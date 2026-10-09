@@ -37,7 +37,7 @@ jobs:
         run: |
           $testCore = 'AdShield.Tests/bin/Release/net10.0-windows10.0.19041.0/core'
           New-Item -ItemType Directory -Path $testCore -Force | Out-Null
-          Copy-Item -Path publish/core/* -Destination $testCore -Force
+          Copy-Item -Path publish/core/* -Destination $testCore -Force -Recurse
           dotnet run --no-build --project AdShield.Tests/AdShield.Tests.csproj -c Release -- --network-tests
           if ($LASTEXITCODE -ne 0) { throw "Network integration tests failed" }
       - name: Package executable
