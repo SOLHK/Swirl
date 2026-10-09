@@ -10,12 +10,16 @@ void Check(bool value, string name)
     Console.WriteLine("PASS: " + name);
 }
 if (args.Length == 1 && args[0] == "--script-runtime-only") { ScriptRuntimeChecks.Pure(Check); await ScriptRuntimeChecks.IntegrationAsync(Check); Console.WriteLine($"All {passed} script runtime checks passed."); return; }
+if (args.Length == 1 && args[0] == "--subscription-only") { SubscriptionChecks.Pure(Check); await SubscriptionChecks.DownloadAsync(Check); Console.WriteLine($"All {passed} subscription checks passed."); return; }
+SubscriptionChecks.Pure(Check);
+await SubscriptionChecks.DownloadAsync(Check);
 NetworkChecks.Pure(Check);
 ScriptRuntimeChecks.Pure(Check);
 SyncRoutingChecks.Run(Check);
 await LoonParityChecks.PureAsync(Check);
 if (args.Length == 1 && args[0] == "--network-tests")
 {
+    await SubscriptionChecks.IntegrationAsync(Check);
     await NetworkChecks.IntegrationAsync(Check);
     await CaptureChecks.RunAsync(Check);
     await LoonParityChecks.TaskRuntimeAsync(Check);

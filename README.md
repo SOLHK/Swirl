@@ -2,7 +2,7 @@
 
 <img src="AdShield/Assets/swirl-256.png" width="112" alt="Swirl 流光风筝图标">
 
-Windows x64 网络工具：Mihomo 代理、规则分流、Loon 明文插件兼容层、HTTPS 改写、JavaScript 脚本与加密配置同步。当前版本 **0.6.0**，支持 Windows 10 2004 及以上版本和 Windows 11，仅开发 Windows 版本。
+Windows x64 网络工具：Mihomo 代理、规则分流、Loon 明文插件兼容层、HTTPS 改写、JavaScript 脚本与加密配置同步。当前版本 **0.6.1**，支持 Windows 10 2004 及以上版本和 Windows 11，仅开发 Windows 版本。
 
 界面采用浅色侧栏、圆角卡片、柔和渐变与独立功能页面，参考 macOS 网络工具的布局。图标使用用户提供的流光风筝。此项目由 AdShield 的网络模块继续开发，删除了爱奇艺和腾讯视频专用暂停广告识别与自动点击功能，广告处理由用户导入的网络规则和插件执行。
 
@@ -10,9 +10,15 @@ Windows x64 网络工具：Mihomo 代理、规则分流、Loon 明文插件兼�
 
 *空配置界面示例；截图未连接代理或启用插件。*
 
+## 0.6.1 订阅兼容修复
+
+订阅下载改用专用客户端标识，默认 Mihomo / Clash Meta，也可在代理节点页选择 Clash 或浏览器请求。支持 HTTPS 原始链接、Clash/Clash Verge/Mihomo 的 install-config 一键链接和整串编码链接。完整订阅转换链接按原服务下载，保留嵌套查询参数，不发送给新的转换站。HTTP 403 发生在下载阶段；可切换请求类型重试。验证码、登录网页或通用 Base64 节点列表会明确提示，不会替换现有配置。有效的独立节点 provider payload 可转为本机 Clash 节点列表。
+
+默认请求标识参考 [MetaCubeX 官方客户端](https://github.com/MetaCubeX/metacubexd)，一键链接格式参考 [Clash Verge 文档](https://www.clash-verge-rev.org/guide/url_schemes)。
+
 ## 安装与开始使用
 
-在 [Actions](https://github.com/SOLHK/Swirl/actions) 中打开最新成功的 **Build Windows EXE**，下载 `Swirl-Setup-win-x64` 安装程序或 `Swirl-win-x64` 便携包。安装程序名为 `Swirl_Setup_0.6.0_x64.exe`。安装程序包含 .NET 运行时、Mihomo、Wintun 与 jq，无需安装另一份 Clash 客户端。安装程序尚未代码签名。
+在 [Actions](https://github.com/SOLHK/Swirl/actions) 中打开最新成功的 **Build Windows EXE**，下载 `Swirl-Setup-win-x64` 安装程序或 `Swirl-win-x64` 便携包。安装程序名为 `Swirl_Setup_0.6.1_x64.exe`。安装程序包含 .NET 运行时、Mihomo、Wintun 与 jq，无需安装另一份 Clash 客户端。安装程序尚未代码签名。
 
 1. 退出旧版。打开 Swirl，进入「节点」导入自己的 **Clash/Mihomo YAML** 或 HTTPS 订阅。软件不提供节点和订阅服务。
 2. 在「总览」选择规则、全局或直连模式，启用系统代理并连接。节点策略组支持选择节点和测延迟。
@@ -71,7 +77,7 @@ dotnet publish AdShield/AdShield.csproj -c Release -r win-x64 --self-contained t
 ./scripts/prepare-core.ps1 -Destination publish/core
 ```
 
-本机完整回归 **180 项通过**：语法、参数、复写顺序、脚本、二进制/API、Cron、加密同步及冲突；真实核心 HTTP/HTTPS、原生 HTTP2 双向修改、同一 HTTP2 连接不同 URL 的命名策略；三模式模拟捕获入口、证书身份、隔离注册表恢复和 11 种协议离线配置验证。测试不改真实系统代理、不全局信任测试 CA、不安装 TUN 路由、不连接真实节点。另对九个页面进行 Windows DPI 截图检查。
+本机完整回归 **243 项通过**：语法、参数、复写顺序、脚本、二进制/API、Cron、加密同步及冲突；真实核心 HTTP/HTTPS、原生 HTTP2 双向修改、同一 HTTP2 连接不同 URL 的命名策略；三模式模拟捕获入口、证书身份、隔离注册表恢复和 11 种协议离线配置验证。测试不改真实系统代理、不全局信任测试 CA、不安装 TUN 路由、不连接真实节点。另对九个页面进行 Windows DPI 截图检查。
 
 HTTP2 正文处理包含针对固定 **Titanium.Web.Proxy 7.0.19** 的窄范围兼容修补，等待异步处理完成并仅对转发前、完整缓冲的正文修改内部状态；升级该依赖须重新验证。原生 HTTP2 及 URL 策略桥接有真实链路测试。
 

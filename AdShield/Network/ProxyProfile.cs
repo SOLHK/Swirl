@@ -10,6 +10,7 @@ internal sealed class ProxyProfile
 {
     public string ProtectedYaml { get; set; } = "";
     public string ProtectedSubscription { get; set; } = "";
+    public SubscriptionClientProfile SubscriptionClient { get; set; } = SubscriptionClientProfile.Mihomo;
     public string Mode { get; set; } = "rule";
     public bool Tun { get; set; }
     public bool Mitm { get; set; }
@@ -39,6 +40,7 @@ internal sealed class ProxyProfile
             profile.ReparsePlugins();
             profile.UserRules ??= new();
             profile.BasicAds = false;
+            if (!Enum.IsDefined(profile.SubscriptionClient)) profile.SubscriptionClient = SubscriptionClientProfile.Mihomo;
             return profile;
         }
         catch { return new(); }
@@ -79,6 +81,46 @@ internal sealed class ProxyProfile
 internal static class MihomoConfig
 {
     internal const int MixedPort = 17890, PluginPort = 17891, ControllerPort = 17909;
+    internal static string ParseSubscription(string yaml)
+    {
+        if (string.IsNullOrWhiteSpace(yaml)) throw new InvalidOperationException("订阅返回了空内容，请检查链接是否仍有效。");
+        if (Encoding.UTF8.GetByteCount(yaml) > 4 * 1024 * 1024) throw new InvalidOperationException("订阅配置超过 4 MB。");
+        string content = yaml.TrimStart('\uFEFF');
+        string start = content.TrimStart();
+        if (start.StartsWith('<')) throw new InvalidOperationException("服务器返回了网页或验证页面，没有返回 Clash/Mihomo 配置。请切换订阅请求类型，或从服务商导出 YAML 文件。");
+        const string nodeListMessage = "服务器返回了通用节点订阅，没有返回 Clash/Mihomo YAML。请在服务商选择 Clash/Mihomo 格式，或切换订阅请求类型后重试。";
+        static bool IsNodeList(string text) => System.Text.RegularExpressions.Regex.IsMatch(text, @"^(?:ssr?|vmess|vless|trojan|hysteria2?|hy2|tuic|socks5?|https?)://", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (IsNodeList(start)) throw new InvalidOperationException(nodeListMessage);
+        // Detect generic node subscriptions for a useful error; never submit
+        // their contents to a new third-party conversion service.
+        try
+        {
+            string base64 = start.Replace('-', '+').Replace('_', '/');
+            base64 += new string('=', (4 - base64.Length % 4) % 4);
+            if (IsNodeList(Encoding.UTF8.GetString(Convert.FromBase64String(base64)).TrimStart())) throw new InvalidOperationException(nodeListMessage);
+        }
+        catch (FormatException) { }
+        Dictionary<string, object> root;
+        try { root = Parse(content); }
+        catch (Exception e) when (e is YamlDotNet.Core.YamlException or ArgumentException or InvalidOperationException)
+        { throw new InvalidOperationException("内容不是有效的 Clash/Mihomo YAML 配置，请确认复制了完整的订阅链接。原有配置未修改。"); }
+        bool ValidNodes(object? value) => value is IEnumerable<object> nodes && value is not string && nodes.Any() && nodes.All(node => node is IDictionary<object, object> map && map.TryGetValue("name", out var name) && name is string n && !string.IsNullOrWhiteSpace(n) && map.TryGetValue("type", out var type) && type is string t && !string.IsNullOrWhiteSpace(t));
+        if (root.TryGetValue("payload", out var payload) && !root.ContainsKey("proxies") && !root.ContainsKey("proxy-providers"))
+        {
+            if (!ValidNodes(payload)) throw new InvalidOperationException("节点文件中的 payload 不是有效的节点列表。");
+            root.Remove("payload"); root["proxies"] = payload;
+            content = new SerializerBuilder().Build().Serialize(root);
+        }
+        bool hasNodes = root.TryGetValue("proxies", out var proxies) && ValidNodes(proxies);
+        bool providerPresent = root.TryGetValue("proxy-providers", out var providers);
+        bool validProviders = providers is null || providers is IDictionary<object, object> maps && maps.All(entry => entry.Key is string key && !string.IsNullOrWhiteSpace(key) && entry.Value is IDictionary<object, object> map && map.TryGetValue("type", out var type) && type is string t && t is "http" or "file" or "inline");
+        bool hasProviders = validProviders && providers is IDictionary<object, object> populated && populated.Count > 0;
+        if (root.ContainsKey("proxies") && proxies is not null && proxies is not IEnumerable<object>) throw new InvalidOperationException("配置中的 proxies 应为节点列表。");
+        if (providerPresent && !validProviders) throw new InvalidOperationException("配置中的 proxy-providers 不是有效的节点提供器列表。");
+        if (root.TryGetValue("proxies", out var nodeValue) && nodeValue is IEnumerable<object> list && list.Any() && !hasNodes) throw new InvalidOperationException("配置中的节点需要有效的 name 和 type。");
+        if (!hasNodes && !hasProviders) throw new InvalidOperationException("返回内容没有 Clash/Mihomo 节点或节点提供器，可能是服务错误或格式不匹配。原有配置未修改。");
+        return content;
+    }
     internal static Dictionary<string, object> Parse(string yaml)
     {
         if (Encoding.UTF8.GetByteCount(yaml) > 4 * 1024 * 1024) throw new InvalidOperationException("配置超过 4 MB。");
@@ -222,7 +264,7 @@ internal static class NetworkFetch
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme != "https" || !string.IsNullOrEmpty(uri.UserInfo))
             throw new InvalidOperationException("请提供 HTTPS 原作者链接或 HTTPS 订阅地址。");
         using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("Swirl/0.6.0 mihomo");
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("Swirl/0.6.1 mihomo");
         using var response = await client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead);
         if (!response.IsSuccessStatusCode) throw new InvalidOperationException("下载失败，HTTP " + (int)response.StatusCode + "；可在浏览器下载后本地导入。");
         if (response.Content.Headers.ContentLength > limit) throw new InvalidOperationException("下载文件过大。");

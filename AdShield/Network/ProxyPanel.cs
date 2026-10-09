@@ -10,7 +10,8 @@ internal sealed class ProxyPanel : UserControl
     private readonly Panel pageHost = new() { Dock = DockStyle.Fill, BackColor = SwirlTheme.Canvas };
     private readonly Dictionary<string, FlowLayoutPanel> pages = new();
     private readonly Dictionary<string, SwirlNav> navigation = new();
-    private readonly TextBox subscription = new() { Width = 620, UseSystemPasswordChar = true, PlaceholderText = "Clash / Mihomo YAML 订阅地址" };
+    private readonly TextBox subscription = new() { Width = 620, UseSystemPasswordChar = true, PlaceholderText = "HTTPS 订阅地址或 Clash 一键导入链接" };
+    private readonly ComboBox subscriptionClient = new() { Width = 320, DropDownStyle = ComboBoxStyle.DropDownList };
     private readonly TextBox pluginUrl = new() { Width = 620, PlaceholderText = "插件原作者链接，或 loon://import?plugin=…" };
     private readonly ComboBox mode = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 200 };
     private readonly ComboBox groups = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 260 };
@@ -66,7 +67,7 @@ internal sealed class ProxyPanel : UserControl
             var nav = new SwirlNav { Text = name, Symbol = symbol, AccessibleName = name };
             navigation.Add(key, nav); nav.Click += (_, _) => SelectPage(key); links.Controls.Add(nav);
         }
-        var footer = new Label { Text = "SWIRL  0.6.0\nWindows · Mihomo", ForeColor = SwirlTheme.Muted, Font = SwirlTheme.Font(8), Dock = DockStyle.Fill, Padding = new Padding(28, 16, 0, 0), BackColor = SwirlTheme.Sidebar, Margin = Padding.Empty };
+        var footer = new Label { Text = "SWIRL  0.6.1\nWindows · Mihomo", ForeColor = SwirlTheme.Muted, Font = SwirlTheme.Font(8), Dock = DockStyle.Fill, Padding = new Padding(28, 16, 0, 0), BackColor = SwirlTheme.Sidebar, Margin = Padding.Empty };
         sidebarLayout.Controls.Add(footer, 0, 1);
         Controls.Add(content); Controls.Add(sidebar);
         var contentLayout = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 2, ColumnCount = 1, BackColor = SwirlTheme.Canvas, Padding = Padding.Empty, Margin = Padding.Empty };
@@ -74,7 +75,7 @@ internal sealed class ProxyPanel : UserControl
         pageHost.Margin = Padding.Empty; status.Dock = DockStyle.Fill; status.Margin = Padding.Empty;
         content.Controls.Add(contentLayout); contentLayout.Controls.Add(pageHost, 0, 0); contentLayout.Controls.Add(status, 0, 1);
         BuildOverview(); BuildNodes(); BuildPlugins(); BuildRouting(); BuildHttps(); BuildScripts(); BuildSync(); BuildLogs(); BuildSettings();
-        foreach (Control control in new Control[] { subscription, pluginUrl, mode, groups, nodes, systemProxy, tun, mitm, pluginList, pluginInfo, argument, pluginPolicy, scriptPlugins, tasks, log, routingRules, ruleKind, rulePolicy, ruleValue, ruleSsid, ruleHttpsHosts, wifiStatus, syncFolder, syncPassword, syncStatus }) SwirlTheme.Prepare(control);
+        foreach (Control control in new Control[] { subscription, subscriptionClient, pluginUrl, mode, groups, nodes, systemProxy, tun, mitm, pluginList, pluginInfo, argument, pluginPolicy, scriptPlugins, tasks, log, routingRules, ruleKind, rulePolicy, ruleValue, ruleSsid, ruleHttpsHosts, wifiStatus, syncFolder, syncPassword, syncStatus }) SwirlTheme.Prepare(control);
         foreach (var field in new[] { subscription, pluginUrl, pluginInfo, argument, pluginPolicy, log, ruleValue, ruleSsid, ruleHttpsHosts, syncFolder, syncPassword }) WrapField(field);
         log.Font = new Font("Cascadia Mono", 9); log.BackColor = Color.FromArgb(251, 252, 255);
         mode.Items.AddRange(new object[] { "规则分流", "全局代理", "全部直连" });
@@ -109,15 +110,23 @@ internal sealed class ProxyPanel : UserControl
         var page = Page("nodes", "代理节点", "导入自己的订阅，选择适合当前网络的线路。");
         var input = Card(page, "订阅与配置", "支持 Clash / Mihomo YAML，地址在本机加密保存。");
         input.Controls.Add(subscription);
+        subscriptionClient.Items.AddRange(new object[] { "Mihomo / Clash Meta（推荐）", "Clash 兼容", "浏览器请求" });
+        Row(input, new Label { Text = "订阅请求类型", AutoSize = true, Padding = new Padding(0, 7, 8, 0) }, subscriptionClient);
+        Note(input, "若相同链接能在其他 Clash 客户端导入，可切换请求类型再更新。支持完整 HTTPS 链接和 Clash 一键导入链接。");
         Row(input, Button("更新订阅", async () => await Mutate(async () =>
         {
-            string address = subscription.Text.Trim(); string yaml = await NetworkFetch.TextAsync(address, 4 * 1024 * 1024); MihomoConfig.Parse(yaml);
-            profile.ProtectedYaml = ProxyProfile.Protect(yaml); profile.ProtectedSubscription = ProxyProfile.Protect(address); profile.Save(); RefreshSummary(); status.Text = "订阅已导入，可以连接并选择节点。";
+            var clientProfile = subscriptionClient.SelectedIndex switch { 1 => SubscriptionClientProfile.Clash, 2 => SubscriptionClientProfile.Browser, _ => SubscriptionClientProfile.Mihomo };
+            status.Text = "正在下载并检查订阅…";
+            var downloaded = await SubscriptionImport.DownloadAsync(subscription.Text, clientProfile);
+            string yaml = MihomoConfig.ParseSubscription(downloaded.Content);
+            profile.ProtectedYaml = ProxyProfile.Protect(yaml); profile.ProtectedSubscription = ProxyProfile.Protect(downloaded.NormalizedSource); profile.SubscriptionClient = clientProfile;
+            profile.Save(); subscription.Text = downloaded.NormalizedSource; RefreshSummary(); status.Text = "订阅已导入，可以连接并选择节点。";
         }), true), Button("导入配置文件", async () => await Mutate(async () =>
         {
             using var dialog = new OpenFileDialog { Filter = "Clash / Mihomo 配置|*.yaml;*.yml|所有文件|*.*" };
             if (dialog.ShowDialog(this) != DialogResult.OK) return;
-            string yaml = await File.ReadAllTextAsync(dialog.FileName); MihomoConfig.Parse(yaml); profile.ProtectedYaml = ProxyProfile.Protect(yaml); profile.Save(); RefreshSummary(); status.Text = "配置已导入，原有节点组与分流规则会保留。";
+            if (new FileInfo(dialog.FileName).Length > 4 * 1024 * 1024) throw new InvalidOperationException("配置文件超过 4 MB。");
+            string yaml = MihomoConfig.ParseSubscription(await File.ReadAllTextAsync(dialog.FileName)); profile.ProtectedYaml = ProxyProfile.Protect(yaml); profile.Save(); RefreshSummary(); status.Text = "配置已导入，原有节点组与分流规则会保留。";
         })), Button("显示地址", () => { subscription.UseSystemPasswordChar = !subscription.UseSystemPasswordChar; return Task.CompletedTask; }));
         var selection = Card(page, "策略组与节点", "连接后加载节点。测速反映当前网络的响应时间。");
         Row(selection, groups, nodes);
@@ -208,7 +217,7 @@ internal sealed class ProxyPanel : UserControl
         var capture = Card(page, "连接方式", "TUN 需要管理员权限；系统代理适用于遵循 Windows 代理设置的应用。");
         capture.Controls.Add(systemProxy); capture.Controls.Add(tun); Row(capture, new Label { Text = "流量模式", AutoSize = true, Margin = new Padding(0, 9, 15, 0) }, mode);
         Row(capture, Button("保存设置", async () => await Mutate(() => { SaveFlags(); status.Text = "设置已保存，下次连接时生效。"; return Task.CompletedTask; }), true));
-        var about = Card(page, "Swirl 0.6.0", "为 Windows 设计的代理与插件工作空间。");
+        var about = Card(page, "Swirl 0.6.1", "为 Windows 设计的代理与插件工作空间。");
         Note(about, "使用 Mihomo 网络核心与本机插件处理器。当前兼容部分 Loon 插件语法和脚本接口；导入时会显示具体不兼容项。");
         Row(about, Button("打开数据目录", () => { Directory.CreateDirectory(ProxyProfile.DirectoryPath); Process.Start(new ProcessStartInfo(ProxyProfile.DirectoryPath) { UseShellExecute = true }); return Task.CompletedTask; }), Button("作者插件中心", () => { Process.Start(new ProcessStartInfo("https://hub.kelee.one/") { UseShellExecute = true }); return Task.CompletedTask; }));
     }
@@ -332,6 +341,7 @@ internal sealed class ProxyPanel : UserControl
     private void LoadProfile()
     {
         try { subscription.Text = profile.Subscription; } catch { status.Text = "订阅无法解密，请重新导入。"; }
+        subscriptionClient.SelectedIndex = profile.SubscriptionClient switch { SubscriptionClientProfile.Clash => 1, SubscriptionClientProfile.Browser => 2, _ => 0 };
         mode.SelectedIndex = profile.Mode == "global" ? 1 : profile.Mode == "direct" ? 2 : 0;
         tun.Checked = profile.Tun; mitm.Checked = profile.Mitm; syncFolder.Text = profile.SyncFolder; RefreshPlugins(); RefreshRules();
     }
@@ -359,7 +369,7 @@ internal sealed class ProxyPanel : UserControl
         if (busy) return;
         if (controller.Running) { MessageBox.Show(this, "请先断开连接，再修改配置或插件。", "连接正在运行"); return; }
         busy = true; start.Enabled = false;
-        try { await action(); } catch (Exception e) { if (!disposed) MessageBox.Show(this, e.Message, "操作未完成"); }
+        try { await action(); } catch (Exception e) { if (!disposed) { status.Text = "操作未完成，请查看提示后重试。"; MessageBox.Show(this, e.Message, "操作未完成"); } }
         finally { busy = false; if (!disposed) { start.Enabled = true; RefreshSummary(); } }
     }
     private void RefreshPlugins(string? selected = null)
