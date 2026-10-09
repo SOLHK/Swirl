@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>Swirl</AssemblyName>
+    <RootNamespace>AdShield</RootNamespace>
+    <Version>0.6.0</Version>
+    <ApplicationIcon>Assets\swirl.ico</ApplicationIcon>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+  </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Assets\swirl-256.png" LogicalName="Swirl.Icon.png" />
+    <EmbeddedResource Include="Assets\swirl.ico" LogicalName="Swirl.Icon.ico" />
+    <PackageReference Include="YamlDotNet" Version="16.3.0" />
+    <PackageReference Include="Titanium.Web.Proxy" Version="7.0.19" />
+    <PackageReference Include="Jint" Version="4.17.0" />
+  </ItemGroup>
+</Project>

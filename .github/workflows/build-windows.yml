@@ -1,0 +1,76 @@
+name: Build Windows EXE
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Publish Windows x64 single-file executable
+        shell: pwsh
+        run: |
+          dotnet restore AdShield/AdShield.csproj -r win-x64
+          dotnet publish AdShield/AdShield.csproj --no-restore -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=false -p:DebugType=None -p:DebugSymbols=false -o publish
+          if (-not (Test-Path publish/Swirl.exe)) { throw "Swirl.exe not produced" }
+          Get-Item publish/Swirl.exe | Select-Object Name,Length
+      - name: Include verified Mihomo core and license
+        shell: pwsh
+        run: ./scripts/prepare-core.ps1 -Destination publish/core
+      - name: Test plugin syntax and request guards
+        shell: pwsh
+        run: dotnet run --project AdShield.Tests/AdShield.Tests.csproj -c Release
+      - name: Test core, captured traffic, scripts and schedules
+        shell: pwsh
+        run: |
+          $testCore = 'AdShield.Tests/bin/Release/net10.0-windows10.0.19041.0/core'
+          New-Item -ItemType Directory -Path $testCore -Force | Out-Null
+          Copy-Item -Path publish/core/* -Destination $testCore -Force
+          dotnet run --no-build --project AdShield.Tests/AdShield.Tests.csproj -c Release -- --network-tests
+          if ($LASTEXITCODE -ne 0) { throw "Network integration tests failed" }
+      - name: Package executable
+        shell: pwsh
+        run: |
+          Compress-Archive -Path publish/* -DestinationPath Swirl-win-x64.zip -Force
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup --yes --no-progress --limit-output
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup installation failed: $LASTEXITCODE" }
+      - name: Build standard Windows installer
+        shell: pwsh
+        run: |
+          $compiler = (Get-Command ISCC.exe -ErrorAction SilentlyContinue).Source
+          if (-not $compiler) {
+            $compiler = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\\ISCC.exe'
+          }
+          if (-not (Test-Path $compiler)) { throw "ISCC.exe not found: $compiler" }
+          & $compiler "installer/AdShield.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Installer compilation failed: $LASTEXITCODE" }
+          $installer = 'dist/Swirl_Setup_0.6.0_x64.exe'
+          if (-not (Test-Path $installer)) { throw "Setup EXE not produced" }
+          Get-Item $installer | Select-Object Name,Length
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-Setup-win-x64
+          path: dist/Swirl_Setup_0.6.0_x64.exe
+          if-no-files-found: error
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-win-x64
+          path: Swirl-win-x64.zip
+          if-no-files-found: error
