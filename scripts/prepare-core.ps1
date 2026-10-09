@@ -9,6 +9,7 @@ $coreExpectedHash = '00549b347d8e124600e46cac67d59293358454f465e9d86d2511567da56
 $coreSourceUrl = "https://github.com/MetaCubeX/mihomo/releases/download/$coreVersion/$coreArchiveName"
 $coreDestination = [IO.Path]::GetFullPath($Destination)
 $coreDownloadedHere = $false
+& (Join-Path $PSScriptRoot 'prepare-geodata.ps1') -Destination (Join-Path $coreDestination 'geodata')
 New-Item -ItemType Directory -Path $coreDestination -Force | Out-Null
 if (-not $Archive) {
     $Archive = Join-Path $coreDestination $coreArchiveName

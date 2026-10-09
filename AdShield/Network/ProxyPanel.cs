@@ -67,7 +67,7 @@ internal sealed class ProxyPanel : UserControl
             var nav = new SwirlNav { Text = name, Symbol = symbol, AccessibleName = name };
             navigation.Add(key, nav); nav.Click += (_, _) => SelectPage(key); links.Controls.Add(nav);
         }
-        var footer = new Label { Text = "SWIRL  0.6.1\nWindows · Mihomo", ForeColor = SwirlTheme.Muted, Font = SwirlTheme.Font(8), Dock = DockStyle.Fill, Padding = new Padding(28, 16, 0, 0), BackColor = SwirlTheme.Sidebar, Margin = Padding.Empty };
+        var footer = new Label { Text = "SWIRL  0.6.2\nWindows · Mihomo", ForeColor = SwirlTheme.Muted, Font = SwirlTheme.Font(8), Dock = DockStyle.Fill, Padding = new Padding(28, 16, 0, 0), BackColor = SwirlTheme.Sidebar, Margin = Padding.Empty };
         sidebarLayout.Controls.Add(footer, 0, 1);
         Controls.Add(content); Controls.Add(sidebar);
         var contentLayout = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 2, ColumnCount = 1, BackColor = SwirlTheme.Canvas, Padding = Padding.Empty, Margin = Padding.Empty };
@@ -128,6 +128,13 @@ internal sealed class ProxyPanel : UserControl
             if (new FileInfo(dialog.FileName).Length > 4 * 1024 * 1024) throw new InvalidOperationException("配置文件超过 4 MB。");
             string yaml = MihomoConfig.ParseSubscription(await File.ReadAllTextAsync(dialog.FileName)); profile.ProtectedYaml = ProxyProfile.Protect(yaml); profile.Save(); RefreshSummary(); status.Text = "配置已导入，原有节点组与分流规则会保留。";
         })), Button("显示地址", () => { subscription.UseSystemPasswordChar = !subscription.UseSystemPasswordChar; return Task.CompletedTask; }));
+        Row(input, Button("检查配置", async () => await Mutate(async () =>
+        {
+            if (string.IsNullOrEmpty(profile.ProtectedYaml)) throw new InvalidOperationException("请先导入订阅或配置文件。");
+            SaveFlags(); status.Text = "正在检查配置、节点和分流规则…";
+            await controller.ValidateAsync(profile);
+            Report("配置、节点和分流规则检查通过。"); status.Text = "配置检查通过，可以连接网络。";
+        })));
         var selection = Card(page, "策略组与节点", "连接后加载节点。测速反映当前网络的响应时间。");
         Row(selection, groups, nodes);
         Row(selection, Button("切换节点", async () =>
@@ -217,7 +224,7 @@ internal sealed class ProxyPanel : UserControl
         var capture = Card(page, "连接方式", "TUN 需要管理员权限；系统代理适用于遵循 Windows 代理设置的应用。");
         capture.Controls.Add(systemProxy); capture.Controls.Add(tun); Row(capture, new Label { Text = "流量模式", AutoSize = true, Margin = new Padding(0, 9, 15, 0) }, mode);
         Row(capture, Button("保存设置", async () => await Mutate(() => { SaveFlags(); status.Text = "设置已保存，下次连接时生效。"; return Task.CompletedTask; }), true));
-        var about = Card(page, "Swirl 0.6.1", "为 Windows 设计的代理与插件工作空间。");
+        var about = Card(page, "Swirl 0.6.2", "为 Windows 设计的代理与插件工作空间。");
         Note(about, "使用 Mihomo 网络核心与本机插件处理器。当前兼容部分 Loon 插件语法和脚本接口；导入时会显示具体不兼容项。");
         Row(about, Button("打开数据目录", () => { Directory.CreateDirectory(ProxyProfile.DirectoryPath); Process.Start(new ProcessStartInfo(ProxyProfile.DirectoryPath) { UseShellExecute = true }); return Task.CompletedTask; }), Button("作者插件中心", () => { Process.Start(new ProcessStartInfo("https://hub.kelee.one/") { UseShellExecute = true }); return Task.CompletedTask; }));
     }
@@ -357,7 +364,15 @@ internal sealed class ProxyPanel : UserControl
             connectionTitle.Text = "已连接，自由流动"; connectionDetail.Text = (profile.Tun ? "TUN 已接管" : "系统代理已启用") + (profile.Mitm ? " · HTTPS 插件已开启" : " · HTTPS 解密未开启");
             status.Text = "连接已建立 · 可在代理节点中选择线路";
         }
-        catch (Exception e) { if (!disposed) status.Text = e.Message; }
+        catch (Exception e)
+        {
+            if (!disposed)
+            {
+                status.Text = "连接未完成 · 请查看运行记录"; Report(e.Message);
+                connectionTitle.Text = "连接未完成"; connectionDetail.Text = "详细原因已记录，可修正后重试。";
+                MessageBox.Show(this, e.Message, "连接未完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
         finally { busy = false; if (!disposed) { start.Enabled = !controller.Running; RefreshSummary(); } }
     }
     private void Stop()

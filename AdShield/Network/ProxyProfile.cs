@@ -264,7 +264,7 @@ internal static class NetworkFetch
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme != "https" || !string.IsNullOrEmpty(uri.UserInfo))
             throw new InvalidOperationException("请提供 HTTPS 原作者链接或 HTTPS 订阅地址。");
         using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("Swirl/0.6.1 mihomo");
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("Swirl/0.6.2 mihomo");
         using var response = await client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead);
         if (!response.IsSuccessStatusCode) throw new InvalidOperationException("下载失败，HTTP " + (int)response.StatusCode + "；可在浏览器下载后本地导入。");
         if (response.Content.Headers.ContentLength > limit) throw new InvalidOperationException("下载文件过大。");

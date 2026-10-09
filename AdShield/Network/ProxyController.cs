@@ -38,11 +38,7 @@ internal sealed class ProxyController : IDisposable
             try { probe.Start(); } catch (SocketException) { throw new InvalidOperationException("本机端口 " + port + " 已占用，请关闭另一份 Swirl 或修改冲突应用。"); }
         }
         secret = Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
-        string runtime = Path.Combine(ProxyProfile.DirectoryPath, "runtime");
-        Directory.CreateDirectory(runtime);
-        string filename = Path.Combine(runtime, "config.yaml");
-        File.WriteAllText(filename, MihomoConfig.Build(profile, secret), new UTF8Encoding(false));
-        await TestConfigAsync(runtime, filename);
+        var (runtime, filename) = await PrepareConfigAsync(profile, secret);
         lifetime.Token.ThrowIfCancellationRequested();
         try
         {
@@ -93,6 +89,25 @@ internal sealed class ProxyController : IDisposable
         catch { Stop(); throw; }
     }
 
+    internal async Task ValidateAsync(ProxyProfile profile)
+    {
+        if (Running) throw new InvalidOperationException("请先断开连接，再检查配置。");
+        await PrepareConfigAsync(profile, Convert.ToHexString(RandomNumberGenerator.GetBytes(24)));
+    }
+    private async Task<(string Directory, string File)> PrepareConfigAsync(ProxyProfile profile, string controllerSecret)
+    {
+        if (!File.Exists(CorePath)) throw new InvalidOperationException("缺少随软件提供的 core/mihomo.exe，请完整安装或解压。");
+        string runtime = Path.Combine(ProxyProfile.DirectoryPath, "runtime");
+        Directory.CreateDirectory(runtime);
+        report("正在准备本地分流数据库…");
+        int installed = await Task.Run(() => CoreAssets.Prepare(profile, runtime), lifetime.Token);
+        if (installed > 0) report("已准备 " + installed + " 份本地分流数据库。");
+        string filename = Path.Combine(runtime, "config.yaml");
+        File.WriteAllText(filename, MihomoConfig.Build(profile, controllerSecret), new UTF8Encoding(false));
+        report("正在检查配置、节点和分流规则…");
+        await TestConfigAsync(runtime, filename);
+        return (runtime, filename);
+    }
     internal static ProcessStartInfo StartInfo(string directory, string filename)
     {
         var start = new ProcessStartInfo(CorePath) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true, WorkingDirectory = directory };
@@ -100,7 +115,7 @@ internal sealed class ProxyController : IDisposable
         start.ArgumentList.Add("-f"); start.ArgumentList.Add(filename);
         return start;
     }
-    private async Task TestConfigAsync(string directory, string filename)
+    internal async Task TestConfigAsync(string directory, string filename)
     {
         var start = StartInfo(directory, filename);
         start.ArgumentList.Add("-t");
@@ -110,9 +125,15 @@ internal sealed class ProxyController : IDisposable
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
         timeout.CancelAfter(TimeSpan.FromSeconds(30));
         try { await process.WaitForExitAsync(timeout.Token); }
-        catch { if (!process.HasExited) process.Kill(true); throw new InvalidOperationException("配置检查超时或已取消。"); }
+        catch (OperationCanceledException)
+        {
+            if (!process.HasExited) process.Kill(true);
+            await process.WaitForExitAsync(); await Task.WhenAll(output, errors);
+            lifetime.Token.ThrowIfCancellationRequested();
+            throw new InvalidOperationException("配置检查超时：默认分流数据库已在本地准备，请检查自定义 GEO 来源或节点 / 规则提供器是否可以下载。");
+        }
         await Task.WhenAll(output, errors);
-        if (process.ExitCode != 0) throw new InvalidOperationException("Mihomo 拒绝了配置。请检查 Clash/Mihomo 格式、规则和节点；为保护订阅密钥，不展示原始核心日志。");
+        if (process.ExitCode != 0) throw new InvalidOperationException(CoreDiagnostics.Describe(output.Result + "\n" + errors.Result, process.ExitCode));
     }
     private async Task<HttpResponseMessage> RequestAsync(HttpMethod method, string path, object? data = null)
     {

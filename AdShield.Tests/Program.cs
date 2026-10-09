@@ -11,6 +11,8 @@ void Check(bool value, string name)
 }
 if (args.Length == 1 && args[0] == "--script-runtime-only") { ScriptRuntimeChecks.Pure(Check); await ScriptRuntimeChecks.IntegrationAsync(Check); Console.WriteLine($"All {passed} script runtime checks passed."); return; }
 if (args.Length == 1 && args[0] == "--subscription-only") { SubscriptionChecks.Pure(Check); await SubscriptionChecks.DownloadAsync(Check); Console.WriteLine($"All {passed} subscription checks passed."); return; }
+if (args.Length == 1 && args[0] == "--core-startup-only") { CoreStartupChecks.Pure(Check); await CoreStartupChecks.RunAsync(Check); Console.WriteLine($"All {passed} core startup checks passed."); return; }
+CoreStartupChecks.Pure(Check);
 SubscriptionChecks.Pure(Check);
 await SubscriptionChecks.DownloadAsync(Check);
 NetworkChecks.Pure(Check);
@@ -25,6 +27,7 @@ if (args.Length == 1 && args[0] == "--network-tests")
     await LoonParityChecks.TaskRuntimeAsync(Check);
     await ScriptRuntimeChecks.IntegrationAsync(Check);
     await ProtocolConfigChecks.RunAsync(Check);
+    await CoreStartupChecks.RunAsync(Check);
 }
 if (args.Length == 2 && args[0] == "--render-proxy-ui")
 {

@@ -59,14 +59,14 @@ jobs:
           if (-not (Test-Path $compiler)) { throw "ISCC.exe not found: $compiler" }
           & $compiler "installer/AdShield.iss"
           if ($LASTEXITCODE -ne 0) { throw "Installer compilation failed: $LASTEXITCODE" }
-          $installer = 'dist/Swirl_Setup_0.6.1_x64.exe'
+          $installer = 'dist/Swirl_Setup_0.6.2_x64.exe'
           if (-not (Test-Path $installer)) { throw "Setup EXE not produced" }
           Get-Item $installer | Select-Object Name,Length
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
           name: Swirl-Setup-win-x64
-          path: dist/Swirl_Setup_0.6.1_x64.exe
+          path: dist/Swirl_Setup_0.6.2_x64.exe
           if-no-files-found: error
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
