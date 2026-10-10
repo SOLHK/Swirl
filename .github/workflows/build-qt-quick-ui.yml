@@ -49,7 +49,11 @@ jobs:
           # Explicitly wait for the real Qt process so smoke tests cannot false-pass.
           $exe = (Resolve-Path "dist/SwirlQuick.exe").Path
           $process = Start-Process -FilePath $exe -ArgumentList "--smoke-test" -Wait -PassThru -NoNewWindow
-          if ($process.ExitCode -ne 0) { throw "Qt Quick startup failed: $($process.ExitCode)" }
+          if ($process.ExitCode -ne 0) {
+            $diag = Join-Path (Resolve-Path "dist").Path "SwirlQuick-diagnostics.txt"
+            if (Test-Path $diag) { Get-Content $diag | Select-Object -Last 160 }
+            throw "Qt Quick startup failed: $($process.ExitCode)"
+          }
       - name: Capture optional UI screenshots (offscreen software renderer)
         shell: pwsh
         run: |
@@ -64,7 +68,11 @@ jobs:
             $path = Join-Path (Resolve-Path "dist").Path $preview.file
             $args = @("--capture-preview=$path", "--preview-page=$($preview.page)", "--preview-theme=$($preview.theme)")
             $process = Start-Process -FilePath $exe -ArgumentList $args -Wait -PassThru -NoNewWindow
-            if ($process.ExitCode -ne 0) { throw "Qt Quick preview exited with $($process.ExitCode)" }
+            if ($process.ExitCode -ne 0) {
+              $diag = Join-Path (Resolve-Path "dist").Path "SwirlQuick-diagnostics.txt"
+              if (Test-Path $diag) { Get-Content $diag | Select-Object -Last 160 }
+              throw "Qt Quick preview exited with $($process.ExitCode)"
+            }
             if (!(Test-Path $path)) { throw "Missing screenshot: $path" }
             if ((Get-Item $path).Length -lt 2048) { throw "Screenshot is suspiciously small: $path" }
             Write-Host "Verified Qt screenshot: $path"
