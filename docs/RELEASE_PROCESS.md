@@ -33,12 +33,31 @@
 
 当前 GitHub App 连接不包含管理分支保护规则的权限，**此 Markdown 不是实际 GitHub 分支保护**。仓库所有者必须在 [Settings → Rules → Rulesets](https://github.com/SOLHK/Swirl/settings/rules) 添加规则，并确认状态为 **Active**。
 
+### 最简启用方式：拥有管理员权限的 Windows 电脑
+
+仓库已提供 [一键规则配置脚本](../scripts/configure-branch-rulesets.ps1)，使用 GitHub CLI 登录自己的 GitHub 账号，**无需向任何聊天或机器人发送 Token**：
+
+```powershell
+# 首次配置，先安装 GitHub CLI：https://cli.github.com/
+gh auth login
+
+# 在仓库目录中预览，不修改任何设置
+powershell -ExecutionPolicy Bypass -File scripts/configure-branch-rulesets.ps1
+
+# 检查无误后，由仓库管理员创建 ACTIVE 规则
+powershell -ExecutionPolicy Bypass -File scripts/configure-branch-rulesets.ps1 -Apply
+```
+
+脚本默认只做预览；`-Apply` 才会创建。若同名规则已存在，脚本只提示、不覆盖；需要更新请前往 GitHub Rulesets 页面调整。实际要求的 **required status check job 名称**为：正式版 `build`、`build-qt-ui`、`production-gate`；测试版 `build`、`build-qt-ui`。正式版和测试版均禁止直接推送、强制推送和删除，需要通过 PR 合并；脚本不添加绕过对象。
+
+**特别说明：** 本流程保留手动发布许可。CI 可以要求 `release-approved` 标签，但 GitHub 本身不会读取私下的“推送正式版”指令。因此只有你确认发布，才能授权添加标签和手动合并；没有启用 Ruleset 前 CI 只是提示而不是硬性阻止。
+
 ### 规则 1：Protect main (required)
 
 - Target branches：`main`
 - Restrict deletions 和 Block force pushes
 - Require a pull request before merging（禁止直接推送）
-- Require status checks to pass：`production-gate`、Windows 构建与 Qt UI CI（检查名称以 GitHub 实际运行名称为准）
+- Require status checks to pass：`production-gate`、`build`、`build-qt-ui`（必须精确匹配 job 名）
 - Require conversation resolution（如设置可用）
 - 不设置自动合并，不设置任何通用的自动发布权限
 - 若只有一个维护者，慎用“必须由其他人 Review”以免自己无法发布。需要至少一名独立审核者才启用该选项。
@@ -47,7 +66,7 @@
 
 - Target branches：`test`
 - Restrict deletions 和 Block force pushes
-- 新功能通过 PR 进入 `test`；要求 Qt CI 成功
+- 新功能通过 PR 进入 `test`；要求 `build` 和 `build-qt-ui` CI 均成功
 - CI 预览包仅供测试使用，不自动发正式 Release
 
 **注意：只有 GitHub 仓库 Ruleset / Branch protection 真正启用后，才具备防止误推正式版的技术性强制保护。** 工作流、标签与文档本身不能阻止拥有写权限的人员直接推送未保护的 `main`。
