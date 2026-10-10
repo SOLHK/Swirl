@@ -19,9 +19,9 @@ Item {
         anchors.fill:parent; anchors.margins:23; spacing:14
         RowLayout {
             Layout.fillWidth:true
-            SwirlStatusBadge { label:"NO LIVE INTERCEPTION"; tone:"warning" }
-            Text { text:"Modify synthetic paused requests without touching the network"; color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
-            SwirlButton { text:"Add breakpoint"; primary:true; onClicked:ruleDialog.open() }
+            SwirlStatusBadge { label:"未启用实时拦截"; tone:"warning" }
+            Text { text:"仅编辑模拟暂停请求，不会影响实际网络"; color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
+            SwirlButton { text:"添加断点"; primary:true; onClicked:ruleDialog.open() }
         }
         SwirlGlassPanel {
             Layout.fillWidth:true; Layout.preferredHeight:88
@@ -29,11 +29,11 @@ Item {
                 anchors.fill:parent; anchors.margins:18; spacing:15
                 ColumnLayout {
                     Layout.fillWidth:true; spacing:5
-                    Text { text:"Breakpoint queue"; color:Theme.text; font.pixelSize:18; font.weight:Font.DemiBold }
-                    Text { text:"Requests are frozen local fixtures. No browser is paused."; color:Theme.muted; font.pixelSize:11 }
+                    Text { text:"断点队列"; color:Theme.text; font.pixelSize:18; font.weight:Font.DemiBold }
+                    Text { text:"请求均为本地模拟数据，不会暂停浏览器。"; color:Theme.muted; font.pixelSize:11 }
                 }
-                SwirlStatusBadge { label:page.records.filter(function(r){return r.status==="Paused"}).length+" PAUSED"; tone:"accent" }
-                SwirlButton { text:"Resume all (demo)"; onClicked:{
+                SwirlStatusBadge { label:page.records.filter(function(r){return r.status==="Paused"}).length+" 已暂停"; tone:"accent" }
+                SwirlButton { text:"全部继续（演示）"; onClicked:{
                     page.records=page.records.map(function(r){return {id:r.id,method:r.method,url:r.url,host:r.host,status:"Continued",time:r.time}})
                 }}
             }
@@ -46,7 +46,7 @@ Item {
                     anchors.fill:parent; anchors.margins:1
                     rows:page.records
                     selectedId:page.selected?page.selected.id:""
-                    columns:[{key:"method",label:"METHOD",w:87},{key:"url",label:"REQUEST PATH",w:215},
+                    columns:[{key:"method",label:"METHOD",w:87},{key:"url",label:"请求路径",w:215},
                              {key:"status",label:"STATE",w:119},{key:"time",label:"TIME",w:98}]
                     onRowSelected:function(r){page.selected=r}
                 }
@@ -57,12 +57,12 @@ Item {
                     anchors.fill:parent; anchors.margins:17; spacing:13
                     RowLayout {
                         Layout.fillWidth:true
-                        Text { text:"Paused request editor"; color:Theme.text; font.pixelSize:17; font.weight:Font.DemiBold; Layout.fillWidth:true }
-                        SwirlStatusBadge { label:page.selected?page.selected.status:"NO SELECTION"; tone:"accent" }
+                        Text { text:"暂停请求编辑器"; color:Theme.text; font.pixelSize:17; font.weight:Font.DemiBold; Layout.fillWidth:true }
+                        SwirlStatusBadge { label:page.selected?page.selected.status:"尚未选择"; tone:"accent" }
                     }
                     Text {
                         Layout.fillWidth:true; elide:Text.ElideMiddle; color:Theme.muted; font.pixelSize:12
-                        text:page.selected?("https://"+page.selected.host+page.selected.url):"Select a request to inspect"
+                        text:page.selected?("https://"+page.selected.host+page.selected.url):"选择请求后查看详情"
                     }
                     RowLayout {
                         Layout.fillWidth:true
@@ -93,7 +93,7 @@ Item {
                             onClicked:page.changeStatus("Continued")
                         }
                         SwirlButton {
-                            text:"Modify & Continue"; enabled:page.selected&&page.selected.status==="Paused"
+                            text:"修改并继续"; enabled:page.selected&&page.selected.status==="Paused"
                             onClicked:{page.payload=editor.text;page.changeStatus("Modified")}
                         }
                         SwirlButton {
@@ -114,18 +114,18 @@ Item {
         AppState.notice("Breakpoint "+status)
     }
     SwirlDialog {
-        id:ruleDialog; title:"Add breakpoint matcher"
+        id:ruleDialog; title:"添加断点匹配条件"
         ColumnLayout {
             width:parent.width; spacing:12
-            Text { text:"URL match expression"; color:Theme.text }
+            Text { text:"URL 匹配表达式"; color:Theme.text }
             SwirlTextField { id:matcher; Layout.fillWidth:true; placeholderText:"/api/*" }
-            Text { text:"Request phase"; color:Theme.text }
-            SwirlComboBox { model:["Before request","After response"] }
+            Text { text:"请求阶段"; color:Theme.text }
+            SwirlComboBox { model:["发送请求前","收到响应后"] }
             RowLayout {
                 Layout.alignment:Qt.AlignRight
                 SwirlButton { text:"Cancel"; onClicked:ruleDialog.close() }
-                SwirlButton { text:"Add demo"; primary:true; enabled:matcher.text.trim().length>0
-                    onClicked:{AppState.notice("Add breakpoint matcher");ruleDialog.close();matcher.text=""}
+                SwirlButton { text:"添加演示"; primary:true; enabled:matcher.text.trim().length>0
+                    onClicked:{AppState.notice("添加断点匹配条件");ruleDialog.close();matcher.text=""}
                 }
             }
         }

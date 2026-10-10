@@ -13,10 +13,10 @@ Item {
         anchors.fill:parent; anchors.margins:23; spacing:12
         RowLayout {
             Layout.fillWidth:true
-            SwirlStatusBadge { label:"JAVASCRIPT · UI ONLY"; tone:"accent" }
-            Text { text:"Edit source safely. No script is executed."; color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
-            SwirlButton { text:"Import"; iconName:"folder"; onClicked:AppState.notice("Import script") }
-            SwirlButton { text:"New script"; primary:true; onClicked:newDialog.open() }
+            SwirlStatusBadge { label:"JavaScript · 仅界面演示"; tone:"accent" }
+            Text { text:"可以编辑源码，不会实际运行脚本。"; color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
+            SwirlButton { text:"Import"; iconName:"folder"; onClicked:AppState.notice("导入脚本") }
+            SwirlButton { text:"新建脚本"; primary:true; onClicked:newDialog.open() }
         }
         SplitView {
             Layout.fillWidth:true; Layout.fillHeight:true
@@ -26,8 +26,8 @@ Item {
                 SplitView.preferredWidth:240; SplitView.minimumWidth:175
                 ColumnLayout {
                     anchors.fill:parent; anchors.margins:14; spacing:12
-                    Text { text:"Script library"; color:Theme.text; font.pixelSize:15; font.weight:Font.DemiBold }
-                    SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:"Filter scripts" }
+                    Text { text:"脚本库"; color:Theme.text; font.pixelSize:15; font.weight:Font.DemiBold }
+                    SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:"搜索脚本" }
                     ListView {
                         Layout.fillWidth:true; Layout.fillHeight:true
                         clip:true
@@ -44,7 +44,7 @@ Item {
                             MouseArea { id:area; anchors.fill:parent; hoverEnabled:true; onClicked:page.selectedScript=modelData }
                         }
                     }
-                    SwirlButton { Layout.fillWidth:true; text:"Script settings"; onClicked:AppState.notice("Script settings") }
+                    SwirlButton { Layout.fillWidth:true; text:"脚本设置"; onClicked:AppState.notice("脚本设置") }
                 }
             }
             SwirlGlassPanel {
@@ -54,18 +54,18 @@ Item {
                     RowLayout {
                         Layout.fillWidth:true
                         Text { text:page.selectedScript; color:Theme.text; font.pixelSize:14; font.weight:Font.DemiBold; Layout.fillWidth:true; elide:Text.ElideRight }
-                        SwirlStatusBadge { label:"EDITABLE DEMO"; tone:"success" }
+                        SwirlStatusBadge { label:"可编辑演示"; tone:"success" }
                     }
                     RowLayout {
                         Layout.fillWidth:true
-                        SwirlComboBox { model:["Response Script","Request Script","Cron Script","Network Event"] }
+                        SwirlComboBox { model:["响应脚本","请求脚本","定时脚本","网络事件"] }
                         Item { Layout.fillWidth:true }
-                        SwirlButton { text:"Save preview"; onClicked:AppState.notice("Save script") }
+                        SwirlButton { text:"保存预览"; onClicked:AppState.notice("保存脚本") }
                         SwirlButton {
                             text:"Run"; primary:true; iconName:"play"
                             onClicked:{
                                 page.consoleText+="\n[demo] Run requested; backend not connected."
-                                AppState.notice("Script execution")
+                                AppState.notice("脚本执行")
                             }
                         }
                     }
@@ -106,14 +106,14 @@ Item {
                             }
                         }
                     }
-                    Text { text:"Native C++ syntax highlighting · editing remains local"; color:Theme.muted; font.pixelSize:11 }
+                    Text { text:"原生 C++ 语法高亮 · 仅本地编辑"; color:Theme.muted; font.pixelSize:11 }
                 }
             }
             SwirlGlassPanel {
                 SplitView.preferredWidth:270; SplitView.minimumWidth:200
                 ColumnLayout {
                     anchors.fill:parent; anchors.margins:15; spacing:12
-                    Text { text:"Execution & debugging"; color:Theme.text; font.pixelSize:15; font.weight:Font.DemiBold }
+                    Text { text:"执行与调试"; color:Theme.text; font.pixelSize:15; font.weight:Font.DemiBold }
                     Text { text:"Type     HTTP Response\nStatus   Not connected\nLast run Never"; color:Theme.muted; lineHeight:1.6; font.pixelSize:12 }
                     Rectangle { Layout.fillWidth:true; height:1; color:Theme.border }
                     Text { text:"Console"; color:Theme.text; font.pixelSize:13; font.weight:Font.DemiBold }
@@ -129,18 +129,18 @@ Item {
                             background:Rectangle { color:Theme.field; radius:8 }
                         }
                     }
-                    SwirlButton { Layout.fillWidth:true; text:"Clear console"; onClicked:page.consoleText="" }
+                    SwirlButton { Layout.fillWidth:true; text:"清空控制台"; onClicked:page.consoleText="" }
                 }
             }
         }
     }
     SwirlDialog {
-        id:newDialog; title:"Create script preview"
+        id:newDialog; title:"新建脚本预览"
         ColumnLayout {
             width:parent.width; spacing:12
-            Text { text:"Script filename"; color:Theme.text }
+            Text { text:"脚本文件名"; color:Theme.text }
             SwirlTextField { id:newName; Layout.fillWidth:true; placeholderText:"example.js" }
-            Text { text:newName.text.trim().endsWith(".js")?"Demo only. No file will be saved.":"Filename must end in .js"; color:Theme.muted; font.pixelSize:12 }
+            Text { text:newName.text.trim().endsWith(".js")?"仅供演示，不会保存文件。":"文件名必须以 .js 结尾"; color:Theme.muted; font.pixelSize:12 }
             RowLayout {
                 Layout.alignment:Qt.AlignRight
                 SwirlButton { text:"Cancel"; onClicked:newDialog.close() }

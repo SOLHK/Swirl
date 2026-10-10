@@ -6,19 +6,19 @@ import "../components"
 import "../controls"
 Item {
     id:page
-    property string tool:"DNS Lookup"
+    property string tool:"DNS 查询"
     property string result:"No test has been run.\nEnter a target and choose Run demo."
-    property var tools:["DNS Lookup","TCP Ping","Traceroute","HTTP Request","TLS Certificate Inspector","Port Check","IP Lookup","Whois","Connectivity Test","Network Interface Info"]
+    property var tools:["DNS 查询","TCP 连通性","Traceroute","HTTP 请求","TLS 证书检查","端口检查","IP 地址查询","Whois","连接测试","网络接口信息"]
     ColumnLayout {
         anchors.fill:parent; anchors.margins:23; spacing:14
-        Text { text:"Select a diagnostic tool. All results are local examples."; color:Theme.muted; font.pixelSize:12 }
+        Text { text:"选择网络诊断工具，结果均为本地模拟。"; color:Theme.muted; font.pixelSize:12 }
         RowLayout {
             Layout.fillWidth:true; Layout.fillHeight:true; spacing:15
             SwirlGlassPanel {
                 Layout.preferredWidth:235; Layout.fillHeight:true
                 ColumnLayout {
                     anchors.fill:parent; anchors.margins:13; spacing:9
-                    Text { text:"NETWORK UTILITIES"; color:Theme.muted; font.pixelSize:11; leftPadding:8 }
+                    Text { text:"网络实用工具"; color:Theme.muted; font.pixelSize:11; leftPadding:8 }
                     ListView {
                         Layout.fillWidth:true; Layout.fillHeight:true; clip:true; spacing:4
                         model:page.tools
@@ -44,38 +44,38 @@ Item {
                         ColumnLayout {
                             Layout.fillWidth:true
                             Text { text:page.tool; color:Theme.text; font.pixelSize:22; font.weight:Font.DemiBold }
-                            Text { text:"Standalone inspection panel"; color:Theme.muted; font.pixelSize:12 }
+                            Text { text:"独立检查面板"; color:Theme.muted; font.pixelSize:12 }
                         }
-                        SwirlStatusBadge { label:"LOCAL SIMULATION"; tone:"accent" }
+                        SwirlStatusBadge { label:"本地模拟"; tone:"accent" }
                     }
                     Rectangle { Layout.fillWidth:true; height:1; color:Theme.border }
-                    Text { text:page.tool==="Network Interface Info"?"Interface name":"Target host, address or URL"; color:Theme.text; font.pixelSize:13 }
+                    Text { text:page.tool==="网络接口信息"?"网卡名称":"目标域名、地址或 URL"; color:Theme.text; font.pixelSize:13 }
                     SwirlTextField {
                         id:target; Layout.fillWidth:true
-                        placeholderText:page.tool==="HTTP Request"?"https://example.test/path":"example.test"
+                        placeholderText:page.tool==="HTTP 请求"?"https://example.test/path":"example.test"
                     }
                     RowLayout {
                         Layout.fillWidth:true
                         SwirlComboBox {
-                            visible:page.tool==="HTTP Request"
+                            visible:page.tool==="HTTP 请求"
                             model:["GET","POST","PUT","DELETE","HEAD"]
                         }
                         SwirlTextField {
-                            visible:page.tool==="Port Check" || page.tool==="TCP Ping"
+                            visible:page.tool==="端口检查" || page.tool==="TCP 连通性"
                             Layout.preferredWidth:130
-                            placeholderText:"Port (443)"
+                            placeholderText:"端口（443）"
                             validator:IntValidator { bottom:1; top:65535 }
                         }
                         Item { Layout.fillWidth:true }
                         SwirlButton {
-                            text:"Run demo"; primary:true; iconName:"play"
+                            text:"运行演示"; primary:true; iconName:"play"
                             enabled:target.text.trim().length>0
                             onClicked:{
-                                page.result="SIMULATED RESULT · "+page.tool+"\n"+
-                                            "Target: "+target.text+"\n"+
+                                page.result="模拟结果 · "+page.tool+"\n"+
+                                            "目标："+target.text+"\n"+
                                             "Status: No network requests were made.\n"+
                                             "Backend connection: not configured.\n\n"+
-                                            "This panel is prepared for a future tool adapter."
+                                            "此面板预留给未来的网络工具模块。"
                             }
                         }
                     }
@@ -95,7 +95,7 @@ Item {
                             }
                         }
                     }
-                    SwirlButton { text:"Copy results"; onClicked:{demoProvider.copyText(page.result);AppState.toast="Copied diagnostic preview"} }
+                    SwirlButton { text:"复制结果"; onClicked:{demoProvider.copyText(page.result);AppState.toast="已复制诊断预览"} }
                 }
             }
         }

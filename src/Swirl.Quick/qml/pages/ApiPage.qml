@@ -7,12 +7,12 @@ import "../controls"
 
 Item {
     id:page
-    property string tab:"API Explorer"
+    property string tab:"API 管理"
     property var routes:[
-        {id:"api1",method:"GET",path:"/v1/status",permission:"Read status",status:"Planned"},
-        {id:"api2",method:"GET",path:"/v1/connections",permission:"Read sessions",status:"Planned"},
-        {id:"api3",method:"POST",path:"/v1/profiles/select",permission:"Update profile",status:"Planned"},
-        {id:"api4",method:"GET",path:"/v1/logs",permission:"Read diagnostics",status:"Planned"}
+        {id:"api1",method:"GET",path:"/v1/status",permission:"读取状态",status:"Planned"},
+        {id:"api2",method:"GET",path:"/v1/connections",permission:"读取会话",status:"Planned"},
+        {id:"api3",method:"POST",path:"/v1/profiles/select",permission:"更新配置",status:"Planned"},
+        {id:"api4",method:"GET",path:"/v1/logs",permission:"读取诊断",status:"Planned"}
     ]
     ColumnLayout {
         anchors.fill:parent; anchors.margins:23; spacing:14
@@ -23,27 +23,27 @@ Item {
                 SwirlIcon { name:"terminal"; size:31; color:Theme.accent }
                 ColumnLayout {
                     Layout.fillWidth:true; spacing:6
-                    Text { text:"Local control API"; font.pixelSize:20; color:Theme.text; font.weight:Font.DemiBold }
-                    Text { text:"API endpoint: not listening · CLI: demonstration command reference"; color:Theme.muted; font.pixelSize:12 }
+                    Text { text:"本地控制 API"; font.pixelSize:20; color:Theme.text; font.weight:Font.DemiBold }
+                    Text { text:"API 未启动 · 命令行仅提供演示参考"; color:Theme.muted; font.pixelSize:12 }
                 }
-                SwirlStatusBadge { label:"SERVER OFFLINE"; tone:"warning" }
+                SwirlStatusBadge { label:"服务未启动"; tone:"warning" }
             }
         }
         RowLayout {
             Layout.fillWidth:true
             Repeater {
-                model:["API Explorer","CLI Commands","Permissions","Access Logs"]
+                model:["API 管理","命令行指令","Permissions","访问日志"]
                 SwirlButton { text:modelData; quiet:page.tab!==modelData; onClicked:page.tab=modelData }
             }
             Item { Layout.fillWidth:true }
-            SwirlButton { text:"Server settings"; onClicked:settingsDialog.open() }
+            SwirlButton { text:"服务设置"; onClicked:settingsDialog.open() }
         }
         RowLayout {
             Layout.fillWidth:true; Layout.fillHeight:true; spacing:14
             SwirlGlassPanel {
                 Layout.fillWidth:true; Layout.fillHeight:true
                 SwirlDataTable {
-                    visible:page.tab==="API Explorer"
+                    visible:page.tab==="API 管理"
                     anchors.fill:parent; anchors.margins:1
                     rows:page.routes
                     columns:[{key:"method",label:"METHOD",w:100},{key:"path",label:"ENDPOINT",w:260},
@@ -51,19 +51,19 @@ Item {
                     onRowSelected:function(r){pathInput.text=r.path;methodInput.currentIndex=methodInput.model.indexOf(r.method)}
                 }
                 ColumnLayout {
-                    visible:page.tab!=="API Explorer"
+                    visible:page.tab!=="API 管理"
                     anchors.fill:parent; anchors.margins:18; spacing:15
                     Text { text:page.tab; color:Theme.text; font.pixelSize:17; font.weight:Font.DemiBold }
                     Repeater {
-                        model:page.tab==="CLI Commands"?
+                        model:page.tab==="命令行指令"?
                             ["swirl status","swirl profiles list","swirl proxies show","swirl dns query example.test","swirl logs --tail"]:
                             page.tab==="Permissions"?
-                            ["Read-only status","Read-only connections","Profile management","Diagnostics export"]:
-                            ["No API requests received in this demonstration.","Local control listener has not been created."]
+                            ["只读状态","只读连接","配置管理","导出诊断"]:
+                            ["当前演示中没有 API 请求。","尚未创建本地 API 监听服务。"]
                         RowLayout {
                             Layout.fillWidth:true
                             Text { text:modelData; color:Theme.text; font.family:"Cascadia Code"; font.pixelSize:12; Layout.fillWidth:true }
-                            SwirlButton { text:"Preview"; onClicked:AppState.notice("CLI/API sample") }
+                            SwirlButton { text:"Preview"; onClicked:AppState.notice("命令行 / API 示例") }
                         }
                     }
                     Item { Layout.fillHeight:true }
@@ -73,10 +73,10 @@ Item {
                 Layout.preferredWidth:313; Layout.fillHeight:true
                 ColumnLayout {
                     anchors.fill:parent; anchors.margins:17; spacing:12
-                    Text { text:"Request example"; color:Theme.text; font.pixelSize:16; font.weight:Font.DemiBold }
+                    Text { text:"请求示例"; color:Theme.text; font.pixelSize:16; font.weight:Font.DemiBold }
                     SwirlComboBox { id:methodInput; Layout.fillWidth:true; model:["GET","POST","PUT","DELETE"] }
                     SwirlTextField { id:pathInput; Layout.fillWidth:true; text:"/v1/status" }
-                    Text { text:"JSON RESPONSE PREVIEW"; color:Theme.muted; font.pixelSize:10 }
+                    Text { text:"JSON 响应预览"; color:Theme.muted; font.pixelSize:10 }
                     Rectangle {
                         Layout.fillWidth:true; Layout.fillHeight:true
                         radius:10; color:Theme.field; border.color:Theme.border
@@ -90,23 +90,23 @@ Item {
                             }
                         }
                     }
-                    SwirlButton { text:"Test locally (demo)"; primary:true; onClicked:AppState.notice("API request not sent") }
+                    SwirlButton { text:"本地测试（演示）"; primary:true; onClicked:AppState.notice("未发送 API 请求") }
                 }
             }
         }
     }
     SwirlDialog {
-        id:settingsDialog; title:"Local API settings"
+        id:settingsDialog; title:"本地 API 设置"
         ColumnLayout {
             width:parent.width; spacing:12
-            Text { text:"Listener address"; color:Theme.text }
+            Text { text:"监听地址"; color:Theme.text }
             SwirlTextField { Layout.fillWidth:true; text:"127.0.0.1"; readOnly:true }
             Text { text:"Port"; color:Theme.text }
             SwirlTextField { Layout.fillWidth:true; text:"6170"; validator:IntValidator { bottom:1024; top:65535 } }
             RowLayout {
                 Layout.fillWidth:true
-                Text { text:"Allow API requests (visual switch only)"; Layout.fillWidth:true; color:Theme.muted; font.pixelSize:12 }
-                SwirlToggle { onToggled:AppState.notice("API listener") }
+                Text { text:"允许 API 请求（仅界面开关）"; Layout.fillWidth:true; color:Theme.muted; font.pixelSize:12 }
+                SwirlToggle { onToggled:AppState.notice("API 监听服务") }
             }
             SwirlButton { text:"Close"; Layout.alignment:Qt.AlignRight; onClicked:settingsDialog.close() }
         }
