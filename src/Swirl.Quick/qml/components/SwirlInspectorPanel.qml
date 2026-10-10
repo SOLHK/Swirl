@@ -18,6 +18,8 @@ SwirlGlassPanel {
                 "\naccept: application/json\nuser-agent: Swirl-Demo/0.1\ncontent-type: application/json\ncache-control: no-cache"
         if(activeTab==="Body")
             return '{\n  "demo": true,\n  "source": "local fixture",\n  "requestId": "'+record.id+'",\n  "items": [\n    { "name": "Swirl", "enabled": false }\n  ]\n}'
+        if(activeTab==="XML")return '<response requestId="'+record.id+'">\n  <source>synthetic fixture</source>\n  <success>true</success>\n</response>'
+        if(activeTab==="Preview")return "Synthetic image preview"
         if(activeTab==="Cookies")return "session_id = [synthetic]\nSameSite = Lax\nSecure = true\nHttpOnly = true"
         if(activeTab==="Query")return "q = swirl\npage = 1\nlimit = 20"
         if(activeTab==="TLS")return "Protocol: "+record.version+"\nCipher: TLS_AES_128_GCM_SHA256\nTLS version: 1.3\nCA trust: not inspected (demo)"
@@ -57,7 +59,7 @@ SwirlGlassPanel {
             Row {
                 id:tabs; spacing:6
                 Repeater {
-                    model:["Headers","Body","Cookies","Query","TLS","Timeline","WebSocket"]
+                    model:["Headers","Body","XML","Preview","Cookies","Query","TLS","Timeline","WebSocket"]
                     SwirlButton {
                         text:modelData
                         quiet:inspector.activeTab!==modelData
@@ -67,10 +69,13 @@ SwirlGlassPanel {
             }
         }
         Rectangle { Layout.fillWidth:true; height:1; color:Theme.border }
-        ScrollView {
+        Item {
             Layout.fillWidth:true; Layout.fillHeight:true
-            clip:true
-            TextArea {
+            ScrollView {
+                visible:inspector.activeTab!=="Preview"
+                anchors.fill:parent
+                clip:true
+                TextArea {
                 readOnly:true
                 text:inspector.detailsText()
                 wrapMode:Text.WrapAnywhere
@@ -80,6 +85,24 @@ SwirlGlassPanel {
                 leftPadding:5
                 background:Rectangle { color:"transparent" }
                 selectByMouse:true
+                }
+            }
+            ColumnLayout {
+                visible:inspector.activeTab==="Preview"
+                anchors.centerIn:parent
+                spacing:12
+                Image {
+                    source:"qrc:/swirl/swirl-256.png"
+                    sourceSize.width:138; sourceSize.height:138
+                    Layout.preferredWidth:138; Layout.preferredHeight:138
+                    fillMode:Image.PreserveAspectFit
+                    Layout.alignment:Qt.AlignHCenter
+                }
+                Text {
+                    text:"Image body fixture · local Swirl brand asset"
+                    color:Theme.muted; font.pixelSize:11
+                    Layout.alignment:Qt.AlignHCenter
+                }
             }
         }
         RowLayout {
