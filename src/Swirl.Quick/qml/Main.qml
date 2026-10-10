@@ -18,6 +18,11 @@ ApplicationWindow {
     background: Rectangle {
         radius: window.visibility === Window.Maximized ? 0 : 18
         color: Theme.canvas
+        gradient: Gradient {
+            GradientStop { position:0; color:Theme.dark ? "#182638" : "#FBFCFF" }
+            GradientStop { position:0.5; color:Theme.canvas }
+            GradientStop { position:1; color:Theme.dark ? "#101824" : "#EDF3FA" }
+        }
         border.width: 1
         border.color: Theme.border
     }
@@ -38,13 +43,13 @@ ApplicationWindow {
         width: parent.width
         height: 49
         radius: window.visibility === Window.Maximized ? 0 : 18
-        color: Theme.sidebar
+        color: Theme.material("floating")
         border.color: Theme.border
         border.width: 0
         Rectangle {
             anchors.left:parent.left; anchors.right:parent.right
             anchors.bottom:parent.bottom; height:20
-            color:Theme.sidebar
+            color:Theme.material("floating")
         }
         // Native system move preserves Windows snapping and multitasking.
         MouseArea {

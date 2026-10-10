@@ -10,12 +10,12 @@ Item {
     property var chosen:null
     property bool scheduleEnabled:true
     property var providers:[
-        {id:"s1",name:"Primary · Singapore",source:"https://provider.example.test/sub/primary",nodes:48,used:34,limit:100,
+        {id:"s1",name:"主订阅 · 新加坡",source:"https://provider.example.test/sub/primary",nodes:48,used:34,limit:100,
          update:"2026-10-10 13:20",status:"Healthy",interval:"6 hours"},
-        {id:"s2",name:"Travel endpoints",source:"https://provider.example.test/sub/travel",nodes:16,used:69,limit:150,
+        {id:"s2",name:"旅行节点",source:"https://provider.example.test/sub/travel",nodes:16,used:69,limit:150,
          update:"2026-10-09 21:05",status:"Healthy",interval:"12 hours"},
-        {id:"s3",name:"Backup provider",source:"https://provider.example.test/sub/backup",nodes:0,used:0,limit:100,
-         update:"2026-10-07 12:45",status:"Error (sample)",interval:"24 hours"}
+        {id:"s3",name:"备用订阅",source:"https://provider.example.test/sub/backup",nodes:0,used:0,limit:100,
+         update:"2026-10-07 12:45",status:"错误（模拟）",interval:"最近 24 小时"}
     ]
     readonly property var listed:providers.filter(function(r){
         return (r.name+" "+r.source).toLowerCase().indexOf(search.text.toLowerCase())>=0
@@ -24,9 +24,9 @@ Item {
         anchors.fill:parent; anchors.margins:23; spacing:14
         RowLayout {
             Layout.fillWidth:true
-            SwirlStatusBadge { label:AppState.zh("SUBSCRIPTIONS · MOCK DATA"); tone:"accent" }
+            SwirlStatusBadge { label:AppState.zh("订阅管理 · 模拟数据"); tone:"accent" }
             Text { text:AppState.zh("No remote URLs are requested or saved."); color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
-            SwirlButton { text:AppState.zh("Update all (demo)"); iconName:"refresh"; onClicked:AppState.notice("Update subscriptions") }
+            SwirlButton { text:AppState.zh("Update all (demo)"); iconName:"refresh"; onClicked:AppState.notice("更新订阅") }
             SwirlButton { text:AppState.zh("Add subscription"); primary:true; onClicked:addDialog.open() }
         }
         RowLayout {
@@ -69,14 +69,14 @@ Item {
                                     }
                                     RowLayout {
                                         Layout.fillWidth:true
-                                        Text { text:record.used+" GB / "+record.limit+" GB · synthetic traffic"; color:Theme.muted; font.pixelSize:11; Layout.fillWidth:true }
-                                        Text { text:record.nodes+" nodes"; color:Theme.text; font.pixelSize:11 }
+                                        Text { text:record.used+" GB / "+record.limit+" GB · 模拟流量"; color:Theme.muted; font.pixelSize:11; Layout.fillWidth:true }
+                                        Text { text:record.nodes+" 个节点"; color:Theme.text; font.pixelSize:11 }
                                     }
                                     RowLayout {
                                         Layout.fillWidth:true
                                         Text { text:AppState.zh("Updated ")+record.update; color:Theme.muted; font.pixelSize:11; Layout.fillWidth:true }
                                         SwirlButton { text:AppState.zh("Details"); quiet:true; onClicked:page.chosen=record }
-                                        SwirlButton { text:AppState.zh("Refresh"); iconName:"refresh"; onClicked:AppState.notice("Refresh provider "+record.name) }
+                                        SwirlButton { text:AppState.zh("Refresh"); iconName:"refresh"; onClicked:AppState.notice("刷新订阅源"+record.name) }
                                     }
                                 }
                             }
@@ -90,17 +90,17 @@ Item {
                     anchors.fill:parent; anchors.margins:18; spacing:13
                     Text { text:AppState.zh("Provider inspector"); color:Theme.text; font.pixelSize:16; font.weight:Font.DemiBold }
                     Text {
-                        text:page.chosen?page.chosen.name:"Select a subscription"
+                        text:page.chosen?page.chosen.name:"请选择订阅"
                         color:Theme.accent; font.pixelSize:15; font.weight:Font.DemiBold
                         wrapMode:Text.WordWrap; Layout.fillWidth:true
                     }
                     Repeater {
                         model:[["STATUS",page.chosen?page.chosen.status:"—"],
                                ["NODES",page.chosen?String(page.chosen.nodes):"—"],
-                               ["LAST UPDATED",page.chosen?page.chosen.update:"—"],
-                               ["AUTOMATIC REFRESH",page.chosen?page.chosen.interval:"—"],
-                               ["USED QUOTA",page.chosen?page.chosen.used+" GB":"—"],
-                               ["PLAN LIMIT",page.chosen?page.chosen.limit+" GB":"—"]]
+                               ["上次更新",page.chosen?page.chosen.update:"—"],
+                               ["自动刷新",page.chosen?page.chosen.interval:"—"],
+                               ["已用流量",page.chosen?page.chosen.used+" GB":"—"],
+                               ["流量限额",page.chosen?page.chosen.limit+" GB":"—"]]
                         ColumnLayout {
                             Layout.fillWidth:true; spacing:3
                             Text { text:modelData[0]; color:Theme.muted; font.pixelSize:10 }
@@ -108,8 +108,8 @@ Item {
                         }
                     }
                     Item { Layout.fillHeight:true }
-                    SwirlButton { text:AppState.zh("Edit provider"); onClicked:addDialog.open() }
-                    SwirlButton { text:AppState.zh("View update errors"); onClicked:AppState.notice("Subscription error details") }
+                    SwirlButton { text:AppState.zh("编辑订阅源"); onClicked:addDialog.open() }
+                    SwirlButton { text:AppState.zh("View update errors"); onClicked:AppState.notice("订阅错误详情") }
                 }
             }
         }
@@ -127,11 +127,11 @@ Item {
                 Layout.alignment:Qt.AlignRight
                 SwirlButton { text:AppState.zh("Cancel"); onClicked:addDialog.close() }
                 SwirlButton {
-                    text:AppState.zh("Add demo"); primary:true
+                    text:AppState.zh("添加演示"); primary:true
                     enabled:displayName.text.trim().length>0&&urlField.text.startsWith("https://")
                     onClicked:{
                         page.providers=page.providers.concat([{id:"s"+Date.now(),name:displayName.text.trim(),
-                            source:urlField.text.trim(),nodes:0,used:0,limit:100,update:"Never",status:"Not checked",interval:"24 hours"}])
+                            source:urlField.text.trim(),nodes:0,used:0,limit:100,update:"Never",status:"未检查",interval:"最近 24 小时"}])
                         displayName.text="";urlField.text="";addDialog.close()
                     }
                 }

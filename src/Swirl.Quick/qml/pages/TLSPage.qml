@@ -8,16 +8,16 @@ import "../controls"
 Item {
     id:page
     property bool tlsPreview:false
-    property string activeTab:"Included domains"
+    property string activeTab:"包含的域名"
     property var selected:null
     property var domainRows:[
-        {id:"tls-1",name:"api.example.test",type:"Include",mode:"Full inspection",status:"Enabled"},
-        {id:"tls-2",name:"*.assets.example.test",type:"Include",mode:"Headers only",status:"Enabled"},
-        {id:"tls-3",name:"*.bank.example.test",type:"Exclude",mode:"Pass through",status:"Excluded"},
-        {id:"tls-4",name:"*.private.example.test",type:"Exclude",mode:"Pass through",status:"Excluded"}
+        {id:"tls-1",name:"api.example.test",type:"Include",mode:"完整检查",status:"Enabled"},
+        {id:"tls-2",name:"*.assets.example.test",type:"Include",mode:"仅请求头",status:"Enabled"},
+        {id:"tls-3",name:"*.bank.example.test",type:"Exclude",mode:"直接放行",status:"Excluded"},
+        {id:"tls-4",name:"*.private.example.test",type:"Exclude",mode:"直接放行",status:"Excluded"}
     ]
     readonly property var shown:domainRows.filter(function(r){
-        return (activeTab==="Included domains"?r.type==="Include":r.type==="Exclude") &&
+        return (activeTab==="包含的域名"?r.type==="Include":r.type==="Exclude") &&
                r.name.toLowerCase().indexOf(search.text.toLowerCase())>=0
     })
     ColumnLayout {
@@ -39,29 +39,29 @@ Item {
                     }
                     RowLayout {
                         SwirlStatusBadge { label:AppState.zh("LOCAL CA: NOT INSTALLED"); tone:"warning" }
-                        SwirlStatusBadge { label:AppState.zh("TLS SESSIONS: 0 REAL"); tone:"neutral" }
+                        SwirlStatusBadge { label:AppState.zh("真实 TLS 会话：0"); tone:"neutral" }
                     }
                 }
                 ColumnLayout {
                     Text { text:AppState.zh("Preview decrypt toggle"); color:Theme.muted; font.pixelSize:11 }
-                    SwirlToggle { checked:page.tlsPreview; onToggled:{page.tlsPreview=checked;AppState.notice("HTTPS decrypt preview")} }
+                    SwirlToggle { checked:page.tlsPreview; onToggled:{page.tlsPreview=checked;AppState.notice("HTTPS 解密预览")} }
                 }
             }
         }
         RowLayout {
             Layout.fillWidth:true; spacing:7
             Repeater {
-                model:["Included domains","Excluded domains"]
+                model:["包含的域名","Excluded domains"]
                 SwirlButton { text:modelData; quiet:page.activeTab!==modelData; onClicked:page.activeTab=modelData }
             }
             Item { Layout.fillWidth:true }
-            SwirlButton { text:AppState.zh("Certificate manager"); iconName:"shield"; onClicked:certDialog.open() }
+            SwirlButton { text:AppState.zh("证书管理"); iconName:"shield"; onClicked:certDialog.open() }
             SwirlButton { text:AppState.zh("Add domain"); primary:true; onClicked:addDialog.open() }
         }
         RowLayout {
             Layout.fillWidth:true
             SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:AppState.zh("Filter host patterns") }
-            SwirlStatusBadge { label:page.shown.length+" DEMO HOSTS"; tone:"accent" }
+            SwirlStatusBadge { label:page.shown.length+" 个模拟域名"; tone:"accent" }
         }
         RowLayout {
             Layout.fillWidth:true; Layout.fillHeight:true; spacing:15
@@ -87,10 +87,10 @@ Item {
                     anchors.fill:parent; anchors.margins:18; spacing:14
                     Text { text:AppState.zh("Certificate & session"); color:Theme.text; font.pixelSize:16; font.weight:Font.DemiBold }
                     Repeater {
-                        model:[["CA STATUS","Absent · demonstration"],["TRUST","Not configured"],
-                               ["ACTIVE REAL SESSIONS","0"],["TLS VERSION","TLS 1.3 (sample)"],
-                               ["CIPHER","AES_128_GCM_SHA256 (sample)"],
-                               ["SELECTED HOST",page.selected?page.selected.name:"—"]]
+                        model:[["证书状态","未安装 · 演示"],["TRUST","未配置"],
+                               ["真实活动会话","0"],["TLS 版本","TLS 1.3（模拟）"],
+                               ["CIPHER","AES_128_GCM_SHA256（模拟）"],
+                               ["选中的域名",page.selected?page.selected.name:"—"]]
                         ColumnLayout {
                             Layout.fillWidth:true; spacing:3
                             Text { text:modelData[0]; font.pixelSize:10; color:Theme.muted }
@@ -98,8 +98,8 @@ Item {
                         }
                     }
                     Item { Layout.fillHeight:true }
-                    SwirlButton { text:AppState.zh("Trust certificate"); onClicked:AppState.notice("Trust CA: blocked in demo") }
-                    SwirlButton { text:AppState.zh("Revoke trust"); danger:true; onClicked:AppState.notice("Revoke CA: blocked in demo") }
+                    SwirlButton { text:AppState.zh("信任证书"); onClicked:AppState.notice("信任证书：演示模式不支持") }
+                    SwirlButton { text:AppState.zh("撤销信任"); danger:true; onClicked:AppState.notice("撤销证书：演示模式不支持") }
                 }
             }
         }
@@ -116,31 +116,31 @@ Item {
             RowLayout {
                 Layout.alignment:Qt.AlignRight
                 SwirlButton { text:AppState.zh("Close"); onClicked:certDialog.close() }
-                SwirlButton { text:AppState.zh("Certificate preview"); onClicked:AppState.notice("Certificate details") }
+                SwirlButton { text:AppState.zh("证书预览"); onClicked:AppState.notice("证书详情") }
             }
         }
     }
     SwirlDialog {
-        id:addDialog; title:"Add HTTPS host pattern"
+        id:addDialog; title:"添加 HTTPS 域名规则"
         ColumnLayout {
             width:parent.width; spacing:11
             Text { text:AppState.zh("Host pattern"); color:Theme.text }
             SwirlTextField { id:hostName; Layout.fillWidth:true; placeholderText:AppState.zh("*.example.test") }
-            SwirlComboBox { id:ruleType; Layout.fillWidth:true; model:["Include","Exclude"]; currentIndex:page.activeTab==="Included domains"?0:1 }
+            SwirlComboBox { id:ruleType; Layout.fillWidth:true; model:["Include","Exclude"]; currentIndex:page.activeTab==="包含的域名"?0:1 }
             Text { text:AppState.zh("Only a local UI fixture will be added."); color:Theme.muted; font.pixelSize:11 }
             RowLayout {
                 Layout.alignment:Qt.AlignRight
                 SwirlButton { text:AppState.zh("Cancel"); onClicked:addDialog.close() }
                 SwirlButton {
-                    text:AppState.zh("Save demo"); primary:true
+                    text:AppState.zh("保存演示"); primary:true
                     enabled:hostName.text.includes(".")&&!hostName.text.includes(" ")
                     onClicked:{
                         var name=hostName.text.trim()
                         page.domainRows=page.domainRows.concat([{id:"tls-"+Date.now(),
                             name:name,type:ruleType.currentText,
-                            mode:ruleType.currentText==="Include"?"Full inspection":"Pass through",
+                            mode:ruleType.currentText==="Include"?"完整检查":"直接放行",
                             status:ruleType.currentText==="Include"?"Enabled":"Excluded"}])
-                        page.activeTab=ruleType.currentText==="Include"?"Included domains":"Excluded domains"
+                        page.activeTab=ruleType.currentText==="Include"?"包含的域名":"Excluded domains"
                         hostName.text="";addDialog.close()
                     }
                 }

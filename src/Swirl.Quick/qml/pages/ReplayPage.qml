@@ -15,13 +15,13 @@ Item {
         anchors.fill:parent; anchors.margins:23; spacing:13
         RowLayout {
             Layout.fillWidth:true
-            SwirlStatusBadge { label:"OFFLINE HTTP COMPOSER"; tone:"accent" }
-            Text { text:"Requests are never transmitted"; color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
+            SwirlStatusBadge { label:"离线 HTTP 请求编辑器"; tone:"accent" }
+            Text { text:"请求不会实际发送"; color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
             SwirlButton { text:"Compare"; onClicked:comparePopup.open() }
-            SwirlButton { text:"Send demo"; iconName:"play"; primary:true; onClicked:{
+            SwirlButton { text:"发送演示"; iconName:"play"; primary:true; onClicked:{
                 page.resultMessage="HTTP 200 OK (simulated)\nContent-Type: application/json\nX-Demo: SwirlQuick\n\n{\n  \"sent\": false,\n  \"message\": \"No network request performed\"\n}"
                 page.history=[{name:verb.currentText+" "+urlField.text,time:"Now",status:"Simulated"}].concat(page.history)
-                AppState.notice("HTTP replay (no request sent)")
+                AppState.notice("HTTP 重放（未实际发送请求）")
             } }
         }
         SplitView {
@@ -32,8 +32,8 @@ Item {
                 SplitView.preferredWidth:272; SplitView.minimumWidth:200
                 ColumnLayout {
                     anchors.fill:parent; anchors.margins:13; spacing:10
-                    Text { text:"Captured history (demo)"; color:Theme.text; font.pixelSize:14; font.weight:Font.DemiBold }
-                    SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:"Filter requests" }
+                    Text { text:"捕获历史（演示）"; color:Theme.text; font.pixelSize:14; font.weight:Font.DemiBold }
+                    SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:"筛选请求" }
                     ListView {
                         Layout.fillHeight:true; Layout.fillWidth:true; clip:true; spacing:4
                         model:page.samples.filter(function(r){
@@ -57,14 +57,14 @@ Item {
                             }
                         }
                     }
-                    SwirlButton { Layout.fillWidth:true; text:"Import HAR"; onClicked:AppState.notice("HAR import") }
+                    SwirlButton { Layout.fillWidth:true; text:"导入 HAR"; onClicked:AppState.notice("导入 HAR") }
                 }
             }
             SwirlGlassPanel {
                 SplitView.fillWidth:true; SplitView.minimumWidth:400
                 ColumnLayout {
                     anchors.fill:parent; anchors.margins:17; spacing:12
-                    Text { text:"Request composer"; color:Theme.text; font.pixelSize:17; font.weight:Font.DemiBold }
+                    Text { text:"请求编辑器"; color:Theme.text; font.pixelSize:17; font.weight:Font.DemiBold }
                     RowLayout {
                         Layout.fillWidth:true
                         SwirlComboBox { id:verb; model:["GET","POST","PUT","PATCH","DELETE","HEAD"] }
@@ -96,8 +96,8 @@ Item {
                     }
                     RowLayout {
                         Layout.fillWidth:true
-                        Text { text:"Execution history: "+page.history.length+" demo actions"; color:Theme.muted; font.pixelSize:11; Layout.fillWidth:true }
-                        SwirlButton { text:"Reset"; onClicked:{page.resultMessage="No request has been replayed.";page.history=[]} }
+                        Text { text:"执行历史："+page.history.length+" 次演示操作"; color:Theme.muted; font.pixelSize:11; Layout.fillWidth:true }
+                        SwirlButton { text:"Reset"; onClicked:{page.resultMessage="尚未重放请求。";page.history=[]} }
                     }
                 }
             }
@@ -105,7 +105,7 @@ Item {
                 SplitView.preferredWidth:300; SplitView.minimumWidth:230
                 ColumnLayout {
                     anchors.fill:parent; anchors.margins:17; spacing:12
-                    Text { text:"Response preview"; color:Theme.text; font.pixelSize:16; font.weight:Font.DemiBold }
+                    Text { text:"响应预览"; color:Theme.text; font.pixelSize:16; font.weight:Font.DemiBold }
                     SwirlStatusBadge { label:"SIMULATED"; tone:"accent" }
                     Rectangle {
                         Layout.fillWidth:true; Layout.fillHeight:true
@@ -120,16 +120,16 @@ Item {
                             }
                         }
                     }
-                    SwirlButton { text:"View comparison"; onClicked:comparePopup.open() }
+                    SwirlButton { text:"查看对比"; onClicked:comparePopup.open() }
                 }
             }
         }
     }
     SwirlDialog {
-        id:comparePopup; title:"Replay comparison"
+        id:comparePopup; title:"重放对比"
         ColumnLayout {
             width:parent.width; spacing:11
-            Text { text:"Original request vs. local replay preview"; color:Theme.text; font.pixelSize:13; Layout.fillWidth:true }
+            Text { text:"原始请求与本地模拟重放对比"; color:Theme.text; font.pixelSize:13; Layout.fillWidth:true }
             Text {
                 text:"Original: HTTP 200  ·  108 ms (fixture)\nReplay: No request sent  ·  N/A\n\nWhen a network adapter is integrated, the comparison pane will show header, body and timing differences."
                 color:Theme.muted; font.family:"Cascadia Code"; font.pixelSize:11

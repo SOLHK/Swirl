@@ -9,15 +9,15 @@ Item {
     id: page
     property var selectedRule:null
     property var rules:[
-        {id:"001",order:"001",type:"DOMAIN-SUFFIX",pattern:"example.test",policy:"Auto Select",enabled:"Enabled",hits:"148"},
+        {id:"001",order:"001",type:"DOMAIN-SUFFIX",pattern:"example.test",policy:"自动选择",enabled:"Enabled",hits:"148"},
         {id:"002",order:"002",type:"DOMAIN-KEYWORD",pattern:"updates",policy:"DIRECT",enabled:"Enabled",hits:"92"},
-        {id:"003",order:"003",type:"IP-CIDR",pattern:"203.0.113.0/24",policy:"Global / SG",enabled:"Enabled",hits:"31"},
+        {id:"003",order:"003",type:"IP-CIDR",pattern:"203.0.113.0/24",policy:"全局 / 新加坡",enabled:"Enabled",hits:"31"},
         {id:"004",order:"004",type:"PROCESS-NAME",pattern:"Browser.exe",policy:"DIRECT",enabled:"Disabled",hits:"0"},
-        {id:"005",order:"005",type:"FINAL",pattern:"MATCH",policy:"Auto Select",enabled:"Enabled",hits:"468"}
+        {id:"005",order:"005",type:"FINAL",pattern:"MATCH",policy:"自动选择",enabled:"Enabled",hits:"468"}
     ]
     readonly property var displayRules:rules.filter(function(r){
         return (r.type+" "+r.pattern+" "+r.policy).toLowerCase().indexOf(search.text.toLowerCase())>=0 &&
-               (policyFilter.currentText==="All policies"||r.policy===policyFilter.currentText)
+               (policyFilter.currentText==="全部策略"||r.policy===policyFilter.currentText)
     })
     ColumnLayout {
         anchors.fill:parent; anchors.margins:23; spacing:14
@@ -25,15 +25,15 @@ Item {
             Layout.fillWidth:true
             SwirlStatusBadge { label:AppState.zh("ORDERED DEMO RULESET"); tone:"accent" }
             Text { text:AppState.zh("Priority is evaluated top to bottom in this preview."); color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
-            SwirlButton { text:AppState.zh("Test rule"); iconName:"activity"; onClicked:testDialog.open() }
+            SwirlButton { text:AppState.zh("测试规则"); iconName:"activity"; onClicked:testDialog.open() }
             SwirlButton { text:AppState.zh("New rule"); primary:true; onClicked:editorDialog.open() }
         }
         RowLayout {
             Layout.fillWidth:true
             SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:AppState.zh("Search pattern, type or target strategy") }
-            SwirlComboBox { id:policyFilter; model:["All policies","Auto Select","DIRECT","Global / SG","REJECT"] }
-            SwirlButton { text:AppState.zh("Import"); onClicked:AppState.notice("Import rules") }
-            SwirlButton { text:AppState.zh("Export"); onClicked:AppState.notice("Export rules") }
+            SwirlComboBox { id:policyFilter; model:["全部策略","自动选择","DIRECT","全局 / 新加坡","REJECT"] }
+            SwirlButton { text:AppState.zh("Import"); onClicked:AppState.notice("导入规则") }
+            SwirlButton { text:AppState.zh("Export"); onClicked:AppState.notice("导出规则") }
         }
         RowLayout {
             Layout.fillWidth:true; Layout.fillHeight:true; spacing:14
@@ -57,14 +57,14 @@ Item {
                 ColumnLayout {
                     anchors.fill:parent; anchors.margins:18; spacing:13
                     Text { text:AppState.zh("Rule inspection"); color:Theme.text; font.pixelSize:16; font.weight:Font.DemiBold }
-                    SwirlStatusBadge { label:page.selectedRule?page.selectedRule.enabled:"SELECT A RULE"; tone:"accent" }
+                    SwirlStatusBadge { label:page.selectedRule?page.selectedRule.enabled:"请选择规则"; tone:"accent" }
                     Repeater {
                         model:[
                             ["PRIORITY",page.selectedRule?page.selectedRule.order:"—"],
                             ["MATCHER",page.selectedRule?page.selectedRule.type:"—"],
                             ["PATTERN",page.selectedRule?page.selectedRule.pattern:"—"],
                             ["STRATEGY",page.selectedRule?page.selectedRule.policy:"—"],
-                            ["SIMULATED MATCHES",page.selectedRule?page.selectedRule.hits:"—"]
+                            ["模拟命中",page.selectedRule?page.selectedRule.hits:"—"]
                         ]
                         ColumnLayout {
                             Layout.fillWidth:true; spacing:4
@@ -91,7 +91,7 @@ Item {
                     }
                     Item { Layout.fillHeight:true }
                     SwirlButton { text:AppState.zh("Edit selected"); onClicked:editorDialog.open() }
-                    SwirlButton { text:AppState.zh("View match details"); quiet:true; onClicked:AppState.notice("Rule hit details") }
+                    SwirlButton { text:AppState.zh("View match details"); quiet:true; onClicked:AppState.notice("规则命中详情") }
                 }
             }
         }
@@ -105,7 +105,7 @@ Item {
             Text { text:AppState.zh("Match pattern"); color:Theme.text }
             SwirlTextField { id:patternInput; Layout.fillWidth:true; placeholderText:AppState.zh("example.test") }
             Text { text:AppState.zh("Target policy"); color:Theme.text }
-            SwirlComboBox { id:policyInput; Layout.fillWidth:true; model:["Auto Select","DIRECT","Global / SG","REJECT"] }
+            SwirlComboBox { id:policyInput; Layout.fillWidth:true; model:["自动选择","DIRECT","全局 / 新加坡","REJECT"] }
             Text { text:AppState.zh("Changes are local to the UI; no routing rules are installed."); color:Theme.muted; font.pixelSize:11; Layout.fillWidth:true; wrapMode:Text.Wrap }
             RowLayout {
                 Layout.alignment:Qt.AlignRight
@@ -146,7 +146,7 @@ Item {
                     text:AppState.zh("Evaluate"); primary:true; enabled:testInput.text.trim().length>0
                     onClicked:{
                         var match=page.rules.find(function(r){return r.type==="DOMAIN-SUFFIX" && testInput.text.endsWith(r.pattern)})
-                        AppState.notice("Test match: "+(match?match.policy:"FINAL · Auto Select"))
+                        AppState.notice("测试匹配："+(match?match.policy:"最终策略 · 自动选择"))
                         testDialog.close()
                     }
                 }
