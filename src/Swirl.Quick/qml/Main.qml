@@ -100,7 +100,10 @@ ApplicationWindow {
                                 AppState.currentPage==="rewrite" ? rewrite :
                                 AppState.currentPage==="profiles" ? profiles :
                                 AppState.currentPage==="subscriptions" ? subscriptions :
-                                AppState.currentPage==="policies" ? policies : workbench
+                                AppState.currentPage==="policies" ? policies :
+                                AppState.currentPage==="traffic" ? traffic :
+                                AppState.currentPage==="breakpoint" ? breakpoint :
+                                AppState.currentPage==="map" ? mapLocal : workbench
                 }
             Rectangle {
                 Layout.fillWidth:true
@@ -132,6 +135,9 @@ ApplicationWindow {
     Component { id:profiles; ProfilesPage {} }
     Component { id:subscriptions; SubscriptionsPage {} }
     Component { id:policies; PolicyGroupsPage {} }
+    Component { id:traffic; TrafficAnalyticsPage {} }
+    Component { id:breakpoint; BreakpointPage {} }
+    Component { id:mapLocal; MapPage {} }
     Component { id:workbench; WorkbenchPage { pageId:AppState.currentPage } }
     Timer { id:toastTimer; interval:2800; onTriggered:AppState.toast="" }
     // Smoke mode deliberately visits every navigation destination and fails CI
