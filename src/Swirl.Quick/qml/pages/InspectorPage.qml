@@ -7,6 +7,7 @@ import "../controls"
 Item {
     id:page
     property var selected:null
+    property bool waterfallOpen:true
     property var displayRows:{
         var q=search.text.toLowerCase()
         var method=methodFilter.currentText
@@ -56,9 +57,48 @@ Item {
                 record:page.selected
             }
         }
+        SwirlGlassPanel {
+            visible:page.waterfallOpen
+            Layout.fillWidth:true; Layout.preferredHeight:159
+            ColumnLayout {
+                anchors.fill:parent; anchors.margins:12; spacing:6
+                RowLayout {
+                    Layout.fillWidth:true
+                    Text { text:"Request waterfall"; color:Theme.text; font.pixelSize:13; font.weight:Font.DemiBold; Layout.fillWidth:true }
+                    Text { text:"0           100           200           300 ms"; color:Theme.muted; font.pixelSize:10 }
+                }
+                ListView {
+                    Layout.fillWidth:true; Layout.fillHeight:true; clip:true; spacing:3
+                    model:page.displayRows.slice(0,5)
+                    delegate:RowLayout {
+                        width:ListView.view.width; height:20; spacing:10
+                        Text {
+                            Layout.preferredWidth:180
+                            text:modelData.method+" "+modelData.path
+                            font.pixelSize:10; color:Theme.muted; elide:Text.ElideRight
+                        }
+                        Item {
+                            Layout.fillWidth:true; height:17
+                            Rectangle {
+                                x:parent.width*Number(modelData.waterfall)/100
+                                width:Math.max(6,Math.min(parent.width-x,parent.width*Number.parseInt(modelData.duration)/640))
+                                height:12; radius:3
+                                color:page.selected&&page.selected.id===modelData.id?Theme.green:Theme.accent
+                                opacity:0.8
+                            }
+                        }
+                        Text { text:modelData.duration; Layout.preferredWidth:54; font.pixelSize:10; color:Theme.muted }
+                    }
+                }
+            }
+        }
         RowLayout {
             Layout.fillWidth:true
-            Text { text:"Request waterfall: select a request to inspect timings, TLS, headers and payload."; color:Theme.muted; font.pixelSize:11; Layout.fillWidth:true }
+            SwirlButton {
+                text:page.waterfallOpen?"Hide waterfall":"Show waterfall"
+                iconName:"chart"; quiet:true; onClicked:page.waterfallOpen=!page.waterfallOpen
+            }
+            Text { text:"Synthetic timing breakdown · select a request for full details"; color:Theme.muted; font.pixelSize:11; Layout.fillWidth:true }
             SwirlButton { text:"Replay"; onClicked:AppState.currentPage="replay" }
             SwirlButton { text:"Breakpoint"; onClicked:AppState.currentPage="breakpoint" }
         }
