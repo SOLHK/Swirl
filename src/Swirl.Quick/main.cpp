@@ -5,6 +5,8 @@
 #include <QIcon>
 #include <QTimer>
 #include <QQuickWindow>
+#include <QQuickItem>
+#include <QQuickItemGrabResult>
 #include <QImage>
 #include <QDebug>
 #include "demo/DemoDataProvider.h"
@@ -49,12 +51,29 @@ int main(int argc, char *argv[])
         if (window) {
             QTimer::singleShot(900, &app, [window, previewPath]() {
                 const QImage screenshot = window->grabWindow();
-                if (screenshot.isNull() || !screenshot.save(previewPath))
-                    qWarning() << "Optional preview screenshot was unavailable:" << previewPath;
-                else
+                if (!screenshot.isNull() && screenshot.save(previewPath)) {
                     qInfo() << "Saved synthetic UI preview:" << previewPath;
+                    return;
+                }
+
+                // The offscreen QPA plugin may not support QQuickWindow::grabWindow().
+                // Grab the rendered Quick item asynchronously as a software fallback.
+                const auto fallback = window->contentItem()->grabToImage();
+                if (!fallback) {
+                    qWarning() << "Optional UI screenshot unavailable on this renderer:"
+                               << previewPath;
+                    return;
+                }
+                QObject::connect(fallback.data(), &QQuickItemGrabResult::ready, window,
+                                 [fallback, previewPath]() {
+                    if (!fallback->image().isNull() && fallback->image().save(previewPath))
+                        qInfo() << "Saved Qt item snapshot:" << previewPath;
+                    else
+                        qWarning() << "Unable to save optional item preview:"
+                                   << previewPath;
+                });
             });
-            QTimer::singleShot(1450, &app, &QCoreApplication::quit);
+            QTimer::singleShot(2400, &app, &QCoreApplication::quit);
         } else
             QTimer::singleShot(0, &app, &QCoreApplication::quit);
     }
