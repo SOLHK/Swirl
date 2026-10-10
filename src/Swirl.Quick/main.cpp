@@ -2,6 +2,7 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QIcon>
+#include <QTimer>
 #include "demo/DemoDataProvider.h"
 #include "app/WindowsBackdrop.h"
 
@@ -18,5 +19,7 @@ int main(int argc, char *argv[])
     engine.loadFromModule("SwirlQuick", "Main");
     if (engine.rootObjects().isEmpty())
         return 1;
+    if (app.arguments().contains("--smoke-test"))
+        QTimer::singleShot(1200, &app, &QCoreApplication::quit);
     return app.exec();
 }
