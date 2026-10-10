@@ -2,14 +2,21 @@
 
 <img src="AdShield/Assets/swirl-256.png" width="112" alt="Swirl 流光风筝图标">
 
-Windows x64 网络工具：Mihomo 代理、规则分流、Loon 明文插件兼容层、HTTPS 改写、JavaScript 脚本与加密配置同步。当前版本 **0.6.2**，支持 Windows 10 2004 及以上版本和 Windows 11，仅开发 Windows 版本。
+Windows x64 网络工具：Mihomo 代理、规则分流、Loon 明文插件兼容层、HTTPS 改写、JavaScript 脚本与加密配置同步。当前版本 **0.7.0**，支持 Windows 10 2004 及以上版本和 Windows 11，仅开发 Windows 版本。
 
-界面采用浅色侧栏、圆角卡片、柔和渐变与独立功能页面，参考 macOS 网络工具的布局。图标使用用户提供的流光风筝。此项目由 AdShield 的网络模块继续开发，删除了爱奇艺和腾讯视频专用暂停广告识别与自动点击功能，广告处理由用户导入的网络规则和插件执行。
+界面使用 WPF 矢量渲染、原生 Windows 11 Desktop Acrylic 模糊背景、紧凑侧栏和半透明卡片，跟随系统浅色 / 深色设置。图标使用流光风筝的透明背景版本，含 16–256 像素图标资源。整体布局借鉴网络工具的功能组织，并非 Loon macOS 界面的复刻。此项目由 AdShield 的网络模块继续开发，删除了爱奇艺和腾讯视频专用暂停广告识别与自动点击功能，广告处理由用户导入的网络规则和插件执行。
 
 ![Swirl 概览](docs/screenshots/overview.png)
 
-*空配置界面示例；截图未连接代理或启用插件。*
+*空配置界面示例；尚未连接或启用插件。蓝橙背景来自背后的测试窗口，用于验证原生模糊效果，并非软件内置背景图。*
 
+## 0.7.0 连接检查与 Windows 界面
+
+系统代理改为使用 Windows 当前连接的原生设置接口，并在启动后读取有效设置确认接管成功；退出时恢复备份。核心启动与网络检测分别显示：两个 HTTPS 检测地址通过插件入口及 Mihomo 请求，网页或重定向不能冒充检测成功。节点页读取核心的实际选择，不再把列表首项当作已选线路。概览显示真实上传 / 下载累计流量与插件启用数量；未启用插件时明确提示去广告尚未配置。
+
+主窗口改为 WPF，使用原生 Desktop Acrylic 显示背后窗口的模糊背景，支持圆角、系统主题、DPI 缩放与窗口缩放。系统关闭透明效果、高对比度或不支持的 Windows 版本使用清晰背景。安装程序使用独立的新图标路径更新桌面快捷方式，避免继续引用旧白底图标。
+
+本次在 Windows Dev build 29648.1000 验证原生代理接管与界面。27H2 尚无本次可据以验证的正式版本；兼容按系统实际能力检测，不根据显示版本名称承诺。Windows 应用是否接受本机证书、插件是否覆盖该客户端的接口，仍以实际规则命中为准。
 ## 0.6.2 配置加载修复
 
 旧安装包未包含 GEO 数据，首次连接遇到 GEOIP / GEOSITE 规则时依赖核心临时下载，下载失败会表现为“核心拒绝配置”。新版随包提供经过固定 SHA256 校验的 `geoip.metadb`、`GeoIP.dat`、`GeoSite.dat` 和 `ASN.mmdb`，首次检查前复制缺少的默认数据库；已有缓存和自定义 GEO 来源保留。常见分流数据库不再依赖首次联网下载。
@@ -24,10 +31,10 @@ Windows x64 网络工具：Mihomo 代理、规则分流、Loon 明文插件兼�
 
 ## 安装与开始使用
 
-在 [Actions](https://github.com/SOLHK/Swirl/actions) 中打开最新成功的 **Build Windows EXE**，下载 `Swirl-Setup-win-x64` 安装程序或 `Swirl-win-x64` 便携包。安装程序名为 `Swirl_Setup_0.6.2_x64.exe`。安装程序包含 .NET 运行时、Mihomo、Wintun 与 jq，无需安装另一份 Clash 客户端。安装程序尚未代码签名。
+在 [Actions](https://github.com/SOLHK/Swirl/actions) 中打开最新成功的 **Build Windows EXE**，下载 `Swirl-Setup-win-x64` 安装程序或 `Swirl-win-x64` 便携包。安装程序名为 `Swirl_Setup_0.7.0_x64.exe`。安装程序包含 .NET 运行时、Mihomo、Wintun 与 jq，无需安装另一份 Clash 客户端。安装程序尚未代码签名。
 
 1. 退出旧版。打开 Swirl，进入「节点」导入自己的 **Clash/Mihomo YAML** 或 HTTPS 订阅。软件不提供节点和订阅服务。
-2. 在「总览」选择规则、全局或直连模式，启用系统代理并连接。节点策略组支持选择节点和测延迟。
+2. 在「偏好设置」启用系统代理或 TUN，并选择流量模式。在「概览」连接后查看 Windows 接管检查与 HTTPS 检测结果；在「代理节点」选择并应用线路。全部直连模式不会使用代理节点，全局模式不应用普通分流规则。
 3. 进入「插件」，从可莉目录选择、粘贴作者 HTTPS 链接、`loon://import?plugin=...` 链接，或导入本地明文 `.plugin/.lpx/.conf`。检查兼容提示、脚本和域名，再启用。含未支持语法的插件不能启用；导入和更新默认停用。
 4. HTTPS 插件需要在「HTTPS」核对解密域名并主动信任本机证书，随后启用 HTTPS。普通系统代理不需要管理员；TUN 需要管理员。TUN 与 HTTPS 可以同时启用。
 5. 停止连接后修改配置、插件和分流规则，再连接生效。退出或断开恢复由 Swirl 接管的系统代理，不覆盖用户或其他软件之后的修改。
@@ -83,7 +90,7 @@ dotnet publish AdShield/AdShield.csproj -c Release -r win-x64 --self-contained t
 ./scripts/prepare-core.ps1 -Destination publish/core
 ```
 
-本机完整回归 **260 项通过**：语法、参数、复写顺序、脚本、二进制/API、Cron、加密同步及冲突；真实核心 HTTP/HTTPS、原生 HTTP2 双向修改、同一 HTTP2 连接不同 URL 的命名策略；三模式模拟捕获入口、证书身份、隔离注册表恢复和 11 种协议离线配置验证。测试不改真实系统代理、不全局信任测试 CA、不安装 TUN 路由、不连接真实节点。另对九个页面进行 Windows DPI 截图检查。
+本机完整回归 **260 项通过**：语法、参数、复写顺序、脚本、二进制/API、Cron、加密同步及冲突；真实核心 HTTP/HTTPS、原生 HTTP2 双向修改、同一 HTTP2 连接不同 URL 的命名策略；三模式模拟捕获入口、证书身份、隔离注册表恢复和 11 种协议离线配置验证。常规链路测试使用隔离代理设置，不全局信任测试 CA、不安装 TUN 路由。另有 --native-proxy-only 检查临时接管真实 Windows 当前连接，通过不显式指定代理的 WinINet 客户端验证入口，finally 恢复原代理、PAC、绕过列表和检测标志。九个 WPF 页面在 Windows 150% DPI 下进行原生合成截图检查。
 
 HTTP2 正文处理包含针对固定 **Titanium.Web.Proxy 7.0.19** 的窄范围兼容修补，等待异步处理完成并仅对转发前、完整缓冲的正文修改内部状态；升级该依赖须重新验证。原生 HTTP2 及 URL 策略桥接有真实链路测试。
 

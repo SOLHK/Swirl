@@ -3,17 +3,19 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms>
+    <UseWPF>true</UseWPF>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>Swirl</AssemblyName>
     <RootNamespace>AdShield</RootNamespace>
-    <Version>0.6.2</Version>
+    <Version>0.7.0</Version>
     <ApplicationIcon>Assets\swirl.ico</ApplicationIcon>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
   </PropertyGroup>
   <ItemGroup>
     <EmbeddedResource Include="Assets\swirl-256.png" LogicalName="Swirl.Icon.png" />
     <EmbeddedResource Include="Assets\swirl.ico" LogicalName="Swirl.Icon.ico" />
+    <None Update="Assets\swirl-glass-070.ico" CopyToOutputDirectory="PreserveNewest" TargetPath="swirl-glass-070.ico" />
     <EmbeddedResource Include="..\scripts\geodata.json" LogicalName="Swirl.GeoData.json" />
     <PackageReference Include="YamlDotNet" Version="16.3.0" />
     <PackageReference Include="Titanium.Web.Proxy" Version="7.0.19" />

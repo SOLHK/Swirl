@@ -13,6 +13,8 @@ internal sealed class ProxyProfile
     public SubscriptionClientProfile SubscriptionClient { get; set; } = SubscriptionClientProfile.Mihomo;
     public string Mode { get; set; } = "rule";
     public bool Tun { get; set; }
+    public bool UseSystemProxy { get; set; } = true;
+    public bool GlassAppearance { get; set; } = true;
     public bool Mitm { get; set; }
     public bool BasicAds { get; set; }
     public List<LoonPlugin> Plugins { get; set; } = new();

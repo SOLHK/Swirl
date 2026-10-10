@@ -81,6 +81,7 @@ internal sealed class ProxyController : IDisposable
                     if (core.HasExited) throw new InvalidOperationException("代理核心已经退出，未接管系统代理。");
                     ownsSystemProxy = true;
                     WindowsSystemProxy.Enable();
+                    if (!WindowsSystemProxy.IsEnabled) throw new InvalidOperationException("Windows 系统代理没有生效，请检查是否有其他代理软件正在接管网络。");
                 }
             }
             report("代理已启动：本机入口 127.0.0.1:" + MihomoConfig.PluginPort + "，模式 " + profile.Mode + (profile.Tun ? "，TUN 已启用" : ""));
@@ -154,6 +155,20 @@ internal sealed class ProxyController : IDisposable
             if (proxy.Value.TryGetProperty("type", out var type) && type.GetString() == "Selector" && proxy.Value.TryGetProperty("all", out var all))
                 groups[proxy.Name] = all.EnumerateArray().Select(n => n.GetString()!).Where(n => n != MihomoConfig.PluginOutbound).ToArray();
         return groups;
+    }
+    internal async Task<Dictionary<string, string>> SelectionsAsync()
+    {
+        using var response = await RequestAsync(HttpMethod.Get, "/proxies"); response.EnsureSuccessStatusCode();
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        return document.RootElement.GetProperty("proxies").EnumerateObject()
+            .Where(p => p.Value.TryGetProperty("now", out var n) && n.ValueKind == JsonValueKind.String)
+            .ToDictionary(p => p.Name, p => p.Value.GetProperty("now").GetString()!);
+    }
+    internal async Task<(long Upload, long Download)> TrafficAsync()
+    {
+        using var response = await RequestAsync(HttpMethod.Get, "/connections"); response.EnsureSuccessStatusCode();
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        var root = document.RootElement; return (root.GetProperty("uploadTotal").GetInt64(), root.GetProperty("downloadTotal").GetInt64());
     }
     internal async Task SelectAsync(string group, string node)
     {

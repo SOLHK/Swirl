@@ -1,6 +1,6 @@
 ; Swirl Windows x64 setup, built by GitHub Actions using Inno Setup 6.
 #define AppName "Swirl"
-#define AppVersion "0.6.2"
+#define AppVersion "0.7.0"
 #define AppExe "Swirl.exe"
 
 [Setup]
@@ -38,9 +38,9 @@ Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: 
 Source: "..\publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\Swirl"; Filename: "{app}\{#AppExe}"
+Name: "{group}\Swirl"; Filename: "{app}\{#AppExe}"; IconFilename: "{app}\swirl-glass-070.ico"
 Name: "{group}\卸载 Swirl"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\Swirl"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
+Name: "{autodesktop}\Swirl"; Filename: "{app}\{#AppExe}"; IconFilename: "{app}\swirl-glass-070.ico"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "立即启动 Swirl"; Flags: nowait postinstall skipifsilent
