@@ -34,6 +34,7 @@ qt_add_qml_module(SwirlQuick
     RESOURCE_PREFIX /qt/qml
     NO_GENERATE_EXTRA_QMLDIRS
     QML_FILES ${SWIRL_QML_FILES}
+    SOURCES app/JavascriptHighlighter.h app/JavascriptHighlighter.cpp
 )
 set(SWIRL_ASSET_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../../AdShield/Assets")
 qt_add_resources(SwirlQuick brand PREFIX "/swirl" BASE "${SWIRL_ASSET_PATH}" FILES "${SWIRL_ASSET_PATH}/swirl-256.png")
