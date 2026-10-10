@@ -1,5 +1,11 @@
 # Swirl
 
+> **🧪 当前为 `test` 测试版分支，不是正式版。** 本分支用于 Windows 构建、Qt 6 Quick / QML UI 预览、修复和验收。独立 Qt 界面的功能操作目前使用模拟数据，不代表真实网络能力。**未经仓库所有者明确指令，禁止合并到 `main` 或发布正式版本。**
+>
+> [正式版 `main`](https://github.com/SOLHK/Swirl/tree/main) · [测试版 Qt CI](https://github.com/SOLHK/Swirl/actions/workflows/build-qt-quick-ui.yml) · [发布流程](docs/RELEASE_PROCESS.md)
+>
+> ![Qt staging build](https://github.com/SOLHK/Swirl/actions/workflows/build-qt-quick-ui.yml/badge.svg?branch=test)
+
 <img src="AdShield/Assets/swirl-256.png" width="112" alt="Swirl 流光风筝图标">
 
 Windows x64 网络工具：Mihomo 代理、规则分流、Loon 明文插件兼容层、HTTPS 改写、JavaScript 脚本与加密配置同步。当前版本 **0.7.1**，支持 Windows 10 2004 及以上版本和 Windows 11，仅开发 Windows 版本。
