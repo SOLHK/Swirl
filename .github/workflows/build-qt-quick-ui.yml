@@ -1,15 +1,15 @@
 name: Build Swirl Qt Quick UI (Preview)
 
 on:
-  push:
-    branches: [feat/qt-quick-ui-demo]
-    paths:
-      - "src/Swirl.Quick/**"
-      - ".github/workflows/build-qt-quick-ui.yml"
   pull_request:
     paths:
       - "src/Swirl.Quick/**"
+      - ".github/workflows/build-qt-quick-ui.yml"
   workflow_dispatch:
+
+concurrency:
+  group: swirl-quick-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-qt-ui:
