@@ -45,17 +45,30 @@ jobs:
         run: |
           $env:QT_QPA_PLATFORM = "offscreen"
           $env:QT_QUICK_BACKEND = "software"
-          & dist/SwirlQuick.exe --smoke-test
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          # GUI-subsystem executables return immediately from PowerShell's '&' invocation.
+          # Explicitly wait for the real Qt process so smoke tests cannot false-pass.
+          $exe = (Resolve-Path "dist/SwirlQuick.exe").Path
+          $process = Start-Process -FilePath $exe -ArgumentList "--smoke-test" -Wait -PassThru -NoNewWindow
+          if ($process.ExitCode -ne 0) { throw "Qt Quick startup failed: $($process.ExitCode)" }
       - name: Capture optional UI screenshots (offscreen software renderer)
         shell: pwsh
         run: |
           $env:QT_QPA_PLATFORM = "offscreen"
           $env:QT_QUICK_BACKEND = "software"
-          & dist/SwirlQuick.exe --capture-preview=dist/Swirl-Overview-preview.png --preview-page=overview --preview-theme=light
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          & dist/SwirlQuick.exe --capture-preview=dist/Swirl-Inspector-preview.png --preview-page=inspector --preview-theme=dark
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $exe = (Resolve-Path "dist/SwirlQuick.exe").Path
+          $previews = @(
+            @{ file = "Swirl-Overview-preview.png"; page = "overview"; theme = "light" },
+            @{ file = "Swirl-Inspector-preview.png"; page = "inspector"; theme = "dark" }
+          )
+          foreach ($preview in $previews) {
+            $path = Join-Path (Resolve-Path "dist").Path $preview.file
+            $args = @("--capture-preview=$path", "--preview-page=$($preview.page)", "--preview-theme=$($preview.theme)")
+            $process = Start-Process -FilePath $exe -ArgumentList $args -Wait -PassThru -NoNewWindow
+            if ($process.ExitCode -ne 0) { throw "Qt Quick preview exited with $($process.ExitCode)" }
+            if (!(Test-Path $path)) { throw "Missing screenshot: $path" }
+            if ((Get-Item $path).Length -lt 2048) { throw "Screenshot is suspiciously small: $path" }
+            Write-Host "Verified Qt screenshot: $path"
+          }
       - name: Upload separate Qt UI preview
         uses: actions/upload-artifact@v4
         with:
