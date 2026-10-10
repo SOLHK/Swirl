@@ -13,7 +13,7 @@ ApplicationWindow {
     minimumWidth: 920
     minimumHeight: 600
     title: "Swirl · UI Preview"
-    color: Theme.canvas
+    color: Theme.transparency ? Qt.rgba(Theme.canvas.r,Theme.canvas.g,Theme.canvas.b,0.91) : Theme.canvas
     property bool swirlTransparencyEnabled: Theme.transparency
     Component.onCompleted: backdrop.apply(window, swirlTransparencyEnabled)
     onSwirlTransparencyEnabledChanged: backdrop.apply(window, swirlTransparencyEnabled)
@@ -76,12 +76,7 @@ ApplicationWindow {
                         }
                     }
                     SwirlStatusBadge { label:"UI DEMO"; tone:"accent" }
-                    SwirlButton { text:"−"; quiet:true; implicitWidth:34; onClicked:window.showMinimized() }
-                    SwirlButton {
-                        text:window.visibility===Window.Maximized ? "❐":"□"
-                        quiet:true; implicitWidth:34
-                        onClicked:window.visibility===Window.Maximized ? window.showNormal() : window.showMaximized()
-                    }
+                    SwirlButton { text:"Settings"; iconName:"settings"; quiet:true; onClicked:AppState.currentPage="settings" }
                 }
             }
             Loader {
