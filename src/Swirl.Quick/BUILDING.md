@@ -28,5 +28,6 @@ disabled the UI uses readable opaque panels.
 
 Build verification: source is authored for the listed toolchain but has NOT
 been compiled on Windows in the authoring environment. No Qt desktop kit or
-Windows compiler is available here. All network/automation operations are UI
+Windows compiler is available here. JavaScript editor uses a native QSyntaxHighlighter for local formatting.
+All network/automation operations are UI
 demonstrations and cannot affect system settings or stored user config.
