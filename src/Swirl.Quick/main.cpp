@@ -9,8 +9,22 @@
 #include <QQuickItemGrabResult>
 #include <QImage>
 #include <QDebug>
+#include <QFile>
+#include <QTextStream>
+#include <QCoreApplication>
 #include "demo/DemoDataProvider.h"
 #include "app/WindowsBackdrop.h"
+
+// Collect Qt/QML diagnostics in a file because the Windows GUI subsystem
+// does not attach stderr to GitHub Actions' PowerShell console.
+static void recordQtDiagnostic(QtMsgType type, const QMessageLogContext &, const QString &message)
+{
+    QFile file(QCoreApplication::applicationDirPath() + QStringLiteral("/SwirlQuick-diagnostics.txt"));
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
+        return;
+    QTextStream out(&file);
+    out << static_cast<int>(type) << ": " << message << '\n';
+}
 
 int main(int argc, char *argv[])
 {
@@ -36,6 +50,10 @@ int main(int argc, char *argv[])
     const QString previewPath = argumentValue(QStringLiteral("--capture-preview="));
     const QString previewPage = argumentValue(QStringLiteral("--preview-page="));
     const QString previewTheme = argumentValue(QStringLiteral("--preview-theme="));
+    if (smoke || !previewPath.isEmpty()) {
+        QFile::remove(QCoreApplication::applicationDirPath() + QStringLiteral("/SwirlQuick-diagnostics.txt"));
+        qInstallMessageHandler(recordQtDiagnostic);
+    }
     engine.rootContext()->setContextProperty("previewPage", previewPage);
     engine.rootContext()->setContextProperty("previewTheme", previewTheme);
     engine.rootContext()->setContextProperty("smokeTestMode", smoke);
