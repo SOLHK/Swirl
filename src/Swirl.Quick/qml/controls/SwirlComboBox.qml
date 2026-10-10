@@ -14,10 +14,30 @@ ComboBox {
         elide:Text.ElideRight
         leftPadding:12; rightPadding:25
     }
-    indicator:Text {
-        text:"⌄"; color:Theme.muted; font.pixelSize:18
-        anchors.right:parent.right; anchors.rightMargin:10
-        anchors.verticalCenter:parent.verticalCenter
+    // Paint the chevron as vectors instead of depending on a rare font glyph.
+    // This renders consistently on Chinese, English and headless Windows kits.
+    indicator:Canvas {
+        id:chevron
+        x:control.width-width-12
+        y:(control.height-height)/2
+        width:13; height:13
+        onPaint:{
+            var ctx=getContext("2d")
+            ctx.reset()
+            ctx.strokeStyle=Theme.muted
+            ctx.lineWidth=1.7
+            ctx.lineCap="round"
+            ctx.lineJoin="round"
+            ctx.beginPath()
+            ctx.moveTo(2.5,5)
+            ctx.lineTo(6.5,9)
+            ctx.lineTo(10.5,5)
+            ctx.stroke()
+        }
+        Connections {
+            target:Theme
+            function onMutedChanged(){chevron.requestPaint()}
+        }
     }
     background:Rectangle { radius:10; color:Theme.surface; border.color:Theme.border }
     delegate:ItemDelegate {
