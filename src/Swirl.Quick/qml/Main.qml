@@ -83,7 +83,7 @@ ApplicationWindow {
             Item { Layout.fillWidth:true }
             Text { text:"Swirl"; color:Theme.text; font.family:"Segoe UI"; font.pixelSize:13; font.weight:Font.DemiBold }
             Item { Layout.fillWidth:true }
-            Text { text:"界面预览 · 所有网络操作均为模拟"; color:Theme.muted; font.pixelSize:11 }
+            Text { text:"所有网络操作均为模拟"; color:Theme.muted; font.pixelSize:11 }
         }
     }
     // Frameless windows still support native edge resizing.
@@ -265,7 +265,7 @@ ApplicationWindow {
                     anchors.fill:parent
                     anchors.leftMargin:27; anchors.rightMargin:26
                     Text { text:"●  当前为界面演示，不会执行真实网络操作"; color:Theme.muted; font.pixelSize:11; Layout.fillWidth:true }
-                    Text { text:"Swirl  ·  测试版 0.1"; color:Theme.muted; font.pixelSize:11 }
+                    Text { text:"界面演示  ·  测试版"; color:Theme.muted; font.pixelSize:11 }
                 }
             }
         }
@@ -283,7 +283,7 @@ ApplicationWindow {
     Component { id:proxies; ProxiesPage {} }
     Component { id:inspector; InspectorPage {} }
     Component { id:scripts; ScriptsPage {} }
-    Component { id:settings; 设置Page {} }
+    Component { id:settings; SettingsPage {} }
     Component { id:toolbox; ToolboxPage {} }
     Component { id:dashboard; DashboardPage {} }
     Component { id:dns; DNSPage {} }
