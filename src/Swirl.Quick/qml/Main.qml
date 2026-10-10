@@ -19,6 +19,12 @@ ApplicationWindow {
     onSwirlTransparencyEnabledChanged: backdrop.apply(window, swirlTransparencyEnabled)
     font.family: "Segoe UI"
     font.pixelSize: 13
+    Item {
+        id: scaledCanvas
+        width:window.width/Theme.uiScale
+        height:window.height/Theme.uiScale
+        scale:Theme.uiScale
+        transformOrigin:Item.TopLeft
     RowLayout {
         anchors.fill: parent
         spacing: 0
@@ -136,5 +142,6 @@ ApplicationWindow {
             elide:Text.ElideRight
             font.pixelSize:12
         }
+    }
     }
 }
