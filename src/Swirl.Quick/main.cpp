@@ -5,6 +5,7 @@
 #include <QIcon>
 #include <QTimer>
 #include <QQuickWindow>
+#include <QQuickStyle>
 #include <QQuickItem>
 #include <QQuickItemGrabResult>
 #include <QImage>
@@ -31,6 +32,9 @@ int main(int argc, char *argv[])
     QGuiApplication app(argc, argv);
     app.setApplicationName(QStringLiteral("Swirl"));
     app.setWindowIcon(QIcon(QStringLiteral(":/swirl/swirl-256.png")));
+    // Native Windows Qt Quick Controls do not support custom backgrounds/content.
+    // Swirl draws its own visual controls, so explicitly use the customizable style.
+    QQuickStyle::setStyle(QStringLiteral("Basic"));
     DemoDataProvider demo;
     WindowsBackdrop backdrop;
     QQmlApplicationEngine engine;
