@@ -11,11 +11,11 @@ using M = System.Windows.Media;
 
 namespace AdShield.Desktop;
 
-internal sealed class SwirlWindow : W.Window
+internal sealed partial class SwirlWindow : W.Window
 {
     private readonly ProxyProfile profile;
     private readonly ProxyController controller;
-    private readonly Dictionary<string, C.StackPanel> pages = new();
+    private readonly Dictionary<string, W.FrameworkElement> pages = new();
     private readonly Dictionary<string, C.Button> navigation = new();
     private readonly C.ScrollViewer viewport = new() { VerticalScrollBarVisibility = C.ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = C.ScrollBarVisibility.Disabled };
     private readonly C.TextBlock status = new(), headline = new(), detail = new(), diagnostic = new(), scope = new(), pluginMetric = new(), uploadMetric = new(), downloadMetric = new(), routeMetric = new(), pluginInfo = new(), syncStatus = new(), groupInfo = new(), nodeInfo = new(), modeInfo = new(), subscriptionInfo = new();
@@ -40,10 +40,10 @@ internal sealed class SwirlWindow : W.Window
 
     internal SwirlWindow(ProxyProfile? initialProfile = null, bool withTray = true)
     {
-        profile = initialProfile ?? ProxyProfile.Load(); controller = new ProxyController(Report);
+        profile = initialProfile ?? ProxyProfile.Load(); SubscriptionLibrary.Ensure(profile); controller = new ProxyController(Report);
         Title = "Swirl"; Width = 1160; Height = 790; MinWidth = 930; MinHeight = 650;
         WindowStartupLocation = W.WindowStartupLocation.CenterScreen; WindowStyle = W.WindowStyle.None;
-        FontFamily = new M.FontFamily("Microsoft YaHei UI"); FontSize = 13;
+        FontFamily = new M.FontFamily("Segoe UI Variable Text, Microsoft YaHei UI"); FontSize = 13;
         UseLayoutRounding = true; SnapsToDevicePixels = true;
         Resources.MergedDictionaries.Add(new W.ResourceDictionary { Source = new Uri("/Swirl;component/Desktop/Styles.xaml", UriKind.Relative) });
         SetColors(); Icon = ImageSource();
@@ -63,20 +63,22 @@ internal sealed class SwirlWindow : W.Window
         var sidebar = new C.DockPanel { Margin = new W.Thickness(12, 6, 12, 12) };
         var brand = new C.StackPanel { Orientation = C.Orientation.Horizontal, Margin = new W.Thickness(10, 9, 0, 26) };
         brand.Children.Add(new C.Image { Source = Icon, Width = 44, Height = 44, Margin = new W.Thickness(0, 0, 10, 0) }); var brandLabels = new C.StackPanel(); brandLabels.Children.Add(Text("Swirl", 24, true)); brandLabels.Children.Add(Note("让网络轻盈一点", 11)); brand.Children.Add(brandLabels); C.DockPanel.SetDock(brand, C.Dock.Top); sidebar.Children.Add(brand);
-        var footer = Note("Swirl 0.7.2\nWindows · Mihomo", 11); footer.Margin = new W.Thickness(16, 10, 0, 0); C.DockPanel.SetDock(footer, C.Dock.Bottom); sidebar.Children.Add(footer);
+        var footer = Note("Swirl 0.8.0\nWindows · Mihomo", 11); footer.Margin = new W.Thickness(16, 10, 0, 0); C.DockPanel.SetDock(footer, C.Dock.Bottom); sidebar.Children.Add(footer);
         var links = new C.StackPanel();
         foreach (var (key, name, glyph) in new[] { ("overview", "概览", "\uE80F"), ("groups", "策略组", "\uE8AB"), ("nodes", "代理节点", "\uE839"), ("subscriptions", "订阅配置", "\uE8F1"), ("plugins", "插件中心", "\uE74C"), ("routing", "规则分流", "\uE8AB"), ("https", "HTTPS 解密", "\uE72E"), ("scripts", "脚本任务", "\uE756"), ("sync", "配置同步", "\uE753"), ("logs", "运行记录", "\uE9D9"), ("settings", "偏好设置", "\uE713") })
         {
             var row = new C.StackPanel { Orientation = C.Orientation.Horizontal }; row.Children.Add(new C.TextBlock { Text = glyph, FontFamily = new M.FontFamily("Segoe Fluent Icons"), Width = 30, VerticalAlignment = W.VerticalAlignment.Center }); row.Children.Add(Text(name));
             var button = Button("", () => { SelectPage(key); return Task.CompletedTask; }); button.Content = row; button.HorizontalContentAlignment = W.HorizontalAlignment.Left; button.Margin = new W.Thickness(0, 0, 0, 5); button.Padding = new W.Thickness(15, 12, 10, 12); button.BorderThickness = new W.Thickness(0); links.Children.Add(button); navigation[key] = button;
         }
-        sidebar.Children.Add(new C.ScrollViewer { Content = links, VerticalScrollBarVisibility = C.ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = C.ScrollBarVisibility.Disabled }); workspace.Children.Add(sidebar);
-        viewport.Margin = new W.Thickness(22, 8, 24, 16); C.Grid.SetColumn(viewport, 1); workspace.Children.Add(viewport);
+        sidebar.Children.Add(new C.ScrollViewer { Content = links, VerticalScrollBarVisibility = C.ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = C.ScrollBarVisibility.Disabled });
+        var navigationSurface = new C.Border { Child = sidebar, CornerRadius = new W.CornerRadius(20), Margin = new W.Thickness(8, 8, 12, 12) }; navigationSurface.SetResourceReference(C.Border.BackgroundProperty, "Sidebar"); workspace.Children.Add(navigationSurface);
+        viewport.Margin = new W.Thickness(25, 22, 25, 20);
+        var sheet = new C.Border { Child = viewport, CornerRadius = new W.CornerRadius(24), Margin = new W.Thickness(0, 8, 16, 12), BorderThickness = new W.Thickness(1) }; sheet.SetResourceReference(C.Border.BackgroundProperty, "Sheet"); sheet.SetResourceReference(C.Border.BorderBrushProperty, "Line"); C.Grid.SetColumn(sheet, 1); workspace.Children.Add(sheet);
         status.Margin = new W.Thickness(238, 7, 25, 0); status.FontSize = 11; status.SetResourceReference(C.TextBlock.ForegroundProperty, "Muted"); status.TextTrimming = W.TextTrimming.CharacterEllipsis; status.TextWrapping = W.TextWrapping.NoWrap; C.Grid.SetRow(status, 2); shell.Children.Add(status); Content = shell;
         BuildOverview(); BuildSubscriptions(); BuildGroups(); BuildNodes(); BuildPlugins(); BuildRouting(); BuildHttps(); BuildScripts(); BuildSync(); BuildLogs(); BuildSettings(); LoadProfile(); SelectPage("overview");
         status.Text = File.Exists(ProxyController.CorePath) ? "网络核心已就绪 · 尚未连接" : "缺少网络核心，请完整安装 Swirl";
         SourceInitialized += (_, _) => ApplyBackdrop();
-        preferenceChanged = (_, _) => { if (!closed) Dispatcher.BeginInvoke(() => { if (!closed) { SetColors(); ApplyBackdrop(); } }); };
+        preferenceChanged = (_, _) => { if (!closed) Dispatcher.BeginInvoke(() => { if (!closed) { SetColors(); RefreshSummary(); FillNodes(); RefreshPolicyCards(); RefreshSubscriptionCards(); ApplyBackdrop(); } }); };
         Microsoft.Win32.SystemEvents.UserPreferenceChanged += preferenceChanged;
         if (withTray)
         {
@@ -94,12 +96,16 @@ internal sealed class SwirlWindow : W.Window
         M.SolidColorBrush Brush(byte alpha, byte r, byte g, byte b) => new(M.Color.FromArgb(alpha, r, g, b));
         Resources["Ink"] = Dark ? Brush(255, 241, 245, 251) : Brush(255, 27, 40, 62);
         Resources["Muted"] = Dark ? Brush(255, 172, 184, 202) : Brush(255, 92, 108, 133);
-        Resources["Card"] = Dark ? Brush(150, 35, 44, 59) : Brush(150, 255, 255, 255);
-        Resources["Field"] = Dark ? Brush(190, 45, 55, 73) : Brush(175, 247, 250, 255);
+        Resources["Card"] = Dark ? Brush(240, 43, 48, 59) : Brush(240, 255, 255, 255);
+        Resources["Sheet"] = Dark ? Brush(225, 27, 31, 40) : Brush(218, 245, 247, 251);
+        Resources["Sidebar"] = Dark ? Brush(175, 31, 37, 48) : Brush(175, 244, 248, 255);
+        Resources["Field"] = Dark ? Brush(245, 52, 58, 71) : Brush(250, 247, 249, 253);
         Resources["PopupSurface"] = Dark ? Brush(255, 40, 48, 63) : Brush(255, 247, 250, 255);
-        Resources["Line"] = Dark ? Brush(70, 184, 210, 245) : Brush(65, 150, 167, 194);
+        Resources["Line"] = Dark ? Brush(55, 184, 210, 245) : Brush(42, 135, 153, 179);
         Resources["Selection"] = Dark ? Brush(140, 40, 92, 146) : Brush(180, 223, 239, 255);
         Resources["Accent"] = Brush(255, 33, 123, 226);
+        Resources["Success"] = Dark ? Brush(255, 95, 220, 171) : Brush(255, 31, 133, 98);
+        Resources["Danger"] = Dark ? Brush(255, 255, 144, 133) : Brush(255, 193, 77, 72);
     }
     private void ApplyBackdrop() { bool enabled = WindowBackdrop.Apply(this, profile.GlassAppearance); if (profile.GlassAppearance && !enabled) Report("玻璃背景未启用：Windows 透明效果设置或当前系统不支持，已使用清晰背景。"); }
     private static BitmapSource ImageSource()
@@ -122,9 +128,9 @@ internal sealed class SwirlWindow : W.Window
     private C.StackPanel Card(C.Panel page, string title, string description = "")
     {
         var content = new C.StackPanel(); content.Children.Add(Text(title, 16, true)); if (description.Length > 0) content.Children.Add(Note(description));
-        var border = new C.Border { Child = content, CornerRadius = new W.CornerRadius(14), Padding = new W.Thickness(20), BorderThickness = new W.Thickness(1), Margin = new W.Thickness(0, 8, 0, 8) }; border.SetResourceReference(C.Border.BackgroundProperty, "Card"); border.SetResourceReference(C.Border.BorderBrushProperty, "Line"); page.Children.Add(border); return content;
+        var border = new C.Border { Child = content, CornerRadius = new W.CornerRadius(20), Padding = new W.Thickness(20), BorderThickness = new W.Thickness(1), Margin = new W.Thickness(0, 8, 0, 8) }; border.SetResourceReference(C.Border.BackgroundProperty, "Card"); border.SetResourceReference(C.Border.BorderBrushProperty, "Line"); page.Children.Add(border); return content;
     }
-    internal void SelectPage(string key) { viewport.Content = pages[key]; viewport.UpdateLayout(); viewport.ScrollToTop(); foreach (var item in navigation) item.Value.Background = item.Key == key ? (M.Brush)Resources["Selection"] : M.Brushes.Transparent; }
+    internal void SelectPage(string key) { viewport.VerticalScrollBarVisibility = key == "nodes" ? C.ScrollBarVisibility.Disabled : C.ScrollBarVisibility.Auto; viewport.Content = pages[key]; viewport.UpdateLayout(); viewport.ScrollToTop(); foreach (var item in navigation) item.Value.Background = item.Key == key ? (M.Brush)Resources["Selection"] : M.Brushes.Transparent; }
     private void BuildOverview()
     {
         var page = Page("overview", "概览", "连接状态、当前线路与插件，一眼可见。");
@@ -148,45 +154,9 @@ internal sealed class SwirlWindow : W.Window
         var health = Card(right, "连接检查"); diagnostic.LineHeight = 22; health.Children.Add(diagnostic);
         Row(health, Button("添加去广告插件", () => { SelectPage("plugins"); return Task.CompletedTask; }), Button("查看记录", () => { SelectPage("logs"); return Task.CompletedTask; }));
     }
-    private void BuildSubscriptions()
-    {
-        var page = Page("subscriptions", "订阅配置", "导入后即可查看策略组和节点，不必先建立连接。");
-        var summary = Card(page, "当前配置"); summary.Children.Add(subscriptionInfo);
-        Row(summary, Button("查看策略组", () => { SelectPage("groups"); return Task.CompletedTask; }), Button("查看节点", () => { SelectPage("nodes"); return Task.CompletedTask; }));
-        var input = Card(page, "订阅与配置"); input.Children.Add(Note("订阅地址（在本机加密保存）")); input.Children.Add(subscription); subscriptionShown.Visibility = W.Visibility.Collapsed; input.Children.Add(subscriptionShown);
-        subscriptionClient.ItemsSource = new[] { "Mihomo / Clash Meta", "Clash 兼容", "浏览器请求" }; Row(input, Text("请求类型"), subscriptionClient); subscriptionRoute.ItemsSource = new[] { "自动 · 先直连，再尝试当前系统代理", "直连 · 不经过系统代理", "当前系统代理 · 每次读取最新设置", "Swirl 代理 · 保持连接下载" }; Row(input, Text("下载链路"), subscriptionRoute); input.Children.Add(Note("下载链路与代理流量模式独立。更新时保持当前连接，新配置在重新连接后生效。"));
-        Row(input, Button("更新订阅", UpdateSubscriptionAsync, true), Button("本地 YAML", () => Mutate(async () => { using var dialog = new OpenFileDialog { Filter = "Clash / Mihomo|*.yaml;*.yml" }; if (dialog.ShowDialog(OwnerHandle) != System.Windows.Forms.DialogResult.OK) return; if (new FileInfo(dialog.FileName).Length > 4 * 1024 * 1024) throw new InvalidOperationException("配置超过 4 MB。"); profile.ProtectedYaml = ProxyProfile.Protect(MihomoConfig.ParseSubscription(await File.ReadAllTextAsync(dialog.FileName))); profile.Save(); status.Text = "本地配置已导入。"; })), Button("显示 / 隐藏地址", () => { bool show = subscriptionShown.Visibility != W.Visibility.Visible; if (show) subscriptionShown.Text = subscription.Password; else subscription.Password = subscriptionShown.Text; subscriptionShown.Visibility = show ? W.Visibility.Visible : W.Visibility.Collapsed; subscription.Visibility = show ? W.Visibility.Collapsed : W.Visibility.Visible; return Task.CompletedTask; }), Button("检查配置", () => Mutate(async () => { SaveFlags(); await controller.ValidateAsync(profile); status.Text = "配置检查通过。"; })));
-    }
-    private void BuildGroups()
-    {
-        var page = Page("groups", "策略组", "按用途管理分流策略；具体服务器在代理节点页选择。");
-        var list = Card(page, "订阅策略"); groups.Height = 220; list.Children.Add(groups); list.Children.Add(groupInfo);
-        groups.SelectionChanged += (_, _) =>
-        {
-            if (groups.SelectedItem is not ProxyGroup group) return;
-            groupInfo.Text = GroupDescription(group);
-            subPolicies.ItemsSource = group.Members.Where(n => !catalog.Nodes.ContainsKey(n)).ToArray();
-            subPolicies.SelectedItem = selections.GetValueOrDefault(group.Name);
-            subPolicies.IsEnabled = group.Selectable;
-            if (group.Selectable) nodeTargetGroup.SelectedItem = group;
-        };
-        Row(list, Button("选择节点", () => { SelectPage("nodes"); return Task.CompletedTask; }, true), Button("刷新策略", RefreshCatalogAsync));
-        var policy = Card(page, "关联策略", "可关联其他策略组，也可明确选择直连或拒绝。自动组由核心管理。");
-        policy.Children.Add(subPolicies);
-        Row(policy, Button("应用关联", async () => { if (groups.SelectedItem is not ProxyGroup group || !group.Selectable || subPolicies.SelectedItem is not string member) throw new InvalidOperationException("请选择可手动切换的策略组和关联策略。"); await ApplySelectionAsync(group.Name, member); }));
-    }
-    private void BuildNodes()
-    {
-        var page = Page("nodes", "代理节点", "这里只显示服务器节点。先选择要使用它的策略，再应用节点。");
-        var card = Card(page, "节点列表");
-        var filters = new C.Grid(); filters.ColumnDefinitions.Add(new C.ColumnDefinition()); filters.ColumnDefinitions.Add(new C.ColumnDefinition());
-        var target = new C.StackPanel { Margin = new W.Thickness(0, 0, 12, 0) }; target.Children.Add(Note("应用到策略组")); target.Children.Add(nodeTargetGroup);
-        var search = new C.StackPanel(); search.Children.Add(Note("搜索节点")); search.Children.Add(nodeSearch); C.Grid.SetColumn(search, 1); filters.Children.Add(target); filters.Children.Add(search); card.Children.Add(filters);
-        nodeSearch.TextChanged += (_, _) => FillNodes();
-        nodeTargetGroup.SelectionChanged += (_, _) => FillNodes(); nodes.Height = 220; card.Children.Add(nodes); card.Children.Add(nodeInfo);
-        Row(card, Button("应用节点", async () => { if (nodeTargetGroup.SelectedItem is not ProxyGroup group || nodes.SelectedItem is not string node) throw new InvalidOperationException("请选择策略组与节点。"); await ApplySelectionAsync(group.Name, node); }, true), Button("测试延迟", async () => { if (!controller.Running || nodes.SelectedItem is not string node) throw new InvalidOperationException("请先连接并选择节点。"); status.Text = node + " · " + await controller.DelayAsync(node) + " ms"; }), Button("连接网络", StartAsync), Button("刷新节点", RefreshCatalogAsync));
-        Row(page, Button("管理订阅", () => { SelectPage("subscriptions"); return Task.CompletedTask; }), Button("管理策略组", () => { SelectPage("groups"); return Task.CompletedTask; }));
-    }
+    private void BuildSubscriptions() => BuildSubscriptionWorkspace();
+    private void BuildGroups() => BuildPolicyWorkspace();
+    private void BuildNodes() => BuildNodeWorkspace();
     private void BuildPlugins()
     {
         var page = Page("plugins", "插件中心", "使用 Loon 明文插件处理规则、重写与脚本。"); var input = Card(page, "添加插件", "支持插件原作者链接、loon://import 链接及可莉公开目录。"); input.Children.Add(pluginUrl);
@@ -238,7 +208,7 @@ internal sealed class SwirlWindow : W.Window
         var page = Page("settings", "偏好设置", "选择流量接管方式与窗口外观。"); var capture = Card(page, "连接方式", "连接时会检查 Windows 代理是否生效。TUN 需要管理员权限。"); capture.Children.Add(systemProxy); capture.Children.Add(tun); mode.ItemsSource = new[] { "规则分流", "全局代理", "全部直连" }; capture.Children.Add(mode);
         Row(capture, Button("保存连接设置", () => Mutate(() => { SaveFlags(); status.Text = "设置已保存，下次连接时生效。"; return Task.CompletedTask; }), true));
         var appearance = Card(page, "外观", "原生 Windows 11 Acrylic 背景，遵循系统透明效果设置。高对比度或不支持的系统会使用清晰背景。"); appearance.Children.Add(glass); glass.Click += (_, _) => { profile.GlassAppearance = glass.IsChecked == true; profile.Save(); ApplyBackdrop(); };
-        var about = Card(page, "Swirl 0.7.2", "为 Windows 设计。部分 Loon 语法和脚本接口已兼容，插件导入后显示具体不兼容项。"); Row(about, Button("打开数据目录", () => { Directory.CreateDirectory(ProxyProfile.DirectoryPath); Process.Start(new ProcessStartInfo(ProxyProfile.DirectoryPath) { UseShellExecute = true }); return Task.CompletedTask; }));
+        var about = Card(page, "Swirl 0.8.0", "为 Windows 设计。部分 Loon 语法和脚本接口已兼容，插件导入后显示具体不兼容项。"); Row(about, Button("打开数据目录", () => { Directory.CreateDirectory(ProxyProfile.DirectoryPath); Process.Start(new ProcessStartInfo(ProxyProfile.DirectoryPath) { UseShellExecute = true }); return Task.CompletedTask; }));
     }
     private async Task StartAsync()
     {
@@ -257,13 +227,9 @@ internal sealed class SwirlWindow : W.Window
         var downloaded = await SubscriptionImport.DownloadRoutedAsync(source,
             selectedClient, selectedRoute, lifetime.Token,
             message => { if (!closed) { status.Text = message; Report(message); } });
-        string yaml = MihomoConfig.ParseSubscription(downloaded.Content);
-        profile.ProtectedYaml = ProxyProfile.Protect(yaml);
-        profile.ProtectedSubscription = ProxyProfile.Protect(downloaded.NormalizedSource);
-        profile.SubscriptionClient = selectedClient;
-        profile.SubscriptionRoute = selectedRoute;
-        profile.Save(); subscription.Password = downloaded.NormalizedSource; subscriptionShown.Text = downloaded.NormalizedSource;
-        status.Text = controller.Running ? "新订阅已保存；当前连接保持原配置，重新连接后生效。" : "订阅已导入，请连接后选择节点。";
+        SubscriptionLibrary.Add(profile, subscriptionName.Text.Trim(), downloaded, selectedClient, selectedRoute);
+        profile.Save(); subscription.Clear(); subscriptionShown.Clear(); RefreshSubscriptionCards();
+        status.Text = "订阅已添加。卡片标出了当前使用的配置，点“使用”可切换。";
     }, allowConnected: true);
     private void Stop() { controller.Stop(); activeProfile = null; disconnect.IsEnabled = false; connect.IsEnabled = true; LoadOfflineCatalog(); RefreshSummary(); status.Text = "已断开连接，已尝试恢复原代理设置。"; }
     private async Task Mutate(Func<Task> action, bool allowConnected = false)
@@ -274,15 +240,16 @@ internal sealed class SwirlWindow : W.Window
     private void SaveFlags() { profile.UseSystemProxy = systemProxy.IsChecked == true; profile.Tun = tun.IsChecked == true; profile.Mitm = mitm.IsChecked == true; profile.Mode = mode.SelectedIndex == 1 ? "global" : mode.SelectedIndex == 2 ? "direct" : "rule"; profile.BasicAds = false; profile.Save(); }
     private void LoadProfile()
     {
-        try { subscription.Password = profile.Subscription; } catch { Report("保存的订阅地址无法解密，请重新导入。"); }
+        subscription.Clear(); subscriptionShown.Clear();
         subscriptionClient.SelectedIndex = (int)profile.SubscriptionClient; subscriptionRoute.SelectedIndex = (int)profile.SubscriptionRoute; systemProxy.IsChecked = profile.UseSystemProxy; tun.IsChecked = profile.Tun; mitm.IsChecked = profile.Mitm; glass.IsChecked = profile.GlassAppearance;
-        mode.SelectedIndex = profile.Mode == "global" ? 1 : profile.Mode == "direct" ? 2 : 0; syncFolder.Text = profile.SyncFolder; RefreshPlugins(); SaveRules(false); LoadOfflineCatalog(); RefreshSummary();
+        mode.SelectedIndex = profile.Mode == "global" ? 1 : profile.Mode == "direct" ? 2 : 0; syncFolder.Text = profile.SyncFolder; RefreshPlugins(); SaveRules(false); LoadOfflineCatalog(); RefreshSubscriptionCards(); RefreshSummary();
     }
     private async Task LoadGroupsAsync()
     {
         catalog = await controller.CatalogAsync();
         selections = catalog.Groups.Values.Where(g => g.Current != null).ToDictionary(g => g.Name, g => g.Current!);
         BindCatalog(); RefreshRoute();
+        RefreshSubscriptionCards();
     }
     private void LoadOfflineCatalog()
     {
@@ -299,12 +266,13 @@ internal sealed class SwirlWindow : W.Window
         string? preferred = MihomoConfig.PreferredGroup(activeProfile ?? profile);
         var first = visible.FirstOrDefault(g => g.Name == preferred) ?? visible.FirstOrDefault();
         nodeTargetGroup.ItemsSource = visible.Where(g => g.Selectable).ToArray();
-        nodeTargetGroup.SelectedItem = visible.FirstOrDefault(g => g.Name == target && g.Selectable) ?? visible.FirstOrDefault(g => g.Selectable && g.Name == first?.Name) ?? visible.FirstOrDefault(g => g.Selectable);
+        nodeTargetGroup.SelectedItem = visible.FirstOrDefault(g => g.Name == target && g.Selectable) ?? visible.FirstOrDefault(g => g.Selectable && g.Name == first?.Name && g.Members.Any(catalog.Nodes.ContainsKey)) ?? visible.FirstOrDefault(g => g.Selectable && g.Members.Any(catalog.Nodes.ContainsKey)) ?? visible.FirstOrDefault(g => g.Selectable);
         groups.ItemsSource = visible;
         groups.SelectedItem = visible.FirstOrDefault(g => g.Name == selectedGroup) ?? first;
         // Binding the strategy list must not overwrite a separately chosen node target.
         if (target != null) nodeTargetGroup.SelectedItem = visible.FirstOrDefault(g => g.Name == target && g.Selectable) ?? nodeTargetGroup.SelectedItem;
         FillNodes();
+        RefreshPolicyCards();
         subscriptionInfo.Text = profile.ProtectedYaml.Length == 0 ? "尚未导入订阅或 YAML 配置" : catalog.Nodes.Count + " 个节点 · " + visible.Length + " 个策略组" + (controller.Running ? " · 当前连接配置（更新订阅后重新连接生效）" : " · 已保存，可预选节点后连接");
     }
     private string GroupDescription(ProxyGroup group) => group.Name + " · " + (group.Selectable ? "手动选择" : group.Type is "URLTest" or "url-test" ? "自动测速" : group.Type is "Fallback" or "fallback" ? "故障转移" : "自动策略") + "\n" + (controller.Running ? "当前线路：" : "连接后使用：") + catalog.Resolve(group.Name, selections) + (group.PendingProvider ? "\n远程提供器节点将在连接后加载，可刷新列表。" : "");
@@ -313,9 +281,12 @@ internal sealed class SwirlWindow : W.Window
         string? previous = nodes.SelectedItem as string;
         var group = nodeTargetGroup.SelectedItem as ProxyGroup;
         var candidates = catalog.Nodes.Keys.Where(n => (group == null || group.Members.Contains(n)) && n.Contains(nodeSearch.Text.Trim(), StringComparison.OrdinalIgnoreCase)).ToArray();
+        if (nodeSort.SelectedIndex == 1) candidates = candidates.OrderBy(n => measuredDelays.TryGetValue(n, out int value) || catalog.Delays.TryGetValue(n, out value) ? value > 0 ? value : int.MaxValue : int.MaxValue).ToArray();
+        else if (nodeSort.SelectedIndex == 2) candidates = candidates.OrderBy(n => n, StringComparer.CurrentCultureIgnoreCase).ToArray();
         nodes.ItemsSource = candidates;
         nodes.SelectedItem = previous != null && candidates.Contains(previous) ? previous : group != null ? selections.GetValueOrDefault(group.Name) : null;
         nodeInfo.Text = candidates.Length == 0 ? profile.ProtectedYaml.Length == 0 ? "先到订阅配置页导入订阅。" : group?.PendingProvider == true ? "提供器节点将在连接后加载。" : "此策略没有直接节点，可在策略组页关联节点组，或清除搜索。" : candidates.Length + " 个节点" + (group == null ? " · 没有可应用的手动策略组" : " · " + (controller.Running ? "已应用：" : "预选：") + catalog.Resolve(group.Name, selections));
+        RefreshNodeHeader(); Dispatcher.BeginInvoke(() => { if (!closed) ResizeNodeCards(); });
     }
     private async Task ApplySelectionAsync(string group, string member)
     {

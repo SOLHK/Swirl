@@ -2,13 +2,29 @@
 
 <img src="AdShield/Assets/swirl-256.png" width="112" alt="Swirl 流光风筝图标">
 
-Windows x64 网络工具：Mihomo 代理、规则分流、Loon 明文插件兼容层、HTTPS 改写、JavaScript 脚本与加密配置同步。当前版本 **0.7.2**，支持 Windows 10 2004 及以上版本和 Windows 11，仅开发 Windows 版本。
+Windows x64 网络工具：Mihomo 代理、规则分流、Loon 明文插件兼容层、HTTPS 改写、JavaScript 脚本与加密配置同步。当前版本 **0.8.0**，支持 Windows 10 2004 及以上版本和 Windows 11，仅开发 Windows 版本。
 
-界面使用 WPF 矢量渲染、原生 Windows 11 Desktop Acrylic 模糊背景、紧凑侧栏和半透明卡片，跟随系统浅色 / 深色设置。图标使用流光风筝的透明背景版本，含 16–256 像素图标资源。整体布局借鉴网络工具的功能组织，并非 Loon macOS 界面的复刻。此项目由 AdShield 的网络模块继续开发，删除了爱奇艺和腾讯视频专用暂停广告识别与自动点击功能，广告处理由用户导入的网络规则和插件执行。
+界面使用 WPF 矢量渲染、原生 Windows 11 Desktop Acrylic 模糊背景、圆角玻璃侧栏和清晰的内容卡片，跟随系统浅色 / 深色设置。布局参考 macOS 的材质层次，控件与功能仍为 Windows 原生实现。图标使用流光风筝的透明背景版本，含 16–256 像素图标资源。整体布局借鉴网络工具的功能组织，并非 Loon macOS 界面的复刻。此项目由 AdShield 的网络模块继续开发，删除了爱奇艺和腾讯视频专用暂停广告识别与自动点击功能，广告处理由用户导入的网络规则和插件执行。
 
 ![Swirl 概览](docs/screenshots/overview.png)
 
-*示例订阅界面；已预选测试节点，尚未连接或启用插件。蓝橙背景来自背后的测试窗口，用于验证原生模糊效果，并非软件内置背景图。*
+*截图使用示例订阅、模拟流量和延迟；未连接真实节点。淡色背景来自测试窗口，用于检查 Acrylic，并非内置壁纸。*
+
+## 0.8.0 订阅库、策略组编辑与界面整理
+
+订阅改为卡片库，支持保存多份配置、切换、更新、重命名、移除、独立下载选项与本地文件重新导入。每份配置分别保存节点选择和策略组修改。旧版保存的单份订阅自动进入订阅库。流量与到期时间来自服务商实际返回的 `subscription-userinfo`，没有数据时明确显示“未提供”；更新正在使用的订阅时标出“有更新待应用”，可点击按钮重新连接。
+
+策略组按 [Loon 的常用用途](https://nsloon.app/docs/Policy/policygroup/)提供手动选择、自动选最快、故障转移、负载均衡四种方式。可以创建或编辑策略组、添加子策略、设置节点和提供器、筛选名称、调整优先顺序以及检测网址、间隔、超时、切换容差。设置转为真实 Mihomo 配置，保存前经过核心检查。自定义策略在订阅更新时保留；更新删除了仍被自定义策略使用的节点时，保留旧配置并提示调整成员。新策略组可在分流规则中使用，也可添加到其他策略组作为成员。
+
+负载均衡提供同一网站固定节点、轮询、同一来源与目标保持节点三种核心方式。前两种对应类似 Loon PCC / Round-Robin 的用途；Loon 的 Random 随机算法未映射为其他算法，也未实现完整 Loon 配置导入。
+
+节点使用卡片显示协议、预选或当前使用状态及真实延迟，支持搜索、排序、并行测速。未测速与暂不可用分别显示。节点和策略组继续使用独立页面；最小窗口中节点的使用按钮固定在底部，策略组编辑器的保存按钮也始终可见。
+
+![订阅卡片](docs/screenshots/subscriptions.png)
+![策略组](docs/screenshots/groups.png)
+![节点](docs/screenshots/nodes.png)
+
+本机完整回归 330 项通过；新增验证包含旧订阅迁移、多订阅选择与加密同步、元数据解析、循环与失效成员校验，以及真实核心选最快、故障切换和轮询连接。桌面验证覆盖双订阅、未连接预选、策略组实际保存、下拉框、11 页与最小窗口。集成测试使用独立端口，可与已有 Swirl 连接同时运行。
 
 ## 0.7.2 节点选择与页面拆分
 
@@ -46,7 +62,7 @@ Windows x64 网络工具：Mihomo 代理、规则分流、Loon 明文插件兼�
 
 ## 安装与开始使用
 
-在 [Actions](https://github.com/SOLHK/Swirl/actions) 中打开最新成功的 **Build Windows EXE**，下载 `Swirl-Setup-win-x64` 安装程序或 `Swirl-win-x64` 便携包。安装程序名为 `Swirl_Setup_0.7.2_x64.exe`。安装程序包含 .NET 运行时、Mihomo、Wintun 与 jq，无需安装另一份 Clash 客户端。安装程序尚未代码签名。
+在 [Actions](https://github.com/SOLHK/Swirl/actions) 中打开最新成功的 **Build Windows EXE**，下载 `Swirl-Setup-win-x64` 安装程序或 `Swirl-win-x64` 便携包。安装程序名为 `Swirl_Setup_0.8.0_x64.exe`。安装程序包含 .NET 运行时、Mihomo、Wintun 与 jq，无需安装另一份 Clash 客户端。安装程序尚未代码签名。
 
 1. 退出旧版。打开 Swirl，进入「订阅配置」导入自己的 **Clash/Mihomo YAML** 或 HTTPS 订阅。软件不提供节点和订阅服务。
 2. 在「偏好设置」启用系统代理或 TUN，并选择流量模式。在「概览」连接后查看 Windows 接管检查与 HTTPS 检测结果；在「代理节点」选择并应用线路。可在首页切换流量模式。全部直连模式不会使用代理节点，全局模式不应用普通分流规则。
@@ -105,7 +121,7 @@ dotnet publish AdShield/AdShield.csproj -c Release -r win-x64 --self-contained t
 ./scripts/prepare-core.ps1 -Destination publish/core
 ```
 
-本机完整回归 **296 项通过**：语法、参数、复写顺序、脚本、二进制/API、Cron、加密同步及冲突；真实核心 HTTP/HTTPS、原生 HTTP2 双向修改、同一 HTTP2 连接不同 URL 的命名策略；三模式模拟捕获入口、证书身份、隔离注册表恢复和 11 种协议离线配置验证。常规链路测试使用隔离代理设置，不全局信任测试 CA、不安装 TUN 路由。另有 --native-proxy-only 检查临时接管真实 Windows 当前连接，通过不显式指定代理的 WinINet 客户端验证入口，finally 恢复原代理、PAC、绕过列表和检测标志。十一个 WPF 页面在 Windows 150% DPI 下进行原生合成截图检查。
+本机完整回归 **330 项通过**：语法、参数、复写顺序、脚本、二进制/API、Cron、加密同步及冲突；真实核心 HTTP/HTTPS、原生 HTTP2 双向修改、同一 HTTP2 连接不同 URL 的命名策略；三模式模拟捕获入口、证书身份、隔离注册表恢复和 11 种协议离线配置验证。常规链路测试使用隔离代理设置，不全局信任测试 CA、不安装 TUN 路由。另有 --native-proxy-only 检查临时接管真实 Windows 当前连接，通过不显式指定代理的 WinINet 客户端验证入口，finally 恢复原代理、PAC、绕过列表和检测标志。十一个 WPF 页面在 Windows 150% DPI 下进行原生合成截图检查。
 
 HTTP2 正文处理包含针对固定 **Titanium.Web.Proxy 7.0.19** 的窄范围兼容修补，等待异步处理完成并仅对转发前、完整缓冲的正文修改内部状态；升级该依赖须重新验证。原生 HTTP2 及 URL 策略桥接有真实链路测试。
 

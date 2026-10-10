@@ -11,7 +11,7 @@ internal sealed class SubscriptionTransportException : InvalidOperationException
     internal SubscriptionTransportException(string message) : base(message) { }
 }
 
-internal sealed record SubscriptionDownload(string Content, string NormalizedSource);
+internal sealed record SubscriptionDownload(string Content, string NormalizedSource, SubscriptionUsage? Usage = null);
 
 /// <summary>
 /// Subscription fetching has its own client identity. Plugin/script downloads
@@ -226,7 +226,8 @@ internal static class SubscriptionImport
                     || beginning.StartsWith("<html", StringComparison.OrdinalIgnoreCase)
                     || beginning.StartsWith("<head", StringComparison.OrdinalIgnoreCase)
                     || beginning.StartsWith("<body", StringComparison.OrdinalIgnoreCase)) throw HtmlResponse();
-                return new(text, source.AbsoluteUri);
+                var usage = response.Headers.TryGetValues("subscription-userinfo", out var values) ? SubscriptionUsage.Parse(string.Join(";", values)) : null;
+                return new(text, source.AbsoluteUri, usage);
             }
         }
         catch (OperationCanceledException)

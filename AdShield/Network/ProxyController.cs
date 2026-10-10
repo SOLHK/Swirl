@@ -139,10 +139,10 @@ internal sealed class ProxyController : IDisposable
         await Task.WhenAll(output, errors);
         if (process.ExitCode != 0) throw new InvalidOperationException(CoreDiagnostics.Describe(output.Result + "\n" + errors.Result, process.ExitCode));
     }
-    private async Task<HttpResponseMessage> RequestAsync(HttpMethod method, string path, object? data = null)
+    private async Task<HttpResponseMessage> RequestAsync(HttpMethod method, string path, object? data = null, int timeoutSeconds = 3)
     {
         using var handler = new HttpClientHandler { UseProxy = false };
-        using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(3) };
+        using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(timeoutSeconds) };
         using var request = new HttpRequestMessage(method, "http://127.0.0.1:" + MihomoConfig.ControllerPort + path);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", secret);
         if (data != null) request.Content = new StringContent(JsonSerializer.Serialize(data), Encoding.UTF8, "application/json");
@@ -184,6 +184,13 @@ internal sealed class ProxyController : IDisposable
         response.EnsureSuccessStatusCode();
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         return document.RootElement.GetProperty("delay").GetInt32();
+    }
+    internal async Task<Dictionary<string, int>> TestGroupAsync(string group, string url = "https://www.gstatic.com/generate_204", int timeout = 5000)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https") || timeout is < 500 or > 30000) throw new InvalidOperationException("测速地址或超时时间无效。");
+        using var response = await RequestAsync(HttpMethod.Get, "/group/" + Uri.EscapeDataString(group) + "/delay?timeout=" + timeout + "&url=" + Uri.EscapeDataString(url), timeoutSeconds: timeout / 1000 + 3);
+        response.EnsureSuccessStatusCode();
+        return JsonSerializer.Deserialize<Dictionary<string, int>>(await response.Content.ReadAsStringAsync()) ?? new();
     }
     internal void Stop()
     {

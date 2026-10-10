@@ -15,6 +15,8 @@ internal sealed class ProxyCatalog
 {
     internal Dictionary<string, ProxyGroup> Groups { get; } = new(StringComparer.Ordinal);
     internal Dictionary<string, string> Nodes { get; } = new(StringComparer.Ordinal);
+    internal Dictionary<string, int> Delays { get; } = new(StringComparer.Ordinal);
+    internal bool Live { get; private set; }
 
     internal static ProxyCatalog FromProfile(ProxyProfile profile)
     {
@@ -25,6 +27,7 @@ internal sealed class ProxyCatalog
         static string[] Names(object? value) => value is IEnumerable<object> items ? items.Select(x => x.ToString()!).ToArray() : [];
         void AddNodes(object? value) { foreach (var node in Maps(value)) if (node.TryGetValue("name", out var name) && name.ToString() != MihomoConfig.PluginOutbound) catalog.Nodes[name.ToString()!] = node.TryGetValue("type", out var type) ? type.ToString()! : ""; }
         root.TryGetValue("proxies", out var proxies); AddNodes(proxies);
+        var declaredNodes = catalog.Nodes.Keys.ToArray();
         var providerNodes = new Dictionary<string, string[]>();
         if (root.TryGetValue("proxy-providers", out var providers) && providers is IDictionary<object, object> entries)
             foreach (var entry in entries)
@@ -38,16 +41,16 @@ internal sealed class ProxyCatalog
         foreach (var map in groupMaps)
         {
             string name = map["name"].ToString()!, type = map["type"].ToString()!;
-            map.TryGetValue("proxies", out var members); var names = Names(members).ToList();
+            map.TryGetValue("proxies", out var members); var explicitNames = Names(members); var names = new List<string>();
             bool Enabled(string key) => map.TryGetValue(key, out var value) && string.Equals(value.ToString(), "true", StringComparison.OrdinalIgnoreCase);
             bool all = Enabled("include-all");
-            if (all || Enabled("include-all-proxies")) names.AddRange(catalog.Nodes.Keys);
-            if (all || Enabled("include-all-groups")) names.AddRange(groupMaps.Select(g => g["name"].ToString()!).Where(n => n != name));
+            if (all || Enabled("include-all-proxies")) names.AddRange(declaredNodes);
             map.TryGetValue("use", out var use); var used = Names(use);
             if (all || Enabled("include-all-providers")) used = providerNodes.Keys.ToArray();
             foreach (var provider in used) names.AddRange(providerNodes.GetValueOrDefault(provider) ?? []);
-            bool Match(string key, string node) => !map.TryGetValue(key, out var expression) || string.IsNullOrWhiteSpace(expression.ToString()) || Regex.IsMatch(node, expression.ToString()!, RegexOptions.None, TimeSpan.FromMilliseconds(100));
-            var filtered = names.Where(n => n != MihomoConfig.PluginOutbound && Match("filter", n) && (!map.ContainsKey("exclude-filter") || string.IsNullOrWhiteSpace(map["exclude-filter"].ToString()) || !Regex.IsMatch(n, map["exclude-filter"].ToString()!, RegexOptions.None, TimeSpan.FromMilliseconds(100)))).Distinct().ToArray();
+            bool Matches(string key, string node) => map.TryGetValue(key, out var expression) && !string.IsNullOrWhiteSpace(expression.ToString()) && expression.ToString()!.Split("```", StringSplitOptions.RemoveEmptyEntries).Any(pattern => Regex.IsMatch(node, pattern, RegexOptions.None, TimeSpan.FromMilliseconds(100)));
+            bool HasFilter = map.TryGetValue("filter", out var include) && !string.IsNullOrWhiteSpace(include.ToString());
+            var filtered = explicitNames.Concat(names.Where(n => !HasFilter || Matches("filter", n))).Where(n => n != MihomoConfig.PluginOutbound && !Matches("exclude-filter", n)).Distinct().ToArray();
             catalog.Groups[name] = new(name, type, filtered, null, used.Any(p => !providerNodes.TryGetValue(p, out var list) || list.Length == 0));
         }
         catalog.Groups["GLOBAL"] = new("GLOBAL", "select", catalog.Groups.Keys.Concat(catalog.Nodes.Keys).Concat(["DIRECT", "REJECT"]).Distinct().ToArray(), null);
@@ -56,7 +59,7 @@ internal sealed class ProxyCatalog
 
     internal static ProxyCatalog FromController(JsonElement root)
     {
-        var catalog = new ProxyCatalog();
+        var catalog = new ProxyCatalog { Live = true };
         foreach (var proxy in root.GetProperty("proxies").EnumerateObject())
         {
             if (proxy.Name == MihomoConfig.PluginOutbound) continue;
@@ -64,6 +67,7 @@ internal sealed class ProxyCatalog
             if (proxy.Value.TryGetProperty("all", out var all))
                 catalog.Groups[proxy.Name] = new(proxy.Name, type, all.EnumerateArray().Select(n => n.GetString()!).Where(n => n != MihomoConfig.PluginOutbound).ToArray(), proxy.Value.TryGetProperty("now", out var current) ? current.GetString() : null);
             else if (type is not ("Direct" or "Reject" or "RejectDrop" or "Pass" or "Compatible")) catalog.Nodes[proxy.Name] = type;
+            if (proxy.Value.TryGetProperty("history", out var history) && history.ValueKind == JsonValueKind.Array && history.GetArrayLength() > 0 && history[history.GetArrayLength() - 1].TryGetProperty("delay", out var delay) && delay.TryGetInt32(out int milliseconds)) catalog.Delays[proxy.Name] = milliseconds;
         }
         return catalog;
     }
@@ -101,9 +105,9 @@ internal sealed class ProxyCatalog
         {
             if (!path.Add(name)) return "策略组循环";
             string? next = selections.GetValueOrDefault(name) ?? group.Current;
-            if (string.IsNullOrEmpty(next)) return group.Type is "LoadBalance" or "load-balance" ? "负载均衡 · " + group.Members.Length + " 个候选" : group.PendingProvider ? "等待提供器加载" : "等待核心选择";
+            if (string.IsNullOrEmpty(next)) return group.Type is "LoadBalance" or "load-balance" ? "负载均衡 · " + group.Members.Length + " 个候选" : group.PendingProvider ? "连接后加载节点" : Live ? "正在检测节点" : "连接后自动选择";
             name = next;
         }
-        return name == "DIRECT" ? "直连" : name == "REJECT" ? "拒绝连接" : name;
+        return name == "DIRECT" ? "直连" : name == "REJECT" ? "拒绝连接" : name == "COMPATIBLE" ? "没有可用节点，请检查提供器" : name;
     }
 }
