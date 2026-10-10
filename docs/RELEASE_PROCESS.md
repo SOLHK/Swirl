@@ -33,6 +33,15 @@
 
 当前 GitHub App 连接不包含管理分支保护规则的权限，**此 Markdown 不是实际 GitHub 分支保护**。仓库所有者必须在 [Settings → Rules → Rulesets](https://github.com/SOLHK/Swirl/settings/rules) 添加规则，并确认状态为 **Active**。
 
+### 无需安装软件：在 GitHub 网页导入规则（推荐）
+
+仓库已经准备好两份可以导入的规则配置，分别保护测试版和正式版：
+
+- [测试版规则 JSON](../.github/rulesets/swirl-test.json)：保护 `test`；要求 `build`、`build-qt-ui`。
+- [正式版规则 JSON](../.github/rulesets/swirl-main.json)：保护 `main`；额外要求 `production-gate`。
+
+使用有管理员权限的 GitHub 账号，打开 [Settings → Rules → Rulesets](https://github.com/SOLHK/Swirl/settings/rules)，找到 **Import a ruleset / 导入规则集** 入口，依次导入以上两个 JSON（如页面不提供该入口，则使用下方脚本或手动新建两条 branch ruleset）。检查两条规则的 **Enforcement = Active**、目标分支、required status checks 和无绕过对象。只有页面显示已生效才算开启保护。
+
 ### 最简启用方式：拥有管理员权限的 Windows 电脑
 
 仓库已提供 [一键规则配置脚本](../scripts/configure-branch-rulesets.ps1)，使用 GitHub CLI 登录自己的 GitHub 账号，**无需向任何聊天或机器人发送 Token**：
