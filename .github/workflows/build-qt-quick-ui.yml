@@ -21,6 +21,7 @@ concurrency:
 jobs:
   build-qt-ui:
     runs-on: windows-2022
+    timeout-minutes: 35
     permissions:
       contents: read
     steps:
@@ -67,3 +68,5 @@ jobs:
         with:
           name: Swirl-Quick-UI-win-x64
           path: dist/
+          if-no-files-found: error
+          retention-days: 14
