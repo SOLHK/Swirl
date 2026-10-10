@@ -2,6 +2,8 @@
 #include <QStringList>
 #include <QVariantMap>
 #include <QChar>
+#include <QGuiApplication>
+#include <QClipboard>
 
 QVariantList DemoDataProvider::connections() const
 {
@@ -75,4 +77,13 @@ QVariantList DemoDataProvider::logs() const
                             {"level",levels.at(i%levels.size())},{"source",i%2 ? "Rules" : "Core"},
                             {"message",messages.at(i%messages.size())}};
     return rows;
+}
+
+bool DemoDataProvider::copyText(const QString &value) const
+{
+    if (auto *clipboard = QGuiApplication::clipboard()) {
+        clipboard->setText(value);
+        return true;
+    }
+    return false;
 }

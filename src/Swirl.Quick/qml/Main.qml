@@ -75,14 +75,39 @@ ApplicationWindow {
                             AppState.notice("No matching page")
                         }
                     }
-                    SwirlStatusBadge { label:"UI DEMO"; tone:"accent" }
+                    SwirlButton {
+                        text:"UI DEMO"; iconName:"grid"; quiet:true
+                        onClicked:demoStatesMenu.popup()
+                        Menu {
+                            id:demoStatesMenu
+                            y:parent.height+3
+                            background:Rectangle { radius:11; color:Theme.raised; border.color:Theme.border }
+                            MenuItem {
+                                text:"Normal view"
+                                onTriggered:{AppState.demoLoading=false;AppState.demoError=false;AppState.demoEmpty=false}
+                            }
+                            MenuItem {
+                                text:"Loading state"
+                                onTriggered:{AppState.demoLoading=true;AppState.demoError=false;AppState.demoEmpty=false}
+                            }
+                            MenuItem {
+                                text:"Empty state"
+                                onTriggered:{AppState.demoEmpty=true;AppState.demoLoading=false;AppState.demoError=false}
+                            }
+                            MenuItem {
+                                text:"Error state"
+                                onTriggered:{AppState.demoError=true;AppState.demoLoading=false;AppState.demoEmpty=false}
+                            }
+                        }
+                    }
                     SwirlButton { text:"Settings"; iconName:"settings"; quiet:true; onClicked:AppState.currentPage="settings" }
                 }
             }
+            Item {
+                Layout.fillWidth:true; Layout.fillHeight:true
             Loader {
                 id:pageLoader
-                Layout.fillWidth:true
-                Layout.fillHeight:true
+                anchors.fill:parent
                 clip:true
                 sourceComponent:AppState.currentPage==="overview" ? overview :
                                 AppState.currentPage==="connections" ? connections :
@@ -109,6 +134,40 @@ ApplicationWindow {
                                 AppState.currentPage==="api" ? api :
                                 AppState.currentPage==="gateway" ? gateway : workbench
                 }
+
+                Rectangle {
+                    anchors.fill:parent
+                    z:20
+                    visible:AppState.demoEmpty||AppState.demoLoading||AppState.demoError
+                    color:Theme.canvas
+                    ColumnLayout {
+                        anchors.centerIn:parent
+                        spacing:14
+                        BusyIndicator {
+                            visible:AppState.demoLoading
+                            running:visible
+                            Layout.alignment:Qt.AlignHCenter
+                        }
+                        SwirlEmptyState {
+                            visible:!AppState.demoLoading
+                            headline:AppState.demoError?"Demo error state":"No matching records"
+                            detail:AppState.demoError?"A simulated loading failure occurred.":"This preview is showing an intentionally empty state."
+                            Layout.alignment:Qt.AlignHCenter
+                        }
+                        Text {
+                            visible:AppState.demoLoading
+                            text:"Loading demonstration data…"
+                            color:Theme.muted; font.pixelSize:13
+                            Layout.alignment:Qt.AlignHCenter
+                        }
+                        SwirlButton {
+                            text:AppState.demoError?"Retry preview":"Return to normal"
+                            Layout.alignment:Qt.AlignHCenter
+                            onClicked:{AppState.demoEmpty=false;AppState.demoError=false;AppState.demoLoading=false}
+                        }
+                    }
+                }
+            }
             Rectangle {
                 Layout.fillWidth:true
                 implicitHeight:31

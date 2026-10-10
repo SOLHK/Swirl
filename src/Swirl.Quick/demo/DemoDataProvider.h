@@ -11,4 +11,5 @@ public:
     Q_INVOKABLE QVariantList events() const;
     Q_INVOKABLE QVariantList traffic() const;
     Q_INVOKABLE QVariantList logs() const;
+    Q_INVOKABLE bool copyText(const QString &value) const;
 };

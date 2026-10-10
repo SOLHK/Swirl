@@ -124,7 +124,7 @@ Item {
                         }
                     }
                     Item { Layout.fillHeight:true }
-                    SwirlButton { text:"Copy answer"; onClicked:AppState.notice("Copy DNS answer") }
+                    SwirlButton { text:"Copy answer"; onClicked:{if(page.selectedRecord)demoProvider.copyText(page.selectedRecord.answer);AppState.toast="Copied synthetic DNS answer"} }
                     SwirlButton { text:"Edit mapping"; onClicked:editDialog.open() }
                 }
             }

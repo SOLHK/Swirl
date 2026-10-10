@@ -95,7 +95,7 @@ Item {
                             }
                         }
                     }
-                    SwirlButton { text:"Copy results"; onClicked:AppState.notice("Copy diagnostic results") }
+                    SwirlButton { text:"Copy results"; onClicked:{demoProvider.copyText(page.result);AppState.toast="Copied diagnostic preview"} }
                 }
             }
         }

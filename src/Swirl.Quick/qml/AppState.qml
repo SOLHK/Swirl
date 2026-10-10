@@ -13,6 +13,7 @@ QtObject {
     property string toast: ""
     property bool demoLoading: false
     property bool demoError: false
+    property bool demoEmpty: false
     readonly property var groups: [
       {title:"CONTROL CENTER", pages:[
         {id:"overview",title:"Overview",icon:"home",sub:"Network at a glance"},

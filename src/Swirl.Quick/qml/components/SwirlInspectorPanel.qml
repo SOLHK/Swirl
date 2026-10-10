@@ -84,7 +84,7 @@ SwirlGlassPanel {
         }
         RowLayout {
             Layout.fillWidth:true
-            SwirlButton { text:"Copy"; iconName:"code"; onClicked:AppState.notice("Copy details") }
+            SwirlButton { text:"Copy"; iconName:"code"; onClicked:{demoProvider.copyText(inspector.detailsText()); AppState.toast="Copied synthetic request details"} }
             Item { Layout.fillWidth:true }
             Text { text:"SYNTHETIC RESPONSE"; color:Theme.muted; font.pixelSize:10 }
         }
