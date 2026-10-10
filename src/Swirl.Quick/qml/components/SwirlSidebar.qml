@@ -10,7 +10,7 @@ SwirlGlassPanel {
     Layout.preferredWidth:AppState.sidebarCollapsed?76:247
     Layout.fillHeight:true
     border.width:0
-    Behavior on Layout.preferredWidth { NumberAnimation { duration:Theme.motion; easing.type:Easing.OutCubic } }
+
     ColumnLayout {
         anchors.fill:parent
         spacing:4
