@@ -38,8 +38,8 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
-          Copy-Item build/swirl-quick/Release/SwirlQuick.exe dist/
-          windeployqt --release --qmldir src/Swirl.Quick/qml dist/SwirlQuick.exe
+          Copy-Item build/swirl-quick/Release/Swirl.exe dist/
+          windeployqt --release --qmldir src/Swirl.Quick/qml dist/Swirl.exe
       # Qt's offscreen QPA font database reads appdir/lib/fonts and does not
       # automatically discover the fonts installed on a Windows CI runner.
       # These fixtures are used for synthetic screenshot tests ONLY.
@@ -65,10 +65,10 @@ jobs:
           $env:QT_QUICK_BACKEND = "software"
           # GUI-subsystem executables return immediately from PowerShell's '&' invocation.
           # Explicitly wait for the real Qt process so smoke tests cannot false-pass.
-          $exe = (Resolve-Path "dist/SwirlQuick.exe").Path
+          $exe = (Resolve-Path "dist/Swirl.exe").Path
           $process = Start-Process -FilePath $exe -ArgumentList "--smoke-test" -Wait -PassThru -NoNewWindow
           if ($process.ExitCode -ne 0) {
-            $diag = Join-Path (Resolve-Path "dist").Path "SwirlQuick-diagnostics.txt"
+            $diag = Join-Path (Resolve-Path "dist").Path "Swirl-diagnostics.txt"
             if (Test-Path $diag) { Get-Content $diag | Select-Object -Last 160 }
             throw "Qt Quick startup failed: $($process.ExitCode)"
           }
@@ -77,7 +77,7 @@ jobs:
         run: |
           $env:QT_QPA_PLATFORM = "offscreen"
           $env:QT_QUICK_BACKEND = "software"
-          $exe = (Resolve-Path "dist/SwirlQuick.exe").Path
+          $exe = (Resolve-Path "dist/Swirl.exe").Path
           $previews = @(
             @{ file = "Swirl-Overview-preview.png"; page = "overview"; theme = "light" },
             @{ file = "Swirl-Inspector-preview.png"; page = "inspector"; theme = "dark" }
@@ -87,7 +87,7 @@ jobs:
             $args = @("--capture-preview=$path", "--preview-page=$($preview.page)", "--preview-theme=$($preview.theme)")
             $process = Start-Process -FilePath $exe -ArgumentList $args -Wait -PassThru -NoNewWindow
             if ($process.ExitCode -ne 0) {
-              $diag = Join-Path (Resolve-Path "dist").Path "SwirlQuick-diagnostics.txt"
+              $diag = Join-Path (Resolve-Path "dist").Path "Swirl-diagnostics.txt"
               if (Test-Path $diag) { Get-Content $diag | Select-Object -Last 160 }
               throw "Qt Quick preview exited with $($process.ExitCode)"
             }
@@ -102,6 +102,36 @@ jobs:
           $fonts = "dist/lib/fonts"
           if (Test-Path $fonts) { Remove-Item -LiteralPath $fonts -Recurse -Force }
           if (Test-Path $fonts) { throw "Test fonts must not be distributed in Swirl preview." }
+      - name: Prepare standalone installer files
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path installer-bin, out | Out-Null
+          Copy-Item -Path "dist/*" -Destination "installer-bin" -Recurse -Force
+          Remove-Item -Path "installer-bin/Swirl-*-preview.png", "installer-bin/Swirl-diagnostics.txt" -ErrorAction SilentlyContinue
+          if (!(Test-Path "installer-bin/Swirl.exe")) { throw "Missing Swirl.exe" }
+      - name: Install NSIS packaging tools
+        shell: pwsh
+        run: |
+          choco install nsis --yes --no-progress --limit-output
+          $nsis = "C:/Program Files (x86)/NSIS/makensis.exe"
+          if (!(Test-Path $nsis)) { throw "NSIS installation failed" }
+      - name: Build Chinese Swirl installer EXE
+        shell: pwsh
+        run: |
+          $nsis = "C:/Program Files (x86)/NSIS/makensis.exe"
+          $appDist = (Resolve-Path "installer-bin").Path
+          $outDir = (Resolve-Path "out").Path
+          & $nsis "/DAPP_DIST=$appDist" "/DOUT_DIR=$outDir" "src/Swirl.Quick/packaging/Swirl.nsi"
+          if ($LASTEXITCODE -ne 0) { throw "NSIS packaging failed ($LASTEXITCODE)" }
+          if (!(Test-Path "out/Swirl-Setup.exe")) { throw "Installer missing" }
+          if ((Get-Item "out/Swirl-Setup.exe").Length -lt 10000000) { throw "Installer suspiciously small" }
+      - name: Upload Swirl Windows installer EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-Windows-Installer-EXE
+          path: out/Swirl-Setup.exe
+          if-no-files-found: error
+          retention-days: 14
       - name: Upload separate Qt UI preview
         uses: actions/upload-artifact@v4
         with:

@@ -15,7 +15,7 @@ From the repository root:
 ```powershell
 cmake -S src/Swirl.Quick -B build/swirl-quick -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="C:/Qt/6.10.3/msvc2022_64"
 cmake --build build/swirl-quick --config Release
-./build/swirl-quick/SwirlQuick.exe
+./build/swirl-quick/Swirl.exe
 ```
 
 For a Visual Studio solution use -G "Visual Studio 17 2022" -A x64 instead.
@@ -55,7 +55,7 @@ settings or stored WPF configuration.
 7. Check DNS, Rules, Profiles, Subscriptions, Scripts and Automation forms.
 8. From the UI DEMO menu, show loading, empty and error states, then restore.
 9. Verify the original WPF app, system proxy and user files are unchanged.
-10. Use the GitHub Actions artifact named `Swirl-Quick-UI-win-x64`
+10. Use the GitHub Actions artifact named `Swirl-Windows-Installer-EXE`
     from a successful run for packaged Windows testing.
 
 ## Future backend adapter strategy
@@ -74,3 +74,7 @@ The CI workflow attempts to save `Swirl-Overview-preview.png` and
 come from the Qt offscreen software renderer and may be unavailable if its
 window-grab capability is unsupported. They are **not** substitutes for
 testing native DWM blur or typography on a real Windows 11 desktop.
+
+## Chinese installer
+
+The test branch CI produces a standalone `Swirl-Setup.exe` with a Simplified Chinese NSIS wizard, per-user installation under `%LOCALAPPDATA%\\Programs\\Swirl`, a desktop/start-menu shortcut and an uninstaller. No administrator permission is requested. Keep this installer on `test` until the user explicitly authorizes promotion to `main`.
