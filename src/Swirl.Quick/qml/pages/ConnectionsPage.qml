@@ -13,7 +13,7 @@ Item {
         var state=status.currentText
         var rows=demoProvider.connections().filter(function(r){
             return (r.host+" "+r.process+" "+r.ip+" "+r.policy).toLowerCase().indexOf(q)>=0 &&
-                   (state==="All states"||r.status===state)
+                   (state==="全部状态"||r.status===state)
         })
         rows.sort(function(a,b){
             var key=s==="Host"?"host":s==="Latency"?"latency":s==="Downloaded"?"down":"process"
@@ -27,17 +27,17 @@ Item {
         spacing:14
         RowLayout {
             Layout.fillWidth:true; spacing:10
-            SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:AppState.zh("Filter host, IP, process or policy") }
-            SwirlComboBox { id:status; model:["All states","Active","Closed"] }
+            SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:AppState.zh("搜索域名、IP、进程或策略") }
+            SwirlComboBox { id:status; model:["全部状态","Active","Closed"] }
             SwirlComboBox { id:sort; model:["Host","Latency","Downloaded","Process"] }
-            SwirlButton { text:AppState.zh("Export"); iconName:"folder"; onClicked:AppState.notice("Export connections") }
-            SwirlButton { text:AppState.zh("Clear"); onClicked:{selected=null;AppState.notice("Clear connection list")} }
+            SwirlButton { text:AppState.zh("导出"); iconName:"folder"; onClicked:AppState.notice("导出连接记录") }
+            SwirlButton { text:AppState.zh("Clear"); onClicked:{selected=null;AppState.notice("清空连接记录")} }
         }
         RowLayout {
             Layout.fillWidth:true; spacing:8
-            SwirlStatusBadge { label:visibleRows.length+" DEMO RECORDS"; tone:"accent" }
+            SwirlStatusBadge { label:visibleRows.length+" 条演示记录"; tone:"accent" }
             Text { text:AppState.zh("Click a row to examine a connection"); color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
-            SwirlButton { text:AppState.detailOpen?"Hide details":"Show details"; quiet:true; onClicked:AppState.detailOpen=!AppState.detailOpen }
+            SwirlButton { text:AppState.detailOpen?"隐藏详情":"显示详情"; quiet:true; onClicked:AppState.detailOpen=!AppState.detailOpen }
         }
         RowLayout {
             Layout.fillWidth:true; Layout.fillHeight:true; spacing:14
@@ -53,14 +53,14 @@ Item {
                         {key:"process",label:AppState.zh("PROCESS"),w:115},{key:"protocol",label:AppState.zh("PROTO"),w:80},
                         {key:"policy",label:AppState.zh("POLICY"),w:119},{key:"up",label:AppState.zh("UPLOAD"),w:89},
                         {key:"down",label:AppState.zh("DOWNLOAD"),w:100},{key:"latency",label:AppState.zh("LATENCY"),w:95},
-                        {key:"time",label:AppState.zh("SINCE"),w:88},{key:"status",label:AppState.zh("STATE"),w:88}
+                        {key:"time",label:AppState.zh("SINCE"),w:88},{key:"status",label:AppState.zh("状态"),w:88}
                     ]
                     onRowSelected:function(record){page.selected=record}
                 }
                 SwirlEmptyState {
                     visible:page.visibleRows.length===0
                     anchors.centerIn:parent
-                    headline:AppState.zh("No matching connections")
+                    headline:AppState.zh("没有匹配的连接")
                     detail:AppState.zh("Adjust the search or status filter")
                 }
             }
@@ -70,14 +70,14 @@ Item {
                 ColumnLayout {
                     anchors.fill:parent; anchors.margins:20; spacing:15
                     Text { text:AppState.zh("Connection details"); color:Theme.text; font.pixelSize:16; font.weight:Font.DemiBold }
-                    SwirlStatusBadge { label:page.selected?page.selected.status.toUpperCase():"NO SELECTION"; tone:page.selected?"success":"neutral" }
+                    SwirlStatusBadge { label:page.selected?page.selected.status.toUpperCase():"尚未选择"; tone:page.selected?"success":"neutral" }
                     Repeater {
                         model:[
                             ["Host",page.selected?page.selected.host:"—"],
                             ["Destination",page.selected?page.selected.ip:"—"],
                             ["Application",page.selected?page.selected.process:"—"],
                             ["Protocol",page.selected?page.selected.protocol:"—"],
-                            ["Matched policy",page.selected?page.selected.policy:"—"],
+                            ["匹配策略",page.selected?page.selected.policy:"—"],
                             ["Upload",page.selected?page.selected.up:"—"],
                             ["Download",page.selected?page.selected.down:"—"],
                             ["Latency",page.selected?page.selected.latency:"—"],

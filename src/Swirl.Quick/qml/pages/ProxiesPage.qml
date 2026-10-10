@@ -12,7 +12,7 @@ Item {
         var country=region.currentText
         var list=demoProvider.nodes().filter(function(n){
             return n.name.toLowerCase().indexOf(needle)>=0 &&
-                   (country==="All regions"||n.region===country)
+                   (country==="全部地区"||n.region===country)
         })
         list.sort(function(a,b){
             return sort.currentText==="Latency"?a.latency-b.latency:a.name.localeCompare(b.name)
@@ -29,17 +29,17 @@ Item {
                     Layout.fillWidth:true
                     Text { text:AppState.zh("Active proxy strategy"); color:Theme.muted; font.pixelSize:11 }
                     Text { text:AppState.policy; color:Theme.text; font.pixelSize:22; font.weight:Font.DemiBold }
-                    Text { text:AppState.zh("Selected endpoint: ")+AppState.selectedNode; color:Theme.muted; font.pixelSize:12 }
+                    Text { text:AppState.zh("当前节点：")+AppState.selectedNode; color:Theme.muted; font.pixelSize:12 }
                 }
-                SwirlStatusBadge { label:AppState.zh("TEST NODES"); tone:"accent" }
-                SwirlButton { text:AppState.zh("Test all"); iconName:"activity"; onClicked:AppState.notice("Latency test") }
+                SwirlStatusBadge { label:AppState.zh("模拟节点"); tone:"accent" }
+                SwirlButton { text:AppState.zh("全部测试"); iconName:"activity"; onClicked:AppState.notice("延迟测试") }
                 SwirlButton { text:AppState.zh("Add node"); primary:true; onClicked:addDialog.open() }
             }
         }
         RowLayout {
             Layout.fillWidth:true; spacing:9
             SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:AppState.zh("Find a node or region") }
-            SwirlComboBox { id:region; model:["All regions","HK","SG","JP","US","KR","DE","TW","GB","AU"] }
+            SwirlComboBox { id:region; model:["全部地区","HK","SG","JP","US","KR","DE","TW","GB","AU"] }
             SwirlComboBox { id:sort; model:["Name","Latency"] }
         }
         RowLayout {
@@ -74,11 +74,11 @@ Item {
                     }
                     Text { text:AppState.zh("Synthetic node · No connection established"); color:Theme.muted; font.pixelSize:11; Layout.fillWidth:true; wrapMode:Text.WordWrap; horizontalAlignment:Text.AlignHCenter }
                     Rectangle { Layout.fillWidth:true; height:1; color:Theme.border }
-                    Text { text:AppState.zh("Protocol    ")+(page.selected?page.selected.protocol:"Trojan"); color:Theme.muted }
-                    Text { text:AppState.zh("Latency       ")+(page.selected?page.selected.latency:"38")+" ms (demo)"; color:Theme.muted }
-                    Text { text:AppState.zh("Strategy      ")+AppState.policy; color:Theme.muted }
+                    Text { text:AppState.zh("协议　")+(page.selected?page.selected.protocol:"Trojan"); color:Theme.muted }
+                    Text { text:AppState.zh("延迟　")+(page.selected?page.selected.latency:"38")+" 毫秒（模拟）"; color:Theme.muted }
+                    Text { text:AppState.zh("策略　")+AppState.policy; color:Theme.muted }
                     Item { Layout.fillHeight:true }
-                    SwirlButton { Layout.fillWidth:true; text:AppState.zh("Select in demo"); primary:true; onClicked:AppState.notice("Select endpoint") }
+                    SwirlButton { Layout.fillWidth:true; text:AppState.zh("模拟选用"); primary:true; onClicked:AppState.notice("选择节点") }
                     SwirlButton { Layout.fillWidth:true; text:AppState.zh("Edit endpoint"); onClicked:addDialog.open() }
                 }
             }
@@ -91,13 +91,13 @@ Item {
             width:parent.width; spacing:12
             Text { text:AppState.zh("Endpoint label"); color:Theme.muted }
             SwirlTextField { id:nodeName; Layout.fillWidth:true; placeholderText:AppState.zh("e.g. Singapore · 03") }
-            Text { text:nodeName.text.trim().length===0?"Please enter a label":"UI-only preview: no configuration will be saved"; color:nodeName.text.trim().length===0?Theme.orange:Theme.muted; font.pixelSize:11; Layout.fillWidth:true }
+            Text { text:nodeName.text.trim().length===0?"请输入名称":"仅供界面预览，不保存配置"; color:nodeName.text.trim().length===0?Theme.orange:Theme.muted; font.pixelSize:11; Layout.fillWidth:true }
             RowLayout {
                 Layout.alignment:Qt.AlignRight
-                SwirlButton { text:AppState.zh("Cancel"); onClicked:addDialog.close() }
+                SwirlButton { text:AppState.zh("取消"); onClicked:addDialog.close() }
                 SwirlButton {
                     text:AppState.zh("Save demo"); primary:true; enabled:nodeName.text.trim().length>0
-                    onClicked:{AppState.selectedNode=nodeName.text.trim();addDialog.close();AppState.notice("Save endpoint")}
+                    onClicked:{AppState.selectedNode=nodeName.text.trim();addDialog.close();AppState.notice("保存节点")}
                 }
             }
         }

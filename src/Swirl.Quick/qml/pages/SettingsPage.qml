@@ -6,8 +6,8 @@ import "../components"
 import "../controls"
 Item {
     id:page
-    property string section:"Appearance"
-    property var sections:["General","Appearance","Proxy","TUN","DNS","Ports","System Integration","Startup","Notifications","Data Management","Privacy & Security","Keyboard Shortcuts","About Swirl"]
+    property string section:"外观"
+    property var sections:["常规","外观","代理","TUN","DNS","端口","系统集成","启动","通知","数据管理","隐私与安全","快捷键","关于 Swirl"]
     ColumnLayout {
         anchors.fill:parent; anchors.margins:23; spacing:14
         RowLayout {
@@ -49,12 +49,12 @@ Item {
                         width:options.availableWidth; spacing:17
                         Text { text:AppState.zh(page.section); color:Theme.text; font.pixelSize:23; font.weight:Font.DemiBold }
                         Text {
-                            text:page.section==="Appearance"?"跟随系统的色彩、玻璃材质、动画与界面缩放。":"当前仅供预览，不会修改操作系统设置。"
+                            text:page.section==="外观"?"跟随系统的色彩、玻璃材质、动画与界面缩放。":"当前仅供预览，不会修改操作系统设置。"
                             color:Theme.muted; wrapMode:Text.WordWrap; Layout.fillWidth:true; font.pixelSize:12
                         }
                         Rectangle { Layout.fillWidth:true; height:1; color:Theme.border }
                         ColumnLayout {
-                            visible:page.section==="Appearance"; spacing:21; Layout.fillWidth:true
+                            visible:page.section==="外观"; spacing:21; Layout.fillWidth:true
                             RowLayout {
                                 Layout.fillWidth:true
                                 ColumnLayout {
@@ -103,15 +103,15 @@ Item {
                             SwirlStatusBadge { label:AppState.zh("CHANGES ARE LOCAL TO THIS UI PREVIEW"); tone:"accent" }
                         }
                         ColumnLayout {
-                            visible:page.section!=="Appearance"; Layout.fillWidth:true; spacing:17
+                            visible:page.section!=="外观"; Layout.fillWidth:true; spacing:17
                             Repeater {
-                                model:page.section==="Proxy"?["System proxy","Default strategy","Process bypass","Proxy authentication"]:
-                                      page.section==="DNS"?["Resolver selection","Encrypted DNS","IPv6","Fake-IP handling"]:
-                                      page.section==="TUN"?["TUN entry point","Interface selection","Route exclusions","Gateway DNS"]:
-                                      page.section==="Ports"?["HTTP port","SOCKS port","API port","Port conflict alerts"]:
-                                      page.section==="Privacy & Security"?["Sensitive data redaction","Local encryption","Certificate trust","Diagnostic consent"]:
-                                      page.section==="About Swirl"?["Version","Build information","Third-party components","Project links"]:
-                                      ["Enable feature","Default behavior","Advanced options","Diagnostics"]
+                                model:page.section==="代理"?["系统代理","默认策略","进程绕过","代理身份验证"]:
+                                      page.section==="DNS"?["解析器选择","加密 DNS","IPv6","虚拟 IP 处理"]:
+                                      page.section==="TUN"?["TUN 入口","网卡选择","路由排除","网关 DNS"]:
+                                      page.section==="端口"?["HTTP 端口","SOCKS 端口","API 端口","端口冲突提醒"]:
+                                      page.section==="隐私与安全"?["敏感数据脱敏","本地加密","证书信任","诊断授权"]:
+                                      page.section==="关于 Swirl"?["Version","构建信息","第三方组件","项目链接"]:
+                                      ["启用功能","默认行为","高级选项","Diagnostics"]
                                 RowLayout {
                                     Layout.fillWidth:true
                                     ColumnLayout {

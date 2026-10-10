@@ -7,13 +7,13 @@ import "../controls"
 
 Item {
     id: page
-    property string range: "Last hour"
+    property string range: "最近 1 小时"
     property var sessions: demoProvider.connections()
     property var sampleRows: [
-        {name:"api.github.com",requests:"1,240",download:"389 MB",policy:"Auto Select"},
+        {name:"api.github.com",requests:"1,240",download:"389 MB",policy:"自动选择"},
         {name:"cdn.jsdelivr.net",requests:"986",download:"270 MB",policy:"DIRECT"},
         {name:"developer.apple.com",requests:"824",download:"116 MB",policy:"Global / SG"},
-        {name:"www.microsoft.com",requests:"641",download:"98 MB",policy:"Auto Select"},
+        {name:"www.microsoft.com",requests:"641",download:"98 MB",policy:"自动选择"},
         {name:"fonts.gstatic.com",requests:"318",download:"42 MB",policy:"DIRECT"}
     ]
     ScrollView {
@@ -29,19 +29,19 @@ Item {
                 Layout.fillWidth:true
                 Text { text:AppState.zh("Activity and throughput"); color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
                 SwirlComboBox {
-                    model:["Last hour","24 hours","7 days","30 days"]
+                    model:["最近 1 小时","最近 24 小时","最近 7 天","最近 30 天"]
                     onActivated:page.range=currentText
                 }
-                SwirlButton { text:AppState.zh("Export report"); iconName:"folder"; onClicked:AppState.notice("Export dashboard") }
+                SwirlButton { text:AppState.zh("导出报告"); iconName:"folder"; onClicked:AppState.notice("导出仪表盘") }
             }
             GridLayout {
                 Layout.fillWidth:true
                 columns:page.width>1080?4:2
                 columnSpacing:13; rowSpacing:13
-                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Total Download"); value:"1.48 GB"; secondary:"Synthetic "+page.range; iconName:"activity" }
-                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Total Upload"); value:"304 MB"; secondary:"Synthetic "+page.range; iconName:"chart" }
-                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Avg. Latency"); value:"58 ms"; secondary:"Synthetic endpoints"; iconName:"clock" }
-                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Connections"); value:"54"; secondary:"42 active · demo"; iconName:"network" }
+                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Total Download"); value:"1.48 GB"; secondary:"模拟"+page.range; iconName:"activity" }
+                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Total Upload"); value:"304 MB"; secondary:"模拟"+page.range; iconName:"chart" }
+                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Avg. Latency"); value:"58 ms"; secondary:"模拟节点"; iconName:"clock" }
+                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Connections"); value:"54"; secondary:"42 个活动连接 · 演示"; iconName:"network" }
             }
             SwirlGlassPanel {
                 Layout.fillWidth:true; Layout.preferredHeight:304
@@ -51,7 +51,7 @@ Item {
                         Layout.fillWidth:true
                         ColumnLayout {
                             Layout.fillWidth:true
-                            Text { text:AppState.zh("Network throughput"); font.pixelSize:17; color:Theme.text; font.weight:Font.DemiBold }
+                            Text { text:AppState.zh("网络吞吐量"); font.pixelSize:17; color:Theme.text; font.weight:Font.DemiBold }
                             Text { text:AppState.zh("Download and upload · local representative series"); color:Theme.muted; font.pixelSize:11 }
                         }
                         SwirlStatusBadge { label:AppState.zh("● DOWNLOAD"); tone:"accent" }
@@ -69,14 +69,14 @@ Item {
                         RowLayout {
                             Layout.fillWidth:true
                             Text { text:AppState.zh("Top destinations"); color:Theme.text; font.pixelSize:16; font.weight:Font.DemiBold; Layout.fillWidth:true }
-                            SwirlButton { text:AppState.zh("Open connections"); quiet:true; onClicked:AppState.currentPage="connections" }
+                            SwirlButton { text:AppState.zh("查看连接记录"); quiet:true; onClicked:AppState.currentPage="connections" }
                         }
                         SwirlDataTable {
                             Layout.fillWidth:true; Layout.fillHeight:true
                             rows:page.sampleRows
                             columns:[{key:"name",label:AppState.zh("DOMAIN"),w:230},{key:"requests",label:AppState.zh("REQUESTS"),w:88},
                                      {key:"download",label:AppState.zh("DOWNLOAD"),w:95},{key:"policy",label:AppState.zh("POLICY"),w:125}]
-                            onRowSelected:function(r){AppState.notice("Inspect destination "+r.name)}
+                            onRowSelected:function(r){AppState.notice("查看目标"+r.name)}
                         }
                     }
                 }
@@ -84,7 +84,7 @@ Item {
                     Layout.preferredWidth:290; Layout.preferredHeight:337
                     ColumnLayout {
                         anchors.fill:parent; anchors.margins:18; spacing:15
-                        Text { text:AppState.zh("Traffic distribution"); color:Theme.text; font.pixelSize:16; font.weight:Font.DemiBold }
+                        Text { text:AppState.zh("流量分布"); color:Theme.text; font.pixelSize:16; font.weight:Font.DemiBold }
                         Repeater {
                             model:[{name:"HTTP/2",share:.47,color:Theme.accent},
                                    {name:"HTTP/3",share:.29,color:Theme.green},

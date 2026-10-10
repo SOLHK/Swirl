@@ -13,7 +13,7 @@ Item {
         var method=methodFilter.currentText
         return demoProvider.requests().filter(function(r){
             return (r.host+r.path+r.method).toLowerCase().indexOf(q)>=0 &&
-                   (method==="All methods"||r.method===method)
+                   (method==="全部方法"||r.method===method)
         })
     }
     ColumnLayout {
@@ -21,16 +21,16 @@ Item {
         RowLayout {
             Layout.fillWidth:true
             SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:AppState.zh("Search URL, path, or request method") }
-            SwirlComboBox { id:methodFilter; model:["All methods","GET","POST","PUT","DELETE"] }
+            SwirlComboBox { id:methodFilter; model:["全部方法","GET","POST","PUT","DELETE"] }
             SwirlButton { text:AppState.zh("Import HAR"); iconName:"folder"; onClicked:AppState.notice("HAR import") }
             SwirlButton { text:AppState.zh("Export HAR"); onClicked:AppState.notice("HAR export") }
         }
         RowLayout {
             Layout.fillWidth:true
             SwirlStatusBadge { label:AppState.zh("HTTP CAPTURE DEMO"); tone:"accent" }
-            Text { text:displayRows.length+" local fixtures"; color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
-            SwirlButton { text:AppState.zh("Record"); iconName:"play"; onClicked:AppState.notice("Capture recording") }
-            SwirlButton { text:AppState.zh("Clear"); onClicked:{selected=null;AppState.notice("Clear capture")} }
+            Text { text:displayRows.length+" 条本地示例"; color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
+            SwirlButton { text:AppState.zh("Record"); iconName:"play"; onClicked:AppState.notice("抓包记录") }
+            SwirlButton { text:AppState.zh("Clear"); onClicked:{selected=null;AppState.notice("清空抓包")} }
         }
         SplitView {
             Layout.fillWidth:true; Layout.fillHeight:true
@@ -46,7 +46,7 @@ Item {
                     columns:[
                         {key:"method",label:AppState.zh("METHOD"),w:83},{key:"status",label:AppState.zh("STATUS"),w:78},
                         {key:"host",label:AppState.zh("HOST"),w:174},{key:"path",label:AppState.zh("PATH / QUERY"),w:260},
-                        {key:"version",label:AppState.zh("HTTP"),w:94},{key:"duration",label:AppState.zh("TIME"),w:92},
+                        {key:"version",label:AppState.zh("HTTP"),w:94},{key:"duration",label:AppState.zh("时间"),w:92},
                         {key:"size",label:AppState.zh("SIZE"),w:78}
                     ]
                     onRowSelected:function(r){page.selected=r}
@@ -95,7 +95,7 @@ Item {
         RowLayout {
             Layout.fillWidth:true
             SwirlButton {
-                text:page.waterfallOpen?"Hide waterfall":"Show waterfall"
+                text:page.waterfallOpen?"隐藏瀑布图":"显示瀑布图"
                 iconName:"chart"; quiet:true; onClicked:page.waterfallOpen=!page.waterfallOpen
             }
             Text { text:AppState.zh("Synthetic timing breakdown · select a request for full details"); color:Theme.muted; font.pixelSize:11; Layout.fillWidth:true }
