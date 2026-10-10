@@ -40,6 +40,24 @@ jobs:
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           Copy-Item build/swirl-quick/Release/SwirlQuick.exe dist/
           windeployqt --release --qmldir src/Swirl.Quick/qml dist/SwirlQuick.exe
+      # Qt's offscreen QPA font database reads appdir/lib/fonts and does not
+      # automatically discover the fonts installed on a Windows CI runner.
+      # These fixtures are used for synthetic screenshot tests ONLY.
+      - name: Stage temporary offscreen screenshot fonts
+        shell: pwsh
+        run: |
+          $fontDir = Join-Path (Resolve-Path "dist").Path "lib/fonts"
+          New-Item -ItemType Directory -Force -Path $fontDir | Out-Null
+          $latin = @("$env:WINDIR/Fonts/segoeui.ttf", "$env:WINDIR/Fonts/arial.ttf") | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (!$latin) { throw "No Latin fallback font found on the Windows runner." }
+          Copy-Item -LiteralPath $latin -Destination $fontDir
+          # Noto Sans SC is licensed under SIL OFL 1.1 and contains both
+          # Simplified Chinese and Latin glyphs. Pin the source revision.
+          $notoUrl = "https://raw.githubusercontent.com/google/fonts/bd8f81ddb5c74d5c8897b36ad88b440266245103/ofl/notosanssc/NotoSansSC%5Bwght%5D.ttf"
+          $notoFile = Join-Path $fontDir "NotoSansSC-VF.ttf"
+          Invoke-WebRequest -Uri $notoUrl -OutFile $notoFile -ErrorAction Stop
+          if ((Get-Item $notoFile).Length -lt 10000000) { throw "Noto Sans SC fixture download is incomplete." }
+          Write-Host "Qt offscreen font fixtures ready; they will NOT be included in the artifact."
       - name: Startup smoke test (offscreen, no network actions)
         shell: pwsh
         run: |
@@ -77,6 +95,13 @@ jobs:
             if ((Get-Item $path).Length -lt 2048) { throw "Screenshot is suspiciously small: $path" }
             Write-Host "Verified Qt screenshot: $path"
           }
+      - name: Remove CI-only font fixtures from portable ZIP
+        if: always()
+        shell: pwsh
+        run: |
+          $fonts = "dist/lib/fonts"
+          if (Test-Path $fonts) { Remove-Item -LiteralPath $fonts -Recurse -Force }
+          if (Test-Path $fonts) { throw "Test fonts must not be distributed in Swirl preview." }
       - name: Upload separate Qt UI preview
         uses: actions/upload-artifact@v4
         with:
