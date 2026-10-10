@@ -31,7 +31,7 @@ Item {
             else if(n==="chart"){line(3,21,3,4);line(3,21,22,21);c.beginPath();c.moveTo(5,16);c.lineTo(10,11);c.lineTo(14,13);c.lineTo(21,5);c.stroke()}
             else if(n==="activity"){c.beginPath();c.moveTo(2,13);c.lineTo(6,13);c.lineTo(9,5);c.lineTo(14,20);c.lineTo(17,11);c.lineTo(22,11);c.stroke()}
             else if(n==="folder"){c.beginPath();c.moveTo(3,7);c.lineTo(10,7);c.lineTo(12,9);c.lineTo(21,9);c.lineTo(21,20);c.lineTo(3,20);c.closePath();c.stroke()}
-            else if(n==="globe"){circle(12,12,9);line(3,12,21,12);c.beginPath();c.ellipse(12,12,4,9,0,0,Math.PI*2);c.stroke()}
+            else if(n==="globe"){circle(12,12,9);line(3,12,21,12);c.beginPath();c.ellipse(8,3,8,18);c.stroke()}
             else if(n==="list"){for(var j=0;j<3;j++){line(8,6+j*6,21,6+j*6);circle(4,6+j*6,1)}}
             else if(n==="pause"){box(4,4,16,16,3);line(10,8,10,16);line(14,8,14,16)}
             else if(n==="play"){circle(12,12,9);c.beginPath();c.moveTo(10,8);c.lineTo(16,12);c.lineTo(10,16);c.closePath();c.stroke()}
