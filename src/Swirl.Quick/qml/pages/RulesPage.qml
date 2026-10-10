@@ -23,17 +23,17 @@ Item {
         anchors.fill:parent; anchors.margins:23; spacing:14
         RowLayout {
             Layout.fillWidth:true
-            SwirlStatusBadge { label:"ORDERED DEMO RULESET"; tone:"accent" }
-            Text { text:"Priority is evaluated top to bottom in this preview."; color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
-            SwirlButton { text:"Test rule"; iconName:"activity"; onClicked:testDialog.open() }
-            SwirlButton { text:"New rule"; primary:true; onClicked:editorDialog.open() }
+            SwirlStatusBadge { label:AppState.zh("ORDERED DEMO RULESET"); tone:"accent" }
+            Text { text:AppState.zh("Priority is evaluated top to bottom in this preview."); color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
+            SwirlButton { text:AppState.zh("Test rule"); iconName:"activity"; onClicked:testDialog.open() }
+            SwirlButton { text:AppState.zh("New rule"); primary:true; onClicked:editorDialog.open() }
         }
         RowLayout {
             Layout.fillWidth:true
-            SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:"Search pattern, type or target strategy" }
+            SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:AppState.zh("Search pattern, type or target strategy") }
             SwirlComboBox { id:policyFilter; model:["All policies","Auto Select","DIRECT","Global / SG","REJECT"] }
-            SwirlButton { text:"Import"; onClicked:AppState.notice("Import rules") }
-            SwirlButton { text:"Export"; onClicked:AppState.notice("Export rules") }
+            SwirlButton { text:AppState.zh("Import"); onClicked:AppState.notice("Import rules") }
+            SwirlButton { text:AppState.zh("Export"); onClicked:AppState.notice("Export rules") }
         }
         RowLayout {
             Layout.fillWidth:true; Layout.fillHeight:true; spacing:14
@@ -42,21 +42,21 @@ Item {
                 SwirlDataTable {
                     anchors.fill:parent; anchors.margins:1
                     rows:page.displayRules; selectedId:page.selectedRule?page.selectedRule.id:""
-                    columns:[{key:"order",label:"PRIORITY",w:82},{key:"type",label:"TYPE",w:170},
-                             {key:"pattern",label:"MATCH PATTERN",w:208},{key:"policy",label:"POLICY",w:126},
-                             {key:"hits",label:"HITS",w:77},{key:"enabled",label:"STATE",w:100}]
+                    columns:[{key:"order",label:AppState.zh("PRIORITY"),w:82},{key:"type",label:AppState.zh("TYPE"),w:170},
+                             {key:"pattern",label:AppState.zh("MATCH PATTERN"),w:208},{key:"policy",label:AppState.zh("POLICY"),w:126},
+                             {key:"hits",label:AppState.zh("HITS"),w:77},{key:"enabled",label:AppState.zh("STATE"),w:100}]
                     onRowSelected:function(r){page.selectedRule=r}
                 }
                 SwirlEmptyState {
                     visible:page.displayRules.length===0; anchors.centerIn:parent
-                    headline:"No matching rules"
+                    headline:AppState.zh("No matching rules")
                 }
             }
             SwirlGlassPanel {
                 Layout.preferredWidth:310; Layout.fillHeight:true
                 ColumnLayout {
                     anchors.fill:parent; anchors.margins:18; spacing:13
-                    Text { text:"Rule inspection"; color:Theme.text; font.pixelSize:16; font.weight:Font.DemiBold }
+                    Text { text:AppState.zh("Rule inspection"); color:Theme.text; font.pixelSize:16; font.weight:Font.DemiBold }
                     SwirlStatusBadge { label:page.selectedRule?page.selectedRule.enabled:"SELECT A RULE"; tone:"accent" }
                     Repeater {
                         model:[
@@ -75,7 +75,7 @@ Item {
                     Rectangle { Layout.fillWidth:true; height:1; color:Theme.border }
                     RowLayout {
                         Layout.fillWidth:true
-                        Text { text:"Enable rule"; color:Theme.text; Layout.fillWidth:true }
+                        Text { text:AppState.zh("Enable rule"); color:Theme.text; Layout.fillWidth:true }
                         SwirlToggle {
                             checked:page.selectedRule&&page.selectedRule.enabled==="Enabled"
                             onToggled:{
@@ -90,8 +90,8 @@ Item {
                         }
                     }
                     Item { Layout.fillHeight:true }
-                    SwirlButton { text:"Edit selected"; onClicked:editorDialog.open() }
-                    SwirlButton { text:"View match details"; quiet:true; onClicked:AppState.notice("Rule hit details") }
+                    SwirlButton { text:AppState.zh("Edit selected"); onClicked:editorDialog.open() }
+                    SwirlButton { text:AppState.zh("View match details"); quiet:true; onClicked:AppState.notice("Rule hit details") }
                 }
             }
         }
@@ -100,18 +100,18 @@ Item {
         id:editorDialog; title:"Rule editor"
         ColumnLayout {
             width:parent.width; spacing:13
-            Text { text:"Rule type"; color:Theme.text }
+            Text { text:AppState.zh("Rule type"); color:Theme.text }
             SwirlComboBox { id:typeInput; Layout.fillWidth:true; model:["DOMAIN-SUFFIX","DOMAIN-KEYWORD","IP-CIDR","PROCESS-NAME","FINAL"] }
-            Text { text:"Match pattern"; color:Theme.text }
-            SwirlTextField { id:patternInput; Layout.fillWidth:true; placeholderText:"example.test" }
-            Text { text:"Target policy"; color:Theme.text }
+            Text { text:AppState.zh("Match pattern"); color:Theme.text }
+            SwirlTextField { id:patternInput; Layout.fillWidth:true; placeholderText:AppState.zh("example.test") }
+            Text { text:AppState.zh("Target policy"); color:Theme.text }
             SwirlComboBox { id:policyInput; Layout.fillWidth:true; model:["Auto Select","DIRECT","Global / SG","REJECT"] }
-            Text { text:"Changes are local to the UI; no routing rules are installed."; color:Theme.muted; font.pixelSize:11; Layout.fillWidth:true; wrapMode:Text.Wrap }
+            Text { text:AppState.zh("Changes are local to the UI; no routing rules are installed."); color:Theme.muted; font.pixelSize:11; Layout.fillWidth:true; wrapMode:Text.Wrap }
             RowLayout {
                 Layout.alignment:Qt.AlignRight
-                SwirlButton { text:"Cancel"; onClicked:editorDialog.close() }
+                SwirlButton { text:AppState.zh("Cancel"); onClicked:editorDialog.close() }
                 SwirlButton {
-                    text:"Add demo rule"; primary:true
+                    text:AppState.zh("Add demo rule"); primary:true
                     enabled:patternInput.text.trim().length>0
                     onClicked:{
                         var n=page.rules.length+1
@@ -129,21 +129,21 @@ Item {
         id:testDialog; title:"Rule matching test"
         ColumnLayout {
             width:parent.width; spacing:13
-            Text { text:"Host or IP to evaluate"; color:Theme.text }
-            SwirlTextField { id:testInput; Layout.fillWidth:true; placeholderText:"api.example.test" }
+            Text { text:AppState.zh("Host or IP to evaluate"); color:Theme.text }
+            SwirlTextField { id:testInput; Layout.fillWidth:true; placeholderText:AppState.zh("api.example.test") }
             Rectangle {
                 Layout.fillWidth:true; implicitHeight:68; radius:9; color:Theme.field
                 Text {
                     anchors.fill:parent; anchors.margins:12
-                    text:"Demo evaluator only.\nNo real DNS lookup or proxy routing occurs."
+                    text:AppState.zh("Demo evaluator only.\nNo real DNS lookup or proxy routing occurs.")
                     color:Theme.muted; font.pixelSize:12; wrapMode:Text.WordWrap
                 }
             }
             RowLayout {
                 Layout.alignment:Qt.AlignRight
-                SwirlButton { text:"Close"; onClicked:testDialog.close() }
+                SwirlButton { text:AppState.zh("Close"); onClicked:testDialog.close() }
                 SwirlButton {
-                    text:"Evaluate"; primary:true; enabled:testInput.text.trim().length>0
+                    text:AppState.zh("Evaluate"); primary:true; enabled:testInput.text.trim().length>0
                     onClicked:{
                         var match=page.rules.find(function(r){return r.type==="DOMAIN-SUFFIX" && testInput.text.endsWith(r.pattern)})
                         AppState.notice("Test match: "+(match?match.policy:"FINAL · Auto Select"))

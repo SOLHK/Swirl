@@ -27,16 +27,16 @@ Item {
         spacing:14
         RowLayout {
             Layout.fillWidth:true; spacing:10
-            SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:"Filter host, IP, process or policy" }
+            SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:AppState.zh("Filter host, IP, process or policy") }
             SwirlComboBox { id:status; model:["All states","Active","Closed"] }
             SwirlComboBox { id:sort; model:["Host","Latency","Downloaded","Process"] }
-            SwirlButton { text:"Export"; iconName:"folder"; onClicked:AppState.notice("Export connections") }
-            SwirlButton { text:"Clear"; onClicked:{selected=null;AppState.notice("Clear connection list")} }
+            SwirlButton { text:AppState.zh("Export"); iconName:"folder"; onClicked:AppState.notice("Export connections") }
+            SwirlButton { text:AppState.zh("Clear"); onClicked:{selected=null;AppState.notice("Clear connection list")} }
         }
         RowLayout {
             Layout.fillWidth:true; spacing:8
             SwirlStatusBadge { label:visibleRows.length+" DEMO RECORDS"; tone:"accent" }
-            Text { text:"Click a row to examine a connection"; color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
+            Text { text:AppState.zh("Click a row to examine a connection"); color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
             SwirlButton { text:AppState.detailOpen?"Hide details":"Show details"; quiet:true; onClicked:AppState.detailOpen=!AppState.detailOpen }
         }
         RowLayout {
@@ -49,19 +49,19 @@ Item {
                     rows:page.visibleRows
                     selectedId:page.selected?page.selected.id:""
                     columns:[
-                        {key:"host",label:"HOST",w:220},{key:"ip",label:"IP ADDRESS",w:125},
-                        {key:"process",label:"PROCESS",w:115},{key:"protocol",label:"PROTO",w:80},
-                        {key:"policy",label:"POLICY",w:119},{key:"up",label:"UPLOAD",w:89},
-                        {key:"down",label:"DOWNLOAD",w:100},{key:"latency",label:"LATENCY",w:95},
-                        {key:"time",label:"SINCE",w:88},{key:"status",label:"STATE",w:88}
+                        {key:"host",label:AppState.zh("HOST"),w:220},{key:"ip",label:AppState.zh("IP ADDRESS"),w:125},
+                        {key:"process",label:AppState.zh("PROCESS"),w:115},{key:"protocol",label:AppState.zh("PROTO"),w:80},
+                        {key:"policy",label:AppState.zh("POLICY"),w:119},{key:"up",label:AppState.zh("UPLOAD"),w:89},
+                        {key:"down",label:AppState.zh("DOWNLOAD"),w:100},{key:"latency",label:AppState.zh("LATENCY"),w:95},
+                        {key:"time",label:AppState.zh("SINCE"),w:88},{key:"status",label:AppState.zh("STATE"),w:88}
                     ]
                     onRowSelected:function(record){page.selected=record}
                 }
                 SwirlEmptyState {
                     visible:page.visibleRows.length===0
                     anchors.centerIn:parent
-                    headline:"No matching connections"
-                    detail:"Adjust the search or status filter"
+                    headline:AppState.zh("No matching connections")
+                    detail:AppState.zh("Adjust the search or status filter")
                 }
             }
             SwirlGlassPanel {
@@ -69,7 +69,7 @@ Item {
                 Layout.preferredWidth:290; Layout.fillHeight:true
                 ColumnLayout {
                     anchors.fill:parent; anchors.margins:20; spacing:15
-                    Text { text:"Connection details"; color:Theme.text; font.pixelSize:16; font.weight:Font.DemiBold }
+                    Text { text:AppState.zh("Connection details"); color:Theme.text; font.pixelSize:16; font.weight:Font.DemiBold }
                     SwirlStatusBadge { label:page.selected?page.selected.status.toUpperCase():"NO SELECTION"; tone:page.selected?"success":"neutral" }
                     Repeater {
                         model:[
@@ -91,7 +91,7 @@ Item {
                     }
                     Item { Layout.fillHeight:true }
                     SwirlButton {
-                        Layout.fillWidth:true; text:"Terminate connection"; danger:true
+                        Layout.fillWidth:true; text:AppState.zh("Terminate connection"); danger:true
                         onClicked:AppState.notice("Terminate connection")
                     }
                 }

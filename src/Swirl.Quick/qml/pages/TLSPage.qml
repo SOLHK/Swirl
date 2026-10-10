@@ -32,18 +32,18 @@ Item {
                 }
                 ColumnLayout {
                     Layout.fillWidth:true; spacing:7
-                    Text { text:"HTTPS inspection"; color:Theme.text; font.pixelSize:21; font.weight:Font.DemiBold }
+                    Text { text:AppState.zh("HTTPS inspection"); color:Theme.text; font.pixelSize:21; font.weight:Font.DemiBold }
                     Text {
-                        text:"The switch previews the future MITM workflow. No root certificate is generated, installed, trusted or revoked."
+                        text:AppState.zh("The switch previews the future MITM workflow. No root certificate is generated, installed, trusted or revoked.")
                         color:Theme.muted; font.pixelSize:12; wrapMode:Text.WordWrap; Layout.fillWidth:true
                     }
                     RowLayout {
-                        SwirlStatusBadge { label:"LOCAL CA: NOT INSTALLED"; tone:"warning" }
-                        SwirlStatusBadge { label:"TLS SESSIONS: 0 REAL"; tone:"neutral" }
+                        SwirlStatusBadge { label:AppState.zh("LOCAL CA: NOT INSTALLED"); tone:"warning" }
+                        SwirlStatusBadge { label:AppState.zh("TLS SESSIONS: 0 REAL"); tone:"neutral" }
                     }
                 }
                 ColumnLayout {
-                    Text { text:"Preview decrypt toggle"; color:Theme.muted; font.pixelSize:11 }
+                    Text { text:AppState.zh("Preview decrypt toggle"); color:Theme.muted; font.pixelSize:11 }
                     SwirlToggle { checked:page.tlsPreview; onToggled:{page.tlsPreview=checked;AppState.notice("HTTPS decrypt preview")} }
                 }
             }
@@ -55,12 +55,12 @@ Item {
                 SwirlButton { text:modelData; quiet:page.activeTab!==modelData; onClicked:page.activeTab=modelData }
             }
             Item { Layout.fillWidth:true }
-            SwirlButton { text:"Certificate manager"; iconName:"shield"; onClicked:certDialog.open() }
-            SwirlButton { text:"Add domain"; primary:true; onClicked:addDialog.open() }
+            SwirlButton { text:AppState.zh("Certificate manager"); iconName:"shield"; onClicked:certDialog.open() }
+            SwirlButton { text:AppState.zh("Add domain"); primary:true; onClicked:addDialog.open() }
         }
         RowLayout {
             Layout.fillWidth:true
-            SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:"Filter host patterns" }
+            SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:AppState.zh("Filter host patterns") }
             SwirlStatusBadge { label:page.shown.length+" DEMO HOSTS"; tone:"accent" }
         }
         RowLayout {
@@ -71,21 +71,21 @@ Item {
                     anchors.fill:parent; anchors.margins:1
                     rows:page.shown
                     selectedId:page.selected?page.selected.id:""
-                    columns:[{key:"name",label:"HOST PATTERN",w:258},{key:"type",label:"RULE",w:107},
-                             {key:"mode",label:"ACTION",w:166},{key:"status",label:"STATE",w:110}]
+                    columns:[{key:"name",label:AppState.zh("HOST PATTERN"),w:258},{key:"type",label:AppState.zh("RULE"),w:107},
+                             {key:"mode",label:AppState.zh("ACTION"),w:166},{key:"status",label:AppState.zh("STATE"),w:110}]
                     onRowSelected:function(r){page.selected=r}
                 }
                 SwirlEmptyState {
                     anchors.centerIn:parent; visible:page.shown.length===0
-                    headline:"No host patterns"
-                    detail:"Try another filter, or add a demo domain"
+                    headline:AppState.zh("No host patterns")
+                    detail:AppState.zh("Try another filter, or add a demo domain")
                 }
             }
             SwirlGlassPanel {
                 Layout.preferredWidth:285; Layout.fillHeight:true
                 ColumnLayout {
                     anchors.fill:parent; anchors.margins:18; spacing:14
-                    Text { text:"Certificate & session"; color:Theme.text; font.pixelSize:16; font.weight:Font.DemiBold }
+                    Text { text:AppState.zh("Certificate & session"); color:Theme.text; font.pixelSize:16; font.weight:Font.DemiBold }
                     Repeater {
                         model:[["CA STATUS","Absent · demonstration"],["TRUST","Not configured"],
                                ["ACTIVE REAL SESSIONS","0"],["TLS VERSION","TLS 1.3 (sample)"],
@@ -98,8 +98,8 @@ Item {
                         }
                     }
                     Item { Layout.fillHeight:true }
-                    SwirlButton { text:"Trust certificate"; onClicked:AppState.notice("Trust CA: blocked in demo") }
-                    SwirlButton { text:"Revoke trust"; danger:true; onClicked:AppState.notice("Revoke CA: blocked in demo") }
+                    SwirlButton { text:AppState.zh("Trust certificate"); onClicked:AppState.notice("Trust CA: blocked in demo") }
+                    SwirlButton { text:AppState.zh("Revoke trust"); danger:true; onClicked:AppState.notice("Revoke CA: blocked in demo") }
                 }
             }
         }
@@ -108,15 +108,15 @@ Item {
         id:certDialog; title:"CA certificate manager"
         ColumnLayout {
             width:parent.width; spacing:11
-            SwirlStatusBadge { label:"NO CERTIFICATE MATERIAL AVAILABLE"; tone:"warning" }
+            SwirlStatusBadge { label:AppState.zh("NO CERTIFICATE MATERIAL AVAILABLE"); tone:"warning" }
             Text {
-                text:"In this UI-only build, Swirl does not generate certificates, access Windows certificate stores, or intercept HTTPS traffic. These buttons only demonstrate the future workflow."
+                text:AppState.zh("In this UI-only build, Swirl does not generate certificates, access Windows certificate stores, or intercept HTTPS traffic. These buttons only demonstrate the future workflow.")
                 color:Theme.text; font.pixelSize:13; wrapMode:Text.WordWrap; Layout.fillWidth:true
             }
             RowLayout {
                 Layout.alignment:Qt.AlignRight
-                SwirlButton { text:"Close"; onClicked:certDialog.close() }
-                SwirlButton { text:"Certificate preview"; onClicked:AppState.notice("Certificate details") }
+                SwirlButton { text:AppState.zh("Close"); onClicked:certDialog.close() }
+                SwirlButton { text:AppState.zh("Certificate preview"); onClicked:AppState.notice("Certificate details") }
             }
         }
     }
@@ -124,15 +124,15 @@ Item {
         id:addDialog; title:"Add HTTPS host pattern"
         ColumnLayout {
             width:parent.width; spacing:11
-            Text { text:"Host pattern"; color:Theme.text }
-            SwirlTextField { id:hostName; Layout.fillWidth:true; placeholderText:"*.example.test" }
+            Text { text:AppState.zh("Host pattern"); color:Theme.text }
+            SwirlTextField { id:hostName; Layout.fillWidth:true; placeholderText:AppState.zh("*.example.test") }
             SwirlComboBox { id:ruleType; Layout.fillWidth:true; model:["Include","Exclude"]; currentIndex:page.activeTab==="Included domains"?0:1 }
-            Text { text:"Only a local UI fixture will be added."; color:Theme.muted; font.pixelSize:11 }
+            Text { text:AppState.zh("Only a local UI fixture will be added."); color:Theme.muted; font.pixelSize:11 }
             RowLayout {
                 Layout.alignment:Qt.AlignRight
-                SwirlButton { text:"Cancel"; onClicked:addDialog.close() }
+                SwirlButton { text:AppState.zh("Cancel"); onClicked:addDialog.close() }
                 SwirlButton {
-                    text:"Save demo"; primary:true
+                    text:AppState.zh("Save demo"); primary:true
                     enabled:hostName.text.includes(".")&&!hostName.text.includes(" ")
                     onClicked:{
                         var name=hostName.text.trim()

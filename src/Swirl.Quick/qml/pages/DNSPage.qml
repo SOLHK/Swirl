@@ -23,9 +23,9 @@ Item {
         anchors.fill:parent; anchors.margins:23; spacing:14
         RowLayout {
             Layout.fillWidth:true
-            SwirlStatusBadge { label:"DEMO DNS ENGINE"; tone:"accent" }
-            Text { text:"Requests are local fixtures · no name resolution occurs"; color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
-            SwirlButton { text:"Test Resolver"; iconName:"activity"; primary:true; onClicked:testDialog.open() }
+            SwirlStatusBadge { label:AppState.zh("DEMO DNS ENGINE"); tone:"accent" }
+            Text { text:AppState.zh("Requests are local fixtures · no name resolution occurs"); color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
+            SwirlButton { text:AppState.zh("Test Resolver"); iconName:"activity"; primary:true; onClicked:testDialog.open() }
         }
         SwirlGlassPanel {
             Layout.fillWidth:true; Layout.preferredHeight:130
@@ -33,20 +33,20 @@ Item {
                 anchors.fill:parent; anchors.margins:20; spacing:22
                 ColumnLayout {
                     Layout.fillWidth:true; spacing:7
-                    Text { text:"Primary resolver"; color:Theme.muted; font.pixelSize:11 }
-                    Text { text:"https://dns.example.test/dns-query"; color:Theme.text; font.pixelSize:17; font.weight:Font.DemiBold; elide:Text.ElideRight; Layout.fillWidth:true }
-                    Text { text:"DoH · DNSSEC option · synthetic endpoint"; color:Theme.muted; font.pixelSize:12 }
+                    Text { text:AppState.zh("Primary resolver"); color:Theme.muted; font.pixelSize:11 }
+                    Text { text:AppState.zh("https://dns.example.test/dns-query"); color:Theme.text; font.pixelSize:17; font.weight:Font.DemiBold; elide:Text.ElideRight; Layout.fillWidth:true }
+                    Text { text:AppState.zh("DoH · DNSSEC option · synthetic endpoint"); color:Theme.muted; font.pixelSize:12 }
                 }
                 Rectangle { width:1; Layout.fillHeight:true; color:Theme.border }
                 ColumnLayout {
                     spacing:8; Layout.preferredWidth:190
-                    Text { text:"Protocols enabled"; color:Theme.muted; font.pixelSize:11 }
+                    Text { text:AppState.zh("Protocols enabled"); color:Theme.muted; font.pixelSize:11 }
                     RowLayout {
-                        SwirlStatusBadge { label:"DoH"; tone:"success" }
-                        SwirlStatusBadge { label:"DoT"; tone:"accent" }
-                        SwirlStatusBadge { label:"DoQ"; tone:"accent" }
+                        SwirlStatusBadge { label:AppState.zh("DoH"); tone:"success" }
+                        SwirlStatusBadge { label:AppState.zh("DoT"); tone:"accent" }
+                        SwirlStatusBadge { label:AppState.zh("DoQ"); tone:"accent" }
                     }
-                    Text { text:"IPv4 + IPv6 · Fake-IP Preview"; color:Theme.muted; font.pixelSize:11 }
+                    Text { text:AppState.zh("IPv4 + IPv6 · Fake-IP Preview"); color:Theme.muted; font.pixelSize:11 }
                 }
             }
         }
@@ -57,11 +57,11 @@ Item {
                 SwirlButton { text:modelData; quiet:page.tab!==modelData; onClicked:page.tab=modelData }
             }
             Item { Layout.fillWidth:true }
-            SwirlButton { text:"Clear demo"; onClicked:{page.dnsRecords=[];page.selectedRecord=null} }
+            SwirlButton { text:AppState.zh("Clear demo"); onClicked:{page.dnsRecords=[];page.selectedRecord=null} }
         }
         RowLayout {
             Layout.fillWidth:true; spacing:12; visible:page.tab==="Query Log"
-            SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:"Search DNS domain, answer or record type" }
+            SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:AppState.zh("Search DNS domain, answer or record type") }
             SwirlComboBox { model:["All record types","A","AAAA","CNAME","TXT","HTTPS"] }
         }
         RowLayout {
@@ -73,9 +73,9 @@ Item {
                     anchors.fill:parent; anchors.margins:1
                     rows:page.visibleRecords
                     selectedId:page.selectedRecord?page.selectedRecord.id:""
-                    columns:[{key:"domain",label:"DOMAIN",w:245},{key:"type",label:"TYPE",w:70},
-                             {key:"answer",label:"ANSWER",w:175},{key:"server",label:"RESOLVER",w:130},
-                             {key:"duration",label:"TIME",w:85},{key:"result",label:"RESULT",w:95}]
+                    columns:[{key:"domain",label:AppState.zh("DOMAIN"),w:245},{key:"type",label:AppState.zh("TYPE"),w:70},
+                             {key:"answer",label:AppState.zh("ANSWER"),w:175},{key:"server",label:AppState.zh("RESOLVER"),w:130},
+                             {key:"duration",label:AppState.zh("TIME"),w:85},{key:"result",label:AppState.zh("RESULT"),w:95}]
                     onRowSelected:function(r){page.selectedRecord=r}
                 }
                 ColumnLayout {
@@ -100,14 +100,14 @@ Item {
                         }
                     }
                     Item { Layout.fillHeight:true }
-                    SwirlButton { text:"Add "+page.tab+" entry"; onClicked:editDialog.open() }
+                    SwirlButton { text:AppState.zh("Add ")+page.tab+" entry"; onClicked:editDialog.open() }
                 }
             }
             SwirlGlassPanel {
                 Layout.preferredWidth:284; Layout.fillHeight:true
                 ColumnLayout {
                     anchors.fill:parent; anchors.margins:18; spacing:14
-                    Text { text:"DNS inspection"; font.pixelSize:16; font.weight:Font.DemiBold; color:Theme.text }
+                    Text { text:AppState.zh("DNS inspection"); font.pixelSize:16; font.weight:Font.DemiBold; color:Theme.text }
                     SwirlStatusBadge { label:page.selectedRecord?page.selectedRecord.result:"NO SELECTION"; tone:page.selectedRecord?"success":"neutral" }
                     Repeater {
                         model:[
@@ -124,8 +124,8 @@ Item {
                         }
                     }
                     Item { Layout.fillHeight:true }
-                    SwirlButton { text:"Copy answer"; onClicked:{if(page.selectedRecord)demoProvider.copyText(page.selectedRecord.answer);AppState.toast="Copied synthetic DNS answer"} }
-                    SwirlButton { text:"Edit mapping"; onClicked:editDialog.open() }
+                    SwirlButton { text:AppState.zh("Copy answer"); onClicked:{if(page.selectedRecord)demoProvider.copyText(page.selectedRecord.answer);AppState.toast="Copied synthetic DNS answer"} }
+                    SwirlButton { text:AppState.zh("Edit mapping"); onClicked:editDialog.open() }
                 }
             }
         }
@@ -134,14 +134,14 @@ Item {
         id:testDialog; title:"Resolver test"
         ColumnLayout {
             width:parent.width; spacing:13
-            Text { text:"Domain name"; color:Theme.text }
-            SwirlTextField { id:domainInput; Layout.fillWidth:true; placeholderText:"example.test" }
-            Text { text:"This test returns an explanatory demo result. No DNS packets are sent."; color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true; wrapMode:Text.WordWrap }
+            Text { text:AppState.zh("Domain name"); color:Theme.text }
+            SwirlTextField { id:domainInput; Layout.fillWidth:true; placeholderText:AppState.zh("example.test") }
+            Text { text:AppState.zh("This test returns an explanatory demo result. No DNS packets are sent."); color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true; wrapMode:Text.WordWrap }
             RowLayout {
                 Layout.alignment:Qt.AlignRight
-                SwirlButton { text:"Cancel"; onClicked:testDialog.close() }
+                SwirlButton { text:AppState.zh("Cancel"); onClicked:testDialog.close() }
                 SwirlButton {
-                    text:"Run demo"; primary:true
+                    text:AppState.zh("Run demo"); primary:true
                     enabled:domainInput.text.includes(".")&&domainInput.text.indexOf(" ")<0
                     onClicked:{testDialog.close();AppState.notice("Resolve "+domainInput.text)}
                 }
@@ -152,15 +152,15 @@ Item {
         id:editDialog; title:"Edit DNS mapping"
         ColumnLayout {
             width:parent.width; spacing:12
-            Text { text:"Hostname"; color:Theme.text }
-            SwirlTextField { id:hostInput; Layout.fillWidth:true; placeholderText:"internal.example.test" }
-            Text { text:"Target / answer"; color:Theme.text }
-            SwirlTextField { id:answerInput; Layout.fillWidth:true; placeholderText:"192.0.2.15" }
+            Text { text:AppState.zh("Hostname"); color:Theme.text }
+            SwirlTextField { id:hostInput; Layout.fillWidth:true; placeholderText:AppState.zh("internal.example.test") }
+            Text { text:AppState.zh("Target / answer"); color:Theme.text }
+            SwirlTextField { id:answerInput; Layout.fillWidth:true; placeholderText:AppState.zh("192.0.2.15") }
             RowLayout {
                 Layout.alignment:Qt.AlignRight
-                SwirlButton { text:"Cancel"; onClicked:editDialog.close() }
+                SwirlButton { text:AppState.zh("Cancel"); onClicked:editDialog.close() }
                 SwirlButton {
-                    text:"Apply demo"; primary:true
+                    text:AppState.zh("Apply demo"); primary:true
                     enabled:hostInput.text.includes(".")&&answerInput.text.trim().length>0
                     onClicked:{editDialog.close();AppState.notice("DNS mapping")}
                 }

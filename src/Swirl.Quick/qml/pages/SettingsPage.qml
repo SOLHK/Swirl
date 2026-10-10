@@ -12,8 +12,8 @@ Item {
         anchors.fill:parent; anchors.margins:23; spacing:14
         RowLayout {
             Layout.fillWidth:true
-            Text { text:"Personalize how Swirl looks and behaves"; color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
-            SwirlStatusBadge { label:"LOCAL UI PREFERENCES"; tone:"accent" }
+            Text { text:AppState.zh("Personalize how Swirl looks and behaves"); color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
+            SwirlStatusBadge { label:AppState.zh("LOCAL UI PREFERENCES"); tone:"accent" }
         }
         RowLayout {
             Layout.fillWidth:true; Layout.fillHeight:true; spacing:15
@@ -21,7 +21,7 @@ Item {
                 Layout.preferredWidth:229; Layout.fillHeight:true
                 ColumnLayout {
                     anchors.fill:parent; anchors.margins:12; spacing:8
-                    Text { text:"PREFERENCES"; color:Theme.muted; font.pixelSize:11; leftPadding:8; topPadding:6 }
+                    Text { text:AppState.zh("PREFERENCES"); color:Theme.muted; font.pixelSize:11; leftPadding:8; topPadding:6 }
                     ListView {
                         Layout.fillWidth:true; Layout.fillHeight:true
                         model:page.sections; clip:true; spacing:3
@@ -59,8 +59,8 @@ Item {
                                 Layout.fillWidth:true
                                 ColumnLayout {
                                     Layout.fillWidth:true
-                                    Text { text:"Color theme"; color:Theme.text; font.pixelSize:14; font.weight:Font.DemiBold }
-                                    Text { text:"Choose light, dark or follow Windows"; color:Theme.muted; font.pixelSize:11 }
+                                    Text { text:AppState.zh("Color theme"); color:Theme.text; font.pixelSize:14; font.weight:Font.DemiBold }
+                                    Text { text:AppState.zh("Choose light, dark or follow Windows"); color:Theme.muted; font.pixelSize:11 }
                                 }
                                 SwirlComboBox {
                                     model:["System","Light","Dark"]
@@ -72,8 +72,8 @@ Item {
                                 Layout.fillWidth:true
                                 ColumnLayout {
                                     Layout.fillWidth:true
-                                    Text { text:"Windows backdrop material"; color:Theme.text; font.pixelSize:14 }
-                                    Text { text:"Uses DWM on supported Windows 11 systems"; color:Theme.muted; font.pixelSize:11 }
+                                    Text { text:AppState.zh("Windows backdrop material"); color:Theme.text; font.pixelSize:14 }
+                                    Text { text:AppState.zh("Uses DWM on supported Windows 11 systems"); color:Theme.muted; font.pixelSize:11 }
                                 }
                                 SwirlToggle { checked:Theme.transparency; onToggled:Theme.transparency=checked }
                             }
@@ -81,8 +81,8 @@ Item {
                                 Layout.fillWidth:true
                                 ColumnLayout {
                                     Layout.fillWidth:true
-                                    Text { text:"Reduce motion"; color:Theme.text; font.pixelSize:14 }
-                                    Text { text:"Disable most transition animations"; color:Theme.muted; font.pixelSize:11 }
+                                    Text { text:AppState.zh("Reduce motion"); color:Theme.text; font.pixelSize:14 }
+                                    Text { text:AppState.zh("Disable most transition animations"); color:Theme.muted; font.pixelSize:11 }
                                 }
                                 SwirlToggle { checked:Theme.reduceMotion; onToggled:Theme.reduceMotion=checked }
                             }
@@ -90,7 +90,7 @@ Item {
                                 Layout.fillWidth:true
                                 ColumnLayout {
                                     Layout.fillWidth:true
-                                    Text { text:"Interface scale"; color:Theme.text; font.pixelSize:14 }
+                                    Text { text:AppState.zh("Interface scale"); color:Theme.text; font.pixelSize:14 }
                                     Text { text:Math.round(Theme.uiScale*100)+"%"; color:Theme.muted; font.pixelSize:11 }
                                 }
                                 Slider {
@@ -100,7 +100,7 @@ Item {
                                     onMoved:Theme.uiScale=value
                                 }
                             }
-                            SwirlStatusBadge { label:"CHANGES ARE LOCAL TO THIS UI PREVIEW"; tone:"accent" }
+                            SwirlStatusBadge { label:AppState.zh("CHANGES ARE LOCAL TO THIS UI PREVIEW"); tone:"accent" }
                         }
                         ColumnLayout {
                             visible:page.section!=="Appearance"; Layout.fillWidth:true; spacing:17
@@ -117,13 +117,13 @@ Item {
                                     ColumnLayout {
                                         Layout.fillWidth:true
                                         Text { text:modelData; color:Theme.text; font.pixelSize:14 }
-                                        Text { text:"Preview configuration, not applied"; color:Theme.muted; font.pixelSize:11 }
+                                        Text { text:AppState.zh("Preview configuration, not applied"); color:Theme.muted; font.pixelSize:11 }
                                     }
                                     SwirlToggle { onToggled:AppState.notice(modelData) }
                                 }
                             }
                             Rectangle { Layout.fillWidth:true; height:1; color:Theme.border }
-                            SwirlButton { text:"Open advanced options"; onClicked:AppState.notice(page.section+" options") }
+                            SwirlButton { text:AppState.zh("Open advanced options"); onClicked:AppState.notice(page.section+" options") }
                         }
                         Item { Layout.preferredHeight:25 }
                     }

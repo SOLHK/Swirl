@@ -27,21 +27,21 @@ Item {
             spacing: 15
             RowLayout {
                 Layout.fillWidth:true
-                Text { text:"Activity and throughput"; color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
+                Text { text:AppState.zh("Activity and throughput"); color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
                 SwirlComboBox {
                     model:["Last hour","24 hours","7 days","30 days"]
                     onActivated:page.range=currentText
                 }
-                SwirlButton { text:"Export report"; iconName:"folder"; onClicked:AppState.notice("Export dashboard") }
+                SwirlButton { text:AppState.zh("Export report"); iconName:"folder"; onClicked:AppState.notice("Export dashboard") }
             }
             GridLayout {
                 Layout.fillWidth:true
                 columns:page.width>1080?4:2
                 columnSpacing:13; rowSpacing:13
-                SwirlMetricCard { Layout.fillWidth:true; label:"Total Download"; value:"1.48 GB"; secondary:"Synthetic "+page.range; iconName:"activity" }
-                SwirlMetricCard { Layout.fillWidth:true; label:"Total Upload"; value:"304 MB"; secondary:"Synthetic "+page.range; iconName:"chart" }
-                SwirlMetricCard { Layout.fillWidth:true; label:"Avg. Latency"; value:"58 ms"; secondary:"Synthetic endpoints"; iconName:"clock" }
-                SwirlMetricCard { Layout.fillWidth:true; label:"Connections"; value:"54"; secondary:"42 active · demo"; iconName:"network" }
+                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Total Download"); value:"1.48 GB"; secondary:"Synthetic "+page.range; iconName:"activity" }
+                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Total Upload"); value:"304 MB"; secondary:"Synthetic "+page.range; iconName:"chart" }
+                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Avg. Latency"); value:"58 ms"; secondary:"Synthetic endpoints"; iconName:"clock" }
+                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Connections"); value:"54"; secondary:"42 active · demo"; iconName:"network" }
             }
             SwirlGlassPanel {
                 Layout.fillWidth:true; Layout.preferredHeight:304
@@ -51,11 +51,11 @@ Item {
                         Layout.fillWidth:true
                         ColumnLayout {
                             Layout.fillWidth:true
-                            Text { text:"Network throughput"; font.pixelSize:17; color:Theme.text; font.weight:Font.DemiBold }
-                            Text { text:"Download and upload · local representative series"; color:Theme.muted; font.pixelSize:11 }
+                            Text { text:AppState.zh("Network throughput"); font.pixelSize:17; color:Theme.text; font.weight:Font.DemiBold }
+                            Text { text:AppState.zh("Download and upload · local representative series"); color:Theme.muted; font.pixelSize:11 }
                         }
-                        SwirlStatusBadge { label:"● DOWNLOAD"; tone:"accent" }
-                        SwirlStatusBadge { label:"● UPLOAD"; tone:"success" }
+                        SwirlStatusBadge { label:AppState.zh("● DOWNLOAD"); tone:"accent" }
+                        SwirlStatusBadge { label:AppState.zh("● UPLOAD"); tone:"success" }
                     }
                     SwirlTrafficChart { Layout.fillWidth:true; Layout.fillHeight:true }
                 }
@@ -68,14 +68,14 @@ Item {
                         anchors.fill:parent; anchors.margins:17; spacing:11
                         RowLayout {
                             Layout.fillWidth:true
-                            Text { text:"Top destinations"; color:Theme.text; font.pixelSize:16; font.weight:Font.DemiBold; Layout.fillWidth:true }
-                            SwirlButton { text:"Open connections"; quiet:true; onClicked:AppState.currentPage="connections" }
+                            Text { text:AppState.zh("Top destinations"); color:Theme.text; font.pixelSize:16; font.weight:Font.DemiBold; Layout.fillWidth:true }
+                            SwirlButton { text:AppState.zh("Open connections"); quiet:true; onClicked:AppState.currentPage="connections" }
                         }
                         SwirlDataTable {
                             Layout.fillWidth:true; Layout.fillHeight:true
                             rows:page.sampleRows
-                            columns:[{key:"name",label:"DOMAIN",w:230},{key:"requests",label:"REQUESTS",w:88},
-                                     {key:"download",label:"DOWNLOAD",w:95},{key:"policy",label:"POLICY",w:125}]
+                            columns:[{key:"name",label:AppState.zh("DOMAIN"),w:230},{key:"requests",label:AppState.zh("REQUESTS"),w:88},
+                                     {key:"download",label:AppState.zh("DOWNLOAD"),w:95},{key:"policy",label:AppState.zh("POLICY"),w:125}]
                             onRowSelected:function(r){AppState.notice("Inspect destination "+r.name)}
                         }
                     }
@@ -84,7 +84,7 @@ Item {
                     Layout.preferredWidth:290; Layout.preferredHeight:337
                     ColumnLayout {
                         anchors.fill:parent; anchors.margins:18; spacing:15
-                        Text { text:"Traffic distribution"; color:Theme.text; font.pixelSize:16; font.weight:Font.DemiBold }
+                        Text { text:AppState.zh("Traffic distribution"); color:Theme.text; font.pixelSize:16; font.weight:Font.DemiBold }
                         Repeater {
                             model:[{name:"HTTP/2",share:.47,color:Theme.accent},
                                    {name:"HTTP/3",share:.29,color:Theme.green},
@@ -108,7 +108,7 @@ Item {
                             }
                         }
                         Item { Layout.fillHeight:true }
-                        Text { text:"Protocol percentages are illustrative."; color:Theme.muted; font.pixelSize:10 }
+                        Text { text:AppState.zh("Protocol percentages are illustrative."); color:Theme.muted; font.pixelSize:10 }
                     }
                 }
             }

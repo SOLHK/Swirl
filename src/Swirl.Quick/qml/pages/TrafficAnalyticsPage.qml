@@ -33,18 +33,18 @@ Item {
             width:scroll.availableWidth; spacing:15
             RowLayout {
                 Layout.fillWidth:true
-                SwirlStatusBadge { label:"SYNTHETIC TRAFFIC"; tone:"accent" }
-                Text { text:"Aggregates are fixtures, not system counters"; color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
+                SwirlStatusBadge { label:AppState.zh("SYNTHETIC TRAFFIC"); tone:"accent" }
+                Text { text:AppState.zh("Aggregates are fixtures, not system counters"); color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
                 SwirlComboBox { model:["Last hour","24 hours","7 days","30 days","Custom range"] }
-                SwirlButton { text:"Export"; onClicked:AppState.notice("Export traffic report") }
+                SwirlButton { text:AppState.zh("Export"); onClicked:AppState.notice("Export traffic report") }
             }
             GridLayout {
                 columns:page.width>1080?4:2
                 Layout.fillWidth:true; columnSpacing:13; rowSpacing:13
-                SwirlMetricCard { Layout.fillWidth:true; label:"Download"; value:"1.48 GB"; secondary:"Demo aggregate"; iconName:"activity" }
-                SwirlMetricCard { Layout.fillWidth:true; label:"Upload"; value:"304 MB"; secondary:"Demo aggregate"; iconName:"chart" }
-                SwirlMetricCard { Layout.fillWidth:true; label:"Domains"; value:"128"; secondary:"Demo unique hosts"; iconName:"globe" }
-                SwirlMetricCard { Layout.fillWidth:true; label:"Applications"; value:"12"; secondary:"Demo traffic owners"; iconName:"grid" }
+                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Download"); value:"1.48 GB"; secondary:"Demo aggregate"; iconName:"activity" }
+                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Upload"); value:"304 MB"; secondary:"Demo aggregate"; iconName:"chart" }
+                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Domains"); value:"128"; secondary:"Demo unique hosts"; iconName:"globe" }
+                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Applications"); value:"12"; secondary:"Demo traffic owners"; iconName:"grid" }
             }
             SwirlGlassPanel {
                 Layout.fillWidth:true; Layout.preferredHeight:305
@@ -52,9 +52,9 @@ Item {
                     anchors.fill:parent; anchors.margins:19; spacing:11
                     RowLayout {
                         Layout.fillWidth:true
-                        Text { text:"Transfer volume over time"; color:Theme.text; font.pixelSize:17; font.weight:Font.DemiBold; Layout.fillWidth:true }
-                        SwirlStatusBadge { label:"● DOWN"; tone:"accent" }
-                        SwirlStatusBadge { label:"● UP"; tone:"success" }
+                        Text { text:AppState.zh("Transfer volume over time"); color:Theme.text; font.pixelSize:17; font.weight:Font.DemiBold; Layout.fillWidth:true }
+                        SwirlStatusBadge { label:AppState.zh("● DOWN"); tone:"accent" }
+                        SwirlStatusBadge { label:AppState.zh("● UP"); tone:"success" }
                     }
                     SwirlTrafficChart { Layout.fillWidth:true; Layout.fillHeight:true }
                 }
@@ -66,15 +66,15 @@ Item {
                     SwirlButton { text:modelData; quiet:page.activeTab!==modelData; onClicked:page.activeTab=modelData }
                 }
                 Item { Layout.fillWidth:true }
-                Text { text:"Top consumers"; color:Theme.muted; font.pixelSize:11 }
+                Text { text:AppState.zh("Top consumers"); color:Theme.muted; font.pixelSize:11 }
             }
             SwirlGlassPanel {
                 Layout.fillWidth:true; Layout.preferredHeight:295; clip:true
                 SwirlDataTable {
                     anchors.fill:parent; anchors.margins:1
                     rows:page.selectedRows
-                    columns:[{key:"name",label:"DESTINATION / OWNER",w:285},{key:"connections",label:"REQUESTS",w:130},
-                             {key:"upload",label:"UPLOAD",w:142},{key:"download",label:"DOWNLOAD",w:155}]
+                    columns:[{key:"name",label:AppState.zh("DESTINATION / OWNER"),w:285},{key:"connections",label:AppState.zh("REQUESTS"),w:130},
+                             {key:"upload",label:AppState.zh("UPLOAD"),w:142},{key:"download",label:AppState.zh("DOWNLOAD"),w:155}]
                     onRowSelected:function(r){AppState.notice("Inspect traffic "+r.name)}
                 }
             }
