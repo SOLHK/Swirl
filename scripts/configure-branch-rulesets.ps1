@@ -43,7 +43,7 @@ function Invoke-GitHubApi {
             $output = & gh api --method $Method -H 'Accept: application/vnd.github+json' $Endpoint
         }
         if ($LASTEXITCODE -ne 0) { throw "GitHub API $Method $Endpoint 执行失败。请检查管理员权限。" }
-        return $output | ConvertFrom-Json
+        return ($output -join "`n") | ConvertFrom-Json
     } finally {
         if ($temporaryFile -and (Test-Path $temporaryFile)) {
             Remove-Item -LiteralPath $temporaryFile -Force
