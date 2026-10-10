@@ -20,7 +20,7 @@
 // does not attach stderr to GitHub Actions' PowerShell console.
 static void recordQtDiagnostic(QtMsgType type, const QMessageLogContext &, const QString &message)
 {
-    QFile file(QCoreApplication::applicationDirPath() + QStringLiteral("/SwirlQuick-diagnostics.txt"));
+    QFile file(QCoreApplication::applicationDirPath() + QStringLiteral("/Swirl-diagnostics.txt"));
     if (!file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
         return;
     QTextStream out(&file);
@@ -29,6 +29,7 @@ static void recordQtDiagnostic(QtMsgType type, const QMessageLogContext &, const
 
 int main(int argc, char *argv[])
 {
+    QQuickWindow::setDefaultAlphaBuffer(true);
     QGuiApplication app(argc, argv);
     app.setApplicationName(QStringLiteral("Swirl"));
     app.setWindowIcon(QIcon(QStringLiteral(":/swirl/swirl-256.png")));
@@ -55,7 +56,7 @@ int main(int argc, char *argv[])
     const QString previewPage = argumentValue(QStringLiteral("--preview-page="));
     const QString previewTheme = argumentValue(QStringLiteral("--preview-theme="));
     if (smoke || !previewPath.isEmpty()) {
-        QFile::remove(QCoreApplication::applicationDirPath() + QStringLiteral("/SwirlQuick-diagnostics.txt"));
+        QFile::remove(QCoreApplication::applicationDirPath() + QStringLiteral("/Swirl-diagnostics.txt"));
         qInstallMessageHandler(recordQtDiagnostic);
     }
     engine.rootContext()->setContextProperty("previewPage", previewPage);

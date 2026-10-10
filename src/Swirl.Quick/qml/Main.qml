@@ -12,8 +12,15 @@ ApplicationWindow {
     height: 895
     minimumWidth: 920
     minimumHeight: 600
-    title: "Swirl · UI Preview"
-    color: Theme.transparency ? Qt.rgba(Theme.canvas.r,Theme.canvas.g,Theme.canvas.b,0.91) : Theme.canvas
+    title: "Swirl"
+    flags: Qt.Window | Qt.FramelessWindowHint
+    color: "transparent"
+    background: Rectangle {
+        radius: window.visibility === Window.Maximized ? 0 : 18
+        color: Theme.canvas
+        border.width: 1
+        border.color: Theme.border
+    }
     property bool swirlTransparencyEnabled: Theme.transparency
     Component.onCompleted: {
         backdrop.apply(window, swirlTransparencyEnabled)
@@ -23,12 +30,87 @@ ApplicationWindow {
             AppState.currentPage=previewPage
     }
     onSwirlTransparencyEnabledChanged: backdrop.apply(window, swirlTransparencyEnabled)
-    font.family: "Segoe UI"
+    font.family: "Microsoft YaHei UI"
     font.pixelSize: 13
+    Rectangle {
+        id: windowToolbar
+        z: 50
+        width: parent.width
+        height: 49
+        radius: window.visibility === Window.Maximized ? 0 : 18
+        color: Theme.sidebar
+        border.color: Theme.border
+        border.width: 0
+        Rectangle {
+            anchors.left:parent.left; anchors.right:parent.right
+            anchors.bottom:parent.bottom; height:20
+            color:Theme.sidebar
+        }
+        // Native system move preserves Windows snapping and multitasking.
+        MouseArea {
+            anchors.fill:parent
+            acceptedButtons: Qt.LeftButton
+            onPressed: window.startSystemMove()
+            onDoubleClicked: {
+                if (window.visibility === Window.Maximized) window.showNormal()
+                else window.showMaximized()
+            }
+        }
+        RowLayout {
+            z: 1
+            anchors.fill:parent; anchors.leftMargin:19; anchors.rightMargin:21
+            spacing:9
+            Repeater {
+                model: ["#FF605C","#FFBD44","#00CA4E"]
+                delegate: Rectangle {
+                    required property int index
+                    required property string modelData
+                    width:13; height:13; radius:7
+                    color:modelData
+                    border.color:Qt.darker(modelData,1.12)
+                    MouseArea {
+                        anchors.fill:parent
+                        cursorShape:Qt.PointingHandCursor
+                        onClicked: {
+                            if (index===0) window.close()
+                            else if (index===1) window.showMinimized()
+                            else if (window.visibility===Window.Maximized) window.showNormal()
+                            else window.showMaximized()
+                        }
+                    }
+                }
+            }
+            Item { Layout.fillWidth:true }
+            Text { text:"Swirl"; color:Theme.text; font.family:"Segoe UI"; font.pixelSize:13; font.weight:Font.DemiBold }
+            Item { Layout.fillWidth:true }
+            Text { text:"界面预览 · 所有网络操作均为模拟"; color:Theme.muted; font.pixelSize:11 }
+        }
+    }
+    // Frameless windows still support native edge resizing.
+    MouseArea {
+        z: 100
+        visible:window.visibility !== Window.Maximized
+        anchors.left:parent.left; anchors.top:parent.top; anchors.bottom:parent.bottom
+        width:6; cursorShape:Qt.SizeHorCursor
+        onPressed:window.startSystemResize(Qt.LeftEdge)
+    }
+    MouseArea {
+        z:100; visible:window.visibility !== Window.Maximized
+        anchors.right:parent.right; anchors.top:parent.top; anchors.bottom:parent.bottom
+        width:6; cursorShape:Qt.SizeHorCursor
+        onPressed:window.startSystemResize(Qt.RightEdge)
+    }
+    MouseArea {
+        z:100; visible:window.visibility !== Window.Maximized
+        anchors.bottom:parent.bottom; anchors.left:parent.left; anchors.right:parent.right
+        height:6; cursorShape:Qt.SizeVerCursor
+        onPressed:window.startSystemResize(Qt.BottomEdge)
+    }
     Item {
         id: scaledCanvas
+        y: windowToolbar.height
         width:window.width/Theme.uiScale
-        height:window.height/Theme.uiScale
+        height:(window.height-windowToolbar.height)/Theme.uiScale
         scale:Theme.uiScale
         transformOrigin:Item.TopLeft
     RowLayout {
@@ -67,7 +149,7 @@ ApplicationWindow {
                         visible:window.width>1120
                         implicitWidth:210
                         id:pageSearch
-                        placeholderText:"Search pages · Ctrl+K"
+                        placeholderText:"搜索功能 · Ctrl+K"
                         onAccepted:{
                             var q=text.toLowerCase()
                             for (var i=0;i<AppState.groups.length;++i)
@@ -79,35 +161,35 @@ ApplicationWindow {
                                         return
                                     }
                                 }
-                            AppState.notice("No matching page")
+                            AppState.notice("没有找到对应功能")
                         }
                     }
                     SwirlButton {
-                        text:"UI DEMO"; iconName:"grid"; quiet:true
+                        text:"界面演示"; iconName:"grid"; quiet:true
                         onClicked:demoStatesMenu.popup()
                         Menu {
                             id:demoStatesMenu
                             y:parent.height+3
                             background:Rectangle { radius:11; color:Theme.raised; border.color:Theme.border }
                             MenuItem {
-                                text:"Normal view"
+                                text:"正常模式"
                                 onTriggered:{AppState.demoLoading=false;AppState.demoError=false;AppState.demoEmpty=false}
                             }
                             MenuItem {
-                                text:"Loading state"
+                                text:"加载中"
                                 onTriggered:{AppState.demoLoading=true;AppState.demoError=false;AppState.demoEmpty=false}
                             }
                             MenuItem {
-                                text:"Empty state"
+                                text:"空数据"
                                 onTriggered:{AppState.demoEmpty=true;AppState.demoLoading=false;AppState.demoError=false}
                             }
                             MenuItem {
-                                text:"Error state"
+                                text:"错误状态"
                                 onTriggered:{AppState.demoError=true;AppState.demoLoading=false;AppState.demoEmpty=false}
                             }
                         }
                     }
-                    SwirlButton { text:"Settings"; iconName:"settings"; quiet:true; onClicked:AppState.currentPage="settings" }
+                    SwirlButton { text:"设置"; iconName:"settings"; quiet:true; onClicked:AppState.currentPage="settings" }
                 }
             }
             Item {
@@ -157,18 +239,18 @@ ApplicationWindow {
                         }
                         SwirlEmptyState {
                             visible:!AppState.demoLoading
-                            headline:AppState.demoError?"Demo error state":"No matching records"
-                            detail:AppState.demoError?"A simulated loading failure occurred.":"This preview is showing an intentionally empty state."
+                            headline:AppState.demoError?"模拟加载失败":"没有匹配的记录"
+                            detail:AppState.demoError?"这是模拟的加载错误。":"当前正在演示空数据状态。"
                             Layout.alignment:Qt.AlignHCenter
                         }
                         Text {
                             visible:AppState.demoLoading
-                            text:"Loading demonstration data…"
+                            text:"正在加载演示数据…"
                             color:Theme.muted; font.pixelSize:13
                             Layout.alignment:Qt.AlignHCenter
                         }
                         SwirlButton {
-                            text:AppState.demoError?"Retry preview":"Return to normal"
+                            text:AppState.demoError?"重试":"恢复正常"
                             Layout.alignment:Qt.AlignHCenter
                             onClicked:{AppState.demoEmpty=false;AppState.demoError=false;AppState.demoLoading=false}
                         }
@@ -182,8 +264,8 @@ ApplicationWindow {
                 RowLayout {
                     anchors.fill:parent
                     anchors.leftMargin:27; anchors.rightMargin:26
-                    Text { text:"●  UI demonstration mode · no live network activity"; color:Theme.muted; font.pixelSize:11; Layout.fillWidth:true }
-                    Text { text:"Swirl Quick   •   Preview 0.1"; color:Theme.muted; font.pixelSize:11 }
+                    Text { text:"●  当前为界面演示，不会执行真实网络操作"; color:Theme.muted; font.pixelSize:11; Layout.fillWidth:true }
+                    Text { text:"Swirl  ·  测试版 0.1"; color:Theme.muted; font.pixelSize:11 }
                 }
             }
         }
@@ -201,7 +283,7 @@ ApplicationWindow {
     Component { id:proxies; ProxiesPage {} }
     Component { id:inspector; InspectorPage {} }
     Component { id:scripts; ScriptsPage {} }
-    Component { id:settings; SettingsPage {} }
+    Component { id:settings; 设置Page {} }
     Component { id:toolbox; ToolboxPage {} }
     Component { id:dashboard; DashboardPage {} }
     Component { id:dns; DNSPage {} }

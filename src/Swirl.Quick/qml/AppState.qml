@@ -7,45 +7,45 @@ QtObject {
     property bool systemProxyOn: false
     property bool tunOn: false
     property bool detailOpen: true
-    property string mode: "Rule"
-    property string policy: "Auto Select"
-    property string selectedNode: "Singapore · 01"
+    property string mode: "规则"
+    property string policy: "自动选择"
+    property string selectedNode: "新加坡 · 01"
     property string toast: ""
     property bool demoLoading: false
     property bool demoError: false
     property bool demoEmpty: false
     readonly property var groups: [
-      {title:"CONTROL CENTER", pages:[
-        {id:"overview",title:"Overview",icon:"home",sub:"Network at a glance"},
-        {id:"dashboard",title:"Dashboard",icon:"chart",sub:"Metrics and history"},
-        {id:"profiles",title:"Profiles",icon:"folder",sub:"Configurations and revisions"}]},
-      {title:"PROXY & ROUTING", pages:[
-        {id:"proxies",title:"Proxies",icon:"globe",sub:"Endpoints and health"},
-        {id:"policies",title:"Policy Groups",icon:"layers",sub:"Routing strategies"},
-        {id:"subscriptions",title:"Subscriptions",icon:"refresh",sub:"Remote providers"},
-        {id:"rules",title:"Rules",icon:"list",sub:"Routing decisions"},
-        {id:"dns",title:"DNS",icon:"server",sub:"Resolvers, hosts and queries"}]},
-      {title:"INSPECTION",pages:[
-        {id:"connections",title:"Connections",icon:"activity",sub:"Network sessions"},
-        {id:"inspector",title:"HTTP Inspector",icon:"inspect",sub:"Requests and responses"},
-        {id:"traffic",title:"Traffic Analytics",icon:"chart",sub:"Usage and distribution"},
-        {id:"tls",title:"TLS / MITM",icon:"shield",sub:"HTTPS decryption controls"}]},
-      {title:"DEBUGGING",pages:[
-        {id:"rewrite",title:"Rewrite",icon:"edit",sub:"HTTP transformations"},
-        {id:"map",title:"Map Local / Remote",icon:"route",sub:"Response mapping"},
-        {id:"breakpoint",title:"HTTP Breakpoint",icon:"pause",sub:"Intercept and modify"},
-        {id:"replay",title:"HTTP Replay",icon:"play",sub:"Replay requests"}]},
-      {title:"AUTOMATION",pages:[
-        {id:"scripts",title:"Scripts",icon:"code",sub:"JavaScript and console"},
-        {id:"modules",title:"Modules",icon:"grid",sub:"Extensions and packages"},
-        {id:"automation",title:"Automation",icon:"clock",sub:"Triggers and schedules"}]},
-      {title:"TOOLS",pages:[
-        {id:"toolbox",title:"Toolbox",icon:"tool",sub:"Network diagnostics"},
-        {id:"api",title:"Local API / CLI",icon:"terminal",sub:"Developer integration"},
-        {id:"gateway",title:"Gateway & Devices",icon:"network",sub:"LAN and network interfaces"}]},
-      {title:"SYSTEM",pages:[
-        {id:"logs",title:"Logs",icon:"list",sub:"Events and diagnostics"},
-        {id:"settings",title:"Settings",icon:"settings",sub:"Appearance and preferences"}]}
+      {title:"控制中心", pages:[
+        {id:"overview",title:"总览",icon:"home",sub:"网络概览"},
+        {id:"dashboard",title:"仪表盘",icon:"chart",sub:"实时数据与历史趋势"},
+        {id:"profiles",title:"配置文件",icon:"folder",sub:"配置管理与历史版本"}]},
+      {title:"代理与路由", pages:[
+        {id:"proxies",title:"代理节点",icon:"globe",sub:"节点和可用状态"},
+        {id:"policies",title:"策略组",icon:"layers",sub:"流量分流策略"},
+        {id:"subscriptions",title:"订阅管理",icon:"refresh",sub:"远程订阅源"},
+        {id:"rules",title:"分流规则",icon:"list",sub:"规则匹配与决策"},
+        {id:"dns",title:"DNS",icon:"server",sub:"解析器、Hosts 与查询"}]},
+      {title:"网络检查",pages:[
+        {id:"connections",title:"连接记录",icon:"activity",sub:"网络会话"},
+        {id:"inspector",title:"HTTP 检查器",icon:"inspect",sub:"请求与响应"},
+        {id:"traffic",title:"流量分析",icon:"chart",sub:"流量统计与分布"},
+        {id:"tls",title:"TLS / HTTPS 解密",icon:"shield",sub:"HTTPS 检查设置"}]},
+      {title:"调试工具",pages:[
+        {id:"rewrite",title:"重写规则",icon:"edit",sub:"HTTP 请求修改"},
+        {id:"map",title:"本地与远程映射",icon:"route",sub:"响应映射"},
+        {id:"breakpoint",title:"HTTP 断点",icon:"pause",sub:"拦截与修改"},
+        {id:"replay",title:"HTTP 重放",icon:"play",sub:"重放请求"}]},
+      {title:"自动化",pages:[
+        {id:"scripts",title:"脚本",icon:"code",sub:"JavaScript 与控制台"},
+        {id:"modules",title:"模块",icon:"grid",sub:"扩展与组件"},
+        {id:"automation",title:"自动化任务",icon:"clock",sub:"触发条件与定时任务"}]},
+      {title:"实用工具",pages:[
+        {id:"toolbox",title:"工具箱",icon:"tool",sub:"网络诊断"},
+        {id:"api",title:"本地 API / 命令行",icon:"terminal",sub:"开发者集成"},
+        {id:"gateway",title:"网关与设备",icon:"network",sub:"局域网与网络接口"}]},
+      {title:"系统",pages:[
+        {id:"logs",title:"日志",icon:"list",sub:"事件与诊断"},
+        {id:"settings",title:"设置",icon:"settings",sub:"外观与偏好设置"}]}
     ]
     function page(id) {
         for (var i=0;i<groups.length;++i)
@@ -53,5 +53,5 @@ QtObject {
                 if (groups[i].pages[j].id === id) return groups[i].pages[j]
         return groups[0].pages[0]
     }
-    function notice(label) { toast=label + " · UI demo only, backend not connected" }
+    function notice(label) { toast=label + " · 仅供界面演示，尚未连接内核" }
 }

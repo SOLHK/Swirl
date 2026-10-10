@@ -9,7 +9,7 @@ SwirlGlassPanel {
     material:"sidebar"
     property bool compactByWindow:false
     readonly property bool effectivelyCollapsed:AppState.sidebarCollapsed||compactByWindow
-    cornerRadius:0
+    cornerRadius:18
     Layout.preferredWidth:sidebar.effectivelyCollapsed?76:247
     Layout.fillHeight:true
     border.width:0
@@ -43,7 +43,7 @@ SwirlGlassPanel {
                     Layout.fillWidth:true
                     spacing:2
                     Text { text:"Swirl"; color:Theme.text; font.pixelSize:21; font.weight:Font.DemiBold }
-                    Text { text:"NETWORK STUDIO"; color:Theme.muted; font.pixelSize:9; font.letterSpacing:1.5 }
+                    Text { text:"专业网络工具"; color:Theme.muted; font.pixelSize:9; font.letterSpacing:1.5 }
                 }
             }
         }
@@ -97,11 +97,11 @@ SwirlGlassPanel {
         SwirlNavigationItem {
             Layout.fillWidth:true
             pageId:"toggle-sidebar"
-            title:sidebar.effectivelyCollapsed?"Expand":"Collapse sidebar"
+            title:sidebar.effectivelyCollapsed?"展开":"收起侧边栏"
             iconName:"layers"
             compact:sidebar.effectivelyCollapsed
             onActivated:{
-                if(sidebar.compactByWindow) AppState.toast="Expand the window to expand navigation"
+                if(sidebar.compactByWindow) AppState.toast="请放大窗口以展开导航"
                 else AppState.sidebarCollapsed=!AppState.sidebarCollapsed
             }
         }
