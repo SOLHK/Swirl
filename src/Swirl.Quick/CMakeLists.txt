@@ -38,6 +38,7 @@ qt_add_qml_module(SwirlQuick
 )
 set(SWIRL_ASSET_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../../AdShield/Assets")
 qt_add_resources(SwirlQuick brand PREFIX "/swirl" BASE "${SWIRL_ASSET_PATH}" FILES "${SWIRL_ASSET_PATH}/swirl-256.png")
+target_include_directories(SwirlQuick PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/app")
 target_link_libraries(SwirlQuick PRIVATE Qt6::Quick Qt6::Qml Qt6::QuickControls2)
 if(WIN32)
  target_link_libraries(SwirlQuick PRIVATE dwmapi)
