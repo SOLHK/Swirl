@@ -97,7 +97,10 @@ ApplicationWindow {
                                 AppState.currentPage==="logs" ? logs :
                                 AppState.currentPage==="tls" ? tls :
                                 AppState.currentPage==="replay" ? replay :
-                                AppState.currentPage==="rewrite" ? rewrite : workbench
+                                AppState.currentPage==="rewrite" ? rewrite :
+                                AppState.currentPage==="profiles" ? profiles :
+                                AppState.currentPage==="subscriptions" ? subscriptions :
+                                AppState.currentPage==="policies" ? policies : workbench
                 }
             Rectangle {
                 Layout.fillWidth:true
@@ -126,6 +129,9 @@ ApplicationWindow {
     Component { id:tls; TLSPage {} }
     Component { id:replay; ReplayPage {} }
     Component { id:rewrite; RewritePage {} }
+    Component { id:profiles; ProfilesPage {} }
+    Component { id:subscriptions; SubscriptionsPage {} }
+    Component { id:policies; PolicyGroupsPage {} }
     Component { id:workbench; WorkbenchPage { pageId:AppState.currentPage } }
     Timer { id:toastTimer; interval:2800; onTriggered:AppState.toast="" }
     // Smoke mode deliberately visits every navigation destination and fails CI
