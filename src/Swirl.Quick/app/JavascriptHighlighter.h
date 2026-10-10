@@ -3,7 +3,7 @@
 #include <QQuickTextDocument>
 #include <QtQml/qqmlregistration.h>
 
-class JavascriptHighlighter final : public QSyntaxHighlighter
+class JavascriptHighlighter : public QSyntaxHighlighter
 {
     Q_OBJECT
     QML_ELEMENT
