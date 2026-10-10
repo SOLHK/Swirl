@@ -1,0 +1,45 @@
+name: Guard production release
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review, converted_to_draft, labeled, unlabeled]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  production-gate:
+    name: production-gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce staging to production promotion
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          SOURCE_BRANCH: ${{ github.head_ref }}
+          SOURCE_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          TARGET_REPO: ${{ github.repository }}
+          TARGET_BRANCH: ${{ github.base_ref }}
+          RELEASE_APPROVED: ${{ contains(github.event.pull_request.labels.*.name, 'release-approved') }}
+          DRAFT_PR: ${{ github.event.pull_request.draft }}
+        run: |
+          set -euo pipefail
+          if [[ "$SOURCE_BRANCH" != "test" || "$SOURCE_REPO" != "$TARGET_REPO" || "$TARGET_BRANCH" != "main" ]]; then
+            echo "::error::Only a same-repository test -> main pull request may ship a production release."
+            exit 1
+          fi
+          if [[ "$DRAFT_PR" == "true" ]]; then
+            echo "::error::Production pull request is still a draft."
+            exit 1
+          fi
+          if [[ "$RELEASE_APPROVED" != "true" ]]; then
+            echo "::error::Release not approved. The repository owner must explicitly authorize release-approved."
+            exit 1
+          fi
+          echo "Production PR source and explicit approval label validated."
+      - name: Explain release policy
+        run: |
+          echo "Passing this job does not authorize auto-merge or auto-release."
+          echo "Owner approval and actual GitHub main branch protection remain mandatory."
