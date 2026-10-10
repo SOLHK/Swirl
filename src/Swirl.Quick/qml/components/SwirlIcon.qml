@@ -23,7 +23,7 @@ Item {
             c.lineCap="round"
             c.lineJoin="round"
             function line(a,b,d,e){c.beginPath();c.moveTo(a,b);c.lineTo(d,e);c.stroke()}
-            function box(x,y,w,h,r){c.beginPath();c.roundedRect(x,y,w,h,r,r);c.stroke()}
+            function box(x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.lineTo(x+w-r,y);c.lineTo(x+w,y+r);c.lineTo(x+w,y+h-r);c.lineTo(x+w-r,y+h);c.lineTo(x+r,y+h);c.lineTo(x,y+h-r);c.lineTo(x,y+r);c.closePath();c.stroke()}
             function circle(x,y,r){c.beginPath();c.arc(x,y,r,0,Math.PI*2);c.stroke()}
             var n=root.name
             if(n==="search"){circle(10.5,10.5,6);line(15,15,21,21)}
