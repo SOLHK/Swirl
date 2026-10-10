@@ -4,6 +4,7 @@ import SwirlQuick
 Menu {
     id:menu
     property var items:["Details","Copy","Export"]
+    property string payload:""
     padding:5
     background:Rectangle { color:Theme.raised; radius:11; border.color:Theme.border }
     Repeater {
@@ -17,7 +18,14 @@ Menu {
                 verticalAlignment:Text.AlignVCenter
             }
             background:Rectangle { radius:7; color:parent.highlighted?Theme.hover:"transparent" }
-            onTriggered:AppState.notice(text)
+            onTriggered:{
+                if (text==="Copy") {
+                    demoProvider.copyText(menu.payload)
+                    AppState.toast="Copied synthetic table row"
+                } else {
+                    AppState.notice(text)
+                }
+            }
         }
     }
 }

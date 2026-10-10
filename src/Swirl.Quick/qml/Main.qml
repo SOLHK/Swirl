@@ -60,7 +60,8 @@ ApplicationWindow {
                     SwirlSearchField {
                         visible:window.width>1120
                         implicitWidth:210
-                        placeholderText:"Go to a page..."
+                        id:pageSearch
+                        placeholderText:"Search pages · Ctrl+K"
                         onAccepted:{
                             var q=text.toLowerCase()
                             for (var i=0;i<AppState.groups.length;++i)
@@ -181,6 +182,14 @@ ApplicationWindow {
             }
         }
     }
+    // Desktop keyboard navigation; all destinations remain UI-only.
+    Shortcut { sequence:"Ctrl+K"; context:Qt.ApplicationShortcut; onActivated:pageSearch.forceActiveFocus() }
+    Shortcut { sequence:"Ctrl+1"; context:Qt.ApplicationShortcut; onActivated:AppState.currentPage="overview" }
+    Shortcut { sequence:"Ctrl+2"; context:Qt.ApplicationShortcut; onActivated:AppState.currentPage="proxies" }
+    Shortcut { sequence:"Ctrl+3"; context:Qt.ApplicationShortcut; onActivated:AppState.currentPage="connections" }
+    Shortcut { sequence:"Ctrl+4"; context:Qt.ApplicationShortcut; onActivated:AppState.currentPage="inspector" }
+    Shortcut { sequence:"Ctrl+,"; context:Qt.ApplicationShortcut; onActivated:AppState.currentPage="settings" }
+    Shortcut { sequence:"Ctrl+B"; context:Qt.ApplicationShortcut; onActivated:AppState.sidebarCollapsed=!AppState.sidebarCollapsed }
     Component { id:overview; OverviewPage {} }
     Component { id:connections; ConnectionsPage {} }
     Component { id:proxies; ProxiesPage {} }
