@@ -26,8 +26,43 @@ DWM system Mica on supported Windows 11 is window backdrop only: it is not
 per-panel backdrop blur or Apple's proprietary glass. On Windows 10 or when
 disabled the UI uses readable opaque panels.
 
-Build verification: source is authored for the listed toolchain but has NOT
-been compiled on Windows in the authoring environment. No Qt desktop kit or
-Windows compiler is available here. JavaScript editor uses a native QSyntaxHighlighter for local formatting.
-All network/automation operations are UI
-demonstrations and cannot affect system settings or stored user config.
+## Verification and release status
+
+An isolated GitHub Actions pipeline builds this preview on Windows 2022 with
+Visual Studio 2022 (MSVC x64) and Qt 6.10.3, deploys dependencies with
+`windeployqt`, and runs an offscreen startup smoke test that navigates all
+24 UI modules. See the workflow:
+https://github.com/SOLHK/Swirl/actions/workflows/build-qt-quick-ui.yml
+
+A successful pipeline confirms compilation, packaging and basic QML loading,
+**not** visual correctness on a physical Windows desktop. Manual tests remain
+necessary for Windows 10/11, DPI 100/125/150/200%, system theme changes,
+screen-reader usability, lower GPU performance and real 60 FPS frame rates.
+The JavaScript editor uses a native QSyntaxHighlighter for local formatting.
+
+All proxy, interception, MITM, scripts, DNS lookups, gateways and automation
+actions are explicit local demonstrations. They cannot affect network
+settings or stored WPF configuration.
+
+## UI acceptance checklist
+
+1. Navigate all 24 modules in the sidebar. Verify no empty page or load error.
+2. Collapse/expand sidebar, resize window to its minimum, and use search.
+3. Change light, dark and system themes, transparency and reduced-motion modes.
+4. Change interface scale, and check text and tables at high DPI.
+5. Select, filter and sort Connections; select nodes in Proxies.
+6. Inspect Headers, Body, XML, image fixture, TLS, WebSocket and waterfall tabs.
+7. Check DNS, Rules, Profiles, Subscriptions, Scripts and Automation forms.
+8. From the UI DEMO menu, show loading, empty and error states, then restore.
+9. Verify the original WPF app, system proxy and user files are unchanged.
+10. Use the GitHub Actions artifact named `Swirl-Quick-UI-win-x64`
+    from a successful run for packaged Windows testing.
+
+## Future backend adapter strategy
+
+Keep DemoDataProvider as a replaceable read-only source. Introduce
+`ISwirlDataSource` (model snapshot/event interface) for profiles,
+connections, policies, DNS and HTTP flows. Add a Qt-side client or IPC bridge
+to the existing .NET process only after the UI contracts are stable. Real
+network-core ownership, certificate actions, script execution and privileged
+Windows changes must remain explicitly user-authorized.
