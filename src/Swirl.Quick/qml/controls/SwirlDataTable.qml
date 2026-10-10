@@ -57,6 +57,7 @@ Item {
                     property var record:modelData
                     color:table.selectedId===String(record.id||record.name) ? Theme.selected :
                           mouse.containsMouse ? Theme.hover : (index%2?Theme.field:Theme.surface)
+                    Behavior on color { ColorAnimation { duration:Theme.motion } }
                     Rectangle { anchors.bottom:parent.bottom; width:parent.width; height:1; color:Theme.border; opacity:0.6 }
                     Row {
                         anchors.fill:parent

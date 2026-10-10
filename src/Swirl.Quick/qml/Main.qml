@@ -206,6 +206,18 @@ ApplicationWindow {
     Component { id:api; ApiPage {} }
     Component { id:gateway; GatewayPage {} }
     Component { id:workbench; WorkbenchPage { pageId:AppState.currentPage } }
+    NumberAnimation {
+        id:pageTransition
+        target:pageLoader
+        property:"opacity"
+        from:0.52; to:1
+        duration:Theme.motion
+        easing.type:Easing.OutCubic
+    }
+    Connections {
+        target:AppState
+        function onCurrentPageChanged(){pageTransition.restart()}
+    }
     Timer { id:toastTimer; interval:2800; onTriggered:AppState.toast="" }
     // Smoke mode deliberately visits every navigation destination and fails CI
     // if the QML engine reports page-loading warnings.
