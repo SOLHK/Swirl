@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Effects
 import SwirlQuick
 import "../controls"
 SwirlGlassPanel {
@@ -27,6 +28,13 @@ SwirlGlassPanel {
                     Layout.preferredWidth:38; Layout.preferredHeight:38
                     fillMode:Image.PreserveAspectFit
                     smooth:true
+                    layer.enabled:Theme.transparency
+                    layer.effect:MultiEffect {
+                        shadowEnabled:true
+                        shadowBlur:0.16
+                        shadowVerticalOffset:2
+                        shadowColor:Theme.dark?"#45000000":"#25000000"
+                    }
                 }
                 Column {
                     visible:!AppState.sidebarCollapsed
