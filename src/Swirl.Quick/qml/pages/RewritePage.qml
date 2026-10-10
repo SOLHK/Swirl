@@ -30,7 +30,7 @@ Item {
             SwirlButton { text:"New rewrite"; primary:true; onClicked:editorDialog.open() }
         }
         Flow {
-            Layout.fillWidth:true; spacing:6
+            Layout.fillWidth:true; Layout.preferredHeight:42; spacing:6
             Repeater {
                 model:["URL Rewrite","Header Rewrite","Body Rewrite","Redirect","Reject","Mock Response"]
                 SwirlButton { text:modelData; quiet:page.category!==modelData; onClicked:{page.category=modelData;page.chosen=null} }

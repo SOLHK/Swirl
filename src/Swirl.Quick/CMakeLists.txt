@@ -24,6 +24,7 @@ set(SWIRL_QML_FILES
  qml/pages/WorkbenchPage.qml qml/pages/ToolboxPage.qml
  qml/pages/DashboardPage.qml qml/pages/DNSPage.qml
  qml/pages/RulesPage.qml qml/pages/LogsPage.qml
+ qml/pages/TLSPage.qml qml/pages/ReplayPage.qml qml/pages/RewritePage.qml
 )
 foreach(file IN LISTS SWIRL_QML_FILES)
     string(REGEX REPLACE "^qml/" "" qml_alias "${file}")
