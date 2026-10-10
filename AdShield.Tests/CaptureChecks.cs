@@ -81,7 +81,7 @@ internal static class CaptureChecks
                     bool ready = false;
                     for (int i = 0; i < 80 && !core.HasExited; i++)
                     {
-                        try { using var result = await health.GetAsync("http://127.0.0.1:17909/version"); ready = true; } catch (HttpRequestException) { }
+                        try { using var result = await health.GetAsync("http://127.0.0.1:" + MihomoConfig.ControllerPort + "/version"); ready = true; } catch (HttpRequestException) { }
                         if (ready) break; await Task.Delay(100);
                     }
                     check(ready, "capture ingress starts in " + mode + " mode");

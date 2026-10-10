@@ -137,6 +137,7 @@ internal static class UserRouting
         if (!string.IsNullOrWhiteSpace(profile.Yaml))
         {
             var root = MihomoConfig.Parse(profile.Yaml);
+            UserProxyGroups.Apply(profile, root);
             foreach (string key in new[] { "proxies", "proxy-groups" })
                 if (root.TryGetValue(key, out var value) && value is IEnumerable<object> items)
                     foreach (var item in items.OfType<IDictionary<object, object>>())
