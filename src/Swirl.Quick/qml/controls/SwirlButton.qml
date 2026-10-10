@@ -34,7 +34,8 @@ Button {
         }
         Text {
             text:control.text
-            font:control.font
+            font.family:control.font.family
+            font.pixelSize:control.font.pixelSize
             font.weight:control.primary?Font.DemiBold:Font.Medium
             color:control.primary?(Theme.dark?"#13263D":"white"):control.danger?Theme.red:Theme.text
             Layout.alignment:Qt.AlignVCenter
