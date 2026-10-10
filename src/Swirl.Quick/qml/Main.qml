@@ -90,7 +90,11 @@ ApplicationWindow {
                                 AppState.currentPage==="inspector" ? inspector :
                                 AppState.currentPage==="scripts" ? scripts :
                                 AppState.currentPage==="settings" ? settings :
-                                AppState.currentPage==="toolbox" ? toolbox : workbench
+                                AppState.currentPage==="toolbox" ? toolbox :
+                                AppState.currentPage==="dashboard" ? dashboard :
+                                AppState.currentPage==="dns" ? dns :
+                                AppState.currentPage==="rules" ? rules :
+                                AppState.currentPage==="logs" ? logs : workbench
                 }
             Rectangle {
                 Layout.fillWidth:true
@@ -112,6 +116,10 @@ ApplicationWindow {
     Component { id:scripts; ScriptsPage {} }
     Component { id:settings; SettingsPage {} }
     Component { id:toolbox; ToolboxPage {} }
+    Component { id:dashboard; DashboardPage {} }
+    Component { id:dns; DNSPage {} }
+    Component { id:rules; RulesPage {} }
+    Component { id:logs; LogsPage {} }
     Component { id:workbench; WorkbenchPage { pageId:AppState.currentPage } }
     Timer { id:toastTimer; interval:2800; onTriggered:AppState.toast="" }
     // Smoke mode deliberately visits every navigation destination and fails CI
