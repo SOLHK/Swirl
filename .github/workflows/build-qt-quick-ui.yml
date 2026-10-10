@@ -39,6 +39,13 @@ jobs:
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           Copy-Item build/swirl-quick/Release/SwirlQuick.exe dist/
           windeployqt --release --qmldir src/Swirl.Quick/qml dist/SwirlQuick.exe
+      - name: Startup smoke test (offscreen, no network actions)
+        shell: pwsh
+        run: |
+          $env:QT_QPA_PLATFORM = "offscreen"
+          $env:QT_QUICK_BACKEND = "software"
+          & dist/SwirlQuick.exe --smoke-test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Upload separate Qt UI preview
         uses: actions/upload-artifact@v4
         with:
