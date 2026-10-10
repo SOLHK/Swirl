@@ -1,7 +1,14 @@
 name: Build Swirl Qt Quick UI (Preview)
 
 on:
+  push:
+    branches: [test]
+    paths:
+      - "src/Swirl.Quick/**"
+      - ".github/workflows/build-qt-quick-ui.yml"
+      - "docs/RELEASE_PROCESS.md"
   pull_request:
+    branches: [test, main]
     paths:
       - "src/Swirl.Quick/**"
       - ".github/workflows/build-qt-quick-ui.yml"
