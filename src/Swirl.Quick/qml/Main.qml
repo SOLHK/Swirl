@@ -114,6 +114,25 @@ ApplicationWindow {
     Component { id:toolbox; ToolboxPage {} }
     Component { id:workbench; WorkbenchPage { pageId:AppState.currentPage } }
     Timer { id:toastTimer; interval:2800; onTriggered:AppState.toast="" }
+    // Smoke mode deliberately visits every navigation destination and fails CI
+    // if the QML engine reports page-loading warnings.
+    Timer {
+        id:smokeNavigator
+        running:smokeTestMode
+        repeat:true
+        interval:60
+        property int groupIndex:0
+        property int pageIndex:0
+        onTriggered:{
+            if (groupIndex>=AppState.groups.length) {stop();return}
+            AppState.currentPage=AppState.groups[groupIndex].pages[pageIndex].id
+            ++pageIndex
+            if (pageIndex>=AppState.groups[groupIndex].pages.length) {
+                pageIndex=0
+                ++groupIndex
+            }
+        }
+    }
     Connections {
         target:AppState
         function onToastChanged() { if (AppState.toast.length) toastTimer.restart() }
