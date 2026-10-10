@@ -79,7 +79,7 @@ Item {
                             }
                         }
                     }
-                    Text { text:"RESULTS"; color:Theme.muted; font.pixelSize:11; font.weight:Font.DemiBold }
+                    Text { text:"结果"; color:Theme.muted; font.pixelSize:11; font.weight:Font.DemiBold }
                     Rectangle {
                         Layout.fillWidth:true; Layout.fillHeight:true
                         color:Theme.field; border.color:Theme.border; radius:12

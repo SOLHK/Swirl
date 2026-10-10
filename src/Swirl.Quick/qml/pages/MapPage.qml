@@ -41,8 +41,8 @@ Item {
                     anchors.fill:parent; anchors.margins:1
                     rows:page.visibleRows
                     selectedId:page.selection?page.selection.id:""
-                    columns:[{key:"name",label:"MAPPING",w:180},{key:"match",label:"请求 URL",w:280},
-                             {key:"target",label:"REPLACEMENT",w:270},{key:"status",label:"STATE",w:105}]
+                    columns:[{key:"name",label:"映射",w:180},{key:"match",label:"请求 URL",w:280},
+                             {key:"target",label:"替换目标",w:270},{key:"status",label:"状态",w:105}]
                     onRowSelected:function(r){page.selection=r;nameField.text=r.name;matchField.text=r.match;targetField.text=r.target}
                 }
                 SwirlEmptyState { visible:page.visibleRows.length===0; anchors.centerIn:parent; headline:"暂无映射" }
@@ -59,7 +59,7 @@ Item {
                     SwirlTextField { id:matchField; Layout.fillWidth:true; placeholderText:"https://example.test/*" }
                     Text { text:page.selectedTab==="本地映射"?"替换文件或目录":"远程替换 URL"; color:Theme.muted; font.pixelSize:11 }
                     SwirlTextField { id:targetField; Layout.fillWidth:true; placeholderText:page.selectedTab==="本地映射"?"fixtures/file.json":"https://mirror.example.test/" }
-                    Text { text:"PREVIEW"; color:Theme.muted; font.pixelSize:10 }
+                    Text { text:"预览"; color:Theme.muted; font.pixelSize:10 }
                     Rectangle {
                         Layout.fillWidth:true; Layout.fillHeight:true
                         radius:10; color:Theme.field; border.color:Theme.border
@@ -94,7 +94,7 @@ Item {
             SwirlTextField { id:destination; Layout.fillWidth:true; placeholderText:page.selectedTab==="本地映射"?"fixtures/response.json":"https://mirror.example.test/" }
             RowLayout {
                 Layout.alignment:Qt.AlignRight
-                SwirlButton { text:"Cancel"; onClicked:newDialog.close() }
+                SwirlButton { text:"取消"; onClicked:newDialog.close() }
                 SwirlButton {
                     text:"添加演示"; primary:true
                     enabled:urlInput.text.startsWith("https://")&&destination.text.trim().length>0

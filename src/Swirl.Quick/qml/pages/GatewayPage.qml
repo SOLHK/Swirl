@@ -44,7 +44,7 @@ Item {
                     anchors.fill:parent; anchors.margins:1
                     rows:page.records
                     columns:[{key:"name",label:"设备 / 接口",w:238},{key:"address",label:"IP",w:150},
-                             {key:"interface",label:"NETWORK",w:204},{key:"status",label:"STATE",w:100}]
+                             {key:"interface",label:"网络",w:204},{key:"status",label:"状态",w:100}]
                     onRowSelected:function(r){AppState.notice("设备详情"+r.name)}
                 }
             }
@@ -70,7 +70,7 @@ Item {
                     }
                     Rectangle { Layout.fillWidth:true; height:1; color:Theme.border }
                     Text { text:"配置界面模拟"; color:Theme.muted; font.pixelSize:10 }
-                    Text { text:"Interface"; color:Theme.muted; font.pixelSize:11 }
+                    Text { text:"网卡"; color:Theme.muted; font.pixelSize:11 }
                     SwirlComboBox { Layout.fillWidth:true; model:["以太网（示例）","Wi-Fi（示例）","自定义网卡"] }
                     Text { text:"设备标签"; color:Theme.muted; font.pixelSize:11 }
                     SwirlTextField { Layout.fillWidth:true; placeholderText:"设备名称" }

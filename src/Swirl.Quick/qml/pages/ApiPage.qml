@@ -46,8 +46,8 @@ Item {
                     visible:page.tab==="API 管理"
                     anchors.fill:parent; anchors.margins:1
                     rows:page.routes
-                    columns:[{key:"method",label:"METHOD",w:100},{key:"path",label:"ENDPOINT",w:260},
-                             {key:"permission",label:"SCOPE",w:160},{key:"status",label:"STATE",w:112}]
+                    columns:[{key:"method",label:"方法",w:100},{key:"path",label:"端点",w:260},
+                             {key:"permission",label:"权限范围",w:160},{key:"status",label:"状态",w:112}]
                     onRowSelected:function(r){pathInput.text=r.path;methodInput.currentIndex=methodInput.model.indexOf(r.method)}
                 }
                 ColumnLayout {
@@ -63,7 +63,7 @@ Item {
                         RowLayout {
                             Layout.fillWidth:true
                             Text { text:modelData; color:Theme.text; font.family:"Cascadia Code"; font.pixelSize:12; Layout.fillWidth:true }
-                            SwirlButton { text:"Preview"; onClicked:AppState.notice("命令行 / API 示例") }
+                            SwirlButton { text:"预览"; onClicked:AppState.notice("命令行 / API 示例") }
                         }
                     }
                     Item { Layout.fillHeight:true }
@@ -101,14 +101,14 @@ Item {
             width:parent.width; spacing:12
             Text { text:"监听地址"; color:Theme.text }
             SwirlTextField { Layout.fillWidth:true; text:"127.0.0.1"; readOnly:true }
-            Text { text:"Port"; color:Theme.text }
+            Text { text:"端口"; color:Theme.text }
             SwirlTextField { Layout.fillWidth:true; text:"6170"; validator:IntValidator { bottom:1024; top:65535 } }
             RowLayout {
                 Layout.fillWidth:true
                 Text { text:"允许 API 请求（仅界面开关）"; Layout.fillWidth:true; color:Theme.muted; font.pixelSize:12 }
                 SwirlToggle { onToggled:AppState.notice("API 监听服务") }
             }
-            SwirlButton { text:"Close"; Layout.alignment:Qt.AlignRight; onClicked:settingsDialog.close() }
+            SwirlButton { text:"关闭"; Layout.alignment:Qt.AlignRight; onClicked:settingsDialog.close() }
         }
     }
 }

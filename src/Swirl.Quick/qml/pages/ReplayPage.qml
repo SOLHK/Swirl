@@ -17,7 +17,7 @@ Item {
             Layout.fillWidth:true
             SwirlStatusBadge { label:"离线 HTTP 请求编辑器"; tone:"accent" }
             Text { text:"请求不会实际发送"; color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
-            SwirlButton { text:"Compare"; onClicked:comparePopup.open() }
+            SwirlButton { text:"对比"; onClicked:comparePopup.open() }
             SwirlButton { text:"发送演示"; iconName:"play"; primary:true; onClicked:{
                 page.resultMessage="HTTP 200 OK (simulated)\nContent-Type: application/json\nX-Demo: SwirlQuick\n\n{\n  \"sent\": false,\n  \"message\": \"No network request performed\"\n}"
                 page.history=[{name:verb.currentText+" "+urlField.text,time:"Now",status:"Simulated"}].concat(page.history)
@@ -97,7 +97,7 @@ Item {
                     RowLayout {
                         Layout.fillWidth:true
                         Text { text:"执行历史："+page.history.length+" 次演示操作"; color:Theme.muted; font.pixelSize:11; Layout.fillWidth:true }
-                        SwirlButton { text:"Reset"; onClicked:{page.resultMessage="尚未重放请求。";page.history=[]} }
+                        SwirlButton { text:"重置"; onClicked:{page.resultMessage="尚未重放请求。";page.history=[]} }
                     }
                 }
             }
@@ -106,7 +106,7 @@ Item {
                 ColumnLayout {
                     anchors.fill:parent; anchors.margins:17; spacing:12
                     Text { text:"响应预览"; color:Theme.text; font.pixelSize:16; font.weight:Font.DemiBold }
-                    SwirlStatusBadge { label:"SIMULATED"; tone:"accent" }
+                    SwirlStatusBadge { label:"模拟数据"; tone:"accent" }
                     Rectangle {
                         Layout.fillWidth:true; Layout.fillHeight:true
                         radius:10; color:Theme.field; border.color:Theme.border
@@ -135,7 +135,7 @@ Item {
                 color:Theme.muted; font.family:"Cascadia Code"; font.pixelSize:11
                 Layout.fillWidth:true; wrapMode:Text.WordWrap
             }
-            SwirlButton { text:"Close"; Layout.alignment:Qt.AlignRight; onClicked:comparePopup.close() }
+            SwirlButton { text:"关闭"; Layout.alignment:Qt.AlignRight; onClicked:comparePopup.close() }
         }
     }
 }

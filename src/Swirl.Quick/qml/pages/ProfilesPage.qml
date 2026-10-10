@@ -131,7 +131,7 @@ Item {
         }
     }
     SwirlDialog {
-        id:addDialog; title:"Create configuration preview"
+        id:addDialog; title:"创建配置预览"
         ColumnLayout {
             width:parent.width; spacing:12
             Text { text:AppState.zh("Name"); color:Theme.text }

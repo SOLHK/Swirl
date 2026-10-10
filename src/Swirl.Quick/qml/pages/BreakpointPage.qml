@@ -46,8 +46,8 @@ Item {
                     anchors.fill:parent; anchors.margins:1
                     rows:page.records
                     selectedId:page.selected?page.selected.id:""
-                    columns:[{key:"method",label:"METHOD",w:87},{key:"url",label:"请求路径",w:215},
-                             {key:"status",label:"STATE",w:119},{key:"time",label:"TIME",w:98}]
+                    columns:[{key:"method",label:"方法",w:87},{key:"url",label:"请求路径",w:215},
+                             {key:"status",label:"状态",w:119},{key:"time",label:"时间",w:98}]
                     onRowSelected:function(r){page.selected=r}
                 }
             }
@@ -89,7 +89,7 @@ Item {
                     RowLayout {
                         Layout.fillWidth:true
                         SwirlButton {
-                            text:"Continue"; primary:true; enabled:page.selected&&page.selected.status==="Paused"
+                            text:"继续"; primary:true; enabled:page.selected&&page.selected.status==="Paused"
                             onClicked:page.changeStatus("Continued")
                         }
                         SwirlButton {
@@ -97,7 +97,7 @@ Item {
                             onClicked:{page.payload=editor.text;page.changeStatus("Modified")}
                         }
                         SwirlButton {
-                            text:"Drop"; danger:true; enabled:page.selected&&page.selected.status==="Paused"
+                            text:"丢弃"; danger:true; enabled:page.selected&&page.selected.status==="Paused"
                             onClicked:page.changeStatus("Dropped")
                         }
                     }
@@ -123,7 +123,7 @@ Item {
             SwirlComboBox { model:["发送请求前","收到响应后"] }
             RowLayout {
                 Layout.alignment:Qt.AlignRight
-                SwirlButton { text:"Cancel"; onClicked:ruleDialog.close() }
+                SwirlButton { text:"取消"; onClicked:ruleDialog.close() }
                 SwirlButton { text:"添加演示"; primary:true; enabled:matcher.text.trim().length>0
                     onClicked:{AppState.notice("添加断点匹配条件");ruleDialog.close();matcher.text=""}
                 }

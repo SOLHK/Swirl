@@ -94,10 +94,36 @@ Item {
                                     Text { text:Math.round(Theme.uiScale*100)+"%"; color:Theme.muted; font.pixelSize:11 }
                                 }
                                 Slider {
+                                    id: scaleSlider
                                     Layout.preferredWidth:200
                                     from:0.9; to:1.25; stepSize:0.05
                                     value:Theme.uiScale
                                     onMoved:Theme.uiScale=value
+                                    background: Rectangle {
+                                        x: scaleSlider.leftPadding
+                                        y: scaleSlider.topPadding + scaleSlider.availableHeight / 2 - height / 2
+                                        width: scaleSlider.availableWidth
+                                        height: 7
+                                        radius: 4
+                                        color: Theme.material("field")
+                                        border.width: 1
+                                        border.color: Theme.glassRim
+                                        Rectangle {
+                                            height: parent.height
+                                            radius: 4
+                                            width: scaleSlider.visualPosition * parent.width
+                                            color: Theme.accent
+                                        }
+                                    }
+                                    handle: Rectangle {
+                                        x: scaleSlider.leftPadding + scaleSlider.visualPosition * (scaleSlider.availableWidth - width)
+                                        y: scaleSlider.topPadding + scaleSlider.availableHeight / 2 - height / 2
+                                        implicitWidth: 20; implicitHeight: 20
+                                        radius: 10
+                                        color: "#FBFDFF"
+                                        border.width: 1
+                                        border.color: Theme.glassRim
+                                    }
                                 }
                             }
                             SwirlStatusBadge { label:AppState.zh("CHANGES ARE LOCAL TO THIS UI PREVIEW"); tone:"accent" }

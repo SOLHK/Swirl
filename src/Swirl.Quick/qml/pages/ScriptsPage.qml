@@ -15,7 +15,7 @@ Item {
             Layout.fillWidth:true
             SwirlStatusBadge { label:"JavaScript · 仅界面演示"; tone:"accent" }
             Text { text:"可以编辑源码，不会实际运行脚本。"; color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
-            SwirlButton { text:"Import"; iconName:"folder"; onClicked:AppState.notice("导入脚本") }
+            SwirlButton { text:"导入"; iconName:"folder"; onClicked:AppState.notice("导入脚本") }
             SwirlButton { text:"新建脚本"; primary:true; onClicked:newDialog.open() }
         }
         SplitView {
@@ -62,7 +62,7 @@ Item {
                         Item { Layout.fillWidth:true }
                         SwirlButton { text:"保存预览"; onClicked:AppState.notice("保存脚本") }
                         SwirlButton {
-                            text:"Run"; primary:true; iconName:"play"
+                            text:"运行"; primary:true; iconName:"play"
                             onClicked:{
                                 page.consoleText+="\n[demo] Run requested; backend not connected."
                                 AppState.notice("脚本执行")
@@ -116,7 +116,7 @@ Item {
                     Text { text:"执行与调试"; color:Theme.text; font.pixelSize:15; font.weight:Font.DemiBold }
                     Text { text:"Type     HTTP Response\nStatus   Not connected\nLast run Never"; color:Theme.muted; lineHeight:1.6; font.pixelSize:12 }
                     Rectangle { Layout.fillWidth:true; height:1; color:Theme.border }
-                    Text { text:"Console"; color:Theme.text; font.pixelSize:13; font.weight:Font.DemiBold }
+                    Text { text:"控制台"; color:Theme.text; font.pixelSize:13; font.weight:Font.DemiBold }
                     ScrollView {
                         Layout.fillWidth:true; Layout.fillHeight:true
                         TextArea {
@@ -143,9 +143,9 @@ Item {
             Text { text:newName.text.trim().endsWith(".js")?"仅供演示，不会保存文件。":"文件名必须以 .js 结尾"; color:Theme.muted; font.pixelSize:12 }
             RowLayout {
                 Layout.alignment:Qt.AlignRight
-                SwirlButton { text:"Cancel"; onClicked:newDialog.close() }
+                SwirlButton { text:"取消"; onClicked:newDialog.close() }
                 SwirlButton {
-                    primary:true; text:"Create"
+                    primary:true; text:"创建"
                     enabled:newName.text.trim().length>3 && newName.text.trim().endsWith(".js")
                     onClicked:{
                         page.scripts=page.scripts.concat([newName.text.trim()])

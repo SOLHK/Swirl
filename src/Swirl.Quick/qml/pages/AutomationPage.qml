@@ -39,8 +39,8 @@ Item {
                     visible:page.tab==="Tasks"
                     anchors.fill:parent; anchors.margins:1
                     rows:page.jobs; selectedId:page.selected?page.selected.id:""
-                    columns:[{key:"name",label:"TASK",w:225},{key:"trigger",label:"TRIGGER",w:155},
-                             {key:"action",label:"ACTION",w:155},{key:"state",label:"STATE",w:96},
+                    columns:[{key:"name",label:"任务",w:225},{key:"trigger",label:"触发条件",w:155},
+                             {key:"action",label:"操作",w:155},{key:"state",label:"状态",w:96},
                              {key:"last",label:"上次运行",w:96}]
                     onRowSelected:function(r){page.selected=r}
                 }
@@ -72,7 +72,7 @@ Item {
                     SwirlComboBox { Layout.fillWidth:true; model:["Schedule","网络变化","HTTP 事件","DNS 事件","错误事件"] }
                     Text { text:"定时 / 事件筛选"; color:Theme.muted; font.pixelSize:10 }
                     SwirlTextField { Layout.fillWidth:true; placeholderText:"0 8 * * *" }
-                    Text { text:"ACTION"; color:Theme.muted; font.pixelSize:10 }
+                    Text { text:"操作"; color:Theme.muted; font.pixelSize:10 }
                     SwirlComboBox { Layout.fillWidth:true; model:["刷新配置","选择代理","记录日志","运行脚本","Notify"] }
                     Rectangle { Layout.fillWidth:true; height:1; color:Theme.border }
                     RowLayout {
@@ -97,7 +97,7 @@ Item {
             SwirlComboBox { id:triggerInput; Layout.fillWidth:true; model:["Scheduled","网络变化","HTTP 事件","错误事件"] }
             RowLayout {
                 Layout.alignment:Qt.AlignRight
-                SwirlButton { text:"Cancel"; onClicked:newDialog.close() }
+                SwirlButton { text:"取消"; onClicked:newDialog.close() }
                 SwirlButton {
                     text:"创建演示"; primary:true; enabled:taskName.text.trim().length>0
                     onClicked:{

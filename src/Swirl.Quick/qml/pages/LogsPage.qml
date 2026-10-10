@@ -20,8 +20,8 @@ Item {
             Layout.fillWidth:true
             SwirlStatusBadge { label:"模拟日志流"; tone:"accent" }
             Text { text:displayLogs.length+" 条记录 · 数据仅供预览"; color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
-            SwirlButton { text:"Export"; iconName:"folder"; onClicked:AppState.notice("导出日志记录") }
-            SwirlButton { text:"Clear"; danger:true; onClicked:{page.records=[];page.selected=null} }
+            SwirlButton { text:"导出"; iconName:"folder"; onClicked:AppState.notice("导出日志记录") }
+            SwirlButton { text:"清空"; danger:true; onClicked:{page.records=[];page.selected=null} }
         }
         RowLayout {
             Layout.fillWidth:true
@@ -38,8 +38,8 @@ Item {
                     anchors.fill:parent; anchors.margins:1
                     rows:page.displayLogs
                     selectedId:page.selected?page.selected.id:""
-                    columns:[{key:"time",label:"TIME",w:108},{key:"level",label:"LEVEL",w:84},
-                             {key:"source",label:"SOURCE",w:104},{key:"message",label:"MESSAGE",w:570}]
+                    columns:[{key:"time",label:"时间",w:108},{key:"level",label:"级别",w:84},
+                             {key:"source",label:"来源",w:104},{key:"message",label:"信息",w:570}]
                     onRowSelected:function(r){page.selected=r}
                 }
                 SwirlEmptyState {

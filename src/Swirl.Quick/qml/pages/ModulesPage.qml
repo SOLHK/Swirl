@@ -43,9 +43,9 @@ Item {
                     anchors.fill:parent; anchors.margins:1
                     rows:page.filtered
                     selectedId:page.chosen?page.chosen.id:""
-                    columns:[{key:"name",label:"模块名称",w:220},{key:"version",label:"VERSION",w:102},
-                             {key:"source",label:"SOURCE",w:172},{key:"update",label:"UPDATES",w:153},
-                             {key:"state",label:"STATE",w:110}]
+                    columns:[{key:"name",label:"模块名称",w:220},{key:"version",label:"版本",w:102},
+                             {key:"source",label:"来源",w:172},{key:"update",label:"更新",w:153},
+                             {key:"state",label:"状态",w:110}]
                     onRowSelected:function(r){page.chosen=r}
                 }
                 ColumnLayout {
@@ -97,7 +97,7 @@ Item {
                             }
                         }
                     }
-                    Text { text:"Parameters"; color:Theme.muted; font.pixelSize:11 }
+                    Text { text:"参数"; color:Theme.muted; font.pixelSize:11 }
                     SwirlTextField { Layout.fillWidth:true; placeholderText:"模块参数" }
                     Item { Layout.fillHeight:true }
                     SwirlButton { text:"保存本地参数"; onClicked:AppState.notice("保存扩展参数") }
@@ -117,7 +117,7 @@ Item {
             Text { text:"不会下载文件或执行脚本。"; color:Theme.muted; font.pixelSize:11; Layout.fillWidth:true }
             RowLayout {
                 Layout.alignment:Qt.AlignRight
-                SwirlButton { text:"Cancel"; onClicked:importDialog.close() }
+                SwirlButton { text:"取消"; onClicked:importDialog.close() }
                 SwirlButton {
                     text:"添加演示"; primary:true; enabled:moduleName.text.trim().length>0
                     onClicked:{

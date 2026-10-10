@@ -86,7 +86,7 @@ Item {
     }
     SwirlDialog {
         id:addDialog
-        title:"Add proxy endpoint"
+        title:"添加代理节点"
         ColumnLayout {
             width:parent.width; spacing:12
             Text { text:AppState.zh("Endpoint label"); color:Theme.muted }

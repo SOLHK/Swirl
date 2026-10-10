@@ -97,7 +97,7 @@ Item {
         }
     }
     SwirlDialog {
-        id:editorDialog; title:"Rule editor"
+        id:editorDialog; title:"规则编辑器"
         ColumnLayout {
             width:parent.width; spacing:13
             Text { text:AppState.zh("Rule type"); color:Theme.text }
@@ -126,7 +126,7 @@ Item {
         }
     }
     SwirlDialog {
-        id:testDialog; title:"Rule matching test"
+        id:testDialog; title:"规则匹配测试"
         ColumnLayout {
             width:parent.width; spacing:13
             Text { text:AppState.zh("Host or IP to evaluate"); color:Theme.text }

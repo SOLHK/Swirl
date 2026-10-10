@@ -131,7 +131,7 @@ Item {
         }
     }
     SwirlDialog {
-        id:testDialog; title:"Resolver test"
+        id:testDialog; title:"解析器测试"
         ColumnLayout {
             width:parent.width; spacing:13
             Text { text:AppState.zh("域名"); color:Theme.text }
@@ -149,7 +149,7 @@ Item {
         }
     }
     SwirlDialog {
-        id:editDialog; title:"Edit DNS mapping"
+        id:editDialog; title:"编辑 DNS 映射"
         ColumnLayout {
             width:parent.width; spacing:12
             Text { text:AppState.zh("Hostname"); color:Theme.text }

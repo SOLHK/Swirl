@@ -26,7 +26,7 @@ Item {
             Layout.fillWidth:true
             SwirlStatusBadge { label:"HTTP 重写演示"; tone:"accent" }
             Text { text:"本地规则编辑器 · 不拦截真实流量"; color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
-            SwirlButton { text:"Import"; onClicked:AppState.notice("导入重写规则") }
+            SwirlButton { text:"导入"; onClicked:AppState.notice("导入重写规则") }
             SwirlButton { text:"新建重写"; primary:true; onClicked:editorDialog.open() }
         }
         Flow {
@@ -50,8 +50,8 @@ Item {
                     anchors.fill:parent; anchors.margins:1
                     rows:page.showRows
                     selectedId:page.chosen?page.chosen.id:""
-                    columns:[{key:"pattern",label:"匹配表达式",w:280},{key:"action",label:"ACTION",w:160},
-                             {key:"hits",label:"HITS",w:72},{key:"status",label:"STATE",w:105}]
+                    columns:[{key:"pattern",label:"匹配表达式",w:280},{key:"action",label:"操作",w:160},
+                             {key:"hits",label:"命中次数",w:72},{key:"status",label:"状态",w:105}]
                     onRowSelected:function(r){page.chosen=r}
                 }
                 SwirlEmptyState { visible:page.showRows.length===0; anchors.centerIn:parent; headline:"没有重写规则"; detail:"添加本地示例" }
@@ -64,7 +64,7 @@ Item {
                     Text { text:page.chosen?page.chosen.pattern:"从列表中选择规则"; color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true; wrapMode:Text.WrapAnywhere }
                     Text { text:"匹配表达式"; color:Theme.muted; font.pixelSize:10 }
                     SwirlTextField { id:expression; Layout.fillWidth:true; text:page.chosen?page.chosen.pattern:""; placeholderText:"https://example.test/.*" }
-                    Text { text:"ACTION"; color:Theme.muted; font.pixelSize:10 }
+                    Text { text:"操作"; color:Theme.muted; font.pixelSize:10 }
                     SwirlComboBox { id:action; Layout.fillWidth:true; model:["替换 URL","设置请求头","替换响应体","302 重定向","拒绝请求","模拟 JSON"] }
                     Text { text:"结果预览"; color:Theme.muted; font.pixelSize:10 }
                     Rectangle {
@@ -86,7 +86,7 @@ Item {
                     }
                     RowLayout {
                         Layout.fillWidth:true
-                        SwirlButton { text:"Preview"; onClicked:AppState.notice("预览"+page.category) }
+                        SwirlButton { text:"预览"; onClicked:AppState.notice("预览"+page.category) }
                         SwirlButton { text:"应用演示"; primary:true; onClicked:AppState.notice("应用重写") }
                     }
                 }
@@ -99,12 +99,12 @@ Item {
             width:parent.width; spacing:12
             Text { text:"匹配表达式"; color:Theme.text }
             SwirlTextField { id:newPattern; Layout.fillWidth:true; placeholderText:"https://example.test/api/.*" }
-            Text { text:"Action"; color:Theme.text }
+            Text { text:"操作"; color:Theme.text }
             SwirlComboBox { id:newAction; Layout.fillWidth:true; model:["替换 URL","设置请求头","替换响应体","302 重定向","拒绝请求","模拟 JSON"] }
             Text { text:"表达式仅用于演示，不会拦截网络或执行正则匹配。"; color:Theme.muted; font.pixelSize:11; Layout.fillWidth:true; wrapMode:Text.WordWrap }
             RowLayout {
                 Layout.alignment:Qt.AlignRight
-                SwirlButton { text:"Cancel"; onClicked:editorDialog.close() }
+                SwirlButton { text:"取消"; onClicked:editorDialog.close() }
                 SwirlButton {
                     text:"添加演示"; primary:true; enabled:newPattern.text.trim().length>2
                     onClicked:{
