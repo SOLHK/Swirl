@@ -100,12 +100,13 @@ Item {
                                     wrapMode:TextEdit.NoWrap
                                     tabStopDistance:32
                                     background:Rectangle { color:"transparent" }
+                                    JavascriptHighlighter { qmlDocument:editor.textDocument }
                                     selectByMouse:true
                                 }
                             }
                         }
                     }
-                    Text { text:"Editor preview · JavaScript syntax highlighting planned for native highlighter"; color:Theme.muted; font.pixelSize:11 }
+                    Text { text:"Native C++ syntax highlighting · editing remains local"; color:Theme.muted; font.pixelSize:11 }
                 }
             }
             SwirlGlassPanel {
