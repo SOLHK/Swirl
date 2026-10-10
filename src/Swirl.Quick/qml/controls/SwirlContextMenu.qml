@@ -2,26 +2,31 @@ import QtQuick
 import QtQuick.Controls
 import SwirlQuick
 Menu {
-    id:menu
-    property var items:["Details","Copy","Export"]
-    property string payload:""
-    padding:5
-    background:Rectangle { color:Theme.raised; radius:11; border.color:Theme.border }
+    id: menu
+    property var items: ["查看详情", "复制", "导出"]
+    property string payload: ""
+    padding: 6
+    background: Rectangle {
+        color: Theme.material("floating")
+        radius: 15
+        border.width: 1
+        border.color: Theme.glassRim
+    }
     Repeater {
-        model:menu.items
+        model: menu.items
         MenuItem {
-            text:modelData
-            height:34
-            contentItem:Text {
-                text:parent.text; color:Theme.text
-                font.pixelSize:13; leftPadding:12
-                verticalAlignment:Text.AlignVCenter
+            text: AppState.zh(String(modelData))
+            height: 36
+            contentItem: Text {
+                text: parent.text; color: Theme.text
+                font.pixelSize: 12; font.family: "Microsoft YaHei UI"
+                leftPadding: 12; verticalAlignment: Text.AlignVCenter
             }
-            background:Rectangle { radius:7; color:parent.highlighted?Theme.hover:"transparent" }
-            onTriggered:{
-                if (text==="Copy") {
+            background: Rectangle { radius: 10; color: parent.highlighted ? Theme.selected : "transparent" }
+            onTriggered: {
+                if (text === "复制" || text === "Copy") {
                     demoProvider.copyText(menu.payload)
-                    AppState.toast="Copied synthetic table row"
+                    AppState.toast = "已复制演示表格内容"
                 } else {
                     AppState.notice(text)
                 }

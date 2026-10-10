@@ -10,21 +10,21 @@ ApplicationWindow {
     visible: true
     width: 1450
     height: 895
-    minimumWidth: 920
-    minimumHeight: 600
+    minimumWidth: 980
+    minimumHeight: 650
     title: "Swirl"
     flags: Qt.Window | Qt.FramelessWindowHint
     color: "transparent"
     background: Rectangle {
-        radius: window.visibility === Window.Maximized ? 0 : 18
+        radius: window.visibility === Window.Maximized ? 0 : 24
         color: Theme.canvas
         gradient: Gradient {
-            GradientStop { position:0; color:Theme.dark ? "#182638" : "#FBFCFF" }
-            GradientStop { position:0.5; color:Theme.canvas }
-            GradientStop { position:1; color:Theme.dark ? "#101824" : "#EDF3FA" }
+            GradientStop { position:0; color:Theme.dark ? "#EA14243C" : "#EDF1F8FF" }
+            GradientStop { position:0.52; color:Theme.dark ? "#F00F1929" : "#E9F5F8FD" }
+            GradientStop { position:1; color:Theme.dark ? "#EA222842" : "#E7E8F0FC" }
         }
         border.width: 1
-        border.color: Theme.border
+        border.color: Theme.glassRim
     }
     property bool swirlTransparencyEnabled: Theme.transparency
     Component.onCompleted: {
@@ -36,20 +36,20 @@ ApplicationWindow {
     }
     onSwirlTransparencyEnabledChanged: backdrop.apply(window, swirlTransparencyEnabled)
     font.family: "Microsoft YaHei UI"
-    font.pixelSize: 13
+    font.pixelSize: 12
     Rectangle {
         id: windowToolbar
         z: 50
         width: parent.width
-        height: 49
-        radius: window.visibility === Window.Maximized ? 0 : 18
-        color: Theme.material("floating")
-        border.color: Theme.border
+        height: 55
+        radius: window.visibility === Window.Maximized ? 0 : 24
+        color: Theme.material("toolbar")
+        border.color: Theme.glassRim
         border.width: 0
         Rectangle {
             anchors.left:parent.left; anchors.right:parent.right
             anchors.bottom:parent.bottom; height:20
-            color:Theme.material("floating")
+            color:Theme.material("toolbar")
         }
         // Native system move preserves Windows snapping and multitasking.
         MouseArea {
@@ -70,7 +70,7 @@ ApplicationWindow {
                 delegate: Rectangle {
                     required property int index
                     required property string modelData
-                    width:13; height:13; radius:7
+                    width:13; height:13; radius:7; antialiasing:true
                     color:modelData
                     border.color:Qt.darker(modelData,1.12)
                     MouseArea {
@@ -120,16 +120,20 @@ ApplicationWindow {
         transformOrigin:Item.TopLeft
     RowLayout {
         anchors.fill: parent
-        spacing: 0
+        anchors.margins: 12
+        spacing: 12
         SwirlSidebar { Layout.fillHeight:true; compactByWindow:scaledCanvas.width<1160 }
         ColumnLayout {
             Layout.fillWidth:true
             Layout.fillHeight:true
-            spacing:0
+            spacing:11
             Rectangle {
                 Layout.fillWidth:true
-                implicitHeight:75
-                color:Theme.canvas
+                implicitHeight:79
+                radius:20
+                color:Theme.material("toolbar")
+                border.width:1
+                border.color:Theme.glassRim
                 RowLayout {
                     anchors.fill:parent
                     anchors.leftMargin:27
@@ -141,7 +145,7 @@ ApplicationWindow {
                         Text {
                             text:AppState.page(AppState.currentPage).title
                             color:Theme.text
-                            font.pixelSize:23
+                            font.pixelSize:22
                             font.weight:Font.DemiBold
                         }
                         Text {
@@ -175,7 +179,7 @@ ApplicationWindow {
                         Menu {
                             id:demoStatesMenu
                             y:parent.height+3
-                            background:Rectangle { radius:11; color:Theme.raised; border.color:Theme.border }
+                            background:Rectangle { radius:15; color:Theme.material("floating"); border.color:Theme.glassRim }
                             MenuItem {
                                 text:"正常模式"
                                 onTriggered:{AppState.demoLoading=false;AppState.demoError=false;AppState.demoEmpty=false}
@@ -199,6 +203,7 @@ ApplicationWindow {
             }
             Item {
                 Layout.fillWidth:true; Layout.fillHeight:true
+            SwirlGlassPanel { anchors.fill:parent; material:"content"; cornerRadius:20 }
             Loader {
                 id:pageLoader
                 anchors.fill:parent
@@ -265,12 +270,15 @@ ApplicationWindow {
             Rectangle {
                 Layout.fillWidth:true
                 implicitHeight:31
-                color:Theme.canvas
+                radius:13
+                color:Theme.material("toolbar")
+                border.width:1
+                border.color:Theme.glassRim
                 RowLayout {
                     anchors.fill:parent
                     anchors.leftMargin:27; anchors.rightMargin:26
-                    Text { text:"●  当前为界面演示，不会执行真实网络操作"; color:Theme.muted; font.pixelSize:11; Layout.fillWidth:true }
-                    Text { text:"界面演示  ·  测试版"; color:Theme.muted; font.pixelSize:11 }
+                    Text { text:"◇  界面测试中 · 不会更改系统网络配置"; color:Theme.muted; font.pixelSize:11; Layout.fillWidth:true }
+                    Text { text:"Swirl · 测试分支"; color:Theme.muted; font.pixelSize:11 }
                 }
             }
         }
@@ -352,8 +360,8 @@ ApplicationWindow {
         anchors.bottom:parent.bottom
         anchors.bottomMargin:54
         z:999
-        color:Theme.raised
-        border.color:Theme.border
+        color:Theme.material("floating")
+        border.color:Theme.glassRim
         Text {
             anchors.fill:parent
             anchors.margins:12

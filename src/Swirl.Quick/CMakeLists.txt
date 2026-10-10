@@ -9,7 +9,7 @@ qt_policy(SET QTP0004 NEW)
 qt_add_executable(Swirl WIN32 main.cpp demo/DemoDataProvider.cpp demo/DemoDataProvider.h app/WindowsBackdrop.cpp app/WindowsBackdrop.h)
 set(SWIRL_QML_FILES
  qml/Main.qml qml/Theme.qml qml/AppState.qml
- qml/controls/SwirlButton.qml qml/controls/SwirlToggle.qml
+ qml/controls/SwirlButton.qml qml/controls/SwirlSegmentedControl.qml qml/controls/SwirlToggle.qml
  qml/controls/SwirlSearchField.qml qml/controls/SwirlTextField.qml
  qml/controls/SwirlComboBox.qml qml/controls/SwirlDialog.qml
  qml/controls/SwirlDataTable.qml qml/controls/SwirlContextMenu.qml

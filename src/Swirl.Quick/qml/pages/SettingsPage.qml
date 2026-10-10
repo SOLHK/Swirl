@@ -110,8 +110,8 @@ Item {
                                       page.section==="TUN"?["TUN 入口","网卡选择","路由排除","网关 DNS"]:
                                       page.section==="端口"?["HTTP 端口","SOCKS 端口","API 端口","端口冲突提醒"]:
                                       page.section==="隐私与安全"?["敏感数据脱敏","本地加密","证书信任","诊断授权"]:
-                                      page.section==="关于 Swirl"?["Version","构建信息","第三方组件","项目链接"]:
-                                      ["启用功能","默认行为","高级选项","Diagnostics"]
+                                      page.section==="关于 Swirl"?["版本","构建信息","第三方组件","项目链接"]:
+                                      ["启用功能","默认行为","高级选项","诊断"]
                                 RowLayout {
                                     Layout.fillWidth:true
                                     ColumnLayout {
@@ -123,7 +123,7 @@ Item {
                                 }
                             }
                             Rectangle { Layout.fillWidth:true; height:1; color:Theme.border }
-                            SwirlButton { text:AppState.zh("Open advanced options"); onClicked:AppState.notice(page.section+" options") }
+                            SwirlButton { text:AppState.zh("Open advanced options"); onClicked:AppState.notice(page.section+"选项") }
                         }
                         Item { Layout.preferredHeight:25 }
                     }

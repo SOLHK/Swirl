@@ -3,7 +3,7 @@ import QtQuick.Controls
 import SwirlQuick
 Item {
     id:table
-    property var columns:[{key:"name",label:"Name",w:220}]
+    property var columns:[{key:"name",label:"名称",w:220}]
     property var rows:[]
     property string selectedId:""
     property int itemHeight:43
@@ -22,7 +22,8 @@ Item {
             spacing:0
             Rectangle {
                 width:parent.width; height:39
-                color:Theme.field
+                color:Theme.material("secondary")
+                radius:10
                 Row {
                     anchors.fill:parent
                     Repeater {
@@ -56,7 +57,7 @@ Item {
                     width:list.width; height:table.itemHeight
                     property var record:modelData
                     color:table.selectedId===String(record.id||record.name) ? Theme.selected :
-                          mouse.containsMouse ? Theme.hover : (index%2?Theme.field:Theme.surface)
+                          mouse.containsMouse ? Theme.hover : (index%2?Theme.material("secondary"):Theme.material("content"))
                     Behavior on color { ColorAnimation { duration:Theme.motion } }
                     Rectangle { anchors.bottom:parent.bottom; width:parent.width; height:1; color:Theme.border; opacity:0.6 }
                     Row {

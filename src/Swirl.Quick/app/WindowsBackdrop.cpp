@@ -25,7 +25,7 @@ void WindowsBackdrop::updateCornerMask(QQuickWindow *window)
     const int h = window->height();
     if (w <= 0 || h <= 0) return;
     QPainterPath shape;
-    shape.addRoundedRect(QRectF(0, 0, w, h), 19, 19);
+    shape.addRoundedRect(QRectF(0, 0, w, h), 24, 24);
     window->setMask(QRegion(shape.toFillPolygon().toPolygon()));
 }
 
@@ -55,7 +55,7 @@ void WindowsBackdrop::apply(QObject *object, bool enabled)
         const int cornerType = 2; // DWMWCP_ROUND
         DwmSetWindowAttribute(hwnd, cornerAttribute, &cornerType, sizeof(cornerType));
         constexpr DWORD backdropAttribute = 38; // DWMWA_SYSTEMBACKDROP_TYPE
-        const int backdropType = enabled ? 2 : 1; // Mica or none
+        const int backdropType = enabled ? 3 : 1; // Desktop Acrylic on supported Windows 11, or none
         DwmSetWindowAttribute(hwnd, backdropAttribute, &backdropType, sizeof(backdropType));
     }
 #else

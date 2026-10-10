@@ -11,10 +11,10 @@ Item {
     property var sessions: demoProvider.connections()
     property var sampleRows: [
         {name:"api.github.com",requests:"1,240",download:"389 MB",policy:"自动选择"},
-        {name:"cdn.jsdelivr.net",requests:"986",download:"270 MB",policy:"DIRECT"},
-        {name:"developer.apple.com",requests:"824",download:"116 MB",policy:"Global / SG"},
+        {name:"cdn.jsdelivr.net",requests:"986",download:"270 MB",policy:"直连"},
+        {name:"developer.apple.com",requests:"824",download:"116 MB",policy:"全局 · 新加坡"},
         {name:"www.microsoft.com",requests:"641",download:"98 MB",policy:"自动选择"},
-        {name:"fonts.gstatic.com",requests:"318",download:"42 MB",policy:"DIRECT"}
+        {name:"fonts.gstatic.com",requests:"318",download:"42 MB",policy:"直连"}
     ]
     ScrollView {
         id: scroll
@@ -28,9 +28,12 @@ Item {
             RowLayout {
                 Layout.fillWidth:true
                 Text { text:AppState.zh("Activity and throughput"); color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
-                SwirlComboBox {
-                    model:["最近 1 小时","最近 24 小时","最近 7 天","最近 30 天"]
-                    onActivated:page.range=currentText
+                SwirlSegmentedControl {
+                    Layout.preferredWidth: 365
+                    options: ["1 小时", "24 小时", "7 天", "30 天"]
+                    onActivated: function(index, value) {
+                        page.range = ["最近 1 小时","最近 24 小时","最近 7 天","最近 30 天"][index]
+                    }
                 }
                 SwirlButton { text:AppState.zh("导出报告"); iconName:"folder"; onClicked:AppState.notice("导出仪表盘") }
             }
@@ -89,7 +92,7 @@ Item {
                             model:[{name:"HTTP/2",share:.47,color:Theme.accent},
                                    {name:"HTTP/3",share:.29,color:Theme.green},
                                    {name:"TCP",share:.17,color:Theme.orange},
-                                   {name:"Other",share:.07,color:Theme.muted}]
+                                   {name:"其他",share:.07,color:Theme.muted}]
                             ColumnLayout {
                                 Layout.fillWidth:true; spacing:6
                                 RowLayout {
