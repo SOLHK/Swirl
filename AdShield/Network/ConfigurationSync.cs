@@ -25,6 +25,7 @@ internal sealed class PortableProfile
     public ProxyProfile Profile { get; set; } = new();
     public string Yaml { get; set; } = "";
     public string Subscription { get; set; } = "";
+    public Dictionary<string, string> Selections { get; set; } = new();
     public Dictionary<string, string> ParameterValues { get; set; } = new();
 }
 
@@ -153,6 +154,7 @@ internal static class ConfigurationSync
     {
         current.ProtectedYaml = incoming.ProtectedYaml;
         current.ProtectedSubscription = incoming.ProtectedSubscription;
+        current.ProtectedSelections = incoming.ProtectedSelections;
         current.SubscriptionClient = Enum.IsDefined(incoming.SubscriptionClient) ? incoming.SubscriptionClient : SubscriptionClientProfile.Mihomo;
         current.SubscriptionRoute = Enum.IsDefined(incoming.SubscriptionRoute) ? incoming.SubscriptionRoute : SubscriptionDownloadRoute.Automatic;
         current.Mode = incoming.Mode;
@@ -180,8 +182,8 @@ internal static class ConfigurationSync
     private static byte[] Plaintext(ProxyProfile profile)
     {
         var copy = JsonSerializer.Deserialize<ProxyProfile>(JsonSerializer.Serialize(profile)) ?? throw new InvalidOperationException("无法复制配置。");
-        var payload = new PortableProfile { Profile = copy, Yaml = profile.Yaml, Subscription = profile.Subscription };
-        copy.ProtectedYaml = ""; copy.ProtectedSubscription = "";
+        var payload = new PortableProfile { Profile = copy, Yaml = profile.Yaml, Subscription = profile.Subscription, Selections = profile.SelectedProxies };
+        copy.ProtectedYaml = ""; copy.ProtectedSubscription = ""; copy.ProtectedSelections = "";
         copy.SyncFolder = ""; copy.SyncRemoteRevision = ""; copy.SyncRemoteHash = ""; copy.SyncContentHash = "";
         foreach (var plugin in copy.Plugins)
         {
@@ -230,6 +232,7 @@ internal static class ConfigurationSync
                 throw new InvalidOperationException("配置中的订阅链接无效。");
             profile.ProtectedYaml = ProxyProfile.Protect(payload.Yaml);
             profile.ProtectedSubscription = ProxyProfile.Protect(payload.Subscription);
+            profile.SelectedProxies = payload.Selections ?? new();
             profile.Tun = false; profile.Mitm = false; profile.BasicAds = false;
             profile.SyncFolder = ""; profile.SyncRemoteRevision = ""; profile.SyncRemoteHash = ""; profile.SyncContentHash = "";
             foreach (var plugin in profile.Plugins)

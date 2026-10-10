@@ -14,6 +14,8 @@ if (args.Length == 1 && args[0] == "--subscription-only") { SubscriptionChecks.P
 if (args.Length == 1 && args[0] == "--core-startup-only") { CoreStartupChecks.Pure(Check); await CoreStartupChecks.RunAsync(Check); Console.WriteLine($"All {passed} core startup checks passed."); return; }
 if (args.Length == 1 && args[0] == "--native-proxy-only") { await NativeCaptureChecks.RunAsync(Check); Console.WriteLine($"All {passed} native capture checks passed."); return; }
 if (args.Length == 2 && args[0] == "--render-swirl-ui") { DesktopChecks.Render(args[1], Check); return; }
+if (args.Length == 1 && args[0] == "--node-selection-only") { NodeSelectionChecks.Pure(Check); await NodeSelectionChecks.IntegrationAsync(Check); Console.WriteLine($"All {passed} node selection checks passed."); return; }
+NodeSelectionChecks.Pure(Check);
 await ConnectionHealthChecks.RunAsync(Check);
 CoreStartupChecks.Pure(Check);
 SubscriptionChecks.Pure(Check);
@@ -25,6 +27,7 @@ SyncRoutingChecks.Run(Check);
 await LoonParityChecks.PureAsync(Check);
 if (args.Length == 1 && args[0] == "--network-tests")
 {
+    await NodeSelectionChecks.IntegrationAsync(Check);
     await SubscriptionChecks.IntegrationAsync(Check);
     await NetworkChecks.IntegrationAsync(Check);
     await CaptureChecks.RunAsync(Check);

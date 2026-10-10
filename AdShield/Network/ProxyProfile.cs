@@ -10,6 +10,7 @@ internal sealed class ProxyProfile
 {
     public string ProtectedYaml { get; set; } = "";
     public string ProtectedSubscription { get; set; } = "";
+    public string ProtectedSelections { get; set; } = "";
     public SubscriptionClientProfile SubscriptionClient { get; set; } = SubscriptionClientProfile.Mihomo;
     public SubscriptionDownloadRoute SubscriptionRoute { get; set; } = SubscriptionDownloadRoute.Automatic;
     public string Mode { get; set; } = "rule";
@@ -32,6 +33,11 @@ internal sealed class ProxyProfile
         ProtectedData.Unprotect(Convert.FromBase64String(text), null, DataProtectionScope.CurrentUser));
     internal string Yaml => Unprotect(ProtectedYaml);
     internal string Subscription => Unprotect(ProtectedSubscription);
+    internal Dictionary<string, string> SelectedProxies
+    {
+        get { try { return JsonSerializer.Deserialize<Dictionary<string, string>>(Unprotect(ProtectedSelections)) ?? new(); } catch { return new(); } }
+        set => ProtectedSelections = Protect(JsonSerializer.Serialize(value));
+    }
 
     internal static string? TestDirectory { get; set; }
     internal static string DirectoryPath => TestDirectory ?? Path.Combine(Store.Dir, "network");
@@ -191,7 +197,9 @@ internal static class MihomoConfig
             ? items.ToList() : new List<object>();
         string groupName = "Swirl 节点";
         while (nodes.Contains(groupName) || providers.Contains(groupName) || groups.OfType<IDictionary<object, object>>().Any(g => g.TryGetValue("name", out var n) && n?.ToString() == groupName)) groupName += "_";
-        var group = new Dictionary<string, object> { ["name"] = groupName, ["type"] = "select", ["proxies"] = nodes.Count > 0 ? nodes : new List<string> { "DIRECT" } };
+        var group = new Dictionary<string, object> { ["name"] = groupName, ["type"] = "select" };
+        if (nodes.Count > 0) group["proxies"] = nodes;
+        else if (providers.Count == 0) group["proxies"] = new[] { "DIRECT" };
         if (providers.Count > 0) group["use"] = providers;
         groups.Insert(0, group);
         var configuredPolicies = nodes.Concat(groups.OfType<IDictionary<object, object>>().Where(g => g.TryGetValue("name", out _)).Select(g => g["name"].ToString()!)).Concat(new[] { groupName }).ToArray();
@@ -209,6 +217,12 @@ internal static class MihomoConfig
                 importedGroup["exclude-filter"] = (string.IsNullOrWhiteSpace(filter?.ToString()) ? "" : "(?:" + filter + ")|") + "^" + PluginOutbound + "$";
             }
         root["proxy-groups"] = groups;
+        // Swirl restores validated, user-scoped selections before capturing
+        // traffic; an old core cache must not override them with DIRECT.
+        var coreProfile = root.TryGetValue("profile", out var coreProfileValue) && coreProfileValue is IDictionary<object, object> settings
+            ? settings.ToDictionary(e => e.Key.ToString()!, e => e.Value) : new Dictionary<string, object>();
+        coreProfile["store-selected"] = false;
+        root["profile"] = coreProfile;
         var rules = new List<string>();
         if (profile.Tun)
         {

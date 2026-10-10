@@ -74,6 +74,9 @@ internal sealed class ProxyController : IDisposable
             }
             if (!ready) throw new InvalidOperationException("代理核心未在规定时间内就绪。");
             lifetime.Token.ThrowIfCancellationRequested();
+            var catalog = await CatalogAsync();
+            foreach (var selection in catalog.InitialSelections(profile))
+                await SelectAsync(selection.Key, selection.Value);
             if (systemProxy)
             {
                 lock (proxySettingsGate)
@@ -147,14 +150,13 @@ internal sealed class ProxyController : IDisposable
     }
     internal async Task<Dictionary<string, string[]>> GroupsAsync()
     {
-        using var response = await RequestAsync(HttpMethod.Get, "/proxies");
-        response.EnsureSuccessStatusCode();
+        return (await CatalogAsync()).Groups.Values.Where(g => g.Selectable).ToDictionary(g => g.Name, g => g.Members);
+    }
+    internal async Task<ProxyCatalog> CatalogAsync()
+    {
+        using var response = await RequestAsync(HttpMethod.Get, "/proxies"); response.EnsureSuccessStatusCode();
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        var groups = new Dictionary<string, string[]>();
-        foreach (var proxy in document.RootElement.GetProperty("proxies").EnumerateObject())
-            if (proxy.Value.TryGetProperty("type", out var type) && type.GetString() == "Selector" && proxy.Value.TryGetProperty("all", out var all))
-                groups[proxy.Name] = all.EnumerateArray().Select(n => n.GetString()!).Where(n => n != MihomoConfig.PluginOutbound).ToArray();
-        return groups;
+        return ProxyCatalog.FromController(document.RootElement);
     }
     internal async Task<Dictionary<string, string>> SelectionsAsync()
     {
