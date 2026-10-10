@@ -57,7 +57,7 @@ Item {
                         {key:"latency",label:AppState.zh("LATENCY (ms)"),w:115},
                         {key:"status",label:AppState.zh("HEALTH"),w:132}
                     ]
-                    onRowSelected:function(r){page.selected=r;AppState.selectedNode=r.name}
+                    onRowSelected:function(r){page.selected=r;AppState.selectNode(r)}
                 }
             }
             SwirlGlassPanel {
@@ -97,7 +97,7 @@ Item {
                 SwirlButton { text:AppState.zh("取消"); onClicked:addDialog.close() }
                 SwirlButton {
                     text:AppState.zh("Save demo"); primary:true; enabled:nodeName.text.trim().length>0
-                    onClicked:{AppState.selectedNode=nodeName.text.trim();addDialog.close();AppState.notice("保存节点")}
+                    onClicked:{AppState.selectNode({name:nodeName.text.trim()});addDialog.close();AppState.notice("保存节点")}
                 }
             }
         }

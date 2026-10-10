@@ -1,44 +1,31 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Effects
 import SwirlQuick
 Switch {
     id: control
-    implicitWidth: 55
-    implicitHeight: 33
+    property bool large: false
+    implicitWidth: large ? 86 : 60
+    implicitHeight: large ? 46 : 32
+    padding: 0
     hoverEnabled: true
     indicator: Rectangle {
-        implicitWidth: 51
-        implicitHeight: 30
-        x: 2
-        y: (control.height - height) / 2
-        radius: 15
-        antialiasing: true
-        color: control.checked ? Theme.accent : (Theme.dark ? "#627589" : "#BCC9D7")
-        border.width: 1
-        border.color: control.checked ? Qt.lighter(Theme.accent, 1.25) : Theme.glassRim
-        gradient: Gradient {
-            GradientStop { position: 0; color: control.checked ? Qt.lighter(Theme.accent, 1.17) : (Theme.dark ? "#6A7C91" : "#CBD7E3") }
-            GradientStop { position: 1; color: control.checked ? Theme.accent : (Theme.dark ? "#415269" : "#A5B6C9") }
-        }
+        width: control.width; height: control.height
+        radius: Theme.pillRadius(height)
+        color: control.checked ? Theme.accent : Theme.dark ? "#5E6C80" : control.large ? "#D3D7DF" : "#E3EBF4"
+        border.width: control.activeFocus ? 1.5 : 0
+        border.color: Theme.accent
+        opacity: control.hovered ? 0.88 : 1
         Rectangle {
-            x: control.checked ? 25 : 3
-            y: 3
-            width: 24
-            height: 24
-            radius: 12
-            antialiasing: true
-            color: "#FAFCFF"
-            border.width: 1
-            border.color: "#D7E4F1"
-            Behavior on x {
-                NumberAnimation { duration: Theme.reduceMotion ? 0 : 240; easing.type: Easing.OutCubic }
-            }
-            Rectangle {
-                x: 5; y: 2; width: 14; height: 3
-                radius: 2; color: "#FFFFFF"
-                opacity: 0.8
-            }
+            width: parent.height - 8; height: width
+            x: control.checked ? parent.width - width - 4 : 4; y: 4
+            radius: Theme.pillRadius(height)
+            color: "#FEFEFF"
+            layer.enabled: true
+            layer.effect: MultiEffect { shadowEnabled:true; shadowBlur:0.35; shadowVerticalOffset:2; shadowColor:"#30586A85" }
+            Behavior on x { NumberAnimation { duration: Theme.motion; easing.type: Easing.OutCubic } }
         }
+        Behavior on color { ColorAnimation { duration: Theme.motion } }
     }
     contentItem: Item {}
 }

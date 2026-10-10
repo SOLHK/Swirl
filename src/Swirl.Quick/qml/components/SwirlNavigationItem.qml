@@ -2,61 +2,37 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import SwirlQuick
-Item {
+import "../controls"
+Button {
     id: entry
     property string pageId: "overview"
     property string title: "总览"
     property string iconName: "home"
     property bool compact: false
-    readonly property bool chosen: AppState.currentPage === entry.pageId
+    readonly property bool chosen: AppState.currentPage === pageId
     signal activated()
-    implicitHeight: 41
-    implicitWidth: compact ? 58 : 221
-    Rectangle {
-        anchors.fill: parent
-        anchors.leftMargin: 8; anchors.rightMargin: 8
-        radius: 12
-        antialiasing: true
-        color: entry.chosen ? Theme.selected : hover.containsMouse ? Theme.hover : "transparent"
-        border.width: entry.chosen ? 1 : 0
-        border.color: Theme.glassRim
-        Behavior on color { ColorAnimation { duration: Theme.motion } }
-        Rectangle {
-            visible: entry.chosen
-            anchors.left: parent.left; anchors.right: parent.right
-            anchors.top: parent.top
-            anchors.leftMargin: 14; anchors.rightMargin: 14
-            height: 1; color: Theme.glassGlint; opacity: 0.85
-        }
+    implicitHeight: chosen ? 48 : 41
+    implicitWidth: compact ? 58 : 217
+    leftPadding:20; rightPadding:16
+    hoverEnabled:true
+    background: SwirlPillSurface {
+        selected: entry.chosen; hovered:entry.hovered; pressed:entry.down
+        subtleShadow:entry.chosen
+        color:entry.chosen ? Theme.selected : entry.down ? Theme.selected : entry.hovered ? Theme.hover : "transparent"
+        border.color:entry.chosen ? Theme.glassRim : entry.activeFocus ? Theme.accent : "transparent"
     }
-    RowLayout {
-        anchors.fill: parent
-        anchors.leftMargin: entry.compact ? 23 : 21
-        anchors.rightMargin: 16
-        spacing: 12
-        SwirlIcon {
-            name: entry.iconName
-            size: 18
-            color: entry.chosen ? Theme.accent : Theme.muted
-        }
+    contentItem: RowLayout {
+        spacing:25
+        SwirlIcon { name:entry.iconName; size:26; color:entry.chosen ? Theme.accent : Theme.muted }
         Text {
-            visible: !entry.compact
-            Layout.fillWidth: true
-            text: entry.title
-            color: entry.chosen ? Theme.text : Theme.muted
-            font.pixelSize: 12
-            font.family: "Microsoft YaHei UI"
-            font.weight: entry.chosen ? Font.DemiBold : Font.Normal
-            elide: Text.ElideRight
+            visible:!entry.compact; Layout.fillWidth:true
+            text:entry.title; color:entry.chosen ? Theme.accent : Theme.muted
+            font.pixelSize:18; font.family:Theme.fontFamily; font.weight:entry.chosen ? Font.DemiBold : Font.Normal
+            elide:Text.ElideRight
         }
     }
-    MouseArea {
-        id: hover
-        anchors.fill: parent
-        hoverEnabled: true
-        cursorShape: Qt.PointingHandCursor
-        onClicked: entry.activated()
-        ToolTip.visible: entry.compact && containsMouse
-        ToolTip.text: entry.title
-    }
+    onClicked:activated()
+    Accessible.name: title
+    ToolTip.visible: compact && hovered
+    ToolTip.text: title
 }

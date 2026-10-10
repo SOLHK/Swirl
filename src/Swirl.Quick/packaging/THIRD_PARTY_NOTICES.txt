@@ -1,0 +1,28 @@
+Swirl - Qt Quick UI demonstration
+
+This installer contains the existing Swirl UI preview. Proxy, DNS, HTTP,
+node latency and traffic operations in this executable are demonstrations.
+The original WPF/.NET network implementation remains in the source repository
+and is not started by the Qt UI.
+
+Qt 6.10.3 is dynamically linked. Copyright The Qt Company Ltd. and other
+contributors. Qt is used under LGPL version 3; corresponding license texts
+are in licenses/. You may replace the bundled Qt libraries with compatible
+modified versions, and reverse engineer this application for debugging such
+modifications as allowed by the LGPL. Qt source archives are available at:
+https://download.qt.io/archive/qt/6.10/6.10.3/single/
+Module-specific license and third-party metadata:
+https://code.qt.io/cgit/qt/qtbase.git/tree/LICENSES?h=v6.10.3
+https://code.qt.io/cgit/qt/qtdeclarative.git/tree/LICENSES?h=v6.10.3
+
+MinGW builds also contain GCC/libstdc++ runtime libraries under GPL version 3
+with the GCC Runtime Library Exception (see licenses/). Source and notices:
+https://gcc.gnu.org/releases.html
+https://www.mingw-w64.org/license/
+
+Swirl source and reproducible Windows build instructions:
+https://github.com/SOLHK/Swirl/tree/test/src/Swirl.Quick
+
+Windows fonts used during validation are system-installed fonts and are not
+redistributed in this installer. The Swirl brand assets are reused from the
+existing repository. All outline UI icons are drawn by QML Canvas code.

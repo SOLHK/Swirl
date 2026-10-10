@@ -1,55 +1,36 @@
 import QtQuick
+import QtQuick.Controls
 import SwirlQuick
 Item {
     id: control
-    property var options: ["下载", "上传", "详细数据"]
+    property var options: ["下载", "上传", "总流量"]
     property int currentIndex: 0
+    property bool accentSelection: false
     signal activated(int index, string value)
-    implicitHeight: 38
-    implicitWidth: 320
-    Rectangle {
-        anchors.fill: parent
-        radius: 14
-        color: Theme.material("field")
-        border.width: 1
-        border.color: Theme.glassRim
-    }
+    implicitHeight: 40; implicitWidth: 295
+    Rectangle { anchors.fill:parent; radius:Theme.pillRadius(height); color:Theme.material("field") }
     Row {
         anchors.fill: parent
-        anchors.margins: 4
-        spacing: 2
         Repeater {
             model: control.options
-            delegate: Item {
-                width: Math.max(1, (control.width - 8 - (control.options.length-1)*2) / control.options.length)
-                height: parent.height
-                Rectangle {
-                    anchors.fill: parent
-                    radius: 11
-                    color: control.currentIndex === index ? Theme.material("floating") :
-                           hit.containsMouse ? Theme.hover : "transparent"
-                    border.width: control.currentIndex === index ? 1 : 0
-                    border.color: Theme.glassRim
-                    Behavior on color { ColorAnimation { duration: Theme.motion } }
+            delegate: Button {
+                required property int index
+                required property var modelData
+                width: control.width / control.options.length; height: control.height
+                hoverEnabled:true
+                background: SwirlPillSurface {
+                    visible: control.currentIndex === index || parent.hovered
+                    primary: control.accentSelection && control.currentIndex === index
+                    hovered: parent.hovered
+                    subtleShadow: control.currentIndex === index
                 }
-                Text {
-                    anchors.centerIn: parent
+                contentItem: Text {
                     text: String(modelData)
-                    color: control.currentIndex === index ? Theme.text : Theme.muted
-                    font.pixelSize: 11
-                    font.weight: control.currentIndex === index ? Font.DemiBold : Font.Normal
-                    font.family: "Microsoft YaHei UI"
+                    color: control.currentIndex === index ? control.accentSelection ? "white" : Theme.accent : Theme.muted
+                    font.pixelSize: 15; font.family:Theme.fontFamily
+                    horizontalAlignment:Text.AlignHCenter; verticalAlignment:Text.AlignVCenter
                 }
-                MouseArea {
-                    id: hit
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        control.currentIndex = index
-                        control.activated(index, String(modelData))
-                    }
-                }
+                onClicked: { control.currentIndex = index; control.activated(index,String(modelData)) }
             }
         }
     }

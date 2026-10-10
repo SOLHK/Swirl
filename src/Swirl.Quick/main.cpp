@@ -13,6 +13,11 @@
 #include <QFile>
 #include <QTextStream>
 #include <QCoreApplication>
+#include <QQmlExpression>
+#include <QQmlIncubationController>
+#ifdef SWIRL_UI_TESTS
+#include "tests/OverviewChecks.h"
+#endif
 #include "demo/DemoDataProvider.h"
 #include "app/WindowsBackdrop.h"
 
@@ -40,10 +45,11 @@ int main(int argc, char *argv[])
     WindowsBackdrop backdrop;
     QQmlApplicationEngine engine;
     const bool smoke = app.arguments().contains("--smoke-test");
+    const bool interaction = app.arguments().contains("--interaction-test");
     bool qmlWarnings = false;
     QObject::connect(&engine, &QQmlEngine::warnings, &app,
-                     [&qmlWarnings, smoke](const QList<QQmlError> &warnings) {
-                         if (smoke && !warnings.isEmpty()) qmlWarnings = true;
+                     [&qmlWarnings, smoke, interaction](const QList<QQmlError> &warnings) {
+                         if ((smoke || interaction) && !warnings.isEmpty()) qmlWarnings = true;
                      });
     const QStringList arguments = app.arguments();
     const auto argumentValue = [&arguments](const QString &prefix) {
@@ -55,7 +61,7 @@ int main(int argc, char *argv[])
     const QString previewPath = argumentValue(QStringLiteral("--capture-preview="));
     const QString previewPage = argumentValue(QStringLiteral("--preview-page="));
     const QString previewTheme = argumentValue(QStringLiteral("--preview-theme="));
-    if (smoke || !previewPath.isEmpty()) {
+    if (smoke || interaction || !previewPath.isEmpty()) {
         QFile::remove(QCoreApplication::applicationDirPath() + QStringLiteral("/Swirl-diagnostics.txt"));
         qInstallMessageHandler(recordQtDiagnostic);
     }
@@ -67,9 +73,33 @@ int main(int argc, char *argv[])
     engine.loadFromModule("SwirlQuick", "Main");
     if (engine.rootObjects().isEmpty())
         return 1;
-    if (smoke)
-        QTimer::singleShot(1900, &app, &QCoreApplication::quit);
-    else if (!previewPath.isEmpty()) {
+    auto *rootWindow = qobject_cast<QQuickWindow *>(engine.rootObjects().constFirst());
+    const auto sizeParts = argumentValue(QStringLiteral("--preview-size=")).split('x');
+    if (rootWindow && sizeParts.size() == 2 && sizeParts[0].toInt() >= 1000 && sizeParts[1].toInt() >= 650)
+        rootWindow->resize(sizeParts[0].toInt(), sizeParts[1].toInt());
+    if (app.arguments().contains("--preview-connected")) {
+        QQmlExpression state(qmlContext(rootWindow), rootWindow,
+                            QStringLiteral("AppState.setConnection(true); AppState.toast = ''"));
+        state.evaluate();
+    }
+    if (interaction) {
+#ifdef SWIRL_UI_TESTS
+        QTimer::singleShot(400, &app, [&app, rootWindow]() {
+            app.exit(runOverviewChecks(rootWindow));
+        });
+#else
+        qWarning() << "Rebuild with -DSWIRL_BUILD_UI_TESTS=ON to run input checks.";
+        return 4;
+#endif
+    }
+    if (app.arguments().contains("--preview-scroll-bottom"))
+        QTimer::singleShot(400, rootWindow, [rootWindow]() { QMetaObject::invokeMethod(rootWindow,"previewScrollBottom"); });
+    if (!interaction && smoke)
+        QTimer::singleShot(15000, &app, [&app]() {
+            qCritical() << "Navigation smoke test timed out before completing all pages.";
+            app.exit(3);
+        });
+    else if (!interaction && !previewPath.isEmpty()) {
         auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().constFirst());
         if (window) {
             QTimer::singleShot(900, &app, [window, previewPath]() {
@@ -101,5 +131,9 @@ int main(int argc, char *argv[])
             QTimer::singleShot(0, &app, &QCoreApplication::quit);
     }
     const int result = app.exec();
-    return smoke && qmlWarnings ? 2 : result;
+    // Drain any lazy Qt Controls creation before the engine is destroyed.
+    // This also keeps scripted page-navigation shutdown free of incubation warnings.
+    if (auto *controller = engine.incubationController())
+        controller->incubateFor(100);
+    return (smoke || interaction) && qmlWarnings ? 2 : result;
 }

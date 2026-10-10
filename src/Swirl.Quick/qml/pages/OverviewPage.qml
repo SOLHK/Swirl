@@ -6,157 +6,200 @@ import "../components"
 import "../controls"
 Item {
     id:page
+    readonly property real overviewHeight:Math.max(798,height)
+    readonly property real unit:(overviewHeight-3*Theme.gap)/756
+    function scrollToBottom() { scroll.contentItem.contentY=Math.max(0,scroll.contentItem.contentHeight-scroll.contentItem.height) }
     ScrollView {
-        id:scroll
-        anchors.fill:parent
-        anchors.leftMargin:24; anchors.rightMargin:24
+        id:scroll; anchors.fill:parent; clip:true
         ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
-        clip:true
         ColumnLayout {
-            width:scroll.availableWidth
-            spacing:18
+            width:scroll.availableWidth; spacing:Theme.gap
             RowLayout {
-                Layout.fillWidth:true
-                spacing:15
+                Layout.fillWidth:true; Layout.preferredHeight:176*page.unit; spacing:Theme.gap
                 SwirlGlassPanel {
-                    Layout.fillWidth:true; Layout.preferredHeight:205
+                    Layout.fillWidth:true; Layout.preferredWidth:756; Layout.fillHeight:true
                     ColumnLayout {
-                        anchors.fill:parent; anchors.margins:21; spacing:10
+                        anchors.fill:parent; anchors.margins:page.width<1000 ? 18 : 23; spacing:page.width<1000 ? 14 : 18
                         RowLayout {
-                            Layout.fillWidth:true
-                            Text { text:"连接控制"; color:Theme.muted; font.pixelSize:11; font.letterSpacing:1.2; Layout.fillWidth:true }
-                            SwirlStatusBadge { label:AppState.proxyOn?"模拟已开启":"未连接"; tone:AppState.proxyOn?"success":"neutral" }
-                        }
-                        RowLayout {
-                            Layout.fillWidth:true
-                            spacing:15
+                            Layout.fillWidth:true; spacing:page.width<1000 ? 14 : 21
                             Rectangle {
-                                width:52; height:52; radius:16
-                                color:Theme.selected
-                                SwirlIcon { name:"globe"; size:27; color:Theme.accent; anchors.centerIn:parent }
+                                width:page.width<1000 ? 58 : 74; height:width; radius:Theme.pillRadius(height); color:Theme.withAlpha(Theme.accent,0.1)
+                                SwirlIcon { name:"globe"; size:44; color:Theme.accent; anchors.centerIn:parent }
                             }
                             ColumnLayout {
-                                Layout.fillWidth:true
-                                Text { text:AppState.proxyOn?"模拟连接已开启":"随时准备连接"; color:Theme.text; font.pixelSize:21; font.weight:Font.DemiBold }
-                                Text { text:"当前为界面演示，不会更改 Windows 代理设置。"; color:Theme.muted; font.pixelSize:12; wrapMode:Text.WordWrap; Layout.fillWidth:true }
+                                Layout.fillWidth:true; spacing:4
+                                Text { text:AppState.proxyOn ? "演示连接已开启" : "随时准备连接"; color:Theme.text; font.pixelSize:page.width<1000 ? 22 : 26; font.weight:Font.DemiBold; Layout.fillWidth:true; elide:Text.ElideRight }
+                                Text { text:"点击右侧开关即可连接，当前为界面演示，不会更改系统代理。"; color:Theme.muted; font.pixelSize:page.width<1000 ? 14 : 16; Layout.fillWidth:true; wrapMode:Text.WordWrap }
                             }
-                            SwirlToggle {
-                                checked:AppState.proxyOn
-                                onToggled:{
-                                    AppState.proxyOn=checked
-                                    AppState.notice("代理预览"+(checked?"已启用":"已关闭"))
-                                }
-                            }
+                            SwirlToggle { objectName:"connectionSwitch"; large:true; implicitWidth:page.width<1000 ? 68 : 86; implicitHeight:page.width<1000 ? 38 : 46; checked:AppState.proxyOn; onToggled:AppState.setConnection(checked); Accessible.name:"演示连接开关" }
                         }
-                        Rectangle { Layout.fillWidth:true; height:1; color:Theme.border }
                         RowLayout {
-                            Layout.fillWidth:true
-                            spacing:18
-                            Text { text:"模式"; color:Theme.muted; font.pixelSize:11 }
+                            Layout.fillWidth:true; spacing:24
+                            Text { text:"模式"; color:Theme.muted; font.pixelSize:17; font.weight:Font.DemiBold }
                             SwirlComboBox {
-                                model:["规则","全局","直连"]
-                                currentIndex:Math.max(0,model.indexOf(AppState.mode))
-                                onActivated:AppState.mode=currentText
+                                objectName:"modeCombo"; Layout.fillWidth:true; Layout.preferredWidth:220
+                                model:["规则","全局","直连"]; currentIndex:Math.max(0,model.indexOf(AppState.mode))
+                                onActivated:{AppState.mode=currentText;AppState.addEvent("演示模式切换到 "+currentText,"accent")}
+                                Accessible.name:"模式选择"
                             }
-                            Text { text:"策略"; color:Theme.muted; font.pixelSize:11 }
+                            Text { text:"策略"; color:Theme.muted; font.pixelSize:17; font.weight:Font.DemiBold }
                             SwirlComboBox {
-                                Layout.fillWidth:true
-                                model:["自动选择","新加坡节点","直连","拒绝"]
-                                onActivated:AppState.policy=currentText
+                                objectName:"policyCombo"; Layout.fillWidth:true; Layout.preferredWidth:340
+                                model:["自动选择","新加坡节点","直连","拒绝"]; currentIndex:Math.max(0,model.indexOf(AppState.policy))
+                                onActivated:{AppState.policy=currentText;AppState.addEvent("演示策略切换到 "+currentText,"accent")}
+                                Accessible.name:"策略选择"
                             }
                         }
                     }
                 }
                 SwirlGlassPanel {
-                    Layout.preferredWidth:Math.max(270,page.width*0.27)
-                    Layout.preferredHeight:205
+                    Layout.fillWidth:true; Layout.preferredWidth:408; Layout.fillHeight:true
                     ColumnLayout {
-                        anchors.fill:parent; anchors.margins:21; spacing:11
-                        Text { text:"当前节点"; color:Theme.muted; font.pixelSize:11; font.letterSpacing:1.2 }
-                        Text { text:AppState.selectedNode; color:Theme.text; font.pixelSize:21; font.weight:Font.DemiBold }
-                        Text { text:"Trojan · 演示线路"; color:Theme.muted; font.pixelSize:12 }
-                        Item { Layout.fillHeight:true }
+                        anchors.fill:parent; anchors.margins:20; spacing:9
+                        Text { text:"当前节点"; color:Theme.muted; font.pixelSize:17; font.weight:Font.DemiBold }
+                        RowLayout {
+                            Layout.fillWidth:true; spacing:19
+                            SwirlRegionBadge { region:AppState.selectedNodeRegion }
+                            ColumnLayout {
+                                Layout.fillWidth:true; spacing:3
+                                Text { text:AppState.selectedNode; color:Theme.text; font.pixelSize:23; font.weight:Font.DemiBold; Layout.fillWidth:true; elide:Text.ElideRight }
+                                Text { text:AppState.selectedNodeProtocol+" · 演示线路"; color:Theme.muted; font.pixelSize:17 }
+                            }
+                            Button { implicitWidth:24; implicitHeight:32; background:Item{} contentItem:SwirlIcon{name:"chevron-right";size:18} onClicked:nodePicker.open(); Accessible.name:"选择演示节点" }
+                        }
                         RowLayout {
                             Layout.fillWidth:true
-                            SwirlStatusBadge { label:"38 ms · 模拟"; tone:"success" }
+                            Rectangle {
+                                width:page.width<1000 ? 112 : 130; height:36; radius:Theme.pillRadius(height); color:Theme.withAlpha(Theme.green,0.1)
+                                Text { anchors.centerIn:parent; text:AppState.selectedNodeLatency>0 ? "历史 "+AppState.selectedNodeLatency+" ms · 演示" : "尚未检测 · 演示"; color:Theme.green; font.pixelSize:page.width<1000 ? 12 : 14 }
+                            }
                             Item { Layout.fillWidth:true }
-                            SwirlButton { text:"切换"; iconName:"route"; onClicked:AppState.currentPage="proxies" }
+                            SwirlButton { objectName:"nodePickerButton"; text:"切换节点"; iconName:"refresh"; implicitHeight:44; font.pixelSize:page.width<1000 ? 15 : 17; onClicked:nodePicker.open() }
                         }
+                    }
+                }
+            }
+            RowLayout {
+                Layout.fillWidth:true; Layout.preferredHeight:142*page.unit; spacing:Theme.gap
+                SwirlMetricCard { objectName:"downloadMetric"; Layout.fillWidth:true; Layout.fillHeight:true; label:"下载速度"; value:AppState.proxyOn ? AppState.demoDown.toFixed(2)+" MB/s" : "0 KB/s"; iconName:"download" }
+                SwirlMetricCard { Layout.fillWidth:true; Layout.fillHeight:true; label:"上传速度"; value:AppState.proxyOn ? AppState.demoUp.toFixed(2)+" MB/s" : "0 KB/s"; iconName:"upload"; chartColor:Theme.green }
+                SwirlMetricCard { Layout.fillWidth:true; Layout.fillHeight:true; label:"活动连接"; value:String(AppState.demoConnections); iconName:"user"; chartColor:Theme.muted; bars:true }
+                SwirlMetricCard { Layout.fillWidth:true; Layout.fillHeight:true; label:"总流量"; value:AppState.totalGB.toFixed(2)+" GB"; iconName:"layers"; chartColor:Theme.muted }
+            }
+            SwirlGlassPanel {
+                Layout.fillWidth:true; Layout.preferredHeight:196*page.unit
+                ColumnLayout {
+                    anchors.fill:parent; anchors.leftMargin:25; anchors.rightMargin:20; anchors.topMargin:11; anchors.bottomMargin:6; spacing:15
+                    RowLayout {
+                        Layout.fillWidth:true; spacing:page.width<950 ? 12 : 30
+                        Text { text:"流量趋势"; color:Theme.text; font.pixelSize:20; font.weight:Font.DemiBold }
+                        SwirlSegmentedControl { objectName:"seriesSelector"; id:seriesSelector; accentSelection:true; implicitWidth:page.width<950 ? 210 : 295 }
+                        Item { Layout.fillWidth:true }
+                        SwirlSegmentedControl { objectName:"rangeSelector"; id:rangeSelector; options:["实时","1小时","6小时","24小时"]; implicitWidth:page.width<950 ? 275 : 335 }
+                    }
+                    SwirlTrafficChart {
+                        objectName:"overviewChart"; Layout.fillWidth:true; Layout.fillHeight:true
+                        series:["down","up","total"][seriesSelector.currentIndex]; rangeIndex:rangeSelector.currentIndex
                     }
                 }
             }
             GridLayout {
-                Layout.fillWidth:true
-                columns:page.width>1120?4:2
-                rowSpacing:14; columnSpacing:14
-                SwirlMetricCard { Layout.fillWidth:true; label:"下载速度"; value:"8.42 MB/s"; secondary:"演示数据"; iconName:"activity" }
-                SwirlMetricCard { Layout.fillWidth:true; label:"上传速度"; value:"1.26 MB/s"; secondary:"演示数据"; iconName:"chart" }
-                SwirlMetricCard { Layout.fillWidth:true; label:"活动连接"; value:"42"; secondary:"模拟连接"; iconName:"network" }
-                SwirlMetricCard { Layout.fillWidth:true; label:"总流量"; value:"2.84 GB"; secondary:"演示会话流量"; iconName:"layers" }
-            }
-            SwirlGlassPanel {
-                Layout.fillWidth:true
-                Layout.preferredHeight:314
-                ColumnLayout {
-                    anchors.fill:parent; anchors.margins:20
-                    spacing:9
-                    RowLayout {
-                        Layout.fillWidth:true
-                        ColumnLayout {
-                            Layout.fillWidth:true; spacing:3
-                            Text { text:"流量趋势"; color:Theme.text; font.pixelSize:17; font.weight:Font.DemiBold }
-                            Text { text:"最近 60 分钟 · 模拟数据"; color:Theme.muted; font.pixelSize:11 }
-                        }
-                        SwirlStatusBadge { label:"● 下载"; tone:"accent" }
-                        SwirlStatusBadge { label:"● 上传"; tone:"success" }
-                        SwirlButton { text:"详细数据"; onClicked:AppState.currentPage="traffic" }
-                    }
-                    SwirlTrafficChart { Layout.fillWidth:true; Layout.fillHeight:true; samples:demoProvider.traffic() }
-                }
-            }
-            RowLayout {
-                Layout.fillWidth:true; spacing:16
+                columns:page.width<1000 ? 1 : 3
+                Layout.fillWidth:true; Layout.preferredHeight:(columns===1 ? 726 : 242)*page.unit
+                rowSpacing:Theme.gap; columnSpacing:Theme.gap
                 SwirlGlassPanel {
-                    Layout.fillWidth:true; Layout.preferredHeight:295
+                    Layout.fillWidth:true; Layout.preferredWidth:418; Layout.fillHeight:true; Layout.preferredHeight:242*page.unit
                     ColumnLayout {
-                        anchors.fill:parent; anchors.margins:18; spacing:12
-                        Text { text:"最近网络事件"; color:Theme.text; font.pixelSize:16; font.weight:Font.DemiBold }
+                        anchors.fill:parent; anchors.leftMargin:25; anchors.rightMargin:22; anchors.topMargin:13; anchors.bottomMargin:13; spacing:0
+                        SwirlListRow { Layout.fillWidth:true; Layout.preferredHeight:38; iconName:"clock"; title:"最近网络事件"; onClicked:AppState.navigate("logs"); contentItem:RowLayout{spacing:24;SwirlIcon{name:"clock";size:29;color:Theme.accent} Text{text:"最近网络事件";font.pixelSize:19;font.weight:Font.DemiBold;color:Theme.text;Layout.fillWidth:true}SwirlIcon{name:"chevron-right";size:19}} }
                         Repeater {
-                            model:demoProvider.events()
-                            RowLayout {
-                                Layout.fillWidth:true; spacing:11
-                                Text { text:modelData.time; color:Theme.muted; font.pixelSize:11; Layout.preferredWidth:57 }
-                                ColumnLayout {
-                                    Layout.fillWidth:true; spacing:2
-                                    Text { text:modelData.title; color:Theme.text; font.pixelSize:12; elide:Text.ElideRight; Layout.fillWidth:true }
-                                    Text { text:modelData.detail; color:Theme.muted; font.pixelSize:11 }
+                            model:AppState.recentEvents
+                            delegate:Item {
+                                required property var modelData
+                                Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumHeight:33
+                                Rectangle { x:51; width:parent.width-51; height:1; color:Theme.border; opacity:0.65 }
+                                RowLayout {
+                                    anchors.fill:parent; spacing:27
+                                    Rectangle { width:16; height:16; radius:Theme.pillRadius(height); color:modelData.tone==="success" ? Theme.green : modelData.tone==="accent" ? Theme.red : "#99A5BF" }
+                                    Text { text:modelData.time; color:Theme.muted; font.pixelSize:16; Layout.preferredWidth:54 }
+                                    Text { text:modelData.title; color:Theme.muted; font.pixelSize:15; Layout.fillWidth:true; elide:Text.ElideRight }
                                 }
                             }
                         }
                     }
                 }
                 SwirlGlassPanel {
-                    Layout.preferredWidth:310; Layout.preferredHeight:295
+                    Layout.fillWidth:true; Layout.preferredWidth:355; Layout.fillHeight:true; Layout.preferredHeight:242*page.unit
                     ColumnLayout {
-                        anchors.fill:parent; anchors.margins:18; spacing:13
-                        Text { text:"快捷控制"; color:Theme.text; font.pixelSize:16; font.weight:Font.DemiBold }
+                        anchors.fill:parent; anchors.leftMargin:25; anchors.rightMargin:24; anchors.topMargin:13; anchors.bottomMargin:26; spacing:0
                         RowLayout {
-                            Layout.fillWidth:true
-                            Text { text:"系统代理"; color:Theme.text; font.pixelSize:13; Layout.fillWidth:true }
-                            SwirlToggle { checked:AppState.systemProxyOn; onToggled:{AppState.systemProxyOn=checked;AppState.notice("系统代理")} }
+                            Layout.fillWidth:true; Layout.preferredHeight:38; spacing:25
+                            SwirlIcon { name:"bolt"; size:29; color:Theme.accent }
+                            Text { text:"快捷操作"; font.pixelSize:19; font.weight:Font.DemiBold; color:Theme.text; Layout.fillWidth:true }
+                            SwirlIcon { name:"chevron-right"; size:19 }
                         }
+                        Repeater {
+                            model:[{title:"打开系统代理",icon:"globe",kind:0},{title:"全局代理",icon:"shield",kind:1},{title:"规则模式",icon:"document",kind:2},{title:"自动切换节点",icon:"refresh",kind:3}]
+                            delegate:Item {
+                                required property var modelData
+                                Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumHeight:38
+                                Rectangle { x:51; width:parent.width-51; height:1; color:Theme.border; opacity:0.65 }
+                                RowLayout {
+                                    anchors.fill:parent; spacing:25
+                                    SwirlIcon { name:modelData.icon; size:25 }
+                                    Text { text:modelData.title; color:Theme.muted; font.pixelSize:16; Layout.fillWidth:true; elide:Text.ElideRight }
+                                    SwirlToggle {
+                                        checked:modelData.kind===0 ? AppState.systemProxyOn : modelData.kind===1 ? AppState.mode==="全局" : modelData.kind===2 ? AppState.mode==="规则" : AppState.autoSwitch
+                                        onToggled:{
+                                            if(modelData.kind===0)AppState.systemProxyOn=checked
+                                            else if(modelData.kind===1)AppState.mode=checked?"全局":"规则"
+                                            else if(modelData.kind===2)AppState.mode=checked?"规则":"直连"
+                                            else AppState.autoSwitch=checked
+                                            AppState.toast="仅切换演示选项，不会更改系统网络设置。"
+                                        }
+                                        Accessible.name:modelData.title+"（演示）"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                SwirlGlassPanel {
+                    Layout.fillWidth:true; Layout.preferredWidth:378; Layout.fillHeight:true; Layout.preferredHeight:242*page.unit
+                    ColumnLayout {
+                        anchors.fill:parent; anchors.leftMargin:25; anchors.rightMargin:24; anchors.topMargin:13; anchors.bottomMargin:13; spacing:0
                         RowLayout {
-                            Layout.fillWidth:true
-                            Text { text:"TUN 模式"; color:Theme.text; font.pixelSize:13; Layout.fillWidth:true }
-                            SwirlToggle { checked:AppState.tunOn; onToggled:{AppState.tunOn=checked;AppState.notice("TUN 模式")} }
+                            Layout.fillWidth:true; Layout.preferredHeight:38; spacing:25
+                            SwirlIcon { name:"grid"; size:29; color:Theme.accent }
+                            Text { text:"常用工具"; font.pixelSize:19; font.weight:Font.DemiBold; color:Theme.text; Layout.fillWidth:true }
                         }
-                        Rectangle { Layout.fillWidth:true; height:1; color:Theme.border }
-                        SwirlButton { Layout.fillWidth:true; text:"打开 HTTP 检查器"; iconName:"inspect"; onClicked:AppState.currentPage="inspector" }
-                        SwirlButton { Layout.fillWidth:true; text:"检查 DNS"; iconName:"server"; onClicked:AppState.currentPage="dns" }
+                        Repeater {
+                            model:[{title:"网络检测",icon:"gauge",page:"toolbox"},{title:"HTTP 检查器",icon:"code",page:"inspector"},{title:"流量统计",icon:"bars",page:"traffic"},{title:"脚本与配置",icon:"terminal",page:"scripts"},{title:"导入配置文件",icon:"folder",page:"profiles"}]
+                            delegate:SwirlListRow {
+                                required property var modelData
+                                objectName:modelData.page==="profiles" ? "importConfigRow" : ""
+                                Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumHeight:33
+                                iconName:modelData.icon; title:modelData.title; onClicked:AppState.navigate(modelData.page)
+                            }
+                        }
                     }
                 }
             }
-            Item { Layout.preferredHeight:15 }
+        }
+    }
+    Popup {
+        id:nodePicker; objectName:"nodePicker"; anchors.centerIn:Overlay.overlay
+        width:420; padding:22; modal:true; focus:true
+        background:SwirlGlassPanel { material:"floating" }
+        contentItem:ColumnLayout {
+            spacing:12
+            Text { text:"选择演示节点"; font.pixelSize:22; font.weight:Font.DemiBold; color:Theme.text }
+            Text { text:"仅更改界面选择，不会建立真实网络连接。"; font.pixelSize:14; color:Theme.muted }
+            Repeater {
+                model:[{name:"新加坡 · 01",region:"SG",protocol:"Trojan",latency:38},{name:"香港 · 01",region:"HK",protocol:"Hysteria2",latency:52},{name:"东京 · 01",region:"JP",protocol:"Trojan",latency:66}]
+                SwirlButton { required property var modelData; objectName:modelData.region==="HK" ? "hongKongNode" : ""; Layout.fillWidth:true; text:modelData.name; primary:AppState.selectedNode===modelData.name; onClicked:{AppState.selectNode(modelData);nodePicker.close()} }
+            }
+            SwirlButton { text:"取消"; Layout.alignment:Qt.AlignRight; onClicked:nodePicker.close() }
         }
     }
 }

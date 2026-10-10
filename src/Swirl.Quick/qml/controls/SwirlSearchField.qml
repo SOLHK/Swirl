@@ -4,7 +4,7 @@ import SwirlQuick
 import "../components"
 TextField {
     id: control
-    implicitHeight: 39
+    implicitHeight: 42
     implicitWidth: 225
     leftPadding: 39
     rightPadding: 15
@@ -14,9 +14,9 @@ TextField {
     selectedTextColor: "white"
     selectionColor: Theme.accent
     font.family: "Microsoft YaHei UI"
-    font.pixelSize: 12
-    background: Rectangle {
-        radius: 14
+    font.pixelSize: 16
+    background: SwirlPillSurface {
+        radius: Theme.pillRadius(height)
         antialiasing: true
         color: control.activeFocus ? Theme.material("floating") : Theme.material("field")
         border.width: control.activeFocus ? 1.5 : 1

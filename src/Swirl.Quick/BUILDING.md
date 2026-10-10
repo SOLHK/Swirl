@@ -1,80 +1,96 @@
-# Swirl Quick: Windows UI-only preview
+# Swirl Windows Qt UI
 
-This subproject coexists with the original Swirl WPF/.NET solution and does not
-start or modify any networking engine. All HTTP, proxy, connection, node,
-traffic and log data in the preview are synthetic demonstration fixtures.
+This is the existing Swirl repository's C++23 / Qt 6 Quick UI subproject on
+`test`. The original WPF/.NET network implementation, configuration and brand
+assets are preserved. The Qt UI uses demonstration data and does not enable
+the system proxy, start Mihomo, access certificates or run network requests.
 
-## Requirements
-Windows 10 2004+ / Windows 11 x64, CMake 3.25+, C++23-capable MSVC v143,
-Qt 6.8+ desktop x64 SDK with Qt Quick and Qt Quick Controls 2.
-Recommended kit: Qt 6.10.x + Visual Studio 2022 x64.
+## Windows Release build and installer
 
-## Build (Developer PowerShell, x64)
-From the repository root:
+Requirements: Qt 6.8+ (validated with 6.10.3), CMake 3.25+, Ninja, either
+MSVC 2022 x64 or MinGW-w64 13.1, and NSIS 3.11+. Put the compiler, CMake and
+Ninja on PATH. Do not mix an MSVC Qt SDK with a MinGW compiler.
+
+From the repository root in a developer PowerShell:
 
 ```powershell
-cmake -S src/Swirl.Quick -B build/swirl-quick -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="C:/Qt/6.10.3/msvc2022_64"
-cmake --build build/swirl-quick --config Release
-./build/swirl-quick/Swirl.exe
+# MSVC: run from the VS 2022 x64 developer shell.
+./scripts/build-quick-windows.ps1 -QtDir C:/Qt/6.10.3/msvc2022_64 -InputTests
+
+# MinGW: add C:/Qt/Tools/mingw1310_64/bin to PATH first.
+./scripts/build-quick-windows.ps1 -QtDir C:/Qt/6.10.3/mingw_64 -InputTests
 ```
 
-For a Visual Studio solution use -G "Visual Studio 17 2022" -A x64 instead.
-For shipping, use windeployqt against the built exe to gather Qt dependencies.
+The script first builds and runs the mouse/keyboard checks, rebuilds a
+production Release EXE without the test harness, deploys Qt/QML plugins using
+`windeployqt`, and produces **out/Swirl-Setup.exe**. The installer creates a
+start-menu shortcut, a desktop shortcut and a per-user uninstaller. A fresh
+DistDir is required to avoid packaging stale plugins. Windows fonts are
+provided by the OS and are never included in the installer.
 
-The existing brand PNG is embedded from ../../AdShield/Assets/swirl-256.png.
-DWM system Mica on supported Windows 11 is window backdrop only: it is not
-per-panel backdrop blur or Apple's proprietary glass. On Windows 10 or when
-disabled the UI uses readable opaque panels.
+For direct builds:
 
-## Verification and release status
+```powershell
+cmake -S src/Swirl.Quick -B build/swirl-quick -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=C:/Qt/6.10.3/mingw_64 -DSWIRL_BUILD_UI_TESTS=ON
+cmake --build build/swirl-quick --parallel
+./build/swirl-quick/Swirl.exe --interaction-test
+./build/swirl-quick/Swirl.exe --smoke-test
+```
 
-An isolated GitHub Actions pipeline builds this preview on Windows 2022 with
-Visual Studio 2022 (MSVC x64) and Qt 6.10.3, deploys dependencies with
-`windeployqt`, and runs an offscreen startup smoke test that navigates all
-24 UI modules. See the workflow:
-https://github.com/SOLHK/Swirl/actions/workflows/build-qt-quick-ui.yml
+Tests log to Swirl-diagnostics.txt beside the EXE. `--interaction-test`
+checks actual mouse/keyboard input, node metadata, offline counters, chart
+selectors, Ctrl+K, search, history and bottom-row reachability. The smoke test
+visits the 24 retained modules and the new external-tools placeholder, waits
+for lazy delegate creation and exits nonzero on QML loading warnings/timeouts.
+CTest runs these checks with the offscreen software platform; on that platform
+set QT_QPA_FONTDIR to a temporary font-fixture directory. Normal Windows
+startup uses installed Windows fonts automatically.
 
-A successful pipeline confirms compilation, packaging and basic QML loading,
-**not** visual correctness on a physical Windows desktop. Manual tests remain
-necessary for Windows 10/11, DPI 100/125/150/200%, system theme changes,
-screen-reader usability, lower GPU performance and real 60 FPS frame rates.
-The JavaScript editor uses a native QSyntaxHighlighter for local formatting.
+## Screenshot verification
 
-All proxy, interception, MITM, scripts, DNS lookups, gateways and automation
-actions are explicit local demonstrations. They cannot affect network
-settings or stored WPF configuration.
+```powershell
+./build/swirl-quick/Swirl.exe --capture-preview=C:/temp/overview.png --preview-size=1450x884 --preview-theme=light
+./build/swirl-quick/Swirl.exe --capture-preview=C:/temp/connected.png --preview-size=1450x884 --preview-connected
+./build/swirl-quick/Swirl.exe --capture-preview=C:/temp/minimum-bottom.png --preview-size=1000x650 --preview-scroll-bottom
+```
 
-## UI acceptance checklist
+These render the real QML window, not a reference-image background. The normal
+Windows platform uses the GPU renderer. Native preview resolution is logical
+size multiplied by the effective device-pixel ratio. QT_SCALE_FACTOR multiplies
+the OS scale; factors 2/3, 5/6, 1 and 4/3 on a 150% desktop check effective
+100/125/150/200% scaling without modifying system settings. Screenshots do not
+verify touch, multi-monitor transitions or OS snap gestures; those remain
+manual checks. Buttons call Qt native close/minimize/maximize APIs, dragging
+uses startSystemMove, and all eight resize edges use startSystemResize.
+DWM corner support and the fallback mask share the QML radius.
 
-1. Navigate all 24 modules in the sidebar. Verify no empty page or load error.
-2. Collapse/expand sidebar, resize window to its minimum, and use search.
-3. Change light, dark and system themes, transparency and reduced-motion modes.
-4. Change interface scale, and check text and tables at high DPI.
-5. Select, filter and sort Connections; select nodes in Proxies.
-6. Inspect Headers, Body, XML, image fixture, TLS, WebSocket and waterfall tabs.
-7. Check DNS, Rules, Profiles, Subscriptions, Scripts and Automation forms.
-8. From the UI DEMO menu, show loading, empty and error states, then restore.
-9. Verify the original WPF app, system proxy and user files are unchanged.
-10. Use the GitHub Actions artifact named `Swirl-Windows-Installer-EXE`
-    from a successful run for packaged Windows testing.
+## Design and scope
 
-## Future backend adapter strategy
+- Theme.qml centralizes colors, fonts, gaps, animation and radius tokens.
+- SwirlPillSurface is shared by navigation, the connection pill, buttons,
+  search, combo boxes and segmented selections; its radius is always height/2.
+- Reference size is 1450 x 884 logical pixels with a 243-pixel sidebar. Below
+  width 1160 the sidebar becomes an icon rail. At narrower main widths the
+  bottom cards stack and scroll so every row remains reachable.
+- Cards are matte pale blue with subtle borders; a translucent DWM acrylic
+  backdrop is deliberately not enabled for this reference style.
+- Only the selected download/upload/cumulative series is drawn. Offline
+  endpoints and current counters are zero. History and event times share the
+  session clock. Cumulative GB stays historical and increases only while the
+  demonstration connection is active.
+- Existing brand assets are reused, rather than replacing them with the
+  reference image's spherical logo. Every outline icon is drawn from Canvas.
+- Existing specialized pages remain available by search and overview links.
+  Real backend integration and further visual refinement of those pages remain
+  future work. External tools explicitly show their current limit.
 
-Keep DemoDataProvider as a replaceable read-only source. Introduce
-`ISwirlDataSource` (model snapshot/event interface) for profiles,
-connections, policies, DNS and HTTP flows. Add a Qt-side client or IPC bridge
-to the existing .NET process only after the UI contracts are stable. Real
-network-core ownership, certificate actions, script execution and privileged
-Windows changes must remain explicitly user-authorized.
+For isolated deployment validation, launch the installer with `/ISOLATED /S`
+and a final `/D=<absolute test directory>` argument. This extracts the same
+runtime and uninstaller but leaves existing Swirl shortcuts and registry
+entries alone. The isolated marker also makes its uninstaller skip shared
+entries. Never use an existing user installation directory for this test.
 
-## Optional headless UI snapshots
-
-The CI workflow attempts to save `Swirl-Overview-preview.png` and
-`Swirl-Inspector-preview.png` alongside the packaged EXE. These screenshots
-come from the Qt offscreen software renderer and may be unavailable if its
-window-grab capability is unsupported. They are **not** substitutes for
-testing native DWM blur or typography on a real Windows 11 desktop.
-
-## Chinese installer
-
-The test branch CI produces a standalone `Swirl-Setup.exe` with a Simplified Chinese NSIS wizard, per-user installation under `%LOCALAPPDATA%\\Programs\\Swirl`, a desktop/start-menu shortcut and an uninstaller. No administrator permission is requested. Keep this installer on `test` until the user explicitly authorizes promotion to `main`.
+The GitHub workflow builds Windows MSVC, runs the input checks and all-page
+smoke, captures previews and packages the production EXE. Its existing release
+step publishes a test-only prerelease. All work stays on `test`; promotion to
+`main` requires an explicit user instruction.

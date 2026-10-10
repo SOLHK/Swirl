@@ -25,7 +25,8 @@ void WindowsBackdrop::updateCornerMask(QQuickWindow *window)
     const int h = window->height();
     if (w <= 0 || h <= 0) return;
     QPainterPath shape;
-    shape.addRoundedRect(QRectF(0, 0, w, h), 24, 24);
+    const qreal radius = window->property("swirlWindowRadius").toReal();
+    shape.addRoundedRect(QRectF(0, 0, w, h), radius, radius);
     window->setMask(QRegion(shape.toFillPolygon().toPolygon()));
 }
 

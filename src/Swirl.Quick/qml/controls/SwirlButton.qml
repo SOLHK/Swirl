@@ -9,63 +9,38 @@ Button {
     property bool quiet: false
     property bool danger: false
     property string iconName: ""
-    implicitWidth: Math.max(76, contents.implicitWidth + 30)
-    implicitHeight: 38
+    implicitWidth: Math.max(76, contents.implicitWidth + 36)
+    implicitHeight: 44
     hoverEnabled: true
-    font.family: "Microsoft YaHei UI"
-    font.pixelSize: 12
-    leftPadding: 15; rightPadding: 15
-    background: Rectangle {
-        radius: 13
-        antialiasing: true
-        border.width: 1
-        border.color: control.primary ? (Theme.dark ? "#9FC9FA" : "#6697F0") :
-                      control.quiet && !control.hovered ? "transparent" : Theme.glassRim
-        color: control.primary ? Theme.accent :
-               control.down ? Theme.selected :
-               control.hovered ? Theme.material("floating") :
-               control.quiet ? "transparent" : Theme.material("secondary")
-        gradient: Gradient {
-            GradientStop {
-                position: 0
-                color: control.primary ? Qt.lighter(Theme.accent, 1.16) :
-                       control.down ? Theme.selected :
-                       control.quiet && !control.hovered ? "transparent" :
-                       Theme.dark ? "#A24A6280" : "#EEFFFFFF"
-            }
-            GradientStop {
-                position: 1
-                color: control.primary ? Theme.accent :
-                       control.down ? Theme.selected :
-                       control.quiet && !control.hovered ? "transparent" :
-                       Theme.material("secondary")
-            }
-        }
-        Rectangle {
-            anchors.left: parent.left; anchors.right: parent.right
-            anchors.top: parent.top
-            anchors.leftMargin: 13; anchors.rightMargin: 13
-            anchors.topMargin: 1
-            height: 1; color: Theme.glassGlint
-            opacity: control.quiet && !control.hovered ? 0 : 0.62
-        }
-        Behavior on border.color { ColorAnimation { duration: Theme.motion } }
+    font.family: Theme.fontFamily
+    font.pixelSize: 17
+    leftPadding: 18; rightPadding: 18
+    background: SwirlPillSurface {
+        primary: control.primary
+        hovered: control.hovered || control.activeFocus
+        pressed: control.down
+        subtleShadow: !control.quiet
+        opacity: control.enabled ? 1 : 0.45
+        color: control.quiet && !control.hovered && !control.down ? "transparent" :
+               control.primary ? Theme.accent : control.down ? Theme.selected : Theme.material("floating")
+        border.color: control.activeFocus ? Theme.accent : control.quiet ? "transparent" : Theme.glassRim
     }
     contentItem: RowLayout {
         id: contents
-        spacing: 7
+        spacing: 10
         SwirlIcon {
             visible: control.iconName !== ""
-            name: control.iconName; size: 16
-            color: control.primary ? (Theme.dark ? "#172A42" : "#FFFFFF") : control.danger ? Theme.red : Theme.text
+            name: control.iconName; size: 23
+            color: control.primary ? "white" : control.danger ? Theme.red : Theme.muted
         }
         Text {
             text: control.text
             font.family: control.font.family
             font.pixelSize: control.font.pixelSize
-            font.weight: control.primary ? Font.DemiBold : Font.Medium
-            color: control.primary ? (Theme.dark ? "#172A42" : "white") : control.danger ? Theme.red : Theme.text
+            font.weight: Font.DemiBold
+            color: control.primary ? "white" : control.danger ? Theme.red : Theme.text
             Layout.alignment: Qt.AlignVCenter
         }
     }
+    Accessible.name: text
 }

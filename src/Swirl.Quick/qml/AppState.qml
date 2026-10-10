@@ -10,10 +10,64 @@ QtObject {
     property string mode: "规则"
     property string policy: "自动选择"
     property string selectedNode: "新加坡 · 01"
+    property string selectedNodeRegion: "SG"
+    property string selectedNodeProtocol: "Trojan"
+    property int selectedNodeLatency: 38
+    function selectNode(node) {
+        selectedNode=node.name; selectedNodeRegion=node.region || "--"
+        selectedNodeProtocol=node.protocol || "未检测"; selectedNodeLatency=node.latency || 0
+        addEvent("选用演示节点 "+node.name,"accent")
+    }
     property string toast: ""
     property bool demoLoading: false
     property bool demoError: false
     property bool demoEmpty: false
+    property bool autoSwitch: false
+    property int historyIndex: 0
+    property var navigationHistory: ["overview"]
+    property date sessionNow: new Date()
+    property var recentEvents: []
+    property real demoDown: 0
+    property real demoUp: 0
+    property int demoConnections: 0
+    property int demoTick: 0
+    property real totalGB: 2.84
+    readonly property var navigationGroups: [
+        {title:"",pages:[{id:"overview",title:"总览",icon:"home"},{id:"proxies",title:"代理节点",icon:"pin"},{id:"policies",title:"策略组",icon:"layers"},{id:"rules",title:"规则",icon:"document"},{id:"subscriptions",title:"订阅管理",icon:"refresh"},{id:"profiles",title:"配置文件",icon:"file"}]},
+        {title:"网络",pages:[{id:"dns",title:"DNS",icon:"globe"},{id:"toolbox",title:"网络检测",icon:"gauge"},{id:"connections",title:"连接记录",icon:"clock"}]},
+        {title:"工具",pages:[{id:"inspector",title:"HTTP 检查器",icon:"code"},{id:"traffic",title:"流量分析",icon:"bars"},{id:"scripts",title:"脚本与配置",icon:"terminal"},{id:"external",title:"外部工具",icon:"folder"}]}
+    ]
+    function navigate(id) {
+        if (currentPage === id) return
+        navigationHistory = navigationHistory.slice(0,historyIndex+1).concat([id])
+        historyIndex = navigationHistory.length-1
+        currentPage = id
+    }
+    function goBack() { if(historyIndex>0) currentPage=navigationHistory[--historyIndex] }
+    function goForward() { if(historyIndex<navigationHistory.length-1) currentPage=navigationHistory[++historyIndex] }
+    function addEvent(title,tone) {
+        recentEvents=[{time:Qt.formatDateTime(sessionNow,"HH:mm"), title:title, tone:tone}].concat(recentEvents).slice(0,5)
+    }
+    function initializeHistory() {
+        sessionNow=new Date()
+        function at(minutes) { return Qt.formatDateTime(new Date(sessionNow.getTime()-minutes*60000),"HH:mm") }
+        recentEvents=[{time:at(1),title:"已断开演示连接",tone:"neutral"},{time:at(2),title:"连接到 新加坡 · 01 (Trojan)",tone:"accent"},{time:at(2),title:"开始建立演示连接",tone:"success"},{time:at(2),title:"演示订阅更新完成",tone:"success"},{time:at(3),title:"切换到 自动选择",tone:"success"}]
+    }
+    function setConnection(on) {
+        proxyOn=on
+        demoDown=on ? 3.2 : 0; demoUp=on ? 0.7 : 0; demoConnections=on ? 12 : 0
+        addEvent(on ? "已建立演示连接" : "已断开演示连接",on ? "success" : "neutral")
+        toast=on ? "界面演示已连接，不会启用系统代理。" : "演示连接已断开，当前实时流量为零。"
+    }
+    function tickTraffic() {
+        sessionNow=new Date(); demoTick++
+        if(proxyOn) {
+            demoDown=3.2+Math.sin(demoTick*0.7)*0.7
+            demoUp=0.65+Math.sin(demoTick*0.5)*0.2
+            demoConnections=12+demoTick%5
+            totalGB+=(demoDown+demoUp)/1024
+        } else { demoDown=0; demoUp=0; demoConnections=0 }
+    }
     readonly property var groups: [
       {title:"控制中心", pages:[
         {id:"overview",title:"总览",icon:"home",sub:"网络概览"},
@@ -362,6 +416,7 @@ QtObject {
         return Object.prototype.hasOwnProperty.call(zhDictionary,key) ? zhDictionary[key] : key
     }
     function page(id) {
+        if(id==="external") return {id:"external",title:"外部工具",sub:"尚未接入外部程序"}
         for (var i=0;i<groups.length;++i)
             for (var j=0;j<groups[i].pages.length;++j)
                 if (groups[i].pages[j].id === id) return groups[i].pages[j]

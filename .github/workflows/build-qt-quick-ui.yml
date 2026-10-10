@@ -30,7 +30,7 @@ jobs:
           cache: true
       - name: Configure Qt UI independently
         shell: pwsh
-        run: cmake -S src/Swirl.Quick -B build/swirl-quick -G "Visual Studio 17 2022" -A x64
+        run: cmake -S src/Swirl.Quick -B build/swirl-quick -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=ON
       - name: Build UI
         shell: pwsh
         run: cmake --build build/swirl-quick --config Release --parallel
@@ -58,6 +58,17 @@ jobs:
           Invoke-WebRequest -Uri $notoUrl -OutFile $notoFile -ErrorAction Stop
           if ((Get-Item $notoFile).Length -lt 10000000) { throw "Noto Sans SC fixture download is incomplete." }
           Write-Host "Qt offscreen font fixtures ready; they will NOT be included in the artifact."
+      - name: Overview mouse and keyboard input checks
+        shell: pwsh
+        run: |
+          $env:QT_QPA_PLATFORM = "offscreen"
+          $env:QT_QUICK_BACKEND = "software"
+          $exe = (Resolve-Path "dist/Swirl.exe").Path
+          $process = Start-Process -FilePath $exe -ArgumentList "--interaction-test" -Wait -PassThru -NoNewWindow
+          if ($process.ExitCode -ne 0) {
+            Get-Content "dist/Swirl-diagnostics.txt" -ErrorAction SilentlyContinue
+            throw "Overview input checks failed: $($process.ExitCode)"
+          }
       - name: Startup smoke test (offscreen, no network actions)
         shell: pwsh
         run: |
@@ -102,11 +113,22 @@ jobs:
           $fonts = "dist/lib/fonts"
           if (Test-Path $fonts) { Remove-Item -LiteralPath $fonts -Recurse -Force }
           if (Test-Path $fonts) { throw "Test fonts must not be distributed in Swirl preview." }
+      - name: Build production EXE without test harness
+        shell: pwsh
+        run: |
+          cmake -S src/Swirl.Quick -B build/swirl-quick -DSWIRL_BUILD_UI_TESTS=OFF
+          if ($LASTEXITCODE -ne 0) { throw "Production configure failed" }
+          cmake --build build/swirl-quick --config Release --parallel
+          if ($LASTEXITCODE -ne 0) { throw "Production build failed" }
+          Copy-Item build/swirl-quick/Release/Swirl.exe dist/ -Force
+          Remove-Item -LiteralPath "dist/Qt6Test.dll" -ErrorAction SilentlyContinue
       - name: Prepare standalone installer files
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path installer-bin, out | Out-Null
           Copy-Item -Path "dist/*" -Destination "installer-bin" -Recurse -Force
+          Copy-Item "src/Swirl.Quick/packaging/THIRD_PARTY_NOTICES.txt" "installer-bin/"
+          Copy-Item "src/Swirl.Quick/packaging/licenses" "installer-bin/licenses" -Recurse -Force
           Remove-Item -Path "installer-bin/Swirl-*-preview.png", "installer-bin/Swirl-diagnostics.txt" -ErrorAction SilentlyContinue
           if (!(Test-Path "installer-bin/Swirl.exe")) { throw "Missing Swirl.exe" }
       - name: Install NSIS packaging tools
@@ -121,7 +143,7 @@ jobs:
           $nsis = "C:/Program Files (x86)/NSIS/makensis.exe"
           $appDist = (Resolve-Path "installer-bin").Path
           $outDir = (Resolve-Path "out").Path
-          & $nsis "/DAPP_DIST=$appDist" "/DOUT_DIR=$outDir" "src/Swirl.Quick/packaging/Swirl.nsi"
+          & $nsis /INPUTCHARSET UTF8 "/DAPP_DIST=$appDist" "/DOUT_DIR=$outDir" "src/Swirl.Quick/packaging/Swirl.nsi"
           if ($LASTEXITCODE -ne 0) { throw "NSIS packaging failed ($LASTEXITCODE)" }
           if (!(Test-Path "out/Swirl-Setup.exe")) { throw "Installer missing" }
           if ((Get-Item "out/Swirl-Setup.exe").Length -lt 10000000) { throw "Installer suspiciously small" }

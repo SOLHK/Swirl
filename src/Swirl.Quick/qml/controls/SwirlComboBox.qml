@@ -4,10 +4,10 @@ import SwirlQuick
 ComboBox {
     id: control
     implicitWidth: 146
-    implicitHeight: 39
+    implicitHeight: 44
     hoverEnabled: true
     font.family: "Microsoft YaHei UI"
-    font.pixelSize: 12
+    font.pixelSize: 17
     leftPadding: 15; rightPadding: 31
     contentItem: Text {
         text: control.displayText
@@ -15,7 +15,7 @@ ComboBox {
         font: control.font
         verticalAlignment: Text.AlignVCenter
         elide: Text.ElideRight
-        leftPadding: 15; rightPadding: 29
+        leftPadding: 4; rightPadding: 4
     }
     indicator: Canvas {
         id: chevron
@@ -29,8 +29,8 @@ ComboBox {
         }
         Connections { target: Theme; function onMutedChanged() { chevron.requestPaint() } }
     }
-    background: Rectangle {
-        radius: 13
+    background: SwirlPillSurface {
+        radius: Theme.pillRadius(height)
         antialiasing: true
         color: control.pressed ? Theme.selected : control.hovered ? Theme.material("floating") : Theme.material("field")
         border.width: 1
@@ -50,7 +50,7 @@ ComboBox {
         highlighted: control.highlightedIndex === index
         contentItem: Text {
             text: parent.text
-            color: Theme.text; font.pixelSize: 12; font.family: "Microsoft YaHei UI"
+            color: Theme.text; font.pixelSize: 17; font.family: "Microsoft YaHei UI"
             verticalAlignment: Text.AlignVCenter; leftPadding: 12
         }
         background: Rectangle {
