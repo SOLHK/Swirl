@@ -6,17 +6,17 @@ QtObject {
     property bool reduceMotion: false
     property real uiScale: 1.0
     readonly property bool dark: mode === "Dark" || (mode === "System" && Qt.styleHints.colorScheme === Qt.Dark)
-    readonly property color canvas: dark ? "#0F1728" : "#F1F5FB"
-    readonly property color surface: dark ? "#1A2940" : "#FDFEFF"
-    readonly property color raised: dark ? "#263955" : "#FFFFFF"
-    readonly property color sidebar: dark ? "#D716273C" : "#EDE8F2FD"
-    readonly property color border: dark ? "#3A4C66" : "#D9E4F2"
-    readonly property color text: dark ? "#F4F7FC" : "#182638"
-    readonly property color muted: dark ? "#A0AEC1" : "#687A91"
-    readonly property color accent: dark ? "#95B9FF" : "#4276E7"
-    readonly property color selected: dark ? "#294363" : "#E2ECFC"
-    readonly property color hover: dark ? "#2A394D" : "#EDF2F9"
-    readonly property color field: dark ? "#162231" : "#F6F8FC"
+    readonly property color canvas: dark ? "#101622" : "#F3F6FA"
+    readonly property color surface: dark ? "#1B2635" : "#FBFCFE"
+    readonly property color raised: dark ? "#263648" : "#FFFFFF"
+    readonly property color sidebar: dark ? "#E5182636" : "#ECEDF3FA"
+    readonly property color border: dark ? "#405166" : "#DCE4EC"
+    readonly property color text: dark ? "#F5F8FB" : "#1C2938"
+    readonly property color muted: dark ? "#AFBDCD" : "#66798B"
+    readonly property color accent: dark ? "#98BEFF" : "#3874E6"
+    readonly property color selected: dark ? "#30455D" : "#E3EDFF"
+    readonly property color hover: dark ? "#2D4056" : "#EAF0F8"
+    readonly property color field: dark ? "#172331" : "#F5F8FB"
     readonly property color green: dark ? "#6CD4B3" : "#168766"
     readonly property color orange: dark ? "#F6C57D" : "#B8792F"
     readonly property color red: dark ? "#F599A2" : "#D35561"
@@ -24,6 +24,6 @@ QtObject {
     function material(kind) {
         if (kind === "sidebar") return transparency ? sidebar : surface
         if (kind === "floating") return transparency ? (dark ? "#EC263955" : "#F8FFFFFF") : raised
-        return transparency ? (dark ? "#F21A2940" : "#F9FFFFFF") : surface
+        return transparency ? (dark ? "#EE1A2A3C" : "#EDFFFFFF") : surface
     }
 }

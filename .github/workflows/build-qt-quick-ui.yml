@@ -139,3 +139,31 @@ jobs:
           path: dist/
           if-no-files-found: error
           retention-days: 14
+
+  publish-test-exe:
+    name: Publish standalone test installer EXE
+    needs: build-qt-ui
+    if: github.event_name == 'push' && github.ref == 'refs/heads/test'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified EXE (not a ZIP download for users)
+        uses: actions/download-artifact@v4
+        with:
+          name: Swirl-Windows-Installer-EXE
+          path: release
+      - name: Upload direct EXE to GitHub prerelease from test commit only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test -s release/Swirl-Setup.exe
+          SHORT_SHA="${GITHUB_SHA:0:7}"
+          TAG="swirl-qt-test-${SHORT_SHA}"
+          gh release create "${TAG}" "release/Swirl-Setup.exe#Swirl-Setup.exe" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --target "${GITHUB_SHA}" \
+            --title "Swirl · 测试版 ${SHORT_SHA}" \
+            --notes "仅供测试分支验收的 Qt 6 Quick 界面演示，尚未接入真实网络功能。请勿作为正式版本使用。" \
+            --prerelease

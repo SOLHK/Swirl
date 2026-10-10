@@ -30,7 +30,7 @@ Item {
                             color:page.section===modelData?Theme.selected:hover.containsMouse?Theme.hover:"transparent"
                             Text {
                                 anchors.fill:parent; anchors.leftMargin:11
-                                text:modelData; color:Theme.text; font.pixelSize:12
+                                text:AppState.zh(modelData); color:Theme.text; font.pixelSize:12
                                 verticalAlignment:Text.AlignVCenter; elide:Text.ElideRight
                             }
                             MouseArea { id:hover; anchors.fill:parent; hoverEnabled:true; onClicked:page.section=modelData }
@@ -47,9 +47,9 @@ Item {
                     ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
                     ColumnLayout {
                         width:options.availableWidth; spacing:17
-                        Text { text:page.section; color:Theme.text; font.pixelSize:23; font.weight:Font.DemiBold }
+                        Text { text:AppState.zh(page.section); color:Theme.text; font.pixelSize:23; font.weight:Font.DemiBold }
                         Text {
-                            text:page.section==="Appearance"?"System-aware colors, translucency, motion and interface sizing.":"Configuration preview. No operating system setting will be modified."
+                            text:page.section==="Appearance"?"跟随系统的色彩、玻璃材质、动画与界面缩放。":"当前仅供预览，不会修改操作系统设置。"
                             color:Theme.muted; wrapMode:Text.WordWrap; Layout.fillWidth:true; font.pixelSize:12
                         }
                         Rectangle { Layout.fillWidth:true; height:1; color:Theme.border }
@@ -63,9 +63,9 @@ Item {
                                     Text { text:AppState.zh("Choose light, dark or follow Windows"); color:Theme.muted; font.pixelSize:11 }
                                 }
                                 SwirlComboBox {
-                                    model:["System","Light","Dark"]
-                                    currentIndex:model.indexOf(Theme.mode)
-                                    onActivated:Theme.mode=currentText
+                                    model:["跟随系统","浅色","深色"]
+                                    currentIndex:["System","Light","Dark"].indexOf(Theme.mode)
+                                    onActivated:Theme.mode=["System","Light","Dark"][currentIndex]
                                 }
                             }
                             RowLayout {
@@ -116,7 +116,7 @@ Item {
                                     Layout.fillWidth:true
                                     ColumnLayout {
                                         Layout.fillWidth:true
-                                        Text { text:modelData; color:Theme.text; font.pixelSize:14 }
+                                        Text { text:AppState.zh(modelData); color:Theme.text; font.pixelSize:14 }
                                         Text { text:AppState.zh("Preview configuration, not applied"); color:Theme.muted; font.pixelSize:11 }
                                     }
                                     SwirlToggle { onToggled:AppState.notice(modelData) }
