@@ -7,8 +7,10 @@ import "../controls"
 SwirlGlassPanel {
     id:sidebar
     material:"sidebar"
+    property bool compactByWindow:false
+    readonly property bool effectivelyCollapsed:AppState.sidebarCollapsed||compactByWindow
     cornerRadius:0
-    Layout.preferredWidth:AppState.sidebarCollapsed?76:247
+    Layout.preferredWidth:sidebar.effectivelyCollapsed?76:247
     Layout.fillHeight:true
     border.width:0
 
@@ -37,7 +39,7 @@ SwirlGlassPanel {
                     }
                 }
                 Column {
-                    visible:!AppState.sidebarCollapsed
+                    visible:!sidebar.effectivelyCollapsed
                     Layout.fillWidth:true
                     spacing:2
                     Text { text:"Swirl"; color:Theme.text; font.pixelSize:21; font.weight:Font.DemiBold }
@@ -61,7 +63,7 @@ SwirlGlassPanel {
                         width:menuStack.width
                         spacing:2
                         Text {
-                            visible:!AppState.sidebarCollapsed
+                            visible:!sidebar.effectivelyCollapsed
                             text:modelData.title
                             color:Theme.muted
                             font.pixelSize:10
@@ -72,7 +74,7 @@ SwirlGlassPanel {
                             bottomPadding:7
                         }
                         Rectangle {
-                            visible:AppState.sidebarCollapsed
+                            visible:sidebar.effectivelyCollapsed
                             width:36; height:1; color:Theme.border
                             anchors.horizontalCenter:parent.horizontalCenter
                         }
@@ -83,7 +85,7 @@ SwirlGlassPanel {
                                 pageId:modelData.id
                                 title:modelData.title
                                 iconName:modelData.icon
-                                compact:AppState.sidebarCollapsed
+                                compact:sidebar.effectivelyCollapsed
                                 onActivated:AppState.currentPage=pageId
                             }
                         }
@@ -95,10 +97,13 @@ SwirlGlassPanel {
         SwirlNavigationItem {
             Layout.fillWidth:true
             pageId:"toggle-sidebar"
-            title:AppState.sidebarCollapsed?"Expand":"Collapse sidebar"
+            title:sidebar.effectivelyCollapsed?"Expand":"Collapse sidebar"
             iconName:"layers"
-            compact:AppState.sidebarCollapsed
-            onActivated:AppState.sidebarCollapsed=!AppState.sidebarCollapsed
+            compact:sidebar.effectivelyCollapsed
+            onActivated:{
+                if(sidebar.compactByWindow) AppState.toast="Expand the window to expand navigation"
+                else AppState.sidebarCollapsed=!AppState.sidebarCollapsed
+            }
         }
         Item { Layout.preferredHeight:8 }
     }

@@ -28,7 +28,7 @@ ApplicationWindow {
     RowLayout {
         anchors.fill: parent
         spacing: 0
-        SwirlSidebar { Layout.fillHeight:true }
+        SwirlSidebar { Layout.fillHeight:true; compactByWindow:scaledCanvas.width<1160 }
         ColumnLayout {
             Layout.fillWidth:true
             Layout.fillHeight:true
