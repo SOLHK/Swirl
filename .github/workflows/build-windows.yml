@@ -2,9 +2,14 @@ name: Build Windows EXE
 
 on:
   push:
-    branches: [main]
+    branches: [main, test]
   workflow_dispatch:
   pull_request:
+    branches: [test, main]
+
+concurrency:
+  group: swirl-windows-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -12,6 +17,7 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
+    timeout-minutes: 55
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
