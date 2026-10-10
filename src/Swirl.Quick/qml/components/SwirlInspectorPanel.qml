@@ -12,6 +12,8 @@ SwirlGlassPanel {
     implicitWidth:450
     function detailsText() {
         if(!record) return "Select a request to inspect its details."
+        if(activeTab==="Headers" && mode==="Response")
+            return "Response Headers\n:status: "+record.status+"\ncontent-type: application/json\nserver: Swirl synthetic fixture"
         if(activeTab==="Headers")
             return mode+" Headers\n\n:method: "+record.method+
                 "\n:authority: "+record.host+"\n:path: "+record.path+
@@ -72,7 +74,7 @@ SwirlGlassPanel {
         Item {
             Layout.fillWidth:true; Layout.fillHeight:true
             ScrollView {
-                visible:inspector.activeTab!=="Preview"
+                visible:inspector.activeTab!=="Preview"&&inspector.activeTab!=="WebSocket"
                 anchors.fill:parent
                 clip:true
                 TextArea {
@@ -86,6 +88,21 @@ SwirlGlassPanel {
                 background:Rectangle { color:"transparent" }
                 selectByMouse:true
                 }
+            }
+            SwirlDataTable {
+                visible:inspector.activeTab==="WebSocket"
+                anchors.fill:parent
+                rows:[
+                    {id:"ws1",direction:"Out",time:"14:08:10",opcode:"Text",size:"21 B",payload:"ping"},
+                    {id:"ws2",direction:"In",time:"14:08:10",opcode:"Text",size:"32 B",payload:"pong"},
+                    {id:"ws3",direction:"In",time:"14:08:12",opcode:"Binary",size:"128 B",payload:"[sample bytes]"}
+                ]
+                columns:[
+                    {key:"direction",label:"DIR",w:52},{key:"time",label:"TIMESTAMP",w:100},
+                    {key:"opcode",label:"TYPE",w:80},{key:"size",label:"SIZE",w:65},
+                    {key:"payload",label:"PAYLOAD",w:160}
+                ]
+                onRowSelected:function(r){AppState.toast="Selected synthetic WebSocket frame: "+r.opcode}
             }
             ColumnLayout {
                 visible:inspector.activeTab==="Preview"
