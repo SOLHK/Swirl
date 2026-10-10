@@ -178,22 +178,76 @@ ApplicationWindow {
                         onClicked:demoStatesMenu.popup()
                         Menu {
                             id:demoStatesMenu
-                            y:parent.height+3
+                            y:parent.height+5
+                            width:140
+                            padding:6
                             background:Rectangle { radius:15; color:Theme.material("floating"); border.color:Theme.glassRim }
                             MenuItem {
                                 text:"正常模式"
+                                implicitHeight:36
+                                contentItem:Text {
+                                    text:parent.text
+                                    color:Theme.text
+                                    font.pixelSize:12
+                                    font.family:"Microsoft YaHei UI"
+                                    verticalAlignment:Text.AlignVCenter
+                                    leftPadding:12
+                                }
+                                background:Rectangle {
+                                    radius:9
+                                    color:parent.highlighted?Theme.selected:"transparent"
+                                }
                                 onTriggered:{AppState.demoLoading=false;AppState.demoError=false;AppState.demoEmpty=false}
                             }
                             MenuItem {
                                 text:"加载中"
+                                implicitHeight:36
+                                contentItem:Text {
+                                    text:parent.text
+                                    color:Theme.text
+                                    font.pixelSize:12
+                                    font.family:"Microsoft YaHei UI"
+                                    verticalAlignment:Text.AlignVCenter
+                                    leftPadding:12
+                                }
+                                background:Rectangle {
+                                    radius:9
+                                    color:parent.highlighted?Theme.selected:"transparent"
+                                }
                                 onTriggered:{AppState.demoLoading=true;AppState.demoError=false;AppState.demoEmpty=false}
                             }
                             MenuItem {
                                 text:"空数据"
+                                implicitHeight:36
+                                contentItem:Text {
+                                    text:parent.text
+                                    color:Theme.text
+                                    font.pixelSize:12
+                                    font.family:"Microsoft YaHei UI"
+                                    verticalAlignment:Text.AlignVCenter
+                                    leftPadding:12
+                                }
+                                background:Rectangle {
+                                    radius:9
+                                    color:parent.highlighted?Theme.selected:"transparent"
+                                }
                                 onTriggered:{AppState.demoEmpty=true;AppState.demoLoading=false;AppState.demoError=false}
                             }
                             MenuItem {
                                 text:"错误状态"
+                                implicitHeight:36
+                                contentItem:Text {
+                                    text:parent.text
+                                    color:Theme.text
+                                    font.pixelSize:12
+                                    font.family:"Microsoft YaHei UI"
+                                    verticalAlignment:Text.AlignVCenter
+                                    leftPadding:12
+                                }
+                                background:Rectangle {
+                                    radius:9
+                                    color:parent.highlighted?Theme.selected:"transparent"
+                                }
                                 onTriggered:{AppState.demoError=true;AppState.demoLoading=false;AppState.demoEmpty=false}
                             }
                         }

@@ -94,7 +94,7 @@ Item {
         }
     }
     SwirlDialog {
-        id:addDialog; title:"Create policy group"
+        id:addDialog; title:"创建策略组"
         ColumnLayout {
             width:parent.width; spacing:12
             Text { text:AppState.zh("Group name"); color:Theme.text }

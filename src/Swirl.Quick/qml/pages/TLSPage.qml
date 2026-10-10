@@ -105,7 +105,7 @@ Item {
         }
     }
     SwirlDialog {
-        id:certDialog; title:"CA certificate manager"
+        id:certDialog; title:"CA 证书管理"
         ColumnLayout {
             width:parent.width; spacing:11
             SwirlStatusBadge { label:AppState.zh("NO CERTIFICATE MATERIAL AVAILABLE"); tone:"warning" }

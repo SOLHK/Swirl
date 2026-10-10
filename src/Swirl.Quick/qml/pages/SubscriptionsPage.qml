@@ -115,7 +115,7 @@ Item {
         }
     }
     SwirlDialog {
-        id:addDialog; title:"Subscription source"
+        id:addDialog; title:"订阅来源"
         ColumnLayout {
             width:parent.width; spacing:12
             Text { text:AppState.zh("Display name"); color:Theme.text }
