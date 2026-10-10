@@ -15,7 +15,13 @@ ApplicationWindow {
     title: "Swirl · UI Preview"
     color: Theme.transparency ? Qt.rgba(Theme.canvas.r,Theme.canvas.g,Theme.canvas.b,0.91) : Theme.canvas
     property bool swirlTransparencyEnabled: Theme.transparency
-    Component.onCompleted: backdrop.apply(window, swirlTransparencyEnabled)
+    Component.onCompleted: {
+        backdrop.apply(window, swirlTransparencyEnabled)
+        if (previewTheme==="dark") Theme.mode="Dark"
+        else if (previewTheme==="light") Theme.mode="Light"
+        if (previewPage.length && AppState.page(previewPage).id===previewPage)
+            AppState.currentPage=previewPage
+    }
     onSwirlTransparencyEnabledChanged: backdrop.apply(window, swirlTransparencyEnabled)
     font.family: "Segoe UI"
     font.pixelSize: 13

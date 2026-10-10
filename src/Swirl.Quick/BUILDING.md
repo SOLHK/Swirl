@@ -66,3 +66,11 @@ connections, policies, DNS and HTTP flows. Add a Qt-side client or IPC bridge
 to the existing .NET process only after the UI contracts are stable. Real
 network-core ownership, certificate actions, script execution and privileged
 Windows changes must remain explicitly user-authorized.
+
+## Optional headless UI snapshots
+
+The CI workflow attempts to save `Swirl-Overview-preview.png` and
+`Swirl-Inspector-preview.png` alongside the packaged EXE. These screenshots
+come from the Qt offscreen software renderer and may be unavailable if its
+window-grab capability is unsupported. They are **not** substitutes for
+testing native DWM blur or typography on a real Windows 11 desktop.

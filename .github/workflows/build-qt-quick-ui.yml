@@ -46,6 +46,15 @@ jobs:
           $env:QT_QUICK_BACKEND = "software"
           & dist/SwirlQuick.exe --smoke-test
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Capture optional UI screenshots (offscreen software renderer)
+        shell: pwsh
+        run: |
+          $env:QT_QPA_PLATFORM = "offscreen"
+          $env:QT_QUICK_BACKEND = "software"
+          & dist/SwirlQuick.exe --capture-preview=dist/Swirl-Overview-preview.png --preview-page=overview --preview-theme=light
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & dist/SwirlQuick.exe --capture-preview=dist/Swirl-Inspector-preview.png --preview-page=inspector --preview-theme=dark
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Upload separate Qt UI preview
         uses: actions/upload-artifact@v4
         with:
