@@ -5,6 +5,11 @@ using System.Text;
 namespace AdShield.Network;
 
 internal enum SubscriptionClientProfile { Mihomo, Clash, Browser }
+internal enum SubscriptionDownloadRoute { Automatic, Direct, SystemProxy, Swirl }
+internal sealed class SubscriptionTransportException : InvalidOperationException
+{
+    internal SubscriptionTransportException(string message) : base(message) { }
+}
 
 internal sealed record SubscriptionDownload(string Content, string NormalizedSource);
 
@@ -65,14 +70,107 @@ internal static class SubscriptionImport
     internal static async Task<SubscriptionDownload> DownloadAsync(string raw,
         SubscriptionClientProfile clientProfile = SubscriptionClientProfile.Mihomo,
         CancellationToken cancellationToken = default)
+        => await DownloadRoutedAsync(raw, clientProfile, SubscriptionDownloadRoute.Automatic, cancellationToken);
+
+    internal static async Task<SubscriptionDownload> DownloadRoutedAsync(string raw,
+        SubscriptionClientProfile clientProfile, SubscriptionDownloadRoute route,
+        CancellationToken cancellationToken = default, Action<string>? report = null,
+        Func<SubscriptionDownloadRoute, Uri, HttpMessageHandler?>? transportFactory = null)
     {
-        using var transport = new HttpClientHandler
+        Uri source = ParseAddress(raw);
+        if (!Enum.IsDefined(route)) throw new InvalidOperationException("请选择有效的订阅下载链路。");
+        _ = UserAgent(clientProfile);
+        using var budget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        budget.CancelAfter(TimeSpan.FromSeconds(40));
+        SubscriptionTransportException? lastFailure = null;
+        var attempts = route == SubscriptionDownloadRoute.Automatic
+            ? new[] { SubscriptionDownloadRoute.Direct, SubscriptionDownloadRoute.SystemProxy }
+            : new[] { route };
+        foreach (var attempt in attempts)
         {
-            AllowAutoRedirect = false,
-            UseCookies = false,
+            cancellationToken.ThrowIfCancellationRequested();
+            using var transport = (transportFactory ?? CreateTransport)(attempt, source);
+            if (transport == null)
+            {
+                if (route != SubscriptionDownloadRoute.Automatic)
+                    throw new SubscriptionTransportException(attempt == SubscriptionDownloadRoute.Swirl
+                        ? "Swirl 代理入口没有运行。请选择直连或当前系统代理下载。"
+                        : "Windows 当前没有启用手动系统代理。请选择直连下载，或先开启可用的系统代理。");
+                continue;
+            }
+            string label = RouteName(attempt);
+            report?.Invoke("正在通过" + label + "下载订阅…");
+            using var attemptTimeout = CancellationTokenSource.CreateLinkedTokenSource(budget.Token);
+            if (route == SubscriptionDownloadRoute.Automatic && attempt == SubscriptionDownloadRoute.Direct)
+                attemptTimeout.CancelAfter(TimeSpan.FromSeconds(12));
+            try
+            {
+                var download = await DownloadAsync(raw, clientProfile, transport, attemptTimeout.Token);
+                report?.Invoke("订阅已通过" + label + "下载，正在检查 YAML…");
+                return download;
+            }
+            catch (SubscriptionTransportException e)
+            {
+                lastFailure = new SubscriptionTransportException(label + "：" + e.Message);
+                report?.Invoke(lastFailure.Message);
+                if (route != SubscriptionDownloadRoute.Automatic) throw lastFailure;
+            }
+            catch (OperationCanceledException)
+            {
+                if (cancellationToken.IsCancellationRequested) throw new OperationCanceledException("订阅下载已取消。", cancellationToken);
+                lastFailure = new SubscriptionTransportException(label + "连接超时。");
+                report?.Invoke(lastFailure.Message);
+                if (route != SubscriptionDownloadRoute.Automatic || budget.IsCancellationRequested) throw lastFailure;
+            }
+        }
+        throw new SubscriptionTransportException((lastFailure?.Message ?? "没有可用的订阅下载链路。") + " 可在下载链路中选择当前系统代理，再重试。");
+    }
+
+    internal static string RouteName(SubscriptionDownloadRoute route) => route switch
+    {
+        SubscriptionDownloadRoute.Direct => "直连",
+        SubscriptionDownloadRoute.SystemProxy => "当前系统代理",
+        SubscriptionDownloadRoute.Swirl => "Swirl 代理入口",
+        _ => "自动链路"
+    };
+    internal static HttpMessageHandler? CreateTransport(SubscriptionDownloadRoute route, Uri source)
+    {
+        IWebProxy? proxy = route switch
+        {
+            SubscriptionDownloadRoute.Direct => null,
+            SubscriptionDownloadRoute.SystemProxy => ReadCurrentSystemProxy(source),
+            SubscriptionDownloadRoute.Swirl => new WebProxy("http://127.0.0.1:" + MihomoConfig.MixedPort),
+            _ => throw new InvalidOperationException("无效的下载链路。")
+        };
+        if (route == SubscriptionDownloadRoute.SystemProxy && proxy == null) return null;
+        return new SocketsHttpHandler
+        {
+            AllowAutoRedirect = false, UseCookies = false,
+            // Explicitly set both fields: HttpClient.DefaultProxy caches the old
+            // Windows/env proxy and does not follow another client's later changes.
+            UseProxy = proxy != null, Proxy = proxy,
+            ConnectTimeout = TimeSpan.FromSeconds(8),
             AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate | DecompressionMethods.Brotli
         };
-        return await DownloadAsync(raw, clientProfile, transport, cancellationToken);
+    }
+    private static IWebProxy? ReadCurrentSystemProxy(Uri source)
+    {
+        var state = NativeProxySettings.Read();
+        return SystemProxyFrom(state, source);
+    }
+    internal static IWebProxy? SystemProxyFrom(NativeProxyState state, Uri source)
+    {
+        if ((state.Flags & 2) == 0 || string.IsNullOrWhiteSpace(state.Server)) return null;
+        string? server = state.Server;
+        if (server.Contains('='))
+            server = server.Split(';', StringSplitOptions.RemoveEmptyEntries)
+                .Select(part => part.Trim().Split('=', 2))
+                .FirstOrDefault(pair => pair.Length == 2 && pair[0].Equals(source.Scheme, StringComparison.OrdinalIgnoreCase))?[1];
+        if (string.IsNullOrWhiteSpace(server)) return null;
+        string address = server.Contains("://", StringComparison.Ordinal) ? server.Trim() : "http://" + server.Trim();
+        if (!Uri.TryCreate(address, UriKind.Absolute, out var uri) || uri.Scheme is not ("http" or "https" or "socks5") || uri.UserInfo.Length != 0 || uri.Port <= 0)
+            throw new SubscriptionTransportException("当前系统代理地址无效，请检查 Windows 代理设置。");
+        return new WebProxy(uri) { Credentials = CredentialCache.DefaultNetworkCredentials };
     }
 
     // Tests can inject an HTTPS-aware fake/loopback adapter. This does not relax
@@ -135,17 +233,24 @@ internal static class SubscriptionImport
         {
             if (cancellationToken.IsCancellationRequested)
                 throw new OperationCanceledException("订阅下载已取消。", cancellationToken);
-            throw new InvalidOperationException("下载订阅超时（30 秒），请检查网络后重试。");
+            throw new SubscriptionTransportException("下载订阅超时（30 秒），请检查网络后重试。");
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException e)
         {
             // HttpClient exceptions may include the complete private subscription
             // URI. Never attach the exception or its message to UI/log failures.
-            throw new InvalidOperationException("无法连接订阅服务器，请检查网络、系统代理和服务器证书后重试。");
+            throw new SubscriptionTransportException(e.HttpRequestError switch
+            {
+                HttpRequestError.NameResolutionError => "订阅服务器的 DNS 解析失败。可使用当前系统代理重试。",
+                HttpRequestError.SecureConnectionError => "订阅服务器 TLS / 证书验证失败。请检查系统时间、证书与下载链路。",
+                HttpRequestError.ProxyTunnelError => "下载代理无法建立 HTTPS 隧道，请检查代理是否可用。",
+                HttpRequestError.ConnectionError => "下载链路连接失败，请确认代理端口仍在运行，或改用直连。",
+                _ => "订阅下载链路中断，请切换下载链路后重试。"
+            });
         }
         catch (IOException)
         {
-            throw new InvalidOperationException("订阅下载中断，请检查网络后重试。");
+            throw new SubscriptionTransportException("订阅下载中断，请检查网络后重试。");
         }
     }
 

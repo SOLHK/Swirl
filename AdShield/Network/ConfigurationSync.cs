@@ -154,6 +154,7 @@ internal static class ConfigurationSync
         current.ProtectedYaml = incoming.ProtectedYaml;
         current.ProtectedSubscription = incoming.ProtectedSubscription;
         current.SubscriptionClient = Enum.IsDefined(incoming.SubscriptionClient) ? incoming.SubscriptionClient : SubscriptionClientProfile.Mihomo;
+        current.SubscriptionRoute = Enum.IsDefined(incoming.SubscriptionRoute) ? incoming.SubscriptionRoute : SubscriptionDownloadRoute.Automatic;
         current.Mode = incoming.Mode;
         current.Tun = false;
         current.Mitm = false;

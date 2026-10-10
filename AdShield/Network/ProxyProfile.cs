@@ -11,6 +11,7 @@ internal sealed class ProxyProfile
     public string ProtectedYaml { get; set; } = "";
     public string ProtectedSubscription { get; set; } = "";
     public SubscriptionClientProfile SubscriptionClient { get; set; } = SubscriptionClientProfile.Mihomo;
+    public SubscriptionDownloadRoute SubscriptionRoute { get; set; } = SubscriptionDownloadRoute.Automatic;
     public string Mode { get; set; } = "rule";
     public bool Tun { get; set; }
     public bool UseSystemProxy { get; set; } = true;
@@ -43,6 +44,7 @@ internal sealed class ProxyProfile
             profile.UserRules ??= new();
             profile.BasicAds = false;
             if (!Enum.IsDefined(profile.SubscriptionClient)) profile.SubscriptionClient = SubscriptionClientProfile.Mihomo;
+            if (!Enum.IsDefined(profile.SubscriptionRoute)) profile.SubscriptionRoute = SubscriptionDownloadRoute.Automatic;
             return profile;
         }
         catch { return new(); }

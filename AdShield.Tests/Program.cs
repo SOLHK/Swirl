@@ -10,7 +10,7 @@ void Check(bool value, string name)
     Console.WriteLine("PASS: " + name);
 }
 if (args.Length == 1 && args[0] == "--script-runtime-only") { ScriptRuntimeChecks.Pure(Check); await ScriptRuntimeChecks.IntegrationAsync(Check); Console.WriteLine($"All {passed} script runtime checks passed."); return; }
-if (args.Length == 1 && args[0] == "--subscription-only") { SubscriptionChecks.Pure(Check); await SubscriptionChecks.DownloadAsync(Check); Console.WriteLine($"All {passed} subscription checks passed."); return; }
+if (args.Length == 1 && args[0] == "--subscription-only") { SubscriptionChecks.Pure(Check); await SubscriptionChecks.DownloadAsync(Check); await SubscriptionRouteChecks.RunAsync(Check); Console.WriteLine($"All {passed} subscription checks passed."); return; }
 if (args.Length == 1 && args[0] == "--core-startup-only") { CoreStartupChecks.Pure(Check); await CoreStartupChecks.RunAsync(Check); Console.WriteLine($"All {passed} core startup checks passed."); return; }
 if (args.Length == 1 && args[0] == "--native-proxy-only") { await NativeCaptureChecks.RunAsync(Check); Console.WriteLine($"All {passed} native capture checks passed."); return; }
 if (args.Length == 2 && args[0] == "--render-swirl-ui") { DesktopChecks.Render(args[1], Check); return; }
@@ -18,6 +18,7 @@ await ConnectionHealthChecks.RunAsync(Check);
 CoreStartupChecks.Pure(Check);
 SubscriptionChecks.Pure(Check);
 await SubscriptionChecks.DownloadAsync(Check);
+await SubscriptionRouteChecks.RunAsync(Check);
 NetworkChecks.Pure(Check);
 ScriptRuntimeChecks.Pure(Check);
 SyncRoutingChecks.Run(Check);

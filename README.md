@@ -2,7 +2,7 @@
 
 <img src="AdShield/Assets/swirl-256.png" width="112" alt="Swirl 流光风筝图标">
 
-Windows x64 网络工具：Mihomo 代理、规则分流、Loon 明文插件兼容层、HTTPS 改写、JavaScript 脚本与加密配置同步。当前版本 **0.7.0**，支持 Windows 10 2004 及以上版本和 Windows 11，仅开发 Windows 版本。
+Windows x64 网络工具：Mihomo 代理、规则分流、Loon 明文插件兼容层、HTTPS 改写、JavaScript 脚本与加密配置同步。当前版本 **0.7.1**，支持 Windows 10 2004 及以上版本和 Windows 11，仅开发 Windows 版本。
 
 界面使用 WPF 矢量渲染、原生 Windows 11 Desktop Acrylic 模糊背景、紧凑侧栏和半透明卡片，跟随系统浅色 / 深色设置。图标使用流光风筝的透明背景版本，含 16–256 像素图标资源。整体布局借鉴网络工具的功能组织，并非 Loon macOS 界面的复刻。此项目由 AdShield 的网络模块继续开发，删除了爱奇艺和腾讯视频专用暂停广告识别与自动点击功能，广告处理由用户导入的网络规则和插件执行。
 
@@ -10,6 +10,13 @@ Windows x64 网络工具：Mihomo 代理、规则分流、Loon 明文插件兼�
 
 *空配置界面示例；尚未连接或启用插件。蓝橙背景来自背后的测试窗口，用于验证原生模糊效果，并非软件内置背景图。*
 
+## 0.7.1 订阅下载链路修复
+
+订阅下载参考 [Clash Verge Rev 的下载链路选择](https://github.com/clash-verge-rev/clash-verge-rev/blob/dev/src-tauri/src/config/prfitem.rs) 和 [网络客户端实现](https://github.com/clash-verge-rev/clash-verge-rev/blob/dev/src-tauri/src/utils/network.rs)，将下载链路与 User-Agent、代理流量模式分开。支持自动、直连、当前手动系统代理和 Swirl 核心入口。自动模式先直连，网络连接失败或超时再尝试当前系统代理；HTTP 拒绝、HTML 验证页面、格式错误不会偷偷更换身份或转换服务。
+
+修复 .NET 全局代理缓存的问题：直连明确关闭代理；系统代理在每次下载时读取 Windows 当前连接设置，避免切换代理客户端后继续连接已经关闭的旧端口。使用 Swirl 核心入口更新时可以保持连接，下载不经过插件改写；新配置保存后在重新连接时生效，当前连接使用独立的配置快照。
+
+下载过程显示正在使用的链路，连接、DNS、HTTPS 隧道和 TLS 验证错误分别提示，仍保持证书验证、4 MB 上限及嵌套查询参数原样保留。用用户提供的实际订阅，在故意保持失效全局代理缓存的情况下验证：自动直连和最新系统代理都能下载有效 YAML，随后通过 Mihomo 配置检查；订阅及节点凭据没有提交仓库。
 ## 0.7.0 连接检查与 Windows 界面
 
 系统代理改为使用 Windows 当前连接的原生设置接口，并在启动后读取有效设置确认接管成功；退出时恢复备份。核心启动与网络检测分别显示：两个 HTTPS 检测地址通过插件入口及 Mihomo 请求，网页或重定向不能冒充检测成功。节点页读取核心的实际选择，不再把列表首项当作已选线路。概览显示真实上传 / 下载累计流量与插件启用数量；未启用插件时明确提示去广告尚未配置。
@@ -31,7 +38,7 @@ Windows x64 网络工具：Mihomo 代理、规则分流、Loon 明文插件兼�
 
 ## 安装与开始使用
 
-在 [Actions](https://github.com/SOLHK/Swirl/actions) 中打开最新成功的 **Build Windows EXE**，下载 `Swirl-Setup-win-x64` 安装程序或 `Swirl-win-x64` 便携包。安装程序名为 `Swirl_Setup_0.7.0_x64.exe`。安装程序包含 .NET 运行时、Mihomo、Wintun 与 jq，无需安装另一份 Clash 客户端。安装程序尚未代码签名。
+在 [Actions](https://github.com/SOLHK/Swirl/actions) 中打开最新成功的 **Build Windows EXE**，下载 `Swirl-Setup-win-x64` 安装程序或 `Swirl-win-x64` 便携包。安装程序名为 `Swirl_Setup_0.7.1_x64.exe`。安装程序包含 .NET 运行时、Mihomo、Wintun 与 jq，无需安装另一份 Clash 客户端。安装程序尚未代码签名。
 
 1. 退出旧版。打开 Swirl，进入「节点」导入自己的 **Clash/Mihomo YAML** 或 HTTPS 订阅。软件不提供节点和订阅服务。
 2. 在「偏好设置」启用系统代理或 TUN，并选择流量模式。在「概览」连接后查看 Windows 接管检查与 HTTPS 检测结果；在「代理节点」选择并应用线路。全部直连模式不会使用代理节点，全局模式不应用普通分流规则。

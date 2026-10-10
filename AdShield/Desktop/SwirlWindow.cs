@@ -1,5 +1,6 @@
 using AdShield.Network;
 using System.Diagnostics;
+using System.Text.Json;
 using System.Windows.Interop;
 using System.Windows.Media.Imaging;
 using System.Windows.Shell;
@@ -20,7 +21,8 @@ internal sealed class SwirlWindow : W.Window
     private readonly C.TextBlock status = new(), headline = new(), detail = new(), diagnostic = new(), scope = new(), pluginMetric = new(), uploadMetric = new(), downloadMetric = new(), routeMetric = new(), pluginInfo = new(), syncStatus = new();
     private readonly C.TextBox subscriptionShown = new(), pluginUrl = new(), argument = new(), pluginPolicy = new(), ruleValue = new(), ruleSsid = new(), ruleHosts = new(), syncFolder = new(), log = new();
     private readonly C.PasswordBox subscription = new(), syncPassword = new();
-    private readonly C.ComboBox subscriptionClient = new(), groups = new(), mode = new(), scriptPlugins = new(), tasks = new(), ruleKind = new(), rulePolicy = new();
+    private readonly C.ComboBox subscriptionClient = new(), subscriptionRoute = new(), groups = new(), mode = new(), scriptPlugins = new(), tasks = new(), ruleKind = new(), rulePolicy = new();
+    private ProxyProfile? activeProfile;
     private readonly C.ListBox nodes = new(), plugins = new(), rules = new();
     private readonly C.CheckBox systemProxy = new() { Content = "系统代理 · 浏览器与遵循 Windows 代理的应用" }, tun = new() { Content = "TUN · 接管更多应用流量（需要管理员权限）" }, mitm = new() { Content = "启用 HTTPS 解密 · 仅限插件指定域名" }, glass = new() { Content = "窗口玻璃效果 · 显示背后窗口与桌面的模糊背景" };
     private C.Button connect = null!, disconnect = null!;
@@ -57,7 +59,7 @@ internal sealed class SwirlWindow : W.Window
         var sidebar = new C.DockPanel { Margin = new W.Thickness(12, 6, 12, 12) };
         var brand = new C.StackPanel { Orientation = C.Orientation.Horizontal, Margin = new W.Thickness(10, 9, 0, 26) };
         brand.Children.Add(new C.Image { Source = Icon, Width = 44, Height = 44, Margin = new W.Thickness(0, 0, 10, 0) }); var brandLabels = new C.StackPanel(); brandLabels.Children.Add(Text("Swirl", 24, true)); brandLabels.Children.Add(Note("让网络轻盈一点", 11)); brand.Children.Add(brandLabels); C.DockPanel.SetDock(brand, C.Dock.Top); sidebar.Children.Add(brand);
-        var footer = Note("Swirl 0.7.0\nWindows · Mihomo", 11); footer.Margin = new W.Thickness(16, 10, 0, 0); C.DockPanel.SetDock(footer, C.Dock.Bottom); sidebar.Children.Add(footer);
+        var footer = Note("Swirl 0.7.1\nWindows · Mihomo", 11); footer.Margin = new W.Thickness(16, 10, 0, 0); C.DockPanel.SetDock(footer, C.Dock.Bottom); sidebar.Children.Add(footer);
         var links = new C.StackPanel();
         foreach (var (key, name, glyph) in new[] { ("overview", "概览", "\uE80F"), ("nodes", "代理节点", "\uE839"), ("plugins", "插件中心", "\uE74C"), ("routing", "规则分流", "\uE8AB"), ("https", "HTTPS 解密", "\uE72E"), ("scripts", "脚本任务", "\uE756"), ("sync", "配置同步", "\uE753"), ("logs", "运行记录", "\uE9D9"), ("settings", "偏好设置", "\uE713") })
         {
@@ -137,8 +139,8 @@ internal sealed class SwirlWindow : W.Window
     {
         var page = Page("nodes", "代理节点", "支持 Clash / Mihomo 订阅，保留原有节点组与规则。");
         var input = Card(page, "订阅与配置"); input.Children.Add(Note("订阅地址（在本机加密保存）")); input.Children.Add(subscription); subscriptionShown.Visibility = W.Visibility.Collapsed; input.Children.Add(subscriptionShown);
-        subscriptionClient.ItemsSource = new[] { "Mihomo / Clash Meta", "Clash 兼容", "浏览器请求" }; input.Children.Add(subscriptionClient);
-        Row(input, Button("更新订阅", () => Mutate(async () => { status.Text = "正在下载并检查订阅…"; string source = subscriptionShown.Visibility == W.Visibility.Visible ? subscriptionShown.Text : subscription.Password; var downloaded = await SubscriptionImport.DownloadAsync(source, (SubscriptionClientProfile)subscriptionClient.SelectedIndex); profile.ProtectedYaml = ProxyProfile.Protect(MihomoConfig.ParseSubscription(downloaded.Content)); profile.ProtectedSubscription = ProxyProfile.Protect(downloaded.NormalizedSource); profile.SubscriptionClient = (SubscriptionClientProfile)subscriptionClient.SelectedIndex; profile.Save(); subscription.Password = downloaded.NormalizedSource; subscriptionShown.Text = downloaded.NormalizedSource; status.Text = "订阅已导入，请连接后选择节点。"; }), true), Button("本地 YAML", () => Mutate(async () => { using var dialog = new OpenFileDialog { Filter = "Clash / Mihomo|*.yaml;*.yml" }; if (dialog.ShowDialog(OwnerHandle) != System.Windows.Forms.DialogResult.OK) return; if (new FileInfo(dialog.FileName).Length > 4 * 1024 * 1024) throw new InvalidOperationException("配置超过 4 MB。"); profile.ProtectedYaml = ProxyProfile.Protect(MihomoConfig.ParseSubscription(await File.ReadAllTextAsync(dialog.FileName))); profile.Save(); status.Text = "本地配置已导入。"; })), Button("显示 / 隐藏地址", () => { bool show = subscriptionShown.Visibility != W.Visibility.Visible; if (show) subscriptionShown.Text = subscription.Password; else subscription.Password = subscriptionShown.Text; subscriptionShown.Visibility = show ? W.Visibility.Visible : W.Visibility.Collapsed; subscription.Visibility = show ? W.Visibility.Collapsed : W.Visibility.Visible; return Task.CompletedTask; }), Button("检查配置", () => Mutate(async () => { SaveFlags(); await controller.ValidateAsync(profile); status.Text = "配置检查通过。"; })));
+        subscriptionClient.ItemsSource = new[] { "Mihomo / Clash Meta", "Clash 兼容", "浏览器请求" }; Row(input, Text("请求类型"), subscriptionClient); subscriptionRoute.ItemsSource = new[] { "自动 · 先直连，再尝试当前系统代理", "直连 · 不经过系统代理", "当前系统代理 · 每次读取最新设置", "Swirl 代理 · 保持连接下载" }; Row(input, Text("下载链路"), subscriptionRoute); input.Children.Add(Note("下载链路与代理流量模式独立。更新时保持当前连接，新配置在重新连接后生效。"));
+        Row(input, Button("更新订阅", UpdateSubscriptionAsync, true), Button("本地 YAML", () => Mutate(async () => { using var dialog = new OpenFileDialog { Filter = "Clash / Mihomo|*.yaml;*.yml" }; if (dialog.ShowDialog(OwnerHandle) != System.Windows.Forms.DialogResult.OK) return; if (new FileInfo(dialog.FileName).Length > 4 * 1024 * 1024) throw new InvalidOperationException("配置超过 4 MB。"); profile.ProtectedYaml = ProxyProfile.Protect(MihomoConfig.ParseSubscription(await File.ReadAllTextAsync(dialog.FileName))); profile.Save(); status.Text = "本地配置已导入。"; })), Button("显示 / 隐藏地址", () => { bool show = subscriptionShown.Visibility != W.Visibility.Visible; if (show) subscriptionShown.Text = subscription.Password; else subscription.Password = subscriptionShown.Text; subscriptionShown.Visibility = show ? W.Visibility.Visible : W.Visibility.Collapsed; subscription.Visibility = show ? W.Visibility.Collapsed : W.Visibility.Visible; return Task.CompletedTask; }), Button("检查配置", () => Mutate(async () => { SaveFlags(); await controller.ValidateAsync(profile); status.Text = "配置检查通过。"; })));
         var select = Card(page, "策略组与线路", "选中线路后点击“应用线路”。检测连接会检查当前实际代理路径。"); select.Children.Add(groups); nodes.Height = 200; select.Children.Add(nodes);
         groups.SelectionChanged += (_, _) => FillNodes();
         Row(select, Button("应用线路", async () => { if (!controller.Running || groups.SelectedItem is not string group || nodes.SelectedItem is not string node) throw new InvalidOperationException("请先连接并选择线路。"); await controller.SelectAsync(group, node); await LoadGroupsAsync(); status.Text = "线路已应用；正在检测…"; await ProbeAsync(); }, true), Button("测试延迟", async () => { if (!controller.Running || nodes.SelectedItem is not string node) throw new InvalidOperationException("请先连接并选择线路。"); status.Text = node + " · " + await controller.DelayAsync(node) + " ms"; }), Button("连接网络", StartAsync));
@@ -194,26 +196,44 @@ internal sealed class SwirlWindow : W.Window
         var page = Page("settings", "偏好设置", "选择流量接管方式与窗口外观。"); var capture = Card(page, "连接方式", "连接时会检查 Windows 代理是否生效。TUN 需要管理员权限。"); capture.Children.Add(systemProxy); capture.Children.Add(tun); mode.ItemsSource = new[] { "规则分流", "全局代理", "全部直连" }; capture.Children.Add(mode);
         Row(capture, Button("保存连接设置", () => Mutate(() => { SaveFlags(); status.Text = "设置已保存，下次连接时生效。"; return Task.CompletedTask; }), true));
         var appearance = Card(page, "外观", "原生 Windows 11 Acrylic 背景，遵循系统透明效果设置。高对比度或不支持的系统会使用清晰背景。"); appearance.Children.Add(glass); glass.Click += (_, _) => { profile.GlassAppearance = glass.IsChecked == true; profile.Save(); ApplyBackdrop(); };
-        var about = Card(page, "Swirl 0.7.0", "为 Windows 设计。部分 Loon 语法和脚本接口已兼容，插件导入后显示具体不兼容项。"); Row(about, Button("打开数据目录", () => { Directory.CreateDirectory(ProxyProfile.DirectoryPath); Process.Start(new ProcessStartInfo(ProxyProfile.DirectoryPath) { UseShellExecute = true }); return Task.CompletedTask; }));
+        var about = Card(page, "Swirl 0.7.1", "为 Windows 设计。部分 Loon 语法和脚本接口已兼容，插件导入后显示具体不兼容项。"); Row(about, Button("打开数据目录", () => { Directory.CreateDirectory(ProxyProfile.DirectoryPath); Process.Start(new ProcessStartInfo(ProxyProfile.DirectoryPath) { UseShellExecute = true }); return Task.CompletedTask; }));
     }
     private async Task StartAsync()
     {
         if (busy || controller.Running) return; busy = true; connect.IsEnabled = false; headline.Text = "正在建立连接"; status.Text = "正在检查配置与接管方式…";
-        try { SaveFlags(); if (!profile.UseSystemProxy && !profile.Tun) throw new InvalidOperationException("请在偏好设置启用系统代理或 TUN，否则应用流量不会自动进入 Swirl。"); await controller.StartAsync(profile, profile.UseSystemProxy); if (closed) return; disconnect.IsEnabled = true; await LoadGroupsAsync(); RefreshSummary(); await ProbeAsync(); }
+        try { SaveFlags(); if (!profile.UseSystemProxy && !profile.Tun) throw new InvalidOperationException("请在偏好设置启用系统代理或 TUN，否则应用流量不会自动进入 Swirl。"); activeProfile = JsonSerializer.Deserialize<ProxyProfile>(JsonSerializer.Serialize(profile))!; await controller.StartAsync(activeProfile, profile.UseSystemProxy); if (closed) return; disconnect.IsEnabled = true; await LoadGroupsAsync(); RefreshSummary(); await ProbeAsync(); }
         catch { controller.Stop(); RefreshSummary(); throw; }
         finally { busy = false; if (!closed) { connect.IsEnabled = !controller.Running; disconnect.IsEnabled = controller.Running; } }
     }
-    private void Stop() { controller.Stop(); disconnect.IsEnabled = false; connect.IsEnabled = true; nodes.ItemsSource = null; groups.ItemsSource = null; selections.Clear(); RefreshSummary(); status.Text = "已断开连接，已尝试恢复原代理设置。"; }
-    private async Task Mutate(Func<Task> action)
+    private Task UpdateSubscriptionAsync() => Mutate(async () =>
     {
-        if (busy) return; if (controller.Running) throw new InvalidOperationException("请先断开连接，再修改配置或插件。"); busy = true;
+        string source = subscriptionShown.Visibility == W.Visibility.Visible ? subscriptionShown.Text : subscription.Password;
+        var selectedRoute = (SubscriptionDownloadRoute)subscriptionRoute.SelectedIndex;
+        var selectedClient = (SubscriptionClientProfile)subscriptionClient.SelectedIndex;
+        if (selectedRoute == SubscriptionDownloadRoute.Swirl && !controller.Running)
+            throw new InvalidOperationException("请先保持 Swirl 连接，再通过 Swirl 代理更新订阅；首次导入请选择自动或当前系统代理。");
+        var downloaded = await SubscriptionImport.DownloadRoutedAsync(source,
+            selectedClient, selectedRoute, lifetime.Token,
+            message => { if (!closed) { status.Text = message; Report(message); } });
+        string yaml = MihomoConfig.ParseSubscription(downloaded.Content);
+        profile.ProtectedYaml = ProxyProfile.Protect(yaml);
+        profile.ProtectedSubscription = ProxyProfile.Protect(downloaded.NormalizedSource);
+        profile.SubscriptionClient = selectedClient;
+        profile.SubscriptionRoute = selectedRoute;
+        profile.Save(); subscription.Password = downloaded.NormalizedSource; subscriptionShown.Text = downloaded.NormalizedSource;
+        status.Text = controller.Running ? "新订阅已保存；当前连接保持原配置，重新连接后生效。" : "订阅已导入，请连接后选择节点。";
+    }, allowConnected: true);
+    private void Stop() { controller.Stop(); disconnect.IsEnabled = false; connect.IsEnabled = true; nodes.ItemsSource = null; groups.ItemsSource = null; selections.Clear(); RefreshSummary(); status.Text = "已断开连接，已尝试恢复原代理设置。"; }
+    private async Task Mutate(Func<Task> action, bool allowConnected = false)
+    {
+        if (busy) return; if (controller.Running && !allowConnected) throw new InvalidOperationException("请先断开连接，再修改配置或插件。"); busy = true;
         try { await action(); RefreshSummary(); } finally { busy = false; }
     }
     private void SaveFlags() { profile.UseSystemProxy = systemProxy.IsChecked == true; profile.Tun = tun.IsChecked == true; profile.Mitm = mitm.IsChecked == true; profile.Mode = mode.SelectedIndex == 1 ? "global" : mode.SelectedIndex == 2 ? "direct" : "rule"; profile.BasicAds = false; profile.Save(); }
     private void LoadProfile()
     {
         try { subscription.Password = profile.Subscription; } catch { Report("保存的订阅地址无法解密，请重新导入。"); }
-        subscriptionClient.SelectedIndex = (int)profile.SubscriptionClient; systemProxy.IsChecked = profile.UseSystemProxy; tun.IsChecked = profile.Tun; mitm.IsChecked = profile.Mitm; glass.IsChecked = profile.GlassAppearance;
+        subscriptionClient.SelectedIndex = (int)profile.SubscriptionClient; subscriptionRoute.SelectedIndex = (int)profile.SubscriptionRoute; systemProxy.IsChecked = profile.UseSystemProxy; tun.IsChecked = profile.Tun; mitm.IsChecked = profile.Mitm; glass.IsChecked = profile.GlassAppearance;
         mode.SelectedIndex = profile.Mode == "global" ? 1 : profile.Mode == "direct" ? 2 : 0; syncFolder.Text = profile.SyncFolder; RefreshPlugins(); SaveRules(false); RefreshSummary();
     }
     private async Task LoadGroupsAsync()
@@ -239,9 +259,10 @@ internal sealed class SwirlWindow : W.Window
     private string PluginSummary() { int enabled = profile.Plugins.Count(p => p.Enabled && p.Unsupported.Count == 0); return enabled == 0 ? "去广告：没有启用插件，请到插件中心添加并启用。" : "插件：" + enabled + " 个已启用 · HTTPS 解密" + (profile.Mitm ? "已开启，实际命中见运行记录" : "未开启，HTTPS 重写脚本不会处理加密正文"); }
     private void RefreshSummary()
     {
+        var summaryProfile = controller.Running ? activeProfile ?? profile : profile;
         pluginMetric.Text = profile.Plugins.Count(p => p.Enabled && p.Unsupported.Count == 0) + " / " + profile.Plugins.Count;
         if (!controller.Running) { headline.Text = "准备好，轻盈出发"; detail.Text = profile.ProtectedYaml.Length == 0 ? "先导入订阅，再连接网络。" : "已导入配置，连接后可查看实际线路与检测结果。"; diagnostic.Text = "网络核心：尚未连接\n" + PluginSummary(); uploadMetric.Text = downloadMetric.Text = "—"; }
-        RefreshRoute(); string[] hosts; try { UserRouting.Prepare(profile); hosts = UserRouting.EffectivePlugins(profile).Where(p => p.Enabled && p.Unsupported.Count == 0).SelectMany(p => p.Hosts).Distinct().ToArray(); } catch { hosts = Array.Empty<string>(); }
+        RefreshRoute(); string[] hosts; try { UserRouting.Prepare(summaryProfile); hosts = UserRouting.EffectivePlugins(summaryProfile).Where(p => p.Enabled && p.Unsupported.Count == 0).SelectMany(p => p.Hosts).Distinct().ToArray(); } catch { hosts = Array.Empty<string>(); }
         scope.Text = hosts.Length == 0 ? "尚无解密域名。启用含 MITM 设置的插件后显示。" : string.Join("\n", hosts);
     }
     private async Task PollAsync()
