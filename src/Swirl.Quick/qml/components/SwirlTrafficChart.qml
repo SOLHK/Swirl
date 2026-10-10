@@ -9,6 +9,11 @@ Item {
     implicitHeight:242
     implicitWidth:550
     onSamplesChanged:plot.requestPaint()
+    Connections {
+        target:Theme
+        function onDarkChanged(){plot.requestPaint()}
+        function onAccentChanged(){plot.requestPaint()}
+    }
     Canvas {
         id:plot
         anchors.fill:parent
