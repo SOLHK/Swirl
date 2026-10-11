@@ -177,7 +177,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path installer-bin, out | Out-Null
           Copy-Item -Path "dist/*" -Destination "installer-bin" -Recurse -Force
           Copy-Item "src/Swirl.Quick/packaging/THIRD_PARTY_NOTICES.txt" "installer-bin/"
-          Copy-Item "src/Swirl.Quick/assets/swirl.ico" "installer-bin/Swirl-brand-003.ico"
+          Copy-Item "src/Swirl.Quick/assets/swirl.ico" "installer-bin/Swirl-brand-100.ico"
           Copy-Item "src/Swirl.Quick/packaging/licenses" "installer-bin/licenses" -Recurse -Force
           Remove-Item -Path "installer-bin/Swirl-*-preview.png", "installer-bin/Swirl-diagnostics.txt" -ErrorAction SilentlyContinue
           if (!(Test-Path "installer-bin/Swirl.exe")) { throw "Missing Swirl.exe" }

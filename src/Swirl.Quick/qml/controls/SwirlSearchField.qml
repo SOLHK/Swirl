@@ -7,7 +7,7 @@ TextField {
     implicitHeight: 42
     implicitWidth: 225
     leftPadding: 39
-    rightPadding: 15
+    rightPadding: control.objectName === "pageSearch" && control.width > 130 ? 64 : 15
     placeholderText: "搜索"
     placeholderTextColor: Theme.muted
     color: Theme.text
@@ -27,6 +27,7 @@ TextField {
         Behavior on color { ColorAnimation { duration: Theme.motion } }
         Behavior on border.color { ColorAnimation { duration: Theme.motion } }
     }
+    Text { visible:control.objectName === "pageSearch" && control.width > 130; anchors.right:parent.right; anchors.rightMargin:12; anchors.verticalCenter:parent.verticalCenter; text:"Ctrl+K"; color:Theme.muted; font.pixelSize:11 }
     SwirlIcon {
         anchors.left: parent.left; anchors.leftMargin: 14
         anchors.verticalCenter: parent.verticalCenter

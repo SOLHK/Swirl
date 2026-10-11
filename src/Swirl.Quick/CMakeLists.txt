@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(Swirl VERSION 0.1 LANGUAGES CXX)
+project(Swirl VERSION 1.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
@@ -46,6 +46,8 @@ qt_add_qml_module(Swirl
     SOURCES app/JavascriptHighlighter.h app/JavascriptHighlighter.cpp
 )
 set(SWIRL_ASSET_PATH "${CMAKE_CURRENT_SOURCE_DIR}/assets")
+file(GLOB SWIRL_UI_ICONS CONFIGURE_DEPENDS "${SWIRL_ASSET_PATH}/icons/ui/*.svg")
+qt_add_resources(Swirl ui_icons PREFIX "/swirl" BASE "${SWIRL_ASSET_PATH}" FILES ${SWIRL_UI_ICONS})
 qt_add_resources(Swirl brand PREFIX "/swirl" BASE "${SWIRL_ASSET_PATH}" FILES
     "${SWIRL_ASSET_PATH}/swirl-mark.png"
     "${SWIRL_ASSET_PATH}/swirl-app.png"
@@ -54,13 +56,14 @@ qt_add_resources(Swirl brand PREFIX "/swirl" BASE "${SWIRL_ASSET_PATH}" FILES
     "${SWIRL_ASSET_PATH}/icons/swirl_wave_mark.svg"
 )
 target_include_directories(Swirl PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/app")
+target_sources(Swirl PRIVATE app/SvgIconProvider.h app/SvgIconProvider.cpp)
 target_link_libraries(Swirl PRIVATE Qt6::Quick Qt6::Qml Qt6::QuickControls2 Qt6::Network Qt6::Svg)
 if(MSVC)
  target_compile_options(Swirl PRIVATE /utf-8)
 endif()
 if(SWIRL_BUILD_UI_TESTS)
  find_package(Qt6 REQUIRED COMPONENTS Test)
- target_sources(Swirl PRIVATE tests/OverviewChecks.cpp tests/OverviewChecks.h tests/CaptureChecks.cpp tests/CaptureChecks.h)
+ target_sources(Swirl PRIVATE tests/OverviewChecks.cpp tests/OverviewChecks.h tests/CaptureChecks.cpp tests/CaptureChecks.h tests/WindowChecks.cpp tests/WindowChecks.h)
  target_link_libraries(Swirl PRIVATE Qt6::Test)
  target_compile_definitions(Swirl PRIVATE SWIRL_UI_TESTS)
  enable_testing()
@@ -73,5 +76,5 @@ endif()
 if(WIN32)
  configure_file(app/Swirl.rc.in "${CMAKE_CURRENT_BINARY_DIR}/Swirl.rc" @ONLY)
  target_sources(Swirl PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/Swirl.rc")
- target_link_libraries(Swirl PRIVATE dwmapi)
+ target_link_libraries(Swirl PRIVATE dwmapi advapi32 psapi)
 endif()

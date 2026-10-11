@@ -25,7 +25,7 @@ Item {
             Rectangle {
                 width:parent.width; height:39
                 color:Theme.material("secondary")
-                radius:10
+                radius: Theme.roundedRadius(width,height)
                 Row {
                     anchors.fill:parent
                     Repeater {

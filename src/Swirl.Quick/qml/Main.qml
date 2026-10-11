@@ -10,7 +10,9 @@ ApplicationWindow {
     visible:true
     width:Math.max(1000,Math.min(1450,Screen.desktopAvailableWidth-40,(Screen.desktopAvailableHeight-40)*1464/930))
     height:Math.max(650,width*930/1464)
-    readonly property real contentScale:Theme.uiScale*(width>=1160 ? Math.min(1,width/1450) : 1)
+    // Small windows reflow and scroll; keep type sizes intact. Only the user's
+    // explicit interface-scale setting scales the scene.
+    readonly property real contentScale:Theme.uiScale
     minimumWidth:1000; minimumHeight:650
     title:"Swirl"; flags:Qt.Window | Qt.FramelessWindowHint; color:"transparent"
     font.family:Theme.fontFamily; font.pixelSize:16
@@ -26,14 +28,20 @@ ApplicationWindow {
     property bool swirlTransparencyEnabled:Theme.transparency
     function previewScrollBottom() { if(pageLoader.item && pageLoader.item.scrollToBottom)pageLoader.item.scrollToBottom() }
     property real swirlWindowRadius:Theme.windowRadius
+    readonly property real shellRadius:backdrop.nativeCorners || window.visibility===Window.Maximized ? 0 : Theme.windowRadius
+    Connections { target:backdrop; function onChanged() { Theme.backdropActive=backdrop.active } }
     readonly property real actualSidebarWidth:AppState.sidebarCollapsed || scaledCanvas.width<1160 ? 82 : Theme.sidebarWidth
     background:Rectangle {
-        radius:window.visibility===Window.Maximized ? 0 : Theme.windowRadius
+        radius:window.shellRadius
         color:Theme.transparency ? "transparent" : Theme.sidebarBase
         border.width:0
     }
     Component.onCompleted:{
-        backdrop.apply(window,Theme.transparency)
+        // Initial aspect ratio is a starting size, not a persistent constraint
+        // that can overwrite the OS height when maximization changes width.
+        window.width=window.width
+        window.height=window.height
+        backdrop.apply(window,Theme.transparency,Theme.dark)
         AppState.initializeHistory()
         if(previewTheme==="dark")Theme.mode="Dark"
         else if(previewTheme==="light")Theme.mode="Light"
@@ -41,7 +49,8 @@ ApplicationWindow {
     }
     Connections {
         target: Theme
-        function onTransparencyChanged() { backdrop.apply(window, Theme.transparency) }
+        function onTransparencyChanged() { backdrop.apply(window, Theme.transparency, Theme.dark) }
+        function onDarkChanged() { backdrop.apply(window, Theme.transparency, Theme.dark) }
     }
     Item {
         id:scaledCanvas
@@ -49,26 +58,41 @@ ApplicationWindow {
         scale:window.contentScale; transformOrigin:Item.TopLeft
         Rectangle {
             width:window.actualSidebarWidth + Theme.windowRadius; height:parent.height
-            radius:window.visibility===Window.Maximized ? 0 : Theme.windowRadius
+            radius:window.shellRadius
             color:Theme.sidebar
 
         }
         Rectangle {
             x: window.actualSidebarWidth
             width: parent.width - x; height: parent.height
-            radius: window.visibility === Window.Maximized ? 0 : Theme.windowRadius
+            radius: window.shellRadius
             color: Theme.canvas
             Rectangle { width: Theme.windowRadius; height: parent.height; color: Theme.canvas }
         }
         Rectangle { x: window.actualSidebarWidth - 1; width: 1; height: parent.height; color: Theme.border }
         MouseArea {
             x:0; y:0; width:parent.width; height:68
-            onPressed:window.startSystemMove()
+            property point pressPosition
+            property bool nativeMoveStarted:false
+            onPressed:mouse=>{ pressPosition=Qt.point(mouse.x,mouse.y);nativeMoveStarted=false }
+            onPositionChanged:mouse=>{ if(pressed&&!nativeMoveStarted&&Math.hypot(mouse.x-pressPosition.x,mouse.y-pressPosition.y)>Qt.styleHints.startDragDistance){nativeMoveStarted=true;window.startSystemMove()} }
             onDoubleClicked:window.visibility===Window.Maximized ? window.showNormal() : window.showMaximized()
+        }
+        MouseArea {
+            objectName:"titleDragArea"
+            visible:AppState.currentPage==="overview"
+            x:window.actualSidebarWidth; y:0; width:parent.width-x-240
+            height:pageLoader.item && pageLoader.item.scrollOffset>0 ? 22 : 68; z:20
+            acceptedButtons:Qt.LeftButton|Qt.RightButton
+            property point pressPosition
+            property bool nativeMoveStarted:false
+            onPressed:mouse=>{ pressPosition=Qt.point(mouse.x,mouse.y);nativeMoveStarted=false;if(mouse.button===Qt.RightButton)backdrop.showSystemMenu() }
+            onPositionChanged:mouse=>{ if(pressed&&(pressedButtons&Qt.LeftButton)&&!nativeMoveStarted&&Math.hypot(mouse.x-pressPosition.x,mouse.y-pressPosition.y)>Qt.styleHints.startDragDistance){nativeMoveStarted=true;window.startSystemMove()} }
+            onDoubleClicked:window.visibility===Window.Maximized?window.showNormal():window.showMaximized()
         }
         SwirlSidebar { id:sidebar; width:window.actualSidebarWidth; height:parent.height; compactByWindow:scaledCanvas.width<1160 }
         Item {
-            id:mainArea; x:window.actualSidebarWidth+46; width:parent.width-x-34; height:parent.height
+            id:mainArea; x:window.actualSidebarWidth+24; width:parent.width-x-24; height:parent.height
             RowLayout {
                 id:toolbar; visible:AppState.currentPage!=="overview"; x:0; y:12; width:parent.width; height:44; spacing:18
                 Item {
@@ -81,6 +105,7 @@ ApplicationWindow {
                             Button {
                                 required property int index
                                 required property string modelData
+                                objectName:index===0?"historyBackButton":"historyForwardButton"
                                 width:42; height:42; hoverEnabled:true
                                 enabled:index===0 ? AppState.historyIndex>0 : AppState.historyIndex<AppState.navigationHistory.length-1
                                 background:Rectangle{radius:Theme.pillRadius(height);color:parent.hovered?Theme.hover:"transparent"}
@@ -105,7 +130,7 @@ ApplicationWindow {
                 SwirlIconButton { iconName:"settings"; tooltip:"设置"; onClicked:AppState.navigate("settings") }
             }
             Loader {
-                id:pageLoader; objectName:"pageLoader"; x:0; y:AppState.currentPage==="overview" ? 42 : 68; width:parent.width; height:parent.height-y-17
+                id:pageLoader; objectName:"pageLoader"; x:0; y:AppState.currentPage==="overview" ? 22 : 68; width:parent.width; height:parent.height-y-17
                 sourceComponent:AppState.currentPage==="overview" ? overview :
                                 AppState.currentPage==="capture" ? capturePage :
                                 AppState.currentPage==="connections" ? connections :
@@ -155,6 +180,7 @@ ApplicationWindow {
             onPressed:window.startSystemResize(modelData)
         }
     }
+    Shortcut { sequence:"Alt+Space"; context:Qt.ApplicationShortcut; onActivated:backdrop.showSystemMenu() }
     Shortcut { sequence:"Ctrl+K"; context:Qt.ApplicationShortcut; onActivated:sidebar.searchField.forceActiveFocus() }
     Shortcut { sequence:"Alt+Left"; onActivated:AppState.goBack() }
     Shortcut { sequence:"Alt+Right"; onActivated:AppState.goForward() }
@@ -208,7 +234,7 @@ ApplicationWindow {
         running:smokeTestMode; repeat:true; interval:200
         property int index:0
         onTriggered:{
-            if(index>=AppState.allPageIds.length){stop();smokeFinished.start();return}
+            if(index>=AppState.allPageIds.length){console.info("SMOKE_PAGES",index);stop();smokeFinished.start();return}
             AppState.currentPage=AppState.allPageIds[index++]
         }
     }

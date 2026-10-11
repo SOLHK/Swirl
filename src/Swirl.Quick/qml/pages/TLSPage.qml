@@ -27,7 +27,7 @@ Item {
             RowLayout {
                 anchors.fill:parent; anchors.margins:23; spacing:18
                 Rectangle {
-                    width:52; height:52; radius:16; color:Theme.selected
+                    width:52; height:52; radius:Theme.roundedRadius(width,height); color:Theme.selected
                     SwirlIcon { name:"shield"; size:27; color:Theme.accent; anchors.centerIn:parent }
                 }
                 ColumnLayout {

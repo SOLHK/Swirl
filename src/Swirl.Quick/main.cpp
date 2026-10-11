@@ -24,9 +24,11 @@
 #ifdef SWIRL_UI_TESTS
 #include "tests/OverviewChecks.h"
 #include "tests/CaptureChecks.h"
+#include "tests/WindowChecks.h"
 #endif
 #include "demo/DemoDataProvider.h"
 #include "app/WindowsBackdrop.h"
+#include "app/SvgIconProvider.h"
 #include "network/CaptureService.h"
 
 // Collect Qt/QML diagnostics in a file because the Windows GUI subsystem
@@ -45,24 +47,28 @@ int main(int argc, char *argv[])
     QQuickWindow::setDefaultAlphaBuffer(true);
     QGuiApplication app(argc, argv);
     app.setApplicationName(QStringLiteral("Swirl"));
-    app.setWindowIcon(QIcon(QStringLiteral(":/swirl/icons/swirl_wave_light.svg")));
+    app.setApplicationVersion(QStringLiteral("1.0.0-preview"));
+    app.setWindowIcon(QIcon(QStringLiteral(":/swirl/icons/swirl_wave_mark.svg")));
     // Native Windows Qt Quick Controls do not support custom backgrounds/content.
     // Swirl draws its own visual controls, so explicitly use the customizable style.
     QQuickStyle::setStyle(QStringLiteral("Basic"));
-    if(app.arguments().contains("--interaction-test")||app.arguments().contains("--capture-self-test")||app.arguments().contains("--smoke-test"))
+    if(app.arguments().contains("--interaction-test")||app.arguments().contains("--capture-self-test")||app.arguments().contains("--smoke-test")||app.arguments().contains("--window-test"))
         QStandardPaths::setTestModeEnabled(true);
     DemoDataProvider demo;
     WindowsBackdrop backdrop;
     CaptureService capture;
     ModuleDraftStore drafts;
     QQmlApplicationEngine engine;
+    engine.addImageProvider(QStringLiteral("swirl"),new SvgIconProvider);
     const bool smoke = app.arguments().contains("--smoke-test");
     const bool interaction = app.arguments().contains("--interaction-test");
     const bool captureTest = app.arguments().contains("--capture-self-test");
+    const bool windowTest = app.arguments().contains("--window-test");
     bool qmlWarnings = false;
+    bool previewCaptured = false;
     QObject::connect(&engine, &QQmlEngine::warnings, &app,
-                     [&qmlWarnings, smoke, interaction, captureTest](const QList<QQmlError> &warnings) {
-                         if ((smoke || interaction || captureTest) && !warnings.isEmpty()) qmlWarnings = true;
+                     [&qmlWarnings, smoke, interaction, captureTest, windowTest](const QList<QQmlError> &warnings) {
+                         if (!warnings.isEmpty()) qmlWarnings = true;
                      });
     const QStringList arguments = app.arguments();
     const auto argumentValue = [&arguments](const QString &prefix) {
@@ -85,11 +91,12 @@ int main(int argc, char *argv[])
     const QString previewPath = nativeFramePath.isEmpty()?argumentValue(QStringLiteral("--capture-preview=")):nativeFramePath;
     const QString previewPage = argumentValue(QStringLiteral("--preview-page="));
     const QString previewTheme = argumentValue(QStringLiteral("--preview-theme="));
-    if (smoke || interaction || captureTest || !previewPath.isEmpty()) {
+    if (smoke || interaction || captureTest || windowTest || !previewPath.isEmpty()) {
         QFile::remove(QCoreApplication::applicationDirPath() + QStringLiteral("/Swirl-diagnostics.txt"));
         qInstallMessageHandler(recordQtDiagnostic);
     }
     engine.rootContext()->setContextProperty("previewPage", previewPage);
+    engine.rootContext()->setContextProperty("gpuEffectsSupported", QQuickWindow::graphicsApi()!=QSGRendererInterface::Software && qEnvironmentVariable("QT_QUICK_BACKEND")!=QStringLiteral("software"));
     engine.rootContext()->setContextProperty("previewTheme", previewTheme);
     engine.rootContext()->setContextProperty("smokeTestMode", smoke);
     engine.rootContext()->setContextProperty("demoProvider", &demo);
@@ -118,6 +125,14 @@ int main(int argc, char *argv[])
         return 4;
 #endif
     }
+    if (windowTest) {
+#ifdef SWIRL_UI_TESTS
+        const auto output=argumentValue(QStringLiteral("--window-test-output="));
+        QTimer::singleShot(400,&app,[&app,rootWindow,&backdrop,output]{app.exit(runWindowChecks(rootWindow,&backdrop,output));});
+#else
+        return 4;
+#endif
+    }
     if(captureTest) {
 #ifdef SWIRL_UI_TESTS
         QTimer::singleShot(400,&app,[&app,&capture]{app.exit(runCaptureChecks(&capture));});
@@ -135,12 +150,18 @@ int main(int argc, char *argv[])
     else if (!interaction && !captureTest && !previewPath.isEmpty()) {
         auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().constFirst());
         if (window) {
-            QTimer::singleShot(900, &app, [window, previewPath, nativeFramePath]() {
-                const QImage screenshot = nativeFramePath.isEmpty()?window->grabWindow():window->screen()->grabWindow(0,window->x()-8,window->y()-8,window->width()+16,window->height()+16).toImage();
+            if(!nativeFramePath.isEmpty())QTimer::singleShot(400,&app,[&app,&backdrop]{if(!backdrop.prepareNativeCapture()){qCritical()<<"Native capture blocked: cannot activate target window";app.exit(3);}});
+            QTimer::singleShot(900, &app, [window, previewPath, nativeFramePath, &backdrop, &app, &previewCaptured]() {
+                if(!nativeFramePath.isEmpty()&&!backdrop.isCaptureForeground()){qCritical()<<"Native capture blocked: target window lost foreground";backdrop.finishNativeCapture();app.exit(3);return;}
+                const QImage screenshot = nativeFramePath.isEmpty()?window->grabWindow():window->screen()->grabWindow(0,window->x(),window->y(),window->width(),window->height()).toImage();
                 if (!screenshot.isNull() && screenshot.save(previewPath)) {
-                    qInfo() << "Saved synthetic UI preview:" << previewPath;
+                    previewCaptured=true;
+                    qInfo() << (nativeFramePath.isEmpty()?"Saved Qt UI render:":"Saved Windows compositor screenshot:") << previewPath;
+                    qInfo()<<"Capture geometry"<<window->geometry()<<"DPR"<<window->devicePixelRatio()<<backdrop.status();
+                    if(!nativeFramePath.isEmpty())backdrop.finishNativeCapture();
                     return;
                 }
+                if(!nativeFramePath.isEmpty()){backdrop.finishNativeCapture();qCritical()<<"Native capture failed; no synthetic fallback used";app.exit(3);return;}
 
                 // The offscreen QPA plugin may not support QQuickWindow::grabWindow().
                 // Grab the rendered Quick item asynchronously as a software fallback.
@@ -151,15 +172,16 @@ int main(int argc, char *argv[])
                     return;
                 }
                 QObject::connect(fallback.data(), &QQuickItemGrabResult::ready, window,
-                                 [fallback, previewPath]() {
-                    if (!fallback->image().isNull() && fallback->image().save(previewPath))
+                                 [fallback, previewPath, &previewCaptured]() {
+                    if (!fallback->image().isNull() && fallback->image().save(previewPath)) {
+                        previewCaptured=true;
                         qInfo() << "Saved Qt item snapshot:" << previewPath;
-                    else
+                    } else
                         qWarning() << "Unable to save optional item preview:"
                                    << previewPath;
                 });
             });
-            QTimer::singleShot(2400, &app, &QCoreApplication::quit);
+            QTimer::singleShot(2400, &app, [&app,&previewCaptured]{app.exit(previewCaptured?0:3);});
         } else
             QTimer::singleShot(0, &app, &QCoreApplication::quit);
     }
@@ -168,5 +190,5 @@ int main(int argc, char *argv[])
     // This also keeps scripted page-navigation shutdown free of incubation warnings.
     if (auto *controller = engine.incubationController())
         controller->incubateFor(100);
-    return (smoke || interaction || captureTest) && qmlWarnings ? 2 : result;
+    return (smoke || interaction || captureTest || windowTest || !previewPath.isEmpty()) && qmlWarnings ? 2 : result;
 }

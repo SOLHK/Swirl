@@ -132,7 +132,7 @@ Item {
             Text { text:AppState.zh("Host or IP to evaluate"); color:Theme.text }
             SwirlTextField { id:testInput; Layout.fillWidth:true; placeholderText:AppState.zh("api.example.test") }
             Rectangle {
-                Layout.fillWidth:true; implicitHeight:68; radius:9; color:Theme.field
+                Layout.fillWidth:true; implicitHeight:68; radius:Theme.roundedRadius(width,height); color:Theme.field
                 Text {
                     anchors.fill:parent; anchors.margins:12
                     text:AppState.zh("Demo evaluator only.\nNo real DNS lookup or proxy routing occurs.")

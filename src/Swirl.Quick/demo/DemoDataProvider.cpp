@@ -4,7 +4,19 @@
 #include <QChar>
 #include <QGuiApplication>
 #include <QClipboard>
+#include <QNetworkInterface>
 
+QVariantMap DemoDataProvider::currentNetwork() const
+{
+    for (const auto &iface : QNetworkInterface::allInterfaces()) {
+        const auto f = iface.flags();
+        if (!(f & QNetworkInterface::IsUp) || !(f & QNetworkInterface::IsRunning) || (f & QNetworkInterface::IsLoopBack)) continue;
+        if (iface.type() != QNetworkInterface::Wifi && iface.type() != QNetworkInterface::Ethernet) continue;
+        if (iface.addressEntries().isEmpty()) continue;
+        return {{"type", iface.type() == QNetworkInterface::Wifi ? "Wi-Fi" : "以太网"}, {"name",iface.humanReadableName()}};
+    }
+    return {{"type","未连接"},{"name","无活动网络接口"}};
+}
 QVariantList DemoDataProvider::connections() const
 {
     QVariantList rows;

@@ -1,14 +1,14 @@
 # Swirl
 
-## Qt 测试版当前状态
+## Qt 1.0 UI 测试版当前状态
 
-Qt 总览采用柔和浅灰白主背景、白色卡片和浅色不透明侧边栏，颜色统一由现有主题管理；搜索位于侧栏顶部，按主导航、网络与工具分组。首页显示演示下载/上传速度、所选节点及历史延迟、当前代理和系统状态；模式、策略、节点切换、趋势与原有工具继续可用。布局、圆角、浅深主题、减少动效和透明效果设置保留。浅色背景不依赖 Windows backdrop 或壁纸；深色保留现有可选半透明侧栏，不包含 Apple 素材或装饰性背景。
+总览采用单一 Qt Quick 窗口：中性灰白侧栏、灰色导航选中、中性白主内容和完整网络总览。Windows 原生 Desktop Acrylic 通过真实背后窗口变化、移动和模糊边缘检查；不可用时使用不透明回退。所有页面共享主题、圆角和外壳，较小窗口换行与滚动，保留完整工具入口。
 
-![Swirl Qt 总览 · 浅色](docs/screenshots/background-hierarchy-after.png)
+![Swirl Qt 1.0 总览](docs/screenshots/ui-1-0-Swirl-overview.png)
 
-![Swirl Qt 总览 · 深色](docs/screenshots/overview-qt-dark.png)
+![Swirl Qt 1.0 暗色](docs/screenshots/ui-1-0-Swirl-dark.png)
 
-*以上为实际 Qt 6.10.3 窗口渲染截图，演示数据不代表真实代理服务已启动。浅色为本轮 Linux OpenGL 渲染输出，深色为既有 Windows 截图。前后对比、Windows Qt Quick 预览及验证范围见 [背景层次验收](docs/UI_BACKGROUND_VALIDATION.md)；历史材质采样见 [UI 视觉验证](docs/UI_VISUAL_VALIDATION.md)。*
+*以上为安装后 EXE 的真实 Windows 合成截图。代理、节点延迟、流量、排名及相关开关仍为演示，未接入 Mihomo；活动网卡信息和独立 HTTP 抓包为真实实现。39 项交互、32 项抓包、41 项原生窗口检查及 61 页加载通过；已验证范围、跨系统未验证项及安装更新报告见 [1.0 UI 验收记录](docs/UI_1_0_VALIDATION.md)。这不是正式版发布。*
 
 功能模块中心保留 56 个入口和 32 个配置草稿页，可保存、导入、导出草稿，实际网络功能后续接入。安装程序支持原目录覆盖更新，运行中的旧版需先退出。详见 [模块覆盖清单](docs/UI_MODULE_COVERAGE.md)。
 

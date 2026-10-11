@@ -83,7 +83,7 @@ Item {
                             text:page.editorText
                             font.family:"Cascadia Code"; font.pixelSize:12; color:Theme.text
                             wrapMode:TextEdit.NoWrap; selectByMouse:true
-                            background:Rectangle { color:Theme.field; radius:10; border.color:Theme.border }
+                            background:Rectangle { color:Theme.field; radius:Theme.roundedRadius(width,height); border.color:Theme.border }
                         }
                     }
                     SwirlButton { text:AppState.zh("Save preview"); onClicked:{page.editorText=editor.text;AppState.notice("保存编辑器预览")} }

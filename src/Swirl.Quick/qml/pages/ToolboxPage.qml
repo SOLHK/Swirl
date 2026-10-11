@@ -23,7 +23,7 @@ Item {
                         Layout.fillWidth:true; Layout.fillHeight:true; clip:true; spacing:4
                         model:page.tools
                         delegate:Rectangle {
-                            width:ListView.view.width; height:40; radius:10
+                            width:ListView.view.width; height:40; radius:Theme.roundedRadius(width,height)
                             color:page.tool===modelData?Theme.selected:area.containsMouse?Theme.hover:"transparent"
                             RowLayout {
                                 anchors.fill:parent; anchors.leftMargin:10
@@ -82,7 +82,7 @@ Item {
                     Text { text:"结果"; color:Theme.muted; font.pixelSize:11; font.weight:Font.DemiBold }
                     Rectangle {
                         Layout.fillWidth:true; Layout.fillHeight:true
-                        color:Theme.field; border.color:Theme.border; radius:12
+                        color:Theme.field; border.color:Theme.border; radius:Theme.roundedRadius(width,height)
                         ScrollView {
                             anchors.fill:parent; anchors.margins:12
                             TextArea {

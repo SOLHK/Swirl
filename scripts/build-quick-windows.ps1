@@ -5,9 +5,11 @@ param(
     [string]$OutDir = "out",
     [string]$Nsis = "C:/Program Files (x86)/NSIS/makensis.exe",
     [string]$Generator = "Ninja",
-    [switch]$InputTests
+    [switch]$InputTests,
+    [switch]$NativeBackdropTests
 )
 $ErrorActionPreference = "Stop"
+if ($NativeBackdropTests -and !$InputTests) { throw "Native backdrop checks require -InputTests and an unlocked Windows desktop." }
 $repo = Split-Path $PSScriptRoot -Parent
 Push-Location $repo
 try {
@@ -29,6 +31,13 @@ try {
         if ($test.ExitCode) { throw "Capture checks failed: $($test.ExitCode)." }
         $test = Start-Process $exe -ArgumentList "--smoke-test" -WindowStyle Hidden -Wait -PassThru
         if ($test.ExitCode) { throw "Module startup checks failed: $($test.ExitCode)." }
+        if ($NativeBackdropTests) {
+            New-Item -ItemType Directory -Force $OutDir | Out-Null
+            $nativeOutput = Join-Path (Resolve-Path $OutDir).Path "window-validation"
+            $test = Start-Process $exe -ArgumentList @("--window-test", ('"--window-test-output=' + $nativeOutput + '"')) -WindowStyle Hidden -Wait -PassThru
+            if ($test.ExitCode) { throw "Native compositor checks failed: $($test.ExitCode)." }
+            Copy-Item (Join-Path (Split-Path $exe) "Swirl-diagnostics.txt") (Join-Path $OutDir "window-validation.log") -Force
+        }
         cmake -S src/Swirl.Quick -B $BuildDir -DSWIRL_BUILD_UI_TESTS=OFF
         if ($LASTEXITCODE) { throw "Production reconfigure failed." }
         cmake --build $BuildDir --config Release --parallel
@@ -39,7 +48,7 @@ try {
     }
     New-Item -ItemType Directory -Force $DistDir,$OutDir | Out-Null
     Copy-Item -LiteralPath $exe -Destination $DistDir
-    Copy-Item src/Swirl.Quick/assets/swirl.ico (Join-Path $DistDir "Swirl-brand-003.ico")
+    Copy-Item src/Swirl.Quick/assets/swirl.ico (Join-Path $DistDir "Swirl-brand-100.ico")
     & "$qt/bin/windeployqt.exe" --release --qmldir src/Swirl.Quick/qml (Join-Path $DistDir "Swirl.exe")
     if ($LASTEXITCODE) { throw "Qt runtime deployment failed." }
     Copy-Item src/Swirl.Quick/packaging/THIRD_PARTY_NOTICES.txt $DistDir

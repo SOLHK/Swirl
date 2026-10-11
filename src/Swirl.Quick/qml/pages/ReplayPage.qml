@@ -40,7 +40,7 @@ Item {
                             return (r.method+" "+r.path).toLowerCase().indexOf(search.text.toLowerCase())>=0
                         })
                         delegate:Rectangle {
-                            width:ListView.view.width; height:51; radius:9
+                            width:ListView.view.width; height:51; radius:Theme.roundedRadius(width,height)
                             color:page.selectedRequest===modelData.id?Theme.selected:tap.containsMouse?Theme.hover:"transparent"
                             ColumnLayout {
                                 anchors.fill:parent; anchors.margins:8; spacing:3
@@ -80,7 +80,7 @@ Item {
                     QtObject { id:requestTab; property string current:"Headers" }
                     Rectangle {
                         Layout.fillWidth:true; Layout.fillHeight:true
-                        radius:10; color:Theme.field; border.color:Theme.border
+                        radius:Theme.roundedRadius(width,height); color:Theme.field; border.color:Theme.border
                         ScrollView {
                             anchors.fill:parent; anchors.margins:9
                             TextArea {
@@ -109,7 +109,7 @@ Item {
                     SwirlStatusBadge { label:"模拟数据"; tone:"accent" }
                     Rectangle {
                         Layout.fillWidth:true; Layout.fillHeight:true
-                        radius:10; color:Theme.field; border.color:Theme.border
+                        radius:Theme.roundedRadius(width,height); color:Theme.field; border.color:Theme.border
                         ScrollView {
                             anchors.fill:parent; anchors.margins:9
                             TextArea {

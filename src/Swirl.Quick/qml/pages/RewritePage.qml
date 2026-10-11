@@ -69,7 +69,7 @@ Item {
                     Text { text:"结果预览"; color:Theme.muted; font.pixelSize:10 }
                     Rectangle {
                         Layout.fillWidth:true; Layout.fillHeight:true
-                        radius:10; color:Theme.field; border.color:Theme.border
+                        radius:Theme.roundedRadius(width,height); color:Theme.field; border.color:Theme.border
                         ScrollView {
                             anchors.fill:parent; anchors.margins:9
                             TextArea {

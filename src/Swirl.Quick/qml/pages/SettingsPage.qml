@@ -26,7 +26,7 @@ Item {
                         Layout.fillWidth:true; Layout.fillHeight:true
                         model:page.sections; clip:true; spacing:3
                         delegate:Rectangle {
-                            width:ListView.view.width; height:36; radius:9
+                            width:ListView.view.width; height:36; radius:Theme.roundedRadius(width,height)
                             color:page.section===modelData?Theme.selected:hover.containsMouse?Theme.hover:"transparent"
                             Text {
                                 anchors.fill:parent; anchors.leftMargin:11
@@ -104,13 +104,13 @@ Item {
                                         y: scaleSlider.topPadding + scaleSlider.availableHeight / 2 - height / 2
                                         width: scaleSlider.availableWidth
                                         height: 7
-                                        radius: 4
+                                        radius:Theme.roundedRadius(width,height)
                                         color: Theme.material("field")
                                         border.width: 1
                                         border.color: Theme.glassRim
                                         Rectangle {
                                             height: parent.height
-                                            radius: 4
+                                            radius:Theme.roundedRadius(width,height)
                                             width: scaleSlider.visualPosition * parent.width
                                             color: Theme.accent
                                         }
@@ -119,7 +119,7 @@ Item {
                                         x: scaleSlider.leftPadding + scaleSlider.visualPosition * (scaleSlider.availableWidth - width)
                                         y: scaleSlider.topPadding + scaleSlider.availableHeight / 2 - height / 2
                                         implicitWidth: 20; implicitHeight: 20
-                                        radius: 10
+                                        radius:Theme.roundedRadius(width,height)
                                         color: "#FBFDFF"
                                         border.width: 1
                                         border.color: Theme.glassRim

@@ -22,11 +22,11 @@ InstallDirRegKey HKCU "Software\\Swirl" "InstallDir"
 RequestExecutionLevel user
 ShowInstDetails show
 ShowUnInstDetails show
-VIProductVersion "0.1.0.3"
+VIProductVersion "1.0.0.0"
 VIAddVersionKey /LANG=2052 "ProductName" "Swirl"
 VIAddVersionKey /LANG=2052 "FileDescription" "Swirl 安装程序"
-VIAddVersionKey /LANG=2052 "FileVersion" "0.1.0.3"
-VIAddVersionKey /LANG=2052 "ProductVersion" "0.1.0.3"
+VIAddVersionKey /LANG=2052 "FileVersion" "1.0.0.0"
+VIAddVersionKey /LANG=2052 "ProductVersion" "1.0.0.0"
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
@@ -76,13 +76,13 @@ Section "安装 Swirl"
     Goto install_done
     regular:
     CreateDirectory "$SMPROGRAMS\\Swirl"
-    CreateShortCut "$SMPROGRAMS\\Swirl\\Swirl.lnk" "$INSTDIR\\Swirl.exe" "" "$INSTDIR\\Swirl-brand-003.ico" 0
-    CreateShortCut "$DESKTOP\\Swirl.lnk" "$INSTDIR\\Swirl.exe" "" "$INSTDIR\\Swirl-brand-003.ico" 0
+    CreateShortCut "$SMPROGRAMS\\Swirl\\Swirl.lnk" "$INSTDIR\\Swirl.exe" "" "$INSTDIR\\Swirl-brand-100.ico" 0
+    CreateShortCut "$DESKTOP\\Swirl.lnk" "$INSTDIR\\Swirl.exe" "" "$INSTDIR\\Swirl-brand-100.ico" 0
     WriteRegStr HKCU "Software\\Swirl" "InstallDir" "$INSTDIR"
     WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "DisplayName" "Swirl"
-    WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "DisplayVersion" "0.1.0.3"
+    WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "DisplayVersion" "1.0.0.0"
     WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "UninstallString" '"$INSTDIR\\卸载 Swirl.exe"'
-    WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "DisplayIcon" "$INSTDIR\\Swirl-brand-003.ico"
+    WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "DisplayIcon" "$INSTDIR\\Swirl-brand-100.ico"
     WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "Publisher" "Swirl"
     WriteRegDWORD HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "NoModify" 1
     WriteRegDWORD HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "NoRepair" 1

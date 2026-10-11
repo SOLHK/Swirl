@@ -40,7 +40,7 @@ Item {
         SplitView {
             Layout.fillWidth:true; Layout.fillHeight:true
             orientation:Qt.Horizontal
-            handle:Rectangle { implicitWidth:7; color:Theme.canvas; Rectangle { width:2; height:45; radius:1; color:Theme.border; anchors.centerIn:parent } }
+            handle:Rectangle { implicitWidth:7; color:Theme.canvas; Rectangle { width:2; height:45; radius:Theme.roundedRadius(width,height); color:Theme.border; anchors.centerIn:parent } }
             SwirlGlassPanel {
                 SplitView.fillWidth:true; SplitView.minimumWidth:320
                 clip:true
@@ -87,7 +87,7 @@ Item {
                             Rectangle {
                                 x:parent.width*Number(modelData.waterfall)/100
                                 width:Math.max(6,Math.min(parent.width-x,parent.width*Number.parseInt(modelData.duration)/640))
-                                height:12; radius:3
+                                height:12; radius:Theme.roundedRadius(width,height)
                                 color:page.selected&&page.selected.id===modelData.id?Theme.green:Theme.accent
                                 opacity:0.8
                             }

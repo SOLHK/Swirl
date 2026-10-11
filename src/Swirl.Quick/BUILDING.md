@@ -114,3 +114,9 @@ The catalog exposes 56 public capability entries. Thirty-two new draft pages off
 The installer reuses the registered install directory and overwrites application files. It retains configuration/data and refuses a silent update when the existing executable is still running or unwritable (exit 2). Interactive setup offers retry after quitting Swirl. Test an old installer followed by the new installer using the SAME fresh isolated test directory; verify the new EXE hash and startup before uninstalling.
 
 Visual comparison, reference sampling and compositor limitations are documented in `docs/UI_VISUAL_VALIDATION.md`.
+
+## Native 1.0 UI validation
+
+`--window-test --window-test-output=C:/Swirl-validation` requires a test-enabled build and an unlocked native Windows desktop. It uses separate color windows to verify changing composition, movement, a blurred edge, opacity fallback, window controls, title double-click, native hit testing and work-area maximization. It temporarily brings only its own test window forward. Do not run this test on offscreen CI.
+
+Use `scripts/build-quick-windows.ps1 -InputTests -NativeBackdropTests` for native checks before producing the installer. Normal input/capture/smoke checks remain available offscreen. Production builds omit Qt Test. `--capture-native-frame=...` explicitly brings the target window forward briefly; it fails if the target cannot be activated or a composed frame cannot be saved. See `docs/UI_1_0_VALIDATION.md` for measured results and unverified environments.
