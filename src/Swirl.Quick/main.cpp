@@ -16,6 +16,11 @@
 #include <QQmlExpression>
 #include <QQmlIncubationController>
 #include <QScreen>
+#include <QSvgRenderer>
+#include <QPainter>
+#include <QDir>
+#include <QStandardPaths>
+#include "app/ModuleDraftStore.h"
 #ifdef SWIRL_UI_TESTS
 #include "tests/OverviewChecks.h"
 #include "tests/CaptureChecks.h"
@@ -40,13 +45,16 @@ int main(int argc, char *argv[])
     QQuickWindow::setDefaultAlphaBuffer(true);
     QGuiApplication app(argc, argv);
     app.setApplicationName(QStringLiteral("Swirl"));
-    app.setWindowIcon(QIcon(QStringLiteral(":/swirl/swirl-app.png")));
+    app.setWindowIcon(QIcon(QStringLiteral(":/swirl/swirl-app.svg")));
     // Native Windows Qt Quick Controls do not support custom backgrounds/content.
     // Swirl draws its own visual controls, so explicitly use the customizable style.
     QQuickStyle::setStyle(QStringLiteral("Basic"));
+    if(app.arguments().contains("--interaction-test")||app.arguments().contains("--capture-self-test")||app.arguments().contains("--smoke-test"))
+        QStandardPaths::setTestModeEnabled(true);
     DemoDataProvider demo;
     WindowsBackdrop backdrop;
     CaptureService capture;
+    ModuleDraftStore drafts;
     QQmlApplicationEngine engine;
     const bool smoke = app.arguments().contains("--smoke-test");
     const bool interaction = app.arguments().contains("--interaction-test");
@@ -63,6 +71,16 @@ int main(int argc, char *argv[])
                 return argument.mid(prefix.size());
         return QString();
     };
+    const QString brandOutput=argumentValue(QStringLiteral("--render-brand-assets="));
+    if(!brandOutput.isEmpty()) {
+        QDir().mkpath(brandOutput);
+        for(const auto &name:{QStringLiteral("swirl-app"),QStringLiteral("swirl-mark")}) {
+            QImage image(1024,1024,QImage::Format_ARGB32_Premultiplied);image.fill(Qt::transparent);
+            QPainter painter(&image);QSvgRenderer svg(QStringLiteral(":/swirl/")+name+QStringLiteral(".svg"));svg.render(&painter);painter.end();
+            if(!image.save(brandOutput+QStringLiteral("/")+name+QStringLiteral(".png")))return 5;
+        }
+        return 0;
+    }
     const QString nativeFramePath = argumentValue(QStringLiteral("--capture-native-frame="));
     const QString previewPath = nativeFramePath.isEmpty()?argumentValue(QStringLiteral("--capture-preview=")):nativeFramePath;
     const QString previewPage = argumentValue(QStringLiteral("--preview-page="));
@@ -77,6 +95,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("demoProvider", &demo);
     engine.rootContext()->setContextProperty("backdrop", &backdrop);
     engine.rootContext()->setContextProperty("captureProvider", &capture);
+    engine.rootContext()->setContextProperty("moduleDrafts", &drafts);
     engine.loadFromModule("SwirlQuick", "Main");
     if (engine.rootObjects().isEmpty())
         return 1;
@@ -109,7 +128,7 @@ int main(int argc, char *argv[])
     if (app.arguments().contains("--preview-scroll-bottom"))
         QTimer::singleShot(400, rootWindow, [rootWindow]() { QMetaObject::invokeMethod(rootWindow,"previewScrollBottom"); });
     if (!interaction && !captureTest && smoke)
-        QTimer::singleShot(15000, &app, [&app]() {
+        QTimer::singleShot(60000, &app, [&app]() {
             qCritical() << "Navigation smoke test timed out before completing all pages.";
             app.exit(3);
         });

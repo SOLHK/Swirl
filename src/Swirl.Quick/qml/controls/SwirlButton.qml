@@ -17,13 +17,18 @@ Button {
     leftPadding: 18; rightPadding: 18
     background: SwirlPillSurface {
         primary: control.primary
+        gradient:control.quiet && !control.hovered && !control.down ? null : pillGradient
+        property Gradient pillGradient:Gradient {
+            GradientStop { position:0; color:control.primary ? "#389BFF" : control.down ? Theme.pressed : control.hovered ? Theme.hover : Theme.pillTop }
+            GradientStop { position:1; color:control.primary ? "#087EFF" : control.down ? Theme.pressed : control.hovered ? Theme.hover : Theme.pillBottom }
+        }
         hovered: control.hovered || control.activeFocus
         pressed: control.down
         subtleShadow: !control.quiet
         opacity: control.enabled ? 1 : 0.45
         color: control.quiet && !control.hovered && !control.down ? "transparent" :
                control.primary ? Theme.accent : control.down ? Theme.pressed : control.hovered ? Theme.hover : Theme.buttonBase
-        border.color: control.activeFocus ? Theme.focusBorder : control.quiet ? "transparent" : Theme.controlBorder
+        border.color: control.activeFocus ? Theme.focusBorder : control.quiet ? "transparent" : Theme.pillRim
     }
     contentItem: RowLayout {
         id: contents

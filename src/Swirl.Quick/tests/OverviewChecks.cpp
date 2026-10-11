@@ -7,6 +7,9 @@
 #include <QTest>
 #include <QDebug>
 #include <functional>
+#include <QTemporaryDir>
+#include <QFile>
+#include "../app/ModuleDraftStore.h"
 
 int runOverviewChecks(QQuickWindow *window)
 {
@@ -108,6 +111,42 @@ int runOverviewChecks(QQuickWindow *window)
     check(state("captureProvider.running && captureProvider.port > 0").toBool(),"capture start button opens actual loopback listener");
     click(item("captureStartButton"));
     check(state("!captureProvider.running").toBool(),"capture stop button closes actual listener");
+    QTest::keyClick(window,Qt::Key_K,Qt::ControlModifier);
+    if(auto *moduleSearch=item("pageSearch"))moduleSearch->setProperty("text",QStringLiteral("DHCP"));
+    QTest::keyClick(window,Qt::Key_Return);QTest::qWait(250);
+    check(state("AppState.currentPage === 'feature-dhcp' && !captureProvider.running").toBool(),"search opens dedicated DHCP module without network listener");
+    auto *firstToggle=item("moduleFirstToggle");
+    const bool before=firstToggle && firstToggle->property("checked").toBool();
+    click(firstToggle);
+    click(item("moduleSaveButton"));
+    check(state("moduleDrafts.load('feature-dhcp').settings.f0").toBool()!=before,"module toggle is saved as actual local draft");
+    state("AppState.navigate('featurehub')");QTest::qWait(200);
+    check(item("moduleSearch")!=nullptr,"module hub renders searchable catalog");
+    check(state("FeatureCatalog.entries.length===56").toBool(),"catalog contains 56 capability entries");
+    state("AppState.navigate('feature-dhcp')");QTest::qWait(200);
+    check(item("moduleFirstToggle") && item("moduleFirstToggle")->property("checked").toBool()!=before,"module draft restored after navigation");
+    // Drive record creation through the page, then reload the persisted list.
+    if(auto *loaderItem=item("pageLoader")) {
+        if(auto *modulePage=qvariant_cast<QObject *>(loaderItem->property("item")))modulePage->setProperty("tab",1);
+    }
+    QTest::qWait(100);click(item("moduleAddButton"));
+    if(auto *name=item("moduleEntryName"))name->setProperty("text",QStringLiteral("UI test reservation"));
+    if(auto *value=item("moduleEntryValue"))value->setProperty("text",QStringLiteral("192.0.2.20"));
+    click(item("moduleEntryConfirm"));click(item("moduleSaveButton"));
+    check(state("moduleDrafts.load('feature-dhcp').records.some(function(r){return r.name==='UI test reservation' && r.value==='192.0.2.20'})").toBool(),"entry dialog persists actual module record");
+    auto *store=qobject_cast<ModuleDraftStore *>(qmlContext(window)->contextProperty("moduleDrafts").value<QObject *>());
+    QTemporaryDir temp;
+    if(store && temp.isValid()) {
+        const auto draft=store->load("feature-dhcp");
+        const auto file=QUrl::fromLocalFile(temp.filePath("draft.json"));
+        check(store->exportFile(file,"feature-dhcp",draft),"draft JSON export writes actual file");
+        check(store->importFile(file,"feature-dhcp")==draft,"draft JSON roundtrip retains settings and ordered records");
+        check(store->importFile(file,"feature-dns").isEmpty() && !store->lastError().isEmpty(),"draft import rejects wrong module");
+        QFile bad(temp.filePath("bad.json"));
+        if(!bad.open(QIODevice::WriteOnly))return 2;
+        bad.write("{broken");bad.close();
+        check(store->importFile(QUrl::fromLocalFile(bad.fileName()),"feature-dhcp").isEmpty() && !store->lastError().isEmpty(),"draft import rejects malformed JSON");
+    } else check(false,"draft test fixture exists");
     qInfo() << "Overview input checks:" << checks << "checks," << failures << "failures";
     return failures ? 2 : 0;
 }

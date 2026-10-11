@@ -1,7 +1,7 @@
 # Swirl 与 Surge 功能现状
 
 核对日期：2026-10-11。参考 [Surge 官方能力地图](https://manual.nssurge.com/)。
-**尚未实现全部 Surge 功能。** Qt 页面、旧核心源码与当前安装包的真实能力需要分别看待。
+界面模块已按官方能力图扩展为 56 个入口，详见 [模块覆盖清单](UI_MODULE_COVERAGE.md)。**实际网络功能尚未完整实现。** Qt 页面、旧核心源码与当前安装包的真实能力需要分别看待。
 
 | 功能类别 | 原 WPF/.NET 源码 | 当前 Qt 安装包 |
 | --- | --- | --- |
@@ -13,8 +13,8 @@
 | URL/头/正文改写、本地响应 | Loon 插件兼容层有部分实现和明确限制 | 演示页面，未接入执行器 |
 | JavaScript、Cron、网络触发 | PluginScriptRunner、PluginTasks 有部分 Loon API 兼容实现 | 演示编辑器；不能视为完整 Surge 脚本 API |
 | HTTP 断点、重放、映射、WebSocket 帧分析 | 未发现完整 Surge 等效工作流 | 原有专门页面是演示；新抓包不支持 Upgrade/WebSocket 明文帧分析 |
-| 网关、DHCP、设备级策略、端口转发 | 未发现对应完整实现 | 占位/演示 |
-| Surge Ponte、内置 Snell/MTProto 服务 | 未发现对应实现 | 未实现 |
+| 网关、DHCP、设备级策略、端口转发 | 未发现对应完整实现 | 网关原交互页 + DHCP、端口转发、网络参数独立草稿页 |
+| Surge Ponte、内置 Snell/MTProto 服务 | 未发现对应实现 | 已新增独立配置草稿页；服务未接入 |
 | Surge 配置/模块/新增协议全兼容 | 以 Mihomo YAML 和部分 Loon 插件为基础，不是 Surge 兼容引擎 | 未实现完整兼容 |
 | PCAP/PCAPng、网卡级 TCP/UDP/QUIC 抓包 | 没有完整网卡采集与导出链路 | 未实现；HAR 是 HTTP 会话文件，不是 PCAP |
 | 本地 API/CLI、远程 Dashboard、设备控制 | 旧核心内部控制接口不等于 Surge 对外 API | 原有页面是演示，未提供完整对外控制接口 |

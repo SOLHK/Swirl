@@ -35,8 +35,9 @@ QtObject {
     readonly property var navigationGroups: [
         {title:"",pages:[{id:"overview",title:"总览",icon:"home"},{id:"proxies",title:"代理节点",icon:"pin"},{id:"policies",title:"策略组",icon:"layers"},{id:"rules",title:"规则",icon:"document"},{id:"subscriptions",title:"订阅管理",icon:"refresh"},{id:"profiles",title:"配置文件",icon:"file"}]},
         {title:"网络",pages:[{id:"dns",title:"DNS",icon:"globe"},{id:"toolbox",title:"网络检测",icon:"gauge"},{id:"connections",title:"连接记录",icon:"clock"}]},
-        {title:"工具",pages:[{id:"inspector",title:"HTTP 检查器",icon:"code"},{id:"capture",title:"抓包",icon:"capture"},{id:"traffic",title:"流量分析",icon:"bars"},{id:"scripts",title:"脚本与配置",icon:"terminal"},{id:"external",title:"外部工具",icon:"folder"}]}
+        {title:"工具",pages:[{id:"inspector",title:"HTTP 检查器",icon:"code"},{id:"traffic",title:"流量分析",icon:"bars"},{id:"scripts",title:"脚本与配置",icon:"terminal"},{id:"external",title:"外部工具",icon:"folder"}]}
     ]
+    readonly property var allPageIds: groups.reduce(function(all,g){return all.concat(g.pages.map(function(p){return p.id}))},[]).concat(["featurehub","external"]).concat(FeatureCatalog.entries.filter(function(f){return f.id.indexOf("feature-")===0}).map(function(f){return f.id}))
     function navigate(id) {
         if (currentPage === id) return
         navigationHistory = navigationHistory.slice(0,historyIndex+1).concat([id])
@@ -417,6 +418,8 @@ QtObject {
         return Object.prototype.hasOwnProperty.call(zhDictionary,key) ? zhDictionary[key] : key
     }
     function page(id) {
+        if(id==="featurehub") return {id:id,title:"功能模块中心",sub:"全部功能与配置草稿"}
+        var feature=FeatureCatalog.find(id); if(feature)return feature
         if(id==="external") return {id:"external",title:"外部工具",sub:"尚未接入外部程序"}
         for (var i=0;i<groups.length;++i)
             for (var j=0;j<groups[i].pages.length;++j)

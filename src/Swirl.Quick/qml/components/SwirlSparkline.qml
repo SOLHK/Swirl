@@ -21,7 +21,7 @@ Canvas {
             return
         }
         function x(i){return i*width/(n-1)}
-        function y(i){var v=active&&i===n-1?0.5:values[i];return base-v*(height-4)*0.75-(active&&i>0?Math.sin(i+AppState.demoTick)*1.2:0)}
+        function y(i){var v=active&&i===n-1?0.5:values[i];return base-v*(height-4)*0.85-(active&&i>0?Math.sin(i+AppState.demoTick)*1.2:0)}
         function path(){c.moveTo(x(0),y(0));for(var i=1;i<n;i++){var mx=(x(i-1)+x(i))/2;c.bezierCurveTo(mx,y(i-1),mx,y(i),x(i),y(i))}}
         var grad=c.createLinearGradient(0,0,0,base);grad.addColorStop(0,Theme.withAlpha(lineColor,0.23));grad.addColorStop(1,Theme.withAlpha(lineColor,0))
         c.beginPath();path();c.lineTo(width,base);c.lineTo(0,base);c.closePath();c.fillStyle=grad;c.fill()

@@ -30,11 +30,9 @@ Item {
             }
             RowLayout {
                 x:7; y:64; width:parent.width-12; spacing:16
-                Rectangle {
-                    width:sidebar.effectivelyCollapsed ? 48 : 64; height:width; radius:Theme.secondaryRadius; color:Theme.buttonBase
-                    Image { anchors.fill:parent; anchors.margins:5; source:"qrc:/swirl/swirl-mark.png"; fillMode:Image.PreserveAspectFit; sourceSize:Qt.size(128,128) }
-                }
+                SwirlBrandIcon { Layout.preferredWidth:sidebar.effectivelyCollapsed ? 48 : 64; Layout.minimumWidth:sidebar.effectivelyCollapsed ? 48 : 64; Layout.maximumWidth:sidebar.effectivelyCollapsed ? 48 : 64; Layout.preferredHeight:sidebar.effectivelyCollapsed ? 48 : 64 }
                 Column {
+                    Layout.fillWidth:true
                     visible:!sidebar.effectivelyCollapsed
                     spacing:3
                     Text { text:"Swirl"; font.family:"Segoe UI"; font.pixelSize:24; font.weight:Font.DemiBold; color:Theme.text }
@@ -55,7 +53,14 @@ Item {
                         Item {
                             visible:modelData.title.length>0; width:parent.width; height:visible ? 42 : 0
                             Text { visible:!sidebar.effectivelyCollapsed; x:16; anchors.verticalCenter:parent.verticalCenter; text:modelData.title; font.pixelSize:15; color:Theme.muted; opacity:0.8 }
-                            Rectangle { x:sidebar.effectivelyCollapsed ? 15 : 74; width:sidebar.effectivelyCollapsed ? 36 : parent.width-90; height:1; anchors.verticalCenter:parent.verticalCenter; color:Theme.border }
+                            Button {
+                                visible:modelData.title==="工具" && !sidebar.effectivelyCollapsed
+                                x:parent.width-65; width:60; height:30; anchors.verticalCenter:parent.verticalCenter
+                                text:"全部 ›"; font.pixelSize:13; palette.buttonText:Theme.muted
+                                background:Rectangle {color:parent.hovered ? Theme.hover : "transparent";radius:Theme.pillRadius(height)}
+                                onClicked:AppState.navigate("featurehub"); Accessible.name:"全部功能模块"
+                            }
+                            Rectangle { visible:modelData.title!=="工具"; x:sidebar.effectivelyCollapsed ? 15 : 74; width:sidebar.effectivelyCollapsed ? 36 : parent.width-90; height:1; anchors.verticalCenter:parent.verticalCenter; color:Theme.border }
                         }
                         Repeater {
                             model:modelData.pages

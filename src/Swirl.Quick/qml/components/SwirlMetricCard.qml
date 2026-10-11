@@ -20,5 +20,5 @@ SwirlGlassPanel {
         Text { text:card.label; color:Theme.muted; font.pixelSize:17; Layout.fillWidth:true; elide:Text.ElideRight }
     }
     Text { x:25; y:61; width:parent.width-40; text:card.value; color:card.valueColor; font.family:"Segoe UI"; font.pixelSize:32; font.weight:Font.DemiBold; elide:Text.ElideRight }
-    SwirlSparkline { x:parent.width*0.31; y:parent.height-44; width:parent.width*0.63; height:34; lineColor:card.chartColor; bars:card.bars }
+    SwirlSparkline { x:parent.width*0.31; y:parent.height-54; width:parent.width*0.63; height:43; lineColor:card.chartColor; bars:card.bars }
 }

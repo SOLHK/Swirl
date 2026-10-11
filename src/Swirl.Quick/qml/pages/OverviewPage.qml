@@ -6,7 +6,7 @@ import "../components"
 import "../controls"
 Item {
     id:page
-    readonly property real overviewHeight:Math.max(798,height)
+    readonly property real overviewHeight:798
     readonly property real unit:(overviewHeight-3*Theme.gap)/756
     function scrollToBottom() { scroll.contentItem.contentY=Math.max(0,scroll.contentItem.contentHeight-scroll.contentItem.height) }
     ScrollView {
@@ -17,7 +17,7 @@ Item {
             RowLayout {
                 Layout.fillWidth:true; Layout.preferredHeight:176*page.unit; spacing:Theme.gap
                 SwirlGlassPanel {
-                    Layout.fillWidth:true; Layout.preferredWidth:756; Layout.fillHeight:true
+                    Layout.fillWidth:true; Layout.preferredWidth:756; Layout.minimumWidth:page.width>=1000 ? 680 : 420; Layout.fillHeight:true
                     ColumnLayout {
                         anchors.fill:parent; anchors.margins:page.width<1000 ? 18 : 23; spacing:page.width<1000 ? 14 : 18
                         RowLayout {
@@ -29,7 +29,7 @@ Item {
                             ColumnLayout {
                                 Layout.fillWidth:true; spacing:4
                                 Text { text:AppState.proxyOn ? "演示连接已开启" : "随时准备连接"; color:Theme.text; font.pixelSize:page.width<1000 ? 22 : 26; font.weight:Font.DemiBold; Layout.fillWidth:true; elide:Text.ElideRight }
-                                Text { text:"点击右侧开关即可连接，当前为界面演示，不会更改系统代理。"; color:Theme.muted; font.pixelSize:page.width<1000 ? 14 : 16; Layout.fillWidth:true; wrapMode:Text.WordWrap }
+                                Text { text:"点击右侧开关即可连接，当前为界面演示，不会更改系统代理。"; color:Theme.muted; font.pixelSize:page.width<1000 ? 13 : 16; Layout.fillWidth:true; elide:Text.ElideRight }
                             }
                             SwirlToggle { objectName:"connectionSwitch"; large:true; implicitWidth:page.width<1000 ? 68 : 86; implicitHeight:page.width<1000 ? 38 : 46; checked:AppState.proxyOn; onToggled:AppState.setConnection(checked); Accessible.name:"演示连接开关" }
                         }
@@ -70,21 +70,21 @@ Item {
                         RowLayout {
                             Layout.fillWidth:true
                             Rectangle {
-                                width:page.width<1000 ? 112 : 130; height:36; radius:Theme.pillRadius(height); color:Theme.withAlpha(Theme.green,0.1)
-                                Text { anchors.centerIn:parent; text:AppState.selectedNodeLatency>0 ? "历史 "+AppState.selectedNodeLatency+" ms · 演示" : "尚未检测 · 演示"; color:Theme.green; font.pixelSize:page.width<1000 ? 12 : 14 }
+                                width:page.width<1000 ? 112 : 121; height:36; radius:Theme.pillRadius(height); color:Theme.withAlpha(Theme.green,0.1)
+                                Text { anchors.centerIn:parent; text:AppState.selectedNodeLatency>0 ? "上次 "+AppState.selectedNodeLatency+" ms" : "尚未检测 · 演示"; color:Theme.green; font.pixelSize:page.width<1000 ? 12 : 14 }
                             }
                             Item { Layout.fillWidth:true }
-                            SwirlButton { objectName:"nodePickerButton"; text:"切换节点"; iconName:"refresh"; implicitHeight:44; font.pixelSize:page.width<1000 ? 15 : 17; onClicked:nodePicker.open() }
+                            SwirlButton { objectName:"nodePickerButton"; implicitWidth:160; text:"切换节点"; iconName:"refresh"; implicitHeight:44; font.pixelSize:page.width<1000 ? 15 : 17; onClicked:nodePicker.open() }
                         }
                     }
                 }
             }
             RowLayout {
                 Layout.fillWidth:true; Layout.preferredHeight:142*page.unit; spacing:Theme.gap
-                SwirlMetricCard { objectName:"downloadMetric"; Layout.fillWidth:true; Layout.fillHeight:true; label:"下载速度"; value:AppState.proxyOn ? AppState.demoDown.toFixed(2)+" MB/s" : "0 KB/s"; iconName:"download" }
-                SwirlMetricCard { Layout.fillWidth:true; Layout.fillHeight:true; label:"上传速度"; value:AppState.proxyOn ? AppState.demoUp.toFixed(2)+" MB/s" : "0 KB/s"; iconName:"upload"; chartColor:Theme.green }
-                SwirlMetricCard { Layout.fillWidth:true; Layout.fillHeight:true; label:"活动连接"; value:String(AppState.demoConnections); iconName:"user"; chartColor:Theme.muted; bars:true }
-                SwirlMetricCard { Layout.fillWidth:true; Layout.fillHeight:true; label:"总流量"; value:AppState.totalGB.toFixed(2)+" GB"; iconName:"layers"; chartColor:Theme.muted }
+                SwirlMetricCard { objectName:"downloadMetric"; Layout.preferredWidth:275; Layout.fillWidth:true; Layout.fillHeight:true; label:"下载速度"; value:AppState.proxyOn ? AppState.demoDown.toFixed(2)+" MB/s" : "0 KB/s"; iconName:"download" }
+                SwirlMetricCard { Layout.preferredWidth:277; Layout.fillWidth:true; Layout.fillHeight:true; label:"上传速度"; value:AppState.proxyOn ? AppState.demoUp.toFixed(2)+" MB/s" : "0 KB/s"; iconName:"upload"; chartColor:Theme.green }
+                SwirlMetricCard { Layout.preferredWidth:276; Layout.fillWidth:true; Layout.fillHeight:true; label:"活动连接"; value:String(AppState.demoConnections); iconName:"user"; chartColor:Theme.muted; bars:true }
+                SwirlMetricCard { Layout.preferredWidth:310; Layout.fillWidth:true; Layout.fillHeight:true; label:"总流量"; value:AppState.totalGB.toFixed(2)+" GB"; iconName:"layers"; chartColor:Theme.muted }
             }
             SwirlGlassPanel {
                 Layout.fillWidth:true; Layout.preferredHeight:196*page.unit
@@ -108,7 +108,7 @@ Item {
                 Layout.fillWidth:true; Layout.preferredHeight:(columns===1 ? 726 : 242)*page.unit
                 rowSpacing:Theme.gap; columnSpacing:Theme.gap
                 SwirlGlassPanel {
-                    Layout.fillWidth:true; Layout.preferredWidth:418; Layout.fillHeight:true; Layout.preferredHeight:242*page.unit
+                    Layout.fillWidth:true; Layout.preferredWidth:418; Layout.fillHeight:true; Layout.preferredHeight:242*page.unit; Layout.minimumWidth:0
                     ColumnLayout {
                         anchors.fill:parent; anchors.leftMargin:25; anchors.rightMargin:22; anchors.topMargin:13; anchors.bottomMargin:13; spacing:0
                         SwirlListRow { Layout.fillWidth:true; Layout.preferredHeight:38; iconName:"clock"; title:"最近网络事件"; onClicked:AppState.navigate("logs"); contentItem:RowLayout{spacing:24;SwirlIcon{name:"clock";size:29;color:Theme.accent} Text{text:"最近网络事件";font.pixelSize:19;font.weight:Font.DemiBold;color:Theme.text;Layout.fillWidth:true}SwirlIcon{name:"chevron-right";size:19}} }
@@ -122,14 +122,14 @@ Item {
                                     anchors.fill:parent; spacing:27
                                     Rectangle { width:16; height:16; radius:Theme.pillRadius(height); color:modelData.tone==="success" ? Theme.green : modelData.tone==="accent" ? Theme.red : "#99A5BF" }
                                     Text { text:modelData.time; color:Theme.muted; font.pixelSize:16; Layout.preferredWidth:54 }
-                                    Text { text:modelData.title; color:Theme.muted; font.pixelSize:15; Layout.fillWidth:true; elide:Text.ElideRight }
+                                    Text { text:modelData.title; color:Theme.muted; font.pixelSize:16; Layout.fillWidth:true; elide:Text.ElideRight }
                                 }
                             }
                         }
                     }
                 }
                 SwirlGlassPanel {
-                    Layout.fillWidth:true; Layout.preferredWidth:355; Layout.fillHeight:true; Layout.preferredHeight:242*page.unit
+                    Layout.fillWidth:true; Layout.preferredWidth:355; Layout.fillHeight:true; Layout.preferredHeight:242*page.unit; Layout.minimumWidth:0
                     ColumnLayout {
                         anchors.fill:parent; anchors.leftMargin:25; anchors.rightMargin:24; anchors.topMargin:13; anchors.bottomMargin:26; spacing:0
                         RowLayout {
@@ -147,7 +147,7 @@ Item {
                                 RowLayout {
                                     anchors.fill:parent; spacing:25
                                     SwirlIcon { name:modelData.icon; size:25 }
-                                    Text { text:modelData.title; color:Theme.muted; font.pixelSize:16; Layout.fillWidth:true; elide:Text.ElideRight }
+                                    Text { text:modelData.title; color:Theme.muted; font.pixelSize:17; Layout.fillWidth:true; elide:Text.ElideRight }
                                     SwirlToggle {
                                         checked:modelData.kind===0 ? AppState.systemProxyOn : modelData.kind===1 ? AppState.mode==="全局" : modelData.kind===2 ? AppState.mode==="规则" : AppState.autoSwitch
                                         onToggled:{
@@ -165,7 +165,7 @@ Item {
                     }
                 }
                 SwirlGlassPanel {
-                    Layout.fillWidth:true; Layout.preferredWidth:378; Layout.fillHeight:true; Layout.preferredHeight:242*page.unit
+                    Layout.fillWidth:true; Layout.preferredWidth:378; Layout.fillHeight:true; Layout.preferredHeight:242*page.unit; Layout.minimumWidth:0
                     ColumnLayout {
                         anchors.fill:parent; anchors.leftMargin:25; anchors.rightMargin:24; anchors.topMargin:13; anchors.bottomMargin:13; spacing:0
                         RowLayout {

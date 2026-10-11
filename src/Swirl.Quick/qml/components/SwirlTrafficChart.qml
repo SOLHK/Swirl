@@ -12,7 +12,7 @@ Item {
     property real reveal: 1
     readonly property real rangeMinutes: [60,60,360,1440][rangeIndex]
     readonly property real maximum: series === "total" ? 4 : 12
-    property var baseHistory: [2.7,4.1,5.4,3.8,5.9,4.4,6.5,4.1,3.1,4.2,3.3,4.7,3.3,3.7,2.7,2.0,2.1,1.5,0.9,1.0,0.1,0]
+    property var baseHistory: [2.7,4.1,5.4,3.8,5.9,4.4,6.5,4.1,3.1,4.2,3.3,4.7,3.3,3.7,2.7,2.1,1.7,1.4,0.8,1.0,0.35,0]
     function valueAt(i) {
         if(series === "total") return 2.36+(AppState.totalGB-2.36)*i/(baseHistory.length-1)
         var v=baseHistory[i]*(series === "up" ? 0.24 : 1)
@@ -38,7 +38,7 @@ Item {
                 required property int index
                 width:66; height:(plot.height-1)/3
                 text:graph.series==="total" ? (4-index*4/3).toFixed(1)+" GB" : index===3 ? "0" : (12-index*4)+" MB/s"
-                color:Theme.muted; font.pixelSize:14; horizontalAlignment:Text.AlignRight; rightPadding:14
+                color:Theme.muted; font.pixelSize:16; horizontalAlignment:Text.AlignRight; rightPadding:0
                 y:index*(plot.height-1)/3-8
             }
         }

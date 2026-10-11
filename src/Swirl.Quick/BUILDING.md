@@ -41,7 +41,7 @@ cmake --build build/swirl-quick --parallel
 Tests log to Swirl-diagnostics.txt beside the EXE. `--interaction-test`
 checks actual mouse/keyboard input, node metadata, offline counters, chart
 selectors, Ctrl+K, search, history and bottom-row reachability. The smoke test
-visits the 24 retained modules, the capture page and the external-tools placeholder, waits
+visits all 59 pages, including 32 dedicated configuration draft pages and the module catalog, waits
 for lazy delegate creation and exits nonzero on QML loading warnings/timeouts.
 CTest runs these checks with the offscreen software platform; on that platform
 set QT_QPA_FONTDIR to a temporary font-fixture directory. Normal Windows
@@ -82,7 +82,7 @@ gray corner remnants at high DPI.
   session clock. Cumulative GB stays historical and increases only while the
   demonstration connection is active.
 - The user-provided flat blue kite replaces the app/installer icon and sidebar
-  mark. The transparent mark sits on a QML pale-blue tile; outline UI icons
+  mark. Clean SVG paths replace bitmap edge noise; the sidebar uses a soft QML icon cradle. Outline UI icons
   remain Canvas drawings.
 - Existing specialized pages remain available by search and overview links.
   The HTTP capture page is real; remaining proxy backend integration and further
@@ -98,3 +98,9 @@ The GitHub workflow builds Windows MSVC, runs the input checks and all-page
 smoke, captures previews and packages the production EXE. Its existing release
 step publishes a test-only prerelease. All work stays on `test`; promotion to
 `main` requires an explicit user instruction.
+
+## Module drafts and in-place upgrades
+
+The catalog exposes 56 public capability entries. Thirty-two new draft pages offer configuration, ordered records, local persistence and JSON import/export. These do not start network services. See `docs/UI_MODULE_COVERAGE.md`. Tests use QStandardPaths test mode and never overwrite user drafts.
+
+The installer reuses the registered install directory and overwrites application files. It retains configuration/data and refuses a silent update when the existing executable is still running or unwritable (exit 2). Interactive setup offers retry after quitting Swirl. Test an old installer followed by the new installer using the SAME fresh isolated test directory; verify the new EXE hash and startup before uninstalling.

@@ -11,18 +11,23 @@ Button {
     property bool compact: false
     readonly property bool chosen: AppState.currentPage === pageId
     signal activated()
-    implicitHeight: chosen ? 48 : 38
+    implicitHeight: chosen ? 48 : 41
     implicitWidth: compact ? 58 : 217
     leftPadding:20; rightPadding:16
     hoverEnabled:true
     background: SwirlPillSurface {
         selected: entry.chosen; hovered:entry.hovered; pressed:entry.down
         subtleShadow:entry.chosen
+        gradient:entry.chosen ? chosenGradient : null
+        property Gradient chosenGradient:Gradient {
+            GradientStop { position:0; color:Theme.dark ? Theme.selected : "#D1E8FD" }
+            GradientStop { position:1; color:Theme.selected }
+        }
         color:entry.down ? Theme.pressed : entry.chosen ? Theme.selected : entry.hovered ? Theme.hover : "transparent"
-        border.color:entry.activeFocus ? Theme.focusBorder : entry.chosen ? Theme.controlBorder : "transparent"
+        border.color:entry.activeFocus ? Theme.focusBorder : entry.chosen ? Theme.pillRim : "transparent"
     }
     contentItem: RowLayout {
-        spacing:25
+        spacing:28
         SwirlIcon { name:entry.iconName; size:26; color:entry.chosen ? Theme.accent : Theme.muted }
         Text {
             visible:!entry.compact; Layout.fillWidth:true

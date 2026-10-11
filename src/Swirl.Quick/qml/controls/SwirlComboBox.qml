@@ -30,11 +30,12 @@ ComboBox {
         Connections { target: Theme; function onMutedChanged() { chevron.requestPaint() } }
     }
     background: SwirlPillSurface {
+        pressed:control.pressed;hovered:control.hovered
         radius: Theme.pillRadius(height)
         antialiasing: true
         color: control.pressed ? Theme.pressed : control.hovered ? Theme.hover : Theme.material("field")
         border.width: 1
-        border.color: control.activeFocus ? Theme.focusBorder : Theme.controlBorder
+        border.color: control.activeFocus ? Theme.focusBorder : Theme.pillRim
         Behavior on color { ColorAnimation { duration: Theme.motion } }
     }
     delegate: ItemDelegate {
@@ -67,7 +68,7 @@ ComboBox {
         background: Rectangle {
             color: Theme.material("floating")
             radius: Theme.secondaryRadius
-            border.width: 1; border.color: Theme.controlBorder
+            border.width: 1; border.color: Theme.pillRim
         }
         contentItem: ListView {
             clip: true

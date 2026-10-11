@@ -16,11 +16,12 @@ TextField {
     font.family: "Microsoft YaHei UI"
     font.pixelSize: 16
     background: SwirlPillSurface {
+        hovered:control.activeFocus
         radius: Theme.pillRadius(height)
         antialiasing: true
         color: control.activeFocus ? Theme.hover : Theme.material("field")
         border.width: control.activeFocus ? 1.5 : 1
-        border.color: control.activeFocus ? Theme.focusBorder : Theme.controlBorder
+        border.color: control.activeFocus ? Theme.focusBorder : Theme.pillRim
         Behavior on color { ColorAnimation { duration: Theme.motion } }
         Behavior on border.color { ColorAnimation { duration: Theme.motion } }
     }

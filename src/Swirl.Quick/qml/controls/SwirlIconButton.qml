@@ -10,7 +10,7 @@ Button {
     hoverEnabled: true
     background: SwirlPillSurface {
         hovered: control.hovered; pressed: control.down
-        border.color: control.activeFocus ? Theme.focusBorder : Theme.controlBorder
+        border.color: control.activeFocus ? Theme.focusBorder : Theme.pillRim
         opacity: control.enabled ? 1 : 0.45
     }
     contentItem: Item { SwirlIcon { anchors.centerIn:parent; name:control.iconName; size:24; color:Theme.muted } }

@@ -8,8 +8,9 @@ import "pages"
 ApplicationWindow {
     id:window
     visible:true
-    width:Math.min(1450,Screen.desktopAvailableWidth-40)
-    height:Math.min(884,Screen.desktopAvailableHeight-40)
+    width:Math.max(1000,Math.min(1450,Screen.desktopAvailableWidth-40,(Screen.desktopAvailableHeight-40)*1450/884))
+    height:Math.max(650,width*884/1450)
+    readonly property real contentScale:Theme.uiScale*(width>=1160 ? Math.min(1,width/1450) : 1)
     minimumWidth:1000; minimumHeight:650
     title:"Swirl"; flags:Qt.Window | Qt.FramelessWindowHint; color:"transparent"
     font.family:Theme.fontFamily; font.pixelSize:16
@@ -40,8 +41,8 @@ ApplicationWindow {
     }
     Item {
         id:scaledCanvas
-        width:window.width/Theme.uiScale; height:window.height/Theme.uiScale
-        scale:Theme.uiScale; transformOrigin:Item.TopLeft
+        width:window.width/window.contentScale; height:window.height/window.contentScale
+        scale:window.contentScale; transformOrigin:Item.TopLeft
         Rectangle {
             width:window.actualSidebarWidth; height:parent.height
             radius:window.visibility===Window.Maximized ? 0 : Theme.windowRadius
@@ -88,6 +89,9 @@ ApplicationWindow {
                             var p=AppState.groups[i].pages[j]
                             if(p.title.toLowerCase().indexOf(q)>=0){AppState.navigate(p.id);text="";return}
                         }
+                        var matches=FeatureCatalog.entries.filter(function(f){return (f.title+" "+f.keywords).toLowerCase().indexOf(q)>=0})
+                        if(matches.length){AppState.navigate(matches[0].id);text="";return}
+                        if(q.indexOf("模块中心")>=0){AppState.navigate("featurehub");text="";return}
                         if(q.indexOf("新加坡")>=0 || q.indexOf("节点")>=0)AppState.navigate("proxies")
                         else AppState.toast="没有找到对应功能或演示节点"
                     }
@@ -105,6 +109,7 @@ ApplicationWindow {
                     MenuItem { text:"导入配置预览"; onTriggered:AppState.navigate("profiles") }
                     MenuItem { text:"订阅管理"; onTriggered:AppState.navigate("subscriptions") }
                     MenuSeparator {}
+                    MenuItem { text:"全部功能模块"; onTriggered:AppState.navigate("featurehub") }
                     MenuItem { text:"更多工具"; onTriggered:AppState.navigate("toolbox") }
                 } }
                 SwirlIconButton { iconName:"settings"; tooltip:"设置"; onClicked:AppState.navigate("settings") }
@@ -136,6 +141,8 @@ ApplicationWindow {
                                 AppState.currentPage==="automation" ? automation :
                                 AppState.currentPage==="api" ? api :
                                 AppState.currentPage==="gateway" ? gateway :
+                                AppState.currentPage==="featurehub" ? featureHub :
+                                FeatureCatalog.find(AppState.currentPage) ? featureModule :
                                 AppState.currentPage==="external" ? externalTools : workbench
             }
         }
@@ -170,6 +177,8 @@ ApplicationWindow {
         Component { id:overview; OverviewPage {} }
     Component { id:capturePage; CapturePage {} }
     Component { id:externalTools; ExternalToolsPage {} }
+    Component { id:featureHub; FeatureHubPage {} }
+    Component { id:featureModule; FeatureModulePage { moduleId:AppState.currentPage } }
     Component { id:connections; ConnectionsPage {} }
     Component { id:proxies; ProxiesPage {} }
     Component { id:inspector; InspectorPage {} }
@@ -207,11 +216,10 @@ ApplicationWindow {
     }
     Timer {
         running:smokeTestMode; repeat:true; interval:200
-        property int groupIndex:0; property int pageIndex:0
+        property int index:0
         onTriggered:{
-            if(groupIndex>=AppState.groups.length){AppState.currentPage="external";stop();smokeFinished.start();return}
-            AppState.currentPage=AppState.groups[groupIndex].pages[pageIndex].id
-            if(++pageIndex>=AppState.groups[groupIndex].pages.length){pageIndex=0;groupIndex++}
+            if(index>=AppState.allPageIds.length){stop();smokeFinished.start();return}
+            AppState.currentPage=AppState.allPageIds[index++]
         }
     }
     Timer { id:smokeFinished; interval:300; onTriggered:Qt.quit() }

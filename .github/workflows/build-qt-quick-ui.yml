@@ -102,7 +102,9 @@ jobs:
           $exe = (Resolve-Path "dist/Swirl.exe").Path
           $previews = @(
             @{ file = "Swirl-Overview-preview.png"; page = "overview"; theme = "light" },
-            @{ file = "Swirl-Inspector-preview.png"; page = "inspector"; theme = "dark" }
+            @{ file = "Swirl-Inspector-preview.png"; page = "inspector"; theme = "dark" },
+            @{ file = "Swirl-ModuleHub-preview.png"; page = "featurehub"; theme = "light" },
+            @{ file = "Swirl-DHCP-preview.png"; page = "feature-dhcp"; theme = "light" }
           )
           foreach ($preview in $previews) {
             $path = Join-Path (Resolve-Path "dist").Path $preview.file
@@ -139,7 +141,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path installer-bin, out | Out-Null
           Copy-Item -Path "dist/*" -Destination "installer-bin" -Recurse -Force
           Copy-Item "src/Swirl.Quick/packaging/THIRD_PARTY_NOTICES.txt" "installer-bin/"
-          Copy-Item "src/Swirl.Quick/assets/swirl.ico" "installer-bin/Swirl-icon-flat.ico"
+          Copy-Item "src/Swirl.Quick/assets/swirl.ico" "installer-bin/Swirl-brand-003.ico"
           Copy-Item "src/Swirl.Quick/packaging/licenses" "installer-bin/licenses" -Recurse -Force
           Remove-Item -Path "installer-bin/Swirl-*-preview.png", "installer-bin/Swirl-diagnostics.txt" -ErrorAction SilentlyContinue
           if (!(Test-Path "installer-bin/Swirl.exe")) { throw "Missing Swirl.exe" }
@@ -199,5 +201,5 @@ jobs:
             --repo "${GITHUB_REPOSITORY}" \
             --target "${GITHUB_SHA}" \
             --title "Swirl · 测试版 ${SHORT_SHA}" \
-            --notes "测试版 Qt 界面：包含真实本机 HTTP 抓包及 CONNECT 隧道记录；代理/配置页面仍为演示，尚未接入完整核心。请勿作为正式版本使用。" \
+            --notes "测试版 Qt 界面：参考图比例、56 个功能入口及配置草稿、覆盖安装；包含真实本机 HTTP 抓包及 CONNECT 隧道记录；代理/配置页面仍为演示，尚未接入完整核心。请勿作为正式版本使用。" \
             --prerelease

@@ -25,6 +25,10 @@ try {
         # This input test uses the actual Windows platform plugin and fonts.
         $test = Start-Process $exe -ArgumentList "--interaction-test" -WindowStyle Hidden -Wait -PassThru
         if ($test.ExitCode) { throw "Input checks failed: $($test.ExitCode). See Swirl-diagnostics.txt." }
+        $test = Start-Process $exe -ArgumentList "--capture-self-test" -WindowStyle Hidden -Wait -PassThru
+        if ($test.ExitCode) { throw "Capture checks failed: $($test.ExitCode)." }
+        $test = Start-Process $exe -ArgumentList "--smoke-test" -WindowStyle Hidden -Wait -PassThru
+        if ($test.ExitCode) { throw "Module startup checks failed: $($test.ExitCode)." }
         cmake -S src/Swirl.Quick -B $BuildDir -DSWIRL_BUILD_UI_TESTS=OFF
         if ($LASTEXITCODE) { throw "Production reconfigure failed." }
         cmake --build $BuildDir --config Release --parallel
@@ -35,7 +39,7 @@ try {
     }
     New-Item -ItemType Directory -Force $DistDir,$OutDir | Out-Null
     Copy-Item -LiteralPath $exe -Destination $DistDir
-    Copy-Item src/Swirl.Quick/assets/swirl.ico (Join-Path $DistDir "Swirl-icon-flat.ico")
+    Copy-Item src/Swirl.Quick/assets/swirl.ico (Join-Path $DistDir "Swirl-brand-003.ico")
     & "$qt/bin/windeployqt.exe" --release --qmldir src/Swirl.Quick/qml (Join-Path $DistDir "Swirl.exe")
     if ($LASTEXITCODE) { throw "Qt runtime deployment failed." }
     Copy-Item src/Swirl.Quick/packaging/THIRD_PARTY_NOTICES.txt $DistDir

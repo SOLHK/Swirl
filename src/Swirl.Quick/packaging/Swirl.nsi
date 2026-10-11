@@ -22,6 +22,11 @@ InstallDirRegKey HKCU "Software\\Swirl" "InstallDir"
 RequestExecutionLevel user
 ShowInstDetails show
 ShowUnInstDetails show
+VIProductVersion "0.1.0.3"
+VIAddVersionKey /LANG=2052 "ProductName" "Swirl"
+VIAddVersionKey /LANG=2052 "FileDescription" "Swirl 安装程序"
+VIAddVersionKey /LANG=2052 "FileVersion" "0.1.0.3"
+VIAddVersionKey /LANG=2052 "ProductVersion" "0.1.0.3"
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
@@ -44,8 +49,24 @@ Function un.onInit
 FunctionEnd
 Section "安装 Swirl"
     SetShellVarContext current
+    ; Replace the previous build in the same directory, without deleting data.
+    ; Do not silently leave a running executable from the previous version.
+    check_running:
+    IfFileExists "$INSTDIR\Swirl.exe" 0 ready_to_copy
+    System::Call 'kernel32::CreateFileW(w "$INSTDIR\Swirl.exe", i 0x40000000, i 1, p 0, i 3, i 0, p 0) p.r0'
+    StrCmp $0 "-1" blocked ready_close
+    ready_close:
+    System::Call 'kernel32::CloseHandle(p r0)'
+    Goto ready_to_copy
+    blocked:
+    IfSilent installation_failed
+    MessageBox MB_RETRYCANCEL|MB_ICONINFORMATION "请先退出 Swirl，再点击重试。安装程序会覆盖更新，保留您的配置和数据。" IDRETRY check_running IDCANCEL installation_failed
+    ready_to_copy:
+    SetOverwrite on
+    ClearErrors
     SetOutPath "$INSTDIR"
     File /r "${APP_DIST}\\*.*"
+    IfErrors installation_failed
     WriteUninstaller "$INSTDIR\\卸载 Swirl.exe"
     StrCmp $IsolatedInstall "1" isolated regular
     isolated:
@@ -55,16 +76,22 @@ Section "安装 Swirl"
     Goto install_done
     regular:
     CreateDirectory "$SMPROGRAMS\\Swirl"
-    CreateShortCut "$SMPROGRAMS\\Swirl\\Swirl.lnk" "$INSTDIR\\Swirl.exe" "" "$INSTDIR\\Swirl-icon-flat.ico" 0
-    CreateShortCut "$DESKTOP\\Swirl.lnk" "$INSTDIR\\Swirl.exe" "" "$INSTDIR\\Swirl-icon-flat.ico" 0
+    CreateShortCut "$SMPROGRAMS\\Swirl\\Swirl.lnk" "$INSTDIR\\Swirl.exe" "" "$INSTDIR\\Swirl-brand-003.ico" 0
+    CreateShortCut "$DESKTOP\\Swirl.lnk" "$INSTDIR\\Swirl.exe" "" "$INSTDIR\\Swirl-brand-003.ico" 0
     WriteRegStr HKCU "Software\\Swirl" "InstallDir" "$INSTDIR"
     WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "DisplayName" "Swirl"
+    WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "DisplayVersion" "0.1.0.3"
     WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "UninstallString" '"$INSTDIR\\卸载 Swirl.exe"'
-    WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "DisplayIcon" "$INSTDIR\\Swirl-icon-flat.ico"
+    WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "DisplayIcon" "$INSTDIR\\Swirl-brand-003.ico"
     WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "Publisher" "Swirl"
     WriteRegDWORD HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "NoModify" 1
     WriteRegDWORD HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "NoRepair" 1
     install_done:
+    Goto installation_finished
+    installation_failed:
+    SetErrorLevel 2
+    Abort "Swirl 正在运行或文件无法写入，更新未完成。"
+    installation_finished:
 SectionEnd
 Section "Uninstall"
     SetShellVarContext current
