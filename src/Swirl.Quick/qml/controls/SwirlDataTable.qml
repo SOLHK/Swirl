@@ -7,6 +7,8 @@ Item {
     property var rows:[]
     property string selectedId:""
     property int itemHeight:43
+    property int textPixelSize:12
+    property int headerPixelSize:11
     readonly property int totalWidth:columns.reduce(function(v,c){return v+c.w},0)
     signal rowSelected(var record)
     clip:true
@@ -33,7 +35,7 @@ Item {
                             Text {
                                 text:modelData.label
                                 color:Theme.muted
-                                font.pixelSize:11
+                                font.pixelSize:table.headerPixelSize
                                 font.weight:Font.DemiBold
                                 anchors.fill:parent
                                 anchors.leftMargin:12
@@ -71,7 +73,7 @@ Item {
                                     anchors.leftMargin:12; anchors.rightMargin:8
                                     text:String(recordRow.record[modelData.key]===undefined?"":recordRow.record[modelData.key])
                                     color:Theme.text
-                                    font.pixelSize:12
+                                    font.pixelSize:table.textPixelSize
                                     font.family:"Segoe UI"
                                     verticalAlignment:Text.AlignVCenter
                                     elide:Text.ElideRight

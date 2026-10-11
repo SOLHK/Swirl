@@ -13,6 +13,15 @@ ApplicationWindow {
     minimumWidth:1000; minimumHeight:650
     title:"Swirl"; flags:Qt.Window | Qt.FramelessWindowHint; color:"transparent"
     font.family:Theme.fontFamily; font.pixelSize:16
+    palette.window:Theme.surface
+    palette.base:Theme.material("field")
+    palette.button:Theme.buttonBase
+    palette.buttonText:Theme.text
+    palette.text:Theme.text
+    palette.highlight:Theme.selected
+    palette.highlightedText:Theme.text
+    palette.light:Theme.buttonBase
+    palette.mid:Theme.controlBorder
     property bool swirlTransparencyEnabled:Theme.transparency
     function previewScrollBottom() { if(pageLoader.item && pageLoader.item.scrollToBottom)pageLoader.item.scrollToBottom() }
     property real swirlWindowRadius:Theme.windowRadius
@@ -20,7 +29,7 @@ ApplicationWindow {
     background:Rectangle {
         radius:window.visibility===Window.Maximized ? 0 : Theme.windowRadius
         color:Theme.canvas
-        border.width:1; border.color:Theme.glassRim
+        border.width:0
     }
     Component.onCompleted:{
         backdrop.apply(window,false)
@@ -89,6 +98,7 @@ ApplicationWindow {
                     Text { anchors.right:parent.right; anchors.rightMargin:20; anchors.verticalCenter:parent.verticalCenter; text:"Ctrl + K"; font.pixelSize:15; color:Theme.muted }
                 }
                 Item { Layout.fillWidth:true }
+                SwirlButton { visible:captureProvider.running; text:"抓包中 · "+captureProvider.sessions.length; iconName:"capture"; font.pixelSize:14; onClicked:AppState.navigate("capture") }
                 SwirlIconButton { objectName:"addButton"; iconName:"plus"; tooltip:"添加配置或节点"; onClicked:addMenu.popup(); Menu {
                     id:addMenu
                     MenuItem { text:"添加演示节点"; onTriggered:AppState.navigate("proxies") }
@@ -102,6 +112,7 @@ ApplicationWindow {
             Loader {
                 id:pageLoader; objectName:"pageLoader"; x:0; y:68; width:parent.width; height:parent.height-y-17
                 sourceComponent:AppState.currentPage==="overview" ? overview :
+                                AppState.currentPage==="capture" ? capturePage :
                                 AppState.currentPage==="connections" ? connections :
                                 AppState.currentPage==="proxies" ? proxies :
                                 AppState.currentPage==="inspector" ? inspector :
@@ -157,6 +168,7 @@ ApplicationWindow {
     Shortcut { sequence:"Ctrl+,"; onActivated:AppState.navigate("settings") }
     Shortcut { sequence:"Ctrl+B"; onActivated:AppState.sidebarCollapsed=!AppState.sidebarCollapsed }
         Component { id:overview; OverviewPage {} }
+    Component { id:capturePage; CapturePage {} }
     Component { id:externalTools; ExternalToolsPage {} }
     Component { id:connections; ConnectionsPage {} }
     Component { id:proxies; ProxiesPage {} }

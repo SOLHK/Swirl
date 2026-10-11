@@ -35,7 +35,7 @@ QtObject {
     readonly property var navigationGroups: [
         {title:"",pages:[{id:"overview",title:"总览",icon:"home"},{id:"proxies",title:"代理节点",icon:"pin"},{id:"policies",title:"策略组",icon:"layers"},{id:"rules",title:"规则",icon:"document"},{id:"subscriptions",title:"订阅管理",icon:"refresh"},{id:"profiles",title:"配置文件",icon:"file"}]},
         {title:"网络",pages:[{id:"dns",title:"DNS",icon:"globe"},{id:"toolbox",title:"网络检测",icon:"gauge"},{id:"connections",title:"连接记录",icon:"clock"}]},
-        {title:"工具",pages:[{id:"inspector",title:"HTTP 检查器",icon:"code"},{id:"traffic",title:"流量分析",icon:"bars"},{id:"scripts",title:"脚本与配置",icon:"terminal"},{id:"external",title:"外部工具",icon:"folder"}]}
+        {title:"工具",pages:[{id:"inspector",title:"HTTP 检查器",icon:"code"},{id:"capture",title:"抓包",icon:"capture"},{id:"traffic",title:"流量分析",icon:"bars"},{id:"scripts",title:"脚本与配置",icon:"terminal"},{id:"external",title:"外部工具",icon:"folder"}]}
     ]
     function navigate(id) {
         if (currentPage === id) return
@@ -80,6 +80,7 @@ QtObject {
         {id:"rules",title:"分流规则",icon:"list",sub:"规则匹配与决策"},
         {id:"dns",title:"DNS",icon:"server",sub:"解析器、Hosts 与查询"}]},
       {title:"网络检查",pages:[
+        {id:"capture",title:"抓包",icon:"capture",sub:"真实 HTTP 会话与 CONNECT 隧道"},
         {id:"connections",title:"连接记录",icon:"activity",sub:"网络会话"},
         {id:"inspector",title:"HTTP 检查器",icon:"inspect",sub:"请求与响应"},
         {id:"traffic",title:"流量分析",icon:"chart",sub:"流量统计与分布"},

@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Effects
 import SwirlQuick
 Rectangle {
     id: surface
@@ -11,15 +10,9 @@ Rectangle {
     radius: Theme.pillRadius(height)
     antialiasing: true
     color: primary ? (pressed ? Qt.darker(Theme.accent,1.12) : Theme.accent) :
-           pressed ? Theme.selected : selected ? Theme.selected : hovered ? Theme.raised : Theme.material("floating")
+           pressed ? Theme.pressed : selected ? Theme.selected : hovered ? Theme.hover : Theme.buttonBase
     border.width: Theme.borderWidth
-    border.color: primary ? "#308EFF" : "#CAFFFFFF"
-    layer.enabled: subtleShadow
-    layer.effect: MultiEffect {
-        shadowEnabled: true
-        shadowColor: Qt.rgba(0.18,0.32,0.5,Theme.shadowOpacity)
-        shadowBlur: 0.35
-        shadowVerticalOffset: 2
-    }
+    border.color: primary ? Theme.accent : Theme.controlBorder
+    // Matte pills deliberately have no effect layer or white specular rim.
     Behavior on color { ColorAnimation { duration: Theme.motion } }
 }

@@ -16,6 +16,12 @@ void WindowsBackdrop::updateCornerMask(QQuickWindow *window)
     // CI uses the offscreen renderer; a native window mask is meaningful only
     // for the real Windows desktop and should not interfere with its smoke test.
     if (QGuiApplication::platformName() == QStringLiteral("offscreen")) return;
+#ifdef Q_OS_WIN
+    // The alpha surface already has antialiased QML corners. A binary HRGN
+    // plus DWM's independent frame leaves small gray corner fragments at DPI.
+    window->setMask(QRegion());
+    return;
+#endif
     if (window->visibility() == QWindow::Maximized ||
         window->visibility() == QWindow::FullScreen) {
         window->setMask(QRegion());
@@ -51,9 +57,16 @@ void WindowsBackdrop::apply(QObject *object, bool enabled)
 #ifdef Q_OS_WIN
     const HWND hwnd = reinterpret_cast<HWND>(window->winId());
     if (hwnd) {
-        // Win11 round-corner preference, plus Qt's window mask fallback.
+        // QML owns the complete rounded alpha silhouette. Suppress the native
+        // non-client frame and its different-radius border/shadow underneath.
+        constexpr DWORD ncPolicyAttribute = 2; // DWMWA_NCRENDERING_POLICY
+        const int ncDisabled = 1; // DWMNCRP_DISABLED
+        DwmSetWindowAttribute(hwnd, ncPolicyAttribute, &ncDisabled, sizeof(ncDisabled));
+        constexpr DWORD borderAttribute = 34; // DWMWA_BORDER_COLOR
+        const DWORD noBorder = 0xFFFFFFFE; // DWMWA_COLOR_NONE
+        DwmSetWindowAttribute(hwnd, borderAttribute, &noBorder, sizeof(noBorder));
         constexpr DWORD cornerAttribute = 33; // DWMWA_WINDOW_CORNER_PREFERENCE
-        const int cornerType = 2; // DWMWCP_ROUND
+        const int cornerType = 1; // DWMWCP_DONOTROUND (QML supplies the radius)
         DwmSetWindowAttribute(hwnd, cornerAttribute, &cornerType, sizeof(cornerType));
         constexpr DWORD backdropAttribute = 38; // DWMWA_SYSTEMBACKDROP_TYPE
         const int backdropType = enabled ? 3 : 1; // Desktop Acrylic on supported Windows 11, or none

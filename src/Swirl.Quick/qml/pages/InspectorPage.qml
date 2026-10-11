@@ -20,6 +20,11 @@ Item {
         anchors.fill:parent; anchors.margins:23; spacing:13
         RowLayout {
             Layout.fillWidth:true
+            Text { text:"此页为请求调试演示；查看真实会话请进入抓包。"; color:Theme.muted; font.pixelSize:14; Layout.fillWidth:true }
+            SwirlButton { text:"打开真实抓包"; iconName:"capture"; font.pixelSize:15; onClicked:AppState.navigate("capture") }
+        }
+        RowLayout {
+            Layout.fillWidth:true
             SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:AppState.zh("Search URL, path, or request method") }
             SwirlComboBox { id:methodFilter; model:["全部方法","GET","POST","PUT","DELETE"] }
             SwirlButton { text:AppState.zh("Import HAR"); iconName:"folder"; onClicked:AppState.notice("HAR import") }

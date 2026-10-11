@@ -98,6 +98,16 @@ int runOverviewChecks(QQuickWindow *window)
     auto *importRow=item("importConfigRow");
     check(importRow && importRow->mapToScene(QPointF(0,importRow->height())).y()<=window->height()-17,
           "last bottom row is fully reachable at minimum size");
+    window->resize(1450,884);
+    QTest::keyClick(window,Qt::Key_K,Qt::ControlModifier);
+    if(auto *captureSearch=item("pageSearch"))captureSearch->setProperty("text",QStringLiteral("抓包"));
+    QTest::keyClick(window,Qt::Key_Return);QTest::qWait(250);
+    check(state("AppState.currentPage === 'capture' && !captureProvider.running").toBool(),"search opens real capture page without starting listener");
+    if(auto *port=item("capturePortField"))port->setProperty("text","0");
+    click(item("captureStartButton"));
+    check(state("captureProvider.running && captureProvider.port > 0").toBool(),"capture start button opens actual loopback listener");
+    click(item("captureStartButton"));
+    check(state("!captureProvider.running").toBool(),"capture stop button closes actual listener");
     qInfo() << "Overview input checks:" << checks << "checks," << failures << "failures";
     return failures ? 2 : 0;
 }

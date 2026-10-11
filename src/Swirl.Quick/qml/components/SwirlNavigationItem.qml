@@ -11,15 +11,15 @@ Button {
     property bool compact: false
     readonly property bool chosen: AppState.currentPage === pageId
     signal activated()
-    implicitHeight: chosen ? 48 : 41
+    implicitHeight: chosen ? 48 : 38
     implicitWidth: compact ? 58 : 217
     leftPadding:20; rightPadding:16
     hoverEnabled:true
     background: SwirlPillSurface {
         selected: entry.chosen; hovered:entry.hovered; pressed:entry.down
         subtleShadow:entry.chosen
-        color:entry.chosen ? Theme.selected : entry.down ? Theme.selected : entry.hovered ? Theme.hover : "transparent"
-        border.color:entry.chosen ? Theme.glassRim : entry.activeFocus ? Theme.accent : "transparent"
+        color:entry.down ? Theme.pressed : entry.chosen ? Theme.selected : entry.hovered ? Theme.hover : "transparent"
+        border.color:entry.activeFocus ? Theme.focusBorder : entry.chosen ? Theme.controlBorder : "transparent"
     }
     contentItem: RowLayout {
         spacing:25

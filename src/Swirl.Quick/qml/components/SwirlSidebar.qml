@@ -31,8 +31,8 @@ Item {
             RowLayout {
                 x:7; y:64; width:parent.width-12; spacing:16
                 Rectangle {
-                    width:sidebar.effectivelyCollapsed ? 48 : 64; height:width; radius:Theme.secondaryRadius; color:Theme.raised
-                    Image { anchors.fill:parent; anchors.margins:6; source:"qrc:/swirl/swirl-256.png"; fillMode:Image.PreserveAspectFit; sourceSize:Qt.size(128,128) }
+                    width:sidebar.effectivelyCollapsed ? 48 : 64; height:width; radius:Theme.secondaryRadius; color:Theme.buttonBase
+                    Image { anchors.fill:parent; anchors.margins:5; source:"qrc:/swirl/swirl-mark.png"; fillMode:Image.PreserveAspectFit; sourceSize:Qt.size(128,128) }
                 }
                 Column {
                     visible:!sidebar.effectivelyCollapsed

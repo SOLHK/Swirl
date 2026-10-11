@@ -22,8 +22,8 @@ Button {
         subtleShadow: !control.quiet
         opacity: control.enabled ? 1 : 0.45
         color: control.quiet && !control.hovered && !control.down ? "transparent" :
-               control.primary ? Theme.accent : control.down ? Theme.selected : Theme.material("floating")
-        border.color: control.activeFocus ? Theme.accent : control.quiet ? "transparent" : Theme.glassRim
+               control.primary ? Theme.accent : control.down ? Theme.pressed : control.hovered ? Theme.hover : Theme.buttonBase
+        border.color: control.activeFocus ? Theme.focusBorder : control.quiet ? "transparent" : Theme.controlBorder
     }
     contentItem: RowLayout {
         id: contents

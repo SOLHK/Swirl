@@ -32,15 +32,9 @@ ComboBox {
     background: SwirlPillSurface {
         radius: Theme.pillRadius(height)
         antialiasing: true
-        color: control.pressed ? Theme.selected : control.hovered ? Theme.material("floating") : Theme.material("field")
+        color: control.pressed ? Theme.pressed : control.hovered ? Theme.hover : Theme.material("field")
         border.width: 1
-        border.color: control.activeFocus ? Theme.accent : Theme.glassRim
-        Rectangle {
-            anchors.left: parent.left; anchors.right: parent.right
-            anchors.leftMargin: 13; anchors.rightMargin: 13
-            anchors.top: parent.top; anchors.topMargin: 1
-            height: 1; color: Theme.glassGlint; opacity: 0.65
-        }
+        border.color: control.activeFocus ? Theme.focusBorder : Theme.controlBorder
         Behavior on color { ColorAnimation { duration: Theme.motion } }
     }
     delegate: ItemDelegate {
@@ -54,7 +48,7 @@ ComboBox {
             verticalAlignment: Text.AlignVCenter; leftPadding: 12
         }
         background: Rectangle {
-            radius: 10; color: parent.highlighted ? Theme.selected : "transparent"
+            radius: Theme.controlRadius; color: parent.highlighted ? Theme.selected : "transparent"
             Behavior on color { ColorAnimation { duration: Theme.motion } }
         }
     }
@@ -72,8 +66,8 @@ ComboBox {
         exit: Transition { NumberAnimation { property: "opacity"; from: 1; to: 0; duration: Theme.motion } }
         background: Rectangle {
             color: Theme.material("floating")
-            radius: 16
-            border.width: 1; border.color: Theme.glassRim
+            radius: Theme.secondaryRadius
+            border.width: 1; border.color: Theme.controlBorder
         }
         contentItem: ListView {
             clip: true

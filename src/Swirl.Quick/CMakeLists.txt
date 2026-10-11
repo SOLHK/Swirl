@@ -4,10 +4,10 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 option(SWIRL_BUILD_UI_TESTS "Build the Qt input-driven overview checks" OFF)
-find_package(Qt6 6.8 REQUIRED COMPONENTS Quick Qml QuickControls2)
+find_package(Qt6 6.8 REQUIRED COMPONENTS Quick Qml QuickControls2 Network)
 qt_standard_project_setup(REQUIRES 6.8)
 qt_policy(SET QTP0004 NEW)
-qt_add_executable(Swirl WIN32 main.cpp demo/DemoDataProvider.cpp demo/DemoDataProvider.h app/WindowsBackdrop.cpp app/WindowsBackdrop.h)
+qt_add_executable(Swirl WIN32 main.cpp demo/DemoDataProvider.cpp demo/DemoDataProvider.h app/WindowsBackdrop.cpp app/WindowsBackdrop.h network/CaptureService.cpp network/CaptureService.h)
 set(SWIRL_QML_FILES
  qml/Main.qml qml/Theme.qml qml/AppState.qml
  qml/controls/SwirlPillSurface.qml qml/controls/SwirlIconButton.qml qml/controls/SwirlButton.qml qml/controls/SwirlSegmentedControl.qml qml/controls/SwirlToggle.qml
@@ -19,7 +19,7 @@ set(SWIRL_QML_FILES
  qml/components/SwirlMetricCard.qml qml/components/SwirlStatusBadge.qml
  qml/components/SwirlInspectorPanel.qml qml/components/SwirlEmptyState.qml
  qml/components/SwirlSparkline.qml qml/components/SwirlListRow.qml qml/components/SwirlRegionBadge.qml qml/components/SwirlIcon.qml
- qml/pages/OverviewPage.qml qml/pages/ExternalToolsPage.qml qml/pages/ConnectionsPage.qml
+ qml/pages/OverviewPage.qml qml/pages/CapturePage.qml qml/pages/ExternalToolsPage.qml qml/pages/ConnectionsPage.qml
  qml/pages/ProxiesPage.qml qml/pages/InspectorPage.qml
  qml/pages/ScriptsPage.qml qml/pages/SettingsPage.qml
  qml/pages/WorkbenchPage.qml qml/pages/ToolboxPage.qml
@@ -44,19 +44,23 @@ qt_add_qml_module(Swirl
     QML_FILES ${SWIRL_QML_FILES}
     SOURCES app/JavascriptHighlighter.h app/JavascriptHighlighter.cpp
 )
-set(SWIRL_ASSET_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../../AdShield/Assets")
-qt_add_resources(Swirl brand PREFIX "/swirl" BASE "${SWIRL_ASSET_PATH}" FILES "${SWIRL_ASSET_PATH}/swirl-256.png")
+set(SWIRL_ASSET_PATH "${CMAKE_CURRENT_SOURCE_DIR}/assets")
+qt_add_resources(Swirl brand PREFIX "/swirl" BASE "${SWIRL_ASSET_PATH}" FILES "${SWIRL_ASSET_PATH}/swirl-mark.png" "${SWIRL_ASSET_PATH}/swirl-app.png")
 target_include_directories(Swirl PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/app")
-target_link_libraries(Swirl PRIVATE Qt6::Quick Qt6::Qml Qt6::QuickControls2)
+target_link_libraries(Swirl PRIVATE Qt6::Quick Qt6::Qml Qt6::QuickControls2 Qt6::Network)
+if(MSVC)
+ target_compile_options(Swirl PRIVATE /utf-8)
+endif()
 if(SWIRL_BUILD_UI_TESTS)
  find_package(Qt6 REQUIRED COMPONENTS Test)
- target_sources(Swirl PRIVATE tests/OverviewChecks.cpp tests/OverviewChecks.h)
+ target_sources(Swirl PRIVATE tests/OverviewChecks.cpp tests/OverviewChecks.h tests/CaptureChecks.cpp tests/CaptureChecks.h)
  target_link_libraries(Swirl PRIVATE Qt6::Test)
  target_compile_definitions(Swirl PRIVATE SWIRL_UI_TESTS)
  enable_testing()
  add_test(NAME swirl-overview-input COMMAND Swirl --interaction-test)
  add_test(NAME swirl-all-pages COMMAND Swirl --smoke-test)
- set_tests_properties(swirl-overview-input swirl-all-pages PROPERTIES
+ add_test(NAME swirl-capture-network COMMAND Swirl --capture-self-test)
+ set_tests_properties(swirl-overview-input swirl-all-pages swirl-capture-network PROPERTIES
   ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software" TIMEOUT 30)
 endif()
 if(WIN32)

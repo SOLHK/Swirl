@@ -50,6 +50,7 @@ Item {
             else if(n==="route"){circle(5,5,2);circle(19,19,2);c.beginPath();c.moveTo(5,8);c.bezierCurveTo(21,6,2,18,19,17);c.stroke()}
             else if(n==="tool"){line(4,20,14,10);circle(17,7,5);line(15,4,20,9)}
             else if(n==="plus"){line(12,3,12,21);line(3,12,21,12)}
+            else if(n==="capture"){box(2,4,20,16,3);line(4,12,8,12);line(8,12,10,8);line(10,8,13,17);line(13,17,16,10);line(16,10,20,10)}
             else if(n==="chevron-right"){line(9,6,15,12);line(15,12,9,18)}
             else if(n==="chevron-left"){line(15,6,9,12);line(9,12,15,18)}
             else if(n==="download" || n==="upload"){line(12,3,12,17);var flip=n==="upload";line(6,flip?9:11,12,flip?3:17);line(12,flip?3:17,18,flip?9:11);if(!flip)line(6,21,18,21)}

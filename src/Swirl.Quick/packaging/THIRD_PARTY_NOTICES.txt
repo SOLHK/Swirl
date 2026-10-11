@@ -1,7 +1,8 @@
 Swirl - Qt Quick UI demonstration
 
-This installer contains the existing Swirl UI preview. Proxy, DNS, HTTP,
-node latency and traffic operations in this executable are demonstrations.
+This installer contains the Swirl Qt UI. Proxy, DNS, node latency and overview
+traffic remain demonstrations. The opt-in loopback HTTP capture service is
+real; CONNECT records tunnel metadata without TLS decryption.
 The original WPF/.NET network implementation remains in the source repository
 and is not started by the Qt UI.
 
@@ -24,5 +25,4 @@ Swirl source and reproducible Windows build instructions:
 https://github.com/SOLHK/Swirl/tree/test/src/Swirl.Quick
 
 Windows fonts used during validation are system-installed fonts and are not
-redistributed in this installer. The Swirl brand assets are reused from the
-existing repository. All outline UI icons are drawn by QML Canvas code.
+redistributed in this installer. The Swirl kite assets are derived from the icon supplied by the user. All outline UI icons are drawn by QML Canvas code.

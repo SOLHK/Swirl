@@ -35,6 +35,7 @@ try {
     }
     New-Item -ItemType Directory -Force $DistDir,$OutDir | Out-Null
     Copy-Item -LiteralPath $exe -Destination $DistDir
+    Copy-Item src/Swirl.Quick/assets/swirl.ico (Join-Path $DistDir "Swirl-icon-flat.ico")
     & "$qt/bin/windeployqt.exe" --release --qmldir src/Swirl.Quick/qml (Join-Path $DistDir "Swirl.exe")
     if ($LASTEXITCODE) { throw "Qt runtime deployment failed." }
     Copy-Item src/Swirl.Quick/packaging/THIRD_PARTY_NOTICES.txt $DistDir

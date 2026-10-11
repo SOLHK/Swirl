@@ -69,7 +69,18 @@ jobs:
             Get-Content "dist/Swirl-diagnostics.txt" -ErrorAction SilentlyContinue
             throw "Overview input checks failed: $($process.ExitCode)"
           }
-      - name: Startup smoke test (offscreen, no network actions)
+      - name: Loopback HTTP capture integration checks
+        shell: pwsh
+        run: |
+          $env:QT_QPA_PLATFORM = "offscreen"
+          $env:QT_QUICK_BACKEND = "software"
+          $exe = (Resolve-Path "dist/Swirl.exe").Path
+          $process = Start-Process -FilePath $exe -ArgumentList "--capture-self-test" -Wait -PassThru -NoNewWindow
+          if ($process.ExitCode -ne 0) {
+            Get-Content "dist/Swirl-diagnostics.txt" -ErrorAction SilentlyContinue
+            throw "HTTP capture checks failed: $($process.ExitCode)"
+          }
+      - name: Startup smoke test (offscreen, capture remains off)
         shell: pwsh
         run: |
           $env:QT_QPA_PLATFORM = "offscreen"
@@ -128,6 +139,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path installer-bin, out | Out-Null
           Copy-Item -Path "dist/*" -Destination "installer-bin" -Recurse -Force
           Copy-Item "src/Swirl.Quick/packaging/THIRD_PARTY_NOTICES.txt" "installer-bin/"
+          Copy-Item "src/Swirl.Quick/assets/swirl.ico" "installer-bin/Swirl-icon-flat.ico"
           Copy-Item "src/Swirl.Quick/packaging/licenses" "installer-bin/licenses" -Recurse -Force
           Remove-Item -Path "installer-bin/Swirl-*-preview.png", "installer-bin/Swirl-diagnostics.txt" -ErrorAction SilentlyContinue
           if (!(Test-Path "installer-bin/Swirl.exe")) { throw "Missing Swirl.exe" }
@@ -187,5 +199,5 @@ jobs:
             --repo "${GITHUB_REPOSITORY}" \
             --target "${GITHUB_SHA}" \
             --title "Swirl · 测试版 ${SHORT_SHA}" \
-            --notes "仅供测试分支验收的 Qt 6 Quick 界面演示，尚未接入真实网络功能。请勿作为正式版本使用。" \
+            --notes "测试版 Qt 界面：包含真实本机 HTTP 抓包及 CONNECT 隧道记录；代理/配置页面仍为演示，尚未接入完整核心。请勿作为正式版本使用。" \
             --prerelease

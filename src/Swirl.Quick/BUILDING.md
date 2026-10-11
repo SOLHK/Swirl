@@ -2,8 +2,9 @@
 
 This is the existing Swirl repository's C++23 / Qt 6 Quick UI subproject on
 `test`. The original WPF/.NET network implementation, configuration and brand
-assets are preserved. The Qt UI uses demonstration data and does not enable
-the system proxy, start Mihomo, access certificates or run network requests.
+assets are preserved. Most Qt pages use demonstration data. The separate opt-in CaptureService
+forwards real HTTP requests and CONNECT tunnels; it never changes the system
+proxy, starts Mihomo or accesses certificate stores. See CAPTURE.md.
 
 ## Windows Release build and installer
 
@@ -40,7 +41,7 @@ cmake --build build/swirl-quick --parallel
 Tests log to Swirl-diagnostics.txt beside the EXE. `--interaction-test`
 checks actual mouse/keyboard input, node metadata, offline counters, chart
 selectors, Ctrl+K, search, history and bottom-row reachability. The smoke test
-visits the 24 retained modules and the new external-tools placeholder, waits
+visits the 24 retained modules, the capture page and the external-tools placeholder, waits
 for lazy delegate creation and exits nonzero on QML loading warnings/timeouts.
 CTest runs these checks with the offscreen software platform; on that platform
 set QT_QPA_FONTDIR to a temporary font-fixture directory. Normal Windows
@@ -62,7 +63,9 @@ the OS scale; factors 2/3, 5/6, 1 and 4/3 on a 150% desktop check effective
 verify touch, multi-monitor transitions or OS snap gestures; those remain
 manual checks. Buttons call Qt native close/minimize/maximize APIs, dragging
 uses startSystemMove, and all eight resize edges use startSystemResize.
-DWM corner support and the fallback mask share the QML radius.
+Windows uses the QML antialiased alpha silhouette only. Native DWM border/
+non-client rounding and the integer region mask are disabled to eliminate
+gray corner remnants at high DPI.
 
 ## Design and scope
 
@@ -78,11 +81,12 @@ DWM corner support and the fallback mask share the QML radius.
   endpoints and current counters are zero. History and event times share the
   session clock. Cumulative GB stays historical and increases only while the
   demonstration connection is active.
-- Existing brand assets are reused, rather than replacing them with the
-  reference image's spherical logo. Every outline icon is drawn from Canvas.
+- The user-provided flat blue kite replaces the app/installer icon and sidebar
+  mark. The transparent mark sits on a QML pale-blue tile; outline UI icons
+  remain Canvas drawings.
 - Existing specialized pages remain available by search and overview links.
-  Real backend integration and further visual refinement of those pages remain
-  future work. External tools explicitly show their current limit.
+  The HTTP capture page is real; remaining proxy backend integration and further
+  visual refinement of other pages remain future work.
 
 For isolated deployment validation, launch the installer with `/ISOLATED /S`
 and a final `/D=<absolute test directory>` argument. This extracts the same
