@@ -14,7 +14,7 @@ ApplicationWindow {
     minimumWidth:1000; minimumHeight:650
     title:"Swirl"; flags:Qt.Window | Qt.FramelessWindowHint; color:"transparent"
     font.family:Theme.fontFamily; font.pixelSize:16
-    palette.window:Theme.surface
+    palette.window:Theme.canvas
     palette.base:Theme.material("field")
     palette.button:Theme.buttonBase
     palette.buttonText:Theme.text

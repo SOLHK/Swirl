@@ -76,10 +76,11 @@ gray corner remnants at high DPI.
 - The current overview reference is 1464 x 930 logical pixels with a 286-pixel sidebar. Below
   width 1160 the sidebar becomes an icon rail. At narrower main widths the
   bottom cards stack and scroll so every row remains reachable.
-- Light content and cards are opaque white, with neutral gray surfaces in dark mode.
-  The sidebar uses a neutral QML tint over the existing native Windows backdrop
-  when transparency is enabled; an opaque fallback is used when it is disabled.
-  The tint alpha is an implementation choice, not a recovered Apple material parameter.
+- Light page backgrounds are opaque soft white (#F8F8FA), with white cards
+  (#FFFFFF), pale borders (#E8E8ED) and an opaque sidebar (#F1F1F4).
+  These roles use the existing Theme.qml tokens; light surfaces remain stable
+  across wallpaper/backdrop and transparency settings. Dark mode retains its
+  existing neutral surfaces and optional sidebar tint over the Windows backdrop.
 - Only the selected download/upload/cumulative series is drawn. Offline
   endpoints and current counters are zero. History and event times share the
   session clock. Cumulative GB stays historical and increases only while the
@@ -98,7 +99,11 @@ entries alone. The isolated marker also makes its uninstaller skip shared
 entries. Never use an existing user installation directory for this test.
 
 The GitHub workflow builds Windows MSVC, runs the input checks and all-page
-smoke, captures previews and packages the production EXE. Its existing release
+smoke, checks Qt Quick previews at 100/125/150/200% effective offscreen scaling,
+and checks 1000x650, 1464x930 and 1920x1219 logical windows before packaging
+the production EXE. Preview warnings/errors fail the job, and per-preview logs
+are uploaded as Swirl-Quick-Preview-Diagnostics. These software previews do not
+replace native Windows GPU/DWM or multi-monitor checks. Its existing release
 step publishes a test-only prerelease. All work stays on `test`; promotion to
 `main` requires an explicit user instruction.
 

@@ -6,14 +6,16 @@ QtObject {
     property bool reduceMotion: false
     property real uiScale: 1.0
     readonly property bool dark: mode === "Dark" || (mode === "System" && Qt.styleHints.colorScheme === Qt.Dark)
-    readonly property color canvas: dark ? "#1E1E1E" : "#FFFFFF"
-    readonly property color surface: canvas
+    // Opaque light surfaces separate the page from its white content cards.
+    readonly property color canvas: dark ? "#1E1E1E" : "#F8F8FA"
+    readonly property color surface: dark ? canvas : "#FFFFFF"
     readonly property color raised: dark ? "#292929" : "#F7F7F7"
-    // Tunable implementation tint; it is not alpha recovered from a reference image.
-    readonly property color sidebarBase: dark ? "#292929" : "#ECECEC"
-    readonly property real sidebarOpacity: transparency ? 0.94 : 1.0
+    // Keep light mode independent of the wallpaper and Windows backdrop.
+    // Retain the existing optional translucent material in dark mode.
+    readonly property color sidebarBase: dark ? "#292929" : "#F1F1F4"
+    readonly property real sidebarOpacity: dark && transparency ? 0.94 : 1.0
     readonly property color sidebar: withAlpha(sidebarBase, sidebarOpacity)
-    readonly property color border: dark ? "#454545" : "#DEE0E4"
+    readonly property color border: dark ? "#454545" : "#E8E8ED"
     readonly property color glassRim: border
     readonly property color glassGlint: dark ? "#4A4A4A" : "#FFFFFF"
     readonly property color glassShadow: dark ? "#50000000" : "#18000000"
