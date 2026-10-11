@@ -2,13 +2,13 @@
 
 ## Qt 测试版当前状态
 
-Qt 总览采用纯白内容面和中性灰白侧边栏；搜索位于侧栏顶部，按主导航、网络与工具分组。首页显示演示下载/上传速度、所选节点及历史延迟、当前代理和系统状态；模式、策略、节点切换、趋势与原有工具继续可用。浅深主题、减少动效和关闭透明效果的设置保留。Windows 半透明侧栏使用现有系统 backdrop 能力，不包含壁纸、Apple 素材或装饰性背景。
+Qt 总览采用柔和浅灰白主背景、白色卡片和浅色不透明侧边栏，颜色统一由现有主题管理；搜索位于侧栏顶部，按主导航、网络与工具分组。首页显示演示下载/上传速度、所选节点及历史延迟、当前代理和系统状态；模式、策略、节点切换、趋势与原有工具继续可用。布局、圆角、浅深主题、减少动效和透明效果设置保留。浅色背景不依赖 Windows backdrop 或壁纸；深色保留现有可选半透明侧栏，不包含 Apple 素材或装饰性背景。
 
-![Swirl Qt 总览 · 浅色](docs/screenshots/overview-qt-light.png)
+![Swirl Qt 总览 · 浅色](docs/screenshots/background-hierarchy-after.png)
 
 ![Swirl Qt 总览 · 深色](docs/screenshots/overview-qt-dark.png)
 
-*以上为实际 Qt 6.10.3 窗口渲染截图，演示数据不代表真实代理服务已启动。截图为窗口自身的渲染输出；Windows 桌面合成透感另外做了本机检查。不是 macOS 原生材质或像素级完全一致的声明。采样和验证方法见 [UI 视觉验证](docs/UI_VISUAL_VALIDATION.md)。*
+*以上为实际 Qt 6.10.3 窗口渲染截图，演示数据不代表真实代理服务已启动。浅色为本轮 Linux OpenGL 渲染输出，深色为既有 Windows 截图。前后对比、Windows Qt Quick 预览及验证范围见 [背景层次验收](docs/UI_BACKGROUND_VALIDATION.md)；历史材质采样见 [UI 视觉验证](docs/UI_VISUAL_VALIDATION.md)。*
 
 功能模块中心保留 56 个入口和 32 个配置草稿页，可保存、导入、导出草稿，实际网络功能后续接入。安装程序支持原目录覆盖更新，运行中的旧版需先退出。详见 [模块覆盖清单](docs/UI_MODULE_COVERAGE.md)。
 
