@@ -1,10 +1,12 @@
 #pragma once
 #include <QObject>
 #include <QVariantList>
+#include <QVariantMap>
 class DemoDataProvider final : public QObject {
     Q_OBJECT
 public:
     using QObject::QObject;
+    Q_INVOKABLE QVariantMap currentNetwork() const;
     Q_INVOKABLE QVariantList connections() const;
     Q_INVOKABLE QVariantList requests() const;
     Q_INVOKABLE QVariantList nodes() const;

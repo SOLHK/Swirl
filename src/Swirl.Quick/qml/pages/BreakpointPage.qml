@@ -73,7 +73,7 @@ Item {
                     }
                     Rectangle {
                         Layout.fillWidth:true; Layout.fillHeight:true
-                        radius:10; color:Theme.field; border.color:Theme.border
+                        radius:Theme.roundedRadius(width,height); color:Theme.field; border.color:Theme.border
                         ScrollView {
                             anchors.fill:parent; anchors.margins:8
                             TextArea {

@@ -16,16 +16,17 @@ Item {
         anchors.bottomMargin: 12
         spacing: 0
         Item {
-            Layout.fillWidth: true; Layout.preferredHeight: 134
+            Layout.fillWidth: true; Layout.preferredHeight: 112
             Row {
-                x: 0; y: 18; spacing: 10
+                x: sidebar.effectivelyCollapsed?0:8; y: 20; spacing: sidebar.effectivelyCollapsed?7:10
                 Repeater {
                     model: ["#FF6055", "#FFBD2E", "#00C84D"]
                     Button {
                         required property int index
                         required property string modelData
-                        width: 16; height: 16; hoverEnabled: true
-                        background: Rectangle { radius: 8; color: parent.modelData; opacity: parent.down ? 0.7 : 1 }
+                        objectName:index===0?"windowCloseButton":index===1?"windowMinimizeButton":"windowMaximizeButton"
+                        width: sidebar.effectivelyCollapsed?12:16; height: width; hoverEnabled: true
+                        background: Rectangle { radius: Theme.roundedRadius(width,height); color: parent.modelData; opacity: parent.down ? 0.7 : 1 }
                         contentItem: Text { text: parent.hovered ? parent.index === 0 ? "×" : parent.index === 1 ? "−" : "+" : ""; font.pixelSize: 13; color: "#703030"; horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter }
                         onClicked: {
                             if (index === 0) sidebar.Window.window.close()
@@ -38,21 +39,21 @@ Item {
                 }
             }
             RowLayout {
-                x: 10; y: 58; width: parent.width - 16; spacing: 16
-                SwirlBrandIcon { Layout.preferredWidth: sidebar.effectivelyCollapsed ? 44 : 58; Layout.preferredHeight: sidebar.effectivelyCollapsed ? 44 : 58 }
+                x: 10; y: 53; width: parent.width - 16; spacing: 12
+                SwirlBrandIcon { Layout.preferredWidth: sidebar.effectivelyCollapsed ? 40 : 48; Layout.preferredHeight: sidebar.effectivelyCollapsed ? 40 : 48 }
                 Column {
                     visible: !sidebar.effectivelyCollapsed; Layout.fillWidth: true; spacing: 3
-                    Text { text: "Swirl"; font.family: "Segoe UI"; font.pixelSize: 24; font.weight: Font.DemiBold; color: Theme.text }
-                    Text { text: "网络代理工具"; font.pixelSize: 16; color: Theme.muted }
+                    Text { text: "Swirl"; font.family: "Segoe UI"; font.pixelSize: 23; font.weight: Font.DemiBold; color: Theme.text }
+                    Text { text: "网络代理工具"; font.pixelSize: 14; color: Theme.muted }
                 }
             }
         }
         SwirlSearchField {
             id: pageSearch; objectName: "pageSearch"
-            Layout.fillWidth: true; Layout.preferredHeight: 42
+            Layout.fillWidth: true; Layout.preferredHeight: 36
             placeholderText: sidebar.effectivelyCollapsed ? "" : "搜索功能"
             leftPadding: sidebar.effectivelyCollapsed ? 10 : 48
-            font.pixelSize: 18
+            font.pixelSize: 14
             Accessible.name: "搜索功能、节点或设置"
                     onAccepted:{
                         var q=text.trim().toLowerCase()
@@ -71,7 +72,7 @@ Item {
         }
         ScrollView {
             id: scroll; Layout.fillWidth: true; Layout.fillHeight: true
-            Layout.topMargin: 12; clip: true
+            Layout.topMargin: 8; clip: true
             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
             Column {
                 width: scroll.availableWidth; spacing: 0
@@ -82,14 +83,14 @@ Item {
                         required property int index
                         width: parent.width
                         Item {
-                            width: parent.width; height: index === 0 ? 30 : 48
-                            Rectangle { visible: index > 0; x: 3; width: parent.width - 6; y: 12; height: 1; color: Theme.controlBorder }
-                            Text { visible: !sidebar.effectivelyCollapsed; x: 12; y: index === 0 ? 6 : 25; text: index === 0 ? "主导航" : modelData.title; font.pixelSize: 14; font.weight: Font.DemiBold; color: Theme.muted }
+                            width: parent.width; height: index === 0 ? 30 : 38
+                            Rectangle { visible: false; x: 3; width: parent.width - 6; y: 12; height: 1; color: Theme.controlBorder }
+                            Text { visible: !sidebar.effectivelyCollapsed; x: 12; y: index === 0 ? 8 : 17; text: index === 0 ? "主要功能" : modelData.title; font.pixelSize: 14; font.weight: Font.Normal; color: Theme.muted }
                             Button {
-                                visible: modelData.title === "工具" && !sidebar.effectivelyCollapsed
-                                x: parent.width - 60; y: 20; width: 60; height: 28
+                                visible: modelData.title === "分析与调试" && !sidebar.effectivelyCollapsed
+                                x: parent.width - 60; y: 12; width: 60; height: 28
                                 text: "全部 ›"; font.pixelSize: 12; palette.buttonText: Theme.muted
-                                background: Rectangle { color: parent.hovered ? Theme.hover : "transparent"; radius: 8 }
+                                background: Rectangle { color: parent.hovered ? Theme.hover : "transparent"; radius: Theme.roundedRadius(width,height) }
                                 onClicked: AppState.navigate("featurehub"); Accessible.name: "全部功能模块"
                             }
                         }
@@ -106,7 +107,7 @@ Item {
                 }
             }
         }
-        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; Layout.topMargin: 8; color: Theme.controlBorder }
+        Text { visible: !sidebar.effectivelyCollapsed; text:"通用"; color:Theme.muted; font.pixelSize:14; Layout.leftMargin:12; Layout.preferredHeight:28 }
         SwirlNavigationItem { Layout.fillWidth: true; pageId: "settings"; title: "设置"; iconName: "settings"; compact: sidebar.effectivelyCollapsed; onActivated: AppState.navigate(pageId) }
         SwirlNavigationItem { Layout.fillWidth: true; pageId: "logs"; title: "日志"; iconName: "document"; compact: sidebar.effectivelyCollapsed; onActivated: AppState.navigate(pageId) }
     }

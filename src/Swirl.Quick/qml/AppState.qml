@@ -3,9 +3,15 @@ import QtQuick
 QtObject {
     property string currentPage: "overview"
     property bool sidebarCollapsed: false
+    // These are preview controls only; there is no Qt Mihomo connection yet.
+    readonly property bool demoMode: true
+    readonly property string connectionState: demoError ? "异常（演示）" : proxyOn ? "已连接（演示）" : "未连接 · 演示数据"
     property bool proxyOn: false
     property bool systemProxyOn: false
     property bool tunOn: false
+    onProxyOnChanged: if (!proxyOn) { systemProxyOn=false; tunOn=false }
+    onSystemProxyOnChanged: if (systemProxyOn && !proxyOn) setConnection(true)
+    onTunOnChanged: if (tunOn && !proxyOn) setConnection(true)
     property bool detailOpen: true
     property string mode: "规则"
     property string policy: "自动选择"
@@ -35,9 +41,9 @@ QtObject {
     readonly property var navigationGroups: [
         {title:"",pages:[{id:"overview",title:"总览",icon:"home"},{id:"proxies",title:"代理节点",icon:"pin"},{id:"policies",title:"策略组",icon:"layers"},{id:"rules",title:"规则",icon:"document"},{id:"subscriptions",title:"订阅管理",icon:"refresh"},{id:"profiles",title:"配置文件",icon:"file"}]},
         {title:"网络",pages:[{id:"dns",title:"DNS",icon:"globe"},{id:"toolbox",title:"网络检测",icon:"gauge"},{id:"connections",title:"连接记录",icon:"clock"}]},
-        {title:"工具",pages:[{id:"inspector",title:"HTTP 检查器",icon:"code"},{id:"traffic",title:"流量分析",icon:"bars"},{id:"scripts",title:"脚本与配置",icon:"terminal"},{id:"external",title:"外部工具",icon:"folder"}]}
+        {title:"分析与调试",pages:[{id:"inspector",title:"HTTP 检查器",icon:"code"},{id:"traffic",title:"流量分析",icon:"bars"},{id:"processes",title:"进程",icon:"sliders"},{id:"gateway",title:"设备",icon:"calendar"},{id:"requestlogs",title:"请求日志",icon:"help"},{id:"tls",title:"HTTPS 解密",icon:"shield"},{id:"rewrite",title:"重写",icon:"route"}]}
     ]
-    readonly property var allPageIds: groups.reduce(function(all,g){return all.concat(g.pages.map(function(p){return p.id}))},[]).concat(["featurehub","external"]).concat(FeatureCatalog.entries.filter(function(f){return f.id.indexOf("feature-")===0}).map(function(f){return f.id}))
+    readonly property var allPageIds: groups.reduce(function(all,g){return all.concat(g.pages.map(function(p){return p.id}))},[]).concat(["featurehub","external","processes","requestlogs"]).concat(FeatureCatalog.entries.filter(function(f){return f.id.indexOf("feature-")===0}).map(function(f){return f.id}))
     function navigate(id) {
         if (currentPage === id) return
         navigationHistory = navigationHistory.slice(0,historyIndex+1).concat([id])
@@ -56,6 +62,7 @@ QtObject {
     }
     function setConnection(on) {
         proxyOn=on
+        if (!on) { systemProxyOn=false; tunOn=false }
         demoDown=on ? 3.2 : 0; demoUp=on ? 0.7 : 0; demoConnections=on ? 12 : 0
         addEvent(on ? "已建立演示连接" : "已断开演示连接",on ? "success" : "neutral")
         toast=on ? "界面演示已连接，不会启用系统代理。" : "演示连接已断开，当前实时流量为零。"
@@ -418,6 +425,8 @@ QtObject {
         return Object.prototype.hasOwnProperty.call(zhDictionary,key) ? zhDictionary[key] : key
     }
     function page(id) {
+        if(id==="processes")return {id:id,title:"进程",sub:"进程流量 · 演示"}
+        if(id==="requestlogs")return {id:id,title:"请求日志",sub:"请求历史 · 演示"}
         if(id==="featurehub") return {id:id,title:"功能模块中心",sub:"全部功能与配置草稿"}
         var feature=FeatureCatalog.find(id); if(feature)return feature
         if(id==="external") return {id:"external",title:"外部工具",sub:"尚未接入外部程序"}

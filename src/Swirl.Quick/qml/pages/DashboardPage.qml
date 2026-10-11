@@ -101,9 +101,9 @@ Item {
                                     Text { text:Math.round(modelData.share*100)+"%"; color:Theme.muted; font.pixelSize:12 }
                                 }
                                 Rectangle {
-                                    Layout.fillWidth:true; height:7; radius:4; color:Theme.field
+                                    Layout.fillWidth:true; height:7; radius:Theme.roundedRadius(width,height); color:Theme.field
                                     Rectangle {
-                                        width:parent.width*modelData.share; height:parent.height; radius:4
+                                        width:parent.width*modelData.share; height:parent.height; radius:Theme.roundedRadius(width,height)
                                         color:modelData.color
                                         Behavior on width { NumberAnimation { duration:Theme.motion } }
                                     }

@@ -65,13 +65,13 @@ Item {
                     Text { text:AppState.zh("Routing relationship"); color:Theme.text; font.pixelSize:16; font.weight:Font.DemiBold }
                     SwirlStatusBadge { label:page.active.type.toUpperCase(); tone:"accent" }
                     Rectangle {
-                        Layout.fillWidth:true; Layout.preferredHeight:68; radius:11
+                        Layout.fillWidth:true; Layout.preferredHeight:68; radius:Theme.roundedRadius(width,height)
                         color:Theme.selected; border.color:Theme.border
                         Text { anchors.centerIn:parent; text:page.active.name; color:Theme.accent; font.pixelSize:15; font.weight:Font.DemiBold }
                     }
                     Text { text:AppState.zh("↓   resolves to"); color:Theme.muted; Layout.alignment:Qt.AlignHCenter; font.pixelSize:11 }
                     Rectangle {
-                        Layout.fillWidth:true; Layout.preferredHeight:68; radius:11
+                        Layout.fillWidth:true; Layout.preferredHeight:68; radius:Theme.roundedRadius(width,height)
                         color:Theme.field; border.color:Theme.border
                         RowLayout {
                             anchors.centerIn:parent; spacing:7

@@ -22,7 +22,7 @@ Menu {
                 font.pixelSize: 12; font.family: "Microsoft YaHei UI"
                 leftPadding: 12; verticalAlignment: Text.AlignVCenter
             }
-            background: Rectangle { radius: 10; color: parent.highlighted ? Theme.selected : "transparent" }
+            background: Rectangle { radius: Theme.roundedRadius(width,height); color: parent.highlighted ? Theme.selected : "transparent" }
             onTriggered: {
                 if (text === "复制" || text === "Copy") {
                     demoProvider.copyText(menu.payload)

@@ -64,8 +64,8 @@ Item {
                                     }
                                     Text { text:record.source; color:Theme.muted; font.pixelSize:11; Layout.fillWidth:true; elide:Text.ElideMiddle }
                                     Rectangle {
-                                        Layout.fillWidth:true; height:7; radius:4; color:Theme.field
-                                        Rectangle { width:parent.width*record.used/record.limit; height:parent.height; radius:4; color:record.used/record.limit>.75?Theme.orange:Theme.accent }
+                                        Layout.fillWidth:true; height:7; radius:Theme.roundedRadius(width,height); color:Theme.field
+                                        Rectangle { width:parent.width*record.used/record.limit; height:parent.height; radius:Theme.roundedRadius(width,height); color:record.used/record.limit>.75?Theme.orange:Theme.accent }
                                     }
                                     RowLayout {
                                         Layout.fillWidth:true

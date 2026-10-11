@@ -16,7 +16,7 @@ Rectangle {
     }
     border.width:Theme.borderWidth
     border.color:Theme.pillRim
-    layer.enabled:subtleShadow
+    layer.enabled:subtleShadow && Theme.effectsSupported
     layer.effect:MultiEffect {
         shadowEnabled:true; shadowBlur:0.35; shadowVerticalOffset:3
         shadowOpacity:Theme.dark ? 0.12 : 0.05; shadowColor:"#000000"

@@ -11,7 +11,7 @@ Switch {
     hoverEnabled: true
     indicator: Rectangle {
         width: control.width; height: control.height
-        radius: Theme.pillRadius(height)
+        radius: height * 0.5
         color: control.checked ? Theme.primaryControl : Theme.dark ? "#626262" : "#DADADD"
         border.width: control.activeFocus ? 2 : 0
         border.color: Theme.focusBorder
@@ -19,9 +19,9 @@ Switch {
         Rectangle {
             width: parent.height - 8; height: width
             x: control.checked ? parent.width - width - 4 : 4; y: 4
-            radius: Theme.pillRadius(height)
+            radius: height * 0.5
             color: "#FEFEFF"
-            layer.enabled: true
+            layer.enabled: Theme.effectsSupported
             layer.effect: MultiEffect { shadowEnabled:true; shadowBlur:0.35; shadowVerticalOffset:2; shadowColor:"#30000000" }
             Behavior on x { NumberAnimation { duration: Theme.motion; easing.type: Easing.OutCubic } }
         }

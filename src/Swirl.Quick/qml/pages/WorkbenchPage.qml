@@ -9,6 +9,8 @@ Item {
     id: page
     property string pageId: "dashboard"
     property var features: ({
+        processes:["进程名称","活动连接","上传 / 下载","进程策略"],
+        requestlogs:["请求时间","目标地址","HTTP 方法","响应状态","匹配规则"],
         dashboard:["速率历史","连接趋势","Latency","最近请求","域名排行","应用排行","策略使用情况"],
         profiles:["本地配置","远程配置","Editor","Import","导出","Backup","Versions"],
         policies:["手动选择","自动选择","Failover","负载均衡","SSID","策略详情","Relationships"],
@@ -127,7 +129,7 @@ Item {
                     Text { text:"编辑器 / 输出"; color:Theme.muted; font.pixelSize:10 }
                     Rectangle {
                         Layout.fillWidth:true; Layout.fillHeight:true
-                        color:Theme.field; radius:10; border.color:Theme.border
+                        color:Theme.field; radius:Theme.roundedRadius(width,height); border.color:Theme.border
                         ScrollView {
                             anchors.fill:parent; anchors.margins:8
                             TextArea {

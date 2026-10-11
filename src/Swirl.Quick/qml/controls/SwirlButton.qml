@@ -14,7 +14,7 @@ Button {
     hoverEnabled: true
     font.family: Theme.fontFamily
     font.pixelSize: 17
-    leftPadding: 18; rightPadding: 18
+    leftPadding: 12; rightPadding: 12
     background: SwirlPillSurface {
         primary: control.primary
         gradient:control.quiet && !control.hovered && !control.down ? null : pillGradient
@@ -32,7 +32,7 @@ Button {
     }
     contentItem: RowLayout {
         id: contents
-        spacing: 10
+        spacing: 8
         SwirlIcon {
             visible: control.iconName !== ""
             name: control.iconName; size: 23
@@ -42,7 +42,8 @@ Button {
             text: control.text
             font.family: control.font.family
             font.pixelSize: control.font.pixelSize
-            font.weight: Font.DemiBold
+            font.weight: Font.Normal
+            Layout.fillWidth: true; elide: Text.ElideRight
             color: control.primary ? "white" : control.danger ? Theme.red : Theme.text
             Layout.alignment: Qt.AlignVCenter
         }

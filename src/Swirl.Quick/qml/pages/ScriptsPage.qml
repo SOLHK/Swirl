@@ -34,7 +34,7 @@ Item {
                         spacing:5
                         model:page.scripts.filter(function(s){return s.toLowerCase().indexOf(search.text.toLowerCase())>=0})
                         delegate:Rectangle {
-                            width:ListView.view.width; height:43; radius:9
+                            width:ListView.view.width; height:43; radius:Theme.roundedRadius(width,height)
                             color:page.selectedScript===modelData?Theme.selected:area.containsMouse?Theme.hover:"transparent"
                             RowLayout {
                                 anchors.fill:parent; anchors.leftMargin:10; anchors.rightMargin:7
@@ -71,7 +71,7 @@ Item {
                     }
                     Rectangle {
                         Layout.fillWidth:true; Layout.fillHeight:true
-                        radius:10
+                        radius:Theme.roundedRadius(width,height)
                         color:Theme.dark?"#121B29":"#F6F8FC"
                         border.color:Theme.border
                         RowLayout {
@@ -126,7 +126,7 @@ Item {
                             font.pixelSize:11
                             font.family:"Cascadia Code"
                             wrapMode:Text.WrapAnywhere
-                            background:Rectangle { color:Theme.field; radius:8 }
+                            background:Rectangle { color:Theme.field; radius:Theme.roundedRadius(width,height) }
                         }
                     }
                     SwirlButton { Layout.fillWidth:true; text:"清空控制台"; onClicked:page.consoleText="" }

@@ -62,7 +62,7 @@ Item {
                     Text { text:"预览"; color:Theme.muted; font.pixelSize:10 }
                     Rectangle {
                         Layout.fillWidth:true; Layout.fillHeight:true
-                        radius:10; color:Theme.field; border.color:Theme.border
+                        radius:Theme.roundedRadius(width,height); color:Theme.field; border.color:Theme.border
                         Text {
                             anchors.fill:parent; anchors.margins:12
                             text:(matchField.text||"原始 URL")+"\n  ↓\n"+(targetField.text||"替换目标")+

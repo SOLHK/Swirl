@@ -10,25 +10,25 @@ Button {
     property bool compact: false
     readonly property bool chosen: AppState.currentPage === pageId
     signal activated()
-    implicitHeight: 42
+    implicitHeight: 33
     implicitWidth: compact ? 58 : 250
     leftPadding: 16; rightPadding: 12
     hoverEnabled: true
     background: Rectangle {
-        radius: 8
+        radius: Theme.roundedRadius(width,height)
         color: entry.down ? Theme.pressed : entry.chosen ? Theme.selected : entry.hovered ? Theme.hover : "transparent"
-        border.width: entry.activeFocus ? 2 : 0
+        border.width: entry.visualFocus ? 2 : 0
         border.color: Theme.focusBorder
         Behavior on color { ColorAnimation { duration: Theme.motion } }
     }
     contentItem: RowLayout {
-        spacing: 22
-        SwirlIcon { name: entry.iconName; size: 26; color: entry.chosen ? Theme.navigationAccent : Theme.text }
+        spacing: 18
+        SwirlIcon { name: entry.iconName; size: 22; color: Theme.text }
         Text {
             visible: !entry.compact; Layout.fillWidth: true
-            text: entry.title; color: entry.chosen ? Theme.navigationAccent : Theme.text
-            font.pixelSize: 18; font.family: Theme.fontFamily
-            font.weight: entry.chosen ? Font.DemiBold : Font.Normal
+            text: entry.title; color: Theme.text
+            font.pixelSize: 17; font.family: Theme.fontFamily
+            font.weight: Font.Normal
             elide: Text.ElideRight
         }
     }
