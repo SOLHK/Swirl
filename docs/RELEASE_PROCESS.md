@@ -14,8 +14,8 @@
 
 ## 测试分支验收
 
-1. Windows x64 CI 构建、Qt Quick QML 启动与 24 页面 smoke test 全部通过。
-2. 下载 `Swirl-Quick-UI-win-x64` 测试包，在 Windows 真机手动验证布局、交互、浅色/深色、100%/125%/150%/200% DPI。
+1. Windows x64 CI 构建、Qt Quick QML 启动与当前 61 页面 smoke test 全部通过。
+2. 下载 `test` 分支 GitHub 测试版 Release 提供的 `Swirl-Setup.exe` 安装程序（CI 同时保留 `Swirl-Quick-UI-win-x64` 运行环境包），在 Windows 真机验证布局、交互、浅色/深色、100%/125%/150%/200% DPI。
 3. 验证核心功能时，另行执行 .NET Windows 构建和回归测试，不将仅 UI 的测试结果冒充后端验证。
 4. 检查工作流无敏感信息泄漏，确认程序安装包和文档准确注明 Qt 界面 Demo 功能边界。
 5. 问题在开发分支修复，再同步至 `test`；任何失败不得晋级。
