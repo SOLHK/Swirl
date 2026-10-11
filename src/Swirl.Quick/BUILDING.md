@@ -41,7 +41,7 @@ cmake --build build/swirl-quick --parallel
 Tests log to Swirl-diagnostics.txt beside the EXE. `--interaction-test`
 checks actual mouse/keyboard input, scrolling targets into view, node metadata, offline counters, chart
 selectors, Ctrl+K, search, history and bottom-row reachability. The smoke test
-visits all 59 pages, including 32 dedicated configuration draft pages and the module catalog, waits
+visits all 61 pages, including 32 dedicated configuration draft pages and the module catalog, waits
 for lazy delegate creation and exits nonzero on QML loading warnings/timeouts.
 CTest runs these checks with the offscreen software platform; on that platform
 set QT_QPA_FONTDIR to a temporary font-fixture directory. Normal Windows
@@ -63,9 +63,11 @@ the OS scale; factors 2/3, 5/6, 1 and 4/3 on a 150% desktop check effective
 verify touch, multi-monitor transitions or OS snap gestures; those remain
 manual checks. Buttons call Qt native close/minimize/maximize APIs, dragging
 uses startSystemMove, and all eight resize edges use startSystemResize.
-Windows uses the QML antialiased alpha silhouette only. Native DWM border/
-non-client rounding and the integer region mask are disabled to eliminate
-gray corner remnants at high DPI.
+Windows uses a single frameless Qt Quick window and native DWM Desktop Acrylic
+where available. Native activation, window controls and system work-area
+maximization are explicitly handled; the OS owns the outer corner/backdrop
+when native composition is active. Unsupported systems or renderers receive
+an opaque fallback. See docs/UI_1_0_VALIDATION.md.
 
 ## Design and scope
 
@@ -73,21 +75,23 @@ gray corner remnants at high DPI.
 - SwirlPillSurface remains shared by buttons, combo boxes and segmented selections.
   Navigation uses stable 42-pixel rows and a neutral rounded selection; sidebar
   search and content cards have their own purpose-specific radius tokens.
-- The current overview reference is 1464 x 930 logical pixels with a 286-pixel sidebar. Below
+- The current overview reference is 1464 x 930 logical pixels with a 252-pixel full sidebar. Below
   width 1160 the sidebar becomes an icon rail. At narrower main widths the
   bottom cards stack and scroll so every row remains reachable.
-- Light page backgrounds are opaque soft white (#F8F8FA), with white cards
-  (#FFFFFF), pale borders (#E8E8ED) and an opaque sidebar (#F1F1F4).
-  These roles use the existing Theme.qml tokens; light surfaces remain stable
-  across wallpaper/backdrop and transparency settings. Dark mode retains its
-  existing neutral surfaces and optional sidebar tint over the Windows backdrop.
+- Light content uses opaque neutral white (#F7F7F8), white cards
+  (#FFFFFF), subtle borders (#E5E5E8) and sidebar tint (#E9E9EC).
+  The sidebar tint uses 0.82 opacity only when native DWM composition is active;
+  otherwise it is opaque. The content area always remains opaque. Dark mode
+  uses corresponding neutral tokens and the same capability-based fallback.
 - Only the selected download/upload/cumulative series is drawn. Offline
   endpoints and current counters are zero. History and event times share the
   session clock. Cumulative GB stays historical and increases only while the
   demonstration connection is active.
-- The user-provided flat blue kite replaces the app/installer icon and sidebar
-  mark. Clean SVG paths replace bitmap edge noise; the sidebar uses a soft QML icon cradle. Outline UI icons
-  remain Canvas drawings.
+- The transparent wave SVG `assets/icons/swirl_wave_mark.svg` is used directly
+  as the sidebar brand mark without icon cradle, frame or shadow. The app and
+  installer use the corresponding wave-based icon resource, with SVG glyphs
+  under `assets/icons/ui/` for interface actions. No legacy kite icon is
+  presented as the current Qt brand.
 - Existing specialized pages remain available by search and overview links.
   The HTTP capture page is real; remaining proxy backend integration and further
   visual refinement of other pages remain future work.
@@ -113,7 +117,9 @@ The catalog exposes 56 public capability entries. Thirty-two new draft pages off
 
 The installer reuses the registered install directory and overwrites application files. It retains configuration/data and refuses a silent update when the existing executable is still running or unwritable (exit 2). Interactive setup offers retry after quitting Swirl. Test an old installer followed by the new installer using the SAME fresh isolated test directory; verify the new EXE hash and startup before uninstalling.
 
-Visual comparison, reference sampling and compositor limitations are documented in `docs/UI_VISUAL_VALIDATION.md`.
+The latest native Windows screenshots, tests and compositor limitations are documented
+in `docs/UI_1_0_VALIDATION.md`. `docs/UI_VISUAL_VALIDATION.md` and
+`docs/UI_BACKGROUND_VALIDATION.md` record previous visual iterations only.
 
 ## Native 1.0 UI validation
 
