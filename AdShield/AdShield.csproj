@@ -8,7 +8,7 @@
     <Nullable>enable</Nullable>
     <AssemblyName>Swirl</AssemblyName>
     <RootNamespace>AdShield</RootNamespace>
-    <Version>0.7.1</Version>
+    <Version>0.8.0</Version>
     <ApplicationIcon>Assets\swirl.ico</ApplicationIcon>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
   </PropertyGroup>

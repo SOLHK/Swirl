@@ -1,6 +1,6 @@
 ; Swirl Windows x64 setup, built by GitHub Actions using Inno Setup 6.
 #define AppName "Swirl"
-#define AppVersion "0.7.1"
+#define AppVersion "0.8.0"
 #define AppExe "Swirl.exe"
 
 [Setup]

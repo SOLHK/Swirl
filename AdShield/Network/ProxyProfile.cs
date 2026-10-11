@@ -10,6 +10,10 @@ internal sealed class ProxyProfile
 {
     public string ProtectedYaml { get; set; } = "";
     public string ProtectedSubscription { get; set; } = "";
+    public string ProtectedSelections { get; set; } = "";
+    public string ProtectedLibrary { get; set; } = "";
+    public string ActiveSubscriptionId { get; set; } = "";
+    public string ProtectedGroups { get; set; } = "";
     public SubscriptionClientProfile SubscriptionClient { get; set; } = SubscriptionClientProfile.Mihomo;
     public SubscriptionDownloadRoute SubscriptionRoute { get; set; } = SubscriptionDownloadRoute.Automatic;
     public string Mode { get; set; } = "rule";
@@ -32,6 +36,16 @@ internal sealed class ProxyProfile
         ProtectedData.Unprotect(Convert.FromBase64String(text), null, DataProtectionScope.CurrentUser));
     internal string Yaml => Unprotect(ProtectedYaml);
     internal string Subscription => Unprotect(ProtectedSubscription);
+    internal Dictionary<string, string> SelectedProxies
+    {
+        get { try { return JsonSerializer.Deserialize<Dictionary<string, string>>(Unprotect(ProtectedSelections)) ?? new(); } catch { return new(); } }
+        set => ProtectedSelections = Protect(JsonSerializer.Serialize(value));
+    }
+    internal List<PolicyGroupSettings> GroupSettings
+    {
+        get => ProtectedGroups.Length == 0 ? [] : JsonSerializer.Deserialize<List<PolicyGroupSettings>>(Unprotect(ProtectedGroups)) ?? [];
+        set => ProtectedGroups = value.Count == 0 ? "" : Protect(JsonSerializer.Serialize(value));
+    }
 
     internal static string? TestDirectory { get; set; }
     internal static string DirectoryPath => TestDirectory ?? Path.Combine(Store.Dir, "network");
@@ -45,6 +59,7 @@ internal sealed class ProxyProfile
             profile.BasicAds = false;
             if (!Enum.IsDefined(profile.SubscriptionClient)) profile.SubscriptionClient = SubscriptionClientProfile.Mihomo;
             if (!Enum.IsDefined(profile.SubscriptionRoute)) profile.SubscriptionRoute = SubscriptionDownloadRoute.Automatic;
+            SubscriptionLibrary.Ensure(profile);
             return profile;
         }
         catch { return new(); }
@@ -76,6 +91,7 @@ internal sealed class ProxyProfile
     }
     internal void Save()
     {
+        SubscriptionLibrary.CaptureActive(this);
         Directory.CreateDirectory(DirectoryPath);
         var file = Path.Combine(DirectoryPath, "profile.json");
         ConfigurationSync.WriteAtomic(file, Encoding.UTF8.GetBytes(JsonSerializer.Serialize(this)));
@@ -84,7 +100,10 @@ internal sealed class ProxyProfile
 
 internal static class MihomoConfig
 {
-    internal const int MixedPort = 17890, PluginPort = 17891, ControllerPort = 17909;
+    internal static (int Mixed, int Plugin, int Controller)? TestPorts { get; set; }
+    internal static int MixedPort => TestPorts?.Mixed ?? 17890;
+    internal static int PluginPort => TestPorts?.Plugin ?? 17891;
+    internal static int ControllerPort => TestPorts?.Controller ?? 17909;
     internal static string ParseSubscription(string yaml)
     {
         if (string.IsNullOrWhiteSpace(yaml)) throw new InvalidOperationException("订阅返回了空内容，请检查链接是否仍有效。");
@@ -139,6 +158,7 @@ internal static class MihomoConfig
         UserRouting.Snapshot(profile);
         var effectivePlugins = UserRouting.EffectivePlugins(profile).ToArray();
         var root = string.IsNullOrWhiteSpace(profile.Yaml) ? new Dictionary<string, object>() : Parse(profile.Yaml);
+        UserProxyGroups.Apply(profile, root);
         root["mixed-port"] = MixedPort;
         foreach (var key in new[] { "port", "socks-port", "redir-port", "tproxy-port", "external-controller-tls", "external-controller-unix", "external-controller-pipe", "external-ui", "external-ui-url", "listeners" }) root.Remove(key);
         root["allow-lan"] = false;
@@ -191,7 +211,9 @@ internal static class MihomoConfig
             ? items.ToList() : new List<object>();
         string groupName = "Swirl 节点";
         while (nodes.Contains(groupName) || providers.Contains(groupName) || groups.OfType<IDictionary<object, object>>().Any(g => g.TryGetValue("name", out var n) && n?.ToString() == groupName)) groupName += "_";
-        var group = new Dictionary<string, object> { ["name"] = groupName, ["type"] = "select", ["proxies"] = nodes.Count > 0 ? nodes : new List<string> { "DIRECT" } };
+        var group = new Dictionary<string, object> { ["name"] = groupName, ["type"] = "select" };
+        if (nodes.Count > 0) group["proxies"] = nodes;
+        else if (providers.Count == 0) group["proxies"] = new[] { "DIRECT" };
         if (providers.Count > 0) group["use"] = providers;
         groups.Insert(0, group);
         var configuredPolicies = nodes.Concat(groups.OfType<IDictionary<object, object>>().Where(g => g.TryGetValue("name", out _)).Select(g => g["name"].ToString()!)).Concat(new[] { groupName }).ToArray();
@@ -209,6 +231,12 @@ internal static class MihomoConfig
                 importedGroup["exclude-filter"] = (string.IsNullOrWhiteSpace(filter?.ToString()) ? "" : "(?:" + filter + ")|") + "^" + PluginOutbound + "$";
             }
         root["proxy-groups"] = groups;
+        // Swirl restores validated, user-scoped selections before capturing
+        // traffic; an old core cache must not override them with DIRECT.
+        var coreProfile = root.TryGetValue("profile", out var coreProfileValue) && coreProfileValue is IDictionary<object, object> settings
+            ? settings.ToDictionary(e => e.Key.ToString()!, e => e.Value) : new Dictionary<string, object>();
+        coreProfile["store-selected"] = false;
+        root["profile"] = coreProfile;
         var rules = new List<string>();
         if (profile.Tun)
         {

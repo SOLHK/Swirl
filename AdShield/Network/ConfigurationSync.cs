@@ -25,6 +25,9 @@ internal sealed class PortableProfile
     public ProxyProfile Profile { get; set; } = new();
     public string Yaml { get; set; } = "";
     public string Subscription { get; set; } = "";
+    public Dictionary<string, string> Selections { get; set; } = new();
+    public List<SubscriptionEntry> Library { get; set; } = new();
+    public List<PolicyGroupSettings> Groups { get; set; } = new();
     public Dictionary<string, string> ParameterValues { get; set; } = new();
 }
 
@@ -153,6 +156,10 @@ internal static class ConfigurationSync
     {
         current.ProtectedYaml = incoming.ProtectedYaml;
         current.ProtectedSubscription = incoming.ProtectedSubscription;
+        current.ProtectedSelections = incoming.ProtectedSelections;
+        current.ProtectedLibrary = incoming.ProtectedLibrary;
+        current.ActiveSubscriptionId = incoming.ActiveSubscriptionId;
+        current.ProtectedGroups = incoming.ProtectedGroups;
         current.SubscriptionClient = Enum.IsDefined(incoming.SubscriptionClient) ? incoming.SubscriptionClient : SubscriptionClientProfile.Mihomo;
         current.SubscriptionRoute = Enum.IsDefined(incoming.SubscriptionRoute) ? incoming.SubscriptionRoute : SubscriptionDownloadRoute.Automatic;
         current.Mode = incoming.Mode;
@@ -179,9 +186,10 @@ internal static class ConfigurationSync
 
     private static byte[] Plaintext(ProxyProfile profile)
     {
+        SubscriptionLibrary.CaptureActive(profile);
         var copy = JsonSerializer.Deserialize<ProxyProfile>(JsonSerializer.Serialize(profile)) ?? throw new InvalidOperationException("无法复制配置。");
-        var payload = new PortableProfile { Profile = copy, Yaml = profile.Yaml, Subscription = profile.Subscription };
-        copy.ProtectedYaml = ""; copy.ProtectedSubscription = "";
+        var payload = new PortableProfile { Profile = copy, Yaml = profile.Yaml, Subscription = profile.Subscription, Selections = profile.SelectedProxies, Library = SubscriptionLibrary.Read(profile), Groups = profile.GroupSettings };
+        copy.ProtectedYaml = ""; copy.ProtectedSubscription = ""; copy.ProtectedSelections = ""; copy.ProtectedLibrary = ""; copy.ProtectedGroups = "";
         copy.SyncFolder = ""; copy.SyncRemoteRevision = ""; copy.SyncRemoteHash = ""; copy.SyncContentHash = "";
         foreach (var plugin in copy.Plugins)
         {
@@ -230,6 +238,18 @@ internal static class ConfigurationSync
                 throw new InvalidOperationException("配置中的订阅链接无效。");
             profile.ProtectedYaml = ProxyProfile.Protect(payload.Yaml);
             profile.ProtectedSubscription = ProxyProfile.Protect(payload.Subscription);
+            profile.SelectedProxies = payload.Selections ?? new();
+            profile.GroupSettings = payload.Groups ?? [];
+            var entries = payload.Library ?? [];
+            foreach (var entry in entries)
+            {
+                if (entry.Id == null || entry.Name == null || entry.Source == null || entry.Yaml == null || entry.Selections == null || entry.Groups == null || !Guid.TryParseExact(entry.Id, "N", out _) || !Enum.IsDefined(entry.Client) || !Enum.IsDefined(entry.Route)) throw new InvalidOperationException("订阅库数据无效。");
+                SubscriptionLibrary.CleanName(entry.Name); MihomoConfig.ParseSubscription(entry.Yaml);
+                if (entry.Source.Length > 0) _ = SubscriptionImport.ParseAddress(entry.Source);
+                foreach (var group in entry.Groups) group.Validate();
+            }
+            if (entries.Select(e => e.Id).Distinct().Count() != entries.Count || entries.Count > 0 && !entries.Any(e => e.Id == profile.ActiveSubscriptionId)) throw new InvalidOperationException("订阅库当前配置无效。");
+            SubscriptionLibrary.Write(profile, entries);
             profile.Tun = false; profile.Mitm = false; profile.BasicAds = false;
             profile.SyncFolder = ""; profile.SyncRemoteRevision = ""; profile.SyncRemoteHash = ""; profile.SyncContentHash = "";
             foreach (var plugin in profile.Plugins)
