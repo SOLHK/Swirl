@@ -1,47 +1,10 @@
-<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="kiteFill" x1="410" y1="185" x2="710" y2="455" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#37404F"/>
-      <stop offset="0.52" stop-color="#303948"/>
-      <stop offset="1" stop-color="#202735"/>
-    </linearGradient>
-    <linearGradient id="tailFill" x1="104" y1="558" x2="418" y2="565" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#151C27"/>
-      <stop offset="0.48" stop-color="#202836"/>
-      <stop offset="1" stop-color="#252D3B"/>
-    </linearGradient>
-  </defs>
-
-  <!-- Tail -->
-  <path d="M142 684
-           C157 650 185 631 217 623
-           C252 615 299 616 349 603
-           C411 586 469 550 512 501
-           C528 482 538 464 541 446
-           C543 431 546 423 553 422
-           C562 421 567 431 564 447
-           C558 482 533 521 491 560
-           C458 591 419 616 377 635
-           C326 658 274 665 232 676
-           C201 685 176 701 160 729
-           C153 742 145 746 135 742
-           C124 737 123 723 130 710
-           C134 701 138 692 142 684 Z"
-        fill="url(#tailFill)"/>
-
-  <!-- Kite body -->
-  <path d="M603 182
-           C549 212 488 246 391 295
-           C447 294 497 307 529 334
-           C559 359 574 399 568 450
-           C564 490 546 532 515 579
-           C577 520 647 465 728 407
-           C709 331 672 255 603 182 Z"
-        fill="url(#kiteFill)"/>
-
-  <!-- Inner structure lines -->
-  <path d="M604 184 C581 282 564 391 520 576"
-        stroke="#FAFBFE" stroke-width="18" stroke-linecap="round"/>
-  <path d="M391 295 C470 296 571 319 726 404"
-        stroke="#FAFBFE" stroke-width="16" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" fill="none">
+  <defs><linearGradient id="kite" x1="150" y1="880" x2="820" y2="200" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#1C2533"/><stop offset="0.58" stop-color="#2A3444"/><stop offset="1" stop-color="#354052"/></linearGradient></defs>
+  
+  <g transform="translate(156.63708 169.19149) scale(2.214099 2.255319)">
+    <path d="M129 87 L263 16 L228 85 C198 79 159 79 129 87 Z" fill="url(#kite)"/>
+    <path d="M263 16 L286 141 C273 124 257 108 234 96 Z" fill="url(#kite)"/>
+    <path d="M129 87 C162 89 191 94 224 97 C204 139 180 190 156 211 C120 240 85 238 57 252 C37 264 40 284 55 295 C26 288 12 267 22 247 C34 223 66 219 103 221 C141 225 162 208 169 176 C179 135 157 103 129 87 Z" fill="url(#kite)"/>
+    <path d="M234 100 C254 110 275 129 286 141 C250 135 199 185 156 211 C186 174 216 122 234 100 Z" fill="url(#kite)"/>
+  </g>
 </svg>
