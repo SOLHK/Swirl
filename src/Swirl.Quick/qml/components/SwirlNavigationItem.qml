@@ -2,7 +2,6 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import SwirlQuick
-import "../controls"
 Button {
     id: entry
     property string pageId: "overview"
@@ -11,33 +10,33 @@ Button {
     property bool compact: false
     readonly property bool chosen: AppState.currentPage === pageId
     signal activated()
-    implicitHeight: chosen ? 48 : 41
-    implicitWidth: compact ? 58 : 217
-    leftPadding:20; rightPadding:16
-    hoverEnabled:true
-    background: SwirlPillSurface {
-        selected: entry.chosen; hovered:entry.hovered; pressed:entry.down
-        subtleShadow:entry.chosen
-        gradient:entry.chosen ? chosenGradient : null
-        property Gradient chosenGradient:Gradient {
-            GradientStop { position:0; color:Theme.dark ? Theme.selected : "#D1E8FD" }
-            GradientStop { position:1; color:Theme.selected }
-        }
-        color:entry.down ? Theme.pressed : entry.chosen ? Theme.selected : entry.hovered ? Theme.hover : "transparent"
-        border.color:entry.activeFocus ? Theme.focusBorder : entry.chosen ? Theme.pillRim : "transparent"
+    implicitHeight: 42
+    implicitWidth: compact ? 58 : 250
+    leftPadding: 16; rightPadding: 12
+    hoverEnabled: true
+    background: Rectangle {
+        radius: 8
+        color: entry.down ? Theme.pressed : entry.chosen ? Theme.selected : entry.hovered ? Theme.hover : "transparent"
+        border.width: entry.activeFocus ? 2 : 0
+        border.color: Theme.focusBorder
+        Behavior on color { ColorAnimation { duration: Theme.motion } }
     }
     contentItem: RowLayout {
-        spacing:28
-        SwirlIcon { name:entry.iconName; size:26; color:entry.chosen ? Theme.accent : Theme.muted }
+        spacing: 22
+        SwirlIcon { name: entry.iconName; size: 26; color: entry.chosen ? Theme.navigationAccent : Theme.text }
         Text {
-            visible:!entry.compact; Layout.fillWidth:true
-            text:entry.title; color:entry.chosen ? Theme.accent : Theme.muted
-            font.pixelSize:18; font.family:Theme.fontFamily; font.weight:entry.chosen ? Font.DemiBold : Font.Normal
-            elide:Text.ElideRight
+            visible: !entry.compact; Layout.fillWidth: true
+            text: entry.title; color: entry.chosen ? Theme.navigationAccent : Theme.text
+            font.pixelSize: 18; font.family: Theme.fontFamily
+            font.weight: entry.chosen ? Font.DemiBold : Font.Normal
+            elide: Text.ElideRight
         }
     }
-    onClicked:activated()
+    onClicked: activated()
     Accessible.name: title
-    ToolTip.visible: compact && hovered
+    Accessible.role: Accessible.ListItem
+    Accessible.selectable: true
+    Accessible.selected: chosen
+    ToolTip.visible: hovered && compact
     ToolTip.text: title
 }

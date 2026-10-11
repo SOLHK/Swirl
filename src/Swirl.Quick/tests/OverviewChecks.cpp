@@ -40,6 +40,28 @@ int runOverviewChecks(QQuickWindow *window)
     const auto item = [&](const char *name) { return findVisual(window->contentItem(),QString::fromLatin1(name)); };
     const auto click = [&](QQuickItem *target, qreal fraction = 0.5) {
         if (!target) { check(false,"input target exists"); return; }
+        // The overview retains its trends and tools below the primary status
+        // panels. Scroll the real viewport before sending input to those items.
+        if (auto *scroll = item("overviewScroll")) {
+            auto *viewport = qobject_cast<QQuickItem *>(
+                qvariant_cast<QObject *>(scroll->property("contentItem")));
+            bool insideViewport = false;
+            for (auto *parent = target; parent; parent = parent->parentItem())
+                if (parent == viewport) { insideViewport = true; break; }
+            if (viewport && insideViewport) {
+                const qreal top = target->mapToItem(viewport, QPointF()).y();
+                const qreal bottom = top + target->height();
+                const qreal delta = top < 0 ? top :
+                    bottom > viewport->height() ? bottom - viewport->height() : 0;
+                if (delta != 0) {
+                    const qreal maximum = qMax<qreal>(0,
+                        viewport->property("contentHeight").toReal() - viewport->height());
+                    viewport->setProperty("contentY", qBound<qreal>(0,
+                        viewport->property("contentY").toReal() + delta, maximum));
+                    QTest::qWait(100);
+                }
+            }
+        }
         QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,
                           target->mapToScene(QPointF(target->width()*fraction,target->height()/2)).toPoint());
         QTest::qWait(250);

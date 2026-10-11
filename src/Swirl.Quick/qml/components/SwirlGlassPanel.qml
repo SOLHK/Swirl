@@ -9,11 +9,7 @@ Rectangle {
     radius: cornerRadius
     antialiasing: true
     color: Theme.material(material)
-    gradient:Gradient {
-        GradientStop { position:0; color:Theme.dark ? panel.color : Qt.lighter(panel.color,1.009) }
-        GradientStop { position:1; color:panel.color }
-    }
     border.width: Theme.borderWidth
-    border.color: selected ? Theme.accent : "#50FFFFFF"
+    border.color: selected ? Theme.focusBorder : Theme.border
     Behavior on color { ColorAnimation { duration: Theme.motion } }
 }

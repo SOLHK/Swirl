@@ -12,9 +12,9 @@ Switch {
     indicator: Rectangle {
         width: control.width; height: control.height
         radius: Theme.pillRadius(height)
-        color: control.checked ? Theme.accent : Theme.dark ? "#5E6C80" : control.large ? "#D3D7DF" : "#E3EBF4"
-        border.width: control.activeFocus ? 1.5 : 0
-        border.color: Theme.accent
+        color: control.checked ? Theme.primaryControl : Theme.dark ? "#626262" : "#DADADD"
+        border.width: control.activeFocus ? 2 : 0
+        border.color: Theme.focusBorder
         opacity: control.hovered ? 0.88 : 1
         Rectangle {
             width: parent.height - 8; height: width
@@ -22,7 +22,7 @@ Switch {
             radius: Theme.pillRadius(height)
             color: "#FEFEFF"
             layer.enabled: true
-            layer.effect: MultiEffect { shadowEnabled:true; shadowBlur:0.35; shadowVerticalOffset:2; shadowColor:"#30586A85" }
+            layer.effect: MultiEffect { shadowEnabled:true; shadowBlur:0.35; shadowVerticalOffset:2; shadowColor:"#30000000" }
             Behavior on x { NumberAnimation { duration: Theme.motion; easing.type: Easing.OutCubic } }
         }
         Behavior on color { ColorAnimation { duration: Theme.motion } }

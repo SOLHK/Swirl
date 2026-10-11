@@ -39,7 +39,7 @@ cmake --build build/swirl-quick --parallel
 ```
 
 Tests log to Swirl-diagnostics.txt beside the EXE. `--interaction-test`
-checks actual mouse/keyboard input, node metadata, offline counters, chart
+checks actual mouse/keyboard input, scrolling targets into view, node metadata, offline counters, chart
 selectors, Ctrl+K, search, history and bottom-row reachability. The smoke test
 visits all 59 pages, including 32 dedicated configuration draft pages and the module catalog, waits
 for lazy delegate creation and exits nonzero on QML loading warnings/timeouts.
@@ -50,8 +50,8 @@ startup uses installed Windows fonts automatically.
 ## Screenshot verification
 
 ```powershell
-./build/swirl-quick/Swirl.exe --capture-preview=C:/temp/overview.png --preview-size=1450x884 --preview-theme=light
-./build/swirl-quick/Swirl.exe --capture-preview=C:/temp/connected.png --preview-size=1450x884 --preview-connected
+./build/swirl-quick/Swirl.exe --capture-preview=C:/temp/overview.png --preview-size=1464x930 --preview-theme=light
+./build/swirl-quick/Swirl.exe --capture-preview=C:/temp/connected.png --preview-size=1464x930 --preview-connected
 ./build/swirl-quick/Swirl.exe --capture-preview=C:/temp/minimum-bottom.png --preview-size=1000x650 --preview-scroll-bottom
 ```
 
@@ -70,13 +70,16 @@ gray corner remnants at high DPI.
 ## Design and scope
 
 - Theme.qml centralizes colors, fonts, gaps, animation and radius tokens.
-- SwirlPillSurface is shared by navigation, the connection pill, buttons,
-  search, combo boxes and segmented selections; its radius is always height/2.
-- Reference size is 1450 x 884 logical pixels with a 243-pixel sidebar. Below
+- SwirlPillSurface remains shared by buttons, combo boxes and segmented selections.
+  Navigation uses stable 42-pixel rows and a neutral rounded selection; sidebar
+  search and content cards have their own purpose-specific radius tokens.
+- The current overview reference is 1464 x 930 logical pixels with a 286-pixel sidebar. Below
   width 1160 the sidebar becomes an icon rail. At narrower main widths the
   bottom cards stack and scroll so every row remains reachable.
-- Cards are matte pale blue with subtle borders; a translucent DWM acrylic
-  backdrop is deliberately not enabled for this reference style.
+- Light content and cards are opaque white, with neutral gray surfaces in dark mode.
+  The sidebar uses a neutral QML tint over the existing native Windows backdrop
+  when transparency is enabled; an opaque fallback is used when it is disabled.
+  The tint alpha is an implementation choice, not a recovered Apple material parameter.
 - Only the selected download/upload/cumulative series is drawn. Offline
   endpoints and current counters are zero. History and event times share the
   session clock. Cumulative GB stays historical and increases only while the
@@ -104,3 +107,5 @@ step publishes a test-only prerelease. All work stays on `test`; promotion to
 The catalog exposes 56 public capability entries. Thirty-two new draft pages offer configuration, ordered records, local persistence and JSON import/export. These do not start network services. See `docs/UI_MODULE_COVERAGE.md`. Tests use QStandardPaths test mode and never overwrite user drafts.
 
 The installer reuses the registered install directory and overwrites application files. It retains configuration/data and refuses a silent update when the existing executable is still running or unwritable (exit 2). Interactive setup offers retry after quitting Swirl. Test an old installer followed by the new installer using the SAME fresh isolated test directory; verify the new EXE hash and startup before uninstalling.
+
+Visual comparison, reference sampling and compositor limitations are documented in `docs/UI_VISUAL_VALIDATION.md`.

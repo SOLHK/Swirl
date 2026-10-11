@@ -8,8 +8,8 @@ import "pages"
 ApplicationWindow {
     id:window
     visible:true
-    width:Math.max(1000,Math.min(1450,Screen.desktopAvailableWidth-40,(Screen.desktopAvailableHeight-40)*1450/884))
-    height:Math.max(650,width*884/1450)
+    width:Math.max(1000,Math.min(1450,Screen.desktopAvailableWidth-40,(Screen.desktopAvailableHeight-40)*1464/930))
+    height:Math.max(650,width*930/1464)
     readonly property real contentScale:Theme.uiScale*(width>=1160 ? Math.min(1,width/1450) : 1)
     minimumWidth:1000; minimumHeight:650
     title:"Swirl"; flags:Qt.Window | Qt.FramelessWindowHint; color:"transparent"
@@ -29,26 +29,38 @@ ApplicationWindow {
     readonly property real actualSidebarWidth:AppState.sidebarCollapsed || scaledCanvas.width<1160 ? 82 : Theme.sidebarWidth
     background:Rectangle {
         radius:window.visibility===Window.Maximized ? 0 : Theme.windowRadius
-        color:Theme.canvas
+        color:Theme.transparency ? "transparent" : Theme.sidebarBase
         border.width:0
     }
     Component.onCompleted:{
-        backdrop.apply(window,false)
+        backdrop.apply(window,Theme.transparency)
         AppState.initializeHistory()
         if(previewTheme==="dark")Theme.mode="Dark"
         else if(previewTheme==="light")Theme.mode="Light"
         if(previewPage.length)AppState.currentPage=previewPage
+    }
+    Connections {
+        target: Theme
+        function onTransparencyChanged() { backdrop.apply(window, Theme.transparency) }
     }
     Item {
         id:scaledCanvas
         width:window.width/window.contentScale; height:window.height/window.contentScale
         scale:window.contentScale; transformOrigin:Item.TopLeft
         Rectangle {
-            width:window.actualSidebarWidth; height:parent.height
+            width:window.actualSidebarWidth + Theme.windowRadius; height:parent.height
             radius:window.visibility===Window.Maximized ? 0 : Theme.windowRadius
-            color:Theme.material("sidebar")
-            Rectangle { anchors.right:parent.right; width:Theme.windowRadius; height:parent.height; color:Theme.material("sidebar") }
+            color:Theme.sidebar
+
         }
+        Rectangle {
+            x: window.actualSidebarWidth
+            width: parent.width - x; height: parent.height
+            radius: window.visibility === Window.Maximized ? 0 : Theme.windowRadius
+            color: Theme.canvas
+            Rectangle { width: Theme.windowRadius; height: parent.height; color: Theme.canvas }
+        }
+        Rectangle { x: window.actualSidebarWidth - 1; width: 1; height: parent.height; color: Theme.border }
         MouseArea {
             x:0; y:0; width:parent.width; height:68
             onPressed:window.startSystemMove()
@@ -56,9 +68,9 @@ ApplicationWindow {
         }
         SwirlSidebar { id:sidebar; width:window.actualSidebarWidth; height:parent.height; compactByWindow:scaledCanvas.width<1160 }
         Item {
-            id:mainArea; x:window.actualSidebarWidth+15; width:parent.width-x-15; height:parent.height
+            id:mainArea; x:window.actualSidebarWidth+46; width:parent.width-x-34; height:parent.height
             RowLayout {
-                id:toolbar; x:0; y:12; width:parent.width; height:44; spacing:18
+                id:toolbar; visible:AppState.currentPage!=="overview"; x:0; y:12; width:parent.width; height:44; spacing:18
                 Item {
                     width:85; height:42
                     SwirlPillSurface { anchors.fill:parent }
@@ -79,28 +91,6 @@ ApplicationWindow {
                         }
                     }
                 }
-                SwirlSearchField {
-                    id:pageSearch; objectName:"pageSearch"; Layout.preferredWidth:Math.min(475,mainArea.width*0.5)
-                    placeholderText:"搜索功能、节点或设置…"; rightPadding:95
-                    onAccepted:{
-                        var q=text.trim().toLowerCase()
-                        if(!q.length)return
-                        for(var i=0;i<AppState.groups.length;i++)for(var j=0;j<AppState.groups[i].pages.length;j++){
-                            var p=AppState.groups[i].pages[j]
-                            if(p.title.toLowerCase().indexOf(q)>=0){AppState.navigate(p.id);text="";return}
-                        }
-                        var matches=FeatureCatalog.entries.filter(function(f){return (f.title+" "+f.keywords).toLowerCase().indexOf(q)>=0})
-                        if(matches.length){AppState.navigate(matches[0].id);text="";return}
-                        if(q.indexOf("模块中心")>=0){AppState.navigate("featurehub");text="";return}
-                        if(q.indexOf("新加坡")>=0 || q.indexOf("节点")>=0)AppState.navigate("proxies")
-                        else AppState.toast="没有找到对应功能或演示节点"
-                    }
-                    Rectangle {
-                        anchors.right:parent.right; anchors.rightMargin:9; anchors.verticalCenter:parent.verticalCenter
-                        width:82; height:29; radius:Theme.pillRadius(height); color:Theme.selected; opacity:0.5
-                    }
-                    Text { anchors.right:parent.right; anchors.rightMargin:20; anchors.verticalCenter:parent.verticalCenter; text:"Ctrl + K"; font.pixelSize:15; color:Theme.muted }
-                }
                 Item { Layout.fillWidth:true }
                 SwirlButton { visible:captureProvider.running; text:"抓包中 · "+captureProvider.sessions.length; iconName:"capture"; font.pixelSize:14; onClicked:AppState.navigate("capture") }
                 SwirlIconButton { objectName:"addButton"; iconName:"plus"; tooltip:"添加配置或节点"; onClicked:addMenu.popup(); Menu {
@@ -115,7 +105,7 @@ ApplicationWindow {
                 SwirlIconButton { iconName:"settings"; tooltip:"设置"; onClicked:AppState.navigate("settings") }
             }
             Loader {
-                id:pageLoader; objectName:"pageLoader"; x:0; y:68; width:parent.width; height:parent.height-y-17
+                id:pageLoader; objectName:"pageLoader"; x:0; y:AppState.currentPage==="overview" ? 42 : 68; width:parent.width; height:parent.height-y-17
                 sourceComponent:AppState.currentPage==="overview" ? overview :
                                 AppState.currentPage==="capture" ? capturePage :
                                 AppState.currentPage==="connections" ? connections :
@@ -165,7 +155,7 @@ ApplicationWindow {
             onPressed:window.startSystemResize(modelData)
         }
     }
-    Shortcut { sequence:"Ctrl+K"; context:Qt.ApplicationShortcut; onActivated:pageSearch.forceActiveFocus() }
+    Shortcut { sequence:"Ctrl+K"; context:Qt.ApplicationShortcut; onActivated:sidebar.searchField.forceActiveFocus() }
     Shortcut { sequence:"Alt+Left"; onActivated:AppState.goBack() }
     Shortcut { sequence:"Alt+Right"; onActivated:AppState.goForward() }
     Shortcut { sequence:"Ctrl+1"; onActivated:AppState.navigate("overview") }
