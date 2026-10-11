@@ -16,7 +16,7 @@ Qt 界面已新增独立的**真实 HTTP 会话抓包**：本机显式代理、H
 
 Qt 其余代理、规则、订阅等页面仍使用演示数据；下文介绍的 WPF/Mihomo 业务代码保留在仓库，尚未接到 Qt 前端。功能页面数量不代表已完整实现 Surge。详细现状见 [Surge 功能对照](docs/SURGE_FEATURE_MATRIX.md) 和 [Qt 抓包说明](src/Swirl.Quick/CAPTURE.md)。
 
-> **🧪 当前为 `test` 测试版分支，不是正式版。** 本分支用于 Windows 构建、Qt 6 Quick / QML UI 预览、修复和验收。Qt 代理/配置页面仍为演示；抓包页已支持真实 HTTP 会话与 CONNECT 隧道。**未经仓库所有者明确指令，禁止合并到 `main` 或发布正式版本。**
+> **🧪 Qt 源码已合并到 `main`，Qt 功能仍为预览实现。** `test` 继续用于 Windows 构建、Qt 6 Quick / QML UI 预览、修复和验收。Qt 代理/配置页面仍为演示；抓包页支持真实 HTTP 会话与 CONNECT 隧道。合并源码不代表 Qt 代理核心已完成接入；**正式版本发布仍需仓库所有者另行授权。**
 >
 > [正式版 `main`](https://github.com/SOLHK/Swirl/tree/main) · [测试版 Qt CI](https://github.com/SOLHK/Swirl/actions/workflows/build-qt-quick-ui.yml) · [发布流程](docs/RELEASE_PROCESS.md)
 >
