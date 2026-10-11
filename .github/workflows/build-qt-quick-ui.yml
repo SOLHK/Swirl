@@ -1,0 +1,205 @@
+name: Build Swirl Qt Quick UI (Preview)
+
+on:
+  push:
+    branches: [test]
+  pull_request:
+    branches: [test, main]
+  workflow_dispatch:
+
+concurrency:
+  group: swirl-quick-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-qt-ui:
+    runs-on: windows-2022
+    timeout-minutes: 35
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout original repository and UI branch
+        uses: actions/checkout@v4
+      - name: Set up Qt desktop SDK
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.10.3'
+          host: windows
+          target: desktop
+          arch: win64_msvc2022_64
+          cache: true
+      - name: Configure Qt UI independently
+        shell: pwsh
+        run: cmake -S src/Swirl.Quick -B build/swirl-quick -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=ON
+      - name: Build UI
+        shell: pwsh
+        run: cmake --build build/swirl-quick --config Release --parallel
+      - name: Bundle UI runtime
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item build/swirl-quick/Release/Swirl.exe dist/
+          windeployqt --release --qmldir src/Swirl.Quick/qml dist/Swirl.exe
+      # Qt's offscreen QPA font database reads appdir/lib/fonts and does not
+      # automatically discover the fonts installed on a Windows CI runner.
+      # These fixtures are used for synthetic screenshot tests ONLY.
+      - name: Stage temporary offscreen screenshot fonts
+        shell: pwsh
+        run: |
+          $fontDir = Join-Path (Resolve-Path "dist").Path "lib/fonts"
+          New-Item -ItemType Directory -Force -Path $fontDir | Out-Null
+          $latin = @("$env:WINDIR/Fonts/segoeui.ttf", "$env:WINDIR/Fonts/arial.ttf") | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (!$latin) { throw "No Latin fallback font found on the Windows runner." }
+          Copy-Item -LiteralPath $latin -Destination $fontDir
+          # Noto Sans SC is licensed under SIL OFL 1.1 and contains both
+          # Simplified Chinese and Latin glyphs. Pin the source revision.
+          $notoUrl = "https://raw.githubusercontent.com/google/fonts/bd8f81ddb5c74d5c8897b36ad88b440266245103/ofl/notosanssc/NotoSansSC%5Bwght%5D.ttf"
+          $notoFile = Join-Path $fontDir "NotoSansSC-VF.ttf"
+          Invoke-WebRequest -Uri $notoUrl -OutFile $notoFile -ErrorAction Stop
+          if ((Get-Item $notoFile).Length -lt 10000000) { throw "Noto Sans SC fixture download is incomplete." }
+          Write-Host "Qt offscreen font fixtures ready; they will NOT be included in the artifact."
+      - name: Overview mouse and keyboard input checks
+        shell: pwsh
+        run: |
+          $env:QT_QPA_PLATFORM = "offscreen"
+          $env:QT_QUICK_BACKEND = "software"
+          $exe = (Resolve-Path "dist/Swirl.exe").Path
+          $process = Start-Process -FilePath $exe -ArgumentList "--interaction-test" -Wait -PassThru -NoNewWindow
+          if ($process.ExitCode -ne 0) {
+            Get-Content "dist/Swirl-diagnostics.txt" -ErrorAction SilentlyContinue
+            throw "Overview input checks failed: $($process.ExitCode)"
+          }
+      - name: Loopback HTTP capture integration checks
+        shell: pwsh
+        run: |
+          $env:QT_QPA_PLATFORM = "offscreen"
+          $env:QT_QUICK_BACKEND = "software"
+          $exe = (Resolve-Path "dist/Swirl.exe").Path
+          $process = Start-Process -FilePath $exe -ArgumentList "--capture-self-test" -Wait -PassThru -NoNewWindow
+          if ($process.ExitCode -ne 0) {
+            Get-Content "dist/Swirl-diagnostics.txt" -ErrorAction SilentlyContinue
+            throw "HTTP capture checks failed: $($process.ExitCode)"
+          }
+      - name: Startup smoke test (offscreen, capture remains off)
+        shell: pwsh
+        run: |
+          $env:QT_QPA_PLATFORM = "offscreen"
+          $env:QT_QUICK_BACKEND = "software"
+          # GUI-subsystem executables return immediately from PowerShell's '&' invocation.
+          # Explicitly wait for the real Qt process so smoke tests cannot false-pass.
+          $exe = (Resolve-Path "dist/Swirl.exe").Path
+          $process = Start-Process -FilePath $exe -ArgumentList "--smoke-test" -Wait -PassThru -NoNewWindow
+          if ($process.ExitCode -ne 0) {
+            $diag = Join-Path (Resolve-Path "dist").Path "Swirl-diagnostics.txt"
+            if (Test-Path $diag) { Get-Content $diag | Select-Object -Last 160 }
+            throw "Qt Quick startup failed: $($process.ExitCode)"
+          }
+      - name: Capture optional UI screenshots (offscreen software renderer)
+        shell: pwsh
+        run: |
+          $env:QT_QPA_PLATFORM = "offscreen"
+          $env:QT_QUICK_BACKEND = "software"
+          $exe = (Resolve-Path "dist/Swirl.exe").Path
+          $previews = @(
+            @{ file = "Swirl-Overview-preview.png"; page = "overview"; theme = "light" },
+            @{ file = "Swirl-Inspector-preview.png"; page = "inspector"; theme = "dark" },
+            @{ file = "Swirl-ModuleHub-preview.png"; page = "featurehub"; theme = "light" },
+            @{ file = "Swirl-DHCP-preview.png"; page = "feature-dhcp"; theme = "light" }
+          )
+          foreach ($preview in $previews) {
+            $path = Join-Path (Resolve-Path "dist").Path $preview.file
+            $args = @("--capture-preview=$path", "--preview-page=$($preview.page)", "--preview-theme=$($preview.theme)")
+            $process = Start-Process -FilePath $exe -ArgumentList $args -Wait -PassThru -NoNewWindow
+            if ($process.ExitCode -ne 0) {
+              $diag = Join-Path (Resolve-Path "dist").Path "Swirl-diagnostics.txt"
+              if (Test-Path $diag) { Get-Content $diag | Select-Object -Last 160 }
+              throw "Qt Quick preview exited with $($process.ExitCode)"
+            }
+            if (!(Test-Path $path)) { throw "Missing screenshot: $path" }
+            if ((Get-Item $path).Length -lt 2048) { throw "Screenshot is suspiciously small: $path" }
+            Write-Host "Verified Qt screenshot: $path"
+          }
+      - name: Remove CI-only font fixtures from portable ZIP
+        if: always()
+        shell: pwsh
+        run: |
+          $fonts = "dist/lib/fonts"
+          if (Test-Path $fonts) { Remove-Item -LiteralPath $fonts -Recurse -Force }
+          if (Test-Path $fonts) { throw "Test fonts must not be distributed in Swirl preview." }
+      - name: Build production EXE without test harness
+        shell: pwsh
+        run: |
+          cmake -S src/Swirl.Quick -B build/swirl-quick -DSWIRL_BUILD_UI_TESTS=OFF
+          if ($LASTEXITCODE -ne 0) { throw "Production configure failed" }
+          cmake --build build/swirl-quick --config Release --parallel
+          if ($LASTEXITCODE -ne 0) { throw "Production build failed" }
+          Copy-Item build/swirl-quick/Release/Swirl.exe dist/ -Force
+          Remove-Item -LiteralPath "dist/Qt6Test.dll" -ErrorAction SilentlyContinue
+      - name: Prepare standalone installer files
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path installer-bin, out | Out-Null
+          Copy-Item -Path "dist/*" -Destination "installer-bin" -Recurse -Force
+          Copy-Item "src/Swirl.Quick/packaging/THIRD_PARTY_NOTICES.txt" "installer-bin/"
+          Copy-Item "src/Swirl.Quick/assets/swirl.ico" "installer-bin/Swirl-brand-003.ico"
+          Copy-Item "src/Swirl.Quick/packaging/licenses" "installer-bin/licenses" -Recurse -Force
+          Remove-Item -Path "installer-bin/Swirl-*-preview.png", "installer-bin/Swirl-diagnostics.txt" -ErrorAction SilentlyContinue
+          if (!(Test-Path "installer-bin/Swirl.exe")) { throw "Missing Swirl.exe" }
+      - name: Install NSIS packaging tools
+        shell: pwsh
+        run: |
+          choco install nsis --yes --no-progress --limit-output
+          $nsis = "C:/Program Files (x86)/NSIS/makensis.exe"
+          if (!(Test-Path $nsis)) { throw "NSIS installation failed" }
+      - name: Build Chinese Swirl installer EXE
+        shell: pwsh
+        run: |
+          $nsis = "C:/Program Files (x86)/NSIS/makensis.exe"
+          $appDist = (Resolve-Path "installer-bin").Path
+          $outDir = (Resolve-Path "out").Path
+          & $nsis /INPUTCHARSET UTF8 "/DAPP_DIST=$appDist" "/DOUT_DIR=$outDir" "src/Swirl.Quick/packaging/Swirl.nsi"
+          if ($LASTEXITCODE -ne 0) { throw "NSIS packaging failed ($LASTEXITCODE)" }
+          if (!(Test-Path "out/Swirl-Setup.exe")) { throw "Installer missing" }
+          if ((Get-Item "out/Swirl-Setup.exe").Length -lt 10000000) { throw "Installer suspiciously small" }
+      - name: Upload Swirl Windows installer EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-Windows-Installer-EXE
+          path: out/Swirl-Setup.exe
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload separate Qt UI preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-Quick-UI-win-x64
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+
+  publish-test-exe:
+    name: Publish standalone test installer EXE
+    needs: build-qt-ui
+    if: github.event_name == 'push' && github.ref == 'refs/heads/test'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified EXE (not a ZIP download for users)
+        uses: actions/download-artifact@v4
+        with:
+          name: Swirl-Windows-Installer-EXE
+          path: release
+      - name: Upload direct EXE to GitHub prerelease from test commit only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test -s release/Swirl-Setup.exe
+          SHORT_SHA="${GITHUB_SHA:0:7}"
+          TAG="swirl-qt-test-${SHORT_SHA}"
+          gh release create "${TAG}" "release/Swirl-Setup.exe#Swirl-Setup.exe" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --target "${GITHUB_SHA}" \
+            --title "Swirl · 测试版 ${SHORT_SHA}" \
+            --notes "测试版 Qt 界面：参考图比例、56 个功能入口及配置草稿、覆盖安装；包含真实本机 HTTP 抓包及 CONNECT 隧道记录；代理/配置页面仍为演示，尚未接入完整核心。请勿作为正式版本使用。" \
+            --prerelease

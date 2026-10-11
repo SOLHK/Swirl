@@ -1,0 +1,216 @@
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+import SwirlQuick
+import "components"
+import "controls"
+import "pages"
+ApplicationWindow {
+    id:window
+    visible:true
+    width:Math.max(1000,Math.min(1450,Screen.desktopAvailableWidth-40,(Screen.desktopAvailableHeight-40)*1464/930))
+    height:Math.max(650,width*930/1464)
+    readonly property real contentScale:Theme.uiScale*(width>=1160 ? Math.min(1,width/1450) : 1)
+    minimumWidth:1000; minimumHeight:650
+    title:"Swirl"; flags:Qt.Window | Qt.FramelessWindowHint; color:"transparent"
+    font.family:Theme.fontFamily; font.pixelSize:16
+    palette.window:Theme.surface
+    palette.base:Theme.material("field")
+    palette.button:Theme.buttonBase
+    palette.buttonText:Theme.text
+    palette.text:Theme.text
+    palette.highlight:Theme.selected
+    palette.highlightedText:Theme.text
+    palette.light:Theme.buttonBase
+    palette.mid:Theme.controlBorder
+    property bool swirlTransparencyEnabled:Theme.transparency
+    function previewScrollBottom() { if(pageLoader.item && pageLoader.item.scrollToBottom)pageLoader.item.scrollToBottom() }
+    property real swirlWindowRadius:Theme.windowRadius
+    readonly property real actualSidebarWidth:AppState.sidebarCollapsed || scaledCanvas.width<1160 ? 82 : Theme.sidebarWidth
+    background:Rectangle {
+        radius:window.visibility===Window.Maximized ? 0 : Theme.windowRadius
+        color:Theme.transparency ? "transparent" : Theme.sidebarBase
+        border.width:0
+    }
+    Component.onCompleted:{
+        backdrop.apply(window,Theme.transparency)
+        AppState.initializeHistory()
+        if(previewTheme==="dark")Theme.mode="Dark"
+        else if(previewTheme==="light")Theme.mode="Light"
+        if(previewPage.length)AppState.currentPage=previewPage
+    }
+    Connections {
+        target: Theme
+        function onTransparencyChanged() { backdrop.apply(window, Theme.transparency) }
+    }
+    Item {
+        id:scaledCanvas
+        width:window.width/window.contentScale; height:window.height/window.contentScale
+        scale:window.contentScale; transformOrigin:Item.TopLeft
+        Rectangle {
+            width:window.actualSidebarWidth + Theme.windowRadius; height:parent.height
+            radius:window.visibility===Window.Maximized ? 0 : Theme.windowRadius
+            color:Theme.sidebar
+
+        }
+        Rectangle {
+            x: window.actualSidebarWidth
+            width: parent.width - x; height: parent.height
+            radius: window.visibility === Window.Maximized ? 0 : Theme.windowRadius
+            color: Theme.canvas
+            Rectangle { width: Theme.windowRadius; height: parent.height; color: Theme.canvas }
+        }
+        Rectangle { x: window.actualSidebarWidth - 1; width: 1; height: parent.height; color: Theme.border }
+        MouseArea {
+            x:0; y:0; width:parent.width; height:68
+            onPressed:window.startSystemMove()
+            onDoubleClicked:window.visibility===Window.Maximized ? window.showNormal() : window.showMaximized()
+        }
+        SwirlSidebar { id:sidebar; width:window.actualSidebarWidth; height:parent.height; compactByWindow:scaledCanvas.width<1160 }
+        Item {
+            id:mainArea; x:window.actualSidebarWidth+46; width:parent.width-x-34; height:parent.height
+            RowLayout {
+                id:toolbar; visible:AppState.currentPage!=="overview"; x:0; y:12; width:parent.width; height:44; spacing:18
+                Item {
+                    width:85; height:42
+                    SwirlPillSurface { anchors.fill:parent }
+                    Row {
+                        anchors.fill:parent
+                        Repeater {
+                            model:["chevron-left","chevron-right"]
+                            Button {
+                                required property int index
+                                required property string modelData
+                                width:42; height:42; hoverEnabled:true
+                                enabled:index===0 ? AppState.historyIndex>0 : AppState.historyIndex<AppState.navigationHistory.length-1
+                                background:Rectangle{radius:Theme.pillRadius(height);color:parent.hovered?Theme.hover:"transparent"}
+                                contentItem:SwirlIcon{name:modelData;size:20;color:parent.enabled?Theme.muted:Theme.withAlpha(Theme.muted,0.4)}
+                                onClicked:index===0?AppState.goBack():AppState.goForward()
+                                Accessible.name:index===0?"返回":"前进"
+                            }
+                        }
+                    }
+                }
+                Item { Layout.fillWidth:true }
+                SwirlButton { visible:captureProvider.running; text:"抓包中 · "+captureProvider.sessions.length; iconName:"capture"; font.pixelSize:14; onClicked:AppState.navigate("capture") }
+                SwirlIconButton { objectName:"addButton"; iconName:"plus"; tooltip:"添加配置或节点"; onClicked:addMenu.popup(); Menu {
+                    id:addMenu
+                    MenuItem { text:"添加演示节点"; onTriggered:AppState.navigate("proxies") }
+                    MenuItem { text:"导入配置预览"; onTriggered:AppState.navigate("profiles") }
+                    MenuItem { text:"订阅管理"; onTriggered:AppState.navigate("subscriptions") }
+                    MenuSeparator {}
+                    MenuItem { text:"全部功能模块"; onTriggered:AppState.navigate("featurehub") }
+                    MenuItem { text:"更多工具"; onTriggered:AppState.navigate("toolbox") }
+                } }
+                SwirlIconButton { iconName:"settings"; tooltip:"设置"; onClicked:AppState.navigate("settings") }
+            }
+            Loader {
+                id:pageLoader; objectName:"pageLoader"; x:0; y:AppState.currentPage==="overview" ? 42 : 68; width:parent.width; height:parent.height-y-17
+                sourceComponent:AppState.currentPage==="overview" ? overview :
+                                AppState.currentPage==="capture" ? capturePage :
+                                AppState.currentPage==="connections" ? connections :
+                                AppState.currentPage==="proxies" ? proxies :
+                                AppState.currentPage==="inspector" ? inspector :
+                                AppState.currentPage==="scripts" ? scripts :
+                                AppState.currentPage==="settings" ? settings :
+                                AppState.currentPage==="toolbox" ? toolbox :
+                                AppState.currentPage==="dashboard" ? dashboard :
+                                AppState.currentPage==="dns" ? dns :
+                                AppState.currentPage==="rules" ? rules :
+                                AppState.currentPage==="logs" ? logs :
+                                AppState.currentPage==="tls" ? tls :
+                                AppState.currentPage==="replay" ? replay :
+                                AppState.currentPage==="rewrite" ? rewrite :
+                                AppState.currentPage==="profiles" ? profiles :
+                                AppState.currentPage==="subscriptions" ? subscriptions :
+                                AppState.currentPage==="policies" ? policies :
+                                AppState.currentPage==="traffic" ? traffic :
+                                AppState.currentPage==="breakpoint" ? breakpoint :
+                                AppState.currentPage==="map" ? mapLocal :
+                                AppState.currentPage==="modules" ? modules :
+                                AppState.currentPage==="automation" ? automation :
+                                AppState.currentPage==="api" ? api :
+                                AppState.currentPage==="gateway" ? gateway :
+                                AppState.currentPage==="featurehub" ? featureHub :
+                                FeatureCatalog.find(AppState.currentPage) ? featureModule :
+                                AppState.currentPage==="external" ? externalTools : workbench
+            }
+        }
+    }
+    // Native move and eight-edge resize keep Windows snap/DPI behavior.
+    Repeater {
+        model:[Qt.LeftEdge,Qt.RightEdge,Qt.TopEdge,Qt.BottomEdge,Qt.LeftEdge|Qt.TopEdge,Qt.RightEdge|Qt.TopEdge,Qt.LeftEdge|Qt.BottomEdge,Qt.RightEdge|Qt.BottomEdge]
+        MouseArea {
+            required property int modelData
+            readonly property bool edgeleft:(modelData&Qt.LeftEdge)!==0
+            readonly property bool edgeright:(modelData&Qt.RightEdge)!==0
+            readonly property bool edgetop:(modelData&Qt.TopEdge)!==0
+            readonly property bool edgebottom:(modelData&Qt.BottomEdge)!==0
+            readonly property bool corner:(edgeleft||edgeright)&&(edgetop||edgebottom)
+            z:100; visible:window.visibility!==Window.Maximized
+            x:edgeright?window.width-width:0; y:edgebottom?window.height-height:0
+            width:corner?10:(edgeleft||edgeright)?5:window.width
+            height:corner?10:(edgetop||edgebottom)?5:window.height
+            cursorShape:corner?(edgeleft&&edgetop||edgeright&&edgebottom?Qt.SizeFDiagCursor:Qt.SizeBDiagCursor):(edgeleft||edgeright)?Qt.SizeHorCursor:Qt.SizeVerCursor
+            onPressed:window.startSystemResize(modelData)
+        }
+    }
+    Shortcut { sequence:"Ctrl+K"; context:Qt.ApplicationShortcut; onActivated:sidebar.searchField.forceActiveFocus() }
+    Shortcut { sequence:"Alt+Left"; onActivated:AppState.goBack() }
+    Shortcut { sequence:"Alt+Right"; onActivated:AppState.goForward() }
+    Shortcut { sequence:"Ctrl+1"; onActivated:AppState.navigate("overview") }
+    Shortcut { sequence:"Ctrl+2"; onActivated:AppState.navigate("proxies") }
+    Shortcut { sequence:"Ctrl+3"; onActivated:AppState.navigate("connections") }
+    Shortcut { sequence:"Ctrl+4"; onActivated:AppState.navigate("inspector") }
+    Shortcut { sequence:"Ctrl+,"; onActivated:AppState.navigate("settings") }
+    Shortcut { sequence:"Ctrl+B"; onActivated:AppState.sidebarCollapsed=!AppState.sidebarCollapsed }
+        Component { id:overview; OverviewPage {} }
+    Component { id:capturePage; CapturePage {} }
+    Component { id:externalTools; ExternalToolsPage {} }
+    Component { id:featureHub; FeatureHubPage {} }
+    Component { id:featureModule; FeatureModulePage { moduleId:AppState.currentPage } }
+    Component { id:connections; ConnectionsPage {} }
+    Component { id:proxies; ProxiesPage {} }
+    Component { id:inspector; InspectorPage {} }
+    Component { id:scripts; ScriptsPage {} }
+    Component { id:settings; SettingsPage {} }
+    Component { id:toolbox; ToolboxPage {} }
+    Component { id:dashboard; DashboardPage {} }
+    Component { id:dns; DNSPage {} }
+    Component { id:rules; RulesPage {} }
+    Component { id:logs; LogsPage {} }
+    Component { id:tls; TLSPage {} }
+    Component { id:replay; ReplayPage {} }
+    Component { id:rewrite; RewritePage {} }
+    Component { id:profiles; ProfilesPage {} }
+    Component { id:subscriptions; SubscriptionsPage {} }
+    Component { id:policies; PolicyGroupsPage {} }
+    Component { id:traffic; TrafficAnalyticsPage {} }
+    Component { id:breakpoint; BreakpointPage {} }
+    Component { id:mapLocal; MapPage {} }
+    Component { id:modules; ModulesPage {} }
+    Component { id:automation; AutomationPage {} }
+    Component { id:api; ApiPage {} }
+    Component { id:gateway; GatewayPage {} }
+    Component { id:workbench; WorkbenchPage { pageId:AppState.currentPage } }
+
+    Timer { interval:1000; running:true; repeat:true; onTriggered:AppState.tickTraffic() }
+    Timer { id:toastTimer; interval:3200; onTriggered:AppState.toast="" }
+    Connections { target:AppState; function onToastChanged(){if(AppState.toast.length)toastTimer.restart()} }
+    Rectangle {
+        visible:AppState.toast.length>0; z:999
+        anchors.horizontalCenter:parent.horizontalCenter; anchors.bottom:parent.bottom; anchors.bottomMargin:28
+        width:Math.min(570,window.width-40); height:48; radius:Theme.controlRadius
+        color:Theme.material("floating"); border.color:Theme.border
+        Text { anchors.fill:parent; anchors.margins:12; text:AppState.toast; color:Theme.muted; font.pixelSize:14; verticalAlignment:Text.AlignVCenter; elide:Text.ElideRight }
+    }
+    Timer {
+        running:smokeTestMode; repeat:true; interval:200
+        property int index:0
+        onTriggered:{
+            if(index>=AppState.allPageIds.length){stop();smokeFinished.start();return}
+            AppState.currentPage=AppState.allPageIds[index++]
+        }
+    }
+    Timer { id:smokeFinished; interval:300; onTriggered:Qt.quit() }
+}
