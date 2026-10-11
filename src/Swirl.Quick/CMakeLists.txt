@@ -49,12 +49,9 @@ set(SWIRL_ASSET_PATH "${CMAKE_CURRENT_SOURCE_DIR}/assets")
 qt_add_resources(Swirl brand PREFIX "/swirl" BASE "${SWIRL_ASSET_PATH}" FILES
     "${SWIRL_ASSET_PATH}/swirl-mark.png"
     "${SWIRL_ASSET_PATH}/swirl-app.png"
-    "${SWIRL_ASSET_PATH}/swirl-app.svg"
-    "${SWIRL_ASSET_PATH}/swirl-mark.svg"
-    "${SWIRL_ASSET_PATH}/icons/swirl_light_card.svg"
-    "${SWIRL_ASSET_PATH}/icons/swirl_dark_card.svg"
-    "${SWIRL_ASSET_PATH}/icons/swirl_light_transparent.svg"
-    "${SWIRL_ASSET_PATH}/icons/swirl_dark_transparent.svg"
+    "${SWIRL_ASSET_PATH}/icons/swirl_wave_light.svg"
+    "${SWIRL_ASSET_PATH}/icons/swirl_wave_dark.svg"
+    "${SWIRL_ASSET_PATH}/icons/swirl_wave_mark.svg"
 )
 target_include_directories(Swirl PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/app")
 target_link_libraries(Swirl PRIVATE Qt6::Quick Qt6::Qml Qt6::QuickControls2 Qt6::Network Qt6::Svg)

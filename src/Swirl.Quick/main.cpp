@@ -45,7 +45,7 @@ int main(int argc, char *argv[])
     QQuickWindow::setDefaultAlphaBuffer(true);
     QGuiApplication app(argc, argv);
     app.setApplicationName(QStringLiteral("Swirl"));
-    app.setWindowIcon(QIcon(QStringLiteral(":/swirl/swirl-app.svg")));
+    app.setWindowIcon(QIcon(QStringLiteral(":/swirl/icons/swirl_wave_light.svg")));
     // Native Windows Qt Quick Controls do not support custom backgrounds/content.
     // Swirl draws its own visual controls, so explicitly use the customizable style.
     QQuickStyle::setStyle(QStringLiteral("Basic"));
@@ -76,7 +76,7 @@ int main(int argc, char *argv[])
         QDir().mkpath(brandOutput);
         for(const auto &name:{QStringLiteral("swirl-app"),QStringLiteral("swirl-mark")}) {
             QImage image(1024,1024,QImage::Format_ARGB32_Premultiplied);image.fill(Qt::transparent);
-            QPainter painter(&image);QSvgRenderer svg(QStringLiteral(":/swirl/")+name+QStringLiteral(".svg"));svg.render(&painter);painter.end();
+            QPainter painter(&image);QSvgRenderer svg(name==QStringLiteral("swirl-app") ? QStringLiteral(":/swirl/icons/swirl_wave_light.svg") : QStringLiteral(":/swirl/icons/swirl_wave_mark.svg"));svg.render(&painter);painter.end();
             if(!image.save(brandOutput+QStringLiteral("/")+name+QStringLiteral(".png")))return 5;
         }
         return 0;
