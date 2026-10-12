@@ -2,13 +2,14 @@ import QtQuick
 import QtQuick.Controls
 import SwirlQuick
 import "../components"
-Button {
+SwirlMotionButton {
     id: control
     property string iconName: "plus"
     property string tooltip: ""
     implicitWidth:Theme.dp(46); implicitHeight:Theme.dp(46)
     hoverEnabled: true
     background: SwirlPillSurface {
+        Behavior on color { ColorAnimation {duration:SwirlMotion.duration} }
         radius:Math.min(width,height)/2
         hovered: control.hovered; pressed: control.down
         border.color: control.activeFocus ? Theme.focusBorder : Theme.pillRim

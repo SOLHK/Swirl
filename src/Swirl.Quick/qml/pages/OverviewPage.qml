@@ -40,7 +40,9 @@ Item {
                 id:cardHeader; width:parent.width; height:Theme.dp(24); spacing:Theme.dp(8)
                 Text { text:card.heading; color:Theme.text; font.pixelSize:Theme.fontSize(18); font.weight:Font.DemiBold; Layout.fillWidth:true; elide:Text.ElideRight }
                 SwirlComboBox { id:filter; visible:card.filters.length>0; model:card.filters; implicitWidth:Theme.dp(card.heading==="实时速度"?138:88); implicitHeight:Theme.dp(28); font.pixelSize:Theme.fontSize(13); leftPadding:Theme.dp(8); rightPadding:Theme.dp(22); Accessible.name:card.heading+"时间范围" }
-                Button { visible:card.actionText.length>0; text:card.actionText; padding:Theme.dp(0); implicitHeight:Theme.dp(24); font.pixelSize:Theme.fontSize(13); palette.buttonText:Theme.muted; background:Rectangle{radius:Theme.roundedRadius(width,height);color:parent.hovered?Theme.hover:"transparent"} onClicked:card.action(); Accessible.name:card.heading+" "+text }
+                SwirlMotionButton { visible:card.actionText.length>0; text:card.actionText; padding:Theme.dp(0); implicitHeight:Theme.dp(24); font.pixelSize:Theme.fontSize(13); palette.buttonText:Theme.muted; background:Rectangle{radius:Theme.roundedRadius(width,height);color:parent.hovered?Theme.hover:"transparent"
+ Behavior on color {ColorAnimation {duration:SwirlMotion.duration}}
+ } onClicked:card.action(); Accessible.name:card.heading+" "+text }
             }
             Item { id:bodyItem; anchors.top:cardHeader.bottom; anchors.topMargin:Theme.dp(10); anchors.left:parent.left; anchors.right:parent.right; anchors.bottom:parent.bottom }
         }]
@@ -54,10 +56,12 @@ Item {
             anchors.fill:parent; spacing:Theme.dp(0)
             Repeater {
                 model:ranking.rows
-                Button {
+                SwirlMotionButton {
                     required property var modelData
                     width:parent.width; height:parent.height/5; padding:Theme.dp(0); hoverEnabled:true
-                    background:Rectangle { radius:Theme.roundedRadius(width,height); color:parent.hovered?Theme.hover:"transparent" }
+                    background:Rectangle { radius:Theme.roundedRadius(width,height); color:parent.hovered?Theme.hover:"transparent"
+ Behavior on color {ColorAnimation {duration:SwirlMotion.duration}}
+ }
                     contentItem:RowLayout {
                         spacing:Theme.dp(10)
                         Rectangle { width:Theme.dp(23);height:Theme.dp(23);radius:width/2;color:modelData.color
@@ -105,10 +109,12 @@ Item {
                         {label:"活跃连接",value:"—",sub:"尚未采集",icon:"link",route:"connections",tint:Theme.accent},
                         {label:"活跃进程",value:engineController.processAlive?"1":"0",sub:"引擎进程",icon:"settings",route:"processes",tint:Theme.accent},
                         {label:"今日流量",value:"—",sub:"尚未采集",icon:"clock",route:"traffic",tint:Theme.accent}]
-                    Button {
+                    SwirlMotionButton {
                         required property var modelData
                         Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(90);Layout.minimumWidth:Theme.dp(0);hoverEnabled:true;padding:Theme.dp(10)
-                        background:SwirlGlassPanel { cornerRadius:Theme.cardRadius; color:parent.hovered?Theme.raised:Theme.surface }
+                        background:SwirlGlassPanel { cornerRadius:Theme.cardRadius; color:parent.hovered?Theme.raised:Theme.surface
+ Behavior on color {ColorAnimation {duration:SwirlMotion.duration}}
+ }
                         contentItem:RowLayout {
                             spacing:Theme.dp(9)
                             Glyph { icon:modelData.icon;tint:modelData.tint;implicitWidth:Theme.dp(40);implicitHeight:Theme.dp(40);width:Theme.dp(40);height:Theme.dp(40) }
@@ -216,9 +222,11 @@ Item {
                         objectName:"currentProxyPanel";Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(172)
                         ColumnLayout {
                             anchors.fill:parent;spacing:Theme.dp(6)
-                            Button {
+                            SwirlMotionButton {
                                 id:nodeButton;objectName:"nodePickerButton";Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(54);padding:Theme.dp(0);hoverEnabled:true
-                                background:Rectangle { radius:Theme.roundedRadius(width,height);color:parent.hovered?Theme.hover:"transparent";border.width:parent.activeFocus?2:0;border.color:Theme.focusBorder }
+                                background:Rectangle { radius:Theme.roundedRadius(width,height);color:parent.hovered?Theme.hover:"transparent";border.width:parent.activeFocus?2:0;border.color:Theme.focusBorder
+ Behavior on color {ColorAnimation {duration:SwirlMotion.duration}}
+ }
                                 contentItem:RowLayout {
                                     spacing:Theme.dp(12);Glyph { icon:"globe" }
                                     ColumnLayout {
@@ -255,9 +263,11 @@ Item {
                             }
                             Repeater {
                                 model:systemProvider.connections().slice(0,3)
-                                Button {
+                                SwirlMotionButton {
                                     required property var modelData;width:parent.width;height:(parent.height-Theme.dp(24))/3;padding:Theme.dp(0)
-                                    background:Rectangle { color:parent.hovered?Theme.hover:"transparent";radius:Theme.roundedRadius(width,height) }
+                                    background:Rectangle { color:parent.hovered?Theme.hover:"transparent";radius:Theme.roundedRadius(width,height)
+ Behavior on color {ColorAnimation {duration:SwirlMotion.duration}}
+ }
                                     contentItem:Row {
                                         leftPadding:Theme.dp(8)
                                         Repeater { model:[{value:modelData.time,ratio:0.11},{value:modelData.host,ratio:0.25},{value:"代理",ratio:0.08},{value:modelData.process,ratio:0.18},{value:AppState.selectedNode,ratio:0.17},{value:modelData.latency,ratio:0.10},{value:modelData.down,ratio:0.11}]

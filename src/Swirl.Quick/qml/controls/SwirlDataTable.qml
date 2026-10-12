@@ -53,6 +53,10 @@ Item {
                 }
             }
             ListView {
+                    add: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";from:0;to:1;duration:SwirlMotion.duration} }
+                    remove: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.duration} }
+                    move: Transition {enabled:!SwirlMotion.reduced;SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration}}
+                    displaced: Transition { enabled:!SwirlMotion.reduced; SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration} }
                 id:list
                 width:parent.width
                 height:Math.floor(Math.max(0,horizontal.height-Theme.dp(39))/table.itemHeight)*table.itemHeight
@@ -78,6 +82,7 @@ Item {
                                     anchors.fill:parent
                                     anchors.leftMargin:Theme.dp(12); anchors.rightMargin:Theme.dp(8)
                                     text:AppState.zh(String(recordRow.record[modelData.key]===undefined?"":recordRow.record[modelData.key]))
+                                    textFormat:Text.PlainText
                                     color:Theme.text
                                     font.pixelSize:Theme.fontSize(table.textPixelSize)
                                     font.family:Theme.fontFamily

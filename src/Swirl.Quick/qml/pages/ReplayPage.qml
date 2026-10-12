@@ -32,6 +32,10 @@ Item {
                     Text { text:"捕获历史"; color:Theme.text; font.pixelSize:Theme.fontSize(14); font.weight:Font.DemiBold }
                     SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:"筛选请求" }
                     ListView {
+                    add: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";from:0;to:1;duration:SwirlMotion.duration} }
+                    remove: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.duration} }
+                    move: Transition {enabled:!SwirlMotion.reduced;SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration}}
+                    displaced: Transition { enabled:!SwirlMotion.reduced; SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration} }
                         Layout.fillHeight:true; Layout.fillWidth:true; clip:true; spacing:Theme.dp(4)
                         model:page.samples.filter(function(r){
                             return (r.method+" "+r.path).toLowerCase().indexOf(search.text.toLowerCase())>=0

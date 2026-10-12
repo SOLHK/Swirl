@@ -26,7 +26,7 @@ try {
     $exe = (Resolve-Path $exe).Path
     & (Join-Path $PSScriptRoot 'stage-mihomo.ps1') -Destination (Split-Path $exe) -Archive $MihomoArchive
     if ($InputTests) {
-        ctest --test-dir $BuildDir -C Release -R 'swirl-engine-(contract|real)|swirl-node-real-chain' --output-on-failure
+        ctest --test-dir $BuildDir -C Release -R 'swirl-engine-(contract|real)|swirl-node-real-chain|swirl-import-subscription|swirl-motion' --output-on-failure
         if ($LASTEXITCODE) { throw "Engine contract, integration or QML checks failed." }
         $test = Start-Process $exe -ArgumentList '--engine-self-test' -WindowStyle Hidden -Wait -PassThru
         if ($test.ExitCode) { throw "Native engine QML checks failed: $($test.ExitCode)." }

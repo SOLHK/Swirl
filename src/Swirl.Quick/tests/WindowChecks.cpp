@@ -56,7 +56,7 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
         if(attached)AttachThreadInput(currentThread,foregroundThread,FALSE);
     }
     QTest::qWait(400);
-    if(GetForegroundWindow()!=testHwnd){qCritical()<<"Native validation blocked: test window is not in foreground";return 3;}
+    if(!backdrop->isCaptureForeground()){qCritical()<<"Native validation blocked: target is covered or the Windows secure desktop is active";return 3;}
     const auto radius=state("Theme.windowRadius").toReal()*window->devicePixelRatio();
     const auto region=CreateRectRgn(0,0,0,0);
     check(GetWindowRgn(testHwnd,region)==ERROR,"native hard region is removed so it cannot cut antialiased pixels");
@@ -77,6 +77,7 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
 #endif
     const auto grab=[&](const QString &name){
 #ifdef Q_OS_WIN
+        if(!backdrop->isCaptureForeground()){qCritical()<<"Native screenshot blocked by foreground or secure desktop";return QImage();}
         check(GetForegroundWindow()==testHwnd,"native screenshot samples the foreground test window");
         qInfo()<<"Capture state"<<name<<"active="<<window->isActive()<<"foreground="<<(GetForegroundWindow()==reinterpret_cast<HWND>(window->winId()))<<"extended style="<<QString::number(GetWindowLongPtrW(reinterpret_cast<HWND>(window->winId()),GWL_EXSTYLE),16)<<"QML opacity="<<state("Theme.sidebarOpacity");
 #endif
@@ -86,8 +87,29 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
         check(!img.isNull() && img.save(directory+"/"+name+".png"),"native compositor screenshot saved");
         return img;
     };
-    const auto sample=[](const QImage &img,qreal x,qreal y){return img.pixelColor(qBound(0,int(x*img.width()),img.width()-1),qBound(0,int(y*img.height()),img.height()-1));};
+    const auto sample=[](const QImage &img,qreal x,qreal y){if(img.isNull())return QColor();return img.pixelColor(qBound(0,int(x*img.width()),img.width()-1),qBound(0,int(y*img.height()),img.height()-1));};
     const auto distance=[](QColor a,QColor b){return qAbs(a.red()-b.red())+qAbs(a.green()-b.green())+qAbs(a.blue()-b.blue());};
+    auto *outline=find(window->contentItem(),"windowOutline");
+    check(outline && outline->isVisible(),"window has a visible Qt outline without changing radius");
+    const auto outlined=grab("outline-enabled");
+    if(outline)outline->setVisible(false);QTest::qWait(200);
+    const auto borderless=grab("outline-disabled-comparison");
+    check(distance(sample(outlined,0.5,0),sample(borderless,0.5,0))>12,"actual compositor shows an outer edge on overlapping pale windows");
+    if(outline)outline->setVisible(true);QTest::qWait(200);
+#ifdef Q_OS_WIN
+    const auto nativeIcon=reinterpret_cast<HICON>(SendMessageW(testHwnd,WM_GETICON,ICON_BIG,0));
+    check(nativeIcon!=nullptr,"Windows taskbar receives an explicit large icon");
+    if(nativeIcon){
+        BITMAPINFO info{};info.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);info.bmiHeader.biWidth=32;info.bmiHeader.biHeight=-32;info.bmiHeader.biPlanes=1;info.bmiHeader.biBitCount=32;info.bmiHeader.biCompression=BI_RGB;
+        void *bits=nullptr;const auto dc=CreateCompatibleDC(nullptr);const auto bitmap=CreateDIBSection(dc,&info,DIB_RGB_COLORS,&bits,nullptr,0);
+        const auto previous=SelectObject(dc,bitmap);RECT box{0,0,32,32};FillRect(dc,&box,reinterpret_cast<HBRUSH>(GetStockObject(WHITE_BRUSH)));
+        DrawIconEx(dc,0,0,nativeIcon,32,32,0,nullptr,DI_NORMAL);
+        QImage image(static_cast<uchar *>(bits),32,32,QImage::Format_RGB32);int dark=0,blue=0;
+        for(int y=0;y<32;++y)for(int x=0;x<32;++x){const auto c=image.pixelColor(x,y);if(c.red()<80&&c.green()<80&&c.blue()<80)++dark;if(c.blue()>c.red()+35)++blue;}
+        check(dark>40 && blue==0,"native taskbar icon is the monochrome knot, not the blue legacy logo");
+        image.save(directory+"/taskbar-native-icon.png");SelectObject(dc,previous);DeleteObject(bitmap);DeleteDC(dc);
+    }
+#endif
     QCursor::setPos(window->screen()->availableGeometry().topLeft()+QPoint(10,10));QTest::qWait(300);
     auto red=grab("backdrop-red");
     const QColor behind("#D72D31");

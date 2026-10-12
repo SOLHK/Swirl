@@ -70,7 +70,7 @@ jobs:
       - name: Engine contract, real Mihomo and QML lifecycle checks
         shell: pwsh
         run: |
-          ctest --test-dir build/swirl-quick -C Release -R "swirl-(engine|node)-" --output-on-failure
+          ctest --test-dir build/swirl-quick -C Release -R "swirl-(engine|node|import)-|swirl-motion" --output-on-failure
           if ($LASTEXITCODE -ne 0) {
             Get-Content build/swirl-quick/engine-contract.txt, build/swirl-quick/engine-real.txt -ErrorAction SilentlyContinue
             throw "Engine checks failed"
@@ -85,6 +85,8 @@ jobs:
             build/swirl-quick/engine-contract.txt
             build/swirl-quick/engine-real.txt
             build/swirl-quick/node-chain.txt
+            build/swirl-quick/import-subscription.txt
+            build/swirl-quick/motion-report.json
             build/swirl-quick/Release/Swirl-diagnostics.txt
           if-no-files-found: warn
       - name: Overview mouse and keyboard input checks

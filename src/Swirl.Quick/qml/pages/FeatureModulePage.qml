@@ -7,6 +7,7 @@ import "../components"
 import "../controls"
 Item {
     id:page
+    SwirlAnimatedModel {id:animatedRecords;source:page.records}
     property string moduleId:""
     readonly property var feature:FeatureCatalog.find(moduleId)
     property var settings:({})
@@ -29,7 +30,7 @@ Item {
         anchors.fill:parent;spacing:Theme.dp(14)
         RowLayout {
             Layout.fillWidth:true;Layout.topMargin:12;spacing:Theme.dp(15)
-            SwirlIconButton {iconName:"chevron-left";tooltip:"功能模块中心";onClicked:AppState.navigate("featurehub")}
+            SwirlIconButton {iconName:"chevron-left";tooltip:"功能模块中心";onClicked:SwirlMotion.returnToHub(detailPanel)}
             ColumnLayout {
                 Layout.fillWidth:true;spacing:Theme.dp(5)
                 Text {text:page.feature ? page.feature.title : "功能模块";font.pixelSize:Theme.fontSize(25);font.weight:Font.DemiBold;color:Theme.text}
@@ -46,6 +47,7 @@ Item {
             Text {text:page.dirty ? "尚未保存" : page.savedAt.length ? "已保存 · "+page.savedAt : "未接入 · 本地界面草稿";color:Theme.muted;font.pixelSize:Theme.fontSize(13)}
         }
         SwirlGlassPanel {
+            id:detailPanel;objectName:"motion-detail"
             Layout.fillWidth:true;Layout.fillHeight:true
             ScrollView {
                 id:formScroll;anchors.fill:parent;anchors.margins:Theme.dp(22);clip:true;visible:page.tab===0
@@ -78,10 +80,16 @@ Item {
                     SwirlButton {objectName:"moduleAddButton";text:"添加条目";primary:true;font.pixelSize:Theme.fontSize(15);onClicked:{page.editing=-1;nameField.text="";valueField.text="";rowDialog.open()}}
                 }
                 ListView {
-                    Layout.fillWidth:true;Layout.fillHeight:true;clip:true;spacing:Theme.dp(8);model:page.records
+                    objectName:"motion-record-list"
+                    add: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";from:0;to:1;duration:SwirlMotion.duration} }
+                    remove: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.duration} }
+                    move: Transition {enabled:!SwirlMotion.reduced;SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration}}
+                    displaced: Transition { enabled:!SwirlMotion.reduced; SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration} }
+                    Layout.fillWidth:true;Layout.fillHeight:true;clip:true;spacing:Theme.dp(8);model:animatedRecords
                     delegate:Rectangle {
                         required property int index
-                        required property var modelData
+                        required property var entry
+                        readonly property var modelData:entry
                         width:ListView.view.width;height:Theme.dp(72);radius:Theme.controlRadius;color:Theme.material("field")
                         RowLayout {
                             anchors.fill:parent;anchors.margins:Theme.dp(12);spacing:Theme.dp(12)

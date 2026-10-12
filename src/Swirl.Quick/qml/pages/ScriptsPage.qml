@@ -30,6 +30,10 @@ Item {
                     Text { text:"脚本库"; color:Theme.text; font.pixelSize:Theme.fontSize(15); font.weight:Font.DemiBold }
                     SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:"搜索脚本" }
                     ListView {
+                    add: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";from:0;to:1;duration:SwirlMotion.duration} }
+                    remove: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.duration} }
+                    move: Transition {enabled:!SwirlMotion.reduced;SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration}}
+                    displaced: Transition { enabled:!SwirlMotion.reduced; SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration} }
                         Layout.fillWidth:true; Layout.fillHeight:true
                         clip:true
                         spacing:Theme.dp(5)

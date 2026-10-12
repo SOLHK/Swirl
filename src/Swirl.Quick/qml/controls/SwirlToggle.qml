@@ -5,6 +5,10 @@ import SwirlQuick
 Switch {
     id: control
     property bool large: false
+    property real motionScale:down?SwirlMotion.pressScale:1
+    Behavior on motionScale {enabled:!SwirlMotion.reduced;SwirlSpring{}}
+    Binding {target:control.indicator;property:"scale";value:control.motionScale}
+    onPressed:SwirlMotion.noteTrigger(control)
     implicitWidth: Theme.dp(large ? 86 : 60)
     implicitHeight: Theme.dp(large ? 46 : 32)
     padding:Theme.dp(0)
@@ -23,7 +27,7 @@ Switch {
             color: "#FEFEFF"
             layer.enabled: Theme.effectsSupported
             layer.effect: MultiEffect { shadowEnabled:true; shadowBlur:0.35; shadowVerticalOffset:2; shadowColor:"#30000000" }
-            Behavior on x { NumberAnimation { duration: Theme.motion; easing.type: Easing.OutCubic } }
+            Behavior on x {enabled:!SwirlMotion.reduced;SwirlSpring {epsilon:0.1}}
         }
         Behavior on color { ColorAnimation { duration: Theme.motion } }
     }

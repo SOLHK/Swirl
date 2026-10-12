@@ -5,6 +5,7 @@
 #include <QQmlExpression>
 #include <QQmlEngine>
 #include <QTest>
+#include <QElapsedTimer>
 #include <QDebug>
 #include <functional>
 #include <QTemporaryDir>
@@ -40,6 +41,8 @@ int runOverviewChecks(QQuickWindow *window)
     const auto item = [&](const char *name) { return findVisual(window->contentItem(),QString::fromLatin1(name)); };
     const auto click = [&](QQuickItem *target, qreal fraction = 0.5) {
         if (!target) { check(false,"input target exists"); return; }
+        QElapsedTimer ready;ready.start();
+        while(state("pageLoader.moving || pageLoader.pendingGrab").toBool() && ready.elapsed()<2500)QTest::qWait(20);
         // The overview retains its trends and tools below the primary status
         // panels. Scroll the real viewport before sending input to those items.
         if (auto *scroll = item("overviewScroll")) {
@@ -65,6 +68,8 @@ int runOverviewChecks(QQuickWindow *window)
         QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,
                           target->mapToScene(QPointF(target->width()*fraction,target->height()/2)).toPoint());
         QTest::qWait(250);
+        QElapsedTimer settling;settling.start();
+        while(state("pageLoader.moving || pageLoader.pendingGrab").toBool() && settling.elapsed()<2500)QTest::qWait(20);
     };
     check(state("AppState.measuredDown === 0 && AppState.measuredUp === 0 && AppState.measuredConnections === 0").toBool(),"offline counters zero");
     check(state("AppState.connectionState === '已停止' && !AppState.proxyOn").toBool(),"overview shows actual stopped engine");
@@ -148,6 +153,8 @@ int runOverviewChecks(QQuickWindow *window)
     QTest::qWait(250);
     check(popup && !popup->property("visible").toBool(),"node picker dismisses with Escape");
     state("Theme.setScalePercent(125); AppState.navigate('settings')");QTest::qWait(200);
+    QElapsedTimer sliderReady;sliderReady.start();
+    while(state("pageLoader.moving || pageLoader.pendingGrab").toBool() && sliderReady.elapsed()<2500)QTest::qWait(20);
     auto *scaleSlider=item("scaleSlider");
     check(scaleSlider && scaleSlider->isEnabled() && scaleSlider->property("from").toReal()==0.75 && scaleSlider->property("to").toReal()==1.5 && scaleSlider->property("stepSize").toReal()==0.01 && scaleSlider->property("value").toReal()==1.25,"appearance exposes enabled 75-150 percent slider with one percent steps");
     if(scaleSlider) {

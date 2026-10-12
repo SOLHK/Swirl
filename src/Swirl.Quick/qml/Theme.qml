@@ -82,7 +82,7 @@ QtObject {
     function withAlpha(color, alpha) { return Qt.rgba(color.r, color.g, color.b, alpha) }
     function roundedRadius(width, height) { return Math.min(controlRadius, width * 0.5, height * 0.5) }
     function pillRadius(height) { return Math.min(buttonRadius, height * 0.5) }
-    readonly property int motion: reduceMotion ? 0 : 180
+    readonly property int motion: SwirlMotion.duration
     function material(kind) {
         if (kind === "sidebar") return sidebar
         if (kind === "field") return field

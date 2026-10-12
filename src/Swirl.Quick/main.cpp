@@ -3,6 +3,13 @@
 #include <QQmlContext>
 #include <QQmlError>
 #include <QIcon>
+#include <QSvgRenderer>
+#include <QPainter>
+#ifdef Q_OS_WIN
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <shobjidl.h>
+#endif
 #include <QTimer>
 #include <QQuickWindow>
 #include <QQuickStyle>
@@ -20,6 +27,7 @@
 #include <QSettings>
 #include <QTemporaryDir>
 #include "app/ModuleDraftStore.h"
+#include "app/MotionPolicy.h"
 #ifdef SWIRL_UI_TESTS
 #include "tests/OverviewChecks.h"
 #include "tests/CaptureChecks.h"
@@ -27,6 +35,7 @@
 #include "tests/HdrChecks.h"
 #include "tests/EngineUiChecks.h"
 #include "tests/NodeUiChecks.h"
+#include "tests/MotionChecks.h"
 #endif
 #include "app/SystemDataProvider.h"
 #include "app/WindowsBackdrop.h"
@@ -49,6 +58,9 @@ static void recordQtDiagnostic(QtMsgType type, const QMessageLogContext &, const
 
 int main(int argc, char *argv[])
 {
+#ifdef Q_OS_WIN
+    SetCurrentProcessExplicitAppUserModelID(L"SOLHK.Swirl.Desktop");
+#endif
     // Keep fractional Windows monitor scale factors (125%, 150%, 175%) intact;
     // Qt then exposes logical geometry and raster DPR per screen.
     QGuiApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
@@ -58,18 +70,27 @@ int main(int argc, char *argv[])
     app.setOrganizationName(QStringLiteral("SOLHK"));
     app.setOrganizationDomain(QStringLiteral("solhk.dev"));
     app.setApplicationVersion(QStringLiteral("1.0.0-preview"));
-    app.setWindowIcon(QIcon(QStringLiteral(":/swirl/icons/swirl_knot_light.svg")));
+    // Rasterize the canonical mark at every Windows icon size. This works even
+    // when the optional SVG QIcon plugin is missing and avoids the old wind logo.
+    QSvgRenderer brand(QStringLiteral(":/swirl/icons/swirl_knot_light.svg"));
+    QIcon icon;
+    for(int size:{16,20,24,32,40,48,64,128,256}) {
+        QPixmap pixmap(size,size);pixmap.fill(Qt::transparent);
+        QPainter painter(&pixmap);brand.render(&painter);painter.end();icon.addPixmap(pixmap);
+    }
+    app.setWindowIcon(icon);
     // Native Windows Qt Quick Controls do not support custom backgrounds/content.
     // Swirl draws its own visual controls, so explicitly use the customizable style.
     QQuickStyle::setStyle(QStringLiteral("Basic"));
+    const bool motionTest=app.arguments().contains("--motion-test");
     bool previewMode=false;
     for(const QString &argument:app.arguments())
-        if(argument.startsWith(QStringLiteral("--capture-preview="))||argument.startsWith(QStringLiteral("--capture-native-frame=")))previewMode=true;
+        if(argument.startsWith(QStringLiteral("--motion-visual-dir="))||argument.startsWith(QStringLiteral("--capture-preview="))||argument.startsWith(QStringLiteral("--capture-native-frame=")))previewMode=true;
     const bool hdrTest=app.arguments().contains("--hdr-self-test");
     const bool hdrDisplayTest=app.arguments().contains("--hdr-display-test");
     const bool nodeTest=app.arguments().contains("--node-self-test");
     const bool engineTest=app.arguments().contains("--engine-self-test");
-    const bool isolatedRun=nodeTest||engineTest||hdrDisplayTest||hdrTest||app.arguments().contains("--interaction-test")||app.arguments().contains("--capture-self-test")||app.arguments().contains("--smoke-test")||app.arguments().contains("--window-test")||previewMode;
+    const bool isolatedRun=nodeTest||motionTest||engineTest||hdrDisplayTest||hdrTest||app.arguments().contains("--interaction-test")||app.arguments().contains("--capture-self-test")||app.arguments().contains("--smoke-test")||app.arguments().contains("--window-test")||previewMode;
     if(isolatedRun) {
         QStandardPaths::setTestModeEnabled(true);
         QSettings::setDefaultFormat(QSettings::IniFormat);
@@ -85,7 +106,9 @@ int main(int argc, char *argv[])
     QTemporaryDir isolatedNodes;
     EngineController engineController(std::make_unique<MihomoAdapter>(),nullptr,isolatedRun?isolatedNodes.filePath("nodes.dpapi"):QString());
     SystemDataProvider systemData(&capture,&engineController);
+    MotionPolicy motionPolicy;
     QQmlApplicationEngine engine;
+    engine.rootContext()->setContextProperty("motionPolicy", &motionPolicy);
     engine.addImageProvider(QStringLiteral("swirl"),new SvgIconProvider);
     const bool smoke = app.arguments().contains("--smoke-test");
     const bool interaction = app.arguments().contains("--interaction-test");
@@ -108,7 +131,7 @@ int main(int argc, char *argv[])
     const QString previewPath = nativeFramePath.isEmpty()?argumentValue(QStringLiteral("--capture-preview=")):nativeFramePath;
     const QString previewPage = argumentValue(QStringLiteral("--preview-page="));
     const QString previewTheme = argumentValue(QStringLiteral("--preview-theme="));
-    if (nodeTest || engineTest || hdrDisplayTest || hdrTest || smoke || interaction || captureTest || windowTest || !previewPath.isEmpty()) {
+    if (nodeTest || motionTest || previewMode || engineTest || hdrDisplayTest || hdrTest || smoke || interaction || captureTest || windowTest || !previewPath.isEmpty()) {
         QFile::remove(QCoreApplication::applicationDirPath() + QStringLiteral("/Swirl-diagnostics.txt"));
         qInstallMessageHandler(recordQtDiagnostic);
     }
@@ -130,6 +153,7 @@ int main(int argc, char *argv[])
     if (engine.rootObjects().isEmpty())
         return 1;
     auto *rootWindow = qobject_cast<QQuickWindow *>(engine.rootObjects().constFirst());
+    if(rootWindow)rootWindow->setIcon(icon);
     hdrOutput.attach(rootWindow);
     if(nodeTest) {
 #ifdef SWIRL_UI_TESTS
@@ -138,6 +162,16 @@ int main(int argc, char *argv[])
         return 4;
 #endif
     }
+        motionPolicy.attach(rootWindow);
+#ifdef SWIRL_UI_TESTS
+    const auto visualDirectory=argumentValue(QStringLiteral("--motion-visual-dir="));
+    if(!visualDirectory.isEmpty()) {
+        QTimer::singleShot(450,&app,[&app,rootWindow,visualDirectory]{app.exit(runMotionVisualChecks(rootWindow,visualDirectory));});
+    } else if(motionTest) {
+        const auto report=argumentValue(QStringLiteral("--motion-output="));
+        QTimer::singleShot(450,&app,[&app,rootWindow,report]{app.exit(runMotionChecks(rootWindow,report));});
+    }
+#endif
     if (engineTest) {
 #ifdef SWIRL_UI_TESTS
         QTimer::singleShot(400, &app, [&app, rootWindow, &engineController, &capture] { app.exit(runEngineUiChecks(rootWindow, &engineController, &capture)); });
@@ -187,6 +221,10 @@ int main(int argc, char *argv[])
             QObject *popup=nullptr;
             if(previewPopup==QStringLiteral("node-dialog"))
                 popup=rootWindow->findChild<QObject *>(QStringLiteral("proxyAddDialog"));
+            else if(previewPopup==QStringLiteral("node-import"))
+                popup=rootWindow->findChild<QObject *>(QStringLiteral("nodeImportDialog"));
+            else if(previewPopup==QStringLiteral("subscription-dialog"))
+                popup=rootWindow->findChild<QObject *>(QStringLiteral("subscriptionDialog"));
             else if(previewPopup==QStringLiteral("region-menu")) {
                 auto *combo=rootWindow->findChild<QObject *>(QStringLiteral("proxyRegionCombo"));
                 if(combo)popup=qvariant_cast<QObject *>(combo->property("popup"));
@@ -272,5 +310,5 @@ int main(int argc, char *argv[])
     // This also keeps scripted page-navigation shutdown free of incubation warnings.
     if (auto *controller = engine.incubationController())
         controller->incubateFor(100);
-    return (nodeTest || engineTest || smoke || interaction || captureTest || windowTest || !previewPath.isEmpty()) && qmlWarnings ? 2 : result;
+    return (nodeTest || motionTest || previewMode || engineTest || smoke || interaction || captureTest || windowTest || !previewPath.isEmpty()) && qmlWarnings ? 2 : result;
 }
