@@ -51,7 +51,7 @@ int main(int argc, char *argv[])
         std::fprintf(stderr, "Usage: SwirlIconBuilder source.svg output.ico\n");
         return 2;
     }
-    const QSvgRenderer renderer(app.arguments().at(1));
+    QSvgRenderer renderer(app.arguments().at(1));
     if (!renderer.isValid()) {
         std::fprintf(stderr, "Invalid Swirl brand SVG\n");
         return 3;
