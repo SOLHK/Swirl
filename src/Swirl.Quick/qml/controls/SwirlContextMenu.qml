@@ -6,6 +6,26 @@ Menu {
     property var items: ["查看详情", "复制", "导出"]
     property string payload: ""
     padding:Theme.dp(6)
+    transformOrigin:Item.TopLeft
+    onAboutToShow: {
+        if(SwirlMotion.reduced){scale=1;opacity=1}
+        else if(scale===1 && opacity===1){scale=0.96;opacity=0}
+    }
+    onClosed:{scale=1;opacity=1}
+    enter:Transition {
+        enabled:!SwirlMotion.reduced
+        ParallelAnimation {
+            NumberAnimation {property:"opacity";to:1;duration:SwirlMotion.duration}
+            SwirlSpring {property:"scale";to:1}
+        }
+    }
+    exit:Transition {
+        enabled:!SwirlMotion.reduced
+        ParallelAnimation {
+            NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.duration}
+            NumberAnimation {property:"scale";to:0.97;duration:SwirlMotion.duration;easing.type:Easing.InCubic}
+        }
+    }
     background: Rectangle {
         color: Theme.material("floating")
         radius:Theme.popupRadius; antialiasing:true
@@ -15,6 +35,7 @@ Menu {
     Repeater {
         model: menu.items
         MenuItem {
+            SwirlPressMotion{}
             text: AppState.zh(String(modelData))
             height:Theme.dp(36)
             contentItem: Text {

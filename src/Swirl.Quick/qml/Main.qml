@@ -153,13 +153,15 @@ ApplicationWindow {
                         anchors.fill:parent
                         Repeater {
                             model:["chevron-left","chevron-right"]
-                            Button {
+                            SwirlMotionButton {
                                 required property int index
                                 required property string modelData
                                 objectName:index===0?"historyBackButton":"historyForwardButton"
                                 width:Theme.dp(42); height:Theme.dp(42); hoverEnabled:true
                                 enabled:index===0 ? AppState.historyIndex>0 : AppState.historyIndex<AppState.navigationHistory.length-1
-                                background:Rectangle{radius:Math.min(width,height)/2;color:parent.hovered?Theme.hover:"transparent"}
+                                background:Rectangle{radius:Math.min(width,height)/2;color:parent.hovered?Theme.hover:"transparent"
+ Behavior on color {ColorAnimation {duration:SwirlMotion.duration}}
+ }
                                 contentItem:SwirlIcon{name:modelData;size:Theme.dp(20);color:parent.enabled?Theme.muted:Theme.withAlpha(Theme.muted,0.4)}
                                 onClicked:index===0?AppState.goBack():AppState.goForward()
                                 Accessible.name:index===0?"返回":"前进"
@@ -171,8 +173,9 @@ ApplicationWindow {
                 SwirlButton { visible:captureProvider.running; text:"抓包中 · "+captureProvider.sessions.length; iconName:"capture"; font.pixelSize:Theme.fontSize(14); onClicked:AppState.navigate("capture") }
 
             }
-            Loader {
-                id:pageLoader; objectName:"pageLoader"; x:Theme.dp(0); y:AppState.currentPage==="overview" ? Theme.dp(22) : Theme.dp(68); width:parent.width; height:parent.height-y-Theme.dp(17)
+            SwirlPageHost {
+                routeKey:AppState.currentPage
+                id:pageLoader; objectName:"pageLoader"; x:Theme.dp(0); y:Theme.dp(22); width:parent.width; height:parent.height-y-Theme.dp(17)
                 sourceComponent:AppState.currentPage==="overview" ? overview :
                                 AppState.currentPage==="capture" ? capturePage :
                                 AppState.currentPage==="connections" ? connections :
@@ -236,7 +239,7 @@ ApplicationWindow {
     Component { id:capturePage; CapturePage {} }
     Component { id:externalTools; ExternalToolsPage {} }
     Component { id:featureHub; FeatureHubPage {} }
-    Component { id:featureModule; FeatureModulePage { moduleId:AppState.currentPage } }
+    Component { id:featureModule; FeatureModulePage { moduleId:parent.routeId } }
     Component { id:connections; ConnectionsPage {} }
     Component { id:proxies; ProxiesPage {} }
     Component { id:inspector; InspectorPage {} }
@@ -260,9 +263,18 @@ ApplicationWindow {
     Component { id:automation; AutomationPage {} }
     Component { id:api; ApiPage {} }
     Component { id:gateway; GatewayPage {} }
-    Component { id:workbench; WorkbenchPage { pageId:AppState.currentPage } }
+    Component { id:workbench; WorkbenchPage { pageId:parent.routeId } }
 
     Timer { interval:1000; running:true; repeat:true; onTriggered:AppState.tickTraffic() }
+    // A thin outline gives overlapping pale windows a visible boundary. Qt
+    // owns the rounded HDR outline, so do not enable a mismatched DWM rectangle.
+    Rectangle {
+        objectName:"windowOutline"
+        anchors.fill:parent;z:998;color:"transparent";antialiasing:true
+        radius:window.shellRadius
+        border.width:window.visibility===Window.Maximized?0:1/Screen.devicePixelRatio
+        border.color:Theme.dark?Qt.rgba(1,1,1,window.active?0.22:0.12):Qt.rgba(0,0,0,window.active?0.25:0.14)
+    }
     Timer { id:toastTimer; interval:3200; onTriggered:AppState.toast="" }
     Connections { target:AppState; function onToastChanged(){if(AppState.toast.length)toastTimer.restart()} }
     Rectangle {

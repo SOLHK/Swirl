@@ -1,6 +1,7 @@
 #pragma once
 #include "ProxyEngine.h"
 #include "NodeStore.h"
+#include "NodeImportService.h"
 #include <memory>
 
 // QML sees only Swirl's generic business facade. Engine implementations are injected in C++.
@@ -34,6 +35,8 @@ class EngineController final : public QObject {
     Q_PROPERTY(bool requestSucceeded READ requestSucceeded NOTIFY statusChanged)
     Q_PROPERTY(int proxyPort READ proxyPort WRITE setProxyPort NOTIFY optionsChanged)
     Q_PROPERTY(int activeProxyPort READ activeProxyPort NOTIFY statusChanged)
+    Q_PROPERTY(NodeImportService* imports READ imports CONSTANT)
+    Q_PROPERTY(QStringList supportedProtocols READ supportedProtocols CONSTANT)
 public:
     explicit EngineController(std::unique_ptr<ProxyEngine> engine, QObject *parent = nullptr, QString storePath = {});
     QString executablePath() const { return m_options.executablePath; }
@@ -48,7 +51,7 @@ public:
     bool processAlive() const { return m_engine->status().processAlive; }
     bool apiHealthy() const { return m_engine->status().apiHealthy; }
     bool busy() const;
-    bool canStart() const { return !busy() && !processAlive(); }
+    bool canStart() const { return !busy() && !processAlive() && !m_imports.busy(); }
     QString version() const { return m_engine->status().version; }
     QString processId() const { return QString::number(m_engine->status().processId); }
     qint64 uptimeSeconds() const { return m_engine->status().uptimeSeconds; }
@@ -65,7 +68,9 @@ public:
     QString nodeStateText() const;
     QString requestStateText() const;
     QString nodeError() const { return !m_nodeError.isEmpty()?m_nodeError:m_store.error(); }
-    bool nodeBusy() const { return m_engine->status().nodeBusy || busy() || m_restartPending; }
+    bool nodeBusy() const { return m_engine->status().nodeBusy || busy() || m_restartPending || m_imports.busy(); }
+    NodeImportService *imports() { return &m_imports; }
+    QStringList supportedProtocols() const { return ProxyNode::protocols(); }
     bool requestSucceeded() const { return m_engine->status().requestState==ProxyEngine::RequestState::Succeeded; }
     int proxyPort() const { return m_options.proxyPort; }
     int activeProxyPort() const { return m_engine->status().proxyPort; }
@@ -84,6 +89,8 @@ private:
     std::unique_ptr<ProxyEngine> m_engine;
     EngineStartOptions m_options;
     NodeStore m_store;
+    NodeImportService m_imports;
     QString m_nodeError;
     bool m_restartPending=false;
+    bool m_connectionRequested=false;
 };

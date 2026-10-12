@@ -150,10 +150,21 @@ bool MihomoAdapter::prepareConfiguration() {
         QJsonArray proxies, names;
         names.append(m_options.selectedNodeId);
         for (const auto &n : m_options.nodes) {
-            QJsonObject proxy{{"name",n.id},{"type",n.protocol},{"server",n.host},{"port",n.port},{"udp",false}};
+            auto proxy=n.parameters;
+            proxy.insert("name",n.id);proxy.insert("type",n.protocol);
+            if(!n.host.isEmpty())proxy.insert("server",n.host);
+            if(n.port)proxy.insert("port",n.port);
+            if(!proxy.contains("udp"))proxy.insert("udp",false);
+            proxy.insert("skip-cert-verify",false);
+            if(n.protocol=="easytier")proxy.insert("no-listener",true);
             if (!n.password.isEmpty()) proxy.insert("password",n.password);
-            if (n.protocol=="socks5" && !n.username.isEmpty()) proxy.insert("username",n.username);
-            if (n.protocol=="ss") proxy.insert("cipher",n.cipher);
+            if (!n.username.isEmpty()) proxy.insert("username",n.username);
+            if (!n.cipher.isEmpty()) proxy.insert("cipher",n.cipher);
+            if(!n.serverName.isEmpty())proxy.insert(n.protocol=="vmess"||n.protocol=="vless"?"servername":"sni",n.serverName);
+            if(proxy.contains("dialer-proxy")) {
+                const auto target=proxy.value("dialer-proxy").toString();
+                for(const auto &candidate:m_options.nodes)if(candidate.sourceId==n.sourceId && candidate.name==target){proxy.insert("dialer-proxy",candidate.id);break;}
+            }
             if (n.protocol=="trojan") { proxy.insert("sni",n.serverName.isEmpty()?n.host:n.serverName); proxy.insert("skip-cert-verify",false); }
             proxies.append(proxy); if (n.id!=m_options.selectedNodeId) names.append(n.id);
         }
@@ -239,6 +250,15 @@ void MihomoAdapter::start(const EngineStartOptions &options) {
         const auto error=ProxyNode::validate(node);
         if (!error.isEmpty() || nodeIds.contains(node.id)) { fail(Error::InvalidNode, error.isEmpty()?QStringLiteral("节点标识重复。"):error); return; }
         nodeIds.insert(node.id);
+        QSet<QString> visited;auto cursor=&node;
+        while(cursor) {
+            if(visited.contains(cursor->id)){fail(Error::InvalidNode,QStringLiteral("节点链式代理存在循环引用。"));return;}
+            visited.insert(cursor->id);const auto target=cursor->parameters.value("dialer-proxy").toString();
+            if(target.isEmpty())break;
+            const auto source=cursor->sourceId;cursor=nullptr;
+            for(const auto &candidate:options.nodes)if(candidate.sourceId==source && candidate.name==target){cursor=&candidate;break;}
+            if(!cursor){fail(Error::InvalidNode,QStringLiteral("链式代理引用了未保存的节点。"));return;}
+        }
     }
     if (!options.selectedNodeId.isEmpty() && (!nodeIds.contains(options.selectedNodeId) || options.proxyPort==0 || options.proxyPort==options.controlPort)) {
         fail(Error::InvalidNode,QStringLiteral("所选节点或本机代理端口无效。")); return;

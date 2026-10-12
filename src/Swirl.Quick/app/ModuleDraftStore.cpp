@@ -8,6 +8,11 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 ModuleDraftStore::ModuleDraftStore(QObject *parent):QObject(parent) {
+    #ifdef SWIRL_UI_TESTS
+    if(qEnvironmentVariableIsSet("SWIRL_TEST_DRAFTS")) {
+        m_path=qEnvironmentVariable("SWIRL_TEST_DRAFTS");return;
+    }
+#endif
     m_path=QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation)+"/Swirl/qt-ui/module-drafts.ini";
 }
 bool ModuleDraftStore::fail(const QString &message) {m_error=message;emit errorChanged();return false;}

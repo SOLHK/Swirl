@@ -73,6 +73,10 @@ Item {
                     Text { text:AppState.zh("0           100           200           300 ms"); color:Theme.muted; font.pixelSize:Theme.fontSize(10) }
                 }
                 ListView {
+                    add: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";from:0;to:1;duration:SwirlMotion.duration} }
+                    remove: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.duration} }
+                    move: Transition {enabled:!SwirlMotion.reduced;SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration}}
+                    displaced: Transition { enabled:!SwirlMotion.reduced; SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration} }
                     Layout.fillWidth:true; Layout.fillHeight:true; clip:true; spacing:Theme.dp(3)
                     model:[]
                     delegate:RowLayout {

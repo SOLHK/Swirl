@@ -1,6 +1,8 @@
 import QtQuick
 import SwirlQuick
 Canvas {
+        onVisibleChanged:if(visible)requestPaint();
+
     id:plot
     property color lineColor: Theme.accent
     property bool bars: false

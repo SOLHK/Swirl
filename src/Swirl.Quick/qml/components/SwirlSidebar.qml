@@ -23,7 +23,7 @@ Item {
                 x: Theme.dp(sidebar.effectivelyCollapsed ? 0 : 8); y:Theme.dp(20); spacing: Theme.dp(sidebar.effectivelyCollapsed ? 7 : 10)
                 Repeater {
                     model: ["#FF453A", "#FFC400", "#16D86F"]
-                    Button {
+                    SwirlMotionButton {
                         required property int index
                         required property string modelData
                         objectName:index===0?"windowCloseButton":index===1?"windowMinimizeButton":"windowMaximizeButton"
@@ -89,11 +89,13 @@ Item {
                             width: parent.width; height: Theme.dp(26)
                             Rectangle { visible: false; x:Theme.dp(3); width: parent.width - Theme.dp(6); y:Theme.dp(12); height:Theme.dp(1); color: Theme.controlBorder }
                             Text { visible: !sidebar.effectivelyCollapsed; x:Theme.dp(12); anchors.verticalCenter:parent.verticalCenter; text: index === 0 ? "主要功能" : modelData.title; font.pixelSize:Theme.fontSize(14); font.weight: Font.Normal; color: Theme.muted }
-                            Button {
+                            SwirlMotionButton {
                                 visible: modelData.title === "分析与调试" && !sidebar.effectivelyCollapsed
                                 x: parent.width - Theme.dp(60); y:0; width:Theme.dp(60); height:parent.height
                                 text: "全部 ›"; font.pixelSize:Theme.fontSize(12); palette.buttonText: Theme.muted
-                                background: Rectangle { color: parent.hovered ? Theme.hover : "transparent"; radius: Theme.roundedRadius(width,height) }
+                                background: Rectangle { color: parent.hovered ? Theme.hover : "transparent"; radius: Theme.roundedRadius(width,height)
+ Behavior on color {ColorAnimation {duration:SwirlMotion.duration}}
+ }
                                 onClicked: AppState.navigate("featurehub"); Accessible.name: "全部功能模块"
                             }
                         }

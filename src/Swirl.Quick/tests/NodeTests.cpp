@@ -1,5 +1,6 @@
 #include "engine/MihomoAdapter.h"
 #include "engine/NodeStore.h"
+#include "engine/NodeImporter.h"
 #include "ControlledNetwork.h"
 #include <QCoreApplication>
 #include <QJsonDocument>
@@ -33,6 +34,45 @@ class NodeTests:public QObject {
         return body;
     }
 private slots:
+    void additionalProtocolsUseActualMihomoConfiguration() {
+        const QList<QJsonObject> samples{
+            {{"type","http"}},
+            {{"type","vmess"},{"uuid","11111111-1111-4111-8111-111111111111"},{"alterId",0},{"cipher","auto"},{"network","ws"},{"ws-opts",QJsonObject{{"path","/fixture"}}}},
+            {{"type","vless"},{"uuid","11111111-1111-4111-8111-111111111111"},{"tls",true},{"network","grpc"},{"grpc-opts",QJsonObject{{"grpc-service-name","fixture"}}}},
+            {{"type","ssr"},{"password","fixture-password"},{"cipher","aes-128-cfb"},{"protocol","origin"},{"obfs","plain"}},
+            {{"type","snell"},{"psk","fixture-password"},{"version",3}},
+            {{"type","hysteria"},{"auth-str","fixture-password"},{"up","10 Mbps"},{"down","10 Mbps"}},
+            {{"type","hysteria2"},{"password","fixture-password"}},
+            {{"type","tuic"},{"uuid","11111111-1111-4111-8111-111111111111"},{"password","fixture-password"},{"congestion-controller","bbr"}},
+            {{"type","anytls"},{"password","fixture-password"}},
+            {{"type","ssh"},{"username","fixture"},{"password","fixture-password"}},
+            {{"type","gost-relay"},{"username","fixture"},{"password","fixture-password"}},
+            {{"type","mieru"},{"username","fixture"},{"password","fixture-password"},{"transport","TCP"}},
+            {{"type","shadowquic"},{"username","fixture"},{"password","fixture-password"}},
+            {{"type","trusttunnel"},{"username","fixture"},{"password","fixture-password"}}
+        };
+        for(auto sample:samples) {
+            const auto protocol=sample.value("type").toString();sample.insert("name","fixture");sample.insert("server","127.0.0.1");sample.insert("port",443);
+            const auto parsed=NodeImporter::parse(QJsonDocument(sample).toJson());QVERIFY2(bool(parsed),qPrintable(protocol+": "+parsed.error));
+            auto config=options();config.nodes=parsed.nodes;config.selectedNodeId=parsed.nodes.first().id;
+            MihomoAdapter engine;engine.start(config);
+            QTRY_VERIFY_WITH_TIMEOUT(engine.status().state==ProxyEngine::State::Running || engine.status().state==ProxyEngine::State::Failed,16000);
+            QVERIFY2(engine.status().state==ProxyEngine::State::Running,qPrintable(protocol+": "+engine.status().message));
+            QVERIFY(!engine.configurationSummary().contains("fixture-password"));
+            qInfo()<<"REAL_MIHOMO_CONFIG"<<protocol<<"accepted by pinned engine; remote handshake not tested";
+            engine.stop();QTRY_COMPARE_WITH_TIMEOUT(engine.status().state,ProxyEngine::State::Stopped,4000);
+        }
+    }
+    void importedVlessKeepsTransportPrivate() {
+        QTemporaryDir temp; const auto path=temp.filePath("import.dpapi"); NodeStore store(path);
+        QVariantMap options{{"uuid","11111111-1111-4111-8111-111111111111"},{"network","ws"},
+            {"ws-opts",QVariantMap{{"path","/private-path"},{"headers",QVariantMap{{"Host","edge.example.org"}}}}}};
+        QVERIFY(store.saveNode({{"name","VLESS imported"},{"protocol","vless"},{"host","edge.example.org"},{"port",443},{"options",options}}));
+        NodeStore loaded(path); QCOMPARE(loaded.nodes().size(),1);
+        QVERIFY(!loaded.publicRows().first().toMap().contains("options"));
+        QFile encrypted(path); QVERIFY(encrypted.open(QIODevice::ReadOnly));
+        QVERIFY(!encrypted.readAll().contains("private-path"));
+    }
     void oversizedStorePreservesPreviousFile() {
         QTemporaryDir temp;const auto path=temp.filePath("nodes.dat");NodeStore store(path);
         auto n=node("large",1080);n.protocol="ss";n.cipher="aes-128-gcm";n.password=QString(4096,QChar(1));
@@ -68,7 +108,7 @@ private slots:
         n.port=0;QVERIFY(!ProxyNode::validate(n).isEmpty());n.port=1080;
         n.protocol="vless";QVERIFY(!ProxyNode::validate(n).isEmpty());n.protocol="socks5";
         n.username="user";QVERIFY(!ProxyNode::validate(n).isEmpty());n.password="secret";QVERIFY(ProxyNode::validate(n).isEmpty());
-        n.protocol="ss";n.cipher="invalid";QVERIFY(!ProxyNode::validate(n).isEmpty());n.cipher="aes-128-gcm";QVERIFY(ProxyNode::validate(n).isEmpty());
+        n.protocol="ss";n.cipher="";QVERIFY(!ProxyNode::validate(n).isEmpty());n.cipher="aes-128-gcm";QVERIFY(ProxyNode::validate(n).isEmpty());
         n.protocol="trojan";n.serverName="bad server";QVERIFY(!ProxyNode::validate(n).isEmpty());
     }
     void realHttpHttpsAndSwitch() {

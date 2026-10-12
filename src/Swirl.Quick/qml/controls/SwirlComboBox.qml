@@ -20,6 +20,8 @@ ComboBox {
         leftPadding:Theme.dp(4); rightPadding:Theme.dp(4)
     }
     indicator: Canvas {
+        onVisibleChanged:if(visible)requestPaint();
+
         id: chevron
         x: control.width-width-Theme.dp(13); y: (control.height-height)/2
         width:Theme.dp(14); height:Theme.dp(14)
@@ -38,9 +40,10 @@ ComboBox {
         color: control.pressed ? Theme.pressed : control.hovered ? Theme.hover : Theme.material("field")
         border.width:Theme.dp(1)
         border.color: control.activeFocus ? Theme.focusBorder : Theme.pillRim
-        Behavior on color { ColorAnimation { duration: Theme.motion } }
+        Behavior on color { ColorAnimation { duration: SwirlMotion.duration } }
     }
     delegate: ItemDelegate {
+        SwirlPressMotion{}
         width: control.popup.availableWidth
         height:Theme.dp(36)
         text: String(modelData)
@@ -52,27 +55,39 @@ ComboBox {
         }
         background: Rectangle {
             radius: Theme.controlRadius; antialiasing:true; color: parent.highlighted ? Theme.selected : "transparent"
-            Behavior on color { ColorAnimation { duration: Theme.motion } }
+            Behavior on color { ColorAnimation { duration: SwirlMotion.duration } }
         }
     }
     popup: Popup {
+        transformOrigin:Item.TopLeft
+    onAboutToShow: {
+        if(SwirlMotion.reduced){scale=1;opacity=1}
+        else if(scale===1 && opacity===1){scale=0.96;opacity=0}
+    }
+    onClosed:{scale=1;opacity=1}
+
         y: control.height + Theme.dp(7)
         width: control.width
         padding:Theme.dp(6)
         implicitHeight: Math.min(Theme.dp(290), contentItem.implicitHeight+Theme.dp(12))
         enter: Transition {
+        enabled:!SwirlMotion.reduced
             ParallelAnimation {
-                NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.motion }
-                NumberAnimation { property: "scale"; from: 0.97; to: 1; duration: Theme.motion; easing.type: Easing.OutCubic }
+                NumberAnimation { property:"opacity";to:1; duration: SwirlMotion.duration }
+                SwirlSpring { property:"scale";to:1 }
             }
         }
-        exit: Transition { NumberAnimation { property: "opacity"; from: 1; to: 0; duration: Theme.motion } }
+        exit: Transition { enabled:!SwirlMotion.reduced; ParallelAnimation { NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.duration} NumberAnimation {property:"scale";to:0.96;duration:SwirlMotion.duration;easing.type:Easing.InCubic} } }
         background: Rectangle {
             color: Theme.material("floating")
             radius: Theme.popupRadius; antialiasing:true
             border.width:Theme.dp(1); border.color: Theme.pillRim
         }
         contentItem: ListView {
+                    add: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";to:1;duration:SwirlMotion.duration} }
+                    remove: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.duration} }
+                    move: Transition {enabled:!SwirlMotion.reduced;SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration}}
+                    displaced: Transition { enabled:!SwirlMotion.reduced; SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration} }
             clip: true
             implicitHeight: contentHeight
             model: control.popup.visible ? control.delegateModel : null

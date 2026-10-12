@@ -13,7 +13,7 @@ Item {
         anchors.fill: parent
         Repeater {
             model: control.options
-            delegate: Button {
+            delegate: SwirlMotionButton {
                 required property int index
                 required property var modelData
                 width: control.width / control.options.length; height: control.height

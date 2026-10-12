@@ -3,7 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import SwirlQuick
 import "../components"
-Button {
+SwirlMotionButton {
     id: control
     property bool primary: false
     property bool quiet: false
@@ -17,11 +17,12 @@ Button {
     leftPadding:Theme.dp(12); rightPadding:Theme.dp(12)
     topPadding:Theme.dp(4); bottomPadding:Theme.dp(4)
     background: SwirlPillSurface {
+        Behavior on color { ColorAnimation {duration:SwirlMotion.duration} }
         primary: control.primary
         gradient:control.quiet && !control.hovered && !control.down ? null : pillGradient
         property Gradient pillGradient:Gradient {
-            GradientStop { position:0; color:control.primary ? Theme.primaryControl : control.down ? Theme.pressed : control.hovered ? Theme.hover : Theme.pillTop }
-            GradientStop { position:1; color:control.primary ? Theme.primaryControl : control.down ? Theme.pressed : control.hovered ? Theme.hover : Theme.pillBottom }
+            GradientStop { position:0; color:control.primary ? Theme.primaryControl : control.down ? Theme.pressed : control.hovered ? Theme.hover : Theme.pillTop; Behavior on color { ColorAnimation { duration:SwirlMotion.duration } } }
+            GradientStop { position:1; color:control.primary ? Theme.primaryControl : control.down ? Theme.pressed : control.hovered ? Theme.hover : Theme.pillBottom; Behavior on color { ColorAnimation { duration:SwirlMotion.duration } } }
         }
         hovered: control.hovered || control.activeFocus
         pressed: control.down

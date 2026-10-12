@@ -37,3 +37,7 @@ https://github.com/SOLHK/Swirl/tree/test/src/Swirl.Quick
 
 Windows fonts used during validation are system-installed fonts and are not
 redistributed in this installer. The existing Swirl SVG artwork is preserved.
+
+fkYAML v0.5.0 — MIT — Copyright Kensuke Fukutani (2023-2026)
+https://github.com/fktn-k/fkYAML
+License: licenses/fkYAML-MIT.txt

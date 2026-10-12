@@ -7,7 +7,7 @@
 #include <QTimer>
 
 EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject *parent, QString storePath)
-    : QObject(parent), m_engine(std::move(engine)), m_store(std::move(storePath)) {
+    : QObject(parent), m_engine(std::move(engine)), m_store(std::move(storePath)),m_imports(&m_store,this) {
     QFile manifest(QStringLiteral(":/engine/mihomo-manifest.json"));
     if (manifest.open(QIODevice::ReadOnly)) {
         const auto object = QJsonDocument::fromJson(manifest.readAll()).object();
@@ -17,11 +17,24 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
     m_options.executablePath = QCoreApplication::applicationDirPath() + QStringLiteral("/core/mihomo.exe");
     connect(m_engine.get(), &ProxyEngine::statusChanged, this, &EngineController::statusChanged);
     connect(&m_store,&NodeStore::changed,this,&EngineController::nodesChanged);
+    connect(&m_imports,&NodeImportService::changed,this,&EngineController::statusChanged);
+    connect(&m_imports,&NodeImportService::nodesApplied,this,[this]{
+        m_nodeError.clear();
+        // A source refresh changes credentials/options too. Restart the owned
+        // process with the new snapshot; never leave the UI ahead of the engine.
+        if(m_connectionRequested && (processAlive() || busy())) {
+            m_options.nodes=m_store.nodes();m_options.selectedNodeId=m_store.selectedId();
+            m_restartPending=!m_options.selectedNodeId.isEmpty();
+            if(!m_restartPending){m_connectionRequested=false;m_nodeError=QStringLiteral("更新移除了当前节点；已停止连接，请重新选择。");}
+            m_engine->stop();
+        }
+        emit nodesChanged();
+    });
     connect(m_engine.get(),&ProxyEngine::statusChanged,this,[this] {
         emit nodesChanged();
         if (m_restartPending && m_engine->status().state==ProxyEngine::State::Stopped) {
             m_restartPending=false;
-            QTimer::singleShot(0,this,[this]{if(!m_options.selectedNodeId.isEmpty())m_engine->start(m_options);});
+            QTimer::singleShot(0,this,[this]{if(m_connectionRequested && !m_options.selectedNodeId.isEmpty())m_engine->start(m_options);});
         }
     });
     connect(QCoreApplication::instance(), &QCoreApplication::aboutToQuit, m_engine.get(), &ProxyEngine::stop);
@@ -53,15 +66,15 @@ bool EngineController::busy() const {
     const auto state = m_engine->status().state;
     return state == ProxyEngine::State::Validating || state == ProxyEngine::State::Starting || state == ProxyEngine::State::Stopping;
 }
-void EngineController::start() { if (canStart()) { m_options.nodes=m_store.nodes(); m_options.selectedNodeId.clear(); m_engine->start(m_options); } }
-void EngineController::stop() { m_restartPending=false; m_options.selectedNodeId.clear(); m_engine->stop(); }
+void EngineController::start() { if (canStart()) { m_connectionRequested=false;m_options.nodes=m_store.nodes(); m_options.selectedNodeId.clear(); m_engine->start(m_options); } }
+void EngineController::stop() { m_connectionRequested=false;m_restartPending=false; m_options.selectedNodeId.clear(); m_engine->stop(); }
 void EngineController::refresh() { m_engine->refresh(); }
 
 QVariantList EngineController::nodes() const {
     auto rows=m_store.publicRows(); const auto status=m_engine->status();
     for (auto &value : rows) {
         auto row=value.toMap(); const bool active=processAlive() && row.value("id").toString()==status.selectedNodeId;
-        row.insert("address",row.value("host").toString()+":"+row.value("port").toString());
+        row.insert("address",row.value("host").toString().isEmpty()?QStringLiteral("协议扩展配置"):row.value("host").toString()+":"+row.value("port").toString());
         row.insert("status",active?nodeStateText():QStringLiteral("未连接"));
         row.insert("latency",active && status.latencyMs>=0?QString::number(status.latencyMs):QStringLiteral("—"));
         value=row;
@@ -95,11 +108,11 @@ QString EngineController::requestStateText() const {
 }
 void EngineController::setProxyPort(int port) { if(canStart() && port>0 && port<=65535 && port!=controlPort()){m_options.proxyPort=quint16(port);emit optionsChanged();} }
 bool EngineController::saveNode(const QVariantMap &input) {
-    if(processAlive() || busy()) { m_nodeError=QStringLiteral("请先断开引擎再编辑节点，避免运行配置与保存配置不一致。");emit nodesChanged();return false; }
+    if(processAlive() || busy() || m_imports.busy()) { m_nodeError=QStringLiteral("请先断开引擎并等待导入完成，再编辑节点。");emit nodesChanged();return false; }
     m_nodeError.clear(); const bool ok=m_store.saveNode(input);emit nodesChanged();return ok;
 }
 bool EngineController::deleteNode(const QString &id) {
-    if(processAlive() || busy()){m_nodeError=QStringLiteral("请先断开引擎再删除节点。");emit nodesChanged();return false;}
+    if(processAlive() || busy() || m_imports.busy()){m_nodeError=QStringLiteral("请先断开引擎并等待导入完成，再删除节点。");emit nodesChanged();return false;}
     m_nodeError.clear();const bool ok=m_store.removeNode(id);emit nodesChanged();return ok;
 }
 bool EngineController::chooseNode(const QString &id) {
@@ -113,6 +126,7 @@ void EngineController::connectNode(const QString &id) {
     if(id.isEmpty()){m_nodeError=QStringLiteral("请先添加并选择节点。");emit nodesChanged();return;}
     if(nodeBusy() || !chooseNode(id))return;
     if(processAlive() && !activeNodeId().isEmpty())return;
+    m_connectionRequested=true;
     m_options.nodes=m_store.nodes();m_options.selectedNodeId=id;
     if(processAlive()){m_restartPending=true;m_engine->stop();}
     else m_engine->start(m_options);

@@ -29,17 +29,22 @@ Item {
             }}
         }
         ScrollView {
-            id:scroll;Layout.fillWidth:true;Layout.fillHeight:true;clip:true
+            id:scroll;objectName:"motion-hub-scroll";Layout.fillWidth:true;Layout.fillHeight:true;clip:true
             ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
             GridLayout {
                 width:scroll.availableWidth;columns:width>=1000 ? 3 : width>=620 ? 2 : 1;columnSpacing:14;rowSpacing:14
                 Repeater {
                     model:page.filtered
-                    Button {
+                    SwirlMotionButton {
                         required property var modelData
+                        objectName:modelData.id.indexOf("feature-")===0?"motion-feature-card":"motion-hub-card"
                         Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(148)
                         hoverEnabled:true;padding:Theme.dp(18)
-                        background:SwirlGlassPanel {color:parent.down ? Theme.selected : parent.hovered ? Theme.hover : Theme.surface}
+                        opacity:SwirlMotion.transitioning && SwirlMotion.shared &&
+                                (SwirlMotion.shared.reverse?SwirlMotion.shared.previous:SwirlMotion.shared.route)===modelData.id ? 0 : 1
+                        background:SwirlGlassPanel {color:parent.down ? Theme.selected : parent.hovered ? Theme.hover : Theme.surface
+ Behavior on color {ColorAnimation {duration:SwirlMotion.duration}}
+ }
                         contentItem:ColumnLayout {
                             spacing:Theme.dp(8)
                             RowLayout {
@@ -52,7 +57,7 @@ Item {
                             Item {Layout.fillHeight:true}
                             Text {text:modelData.id==="capture" ? "HTTP 已接入" : modelData.id.indexOf("feature-")===0 ? "配置草稿" : "交互预览";color:modelData.id==="capture" ? Theme.green : Theme.muted;font.pixelSize:Theme.fontSize(12)}
                         }
-                        onClicked:AppState.navigate(modelData.id)
+                        onClicked:SwirlMotion.navigateFrom(this,modelData.id)
                         Accessible.name:modelData.title
                     }
                 }

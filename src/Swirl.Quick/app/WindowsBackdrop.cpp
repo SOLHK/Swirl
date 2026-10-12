@@ -185,14 +185,21 @@ bool WindowsBackdrop::prepareNativeCapture() {
         SetForegroundWindow(hwnd);
         if(attached)AttachThreadInput(currentThread,foregroundThread,FALSE);
     }
-    return GetForegroundWindow()==hwnd;
+    return isCaptureForeground();
 #else
     return false;
 #endif
 }
 bool WindowsBackdrop::isCaptureForeground() const {
 #ifdef Q_OS_WIN
-    return m_handle && GetForegroundWindow()==reinterpret_cast<HWND>(m_handle);
+    const auto input=OpenInputDesktop(0,FALSE,DESKTOP_READOBJECTS);
+    if(!input)return false;
+    wchar_t inputName[128]{},threadName[128]{};DWORD needed=0;
+    const bool same=GetUserObjectInformationW(input,UOI_NAME,inputName,sizeof(inputName),&needed) &&
+        GetUserObjectInformationW(GetThreadDesktop(GetCurrentThreadId()),UOI_NAME,threadName,sizeof(threadName),&needed) &&
+        wcscmp(inputName,threadName)==0;
+    CloseDesktop(input);
+    return same && m_handle && GetForegroundWindow()==reinterpret_cast<HWND>(m_handle);
 #else
     return false;
 #endif

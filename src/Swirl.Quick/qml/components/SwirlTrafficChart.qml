@@ -38,6 +38,8 @@ Item {
         }
     }
     Canvas {
+        onVisibleChanged:if(visible)requestPaint();
+
         id:plot
         x:Theme.dp(79); y:Theme.dp(5); width:parent.width-x-Theme.dp(8); height:parent.height-Theme.dp(33)
         onWidthChanged:requestPaint(); onHeightChanged:requestPaint()

@@ -13,7 +13,9 @@ add_library(SwirlEngine STATIC
  engine/MihomoAdapter.h engine/MihomoAdapter.cpp
  engine/EngineController.h engine/EngineController.cpp)
 target_sources(SwirlEngine PRIVATE engine/ProxyNode.h engine/ProxyNode.cpp engine/NodeStore.h engine/NodeStore.cpp)
-target_link_libraries(SwirlEngine PUBLIC Qt6::Core Qt6::Network)
+target_sources(SwirlEngine PRIVATE engine/NodeImporter.h engine/NodeImporter.cpp)
+target_sources(SwirlEngine PRIVATE engine/NodeImportService.h engine/NodeImportService.cpp)
+target_link_libraries(SwirlEngine PUBLIC Qt6::Core Qt6::Network Qt6::Gui)
 target_include_directories(SwirlEngine PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 if(WIN32)
  target_link_libraries(SwirlEngine PRIVATE advapi32 ws2_32 iphlpapi crypt32)
@@ -25,7 +27,8 @@ target_link_libraries(Swirl PRIVATE SwirlEngine)
 qt_add_resources(Swirl engine_manifest PREFIX "/engine" BASE "${CMAKE_CURRENT_SOURCE_DIR}/packaging"
  FILES packaging/mihomo-manifest.json)
 set(SWIRL_QML_FILES
- qml/Main.qml qml/Theme.qml qml/AppState.qml qml/FeatureCatalog.qml
+ qml/Main.qml qml/Theme.qml qml/AppState.qml qml/FeatureCatalog.qml qml/SwirlMotion.qml
+ qml/controls/SwirlPressMotion.qml qml/controls/SwirlAnimatedModel.qml qml/controls/SwirlMotionButton.qml qml/controls/SwirlSpring.qml qml/controls/SwirlPageHost.qml
  qml/pages/FeatureHubPage.qml qml/pages/FeatureModulePage.qml qml/components/SwirlBrandIcon.qml
  qml/controls/SwirlPillSurface.qml qml/controls/SwirlIconButton.qml qml/controls/SwirlButton.qml qml/controls/SwirlSegmentedControl.qml qml/controls/SwirlToggle.qml
  qml/controls/SwirlSearchField.qml qml/controls/SwirlTextField.qml
@@ -52,7 +55,7 @@ foreach(file IN LISTS SWIRL_QML_FILES)
     string(REGEX REPLACE "^qml/" "" qml_alias "${file}")
     set_source_files_properties("${file}" PROPERTIES QT_RESOURCE_ALIAS "${qml_alias}")
 endforeach()
-set_source_files_properties(qml/Theme.qml qml/AppState.qml qml/FeatureCatalog.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+set_source_files_properties(qml/SwirlMotion.qml qml/Theme.qml qml/AppState.qml qml/FeatureCatalog.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 qt_add_qml_module(Swirl
     URI SwirlQuick
     VERSION 1.0
@@ -71,7 +74,7 @@ qt_add_resources(Swirl brand PREFIX "/swirl" BASE "${SWIRL_ASSET_PATH}" FILES
     "${SWIRL_ASSET_PATH}/icons/swirl_knot_mark_dark.svg"
 )
 qt_add_shaders(Swirl hdr_ui PREFIX "/swirl" BASE "${CMAKE_CURRENT_SOURCE_DIR}" FILES shaders/hdr-ui.frag)
-target_sources(Swirl PRIVATE app/HdrOutput.h app/HdrOutput.cpp)
+target_sources(Swirl PRIVATE app/HdrOutput.h app/HdrOutput.cpp app/MotionPolicy.h app/MotionPolicy.cpp)
 target_link_libraries(Swirl PRIVATE Qt6::GuiPrivate)
 
 target_include_directories(Swirl PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/app")
@@ -102,12 +105,21 @@ if(SWIRL_BUILD_UI_TESTS)
   target_compile_options(SwirlNodeTests PRIVATE /utf-8)
  endif()
  add_test(NAME swirl-node-real-chain COMMAND SwirlNodeTests -o node-chain.txt,txt)
+ add_executable(SwirlImportTests tests/ImportTests.cpp tests/ControlledNetwork.h)
+ target_link_libraries(SwirlImportTests PRIVATE SwirlEngine Qt6::Test)
+ target_compile_definitions(SwirlImportTests PRIVATE SWIRL_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
+ qt_add_resources(SwirlImportTests import_manifest PREFIX "/engine" BASE "${CMAKE_CURRENT_SOURCE_DIR}/packaging" FILES packaging/mihomo-manifest.json)
+ if(MSVC)
+  target_compile_options(SwirlImportTests PRIVATE /utf-8)
+ endif()
+ add_test(NAME swirl-import-subscription COMMAND SwirlImportTests -o import-subscription.txt,txt)
+ set_tests_properties(swirl-import-subscription PROPERTIES TIMEOUT 120)
  set_tests_properties(swirl-node-real-chain PROPERTIES TIMEOUT 120)
  add_test(NAME swirl-engine-contract COMMAND SwirlEngineTests -o engine-contract.txt,txt)
  set_tests_properties(swirl-engine-contract PROPERTIES TIMEOUT 90)
  add_test(NAME swirl-engine-real COMMAND SwirlEngineTests realEngine -o engine-real.txt,txt)
  set_tests_properties(swirl-engine-real PROPERTIES TIMEOUT 90 ENVIRONMENT "SWIRL_REAL_ENGINE_TEST=1")
- target_sources(Swirl PRIVATE tests/EngineUiChecks.cpp tests/EngineUiChecks.h tests/NodeUiChecks.cpp tests/NodeUiChecks.h)
+ target_sources(Swirl PRIVATE tests/EngineUiChecks.cpp tests/EngineUiChecks.h tests/NodeUiChecks.cpp tests/NodeUiChecks.h tests/MotionChecks.cpp tests/MotionChecks.h)
  target_compile_definitions(Swirl PRIVATE SWIRL_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
  add_test(NAME swirl-node-ui COMMAND Swirl --node-self-test)
  set_tests_properties(swirl-node-ui PROPERTIES TIMEOUT 60 ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software")
@@ -116,6 +128,9 @@ if(SWIRL_BUILD_UI_TESTS)
   ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software")
  add_test(NAME swirl-overview-input COMMAND Swirl --interaction-test)
  add_test(NAME swirl-all-pages COMMAND Swirl --smoke-test)
+ add_test(NAME swirl-motion COMMAND Swirl --motion-test --motion-output=motion-report.json)
+ set_tests_properties(swirl-motion PROPERTIES TIMEOUT 120
+  ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software")
  add_test(NAME swirl-capture-network COMMAND Swirl --capture-self-test)
  set_tests_properties(swirl-overview-input swirl-all-pages swirl-capture-network PROPERTIES
   ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software" TIMEOUT 60)
@@ -139,5 +154,5 @@ if(WIN32)
  add_dependencies(Swirl swirl-generate-icon)
  configure_file(app/Swirl.rc.in "${CMAKE_CURRENT_BINARY_DIR}/Swirl.rc" @ONLY)
  target_sources(Swirl PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/Swirl.rc")
- target_link_libraries(Swirl PRIVATE dwmapi advapi32 psapi)
+ target_link_libraries(Swirl PRIVATE dwmapi advapi32 psapi shell32)
 endif()
