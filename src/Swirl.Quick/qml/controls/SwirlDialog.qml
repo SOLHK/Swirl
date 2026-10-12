@@ -4,9 +4,9 @@ import SwirlQuick
 Dialog {
     id: dialog
     modal: true
-    width: Math.min(470, parent ? parent.width-40 : 470)
+    width: Math.min(Theme.dp(470), parent ? parent.width-Theme.dp(40) : Theme.dp(470))
     anchors.centerIn: Overlay.overlay
-    padding: 23
+    padding:Theme.dp(23)
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
     enter: Transition {
         ParallelAnimation {
@@ -17,20 +17,22 @@ Dialog {
     exit: Transition { NumberAnimation { property: "opacity"; from: 1; to: 0; duration: Theme.motion } }
     font.family: "Microsoft YaHei UI"
     header: Item {
-        implicitHeight: 47
+        implicitHeight:Theme.dp(47)
         Text {
             text: dialog.title
-            color: Theme.text; font.pixelSize: 18; font.weight: Font.DemiBold
-            anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter
+            color: Theme.text; font.pixelSize:Theme.fontSize(18); font.weight: Font.DemiBold
+            anchors.left: parent.left; anchors.leftMargin:dialog.leftPadding
+            anchors.right:parent.right; anchors.rightMargin:dialog.rightPadding
+            elide:Text.ElideRight; anchors.verticalCenter: parent.verticalCenter
         }
     }
     background: Rectangle {
         color: Theme.material("floating")
-        radius: 23; border.width: 1; border.color: Theme.glassRim
+        radius:Theme.popupRadius; antialiasing:true; border.width:Theme.dp(1); border.color: Theme.glassRim
         Rectangle {
             anchors.left: parent.left; anchors.right: parent.right
-            anchors.leftMargin: 24; anchors.rightMargin: 24; anchors.top: parent.top
-            anchors.topMargin: 1; height: 1; color: Theme.glassGlint
+            anchors.leftMargin:Theme.dp(24); anchors.rightMargin:Theme.dp(24); anchors.top: parent.top
+            anchors.topMargin:Theme.dp(1); height:Theme.dp(1); color: Theme.glassGlint
         }
     }
 }

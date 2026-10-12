@@ -17,16 +17,22 @@
 #include <QQmlIncubationController>
 #include <QScreen>
 #include <QStandardPaths>
+#include <QSettings>
 #include "app/ModuleDraftStore.h"
 #ifdef SWIRL_UI_TESTS
 #include "tests/OverviewChecks.h"
 #include "tests/CaptureChecks.h"
 #include "tests/WindowChecks.h"
+#include "tests/HdrChecks.h"
+#include "tests/EngineUiChecks.h"
 #endif
 #include "demo/DemoDataProvider.h"
 #include "app/WindowsBackdrop.h"
 #include "app/SvgIconProvider.h"
+#include "app/HdrOutput.h"
 #include "network/CaptureService.h"
+#include "engine/MihomoAdapter.h"
+#include "engine/EngineController.h"
 
 // Collect Qt/QML diagnostics in a file because the Windows GUI subsystem
 // does not attach stderr to GitHub Actions' PowerShell console.
@@ -41,20 +47,40 @@ static void recordQtDiagnostic(QtMsgType type, const QMessageLogContext &, const
 
 int main(int argc, char *argv[])
 {
+    // Keep fractional Windows monitor scale factors (125%, 150%, 175%) intact;
+    // Qt then exposes logical geometry and raster DPR per screen.
+    QGuiApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
     QQuickWindow::setDefaultAlphaBuffer(true);
     QGuiApplication app(argc, argv);
     app.setApplicationName(QStringLiteral("Swirl"));
+    app.setOrganizationName(QStringLiteral("SOLHK"));
+    app.setOrganizationDomain(QStringLiteral("solhk.dev"));
     app.setApplicationVersion(QStringLiteral("1.0.0-preview"));
     app.setWindowIcon(QIcon(QStringLiteral(":/swirl/icons/swirl_knot_light.svg")));
     // Native Windows Qt Quick Controls do not support custom backgrounds/content.
     // Swirl draws its own visual controls, so explicitly use the customizable style.
     QQuickStyle::setStyle(QStringLiteral("Basic"));
-    if(app.arguments().contains("--interaction-test")||app.arguments().contains("--capture-self-test")||app.arguments().contains("--smoke-test")||app.arguments().contains("--window-test"))
+    bool previewMode=false;
+    for(const QString &argument:app.arguments())
+        if(argument.startsWith(QStringLiteral("--capture-preview="))||argument.startsWith(QStringLiteral("--capture-native-frame=")))previewMode=true;
+    const bool hdrTest=app.arguments().contains("--hdr-self-test");
+    const bool hdrDisplayTest=app.arguments().contains("--hdr-display-test");
+    const bool engineTest=app.arguments().contains("--engine-self-test");
+    const bool isolatedRun=engineTest||hdrDisplayTest||hdrTest||app.arguments().contains("--interaction-test")||app.arguments().contains("--capture-self-test")||app.arguments().contains("--smoke-test")||app.arguments().contains("--window-test")||previewMode;
+    if(isolatedRun) {
         QStandardPaths::setTestModeEnabled(true);
+        QSettings::setDefaultFormat(QSettings::IniFormat);
+        QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation));
+        QSettings isolatedSettings;
+        if(!app.arguments().contains("--preview-preserve-settings"))isolatedSettings.clear();
+        isolatedSettings.sync();
+    }
     DemoDataProvider demo;
     WindowsBackdrop backdrop;
+    HdrOutput hdrOutput;
     CaptureService capture;
     ModuleDraftStore drafts;
+    EngineController engineController(std::make_unique<MihomoAdapter>());
     QQmlApplicationEngine engine;
     engine.addImageProvider(QStringLiteral("swirl"),new SvgIconProvider);
     const bool smoke = app.arguments().contains("--smoke-test");
@@ -78,29 +104,90 @@ int main(int argc, char *argv[])
     const QString previewPath = nativeFramePath.isEmpty()?argumentValue(QStringLiteral("--capture-preview=")):nativeFramePath;
     const QString previewPage = argumentValue(QStringLiteral("--preview-page="));
     const QString previewTheme = argumentValue(QStringLiteral("--preview-theme="));
-    if (smoke || interaction || captureTest || windowTest || !previewPath.isEmpty()) {
+    if (engineTest || hdrDisplayTest || hdrTest || smoke || interaction || captureTest || windowTest || !previewPath.isEmpty()) {
         QFile::remove(QCoreApplication::applicationDirPath() + QStringLiteral("/Swirl-diagnostics.txt"));
         qInstallMessageHandler(recordQtDiagnostic);
     }
     engine.rootContext()->setContextProperty("previewPage", previewPage);
+    engine.rootContext()->setContextProperty("previewCaptureMode", previewMode);
     engine.rootContext()->setContextProperty("gpuEffectsSupported", QQuickWindow::graphicsApi()!=QSGRendererInterface::Software && qEnvironmentVariable("QT_QUICK_BACKEND")!=QStringLiteral("software"));
     engine.rootContext()->setContextProperty("previewTheme", previewTheme);
     engine.rootContext()->setContextProperty("smokeTestMode", smoke);
     engine.rootContext()->setContextProperty("demoProvider", &demo);
     engine.rootContext()->setContextProperty("backdrop", &backdrop);
+    engine.rootContext()->setContextProperty("hdrOutput", &hdrOutput);
     engine.rootContext()->setContextProperty("captureProvider", &capture);
     engine.rootContext()->setContextProperty("moduleDrafts", &drafts);
+    engine.rootContext()->setContextProperty("engineController", &engineController);
+#ifdef SWIRL_UI_TESTS
+    if(hdrTest)return runHdrChecks();
+#endif
     engine.loadFromModule("SwirlQuick", "Main");
     if (engine.rootObjects().isEmpty())
         return 1;
     auto *rootWindow = qobject_cast<QQuickWindow *>(engine.rootObjects().constFirst());
+    hdrOutput.attach(rootWindow);
+    if (engineTest) {
+#ifdef SWIRL_UI_TESTS
+        QTimer::singleShot(400, &app, [&app, rootWindow, &engineController, &capture] { app.exit(runEngineUiChecks(rootWindow, &engineController, &capture)); });
+#else
+        return 4;
+#endif
+    }
+    if(hdrDisplayTest) {
+        // Asynchronous GPU readbacks retire on later frames. Keep this test
+        // rendering even when the UI is idle; ordinary runs remain event driven.
+        auto *readbackFrames = new QTimer(&app);
+        readbackFrames->setInterval(16);
+        QObject::connect(readbackFrames, &QTimer::timeout, rootWindow, &QQuickWindow::update);
+        readbackFrames->start();
+        QTimer::singleShot(400,&app,[rootWindow,&backdrop]{rootWindow->showNormal();rootWindow->raise();rootWindow->requestActivate();backdrop.prepareNativeCapture();});
+        QObject::connect(&hdrOutput,&HdrOutput::displayTestFinished,&app,[&app,&backdrop](bool success){backdrop.finishNativeCapture();app.exit(success?0:2);});
+        QTimer::singleShot(1600,&hdrOutput,[&hdrOutput,argumentValue]{hdrOutput.startDisplayTest(argumentValue(QStringLiteral("--hdr-display-output=")));});
+        QTimer::singleShot(10000,&app,[&app]{qCritical()<<"HDR display readback timeout";app.exit(3);});
+    }
     const auto sizeParts = argumentValue(QStringLiteral("--preview-size=")).split('x');
-    if (rootWindow && sizeParts.size() == 2 && sizeParts[0].toInt() >= 1000 && sizeParts[1].toInt() >= 650)
+    if (rootWindow && sizeParts.size() == 2 && sizeParts[0].toInt() >= 760 && sizeParts[1].toInt() >= 520)
         rootWindow->resize(sizeParts[0].toInt(), sizeParts[1].toInt());
+    if (rootWindow && rootWindow->screen()) {
+        // QML chooses the initial logical size after the platform has placed
+        // its small bootstrap window. Recenter once using the final size.
+        const auto area = rootWindow->screen()->availableGeometry();
+        rootWindow->setPosition(area.x()+qMax(0,(area.width()-rootWindow->width())/2),
+                                area.y()+qMax(0,(area.height()-rootWindow->height())/2));
+    }
     if (app.arguments().contains("--preview-connected")) {
         QQmlExpression state(qmlContext(rootWindow), rootWindow,
                             QStringLiteral("AppState.setConnection(true); AppState.toast = ''"));
         state.evaluate();
+    }
+    const auto previewSection=argumentValue(QStringLiteral("--preview-section="));
+    if(rootWindow && !previewSection.isEmpty()) {
+        if(auto *loader=rootWindow->findChild<QObject *>(QStringLiteral("pageLoader")))
+            if(auto *page=qvariant_cast<QObject *>(loader->property("item")))page->setProperty("section",previewSection);
+    }
+    const auto previewScale=argumentValue(QStringLiteral("--preview-ui-scale="));
+    if(rootWindow && !previewScale.isEmpty()) {
+        QQmlExpression scale(qmlContext(rootWindow),rootWindow,QStringLiteral("Theme.setScalePercent(%1)").arg(qBound(75,previewScale.toInt(),150)));
+        scale.evaluate();
+    }
+    // Capture-only controls for visually reviewing actual popup surfaces.
+    const auto previewPopup=argumentValue(QStringLiteral("--preview-popup="));
+    if(previewMode && rootWindow && !previewPopup.isEmpty()) {
+        QTimer::singleShot(600, rootWindow, [rootWindow, previewPopup]() {
+            auto *loader=rootWindow->findChild<QObject *>(QStringLiteral("pageLoader"));
+            auto *page=loader?qvariant_cast<QObject *>(loader->property("item")):nullptr;
+            if(!page)return;
+            QObject *popup=nullptr;
+            if(previewPopup==QStringLiteral("node-dialog"))
+                popup=rootWindow->findChild<QObject *>(QStringLiteral("proxyAddDialog"));
+            else if(previewPopup==QStringLiteral("region-menu")) {
+                auto *combo=rootWindow->findChild<QObject *>(QStringLiteral("proxyRegionCombo"));
+                if(combo)popup=qvariant_cast<QObject *>(combo->property("popup"));
+            }
+            if(!popup || !QMetaObject::invokeMethod(popup,"open"))
+                qWarning()<<"Preview popup could not be opened"<<previewPopup;
+        });
     }
     if (interaction) {
 #ifdef SWIRL_UI_TESTS
@@ -145,6 +232,8 @@ int main(int argc, char *argv[])
                     previewCaptured=true;
                     qInfo() << (nativeFramePath.isEmpty()?"Saved Qt UI render:":"Saved Windows compositor screenshot:") << previewPath;
                     qInfo()<<"Capture geometry"<<window->geometry()<<"DPR"<<window->devicePixelRatio()<<backdrop.status();
+                    QQmlExpression scaleState(qmlContext(window),window,QStringLiteral("Theme.uiScale"));
+                    qInfo()<<"Capture UI scale"<<scaleState.evaluate();
                     if(!nativeFramePath.isEmpty())backdrop.finishNativeCapture();
                     return;
                 }
@@ -177,5 +266,5 @@ int main(int argc, char *argv[])
     // This also keeps scripted page-navigation shutdown free of incubation warnings.
     if (auto *controller = engine.incubationController())
         controller->incubateFor(100);
-    return (smoke || interaction || captureTest || windowTest || !previewPath.isEmpty()) && qmlWarnings ? 2 : result;
+    return (engineTest || smoke || interaction || captureTest || windowTest || !previewPath.isEmpty()) && qmlWarnings ? 2 : result;
 }

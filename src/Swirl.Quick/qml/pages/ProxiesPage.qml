@@ -20,34 +20,34 @@ Item {
         return list
     }
     ColumnLayout {
-        anchors.fill:parent; anchors.margins:24; spacing:15
+        anchors.fill:parent; anchors.margins:Theme.dp(24); spacing:Theme.dp(15)
         SwirlGlassPanel {
-            Layout.fillWidth:true; Layout.preferredHeight:110
+            Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(110)
             RowLayout {
-                anchors.fill:parent; anchors.margins:20; spacing:18
+                anchors.fill:parent; anchors.margins:Theme.dp(20); spacing:Theme.dp(18)
                 ColumnLayout {
                     Layout.fillWidth:true
-                    Text { text:AppState.zh("Active proxy strategy"); color:Theme.muted; font.pixelSize:11 }
-                    Text { text:AppState.policy; color:Theme.text; font.pixelSize:22; font.weight:Font.DemiBold }
-                    Text { text:AppState.zh("当前节点：")+AppState.selectedNode; color:Theme.muted; font.pixelSize:12 }
+                    Text { text:AppState.zh("Active proxy strategy"); color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
+                    Text { text:AppState.policy; color:Theme.text; font.pixelSize:Theme.fontSize(22); font.weight:Font.DemiBold }
+                    Text { text:AppState.zh("当前节点：")+AppState.selectedNode; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
                 }
-                SwirlStatusBadge { label:AppState.zh("模拟节点"); tone:"accent" }
+                SwirlStatusBadge { label:AppState.zh("节点"); tone:"accent" }
                 SwirlButton { text:AppState.zh("全部测试"); iconName:"activity"; onClicked:AppState.notice("延迟测试") }
                 SwirlButton { text:AppState.zh("Add node"); primary:true; onClicked:addDialog.open() }
             }
         }
         RowLayout {
-            Layout.fillWidth:true; spacing:9
+            Layout.fillWidth:true; spacing:Theme.dp(9)
             SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:AppState.zh("Find a node or region") }
-            SwirlComboBox { id:region; model:["全部地区","HK","SG","JP","US","KR","DE","TW","GB","AU"] }
+            SwirlComboBox { id:region; objectName:"proxyRegionCombo"; model:["全部地区","HK","SG","JP","US","KR","DE","TW","GB","AU"] }
             SwirlComboBox { id:sort; model:["Name","Latency"] }
         }
         RowLayout {
-            Layout.fillWidth:true; Layout.fillHeight:true; spacing:14
+            Layout.fillWidth:true; Layout.fillHeight:true; spacing:Theme.dp(14)
             SwirlGlassPanel {
                 Layout.fillWidth:true; Layout.fillHeight:true; clip:true
                 SwirlDataTable {
-                    anchors.fill:parent; anchors.margins:1
+                    anchors.fill:parent; anchors.margins:Theme.dp(1)
                     rows:page.viewRows
                     selectedId:page.selected?page.selected.name:""
                     columns:[
@@ -61,37 +61,46 @@ Item {
                 }
             }
             SwirlGlassPanel {
-                Layout.preferredWidth:280; Layout.fillHeight:true
+                Layout.preferredWidth:Theme.dp(280); Layout.fillHeight:true
                 ColumnLayout {
-                    anchors.fill:parent; anchors.margins:19; spacing:16
-                    Text { text:AppState.zh("Endpoint inspector"); color:Theme.text; font.pixelSize:16; font.weight:Font.DemiBold }
-                    SwirlIcon { name:"globe"; size:45; color:Theme.accent; Layout.alignment:Qt.AlignHCenter }
+                    anchors.fill:parent; anchors.margins:Theme.dp(19); spacing:Theme.dp(12)
+                    ScrollView {
+                        id:detailScroll0; Layout.fillWidth:true; Layout.fillHeight:true; clip:true
+                        ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
+                        ColumnLayout {
+                    width:detailScroll0.availableWidth; spacing:Theme.dp(16)
+                    Text { text:AppState.zh("Endpoint inspector"); color:Theme.text; font.pixelSize:Theme.fontSize(16); font.weight:Font.DemiBold }
+                    SwirlIcon { name:"globe"; size:Theme.dp(45); color:Theme.accent; Layout.alignment:Qt.AlignHCenter }
                     Text {
                         Layout.fillWidth:true
                         text:page.selected?page.selected.name:AppState.selectedNode
-                        color:Theme.text; font.pixelSize:19; font.weight:Font.DemiBold
+                        color:Theme.text; font.pixelSize:Theme.fontSize(19); font.weight:Font.DemiBold
                         horizontalAlignment:Text.AlignHCenter; wrapMode:Text.WordWrap
                     }
-                    Text { text:AppState.zh("Synthetic node · No connection established"); color:Theme.muted; font.pixelSize:11; Layout.fillWidth:true; wrapMode:Text.WordWrap; horizontalAlignment:Text.AlignHCenter }
-                    Rectangle { Layout.fillWidth:true; height:1; color:Theme.border }
+                    Text { text:AppState.zh("Synthetic node · No connection established"); color:Theme.muted; font.pixelSize:Theme.fontSize(11); Layout.fillWidth:true; wrapMode:Text.WordWrap; horizontalAlignment:Text.AlignHCenter }
+                    Rectangle { Layout.fillWidth:true; height:Theme.dp(1); color:Theme.border }
                     Text { text:AppState.zh("协议　")+(page.selected?page.selected.protocol:"Trojan"); color:Theme.muted }
-                    Text { text:AppState.zh("延迟　")+(page.selected?page.selected.latency:"38")+" 毫秒（模拟）"; color:Theme.muted }
+                    Text { text:AppState.zh("延迟　")+(page.selected?page.selected.latency:"38")+" 毫秒"; color:Theme.muted }
                     Text { text:AppState.zh("策略　")+AppState.policy; color:Theme.muted }
-                    Item { Layout.fillHeight:true }
-                    SwirlButton { Layout.fillWidth:true; text:AppState.zh("模拟选用"); primary:true; onClicked:AppState.notice("选择节点") }
+
+                        }
+                    }
+
+                    SwirlButton { Layout.fillWidth:true; text:AppState.zh("选用"); primary:true; onClicked:AppState.notice("选择节点") }
                     SwirlButton { Layout.fillWidth:true; text:AppState.zh("Edit endpoint"); onClicked:addDialog.open() }
+
                 }
             }
         }
     }
     SwirlDialog {
-        id:addDialog
+        id:addDialog; objectName:"proxyAddDialog"
         title:"添加代理节点"
         ColumnLayout {
-            width:parent.width; spacing:12
+            width:parent.width; spacing:Theme.dp(12)
             Text { text:AppState.zh("Endpoint label"); color:Theme.muted }
             SwirlTextField { id:nodeName; Layout.fillWidth:true; placeholderText:AppState.zh("e.g. Singapore · 03") }
-            Text { text:nodeName.text.trim().length===0?"请输入名称":"仅供界面预览，不保存配置"; color:nodeName.text.trim().length===0?Theme.orange:Theme.muted; font.pixelSize:11; Layout.fillWidth:true }
+            Text { text:nodeName.text.trim().length===0?"请输入名称":"仅供界面预览，不保存配置"; color:nodeName.text.trim().length===0?Theme.orange:Theme.muted; font.pixelSize:Theme.fontSize(11); Layout.fillWidth:true }
             RowLayout {
                 Layout.alignment:Qt.AlignRight
                 SwirlButton { text:AppState.zh("取消"); onClicked:addDialog.close() }

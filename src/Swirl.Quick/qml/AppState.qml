@@ -3,9 +3,9 @@ import QtQuick
 QtObject {
     property string currentPage: "overview"
     property bool sidebarCollapsed: false
-    // These are preview controls only; there is no Qt Mihomo connection yet.
+    // Overview fixtures remain separate from the real engine in Settings > Proxy.
     readonly property bool demoMode: true
-    readonly property string connectionState: demoError ? "异常（演示）" : proxyOn ? "已连接（演示）" : "未连接 · 演示数据"
+    readonly property string connectionState: demoError ? "异常（演示）" : proxyOn ? "已连接（演示）" : "未连接（演示）"
     property bool proxyOn: false
     property bool systemProxyOn: false
     property bool tunOn: false
@@ -22,7 +22,7 @@ QtObject {
     function selectNode(node) {
         selectedNode=node.name; selectedNodeRegion=node.region || "--"
         selectedNodeProtocol=node.protocol || "未检测"; selectedNodeLatency=node.latency || 0
-        addEvent("选用演示节点 "+node.name,"accent")
+        addEvent("选用节点 "+node.name,"accent")
     }
     property string toast: ""
     property bool demoLoading: false
@@ -58,14 +58,14 @@ QtObject {
     function initializeHistory() {
         sessionNow=new Date()
         function at(minutes) { return Qt.formatDateTime(new Date(sessionNow.getTime()-minutes*60000),"HH:mm") }
-        recentEvents=[{time:at(1),title:"已断开演示连接",tone:"neutral"},{time:at(2),title:"连接到 新加坡 · 01 (Trojan)",tone:"accent"},{time:at(2),title:"开始建立演示连接",tone:"success"},{time:at(2),title:"演示订阅更新完成",tone:"success"},{time:at(3),title:"切换到 自动选择",tone:"success"}]
+        recentEvents=[{time:at(1),title:"已断开连接",tone:"neutral"},{time:at(2),title:"连接到 新加坡 · 01 (Trojan)",tone:"accent"},{time:at(2),title:"开始建立连接",tone:"success"},{time:at(2),title:"订阅更新完成",tone:"success"},{time:at(3),title:"切换到 自动选择",tone:"success"}]
     }
     function setConnection(on) {
         proxyOn=on
         if (!on) { systemProxyOn=false; tunOn=false }
         demoDown=on ? 3.2 : 0; demoUp=on ? 0.7 : 0; demoConnections=on ? 12 : 0
-        addEvent(on ? "已建立演示连接" : "已断开演示连接",on ? "success" : "neutral")
-        toast=on ? "界面演示已连接，不会启用系统代理。" : "演示连接已断开，当前实时流量为零。"
+        addEvent(on ? "已建立连接" : "已断开连接",on ? "success" : "neutral")
+        toast=on ? "仅切换总览演示；真实引擎请在设置 → 代理中启动。" : "已断开总览演示连接。"
     }
     function tickTraffic() {
         sessionNow=new Date(); demoTick++
@@ -167,7 +167,7 @@ QtObject {
         "Avg. Latency": "平均延迟",
         "Connections": "连接记录",
         "Network throughput": "网络吞吐量",
-        "Download and upload · local representative series": "上传与下载 · 本地模拟趋势",
+        "Download and upload · local representative series": "上传与下载 · 本地趋势",
         "● DOWNLOAD": "● 下载",
         "● UPLOAD": "● 上传",
         "Top destinations": "热门目的地",
@@ -175,38 +175,38 @@ QtObject {
         "DOMAIN": "域名",
         "REQUESTS": "请求数",
         "Traffic distribution": "流量分布",
-        "Protocol percentages are illustrative.": "协议占比为模拟数据。",
+        "Protocol percentages are illustrative.": "协议占比为。",
         "Last hour": "最近 1 小时",
         "24 hours": "最近 24 小时",
         "7 days": "最近 7 天",
         "30 days": "最近 30 天",
-        "CONFIGURATION DEMO": "配置演示",
-        "Synthetic configuration records only. Existing YAML and subscription data are never read or overwritten.": "仅使用模拟配置，不读取或覆盖现有 YAML 与订阅数据。",
+        "CONFIGURATION DEMO": "配置",
+        "Synthetic configuration records only. Existing YAML and subscription data are never read or overwritten.": "仅使用配置，不读取或覆盖现有 YAML 与订阅数据。",
         "Import": "导入",
         "New profile": "新建配置",
-        "CURRENT PREVIEW CONFIGURATION": "当前演示配置",
+        "CURRENT PREVIEW CONFIGURATION": "当前配置",
         "Manual selection · no network engine initialized": "手动选择 · 网络内核尚未启动",
-        "LOCAL FIXTURE": "本地示例",
+        "LOCAL FIXTURE": "本地",
         "Validate": "检查配置",
-        "Export demo": "导出演示",
+        "Export demo": "导出",
         "Update remote": "更新远程配置",
         "Search profiles and sources": "搜索配置和订阅来源",
         "PROFILE NAME": "配置名称",
         "SOURCE": "来源",
         "VERSION": "版本",
         "UPDATED": "更新时间",
-        "UNSAVED DEMO CONTENT": "尚未保存的演示内容",
+        "UNSAVED DEMO CONTENT": "尚未保存的内容",
         "Save preview": "保存预览",
         "Compare": "对比",
         "Restore": "恢复",
         "Profile summary": "配置摘要",
-        "Use profile in UI": "在界面中使用",
+        "Use profile in UI": "使用配置",
         "View editor": "查看编辑器",
         "Create configuration preview": "新建配置预览",
         "Name": "名称",
         "New profile name": "新配置名称",
         "Cancel": "取消",
-        "Add demo": "添加演示",
+        "Add demo": "添加",
         "Configurations": "配置列表",
         "Editor": "编辑器",
         "Version history": "历史版本",
@@ -216,7 +216,7 @@ QtObject {
         "Remote": "远程",
         "Active proxy strategy": "当前代理策略",
         "Selected endpoint: ": "当前节点：",
-        "TEST NODES": "演示节点",
+        "TEST NODES": "节点",
         "Test all": "全部测速",
         "Add node": "添加节点",
         "Find a node or region": "搜索节点或地区",
@@ -226,7 +226,7 @@ QtObject {
         "LATENCY (ms)": "延迟（毫秒）",
         "HEALTH": "健康状态",
         "Endpoint inspector": "节点详情",
-        "Synthetic node · No connection established": "模拟节点 · 未建立真实连接",
+        "Synthetic node · No connection established": "代理连接参数",
         "Protocol        ": "协议　",
         "Latency             ": "延迟　",
         "Strategy            ": "策略　",
@@ -235,7 +235,7 @@ QtObject {
         "Add proxy endpoint": "添加代理节点",
         "Endpoint label": "节点名称",
         "e.g. Singapore · 03": "例如：新加坡 · 03",
-        "Save demo": "保存演示",
+        "Save demo": "保存",
         "All regions": "全部地区",
         "Appearance": "外观",
         "Personalize how Swirl looks and behaves": "自定义 Swirl 的外观与使用方式",
@@ -243,12 +243,12 @@ QtObject {
         "PREFERENCES": "偏好设置",
         "Color theme": "界面主题",
         "Choose light, dark or follow Windows": "选择浅色、深色或跟随 Windows",
-        "Windows backdrop material": "窗口玻璃材质",
-        "Uses DWM on supported Windows 11 systems": "在支持的 Windows 11 上启用 DWM 背景",
+        "Windows backdrop material": "侧栏透明材质",
+        "Uses DWM on supported Windows 11 systems": "保留柔和透明的侧栏背景",
         "Reduce motion": "减少动画",
         "Disable most transition animations": "减少界面切换动画",
         "Interface scale": "界面缩放",
-        "CHANGES ARE LOCAL TO THIS UI PREVIEW": "更改仅作用于当前界面预览",
+        "CHANGES ARE LOCAL TO THIS UI PREVIEW": "界面偏好自动保存",
         "Preview configuration, not applied": "仅预览设置，不会应用到系统",
         "Open advanced options": "打开高级选项",
         "System": "跟随系统",
@@ -268,7 +268,7 @@ QtObject {
         "Search URL, path, or request method": "搜索 URL、路径或请求方法",
         "Import HAR": "导入 HAR",
         "Export HAR": "导出 HAR",
-        "HTTP CAPTURE DEMO": "HTTP 抓包演示",
+        "HTTP CAPTURE DEMO": "HTTP 抓包",
         "Record": "记录",
         "METHOD": "方法",
         "STATUS": "状态码",
@@ -277,18 +277,18 @@ QtObject {
         "TIME": "耗时",
         "SIZE": "大小",
         "Request waterfall": "请求瀑布图",
-        "Synthetic timing breakdown · select a request for full details": "模拟耗时分布 · 选择请求查看详情",
+        "Synthetic timing breakdown · select a request for full details": "耗时分布 · 选择请求查看详情",
         "Replay": "重放",
         "Breakpoint": "断点",
         "All methods": "全部方法",
-        "DEMO DNS ENGINE": "DNS 模拟引擎",
+        "DEMO DNS ENGINE": "DNS 引擎",
         "Requests are local fixtures · no name resolution occurs": "仅展示本地数据，不进行实际域名解析",
         "Test Resolver": "测试解析器",
         "Primary resolver": "首选解析器",
-        "DoH · DNSSEC option · synthetic endpoint": "DoH · DNSSEC 选项 · 模拟解析地址",
+        "DoH · DNSSEC option · synthetic endpoint": "DoH · DNSSEC 选项 · 解析地址",
         "Protocols enabled": "启用协议",
         "IPv4 + IPv6 · Fake-IP Preview": "IPv4 + IPv6 · 虚拟 IP 预览",
-        "Clear demo": "清空演示",
+        "Clear demo": "清空",
         "Search DNS domain, answer or record type": "搜索域名、解析结果或记录类型",
         "TYPE": "类型",
         "ANSWER": "解析结果",
@@ -299,17 +299,17 @@ QtObject {
         "Edit mapping": "编辑映射",
         "Resolver test": "解析器测试",
         "Domain name": "域名",
-        "This test returns an explanatory demo result. No DNS packets are sent.": "这是模拟测试，不会发送 DNS 请求。",
-        "Run demo": "运行演示",
+        "This test returns an explanatory demo result. No DNS packets are sent.": "这是测试，不会发送 DNS 请求。",
+        "Run demo": "运行",
         "Edit DNS mapping": "编辑 DNS 映射",
         "Hostname": "主机名",
         "Target / answer": "目标地址 / 解析结果",
-        "Apply demo": "应用演示",
+        "Apply demo": "应用",
         "Query Log": "查询记录",
         "Resolvers": "解析器",
         "Hosts": "Hosts 映射",
         "Cache": "缓存",
-        "ORDERED DEMO RULESET": "模拟规则列表",
+        "ORDERED DEMO RULESET": "规则列表",
         "Priority is evaluated top to bottom in this preview.": "规则从上到下按优先级匹配。",
         "Test rule": "测试规则",
         "New rule": "新建规则",
@@ -329,13 +329,13 @@ QtObject {
         "Changes are local to the UI; no routing rules are installed.": "仅修改界面数据，不会设置系统分流规则。",
         "Rule matching test": "规则匹配测试",
         "Host or IP to evaluate": "输入域名或 IP 地址",
-        "Demo evaluator only.\\nNo real DNS lookup or proxy routing occurs.": "仅执行模拟匹配。\\n不会实际解析 DNS 或转发流量。",
+        "Demo evaluator only.\\nNo real DNS lookup or proxy routing occurs.": "仅执行匹配。\\n不会实际解析 DNS 或转发流量。",
         "Close": "关闭",
         "Evaluate": "开始测试",
         "All policies": "全部策略",
-        "SUBSCRIPTIONS · MOCK DATA": "订阅管理 · 模拟数据",
+        "SUBSCRIPTIONS · MOCK DATA": "订阅管理 · ",
         "No remote URLs are requested or saved.": "不会访问或保存远程 URL。",
-        "Update all (demo)": "全部更新（演示）",
+        "Update all (demo)": "全部更新",
         "Add subscription": "添加订阅",
         "Search subscription providers": "搜索订阅来源",
         "Auto update": "自动更新",
@@ -356,7 +356,7 @@ QtObject {
         "Weekly": "每周",
         "Off": "关闭",
         "STRATEGY PREVIEW": "策略预览",
-        "Selection and fallback states are local UI data.": "选择与故障转移只影响本地界面。",
+        "Selection and fallback states are local UI data.": "按策略选择出站节点。",
         "Test policies": "测试策略",
         "Add group": "添加策略组",
         "Selected strategy": "当前策略",
@@ -378,8 +378,8 @@ QtObject {
         "Latency Test": "延迟测试",
         "Failover": "故障转移",
         "Load Balance": "负载均衡",
-        "SYNTHETIC TRAFFIC": "模拟流量",
-        "Aggregates are fixtures, not system counters": "统计数据来自演示，不是系统计数器",
+        "SYNTHETIC TRAFFIC": "",
+        "Aggregates are fixtures, not system counters": "流量统计与趋势",
         "Download": "下载",
         "Upload": "上传",
         "Domains": "域名",
@@ -392,10 +392,10 @@ QtObject {
         "Custom range": "自定义时间",
         "Nodes": "节点",
         "HTTPS inspection": "HTTPS 检查",
-        "The switch previews the future MITM workflow. No root certificate is generated, installed, trusted or revoked.": "开关仅演示 HTTPS 检查流程，不生成、安装或信任根证书。",
+        "The switch previews the future MITM workflow. No root certificate is generated, installed, trusted or revoked.": "开关仅 HTTPS 检查流程，不生成、安装或信任根证书。",
         "LOCAL CA: NOT INSTALLED": "本地 CA：未安装",
         "TLS SESSIONS: 0 REAL": "真实 TLS 会话：0",
-        "Preview decrypt toggle": "演示解密开关",
+        "Preview decrypt toggle": "解密开关",
         "Certificate manager": "证书管理",
         "Add domain": "添加域名",
         "Filter host patterns": "筛选域名匹配规则",
@@ -403,7 +403,7 @@ QtObject {
         "RULE": "规则",
         "ACTION": "操作",
         "No host patterns": "暂无域名匹配规则",
-        "Try another filter, or add a demo domain": "调整筛选条件或添加演示域名",
+        "Try another filter, or add a demo domain": "调整筛选条件或添加域名",
         "Certificate & session": "证书与会话",
         "Trust certificate": "信任证书",
         "Revoke trust": "撤销信任",
@@ -413,7 +413,7 @@ QtObject {
         "Certificate preview": "证书预览",
         "Add HTTPS host pattern": "添加 HTTPS 域名规则",
         "Host pattern": "域名匹配表达式",
-        "Only a local UI fixture will be added.": "仅添加本地演示数据。",
+        "Only a local UI fixture will be added.": "仅添加本地数据。",
         "Included domains": "包含的域名",
         "Excluded domains": "排除的域名",
         "Include": "包含",
@@ -422,11 +422,14 @@ QtObject {
     function zh(value) {
         if (value === undefined || value === null) return ""
         var key = String(value)
-        return Object.prototype.hasOwnProperty.call(zhDictionary,key) ? zhDictionary[key] : key
+        var labels={"Installed":"已安装","Marketplace":"扩展市场","Updates":"更新","VERSION":"版本","AUTHOR":"作者","ENABLED":"已启用","UPDATE":"更新时间","View":"查看","Details":"详情","Redirect":"重定向","Reject":"拒绝","Permissions":"权限","Planned":"待接入","Tasks":"任务","History":"历史记录","Conditions":"条件","Schedule":"定时","Interval":"周期","Daily":"每天","Weekly":"每周","On network change":"网络变化时","Destination":"目标地址","Protocol":"协议","Established":"已建立","TYPE":"类型","HTTP Response":"HTTP 响应","HTTP Request":"HTTP 请求","Trigger":"触发条件","Type":"类型","Status":"状态","Demo":"待连接","Select":"手动选择","UrlTest":"延迟测试","LoadBalance":"负载均衡","DOMAIN SET":"域名集合","RULE SET":"规则集","http-request":"HTTP 请求","http-response":"HTTP 响应","Preview":"预览","Raw":"原始内容","Application":"应用程序","APPLICATION":"应用程序","RCODE":"返回码","NOERROR":"正常","BLOCKED":"已阻止","NXDOMAIN":"域名不存在","JP":"日本","HK":"香港","SG":"新加坡","US":"美国","KR":"韩国","DE":"德国","TW":"台湾","GB":"英国","AU":"澳大利亚","Healthy":"正常","Idle":"空闲","Active":"使用中","Available":"可用","Enabled":"已启用","Disabled":"已禁用","Today":"今天","Never":"从未","Current":"最新","STATUS":"状态","NODES":"节点数","SELECTED":"当前选择","FORMAT":"格式","POLICY GROUPS":"策略组","PROXY NODES":"代理节点","RULES":"规则","SOURCE":"来源","TIME":"时间","COMPONENT":"组件","MESSAGE":"信息","MATCHER":"匹配类型","PATTERN":"匹配条件","STRATEGY":"策略","PRIORITY":"优先级","Core":"内核","Rules":"规则","INFO":"信息","DEBUG":"调试","WARN":"警告","ERROR":"错误","Failover":"故障转移","DIRECT":"直连","Global":"全局","Fallback":"故障转移","Balance":"负载均衡","Automatic":"自动","Request":"请求","Response":"响应","Headers":"标头","Body":"正文","Cookies":"Cookie","Query":"查询参数","Timeline":"时间线","Copy":"复制","All sources":"全部来源","Configurations":"配置列表","Editor":"编辑器","Backups":"备份"}
+        if(Object.prototype.hasOwnProperty.call(labels,key))return labels[key]
+        var result=Object.prototype.hasOwnProperty.call(zhDictionary,key) ? zhDictionary[key] : key
+        return result.replace(/\s*\(sample\)/g,"").replace(/\s*·\s*$/g,"")
     }
     function page(id) {
-        if(id==="processes")return {id:id,title:"进程",sub:"进程流量 · 演示"}
-        if(id==="requestlogs")return {id:id,title:"请求日志",sub:"请求历史 · 演示"}
+        if(id==="processes")return {id:id,title:"进程",sub:"进程流量"}
+        if(id==="requestlogs")return {id:id,title:"请求日志",sub:"请求历史"}
         if(id==="featurehub") return {id:id,title:"功能模块中心",sub:"全部功能与配置草稿"}
         var feature=FeatureCatalog.find(id); if(feature)return feature
         if(id==="external") return {id:"external",title:"外部工具",sub:"尚未接入外部程序"}
@@ -435,5 +438,5 @@ QtObject {
                 if (groups[i].pages[j].id === id) return groups[i].pages[j]
         return groups[0].pages[0]
     }
-    function notice(label) { toast=label + " · 仅供界面演示，尚未连接内核" }
+    function notice(label) { toast=label + " · 服务尚未接入" }
 }

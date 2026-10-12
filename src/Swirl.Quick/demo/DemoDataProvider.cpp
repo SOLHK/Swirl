@@ -21,7 +21,7 @@ QVariantList DemoDataProvider::connections() const
 {
     QVariantList rows;
     const QStringList hosts={"api.github.com","cdn.jsdelivr.net","developer.apple.com","www.microsoft.com","fonts.gstatic.com","example.org","api.openai.com","updates.example.net"};
-    const QStringList apps={"浏览器","系统","Swirl 演示","终端","开发工具","邮件"};
+    const QStringList apps={"浏览器","系统","Swirl","终端","开发工具","邮件"};
     const QStringList policy={"DIRECT","Global / SG","Auto Select","REJECT"};
     for(int i=0;i<54;++i)
         rows << QVariantMap{
@@ -69,7 +69,7 @@ QVariantList DemoDataProvider::events() const
     return {QVariantMap{{"time","14:08:21"},{"title","策略匹配：自动选择"},{"detail","api.github.com · HTTPS"},{"kind","info"}},
     QVariantMap{{"time","14:08:12"},{"title","DNS 解析已完成"},{"detail","cdn.jsdelivr.net · DoH"},{"kind","success"}},
     QVariantMap{{"time","14:07:58"},{"title","规则已拒绝请求"},{"detail","ads.example.test · REJECT"},{"kind","warn"}},
-    QVariantMap{{"time","14:07:43"},{"title","演示数据已刷新"},{"detail","仅本地演示数据"},{"kind","info"}}};
+    QVariantMap{{"time","14:07:43"},{"title","数据已刷新"},{"detail","本地数据"},{"kind","info"}}};
 }
 QVariantList DemoDataProvider::traffic() const
 {
@@ -83,7 +83,7 @@ QVariantList DemoDataProvider::logs() const
 {
     QVariantList rows;
     const QStringList levels={"INFO","DEBUG","INFO","WARN","INFO","ERROR"};
-    const QStringList messages={"演示连接的分流规则已匹配","DNS 缓存查询已完成","模拟请求已检查","界面演示的自动化事件"};
+    const QStringList messages={"连接的分流规则已匹配","DNS 缓存查询已完成","请求已检查","自动化事件"};
     for(int i=0;i<80;++i)
         rows << QVariantMap{{"time",QString("14:%1:%2").arg(i*3%60,2,10,QChar('0')).arg(i*9%60,2,10,QChar('0'))},
                             {"level",levels.at(i%levels.size())},{"source",i%2 ? "Rules" : "Core"},

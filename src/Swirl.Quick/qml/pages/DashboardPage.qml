@@ -19,17 +19,17 @@ Item {
     ScrollView {
         id: scroll
         anchors.fill: parent
-        anchors.leftMargin: 23; anchors.rightMargin: 23
+        anchors.leftMargin:Theme.dp(23); anchors.rightMargin:Theme.dp(23)
         clip: true
         ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
         ColumnLayout {
             width: scroll.availableWidth
-            spacing: 15
+            spacing:Theme.dp(15)
             RowLayout {
                 Layout.fillWidth:true
-                Text { text:AppState.zh("Activity and throughput"); color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
+                Text { text:AppState.zh("Activity and throughput"); color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
                 SwirlSegmentedControl {
-                    Layout.preferredWidth: 365
+                    Layout.preferredWidth:Theme.dp(365)
                     options: ["1 小时", "24 小时", "7 天", "30 天"]
                     onActivated: function(index, value) {
                         page.range = ["最近 1 小时","最近 24 小时","最近 7 天","最近 30 天"][index]
@@ -41,21 +41,21 @@ Item {
                 Layout.fillWidth:true
                 columns:page.width>1080?4:2
                 columnSpacing:13; rowSpacing:13
-                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Total Download"); value:"1.48 GB"; secondary:"模拟"+page.range; iconName:"activity" }
-                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Total Upload"); value:"304 MB"; secondary:"模拟"+page.range; iconName:"chart" }
-                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Avg. Latency"); value:"58 ms"; secondary:"模拟节点"; iconName:"clock" }
-                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Connections"); value:"54"; secondary:"42 个活动连接 · 演示"; iconName:"network" }
+                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Total Download"); value:"1.48 GB"; secondary:""+page.range; iconName:"activity" }
+                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Total Upload"); value:"304 MB"; secondary:""+page.range; iconName:"chart" }
+                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Avg. Latency"); value:"58 ms"; secondary:"节点"; iconName:"clock" }
+                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Connections"); value:"54"; secondary:"42 个活动连接"; iconName:"network" }
             }
             SwirlGlassPanel {
-                Layout.fillWidth:true; Layout.preferredHeight:304
+                Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(304)
                 ColumnLayout {
-                    anchors.fill:parent; anchors.margins:20; spacing:13
+                    anchors.fill:parent; anchors.margins:Theme.dp(20); spacing:Theme.dp(13)
                     RowLayout {
                         Layout.fillWidth:true
                         ColumnLayout {
                             Layout.fillWidth:true
-                            Text { text:AppState.zh("网络吞吐量"); font.pixelSize:17; color:Theme.text; font.weight:Font.DemiBold }
-                            Text { text:AppState.zh("Download and upload · local representative series"); color:Theme.muted; font.pixelSize:11 }
+                            Text { text:AppState.zh("网络吞吐量"); font.pixelSize:Theme.fontSize(17); color:Theme.text; font.weight:Font.DemiBold }
+                            Text { text:AppState.zh("Download and upload · local representative series"); color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
                         }
                         SwirlStatusBadge { label:AppState.zh("● DOWNLOAD"); tone:"accent" }
                         SwirlStatusBadge { label:AppState.zh("● UPLOAD"); tone:"success" }
@@ -64,15 +64,15 @@ Item {
                 }
             }
             RowLayout {
-                Layout.fillWidth:true; spacing:14
+                Layout.fillWidth:true; spacing:Theme.dp(14)
                 SwirlGlassPanel {
-                    Layout.fillWidth:true; Layout.preferredHeight:337
+                    Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(337)
                     ColumnLayout {
-                        anchors.fill:parent; anchors.margins:17; spacing:11
+                        anchors.fill:parent; anchors.margins:Theme.dp(17); spacing:Theme.dp(11)
                         RowLayout {
                             Layout.fillWidth:true
-                            Text { text:AppState.zh("Top destinations"); color:Theme.text; font.pixelSize:16; font.weight:Font.DemiBold; Layout.fillWidth:true }
-                            SwirlButton { text:AppState.zh("查看连接记录"); quiet:true; onClicked:AppState.currentPage="connections" }
+                            Text { text:AppState.zh("Top destinations"); color:Theme.text; font.pixelSize:Theme.fontSize(16); font.weight:Font.DemiBold; Layout.fillWidth:true }
+                            SwirlButton { text:AppState.zh("查看连接记录"); quiet:false; onClicked:AppState.currentPage="connections" }
                         }
                         SwirlDataTable {
                             Layout.fillWidth:true; Layout.fillHeight:true
@@ -84,24 +84,24 @@ Item {
                     }
                 }
                 SwirlGlassPanel {
-                    Layout.preferredWidth:290; Layout.preferredHeight:337
+                    Layout.preferredWidth:Theme.dp(290); Layout.preferredHeight:Theme.dp(337)
                     ColumnLayout {
-                        anchors.fill:parent; anchors.margins:18; spacing:15
-                        Text { text:AppState.zh("流量分布"); color:Theme.text; font.pixelSize:16; font.weight:Font.DemiBold }
+                        anchors.fill:parent; anchors.margins:Theme.dp(18); spacing:Theme.dp(15)
+                        Text { text:AppState.zh("流量分布"); color:Theme.text; font.pixelSize:Theme.fontSize(16); font.weight:Font.DemiBold }
                         Repeater {
                             model:[{name:"HTTP/2",share:.47,color:Theme.accent},
                                    {name:"HTTP/3",share:.29,color:Theme.green},
                                    {name:"TCP",share:.17,color:Theme.orange},
                                    {name:"其他",share:.07,color:Theme.muted}]
                             ColumnLayout {
-                                Layout.fillWidth:true; spacing:6
+                                Layout.fillWidth:true; spacing:Theme.dp(6)
                                 RowLayout {
                                     Layout.fillWidth:true
-                                    Text { text:modelData.name; color:Theme.text; font.pixelSize:12; Layout.fillWidth:true }
-                                    Text { text:Math.round(modelData.share*100)+"%"; color:Theme.muted; font.pixelSize:12 }
+                                    Text { text:modelData.name; color:Theme.text; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
+                                    Text { text:Math.round(modelData.share*100)+"%"; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
                                 }
                                 Rectangle {
-                                    Layout.fillWidth:true; height:7; radius:Theme.roundedRadius(width,height); color:Theme.field
+                                    Layout.fillWidth:true; height:Theme.dp(7); radius:Theme.roundedRadius(width,height); color:Theme.field
                                     Rectangle {
                                         width:parent.width*modelData.share; height:parent.height; radius:Theme.roundedRadius(width,height)
                                         color:modelData.color
@@ -111,11 +111,11 @@ Item {
                             }
                         }
                         Item { Layout.fillHeight:true }
-                        Text { text:AppState.zh("Protocol percentages are illustrative."); color:Theme.muted; font.pixelSize:10 }
+                        Text { text:AppState.zh("Protocol percentages are illustrative."); color:Theme.muted; font.pixelSize:Theme.fontSize(10) }
                     }
                 }
             }
-            Item { Layout.preferredHeight:15 }
+            Item { Layout.preferredHeight:Theme.dp(15) }
         }
     }
 }

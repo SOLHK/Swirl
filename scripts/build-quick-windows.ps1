@@ -5,6 +5,7 @@ param(
     [string]$OutDir = "out",
     [string]$Nsis = "C:/Program Files (x86)/NSIS/makensis.exe",
     [string]$Generator = "Ninja",
+    [string]$MihomoArchive,
     [switch]$InputTests,
     [switch]$NativeBackdropTests
 )
@@ -23,7 +24,12 @@ try {
     $exe = Join-Path $BuildDir "Swirl.exe"
     if (!(Test-Path $exe)) { $exe = Join-Path $BuildDir "Release/Swirl.exe" }
     $exe = (Resolve-Path $exe).Path
+    & (Join-Path $PSScriptRoot 'stage-mihomo.ps1') -Destination (Split-Path $exe) -Archive $MihomoArchive
     if ($InputTests) {
+        ctest --test-dir $BuildDir -C Release -R 'swirl-engine-(contract|real)' --output-on-failure
+        if ($LASTEXITCODE) { throw "Engine contract, integration or QML checks failed." }
+        $test = Start-Process $exe -ArgumentList '--engine-self-test' -WindowStyle Hidden -Wait -PassThru
+        if ($test.ExitCode) { throw "Native engine QML checks failed: $($test.ExitCode)." }
         # This input test uses the actual Windows platform plugin and fonts.
         $test = Start-Process $exe -ArgumentList "--interaction-test" -WindowStyle Hidden -Wait -PassThru
         if ($test.ExitCode) { throw "Input checks failed: $($test.ExitCode). See Swirl-diagnostics.txt." }
@@ -48,6 +54,7 @@ try {
     }
     New-Item -ItemType Directory -Force $DistDir,$OutDir | Out-Null
     Copy-Item -LiteralPath $exe -Destination $DistDir
+    Copy-Item -LiteralPath (Join-Path (Split-Path $exe) 'core') -Destination (Join-Path $DistDir 'core') -Recurse
     $icon = Join-Path (Resolve-Path $BuildDir).Path "brand/Swirl.ico"
     if (!(Test-Path -LiteralPath $icon)) { throw "SVG-derived icon is missing: $icon" }
     Copy-Item -LiteralPath $icon -Destination (Join-Path $DistDir "Swirl-brand-100.ico")

@@ -5,20 +5,20 @@ import SwirlQuick
 Switch {
     id: control
     property bool large: false
-    implicitWidth: large ? 86 : 60
-    implicitHeight: large ? 46 : 32
-    padding: 0
+    implicitWidth: Theme.dp(large ? 86 : 60)
+    implicitHeight: Theme.dp(large ? 46 : 32)
+    padding:Theme.dp(0)
     hoverEnabled: true
     indicator: Rectangle {
         width: control.width; height: control.height
         radius: height * 0.5
         color: control.checked ? Theme.primaryControl : Theme.dark ? "#626262" : "#DADADD"
-        border.width: control.activeFocus ? 2 : 0
+        border.width: Theme.dp(control.activeFocus ? 2 : 0)
         border.color: Theme.focusBorder
         opacity: control.hovered ? 0.88 : 1
         Rectangle {
-            width: parent.height - 8; height: width
-            x: control.checked ? parent.width - width - 4 : 4; y: 4
+            width: parent.height - Theme.dp(8); height: width
+            x: control.checked ? parent.width - width - Theme.dp(4) : Theme.dp(4); y:Theme.dp(4)
             radius: height * 0.5
             color: "#FEFEFF"
             layer.enabled: Theme.effectsSupported

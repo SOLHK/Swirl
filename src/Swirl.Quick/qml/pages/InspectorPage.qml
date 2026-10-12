@@ -17,11 +17,11 @@ Item {
         })
     }
     ColumnLayout {
-        anchors.fill:parent; anchors.margins:23; spacing:13
+        anchors.fill:parent; anchors.margins:Theme.dp(23); spacing:Theme.dp(13)
         RowLayout {
             Layout.fillWidth:true
-            Text { text:"此页为请求调试演示；查看真实会话请进入抓包。"; color:Theme.muted; font.pixelSize:14; Layout.fillWidth:true }
-            SwirlButton { text:"打开真实抓包"; iconName:"capture"; font.pixelSize:15; onClicked:AppState.navigate("capture") }
+            Text { text:"此页为请求调试；查看真实会话请进入抓包。"; color:Theme.muted; font.pixelSize:Theme.fontSize(14); Layout.fillWidth:true }
+            SwirlButton { text:"打开真实抓包"; iconName:"capture"; font.pixelSize:Theme.fontSize(15); onClicked:AppState.navigate("capture") }
         }
         RowLayout {
             Layout.fillWidth:true
@@ -33,19 +33,19 @@ Item {
         RowLayout {
             Layout.fillWidth:true
             SwirlStatusBadge { label:AppState.zh("HTTP CAPTURE DEMO"); tone:"accent" }
-            Text { text:displayRows.length+" 条本地示例"; color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
+            Text { text:displayRows.length+" 条本地"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
             SwirlButton { text:AppState.zh("Record"); iconName:"play"; onClicked:AppState.notice("抓包记录") }
             SwirlButton { text:AppState.zh("Clear"); onClicked:{selected=null;AppState.notice("清空抓包")} }
         }
         SplitView {
             Layout.fillWidth:true; Layout.fillHeight:true
             orientation:Qt.Horizontal
-            handle:Rectangle { implicitWidth:7; color:Theme.canvas; Rectangle { width:2; height:45; radius:Theme.roundedRadius(width,height); color:Theme.border; anchors.centerIn:parent } }
+            handle:Rectangle { implicitWidth:Theme.dp(7); color:Theme.canvas; Rectangle { width:Theme.dp(2); height:Theme.dp(45); radius:Theme.roundedRadius(width,height); color:Theme.border; anchors.centerIn:parent } }
             SwirlGlassPanel {
-                SplitView.fillWidth:true; SplitView.minimumWidth:320
+                SplitView.fillWidth:true; SplitView.minimumWidth:Theme.dp(320)
                 clip:true
                 SwirlDataTable {
-                    anchors.fill:parent; anchors.margins:1
+                    anchors.fill:parent; anchors.margins:Theme.dp(1)
                     rows:page.displayRows
                     selectedId:page.selected?page.selected.id:""
                     columns:[
@@ -58,41 +58,41 @@ Item {
                 }
             }
             SwirlInspectorPanel {
-                SplitView.preferredWidth:440; SplitView.minimumWidth:325
+                SplitView.preferredWidth:Theme.dp(440); SplitView.minimumWidth:Theme.dp(325)
                 record:page.selected
             }
         }
         SwirlGlassPanel {
             visible:page.waterfallOpen
-            Layout.fillWidth:true; Layout.preferredHeight:159
+            Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(159)
             ColumnLayout {
-                anchors.fill:parent; anchors.margins:12; spacing:6
+                anchors.fill:parent; anchors.margins:Theme.dp(12); spacing:Theme.dp(6)
                 RowLayout {
                     Layout.fillWidth:true
-                    Text { text:AppState.zh("Request waterfall"); color:Theme.text; font.pixelSize:13; font.weight:Font.DemiBold; Layout.fillWidth:true }
-                    Text { text:AppState.zh("0           100           200           300 ms"); color:Theme.muted; font.pixelSize:10 }
+                    Text { text:AppState.zh("Request waterfall"); color:Theme.text; font.pixelSize:Theme.fontSize(13); font.weight:Font.DemiBold; Layout.fillWidth:true }
+                    Text { text:AppState.zh("0           100           200           300 ms"); color:Theme.muted; font.pixelSize:Theme.fontSize(10) }
                 }
                 ListView {
-                    Layout.fillWidth:true; Layout.fillHeight:true; clip:true; spacing:3
+                    Layout.fillWidth:true; Layout.fillHeight:true; clip:true; spacing:Theme.dp(3)
                     model:page.displayRows.slice(0,5)
                     delegate:RowLayout {
-                        width:ListView.view.width; height:20; spacing:10
+                        width:ListView.view.width; height:Theme.dp(20); spacing:Theme.dp(10)
                         Text {
-                            Layout.preferredWidth:180
+                            Layout.preferredWidth:Theme.dp(180)
                             text:modelData.method+" "+modelData.path
-                            font.pixelSize:10; color:Theme.muted; elide:Text.ElideRight
+                            font.pixelSize:Theme.fontSize(10); color:Theme.muted; elide:Text.ElideRight
                         }
                         Item {
-                            Layout.fillWidth:true; height:17
+                            Layout.fillWidth:true; height:Theme.dp(17)
                             Rectangle {
                                 x:parent.width*Number(modelData.waterfall)/100
-                                width:Math.max(6,Math.min(parent.width-x,parent.width*Number.parseInt(modelData.duration)/640))
-                                height:12; radius:Theme.roundedRadius(width,height)
+                                width:Math.max(Theme.dp(6),Math.min(parent.width-x,parent.width*Number.parseInt(modelData.duration)/640))
+                                height:Theme.dp(12); radius:Theme.roundedRadius(width,height)
                                 color:page.selected&&page.selected.id===modelData.id?Theme.green:Theme.accent
                                 opacity:0.8
                             }
                         }
-                        Text { text:modelData.duration; Layout.preferredWidth:54; font.pixelSize:10; color:Theme.muted }
+                        Text { text:modelData.duration; Layout.preferredWidth:Theme.dp(54); font.pixelSize:Theme.fontSize(10); color:Theme.muted }
                     }
                 }
             }
@@ -101,9 +101,9 @@ Item {
             Layout.fillWidth:true
             SwirlButton {
                 text:page.waterfallOpen?"隐藏瀑布图":"显示瀑布图"
-                iconName:"chart"; quiet:true; onClicked:page.waterfallOpen=!page.waterfallOpen
+                iconName:"chart"; quiet:false; onClicked:page.waterfallOpen=!page.waterfallOpen
             }
-            Text { text:AppState.zh("Synthetic timing breakdown · select a request for full details"); color:Theme.muted; font.pixelSize:11; Layout.fillWidth:true }
+            Text { text:AppState.zh("Synthetic timing breakdown · select a request for full details"); color:Theme.muted; font.pixelSize:Theme.fontSize(11); Layout.fillWidth:true }
             SwirlButton { text:AppState.zh("Replay"); onClicked:AppState.currentPage="replay" }
             SwirlButton { text:AppState.zh("Breakpoint"); onClicked:AppState.currentPage="breakpoint" }
         }

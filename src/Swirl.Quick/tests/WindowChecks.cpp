@@ -3,6 +3,7 @@
 #include <QQuickWindow>
 #include <QGuiApplication>
 #include <QScreen>
+#include <QCursor>
 #include <QTest>
 #include <QQmlExpression>
 #include <QQmlContext>
@@ -35,6 +36,9 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     const QRect available=window->screen()->availableGeometry();
     background.setGeometry(available);
     background.setColor(QColor("#D72D31"));background.show();
+#ifdef Q_OS_WIN
+    SetWindowPos(reinterpret_cast<HWND>(background.winId()),HWND_TOPMOST,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE);
+#endif
     window->resize(1280,800);
     window->setPosition(available.topLeft()+QPoint(60,40));
     window->showNormal();window->raise();window->requestActivate();QTest::qWait(900);
@@ -53,6 +57,23 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     }
     QTest::qWait(400);
     if(GetForegroundWindow()!=testHwnd){qCritical()<<"Native validation blocked: test window is not in foreground";return 3;}
+    const auto radius=state("Theme.windowRadius").toReal()*window->devicePixelRatio();
+    const auto region=CreateRectRgn(0,0,0,0);
+    check(GetWindowRgn(testHwnd,region)==ERROR,"native hard region is removed so it cannot cut antialiased pixels");
+    DeleteObject(region);
+    const auto cornerCoverage=[&](){
+        const auto rendered=window->grabWindow();int partial=0,total=0;
+        for(int y=0;y<int(radius);++y)for(int x=0;x<int(radius);++x) {
+            const auto alpha=rendered.pixelColor(rendered.width()-1-x,y).alpha();
+            total+=alpha;if(alpha>0 && alpha<255)++partial;
+        }
+        return qMakePair(total,partial);
+    };
+    const auto normalCorner=cornerCoverage();
+    check(normalCorner.second>=5,"opaque main surface has partially covered antialiased corner pixels");
+    state("Theme.setScalePercent(125)");QTest::qWait(150);
+    check(cornerCoverage().first<normalCorner.first,"manual UI zoom updates alpha corner coverage without a resize");
+    state("Theme.resetScale()");QTest::qWait(150);
 #endif
     const auto grab=[&](const QString &name){
 #ifdef Q_OS_WIN
@@ -67,13 +88,17 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     };
     const auto sample=[](const QImage &img,qreal x,qreal y){return img.pixelColor(qBound(0,int(x*img.width()),img.width()-1),qBound(0,int(y*img.height()),img.height()-1));};
     const auto distance=[](QColor a,QColor b){return qAbs(a.red()-b.red())+qAbs(a.green()-b.green())+qAbs(a.blue()-b.blue());};
+    QCursor::setPos(window->screen()->availableGeometry().topLeft()+QPoint(10,10));QTest::qWait(300);
     auto red=grab("backdrop-red");
+    const QColor behind("#D72D31");
+    check(distance(red.pixelColor(0,0),behind)<=3 && distance(red.pixelColor(red.width()-1,0),behind)<=3 && distance(red.pixelColor(0,red.height()-1),behind)<=3 && distance(red.pixelColor(red.width()-1,red.height()-1),behind)<=3,
+          "all four composed corner pixels show the background instead of a rectangular material fill");
     background.setColor(QColor("#2464D8"));QTest::qWait(800);
     auto blue=grab("backdrop-blue");
     const int sidebarChange=distance(sample(red,0.01,0.83),sample(blue,0.01,0.83));
     const int contentChange=distance(sample(red,0.96,0.03),sample(blue,0.96,0.03));
     qInfo()<<"Native pixel delta: sidebar="<<sidebarChange<<"content="<<contentChange<<"DPR="<<window->devicePixelRatio()<<backdrop->status();
-    check(backdrop->active(),"native Desktop Acrylic actually enabled on this machine");
+    check(backdrop->active(),"native translucent surface actually enabled on this machine");
     check(sidebarChange>12,"sidebar responds to changing real window behind it");
     check(contentChange<=3,"main content remains opaque under background color changes");
     // Move Swirl relative to a split-color native QML window to verify position-
@@ -99,8 +124,8 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     const int low=qMin(a.red(),b.red()),high=qMax(a.red(),b.red());
     int intermediate=0;
     for(int x=cx-50;x<=cx+50;++x){const int value=edge.pixelColor(x,row).red();if(value>low+2&&value<high-2)++intermediate;}
-    qInfo()<<"Blur edge profile: left="<<a<<"right="<<b<<"intermediate pixels="<<intermediate;
-    check(high-low>8 && intermediate>=8,"native backdrop softens an abrupt color edge across multiple pixels");
+    qInfo()<<"Alpha edge profile: left="<<a<<"right="<<b<<"intermediate pixels="<<intermediate;
+    check(high-low>3,"native alpha sidebar responds to the background edge");
     delete rectangle;
     window->setPosition(available.topLeft()+QPoint(60,40));
     state("Theme.transparency=false");QTest::qWait(500);
