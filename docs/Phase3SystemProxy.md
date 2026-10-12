@@ -8,7 +8,20 @@ capture service and HDR renderer. It does not alter `main`.
 
 The overview switch queries and updates the current user's **WinINET LAN**
 configuration through `INTERNET_OPTION_PER_CONNECTION_OPTION`. It snapshots
-the flags, proxy server, bypass list and PAC URL. WinHTTP, OS DNS, routes, TUN,
+the flags, proxy server, bypass list and PAC URL. It also explicitly synchronizes
+the current-user `ProxyEnable`, `ProxyServer`, `ProxyOverride` and `AutoConfigURL`
+registry values used by native HTTP clients. Updating WinINET's per-connection
+store alone can leave those registry values pointing at an old proxy, so browser
+traffic works while Codex's OAuth token exchange cannot connect.
+
+Schema 2 DPAPI journals preserve both stores separately, including each registry
+value's existence, type and bytes. Shutdown and crash recovery restore that exact
+snapshot, even when the two stores originally differed. Registry-only external
+edits also relinquish ownership. Schema 1 journals remain readable and restore
+only their originally owned connection settings. A registry write failure rolls
+back the update before reporting failure; notifications follow both writes.
+
+Machine-wide WinHTTP, OS DNS, routes, TUN,
 VPN processes and other proxy applications are untouched.
 
 Enable requires the owned Mihomo process, authenticated API and a successful

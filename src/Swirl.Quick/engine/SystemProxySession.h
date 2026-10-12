@@ -4,8 +4,8 @@
 #include <QTimer>
 #include <QProcess>
 
-// Current-user WinINET only. The independently running guard survives loss of
-// the GUI; both paths compare all owned settings before restoring a snapshot.
+// Current-user WinINET connection settings plus their legacy registry view.
+// The independent guard compares both stores before restoring their snapshots.
 class SystemProxySession final : public QObject {
     Q_OBJECT
     Q_PROPERTY(bool enabled READ enabled NOTIFY changed)

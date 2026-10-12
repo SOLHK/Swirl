@@ -10,6 +10,7 @@
 #include <QFileInfo>
 #include <cstdio>
 #include <QUuid>
+#include <limits>
 #ifdef Q_OS_WIN
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -42,6 +43,76 @@ bool write(const QString &path, const QJsonObject &object) {
     QSaveFile f(path);return !bytes.isEmpty()&&f.open(QIODevice::WriteOnly)&&f.write(bytes)==bytes.size()&&f.commit();
 }
 #ifdef Q_OS_WIN
+constexpr auto internetKey=L"Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings";
+constexpr const wchar_t *registryNames[]={L"ProxyEnable",L"ProxyServer",L"ProxyOverride",L"AutoConfigURL"};
+constexpr const char *registryKeys[]={"ProxyEnable","ProxyServer","ProxyOverride","AutoConfigURL"};
+// Preserve presence, native type and bytes: missing values are not empty strings,
+// and WinINET's connection store can legitimately differ from these values.
+QJsonObject registrySnapshot(QString *error) {
+    HKEY key{};auto status=RegOpenKeyExW(HKEY_CURRENT_USER,internetKey,0,KEY_QUERY_VALUE,&key);
+    if(status!=ERROR_SUCCESS){SetLastError(status);if(error)*error=QStringLiteral("无法读取当前用户代理注册表（错误 %1）。").arg(status);return {};}
+    QJsonObject result;
+    for(int i=0;i<4;++i) {
+        DWORD type=0,size=0;status=RegQueryValueExW(key,registryNames[i],nullptr,&type,nullptr,&size);
+        if(status==ERROR_FILE_NOT_FOUND){result.insert(registryKeys[i],QJsonObject{{"present",false}});continue;}
+        if(status!=ERROR_SUCCESS||size>65536){RegCloseKey(key);if(error)*error=QStringLiteral("无法安全读取代理注册表值。");return {};}
+        QByteArray bytes(size,Qt::Uninitialized);
+        status=RegQueryValueExW(key,registryNames[i],nullptr,&type,reinterpret_cast<BYTE *>(bytes.data()),&size);
+        if(status!=ERROR_SUCCESS){RegCloseKey(key);if(error)*error=QStringLiteral("代理注册表值在读取时发生变化。");return {};}
+        bytes.resize(size);
+        result.insert(registryKeys[i],QJsonObject{{"present",true},{"type",double(type)},{"data",QString::fromLatin1(bytes.toBase64())}});
+    }
+    RegCloseKey(key);return result;
+}
+bool validRegistry(const QJsonObject &values) {
+    if(values.size()!=4)return false;
+    for(const auto name:registryKeys) {
+        if(!values.value(name).isObject())return false;
+        const auto v=values.value(name).toObject();if(!v.value("present").isBool())return false;
+        if(!v.value("present").toBool())continue;
+        const double type=v.value("type").toDouble(-1);
+        if(type<0||type>std::numeric_limits<DWORD>::max()||type!=double(DWORD(type))||!v.value("data").isString())return false;
+        const auto encoded=v.value("data").toString().toLatin1();const auto bytes=QByteArray::fromBase64(encoded);
+        if(bytes.size()>65536||bytes.toBase64()!=encoded)return false;
+    }
+    return true;
+}
+LONG writeRegistry(const QJsonObject &values) {
+    HKEY key{};auto status=RegOpenKeyExW(HKEY_CURRENT_USER,internetKey,0,KEY_SET_VALUE,&key);
+    if(status!=ERROR_SUCCESS)return status;
+    for(int i=0;i<4;++i) {
+        const auto v=values.value(registryKeys[i]).toObject();
+        if(!v.value("present").toBool()) {
+            status=RegDeleteValueW(key,registryNames[i]);if(status==ERROR_FILE_NOT_FOUND)status=ERROR_SUCCESS;
+        } else {
+            const auto bytes=QByteArray::fromBase64(v.value("data").toString().toLatin1());
+            status=RegSetValueExW(key,registryNames[i],0,DWORD(v.value("type").toDouble()),reinterpret_cast<const BYTE *>(bytes.constData()),DWORD(bytes.size()));
+        }
+        if(status!=ERROR_SUCCESS)break;
+    }
+    RegCloseKey(key);return status;
+}
+QJsonObject proxyRegistry(const QString &server,const QString &bypass) {
+    QJsonObject result;DWORD enabled=1;
+    result.insert("ProxyEnable",QJsonObject{{"present",true},{"type",REG_DWORD},{"data",QString::fromLatin1(QByteArray(reinterpret_cast<const char *>(&enabled),sizeof(enabled)).toBase64())}});
+    const QString strings[]={server,bypass,QString()};
+    for(int i=1;i<4;++i)result.insert(registryKeys[i],QJsonObject{{"present",true},{"type",REG_SZ},
+        {"data",QString::fromLatin1(QByteArray(reinterpret_cast<const char *>(strings[i-1].utf16()),(strings[i-1].size()+1)*sizeof(wchar_t)).toBase64())}});
+    return result;
+}
+bool writeConnection(const QJsonObject &value) {
+    const auto server=value.value("server").toString(),bypass=value.value("bypass").toString(),pac=value.value("pac").toString();
+    INTERNET_PER_CONN_OPTIONW options[4]{};options[0].dwOption=INTERNET_PER_CONN_FLAGS;options[0].Value.dwValue=value.value("flags").toInt();
+    options[1].dwOption=INTERNET_PER_CONN_PROXY_SERVER;options[1].Value.pszValue=const_cast<wchar_t *>(reinterpret_cast<const wchar_t *>(server.utf16()));
+    options[2].dwOption=INTERNET_PER_CONN_PROXY_BYPASS;options[2].Value.pszValue=const_cast<wchar_t *>(reinterpret_cast<const wchar_t *>(bypass.utf16()));
+    options[3].dwOption=INTERNET_PER_CONN_AUTOCONFIG_URL;options[3].Value.pszValue=const_cast<wchar_t *>(reinterpret_cast<const wchar_t *>(pac.utf16()));
+    INTERNET_PER_CONN_OPTION_LISTW list{};list.dwSize=sizeof(list);list.dwOptionCount=4;list.pOptions=options;
+    return InternetSetOptionW(nullptr,INTERNET_OPTION_PER_CONNECTION_OPTION,&list,sizeof(list));
+}
+void notifyProxyChange() {
+    InternetSetOptionW(nullptr,INTERNET_OPTION_SETTINGS_CHANGED,nullptr,0);
+    InternetSetOptionW(nullptr,INTERNET_OPTION_REFRESH,nullptr,0);
+}
 QString stamp(HANDLE process) {
     FILETIME created{},exit{},kernel{},user{};
     if(!GetProcessTimes(process,&created,&exit,&kernel,&user))return {};
@@ -55,6 +126,11 @@ bool alive(const QJsonObject &record, const char *key, const char *timeKey) {
 }
 QString nativeError() { return QStringLiteral("Windows 系统代理操作失败（错误 %1）。").arg(GetLastError()); }
 #endif
+bool matchesSettings(QJsonObject current,const QJsonObject &expected) {
+    // Schema 1 journals predate registry ownership. Never claim those values.
+    if(!expected.contains("registry"))current.remove("registry");
+    return current==expected;
+}
 }
 QString SystemProxySession::journalPath() { return QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/system-proxy.dpapi"; }
 SystemProxySession::SystemProxySession(QObject *parent, QString journal):QObject(parent),m_journal(journal.isEmpty()?journalPath():journal) {
@@ -79,6 +155,8 @@ QJsonObject SystemProxySession::snapshot(QString *error) {
     QJsonObject result{{"flags",int(options[0].Value.dwValue)}};
     const char *keys[]={"server","bypass","pac"};
     for(int i=1;i<4;++i){result.insert(keys[i-1],QString::fromWCharArray(options[i].Value.pszValue?options[i].Value.pszValue:L""));if(options[i].Value.pszValue)GlobalFree(options[i].Value.pszValue);}
+    const auto registry=registrySnapshot(error);if(registry.isEmpty())return {};
+    result.insert("registry",registry);
     return result;
 #else
     if(error)*error=QStringLiteral("系统代理仅支持 Windows。");return {};
@@ -94,15 +172,22 @@ bool SystemProxySession::apply(const QJsonObject &value, QString *error) {
         data=0;size=sizeof(data);
         if(RegGetValueW(hive,L"Software\\Policies\\Microsoft\\Internet Explorer\\Control Panel",L"Proxy",RRF_RT_REG_DWORD,nullptr,&data,&size)==ERROR_SUCCESS&&data){if(error)*error=QStringLiteral("系统策略禁止修改代理。");return false;}
     }
-    const auto server=value.value("server").toString(),bypass=value.value("bypass").toString(),pac=value.value("pac").toString();
-    INTERNET_PER_CONN_OPTIONW options[4]{};options[0].dwOption=INTERNET_PER_CONN_FLAGS;options[0].Value.dwValue=value.value("flags").toInt();
-    options[1].dwOption=INTERNET_PER_CONN_PROXY_SERVER;options[1].Value.pszValue=const_cast<wchar_t *>(reinterpret_cast<const wchar_t *>(server.utf16()));
-    options[2].dwOption=INTERNET_PER_CONN_PROXY_BYPASS;options[2].Value.pszValue=const_cast<wchar_t *>(reinterpret_cast<const wchar_t *>(bypass.utf16()));
-    options[3].dwOption=INTERNET_PER_CONN_AUTOCONFIG_URL;options[3].Value.pszValue=const_cast<wchar_t *>(reinterpret_cast<const wchar_t *>(pac.utf16()));
-    INTERNET_PER_CONN_OPTION_LISTW list{};list.dwSize=sizeof(list);list.dwOptionCount=4;list.pOptions=options;
-    if(!InternetSetOptionW(nullptr,INTERNET_OPTION_PER_CONNECTION_OPTION,&list,sizeof(list))){if(error)*error=nativeError();return false;}
-    InternetSetOptionW(nullptr,INTERNET_OPTION_SETTINGS_CHANGED,nullptr,0);InternetSetOptionW(nullptr,INTERNET_OPTION_REFRESH,nullptr,0);
-    if(snapshot()!=value){if(error)*error=QStringLiteral("Windows 实际代理配置与写入值不一致。");return false;}return true;
+    const auto original=snapshot(error);if(original.isEmpty())return false;
+    const auto registry=value.contains("registry")?value.value("registry").toObject():original.value("registry").toObject();
+    if(!validRegistry(registry)){if(error)*error=QStringLiteral("代理注册表恢复记录无效。");return false;}
+    if(!writeConnection(value)){if(error)*error=nativeError();return false;}
+    const auto status=writeRegistry(registry);
+    if(status!=ERROR_SUCCESS) {
+        // A partial update must not strand native clients on a different port.
+        const bool connectionRestored=writeConnection(original);
+        const bool registryRestored=writeRegistry(original.value("registry").toObject())==ERROR_SUCCESS;
+        notifyProxyChange();
+        if(error)*error=QStringLiteral("代理注册表写入失败（错误 %1）；恢复%2。").arg(status).arg(connectionRestored&&registryRestored?QStringLiteral("成功"):QStringLiteral("失败，请检查系统代理"));
+        return false;
+    }
+    // Publish only after both representations agree.
+    notifyProxyChange();
+    if(!matchesSettings(snapshot(),value)){if(error)*error=QStringLiteral("Windows 实际代理配置与写入值不一致。");return false;}return true;
 #else
     Q_UNUSED(value);if(error)*error=QStringLiteral("系统代理仅支持 Windows。");return false;
 #endif
@@ -111,13 +196,14 @@ bool SystemProxySession::recover(const QString &journal, QString *error, bool re
     QLockFile lock(journal+".lock");if(!lock.tryLock(1000)){if(error)*error=QStringLiteral("系统代理恢复正在由另一进程处理。");return false;}
     if(!QFile::exists(journal))return true;
     const auto record=read(journal);
-    if(record.value("schema").toInt()!=1){if(error)*error=QStringLiteral("无法解密代理恢复记录；已保留记录。");return false;}
+    const auto schema=record.value("schema").toInt();
+    if(schema!=1&&schema!=2){if(error)*error=QStringLiteral("无法解密代理恢复记录；已保留记录。");return false;}
     if(!expectedSession.isEmpty()&&record.value("session").toString()!=expectedSession)return true;
 #ifdef Q_OS_WIN
     if(requireDeadOwner&&alive(record,"owner","ownerTime")){if(error)*error=QStringLiteral("另一个 Swirl 正在管理系统代理。");return false;}
 #endif
     const auto current=snapshot(error);if(current.isEmpty())return false;
-    if(current==record.value("applied").toObject()&&!apply(record.value("original").toObject(),error))return false;
+    if(matchesSettings(current,record.value("applied").toObject())&&!apply(record.value("original").toObject(),error))return false;
     // If any setting changed externally, relinquish ownership without writing.
     return QFile::remove(journal);
 }
@@ -129,9 +215,12 @@ bool SystemProxySession::enable(int port, qint64 enginePid) {
     QLockFile lock(m_journal+".lock");
     if(!lock.tryLock(1000)||QFile::exists(m_journal)){m_error=QStringLiteral("另一个 Swirl 正在启用代理。");emit changed();return false;}
     const auto original=snapshot(&m_error);if(original.isEmpty()){emit changed();return false;}
-    const QJsonObject applied{{"flags",3},{"server",QStringLiteral("127.0.0.1:%1").arg(port)},
+    QJsonObject applied{{"flags",3},{"server",QStringLiteral("127.0.0.1:%1").arg(port)},
         {"bypass","localhost;127.*;10.*;192.168.*;172.16.*;172.17.*;172.18.*;172.19.*;172.20.*;172.21.*;172.22.*;172.23.*;172.24.*;172.25.*;172.26.*;172.27.*;172.28.*;172.29.*;172.30.*;172.31.*;[::1];<local>"},{"pac",""}};
-    QJsonObject record{{"schema",1},{"session",QUuid::createUuid().toString()},{"owner",double(QCoreApplication::applicationPid())},{"engine",double(enginePid)},{"original",original},{"applied",applied}};
+    #ifdef Q_OS_WIN
+    applied.insert("registry",proxyRegistry(applied.value("server").toString(),applied.value("bypass").toString()));
+    #endif
+    QJsonObject record{{"schema",2},{"session",QUuid::createUuid().toString()},{"owner",double(QCoreApplication::applicationPid())},{"engine",double(enginePid)},{"original",original},{"applied",applied}};
 #ifdef Q_OS_WIN
     record.insert("ownerTime",stamp(GetCurrentProcess()));
     auto h=OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION,FALSE,DWORD(enginePid));if(!h){m_error=QStringLiteral("无法验证引擎进程身份。");emit changed();return false;}
@@ -164,14 +253,15 @@ void SystemProxySession::refresh() {
     // Retain the encrypted recovery record so the independent guard can act.
     if(current.isEmpty())return;
     const bool ownSession=!m_session.isEmpty()&&record.value("session").toString()==m_session;
-    const bool same=ownSession&&current==record.value("applied").toObject();
+    const bool same=ownSession&&matchesSettings(current,record.value("applied").toObject());
     if(m_owned&&!same){m_owned=false;if(ownSession)QFile::remove(m_journal);m_error=QStringLiteral("系统代理已由外部修改或安全恢复，Swirl 已放弃控制。");}
     const bool enabled=m_owned&&same;
     if(enabled!=m_enabled){m_enabled=enabled;emit changed();}
 }
 int SystemProxySession::guard(const QString &journal) {
 #ifdef Q_OS_WIN
-    const auto record=read(journal);if(record.value("schema").toInt()!=1||!alive(record,"owner","ownerTime"))return 2;
+    const auto record=read(journal);const auto schema=record.value("schema").toInt();
+    if((schema!=1&&schema!=2)||!alive(record,"owner","ownerTime"))return 2;
     auto owner=OpenProcess(SYNCHRONIZE|PROCESS_QUERY_LIMITED_INFORMATION,FALSE,DWORD(record.value("owner").toDouble()));
     if(!owner)return 3;
     QFile ready(journal+".ready");
