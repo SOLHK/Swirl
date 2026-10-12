@@ -83,6 +83,9 @@ bool NodeStore::write(const QList<ProxyNode> &nodes, const QString &selected) {
     if (encrypted.isEmpty()) { m_error=QStringLiteral("Windows DPAPI 加密失败，未保存任何明文凭据。"); return false; }
     if (!QDir().mkpath(QFileInfo(m_path).absolutePath())) { m_error=QStringLiteral("节点目录无法创建。"); return false; }
     QSaveFile file(m_path); const auto bytes=QByteArray("SWIRLNODE1\n")+encrypted;
+    if(bytes.size()>1024*1024) {
+        m_error=QStringLiteral("节点库超过 1 MiB 保存上限；旧配置保持不变。"); return false;
+    }
     if (!file.open(QIODevice::WriteOnly) || !file.setPermissions(QFile::ReadOwner|QFile::WriteOwner) || file.write(bytes)!=bytes.size() || !file.commit()) {
         m_error=QStringLiteral("节点配置无法安全保存，旧配置保持不变。"); return false;
     }
