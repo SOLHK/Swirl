@@ -27,6 +27,7 @@ jobs:
           host: windows
           target: desktop
           arch: win64_msvc2022_64
+          modules: qtshadertools
           cache: true
       - name: Configure Qt UI independently
         shell: pwsh
@@ -40,6 +41,11 @@ jobs:
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           Copy-Item build/swirl-quick/Release/Swirl.exe dist/
           windeployqt --release --qmldir src/Swirl.Quick/qml dist/Swirl.exe
+      - name: Stage pinned and verified Mihomo for integration and installer
+        shell: pwsh
+        run: |
+          ./scripts/stage-mihomo.ps1 -Destination dist
+          Copy-Item -LiteralPath dist/core -Destination build/swirl-quick/Release/core -Recurse
       # Qt's offscreen QPA font database reads appdir/lib/fonts and does not
       # automatically discover the fonts installed on a Windows CI runner.
       # These fixtures are used for synthetic screenshot tests ONLY.
@@ -58,6 +64,28 @@ jobs:
           Invoke-WebRequest -Uri $notoUrl -OutFile $notoFile -ErrorAction Stop
           if ((Get-Item $notoFile).Length -lt 10000000) { throw "Noto Sans SC fixture download is incomplete." }
           Write-Host "Qt offscreen font fixtures ready; they will NOT be included in the artifact."
+          # CTest launches Swirl from the build directory, separate from dist.
+          New-Item -ItemType Directory -Force "build/swirl-quick/Release/lib" | Out-Null
+          Copy-Item -LiteralPath $fontDir -Destination "build/swirl-quick/Release/lib/fonts" -Recurse -Force
+      - name: Engine contract, real Mihomo and QML lifecycle checks
+        shell: pwsh
+        run: |
+          ctest --test-dir build/swirl-quick -C Release -R "swirl-engine-" --output-on-failure
+          if ($LASTEXITCODE -ne 0) {
+            Get-Content build/swirl-quick/engine-contract.txt, build/swirl-quick/engine-real.txt -ErrorAction SilentlyContinue
+            throw "Engine checks failed"
+          }
+      - name: Upload engine test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-Engine-Test-Evidence
+          path: |
+            build/swirl-quick/Testing/Temporary/LastTest.log
+            build/swirl-quick/engine-contract.txt
+            build/swirl-quick/engine-real.txt
+            build/swirl-quick/Release/Swirl-diagnostics.txt
+          if-no-files-found: warn
       - name: Overview mouse and keyboard input checks
         shell: pwsh
         run: |
@@ -109,6 +137,8 @@ jobs:
             @{ file = "Swirl-Overview-200-preview.png"; page = "overview"; theme = "light"; size = "1464x930"; scale = "2" },
             @{ file = "Swirl-Minimum-preview.png"; page = "overview"; theme = "light"; size = "1000x650"; scale = "1" },
             @{ file = "Swirl-Minimum-bottom-preview.png"; page = "overview"; theme = "light"; size = "1000x650"; scale = "1.5"; bottom = $true },
+            @{ file = "Swirl-Compact-preview.png"; page = "overview"; theme = "light"; size = "800x560"; scale = "1" },
+            @{ file = "Swirl-Compact-200-preview.png"; page = "overview"; theme = "light"; size = "800x560"; scale = "2" },
             @{ file = "Swirl-Large-preview.png"; page = "overview"; theme = "light"; size = "1920x1219"; scale = "1" },
             @{ file = "Swirl-Inspector-preview.png"; page = "inspector"; theme = "dark"; size = "1464x930"; scale = "1" },
             @{ file = "Swirl-ModuleHub-preview.png"; page = "featurehub"; theme = "light"; size = "1464x930"; scale = "1" },
@@ -153,6 +183,14 @@ jobs:
         with:
           name: Swirl-Quick-Preview-Diagnostics
           path: preview-diagnostics/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Upload rendered Qt Quick UI previews
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-Quick-UI-Previews
+          path: dist/Swirl-*-preview.png
           if-no-files-found: warn
           retention-days: 14
       - name: Remove CI-only font fixtures from portable ZIP
@@ -240,5 +278,5 @@ jobs:
             --repo "${GITHUB_REPOSITORY}" \
             --target "${GITHUB_SHA}" \
             --title "Swirl · 测试版 ${SHORT_SHA}" \
-            --notes "测试版 Qt 界面：参考图比例、56 个功能入口及配置草稿、覆盖安装；包含真实本机 HTTP 抓包及 CONNECT 隧道记录；代理/配置页面仍为演示，尚未接入完整核心。请勿作为正式版本使用。" \
+            --notes "测试版：保留现有 Qt UI 与 HDR；设置 → 代理提供真实 Mihomo 进程启停、版本与认证 API 健康检查；不接管系统代理、不启用 TUN。包含真实本机 HTTP 抓包及 CONNECT 记录。总览流量与节点仍为明确标注的演示。请勿作为正式版本使用。" \
             --prerelease

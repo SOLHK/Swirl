@@ -4,7 +4,8 @@ This is Swirl's only maintained Windows application project, using C++23 / Qt 6
 Quick/QML and Windows NSIS. The old WPF/.NET program is no longer present in
 current branches. Most Qt pages use demonstration data. The separate opt-in CaptureService
 forwards real HTTP requests and CONNECT tunnels; it never changes the system
-proxy, starts Mihomo or accesses certificate stores. See CAPTURE.md.
+proxy or accesses certificate stores. See CAPTURE.md. Settings > Proxy now
+supports the independent, verified Mihomo lifecycle described in ENGINE_PHASE1.md.
 
 ## Windows Release build and installer
 
@@ -22,7 +23,9 @@ From the repository root in a developer PowerShell:
 ./scripts/build-quick-windows.ps1 -QtDir C:/Qt/6.10.3/mingw_64 -InputTests
 ```
 
-The script first builds and runs the mouse/keyboard checks, rebuilds a
+The script stages a pinned Mihomo release only after archive and executable
+SHA-256 verification, runs engine contract/real-process/QML checks and existing
+mouse/keyboard checks, then rebuilds a
 production Release EXE without the test harness, deploys Qt/QML plugins using
 `windeployqt`, and produces **out/Swirl-Setup.exe**. The installer creates a
 start-menu shortcut, a desktop shortcut and a per-user uninstaller. A fresh
@@ -52,7 +55,7 @@ startup uses installed Windows fonts automatically.
 ```powershell
 ./build/swirl-quick/Swirl.exe --capture-preview=C:/temp/overview.png --preview-size=1464x930 --preview-theme=light
 ./build/swirl-quick/Swirl.exe --capture-preview=C:/temp/connected.png --preview-size=1464x930 --preview-connected
-./build/swirl-quick/Swirl.exe --capture-preview=C:/temp/minimum-bottom.png --preview-size=1000x650 --preview-scroll-bottom
+./build/swirl-quick/Swirl.exe --capture-preview=C:/temp/minimum-bottom.png --preview-size=800x560 --preview-scroll-bottom
 ```
 
 These render the real QML window, not a reference-image background. The normal
@@ -63,24 +66,33 @@ the OS scale; factors 2/3, 5/6, 1 and 4/3 on a 150% desktop check effective
 verify touch, multi-monitor transitions or OS snap gestures; those remain
 manual checks. Buttons call Qt native close/minimize/maximize APIs, dragging
 uses startSystemMove, and all eight resize edges use startSystemResize.
-Windows uses a single frameless Qt Quick window and native DWM Desktop Acrylic
-where available. Native activation, window controls and system work-area
-maximization are explicitly handled; the OS owns the outer corner/backdrop
-when native composition is active. Unsupported systems or renderers receive
+Windows uses a single frameless Qt Quick window and native per-pixel transparency
+where available. The QML shell uses a scalable 12-unit logical radius on the native per-pixel alpha surface.
+Large containers use 12, cards and popups 10, fields 8, and rectangular buttons 10.
+These are visual design units, not physical pixels or an OS specification. Qt
+handles screen DPI and Theme.dp handles user UI zoom independently.
+The QML content mask preserves antialiased edge coverage without a binary Win32 region; system DWM
+Acrylic fills transparent corner pixels and is therefore disabled. Activation, window controls and
+work-area maximization are explicitly handled. Unsupported systems or renderers receive
 an opaque fallback. See docs/UI_1_0_VALIDATION.md.
 
 ## Design and scope
 
 - Theme.qml centralizes colors, fonts, gaps, animation and radius tokens.
 - SwirlPillSurface remains shared by buttons, combo boxes and segmented selections.
-  Navigation uses stable 42-pixel rows and a neutral rounded selection; sidebar
-  search and content cards have their own purpose-specific radius tokens.
-- The current overview reference is 1464 x 930 logical pixels with a 252-pixel full sidebar. Below
-  width 1160 the sidebar becomes an icon rail. At narrower main widths the
-  bottom cards stack and scroll so every row remains reachable.
+  Navigation rows compress between 27 and 33 logical pixels to fit the available
+  sidebar height, then scroll independently. Non-circular controls use the shared
+  radius hierarchy clamped to their geometry; circular icon buttons retain their original circular outline.
+- The overview reference is 1464 x 930 logical pixels. The initial window is
+  derived from the current screen's available logical geometry and saved normal
+  size. Qt owns per-screen device-pixel-ratio handling; manual UI scale applies
+  through shared font and geometry tokens from 75% to 150%.
+- Sidebar width contracts with the available window width and becomes an icon
+  rail below 900 logical pixels. Overview columns use their minimum useful card
+  widths, and the page scrolls vertically when the work area cannot fit all rows.
 - Light content uses opaque neutral white (#F7F7F8), white cards
   (#FFFFFF), subtle borders (#E5E5E8) and sidebar tint (#E9E9EC).
-  The sidebar tint uses 0.82 opacity only when native DWM composition is active;
+  The sidebar tint uses 0.96 opacity on the native translucent surface;
   otherwise it is opaque. The content area always remains opaque. Dark mode
   uses corresponding neutral tokens and the same capability-based fallback.
 - Only the selected download/upload/cumulative series is drawn. Offline
@@ -108,7 +120,7 @@ entries. Never use an existing user installation directory for this test.
 
 The GitHub workflow builds Windows MSVC, runs the input checks and all-page
 smoke, checks Qt Quick previews at 100/125/150/200% effective offscreen scaling,
-and checks 1000x650, 1464x930 and 1920x1219 logical windows before packaging
+and checks 800x560, 1000x650, 1464x930 and 1920x1219 logical windows before packaging
 the production EXE. Preview warnings/errors fail the job, and per-preview logs
 are uploaded as Swirl-Quick-Preview-Diagnostics. These software previews do not
 replace native Windows GPU/DWM or multi-monitor checks. Its existing release
@@ -130,3 +142,30 @@ in `docs/UI_1_0_VALIDATION.md`. `docs/UI_VISUAL_VALIDATION.md` and
 `--window-test --window-test-output=C:/Swirl-validation` requires a test-enabled build and an unlocked native Windows desktop. It uses separate color windows to verify changing composition, movement, a blurred edge, opacity fallback, window controls, title double-click, native hit testing and work-area maximization. It temporarily brings only its own test window forward. Do not run this test on offscreen CI.
 
 Use `scripts/build-quick-windows.ps1 -InputTests -NativeBackdropTests` for native checks before producing the installer. Normal input/capture/smoke checks remain available offscreen. Production builds omit Qt Test. `--capture-native-frame=...` explicitly brings the target window forward briefly; it fails if the target cannot be activated or a composed frame cannot be saved. See `docs/UI_1_0_VALIDATION.md` for measured results and unverified environments.
+
+
+## Knot branding and HDR traffic lights
+
+The sidebar/About marks use the canonical `swirl_knot_mark_light.svg` and dark
+variant from the upstream test branch. The application/window icon uses the
+full `swirl_knot_light.svg`; the embedded Windows ICO is rasterized from that
+SVG because the upstream legacy swirl.ico still contains the blue artwork.
+
+Builds now require the Qt ShaderTools SDK (`qtshadertools` in aqt/install-qt)
+and GuiPrivate headers matching the shipped Qt 6.10.3 runtime. Baked shaders
+are embedded and do not require qsb on the user's machine. The window requests
+Qt's version-specific `_qt_sg_hdr_format=scrgb` hook; unsupported output falls
+back to SDR. HdrOutput samples the actual RHI swapchain, not a guessed Windows
+setting. The final FP16 pass linearizes ordinary SDR UI and applies Windows SDR
+white correction; only the three circular controls receive an emissive highlight
+bounded by the reported display peak. Popup/overlay content is corrected too.
+No system HDR or display settings are changed. Dark hover glyphs remain dark.
+
+`--hdr-self-test` renders the production shader into an FP16 GPU texture and
+checks above-white output, SDR fallback, white correction and dark glyphs.
+`--hdr-display-test --hdr-display-output=C:/Swirl-validation/hdr.csv` reads the
+actual HDR window backbuffer around all three controls and records nominal
+linear luminance. It requires HDR enabled and available headroom; its values
+are GPU output measurements, not a physical photometer calibration. After
+changing display HDR mode, restart to renegotiate the Qt swapchain format.
+Ordinary PNG screenshots cannot preserve the actual HDR emission range.

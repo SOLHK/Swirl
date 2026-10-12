@@ -9,12 +9,13 @@ Button {
     property bool quiet: false
     property bool danger: false
     property string iconName: ""
-    implicitWidth: Math.max(76, contents.implicitWidth + 36)
-    implicitHeight: 44
+    implicitWidth: Math.max(Theme.dp(76), contents.implicitWidth + Theme.dp(36))
+    implicitHeight:Theme.dp(44)
     hoverEnabled: true
     font.family: Theme.fontFamily
-    font.pixelSize: 17
-    leftPadding: 12; rightPadding: 12
+    font.pixelSize:Theme.fontSize(17)
+    leftPadding:Theme.dp(12); rightPadding:Theme.dp(12)
+    topPadding:Theme.dp(4); bottomPadding:Theme.dp(4)
     background: SwirlPillSurface {
         primary: control.primary
         gradient:control.quiet && !control.hovered && !control.down ? null : pillGradient
@@ -30,22 +31,30 @@ Button {
                control.primary ? Theme.primaryControl : control.down ? Theme.pressed : control.hovered ? Theme.hover : Theme.buttonBase
         border.color: control.activeFocus ? Theme.focusBorder : control.quiet ? "transparent" : Theme.pillRim
     }
-    contentItem: RowLayout {
+    contentItem: Item {
+        implicitWidth: contents.implicitWidth
+        implicitHeight: contents.implicitHeight
+        RowLayout {
         id: contents
-        spacing: 8
+        anchors.centerIn:parent
+        width:Math.min(implicitWidth,parent.width)
+        spacing:Theme.dp(8)
         SwirlIcon {
             visible: control.iconName !== ""
-            name: control.iconName; size: 23
+            name: control.iconName; size:Theme.dp(23)
             color: control.primary ? "white" : control.danger ? Theme.red : Theme.muted
         }
         Text {
-            text: control.text
+            text: AppState.zh(control.text)
             font.family: control.font.family
             font.pixelSize: control.font.pixelSize
             font.weight: Font.Normal
             Layout.fillWidth: true; elide: Text.ElideRight
             color: control.primary ? "white" : control.danger ? Theme.red : Theme.text
             Layout.alignment: Qt.AlignVCenter
+            horizontalAlignment:Text.AlignHCenter
+            verticalAlignment:Text.AlignVCenter
+        }
         }
     }
     Accessible.name: text

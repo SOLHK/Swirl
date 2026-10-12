@@ -7,7 +7,7 @@ Item {
     property int currentIndex: 0
     property bool accentSelection: false
     signal activated(int index, string value)
-    implicitHeight: 40; implicitWidth: 295
+    implicitHeight:Theme.dp(40); implicitWidth:Theme.dp(295)
     Rectangle { anchors.fill:parent; radius:Theme.pillRadius(height); color:Theme.material("field") }
     Row {
         anchors.fill: parent
@@ -25,9 +25,9 @@ Item {
                     subtleShadow: control.currentIndex === index
                 }
                 contentItem: Text {
-                    text: String(modelData)
+                    text: AppState.zh(String(modelData))
                     color: control.currentIndex === index ? control.accentSelection ? "white" : Theme.accent : Theme.muted
-                    font.pixelSize: 15; font.family:Theme.fontFamily
+                    font.pixelSize:Theme.fontSize(15); font.family:Theme.fontFamily
                     horizontalAlignment:Text.AlignHCenter; verticalAlignment:Text.AlignVCenter
                 }
                 onClicked: { control.currentIndex = index; control.activated(index,String(modelData)) }

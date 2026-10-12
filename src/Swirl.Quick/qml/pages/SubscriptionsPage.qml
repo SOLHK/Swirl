@@ -15,68 +15,69 @@ Item {
         {id:"s2",name:"旅行节点",source:"https://provider.example.test/sub/travel",nodes:16,used:69,limit:150,
          update:"2026-10-09 21:05",status:"Healthy",interval:"12 hours"},
         {id:"s3",name:"备用订阅",source:"https://provider.example.test/sub/backup",nodes:0,used:0,limit:100,
-         update:"2026-10-07 12:45",status:"错误（模拟）",interval:"最近 24 小时"}
+         update:"2026-10-07 12:45",status:"错误",interval:"最近 24 小时"}
     ]
     readonly property var listed:providers.filter(function(r){
         return (r.name+" "+r.source).toLowerCase().indexOf(search.text.toLowerCase())>=0
     })
     ColumnLayout {
-        anchors.fill:parent; anchors.margins:23; spacing:14
+        anchors.fill:parent; anchors.margins:Theme.dp(23); spacing:Theme.dp(14)
         RowLayout {
             Layout.fillWidth:true
-            SwirlStatusBadge { label:AppState.zh("订阅管理 · 模拟数据"); tone:"accent" }
-            Text { text:AppState.zh("No remote URLs are requested or saved."); color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
+            SwirlStatusBadge { label:AppState.zh("订阅管理 · "); tone:"accent" }
+            Text { text:AppState.zh("No remote URLs are requested or saved."); color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
             SwirlButton { text:AppState.zh("Update all (demo)"); iconName:"refresh"; onClicked:AppState.notice("更新订阅") }
             SwirlButton { text:AppState.zh("Add subscription"); primary:true; onClicked:addDialog.open() }
         }
         RowLayout {
-            Layout.fillWidth:true; spacing:12
+            Layout.fillWidth:true; spacing:Theme.dp(12)
             SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:AppState.zh("Search subscription providers") }
-            Text { text:AppState.zh("Auto update"); color:Theme.muted; font.pixelSize:12 }
+            Text { text:AppState.zh("Auto update"); color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
             SwirlToggle { checked:page.scheduleEnabled; onToggled:page.scheduleEnabled=checked }
             SwirlComboBox { model:["Every 6 hours","Every 12 hours","Daily","Weekly","Off"] }
         }
         RowLayout {
-            Layout.fillWidth:true; Layout.fillHeight:true; spacing:14
+            Layout.fillWidth:true; Layout.fillHeight:true; spacing:Theme.dp(14)
             SwirlGlassPanel {
                 Layout.fillWidth:true; Layout.fillHeight:true
                 ScrollView {
                     id:scroll
-                    anchors.fill:parent; anchors.margins:16; clip:true
+                    anchors.fill:parent; anchors.margins:Theme.dp(16); clip:true
                     ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
                     ColumnLayout {
-                        width:scroll.availableWidth; spacing:12
+                        width:scroll.availableWidth; spacing:Theme.dp(12)
                         Repeater {
                             model:page.listed
                             SwirlGlassPanel {
                                 id:provider
                                 property var record:modelData
                                 Layout.fillWidth:true
-                                Layout.preferredHeight:151
+                                Layout.preferredHeight:Math.max(Theme.dp(178),providerContent.implicitHeight+Theme.dp(30))
                                 selected:page.chosen&&page.chosen.id===record.id
                                 ColumnLayout {
-                                    anchors.fill:parent; anchors.margins:15; spacing:9
+                                    id:providerContent
+                                    anchors.fill:parent; anchors.margins:Theme.dp(15); spacing:Theme.dp(9)
                                     RowLayout {
                                         Layout.fillWidth:true
-                                        SwirlIcon { name:"refresh"; size:18; color:Theme.accent }
-                                        Text { text:record.name; color:Theme.text; font.pixelSize:15; font.weight:Font.DemiBold; Layout.fillWidth:true }
-                                        SwirlStatusBadge { label:record.status; tone:record.status==="Healthy"?"success":"warning" }
+                                        SwirlIcon { name:"refresh"; size:Theme.dp(18); color:Theme.accent }
+                                        Text { text:record.name; color:Theme.text; font.pixelSize:Theme.fontSize(15); font.weight:Font.DemiBold; Layout.fillWidth:true }
+                                        SwirlStatusBadge { label:AppState.zh(record.status); tone:record.status==="Healthy"?"success":"warning" }
                                     }
-                                    Text { text:record.source; color:Theme.muted; font.pixelSize:11; Layout.fillWidth:true; elide:Text.ElideMiddle }
+                                    Text { text:record.source; color:Theme.muted; font.pixelSize:Theme.fontSize(11); Layout.fillWidth:true; elide:Text.ElideMiddle }
                                     Rectangle {
-                                        Layout.fillWidth:true; height:7; radius:Theme.roundedRadius(width,height); color:Theme.field
+                                        Layout.fillWidth:true; height:Theme.dp(7); radius:Theme.roundedRadius(width,height); color:Theme.field
                                         Rectangle { width:parent.width*record.used/record.limit; height:parent.height; radius:Theme.roundedRadius(width,height); color:record.used/record.limit>.75?Theme.orange:Theme.accent }
                                     }
                                     RowLayout {
                                         Layout.fillWidth:true
-                                        Text { text:record.used+" GB / "+record.limit+" GB · 模拟流量"; color:Theme.muted; font.pixelSize:11; Layout.fillWidth:true }
-                                        Text { text:record.nodes+" 个节点"; color:Theme.text; font.pixelSize:11 }
+                                        Text { text:record.used+" GB / "+record.limit+" GB"; color:Theme.muted; font.pixelSize:Theme.fontSize(11); Layout.fillWidth:true }
+                                        Text { text:record.nodes+" 个节点"; color:Theme.text; font.pixelSize:Theme.fontSize(11) }
                                     }
                                     RowLayout {
                                         Layout.fillWidth:true
-                                        Text { text:AppState.zh("Updated ")+record.update; color:Theme.muted; font.pixelSize:11; Layout.fillWidth:true }
-                                        SwirlButton { text:AppState.zh("Details"); quiet:true; onClicked:page.chosen=record }
-                                        SwirlButton { text:AppState.zh("Refresh"); iconName:"refresh"; onClicked:AppState.notice("刷新订阅源"+record.name) }
+                                        Text { text:AppState.zh("Updated ")+record.update; color:Theme.muted; font.pixelSize:Theme.fontSize(11); Layout.fillWidth:true }
+                                        SwirlButton { text:AppState.zh("Details"); implicitHeight:Theme.dp(32); quiet:false; onClicked:page.chosen=record }
+                                        SwirlButton { text:AppState.zh("Refresh"); implicitHeight:Theme.dp(32); iconName:"refresh"; onClicked:AppState.notice("刷新订阅源"+record.name) }
                                     }
                                 }
                             }
@@ -85,13 +86,18 @@ Item {
                 }
             }
             SwirlGlassPanel {
-                Layout.preferredWidth:284; Layout.fillHeight:true
+                Layout.preferredWidth:Theme.dp(284); Layout.fillHeight:true
                 ColumnLayout {
-                    anchors.fill:parent; anchors.margins:18; spacing:13
-                    Text { text:AppState.zh("Provider inspector"); color:Theme.text; font.pixelSize:16; font.weight:Font.DemiBold }
+                    anchors.fill:parent; anchors.margins:Theme.dp(18); spacing:Theme.dp(12)
+                    ScrollView {
+                        id:detailScroll0; Layout.fillWidth:true; Layout.fillHeight:true; clip:true
+                        ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
+                        ColumnLayout {
+                    width:detailScroll0.availableWidth; spacing:Theme.dp(13)
+                    Text { text:AppState.zh("Provider inspector"); color:Theme.text; font.pixelSize:Theme.fontSize(16); font.weight:Font.DemiBold }
                     Text {
                         text:page.chosen?page.chosen.name:"请选择订阅"
-                        color:Theme.accent; font.pixelSize:15; font.weight:Font.DemiBold
+                        color:Theme.accent; font.pixelSize:Theme.fontSize(15); font.weight:Font.DemiBold
                         wrapMode:Text.WordWrap; Layout.fillWidth:true
                     }
                     Repeater {
@@ -102,14 +108,18 @@ Item {
                                ["已用流量",page.chosen?page.chosen.used+" GB":"—"],
                                ["流量限额",page.chosen?page.chosen.limit+" GB":"—"]]
                         ColumnLayout {
-                            Layout.fillWidth:true; spacing:3
-                            Text { text:modelData[0]; color:Theme.muted; font.pixelSize:10 }
-                            Text { text:modelData[1]; color:Theme.text; font.pixelSize:13; Layout.fillWidth:true; elide:Text.ElideRight }
+                            Layout.fillWidth:true; spacing:Theme.dp(3)
+                            Text { text:AppState.zh(modelData[0]); color:Theme.muted; font.pixelSize:Theme.fontSize(10) }
+                            Text { text:AppState.zh(modelData[1]); color:Theme.text; font.pixelSize:Theme.fontSize(13); Layout.fillWidth:true; elide:Text.ElideRight }
                         }
                     }
-                    Item { Layout.fillHeight:true }
+
+                        }
+                    }
+
                     SwirlButton { text:AppState.zh("编辑订阅源"); onClicked:addDialog.open() }
                     SwirlButton { text:AppState.zh("View update errors"); onClicked:AppState.notice("订阅错误详情") }
+
                 }
             }
         }
@@ -117,17 +127,17 @@ Item {
     SwirlDialog {
         id:addDialog; title:"订阅来源"
         ColumnLayout {
-            width:parent.width; spacing:12
+            width:parent.width; spacing:Theme.dp(12)
             Text { text:AppState.zh("Display name"); color:Theme.text }
             SwirlTextField { id:displayName; Layout.fillWidth:true; placeholderText:AppState.zh("My subscription") }
             Text { text:AppState.zh("HTTPS URL (stored only in preview memory)"); color:Theme.text }
             SwirlTextField { id:urlField; Layout.fillWidth:true; placeholderText:AppState.zh("https://provider.example.test/sub") }
-            Text { text:AppState.zh("Real subscriptions, credentials and tokens are not downloaded or saved."); color:Theme.muted; font.pixelSize:11; Layout.fillWidth:true; wrapMode:Text.WordWrap }
+            Text { text:AppState.zh("Real subscriptions, credentials and tokens are not downloaded or saved."); color:Theme.muted; font.pixelSize:Theme.fontSize(11); Layout.fillWidth:true; wrapMode:Text.WordWrap }
             RowLayout {
                 Layout.alignment:Qt.AlignRight
                 SwirlButton { text:AppState.zh("Cancel"); onClicked:addDialog.close() }
                 SwirlButton {
-                    text:AppState.zh("添加演示"); primary:true
+                    text:AppState.zh("添加"); primary:true
                     enabled:displayName.text.trim().length>0&&urlField.text.startsWith("https://")
                     onClicked:{
                         page.providers=page.providers.concat([{id:"s"+Date.now(),name:displayName.text.trim(),

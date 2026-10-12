@@ -3,29 +3,31 @@ import QtQuick.Controls
 import SwirlQuick
 ComboBox {
     id: control
-    implicitWidth: 146
-    implicitHeight: 44
+    implicitWidth:Theme.dp(146)
+    implicitHeight:Theme.dp(44)
     hoverEnabled: true
     font.family: "Microsoft YaHei UI"
-    font.pixelSize: 17
-    leftPadding: 15; rightPadding: 31
+    font.pixelSize:Theme.fontSize(17)
+    leftPadding:Theme.dp(15); rightPadding:Theme.dp(31)
+    topPadding:Theme.dp(4); bottomPadding:Theme.dp(4)
     contentItem: Text {
-        text: control.displayText
+        text: AppState.zh(control.displayText)
         color: Theme.text
         font: control.font
         verticalAlignment: Text.AlignVCenter
+        horizontalAlignment:Text.AlignHCenter
         elide: Text.ElideRight
-        leftPadding: 4; rightPadding: 4
+        leftPadding:Theme.dp(4); rightPadding:Theme.dp(4)
     }
     indicator: Canvas {
         id: chevron
-        x: control.width-width-13; y: (control.height-height)/2
-        width: 14; height: 14
+        x: control.width-width-Theme.dp(13); y: (control.height-height)/2
+        width:Theme.dp(14); height:Theme.dp(14)
         onPaint: {
             var ctx=getContext("2d")
             ctx.reset(); ctx.strokeStyle=Theme.muted
-            ctx.lineWidth=1.65; ctx.lineCap="round"; ctx.lineJoin="round"
-            ctx.beginPath(); ctx.moveTo(3,5); ctx.lineTo(7,9); ctx.lineTo(11,5); ctx.stroke()
+            ctx.lineWidth=Theme.dp(1.65); ctx.lineCap="round"; ctx.lineJoin="round"
+            ctx.beginPath(); ctx.moveTo(Theme.dp(3),Theme.dp(5)); ctx.lineTo(Theme.dp(7),Theme.dp(9)); ctx.lineTo(Theme.dp(11),Theme.dp(5)); ctx.stroke()
         }
         Connections { target: Theme; function onMutedChanged() { chevron.requestPaint() } }
     }
@@ -34,30 +36,30 @@ ComboBox {
         radius: Theme.pillRadius(height)
         antialiasing: true
         color: control.pressed ? Theme.pressed : control.hovered ? Theme.hover : Theme.material("field")
-        border.width: 1
+        border.width:Theme.dp(1)
         border.color: control.activeFocus ? Theme.focusBorder : Theme.pillRim
         Behavior on color { ColorAnimation { duration: Theme.motion } }
     }
     delegate: ItemDelegate {
-        width: control.width
-        height: 36
+        width: control.popup.availableWidth
+        height:Theme.dp(36)
         text: String(modelData)
         highlighted: control.highlightedIndex === index
         contentItem: Text {
-            text: parent.text
-            color: Theme.text; font.pixelSize: 17; font.family: "Microsoft YaHei UI"
-            verticalAlignment: Text.AlignVCenter; leftPadding: 12
+            text: AppState.zh(parent.text)
+            color: Theme.text; font.pixelSize:Theme.fontSize(17); font.family: "Microsoft YaHei UI"
+            verticalAlignment: Text.AlignVCenter; leftPadding:Theme.dp(12)
         }
         background: Rectangle {
-            radius: Theme.controlRadius; color: parent.highlighted ? Theme.selected : "transparent"
+            radius: Theme.controlRadius; antialiasing:true; color: parent.highlighted ? Theme.selected : "transparent"
             Behavior on color { ColorAnimation { duration: Theme.motion } }
         }
     }
     popup: Popup {
-        y: control.height + 7
+        y: control.height + Theme.dp(7)
         width: control.width
-        padding: 6
-        implicitHeight: Math.min(290, contentItem.implicitHeight+12)
+        padding:Theme.dp(6)
+        implicitHeight: Math.min(Theme.dp(290), contentItem.implicitHeight+Theme.dp(12))
         enter: Transition {
             ParallelAnimation {
                 NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.motion }
@@ -67,8 +69,8 @@ ComboBox {
         exit: Transition { NumberAnimation { property: "opacity"; from: 1; to: 0; duration: Theme.motion } }
         background: Rectangle {
             color: Theme.material("floating")
-            radius: Theme.secondaryRadius
-            border.width: 1; border.color: Theme.pillRim
+            radius: Theme.popupRadius; antialiasing:true
+            border.width:Theme.dp(1); border.color: Theme.pillRim
         }
         contentItem: ListView {
             clip: true

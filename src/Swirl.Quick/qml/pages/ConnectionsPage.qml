@@ -23,10 +23,10 @@ Item {
     }
     ColumnLayout {
         anchors.fill:parent
-        anchors.leftMargin:23; anchors.rightMargin:23; anchors.bottomMargin:14
-        spacing:14
+        anchors.leftMargin:Theme.dp(23); anchors.rightMargin:Theme.dp(23); anchors.bottomMargin:Theme.dp(14)
+        spacing:Theme.dp(14)
         RowLayout {
-            Layout.fillWidth:true; spacing:10
+            Layout.fillWidth:true; spacing:Theme.dp(10)
             SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:AppState.zh("搜索域名、IP、进程或策略") }
             SwirlComboBox { id:status; model:["全部状态","Active","Closed"] }
             SwirlComboBox { id:sort; model:["Host","Latency","Downloaded","Process"] }
@@ -34,18 +34,18 @@ Item {
             SwirlButton { text:AppState.zh("Clear"); onClicked:{selected=null;AppState.notice("清空连接记录")} }
         }
         RowLayout {
-            Layout.fillWidth:true; spacing:8
-            SwirlStatusBadge { label:visibleRows.length+" 条演示记录"; tone:"accent" }
-            Text { text:AppState.zh("Click a row to examine a connection"); color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
-            SwirlButton { text:AppState.detailOpen?"隐藏详情":"显示详情"; quiet:true; onClicked:AppState.detailOpen=!AppState.detailOpen }
+            Layout.fillWidth:true; spacing:Theme.dp(8)
+            SwirlStatusBadge { label:visibleRows.length+" 条记录"; tone:"accent" }
+            Text { text:AppState.zh("Click a row to examine a connection"); color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
+            SwirlButton { text:AppState.detailOpen?"隐藏详情":"显示详情"; quiet:false; onClicked:AppState.detailOpen=!AppState.detailOpen }
         }
         RowLayout {
-            Layout.fillWidth:true; Layout.fillHeight:true; spacing:14
+            Layout.fillWidth:true; Layout.fillHeight:true; spacing:Theme.dp(14)
             SwirlGlassPanel {
                 Layout.fillWidth:true; Layout.fillHeight:true
                 clip:true
                 SwirlDataTable {
-                    anchors.fill:parent; anchors.margins:1
+                    anchors.fill:parent; anchors.margins:Theme.dp(1)
                     rows:page.visibleRows
                     selectedId:page.selected?page.selected.id:""
                     columns:[
@@ -66,10 +66,15 @@ Item {
             }
             SwirlGlassPanel {
                 visible:AppState.detailOpen
-                Layout.preferredWidth:290; Layout.fillHeight:true
+                Layout.preferredWidth:Theme.dp(290); Layout.fillHeight:true
                 ColumnLayout {
-                    anchors.fill:parent; anchors.margins:20; spacing:15
-                    Text { text:AppState.zh("Connection details"); color:Theme.text; font.pixelSize:16; font.weight:Font.DemiBold }
+                    anchors.fill:parent; anchors.margins:Theme.dp(20); spacing:Theme.dp(12)
+                    ScrollView {
+                        id:detailScroll0; Layout.fillWidth:true; Layout.fillHeight:true; clip:true
+                        ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
+                        ColumnLayout {
+                    width:detailScroll0.availableWidth; spacing:Theme.dp(15)
+                    Text { text:AppState.zh("Connection details"); color:Theme.text; font.pixelSize:Theme.fontSize(16); font.weight:Font.DemiBold }
                     SwirlStatusBadge { label:page.selected?page.selected.status.toUpperCase():"尚未选择"; tone:page.selected?"success":"neutral" }
                     Repeater {
                         model:[
@@ -84,16 +89,20 @@ Item {
                             ["Established",page.selected?page.selected.time:"—"]
                         ]
                         ColumnLayout {
-                            Layout.fillWidth:true; spacing:3
-                            Text { text:modelData[0].toUpperCase(); color:Theme.muted; font.pixelSize:10 }
-                            Text { text:modelData[1]; color:Theme.text; font.pixelSize:13; elide:Text.ElideRight; Layout.fillWidth:true }
+                            Layout.fillWidth:true; spacing:Theme.dp(3)
+                            Text { text:AppState.zh(modelData[0]); color:Theme.muted; font.pixelSize:Theme.fontSize(10) }
+                            Text { text:AppState.zh(modelData[1]); color:Theme.text; font.pixelSize:Theme.fontSize(13); elide:Text.ElideRight; Layout.fillWidth:true }
                         }
                     }
-                    Item { Layout.fillHeight:true }
+
+                        }
+                    }
+
                     SwirlButton {
                         Layout.fillWidth:true; text:AppState.zh("Terminate connection"); danger:true
                         onClicked:AppState.notice("Terminate connection")
                     }
+
                 }
             }
         }

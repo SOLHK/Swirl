@@ -14,36 +14,36 @@ Item {
     ]
     property var selected:null
     property string tab:"Headers"
-    property string payload:"Accept: application/json\nContent-Type: application/json\nX-Swirl-Demo: true\n"
+    property string payload:"Accept: application/json\nContent-Type: application/json\nX-Swirl: true\n"
     ColumnLayout {
-        anchors.fill:parent; anchors.margins:23; spacing:14
+        anchors.fill:parent; anchors.margins:Theme.dp(23); spacing:Theme.dp(14)
         RowLayout {
             Layout.fillWidth:true
             SwirlStatusBadge { label:"未启用实时拦截"; tone:"warning" }
-            Text { text:"仅编辑模拟暂停请求，不会影响实际网络"; color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
+            Text { text:"仅编辑暂停请求，不会影响实际网络"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
             SwirlButton { text:"添加断点"; primary:true; onClicked:ruleDialog.open() }
         }
         SwirlGlassPanel {
-            Layout.fillWidth:true; Layout.preferredHeight:88
+            Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(88)
             RowLayout {
-                anchors.fill:parent; anchors.margins:18; spacing:15
+                anchors.fill:parent; anchors.margins:Theme.dp(18); spacing:Theme.dp(15)
                 ColumnLayout {
-                    Layout.fillWidth:true; spacing:5
-                    Text { text:"断点队列"; color:Theme.text; font.pixelSize:18; font.weight:Font.DemiBold }
-                    Text { text:"请求均为本地模拟数据，不会暂停浏览器。"; color:Theme.muted; font.pixelSize:11 }
+                    Layout.fillWidth:true; spacing:Theme.dp(5)
+                    Text { text:"断点队列"; color:Theme.text; font.pixelSize:Theme.fontSize(18); font.weight:Font.DemiBold }
+                    Text { text:"请求均为本地，不会暂停浏览器。"; color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
                 }
                 SwirlStatusBadge { label:page.records.filter(function(r){return r.status==="Paused"}).length+" 已暂停"; tone:"accent" }
-                SwirlButton { text:"全部继续（演示）"; onClicked:{
+                SwirlButton { text:"全部继续"; onClicked:{
                     page.records=page.records.map(function(r){return {id:r.id,method:r.method,url:r.url,host:r.host,status:"Continued",time:r.time}})
                 }}
             }
         }
         RowLayout {
-            Layout.fillWidth:true; Layout.fillHeight:true; spacing:14
+            Layout.fillWidth:true; Layout.fillHeight:true; spacing:Theme.dp(14)
             SwirlGlassPanel {
-                Layout.preferredWidth:380; Layout.fillHeight:true; clip:true
+                Layout.preferredWidth:Theme.dp(380); Layout.fillHeight:true; clip:true
                 SwirlDataTable {
-                    anchors.fill:parent; anchors.margins:1
+                    anchors.fill:parent; anchors.margins:Theme.dp(1)
                     rows:page.records
                     selectedId:page.selected?page.selected.id:""
                     columns:[{key:"method",label:"方法",w:87},{key:"url",label:"请求路径",w:215},
@@ -54,14 +54,14 @@ Item {
             SwirlGlassPanel {
                 Layout.fillWidth:true; Layout.fillHeight:true
                 ColumnLayout {
-                    anchors.fill:parent; anchors.margins:17; spacing:13
+                    anchors.fill:parent; anchors.margins:Theme.dp(17); spacing:Theme.dp(13)
                     RowLayout {
                         Layout.fillWidth:true
-                        Text { text:"暂停请求编辑器"; color:Theme.text; font.pixelSize:17; font.weight:Font.DemiBold; Layout.fillWidth:true }
+                        Text { text:"暂停请求编辑器"; color:Theme.text; font.pixelSize:Theme.fontSize(17); font.weight:Font.DemiBold; Layout.fillWidth:true }
                         SwirlStatusBadge { label:page.selected?page.selected.status:"尚未选择"; tone:"accent" }
                     }
                     Text {
-                        Layout.fillWidth:true; elide:Text.ElideMiddle; color:Theme.muted; font.pixelSize:12
+                        Layout.fillWidth:true; elide:Text.ElideMiddle; color:Theme.muted; font.pixelSize:Theme.fontSize(12)
                         text:page.selected?("https://"+page.selected.host+page.selected.url):"选择请求后查看详情"
                     }
                     RowLayout {
@@ -75,12 +75,12 @@ Item {
                         Layout.fillWidth:true; Layout.fillHeight:true
                         radius:Theme.roundedRadius(width,height); color:Theme.field; border.color:Theme.border
                         ScrollView {
-                            anchors.fill:parent; anchors.margins:8
+                            anchors.fill:parent; anchors.margins:Theme.dp(8)
                             TextArea {
                                 id:editor
                                 text:page.tab==="Headers"?page.payload:
-                                     page.tab==="Body"?"{\n  \"preview\": true\n}":"page=1&mode=demo"
-                                color:Theme.text; font.family:"Cascadia Code"; font.pixelSize:12
+                                     page.tab==="Body"?"{\n  \"preview\": true\n}":"page=1&mode=rule"
+                                color:Theme.text; font.family:"Cascadia Code"; font.pixelSize:Theme.fontSize(12)
                                 selectByMouse:true; wrapMode:Text.WrapAnywhere
                                 background:Rectangle { color:"transparent" }
                             }
@@ -116,7 +116,7 @@ Item {
     SwirlDialog {
         id:ruleDialog; title:"添加断点匹配条件"
         ColumnLayout {
-            width:parent.width; spacing:12
+            width:parent.width; spacing:Theme.dp(12)
             Text { text:"URL 匹配表达式"; color:Theme.text }
             SwirlTextField { id:matcher; Layout.fillWidth:true; placeholderText:"/api/*" }
             Text { text:"请求阶段"; color:Theme.text }
@@ -124,7 +124,7 @@ Item {
             RowLayout {
                 Layout.alignment:Qt.AlignRight
                 SwirlButton { text:"取消"; onClicked:ruleDialog.close() }
-                SwirlButton { text:"添加演示"; primary:true; enabled:matcher.text.trim().length>0
+                SwirlButton { text:"添加"; primary:true; enabled:matcher.text.trim().length>0
                     onClicked:{AppState.notice("添加断点匹配条件");ruleDialog.close();matcher.text=""}
                 }
             }

@@ -26,60 +26,60 @@ Item {
     onRangeIndexChanged:transition()
     onRevealChanged:repaint()
     onSamplesChanged:repaint()
-    implicitHeight:130; implicitWidth:550
+    implicitHeight:Theme.dp(130); implicitWidth:Theme.dp(550)
     NumberAnimation { id:updateAnimation; target:graph; property:"reveal"; to:1; duration:Theme.motion; easing.type:Easing.OutCubic }
     Connections { target:AppState; function onDemoTickChanged(){graph.repaint()} function onProxyOnChanged(){graph.transition()} }
     Connections { target:Theme; function onDarkChanged(){graph.repaint()} }
     Item {
-        x:0; y:4; width:66; height:plot.height
+        x:Theme.dp(0); y:Theme.dp(4); width:Theme.dp(66); height:plot.height
         Repeater {
             model:4
             Text {
                 required property int index
-                width:66; height:(plot.height-1)/3
+                width:Theme.dp(66); height:(plot.height-Theme.dp(1))/3
                 text:graph.series==="total" ? (4-index*4/3).toFixed(1)+" GB" : index===3 ? "0" : (12-index*4)+" MB/s"
-                color:Theme.muted; font.pixelSize:16; horizontalAlignment:Text.AlignRight; rightPadding:0
-                y:index*(plot.height-1)/3-8
+                color:Theme.muted; font.pixelSize:Theme.fontSize(16); horizontalAlignment:Text.AlignRight; rightPadding:Theme.dp(0)
+                y:index*(plot.height-Theme.dp(1))/3-Theme.dp(8)
             }
         }
     }
     Canvas {
         id:plot
-        x:79; y:5; width:parent.width-x-8; height:parent.height-33
+        x:Theme.dp(79); y:Theme.dp(5); width:parent.width-x-Theme.dp(8); height:parent.height-Theme.dp(33)
         onWidthChanged:requestPaint(); onHeightChanged:requestPaint()
         onPaint: {
             var c=getContext("2d");c.reset()
-            var w=width,h=height-1,n=graph.baseHistory.length
+            var w=width,h=height-Theme.dp(1),n=graph.baseHistory.length
             function X(i){return i*w/(n-1)}
             function Y(i){return h-graph.valueAt(i)*h/graph.maximum*graph.reveal}
-            c.strokeStyle=Theme.dark?"#405875":"#E0EBFA";c.lineWidth=1
+            c.strokeStyle=Theme.dark?"#405875":"#E0EBFA";c.lineWidth=Theme.dp(1)
             for(var k=0;k<4;k++){c.beginPath();c.moveTo(0,k*h/3);c.lineTo(w,k*h/3);c.stroke()}
             for(var a=0;a<5;a++){c.beginPath();c.moveTo(a*w/4,0);c.lineTo(a*w/4,h);c.stroke()}
             function curve(){c.moveTo(X(0),Y(0));for(var i=1;i<n;i++){var mid=(X(i-1)+X(i))/2;c.bezierCurveTo(mid,Y(i-1),mid,Y(i),X(i),Y(i))}}
             var color=graph.series==="up" ? Theme.green : graph.series==="total" ? Theme.muted : Theme.accent
             var gradient=c.createLinearGradient(0,0,0,h);gradient.addColorStop(0,Theme.withAlpha(color,0.35));gradient.addColorStop(1,Theme.withAlpha(color,0.06))
             c.beginPath();curve();c.lineTo(w,h);c.lineTo(0,h);c.closePath();c.fillStyle=gradient;c.fill()
-            c.beginPath();curve();c.strokeStyle=color;c.lineWidth=2;c.stroke()
-            if(hover.containsMouse){var ix=Math.round(hover.mouseX/w*(n-1));c.beginPath();c.moveTo(X(ix),0);c.lineTo(X(ix),h);c.strokeStyle=Theme.withAlpha(color,0.4);c.stroke();c.beginPath();c.arc(X(ix),Y(ix),3,0,Math.PI*2);c.fillStyle=color;c.fill()}
+            c.beginPath();curve();c.strokeStyle=color;c.lineWidth=Theme.dp(2);c.stroke()
+            if(hover.containsMouse){var ix=Math.round(hover.mouseX/w*(n-1));c.beginPath();c.moveTo(X(ix),0);c.lineTo(X(ix),h);c.strokeStyle=Theme.withAlpha(color,0.4);c.stroke();c.beginPath();c.arc(X(ix),Y(ix),Theme.dp(3),0,Math.PI*2);c.fillStyle=color;c.fill()}
         }
         MouseArea {
             id:hover; anchors.fill:parent; hoverEnabled:true
             onPositionChanged:plot.requestPaint(); onContainsMouseChanged:plot.requestPaint()
-            ToolTip.visible:containsMouse
+            ToolTip.visible:containsMouse&&!previewCaptureMode
             ToolTip.text: {
                 var i=Math.max(0,Math.min(graph.baseHistory.length-1,Math.round(mouseX/width*(graph.baseHistory.length-1))))
                 var when=new Date(AppState.sessionNow.getTime()-(1-i/(graph.baseHistory.length-1))*graph.rangeMinutes*60000)
-                return Qt.formatDateTime(when,"MM-dd HH:mm")+" · "+graph.valueAt(i).toFixed(2)+(graph.series==="total" ? " GB" : " MB/s")+(i===graph.baseHistory.length-1 ? " · 当前演示" : " · 历史演示")
+                return Qt.formatDateTime(when,"MM-dd HH:mm")+" · "+graph.valueAt(i).toFixed(2)+(graph.series==="total" ? " GB" : " MB/s")+(i===graph.baseHistory.length-1 ? " · 当前" : " · 历史")
             }
         }
     }
     Row {
-        x:plot.x; y:parent.height-22; width:plot.width
+        x:plot.x; y:parent.height-Theme.dp(22); width:plot.width
         Repeater {
             model:5
             Text {
                 required property int index
-                width:plot.width/5; font.pixelSize:14; color:Theme.muted
+                width:plot.width/5; font.pixelSize:Theme.fontSize(14); color:Theme.muted
                 horizontalAlignment:index===0?Text.AlignLeft:index===4?Text.AlignRight:Text.AlignHCenter
                 text:index===4 ? "现在" : graph.rangeIndex<2 ? ["1小时前","45分钟前","30分钟前","15分钟前"][index] : (graph.rangeMinutes*(1-index/4)/60)+"小时前"
             }

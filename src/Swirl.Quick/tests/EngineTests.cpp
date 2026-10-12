@@ -1,0 +1,253 @@
+#include "engine/MihomoAdapter.h"
+#include <QCoreApplication>
+#include <QCryptographicHash>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QNetworkReply>
+#include <QNetworkProxy>
+#include <QSettings>
+#include <QSignalSpy>
+#include <QStandardPaths>
+#include <QTemporaryDir>
+#include <QTest>
+#ifdef Q_OS_WIN
+#include <windows.h>
+#endif
+
+class EngineTests : public QObject {
+    Q_OBJECT
+    EngineStartOptions options() {
+        EngineStartOptions result;
+        result.executablePath = QCoreApplication::applicationDirPath() + "/SwirlEngineFixture.exe";
+#ifndef Q_OS_WIN
+        result.executablePath.chop(4);
+#endif
+        QFile file(result.executablePath);
+        if (!file.open(QIODevice::ReadOnly)) return result;
+        QCryptographicHash hash(QCryptographicHash::Sha256); hash.addData(&file);
+        result.expectedSha256 = hash.result().toHex(); result.expectedVersion = "vfixture";
+        QTcpServer port; port.listen(QHostAddress::LocalHost, 0); result.controlPort = port.serverPort();
+        result.startupTimeoutMs = 2500; result.requestTimeoutMs = 150; result.healthIntervalMs = 100;
+        return result;
+    }
+    static bool processExists(qint64 pid) {
+#ifdef Q_OS_WIN
+        HANDLE process = OpenProcess(SYNCHRONIZE, FALSE, DWORD(pid));
+        if (!process) return false;
+        const bool exists = WaitForSingleObject(process, 0) == WAIT_TIMEOUT;
+        CloseHandle(process); return exists;
+#else
+        Q_UNUSED(pid); return false;
+#endif
+    }
+    static bool terminateOwned(qint64 pid) {
+#ifdef Q_OS_WIN
+        HANDLE process = OpenProcess(PROCESS_TERMINATE, FALSE, DWORD(pid));
+        if (!process) return false;
+        const bool result = TerminateProcess(process, 42); CloseHandle(process); return result;
+#else
+        Q_UNUSED(pid); return false;
+#endif
+    }
+    static QVariantMap systemProxy() {
+        QVariantMap result;
+#ifdef Q_OS_WIN
+        QSettings settings("HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings", QSettings::NativeFormat);
+        for (const auto &key : {"ProxyEnable", "ProxyServer", "ProxyOverride", "AutoConfigURL"}) result.insert(key, settings.value(key));
+#endif
+        return result;
+    }
+    static void writeControl(const QString &path, const QByteArray &value) {
+        QFile file(path); QVERIFY(file.open(QIODevice::WriteOnly)); QCOMPARE(file.write(value), qint64(value.size()));
+    }
+private slots:
+    void initTestCase() { QStandardPaths::setTestModeEnabled(true); }
+    void cleanup() { qunsetenv("SWIRL_FIXTURE_MODE"); qunsetenv("SWIRL_FIXTURE_CONTROL"); }
+    void missingAndTampered() {
+        MihomoAdapter engine;
+        auto config = options(); config.executablePath += ".missing";
+        engine.start(config);
+        QCOMPARE(engine.status().error, ProxyEngine::Error::MissingExecutable);
+        QVERIFY(engine.status().message.contains(config.executablePath)); QVERIFY(!engine.status().processAlive);
+        config = options(); config.expectedSha256 = QByteArray(64, '0'); engine.start(config);
+        QCOMPARE(engine.status().error, ProxyEngine::Error::IntegrityMismatch); QVERIFY(!engine.status().processAlive);
+    }
+    void invalidOptions() {
+        MihomoAdapter engine; auto config = options(); config.executablePath = "relative.exe";
+        engine.start(config); QCOMPARE(engine.status().error, ProxyEngine::Error::InvalidOptions);
+        config = options(); config.controlPort = 0; engine.start(config);
+        QCOMPARE(engine.status().error, ProxyEngine::Error::InvalidOptions);
+    }
+    void invalidExecutable() {
+        QTemporaryDir temp; QVERIFY(temp.isValid());
+        const auto path = temp.filePath("invalid.exe"); writeControl(path, "not an executable");
+        auto config = options(); config.executablePath = path;
+        config.expectedSha256 = QCryptographicHash::hash("not an executable", QCryptographicHash::Sha256).toHex();
+        MihomoAdapter engine; engine.start(config);
+        QTRY_COMPARE_WITH_TIMEOUT(engine.status().error, ProxyEngine::Error::ProcessStartFailed, 5000);
+        QVERIFY(!engine.status().processAlive);
+    }
+    void portConflict() {
+        QTcpServer occupied; QVERIFY(occupied.listen(QHostAddress::AnyIPv4, 0));
+        auto config = options(); config.controlPort = occupied.serverPort();
+        MihomoAdapter engine; engine.start(config);
+        QCOMPARE(engine.status().error, ProxyEngine::Error::PortConflict); QVERIFY(!engine.status().processAlive);
+        QVERIFY(occupied.isListening());
+    }
+    void failures_data() {
+        QTest::addColumn<QByteArray>("mode"); QTest::addColumn<int>("error");
+        QTest::newRow("config-rejected") << QByteArray("config-error") << int(ProxyEngine::Error::ConfigurationFailed);
+        QTest::newRow("exit-at-start") << QByteArray("start-exit") << int(ProxyEngine::Error::UnexpectedExit);
+        QTest::newRow("version-hangs") << QByteArray("hang-version") << int(ProxyEngine::Error::StartupTimeout);
+        QTest::newRow("api-not-listening") << QByteArray("no-api") << int(ProxyEngine::Error::StartupTimeout);
+        QTest::newRow("api-unauthorized") << QByteArray("auth") << int(ProxyEngine::Error::StartupTimeout);
+        QTest::newRow("malformed-json") << QByteArray("bad-json") << int(ProxyEngine::Error::StartupTimeout);
+        QTest::newRow("mismatched-api-version") << QByteArray("wrong-version") << int(ProxyEngine::Error::StartupTimeout);
+        QTest::newRow("unsafe-runtime") << QByteArray("unsafe") << int(ProxyEngine::Error::ConfigurationFailed);
+    }
+    void failures() {
+        QFETCH(QByteArray, mode); QFETCH(int, error); qputenv("SWIRL_FIXTURE_MODE", mode);
+        auto config = options(); config.startupTimeoutMs = 1200;
+        MihomoAdapter engine; engine.start(config);
+        QTRY_COMPARE_WITH_TIMEOUT(engine.status().state, ProxyEngine::State::Failed, 5000);
+        QCOMPARE(int(engine.status().error), error);
+        QTRY_VERIFY_WITH_TIMEOUT(!engine.status().processAlive, 3000);
+        QVERIFY(!engine.status().apiHealthy);
+    }
+    void lifecycleAndCleanup() {
+        const auto proxyBefore = systemProxy();
+        MihomoAdapter engine; const auto config = options(); QSignalSpy spy(&engine, &ProxyEngine::statusChanged);
+        for (int i = 0; i < 8; ++i) {
+            engine.start(config); engine.start(config);
+            QTRY_COMPARE_WITH_TIMEOUT(engine.status().state, ProxyEngine::State::Running, 5000);
+            QVERIFY(engine.status().processAlive); QVERIFY(engine.status().apiHealthy);
+            const auto pid = engine.status().processId; QVERIFY(pid > 0);
+            engine.start(config); QCOMPARE(engine.status().processId, pid);
+            QCOMPARE(engine.status().version, QString("vfixture"));
+            const auto configPath = engine.status().configPath;
+            QFile file(configPath); QVERIFY(file.open(QIODevice::ReadOnly));
+            const auto contents = file.readAll(); file.close();
+            QVERIFY(contents.contains("tun:\n  enable: false")); QVERIFY(contents.contains("dns:\n  enable: false"));
+            QVERIFY(contents.contains("external-controller: '127.0.0.1:"));
+            QVERIFY(engine.configurationSummary().contains("已隐藏"));
+            engine.stop(); engine.stop();
+            QTRY_COMPARE_WITH_TIMEOUT(engine.status().state, ProxyEngine::State::Stopped, 4000);
+            QVERIFY(!engine.status().processAlive); QVERIFY(!engine.status().apiHealthy);
+            QVERIFY(!QFile::exists(configPath)); QVERIFY(!processExists(pid));
+        }
+        QVERIFY(spy.count() >= 32); QCOMPARE(systemProxy(), proxyBefore);
+    }
+    void healthFailureAndRecovery() {
+        QTemporaryDir temp; QVERIFY(temp.isValid()); const auto control = temp.filePath("control");
+        writeControl(control, "ok"); qputenv("SWIRL_FIXTURE_CONTROL", control.toUtf8());
+        MihomoAdapter engine; engine.start(options());
+        QTRY_COMPARE_WITH_TIMEOUT(engine.status().state, ProxyEngine::State::Running, 5000);
+        const auto pid = engine.status().processId;
+        for (const auto &mode : {QByteArray("timeout"), QByteArray("auth"), QByteArray("bad-json"), QByteArray("oversize")}) {
+            writeControl(control, mode);
+            QTRY_COMPARE_WITH_TIMEOUT(engine.status().state, ProxyEngine::State::Degraded, 3000);
+            QVERIFY(engine.status().processAlive); QVERIFY(!engine.status().apiHealthy); QCOMPARE(engine.status().processId, pid);
+            QVERIFY(!engine.status().message.isEmpty());
+            if (mode == "auth") QCOMPARE(engine.status().error, ProxyEngine::Error::AuthenticationFailed);
+            if (mode == "bad-json") QCOMPARE(engine.status().error, ProxyEngine::Error::InvalidResponse);
+            writeControl(control, "ok");
+            QTRY_COMPARE_WITH_TIMEOUT(engine.status().state, ProxyEngine::State::Running, 3000);
+            QVERIFY(engine.status().apiHealthy); QVERIFY(engine.status().message.isEmpty());
+        }
+        engine.stop(); QTRY_COMPARE_WITH_TIMEOUT(engine.status().state, ProxyEngine::State::Stopped, 4000);
+    }
+    void unexpectedExitAndDestructor() {
+#ifndef Q_OS_WIN
+        QSKIP("Windows ownership test");
+#else
+        auto engine = std::make_unique<MihomoAdapter>(); const auto config = options(); engine->start(config);
+        QTRY_COMPARE_WITH_TIMEOUT(engine->status().state, ProxyEngine::State::Running, 5000);
+        QVERIFY(terminateOwned(engine->status().processId));
+        QTRY_COMPARE_WITH_TIMEOUT(engine->status().state, ProxyEngine::State::Failed, 4000);
+        QCOMPARE(engine->status().error, ProxyEngine::Error::UnexpectedExit); QVERIFY(!engine->status().apiHealthy);
+        engine->start(config); QTRY_COMPARE_WITH_TIMEOUT(engine->status().state, ProxyEngine::State::Running, 5000);
+        const auto pid = engine->status().processId; engine.reset(); QVERIFY(!processExists(pid));
+#endif
+    }
+    void stopDuringValidation() {
+        qputenv("SWIRL_FIXTURE_MODE", "hang-version");
+        MihomoAdapter engine; auto config = options(); engine.start(config); engine.stop();
+        QTRY_COMPARE_WITH_TIMEOUT(engine.status().state, ProxyEngine::State::Stopped, 4000);
+        qunsetenv("SWIRL_FIXTURE_MODE"); engine.start(config);
+        QTRY_COMPARE_WITH_TIMEOUT(engine.status().state, ProxyEngine::State::Running, 5000);
+        engine.stop(); QTRY_COMPARE_WITH_TIMEOUT(engine.status().state, ProxyEngine::State::Stopped, 4000);
+    }
+    void executablePathWithSpacesAndMetacharacters() {
+        QTemporaryDir temp; QVERIFY(temp.isValid());
+        auto config = options(); const auto relocated = temp.filePath(QStringLiteral("engine & 空格.exe"));
+        QVERIFY(QFile::copy(config.executablePath, relocated)); config.executablePath = relocated;
+        MihomoAdapter engine; engine.start(config);
+        QTRY_COMPARE_WITH_TIMEOUT(engine.status().state, ProxyEngine::State::Running, 5000);
+        engine.stop(); QTRY_COMPARE_WITH_TIMEOUT(engine.status().state, ProxyEngine::State::Stopped, 4000);
+    }
+    void abruptHostExitReapsJob() {
+#ifndef Q_OS_WIN
+        QSKIP("Windows atomic job ownership test");
+#else
+        QTemporaryDir temp; QVERIFY(temp.isValid()); const auto pidFile = temp.filePath("pid.txt");
+        QProcess host;
+        host.start(QCoreApplication::applicationFilePath(), {"--ownership-host", pidFile});
+        QVERIFY(host.waitForStarted(3000));
+        QTRY_VERIFY_WITH_TIMEOUT(QFile::exists(pidFile), 3000);
+        QFile file(pidFile); QVERIFY(file.open(QIODevice::ReadOnly)); const auto pid = file.readAll().toLongLong(); file.close();
+        QVERIFY(pid > 0); QVERIFY(processExists(pid));
+        host.kill(); QVERIFY(host.waitForFinished(3000));
+        QTRY_VERIFY_WITH_TIMEOUT(!processExists(pid), 3000);
+#endif
+    }
+    void realEngine() {
+        if (!qEnvironmentVariableIsSet("SWIRL_REAL_ENGINE_TEST")) QSKIP("Opt-in real Mihomo integration; run CTest swirl-engine-real");
+        QFile manifest(QString::fromUtf8(SWIRL_TEST_MANIFEST)); QVERIFY(manifest.open(QIODevice::ReadOnly));
+        const auto object = QJsonDocument::fromJson(manifest.readAll()).object();
+        auto config = options(); config.executablePath = QCoreApplication::applicationDirPath() + "/core/mihomo.exe";
+        config.expectedVersion = object.value("version").toString();
+        config.expectedSha256 = object.value("executableSha256").toString().toLatin1(); config.startupTimeoutMs = 15000;
+        const auto proxyBefore = systemProxy();
+        MihomoAdapter engine;
+        for (int i = 0; i < 5; ++i) {
+            engine.start(config);
+            QTRY_COMPARE_WITH_TIMEOUT(engine.status().state, ProxyEngine::State::Running, 16000);
+            QVERIFY(engine.status().apiHealthy); QVERIFY(engine.status().processAlive);
+            QCOMPARE(engine.status().version, config.expectedVersion); QCOMPARE(engine.status().mode, QString("direct"));
+            if (i == 0) {
+                QNetworkAccessManager client; client.setProxy(QNetworkProxy::NoProxy);
+                auto *reply = client.get(QNetworkRequest(QUrl(engine.status().controlEndpoint + "/version")));
+                QSignalSpy complete(reply, &QNetworkReply::finished);
+                QVERIFY(complete.wait(3000));
+                QCOMPARE(reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt(), 401);
+                reply->deleteLater();
+            }
+            const auto pid = engine.status().processId; const auto path = engine.status().configPath;
+            if (i == 2) {
+#ifdef Q_OS_WIN
+                QVERIFY(terminateOwned(pid)); QTRY_COMPARE_WITH_TIMEOUT(engine.status().state, ProxyEngine::State::Failed, 4000);
+                QCOMPARE(engine.status().error, ProxyEngine::Error::UnexpectedExit);
+#endif
+            }
+            engine.stop(); QTRY_COMPARE_WITH_TIMEOUT(engine.status().state, ProxyEngine::State::Stopped, 4000);
+            QVERIFY(!processExists(pid)); QVERIFY(!QFile::exists(path));
+        }
+        QCOMPARE(systemProxy(), proxyBefore);
+    }
+};
+int main(int argc, char **argv) {
+    QCoreApplication app(argc, argv);
+    if (app.arguments().contains("--ownership-host")) {
+        OwnedProcess child;
+        if (!child.ownershipReady()) return 2;
+        child.start(QCoreApplication::applicationDirPath() + "/SwirlEngineFixture.exe", {"--idle"});
+        if (!child.waitForStarted(3000)) return 3;
+        QFile pidFile(app.arguments().last());
+        if (!pidFile.open(QIODevice::WriteOnly)) return 4;
+        pidFile.write(QByteArray::number(child.processId())); pidFile.close();
+        return app.exec();
+    }
+    EngineTests tests;
+    return QTest::qExec(&tests, argc, argv);
+}
+#include "EngineTests.moc"

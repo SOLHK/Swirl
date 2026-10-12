@@ -18,39 +18,39 @@ Item {
     readonly property var active:groups.find(function(g){return g.name===page.chosen})||groups[0]
     readonly property var showing:groups.filter(function(g){return (g.name+" "+g.type).toLowerCase().indexOf(search.text.toLowerCase())>=0})
     ColumnLayout {
-        anchors.fill:parent; anchors.margins:23; spacing:14
+        anchors.fill:parent; anchors.margins:Theme.dp(23); spacing:Theme.dp(14)
         RowLayout {
             Layout.fillWidth:true
             SwirlStatusBadge { label:AppState.zh("STRATEGY PREVIEW"); tone:"accent" }
-            Text { text:AppState.zh("Selection and fallback states are local UI data."); color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
+            Text { text:AppState.zh("Selection and fallback states are local UI data."); color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
             SwirlButton { text:AppState.zh("Test policies"); onClicked:AppState.notice("策略组延迟测试") }
             SwirlButton { text:AppState.zh("Add group"); primary:true; onClicked:addDialog.open() }
         }
         SwirlGlassPanel {
-            Layout.fillWidth:true; Layout.preferredHeight:120
+            Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(120)
             RowLayout {
-                anchors.fill:parent; anchors.margins:19; spacing:19
-                SwirlIcon { name:"layers"; size:36; color:Theme.accent }
+                anchors.fill:parent; anchors.margins:Theme.dp(19); spacing:Theme.dp(19)
+                SwirlIcon { name:"layers"; size:Theme.dp(36); color:Theme.accent }
                 ColumnLayout {
-                    Layout.fillWidth:true; spacing:6
-                    Text { text:AppState.zh("Selected strategy"); color:Theme.muted; font.pixelSize:11 }
-                    Text { text:page.chosen; color:Theme.text; font.pixelSize:22; font.weight:Font.DemiBold }
-                    Text { text:AppState.zh("策略组类型：")+page.active.type+"  ·  当前演示节点："+page.active.current; color:Theme.muted; font.pixelSize:12 }
+                    Layout.fillWidth:true; spacing:Theme.dp(6)
+                    Text { text:AppState.zh("Selected strategy"); color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
+                    Text { text:page.chosen; color:Theme.text; font.pixelSize:Theme.fontSize(22); font.weight:Font.DemiBold }
+                    Text { text:AppState.zh("策略组类型：")+page.active.type+"  ·  当前节点："+page.active.current; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
                 }
                 SwirlButton { text:AppState.zh("Apply selection"); primary:true; onClicked:{AppState.policy=page.chosen;AppState.notice("已选择策略组")} }
             }
         }
         RowLayout {
-            Layout.fillWidth:true; spacing:11
+            Layout.fillWidth:true; spacing:Theme.dp(11)
             SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:AppState.zh("Filter groups") }
             SwirlComboBox { model:["All types","手动选择","延迟测试","Failover","负载均衡","SSID"] }
         }
         RowLayout {
-            Layout.fillWidth:true; Layout.fillHeight:true; spacing:14
+            Layout.fillWidth:true; Layout.fillHeight:true; spacing:Theme.dp(14)
             SwirlGlassPanel {
                 Layout.fillWidth:true; Layout.fillHeight:true; clip:true
                 SwirlDataTable {
-                    anchors.fill:parent; anchors.margins:1
+                    anchors.fill:parent; anchors.margins:Theme.dp(1)
                     rows:page.showing
                     selectedId:page.active.id
                     columns:[{key:"name",label:AppState.zh("POLICY GROUP"),w:193},{key:"type",label:AppState.zh("GROUP TYPE"),w:163},
@@ -59,36 +59,45 @@ Item {
                 }
             }
             SwirlGlassPanel {
-                Layout.preferredWidth:309; Layout.fillHeight:true
+                Layout.preferredWidth:Theme.dp(309); Layout.fillHeight:true
                 ColumnLayout {
-                    anchors.fill:parent; anchors.margins:18; spacing:14
-                    Text { text:AppState.zh("Routing relationship"); color:Theme.text; font.pixelSize:16; font.weight:Font.DemiBold }
+                    anchors.fill:parent; anchors.margins:Theme.dp(18); spacing:Theme.dp(12)
+                    ScrollView {
+                        id:detailScroll0; Layout.fillWidth:true; Layout.fillHeight:true; clip:true
+                        ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
+                        ColumnLayout {
+                    width:detailScroll0.availableWidth; spacing:Theme.dp(14)
+                    Text { text:AppState.zh("Routing relationship"); color:Theme.text; font.pixelSize:Theme.fontSize(16); font.weight:Font.DemiBold }
                     SwirlStatusBadge { label:page.active.type.toUpperCase(); tone:"accent" }
                     Rectangle {
-                        Layout.fillWidth:true; Layout.preferredHeight:68; radius:Theme.roundedRadius(width,height)
+                        Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(68); radius:Theme.roundedRadius(width,height)
                         color:Theme.selected; border.color:Theme.border
-                        Text { anchors.centerIn:parent; text:page.active.name; color:Theme.accent; font.pixelSize:15; font.weight:Font.DemiBold }
+                        Text { anchors.centerIn:parent; text:page.active.name; color:Theme.accent; font.pixelSize:Theme.fontSize(15); font.weight:Font.DemiBold }
                     }
-                    Text { text:AppState.zh("↓   resolves to"); color:Theme.muted; Layout.alignment:Qt.AlignHCenter; font.pixelSize:11 }
+                    Text { text:AppState.zh("↓ 当前使用"); color:Theme.muted; Layout.alignment:Qt.AlignHCenter; font.pixelSize:Theme.fontSize(11) }
                     Rectangle {
-                        Layout.fillWidth:true; Layout.preferredHeight:68; radius:Theme.roundedRadius(width,height)
+                        Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(68); radius:Theme.roundedRadius(width,height)
                         color:Theme.field; border.color:Theme.border
                         RowLayout {
-                            anchors.centerIn:parent; spacing:7
-                            SwirlIcon { name:"globe"; size:18; color:Theme.green }
-                            Text { text:page.active.current; color:Theme.text; font.pixelSize:14 }
+                            anchors.centerIn:parent; spacing:Theme.dp(7)
+                            SwirlIcon { name:"globe"; size:Theme.dp(18); color:Theme.green }
+                            Text { text:page.active.current; color:Theme.text; font.pixelSize:Theme.fontSize(14) }
                         }
                     }
                     Text {
-                        text:page.active.type==="负载均衡"?"在可用的模拟节点间轮询":
+                        text:page.active.type==="负载均衡"?"在可用的节点间轮询":
                              page.active.type==="Failover"?"故障后切换下一条可用线路":
                              page.active.type==="SSID"?"按照当前网络名称选择路由":
-                             page.active.type==="延迟测试"?"选择模拟延迟最低的节点":"手动选择节点"
-                        color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true; wrapMode:Text.WordWrap
+                             page.active.type==="延迟测试"?"选择延迟最低的节点":"手动选择节点"
+                        color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true; wrapMode:Text.WordWrap
                     }
-                    Item { Layout.fillHeight:true }
+
+                        }
+                    }
+
                     SwirlButton { text:AppState.zh("Choose endpoint"); onClicked:AppState.currentPage="proxies" }
                     SwirlButton { text:AppState.zh("View details"); onClicked:AppState.notice("策略关系详情") }
+
                 }
             }
         }
@@ -96,7 +105,7 @@ Item {
     SwirlDialog {
         id:addDialog; title:"创建策略组"
         ColumnLayout {
-            width:parent.width; spacing:12
+            width:parent.width; spacing:Theme.dp(12)
             Text { text:AppState.zh("Group name"); color:Theme.text }
             SwirlTextField { id:groupName; Layout.fillWidth:true; placeholderText:AppState.zh("My policy group") }
             SwirlComboBox { id:groupType; Layout.fillWidth:true; model:["手动选择","延迟测试","Failover","负载均衡","SSID"] }

@@ -3,7 +3,7 @@ import SwirlQuick
 Item {
     id:root
     property string name:"home"
-    property int size:20
+    property int size:Theme.dp(20)
     property color color:Theme.muted
     readonly property var supported:["search", "home", "chart", "activity", "folder", "globe", "wifi", "router", "link", "list", "layers", "grid", "code", "shield", "settings", "server", "inspect", "refresh", "clock", "terminal", "edit", "network", "route", "tool", "plus", "capture", "chevron-right", "chevron-left", "download", "upload", "user", "pin", "document", "file", "gauge", "bars", "bolt", "sliders", "calendar", "help", "pause", "play"]
     implicitWidth:size; implicitHeight:size; width:size; height:size
