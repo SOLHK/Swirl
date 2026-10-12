@@ -11,7 +11,7 @@ Item {
     property var displayRows:{
         var q=search.text.toLowerCase()
         var method=methodFilter.currentText
-        return demoProvider.requests().filter(function(r){
+        return (systemProvider.revision,systemProvider.requests()).filter(function(r){
             return (r.host+r.path+r.method).toLowerCase().indexOf(q)>=0 &&
                    (method==="全部方法"||r.method===method)
         })
@@ -32,7 +32,7 @@ Item {
         }
         RowLayout {
             Layout.fillWidth:true
-            SwirlStatusBadge { label:AppState.zh("HTTP CAPTURE DEMO"); tone:"accent" }
+            SwirlStatusBadge { label:"尚未实现"; tone:"accent" }
             Text { text:displayRows.length+" 条本地"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
             SwirlButton { text:AppState.zh("Record"); iconName:"play"; onClicked:AppState.notice("抓包记录") }
             SwirlButton { text:AppState.zh("Clear"); onClicked:{selected=null;AppState.notice("清空抓包")} }
@@ -69,12 +69,12 @@ Item {
                 anchors.fill:parent; anchors.margins:Theme.dp(12); spacing:Theme.dp(6)
                 RowLayout {
                     Layout.fillWidth:true
-                    Text { text:AppState.zh("Request waterfall"); color:Theme.text; font.pixelSize:Theme.fontSize(13); font.weight:Font.DemiBold; Layout.fillWidth:true }
+                    Text { text:AppState.zh("耗时明细尚未采集"); color:Theme.text; font.pixelSize:Theme.fontSize(13); font.weight:Font.DemiBold; Layout.fillWidth:true }
                     Text { text:AppState.zh("0           100           200           300 ms"); color:Theme.muted; font.pixelSize:Theme.fontSize(10) }
                 }
                 ListView {
                     Layout.fillWidth:true; Layout.fillHeight:true; clip:true; spacing:Theme.dp(3)
-                    model:page.displayRows.slice(0,5)
+                    model:[]
                     delegate:RowLayout {
                         width:ListView.view.width; height:Theme.dp(20); spacing:Theme.dp(10)
                         Text {
@@ -103,7 +103,7 @@ Item {
                 text:page.waterfallOpen?"隐藏瀑布图":"显示瀑布图"
                 iconName:"chart"; quiet:false; onClicked:page.waterfallOpen=!page.waterfallOpen
             }
-            Text { text:AppState.zh("Synthetic timing breakdown · select a request for full details"); color:Theme.muted; font.pixelSize:Theme.fontSize(11); Layout.fillWidth:true }
+            Text { text:"尚未实现"; color:Theme.muted; font.pixelSize:Theme.fontSize(11); Layout.fillWidth:true }
             SwirlButton { text:AppState.zh("Replay"); onClicked:AppState.currentPage="replay" }
             SwirlButton { text:AppState.zh("Breakpoint"); onClicked:AppState.currentPage="breakpoint" }
         }

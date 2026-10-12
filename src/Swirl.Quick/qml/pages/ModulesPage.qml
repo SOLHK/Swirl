@@ -7,14 +7,10 @@ import "../controls"
 
 Item {
     id:page
+    readonly property bool implemented:false
     property string tab:"Installed"
     property var chosen:null
-    property var modules:[
-        {id:"mod1",name:"隐私规则",author:"本地",version:"1.4.2",state:"Enabled",source:"本地模块",update:"Current"},
-        {id:"mod2",name:"请求头工具",author:"本地",version:"2.0.1",state:"Enabled",source:"本地模块",update:"有可用更新"},
-        {id:"mod3",name:"设备监控",author:"本地",version:"0.9.0",state:"Disabled",source:"远程",update:"Current"},
-        {id:"mod4",name:"请求工具",author:"本地",version:"1.0.3",state:"Disabled",source:"远程",update:"Current"}
-    ]
+    property var modules:[]
     readonly property var filtered:modules.filter(function(m){return (m.name+" "+m.author).toLowerCase().indexOf(search.text.toLowerCase())>=0})
     ColumnLayout {
         anchors.fill:parent; anchors.margins:Theme.dp(23); spacing:Theme.dp(14)
@@ -22,14 +18,14 @@ Item {
             Layout.fillWidth:true
             SwirlStatusBadge { label:"扩展目录"; tone:"accent" }
             Text { text:"尚未加载第三方脚本或扩展。"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
-            SwirlButton { text:"本地导入"; onClicked:importDialog.open() }
-            SwirlButton { text:"添加远程"; primary:true; onClicked:importDialog.open() }
+            SwirlButton { enabled:false; text:"本地导入"; onClicked:importDialog.open() }
+            SwirlButton { enabled:false; text:"添加远程"; primary:true; onClicked:importDialog.open() }
         }
         RowLayout {
             Layout.fillWidth:true
             Repeater {
                 model:["Installed","Marketplace","Updates"]
-                SwirlButton { text:modelData; quiet:page.tab!==modelData; onClicked:page.tab=modelData }
+                SwirlButton { enabled:false; text:modelData; quiet:page.tab!==modelData; onClicked:page.tab=modelData }
             }
             Item { Layout.fillWidth:true }
             SwirlSearchField { id:search; implicitWidth:Theme.dp(250); placeholderText:"搜索扩展" }
@@ -53,15 +49,14 @@ Item {
                     anchors.fill:parent; anchors.margins:Theme.dp(19); spacing:Theme.dp(16)
                     Text { text:page.tab==="Marketplace"?"扩展市场（界面预览）":"模块更新"; color:Theme.text; font.pixelSize:Theme.fontSize(18); font.weight:Font.DemiBold }
                     Repeater {
-                        model:page.tab==="Marketplace"?["规则辅助工具","DNS 工具","流量可视化"]:
-                            ["请求头工具 · v2.1 可更新","没有其他可用更新"]
+                        model:[]
                         SwirlGlassPanel {
                             Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(66)
                             RowLayout {
                                 anchors.fill:parent; anchors.margins:Theme.dp(12)
                                 SwirlIcon { name:"grid"; color:Theme.accent; size:Theme.dp(22) }
                                 Text { text:modelData; color:Theme.text; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
-                                SwirlButton { text:page.tab==="Marketplace"?"View":"Details"; onClicked:AppState.notice("扩展列表") }
+                                SwirlButton { enabled:false; text:page.tab==="Marketplace"?"View":"Details"; onClicked:AppState.notice("扩展列表") }
                             }
                         }
                     }
@@ -92,8 +87,8 @@ Item {
                     RowLayout {
                         Layout.fillWidth:true
                         Text { text:"启用扩展（预览）"; color:Theme.text; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true; wrapMode:Text.WordWrap }
-                        SwirlToggle {
-                            checked:page.chosen&&page.chosen.state==="Enabled"
+                        SwirlToggle { enabled:false;checked:false;
+
                             onToggled:if(page.chosen){
                                 var id=page.chosen.id
                                 page.modules=page.modules.map(function(m){return m.id===id?
@@ -108,8 +103,8 @@ Item {
                         }
                     }
 
-                    SwirlButton { text:"保存本地参数"; onClicked:AppState.notice("保存扩展参数") }
-                    SwirlButton { text:"检查更新"; onClicked:AppState.notice("检查扩展更新") }
+                    SwirlButton { enabled:false; text:"保存本地参数"; onClicked:AppState.notice("保存扩展参数") }
+                    SwirlButton { enabled:false; text:"检查更新"; onClicked:AppState.notice("检查扩展更新") }
 
                 }
             }
@@ -126,15 +121,10 @@ Item {
             Text { text:"不会下载文件或执行脚本。"; color:Theme.muted; font.pixelSize:Theme.fontSize(11); Layout.fillWidth:true }
             RowLayout {
                 Layout.alignment:Qt.AlignRight
-                SwirlButton { text:"取消"; onClicked:importDialog.close() }
-                SwirlButton {
-                    text:"添加"; primary:true; enabled:moduleName.text.trim().length>0
-                    onClicked:{
-                        page.modules=page.modules.concat([{id:"mod"+Date.now(),name:moduleName.text.trim(),
-                            author:"作者",version:"0.1",state:"Disabled",
-                            source:sourceUrl.text.trim()||"本地",update:"未检查"}])
-                        moduleName.text="";sourceUrl.text="";importDialog.close()
-                    }
+                SwirlButton { enabled:false; text:"取消"; onClicked:importDialog.close() }
+                SwirlButton { enabled:false;
+                    text:"添加"; primary:true;
+                    onClicked:AppState.notice("尚未实现")
                 }
             }
         }

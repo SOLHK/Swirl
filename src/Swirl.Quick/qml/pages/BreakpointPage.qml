@@ -7,21 +7,18 @@ import "../controls"
 
 Item {
     id:page
-    property var records:[
-        {id:"b1",method:"POST",url:"/api/v1/profile",host:"api.example.test",status:"Paused",time:"14:08:17"},
-        {id:"b2",method:"GET",url:"/config.json",host:"cdn.example.test",status:"Paused",time:"14:08:11"},
-        {id:"b3",method:"PUT",url:"/account/settings",host:"api.example.test",status:"Continued",time:"14:07:54"}
-    ]
+    readonly property bool implemented:false
+    property var records:[]
     property var selected:null
     property string tab:"Headers"
-    property string payload:"Accept: application/json\nContent-Type: application/json\nX-Swirl: true\n"
+    property string payload: ""
     ColumnLayout {
         anchors.fill:parent; anchors.margins:Theme.dp(23); spacing:Theme.dp(14)
         RowLayout {
             Layout.fillWidth:true
             SwirlStatusBadge { label:"未启用实时拦截"; tone:"warning" }
             Text { text:"仅编辑暂停请求，不会影响实际网络"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
-            SwirlButton { text:"添加断点"; primary:true; onClicked:ruleDialog.open() }
+            SwirlButton { enabled:false; text:"添加断点"; primary:true; onClicked:ruleDialog.open() }
         }
         SwirlGlassPanel {
             Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(88)
@@ -33,9 +30,7 @@ Item {
                     Text { text:"请求均为本地，不会暂停浏览器。"; color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
                 }
                 SwirlStatusBadge { label:page.records.filter(function(r){return r.status==="Paused"}).length+" 已暂停"; tone:"accent" }
-                SwirlButton { text:"全部继续"; onClicked:{
-                    page.records=page.records.map(function(r){return {id:r.id,method:r.method,url:r.url,host:r.host,status:"Continued",time:r.time}})
-                }}
+                SwirlButton { enabled:false; text:"全部继续"; onClicked:AppState.notice("尚未实现")}
             }
         }
         RowLayout {
@@ -68,7 +63,7 @@ Item {
                         Layout.fillWidth:true
                         Repeater {
                             model:["Headers","Body","Query"]
-                            SwirlButton { text:modelData; quiet:page.tab!==modelData; onClicked:page.tab=modelData }
+                            SwirlButton { enabled:false; text:modelData; quiet:page.tab!==modelData; onClicked:page.tab=modelData }
                         }
                     }
                     Rectangle {
@@ -78,8 +73,7 @@ Item {
                             anchors.fill:parent; anchors.margins:Theme.dp(8)
                             TextArea {
                                 id:editor
-                                text:page.tab==="Headers"?page.payload:
-                                     page.tab==="Body"?"{\n  \"preview\": true\n}":"page=1&mode=rule"
+                                text:"尚未实现；没有被拦截的请求。"
                                 color:Theme.text; font.family:"Cascadia Code"; font.pixelSize:Theme.fontSize(12)
                                 selectByMouse:true; wrapMode:Text.WrapAnywhere
                                 background:Rectangle { color:"transparent" }
@@ -88,16 +82,16 @@ Item {
                     }
                     RowLayout {
                         Layout.fillWidth:true
-                        SwirlButton {
-                            text:"继续"; primary:true; enabled:page.selected&&page.selected.status==="Paused"
+                        SwirlButton { enabled:false;
+                            text:"继续"; primary:true;
                             onClicked:page.changeStatus("Continued")
                         }
-                        SwirlButton {
-                            text:"修改并继续"; enabled:page.selected&&page.selected.status==="Paused"
-                            onClicked:{page.payload=editor.text;page.changeStatus("Modified")}
+                        SwirlButton { enabled:false;
+                            text:"修改并继续";
+                            onClicked:AppState.notice("尚未实现")
                         }
-                        SwirlButton {
-                            text:"丢弃"; danger:true; enabled:page.selected&&page.selected.status==="Paused"
+                        SwirlButton { enabled:false;
+                            text:"丢弃"; danger:true;
                             onClicked:page.changeStatus("Dropped")
                         }
                     }
@@ -123,9 +117,9 @@ Item {
             SwirlComboBox { model:["发送请求前","收到响应后"] }
             RowLayout {
                 Layout.alignment:Qt.AlignRight
-                SwirlButton { text:"取消"; onClicked:ruleDialog.close() }
-                SwirlButton { text:"添加"; primary:true; enabled:matcher.text.trim().length>0
-                    onClicked:{AppState.notice("添加断点匹配条件");ruleDialog.close();matcher.text=""}
+                SwirlButton { enabled:false; text:"取消"; onClicked:ruleDialog.close() }
+                SwirlButton { enabled:false; text:"添加"; primary:true;
+                    onClicked:AppState.notice("尚未实现")
                 }
             }
         }

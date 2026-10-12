@@ -7,16 +7,10 @@ import "../controls"
 
 Item {
     id:page
+    readonly property bool implemented:false
     property var chosen:null
     property bool scheduleEnabled:true
-    property var providers:[
-        {id:"s1",name:"主订阅 · 新加坡",source:"https://provider.example.test/sub/primary",nodes:48,used:34,limit:100,
-         update:"2026-10-10 13:20",status:"Healthy",interval:"6 hours"},
-        {id:"s2",name:"旅行节点",source:"https://provider.example.test/sub/travel",nodes:16,used:69,limit:150,
-         update:"2026-10-09 21:05",status:"Healthy",interval:"12 hours"},
-        {id:"s3",name:"备用订阅",source:"https://provider.example.test/sub/backup",nodes:0,used:0,limit:100,
-         update:"2026-10-07 12:45",status:"错误",interval:"最近 24 小时"}
-    ]
+    property var providers:[]
     readonly property var listed:providers.filter(function(r){
         return (r.name+" "+r.source).toLowerCase().indexOf(search.text.toLowerCase())>=0
     })
@@ -26,14 +20,14 @@ Item {
             Layout.fillWidth:true
             SwirlStatusBadge { label:AppState.zh("订阅管理 · "); tone:"accent" }
             Text { text:AppState.zh("No remote URLs are requested or saved."); color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
-            SwirlButton { text:AppState.zh("Update all (demo)"); iconName:"refresh"; onClicked:AppState.notice("更新订阅") }
-            SwirlButton { text:AppState.zh("Add subscription"); primary:true; onClicked:addDialog.open() }
+            SwirlButton { enabled:false; text:"尚未实现"; iconName:"refresh"; onClicked:AppState.notice("更新订阅") }
+            SwirlButton { enabled:false; text:AppState.zh("Add subscription"); primary:true; onClicked:addDialog.open() }
         }
         RowLayout {
             Layout.fillWidth:true; spacing:Theme.dp(12)
             SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:AppState.zh("Search subscription providers") }
             Text { text:AppState.zh("Auto update"); color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
-            SwirlToggle { checked:page.scheduleEnabled; onToggled:page.scheduleEnabled=checked }
+            SwirlToggle { enabled:false;checked:false;  onToggled:page.scheduleEnabled=checked }
             SwirlComboBox { model:["Every 6 hours","Every 12 hours","Daily","Weekly","Off"] }
         }
         RowLayout {
@@ -76,8 +70,8 @@ Item {
                                     RowLayout {
                                         Layout.fillWidth:true
                                         Text { text:AppState.zh("Updated ")+record.update; color:Theme.muted; font.pixelSize:Theme.fontSize(11); Layout.fillWidth:true }
-                                        SwirlButton { text:AppState.zh("Details"); implicitHeight:Theme.dp(32); quiet:false; onClicked:page.chosen=record }
-                                        SwirlButton { text:AppState.zh("Refresh"); implicitHeight:Theme.dp(32); iconName:"refresh"; onClicked:AppState.notice("刷新订阅源"+record.name) }
+                                        SwirlButton { enabled:false; text:AppState.zh("Details"); implicitHeight:Theme.dp(32); quiet:false; onClicked:page.chosen=record }
+                                        SwirlButton { enabled:false; text:AppState.zh("Refresh"); implicitHeight:Theme.dp(32); iconName:"refresh"; onClicked:AppState.notice("刷新订阅源"+record.name) }
                                     }
                                 }
                             }
@@ -117,8 +111,8 @@ Item {
                         }
                     }
 
-                    SwirlButton { text:AppState.zh("编辑订阅源"); onClicked:addDialog.open() }
-                    SwirlButton { text:AppState.zh("View update errors"); onClicked:AppState.notice("订阅错误详情") }
+                    SwirlButton { enabled:false; text:AppState.zh("编辑订阅源"); onClicked:addDialog.open() }
+                    SwirlButton { enabled:false; text:AppState.zh("View update errors"); onClicked:AppState.notice("订阅错误详情") }
 
                 }
             }
@@ -130,20 +124,16 @@ Item {
             width:parent.width; spacing:Theme.dp(12)
             Text { text:AppState.zh("Display name"); color:Theme.text }
             SwirlTextField { id:displayName; Layout.fillWidth:true; placeholderText:AppState.zh("My subscription") }
-            Text { text:AppState.zh("HTTPS URL (stored only in preview memory)"); color:Theme.text }
+            Text { text:"订阅功能尚未实现"; color:Theme.text }
             SwirlTextField { id:urlField; Layout.fillWidth:true; placeholderText:AppState.zh("https://provider.example.test/sub") }
             Text { text:AppState.zh("Real subscriptions, credentials and tokens are not downloaded or saved."); color:Theme.muted; font.pixelSize:Theme.fontSize(11); Layout.fillWidth:true; wrapMode:Text.WordWrap }
             RowLayout {
                 Layout.alignment:Qt.AlignRight
-                SwirlButton { text:AppState.zh("Cancel"); onClicked:addDialog.close() }
-                SwirlButton {
+                SwirlButton { enabled:false; text:AppState.zh("Cancel"); onClicked:addDialog.close() }
+                SwirlButton { enabled:false;
                     text:AppState.zh("添加"); primary:true
-                    enabled:displayName.text.trim().length>0&&urlField.text.startsWith("https://")
-                    onClicked:{
-                        page.providers=page.providers.concat([{id:"s"+Date.now(),name:displayName.text.trim(),
-                            source:urlField.text.trim(),nodes:0,used:0,limit:100,update:"Never",status:"未检查",interval:"最近 24 小时"}])
-                        displayName.text="";urlField.text="";addDialog.close()
-                    }
+
+                    onClicked:AppState.notice("尚未实现")
                 }
             }
         }

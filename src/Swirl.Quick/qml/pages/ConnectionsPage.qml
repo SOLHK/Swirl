@@ -11,7 +11,7 @@ Item {
         var q=search.text.toLowerCase()
         var s=sort.currentText
         var state=status.currentText
-        var rows=demoProvider.connections().filter(function(r){
+        var rows=systemProvider.connections().filter(function(r){
             return (r.host+" "+r.process+" "+r.ip+" "+r.policy).toLowerCase().indexOf(q)>=0 &&
                    (state==="全部状态"||r.status===state)
         })

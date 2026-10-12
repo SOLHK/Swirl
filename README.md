@@ -6,43 +6,21 @@ Swirl 品牌图标以 SVG 为唯一设计源：浅色为黑色祥云结、灰白
 
 **Swirl** 是面向 Windows 的专业网络工具项目，使用 **C++23 + Qt 6 Quick/QML** 开发统一的桌面界面、HTTP 调试与后续代理管理功能。界面设计借鉴 macOS 应用的简洁布局与细腻材质，运行于 Windows。
 
-> **🧪 当前状态：Swirl 1.0 UI Preview（`1.0.0-preview`）。** 仓库当前仅保留 C++23 / Qt 6 代码和构建链；原 WPF/.NET 项目与安装器已退出当前源码树。**这仍是功能预览，不是已完成代理核心的正式客户端。**
+> **🧪 当前状态：Swirl 第二阶段测试版（`1.0.0-preview`）。** 仓库当前仅保留 C++23 / Qt 6 代码和构建链；原 WPF/.NET 项目与安装器已退出当前源码树。**当前提供真实本机代理节点功能，尚非正式发布版本。**
 
 [![Qt UI 测试构建](https://github.com/SOLHK/Swirl/actions/workflows/build-qt-quick-ui.yml/badge.svg?branch=test)](https://github.com/SOLHK/Swirl/actions/workflows/build-qt-quick-ui.yml) · [测试版安装程序（EXE）](https://github.com/SOLHK/Swirl/releases) · [test 分支](https://github.com/SOLHK/Swirl/tree/test) · [Qt 1.0 验收记录](docs/UI_1_0_VALIDATION.md)
 
-## 最新界面截图
+## 当前实现
 
-以下图片来自 [Qt 1.0 UI 验收提交 `0fb2ad8`](https://github.com/SOLHK/Swirl/commit/0fb2ad8b2779ae0f621b8dd4f3f69c12eaf95585) 安装后的 Windows EXE 实机合成截图，不是设计概念图。节点、流量、延迟和连接状态的示例值**不能当作真实联网数据**。
+- C++23 自研 ProxyEngine 抽象、MihomoAdapter、EngineController，独立 Mihomo 生命周期、完整性校验、认证控制 API、Windows Job 进程管理。
+- 手动添加、编辑、删除、DPAPI 保存和选择 SOCKS5、Shadowsocks、Trojan 节点；真实本机代理端口、节点切换和请求测试。
+- 真实 HTTP 会话抓包和 CONNECT 隧道记录；不解密 HTTPS 正文。
+- 保留 Qt 界面、主题、圆角、SVG、HDR 和窗口交互；移除演示数据与模拟成功，未实现功能显示空数据并禁用执行。
+- 56 个模块入口和实际本地配置草稿，草稿不代表对应网络服务已经实现。
 
-### 浅色总览
+详见 [第二阶段使用、测试和限制](docs/PHASE2_REAL_NODES.md)、[抓包说明](src/Swirl.Quick/CAPTURE.md)。
 
-![Swirl 1.0 Qt 浅色总览](docs/screenshots/ui-1-0-Swirl-overview.png)
-
-### 暗色与连接演示
-
-| 暗色界面 | 连接演示（示例数据） |
-| --- | --- |
-| ![Swirl Qt 深色总览](docs/screenshots/ui-1-0-Swirl-dark.png) | ![Swirl Qt 连接演示](docs/screenshots/ui-1-0-Swirl-overview-demo.png) |
-
-[截图索引](docs/screenshots/README.md) · [验收与限制](docs/UI_1_0_VALIDATION.md)
-
-## 当前真正实现的功能
-
-- **Qt 原生桌面界面**：统一圆角与主题，浅色/深色总览、导航与工具页，Windows DWM Desktop Acrylic 条件式合成和不透明回退。
-- **HTTP 会话抓包**：用户手动启动本机显式 HTTP 代理后，可查看 HTTP 请求与响应、记录 CONNECT 隧道、按条件过滤并导出 HAR；不会自动修改系统代理，**不会解密 HTTPS 正文**。
-- **工具目录和草稿**：56 个模块入口、32 个可编辑配置草稿页，支持本地保存及 JSON 导入导出；这不意味着对应服务已能执行。
-- **测试安装程序**：从 Qt 源码打包为 Windows x64 NSIS `Swirl-Setup.exe`，支持覆盖更新和保留用户设置，当前未签名。
-
-## 仍在开发
-
-| 领域 | 当前状态 |
-| --- | --- |
-| Mihomo 代理引擎、节点/订阅/策略组 | **尚未接入**，目前为 Qt 演示交互 |
-| 系统代理、TUN、真实流量/延迟与连接分析 | **尚未实现**实际接管，界面相关数字是演示 |
-| DNS 分流、真实规则执行、脚本扩展、请求改写 | 保留界面/草稿，后续接入引擎和服务 |
-| HTTPS MITM、WebSocket 帧检查、PCAP 抓包 | 当前 HTTP 抓包不具备这些能力 |
-
-**架构方向：** 未来在 C++23 中增加独立的 `ProxyEngine` 抽象和 Mihomo 适配层，再逐步接入 Qt 页面，避免将代理内核与 UI 绑定。**此抽象目前是规划，未在代码中实现。** 详见 [架构说明](docs/ARCHITECTURE.md)、[Surge 功能对照](docs/SURGE_FEATURE_MATRIX.md) 和 [Qt 抓包说明](src/Swirl.Quick/CAPTURE.md)。
+订阅导入/更新、系统代理接管、TUN、DNS 分流、HTTPS MITM、重写、脚本和网关尚未实现。本阶段仅验证受控 SOCKS5 真实 HTTP/HTTPS 链路；未使用真实远程 Shadowsocks/Trojan 凭据验证。
 
 ## 下载和构建
 

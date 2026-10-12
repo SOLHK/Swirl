@@ -6,24 +6,12 @@ import "../components"
 import "../controls"
 
 Item {
-    id: page
+    id:page
+    readonly property bool implemented:false
     property string activeTab:"Domains"
-    property var topDomains:[
-        {id:"d1",name:"api.github.com",connections:"1,240",upload:"62 MB",download:"389 MB"},
-        {id:"d2",name:"cdn.jsdelivr.net",connections:"986",upload:"34 MB",download:"270 MB"},
-        {id:"d3",name:"www.microsoft.com",connections:"641",upload:"12 MB",download:"98 MB"},
-        {id:"d4",name:"example.test",connections:"318",upload:"4 MB",download:"43 MB"}
-    ]
-    property var apps:[
-        {id:"a1",name:"Browser",connections:"1,874",upload:"180 MB",download:"840 MB"},
-        {id:"a2",name:"Code",connections:"492",upload:"84 MB",download:"420 MB"},
-        {id:"a3",name:"Terminal",connections:"215",upload:"38 MB",download:"176 MB"}
-    ]
-    property var nodes:[
-        {id:"n1",name:"新加坡 · 01",connections:"1,280",upload:"98 MB",download:"510 MB"},
-        {id:"n2",name:"香港 · 01",connections:"837",upload:"40 MB",download:"279 MB"},
-        {id:"n3",name:"东京 · 02",connections:"243",upload:"21 MB",download:"122 MB"}
-    ]
+    property var topDomains:[]
+    property var apps:[]
+    property var nodes:[]
     readonly property var selectedRows:activeTab==="Domains"?topDomains:activeTab==="Applications"?apps:nodes
     ScrollView {
         id:scroll
@@ -33,18 +21,18 @@ Item {
             width:scroll.availableWidth; spacing:Theme.dp(15)
             RowLayout {
                 Layout.fillWidth:true
-                SwirlStatusBadge { label:AppState.zh("SYNTHETIC TRAFFIC"); tone:"accent" }
-                Text { text:AppState.zh("Aggregates are fixtures, not system counters"); color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
+                SwirlStatusBadge { label:"尚未实现"; tone:"accent" }
+                Text { text:"尚未实现"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
                 SwirlComboBox { model:["最近 1 小时","最近 24 小时","最近 7 天","最近 30 天","自定义时段"] }
-                SwirlButton { text:AppState.zh("Export"); onClicked:AppState.notice("导出流量报告") }
+                SwirlButton { enabled:false; text:AppState.zh("Export"); onClicked:AppState.notice("导出流量报告") }
             }
             GridLayout {
                 columns:page.width>1080?4:2
                 Layout.fillWidth:true; columnSpacing:13; rowSpacing:13
-                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Download"); value:"1.48 GB"; secondary:"汇总"; iconName:"activity" }
-                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Upload"); value:"304 MB"; secondary:"汇总"; iconName:"chart" }
-                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Domains"); value:"128"; secondary:"独立域名"; iconName:"globe" }
-                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Applications"); value:"12"; secondary:"来源"; iconName:"grid" }
+                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Download"); value:"—"; secondary:"汇总"; iconName:"activity" }
+                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Upload"); value:"—"; secondary:"汇总"; iconName:"chart" }
+                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Domains"); value:"—"; secondary:"独立域名"; iconName:"globe" }
+                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Applications"); value:"—"; secondary:"来源"; iconName:"grid" }
             }
             SwirlGlassPanel {
                 Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(305)
@@ -63,7 +51,7 @@ Item {
                 Layout.fillWidth:true
                 Repeater {
                     model:["Domains","Applications","Nodes"]
-                    SwirlButton { text:modelData; quiet:page.activeTab!==modelData; onClicked:page.activeTab=modelData }
+                    SwirlButton { enabled:false; text:modelData; quiet:page.activeTab!==modelData; onClicked:page.activeTab=modelData }
                 }
                 Item { Layout.fillWidth:true }
                 Text { text:AppState.zh("主要流量来源"); color:Theme.muted; font.pixelSize:Theme.fontSize(11) }

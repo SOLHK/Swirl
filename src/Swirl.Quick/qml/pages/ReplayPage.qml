@@ -7,9 +7,10 @@ import "../controls"
 
 Item {
     id:page
+    readonly property bool implemented:false
     property string selectedRequest:""
     property string resultMessage:"尚未重放请求。\n选择请求后查看重放结果。"
-    property var samples:demoProvider.requests().slice(0,14)
+    property var samples:(systemProvider.revision,systemProvider.requests()).slice(0,14)
     property var history:[]
     ColumnLayout {
         anchors.fill:parent; anchors.margins:Theme.dp(23); spacing:Theme.dp(13)
@@ -17,12 +18,8 @@ Item {
             Layout.fillWidth:true
             SwirlStatusBadge { label:"离线 HTTP 请求编辑器"; tone:"accent" }
             Text { text:"请求不会实际发送"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
-            SwirlButton { text:"对比"; onClicked:comparePopup.open() }
-            SwirlButton { text:"发送"; iconName:"play"; primary:true; onClicked:{
-                page.resultMessage="HTTP 200 OK (simulated)\nContent-Type: application/json\nX-Demo: SwirlQuick\n\n{\n  \"sent\": false,\n  \"message\": \"No network request performed\"\n}"
-                page.history=[{name:verb.currentText+" "+urlField.text,time:"Now",status:"Simulated"}].concat(page.history)
-                AppState.notice("HTTP 重放（未实际发送请求）")
-            } }
+            SwirlButton { enabled:false; text:"对比"; onClicked:comparePopup.open() }
+            SwirlButton { enabled:false; text:"发送"; iconName:"play"; primary:true; onClicked:AppState.notice("尚未实现") }
         }
         SplitView {
             Layout.fillHeight:true; Layout.fillWidth:true
@@ -49,15 +46,11 @@ Item {
                             }
                             MouseArea {
                                 id:tap; anchors.fill:parent; hoverEnabled:true
-                                onClicked:{
-                                    page.selectedRequest=modelData.id
-                                    verb.currentIndex=verb.model.indexOf(modelData.method)
-                                    urlField.text="https://"+modelData.host+modelData.path
-                                }
+                                onClicked:AppState.notice("尚未实现")
                             }
                         }
                     }
-                    SwirlButton { Layout.fillWidth:true; text:"导入 HAR"; onClicked:AppState.notice("导入 HAR") }
+                    SwirlButton { enabled:false; Layout.fillWidth:true; text:"导入 HAR"; onClicked:AppState.notice("导入 HAR") }
                 }
             }
             SwirlGlassPanel {
@@ -68,13 +61,13 @@ Item {
                     RowLayout {
                         Layout.fillWidth:true
                         SwirlComboBox { id:verb; model:["GET","POST","PUT","PATCH","DELETE","HEAD"] }
-                        SwirlTextField { id:urlField; Layout.fillWidth:true; text:"https://api.example.test/v1/user" }
+                        SwirlTextField { id:urlField; Layout.fillWidth:true; text:"" }
                     }
                     RowLayout {
                         Layout.fillWidth:true
                         Repeater {
                             model:["Headers","Body","Cookies","Query"]
-                            SwirlButton { text:modelData; quiet:requestTab.current!==modelData; onClicked:requestTab.current=modelData }
+                            SwirlButton { enabled:false; text:modelData; quiet:requestTab.current!==modelData; onClicked:requestTab.current=modelData }
                         }
                     }
                     QtObject { id:requestTab; property string current:"Headers" }
@@ -85,9 +78,7 @@ Item {
                             anchors.fill:parent; anchors.margins:Theme.dp(9)
                             TextArea {
                                 id:bodyEditor
-                                text:requestTab.current==="Headers"?"Accept: application/json\nX-Swirl: true\nContent-Type: application/json":
-                                    requestTab.current==="Body"?"{\n  \"test\": true\n}":
-                                    requestTab.current==="Cookies"?"session=synthetic":"page=1\nq=swirl"
+                                text:""
                                 font.family:"Cascadia Code"; font.pixelSize:Theme.fontSize(12); color:Theme.text
                                 selectByMouse:true; wrapMode:Text.WrapAnywhere
                                 background:Rectangle { color:"transparent" }
@@ -97,7 +88,7 @@ Item {
                     RowLayout {
                         Layout.fillWidth:true
                         Text { text:"执行历史："+page.history.length+" 次操作"; color:Theme.muted; font.pixelSize:Theme.fontSize(11); Layout.fillWidth:true }
-                        SwirlButton { text:"重置"; onClicked:{page.resultMessage="尚未重放请求。";page.history=[]} }
+                        SwirlButton { enabled:false; text:"重置"; onClicked:AppState.notice("尚未实现") }
                     }
                 }
             }
@@ -120,7 +111,7 @@ Item {
                             }
                         }
                     }
-                    SwirlButton { text:"查看对比"; onClicked:comparePopup.open() }
+                    SwirlButton { enabled:false; text:"查看对比"; onClicked:comparePopup.open() }
                 }
             }
         }
@@ -131,11 +122,11 @@ Item {
             width:parent.width; spacing:Theme.dp(11)
             Text { text:"原始请求与本地重放对比"; color:Theme.text; font.pixelSize:Theme.fontSize(13); Layout.fillWidth:true }
             Text {
-                text:"原始请求：HTTP 200 · 108 ms\n重放结果：尚未运行\n\n比较请求标头、响应正文与耗时。"
+                text:"尚未实现"
                 color:Theme.muted; font.family:"Cascadia Code"; font.pixelSize:Theme.fontSize(11)
                 Layout.fillWidth:true; wrapMode:Text.WordWrap
             }
-            SwirlButton { text:"关闭"; Layout.alignment:Qt.AlignRight; onClicked:comparePopup.close() }
+            SwirlButton { enabled:false; text:"关闭"; Layout.alignment:Qt.AlignRight; onClicked:comparePopup.close() }
         }
     }
 }

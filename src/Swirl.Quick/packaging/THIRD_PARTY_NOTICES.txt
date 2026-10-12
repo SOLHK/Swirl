@@ -1,10 +1,11 @@
-Swirl - phase 1 engine lifecycle test build
+Swirl - phase 2 real proxy node test build
 
-This installer contains the Swirl Qt UI. Proxy, DNS, node latency and overview
-traffic remain demonstrations. The opt-in loopback HTTP capture service is
-real; CONNECT records tunnel metadata without TLS decryption.
-Settings > Proxy uses a real, separate Mihomo process. No system proxy, TUN,
-DNS service, route manipulation or subscription is enabled by this build.
+This installer includes a real, separate Mihomo engine and manual SOCKS5,
+Shadowsocks and Trojan node configuration. Node credentials are protected by
+Windows DPAPI. UI simulation data has been removed. Unimplemented network
+features remain disabled. The opt-in HTTP capture is real; CONNECT records
+metadata without TLS decryption. No system proxy, TUN, DNS service, route
+manipulation or subscription update is enabled by this build.
 
 Mihomo v1.19.32, Copyright MetaCubeX and other contributors, is bundled as an
 unmodified, separate executable under GPL version 3. Its full license is in

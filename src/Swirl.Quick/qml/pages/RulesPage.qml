@@ -6,15 +6,10 @@ import "../components"
 import "../controls"
 
 Item {
-    id: page
+    id:page
+    readonly property bool implemented:false
     property var selectedRule:null
-    property var rules:[
-        {id:"001",order:"001",type:"DOMAIN-SUFFIX",pattern:"example.test",policy:"自动选择",enabled:"Enabled",hits:"148"},
-        {id:"002",order:"002",type:"DOMAIN-KEYWORD",pattern:"updates",policy:"DIRECT",enabled:"Enabled",hits:"92"},
-        {id:"003",order:"003",type:"IP-CIDR",pattern:"203.0.113.0/24",policy:"全局 / 新加坡",enabled:"Enabled",hits:"31"},
-        {id:"004",order:"004",type:"PROCESS-NAME",pattern:"Browser.exe",policy:"DIRECT",enabled:"Disabled",hits:"0"},
-        {id:"005",order:"005",type:"FINAL",pattern:"MATCH",policy:"自动选择",enabled:"Enabled",hits:"468"}
-    ]
+    property var rules:[]
     readonly property var displayRules:rules.filter(function(r){
         return (r.type+" "+r.pattern+" "+r.policy).toLowerCase().indexOf(search.text.toLowerCase())>=0 &&
                (policyFilter.currentText==="全部策略"||r.policy===policyFilter.currentText)
@@ -23,17 +18,17 @@ Item {
         anchors.fill:parent; anchors.margins:Theme.dp(23); spacing:Theme.dp(14)
         RowLayout {
             Layout.fillWidth:true
-            SwirlStatusBadge { label:AppState.zh("ORDERED DEMO RULESET"); tone:"accent" }
-            Text { text:AppState.zh("Priority is evaluated top to bottom in this preview."); color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
-            SwirlButton { text:AppState.zh("测试规则"); iconName:"activity"; onClicked:testDialog.open() }
-            SwirlButton { text:AppState.zh("New rule"); primary:true; onClicked:editorDialog.open() }
+            SwirlStatusBadge { label:"尚未实现"; tone:"accent" }
+            Text { text:"分流规则尚未实现。"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
+            SwirlButton { enabled:false; text:AppState.zh("测试规则"); iconName:"activity"; onClicked:testDialog.open() }
+            SwirlButton { enabled:false; text:AppState.zh("New rule"); primary:true; onClicked:editorDialog.open() }
         }
         RowLayout {
             Layout.fillWidth:true
             SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:AppState.zh("Search pattern, type or target strategy") }
             SwirlComboBox { id:policyFilter; model:["全部策略","自动选择","DIRECT","全局 / 新加坡","REJECT"] }
-            SwirlButton { text:AppState.zh("Import"); onClicked:AppState.notice("导入规则") }
-            SwirlButton { text:AppState.zh("Export"); onClicked:AppState.notice("导出规则") }
+            SwirlButton { enabled:false; text:AppState.zh("Import"); onClicked:AppState.notice("导入规则") }
+            SwirlButton { enabled:false; text:AppState.zh("Export"); onClicked:AppState.notice("导出规则") }
         }
         RowLayout {
             Layout.fillWidth:true; Layout.fillHeight:true; spacing:Theme.dp(14)
@@ -81,13 +76,13 @@ Item {
                     RowLayout {
                         Layout.fillWidth:true
                         Text { text:AppState.zh("Enable rule"); color:Theme.text; Layout.fillWidth:true }
-                        SwirlToggle {
-                            checked:page.selectedRule&&page.selectedRule.enabled==="Enabled"
+                        SwirlToggle { enabled:false;checked:false;
+
                             onToggled:{
                                 if(page.selectedRule) {
                                     var arr=page.rules.map(function(r){return r.id===page.selectedRule.id?
                                         {id:r.id,order:r.order,type:r.type,pattern:r.pattern,policy:r.policy,
-                                         enabled:checked?"Enabled":"Disabled",hits:r.hits}:r})
+                                         }:r})
                                     page.rules=arr
                                     page.selectedRule=arr.filter(function(r){return r.id===page.selectedRule.id})[0]
                                 }
@@ -98,8 +93,8 @@ Item {
                         }
                     }
 
-                    SwirlButton { text:AppState.zh("Edit selected"); onClicked:editorDialog.open() }
-                    SwirlButton { text:AppState.zh("View match details"); quiet:false; onClicked:AppState.notice("规则命中详情") }
+                    SwirlButton { enabled:false; text:AppState.zh("Edit selected"); onClicked:editorDialog.open() }
+                    SwirlButton { enabled:false; text:AppState.zh("View match details"); quiet:false; onClicked:AppState.notice("规则命中详情") }
 
                 }
             }
@@ -118,18 +113,11 @@ Item {
             Text { text:AppState.zh("Changes are local to the UI; no routing rules are installed."); color:Theme.muted; font.pixelSize:Theme.fontSize(11); Layout.fillWidth:true; wrapMode:Text.Wrap }
             RowLayout {
                 Layout.alignment:Qt.AlignRight
-                SwirlButton { text:AppState.zh("Cancel"); onClicked:editorDialog.close() }
-                SwirlButton {
-                    text:AppState.zh("Add demo rule"); primary:true
-                    enabled:patternInput.text.trim().length>0
-                    onClicked:{
-                        var n=page.rules.length+1
-                        page.rules=page.rules.concat([{id:"R"+n,order:String(n).padStart(3,"0"),
-                            type:typeInput.currentText,pattern:patternInput.text.trim(),
-                            policy:policyInput.currentText,enabled:"Enabled",hits:"0"}])
-                        patternInput.text=""
-                        editorDialog.close()
-                    }
+                SwirlButton { enabled:false; text:AppState.zh("Cancel"); onClicked:editorDialog.close() }
+                SwirlButton { enabled:false;
+                    text:"尚未实现"; primary:true
+
+                    onClicked:AppState.notice("尚未实现")
                 }
             }
         }
@@ -150,14 +138,10 @@ Item {
             }
             RowLayout {
                 Layout.alignment:Qt.AlignRight
-                SwirlButton { text:AppState.zh("Close"); onClicked:testDialog.close() }
-                SwirlButton {
-                    text:AppState.zh("Evaluate"); primary:true; enabled:testInput.text.trim().length>0
-                    onClicked:{
-                        var match=page.rules.find(function(r){return r.type==="DOMAIN-SUFFIX" && testInput.text.endsWith(r.pattern)})
-                        AppState.notice("测试匹配："+(match?match.policy:"最终策略 · 自动选择"))
-                        testDialog.close()
-                    }
+                SwirlButton { enabled:false; text:AppState.zh("Close"); onClicked:testDialog.close() }
+                SwirlButton { enabled:false;
+                    text:AppState.zh("Evaluate"); primary:true;
+                    onClicked:AppState.notice("尚未实现")
                 }
             }
         }

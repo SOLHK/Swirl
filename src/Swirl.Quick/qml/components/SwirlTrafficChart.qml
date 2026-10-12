@@ -12,14 +12,8 @@ Item {
     property real reveal: 1
     readonly property real rangeMinutes: [60,60,360,1440][rangeIndex]
     readonly property real maximum: series === "total" ? 4 : 12
-    property var baseHistory: [2.7,4.1,5.4,3.8,5.9,4.4,6.5,4.1,3.1,4.2,3.3,4.7,3.3,3.7,2.7,2.1,1.7,1.4,0.8,1.0,0.35,0]
-    function valueAt(i) {
-        if(series === "total") return 2.36+(AppState.totalGB-2.36)*i/(baseHistory.length-1)
-        var v=baseHistory[i]*(series === "up" ? 0.24 : 1)
-        if(i===baseHistory.length-1) return series === "up" ? AppState.demoUp : AppState.demoDown
-        if(i===baseHistory.length-2 && !AppState.proxyOn) return 0
-        return v*(rangeIndex>1 ? 0.8+0.2*Math.cos(i+rangeIndex) : 1)
-    }
+    readonly property var baseHistory: samples
+    function valueAt(i) { return baseHistory[i] || 0 }
     function repaint(){plot.requestPaint()}
     function transition(){reveal=0.3;updateAnimation.restart()}
     onSeriesChanged:transition()
@@ -28,7 +22,7 @@ Item {
     onSamplesChanged:repaint()
     implicitHeight:Theme.dp(130); implicitWidth:Theme.dp(550)
     NumberAnimation { id:updateAnimation; target:graph; property:"reveal"; to:1; duration:Theme.motion; easing.type:Easing.OutCubic }
-    Connections { target:AppState; function onDemoTickChanged(){graph.repaint()} function onProxyOnChanged(){graph.transition()} }
+    Connections { target:AppState; function onMeasurementTickChanged(){graph.repaint()} function onProxyOnChanged(){graph.transition()} }
     Connections { target:Theme; function onDarkChanged(){graph.repaint()} }
     Item {
         x:Theme.dp(0); y:Theme.dp(4); width:Theme.dp(66); height:plot.height
@@ -55,6 +49,7 @@ Item {
             c.strokeStyle=Theme.dark?"#405875":"#E0EBFA";c.lineWidth=Theme.dp(1)
             for(var k=0;k<4;k++){c.beginPath();c.moveTo(0,k*h/3);c.lineTo(w,k*h/3);c.stroke()}
             for(var a=0;a<5;a++){c.beginPath();c.moveTo(a*w/4,0);c.lineTo(a*w/4,h);c.stroke()}
+            if(n<2)return
             function curve(){c.moveTo(X(0),Y(0));for(var i=1;i<n;i++){var mid=(X(i-1)+X(i))/2;c.bezierCurveTo(mid,Y(i-1),mid,Y(i),X(i),Y(i))}}
             var color=graph.series==="up" ? Theme.green : graph.series==="total" ? Theme.muted : Theme.accent
             var gradient=c.createLinearGradient(0,0,0,h);gradient.addColorStop(0,Theme.withAlpha(color,0.35));gradient.addColorStop(1,Theme.withAlpha(color,0.06))
@@ -65,7 +60,7 @@ Item {
         MouseArea {
             id:hover; anchors.fill:parent; hoverEnabled:true
             onPositionChanged:plot.requestPaint(); onContainsMouseChanged:plot.requestPaint()
-            ToolTip.visible:containsMouse&&!previewCaptureMode
+            ToolTip.visible:containsMouse&&!previewCaptureMode&&graph.baseHistory.length>1
             ToolTip.text: {
                 var i=Math.max(0,Math.min(graph.baseHistory.length-1,Math.round(mouseX/width*(graph.baseHistory.length-1))))
                 var when=new Date(AppState.sessionNow.getTime()-(1-i/(graph.baseHistory.length-1))*graph.rangeMinutes*60000)

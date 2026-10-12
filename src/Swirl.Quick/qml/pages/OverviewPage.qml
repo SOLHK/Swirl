@@ -9,27 +9,14 @@ Item {
     readonly property bool wide: width >= Theme.dp(690)
     readonly property bool medium: width >= Theme.dp(700)
     readonly property real telemetryHeight:Theme.dp(width>=Theme.dp(1100)?158:186)
-    property var network: demoProvider.currentNetwork()
+    property var network: systemProvider.currentNetwork()
     property bool showDetails: false
     readonly property real scrollOffset: scroll.contentItem ? scroll.contentItem.contentY : 0
     property int speedRange: 0
-    readonly property var apps: [
-        {name:"Edge",mark:"E",color:"#0078D4",value:"428.6 MB",percent:"34.5%"},
-        {name:"微信",mark:"微",color:"#00A547",value:"298.4 MB",percent:"24.0%"},
-        {name:"Steam",mark:"S",color:"#25476B",value:"128.9 MB",percent:"10.4%"},
-        {name:"GitHub Desktop",mark:"G",color:"#8328B6",value:"74.6 MB",percent:"6.0%"},
-        {name:"其他应用",mark:"···",color:"#6D7480",value:"312.1 MB",percent:"25.1%"}]
-    readonly property var domains: [
-        {name:"youtube.com",mark:"▶",color:"#EA1717",value:"320.4 MB",percent:"25.8%"},
-        {name:"google.com",mark:"G",color:"#4285F4",value:"298.1 MB",percent:"24.0%"},
-        {name:"github.com",mark:"G",color:"#17181B",value:"128.9 MB",percent:"10.4%"},
-        {name:"openai.com",mark:"O",color:"#17181B",value:"96.3 MB",percent:"7.8%"},
-        {name:"其他域名",mark:"···",color:"#6D7480",value:"398.9 MB",percent:"32.0%"}]
-    function periodValue(value, index) {
-        return index===0 ? value : (parseFloat(value)*(index===1?0.78:4.6)).toFixed(1)+" MB"
-    }
+    readonly property var apps: []
+    readonly property var domains: []
     function scrollToBottom() { scroll.contentItem.contentY=Math.max(0,scroll.contentItem.contentHeight-scroll.contentItem.height) }
-    Timer { interval:10000; repeat:true; running:true; onTriggered:page.network=demoProvider.currentNetwork() }
+    Timer { interval:10000; repeat:true; running:true; onTriggered:page.network=systemProvider.currentNetwork() }
     component Glyph: Rectangle {
         property string icon: "globe"
         property color tint: Theme.accent
@@ -98,7 +85,7 @@ Item {
                 ColumnLayout {
                     Layout.fillWidth:true;spacing:Theme.dp(1)
                     Text { text:"总览";color:Theme.text;font.pixelSize:Theme.fontSize(38);font.weight:Font.Bold;Accessible.role:Accessible.Heading }
-                    Text { text:"总览图表与节点为演示 · 真实引擎状态见设置 → 代理";color:Theme.muted;font.pixelSize:Theme.fontSize(17);Layout.fillWidth:true;elide:Text.ElideRight }
+                    Text { text:"真实引擎与节点状态 · 未采集的数据不显示数值";color:Theme.muted;font.pixelSize:Theme.fontSize(17);Layout.fillWidth:true;elide:Text.ElideRight }
                 }
             }
             GridLayout {
@@ -113,11 +100,11 @@ Item {
                 Repeater {
                     model:[
                         {label:"当前网络",value:page.network.type,sub:page.network.name,icon:"wifi",route:"toolbox",tint:Theme.accent},
-                        {label:"当前配置",value:"Default.conf",sub:"3 条规则",icon:"document",route:"profiles",tint:Theme.accent},
-                        {label:"出站模式",value:AppState.mode,sub:"根据策略组分流",icon:"code",route:"rules",tint:Theme.green},
-                        {label:"活跃连接",value:String(AppState.demoConnections),sub:"条连接",icon:"link",route:"connections",tint:Theme.accent},
-                        {label:"活跃进程",value:AppState.proxyOn?"6":"0",sub:"个进程",icon:"settings",route:"processes",tint:Theme.accent},
-                        {label:"今日流量",value:AppState.proxyOn?AppState.totalGB.toFixed(2)+" GB":"0 B",sub:"流量统计",icon:"clock",route:"traffic",tint:Theme.accent}]
+                        {label:"当前配置",value:engineController.processAlive?"Swirl 运行配置":"未运行",sub:"本机代理配置",icon:"document",route:"profiles",tint:Theme.accent},
+                        {label:"出站模式",value:AppState.mode,sub:"单一选中节点",icon:"code",route:"rules",tint:Theme.green},
+                        {label:"活跃连接",value:"—",sub:"尚未采集",icon:"link",route:"connections",tint:Theme.accent},
+                        {label:"活跃进程",value:engineController.processAlive?"1":"0",sub:"引擎进程",icon:"settings",route:"processes",tint:Theme.accent},
+                        {label:"今日流量",value:"—",sub:"尚未采集",icon:"clock",route:"traffic",tint:Theme.accent}]
                     Button {
                         required property var modelData
                         Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(90);Layout.minimumWidth:Theme.dp(0);hoverEnabled:true;padding:Theme.dp(10)
@@ -147,7 +134,7 @@ Item {
                     GridLayout {
                         anchors.fill:parent;columns:page.width>=Theme.dp(1100)?4:2;columnSpacing:Theme.dp(8);rowSpacing:Theme.dp(8)
                         Repeater {
-                            model:[{label:"互联网延迟",value:28,icon:"globe",tint:Theme.accent},{label:"路由器延迟",value:4,icon:"router",tint:Theme.green},{label:"DNS 延迟",value:12,icon:"network",tint:Theme.accent},{label:"代理延迟",value:AppState.selectedNodeLatency,icon:"bolt",tint:Theme.orange}]
+                            model:[{label:"互联网延迟",value:"—",icon:"globe",tint:Theme.accent},{label:"路由器延迟",value:"—",icon:"router",tint:Theme.green},{label:"DNS 延迟",value:"—",icon:"network",tint:Theme.accent},{label:"代理延迟",value:"—",icon:"bolt",tint:Theme.orange}]
                             Item {
                                 required property var modelData
                                 Layout.fillWidth:true;Layout.fillHeight:true;Layout.minimumWidth:Theme.dp(0);Layout.preferredHeight:Theme.dp(64)
@@ -175,7 +162,7 @@ Item {
                             Item {
                                 id:metric;required property var modelData
                                 objectName:modelData.up?"uploadMetric":"downloadMetric"
-                                property string value:AppState.proxyOn?(modelData.up?AppState.demoUp:AppState.demoDown).toFixed(1)+" MB/s":"0 KB/s"
+                                property string value:"—"
                                 Layout.fillWidth:true;Layout.fillHeight:true
                                 RowLayout {
                                     width:parent.width;spacing:Theme.dp(10)
@@ -187,7 +174,7 @@ Item {
                                     }
                                 }
                                 Text { x:Theme.dp(0);y:Theme.dp(55);text:AppState.proxyOn?"":"未连接";font.pixelSize:Theme.fontSize(11);color:Theme.muted }
-                                SwirlSparkline { x:Theme.dp(44);y:Theme.dp(54);width:parent.width-Theme.dp(44);height:Theme.dp(42);lineColor:metric.modelData.tint;active:AppState.proxyOn;values:AppState.proxyOn?(page.speedRange===0?[0.18,0.65,0.25,0.56,0.3,0.85,0.52,0.73]:page.speedRange===1?[0.2,0.4,0.65,0.6,0.8,0.6,0.4,0.9]:[0.5,0.3,0.6,0.25,0.85,0.5,0.35,0.6]):[0,0,0,0,0,0,0,0] }
+                                SwirlSparkline { x:Theme.dp(44);y:Theme.dp(54);width:parent.width-Theme.dp(44);height:Theme.dp(42);lineColor:metric.modelData.tint;active:false;values:[] }
                                 Accessible.name:metric.modelData.label+" "+value+"，数据"
                             }
                         }
@@ -202,17 +189,17 @@ Item {
                         anchors.fill:parent;spacing:Theme.dp(5)
                         Rectangle {
                             Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(22);radius:Theme.roundedRadius(width,height);color:Theme.raised;clip:true
-                            Canvas { anchors.fill:parent; onPaint:{ var ctx=getContext("2d");ctx.reset();var r=height/2;ctx.beginPath();ctx.moveTo(r,0);ctx.lineTo(width-r,0);ctx.arc(width-r,r,r,-Math.PI/2,Math.PI/2);ctx.lineTo(r,height);ctx.arc(r,r,r,Math.PI/2,Math.PI*1.5);ctx.closePath();ctx.clip();ctx.fillStyle=Theme.accent;ctx.fillRect(0,0,width*0.682,height);ctx.fillStyle=Theme.statusGreen;ctx.fillRect(width*0.682,0,width*0.241,height);ctx.fillStyle="#FFA326";ctx.fillRect(width*0.923,0,width*0.047,height) } }
+                            Canvas { anchors.fill:parent; onPaint:getContext("2d").reset() }
                         }
                         Repeater {
-                            model:[{name:"代理流量",percent:"68.2%",value:"845.6 MB",tint:Theme.accent},{name:"直连流量",percent:"24.1%",value:"298.4 MB",tint:Theme.statusGreen},{name:"阻止流量",percent:"4.7%",value:"58.1 MB",tint:"#FFA326"},{name:"其他流量",percent:"3.0%",value:"37.9 MB",tint:Theme.muted}]
+                            model:[{name:"代理流量",percent:"—",value:"—",tint:Theme.accent},{name:"直连流量",percent:"—",value:"—",tint:Theme.statusGreen},{name:"阻止流量",percent:"—",value:"—",tint:"#FFA326"},{name:"其他流量",percent:"—",value:"—",tint:Theme.muted}]
                             RowLayout {
                                 required property var modelData
                                 Layout.fillWidth:true;Layout.fillHeight:true;spacing:Theme.dp(10)
                                 Rectangle { width:Theme.dp(12);height:Theme.dp(12);radius:width/2;color:modelData.tint }
                                 Text { text:modelData.name;color:Theme.text;font.pixelSize:Theme.fontSize(14);Layout.fillWidth:true }
                                 Text { text:modelData.percent;color:Theme.text;font.family:"Segoe UI";font.pixelSize:Theme.fontSize(14);Layout.preferredWidth:Theme.dp(46);horizontalAlignment:Text.AlignRight }
-                                Text { text:page.periodValue(modelData.value,distribution.filterIndex);color:Theme.muted;font.family:"Segoe UI";font.pixelSize:Theme.fontSize(13);Layout.preferredWidth:Theme.dp(86);horizontalAlignment:Text.AlignRight }
+                                Text { text:modelData.value;color:Theme.muted;font.family:"Segoe UI";font.pixelSize:Theme.fontSize(13);Layout.preferredWidth:Theme.dp(86);horizontalAlignment:Text.AlignRight }
                             }
                         }
                     }
@@ -246,9 +233,9 @@ Item {
                             RowLayout {
                                 Layout.fillWidth:true;spacing:Theme.dp(8)
                                 Text { text:"模式";color:Theme.muted;font.pixelSize:Theme.fontSize(13) }
-                                SwirlComboBox { objectName:"modeCombo";Layout.fillWidth:true;Layout.minimumWidth:Theme.dp(0);implicitHeight:Theme.dp(32);font.pixelSize:Theme.fontSize(13);model:["规则","全局","直连"];currentIndex:Math.max(0,model.indexOf(AppState.mode));onActivated:AppState.mode=currentText;Accessible.name:"模式选择" }
+                                SwirlComboBox { objectName:"modeCombo";Layout.fillWidth:true;Layout.minimumWidth:Theme.dp(0);implicitHeight:Theme.dp(32);font.pixelSize:Theme.fontSize(13);enabled:false;model:["固定节点","直连"];currentIndex:Math.max(0,model.indexOf(AppState.mode));onActivated:AppState.mode=currentText;Accessible.name:"模式选择" }
                                 Text { text:"策略";color:Theme.muted;font.pixelSize:Theme.fontSize(13) }
-                                SwirlComboBox { objectName:"policyCombo";Layout.fillWidth:true;Layout.minimumWidth:Theme.dp(0);implicitHeight:Theme.dp(32);font.pixelSize:Theme.fontSize(13);model:["自动选择","新加坡节点","直连","拒绝"];currentIndex:Math.max(0,model.indexOf(AppState.policy));onActivated:AppState.policy=currentText;Accessible.name:"策略选择" }
+                                SwirlComboBox { objectName:"policyCombo";Layout.fillWidth:true;Layout.minimumWidth:Theme.dp(0);implicitHeight:Theme.dp(32);font.pixelSize:Theme.fontSize(13);enabled:false;model:["固定节点"];currentIndex:Math.max(0,model.indexOf(AppState.policy));onActivated:AppState.policy=currentText;Accessible.name:"策略选择" }
                                 SwirlButton { text:AppState.selectedNode;Layout.fillWidth:true;Layout.minimumWidth:Theme.dp(0);implicitHeight:Theme.dp(32);font.pixelSize:Theme.fontSize(13);onClicked:nodePicker.open();Accessible.name:"当前节点 "+text }
                             }
                         }
@@ -267,7 +254,7 @@ Item {
                                 }
                             }
                             Repeater {
-                                model:demoProvider.connections().slice(0,3)
+                                model:systemProvider.connections().slice(0,3)
                                 Button {
                                     required property var modelData;width:parent.width;height:(parent.height-Theme.dp(24))/3;padding:Theme.dp(0)
                                     background:Rectangle { color:parent.hovered?Theme.hover:"transparent";radius:Theme.roundedRadius(width,height) }
@@ -302,7 +289,7 @@ Item {
                                     SwirlToggle {
                                         objectName:modelData.kind===0?"systemProxyToggle":"tunToggle";visible:modelData.kind<2;implicitWidth:Theme.dp(46);implicitHeight:Theme.dp(26)
                                         checked:modelData.kind===0?AppState.systemProxyOn:AppState.tunOn
-                                        onToggled:{ if(checked&&!AppState.proxyOn)AppState.setConnection(true);if(modelData.kind===0)AppState.systemProxyOn=checked;else AppState.tunOn=checked }
+                                        enabled:false
                                         Accessible.name:modelData.title+"开关"
                                     }
                                     SwirlButton { visible:modelData.kind===2;text:"查看设置";implicitHeight:Theme.dp(28);implicitWidth:Theme.dp(84);font.pixelSize:Theme.fontSize(12);onClicked:AppState.navigate("dns") }
@@ -355,8 +342,8 @@ Item {
             Text { text:"选择节点";font.pixelSize:Theme.fontSize(22);font.weight:Font.DemiBold;color:Theme.text }
             Text { text:"选择要使用的代理节点";font.pixelSize:Theme.fontSize(14);color:Theme.muted }
             Repeater {
-                model:[{name:"新加坡 · 01",region:"SG",protocol:"Trojan",latency:38},{name:"香港 · 01",region:"HK",protocol:"Hysteria2",latency:52},{name:"东京 · 01",region:"JP",protocol:"Trojan",latency:66}]
-                SwirlButton { required property var modelData;objectName:modelData.region==="HK"?"hongKongNode":"";Layout.fillWidth:true;text:modelData.name;primary:AppState.selectedNode===modelData.name;onClicked:{AppState.selectNode(modelData);nodePicker.close()} }
+                model:engineController.nodes
+                SwirlButton { required property var modelData;objectName:"savedNodeChoice";Layout.fillWidth:true;text:modelData.name;primary:AppState.selectedNode===modelData.name;onClicked:{engineController.chooseNode(modelData.id);nodePicker.close()} }
             }
             SwirlButton { text:"取消";Layout.alignment:Qt.AlignRight;onClicked:nodePicker.close() }
         }

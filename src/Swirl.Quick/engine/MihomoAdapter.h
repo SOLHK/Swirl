@@ -19,6 +19,8 @@ public:
     void start(const EngineStartOptions &options) override;
     void stop() override;
     void refresh() override;
+    void selectNode(const QString &id) override;
+    void probeNode(const QUrl &url) override;
     Status status() const override;
     QString configurationSummary() const override;
 private:
@@ -32,12 +34,19 @@ private:
     void apiFailure(Error error, const QString &message);
     bool prepareConfiguration();
     bool reserveControlPort();
+    bool reservePort(QTcpServer &server, quint16 port);
+    void cancelNodeRequests();
+    void nodeFailure(const QString &message);
     bool lockAndVerifyExecutable();
     void unlockExecutable();
     OwnedProcess m_process;
     QNetworkAccessManager m_network;
     QPointer<QNetworkReply> m_reply;
     QTcpServer m_reservation;
+    QTcpServer m_proxyReservation;
+    QNetworkAccessManager m_probeNetwork;
+    QPointer<QNetworkReply> m_nodeReply, m_probeReply;
+    quint64 m_nodeGeneration = 0;
     QTimer m_poll, m_deadline, m_killTimer;
     QElapsedTimer m_uptime;
     EngineStartOptions m_options;
@@ -50,4 +59,5 @@ private:
     void *m_executableHandle = nullptr;
     quint64 m_generation = 0;
     bool m_failureExit = false;
+    bool m_selectionPending = false;
 };

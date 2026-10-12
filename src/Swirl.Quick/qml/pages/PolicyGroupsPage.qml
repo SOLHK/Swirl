@@ -7,24 +7,19 @@ import "../controls"
 
 Item {
     id:page
-    property string chosen:"自动选择"
-    property var groups:[
-        {id:"g1",name:"自动选择",type:"延迟测试",current:"新加坡 · 01",health:"Healthy"},
-        {id:"g2",name:"Global",type:"手动选择",current:"香港 · 01",health:"Healthy"},
-        {id:"g3",name:"Fallback",type:"Failover",current:"东京 · 01",health:"Healthy"},
-        {id:"g4",name:"Balance",type:"负载均衡",current:"轮询",health:"Healthy"},
-        {id:"g5",name:"办公 Wi-Fi",type:"SSID",current:"DIRECT",health:"Idle"}
-    ]
-    readonly property var active:groups.find(function(g){return g.name===page.chosen})||groups[0]
+    readonly property bool implemented:false
+    property string chosen: ""
+    property var groups:[]
+    readonly property var active:groups.find(function(g){return g.name===page.chosen})||({id:"",name:"未配置",type:"尚未实现",current:"—",health:"未检测"})
     readonly property var showing:groups.filter(function(g){return (g.name+" "+g.type).toLowerCase().indexOf(search.text.toLowerCase())>=0})
     ColumnLayout {
         anchors.fill:parent; anchors.margins:Theme.dp(23); spacing:Theme.dp(14)
         RowLayout {
             Layout.fillWidth:true
-            SwirlStatusBadge { label:AppState.zh("STRATEGY PREVIEW"); tone:"accent" }
-            Text { text:AppState.zh("Selection and fallback states are local UI data."); color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
-            SwirlButton { text:AppState.zh("Test policies"); onClicked:AppState.notice("策略组延迟测试") }
-            SwirlButton { text:AppState.zh("Add group"); primary:true; onClicked:addDialog.open() }
+            SwirlStatusBadge { label:"尚未实现"; tone:"accent" }
+            Text { text:"策略组尚未实现。"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
+            SwirlButton { enabled:false; text:AppState.zh("Test policies"); onClicked:AppState.notice("策略组延迟测试") }
+            SwirlButton { enabled:false; text:AppState.zh("Add group"); primary:true; onClicked:addDialog.open() }
         }
         SwirlGlassPanel {
             Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(120)
@@ -37,7 +32,7 @@ Item {
                     Text { text:page.chosen; color:Theme.text; font.pixelSize:Theme.fontSize(22); font.weight:Font.DemiBold }
                     Text { text:AppState.zh("策略组类型：")+page.active.type+"  ·  当前节点："+page.active.current; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
                 }
-                SwirlButton { text:AppState.zh("Apply selection"); primary:true; onClicked:{AppState.policy=page.chosen;AppState.notice("已选择策略组")} }
+                SwirlButton { enabled:false; text:AppState.zh("Apply selection"); primary:true; onClicked:AppState.notice("尚未实现") }
             }
         }
         RowLayout {
@@ -95,8 +90,8 @@ Item {
                         }
                     }
 
-                    SwirlButton { text:AppState.zh("Choose endpoint"); onClicked:AppState.currentPage="proxies" }
-                    SwirlButton { text:AppState.zh("View details"); onClicked:AppState.notice("策略关系详情") }
+                    SwirlButton { enabled:false; text:AppState.zh("Choose endpoint"); onClicked:AppState.currentPage="proxies" }
+                    SwirlButton { enabled:false; text:AppState.zh("View details"); onClicked:AppState.notice("策略关系详情") }
 
                 }
             }
@@ -111,15 +106,10 @@ Item {
             SwirlComboBox { id:groupType; Layout.fillWidth:true; model:["手动选择","延迟测试","Failover","负载均衡","SSID"] }
             RowLayout {
                 Layout.alignment:Qt.AlignRight
-                SwirlButton { text:AppState.zh("取消"); onClicked:addDialog.close() }
-                SwirlButton {
-                    text:AppState.zh("Add demo"); primary:true; enabled:groupName.text.trim().length>0
-                    onClicked:{
-                        page.groups=page.groups.concat([{id:"g"+Date.now(),name:groupName.text.trim(),
-                            type:groupType.currentText,current:"DIRECT",health:"Idle"}])
-                        page.chosen=groupName.text.trim()
-                        groupName.text="";addDialog.close()
-                    }
+                SwirlButton { enabled:false; text:AppState.zh("取消"); onClicked:addDialog.close() }
+                SwirlButton { enabled:false;
+                    text:"尚未实现"; primary:true;
+                    onClicked:AppState.notice("尚未实现")
                 }
             }
         }
