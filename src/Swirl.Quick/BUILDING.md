@@ -1,8 +1,8 @@
 # Swirl Windows Qt UI
 
-This is the existing Swirl repository's C++23 / Qt 6 Quick UI subproject on
-`test`. The original WPF/.NET network implementation, configuration and brand
-assets are preserved. Most Qt pages use demonstration data. The separate opt-in CaptureService
+This is Swirl's only maintained Windows application project, using C++23 / Qt 6
+Quick/QML and Windows NSIS. The old WPF/.NET program is no longer present in
+current branches. Most Qt pages use demonstration data. The separate opt-in CaptureService
 forwards real HTTP requests and CONNECT tunnels; it never changes the system
 proxy, starts Mihomo or accesses certificate stores. See CAPTURE.md.
 
@@ -90,8 +90,7 @@ an opaque fallback. See docs/UI_1_0_VALIDATION.md.
 - The transparent wave SVG `assets/icons/swirl_wave_mark.svg` is used directly
   as the sidebar brand mark without icon cradle, frame or shadow. The app and
   installer use the corresponding wave-based icon resource, with SVG glyphs
-  under `assets/icons/ui/` for interface actions. No legacy kite icon is
-  presented as the current Qt brand.
+  under `assets/icons/ui/` for interface actions.
 - Existing specialized pages remain available by search and overview links.
   The HTTP capture page is real; remaining proxy backend integration and further
   visual refinement of other pages remain future work.
@@ -108,8 +107,8 @@ and checks 1000x650, 1464x930 and 1920x1219 logical windows before packaging
 the production EXE. Preview warnings/errors fail the job, and per-preview logs
 are uploaded as Swirl-Quick-Preview-Diagnostics. These software previews do not
 replace native Windows GPU/DWM or multi-monitor checks. Its existing release
-step publishes a test-only prerelease. All work stays on `test`; promotion to
-`main` requires an explicit user instruction.
+step publishes a test-only prerelease. Development changes go to `test` first; promotion to `main` requires the
+repository owner's explicit approval and successful required checks.
 
 ## Module drafts and in-place upgrades
 
