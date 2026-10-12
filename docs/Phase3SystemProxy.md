@@ -86,6 +86,9 @@ The installed window uses the same ICO. A new Swirl-specific icon filename updat
 its own installed shortcuts without clearing global caches. AppUserModelID remains
 `SOLHK.Swirl.Desktop`. Existing pins targeting a different old installation may
 still need the user's repinning; unrelated shortcuts are not modified.
+The installer also stamps that AppUserModelID on its own desktop/start-menu
+links using a guarded helper. It verifies the link's existing target before
+updating the icon/property and notifies Explorer for that item only.
 
 The antialiased one-physical-pixel window contour has stronger theme-aware
 contrast. Radius, desktop acrylic material and HDR composition are retained;

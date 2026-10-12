@@ -81,6 +81,12 @@ Section "安装 Swirl"
     CreateDirectory "$SMPROGRAMS\\Swirl"
     CreateShortCut "$SMPROGRAMS\\Swirl\\Swirl.lnk" "$INSTDIR\\Swirl.exe" "" "$INSTDIR\\Swirl-brand-phase3.ico" 0
     CreateShortCut "$DESKTOP\\Swirl.lnk" "$INSTDIR\\Swirl.exe" "" "$INSTDIR\\Swirl-brand-phase3.ico" 0
+    ExecWait '"$INSTDIR\SwirlProxyGuard.exe" --repair-shortcut "$DESKTOP\Swirl.lnk" "$INSTDIR\Swirl.exe" "$INSTDIR\Swirl-brand-phase3.ico"' $0
+    StrCmp $0 0 +2
+    DetailPrint "Swirl 桌面快捷方式属性更新失败，错误 $0。"
+    ExecWait '"$INSTDIR\SwirlProxyGuard.exe" --repair-shortcut "$SMPROGRAMS\Swirl\Swirl.lnk" "$INSTDIR\Swirl.exe" "$INSTDIR\Swirl-brand-phase3.ico"' $0
+    StrCmp $0 0 +2
+    DetailPrint "Swirl 开始菜单快捷方式属性更新失败，错误 $0。"
     WriteRegStr HKCU "Software\\Swirl" "InstallDir" "$INSTDIR"
     WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "DisplayName" "Swirl"
     WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "DisplayVersion" "1.0.0.0"
