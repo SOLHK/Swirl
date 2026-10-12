@@ -73,6 +73,22 @@ if(SWIRL_BUILD_UI_TESTS)
   ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software" TIMEOUT 60)
 endif()
 if(WIN32)
+ # Generate the Windows-only ICO from the canonical Swirl SVG before RC compilation.
+ add_executable(SwirlIconBuilder tools/BuildWindowsIcon.cpp)
+ target_link_libraries(SwirlIconBuilder PRIVATE Qt6::Gui Qt6::Svg)
+ set(SWIRL_GENERATED_ICON "${CMAKE_CURRENT_BINARY_DIR}/brand/Swirl.ico")
+ add_custom_command(
+  OUTPUT "${SWIRL_GENERATED_ICON}"
+  COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/brand"
+  COMMAND $<TARGET_FILE:SwirlIconBuilder>
+          "${SWIRL_ASSET_PATH}/icons/swirl_knot_light.svg"
+          "${SWIRL_GENERATED_ICON}"
+  DEPENDS SwirlIconBuilder "${SWIRL_ASSET_PATH}/icons/swirl_knot_light.svg"
+  COMMENT "Generate Windows ICO from Swirl SVG"
+  VERBATIM
+ )
+ add_custom_target(swirl-generate-icon DEPENDS "${SWIRL_GENERATED_ICON}")
+ add_dependencies(Swirl swirl-generate-icon)
  configure_file(app/Swirl.rc.in "${CMAKE_CURRENT_BINARY_DIR}/Swirl.rc" @ONLY)
  target_sources(Swirl PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/Swirl.rc")
  target_link_libraries(Swirl PRIVATE dwmapi advapi32 psapi)

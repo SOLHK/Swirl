@@ -177,7 +177,9 @@ jobs:
           New-Item -ItemType Directory -Force -Path installer-bin, out | Out-Null
           Copy-Item -Path "dist/*" -Destination "installer-bin" -Recurse -Force
           Copy-Item "src/Swirl.Quick/packaging/THIRD_PARTY_NOTICES.txt" "installer-bin/"
-          Copy-Item "src/Swirl.Quick/assets/swirl.ico" "installer-bin/Swirl-brand-100.ico"
+          $icon = "build/swirl-quick/brand/Swirl.ico"
+          if (!(Test-Path -LiteralPath $icon)) { throw "Missing SVG-derived Windows icon: $icon" }
+          Copy-Item -LiteralPath $icon -Destination "installer-bin/Swirl-brand-100.ico"
           Copy-Item "src/Swirl.Quick/packaging/licenses" "installer-bin/licenses" -Recurse -Force
           Remove-Item -Path "installer-bin/Swirl-*-preview.png", "installer-bin/Swirl-diagnostics.txt" -ErrorAction SilentlyContinue
           if (!(Test-Path "installer-bin/Swirl.exe")) { throw "Missing Swirl.exe" }
@@ -193,7 +195,8 @@ jobs:
           $nsis = "C:/Program Files (x86)/NSIS/makensis.exe"
           $appDist = (Resolve-Path "installer-bin").Path
           $outDir = (Resolve-Path "out").Path
-          & $nsis /INPUTCHARSET UTF8 "/DAPP_DIST=$appDist" "/DOUT_DIR=$outDir" "src/Swirl.Quick/packaging/Swirl.nsi"
+          $icon = (Resolve-Path "build/swirl-quick/brand/Swirl.ico").Path
+          & $nsis /INPUTCHARSET UTF8 "/DAPP_DIST=$appDist" "/DOUT_DIR=$outDir" "/DAPP_ICON=$icon" "src/Swirl.Quick/packaging/Swirl.nsi"
           if ($LASTEXITCODE -ne 0) { throw "NSIS packaging failed ($LASTEXITCODE)" }
           if (!(Test-Path "out/Swirl-Setup.exe")) { throw "Installer missing" }
           if ((Get-Item "out/Swirl-Setup.exe").Length -lt 10000000) { throw "Installer suspiciously small" }

@@ -90,9 +90,12 @@ an opaque fallback. See docs/UI_1_0_VALIDATION.md.
 - The sidebar brand mark uses `assets/icons/swirl_knot_mark_light.svg` (black)
   or `swirl_knot_mark_dark.svg` (white) according to the active theme, without
   a tile, cradle, frame, or shadow. Light/dark application tile SVGs are in
-  `assets/icons/swirl_knot_light.svg` and `swirl_knot_dark.svg`. The Windows
-  installer `.ico` remains a separately maintained raster resource. Generic
-  UI action SVGs remain under `assets/icons/ui/`.
+  `assets/icons/swirl_knot_light.svg` and `swirl_knot_dark.svg`. Those SVGs
+  are the only maintained Swirl brand sources. Windows executables and installers
+  require an ICO; CMake invokes a Qt SVG-based generator to build
+  `build/swirl-quick/brand/Swirl.ico` automatically from the light SVG.
+  Do not commit old raster brand icons. Generic interface action icons
+  remain under `assets/icons/ui/`.
 - Existing specialized pages remain available by search and overview links.
   The HTTP capture page is real; remaining proxy backend integration and further
   visual refinement of other pages remain future work.

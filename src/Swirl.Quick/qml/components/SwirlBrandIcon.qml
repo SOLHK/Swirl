@@ -1,4 +1,5 @@
 import QtQuick
+import SwirlQuick
 Item {
     id:mark
     implicitWidth:48; implicitHeight:48

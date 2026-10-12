@@ -2,6 +2,8 @@
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="src/Swirl.Quick/assets/icons/swirl_knot_dark.svg"><img src="src/Swirl.Quick/assets/icons/swirl_knot_light.svg" width="88" alt="Swirl 祥云结标志"></picture>
 
+Swirl 品牌图标以 SVG 为唯一设计源：浅色为黑色祥云结、灰白底，深色为白色祥云结、深灰底。Windows 安装器与 EXE 所需的 ICO 会在构建时由同一 SVG 自动生成。
+
 **Swirl** 是面向 Windows 的专业网络工具项目，使用 **C++23 + Qt 6 Quick/QML** 开发统一的桌面界面、HTTP 调试与后续代理管理功能。界面设计借鉴 macOS 应用的简洁布局与细腻材质，运行于 Windows。
 
 > **🧪 当前状态：Swirl 1.0 UI Preview（`1.0.0-preview`）。** 仓库当前仅保留 C++23 / Qt 6 代码和构建链；原 WPF/.NET 项目与安装器已退出当前源码树。**这仍是功能预览，不是已完成代理核心的正式客户端。**

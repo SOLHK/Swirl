@@ -16,9 +16,6 @@
 #include <QQmlExpression>
 #include <QQmlIncubationController>
 #include <QScreen>
-#include <QSvgRenderer>
-#include <QPainter>
-#include <QDir>
 #include <QStandardPaths>
 #include "app/ModuleDraftStore.h"
 #ifdef SWIRL_UI_TESTS
@@ -77,16 +74,6 @@ int main(int argc, char *argv[])
                 return argument.mid(prefix.size());
         return QString();
     };
-    const QString brandOutput=argumentValue(QStringLiteral("--render-brand-assets="));
-    if(!brandOutput.isEmpty()) {
-        QDir().mkpath(brandOutput);
-        for(const auto &name:{QStringLiteral("swirl-app"),QStringLiteral("swirl-mark")}) {
-            QImage image(1024,1024,QImage::Format_ARGB32_Premultiplied);image.fill(Qt::transparent);
-            QPainter painter(&image);QSvgRenderer svg(name==QStringLiteral("swirl-app") ? QStringLiteral(":/swirl/icons/swirl_knot_light.svg") : QStringLiteral(":/swirl/icons/swirl_knot_mark_light.svg"));svg.render(&painter);painter.end();
-            if(!image.save(brandOutput+QStringLiteral("/")+name+QStringLiteral(".png")))return 5;
-        }
-        return 0;
-    }
     const QString nativeFramePath = argumentValue(QStringLiteral("--capture-native-frame="));
     const QString previewPath = nativeFramePath.isEmpty()?argumentValue(QStringLiteral("--capture-preview=")):nativeFramePath;
     const QString previewPage = argumentValue(QStringLiteral("--preview-page="));

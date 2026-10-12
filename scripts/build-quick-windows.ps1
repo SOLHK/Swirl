@@ -48,14 +48,16 @@ try {
     }
     New-Item -ItemType Directory -Force $DistDir,$OutDir | Out-Null
     Copy-Item -LiteralPath $exe -Destination $DistDir
-    Copy-Item src/Swirl.Quick/assets/swirl.ico (Join-Path $DistDir "Swirl-brand-100.ico")
+    $icon = Join-Path (Resolve-Path $BuildDir).Path "brand/Swirl.ico"
+    if (!(Test-Path -LiteralPath $icon)) { throw "SVG-derived icon is missing: $icon" }
+    Copy-Item -LiteralPath $icon -Destination (Join-Path $DistDir "Swirl-brand-100.ico")
     & "$qt/bin/windeployqt.exe" --release --qmldir src/Swirl.Quick/qml (Join-Path $DistDir "Swirl.exe")
     if ($LASTEXITCODE) { throw "Qt runtime deployment failed." }
     Copy-Item src/Swirl.Quick/packaging/THIRD_PARTY_NOTICES.txt $DistDir
     Copy-Item src/Swirl.Quick/packaging/licenses (Join-Path $DistDir "licenses") -Recurse
     $dist = (Resolve-Path $DistDir).Path
     $out = (Resolve-Path $OutDir).Path
-    & $Nsis /INPUTCHARSET UTF8 "/DAPP_DIST=$dist" "/DOUT_DIR=$out" src/Swirl.Quick/packaging/Swirl.nsi
+    & $Nsis /INPUTCHARSET UTF8 "/DAPP_DIST=$dist" "/DOUT_DIR=$out" "/DAPP_ICON=$icon" src/Swirl.Quick/packaging/Swirl.nsi
     if ($LASTEXITCODE) { throw "NSIS packaging failed." }
     Get-Item (Join-Path $out "Swirl-Setup.exe")
 } finally { Pop-Location }

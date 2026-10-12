@@ -10,9 +10,12 @@ Var Parameters
 !ifndef OUT_DIR
 !error "OUT_DIR is required"
 !endif
+!ifndef APP_ICON
+!error "APP_ICON required (generated from Swirl SVG)"
+!endif
 !define MUI_ABORTWARNING
-!define MUI_ICON "../assets/swirl.ico"
-!define MUI_UNICON "../assets/swirl.ico"
+!define MUI_ICON "${APP_ICON}"
+!define MUI_UNICON "${APP_ICON}"
 !define MUI_FINISHPAGE_RUN "$INSTDIR\\Swirl.exe"
 !define MUI_FINISHPAGE_RUN_TEXT "启动 Swirl"
 Name "Swirl"
