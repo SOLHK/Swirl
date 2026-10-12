@@ -21,8 +21,10 @@ public:
     void refresh() override;
     void selectNode(const QString &id) override;
     void probeNode(const QUrl &url) override;
+    void setRoutingMode(const QString &mode) override;
     Status status() const override;
     QString configurationSummary() const override;
+    QVariantList routingRules() const override;
 private:
     enum class Stage { Version, ValidateConfig, Engine };
     void launch(Stage stage);
@@ -31,6 +33,7 @@ private:
     void fail(Error error, const QString &message);
     void cancelRequest();
     void request(bool version);
+    void readConnections();
     void apiFailure(Error error, const QString &message);
     bool prepareConfiguration();
     bool reserveControlPort();
@@ -46,6 +49,8 @@ private:
     QTcpServer m_proxyReservation;
     QNetworkAccessManager m_probeNetwork;
     QPointer<QNetworkReply> m_nodeReply, m_probeReply;
+    QPointer<QNetworkReply> m_modeReply;
+    QPointer<QNetworkReply> m_connectionsReply;
     quint64 m_nodeGeneration = 0;
     QTimer m_poll, m_deadline, m_killTimer;
     QElapsedTimer m_uptime;

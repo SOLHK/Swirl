@@ -5,10 +5,10 @@ QtObject {
     property bool sidebarCollapsed: false
     readonly property string connectionState: engineController.stateText
     readonly property bool proxyOn: engineController.requestSucceeded
-    readonly property bool systemProxyOn: false
+    readonly property bool systemProxyOn: engineController.systemProxy.enabled
     readonly property bool tunOn: false
     property bool detailOpen: true
-    readonly property string mode: engineController.activeNodeId.length?"固定节点":"直连"
+    readonly property string mode: engineController.routingMode==="rule"?"规则":engineController.routingMode==="global"?"全局":"直连"
     readonly property string policy: "固定节点"
     readonly property string selectedNode: engineController.selectedNodeName
     readonly property string selectedNodeRegion: "—"

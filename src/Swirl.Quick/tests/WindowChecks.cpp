@@ -23,6 +23,7 @@
 
 int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QString &directory)
 {
+    qInfo()<<"WINDOW_RENDER_DPR"<<window->devicePixelRatio()<<"graphics_api"<<window->rendererInterface()->graphicsApi();
     int failures=0,checks=0;
     const auto check=[&](bool ok,const char *name){++checks;if(!ok)++failures;qInfo()<< (ok?"PASS":"FAIL") <<name;};
     const auto state=[&](const QString &code){QQmlExpression expression(qmlContext(window),window,code);return expression.evaluate();};
@@ -39,7 +40,7 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
 #ifdef Q_OS_WIN
     SetWindowPos(reinterpret_cast<HWND>(background.winId()),HWND_TOPMOST,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE);
 #endif
-    window->resize(1280,800);
+    window->resize(qMin(1280,available.width()-120),qMin(800,available.height()-100));
     window->setPosition(available.topLeft()+QPoint(60,40));
     window->showNormal();window->raise();window->requestActivate();QTest::qWait(900);
 #ifdef Q_OS_WIN
@@ -83,7 +84,27 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
 #endif
         // Read the actual desktop compositor, never QQuickWindow::grabWindow,
         // which contains only the application's alpha surface.
-        auto img=window->screen()->grabWindow(0,window->x(),window->y(),window->width(),window->height()).toImage();
+        QImage img;
+#ifdef Q_OS_WIN
+        // QScreen::grabWindow(0, logical x/y) can map to a different desktop
+        // rectangle with per-process DPR overrides. Use this HWND's physical
+        // rectangle so fractional-DPI checks sample the actual compositor.
+        RECT r{};GetWindowRect(testHwnd,&r);
+        const int w=r.right-r.left,h=r.bottom-r.top;
+        const auto desktop=GetDC(nullptr),dc=CreateCompatibleDC(desktop);
+        BITMAPINFO info{};info.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);
+        info.bmiHeader.biWidth=w;info.bmiHeader.biHeight=-h;
+        info.bmiHeader.biPlanes=1;info.bmiHeader.biBitCount=32;info.bmiHeader.biCompression=BI_RGB;
+        void *bits=nullptr;auto bitmap=CreateDIBSection(dc,&info,DIB_RGB_COLORS,&bits,nullptr,0);
+        if(bitmap&&bits) {
+            const auto previous=SelectObject(dc,bitmap);
+            if(BitBlt(dc,0,0,w,h,desktop,r.left,r.top,SRCCOPY|CAPTUREBLT))img=QImage(static_cast<uchar *>(bits),w,h,QImage::Format_RGB32).copy();
+            SelectObject(dc,previous);DeleteObject(bitmap);
+        }
+        DeleteDC(dc);ReleaseDC(nullptr,desktop);
+#else
+        img=window->screen()->grabWindow(0,window->x(),window->y(),window->width(),window->height()).toImage();
+#endif
         check(!img.isNull() && img.save(directory+"/"+name+".png"),"native compositor screenshot saved");
         return img;
     };

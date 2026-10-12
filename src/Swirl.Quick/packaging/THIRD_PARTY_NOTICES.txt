@@ -41,3 +41,8 @@ redistributed in this installer. The existing Swirl SVG artwork is preserved.
 fkYAML v0.5.0 — MIT — Copyright Kensuke Fukutani (2023-2026)
 https://github.com/fktn-k/fkYAML
 License: licenses/fkYAML-MIT.txt
+
+MetaCubeX/meta-rules-dat - GPL-3.0
+China domain/IP MRS data pinned to commit 83c8208bdfae92b1caaa29745f51f233b6f1847e.
+https://github.com/MetaCubeX/meta-rules-dat
+License and SHA-256 manifest: rules/LICENSE, rules/manifest.json

@@ -3,12 +3,14 @@ project(Swirl VERSION 1.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
+set(SWIRL_TEST_FONT_DIRECTORY "C:/Windows/Fonts" CACHE PATH "Offscreen test font directory")
 option(SWIRL_BUILD_UI_TESTS "Build the Qt input-driven overview checks" OFF)
 find_package(Qt6 6.8 REQUIRED COMPONENTS Quick Qml QuickControls2 Network Svg GuiPrivate ShaderTools)
 qt_standard_project_setup(REQUIRES 6.8)
 qt_policy(SET QTP0004 NEW)
 qt_add_executable(Swirl WIN32 main.cpp app/SystemDataProvider.cpp app/SystemDataProvider.h app/WindowsBackdrop.cpp app/WindowsBackdrop.h network/CaptureService.cpp network/CaptureService.h app/ModuleDraftStore.cpp app/ModuleDraftStore.h)
 add_library(SwirlEngine STATIC
+ engine/SystemProxySession.h engine/SystemProxySession.cpp
  engine/ProxyEngine.h engine/OwnedProcess.h engine/OwnedProcess.cpp
  engine/MihomoAdapter.h engine/MihomoAdapter.cpp
  engine/EngineController.h engine/EngineController.cpp)
@@ -18,7 +20,10 @@ target_sources(SwirlEngine PRIVATE engine/NodeImportService.h engine/NodeImportS
 target_link_libraries(SwirlEngine PUBLIC Qt6::Core Qt6::Network Qt6::Gui)
 target_include_directories(SwirlEngine PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 if(WIN32)
- target_link_libraries(SwirlEngine PRIVATE advapi32 ws2_32 iphlpapi crypt32)
+ target_link_libraries(SwirlEngine PRIVATE advapi32 ws2_32 iphlpapi crypt32 wininet)
+ add_executable(SwirlProxyGuard tools/ProxyGuard.cpp)
+ target_link_libraries(SwirlProxyGuard PRIVATE SwirlEngine)
+ add_dependencies(Swirl SwirlProxyGuard)
 endif()
 if(MSVC)
  target_compile_options(SwirlEngine PRIVATE /utf-8)
@@ -89,6 +94,22 @@ if(SWIRL_BUILD_UI_TESTS)
  target_link_libraries(Swirl PRIVATE Qt6::Test)
  target_compile_definitions(Swirl PRIVATE SWIRL_UI_TESTS)
  enable_testing()
+ if(WIN32)
+  add_executable(SwirlSystemProxyTests tests/SystemProxyTests.cpp)
+  target_link_libraries(SwirlSystemProxyTests PRIVATE SwirlEngine Qt6::Test)
+  add_dependencies(SwirlSystemProxyTests SwirlProxyGuard)
+  # Explicit opt-in: normal CI and CTest never modify the runner's proxy.
+  if(DEFINED ENV{SWIRL_SYSTEM_PROXY_TEST})
+   add_test(NAME swirl-system-proxy-recovery COMMAND SwirlSystemProxyTests)
+   set_tests_properties(swirl-system-proxy-recovery PROPERTIES RUN_SERIAL TRUE TIMEOUT 45)
+  endif()
+  add_executable(SwirlAcceptance tests/AcceptanceSession.cpp)
+  target_link_libraries(SwirlAcceptance PRIVATE SwirlEngine)
+  if(MSVC)
+   target_compile_options(SwirlSystemProxyTests PRIVATE /utf-8)
+   target_compile_options(SwirlAcceptance PRIVATE /utf-8)
+  endif()
+ endif()
  add_executable(SwirlEngineFixture tests/EngineFixture.cpp)
  target_link_libraries(SwirlEngineFixture PRIVATE Qt6::Core Qt6::Network)
  add_executable(SwirlEngineTests tests/EngineTests.cpp)
@@ -122,18 +143,18 @@ if(SWIRL_BUILD_UI_TESTS)
  target_sources(Swirl PRIVATE tests/EngineUiChecks.cpp tests/EngineUiChecks.h tests/NodeUiChecks.cpp tests/NodeUiChecks.h tests/MotionChecks.cpp tests/MotionChecks.h)
  target_compile_definitions(Swirl PRIVATE SWIRL_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
  add_test(NAME swirl-node-ui COMMAND Swirl --node-self-test)
- set_tests_properties(swirl-node-ui PROPERTIES TIMEOUT 60 ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software")
+ set_tests_properties(swirl-node-ui PROPERTIES TIMEOUT 60 ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QPA_FONTDIR=${SWIRL_TEST_FONT_DIRECTORY}")
  add_test(NAME swirl-engine-ui COMMAND Swirl --engine-self-test)
  set_tests_properties(swirl-engine-ui PROPERTIES TIMEOUT 60
-  ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software")
+  ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QPA_FONTDIR=${SWIRL_TEST_FONT_DIRECTORY}")
  add_test(NAME swirl-overview-input COMMAND Swirl --interaction-test)
  add_test(NAME swirl-all-pages COMMAND Swirl --smoke-test)
  add_test(NAME swirl-motion COMMAND Swirl --motion-test --motion-output=motion-report.json)
  set_tests_properties(swirl-motion PROPERTIES TIMEOUT 120
-  ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software")
+  ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QPA_FONTDIR=${SWIRL_TEST_FONT_DIRECTORY}")
  add_test(NAME swirl-capture-network COMMAND Swirl --capture-self-test)
  set_tests_properties(swirl-overview-input swirl-all-pages swirl-capture-network PROPERTIES
-  ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software" TIMEOUT 60)
+  ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QPA_FONTDIR=${SWIRL_TEST_FONT_DIRECTORY}" TIMEOUT 60)
 endif()
 if(WIN32)
  # Generate the Windows-only ICO from the canonical Swirl SVG before RC compilation.
@@ -144,9 +165,9 @@ if(WIN32)
   OUTPUT "${SWIRL_GENERATED_ICON}"
   COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/brand"
   COMMAND $<TARGET_FILE:SwirlIconBuilder>
-          "${SWIRL_ASSET_PATH}/icons/swirl_knot_light.svg"
+          "${SWIRL_ASSET_PATH}/icons/swirl_knot_mark_light.svg"
           "${SWIRL_GENERATED_ICON}"
-  DEPENDS SwirlIconBuilder "${SWIRL_ASSET_PATH}/icons/swirl_knot_light.svg"
+  DEPENDS SwirlIconBuilder "${SWIRL_ASSET_PATH}/icons/swirl_knot_mark_light.svg"
   COMMENT "Generate Windows ICO from Swirl SVG"
   VERBATIM
  )

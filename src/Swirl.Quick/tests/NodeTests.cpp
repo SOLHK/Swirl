@@ -133,6 +133,20 @@ private slots:
         QVERIFY(engine.status().processAlive);QVERIFY(engine.status().apiHealthy);
         net.a.reject=false;engine.probeNode(net.url());QTRY_VERIFY_WITH_TIMEOUT(!engine.status().nodeBusy,8000);
         QCOMPARE(engine.status().requestState,ProxyEngine::RequestState::Succeeded);
+        engine.setRoutingMode("global");
+        QTRY_VERIFY_WITH_TIMEOUT(engine.status().mode=="global"&&engine.status().apiHealthy,5000);
+        QCOMPARE(fetch(net,config.proxyPort),QByteArray("exit-A"));
+        engine.selectNode(b.id);QTRY_VERIFY_WITH_TIMEOUT(!engine.status().nodeBusy,5000);
+        QCOMPARE(fetch(net,config.proxyPort),QByteArray("exit-B"));
+        const int forwards=net.a.forwarded+net.b.forwarded;
+        engine.setRoutingMode("direct");
+        QTRY_VERIFY_WITH_TIMEOUT(engine.status().mode=="direct"&&engine.status().apiHealthy,5000);
+        QCOMPARE(fetch(net,config.proxyPort),QByteArray("DIRECT-BYPASS"));
+        QCOMPARE(net.a.forwarded+net.b.forwarded,forwards);
+        engine.setRoutingMode("rule");
+        QTRY_VERIFY_WITH_TIMEOUT(engine.status().mode=="rule"&&engine.status().apiHealthy,5000);
+        engine.selectNode(a.id);QTRY_VERIFY_WITH_TIMEOUT(!engine.status().nodeBusy,5000);
+        QCOMPARE(fetch(net,config.proxyPort),QByteArray("exit-A"));
         engine.stop();QTRY_COMPARE_WITH_TIMEOUT(engine.status().state,ProxyEngine::State::Stopped,4000);
         QVERIFY(engine.status().nodeMessage.isEmpty());QCOMPARE(engine.status().latencyMs,-1);QCOMPARE(engine.status().requestState,ProxyEngine::RequestState::NotTested);
         QTcpServer reuse;QVERIFY(reuse.listen(QHostAddress::LocalHost,config.proxyPort));reuse.close();
@@ -150,6 +164,24 @@ private slots:
             QVERIFY(!engine.configurationSummary().contains("fixture-secret"));
             engine.stop();QTRY_COMPARE_WITH_TIMEOUT(engine.status().state,ProxyEngine::State::Stopped,4000);
         }
+    }
+    void verifiedRoutingProviders() {
+        ControlledNetwork net;QVERIFY(net.start());auto config=options();
+        auto n=node("routing-fixture",net.a.serverPort());config.nodes={n};config.selectedNodeId=n.id;
+        QTemporaryDir rules;QVERIFY(rules.isValid());
+        for(const auto &name:{"manifest.json","cn-domain.mrs","cn-ip.mrs"})
+            QVERIFY(QFile::copy(QCoreApplication::applicationDirPath()+"/rules/"+name,rules.filePath(name)));
+        config.smartRouting=true;config.rulesDirectory=rules.path();
+        MihomoAdapter engine;engine.start(config);
+        QTRY_COMPARE_WITH_TIMEOUT(engine.status().state,ProxyEngine::State::Running,16000);
+        QVERIFY(engine.routingRules().size()>=20);
+        QCOMPARE(fetch(net,config.proxyPort),QByteArray("DIRECT-BYPASS"));
+        engine.setRoutingMode("global");QTRY_VERIFY_WITH_TIMEOUT(engine.status().mode=="global"&&engine.status().apiHealthy,5000);
+        QCOMPARE(fetch(net,config.proxyPort),QByteArray("exit-A"));
+        engine.stop();QTRY_COMPARE_WITH_TIMEOUT(engine.status().state,ProxyEngine::State::Stopped,4000);
+        QFile modified(rules.filePath("cn-domain.mrs"));QVERIFY(modified.open(QIODevice::Append));modified.write("changed");modified.close();
+        engine.start(config);QCOMPARE(engine.status().error,ProxyEngine::Error::ConfigurationFailed);
+        QVERIFY(!engine.status().processAlive);
     }
 };
 QTEST_GUILESS_MAIN(NodeTests)

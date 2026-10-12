@@ -273,7 +273,7 @@ ApplicationWindow {
         anchors.fill:parent;z:998;color:"transparent";antialiasing:true
         radius:window.shellRadius
         border.width:window.visibility===Window.Maximized?0:1/Screen.devicePixelRatio
-        border.color:Theme.dark?Qt.rgba(1,1,1,window.active?0.22:0.12):Qt.rgba(0,0,0,window.active?0.25:0.14)
+        border.color:Theme.dark?Qt.rgba(1,1,1,window.active?0.30:0.20):Qt.rgba(0,0,0,window.active?0.32:0.22)
     }
     Timer { id:toastTimer; interval:3200; onTriggered:AppState.toast="" }
     Connections { target:AppState; function onToastChanged(){if(AppState.toast.length)toastTimer.restart()} }

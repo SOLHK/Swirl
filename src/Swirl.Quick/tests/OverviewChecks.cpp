@@ -124,7 +124,7 @@ int runOverviewChecks(QQuickWindow *window)
     auto *chart = item("overviewChart");
     check(chart && chart->property("series").toString()=="down","download is the only default curve");
     check(item("connectionSwitch")==nullptr,"upper-right connection demo control removed");
-    check(item("systemProxyToggle") && !item("systemProxyToggle")->isEnabled(),"system proxy control remains disabled");
+    check(item("systemProxyToggle") && item("systemProxyToggle")->isEnabled(),"system proxy control is implemented");
     check(item("tunToggle") && !item("tunToggle")->isEnabled(),"TUN control remains disabled");
     check(state("!AppState.systemProxyOn && !AppState.tunOn && !engineController.processAlive").toBool(),"overview does not change networking or start engine");
     check(chart && chart->property("baseHistory").toList().isEmpty(),"traffic history contains no generated samples");
@@ -136,7 +136,7 @@ int runOverviewChecks(QQuickWindow *window)
     state("Theme.resetScale()");
     check(state("Theme.followSystemScale && Theme.uiScale === 1").toBool(),"scale reset follows system DPI through Qt logical pixels");
     auto *combo=item("modeCombo");
-    check(combo && !combo->isEnabled() && state("AppState.mode === '直连'").toBool(),"unimplemented routing modes cannot alter engine state");
+    check(combo && combo->isEnabled() && state("AppState.mode === '规则'").toBool(),"routing mode defaults to rule independently of engine state");
     state("pageLoader.item.showDetails = true");
     QTest::qWait(150);
     click(item("seriesSelector"),0.5);

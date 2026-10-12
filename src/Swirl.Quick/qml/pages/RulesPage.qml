@@ -7,9 +7,9 @@ import "../controls"
 
 Item {
     id:page
-    readonly property bool implemented:false
+    readonly property bool implemented:true
     property var selectedRule:null
-    property var rules:[]
+    readonly property var rules:engineController.routingRules
     readonly property var displayRules:rules.filter(function(r){
         return (r.type+" "+r.pattern+" "+r.policy).toLowerCase().indexOf(search.text.toLowerCase())>=0 &&
                (policyFilter.currentText==="全部策略"||r.policy===policyFilter.currentText)
@@ -18,15 +18,15 @@ Item {
         anchors.fill:parent; anchors.margins:Theme.dp(23); spacing:Theme.dp(14)
         RowLayout {
             Layout.fillWidth:true
-            SwirlStatusBadge { label:"尚未实现"; tone:"accent" }
-            Text { text:"分流规则尚未实现。"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
+            SwirlStatusBadge { label:AppState.mode+"模式"; tone:"accent" }
+            Text { text:"私有地址直连 → 国外关键域名代理 → 国内域名/IP 直连 → 其余走所选节点。"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
             SwirlButton { enabled:false; text:AppState.zh("测试规则"); iconName:"activity"; onClicked:testDialog.open() }
             SwirlButton { enabled:false; text:AppState.zh("New rule"); primary:true; onClicked:editorDialog.open() }
         }
         RowLayout {
             Layout.fillWidth:true
             SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:AppState.zh("Search pattern, type or target strategy") }
-            SwirlComboBox { id:policyFilter; model:["全部策略","自动选择","DIRECT","全局 / 新加坡","REJECT"] }
+            SwirlComboBox { id:policyFilter; model:["全部策略","DIRECT","SWIRL"] }
             SwirlButton { enabled:false; text:AppState.zh("Import"); onClicked:AppState.notice("导入规则") }
             SwirlButton { enabled:false; text:AppState.zh("Export"); onClicked:AppState.notice("导出规则") }
         }

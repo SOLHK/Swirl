@@ -63,7 +63,12 @@ void MotionPolicy::setTransitioning(bool active) {
 }
 void MotionPolicy::leavePage(QObject *page) {
     if(!page)return;
-    for(auto *child:page->findChildren<QObject *>()) {
+    // Closing a popup may synchronously destroy its delegate/animation children.
+    // A raw findChildren list then contains dangling pointers on the next step.
+    QList<QPointer<QObject>> children;
+    for(auto *child:page->findChildren<QObject *>())children.append(child);
+    for(const auto &guard:children) {
+        auto *child=guard.data();if(!child)continue;
         if(child->property("opened").isValid() && child->metaObject()->indexOfMethod("close()")>=0)
             QMetaObject::invokeMethod(child,"close");
     }

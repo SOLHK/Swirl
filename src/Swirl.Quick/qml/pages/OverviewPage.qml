@@ -105,7 +105,7 @@ Item {
                     model:[
                         {label:"当前网络",value:page.network.type,sub:page.network.name,icon:"wifi",route:"toolbox",tint:Theme.accent},
                         {label:"当前配置",value:engineController.processAlive?"Swirl 运行配置":"未运行",sub:"本机代理配置",icon:"document",route:"profiles",tint:Theme.accent},
-                        {label:"出站模式",value:AppState.mode,sub:"单一选中节点",icon:"code",route:"rules",tint:Theme.green},
+                        {label:"出站模式",value:AppState.mode,sub:"国内直连 · 国外使用所选节点",icon:"code",route:"rules",tint:Theme.green},
                         {label:"活跃连接",value:"—",sub:"尚未采集",icon:"link",route:"connections",tint:Theme.accent},
                         {label:"活跃进程",value:engineController.processAlive?"1":"0",sub:"引擎进程",icon:"settings",route:"processes",tint:Theme.accent},
                         {label:"今日流量",value:"—",sub:"尚未采集",icon:"clock",route:"traffic",tint:Theme.accent}]
@@ -122,7 +122,7 @@ Item {
                                 Layout.fillWidth:true;spacing:Theme.dp(2)
                                 Text { text:modelData.label;color:Theme.muted;font.pixelSize:Theme.fontSize(13);Layout.fillWidth:true;elide:Text.ElideRight }
                                 Text { text:modelData.value;color:Theme.text;font.family:"Segoe UI";font.pixelSize:Theme.fontSize(18);font.weight:Font.DemiBold;Layout.fillWidth:true;elide:Text.ElideRight }
-                                Text { text:modelData.sub;color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;elide:Text.ElideRight }
+                                Text { text:modelData.kind===0 && (engineController.systemProxy.error.length || engineController.routingError.length)?(engineController.systemProxy.error || engineController.routingError):modelData.sub;color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;elide:Text.ElideRight }
                             }
                         }
                         onClicked:AppState.navigate(modelData.route)
@@ -241,7 +241,7 @@ Item {
                             RowLayout {
                                 Layout.fillWidth:true;spacing:Theme.dp(8)
                                 Text { text:"模式";color:Theme.muted;font.pixelSize:Theme.fontSize(13) }
-                                SwirlComboBox { objectName:"modeCombo";Layout.fillWidth:true;Layout.minimumWidth:Theme.dp(0);implicitHeight:Theme.dp(32);font.pixelSize:Theme.fontSize(13);enabled:false;model:["固定节点","直连"];currentIndex:Math.max(0,model.indexOf(AppState.mode));onActivated:AppState.mode=currentText;Accessible.name:"模式选择" }
+                                SwirlComboBox { objectName:"modeCombo";Layout.fillWidth:true;Layout.minimumWidth:Theme.dp(0);implicitHeight:Theme.dp(32);font.pixelSize:Theme.fontSize(13);enabled:!engineController.busy && !engineController.routingBusy;model:["规则","全局","直连"];currentIndex:Math.max(0,model.indexOf(AppState.mode));onActivated:engineController.setRoutingMode(["rule","global","direct"][currentIndex]);Accessible.name:"模式选择" }
                                 Text { text:"策略";color:Theme.muted;font.pixelSize:Theme.fontSize(13) }
                                 SwirlComboBox { objectName:"policyCombo";Layout.fillWidth:true;Layout.minimumWidth:Theme.dp(0);implicitHeight:Theme.dp(32);font.pixelSize:Theme.fontSize(13);enabled:false;model:["固定节点"];currentIndex:Math.max(0,model.indexOf(AppState.policy));onActivated:AppState.policy=currentText;Accessible.name:"策略选择" }
                                 SwirlButton { text:AppState.selectedNode;Layout.fillWidth:true;Layout.minimumWidth:Theme.dp(0);implicitHeight:Theme.dp(32);font.pixelSize:Theme.fontSize(13);onClicked:nodePicker.open();Accessible.name:"当前节点 "+text }
@@ -294,12 +294,13 @@ Item {
                                     ColumnLayout {
                                         Layout.fillWidth:true;spacing:Theme.dp(0)
                                         Text { text:modelData.title;color:Theme.text;font.pixelSize:Theme.fontSize(14);font.weight:Font.DemiBold }
-                                        Text { text:modelData.sub;color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;elide:Text.ElideRight }
+                                        Text { text:modelData.kind===0 && (engineController.systemProxy.error.length || engineController.routingError.length)?(engineController.systemProxy.error || engineController.routingError):modelData.sub;color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;elide:Text.ElideRight }
                                     }
                                     SwirlToggle {
                                         objectName:modelData.kind===0?"systemProxyToggle":"tunToggle";visible:modelData.kind<2;implicitWidth:Theme.dp(46);implicitHeight:Theme.dp(26)
                                         checked:modelData.kind===0?AppState.systemProxyOn:AppState.tunOn
-                                        enabled:false
+                                        enabled:modelData.kind===0 && !engineController.busy
+                                        onToggled:if(modelData.kind===0)engineController.setSystemProxy(checked)
                                         Accessible.name:modelData.title+"开关"
                                     }
                                     SwirlButton { visible:modelData.kind===2;text:"查看设置";implicitHeight:Theme.dp(28);implicitWidth:Theme.dp(84);font.pixelSize:Theme.fontSize(12);onClicked:AppState.navigate("dns") }

@@ -168,12 +168,53 @@ bool MihomoAdapter::prepareConfiguration() {
             if (n.protocol=="trojan") { proxy.insert("sni",n.serverName.isEmpty()?n.host:n.serverName); proxy.insert("skip-cert-verify",false); }
             proxies.append(proxy); if (n.id!=m_options.selectedNodeId) names.append(n.id);
         }
-        const QJsonArray groups{QJsonObject{{"name","SWIRL"},{"type","select"},{"proxies",names}}};
-        m_generatedConfig.replace("mode: direct\n","mode: rule\n");
+        const QJsonArray groups{QJsonObject{{"name","SWIRL"},{"type","select"},{"proxies",names}},
+            QJsonObject{{"name","GLOBAL"},{"type","select"},{"proxies",QJsonArray{"SWIRL"}}}};
+        m_generatedConfig.replace("mode: direct\n",QStringLiteral("mode: %1\n").arg(m_options.routingMode));
         m_generatedConfig.replace("mixed-port: 0\n",QStringLiteral("mixed-port: %1\n").arg(m_options.proxyPort));
         m_generatedConfig.replace("proxies: []\n",QStringLiteral("proxies: ")+QString::fromUtf8(QJsonDocument(proxies).toJson(QJsonDocument::Compact))+"\n");
         m_generatedConfig.replace("proxy-groups: []\n",QStringLiteral("proxy-groups: ")+QString::fromUtf8(QJsonDocument(groups).toJson(QJsonDocument::Compact))+"\n");
-        m_generatedConfig.replace("rules: []\n","rules: ['MATCH,SWIRL']\n");
+        if(m_options.smartRouting) {
+            QFile manifest(m_options.rulesDirectory+"/manifest.json");
+            if(!manifest.open(QIODevice::ReadOnly))return false;
+            const auto files=QJsonDocument::fromJson(manifest.readAll()).object().value("files").toArray();
+            if(files.size()!=2)return false;
+            QSet<QString> copied;
+            for(const auto &entry:files) {
+                const auto obj=entry.toObject();const auto name=obj.value("name").toString();
+                if(name!="cn-domain.mrs"&&name!="cn-ip.mrs")return false;
+                QFile data(m_options.rulesDirectory+"/"+name);
+                if(!data.open(QIODevice::ReadOnly)||data.size()>16*1024*1024)return false;
+                QCryptographicHash hash(QCryptographicHash::Sha256);
+                if(!hash.addData(&data)||hash.result().toHex()!=obj.value("sha256").toString().toLatin1())return false;
+                data.close();if(!QFile::copy(data.fileName(),m_directory->filePath(name)))return false;copied.insert(name);
+            }
+            if(copied.size()!=2)return false;
+            m_generatedConfig += QStringLiteral(
+                "rule-providers:\n  cn-domain:\n    type: file\n    behavior: domain\n    format: mrs\n    path: ./cn-domain.mrs\n"
+                "  cn-ip:\n    type: file\n    behavior: ipcidr\n    format: mrs\n    path: ./cn-ip.mrs\n");
+            m_generatedConfig.replace("rules: []\n",QStringLiteral(
+                "rules:\n  - IP-CIDR,127.0.0.0/8,DIRECT,no-resolve\n  - IP-CIDR,10.0.0.0/8,DIRECT,no-resolve\n"
+                "  - IP-CIDR,172.16.0.0/12,DIRECT,no-resolve\n  - IP-CIDR,192.168.0.0/16,DIRECT,no-resolve\n"
+                "  - IP-CIDR,169.254.0.0/16,DIRECT,no-resolve\n  - IP-CIDR6,::1/128,DIRECT,no-resolve\n"
+                "  - IP-CIDR6,fc00::/7,DIRECT,no-resolve\n  - IP-CIDR6,fe80::/10,DIRECT,no-resolve\n"
+                "  - DOMAIN,localhost,DIRECT\n  - DOMAIN-SUFFIX,local,DIRECT\n"
+                "  - DOMAIN-SUFFIX,google.com,SWIRL\n  - DOMAIN-SUFFIX,google.com.hk,SWIRL\n"
+                "  - DOMAIN-SUFFIX,gstatic.com,SWIRL\n  - DOMAIN-SUFFIX,googleapis.com,SWIRL\n"
+                "  - DOMAIN-SUFFIX,googleusercontent.com,SWIRL\n  - DOMAIN-SUFFIX,youtube.com,SWIRL\n"
+                "  - DOMAIN-SUFFIX,youtu.be,SWIRL\n  - DOMAIN-SUFFIX,ytimg.com,SWIRL\n"
+                "  - DOMAIN-SUFFIX,googlevideo.com,SWIRL\n  - DOMAIN-SUFFIX,ggpht.com,SWIRL\n"
+                "  - RULE-SET,cn-domain,DIRECT\n  - RULE-SET,cn-ip,DIRECT\n  - MATCH,SWIRL\n"));
+            // Internal DNS serves Mihomo only: no system DNS or listener changes.
+            // Foreign domain resolution uses DoH through SWIRL; proxy bootstrap
+            // and domestic direct traffic use the existing system resolver.
+            m_generatedConfig.replace("dns:\n  enable: false\n",QStringLiteral(
+                "dns:\n  enable: true\n  ipv6: false\n  enhanced-mode: redir-host\n"
+                "  default-nameserver: [system]\n  proxy-server-nameserver: [system]\n"
+                "  direct-nameserver: [system]\n  direct-nameserver-follow-policy: false\n"
+                "  nameserver: ['https://1.1.1.1/dns-query#SWIRL']\n"
+                "  nameserver-policy:\n    'rule-set:cn-domain': [system]\n"));
+        } else m_generatedConfig.replace("rules: []\n","rules: ['MATCH,SWIRL']\n");
     }
     QSaveFile file(m_status.configPath);
     if (!file.open(QIODevice::WriteOnly) || !file.setPermissions(QFile::ReadOwner | QFile::WriteOwner)) return false;
@@ -260,6 +301,9 @@ void MihomoAdapter::start(const EngineStartOptions &options) {
             if(!cursor){fail(Error::InvalidNode,QStringLiteral("链式代理引用了未保存的节点。"));return;}
         }
     }
+    if(options.routingMode!="rule"&&options.routingMode!="global"&&options.routingMode!="direct") {
+        fail(Error::InvalidOptions,QStringLiteral("分流模式无效。"));return;
+    }
     if (!options.selectedNodeId.isEmpty() && (!nodeIds.contains(options.selectedNodeId) || options.proxyPort==0 || options.proxyPort==options.controlPort)) {
         fail(Error::InvalidNode,QStringLiteral("所选节点或本机代理端口无效。")); return;
     }
@@ -271,7 +315,7 @@ void MihomoAdapter::start(const EngineStartOptions &options) {
         unlockExecutable(); return;
     }
     if (!prepareConfiguration()) {
-        fail(Error::ConfigurationFailed, QStringLiteral("无法创建只允许当前用户访问的引擎运行配置。"));
+        fail(Error::ConfigurationFailed, QStringLiteral("无法创建安全运行配置，或国内规则数据缺失/哈希校验失败。请修复安装，未使用空规则回退。"));
         unlockExecutable(); return;
     }
     if (!options.selectedNodeId.isEmpty() && !reservePort(m_proxyReservation,options.proxyPort)) {
@@ -364,7 +408,11 @@ void MihomoAdapter::fail(Error error, const QString &message) {
 }
 
 void MihomoAdapter::cancelRequest() {
+    // Invalidate callbacks BEFORE abort(), which can emit finished inline.
     ++m_generation;
+    if(m_connectionsReply){m_connectionsReply->abort();m_connectionsReply->deleteLater();m_connectionsReply=nullptr;}
+    m_status.connections.clear();m_status.routingBusy=false;
+    if(m_modeReply){m_modeReply->abort();m_modeReply->deleteLater();m_modeReply=nullptr;}
     if (m_reply) {
         auto *reply = m_reply.data(); m_reply = nullptr;
         reply->disconnect(this); reply->abort(); reply->deleteLater();
@@ -456,8 +504,8 @@ void MihomoAdapter::probeNode(const QUrl &url) {
             const auto code=probe->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt(); m_status.responseCode=code;
             const bool ok=probe->error()==QNetworkReply::NoError && code>=200 && code<400;
             m_status.requestState=ok?RequestState::Succeeded:RequestState::Failed;
-            m_status.nodeMessage=ok?QStringLiteral("真实请求成功：已通过所选节点完成请求（HTTP %1）。").arg(code)
-                :QStringLiteral("本机代理的实际请求失败（HTTP %1）；未使用直连回退。").arg(code);
+            m_status.nodeMessage=ok?QStringLiteral("真实请求成功：本机代理按当前 %1 模式完成请求（HTTP %2）。").arg(m_status.mode).arg(code)
+                :QStringLiteral("本机代理的实际请求失败（HTTP %1）；请检查当前分流、节点或直连网络。").arg(code);
             publish();
         });
     });
@@ -479,6 +527,7 @@ void MihomoAdapter::stop() {
 }
 
 void MihomoAdapter::refresh() {
+    if(m_modeReply)return;
     if (m_stage != Stage::Engine || m_process.state() != QProcess::Running || m_reply ||
         (m_status.state != State::Starting && m_status.state != State::Running && m_status.state != State::Degraded)) return;
     request(true);
@@ -537,7 +586,7 @@ void MihomoAdapter::request(bool version) {
             this->request(false); return;
         }
         const bool connected=!m_options.selectedNodeId.isEmpty();
-        bool safe = object.value(QStringLiteral("mode")).toString() == (connected ? QStringLiteral("rule"):QStringLiteral("direct")) &&
+        bool safe = object.value(QStringLiteral("mode")).toString() == (connected ? m_options.routingMode:QStringLiteral("direct")) &&
             object.value(QStringLiteral("allow-lan")) == QJsonValue(false) &&
             object.value(QStringLiteral("tun")).isObject() &&
             object.value(QStringLiteral("tun")).toObject().value(QStringLiteral("enable")) == QJsonValue(false);
@@ -547,8 +596,85 @@ void MihomoAdapter::request(bool version) {
         if (!safe) {
             fail(Error::ConfigurationFailed, QStringLiteral("引擎运行配置不符合 Swirl 安全约束；已停止进程。")); return;
         }
-        m_status.mode = connected?QStringLiteral("rule"):QStringLiteral("direct");
+        m_status.mode = connected?m_options.routingMode:QStringLiteral("direct");
         m_status.state = State::Running; m_status.apiHealthy = true;
-        m_status.error = Error::None; m_status.message.clear(); m_deadline.stop(); publish();
+        m_status.error = Error::None; m_status.message.clear(); m_status.routingBusy=false;m_deadline.stop(); publish();readConnections();
+    });
+}
+
+void MihomoAdapter::setRoutingMode(const QString &mode) {
+    if((mode!="rule"&&mode!="global"&&mode!="direct")||!m_status.apiHealthy||m_options.selectedNodeId.isEmpty()||m_modeReply)return;
+    if(mode==m_options.routingMode)return;
+    // No in-flight health read may observe the old mode after a successful PATCH.
+    cancelRequest();
+    const auto generation=m_generation;
+    QNetworkRequest request(QUrl(m_status.controlEndpoint+"/configs"));
+    request.setRawHeader("Authorization","Bearer "+m_secret);
+    request.setHeader(QNetworkRequest::ContentTypeHeader,"application/json");
+    request.setTransferTimeout(2000);
+    auto reply=m_network.sendCustomRequest(request,"PATCH",QJsonDocument(QJsonObject{{"mode",mode}}).toJson(QJsonDocument::Compact));
+    m_modeReply=reply;
+    m_status.routingBusy=true;publish();
+    connect(reply,&QNetworkReply::finished,this,[this,reply,generation,mode] {
+        reply->deleteLater();if(generation!=m_generation)return;m_modeReply=nullptr;
+        if(reply->error()!=QNetworkReply::NoError||reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()!=204){
+            fail(Error::ConfigurationFailed,QStringLiteral("分流模式更新失败；已停止引擎避免显示与实际出口不一致。"));return;}
+        m_options.routingMode=mode;
+        m_status.nodeHealth=NodeHealth::Unknown;m_status.requestState=RequestState::NotTested;
+        m_status.nodeMessage.clear();m_status.apiHealthy=false;publish();refresh();
+    });
+}
+
+QVariantList MihomoAdapter::routingRules() const {
+    QVariantList result;
+    const auto start=m_generatedConfig.indexOf("\nrules:\n");
+    if(start<0)return result;
+    auto section=m_generatedConfig.mid(start+8);
+    const auto end=section.indexOf("\nrule-providers:");if(end>=0)section=section.left(end);
+    int order=0;
+    for(const auto &line:section.split('\n')) {
+        if(!line.startsWith("  - "))continue;
+        const auto parts=line.mid(4).split(',');if(parts.size()<2)continue;
+        const bool match=parts[0]=="MATCH";
+        result.append(QVariantMap{{"id",QString::number(++order)},{"order",order},{"type",parts[0]},
+            {"pattern",match?QStringLiteral("其他流量"):parts[1]},
+            {"policy",match?parts[1]:parts.value(2)},{"hits",QStringLiteral("—")},
+            {"enabled",m_status.mode=="rule"&&m_status.apiHealthy?QStringLiteral("生效"):QStringLiteral("规则模式使用")}});
+    }
+    return result;
+}
+void MihomoAdapter::readConnections() {
+    if(m_connectionsReply||!m_status.apiHealthy)return;
+    const auto generation=m_generation;
+    QNetworkRequest req(QUrl(m_status.controlEndpoint+"/connections"));
+    req.setRawHeader("Authorization","Bearer "+m_secret);req.setTransferTimeout(1500);
+    auto reply=m_network.get(req);m_connectionsReply=reply;
+    connect(reply,&QNetworkReply::readyRead,this,[reply]{if(reply->bytesAvailable()>1024*1024)reply->abort();});
+    connect(reply,&QNetworkReply::finished,this,[this,reply,generation]{
+        reply->deleteLater();if(generation!=m_generation)return;m_connectionsReply=nullptr;
+        if(reply->error()!=QNetworkReply::NoError||reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()!=200)return;
+        const auto bytes=reply->readAll();if(bytes.size()>1024*1024)return;
+        QVariantList rows;
+        const auto array=QJsonDocument::fromJson(bytes).object().value("connections").toArray();
+        for(const auto &entry:array) {
+            if(rows.size()>=1000)break;
+            const auto c=entry.toObject(),m=c.value("metadata").toObject();QStringList chain;
+            for(const auto &hop:c.value("chains").toArray()) {
+                auto label=hop.toString();
+                for(const auto &node:m_options.nodes)if(node.id==label){label=node.name;break;}
+                chain.append(label);
+            }
+            const auto rule=c.value("rule").toString()+" "+c.value("rulePayload").toString();
+            rows.append(QVariantMap{{"id",QString::fromLatin1(QCryptographicHash::hash(c.value("id").toString().toUtf8(),QCryptographicHash::Sha256).toHex().left(12))},
+                {"host",m.value("host").toString()},{"ip",m.value("destinationIP").toString()},
+                {"process",QFileInfo(m.value("process").toString()).fileName()},
+                {"protocol",m.value("network").toString()+" / "+m.value("type").toString()},
+                {"policy",chain.join(QStringLiteral(" → "))},{"rule",rule},
+                {"up",QString::number(qint64(c.value("upload").toDouble()))+" B"},
+                {"down",QString::number(qint64(c.value("download").toDouble()))+" B"},
+                {"latency",QStringLiteral("—")},{"time",c.value("start").toString()},
+                {"status",QStringLiteral("Active")}});
+        }
+        m_status.connections=rows;publish();
     });
 }

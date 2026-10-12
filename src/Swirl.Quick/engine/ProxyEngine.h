@@ -2,6 +2,7 @@
 #include <QObject>
 #include <QString>
 #include <QUrl>
+#include <QVariantList>
 #include "ProxyNode.h"
 
 // Swirl-owned contract. No Mihomo JSON or transport objects cross this boundary.
@@ -16,6 +17,11 @@ struct EngineStartOptions {
     QList<ProxyNode> nodes;
     QString selectedNodeId;
     quint16 proxyPort = 7898;
+    QString routingMode = QStringLiteral("rule");
+    // Production uses verified, bundled China domain/IP MRS providers. The
+    // controlled transport fixtures intentionally retain MATCH-only routing.
+    bool smartRouting = false;
+    QString rulesDirectory;
 };
 
 class ProxyEngine : public QObject {
@@ -51,6 +57,8 @@ public:
         int latencyMs = -1;
         int responseCode = 0;
         QString nodeMessage;
+        QVariantList connections;
+        bool routingBusy = false;
     };
     using QObject::QObject;
     virtual ~ProxyEngine() = default;
@@ -59,8 +67,10 @@ public:
     virtual void refresh() = 0;
     virtual void selectNode(const QString &id) = 0;
     virtual void probeNode(const QUrl &url) = 0;
+    virtual void setRoutingMode(const QString &mode) { Q_UNUSED(mode); }
     virtual Status status() const = 0;
     virtual QString configurationSummary() const = 0;
+    virtual QVariantList routingRules() const { return {}; }
 signals:
     void statusChanged();
 };

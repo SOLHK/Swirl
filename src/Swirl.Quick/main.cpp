@@ -69,15 +69,19 @@ int main(int argc, char *argv[])
     app.setApplicationName(QStringLiteral("Swirl"));
     app.setOrganizationName(QStringLiteral("SOLHK"));
     app.setOrganizationDomain(QStringLiteral("solhk.dev"));
-    app.setApplicationVersion(QStringLiteral("1.0.0-preview"));
+    app.setApplicationVersion(QStringLiteral("1.0.0-phase3-preview"));
     // Rasterize the canonical mark at every Windows icon size. This works even
     // when the optional SVG QIcon plugin is missing and avoids the old wind logo.
-    QSvgRenderer brand(QStringLiteral(":/swirl/icons/swirl_knot_light.svg"));
+    QSvgRenderer brand(QStringLiteral(":/swirl/icons/swirl_knot_mark_light.svg"));
     QIcon icon;
     for(int size:{16,20,24,32,40,48,64,128,256}) {
         QPixmap pixmap(size,size);pixmap.fill(Qt::transparent);
         QPainter painter(&pixmap);brand.render(&painter);painter.end();icon.addPixmap(pixmap);
     }
+    // Use the same generated ICO as Explorer/NSIS when installed. SVG raster
+    // remains a fallback for development builds lacking the deployed ICO.
+    const QString iconPath=app.applicationDirPath()+"/Swirl-brand-phase3.ico";
+    if(QFile::exists(iconPath))icon=QIcon(iconPath);
     app.setWindowIcon(icon);
     // Native Windows Qt Quick Controls do not support custom backgrounds/content.
     // Swirl draws its own visual controls, so explicitly use the customizable style.
