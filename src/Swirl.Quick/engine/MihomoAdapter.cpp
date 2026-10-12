@@ -336,6 +336,7 @@ void MihomoAdapter::fail(Error error, const QString &message) {
     m_poll.stop(); m_deadline.stop(); m_reservation.close(); cancelRequest();
     m_proxyReservation.close(); cancelNodeRequests();
     m_status.proxyPort=0; m_status.nodeHealth=NodeHealth::Unknown; m_status.requestState=RequestState::NotTested;
+    m_status.nodeMessage.clear(); m_status.latencyMs=-1; m_status.responseCode=0;
     m_status.state = State::Failed; m_status.error = error; m_status.message = message;
     m_status.apiHealthy = false;
     if (m_process.state() != QProcess::NotRunning) m_process.kill();
@@ -447,6 +448,7 @@ void MihomoAdapter::stop() {
     m_failureExit = false; cancelRequest();
     cancelNodeRequests(); m_proxyReservation.close();
     m_status.proxyPort=0; m_status.nodeHealth=NodeHealth::Unknown; m_status.requestState=RequestState::NotTested;
+    m_status.nodeMessage.clear(); m_status.latencyMs=-1; m_status.responseCode=0;
     m_poll.stop(); m_deadline.stop(); m_reservation.close();
     m_status.error = Error::None; m_status.message.clear(); m_status.apiHealthy = false;
     if (m_process.state() == QProcess::NotRunning) {
@@ -465,6 +467,7 @@ void MihomoAdapter::refresh() {
 void MihomoAdapter::apiFailure(Error error, const QString &message) {
     if(m_selectionPending){fail(Error::SelectionFailed,QStringLiteral("节点切换期间控制接口异常，已停止引擎以避免错误出口。"));return;}
     cancelNodeRequests(); m_status.nodeHealth=NodeHealth::Unknown; m_status.requestState=RequestState::NotTested;
+    m_status.nodeMessage.clear(); m_status.latencyMs=-1; m_status.responseCode=0;
     m_status.apiHealthy = false;
     // Startup retries are bounded by the original deadline; never reset it.
     if (m_status.state != State::Starting) m_status.state = State::Degraded;

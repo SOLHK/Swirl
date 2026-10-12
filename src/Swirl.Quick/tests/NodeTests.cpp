@@ -94,6 +94,7 @@ private slots:
         net.a.reject=false;engine.probeNode(net.url());QTRY_VERIFY_WITH_TIMEOUT(!engine.status().nodeBusy,8000);
         QCOMPARE(engine.status().requestState,ProxyEngine::RequestState::Succeeded);
         engine.stop();QTRY_COMPARE_WITH_TIMEOUT(engine.status().state,ProxyEngine::State::Stopped,4000);
+        QVERIFY(engine.status().nodeMessage.isEmpty());QCOMPARE(engine.status().latencyMs,-1);QCOMPARE(engine.status().requestState,ProxyEngine::RequestState::NotTested);
         QTcpServer reuse;QVERIFY(reuse.listen(QHostAddress::LocalHost,config.proxyPort));reuse.close();
         for(int i=0;i<3;++i){engine.start(config);QTRY_COMPARE_WITH_TIMEOUT(engine.status().state,ProxyEngine::State::Running,16000);
             QCOMPARE(fetch(net,config.proxyPort),QByteArray("exit-A"));engine.stop();QTRY_COMPARE_WITH_TIMEOUT(engine.status().state,ProxyEngine::State::Stopped,4000);}
