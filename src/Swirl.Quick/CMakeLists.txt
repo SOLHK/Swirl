@@ -49,11 +49,10 @@ set(SWIRL_ASSET_PATH "${CMAKE_CURRENT_SOURCE_DIR}/assets")
 file(GLOB SWIRL_UI_ICONS CONFIGURE_DEPENDS "${SWIRL_ASSET_PATH}/icons/ui/*.svg")
 qt_add_resources(Swirl ui_icons PREFIX "/swirl" BASE "${SWIRL_ASSET_PATH}" FILES ${SWIRL_UI_ICONS})
 qt_add_resources(Swirl brand PREFIX "/swirl" BASE "${SWIRL_ASSET_PATH}" FILES
-    "${SWIRL_ASSET_PATH}/swirl-mark.png"
-    "${SWIRL_ASSET_PATH}/swirl-app.png"
-    "${SWIRL_ASSET_PATH}/icons/swirl_wave_light.svg"
-    "${SWIRL_ASSET_PATH}/icons/swirl_wave_dark.svg"
-    "${SWIRL_ASSET_PATH}/icons/swirl_wave_mark.svg"
+    "${SWIRL_ASSET_PATH}/icons/swirl_knot_light.svg"
+    "${SWIRL_ASSET_PATH}/icons/swirl_knot_dark.svg"
+    "${SWIRL_ASSET_PATH}/icons/swirl_knot_mark_light.svg"
+    "${SWIRL_ASSET_PATH}/icons/swirl_knot_mark_dark.svg"
 )
 target_include_directories(Swirl PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/app")
 target_sources(Swirl PRIVATE app/SvgIconProvider.h app/SvgIconProvider.cpp)

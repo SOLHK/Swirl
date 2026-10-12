@@ -87,10 +87,12 @@ an opaque fallback. See docs/UI_1_0_VALIDATION.md.
   endpoints and current counters are zero. History and event times share the
   session clock. Cumulative GB stays historical and increases only while the
   demonstration connection is active.
-- The transparent wave SVG `assets/icons/swirl_wave_mark.svg` is used directly
-  as the sidebar brand mark without icon cradle, frame or shadow. The app and
-  installer use the corresponding wave-based icon resource, with SVG glyphs
-  under `assets/icons/ui/` for interface actions.
+- The sidebar brand mark uses `assets/icons/swirl_knot_mark_light.svg` (black)
+  or `swirl_knot_mark_dark.svg` (white) according to the active theme, without
+  a tile, cradle, frame, or shadow. Light/dark application tile SVGs are in
+  `assets/icons/swirl_knot_light.svg` and `swirl_knot_dark.svg`. The Windows
+  installer `.ico` remains a separately maintained raster resource. Generic
+  UI action SVGs remain under `assets/icons/ui/`.
 - Existing specialized pages remain available by search and overview links.
   The HTTP capture page is real; remaining proxy backend integration and further
   visual refinement of other pages remain future work.

@@ -109,7 +109,7 @@ SwirlGlassPanel {
                 anchors.centerIn:parent
                 spacing:12
                 Image {
-                    source:"qrc:/swirl/swirl-app.png"
+                    source:Theme.dark ? "qrc:/swirl/icons/swirl_knot_dark.svg" : "qrc:/swirl/icons/swirl_knot_light.svg"
                     sourceSize.width:138; sourceSize.height:138
                     Layout.preferredWidth:138; Layout.preferredHeight:138
                     fillMode:Image.PreserveAspectFit

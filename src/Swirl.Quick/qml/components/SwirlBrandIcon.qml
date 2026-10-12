@@ -4,7 +4,7 @@ Item {
     implicitWidth:48; implicitHeight:48
     Image {
         anchors.fill:parent
-        source: "qrc:/swirl/icons/swirl_wave_mark.svg"
+        source: Theme.dark ? "qrc:/swirl/icons/swirl_knot_mark_dark.svg" : "qrc:/swirl/icons/swirl_knot_mark_light.svg"
         sourceSize: Qt.size(mark.width * Screen.devicePixelRatio, mark.height * Screen.devicePixelRatio)
         fillMode: Image.PreserveAspectFit
     }

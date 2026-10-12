@@ -34,7 +34,10 @@ jobs:
           test -f src/Swirl.Quick/qml/Main.qml
           test -f src/Swirl.Quick/network/CaptureService.cpp
           test -f src/Swirl.Quick/packaging/Swirl.nsi
-          test -f src/Swirl.Quick/assets/icons/swirl_wave_mark.svg
+          test -f src/Swirl.Quick/assets/icons/swirl_knot_light.svg
+          test -f src/Swirl.Quick/assets/icons/swirl_knot_dark.svg
+          test -f src/Swirl.Quick/assets/icons/swirl_knot_mark_light.svg
+          test -f src/Swirl.Quick/assets/icons/swirl_knot_mark_dark.svg
           if grep -Eq 'AdShield[/\\]|AdShield\.Tests|installer/AdShield' README.md docs/SURGE_FEATURE_MATRIX.md; then
             echo "::error::Current user documentation still points at removed code"
             exit 1
