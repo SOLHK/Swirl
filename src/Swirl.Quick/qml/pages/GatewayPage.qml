@@ -7,13 +7,10 @@ import "../controls"
 
 Item {
     id:page
+    readonly property bool implemented:false
     property string selected:"局域网设备"
     readonly property var modules:["局域网设备","网关模式","DHCP 服务","端口转发","远程设备","网络接口"]
-    property var records:[
-        {id:"d1",name:"电脑",address:"192.0.2.10",interface:"以太网",status:"Demo"},
-        {id:"d2",name:"平板",address:"192.0.2.11",interface:"Wi-Fi",status:"Demo"},
-        {id:"d3",name:"路由器",address:"192.0.2.1",interface:"网关",status:"Demo"}
-    ]
+    property var records:[]
     ColumnLayout {
         anchors.fill:parent; anchors.margins:Theme.dp(23); spacing:Theme.dp(15)
         SwirlGlassPanel {
@@ -33,7 +30,7 @@ Item {
             Layout.fillWidth:true; spacing:Theme.dp(7)
             Repeater {
                 model:page.modules
-                SwirlButton { text:modelData; quiet:page.selected!==modelData; onClicked:page.selected=modelData }
+                SwirlButton { enabled:false; text:modelData; quiet:page.selected!==modelData; onClicked:page.selected=modelData }
             }
         }
         RowLayout {
@@ -80,13 +77,13 @@ Item {
                     Text { text:"设备标签"; color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
                     SwirlTextField { Layout.fillWidth:true; placeholderText:"设备名称" }
                     Text { text:"内网子网"; color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
-                    SwirlTextField { Layout.fillWidth:true; text:"192.0.2.0/24" }
+                    SwirlTextField { Layout.fillWidth:true; text:"";placeholderText:"尚未实现" }
 
                         }
                     }
 
-                    SwirlButton { text:"预览设置"; onClicked:AppState.notice("网关配置") }
-                    SwirlButton { text:"启用功能"; enabled:false; primary:true }
+                    SwirlButton { enabled:false; text:"预览设置"; onClicked:AppState.notice("网关配置") }
+                    SwirlButton { enabled:false; text:"启用功能";  primary:true }
 
                 }
             }

@@ -70,7 +70,7 @@ jobs:
       - name: Engine contract, real Mihomo and QML lifecycle checks
         shell: pwsh
         run: |
-          ctest --test-dir build/swirl-quick -C Release -R "swirl-engine-" --output-on-failure
+          ctest --test-dir build/swirl-quick -C Release -R "swirl-(engine|node)-" --output-on-failure
           if ($LASTEXITCODE -ne 0) {
             Get-Content build/swirl-quick/engine-contract.txt, build/swirl-quick/engine-real.txt -ErrorAction SilentlyContinue
             throw "Engine checks failed"
@@ -84,6 +84,7 @@ jobs:
             build/swirl-quick/Testing/Temporary/LastTest.log
             build/swirl-quick/engine-contract.txt
             build/swirl-quick/engine-real.txt
+            build/swirl-quick/node-chain.txt
             build/swirl-quick/Release/Swirl-diagnostics.txt
           if-no-files-found: warn
       - name: Overview mouse and keyboard input checks
@@ -278,5 +279,5 @@ jobs:
             --repo "${GITHUB_REPOSITORY}" \
             --target "${GITHUB_SHA}" \
             --title "Swirl · 测试版 ${SHORT_SHA}" \
-            --notes "测试版：保留现有 Qt UI 与 HDR；设置 → 代理提供真实 Mihomo 进程启停、版本与认证 API 健康检查；不接管系统代理、不启用 TUN。包含真实本机 HTTP 抓包及 CONNECT 记录。总览流量与节点仍为明确标注的演示。请勿作为正式版本使用。" \
+            --notes "测试版：保留现有 Qt UI 与 HDR；设置 → 代理提供真实 Mihomo 进程启停、版本与认证 API 健康检查；不接管系统代理、不启用 TUN。包含真实本机 HTTP 抓包及 CONNECT 记录。支持手动 SOCKS5、Shadowsocks、Trojan 节点，本机代理与真实请求验证；没有演示数据，未实现功能保持禁用。请勿作为正式版本使用。" \
             --prerelease

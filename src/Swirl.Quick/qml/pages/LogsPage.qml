@@ -9,7 +9,7 @@ Item {
     id: page
     property var selected:null
     property bool followTail:true
-    property var records:demoProvider.logs()
+    property var records:(systemProvider.revision,systemProvider.logs())
     readonly property var displayLogs:records.filter(function(r){
         return (r.message+" "+r.source+" "+r.level).toLowerCase().indexOf(search.text.toLowerCase())>=0 &&
                (level.currentText==="全部级别"||r.level===level.currentText)
@@ -19,9 +19,9 @@ Item {
         RowLayout {
             Layout.fillWidth:true
             SwirlStatusBadge { label:"日志记录"; tone:"accent" }
-            Text { text:displayLogs.length+" 条记录 · 数据仅供预览"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
-            SwirlButton { text:"导出"; iconName:"folder"; onClicked:AppState.notice("导出日志记录") }
-            SwirlButton { text:"清空"; danger:true; onClicked:{page.records=[];page.selected=null} }
+            Text { text:displayLogs.length+" 条真实引擎状态记录"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
+            SwirlButton { enabled:false; text:"导出"; iconName:"folder"; onClicked:AppState.notice("导出日志记录") }
+            SwirlButton { text:"清空"; danger:true; onClicked:{systemProvider.clearLogs();page.selected=null} }
         }
         RowLayout {
             Layout.fillWidth:true
@@ -45,7 +45,7 @@ Item {
                 SwirlEmptyState {
                     visible:page.displayLogs.length===0; anchors.centerIn:parent
                     headline:"没有日志记录"
-                    detail:"请调整筛选条件或恢复数据"
+                    detail:"暂无真实引擎事件"
                 }
             }
             SwirlGlassPanel {
@@ -79,7 +79,7 @@ Item {
                         }
                     }
 
-                    SwirlButton { text:"恢复日志"; onClicked:page.records=demoProvider.logs() }
+                    SwirlButton { text:"恢复日志"; onClicked:page.records=(systemProvider.revision,systemProvider.logs()) }
 
                 }
             }

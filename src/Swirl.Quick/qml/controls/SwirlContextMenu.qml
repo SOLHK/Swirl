@@ -25,7 +25,7 @@ Menu {
             background: Rectangle { radius: Theme.roundedRadius(width,height); color: parent.highlighted ? Theme.selected : "transparent" }
             onTriggered: {
                 if (text === "复制" || text === "Copy") {
-                    demoProvider.copyText(menu.payload)
+                    systemProvider.copyText(menu.payload)
                     AppState.toast = "已复制表格内容"
                 } else {
                     AppState.notice(text)

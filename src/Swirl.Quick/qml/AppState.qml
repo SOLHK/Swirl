@@ -3,41 +3,32 @@ import QtQuick
 QtObject {
     property string currentPage: "overview"
     property bool sidebarCollapsed: false
-    // Overview fixtures remain separate from the real engine in Settings > Proxy.
-    readonly property bool demoMode: true
-    readonly property string connectionState: demoError ? "异常（演示）" : proxyOn ? "已连接（演示）" : "未连接（演示）"
-    property bool proxyOn: false
-    property bool systemProxyOn: false
-    property bool tunOn: false
-    onProxyOnChanged: if (!proxyOn) { systemProxyOn=false; tunOn=false }
-    onSystemProxyOnChanged: if (systemProxyOn && !proxyOn) setConnection(true)
-    onTunOnChanged: if (tunOn && !proxyOn) setConnection(true)
+    readonly property string connectionState: engineController.stateText
+    readonly property bool proxyOn: engineController.requestSucceeded
+    readonly property bool systemProxyOn: false
+    readonly property bool tunOn: false
     property bool detailOpen: true
-    property string mode: "规则"
-    property string policy: "自动选择"
-    property string selectedNode: "新加坡 · 01"
-    property string selectedNodeRegion: "SG"
-    property string selectedNodeProtocol: "Trojan"
-    property int selectedNodeLatency: 38
-    function selectNode(node) {
-        selectedNode=node.name; selectedNodeRegion=node.region || "--"
-        selectedNodeProtocol=node.protocol || "未检测"; selectedNodeLatency=node.latency || 0
-        addEvent("选用节点 "+node.name,"accent")
-    }
+    readonly property string mode: engineController.activeNodeId.length?"固定节点":"直连"
+    readonly property string policy: "固定节点"
+    readonly property string selectedNode: engineController.selectedNodeName
+    readonly property string selectedNodeRegion: "—"
+    readonly property string selectedNodeProtocol: "—"
+    readonly property int selectedNodeLatency: -1
+    function selectNode(node) { engineController.chooseNode(node.id) }
     property string toast: ""
-    property bool demoLoading: false
-    property bool demoError: false
-    property bool demoEmpty: false
+    property bool loading: false
+    property bool hasError: false
+    property bool empty: false
     property bool autoSwitch: false
     property int historyIndex: 0
     property var navigationHistory: ["overview"]
     property date sessionNow: new Date()
     property var recentEvents: []
-    property real demoDown: 0
-    property real demoUp: 0
-    property int demoConnections: 0
-    property int demoTick: 0
-    property real totalGB: 2.84
+    property real measuredDown: 0
+    property real measuredUp: 0
+    property int measuredConnections: 0
+    property int measurementTick: 0
+    readonly property real totalGB: 0
     readonly property var navigationGroups: [
         {title:"",pages:[{id:"overview",title:"总览",icon:"home"},{id:"proxies",title:"代理节点",icon:"pin"},{id:"policies",title:"策略组",icon:"layers"},{id:"rules",title:"规则",icon:"document"},{id:"subscriptions",title:"订阅管理",icon:"refresh"},{id:"profiles",title:"配置文件",icon:"file"}]},
         {title:"网络",pages:[{id:"dns",title:"DNS",icon:"globe"},{id:"toolbox",title:"网络检测",icon:"gauge"},{id:"connections",title:"连接记录",icon:"clock"}]},
@@ -55,27 +46,9 @@ QtObject {
     function addEvent(title,tone) {
         recentEvents=[{time:Qt.formatDateTime(sessionNow,"HH:mm"), title:title, tone:tone}].concat(recentEvents).slice(0,5)
     }
-    function initializeHistory() {
-        sessionNow=new Date()
-        function at(minutes) { return Qt.formatDateTime(new Date(sessionNow.getTime()-minutes*60000),"HH:mm") }
-        recentEvents=[{time:at(1),title:"已断开连接",tone:"neutral"},{time:at(2),title:"连接到 新加坡 · 01 (Trojan)",tone:"accent"},{time:at(2),title:"开始建立连接",tone:"success"},{time:at(2),title:"订阅更新完成",tone:"success"},{time:at(3),title:"切换到 自动选择",tone:"success"}]
-    }
-    function setConnection(on) {
-        proxyOn=on
-        if (!on) { systemProxyOn=false; tunOn=false }
-        demoDown=on ? 3.2 : 0; demoUp=on ? 0.7 : 0; demoConnections=on ? 12 : 0
-        addEvent(on ? "已建立连接" : "已断开连接",on ? "success" : "neutral")
-        toast=on ? "仅切换总览演示；真实引擎请在设置 → 代理中启动。" : "已断开总览演示连接。"
-    }
-    function tickTraffic() {
-        sessionNow=new Date(); demoTick++
-        if(proxyOn) {
-            demoDown=3.2+Math.sin(demoTick*0.7)*0.7
-            demoUp=0.65+Math.sin(demoTick*0.5)*0.2
-            demoConnections=12+demoTick%5
-            totalGB+=(demoDown+demoUp)/1024
-        } else { demoDown=0; demoUp=0; demoConnections=0 }
-    }
+    function initializeHistory() { recentEvents=[]; sessionNow=new Date() }
+    function setConnection(on) { if(on)engineController.connectNode(engineController.selectedNodeId);else engineController.disconnectNode() }
+    function tickTraffic() { sessionNow=new Date() }
     readonly property var groups: [
       {title:"控制中心", pages:[
         {id:"overview",title:"总览",icon:"home",sub:"网络概览"},
@@ -180,22 +153,18 @@ QtObject {
         "24 hours": "最近 24 小时",
         "7 days": "最近 7 天",
         "30 days": "最近 30 天",
-        "CONFIGURATION DEMO": "配置",
-        "Synthetic configuration records only. Existing YAML and subscription data are never read or overwritten.": "仅使用配置，不读取或覆盖现有 YAML 与订阅数据。",
         "Import": "导入",
         "New profile": "新建配置",
         "CURRENT PREVIEW CONFIGURATION": "当前配置",
         "Manual selection · no network engine initialized": "手动选择 · 网络内核尚未启动",
         "LOCAL FIXTURE": "本地",
         "Validate": "检查配置",
-        "Export demo": "导出",
         "Update remote": "更新远程配置",
         "Search profiles and sources": "搜索配置和订阅来源",
         "PROFILE NAME": "配置名称",
         "SOURCE": "来源",
         "VERSION": "版本",
         "UPDATED": "更新时间",
-        "UNSAVED DEMO CONTENT": "尚未保存的内容",
         "Save preview": "保存预览",
         "Compare": "对比",
         "Restore": "恢复",
@@ -206,7 +175,6 @@ QtObject {
         "Name": "名称",
         "New profile name": "新配置名称",
         "Cancel": "取消",
-        "Add demo": "添加",
         "Configurations": "配置列表",
         "Editor": "编辑器",
         "Version history": "历史版本",
@@ -226,16 +194,13 @@ QtObject {
         "LATENCY (ms)": "延迟（毫秒）",
         "HEALTH": "健康状态",
         "Endpoint inspector": "节点详情",
-        "Synthetic node · No connection established": "代理连接参数",
         "Protocol        ": "协议　",
         "Latency             ": "延迟　",
         "Strategy            ": "策略　",
-        "Select in demo": "选用此节点",
         "Edit endpoint": "编辑节点",
         "Add proxy endpoint": "添加代理节点",
         "Endpoint label": "节点名称",
         "e.g. Singapore · 03": "例如：新加坡 · 03",
-        "Save demo": "保存",
         "All regions": "全部地区",
         "Appearance": "外观",
         "Personalize how Swirl looks and behaves": "自定义 Swirl 的外观与使用方式",
@@ -268,7 +233,6 @@ QtObject {
         "Search URL, path, or request method": "搜索 URL、路径或请求方法",
         "Import HAR": "导入 HAR",
         "Export HAR": "导出 HAR",
-        "HTTP CAPTURE DEMO": "HTTP 抓包",
         "Record": "记录",
         "METHOD": "方法",
         "STATUS": "状态码",
@@ -277,18 +241,14 @@ QtObject {
         "TIME": "耗时",
         "SIZE": "大小",
         "Request waterfall": "请求瀑布图",
-        "Synthetic timing breakdown · select a request for full details": "耗时分布 · 选择请求查看详情",
         "Replay": "重放",
         "Breakpoint": "断点",
         "All methods": "全部方法",
-        "DEMO DNS ENGINE": "DNS 引擎",
-        "Requests are local fixtures · no name resolution occurs": "仅展示本地数据，不进行实际域名解析",
         "Test Resolver": "测试解析器",
         "Primary resolver": "首选解析器",
         "DoH · DNSSEC option · synthetic endpoint": "DoH · DNSSEC 选项 · 解析地址",
         "Protocols enabled": "启用协议",
         "IPv4 + IPv6 · Fake-IP Preview": "IPv4 + IPv6 · 虚拟 IP 预览",
-        "Clear demo": "清空",
         "Search DNS domain, answer or record type": "搜索域名、解析结果或记录类型",
         "TYPE": "类型",
         "ANSWER": "解析结果",
@@ -299,17 +259,13 @@ QtObject {
         "Edit mapping": "编辑映射",
         "Resolver test": "解析器测试",
         "Domain name": "域名",
-        "This test returns an explanatory demo result. No DNS packets are sent.": "这是测试，不会发送 DNS 请求。",
-        "Run demo": "运行",
         "Edit DNS mapping": "编辑 DNS 映射",
         "Hostname": "主机名",
         "Target / answer": "目标地址 / 解析结果",
-        "Apply demo": "应用",
         "Query Log": "查询记录",
         "Resolvers": "解析器",
         "Hosts": "Hosts 映射",
         "Cache": "缓存",
-        "ORDERED DEMO RULESET": "规则列表",
         "Priority is evaluated top to bottom in this preview.": "规则从上到下按优先级匹配。",
         "Test rule": "测试规则",
         "New rule": "新建规则",
@@ -333,9 +289,7 @@ QtObject {
         "Close": "关闭",
         "Evaluate": "开始测试",
         "All policies": "全部策略",
-        "SUBSCRIPTIONS · MOCK DATA": "订阅管理 · ",
         "No remote URLs are requested or saved.": "不会访问或保存远程 URL。",
-        "Update all (demo)": "全部更新",
         "Add subscription": "添加订阅",
         "Search subscription providers": "搜索订阅来源",
         "Auto update": "自动更新",
@@ -379,7 +333,6 @@ QtObject {
         "Failover": "故障转移",
         "Load Balance": "负载均衡",
         "SYNTHETIC TRAFFIC": "",
-        "Aggregates are fixtures, not system counters": "流量统计与趋势",
         "Download": "下载",
         "Upload": "上传",
         "Domains": "域名",
@@ -403,17 +356,14 @@ QtObject {
         "RULE": "规则",
         "ACTION": "操作",
         "No host patterns": "暂无域名匹配规则",
-        "Try another filter, or add a demo domain": "调整筛选条件或添加域名",
         "Certificate & session": "证书与会话",
         "Trust certificate": "信任证书",
         "Revoke trust": "撤销信任",
         "CA certificate manager": "CA 证书管理",
         "NO CERTIFICATE MATERIAL AVAILABLE": "暂无证书材料",
-        "In this UI-only build, Swirl does not generate certificates, access Windows certificate stores, or intercept HTTPS traffic. These buttons only demonstrate the future workflow.": "此版本仅包含界面，不生成证书、不访问 Windows 证书存储，也不会拦截 HTTPS 流量。",
         "Certificate preview": "证书预览",
         "Add HTTPS host pattern": "添加 HTTPS 域名规则",
         "Host pattern": "域名匹配表达式",
-        "Only a local UI fixture will be added.": "仅添加本地数据。",
         "Included domains": "包含的域名",
         "Excluded domains": "排除的域名",
         "Include": "包含",
@@ -422,7 +372,7 @@ QtObject {
     function zh(value) {
         if (value === undefined || value === null) return ""
         var key = String(value)
-        var labels={"Installed":"已安装","Marketplace":"扩展市场","Updates":"更新","VERSION":"版本","AUTHOR":"作者","ENABLED":"已启用","UPDATE":"更新时间","View":"查看","Details":"详情","Redirect":"重定向","Reject":"拒绝","Permissions":"权限","Planned":"待接入","Tasks":"任务","History":"历史记录","Conditions":"条件","Schedule":"定时","Interval":"周期","Daily":"每天","Weekly":"每周","On network change":"网络变化时","Destination":"目标地址","Protocol":"协议","Established":"已建立","TYPE":"类型","HTTP Response":"HTTP 响应","HTTP Request":"HTTP 请求","Trigger":"触发条件","Type":"类型","Status":"状态","Demo":"待连接","Select":"手动选择","UrlTest":"延迟测试","LoadBalance":"负载均衡","DOMAIN SET":"域名集合","RULE SET":"规则集","http-request":"HTTP 请求","http-response":"HTTP 响应","Preview":"预览","Raw":"原始内容","Application":"应用程序","APPLICATION":"应用程序","RCODE":"返回码","NOERROR":"正常","BLOCKED":"已阻止","NXDOMAIN":"域名不存在","JP":"日本","HK":"香港","SG":"新加坡","US":"美国","KR":"韩国","DE":"德国","TW":"台湾","GB":"英国","AU":"澳大利亚","Healthy":"正常","Idle":"空闲","Active":"使用中","Available":"可用","Enabled":"已启用","Disabled":"已禁用","Today":"今天","Never":"从未","Current":"最新","STATUS":"状态","NODES":"节点数","SELECTED":"当前选择","FORMAT":"格式","POLICY GROUPS":"策略组","PROXY NODES":"代理节点","RULES":"规则","SOURCE":"来源","TIME":"时间","COMPONENT":"组件","MESSAGE":"信息","MATCHER":"匹配类型","PATTERN":"匹配条件","STRATEGY":"策略","PRIORITY":"优先级","Core":"内核","Rules":"规则","INFO":"信息","DEBUG":"调试","WARN":"警告","ERROR":"错误","Failover":"故障转移","DIRECT":"直连","Global":"全局","Fallback":"故障转移","Balance":"负载均衡","Automatic":"自动","Request":"请求","Response":"响应","Headers":"标头","Body":"正文","Cookies":"Cookie","Query":"查询参数","Timeline":"时间线","Copy":"复制","All sources":"全部来源","Configurations":"配置列表","Editor":"编辑器","Backups":"备份"}
+        var labels={"Installed":"已安装","Marketplace":"扩展市场","Updates":"更新","VERSION":"版本","AUTHOR":"作者","ENABLED":"已启用","UPDATE":"更新时间","View":"查看","Details":"详情","Redirect":"重定向","Reject":"拒绝","Permissions":"权限","Planned":"待接入","Tasks":"任务","History":"历史记录","Conditions":"条件","Schedule":"定时","Interval":"周期","Daily":"每天","Weekly":"每周","On network change":"网络变化时","Destination":"目标地址","Protocol":"协议","Established":"已建立","TYPE":"类型","HTTP Response":"HTTP 响应","HTTP Request":"HTTP 请求","Trigger":"触发条件","Type":"类型","Status":"状态","Select":"手动选择","UrlTest":"延迟测试","LoadBalance":"负载均衡","DOMAIN SET":"域名集合","RULE SET":"规则集","http-request":"HTTP 请求","http-response":"HTTP 响应","Preview":"预览","Raw":"原始内容","Application":"应用程序","APPLICATION":"应用程序","RCODE":"返回码","NOERROR":"正常","BLOCKED":"已阻止","NXDOMAIN":"域名不存在","JP":"日本","HK":"香港","SG":"新加坡","US":"美国","KR":"韩国","DE":"德国","TW":"台湾","GB":"英国","AU":"澳大利亚","Healthy":"正常","Idle":"空闲","Active":"使用中","Available":"可用","Enabled":"已启用","Disabled":"已禁用","Today":"今天","Never":"从未","Current":"最新","STATUS":"状态","NODES":"节点数","SELECTED":"当前选择","FORMAT":"格式","POLICY GROUPS":"策略组","PROXY NODES":"代理节点","RULES":"规则","SOURCE":"来源","TIME":"时间","COMPONENT":"组件","MESSAGE":"信息","MATCHER":"匹配类型","PATTERN":"匹配条件","STRATEGY":"策略","PRIORITY":"优先级","Core":"内核","Rules":"规则","INFO":"信息","DEBUG":"调试","WARN":"警告","ERROR":"错误","Failover":"故障转移","DIRECT":"直连","Global":"全局","Fallback":"故障转移","Balance":"负载均衡","Automatic":"自动","Request":"请求","Response":"响应","Headers":"标头","Body":"正文","Cookies":"Cookie","Query":"查询参数","Timeline":"时间线","Copy":"复制","All sources":"全部来源","Configurations":"配置列表","Editor":"编辑器","Backups":"备份"}
         if(Object.prototype.hasOwnProperty.call(labels,key))return labels[key]
         var result=Object.prototype.hasOwnProperty.call(zhDictionary,key) ? zhDictionary[key] : key
         return result.replace(/\s*\(sample\)/g,"").replace(/\s*·\s*$/g,"")
@@ -438,5 +388,5 @@ QtObject {
                 if (groups[i].pages[j].id === id) return groups[i].pages[j]
         return groups[0].pages[0]
     }
-    function notice(label) { toast=label + " · 服务尚未接入" }
+    function notice(label) { toast=label+" · 尚未实现" }
 }

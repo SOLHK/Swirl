@@ -6,8 +6,9 @@ import "../components"
 import "../controls"
 Item {
     id:page
+    readonly property bool implemented:false
     property string tool:"DNS 查询"
-    property string result:"尚未运行检测。\n输入目标并点击运行。"
+    property string result:"网络检测尚未实现。"
     property var tools:["DNS 查询","TCP 连通性","Traceroute","HTTP 请求","TLS 证书检查","端口检查","IP 地址查询","Whois","连接测试","网络接口信息"]
     ColumnLayout {
         anchors.fill:parent; anchors.margins:Theme.dp(23); spacing:Theme.dp(14)
@@ -33,7 +34,7 @@ Item {
                                 SwirlIcon { name:"tool"; size:Theme.dp(17); color:Theme.muted }
                                 Text { text:modelData; color:Theme.text; font.pixelSize:Theme.fontSize(12); elide:Text.ElideRight; Layout.fillWidth:true }
                             }
-                            MouseArea { id:area; anchors.fill:parent; hoverEnabled:true; onClicked:{page.tool=modelData;page.result="尚未运行检测。\n输入目标并点击运行。"} }
+                            MouseArea { id:area; anchors.fill:parent; hoverEnabled:true; onClicked:AppState.notice("尚未实现") }
                         }
                     }
                 }
@@ -71,16 +72,10 @@ Item {
                             validator:IntValidator { bottom:1; top:65535 }
                         }
                         Item { Layout.fillWidth:true }
-                        SwirlButton {
+                        SwirlButton { enabled:false;
                             text:"运行"; primary:true; iconName:"play"
-                            enabled:target.text.trim().length>0
-                            onClicked:{
-                                page.result="结果 · "+page.tool+"\n"+
-                                            "目标："+target.text+"\n"+
-                                            "Status: No network requests were made.\n"+
-                                            "Backend connection: not configured.\n\n"+
-                                            "此面板预留给未来的网络工具模块。"
-                            }
+
+                            onClicked:AppState.notice("尚未实现")
                         }
                     }
                     Text { text:"结果"; color:Theme.muted; font.pixelSize:Theme.fontSize(11); font.weight:Font.DemiBold }
@@ -99,7 +94,7 @@ Item {
                             }
                         }
                     }
-                    SwirlButton { text:"复制结果"; onClicked:{demoProvider.copyText(page.result);AppState.toast="已复制诊断预览"} }
+                    SwirlButton { enabled:false; text:"复制结果"; onClicked:AppState.notice("尚未实现") }
                 }
             }
         }

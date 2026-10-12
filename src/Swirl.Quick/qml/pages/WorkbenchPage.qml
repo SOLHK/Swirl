@@ -6,7 +6,8 @@ import "../components"
 import "../controls"
 
 Item {
-    id: page
+    id:page
+    readonly property bool implemented:false
     property string pageId: "dashboard"
     property var features: ({
         processes:["进程名称","活动连接","上传 / 下载","进程策略"],
@@ -34,15 +35,7 @@ Item {
     property var records:[]
     Component.onCompleted:regenerate()
     onPageIdChanged:regenerate()
-    function regenerate() {
-        var result=[]
-        for (var i=0;i<featureList.length;i++) {
-            result.push({id:"demo-"+i,name:featureList[i],type:AppState.page(pageId).title,
-                status:pageId==="gateway"?"规划中":i%2?"":"已启用",updated:""})
-        }
-        records=result
-        selected=featureList.length?featureList[0]:""
-    }
+    function regenerate() { records=[]; selected="" }
     readonly property var filtered:records.filter(function(r){
         return r.name.toLowerCase().indexOf(search.text.toLowerCase())>=0 &&
             (filter.currentText==="全部"||r.status===filter.currentText)
@@ -62,7 +55,7 @@ Item {
                     Text { text:featureList.length+" 个可交互功能区域，使用"; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
                 }
                 SwirlStatusBadge { label:page.pageId==="gateway"?"规划中":"界面"; tone:page.pageId==="gateway"?"warning":"accent" }
-                SwirlButton { text:"新建"; primary:true; onClicked:addDialog.open() }
+                SwirlButton { enabled:false; text:"新建"; primary:true; onClicked:addDialog.open() }
             }
         }
         SwirlGlassPanel {
@@ -79,8 +72,8 @@ Item {
             Layout.fillWidth:true
             SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:"搜索记录" }
             SwirlComboBox { id:filter; model:["全部","已启用","","规划中"] }
-            SwirlButton { text:"刷新"; onClicked:{page.regenerate();AppState.notice("刷新"+page.pageId)} }
-            SwirlButton { text:"导出"; onClicked:AppState.notice("导出"+page.pageId) }
+            SwirlButton { enabled:false; text:"刷新"; onClicked:AppState.notice("尚未实现") }
+            SwirlButton { enabled:false; text:"导出"; onClicked:AppState.notice("导出"+page.pageId) }
         }
         RowLayout {
             Layout.fillWidth:true; Layout.fillHeight:true; spacing:Theme.dp(15)
@@ -124,7 +117,7 @@ Item {
                                         text:modelData; color:Theme.text; font.pixelSize:Theme.fontSize(12); elide:Text.ElideRight
                                         MouseArea { anchors.fill:parent; onClicked:page.selected=modelData }
                                     }
-                                    SwirlToggle { onToggled:AppState.notice(modelData) }
+                                    SwirlToggle { enabled:false;checked:false; onToggled:AppState.notice(modelData) }
                                 }
                             }
                         }
@@ -146,8 +139,8 @@ Item {
                     }
                     RowLayout {
                         Layout.fillWidth:true
-                        SwirlButton { text:page.pageId==="replay"?"发送":"应用"; onClicked:AppState.notice(text) }
-                        SwirlButton { text:"更多"; quiet:false; onClicked:AppState.notice("更多选项") }
+                        SwirlButton { enabled:false; text:page.pageId==="replay"?"发送":"应用"; onClicked:AppState.notice(text) }
+                        SwirlButton { enabled:false; text:"更多"; quiet:false; onClicked:AppState.notice("更多选项") }
                     }
                 }
                 }
@@ -163,15 +156,10 @@ Item {
             SwirlTextField { id:nameField; Layout.fillWidth:true; placeholderText:"请输入名称" }
             RowLayout {
                 Layout.alignment:Qt.AlignRight
-                SwirlButton { text:"取消"; onClicked:addDialog.close() }
-                SwirlButton {
-                    text:"添加"; primary:true; enabled:nameField.text.trim().length>0
-                    onClicked:{
-                        page.records=page.records.concat([{id:"local-"+Date.now(),name:nameField.text.trim(),
-                            type:AppState.page(page.pageId).title,status:"",updated:"现在"}])
-                        nameField.text=""
-                        addDialog.close()
-                    }
+                SwirlButton { enabled:false; text:"取消"; onClicked:addDialog.close() }
+                SwirlButton { enabled:false;
+                    text:"添加"; primary:true;
+                    onClicked:AppState.notice("尚未实现")
                 }
             }
         }

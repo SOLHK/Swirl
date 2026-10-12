@@ -26,10 +26,12 @@ try {
     $exe = (Resolve-Path $exe).Path
     & (Join-Path $PSScriptRoot 'stage-mihomo.ps1') -Destination (Split-Path $exe) -Archive $MihomoArchive
     if ($InputTests) {
-        ctest --test-dir $BuildDir -C Release -R 'swirl-engine-(contract|real)' --output-on-failure
+        ctest --test-dir $BuildDir -C Release -R 'swirl-engine-(contract|real)|swirl-node-real-chain' --output-on-failure
         if ($LASTEXITCODE) { throw "Engine contract, integration or QML checks failed." }
         $test = Start-Process $exe -ArgumentList '--engine-self-test' -WindowStyle Hidden -Wait -PassThru
         if ($test.ExitCode) { throw "Native engine QML checks failed: $($test.ExitCode)." }
+        $test = Start-Process $exe -ArgumentList "--node-self-test" -WindowStyle Hidden -Wait -PassThru
+        if ($test.ExitCode) { throw "Native node QML checks failed: $($test.ExitCode)." }
         # This input test uses the actual Windows platform plugin and fonts.
         $test = Start-Process $exe -ArgumentList "--interaction-test" -WindowStyle Hidden -Wait -PassThru
         if ($test.ExitCode) { throw "Input checks failed: $($test.ExitCode). See Swirl-diagnostics.txt." }

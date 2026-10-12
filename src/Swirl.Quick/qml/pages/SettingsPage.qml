@@ -48,7 +48,7 @@ Item {
                         width:options.availableWidth; spacing:Theme.dp(17)
                         Text { text:AppState.zh(page.section); color:Theme.text; font.pixelSize:Theme.fontSize(23); font.weight:Font.DemiBold }
                         Text {
-                            text:page.section==="外观"?"主题、窗口材质、动画与界面缩放。":page.section==="代理"?"第一阶段 · 引擎通信与生命周期，不接管系统代理或启用 TUN。":page.section==="关于 Swirl"?"版本与项目信息":"管理 Swirl 的"+AppState.zh(page.section)+"偏好。"
+                            text:page.section==="外观"?"主题、窗口材质、动画与界面缩放。":page.section==="代理"?"引擎与真实节点 · 不接管系统代理或启用 TUN。":page.section==="关于 Swirl"?"版本与项目信息":"此项尚未实现。"
                             color:Theme.muted; wrapMode:Text.WordWrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12)
                         }
                         Rectangle { Layout.fillWidth:true; height:Theme.dp(1); color:Theme.border }
@@ -164,23 +164,23 @@ Item {
                                         Layout.fillWidth:true
                                         Text { text:AppState.zh(modelData); color:Theme.text; font.pixelSize:Theme.fontSize(14) }
                                     }
-                                    SwirlTextField {
+                                    SwirlTextField { enabled:false;
                                         visible:page.section==="端口"&&modelData.indexOf("端口")>=0&&modelData!=="端口冲突提醒"
                                         implicitWidth:Theme.dp(156); text:modelData==="HTTP 端口"?"7890":modelData==="SOCKS 端口"?"7891":"9090"
                                         validator:IntValidator { bottom:1; top:65535 }
                                         Accessible.name:modelData
                                     }
-                                    SwirlComboBox {
+                                    SwirlComboBox { enabled:false;
                                         visible:modelData==="默认策略"||modelData==="解析器选择"||modelData==="网卡选择"
                                         model:modelData==="默认策略"?["自动选择","直连"]:modelData==="解析器选择"?["系统 DNS","加密 DNS"]:["自动","手动指定"]
                                         Accessible.name:modelData
                                     }
-                                    SwirlButton {
+                                    SwirlButton { enabled:false;
                                         visible:page.section==="快捷键"
                                         text:modelData==="全局搜索快捷键"?"Ctrl+K":modelData==="页面导航快捷键"?"Alt+← / →":"未设置"
                                         Accessible.name:modelData
                                     }
-                                    SwirlToggle {
+                                    SwirlToggle { enabled:false;
                                         visible:page.section!=="快捷键"&&!(page.section==="端口"&&modelData!=="端口冲突提醒")&&modelData!=="默认策略"&&modelData!=="解析器选择"&&modelData!=="网卡选择"
                                         onToggled:AppState.notice(modelData)
                                         Accessible.name:modelData

@@ -6,17 +6,18 @@ import "../components"
 import "../controls"
 Item {
     id:page
-    property string selectedScript:"response-transform.js"
-    property var scripts:["response-transform.js","request-headers.js","on-network-change.js","daily-cleanup.js"]
-    property string consoleText:"[14:08:01] 控制台已就绪\n[14:08:02] 尚未接入 JavaScript 运行环境"
+    readonly property bool implemented:false
+    property string selectedScript: ""
+    property var scripts:[]
+    property string consoleText: ""
     ColumnLayout {
         anchors.fill:parent; anchors.margins:Theme.dp(23); spacing:Theme.dp(12)
         RowLayout {
             Layout.fillWidth:true
             SwirlStatusBadge { label:"JavaScript · 仅界面"; tone:"accent" }
             Text { text:"可以编辑源码，不会实际运行脚本。"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
-            SwirlButton { text:"导入"; iconName:"folder"; onClicked:AppState.notice("导入脚本") }
-            SwirlButton { text:"新建脚本"; primary:true; onClicked:newDialog.open() }
+            SwirlButton { enabled:false; text:"导入"; iconName:"folder"; onClicked:AppState.notice("导入脚本") }
+            SwirlButton { enabled:false; text:"新建脚本"; primary:true; onClicked:newDialog.open() }
         }
         SplitView {
             Layout.fillWidth:true; Layout.fillHeight:true
@@ -44,7 +45,7 @@ Item {
                             MouseArea { id:area; anchors.fill:parent; hoverEnabled:true; onClicked:page.selectedScript=modelData }
                         }
                     }
-                    SwirlButton { Layout.fillWidth:true; text:"脚本设置"; onClicked:AppState.notice("脚本设置") }
+                    SwirlButton { enabled:false; Layout.fillWidth:true; text:"脚本设置"; onClicked:AppState.notice("脚本设置") }
                 }
             }
             SwirlGlassPanel {
@@ -60,13 +61,10 @@ Item {
                         Layout.fillWidth:true
                         SwirlComboBox { model:["响应脚本","请求脚本","定时脚本","网络事件"] }
                         Item { Layout.fillWidth:true }
-                        SwirlButton { text:"保存预览"; onClicked:AppState.notice("保存脚本") }
-                        SwirlButton {
+                        SwirlButton { enabled:false; text:"保存预览"; onClicked:AppState.notice("保存脚本") }
+                        SwirlButton { enabled:false;
                             text:"运行"; primary:true; iconName:"play"
-                            onClicked:{
-                                page.consoleText+="\n尚未接入脚本运行环境。"
-                                AppState.notice("脚本执行")
-                            }
+                            onClicked:AppState.notice("尚未实现")
                         }
                     }
                     Rectangle {
@@ -91,7 +89,7 @@ Item {
                                 Layout.fillWidth:true; Layout.fillHeight:true
                                 TextArea {
                                     id:editor
-                                    text:"// Swirl JavaScript\n// 当前编辑仅在本地界面生效。\n\nconst requestId = $request?.url;\nconst headers = {\n  'X-Swirl-Preview': 'true'\n};\n\n// 尚未接入运行环境。\nconsole.log(requestId);\n$done({ headers });"
+                                    text:"";readOnly:true
                                     color:Theme.text
                                     selectionColor:Theme.accent
                                     selectedTextColor:"white"
@@ -129,7 +127,7 @@ Item {
                             background:Rectangle { color:Theme.field; radius:Theme.roundedRadius(width,height) }
                         }
                     }
-                    SwirlButton { Layout.fillWidth:true; text:"清空控制台"; onClicked:page.consoleText="" }
+                    SwirlButton { enabled:false; Layout.fillWidth:true; text:"清空控制台"; onClicked:page.consoleText="" }
                 }
             }
         }
@@ -143,15 +141,11 @@ Item {
             Text { text:newName.text.trim().endsWith(".js")?"仅在当前页面创建，不会保存文件。":"文件名必须以 .js 结尾"; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
             RowLayout {
                 Layout.alignment:Qt.AlignRight
-                SwirlButton { text:"取消"; onClicked:newDialog.close() }
-                SwirlButton {
+                SwirlButton { enabled:false; text:"取消"; onClicked:newDialog.close() }
+                SwirlButton { enabled:false;
                     primary:true; text:"创建"
-                    enabled:newName.text.trim().length>3 && newName.text.trim().endsWith(".js")
-                    onClicked:{
-                        page.scripts=page.scripts.concat([newName.text.trim()])
-                        page.selectedScript=newName.text.trim()
-                        newDialog.close()
-                    }
+
+                    onClicked:AppState.notice("尚未实现")
                 }
             }
         }

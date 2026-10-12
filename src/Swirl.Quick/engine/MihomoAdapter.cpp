@@ -4,11 +4,15 @@
 #include <QFileInfo>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonArray>
+#include <QUrlQuery>
 #include <QNetworkProxy>
 #include <QNetworkReply>
 #include <QProcessEnvironment>
 #include <QRandomGenerator>
 #include <QSaveFile>
+#include <QSet>
+#include <algorithm>
 #include <QStandardPaths>
 #ifdef Q_OS_WIN
 #include <winsock2.h>
@@ -48,6 +52,7 @@ MihomoAdapter::MihomoAdapter(QObject *parent) : ProxyEngine(parent) {
 MihomoAdapter::~MihomoAdapter() {
     m_poll.stop(); m_deadline.stop(); m_killTimer.stop();
     cancelRequest();
+    cancelNodeRequests();
     if (m_process.state() != QProcess::NotRunning) { m_process.kill(); m_process.waitForFinished(3000); }
     unlockExecutable();
 }
@@ -65,6 +70,9 @@ void MihomoAdapter::publish() { emit statusChanged(); }
 QString MihomoAdapter::configurationSummary() const {
     // A redacted copy is inspectable; the authenticated file is kept private.
     auto result = m_generatedConfig;
+    if (!m_options.selectedNodeId.isEmpty()) {
+        result = result.left(result.indexOf(QStringLiteral("proxies:"))) + QStringLiteral("节点配置已生成，全部节点凭据已隐藏。\n");
+    }
     if (!m_secret.isEmpty()) result.replace(QString::fromLatin1(m_secret), QStringLiteral("<每次启动随机生成，已隐藏>"));
     return result;
 }
@@ -138,13 +146,32 @@ bool MihomoAdapter::prepareConfiguration() {
         "tun:\n  enable: false\n  auto-route: false\n  auto-detect-interface: false\n"
         "dns:\n  enable: false\nproxies: []\nproxy-groups: []\nrules: []\n")
         .arg(m_options.controlPort).arg(QString::fromLatin1(m_secret));
+    if (!m_options.selectedNodeId.isEmpty()) {
+        QJsonArray proxies, names;
+        names.append(m_options.selectedNodeId);
+        for (const auto &n : m_options.nodes) {
+            QJsonObject proxy{{"name",n.id},{"type",n.protocol},{"server",n.host},{"port",n.port},{"udp",false}};
+            if (!n.password.isEmpty()) proxy.insert("password",n.password);
+            if (n.protocol=="socks5" && !n.username.isEmpty()) proxy.insert("username",n.username);
+            if (n.protocol=="ss") proxy.insert("cipher",n.cipher);
+            if (n.protocol=="trojan") { proxy.insert("sni",n.serverName.isEmpty()?n.host:n.serverName); proxy.insert("skip-cert-verify",false); }
+            proxies.append(proxy); if (n.id!=m_options.selectedNodeId) names.append(n.id);
+        }
+        const QJsonArray groups{QJsonObject{{"name","SWIRL"},{"type","select"},{"proxies",names}}};
+        m_generatedConfig.replace("mode: direct\n","mode: rule\n");
+        m_generatedConfig.replace("mixed-port: 0\n",QStringLiteral("mixed-port: %1\n").arg(m_options.proxyPort));
+        m_generatedConfig.replace("proxies: []\n",QStringLiteral("proxies: ")+QString::fromUtf8(QJsonDocument(proxies).toJson(QJsonDocument::Compact))+"\n");
+        m_generatedConfig.replace("proxy-groups: []\n",QStringLiteral("proxy-groups: ")+QString::fromUtf8(QJsonDocument(groups).toJson(QJsonDocument::Compact))+"\n");
+        m_generatedConfig.replace("rules: []\n","rules: ['MATCH,SWIRL']\n");
+    }
     QSaveFile file(m_status.configPath);
     if (!file.open(QIODevice::WriteOnly) || !file.setPermissions(QFile::ReadOwner | QFile::WriteOwner)) return false;
     const auto bytes = m_generatedConfig.toUtf8();
     return file.write(bytes) == bytes.size() && file.commit();
 }
 
-bool MihomoAdapter::reserveControlPort() {
+bool MihomoAdapter::reserveControlPort() { return reservePort(m_reservation,m_options.controlPort); }
+bool MihomoAdapter::reservePort(QTcpServer &server, quint16 port) {
 #ifdef Q_OS_WIN
     // A wildcard listener using SO_REUSEADDR can coexist with a specific bind
     // even if the second socket is exclusive. Reject existing listeners from
@@ -158,11 +185,11 @@ bool MihomoAdapter::reserveControlPort() {
         if (family == AF_INET) {
             const auto *entries = reinterpret_cast<const MIB_TCPTABLE_OWNER_PID *>(table.constData());
             for (DWORD i = 0; i < entries->dwNumEntries; ++i)
-                if (ntohs(u_short(entries->table[i].dwLocalPort)) == m_options.controlPort) return false;
+                if (ntohs(u_short(entries->table[i].dwLocalPort)) == port) return false;
         } else {
             const auto *entries = reinterpret_cast<const MIB_TCP6TABLE_OWNER_PID *>(table.constData());
             for (DWORD i = 0; i < entries->dwNumEntries; ++i)
-                if (ntohs(u_short(entries->table[i].dwLocalPort)) == m_options.controlPort) return false;
+                if (ntohs(u_short(entries->table[i].dwLocalPort)) == port) return false;
         }
     }
     // Qt's default Windows bind permits wildcard/specific-address overlap.
@@ -174,24 +201,24 @@ bool MihomoAdapter::reserveControlPort() {
     if (descriptor != INVALID_SOCKET) {
         const BOOL exclusive = TRUE;
         sockaddr_in address{}; address.sin_family = AF_INET;
-        address.sin_addr.s_addr = htonl(INADDR_LOOPBACK); address.sin_port = htons(m_options.controlPort);
+        address.sin_addr.s_addr = htonl(INADDR_LOOPBACK); address.sin_port = htons(port);
         ready = setsockopt(descriptor, SOL_SOCKET, SO_EXCLUSIVEADDRUSE,
                     reinterpret_cast<const char *>(&exclusive), sizeof(exclusive)) == 0 &&
             bind(descriptor, reinterpret_cast<sockaddr *>(&address), sizeof(address)) == 0 &&
-            listen(descriptor, SOMAXCONN) == 0 && m_reservation.setSocketDescriptor(qintptr(descriptor));
+            listen(descriptor, SOMAXCONN) == 0 && server.setSocketDescriptor(qintptr(descriptor));
         if (!ready) closesocket(descriptor);
     }
     WSACleanup();
     return ready;
 #else
-    return m_reservation.listen(QHostAddress::LocalHost, m_options.controlPort);
+    return server.listen(QHostAddress::LocalHost, port);
 #endif
 }
 
 void MihomoAdapter::start(const EngineStartOptions &options) {
     if (m_process.state() != QProcess::NotRunning || m_status.state == State::Validating ||
         m_status.state == State::Starting || m_status.state == State::Stopping) return;
-    cancelRequest(); m_poll.stop(); m_deadline.stop(); m_killTimer.stop();
+    cancelRequest(); cancelNodeRequests(); m_poll.stop(); m_deadline.stop(); m_killTimer.stop();
     unlockExecutable(); m_directory.reset(); m_uptime.invalidate();
     m_secret.clear(); m_generatedConfig.clear(); m_output.clear();
     m_options = options; m_status = {}; m_failureExit = false;
@@ -207,6 +234,17 @@ void MihomoAdapter::start(const EngineStartOptions &options) {
     if (!m_process.ownershipReady()) {
         fail(Error::OwnershipFailed, QStringLiteral("无法建立 Windows 进程归属 Job；已拒绝启动。")); return;
     }
+    QSet<QString> nodeIds;
+    for (const auto &node : options.nodes) {
+        const auto error=ProxyNode::validate(node);
+        if (!error.isEmpty() || nodeIds.contains(node.id)) { fail(Error::InvalidNode, error.isEmpty()?QStringLiteral("节点标识重复。"):error); return; }
+        nodeIds.insert(node.id);
+    }
+    if (!options.selectedNodeId.isEmpty() && (!nodeIds.contains(options.selectedNodeId) || options.proxyPort==0 || options.proxyPort==options.controlPort)) {
+        fail(Error::InvalidNode,QStringLiteral("所选节点或本机代理端口无效。")); return;
+    }
+    m_status.selectedNodeId=options.selectedNodeId;
+    m_status.proxyPort=options.selectedNodeId.isEmpty()?0:options.proxyPort;
     if (!lockAndVerifyExecutable()) return;
     if (!reserveControlPort()) {
         fail(Error::PortConflict, QStringLiteral("本机控制端口 %1 已占用或不允许绑定；请更换端口。").arg(options.controlPort));
@@ -215,6 +253,10 @@ void MihomoAdapter::start(const EngineStartOptions &options) {
     if (!prepareConfiguration()) {
         fail(Error::ConfigurationFailed, QStringLiteral("无法创建只允许当前用户访问的引擎运行配置。"));
         unlockExecutable(); return;
+    }
+    if (!options.selectedNodeId.isEmpty() && !reservePort(m_proxyReservation,options.proxyPort)) {
+        fail(Error::PortConflict,QStringLiteral("本机代理端口 %1 已占用或不允许绑定。").arg(options.proxyPort));
+        unlockExecutable(); m_directory.reset(); return;
     }
     m_deadline.start(options.startupTimeoutMs);
     launch(Stage::Version);
@@ -242,6 +284,7 @@ void MihomoAdapter::launch(Stage stage) {
     if (stage == Stage::Engine) {
         m_status.state = State::Starting;
         m_reservation.close();
+        m_proxyReservation.close();
         m_uptime.start();
     }
     m_process.setArguments(args);
@@ -291,6 +334,8 @@ void MihomoAdapter::processFinished(int code, QProcess::ExitStatus exitStatus) {
 void MihomoAdapter::fail(Error error, const QString &message) {
     m_failureExit = true;
     m_poll.stop(); m_deadline.stop(); m_reservation.close(); cancelRequest();
+    m_proxyReservation.close(); cancelNodeRequests();
+    m_status.proxyPort=0; m_status.nodeHealth=NodeHealth::Unknown; m_status.requestState=RequestState::NotTested;
     m_status.state = State::Failed; m_status.error = error; m_status.message = message;
     m_status.apiHealthy = false;
     if (m_process.state() != QProcess::NotRunning) m_process.kill();
@@ -305,9 +350,103 @@ void MihomoAdapter::cancelRequest() {
     }
 }
 
+void MihomoAdapter::cancelNodeRequests() {
+    ++m_nodeGeneration;
+    for (auto *reply : {m_nodeReply.data(),m_probeReply.data()}) {
+        if (reply) { reply->disconnect(this); reply->abort(); reply->deleteLater(); }
+    }
+    m_nodeReply=nullptr; m_probeReply=nullptr; m_status.nodeBusy=false;
+    m_selectionPending=false;
+}
+void MihomoAdapter::nodeFailure(const QString &message) {
+    m_status.nodeBusy=false; m_status.nodeMessage=message;
+    m_status.nodeHealth=NodeHealth::Unavailable; m_status.requestState=RequestState::NotTested; publish();
+}
+static void boundReply(QNetworkReply *reply, int milliseconds) {
+    auto *timer=new QTimer(reply); timer->setSingleShot(true);
+    QObject::connect(timer,&QTimer::timeout,reply,[reply]{reply->abort();});
+    QObject::connect(reply,&QNetworkReply::finished,timer,&QTimer::stop);
+    QObject::connect(reply,&QNetworkReply::readyRead,reply,[reply]{if(reply->bytesAvailable()>65536)reply->abort();});
+    timer->start(milliseconds);
+}
+
+void MihomoAdapter::selectNode(const QString &id) {
+    if (!m_status.apiHealthy || m_status.nodeBusy || m_options.selectedNodeId.isEmpty()) return;
+    if (std::none_of(m_options.nodes.begin(),m_options.nodes.end(),[&](const ProxyNode &n){return n.id==id;})) {
+        nodeFailure(QStringLiteral("节点不在已启动的引擎配置中。")); return;
+    }
+    cancelNodeRequests(); const auto generation=m_nodeGeneration;
+    m_selectionPending=true;
+    m_status.nodeBusy=true; m_status.nodeHealth=NodeHealth::Unknown; m_status.requestState=RequestState::NotTested; m_status.nodeMessage.clear(); publish();
+    QNetworkRequest request(QUrl(m_status.controlEndpoint+"/proxies/SWIRL"));
+    request.setRawHeader("Authorization","Bearer "+m_secret); request.setHeader(QNetworkRequest::ContentTypeHeader,"application/json");
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,QNetworkRequest::ManualRedirectPolicy);
+    auto *reply=m_network.put(request,QJsonDocument(QJsonObject{{"name",id}}).toJson(QJsonDocument::Compact));
+    m_nodeReply=reply; boundReply(reply,m_options.requestTimeoutMs);
+    connect(reply,&QNetworkReply::finished,this,[this,reply,generation,id,request] {
+        reply->deleteLater(); if(generation!=m_nodeGeneration)return; m_nodeReply=nullptr;
+        if (reply->error()!=QNetworkReply::NoError || reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()!=204) {
+            fail(Error::SelectionFailed,QStringLiteral("节点切换未获得控制接口确认，已停止引擎以避免错误出口。")); return;
+        }
+        auto *verify=m_network.get(request); m_nodeReply=verify; boundReply(verify,m_options.requestTimeoutMs);
+        connect(verify,&QNetworkReply::finished,this,[this,verify,generation,id] {
+            verify->deleteLater(); if(generation!=m_nodeGeneration)return; m_nodeReply=nullptr;
+            const auto object=QJsonDocument::fromJson(verify->readAll()).object();
+            if (verify->error()!=QNetworkReply::NoError || verify->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()!=200 || object.value("now").toString()!=id) {
+                fail(Error::SelectionFailed,QStringLiteral("无法确认当前节点，已停止引擎。")); return;
+            }
+            m_options.selectedNodeId=id; m_status.selectedNodeId=id; m_status.nodeBusy=false;
+            m_selectionPending=false;
+            m_status.latencyMs=-1; m_status.responseCode=0; m_status.nodeMessage.clear(); publish();
+        });
+    });
+}
+
+void MihomoAdapter::probeNode(const QUrl &url) {
+    if (!m_status.apiHealthy || m_status.nodeBusy || m_options.selectedNodeId.isEmpty()) return;
+    if (!url.isValid() || (url.scheme()!="http" && url.scheme()!="https") || url.host().isEmpty() ||
+        !url.userInfo().isEmpty() || url.toString().size()>2048 || url.hasFragment()) {
+        nodeFailure(QStringLiteral("测试地址须为不含凭据或片段的 HTTP/HTTPS URL。")); return;
+    }
+    cancelNodeRequests(); const auto generation=m_nodeGeneration;
+    m_status.nodeBusy=true; m_status.nodeHealth=NodeHealth::Checking; m_status.requestState=RequestState::NotTested;
+    m_status.nodeMessage.clear(); m_status.responseCode=0; m_status.latencyMs=-1; publish();
+    QUrl endpoint(m_status.controlEndpoint+"/proxies/"+m_options.selectedNodeId+"/delay");
+    QUrlQuery query; query.addQueryItem("timeout","5000"); query.addQueryItem("url",url.toString(QUrl::FullyEncoded)); endpoint.setQuery(query);
+    QNetworkRequest request(endpoint); request.setRawHeader("Authorization","Bearer "+m_secret);
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,QNetworkRequest::ManualRedirectPolicy);
+    auto *reply=m_network.get(request); m_nodeReply=reply; boundReply(reply,6000);
+    connect(reply,&QNetworkReply::finished,this,[this,reply,generation,url] {
+        reply->deleteLater(); if(generation!=m_nodeGeneration)return; m_nodeReply=nullptr;
+        const auto delay=QJsonDocument::fromJson(reply->readAll()).object().value("delay");
+        if (reply->error()!=QNetworkReply::NoError || !delay.isDouble() || delay.toInt(-1)<0) {
+            nodeFailure(QStringLiteral("所选节点的真实可用性检测失败；实际请求未执行。请检查服务器、凭据或网络。")); return;
+        }
+        m_status.nodeHealth=NodeHealth::Available; m_status.latencyMs=delay.toInt(); m_status.requestState=RequestState::InProgress; publish();
+        m_probeNetwork.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,QStringLiteral("127.0.0.1"),m_options.proxyPort));
+        QNetworkRequest actual(url);
+        actual.setAttribute(QNetworkRequest::RedirectPolicyAttribute,QNetworkRequest::ManualRedirectPolicy);
+        actual.setAttribute(QNetworkRequest::CacheLoadControlAttribute,QNetworkRequest::AlwaysNetwork);
+        actual.setRawHeader("Connection","close");
+        auto *probe=m_probeNetwork.get(actual); m_probeReply=probe; boundReply(probe,6000);
+        connect(probe,&QNetworkReply::finished,this,[this,probe,generation] {
+            probe->deleteLater(); if(generation!=m_nodeGeneration)return; m_probeReply=nullptr;
+            m_status.nodeBusy=false;
+            const auto code=probe->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt(); m_status.responseCode=code;
+            const bool ok=probe->error()==QNetworkReply::NoError && code>=200 && code<400;
+            m_status.requestState=ok?RequestState::Succeeded:RequestState::Failed;
+            m_status.nodeMessage=ok?QStringLiteral("真实请求成功：已通过所选节点完成请求（HTTP %1）。").arg(code)
+                :QStringLiteral("本机代理的实际请求失败（HTTP %1）；未使用直连回退。").arg(code);
+            publish();
+        });
+    });
+}
+
 void MihomoAdapter::stop() {
     if (m_status.state == State::Stopped) return;
     m_failureExit = false; cancelRequest();
+    cancelNodeRequests(); m_proxyReservation.close();
+    m_status.proxyPort=0; m_status.nodeHealth=NodeHealth::Unknown; m_status.requestState=RequestState::NotTested;
     m_poll.stop(); m_deadline.stop(); m_reservation.close();
     m_status.error = Error::None; m_status.message.clear(); m_status.apiHealthy = false;
     if (m_process.state() == QProcess::NotRunning) {
@@ -324,6 +463,8 @@ void MihomoAdapter::refresh() {
 }
 
 void MihomoAdapter::apiFailure(Error error, const QString &message) {
+    if(m_selectionPending){fail(Error::SelectionFailed,QStringLiteral("节点切换期间控制接口异常，已停止引擎以避免错误出口。"));return;}
+    cancelNodeRequests(); m_status.nodeHealth=NodeHealth::Unknown; m_status.requestState=RequestState::NotTested;
     m_status.apiHealthy = false;
     // Startup retries are bounded by the original deadline; never reset it.
     if (m_status.state != State::Starting) m_status.state = State::Degraded;
@@ -372,16 +513,18 @@ void MihomoAdapter::request(bool version) {
             m_status.version = object.value(QStringLiteral("version")).toString();
             this->request(false); return;
         }
-        bool safe = object.value(QStringLiteral("mode")).toString() == QStringLiteral("direct") &&
+        const bool connected=!m_options.selectedNodeId.isEmpty();
+        bool safe = object.value(QStringLiteral("mode")).toString() == (connected ? QStringLiteral("rule"):QStringLiteral("direct")) &&
             object.value(QStringLiteral("allow-lan")) == QJsonValue(false) &&
             object.value(QStringLiteral("tun")).isObject() &&
             object.value(QStringLiteral("tun")).toObject().value(QStringLiteral("enable")) == QJsonValue(false);
-        for (const auto &key : {"port", "socks-port", "mixed-port", "redir-port", "tproxy-port"})
+        for (const auto &key : {"port", "socks-port", "redir-port", "tproxy-port"})
             safe = safe && object.value(QLatin1String(key)).isDouble() && object.value(QLatin1String(key)).toInt(-1) == 0;
+        safe=safe && object.value("mixed-port").isDouble() && object.value("mixed-port").toInt(-1)==(connected?m_options.proxyPort:0);
         if (!safe) {
-            fail(Error::ConfigurationFailed, QStringLiteral("引擎运行配置不符合第一阶段安全约束；已停止进程。")); return;
+            fail(Error::ConfigurationFailed, QStringLiteral("引擎运行配置不符合 Swirl 安全约束；已停止进程。")); return;
         }
-        m_status.mode = QStringLiteral("direct");
+        m_status.mode = connected?QStringLiteral("rule"):QStringLiteral("direct");
         m_status.state = State::Running; m_status.apiHealthy = true;
         m_status.error = Error::None; m_status.message.clear(); m_deadline.stop(); publish();
     });

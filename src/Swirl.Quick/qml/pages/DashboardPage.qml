@@ -6,16 +6,11 @@ import "../components"
 import "../controls"
 
 Item {
-    id: page
+    id:page
+    readonly property bool implemented:false
     property string range: "最近 1 小时"
-    property var sessions: demoProvider.connections()
-    property var sampleRows: [
-        {name:"api.github.com",requests:"1,240",download:"389 MB",policy:"自动选择"},
-        {name:"cdn.jsdelivr.net",requests:"986",download:"270 MB",policy:"直连"},
-        {name:"developer.apple.com",requests:"824",download:"116 MB",policy:"全局 · 新加坡"},
-        {name:"www.microsoft.com",requests:"641",download:"98 MB",policy:"自动选择"},
-        {name:"fonts.gstatic.com",requests:"318",download:"42 MB",policy:"直连"}
-    ]
+    property var sessions: systemProvider.connections()
+    property var sampleRows: []
     ScrollView {
         id: scroll
         anchors.fill: parent
@@ -35,16 +30,16 @@ Item {
                         page.range = ["最近 1 小时","最近 24 小时","最近 7 天","最近 30 天"][index]
                     }
                 }
-                SwirlButton { text:AppState.zh("导出报告"); iconName:"folder"; onClicked:AppState.notice("导出仪表盘") }
+                SwirlButton { enabled:false; text:AppState.zh("导出报告"); iconName:"folder"; onClicked:AppState.notice("导出仪表盘") }
             }
             GridLayout {
                 Layout.fillWidth:true
                 columns:page.width>1080?4:2
                 columnSpacing:13; rowSpacing:13
-                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Total Download"); value:"1.48 GB"; secondary:""+page.range; iconName:"activity" }
-                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Total Upload"); value:"304 MB"; secondary:""+page.range; iconName:"chart" }
-                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Avg. Latency"); value:"58 ms"; secondary:"节点"; iconName:"clock" }
-                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Connections"); value:"54"; secondary:"42 个活动连接"; iconName:"network" }
+                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Total Download"); value:"—"; secondary:""+page.range; iconName:"activity" }
+                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Total Upload"); value:"—"; secondary:""+page.range; iconName:"chart" }
+                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Avg. Latency"); value:"—"; secondary:"节点"; iconName:"clock" }
+                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Connections"); value:"—"; secondary:"未采集"; iconName:"network" }
             }
             SwirlGlassPanel {
                 Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(304)
@@ -72,7 +67,7 @@ Item {
                         RowLayout {
                             Layout.fillWidth:true
                             Text { text:AppState.zh("Top destinations"); color:Theme.text; font.pixelSize:Theme.fontSize(16); font.weight:Font.DemiBold; Layout.fillWidth:true }
-                            SwirlButton { text:AppState.zh("查看连接记录"); quiet:false; onClicked:AppState.currentPage="connections" }
+                            SwirlButton { enabled:false; text:AppState.zh("查看连接记录"); quiet:false; onClicked:AppState.currentPage="connections" }
                         }
                         SwirlDataTable {
                             Layout.fillWidth:true; Layout.fillHeight:true
@@ -89,10 +84,7 @@ Item {
                         anchors.fill:parent; anchors.margins:Theme.dp(18); spacing:Theme.dp(15)
                         Text { text:AppState.zh("流量分布"); color:Theme.text; font.pixelSize:Theme.fontSize(16); font.weight:Font.DemiBold }
                         Repeater {
-                            model:[{name:"HTTP/2",share:.47,color:Theme.accent},
-                                   {name:"HTTP/3",share:.29,color:Theme.green},
-                                   {name:"TCP",share:.17,color:Theme.orange},
-                                   {name:"其他",share:.07,color:Theme.muted}]
+                            model:[]
                             ColumnLayout {
                                 Layout.fillWidth:true; spacing:Theme.dp(6)
                                 RowLayout {

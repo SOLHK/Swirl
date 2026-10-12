@@ -7,13 +7,10 @@ import "../controls"
 
 Item {
     id:page
+    readonly property bool implemented:false
     property string selectedTab:"本地映射"
     property var selection:null
-    property var entries:[
-        {id:"m1",name:"用户配置",match:"https://api.example.test/user",target:"fixtures/user.json",type:"本地映射",status:"Enabled"},
-        {id:"m2",name:"静态资源",match:"https://cdn.example.test/*",target:"C:/fixtures/assets/",type:"本地映射",status:"Enabled"},
-        {id:"m3",name:"旧版 API 镜像",match:"https://api.example.test/v1/*",target:"https://mirror.example.test/v2/",type:"远程映射",status:"Disabled"}
-    ]
+    property var entries:[]
     readonly property var visibleRows:entries.filter(function(r){return r.type===selectedTab &&
         (r.name+" "+r.match+" "+r.target).toLowerCase().indexOf(search.text.toLowerCase())>=0})
     ColumnLayout {
@@ -22,13 +19,13 @@ Item {
             Layout.fillWidth:true
             SwirlStatusBadge { label:"响应映射"; tone:"accent" }
             Text { text:"不会读取文件或重定向实际请求"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
-            SwirlButton { text:"新建映射"; primary:true; onClicked:newDialog.open() }
+            SwirlButton { enabled:false; text:"新建映射"; primary:true; onClicked:newDialog.open() }
         }
         RowLayout {
             Layout.fillWidth:true
             Repeater {
                 model:["本地映射","远程映射"]
-                SwirlButton { text:modelData; quiet:page.selectedTab!==modelData; onClicked:{page.selectedTab=modelData;page.selection=null} }
+                SwirlButton { enabled:false; text:modelData; quiet:page.selectedTab!==modelData; onClicked:AppState.notice("尚未实现") }
             }
             Item { Layout.fillWidth:true }
             SwirlSearchField { id:search; implicitWidth:Theme.dp(260); placeholderText:"筛选映射 URL" }
@@ -73,15 +70,10 @@ Item {
                             color:Theme.text; font.family:"Cascadia Code"; font.pixelSize:Theme.fontSize(11); wrapMode:Text.WrapAnywhere
                         }
                     }
-                    SwirlButton {
+                    SwirlButton { enabled:false;
                         text:"保存映射"; primary:true
-                        enabled:page.selection&&matchField.text.trim().length>0&&targetField.text.trim().length>0
-                        onClicked:{
-                            var id=page.selection.id
-                            page.entries=page.entries.map(function(r){return r.id===id?
-                                {id:r.id,name:nameField.text,match:matchField.text,target:targetField.text,type:r.type,status:r.status}:r})
-                            AppState.notice("保存映射")
-                        }
+
+                        onClicked:AppState.notice("尚未实现")
                     }
                 }
                 }
@@ -98,15 +90,11 @@ Item {
             SwirlTextField { id:destination; Layout.fillWidth:true; placeholderText:page.selectedTab==="本地映射"?"fixtures/response.json":"https://mirror.example.test/" }
             RowLayout {
                 Layout.alignment:Qt.AlignRight
-                SwirlButton { text:"取消"; onClicked:newDialog.close() }
-                SwirlButton {
+                SwirlButton { enabled:false; text:"取消"; onClicked:newDialog.close() }
+                SwirlButton { enabled:false;
                     text:"添加"; primary:true
-                    enabled:urlInput.text.startsWith("https://")&&destination.text.trim().length>0
-                    onClicked:{
-                        page.entries=page.entries.concat([{id:"m"+Date.now(),name:"新建映射",
-                            match:urlInput.text.trim(),target:destination.text.trim(),type:page.selectedTab,status:"Enabled"}])
-                        urlInput.text="";destination.text="";newDialog.close()
-                    }
+
+                    onClicked:AppState.notice("尚未实现")
                 }
             }
         }

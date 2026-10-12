@@ -11,24 +11,13 @@ SwirlGlassPanel {
     cornerRadius:Theme.containerRadius
     implicitWidth:Theme.dp(450)
     function detailsText() {
-        if(!record) return "选择一条请求查看详细信息。"
-        if(activeTab==="Headers" && mode==="Response")
-            return "Response Headers\n:status: "+record.status+"\ncontent-type: application/json\nserver: Swirl"
-        if(activeTab==="Headers")
-            return mode+" Headers\n\n:method: "+record.method+
-                "\n:authority: "+record.host+"\n:path: "+record.path+
-                "\naccept: application/json\nuser-agent: Swirl/0.1\ncontent-type: application/json\ncache-control: no-cache"
-        if(activeTab==="Body")
-            return '{\n  "source": "Swirl",\n  "requestId": "'+record.id+'",\n  "items": [\n    { "name": "Swirl", "enabled": false }\n  ]\n}'
-        if(activeTab==="XML")return '<response requestId="'+record.id+'">\n  <source>Swirl</source>\n  <success>true</success>\n</response>'
-        if(activeTab==="Preview")return "图像预览"
-        if(activeTab==="Cookies")return "session_id = [session]\nSameSite = Lax\nSecure = true\nHttpOnly = true"
-        if(activeTab==="Query")return "q = swirl\npage = 1\nlimit = 20"
-        if(activeTab==="TLS")return "Protocol: "+record.version+"\nCipher: TLS_AES_128_GCM_SHA256\nTLS version: 1.3\nCA trust: not inspected"
-        if(activeTab==="Timeline")return "DNS Lookup          12 ms\nTCP Connect         21 ms\nTLS Handshake       31 ms\nRequest Sent         4 ms\nWaiting / TTFB      84 ms\nContent Download    18 ms"
-        if(activeTab==="WebSocket")return "暂无 WebSocket 帧"
-        return record.path
-    }
+        if(!record)return "选择一条真实抓包记录。"
+        if(activeTab==="Headers")return mode==="Response"?(record.responseHeaders||"未采集"):(record.requestHeaders||"未采集")
+        if(activeTab==="Body" || activeTab==="XML")return mode==="Response"?(record.responseBody||"无正文"):(record.requestBody||"无正文")
+        if(activeTab==="Timeline")return "总耗时："+record.duration+"；阶段耗时未采集。"
+        if(activeTab==="TLS")return "未解密或采集 TLS 详情。"
+        return "此类详情尚未采集。"
+ }
     ColumnLayout {
         anchors.fill:parent; anchors.margins:Theme.dp(17)
         spacing:Theme.dp(13)
@@ -92,11 +81,7 @@ SwirlGlassPanel {
             SwirlDataTable {
                 visible:inspector.activeTab==="WebSocket"
                 anchors.fill:parent
-                rows:[
-                    {id:"ws1",direction:"Out",time:"14:08:10",opcode:"Text",size:"21 B",payload:"ping"},
-                    {id:"ws2",direction:"In",time:"14:08:10",opcode:"Text",size:"32 B",payload:"pong"},
-                    {id:"ws3",direction:"In",time:"14:08:12",opcode:"Binary",size:"128 B",payload:"[sample bytes]"}
-                ]
+                rows:[]
                 columns:[
                     {key:"direction",label:"DIR",w:52},{key:"time",label:"TIMESTAMP",w:100},
                     {key:"opcode",label:"TYPE",w:80},{key:"size",label:"SIZE",w:65},
@@ -105,7 +90,7 @@ SwirlGlassPanel {
                 onRowSelected:function(r){AppState.toast="已选择 WebSocket 帧："+r.opcode}
             }
             ColumnLayout {
-                visible:inspector.activeTab==="Preview"
+                visible:false
                 anchors.centerIn:parent
                 spacing:Theme.dp(12)
                 Image {
@@ -124,7 +109,7 @@ SwirlGlassPanel {
         }
         RowLayout {
             Layout.fillWidth:true
-            SwirlButton { text:"Copy"; iconName:"code"; onClicked:{demoProvider.copyText(inspector.detailsText()); AppState.toast="已复制请求详情"} }
+            SwirlButton { text:"Copy"; iconName:"code"; onClicked:{systemProvider.copyText(inspector.detailsText()); AppState.toast="已复制请求详情"} }
             Item { Layout.fillWidth:true }
             Text { text:"响应详情"; color:Theme.muted; font.pixelSize:Theme.fontSize(10) }
         }

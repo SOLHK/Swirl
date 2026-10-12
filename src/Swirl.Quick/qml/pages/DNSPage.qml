@@ -6,16 +6,11 @@ import "../components"
 import "../controls"
 
 Item {
-    id: page
+    id:page
+    readonly property bool implemented:false
     property string tab: "查询日志"
     property var selectedRecord: null
-    property var dnsRecords: [
-        {id:"Q100",domain:"api.example.test",type:"A",answer:"203.0.113.42",server:"DoH / 首选",duration:"23 ms",result:"NOERROR"},
-        {id:"Q101",domain:"cdn.example.test",type:"AAAA",answer:"2001:db8::20",server:"DoQ / 备用",duration:"35 ms",result:"NOERROR"},
-        {id:"Q102",domain:"private.example.test",type:"A",answer:"192.0.2.15",server:"Hosts",duration:"0 ms",result:"HOSTS"},
-        {id:"Q103",domain:"blocked.example.test",type:"A",answer:"-",server:"规则解析器",duration:"4 ms",result:"BLOCKED"},
-        {id:"Q104",domain:"assets.example.test",type:"CNAME",answer:"edge.example.test",server:"DoH / 首选",duration:"19 ms",result:"NOERROR"}
-    ]
+    property var dnsRecords: []
     readonly property var visibleRecords:dnsRecords.filter(function(r){
         return (r.domain+" "+r.answer+" "+r.type).toLowerCase().indexOf(search.text.toLowerCase())>=0
     })
@@ -23,9 +18,9 @@ Item {
         anchors.fill:parent; anchors.margins:Theme.dp(23); spacing:Theme.dp(14)
         RowLayout {
             Layout.fillWidth:true
-            SwirlStatusBadge { label:AppState.zh("DEMO DNS ENGINE"); tone:"accent" }
-            Text { text:AppState.zh("Requests are local fixtures · no name resolution occurs"); color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
-            SwirlButton { text:AppState.zh("Test Resolver"); iconName:"activity"; primary:true; onClicked:testDialog.open() }
+            SwirlStatusBadge { label:"尚未实现"; tone:"accent" }
+            Text { text:"尚未实现"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
+            SwirlButton { enabled:false; text:AppState.zh("Test Resolver"); iconName:"activity"; primary:true; onClicked:testDialog.open() }
         }
         SwirlGlassPanel {
             Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(130)
@@ -46,7 +41,7 @@ Item {
                         SwirlStatusBadge { label:AppState.zh("DoT"); tone:"accent" }
                         SwirlStatusBadge { label:AppState.zh("DoQ"); tone:"accent" }
                     }
-                    Text { text:AppState.zh("IPv4 + IPv6 · Fake-IP Preview"); color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
+                    Text { text:"DNS 配置尚未实现"; color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
                 }
             }
         }
@@ -54,10 +49,10 @@ Item {
             Layout.fillWidth:true; spacing:Theme.dp(7)
             Repeater {
                 model:["查询日志","Resolvers","Hosts","Cache","Fake-IP"]
-                SwirlButton { text:modelData; quiet:page.tab!==modelData; onClicked:page.tab=modelData }
+                SwirlButton { enabled:false; text:modelData; quiet:page.tab!==modelData; onClicked:page.tab=modelData }
             }
             Item { Layout.fillWidth:true }
-            SwirlButton { text:AppState.zh("清空"); onClicked:{page.dnsRecords=[];page.selectedRecord=null} }
+            SwirlButton { enabled:false; text:AppState.zh("清空"); onClicked:AppState.notice("尚未实现") }
         }
         RowLayout {
             Layout.fillWidth:true; spacing:Theme.dp(12); visible:page.tab==="查询日志"
@@ -83,24 +78,15 @@ Item {
                     anchors.fill:parent; anchors.margins:Theme.dp(18); spacing:Theme.dp(14)
                     Text { text:AppState.zh(page.tab); color:Theme.text; font.pixelSize:Theme.fontSize(18); font.weight:Font.DemiBold }
                     Repeater {
-                        model:page.tab==="Resolvers"?
-                            ["Primary  ·  DoH  ·  https://dns.example.test/dns-query",
-                             "Secondary  ·  DoT  ·  tls://resolver.example.test",
-                             "Experimental  ·  DoQ  ·  quic://dns3.example.test"]:
-                            page.tab==="Hosts"?
-                            ["internal.example.test  →  192.0.2.15",
-                             "lab.example.test  →  2001:db8::42"]:
-                            page.tab==="Cache"?
-                            ["api.example.test  ·  TTL 120 s","cdn.example.test · TTL 245 s"]:
-                            ["Fake-IP range  198.18.0.0/15","Exclusions  *.local, *.lan"]
+                        model:[]
                         RowLayout {
                             Layout.fillWidth:true
                             Text { text:modelData; Layout.fillWidth:true; color:Theme.text; font.pixelSize:Theme.fontSize(12); elide:Text.ElideRight }
-                            SwirlToggle { onToggled:AppState.notice("DNS "+page.tab) }
+                            SwirlToggle { enabled:false;checked:false; onToggled:AppState.notice("DNS "+page.tab) }
                         }
                     }
                     Item { Layout.fillHeight:true }
-                    SwirlButton { text:AppState.zh("Add ")+page.tab+" entry"; onClicked:editDialog.open() }
+                    SwirlButton { enabled:false; text:AppState.zh("Add ")+page.tab+" entry"; onClicked:editDialog.open() }
                 }
             }
             SwirlGlassPanel {
@@ -132,8 +118,8 @@ Item {
                         }
                     }
 
-                    SwirlButton { text:AppState.zh("复制解析结果"); onClicked:{if(page.selectedRecord)demoProvider.copyText(page.selectedRecord.answer);AppState.toast="已复制 DNS 解析结果"} }
-                    SwirlButton { text:AppState.zh("Edit mapping"); onClicked:editDialog.open() }
+                    SwirlButton { enabled:false; text:AppState.zh("复制解析结果"); onClicked:AppState.notice("尚未实现") }
+                    SwirlButton { enabled:false; text:AppState.zh("Edit mapping"); onClicked:editDialog.open() }
 
                 }
             }
@@ -145,14 +131,14 @@ Item {
             width:parent.width; spacing:Theme.dp(13)
             Text { text:AppState.zh("域名"); color:Theme.text }
             SwirlTextField { id:domainInput; Layout.fillWidth:true; placeholderText:AppState.zh("example.test") }
-            Text { text:AppState.zh("This test returns an explanatory demo result. No DNS packets are sent."); color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true; wrapMode:Text.WordWrap }
+            Text { text:"尚未实现"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true; wrapMode:Text.WordWrap }
             RowLayout {
                 Layout.alignment:Qt.AlignRight
-                SwirlButton { text:AppState.zh("取消"); onClicked:testDialog.close() }
-                SwirlButton {
-                    text:AppState.zh("Run demo"); primary:true
-                    enabled:domainInput.text.includes(".")&&domainInput.text.indexOf(" ")<0
-                    onClicked:{testDialog.close();AppState.notice("Resolve "+domainInput.text)}
+                SwirlButton { enabled:false; text:AppState.zh("取消"); onClicked:testDialog.close() }
+                SwirlButton { enabled:false;
+                    text:"尚未实现"; primary:true
+
+                    onClicked:AppState.notice("尚未实现")
                 }
             }
         }
@@ -167,11 +153,11 @@ Item {
             SwirlTextField { id:answerInput; Layout.fillWidth:true; placeholderText:AppState.zh("192.0.2.15") }
             RowLayout {
                 Layout.alignment:Qt.AlignRight
-                SwirlButton { text:AppState.zh("取消"); onClicked:editDialog.close() }
-                SwirlButton {
+                SwirlButton { enabled:false; text:AppState.zh("取消"); onClicked:editDialog.close() }
+                SwirlButton { enabled:false;
                     text:AppState.zh("应用"); primary:true
-                    enabled:hostInput.text.includes(".")&&answerInput.text.trim().length>0
-                    onClicked:{editDialog.close();AppState.notice("DNS mapping")}
+
+                    onClicked:AppState.notice("尚未实现")
                 }
             }
         }

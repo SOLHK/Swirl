@@ -7,13 +7,9 @@ import "../controls"
 
 Item {
     id:page
+    readonly property bool implemented:false
     property string tab:"API 管理"
-    property var routes:[
-        {id:"api1",method:"GET",path:"/v1/status",permission:"读取状态",status:"Planned"},
-        {id:"api2",method:"GET",path:"/v1/connections",permission:"读取会话",status:"Planned"},
-        {id:"api3",method:"POST",path:"/v1/profiles/select",permission:"更新配置",status:"Planned"},
-        {id:"api4",method:"GET",path:"/v1/logs",permission:"读取诊断",status:"Planned"}
-    ]
+    property var routes:[]
     ColumnLayout {
         anchors.fill:parent; anchors.margins:Theme.dp(23); spacing:Theme.dp(14)
         SwirlGlassPanel {
@@ -33,10 +29,10 @@ Item {
             Layout.fillWidth:true
             Repeater {
                 model:["API 管理","命令行指令","Permissions","访问日志"]
-                SwirlButton { text:modelData; quiet:page.tab!==modelData; onClicked:page.tab=modelData }
+                SwirlButton { enabled:false; text:modelData; quiet:page.tab!==modelData; onClicked:page.tab=modelData }
             }
             Item { Layout.fillWidth:true }
-            SwirlButton { text:"服务设置"; onClicked:settingsDialog.open() }
+            SwirlButton { enabled:false; text:"服务设置"; onClicked:settingsDialog.open() }
         }
         RowLayout {
             Layout.fillWidth:true; Layout.fillHeight:true; spacing:Theme.dp(14)
@@ -55,15 +51,11 @@ Item {
                     anchors.fill:parent; anchors.margins:Theme.dp(18); spacing:Theme.dp(15)
                     Text { text:AppState.zh(page.tab); color:Theme.text; font.pixelSize:Theme.fontSize(17); font.weight:Font.DemiBold }
                     Repeater {
-                        model:page.tab==="命令行指令"?
-                            ["swirl status","swirl profiles list","swirl proxies show","swirl dns query example.test","swirl logs --tail"]:
-                            page.tab==="Permissions"?
-                            ["只读状态","只读连接","配置管理","导出诊断"]:
-                            ["当前中没有 API 请求。","尚未创建本地 API 监听服务。"]
+                        model:[]
                         RowLayout {
                             Layout.fillWidth:true
                             Text { text:modelData; color:Theme.text; font.family:"Cascadia Code"; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
-                            SwirlButton { text:"预览"; onClicked:AppState.notice("命令行 / API ") }
+                            SwirlButton { enabled:false; text:"预览"; onClicked:AppState.notice("命令行 / API ") }
                         }
                     }
                     Item { Layout.fillHeight:true }
@@ -87,13 +79,13 @@ Item {
                             anchors.fill:parent; anchors.margins:Theme.dp(9)
                             TextArea {
                                 readOnly:true
-                                text:"HTTP/1.1 503 Preview Only\nContent-Type: application/json\n\n{\n  \"running\": false,\n  \"path\": \""+pathInput.text+"\"\n}"
+                                text:"尚未实现；未发起 API 请求。"
                                 color:Theme.text; font.family:"Cascadia Code"; font.pixelSize:Theme.fontSize(11)
                                 wrapMode:Text.WrapAnywhere; background:Rectangle { color:"transparent" }
                             }
                         }
                     }
-                    SwirlButton { text:"本地测试"; primary:true; onClicked:AppState.notice("未发送 API 请求") }
+                    SwirlButton { enabled:false; text:"本地测试"; primary:true; onClicked:AppState.notice("未发送 API 请求") }
                 }
                 }
             }
@@ -110,9 +102,9 @@ Item {
             RowLayout {
                 Layout.fillWidth:true
                 Text { text:"允许 API 请求（仅界面开关）"; Layout.fillWidth:true; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
-                SwirlToggle { onToggled:AppState.notice("API 监听服务") }
+                SwirlToggle { enabled:false;checked:false; onToggled:AppState.notice("API 监听服务") }
             }
-            SwirlButton { text:"关闭"; Layout.alignment:Qt.AlignRight; onClicked:settingsDialog.close() }
+            SwirlButton { enabled:false; text:"关闭"; Layout.alignment:Qt.AlignRight; onClicked:settingsDialog.close() }
         }
     }
 }
