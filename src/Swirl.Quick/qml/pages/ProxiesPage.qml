@@ -31,7 +31,6 @@ Item {
                     Text {text:engineController.stateText+" · "+engineController.nodeStateText;color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;elide:Text.ElideRight}
                 }
                 SwirlStatusBadge {label:engineController.activeProxyPort>0?"127.0.0.1:"+engineController.activeProxyPort:"未开放代理端口";tone:"accent"}
-                SwirlButton {objectName:"nodeTestButton";text:"测试请求";iconName:"activity";enabled:engineController.apiHealthy&&engineController.activeNodeId.length>0&&!engineController.nodeBusy;onClicked:engineController.testNode(testUrl.text)}
                 SwirlButton {objectName:"nodeImportButton";text:"一键导入";enabled:!engineController.imports.busy;onClicked:importDialog.open()}
                 SwirlButton {objectName:"nodeAddButton";text:"添加节点";primary:true;enabled:engineController.canStart;onClicked:page.edit(null)}
             }
@@ -48,7 +47,7 @@ Item {
                 Layout.fillWidth:true;Layout.fillHeight:true;clip:true
                 SwirlDataTable {
                     objectName:"realNodeTable";anchors.fill:parent;anchors.margins:Theme.dp(1);rows:page.viewRows;selectedId:page.selectedId
-                    columns:[{key:"name",label:"节点名称",w:240},{key:"address",label:"地址 / 端口",w:180},{key:"protocol",label:"协议",w:122},{key:"latency",label:"检测耗时（ms）",w:115},{key:"status",label:"节点状态",w:132}]
+                    columns:[{key:"name",label:"节点名称",w:240},{key:"address",label:"地址 / 端口",w:180},{key:"protocol",label:"协议",w:122},{key:"latency",label:"延迟（ms）",w:115},{key:"status",label:"节点状态",w:132}]
                     onRowSelected:function(row){page.selectedId=row.id;engineController.chooseNode(row.id)}
                 }
                 SwirlEmptyState {anchors.centerIn:parent;visible:page.viewRows.length===0;headline:"没有保存的节点";detail:"添加节点，或一键导入 Clash 配置 / 订阅"}
@@ -74,7 +73,9 @@ Item {
                             Text {text:engineController.nodeError||engineController.error;color:Theme.orange;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
                         }
                     }
-                    SwirlButton {objectName:"nodeConnectButton";Layout.fillWidth:true;text:engineController.activeNodeId===page.selectedId&&engineController.processAlive?"断开节点":"连接 / 切换节点";primary:true;enabled:page.selected!==null&&!engineController.nodeBusy;onClicked:{if(engineController.activeNodeId===page.selectedId&&engineController.processAlive)engineController.disconnectNode();else engineController.connectNode(page.selectedId)}}
+                    SwirlButton {objectName:"nodeConnectButton";Layout.fillWidth:true;text:engineController.activeNodeId===page.selectedId&&engineController.processAlive?"断开连接":"连接节点";primary:true;enabled:page.selected!==null&&(!engineController.nodeBusy || engineController.activeNodeId===page.selectedId&&engineController.processAlive);onClicked:{if(engineController.activeNodeId===page.selectedId&&engineController.processAlive)engineController.disconnectNode();else engineController.connectNode(page.selectedId)}}
+                    SwirlButton {objectName:"nodeTestButton";Layout.fillWidth:true;text:engineController.nodeBusy?"正在测试…":"测试当前连接延迟";iconName:"activity";enabled:engineController.apiHealthy&&engineController.activeNodeId.length>0&&!engineController.nodeBusy;onClicked:engineController.testNode(testUrl.text)}
+                    Text {text:engineController.systemProxyError;color:Theme.orange;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap;visible:text.length>0}
                     RowLayout {
                         Layout.fillWidth:true
                         SwirlButton {objectName:"nodeEditButton";Layout.fillWidth:true;text:"编辑";enabled:page.selected!==null&&engineController.canStart;onClicked:page.edit(page.selected)}

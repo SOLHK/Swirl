@@ -4,8 +4,8 @@ This installer includes a real, separate Mihomo engine and manual SOCKS5,
 Shadowsocks and Trojan node configuration. Node credentials are protected by
 Windows DPAPI. UI simulation data has been removed. Unimplemented network
 features remain disabled. The opt-in HTTP capture is real; CONNECT records
-metadata without TLS decryption. No system proxy, TUN, DNS service, route
-manipulation or subscription update is enabled by this build.
+metadata without TLS decryption. Windows system proxy can be enabled for a connected node and is restored on
+disconnect/exit. TUN, DNS service and route manipulation remain disabled.
 
 Mihomo v1.19.32, Copyright MetaCubeX and other contributors, is bundled as an
 unmodified, separate executable under GPL version 3. Its full license is in

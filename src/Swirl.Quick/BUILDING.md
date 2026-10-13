@@ -67,7 +67,7 @@ verify touch, multi-monitor transitions or OS snap gestures; those remain
 manual checks. Buttons call Qt native close/minimize/maximize APIs, dragging
 uses startSystemMove, and all eight resize edges use startSystemResize.
 Windows uses a single frameless Qt Quick window and native per-pixel transparency
-where available. The QML shell uses a scalable 12-unit logical radius on the native per-pixel alpha surface.
+where available. The QML shell uses a scalable 14-unit logical radius on the native per-pixel alpha surface.
 Large containers use 12, cards and popups 10, fields 8, and rectangular buttons 10.
 These are visual design units, not physical pixels or an OS specification. Qt
 handles screen DPI and Theme.dp handles user UI zoom independently.
@@ -117,3 +117,10 @@ has no brand block. The three 12 DIP window buttons invoke native close,
 minimize and maximize/restore APIs. The shell uses SDR and no emissive traffic
 light pass. Previous HDR shader diagnostics remain in the tree but are not
 the production window's visual treatment.
+
+System proxy lease tests run in `swirl-system-proxy` without changing Windows
+settings. To temporarily verify real WinINet routing against an already running
+loopback proxy, set `SWIRL_NATIVE_PROXY_TEST=1` and `SWIRL_NATIVE_PROXY_PORT` then
+run `SwirlSystemProxyTests nativeInternetRequest`. This restores the previous
+settings before reporting success. Production enables the native backend only
+for ordinary interactive runs, never for preview or test modes.

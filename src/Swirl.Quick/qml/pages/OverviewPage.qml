@@ -176,7 +176,8 @@ Item {
                                     SwirlToggle {
                                         objectName:modelData.kind===0?"systemProxyToggle":"tunToggle";visible:modelData.kind<2;implicitWidth:Theme.dp(46);implicitHeight:Theme.dp(26)
                                         checked:modelData.kind===0?AppState.systemProxyOn:AppState.tunOn
-                                        enabled:false
+                                        enabled:modelData.kind===0 && (engineController.canEnableSystemProxy || AppState.systemProxyOn)
+                                        onToggled:if(modelData.kind===0)engineController.setSystemProxyEnabled(checked)
                                         Accessible.name:modelData.title+"开关"
                                     }
                                     SwirlButton { visible:modelData.kind===2;text:"查看设置";implicitHeight:Theme.dp(28);implicitWidth:Theme.dp(84);font.pixelSize:Theme.fontSize(12);onClicked:AppState.navigate("dns") }

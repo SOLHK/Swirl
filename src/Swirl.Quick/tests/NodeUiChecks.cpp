@@ -40,6 +40,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     port.listen(QHostAddress::LocalHost,0);controller->setControlPort(port.serverPort());port.close();
     select(0);click("nodeConnectButton");
     if(check(QTest::qWaitFor([&]{return controller->apiHealthy();},15000),"UI starts actual pinned Mihomo")) {
+        check(controller->systemProxyEnabled(),"connected node automatically enables isolated system proxy lease");
         check(!controller->requestSucceeded(),"running engine does not imply successful request");fill("nodeTestUrl",net.url().toString());click("nodeTestButton");
         check(QTest::qWaitFor([&]{return !controller->nodeBusy();},8000)&&controller->requestSucceeded()&&net.a.forwarded>=2&&net.b.forwarded==0,"UI real request passes only through selected node A");
         const auto pid=controller->processId();select(1);
@@ -48,6 +49,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         check(QTest::qWaitFor([&]{return !controller->nodeBusy();},8000)&&controller->requestSucceeded()&&net.b.forwarded>=2,"UI new requests use authenticated selected node B");
         check(item("nodeRequestState")&&item("nodeRequestState")->property("text").toString().contains("成功"),"visible request state follows actual result");click("nodeConnectButton");
         check(QTest::qWaitFor([&]{return controller->canStart();},4000)&&!controller->processAlive(),"UI disconnect reaps engine");
+        check(!controller->systemProxyEnabled(),"disconnect restores system proxy lease");
     }
     check(!controller->requestSucceeded() && controller->requestStateText()==QStringLiteral("尚未发起实际请求"),"disconnect clears stale request success text");
     select(1);click("nodeEditButton");check(item("nodePasswordField")&&item("nodePasswordField")->property("text").toString().isEmpty(),"editing never reveals stored credentials");fill("nodeNameField","B edited");click("nodeSaveButton");check(controller->nodes().last().toMap().value("name").toString()=="B edited","UI edits saved metadata");

@@ -4,8 +4,8 @@ QtObject {
     property string currentPage: "activity"
     property bool sidebarCollapsed: false
     readonly property string connectionState: engineController.stateText
-    readonly property bool proxyOn: engineController.requestSucceeded
-    readonly property bool systemProxyOn: false
+    readonly property bool proxyOn: engineController.apiHealthy && engineController.activeNodeId.length>0
+    readonly property bool systemProxyOn: engineController.systemProxyEnabled
     readonly property bool tunOn: false
     property bool detailOpen: true
     readonly property string mode: engineController.activeNodeId.length?"固定节点":"直连"
@@ -35,7 +35,7 @@ QtObject {
         {title:"代理",pages:[{id:"policies",title:"策略",icon:"layers"},{id:"rules",title:"规则",icon:"document"}]},
         {title:"HTTP",pages:[{id:"capture",title:"抓包",icon:"capture"},{id:"tls",title:"解密",icon:"shield"},{id:"rewrite",title:"重写",icon:"route"}]}
     ]
-    readonly property var allPageIds: groups.reduce(function(all,g){return all.concat(g.pages.map(function(p){return p.id}))},[]).concat(["featurehub","external","processes","requestlogs"]).concat(FeatureCatalog.entries.filter(function(f){return f.id.indexOf("feature-")===0}).map(function(f){return f.id}))
+    readonly property var allPageIds: groups.reduce(function(all,g){return all.concat(g.pages.map(function(p){return p.id}))},[]).concat(["more","featurehub","external","processes","requestlogs"]).concat(FeatureCatalog.entries.filter(function(f){return f.id.indexOf("feature-")===0}).map(function(f){return f.id}))
     function navigate(id) {
         if (currentPage === id) return
         navigationHistory = navigationHistory.slice(0,historyIndex+1).concat([id])
@@ -382,6 +382,7 @@ QtObject {
     function page(id) {
         if(id==="processes")return {id:id,title:"进程",sub:"进程流量"}
         if(id==="requestlogs")return {id:id,title:"请求日志",sub:"请求历史"}
+        if(id==="more") return {id:id,title:"更多",sub:"配置、网络与应用设置"}
         if(id==="featurehub") return {id:id,title:"功能模块中心",sub:"全部功能与配置草稿"}
         var feature=FeatureCatalog.find(id); if(feature)return feature
         if(id==="external") return {id:"external",title:"外部工具",sub:"尚未接入外部程序"}

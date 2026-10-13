@@ -12,6 +12,8 @@
 #include <QDir>
 #include <QDebug>
 #include <QImage>
+#include <QSvgRenderer>
+#include <QPainter>
 #include <QElapsedTimer>
 #include <QQuickItem>
 #include <functional>
@@ -70,9 +72,9 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
         return qMakePair(total,partial);
     };
     const auto normalCorner=cornerCoverage();
-    check(backdrop->nativeCorners() || normalCorner.second>=5,"native DWM or antialiased Qt owns the window corners");
+    check(normalCorner.second>=5,"QML mask keeps antialiased 14 DIP corners with native Acrylic");
     state("Theme.setScalePercent(125)");QTest::qWait(150);
-    check(backdrop->nativeCorners() || cornerCoverage().first<normalCorner.first,"native corner ownership remains stable across UI zoom");
+    check(cornerCoverage().first<normalCorner.first,"outer corner mask scales with UI zoom");
     state("Theme.resetScale()");QTest::qWait(150);
 #endif
     const auto grab=[&](const QString &name){
@@ -104,9 +106,24 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
         void *bits=nullptr;const auto dc=CreateCompatibleDC(nullptr);const auto bitmap=CreateDIBSection(dc,&info,DIB_RGB_COLORS,&bits,nullptr,0);
         const auto previous=SelectObject(dc,bitmap);RECT box{0,0,32,32};FillRect(dc,&box,reinterpret_cast<HBRUSH>(GetStockObject(WHITE_BRUSH)));
         DrawIconEx(dc,0,0,nativeIcon,32,32,0,nullptr,DI_NORMAL);
-        QImage image(static_cast<uchar *>(bits),32,32,QImage::Format_RGB32);int dark=0,blue=0;
-        for(int y=0;y<32;++y)for(int x=0;x<32;++x){const auto c=image.pixelColor(x,y);if(c.red()<80&&c.green()<80&&c.blue()<80)++dark;if(c.blue()>c.red()+35)++blue;}
-        check(blue>20,"native taskbar icon contains the abstract blue S data-flow mark");
+        QImage image(static_cast<uchar *>(bits),32,32,QImage::Format_RGB32);
+        QImage expected(32,32,QImage::Format_RGB32);expected.fill(Qt::white);
+        QPainter painter(&expected);QSvgRenderer knot(QStringLiteral(":/swirl/icons/swirl_knot_light.svg"));knot.render(&painter);painter.end();
+        // Windows may resample a 48px DPI icon to 32px; compare the dark mark
+        // within one pixel rather than requiring identical gradient/AA pixels.
+        const auto darkPixel=[](const QImage &img,int x,int y){const auto c=img.pixelColor(x,y);return c.red()<120&&c.green()<120&&c.blue()<120;};
+        int expectedMark=0,nativeMark=0,matchedExpected=0,matchedNative=0;
+        for(int y=0;y<32;++y)for(int x=0;x<32;++x) {
+            const bool e=darkPixel(expected,x,y),n=darkPixel(image,x,y);expectedMark+=e;nativeMark+=n;
+            bool nearExpected=false,nearNative=false;
+            for(int dy=-1;dy<=1;++dy)for(int dx=-1;dx<=1;++dx) {
+                const int xx=qBound(0,x+dx,31),yy=qBound(0,y+dy,31);
+                nearExpected|=darkPixel(expected,xx,yy);nearNative|=darkPixel(image,xx,yy);
+            }
+            matchedExpected+=e&&nearNative;matchedNative+=n&&nearExpected;
+        }
+        qInfo()<<"Native icon mark coverage:"<<matchedExpected<<expectedMark<<matchedNative<<nativeMark;
+        check(expectedMark>20 && nativeMark>20 && matchedExpected>=expectedMark*0.85 && matchedNative>=nativeMark*0.85,"native taskbar icon matches the canonical cloud knot");
         image.save(directory+"/taskbar-native-icon.png");SelectObject(dc,previous);DeleteObject(bitmap);DeleteDC(dc);
     }
 #endif
@@ -183,6 +200,7 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
 #ifdef Q_OS_WIN
     const HWND hwnd=reinterpret_cast<HWND>(window->winId());
     const auto style=GetWindowLongPtrW(hwnd,GWL_STYLE);
+    check(!(style&WS_CAPTION),"native caption removed; traffic lights own window controls");
     check((style&WS_THICKFRAME)&&(style&WS_SYSMENU)&&(style&WS_MAXIMIZEBOX),"native resize and system menu styles preserved");
     RECT rect;GetWindowRect(hwnd,&rect);
     const auto hit=SendMessageW(hwnd,WM_NCHITTEST,0,MAKELPARAM(rect.left+2,rect.top+2));

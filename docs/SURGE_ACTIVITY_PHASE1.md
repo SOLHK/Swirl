@@ -8,8 +8,11 @@ Work starts from `test` at `a83d2b2`, not the older `main` UI preview.
 The app is C++23 / Qt 6.10 Quick, with QML routes held by `SwirlPageHost`.
 `EngineController` is the business facade; `MihomoAdapter` owns the pinned
 Mihomo process and authenticated loopback API. `CaptureService` remains a
-separate, opt-in HTTP capture service. No system-proxy or TUN activation is
-added by this UI change.
+separate, opt-in HTTP capture service. SystemProxy manages a WinINet lease after a connected node becomes ready,
+restoring all prior flags, server, bypass and PAC on disconnect/exit. A journal
+recovers abandoned settings; a lock prevents concurrent Swirl leases. External
+client changes are preserved. Isolated tests use an injected memory backend.
+TUN remains disabled.
 
 Activity is now the initial route. Overview retains network/configuration,
 node selection and system controls. Additional routes remain available through
@@ -44,8 +47,9 @@ Normalizing its 1372×1008 window to 1144×840 logical units gives:
 
 Screenshot pixels do not reveal the original macOS point scale or exact corner
 curve. Qt Rectangle uses circular corners; this is not claimed to reproduce
-Apple's continuous corner mathematics. DWM owns native outer corners when
-composition is available; its OS-controlled radius is not the QML DIP token.
+Apple's continuous corner mathematics. DWM owns the native outside silhouette and shadow. The QML surface and all
+content share a 14 DIP antialiased mask, including when Acrylic is active.
+The native WS_CAPTION is removed so only the left traffic lights are visible.
 
 ## Real data and diagnostics
 
@@ -106,3 +110,23 @@ claim public internet proxy-node performance. Render checks cover effective
 measure different sidebar/content transmission, a blurred moving background,
 window controls and repeated dragging. Physical multi-monitor DPI transitions
 and long-duration stress remain unverified.
+
+## October 13 follow-up
+
+The More entry now opens a dedicated, scrollable page with grouped configuration,
+network records and app tools; no stock popup is drawn over the sidebar. Navigation
+selection uses a stationary 140ms color transition with reduced-motion support.
+Node connect/disconnect and current-connection latency testing are separate controls.
+The canonical cloud-knot SVG is restored for the app, EXE and installer; shortcut
+icons use Swirl-cloud-knot.ico to avoid reusing the prior blue icon resource name.
+
+System proxy tests cover exact restoration (including PAC), external-client changes,
+write failure, crash recovery and concurrent leases. Native validation explicitly
+opts into temporary WinINet changes, sends an HTTPS request using PRECONFIG, then
+restores the previous proxy. It is never run implicitly in CI.
+
+Follow-up native checks: 54 passed, including the actual WM_GETICON knot
+shape, masked corners under Acrylic, native caption removal, move/resize and
+window controls. WinINet PRECONFIG HTTPS returned 204 through the active Swirl
+port; exact previous settings were restored. A separate Google request through
+that port followed redirects to HTTP 200.

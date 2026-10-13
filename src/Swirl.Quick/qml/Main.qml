@@ -30,7 +30,7 @@ ApplicationWindow {
     property bool swirlTransparencyEnabled:Theme.transparency
     function previewScrollBottom() { if(pageLoader.item && pageLoader.item.scrollToBottom)pageLoader.item.scrollToBottom() }
     property real swirlWindowRadius:Theme.windowRadius
-    readonly property real shellRadius:backdrop.nativeCorners || window.visibility===Window.Maximized ? 0 : Theme.windowRadius
+    readonly property real shellRadius:window.visibility===Window.Maximized ? 0 : Theme.windowRadius
     Connections { target:backdrop; function onChanged() { Theme.backdropActive=backdrop.active } }
     readonly property real sidebarGutter:Theme.pageMargin
     readonly property real actualSidebarWidth:AppState.sidebarCollapsed || scaledCanvas.width<Theme.dp(900) ? Theme.dp(64) : Theme.sidebarWidth
@@ -147,9 +147,12 @@ ApplicationWindow {
                 Item { Layout.fillWidth:true }
                 Repeater {
                     model:[{name:"系统代理",on:AppState.systemProxyOn},{name:"增强模式",on:AppState.tunOn}]
-                    Rectangle {
+                    Button {
                         required property var modelData
-                        implicitWidth:statusRow.implicitWidth+Theme.dp(20); implicitHeight:Theme.dp(28); radius:height/2; color:Theme.withAlpha(Theme.muted,0.13)
+                        enabled:modelData.name==="系统代理" && (engineController.canEnableSystemProxy || AppState.systemProxyOn)
+                        onClicked:engineController.setSystemProxyEnabled(!AppState.systemProxyOn)
+                        Accessible.name:modelData.name
+                        implicitWidth:statusRow.implicitWidth+Theme.dp(20); implicitHeight:Theme.dp(28); background:Rectangle {radius:height/2;color:Theme.withAlpha(Theme.muted,0.13)}
                         Row { id:statusRow; anchors.centerIn:parent; spacing:Theme.dp(6)
                             Rectangle { width:Theme.dp(6);height:width;radius:width/2;color:modelData.on?Theme.statusGreen:Theme.muted;anchors.verticalCenter:parent.verticalCenter }
                             Text { text:modelData.name;color:Theme.text;font.pixelSize:Theme.fontSize(15) }
@@ -186,6 +189,7 @@ ApplicationWindow {
                                 AppState.currentPage==="automation" ? automation :
                                 AppState.currentPage==="api" ? api :
                                 AppState.currentPage==="gateway" ? gateway :
+                                AppState.currentPage==="more" ? morePage :
                                 AppState.currentPage==="featurehub" ? featureHub :
                                 FeatureCatalog.find(AppState.currentPage) ? featureModule :
                                 AppState.currentPage==="external" ? externalTools : workbench
@@ -220,6 +224,7 @@ ApplicationWindow {
     Shortcut { sequence:"Ctrl+4"; onActivated:AppState.navigate("inspector") }
     Shortcut { sequence:"Ctrl+,"; onActivated:AppState.navigate("settings") }
     Shortcut { sequence:"Ctrl+B"; onActivated:AppState.sidebarCollapsed=!AppState.sidebarCollapsed }
+        Component { id:morePage; MorePage {} }
         Component { id:activity; ActivityPage {} }
     Component { id:overview; OverviewPage {} }
     Component { id:capturePage; CapturePage {} }

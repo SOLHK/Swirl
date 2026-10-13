@@ -230,6 +230,10 @@ int runOverviewChecks(QQuickWindow *window)
     click(firstToggle);
     click(item("moduleSaveButton"));
     check(state("moduleDrafts.load('feature-dhcp').settings.f0").toBool()!=before,"module toggle is saved as actual local draft");
+    click(item("nav-more"));QTest::qWait(250);
+    check(state("AppState.currentPage === 'more'").toBool() && item("moreSystemProxyToggle"),"More opens styled page with real system proxy control");
+    click(item("more-entry-proxies"));QTest::qWait(250);
+    check(state("AppState.currentPage === 'proxies'").toBool(),"More node entry opens actual node page");
     state("AppState.navigate('featurehub')");QTest::qWait(200);
     check(item("moduleSearch")!=nullptr,"module hub renders searchable catalog");
     check(state("FeatureCatalog.entries.length===56").toBool(),"catalog contains 56 capability entries");

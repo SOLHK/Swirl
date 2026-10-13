@@ -1,5 +1,6 @@
 #pragma once
 #include "ProxyEngine.h"
+#include "SystemProxy.h"
 #include "NodeStore.h"
 #include "NodeImportService.h"
 #include <memory>
@@ -7,6 +8,9 @@
 // QML sees only Swirl's generic business facade. Engine implementations are injected in C++.
 class EngineController final : public QObject {
     Q_OBJECT
+    Q_PROPERTY(bool systemProxyEnabled READ systemProxyEnabled NOTIFY systemProxyChanged)
+    Q_PROPERTY(QString systemProxyError READ systemProxyError NOTIFY systemProxyChanged)
+    Q_PROPERTY(bool canEnableSystemProxy READ canEnableSystemProxy NOTIFY statusChanged)
     Q_PROPERTY(QString executablePath READ executablePath WRITE setExecutablePath NOTIFY optionsChanged)
     Q_PROPERTY(int controlPort READ controlPort WRITE setControlPort NOTIFY optionsChanged)
     Q_PROPERTY(QString expectedVersion READ expectedVersion CONSTANT)
@@ -39,7 +43,12 @@ class EngineController final : public QObject {
     Q_PROPERTY(QStringList supportedProtocols READ supportedProtocols CONSTANT)
     Q_PROPERTY(QVariantMap telemetry READ telemetry NOTIFY telemetryChanged)
 public:
-    explicit EngineController(std::unique_ptr<ProxyEngine> engine, QObject *parent = nullptr, QString storePath = {});
+    explicit EngineController(std::unique_ptr<ProxyEngine> engine, QObject *parent = nullptr, QString storePath = {}, bool nativeSystemProxy = false);
+    ~EngineController() override;
+    bool systemProxyEnabled() const {return m_systemProxy.enabled();}
+    QString systemProxyError() const {return m_systemProxy.error();}
+    bool canEnableSystemProxy() const {return apiHealthy() && activeProxyPort()>0 && !activeNodeId().isEmpty();}
+    Q_INVOKABLE void setSystemProxyEnabled(bool enabled);
     QString executablePath() const { return m_options.executablePath; }
     int controlPort() const { return m_options.controlPort; }
     void setExecutablePath(const QString &path);
@@ -85,6 +94,7 @@ public:
     Q_INVOKABLE void testNode(const QUrl &url);
     Q_INVOKABLE void disconnectNode();
 signals:
+    void systemProxyChanged();
     void telemetryChanged();
     void statusChanged();
     void optionsChanged();
@@ -94,6 +104,8 @@ private:
     EngineStartOptions m_options;
     NodeStore m_store;
     NodeImportService m_imports;
+    SystemProxy m_systemProxy;
+    bool m_wantsSystemProxy=true;
     QString m_nodeError;
     bool m_restartPending=false;
     bool m_connectionRequested=false;

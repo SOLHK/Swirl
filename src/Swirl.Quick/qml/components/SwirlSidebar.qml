@@ -105,15 +105,7 @@ Item {
                 }
             }
         }
-        SwirlNavigationItem { Layout.fillWidth:true; pageId:"featurehub"; title:"更多"; iconName:"grid"; compact:sidebar.effectivelyCollapsed; onActivated:more.open() }
+        SwirlNavigationItem { Layout.fillWidth:true; pageId:"more"; title:"更多"; iconName:"grid"; compact:sidebar.effectivelyCollapsed; onActivated:AppState.navigate(pageId) }
         SwirlNavigationItem { Layout.fillWidth:true; pageId:"dashboard"; title:"仪表盘"; iconName:"chart"; compact:sidebar.effectivelyCollapsed; onActivated:AppState.navigate(pageId) }
-    }
-    Menu {
-        id:more; y:Math.max(0,sidebar.height-height-Theme.dp(50)); width:Theme.dp(220)
-        Repeater {
-            model:AppState.groups.reduce(function(a,g){return a.concat(g.pages)},[])
-            MenuItem { required property var modelData; text:modelData.title; onTriggered:AppState.navigate(modelData.id) }
-        }
-        MenuItem { text:"全部功能"; onTriggered:AppState.navigate("featurehub") }
     }
 }

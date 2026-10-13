@@ -26,7 +26,7 @@ try {
     $exe = (Resolve-Path $exe).Path
     & (Join-Path $PSScriptRoot 'stage-mihomo.ps1') -Destination (Split-Path $exe) -Archive $MihomoArchive
     if ($InputTests) {
-        ctest --test-dir $BuildDir -C Release -R 'swirl-engine-(contract|real)|swirl-node-real-chain|swirl-import-subscription|swirl-motion' --output-on-failure
+        ctest --test-dir $BuildDir -C Release -R 'swirl-system-proxy|swirl-activity-data|swirl-engine-(contract|real)|swirl-node-real-chain|swirl-import-subscription|swirl-motion' --output-on-failure
         if ($LASTEXITCODE) { throw "Engine contract, integration or QML checks failed." }
         $test = Start-Process $exe -ArgumentList '--engine-self-test' -WindowStyle Hidden -Wait -PassThru
         if ($test.ExitCode) { throw "Native engine QML checks failed: $($test.ExitCode)." }
@@ -60,6 +60,7 @@ try {
     $icon = Join-Path (Resolve-Path $BuildDir).Path "brand/Swirl.ico"
     if (!(Test-Path -LiteralPath $icon)) { throw "SVG-derived icon is missing: $icon" }
     Copy-Item -LiteralPath $icon -Destination (Join-Path $DistDir "Swirl-brand-100.ico")
+    Copy-Item -LiteralPath $icon -Destination (Join-Path $DistDir "Swirl-cloud-knot.ico")
     & "$qt/bin/windeployqt.exe" --release --qmldir src/Swirl.Quick/qml (Join-Path $DistDir "Swirl.exe")
     if ($LASTEXITCODE) { throw "Qt runtime deployment failed." }
     Copy-Item src/Swirl.Quick/packaging/THIRD_PARTY_NOTICES.txt $DistDir

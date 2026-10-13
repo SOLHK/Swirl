@@ -105,7 +105,7 @@ int main(int argc, char *argv[])
     CaptureService capture;
     ModuleDraftStore drafts;
     QTemporaryDir isolatedNodes;
-    EngineController engineController(std::make_unique<MihomoAdapter>(),nullptr,isolatedRun?isolatedNodes.filePath("nodes.dpapi"):QString());
+    EngineController engineController(std::make_unique<MihomoAdapter>(),nullptr,isolatedRun?isolatedNodes.filePath("nodes.dpapi"):QString(),!isolatedRun);
     SystemDataProvider systemData(&capture,&engineController);
     NetworkDiagnostics networkDiagnostics;
     QString diagnosticNode;
