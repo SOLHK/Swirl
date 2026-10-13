@@ -30,32 +30,12 @@ QtObject {
                y>popup.height*2/3 ? (x<popup.width/3?Item.BottomLeft:x>popup.width*2/3?Item.BottomRight:Item.Bottom) : Item.Center
     }
     function navigateFrom(item, route) {
-        if (reduced || !motionPolicy.complexMotion) { AppState.navigate(route); return }
-        const generation=++sharedGeneration
-        const point=item.mapToItem(null,0,0)
-        const origin=Qt.rect(point.x,point.y,item.width,item.height)
-        const previous=AppState.currentPage
-        // The item remains alive until the asynchronous scene-graph grab completes.
-        const accepted=motionPolicy.capture(item,function(grabId,url) {
-            if (generation!==sharedGeneration || AppState.currentPage!==previous) {motionPolicy.releaseGrab(grabId);return}
-            shared={route:route,previous:previous,rect:origin,grabId:grabId,url:url,reverse:false}
-            returnShared={route:route,previous:previous,rect:origin}
-            AppState.navigate(route)
-        })
-        if(!accepted)AppState.navigate(route)
+        // Content transitions are uniform and immediate; no card texture grab
+        // delays navigation or introduces a second shared-element animation.
+        returnShared={route:route,previous:AppState.currentPage}
+        AppState.navigate(route)
     }
     function returnToHub(item) {
-        if (returnShared && returnShared.route===AppState.currentPage && !reduced) {
-            const p=item.mapToItem(null,0,0)
-            const data=returnShared
-            const generation=++sharedGeneration
-            const accepted=motionPolicy.capture(item,function(grabId,url) {
-                if(generation!==sharedGeneration){motionPolicy.releaseGrab(grabId);return}
-                shared={route:data.previous,previous:data.route,rect:Qt.rect(p.x,p.y,item.width,item.height),
-                        target:data.rect,grabId:grabId,url:url,reverse:true}
-                AppState.navigate(data.previous)
-            })
-            if(!accepted)AppState.navigate(data.previous)
-        } else AppState.navigate("featurehub")
+        AppState.navigate(returnShared && returnShared.route===AppState.currentPage ? returnShared.previous : "featurehub")
     }
 }

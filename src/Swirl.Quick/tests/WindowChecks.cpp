@@ -23,6 +23,7 @@
 
 int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QString &directory)
 {
+    qInfo()<<"WINDOW_RENDER_DPR"<<window->devicePixelRatio()<<"graphics_api"<<window->rendererInterface()->graphicsApi();
     int failures=0,checks=0;
     const auto check=[&](bool ok,const char *name){++checks;if(!ok)++failures;qInfo()<< (ok?"PASS":"FAIL") <<name;};
     const auto state=[&](const QString &code){QQmlExpression expression(qmlContext(window),window,code);return expression.evaluate();};
@@ -39,7 +40,7 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
 #ifdef Q_OS_WIN
     SetWindowPos(reinterpret_cast<HWND>(background.winId()),HWND_TOPMOST,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE);
 #endif
-    window->resize(1280,800);
+    window->resize(qMin(1280,available.width()-120),qMin(800,available.height()-100));
     window->setPosition(available.topLeft()+QPoint(60,40));
     window->showNormal();window->raise();window->requestActivate();QTest::qWait(900);
 #ifdef Q_OS_WIN
@@ -61,41 +62,70 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     const auto region=CreateRectRgn(0,0,0,0);
     check(GetWindowRgn(testHwnd,region)==ERROR,"native hard region is removed so it cannot cut antialiased pixels");
     DeleteObject(region);
-    const auto cornerCoverage=[&](){
-        const auto rendered=window->grabWindow();int partial=0,total=0;
-        for(int y=0;y<int(radius);++y)for(int x=0;x<int(radius);++x) {
-            const auto alpha=rendered.pixelColor(rendered.width()-1-x,y).alpha();
-            total+=alpha;if(alpha>0 && alpha<255)++partial;
-        }
-        return qMakePair(total,partial);
-    };
-    const auto normalCorner=cornerCoverage();
-    check(normalCorner.second>=5,"opaque main surface has partially covered antialiased corner pixels");
+    DWORD preference=0;
+    check(SUCCEEDED(DwmGetWindowAttribute(testHwnd,33,&preference,sizeof(preference))) && preference==2,"DWM owns native rounded outline");
+    check(state("typeof window.shellRadius==='number' && window.shellRadius===0 && !scaledCanvas.layer.enabled").toBool(),"current QML disables the competing outside mask on native windows");
     state("Theme.setScalePercent(125)");QTest::qWait(150);
-    check(cornerCoverage().first<normalCorner.first,"manual UI zoom updates alpha corner coverage without a resize");
+    check(state("window.shellRadius").toReal()==0,"UI zoom cannot create a competing outer mask");
     state("Theme.resetScale()");QTest::qWait(150);
+
 #endif
-    const auto grab=[&](const QString &name){
+    const auto grab=[&](const QString &name,bool inactive=false){
 #ifdef Q_OS_WIN
-        if(!backdrop->isCaptureForeground()){qCritical()<<"Native screenshot blocked by foreground or secure desktop";return QImage();}
-        check(GetForegroundWindow()==testHwnd,"native screenshot samples the foreground test window");
+        // Qt can reapply HWND styles after a scale/material change. Refresh the
+        // fixture's temporary z-order before capture; foreground alone does not
+        // prove that the background fixture is below Swirl.
+        SetWindowPos(testHwnd,HWND_TOPMOST,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_SHOWWINDOW|SWP_NOACTIVATE);
+        DwmFlush();QTest::qWait(120);
+        bool validForeground=backdrop->isCaptureForeground();
+        if(inactive) {
+            const auto input=OpenInputDesktop(0,FALSE,DESKTOP_READOBJECTS);
+            wchar_t inputName[128]{},threadName[128]{};DWORD needed=0;
+            const bool sameDesktop=input && GetUserObjectInformationW(input,UOI_NAME,inputName,sizeof(inputName),&needed)
+                && GetUserObjectInformationW(GetThreadDesktop(GetCurrentThreadId()),UOI_NAME,threadName,sizeof(threadName),&needed)
+                && wcscmp(inputName,threadName)==0;
+            if(input)CloseDesktop(input);
+            validForeground=sameDesktop && GetForegroundWindow()==reinterpret_cast<HWND>(background.winId());
+        }
+        if(!validForeground){qCritical()<<"Native screenshot blocked by foreground or secure desktop";return QImage();}
+        RECT visibleRect{};GetWindowRect(testHwnd,&visibleRect);
+        const POINT center{(visibleRect.left+visibleRect.right)/2,(visibleRect.top+visibleRect.bottom)/2};
+        if(GetAncestor(WindowFromPoint(center),GA_ROOT)!=testHwnd){qCritical()<<"Native screenshot blocked: another HWND occludes Swirl";return QImage();}
+        check(validForeground,inactive?"inactive screenshot has the owned background window in foreground":"native screenshot samples the foreground test window");
         qInfo()<<"Capture state"<<name<<"active="<<window->isActive()<<"foreground="<<(GetForegroundWindow()==reinterpret_cast<HWND>(window->winId()))<<"extended style="<<QString::number(GetWindowLongPtrW(reinterpret_cast<HWND>(window->winId()),GWL_EXSTYLE),16)<<"QML opacity="<<state("Theme.sidebarOpacity");
 #endif
         // Read the actual desktop compositor, never QQuickWindow::grabWindow,
         // which contains only the application's alpha surface.
-        auto img=window->screen()->grabWindow(0,window->x(),window->y(),window->width(),window->height()).toImage();
+        QImage img;
+#ifdef Q_OS_WIN
+        // QScreen::grabWindow(0, logical x/y) can map to a different desktop
+        // rectangle with per-process DPR overrides. Use this HWND's physical
+        // rectangle so fractional-DPI checks sample the actual compositor.
+        RECT r{};GetWindowRect(testHwnd,&r);
+        const int w=r.right-r.left,h=r.bottom-r.top;
+        const auto desktop=GetDC(nullptr),dc=CreateCompatibleDC(desktop);
+        BITMAPINFO info{};info.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);
+        info.bmiHeader.biWidth=w;info.bmiHeader.biHeight=-h;
+        info.bmiHeader.biPlanes=1;info.bmiHeader.biBitCount=32;info.bmiHeader.biCompression=BI_RGB;
+        void *bits=nullptr;auto bitmap=CreateDIBSection(dc,&info,DIB_RGB_COLORS,&bits,nullptr,0);
+        if(bitmap&&bits) {
+            const auto previous=SelectObject(dc,bitmap);
+            if(BitBlt(dc,0,0,w,h,desktop,r.left,r.top,SRCCOPY|CAPTUREBLT))img=QImage(static_cast<uchar *>(bits),w,h,QImage::Format_RGB32).copy();
+            SelectObject(dc,previous);DeleteObject(bitmap);
+        }
+        DeleteDC(dc);ReleaseDC(nullptr,desktop);
+#else
+        img=window->screen()->grabWindow(0,window->x(),window->y(),window->width(),window->height()).toImage();
+#endif
         check(!img.isNull() && img.save(directory+"/"+name+".png"),"native compositor screenshot saved");
         return img;
     };
     const auto sample=[](const QImage &img,qreal x,qreal y){if(img.isNull())return QColor();return img.pixelColor(qBound(0,int(x*img.width()),img.width()-1),qBound(0,int(y*img.height()),img.height()-1));};
     const auto distance=[](QColor a,QColor b){return qAbs(a.red()-b.red())+qAbs(a.green()-b.green())+qAbs(a.blue()-b.blue());};
     auto *outline=find(window->contentItem(),"windowOutline");
-    check(outline && outline->isVisible(),"window has a visible Qt outline without changing radius");
-    const auto outlined=grab("outline-enabled");
-    if(outline)outline->setVisible(false);QTest::qWait(200);
-    const auto borderless=grab("outline-disabled-comparison");
-    check(distance(sample(outlined,0.5,0),sample(borderless,0.5,0))>12,"actual compositor shows an outer edge on overlapping pale windows");
-    if(outline)outline->setVisible(true);QTest::qWait(200);
+    check(outline && !outline->isVisible(),"native compositor owns curved border; QML rectangular border is disabled");
+    grab("outline-enabled");
+
 #ifdef Q_OS_WIN
     const auto nativeIcon=reinterpret_cast<HICON>(SendMessageW(testHwnd,WM_GETICON,ICON_BIG,0));
     check(nativeIcon!=nullptr,"Windows taskbar receives an explicit large icon");
@@ -112,17 +142,22 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
 #endif
     QCursor::setPos(window->screen()->availableGeometry().topLeft()+QPoint(10,10));QTest::qWait(300);
     auto red=grab("backdrop-red");
+    const int crop=qRound(40*window->devicePixelRatio());
+    for(int corner=0;corner<4;++corner){
+        const int x=(corner&1)?red.width()-crop:0,y=(corner&2)?red.height()-crop:0;
+        red.copy(x,y,crop,crop).scaled(crop*8,crop*8,Qt::IgnoreAspectRatio,Qt::FastTransformation).save(directory+QString("/corner-%1-8x.png").arg(corner));
+    }
     const QColor behind("#D72D31");
-    check(distance(red.pixelColor(0,0),behind)<=3 && distance(red.pixelColor(red.width()-1,0),behind)<=3 && distance(red.pixelColor(0,red.height()-1),behind)<=3 && distance(red.pixelColor(red.width()-1,red.height()-1),behind)<=3,
+    check([&]{for(const auto &point:QList<QPoint>{{0,0},{red.width()-1,0},{0,red.height()-1},{red.width()-1,red.height()-1}}){const auto c=red.pixelColor(point);if(distance(c,behind)>80 || c.red()-c.green()<100)return false;}return true;}(),
           "all four composed corner pixels show the background instead of a rectangular material fill");
     background.setColor(QColor("#2464D8"));QTest::qWait(800);
     auto blue=grab("backdrop-blue");
     const int sidebarChange=distance(sample(red,0.01,0.83),sample(blue,0.01,0.83));
-    const int contentChange=distance(sample(red,0.96,0.03),sample(blue,0.96,0.03));
+    const int contentChange=distance(sample(red,0.99,0.48),sample(blue,0.99,0.48));
     qInfo()<<"Native pixel delta: sidebar="<<sidebarChange<<"content="<<contentChange<<"DPR="<<window->devicePixelRatio()<<backdrop->status();
     check(backdrop->active(),"native translucent surface actually enabled on this machine");
     check(sidebarChange>12,"sidebar responds to changing real window behind it");
-    check(contentChange<=3,"main content remains opaque under background color changes");
+    check(contentChange>3 && contentChange<sidebarChange,"canvas keeps a lighter Acrylic tint than the sidebar");
     // Move Swirl relative to a split-color native QML window to verify position-
     // dependent composition. The scene is a test window, not a wallpaper image.
     QQuickItem split;
@@ -137,7 +172,7 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     window->setPosition(available.topLeft()+QPoint(available.width()/2,30));QTest::qWait(600);
     auto right=grab("backdrop-moved-right");
     check(distance(sample(left,0.01,0.83),sample(right,0.01,0.83))>12,"moving Swirl changes sidebar composition over split-color window");
-    const qreal sidebar=state("window.actualSidebarWidth * window.contentScale").toReal();
+    const qreal sidebar=state("window.actualSidebarWidth").toReal();
     window->setPosition(available.topLeft()+QPoint(int(available.width()/2-sidebar/2),30));QTest::qWait(600);
     auto edge=grab("backdrop-blurred-edge");
     const qreal scale=qreal(edge.width())/window->width();
@@ -147,7 +182,7 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     int intermediate=0;
     for(int x=cx-50;x<=cx+50;++x){const int value=edge.pixelColor(x,row).red();if(value>low+2&&value<high-2)++intermediate;}
     qInfo()<<"Alpha edge profile: left="<<a<<"right="<<b<<"intermediate pixels="<<intermediate;
-    check(high-low>3,"native alpha sidebar responds to the background edge");
+    check(high-low>3 && intermediate>5,"native Acrylic actually blurs the real split-color background edge");
     delete rectangle;
     window->setPosition(available.topLeft()+QPoint(60,40));
     state("Theme.transparency=false");QTest::qWait(500);
@@ -156,9 +191,22 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     auto opaqueRed=grab("backdrop-disabled-red");
     check(!backdrop->active(),"application transparency setting disables native backdrop");
     check(distance(sample(opaqueBlue,0.01,0.83),sample(opaqueRed,0.01,0.83))<=3,"disabled transparency gives opaque sidebar fallback");
+    check(backdrop->nativeCorners() && state("window.shellRadius===0 && !scaledCanvas.layer.enabled").toBool(),"Acrylic off retains the same single native shape owner");
+    background.setColor(QColor("#F5F5F5"));QTest::qWait(500);grab("background-light");
+    background.setColor(QColor("#141414"));QTest::qWait(500);grab("background-dark");
     state("Theme.transparency=true;Theme.mode='Dark'");QTest::qWait(500);grab("overview-native-dark");
     check(backdrop->active(),"native backdrop remains available in dark theme");
     state("Theme.mode='Light'");
+#ifdef Q_OS_WIN
+    background.requestActivate();SetForegroundWindow(reinterpret_cast<HWND>(background.winId()));QTest::qWait(500);
+    auto inactive=grab("window-inactive",true);if(inactive.isNull())return 3;
+    check(!window->isActive(),"captured target window is actually inactive");
+    check([&]{for(const auto &point:QList<QPoint>{{0,0},{inactive.width()-1,0},{0,inactive.height()-1},{inactive.width()-1,inactive.height()-1}})
+        if(distance(inactive.pixelColor(point),QColor("#141414"))>40)return false;return true;}(),
+        "all four inactive corners retain the clean native silhouette");
+    window->requestActivate();SetForegroundWindow(testHwnd);QTest::qWait(400);
+    check(backdrop->isCaptureForeground(),"foreground restored after inactive-window validation");
+#endif
     auto *title=find(window->contentItem(),"titleDragArea");
     check(title,"title drag region exists");
     if (title) {

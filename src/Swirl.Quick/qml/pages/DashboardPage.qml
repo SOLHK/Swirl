@@ -7,10 +7,12 @@ import "../controls"
 
 Item {
     id:page
-    readonly property bool implemented:false
-    property string range: "最近 1 小时"
-    property var sessions: systemProvider.connections()
-    property var sampleRows: []
+    readonly property bool implemented:true
+    property string range:"今日"
+    property int period:0
+    property var sessions: engineController.telemetry.connections
+    readonly property var totals:(engineController.telemetry.revision,engineController.telemetry.summary(period))
+    property var sampleRows: (engineController.telemetry.revision,engineController.telemetry.ranking("domains",period,20))
     ScrollView {
         id: scroll
         anchors.fill: parent
@@ -25,9 +27,9 @@ Item {
                 Text { text:AppState.zh("Activity and throughput"); color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
                 SwirlSegmentedControl {
                     Layout.preferredWidth:Theme.dp(365)
-                    options: ["1 小时", "24 小时", "7 天", "30 天"]
+                    options:["今日","昨日","本周"]
                     onActivated: function(index, value) {
-                        page.range = ["最近 1 小时","最近 24 小时","最近 7 天","最近 30 天"][index]
+                        page.period=index;page.range=["今日","昨日","本周"][index]
                     }
                 }
                 SwirlButton { enabled:false; text:AppState.zh("导出报告"); iconName:"folder"; onClicked:AppState.notice("导出仪表盘") }
@@ -36,10 +38,10 @@ Item {
                 Layout.fillWidth:true
                 columns:page.width>1080?4:2
                 columnSpacing:13; rowSpacing:13
-                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Total Download"); value:"—"; secondary:""+page.range; iconName:"activity" }
-                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Total Upload"); value:"—"; secondary:""+page.range; iconName:"chart" }
+                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Total Download"); value:totals.sampled?engineController.telemetry.formatBytes(totals.down):"未采集"; secondary:""+page.range; iconName:"activity" }
+                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Total Upload"); value:totals.sampled?engineController.telemetry.formatBytes(totals.up):"未采集"; secondary:""+page.range; iconName:"chart" }
                 SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Avg. Latency"); value:"—"; secondary:"节点"; iconName:"clock" }
-                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Connections"); value:"—"; secondary:"未采集"; iconName:"network" }
+                SwirlMetricCard { Layout.fillWidth:true; label:AppState.zh("Connections"); value:engineController.telemetry.connectionsSampled?String(engineController.telemetry.activeConnections):"未采集"; secondary:"未采集"; iconName:"network" }
             }
             SwirlGlassPanel {
                 Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(304)
@@ -50,7 +52,7 @@ Item {
                         ColumnLayout {
                             Layout.fillWidth:true
                             Text { text:AppState.zh("网络吞吐量"); font.pixelSize:Theme.fontSize(17); color:Theme.text; font.weight:Font.DemiBold }
-                            Text { text:AppState.zh("Download and upload · local representative series"); color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
+                            Text { text:"真实速率 · 最近 1 分钟"; color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
                         }
                         SwirlStatusBadge { label:AppState.zh("● DOWNLOAD"); tone:"accent" }
                         SwirlStatusBadge { label:AppState.zh("● UPLOAD"); tone:"success" }
@@ -67,12 +69,12 @@ Item {
                         RowLayout {
                             Layout.fillWidth:true
                             Text { text:AppState.zh("Top destinations"); color:Theme.text; font.pixelSize:Theme.fontSize(16); font.weight:Font.DemiBold; Layout.fillWidth:true }
-                            SwirlButton { enabled:false; text:AppState.zh("查看连接记录"); quiet:false; onClicked:AppState.currentPage="connections" }
+                            SwirlButton { text:AppState.zh("查看连接记录"); quiet:false; onClicked:AppState.currentPage="connections" }
                         }
                         SwirlDataTable {
                             Layout.fillWidth:true; Layout.fillHeight:true
                             rows:page.sampleRows
-                            columns:[{key:"name",label:AppState.zh("DOMAIN"),w:230},{key:"requests",label:AppState.zh("REQUESTS"),w:88},
+                            columns:[{key:"name",label:AppState.zh("DOMAIN"),w:230},{key:"connections",label:AppState.zh("REQUESTS"),w:88},
                                      {key:"download",label:AppState.zh("DOWNLOAD"),w:95},{key:"policy",label:AppState.zh("POLICY"),w:125}]
                             onRowSelected:function(r){AppState.notice("查看目标"+r.name)}
                         }
@@ -84,26 +86,26 @@ Item {
                         anchors.fill:parent; anchors.margins:Theme.dp(18); spacing:Theme.dp(15)
                         Text { text:AppState.zh("流量分布"); color:Theme.text; font.pixelSize:Theme.fontSize(16); font.weight:Font.DemiBold }
                         Repeater {
-                            model:[]
+                            model:(engineController.telemetry.revision,engineController.telemetry.distribution(page.period))
                             ColumnLayout {
                                 Layout.fillWidth:true; spacing:Theme.dp(6)
                                 RowLayout {
                                     Layout.fillWidth:true
                                     Text { text:modelData.name; color:Theme.text; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
-                                    Text { text:Math.round(modelData.share*100)+"%"; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
+                                    Text { text:modelData.percent; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
                                 }
                                 Rectangle {
                                     Layout.fillWidth:true; height:Theme.dp(7); radius:Theme.roundedRadius(width,height); color:Theme.field
                                     Rectangle {
-                                        width:parent.width*modelData.share; height:parent.height; radius:Theme.roundedRadius(width,height)
-                                        color:modelData.color
+                                        width:parent.width*(parseFloat(modelData.percent)||0)/100; height:parent.height; radius:Theme.roundedRadius(width,height)
+                                        color:modelData.tint
                                         Behavior on width { NumberAnimation { duration:Theme.motion } }
                                     }
                                 }
                             }
                         }
                         Item { Layout.fillHeight:true }
-                        Text { text:AppState.zh("Protocol percentages are illustrative."); color:Theme.muted; font.pixelSize:Theme.fontSize(10) }
+                        Text { text:"未采集的短连接计入其他流量；阻止请求按次数显示"; color:Theme.muted; font.pixelSize:Theme.fontSize(10) }
                     }
                 }
             }

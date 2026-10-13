@@ -10,6 +10,7 @@
 #include <QVector>
 #include <QtGlobal>
 #include <cstdio>
+#include "../app/BrandRaster.h"
 
 static QByteArray makeDib(const QImage &source, int size)
 {
@@ -56,15 +57,9 @@ int main(int argc, char *argv[])
         std::fprintf(stderr, "Invalid Swirl brand SVG\n");
         return 3;
     }
-    QImage source(1024, 1024, QImage::Format_ARGB32);
-    source.fill(Qt::transparent);
-    {
-        QPainter painter(&source);
-        renderer.render(&painter);
-    }
-    const QVector<int> sizes = {16, 24, 32, 48, 64, 128, 256};
+    const QVector<int> sizes = {16, 20, 24, 32, 40, 48, 64, 128, 256};
     QVector<QByteArray> frames;
-    for (int size : sizes) frames.append(makeDib(source, size));
+    for (int size : sizes) frames.append(makeDib(swirlBrandRaster(renderer,size), size));
     QByteArray icon;
     QDataStream header(&icon, QIODevice::WriteOnly);
     header.setByteOrder(QDataStream::LittleEndian);

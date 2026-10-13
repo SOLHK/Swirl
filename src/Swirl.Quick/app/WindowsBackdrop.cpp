@@ -7,6 +7,7 @@
 #include <QTimer>
 #include <QDebug>
 #include <QScreen>
+#include <QVariantMap>
 #include <QSGRendererInterface>
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -38,26 +39,26 @@ void WindowsBackdrop::refresh() {
         const bool software=QQuickWindow::graphicsApi()==QSGRendererInterface::Software || qEnvironmentVariable("QT_QUICK_BACKEND")==QStringLiteral("software");
         const HWND hwnd = reinterpret_cast<HWND>(m_window->winId());
         m_handle = reinterpret_cast<quintptr>(hwnd);
-        // Keep Qt's per-pixel alpha surface so the clipped corner pixels
-        // show the actual desktop. Window-wide Acrylic fills those pixels.
+        // DWM owns the blur and native corners; layered windows suppress the
+        // system backdrop. QML supplies only the three material tint levels.
         const auto extended = GetWindowLongPtrW(hwnd,GWL_EXSTYLE);
-        if (!software && !(extended & WS_EX_LAYERED))
-            SetWindowLongPtrW(hwnd,GWL_EXSTYLE,extended | WS_EX_LAYERED);
+        if (!software && (extended & WS_EX_LAYERED))
+            SetWindowLongPtrW(hwnd,GWL_EXSTYLE,extended & ~WS_EX_LAYERED);
         // Keep native snap/resize styles. Only the visible caption is removed.
         const auto oldStyle = GetWindowLongPtrW(hwnd, GWL_STYLE);
-        const auto style = oldStyle | WS_THICKFRAME | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
+        const auto style = (oldStyle & ~WS_CAPTION) | WS_THICKFRAME | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
         if (oldStyle != style) {
             SetWindowLongPtrW(hwnd, GWL_STYLE, style);
             SetWindowPos(hwnd, nullptr, 0, 0, 0, 0, SWP_NOMOVE|SWP_NOSIZE|SWP_NOZORDER|SWP_NOACTIVATE|SWP_FRAMECHANGED);
         }
         const int nc = 2; // DWMNCRP_ENABLED: preserve native activation and window behavior
         DwmSetWindowAttribute(hwnd, 2, &nc, sizeof(nc));
-        const DWORD noBorder = 0xFFFFFFFE;
-        DwmSetWindowAttribute(hwnd, 34, &noBorder, sizeof(noBorder));
-        // Qt owns the scalable outline; avoid a second DWM corner treatment.
-        const int corner = 1; // DWMWCP_DONOTROUND
-        DwmSetWindowAttribute(hwnd, 33, &corner, sizeof(corner));
-        corners = false;
+        const DWORD borderColor = m_dark ? RGB(88,88,92) : RGB(166,169,176);
+        DwmSetWindowAttribute(hwnd, 34, &borderColor, sizeof(borderColor));
+        // DWM supplies the native outside corners. Qt masks the fallback.
+        const int corner = 2; // DWMWCP_ROUND
+        const HRESULT cornerResult=DwmSetWindowAttribute(hwnd, 33, &corner, sizeof(corner));
+        corners = !software && SUCCEEDED(cornerResult);
         const BOOL dark = m_dark;
         DwmSetWindowAttribute(hwnd, 20, &dark, sizeof(dark));
         HIGHCONTRASTW contrast{sizeof(HIGHCONTRASTW), 0, nullptr};
@@ -73,18 +74,21 @@ void WindowsBackdrop::refresh() {
         const bool remote=GetSystemMetrics(SM_REMOTESESSION)!=0;
         const bool allowed = m_enabled && !software && !batterySaver && !remote && contrastKnown && !(contrast.dwFlags & HCF_HIGHCONTRASTON)
             && transparencyKnown && transparency && compositionEnabled;
-        const int backdrop = 1; // DWMSBT_NONE: leave transparent Qt corners unpainted
-        DwmSetWindowAttribute(hwnd, 38, &backdrop, sizeof(backdrop));
-        const MARGINS margins{0,0,0,0};
+        const int backdrop = allowed ? 3 : 1; // DWMSBT_TRANSIENTWINDOW / NONE
+        const HRESULT material=DwmSetWindowAttribute(hwnd, 38, &backdrop, sizeof(backdrop));
+        const MARGINS margins=allowed?MARGINS{-1,-1,-1,-1}:MARGINS{0,0,0,0};
         const HRESULT frame = DwmExtendFrameIntoClientArea(hwnd, &margins);
-        active = allowed && SUCCEEDED(frame);
-        status = active ? QStringLiteral("Native translucent surface: antialiased Qt alpha outline")
+        active = allowed && SUCCEEDED(material) && SUCCEEDED(frame);
+        // Native shape ownership is independent of Acrylic being enabled.
+        // Keeping it stable prevents a second QML mask on opaque GPU windows.
+        status = active ? QStringLiteral("DWM Desktop Acrylic: native blur and rounded outline")
             : !m_enabled ? QStringLiteral("Opaque: application transparency disabled")
             : software ? QStringLiteral("Opaque: software renderer")
             : batterySaver ? QStringLiteral("Opaque: battery saver")
             : remote ? QStringLiteral("Opaque: remote desktop session")
             : QStringLiteral("Opaque: native transparency unavailable");    } else status = QStringLiteral("Opaque: offscreen renderer");
 #endif
+    qApp->setProperty("swirlComposition",QVariantMap{{"active",active},{"nativeCorners",corners},{"status",status},{"dpr",m_window->devicePixelRatio()},{"graphicsApi",int(m_window->rendererInterface()->graphicsApi())}});
     if (active != m_active || corners != m_nativeCorners || status != m_status) {
         m_active = active; m_nativeCorners = corners; m_status = status;
         qInfo().noquote() << "Window composition:" << status;
@@ -94,15 +98,13 @@ void WindowsBackdrop::refresh() {
 }
 void WindowsBackdrop::updateCornerMask() {
     if (!m_window || QGuiApplication::platformName() == QStringLiteral("offscreen")) return;
-    if (m_nativeCorners || m_window->visibility() == QWindow::Maximized || m_window->visibility() == QWindow::FullScreen) {
+    if (m_window->visibility() == QWindow::Maximized || m_window->visibility() == QWindow::FullScreen) {
 #ifdef Q_OS_WIN
         SetWindowRgn(reinterpret_cast<HWND>(m_window->winId()),nullptr,TRUE);
 #endif
         m_window->setMask(QRegion()); return;
     }
-    // A Win32 rounded region is binary at physical pixel boundaries and clips
-    // Qt's partially covered edge pixels. The layered Qt surface supplies the
-    // antialiased outline; retain the complete native input/resize rectangle.
+    // A hard window region disables Acrylic. Retain DWM's native outline.
 #ifdef Q_OS_WIN
     const auto hwnd=reinterpret_cast<HWND>(m_window->winId());
     const auto current=CreateRectRgn(0,0,0,0);
@@ -113,7 +115,9 @@ void WindowsBackdrop::updateCornerMask() {
 #endif
 }
 bool WindowsBackdrop::eventFilter(QObject *object, QEvent *event) {
-    if (object == m_window && (event->type() == QEvent::Resize || event->type() == QEvent::Move || event->type() == QEvent::WindowStateChange || event->type() == QEvent::Show))
+    if (object == m_window && event->type() == QEvent::DevicePixelRatioChange)
+        QTimer::singleShot(0,this,[this]{refresh();});
+    if (object == m_window && (event->type() == QEvent::Resize || event->type() == QEvent::Move || event->type() == QEvent::WindowStateChange || event->type() == QEvent::Show || event->type() == QEvent::DevicePixelRatioChange))
         QTimer::singleShot(0,this,[this]{updateCornerMask();});
     return QObject::eventFilter(object,event);
 }

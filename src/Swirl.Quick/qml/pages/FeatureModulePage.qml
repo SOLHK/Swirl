@@ -34,8 +34,9 @@ Item {
             ColumnLayout {
                 Layout.fillWidth:true;spacing:Theme.dp(5)
                 Text {text:page.feature ? page.feature.title : "功能模块";font.pixelSize:Theme.fontSize(25);font.weight:Font.DemiBold;color:Theme.text}
-                Text {text:page.feature ? page.feature.sub : "";font.pixelSize:Theme.fontSize(14);color:Theme.muted;Layout.fillWidth:true;elide:Text.ElideRight}
+                Text {text:page.feature ? page.feature.status+" · "+page.feature.sub : "";font.pixelSize:Theme.fontSize(14);color:Theme.muted;Layout.fillWidth:true;elide:Text.ElideRight}
             }
+            SwirlButton {visible:page.feature && page.feature.liveRoute.length>0;text:"打开已接入功能";onClicked:AppState.navigate(page.feature.liveRoute)}
             SwirlButton {text:"导入草稿";font.pixelSize:Theme.fontSize(14);onClicked:importDialog.open()}
             SwirlButton {text:"导出草稿";font.pixelSize:Theme.fontSize(14);onClicked:exportDialog.open()}
             SwirlButton {objectName:"moduleSaveButton";text:"保存草稿";font.pixelSize:Theme.fontSize(14);primary:true;onClicked:page.save()}
@@ -104,14 +105,26 @@ Item {
                     Text {visible:page.records.length===0;anchors.centerIn:parent;text:"暂无条目，点击添加建立配置草稿。";color:Theme.muted;font.pixelSize:Theme.fontSize(16)}
                 }
             }
-            ColumnLayout {
-                anchors.fill:parent;anchors.margins:Theme.dp(26);spacing:Theme.dp(17);visible:page.tab===2
-                SwirlIcon {name:page.feature ? page.feature.icon : "grid";size:Theme.dp(38);color:Theme.accent}
-                Text {text:"模块界面已具备，实际功能待接入";font.pixelSize:Theme.fontSize(22);font.weight:Font.DemiBold;color:Theme.text}
-                Text {text:page.feature ? page.feature.sub : "";color:Theme.muted;font.pixelSize:Theme.fontSize(16);Layout.fillWidth:true;wrapMode:Text.WordWrap}
-                Text {text:"可以编辑参数、增删条目、调整优先级、切换草稿启停、保存以及导入导出 JSON。这里的启用选项仅表示草稿意图，不代表操作系统或网络服务已经开启。";color:Theme.muted;font.pixelSize:Theme.fontSize(15);Layout.fillWidth:true;wrapMode:Text.WordWrap}
-                Text {text:"Apple / 移动平台专有能力保留参考模块，Windows 的实际实现方式需后续确定。";color:Theme.muted;font.pixelSize:Theme.fontSize(15);Layout.fillWidth:true;wrapMode:Text.WordWrap}
-                Item {Layout.fillHeight:true}
+            ScrollView {
+                id:capabilityScroll;anchors.fill:parent;anchors.margins:Theme.dp(24);visible:page.tab===2;clip:true
+                ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
+                ColumnLayout {
+                    width:capabilityScroll.availableWidth;spacing:Theme.dp(14)
+                    Text {text:page.feature ? page.feature.status : "待开发";font.pixelSize:Theme.fontSize(22);font.weight:Font.DemiBold;color:Theme.text}
+                    Text {text:page.feature ? page.feature.sub+"\n"+page.feature.platform : "";color:Theme.muted;Layout.fillWidth:true;wrapMode:Text.WordWrap}
+                    Text {text:"以下细项均有明确归属。草稿开关表示规划意图；未接入项目不会改变系统或网络。";color:Theme.muted;Layout.fillWidth:true;wrapMode:Text.WordWrap}
+                    Repeater {
+                        model:page.feature ? page.feature.capabilities : []
+                        ColumnLayout {
+                            required property var modelData
+                            Layout.fillWidth:true;spacing:Theme.dp(6)
+                            Text {text:modelData.name+" · "+modelData.status;color:Theme.text;font.pixelSize:Theme.fontSize(14);Layout.fillWidth:true;wrapMode:Text.WordWrap}
+                            Text {text:modelData.note;color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.WordWrap}
+                            Text {text:modelData.source;color:Theme.accent;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.WrapAnywhere}
+                            Rectangle {Layout.fillWidth:true;height:1;color:Theme.border}
+                        }
+                    }
+                }
             }
         }
     }

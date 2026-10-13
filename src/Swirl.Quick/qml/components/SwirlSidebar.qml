@@ -9,7 +9,7 @@ Item {
     property alias searchField: pageSearch
     readonly property bool effectivelyCollapsed: AppState.sidebarCollapsed || compactByWindow
     readonly property int navigationCount: AppState.navigationGroups.reduce(function(n,g){return n+g.pages.length},0)
-    readonly property real navigationRowHeight: Math.min(Theme.dp(33),Math.max(Theme.dp(27),(scroll.height-AppState.navigationGroups.length*Theme.dp(26))/navigationCount))
+    readonly property real navigationRowHeight: Theme.dp(32)
     implicitWidth: Theme.sidebarWidth
     ColumnLayout {
         anchors.fill: parent
@@ -60,8 +60,10 @@ Item {
                     onAccepted:{
                         var q=text.trim().toLowerCase()
                         if(!q.length)return
-                        for(var i=0;i<AppState.groups.length;i++)for(var j=0;j<AppState.groups[i].pages.length;j++){
-                            var p=AppState.groups[i].pages[j]
+                        if(q==="http"){AppState.navigate("inspector");text="";return}
+                        var searchable=AppState.navigationGroups.concat(AppState.groups)
+                        for(var i=0;i<searchable.length;i++)for(var j=0;j<searchable[i].pages.length;j++){
+                            var p=searchable[i].pages[j]
                             if(p.title.toLowerCase().indexOf(q)>=0){AppState.navigate(p.id);text="";return}
                         }
                         var matches=FeatureCatalog.entries.filter(function(f){return (f.title+" "+f.keywords).toLowerCase().indexOf(q)>=0})
@@ -86,11 +88,11 @@ Item {
                         required property int index
                         width: parent.width
                         Item {
-                            width: parent.width; height: Theme.dp(26)
+                            width: parent.width; height: Theme.dp(30)
                             Rectangle { visible: false; x:Theme.dp(3); width: parent.width - Theme.dp(6); y:Theme.dp(12); height:Theme.dp(1); color: Theme.controlBorder }
-                            Text { visible: !sidebar.effectivelyCollapsed; x:Theme.dp(12); anchors.verticalCenter:parent.verticalCenter; text: index === 0 ? "主要功能" : modelData.title; font.pixelSize:Theme.fontSize(14); font.weight: Font.Normal; color: Theme.muted }
+                            Text { visible: !sidebar.effectivelyCollapsed; x:Theme.dp(12); anchors.verticalCenter:parent.verticalCenter; text: modelData.title; font.pixelSize:Theme.fontSize(11); font.weight: Font.Normal; color: Theme.muted }
                             SwirlMotionButton {
-                                visible: modelData.title === "分析与调试" && !sidebar.effectivelyCollapsed
+                                visible: false
                                 x: parent.width - Theme.dp(60); y:0; width:Theme.dp(60); height:parent.height
                                 text: "全部 ›"; font.pixelSize:Theme.fontSize(12); palette.buttonText: Theme.muted
                                 background: Rectangle { color: parent.hovered ? Theme.hover : "transparent"; radius: Theme.roundedRadius(width,height)
@@ -113,8 +115,8 @@ Item {
                 }
             }
         }
-        Text { visible: !sidebar.effectivelyCollapsed; text:"通用"; color:Theme.muted; font.pixelSize:Theme.fontSize(14); Layout.leftMargin:Theme.dp(12); Layout.preferredHeight:Theme.dp(28) }
-        SwirlNavigationItem { Layout.fillWidth: true; pageId: "settings"; title: "设置"; iconName: "settings"; compact: sidebar.effectivelyCollapsed; onActivated: AppState.navigate(pageId) }
-        SwirlNavigationItem { Layout.fillWidth: true; pageId: "logs"; title: "日志"; iconName: "document"; compact: sidebar.effectivelyCollapsed; onActivated: AppState.navigate(pageId) }
+        Item { Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(10) }
+        SwirlNavigationItem { Layout.fillWidth:true; pageId:"more"; title:"更多"; iconName:"layers"; compact:sidebar.effectivelyCollapsed; onActivated:AppState.navigate(pageId) }
+        SwirlNavigationItem { Layout.fillWidth:true; pageId:"dashboard"; title:"仪表盘"; iconName:"bars"; compact:sidebar.effectivelyCollapsed; onActivated:AppState.navigate(pageId) }
     }
 }

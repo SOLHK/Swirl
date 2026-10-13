@@ -54,10 +54,10 @@ ApplicationWindow {
     property bool swirlTransparencyEnabled:Theme.transparency
     function previewScrollBottom() { if(pageLoader.item && pageLoader.item.scrollToBottom)pageLoader.item.scrollToBottom() }
     property real swirlWindowRadius:Theme.windowRadius
-    readonly property real shellRadius:backdrop.nativeCorners || window.visibility===Window.Maximized ? 0 : Theme.windowRadius
+    readonly property real shellRadius:backdrop.nativeCorners || window.visibility===Window.Maximized || window.visibility===Window.FullScreen ? 0 : Theme.windowRadius
     Connections { target:backdrop; function onChanged() { Theme.backdropActive=backdrop.active } }
-    readonly property real sidebarGutter:Theme.dp(Math.min(24,Math.max(12,window.width*0.017)))
-    readonly property real actualSidebarWidth:AppState.sidebarCollapsed || scaledCanvas.width<Theme.dp(900) ? Theme.dp(82) : Math.min(Theme.sidebarWidth,Math.max(Theme.dp(188),Theme.dp(scaledCanvas.width*0.172)))
+    readonly property real sidebarGutter:Theme.pageMargin
+    readonly property real actualSidebarWidth:AppState.sidebarCollapsed || scaledCanvas.width<Theme.dp(900) ? Theme.dp(64) : Theme.sidebarWidth
     Settings { id:windowSettings; category:"Window"; property int normalWidth:0; property int normalHeight:0 }
     onWidthChanged:if(geometryReady && visibility===Window.Windowed)windowSettings.normalWidth=Math.round(width)
     onHeightChanged:if(geometryReady && visibility===Window.Windowed)windowSettings.normalHeight=Math.round(height)
@@ -77,7 +77,7 @@ ApplicationWindow {
             // Assign once so the user can resize freely after startup.
             const maxWidth=Screen.desktopAvailableWidth*0.91
             const maxHeight=Screen.desktopAvailableHeight*0.91
-            const aspect=1464/930
+            const aspect=1144/840
             window.width=Math.max(minimumWidth,Math.min(maxWidth,maxHeight*aspect))
             window.height=Math.max(minimumHeight,Math.min(maxHeight,window.width/aspect))
         }
@@ -104,7 +104,7 @@ ApplicationWindow {
         id:scaledCanvas
         // Clip all page layers, including controls' shadows, to the same soft
         // window outline. Background rectangles alone cannot clip descendants.
-        layer.enabled:Theme.effectsSupported
+        layer.enabled:Theme.effectsSupported && !backdrop.nativeCorners
         layer.effect:MultiEffect { maskEnabled:true; maskSource:windowCornerMask }
         width:window.width; height:window.height
         Rectangle {
@@ -131,8 +131,8 @@ ApplicationWindow {
         }
         MouseArea {
             objectName:"titleDragArea"
-            visible:AppState.currentPage==="overview"
-            x:window.actualSidebarWidth; y:Theme.dp(0); width:parent.width-x-Theme.dp(240)
+            visible:true
+            x:window.actualSidebarWidth+window.sidebarGutter+Theme.dp(96); y:Theme.dp(0); width:Math.max(0,Math.min(Theme.dp(120),parent.width-x-Theme.dp(470)))
             height:pageLoader.item && pageLoader.item.scrollOffset>0 ? Theme.dp(22) : Theme.dp(68); z:20
             acceptedButtons:Qt.LeftButton|Qt.RightButton
             property point pressPosition
@@ -145,7 +145,7 @@ ApplicationWindow {
         Item {
             id:mainArea; x:window.actualSidebarWidth+window.sidebarGutter; width:parent.width-x-window.sidebarGutter; height:parent.height
             RowLayout {
-                id:toolbar; visible:AppState.currentPage!=="overview"; x:Theme.dp(0); y:Theme.dp(12); width:parent.width; height:Theme.dp(44); spacing:Theme.dp(18)
+                id:toolbar; visible:true; x:Theme.dp(0); y:Theme.dp(12); width:parent.width; height:Theme.dp(44); spacing:Theme.dp(18)
                 Item {
                     width:Theme.dp(85); height:Theme.dp(42)
                     SwirlPillSurface { anchors.fill:parent }
@@ -170,15 +170,35 @@ ApplicationWindow {
                     }
                 }
                 Item { Layout.fillWidth:true }
+                SwirlStatusCapsule { objectName:"eventsCapsule"; label:systemProvider.eventCount>0?systemProvider.eventCount+" 个事件":"无事件";tone:systemProvider.eventCount>0?"warning":"neutral"; onClicked:AppState.navigate("logs") }
+                Item { Layout.fillWidth:true }
+                SwirlStatusCapsule {
+                    objectName:"proxyCapsule"
+                    label:engineController.systemProxy.stateReadError.length?"系统代理 · 读取失败":engineController.systemProxy.stateDiffers?"系统代理 · 状态差异":engineController.systemProxy.systemEnabled&&!engineController.systemProxy.owned?"系统代理 · 其他应用":"系统代理"
+                    tone:engineController.systemProxy.error.length||engineController.systemProxy.stateReadError.length||engineController.systemProxy.stateDiffers||engineController.routingError.length?"warning":engineController.systemProxy.systemEnabled?"success":"neutral"
+                    detail:engineController.systemProxy.error||engineController.systemProxy.stateReadError||engineController.routingError||(engineController.systemProxy.stateDiffers?"WinINET 与本机客户端代理标志不同。诊断报告分别记录两者；Swirl 未修改其他应用的设置。":engineController.systemProxy.systemEnabled&&!engineController.systemProxy.owned?"Windows 系统代理已由其他应用启用，Swirl 未接管":"点击控制 Swirl 系统代理")
+                    enabled:!engineController.busy
+                    onClicked:engineController.setSystemProxy(!engineController.systemProxy.enabled)
+                }
+                SwirlStatusCapsule { objectName:"tunCapsule"; label:"增强模式 · 未实现";detail:"本阶段尚未实现 TUN";enabled:false }
                 SwirlButton { visible:captureProvider.running; text:"抓包中 · "+captureProvider.sessions.length; iconName:"capture"; font.pixelSize:Theme.fontSize(14); onClicked:AppState.navigate("capture") }
 
             }
+            Text {
+                readonly property var feature:FeatureCatalog.find(AppState.currentPage)
+                visible:feature && (feature.status==="待开发" || feature.status==="平台受限") && AppState.currentPage.indexOf("feature-")!==0
+                text:feature ? feature.status+" · "+feature.sub : ""
+                x:0;y:Theme.dp(62);width:parent.width;elide:Text.ElideRight;color:Theme.orange;font.pixelSize:Theme.fontSize(12)
+            }
             SwirlPageHost {
                 routeKey:AppState.currentPage
-                id:pageLoader; objectName:"pageLoader"; x:Theme.dp(0); y:Theme.dp(22); width:parent.width; height:parent.height-y-Theme.dp(17)
-                sourceComponent:AppState.currentPage==="overview" ? overview :
+                id:pageLoader; objectName:"pageLoader"; x:Theme.dp(0); y:Theme.dp(FeatureCatalog.find(AppState.currentPage) && FeatureCatalog.find(AppState.currentPage).status!=="部分实现" && AppState.currentPage.indexOf("feature-")!==0?88:68); width:parent.width; height:parent.height-y-Theme.dp(17)
+                sourceComponent:AppState.currentPage==="activity" ? activity :
+                                AppState.currentPage==="more" ? morePage :
+                                AppState.currentPage==="overview" ? overview :
                                 AppState.currentPage==="capture" ? capturePage :
-                                AppState.currentPage==="connections" ? connections :
+                                AppState.currentPage==="connections" || AppState.currentPage==="requestlogs" ? connections :
+                                AppState.currentPage==="processes" ? processes :
                                 AppState.currentPage==="proxies" ? proxies :
                                 AppState.currentPage==="inspector" ? inspector :
                                 AppState.currentPage==="scripts" ? scripts :
@@ -235,12 +255,15 @@ ApplicationWindow {
     Shortcut { sequence:"Ctrl+4"; onActivated:AppState.navigate("inspector") }
     Shortcut { sequence:"Ctrl+,"; onActivated:AppState.navigate("settings") }
     Shortcut { sequence:"Ctrl+B"; onActivated:AppState.sidebarCollapsed=!AppState.sidebarCollapsed }
-        Component { id:overview; OverviewPage {} }
+        Component { id:activity; ActivityPage {} }
+    Component { id:morePage; MorePage {} }
+    Component { id:overview; OverviewPage {} }
     Component { id:capturePage; CapturePage {} }
     Component { id:externalTools; ExternalToolsPage {} }
     Component { id:featureHub; FeatureHubPage {} }
     Component { id:featureModule; FeatureModulePage { moduleId:parent.routeId } }
     Component { id:connections; ConnectionsPage {} }
+    Component { id:processes; ProcessesPage {} }
     Component { id:proxies; ProxiesPage {} }
     Component { id:inspector; InspectorPage {} }
     Component { id:scripts; ScriptsPage {} }
@@ -266,14 +289,15 @@ ApplicationWindow {
     Component { id:workbench; WorkbenchPage { pageId:parent.routeId } }
 
     Timer { interval:1000; running:true; repeat:true; onTriggered:AppState.tickTraffic() }
-    // A thin outline gives overlapping pale windows a visible boundary. Qt
-    // owns the rounded HDR outline, so do not enable a mismatched DWM rectangle.
+    // DWM draws the GPU window's outline on its own curved boundary. The alpha
+    // fallback alone needs a QML outline.
     Rectangle {
         objectName:"windowOutline"
+        visible:!backdrop.nativeCorners
         anchors.fill:parent;z:998;color:"transparent";antialiasing:true
         radius:window.shellRadius
         border.width:window.visibility===Window.Maximized?0:1/Screen.devicePixelRatio
-        border.color:Theme.dark?Qt.rgba(1,1,1,window.active?0.22:0.12):Qt.rgba(0,0,0,window.active?0.25:0.14)
+        border.color:Theme.dark?Qt.rgba(1,1,1,window.active?0.30:0.20):Qt.rgba(0,0,0,window.active?0.32:0.22)
     }
     Timer { id:toastTimer; interval:3200; onTriggered:AppState.toast="" }
     Connections { target:AppState; function onToastChanged(){if(AppState.toast.length)toastTimer.restart()} }

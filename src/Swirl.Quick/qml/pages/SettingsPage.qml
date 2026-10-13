@@ -52,7 +52,7 @@ Item {
                         width:options.availableWidth; spacing:Theme.dp(17)
                         Text { text:AppState.zh(page.section); color:Theme.text; font.pixelSize:Theme.fontSize(23); font.weight:Font.DemiBold }
                         Text {
-                            text:page.section==="外观"?"主题、窗口材质、动画与界面缩放。":page.section==="代理"?"引擎与真实节点 · 不接管系统代理或启用 TUN。":page.section==="关于 Swirl"?"版本与项目信息":"此项尚未实现。"
+                            text:page.section==="外观"?"主题、窗口材质、动画与界面缩放。":page.section==="代理"?"引擎、真实节点与当前用户系统代理 · 国内外分流。":page.section==="关于 Swirl"?"版本与项目信息":"此项尚未实现。"
                             color:Theme.muted; wrapMode:Text.WordWrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12)
                         }
                         Rectangle { Layout.fillWidth:true; height:Theme.dp(1); color:Theme.border }

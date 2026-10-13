@@ -1,4 +1,6 @@
 #include "HdrOutput.h"
+#include <QGuiApplication>
+#include <QVariantMap>
 #include <QQuickWindow>
 #include <QSGRendererInterface>
 #include <QTimer>
@@ -38,6 +40,7 @@ void HdrOutput::attach(QQuickWindow *window) {
             if(m_reported && m_active==active && m_glow==glow && qAbs(m_white-white)<0.001 && qAbs(m_peak-peak)<0.001)return;
             m_reported=true;m_active=active;m_glow=glow;m_white=white;m_peak=peak;
             qInfo()<<"HDR_OUTPUT"<<(active?"FP16 scRGB":"SDR fallback")<<"emissive="<<glow<<"SDR white scale="<<white<<"peak="<<peak;
+            qApp->setProperty("swirlHdr",QVariantMap{{"fp16Active",active},{"glow",glow},{"whiteScale",white},{"peak",peak}});
             emit changed();
         },Qt::QueuedConnection);
     },Qt::DirectConnection);

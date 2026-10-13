@@ -4,6 +4,7 @@ import SwirlQuick
 Dialog {
     id: dialog
     modal: true
+    focus: true
     transformOrigin:Item.Center
     onAboutToShow: {
         transformOrigin=SwirlMotion.popupOrigin(dialog)

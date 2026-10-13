@@ -11,12 +11,12 @@ Item {
         var q=search.text.toLowerCase()
         var s=sort.currentText
         var state=status.currentText
-        var rows=systemProvider.connections().filter(function(r){
+        var rows=engineController.connections.filter(function(r){
             return (r.host+" "+r.process+" "+r.ip+" "+r.policy).toLowerCase().indexOf(q)>=0 &&
                    (state==="全部状态"||r.status===state)
         })
         rows.sort(function(a,b){
-            var key=s==="Host"?"host":s==="Latency"?"latency":s==="Downloaded"?"down":"process"
+            var key=s==="域名"?"host":s==="延迟"?"latency":s==="下载"?"down":"process"
             return String(a[key]).localeCompare(String(b[key]),undefined,{numeric:true})
         })
         return rows
@@ -28,10 +28,10 @@ Item {
         RowLayout {
             Layout.fillWidth:true; spacing:Theme.dp(10)
             SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:AppState.zh("搜索域名、IP、进程或策略") }
-            SwirlComboBox { id:status; model:["全部状态","Active","Closed"] }
-            SwirlComboBox { id:sort; model:["Host","Latency","Downloaded","Process"] }
-            SwirlButton { text:AppState.zh("导出"); iconName:"folder"; onClicked:AppState.notice("导出连接记录") }
-            SwirlButton { text:AppState.zh("Clear"); onClicked:{selected=null;AppState.notice("清空连接记录")} }
+            SwirlComboBox { id:status; model:["全部状态","活动","已结束"] }
+            SwirlComboBox { id:sort; model:["域名","延迟","下载","进程"] }
+            SwirlButton { enabled:false; text:AppState.zh("导出"); iconName:"folder"; onClicked:AppState.notice("导出连接记录") }
+            SwirlButton { enabled:false; text:AppState.zh("Clear"); onClicked:{selected=null;AppState.notice("清空连接记录")} }
         }
         RowLayout {
             Layout.fillWidth:true; spacing:Theme.dp(8)
@@ -83,6 +83,7 @@ Item {
                             ["Application",page.selected?page.selected.process:"—"],
                             ["Protocol",page.selected?page.selected.protocol:"—"],
                             ["匹配策略",page.selected?page.selected.policy:"—"],
+                            ["匹配规则",page.selected?page.selected.rule:"—"],
                             ["Upload",page.selected?page.selected.up:"—"],
                             ["Download",page.selected?page.selected.down:"—"],
                             ["Latency",page.selected?page.selected.latency:"—"],
@@ -99,8 +100,8 @@ Item {
                     }
 
                     SwirlButton {
-                        Layout.fillWidth:true; text:AppState.zh("Terminate connection"); danger:true
-                        onClicked:AppState.notice("Terminate connection")
+                        enabled:page.selected && page.selected.status==="活动" && engineController.apiHealthy; Layout.fillWidth:true; text:AppState.zh("Terminate connection"); danger:true
+                        onClicked:engineController.closeConnection(page.selected.id)
                     }
 
                 }

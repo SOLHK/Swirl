@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Dialogs
 import QtQuick.Controls
 import QtQuick.Layouts
 import SwirlQuick
@@ -11,16 +12,18 @@ Item {
     property bool followTail:true
     property var records:(systemProvider.revision,systemProvider.logs())
     readonly property var displayLogs:records.filter(function(r){
-        return (r.message+" "+r.source+" "+r.level).toLowerCase().indexOf(search.text.toLowerCase())>=0 &&
+        return (r.message+" "+r.source+" "+r.level+" "+r.code).toLowerCase().indexOf(search.text.toLowerCase())>=0 &&
                (level.currentText==="全部级别"||r.level===level.currentText)
-    }).map(function(r,i){return {id:"log-"+i,time:r.time,level:r.level,source:r.source,message:r.message}})
+    }).map(function(r,i){return {id:"log-"+i,time:r.time,level:r.level,source:r.source,code:r.code,message:r.message}})
+    FileDialog { id:diagnosticFile;title:"导出诊断报告";fileMode:FileDialog.SaveFile;nameFilters:["诊断 ZIP (*.zip)"];defaultSuffix:"zip";onAccepted:{diagnostics.exportReport(selectedFile,systemProvider.diagnosticSnapshot());AppState.toast=diagnostics.exportMessage} }
     ColumnLayout {
         anchors.fill:parent; anchors.margins:Theme.dp(23); spacing:Theme.dp(13)
         RowLayout {
             Layout.fillWidth:true
             SwirlStatusBadge { label:"日志记录"; tone:"accent" }
-            Text { text:displayLogs.length+" 条真实引擎状态记录"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
-            SwirlButton { enabled:false; text:"导出"; iconName:"folder"; onClicked:AppState.notice("导出日志记录") }
+            Text { text:displayLogs.length+" 条诊断事件"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
+            SwirlButton { text:"导出诊断 ZIP"; iconName:"folder"; onClicked:diagnosticFile.open() }
+            SwirlButton { text:"标记已处理";enabled:diagnostics.eventCount>0;onClicked:diagnostics.acknowledge() }
             SwirlButton { text:"清空"; danger:true; onClicked:{systemProvider.clearLogs();page.selected=null} }
         }
         RowLayout {
@@ -39,7 +42,7 @@ Item {
                     rows:page.displayLogs
                     selectedId:page.selected?page.selected.id:""
                     columns:[{key:"time",label:"时间",w:108},{key:"level",label:"级别",w:84},
-                             {key:"source",label:"来源",w:104},{key:"message",label:"信息",w:570}]
+                             {key:"source",label:"来源",w:104},{key:"code",label:"错误码",w:140},{key:"message",label:"信息",w:570}]
                     onRowSelected:function(r){page.selected=r}
                 }
                 SwirlEmptyState {
@@ -61,7 +64,7 @@ Item {
                     SwirlStatusBadge { label:page.selected?page.selected.level:"未选择"; tone:page.selected&&page.selected.level==="ERROR"?"warning":"neutral" }
                     Repeater {
                         model:[["TIME",page.selected?page.selected.time:"—"],["COMPONENT",page.selected?page.selected.source:"—"],
-                               ["MESSAGE",page.selected?page.selected.message:"—"]]
+                               ["错误码",page.selected?page.selected.code:"—"],["MESSAGE",page.selected?page.selected.message:"—"]]
                         ColumnLayout {
                             Layout.fillWidth:true; spacing:Theme.dp(4)
                             Text { text:AppState.zh(modelData[0]); font.pixelSize:Theme.fontSize(10); color:Theme.muted }
@@ -72,7 +75,7 @@ Item {
                     Text { text:"诊断事件"; color:Theme.muted; font.pixelSize:Theme.fontSize(10) }
                     Text {
                         Layout.fillWidth:true
-                        text:"这里的事件由生成，不会读取系统、Mihomo 或 Windows 日志。"
+                        text:"仅记录 Swirl 可观测的故障。日志已脱敏并限制大小；诊断 ZIP 保存在本机，不会自动上传。"
                         color:Theme.muted; font.pixelSize:Theme.fontSize(12); wrapMode:Text.WordWrap
                     }
 

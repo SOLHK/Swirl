@@ -7,19 +7,21 @@ import "../controls"
 Item {
     id:page
     property string category:"全部"
-    readonly property var filtered:FeatureCatalog.entries.filter(function(f){return (page.category==="全部" || f.group===page.category) && (f.title+" "+f.keywords).toLowerCase().indexOf(search.text.toLowerCase())>=0})
+    property string statusFilter:"全部状态"
+    readonly property var filtered:FeatureCatalog.entries.filter(function(f){return (page.category==="全部" || f.group===page.category) && (page.statusFilter==="全部状态" || f.status===page.statusFilter) && (f.title+" "+f.keywords).toLowerCase().indexOf(search.text.toLowerCase())>=0})
     ColumnLayout {
         anchors.fill:parent; spacing:Theme.dp(14)
         RowLayout {
             Layout.fillWidth:true; Layout.topMargin:14; spacing:Theme.dp(16)
             ColumnLayout {
                 Layout.fillWidth:true; spacing:Theme.dp(6)
-                Text {text:"功能模块";color:Theme.text;font.pixelSize:Theme.fontSize(27);font.weight:Font.DemiBold}
-                Text {text:FeatureCatalog.entries.length+" 个入口 · 配置草稿与界面预览";color:Theme.muted;font.pixelSize:Theme.fontSize(15);Layout.fillWidth:true;elide:Text.ElideRight}
+                Text {text:"全部功能";color:Theme.text;font.pixelSize:Theme.fontSize(27);font.weight:Font.DemiBold}
+                Text {text:FeatureCatalog.entries.length+" 个模块 · 对照官方手册逐项归属";color:Theme.muted;font.pixelSize:Theme.fontSize(15);Layout.fillWidth:true;elide:Text.ElideRight}
             }
-            SwirlSearchField {id:search;objectName:"moduleSearch";Layout.preferredWidth:Theme.dp(280);placeholderText:"搜索模块或协议…"}
+            SwirlSearchField {id:search;objectName:"moduleSearch";Layout.preferredWidth:Math.min(Theme.dp(280),page.width*0.34);placeholderText:"搜索模块或协议…"}
         }
-        Text {text:"真实 HTTP 抓包已接入。其他页面用于配置与交互预览，保存草稿不会启动网络服务。";color:Theme.muted;font.pixelSize:Theme.fontSize(14);Layout.fillWidth:true;wrapMode:Text.WordWrap}
+        Text {text:"部分实现的模块连接真实业务接口；待开发模块仅保存本机草稿。保存草稿不会使网络配置生效。";color:Theme.muted;font.pixelSize:Theme.fontSize(14);Layout.fillWidth:true;wrapMode:Text.WordWrap}
+        SwirlComboBox {model:["全部状态","部分实现","待开发","平台受限"];onActivated:page.statusFilter=currentText;Accessible.name:"功能状态筛选"}
         ScrollView {
             Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(45)
             ScrollBar.vertical.policy:ScrollBar.AlwaysOff
@@ -55,7 +57,7 @@ Item {
                             }
                             Text {text:modelData.sub;color:Theme.muted;font.pixelSize:Theme.fontSize(14);Layout.fillWidth:true;wrapMode:Text.WordWrap;maximumLineCount:2;elide:Text.ElideRight}
                             Item {Layout.fillHeight:true}
-                            Text {text:modelData.id==="capture" ? "HTTP 已接入" : modelData.id.indexOf("feature-")===0 ? "配置草稿" : "交互预览";color:modelData.id==="capture" ? Theme.green : Theme.muted;font.pixelSize:Theme.fontSize(12)}
+                            Text {text:modelData.status+" · "+modelData.capabilities.length+" 个归属细项";color:modelData.status==="部分实现" ? Theme.green : Theme.muted;font.pixelSize:Theme.fontSize(12)}
                         }
                         onClicked:SwirlMotion.navigateFrom(this,modelData.id)
                         Accessible.name:modelData.title

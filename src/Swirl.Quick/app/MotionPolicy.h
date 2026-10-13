@@ -11,11 +11,13 @@ class QQuickWindow;
 class MotionPolicy final : public QObject {
     Q_OBJECT
     Q_PROPERTY(bool systemReducedMotion READ systemReducedMotion NOTIFY policyChanged)
+    Q_PROPERTY(bool alwaysShowScrollbars READ alwaysShowScrollbars NOTIFY policyChanged)
     Q_PROPERTY(bool complexMotion READ complexMotion NOTIFY policyChanged)
     Q_PROPERTY(int activeGrabCount READ activeGrabCount NOTIFY grabsChanged)
 public:
     explicit MotionPolicy(QObject *parent=nullptr);
     bool systemReducedMotion() const;
+    bool alwaysShowScrollbars() const;
     bool complexMotion() const { return m_complex.load(); }
     void attach(QQuickWindow *);
     Q_INVOKABLE void leavePage(QObject *);
