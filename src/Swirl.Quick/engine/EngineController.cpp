@@ -16,6 +16,8 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
     }
     m_options.executablePath = QCoreApplication::applicationDirPath() + QStringLiteral("/core/mihomo.exe");
     connect(m_engine.get(), &ProxyEngine::statusChanged, this, &EngineController::statusChanged);
+    connect(m_engine.get(), &ProxyEngine::telemetryChanged, this, &EngineController::telemetryChanged);
+    connect(m_engine.get(), &ProxyEngine::statusChanged, this, &EngineController::telemetryChanged);
     connect(&m_store,&NodeStore::changed,this,&EngineController::nodesChanged);
     connect(&m_imports,&NodeImportService::changed,this,&EngineController::statusChanged);
     connect(&m_imports,&NodeImportService::nodesApplied,this,[this]{

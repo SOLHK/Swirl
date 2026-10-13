@@ -71,21 +71,18 @@ int runOverviewChecks(QQuickWindow *window)
         QElapsedTimer settling;settling.start();
         while(state("pageLoader.moving || pageLoader.pendingGrab").toBool() && settling.elapsed()<2500)QTest::qWait(20);
     };
+    state("AppState.navigate('overview')");QTest::qWait(250);
     check(state("AppState.measuredDown === 0 && AppState.measuredUp === 0 && AppState.measuredConnections === 0").toBool(),"offline counters zero");
     check(state("AppState.connectionState === '已停止' && !AppState.proxyOn").toBool(),"overview shows actual stopped engine");
-    check(state("Theme.canvas.toString() === '#f7f7f8' && Theme.surface.toString() === '#ffffff'").toBool(),"all pages share neutral canvas and white card tokens");
-    check(state("Theme.windowRadius === 12 && Theme.containerRadius === 12 && Theme.cardRadius === 10 && Theme.popupRadius === 10 && Theme.controlRadius === 8 && Theme.pillRadius(32) === 10 && Theme.roundedRadius(100,24) === 8").toBool(),"window, containers, cards, popups and controls follow the shared radius hierarchy");
+    check(state("Theme.canvas.toString() === '#f1f2f4' && Theme.surface.toString() === '#ffffff'").toBool(),"all pages share neutral canvas and white card tokens");
+    check(state("Theme.windowRadius === 14 && Theme.cardRadius === 24 && Theme.navigationRadius === 12 && Theme.controlRadius === 10").toBool(),"window, containers, cards, popups and controls follow the shared radius hierarchy");
     const auto lightSelected=state("Theme.navigationSelected").value<QColor>();
     const auto lightSidebar=state("Theme.sidebarBase").value<QColor>();
-    check(lightSidebar.green()-lightSelected.green()>=30,"light navigation selection is clearly darker than the sidebar");
-    auto *brand=window->findChild<QObject *>("brandVector");
-    check(brand && brand->property("source").toUrl().toString().endsWith("swirl_knot_mark_light.svg"),"sidebar uses latest knot SVG light artwork");
-    state("Theme.mode='Dark'");QTest::qWait(100);
-    check(brand && brand->property("source").toUrl().toString().endsWith("swirl_knot_mark_dark.svg") && state("Theme.navigationSelected").value<QColor>().green()-state("Theme.sidebarBase").value<QColor>().green()>=30,"dark mode switches knot SVG and retains distinct navigation selection");
-    state("Theme.mode='Light'");QTest::qWait(100);
-    check(window->property("_qt_sg_hdr_format").toString()=="scrgb","window requests real FP16 scRGB with automatic SDR fallback");
+    check(lightSidebar.green()-lightSelected.green()>=8,"light navigation selection is subtly darker than the sidebar");
+    check(window->findChild<QObject *>("brandVector")==nullptr,"sidebar has no reference-incompatible brand block");
+    check(!window->property("_qt_sg_hdr_format").isValid(),"shell does not request emissive HDR traffic lights");
     auto *statusCards=item("statusCardsGrid");
-    check(statusCards && statusCards->property("columns").toInt()==6,"reference overview keeps all six status cards in one row when they fit");
+    check(statusCards && statusCards->property("columns").toInt()==3,"overview keeps network, profile and outbound summary without duplicate activity cards");
     for(const auto &name : {"windowCloseButton","windowMinimizeButton","windowMaximizeButton","historyBackButton","historyForwardButton"}) {
         auto *circle=item(name);
         auto *background=circle?qvariant_cast<QObject *>(circle->property("background")):nullptr;
@@ -96,7 +93,7 @@ int runOverviewChecks(QQuickWindow *window)
     for(int percent : {75,100,125,150}) {
         state(QStringLiteral("Theme.setScalePercent(%1)").arg(percent));QTest::qWait(80);
         const qreal scale=percent/100.0;
-        zoomCornersStable=zoomCornersStable && qAbs(state("Theme.windowRadius").toReal()-12*scale)<0.01 && qAbs(state("Theme.controlRadius").toReal()-8*scale)<0.01;
+        zoomCornersStable=zoomCornersStable && qAbs(state("Theme.windowRadius").toReal()-14*scale)<0.01 && qAbs(state("Theme.controlRadius").toReal()-10*scale)<0.01;
         for(const auto &name : {"windowCloseButton","windowMinimizeButton","windowMaximizeButton","historyBackButton","historyForwardButton"}) {
             auto *circle=item(name);
             auto *background=circle?qvariant_cast<QObject *>(circle->property("background")):nullptr;
@@ -106,10 +103,10 @@ int runOverviewChecks(QQuickWindow *window)
     check(zoomCornersStable,"radius hierarchy scales proportionally at 75/100/125/150 percent and circular controls remain circular");
     state("Theme.resetScale()");QTest::qWait(80);
     check(item("addButton")==nullptr && item("globalSettingsButton")==nullptr,"global add and settings shortcuts removed from every page");
-    auto *subscriptions=item("nav-subscriptions");auto *profiles=item("nav-profiles");
+    auto *subscriptions=item("nav-activity");auto *profiles=item("nav-overview");
     if(subscriptions && profiles) {
         QTest::mouseMove(window,subscriptions->mapToScene(QPointF(subscriptions->width()/2,subscriptions->height()/2)).toPoint());
-        state("AppState.navigate('profiles')");QTest::qWait(30);
+        state("AppState.navigate('overview')");QTest::qWait(30);
         auto *oldBackground=qvariant_cast<QObject *>(subscriptions->property("background"));
         auto *newBackground=qvariant_cast<QObject *>(profiles->property("background"));
         check(oldBackground && newBackground && oldBackground->property("color").value<QColor>().alpha()==0 && newBackground->property("color").value<QColor>().alpha()>0,"pointer remaining over the old navigation row cannot produce a second selection highlight");
@@ -119,15 +116,23 @@ int runOverviewChecks(QQuickWindow *window)
         check(oldBackground && newBackground && oldBackground->property("color").value<QColor>().alpha()>0 && newBackground->property("color").value<QColor>().alpha()==0,"navigation selection transfers immediately with no outgoing fade");
     } else check(false,"navigation regression targets exist");
     state("AppState.navigate('overview')");QTest::qWait(150);
-    auto *metric = item("downloadMetric");
-    check(metric && metric->property("value").toString()=="—","uncollected metric displays no fabricated value");
-    auto *chart = item("overviewChart");
-    check(chart && chart->property("series").toString()=="down","download is the only default curve");
+    state("AppState.navigate('activity')");QTest::qWait(250);
+    auto *metric=item("downloadMetric");
+    check(metric && metric->property("value").toString()=="—","uncollected activity metric displays no fabricated value");
+    auto *latency=item("internetLatencyCard"),*active=item("activeConnectionCard"),*total=item("totalTrafficCard"),*traffic=item("trafficCard"),*upload=item("uploadMetric");
+    check(latency && active && total && traffic && upload,"all six Activity cards are present");
+    if(latency && active && total && traffic && upload) {
+        check(qAbs(latency->width()-active->width())<1 && qAbs(active->width()-total->width())<1,"left column card edges align");
+        check(qAbs(latency->mapToScene(QPointF()).y()-upload->mapToScene(QPointF()).y())<1 && qAbs(latency->height()-upload->height())<1,"latency and speed cards have identical top and bottom edges");
+        check(qAbs(traffic->height()-(active->height()+total->height()+20))<1,"Traffic spans the two lower rows");
+    }
+    check(state("engineController.telemetry.upHistory === undefined").toBool(),"stopped engine has no fabricated chart samples");
+    check(item("historyBackButton") && !item("historyBackButton")->isVisible(),"Activity has no history arrow controls");
+    state("AppState.navigate('overview')");QTest::qWait(250);
     check(item("connectionSwitch")==nullptr,"upper-right connection demo control removed");
     check(item("systemProxyToggle") && !item("systemProxyToggle")->isEnabled(),"system proxy control remains disabled");
     check(item("tunToggle") && !item("tunToggle")->isEnabled(),"TUN control remains disabled");
     check(state("!AppState.systemProxyOn && !AppState.tunOn && !engineController.processAlive").toBool(),"overview does not change networking or start engine");
-    check(chart && chart->property("baseHistory").toList().isEmpty(),"traffic history contains no generated samples");
     check(state("systemProvider.connections().length === 0").toBool(),"uncollected connection list is empty");
     state("Theme.setScalePercent(75)");
     check(state("!Theme.followSystemScale && Theme.uiScale === 0.75 && Theme.dp(20) === 15 && Theme.appearanceSettings.savedScalePercent === 75").toBool(),"manual 75 percent scale updates shared layout units and stored preference");
@@ -137,14 +142,6 @@ int runOverviewChecks(QQuickWindow *window)
     check(state("Theme.followSystemScale && Theme.uiScale === 1").toBool(),"scale reset follows system DPI through Qt logical pixels");
     auto *combo=item("modeCombo");
     check(combo && !combo->isEnabled() && state("AppState.mode === '直连'").toBool(),"unimplemented routing modes cannot alter engine state");
-    state("pageLoader.item.showDetails = true");
-    QTest::qWait(150);
-    click(item("seriesSelector"),0.5);
-    check(chart && chart->property("series").toString()=="up","upload selection replaces download");
-    click(item("seriesSelector"),0.85);
-    check(chart && chart->property("series").toString()=="total","total selection displays cumulative series");
-    click(item("rangeSelector"),0.62);
-    check(chart && chart->property("rangeIndex").toInt()==2,"six-hour range input");
     click(item("nodePickerButton"));
     auto *popup=window->findChild<QObject *>("nodePicker");
     check(popup && popup->property("opened").toBool(),"node picker opens from button");
@@ -200,11 +197,7 @@ int runOverviewChecks(QQuickWindow *window)
     check(window->width()==1000 && window->height()==650,"manual window resizing can change width and height independently");
     check(loader && loader->width()>0 && loader->height()>0,"minimum size leaves usable scrolling viewport");
     auto *compactStatusCards=item("statusCardsGrid");
-    auto *speedPanel=item("speedPanel");
-    check(compactStatusCards && compactStatusCards->property("columns").toInt()==3,"compact overview uses balanced card rows instead of leaving a single card orphaned");
-    check(speedPanel && speedPanel->width()<loader->width()*0.7,"compact overview keeps latency and speed side by side");
-    auto *latencyPanel=item("latencyPanel");
-    check(latencyPanel && speedPanel && qAbs(latencyPanel->mapToScene(QPointF()).y()-speedPanel->mapToScene(QPointF()).y())<1 && qAbs(latencyPanel->height()-speedPanel->height())<1,"compact latency and speed cards share top and bottom edges");
+    check(compactStatusCards && compactStatusCards->property("columns").toInt()==3,"compact overview retains its three summary cards");
     auto *proxyPanel=item("currentProxyPanel");auto *systemPanel=item("systemStatusPanel");
     check(proxyPanel && systemPanel && qAbs(proxyPanel->mapToScene(QPointF()).y()-systemPanel->mapToScene(QPointF()).y())<1 && qAbs(proxyPanel->height()-systemPanel->height())<1,"current proxy and system status share top and bottom edges");
     window->resize(1260,816);QTest::qWait(150);

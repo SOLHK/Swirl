@@ -59,7 +59,7 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     if(!backdrop->isCaptureForeground()){qCritical()<<"Native validation blocked: target is covered or the Windows secure desktop is active";return 3;}
     const auto radius=state("Theme.windowRadius").toReal()*window->devicePixelRatio();
     const auto region=CreateRectRgn(0,0,0,0);
-    check(GetWindowRgn(testHwnd,region)==ERROR,"native hard region is removed so it cannot cut antialiased pixels");
+    check(GetWindowRgn(testHwnd,region)==ERROR,"native DWM material is not disabled by a hard window region");
     DeleteObject(region);
     const auto cornerCoverage=[&](){
         const auto rendered=window->grabWindow();int partial=0,total=0;
@@ -70,9 +70,9 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
         return qMakePair(total,partial);
     };
     const auto normalCorner=cornerCoverage();
-    check(normalCorner.second>=5,"opaque main surface has partially covered antialiased corner pixels");
+    check(backdrop->nativeCorners() || normalCorner.second>=5,"native DWM or antialiased Qt owns the window corners");
     state("Theme.setScalePercent(125)");QTest::qWait(150);
-    check(cornerCoverage().first<normalCorner.first,"manual UI zoom updates alpha corner coverage without a resize");
+    check(backdrop->nativeCorners() || cornerCoverage().first<normalCorner.first,"native corner ownership remains stable across UI zoom");
     state("Theme.resetScale()");QTest::qWait(150);
 #endif
     const auto grab=[&](const QString &name){
@@ -106,15 +106,19 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
         DrawIconEx(dc,0,0,nativeIcon,32,32,0,nullptr,DI_NORMAL);
         QImage image(static_cast<uchar *>(bits),32,32,QImage::Format_RGB32);int dark=0,blue=0;
         for(int y=0;y<32;++y)for(int x=0;x<32;++x){const auto c=image.pixelColor(x,y);if(c.red()<80&&c.green()<80&&c.blue()<80)++dark;if(c.blue()>c.red()+35)++blue;}
-        check(dark>40 && blue==0,"native taskbar icon is the monochrome knot, not the blue legacy logo");
+        check(blue>20,"native taskbar icon contains the abstract blue S data-flow mark");
         image.save(directory+"/taskbar-native-icon.png");SelectObject(dc,previous);DeleteObject(bitmap);DeleteDC(dc);
     }
 #endif
     QCursor::setPos(window->screen()->availableGeometry().topLeft()+QPoint(10,10));QTest::qWait(300);
     auto red=grab("backdrop-red");
     const QColor behind("#D72D31");
-    check(distance(red.pixelColor(0,0),behind)<=3 && distance(red.pixelColor(red.width()-1,0),behind)<=3 && distance(red.pixelColor(0,red.height()-1),behind)<=3 && distance(red.pixelColor(red.width()-1,red.height()-1),behind)<=3,
-          "all four composed corner pixels show the background instead of a rectangular material fill");
+    // DWM's real outer shadow darkens the desktop pixels at the bottom corners.
+    // Verify the desktop hue and attenuation, rather than requiring an exact
+    // unshadowed RGB value. A rectangular Acrylic fill has high green/blue here.
+    const auto desktopCorner=[&](QColor c){return c.red()>=behind.red()*0.65 && c.red()<=behind.red()*1.05 && c.green()<=behind.green()*1.15 && c.blue()<=behind.blue()*1.15;};
+    check(desktopCorner(red.pixelColor(0,0)) && desktopCorner(red.pixelColor(red.width()-1,0)) && desktopCorner(red.pixelColor(0,red.height()-1)) && desktopCorner(red.pixelColor(red.width()-1,red.height()-1)),
+          "all four corners reveal desktop color with native shadow attenuation");
     background.setColor(QColor("#2464D8"));QTest::qWait(800);
     auto blue=grab("backdrop-blue");
     const int sidebarChange=distance(sample(red,0.01,0.83),sample(blue,0.01,0.83));
@@ -122,7 +126,7 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     qInfo()<<"Native pixel delta: sidebar="<<sidebarChange<<"content="<<contentChange<<"DPR="<<window->devicePixelRatio()<<backdrop->status();
     check(backdrop->active(),"native translucent surface actually enabled on this machine");
     check(sidebarChange>12,"sidebar responds to changing real window behind it");
-    check(contentChange<=3,"main content remains opaque under background color changes");
+    check(contentChange>3 && contentChange<sidebarChange,"main content transmits less background color than the sidebar");
     // Move Swirl relative to a split-color native QML window to verify position-
     // dependent composition. The scene is a test window, not a wallpaper image.
     QQuickItem split;

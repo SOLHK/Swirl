@@ -38,6 +38,7 @@
 #include "tests/MotionChecks.h"
 #endif
 #include "app/SystemDataProvider.h"
+#include "network/NetworkDiagnostics.h"
 #include "app/WindowsBackdrop.h"
 #include "app/SvgIconProvider.h"
 #include "app/HdrOutput.h"
@@ -106,6 +107,19 @@ int main(int argc, char *argv[])
     QTemporaryDir isolatedNodes;
     EngineController engineController(std::make_unique<MihomoAdapter>(),nullptr,isolatedRun?isolatedNodes.filePath("nodes.dpapi"):QString());
     SystemDataProvider systemData(&capture,&engineController);
+    NetworkDiagnostics networkDiagnostics;
+    QString diagnosticNode;
+    QObject::connect(&engineController,&EngineController::statusChanged,&networkDiagnostics,[&]{
+        if(diagnosticNode!=engineController.activeNodeId()){diagnosticNode=engineController.activeNodeId();networkDiagnostics.invalidate();}
+        networkDiagnostics.setProxyPort(engineController.apiHealthy()?engineController.activeProxyPort():0);
+    });
+    QTimer networkChangePoll;
+    auto diagnosticNetwork=systemData.currentNetwork();
+    QObject::connect(&networkChangePoll,&QTimer::timeout,&networkDiagnostics,[&]{
+        const auto current=systemData.currentNetwork();
+        if(current!=diagnosticNetwork){diagnosticNetwork=current;networkDiagnostics.invalidate();}
+    });
+    networkChangePoll.start(5000);
     MotionPolicy motionPolicy;
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("motionPolicy", &motionPolicy);
@@ -141,6 +155,8 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("previewTheme", previewTheme);
     engine.rootContext()->setContextProperty("smokeTestMode", smoke);
     engine.rootContext()->setContextProperty("systemProvider", &systemData);
+    engine.rootContext()->setContextProperty("networkDiagnostics", &networkDiagnostics);
+    engine.rootContext()->setContextProperty("isolatedRun", isolatedRun);
     engine.rootContext()->setContextProperty("backdrop", &backdrop);
     engine.rootContext()->setContextProperty("hdrOutput", &hdrOutput);
     engine.rootContext()->setContextProperty("captureProvider", &capture);

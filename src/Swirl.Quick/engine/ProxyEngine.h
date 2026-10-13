@@ -2,6 +2,7 @@
 #include <QObject>
 #include <QString>
 #include <QUrl>
+#include <QVariantMap>
 #include "ProxyNode.h"
 
 // Swirl-owned contract. No Mihomo JSON or transport objects cross this boundary.
@@ -61,6 +62,9 @@ public:
     virtual void probeNode(const QUrl &url) = 0;
     virtual Status status() const = 0;
     virtual QString configurationSummary() const = 0;
+    virtual QVariantMap telemetry() const {return {};}
+    virtual void closeConnection(const QString &) {}
 signals:
     void statusChanged();
+    void telemetryChanged();
 };

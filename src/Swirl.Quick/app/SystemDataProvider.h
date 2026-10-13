@@ -12,7 +12,7 @@ public:
     int revision() const { return m_revision; }
     Q_INVOKABLE void clearLogs() { m_logs.clear(); ++m_revision; emit dataChanged(); }
     Q_INVOKABLE QVariantMap currentNetwork() const;
-    Q_INVOKABLE QVariantList connections() const { return {}; }
+    Q_INVOKABLE QVariantList connections() const;
     Q_INVOKABLE QVariantList requests() const;
     Q_INVOKABLE QVariantList nodes() const;
     Q_INVOKABLE QVariantList logs() const { return m_logs; }

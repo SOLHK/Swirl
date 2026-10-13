@@ -23,6 +23,7 @@
 #endif
 
 MihomoAdapter::MihomoAdapter(QObject *parent) : ProxyEngine(parent) {
+    m_activity.setHistoryPath(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/activity-history.json");
     m_network.setProxy(QNetworkProxy::NoProxy);
     m_deadline.setSingleShot(true);
     m_killTimer.setSingleShot(true);
@@ -364,6 +365,8 @@ void MihomoAdapter::fail(Error error, const QString &message) {
 }
 
 void MihomoAdapter::cancelRequest() {
+    if(m_activityReply){m_activityReply->disconnect(this);m_activityReply->abort();m_activityReply->deleteLater();m_activityReply=nullptr;}
+    m_activity.reset();emit telemetryChanged();
     ++m_generation;
     if (m_reply) {
         auto *reply = m_reply.data(); m_reply = nullptr;
@@ -385,7 +388,7 @@ void MihomoAdapter::nodeFailure(const QString &message) {
 }
 static void boundReply(QNetworkReply *reply, int milliseconds) {
     auto *timer=new QTimer(reply); timer->setSingleShot(true);
-    QObject::connect(timer,&QTimer::timeout,reply,[reply]{reply->abort();});
+    QObject::connect(timer,&QTimer::timeout,reply,[reply]{reply->setProperty("swirlTimeout",true);reply->abort();});
     QObject::connect(reply,&QNetworkReply::finished,timer,&QTimer::stop);
     QObject::connect(reply,&QNetworkReply::readyRead,reply,[reply]{if(reply->bytesAvailable()>65536)reply->abort();});
     timer->start(milliseconds);
@@ -454,10 +457,11 @@ void MihomoAdapter::probeNode(const QUrl &url) {
             probe->deleteLater(); if(generation!=m_nodeGeneration)return; m_probeReply=nullptr;
             m_status.nodeBusy=false;
             const auto code=probe->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt(); m_status.responseCode=code;
-            const bool ok=probe->error()==QNetworkReply::NoError && code>=200 && code<400;
+            const bool ok=probe->error()==QNetworkReply::NoError && code>=200 && code<300;
             m_status.requestState=ok?RequestState::Succeeded:RequestState::Failed;
             m_status.nodeMessage=ok?QStringLiteral("真实请求成功：已通过所选节点完成请求（HTTP %1）。").arg(code)
-                :QStringLiteral("本机代理的实际请求失败（HTTP %1）；未使用直连回退。").arg(code);
+                :QStringLiteral("本机代理请求%1（HTTP %2，Qt 错误 %3：%4）；未使用直连回退。可在 Activity 的 Diagnostics 中检查多个端点和直连链路。")
+                    .arg(probe->property("swirlTimeout").toBool()?QStringLiteral("超时"):QStringLiteral("失败")).arg(code).arg(int(probe->error())).arg(probe->errorString());
             publish();
         });
     });
@@ -550,5 +554,41 @@ void MihomoAdapter::request(bool version) {
         m_status.mode = connected?QStringLiteral("rule"):QStringLiteral("direct");
         m_status.state = State::Running; m_status.apiHealthy = true;
         m_status.error = Error::None; m_status.message.clear(); m_deadline.stop(); publish();
+        sampleActivity();
     });
+}
+
+void MihomoAdapter::sampleActivity() {
+    if(m_activityReply || !m_status.apiHealthy)return;
+    const auto generation=m_generation;
+    QNetworkRequest request(QUrl(m_status.controlEndpoint+"/connections"));
+    request.setRawHeader("Authorization","Bearer "+m_secret);
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,QNetworkRequest::ManualRedirectPolicy);
+    auto *reply=m_network.get(request);m_activityReply=reply;
+    auto *timer=new QTimer(reply);timer->setSingleShot(true);
+    connect(timer,&QTimer::timeout,reply,&QNetworkReply::abort);
+    reply->setReadBufferSize(2*1024*1024+1);
+    connect(reply,&QNetworkReply::readyRead,reply,[reply]{if(reply->bytesAvailable()>2*1024*1024)reply->abort();});
+    connect(reply,&QNetworkReply::finished,this,[this,reply,timer,generation]{
+        timer->stop();reply->deleteLater();if(generation!=m_generation)return;m_activityReply=nullptr;
+        if(!m_status.apiHealthy){m_activity.reset();emit telemetryChanged();return;}
+        const auto json=QJsonDocument::fromJson(reply->readAll());
+        if(reply->error()==QNetworkReply::NoError && reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()==200 && json.isObject()) {
+            if(m_activity.ingest(json.object(),QDateTime::currentMSecsSinceEpoch())){emit telemetryChanged();return;}
+        }
+        // No stale success or fabricated zeroes after a failed sample.
+        m_activity.reset();emit telemetryChanged();
+    });
+    timer->start(m_options.requestTimeoutMs);
+}
+
+void MihomoAdapter::closeConnection(const QString &id) {
+    if(!m_status.apiHealthy || id.isEmpty())return;
+    const auto rows=m_activity.snapshot().value("connections").toList();
+    if(std::none_of(rows.cbegin(),rows.cend(),[&](const QVariant &row){return row.toMap().value("id").toString()==id;}))return;
+    QNetworkRequest request(QUrl(m_status.controlEndpoint+"/connections/"+QString::fromLatin1(QUrl::toPercentEncoding(id))));
+    request.setRawHeader("Authorization","Bearer "+m_secret);
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,QNetworkRequest::ManualRedirectPolicy);
+    auto *reply=m_network.deleteResource(request);boundReply(reply,m_options.requestTimeoutMs);
+    connect(reply,&QNetworkReply::finished,this,[this,reply]{reply->deleteLater();sampleActivity();});
 }

@@ -18,14 +18,15 @@ QtObject {
     property bool followSystemScale: appearanceSettings.followSystemScale
     readonly property real uiScale: followSystemScale ? 1.0 : appearanceSettings.savedScalePercent / 100.0
     readonly property bool dark: mode === "Dark" || (mode === "System" && Qt.styleHints.colorScheme === Qt.Dark)
-    // Opaque light surfaces separate the page from its white content cards.
-    readonly property color canvas: dark ? "#1E1E1E" : "#F7F7F8"
+    // Native compositor blur is tinted independently for sidebar, canvas and cards.
+    readonly property color canvasBase: dark ? "#1E1E1E" : "#F1F2F4"
+    readonly property color canvas: withAlpha(canvasBase, transparency && backdropActive ? 0.84 : 1.0)
     readonly property color surface: dark ? "#29292C" : "#FFFFFF"
     readonly property color raised: dark ? "#292929" : "#F7F7F7"
     // Neutral QML tint above the native window backdrop. Fall back to opacity 1.
-    readonly property color sidebarBase: dark ? "#292929" : "#E9E9EC"
+    readonly property color sidebarBase: dark ? "#292929" : "#E7EDF1"
     // Native per-pixel alpha preserves the shared corner outline.
-    readonly property real sidebarOpacity: transparency && backdropActive ? 0.96 : 1.0
+    readonly property real sidebarOpacity: transparency && backdropActive ? 0.65 : 1.0
     readonly property color sidebar: withAlpha(sidebarBase, sidebarOpacity)
     readonly property color border: dark ? "#454545" : "#E5E5E8"
     readonly property color glassRim: border
@@ -35,12 +36,15 @@ QtObject {
     readonly property color pillTop: dark ? "#333333" : "#F7F7F7"
     readonly property color pillBottom: pillTop
     readonly property color text: dark ? "#F5F5F5" : "#17181B"
-    readonly property color muted: dark ? "#BFC3CB" : "#596273"
+    readonly property color muted: dark ? "#BFC3CB" : "#707276"
     readonly property color accent: dark ? "#80B7FF" : "#0069D9"
     readonly property color speedAccent: dark ? "#80B7FF" : "#007AFF"
+    readonly property color uploadColor: "#6055D8"
+    readonly property color downloadColor: "#50BFE7"
+    readonly property color segmentSelected: dark ? "#65656A" : "#909094"
     readonly property color primaryControl: dark ? "#2165AF" : "#005BBF"
     readonly property color navigationAccent: dark ? "#9AC8FF" : "#005BBF"
-    readonly property color navigationSelected: dark ? "#53575E" : "#C4C7CD"
+    readonly property color navigationSelected: dark ? "#53575E" : "#D8E0E6"
     readonly property color navigationPressed: dark ? "#636871" : "#B4BAC3"
     readonly property color selected: dark ? "#484848" : "#E3E4E7"
     readonly property color hover: dark ? "#3A3A3A" : "#E3E3E3"
@@ -56,18 +60,20 @@ QtObject {
     // Logical design units: Qt applies screen DPI; dp applies only user UI zoom.
     // Large surfaces follow the supplied ~12 pt visual reference, while nested
     // cards and controls have smaller corners. Circular controls use geometry.
-    readonly property real windowRadius: dp(12)
+    readonly property real windowRadius: dp(14)
     readonly property real containerRadius: dp(12)
     readonly property real radius: containerRadius
-    readonly property real cardRadius: dp(10)
+    readonly property real cardRadius: dp(24)
     readonly property real popupRadius: dp(10)
     readonly property real secondaryRadius: popupRadius
-    readonly property real controlRadius: dp(8)
+    readonly property real controlRadius: dp(10)
     readonly property real buttonRadius: dp(10)
-    readonly property real sidebarWidth: dp(252)
+    readonly property real sidebarWidth: dp(242)
+    readonly property real navigationRadius: dp(12)
+    readonly property real pageMargin: dp(20)
     readonly property real space: dp(4)
-    readonly property real cardPadding: dp(16)
-    readonly property real gap: dp(12)
+    readonly property real cardPadding: dp(20)
+    readonly property real gap: dp(20)
     readonly property real borderWidth: dp(1)
     readonly property real shadowOpacity: 0.05
     readonly property string fontFamily: "Microsoft YaHei UI"

@@ -4,7 +4,7 @@ Rectangle {
     id:panel
     property string material: "content"
     property bool selected: false
-    property real cornerRadius: Theme.containerRadius
+    property real cornerRadius: Theme.cardRadius
     readonly property bool floating: material === "floating"
     radius: cornerRadius
     antialiasing: true

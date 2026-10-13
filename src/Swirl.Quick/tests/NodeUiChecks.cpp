@@ -8,6 +8,10 @@
 #include <QTest>
 #include <QClipboard>
 #include <QGuiApplication>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QNetworkProxy>
+#include <QTimer>
 #include <functional>
 
 int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
@@ -61,6 +65,41 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     check(QTest::qWaitFor([&]{return controller->apiHealthy();},15000),"UI imported node starts real Mihomo");
     fill("nodeTestUrl",net.url().toString());click("nodeTestButton");
     check(QTest::qWaitFor([&]{return !controller->nodeBusy();},8000) && controller->requestSucceeded(),"UI imported node forwards a real HTTP request");
+    // Exercise the Activity facade and termination against a held real stream.
+    // Its data travels through the owned Mihomo and the controlled SOCKS relay.
+    QTcpServer origin;
+    check(origin.listen(QHostAddress::LocalHost,0),"Activity stream origin opens on loopback");
+    net.a.targetPorts.append(origin.serverPort());
+    QPointer<QTcpSocket> held;
+    QObject::connect(&origin,&QTcpServer::newConnection,&origin,[&]{
+        auto *socket=origin.nextPendingConnection();held=socket;
+        QObject::connect(socket,&QTcpSocket::readyRead,socket,[socket]{
+            socket->readAll();if(socket->property("responded").toBool())return;
+            socket->setProperty("responded",true);
+            socket->write("HTTP/1.1 200 OK\r\nContent-Length: 10485760\r\nConnection: close\r\n\r\n");
+            auto *timer=new QTimer(socket);timer->setInterval(100);
+            QObject::connect(timer,&QTimer::timeout,socket,[socket]{if(socket->state()==QAbstractSocket::ConnectedState && socket->bytesToWrite()<65536)socket->write(QByteArray(4096,'x'));});timer->start();
+        });
+        QObject::connect(socket,&QTcpSocket::disconnected,socket,&QObject::deleteLater);
+    });
+    QNetworkAccessManager stream;
+    stream.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",controller->activeProxyPort()));
+    auto *reply=stream.get(QNetworkRequest(QUrl(QStringLiteral("http://127.0.0.1:%1/activity-check").arg(origin.serverPort()))));
+    QObject::connect(reply,&QNetworkReply::readyRead,reply,[reply]{reply->readAll();});
+    check(QTest::qWaitFor([&]{return !controller->telemetry().value("connections").toList().isEmpty() && controller->telemetry().value("down").toDouble()>0;},7000),"Activity receives real connection and throughput samples");
+    eval("AppState.navigate('activity')");QTest::qWait(350);
+    check(eval("pageLoader.item.available && pageLoader.item.stats.down>0 && pageLoader.item.rankings.length>0").toBool(),"Activity binds live engine speed and ranking rows");
+    const auto capturePath=qEnvironmentVariable("SWIRL_ACTIVITY_SCREENSHOT");
+    if(!capturePath.isEmpty()) {
+        window->resize(1144,840);QTest::qWait(4500);
+        check(window->grabWindow().save(capturePath),"Activity real-stream running screenshot saved");
+        window->resize(1450,884);
+    }
+    const auto connections=controller->telemetry().value("connections").toList();
+    if(!connections.isEmpty())controller->closeConnection(connections.first().toMap().value("id").toString());
+    check(QTest::qWaitFor([&]{return reply->isFinished();},4000),"terminate connection closes actual Mihomo stream");
+    reply->abort();reply->deleteLater();
+    eval("AppState.navigate('proxies')");QTest::qWait(350);
     controller->stop();check(QTest::qWaitFor([&]{return !controller->processAlive();},4000),"UI imported node cleanup reaps owned engine");
     controller->deleteNode(controller->nodes().first().toMap().value("id").toString());
     qInfo()<<"Node UI checks:"<<checks<<"checks,"<<failures<<"failures";return failures?2:0;

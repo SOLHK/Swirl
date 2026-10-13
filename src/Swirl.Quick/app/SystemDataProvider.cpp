@@ -8,6 +8,7 @@
 #include <QUrl>
 
 SystemDataProvider::SystemDataProvider(CaptureService *capture,EngineController *engine):m_capture(capture),m_engine(engine) {
+    connect(engine,&EngineController::telemetryChanged,this,[this]{++m_revision;emit dataChanged();});
     connect(capture,&CaptureService::sessionsChanged,this,[this]{++m_revision;emit dataChanged();});
     connect(engine,&EngineController::statusChanged,this,[this]{
         m_logs.prepend(QVariantMap{{"time",QDateTime::currentDateTime().toString("HH:mm:ss")},
@@ -21,7 +22,10 @@ QVariantMap SystemDataProvider::currentNetwork() const {
         const auto flags=iface.flags();
         if(!(flags&QNetworkInterface::IsUp) || !(flags&QNetworkInterface::IsRunning) || (flags&QNetworkInterface::IsLoopBack))continue;
         if(iface.type()!=QNetworkInterface::Wifi && iface.type()!=QNetworkInterface::Ethernet)continue;
-        if(!iface.addressEntries().isEmpty())return {{"type",iface.type()==QNetworkInterface::Wifi?"Wi-Fi":"以太网"},{"name",iface.humanReadableName()}};
+        if(!iface.addressEntries().isEmpty()) {
+            QStringList addresses;for(const auto &entry:iface.addressEntries())addresses.append(entry.ip().toString());
+            return {{"type",iface.type()==QNetworkInterface::Wifi?"Wi-Fi":"以太网"},{"name",iface.humanReadableName()},{"addresses",addresses}};
+        }
     }
     return {{"type","未连接"},{"name","无活动网络接口"}};
 }
@@ -31,4 +35,5 @@ QVariantList SystemDataProvider::requests() const {
     return result;
 }
 QVariantList SystemDataProvider::nodes() const { return m_engine->nodes(); }
+QVariantList SystemDataProvider::connections() const {return m_engine->telemetry().value("connections").toList();}
 bool SystemDataProvider::copyText(const QString &text) const { if(auto *clipboard=QGuiApplication::clipboard()){clipboard->setText(text);return true;}return false; }

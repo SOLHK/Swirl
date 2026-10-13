@@ -8,6 +8,7 @@ Item {
     id:page
     property var selected:null
     property var visibleRows:{
+        var revision=systemProvider.revision
         var q=search.text.toLowerCase()
         var s=sort.currentText
         var state=status.currentText
@@ -100,7 +101,8 @@ Item {
 
                     SwirlButton {
                         Layout.fillWidth:true; text:AppState.zh("Terminate connection"); danger:true
-                        onClicked:AppState.notice("Terminate connection")
+                        enabled:page.selected!==null && page.selected.status==="Active"
+                        onClicked:{engineController.closeConnection(page.selected.id);page.selected=null}
                     }
 
                 }

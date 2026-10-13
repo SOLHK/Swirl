@@ -2,6 +2,7 @@
 #include <QQuickWindow>
 #include <QQuickItem>
 #include <QTimer>
+#include <QPointer>
 #include <QSGRendererInterface>
 #include <QGuiApplication>
 #include <QDateTime>
@@ -63,7 +64,12 @@ void MotionPolicy::setTransitioning(bool active) {
 }
 void MotionPolicy::leavePage(QObject *page) {
     if(!page)return;
-    for(auto *child:page->findChildren<QObject *>()) {
+    QList<QPointer<QObject>> children;
+    for(auto *child:page->findChildren<QObject *>())children.append(child);
+    // Closing a popup can synchronously destroy its overlay descendants.
+    // Guard the snapshot rather than dereferencing freed children afterwards.
+    for(const auto &child:children) {
+        if(!child)continue;
         if(child->property("opened").isValid() && child->metaObject()->indexOfMethod("close()")>=0)
             QMetaObject::invokeMethod(child,"close");
     }

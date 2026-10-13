@@ -37,6 +37,7 @@ class EngineController final : public QObject {
     Q_PROPERTY(int activeProxyPort READ activeProxyPort NOTIFY statusChanged)
     Q_PROPERTY(NodeImportService* imports READ imports CONSTANT)
     Q_PROPERTY(QStringList supportedProtocols READ supportedProtocols CONSTANT)
+    Q_PROPERTY(QVariantMap telemetry READ telemetry NOTIFY telemetryChanged)
 public:
     explicit EngineController(std::unique_ptr<ProxyEngine> engine, QObject *parent = nullptr, QString storePath = {});
     QString executablePath() const { return m_options.executablePath; }
@@ -75,6 +76,8 @@ public:
     int proxyPort() const { return m_options.proxyPort; }
     int activeProxyPort() const { return m_engine->status().proxyPort; }
     void setProxyPort(int port);
+    QVariantMap telemetry() const {return m_engine->telemetry();}
+    Q_INVOKABLE void closeConnection(const QString &id) {m_engine->closeConnection(id);}
     Q_INVOKABLE bool saveNode(const QVariantMap &input);
     Q_INVOKABLE bool deleteNode(const QString &id);
     Q_INVOKABLE bool chooseNode(const QString &id);
@@ -82,6 +85,7 @@ public:
     Q_INVOKABLE void testNode(const QUrl &url);
     Q_INVOKABLE void disconnectNode();
 signals:
+    void telemetryChanged();
     void statusChanged();
     void optionsChanged();
     void nodesChanged();

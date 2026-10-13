@@ -1,6 +1,7 @@
 #pragma once
 #include "ProxyEngine.h"
 #include "OwnedProcess.h"
+#include "ActivityTelemetry.h"
 #include <QElapsedTimer>
 #include <QNetworkAccessManager>
 #include <QPointer>
@@ -23,6 +24,8 @@ public:
     void probeNode(const QUrl &url) override;
     Status status() const override;
     QString configurationSummary() const override;
+    QVariantMap telemetry() const override {return m_status.apiHealthy?m_activity.snapshot():QVariantMap();}
+    void closeConnection(const QString &id) override;
 private:
     enum class Stage { Version, ValidateConfig, Engine };
     void launch(Stage stage);
@@ -31,6 +34,9 @@ private:
     void fail(Error error, const QString &message);
     void cancelRequest();
     void request(bool version);
+    void sampleActivity();
+    ActivityTelemetry m_activity;
+    QPointer<QNetworkReply> m_activityReply;
     void apiFailure(Error error, const QString &message);
     bool prepareConfiguration();
     bool reserveControlPort();
