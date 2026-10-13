@@ -16,12 +16,12 @@ void NodeTestService::start(const EngineStartOptions &options,const QStringList 
 }
 void NodeTestService::next(){
  while(m_running.size()<3&&!m_queue.isEmpty()){
-  const auto id=m_queue.dequeue();auto opts=m_options;opts.selectedNodeId=id;opts.smartRouting=false;opts.routingMode="rule";opts.controlPort=freePort();opts.proxyPort=freePort();opts.healthIntervalMs=2000;opts.requestTimeoutMs=3000;
+  const auto id=m_queue.dequeue();auto opts=m_options;opts.selectedNodeId=id;opts.smartRouting=false;opts.routingMode="rule";opts.controlPort=freePort();opts.proxyPort=freePort();opts.healthIntervalMs=2000;opts.requestTimeoutMs=3000;opts.startupTimeoutMs=20000;
   while(opts.controlPort==opts.proxyPort&&opts.controlPort)opts.proxyPort=freePort();
   // Include only the selected node and its explicit dialer dependencies.
   QSet<QString> needed{id};bool added=true;while(added){added=false;for(const auto &node:m_options.nodes)if(needed.contains(node.id)){const auto dependency=node.parameters.value("dialer-proxy").toString();for(const auto &other:m_options.nodes)if(other.sourceId==node.sourceId&&(other.name==dependency||other.id==dependency)&&!needed.contains(other.id)){needed.insert(other.id);added=true;}}}
   opts.nodes.clear();for(const auto &node:m_options.nodes)if(needed.contains(node.id))opts.nodes.append(node);
-  auto runner=new MihomoAdapter(this);m_running[id]=runner;auto deadline=new QTimer(runner);deadline->setSingleShot(true);deadline->setInterval(23000);
+  auto runner=new MihomoAdapter(this);m_running[id]=runner;auto deadline=new QTimer(runner);deadline->setSingleShot(true);deadline->setInterval(40000);
   connect(deadline,&QTimer::timeout,this,[this,runner,id]{finish(id,runner,{{"success",false},{"latency",-1},{"http",0},{"error","节点测试超时"}});});deadline->start();
   connect(runner,&ProxyEngine::statusChanged,this,[this,runner,id]{
    if(m_running.value(id)!=runner)return;const auto status=runner->status();
