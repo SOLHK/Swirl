@@ -52,7 +52,8 @@
 // does not attach stderr to GitHub Actions' PowerShell console.
 static void recordQtDiagnostic(QtMsgType type, const QMessageLogContext &, const QString &message)
 {
-    QFile file(QCoreApplication::applicationDirPath() + QStringLiteral("/Swirl-diagnostics.txt"));
+    const auto name=qApp->property("qtDiagnosticFile").toString();
+    QFile file(QCoreApplication::applicationDirPath()+"/"+(name.isEmpty()?QStringLiteral("Swirl-diagnostics.txt"):name));
     if (!file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
         return;
     QTextStream out(&file);
@@ -161,6 +162,7 @@ int main(int argc, char *argv[])
     const QString previewPage = argumentValue(QStringLiteral("--preview-page="));
     const QString previewTheme = argumentValue(QStringLiteral("--preview-theme="));
     if (nodeTest || motionTest || previewMode || engineTest || hdrDisplayTest || hdrTest || smoke || interaction || captureTest || windowTest || !previewPath.isEmpty()) {
+        if(nodeTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-node-ui-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-node-ui-diagnostics.txt");}
         QFile::remove(QCoreApplication::applicationDirPath() + QStringLiteral("/Swirl-diagnostics.txt"));
         qInstallMessageHandler(recordQtDiagnostic);
     }

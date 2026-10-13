@@ -32,8 +32,10 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     fill("nodeHostField","127.0.0.1");click("nodeSaveButton");check(controller->nodes().size()==1,"UI saves first real node");
     click("nodeAddButton");fill("nodeNameField","B");fill("nodeHostField","127.0.0.1");fill("nodePortField",QString::number(net.b.serverPort()));fill("nodeUsernameField",QString::fromUtf8(net.b.username));fill("nodePasswordField",QString::fromUtf8(net.b.password));
     check(item("nodePasswordField")&&item("nodePasswordField")->property("echoMode").toInt()==2,"credential field is masked");click("nodeSaveButton");check(controller->nodes().size()==2,"UI saves authenticated SOCKS5 node");
-    QTcpServer port;port.listen(QHostAddress::LocalHost,0);controller->setProxyPort(port.serverPort());port.close();
-    port.listen(QHostAddress::LocalHost,0);controller->setControlPort(port.serverPort());port.close();
+    QTcpServer proxyPort,controlPort;
+    if(!check(proxyPort.listen(QHostAddress::LocalHost,0)&&controlPort.listen(QHostAddress::LocalHost,0),"distinct UI test ports are reserved together"))return 2;
+    controller->setProxyPort(proxyPort.serverPort());controller->setControlPort(controlPort.serverPort());
+    proxyPort.close();controlPort.close();
     select(0);click("nodeConnectButton");
     if(check(QTest::qWaitFor([&]{return controller->apiHealthy();},15000),"UI starts actual pinned Mihomo")) {
         check(!controller->requestSucceeded(),"running engine does not imply successful request");fill("nodeTestUrl",net.url().toString());click("nodeTestButton");
