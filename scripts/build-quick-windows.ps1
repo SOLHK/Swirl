@@ -56,10 +56,13 @@ try {
     }
     New-Item -ItemType Directory -Force $DistDir,$OutDir | Out-Null
     Copy-Item -LiteralPath $exe -Destination $DistDir
+    Copy-Item -LiteralPath (Join-Path (Split-Path $exe) 'SwirlProxyGuard.exe') -Destination $DistDir
+    Copy-Item -LiteralPath 'src/Swirl.Quick/packaging/rules' -Destination (Join-Path $DistDir 'rules') -Recurse
     Copy-Item -LiteralPath (Join-Path (Split-Path $exe) 'core') -Destination (Join-Path $DistDir 'core') -Recurse
     $icon = Join-Path (Resolve-Path $BuildDir).Path "brand/Swirl.ico"
     if (!(Test-Path -LiteralPath $icon)) { throw "SVG-derived icon is missing: $icon" }
-    Copy-Item -LiteralPath $icon -Destination (Join-Path $DistDir "Swirl-brand-100.ico")
+    Copy-Item -LiteralPath $icon -Destination (Join-Path $DistDir "Swirl-brand-phase3.ico")
+    Copy-Item -LiteralPath $icon -Destination (Join-Path $DistDir "Swirl-brand-phase3-v2.ico")
     & "$qt/bin/windeployqt.exe" --release --qmldir src/Swirl.Quick/qml (Join-Path $DistDir "Swirl.exe")
     if ($LASTEXITCODE) { throw "Qt runtime deployment failed." }
     Copy-Item src/Swirl.Quick/packaging/THIRD_PARTY_NOTICES.txt $DistDir

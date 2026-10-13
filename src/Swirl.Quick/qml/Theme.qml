@@ -19,13 +19,14 @@ QtObject {
     readonly property real uiScale: followSystemScale ? 1.0 : appearanceSettings.savedScalePercent / 100.0
     readonly property bool dark: mode === "Dark" || (mode === "System" && Qt.styleHints.colorScheme === Qt.Dark)
     // Opaque light surfaces separate the page from its white content cards.
-    readonly property color canvas: dark ? "#1E1E1E" : "#F7F7F8"
+    readonly property color canvasBase: dark ? "#1E1E1E" : "#F1F2F4"
+    readonly property color canvas: withAlpha(canvasBase, transparency && backdropActive ? 0.84 : 1.0)
     readonly property color surface: dark ? "#29292C" : "#FFFFFF"
     readonly property color raised: dark ? "#292929" : "#F7F7F7"
     // Neutral QML tint above the native window backdrop. Fall back to opacity 1.
     readonly property color sidebarBase: dark ? "#292929" : "#E9E9EC"
     // Native per-pixel alpha preserves the shared corner outline.
-    readonly property real sidebarOpacity: transparency && backdropActive ? 0.96 : 1.0
+    readonly property real sidebarOpacity: transparency && backdropActive ? 0.65 : 1.0
     readonly property color sidebar: withAlpha(sidebarBase, sidebarOpacity)
     readonly property color border: dark ? "#454545" : "#E5E5E8"
     readonly property color glassRim: border
@@ -49,6 +50,7 @@ QtObject {
     readonly property color focusBorder: dark ? "#9AC8FF" : "#005BBF"
     readonly property color buttonBase: dark ? "#333333" : "#F7F7F7"
     readonly property color field: dark ? "#353535" : "#F6F6F6"
+    readonly property color capsuleSurface: dark ? "#38383C" : "#ECEDEF"
     readonly property color green: dark ? "#75DD91" : "#00852A"
     readonly property color statusGreen: dark ? "#75DD91" : "#00B832"
     readonly property color orange: dark ? "#F5C67D" : "#976217"
@@ -56,18 +58,26 @@ QtObject {
     // Logical design units: Qt applies screen DPI; dp applies only user UI zoom.
     // Large surfaces follow the supplied ~12 pt visual reference, while nested
     // cards and controls have smaller corners. Circular controls use geometry.
-    readonly property real windowRadius: dp(12)
+    readonly property real windowRadius: dp(14)
     readonly property real containerRadius: dp(12)
     readonly property real radius: containerRadius
-    readonly property real cardRadius: dp(10)
+    readonly property real cardRadius: dp(24)
     readonly property real popupRadius: dp(10)
     readonly property real secondaryRadius: popupRadius
     readonly property real controlRadius: dp(8)
     readonly property real buttonRadius: dp(10)
-    readonly property real sidebarWidth: dp(252)
+    readonly property real sidebarWidth: dp(242)
+    readonly property real navigationRadius: dp(12)
+    readonly property real pageMargin: dp(20)
+    readonly property color uploadColor: "#6055D8"
+    readonly property color downloadColor: "#50BFE7"
+    readonly property color segmentSelected: dark ? "#65656A" : "#737378"
     readonly property real space: dp(4)
-    readonly property real cardPadding: dp(16)
-    readonly property real gap: dp(12)
+    readonly property real cardPadding: dp(20)
+    readonly property real subCardRadius: dp(10)
+    readonly property real capsuleHeight: dp(32)
+    readonly property real groupGap: dp(10)
+    readonly property real gap: dp(20)
     readonly property real borderWidth: dp(1)
     readonly property real shadowOpacity: 0.05
     readonly property string fontFamily: "Microsoft YaHei UI"

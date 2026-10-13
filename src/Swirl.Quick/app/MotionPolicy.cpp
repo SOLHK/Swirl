@@ -6,6 +6,7 @@
 #include <QGuiApplication>
 #include <QDateTime>
 #include <QScreen>
+#include <QSettings>
 #include <QAbstractNativeEventFilter>
 #ifdef Q_OS_WIN
 #define WIN32_LEAN_AND_MEAN
@@ -39,6 +40,13 @@ bool MotionPolicy::systemReducedMotion() const {
 #endif
     return false;
 }
+bool MotionPolicy::alwaysShowScrollbars() const {
+#ifdef Q_OS_WIN
+    return QSettings("HKEY_CURRENT_USER\\Control Panel\\Accessibility",QSettings::NativeFormat).value("DynamicScrollbars",1).toInt()==0;
+#else
+    return false;
+#endif
+}
 void MotionPolicy::attach(QQuickWindow *window) {
     m_clock.start();
     // Software rendering uses inexpensive spatial transitions without texture grabs.
@@ -63,7 +71,12 @@ void MotionPolicy::setTransitioning(bool active) {
 }
 void MotionPolicy::leavePage(QObject *page) {
     if(!page)return;
-    for(auto *child:page->findChildren<QObject *>()) {
+    // Closing a popup may synchronously destroy its delegate/animation children.
+    // A raw findChildren list then contains dangling pointers on the next step.
+    QList<QPointer<QObject>> children;
+    for(auto *child:page->findChildren<QObject *>())children.append(child);
+    for(const auto &guard:children) {
+        auto *child=guard.data();if(!child)continue;
         if(child->property("opened").isValid() && child->metaObject()->indexOfMethod("close()")>=0)
             QMetaObject::invokeMethod(child,"close");
     }

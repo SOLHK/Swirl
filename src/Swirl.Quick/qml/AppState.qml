@@ -1,18 +1,18 @@
 pragma Singleton
 import QtQuick
 QtObject {
-    property string currentPage: "overview"
+    property string currentPage: "activity"
     property bool sidebarCollapsed: false
     readonly property string connectionState: engineController.stateText
-    readonly property bool proxyOn: engineController.requestSucceeded
-    readonly property bool systemProxyOn: false
+    readonly property bool proxyOn: engineController.apiHealthy && engineController.activeNodeId.length>0
+    readonly property bool systemProxyOn: engineController.systemProxy.enabled
     readonly property bool tunOn: false
     property bool detailOpen: true
-    readonly property string mode: engineController.activeNodeId.length?"固定节点":"直连"
+    readonly property string mode: engineController.routingMode==="rule"?"规则":engineController.routingMode==="global"?"全局":"直连"
     readonly property string policy: "固定节点"
     readonly property string selectedNode: engineController.selectedNodeName
     readonly property string selectedNodeRegion: "—"
-    readonly property string selectedNodeProtocol: "—"
+    readonly property string selectedNodeProtocol: (engineController.nodes.find(function(n){return n.id===engineController.selectedNodeId})||{}).protocol||"—"
     readonly property int selectedNodeLatency: -1
     function selectNode(node) { engineController.chooseNode(node.id) }
     property string toast: ""
@@ -21,7 +21,7 @@ QtObject {
     property bool empty: false
     property bool autoSwitch: false
     property int historyIndex: 0
-    property var navigationHistory: ["overview"]
+    property var navigationHistory: ["activity"]
     property date sessionNow: new Date()
     property var recentEvents: []
     property real measuredDown: 0
@@ -30,11 +30,12 @@ QtObject {
     property int measurementTick: 0
     readonly property real totalGB: 0
     readonly property var navigationGroups: [
-        {title:"",pages:[{id:"overview",title:"总览",icon:"home"},{id:"proxies",title:"代理节点",icon:"pin"},{id:"policies",title:"策略组",icon:"layers"},{id:"rules",title:"规则",icon:"document"},{id:"subscriptions",title:"订阅管理",icon:"refresh"},{id:"profiles",title:"配置文件",icon:"file"}]},
-        {title:"网络",pages:[{id:"dns",title:"DNS",icon:"globe"},{id:"toolbox",title:"网络检测",icon:"gauge"},{id:"connections",title:"连接记录",icon:"clock"}]},
-        {title:"分析与调试",pages:[{id:"inspector",title:"HTTP 检查器",icon:"code"},{id:"traffic",title:"流量分析",icon:"bars"},{id:"processes",title:"进程",icon:"sliders"},{id:"gateway",title:"设备",icon:"calendar"},{id:"requestlogs",title:"请求日志",icon:"help"},{id:"tls",title:"HTTPS 解密",icon:"shield"},{id:"rewrite",title:"重写",icon:"route"}]}
+        {title:"",pages:[{id:"activity",title:"活动",icon:"activity"},{id:"overview",title:"总览",icon:"home"}]},
+        {title:"客户端",pages:[{id:"processes",title:"进程",icon:"sliders"},{id:"connections",title:"连接记录",icon:"clock"}]},
+        {title:"代理",pages:[{id:"proxies",title:"代理节点",icon:"pin"},{id:"policies",title:"策略组",icon:"layers"},{id:"rules",title:"规则",icon:"document"},{id:"subscriptions",title:"订阅管理",icon:"refresh"}]},
+        {title:"HTTP",pages:[{id:"capture",title:"抓包",icon:"capture"},{id:"tls",title:"HTTPS 解密",icon:"shield"}]}
     ]
-    readonly property var allPageIds: groups.reduce(function(all,g){return all.concat(g.pages.map(function(p){return p.id}))},[]).concat(["featurehub","external","processes","requestlogs"]).concat(FeatureCatalog.entries.filter(function(f){return f.id.indexOf("feature-")===0}).map(function(f){return f.id}))
+    readonly property var allPageIds: groups.reduce(function(all,g){return all.concat(g.pages.map(function(p){return p.id}))},[]).concat(["activity","more","featurehub","external","processes","requestlogs"]).concat(FeatureCatalog.entries.filter(function(f){return f.id.indexOf("feature-")===0}).map(function(f){return f.id}))
     function navigate(id) {
         if (currentPage === id) return
         navigationHistory = navigationHistory.slice(0,historyIndex+1).concat([id])
@@ -378,6 +379,8 @@ QtObject {
         return result.replace(/\s*\(sample\)/g,"").replace(/\s*·\s*$/g,"")
     }
     function page(id) {
+        if(id==="activity")return {id:id,title:"活动",sub:"真实网络活动"}
+        if(id==="more")return {id:id,title:"更多",sub:"全部功能与应用设置"}
         if(id==="processes")return {id:id,title:"进程",sub:"进程流量"}
         if(id==="requestlogs")return {id:id,title:"请求日志",sub:"请求历史"}
         if(id==="featurehub") return {id:id,title:"功能模块中心",sub:"全部功能与配置草稿"}

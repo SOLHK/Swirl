@@ -30,6 +30,7 @@
 #include "app/MotionPolicy.h"
 #ifdef SWIRL_UI_TESTS
 #include "tests/OverviewChecks.h"
+#include "tests/RuntimeEvidence.h"
 #include "tests/CaptureChecks.h"
 #include "tests/WindowChecks.h"
 #include "tests/HdrChecks.h"
@@ -40,6 +41,8 @@
 #include "app/SystemDataProvider.h"
 #include "app/WindowsBackdrop.h"
 #include "app/SvgIconProvider.h"
+#include "app/BrandRaster.h"
+#include "app/DiagnosticService.h"
 #include "app/HdrOutput.h"
 #include "network/CaptureService.h"
 #include "engine/MihomoAdapter.h"
@@ -49,7 +52,8 @@
 // does not attach stderr to GitHub Actions' PowerShell console.
 static void recordQtDiagnostic(QtMsgType type, const QMessageLogContext &, const QString &message)
 {
-    QFile file(QCoreApplication::applicationDirPath() + QStringLiteral("/Swirl-diagnostics.txt"));
+    const auto name=qApp->property("qtDiagnosticFile").toString();
+    QFile file(QCoreApplication::applicationDirPath()+"/"+(name.isEmpty()?QStringLiteral("Swirl-diagnostics.txt"):name));
     if (!file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text))
         return;
     QTextStream out(&file);
@@ -69,14 +73,29 @@ int main(int argc, char *argv[])
     app.setApplicationName(QStringLiteral("Swirl"));
     app.setOrganizationName(QStringLiteral("SOLHK"));
     app.setOrganizationDomain(QStringLiteral("solhk.dev"));
-    app.setApplicationVersion(QStringLiteral("1.0.0-preview"));
+    app.setApplicationVersion(QStringLiteral("1.0.0-phase3-preview"));
+#ifdef SWIRL_UI_TESTS
+#ifdef Q_OS_WIN
+    // Read-only native QA capture, limited to the actual Windows taskbar.
+    for(const auto &argument:app.arguments())if(argument.startsWith("--capture-taskbar=")) {
+        const auto taskbar=FindWindowW(L"Shell_TrayWnd",nullptr);
+        if(!taskbar||!app.primaryScreen())return 3;
+        RECT area{};if(!GetWindowRect(taskbar,&area))return 3;
+        // The taskbar itself uses DirectComposition, so its window DC is
+        // black. Capture the composed desktop and retain only its taskbar ROI.
+        const auto desktop=app.primaryScreen()->grabWindow(0);
+        const auto origin=app.primaryScreen()->geometry().topLeft()*app.primaryScreen()->devicePixelRatio();
+        const auto shot=desktop.copy(area.left-origin.x(),area.top-origin.y(),area.right-area.left,area.bottom-area.top);
+        return !shot.isNull()&&shot.save(argument.mid(QStringLiteral("--capture-taskbar=").size()))?0:4;
+    }
+#endif
+#endif
     // Rasterize the canonical mark at every Windows icon size. This works even
     // when the optional SVG QIcon plugin is missing and avoids the old wind logo.
-    QSvgRenderer brand(QStringLiteral(":/swirl/icons/swirl_knot_light.svg"));
+    QSvgRenderer brand(QStringLiteral(":/swirl/icons/swirl_knot_mark_light.svg"));
     QIcon icon;
     for(int size:{16,20,24,32,40,48,64,128,256}) {
-        QPixmap pixmap(size,size);pixmap.fill(Qt::transparent);
-        QPainter painter(&pixmap);brand.render(&painter);painter.end();icon.addPixmap(pixmap);
+        icon.addPixmap(QPixmap::fromImage(swirlBrandRaster(brand,size)));
     }
     app.setWindowIcon(icon);
     // Native Windows Qt Quick Controls do not support custom backgrounds/content.
@@ -90,7 +109,16 @@ int main(int argc, char *argv[])
     const bool hdrDisplayTest=app.arguments().contains("--hdr-display-test");
     const bool nodeTest=app.arguments().contains("--node-self-test");
     const bool engineTest=app.arguments().contains("--engine-self-test");
-    const bool isolatedRun=nodeTest||motionTest||engineTest||hdrDisplayTest||hdrTest||app.arguments().contains("--interaction-test")||app.arguments().contains("--capture-self-test")||app.arguments().contains("--smoke-test")||app.arguments().contains("--window-test")||previewMode;
+    QString runtimeStore,runtimeCommands,runtimeState;
+#ifdef SWIRL_UI_TESTS
+    for(const auto &argument:app.arguments()){
+        if(argument.startsWith("--runtime-store="))runtimeStore=argument.mid(16);
+        if(argument.startsWith("--runtime-commands="))runtimeCommands=argument.mid(19);
+        if(argument.startsWith("--runtime-state="))runtimeState=argument.mid(16);
+    }
+#endif
+    const bool realAcceptance=!runtimeStore.isEmpty()&&!runtimeCommands.isEmpty()&&!runtimeState.isEmpty();
+    const bool isolatedRun=realAcceptance||nodeTest||motionTest||engineTest||hdrDisplayTest||hdrTest||app.arguments().contains("--interaction-test")||app.arguments().contains("--capture-self-test")||app.arguments().contains("--smoke-test")||app.arguments().contains("--window-test")||previewMode;
     if(isolatedRun) {
         QStandardPaths::setTestModeEnabled(true);
         QSettings::setDefaultFormat(QSettings::IniFormat);
@@ -104,8 +132,10 @@ int main(int argc, char *argv[])
     CaptureService capture;
     ModuleDraftStore drafts;
     QTemporaryDir isolatedNodes;
-    EngineController engineController(std::make_unique<MihomoAdapter>(),nullptr,isolatedRun?isolatedNodes.filePath("nodes.dpapi"):QString());
-    SystemDataProvider systemData(&capture,&engineController);
+    EngineController engineController(std::make_unique<MihomoAdapter>(),nullptr,realAcceptance?runtimeStore:isolatedRun?isolatedNodes.filePath("nodes.dpapi"):QString(),realAcceptance);
+    DiagnosticService diagnostics(isolatedRun?isolatedNodes.filePath("diagnostics"):QString());
+    diagnostics.installQtHandler();
+    SystemDataProvider systemData(&capture,&engineController,&diagnostics);
     MotionPolicy motionPolicy;
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("motionPolicy", &motionPolicy);
@@ -132,15 +162,18 @@ int main(int argc, char *argv[])
     const QString previewPage = argumentValue(QStringLiteral("--preview-page="));
     const QString previewTheme = argumentValue(QStringLiteral("--preview-theme="));
     if (nodeTest || motionTest || previewMode || engineTest || hdrDisplayTest || hdrTest || smoke || interaction || captureTest || windowTest || !previewPath.isEmpty()) {
+        if(nodeTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-node-ui-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-node-ui-diagnostics.txt");}
         QFile::remove(QCoreApplication::applicationDirPath() + QStringLiteral("/Swirl-diagnostics.txt"));
         qInstallMessageHandler(recordQtDiagnostic);
     }
+    engine.rootContext()->setContextProperty("isolatedRun", isolatedRun);
     engine.rootContext()->setContextProperty("previewPage", previewPage);
     engine.rootContext()->setContextProperty("previewCaptureMode", previewMode);
     engine.rootContext()->setContextProperty("gpuEffectsSupported", QQuickWindow::graphicsApi()!=QSGRendererInterface::Software && qEnvironmentVariable("QT_QUICK_BACKEND")!=QStringLiteral("software"));
     engine.rootContext()->setContextProperty("previewTheme", previewTheme);
     engine.rootContext()->setContextProperty("smokeTestMode", smoke);
     engine.rootContext()->setContextProperty("systemProvider", &systemData);
+    engine.rootContext()->setContextProperty("diagnostics", &diagnostics);
     engine.rootContext()->setContextProperty("backdrop", &backdrop);
     engine.rootContext()->setContextProperty("hdrOutput", &hdrOutput);
     engine.rootContext()->setContextProperty("captureProvider", &capture);
@@ -154,6 +187,9 @@ int main(int argc, char *argv[])
         return 1;
     auto *rootWindow = qobject_cast<QQuickWindow *>(engine.rootObjects().constFirst());
     if(rootWindow)rootWindow->setIcon(icon);
+#ifdef SWIRL_UI_TESTS
+    if(realAcceptance&&rootWindow)startRuntimeEvidence(rootWindow,&engineController,&systemData,&diagnostics,runtimeCommands,runtimeState);
+#endif
     hdrOutput.attach(rootWindow);
     if(nodeTest) {
 #ifdef SWIRL_UI_TESTS
@@ -246,7 +282,8 @@ int main(int argc, char *argv[])
     if (windowTest) {
 #ifdef SWIRL_UI_TESTS
         const auto output=argumentValue(QStringLiteral("--window-test-output="));
-        QTimer::singleShot(400,&app,[&app,rootWindow,&backdrop,output]{app.exit(runWindowChecks(rootWindow,&backdrop,output));});
+        const auto delay=qBound(400,argumentValue(QStringLiteral("--window-test-delay=")).toInt(),30000);
+        QTimer::singleShot(delay,&app,[&app,rootWindow,&backdrop,output]{app.exit(runWindowChecks(rootWindow,&backdrop,output));});
 #else
         return 4;
 #endif

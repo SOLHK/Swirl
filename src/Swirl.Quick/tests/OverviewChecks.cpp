@@ -71,10 +71,11 @@ int runOverviewChecks(QQuickWindow *window)
         QElapsedTimer settling;settling.start();
         while(state("pageLoader.moving || pageLoader.pendingGrab").toBool() && settling.elapsed()<2500)QTest::qWait(20);
     };
+    state("AppState.navigate('overview')");QTest::qWait(350);
     check(state("AppState.measuredDown === 0 && AppState.measuredUp === 0 && AppState.measuredConnections === 0").toBool(),"offline counters zero");
     check(state("AppState.connectionState === '已停止' && !AppState.proxyOn").toBool(),"overview shows actual stopped engine");
-    check(state("Theme.canvas.toString() === '#f7f7f8' && Theme.surface.toString() === '#ffffff'").toBool(),"all pages share neutral canvas and white card tokens");
-    check(state("Theme.windowRadius === 12 && Theme.containerRadius === 12 && Theme.cardRadius === 10 && Theme.popupRadius === 10 && Theme.controlRadius === 8 && Theme.pillRadius(32) === 10 && Theme.roundedRadius(100,24) === 8").toBool(),"window, containers, cards, popups and controls follow the shared radius hierarchy");
+    check(state("Theme.canvas.toString() === '#f1f2f4' && Theme.surface.toString() === '#ffffff'").toBool(),"all pages share neutral canvas and white card tokens");
+    check(state("Theme.windowRadius === 14 && Theme.containerRadius === 12 && Theme.cardRadius === 24 && Theme.popupRadius === 10 && Theme.controlRadius === 8 && Theme.pillRadius(32) === 10 && Theme.roundedRadius(100,24) === 8").toBool(),"window, containers, cards, popups and controls follow the shared radius hierarchy");
     const auto lightSelected=state("Theme.navigationSelected").value<QColor>();
     const auto lightSidebar=state("Theme.sidebarBase").value<QColor>();
     check(lightSidebar.green()-lightSelected.green()>=30,"light navigation selection is clearly darker than the sidebar");
@@ -96,7 +97,7 @@ int runOverviewChecks(QQuickWindow *window)
     for(int percent : {75,100,125,150}) {
         state(QStringLiteral("Theme.setScalePercent(%1)").arg(percent));QTest::qWait(80);
         const qreal scale=percent/100.0;
-        zoomCornersStable=zoomCornersStable && qAbs(state("Theme.windowRadius").toReal()-12*scale)<0.01 && qAbs(state("Theme.controlRadius").toReal()-8*scale)<0.01;
+        zoomCornersStable=zoomCornersStable && qAbs(state("Theme.windowRadius").toReal()-14*scale)<0.01 && qAbs(state("Theme.controlRadius").toReal()-8*scale)<0.01;
         for(const auto &name : {"windowCloseButton","windowMinimizeButton","windowMaximizeButton","historyBackButton","historyForwardButton"}) {
             auto *circle=item(name);
             auto *background=circle?qvariant_cast<QObject *>(circle->property("background")):nullptr;
@@ -106,10 +107,10 @@ int runOverviewChecks(QQuickWindow *window)
     check(zoomCornersStable,"radius hierarchy scales proportionally at 75/100/125/150 percent and circular controls remain circular");
     state("Theme.resetScale()");QTest::qWait(80);
     check(item("addButton")==nullptr && item("globalSettingsButton")==nullptr,"global add and settings shortcuts removed from every page");
-    auto *subscriptions=item("nav-subscriptions");auto *profiles=item("nav-profiles");
+    auto *subscriptions=item("nav-subscriptions");auto *profiles=item("nav-proxies");
     if(subscriptions && profiles) {
         QTest::mouseMove(window,subscriptions->mapToScene(QPointF(subscriptions->width()/2,subscriptions->height()/2)).toPoint());
-        state("AppState.navigate('profiles')");QTest::qWait(30);
+        state("AppState.navigate('proxies')");QTest::qWait(30);
         auto *oldBackground=qvariant_cast<QObject *>(subscriptions->property("background"));
         auto *newBackground=qvariant_cast<QObject *>(profiles->property("background"));
         check(oldBackground && newBackground && oldBackground->property("color").value<QColor>().alpha()==0 && newBackground->property("color").value<QColor>().alpha()>0,"pointer remaining over the old navigation row cannot produce a second selection highlight");
@@ -124,7 +125,7 @@ int runOverviewChecks(QQuickWindow *window)
     auto *chart = item("overviewChart");
     check(chart && chart->property("series").toString()=="down","download is the only default curve");
     check(item("connectionSwitch")==nullptr,"upper-right connection demo control removed");
-    check(item("systemProxyToggle") && !item("systemProxyToggle")->isEnabled(),"system proxy control remains disabled");
+    check(item("systemProxyToggle") && item("systemProxyToggle")->isEnabled(),"system proxy control is implemented");
     check(item("tunToggle") && !item("tunToggle")->isEnabled(),"TUN control remains disabled");
     check(state("!AppState.systemProxyOn && !AppState.tunOn && !engineController.processAlive").toBool(),"overview does not change networking or start engine");
     check(chart && chart->property("baseHistory").toList().isEmpty(),"traffic history contains no generated samples");
@@ -136,7 +137,7 @@ int runOverviewChecks(QQuickWindow *window)
     state("Theme.resetScale()");
     check(state("Theme.followSystemScale && Theme.uiScale === 1").toBool(),"scale reset follows system DPI through Qt logical pixels");
     auto *combo=item("modeCombo");
-    check(combo && !combo->isEnabled() && state("AppState.mode === '直连'").toBool(),"unimplemented routing modes cannot alter engine state");
+    check(combo && combo->isEnabled() && state("AppState.mode === '规则'").toBool(),"routing mode defaults to rule independently of engine state");
     state("pageLoader.item.showDetails = true");
     QTest::qWait(150);
     click(item("seriesSelector"),0.5);
@@ -144,7 +145,7 @@ int runOverviewChecks(QQuickWindow *window)
     click(item("seriesSelector"),0.85);
     check(chart && chart->property("series").toString()=="total","total selection displays cumulative series");
     click(item("rangeSelector"),0.62);
-    check(chart && chart->property("rangeIndex").toInt()==2,"six-hour range input");
+    check(chart && chart->property("rangeIndex").toInt()==2,"five-minute range input");
     click(item("nodePickerButton"));
     auto *popup=window->findChild<QObject *>("nodePicker");
     check(popup && popup->property("opened").toBool(),"node picker opens from button");
@@ -209,7 +210,7 @@ int runOverviewChecks(QQuickWindow *window)
     check(proxyPanel && systemPanel && qAbs(proxyPanel->mapToScene(QPointF()).y()-systemPanel->mapToScene(QPointF()).y())<1 && qAbs(proxyPanel->height()-systemPanel->height())<1,"current proxy and system status share top and bottom edges");
     window->resize(1260,816);QTest::qWait(150);
     auto *navScroll=item("sidebarNavigationScroll");
-    auto *lastNav=item("nav-rewrite");
+    auto *lastNav=item("nav-tls");
     check(navScroll && lastNav && lastNav->mapToScene(QPointF(0,lastNav->height())).y()<=navScroll->mapToScene(QPointF(0,navScroll->height())).y()+1,"all sidebar rows fit the reported laptop window without clipping the last label");
     window->resize(800,560);QTest::qWait(150);
     check(window->width()==800 && window->height()==560,"minimum window size can be reached without locking the aspect ratio");
@@ -239,7 +240,7 @@ int runOverviewChecks(QQuickWindow *window)
     check(state("moduleDrafts.load('feature-dhcp').settings.f0").toBool()!=before,"module toggle is saved as actual local draft");
     state("AppState.navigate('featurehub')");QTest::qWait(200);
     check(item("moduleSearch")!=nullptr,"module hub renders searchable catalog");
-    check(state("FeatureCatalog.entries.length===56").toBool(),"catalog contains 56 capability entries");
+    check(state("FeatureCatalog.entries.length===69 && new Set(FeatureCatalog.entries.map(function(f){return f.id})).size===69 && FeatureCatalog.entries.every(function(f){return f.status && f.capabilities.length>0 && AppState.allPageIds.indexOf(f.id)>=0})").toBool(),"69 unique modules have reachable routes, explicit states and assigned capabilities");
     state("AppState.navigate('feature-dhcp')");QTest::qWait(200);
     check(item("moduleFirstToggle") && item("moduleFirstToggle")->property("checked").toBool()!=before,"module draft restored after navigation");
     // Drive record creation through the page, then reload the persisted list.

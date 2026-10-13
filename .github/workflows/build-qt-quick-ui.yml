@@ -31,7 +31,7 @@ jobs:
           cache: true
       - name: Configure Qt UI independently
         shell: pwsh
-        run: cmake -S src/Swirl.Quick -B build/swirl-quick -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=ON
+        run: cmake -S src/Swirl.Quick -B build/swirl-quick -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=ON -DSWIRL_TEST_FONT_DIRECTORY="${{ github.workspace }}/build/swirl-quick/Release/lib/fonts"
       - name: Build UI
         shell: pwsh
         run: cmake --build build/swirl-quick --config Release --parallel
@@ -40,6 +40,9 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           Copy-Item build/swirl-quick/Release/Swirl.exe dist/
+          Copy-Item build/swirl-quick/Release/SwirlProxyGuard.exe dist/
+          Copy-Item src/Swirl.Quick/packaging/rules dist/rules -Recurse
+          Copy-Item src/Swirl.Quick/packaging/rules build/swirl-quick/Release/rules -Recurse
           windeployqt --release --qmldir src/Swirl.Quick/qml dist/Swirl.exe
       - name: Stage pinned and verified Mihomo for integration and installer
         shell: pwsh
@@ -70,7 +73,7 @@ jobs:
       - name: Engine contract, real Mihomo and QML lifecycle checks
         shell: pwsh
         run: |
-          ctest --test-dir build/swirl-quick -C Release -R "swirl-(engine|node|import)-|swirl-motion" --output-on-failure
+          ctest --test-dir build/swirl-quick -C Release -R "swirl-(engine|node|import)-|swirl-motion|swirl-telemetry-accounting|swirl-diagnostic-export|swirl-network-diagnostics" --output-on-failure
           if ($LASTEXITCODE -ne 0) {
             Get-Content build/swirl-quick/engine-contract.txt, build/swirl-quick/engine-real.txt -ErrorAction SilentlyContinue
             throw "Engine checks failed"
@@ -88,6 +91,7 @@ jobs:
             build/swirl-quick/import-subscription.txt
             build/swirl-quick/motion-report.json
             build/swirl-quick/Release/Swirl-diagnostics.txt
+            build/swirl-quick/Release/Swirl-node-ui-diagnostics.txt
           if-no-files-found: warn
       - name: Overview mouse and keyboard input checks
         shell: pwsh
@@ -211,6 +215,7 @@ jobs:
           cmake --build build/swirl-quick --config Release --parallel
           if ($LASTEXITCODE -ne 0) { throw "Production build failed" }
           Copy-Item build/swirl-quick/Release/Swirl.exe dist/ -Force
+          Copy-Item build/swirl-quick/Release/SwirlProxyGuard.exe dist/
           Remove-Item -LiteralPath "dist/Qt6Test.dll" -ErrorAction SilentlyContinue
       - name: Prepare standalone installer files
         shell: pwsh
@@ -220,7 +225,8 @@ jobs:
           Copy-Item "src/Swirl.Quick/packaging/THIRD_PARTY_NOTICES.txt" "installer-bin/"
           $icon = "build/swirl-quick/brand/Swirl.ico"
           if (!(Test-Path -LiteralPath $icon)) { throw "Missing SVG-derived Windows icon: $icon" }
-          Copy-Item -LiteralPath $icon -Destination "installer-bin/Swirl-brand-100.ico"
+          Copy-Item -LiteralPath $icon -Destination "installer-bin/Swirl-brand-phase3.ico"
+          Copy-Item -LiteralPath $icon -Destination "installer-bin/Swirl-brand-phase3-v2.ico"
           Copy-Item "src/Swirl.Quick/packaging/licenses" "installer-bin/licenses" -Recurse -Force
           Remove-Item -Path "installer-bin/Swirl-*-preview.png", "installer-bin/Swirl-diagnostics.txt" -ErrorAction SilentlyContinue
           if (!(Test-Path "installer-bin/Swirl.exe")) { throw "Missing Swirl.exe" }

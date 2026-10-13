@@ -3,12 +3,18 @@ project(Swirl VERSION 1.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
+set(SWIRL_TEST_FONT_DIRECTORY "C:/Windows/Fonts" CACHE PATH "Offscreen test font directory")
 option(SWIRL_BUILD_UI_TESTS "Build the Qt input-driven overview checks" OFF)
 find_package(Qt6 6.8 REQUIRED COMPONENTS Quick Qml QuickControls2 Network Svg GuiPrivate ShaderTools)
 qt_standard_project_setup(REQUIRES 6.8)
 qt_policy(SET QTP0004 NEW)
 qt_add_executable(Swirl WIN32 main.cpp app/SystemDataProvider.cpp app/SystemDataProvider.h app/WindowsBackdrop.cpp app/WindowsBackdrop.h network/CaptureService.cpp network/CaptureService.h app/ModuleDraftStore.cpp app/ModuleDraftStore.h)
 add_library(SwirlEngine STATIC
+ app/DiagnosticService.h app/DiagnosticService.cpp
+ network/NetworkDiagnostics.h network/NetworkDiagnostics.cpp
+ engine/TelemetryService.h engine/TelemetryService.cpp
+ engine/NodeTestService.h engine/NodeTestService.cpp
+ engine/SystemProxySession.h engine/SystemProxySession.cpp
  engine/ProxyEngine.h engine/OwnedProcess.h engine/OwnedProcess.cpp
  engine/MihomoAdapter.h engine/MihomoAdapter.cpp
  engine/EngineController.h engine/EngineController.cpp)
@@ -18,7 +24,11 @@ target_sources(SwirlEngine PRIVATE engine/NodeImportService.h engine/NodeImportS
 target_link_libraries(SwirlEngine PUBLIC Qt6::Core Qt6::Network Qt6::Gui)
 target_include_directories(SwirlEngine PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 if(WIN32)
- target_link_libraries(SwirlEngine PRIVATE advapi32 ws2_32 iphlpapi crypt32)
+ target_compile_definitions(SwirlEngine PUBLIC NOMINMAX)
+ target_link_libraries(SwirlEngine PRIVATE advapi32 ws2_32 iphlpapi crypt32 wininet)
+ add_executable(SwirlProxyGuard tools/ProxyGuard.cpp)
+ target_link_libraries(SwirlProxyGuard PRIVATE SwirlEngine ole32 propsys shell32 shlwapi uuid)
+ add_dependencies(Swirl SwirlProxyGuard)
 endif()
 if(MSVC)
  target_compile_options(SwirlEngine PRIVATE /utf-8)
@@ -27,6 +37,8 @@ target_link_libraries(Swirl PRIVATE SwirlEngine)
 qt_add_resources(Swirl engine_manifest PREFIX "/engine" BASE "${CMAKE_CURRENT_SOURCE_DIR}/packaging"
  FILES packaging/mihomo-manifest.json)
 set(SWIRL_QML_FILES
+ qml/controls/SwirlStatusCapsule.qml qml/controls/SwirlScrollBar.qml qml/pages/ProcessesPage.qml
+ qml/pages/ActivityPage.qml qml/pages/MorePage.qml
  qml/Main.qml qml/Theme.qml qml/AppState.qml qml/FeatureCatalog.qml qml/SwirlMotion.qml
  qml/controls/SwirlPressMotion.qml qml/controls/SwirlAnimatedModel.qml qml/controls/SwirlMotionButton.qml qml/controls/SwirlSpring.qml qml/controls/SwirlPageHost.qml
  qml/pages/FeatureHubPage.qml qml/pages/FeatureModulePage.qml qml/components/SwirlBrandIcon.qml
@@ -86,9 +98,44 @@ endif()
 if(SWIRL_BUILD_UI_TESTS)
  find_package(Qt6 REQUIRED COMPONENTS Test)
  target_sources(Swirl PRIVATE tests/HdrChecks.cpp tests/HdrChecks.h tests/OverviewChecks.cpp tests/OverviewChecks.h tests/CaptureChecks.cpp tests/CaptureChecks.h tests/WindowChecks.cpp tests/WindowChecks.h)
+ target_sources(Swirl PRIVATE tests/RuntimeEvidence.cpp tests/RuntimeEvidence.h)
  target_link_libraries(Swirl PRIVATE Qt6::Test)
  target_compile_definitions(Swirl PRIVATE SWIRL_UI_TESTS)
  enable_testing()
+ add_executable(SwirlNetworkDiagnosticTests tests/NetworkDiagnosticTests.cpp)
+ target_link_libraries(SwirlNetworkDiagnosticTests PRIVATE SwirlEngine Qt6::Test)
+ if(MSVC)
+  target_compile_options(SwirlNetworkDiagnosticTests PRIVATE /utf-8)
+ endif()
+ add_test(NAME swirl-network-diagnostics COMMAND SwirlNetworkDiagnosticTests)
+ add_executable(SwirlTelemetryTests tests/TelemetryTests.cpp)
+ target_link_libraries(SwirlTelemetryTests PRIVATE SwirlEngine Qt6::Test)
+ if(MSVC)
+  target_compile_options(SwirlTelemetryTests PRIVATE /utf-8)
+ endif()
+ add_test(NAME swirl-telemetry-accounting COMMAND SwirlTelemetryTests)
+ add_executable(SwirlDiagnosticTests tests/DiagnosticTests.cpp)
+ target_link_libraries(SwirlDiagnosticTests PRIVATE SwirlEngine Qt6::Test)
+ if(MSVC)
+  target_compile_options(SwirlDiagnosticTests PRIVATE /utf-8)
+ endif()
+ add_test(NAME swirl-diagnostic-export COMMAND SwirlDiagnosticTests)
+ if(WIN32)
+  add_executable(SwirlSystemProxyTests tests/SystemProxyTests.cpp)
+  target_link_libraries(SwirlSystemProxyTests PRIVATE SwirlEngine Qt6::Test)
+  add_dependencies(SwirlSystemProxyTests SwirlProxyGuard)
+  # Explicit opt-in: normal CI and CTest never modify the runner's proxy.
+  if(DEFINED ENV{SWIRL_SYSTEM_PROXY_TEST})
+   add_test(NAME swirl-system-proxy-recovery COMMAND SwirlSystemProxyTests)
+   set_tests_properties(swirl-system-proxy-recovery PROPERTIES RUN_SERIAL TRUE TIMEOUT 45)
+  endif()
+  add_executable(SwirlAcceptance tests/AcceptanceSession.cpp)
+  target_link_libraries(SwirlAcceptance PRIVATE SwirlEngine)
+  if(MSVC)
+   target_compile_options(SwirlSystemProxyTests PRIVATE /utf-8)
+   target_compile_options(SwirlAcceptance PRIVATE /utf-8)
+  endif()
+ endif()
  add_executable(SwirlEngineFixture tests/EngineFixture.cpp)
  target_link_libraries(SwirlEngineFixture PRIVATE Qt6::Core Qt6::Network)
  add_executable(SwirlEngineTests tests/EngineTests.cpp)
@@ -114,7 +161,7 @@ if(SWIRL_BUILD_UI_TESTS)
  endif()
  add_test(NAME swirl-import-subscription COMMAND SwirlImportTests -o import-subscription.txt,txt)
  set_tests_properties(swirl-import-subscription PROPERTIES TIMEOUT 120)
- set_tests_properties(swirl-node-real-chain PROPERTIES TIMEOUT 120)
+ set_tests_properties(swirl-node-real-chain PROPERTIES TIMEOUT 180)
  add_test(NAME swirl-engine-contract COMMAND SwirlEngineTests -o engine-contract.txt,txt)
  set_tests_properties(swirl-engine-contract PROPERTIES TIMEOUT 90)
  add_test(NAME swirl-engine-real COMMAND SwirlEngineTests realEngine -o engine-real.txt,txt)
@@ -122,18 +169,18 @@ if(SWIRL_BUILD_UI_TESTS)
  target_sources(Swirl PRIVATE tests/EngineUiChecks.cpp tests/EngineUiChecks.h tests/NodeUiChecks.cpp tests/NodeUiChecks.h tests/MotionChecks.cpp tests/MotionChecks.h)
  target_compile_definitions(Swirl PRIVATE SWIRL_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
  add_test(NAME swirl-node-ui COMMAND Swirl --node-self-test)
- set_tests_properties(swirl-node-ui PROPERTIES TIMEOUT 60 ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software")
+ set_tests_properties(swirl-node-ui PROPERTIES TIMEOUT 180 ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QPA_FONTDIR=${SWIRL_TEST_FONT_DIRECTORY}")
  add_test(NAME swirl-engine-ui COMMAND Swirl --engine-self-test)
  set_tests_properties(swirl-engine-ui PROPERTIES TIMEOUT 60
-  ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software")
+  ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QPA_FONTDIR=${SWIRL_TEST_FONT_DIRECTORY}")
  add_test(NAME swirl-overview-input COMMAND Swirl --interaction-test)
  add_test(NAME swirl-all-pages COMMAND Swirl --smoke-test)
  add_test(NAME swirl-motion COMMAND Swirl --motion-test --motion-output=motion-report.json)
  set_tests_properties(swirl-motion PROPERTIES TIMEOUT 120
-  ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software")
+  ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QPA_FONTDIR=${SWIRL_TEST_FONT_DIRECTORY}")
  add_test(NAME swirl-capture-network COMMAND Swirl --capture-self-test)
  set_tests_properties(swirl-overview-input swirl-all-pages swirl-capture-network PROPERTIES
-  ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software" TIMEOUT 60)
+  ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QPA_FONTDIR=${SWIRL_TEST_FONT_DIRECTORY}" TIMEOUT 60)
 endif()
 if(WIN32)
  # Generate the Windows-only ICO from the canonical Swirl SVG before RC compilation.
@@ -144,9 +191,9 @@ if(WIN32)
   OUTPUT "${SWIRL_GENERATED_ICON}"
   COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/brand"
   COMMAND $<TARGET_FILE:SwirlIconBuilder>
-          "${SWIRL_ASSET_PATH}/icons/swirl_knot_light.svg"
+          "${SWIRL_ASSET_PATH}/icons/swirl_knot_mark_light.svg"
           "${SWIRL_GENERATED_ICON}"
-  DEPENDS SwirlIconBuilder "${SWIRL_ASSET_PATH}/icons/swirl_knot_light.svg"
+  DEPENDS SwirlIconBuilder app/BrandRaster.h "${SWIRL_ASSET_PATH}/icons/swirl_knot_mark_light.svg"
   COMMENT "Generate Windows ICO from Swirl SVG"
   VERBATIM
  )

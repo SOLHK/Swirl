@@ -1,0 +1,41 @@
+#include "NodeTestService.h"
+#include <QTcpServer>
+#include <QSet>
+#include <QDateTime>
+#include <QPointer>
+namespace {
+quint16 freePort(){QTcpServer server;if(!server.listen(QHostAddress::LocalHost,0))return 0;return server.serverPort();}
+}
+NodeTestService::~NodeTestService(){cancel();}
+void NodeTestService::start(const EngineStartOptions &options,const QStringList &ids,const QUrl &url){
+ if(busy())return;
+ if(!url.isValid()||(url.scheme()!="https"&&url.scheme()!="http")||url.host().isEmpty()||!url.userInfo().isEmpty()||url.hasFragment()||url.toString().size()>2048){m_message="测试地址必须为有效且不含凭据的 HTTP/HTTPS URL";emit changed();return;}
+ m_options=options;m_url=url;m_completed=0;m_succeeded=0;m_failed=0;m_queue.clear();
+ for(const auto &id:ids)if(!m_queue.contains(id)){bool found=false;for(const auto &n:options.nodes)if(n.id==id)found=true;if(found)m_queue.enqueue(id);}
+ m_total=m_queue.size();m_message=m_total?"正在独立测试节点":"没有可测试的节点";emit changed();next();
+}
+void NodeTestService::next(){
+ while(m_running.size()<3&&!m_queue.isEmpty()){
+  const auto id=m_queue.dequeue();auto opts=m_options;opts.selectedNodeId=id;opts.smartRouting=false;opts.routingMode="rule";opts.controlPort=freePort();opts.proxyPort=freePort();opts.healthIntervalMs=2000;opts.requestTimeoutMs=3000;opts.startupTimeoutMs=20000;
+  while(opts.controlPort==opts.proxyPort&&opts.controlPort)opts.proxyPort=freePort();
+  // Include only the selected node and its explicit dialer dependencies.
+  QSet<QString> needed{id};bool added=true;while(added){added=false;for(const auto &node:m_options.nodes)if(needed.contains(node.id)){const auto dependency=node.parameters.value("dialer-proxy").toString();for(const auto &other:m_options.nodes)if(other.sourceId==node.sourceId&&(other.name==dependency||other.id==dependency)&&!needed.contains(other.id)){needed.insert(other.id);added=true;}}}
+  opts.nodes.clear();for(const auto &node:m_options.nodes)if(needed.contains(node.id))opts.nodes.append(node);
+  auto runner=new MihomoAdapter(this);m_running[id]=runner;auto deadline=new QTimer(runner);deadline->setSingleShot(true);deadline->setInterval(40000);
+  connect(deadline,&QTimer::timeout,this,[this,runner,id]{finish(id,runner,{{"success",false},{"latency",-1},{"http",0},{"error","节点测试超时"}});});deadline->start();
+  connect(runner,&ProxyEngine::statusChanged,this,[this,runner,id]{
+   if(m_running.value(id)!=runner)return;const auto status=runner->status();
+   if(status.state==ProxyEngine::State::Failed){finish(id,runner,{{"success",false},{"latency",-1},{"http",0},{"error",status.message}});return;}
+   if(status.apiHealthy&&!runner->property("probeStarted").toBool()){runner->setProperty("probeStarted",true);QPointer<MihomoAdapter> guard(runner);QTimer::singleShot(0,runner,[this,guard]{if(guard)guard->probeNode(m_url);});}
+   if(runner->property("probeStarted").toBool()&&!status.nodeBusy&&(status.requestState==ProxyEngine::RequestState::Succeeded||status.requestState==ProxyEngine::RequestState::Failed||status.nodeHealth==ProxyEngine::NodeHealth::Unavailable)){
+    finish(id,runner,{{"success",status.requestState==ProxyEngine::RequestState::Succeeded},{"latency",status.latencyMs},{"http",status.responseCode},{"error",status.requestState==ProxyEngine::RequestState::Succeeded?QString():status.nodeMessage}});
+   }
+  });runner->start(opts);
+ }
+}
+void NodeTestService::finish(const QString &id,MihomoAdapter *runner,const QVariantMap &result){
+ if(m_running.value(id)!=runner)return;m_running.remove(id);runner->disconnect(this);runner->stop();runner->deleteLater();
+ auto row=result;row["time"]=QDateTime::currentDateTime().toString(Qt::ISODate);m_results[id]=row;++m_completed;if(row.value("success").toBool())++m_succeeded;else{++m_failed;emit diagnostic("NodeTestFailed",row.value("error").toString());}
+ m_message=QString("%1/%2 · 成功 %3 · 失败 %4").arg(m_completed).arg(m_total).arg(m_succeeded).arg(m_failed);emit changed();QTimer::singleShot(0,this,&NodeTestService::next);
+}
+void NodeTestService::cancel(){m_queue.clear();const auto runners=m_running;m_running.clear();for(auto runner:runners){runner->disconnect(this);runner->stop();runner->deleteLater();}if(!runners.isEmpty())m_message=QString("已取消 · 完成 %1/%2").arg(m_completed).arg(m_total);emit changed();}

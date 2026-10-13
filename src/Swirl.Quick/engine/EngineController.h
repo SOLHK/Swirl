@@ -2,6 +2,9 @@
 #include "ProxyEngine.h"
 #include "NodeStore.h"
 #include "NodeImportService.h"
+#include "SystemProxySession.h"
+#include "TelemetryService.h"
+#include "NodeTestService.h"
 #include <memory>
 
 // QML sees only Swirl's generic business facade. Engine implementations are injected in C++.
@@ -37,8 +40,16 @@ class EngineController final : public QObject {
     Q_PROPERTY(int activeProxyPort READ activeProxyPort NOTIFY statusChanged)
     Q_PROPERTY(NodeImportService* imports READ imports CONSTANT)
     Q_PROPERTY(QStringList supportedProtocols READ supportedProtocols CONSTANT)
+    Q_PROPERTY(SystemProxySession* systemProxy READ systemProxy CONSTANT)
+    Q_PROPERTY(QString routingMode READ routingMode NOTIFY statusChanged)
+    Q_PROPERTY(QString routingError READ routingError NOTIFY statusChanged)
+    Q_PROPERTY(bool routingBusy READ routingBusy NOTIFY statusChanged)
+    Q_PROPERTY(QVariantList connections READ connections NOTIFY statusChanged)
+    Q_PROPERTY(TelemetryService* telemetry READ telemetry CONSTANT)
+    Q_PROPERTY(NodeTestService* tests READ tests CONSTANT)
+    Q_PROPERTY(QVariantList routingRules READ routingRules NOTIFY statusChanged)
 public:
-    explicit EngineController(std::unique_ptr<ProxyEngine> engine, QObject *parent = nullptr, QString storePath = {});
+    explicit EngineController(std::unique_ptr<ProxyEngine> engine, QObject *parent = nullptr, QString storePath = {},bool realAcceptance=false);
     QString executablePath() const { return m_options.executablePath; }
     int controlPort() const { return m_options.controlPort; }
     void setExecutablePath(const QString &path);
@@ -81,7 +92,21 @@ public:
     Q_INVOKABLE void connectNode(const QString &id);
     Q_INVOKABLE void testNode(const QUrl &url);
     Q_INVOKABLE void disconnectNode();
+    Q_INVOKABLE void closeConnection(const QString &id) {m_engine->closeConnection(id);}
+    SystemProxySession *systemProxy() { return &m_systemProxy; }
+    QString routingMode() const { return processAlive()?m_engine->status().mode:m_options.routingMode; }
+    QString routingError() const { return m_routingError; }
+    bool routingBusy() const { return m_engine->status().routingBusy; }
+    QVariantList connections() const { return m_telemetry.connections(); }
+    TelemetryService *telemetry() { return &m_telemetry; }
+    NodeTestService *tests() { return &m_tests; }
+    Q_INVOKABLE void testAllNodes(const QUrl &url);
+    Q_INVOKABLE void testSelectedNode(const QString &id,const QUrl &url);
+    QVariantList routingRules() const { return m_engine->routingRules(); }
+    Q_INVOKABLE void setRoutingMode(const QString &mode);
+    Q_INVOKABLE void setSystemProxy(bool enabled);
 signals:
+    void diagnostic(const QString &module,const QString &code,const QString &message);
     void statusChanged();
     void optionsChanged();
     void nodesChanged();
@@ -90,6 +115,12 @@ private:
     EngineStartOptions m_options;
     NodeStore m_store;
     NodeImportService m_imports;
+    SystemProxySession m_systemProxy;
+    TelemetryService m_telemetry;
+    NodeTestService m_tests;
+    QString m_routingError;
+    bool m_proxyRequested=false;
+    bool m_proxyChecking=false;
     QString m_nodeError;
     bool m_restartPending=false;
     bool m_connectionRequested=false;

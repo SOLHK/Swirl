@@ -3,3 +3,7 @@
 publish/
 dist/
 *.zip
+
+build/
+system-proxy-tests.txt
+routing-tests.txt
