@@ -58,6 +58,13 @@ public:
         int responseCode = 0;
         QString nodeMessage;
         QVariantList connections;
+        qint64 connectionsAt = 0;
+        qint64 trafficAt = 0;
+        qint64 uploadTotal = 0;
+        qint64 downloadTotal = 0;
+        double uploadRate = 0;
+        double downloadRate = 0;
+        QString telemetryError;
         bool routingBusy = false;
     };
     using QObject::QObject;
@@ -73,4 +80,5 @@ public:
     virtual QVariantList routingRules() const { return {}; }
 signals:
     void statusChanged();
+    void diagnostic(const QString &module,const QString &code,const QString &message);
 };

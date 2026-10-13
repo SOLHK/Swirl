@@ -32,6 +32,7 @@ static int repairShortcut(const QStringList &args) {
     PropVariantClear(&value);
     if(SUCCEEDED(hr))hr=file->Save(reinterpret_cast<LPCWSTR>(linkPath.absoluteFilePath().utf16()),TRUE);
     if(SUCCEEDED(hr))SHChangeNotify(SHCNE_UPDATEITEM,SHCNF_PATHW,linkPath.absoluteFilePath().utf16(),nullptr);
+    if(SUCCEEDED(hr))SHChangeNotify(SHCNE_UPDATEITEM,SHCNF_PATHW,icon.absoluteFilePath().utf16(),nullptr);
     if(store)store->Release();if(file)file->Release();if(link)link->Release();CoUninitialize();
     return SUCCEEDED(hr)?0:4;
 }
@@ -39,6 +40,12 @@ static int repairShortcut(const QStringList &args) {
 int main(int argc,char **argv) {
     QCoreApplication app(argc,argv);
 #ifdef Q_OS_WIN
+    if(app.arguments().size()==4&&app.arguments().at(1)=="--repair-owned-pins") {
+        const auto root=qEnvironmentVariable("APPDATA")+"/Microsoft/Internet Explorer/Quick Launch/User Pinned/TaskBar";
+        const auto link=QDir(root).filePath("Swirl.lnk");
+        if(!QFileInfo::exists(link))return 0;
+        return repairShortcut({app.arguments().first(),"--repair-shortcut",link,app.arguments().at(2),app.arguments().at(3)});
+    }
     if(app.arguments().size()==5&&app.arguments().at(1)=="--repair-shortcut")return repairShortcut(app.arguments());
 #endif
     if(app.arguments().size()!=2)return 2;

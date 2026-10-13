@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Dialogs
 import QtQuick.Controls
 import QtQuick.Layouts
 import SwirlQuick
@@ -14,13 +15,15 @@ Item {
         return (r.message+" "+r.source+" "+r.level).toLowerCase().indexOf(search.text.toLowerCase())>=0 &&
                (level.currentText==="全部级别"||r.level===level.currentText)
     }).map(function(r,i){return {id:"log-"+i,time:r.time,level:r.level,source:r.source,message:r.message}})
+    FileDialog { id:diagnosticFile;title:"导出诊断报告";fileMode:FileDialog.SaveFile;nameFilters:["诊断 ZIP (*.zip)"];defaultSuffix:"zip";onAccepted:{diagnostics.exportReport(selectedFile,systemProvider.diagnosticSnapshot());AppState.toast=diagnostics.exportMessage} }
     ColumnLayout {
         anchors.fill:parent; anchors.margins:Theme.dp(23); spacing:Theme.dp(13)
         RowLayout {
             Layout.fillWidth:true
             SwirlStatusBadge { label:"日志记录"; tone:"accent" }
-            Text { text:displayLogs.length+" 条真实引擎状态记录"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
-            SwirlButton { enabled:false; text:"导出"; iconName:"folder"; onClicked:AppState.notice("导出日志记录") }
+            Text { text:displayLogs.length+" 条诊断事件"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
+            SwirlButton { text:"导出诊断报告"; iconName:"folder"; onClicked:diagnosticFile.open() }
+            SwirlButton { text:"标记已处理";enabled:diagnostics.eventCount>0;onClicked:diagnostics.acknowledge() }
             SwirlButton { text:"清空"; danger:true; onClicked:{systemProvider.clearLogs();page.selected=null} }
         }
         RowLayout {
@@ -72,7 +75,7 @@ Item {
                     Text { text:"诊断事件"; color:Theme.muted; font.pixelSize:Theme.fontSize(10) }
                     Text {
                         Layout.fillWidth:true
-                        text:"这里的事件由生成，不会读取系统、Mihomo 或 Windows 日志。"
+                        text:"仅记录 Swirl 可观测的故障。日志已脱敏并限制大小；诊断 ZIP 保存在本机，不会自动上传。"
                         color:Theme.muted; font.pixelSize:Theme.fontSize(12); wrapMode:Text.WordWrap
                     }
 

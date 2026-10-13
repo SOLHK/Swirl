@@ -16,7 +16,7 @@ Item {
                    (state==="全部状态"||r.status===state)
         })
         rows.sort(function(a,b){
-            var key=s==="Host"?"host":s==="Latency"?"latency":s==="Downloaded"?"down":"process"
+            var key=s==="域名"?"host":s==="延迟"?"latency":s==="下载"?"down":"process"
             return String(a[key]).localeCompare(String(b[key]),undefined,{numeric:true})
         })
         return rows
@@ -28,8 +28,8 @@ Item {
         RowLayout {
             Layout.fillWidth:true; spacing:Theme.dp(10)
             SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:AppState.zh("搜索域名、IP、进程或策略") }
-            SwirlComboBox { id:status; model:["全部状态","Active","Closed"] }
-            SwirlComboBox { id:sort; model:["Host","Latency","Downloaded","Process"] }
+            SwirlComboBox { id:status; model:["全部状态","活动","已结束"] }
+            SwirlComboBox { id:sort; model:["域名","延迟","下载","进程"] }
             SwirlButton { enabled:false; text:AppState.zh("导出"); iconName:"folder"; onClicked:AppState.notice("导出连接记录") }
             SwirlButton { enabled:false; text:AppState.zh("Clear"); onClicked:{selected=null;AppState.notice("清空连接记录")} }
         }

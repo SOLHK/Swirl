@@ -37,11 +37,11 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     select(0);click("nodeConnectButton");
     if(check(QTest::qWaitFor([&]{return controller->apiHealthy();},15000),"UI starts actual pinned Mihomo")) {
         check(!controller->requestSucceeded(),"running engine does not imply successful request");fill("nodeTestUrl",net.url().toString());click("nodeTestButton");
-        check(QTest::qWaitFor([&]{return !controller->nodeBusy();},8000)&&controller->requestSucceeded()&&net.a.forwarded>=2&&net.b.forwarded==0,"UI real request passes only through selected node A");
+        check(QTest::qWaitFor([&]{return !controller->tests()->busy();},24000)&&controller->tests()->result(controller->selectedNodeId()).value("success").toBool()&&net.a.forwarded>=2&&net.b.forwarded==0,"UI real request passes only through selected node A");
         const auto pid=controller->processId();select(1);
         check(QTest::qWaitFor([&]{return !controller->nodeBusy();},5000)&&controller->activeNodeId()==controller->selectedNodeId()&&controller->processId()==pid,"row selection switches real engine node without restarting");
-        check(!controller->requestSucceeded(),"switch invalidates previous request success");click("nodeTestButton");
-        check(QTest::qWaitFor([&]{return !controller->nodeBusy();},8000)&&controller->requestSucceeded()&&net.b.forwarded>=2,"UI new requests use authenticated selected node B");
+        check(!controller->tests()->result(controller->selectedNodeId()).value("success").toBool(),"new selected node has no inherited request result");click("nodeTestButton");
+        check(QTest::qWaitFor([&]{return !controller->tests()->busy();},24000)&&controller->tests()->result(controller->selectedNodeId()).value("success").toBool()&&net.b.forwarded>=2,"UI new requests use authenticated selected node B");
         check(item("nodeRequestState")&&item("nodeRequestState")->property("text").toString().contains("成功"),"visible request state follows actual result");click("nodeConnectButton");
         check(QTest::qWaitFor([&]{return controller->canStart();},4000)&&!controller->processAlive(),"UI disconnect reaps engine");
     }
@@ -60,7 +60,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     select(0);click("nodeConnectButton");
     check(QTest::qWaitFor([&]{return controller->apiHealthy();},15000),"UI imported node starts real Mihomo");
     fill("nodeTestUrl",net.url().toString());click("nodeTestButton");
-    check(QTest::qWaitFor([&]{return !controller->nodeBusy();},8000) && controller->requestSucceeded(),"UI imported node forwards a real HTTP request");
+    check(QTest::qWaitFor([&]{return !controller->tests()->busy();},24000) && controller->tests()->result(controller->selectedNodeId()).value("success").toBool(),"UI imported node forwards a real HTTP request");
     controller->stop();check(QTest::qWaitFor([&]{return !controller->processAlive();},4000),"UI imported node cleanup reaps owned engine");
     controller->deleteNode(controller->nodes().first().toMap().value("id").toString());
     qInfo()<<"Node UI checks:"<<checks<<"checks,"<<failures<<"failures";return failures?2:0;

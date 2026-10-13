@@ -10,12 +10,14 @@ class SystemProxySession final : public QObject {
     Q_OBJECT
     Q_PROPERTY(bool enabled READ enabled NOTIFY changed)
     Q_PROPERTY(bool owned READ owned NOTIFY changed)
+    Q_PROPERTY(bool systemEnabled READ systemEnabled NOTIFY changed)
     Q_PROPERTY(QString error READ error NOTIFY changed)
 public:
     explicit SystemProxySession(QObject *parent=nullptr, QString journal={});
     ~SystemProxySession() override;
     bool enabled() const { return m_enabled; }
     bool owned() const { return m_owned; }
+    bool systemEnabled() const { return m_systemEnabled; }
     QString error() const { return m_error; }
     bool enable(int port, qint64 enginePid);
     Q_INVOKABLE bool disable();
@@ -30,6 +32,7 @@ signals:
 private:
     QString m_journal, m_error, m_session;
     bool m_enabled=false, m_owned=false;
+    bool m_systemEnabled=false;
     QTimer m_poll;
     QProcess m_guard;
 };

@@ -1,4 +1,6 @@
 #include "MihomoAdapter.h"
+#include <cmath>
+#include <QDateTime>
 #include <QCryptographicHash>
 #include <QDir>
 #include <QFileInfo>
@@ -65,7 +67,10 @@ ProxyEngine::Status MihomoAdapter::status() const {
         ? m_uptime.elapsed() / 1000 : 0;
     return result;
 }
-void MihomoAdapter::publish() { emit statusChanged(); }
+void MihomoAdapter::publish() {
+    if(!m_status.telemetryError.isEmpty()&&property("lastTelemetryError").toString()!=m_status.telemetryError){setProperty("lastTelemetryError",m_status.telemetryError);emit diagnostic("Telemetry","CollectionFailed",m_status.telemetryError);}
+    emit statusChanged();
+}
 
 QString MihomoAdapter::configurationSummary() const {
     // A redacted copy is inspectable; the authenticated file is kept private.
@@ -141,7 +146,7 @@ bool MihomoAdapter::prepareConfiguration() {
         "external-controller: '127.0.0.1:%1'\nsecret: '%2'\n"
         "allow-lan: false\nbind-address: '127.0.0.1'\nmode: direct\n"
         "port: 0\nsocks-port: 0\nmixed-port: 0\nredir-port: 0\ntproxy-port: 0\n"
-        "ipv6: false\nlog-level: silent\nfind-process-mode: off\ngeodata-mode: false\n"
+        "ipv6: false\nlog-level: warning\nfind-process-mode: always\ngeodata-mode: false\n"
         "geo-auto-update: false\nprofile:\n  store-selected: false\n  store-fake-ip: false\n"
         "tun:\n  enable: false\n  auto-route: false\n  auto-detect-interface: false\n"
         "dns:\n  enable: false\nproxies: []\nproxy-groups: []\nrules: []\n")
@@ -411,6 +416,9 @@ void MihomoAdapter::cancelRequest() {
     // Invalidate callbacks BEFORE abort(), which can emit finished inline.
     ++m_generation;
     if(m_connectionsReply){m_connectionsReply->abort();m_connectionsReply->deleteLater();m_connectionsReply=nullptr;}
+    if(m_trafficReply){auto reply=m_trafficReply.data();m_trafficReply=nullptr;reply->disconnect(this);reply->abort();reply->deleteLater();}
+    if(m_logsReply){auto reply=m_logsReply.data();m_logsReply=nullptr;reply->disconnect(this);reply->abort();reply->deleteLater();}m_logsBuffer.clear();
+    m_trafficBuffer.clear();m_status.trafficAt=0;m_status.connectionsAt=0;
     m_status.connections.clear();m_status.routingBusy=false;
     if(m_modeReply){m_modeReply->abort();m_modeReply->deleteLater();m_modeReply=nullptr;}
     if (m_reply) {
@@ -598,7 +606,7 @@ void MihomoAdapter::request(bool version) {
         }
         m_status.mode = connected?m_options.routingMode:QStringLiteral("direct");
         m_status.state = State::Running; m_status.apiHealthy = true;
-        m_status.error = Error::None; m_status.message.clear(); m_status.routingBusy=false;m_deadline.stop(); publish();readConnections();
+        m_status.error = Error::None; m_status.message.clear(); m_status.routingBusy=false;m_deadline.stop(); publish();readConnections();readTraffic();readLogs();
     });
 }
 
@@ -652,13 +660,23 @@ void MihomoAdapter::readConnections() {
     connect(reply,&QNetworkReply::readyRead,this,[reply]{if(reply->bytesAvailable()>1024*1024)reply->abort();});
     connect(reply,&QNetworkReply::finished,this,[this,reply,generation]{
         reply->deleteLater();if(generation!=m_generation)return;m_connectionsReply=nullptr;
-        if(reply->error()!=QNetworkReply::NoError||reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()!=200)return;
+        if(reply->error()!=QNetworkReply::NoError||reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()!=200){m_status.telemetryError=QStringLiteral("连接采集失败");publish();return;}
         const auto bytes=reply->readAll();if(bytes.size()>1024*1024)return;
+        QJsonParseError parseError;const auto doc=QJsonDocument::fromJson(bytes,&parseError);
+        // Mihomo serializes its nil Go slice as null when no connections are
+        // active. This valid idle snapshot still carries final byte counters.
+        const auto list=doc.object().value("connections");
+        if(parseError.error!=QJsonParseError::NoError||!doc.isObject()||(!list.isArray()&&!list.isNull())){m_status.telemetryError=QStringLiteral("连接接口返回无效数据");publish();return;}
+        const auto snapshot=doc.object();
+        auto validCounter=[](const QJsonValue &value){const auto number=value.toDouble(-1);return value.isDouble()&&std::isfinite(number)&&number>=0&&number<9.22e18;};
+        if(!validCounter(snapshot.value("uploadTotal"))||!validCounter(snapshot.value("downloadTotal"))){m_status.telemetryError=QStringLiteral("连接接口累计计数无效");publish();return;}
+        m_status.uploadTotal=qint64(snapshot.value("uploadTotal").toDouble());m_status.downloadTotal=qint64(snapshot.value("downloadTotal").toDouble());
         QVariantList rows;
-        const auto array=QJsonDocument::fromJson(bytes).object().value("connections").toArray();
+        const auto array=snapshot.value("connections").toArray();
         for(const auto &entry:array) {
-            if(rows.size()>=1000)break;
+            if(rows.size()>=2000)break;
             const auto c=entry.toObject(),m=c.value("metadata").toObject();QStringList chain;
+            if(!validCounter(c.value("upload"))||!validCounter(c.value("download"))||c.value("id").toString().isEmpty())continue;
             for(const auto &hop:c.value("chains").toArray()) {
                 auto label=hop.toString();
                 for(const auto &node:m_options.nodes)if(node.id==label){label=node.name;break;}
@@ -666,15 +684,55 @@ void MihomoAdapter::readConnections() {
             }
             const auto rule=c.value("rule").toString()+" "+c.value("rulePayload").toString();
             rows.append(QVariantMap{{"id",QString::fromLatin1(QCryptographicHash::hash(c.value("id").toString().toUtf8(),QCryptographicHash::Sha256).toHex().left(12))},
-                {"host",m.value("host").toString()},{"ip",m.value("destinationIP").toString()},
-                {"process",QFileInfo(m.value("process").toString()).fileName()},
+                {"host",m.value("host").toString().isEmpty()?m.value("destinationIP").toString():m.value("host").toString()},{"ip",m.value("destinationIP").toString()},
+                {"process",QFileInfo(m.value("processPath").toString().isEmpty()?m.value("process").toString():m.value("processPath").toString()).fileName().isEmpty()?QStringLiteral("未知进程"):QFileInfo(m.value("processPath").toString().isEmpty()?m.value("process").toString():m.value("processPath").toString()).fileName()},
                 {"protocol",m.value("network").toString()+" / "+m.value("type").toString()},
                 {"policy",chain.join(QStringLiteral(" → "))},{"rule",rule},
+                {"category",chain.contains("REJECT")||chain.contains("REJECT-DROP")?"reject":chain.contains("DIRECT")?"direct":chain.isEmpty()?"other":"proxy"},
+                {"uploadBytes",qint64(c.value("upload").toDouble())},{"downloadBytes",qint64(c.value("download").toDouble())},
                 {"up",QString::number(qint64(c.value("upload").toDouble()))+" B"},
                 {"down",QString::number(qint64(c.value("download").toDouble()))+" B"},
                 {"latency",QStringLiteral("—")},{"time",c.value("start").toString()},
                 {"status",QStringLiteral("Active")}});
         }
-        m_status.connections=rows;publish();
+        m_status.connections=rows;m_status.connectionsAt=QDateTime::currentMSecsSinceEpoch();m_status.telemetryError.clear();publish();
     });
+}
+
+void MihomoAdapter::readTraffic() {
+    if(m_trafficReply||!m_status.apiHealthy)return;
+    const auto generation=m_generation;
+    QNetworkRequest request(QUrl(m_status.controlEndpoint+"/traffic"));
+    request.setRawHeader("Authorization","Bearer "+m_secret);
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,QNetworkRequest::ManualRedirectPolicy);
+    auto reply=m_network.get(request);m_trafficReply=reply;m_trafficBuffer.clear();
+    connect(reply,&QNetworkReply::readyRead,this,[this,reply,generation]{
+        if(generation!=m_generation)return;m_trafficBuffer+=reply->readAll();
+        if(m_trafficBuffer.size()>65536){reply->abort();return;}
+        while(m_trafficBuffer.contains('\n')){
+            const auto end=m_trafficBuffer.indexOf('\n');const auto line=m_trafficBuffer.left(end);m_trafficBuffer.remove(0,end+1);
+            QJsonParseError error;const auto object=QJsonDocument::fromJson(line,&error).object();
+            const auto up=object.value("up").toDouble(-1),down=object.value("down").toDouble(-1);
+            if(error.error!=QJsonParseError::NoError||up<0||down<0||!std::isfinite(up)||!std::isfinite(down)||up>1e12||down>1e12){m_status.telemetryError=QStringLiteral("流量接口返回无效采样");continue;}
+            m_status.uploadRate=up;m_status.downloadRate=down;m_status.trafficAt=QDateTime::currentMSecsSinceEpoch();publish();
+        }
+    });
+    connect(reply,&QNetworkReply::finished,this,[this,reply,generation]{reply->deleteLater();if(generation!=m_generation)return;m_trafficReply=nullptr;m_trafficBuffer.clear();m_status.trafficAt=0;m_status.telemetryError=QStringLiteral("流量流已断开，等待重新采集");publish();});
+}
+
+void MihomoAdapter::readLogs() {
+    if(m_logsReply||!m_status.apiHealthy)return;const auto generation=m_generation;
+    QNetworkRequest request(QUrl(m_status.controlEndpoint+"/logs?level=warning"));request.setRawHeader("Authorization","Bearer "+m_secret);request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,QNetworkRequest::ManualRedirectPolicy);
+    auto reply=m_network.get(request);m_logsReply=reply;m_logsBuffer.clear();
+    connect(reply,&QNetworkReply::readyRead,this,[this,reply,generation]{
+        if(generation!=m_generation)return;m_logsBuffer+=reply->readAll();if(m_logsBuffer.size()>65536){reply->abort();return;}
+        while(m_logsBuffer.contains('\n')){const auto end=m_logsBuffer.indexOf('\n');const auto line=m_logsBuffer.left(end);m_logsBuffer.remove(0,end+1);const auto event=QJsonDocument::fromJson(line).object();if(event.isEmpty())continue;
+            const auto payload=event.value("payload").toString();
+            // Raw engine messages can contain endpoint addresses or remote
+            // credentials. Forward only an observed fault category and level.
+            const auto code=payload.contains("dns",Qt::CaseInsensitive)?QStringLiteral("DNSFailure"):payload.contains("tls",Qt::CaseInsensitive)||payload.contains("certificate",Qt::CaseInsensitive)?QStringLiteral("TLSFailure"):payload.contains("rule",Qt::CaseInsensitive)?QStringLiteral("RuleFailure"):QStringLiteral("RouteHandshakeFailure");
+            emit diagnostic("Mihomo",code,QStringLiteral("引擎报告 %1：%2（敏感的原始端点内容已省略）").arg(event.value("type").toString(),code));
+        }
+    });
+    connect(reply,&QNetworkReply::finished,this,[this,reply,generation]{reply->deleteLater();if(generation!=m_generation)return;m_logsReply=nullptr;m_logsBuffer.clear();});
 }

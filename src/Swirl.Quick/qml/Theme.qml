@@ -49,6 +49,7 @@ QtObject {
     readonly property color focusBorder: dark ? "#9AC8FF" : "#005BBF"
     readonly property color buttonBase: dark ? "#333333" : "#F7F7F7"
     readonly property color field: dark ? "#353535" : "#F6F6F6"
+    readonly property color capsuleSurface: dark ? "#38383C" : "#ECEDEF"
     readonly property color green: dark ? "#75DD91" : "#00852A"
     readonly property color statusGreen: dark ? "#75DD91" : "#00B832"
     readonly property color orange: dark ? "#F5C67D" : "#976217"
@@ -59,7 +60,7 @@ QtObject {
     readonly property real windowRadius: dp(12)
     readonly property real containerRadius: dp(12)
     readonly property real radius: containerRadius
-    readonly property real cardRadius: dp(10)
+    readonly property real cardRadius: dp(14)
     readonly property real popupRadius: dp(10)
     readonly property real secondaryRadius: popupRadius
     readonly property real controlRadius: dp(8)
@@ -67,6 +68,9 @@ QtObject {
     readonly property real sidebarWidth: dp(252)
     readonly property real space: dp(4)
     readonly property real cardPadding: dp(16)
+    readonly property real subCardRadius: dp(10)
+    readonly property real capsuleHeight: dp(32)
+    readonly property real groupGap: dp(10)
     readonly property real gap: dp(12)
     readonly property real borderWidth: dp(1)
     readonly property real shadowOpacity: 0.05

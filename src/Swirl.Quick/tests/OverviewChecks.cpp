@@ -74,7 +74,7 @@ int runOverviewChecks(QQuickWindow *window)
     check(state("AppState.measuredDown === 0 && AppState.measuredUp === 0 && AppState.measuredConnections === 0").toBool(),"offline counters zero");
     check(state("AppState.connectionState === '已停止' && !AppState.proxyOn").toBool(),"overview shows actual stopped engine");
     check(state("Theme.canvas.toString() === '#f7f7f8' && Theme.surface.toString() === '#ffffff'").toBool(),"all pages share neutral canvas and white card tokens");
-    check(state("Theme.windowRadius === 12 && Theme.containerRadius === 12 && Theme.cardRadius === 10 && Theme.popupRadius === 10 && Theme.controlRadius === 8 && Theme.pillRadius(32) === 10 && Theme.roundedRadius(100,24) === 8").toBool(),"window, containers, cards, popups and controls follow the shared radius hierarchy");
+    check(state("Theme.windowRadius === 12 && Theme.containerRadius === 12 && Theme.cardRadius === 14 && Theme.popupRadius === 10 && Theme.controlRadius === 8 && Theme.pillRadius(32) === 10 && Theme.roundedRadius(100,24) === 8").toBool(),"window, containers, cards, popups and controls follow the shared radius hierarchy");
     const auto lightSelected=state("Theme.navigationSelected").value<QColor>();
     const auto lightSidebar=state("Theme.sidebarBase").value<QColor>();
     check(lightSidebar.green()-lightSelected.green()>=30,"light navigation selection is clearly darker than the sidebar");
@@ -144,7 +144,7 @@ int runOverviewChecks(QQuickWindow *window)
     click(item("seriesSelector"),0.85);
     check(chart && chart->property("series").toString()=="total","total selection displays cumulative series");
     click(item("rangeSelector"),0.62);
-    check(chart && chart->property("rangeIndex").toInt()==2,"six-hour range input");
+    check(chart && chart->property("rangeIndex").toInt()==2,"five-minute range input");
     click(item("nodePickerButton"));
     auto *popup=window->findChild<QObject *>("nodePicker");
     check(popup && popup->property("opened").toBool(),"node picker opens from button");

@@ -34,6 +34,8 @@ private:
     void cancelRequest();
     void request(bool version);
     void readConnections();
+    void readTraffic();
+    void readLogs();
     void apiFailure(Error error, const QString &message);
     bool prepareConfiguration();
     bool reserveControlPort();
@@ -51,6 +53,10 @@ private:
     QPointer<QNetworkReply> m_nodeReply, m_probeReply;
     QPointer<QNetworkReply> m_modeReply;
     QPointer<QNetworkReply> m_connectionsReply;
+    QPointer<QNetworkReply> m_trafficReply;
+    QByteArray m_trafficBuffer;
+    QPointer<QNetworkReply> m_logsReply;
+    QByteArray m_logsBuffer;
     quint64 m_nodeGeneration = 0;
     QTimer m_poll, m_deadline, m_killTimer;
     QElapsedTimer m_uptime;

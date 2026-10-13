@@ -9,15 +9,19 @@
 #include <QNetworkProxy>
 #include <QSettings>
 
-EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject *parent, QString storePath)
-    : QObject(parent), m_engine(std::move(engine)), m_store(storePath),m_imports(&m_store,this) {
+EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject *parent, QString storePath,bool realAcceptance)
+    : QObject(parent), m_engine(std::move(engine)), m_store(storePath),m_imports(&m_store,this),m_telemetry(storePath.isEmpty()?QString():storePath+".telemetry",storePath.isEmpty()||realAcceptance) {
+    connect(m_engine.get(),&ProxyEngine::statusChanged,this,[this]{m_telemetry.ingest(m_engine->status());});
+    connect(&m_telemetry,&TelemetryService::changed,this,&EngineController::statusChanged);
+    connect(&m_tests,&NodeTestService::changed,this,&EngineController::nodesChanged);
+    connect(m_engine.get(),&ProxyEngine::diagnostic,this,&EngineController::diagnostic);
     QFile manifest(QStringLiteral(":/engine/mihomo-manifest.json"));
     if (manifest.open(QIODevice::ReadOnly)) {
         const auto object = QJsonDocument::fromJson(manifest.readAll()).object();
         m_options.expectedSha256 = object.value(QStringLiteral("executableSha256")).toString().toLatin1();
         m_options.expectedVersion = object.value(QStringLiteral("version")).toString();
     }
-    m_options.smartRouting=storePath.isEmpty();
+    m_options.smartRouting=storePath.isEmpty()||realAcceptance;
     connect(&m_systemProxy,&SystemProxySession::changed,this,[this] {
         if(!m_systemProxy.owned()&&!m_systemProxy.error().isEmpty())m_proxyRequested=false;
     });
@@ -27,6 +31,7 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
     if(m_options.routingMode!="rule"&&m_options.routingMode!="global"&&m_options.routingMode!="direct")m_options.routingMode="rule";
     connect(m_engine.get(),&ProxyEngine::statusChanged,this,[this] {
         const auto s=m_engine->status();
+        m_imports.setDownloadProxy(s.apiHealthy?s.proxyPort:0);
         if(s.state==ProxyEngine::State::Stopping||s.state==ProxyEngine::State::Stopped||s.state==ProxyEngine::State::Failed||s.state==ProxyEngine::State::Degraded) {
             m_systemProxy.disable();
             if(s.state==ProxyEngine::State::Failed||s.state==ProxyEngine::State::Degraded)m_proxyRequested=false;
@@ -95,6 +100,8 @@ QVariantList EngineController::nodes() const {
         row.insert("address",row.value("host").toString().isEmpty()?QStringLiteral("协议扩展配置"):row.value("host").toString()+":"+row.value("port").toString());
         row.insert("status",active?nodeStateText():QStringLiteral("未连接"));
         row.insert("latency",active && status.latencyMs>=0?QString::number(status.latencyMs):QStringLiteral("—"));
+        const auto measured=m_tests.result(row.value("id").toString());
+        if(!measured.isEmpty()){row.insert("latency",measured.value("latency").toInt()>=0?QString::number(measured.value("latency").toInt()):QStringLiteral("失败"));row.insert("testHttp",measured.value("http"));row.insert("testError",measured.value("error"));}
         value=row;
     }
     return rows;
@@ -150,6 +157,8 @@ void EngineController::connectNode(const QString &id) {
     else m_engine->start(m_options);
 }
 void EngineController::testNode(const QUrl &url) { if(!nodeBusy())m_engine->probeNode(url); }
+void EngineController::testAllNodes(const QUrl &url) { auto options=m_options;options.nodes=m_store.nodes();QStringList ids;for(const auto &node:options.nodes)ids.append(node.id);m_tests.start(options,ids,url); }
+void EngineController::testSelectedNode(const QString &id,const QUrl &url) { auto options=m_options;options.nodes=m_store.nodes();m_tests.start(options,{id},url); }
 void EngineController::disconnectNode() { stop(); }
 
 void EngineController::setRoutingMode(const QString &mode) {

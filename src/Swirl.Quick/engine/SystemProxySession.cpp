@@ -256,6 +256,8 @@ void SystemProxySession::refresh() {
     const bool same=ownSession&&matchesSettings(current,record.value("applied").toObject());
     if(m_owned&&!same){m_owned=false;if(ownSession)QFile::remove(m_journal);m_error=QStringLiteral("系统代理已由外部修改或安全恢复，Swirl 已放弃控制。");}
     const bool enabled=m_owned&&same;
+    const bool systemEnabled=(current.value("flags").toInt()&2)!=0;
+    if(systemEnabled!=m_systemEnabled){m_systemEnabled=systemEnabled;emit changed();}
     if(enabled!=m_enabled){m_enabled=enabled;emit changed();}
 }
 int SystemProxySession::guard(const QString &journal) {

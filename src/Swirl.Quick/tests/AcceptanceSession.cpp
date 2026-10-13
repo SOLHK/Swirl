@@ -3,6 +3,7 @@
 #include "engine/MihomoAdapter.h"
 #include "engine/NodeStore.h"
 #include "engine/SystemProxySession.h"
+#include "engine/NodeTestService.h"
 #include <QCoreApplication>
 #include <QFile>
 #include <QJsonDocument>
@@ -23,13 +24,21 @@ int main(int argc,char **argv) {
     EngineStartOptions opts;opts.nodes=store.nodes();
     const auto name=app.arguments().at(2);
     for(const auto &n:opts.nodes)if(n.name==name)opts.selectedNodeId=n.id;
-    if(opts.selectedNodeId.isEmpty())return 4;
+    if(opts.selectedNodeId.isEmpty()&&name!="test-all")return 4;
     opts.executablePath=app.applicationDirPath()+"/core/mihomo.exe";
     QFile manifest(app.applicationDirPath()+"/core/mihomo-manifest.json");if(!manifest.open(QIODevice::ReadOnly))return 5;
     const auto meta=QJsonDocument::fromJson(manifest.readAll()).object();
     opts.expectedSha256=meta.value("executableSha256").toString().toLatin1();opts.expectedVersion=meta.value("version").toString();
     opts.smartRouting=true;opts.rulesDirectory=app.applicationDirPath()+"/rules";
     opts.proxyPort=17988;opts.controlPort=19097;
+    if(name=="test-all") {
+        NodeTestService tests;QStringList ids;for(const auto &n:opts.nodes)ids.append(n.id);
+        QObject::connect(&tests,&NodeTestService::changed,&app,[&]{
+            if(tests.busy()||tests.completed()!=tests.total()||tests.completed()==0)return;
+            QJsonArray rows;for(const auto &n:opts.nodes){const auto result=tests.result(n.id);if(!result.isEmpty())rows.append(QJsonObject{{"name",n.name},{"success",result.value("success").toBool()},{"latencyMs",result.value("latency").toInt()},{"http",result.value("http").toInt()},{"error",result.value("error").toString()}});}
+            output({{"complete",true},{"total",tests.total()},{"succeeded",tests.succeeded()},{"failed",tests.failed()},{"rows",rows},{"mainSelectionModified",false},{"systemProxyModified",false}});app.quit();
+        });QTimer::singleShot(15*60*1000,&app,[&]{tests.cancel();app.exit(8);});tests.start(opts,ids,QUrl("https://www.gstatic.com/generate_204"));return app.exec();
+    }
     MihomoAdapter engine;SystemProxySession proxy;
     const QString command=app.arguments().value(3);
     bool announced=false;

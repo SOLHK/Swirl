@@ -73,7 +73,7 @@ jobs:
       - name: Engine contract, real Mihomo and QML lifecycle checks
         shell: pwsh
         run: |
-          ctest --test-dir build/swirl-quick -C Release -R "swirl-(engine|node|import)-|swirl-motion" --output-on-failure
+          ctest --test-dir build/swirl-quick -C Release -R "swirl-(engine|node|import)-|swirl-motion|swirl-telemetry-accounting|swirl-diagnostic-export" --output-on-failure
           if ($LASTEXITCODE -ne 0) {
             Get-Content build/swirl-quick/engine-contract.txt, build/swirl-quick/engine-real.txt -ErrorAction SilentlyContinue
             throw "Engine checks failed"
@@ -225,6 +225,7 @@ jobs:
           $icon = "build/swirl-quick/brand/Swirl.ico"
           if (!(Test-Path -LiteralPath $icon)) { throw "Missing SVG-derived Windows icon: $icon" }
           Copy-Item -LiteralPath $icon -Destination "installer-bin/Swirl-brand-phase3.ico"
+          Copy-Item -LiteralPath $icon -Destination "installer-bin/Swirl-brand-phase3-v2.ico"
           Copy-Item "src/Swirl.Quick/packaging/licenses" "installer-bin/licenses" -Recurse -Force
           Remove-Item -Path "installer-bin/Swirl-*-preview.png", "installer-bin/Swirl-diagnostics.txt" -ErrorAction SilentlyContinue
           if (!(Test-Path "installer-bin/Swirl.exe")) { throw "Missing Swirl.exe" }

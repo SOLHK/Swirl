@@ -62,6 +62,7 @@ try {
     $icon = Join-Path (Resolve-Path $BuildDir).Path "brand/Swirl.ico"
     if (!(Test-Path -LiteralPath $icon)) { throw "SVG-derived icon is missing: $icon" }
     Copy-Item -LiteralPath $icon -Destination (Join-Path $DistDir "Swirl-brand-phase3.ico")
+    Copy-Item -LiteralPath $icon -Destination (Join-Path $DistDir "Swirl-brand-phase3-v2.ico")
     & "$qt/bin/windeployqt.exe" --release --qmldir src/Swirl.Quick/qml (Join-Path $DistDir "Swirl.exe")
     if ($LASTEXITCODE) { throw "Qt runtime deployment failed." }
     Copy-Item src/Swirl.Quick/packaging/THIRD_PARTY_NOTICES.txt $DistDir

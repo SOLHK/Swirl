@@ -23,7 +23,9 @@ QVariantList NodeImportService::providers() const {
     auto rows=m_store->publicSubscriptions();
     for(auto &row:rows){auto r=row.toMap();const auto id=r.value("id").toString();
         r.insert("status",m_busy&&id==m_source?QStringLiteral("正在更新"):m_errors.contains(id)?QStringLiteral("更新失败"):r.value("lastSuccess").toLongLong()>0?QStringLiteral("已保存真实节点"):QStringLiteral("等待更新"));
-        r.insert("error",m_errors.value(id));row=r;
+        r.insert("error",m_errors.value(id));
+        const auto due=qMax(r.value("lastSuccess").toLongLong()+r.value("intervalMinutes").toLongLong()*60,m_attempts.value(id)+900);
+        r.insert("nextUpdate",r.value("enabled").toBool()?QDateTime::fromSecsSinceEpoch(qMax(due,m_clock())).toLocalTime().toString("yyyy-MM-dd HH:mm"):QStringLiteral("已关闭"));row=r;
     }return rows;
 }
 void NodeImportService::importText(const QString &text) {
@@ -90,6 +92,8 @@ void NodeImportService::download(const QUrl &url,int redirects) {
     request.setRawHeader("User-Agent","Clash.Meta/1.19.32 Swirl/1.0");
     request.setRawHeader("Accept","application/yaml, application/json, text/plain");
     request.setTransferTimeout(15000);
+    const bool local=url.host()=="localhost"||url.host()=="127.0.0.1"||url.host()=="::1";
+    m_network.setProxy(!local&&m_proxyPort>0?QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",m_proxyPort):QNetworkProxy(QNetworkProxy::NoProxy));
     auto *reply=m_network.get(request);m_reply=reply;reply->setReadBufferSize(NodeImporter::MaximumBytes+1);
     auto bytes=std::make_shared<QByteArray>();auto tooLarge=std::make_shared<bool>(false);
     connect(reply,&QNetworkReply::readyRead,this,[reply,bytes,tooLarge]{
@@ -101,12 +105,12 @@ void NodeImportService::download(const QUrl &url,int redirects) {
         const auto redirect=reply->attribute(QNetworkRequest::RedirectionTargetAttribute).toUrl();
         const auto error=reply->error();reply->deleteLater();
         if(*tooLarge || bytes->size()>NodeImporter::MaximumBytes){finish(QStringLiteral("订阅内容超过 4 MiB；旧节点保持不变。"));return;}
-        if(error!=QNetworkReply::NoError){finish(QStringLiteral("订阅下载失败（网络错误 %1）；请检查网络、证书或地址。旧节点保持不变。").arg(int(error)));return;}
-        if(code>=300 && code<400 && !redirect.isEmpty()) {
+        if((code==301||code==302||code==303||code==307||code==308) && !redirect.isEmpty()) {
             const auto nextUrl=url.resolved(redirect);
             if(url.scheme()=="https" && nextUrl.scheme()!="https"){finish(QStringLiteral("已拒绝从 HTTPS 降级的重定向。"));return;}
             download(nextUrl,redirects+1);return;
         }
+        if(error!=QNetworkReply::NoError){finish(QStringLiteral("订阅下载失败（HTTP %1，网络错误 %2）；请检查认证、TLS 或网络出口。旧节点保持不变。").arg(code).arg(int(error)));return;}
         if(code!=200){finish(QStringLiteral("订阅服务器返回 HTTP %1；旧节点保持不变。").arg(code));return;}
         m_deadline.stop();parse(*bytes);
     });

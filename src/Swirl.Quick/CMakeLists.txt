@@ -10,6 +10,9 @@ qt_standard_project_setup(REQUIRES 6.8)
 qt_policy(SET QTP0004 NEW)
 qt_add_executable(Swirl WIN32 main.cpp app/SystemDataProvider.cpp app/SystemDataProvider.h app/WindowsBackdrop.cpp app/WindowsBackdrop.h network/CaptureService.cpp network/CaptureService.h app/ModuleDraftStore.cpp app/ModuleDraftStore.h)
 add_library(SwirlEngine STATIC
+ app/DiagnosticService.h app/DiagnosticService.cpp
+ engine/TelemetryService.h engine/TelemetryService.cpp
+ engine/NodeTestService.h engine/NodeTestService.cpp
  engine/SystemProxySession.h engine/SystemProxySession.cpp
  engine/ProxyEngine.h engine/OwnedProcess.h engine/OwnedProcess.cpp
  engine/MihomoAdapter.h engine/MihomoAdapter.cpp
@@ -32,6 +35,7 @@ target_link_libraries(Swirl PRIVATE SwirlEngine)
 qt_add_resources(Swirl engine_manifest PREFIX "/engine" BASE "${CMAKE_CURRENT_SOURCE_DIR}/packaging"
  FILES packaging/mihomo-manifest.json)
 set(SWIRL_QML_FILES
+ qml/controls/SwirlStatusCapsule.qml qml/controls/SwirlScrollBar.qml qml/pages/ProcessesPage.qml
  qml/Main.qml qml/Theme.qml qml/AppState.qml qml/FeatureCatalog.qml qml/SwirlMotion.qml
  qml/controls/SwirlPressMotion.qml qml/controls/SwirlAnimatedModel.qml qml/controls/SwirlMotionButton.qml qml/controls/SwirlSpring.qml qml/controls/SwirlPageHost.qml
  qml/pages/FeatureHubPage.qml qml/pages/FeatureModulePage.qml qml/components/SwirlBrandIcon.qml
@@ -91,9 +95,22 @@ endif()
 if(SWIRL_BUILD_UI_TESTS)
  find_package(Qt6 REQUIRED COMPONENTS Test)
  target_sources(Swirl PRIVATE tests/HdrChecks.cpp tests/HdrChecks.h tests/OverviewChecks.cpp tests/OverviewChecks.h tests/CaptureChecks.cpp tests/CaptureChecks.h tests/WindowChecks.cpp tests/WindowChecks.h)
+ target_sources(Swirl PRIVATE tests/RuntimeEvidence.cpp tests/RuntimeEvidence.h)
  target_link_libraries(Swirl PRIVATE Qt6::Test)
  target_compile_definitions(Swirl PRIVATE SWIRL_UI_TESTS)
  enable_testing()
+ add_executable(SwirlTelemetryTests tests/TelemetryTests.cpp)
+ target_link_libraries(SwirlTelemetryTests PRIVATE SwirlEngine Qt6::Test)
+ if(MSVC)
+  target_compile_options(SwirlTelemetryTests PRIVATE /utf-8)
+ endif()
+ add_test(NAME swirl-telemetry-accounting COMMAND SwirlTelemetryTests)
+ add_executable(SwirlDiagnosticTests tests/DiagnosticTests.cpp)
+ target_link_libraries(SwirlDiagnosticTests PRIVATE SwirlEngine Qt6::Test)
+ if(MSVC)
+  target_compile_options(SwirlDiagnosticTests PRIVATE /utf-8)
+ endif()
+ add_test(NAME swirl-diagnostic-export COMMAND SwirlDiagnosticTests)
  if(WIN32)
   add_executable(SwirlSystemProxyTests tests/SystemProxyTests.cpp)
   target_link_libraries(SwirlSystemProxyTests PRIVATE SwirlEngine Qt6::Test)
@@ -167,7 +184,7 @@ if(WIN32)
   COMMAND $<TARGET_FILE:SwirlIconBuilder>
           "${SWIRL_ASSET_PATH}/icons/swirl_knot_mark_light.svg"
           "${SWIRL_GENERATED_ICON}"
-  DEPENDS SwirlIconBuilder "${SWIRL_ASSET_PATH}/icons/swirl_knot_mark_light.svg"
+  DEPENDS SwirlIconBuilder app/BrandRaster.h "${SWIRL_ASSET_PATH}/icons/swirl_knot_mark_light.svg"
   COMMENT "Generate Windows ICO from Swirl SVG"
   VERBATIM
  )

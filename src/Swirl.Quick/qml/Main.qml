@@ -131,7 +131,7 @@ ApplicationWindow {
         }
         MouseArea {
             objectName:"titleDragArea"
-            visible:AppState.currentPage==="overview"
+            visible:false
             x:window.actualSidebarWidth; y:Theme.dp(0); width:parent.width-x-Theme.dp(240)
             height:pageLoader.item && pageLoader.item.scrollOffset>0 ? Theme.dp(22) : Theme.dp(68); z:20
             acceptedButtons:Qt.LeftButton|Qt.RightButton
@@ -145,7 +145,7 @@ ApplicationWindow {
         Item {
             id:mainArea; x:window.actualSidebarWidth+window.sidebarGutter; width:parent.width-x-window.sidebarGutter; height:parent.height
             RowLayout {
-                id:toolbar; visible:AppState.currentPage!=="overview"; x:Theme.dp(0); y:Theme.dp(12); width:parent.width; height:Theme.dp(44); spacing:Theme.dp(18)
+                id:toolbar; visible:true; x:Theme.dp(0); y:Theme.dp(12); width:parent.width; height:Theme.dp(44); spacing:Theme.dp(18)
                 Item {
                     width:Theme.dp(85); height:Theme.dp(42)
                     SwirlPillSurface { anchors.fill:parent }
@@ -170,15 +170,20 @@ ApplicationWindow {
                     }
                 }
                 Item { Layout.fillWidth:true }
+                SwirlStatusCapsule { objectName:"eventsCapsule"; label:systemProvider.eventCount>0?systemProvider.eventCount+" 个事件":"无事件";tone:systemProvider.eventCount>0?"warning":"neutral"; onClicked:AppState.navigate("logs") }
+                Item { Layout.fillWidth:true }
+                SwirlStatusCapsule { objectName:"proxyCapsule"; label:engineController.systemProxy.systemEnabled&&!engineController.systemProxy.owned?"系统代理 · 其他应用":"系统代理";tone:engineController.systemProxy.error.length||engineController.routingError.length?"warning":engineController.systemProxy.systemEnabled?"success":"neutral";detail:engineController.systemProxy.error||engineController.routingError||(engineController.systemProxy.systemEnabled&&!engineController.systemProxy.owned?"Windows 系统代理已由其他应用启用，Swirl 未接管":"点击控制 Swirl 系统代理"); enabled:!engineController.busy; onClicked:engineController.setSystemProxy(!engineController.systemProxy.enabled) }
+                SwirlStatusCapsule { objectName:"tunCapsule"; label:"增强模式 · 未实现";detail:"本阶段尚未实现 TUN";enabled:false }
                 SwirlButton { visible:captureProvider.running; text:"抓包中 · "+captureProvider.sessions.length; iconName:"capture"; font.pixelSize:Theme.fontSize(14); onClicked:AppState.navigate("capture") }
 
             }
             SwirlPageHost {
                 routeKey:AppState.currentPage
-                id:pageLoader; objectName:"pageLoader"; x:Theme.dp(0); y:Theme.dp(22); width:parent.width; height:parent.height-y-Theme.dp(17)
+                id:pageLoader; objectName:"pageLoader"; x:Theme.dp(0); y:Theme.dp(68); width:parent.width; height:parent.height-y-Theme.dp(17)
                 sourceComponent:AppState.currentPage==="overview" ? overview :
                                 AppState.currentPage==="capture" ? capturePage :
-                                AppState.currentPage==="connections" ? connections :
+                                AppState.currentPage==="connections" || AppState.currentPage==="requestlogs" ? connections :
+                                AppState.currentPage==="processes" ? processes :
                                 AppState.currentPage==="proxies" ? proxies :
                                 AppState.currentPage==="inspector" ? inspector :
                                 AppState.currentPage==="scripts" ? scripts :
@@ -241,6 +246,7 @@ ApplicationWindow {
     Component { id:featureHub; FeatureHubPage {} }
     Component { id:featureModule; FeatureModulePage { moduleId:parent.routeId } }
     Component { id:connections; ConnectionsPage {} }
+    Component { id:processes; ProcessesPage {} }
     Component { id:proxies; ProxiesPage {} }
     Component { id:inspector; InspectorPage {} }
     Component { id:scripts; ScriptsPage {} }

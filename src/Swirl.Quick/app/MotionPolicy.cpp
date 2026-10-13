@@ -6,6 +6,7 @@
 #include <QGuiApplication>
 #include <QDateTime>
 #include <QScreen>
+#include <QSettings>
 #include <QAbstractNativeEventFilter>
 #ifdef Q_OS_WIN
 #define WIN32_LEAN_AND_MEAN
@@ -38,6 +39,13 @@ bool MotionPolicy::systemReducedMotion() const {
     if(SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION,0,&enabled,0))return !enabled;
 #endif
     return false;
+}
+bool MotionPolicy::alwaysShowScrollbars() const {
+#ifdef Q_OS_WIN
+    return QSettings("HKEY_CURRENT_USER\\Control Panel\\Accessibility",QSettings::NativeFormat).value("DynamicScrollbars",1).toInt()==0;
+#else
+    return false;
+#endif
 }
 void MotionPolicy::attach(QQuickWindow *window) {
     m_clock.start();

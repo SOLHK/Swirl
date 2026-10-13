@@ -11,10 +11,12 @@ Item {
     readonly property real telemetryHeight:Theme.dp(width>=Theme.dp(1100)?158:186)
     property var network: systemProvider.currentNetwork()
     property bool showDetails: false
+    readonly property var telemetry:engineController.telemetry
+    readonly property var today:(telemetry.revision,telemetry.summary(0))
     readonly property real scrollOffset: scroll.contentItem ? scroll.contentItem.contentY : 0
     property int speedRange: 0
-    readonly property var apps: []
-    readonly property var domains: []
+    readonly property var apps: (telemetry.revision,telemetry.ranking("apps",0,5))
+    readonly property var domains: (telemetry.revision,telemetry.ranking("domains",0,5))
     function scrollToBottom() { scroll.contentItem.contentY=Math.max(0,scroll.contentItem.contentHeight-scroll.contentItem.height) }
     Timer { interval:10000; repeat:true; running:true; onTriggered:page.network=systemProvider.currentNetwork() }
     component Glyph: Rectangle {
@@ -49,8 +51,10 @@ Item {
     }
     component Ranking: Card {
         id:ranking
-        property var rows: []
+        property var rows: (telemetry.revision,telemetry.ranking(kind,filterIndex,5))
         property string destination: "traffic"
+        property string kind:"apps"
+
         filters:["今日","昨日","本周"]
         Column {
             anchors.fill:parent; spacing:Theme.dp(0)
@@ -68,7 +72,7 @@ Item {
                             Text { anchors.centerIn:parent;text:modelData.mark;color:"white";font.pixelSize:Theme.fontSize(13);font.weight:Font.Bold }
                         }
                         Text { text:modelData.name;color:Theme.text;font.pixelSize:Theme.fontSize(14);Layout.fillWidth:true;elide:Text.ElideRight }
-                        Text { text:page.periodValue(modelData.value,ranking.filterIndex);color:Theme.muted;font.family:"Segoe UI";font.pixelSize:Theme.fontSize(13);Layout.preferredWidth:Theme.dp(74);horizontalAlignment:Text.AlignRight }
+                        Text { text:modelData.value;color:Theme.muted;font.family:"Segoe UI";font.pixelSize:Theme.fontSize(13);Layout.preferredWidth:Theme.dp(74);horizontalAlignment:Text.AlignRight }
                         Text { text:modelData.percent;color:Theme.muted;font.family:"Segoe UI";font.pixelSize:Theme.fontSize(13);Layout.preferredWidth:Theme.dp(42);horizontalAlignment:Text.AlignRight }
                         SwirlIcon { name:"chevron-right";size:Theme.dp(14) }
                     }
@@ -82,6 +86,7 @@ Item {
     ScrollView {
         id:scroll; objectName:"overviewScroll"; anchors.fill:parent;clip:true
         ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
+        ScrollBar.vertical:SwirlScrollBar {}
         ColumnLayout {
             width:scroll.availableWidth;spacing:Theme.gap
             RowLayout {
@@ -91,6 +96,14 @@ Item {
                     Text { text:"总览";color:Theme.text;font.pixelSize:Theme.fontSize(38);font.weight:Font.Bold;Accessible.role:Accessible.Heading }
                     Text { text:"真实引擎与节点状态 · 未采集的数据不显示数值";color:Theme.muted;font.pixelSize:Theme.fontSize(17);Layout.fillWidth:true;elide:Text.ElideRight }
                 }
+            }
+            RowLayout {
+                Layout.fillWidth:true; spacing:Theme.dp(18)
+                Text { text:"当前网络  "+page.network.type;color:Theme.muted;font.pixelSize:Theme.fontSize(12) }
+                Text { text:"当前配置  "+(engineController.processAlive?"Swirl 运行配置":"未运行");color:Theme.muted;font.pixelSize:Theme.fontSize(12) }
+                Text { text:"出站模式  "+AppState.mode;color:Theme.muted;font.pixelSize:Theme.fontSize(12) }
+                Text { text:"外部 IP  "+(telemetry.externalIp||"未检测");color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;elide:Text.ElideRight }
+                SwirlButton { text:telemetry.measurementState==="正在测量"?"测量中…":"检测网络"; enabled:telemetry.measurementState!=="正在测量"; implicitHeight:Theme.dp(28);onClicked:{telemetry.measureNetwork();if(engineController.activeNodeId.length>0&&!engineController.tests.busy)engineController.testSelectedNode(engineController.activeNodeId,"https://www.gstatic.com/generate_204")} }
             }
             GridLayout {
                 objectName:"statusCardsGrid"
@@ -106,9 +119,9 @@ Item {
                         {label:"当前网络",value:page.network.type,sub:page.network.name,icon:"wifi",route:"toolbox",tint:Theme.accent},
                         {label:"当前配置",value:engineController.processAlive?"Swirl 运行配置":"未运行",sub:"本机代理配置",icon:"document",route:"profiles",tint:Theme.accent},
                         {label:"出站模式",value:AppState.mode,sub:"国内直连 · 国外使用所选节点",icon:"code",route:"rules",tint:Theme.green},
-                        {label:"活跃连接",value:"—",sub:"尚未采集",icon:"link",route:"connections",tint:Theme.accent},
-                        {label:"活跃进程",value:engineController.processAlive?"1":"0",sub:"引擎进程",icon:"settings",route:"processes",tint:Theme.accent},
-                        {label:"今日流量",value:"—",sub:"尚未采集",icon:"clock",route:"traffic",tint:Theme.accent}]
+                        {label:"活跃连接",value:telemetry.connectionsSampled?String(telemetry.activeConnections):"—",sub:telemetry.connectionsSampled?"经过 Swirl 的连接":"尚未采集",icon:"link",route:"connections",tint:Theme.accent},
+                        {label:"活跃进程",value:telemetry.connectionsSampled?String(telemetry.activeProcesses):"—",sub:"已识别的流量来源",icon:"settings",route:"processes",tint:Theme.accent},
+                        {label:"今日流量",value:today.sampled?telemetry.formatBytes(today.total):"—",sub:today.sampled?"本机持久化累计":"尚未采集",icon:"clock",route:"traffic",tint:Theme.accent}]
                     SwirlMotionButton {
                         required property var modelData
                         Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(90);Layout.minimumWidth:Theme.dp(0);hoverEnabled:true;padding:Theme.dp(10)
@@ -140,7 +153,7 @@ Item {
                     GridLayout {
                         anchors.fill:parent;columns:page.width>=Theme.dp(1100)?4:2;columnSpacing:Theme.dp(8);rowSpacing:Theme.dp(8)
                         Repeater {
-                            model:[{label:"互联网延迟",value:"—",icon:"globe",tint:Theme.accent},{label:"路由器延迟",value:"—",icon:"router",tint:Theme.green},{label:"DNS 延迟",value:"—",icon:"network",tint:Theme.accent},{label:"代理延迟",value:"—",icon:"bolt",tint:Theme.orange}]
+                            model:[{label:"互联网延迟",value:telemetry.latencies.internet||"未采集",icon:"globe",tint:Theme.accent},{label:"路由器延迟",value:telemetry.latencies.router||"未采集",icon:"router",tint:Theme.green},{label:"DNS 延迟",value:telemetry.latencies.dns||"未采集",icon:"network",tint:Theme.accent},{label:"代理延迟",value:engineController.nodes.filter(function(n){return n.id===engineController.activeNodeId}).map(function(n){return n.latency==="—"?"未采集":isNaN(Number(n.latency))?"检测失败":n.latency+" ms"})[0]||"未采集",icon:"bolt",tint:Theme.orange}]
                             Item {
                                 required property var modelData
                                 Layout.fillWidth:true;Layout.fillHeight:true;Layout.minimumWidth:Theme.dp(0);Layout.preferredHeight:Theme.dp(64)
@@ -150,7 +163,7 @@ Item {
                                     ColumnLayout {
                                         spacing:Theme.dp(4);Layout.fillWidth:true
                                         Text { text:modelData.label;color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;elide:Text.ElideRight }
-                                        Text { text:modelData.value+" ms";color:Theme.text;font.family:"Segoe UI";font.pixelSize:Theme.fontSize(22);font.weight:Font.DemiBold }
+                                        Text { text:modelData.value;color:Theme.text;font.family:"Segoe UI";font.pixelSize:Theme.fontSize(18);font.weight:Font.DemiBold }
                                     }
                                 }
                             }
@@ -168,7 +181,7 @@ Item {
                             Item {
                                 id:metric;required property var modelData
                                 objectName:modelData.up?"uploadMetric":"downloadMetric"
-                                property string value:"—"
+                                property string value:telemetry.sampled?telemetry.formatBytes(modelData.up?telemetry.uploadRate:telemetry.downloadRate)+"/s":"—"
                                 Layout.fillWidth:true;Layout.fillHeight:true
                                 RowLayout {
                                     width:parent.width;spacing:Theme.dp(10)
@@ -179,8 +192,8 @@ Item {
                                         Text { text:metric.value;color:Theme.text;font.family:"Segoe UI";font.pixelSize:Theme.fontSize(24);font.weight:Font.DemiBold }
                                     }
                                 }
-                                Text { x:Theme.dp(0);y:Theme.dp(55);text:AppState.proxyOn?"":"未连接";font.pixelSize:Theme.fontSize(11);color:Theme.muted }
-                                SwirlSparkline { x:Theme.dp(44);y:Theme.dp(54);width:parent.width-Theme.dp(44);height:Theme.dp(42);lineColor:metric.modelData.tint;active:false;values:[] }
+                                Text { x:Theme.dp(0);y:Theme.dp(55);text:telemetry.sampled?"真实引擎采样":"未采集";font.pixelSize:Theme.fontSize(11);color:Theme.muted }
+                                SwirlSparkline { x:Theme.dp(44);y:Theme.dp(54);width:parent.width-Theme.dp(44);height:Theme.dp(42);lineColor:metric.modelData.tint;active:telemetry.sampled;values:(telemetry.revision,telemetry.history(metric.modelData.up?"up":"down",[60,300,3600][page.speedRange],true)) }
                                 Accessible.name:metric.modelData.label+" "+value+"，数据"
                             }
                         }
@@ -195,10 +208,10 @@ Item {
                         anchors.fill:parent;spacing:Theme.dp(5)
                         Rectangle {
                             Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(22);radius:Theme.roundedRadius(width,height);color:Theme.raised;clip:true
-                            Canvas { anchors.fill:parent; onPaint:getContext("2d").reset() }
+                            Row { anchors.fill:parent; Repeater { model:(telemetry.revision,telemetry.distribution(distribution.filterIndex)); Rectangle { required property var modelData; height:parent.height;width:parent.width*parseFloat(modelData.percent||"0")/100;color:modelData.tint } } }
                         }
                         Repeater {
-                            model:[{name:"代理流量",percent:"—",value:"—",tint:Theme.accent},{name:"直连流量",percent:"—",value:"—",tint:Theme.statusGreen},{name:"阻止流量",percent:"—",value:"—",tint:"#FFA326"},{name:"其他流量",percent:"—",value:"—",tint:Theme.muted}]
+                            model:(telemetry.revision,telemetry.distribution(distribution.filterIndex))
                             RowLayout {
                                 required property var modelData
                                 Layout.fillWidth:true;Layout.fillHeight:true;spacing:Theme.dp(10)
@@ -210,8 +223,8 @@ Item {
                         }
                     }
                 }
-                Ranking { heading:"应用流量排行";rows:page.apps;Layout.fillWidth:true;Layout.preferredWidth:Theme.dp(1);Layout.minimumWidth:Theme.dp(0);Layout.preferredHeight:Theme.dp(198) }
-                Ranking { heading:"域名流量排行";rows:page.domains;Layout.fillWidth:true;Layout.preferredWidth:Theme.dp(1);Layout.minimumWidth:Theme.dp(0);Layout.preferredHeight:Theme.dp(198) }
+                Ranking { heading:"应用流量排行";kind:"apps";Layout.fillWidth:true;Layout.preferredWidth:Theme.dp(1);Layout.minimumWidth:Theme.dp(0);Layout.preferredHeight:Theme.dp(198) }
+                Ranking { heading:"域名流量排行";kind:"domains";Layout.fillWidth:true;Layout.preferredWidth:Theme.dp(1);Layout.minimumWidth:Theme.dp(0);Layout.preferredHeight:Theme.dp(198) }
             }
             GridLayout {
                 Layout.fillWidth:true;columns:page.medium?3:1;columnSpacing:Theme.gap;rowSpacing:Theme.gap
@@ -262,7 +275,7 @@ Item {
                                 }
                             }
                             Repeater {
-                                model:systemProvider.connections().slice(0,3)
+                                model:telemetry.connections.slice(0,3)
                                 SwirlMotionButton {
                                     required property var modelData;width:parent.width;height:(parent.height-Theme.dp(24))/3;padding:Theme.dp(0)
                                     background:Rectangle { color:parent.hovered?Theme.hover:"transparent";radius:Theme.roundedRadius(width,height)
@@ -270,7 +283,7 @@ Item {
  }
                                     contentItem:Row {
                                         leftPadding:Theme.dp(8)
-                                        Repeater { model:[{value:modelData.time,ratio:0.11},{value:modelData.host,ratio:0.25},{value:"代理",ratio:0.08},{value:modelData.process,ratio:0.18},{value:AppState.selectedNode,ratio:0.17},{value:modelData.latency,ratio:0.10},{value:modelData.down,ratio:0.11}]
+                                        Repeater { model:[{value:modelData.time,ratio:0.11},{value:modelData.host,ratio:0.25},{value:modelData.protocol,ratio:0.08},{value:modelData.process,ratio:0.18},{value:modelData.policy,ratio:0.17},{value:modelData.latency,ratio:0.10},{value:modelData.down,ratio:0.11}]
                                             Text { required property var modelData;width:(parent.width-Theme.dp(8))*modelData.ratio;height:parent.height;text:modelData.value;color:Theme.text;font.family:Theme.fontFamily;font.pixelSize:Theme.fontSize(12);verticalAlignment:Text.AlignVCenter;elide:Text.ElideRight }
                                         }
                                     }
@@ -287,7 +300,7 @@ Item {
                         ColumnLayout {
                             anchors.fill:parent;spacing:Theme.dp(0)
                             Repeater {
-                                model:[{title:"系统代理",sub:"系统流量转发",icon:"layers",kind:0},{title:"增强模式（TUN）",sub:"网络接管",icon:"layers",kind:1},{title:"DNS",sub:"使用 DNS 解析",icon:"shield",kind:2}]
+                                model:[{title:"系统代理",sub:"经过系统代理的连接",icon:"layers",kind:0},{title:"增强模式（TUN）",sub:"本阶段未实现",icon:"layers",kind:1},{title:"DNS",sub:"使用 DNS 解析",icon:"shield",kind:2}]
                                 RowLayout {
                                     required property var modelData;Layout.fillWidth:true;Layout.fillHeight:true;spacing:Theme.dp(12)
                                     SwirlIcon { name:modelData.icon;size:Theme.dp(22);color:Theme.text }
@@ -338,7 +351,7 @@ Item {
                         Layout.fillWidth:true
                         SwirlSegmentedControl { id:seriesSelector;objectName:"seriesSelector";implicitWidth:Theme.dp(210);accentSelection:true }
                         Item { Layout.fillWidth:true }
-                        SwirlSegmentedControl { id:rangeSelector;objectName:"rangeSelector";options:["实时","1小时","6小时","24小时"];implicitWidth:Theme.dp(275) }
+                        SwirlSegmentedControl { id:rangeSelector;objectName:"rangeSelector";options:["实时","1分钟","5分钟","1小时"];implicitWidth:Theme.dp(275) }
                     }
                     SwirlTrafficChart { objectName:"overviewChart";Layout.fillWidth:true;Layout.fillHeight:true;series:["down","up","total"][seriesSelector.currentIndex];rangeIndex:rangeSelector.currentIndex }
                 }

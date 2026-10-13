@@ -10,6 +10,7 @@
 #include <QVector>
 #include <QtGlobal>
 #include <cstdio>
+#include "../app/BrandRaster.h"
 
 static QByteArray makeDib(const QImage &source, int size)
 {
@@ -56,26 +57,9 @@ int main(int argc, char *argv[])
         std::fprintf(stderr, "Invalid Swirl brand SVG\n");
         return 3;
     }
-    QImage source(1024, 1024, QImage::Format_ARGB32);
-    source.fill(Qt::transparent);
-    {
-        QPainter painter(&source);
-        renderer.render(&painter);
-    }
-    // Crop transparent margins, then add a consistent 6% safe edge. The path
-    // itself is unchanged; the knot now occupies 88% of the Windows canvas.
-    QRect bounds;
-    for(int y=0;y<source.height();++y)for(int x=0;x<source.width();++x)
-        if(qAlpha(source.pixel(x,y))>0)bounds=bounds.united(QRect(x,y,1,1));
-    if(bounds.isEmpty())return 3;
-    QImage enlarged(1024,1024,QImage::Format_ARGB32);enlarged.fill(Qt::transparent);
-    {QPainter p(&enlarged);p.setRenderHint(QPainter::SmoothPixmapTransform);
-     const auto fitted=bounds.size().scaled(900,900,Qt::KeepAspectRatio);
-     p.drawImage(QRect((1024-fitted.width())/2,(1024-fitted.height())/2,fitted.width(),fitted.height()),source,bounds);}
-    source=enlarged;
     const QVector<int> sizes = {16, 20, 24, 32, 40, 48, 64, 128, 256};
     QVector<QByteArray> frames;
-    for (int size : sizes) frames.append(makeDib(source, size));
+    for (int size : sizes) frames.append(makeDib(swirlBrandRaster(renderer,size), size));
     QByteArray icon;
     QDataStream header(&icon, QIODevice::WriteOnly);
     header.setByteOrder(QDataStream::LittleEndian);

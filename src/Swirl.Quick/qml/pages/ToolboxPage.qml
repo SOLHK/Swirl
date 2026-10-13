@@ -6,13 +6,26 @@ import "../components"
 import "../controls"
 Item {
     id:page
-    readonly property bool implemented:false
+    readonly property bool implemented:true
     property string tool:"DNS 查询"
-    property string result:"网络检测尚未实现。"
+    property string result:"上方诊断使用真实测量；下面的自定义工具尚未实现。"
     property var tools:["DNS 查询","TCP 连通性","Traceroute","HTTP 请求","TLS 证书检查","端口检查","IP 地址查询","Whois","连接测试","网络接口信息"]
     ColumnLayout {
         anchors.fill:parent; anchors.margins:Theme.dp(23); spacing:Theme.dp(14)
-        Text { text:"选择网络诊断工具，结果均为本地。"; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
+        Text { text:"网络诊断";font.weight:Font.DemiBold; font.pixelSize:Theme.fontSize(28);color:Theme.text }
+        RowLayout {
+            Layout.fillWidth:true
+            Text {text:engineController.telemetry.measurementState||"尚未测量";color:Theme.muted;Layout.fillWidth:true}
+            SwirlButton {text:"开始检测";enabled:engineController.telemetry.measurementState!=="正在测量";onClicked:{engineController.telemetry.measureNetwork();if(engineController.selectedNodeId.length&&!engineController.tests.busy)engineController.testSelectedNode(engineController.selectedNodeId,"https://www.gstatic.com/generate_204")}}
+        }
+        SwirlGlassPanel { Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(155)
+            ColumnLayout {anchors.fill:parent;anchors.margins:Theme.cardPadding;spacing:Theme.dp(10)
+                Text {text:"互联网 TCP："+(engineController.telemetry.latencies.internet||"未采集")+"  ·  默认网关 ICMP："+(engineController.telemetry.latencies.router||"未采集")+"  ·  DNS 查询："+(engineController.telemetry.latencies.dns||"未采集");color:Theme.text;Layout.fillWidth:true;wrapMode:Text.Wrap}
+                Text {text:"外部 IP："+(engineController.telemetry.externalIp||"未检测")+"  ·  "+systemProvider.currentNetwork().type;color:Theme.text;Layout.fillWidth:true;wrapMode:Text.Wrap}
+                Text {text:"互联网测量为直连 TCP 握手；网关来自当前活动网卡；出口检测经实际 Swirl 分流。节点检测使用独立引擎。";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
+            }
+        }
+        Text { text:"其他自定义工具（尚未实现）"; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
         RowLayout {
             Layout.fillWidth:true; Layout.fillHeight:true; spacing:Theme.dp(15)
             SwirlGlassPanel {

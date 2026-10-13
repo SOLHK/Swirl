@@ -13,13 +13,13 @@
 
 class SubscriptionServer:public QTcpServer {
 public:
-    QByteArray content;int count=0,code=200;bool hanging=false;
+    QByteArray content,location;int count=0,code=200;bool hanging=false;
     SubscriptionServer(){connect(this,&QTcpServer::newConnection,this,[this]{while(hasPendingConnections()){
         auto *socket=nextPendingConnection();auto data=std::make_shared<QByteArray>();
         connect(socket,&QTcpSocket::readyRead,socket,[this,socket,data]{data->append(socket->readAll());if(!data->contains("\r\n\r\n"))return;
             if(socket->property("done").toBool())return;socket->setProperty("done",true);++count;
             if(hanging)return;
-            socket->write("HTTP/1.1 "+QByteArray::number(code)+" Result\r\nContent-Length: "+QByteArray::number(content.size())+"\r\nConnection: close\r\n\r\n"+content);socket->disconnectFromHost();});
+            socket->write("HTTP/1.1 "+QByteArray::number(code)+" Result\r\n"+(location.isEmpty()?QByteArray():"Location: "+location+"\r\n")+"Content-Length: "+QByteArray::number(content.size())+"\r\nConnection: close\r\n\r\n"+content);socket->disconnectFromHost();});
         connect(socket,&QTcpSocket::disconnected,socket,&QObject::deleteLater);
     }});}
     QUrl url() const{return QUrl(QString("http://127.0.0.1:%1/sub?token=PRIVATE-TOKEN").arg(serverPort()));}
@@ -105,6 +105,14 @@ external-controller: 0.0.0.0:9090
         QVERIFY(service.saveSubscription(source,"Paused",{},15,false));const int count=server.count;now+=10000;QTest::qWait(250);QCOMPARE(server.count,count);
         NodeStore reloaded(store.filePath());QCOMPARE(reloaded.subscriptions().first().url,server.url());QCOMPARE(reloaded.nodes().first().port,quint16(1081));
         QVERIFY(service.removeSubscription(source));QVERIFY(store.subscriptions().isEmpty());QVERIFY(store.nodes().first().sourceId.isEmpty());
+    }
+    void redirectsPreserveNodesAndBoundLoops() {
+        SubscriptionServer first,second;QVERIFY(first.listen(QHostAddress::LocalHost,0));QVERIFY(second.listen(QHostAddress::LocalHost,0));
+        first.code=302;first.location=second.url().toEncoded();second.content=socks(1080);
+        QTemporaryDir temp;NodeStore store(temp.filePath("nodes"));NodeImportService service(&store);
+        service.importUrl(first.url());QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),5000);QCOMPARE(store.nodes().size(),1);QCOMPARE(store.nodes().first().port,quint16(1080));
+        first.location=first.url().toEncoded();service.importUrl(first.url());QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),5000);QCOMPARE(store.nodes().size(),1);QVERIFY(service.message().contains(QStringLiteral("重定向")));QVERIFY(first.count<=7);
+        first.location="file:///C:/private";service.importUrl(first.url());QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),5000);QCOMPARE(store.nodes().size(),1);QVERIFY(service.message().contains(QStringLiteral("不安全")));
     }
     void importedChainAndRunningRefresh() {
         ControlledNetwork network;QVERIFY(network.start());SubscriptionServer source;QVERIFY(source.listen(QHostAddress::LocalHost,0));
