@@ -73,7 +73,7 @@ int main(int argc, char *argv[])
     app.setApplicationName(QStringLiteral("Swirl"));
     app.setOrganizationName(QStringLiteral("SOLHK"));
     app.setOrganizationDomain(QStringLiteral("solhk.dev"));
-    app.setApplicationVersion(QStringLiteral("1.0.0-phase3-preview"));
+    app.setApplicationVersion(QStringLiteral("1.0.0-phase3-final-preview"));
 #ifdef SWIRL_UI_TESTS
 #ifdef Q_OS_WIN
     // Read-only native QA capture, limited to the actual Windows taskbar.
@@ -126,6 +126,18 @@ int main(int argc, char *argv[])
         QSettings isolatedSettings;
         if(!app.arguments().contains("--preview-preserve-settings"))isolatedSettings.clear();
         isolatedSettings.sync();
+    }
+    // Preserve old caches and user data. UI revisions and test builds must not
+    // reuse bytecode left by either source PR at the same resource URLs.
+    if(qEnvironmentVariableIsEmpty("QML_DISK_CACHE_PATH")) {
+#ifdef SWIRL_UI_TESTS
+        const QString flavor=QStringLiteral("qa");
+#else
+        const QString flavor=QStringLiteral("release");
+#endif
+        const auto cache=QStandardPaths::writableLocation(QStandardPaths::CacheLocation)
+            +QStringLiteral("/qmlcache/%1-qt%2-%3").arg(QStringLiteral(SWIRL_QML_CACHE_REVISION),QString::fromLatin1(qVersion()),flavor);
+        qputenv("QML_DISK_CACHE_PATH",cache.toUtf8());
     }
     WindowsBackdrop backdrop;
     HdrOutput hdrOutput;

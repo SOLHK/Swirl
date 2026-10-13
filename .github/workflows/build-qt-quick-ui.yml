@@ -217,6 +217,21 @@ jobs:
           Copy-Item build/swirl-quick/Release/Swirl.exe dist/ -Force
           Copy-Item build/swirl-quick/Release/SwirlProxyGuard.exe dist/
           Remove-Item -LiteralPath "dist/Qt6Test.dll" -ErrorAction SilentlyContinue
+      - name: Verify production navigation without QtTest
+        shell: pwsh
+        run: |
+          $env:QT_QPA_PLATFORM = "offscreen"
+          $env:QT_QUICK_BACKEND = "software"
+          $qtBin = Split-Path (Get-Command qmake).Source
+          $env:QT_QPA_PLATFORM_PLUGIN_PATH = Join-Path (Split-Path $qtBin) "plugins/platforms"
+          $env:QT_QPA_FONTDIR = (Resolve-Path "build/swirl-quick/Release/lib/fonts").Path
+          if (Test-Path "dist/Qt6Test.dll") { throw "Production must not depend on QtTest" }
+          $exe = (Resolve-Path "dist/Swirl.exe").Path
+          foreach ($run in 1..2) {
+            $process = Start-Process $exe -ArgumentList "--smoke-test" -Wait -PassThru -NoNewWindow
+            Get-Content "dist/Swirl-diagnostics.txt"
+            if ($process.ExitCode -ne 0) { throw "Production navigation failed on run $run" }
+          }
       - name: Prepare standalone installer files
         shell: pwsh
         run: |

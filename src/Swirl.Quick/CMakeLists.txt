@@ -68,6 +68,17 @@ foreach(file IN LISTS SWIRL_QML_FILES)
     set_source_files_properties("${file}" PROPERTIES QT_RESOURCE_ALIAS "${qml_alias}")
 endforeach()
 set_source_files_properties(qml/SwirlMotion.qml qml/Theme.qml qml/AppState.qml qml/FeatureCatalog.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+# Different PRs and test/production builds use the same qrc URLs. Keep their
+# runtime bytecode caches apart even when resource timestamps are identical.
+set(SWIRL_QML_CACHE_INPUT "")
+foreach(qml IN LISTS SWIRL_QML_FILES)
+ file(SHA256 "${CMAKE_CURRENT_SOURCE_DIR}/${qml}" qml_hash)
+ string(APPEND SWIRL_QML_CACHE_INPUT "${qml}:${qml_hash}\n")
+ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${qml}")
+endforeach()
+string(SHA256 SWIRL_QML_CACHE_HASH "${SWIRL_QML_CACHE_INPUT}")
+string(SUBSTRING "${SWIRL_QML_CACHE_HASH}" 0 16 SWIRL_QML_CACHE_REVISION)
+target_compile_definitions(Swirl PRIVATE SWIRL_QML_CACHE_REVISION="${SWIRL_QML_CACHE_REVISION}")
 qt_add_qml_module(Swirl
     URI SwirlQuick
     VERSION 1.0
