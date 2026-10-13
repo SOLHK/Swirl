@@ -94,9 +94,9 @@ LONG writeRegistry(const QJsonObject &values) {
 }
 QJsonObject proxyRegistry(const QString &server,const QString &bypass) {
     QJsonObject result;DWORD enabled=1;
-    result.insert("ProxyEnable",QJsonObject{{"present",true},{"type",REG_DWORD},{"data",QString::fromLatin1(QByteArray(reinterpret_cast<const char *>(&enabled),sizeof(enabled)).toBase64())}});
+    result.insert("ProxyEnable",QJsonObject{{"present",true},{"type",int(REG_DWORD)},{"data",QString::fromLatin1(QByteArray(reinterpret_cast<const char *>(&enabled),sizeof(enabled)).toBase64())}});
     const QString strings[]={server,bypass,QString()};
-    for(int i=1;i<4;++i)result.insert(registryKeys[i],QJsonObject{{"present",true},{"type",REG_SZ},
+    for(int i=1;i<4;++i)result.insert(registryKeys[i],QJsonObject{{"present",true},{"type",int(REG_SZ)},
         {"data",QString::fromLatin1(QByteArray(reinterpret_cast<const char *>(strings[i-1].utf16()),(strings[i-1].size()+1)*sizeof(wchar_t)).toBase64())}});
     return result;
 }

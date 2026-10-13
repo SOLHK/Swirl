@@ -23,6 +23,7 @@ target_sources(SwirlEngine PRIVATE engine/NodeImportService.h engine/NodeImportS
 target_link_libraries(SwirlEngine PUBLIC Qt6::Core Qt6::Network Qt6::Gui)
 target_include_directories(SwirlEngine PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 if(WIN32)
+ target_compile_definitions(SwirlEngine PUBLIC NOMINMAX)
  target_link_libraries(SwirlEngine PRIVATE advapi32 ws2_32 iphlpapi crypt32 wininet)
  add_executable(SwirlProxyGuard tools/ProxyGuard.cpp)
  target_link_libraries(SwirlProxyGuard PRIVATE SwirlEngine ole32 propsys shell32 shlwapi uuid)

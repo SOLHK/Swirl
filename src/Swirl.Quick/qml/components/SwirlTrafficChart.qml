@@ -72,6 +72,7 @@ Item {
             onPositionChanged:plot.requestPaint(); onContainsMouseChanged:plot.requestPaint()
             ToolTip.visible:containsMouse&&!previewCaptureMode&&graph.nearestIndex(mouseX/width)>=0
             ToolTip.text: {
+                if(graph.nearestIndex(mouseX/width)<0)return ""
                 var i=Math.max(0,graph.nearestIndex(mouseX/width))
                 var when=new Date(graph.points.length===graph.baseHistory.length?graph.points[i].time:graph.startTime+i/(graph.baseHistory.length-1)*(graph.endTime-graph.startTime))
                 return Qt.formatDateTime(when,"MM-dd HH:mm")+" · "+engineController.telemetry.formatBytes(graph.valueAt(i))+"/s"+(i===graph.baseHistory.length-1 ? " · 当前" : " · 历史")
