@@ -180,7 +180,7 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
         QTest::keyClick(window,Qt::Key_Escape);wait(400);
         check("dropdown-escape",!popup->property("visible").toBool());
     } else check("dropdown-present",false);
-    auto *button=window->findChild<QQuickItem *>("nav-settings");
+    auto *button=findVisual(window->contentItem(),"nav-overview");
     if(button) {
         const auto p=button->mapToScene(QPointF(button->width()/2,button->height()/2)).toPoint();
         for(int i=0;i<8;++i){QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,p);wait(22);QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,p);wait(15);}

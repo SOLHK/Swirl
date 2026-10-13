@@ -8,7 +8,10 @@ find_package(Qt6 6.8 REQUIRED COMPONENTS Quick Qml QuickControls2 Network Svg Gu
 qt_standard_project_setup(REQUIRES 6.8)
 qt_policy(SET QTP0004 NEW)
 qt_add_executable(Swirl WIN32 main.cpp app/SystemDataProvider.cpp app/SystemDataProvider.h app/WindowsBackdrop.cpp app/WindowsBackdrop.h network/CaptureService.cpp network/CaptureService.h app/ModuleDraftStore.cpp app/ModuleDraftStore.h)
+target_sources(Swirl PRIVATE network/NetworkDiagnostics.cpp network/NetworkDiagnostics.h)
 add_library(SwirlEngine STATIC
+ engine/SystemProxy.h engine/SystemProxy.cpp
+ engine/ActivityTelemetry.h engine/ActivityTelemetry.cpp
  engine/ProxyEngine.h engine/OwnedProcess.h engine/OwnedProcess.cpp
  engine/MihomoAdapter.h engine/MihomoAdapter.cpp
  engine/EngineController.h engine/EngineController.cpp)
@@ -18,7 +21,7 @@ target_sources(SwirlEngine PRIVATE engine/NodeImportService.h engine/NodeImportS
 target_link_libraries(SwirlEngine PUBLIC Qt6::Core Qt6::Network Qt6::Gui)
 target_include_directories(SwirlEngine PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 if(WIN32)
- target_link_libraries(SwirlEngine PRIVATE advapi32 ws2_32 iphlpapi crypt32)
+ target_link_libraries(SwirlEngine PRIVATE advapi32 ws2_32 iphlpapi crypt32 wininet)
 endif()
 if(MSVC)
  target_compile_options(SwirlEngine PRIVATE /utf-8)
@@ -29,7 +32,7 @@ qt_add_resources(Swirl engine_manifest PREFIX "/engine" BASE "${CMAKE_CURRENT_SO
 set(SWIRL_QML_FILES
  qml/Main.qml qml/Theme.qml qml/AppState.qml qml/FeatureCatalog.qml qml/SwirlMotion.qml
  qml/controls/SwirlPressMotion.qml qml/controls/SwirlAnimatedModel.qml qml/controls/SwirlMotionButton.qml qml/controls/SwirlSpring.qml qml/controls/SwirlPageHost.qml
- qml/pages/FeatureHubPage.qml qml/pages/FeatureModulePage.qml qml/components/SwirlBrandIcon.qml
+ qml/pages/MorePage.qml qml/pages/FeatureHubPage.qml qml/pages/FeatureModulePage.qml qml/components/SwirlBrandIcon.qml
  qml/controls/SwirlPillSurface.qml qml/controls/SwirlIconButton.qml qml/controls/SwirlButton.qml qml/controls/SwirlSegmentedControl.qml qml/controls/SwirlToggle.qml
  qml/controls/SwirlSearchField.qml qml/controls/SwirlTextField.qml
  qml/controls/SwirlComboBox.qml qml/controls/SwirlDialog.qml
@@ -39,7 +42,7 @@ set(SWIRL_QML_FILES
  qml/components/SwirlMetricCard.qml qml/components/SwirlStatusBadge.qml
  qml/components/SwirlInspectorPanel.qml qml/components/SwirlEmptyState.qml
  qml/components/SwirlSparkline.qml qml/components/SwirlListRow.qml qml/components/SwirlRegionBadge.qml qml/components/SwirlIcon.qml
- qml/pages/OverviewPage.qml qml/pages/CapturePage.qml qml/pages/ExternalToolsPage.qml qml/pages/ConnectionsPage.qml
+ qml/pages/ActivityPage.qml qml/pages/OverviewPage.qml qml/pages/CapturePage.qml qml/pages/ExternalToolsPage.qml qml/pages/ConnectionsPage.qml
  qml/pages/ProxiesPage.qml qml/pages/InspectorPage.qml
  qml/pages/ScriptsPage.qml qml/pages/SettingsPage.qml
  qml/pages/WorkbenchPage.qml qml/pages/ToolboxPage.qml
@@ -84,6 +87,22 @@ if(MSVC)
  target_compile_options(Swirl PRIVATE /utf-8)
 endif()
 if(SWIRL_BUILD_UI_TESTS)
+    find_package(Qt6 REQUIRED COMPONENTS Test)
+    add_executable(SwirlSystemProxyTests tests/SystemProxyTests.cpp)
+    target_link_libraries(SwirlSystemProxyTests PRIVATE SwirlEngine Qt6::Test)
+    if(WIN32)
+        target_link_libraries(SwirlSystemProxyTests PRIVATE wininet)
+    endif()
+    if(MSVC)
+        target_compile_options(SwirlSystemProxyTests PRIVATE /utf-8)
+    endif()
+    add_test(NAME swirl-system-proxy COMMAND SwirlSystemProxyTests)
+    add_executable(SwirlActivityTests tests/ActivityTests.cpp network/NetworkDiagnostics.cpp network/NetworkDiagnostics.h)
+    target_link_libraries(SwirlActivityTests PRIVATE SwirlEngine Qt6::Test)
+    if(MSVC)
+        target_compile_options(SwirlActivityTests PRIVATE /utf-8)
+    endif()
+    add_test(NAME swirl-activity-data COMMAND SwirlActivityTests)
  find_package(Qt6 REQUIRED COMPONENTS Test)
  target_sources(Swirl PRIVATE tests/HdrChecks.cpp tests/HdrChecks.h tests/OverviewChecks.cpp tests/OverviewChecks.h tests/CaptureChecks.cpp tests/CaptureChecks.h tests/WindowChecks.cpp tests/WindowChecks.h)
  target_link_libraries(Swirl PRIVATE Qt6::Test)

@@ -70,7 +70,7 @@ jobs:
       - name: Engine contract, real Mihomo and QML lifecycle checks
         shell: pwsh
         run: |
-          ctest --test-dir build/swirl-quick -C Release -R "swirl-(engine|node|import)-|swirl-motion" --output-on-failure
+          ctest --test-dir build/swirl-quick -C Release -R "swirl-(system-proxy|activity-|engine-|node-|import-)|swirl-motion" --output-on-failure
           if ($LASTEXITCODE -ne 0) {
             Get-Content build/swirl-quick/engine-contract.txt, build/swirl-quick/engine-real.txt -ErrorAction SilentlyContinue
             throw "Engine checks failed"
@@ -221,6 +221,7 @@ jobs:
           $icon = "build/swirl-quick/brand/Swirl.ico"
           if (!(Test-Path -LiteralPath $icon)) { throw "Missing SVG-derived Windows icon: $icon" }
           Copy-Item -LiteralPath $icon -Destination "installer-bin/Swirl-brand-100.ico"
+          Copy-Item -LiteralPath $icon -Destination "installer-bin/Swirl-cloud-knot.ico"
           Copy-Item "src/Swirl.Quick/packaging/licenses" "installer-bin/licenses" -Recurse -Force
           Remove-Item -Path "installer-bin/Swirl-*-preview.png", "installer-bin/Swirl-diagnostics.txt" -ErrorAction SilentlyContinue
           if (!(Test-Path "installer-bin/Swirl.exe")) { throw "Missing Swirl.exe" }
@@ -281,5 +282,5 @@ jobs:
             --repo "${GITHUB_REPOSITORY}" \
             --target "${GITHUB_SHA}" \
             --title "Swirl · 测试版 ${SHORT_SHA}" \
-            --notes "测试版：保留现有 Qt UI 与 HDR；设置 → 代理提供真实 Mihomo 进程启停、版本与认证 API 健康检查；不接管系统代理、不启用 TUN。包含真实本机 HTTP 抓包及 CONNECT 记录。支持手动 SOCKS5、Shadowsocks、Trojan 节点，本机代理与真实请求验证；没有演示数据，未实现功能保持禁用。请勿作为正式版本使用。" \
+            --notes "测试版：保留现有 Qt UI 与 HDR；设置 → 代理提供真实 Mihomo 进程启停、版本与认证 API 健康检查；节点就绪后可接管系统代理，断开时恢复原设置；不启用 TUN。包含真实本机 HTTP 抓包及 CONNECT 记录。支持手动 SOCKS5、Shadowsocks、Trojan 节点，本机代理与真实请求验证；没有演示数据，未实现功能保持禁用。请勿作为正式版本使用。" \
             --prerelease

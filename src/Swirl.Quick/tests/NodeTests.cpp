@@ -120,6 +120,9 @@ private slots:
         QCOMPARE(engine.status().nodeHealth,ProxyEngine::NodeHealth::Unknown);QCOMPARE(engine.status().requestState,ProxyEngine::RequestState::NotTested);
         QVERIFY(!engine.configurationSummary().contains(b.password));QCOMPARE(fetch(net,config.proxyPort),QByteArray("exit-A"));
         QCOMPARE(fetch(net,config.proxyPort,true),QByteArray("exit-A"));QVERIFY(net.a.forwarded>=2);QCOMPARE(net.b.forwarded,0);QVERIFY(net.httpsRequests>0);
+        QTRY_VERIFY_WITH_TIMEOUT(engine.telemetry().value("available").toBool(),5000);
+        QTRY_VERIFY_WITH_TIMEOUT(engine.telemetry().value("total").toLongLong()>0,5000);
+        QVERIFY(engine.telemetry().contains("connections"));
         engine.probeNode(net.url());QTRY_VERIFY_WITH_TIMEOUT(!engine.status().nodeBusy,8000);
         QCOMPARE(engine.status().nodeHealth,ProxyEngine::NodeHealth::Available);QCOMPARE(engine.status().requestState,ProxyEngine::RequestState::Succeeded);
         const auto pid=engine.status().processId;

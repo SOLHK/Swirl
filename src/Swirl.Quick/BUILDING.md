@@ -67,7 +67,7 @@ verify touch, multi-monitor transitions or OS snap gestures; those remain
 manual checks. Buttons call Qt native close/minimize/maximize APIs, dragging
 uses startSystemMove, and all eight resize edges use startSystemResize.
 Windows uses a single frameless Qt Quick window and native per-pixel transparency
-where available. The QML shell uses a scalable 12-unit logical radius on the native per-pixel alpha surface.
+where available. The QML shell uses a scalable 14-unit logical radius on the native per-pixel alpha surface.
 Large containers use 12, cards and popups 10, fields 8, and rectangular buttons 10.
 These are visual design units, not physical pixels or an OS specification. Qt
 handles screen DPI and Theme.dp handles user UI zoom independently.
@@ -78,54 +78,19 @@ an opaque fallback. See docs/UI_1_0_VALIDATION.md.
 
 ## Design and scope
 
-- Theme.qml centralizes colors, fonts, gaps, animation and radius tokens.
-- SwirlPillSurface remains shared by buttons, combo boxes and segmented selections.
-  Navigation rows compress between 27 and 33 logical pixels to fit the available
-  sidebar height, then scroll independently. Non-circular controls use the shared
-  radius hierarchy clamped to their geometry; circular icon buttons retain their original circular outline.
-- The overview reference is 1464 x 930 logical pixels. The initial window is
-  derived from the current screen's available logical geometry and saved normal
-  size. Qt owns per-screen device-pixel-ratio handling; manual UI scale applies
-  through shared font and geometry tokens from 75% to 150%.
-- Sidebar width contracts with the available window width and becomes an icon
-  rail below 900 logical pixels. Overview columns use their minimum useful card
-  widths, and the page scrolls vertically when the work area cannot fit all rows.
-- Light content uses opaque neutral white (#F7F7F8), white cards
-  (#FFFFFF), subtle borders (#E5E5E8) and sidebar tint (#E9E9EC).
-  The sidebar tint uses 0.96 opacity on the native translucent surface;
-  otherwise it is opaque. The content area always remains opaque. Dark mode
-  uses corresponding neutral tokens and the same capability-based fallback.
-- Only the selected download/upload/cumulative series is drawn. Offline
-  endpoints and current counters are zero. History and event times share the
-  session clock. Cumulative GB stays historical and increases only while the
-  demonstration connection is active.
-- The sidebar brand mark uses `assets/icons/swirl_knot_mark_light.svg` (black)
-  or `swirl_knot_mark_dark.svg` (white) according to the active theme, without
-  a tile, cradle, frame, or shadow. Light/dark application tile SVGs are in
-  `assets/icons/swirl_knot_light.svg` and `swirl_knot_dark.svg`. Those SVGs
-  are the only maintained Swirl brand sources. Windows executables and installers
-  require an ICO; CMake invokes a Qt SVG-based generator to build
-  `build/swirl-quick/brand/Swirl.ico` automatically from the light SVG.
-  Do not commit old raster brand icons. Generic interface action icons
-  remain under `assets/icons/ui/`.
-- Existing specialized pages remain available by search and overview links.
-  The HTTP capture page is real; remaining proxy backend integration and further
-  visual refinement of other pages remain future work.
-
-For isolated deployment validation, launch the installer with `/ISOLATED /S`
-and a final `/D=<absolute test directory>` argument. This extracts the same
-runtime and uninstaller but leaves existing Swirl shortcuts and registry
-entries alone. The isolated marker also makes its uninstaller skip shared
-entries. Never use an existing user installation directory for this test.
-
-The GitHub workflow builds Windows MSVC, runs the input checks and all-page
-smoke, checks Qt Quick previews at 100/125/150/200% effective offscreen scaling,
-and checks 800x560, 1000x650, 1464x930 and 1920x1219 logical windows before packaging
-the production EXE. Preview warnings/errors fail the job, and per-preview logs
-are uploaded as Swirl-Quick-Preview-Diagnostics. These software previews do not
-replace native Windows GPU/DWM or multi-monitor checks. Its existing release
-step publishes a test-only prerelease. Development changes go to `test` first; promotion to `main` requires the
-repository owner's explicit approval and successful required checks.
+- The initial route is Activity (活动). The reference window is 1144×840 DIP,
+  with a 242 DIP sidebar, 20 DIP margins/gaps and a shared 24 DIP card radius.
+- Navigation follows the supplied Surge Activity reference. Additional features
+  remain available in More (更多) and through Ctrl+K. Overview keeps global
+  configuration, node selection and system summaries.
+- Native Windows 11 DWM Acrylic supplies real desktop blur. Sidebar and main
+  content use different alpha tints; unavailable composition falls back to
+  opaque surfaces. Qt applies system DPI and Theme.dp applies user UI zoom.
+- Activity samples the owned Mihomo's authenticated API. No reference-image
+  data is fabricated. Unavailable router/DHCP/public-IP values remain blank.
+- Diagnostics tests explicit direct and proxy routes independently, tries
+  multiple HTTPS 204 endpoints and classifies actual DNS/TCP/TLS/HTTP errors.
+- Detailed architecture, measurements and scope: docs/SURGE_ACTIVITY_PHASE1.md.
 
 ## Module drafts and in-place upgrades
 
@@ -144,28 +109,18 @@ in `docs/UI_1_0_VALIDATION.md`. `docs/UI_VISUAL_VALIDATION.md` and
 Use `scripts/build-quick-windows.ps1 -InputTests -NativeBackdropTests` for native checks before producing the installer. Normal input/capture/smoke checks remain available offscreen. Production builds omit Qt Test. `--capture-native-frame=...` explicitly brings the target window forward briefly; it fails if the target cannot be activated or a composed frame cannot be saved. See `docs/UI_1_0_VALIDATION.md` for measured results and unverified environments.
 
 
-## Knot branding and HDR traffic lights
+## Branding and window controls
 
-The sidebar/About marks use the canonical `swirl_knot_mark_light.svg` and dark
-variant from the upstream test branch. The application/window icon uses the
-full `swirl_knot_light.svg`; the embedded Windows ICO is rasterized from that
-SVG because the upstream legacy swirl.ico still contains the blue artwork.
+The application and About page use the abstract S data-flow SVG mark. Existing
+asset filenames are retained for installer/resource compatibility. The sidebar
+has no brand block. The three 12 DIP window buttons invoke native close,
+minimize and maximize/restore APIs. The shell uses SDR and no emissive traffic
+light pass. Previous HDR shader diagnostics remain in the tree but are not
+the production window's visual treatment.
 
-Builds now require the Qt ShaderTools SDK (`qtshadertools` in aqt/install-qt)
-and GuiPrivate headers matching the shipped Qt 6.10.3 runtime. Baked shaders
-are embedded and do not require qsb on the user's machine. The window requests
-Qt's version-specific `_qt_sg_hdr_format=scrgb` hook; unsupported output falls
-back to SDR. HdrOutput samples the actual RHI swapchain, not a guessed Windows
-setting. The final FP16 pass linearizes ordinary SDR UI and applies Windows SDR
-white correction; only the three circular controls receive an emissive highlight
-bounded by the reported display peak. Popup/overlay content is corrected too.
-No system HDR or display settings are changed. Dark hover glyphs remain dark.
-
-`--hdr-self-test` renders the production shader into an FP16 GPU texture and
-checks above-white output, SDR fallback, white correction and dark glyphs.
-`--hdr-display-test --hdr-display-output=C:/Swirl-validation/hdr.csv` reads the
-actual HDR window backbuffer around all three controls and records nominal
-linear luminance. It requires HDR enabled and available headroom; its values
-are GPU output measurements, not a physical photometer calibration. After
-changing display HDR mode, restart to renegotiate the Qt swapchain format.
-Ordinary PNG screenshots cannot preserve the actual HDR emission range.
+System proxy lease tests run in `swirl-system-proxy` without changing Windows
+settings. To temporarily verify real WinINet routing against an already running
+loopback proxy, set `SWIRL_NATIVE_PROXY_TEST=1` and `SWIRL_NATIVE_PROXY_PORT` then
+run `SwirlSystemProxyTests nativeInternetRequest`. This restores the previous
+settings before reporting success. Production enables the native backend only
+for ordinary interactive runs, never for preview or test modes.

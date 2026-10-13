@@ -1,14 +1,20 @@
 # Swirl
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="src/Swirl.Quick/assets/icons/swirl_knot_dark.svg"><img src="src/Swirl.Quick/assets/icons/swirl_knot_light.svg" width="88" alt="Swirl 祥云结标志"></picture>
+<picture><source media="(prefers-color-scheme: dark)" srcset="src/Swirl.Quick/assets/icons/swirl_knot_dark.svg"><img src="src/Swirl.Quick/assets/icons/swirl_knot_light.svg" width="88" alt="Swirl 数据流标志"></picture>
 
-Swirl 品牌图标以 SVG 为唯一设计源：浅色为黑色祥云结、灰白底，深色为白色祥云结、深灰底。Windows 安装器与 EXE 所需的 ICO 会在构建时由同一 SVG 自动生成。
+Swirl 品牌图标以 SVG 为唯一设计源：祥云结图形，分别提供浅色与深色主题版本。Windows 安装器与 EXE 所需的 ICO 会在构建时由同一 SVG 自动生成。
 
 **Swirl** 是面向 Windows 的专业网络工具项目，使用 **C++23 + Qt 6 Quick/QML** 开发统一的桌面界面、HTTP 调试与后续代理管理功能。界面设计借鉴 macOS 应用的简洁布局与细腻材质，运行于 Windows。
 
 > **🧪 当前状态：Swirl 第二阶段测试版（`1.0.0-preview`）。** 仓库当前仅保留 C++23 / Qt 6 代码和构建链；原 WPF/.NET 项目与安装器已退出当前源码树。**当前提供真实本机代理节点功能，尚非正式发布版本。**
 
 [![Qt UI 测试构建](https://github.com/SOLHK/Swirl/actions/workflows/build-qt-quick-ui.yml/badge.svg?branch=test)](https://github.com/SOLHK/Swirl/actions/workflows/build-qt-quick-ui.yml) · [测试版安装程序（EXE）](https://github.com/SOLHK/Swirl/releases) · [test 分支](https://github.com/SOLHK/Swirl/tree/test) · [Qt 1.0 验收记录](docs/UI_1_0_VALIDATION.md)
+
+## Surge Activity 对照预览
+
+本开发分支根据用户提供的 Surge 截图组织中文活动页，接入真实 Mihomo 采样、独立直连/代理诊断与连接终止。其他功能可从“更多”和搜索进入。
+
+[实现、截图与数据边界](docs/SURGE_ACTIVITY_PHASE1.md)。
 
 ## 当前实现
 
@@ -20,7 +26,7 @@ Swirl 品牌图标以 SVG 为唯一设计源：浅色为黑色祥云结、灰白
 
 详见 [第二阶段使用、测试和限制](docs/PHASE2_REAL_NODES.md)、[抓包说明](src/Swirl.Quick/CAPTURE.md)。
 
-订阅导入/更新、系统代理接管、TUN、DNS 分流、HTTPS MITM、重写、脚本和网关尚未实现。本阶段仅验证受控 SOCKS5 真实 HTTP/HTTPS 链路；未使用真实远程 Shadowsocks/Trojan 凭据验证。
+TUN、DNS 分流、HTTPS MITM、重写、脚本和网关尚未实现。节点连接就绪后自动启用 Windows 系统代理，断开或退出恢复原设置；也可在总览、更多和设置中手动开关。系统代理有异常退出恢复记录与实例互斥，不覆盖其他客户端后来修改的设置。
 
 ## 下载和构建
 

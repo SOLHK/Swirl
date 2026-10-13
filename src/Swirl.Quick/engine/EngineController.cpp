@@ -6,8 +6,9 @@
 #include <QMetaEnum>
 #include <QTimer>
 
-EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject *parent, QString storePath)
-    : QObject(parent), m_engine(std::move(engine)), m_store(std::move(storePath)),m_imports(&m_store,this) {
+EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject *parent, QString storePath, bool nativeSystemProxy)
+    : QObject(parent), m_engine(std::move(engine)), m_store(std::move(storePath)),m_imports(&m_store,this),m_systemProxy(nativeSystemProxy,this) {
+    connect(&m_systemProxy,&SystemProxy::changed,this,&EngineController::systemProxyChanged);
     QFile manifest(QStringLiteral(":/engine/mihomo-manifest.json"));
     if (manifest.open(QIODevice::ReadOnly)) {
         const auto object = QJsonDocument::fromJson(manifest.readAll()).object();
@@ -16,6 +17,8 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
     }
     m_options.executablePath = QCoreApplication::applicationDirPath() + QStringLiteral("/core/mihomo.exe");
     connect(m_engine.get(), &ProxyEngine::statusChanged, this, &EngineController::statusChanged);
+    connect(m_engine.get(), &ProxyEngine::telemetryChanged, this, &EngineController::telemetryChanged);
+    connect(m_engine.get(), &ProxyEngine::statusChanged, this, &EngineController::telemetryChanged);
     connect(&m_store,&NodeStore::changed,this,&EngineController::nodesChanged);
     connect(&m_imports,&NodeImportService::changed,this,&EngineController::statusChanged);
     connect(&m_imports,&NodeImportService::nodesApplied,this,[this]{
@@ -31,13 +34,22 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
         emit nodesChanged();
     });
     connect(m_engine.get(),&ProxyEngine::statusChanged,this,[this] {
+        if(!processAlive() || !apiHealthy())m_systemProxy.disable();
+        else if(m_connectionRequested && m_wantsSystemProxy && canEnableSystemProxy() && !m_systemProxy.enabled() && m_systemProxy.error().isEmpty())m_systemProxy.enable(activeProxyPort());
         emit nodesChanged();
         if (m_restartPending && m_engine->status().state==ProxyEngine::State::Stopped) {
             m_restartPending=false;
             QTimer::singleShot(0,this,[this]{if(m_connectionRequested && !m_options.selectedNodeId.isEmpty())m_engine->start(m_options);});
         }
     });
-    connect(QCoreApplication::instance(), &QCoreApplication::aboutToQuit, m_engine.get(), &ProxyEngine::stop);
+    connect(QCoreApplication::instance(), &QCoreApplication::aboutToQuit, this, &EngineController::stop);
+}
+EngineController::~EngineController() {disconnect(m_engine.get(),nullptr,this,nullptr);m_systemProxy.disable();m_engine->stop();}
+void EngineController::setSystemProxyEnabled(bool enabled) {
+    m_wantsSystemProxy=enabled;
+    if(!enabled)m_systemProxy.disable();
+    else if(canEnableSystemProxy())m_systemProxy.enable(activeProxyPort());
+    emit systemProxyChanged();
 }
 void EngineController::setExecutablePath(const QString &path) {
     if (!canStart() || m_options.executablePath == path) return;
@@ -67,7 +79,7 @@ bool EngineController::busy() const {
     return state == ProxyEngine::State::Validating || state == ProxyEngine::State::Starting || state == ProxyEngine::State::Stopping;
 }
 void EngineController::start() { if (canStart()) { m_connectionRequested=false;m_options.nodes=m_store.nodes(); m_options.selectedNodeId.clear(); m_engine->start(m_options); } }
-void EngineController::stop() { m_connectionRequested=false;m_restartPending=false; m_options.selectedNodeId.clear(); m_engine->stop(); }
+void EngineController::stop() { m_systemProxy.disable(); m_connectionRequested=false;m_restartPending=false; m_options.selectedNodeId.clear(); m_engine->stop(); }
 void EngineController::refresh() { m_engine->refresh(); }
 
 QVariantList EngineController::nodes() const {

@@ -22,7 +22,7 @@ Item {
     property rect heroStart
     property rect heroEnd
     clip: moving || pendingGrab
-    function pageOffset(route) { return route==="overview"?0:Theme.dp(46) }
+    function pageOffset(route) { return route==="overview" || route==="activity" ? 0 : Theme.dp(46) }
     function targetRect(root) {
         if(!root)return Qt.rect(0,0,width,height)
         if(root.objectName==="motion-detail") {

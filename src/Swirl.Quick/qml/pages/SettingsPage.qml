@@ -52,7 +52,7 @@ Item {
                         width:options.availableWidth; spacing:Theme.dp(17)
                         Text { text:AppState.zh(page.section); color:Theme.text; font.pixelSize:Theme.fontSize(23); font.weight:Font.DemiBold }
                         Text {
-                            text:page.section==="外观"?"主题、窗口材质、动画与界面缩放。":page.section==="代理"?"引擎与真实节点 · 不接管系统代理或启用 TUN。":page.section==="关于 Swirl"?"版本与项目信息":"此项尚未实现。"
+                            text:page.section==="外观"?"主题、窗口材质、动画与界面缩放。":page.section==="代理"?"节点连接与系统代理 · 断开时恢复原设置。":page.section==="关于 Swirl"?"版本与项目信息":"此项尚未实现。"
                             color:Theme.muted; wrapMode:Text.WordWrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12)
                         }
                         Rectangle { Layout.fillWidth:true; height:Theme.dp(1); color:Theme.border }
@@ -204,6 +204,16 @@ Item {
                                 objectName:"engineErrorText"; visible:engineController.error.length>0
                                 text:engineController.error; color:Theme.orange; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12)
                             }
+                            RowLayout {
+                                Layout.fillWidth:true
+                                ColumnLayout {
+                                    Layout.fillWidth:true
+                                    Text {text:"系统代理";color:Theme.text;font.pixelSize:Theme.fontSize(16)}
+                                    Text {text:AppState.systemProxyOn?"系统流量已转发到当前节点":"连接节点后自动开启，断开时恢复原设置";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
+                                }
+                                SwirlToggle {objectName:"settingsSystemProxyToggle";checked:AppState.systemProxyOn;enabled:engineController.canEnableSystemProxy||AppState.systemProxyOn;onToggled:engineController.setSystemProxyEnabled(checked);Accessible.name:"系统代理开关"}
+                            }
+                            Text {text:engineController.systemProxyError;visible:text.length>0;color:Theme.orange;Layout.fillWidth:true;wrapMode:Text.Wrap}
                             Text { text:"程序路径"; color:Theme.text; font.pixelSize:Theme.fontSize(14) }
                             SwirlTextField {
                                 objectName:"enginePathField"; Layout.fillWidth:true; text:engineController.executablePath
