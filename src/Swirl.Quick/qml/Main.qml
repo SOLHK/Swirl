@@ -172,7 +172,14 @@ ApplicationWindow {
                 Item { Layout.fillWidth:true }
                 SwirlStatusCapsule { objectName:"eventsCapsule"; label:systemProvider.eventCount>0?systemProvider.eventCount+" 个事件":"无事件";tone:systemProvider.eventCount>0?"warning":"neutral"; onClicked:AppState.navigate("logs") }
                 Item { Layout.fillWidth:true }
-                SwirlStatusCapsule { objectName:"proxyCapsule"; label:engineController.systemProxy.systemEnabled&&!engineController.systemProxy.owned?"系统代理 · 其他应用":"系统代理";tone:engineController.systemProxy.error.length||engineController.routingError.length?"warning":engineController.systemProxy.systemEnabled?"success":"neutral";detail:engineController.systemProxy.error||engineController.routingError||(engineController.systemProxy.systemEnabled&&!engineController.systemProxy.owned?"Windows 系统代理已由其他应用启用，Swirl 未接管":"点击控制 Swirl 系统代理"); enabled:!engineController.busy; onClicked:engineController.setSystemProxy(!engineController.systemProxy.enabled) }
+                SwirlStatusCapsule {
+                    objectName:"proxyCapsule"
+                    label:engineController.systemProxy.stateReadError.length?"系统代理 · 读取失败":engineController.systemProxy.stateDiffers?"系统代理 · 状态差异":engineController.systemProxy.systemEnabled&&!engineController.systemProxy.owned?"系统代理 · 其他应用":"系统代理"
+                    tone:engineController.systemProxy.error.length||engineController.systemProxy.stateReadError.length||engineController.systemProxy.stateDiffers||engineController.routingError.length?"warning":engineController.systemProxy.systemEnabled?"success":"neutral"
+                    detail:engineController.systemProxy.error||engineController.systemProxy.stateReadError||engineController.routingError||(engineController.systemProxy.stateDiffers?"WinINET 与本机客户端代理标志不同。诊断报告分别记录两者；Swirl 未修改其他应用的设置。":engineController.systemProxy.systemEnabled&&!engineController.systemProxy.owned?"Windows 系统代理已由其他应用启用，Swirl 未接管":"点击控制 Swirl 系统代理")
+                    enabled:!engineController.busy
+                    onClicked:engineController.setSystemProxy(!engineController.systemProxy.enabled)
+                }
                 SwirlStatusCapsule { objectName:"tunCapsule"; label:"增强模式 · 未实现";detail:"本阶段尚未实现 TUN";enabled:false }
                 SwirlButton { visible:captureProvider.running; text:"抓包中 · "+captureProvider.sessions.length; iconName:"capture"; font.pixelSize:Theme.fontSize(14); onClicked:AppState.navigate("capture") }
 

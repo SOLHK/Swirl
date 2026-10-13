@@ -51,10 +51,13 @@ static void captureRenderedFrame(QQuickWindow *window,const QString &path){
 // Test-build-only harness. It drives THIS Swirl window with the real encrypted
 // node store copy and real engine. It has no fixtures or access to other apps.
 void startRuntimeEvidence(QQuickWindow *window,EngineController *controller,SystemDataProvider *system,DiagnosticService *diagnostics,const QString &commandPath,const QString &statePath){
+ if(qApp->arguments().contains("--runtime-no-system-proxy"))controller->setSystemProxy(false);
  controller->setControlPort(19097);controller->setProxyPort(17988);controller->connectNode(controller->selectedNodeId());
  auto timer=new QTimer(window);timer->setInterval(500);
  QObject::connect(timer,&QTimer::timeout,window,[=]{
+  const auto trafficPoints=controller->telemetry()->historyPoints("down",3600);
   auto status=system->diagnosticSnapshot();status["testsBusy"]=controller->tests()->busy();status["testsCompleted"]=controller->tests()->completed();status["testsTotal"]=controller->tests()->total();status["testsSucceeded"]=controller->tests()->succeeded();status["testsFailed"]=controller->tests()->failed();status["hasExternalIp"]=!controller->telemetry()->externalIp().isEmpty();
+  status["lastTrafficSampleAt"]=trafficPoints.isEmpty()?0:trafficPoints.last().toMap().value("time").toLongLong();status["retainedTrafficSamples"]=trafficPoints.size();
   QVariantList subscriptions;for(const auto &value:controller->imports()->providers()){const auto row=value.toMap();subscriptions.append(QVariantMap{{"name",row.value("name")},{"nodeCount",row.value("nodes")},{"status",row.value("status")},{"error",DiagnosticService::redact(row.value("error").toString())},{"updated",row.value("update")},{"nextUpdate",row.value("nextUpdate")}});}status["subscriptions"]=subscriptions;status["selectedNode"]=controller->selectedNodeName();status["activeNode"]=controller->activeNodeId();
   QSaveFile state(statePath);if(state.open(QIODevice::WriteOnly)){state.write(QJsonDocument(QJsonObject::fromVariantMap(status)).toJson());state.commit();}
   QFile command(commandPath);if(!command.open(QIODevice::ReadOnly))return;const auto request=QJsonDocument::fromJson(command.read(8192)).object();command.close();QFile::remove(commandPath);const auto action=request.value("action").toString();
@@ -69,7 +72,7 @@ void startRuntimeEvidence(QQuickWindow *window,EngineController *controller,Syst
   else if(action=="diagnostic")diagnostics->exportReport(QUrl::fromLocalFile(request.value("file").toString()),system->diagnosticSnapshot());
   else if(action=="mode")controller->setRoutingMode(request.value("mode").toString());
   else if(action=="page"){
-   const auto page=request.value("page").toString();if(QStringList{"activity","more","feature-hub","overview","subscriptions","proxies","traffic","processes","connections","logs","toolbox"}.contains(page)){
+   const auto page=request.value("page").toString();if(QStringList{"activity","more","featurehub","overview","subscriptions","proxies","traffic","processes","connections","logs","toolbox"}.contains(page)){
     QQmlExpression expression(qmlContext(window),window,QString("AppState.navigate('%1')").arg(page));expression.evaluate();
    }
   }else if(action=="capture"){

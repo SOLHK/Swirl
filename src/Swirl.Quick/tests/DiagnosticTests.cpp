@@ -6,6 +6,8 @@ class DiagnosticTests:public QObject {
  Q_OBJECT
 private slots:
  void bareBrowsingMetadataIsRemoved(){const auto safe=DiagnosticService::redact("TLS failure for private.example.net and https://private.example.net/path Cookie: session-private");QVERIFY(!safe.contains("private.example.net"));QVERIFY(!safe.contains("session-private"));}
+ void unicodeHostsAndProxyUrisAreRemoved(){const auto safe=DiagnosticService::redact(QStringLiteral("TLS failure for 私人.测试 socks5://fixture-user:fixture-secret@fixture.test:1080 username=fixture-account"));for(const auto &value:{QStringLiteral("私人.测试"),QStringLiteral("fixture-user"),QStringLiteral("fixture-secret"),QStringLiteral("fixture-account")})QVERIFY(!safe.contains(value));}
+ void protocolCredentialsAreRemoved(){const auto safe=DiagnosticService::redact("psk=fixture-psk pre-shared-key=fixture-peer auth-str=fixture-auth private-key-passphrase=fixture-pass short-id=abcdef12");for(const auto &value:{"fixture-psk","fixture-peer","fixture-auth","fixture-pass","abcdef12"})QVERIFY(!safe.contains(value));}
  void redactionAndZip(){QTemporaryDir temp;DiagnosticService log(temp.path());
   const auto secrets=QStringLiteral("token=FIXTURE-TOKEN password: FIXTURE-PASSWORD Cookie: private-cookie\nhttps://fixture.test/sub?secret=PRIVATE-URL\nuuid: 11111111-1111-4111-8111-111111111111\n-----BEGIN PRIVATE KEY-----\nPRIVATE-KEY\n-----END PRIVATE KEY-----");
   log.record("ERROR","Fixture","ExpectedFailure",secrets);QCOMPARE(log.eventCount(),1);const auto text=log.records().first().toMap().value("message").toString();for(const auto &secret:{"FIXTURE-TOKEN","FIXTURE-PASSWORD","private-cookie","PRIVATE-URL","11111111","PRIVATE-KEY"})QVERIFY2(!text.contains(secret),secret);

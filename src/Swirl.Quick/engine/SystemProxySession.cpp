@@ -1,4 +1,5 @@
 #include "SystemProxySession.h"
+#include <QtEndian>
 #include <QCoreApplication>
 #include <QStandardPaths>
 #include <QDir>
@@ -130,6 +131,13 @@ bool matchesSettings(QJsonObject current,const QJsonObject &expected) {
     // Schema 1 journals predate registry ownership. Never claim those values.
     if(!expected.contains("registry"))current.remove("registry");
     return current==expected;
+}
+QVariant registryProxyFlag(const QJsonObject &settings) {
+    const auto value=settings.value("registry").toObject().value("ProxyEnable").toObject();
+    const auto bytes=QByteArray::fromBase64(value.value("data").toString().toLatin1());
+    if(value.value("present").toBool()&&value.value("type").toInt()==4&&bytes.size()==4)
+        return qFromLittleEndian<quint32>(bytes.constData())!=0;
+    return {};
 }
 }
 QString SystemProxySession::journalPath() { return QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/system-proxy.dpapi"; }
@@ -265,8 +273,22 @@ bool SystemProxySession::disable() {
     m_error.clear();bool ok=recover(m_journal,&m_error,false,m_session);
     if(ok){m_owned=false;m_legacyLock.reset();}refresh();emit changed();return ok;
 }
+QVariantMap SystemProxySession::diagnosticState() const {
+    QString readError;
+    const auto settings=snapshot(&readError);
+    const bool known=!settings.isEmpty();
+    const auto value=settings.value("registry").toObject().value("ProxyEnable").toObject();
+    const auto registryEnabled=registryProxyFlag(settings);
+    // WinINET and native-client registry values can legitimately differ.
+    // Report both without exporting servers, PAC URLs or bypass addresses.
+    return {{"known",known},{"winInetManualProxy",known?QVariant((settings.value("flags").toInt()&2)!=0):QVariant()},
+        {"registryManualProxy",registryEnabled},{"registryValuePresent",known?QVariant(value.value("present").toBool()):QVariant()},
+        {"swirlEnabled",m_enabled},{"owned",m_owned},{"readError",readError},{"recoveryError",m_error},
+        {"recoveryJournalPresent",QFile::exists(m_journal)},{"guardAcknowledged",m_owned&&QFile::exists(m_journal)&&QFile::exists(m_journal+".ready")}};
+}
 void SystemProxySession::refresh() {
-    const auto record=read(m_journal);const auto current=snapshot();
+    const auto record=read(m_journal);QString readError;const auto current=snapshot(&readError);
+    if(readError!=m_readError){m_readError=readError;emit changed();}
     // A transient WinINET read failure is not an external ownership change.
     // Retain the encrypted recovery record so the independent guard can act.
     if(current.isEmpty())return;
@@ -274,7 +296,11 @@ void SystemProxySession::refresh() {
     const bool same=ownSession&&matchesSettings(current,record.value("applied").toObject());
     if(m_owned&&!same){m_owned=false;m_legacyLock.reset();if(ownSession)QFile::remove(m_journal);m_error=QStringLiteral("系统代理已由外部修改或安全恢复，Swirl 已放弃控制。");}
     const bool enabled=m_owned&&same;
-    const bool systemEnabled=(current.value("flags").toInt()&2)!=0;
+    const bool winInetEnabled=(current.value("flags").toInt()&2)!=0;
+    const auto registryEnabled=registryProxyFlag(current);
+    const bool differs=registryEnabled.isValid()&&registryEnabled.toBool()!=winInetEnabled;
+    const bool systemEnabled=winInetEnabled||registryEnabled.toBool();
+    if(differs!=m_stateDiffers){m_stateDiffers=differs;emit changed();}
     if(systemEnabled!=m_systemEnabled){m_systemEnabled=systemEnabled;emit changed();}
     if(enabled!=m_enabled){m_enabled=enabled;emit changed();}
 }

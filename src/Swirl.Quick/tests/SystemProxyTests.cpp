@@ -7,6 +7,7 @@
 #include <QFile>
 #include <QJsonDocument>
 #include <QSettings>
+#include <QtEndian>
 #ifdef Q_OS_WIN
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -16,6 +17,35 @@
 class ProxyTests : public QObject {
     Q_OBJECT
 private slots:
+    void diagnosticIsReadOnlyAndSeparatesStores() {
+        const auto before=SystemProxySession::snapshot();
+        QTemporaryDir temp;SystemProxySession proxy(nullptr,temp.filePath("read-only.dpapi"));
+        const auto state=proxy.diagnosticState();
+        for(const auto &key:{"server","pac","bypass","registry"})QVERIFY(!state.contains(key));
+        QVERIFY(!state.value("owned").toBool());QVERIFY(!state.value("recoveryJournalPresent").toBool());
+        QVERIFY(!state.value("guardAcknowledged").toBool());
+        if(before.isEmpty()) {
+            QVERIFY(!state.value("known").toBool());
+            QVERIFY(!state.value("winInetManualProxy").isValid());
+            QVERIFY(!state.value("registryManualProxy").isValid());
+            QVERIFY(!state.value("readError").toString().isEmpty());
+            qInfo()<<"Windows proxy snapshot unavailable; unknown state reported explicitly";
+            return;
+        }
+        QVERIFY(state.value("known").toBool());
+        QCOMPARE(state.value("winInetManualProxy").toBool(),(before.value("flags").toInt()&2)!=0);
+        const auto registry=before.value("registry").toObject().value("ProxyEnable").toObject();
+        const auto bytes=QByteArray::fromBase64(registry.value("data").toString().toLatin1());
+        if(registry.value("present").toBool()&&registry.value("type").toInt()==4&&bytes.size()==4)
+        {
+            const bool registryEnabled=qFromLittleEndian<quint32>(bytes.constData())!=0;
+            QCOMPARE(state.value("registryManualProxy").toBool(),registryEnabled);
+            QCOMPARE(proxy.systemEnabled(),registryEnabled||state.value("winInetManualProxy").toBool());
+            QCOMPARE(proxy.stateDiffers(),registryEnabled!=state.value("winInetManualProxy").toBool());
+        }
+        else QVERIFY(!state.value("registryManualProxy").isValid());
+        QVERIFY(before==SystemProxySession::snapshot());
+    }
     void currentUserRecovery() {
         const auto original=SystemProxySession::snapshot();QVERIFY(!original.isEmpty());
         // Restore the user's real settings even when an assertion terminates a

@@ -93,6 +93,19 @@ jobs:
             build/swirl-quick/Release/Swirl-diagnostics.txt
             build/swirl-quick/Release/Swirl-node-ui-diagnostics.txt
           if-no-files-found: warn
+      # Recovery mutations run only on the authorized local desktop.
+      - name: Read-only Windows proxy state and privacy checks
+        shell: pwsh
+        run: |
+          & build/swirl-quick/Release/SwirlSystemProxyTests.exe diagnosticIsReadOnlyAndSeparatesStores -o build/swirl-quick/proxy-read-only.txt,txt
+          if ($LASTEXITCODE -ne 0) { throw "Read-only Windows proxy diagnostics failed" }
+      - name: Upload read-only Windows proxy diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-Proxy-Read-Only-Evidence
+          path: build/swirl-quick/proxy-read-only.txt
+          if-no-files-found: warn
       - name: Overview mouse and keyboard input checks
         shell: pwsh
         run: |

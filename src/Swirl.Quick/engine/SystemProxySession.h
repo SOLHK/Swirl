@@ -1,6 +1,7 @@
 #pragma once
 #include <QObject>
 #include <QJsonObject>
+#include <QVariantMap>
 #include <QTimer>
 #include <QProcess>
 #include <QLockFile>
@@ -13,6 +14,8 @@ class SystemProxySession final : public QObject {
     Q_PROPERTY(bool enabled READ enabled NOTIFY changed)
     Q_PROPERTY(bool owned READ owned NOTIFY changed)
     Q_PROPERTY(bool systemEnabled READ systemEnabled NOTIFY changed)
+    Q_PROPERTY(bool stateDiffers READ stateDiffers NOTIFY changed)
+    Q_PROPERTY(QString stateReadError READ stateReadError NOTIFY changed)
     Q_PROPERTY(QString error READ error NOTIFY changed)
 public:
     explicit SystemProxySession(QObject *parent=nullptr, QString journal={});
@@ -20,7 +23,10 @@ public:
     bool enabled() const { return m_enabled; }
     bool owned() const { return m_owned; }
     bool systemEnabled() const { return m_systemEnabled; }
+    bool stateDiffers() const { return m_stateDiffers; }
+    QString stateReadError() const { return m_readError; }
     QString error() const { return m_error; }
+    QVariantMap diagnosticState() const;
     bool enable(int port, qint64 enginePid);
     Q_INVOKABLE bool disable();
     Q_INVOKABLE void refresh();
@@ -35,6 +41,8 @@ private:
     QString m_journal, m_error, m_session;
     bool m_enabled=false, m_owned=false;
     bool m_systemEnabled=false;
+    bool m_stateDiffers=false;
+    QString m_readError;
     QTimer m_poll;
     QProcess m_guard;
     std::unique_ptr<QLockFile> m_legacyLock;
