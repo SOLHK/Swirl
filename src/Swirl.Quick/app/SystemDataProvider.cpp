@@ -17,7 +17,7 @@ SystemDataProvider::SystemDataProvider(CaptureService *capture,EngineController 
         ++m_revision;emit dataChanged();
     });
     connect(engine,&EngineController::diagnostic,this,[this](const QString &module,const QString &code,const QString &message){m_diagnostics->record("ERROR",module,code,message);});
-    connect(engine->telemetry(),&TelemetryService::diagnostic,this,[this](const QString &module,const QString &code,const QString &message){m_diagnostics->record("ERROR",module,code,message);});
+    connect(engine->telemetry(),&TelemetryService::diagnostic,this,[this](const QString &module,const QString &code,const QString &message){m_diagnostics->record(module=="CodexNetwork"&&code=="PublicEndpointReachable"?"INFO":"ERROR",module,code,message);});
     connect(engine->tests(),&NodeTestService::diagnostic,this,[this](const QString &code,const QString &message){m_diagnostics->record("ERROR","NodeTest",code,message);});
     connect(engine->imports(),&NodeImportService::changed,this,[this]{const auto message=m_engine->imports()->message();if(!message.isEmpty()&&property("lastSubscription").toString()!=message){setProperty("lastSubscription",message);const bool failed=message.contains(QStringLiteral("失败"))||message.contains(QStringLiteral("拒绝"))||message.contains(QStringLiteral("错误"));m_diagnostics->record(failed?"ERROR":"INFO","Subscription","Update",message);}});
     connect(engine->systemProxy(),&SystemProxySession::changed,this,[this]{const auto proxy=m_engine->systemProxy();const auto state=QString::number(proxy->enabled())+" | "+proxy->error();if(property("lastProxy").toString()!=state){setProperty("lastProxy",state);m_diagnostics->record(proxy->error().isEmpty()?"INFO":"ERROR","SystemProxy","WindowsState",state);}});
