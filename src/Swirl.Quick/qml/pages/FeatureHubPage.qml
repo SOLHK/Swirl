@@ -23,7 +23,7 @@ Item {
    SwirlMotionButton {id:entry;objectName:"settings-"+modelData.route;required property var modelData;required property int index;width:Theme.dp(216);height:Theme.dp(189);padding:0;hoverEnabled:true
     background:Rectangle{color:entry.hovered?Theme.withAlpha(Theme.hover,0.25):"transparent";radius:Theme.tileRadius;Behavior on color {ColorAnimation{duration:SwirlMotion.hoverDuration}}}
     contentItem:Item {
-     Image{x:Theme.dp(16);y:Theme.dp(14);width:Theme.dp(52);height:Theme.dp(52);source:"qrc:/swirl/icons/ui/reference-"+entry.modelData.icon+".png";fillMode:Image.PreserveAspectFit}
+     Image{x:Theme.dp(16);y:Theme.dp(14);width:Theme.dp(52);height:Theme.dp(52);source:Theme.dark?"image://swirl/reference-"+entry.modelData.icon:"qrc:/swirl/icons/ui/reference-"+entry.modelData.icon+".png";fillMode:Image.PreserveAspectFit}
      Text{x:Theme.dp(16);y:Theme.dp(86);text:entry.modelData.title;color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold}
      Text{x:Theme.dp(16);y:Theme.dp(112);width:Theme.dp(175);text:entry.modelData.description;color:Theme.muted;font.pixelSize:Theme.fontSize(11);wrapMode:Text.WordWrap}
      Rectangle{visible:entry.index<6;y:Theme.dp(170);width:parent.width;height:Theme.dp(1);color:Theme.border}

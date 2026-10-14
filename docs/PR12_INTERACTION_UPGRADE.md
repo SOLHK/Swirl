@@ -50,6 +50,8 @@ Release packaging turns SWIRL_BUILD_UI_TESTS off, deploys the existing Qt/Mihomo
 
 Changed areas: SwirlClickLight/QEP/generated shaders, motion button resource wiring, secondary DWM contexts/material tokens, DismissalController/title-bar Esc, viewport/native/HDR validation driver, third-party notices and dependency research documentation.
 
+Final packaged screenshot review found that the existing reference PNG icons carried the light screenshot's pale backdrop into dark mode. Dark-mode rendering now removes only the pale surround connected to the image border, using the existing native image provider; original asset files and enclosed white icon details are preserved. This needs no shader/runtime dependency and works with the software renderer. Light-mode rendering remains the original reference artwork.
+
 ## Acceptance limits
 
 - Subscription/DPAPI/timer/node paths were tested with isolated synthetic HTTPS sources and actual pinned Mihomo/TCP forwarding. No real user subscription credentials were supplied or copied into evidence.
