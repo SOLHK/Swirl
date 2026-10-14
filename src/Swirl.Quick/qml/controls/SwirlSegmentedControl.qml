@@ -13,6 +13,14 @@ Item {
     signal activated(int index, string value)
     implicitHeight:Theme.dp(25); implicitWidth:Theme.dp(295)
     Rectangle { anchors.fill:parent; radius:control.rounded ? height/2 : Theme.segmentedRadius; color:control.rounded?(control.accentSelection?Theme.buttonBase:Theme.surface):Theme.material("field"); border.width:control.rounded?0:Theme.borderWidth; border.color:Theme.border }
+    Rectangle {
+        x:(control.rounded?0:Theme.dp(2))+control.currentIndex*width;y:control.rounded?0:Theme.dp(2)
+        width:(control.width-(control.rounded?0:Theme.dp(4)))/Math.max(1,control.options.length)
+        height:control.height-(control.rounded?0:Theme.dp(4))
+        radius:control.rounded?height/2:Theme.segmentedSelectedRadius
+        color:control.accentSelection?Theme.primaryControl:control.rounded?Theme.buttonBase:Theme.segmentSelected
+        Behavior on x{enabled:!SwirlMotion.reduced;NumberAnimation{duration:SwirlMotion.switchDuration;easing.type:Easing.OutCubic}}
+    }
     Row {
         anchors.fill: parent; anchors.margins:control.rounded?0:Theme.dp(2)
         Repeater {
@@ -24,7 +32,8 @@ Item {
                 hoverEnabled:true
                 background: Rectangle {
                     radius:control.rounded ? height/2 : Theme.segmentedSelectedRadius
-                    color:control.currentIndex===index ? (control.accentSelection ? Theme.primaryControl : control.rounded?Theme.buttonBase:Theme.segmentSelected) : parent.hovered ? Theme.hover : "transparent"
+                    color:control.currentIndex!==index && parent.hovered?Theme.withAlpha(Theme.hover,0.5):"transparent"
+                    Behavior on color{ColorAnimation{duration:SwirlMotion.hoverDuration}}
                 }
                 contentItem: Text {
                     text: AppState.zh(String(modelData))

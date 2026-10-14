@@ -104,7 +104,7 @@ Item {
                 Text { text:"允许 API 请求（仅界面开关）"; Layout.fillWidth:true; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
                 SwirlToggle { enabled:false;checked:false; onToggled:AppState.notice("API 监听服务") }
             }
-            SwirlButton { enabled:false; text:"关闭"; Layout.alignment:Qt.AlignRight; onClicked:settingsDialog.close() }
+
         }
     }
 }

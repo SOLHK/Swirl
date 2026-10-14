@@ -23,12 +23,43 @@
 #include <functional>
 #include <QMutex>
 #include <QMutexLocker>
+#include <QPainter>
 #include <QQmlEngine>
 #ifdef Q_OS_WIN
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <psapi.h>
 #endif
+
+int runMotionDemo(QQuickWindow *window,const QString &directory) {
+    QDir().mkpath(directory);
+    const auto eval=[&](const QString &code){QQmlExpression e(qmlContext(window),window,code);e.evaluate();};
+    std::function<QQuickItem *(QQuickItem *,const QString &)> find;
+    find=[&](QQuickItem *root,const QString &name)->QQuickItem *{if(root->objectName()==name)return root;for(auto *child:root->childItems())if(auto *match=find(child,name))return match;return nullptr;};
+    const auto point=[&](QQuickWindow *owner,const QString &name){auto *control=find(owner->contentItem(),name);return control?control->mapToScene(QPointF(control->width()/2,control->height()/2)).toPoint():QPoint(-10,-10);};
+    window->resize(1100,860);window->requestActivate();
+    eval("Theme.reduceMotion=false;Theme.transparency=false;Theme.mode='Light';AppState.navigate('featurehub')");
+    QTest::qWait(450);
+    QQuickWindow *sheet=nullptr;
+    for(auto *candidate:QGuiApplication::allWindows())if(candidate->objectName()=="settingsSheet")sheet=qobject_cast<QQuickWindow *>(candidate);
+    if(!sheet)return 2;
+    int failures=0;
+    for(int frame=0;frame<80;++frame) {
+        if(frame==0)QTest::mouseMove(window,point(window,"settings-subscriptions"));
+        if(frame==5)QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,point(window,"settings-subscriptions"));
+        if(frame==8)QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,point(window,"settings-subscriptions"));
+        if(frame==25)QTest::mousePress(sheet,Qt::LeftButton,Qt::NoModifier,point(sheet,"addSubscription"));
+        if(frame==28)QTest::mouseRelease(sheet,Qt::LeftButton,Qt::NoModifier,point(sheet,"addSubscription"));
+        if(frame==48)QTest::keyClick(sheet,Qt::Key_Escape);
+        if(frame==60)QTest::keyClick(sheet,Qt::Key_Escape);
+        if(frame==65)QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,point(window,"nav-overview"));
+        QTest::qWait(40);
+        auto image=window->grabWindow();
+        if(sheet->isVisible()) {QPainter painter(&image);painter.drawImage(sheet->position()-window->position(),sheet->grabWindow());}
+        if(!image.scaledToWidth(825,Qt::SmoothTransformation).save(directory+QString("/%1.png").arg(frame,3,10,QChar('0'))))++failures;
+    }
+    return failures?1:0;
+}
 
 int runMotionVisualChecks(QQuickWindow *window, const QString &directory) {
     QDir().mkpath(directory);

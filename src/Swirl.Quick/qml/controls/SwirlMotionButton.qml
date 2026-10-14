@@ -4,12 +4,27 @@ import SwirlQuick
 Button {
     id: control
     // Transform the paint nodes, keeping layout and mouse/keyboard hit areas fixed.
-    property real motionScale: down ? SwirlMotion.pressScale : 1
+    property real motionScale: enabled && down ? SwirlMotion.pressScale : 1
+    property real clickLight:0
     Behavior on motionScale {
         enabled: !SwirlMotion.reduced
-        SwirlSpring {}
+        NumberAnimation {duration:control.down?SwirlMotion.pressDuration:SwirlMotion.hoverDuration;easing.type:control.down?Easing.OutCubic:Easing.OutBack;easing.overshoot:0.45}
     }
     Binding { target:control.background; property:"scale"; value:control.motionScale; when:control.background!==null }
     Binding { target:control.contentItem; property:"scale"; value:control.motionScale; when:control.contentItem!==null }
     onPressed: SwirlMotion.noteTrigger(control)
+    onClicked:if(enabled && visible && !SwirlMotion.reduced)lightPulse.restart()
+    onVisibleChanged:if(!visible){lightPulse.stop();clickLight=0}
+    onEnabledChanged:if(!enabled){lightPulse.stop();clickLight=0}
+    Connections {target:SwirlMotion;function onReducedChanged(){if(SwirlMotion.reduced){lightPulse.stop();control.clickLight=0}}}
+    Rectangle {
+        parent:control.background;anchors.fill:parent
+        radius:parent && parent.radius!==undefined?parent.radius:Theme.buttonRadius
+        color:Theme.dark?"#CDE4FF":"#FFFFFF";opacity:control.clickLight;visible:opacity>0
+    }
+    SequentialAnimation {
+        id:lightPulse
+        NumberAnimation {target:control;property:"clickLight";from:0;to:0.14;duration:SwirlMotion.ms(45)}
+        NumberAnimation {target:control;property:"clickLight";to:0;duration:SwirlMotion.hoverDuration;easing.type:Easing.OutCubic}
+    }
 }

@@ -130,7 +130,7 @@ Item {
                 color:Theme.muted; font.family:"Cascadia Code"; font.pixelSize:Theme.fontSize(11)
                 Layout.fillWidth:true; wrapMode:Text.WordWrap
             }
-            SwirlButton { enabled:false; text:"关闭"; Layout.alignment:Qt.AlignRight; onClicked:comparePopup.close() }
+
         }
     }
 }

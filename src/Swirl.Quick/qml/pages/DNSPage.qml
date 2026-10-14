@@ -27,7 +27,7 @@ Item {
    Column{x:Theme.dp(16);y:Theme.dp(8);spacing:0;width:parent.width-Theme.dp(32)
     Repeater{model:["使用系统 DNS 服务器","使用系统 DNS 服务器和额外的服务器","使用自定义的服务器"]
      RadioButton{objectName:"dnsMode-"+index;required property string modelData;required property int index;text:modelData;checked:page.serverMode===index;onClicked:page.serverMode=index;implicitHeight:Theme.dp(24);font.pixelSize:Theme.fontSize(13);padding:0;spacing:Theme.dp(6)
-      indicator:Rectangle{width:Theme.dp(16);height:width;radius:width/2;color:parent.checked?Theme.accent:"#DEDEDF";anchors.verticalCenter:parent.verticalCenter;Rectangle{visible:parent.parent.checked;anchors.centerIn:parent;width:Theme.dp(5);height:width;radius:width/2;color:"white"}}
+      indicator:Rectangle{Behavior on color{ColorAnimation{duration:SwirlMotion.switchDuration}}width:Theme.dp(16);height:width;radius:width/2;color:parent.checked?Theme.accent:"#DEDEDF";anchors.verticalCenter:parent.verticalCenter;Rectangle{opacity:parent.parent.checked?1:0;Behavior on opacity{NumberAnimation{duration:SwirlMotion.switchDuration}}anchors.centerIn:parent;width:Theme.dp(5);height:width;radius:width/2;color:"white"}}
       contentItem:Text{text:parent.text;leftPadding:Theme.dp(22);color:Theme.text;font.pixelSize:Theme.fontSize(13);verticalAlignment:Text.AlignVCenter}}
     }
     SwirlTextField{id:serverAddress;objectName:"dnsServerAddress";width:parent.width;height:Theme.dp(26);placeholderText:"服务器地址 (逗号分隔)";font.pixelSize:Theme.fontSize(12)}

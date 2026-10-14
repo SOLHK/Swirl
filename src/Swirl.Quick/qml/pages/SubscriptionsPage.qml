@@ -55,7 +55,7 @@ Item {
     SwirlDialog {
         id:deleteDialog;title:"删除订阅？";property string recordId:"";guardChanges:false
         ColumnLayout {width:parent.width
-            Text {text:"删除此订阅及其导入的节点。";color:Theme.text}
+            Text {text:"删除订阅，已导入的节点将保留为手动节点。";color:Theme.text;wrapMode:Text.Wrap;Layout.fillWidth:true}
             RowLayout {Layout.alignment:Qt.AlignRight
                 SwirlButton {text:"取消";onClicked:deleteDialog.close()}
                 SwirlButton {text:"删除";danger:true;onClicked:{engineController.imports.removeSubscription(deleteDialog.recordId);deleteDialog.close()}}

@@ -20,6 +20,7 @@ SwirlMotionButton {
     background:Rectangle {
         radius:Theme.buttonRadius;color:control.primary?Theme.primaryControl:control.down?Theme.pressed:control.hovered?Theme.hover:control.quiet||control.outlined?"transparent":Theme.buttonBase
         border.width:control.activeFocus?Theme.dp(2):control.outlined?Theme.dp(1):0;border.color:control.activeFocus?Theme.focusBorder:Theme.border
+        Behavior on color {ColorAnimation{duration:SwirlMotion.hoverDuration}}
         opacity:control.enabled?1:0.45
     }
     contentItem: Item {

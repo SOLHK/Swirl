@@ -117,10 +117,16 @@ ApplicationWindow {
         width:window.width; height:window.height
         // Adjacent tints share one clipping outline; alpha is never stacked.
         Rectangle {
+            visible:!Theme.effectsSupported;anchors.fill:parent;radius:window.shellRadius;antialiasing:true
+            gradient:Gradient{GradientStop{position:0;color:Theme.shellTop}GradientStop{position:1;color:Theme.shellBottom}}
+        }
+        Rectangle {
+            visible:Theme.effectsSupported
             x:0;y:0;width:window.actualSidebarWidth+window.sidebarGutter;height:parent.height
             gradient:Gradient{GradientStop{position:0;color:Theme.withAlpha(Theme.shellTop,Theme.sidebarOpacity)}GradientStop{position:1;color:Theme.withAlpha(Theme.shellBottom,Theme.sidebarOpacity)}}
         }
         Rectangle {
+            visible:Theme.effectsSupported
             x:window.actualSidebarWidth+window.sidebarGutter;y:0;width:parent.width-x;height:parent.height
             gradient:Gradient{GradientStop{position:0;color:Theme.withAlpha(Theme.shellTop,Theme.workspaceOpacity)}GradientStop{position:1;color:Theme.withAlpha(Theme.shellBottom,Theme.workspaceOpacity)}}
         }
@@ -185,7 +191,7 @@ ApplicationWindow {
     Rectangle { objectName:"windowOutline";anchors.fill:parent;radius:window.shellRadius;color:"transparent";border.width:Theme.dp(1);border.color:Theme.withAlpha(Theme.dark?"#FFFFFF":"#607D98",0.28);z:90 }
     function openDashboard(){dashboardWindow.show();dashboardWindow.raise();dashboardWindow.requestActivate()}
     function openCaptureInspector(){captureInspectorDialog.open()}
-    function openSettings(route){settingsSheet.x=window.x+(window.width-settingsSheet.width)/2;settingsSheet.y=Math.max(0,Math.min(window.y,Screen.desktopAvailableHeight-settingsSheet.height));settingsSheet.section=route;settingsSheet.updateSettingsSection();settingsSheet.show();settingsSheet.raise();settingsSheet.requestActivate()}
+    function openSettings(route){settingsExit.stop();settingsSheet.closeApproved=false;settingsSheet.x=window.x+(window.width-settingsSheet.width)/2;settingsSheet.y=Math.max(0,Math.min(window.y,Screen.desktopAvailableHeight-settingsSheet.height));settingsSheet.section=route;settingsSheet.updateSettingsSection();settingsSheet.show();if(SwirlMotion.reduced)settingsSheet.reveal=1;else settingsEnter.restart();settingsSheet.raise();settingsSheet.requestActivate()}
     function closeSettings(){settingsSheet.close()}
     function openRewriteEditor(kind,title){rewriteRulesDialog.kind=kind;rewriteRulesDialog.title=title;rewriteRulesDialog.open()}
     RewriteRulesDialog{id:rewriteRulesDialog}
@@ -205,20 +211,25 @@ ApplicationWindow {
         property string section:"dns";visible:false;width:Math.min(Theme.dp(900),Screen.desktopAvailableWidth);height:Math.min(Theme.dp(790),Screen.desktopAvailableHeight);title:section==="subscriptions"?"Swirl 订阅管理":section==="profiles"?"Swirl 配置":section==="modules"?"Swirl 模块":section==="scripts"?"Swirl 脚本":"Swirl 设置";flags:Qt.Window|Qt.FramelessWindowHint;modality:Qt.WindowModal;transientParent:window;color:"transparent"
         function closeSettings(){settingsSheet.close()}
         function updateSettingsSection(){if(settingsLoader.item&&settingsLoader.item.section!==undefined)settingsLoader.item.section=section==="appearance"?"外观":section==="license"?"关于 Swirl":"常规"}
+        property real reveal:1
+        property bool closeApproved:false
+        NumberAnimation{id:settingsEnter;target:settingsSheet;property:"reveal";from:0;to:1;duration:SwirlMotion.dialogDuration;easing.type:Easing.OutCubic}
+        NumberAnimation{id:settingsExit;target:settingsSheet;property:"reveal";to:0;duration:SwirlMotion.exitDuration;easing.type:Easing.InCubic;onFinished:{settingsSheet.closeApproved=true;settingsSheet.close()}}
         property string savedFingerprint:""
         property bool discardApproved:false
-        onVisibleChanged:if(visible){discardApproved=false;Qt.callLater(function(){savedFingerprint=dismissals.fingerprint(settingsLoader.item)})}
+        onVisibleChanged:if(visible){discardApproved=false;closeApproved=false;if(SwirlMotion.reduced)reveal=1;else settingsEnter.restart();Qt.callLater(function(){savedFingerprint=dismissals.fingerprint(settingsLoader.item)})}else{settingsEnter.stop();settingsExit.stop();reveal=1}
         onClosing:close=>{
             if(!discardApproved && dismissals.hasPopup(settingsSheet)){close.accepted=false;dismissals.dismiss(settingsSheet);return}
             // DNS is an unapplied page form. Other settings persist on change.
             if(section==="dns" && !discardApproved && savedFingerprint!==dismissals.fingerprint(settingsLoader.item)) {
                 close.accepted=false;settingsDiscard.open();return
             }
-            window.requestActivate()
+            if(!closeApproved && !SwirlMotion.reduced){close.accepted=false;if(!settingsExit.running){settingsEnter.stop();settingsExit.restart()}return}
+            closeApproved=false;window.requestActivate()
         }
         onSectionChanged:updateSettingsSection()
         Rectangle{id:settingsMask;anchors.fill:parent;radius:settingsSheet.visibility===Window.Maximized?0:Theme.dp(27);visible:false;layer.enabled:true;color:"white"}
-        Item{anchors.fill:parent;layer.enabled:Theme.effectsSupported;layer.effect:MultiEffect{maskEnabled:true;maskSource:settingsMask}
+        Item{anchors.fill:parent;opacity:settingsSheet.reveal;scale:0.985+0.015*settingsSheet.reveal;layer.enabled:Theme.effectsSupported;layer.effect:MultiEffect{maskEnabled:true;maskSource:settingsMask}
         Rectangle{anchors.fill:parent;radius:settingsSheet.visibility===Window.Maximized?0:Theme.dp(27);gradient:Gradient{GradientStop{position:0;color:Theme.shellTop}GradientStop{position:1;color:Theme.shellBottom}}}
         SwirlWindowTitleBar{id:settingsTitleBar;anchors.left:parent.left;anchors.right:parent.right;targetWindow:settingsSheet}
         SwirlDialog {

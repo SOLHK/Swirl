@@ -15,3 +15,13 @@ Validation before Phase 2: `swirl-import-subscription`, `swirl-overview-input`, 
 Evidence is delivered outside the source repository in `outputs/phase1`: secondary page PNGs, compositor light/dark/disabled/maximized PNGs, and test logs. Real user subscription URLs, tokens, passwords and stores were not used. Tests run with isolated temporary stores. Physical HDR and other monitors/resolutions still require separate acceptance; 150% DPI is the tested desktop.
 
 Changed areas: CMake/main context setup, DismissalController, WindowsBackdrop, Main/Theme, shared dialog/title bar, FeatureHub, Subscriptions, DNS/Scripts save semantics, native input/window checks.
+
+## Phase 2
+
+Shared motion tokens now distinguish press (110 ms), hover (150), switch (180), page/dialog (220), exit (160), and expansion (240). Buttons retain fixed hit areas, get subtle interrupted press/rebound and a bounded click light, and stop feedback when disabled/hidden/reduced. Navigation hover, directional page history, segmented selection travel, checkbox/radio state, switch thumb and field focus transitions follow the same policy. Secondary settings windows fade/scale; quick reopening cancels exit. Dialogs release modal mouse interception when exit starts so fading cannot swallow the next table click. Noninteractive cards have no hover loop; interactive cards opt in. Software rendering retains a rounded opaque fallback.
+
+Validation: the full 14-test run initially found one input regression and the missing packaged rule fixtures. Both were fixed. The other 13 tests passed, including actual Mihomo HTTP/HTTPS switching, subscriptions, gateway, capture, telemetry and local scripts. The repaired input check (61/61) and motion check passed on repeat; all-page startup passed. Native input also passed. Native GPU motion checks had zero failures, 704 measured frames, 240 Hz refresh, warm median 4.1501 ms and warm P95 4.6092 ms. Revisit working-set growth was 2,027,520 bytes; one idle frame, zero live texture grabs. These describe this machine, not every GPU/resolution.
+
+`outputs/phase2/motion-comparison.gif` uses the same 80-frame native input sequence before and after Phase 2: hover/press the More subscription entry, open Add Subscription, Escape the form and settings, and switch navigation. It is a UI recording of empty isolated stores. Capture is deliberately sampled for review; it is not the FPS measurement. `gpu-motion.json` contains the separate GPU measurements.
+
+Changed areas: SwirlMotion, shared buttons/dialogs/combo/toggle/segmented/field controls, checkbox/radio/card/navigation surfaces, AppState/PageHost history direction, Main settings animation, CMake test fixture staging, input/motion recording tests. No animation runtime dependency added.

@@ -40,7 +40,8 @@ SwirlMotionButton {
     hoverEnabled: true
     background: Rectangle {
         radius:Theme.sidebarRowRadius
-        color:entry.chosen?(entry.down?Theme.navigationPressed:Theme.navigationSelected):"transparent"
+        color:entry.chosen?(entry.down?Theme.navigationPressed:Theme.navigationSelected):entry.hovered?Theme.withAlpha(Theme.hover,0.45):"transparent"
+        Behavior on color {ColorAnimation{duration:SwirlMotion.hoverDuration}}
         antialiasing:true
         border.width:Theme.dp(entry.visualFocus?2:0)
         border.color:Theme.focusBorder

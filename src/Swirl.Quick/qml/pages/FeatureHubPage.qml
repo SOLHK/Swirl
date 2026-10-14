@@ -21,7 +21,7 @@ Item {
    {title:"脚本",icon:"scripts",route:"scripts",description:"使用 JavaScript 来扩展 Swirl 的功能。"},
    {title:"订阅管理",icon:"profiles",route:"subscriptions",description:"添加、更新和管理远程订阅与自动更新周期。"}]
    SwirlMotionButton {id:entry;objectName:"settings-"+modelData.route;required property var modelData;required property int index;width:Theme.dp(216);height:Theme.dp(189);padding:0;hoverEnabled:true
-    background:Rectangle{color:entry.hovered?Theme.withAlpha(Theme.hover,0.25):"transparent";radius:Theme.tileRadius}
+    background:Rectangle{color:entry.hovered?Theme.withAlpha(Theme.hover,0.25):"transparent";radius:Theme.tileRadius;Behavior on color {ColorAnimation{duration:SwirlMotion.hoverDuration}}}
     contentItem:Item {
      Image{x:Theme.dp(16);y:Theme.dp(14);width:Theme.dp(52);height:Theme.dp(52);source:"qrc:/swirl/icons/ui/reference-"+entry.modelData.icon+".png";fillMode:Image.PreserveAspectFit}
      Text{x:Theme.dp(16);y:Theme.dp(86);text:entry.modelData.title;color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold}

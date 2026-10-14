@@ -19,7 +19,8 @@ Switch {
         color: control.checked ? Theme.primaryControl : Theme.dark ? "#626262" : "#DADADD"
         border.width: Theme.dp(control.activeFocus ? 2 : 0)
         border.color: Theme.focusBorder
-        opacity: control.hovered ? 0.88 : 1
+        opacity: control.enabled?(control.hovered ? 0.88 : 1):0.45
+        Behavior on opacity{NumberAnimation{duration:SwirlMotion.hoverDuration}}
         Rectangle {
             width: parent.height - Theme.dp(4); height: width
             x: control.checked ? parent.width - width - Theme.dp(2) : Theme.dp(2); y:Theme.dp(2)
@@ -27,7 +28,7 @@ Switch {
             color: "#FEFEFF"
             layer.enabled: Theme.effectsSupported
             layer.effect: MultiEffect { shadowEnabled:true; shadowBlur:0.35; shadowVerticalOffset:2; shadowColor:"#30000000" }
-            Behavior on x {enabled:!SwirlMotion.reduced;SwirlSpring {epsilon:0.1}}
+            Behavior on x {enabled:!SwirlMotion.reduced;NumberAnimation {duration:SwirlMotion.switchDuration;easing.type:Easing.OutCubic}}
         }
         Behavior on color { ColorAnimation { duration: Theme.motion } }
     }

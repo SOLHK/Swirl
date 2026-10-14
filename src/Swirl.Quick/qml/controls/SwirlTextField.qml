@@ -18,6 +18,7 @@ TextField {
         border.width: Theme.dp(control.activeFocus ? 3 : 1)
         border.color: control.activeFocus ? (Theme.dark?Theme.focusBorder:"#80ABFF") : Theme.controlBorder
         Behavior on color { ColorAnimation { duration: Theme.motion } }
+        Behavior on border.width {NumberAnimation{duration:SwirlMotion.hoverDuration}}
         Behavior on border.color { ColorAnimation { duration: Theme.motion } }
     }
 }

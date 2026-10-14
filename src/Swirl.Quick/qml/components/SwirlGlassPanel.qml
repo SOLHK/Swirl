@@ -5,6 +5,9 @@ Rectangle {
     id:panel
     property string material: "content"
     property bool selected: false
+    property bool interactive:false
+    HoverHandler{id:cardHover;enabled:panel.interactive}
+    Behavior on border.color{ColorAnimation{duration:SwirlMotion.hoverDuration}}
     property real cornerRadius: floating ? Theme.popupRadius : Theme.cardRadius
     property bool independentCard: Theme.pageBranch === "A" && !floating
     readonly property bool floating: material === "floating"
@@ -12,7 +15,7 @@ Rectangle {
     antialiasing: true
     color: independentCard ? Theme.independentCard : Theme.material(material)
     border.width: independentCard ? 0 : Theme.borderWidth
-    border.color: selected ? Theme.focusBorder : Theme.border
+    border.color: selected ? Theme.focusBorder : interactive && cardHover.hovered?Theme.withAlpha(Theme.focusBorder,0.35):Theme.border
     layer.enabled: independentCard && Theme.effectsSupported
     layer.effect: MultiEffect {
         shadowEnabled:true

@@ -20,6 +20,7 @@ QtObject {
     property bool hasError: false
     property bool empty: false
     property bool autoSwitch: false
+    property int navigationDirection:1
     property int historyIndex: 0
     property var navigationHistory: ["activity"]
     property date sessionNow: new Date()
@@ -38,12 +39,13 @@ QtObject {
     readonly property var allPageIds: groups.reduce(function(all,g){return all.concat(g.pages.map(function(p){return p.id}))},[]).concat(["featurehub","external","processes","requestlogs"]).concat(FeatureCatalog.entries.filter(function(f){return f.id.indexOf("feature-")===0}).map(function(f){return f.id}))
     function navigate(id) {
         if (currentPage === id) return
+        navigationDirection=1
         navigationHistory = navigationHistory.slice(0,historyIndex+1).concat([id])
         historyIndex = navigationHistory.length-1
         currentPage = id
     }
-    function goBack() { if(historyIndex>0) currentPage=navigationHistory[--historyIndex] }
-    function goForward() { if(historyIndex<navigationHistory.length-1) currentPage=navigationHistory[++historyIndex] }
+    function goBack() { if(historyIndex>0){navigationDirection=-1;currentPage=navigationHistory[--historyIndex]} }
+    function goForward() { if(historyIndex<navigationHistory.length-1){navigationDirection=1;currentPage=navigationHistory[++historyIndex]} }
     function addEvent(title,tone) {
         recentEvents=[{time:Qt.formatDateTime(sessionNow,"HH:mm"), title:title, tone:tone}].concat(recentEvents).slice(0,5)
     }

@@ -8,7 +8,15 @@ QtObject {
     readonly property bool reduced: Theme.reduceMotion || motionPolicy.systemReducedMotion
     readonly property real spring: 3.2 * speed * speed
     readonly property real damping: 0.28
-    readonly property int duration: reduced ? 0 : Math.round(180 / speed)
+    function ms(value){return reduced ? 0 : Math.round(value/Math.max(0.25,speed))}
+    readonly property int duration:ms(180)
+    readonly property int pressDuration:ms(110)
+    readonly property int hoverDuration:ms(150)
+    readonly property int switchDuration:ms(180)
+    readonly property int pageDuration:ms(220)
+    readonly property int dialogDuration:ms(220)
+    readonly property int exitDuration:ms(160)
+    readonly property int expandDuration:ms(240)
     readonly property real pressScale: reduced ? 1 : 0.972
     property bool transitioning: false
     onTransitioningChanged:motionPolicy.setTransitioning(transitioning)

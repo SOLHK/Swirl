@@ -69,7 +69,7 @@ ComboBox {
         enabled:!SwirlMotion.reduced
             ParallelAnimation {
                 NumberAnimation { property:"opacity";to:1; duration: SwirlMotion.duration }
-                SwirlSpring { property:"scale";to:1 }
+                NumberAnimation{property:"scale";to:1;duration:SwirlMotion.dialogDuration;easing.type:Easing.OutCubic}
             }
         }
         exit: Transition { enabled:!SwirlMotion.reduced; ParallelAnimation { NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.duration} NumberAnimation {property:"scale";to:0.96;duration:SwirlMotion.duration;easing.type:Easing.InCubic} } }

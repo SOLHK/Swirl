@@ -109,7 +109,7 @@ int main(int argc, char *argv[])
     const bool motionTest=app.arguments().contains("--motion-test");
     bool previewMode=false;
     for(const QString &argument:app.arguments())
-        if(argument.startsWith(QStringLiteral("--motion-visual-dir="))||argument.startsWith(QStringLiteral("--capture-preview="))||argument.startsWith(QStringLiteral("--capture-native-frame=")))previewMode=true;
+        if(argument.startsWith(QStringLiteral("--motion-demo-output="))||argument.startsWith(QStringLiteral("--motion-visual-dir="))||argument.startsWith(QStringLiteral("--capture-preview="))||argument.startsWith(QStringLiteral("--capture-native-frame=")))previewMode=true;
     const bool hdrTest=app.arguments().contains("--hdr-self-test");
     const bool hdrDisplayTest=app.arguments().contains("--hdr-display-test");
     const bool nodeTest=app.arguments().contains("--node-self-test");
@@ -175,6 +175,7 @@ int main(int argc, char *argv[])
     const QString previewState = argumentValue(QStringLiteral("--preview-state="));
     if (nodeTest || motionTest || previewMode || engineTest || hdrDisplayTest || hdrTest || smoke || interaction || captureTest || gatewayTest || windowTest || !previewPath.isEmpty()) {
         if(nodeTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-node-ui-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-node-ui-diagnostics.txt");}
+        else if(interaction){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-input-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-input-diagnostics.txt");}
         QFile::remove(QCoreApplication::applicationDirPath() + QStringLiteral("/Swirl-diagnostics.txt"));
         qInstallMessageHandler(recordQtDiagnostic);
     }
@@ -214,8 +215,11 @@ int main(int argc, char *argv[])
     }
         motionPolicy.attach(rootWindow);
 #ifdef SWIRL_UI_TESTS
+    const auto demoDirectory=argumentValue(QStringLiteral("--motion-demo-output="));
     const auto visualDirectory=argumentValue(QStringLiteral("--motion-visual-dir="));
-    if(!visualDirectory.isEmpty()) {
+    if(!demoDirectory.isEmpty()) {
+        QTimer::singleShot(450,&app,[&app,rootWindow,demoDirectory]{app.exit(runMotionDemo(rootWindow,demoDirectory));});
+    } else if(!visualDirectory.isEmpty()) {
         QTimer::singleShot(450,&app,[&app,rootWindow,visualDirectory]{app.exit(runMotionVisualChecks(rootWindow,visualDirectory));});
     } else if(motionTest) {
         const auto report=argumentValue(QStringLiteral("--motion-output="));
