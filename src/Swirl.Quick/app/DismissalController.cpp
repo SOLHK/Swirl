@@ -41,9 +41,14 @@ bool DismissalController::eventFilter(QObject *receiver,QEvent *event) {
     if(event->type()!=QEvent::ShortcutOverride && event->type()!=QEvent::KeyPress)return false;
     auto *key=static_cast<QKeyEvent *>(event);
     auto *window=qobject_cast<QQuickWindow *>(receiver);
-    if(!window || key->key()!=Qt::Key_Escape || !hasPopup(window))return false;
+    if(!window || key->key()!=Qt::Key_Escape)return false;
+    const bool popup=hasPopup(window);
+    const bool dismissible=window->property("swirlDismissibleWindow").toBool();
+    if(!popup && !dismissible)return false;
     event->accept();
-    if(event->type()==QEvent::KeyPress && !key->isAutoRepeat())dismiss(window);
+    if(event->type()==QEvent::KeyPress && !key->isAutoRepeat()) {
+        if(popup)dismiss(window);else window->close();
+    }
     return true;
 }
 QString DismissalController::fingerprint(QObject *root) const {

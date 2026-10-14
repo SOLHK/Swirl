@@ -57,3 +57,12 @@ Checkmark, add square, add circle, dismiss and chevron up/down icons.
 Copyright Microsoft Corporation. MIT license.
 License: licenses/fluentui-MIT.txt
 Source: https://github.com/microsoft/fluentui-system-icons
+
+Animation development tools and references (not runtime dependencies)
+Qt Quick Effect Maker v6.10.3 was used to bake the original Swirl click-light
+shader project. The GPL/commercial development tool is not included in this
+package. Original Swirl shader sources are compiled through Qt ShaderTools.
+RiveQtQuickPlugin2 and FluentUI for QML were researched, but their runtime,
+example code, fonts and animation assets are not included. The application
+uses its existing Qt Quick motion implementation and native fallbacks.
+Verification and license inventory: docs/ANIMATION_DEPENDENCY_RESEARCH.md

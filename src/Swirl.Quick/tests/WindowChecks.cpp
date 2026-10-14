@@ -40,7 +40,8 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
 #ifdef Q_OS_WIN
     SetWindowPos(reinterpret_cast<HWND>(background.winId()),HWND_TOPMOST,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE);
 #endif
-    window->resize(qMin(1280,available.width()-120),qMin(800,available.height()-100));
+    const QSize captureSize(qMax(window->minimumWidth(),qMin(1280,available.width()-120)),qMax(window->minimumHeight(),qMin(800,available.height()-100)));
+    window->resize(captureSize);
     window->setPosition(available.topLeft()+QPoint(60,40));
     window->showNormal();window->raise();window->requestActivate();QTest::qWait(900);
 #ifdef Q_OS_WIN
@@ -75,6 +76,10 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     state("Theme.setScalePercent(125)");QTest::qWait(150);
     check(backdrop->nativeCorners() || cornerCoverage().first<normalCorner.first,"native corners remain system managed or Qt alpha follows manual UI zoom");
     state("Theme.resetScale()");QTest::qWait(150);
+    // Increasing the minimum geometry for manual UI zoom can enlarge the
+    // window. Restore the capture bounds so the bottom corners remain on the
+    // actual desktop at 200% DPR, rather than sampling offscreen black pixels.
+    window->resize(captureSize);QTest::qWait(150);
 #endif
     const auto grab=[&](const QString &name){
 #ifdef Q_OS_WIN

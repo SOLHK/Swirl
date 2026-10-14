@@ -47,5 +47,4 @@ Item {
         anchors.centerIn:parent;width:Math.max(0,parent.width-Theme.dp(200));horizontalAlignment:Text.AlignHCenter
         text:bar.targetWindow.title;color:Theme.text;font.pixelSize:Theme.fontSize(12);elide:Text.ElideRight
     }
-    Shortcut { sequence:"Escape";context:Qt.WindowShortcut;enabled:!dismissals.count || !dismissals.hasPopup(bar.targetWindow);onActivated:bar.targetWindow.close() }
 }

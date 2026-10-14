@@ -94,8 +94,8 @@ ApplicationWindow {
     }
     Connections {
         target: Theme
-        function onTransparencyChanged() { backdrop.apply(window, Theme.transparency, Theme.dark) }
-        function onDarkChanged() { backdrop.apply(window, Theme.transparency, Theme.dark) }
+        function onTransparencyChanged() { backdrop.apply(window, Theme.transparency, Theme.dark);settingsBackdrop.apply(settingsSheet,Theme.transparency,Theme.dark);panelBackdrop.apply(dashboardWindow,Theme.transparency,Theme.dark) }
+        function onDarkChanged() { backdrop.apply(window, Theme.transparency, Theme.dark);settingsBackdrop.apply(settingsSheet,Theme.transparency,Theme.dark);panelBackdrop.apply(dashboardWindow,Theme.transparency,Theme.dark) }
         function onUiScaleChanged() { backdrop.apply(window, Theme.transparency, Theme.dark) }
     }
     Binding {
@@ -197,17 +197,20 @@ ApplicationWindow {
     RewriteRulesDialog{id:rewriteRulesDialog}
     Window {
         id:dashboardWindow;objectName:"dashboardWindow";function openProxyControl(){hide();AppState.navigate("policies");window.show();window.raise();window.requestActivate()}
+        property bool swirlDismissibleWindow:true
+        onVisibleChanged:if(visible)panelBackdrop.apply(dashboardWindow,Theme.transparency,Theme.dark)
         visible:false;width:Theme.dp(1300);height:Theme.dp(600);minimumWidth:Theme.dp(914);minimumHeight:Theme.dp(560);title:"Swirl 面板";flags:Qt.Window|Qt.FramelessWindowHint;color:"transparent"
         function openCaptureInspector(){window.openCaptureInspector()}
-        Rectangle{id:dashboardMask;anchors.fill:parent;radius:dashboardWindow.visibility===Window.Maximized?0:Theme.dp(24);visible:false;layer.enabled:true;color:"white"}
+        Rectangle{id:dashboardMask;anchors.fill:parent;radius:panelBackdrop.nativeCorners || dashboardWindow.visibility===Window.Maximized?0:Theme.dp(24);visible:false;layer.enabled:true;color:"white"}
         Item{anchors.fill:parent;layer.enabled:Theme.effectsSupported;layer.effect:MultiEffect{maskEnabled:true;maskSource:dashboardMask}
-        Rectangle{anchors.fill:parent;radius:dashboardWindow.visibility===Window.Maximized?0:Theme.dp(24);gradient:Gradient{GradientStop{position:0;color:Theme.shellTop}GradientStop{position:1;color:Theme.shellBottom}}}
+        Rectangle{anchors.fill:parent;radius:panelBackdrop.nativeCorners || dashboardWindow.visibility===Window.Maximized?0:Theme.dp(24);gradient:Gradient{GradientStop{position:0;color:Theme.withAlpha(Theme.shellTop,panelBackdrop.active?Theme.settingsOpacity:1)}GradientStop{position:1;color:Theme.withAlpha(Theme.shellBottom,panelBackdrop.active?Theme.settingsOpacity:1)}}}
         SwirlWindowTitleBar{id:dashboardTitleBar;anchors.left:parent.left;anchors.right:parent.right;targetWindow:dashboardWindow}
         ExternalToolsPage{anchors.left:parent.left;anchors.right:parent.right;anchors.top:dashboardTitleBar.bottom;anchors.bottom:parent.bottom;clip:true}
         }
     }
     Window {
         id:settingsSheet;objectName:"settingsSheet";
+        property bool swirlDismissibleWindow:true
         property string section:"dns";visible:false;width:Math.min(Theme.dp(900),Screen.desktopAvailableWidth);height:Math.min(Theme.dp(790),Screen.desktopAvailableHeight);title:section==="subscriptions"?"Swirl 订阅管理":section==="profiles"?"Swirl 配置":section==="modules"?"Swirl 模块":section==="scripts"?"Swirl 脚本":"Swirl 设置";flags:Qt.Window|Qt.FramelessWindowHint;modality:Qt.WindowModal;transientParent:window;color:"transparent"
         function closeSettings(){settingsSheet.close()}
         function updateSettingsSection(){if(settingsLoader.item&&settingsLoader.item.section!==undefined)settingsLoader.item.section=section==="appearance"?"外观":section==="license"?"关于 Swirl":"常规"}
@@ -217,7 +220,7 @@ ApplicationWindow {
         NumberAnimation{id:settingsExit;target:settingsSheet;property:"reveal";to:0;duration:SwirlMotion.exitDuration;easing.type:Easing.InCubic;onFinished:{settingsSheet.closeApproved=true;settingsSheet.close()}}
         property string savedFingerprint:""
         property bool discardApproved:false
-        onVisibleChanged:if(visible){discardApproved=false;closeApproved=false;if(SwirlMotion.reduced)reveal=1;else settingsEnter.restart();Qt.callLater(function(){savedFingerprint=dismissals.fingerprint(settingsLoader.item)})}else{settingsEnter.stop();settingsExit.stop();reveal=1}
+        onVisibleChanged:if(visible){settingsBackdrop.apply(settingsSheet,Theme.transparency,Theme.dark);discardApproved=false;closeApproved=false;if(SwirlMotion.reduced)reveal=1;else settingsEnter.restart();Qt.callLater(function(){savedFingerprint=dismissals.fingerprint(settingsLoader.item)})}else{settingsEnter.stop();settingsExit.stop();reveal=1}
         onClosing:close=>{
             if(!discardApproved && dismissals.hasPopup(settingsSheet)){close.accepted=false;dismissals.dismiss(settingsSheet);return}
             // DNS is an unapplied page form. Other settings persist on change.
@@ -228,9 +231,9 @@ ApplicationWindow {
             closeApproved=false;window.requestActivate()
         }
         onSectionChanged:updateSettingsSection()
-        Rectangle{id:settingsMask;anchors.fill:parent;radius:settingsSheet.visibility===Window.Maximized?0:Theme.dp(27);visible:false;layer.enabled:true;color:"white"}
+        Rectangle{id:settingsMask;anchors.fill:parent;radius:settingsBackdrop.nativeCorners || settingsSheet.visibility===Window.Maximized?0:Theme.dp(27);visible:false;layer.enabled:true;color:"white"}
         Item{anchors.fill:parent;opacity:settingsSheet.reveal;scale:0.985+0.015*settingsSheet.reveal;layer.enabled:Theme.effectsSupported;layer.effect:MultiEffect{maskEnabled:true;maskSource:settingsMask}
-        Rectangle{anchors.fill:parent;radius:settingsSheet.visibility===Window.Maximized?0:Theme.dp(27);gradient:Gradient{GradientStop{position:0;color:Theme.shellTop}GradientStop{position:1;color:Theme.shellBottom}}}
+        Rectangle{anchors.fill:parent;radius:settingsBackdrop.nativeCorners || settingsSheet.visibility===Window.Maximized?0:Theme.dp(27);gradient:Gradient{GradientStop{position:0;color:Theme.withAlpha(Theme.shellTop,settingsBackdrop.active?Theme.settingsOpacity:1)}GradientStop{position:1;color:Theme.withAlpha(Theme.shellBottom,settingsBackdrop.active?Theme.settingsOpacity:1)}}}
         SwirlWindowTitleBar{id:settingsTitleBar;anchors.left:parent.left;anchors.right:parent.right;targetWindow:settingsSheet}
         SwirlDialog {
             id:settingsDiscard;objectName:"settingsDiscard";title:"放弃未保存的修改？";guardChanges:false

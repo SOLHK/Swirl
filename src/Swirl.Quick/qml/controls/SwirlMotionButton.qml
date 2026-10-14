@@ -17,10 +17,10 @@ Button {
     onVisibleChanged:if(!visible){lightPulse.stop();clickLight=0}
     onEnabledChanged:if(!enabled){lightPulse.stop();clickLight=0}
     Connections {target:SwirlMotion;function onReducedChanged(){if(SwirlMotion.reduced){lightPulse.stop();control.clickLight=0}}}
-    Rectangle {
+    SwirlClickLight {
         parent:control.background;anchors.fill:parent
-        radius:parent && parent.radius!==undefined?parent.radius:Theme.buttonRadius
-        color:Theme.dark?"#CDE4FF":"#FFFFFF";opacity:control.clickLight;visible:opacity>0
+        cornerRadius:parent && parent.radius!==undefined?parent.radius:Theme.buttonRadius
+        amount:control.clickLight
     }
     SequentialAnimation {
         id:lightPulse

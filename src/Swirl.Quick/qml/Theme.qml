@@ -35,6 +35,8 @@ QtObject {
     // Native per-pixel alpha preserves the shared corner outline.
     readonly property real sidebarOpacity: transparency && backdropActive ? (dark ? 0.92 : 0.88) : 1.0
     readonly property real workspaceOpacity:transparency && backdropActive ? (dark ? 0.96 : 0.94) : 1.0
+    readonly property real settingsOpacity:dark?0.98:0.96
+    readonly property real popupOpacity:transparency && backdropActive ? (dark?0.98:0.99) : 1.0
     readonly property color sidebar: withAlpha(sidebarBase, sidebarOpacity)
     readonly property color border: dark ? "#454545" : "#E5E5E8"
     readonly property color glassRim: border
@@ -117,7 +119,7 @@ QtObject {
     function material(kind) {
         if (kind === "sidebar") return sidebar
         if (kind === "field") return field
-        if (kind === "floating") return dark ? "#2B2B2B" : "#FFFFFF"
+        if (kind === "floating") return withAlpha(dark ? "#2B2B2B" : "#FFFFFF",popupOpacity)
         if (kind === "toolbar") return canvas
         if (kind === "independent-card") return independentCard
         if (kind === "container") return primaryContainer

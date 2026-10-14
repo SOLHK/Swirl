@@ -31,6 +31,31 @@
 #include <psapi.h>
 #endif
 
+int runViewportChecks(QQuickWindow *window,const QString &directory) {
+    QDir().mkpath(directory);QJsonArray checks;int failures=0;
+    auto eval=[&](const QString &code){QQmlExpression e(qmlContext(window),window,code);return e.evaluate();};
+    eval("Theme.reduceMotion=true;Theme.transparency=false");
+    window->setProperty("swirlViewportTest",true);
+    const auto dpr=window->devicePixelRatio();
+    for(const auto pixels:{QSize(1920,1080),QSize(2560,1440),QSize(3840,2160)}) {
+        window->resize(qRound(pixels.width()/dpr),qRound(pixels.height()/dpr));
+        for(const auto theme:{QString("Light"),QString("Dark")}) {
+            eval("Theme.mode='"+theme+"'");
+            for(const auto route:{QString("featurehub"),QString("overview"),QString("subscriptions")}) {
+                eval("AppState.navigate('"+route+"')");QTest::qWait(180);window->update();QTest::qWait(80);
+                const auto shot=window->grabWindow();
+                const auto name=QString("%1-%2-%3.png").arg(pixels.width()).arg(theme.toLower(),route);
+                const bool valid=!shot.isNull() && qAbs(shot.width()-pixels.width())<=2 && qAbs(shot.height()-pixels.height())<=2 && shot.save(directory+"/"+name) && eval("pageLoader.item!==null").toBool();
+                checks.append(QJsonObject{{"file",name},{"valid",valid},{"physicalWidth",shot.width()},{"physicalHeight",shot.height()},{"dpr",dpr}});
+                if(!valid)++failures;
+            }
+        }
+    }
+    QFile report(directory+"/viewports.json");if(!report.open(QIODevice::WriteOnly))return 2;report.write(QJsonDocument(QJsonObject{{"checks",checks},{"failures",failures},{"note","GPU UI render at requested physical viewport sizes; OS desktop resolution was not changed"}}).toJson());
+    qInfo()<<"VIEWPORT_CHECKS"<<checks.size()<<"failures"<<failures<<"DPR"<<dpr;
+    return failures?1:0;
+}
+
 int runMotionDemo(QQuickWindow *window,const QString &directory) {
     QDir().mkpath(directory);
     const auto eval=[&](const QString &code){QQmlExpression e(qmlContext(window),window,code);e.evaluate();};
@@ -214,6 +239,13 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
         wait(1400);settle();
         check("rapid-button-release-restores-scale",qAbs(button->property("motionScale").toDouble()-1)<0.001);
         check("button-hit-area-unchanged",button->scale()==1);
+        check("click-light-stops-after-release",button->property("clickLight").toDouble()==0);
+        QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,p);wait(60);
+        auto *shader=button->findChild<QObject *>("clickLightShaderLoader");
+        const bool expectedShader=eval("Theme.effectsSupported && motionPolicy.complexMotion && !SwirlMotion.reduced").toBool();
+        check("click-light-uses-supported-backend",shader && shader->property("active").toBool()==expectedShader);
+        wait(300);
+        check("click-light-unloads-shader-when-idle",shader&&!shader->property("active").toBool());
     } else check("navigation-button-present",false);
     QList<double> intervals;QList<double> warmIntervals;bool warmPhase=false;bool measuring=true;QMutex frameMutex;
     QElapsedTimer clock;clock.start();qint64 last=0;

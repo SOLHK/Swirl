@@ -109,7 +109,7 @@ int main(int argc, char *argv[])
     const bool motionTest=app.arguments().contains("--motion-test");
     bool previewMode=false;
     for(const QString &argument:app.arguments())
-        if(argument.startsWith(QStringLiteral("--motion-demo-output="))||argument.startsWith(QStringLiteral("--motion-visual-dir="))||argument.startsWith(QStringLiteral("--capture-preview="))||argument.startsWith(QStringLiteral("--capture-native-frame=")))previewMode=true;
+        if(argument.startsWith(QStringLiteral("--viewport-test-output="))||argument.startsWith(QStringLiteral("--motion-demo-output="))||argument.startsWith(QStringLiteral("--motion-visual-dir="))||argument.startsWith(QStringLiteral("--capture-preview="))||argument.startsWith(QStringLiteral("--capture-native-frame=")))previewMode=true;
     const bool hdrTest=app.arguments().contains("--hdr-self-test");
     const bool hdrDisplayTest=app.arguments().contains("--hdr-display-test");
     const bool nodeTest=app.arguments().contains("--node-self-test");
@@ -133,6 +133,8 @@ int main(int argc, char *argv[])
         isolatedSettings.sync();
     }
     WindowsBackdrop backdrop;
+    WindowsBackdrop settingsBackdrop;
+    WindowsBackdrop panelBackdrop;
     HdrOutput hdrOutput;
     QTemporaryDir isolatedTls;
     CaptureService capture(nullptr,isolatedRun?isolatedTls.filePath("ca.dpapi"):QString());
@@ -148,6 +150,8 @@ int main(int argc, char *argv[])
     DismissalController dismissals;
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("motionPolicy", &motionPolicy);
+    engine.rootContext()->setContextProperty("settingsBackdrop", &settingsBackdrop);
+    engine.rootContext()->setContextProperty("panelBackdrop", &panelBackdrop);
     engine.rootContext()->setContextProperty("dismissals", &dismissals);
     engine.addImageProvider(QStringLiteral("swirl"),new SvgIconProvider);
     const bool smoke = app.arguments().contains("--smoke-test");
@@ -215,9 +219,12 @@ int main(int argc, char *argv[])
     }
         motionPolicy.attach(rootWindow);
 #ifdef SWIRL_UI_TESTS
+    const auto viewportDirectory=argumentValue(QStringLiteral("--viewport-test-output="));
     const auto demoDirectory=argumentValue(QStringLiteral("--motion-demo-output="));
     const auto visualDirectory=argumentValue(QStringLiteral("--motion-visual-dir="));
-    if(!demoDirectory.isEmpty()) {
+    if(!viewportDirectory.isEmpty()) {
+        QTimer::singleShot(450,&app,[&app,rootWindow,viewportDirectory]{app.exit(runViewportChecks(rootWindow,viewportDirectory));});
+    } else if(!demoDirectory.isEmpty()) {
         QTimer::singleShot(450,&app,[&app,rootWindow,demoDirectory]{app.exit(runMotionDemo(rootWindow,demoDirectory));});
     } else if(!visualDirectory.isEmpty()) {
         QTimer::singleShot(450,&app,[&app,rootWindow,visualDirectory]{app.exit(runMotionVisualChecks(rootWindow,visualDirectory));});

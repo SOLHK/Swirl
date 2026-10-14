@@ -140,6 +140,11 @@ bool WindowsBackdrop::nativeEventFilter(const QByteArray &, void *message, qintp
             info->ptMaxSize = {monitor.rcWork.right-monitor.rcWork.left,monitor.rcWork.bottom-monitor.rcWork.top};
             const auto dpi = m_window->devicePixelRatio();
             info->ptMinTrackSize = {LONG(m_window->minimumWidth()*dpi),LONG(m_window->minimumHeight()*dpi)};
+#ifdef SWIRL_UI_TESTS
+            // Render-only viewport checks can allocate a 4K swapchain on a
+            // smaller desktop. Ordinary windows retain Windows track limits.
+            if(m_window->property("swirlViewportTest").toBool())info->ptMaxTrackSize={32768,32768};
+#endif
             *result = 0; return true;
         } break;
     }
