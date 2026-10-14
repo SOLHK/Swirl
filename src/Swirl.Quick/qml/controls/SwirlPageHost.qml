@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import SwirlQuick
 Item {
     id: host
@@ -14,9 +15,23 @@ Item {
     readonly property real position: Math.max(0, Math.min(1, progress))
     readonly property bool pendingGrab: false
     readonly property var heroData: null
+    readonly property bool contained: routeKey!=="activity" && routeKey!=="overview" && routeKey!=="rewrite"
     property bool initialized: false
     clip: moving
-    function pageOffset(route) { return route === "overview" ? 0 : Theme.dp(46) }
+    Rectangle {
+        anchors.fill:parent
+        visible:host.contained
+        radius:Theme.containerRadius
+        color:Theme.primaryContainer
+        clip:true
+        layer.enabled:visible && Theme.effectsSupported
+        layer.effect:MultiEffect {
+            shadowEnabled:true; shadowBlur:0.42; shadowOpacity:Theme.mainContainerShadowOpacity
+            shadowColor:"#000000"; shadowHorizontalOffset:0; shadowVerticalOffset:0
+        }
+    }
+    Item { id:viewport; anchors.fill:parent; clip:host.contained || host.moving }
+    function pageOffset(route) { return route === "overview" || route === "activity" ? 0 : Theme.dp(0) }
     function releaseShared() {
         if (SwirlMotion.shared) motionPolicy.releaseGrab(SwirlMotion.shared.grabId)
         SwirlMotion.shared = null
@@ -57,7 +72,7 @@ Item {
     Connections { target: SwirlMotion; function onReducedChanged() { if(SwirlMotion.reduced) host.finish() } }
     Component {
         id: pageFactory
-        Loader { property string routeId; x:0; y:host.pageOffset(routeId); width:host.width; height:host.height-y; visible:false }
+        Loader { parent:viewport; property string routeId; x:0; y:host.pageOffset(routeId); width:host.width; height:host.height-host.pageOffset(routeId); visible:false }
     }
     Binding { target:host.activeLoader; property:"opacity"; value:host.moving ? host.position : 1; when:host.activeLoader!==null }
     Binding { target:host.activeLoader; property:"y"; value:host.activeLoader ? host.pageOffset(host.activeLoader.routeId)+(host.moving?Theme.dp(6)*(1-host.position):0) : 0; when:host.activeLoader!==null }

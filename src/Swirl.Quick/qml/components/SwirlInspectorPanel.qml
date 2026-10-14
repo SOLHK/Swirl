@@ -59,7 +59,7 @@ SwirlGlassPanel {
                 }
             }
         }
-        Rectangle { Layout.fillWidth:true; height:Theme.dp(1); color:Theme.border }
+        Rectangle { Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(1); color:Theme.border }
         Item {
             Layout.fillWidth:true; Layout.fillHeight:true
             ScrollView {

@@ -7,7 +7,7 @@ Rectangle {
     property bool pressed:false
     property bool hovered:false
     property bool primary:false
-    property bool subtleShadow:true
+    property bool subtleShadow:false
     radius:Theme.pillRadius(height); antialiasing:true
     color:primary ? Theme.primaryControl : pressed ? Theme.pressed : selected ? Theme.selected : hovered ? Theme.hover : Theme.buttonBase
     gradient:Gradient {

@@ -16,12 +16,24 @@ struct EngineStartOptions {
     int healthIntervalMs = 2000;
     QList<ProxyNode> nodes;
     QString selectedNodeId;
+    bool directSession = false;
+    bool meteredNetwork = false;
+    QStringList meteredAllowlist;
     quint16 proxyPort = 7898;
     QString routingMode = QStringLiteral("rule");
     // Production uses verified, bundled China domain/IP MRS providers. The
     // controlled transport fixtures intentionally retain MATCH-only routing.
     bool smartRouting = false;
     QString rulesDirectory;
+    bool tunEnabled=false;
+    bool gatewayForwarding=false;
+    bool allowLan=false;
+    QString lanUsername,lanPassword;
+    QString lanBindAddress = QStringLiteral("*");
+    bool lanSkipLocalAuthentication = true;
+    QVariantMap dnsConfig;
+    QStringList customRules;
+    QVariantList customGroups;
 };
 
 class ProxyEngine : public QObject {
@@ -66,6 +78,9 @@ public:
         double downloadRate = 0;
         QString telemetryError;
         bool routingBusy = false;
+        bool gatewayForwarding=false;
+        bool directSession=false;
+        bool tunEnabled=false,allowLan=false;
     };
     using QObject::QObject;
     virtual ~ProxyEngine() = default;

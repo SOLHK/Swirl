@@ -30,6 +30,7 @@ class EngineController final : public QObject {
     Q_PROPERTY(QVariantList nodes READ nodes NOTIFY nodesChanged)
     Q_PROPERTY(QString selectedNodeId READ selectedNodeId NOTIFY nodesChanged)
     Q_PROPERTY(QString selectedNodeName READ selectedNodeName NOTIFY nodesChanged)
+    Q_PROPERTY(bool connected READ connected NOTIFY statusChanged)
     Q_PROPERTY(QString activeNodeId READ activeNodeId NOTIFY statusChanged)
     Q_PROPERTY(QString nodeStateText READ nodeStateText NOTIFY statusChanged)
     Q_PROPERTY(QString requestStateText READ requestStateText NOTIFY statusChanged)
@@ -48,6 +49,18 @@ class EngineController final : public QObject {
     Q_PROPERTY(TelemetryService* telemetry READ telemetry CONSTANT)
     Q_PROPERTY(NodeTestService* tests READ tests CONSTANT)
     Q_PROPERTY(QVariantList routingRules READ routingRules NOTIFY statusChanged)
+    Q_PROPERTY(bool meteredEnabled READ meteredEnabled NOTIFY statusChanged)
+    Q_PROPERTY(QStringList meteredAllowlist READ meteredAllowlist NOTIFY optionsChanged)
+    Q_PROPERTY(bool lanEnabled READ lanEnabled NOTIFY statusChanged)
+    Q_PROPERTY(bool lanConfigured READ lanConfigured NOTIFY optionsChanged)
+    Q_PROPERTY(QString lanUsername READ lanUsername NOTIFY optionsChanged)
+    Q_PROPERTY(QStringList lanAddresses READ lanAddresses NOTIFY statusChanged)
+    Q_PROPERTY(bool tunRequested READ tunRequested NOTIFY statusChanged)
+    Q_PROPERTY(bool tunEnabled READ tunEnabled NOTIFY statusChanged)
+    Q_PROPERTY(bool elevated READ elevated CONSTANT)
+    Q_PROPERTY(QVariantMap dnsConfiguration READ dnsConfiguration NOTIFY optionsChanged)
+    Q_PROPERTY(QVariantList policyGroups READ policyGroups NOTIFY optionsChanged)
+    Q_PROPERTY(QString networkConfigurationError READ networkConfigurationError NOTIFY optionsChanged)
 public:
     explicit EngineController(std::unique_ptr<ProxyEngine> engine, QObject *parent = nullptr, QString storePath = {},bool realAcceptance=false);
     QString executablePath() const { return m_options.executablePath; }
@@ -75,6 +88,7 @@ public:
     QVariantList nodes() const;
     QString selectedNodeId() const { return m_store.selectedId(); }
     QString selectedNodeName() const;
+    bool connected() const { const auto s=m_engine->status();return s.apiHealthy&&s.processAlive&&(!s.selectedNodeId.isEmpty()||s.directSession); }
     QString activeNodeId() const { return m_engine->status().selectedNodeId; }
     QString nodeStateText() const;
     QString requestStateText() const;
@@ -101,7 +115,36 @@ public:
     NodeTestService *tests() { return &m_tests; }
     Q_INVOKABLE void testAllNodes(const QUrl &url);
     Q_INVOKABLE void testSelectedNode(const QString &id,const QUrl &url);
-    QVariantList routingRules() const { return m_engine->routingRules(); }
+    QVariantList routingRules() const;
+    QVariantMap dnsConfiguration() const { return m_options.dnsConfig; }
+    QVariantList policyGroups() const { return m_options.customGroups; }
+    QString networkConfigurationError() const { return m_networkError; }
+    bool tunRequested() const { return m_options.tunEnabled; }
+    Q_INVOKABLE void setCaptureProxyPort(int port);
+    bool tunEnabled() const { return m_engine->status().tunEnabled&&apiHealthy()&&processAlive(); }
+    bool elevated() const;
+    bool meteredEnabled() const { return m_options.meteredNetwork; }
+    QStringList meteredAllowlist() const { return m_options.meteredAllowlist; }
+    Q_INVOKABLE bool setMeteredEnabled(bool enabled);
+    Q_INVOKABLE bool configureMeteredAllowlist(const QStringList &processes);
+    bool lanEnabled() const { return m_engine->status().allowLan && processAlive() && apiHealthy(); }
+    bool lanConfigured() const { return !m_options.lanUsername.isEmpty() && !m_options.lanPassword.isEmpty(); }
+    QString lanUsername() const { return m_options.lanUsername; }
+    QStringList lanAddresses() const;
+    Q_INVOKABLE bool configureLan(const QString &username,const QString &password);
+    Q_INVOKABLE bool setLanEnabled(bool enabled);
+    bool gatewayForwardingReady() const { return tunEnabled() && m_engine->status().gatewayForwarding; }
+    bool setGatewayForwarding(bool enabled);
+    Q_INVOKABLE bool setTunEnabled(bool enabled);
+    Q_INVOKABLE bool configureDns(const QVariantMap &configuration);
+    Q_INVOKABLE QVariantMap networkConfigurationSnapshot() const;
+    bool validateNetworkConfiguration(const QVariantMap &configuration,QVariantMap *canonical=nullptr);
+    bool replaceNetworkConfiguration(const QVariantMap &configuration);
+    void setModuleOverlayActive(bool active) { m_moduleOverlayActive=active; }
+    Q_INVOKABLE bool saveRoutingRule(const QString &type,const QString &pattern,const QString &policy);
+    Q_INVOKABLE bool removeRoutingRule(int index);
+    Q_INVOKABLE bool savePolicyGroup(const QString &name,const QString &type,const QStringList &members);
+    Q_INVOKABLE bool removePolicyGroup(const QString &name);
     Q_INVOKABLE void setRoutingMode(const QString &mode);
     Q_INVOKABLE void setSystemProxy(bool enabled);
 signals:
@@ -117,10 +160,19 @@ private:
     SystemProxySession m_systemProxy;
     TelemetryService m_telemetry;
     NodeTestService m_tests;
+    bool saveNetworkConfiguration();
+    bool networkEditAllowed();
+    void startConfiguredSession();
+    QString m_networkError;
     QString m_routingError;
+    int m_captureProxyPort=0;
     bool m_proxyRequested=false;
     bool m_proxyChecking=false;
     QString m_nodeError;
+    bool m_tunBeforeGateway=false;
+    bool m_tunBeforeMetered=false;
+    QString m_modeBeforeMetered="rule";
     bool m_restartPending=false;
     bool m_connectionRequested=false;
+    bool m_moduleOverlayActive=false;
 };

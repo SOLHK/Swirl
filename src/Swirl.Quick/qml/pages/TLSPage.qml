@@ -1,147 +1,48 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Dialogs
 import SwirlQuick
 import "../components"
 import "../controls"
-
 Item {
-    id:page
-    readonly property bool implemented:false
-    property bool tlsPreview:false
-    property string activeTab:"包含的域名"
-    property var selected:null
-    property var domainRows:[]
-    readonly property var shown:domainRows.filter(function(r){
-        return (activeTab==="包含的域名"?r.type==="Include":r.type==="Exclude") &&
-               r.name.toLowerCase().indexOf(search.text.toLowerCase())>=0
-    })
-    ColumnLayout {
-        anchors.fill:parent; anchors.margins:Theme.dp(23); spacing:Theme.dp(15)
-        SwirlGlassPanel {
-            Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(157)
-            RowLayout {
-                anchors.fill:parent; anchors.margins:Theme.dp(23); spacing:Theme.dp(18)
-                Rectangle {
-                    width:Theme.dp(52); height:Theme.dp(52); radius:Theme.roundedRadius(width,height); color:Theme.selected
-                    SwirlIcon { name:"shield"; size:Theme.dp(27); color:Theme.accent; anchors.centerIn:parent }
-                }
-                ColumnLayout {
-                    Layout.fillWidth:true; spacing:Theme.dp(7)
-                    Text { text:AppState.zh("HTTPS inspection"); color:Theme.text; font.pixelSize:Theme.fontSize(21); font.weight:Font.DemiBold }
-                    Text {
-                        text:"尚未实现 HTTPS 解密；没有生成或安装证书。"
-                        color:Theme.muted; font.pixelSize:Theme.fontSize(12); wrapMode:Text.WordWrap; Layout.fillWidth:true
-                    }
-                    RowLayout {
-                        SwirlStatusBadge { label:AppState.zh("LOCAL CA: NOT INSTALLED"); tone:"warning" }
-                        SwirlStatusBadge { label:"TLS 会话：未采集"; tone:"neutral" }
-                    }
-                }
-                ColumnLayout {
-                    Text { text:"HTTPS 解密（尚未实现）"; color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
-                    SwirlToggle { enabled:false;checked:false;  onToggled:{page.tlsPreview=checked;AppState.notice("HTTPS 解密预览")} }
-                }
-            }
-        }
-        RowLayout {
-            Layout.fillWidth:true; spacing:Theme.dp(7)
-            Repeater {
-                model:["包含的域名","Excluded domains"]
-                SwirlButton { enabled:false; text:modelData; quiet:page.activeTab!==modelData; onClicked:page.activeTab=modelData }
-            }
-            Item { Layout.fillWidth:true }
-            SwirlButton { enabled:false; text:AppState.zh("证书管理"); iconName:"shield"; onClicked:certDialog.open() }
-            SwirlButton { enabled:false; text:AppState.zh("Add domain"); primary:true; onClicked:addDialog.open() }
-        }
-        RowLayout {
-            Layout.fillWidth:true
-            SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:AppState.zh("Filter host patterns") }
-            SwirlStatusBadge { label:page.shown.length+" 个域名"; tone:"accent" }
-        }
-        RowLayout {
-            Layout.fillWidth:true; Layout.fillHeight:true; spacing:Theme.dp(15)
-            SwirlGlassPanel {
-                Layout.fillHeight:true; Layout.fillWidth:true; clip:true
-                SwirlDataTable {
-                    anchors.fill:parent; anchors.margins:Theme.dp(1)
-                    rows:page.shown
-                    selectedId:page.selected?page.selected.id:""
-                    columns:[{key:"name",label:AppState.zh("HOST PATTERN"),w:258},{key:"type",label:AppState.zh("RULE"),w:107},
-                             {key:"mode",label:AppState.zh("ACTION"),w:166},{key:"status",label:AppState.zh("STATE"),w:110}]
-                    onRowSelected:function(r){page.selected=r}
-                }
-                SwirlEmptyState {
-                    anchors.centerIn:parent; visible:page.shown.length===0
-                    headline:AppState.zh("No host patterns")
-                    detail:"尚未实现"
-                }
-            }
-            SwirlGlassPanel {
-                Layout.preferredWidth:Theme.dp(285); Layout.fillHeight:true
-                ColumnLayout {
-                    anchors.fill:parent; anchors.margins:Theme.dp(18); spacing:Theme.dp(12)
-                    ScrollView {
-                        id:detailScroll0; Layout.fillWidth:true; Layout.fillHeight:true; clip:true
-                        ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
-                        ColumnLayout {
-                    width:detailScroll0.availableWidth; spacing:Theme.dp(14)
-                    Text { text:AppState.zh("Certificate & session"); color:Theme.text; font.pixelSize:Theme.fontSize(16); font.weight:Font.DemiBold }
-                    Repeater {
-                        model:[["证书状态","未安装"],["TRUST","未配置"],
-                               ["真实活动会话","0"],["TLS 版本","TLS 1.3"],
-                               ["CIPHER","AES_128_GCM_SHA256"],
-                               ["选中的域名",page.selected?page.selected.name:"—"]]
-                        ColumnLayout {
-                            Layout.fillWidth:true; spacing:Theme.dp(3)
-                            Text { text:AppState.zh(modelData[0]); font.pixelSize:Theme.fontSize(10); color:Theme.muted }
-                            Text { text:AppState.zh(modelData[1]); font.pixelSize:Theme.fontSize(12); color:Theme.text; wrapMode:Text.WrapAnywhere; Layout.fillWidth:true }
-                        }
-                    }
-
-                        }
-                    }
-
-                    SwirlButton { enabled:false; text:AppState.zh("信任证书"); onClicked:AppState.notice("信任证书：模式不支持") }
-                    SwirlButton { enabled:false; text:AppState.zh("撤销信任"); danger:true; onClicked:AppState.notice("撤销证书：模式不支持") }
-
-                }
-            }
-        }
-    }
-    SwirlDialog {
-        id:certDialog; title:"CA 证书管理"
-        ColumnLayout {
-            width:parent.width; spacing:Theme.dp(11)
-            SwirlStatusBadge { label:AppState.zh("NO CERTIFICATE MATERIAL AVAILABLE"); tone:"warning" }
-            Text {
-                text:"尚未实现"
-                color:Theme.text; font.pixelSize:Theme.fontSize(13); wrapMode:Text.WordWrap; Layout.fillWidth:true
-            }
-            RowLayout {
-                Layout.alignment:Qt.AlignRight
-                SwirlButton { enabled:false; text:AppState.zh("Close"); onClicked:certDialog.close() }
-                SwirlButton { enabled:false; text:AppState.zh("证书预览"); onClicked:AppState.notice("证书详情") }
-            }
-        }
-    }
-    SwirlDialog {
-        id:addDialog; title:"添加 HTTPS 域名规则"
-        ColumnLayout {
-            width:parent.width; spacing:Theme.dp(11)
-            Text { text:AppState.zh("Host pattern"); color:Theme.text }
-            SwirlTextField { id:hostName; Layout.fillWidth:true; placeholderText:AppState.zh("*.example.test") }
-            SwirlComboBox { id:ruleType; Layout.fillWidth:true; model:["Include","Exclude"]; currentIndex:page.activeTab==="包含的域名"?0:1 }
-            Text { text:"尚未实现"; color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
-            RowLayout {
-                Layout.alignment:Qt.AlignRight
-                SwirlButton { enabled:false; text:AppState.zh("Cancel"); onClicked:addDialog.close() }
-                SwirlButton { enabled:false;
-                    text:AppState.zh("保存"); primary:true
-
-                    onClicked:AppState.notice("尚未实现")
-                }
-            }
-        }
-    }
+ id:page;readonly property var domainRows:captureProvider.tls.hostnames
+ component Note:Text{color:Theme.muted;font.pixelSize:Theme.fontSize(11);lineHeightMode:Text.FixedHeight;lineHeight:Theme.dp(14);wrapMode:Text.WordWrap;width:parent.width}
+ Text{x:Theme.dp(24);y:Theme.dp(30);text:"HTTPS 解密";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.Bold}
+ SwirlToggle{objectName:"tlsToggle";x:Theme.dp(186);y:Theme.dp(34);large:true;enabled:captureProvider.tls.ready;checked:captureProvider.tls.enabled;onToggled:captureProvider.tls.enabled=checked;Accessible.name:"HTTPS 解密"}
+ Note{x:Theme.dp(24);y:Theme.dp(74);width:parent.width-Theme.dp(48);text:"通过中间人攻击 (MitM, man-in-the-middle) 的方式解密 HTTPS 流量。"}
+ Column{x:Theme.dp(24);y:Theme.dp(108);width:(parent.width-Theme.dp(96))/2;spacing:Theme.dp(12)
+  ReferenceSection{width:parent.width;title:"CA 证书";tint:Theme.orange}
+  Row{x:Theme.dp(20);width:parent.width-Theme.dp(20);height:Theme.dp(54);spacing:Theme.dp(8)
+   Image{source:"qrc:/swirl/icons/ui/reference-certificate.png";width:Theme.dp(48);height:Theme.dp(48);fillMode:Image.PreserveAspectFit}
+   Column{width:parent.width-Theme.dp(56);spacing:Theme.dp(4);Text{text:captureProvider.tls.ready?"Swirl Local CA":"配置中没有 CA 证书";color:Theme.text;font.pixelSize:Theme.fontSize(13)}Note{text:captureProvider.tls.trusted?"CA 证书已被当前用户信任":"CA 证书不被系统信任"}}
+  }
+  Column{width:Theme.dp(180);x:Theme.dp(76);height:implicitHeight-Theme.dp(4);spacing:Theme.dp(8)
+   Repeater{model:["生成新证书","将证书安装到系统","从 PKCS #12 文件导入证书","导出证书"]
+    SwirlButton{objectName:"certificateAction-"+index;required property string modelData;required property int index;leftPadding:Theme.dp(6);rightPadding:Theme.dp(6);width:parent.width;height:Theme.dp(24);text:modelData;enabled:index===0||index===2||captureProvider.tls.ready;onClicked:{if(index===0){if(!captureProvider.tls.generate())AppState.notice(captureProvider.tls.error)}else if(index===1){if(!captureProvider.tls.installTrust())AppState.notice(captureProvider.tls.error)}else if(index===2)certificateImport.open();else certificateExport.open()}
+Accessible.name:modelData;Text{visible:index===0;x:Theme.dp(-45);anchors.verticalCenter:parent.verticalCenter;text:"操作：";color:Theme.text;font.pixelSize:Theme.fontSize(13)}}
+   }
+  }
+  Column{width:parent.width;spacing:Theme.dp(8)
+  ReferenceSection{width:parent.width;title:"选项";tint:Theme.green}
+  Column{width:parent.width;spacing:Theme.dp(2);ReferenceCheckBox{text:"进行 MitM 时跳过服务端证书验证";enabled:captureProvider.tls.ready;checked:captureProvider.tls.skipServerVerification;onToggled:captureProvider.tls.skipServerVerification=checked}
+  Note{x:Theme.dp(22);width:parent.width-Theme.dp(22);text:"即使服务器证书无效也允许连接。"}}
+  Column{width:parent.width;spacing:Theme.dp(2);ReferenceCheckBox{text:"自动屏蔽 QUIC";enabled:false}
+  Note{x:Theme.dp(22);width:parent.width-Theme.dp(22);text:"当 QUIC 连接 (即 HTTP/3) 命中 MITM 主机名列表时，自动阻止该 QUIC 连接，使得连接回退至 HTTP/2 或 HTTP/1.1，以便使其可被 MITM。"}}
+  Column{width:parent.width;spacing:Theme.dp(2);ReferenceCheckBox{text:"MitM over HTTP/2";checked:captureProvider.tls.http2Enabled;onToggled:captureProvider.tls.http2Enabled=checked}
+  Note{x:Theme.dp(22);width:parent.width-Theme.dp(22);text:"使用 HTTP/2 协议进行 MITM 解密，可在高并发下优化性能。"}}
+  }
+ }
+ Rectangle{anchors.right:parent.right;anchors.rightMargin:Theme.dp(24);y:Theme.dp(108);width:(parent.width-Theme.dp(48))/2;height:parent.height-y-Theme.dp(66);radius:Theme.tableRadius;color:"transparent";border.color:Theme.border
+  Rectangle{width:parent.width;height:Theme.dp(30);color:Theme.tableToolbar;Text{x:Theme.dp(16);anchors.verticalCenter:parent.verticalCenter;text:"MitM 主机名";color:Theme.muted;font.pixelSize:Theme.fontSize(13)}SwirlIconButton{quiet:true;anchors.right:parent.right;anchors.verticalCenter:parent.verticalCenter;iconName:"add-circle";width:Theme.dp(30);height:width;onClicked:hostDialog.open()}}
+  ListView{x:Theme.dp(16);y:Theme.dp(40);width:parent.width-Theme.dp(32);height:parent.height-y-Theme.dp(8);spacing:Theme.dp(8);clip:true;model:page.domainRows;ScrollIndicator.vertical:ScrollIndicator{}
+   delegate:Row{required property string modelData;width:ListView.view.width;height:Theme.dp(22);Text{width:parent.width-Theme.dp(24);text:parent.modelData;color:Theme.text;font.pixelSize:Theme.fontSize(13);elide:Text.ElideRight}SwirlIconButton{quiet:true;iconName:"dismiss";width:Theme.dp(24);height:Theme.dp(22);Accessible.name:"删除 MitM 主机名";onClicked:captureProvider.tls.removeHostname(parent.modelData)}}
+  }
+  Note{anchors.top:parent.bottom;anchors.topMargin:Theme.dp(9);text:"只有该列表中的域名才会被 Swirl 进行解密，允许使用通配符。部分应用有严格的安全策略，仅允许特定的 CA 证书。支持通过 HTTP 捕获端口进行 HTTP/1.1 和 HTTP/2 解密。"}
+ }
+ SwirlDialog{id:hostDialog;title:"MitM 主机名";ColumnLayout{width:parent.width;SwirlTextField{id:hostname;Layout.fillWidth:true;placeholderText:"*.example.com"}Text{text:"仅在开启 HTTPS 解密后，对列表中的主机名生效。";color:Theme.muted;font.pixelSize:Theme.fontSize(11)}RowLayout{Layout.alignment:Qt.AlignRight;SwirlButton{text:"取消";onClicked:hostDialog.close()}SwirlButton{text:"添加";primary:true;enabled:hostname.text.trim().length>0;onClicked:{if(captureProvider.tls.addHostname(hostname.text)){hostname.clear();hostDialog.close()}else AppState.notice(captureProvider.tls.error)}}}}}
+ FileDialog{id:certificateImport;title:"导入 CA 证书";nameFilters:["PKCS #12 证书 (*.p12 *.pfx)"];onAccepted:importPasswordDialog.open()}
+ SwirlDialog{id:importPasswordDialog;title:"CA 私钥密码";ColumnLayout{width:parent.width;SwirlTextField{id:certificatePassword;Layout.fillWidth:true;echoMode:TextInput.Password;placeholderText:"PKCS #12 密码（可为空）"}RowLayout{Layout.alignment:Qt.AlignRight;SwirlButton{text:"取消";onClicked:{certificatePassword.clear();importPasswordDialog.close()}}SwirlButton{text:"导入";primary:true;onClicked:{const success=captureProvider.tls.importPkcs12(certificateImport.selectedFile,certificatePassword.text);certificatePassword.clear();if(success)importPasswordDialog.close();else AppState.notice(captureProvider.tls.error)}}}}}
+ FileDialog{id:certificateExport;title:"导出 CA 证书";fileMode:FileDialog.SaveFile;nameFilters:["PEM 证书 (*.pem)"];defaultSuffix:"pem";onAccepted:if(!captureProvider.tls.exportCertificate(selectedFile))AppState.notice(captureProvider.tls.error)}
 }

@@ -1,11 +1,11 @@
-Swirl - phase 2 real proxy node test build
+Swirl - Windows development preview
 
-This installer includes a real, separate Mihomo engine and manual SOCKS5,
-Shadowsocks and Trojan node configuration. Node credentials are protected by
-Windows DPAPI. UI simulation data has been removed. Unimplemented network
-features remain disabled. The opt-in HTTP capture is real; CONNECT records
-metadata without TLS decryption. No system proxy, TUN, DNS service, route
-manipulation or subscription update is enabled by this build.
+This build includes a separate Mihomo engine, real proxy configuration,
+optional Windows system proxy/TUN, HTTP capture and scoped HTTPS decryption,
+rewrites, local JavaScript execution, configuration overlays and DHCP gateway
+control. Credentials and local private keys use Windows DPAPI. Network
+takeover and certificate trust require explicit user actions. Unimplemented
+features remain unavailable. See the source documentation for limitations.
 
 Mihomo v1.19.32, Copyright MetaCubeX and other contributors, is bundled as an
 unmodified, separate executable under GPL version 3. Its full license is in
@@ -46,3 +46,14 @@ MetaCubeX/meta-rules-dat - GPL-3.0
 China domain/IP MRS data pinned to commit 83c8208bdfae92b1caaa29745f51f233b6f1847e.
 https://github.com/MetaCubeX/meta-rules-dat
 License and SHA-256 manifest: rules/LICENSE, rules/manifest.json
+nghttp2 1.70.0
+Native HTTP/2 framing and flow control library, statically linked.
+Copyright (c) 2012 Tatsuhiro Tsujikawa. MIT license.
+License: licenses/nghttp2-MIT.txt
+Source: https://github.com/nghttp2/nghttp2/releases/tag/v1.70.0
+
+Microsoft Fluent UI System Icons
+Checkmark, add square, add circle, dismiss and chevron up/down icons.
+Copyright Microsoft Corporation. MIT license.
+License: licenses/fluentui-MIT.txt
+Source: https://github.com/microsoft/fluentui-system-icons

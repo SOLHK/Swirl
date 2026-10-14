@@ -87,7 +87,7 @@ Item {
                             font.pixelSize:Theme.fontSize(10); color:Theme.muted; elide:Text.ElideRight
                         }
                         Item {
-                            Layout.fillWidth:true; height:Theme.dp(17)
+                            Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(17)
                             Rectangle {
                                 x:parent.width*Number(modelData.waterfall)/100
                                 width:Math.max(Theme.dp(6),Math.min(parent.width-x,parent.width*Number.parseInt(modelData.duration)/640))

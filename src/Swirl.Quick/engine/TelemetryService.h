@@ -41,6 +41,7 @@ public:
  Q_INVOKABLE QVariantList distribution(int period=0) const;
  Q_INVOKABLE QVariantList history(const QString &series="down",int seconds=60,bool normalized=false) const;
  Q_INVOKABLE QVariantList historyPoints(const QString &series="down",int seconds=60) const;
+ Q_INVOKABLE QVariantList dailyTraffic(bool proxyOnly=false) const;
  Q_INVOKABLE QString formatBytes(double bytes) const;
  Q_INVOKABLE void measureNetwork();
  Q_INVOKABLE void flush();

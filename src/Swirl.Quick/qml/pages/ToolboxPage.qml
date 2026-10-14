@@ -70,7 +70,7 @@ Item {
                         }
                         SwirlStatusBadge { label:"本地"; tone:"accent" }
                     }
-                    Rectangle { Layout.fillWidth:true; height:Theme.dp(1); color:Theme.border }
+                    Rectangle { Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(1); color:Theme.border }
                     Text { text:page.tool==="网络接口信息"?"网卡名称":"目标域名、地址或 URL"; color:Theme.text; font.pixelSize:Theme.fontSize(13) }
                     SwirlTextField {
                         id:target; Layout.fillWidth:true

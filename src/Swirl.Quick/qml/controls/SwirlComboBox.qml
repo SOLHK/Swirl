@@ -4,11 +4,12 @@ import SwirlQuick
 ComboBox {
     id: control
     implicitWidth:Theme.dp(146)
-    implicitHeight:Theme.dp(44)
+    implicitHeight:Theme.dp(24)
     hoverEnabled: true
+    MouseArea { anchors.fill:parent;acceptedButtons:Qt.LeftButton;onClicked:{control.forceActiveFocus();if(control.popup.visible)control.popup.close();else control.popup.open()} }
     font.family: "Microsoft YaHei UI"
-    font.pixelSize:Theme.fontSize(17)
-    leftPadding:Theme.dp(15); rightPadding:Theme.dp(31)
+    font.pixelSize:Theme.fontSize(13)
+    leftPadding:Theme.dp(8); rightPadding:Theme.dp(20)
     topPadding:Theme.dp(4); bottomPadding:Theme.dp(4)
     contentItem: Text {
         text: AppState.zh(control.displayText)
@@ -17,21 +18,11 @@ ComboBox {
         verticalAlignment: Text.AlignVCenter
         horizontalAlignment:Text.AlignHCenter
         elide: Text.ElideRight
-        leftPadding:Theme.dp(4); rightPadding:Theme.dp(4)
+        leftPadding:0; rightPadding:0
     }
-    indicator: Canvas {
-        onVisibleChanged:if(visible)requestPaint();
-
-        id: chevron
-        x: control.width-width-Theme.dp(13); y: (control.height-height)/2
-        width:Theme.dp(14); height:Theme.dp(14)
-        onPaint: {
-            var ctx=getContext("2d")
-            ctx.reset(); ctx.strokeStyle=Theme.muted
-            ctx.lineWidth=Theme.dp(1.65); ctx.lineCap="round"; ctx.lineJoin="round"
-            ctx.beginPath(); ctx.moveTo(Theme.dp(3),Theme.dp(5)); ctx.lineTo(Theme.dp(7),Theme.dp(9)); ctx.lineTo(Theme.dp(11),Theme.dp(5)); ctx.stroke()
-        }
-        Connections { target: Theme; function onMutedChanged() { chevron.requestPaint() } }
+    indicator: Image {
+        x:control.width-width-Theme.dp(6);y:(control.height-height)/2;width:Theme.dp(14);height:width
+        source:"image://swirl/chevron-up-down/"+Theme.text.toString().slice(1)
     }
     background: SwirlPillSurface {
         pressed:control.pressed;hovered:control.hovered
@@ -45,20 +36,23 @@ ComboBox {
     delegate: ItemDelegate {
         SwirlPressMotion{}
         width: control.popup.availableWidth
-        height:Theme.dp(36)
+        height:Theme.dp(24)
         text: String(modelData)
         highlighted: control.highlightedIndex === index
         contentItem: Text {
             text: AppState.zh(parent.text)
-            color: Theme.text; font.pixelSize:Theme.fontSize(17); font.family: "Microsoft YaHei UI"
-            verticalAlignment: Text.AlignVCenter; leftPadding:Theme.dp(12)
+            color: parent.highlighted ? "white" : Theme.text; font.pixelSize:Theme.fontSize(13); font.family: "Microsoft YaHei UI"
+            verticalAlignment: Text.AlignVCenter; leftPadding:Theme.dp(24)
+            Image{visible:control.currentIndex===index;x:Theme.dp(3);anchors.verticalCenter:parent.verticalCenter;width:Theme.dp(14);height:width;source:"image://swirl/checkmark/"+(parent.parent.highlighted?"ffffff":Theme.text.toString().slice(1))}
         }
         background: Rectangle {
-            radius: Theme.controlRadius; antialiasing:true; color: parent.highlighted ? Theme.selected : "transparent"
+            radius: Theme.controlRadius; antialiasing:true; color: parent.highlighted ? Theme.accent : "transparent"
             Behavior on color { ColorAnimation { duration: SwirlMotion.duration } }
         }
     }
     popup: Popup {
+        focus:true
+        popupType:Popup.Window
         transformOrigin:Item.TopLeft
     onAboutToShow: {
         if(SwirlMotion.reduced){scale=1;opacity=1}
@@ -66,9 +60,10 @@ ComboBox {
     }
     onClosed:{scale=1;opacity=1}
 
-        y: control.height + Theme.dp(7)
+        y: -control.currentIndex*Theme.dp(24)-Theme.dp(3)
+        x:-Theme.dp(12)
         width: control.width
-        padding:Theme.dp(6)
+        padding:Theme.dp(5)
         implicitHeight: Math.min(Theme.dp(290), contentItem.implicitHeight+Theme.dp(12))
         enter: Transition {
         enabled:!SwirlMotion.reduced
@@ -79,7 +74,7 @@ ComboBox {
         }
         exit: Transition { enabled:!SwirlMotion.reduced; ParallelAnimation { NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.duration} NumberAnimation {property:"scale";to:0.96;duration:SwirlMotion.duration;easing.type:Easing.InCubic} } }
         background: Rectangle {
-            color: Theme.material("floating")
+            color:Theme.dark?Theme.field:"#EDF8FC"
             radius: Theme.popupRadius; antialiasing:true
             border.width:Theme.dp(1); border.color: Theme.pillRim
         }

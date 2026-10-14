@@ -68,7 +68,7 @@ Item {
                             }
                         }
                     }
-                    Rectangle {Layout.fillWidth:true;height:Theme.dp(1);color:Theme.border}
+                    Rectangle {Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(1);color:Theme.border}
                     Text {text:"凭据字段填写引用名称即可；此草稿存储不适合保存实际密码或私钥。";color:Theme.muted;font.pixelSize:Theme.fontSize(13);Layout.fillWidth:true;wrapMode:Text.WordWrap}
                 }
             }

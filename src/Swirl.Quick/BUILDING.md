@@ -1,171 +1,45 @@
-# Swirl Windows Qt UI
+# Swirl Windows 构建与验证
 
-This is Swirl's only maintained Windows application project, using C++23 / Qt 6
-Quick/QML and Windows NSIS. The old WPF/.NET program is no longer present in
-current branches. Most Qt pages use demonstration data. The separate opt-in CaptureService
-forwards real HTTP requests and CONNECT tunnels; it never changes the system
-proxy or accesses certificate stores. See CAPTURE.md. Settings > Proxy now
-supports the independent, verified Mihomo lifecycle described in ENGINE_PHASE1.md.
+Swirl 使用 C++23、Qt 6 Quick/QML 和独立 Mihomo。主界面按照提供的 Surge 截图重绘，真实功能与尚未接入的入口分开。当前是开发预览版本，不表示 Word 描述的所有高级功能已完成。
 
-## Windows Release build and installer
+## 构建
 
-Requirements: Qt 6.8+ (validated with 6.10.3), CMake 3.25+, Ninja, either
-MSVC 2022 x64 or MinGW-w64 13.1, and NSIS 3.11+. Put the compiler, CMake and
-Ninja on PATH. Do not mix an MSVC Qt SDK with a MinGW compiler.
-
-From the repository root in a developer PowerShell:
+需要 Windows x64、Qt 6.8+（本机验证 6.10.3）、匹配的 MSVC 2022 或 MinGW 13.1、CMake 3.25+、Ninja；安装包另需 NSIS 3.11。编译器、CMake、Ninja 加入 PATH，不能混用 MSVC 和 MinGW Qt。
 
 ```powershell
-# MSVC: run from the VS 2022 x64 developer shell.
-./scripts/build-quick-windows.ps1 -QtDir C:/Qt/6.10.3/msvc2022_64 -InputTests
-
-# MinGW: add C:/Qt/Tools/mingw1310_64/bin to PATH first.
-./scripts/build-quick-windows.ps1 -QtDir C:/Qt/6.10.3/mingw_64 -InputTests
+cmake -S src/Swirl.Quick -B build/quick -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=C:/Qt/6.10.3/mingw_64 -DSWIRL_BUILD_UI_TESTS=ON
+cmake --build build/quick --parallel 6
+./scripts/stage-mihomo.ps1 -Destination build/quick
+ctest --test-dir build/quick -E swirl-system-proxy-recovery --output-on-failure
 ```
 
-The script stages a pinned Mihomo release only after archive and executable
-SHA-256 verification, runs engine contract/real-process/QML checks and existing
-mouse/keyboard checks, then rebuilds a
-production Release EXE without the test harness, deploys Qt/QML plugins using
-`windeployqt`, and produces **out/Swirl-Setup.exe**. The installer creates a
-start-menu shortcut, a desktop shortcut and a per-user uninstaller. A fresh
-DistDir is required to avoid packaging stale plugins. Windows fonts are
-provided by the OS and are never included in the installer.
+system-proxy-recovery 测试会临时修改并恢复当前用户系统代理，只应在专用测试环境单独运行。本次验证没有运行它。其余网络集成测试使用本机隔离服务。swirl-motion 在 Windows QPA 验证原生弹窗，其余界面测试使用 offscreen 软件渲染。原生窗口测试需要可用桌面。
 
-For direct builds:
+生产包必须重新配置 SWIRL_BUILD_UI_TESTS=OFF，并使用新 DistDir 部署。编译输出包含 Swirl.exe、SwirlProxyGuard.exe、SwirlGatewayGuard.exe、SwirlScriptRunner.exe；四个文件都要打包。脚本运行器依赖 QtQml，Qt 部署应包含相应动态库。
 
 ```powershell
-cmake -S src/Swirl.Quick -B build/swirl-quick -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=C:/Qt/6.10.3/mingw_64 -DSWIRL_BUILD_UI_TESTS=ON
-cmake --build build/swirl-quick --parallel
-./build/swirl-quick/Swirl.exe --interaction-test
-./build/swirl-quick/Swirl.exe --smoke-test
+./scripts/build-quick-windows.ps1 -QtDir C:/Qt/6.10.3/mingw_64 -BuildDir build/release -DistDir dist/release -OutDir out -Nsis C:/NSIS/makensis.exe
 ```
 
-Tests log to Swirl-diagnostics.txt beside the EXE. `--interaction-test`
-checks actual mouse/keyboard input, scrolling targets into view, node metadata, offline counters, chart
-selectors, Ctrl+K, search, history and bottom-row reachability. The smoke test
-visits all 61 pages, including 32 dedicated configuration draft pages and the module catalog, waits
-for lazy delegate creation and exits nonzero on QML loading warnings/timeouts.
-CTest runs these checks with the offscreen software platform; on that platform
-set QT_QPA_FONTDIR to a temporary font-fixture directory. Normal Windows
-startup uses installed Windows fonts automatically.
+构建脚本校验并暂存固定版本 Mihomo，windeployqt 部署 Qt/QML，复制许可，输出安装程序。不要复用含旧 Qt 插件的 DistDir。Windows 字体不随包分发。
 
-## Screenshot verification
+## 截图对照
+
+测试构建可截取真实 QML：
 
 ```powershell
-./build/swirl-quick/Swirl.exe --capture-preview=C:/temp/overview.png --preview-size=1464x930 --preview-theme=light
-./build/swirl-quick/Swirl.exe --capture-preview=C:/temp/connected.png --preview-size=1464x930 --preview-connected
-./build/swirl-quick/Swirl.exe --capture-preview=C:/temp/minimum-bottom.png --preview-size=800x560 --preview-scroll-bottom
+./build/quick/Swirl.exe --capture-preview=C:/temp/activity.png --preview-size=914x672 --preview-theme=light --preview-page=activity
+./build/quick/Swirl.exe --capture-preview=C:/temp/sort.png --preview-size=914x672 --preview-theme=light --preview-page=gateway --preview-state=device-sort
 ```
 
-These render the real QML window, not a reference-image background. The normal
-Windows platform uses the GPU renderer. Native preview resolution is logical
-size multiplied by the effective device-pixel ratio. QT_SCALE_FACTOR multiplies
-the OS scale; factors 2/3, 5/6, 1 and 4/3 on a 150% desktop check effective
-100/125/150/200% scaling without modifying system settings. Screenshots do not
-verify touch, multi-monitor transitions or OS snap gestures; those remain
-manual checks. Buttons call Qt native close/minimize/maximize APIs, dragging
-uses startSystemMove, and all eight resize edges use startSystemResize.
-Windows uses a single frameless Qt Quick window and native per-pixel transparency
-where available. The QML shell uses a scalable 12-unit logical radius on the native per-pixel alpha surface.
-Large containers use 12, cards and popups 10, fields 8, and rectangular buttons 10.
-These are visual design units, not physical pixels or an OS specification. Qt
-handles screen DPI and Theme.dp handles user UI zoom independently.
-The QML content mask preserves antialiased edge coverage without a binary Win32 region; system DWM
-Acrylic fills transparent corner pixels and is therefore disabled. Activation, window controls and
-work-area maximization are explicitly handled. Unsupported systems or renderers receive
-an opaque fallback. See docs/UI_1_0_VALIDATION.md.
+主窗口参考尺寸 914×672 逻辑像素，面板 1300×600，DNS 900×748。实际 PNG 受 Windows DPI 比例影响。其他参考状态：inactive、device-settings、rewrite-on、dns-focus。原生弹窗截图包括弹出窗口超出主窗口的区域；比较时必须对齐主窗口边界，不能拉伸整个联合截图。
 
-## Design and scope
+Theme.qml 定义颜色、尺寸与动效令牌。页面缓存保留表单和滚动位置；切页释放模态抓取；支持减少动态效果。截图不能代替多显示器切换、长时间压力、真实远程凭据和专用 LAN 验证。
 
-- Theme.qml centralizes colors, fonts, gaps, animation and radius tokens.
-- SwirlPillSurface remains shared by buttons, combo boxes and segmented selections.
-  Navigation rows compress between 27 and 33 logical pixels to fit the available
-  sidebar height, then scroll independently. Non-circular controls use the shared
-  radius hierarchy clamped to their geometry; circular icon buttons retain their original circular outline.
-- The overview reference is 1464 x 930 logical pixels. The initial window is
-  derived from the current screen's available logical geometry and saved normal
-  size. Qt owns per-screen device-pixel-ratio handling; manual UI scale applies
-  through shared font and geometry tokens from 75% to 150%.
-- Sidebar width contracts with the available window width and becomes an icon
-  rail below 900 logical pixels. Overview columns use their minimum useful card
-  widths, and the page scrolls vertically when the work area cannot fit all rows.
-- Light content uses opaque neutral white (#F7F7F8), white cards
-  (#FFFFFF), subtle borders (#E5E5E8) and sidebar tint (#E9E9EC).
-  The sidebar tint uses 0.96 opacity on the native translucent surface;
-  otherwise it is opaque. The content area always remains opaque. Dark mode
-  uses corresponding neutral tokens and the same capability-based fallback.
-- Only the selected download/upload/cumulative series is drawn. Offline
-  endpoints and current counters are zero. History and event times share the
-  session clock. Cumulative GB stays historical and increases only while the
-  demonstration connection is active.
-- The sidebar brand mark uses `assets/icons/swirl_knot_mark_light.svg` (black)
-  or `swirl_knot_mark_dark.svg` (white) according to the active theme, without
-  a tile, cradle, frame, or shadow. Light/dark application tile SVGs are in
-  `assets/icons/swirl_knot_light.svg` and `swirl_knot_dark.svg`. Those SVGs
-  are the only maintained Swirl brand sources. Windows executables and installers
-  require an ICO; CMake invokes a Qt SVG-based generator to build
-  `build/swirl-quick/brand/Swirl.ico` automatically from the light SVG.
-  Do not commit old raster brand icons. Generic interface action icons
-  remain under `assets/icons/ui/`.
-- Existing specialized pages remain available by search and overview links.
-  The HTTP capture page is real; remaining proxy backend integration and further
-  visual refinement of other pages remain future work.
+## 功能资料
 
-For isolated deployment validation, launch the installer with `/ISOLATED /S`
-and a final `/D=<absolute test directory>` argument. This extracts the same
-runtime and uninstaller but leaves existing Swirl shortcuts and registry
-entries alone. The isolated marker also makes its uninstaller skip shared
-entries. Never use an existing user installation directory for this test.
+- [捕获、HTTPS 解密与重写](CAPTURE.md)
+- [本地脚本、模块和配置](../../docs/LOCAL_EXTENSIONS.md)
+- [当前复刻验证](../../design-qa.md)
 
-The GitHub workflow builds Windows MSVC, runs the input checks and all-page
-smoke, checks Qt Quick previews at 100/125/150/200% effective offscreen scaling,
-and checks 800x560, 1000x650, 1464x930 and 1920x1219 logical windows before packaging
-the production EXE. Preview warnings/errors fail the job, and per-preview logs
-are uploaded as Swirl-Quick-Preview-Diagnostics. These software previews do not
-replace native Windows GPU/DWM or multi-monitor checks. Its existing release
-step publishes a test-only prerelease. Development changes go to `test` first; promotion to `main` requires the
-repository owner's explicit approval and successful required checks.
-
-## Module drafts and in-place upgrades
-
-The catalog exposes 56 public capability entries. Thirty-two new draft pages offer configuration, ordered records, local persistence and JSON import/export. These do not start network services. See `docs/UI_MODULE_COVERAGE.md`. Tests use QStandardPaths test mode and never overwrite user drafts.
-
-The installer reuses the registered install directory and overwrites application files. It retains configuration/data and refuses a silent update when the existing executable is still running or unwritable (exit 2). Interactive setup offers retry after quitting Swirl. Test an old installer followed by the new installer using the SAME fresh isolated test directory; verify the new EXE hash and startup before uninstalling.
-
-The latest native Windows screenshots, tests and compositor limitations are documented
-in `docs/UI_1_0_VALIDATION.md`. `docs/UI_VISUAL_VALIDATION.md` and
-`docs/UI_BACKGROUND_VALIDATION.md` record previous visual iterations only.
-
-## Native 1.0 UI validation
-
-`--window-test --window-test-output=C:/Swirl-validation` requires a test-enabled build and an unlocked native Windows desktop. It uses separate color windows to verify changing composition, movement, a blurred edge, opacity fallback, window controls, title double-click, native hit testing and work-area maximization. It temporarily brings only its own test window forward. Do not run this test on offscreen CI.
-
-Use `scripts/build-quick-windows.ps1 -InputTests -NativeBackdropTests` for native checks before producing the installer. Normal input/capture/smoke checks remain available offscreen. Production builds omit Qt Test. `--capture-native-frame=...` explicitly brings the target window forward briefly; it fails if the target cannot be activated or a composed frame cannot be saved. See `docs/UI_1_0_VALIDATION.md` for measured results and unverified environments.
-
-
-## Knot branding and HDR traffic lights
-
-The sidebar/About marks use the canonical `swirl_knot_mark_light.svg` and dark
-variant from the upstream test branch. The application/window icon uses the
-full `swirl_knot_light.svg`; the embedded Windows ICO is rasterized from that
-SVG because the upstream legacy swirl.ico still contains the blue artwork.
-
-Builds now require the Qt ShaderTools SDK (`qtshadertools` in aqt/install-qt)
-and GuiPrivate headers matching the shipped Qt 6.10.3 runtime. Baked shaders
-are embedded and do not require qsb on the user's machine. The window requests
-Qt's version-specific `_qt_sg_hdr_format=scrgb` hook; unsupported output falls
-back to SDR. HdrOutput samples the actual RHI swapchain, not a guessed Windows
-setting. The final FP16 pass linearizes ordinary SDR UI and applies Windows SDR
-white correction; only the three circular controls receive an emissive highlight
-bounded by the reported display peak. Popup/overlay content is corrected too.
-No system HDR or display settings are changed. Dark hover glyphs remain dark.
-
-`--hdr-self-test` renders the production shader into an FP16 GPU texture and
-checks above-white output, SDR fallback, white correction and dark glyphs.
-`--hdr-display-test --hdr-display-output=C:/Swirl-validation/hdr.csv` reads the
-actual HDR window backbuffer around all three controls and records nominal
-linear luminance. It requires HDR enabled and available headroom; its values
-are GPU output measurements, not a physical photometer calibration. After
-changing display HDR mode, restart to renegotiate the Qt swapchain format.
-Ordinary PNG screenshots cannot preserve the actual HDR emission range.
+系统代理、TUN、DHCP、接口转发与证书信任均由明确的界面操作触发。TUN/网关需管理员权限，网关还需要专用 LAN。不要将草稿页的保存动作解释为真实服务启用。Mihomo、Qt、nghttp2、Fluent 图标和编译器运行时许可随包提供。

@@ -37,7 +37,7 @@ Dialog {
     }
     background: Rectangle {
         color: Theme.material("floating")
-        radius:Theme.popupRadius; antialiasing:true; border.width:Theme.dp(1); border.color: Theme.glassRim
+        radius:Theme.dp(27); antialiasing:true; border.width:Theme.dp(1); border.color: Theme.glassRim
         Rectangle {
             anchors.left: parent.left; anchors.right: parent.right
             anchors.leftMargin:Theme.dp(24); anchors.rightMargin:Theme.dp(24); anchors.top: parent.top

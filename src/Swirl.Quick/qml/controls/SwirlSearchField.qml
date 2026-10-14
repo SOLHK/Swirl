@@ -4,9 +4,10 @@ import SwirlQuick
 import "../components"
 TextField {
     id: control
+    property bool borderless:false
     implicitHeight:Theme.dp(42)
     implicitWidth:Theme.dp(225)
-    leftPadding:Theme.dp(39)
+    leftPadding:Theme.dp(24)
     topPadding:Theme.dp(4); bottomPadding:Theme.dp(4)
     rightPadding: Theme.dp(control.objectName === "pageSearch" && control.width > Theme.dp(130) ? 64 : 15)
     placeholderText: "搜索"
@@ -18,20 +19,20 @@ TextField {
     font.pixelSize:Theme.fontSize(16)
     background: SwirlPillSurface {
         hovered:control.activeFocus
-        radius: Theme.controlRadius
+        radius: height/2
         gradient: null
         subtleShadow: false
         antialiasing: true
-        color: control.activeFocus ? Theme.hover : Theme.material("field")
-        border.width: Theme.dp(control.activeFocus ? 2 : 1)
+        color:Theme.dark?Theme.field:Theme.surface
+        border.width:Theme.dp(control.activeFocus?2:control.borderless?0:1)
         border.color: control.activeFocus ? Theme.focusBorder : Theme.pillRim
         Behavior on color { ColorAnimation { duration: Theme.motion } }
         Behavior on border.color { ColorAnimation { duration: Theme.motion } }
     }
     Text { visible:control.objectName === "pageSearch" && control.width > Theme.dp(130); anchors.right:parent.right; anchors.rightMargin:Theme.dp(12); anchors.verticalCenter:parent.verticalCenter; text:"Ctrl+K"; color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
     SwirlIcon {
-        anchors.left: parent.left; anchors.leftMargin:Theme.dp(14)
+        anchors.left: parent.left; anchors.leftMargin:Theme.dp(8)
         anchors.verticalCenter: parent.verticalCenter
-        name: "search"; size:Theme.dp(22); color: control.activeFocus ? Theme.focusBorder : Theme.text
+        name: "search"; size:Theme.dp(14); color: control.activeFocus ? Theme.focusBorder : Theme.muted
     }
 }

@@ -55,7 +55,7 @@ Item {
                             text:page.section==="外观"?"主题、窗口材质、动画与界面缩放。":page.section==="代理"?"引擎、真实节点与当前用户系统代理 · 国内外分流。":page.section==="关于 Swirl"?"版本与项目信息":"此项尚未实现。"
                             color:Theme.muted; wrapMode:Text.WordWrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12)
                         }
-                        Rectangle { Layout.fillWidth:true; height:Theme.dp(1); color:Theme.border }
+                        Rectangle { Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(1); color:Theme.border }
                         ColumnLayout {
                             visible:page.section==="外观"; spacing:Theme.dp(21); Layout.fillWidth:true
                             RowLayout {
@@ -191,7 +191,7 @@ Item {
                                     }
                                 }
                             }
-                            Rectangle { Layout.fillWidth:true; height:Theme.dp(1); color:Theme.border }
+                            Rectangle { Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(1); color:Theme.border }
                         }
                         ColumnLayout {
                             visible:page.section==="代理"; Layout.fillWidth:true; spacing:Theme.dp(17)
@@ -252,7 +252,7 @@ Item {
                             SwirlBrandIcon { Layout.alignment:Qt.AlignHCenter; Layout.preferredWidth:Theme.dp(76); Layout.preferredHeight:Theme.dp(76) }
                             Text { text:"Swirl"; Layout.fillWidth:true; horizontalAlignment:Text.AlignHCenter; color:Theme.text; font.pixelSize:Theme.fontSize(30); font.weight:Font.DemiBold }
                             Text { text:"网络代理工具"; Layout.fillWidth:true; horizontalAlignment:Text.AlignHCenter; color:Theme.muted; font.pixelSize:Theme.fontSize(14) }
-                            Rectangle { Layout.fillWidth:true; height:Theme.dp(1); color:Theme.border }
+                            Rectangle { Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(1); color:Theme.border }
                             Repeater {
                                 model:[["版本",Qt.application.version.replace("-preview"," · 开发版")],["开发者","SOLHK"],["界面框架","Qt 6 Quick"],["平台","Windows 64 位"]]
                                 RowLayout {

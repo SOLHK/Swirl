@@ -9,8 +9,8 @@ Switch {
     Behavior on motionScale {enabled:!SwirlMotion.reduced;SwirlSpring{}}
     Binding {target:control.indicator;property:"scale";value:control.motionScale}
     onPressed:SwirlMotion.noteTrigger(control)
-    implicitWidth: Theme.dp(large ? 86 : 60)
-    implicitHeight: Theme.dp(large ? 46 : 32)
+    implicitWidth: Theme.dp(large ? 52 : 36)
+    implicitHeight: Theme.dp(large ? 24 : 17)
     padding:Theme.dp(0)
     hoverEnabled: true
     indicator: Rectangle {
@@ -21,8 +21,8 @@ Switch {
         border.color: Theme.focusBorder
         opacity: control.hovered ? 0.88 : 1
         Rectangle {
-            width: parent.height - Theme.dp(8); height: width
-            x: control.checked ? parent.width - width - Theme.dp(4) : Theme.dp(4); y:Theme.dp(4)
+            width: parent.height - Theme.dp(4); height: width
+            x: control.checked ? parent.width - width - Theme.dp(2) : Theme.dp(2); y:Theme.dp(2)
             radius: height * 0.5
             color: "#FEFEFF"
             layer.enabled: Theme.effectsSupported

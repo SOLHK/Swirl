@@ -15,7 +15,7 @@ SwirlGlassPanel {
     RowLayout {
         x:Theme.dp(14); y:Theme.dp(10); width:parent.width-Theme.dp(28); spacing:Theme.dp(18)
         Rectangle {
-            width:Theme.dp(46); height:Theme.dp(46); radius:Math.min(width,height)/2; color:Theme.withAlpha(card.chartColor,0.09)
+            Layout.preferredWidth:Theme.dp(46); Layout.preferredHeight:Theme.dp(46); radius:Math.min(width,height)/2; color:Theme.withAlpha(card.chartColor,0.09)
             SwirlIcon { anchors.centerIn:parent; name:card.iconName; size:Theme.dp(27); color:card.chartColor }
         }
         Text { text:card.label; color:Theme.muted; font.pixelSize:Theme.fontSize(17); Layout.fillWidth:true; elide:Text.ElideRight }

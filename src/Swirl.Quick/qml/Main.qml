@@ -9,6 +9,9 @@ import "controls"
 import "pages"
 ApplicationWindow {
     id:window
+    readonly property var engineControllerContext: engineController
+    readonly property var systemProviderContext: systemProvider
+    readonly property var captureProviderContext: captureProvider
     // Qt 6.10 RHI requests FP16 scRGB and falls back to SDR when unsupported.
     // Version-specific Qt hook; HdrOutput checks the actual swapchain format.
     property string _qt_sg_hdr_format:"scrgb"
@@ -21,9 +24,9 @@ ApplicationWindow {
             property real whiteScale:hdrOutput.whiteScale
             property real peakValue:hdrOutput.peakValue
             property real glowEnabled:hdrOutput.glowEnabled?1:0
-            property vector4d redLamp:Qt.vector4d(Theme.dp(sidebar.effectivelyCollapsed?14:34),Theme.dp(sidebar.effectivelyCollapsed?26:28),Theme.dp(sidebar.effectivelyCollapsed?6:8),1)
-            property vector4d yellowLamp:Qt.vector4d(Theme.dp(sidebar.effectivelyCollapsed?33:60),redLamp.y,redLamp.z,1)
-            property vector4d greenLamp:Qt.vector4d(Theme.dp(sidebar.effectivelyCollapsed?52:86),redLamp.y,redLamp.z,1)
+            property vector4d redLamp:Qt.vector4d(Theme.dp(16),Theme.dp(16),Theme.dp(7),1)
+            property vector4d yellowLamp:Qt.vector4d(Theme.dp(39),redLamp.y,redLamp.z,1)
+            property vector4d greenLamp:Qt.vector4d(Theme.dp(62),redLamp.y,redLamp.z,1)
             fragmentShader:"qrc:/swirl/shaders/hdr-ui.frag.qsb"
         }
     }
@@ -34,12 +37,12 @@ ApplicationWindow {
     Binding { target:window.popupOverlay ? window.popupOverlay.layer : null; property:"enabled"; value:hdrOutput.active; when:window.popupOverlay!==null }
     Binding { target:window.popupOverlay ? window.popupOverlay.layer : null; property:"effect"; value:hdrComposite; when:window.popupOverlay!==null }
     visible:true
-    width:Theme.dp(760); height:Theme.dp(520)
+    width:Theme.dp(914); height:Theme.dp(672)
     // Qt Quick reports logical dimensions and handles each QScreen's device
     // pixel ratio. Manual sizing is applied to design metrics, not a scene transform.
     readonly property real contentScale:1.0
     property bool geometryReady:false
-    minimumWidth:Math.min(Theme.dp(760),Screen.desktopAvailableWidth); minimumHeight:Math.min(Theme.dp(520),Screen.desktopAvailableHeight)
+    minimumWidth:Theme.windowMinimumWidth; minimumHeight:Theme.windowMinimumHeight
     title:"Swirl"; flags:Qt.Window | Qt.FramelessWindowHint; color:"transparent"
     font.family:Theme.fontFamily; font.pixelSize:Theme.fontSize(16)
     palette.window:Theme.canvas
@@ -52,12 +55,16 @@ ApplicationWindow {
     palette.light:Theme.buttonBase
     palette.mid:Theme.controlBorder
     property bool swirlTransparencyEnabled:Theme.transparency
+    function preparePreviewState(state){const item=previewPage==="dns"?settingsLoader.item:pageLoader.item;if(item&&item.preparePreviewState)item.preparePreviewState(state)}
     function previewScrollBottom() { if(pageLoader.item && pageLoader.item.scrollToBottom)pageLoader.item.scrollToBottom() }
     property real swirlWindowRadius:Theme.windowRadius
     readonly property real shellRadius:backdrop.nativeCorners || window.visibility===Window.Maximized ? 0 : Theme.windowRadius
+    Binding { target:window.captureProviderContext; property:"upstreamProxyPort"; value:window.engineControllerContext.apiHealthy?window.engineControllerContext.activeProxyPort:0 }
+    Connections { target:window.captureProviderContext; function onStateChanged(){window.engineControllerContext.setCaptureProxyPort(window.captureProviderContext.running?window.captureProviderContext.port:0)} }
     Connections { target:backdrop; function onChanged() { Theme.backdropActive=backdrop.active } }
-    readonly property real sidebarGutter:Theme.dp(Math.min(24,Math.max(12,window.width*0.017)))
-    readonly property real actualSidebarWidth:AppState.sidebarCollapsed || scaledCanvas.width<Theme.dp(900) ? Theme.dp(82) : Math.min(Theme.sidebarWidth,Math.max(Theme.dp(188),Theme.dp(scaledCanvas.width*0.172)))
+    Binding { target:Theme; property:"windowActive"; value:previewState==="inactive"?false:window.active }
+    readonly property real sidebarGutter:Theme.pageInset
+    readonly property real actualSidebarWidth:Theme.sidebarWidth
     Settings { id:windowSettings; category:"Window"; property int normalWidth:0; property int normalHeight:0 }
     onWidthChanged:if(geometryReady && visibility===Window.Windowed)windowSettings.normalWidth=Math.round(width)
     onHeightChanged:if(geometryReady && visibility===Window.Windowed)windowSettings.normalHeight=Math.round(height)
@@ -73,13 +80,8 @@ ApplicationWindow {
             window.width=windowSettings.normalWidth
             window.height=windowSettings.normalHeight
         } else {
-            // Derive a roomy first-run size from the current logical work area.
-            // Assign once so the user can resize freely after startup.
-            const maxWidth=Screen.desktopAvailableWidth*0.91
-            const maxHeight=Screen.desktopAvailableHeight*0.91
-            const aspect=1464/930
-            window.width=Math.max(minimumWidth,Math.min(maxWidth,maxHeight*aspect))
-            window.height=Math.max(minimumHeight,Math.min(maxHeight,window.width/aspect))
+            window.width=minimumWidth
+            window.height=minimumHeight
         }
         geometryReady=true
         backdrop.apply(window,Theme.transparency,Theme.dark)
@@ -87,12 +89,18 @@ ApplicationWindow {
         if(previewTheme==="dark")Theme.mode="Dark"
         else if(previewTheme==="light")Theme.mode="Light"
         if(previewPage.length)AppState.currentPage=previewPage
+        if(previewPage==="external")Qt.callLater(openDashboard)
+        if(previewPage==="dns")Qt.callLater(function(){openSettings("dns")})
     }
     Connections {
         target: Theme
         function onTransparencyChanged() { backdrop.apply(window, Theme.transparency, Theme.dark) }
         function onDarkChanged() { backdrop.apply(window, Theme.transparency, Theme.dark) }
         function onUiScaleChanged() { backdrop.apply(window, Theme.transparency, Theme.dark) }
+    }
+    Binding {
+        target:Theme; property:"pageBranch"
+        value:pageLoader.routeKey==="activity" || pageLoader.routeKey==="overview" || pageLoader.routeKey==="rewrite" ? "A" : "B"
     }
     Rectangle {
         id:windowCornerMask
@@ -111,6 +119,7 @@ ApplicationWindow {
             width:window.actualSidebarWidth + Theme.windowRadius; height:parent.height
             radius:window.shellRadius; antialiasing:true
             color:Theme.sidebar
+            gradient:Gradient{GradientStop{position:0;color:Theme.shellTop}GradientStop{position:1;color:Theme.shellBottom}}
 
         }
         Rectangle {
@@ -118,9 +127,10 @@ ApplicationWindow {
             width: parent.width - x; height: parent.height
             radius: window.shellRadius; antialiasing:true
             color: Theme.canvas
-            Rectangle { width: Theme.windowRadius; height: parent.height; color: Theme.canvas }
+            gradient:Gradient{GradientStop{position:0;color:Theme.shellTop}GradientStop{position:1;color:Theme.shellBottom}}
+            Rectangle { width: Theme.windowRadius; height: parent.height; gradient:Gradient{GradientStop{position:0;color:Theme.shellTop}GradientStop{position:1;color:Theme.shellBottom}} }
         }
-        Rectangle { x: window.actualSidebarWidth - 1; width:Theme.dp(1); height: parent.height; color: Theme.border }
+
         MouseArea {
             x:Theme.dp(0); y:Theme.dp(0); width:parent.width; height:Theme.dp(68)
             property point pressPosition
@@ -141,55 +151,31 @@ ApplicationWindow {
             onPositionChanged:mouse=>{ if(pressed&&(pressedButtons&Qt.LeftButton)&&!nativeMoveStarted&&Math.hypot(mouse.x-pressPosition.x,mouse.y-pressPosition.y)>Qt.styleHints.startDragDistance){nativeMoveStarted=true;window.startSystemMove()} }
             onDoubleClicked:window.visibility===Window.Maximized?window.showNormal():window.showMaximized()
         }
-        SwirlSidebar { id:sidebar; width:window.actualSidebarWidth; height:parent.height; compactByWindow:scaledCanvas.width<Theme.dp(900) }
+        SwirlSidebar { id:sidebar; width:window.actualSidebarWidth; height:parent.height; compactByWindow:false }
         Item {
-            id:mainArea; x:window.actualSidebarWidth+window.sidebarGutter; width:parent.width-x-window.sidebarGutter; height:parent.height
+            id:mainArea; x:window.actualSidebarWidth+window.sidebarGutter; width:parent.width-x-Theme.dp(12); height:parent.height
             RowLayout {
-                id:toolbar; visible:true; x:Theme.dp(0); y:Theme.dp(12); width:parent.width; height:Theme.dp(44); spacing:Theme.dp(18)
-                Item {
-                    width:Theme.dp(85); height:Theme.dp(42)
-                    SwirlPillSurface { anchors.fill:parent }
-                    Row {
-                        anchors.fill:parent
-                        Repeater {
-                            model:["chevron-left","chevron-right"]
-                            SwirlMotionButton {
-                                required property int index
-                                required property string modelData
-                                objectName:index===0?"historyBackButton":"historyForwardButton"
-                                width:Theme.dp(42); height:Theme.dp(42); hoverEnabled:true
-                                enabled:index===0 ? AppState.historyIndex>0 : AppState.historyIndex<AppState.navigationHistory.length-1
-                                background:Rectangle{radius:Math.min(width,height)/2;color:parent.hovered?Theme.hover:"transparent"
- Behavior on color {ColorAnimation {duration:SwirlMotion.duration}}
- }
-                                contentItem:SwirlIcon{name:modelData;size:Theme.dp(20);color:parent.enabled?Theme.muted:Theme.withAlpha(Theme.muted,0.4)}
-                                onClicked:index===0?AppState.goBack():AppState.goForward()
-                                Accessible.name:index===0?"返回":"前进"
-                            }
-                        }
-                    }
-                }
+                id:toolbar; visible:AppState.currentPage==="activity"; x:Theme.dp(4); y:Theme.dp(8); width:parent.width-Theme.dp(14); height:Theme.dp(22); spacing:Theme.dp(10)
+                SwirlStatusCapsule { objectName:"eventsCapsule"; Layout.preferredWidth:Theme.dp(236); Layout.preferredHeight:Theme.dp(22); label:systemProvider.eventCount>0?systemProvider.eventCount+" 个事件":"暂无警告";tone:systemProvider.eventCount>0?"warning":"neutral"; onClicked:AppState.navigate("logs") }
                 Item { Layout.fillWidth:true }
-                SwirlStatusCapsule { objectName:"eventsCapsule"; label:systemProvider.eventCount>0?systemProvider.eventCount+" 个事件":"无事件";tone:systemProvider.eventCount>0?"warning":"neutral"; onClicked:AppState.navigate("logs") }
-                Item { Layout.fillWidth:true }
-                SwirlStatusCapsule { objectName:"proxyCapsule"; label:engineController.systemProxy.systemEnabled&&!engineController.systemProxy.owned?"系统代理 · 其他应用":"系统代理";tone:engineController.systemProxy.error.length||engineController.routingError.length?"warning":engineController.systemProxy.systemEnabled?"success":"neutral";detail:engineController.systemProxy.error||engineController.routingError||(engineController.systemProxy.systemEnabled&&!engineController.systemProxy.owned?"Windows 系统代理已由其他应用启用，Swirl 未接管":"点击控制 Swirl 系统代理"); enabled:!engineController.busy; onClicked:engineController.setSystemProxy(!engineController.systemProxy.enabled) }
-                SwirlStatusCapsule { objectName:"tunCapsule"; label:"增强模式 · 未实现";detail:"本阶段尚未实现 TUN";enabled:false }
+                SwirlStatusCapsule { objectName:"proxyCapsule"; Layout.preferredWidth:Theme.dp(130); Layout.preferredHeight:Theme.dp(22); label:engineController.systemProxy.systemEnabled&&!engineController.systemProxy.owned?"系统代理 · 其他应用":"系统代理";tone:engineController.systemProxy.error.length||engineController.routingError.length?"warning":engineController.systemProxy.systemEnabled?"success":"neutral";detail:engineController.systemProxy.error||engineController.routingError||(engineController.systemProxy.systemEnabled&&!engineController.systemProxy.owned?"Windows 系统代理已由其他应用启用，Swirl 未接管":"点击控制 Swirl 系统代理"); enabled:!engineController.busy; onClicked:engineController.setSystemProxy(!engineController.systemProxy.enabled) }
+                SwirlStatusCapsule { objectName:"tunCapsule"; Layout.preferredWidth:Theme.dp(130); Layout.preferredHeight:Theme.dp(22); label:"增强模式"; tone:engineController.tunEnabled?"success":"neutral"; enabled:!engineController.busy; onClicked:{if(!engineController.setTunEnabled(!engineController.tunRequested))AppState.notice(engineController.routingError||engineController.networkConfigurationError)} }
                 SwirlButton { visible:captureProvider.running; text:"抓包中 · "+captureProvider.sessions.length; iconName:"capture"; font.pixelSize:Theme.fontSize(14); onClicked:AppState.navigate("capture") }
 
             }
             SwirlPageHost {
-                routeKey:AppState.currentPage
-                id:pageLoader; objectName:"pageLoader"; x:Theme.dp(0); y:Theme.dp(68); width:parent.width; height:parent.height-y-Theme.dp(17)
+                routeKey:AppState.currentPage==="requestlogs" || AppState.currentPage==="dashboard" ? "activity" : AppState.currentPage
+                id:pageLoader; objectName:"pageLoader"; x:Theme.dp(0); y:AppState.currentPage==="activity" || AppState.currentPage==="overview" || AppState.currentPage==="rewrite" ? Theme.dp(40):Theme.dp(12); width:parent.width; height:parent.height-y-Theme.dp(12)
                 sourceComponent:AppState.currentPage==="overview" ? overview :
+                                AppState.currentPage==="activity" || AppState.currentPage==="requestlogs" || AppState.currentPage==="dashboard" ? activity :
                                 AppState.currentPage==="capture" ? capturePage :
-                                AppState.currentPage==="connections" || AppState.currentPage==="requestlogs" ? connections :
+                                AppState.currentPage==="connections" ? connections :
                                 AppState.currentPage==="processes" ? processes :
                                 AppState.currentPage==="proxies" ? proxies :
                                 AppState.currentPage==="inspector" ? inspector :
                                 AppState.currentPage==="scripts" ? scripts :
                                 AppState.currentPage==="settings" ? settings :
                                 AppState.currentPage==="toolbox" ? toolbox :
-                                AppState.currentPage==="dashboard" ? dashboard :
                                 AppState.currentPage==="dns" ? dns :
                                 AppState.currentPage==="rules" ? rules :
                                 AppState.currentPage==="logs" ? logs :
@@ -212,6 +198,37 @@ ApplicationWindow {
             }
         }
     }
+    function openDashboard(){dashboardWindow.show();dashboardWindow.raise();dashboardWindow.requestActivate()}
+    function openCaptureInspector(){captureInspectorDialog.open()}
+    function openSettings(route){settingsSheet.x=window.x+(window.width-settingsSheet.width)/2;settingsSheet.y=Math.max(0,Math.min(window.y,Screen.desktopAvailableHeight-settingsSheet.height));settingsSheet.section=route;settingsSheet.show();settingsSheet.raise();settingsSheet.requestActivate()}
+    function closeSettings(){settingsSheet.hide()}
+    function openRewriteEditor(kind,title){rewriteRulesDialog.kind=kind;rewriteRulesDialog.title=title;rewriteRulesDialog.open()}
+    RewriteRulesDialog{id:rewriteRulesDialog}
+    Window {
+        id:dashboardWindow;objectName:"dashboardWindow";function openProxyControl(){hide();AppState.navigate("policies");window.show();window.raise();window.requestActivate()}
+        visible:false;width:Theme.dp(1300);height:Theme.dp(600);minimumWidth:Theme.dp(914);minimumHeight:Theme.dp(560);title:"Swirl 面板";flags:Qt.Window|Qt.FramelessWindowHint;color:"transparent"
+        function openCaptureInspector(){window.openCaptureInspector()}
+        Rectangle{id:dashboardMask;anchors.fill:parent;radius:Theme.dp(24);visible:false;layer.enabled:true;color:"white"}
+        Rectangle{anchors.fill:parent;radius:Theme.dp(24);color:Theme.surface}
+        ExternalToolsPage{anchors.fill:parent;layer.enabled:Theme.effectsSupported;layer.effect:MultiEffect{maskEnabled:true;maskSource:dashboardMask}}
+        MouseArea{x:0;y:0;width:Theme.dp(220);height:Theme.dp(48);onPressed:dashboardWindow.startSystemMove()}
+        Row{x:Theme.dp(20);y:Theme.dp(18);spacing:Theme.dp(9);Repeater{model:["#FF5F57","#FEBC2E","#28C840"];SwirlMotionButton{required property string modelData;required property int index;width:Theme.dp(14);height:width;background:Rectangle{color:parent.modelData;radius:width/2}
+contentItem:Item{}
+onClicked:{if(index===0)dashboardWindow.hide();else if(index===1)dashboardWindow.showMinimized();else if(dashboardWindow.visibility===Window.Maximized)dashboardWindow.showNormal();else dashboardWindow.showMaximized()}}}}
+    }
+    Window {
+        id:settingsSheet;objectName:"settingsSheet";
+        property string section:"dns";visible:false;width:Theme.dp(900);height:previewPage==="dns"?Theme.dp(748):Math.min(Theme.dp(748),Screen.desktopAvailableHeight);title:"Swirl 设置";flags:Qt.Dialog|Qt.FramelessWindowHint;modality:Qt.WindowModal;transientParent:window;color:"transparent"
+        function closeSettings(){settingsSheet.hide()}
+        Rectangle{anchors.fill:parent;radius:Theme.dp(27);color:Theme.surface}
+        Rectangle{id:settingsMask;anchors.fill:parent;radius:Theme.dp(27);visible:false;layer.enabled:true;color:"white"}
+        Loader{id:settingsLoader;anchors.fill:parent;layer.enabled:Theme.effectsSupported;layer.effect:MultiEffect{maskEnabled:true;maskSource:settingsMask}
+sourceComponent:settingsSheet.section==="dns"?dns:settingsSheet.section==="modules"?modules:settingsSheet.section==="profiles"?profiles:settingsSheet.section==="scripts"?scripts:settings;onLoaded:{if(item&&item.section!==undefined)item.section=settingsSheet.section==="appearance"?"外观":settingsSheet.section==="license"?"关于 Swirl":"常规"}}
+    }
+    SwirlDialog {
+        id:captureInspectorDialog;title:"HTTP 请求详情";width:Math.min(Theme.dp(1000),window.width-Theme.dp(20));height:Math.min(Theme.dp(650),window.height-Theme.dp(20));padding:Theme.dp(14)
+        CaptureInspectorPage{captureProvider:window.captureProviderContext;anchors.fill:parent}
+    }
     // Native move and eight-edge resize keep Windows snap/DPI behavior.
     Repeater {
         model:[Qt.LeftEdge,Qt.RightEdge,Qt.TopEdge,Qt.BottomEdge,Qt.LeftEdge|Qt.TopEdge,Qt.RightEdge|Qt.TopEdge,Qt.LeftEdge|Qt.BottomEdge,Qt.RightEdge|Qt.BottomEdge]
@@ -231,7 +248,7 @@ ApplicationWindow {
         }
     }
     Shortcut { sequence:"Alt+Space"; context:Qt.ApplicationShortcut; onActivated:backdrop.showSystemMenu() }
-    Shortcut { sequence:"Ctrl+K"; context:Qt.ApplicationShortcut; onActivated:sidebar.searchField.forceActiveFocus() }
+    Shortcut { sequence:"Ctrl+K"; context:Qt.ApplicationShortcut; onActivated:sidebar.openSearch() }
     Shortcut { sequence:"Alt+Left"; onActivated:AppState.goBack() }
     Shortcut { sequence:"Alt+Right"; onActivated:AppState.goForward() }
     Shortcut { sequence:"Ctrl+1"; onActivated:AppState.navigate("overview") }
@@ -240,28 +257,28 @@ ApplicationWindow {
     Shortcut { sequence:"Ctrl+4"; onActivated:AppState.navigate("inspector") }
     Shortcut { sequence:"Ctrl+,"; onActivated:AppState.navigate("settings") }
     Shortcut { sequence:"Ctrl+B"; onActivated:AppState.sidebarCollapsed=!AppState.sidebarCollapsed }
-        Component { id:overview; OverviewPage {} }
-    Component { id:capturePage; CapturePage {} }
+        Component { id:activity; ActivityPage { engineController:window.engineControllerContext; systemProvider:window.systemProviderContext } }
+        Component { id:overview; OverviewPage { engineController:window.engineControllerContext; systemProvider:window.systemProviderContext } }
+    Component { id:capturePage; CapturePage { captureProvider:window.captureProviderContext } }
     Component { id:externalTools; ExternalToolsPage {} }
     Component { id:featureHub; FeatureHubPage {} }
     Component { id:featureModule; FeatureModulePage { moduleId:parent.routeId } }
     Component { id:connections; ConnectionsPage {} }
-    Component { id:processes; ProcessesPage {} }
+    Component { id:processes; ProcessesPage { engineController:window.engineControllerContext } }
     Component { id:proxies; ProxiesPage {} }
     Component { id:inspector; InspectorPage {} }
     Component { id:scripts; ScriptsPage {} }
     Component { id:settings; SettingsPage {} }
     Component { id:toolbox; ToolboxPage {} }
-    Component { id:dashboard; DashboardPage {} }
     Component { id:dns; DNSPage {} }
-    Component { id:rules; RulesPage {} }
+    Component { id:rules; RulesPage { engineController:window.engineControllerContext } }
     Component { id:logs; LogsPage {} }
     Component { id:tls; TLSPage {} }
     Component { id:replay; ReplayPage {} }
     Component { id:rewrite; RewritePage {} }
     Component { id:profiles; ProfilesPage {} }
     Component { id:subscriptions; SubscriptionsPage {} }
-    Component { id:policies; PolicyGroupsPage {} }
+    Component { id:policies; PolicyGroupsPage { engineController:window.engineControllerContext } }
     Component { id:traffic; TrafficAnalyticsPage {} }
     Component { id:breakpoint; BreakpointPage {} }
     Component { id:mapLocal; MapPage {} }
@@ -279,7 +296,7 @@ ApplicationWindow {
         anchors.fill:parent;z:998;color:"transparent";antialiasing:true
         radius:window.shellRadius
         border.width:window.visibility===Window.Maximized?0:1/Screen.devicePixelRatio
-        border.color:Theme.dark?Qt.rgba(1,1,1,window.active?0.30:0.20):Qt.rgba(0,0,0,window.active?0.32:0.22)
+        border.color:Theme.dark?Qt.rgba(1,1,1,window.active?0.30:0.20):Qt.rgba(0,0,0,window.active?0.12:0.08)
     }
     Timer { id:toastTimer; interval:3200; onTriggered:AppState.toast="" }
     Connections { target:AppState; function onToastChanged(){if(AppState.toast.length)toastTimer.restart()} }

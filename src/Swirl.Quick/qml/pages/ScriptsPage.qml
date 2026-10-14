@@ -1,157 +1,42 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Dialogs
 import SwirlQuick
 import "../components"
 import "../controls"
 Item {
-    id:page
-    readonly property bool implemented:false
-    property string selectedScript: ""
-    property var scripts:[]
-    property string consoleText: ""
-    ColumnLayout {
-        anchors.fill:parent; anchors.margins:Theme.dp(23); spacing:Theme.dp(12)
-        RowLayout {
-            Layout.fillWidth:true
-            SwirlStatusBadge { label:"JavaScript · 仅界面"; tone:"accent" }
-            Text { text:"可以编辑源码，不会实际运行脚本。"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
-            SwirlButton { enabled:false; text:"导入"; iconName:"folder"; onClicked:AppState.notice("导入脚本") }
-            SwirlButton { enabled:false; text:"新建脚本"; primary:true; onClicked:newDialog.open() }
-        }
-        SplitView {
-            Layout.fillWidth:true; Layout.fillHeight:true
-            orientation:Qt.Horizontal
-            handle:Rectangle { implicitWidth:Theme.dp(7); color:Theme.canvas }
-            SwirlGlassPanel {
-                SplitView.preferredWidth:Theme.dp(240); SplitView.minimumWidth:Theme.dp(175)
-                ColumnLayout {
-                    anchors.fill:parent; anchors.margins:Theme.dp(14); spacing:Theme.dp(12)
-                    Text { text:"脚本库"; color:Theme.text; font.pixelSize:Theme.fontSize(15); font.weight:Font.DemiBold }
-                    SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:"搜索脚本" }
-                    ListView {
-                    add: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";from:0;to:1;duration:SwirlMotion.duration} }
-                    remove: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.duration} }
-                    move: Transition {enabled:!SwirlMotion.reduced;SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration}}
-                    displaced: Transition { enabled:!SwirlMotion.reduced; SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration} }
-                        Layout.fillWidth:true; Layout.fillHeight:true
-                        clip:true
-                        spacing:Theme.dp(5)
-                        model:page.scripts.filter(function(s){return s.toLowerCase().indexOf(search.text.toLowerCase())>=0})
-                        delegate:Rectangle {
-                            width:ListView.view.width; height:Theme.dp(43); radius:Theme.roundedRadius(width,height)
-                            color:page.selectedScript===modelData?Theme.selected:area.containsMouse?Theme.hover:"transparent"
-                            RowLayout {
-                                anchors.fill:parent; anchors.leftMargin:Theme.dp(10); anchors.rightMargin:Theme.dp(7)
-                                SwirlIcon { name:"code"; size:Theme.dp(16); color:Theme.muted }
-                                Text { text:modelData; color:Theme.text; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true; elide:Text.ElideRight }
-                            }
-                            MouseArea { id:area; anchors.fill:parent; hoverEnabled:true; onClicked:page.selectedScript=modelData }
-                        }
-                    }
-                    SwirlButton { enabled:false; Layout.fillWidth:true; text:"脚本设置"; onClicked:AppState.notice("脚本设置") }
-                }
-            }
-            SwirlGlassPanel {
-                SplitView.fillWidth:true; SplitView.minimumWidth:Theme.dp(300)
-                ColumnLayout {
-                    anchors.fill:parent; anchors.margins:Theme.dp(15); spacing:Theme.dp(11)
-                    RowLayout {
-                        Layout.fillWidth:true
-                        Text { text:page.selectedScript; color:Theme.text; font.pixelSize:Theme.fontSize(14); font.weight:Font.DemiBold; Layout.fillWidth:true; elide:Text.ElideRight }
-                        SwirlStatusBadge { label:"可编辑"; tone:"success" }
-                    }
-                    RowLayout {
-                        Layout.fillWidth:true
-                        SwirlComboBox { model:["响应脚本","请求脚本","定时脚本","网络事件"] }
-                        Item { Layout.fillWidth:true }
-                        SwirlButton { enabled:false; text:"保存预览"; onClicked:AppState.notice("保存脚本") }
-                        SwirlButton { enabled:false;
-                            text:"运行"; primary:true; iconName:"play"
-                            onClicked:AppState.notice("尚未实现")
-                        }
-                    }
-                    Rectangle {
-                        Layout.fillWidth:true; Layout.fillHeight:true
-                        radius:Theme.roundedRadius(width,height)
-                        color:Theme.dark?"#121B29":"#F6F8FC"
-                        border.color:Theme.border
-                        RowLayout {
-                            anchors.fill:parent; anchors.margins:Theme.dp(8); spacing:Theme.dp(0)
-                            Text {
-                                Layout.alignment:Qt.AlignTop
-                                Layout.preferredWidth:Theme.dp(35)
-                                text:"1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12"
-                                color:Theme.muted
-                                font.family:"Cascadia Code"
-                                font.pixelSize:Theme.fontSize(12)
-                                lineHeight:1.35
-                                horizontalAlignment:Text.AlignRight
-                            }
-                            Rectangle { Layout.fillHeight:true; width:Theme.dp(1); color:Theme.border }
-                            ScrollView {
-                                Layout.fillWidth:true; Layout.fillHeight:true
-                                TextArea {
-                                    id:editor
-                                    text:"";readOnly:true
-                                    color:Theme.text
-                                    selectionColor:Theme.accent
-                                    selectedTextColor:"white"
-                                    font.family:"Cascadia Code"
-                                    font.pixelSize:Theme.fontSize(12)
-                                    wrapMode:TextEdit.NoWrap
-                                    tabStopDistance:32
-                                    background:Rectangle { color:"transparent" }
-                                    JavascriptHighlighter { qmlDocument:editor.textDocument }
-                                    selectByMouse:true
-                                }
-                            }
-                        }
-                    }
-                    Text { text:"原生 C++ 语法高亮 · 仅本地编辑"; color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
-                }
-            }
-            SwirlGlassPanel {
-                SplitView.preferredWidth:Theme.dp(270); SplitView.minimumWidth:Theme.dp(200)
-                ColumnLayout {
-                    anchors.fill:parent; anchors.margins:Theme.dp(15); spacing:Theme.dp(12)
-                    Text { text:"执行与调试"; color:Theme.text; font.pixelSize:Theme.fontSize(15); font.weight:Font.DemiBold }
-                    Text { text:"类型     HTTP 响应\n状态     未连接\n上次运行 从未"; color:Theme.muted; lineHeight:1.6; font.pixelSize:Theme.fontSize(12) }
-                    Rectangle { Layout.fillWidth:true; height:Theme.dp(1); color:Theme.border }
-                    Text { text:"控制台"; color:Theme.text; font.pixelSize:Theme.fontSize(13); font.weight:Font.DemiBold }
-                    ScrollView {
-                        Layout.fillWidth:true; Layout.fillHeight:true
-                        TextArea {
-                            readOnly:true
-                            text:page.consoleText
-                            color:Theme.muted
-                            font.pixelSize:Theme.fontSize(11)
-                            font.family:"Cascadia Code"
-                            wrapMode:Text.WrapAnywhere
-                            background:Rectangle { color:Theme.field; radius:Theme.roundedRadius(width,height) }
-                        }
-                    }
-                    SwirlButton { enabled:false; Layout.fillWidth:true; text:"清空控制台"; onClicked:page.consoleText="" }
-                }
-            }
-        }
-    }
-    SwirlDialog {
-        id:newDialog; title:"新建脚本预览"
-        ColumnLayout {
-            width:parent.width; spacing:Theme.dp(12)
-            Text { text:"脚本文件名"; color:Theme.text }
-            SwirlTextField { id:newName; Layout.fillWidth:true; placeholderText:"example.js" }
-            Text { text:newName.text.trim().endsWith(".js")?"仅在当前页面创建，不会保存文件。":"文件名必须以 .js 结尾"; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
-            RowLayout {
-                Layout.alignment:Qt.AlignRight
-                SwirlButton { enabled:false; text:"取消"; onClicked:newDialog.close() }
-                SwirlButton { enabled:false;
-                    primary:true; text:"创建"
-
-                    onClicked:AppState.notice("尚未实现")
-                }
-            }
-        }
-    }
+ id:page;property string selectedId:""
+ readonly property var selected:extensionsProvider.scripts.find(r=>r.id===selectedId)||null
+ function editScript(fresh){scriptEditor.scriptId=fresh?"":selectedId;scriptName.text=fresh?"":selected.name;scriptCode.text=fresh?"function main(input) {\n    console.log('Swirl local script');\n    return input;\n}\n":selected.source;scriptInput.text="{}";scriptEditor.open()}
+ ColumnLayout{anchors.fill:parent;anchors.margins:Theme.dp(24);spacing:Theme.dp(12)
+  Text{text:"脚本";color:Theme.text;font.pixelSize:Theme.fontSize(24);font.weight:Font.DemiBold}
+  Text{text:"本地 JavaScript 脚本在独立进程中执行，输入和结果使用 JSON。";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.WordWrap}
+  SwirlDataTable{objectName:"localScriptTable";Layout.fillWidth:true;Layout.fillHeight:true;fillEmptyRows:true;rows:extensionsProvider.scripts;selectedId:page.selectedId;columns:[{key:"type",label:"类型",w:140},{key:"name",label:"名称",w:260}];onRowSelected:r=>page.selectedId=r.id}
+  Text{text:extensionsProvider.error;color:Theme.orange;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.WordWrap;textFormat:Text.PlainText}
+  RowLayout{Layout.fillWidth:true;spacing:Theme.dp(8)
+   SwirlButton{objectName:"scriptAddButton";text:"+";implicitWidth:Theme.dp(40);enabled:!extensionsProvider.busy;onClicked:page.editScript(true)}
+   SwirlButton{text:"−";implicitWidth:Theme.dp(40);enabled:page.selected!==null&&!extensionsProvider.busy;onClicked:extensionsProvider.removeScript(page.selectedId)}
+   SwirlButton{text:"导入本地脚本…";enabled:!extensionsProvider.busy;onClicked:scriptFile.open()}
+   Item{Layout.fillWidth:true}
+   SwirlButton{text:"Script Editor…";enabled:page.selected!==null&&!extensionsProvider.busy;onClicked:page.editScript(false)}
+  }
+ }
+ FileDialog{id:scriptFile;title:"导入本地 JavaScript";nameFilters:["JavaScript (*.js)"];onAccepted:extensionsProvider.importScript(selectedFile)}
+ SwirlDialog{id:scriptEditor;objectName:"localScriptEditor";title:"Script Editor";width:Math.min(Theme.dp(780),page.width-Theme.dp(24));height:Math.min(Theme.dp(650),page.height-Theme.dp(24));property string scriptId:""
+  ColumnLayout{anchors.fill:parent;spacing:Theme.dp(8)
+   SwirlTextField{id:scriptName;objectName:"localScriptName";Layout.fillWidth:true;placeholderText:"脚本名称";enabled:!extensionsProvider.busy}
+   Text{text:"定义 function main(input)，返回 JSON 可表示的值；可使用 console.log。";color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.WordWrap}
+   ScrollView{Layout.fillWidth:true;Layout.fillHeight:true;clip:true;TextArea{id:scriptCode;objectName:"localScriptSource";textFormat:TextEdit.PlainText;font.family:"Cascadia Code";font.pixelSize:Theme.fontSize(12);selectByMouse:true;readOnly:extensionsProvider.busy;wrapMode:TextEdit.NoWrap;JavascriptHighlighter{qmlDocument:scriptCode.textDocument}}}
+   Text{text:"输入 JSON";color:Theme.text;font.pixelSize:Theme.fontSize(12)}
+   ScrollView{Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(60);clip:true;TextArea{id:scriptInput;objectName:"localScriptInput";textFormat:TextEdit.PlainText;font.family:"Cascadia Code";font.pixelSize:Theme.fontSize(12);selectByMouse:true;readOnly:extensionsProvider.busy}}
+   ScrollView{Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(100);clip:true;TextArea{text:extensionsProvider.error||extensionsProvider.output;textFormat:TextEdit.PlainText;readOnly:true;selectByMouse:true;font.family:"Cascadia Code";font.pixelSize:Theme.fontSize(12)}}
+   RowLayout{Layout.alignment:Qt.AlignRight
+    SwirlButton{text:"关闭";onClicked:scriptEditor.close()}
+    SwirlButton{objectName:"localScriptSave";text:"保存";enabled:!extensionsProvider.busy&&scriptName.text.trim().length>0;onClicked:{if(extensionsProvider.saveScript(scriptEditor.scriptId,scriptName.text,scriptCode.text)){const row=extensionsProvider.scripts.find(r=>r.name===scriptName.text.trim());if(row){scriptEditor.scriptId=row.id;page.selectedId=row.id}}}}
+    SwirlButton{objectName:"localScriptRun";text:extensionsProvider.busy?"执行中…":"Evaluate";primary:true;enabled:!extensionsProvider.busy&&scriptEditor.scriptId.length>0;onClicked:{if(extensionsProvider.saveScript(scriptEditor.scriptId,scriptName.text,scriptCode.text))extensionsProvider.runScript(scriptEditor.scriptId,scriptInput.text)}}
+   }
+  }
+ }
 }

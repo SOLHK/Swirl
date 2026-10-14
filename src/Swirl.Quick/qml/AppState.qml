@@ -1,14 +1,14 @@
 pragma Singleton
 import QtQuick
 QtObject {
-    property string currentPage: "overview"
+    property string currentPage: "activity"
     property bool sidebarCollapsed: false
     readonly property string connectionState: engineController.stateText
-    readonly property bool proxyOn: engineController.apiHealthy && engineController.activeNodeId.length>0
+    readonly property bool proxyOn: engineController.connected
     readonly property bool systemProxyOn: engineController.systemProxy.enabled
-    readonly property bool tunOn: false
+    readonly property bool tunOn: engineController.tunEnabled
     property bool detailOpen: true
-    readonly property string mode: engineController.routingMode==="rule"?"规则":engineController.routingMode==="global"?"全局":"直连"
+    readonly property string mode: engineController.routingMode==="rule"?"规则判定":engineController.routingMode==="global"?"全局代理":"直接连接"
     readonly property string policy: "固定节点"
     readonly property string selectedNode: engineController.selectedNodeName
     readonly property string selectedNodeRegion: "—"
@@ -21,7 +21,7 @@ QtObject {
     property bool empty: false
     property bool autoSwitch: false
     property int historyIndex: 0
-    property var navigationHistory: ["overview"]
+    property var navigationHistory: ["activity"]
     property date sessionNow: new Date()
     property var recentEvents: []
     property real measuredDown: 0
@@ -30,13 +30,10 @@ QtObject {
     property int measurementTick: 0
     readonly property real totalGB: 0
     readonly property var navigationGroups: [
-        {title:"总览",pages:[{id:"requestlogs",title:"活动",icon:"activity"},{id:"overview",title:"总览",icon:"home"}]},
-        {title:"客户端",pages:[{id:"processes",title:"进程",icon:"sliders"},{id:"gateway",title:"设备",icon:"network"}]},
-        {title:"代理",pages:[{id:"proxies",title:"代理节点",icon:"pin"},{id:"policies",title:"策略组",icon:"layers"},{id:"rules",title:"规则",icon:"document"},{id:"subscriptions",title:"订阅管理",icon:"refresh"},{id:"profiles",title:"配置文件",icon:"file"}]},
-        {title:"HTTP",pages:[{id:"capture",title:"抓包",icon:"capture"},{id:"tls",title:"HTTPS 解密",icon:"shield"},{id:"rewrite",title:"重写",icon:"route"}]},
-        {title:"网络",pages:[{id:"dns",title:"DNS",icon:"globe"},{id:"toolbox",title:"网络诊断",icon:"tool"},{id:"connections",title:"连接记录",icon:"clock"}]},
-        {title:"分析与调试",pages:[{id:"inspector",title:"HTTP 检测",icon:"inspect"},{id:"traffic",title:"流量分析",icon:"bars"}]},
-        {title:"通用",pages:[{id:"settings",title:"设置",icon:"settings"},{id:"logs",title:"日志",icon:"document"}]}
+        {title:"",pages:[{id:"activity",title:"活动",icon:"activity"},{id:"overview",title:"概览",icon:"grid"}]},
+        {title:"客户端",pages:[{id:"processes",title:"进程",icon:"terminal"},{id:"gateway",title:"设备",icon:"router"}]},
+        {title:"代理",pages:[{id:"policies",title:"策略",icon:"route"},{id:"rules",title:"规则",icon:"list"}]},
+        {title:"HTTP",pages:[{id:"capture",title:"捕获",icon:"capture"},{id:"tls",title:"解密",icon:"shield"},{id:"rewrite",title:"重写",icon:"edit"}]}
     ]
     readonly property var allPageIds: groups.reduce(function(all,g){return all.concat(g.pages.map(function(p){return p.id}))},[]).concat(["featurehub","external","processes","requestlogs"]).concat(FeatureCatalog.entries.filter(function(f){return f.id.indexOf("feature-")===0}).map(function(f){return f.id}))
     function navigate(id) {
@@ -392,5 +389,5 @@ QtObject {
                 if (groups[i].pages[j].id === id) return groups[i].pages[j]
         return groups[0].pages[0]
     }
-    function notice(label) { toast=label+" · 尚未实现" }
+    function notice(label) { toast=String(label) }
 }

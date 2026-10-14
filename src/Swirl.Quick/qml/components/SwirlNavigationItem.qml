@@ -33,13 +33,13 @@ SwirlMotionButton {
     Component.onCompleted:{selectionReady=true;Qt.callLater(updateSelection)}
     SwirlSpring {id:settleX;target:entry;property:"selectionX";to:0}
     SwirlSpring {id:settleY;target:entry;property:"selectionY";to:0;epsilon:0.1}
-    implicitHeight:Theme.dp(33)
-    implicitWidth: Theme.dp(compact ? 58 : 250)
-    leftPadding:Theme.dp(16); rightPadding:Theme.dp(12)
+    implicitHeight:Theme.sidebarRowHeight
+    implicitWidth: Theme.dp(compact ? 58 : 180)
+    leftPadding:Theme.dp(8); rightPadding:Theme.dp(10)
     topPadding:0; bottomPadding:0
     hoverEnabled: true
     background: Rectangle {
-        radius:Theme.roundedRadius(width,height)
+        radius:Theme.sidebarRowRadius
         color:entry.chosen?(entry.down?Theme.navigationPressed:Theme.navigationSelected):"transparent"
         antialiasing:true
         border.width:Theme.dp(entry.visualFocus?2:0)
@@ -47,12 +47,12 @@ SwirlMotionButton {
         transform:Translate{x:entry.selectionX;y:entry.selectionY}
     }
     contentItem: RowLayout {
-        spacing:Theme.dp(18)
-        SwirlIcon { name: entry.iconName; size:Theme.dp(22); color: Theme.text }
+        spacing:Theme.dp(8)
+        SwirlIcon { name: "nav-"+entry.pageId; size:Theme.dp(16); color: Theme.muted }
         Text {
             visible: !entry.compact; Layout.fillWidth: true
             text: entry.title; color: Theme.text
-            font.pixelSize:Theme.fontSize(17); font.family: Theme.fontFamily
+            font.pixelSize:Theme.fontSize(13); font.family: Theme.fontFamily
             font.weight: Font.Normal
             elide: Text.ElideRight
         }

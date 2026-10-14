@@ -73,7 +73,7 @@ Item {
                     SwirlTextField { Layout.fillWidth:true; placeholderText:"0 8 * * *" }
                     Text { text:"操作"; color:Theme.muted; font.pixelSize:Theme.fontSize(10) }
                     SwirlComboBox { Layout.fillWidth:true; model:["刷新配置","选择代理","记录日志","运行脚本","Notify"] }
-                    Rectangle { Layout.fillWidth:true; height:Theme.dp(1); color:Theme.border }
+                    Rectangle { Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(1); color:Theme.border }
                     RowLayout {
                         Layout.fillWidth:true
                         Text { text:"启用任务"; color:Theme.text; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }

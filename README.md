@@ -6,7 +6,7 @@ Swirl 品牌图标以 SVG 为唯一设计源：浅色为黑色祥云结、灰白
 
 **Swirl** 是面向 Windows 的专业网络工具项目，使用 **C++23 + Qt 6 Quick/QML** 开发统一的桌面界面、HTTP 调试与后续代理管理功能。界面设计借鉴 macOS 应用的简洁布局与细腻材质，运行于 Windows。
 
-> **🧪 当前状态：Swirl 第二阶段测试版（`1.0.0-preview`）。** 仓库当前仅保留 C++23 / Qt 6 代码和构建链；原 WPF/.NET 项目与安装器已退出当前源码树。**当前提供真实本机代理节点功能，尚非正式发布版本。**
+> **当前状态：Swirl 开发预览版（`1.0.0-preview`）。** 保留 C++23 / Qt 6 与 Mihomo，正在按参考截图重绘界面并逐模块接入真实功能。尚非正式发布版本，也未完成全部高级模块。
 
 [![Qt UI 测试构建](https://github.com/SOLHK/Swirl/actions/workflows/build-qt-quick-ui.yml/badge.svg?branch=test)](https://github.com/SOLHK/Swirl/actions/workflows/build-qt-quick-ui.yml) · [测试版安装程序（EXE）](https://github.com/SOLHK/Swirl/releases) · [test 分支](https://github.com/SOLHK/Swirl/tree/test) · [Qt 1.0 验收记录](docs/UI_1_0_VALIDATION.md)
 
@@ -14,13 +14,16 @@ Swirl 品牌图标以 SVG 为唯一设计源：浅色为黑色祥云结、灰白
 
 - C++23 自研 ProxyEngine 抽象、MihomoAdapter、EngineController，独立 Mihomo 生命周期、完整性校验、认证控制 API、Windows Job 进程管理。
 - 手动添加、编辑、删除、DPAPI 保存和选择 SOCKS5、Shadowsocks、Trojan 节点；真实本机代理端口、节点切换和请求测试。
-- 真实 HTTP 会话抓包和 CONNECT 隧道记录；不解密 HTTPS 正文。
+- 真实 HTTP 捕获、CONNECT 隧道、按主机名解密的 HTTPS HTTP/1.1 / HTTP/2；Windows CA 生成和 PKCS #12 导入。
+- Windows 系统代理、Mihomo TUN、局域网认证代理、DNS 与规则/策略组、计费网络进程白名单。
+- URL/Header/Body 重写、静态 Mock 与 TCP 端口转发；本地 JavaScript、配置模块覆盖和配置切换。
+- 自研 DHCP 与 Mihomo TUN 网关转发控制；专用 LAN 端到端实机验证尚待完成。
 - 保留 Qt 界面、主题、圆角、SVG、HDR 和窗口交互；移除演示数据与模拟成功，未实现功能显示空数据并禁用执行。
 - 56 个模块入口和实际本地配置草稿，草稿不代表对应网络服务已经实现。
 
 详见 [第二阶段使用、测试和限制](docs/PHASE2_REAL_NODES.md)、[抓包说明](src/Swirl.Quick/CAPTURE.md)。
 
-订阅导入/更新、系统代理接管、TUN、DNS 分流、HTTPS MITM、重写、脚本和网关尚未实现。本阶段仅验证受控 SOCKS5 真实 HTTP/HTTPS 链路；未使用真实远程 Shadowsocks/Trojan 凭据验证。
+当前支持订阅与节点导入。远程节点的完整互通需要实际凭据。WireGuard 等通过 Mihomo 节点配置提供 Windows 对应路线，尚未验证完整的私有组网互通；不兼容 Surge Ponte 私有协议。自动屏蔽 QUIC、断点编辑、HTTP 脚本挂钩和部分高级工具仍未实现。详见 [捕获边界](src/Swirl.Quick/CAPTURE.md) 与 [本地扩展格式](docs/LOCAL_EXTENSIONS.md)。
 
 ## 下载和构建
 

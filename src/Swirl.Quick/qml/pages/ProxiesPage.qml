@@ -66,7 +66,7 @@ Item {
                             SwirlIcon {name:"globe";size:Theme.dp(45);color:Theme.accent;Layout.alignment:Qt.AlignHCenter}
                             Text {text:page.selected?page.selected.name:"未选择节点";textFormat:Text.PlainText;color:Theme.text;font.pixelSize:Theme.fontSize(19);font.weight:Font.DemiBold;Layout.fillWidth:true;horizontalAlignment:Text.AlignHCenter;wrapMode:Text.Wrap}
                             Text {text:page.selected?page.selected.protocol+" · "+page.selected.address:"—";color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.WrapAnywhere}
-                            Rectangle {Layout.fillWidth:true;height:Theme.dp(1);color:Theme.border}
+                            Rectangle {Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(1);color:Theme.border}
                             Text {objectName:"nodeRequestState";text:engineController.tests.busy?engineController.tests.message:page.tested.time?(page.tested.success?"请求成功":"请求失败")+" · HTTP "+page.tested.http+" · "+(page.tested.latency>=0?page.tested.latency+" ms":"无延迟结果")+(page.tested.error?"\n"+page.tested.error:""):engineController.requestStateText;color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
                             Text {text:"测试 URL";color:Theme.muted}
                             SwirlTextField {id:testUrl;objectName:"nodeTestUrl";Layout.fillWidth:true;text:"https://www.gstatic.com/generate_204";enabled:!engineController.nodeBusy;Accessible.name:"真实请求测试地址"}
@@ -91,6 +91,7 @@ Item {
     }
     SwirlDialog {
         id:addDialog;objectName:"proxyAddDialog";title:page.editingId.length?"编辑代理节点":"添加代理节点"
+        width:Math.min(Theme.dp(890),parent?parent.width-Theme.dp(30):Theme.dp(890));height:Math.min(Theme.dp(713),parent?parent.height-Theme.dp(30):Theme.dp(713))
         onClosed:{nodePassword.text="";nodeUsername.text="";nodeUuid.text="";nodeOptions.text=""}
         ColumnLayout {
             width:parent.width;spacing:Theme.dp(12)

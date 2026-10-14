@@ -1,4 +1,5 @@
 #include "engine/MihomoAdapter.h"
+#include "engine/EngineController.h"
 #include <QCoreApplication>
 #include <QCryptographicHash>
 #include <QJsonDocument>
@@ -63,6 +64,36 @@ class EngineTests : public QObject {
 private slots:
     void initTestCase() { QStandardPaths::setTestModeEnabled(true); }
     void cleanup() { qunsetenv("SWIRL_FIXTURE_MODE"); qunsetenv("SWIRL_FIXTURE_CONTROL"); }
+    void networkPreferencesValidateAndPersist() {
+        QTemporaryDir directory;const auto store=directory.filePath("nodes.dpapi");
+        EngineController controller(std::make_unique<MihomoAdapter>(),nullptr,store);
+        QVERIFY(!controller.configureDns({{"mode",2},{"servers","127.0.0.1\nproxies: []"}}));
+        QVERIFY(!controller.configureDns({{"mode",2},{"servers",""}}));
+        QVERIFY(!controller.configureDns({{"mode",0},{"encrypted","http://insecure.test/dns"}}));
+        QVERIFY(!controller.configureDns({{"mode",0},{"hosts",QVariantList{QVariantMap{{"name","valid.test"},{"value","not-an-ip"}}}}}));
+        const QVariantMap dns{{"mode",2},{"servers","127.0.0.1,::1"},{"encrypted","https://example.test/dns-query"},{"useHosts",false},{"hosts",QVariantList{QVariantMap{{"name","fixture.test"},{"value","127.0.0.1"}}}}};
+        QVERIFY(controller.configureDns(dns));
+        QVERIFY(!controller.configureLan("bad:username","long-enough"));QVERIFY(!controller.configureLan("swirl","short"));
+        QVERIFY(controller.configureLan("swirl","swirl-test-password"));QVERIFY(controller.lanConfigured());
+        QFile networkStore(store+".network.json");QVERIFY(networkStore.open(QIODevice::ReadOnly));QVERIFY(!networkStore.readAll().contains("swirl-test-password"));networkStore.close();
+        QVERIFY(!controller.saveRoutingRule("DOMAIN-SUFFIX","test\nMATCH,REJECT","DIRECT"));
+        QVERIFY(!controller.saveRoutingRule("IP-CIDR","not-a-subnet","DIRECT"));
+        QVERIFY(!controller.saveRoutingRule("DOMAIN","fixture.test","missing-group"));
+        QVERIFY(controller.savePolicyGroup("Local","select",{"DIRECT"}));
+        QVERIFY(!controller.savePolicyGroup("bad,group","select",{"DIRECT"}));
+        QVERIFY(!controller.savePolicyGroup(" group ","select",{"DIRECT"}));
+        QVERIFY(!controller.configureMeteredAllowlist({"chrome.exe),(MATCH,REJECT"}));
+        QVERIFY(controller.configureMeteredAllowlist({"chrome.exe","CHROME.exe","curl.exe"}));
+        QCOMPARE(controller.meteredAllowlist().size(),2);
+        QVERIFY(controller.saveRoutingRule("DOMAIN","fixture.test","Local"));
+        QVERIFY(!controller.removePolicyGroup("Local"));
+        EngineController restored(std::make_unique<MihomoAdapter>(),nullptr,store);
+        QCOMPARE(restored.dnsConfiguration().value("servers").toString(),QStringLiteral("127.0.0.1,::1"));
+        QCOMPARE(restored.dnsConfiguration().value("hosts").toList().size(),1);
+        QCOMPARE(restored.policyGroups().size(),1);
+        QCOMPARE(restored.routingRules().first().toMap().value("policy").toString(),QStringLiteral("Local"));
+        QVERIFY(restored.removeRoutingRule(0));QVERIFY(restored.removePolicyGroup("Local"));
+    }
     void missingAndTampered() {
         MihomoAdapter engine;
         auto config = options(); config.executablePath += ".missing";

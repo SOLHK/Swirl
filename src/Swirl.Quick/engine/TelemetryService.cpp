@@ -59,7 +59,10 @@ void TelemetryService::ingest(const ProxyEngine::Status &status){
   auto day=m_days.value(date).toObject();day["sampled"]=true;
   // Session counters are owned by this process. A reset starts a new baseline.
   const auto up=qMax<qint64>(0,status.uploadTotal),down=qMax<qint64>(0,status.downloadTotal);
+  const auto totalDelta=(up>=m_lastUp?up-m_lastUp:up)+(down>=m_lastDown?down-m_lastDown:down);
   add(day,"up",up>=m_lastUp?up-m_lastUp:up);add(day,"down",down>=m_lastDown?down-m_lastDown:down);m_lastUp=up;m_lastDown=down;
+  const auto time=QDateTime::fromMSecsSinceEpoch(status.connectionsAt).time();const auto bucketKey=QString::number(time.hour()*2+time.minute()/30);
+  auto buckets=day.value("buckets").toObject(),bucket=buckets.value(bucketKey).toObject();bucket["sampled"]=true;add(bucket,"total",totalDelta);
   QSet<QString> active;
   for(const auto &value:status.connections){
    auto row=value.toMap();const auto id=row.value("id").toString();if(id.isEmpty()||active.contains(id))continue;active.insert(id);
@@ -69,14 +72,19 @@ void TelemetryService::ingest(const ProxyEngine::Status &status){
    const bool count=old.value("accountedDay").toString()!=date;
    aggregate(day,"apps",row.value("process","未知进程").toString(),du,dd,count);
    aggregate(day,"domains",row.value("host",row.value("ip")).toString(),du,dd,count);
+   if(!row.value("sourceIp").toString().isEmpty())aggregate(day,"devices",row.value("sourceIp").toString(),du,dd,count);
    aggregate(day,"nodes",row.value("policy").toString(),du,dd,count);
    aggregate(day,"categories",row.value("category","other").toString(),du,dd,count);
+   if(row.value("category")=="proxy")add(bucket,"proxy",du+dd);
+   const auto interval=status.connectionsAt-old.value("lastSeen").toLongLong();
+   row["uploadRate"]=!old.isEmpty()&&interval>0?double(du)*1000/interval:0;row["downloadRate"]=!old.isEmpty()&&interval>0?double(dd)*1000/interval:0;
    row["accountedDay"]=date;row["lastSeen"]=status.connectionsAt;row["status"]="活动";
    row["up"]=formatBytes(u);row["down"]=formatBytes(d);row["time"]=QDateTime::fromString(row.value("time").toString(),Qt::ISODateWithMs).toLocalTime().toString("MM-dd HH:mm:ss");
    m_seen[id]=row;
   }
   for(auto it=m_seen.begin();it!=m_seen.end();++it)if(!active.contains(it.key()))(*it)["status"]="已结束";
   while(m_seen.size()>2000){auto oldest=m_seen.end();for(auto it=m_seen.begin();it!=m_seen.end();++it)if(!active.contains(it.key())&&(oldest==m_seen.end()||it->value("lastSeen").toLongLong()<oldest->value("lastSeen").toLongLong()))oldest=it;if(oldest==m_seen.end())break;m_seen.erase(oldest);}
+  buckets[bucketKey]=bucket;day["buckets"]=buckets;
   m_days[date]=day;const auto oldest=QDate::currentDate().addDays(-31).toString(Qt::ISODate);for(const auto &key:m_days.keys())if(key<oldest)m_days.remove(key);while(m_days.size()>32)m_days.remove(m_days.keys().first());m_dirty=true;
  }
  if(status.trafficAt>m_lastTraffic){m_lastTraffic=status.trafficAt;m_history.append(QVariantMap{{"time",status.trafficAt},{"down",status.downloadRate},{"up",status.uploadRate}});while(m_history.size()>3600)m_history.removeFirst();m_dirty=true;}
@@ -84,16 +92,21 @@ void TelemetryService::ingest(const ProxyEngine::Status &status){
 }
 QVariantList TelemetryService::connections() const {QVariantList rows;for(const auto &r:m_seen)rows.append(r);std::sort(rows.begin(),rows.end(),[](const QVariant &a,const QVariant &b){return a.toMap().value("lastSeen").toLongLong()>b.toMap().value("lastSeen").toLongLong();});return rows;}
 QJsonObject TelemetryService::periodData(int period) const {
- QJsonObject out;const auto today=QDate::currentDate();const auto start=period==1?today.addDays(-1):period==2?today.addDays(1-today.dayOfWeek()):today;
+ QJsonObject out;const auto today=QDate::currentDate();const auto start=period==1?today.addDays(-1):period==2?today.addDays(1-today.dayOfWeek()):period==3?QDate(today.year(),today.month(),1):today;
  const auto end=period==1?today.addDays(-1):today;
  for(const auto &key:m_days.keys()){const auto date=QDate::fromString(key,Qt::ISODate);if(date<start||date>end)continue;const auto d=m_days.value(key).toObject();if(d.value("sampled").toBool())out["sampled"]=true;add(out,"up",d.value("up").toDouble());add(out,"down",d.value("down").toDouble());
-  for(const auto &kind:{"apps","domains","nodes","categories"}){auto group=out.value(kind).toObject();const auto entries=d.value(kind).toObject();for(const auto &name:entries.keys()){auto sum=group.value(name).toObject();const auto row=entries.value(name).toObject();for(const auto &field:{"up","down","count"})add(sum,field,row.value(field).toDouble());group[name]=sum;}out[kind]=group;}
+  for(const auto &kind:{"apps","domains","nodes","devices","categories"}){auto group=out.value(kind).toObject();const auto entries=d.value(kind).toObject();for(const auto &name:entries.keys()){auto sum=group.value(name).toObject();const auto row=entries.value(name).toObject();for(const auto &field:{"up","down","count"})add(sum,field,row.value(field).toDouble());group[name]=sum;}out[kind]=group;}
  }return out;
 }
 QVariantMap TelemetryService::summary(int period) const {auto d=periodData(period);return {{"sampled",d.value("sampled").toBool()},{"up",d.value("up").toDouble()},{"down",d.value("down").toDouble()},{"total",d.value("up").toDouble()+d.value("down").toDouble()},{"domains",d.value("domains").toObject().size()},{"apps",d.value("apps").toObject().size()}};}
 QVariantList TelemetryService::ranking(const QString &kind,int period,int limit) const {
- if(kind!="apps"&&kind!="domains"&&kind!="nodes")return {};const auto data=periodData(period),entries=data.value(kind).toObject();QVariantList result;const auto total=data.value("up").toDouble()+data.value("down").toDouble();
+ if(kind!="apps"&&kind!="domains"&&kind!="nodes"&&kind!="devices")return {};const auto data=periodData(period),entries=data.value(kind).toObject();QVariantList result;const auto total=data.value("up").toDouble()+data.value("down").toDouble();
  for(const auto &name:entries.keys()){const auto r=entries.value(name).toObject();const auto up=r.value("up").toDouble(),down=r.value("down").toDouble();result.append(QVariantMap{{"id",name},{"name",name},{"upload",formatBytes(up)},{"download",formatBytes(down)},{"value",formatBytes(up+down)},{"total",up+down},{"connections",r.value("count").toDouble()},{"percent",total>0?QString::number(100*(up+down)/total,'f',1)+"%":"0%"},{"mark",name.left(1)},{"color","#596273"}});}
+ for(auto &entry:result){auto row=entry.toMap();double speed=0;
+  if(connectionsSampled())for(const auto &value:m_seen){if(value.value("status")!="活动")continue;
+   const auto key=kind=="apps"?value.value("process"):kind=="domains"?value.value("host",value.value("ip")):kind=="devices"?value.value("sourceIp"):value.value("policy");
+   if(key.toString()==row.value("name").toString())speed+=value.value("uploadRate").toDouble()+value.value("downloadRate").toDouble();}
+  row["speed"]=speed;row["speedText"]=formatBytes(speed)+"/s";entry=row;}
  std::sort(result.begin(),result.end(),[](const QVariant &a,const QVariant &b){return a.toMap().value("total").toDouble()>b.toMap().value("total").toDouble();});while(result.size()>qBound(1,limit,512))result.removeLast();return result;
 }
 QVariantList TelemetryService::distribution(int period) const {
@@ -104,6 +117,10 @@ QVariantList TelemetryService::distribution(int period) const {
 }
 QVariantList TelemetryService::history(const QString &series,int seconds,bool normalized) const {QVariantList out;double maximum=1;const auto cutoff=nowMs()-qBound(60,seconds,86400)*1000LL;for(const auto &v:m_history){const auto r=v.toMap();if(r.value("time").toLongLong()<cutoff)continue;const auto value=series=="total"?r.value("up").toDouble()+r.value("down").toDouble():r.value(series).toDouble();out.append(value);maximum=qMax(maximum,value);}if(normalized)for(auto &v:out)v=v.toDouble()/maximum;return out;}
 QVariantList TelemetryService::historyPoints(const QString &series,int seconds) const {QVariantList out;const auto cutoff=nowMs()-qBound(60,seconds,86400)*1000LL;for(const auto &v:m_history){const auto row=v.toMap();if(row.value("time").toLongLong()<cutoff)continue;const auto value=series=="total"?row.value("up").toDouble()+row.value("down").toDouble():row.value(series).toDouble();out.append(QVariantMap{{"time",row.value("time")},{"value",value}});}return out;}
+QVariantList TelemetryService::dailyTraffic(bool proxyOnly) const {
+ const auto date=QDate::currentDate();const auto buckets=m_days.value(date.toString(Qt::ISODate)).toObject().value("buckets").toObject();QVariantList rows;
+ for(int i=0;i<48;++i){const auto bucket=buckets.value(QString::number(i)).toObject();rows.append(QVariantMap{{"time",QDateTime(date,QTime(i/2,(i%2)*30)).toMSecsSinceEpoch()},{"sampled",bucket.value("sampled").toBool()},{"value",bucket.value(proxyOnly?"proxy":"total").toDouble()}});}return rows;
+}
 void TelemetryService::load(){QFile file(m_path);if(!file.exists())return;if(!file.open(QIODevice::ReadOnly)||file.size()>16*1024*1024){m_storageError="监控历史无法读取或超过大小限制";return;}QJsonParseError e;const auto doc=QJsonDocument::fromJson(file.readAll(),&e);if(e.error!=QJsonParseError::NoError||doc.object().value("schema").toInt()!=1){m_storageError="监控历史格式无效";return;}m_days=doc.object().value("days").toObject();m_history=doc.object().value("history").toArray().toVariantList();while(m_history.size()>3600)m_history.removeFirst();}
 void TelemetryService::flush(){if(!m_dirty)return;QDir().mkpath(QFileInfo(m_path).absolutePath());QSaveFile file(m_path);const auto bytes=QJsonDocument(QJsonObject{{"schema",1},{"days",m_days},{"history",QJsonArray::fromVariantList(m_history)}}).toJson(QJsonDocument::Compact);if(!file.open(QIODevice::WriteOnly)||file.write(bytes)!=bytes.size()||!file.commit()){m_storageError="监控历史保存失败";emit diagnostic("Telemetry","StorageWrite",m_storageError);publish();return;}m_dirty=false;}
 void TelemetryService::measureHttp(const QString &key,const QUrl &url,bool throughProxy,bool ip){

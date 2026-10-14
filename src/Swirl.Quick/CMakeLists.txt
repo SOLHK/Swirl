@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(Swirl VERSION 1.0 LANGUAGES CXX)
+project(Swirl VERSION 1.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
@@ -8,6 +8,10 @@ option(SWIRL_BUILD_UI_TESTS "Build the Qt input-driven overview checks" OFF)
 find_package(Qt6 6.8 REQUIRED COMPONENTS Quick Qml QuickControls2 Network Svg GuiPrivate ShaderTools)
 qt_standard_project_setup(REQUIRES 6.8)
 qt_policy(SET QTP0004 NEW)
+add_subdirectory(third_party)
+add_executable(SwirlScriptRunner tools/ScriptRunner.cpp)
+target_link_libraries(SwirlScriptRunner PRIVATE Qt6::Core Qt6::Qml)
+target_compile_definitions(SwirlScriptRunner PRIVATE NOMINMAX)
 qt_add_executable(Swirl WIN32 main.cpp app/SystemDataProvider.cpp app/SystemDataProvider.h app/WindowsBackdrop.cpp app/WindowsBackdrop.h network/CaptureService.cpp network/CaptureService.h app/ModuleDraftStore.cpp app/ModuleDraftStore.h)
 add_library(SwirlEngine STATIC
  app/DiagnosticService.h app/DiagnosticService.cpp
@@ -21,21 +25,37 @@ target_sources(SwirlEngine PRIVATE engine/ProxyNode.h engine/ProxyNode.cpp engin
 target_sources(SwirlEngine PRIVATE engine/NodeImporter.h engine/NodeImporter.cpp)
 target_sources(SwirlEngine PRIVATE engine/NodeImportService.h engine/NodeImportService.cpp)
 target_link_libraries(SwirlEngine PUBLIC Qt6::Core Qt6::Network Qt6::Gui)
+add_library(SwirlExtensions STATIC app/ExtensionService.h app/ExtensionService.cpp)
+target_link_libraries(SwirlExtensions PUBLIC SwirlEngine Qt6::Core Qt6::Qml)
+target_include_directories(SwirlExtensions PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(SwirlEngine PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 if(WIN32)
  target_compile_definitions(SwirlEngine PUBLIC NOMINMAX)
  target_link_libraries(SwirlEngine PRIVATE advapi32 ws2_32 iphlpapi crypt32 wininet)
+ add_executable(SwirlGatewayGuard WIN32 tools/GatewayGuard.cpp network/GatewayRouting.cpp)
+ target_include_directories(SwirlGatewayGuard PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+ target_link_libraries(SwirlGatewayGuard PRIVATE Qt6::Core Qt6::Network)
+ add_dependencies(Swirl SwirlGatewayGuard)
  add_executable(SwirlProxyGuard tools/ProxyGuard.cpp)
  target_link_libraries(SwirlProxyGuard PRIVATE SwirlEngine ole32 propsys shell32 shlwapi uuid)
  add_dependencies(Swirl SwirlProxyGuard)
 endif()
 if(MSVC)
  target_compile_options(SwirlEngine PRIVATE /utf-8)
+ target_compile_options(SwirlExtensions PRIVATE /utf-8)
+ target_compile_options(SwirlScriptRunner PRIVATE /utf-8)
+ if(TARGET SwirlGatewayGuard)
+  target_compile_options(SwirlGatewayGuard PRIVATE /utf-8)
+ endif()
 endif()
-target_link_libraries(Swirl PRIVATE SwirlEngine)
+target_sources(Swirl PRIVATE network/GatewayService.h network/GatewayService.cpp network/GatewayRouting.h network/GatewayRouting.cpp network/DhcpServer.h network/DhcpServer.cpp network/Http2Session.h network/Http2Session.cpp network/TlsCertificateService.h network/TlsCertificateService.cpp)
+target_link_libraries(Swirl PRIVATE SwirlEngine SwirlHttp2 SwirlExtensions)
+add_dependencies(Swirl SwirlScriptRunner)
 qt_add_resources(Swirl engine_manifest PREFIX "/engine" BASE "${CMAKE_CURRENT_SOURCE_DIR}/packaging"
  FILES packaging/mihomo-manifest.json)
 set(SWIRL_QML_FILES
+ qml/controls/RewriteRulesDialog.qml
+ qml/components/ReferenceSection.qml qml/components/ReferenceOutline.qml qml/components/ReferenceCheckBox.qml qml/pages/CaptureInspectorPage.qml
  qml/controls/SwirlStatusCapsule.qml qml/controls/SwirlScrollBar.qml qml/pages/ProcessesPage.qml
  qml/Main.qml qml/Theme.qml qml/AppState.qml qml/FeatureCatalog.qml qml/SwirlMotion.qml
  qml/controls/SwirlPressMotion.qml qml/controls/SwirlAnimatedModel.qml qml/controls/SwirlMotionButton.qml qml/controls/SwirlSpring.qml qml/controls/SwirlPageHost.qml
@@ -53,7 +73,7 @@ set(SWIRL_QML_FILES
  qml/pages/ProxiesPage.qml qml/pages/InspectorPage.qml
  qml/pages/ScriptsPage.qml qml/pages/SettingsPage.qml
  qml/pages/WorkbenchPage.qml qml/pages/ToolboxPage.qml
- qml/pages/DashboardPage.qml qml/pages/DNSPage.qml
+ qml/pages/ActivityPage.qml qml/pages/DNSPage.qml
  qml/pages/RulesPage.qml qml/pages/LogsPage.qml
  qml/pages/TLSPage.qml qml/pages/ReplayPage.qml qml/pages/RewritePage.qml
  qml/pages/ProfilesPage.qml qml/pages/SubscriptionsPage.qml qml/pages/PolicyGroupsPage.qml
@@ -75,7 +95,7 @@ qt_add_qml_module(Swirl
     SOURCES app/JavascriptHighlighter.h app/JavascriptHighlighter.cpp
 )
 set(SWIRL_ASSET_PATH "${CMAKE_CURRENT_SOURCE_DIR}/assets")
-file(GLOB SWIRL_UI_ICONS CONFIGURE_DEPENDS "${SWIRL_ASSET_PATH}/icons/ui/*.svg")
+file(GLOB SWIRL_UI_ICONS CONFIGURE_DEPENDS "${SWIRL_ASSET_PATH}/icons/ui/*.svg" "${SWIRL_ASSET_PATH}/icons/ui/reference-*.png")
 qt_add_resources(Swirl ui_icons PREFIX "/swirl" BASE "${SWIRL_ASSET_PATH}" FILES ${SWIRL_UI_ICONS})
 qt_add_resources(Swirl brand PREFIX "/swirl" BASE "${SWIRL_ASSET_PATH}" FILES
     "${SWIRL_ASSET_PATH}/icons/swirl_knot_light.svg"
@@ -95,11 +115,20 @@ if(MSVC)
 endif()
 if(SWIRL_BUILD_UI_TESTS)
  find_package(Qt6 REQUIRED COMPONENTS Test)
- target_sources(Swirl PRIVATE tests/HdrChecks.cpp tests/HdrChecks.h tests/OverviewChecks.cpp tests/OverviewChecks.h tests/CaptureChecks.cpp tests/CaptureChecks.h tests/WindowChecks.cpp tests/WindowChecks.h)
+ target_sources(Swirl PRIVATE tests/GatewayChecks.cpp tests/GatewayChecks.h tests/HdrChecks.cpp tests/HdrChecks.h tests/OverviewChecks.cpp tests/OverviewChecks.h tests/CaptureChecks.cpp tests/CaptureChecks.h tests/WindowChecks.cpp tests/WindowChecks.h)
  target_sources(Swirl PRIVATE tests/RuntimeEvidence.cpp tests/RuntimeEvidence.h)
  target_link_libraries(Swirl PRIVATE Qt6::Test)
  target_compile_definitions(Swirl PRIVATE SWIRL_UI_TESTS)
  enable_testing()
+ add_executable(SwirlExtensionTests tests/ExtensionTests.cpp)
+ if(MSVC)
+  target_compile_options(SwirlExtensionTests PRIVATE /utf-8)
+ endif()
+ target_link_libraries(SwirlExtensionTests PRIVATE SwirlExtensions Qt6::Test)
+ add_dependencies(SwirlExtensionTests SwirlScriptRunner)
+ qt_add_resources(SwirlExtensionTests extension_engine_manifest PREFIX "/engine" BASE "${CMAKE_CURRENT_SOURCE_DIR}/packaging" FILES packaging/mihomo-manifest.json)
+ add_test(NAME swirl-local-extensions COMMAND SwirlExtensionTests)
+ set_tests_properties(swirl-local-extensions PROPERTIES TIMEOUT 60)
  add_executable(SwirlTelemetryTests tests/TelemetryTests.cpp)
  target_link_libraries(SwirlTelemetryTests PRIVATE SwirlEngine Qt6::Test)
  if(MSVC)
@@ -170,6 +199,13 @@ if(SWIRL_BUILD_UI_TESTS)
  add_test(NAME swirl-motion COMMAND Swirl --motion-test --motion-output=motion-report.json)
  set_tests_properties(swirl-motion PROPERTIES TIMEOUT 120
   ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QPA_FONTDIR=${SWIRL_TEST_FONT_DIRECTORY}")
+ if(WIN32)
+  # Popup.Window has native grabs and activation; the offscreen plugin cannot
+  # exercise its opening/closing behavior. Keep this check on Windows QPA.
+  set_tests_properties(swirl-motion PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=windows;QT_QUICK_BACKEND=software")
+ endif()
+ add_test(NAME swirl-gateway-network COMMAND Swirl --gateway-self-test)
+ set_tests_properties(swirl-gateway-network PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QPA_FONTDIR=${SWIRL_TEST_FONT_DIRECTORY}" TIMEOUT 60)
  add_test(NAME swirl-capture-network COMMAND Swirl --capture-self-test)
  set_tests_properties(swirl-overview-input swirl-all-pages swirl-capture-network PROPERTIES
   ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QPA_FONTDIR=${SWIRL_TEST_FONT_DIRECTORY}" TIMEOUT 60)

@@ -3,8 +3,8 @@ import QtQuick.Controls
 import SwirlQuick
 TextField {
     id: control
-    implicitHeight:Theme.dp(39)
-    leftPadding:Theme.dp(15); rightPadding:Theme.dp(15)
+    implicitHeight:Theme.dp(26)
+    leftPadding:Theme.dp(8); rightPadding:Theme.dp(8)
     color: Theme.text
     selectionColor: Theme.accent
     selectedTextColor: "white"
@@ -14,9 +14,9 @@ TextField {
     background: Rectangle {
         radius: Theme.controlRadius
         antialiasing: true
-        color: control.activeFocus ? Theme.hover : Theme.material("field")
-        border.width: Theme.dp(control.activeFocus ? 1.5 : 1)
-        border.color: control.activeFocus ? Theme.focusBorder : Theme.controlBorder
+        color:Theme.dark?Theme.field:Theme.surface
+        border.width: Theme.dp(control.activeFocus ? 3 : 1)
+        border.color: control.activeFocus ? (Theme.dark?Theme.focusBorder:"#80ABFF") : Theme.controlBorder
         Behavior on color { ColorAnimation { duration: Theme.motion } }
         Behavior on border.color { ColorAnimation { duration: Theme.motion } }
     }

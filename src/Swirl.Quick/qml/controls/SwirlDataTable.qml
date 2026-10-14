@@ -10,13 +10,21 @@ Item {
     property int itemHeight:Theme.dp(43)
     property int textPixelSize:12
     property int headerPixelSize:11
+    property real headerHeight:Theme.dp(26)
+    property real emptyStripeHeight:itemHeight
+    property bool fillEmptyRows:false
+    property bool gridLines:false
+    property real cellPadding:Theme.dp(12)
+    property real stripeInset:0
+    property real stripeRadius:0
     readonly property real totalWidth:columns.reduce(function(v,c){return v+Theme.dp(c.w)},0)
-    function columnWidth(column) { return Math.max(Theme.dp(48),width*Theme.dp(column.w)/totalWidth) }
+    function columnWidth(column) { return Math.max(Theme.dp(12),width*Theme.dp(column.w)/totalWidth) }
     signal rowSelected(var record)
     clip:true
     layer.enabled:Theme.effectsSupported
     layer.effect:MultiEffect { maskEnabled:true; maskSource:cornerMask }
-    Rectangle { id:cornerMask; anchors.fill:parent; radius:Theme.containerRadius; layer.enabled:true; visible:false; color:"white" }
+    Rectangle { id:cornerMask; anchors.fill:parent; radius:Theme.tableRadius; layer.enabled:true; visible:false; color:"white" }
+    Rectangle { anchors.fill:parent; radius:Theme.tableRadius; color:"transparent"; border.width:Theme.borderWidth; border.color:Theme.border; z:10 }
     Flickable {
         id:horizontal
         anchors.fill:parent
@@ -28,23 +36,24 @@ Item {
             width:horizontal.contentWidth
             spacing:Theme.dp(0)
             Rectangle {
-                width:parent.width; height:Theme.dp(39)
-                color:Theme.material("secondary")
-                radius: Theme.roundedRadius(width,height)
+                width:parent.width; height:table.headerHeight
+                color:Theme.surface
+                radius: 0
                 Row {
                     anchors.fill:parent
                     Repeater {
                         model:table.columns
                         delegate:Item {
-                            width:table.columnWidth(modelData); height:Theme.dp(39)
+                            width:table.columnWidth(modelData); height:table.headerHeight
+                            Rectangle{visible:index>0;x:0;y:Theme.dp(5);width:Theme.dp(1);height:parent.height-Theme.dp(10);color:Theme.border}
                             Text {
                                 text:AppState.zh(modelData.label)
-                                color:Theme.muted
+                                color:Theme.text
                                 font.pixelSize:Theme.fontSize(table.headerPixelSize)
                                 font.family:Theme.fontFamily
-                                font.weight:Font.DemiBold
+                                font.weight:Font.Normal
                                 anchors.fill:parent
-                                anchors.leftMargin:Theme.dp(12)
+                                anchors.leftMargin:table.cellPadding
                                 verticalAlignment:Text.AlignVCenter
                                 elide:Text.ElideRight
                             }
@@ -58,20 +67,24 @@ Item {
                     move: Transition {enabled:!SwirlMotion.reduced;SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration}}
                     displaced: Transition { enabled:!SwirlMotion.reduced; SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration} }
                 id:list
+                Repeater {model:table.fillEmptyRows?Math.max(0,Math.ceil((list.height-table.rows.length*table.itemHeight)/table.emptyStripeHeight)):0
+                    Rectangle{required property int index;x:table.stripeInset;y:table.rows.length*table.itemHeight+index*table.emptyStripeHeight;width:list.width-2*table.stripeInset;height:table.emptyStripeHeight;radius:table.stripeRadius;color:(index+table.rows.length)%2?Theme.field:Theme.surface;z:-1}
+                }
                 width:parent.width
-                height:Math.floor(Math.max(0,horizontal.height-Theme.dp(39))/table.itemHeight)*table.itemHeight
+                height:Math.floor(Math.max(0,horizontal.height-table.headerHeight)/table.itemHeight)*table.itemHeight
                 clip:true
                 model:table.rows
                 boundsBehavior:Flickable.StopAtBounds
                 ScrollBar.vertical:ScrollBar {}
                 delegate:Rectangle {
                     id:recordRow
+                    z:1
                     width:list.width; height:table.itemHeight
                     property var record:modelData
                     color:table.selectedId===String(record.id||record.name) ? Theme.selected :
-                          mouse.containsMouse ? Theme.hover : (index%2?Theme.material("secondary"):Theme.material("content"))
+                          mouse.containsMouse ? Theme.hover : (index%2?Theme.field:Theme.surface)
                     Behavior on color { ColorAnimation { duration:Theme.motion } }
-                    Rectangle { anchors.bottom:parent.bottom; width:parent.width; height:Theme.dp(1); color:Theme.border; opacity:0.6 }
+                    Rectangle { anchors.bottom:parent.bottom; width:parent.width; height:Theme.dp(1); color:Theme.border; opacity:table.fillEmptyRows?0:0.6 }
                     Row {
                         anchors.fill:parent
                         Repeater {
@@ -80,8 +93,8 @@ Item {
                                 width:table.columnWidth(modelData); height:table.itemHeight
                                 Text {
                                     anchors.fill:parent
-                                    anchors.leftMargin:Theme.dp(12); anchors.rightMargin:Theme.dp(8)
-                                    text:AppState.zh(String(recordRow.record[modelData.key]===undefined?"":recordRow.record[modelData.key]))
+                                    anchors.leftMargin:table.cellPadding; anchors.rightMargin:Theme.dp(8)
+                                    text:String(recordRow.record[modelData.key]===undefined?"":recordRow.record[modelData.key])
                                     textFormat:Text.PlainText
                                     color:Theme.text
                                     font.pixelSize:Theme.fontSize(table.textPixelSize)
@@ -109,6 +122,9 @@ Item {
                     }
                 }
             }
+        }
+        Item {visible:table.gridLines;y:table.headerHeight;width:horizontal.contentWidth;height:horizontal.height-table.headerHeight;z:3
+            Row{anchors.fill:parent;Repeater{model:table.columns;Item{width:table.columnWidth(modelData);height:parent.height;Rectangle{visible:index>0;width:Theme.dp(1);height:parent.height;color:Theme.border}}}}
         }
     }
 }

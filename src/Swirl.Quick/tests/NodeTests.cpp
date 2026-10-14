@@ -3,6 +3,7 @@
 #include "engine/TelemetryService.h"
 #include "engine/NodeStore.h"
 #include "engine/NodeImporter.h"
+#include "engine/NodeImportService.h"
 #include "ControlledNetwork.h"
 #include <QCoreApplication>
 #include <QJsonDocument>
@@ -14,6 +15,8 @@
 #include <QTemporaryDir>
 #include <QTest>
 #include <QUuid>
+#include <QJsonArray>
+#include <QSaveFile>
 
 static quint16 freePort(){QTcpServer server;server.listen(QHostAddress::LocalHost,0);return server.serverPort();}
 static ProxyNode node(QString name,quint16 port){ProxyNode n;n.id=QUuid::createUuid().toString(QUuid::WithoutBraces);n.name=name;n.protocol="socks5";n.host="127.0.0.1";n.port=port;return n;}
@@ -36,6 +39,97 @@ class NodeTests:public QObject {
         return body;
     }
 private slots:
+    void userAuthorizedLiveSubscription() {
+        const auto subscription=qEnvironmentVariable("SWIRL_LIVE_SUBSCRIPTION_URL");
+        if(subscription.isEmpty())QSKIP("Requires an explicitly user-authorized subscription supplied in the environment");
+        QTemporaryDir privateData;QVERIFY(privateData.isValid());NodeStore store(privateData.filePath("nodes.dpapi"));NodeImportService importer(&store);
+        QVERIFY(importer.saveSubscription({},"User authorized test",QUrl(subscription),360,false));
+        const auto source=store.subscriptions().first().id;importer.refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!importer.busy(),35000);
+        bool usedProxy=false;
+        if(store.nodes().isEmpty()&&qEnvironmentVariableIntValue("SWIRL_LIVE_DOWNLOAD_PROXY_PORT")>0){usedProxy=true;importer.setDownloadProxy(qEnvironmentVariableIntValue("SWIRL_LIVE_DOWNLOAD_PROXY_PORT"));importer.refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!importer.busy(),35000);}
+        QVERIFY2(!store.nodes().isEmpty(),qPrintable(importer.message()));
+        NodeStore reloaded(privateData.filePath("nodes.dpapi"));QCOMPARE(reloaded.nodes().size(),store.nodes().size());
+        QFile encrypted(store.filePath());QVERIFY(encrypted.open(QIODevice::ReadOnly));QVERIFY(!encrypted.readAll().contains(subscription.toUtf8()));encrypted.close();
+        auto config=options();config.nodes=store.nodes();QStringList ids;QHash<QString,int> protocolCounts;
+        // Bound account traffic while sampling multiple protocols/regions.
+        const int requested=qEnvironmentVariableIntValue("SWIRL_LIVE_TEST_LIMIT");const int limit=requested>0?qBound(1,requested,60):12;
+        for(const auto &node:config.nodes){++protocolCounts[node.protocol];if(ids.size()<limit)ids.append(node.id);}
+        NodeTestService probes;probes.start(config,ids,QUrl("https://www.gstatic.com/generate_204"));QTRY_VERIFY_WITH_TIMEOUT(!probes.busy(),((ids.size()+2)/3)*45000+5000);
+        QJsonArray rows;QStringList available;
+        for(int i=0;i<ids.size();++i){const auto result=probes.result(ids[i]);QString protocol;for(const auto &node:config.nodes)if(node.id==ids[i])protocol=node.protocol;
+            rows.append(QJsonObject{{"node",QString("node-%1").arg(i+1,3,10,QChar('0'))},{"protocol",protocol},{"success",result.value("success").toBool()},{"latencyMs",result.value("latency").toInt()},{"httpStatus",result.value("http").toInt()}});
+            if(result.value("success").toBool())available.append(ids[i]);}
+        std::sort(available.begin(),available.end(),[&](const auto &a,const auto &b){return probes.result(a).value("latency").toInt()<probes.result(b).value("latency").toInt();});
+        QJsonArray transfers;int passed=0;
+        for(const auto &id:available.mid(0,3)){
+            config.selectedNodeId=id;config.controlPort=freePort();config.proxyPort=freePort();MihomoAdapter engine;engine.start(config);QTRY_VERIFY_WITH_TIMEOUT(engine.status().apiHealthy,20000);
+            QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",config.proxyPort));
+            for(const auto &url:{QUrl("http://www.msftconnecttest.com/connecttest.txt"),QUrl("https://www.gstatic.com/generate_204")}){
+                QNetworkRequest request(url);request.setTransferTimeout(15000);request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,QNetworkRequest::ManualRedirectPolicy);auto *reply=client.get(request);QTRY_VERIFY_WITH_TIMEOUT(reply->isFinished(),18000);
+                const int status=reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();const bool ok=reply->error()==QNetworkReply::NoError&&status>=200&&status<300;if(ok)++passed;
+                transfers.append(QJsonObject{{"node",QString("node-%1").arg(ids.indexOf(id)+1,3,10,QChar('0'))},{"scheme",url.scheme()},{"success",ok},{"httpStatus",status},{"networkError",int(reply->error())},{"bodyBytes",reply->readAll().size()}});reply->deleteLater();
+            }engine.stop();QTRY_VERIFY_WITH_TIMEOUT(!engine.status().processAlive,4000);
+        }
+        QJsonObject protocols;for(auto i=protocolCounts.cbegin();i!=protocolCounts.cend();++i)protocols[i.key()]=i.value();
+        const QJsonObject report{{"importedNodes",config.nodes.size()},{"protocolCounts",protocols},{"downloadUsedExistingLocalProxy",usedProxy},{"sampledNodes",ids.size()},{"successfulProbes",available.size()},{"probes",rows},{"transfers",transfers}};
+        const auto output=qEnvironmentVariable("SWIRL_LIVE_REPORT");if(!output.isEmpty()){QSaveFile file(output);QVERIFY(file.open(QIODevice::WriteOnly));file.write(QJsonDocument(report).toJson());QVERIFY(file.commit());}
+        qInfo()<<"LIVE_SUBSCRIPTION imported="<<config.nodes.size()<<"sampled="<<ids.size()<<"available="<<available.size()<<"successfulRequests="<<passed;
+        QVERIFY(!available.isEmpty());QCOMPARE(passed,qMin(3,available.size())*2);
+    }
+    void meteredRulesReallyRejectAndAllowProcesses() {
+        ControlledNetwork net;QVERIFY(net.start());auto config=options();config.directSession=true;config.meteredNetwork=true;
+        MihomoAdapter engine;engine.start(config);QTRY_VERIFY_WITH_TIMEOUT(engine.status().apiHealthy,18000);
+        QVERIFY(fetch(net,config.proxyPort).startsWith("REQUEST_ERROR"));QCOMPARE(net.httpRequests,0);
+        engine.setRoutingMode("direct");QTest::qWait(150);QCOMPARE(engine.status().mode,QString("rule"));
+        engine.stop();QTRY_VERIFY_WITH_TIMEOUT(!engine.status().processAlive,4000);
+        config.meteredAllowlist={QFileInfo(QCoreApplication::applicationFilePath()).fileName()};
+        engine.start(config);QTRY_VERIFY_WITH_TIMEOUT(engine.status().apiHealthy,18000);
+        QCOMPARE(fetch(net,config.proxyPort),QByteArray("DIRECT-BYPASS"));QVERIFY(net.httpRequests>0);
+        engine.stop();QTRY_VERIFY_WITH_TIMEOUT(!engine.status().processAlive,4000);
+        config.meteredAllowlist={"unknown-app.exe","another-app.exe"};
+        engine.start(config);QTRY_VERIFY_WITH_TIMEOUT(engine.status().apiHealthy,18000);
+        const auto before=net.httpRequests;QVERIFY(fetch(net,config.proxyPort).startsWith("REQUEST_ERROR"));QCOMPARE(net.httpRequests,before);
+        engine.stop();QTRY_VERIFY_WITH_TIMEOUT(!engine.status().processAlive,4000);
+    }
+    void noNodeDirectSessionAndAuthenticatedListener() {
+        ControlledNetwork net;QVERIFY(net.start());auto config=options();config.directSession=true;
+        MihomoAdapter engine;engine.start(config);
+        QTRY_VERIFY_WITH_TIMEOUT(engine.status().apiHealthy,18000);
+        QVERIFY(engine.status().directSession);QVERIFY(engine.status().selectedNodeId.isEmpty());
+        QCOMPARE(fetch(net,config.proxyPort),QByteArray("DIRECT-BYPASS"));
+        QCOMPARE(fetch(net,config.proxyPort,true),QByteArray("DIRECT-BYPASS"));
+        QCOMPARE(net.a.forwarded+net.b.forwarded,0);
+        engine.setRoutingMode("global");QTRY_COMPARE_WITH_TIMEOUT(engine.status().mode,QString("global"),5000);
+        QCOMPARE(fetch(net,config.proxyPort),QByteArray("DIRECT-BYPASS"));
+        engine.stop();QTRY_VERIFY_WITH_TIMEOUT(!engine.status().processAlive,4000);
+        config.allowLan=true;config.lanUsername="fixture";config.lanPassword="test-password-only";
+        config.lanBindAddress="127.0.0.1";config.lanSkipLocalAuthentication=false;
+        engine.start(config);QTRY_VERIFY_WITH_TIMEOUT(engine.status().apiHealthy,18000);
+        QVERIFY(!engine.configurationSummary().contains(config.lanPassword));
+        const auto authenticatedFetch=[&](QString password){
+            QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",config.proxyPort,config.lanUsername,password));
+            auto reply=client.get(QNetworkRequest(net.url()));QSignalSpy done(reply,&QNetworkReply::finished);
+            if(!done.wait(8000)){reply->abort();return QByteArray("TIMEOUT");}
+            return reply->error()==QNetworkReply::NoError?reply->readAll():QByteArray("REJECTED");
+        };
+        const auto before=net.httpRequests;QCOMPARE(authenticatedFetch("wrong-password"),QByteArray("REJECTED"));
+        QCOMPARE(net.httpRequests,before);QCOMPARE(authenticatedFetch(config.lanPassword),QByteArray("DIRECT-BYPASS"));
+        engine.stop();QTRY_VERIFY_WITH_TIMEOUT(!engine.status().processAlive,4000);
+    }
+    void customDnsRulesAndGroupsReachRealMihomo() {
+        ControlledNetwork network;QVERIFY(network.start());
+        auto opts=options();opts.nodes={node("A",network.a.serverPort())};opts.selectedNodeId=opts.nodes.first().id;
+        opts.dnsConfig={{"mode",0},{"hosts",QVariantList{QVariantMap{{"name","fixture.test"},{"value","127.0.0.1"}}}}};
+        opts.customGroups={QVariantMap{{"name","Custom"},{"type","select"},{"proxies",QStringList{"DIRECT"}}}};
+        opts.customRules={"DOMAIN,fixture.test,Custom"};
+        MihomoAdapter engine;engine.start(opts);QTRY_VERIFY_WITH_TIMEOUT(engine.status().apiHealthy,18000);
+        QFile configuration(engine.status().configPath);QVERIFY(configuration.open(QIODevice::ReadOnly));const auto config=configuration.readAll();configuration.close();QVERIFY(config.contains("fixture.test"));QVERIFY(config.contains("Custom"));
+        QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",opts.proxyPort));
+        auto destination=network.url();destination.setHost("fixture.test");QNetworkRequest request(destination);request.setRawHeader("Connection","close");
+        auto *reply=client.get(request);QSignalSpy done(reply,&QNetworkReply::finished);QVERIFY(done.wait(8000));QCOMPARE(reply->error(),QNetworkReply::NoError);QCOMPARE(reply->readAll(),QByteArray("DIRECT-BYPASS"));
+        QCOMPARE(network.a.forwarded,0);QVERIFY(network.httpRequests>0);
+        engine.stop();QTRY_VERIFY_WITH_TIMEOUT(!engine.status().processAlive,4000);
+    }
     void isolatedBatchNeverChangesMainSelection() {
         ControlledNetwork network;QVERIFY(network.start());network.b.reject=true;
         auto opts=options();opts.nodes={node("A",network.a.serverPort()),node("B",network.b.serverPort())};opts.selectedNodeId=opts.nodes.first().id;

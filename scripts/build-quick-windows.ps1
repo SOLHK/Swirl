@@ -5,6 +5,7 @@ param(
     [string]$OutDir = "out",
     [string]$Nsis = "C:/Program Files (x86)/NSIS/makensis.exe",
     [string]$Generator = "Ninja",
+    [int]$Parallel = 6,
     [string]$MihomoArchive,
     [switch]$InputTests,
     [switch]$NativeBackdropTests
@@ -19,14 +20,14 @@ try {
     $testFlag = if ($InputTests) { "ON" } else { "OFF" }
     cmake -S src/Swirl.Quick -B $BuildDir -G $Generator -DCMAKE_BUILD_TYPE=Release "-DCMAKE_PREFIX_PATH=$qt" "-DSWIRL_BUILD_UI_TESTS=$testFlag"
     if ($LASTEXITCODE) { throw "CMake configure failed." }
-    cmake --build $BuildDir --config Release --parallel
+    cmake --build $BuildDir --config Release --parallel $Parallel
     if ($LASTEXITCODE) { throw "Release build failed." }
     $exe = Join-Path $BuildDir "Swirl.exe"
     if (!(Test-Path $exe)) { $exe = Join-Path $BuildDir "Release/Swirl.exe" }
     $exe = (Resolve-Path $exe).Path
     & (Join-Path $PSScriptRoot 'stage-mihomo.ps1') -Destination (Split-Path $exe) -Archive $MihomoArchive
     if ($InputTests) {
-        ctest --test-dir $BuildDir -C Release -R 'swirl-engine-(contract|real)|swirl-node-real-chain|swirl-import-subscription|swirl-motion' --output-on-failure
+        ctest --test-dir $BuildDir -C Release -R 'swirl-engine-(contract|real)|swirl-node-real-chain|swirl-import-subscription|swirl-motion|swirl-local-extensions|swirl-gateway-network|swirl-telemetry-accounting' --output-on-failure
         if ($LASTEXITCODE) { throw "Engine contract, integration or QML checks failed." }
         $test = Start-Process $exe -ArgumentList '--engine-self-test' -WindowStyle Hidden -Wait -PassThru
         if ($test.ExitCode) { throw "Native engine QML checks failed: $($test.ExitCode)." }
@@ -48,7 +49,7 @@ try {
         }
         cmake -S src/Swirl.Quick -B $BuildDir -DSWIRL_BUILD_UI_TESTS=OFF
         if ($LASTEXITCODE) { throw "Production reconfigure failed." }
-        cmake --build $BuildDir --config Release --parallel
+        cmake --build $BuildDir --config Release --parallel $Parallel
         if ($LASTEXITCODE) { throw "Production build failed." }
     }
     if (Test-Path (Join-Path $DistDir "Swirl.exe")) {
@@ -57,6 +58,8 @@ try {
     New-Item -ItemType Directory -Force $DistDir,$OutDir | Out-Null
     Copy-Item -LiteralPath $exe -Destination $DistDir
     Copy-Item -LiteralPath (Join-Path (Split-Path $exe) 'SwirlProxyGuard.exe') -Destination $DistDir
+    Copy-Item -LiteralPath (Join-Path (Split-Path $exe) 'SwirlGatewayGuard.exe') -Destination $DistDir
+    Copy-Item -LiteralPath (Join-Path (Split-Path $exe) 'SwirlScriptRunner.exe') -Destination $DistDir
     Copy-Item -LiteralPath 'src/Swirl.Quick/packaging/rules' -Destination (Join-Path $DistDir 'rules') -Recurse
     Copy-Item -LiteralPath (Join-Path (Split-Path $exe) 'core') -Destination (Join-Path $DistDir 'core') -Recurse
     $icon = Join-Path (Resolve-Path $BuildDir).Path "brand/Swirl.ico"
@@ -67,6 +70,9 @@ try {
     if ($LASTEXITCODE) { throw "Qt runtime deployment failed." }
     Copy-Item src/Swirl.Quick/packaging/THIRD_PARTY_NOTICES.txt $DistDir
     Copy-Item src/Swirl.Quick/packaging/licenses (Join-Path $DistDir "licenses") -Recurse
+    $documentation = Join-Path $DistDir 'docs'
+    New-Item -ItemType Directory -Force -Path $documentation | Out-Null
+    Copy-Item -LiteralPath 'src/Swirl.Quick/CAPTURE.md','docs/LOCAL_EXTENSIONS.md' -Destination $documentation
     $dist = (Resolve-Path $DistDir).Path
     $out = (Resolve-Path $OutDir).Path
     & $Nsis /INPUTCHARSET UTF8 "/DAPP_DIST=$dist" "/DOUT_DIR=$out" "/DAPP_ICON=$icon" src/Swirl.Quick/packaging/Swirl.nsi

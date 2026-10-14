@@ -71,7 +71,7 @@ Item {
                             Text { text:AppState.zh(modelData[1]); font.pixelSize:Theme.fontSize(12); color:Theme.text; Layout.fillWidth:true; wrapMode:Text.WordWrap }
                         }
                     }
-                    Rectangle { Layout.fillWidth:true; height:Theme.dp(1); color:Theme.border }
+                    Rectangle { Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(1); color:Theme.border }
                     Text { text:"诊断事件"; color:Theme.muted; font.pixelSize:Theme.fontSize(10) }
                     Text {
                         Layout.fillWidth:true

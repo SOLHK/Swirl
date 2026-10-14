@@ -143,18 +143,17 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
     route("featurehub");
     auto *hub=item();
     check("hub-loaded",hub!=nullptr);
-    auto *search=hub?hub->findChild<QObject *>("moduleSearch"):nullptr;
-    if(search)search->setProperty("text","http");
-    route("settings");route("featurehub");
-    check("page-instance-preserved",item()==hub);
+    route("rules");auto *rulePage=item();auto *search=findVisual(qobject_cast<QQuickItem *>(rulePage),"rulesSearch");
+    if(search)search->setProperty("text","http");route("settings");route("rules");
+    check("page-instance-preserved",item()==rulePage);
     check("editable-state-preserved",search&&search->property("text").toString()=="http");
-    if(search)search->setProperty("text","");wait(80);
-    auto *hubScroll=findVisual(qobject_cast<QQuickItem *>(hub),"motion-hub-scroll");
-    auto *flick=hubScroll?qvariant_cast<QObject *>(hubScroll->property("contentItem")):nullptr;
-    if(flick)flick->setProperty("contentY",240);
+    if(search)search->setProperty("text","");
+    route("dns");auto *dnsPage=item();auto *flick=findVisual(qobject_cast<QQuickItem *>(dnsPage),"motion-dns-scroll");
+    if(flick)flick->setProperty("contentY",qMin(40.0,flick->property("contentHeight").toDouble()-flick->height()));
     wait(80);const double scrollBefore=flick?flick->property("contentY").toDouble():-1;
-    route("settings");route("featurehub");
-    check("scroll-state-preserved",flick && scrollBefore>0 && qAbs(flick->property("contentY").toDouble()-scrollBefore)<0.1);
+    route("settings");route("dns");
+    qInfo()<<"MOTION_SCROLL"<<scrollBefore<<(flick?flick->property("contentY"):QVariant())<<(flick?flick->property("contentHeight"):QVariant())<<(flick?flick->height():-1);
+    check("scroll-state-preserved",flick&&scrollBefore>0&&qAbs(flick->property("contentY").toDouble()-scrollBefore)<0.1);
     if(flick)flick->setProperty("contentY",0);
     route("proxies");
     auto *proxy=item();
@@ -169,17 +168,14 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
         route("settings");wait(250);
         check("leaving-page-releases-modal",!dialog->property("visible").toBool());
     }
-    route("proxies");
-    auto *combo=proxy?proxy->findChild<QObject *>("proxyRegionCombo"):nullptr;
+    route("gateway");
+    auto *combo=findVisual(qobject_cast<QQuickItem *>(item()),"deviceSortPicker");
     auto *popup=combo?qvariant_cast<QObject *>(combo->property("popup")):nullptr;
-    if(popup) {
-        auto *comboItem=qobject_cast<QQuickItem *>(combo);
-        const auto comboPoint=comboItem->mapToScene(QPointF(comboItem->width()/2,comboItem->height()/2)).toPoint();
-        QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,comboPoint);waitOpen(popup);
-        check("dropdown-opens",popup->property("opened").toBool());
-        QTest::keyClick(window,Qt::Key_Escape);wait(400);
-        check("dropdown-escape",!popup->property("visible").toBool());
-    } else check("dropdown-present",false);
+    if(popup){const auto point=combo->mapToScene(QPointF(combo->width()/2,combo->height()/2)).toPoint();
+        QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,point);waitOpen(popup);qInfo()<<"MOTION_DROPDOWN"<<point<<combo->isEnabled()<<combo->isVisible()<<popup->property("visible")<<popup->property("opened")<<popup->property("scale")<<popup->property("opacity");check("dropdown-opens",popup->property("opened").toBool());
+        QQuickWindow *popupWindow=window;for(auto *candidate:QGuiApplication::allWindows())if(candidate->isVisible()&&candidate->flags().testFlag(Qt::Popup))if(auto *quick=qobject_cast<QQuickWindow *>(candidate))popupWindow=quick;
+        QTest::keyClick(popupWindow,Qt::Key_Escape);wait(400);check("dropdown-escape",!popup->property("visible").toBool());
+    }else check("dropdown-present",false);
     auto *button=findVisual(window->contentItem(),"nav-overview");
     if(button) {
         const auto p=button->mapToScene(QPointF(button->width()/2,button->height()/2)).toPoint();
@@ -227,32 +223,11 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
     check("all-transient-grabs-released",eval("motionPolicy.activeGrabCount===0").toBool());
     check("revisit-memory-growth-below-24MiB",growth<24*1024*1024);
     route("featurehub");
-    eval("SwirlMotion.shared=null");
-    // Exercise the real card and its asynchronous scene-graph capture.
-    if(search){search->setProperty("text",QString::fromUtf8("系统代理"));wait(80);}
-    auto *card=findVisual(qobject_cast<QQuickItem *>(item()),"motion-feature-card");
-    check("shared-element-source-present",card!=nullptr);
-    if(card) {
-        const auto p=card->mapToScene(QPointF(card->width()/2,card->height()/2)).toPoint();
-        QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,p);
-        wait(120);check("shared-card-navigates",eval("AppState.currentPage!=='featurehub'").toBool());
-        check("shared-transition-settles",settle(3500));
-        check("shared-texture-released",eval("pageLoader.heroData===null").toBool());
-        auto *detail=findVisual(qobject_cast<QQuickItem *>(item()),"motion-detail");
-        check("shared-element-target-present",detail!=nullptr);
-        if(detail) {
-            QQmlExpression reverse(qmlContext(detail),detail,"SwirlMotion.returnToHub(this)");reverse.evaluate();
-            wait(100);settle(3500);
-            check("shared-reverse-restores-hub",eval("AppState.currentPage==='featurehub'").toBool());
-            check("shared-reverse-preserves-page",item()==hub);
-            auto *source=findVisual(qobject_cast<QQuickItem *>(item()),"motion-feature-card");
-            if(source) {
-                const auto point=source->mapToScene(QPointF(source->width()/2,source->height()/2)).toPoint();
-                QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,point);wait(100);settle(3500);
-                QTest::keyClick(window,Qt::Key_Left,Qt::AltModifier);wait(100);settle(3500);
-                check("history-shared-return",eval("AppState.currentPage==='featurehub'").toBool() && item()==hub);
-            }
-        }
+    auto *card=findVisual(qobject_cast<QQuickItem *>(item()),"settings-dns");check("settings-tile-present",card!=nullptr);
+    if(card){QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,card->mapToScene(QPointF(card->width()/2,card->height()/2)).toPoint());wait(200);
+        QQuickWindow *sheet=nullptr;for(auto *candidate:QGuiApplication::allWindows())if(candidate->objectName()=="settingsSheet")sheet=qobject_cast<QQuickWindow *>(candidate);
+        check("settings-tile-opens-native-sheet",sheet&&sheet->isVisible());if(sheet)sheet->hide();
+        check("native-sheet-preserves-hub",item()==hub);window->requestActivate();
     }
     route("feature-system");
     auto *module=item();

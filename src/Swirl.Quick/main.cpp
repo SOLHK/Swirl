@@ -16,6 +16,7 @@
 #include <QQuickItem>
 #include <QQuickItemGrabResult>
 #include <QImage>
+#include <QMouseEvent>
 #include <QDebug>
 #include <QFile>
 #include <QTextStream>
@@ -27,11 +28,13 @@
 #include <QSettings>
 #include <QTemporaryDir>
 #include "app/ModuleDraftStore.h"
+#include "app/ExtensionService.h"
 #include "app/MotionPolicy.h"
 #ifdef SWIRL_UI_TESTS
 #include "tests/OverviewChecks.h"
 #include "tests/RuntimeEvidence.h"
 #include "tests/CaptureChecks.h"
+#include "tests/GatewayChecks.h"
 #include "tests/WindowChecks.h"
 #include "tests/HdrChecks.h"
 #include "tests/EngineUiChecks.h"
@@ -45,6 +48,7 @@
 #include "app/DiagnosticService.h"
 #include "app/HdrOutput.h"
 #include "network/CaptureService.h"
+#include "network/GatewayService.h"
 #include "engine/MihomoAdapter.h"
 #include "engine/EngineController.h"
 
@@ -118,7 +122,7 @@ int main(int argc, char *argv[])
     }
 #endif
     const bool realAcceptance=!runtimeStore.isEmpty()&&!runtimeCommands.isEmpty()&&!runtimeState.isEmpty();
-    const bool isolatedRun=realAcceptance||nodeTest||motionTest||engineTest||hdrDisplayTest||hdrTest||app.arguments().contains("--interaction-test")||app.arguments().contains("--capture-self-test")||app.arguments().contains("--smoke-test")||app.arguments().contains("--window-test")||previewMode;
+    const bool isolatedRun=realAcceptance||nodeTest||motionTest||engineTest||hdrDisplayTest||hdrTest||app.arguments().contains("--interaction-test")||app.arguments().contains("--capture-self-test")||app.arguments().contains("--gateway-self-test")||app.arguments().contains("--smoke-test")||app.arguments().contains("--window-test")||previewMode;
     if(isolatedRun) {
         QStandardPaths::setTestModeEnabled(true);
         QSettings::setDefaultFormat(QSettings::IniFormat);
@@ -129,10 +133,13 @@ int main(int argc, char *argv[])
     }
     WindowsBackdrop backdrop;
     HdrOutput hdrOutput;
-    CaptureService capture;
+    QTemporaryDir isolatedTls;
+    CaptureService capture(nullptr,isolatedRun?isolatedTls.filePath("ca.dpapi"):QString());
     ModuleDraftStore drafts;
     QTemporaryDir isolatedNodes;
     EngineController engineController(std::make_unique<MihomoAdapter>(),nullptr,realAcceptance?runtimeStore:isolatedRun?isolatedNodes.filePath("nodes.dpapi"):QString(),realAcceptance);
+    ExtensionService extensions(&engineController,isolatedRun?isolatedNodes.filePath("extensions.dpapi"):QString());
+    GatewayService gateway(&engineController,isolatedRun?isolatedNodes.filePath("gateway.json"):QString());
     DiagnosticService diagnostics(isolatedRun?isolatedNodes.filePath("diagnostics"):QString());
     diagnostics.installQtHandler();
     SystemDataProvider systemData(&capture,&engineController,&diagnostics);
@@ -143,6 +150,7 @@ int main(int argc, char *argv[])
     const bool smoke = app.arguments().contains("--smoke-test");
     const bool interaction = app.arguments().contains("--interaction-test");
     const bool captureTest = app.arguments().contains("--capture-self-test");
+    const bool gatewayTest=app.arguments().contains("--gateway-self-test");
     const bool windowTest = app.arguments().contains("--window-test");
     bool qmlWarnings = false;
     bool previewCaptured = false;
@@ -161,7 +169,8 @@ int main(int argc, char *argv[])
     const QString previewPath = nativeFramePath.isEmpty()?argumentValue(QStringLiteral("--capture-preview=")):nativeFramePath;
     const QString previewPage = argumentValue(QStringLiteral("--preview-page="));
     const QString previewTheme = argumentValue(QStringLiteral("--preview-theme="));
-    if (nodeTest || motionTest || previewMode || engineTest || hdrDisplayTest || hdrTest || smoke || interaction || captureTest || windowTest || !previewPath.isEmpty()) {
+    const QString previewState = argumentValue(QStringLiteral("--preview-state="));
+    if (nodeTest || motionTest || previewMode || engineTest || hdrDisplayTest || hdrTest || smoke || interaction || captureTest || gatewayTest || windowTest || !previewPath.isEmpty()) {
         if(nodeTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-node-ui-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-node-ui-diagnostics.txt");}
         QFile::remove(QCoreApplication::applicationDirPath() + QStringLiteral("/Swirl-diagnostics.txt"));
         qInstallMessageHandler(recordQtDiagnostic);
@@ -170,12 +179,15 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("previewCaptureMode", previewMode);
     engine.rootContext()->setContextProperty("gpuEffectsSupported", QQuickWindow::graphicsApi()!=QSGRendererInterface::Software && qEnvironmentVariable("QT_QUICK_BACKEND")!=QStringLiteral("software"));
     engine.rootContext()->setContextProperty("previewTheme", previewTheme);
+    engine.rootContext()->setContextProperty("previewState", previewState);
     engine.rootContext()->setContextProperty("smokeTestMode", smoke);
     engine.rootContext()->setContextProperty("systemProvider", &systemData);
+    engine.rootContext()->setContextProperty("extensionsProvider", &extensions);
     engine.rootContext()->setContextProperty("diagnostics", &diagnostics);
     engine.rootContext()->setContextProperty("backdrop", &backdrop);
     engine.rootContext()->setContextProperty("hdrOutput", &hdrOutput);
     engine.rootContext()->setContextProperty("captureProvider", &capture);
+    engine.rootContext()->setContextProperty("gatewayProvider", &gateway);
     engine.rootContext()->setContextProperty("moduleDrafts", &drafts);
     engine.rootContext()->setContextProperty("engineController", &engineController);
 #ifdef SWIRL_UI_TESTS
@@ -286,6 +298,13 @@ int main(int argc, char *argv[])
         return 4;
 #endif
     }
+    if(gatewayTest){
+#ifdef SWIRL_UI_TESTS
+        QTimer::singleShot(400,&app,[&app]{app.exit(runGatewayChecks());});
+#else
+        return 4;
+#endif
+    }
     if(captureTest) {
 #ifdef SWIRL_UI_TESTS
         QTimer::singleShot(400,&app,[&app,&capture]{app.exit(runCaptureChecks(&capture));});
@@ -303,10 +322,29 @@ int main(int argc, char *argv[])
     else if (!interaction && !captureTest && !previewPath.isEmpty()) {
         auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().constFirst());
         if (window) {
+            QTimer::singleShot(500,&app,[window,previewState]{
+                QMouseEvent move(QEvent::MouseMove,QPointF(1,1),window->mapToGlobal(QPoint(1,1)),Qt::NoButton,Qt::NoButton,Qt::NoModifier);
+                QCoreApplication::sendEvent(window,&move);
+                QQmlExpression expression(qmlContext(window),window,QStringLiteral("preparePreviewState(previewState)"));expression.evaluate();
+                if(expression.hasError())qWarning()<<expression.error();
+            });
             if(!nativeFramePath.isEmpty())QTimer::singleShot(400,&app,[&app,&backdrop]{if(!backdrop.prepareNativeCapture()){qCritical()<<"Native capture blocked: cannot activate target window";app.exit(3);}});
-            QTimer::singleShot(900, &app, [window, previewPath, nativeFramePath, &backdrop, &app, &previewCaptured]() {
+            QTimer::singleShot(900, &app, [window, previewPage, previewPath, nativeFramePath, &backdrop, &app, &previewCaptured]() {
+                QQuickWindow *captureWindow=window;
+                if(previewPage=="dns"||previewPage=="external")for(auto *candidate:QGuiApplication::allWindows())if(candidate->isVisible()&&candidate!=window)if(auto *quick=qobject_cast<QQuickWindow *>(candidate)){captureWindow=quick;break;}
                 if(!nativeFramePath.isEmpty()&&!backdrop.isCaptureForeground()){qCritical()<<"Native capture blocked: target window lost foreground";backdrop.finishNativeCapture();app.exit(3);return;}
-                const QImage screenshot = nativeFramePath.isEmpty()?window->grabWindow():window->screen()->grabWindow(0,window->x(),window->y(),window->width(),window->height()).toImage();
+                QImage screenshot = nativeFramePath.isEmpty()?captureWindow->grabWindow():window->screen()->grabWindow(0,window->x(),window->y(),window->width(),window->height()).toImage();
+                if(nativeFramePath.isEmpty()&&captureWindow==window){
+                    QList<QQuickWindow *> popups;QRect bounds=window->geometry();
+                    for(auto *candidate:QGuiApplication::allWindows())if(candidate!=window&&candidate->isVisible()&&candidate->flags().testFlag(Qt::Popup))if(auto *quick=qobject_cast<QQuickWindow *>(candidate)){popups.append(quick);bounds=bounds.united(candidate->geometry());}
+                    if(!popups.isEmpty()){
+                        qInfo()<<"Capture union geometry"<<bounds;
+                        for(auto *popup:popups)qInfo()<<"Capture popup geometry"<<popup->geometry();
+                        const auto ratio=window->devicePixelRatio();QImage combined(qRound(bounds.width()*ratio),qRound(bounds.height()*ratio),QImage::Format_ARGB32_Premultiplied);combined.setDevicePixelRatio(ratio);combined.fill(Qt::transparent);
+                        QPainter painter(&combined);painter.drawImage(window->position()-bounds.topLeft(),screenshot);
+                        for(auto *popup:popups)painter.drawImage(popup->position()-bounds.topLeft(),popup->grabWindow());painter.end();screenshot=combined;
+                    }
+                }
                 if (!screenshot.isNull() && screenshot.save(previewPath)) {
                     previewCaptured=true;
                     qInfo() << (nativeFramePath.isEmpty()?"Saved Qt UI render:":"Saved Windows compositor screenshot:") << previewPath;
@@ -345,5 +383,5 @@ int main(int argc, char *argv[])
     // This also keeps scripted page-navigation shutdown free of incubation warnings.
     if (auto *controller = engine.incubationController())
         controller->incubateFor(100);
-    return (nodeTest || motionTest || previewMode || engineTest || smoke || interaction || captureTest || windowTest || !previewPath.isEmpty()) && qmlWarnings ? 2 : result;
+    return (nodeTest || motionTest || previewMode || engineTest || smoke || interaction || captureTest || gatewayTest || windowTest || !previewPath.isEmpty()) && qmlWarnings ? 2 : result;
 }

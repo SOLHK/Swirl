@@ -75,9 +75,10 @@ void MihomoAdapter::publish() {
 QString MihomoAdapter::configurationSummary() const {
     // A redacted copy is inspectable; the authenticated file is kept private.
     auto result = m_generatedConfig;
-    if (!m_options.selectedNodeId.isEmpty()) {
+    if (!m_options.selectedNodeId.isEmpty() || m_options.directSession) {
         result = result.left(result.indexOf(QStringLiteral("proxies:"))) + QStringLiteral("节点配置已生成，全部节点凭据已隐藏。\n");
     }
+    result.replace(QRegularExpression("authentication: [^\\n]*"),QStringLiteral("authentication: [<已隐藏>]"));
     if (!m_secret.isEmpty()) result.replace(QString::fromLatin1(m_secret), QStringLiteral("<每次启动随机生成，已隐藏>"));
     return result;
 }
@@ -151,9 +152,9 @@ bool MihomoAdapter::prepareConfiguration() {
         "tun:\n  enable: false\n  auto-route: false\n  auto-detect-interface: false\n"
         "dns:\n  enable: false\nproxies: []\nproxy-groups: []\nrules: []\n")
         .arg(m_options.controlPort).arg(QString::fromLatin1(m_secret));
-    if (!m_options.selectedNodeId.isEmpty()) {
+    if (!m_options.selectedNodeId.isEmpty() || m_options.directSession) {
         QJsonArray proxies, names;
-        names.append(m_options.selectedNodeId);
+        names.append(m_options.selectedNodeId.isEmpty()?QStringLiteral("DIRECT"):m_options.selectedNodeId);
         for (const auto &n : m_options.nodes) {
             auto proxy=n.parameters;
             proxy.insert("name",n.id);proxy.insert("type",n.protocol);
@@ -173,8 +174,9 @@ bool MihomoAdapter::prepareConfiguration() {
             if (n.protocol=="trojan") { proxy.insert("sni",n.serverName.isEmpty()?n.host:n.serverName); proxy.insert("skip-cert-verify",false); }
             proxies.append(proxy); if (n.id!=m_options.selectedNodeId) names.append(n.id);
         }
-        const QJsonArray groups{QJsonObject{{"name","SWIRL"},{"type","select"},{"proxies",names}},
+        QJsonArray groups{QJsonObject{{"name","SWIRL"},{"type","select"},{"proxies",names}},
             QJsonObject{{"name","GLOBAL"},{"type","select"},{"proxies",QJsonArray{"SWIRL"}}}};
+        for(const auto &group:m_options.customGroups)groups.append(QJsonObject::fromVariantMap(group.toMap()));
         m_generatedConfig.replace("mode: direct\n",QStringLiteral("mode: %1\n").arg(m_options.routingMode));
         m_generatedConfig.replace("mixed-port: 0\n",QStringLiteral("mixed-port: %1\n").arg(m_options.proxyPort));
         m_generatedConfig.replace("proxies: []\n",QStringLiteral("proxies: ")+QString::fromUtf8(QJsonDocument(proxies).toJson(QJsonDocument::Compact))+"\n");
@@ -220,6 +222,56 @@ bool MihomoAdapter::prepareConfiguration() {
                 "  nameserver: ['https://1.1.1.1/dns-query#SWIRL']\n"
                 "  nameserver-policy:\n    'rule-set:cn-domain': [system]\n"));
         } else m_generatedConfig.replace("rules: []\n","rules: ['MATCH,SWIRL']\n");
+    }
+    if(!m_options.selectedNodeId.isEmpty() || m_options.directSession) {
+        if(!m_options.customRules.isEmpty()) {
+            QString prefix="rules:\n";
+            for(const auto &rule:m_options.customRules)prefix+="  - "+QString::fromUtf8(QJsonDocument(QJsonArray{rule}).toJson(QJsonDocument::Compact)).mid(1).chopped(1)+"\n";
+            if(m_generatedConfig.contains("rules:\n"))m_generatedConfig.replace("rules:\n",prefix);
+            else m_generatedConfig.replace("rules: ['MATCH,SWIRL']\n",prefix+"  - MATCH,SWIRL\n");
+        }
+        if(!m_options.dnsConfig.isEmpty()) {
+            const auto config=m_options.dnsConfig;
+            QStringList nameservers;
+            const auto mode=config.value("mode").toInt();
+            if(mode!=2)nameservers.append("system");
+            if(mode!=0)for(const auto &part:config.value("servers").toString().split(',',Qt::SkipEmptyParts))nameservers.append(part.trimmed());
+            const auto encrypted=config.value("encrypted").toString();if(!encrypted.isEmpty())nameservers={encrypted};
+            QJsonObject dns{{"enable",true},{"ipv6",false},{"enhanced-mode","redir-host"},{"default-nameserver",QJsonArray{"system"}},
+                {"proxy-server-nameserver",QJsonArray{"system"}},{"nameserver",QJsonArray::fromStringList(nameservers)},
+                {"use-hosts",true},{"use-system-hosts",config.value("useHosts",true).toBool()},{"respect-rules",config.value("respectRules",false).toBool()}};
+            const auto begin=m_generatedConfig.indexOf("dns:\n"),end=m_generatedConfig.indexOf("proxies:",begin);
+            if(begin>=0&&end>begin)m_generatedConfig.replace(begin,end-begin,"dns: "+QString::fromUtf8(QJsonDocument(dns).toJson(QJsonDocument::Compact))+"\n");
+            QJsonObject hosts;for(const auto &entry:config.value("hosts").toList()){const auto row=entry.toMap();hosts[row.value("name").toString()]=row.value("value").toString();}
+            if(!hosts.isEmpty())m_generatedConfig+="hosts: "+QString::fromUtf8(QJsonDocument(hosts).toJson(QJsonDocument::Compact))+"\n";
+        }
+    }
+    if(m_options.meteredNetwork) {
+        if(m_options.routingMode!="rule"){fail(Error::ConfigurationFailed,QStringLiteral("计费网络模式必须使用规则判定。"));return false;}
+        QString guard="MATCH,REJECT";
+        if(!m_options.meteredAllowlist.isEmpty()) {
+            QStringList conditions;
+            for(const auto &process:m_options.meteredAllowlist){
+                if(!QRegularExpression("^[A-Za-z0-9_. -]{1,128}\\.exe$").match(process).hasMatch()){fail(Error::InvalidOptions,QStringLiteral("计费网络允许名单无效。"));return false;}
+                conditions.append("(NOT,((PROCESS-NAME,"+process+")))");
+            }
+            guard="AND,("+conditions.join(',')+"),REJECT";
+        }
+        const auto encoded=QString::fromUtf8(QJsonDocument(QJsonArray{guard}).toJson(QJsonDocument::Compact)).mid(1).chopped(1);
+        if(m_generatedConfig.contains("rules:\n"))m_generatedConfig.replace("rules:\n","rules:\n  - "+encoded+"\n");
+        else m_generatedConfig.replace("rules: ['MATCH,SWIRL']\n","rules:\n  - "+encoded+"\n  - MATCH,SWIRL\n");
+    }
+    if(m_options.allowLan&&(!m_options.selectedNodeId.isEmpty()||m_options.directSession)) {
+        if(m_options.lanUsername.isEmpty()||m_options.lanPassword.isEmpty()){fail(Error::ConfigurationFailed,QStringLiteral("局域网代理缺少认证凭据。"));return false;}
+        m_generatedConfig.replace("allow-lan: false\n","allow-lan: true\n");m_generatedConfig.replace("bind-address: '127.0.0.1'\n",QStringLiteral("bind-address: %1\n").arg(QString::fromUtf8(QJsonDocument(QJsonArray{m_options.lanBindAddress}).toJson(QJsonDocument::Compact)).mid(1).chopped(1)));
+        m_generatedConfig+="authentication: "+QString::fromUtf8(QJsonDocument(QJsonArray{m_options.lanUsername+":"+m_options.lanPassword}).toJson(QJsonDocument::Compact))+"\n";
+        m_generatedConfig+=m_options.lanSkipLocalAuthentication?"skip-auth-prefixes: ['127.0.0.1/8', '::1/128']\n":"skip-auth-prefixes: []\n";
+    }
+    if(m_options.tunEnabled&&(!m_options.selectedNodeId.isEmpty()||m_options.directSession)) {
+        const QJsonObject tun{{"enable",true},{"device","Swirl"},{"stack","gvisor"},{"auto-route",true},
+            {"auto-detect-interface",true},{"strict-route",!m_options.gatewayForwarding},{"mtu",1500},{"dns-hijack",QJsonArray{"any:53","tcp://any:53"}}};
+        m_generatedConfig.replace("tun:\n  enable: false\n  auto-route: false\n  auto-detect-interface: false\n","tun: "+QString::fromUtf8(QJsonDocument(tun).toJson(QJsonDocument::Compact))+"\n");
+        if(m_generatedConfig.contains("dns:\n  enable: false\n"))m_generatedConfig.replace("dns:\n  enable: false\n","dns: {enable: true, enhanced-mode: redir-host, nameserver: [system]}\n");
     }
     QSaveFile file(m_status.configPath);
     if (!file.open(QIODevice::WriteOnly) || !file.setPermissions(QFile::ReadOwner | QFile::WriteOwner)) return false;
@@ -309,11 +361,11 @@ void MihomoAdapter::start(const EngineStartOptions &options) {
     if(options.routingMode!="rule"&&options.routingMode!="global"&&options.routingMode!="direct") {
         fail(Error::InvalidOptions,QStringLiteral("分流模式无效。"));return;
     }
-    if (!options.selectedNodeId.isEmpty() && (!nodeIds.contains(options.selectedNodeId) || options.proxyPort==0 || options.proxyPort==options.controlPort)) {
+    if ((!options.selectedNodeId.isEmpty() && !nodeIds.contains(options.selectedNodeId)) || ((!options.selectedNodeId.isEmpty() || options.directSession) && (options.proxyPort==0 || options.proxyPort==options.controlPort))) {
         fail(Error::InvalidNode,QStringLiteral("所选节点或本机代理端口无效。")); return;
     }
     m_status.selectedNodeId=options.selectedNodeId;
-    m_status.proxyPort=options.selectedNodeId.isEmpty()?0:options.proxyPort;
+    m_status.proxyPort=(options.selectedNodeId.isEmpty()&&!options.directSession)?0:options.proxyPort;
     if (!lockAndVerifyExecutable()) return;
     if (!reserveControlPort()) {
         fail(Error::PortConflict, QStringLiteral("本机控制端口 %1 已占用或不允许绑定；请更换端口。").arg(options.controlPort));
@@ -323,7 +375,7 @@ void MihomoAdapter::start(const EngineStartOptions &options) {
         fail(Error::ConfigurationFailed, QStringLiteral("无法创建安全运行配置，或国内规则数据缺失/哈希校验失败。请修复安装，未使用空规则回退。"));
         unlockExecutable(); return;
     }
-    if (!options.selectedNodeId.isEmpty() && !reservePort(m_proxyReservation,options.proxyPort)) {
+    if ((!options.selectedNodeId.isEmpty()||options.directSession) && !reservePort(m_proxyReservation,options.proxyPort)) {
         fail(Error::PortConflict,QStringLiteral("本机代理端口 %1 已占用或不允许绑定。").arg(options.proxyPort));
         unlockExecutable(); m_directory.reset(); return;
     }
@@ -593,11 +645,11 @@ void MihomoAdapter::request(bool version) {
             m_status.version = object.value(QStringLiteral("version")).toString();
             this->request(false); return;
         }
-        const bool connected=!m_options.selectedNodeId.isEmpty();
+        const bool connected=!m_options.selectedNodeId.isEmpty()||m_options.directSession;
         bool safe = object.value(QStringLiteral("mode")).toString() == (connected ? m_options.routingMode:QStringLiteral("direct")) &&
-            object.value(QStringLiteral("allow-lan")) == QJsonValue(false) &&
+            object.value(QStringLiteral("allow-lan")) == QJsonValue(connected&&m_options.allowLan) &&
             object.value(QStringLiteral("tun")).isObject() &&
-            object.value(QStringLiteral("tun")).toObject().value(QStringLiteral("enable")) == QJsonValue(false);
+            object.value(QStringLiteral("tun")).toObject().value(QStringLiteral("enable")) == QJsonValue(connected&&m_options.tunEnabled);
         for (const auto &key : {"port", "socks-port", "redir-port", "tproxy-port"})
             safe = safe && object.value(QLatin1String(key)).isDouble() && object.value(QLatin1String(key)).toInt(-1) == 0;
         safe=safe && object.value("mixed-port").isDouble() && object.value("mixed-port").toInt(-1)==(connected?m_options.proxyPort:0);
@@ -605,13 +657,14 @@ void MihomoAdapter::request(bool version) {
             fail(Error::ConfigurationFailed, QStringLiteral("引擎运行配置不符合 Swirl 安全约束；已停止进程。")); return;
         }
         m_status.mode = connected?m_options.routingMode:QStringLiteral("direct");
-        m_status.state = State::Running; m_status.apiHealthy = true;
+        m_status.state = State::Running; m_status.apiHealthy = true;m_status.gatewayForwarding=m_options.gatewayForwarding;m_status.directSession=m_options.directSession&&m_options.selectedNodeId.isEmpty();m_status.tunEnabled=connected&&m_options.tunEnabled;m_status.allowLan=connected&&m_options.allowLan;
         m_status.error = Error::None; m_status.message.clear(); m_status.routingBusy=false;m_deadline.stop(); publish();readConnections();readTraffic();readLogs();
     });
 }
 
 void MihomoAdapter::setRoutingMode(const QString &mode) {
-    if((mode!="rule"&&mode!="global"&&mode!="direct")||!m_status.apiHealthy||m_options.selectedNodeId.isEmpty()||m_modeReply)return;
+    if(m_options.meteredNetwork&&mode!="rule")return;
+    if((mode!="rule"&&mode!="global"&&mode!="direct")||!m_status.apiHealthy||(m_options.selectedNodeId.isEmpty()&&!m_options.directSession)||m_modeReply)return;
     if(mode==m_options.routingMode)return;
     // No in-flight health read may observe the old mode after a successful PATCH.
     cancelRequest();
@@ -642,7 +695,9 @@ QVariantList MihomoAdapter::routingRules() const {
     int order=0;
     for(const auto &line:section.split('\n')) {
         if(!line.startsWith("  - "))continue;
-        const auto parts=line.mid(4).split(',');if(parts.size()<2)continue;
+        auto rule=line.mid(4);
+        if(rule.startsWith('"')){const auto value=QJsonDocument::fromJson(("["+rule+"]").toUtf8());if(value.isArray())rule=value.array().first().toString();}
+        const auto parts=rule.split(',');if(parts.size()<2)continue;
         const bool match=parts[0]=="MATCH";
         result.append(QVariantMap{{"id",QString::number(++order)},{"order",order},{"type",parts[0]},
             {"pattern",match?QStringLiteral("其他流量"):parts[1]},
@@ -684,7 +739,7 @@ void MihomoAdapter::readConnections() {
             }
             const auto rule=c.value("rule").toString()+" "+c.value("rulePayload").toString();
             rows.append(QVariantMap{{"id",QString::fromLatin1(QCryptographicHash::hash(c.value("id").toString().toUtf8(),QCryptographicHash::Sha256).toHex().left(12))},
-                {"host",m.value("host").toString().isEmpty()?m.value("destinationIP").toString():m.value("host").toString()},{"ip",m.value("destinationIP").toString()},
+                {"host",m.value("host").toString().isEmpty()?m.value("destinationIP").toString():m.value("host").toString()},{"ip",m.value("destinationIP").toString()},{"sourceIp",m.value("sourceIP").toString()},
                 {"process",QFileInfo(m.value("processPath").toString().isEmpty()?m.value("process").toString():m.value("processPath").toString()).fileName().isEmpty()?QStringLiteral("未知进程"):QFileInfo(m.value("processPath").toString().isEmpty()?m.value("process").toString():m.value("processPath").toString()).fileName()},
                 {"protocol",m.value("network").toString()+" / "+m.value("type").toString()},
                 {"policy",chain.join(QStringLiteral(" → "))},{"rule",rule},
