@@ -40,9 +40,6 @@ void WindowsBackdrop::refresh() {
         m_handle = reinterpret_cast<quintptr>(hwnd);
         // Keep Qt's per-pixel alpha surface so the clipped corner pixels
         // show the actual desktop. Window-wide Acrylic fills those pixels.
-        const auto extended = GetWindowLongPtrW(hwnd,GWL_EXSTYLE);
-        if (!software && !(extended & WS_EX_LAYERED))
-            SetWindowLongPtrW(hwnd,GWL_EXSTYLE,extended | WS_EX_LAYERED);
         // Keep native snap/resize styles. Only the visible caption is removed.
         const auto oldStyle = GetWindowLongPtrW(hwnd, GWL_STYLE);
         const auto style = oldStyle | WS_THICKFRAME | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
@@ -73,12 +70,19 @@ void WindowsBackdrop::refresh() {
         const bool remote=GetSystemMetrics(SM_REMOTESESSION)!=0;
         const bool allowed = m_enabled && !software && !batterySaver && !remote && contrastKnown && !(contrast.dwFlags & HCF_HIGHCONTRASTON)
             && transparencyKnown && transparency && compositionEnabled;
-        const int backdrop = 1; // DWMSBT_NONE: leave transparent Qt corners unpainted
-        DwmSetWindowAttribute(hwnd, 38, &backdrop, sizeof(backdrop));
-        const MARGINS margins{0,0,0,0};
+        // Windows 11 22H2 Desktop Acrylic supplies actual background blur.
+        // Use native rounded corners with the native material, so it cannot
+        // fill the transparent pixels outside Qt's rounded outline.
+        const int backdrop = allowed ? 3 : 1; // DWMSBT_TRANSIENTWINDOW / NONE
+        const bool acrylic=allowed && SUCCEEDED(DwmSetWindowAttribute(hwnd, 38, &backdrop, sizeof(backdrop)));
+        if(acrylic) {
+            const int rounded=2; // DWMWCP_ROUND
+            corners=SUCCEEDED(DwmSetWindowAttribute(hwnd,33,&rounded,sizeof(rounded)));
+        }
+        const MARGINS margins=acrylic ? MARGINS{-1,-1,-1,-1} : MARGINS{0,0,0,0};
         const HRESULT frame = DwmExtendFrameIntoClientArea(hwnd, &margins);
         active = allowed && SUCCEEDED(frame);
-        status = active ? QStringLiteral("Native translucent surface: antialiased Qt alpha outline")
+        status = active ? (acrylic ? QStringLiteral("Native Desktop Acrylic: DWM blur and rounded corners") : QStringLiteral("Native alpha fallback: Desktop Acrylic unavailable"))
             : !m_enabled ? QStringLiteral("Opaque: application transparency disabled")
             : software ? QStringLiteral("Opaque: software renderer")
             : batterySaver ? QStringLiteral("Opaque: battery saver")

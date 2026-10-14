@@ -1,21 +1,51 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Layouts
 import SwirlQuick
 Dialog {
     id: dialog
+    property bool guardChanges:true
+    property string savedFingerprint:""
+    readonly property var ownerWindow:parent ? parent.Window.window : null
+    function markSaved(){savedFingerprint=dismissals.fingerprint(contentItem)}
+    function requestDismiss(){
+        if(!visible)return
+        if(guardChanges && savedFingerprint!==dismissals.fingerprint(contentItem))discardPrompt.open()
+        else close()
+    }
     modal: true
     focus: true
     transformOrigin:Item.Center
     onAboutToShow: {
+        dismissals.push(dialog,ownerWindow)
+        Qt.callLater(markSaved)
         transformOrigin=SwirlMotion.popupOrigin(dialog)
         if(SwirlMotion.reduced){scale=1;opacity=1}
         else if(scale===1 && opacity===1){scale=0.96;opacity=0}
     }
-    onClosed:{scale=1;opacity=1}
+    onClosed:{dismissals.pop(dialog);scale=1;opacity=1}
     width: Math.min(Theme.dp(470), parent ? parent.width-Theme.dp(40) : Theme.dp(470))
     anchors.centerIn: Overlay.overlay
     padding:Theme.dp(23)
-    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+    closePolicy: Popup.NoAutoClose
+    Dialog {
+        id:discardPrompt;objectName:"discardChangesPrompt"
+        property var owner:dialog.ownerWindow
+        function requestDismiss(){close()}
+        modal:true;focus:true;title:"放弃未保存的修改？"
+        anchors.centerIn:Overlay.overlay;width:Math.min(Theme.dp(400),dialog.width)
+        closePolicy:Popup.NoAutoClose
+        onAboutToShow:dismissals.push(discardPrompt,owner)
+        onClosed:dismissals.pop(discardPrompt)
+        background:Rectangle{radius:Theme.popupRadius;color:Theme.material("floating");border.color:Theme.border}
+        contentItem:ColumnLayout {
+            Text {text:"关闭后将丢失尚未保存的内容。";color:Theme.text;wrapMode:Text.Wrap;Layout.fillWidth:true}
+            RowLayout {Layout.alignment:Qt.AlignRight
+                SwirlButton {text:"继续编辑";onClicked:discardPrompt.close()}
+                SwirlButton {objectName:"discardChangesConfirm";text:"放弃修改";danger:true;onClicked:{discardPrompt.close();dialog.close()}}
+            }
+        }
+    }
     enter: Transition {
         enabled:!SwirlMotion.reduced
         ParallelAnimation {

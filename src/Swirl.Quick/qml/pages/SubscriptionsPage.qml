@@ -11,11 +11,11 @@ Item {
  function edit(record){editingId=record?record.id:"";displayName.text=record?record.name:"";urlField.text="";interval.currentIndex=record?Math.max(0,[360,720,1440,10080].indexOf(record.intervalMinutes)):0;autoEnabled.checked=record?record.enabled:true;addDialog.open()}
  readonly property var providers:engineController.imports.providers
  readonly property var listed:providers.filter(function(r){return r.name.toLowerCase().indexOf(search.text.toLowerCase())>=0})
- ColumnLayout { anchors.fill:parent;spacing:Theme.gap
+ ColumnLayout { anchors.fill:parent;anchors.margins:Theme.dp(24);spacing:Theme.gap
   RowLayout { Layout.fillWidth:true
    Text { text:"订阅管理";color:Theme.text;font.pixelSize:Theme.fontSize(30);font.weight:Font.DemiBold;Layout.fillWidth:true }
    SwirlButton { text:"更新全部";enabled:!engineController.imports.busy;onClicked:engineController.imports.refreshAll() }
-   SwirlButton { text:"添加订阅";primary:true;enabled:!engineController.imports.busy;onClicked:page.edit(null) }
+   SwirlButton { objectName:"addSubscription";text:"添加订阅";primary:true;enabled:!engineController.imports.busy;onClicked:page.edit(null) }
   }
   Text { text:engineController.imports.message||"地址由 DPAPI 加密；更新失败保留原节点";color:Theme.muted;Layout.fillWidth:true;wrapMode:Text.Wrap;font.pixelSize:Theme.fontSize(12) }
   SwirlSearchField { id:search;Layout.fillWidth:true;placeholderText:"搜索订阅名称" }
@@ -43,7 +43,7 @@ Item {
         Item { Layout.fillWidth:true }
         SwirlButton { text:"刷新";enabled:!engineController.imports.busy;onClicked:engineController.imports.refreshSubscription(provider.record.id) }
         SwirlButton { text:"编辑";enabled:!engineController.imports.busy;onClicked:page.edit(provider.record) }
-        SwirlButton { text:"删除";danger:true;enabled:!engineController.imports.busy;onClicked:engineController.imports.removeSubscription(provider.record.id) }
+        SwirlButton { text:"删除";danger:true;enabled:!engineController.imports.busy;onClicked:{deleteDialog.recordId=provider.record.id;deleteDialog.open()} }
        }
       }
      }
@@ -53,6 +53,16 @@ Item {
   }
  }
     SwirlDialog {
+        id:deleteDialog;title:"删除订阅？";property string recordId:"";guardChanges:false
+        ColumnLayout {width:parent.width
+            Text {text:"删除此订阅及其导入的节点。";color:Theme.text}
+            RowLayout {Layout.alignment:Qt.AlignRight
+                SwirlButton {text:"取消";onClicked:deleteDialog.close()}
+                SwirlButton {text:"删除";danger:true;onClicked:{engineController.imports.removeSubscription(deleteDialog.recordId);deleteDialog.close()}}
+            }
+        }
+    }
+    SwirlDialog {
         id:addDialog;objectName:"subscriptionDialog"; title:"订阅来源";onClosed:urlField.text=""
         ColumnLayout {
             width:parent.width; spacing:Theme.dp(12)
@@ -60,9 +70,9 @@ Item {
         ScrollBar.vertical:SwirlScrollBar {}
                 ColumnLayout {width:subscriptionForm.availableWidth;spacing:Theme.dp(12)
             Text { text:AppState.zh("Display name"); color:Theme.text }
-            SwirlTextField { id:displayName; Layout.fillWidth:true; placeholderText:AppState.zh("My subscription") }
+            SwirlTextField { id:displayName;objectName:"subscriptionName"; Layout.fillWidth:true; placeholderText:AppState.zh("My subscription") }
             Text { text:"HTTPS 订阅地址"; color:Theme.text }
-            SwirlTextField { id:urlField; Layout.fillWidth:true;echoMode:TextInput.Password; placeholderText:page.editingId.length?"留空保留已加密地址":"https://…";Accessible.name:"订阅地址" }
+            SwirlTextField { id:urlField;objectName:"subscriptionUrl"; Layout.fillWidth:true;echoMode:TextInput.Password; placeholderText:page.editingId.length?"留空保留已加密地址":"https://…";Accessible.name:"订阅地址" }
             Text { text:"应用运行时按设定间隔更新；只导入节点，不执行远程全局配置。"; color:Theme.muted; font.pixelSize:Theme.fontSize(11); Layout.fillWidth:true; wrapMode:Text.WordWrap }
             SwirlComboBox {id:interval;Layout.fillWidth:true;model:["每 6 小时","每 12 小时","每天","每周"];Accessible.name:"自动更新间隔"}
             RowLayout {Layout.fillWidth:true;Text {text:"自动更新";color:Theme.text;Layout.fillWidth:true}SwirlToggle {id:autoEnabled;checked:true}}
@@ -73,7 +83,7 @@ Item {
                 Layout.alignment:Qt.AlignRight
                 SwirlButton { text:AppState.zh("Cancel"); onClicked:addDialog.close() }
                 SwirlButton { enabled:!engineController.imports.busy && displayName.text.trim().length>0 && (page.editingId.length>0 || urlField.text.trim().length>0);
-                    text:"保存并更新"; primary:true
+                    objectName:"saveSubscription";text:"保存并更新"; primary:true
                     onClicked:{if(engineController.imports.saveSubscription(page.editingId,displayName.text,urlField.text.trim(),[360,720,1440,10080][interval.currentIndex],autoEnabled.checked)){var id=page.editingId||engineController.imports.providers[engineController.imports.providers.length-1].id;addDialog.close();engineController.imports.refreshSubscription(id)}}
                 }
             }

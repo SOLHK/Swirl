@@ -7,9 +7,9 @@ QtObject {
     property bool backdropActive: false
     property bool windowActive:true
     // Tint the real desktop through the Qt alpha surface, including the page gutter.
-    readonly property real shellOpacity:transparency && backdropActive ? (dark?0.82:0.72) : 1.0
-    readonly property color shellTop:withAlpha(dark?"#292C31":windowActive?"#D7E8F3":"#E6F0F7",shellOpacity)
-    readonly property color shellBottom:withAlpha(dark?"#22252B":windowActive?"#D4DEEB":"#E5EAF4",shellOpacity)
+    readonly property real shellOpacity:transparency && backdropActive ? (dark?0.94:0.90) : 1.0
+    readonly property color shellTop:withAlpha(dark?"#292C31":windowActive?"#EEF0F3":"#F1F2F4",shellOpacity)
+    readonly property color shellBottom:withAlpha(dark?"#22252B":windowActive?"#E9EBEF":"#EEF0F3",shellOpacity)
     readonly property bool effectsSupported: gpuEffectsSupported
     property bool reduceMotion: false
     property string pageBranch: "B"
@@ -25,15 +25,16 @@ QtObject {
     readonly property real uiScale: followSystemScale ? 1.0 : appearanceSettings.savedScalePercent / 100.0
     readonly property bool dark: mode === "Dark" || (mode === "System" && Qt.styleHints.colorScheme === Qt.Dark)
     // Opaque light surfaces separate the page from its white content cards.
-    readonly property color canvas: dark ? "#24272C" : "#D9E4EC"
+    readonly property color canvas: dark ? "#24272C" : "#EEF0F3"
     readonly property color surface: dark ? "#292C31" : "#FFFFFF"
-    readonly property color independentCard: withAlpha(dark ? "#FFFFFF" : "#FFFFFF", dark ? 0.35 : 0.94)
+    readonly property color independentCard: withAlpha(dark ? "#30343A" : "#FFFFFF", dark ? 0.96 : 0.98)
     readonly property color primaryContainer: dark ? "#292C31" : "#F5F6F8"
     readonly property color raised: dark ? "#292929" : "#F7F7F7"
     // Neutral QML tint above the native window backdrop. Fall back to opacity 1.
-    readonly property color sidebarBase: dark ? "#292C31" : "#D9E4EC"
+    readonly property color sidebarBase: dark ? "#292C31" : "#EEF0F3"
     // Native per-pixel alpha preserves the shared corner outline.
-    readonly property real sidebarOpacity: shellOpacity
+    readonly property real sidebarOpacity: transparency && backdropActive ? (dark ? 0.92 : 0.88) : 1.0
+    readonly property real workspaceOpacity:transparency && backdropActive ? (dark ? 0.96 : 0.94) : 1.0
     readonly property color sidebar: withAlpha(sidebarBase, sidebarOpacity)
     readonly property color border: dark ? "#454545" : "#E5E5E8"
     readonly property color glassRim: border

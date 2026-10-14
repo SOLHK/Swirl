@@ -45,11 +45,28 @@ int runOverviewChecks(QQuickWindow *window) {
         check(!sheet->isVisible()&&state("engineController.dnsConfiguration.mode===2 && engineController.dnsConfiguration.servers==='127.0.0.1'").toBool(),"DNS Apply validates, persists and closes the native sheet");
         window->requestActivate();click("settings-dns");type("dnsServerAddress","192.0.2.53",sheet);click("cancelDns",sheet);
         check(!sheet->isVisible()&&state("engineController.dnsConfiguration.servers==='127.0.0.1'").toBool(),"DNS Cancel closes the sheet without applying draft edits");}
+    window->requestActivate();click("nav-featurehub");click("settings-subscriptions");
+    check(sheet&&sheet->isVisible()&&state("settingsSheet.section==='subscriptions'").toBool(),"More opens the existing subscription manager directly");
+    if(sheet){
+        click("addSubscription",sheet);QTest::qWait(300);
+        QTest::keyClick(sheet,Qt::Key_Escape);QTest::qWait(350);
+        check(sheet->isVisible()&&state("dismissals.count===0").toBool(),"one Escape closes only the subscription form and preserves its settings window");
+        click("addSubscription",sheet);QTest::qWait(300);type("subscriptionName","Unsaved fixture",sheet);
+        QTest::keyClick(sheet,Qt::Key_Escape);QTest::qWait(300);
+        check(sheet->isVisible()&&state("dismissals.count===2").toBool(),"dirty subscription form asks before discarding");
+        QTest::keyClick(sheet,Qt::Key_Escape);QTest::qWait(300);
+        check(state("dismissals.count===1").toBool(),"Escape cancels discard confirmation and preserves the edited form");
+        QTest::keyClick(sheet,Qt::Key_Escape);QTest::qWait(300);click("discardChangesConfirm",sheet);QTest::qWait(350);
+        QTest::keyClick(sheet,Qt::Key_Escape);QTest::qWait(100);
+        check(!sheet->isVisible()&&window->isVisible(),"next Escape closes settings while the main window stays open");
+        window->requestActivate();QTest::keyClick(window,Qt::Key_Escape);QTest::qWait(100);
+        check(window->isVisible(),"Escape on the main page never exits Swirl");
+    }
     window->requestActivate();click("nav-external");QQuickWindow *dashboard=nullptr;for(auto *candidate:QGuiApplication::allWindows())if(candidate->objectName()=="dashboardWindow")dashboard=qobject_cast<QQuickWindow *>(candidate);
     check(dashboard&&dashboard->isVisible()&&dashboard->width()==1300,"Panel opens the independent native request window");
     if(dashboard){check(item("windowCloseButton",dashboard)&&item("windowMinimizeButton",dashboard)&&item("windowMaximizeButton",dashboard),"request panel has all three window controls");click("windowCloseButton",dashboard);check(!dashboard->isVisible()&&window->isVisible(),"panel red button closes only the panel");}
     if(sheet){
-        for(const auto *route:{"profiles","appearance","license","dns","modules","scripts"}){
+        for(const auto *route:{"profiles","appearance","license","dns","modules","scripts","subscriptions"}){
             state(QString("window.openSettings('%1')").arg(route));QTest::qWait(100);
             check(sheet->isVisible()&&item("windowCloseButton",sheet)&&item("windowMinimizeButton",sheet)&&item("windowMaximizeButton",sheet),"every secondary route has visible window controls");
             check(state("settingsLoader.y>=settingsTitleBar.height").toBool(),"secondary page starts below the title bar");

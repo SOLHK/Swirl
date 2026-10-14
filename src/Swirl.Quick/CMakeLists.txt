@@ -12,7 +12,7 @@ add_subdirectory(third_party)
 add_executable(SwirlScriptRunner tools/ScriptRunner.cpp)
 target_link_libraries(SwirlScriptRunner PRIVATE Qt6::Core Qt6::Qml)
 target_compile_definitions(SwirlScriptRunner PRIVATE NOMINMAX)
-qt_add_executable(Swirl WIN32 main.cpp app/SystemDataProvider.cpp app/SystemDataProvider.h app/WindowsBackdrop.cpp app/WindowsBackdrop.h network/CaptureService.cpp network/CaptureService.h app/ModuleDraftStore.cpp app/ModuleDraftStore.h)
+qt_add_executable(Swirl WIN32 main.cpp app/DismissalController.h app/DismissalController.cpp app/SystemDataProvider.cpp app/SystemDataProvider.h app/WindowsBackdrop.cpp app/WindowsBackdrop.h network/CaptureService.cpp network/CaptureService.h app/ModuleDraftStore.cpp app/ModuleDraftStore.h)
 add_library(SwirlEngine STATIC
  app/DiagnosticService.h app/DiagnosticService.cpp
  engine/TelemetryService.h engine/TelemetryService.cpp

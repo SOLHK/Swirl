@@ -18,7 +18,8 @@ Item {
    {title:"模块",icon:"modules",route:"modules",description:"模块是一系列设置的集合，可用于覆盖当前配置的部分设定。"},
    {title:"配置",icon:"profiles",route:"profiles",description:"Swirl 的大部分功能都可以被配置式管理，可以在这里管理所有的配置式。"},
    {title:"授权 & 更新",icon:"license",route:"license",description:"管理你的授权和升级设定。"},
-   {title:"脚本",icon:"scripts",route:"scripts",description:"使用 JavaScript 来扩展 Swirl 的功能。"}]
+   {title:"脚本",icon:"scripts",route:"scripts",description:"使用 JavaScript 来扩展 Swirl 的功能。"},
+   {title:"订阅管理",icon:"profiles",route:"subscriptions",description:"添加、更新和管理远程订阅与自动更新周期。"}]
    SwirlMotionButton {id:entry;objectName:"settings-"+modelData.route;required property var modelData;required property int index;width:Theme.dp(216);height:Theme.dp(189);padding:0;hoverEnabled:true
     background:Rectangle{color:entry.hovered?Theme.withAlpha(Theme.hover,0.25):"transparent";radius:Theme.tileRadius}
     contentItem:Item {

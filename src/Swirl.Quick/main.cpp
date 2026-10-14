@@ -30,6 +30,7 @@
 #include "app/ModuleDraftStore.h"
 #include "app/ExtensionService.h"
 #include "app/MotionPolicy.h"
+#include "app/DismissalController.h"
 #ifdef SWIRL_UI_TESTS
 #include "tests/OverviewChecks.h"
 #include "tests/RuntimeEvidence.h"
@@ -144,8 +145,10 @@ int main(int argc, char *argv[])
     diagnostics.installQtHandler();
     SystemDataProvider systemData(&capture,&engineController,&diagnostics);
     MotionPolicy motionPolicy;
+    DismissalController dismissals;
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("motionPolicy", &motionPolicy);
+    engine.rootContext()->setContextProperty("dismissals", &dismissals);
     engine.addImageProvider(QStringLiteral("swirl"),new SvgIconProvider);
     const bool smoke = app.arguments().contains("--smoke-test");
     const bool interaction = app.arguments().contains("--interaction-test");

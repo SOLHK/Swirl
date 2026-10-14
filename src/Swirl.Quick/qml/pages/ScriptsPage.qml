@@ -33,8 +33,8 @@ Item {
    ScrollView{Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(60);clip:true;TextArea{id:scriptInput;objectName:"localScriptInput";textFormat:TextEdit.PlainText;font.family:"Cascadia Code";font.pixelSize:Theme.fontSize(12);selectByMouse:true;readOnly:extensionsProvider.busy}}
    ScrollView{Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(100);clip:true;TextArea{text:extensionsProvider.error||extensionsProvider.output;textFormat:TextEdit.PlainText;readOnly:true;selectByMouse:true;font.family:"Cascadia Code";font.pixelSize:Theme.fontSize(12)}}
    RowLayout{Layout.alignment:Qt.AlignRight
-    SwirlButton{text:"关闭";onClicked:scriptEditor.close()}
-    SwirlButton{objectName:"localScriptSave";text:"保存";enabled:!extensionsProvider.busy&&scriptName.text.trim().length>0;onClicked:{if(extensionsProvider.saveScript(scriptEditor.scriptId,scriptName.text,scriptCode.text)){const row=extensionsProvider.scripts.find(r=>r.name===scriptName.text.trim());if(row){scriptEditor.scriptId=row.id;page.selectedId=row.id}}}}
+    SwirlButton{text:"完成";onClicked:scriptEditor.requestDismiss()}
+    SwirlButton{objectName:"localScriptSave";text:"保存";enabled:!extensionsProvider.busy&&scriptName.text.trim().length>0;onClicked:{if(extensionsProvider.saveScript(scriptEditor.scriptId,scriptName.text,scriptCode.text)){const row=extensionsProvider.scripts.find(r=>r.name===scriptName.text.trim());if(row){scriptEditor.scriptId=row.id;page.selectedId=row.id;scriptEditor.markSaved()}}}}
     SwirlButton{objectName:"localScriptRun";text:extensionsProvider.busy?"执行中…":"Evaluate";primary:true;enabled:!extensionsProvider.busy&&scriptEditor.scriptId.length>0;onClicked:{if(extensionsProvider.saveScript(scriptEditor.scriptId,scriptName.text,scriptCode.text))extensionsProvider.runScript(scriptEditor.scriptId,scriptInput.text)}}
    }
   }

@@ -73,7 +73,7 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     const auto normalCorner=cornerCoverage();
     check(normalCorner.second>=5,"opaque main surface has partially covered antialiased corner pixels");
     state("Theme.setScalePercent(125)");QTest::qWait(150);
-    check(cornerCoverage().first<normalCorner.first,"manual UI zoom updates alpha corner coverage without a resize");
+    check(backdrop->nativeCorners() || cornerCoverage().first<normalCorner.first,"native corners remain system managed or Qt alpha follows manual UI zoom");
     state("Theme.resetScale()");QTest::qWait(150);
 #endif
     const auto grab=[&](const QString &name){
@@ -134,8 +134,14 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     QCursor::setPos(window->screen()->availableGeometry().topLeft()+QPoint(10,10));QTest::qWait(300);
     auto red=grab("backdrop-red");
     const QColor behind("#D72D31");
-    check(distance(red.pixelColor(0,0),behind)<=3 && distance(red.pixelColor(red.width()-1,0),behind)<=3 && distance(red.pixelColor(0,red.height()-1),behind)<=3 && distance(red.pixelColor(red.width()-1,red.height()-1),behind)<=3,
-          "all four composed corner pixels show the background instead of a rectangular material fill");
+    const auto cornerShowsBackground=[&](QColor pixel){
+        if(!backdrop->nativeCorners())return distance(pixel,behind)<=3;
+        // DWM's native shadow dims the desktop at the corner. Check the
+        // background hue, not exact luminance, to distinguish it from material.
+        return pixel.red()>100 && pixel.red()>3*pixel.green() && qAbs(pixel.blue()-pixel.green())<8;
+    };
+    check(cornerShowsBackground(red.pixelColor(0,0)) && cornerShowsBackground(red.pixelColor(red.width()-1,0)) && cornerShowsBackground(red.pixelColor(0,red.height()-1)) && cornerShowsBackground(red.pixelColor(red.width()-1,red.height()-1)),
+          "all four composed corners show desktop or its native shadow without material fill");
     background.setColor(QColor("#2464D8"));QTest::qWait(800);
     auto blue=grab("backdrop-blue");
     const int sidebarChange=distance(sample(red,0.01,0.83),sample(blue,0.01,0.83));
@@ -145,7 +151,7 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     check(sidebarChange>12,"sidebar responds to changing real window behind it");
     check(contentChange>12,"main page background responds to the real desktop behind it");
     // Cards remain readable while the shell and page gutter reveal the desktop.
-    check(window->grabWindow().pixelColor(int(window->width()*0.995*window->devicePixelRatio()),int(window->height()*0.5*window->devicePixelRatio())).alpha()<240,"page shell has per-pixel alpha instead of opaque blue paint");
+    check(window->grabWindow().pixelColor(int(window->width()*0.995*window->devicePixelRatio()),int(window->height()*0.5*window->devicePixelRatio())).alpha()<255,"page shell has per-pixel alpha instead of opaque blue paint");
     // Move Swirl relative to a split-color native QML window to verify position-
     // dependent composition. The scene is a test window, not a wallpaper image.
     QQuickItem split;
@@ -171,6 +177,7 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     for(int x=cx-50;x<=cx+50;++x){const int value=edge.pixelColor(x,row).red();if(value>low+2&&value<high-2)++intermediate;}
     qInfo()<<"Alpha edge profile: left="<<a<<"right="<<b<<"intermediate pixels="<<intermediate;
     check(high-low>3,"native alpha sidebar responds to the background edge");
+    if(backdrop->status().contains("Acrylic"))check(intermediate>=10,"native Acrylic actually blurs the split-color background edge");
     delete rectangle;
     window->setPosition(available.topLeft()+QPoint(60,40));
     state("Theme.transparency=false");QTest::qWait(500);
