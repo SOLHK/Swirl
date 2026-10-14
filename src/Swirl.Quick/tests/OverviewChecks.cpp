@@ -8,6 +8,7 @@
 #include <QElapsedTimer>
 #include <QTest>
 #include <QDebug>
+#include <QDir>
 #include <functional>
 
 int runOverviewChecks(QQuickWindow *window) {
@@ -39,13 +40,31 @@ int runOverviewChecks(QQuickWindow *window) {
     click("tlsToggle");check(state("captureProvider.tls.enabled").toBool(),"TLS control enables interception after certificate creation");click("tlsToggle");
     click("nav-featurehub");click("settings-dns");
     QQuickWindow *sheet=nullptr;for(auto *candidate:QGuiApplication::allWindows())if(candidate->objectName()=="settingsSheet")sheet=qobject_cast<QQuickWindow *>(candidate);
-    check(sheet&&sheet->isVisible()&&sheet->width()==900&&sheet->height()==qMin(748,sheet->screen()->availableGeometry().height()),"DNS opens a separate native sheet larger than its main window");
+    check(sheet&&sheet->isVisible()&&sheet->width()==qMin(900,sheet->screen()->availableGeometry().width())&&sheet->height()==qMin(790,sheet->screen()->availableGeometry().height()),"DNS opens a separate native sheet with room for its title bar");
     if(sheet){const auto originalHeight=sheet->height();sheet->resize(900,500);QTest::qWait(50);auto *apply=item("applyDns",sheet);check(apply&&apply->mapToScene(QPointF(0,0)).y()+apply->height()<=sheet->height(),"DNS Apply remains visible on a short native viewport");sheet->resize(900,originalHeight);QTest::qWait(50);click("dnsMode-2",sheet);type("dnsServerAddress","127.0.0.1",sheet);click("applyDns",sheet);
         check(!sheet->isVisible()&&state("engineController.dnsConfiguration.mode===2 && engineController.dnsConfiguration.servers==='127.0.0.1'").toBool(),"DNS Apply validates, persists and closes the native sheet");
         window->requestActivate();click("settings-dns");type("dnsServerAddress","192.0.2.53",sheet);click("cancelDns",sheet);
         check(!sheet->isVisible()&&state("engineController.dnsConfiguration.servers==='127.0.0.1'").toBool(),"DNS Cancel closes the sheet without applying draft edits");}
     window->requestActivate();click("nav-external");QQuickWindow *dashboard=nullptr;for(auto *candidate:QGuiApplication::allWindows())if(candidate->objectName()=="dashboardWindow")dashboard=qobject_cast<QQuickWindow *>(candidate);
-    check(dashboard&&dashboard->isVisible()&&dashboard->width()==1300,"Panel opens the independent native request window");if(dashboard)dashboard->hide();
+    check(dashboard&&dashboard->isVisible()&&dashboard->width()==1300,"Panel opens the independent native request window");
+    if(dashboard){check(item("windowCloseButton",dashboard)&&item("windowMinimizeButton",dashboard)&&item("windowMaximizeButton",dashboard),"request panel has all three window controls");click("windowCloseButton",dashboard);check(!dashboard->isVisible()&&window->isVisible(),"panel red button closes only the panel");}
+    if(sheet){
+        for(const auto *route:{"profiles","appearance","license","dns","modules","scripts"}){
+            state(QString("window.openSettings('%1')").arg(route));QTest::qWait(100);
+            check(sheet->isVisible()&&item("windowCloseButton",sheet)&&item("windowMinimizeButton",sheet)&&item("windowMaximizeButton",sheet),"every secondary route has visible window controls");
+            check(state("settingsLoader.y>=settingsTitleBar.height").toBool(),"secondary page starts below the title bar");
+            if(QString::fromLatin1(route)=="license"){
+                const auto *brand=item("brandVector",sheet);check(brand&&brand->isVisible()&&brand->width()>=104,"About page displays the enlarged brand mark after reopening Appearance");
+            }
+            const auto qaDirectory=qEnvironmentVariable("SWIRL_UI_QA_DIRECTORY");
+            if(!qaDirectory.isEmpty()){QDir().mkpath(qaDirectory);check(sheet->grabWindow().save(qaDirectory+"/"+route+".png"),"secondary window render saved for visual review");}
+            click("windowCloseButton",sheet);check(!sheet->isVisible()&&window->isVisible(),"secondary red button closes only its window");
+        }
+        state("window.openSettings('profiles')");QTest::qWait(100);click("windowMaximizeButton",sheet);check(sheet->visibility()==QWindow::Maximized,"secondary green button maximizes");
+        click("windowMaximizeButton",sheet);check(sheet->visibility()==QWindow::Windowed,"secondary green button restores");
+        click("windowMinimizeButton",sheet);check(sheet->visibility()==QWindow::Minimized,"secondary yellow button minimizes");
+        sheet->showNormal();sheet->requestActivate();QTest::qWait(100);QTest::keyClick(sheet,Qt::Key_Escape);QTest::qWait(100);check(!sheet->isVisible()&&window->isVisible(),"Escape dismisses the secondary window");
+    }
     window->requestActivate();QTest::keyClick(window,Qt::Key_K,Qt::ControlModifier);QTest::qWait(100);type("pageSearch","DNS");QTest::keyClick(window,Qt::Key_Return);settled();
     check(state("AppState.currentPage==='dns'").toBool(),"Ctrl+K searches and navigates from actual keyboard input");
     state("AppState.navigate('scripts')");QTest::qWait(50);settled();click("scriptAddButton");type("localScriptName","UI script");type("localScriptSource","function main(input){return {sum:input.a+input.b};}");type("localScriptInput","{\"a\":20,\"b\":22}");click("localScriptSave");

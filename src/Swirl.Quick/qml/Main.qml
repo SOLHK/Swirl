@@ -116,40 +116,22 @@ ApplicationWindow {
         layer.effect:MultiEffect { maskEnabled:true; maskSource:windowCornerMask }
         width:window.width; height:window.height
         Rectangle {
-            width:window.actualSidebarWidth + Theme.windowRadius; height:parent.height
+            // One shared layer avoids stacking alpha tints along the sidebar seam.
+            anchors.fill:parent
             radius:window.shellRadius; antialiasing:true
-            color:Theme.sidebar
             gradient:Gradient{GradientStop{position:0;color:Theme.shellTop}GradientStop{position:1;color:Theme.shellBottom}}
 
         }
-        Rectangle {
-            x: window.actualSidebarWidth
-            width: parent.width - x; height: parent.height
-            radius: window.shellRadius; antialiasing:true
-            color: Theme.canvas
-            gradient:Gradient{GradientStop{position:0;color:Theme.shellTop}GradientStop{position:1;color:Theme.shellBottom}}
-            Rectangle { width: Theme.windowRadius; height: parent.height; gradient:Gradient{GradientStop{position:0;color:Theme.shellTop}GradientStop{position:1;color:Theme.shellBottom}} }
-        }
 
-        MouseArea {
-            x:Theme.dp(0); y:Theme.dp(0); width:parent.width; height:Theme.dp(68)
-            property point pressPosition
-            property bool nativeMoveStarted:false
-            onPressed:mouse=>{ pressPosition=Qt.point(mouse.x,mouse.y);nativeMoveStarted=false }
-            onPositionChanged:mouse=>{ if(pressed&&!nativeMoveStarted&&Math.hypot(mouse.x-pressPosition.x,mouse.y-pressPosition.y)>Qt.styleHints.startDragDistance){nativeMoveStarted=true;window.startSystemMove()} }
-            onDoubleClicked:window.visibility===Window.Maximized ? window.showNormal() : window.showMaximized()
-        }
         MouseArea {
             objectName:"titleDragArea"
-            visible:false
-            x:window.actualSidebarWidth; y:Theme.dp(0); width:parent.width-x-Theme.dp(240)
-            height:pageLoader.item && pageLoader.item.scrollOffset>0 ? Theme.dp(22) : Theme.dp(68); z:20
+            x:Theme.dp(0); y:Theme.dp(0); width:parent.width; height:Theme.dp(68)
             acceptedButtons:Qt.LeftButton|Qt.RightButton
             property point pressPosition
             property bool nativeMoveStarted:false
             onPressed:mouse=>{ pressPosition=Qt.point(mouse.x,mouse.y);nativeMoveStarted=false;if(mouse.button===Qt.RightButton)backdrop.showSystemMenu() }
             onPositionChanged:mouse=>{ if(pressed&&(pressedButtons&Qt.LeftButton)&&!nativeMoveStarted&&Math.hypot(mouse.x-pressPosition.x,mouse.y-pressPosition.y)>Qt.styleHints.startDragDistance){nativeMoveStarted=true;window.startSystemMove()} }
-            onDoubleClicked:window.visibility===Window.Maximized?window.showNormal():window.showMaximized()
+            onDoubleClicked:window.visibility===Window.Maximized ? window.showNormal() : window.showMaximized()
         }
         SwirlSidebar { id:sidebar; width:window.actualSidebarWidth; height:parent.height; compactByWindow:false }
         Item {
@@ -198,9 +180,10 @@ ApplicationWindow {
             }
         }
     }
+    Rectangle { objectName:"windowOutline";anchors.fill:parent;radius:window.shellRadius;color:"transparent";border.width:Theme.dp(1);border.color:Theme.withAlpha(Theme.dark?"#FFFFFF":"#607D98",0.28);z:90 }
     function openDashboard(){dashboardWindow.show();dashboardWindow.raise();dashboardWindow.requestActivate()}
     function openCaptureInspector(){captureInspectorDialog.open()}
-    function openSettings(route){settingsSheet.x=window.x+(window.width-settingsSheet.width)/2;settingsSheet.y=Math.max(0,Math.min(window.y,Screen.desktopAvailableHeight-settingsSheet.height));settingsSheet.section=route;settingsSheet.show();settingsSheet.raise();settingsSheet.requestActivate()}
+    function openSettings(route){settingsSheet.x=window.x+(window.width-settingsSheet.width)/2;settingsSheet.y=Math.max(0,Math.min(window.y,Screen.desktopAvailableHeight-settingsSheet.height));settingsSheet.section=route;settingsSheet.updateSettingsSection();settingsSheet.show();settingsSheet.raise();settingsSheet.requestActivate()}
     function closeSettings(){settingsSheet.hide()}
     function openRewriteEditor(kind,title){rewriteRulesDialog.kind=kind;rewriteRulesDialog.title=title;rewriteRulesDialog.open()}
     RewriteRulesDialog{id:rewriteRulesDialog}
@@ -208,22 +191,26 @@ ApplicationWindow {
         id:dashboardWindow;objectName:"dashboardWindow";function openProxyControl(){hide();AppState.navigate("policies");window.show();window.raise();window.requestActivate()}
         visible:false;width:Theme.dp(1300);height:Theme.dp(600);minimumWidth:Theme.dp(914);minimumHeight:Theme.dp(560);title:"Swirl 面板";flags:Qt.Window|Qt.FramelessWindowHint;color:"transparent"
         function openCaptureInspector(){window.openCaptureInspector()}
-        Rectangle{id:dashboardMask;anchors.fill:parent;radius:Theme.dp(24);visible:false;layer.enabled:true;color:"white"}
-        Rectangle{anchors.fill:parent;radius:Theme.dp(24);color:Theme.surface}
-        ExternalToolsPage{anchors.fill:parent;layer.enabled:Theme.effectsSupported;layer.effect:MultiEffect{maskEnabled:true;maskSource:dashboardMask}}
-        MouseArea{x:0;y:0;width:Theme.dp(220);height:Theme.dp(48);onPressed:dashboardWindow.startSystemMove()}
-        Row{x:Theme.dp(20);y:Theme.dp(18);spacing:Theme.dp(9);Repeater{model:["#FF5F57","#FEBC2E","#28C840"];SwirlMotionButton{required property string modelData;required property int index;width:Theme.dp(14);height:width;background:Rectangle{color:parent.modelData;radius:width/2}
-contentItem:Item{}
-onClicked:{if(index===0)dashboardWindow.hide();else if(index===1)dashboardWindow.showMinimized();else if(dashboardWindow.visibility===Window.Maximized)dashboardWindow.showNormal();else dashboardWindow.showMaximized()}}}}
+        Rectangle{id:dashboardMask;anchors.fill:parent;radius:dashboardWindow.visibility===Window.Maximized?0:Theme.dp(24);visible:false;layer.enabled:true;color:"white"}
+        Item{anchors.fill:parent;layer.enabled:Theme.effectsSupported;layer.effect:MultiEffect{maskEnabled:true;maskSource:dashboardMask}
+        Rectangle{anchors.fill:parent;radius:dashboardWindow.visibility===Window.Maximized?0:Theme.dp(24);gradient:Gradient{GradientStop{position:0;color:Theme.shellTop}GradientStop{position:1;color:Theme.shellBottom}}}
+        SwirlWindowTitleBar{id:dashboardTitleBar;anchors.left:parent.left;anchors.right:parent.right;targetWindow:dashboardWindow}
+        ExternalToolsPage{anchors.left:parent.left;anchors.right:parent.right;anchors.top:dashboardTitleBar.bottom;anchors.bottom:parent.bottom;clip:true}
+        }
     }
     Window {
         id:settingsSheet;objectName:"settingsSheet";
-        property string section:"dns";visible:false;width:Theme.dp(900);height:previewPage==="dns"?Theme.dp(748):Math.min(Theme.dp(748),Screen.desktopAvailableHeight);title:"Swirl 设置";flags:Qt.Dialog|Qt.FramelessWindowHint;modality:Qt.WindowModal;transientParent:window;color:"transparent"
+        property string section:"dns";visible:false;width:Math.min(Theme.dp(900),Screen.desktopAvailableWidth);height:Math.min(Theme.dp(790),Screen.desktopAvailableHeight);title:section==="profiles"?"Swirl 配置":section==="modules"?"Swirl 模块":section==="scripts"?"Swirl 脚本":"Swirl 设置";flags:Qt.Window|Qt.FramelessWindowHint;modality:Qt.WindowModal;transientParent:window;color:"transparent"
         function closeSettings(){settingsSheet.hide()}
-        Rectangle{anchors.fill:parent;radius:Theme.dp(27);color:Theme.surface}
-        Rectangle{id:settingsMask;anchors.fill:parent;radius:Theme.dp(27);visible:false;layer.enabled:true;color:"white"}
-        Loader{id:settingsLoader;anchors.fill:parent;layer.enabled:Theme.effectsSupported;layer.effect:MultiEffect{maskEnabled:true;maskSource:settingsMask}
-sourceComponent:settingsSheet.section==="dns"?dns:settingsSheet.section==="modules"?modules:settingsSheet.section==="profiles"?profiles:settingsSheet.section==="scripts"?scripts:settings;onLoaded:{if(item&&item.section!==undefined)item.section=settingsSheet.section==="appearance"?"外观":settingsSheet.section==="license"?"关于 Swirl":"常规"}}
+        function updateSettingsSection(){if(settingsLoader.item&&settingsLoader.item.section!==undefined)settingsLoader.item.section=section==="appearance"?"外观":section==="license"?"关于 Swirl":"常规"}
+        onSectionChanged:updateSettingsSection()
+        Rectangle{id:settingsMask;anchors.fill:parent;radius:settingsSheet.visibility===Window.Maximized?0:Theme.dp(27);visible:false;layer.enabled:true;color:"white"}
+        Item{anchors.fill:parent;layer.enabled:Theme.effectsSupported;layer.effect:MultiEffect{maskEnabled:true;maskSource:settingsMask}
+        Rectangle{anchors.fill:parent;radius:settingsSheet.visibility===Window.Maximized?0:Theme.dp(27);gradient:Gradient{GradientStop{position:0;color:Theme.shellTop}GradientStop{position:1;color:Theme.shellBottom}}}
+        SwirlWindowTitleBar{id:settingsTitleBar;anchors.left:parent.left;anchors.right:parent.right;targetWindow:settingsSheet}
+        Loader{id:settingsLoader;anchors.left:parent.left;anchors.right:parent.right;anchors.top:settingsTitleBar.bottom;anchors.bottom:parent.bottom;clip:true
+sourceComponent:settingsSheet.section==="dns"?dns:settingsSheet.section==="modules"?modules:settingsSheet.section==="profiles"?profiles:settingsSheet.section==="scripts"?scripts:settings;onLoaded:settingsSheet.updateSettingsSection()}
+        }
     }
     SwirlDialog {
         id:captureInspectorDialog;title:"HTTP 请求详情";width:Math.min(Theme.dp(1000),window.width-Theme.dp(20));height:Math.min(Theme.dp(650),window.height-Theme.dp(20));padding:Theme.dp(14)

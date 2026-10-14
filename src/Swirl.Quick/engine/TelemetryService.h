@@ -3,6 +3,7 @@
 #include <QJsonObject>
 #include <QNetworkAccessManager>
 #include <QTimer>
+#include <QSet>
 
 // Single model shared by overview, connections, processes and analytics.
 // Only authenticated adapter observations enter the accounting model.
@@ -49,6 +50,8 @@ signals:
  void changed();
  void diagnostic(const QString &module,const QString &code,const QString &message);
 private:
+ friend class TelemetryTests;
+ void reportMeasurement(const QString &key,bool ok,const QString &message);
  void publish();
  void load();
  QJsonObject periodData(int period) const;
@@ -62,5 +65,6 @@ private:
  QHash<QString,QVariantMap> m_seen;
  QVariantList m_history;
  QVariantMap m_latencies;
+ QSet<QString> m_failedMeasurements;
  QTimer m_save,m_measure,m_stale;
 };

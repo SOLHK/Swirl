@@ -139,11 +139,13 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     background.setColor(QColor("#2464D8"));QTest::qWait(800);
     auto blue=grab("backdrop-blue");
     const int sidebarChange=distance(sample(red,0.01,0.83),sample(blue,0.01,0.83));
-    const int contentChange=distance(sample(red,0.96,0.03),sample(blue,0.96,0.03));
+    const int contentChange=distance(sample(red,0.995,0.5),sample(blue,0.995,0.5));
     qInfo()<<"Native pixel delta: sidebar="<<sidebarChange<<"content="<<contentChange<<"DPR="<<window->devicePixelRatio()<<backdrop->status();
     check(backdrop->active(),"native translucent surface actually enabled on this machine");
     check(sidebarChange>12,"sidebar responds to changing real window behind it");
-    check(contentChange<=3,"main content remains opaque under background color changes");
+    check(contentChange>12,"main page background responds to the real desktop behind it");
+    // Cards remain readable while the shell and page gutter reveal the desktop.
+    check(window->grabWindow().pixelColor(int(window->width()*0.995*window->devicePixelRatio()),int(window->height()*0.5*window->devicePixelRatio())).alpha()<240,"page shell has per-pixel alpha instead of opaque blue paint");
     // Move Swirl relative to a split-color native QML window to verify position-
     // dependent composition. The scene is a test window, not a wallpaper image.
     QQuickItem split;
@@ -177,15 +179,16 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     auto opaqueRed=grab("backdrop-disabled-red");
     check(!backdrop->active(),"application transparency setting disables native backdrop");
     check(distance(sample(opaqueBlue,0.01,0.83),sample(opaqueRed,0.01,0.83))<=3,"disabled transparency gives opaque sidebar fallback");
+    check(distance(sample(opaqueBlue,0.995,0.5),sample(opaqueRed,0.995,0.5))<=3,"disabled transparency gives opaque page fallback");
     state("Theme.transparency=true;Theme.mode='Dark'");QTest::qWait(500);grab("overview-native-dark");
     check(backdrop->active(),"native backdrop remains available in dark theme");
     state("Theme.mode='Light'");
     auto *title=find(window->contentItem(),"titleDragArea");
     check(title,"title drag region exists");
     if (title) {
-        QTest::mouseDClick(window,Qt::LeftButton,Qt::NoModifier,title->mapToScene(QPointF(title->width()/2,20)).toPoint());QTest::qWait(350);
+        QTest::mouseDClick(window,Qt::LeftButton,Qt::NoModifier,title->mapToScene(QPointF(100,20)).toPoint());QTest::qWait(350);
         check(window->visibility()==QWindow::Maximized,"double click title maximizes actual window");
-        QTest::mouseDClick(window,Qt::LeftButton,Qt::NoModifier,title->mapToScene(QPointF(title->width()/2,20)).toPoint());QTest::qWait(350);
+        QTest::mouseDClick(window,Qt::LeftButton,Qt::NoModifier,title->mapToScene(QPointF(100,20)).toPoint());QTest::qWait(350);
         check(window->visibility()==QWindow::Windowed,"double click title restores actual window");
     }
     click("windowMaximizeButton");QTest::qWait(500);grab("overview-maximized");

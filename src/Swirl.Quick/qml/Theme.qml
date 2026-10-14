@@ -6,8 +6,10 @@ QtObject {
     property bool transparency: true
     property bool backdropActive: false
     property bool windowActive:true
-    readonly property color shellTop:dark?"#292C31":windowActive?"#D7E8F3":"#F6FAFC"
-    readonly property color shellBottom:dark?"#22252B":windowActive?"#D4DEEB":"#F7F5FD"
+    // Tint the real desktop through the Qt alpha surface, including the page gutter.
+    readonly property real shellOpacity:transparency && backdropActive ? (dark?0.82:0.72) : 1.0
+    readonly property color shellTop:withAlpha(dark?"#292C31":windowActive?"#D7E8F3":"#E6F0F7",shellOpacity)
+    readonly property color shellBottom:withAlpha(dark?"#22252B":windowActive?"#D4DEEB":"#E5EAF4",shellOpacity)
     readonly property bool effectsSupported: gpuEffectsSupported
     property bool reduceMotion: false
     property string pageBranch: "B"
@@ -31,7 +33,7 @@ QtObject {
     // Neutral QML tint above the native window backdrop. Fall back to opacity 1.
     readonly property color sidebarBase: dark ? "#292C31" : "#D9E4EC"
     // Native per-pixel alpha preserves the shared corner outline.
-    readonly property real sidebarOpacity: transparency && backdropActive ? 0.96 : 1.0
+    readonly property real sidebarOpacity: shellOpacity
     readonly property color sidebar: withAlpha(sidebarBase, sidebarOpacity)
     readonly property color border: dark ? "#454545" : "#E5E5E8"
     readonly property color glassRim: border
