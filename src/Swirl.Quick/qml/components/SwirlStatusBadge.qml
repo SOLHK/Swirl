@@ -1,10 +1,14 @@
 import QtQuick
 import SwirlQuick
+import "../controls"
 Rectangle {
     id: badge
     property string label: ""
     property string tone: "neutral"
-    implicitWidth: caption.implicitWidth + Theme.dp(20)
+    property bool busy:false
+    Behavior on color{ColorAnimation{duration:SwirlMotion.duration}}
+    SwirlActivityIndicator{anchors.left:parent.left;anchors.leftMargin:Theme.dp(6);anchors.verticalCenter:parent.verticalCenter;busy:badge.busy}
+    implicitWidth: caption.implicitWidth + Theme.dp(busy?40:20)
     implicitHeight:Theme.dp(24)
     radius:Theme.roundedRadius(width,height)
     border.width:Theme.dp(1)
@@ -15,6 +19,7 @@ Rectangle {
     Text {
         id: caption
         anchors.centerIn: parent
+        anchors.horizontalCenterOffset:badge.busy?Theme.dp(8):0
         text: AppState.zh(badge.label)
         font.pixelSize:Theme.fontSize(11)
         font.weight: Font.Medium

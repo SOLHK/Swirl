@@ -270,15 +270,15 @@ sourceComponent:settingsSheet.section==="subscriptions"?subscriptions:settingsSh
         }
     }
     Shortcut { sequence:"Alt+Space"; context:Qt.ApplicationShortcut; onActivated:backdrop.showSystemMenu() }
-    Shortcut { sequence:"Ctrl+K"; context:Qt.ApplicationShortcut; onActivated:sidebar.openSearch() }
-    Shortcut { sequence:"Alt+Left"; onActivated:AppState.goBack() }
-    Shortcut { sequence:"Alt+Right"; onActivated:AppState.goForward() }
-    Shortcut { sequence:"Ctrl+1"; onActivated:AppState.navigate("overview") }
-    Shortcut { sequence:"Ctrl+2"; onActivated:AppState.navigate("proxies") }
-    Shortcut { sequence:"Ctrl+3"; onActivated:AppState.navigate("connections") }
-    Shortcut { sequence:"Ctrl+4"; onActivated:AppState.navigate("inspector") }
-    Shortcut { sequence:"Ctrl+,"; onActivated:AppState.navigate("settings") }
-    Shortcut { sequence:"Ctrl+B"; onActivated:AppState.sidebarCollapsed=!AppState.sidebarCollapsed }
+    Shortcut { enabled:dismissals.count===0;sequence:"Ctrl+K"; context:Qt.ApplicationShortcut; onActivated:sidebar.openSearch() }
+    Shortcut { enabled:dismissals.count===0;sequence:"Alt+Left"; onActivated:AppState.goBack() }
+    Shortcut { enabled:dismissals.count===0;sequence:"Alt+Right"; onActivated:AppState.goForward() }
+    Shortcut { enabled:dismissals.count===0;sequence:"Ctrl+1"; onActivated:AppState.navigate("overview") }
+    Shortcut { enabled:dismissals.count===0;sequence:"Ctrl+2"; onActivated:AppState.navigate("proxies") }
+    Shortcut { enabled:dismissals.count===0;sequence:"Ctrl+3"; onActivated:AppState.navigate("connections") }
+    Shortcut { enabled:dismissals.count===0;sequence:"Ctrl+4"; onActivated:AppState.navigate("inspector") }
+    Shortcut { enabled:dismissals.count===0;sequence:"Ctrl+,"; onActivated:AppState.navigate("settings") }
+    Shortcut { enabled:dismissals.count===0;sequence:"Ctrl+B"; onActivated:AppState.sidebarCollapsed=!AppState.sidebarCollapsed }
         Component { id:activity; ActivityPage { engineController:window.engineControllerContext; systemProvider:window.systemProviderContext } }
         Component { id:overview; OverviewPage { engineController:window.engineControllerContext; systemProvider:window.systemProviderContext } }
     Component { id:capturePage; CapturePage { captureProvider:window.captureProviderContext } }

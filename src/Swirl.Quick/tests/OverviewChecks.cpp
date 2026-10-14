@@ -52,6 +52,8 @@ int runOverviewChecks(QQuickWindow *window) {
         QTest::keyClick(sheet,Qt::Key_Escape);QTest::qWait(350);
         check(sheet->isVisible()&&state("dismissals.count===0").toBool(),"one Escape closes only the subscription form and preserves its settings window");
         click("addSubscription",sheet);QTest::qWait(300);type("subscriptionName","Unsaved fixture",sheet);
+        QTest::keyClick(sheet,Qt::Key_1,Qt::ControlModifier);QTest::qWait(50);
+        check(state("AppState.currentPage==='featurehub'").toBool(),"navigation shortcuts cannot bypass a modal draft");
         QTest::keyClick(sheet,Qt::Key_Escape);QTest::qWait(300);
         check(sheet->isVisible()&&state("dismissals.count===2").toBool(),"dirty subscription form asks before discarding");
         QTest::keyClick(sheet,Qt::Key_Escape);QTest::qWait(300);

@@ -6,6 +6,9 @@ Item {
     id:table
     property var columns:[{key:"name",label:"名称",w:220}]
     property var rows:[]
+    property bool incrementalRows:false
+    property bool animateLatency:false
+    SwirlAnimatedModel{id:stableRows;source:table.incrementalRows?table.rows:[];keyRole:"id"}
     property string selectedId:""
     property int itemHeight:Theme.dp(43)
     property int textPixelSize:12
@@ -73,14 +76,14 @@ Item {
                 width:parent.width
                 height:Math.floor(Math.max(0,horizontal.height-table.headerHeight)/table.itemHeight)*table.itemHeight
                 clip:true
-                model:table.rows
+                model:table.incrementalRows?stableRows:table.rows
                 boundsBehavior:Flickable.StopAtBounds
                 ScrollBar.vertical:ScrollBar {}
                 delegate:Rectangle {
                     id:recordRow
                     z:1
                     width:list.width; height:table.itemHeight
-                    property var record:modelData
+                    property var record:table.incrementalRows?model.entry:modelData
                     color:table.selectedId===String(record.id||record.name) ? Theme.selected :
                           mouse.containsMouse ? Theme.hover : (index%2?Theme.field:Theme.surface)
                     Behavior on color { ColorAnimation { duration:Theme.motion } }
@@ -94,7 +97,14 @@ Item {
                                 Text {
                                     anchors.fill:parent
                                     anchors.leftMargin:table.cellPadding; anchors.rightMargin:Theme.dp(8)
-                                    text:String(recordRow.record[modelData.key]===undefined?"":recordRow.record[modelData.key])
+                                    id:cell
+                                    readonly property string raw:String(recordRow.record[modelData.key]===undefined?"":recordRow.record[modelData.key])
+                                    readonly property real measured:table.animateLatency && modelData.key==="latency" && raw.length && isFinite(Number(raw))?Number(raw):-1
+                                    property real displayed:-1
+                                    property real previous:-1
+                                    onMeasuredChanged:{if(measured>=0 && previous>=0 && !SwirlMotion.reduced)numberSlide.restart();else{numberSlide.stop();displayed=measured}previous=measured}
+                                    SmoothedAnimation{id:numberSlide;target:cell;property:"displayed";to:cell.measured;duration:SwirlMotion.duration;velocity:-1}
+                                    text:measured>=0?String(Math.round(displayed)):raw
                                     textFormat:Text.PlainText
                                     color:Theme.text
                                     font.pixelSize:Theme.fontSize(table.textPixelSize)
@@ -109,7 +119,7 @@ Item {
                         id:mouse; anchors.fill:parent; hoverEnabled:true
                         acceptedButtons:Qt.LeftButton|Qt.RightButton
                         onClicked:function(event){
-                            table.selectedId=String(recordRow.record.id||recordRow.record.name)
+                            if(!table.incrementalRows)table.selectedId=String(recordRow.record.id||recordRow.record.name)
                             table.rowSelected(recordRow.record)
                             if(event.button===Qt.RightButton) contextMenu.popup()
                         }

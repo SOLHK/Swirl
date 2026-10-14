@@ -8,6 +8,8 @@
 #include <QTest>
 #include <QClipboard>
 #include <QGuiApplication>
+#include <QDir>
+#include <QImage>
 #include <functional>
 
 int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
@@ -65,5 +67,51 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     check(QTest::qWaitFor([&]{return !controller->tests()->busy();},41000) && controller->tests()->result(controller->selectedNodeId()).value("success").toBool(),"UI imported node forwards a real HTTP request");
     controller->stop();check(QTest::qWaitFor([&]{return !controller->processAlive();},4000),"UI imported node cleanup reaps owned engine");
     controller->deleteNode(controller->nodes().first().toMap().value("id").toString());
+    // Exercise the actual subscription form against an isolated HTTPS server.
+    // Only synthetic fixture data enters this temporary DPAPI store.
+    QSslServer subscriptions;subscriptions.setSslConfiguration(net.https.sslConfiguration());
+    const auto previousSsl=QSslConfiguration::defaultConfiguration();
+    struct RestoreSsl{QSslConfiguration value;~RestoreSsl(){QSslConfiguration::setDefaultConfiguration(value);}} restoreSsl{previousSsl};
+    auto trustedSsl=previousSsl;trustedSsl.addCaCertificate(net.certificate);QSslConfiguration::setDefaultConfiguration(trustedSsl);
+    int subscriptionRequests=0;
+    QObject::connect(&subscriptions,&QTcpServer::pendingConnectionAvailable,&subscriptions,[&]{while(subscriptions.hasPendingConnections()){
+        auto *socket=subscriptions.nextPendingConnection();
+        QObject::connect(socket,&QTcpSocket::readyRead,socket,[&,socket]{
+            socket->readAll();if(socket->property("responded").toBool())return;socket->setProperty("responded",true);++subscriptionRequests;
+            const auto content=QString("proxies: [{name: Subscription fixture, type: socks5, server: 127.0.0.1, port: %1}]\n").arg(net.a.serverPort()).toUtf8();
+            QTimer::singleShot(600,socket,[socket,content]{socket->write("HTTP/1.1 200 OK\r\nContent-Length: "+QByteArray::number(content.size())+"\r\nConnection: close\r\n\r\n"+content);socket->disconnectFromHost();});
+        });
+        QObject::connect(socket,&QTcpSocket::disconnected,socket,&QObject::deleteLater);
+    }});
+    check(subscriptions.listen(QHostAddress::LocalHost,0),"subscription HTTPS fixture listens");
+    eval("AppState.navigate('subscriptions')");QTest::qWait(350);
+    click("addSubscription");fill("subscriptionName","Subscription fixture");fill("subscriptionUrl",QString("https://localhost:%1/fixture").arg(subscriptions.serverPort()));click("saveSubscription");
+    const auto businessQa=qEnvironmentVariable("SWIRL_UI_QA_DIRECTORY");
+    if(!businessQa.isEmpty()) {
+        QDir().mkpath(businessQa+"/business-frames");
+        for(int frame=0;frame<25;++frame){QTest::qWait(40);window->grabWindow().scaledToWidth(1000,Qt::SmoothTransformation).save(businessQa+QString("/business-frames/%1.png").arg(frame,3,10,QChar('0')));}
+    }
+    check(QTest::qWaitFor([&]{return !controller->imports()->busy();},8000)&&controller->imports()->providers().size()==1&&controller->nodes().size()==1&&subscriptionRequests==1,"subscription UI saves HTTPS source and imports an actual node");
+    if(!controller->imports()->providers().isEmpty()) {
+        const auto id=controller->imports()->providers().first().toMap().value("id").toString();
+        QPointer<QQuickItem> card=item("subscriptionCard-"+id);
+        const auto collapsedHeight=card?card->height():0;
+        click("expandSubscription-"+id);
+        check(card&&card->height()>collapsedHeight,"subscription details animate open without replacing the card");
+        click("editSubscription-"+id);check(item("subscriptionUrl")&&item("subscriptionUrl")->property("text").toString().isEmpty(),"editing subscription keeps its protected URL hidden");
+        fill("subscriptionName","Edited subscription fixture");click("saveSubscription");
+        check(QTest::qWaitFor([&]{return !controller->imports()->busy();},8000)&&controller->imports()->providers().first().toMap().value("name").toString()=="Edited subscription fixture"&&subscriptionRequests==2,"editing preserves encrypted URL and refreshes the real source");
+        check(card&&item("subscriptionCard-"+id)==card,"subscription refresh keeps the same card delegate and expanded state");
+        const auto qa=qEnvironmentVariable("SWIRL_UI_QA_DIRECTORY");
+        if(!qa.isEmpty()){QDir().mkpath(qa);window->grabWindow().save(qa+"/subscription-success.png");}
+        subscriptions.close();click("refreshSubscription-"+id);
+        check(QTest::qWaitFor([&]{return !controller->imports()->busy();},8000)&&!controller->imports()->providers().first().toMap().value("error").toString().isEmpty()&&controller->nodes().size()==1,"failed real refresh displays an error and retains imported nodes");
+        if(!qa.isEmpty())window->grabWindow().save(qa+"/subscription-failure.png");
+        click("deleteSubscription-"+id);QTest::keyClick(window,Qt::Key_Escape);QTest::qWait(250);
+        check(controller->imports()->providers().size()==1,"Escape cancels destructive subscription confirmation");
+        click("deleteSubscription-"+id);click("confirmSubscriptionDelete");
+        check(controller->imports()->providers().isEmpty()&&controller->nodes().size()==1,"confirmed deletion retains nodes as documented");
+        controller->deleteNode(controller->nodes().first().toMap().value("id").toString());
+    }
     qInfo()<<"Node UI checks:"<<checks<<"checks,"<<failures<<"failures";return failures?2:0;
 }

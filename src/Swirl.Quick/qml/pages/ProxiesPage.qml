@@ -31,7 +31,7 @@ Item {
                     Text {text:engineController.selectedNodeName;textFormat:Text.PlainText;color:Theme.text;font.pixelSize:Theme.fontSize(22);font.weight:Font.DemiBold;Layout.fillWidth:true;elide:Text.ElideRight}
                     Text {text:engineController.tests.message||engineController.stateText+" · "+engineController.nodeStateText;color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;elide:Text.ElideRight}
                 }
-                SwirlStatusBadge {label:engineController.activeProxyPort>0?"127.0.0.1:"+engineController.activeProxyPort:"未开放代理端口";tone:"accent"}
+                SwirlStatusBadge {busy:engineController.nodeBusy||engineController.tests.busy;label:engineController.activeProxyPort>0?"127.0.0.1:"+engineController.activeProxyPort:"未开放代理端口";tone:engineController.nodeError.length?"warning":engineController.apiHealthy?"success":"neutral"}
                 SwirlButton {objectName:"allNodesTestButton";text:engineController.tests.busy?"取消测速":"全部测速";iconName:"activity";enabled:engineController.nodes.length>0;onClicked:engineController.tests.busy?engineController.tests.cancel():engineController.testAllNodes(testUrl.text)}
                 SwirlButton {objectName:"nodeImportButton";text:"一键导入";enabled:!engineController.imports.busy;onClicked:importDialog.open()}
                 SwirlButton {objectName:"nodeAddButton";text:"添加节点";primary:true;enabled:engineController.canStart;onClicked:page.edit(null)}
@@ -48,7 +48,7 @@ Item {
             SwirlGlassPanel {
                 Layout.fillWidth:true;Layout.fillHeight:true;clip:true
                 SwirlDataTable {
-                    objectName:"realNodeTable";anchors.fill:parent;anchors.margins:Theme.dp(1);rows:page.viewRows;selectedId:page.selectedId
+                    objectName:"realNodeTable";incrementalRows:true;animateLatency:true;anchors.fill:parent;anchors.margins:Theme.dp(1);rows:page.viewRows;selectedId:page.selectedId
                     columns:[{key:"name",label:"节点名称",w:240},{key:"address",label:"地址 / 端口",w:180},{key:"protocol",label:"协议",w:122},{key:"latency",label:"检测耗时（ms）",w:115},{key:"status",label:"节点状态",w:132}]
                     onRowSelected:function(row){page.selectedId=row.id;engineController.chooseNode(row.id)}
                 }
@@ -67,7 +67,7 @@ Item {
                             Text {text:page.selected?page.selected.name:"未选择节点";textFormat:Text.PlainText;color:Theme.text;font.pixelSize:Theme.fontSize(19);font.weight:Font.DemiBold;Layout.fillWidth:true;horizontalAlignment:Text.AlignHCenter;wrapMode:Text.Wrap}
                             Text {text:page.selected?page.selected.protocol+" · "+page.selected.address:"—";color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.WrapAnywhere}
                             Rectangle {Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(1);color:Theme.border}
-                            Text {objectName:"nodeRequestState";text:engineController.tests.busy?engineController.tests.message:page.tested.time?(page.tested.success?"请求成功":"请求失败")+" · HTTP "+page.tested.http+" · "+(page.tested.latency>=0?page.tested.latency+" ms":"无延迟结果")+(page.tested.error?"\n"+page.tested.error:""):engineController.requestStateText;color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
+                            Text {objectName:"nodeRequestState";text:engineController.tests.busy?engineController.tests.message:page.tested.time?(page.tested.success?"请求成功":"请求失败")+" · HTTP "+page.tested.http+" · "+(page.tested.latency>=0?page.tested.latency+" ms":"无延迟结果")+(page.tested.error?"\n"+page.tested.error:""):engineController.requestStateText;color:engineController.tests.busy?Theme.muted:page.tested.time?(page.tested.success?Theme.green:Theme.orange):engineController.requestSucceeded?Theme.green:Theme.muted;Behavior on color{ColorAnimation{duration:SwirlMotion.duration}}font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
                             Text {text:"测试 URL";color:Theme.muted}
                             SwirlTextField {id:testUrl;objectName:"nodeTestUrl";Layout.fillWidth:true;text:"https://www.gstatic.com/generate_204";enabled:!engineController.nodeBusy;Accessible.name:"真实请求测试地址"}
                             Text {text:"本机代理端口";color:Theme.muted}

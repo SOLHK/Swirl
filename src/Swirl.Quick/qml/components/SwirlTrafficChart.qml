@@ -18,8 +18,9 @@ Item {
     readonly property var baseHistory: samples
     function valueAt(i) { return baseHistory[i] || 0 }
     function nearestIndex(fraction){if(!points.length)return -1;var target=startTime+fraction*(endTime-startTime),best=-1,distance=3000;for(var i=0;i<points.length;i++){var delta=Math.abs(points[i].time-target);if(delta<distance){distance=delta;best=i}}return best}
-    function repaint(){plot.requestPaint()}
-    function transition(){reveal=0.3;updateAnimation.restart()}
+    function repaint(){if(visible && Window.window && Window.window.visibility!==Window.Minimized)plot.requestPaint()}
+    function transition(){if(!visible || SwirlMotion.reduced){updateAnimation.stop();reveal=1;return}reveal=0.3;updateAnimation.restart()}
+    onVisibleChanged:if(visible)repaint();else updateAnimation.stop()
     onSeriesChanged:transition()
     onRangeIndexChanged:transition()
     onRevealChanged:repaint()
