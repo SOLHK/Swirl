@@ -70,19 +70,14 @@ void WindowsBackdrop::refresh() {
         const bool remote=GetSystemMetrics(SM_REMOTESESSION)!=0;
         const bool allowed = m_enabled && !software && !batterySaver && !remote && contrastKnown && !(contrast.dwFlags & HCF_HIGHCONTRASTON)
             && transparencyKnown && transparency && compositionEnabled;
-        // Windows 11 22H2 Desktop Acrylic supplies actual background blur.
-        // Use native rounded corners with the native material, so it cannot
-        // fill the transparent pixels outside Qt's rounded outline.
-        const int backdrop = allowed ? 3 : 1; // DWMSBT_TRANSIENTWINDOW / NONE
-        const bool acrylic=allowed && SUCCEEDED(DwmSetWindowAttribute(hwnd, 38, &backdrop, sizeof(backdrop)));
-        if(acrylic) {
-            const int rounded=2; // DWMWCP_ROUND
-            corners=SUCCEEDED(DwmSetWindowAttribute(hwnd,33,&rounded,sizeof(rounded)));
-        }
-        const MARGINS margins=acrylic ? MARGINS{-1,-1,-1,-1} : MARGINS{0,0,0,0};
+        // Swirl owns the wallpaper sampling, blur and continuous outline.
+        // DWM supplies the native frame/shadow only; Acrylic is never enabled.
+        const int backdrop = 1; // DWMSBT_NONE
+        DwmSetWindowAttribute(hwnd,38,&backdrop,sizeof(backdrop));
+        const MARGINS margins{-1,-1,-1,-1};
         const HRESULT frame = DwmExtendFrameIntoClientArea(hwnd, &margins);
-        active = allowed && SUCCEEDED(frame);
-        status = active ? (acrylic ? QStringLiteral("Native Desktop Acrylic: DWM blur and rounded corners") : QStringLiteral("Native alpha fallback: Desktop Acrylic unavailable"))
+        active = false;
+        status = allowed && SUCCEEDED(frame) ? QStringLiteral("Swirl wallpaper material: Qt RHI blur, Qt continuous corners, DWM frame")
             : !m_enabled ? QStringLiteral("Opaque: application transparency disabled")
             : software ? QStringLiteral("Opaque: software renderer")
             : batterySaver ? QStringLiteral("Opaque: battery saver")

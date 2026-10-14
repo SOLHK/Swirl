@@ -8,6 +8,8 @@ QtObject {
     readonly property bool systemProxyOn: engineController.systemProxy.enabled
     readonly property bool tunOn: engineController.tunEnabled
     property bool detailOpen: true
+    property int trafficPeriod:0
+    property string trafficSelectedProcess:""
     readonly property string mode: engineController.routingMode==="rule"?"规则判定":engineController.routingMode==="global"?"全局代理":"直接连接"
     readonly property string policy: "固定节点"
     readonly property string selectedNode: engineController.selectedNodeName

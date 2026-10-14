@@ -51,14 +51,19 @@ void MotionPolicy::attach(QQuickWindow *window) {
     m_clock.start();
     // Software rendering uses inexpensive spatial transitions without texture grabs.
     m_complex=window && window->rendererInterface()->graphicsApi()!=QSGRendererInterface::Software;
-    if(window && window->screen())m_budget=1000.0/qMax(60.0,window->screen()->refreshRate());
-    if(window)connect(window,&QQuickWindow::screenChanged,this,[this](QScreen *screen){if(screen)m_budget=1000.0/qMax(60.0,screen->refreshRate());});
+    const auto monitor=[this](QScreen *screen){
+        QObject::disconnect(m_refreshSignal);
+        if(!screen)return;
+        m_budget=1000.0/qMax(1.0,screen->refreshRate());m_lastFrame=0;
+        m_refreshSignal=connect(screen,&QScreen::refreshRateChanged,this,[this](qreal rate){m_budget=1000.0/qMax(1.0,rate);m_lastFrame=0;});
+    };
+    if(window){monitor(window->screen());connect(window,&QQuickWindow::screenChanged,this,monitor);}
     if(window)connect(window,&QQuickWindow::frameSwapped,this,[this,window]{
         const auto now=m_clock.nsecsElapsed();
         const auto last=m_lastFrame.load();
         if(m_transitioning.load() && last) {
             const double budget=m_budget.load();
-            if(double(now-last)/1000000.0>qMax(25.0,budget*2.2))++m_slowFrames;
+            if(double(now-last)/1000000.0>qMax(8.0,budget*2.2))++m_slowFrames;
             else m_slowFrames=qMax(0,m_slowFrames-1);
             if(m_complex && m_slowFrames>=12){m_complex=false;emit policyChanged();}
         }

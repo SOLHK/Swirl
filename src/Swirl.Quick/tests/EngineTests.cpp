@@ -86,12 +86,18 @@ private slots:
         QVERIFY(controller.configureMeteredAllowlist({"chrome.exe","CHROME.exe","curl.exe"}));
         QCOMPARE(controller.meteredAllowlist().size(),2);
         QVERIFY(controller.saveRoutingRule("DOMAIN","fixture.test","Local"));
+        const auto ruleCount=controller.routingRules().size();
+        QVERIFY(controller.saveRoutingRule("DOMAIN-SUFFIX","edited.fixture.test","Local",0));
+        QCOMPARE(controller.routingRules().size(),ruleCount);
+        QVERIFY(!controller.saveRoutingRule("DOMAIN","invalid.fixture.test","DIRECT",99));
+        QCOMPARE(controller.routingRules().first().toMap().value("pattern").toString(),QStringLiteral("edited.fixture.test"));
         QVERIFY(!controller.removePolicyGroup("Local"));
         EngineController restored(std::make_unique<MihomoAdapter>(),nullptr,store);
         QCOMPARE(restored.dnsConfiguration().value("servers").toString(),QStringLiteral("127.0.0.1,::1"));
         QCOMPARE(restored.dnsConfiguration().value("hosts").toList().size(),1);
         QCOMPARE(restored.policyGroups().size(),1);
         QCOMPARE(restored.routingRules().first().toMap().value("policy").toString(),QStringLiteral("Local"));
+        QCOMPARE(restored.routingRules().first().toMap().value("pattern").toString(),QStringLiteral("edited.fixture.test"));
         QVERIFY(restored.removeRoutingRule(0));QVERIFY(restored.removePolicyGroup("Local"));
     }
     void missingAndTampered() {

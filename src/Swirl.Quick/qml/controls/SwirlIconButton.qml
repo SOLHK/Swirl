@@ -8,6 +8,7 @@ SwirlMotionButton {
     property string tooltip: ""
     property bool quiet:false
     property real iconSize:Theme.dp(16)
+    property color iconColor:Theme.muted
     implicitWidth:Theme.dp(46); implicitHeight:Theme.dp(46)
     hoverEnabled: true
     background: SwirlPillSurface {
@@ -20,7 +21,7 @@ SwirlMotionButton {
         border.color: control.activeFocus ? Theme.focusBorder : Theme.pillRim
         opacity: control.enabled ? 1 : 0.45
     }
-    contentItem: Item { SwirlIcon { anchors.centerIn:parent; name:control.iconName; size:control.iconSize; color:Theme.muted } }
+    contentItem: Item { SwirlIcon { anchors.centerIn:parent; name:control.iconName; size:control.iconSize; color:control.iconColor } }
     ToolTip.visible: hovered && tooltip.length > 0 && !previewCaptureMode
     ToolTip.text: tooltip
     Accessible.name: tooltip

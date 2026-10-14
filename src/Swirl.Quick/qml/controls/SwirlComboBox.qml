@@ -7,7 +7,7 @@ ComboBox {
     implicitHeight:Theme.dp(24)
     hoverEnabled: true
     MouseArea { anchors.fill:parent;acceptedButtons:Qt.LeftButton;onClicked:{control.forceActiveFocus();if(control.popup.visible)control.popup.close();else control.popup.open()} }
-    font.family: "Microsoft YaHei UI"
+    font.family: Theme.fontFamily
     font.pixelSize:Theme.fontSize(13)
     leftPadding:Theme.dp(8); rightPadding:Theme.dp(20)
     topPadding:Theme.dp(4); bottomPadding:Theme.dp(4)
@@ -24,13 +24,12 @@ ComboBox {
         x:control.width-width-Theme.dp(6);y:(control.height-height)/2;width:Theme.dp(14);height:width
         source:"image://swirl/chevron-up-down/"+Theme.text.toString().slice(1)
     }
-    background: SwirlPillSurface {
-        pressed:control.pressed;hovered:control.hovered
-        radius: Theme.pillRadius(height)
+    background: SwirlContinuousSurface {
+        radius: Math.min(height/2,Theme.dp(9))
         antialiasing: true
-        color: control.pressed ? Theme.pressed : control.hovered ? Theme.hover : Theme.material("field")
-        border.width:Theme.dp(1)
-        border.color: control.activeFocus ? Theme.focusBorder : Theme.pillRim
+        color: control.pressed ? Theme.pressed : control.hovered ? Theme.hover : Theme.buttonBase
+        border.width:Theme.dp(0.7)
+        border.color: control.activeFocus ? Theme.focusBorder : Theme.withAlpha(Theme.dark?"#A9BDD5":"#7892B1",0.24)
         Behavior on color { ColorAnimation { duration: SwirlMotion.duration } }
     }
     delegate: ItemDelegate {
@@ -41,7 +40,7 @@ ComboBox {
         highlighted: control.highlightedIndex === index
         contentItem: Text {
             text: AppState.zh(parent.text)
-            color: parent.highlighted ? "white" : Theme.text; font.pixelSize:Theme.fontSize(13); font.family: "Microsoft YaHei UI"
+            color: parent.highlighted ? "white" : Theme.text; font.pixelSize:Theme.fontSize(13); font.family: Theme.fontFamily
             verticalAlignment: Text.AlignVCenter; leftPadding:Theme.dp(24)
             Image{visible:control.currentIndex===index;x:Theme.dp(3);anchors.verticalCenter:parent.verticalCenter;width:Theme.dp(14);height:width;source:"image://swirl/checkmark/"+(parent.parent.highlighted?"ffffff":Theme.text.toString().slice(1))}
         }

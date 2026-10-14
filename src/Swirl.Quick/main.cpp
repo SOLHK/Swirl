@@ -1,4 +1,8 @@
 #include <QGuiApplication>
+#include "app/FontManager.h"
+#if defined(SWIRL_UI_TESTS) && defined(Q_OS_WIN)
+#include "tests/third_party/renderdoc_app.h"
+#endif
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQmlError>
@@ -30,6 +34,7 @@
 #include "app/ModuleDraftStore.h"
 #include "app/ExtensionService.h"
 #include "app/MotionPolicy.h"
+#include "app/WallpaperBackdrop.h"
 #include "app/DismissalController.h"
 #ifdef SWIRL_UI_TESTS
 #include "tests/OverviewChecks.h"
@@ -41,6 +46,8 @@
 #include "tests/EngineUiChecks.h"
 #include "tests/NodeUiChecks.h"
 #include "tests/MotionChecks.h"
+#include "tests/MaterialChecks.h"
+#include "tests/HeroChecks.h"
 #endif
 #include "app/SystemDataProvider.h"
 #include "app/WindowsBackdrop.h"
@@ -74,6 +81,7 @@ int main(int argc, char *argv[])
     // Qt then exposes logical geometry and raster DPR per screen.
     QGuiApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
     QQuickWindow::setDefaultAlphaBuffer(true);
+    QQuickWindow::setTextRenderType(QQuickWindow::NativeTextRendering);
     QGuiApplication app(argc, argv);
     app.setApplicationName(QStringLiteral("Swirl"));
     app.setOrganizationName(QStringLiteral("SOLHK"));
@@ -107,9 +115,10 @@ int main(int argc, char *argv[])
     // Swirl draws its own visual controls, so explicitly use the customizable style.
     QQuickStyle::setStyle(QStringLiteral("Basic"));
     const bool motionTest=app.arguments().contains("--motion-test");
+    const bool heroTest=app.arguments().contains("--hero-test");
     bool previewMode=false;
     for(const QString &argument:app.arguments())
-        if(argument.startsWith(QStringLiteral("--viewport-test-output="))||argument.startsWith(QStringLiteral("--motion-demo-output="))||argument.startsWith(QStringLiteral("--motion-visual-dir="))||argument.startsWith(QStringLiteral("--capture-preview="))||argument.startsWith(QStringLiteral("--capture-native-frame=")))previewMode=true;
+        if(argument.startsWith(QStringLiteral("--material-test-output="))||argument.startsWith(QStringLiteral("--viewport-test-output="))||argument.startsWith(QStringLiteral("--motion-demo-output="))||argument.startsWith(QStringLiteral("--motion-visual-dir="))||argument.startsWith(QStringLiteral("--capture-preview="))||argument.startsWith(QStringLiteral("--capture-native-frame=")))previewMode=true;
     const bool hdrTest=app.arguments().contains("--hdr-self-test");
     const bool hdrDisplayTest=app.arguments().contains("--hdr-display-test");
     const bool nodeTest=app.arguments().contains("--node-self-test");
@@ -123,7 +132,7 @@ int main(int argc, char *argv[])
     }
 #endif
     const bool realAcceptance=!runtimeStore.isEmpty()&&!runtimeCommands.isEmpty()&&!runtimeState.isEmpty();
-    const bool isolatedRun=realAcceptance||nodeTest||motionTest||engineTest||hdrDisplayTest||hdrTest||app.arguments().contains("--interaction-test")||app.arguments().contains("--capture-self-test")||app.arguments().contains("--gateway-self-test")||app.arguments().contains("--smoke-test")||app.arguments().contains("--window-test")||previewMode;
+    const bool isolatedRun=realAcceptance||heroTest||nodeTest||motionTest||engineTest||hdrDisplayTest||hdrTest||app.arguments().contains("--interaction-test")||app.arguments().contains("--capture-self-test")||app.arguments().contains("--gateway-self-test")||app.arguments().contains("--smoke-test")||app.arguments().contains("--window-test")||previewMode;
     if(isolatedRun) {
         QStandardPaths::setTestModeEnabled(true);
         QSettings::setDefaultFormat(QSettings::IniFormat);
@@ -132,6 +141,7 @@ int main(int argc, char *argv[])
         if(!app.arguments().contains("--preview-preserve-settings"))isolatedSettings.clear();
         isolatedSettings.sync();
     }
+    FontManager fontManager;
     WindowsBackdrop backdrop;
     WindowsBackdrop settingsBackdrop;
     WindowsBackdrop panelBackdrop;
@@ -147,8 +157,10 @@ int main(int argc, char *argv[])
     diagnostics.installQtHandler();
     SystemDataProvider systemData(&capture,&engineController,&diagnostics);
     MotionPolicy motionPolicy;
+    WallpaperBackdrop wallpaperBackdrop(isolatedRun&&!app.arguments().contains("--preview-real-wallpaper"));
     DismissalController dismissals;
     QQmlApplicationEngine engine;
+    engine.rootContext()->setContextProperty("fontManager", &fontManager);
     engine.rootContext()->setContextProperty("motionPolicy", &motionPolicy);
     engine.rootContext()->setContextProperty("settingsBackdrop", &settingsBackdrop);
     engine.rootContext()->setContextProperty("panelBackdrop", &panelBackdrop);
@@ -177,7 +189,7 @@ int main(int argc, char *argv[])
     const QString previewPage = argumentValue(QStringLiteral("--preview-page="));
     const QString previewTheme = argumentValue(QStringLiteral("--preview-theme="));
     const QString previewState = argumentValue(QStringLiteral("--preview-state="));
-    if (nodeTest || motionTest || previewMode || engineTest || hdrDisplayTest || hdrTest || smoke || interaction || captureTest || gatewayTest || windowTest || !previewPath.isEmpty()) {
+    if (heroTest || nodeTest || motionTest || previewMode || engineTest || hdrDisplayTest || hdrTest || smoke || interaction || captureTest || gatewayTest || windowTest || !previewPath.isEmpty()) {
         if(nodeTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-node-ui-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-node-ui-diagnostics.txt");}
         else if(interaction){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-input-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-input-diagnostics.txt");}
         QFile::remove(QCoreApplication::applicationDirPath() + QStringLiteral("/Swirl-diagnostics.txt"));
@@ -185,6 +197,8 @@ int main(int argc, char *argv[])
     }
     engine.rootContext()->setContextProperty("previewPage", previewPage);
     engine.rootContext()->setContextProperty("previewCaptureMode", previewMode);
+    engine.addImageProvider("swirlwallpaper",new WallpaperImages);
+    engine.rootContext()->setContextProperty("wallpaperBackdrop",&wallpaperBackdrop);
     engine.rootContext()->setContextProperty("gpuEffectsSupported", QQuickWindow::graphicsApi()!=QSGRendererInterface::Software && qEnvironmentVariable("QT_QUICK_BACKEND")!=QStringLiteral("software"));
     engine.rootContext()->setContextProperty("previewTheme", previewTheme);
     engine.rootContext()->setContextProperty("previewState", previewState);
@@ -210,6 +224,24 @@ int main(int argc, char *argv[])
     if(realAcceptance&&rootWindow)startRuntimeEvidence(rootWindow,&engineController,&systemData,&diagnostics,runtimeCommands,runtimeState);
 #endif
     hdrOutput.attach(rootWindow);
+#if defined(SWIRL_UI_TESTS) && defined(Q_OS_WIN)
+    const auto renderdocOutput=argumentValue(QStringLiteral("--renderdoc-output="));
+    if(!renderdocOutput.isEmpty()) {
+        // Opt-in QA only: the external RenderDoc launcher injects its library.
+        // This captures this process's graphics commands, never the desktop.
+        const auto library=GetModuleHandleW(L"renderdoc.dll");
+        auto getApi=library?reinterpret_cast<pRENDERDOC_GetAPI>(GetProcAddress(library,"RENDERDOC_GetAPI")):nullptr;
+        RENDERDOC_API_1_6_0 *api=nullptr;
+        if(!getApi||!getApi(eRENDERDOC_API_Version_1_6_0,reinterpret_cast<void **>(&api)))return 5;
+        api->SetCaptureFilePathTemplate(renderdocOutput.toUtf8().constData());
+        api->MaskOverlayBits(0,0);
+        QTimer::singleShot(650,rootWindow,[api,rootWindow]{api->TriggerCapture();rootWindow->update();});
+        QTimer::singleShot(1100,rootWindow,[api,rootWindow]{
+            QQmlExpression expression(qmlContext(rootWindow),rootWindow,"Theme.glassBlurStrength+=0.25");expression.evaluate();
+            api->TriggerMultiFrameCapture(3);rootWindow->update();
+        });
+    }
+#endif
     if(nodeTest) {
 #ifdef SWIRL_UI_TESTS
         QTimer::singleShot(400,&app,[&app,rootWindow,&engineController]{app.exit(runNodeUiChecks(rootWindow,&engineController));});
@@ -220,9 +252,26 @@ int main(int argc, char *argv[])
         motionPolicy.attach(rootWindow);
 #ifdef SWIRL_UI_TESTS
     const auto viewportDirectory=argumentValue(QStringLiteral("--viewport-test-output="));
+    const auto materialDirectory=argumentValue(QStringLiteral("--material-test-output="));
     const auto demoDirectory=argumentValue(QStringLiteral("--motion-demo-output="));
     const auto visualDirectory=argumentValue(QStringLiteral("--motion-visual-dir="));
-    if(!viewportDirectory.isEmpty()) {
+    if(heroTest) {
+        const auto directory=argumentValue(QStringLiteral("--hero-output="));
+        const auto armFile=argumentValue(QStringLiteral("--hero-arm-file="));
+        if(armFile.isEmpty())QTimer::singleShot(450,&app,[&app,rootWindow,&engineController,directory]{app.exit(runHeroChecks(rootWindow,&engineController,directory));});
+        else {
+            // Wait until the external ETW recorder has been allowed through
+            // the Windows secure desktop before exercising display modes.
+            auto armTimer=new QTimer(&app);armTimer->setInterval(100);
+            QObject::connect(armTimer,&QTimer::timeout,&app,[&app,rootWindow,&engineController,directory,armFile,armTimer]{
+                if(!QFile::exists(armFile))return;
+                armTimer->stop();armTimer->deleteLater();QFile::remove(armFile);
+                app.exit(runHeroChecks(rootWindow,&engineController,directory));
+            });armTimer->start();
+        }
+    } else if(!materialDirectory.isEmpty()) {
+        QTimer::singleShot(450,&app,[&app,rootWindow,materialDirectory]{app.exit(runMaterialChecks(rootWindow,materialDirectory));});
+    } else if(!viewportDirectory.isEmpty()) {
         QTimer::singleShot(450,&app,[&app,rootWindow,viewportDirectory]{app.exit(runViewportChecks(rootWindow,viewportDirectory));});
     } else if(!demoDirectory.isEmpty()) {
         QTimer::singleShot(450,&app,[&app,rootWindow,demoDirectory]{app.exit(runMotionDemo(rootWindow,demoDirectory));});
@@ -397,5 +446,5 @@ int main(int argc, char *argv[])
     // This also keeps scripted page-navigation shutdown free of incubation warnings.
     if (auto *controller = engine.incubationController())
         controller->incubateFor(100);
-    return (nodeTest || motionTest || previewMode || engineTest || smoke || interaction || captureTest || gatewayTest || windowTest || !previewPath.isEmpty()) && qmlWarnings ? 2 : result;
+    return (heroTest || nodeTest || motionTest || previewMode || engineTest || smoke || interaction || captureTest || gatewayTest || windowTest || !previewPath.isEmpty()) && qmlWarnings ? 2 : result;
 }

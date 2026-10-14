@@ -1,41 +1,45 @@
-# Animation dependency and tool verification
+# 图形依赖与工具验证（2026-10-15）
 
-Verified 2026-10-14 against Swirl's Windows x64 / Qt 6.10.3 / MinGW 13.1 / C++23 Release environment. Candidate clones and tools are separate from Swirl's source/build. No candidate runtime or marketplace animation is shipped.
+主环境：Windows 11 x64、Qt 6.10.3、MinGW 13.1、C++23、CMake/Ninja Release。候选代码和构建目录位于独立研究目录；生产继续使用 Qt Quick/QML/RHI，不引入第二套 UI 框架。
 
-| Candidate | Version inspected | Result | Production decision |
+| 项目 | 固定版本与许可 | 实际结果 | 生产使用 |
 | --- | --- | --- | --- |
-| [Qt Quick animations](https://doc.qt.io/qt-6/qtquick-statesanimations-animations.html) | Installed Qt 6.10.3 | Existing Behavior, SpringAnimation, NumberAnimation, SmoothedAnimation and Transition compile/run in Release | Main motion architecture; no second animation system |
-| [RiveQtQuickPlugin2](https://github.com/jebos/RiveQtQuickPlugin2) | `4ff14b434400cc2a32b4dd3e45bc20f9d657389a` | Dependency bootstrap completed; real MinGW/Qt configuration stops because `fxc.exe` is absent | Native QML fallback; Rive is not enabled or linked |
-| [Qt Quick Effect Maker](https://github.com/qt/qtquickeffectmaker/tree/v6.10.3) | v6.10.3, commit `3e8b0f9` | Tool compiles with the same Qt/MinGW kit; original SwirlClickLight.qep loads, bakes and exports .vert/.frag/.qsb, exit 0 | Development tool only; small generated shaders compiled into Swirl through Qt ShaderTools |
-| [FluentUI for QML](https://github.com/zhuzichu520/FluentUI) | `7e33a2f672d18239ef49ab960075b1137a1d18e7` | Qt6 FluButton/ToggleSwitch/TextBox/ComboBox interaction code inspected | Adopt interaction ideas (bounded thumb travel, disabled feedback, visible focus, interruptible transitions); retain Surge geometry and existing controls; no copied runtime |
+| Qt Quick / Qt RHI / ShaderTools / MultiEffect | 6.10.3；动态 Qt LGPL-3.0，模块许可随包 | Release 着色器编译、D3D11 原生输入、GPU 时间戳比较、RenderDoc 抓帧 | 是 |
+| Qt Quick Effect Maker | v6.10.3，3e8b0f9；工具 GPL-3.0-only/商业，构建文件 BSD | 复用匹配 Qt 的已构建工具，通过本地无界面导出入口重新加载原创 SwirlClickLight.qep，导出 vert/frag/qsb，退出 0 | 工具不随包，仅原创短暂点击高光着色器 |
+| RiveQtQuickPlugin2 | 4ff14b434400cc2a32b4dd3e45bc20f9d657389a；MIT | 补齐 FXC 后 CMake 成功、原始 DirectX 着色器编译成功；真实 MinGW 编译在 DirectX COM 接口处失败，见下文 | 否；使用原生 QML 状态反馈 |
+| FluentUI for QML | 7e33a2f672d18239ef49ab960075b1137a1d18e7；MIT | Qt6/MinGW Release 插件真实编译链接成功；显式输出到独立研究目录 | 否；只研究交互；未复制字体、图标或运行库 |
+| alex47/Dual-Kawase-Blur | 41c41b3059b3c37ff843822a0dc0e892825927c6；GPL-3.0 | 下载并核验 README/许可证；研究算法，未将 OpenGL 示例代码链接到 Qt Quick | 否；Swirl 模糊着色器独立编写 |
+| Google Skia | 59f566489c0dc9c7b6a42bceaaefb5a8be19aaee；BSD-3-Clause | 检查许可及官方 Path/轮廓文档，比较圆弧与四阶超椭圆几何；未编译完整 Skia | 否 |
+| Qt Quick Shapes | 与 Qt 6.10.3 相同发行版 | 研究 PathCubic/CurveRenderer 的轮廓与重建成本；主窗口采用独立 SDF 着色器，普通卡片按用户要求保留原有圆弧曲率 | 不增加运行模块 |
+| PresentMon / DXGI 统计 | PresentMon 官方 Windows 2.6.0，签名有效；MIT；DXGI 为系统接口 | ETW 60Hz 有效；早期 120/240Hz 遮挡与后续 UAC 取消均记录。最终使用自身 flip swapchain 的呈现计数/QPC 统计，不以 Qt frameSwapped 代替显示 FPS | 开发工具，不随包；DXGI 采样代码仅用于测试 |
+| RenderDoc | 官方便携版 1.46；MIT，另含工具自身第三方许可 | 成功注入隔离 Swirl 测试进程，获得 4 个 D3D11 RDC 帧，转换为 API XML 并统计目标纹理/绘制调用 | 工具不随包；MIT API 头文件仅供 SWIRL_UI_TESTS 编译 |
+| HarmonyOS Sans SC | OpenHarmony resources 0d79cad76b37ba0f3ccb1323c83833c78e0860de；HarmonyOS Sans Fonts License Agreement | 官方 Regular/Medium/Bold 原样文件、哈希固定、Qt 加载、切换/导入/持久化和本机 UI 检查 | 是；完整声明随包及应用内展示，详见 FONTS.md |
 
-## Rive compatibility and licenses
+## Rive 具体编译证据
 
-The plugin requires Qt >=6.6 and Qt GuiPrivate. This kit supplies both. It also unconditionally requires a Windows SDK `fxc.exe` shader compiler and enables D3D12 on Windows. After fetching its pinned runtime and dependencies, CMake failed at `cmake/RiveThirdParty.cmake:109`, `fxc.exe was not found`. This is a concrete missing prerequisite, not proof that all MinGW compilation/linking would succeed if the SDK were supplied. MinGW ABI/build and actual Rive rendering are therefore unverified. No SDK was installed, no MSVC kit substituted, and the production build has no Rive dependency. This follows the requested native fallback when a stable integration cannot be verified.
+Windows SDK Microsoft.Windows.SDK.CPP 10.0.28000.2705 已在研究目录解压，实际执行 x64/fxc.exe 成功。解决了上一轮仅因缺少 FXC 就停止配置的问题。
 
-License files actually inspected:
+原始插件配置使用现有 Qt/MinGW 完成，构建进入数百个运行库和着色器目标后，在 DirectX-Headers/RPC 头文件以及 COM 按值结构返回接口处失败，例如 `ID3D12Resource::GetDesc()` 与 MinGW 暴露的 `GetDesc(D3D12_RESOURCE_DESC*)` 不一致。另做独立 OpenGL-only 实验后，插件 Windows D3D11 桥仍引用已排除的运行库，链接失败。未将实验修改带入 Swirl，也未声称通过 Rive 渲染验证。
 
-| Source | License observed |
-| --- | --- |
-| Plugin LICENSE | MIT, 2026 Jeremias Bosch |
-| rive-cpp LICENSE and renderer/LICENSE, runtime revision `3ccf0d9d7c2cf8bee0553245acaffe21ae3314b6` | MIT, Rive |
-| HarfBuzz COPYING | Old MIT; individual test/asset subdirectories have additional notices |
-| SheenBidi LICENSE | Apache-2.0 |
-| Yoga LICENSE | MIT |
-| Luau LICENSE.txt / lua_LICENSE.txt | MIT / Lua notices |
-| libhydrogen LICENSE | ISC |
-| miniaudio LICENSE | Alternative Unlicense or MIT |
-| DirectX-Headers LICENSE | MIT |
-| PLY 3.11 metadata | BSD |
+本机未找到可用 MSVC + 匹配的 Qt MSVC 套件；可选 MSVC/Rive 渲染仍未验证。生产不依赖该实验，因此现有编译链与已通过的功能继续可用。
 
-No `.riv`, font, sample audio or marketplace asset is included in Swirl. Their resource-specific redistribution rights were not established, so no blanket permission is inferred from the plugin's MIT license. Bootstrap also encountered long-path omissions in HarfBuzz's test fonts; runtime source and license checks succeeded, but this reinforces why the candidate is not reported as a verified production integration.
+插件及其固定运行库的 MIT、HarfBuzz Old MIT、SheenBidi Apache-2.0、Yoga MIT、Luau MIT/Lua、libhydrogen ISC、miniaudio MIT/Unlicense、DirectX-Headers MIT、PLY BSD 许可均保留在研究副本；没有 .riv、样例字体、样例音频或市场动画进入生产包。
 
-## Effect Maker provenance and packaging
+## 材质与几何决策
 
-Effect Maker's dev branch currently requests a newer Qt version. The verification deliberately checks out the matching v6.10.3 tag rather than changing Swirl's kit. `qqem.exe` was built as a development tool. A local headless harness calls its existing EffectManager/NodeView load, bake and export APIs to make the export reproducible without changing app UI. The tool and local harness are not part of the Swirl runtime or delivered binaries.
+Swirl 通过 Windows IDesktopWallpaper 读取当前屏幕壁纸，按填充/适应/居中/平铺/跨屏模式映射，再由 Qt RHI 多级降采样/上采样进行模糊。壁纸解码与 GPU 模糊分别缓存；纹理按 512/768/1024 档位限制。只有壁纸、屏幕、质量或模糊强度变化触发更新。窗口移动改变取样坐标，不重复读取整个桌面。
 
-The tool source is GPL-3.0-only or Qt commercial; build system is BSD-3-Clause; its example assets have per-file BSD/commercial annotations. Swirl's `.qep` contains original shader math and headings, without imported Qt example nodes/assets. Only generated minimal GLSL source is retained; Swirl's normal Qt ShaderTools build creates its own backend shader packs. Existing dynamically linked Qt licensing remains in the third-party notices. There are no new DLLs, network services, fonts or animation assets.
+按用户最新要求，主窗口只保留一层均匀的淡蓝色半透明材质，不叠加侧栏/工作区染色矩形和渐变。该层保留真实窗口 alpha，桌面可透出。模糊来源为壁纸，不能将此描述为对所有后方应用窗口进行实时模糊；没有常驻桌面捕获。DWM 仅保留原生边框行为与阴影，不启用 Acrylic/Mica。
 
-The effect is a small, premultiplied click highlight, confined to a button. It has no time uniform, loop, texture capture, or large-area shader layer. Its Loader exists only while the bounded click pulse is visible and GPU effects are supported; software/adaptive fallback uses the existing QML surface. Reduced motion disables the pulse. Tests check that the selected backend is correct and the shader unloads when idle. Exported development shader packs total 2,930 bytes; final packaged sizes are recorded with the Release deliverable.
+窗口/大容器使用独立四阶超椭圆 SDF、导数抗锯齿和统一遮罩；普通卡片按用户最终反馈保留原有 Surge 参考圆弧与 20 逻辑像素半径。软件渲染提供不透明圆角回退。
 
-Native material reference: [Microsoft DWM system backdrop types](https://learn.microsoft.com/en-us/windows/win32/api/dwmapi/ne-dwmapi-dwm_systembackdrop_type). Swirl uses Desktop Acrylic only when DWM accepts it, and retains an explicit fallback. Native Windows corners/shadows differ from macOS; matching the screenshot's geometry does not imply identical material implementation.
+参考原始地址：
+- https://github.com/qt/qtquickeffectmaker/tree/v6.10.3
+- https://github.com/jebos/RiveQtQuickPlugin2
+- https://github.com/zhuzichu520/FluentUI
+- https://github.com/alex47/Dual-Kawase-Blur
+- https://skia.org/docs/user/api/skpath_overview/
+- https://doc.qt.io/qt-6.10/qtquick-shapes-qmlmodule.html
+- https://github.com/GameTechDev/PresentMon
+- https://renderdoc.org/
+- https://github.com/openharmony/resources

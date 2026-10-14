@@ -323,7 +323,7 @@ bool EngineController::configureDns(const QVariantMap &input) {
         {"useHosts",input.value("useHosts",true).toBool()},{"respectRules",input.value("respectRules",false).toBool()}};
     if(saveNetworkConfiguration())return true;m_options.dnsConfig=before;emit optionsChanged();return false;
 }
-bool EngineController::saveRoutingRule(const QString &type,const QString &pattern,const QString &policy) {
+bool EngineController::saveRoutingRule(const QString &type,const QString &pattern,const QString &policy,int index) {
     if(!networkEditAllowed())return false;
     const QStringList types={"DOMAIN","DOMAIN-SUFFIX","DOMAIN-KEYWORD","IP-CIDR","IP-CIDR6","PROCESS-NAME","DST-PORT","SRC-IP-CIDR","MATCH"};
     bool valid=types.contains(type)&&pattern.size()<=2048&&!pattern.contains(QRegularExpression("[,\\r\\n]"));
@@ -333,9 +333,10 @@ bool EngineController::saveRoutingRule(const QString &type,const QString &patter
         const auto cidr=QHostAddress::parseSubnet(pattern);valid=valid&&!cidr.first.isNull()&&cidr.second>=0;
     }
     if(type=="DST-PORT"){bool ok=false;const auto port=pattern.toInt(&ok);valid=valid&&ok&&port>0&&port<=65535;}
-    if(!valid||m_options.customRules.size()>=1000){m_networkError=QStringLiteral("规则类型、匹配值或目标策略无效。");emit optionsChanged();return false;}
+    if(!valid||index<-1||index>=m_options.customRules.size()||(index<0&&m_options.customRules.size()>=1000)){m_networkError=QStringLiteral("规则类型、匹配值或目标策略无效。");emit optionsChanged();return false;}
     const auto before=m_options.customRules;
-    m_options.customRules.append(type=="MATCH"?"MATCH,"+policy:type+","+pattern.trimmed()+","+policy);
+    const auto rule=type=="MATCH"?"MATCH,"+policy:type+","+pattern.trimmed()+","+policy;
+    if(index<0)m_options.customRules.append(rule);else m_options.customRules[index]=rule;
     if(saveNetworkConfiguration())return true;m_options.customRules=before;emit optionsChanged();return false;
 }
 bool EngineController::removeRoutingRule(int index) {

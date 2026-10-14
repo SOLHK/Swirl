@@ -40,7 +40,7 @@ Menu {
             height:Theme.dp(36)
             contentItem: Text {
                 text: parent.text; color: Theme.text
-                font.pixelSize:Theme.fontSize(12); font.family: "Microsoft YaHei UI"
+                font.pixelSize:Theme.fontSize(12); font.family: Theme.fontFamily
                 leftPadding:Theme.dp(12); verticalAlignment: Text.AlignVCenter
             }
             background: Rectangle { radius: Theme.roundedRadius(width,height); color: parent.highlighted ? Theme.selected : "transparent" }

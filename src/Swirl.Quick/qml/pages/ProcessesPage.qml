@@ -8,7 +8,11 @@ import "../controls"
 Item {
  id:page;required property var engineController;property int sortIndex:0;property string selectedId:""
  readonly property var telemetry:engineController.telemetry
- readonly property var processes:{let rows=(telemetry.revision,telemetry.ranking("apps",0,100));if(sortIndex===1)rows.sort((a,b)=>b.speed-a.speed);else if(sortIndex===2)rows.sort((a,b)=>a.name.localeCompare(b.name));return rows}
+ readonly property var heroTargets:({processName:processDetailName})
+ function selectRequested(){const row=processes.find(r=>r.name===AppState.trafficSelectedProcess);if(row)selectedId=row.id}
+ Component.onCompleted:selectRequested()
+ Connections {target:AppState;function onTrafficSelectedProcessChanged(){page.selectRequested()}function onTrafficPeriodChanged(){Qt.callLater(page.selectRequested)}}
+ readonly property var processes:{let rows=(telemetry.revision,telemetry.ranking("apps",AppState.trafficPeriod,100));if(sortIndex===1)rows.sort((a,b)=>b.speed-a.speed);else if(sortIndex===2)rows.sort((a,b)=>a.name.localeCompare(b.name));return rows}
  readonly property var selected:processes.find(r=>r.id===selectedId)||null
  Text{x:Theme.dp(24);y:Theme.dp(30);text:"进程";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.Bold}
  SwirlComboBox{objectName:"processSortPicker";anchors.right:parent.right;anchors.rightMargin:Theme.dp(20);y:Theme.dp(34);width:Theme.dp(112);height:Theme.dp(24);model:["按流量排序","按速度排序","按名称排序"];onActivated:page.sortIndex=currentIndex}
@@ -18,7 +22,7 @@ Item {
  }
  ReferenceOutline{anchors.right:parent.right;anchors.rightMargin:Theme.dp(24);y:Theme.dp(90);width:(parent.width-Theme.dp(90))/2;height:parent.height-y-Theme.dp(24)
   Column{visible:page.selected!==null;anchors.fill:parent;anchors.margins:Theme.dp(20);spacing:Theme.dp(12)
-   Text{text:page.selected?page.selected.name:"";color:Theme.text;font.pixelSize:Theme.fontSize(18);width:parent.width;wrapMode:Text.WrapAnywhere}
+   Text{id:processDetailName;text:page.selected?page.selected.name:"";color:Theme.text;font.pixelSize:Theme.fontSize(18);width:parent.width;wrapMode:Text.WrapAnywhere}
    Text{text:page.selected?"上传  "+page.selected.upload+"\n下载  "+page.selected.download+"\n连接  "+page.selected.connections:"";color:Theme.muted;font.pixelSize:Theme.fontSize(13)}
    SwirlButton{text:"查看连接";onClicked:page.Window.window.openDashboard()}
   }

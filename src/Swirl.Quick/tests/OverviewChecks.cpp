@@ -31,6 +31,7 @@ int runOverviewChecks(QQuickWindow *window) {
     click("nav-rules");click("addRoutingRule");type("rulePattern","example.test");click("saveRoutingRule");
     check(state("engineController.routingRules.some(r=>r.pattern==='example.test' && r.policy==='DIRECT')").toBool(),"rule editor mouse and keyboard input persists a real rule");
     type("rulesSearch","example.test");check(state("pageLoader.item.displayRules.length===1").toBool(),"rules search filters saved rules");
+    check(wait([&]{return state("dismissals.count===0").toBool();}),"rule dialog releases its modal shield before table input");
     if(auto *table=item("rulesTable")){QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,table->mapToScene(QPointF(60,39)).toPoint());QTest::qWait(50);}else check(false,"rules table exists");
     click("removeRoutingRule");check(state("!engineController.routingRules.some(r=>r.pattern==='example.test')").toBool(),"selected custom rule can be removed by its editor action");
     click("nav-capture");click("captureToggle");check(state("captureProvider.running && captureProvider.port===8899").toBool(),"capture toggle starts the actual loopback listener");
@@ -79,7 +80,7 @@ int runOverviewChecks(QQuickWindow *window) {
             if(!qaDirectory.isEmpty()){QDir().mkpath(qaDirectory);check(sheet->grabWindow().save(qaDirectory+"/"+route+".png"),"secondary window render saved for visual review");}
             click("windowCloseButton",sheet);check(wait([&]{return !sheet->isVisible();})&&window->isVisible(),"secondary red button closes only its window");
         }
-        state("window.openSettings('profiles')");QTest::qWait(100);click("windowMaximizeButton",sheet);check(sheet->visibility()==QWindow::Maximized,"secondary green button maximizes");
+        state("window.openSettings('profiles')");QTest::qWait(100);click("windowMaximizeButton",sheet);check(sheet->visibility()==QWindow::FullScreen,"secondary green button enters full screen");
         click("windowMaximizeButton",sheet);check(sheet->visibility()==QWindow::Windowed,"secondary green button restores");
         click("windowMinimizeButton",sheet);check(sheet->visibility()==QWindow::Minimized,"secondary yellow button minimizes");
         sheet->showNormal();sheet->requestActivate();QTest::qWait(100);QTest::keyClick(sheet,Qt::Key_Escape);QTest::qWait(100);check(wait([&]{return !sheet->isVisible();})&&window->isVisible(),"Escape dismisses the secondary window");

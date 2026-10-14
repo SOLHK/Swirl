@@ -17,6 +17,8 @@ Item {
     property string savedAt:""
     property int editing:-1
     property int revision:0
+    function exportCacheState() { return {settings:settings,records:records,tab:tab,dirty:dirty,savedAt:savedAt,editing:editing,revision:revision} }
+    function restoreCacheState(value) { settings=value.settings;records=value.records;tab=value.tab;dirty=value.dirty;savedAt=value.savedAt;editing=value.editing;revision=value.revision }
     function restore() {
         var draft=moduleDrafts.load(moduleId)
         settings=draft.settings || {};records=draft.records || [];savedAt=draft.savedAt || "";dirty=false;revision++

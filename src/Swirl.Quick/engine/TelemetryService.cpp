@@ -51,7 +51,7 @@ void TelemetryService::ingest(const ProxyEngine::Status &status){
  const auto epoch=QString::number(status.processId);
  if(status.processAlive&&m_epoch!=epoch){m_epoch=epoch;m_seen.clear();m_lastConnections=0;m_lastTraffic=0;m_lastUp=0;m_lastDown=0;m_externalIp.clear();m_latencies.clear();}
  const auto route=epoch+"/"+status.selectedNodeId+"/"+status.mode;
- if(route!=m_routeEpoch){m_routeEpoch=route;m_externalIp.clear();m_latencies.clear();m_failedMeasurements.clear();}
+ if(route!=m_routeEpoch){m_routeEpoch=route;m_externalIp.clear();m_latencies.clear();m_failedMeasurements.clear();m_internetDiagnostic.clear();}
  m_status=status;
  if(!status.apiHealthy){for(auto it=m_seen.begin();it!=m_seen.end();++it)(*it)["status"]="已结束";publish();return;}
  if(status.connectionsAt>m_lastConnections){
@@ -129,19 +129,38 @@ void TelemetryService::reportMeasurement(const QString &key,bool ok,const QStrin
  if(m_failedMeasurements.contains(key))return;
  m_failedMeasurements.insert(key);emit diagnostic("NetworkMeasurement",key,message);
 }
+void TelemetryService::recordInternetResult(int error,int http,bool proxy,qint64 elapsed) {
+ QString code,state,advice;
+ const bool success=error==int(QNetworkReply::NoError)&&http>=200&&http<300;
+ if(success){code="ok";state=QStringLiteral("请求成功");advice=proxy?QStringLiteral("HTTPS 已通过 Swirl 当前代理策略；此结果仅代表本次检测请求。"):QStringLiteral("直连 HTTPS 请求成功；未验证代理节点。");}
+ else if(m_status.error==ProxyEngine::Error::SelectionFailed){code="policy";state=QStringLiteral("策略选择失败");advice=QStringLiteral("检查所选节点和代理策略。");}
+ else if(proxy && m_status.nodeHealth==ProxyEngine::NodeHealth::Unavailable){code="node";state=QStringLiteral("节点不可用");advice=QStringLiteral("尝试测速或切换节点，再检测实际请求。");}
+ else if(error==int(QNetworkReply::HostNotFoundError)||error==int(QNetworkReply::ProxyNotFoundError)){code="dns";state=QStringLiteral("DNS 解析失败");advice=QStringLiteral("检查系统 DNS 与 Swirl DNS 配置。");}
+ else if(error==int(QNetworkReply::TimeoutError)||error==int(QNetworkReply::OperationCanceledError)){code="timeout";state=QStringLiteral("检测超时");advice=QStringLiteral("检查网络、节点可达性或稍后重试。");}
+ else if(proxy && (error==int(QNetworkReply::ProxyConnectionRefusedError)||error==int(QNetworkReply::ConnectionRefusedError))){code="proxy-port";state=QStringLiteral("本地代理端口不可用");advice=QStringLiteral("确认 Mihomo 正在运行，且本地代理端口正常监听。");}
+ else if(!proxy && error==int(QNetworkReply::NetworkSessionFailedError)){code="offline";state=QStringLiteral("本机网络不可用");advice=QStringLiteral("检查 Wi-Fi、网线或系统网络连接。");}
+ else if(!proxy && m_status.processAlive && !m_status.apiHealthy){code="proxy-unconnected";state=QStringLiteral("代理尚未就绪");advice=QStringLiteral("确认 Mihomo 控制接口健康，等待连接完成或检查引擎错误。");}
+ else if(http>=300){code="service";state=QStringLiteral("检测服务响应异常");advice=QStringLiteral("检测服务未返回成功响应，可使用节点详情中的自选 URL 测试。");}
+ else {code="outbound";state=QStringLiteral("出站请求失败");advice=QStringLiteral("检查网络和节点；路由、DNS 有延迟不代表 HTTPS 出站成功。");}
+ m_internetDiagnostic["code"]=code;m_internetDiagnostic["state"]=state;m_internetDiagnostic["advice"]=advice;
+ m_internetDiagnostic["route"]=proxy?QStringLiteral("Swirl 本地代理策略"):QStringLiteral("直连");
+ m_internetDiagnostic["http"]=http;m_internetDiagnostic["networkError"]=error;m_internetDiagnostic["elapsedMs"]=elapsed;
+ m_internetDiagnostic["success"]=success;
+ m_latencies["internet"]=success?QString::number(elapsed)+" ms":state;
+}
 void TelemetryService::measureHttp(const QString &key,const QUrl &url,bool throughProxy,bool ip){
  auto network=new QNetworkAccessManager(this);network->setProxy(throughProxy?QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",m_status.proxyPort):QNetworkProxy(QNetworkProxy::NoProxy));QNetworkRequest req(url);req.setTransferTimeout(8000);req.setAttribute(QNetworkRequest::RedirectPolicyAttribute,QNetworkRequest::ManualRedirectPolicy);req.setAttribute(QNetworkRequest::CacheLoadControlAttribute,QNetworkRequest::AlwaysNetwork);req.setRawHeader("Connection","close");auto timer=std::make_shared<QElapsedTimer>();timer->start();auto reply=network->get(req);auto deadline=new QTimer(reply);deadline->setSingleShot(true);connect(deadline,&QTimer::timeout,reply,&QNetworkReply::abort);deadline->start(9000);const auto epoch=m_routeEpoch;
  connect(reply,&QNetworkReply::readyRead,this,[reply]{if(reply->bytesAvailable()>4096)reply->abort();});
- connect(reply,&QNetworkReply::finished,this,[this,network,reply,timer,key,ip,epoch]{const auto code=reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();const bool ok=reply->error()==QNetworkReply::NoError&&code>=200&&code<300;if(epoch==m_routeEpoch){if(ip){const QString candidate=QString::fromUtf8(reply->readAll()).trimmed();m_externalIp=ok&&!QHostAddress(candidate).isNull()?candidate:QString();}else m_latencies[key]=ok?QString::number(timer->elapsed())+" ms":"检测失败";reportMeasurement(key,ok,QString("测量失败，HTTP %1，网络错误 %2").arg(code).arg(int(reply->error())));}reply->deleteLater();network->deleteLater();--m_measurements;m_measurementState=m_measurements?"正在测量":"测量完成";publish();});
+ connect(reply,&QNetworkReply::finished,this,[this,network,reply,timer,key,ip,epoch,throughProxy]{const auto code=reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();const bool ok=reply->error()==QNetworkReply::NoError&&code>=200&&code<300;if(epoch==m_routeEpoch){if(key=="internet")recordInternetResult(int(reply->error()),code,throughProxy,timer->elapsed());if(ip){const QString candidate=QString::fromUtf8(reply->readAll()).trimmed();m_externalIp=ok&&!QHostAddress(candidate).isNull()?candidate:QString();}else if(key!="internet")m_latencies[key]=ok?QString::number(timer->elapsed())+" ms":"检测失败";reportMeasurement(key,ok,QString("测量失败，HTTP %1，网络错误 %2").arg(code).arg(int(reply->error())));}reply->deleteLater();network->deleteLater();--m_measurements;m_measurementState=m_measurements?"正在测量":"测量完成";publish();});
 }
 void TelemetryService::measureNetwork(){
  if(!m_networkEnabled||m_measurements)return;m_measurementState="正在测量";m_measurements=2;
- // TCP handshake to a public Internet endpoint; independent of proxy routing,
- // HTTP redirects and the DNS lookup measured below.
- auto socket=new QTcpSocket(this);socket->setProxy(QNetworkProxy::NoProxy);auto tcpClock=std::make_shared<QElapsedTimer>();tcpClock->start();auto tcpDeadline=new QTimer(socket);tcpDeadline->setSingleShot(true);tcpDeadline->start(6000);
- const auto tcpEpoch=m_routeEpoch;
- auto tcpDone=[this,socket,tcpClock,tcpEpoch](bool ok){if(socket->property("measured").toBool())return;socket->setProperty("measured",true);if(tcpEpoch==m_routeEpoch){m_latencies["internet"]=ok?QString::number(tcpClock->elapsed())+" ms":"连接失败";reportMeasurement("InternetTCP",ok,"外部 TCP 握手失败或超时");}socket->deleteLater();--m_measurements;m_measurementState=m_measurements?"正在测量":"测量完成";publish();};
- connect(socket,&QTcpSocket::connected,this,[tcpDone]{tcpDone(true);});connect(socket,&QTcpSocket::errorOccurred,this,[tcpDone](QAbstractSocket::SocketError){tcpDone(false);});connect(tcpDeadline,&QTimer::timeout,this,[tcpDone]{tcpDone(false);});socket->connectToHost(QHostAddress("1.1.1.1"),443);
+ // A fixed direct TCP handshake bypassed the selected proxy and falsely
+ // reported failure on networks blocking that endpoint. Test real HTTPS
+ // through the active local proxy policy, or explicitly report a direct route.
+ const bool throughProxy=m_status.apiHealthy && m_status.proxyPort>0;
+ m_internetDiagnostic={{"code","measuring"},{"state",QStringLiteral("正在检测")},{"route",throughProxy?QStringLiteral("Swirl 本地代理策略"):QStringLiteral("直连")},{"engineRunning",m_status.processAlive},{"apiHealthy",m_status.apiHealthy},{"proxyPort",m_status.proxyPort},{"selectedNode",!m_status.selectedNodeId.isEmpty()},{"directSession",m_status.directSession}};
+ measureHttp("internet",m_internetProbe,throughProxy);
  if(m_status.apiHealthy&&m_status.proxyPort>0){++m_measurements;measureHttp("exit",QUrl("https://api.ipify.org"),true,true);}
  auto dns=new QDnsLookup(QDnsLookup::A,"www.microsoft.com",this);auto elapsed=std::make_shared<QElapsedTimer>();elapsed->start();const auto epoch=m_routeEpoch;
  auto dnsDeadline=new QTimer(dns);dnsDeadline->setSingleShot(true);connect(dnsDeadline,&QTimer::timeout,dns,&QDnsLookup::abort);dnsDeadline->start(8000);

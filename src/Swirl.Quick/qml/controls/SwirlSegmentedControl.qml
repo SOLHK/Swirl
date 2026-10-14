@@ -37,7 +37,7 @@ Item {
                 }
                 contentItem: Text {
                     text: AppState.zh(String(modelData))
-                    color:control.currentIndex===index&&control.accentSelection?"white":control.rounded?Theme.text:control.currentIndex===index?"white":Theme.muted
+                    color:control.currentIndex===index&&control.accentSelection?"white":control.currentIndex===index?Theme.text:Theme.muted
                     leftPadding:control.optionIcons.length?Theme.dp(18):0
                     SwirlIcon{visible:control.optionIcons.length>index;name:control.optionIcons[index]||"link";size:Theme.dp(16);color:parent.color;x:(parent.width-parent.contentWidth)/2-Theme.dp(22);anchors.verticalCenter:parent.verticalCenter}
                     font.pixelSize:Theme.fontSize(control.textPixelSize); font.family:Theme.fontFamily

@@ -15,7 +15,7 @@ Item {
  Column{x:Theme.dp(24);y:Theme.dp(108);width:(parent.width-Theme.dp(96))/2;spacing:Theme.dp(12)
   ReferenceSection{width:parent.width;title:"CA 证书";tint:Theme.orange}
   Row{x:Theme.dp(20);width:parent.width-Theme.dp(20);height:Theme.dp(54);spacing:Theme.dp(8)
-   Image{source:"qrc:/swirl/icons/ui/reference-certificate.png";width:Theme.dp(48);height:Theme.dp(48);fillMode:Image.PreserveAspectFit}
+   SwirlIcon{name:"certificate";size:Theme.dp(48);color:Theme.accent}
    Column{width:parent.width-Theme.dp(56);spacing:Theme.dp(4);Text{text:captureProvider.tls.ready?"Swirl Local CA":"配置中没有 CA 证书";color:Theme.text;font.pixelSize:Theme.fontSize(13)}Note{text:captureProvider.tls.trusted?"CA 证书已被当前用户信任":"CA 证书不被系统信任"}}
   }
   Column{width:Theme.dp(180);x:Theme.dp(76);height:implicitHeight-Theme.dp(4);spacing:Theme.dp(8)

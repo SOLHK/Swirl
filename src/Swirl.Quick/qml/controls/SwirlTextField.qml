@@ -9,7 +9,7 @@ TextField {
     selectionColor: Theme.accent
     selectedTextColor: "white"
     placeholderTextColor: Theme.muted
-    font.family: "Microsoft YaHei UI"
+    font.family: Theme.fontFamily
     font.pixelSize:Theme.fontSize(12)
     background: Rectangle {
         radius: Theme.controlRadius

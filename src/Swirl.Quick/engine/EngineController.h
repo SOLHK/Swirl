@@ -141,7 +141,7 @@ public:
     bool validateNetworkConfiguration(const QVariantMap &configuration,QVariantMap *canonical=nullptr);
     bool replaceNetworkConfiguration(const QVariantMap &configuration);
     void setModuleOverlayActive(bool active) { m_moduleOverlayActive=active; }
-    Q_INVOKABLE bool saveRoutingRule(const QString &type,const QString &pattern,const QString &policy);
+    Q_INVOKABLE bool saveRoutingRule(const QString &type,const QString &pattern,const QString &policy,int index=-1);
     Q_INVOKABLE bool removeRoutingRule(int index);
     Q_INVOKABLE bool savePolicyGroup(const QString &name,const QString &type,const QStringList &members);
     Q_INVOKABLE bool removePolicyGroup(const QString &name);

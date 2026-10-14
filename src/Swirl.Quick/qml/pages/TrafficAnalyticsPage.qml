@@ -7,16 +7,21 @@ import "../controls"
 Item {
  id:page
  readonly property var telemetry:engineController.telemetry
- property int period:0
+ property int period:AppState.trafficPeriod
+ readonly property var heroTargets:({totalTraffic:totalTraffic,uploadRate:uploadRate,downloadRate:downloadRate})
+ Connections {target:AppState;function onTrafficPeriodChanged(){page.period=AppState.trafficPeriod}}
  property string kind:"domains"
  readonly property var totals:(telemetry.revision,telemetry.summary(period))
  ScrollView { id:scroll;anchors.fill:parent;clip:true;ScrollBar.horizontal.policy:ScrollBar.AlwaysOff;ScrollBar.vertical:SwirlScrollBar {}
   ColumnLayout { width:scroll.availableWidth;spacing:Theme.gap
    RowLayout { Layout.fillWidth:true
     Text { text:"流量分析";font.pixelSize:Theme.fontSize(30);font.weight:Font.DemiBold;color:Theme.text;Layout.fillWidth:true }
-    SwirlComboBox { model:["今日","昨日","本周"];onActivated:page.period=currentIndex }
+    SwirlButton {text:"返回";visible:SwirlMotion.returnShared && SwirlMotion.returnShared.route===AppState.currentPage;onClicked:SwirlMotion.returnToHub(totalTraffic)}
+    SwirlComboBox { model:["今日","昨日","本周","本月"];currentIndex:page.period;onActivated:page.period=currentIndex }
    }
    Text { text:"仅统计经过 Swirl 的流量；排行基于已采集连接，短于采样间隔的连接可能无法归属。历史保留 32 天。";color:Theme.muted;Layout.fillWidth:true;wrapMode:Text.Wrap }
+   RowLayout {Layout.fillWidth:true;Text {text:"总流量";color:Theme.muted}Text {id:totalTraffic;text:page.totals.sampled?page.telemetry.formatBytes(page.totals.total):"—";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold;Layout.fillWidth:true}}
+   RowLayout {Layout.fillWidth:true;Text {text:"实时上传";color:Theme.muted}Text {id:uploadRate;text:page.telemetry.sampled?page.telemetry.formatBytes(page.telemetry.uploadRate)+"/s":"—";color:Theme.text;font.pixelSize:Theme.fontSize(20);Layout.fillWidth:true}Text {text:"实时下载";color:Theme.muted}Text {id:downloadRate;text:page.telemetry.sampled?page.telemetry.formatBytes(page.telemetry.downloadRate)+"/s":"—";color:Theme.text;font.pixelSize:Theme.fontSize(20);Layout.fillWidth:true}}
    GridLayout { Layout.fillWidth:true;columns:page.width>Theme.dp(800)?4:2;columnSpacing:Theme.gap;rowSpacing:Theme.gap
     SwirlMetricCard { Layout.fillWidth:true;label:"下载";value:totals.sampled?telemetry.formatBytes(totals.down):"未采集";iconName:"download" }
     SwirlMetricCard { Layout.fillWidth:true;label:"上传";value:totals.sampled?telemetry.formatBytes(totals.up):"未采集";iconName:"upload" }

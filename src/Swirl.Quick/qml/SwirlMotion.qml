@@ -19,7 +19,8 @@ QtObject {
     readonly property int expandDuration:ms(240)
     readonly property real pressScale: reduced ? 1 : 0.972
     property bool transitioning: false
-    onTransitioningChanged:motionPolicy.setTransitioning(transitioning)
+    readonly property bool busy: transitioning || SwirlTransitionRegistry.activeCount>0
+    onBusyChanged:motionPolicy.setTransitioning(busy)
     property var triggerRect: Qt.rect(0,0,0,0)
     property var navigationRect: null
     property var shared: null
@@ -37,10 +38,9 @@ QtObject {
         return y<popup.height/3 ? (x<popup.width/3?Item.TopLeft:x>popup.width*2/3?Item.TopRight:Item.Top) :
                y>popup.height*2/3 ? (x<popup.width/3?Item.BottomLeft:x>popup.width*2/3?Item.BottomRight:Item.Bottom) : Item.Center
     }
-    function navigateFrom(item, route) {
-        // Content transitions are uniform and immediate; no card texture grab
-        // delays navigation or introduces a second shared-element animation.
-        returnShared={route:route,previous:AppState.currentPage}
+    function navigateFrom(item, route, targetKey) {
+        shared={source:item,targetKey:targetKey || "title",text:item.text || ""}
+        returnShared={route:route,previous:AppState.currentPage,source:item,targetKey:targetKey || "title"}
         AppState.navigate(route)
     }
     function returnToHub(item) {

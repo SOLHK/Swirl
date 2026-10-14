@@ -9,21 +9,7 @@ Item {
  readonly property bool effectivelyCollapsed:false
  property alias searchField:pageSearch
  function openSearch(){ searchPopup.open();pageSearch.forceActiveFocus() }
- Row {
-  x:Theme.dp(8);y:Theme.dp(8);spacing:Theme.dp(7)
-  Repeater {
-   model:["#FF5F57","#FEBC2E","#28C840"]
-   SwirlMotionButton {
-    required property int index;required property string modelData
-    width:Theme.dp(16);height:width;hoverEnabled:true
-    objectName:index===0?"windowCloseButton":index===1?"windowMinimizeButton":"windowMaximizeButton"
-    background:Rectangle { anchors.centerIn:parent;width:Theme.dp(14);height:width;radius:width/2;color:Theme.windowActive?parent.modelData:"#D1D9DE" }
-    contentItem:Item {}
-    onClicked:{if(index===0)sidebar.Window.window.close();else if(index===1)sidebar.Window.window.showMinimized();else if(sidebar.Window.window.visibility===Window.Maximized)sidebar.Window.window.showNormal();else sidebar.Window.window.showMaximized()}
-    Accessible.name:index===0?"关闭":index===1?"最小化":"最大化或还原"
-   }
-  }
- }
+ SwirlTrafficLights{x:Theme.dp(8);y:Theme.dp(4);targetWindow:sidebar.Window.window}
  Column {
   x:Theme.dp(10);y:Theme.dp(55);width:parent.width-Theme.dp(20);spacing:0
   Repeater {

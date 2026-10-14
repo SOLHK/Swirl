@@ -7,6 +7,7 @@ import "../controls"
 Item {
     id:page
     property var selected:null
+    readonly property var heroTargets:({activeConnections:activeCount})
     property var visibleRows:{
         var q=search.text.toLowerCase()
         var s=sort.currentText
@@ -25,6 +26,7 @@ Item {
         anchors.fill:parent
         anchors.leftMargin:Theme.dp(23); anchors.rightMargin:Theme.dp(23); anchors.bottomMargin:Theme.dp(14)
         spacing:Theme.dp(14)
+        RowLayout {Layout.fillWidth:true;Text {text:"活动连接";color:Theme.text;font.pixelSize:Theme.fontSize(22);Layout.fillWidth:true}Text {id:activeCount;text:engineController.telemetry.connectionsSampled?String(engineController.telemetry.activeConnections):"—";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold}SwirlButton {text:"返回";visible:SwirlMotion.returnShared && SwirlMotion.returnShared.route===AppState.currentPage;onClicked:SwirlMotion.returnToHub(activeCount)}}
         RowLayout {
             Layout.fillWidth:true; spacing:Theme.dp(10)
             SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:AppState.zh("搜索域名、IP、进程或策略") }

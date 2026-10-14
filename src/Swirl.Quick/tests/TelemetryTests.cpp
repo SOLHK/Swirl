@@ -3,10 +3,37 @@
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QDateTime>
+#include <QNetworkReply>
+#include <QTcpServer>
+#include <QTcpSocket>
 class TelemetryTests:public QObject {
  Q_OBJECT
  ProxyEngine::Status sample(qint64 time,int up,int down){ProxyEngine::Status s;s.processAlive=true;s.processId=1;s.apiHealthy=true;s.connectionsAt=time;s.trafficAt=time;s.uploadTotal=up;s.downloadTotal=down;s.uploadRate=up;s.downloadRate=down;s.connections={QVariantMap{{"id","connection-a"},{"host","fixture.test"},{"process","fixture.exe"},{"policy","DIRECT"},{"category","direct"},{"uploadBytes",up},{"downloadBytes",down},{"time",QDateTime::fromMSecsSinceEpoch(time).toString(Qt::ISODateWithMs)}}};return s;}
 private slots:
+ void internetUsesExplicitProxyAndActualHttpResponse(){
+  QTemporaryDir temp;TelemetryService model(temp.filePath("diagnostic.json"),false);
+  QTcpServer proxy;QVERIFY(proxy.listen(QHostAddress::LocalHost,0));QByteArray request;
+  connect(&proxy,&QTcpServer::newConnection,this,[&]{auto socket=proxy.nextPendingConnection();connect(socket,&QTcpSocket::readyRead,this,[&,socket]{request+=socket->readAll();if(request.contains("\r\n\r\n")){socket->write("HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");socket->disconnectFromHost();}});});
+  auto status=sample(QDateTime::currentMSecsSinceEpoch(),0,0);status.proxyPort=proxy.serverPort();model.ingest(status);
+  model.m_measurements=1;model.measureHttp("internet",QUrl("http://fixture.invalid/probe"),true);
+  QTRY_VERIFY_WITH_TIMEOUT(model.m_measurements==0,4000);
+  QVERIFY(request.startsWith("GET http://fixture.invalid/probe HTTP/1.1"));
+  QVERIFY(model.internetDiagnostic().value("success").toBool());QCOMPARE(model.internetDiagnostic().value("http").toInt(),204);
+  // A stopped listener must never reuse the previous success.
+  proxy.close();model.m_measurements=1;model.measureHttp("internet",QUrl("http://fixture.invalid/probe"),true);
+  QTRY_VERIFY_WITH_TIMEOUT(model.m_measurements==0,4000);
+  QVERIFY(!model.internetDiagnostic().value("success").toBool());QCOMPARE(model.internetDiagnostic().value("code").toString(),QString("proxy-port"));
+ }
+ void internetFailureClassificationAndRouteChanges(){
+  QTemporaryDir temp;TelemetryService model(temp.filePath("classification.json"),false);
+  model.recordInternetResult(QNetworkReply::HostNotFoundError,0,false,2);QCOMPARE(model.internetDiagnostic().value("code").toString(),QString("dns"));
+  model.recordInternetResult(QNetworkReply::OperationCanceledError,0,true,9000);QCOMPARE(model.internetDiagnostic().value("code").toString(),QString("timeout"));
+  model.recordInternetResult(QNetworkReply::ServiceUnavailableError,503,true,80);QCOMPARE(model.internetDiagnostic().value("code").toString(),QString("service"));
+  QVERIFY(!model.internetDiagnostic().value("success").toBool());
+  model.recordInternetResult(QNetworkReply::NoError,204,false,20);QVERIFY(model.internetDiagnostic().value("success").toBool());
+  QVERIFY(model.internetDiagnostic().value("advice").toString().contains(QStringLiteral("未验证代理节点")));
+  model.ingest(sample(QDateTime::currentMSecsSinceEpoch(),0,0));QVERIFY(model.internetDiagnostic().isEmpty());
+ }
  void continuingMeasurementFailureIsOneIncident(){
   QTemporaryDir temp;TelemetryService model(temp.filePath("measurements.json"),false);QSignalSpy incidents(&model,&TelemetryService::diagnostic);
   for(int i=0;i<510;++i)model.reportMeasurement("InternetTCP",false,"timeout");

@@ -45,6 +45,9 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     window->setPosition(available.topLeft()+QPoint(60,40));
     window->showNormal();window->raise();window->requestActivate();QTest::qWait(900);
 #ifdef Q_OS_WIN
+    // Keep Qt's flag model in sync: a raw HWND_TOPMOST alone is cleared when
+    // Qt reapplies its flags after the manual DPI/size checks below.
+    window->setFlag(Qt::WindowStaysOnTopHint,true);
     // This explicit validation fixture must not sample an unrelated window
     // that happens to cover Swirl. Temporarily keep the test HWND on top and
     // activate it, without changing any other application's window settings.
@@ -140,23 +143,25 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     auto red=grab("backdrop-red");
     const QColor behind("#D72D31");
     const auto cornerShowsBackground=[&](QColor pixel){
-        if(!backdrop->nativeCorners())return distance(pixel,behind)<=3;
-        // DWM's native shadow dims the desktop at the corner. Check the
-        // background hue, not exact luminance, to distinguish it from material.
+        // DWM's frame shadow also surrounds Qt's own alpha outline. Check
+        // the background hue, then separately require zero corner alpha.
         return pixel.red()>100 && pixel.red()>3*pixel.green() && qAbs(pixel.blue()-pixel.green())<8;
     };
     check(cornerShowsBackground(red.pixelColor(0,0)) && cornerShowsBackground(red.pixelColor(red.width()-1,0)) && cornerShowsBackground(red.pixelColor(0,red.height()-1)) && cornerShowsBackground(red.pixelColor(red.width()-1,red.height()-1)),
           "all four composed corners show desktop or its native shadow without material fill");
+    const auto cornerAlpha=window->grabWindow();
+    check(cornerAlpha.pixelColor(0,0).alpha()==0&&cornerAlpha.pixelColor(cornerAlpha.width()-1,0).alpha()==0&&cornerAlpha.pixelColor(0,cornerAlpha.height()-1).alpha()==0&&cornerAlpha.pixelColor(cornerAlpha.width()-1,cornerAlpha.height()-1).alpha()==0,"all four rendered corner tips are completely transparent");
     background.setColor(QColor("#2464D8"));QTest::qWait(800);
     auto blue=grab("backdrop-blue");
     const int sidebarChange=distance(sample(red,0.01,0.83),sample(blue,0.01,0.83));
     const int contentChange=distance(sample(red,0.995,0.5),sample(blue,0.995,0.5));
     qInfo()<<"Native pixel delta: sidebar="<<sidebarChange<<"content="<<contentChange<<"DPR="<<window->devicePixelRatio()<<backdrop->status();
-    check(backdrop->active(),"native translucent surface actually enabled on this machine");
-    check(sidebarChange>12,"sidebar responds to changing real window behind it");
-    check(contentChange>12,"main page background responds to the real desktop behind it");
+    check(!backdrop->active()&&backdrop->status().contains("Swirl wallpaper"),"Swirl RHI material owns composition with DWM Acrylic disabled");
+    check(sidebarChange>10&&sidebarChange<100,"single pale-blue material preserves controlled desktop transparency in the sidebar");
+    check(contentChange>10&&contentChange<100,"the same single material reveals the desktop through the workspace gutter");
     // Cards remain readable while the shell and page gutter reveal the desktop.
-    check(window->grabWindow().pixelColor(int(window->width()*0.995*window->devicePixelRatio()),int(window->height()*0.5*window->devicePixelRatio())).alpha()<255,"page shell has per-pixel alpha instead of opaque blue paint");
+    const auto materialAlpha=window->grabWindow().pixelColor(int(window->width()*0.995*window->devicePixelRatio()),int(window->height()*0.5*window->devicePixelRatio())).alpha();
+    check(materialAlpha>=200&&materialAlpha<250,"the single glass surface has real alpha rather than an opaque wallpaper replacement");
     // Move Swirl relative to a split-color native QML window to verify position-
     // dependent composition. The scene is a test window, not a wallpaper image.
     QQuickItem split;
@@ -170,7 +175,7 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     auto left=grab("backdrop-moved-left");
     window->setPosition(available.topLeft()+QPoint(available.width()/2,30));QTest::qWait(600);
     auto right=grab("backdrop-moved-right");
-    check(distance(sample(left,0.01,0.83),sample(right,0.01,0.83))>12,"moving Swirl changes sidebar composition over split-color window");
+    check(distance(sample(left,0.01,0.83),sample(right,0.01,0.83))>1,"moving Swirl changes the cached wallpaper sample in screen coordinates");
     const qreal sidebar=state("window.actualSidebarWidth * window.contentScale").toReal();
     window->setPosition(available.topLeft()+QPoint(int(available.width()/2-sidebar/2),30));QTest::qWait(600);
     auto edge=grab("backdrop-blurred-edge");
@@ -181,8 +186,7 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     int intermediate=0;
     for(int x=cx-50;x<=cx+50;++x){const int value=edge.pixelColor(x,row).red();if(value>low+2&&value<high-2)++intermediate;}
     qInfo()<<"Alpha edge profile: left="<<a<<"right="<<b<<"intermediate pixels="<<intermediate;
-    check(high-low>3,"native alpha sidebar responds to the background edge");
-    if(backdrop->status().contains("Acrylic"))check(intermediate>=10,"native Acrylic actually blurs the split-color background edge");
+    check(!backdrop->status().contains("Acrylic"),"external split-color window is not mistaken for a captured backdrop");
     delete rectangle;
     window->setPosition(available.topLeft()+QPoint(60,40));
     state("Theme.transparency=false");QTest::qWait(500);
@@ -193,7 +197,7 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     check(distance(sample(opaqueBlue,0.01,0.83),sample(opaqueRed,0.01,0.83))<=3,"disabled transparency gives opaque sidebar fallback");
     check(distance(sample(opaqueBlue,0.995,0.5),sample(opaqueRed,0.995,0.5))<=3,"disabled transparency gives opaque page fallback");
     state("Theme.transparency=true;Theme.mode='Dark'");QTest::qWait(500);grab("overview-native-dark");
-    check(backdrop->active(),"native backdrop remains available in dark theme");
+    check(!backdrop->active()&&backdrop->status().contains("Swirl wallpaper"),"dark theme retains Swirl material with no native Acrylic");
     state("Theme.mode='Light'");
     auto *title=find(window->contentItem(),"titleDragArea");
     check(title,"title drag region exists");
@@ -205,7 +209,7 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     }
     click("windowMaximizeButton");QTest::qWait(500);grab("overview-maximized");
     qInfo()<<"Maximized geometry"<<window->geometry()<<"work area"<<available;
-    check(window->geometry()==available,"maximization respects work area without corner gaps");
+    check(window->visibility()==QWindow::FullScreen&&window->geometry()==window->screen()->geometry(),"green traffic light enters true full screen without corner gaps");
     click("windowMaximizeButton");QTest::qWait(300);
     check(window->visibility()==QWindow::Windowed,"restore returns to windowed state");
     click("windowMinimizeButton");QTest::qWait(300);
@@ -230,6 +234,7 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
 #endif
     background.hide();
 #ifdef Q_OS_WIN
+    window->setFlag(Qt::WindowStaysOnTopHint,false);
     SetWindowPos(testHwnd,HWND_NOTOPMOST,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE);
 #endif
     const bool quitOnClose=QGuiApplication::quitOnLastWindowClosed();

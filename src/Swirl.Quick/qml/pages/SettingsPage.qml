@@ -7,7 +7,7 @@ import "../controls"
 Item {
     id:page
     property string section:"外观"
-    property var sections:["常规","外观","代理","TUN","DNS","端口","系统集成","启动","通知","数据管理","隐私与安全","快捷键","关于 Swirl"]
+    property var sections:["常规","外观","字体","代理","TUN","DNS","端口","系统集成","启动","通知","数据管理","隐私与安全","快捷键","关于 Swirl"]
     ColumnLayout {
         anchors.fill:parent; anchors.margins:Theme.dp(23); spacing:Theme.dp(14)
         RowLayout {
@@ -52,7 +52,7 @@ Item {
                         width:options.availableWidth; spacing:Theme.dp(17)
                         Text { text:AppState.zh(page.section); color:Theme.text; font.pixelSize:Theme.fontSize(23); font.weight:Font.DemiBold }
                         Text {
-                            text:page.section==="外观"?"主题、窗口材质、动画与界面缩放。":page.section==="代理"?"引擎、真实节点与当前用户系统代理 · 国内外分流。":page.section==="关于 Swirl"?"版本与项目信息":"此项尚未实现。"
+                            text:page.section==="外观"?"主题、窗口材质、动画与界面缩放。":page.section==="字体"?"选择喜欢的字体，立即应用并自动保存。":page.section==="代理"?"引擎、真实节点与当前用户系统代理 · 国内外分流。":page.section==="关于 Swirl"?"版本与项目信息":"此项尚未实现。"
                             color:Theme.muted; wrapMode:Text.WordWrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12)
                         }
                         Rectangle { Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(1); color:Theme.border }
@@ -75,8 +75,8 @@ Item {
                                 Layout.fillWidth:true
                                 ColumnLayout {
                                     Layout.fillWidth:true
-                                    Text { text:AppState.zh("Windows backdrop material"); color:Theme.text; font.pixelSize:Theme.fontSize(14) }
-                                    Text { text:AppState.zh("Uses DWM on supported Windows 11 systems"); color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
+                                    Text { text:"磨砂背景"; color:Theme.text; font.pixelSize:Theme.fontSize(14) }
+                                    Text { text:"使用本地壁纸生成模糊材质"; color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
                                 }
                                 SwirlToggle { checked:Theme.transparency; onToggled:Theme.transparency=checked }
                             }
@@ -149,7 +149,7 @@ Item {
                             SwirlStatusBadge { label:AppState.zh("CHANGES ARE LOCAL TO THIS UI PREVIEW"); tone:"accent" }
                         }
                         ColumnLayout {
-                            visible:page.section!=="外观"&&page.section!=="关于 Swirl"&&page.section!=="代理"; Layout.fillWidth:true; spacing:Theme.dp(17)
+                            visible:page.section!=="外观"&&page.section!=="字体"&&page.section!=="关于 Swirl"&&page.section!=="代理"; Layout.fillWidth:true; spacing:Theme.dp(17)
                             Repeater {
                                 model:page.section==="代理"?["系统代理","默认策略","进程绕过","代理身份验证"]:
                                       page.section==="DNS"?["解析器选择","加密 DNS","IPv6","虚拟 IP 处理"]:
@@ -247,6 +247,7 @@ Item {
                                 color:Theme.muted; font.pixelSize:Theme.fontSize(11); wrapMode:Text.WrapAnywhere; Layout.fillWidth:true
                             }
                         }
+                        SwirlFontSettings { visible:page.section==="字体"; Layout.fillWidth:true }
                         ColumnLayout {
                             visible:page.section==="关于 Swirl"; Layout.fillWidth:true; spacing:Theme.dp(18)
                             SwirlBrandIcon { Layout.alignment:Qt.AlignHCenter; Layout.preferredWidth:Theme.dp(104); Layout.preferredHeight:Theme.dp(104) }
@@ -262,8 +263,10 @@ Item {
                                     Text { text:AppState.zh(modelData[1]); color:Theme.text; font.pixelSize:Theme.fontSize(14) }
                                 }
                             }
+                            Text { text:"Swirl 使用 HarmonyOS Sans 字体。Copyright 2021 Huawei Device Co., Ltd.\n完整许可可在字体设置中查看。"; Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
+                            SwirlButton { text:"字体与许可"; onClicked:page.section="字体" }
                             SwirlButton { text:"项目主页"; Layout.alignment:Qt.AlignHCenter; onClicked:Qt.openUrlExternally("https://github.com/SOLHK/Swirl") }
-                            Text { text:"第三方组件：Qt、MinGW 运行库、Mihomo（GPL-3.0）"; Layout.fillWidth:true; horizontalAlignment:Text.AlignHCenter; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
+                            Text { text:"第三方组件：Qt、MinGW 运行库、Mihomo（GPL-3.0）、HarmonyOS Sans"; Layout.fillWidth:true; horizontalAlignment:Text.AlignHCenter; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
                         }
                         Item { Layout.preferredHeight:Theme.dp(25) }
                     }

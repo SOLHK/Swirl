@@ -8,8 +8,12 @@ QtObject {
     property bool windowActive:true
     // Tint the real desktop through the Qt alpha surface, including the page gutter.
     readonly property real shellOpacity:transparency && backdropActive ? (dark?0.94:0.90) : 1.0
-    readonly property color shellTop:withAlpha(dark?"#292C31":windowActive?"#EEF0F3":"#F1F2F4",shellOpacity)
-    readonly property color shellBottom:withAlpha(dark?"#22252B":windowActive?"#E9EBEF":"#EEF0F3",shellOpacity)
+    readonly property color shellTop:withAlpha(dark?"#233044":windowActive?"#EAF4FF":"#EDF5FD",shellOpacity)
+    readonly property color shellBottom:withAlpha(dark?"#1E2C3F":windowActive?"#DEECFA":"#E7F1FC",shellOpacity)
+    property real glassBlurStrength: 0.85
+    property int glassQuality: 1
+    property real glassTintAmount: 0.72
+    readonly property real glassSurfaceOpacity: dark ? 0.97 : 0.96
     readonly property bool effectsSupported: gpuEffectsSupported
     property bool reduceMotion: false
     property string pageBranch: "B"
@@ -28,7 +32,7 @@ QtObject {
     readonly property color canvas: dark ? "#24272C" : "#EEF0F3"
     readonly property color surface: dark ? "#292C31" : "#FFFFFF"
     readonly property color independentCard: withAlpha(dark ? "#30343A" : "#FFFFFF", dark ? 0.96 : 0.98)
-    readonly property color primaryContainer: dark ? "#292C31" : "#F5F6F8"
+    readonly property color primaryContainer: withAlpha(dark ? "#2A3546" : "#F2F7FD",transparency?0.78:1)
     readonly property color raised: dark ? "#292929" : "#F7F7F7"
     // Neutral QML tint above the native window backdrop. Fall back to opacity 1.
     readonly property color sidebarBase: dark ? "#292C31" : "#EEF0F3"
@@ -38,7 +42,7 @@ QtObject {
     readonly property real settingsOpacity:dark?0.98:0.96
     readonly property real popupOpacity:transparency && backdropActive ? (dark?0.98:0.99) : 1.0
     readonly property color sidebar: withAlpha(sidebarBase, sidebarOpacity)
-    readonly property color border: dark ? "#454545" : "#E5E5E8"
+    readonly property color border: dark ? "#46566C" : "#D5E2F0"
     readonly property color glassRim: border
     readonly property color glassGlint: dark ? "#4A4A4A" : "#FFFFFF"
     readonly property color glassShadow: dark ? "#50000000" : "#18000000"
@@ -48,7 +52,7 @@ QtObject {
     readonly property color text: dark ? "#DDDDDD" : "#202327"
     readonly property color magenta: "#D92DF3"
     readonly property color cyan: "#06B5F4"
-    readonly property color muted: dark ? "#8F949F" : "#A5A7AB"
+    readonly property color muted: dark ? "#AAB8CA" : "#596C80"
     readonly property color accent: dark ? "#80B7FF" : "#007AFF"
     readonly property color accentIndigo: "#5856D6"
     readonly property color speedAccent: dark ? "#80B7FF" : "#007AFF"
@@ -57,13 +61,13 @@ QtObject {
     readonly property color navigationSelected: withAlpha(dark ? "#FFFFFF" : "#000000", dark ? 0.12 : 0.05)
     readonly property color navigationPressed: dark ? "#636871" : "#B4BAC3"
     readonly property color selected: dark ? "#484848" : "#E3E4E7"
-    readonly property color segmentSelected: dark ? "#62646B" : "#929294"
+    readonly property color segmentSelected: dark ? "#546173" : "#FFFFFF"
     readonly property color hover: dark ? "#3A3A3A" : "#E3E3E3"
     readonly property color pressed: dark ? "#505050" : "#D8D8D8"
     readonly property color controlBorder: pillRim
     readonly property color focusBorder: dark ? "#9AC8FF" : "#005BBF"
     readonly property color tableToolbar: dark ? "#333333" : "#ECECED"
-    readonly property color buttonBase: dark ? "#333333" : "#E5E5E7"
+    readonly property color buttonBase: dark ? "#3C4654" : "#F8FAFD"
     readonly property color field: dark ? "#353535" : "#F4F4F5"
     readonly property color capsuleSurface: dark ? "#38383C" : "#ECEDEF"
     readonly property color green: dark ? "#75DD91" : "#30C759"
@@ -73,8 +77,8 @@ QtObject {
     // Logical design units: Qt applies screen DPI; dp applies only user UI zoom.
     // Large surfaces follow the supplied ~12 pt visual reference, while nested
     // cards and controls have smaller corners. Circular controls use geometry.
-    readonly property real windowRadius: dp(16)
-    readonly property real containerRadius: dp(10)
+    readonly property real windowRadius: dp(28)
+    readonly property real containerRadius: dp(24)
     readonly property real radius: containerRadius
     readonly property real cardRadius: pageBranch === "A" ? dp(20) : dp(10)
     readonly property real independentCardRadius: dp(20)
@@ -103,9 +107,9 @@ QtObject {
     readonly property real cardShadowOpacity: 0.06
     readonly property real borderWidth: dp(1)
     readonly property real shadowOpacity: 0.05
-    readonly property string fontFamily: "Microsoft YaHei UI"
+    readonly property string fontFamily: fontManager.currentFamily
     function dp(value) { return value === 0 ? 0 : Math.round(value * uiScale * 100) / 100 }
-    function fontSize(value) { return Math.max(9, dp(value)) }
+    function fontSize(value) { return Math.max(11, Math.round(dp(value))) }
     function setScalePercent(percent) {
         appearanceSettings.followSystemScale = false
         appearanceSettings.savedScalePercent = Math.max(75, Math.min(150, Math.round(percent)))

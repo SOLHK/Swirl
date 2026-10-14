@@ -15,7 +15,7 @@ TextField {
     color: Theme.text
     selectedTextColor: "white"
     selectionColor: Theme.accent
-    font.family: "Microsoft YaHei UI"
+    font.family: Theme.fontFamily
     font.pixelSize:Theme.fontSize(16)
     background: SwirlPillSurface {
         hovered:control.activeFocus

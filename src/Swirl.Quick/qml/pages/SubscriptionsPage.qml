@@ -25,33 +25,49 @@ Item {
     add:Transition{enabled:!SwirlMotion.reduced;NumberAnimation{property:"opacity";from:0;to:1;duration:SwirlMotion.duration}}
     remove:Transition{enabled:!SwirlMotion.reduced;NumberAnimation{property:"opacity";to:0;duration:SwirlMotion.exitDuration}}
     displaced:Transition{enabled:!SwirlMotion.reduced;NumberAnimation{property:"y";duration:SwirlMotion.expandDuration;easing.type:Easing.OutCubic}}
-    delegate:SwirlGlassPanel { id:provider;objectName:"subscriptionCard-"+record.id;required property var entry;readonly property var record:entry;interactive:true
-      width:subscriptionList.width;height:providerContent.implicitHeight+2*Theme.cardPadding
-      ColumnLayout { id:providerContent;anchors.fill:parent;anchors.margins:Theme.cardPadding;spacing:Theme.dp(10)
-       RowLayout { Layout.fillWidth:true
-        Text { text:provider.record.name;textFormat:Text.PlainText;color:Theme.text;font.pixelSize:Theme.fontSize(18);font.weight:Font.DemiBold;Layout.fillWidth:true }
-        SwirlStatusBadge { busy:provider.record.status==="正在更新";label:provider.record.status;tone:provider.record.status==="已保存真实节点"?"success":provider.record.status==="更新失败"?"warning":"neutral" }
-        Text { text:provider.record.nodes+" 个节点";color:Theme.muted }
-       }
-       RowLayout { Layout.fillWidth:true
-        Text { text:"最近更新："+provider.record.update;color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true }
-        Text { text:"自动更新";color:Theme.text;font.pixelSize:Theme.fontSize(12) }
-        SwirlToggle { checked:provider.record.enabled;enabled:!engineController.imports.busy;onToggled:engineController.imports.saveSubscription(provider.record.id,provider.record.name,"",provider.record.intervalMinutes,checked) }
-       }
-       Text { text:provider.record.enabled?"每 "+provider.record.intervalMinutes+" 分钟 · 下次预计 "+provider.record.nextUpdate:"自动更新已关闭";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap }
-       Text { text:provider.record.error;visible:text.length>0;color:Theme.orange;Layout.fillWidth:true;wrapMode:Text.Wrap;font.pixelSize:Theme.fontSize(12) }
-       SwirlExpander {expanded:page.expandedId===provider.record.id;Layout.fillWidth:true
-        Text {width:parent.width;text:"订阅地址已加密隐藏。更新失败时保留现有节点。";color:Theme.muted;wrapMode:Text.Wrap;font.pixelSize:Theme.fontSize(12)}
-       }
-       RowLayout { Layout.fillWidth:true
-        SwirlButton { objectName:"expandSubscription-"+provider.record.id;text:page.expandedId===provider.record.id?"收起详情":"展开详情";onClicked:page.expandedId=page.expandedId===provider.record.id?"":provider.record.id }
-        Item { Layout.fillWidth:true }
-        SwirlButton { objectName:"refreshSubscription-"+provider.record.id;text:"刷新";enabled:!engineController.imports.busy;onClicked:engineController.imports.refreshSubscription(provider.record.id) }
-        SwirlButton { objectName:"editSubscription-"+provider.record.id;text:"编辑";enabled:!engineController.imports.busy;onClicked:page.edit(provider.record) }
-        SwirlButton { objectName:"deleteSubscription-"+provider.record.id;text:"删除";danger:true;enabled:!engineController.imports.busy;onClicked:{deleteDialog.recordId=provider.record.id;deleteDialog.open()} }
-       }
+    delegate:SwirlHeroCard {
+      id:provider;objectName:'subscriptionCard-'+record.id
+      required property var entry;readonly property var record:entry
+      expanded:page.expandedId===record.id
+      width:subscriptionList.width
+      collapsedHeight:header.implicitHeight+actions.implicitHeight+2*Theme.cardPadding+Theme.dp(14)
+      expandedHeight:collapsedHeight+detailBody.implicitHeight+Theme.dp(18)
+      ColumnLayout {
+        id:header;x:Theme.cardPadding;y:Theme.cardPadding;width:parent.width-2*Theme.cardPadding;spacing:Theme.dp(9)
+        RowLayout {Layout.fillWidth:true
+          Text {objectName:'subscriptionTitle-'+provider.record.id;text:provider.record.name;textFormat:Text.PlainText;color:Theme.text;font.pixelSize:Theme.fontSize(18+4*provider.reveal);font.weight:Font.DemiBold;Layout.fillWidth:true;elide:Text.ElideRight}
+          SwirlStatusBadge {busy:provider.record.status==='正在更新';label:provider.record.status;tone:provider.record.status==='已保存真实节点'?'success':provider.record.status==='更新失败'?'warning':'neutral'}
+          Text {text:provider.record.nodes+' 个节点';color:Theme.muted}
+        }
+        Text {text:'最近更新：'+provider.record.update;color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
+        Text {text:provider.record.error;visible:text.length>0;color:Theme.orange;Layout.fillWidth:true;wrapMode:Text.Wrap;font.pixelSize:Theme.fontSize(12)}
       }
-     }
+      Item {
+        x:Theme.cardPadding;y:header.y+header.implicitHeight+Theme.dp(14);width:parent.width-2*Theme.cardPadding
+        height:detailBody.implicitHeight*provider.reveal;clip:true
+        opacity:Math.max(0,Math.min(1,(provider.reveal-0.20)/0.65));enabled:provider.expanded
+        ColumnLayout {id:detailBody;width:parent.width;spacing:Theme.dp(12)
+          Rectangle {Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(1);color:Theme.border}
+          RowLayout {Layout.fillWidth:true
+            ColumnLayout {Layout.fillWidth:true;spacing:Theme.dp(5)
+              Text {text:'自动更新';color:Theme.text;font.pixelSize:Theme.fontSize(14);font.weight:Font.DemiBold}
+              Text {text:provider.record.enabled?'每 '+provider.record.intervalMinutes+' 分钟':'自动更新已关闭';color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
+            }
+            SwirlToggle {checked:provider.record.enabled;enabled:!engineController.imports.busy;onToggled:engineController.imports.saveSubscription(provider.record.id,provider.record.name,'',provider.record.intervalMinutes,checked)}
+          }
+          Text {text:provider.record.enabled?'下次预计：'+provider.record.nextUpdate:'可在编辑中调整更新周期';color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
+          Text {text:'订阅地址已加密隐藏。更新失败时保留现有节点。';color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
+        }
+      }
+      RowLayout {
+        id:actions;x:Theme.cardPadding;y:provider.height-Theme.cardPadding-implicitHeight;width:parent.width-2*Theme.cardPadding;spacing:Theme.dp(8)
+        SwirlButton {objectName:'expandSubscription-'+provider.record.id;text:provider.expanded?'收起详情':'展开详情';onClicked:page.expandedId=provider.expanded?'':provider.record.id;Accessible.name:text+' '+provider.record.name}
+        Item {Layout.fillWidth:true}
+        SwirlButton {objectName:'refreshSubscription-'+provider.record.id;text:'刷新';enabled:!engineController.imports.busy;onClicked:engineController.imports.refreshSubscription(provider.record.id)}
+        SwirlButton {objectName:'editSubscription-'+provider.record.id;text:'编辑';enabled:!engineController.imports.busy;onClicked:page.edit(provider.record)}
+        SwirlButton {objectName:'deleteSubscription-'+provider.record.id;text:'删除';danger:true;enabled:!engineController.imports.busy;onClicked:{deleteDialog.recordId=provider.record.id;deleteDialog.open()}}
+      }
+    }
     footer:Text {visible:page.listed.length===0;text:"暂无订阅。添加订阅后，可在卡片内查看更新状态。";color:Theme.muted;width:subscriptionList.width;wrapMode:Text.Wrap}
 
    }

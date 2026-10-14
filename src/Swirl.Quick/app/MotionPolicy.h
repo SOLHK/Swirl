@@ -31,6 +31,7 @@ private:
     std::atomic<qint64> m_lastFrame{0};
     int m_slowFrames=0;
     std::atomic<double> m_budget{16.67};
+    QMetaObject::Connection m_refreshSignal;
 signals:
     void policyChanged();
     void grabsChanged();

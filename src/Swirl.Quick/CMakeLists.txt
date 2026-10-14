@@ -13,6 +13,9 @@ add_executable(SwirlScriptRunner tools/ScriptRunner.cpp)
 target_link_libraries(SwirlScriptRunner PRIVATE Qt6::Core Qt6::Qml)
 target_compile_definitions(SwirlScriptRunner PRIVATE NOMINMAX)
 qt_add_executable(Swirl WIN32 main.cpp app/DismissalController.h app/DismissalController.cpp app/SystemDataProvider.cpp app/SystemDataProvider.h app/WindowsBackdrop.cpp app/WindowsBackdrop.h network/CaptureService.cpp network/CaptureService.h app/ModuleDraftStore.cpp app/ModuleDraftStore.h)
+target_sources(Swirl PRIVATE app/FontManager.h app/FontManager.cpp)
+qt_add_resources(Swirl harmony_fonts PREFIX "/swirl/fonts" BASE "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts" FILES
+ assets/fonts/HarmonyOS_Sans_SC_Regular.ttf assets/fonts/HarmonyOS_Sans_SC_Medium.ttf assets/fonts/HarmonyOS_Sans_SC_Bold.ttf assets/fonts/LICENSE_HarmonyOS_Sans.txt)
 add_library(SwirlEngine STATIC
  app/DiagnosticService.h app/DiagnosticService.cpp
  engine/TelemetryService.h engine/TelemetryService.cpp
@@ -54,11 +57,15 @@ add_dependencies(Swirl SwirlScriptRunner)
 qt_add_resources(Swirl engine_manifest PREFIX "/engine" BASE "${CMAKE_CURRENT_SOURCE_DIR}/packaging"
  FILES packaging/mihomo-manifest.json)
 set(SWIRL_QML_FILES
+ qml/controls/SwirlNodeTransfer.qml
+ qml/components/SwirlFontSettings.qml
  qml/components/SwirlWindowTitleBar.qml
  qml/controls/RewriteRulesDialog.qml
  qml/components/ReferenceSection.qml qml/components/ReferenceOutline.qml qml/components/ReferenceCheckBox.qml qml/pages/CaptureInspectorPage.qml
  qml/controls/SwirlStatusCapsule.qml qml/controls/SwirlScrollBar.qml qml/pages/ProcessesPage.qml
- qml/Main.qml qml/Theme.qml qml/AppState.qml qml/FeatureCatalog.qml qml/SwirlMotion.qml
+ qml/Main.qml qml/Theme.qml qml/AppState.qml qml/FeatureCatalog.qml qml/SwirlMotion.qml qml/SwirlTransitionRegistry.qml
+ qml/controls/SwirlTransitionCoordinator.qml qml/controls/SwirlHeroCard.qml qml/controls/SwirlHeroTitle.qml
+ qml/components/SwirlContinuousSurface.qml qml/components/SwirlBlurLayer.qml qml/components/SwirlGlassMaterial.qml qml/components/SwirlTrafficLights.qml qml/components/SwirlDailyTrafficChart.qml
  qml/controls/SwirlClickLight.qml qml/controls/SwirlActivityIndicator.qml qml/controls/SwirlExpander.qml
  qml/controls/SwirlPressMotion.qml qml/controls/SwirlAnimatedModel.qml qml/controls/SwirlMotionButton.qml qml/controls/SwirlSpring.qml qml/controls/SwirlPageHost.qml
  qml/pages/FeatureHubPage.qml qml/pages/FeatureModulePage.qml qml/components/SwirlBrandIcon.qml
@@ -87,7 +94,7 @@ foreach(file IN LISTS SWIRL_QML_FILES)
     string(REGEX REPLACE "^qml/" "" qml_alias "${file}")
     set_source_files_properties("${file}" PROPERTIES QT_RESOURCE_ALIAS "${qml_alias}")
 endforeach()
-set_source_files_properties(qml/SwirlMotion.qml qml/Theme.qml qml/AppState.qml qml/FeatureCatalog.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+set_source_files_properties(qml/SwirlMotion.qml qml/SwirlTransitionRegistry.qml qml/Theme.qml qml/AppState.qml qml/FeatureCatalog.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 qt_add_qml_module(Swirl
     URI SwirlQuick
     VERSION 1.0
@@ -97,7 +104,7 @@ qt_add_qml_module(Swirl
     SOURCES app/JavascriptHighlighter.h app/JavascriptHighlighter.cpp
 )
 set(SWIRL_ASSET_PATH "${CMAKE_CURRENT_SOURCE_DIR}/assets")
-file(GLOB SWIRL_UI_ICONS CONFIGURE_DEPENDS "${SWIRL_ASSET_PATH}/icons/ui/*.svg" "${SWIRL_ASSET_PATH}/icons/ui/reference-*.png")
+file(GLOB SWIRL_UI_ICONS CONFIGURE_DEPENDS "${SWIRL_ASSET_PATH}/icons/ui/*.svg")
 qt_add_resources(Swirl ui_icons PREFIX "/swirl" BASE "${SWIRL_ASSET_PATH}" FILES ${SWIRL_UI_ICONS})
 qt_add_resources(Swirl brand PREFIX "/swirl" BASE "${SWIRL_ASSET_PATH}" FILES
     "${SWIRL_ASSET_PATH}/icons/swirl_knot_light.svg"
@@ -106,6 +113,11 @@ qt_add_resources(Swirl brand PREFIX "/swirl" BASE "${SWIRL_ASSET_PATH}" FILES
     "${SWIRL_ASSET_PATH}/icons/swirl_knot_mark_dark.svg"
 )
 qt_add_shaders(Swirl hdr_ui PREFIX "/swirl" BASE "${CMAKE_CURRENT_SOURCE_DIR}" FILES shaders/hdr-ui.frag shaders/swirlclicklight.frag shaders/swirlclicklight.vert)
+qt_add_shaders(Swirl glass_ui PREFIX "/swirl" BASE "${CMAKE_CURRENT_SOURCE_DIR}" FILES shaders/swirl-surface.frag shaders/swirl-blur.frag shaders/swirl-glass.frag)
+target_sources(Swirl PRIVATE app/WallpaperBackdrop.h app/WallpaperBackdrop.cpp)
+if(WIN32)
+ target_link_libraries(Swirl PRIVATE ole32 uuid)
+endif()
 target_sources(Swirl PRIVATE app/HdrOutput.h app/HdrOutput.cpp app/MotionPolicy.h app/MotionPolicy.cpp)
 target_link_libraries(Swirl PRIVATE Qt6::GuiPrivate)
 
@@ -118,11 +130,24 @@ endif()
 if(SWIRL_BUILD_UI_TESTS)
  file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/packaging/rules" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
  find_package(Qt6 REQUIRED COMPONENTS Test)
+ add_executable(SwirlFontTests tests/FontTests.cpp app/FontManager.h app/FontManager.cpp)
+ target_include_directories(SwirlFontTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+ target_link_libraries(SwirlFontTests PRIVATE Qt6::Gui Qt6::Test)
+ if(MSVC)
+  target_compile_options(SwirlFontTests PRIVATE /utf-8)
+ endif()
+ qt_add_resources(SwirlFontTests harmony_test_fonts PREFIX "/swirl/fonts" BASE "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts" FILES
+  assets/fonts/HarmonyOS_Sans_SC_Regular.ttf assets/fonts/HarmonyOS_Sans_SC_Medium.ttf assets/fonts/HarmonyOS_Sans_SC_Bold.ttf assets/fonts/LICENSE_HarmonyOS_Sans.txt)
  target_sources(Swirl PRIVATE tests/GatewayChecks.cpp tests/GatewayChecks.h tests/HdrChecks.cpp tests/HdrChecks.h tests/OverviewChecks.cpp tests/OverviewChecks.h tests/CaptureChecks.cpp tests/CaptureChecks.h tests/WindowChecks.cpp tests/WindowChecks.h)
  target_sources(Swirl PRIVATE tests/RuntimeEvidence.cpp tests/RuntimeEvidence.h)
+ target_sources(Swirl PRIVATE tests/MaterialChecks.cpp tests/MaterialChecks.h)
+ target_sources(Swirl PRIVATE tests/HeroChecks.cpp tests/HeroChecks.h)
+ qt_add_resources(Swirl material_tests PREFIX "/tests" BASE "${CMAKE_CURRENT_SOURCE_DIR}/tests" FILES tests/MaterialBench.qml)
  target_link_libraries(Swirl PRIVATE Qt6::Test)
  target_compile_definitions(Swirl PRIVATE SWIRL_UI_TESTS)
  enable_testing()
+ add_test(NAME swirl-font-selection COMMAND SwirlFontTests)
+ set_tests_properties(swirl-font-selection PROPERTIES TIMEOUT 30 ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QPA_FONTDIR=${SWIRL_TEST_FONT_DIRECTORY}")
  add_executable(SwirlExtensionTests tests/ExtensionTests.cpp)
  if(MSVC)
   target_compile_options(SwirlExtensionTests PRIVATE /utf-8)
@@ -200,6 +225,10 @@ if(SWIRL_BUILD_UI_TESTS)
  add_test(NAME swirl-overview-input COMMAND Swirl --interaction-test)
  add_test(NAME swirl-all-pages COMMAND Swirl --smoke-test)
  add_test(NAME swirl-motion COMMAND Swirl --motion-test --motion-output=motion-report.json)
+ if(WIN32)
+  add_test(NAME swirl-hero COMMAND Swirl --hero-test --hero-output=hero-evidence)
+  set_tests_properties(swirl-hero PROPERTIES TIMEOUT 120 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
+ endif()
  set_tests_properties(swirl-motion PROPERTIES TIMEOUT 120
   ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QPA_FONTDIR=${SWIRL_TEST_FONT_DIRECTORY}")
  if(WIN32)

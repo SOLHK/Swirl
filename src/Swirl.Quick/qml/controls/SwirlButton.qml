@@ -10,16 +10,18 @@ SwirlMotionButton {
     property bool danger: false
     property string iconName: ""
     implicitWidth: Math.max(Theme.dp(76), contents.implicitWidth + Theme.dp(24))
-    implicitHeight:Theme.dp(26)
+    implicitHeight:Theme.dp(30)
     hoverEnabled: true
     font.family: Theme.fontFamily
     font.pixelSize:Theme.fontSize(13)
     leftPadding:Theme.dp(12); rightPadding:Theme.dp(12)
     topPadding:Theme.dp(4); bottomPadding:Theme.dp(4)
     property bool outlined:false
-    background:Rectangle {
-        radius:Theme.buttonRadius;color:control.primary?Theme.primaryControl:control.down?Theme.pressed:control.hovered?Theme.hover:control.quiet||control.outlined?"transparent":Theme.buttonBase
-        border.width:control.activeFocus?Theme.dp(2):control.outlined?Theme.dp(1):0;border.color:control.activeFocus?Theme.focusBorder:Theme.border
+    background:SwirlContinuousSurface {
+        radius:height/2
+        color:control.primary?(control.down?Qt.darker(Theme.primaryControl,1.15):control.hovered?Qt.lighter(Theme.primaryControl,1.08):Theme.primaryControl):control.down?Theme.pressed:control.hovered?Theme.hover:control.quiet?"transparent":Theme.buttonBase
+        border.width:control.activeFocus?Theme.dp(2):control.primary||control.quiet?0:Theme.dp(0.7)
+        border.color:control.activeFocus?Theme.focusBorder:Theme.withAlpha(Theme.dark?"#A9BDD5":"#7892B1",0.24)
         Behavior on color {ColorAnimation{duration:SwirlMotion.hoverDuration}}
         opacity:control.enabled?1:0.45
     }
@@ -41,7 +43,7 @@ SwirlMotionButton {
             text: AppState.zh(control.text)
             font.family: control.font.family
             font.pixelSize: control.font.pixelSize
-            font.weight: Font.Normal
+            font.weight: Font.Medium
             Layout.fillWidth: true; elide: Text.ElideRight
             color: control.primary ? "white" : control.danger ? Theme.red : Theme.text
             Layout.alignment: Qt.AlignVCenter
