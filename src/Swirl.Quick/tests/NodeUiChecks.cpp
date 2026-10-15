@@ -22,7 +22,13 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     const auto eval=[&](const QString &s){QQmlExpression e(qmlContext(window),window,s);auto v=e.evaluate();check(!e.hasError(),"QML expression valid");return v;};
     const auto click=[&](const QString &n){auto *t=item(n);if(check(t&&t->isEnabled(),"node input exists and is enabled"))QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,t->mapToScene(QPointF(t->width()/2,t->height()/2)).toPoint());QTest::qWait(300);};
     const auto fill=[&](const QString &n,const QString &v){auto *t=item(n);if(check(t!=nullptr,"node field exists"))t->setProperty("text",v);};
-    const auto select=[&](int index){auto *t=item("realNodeTable");if(!check(t!=nullptr,"real node table exists"))return;QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,t->mapToScene(QPointF(80,39+t->property("itemHeight").toInt()*(index+0.5))).toPoint());QTest::qWait(150);};
+    const auto select=[&](int index){
+        auto *t=item("realNodeTable");if(!check(t!=nullptr,"real node table exists"))return;
+        QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,t->mapToScene(QPointF(80,39+t->property("itemHeight").toInt()*(index+0.5))).toPoint());
+        // The next click targets a card which moves for longer than 150 ms.
+        // Sample its hit position after the real transition has settled.
+        check(QTest::qWaitFor([&]{auto *hero=item("nodeHero");return hero&&!hero->property("moving").toBool();},3500),"node card settles before next coordinate-based input");
+    };
     ControlledNetwork net;if(!check(net.start(),"controlled real TCP endpoints start"))return 2;
     window->resize(1450,884);eval("AppState.navigate('proxies')");
     auto *host=window->findChild<QObject *>("pageLoader");
