@@ -27,12 +27,15 @@ Dialog {
     onAboutToShow: {
         dismissing=false;modal=true
         dismissals.push(dialog,ownerWindow)
-        Qt.callLater(markSaved)
         transformOrigin=SwirlMotion.popupOrigin(dialog)
         if(heroSource){scale=1;opacity=1;heroClock.progress=0;heroClock.moveTo(1)}
         else if(SwirlMotion.reduced){scale=1;opacity=1}
         else opacity=0
     }
+    // The modal can be opened (and Escape pressed) before a Qt.callLater
+    // callback executes. Snapshot the initialized fields synchronously when
+    // the popup reports opened, so an untouched form never prompts to discard.
+    onOpened:markSaved()
     onAboutToHide:{dismissing=true;if(heroSource)heroClock.moveTo(0)}
     onClosed:{dismissals.pop(dialog);scale=1;opacity=1}
     parent:Overlay.overlay
