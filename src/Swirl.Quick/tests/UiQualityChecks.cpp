@@ -67,12 +67,12 @@ Item { Rectangle {anchors.fill:parent;color:'#536BB4'}
         return image;
     };
     auto auditText=[&](QQuickWindow *window,const QString &route) {
-        int glyphs=0,native=0,layered=0,scaled=0,small=0,wrongFamily=0;
+        int glyphs=0,native=0,layered=0,scaled=0,smallTextCount=0,wrongFamily=0;
         std::function<void(QQuickItem *)> scan=[&](QQuickItem *item) {
             if(!item->isVisible())return;
             if(item->property("text").isValid() && item->property("renderType").isValid()) {
                 ++glyphs;if(item->property("renderType").toInt()==1)++native;
-                const auto font=item->property("font").value<QFont>();if(font.pixelSize()>0&&font.pixelSize()<12)++small;
+                const auto font=item->property("font").value<QFont>();if(font.pixelSize()>0&&font.pixelSize()<12)++smallTextCount;
                 if(font.family()!=QGuiApplication::font().family()){++wrongFamily;qInfo()<<"TEXT_FONT_MISMATCH"<<item->property("text").toString().left(30)<<font.family();}
                 for(auto *p=item;p;p=p->parentItem()) {
                     QQmlExpression layer(qmlContext(window),p,"layer.enabled");
@@ -82,8 +82,8 @@ Item { Rectangle {anchors.fill:parent;color:'#536BB4'}
             }
             for(auto *child:item->childItems())scan(child);
         };scan(window->contentItem());
-        qInfo()<<"TEXT_AUDIT"<<route<<"glyphs"<<glyphs<<"native"<<native<<"layered"<<layered<<"scaled"<<scaled<<"small"<<small;
-        check(glyphs>0 && glyphs==native && !layered && !scaled && !small && !wrongFamily,route+": selected font, native text >=12px, no textured or scaled glyph ancestors");
+        qInfo()<<"TEXT_AUDIT"<<route<<"glyphs"<<glyphs<<"native"<<native<<"layered"<<layered<<"scaled"<<scaled<<"small"<<smallTextCount;
+        check(glyphs>0 && glyphs==native && !layered && !scaled && !smallTextCount && !wrongFamily,route+": selected font, native text >=12px, no textured or scaled glyph ancestors");
     };
     main->resize(914,672);
     for(const auto &route:QStringList{"activity","overview","processes","policies","rules","capture","tls","featurehub"}){eval(QString("AppState.navigate('%1')").arg(route));QTest::qWait(250);const auto frame=capture(main,route);if(!baseline)auditText(main,route);
