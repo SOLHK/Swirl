@@ -6,7 +6,7 @@ import SwirlQuick
 import "../components"
 import "../controls"
 Item {
- id:page
+ id:page;objectName:"dashboardPage"
  property int tabIndex:0
  property int filterIndex:0
  property string query:""
@@ -42,10 +42,10 @@ Item {
   }
   ColumnLayout{
    Layout.fillWidth:true;Layout.fillHeight:true;spacing:Theme.dp(10)
-   SwirlSegmentedControl{Layout.fillWidth:true;implicitHeight:Theme.dp(32);rounded:true;options:["最近请求","活动连接","DNS","设备","流量统计","日志"];currentIndex:page.tabIndex;textPixelSize:12;onActivated:index=>page.tabIndex=index}
+   SwirlSegmentedControl{objectName:"dashboardTabs";Layout.fillWidth:true;implicitHeight:Theme.dp(32);rounded:true;options:["最近请求","活动连接","DNS","设备","流量统计","日志"];currentIndex:page.tabIndex;textPixelSize:12;onActivated:index=>page.tabIndex=index}
    RowLayout{
     Layout.fillWidth:true
-    SwirlSearchField{Layout.fillWidth:true;placeholderText:"搜索当前记录";onTextChanged:page.query=text}
+    SwirlSearchField{objectName:"dashboardSearch";Layout.fillWidth:true;placeholderText:"搜索当前记录";onTextChanged:page.query=text}
     Text{text:page.records.length+" 项";color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
    }
    Text{Layout.fillWidth:true;wrapMode:Text.Wrap;font.pixelSize:Theme.fontSize(12);text:page.tabIndex===2?"当前显示已保存的 Hosts 配置 · DNS 查询历史研发中":page.feedback||captureProvider.error||engineController.error;visible:text.length>0;color:page.tabIndex===2?Theme.muted:Theme.orange}
@@ -56,7 +56,7 @@ Item {
    }
    Flow{
     Layout.fillWidth:true;spacing:Theme.dp(8)
-    SwirlButton{text:"清空";enabled:page.tabIndex===0||page.tabIndex===5;onClicked:{if(page.tabIndex===5)systemProvider.clearLogs();else captureProvider.clear();page.feedback=page.tabIndex===5?"已清空日志视图":"已清空请求记录"}}
+    SwirlButton{objectName:"dashboardClear";text:"清空";enabled:page.tabIndex===0||page.tabIndex===5;onClicked:{if(page.tabIndex===5)systemProvider.clearLogs();else captureProvider.clear();page.feedback=page.tabIndex===5?"已清空日志视图":"已清空请求记录"}}
     SwirlButton{text:"重新载入";onClicked:{engineController.refresh();page.feedback="已请求刷新当前网络状态"}}
     SwirlButton{text:captureProvider.running?"停止捕获":"启动捕获";onClicked:{if(captureProvider.running)captureProvider.stop();else captureProvider.start(8899);page.feedback=captureProvider.error||(captureProvider.running?"捕获监听：127.0.0.1:"+captureProvider.port:"捕获已停止")}}
     SwirlButton{text:captureProvider.tls.enabled?"关闭 MitM":"开启 MitM";enabled:captureProvider.tls.ready;onClicked:{captureProvider.tls.enabled=!captureProvider.tls.enabled;page.feedback=captureProvider.tls.enabled?"MitM 已开启，需显式代理及受信任证书":"MitM 已关闭"}}

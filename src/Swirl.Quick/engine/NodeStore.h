@@ -6,6 +6,7 @@
 
 struct NodeSubscription {
     QString id, name;
+    QString formatHint="auto";
     QUrl url; // Token-bearing URL is DPAPI protected and never exposed to QML.
     int intervalMinutes=360;
     bool enabled=true;
@@ -26,7 +27,8 @@ public:
     bool select(const QString &id);
     QList<NodeSubscription> subscriptions() const { return m_subscriptions; }
     QVariantList publicSubscriptions() const;
-    bool saveSubscription(const QString &id, const QString &name, const QUrl &url, int intervalMinutes, bool enabled);
+    bool saveSubscription(const QString &id, const QString &name, const QUrl &url, int intervalMinutes, bool enabled,const QString &formatHint={});
+    static QStringList subscriptionFormats(){return {"auto","loon","shadowrocket","surge","quantumult-x","sing-box"};}
     bool removeSubscription(const QString &id);
     bool importNodes(QList<ProxyNode> incoming, const QString &sourceId = {});
     static bool allowedSubscriptionUrl(const QUrl &url);

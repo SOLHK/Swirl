@@ -59,6 +59,7 @@
 #include "network/CaptureService.h"
 #include "network/GatewayService.h"
 #include "engine/MihomoAdapter.h"
+#include "engine/SwirlEngineManager.h"
 #include "engine/EngineController.h"
 
 // Collect Qt/QML diagnostics in a file because the Windows GUI subsystem
@@ -152,7 +153,10 @@ int main(int argc, char *argv[])
     CaptureService capture(nullptr,isolatedRun?isolatedTls.filePath("ca.dpapi"):QString());
     ModuleDraftStore drafts;
     QTemporaryDir isolatedNodes;
-    EngineController engineController(std::make_unique<MihomoAdapter>(),nullptr,realAcceptance?runtimeStore:isolatedRun?isolatedNodes.filePath("nodes.dpapi"):QString(),realAcceptance);
+    std::unique_ptr<ProxyEngine> runtimeEngine;
+    if(nodeTest||engineTest)runtimeEngine=std::make_unique<MihomoAdapter>(); // Pinned legacy regression fixtures.
+    else runtimeEngine=std::make_unique<SwirlEngineManager>();
+    EngineController engineController(std::move(runtimeEngine),nullptr,realAcceptance?runtimeStore:isolatedRun?isolatedNodes.filePath("nodes.dpapi"):QString(),realAcceptance);
     ExtensionService extensions(&engineController,isolatedRun?isolatedNodes.filePath("extensions.dpapi"):QString());
     GatewayService gateway(&engineController,isolatedRun?isolatedNodes.filePath("gateway.json"):QString());
     DiagnosticService diagnostics(isolatedRun?isolatedNodes.filePath("diagnostics"):QString());
@@ -223,6 +227,10 @@ int main(int argc, char *argv[])
         return 1;
     auto *rootWindow = qobject_cast<QQuickWindow *>(engine.rootObjects().constFirst());
     if(rootWindow)rootWindow->setIcon(icon);
+    // All smoke state is isolated. Finish with exit(), as other QA drivers do,
+    // rather than the user-facing window close/unsaved-change quit path.
+    QTimer smokeFinish;smokeFinish.setSingleShot(true);smokeFinish.setInterval(0);
+    if(rootWindow&&smoke){QObject::connect(rootWindow,SIGNAL(navigationSmokeCompleted()),&smokeFinish,SLOT(start()),Qt::QueuedConnection);QObject::connect(&smokeFinish,&QTimer::timeout,&app,[&app]{app.exit(0);});}
 #ifdef SWIRL_UI_TESTS
     if(realAcceptance&&rootWindow)startRuntimeEvidence(rootWindow,&engineController,&systemData,&diagnostics,runtimeCommands,runtimeState);
 #endif

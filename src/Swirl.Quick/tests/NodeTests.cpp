@@ -4,6 +4,8 @@
 #include "engine/NodeStore.h"
 #include "engine/NodeImporter.h"
 #include "engine/NodeImportService.h"
+#include "engine/EngineController.h"
+#include "engine/SwirlEngineManager.h"
 #include "ControlledNetwork.h"
 #include <QCoreApplication>
 #include <QJsonDocument>
@@ -43,7 +45,7 @@ private slots:
         const auto subscription=qEnvironmentVariable("SWIRL_LIVE_SUBSCRIPTION_URL");
         if(subscription.isEmpty())QSKIP("Requires an explicitly user-authorized subscription supplied in the environment");
         QTemporaryDir privateData;QVERIFY(privateData.isValid());NodeStore store(privateData.filePath("nodes.dpapi"));NodeImportService importer(&store);
-        QVERIFY(importer.saveSubscription({},"User authorized test",QUrl(subscription),360,false));
+        QVERIFY(importer.saveSubscription({},"User authorized test",QUrl(subscription),360,false,qEnvironmentVariable("SWIRL_LIVE_FORMAT_HINT","auto")));
         const auto source=store.subscriptions().first().id;importer.refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!importer.busy(),35000);
         bool usedProxy=false;
         if(store.nodes().isEmpty()&&qEnvironmentVariableIntValue("SWIRL_LIVE_DOWNLOAD_PROXY_PORT")>0){usedProxy=true;importer.setDownloadProxy(qEnvironmentVariableIntValue("SWIRL_LIVE_DOWNLOAD_PROXY_PORT"));importer.refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!importer.busy(),35000);}
@@ -57,7 +59,7 @@ private slots:
         NodeTestService probes;probes.start(config,ids,QUrl("https://www.gstatic.com/generate_204"));QTRY_VERIFY_WITH_TIMEOUT(!probes.busy(),((ids.size()+2)/3)*45000+5000);
         QJsonArray rows;QStringList available;
         for(int i=0;i<ids.size();++i){const auto result=probes.result(ids[i]);QString protocol;for(const auto &node:config.nodes)if(node.id==ids[i])protocol=node.protocol;
-            rows.append(QJsonObject{{"node",QString("node-%1").arg(i+1,3,10,QChar('0'))},{"protocol",protocol},{"success",result.value("success").toBool()},{"latencyMs",result.value("latency").toInt()},{"httpStatus",result.value("http").toInt()}});
+            rows.append(QJsonObject{{"node",QString("node-%1").arg(i+1,3,10,QChar('0'))},{"protocol",protocol},{"success",result.value("success").toBool()},{"latencyMs",result.value("latency").toInt()},{"httpStatus",result.value("http").toInt()},{"diagnostic",result.value("error").toString()}});
             if(result.value("success").toBool())available.append(ids[i]);}
         std::sort(available.begin(),available.end(),[&](const auto &a,const auto &b){return probes.result(a).value("latency").toInt()<probes.result(b).value("latency").toInt();});
         QJsonArray transfers;int passed=0;
@@ -70,8 +72,21 @@ private slots:
                 transfers.append(QJsonObject{{"node",QString("node-%1").arg(ids.indexOf(id)+1,3,10,QChar('0'))},{"scheme",url.scheme()},{"success",ok},{"httpStatus",status},{"networkError",int(reply->error())},{"bodyBytes",reply->readAll().size()}});reply->deleteLater();
             }engine.stop();QTRY_VERIFY_WITH_TIMEOUT(!engine.status().processAlive,4000);
         }
+        QJsonObject reconnect{{"attempted",false}};
+        if(!available.isEmpty()){
+            EngineController controller(std::make_unique<SwirlEngineManager>(),nullptr,store.filePath());controller.setControlPort(freePort());controller.setProxyPort(freePort());
+            const auto id=available.first();controller.connectNode(id);QTRY_VERIFY_WITH_TIMEOUT(controller.apiHealthy(),25000);const auto oldPid=controller.processId();
+            controller.imports()->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!controller.imports()->busy(),35000);
+            QTRY_VERIFY_WITH_TIMEOUT(controller.apiHealthy()&&controller.processId()!=oldPid,25000);QCOMPARE(controller.activeNodeId(),id);
+            QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",controller.activeProxyPort()));QJsonArray requests;
+            for(const auto &url:{QUrl("http://www.msftconnecttest.com/connecttest.txt"),QUrl("https://www.gstatic.com/generate_204")}){
+                QNetworkRequest request(url);request.setTransferTimeout(15000);auto reply=client.get(request);QTRY_VERIFY_WITH_TIMEOUT(reply->isFinished(),18000);const int code=reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();const bool ok=reply->error()==QNetworkReply::NoError&&code>=200&&code<300;
+                requests.append(QJsonObject{{"scheme",url.scheme()},{"httpStatus",code},{"success",ok}});QVERIFY(ok);
+            }
+            reconnect={{"attempted",true},{"automaticEngineRestart",true},{"selectedNodePreserved",true},{"engine",controller.engineName()},{"requests",requests}};controller.stop();QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive(),4000);
+        }
         QJsonObject protocols;for(auto i=protocolCounts.cbegin();i!=protocolCounts.cend();++i)protocols[i.key()]=i.value();
-        const QJsonObject report{{"importedNodes",config.nodes.size()},{"protocolCounts",protocols},{"downloadUsedExistingLocalProxy",usedProxy},{"sampledNodes",ids.size()},{"successfulProbes",available.size()},{"probes",rows},{"transfers",transfers}};
+        const QJsonObject report{{"importedNodes",config.nodes.size()},{"protocolCounts",protocols},{"downloadUsedExistingLocalProxy",usedProxy},{"sampledNodes",ids.size()},{"successfulProbes",available.size()},{"probes",rows},{"transfers",transfers},{"refreshReconnect",reconnect}};
         const auto output=qEnvironmentVariable("SWIRL_LIVE_REPORT");if(!output.isEmpty()){QSaveFile file(output);QVERIFY(file.open(QIODevice::WriteOnly));file.write(QJsonDocument(report).toJson());QVERIFY(file.commit());}
         qInfo()<<"LIVE_SUBSCRIPTION imported="<<config.nodes.size()<<"sampled="<<ids.size()<<"available="<<available.size()<<"successfulRequests="<<passed;
         QVERIFY(!available.isEmpty());QCOMPARE(passed,qMin(3,available.size())*2);

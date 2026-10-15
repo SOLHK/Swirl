@@ -101,6 +101,15 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
  }
  snapshot("nodes-180");check(!controller->processAlive(),"rendering fixture selection never starts a proxy or fabricates a connection");
  route("featurehub");snapshot("more");route("activity");snapshot("activity");eval("Theme.mode='Dark'");snapshot("activity-dark");eval("Theme.mode='Light'");
+ eval("window.openDashboard()");wait(350);QQuickWindow *panel=nullptr;for(auto candidate:QGuiApplication::allWindows())if(candidate->objectName()=="dashboardWindow")panel=qobject_cast<QQuickWindow *>(candidate);
+ check(panel&&panel->isVisible(),"real network panel opens in its native window");
+ if(panel){
+  auto page=find(panel->contentItem(),"dashboardPage"),tabs=find(panel->contentItem(),"dashboardTabs"),clear=find(panel->contentItem(),"dashboardClear");
+  check(page&&tabs&&clear,"network panel keeps tabs, real data surface and scoped actions");
+  if(page&&tabs&&clear){for(int i=0;i<6;++i){QTest::mouseClick(panel,Qt::LeftButton,Qt::NoModifier,tabs->mapToScene(QPointF((i+0.5)*tabs->width()/6,tabs->height()/2)).toPoint());wait(50);check(page->property("tabIndex").toInt()==i&&clear->isEnabled()==(i==0||i==5),QString("panel tab %1 switches and clearing is scoped correctly").arg(i));}}
+  if(recording){panel->grabWindow().save(directory+"/panel-logs.png");if(tabs){QTest::mouseClick(panel,Qt::LeftButton,Qt::NoModifier,tabs->mapToScene(QPointF(2.5*tabs->width()/6,tabs->height()/2)).toPoint());wait(80);}auto surface=panel->grabWindow();surface.save(directory+"/panel-dns.png");check(surface.hasAlphaChannel()&&qAlpha(surface.pixel(0,0))<10&&qAlpha(surface.pixel(surface.width()-1,0))<10&&qAlpha(surface.pixel(0,surface.height()-1))<10&&qAlpha(surface.pixel(surface.width()-1,surface.height()-1))<10,"all four panel corners are transparent without triangular remnants");}
+  panel->hide();window->requestActivate();
+ }
  // Passive native frame delivery measurements exclude all screenshot readback.
  auto qpcMs=[]()->double {
 #ifdef Q_OS_WIN
@@ -141,12 +150,15 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
  DEVMODEW original{};original.dmSize=sizeof(original);EnumDisplaySettingsW(display.szDevice,ENUM_CURRENT_SETTINGS,&original);
  struct RestoreDisplay {LPCWSTR device;DEVMODEW mode;bool enabled;~RestoreDisplay(){if(enabled)ChangeDisplaySettingsExW(device,&mode,nullptr,0,nullptr);}} restoreDisplay{display.szDevice,original,sweep};
 #endif
- for(int hz:sweep?QList<int>{60,120,240}:QList<int>{0}){
+ for(int hz:sweep?QList<int>{60,120,144,165,240}:QList<int>{0}){
 #ifdef Q_OS_WIN
   if(hz){DEVMODEW requested=original;requested.dmFields=DM_DISPLAYFREQUENCY;requested.dmDisplayFrequency=hz;
    const auto tested=ChangeDisplaySettingsExW(display.szDevice,&requested,nullptr,CDS_TEST,nullptr);
-   const auto changed=tested==DISP_CHANGE_SUCCESSFUL?ChangeDisplaySettingsExW(display.szDevice,&requested,nullptr,0,nullptr):tested;
+   if(tested!=DISP_CHANGE_SUCCESSFUL){refreshPhases.append(QJsonObject{{"requestedHz",hz},{"available",false},{"displayTestResult",int(tested)}});continue;}
+   const auto changed=ChangeDisplaySettingsExW(display.szDevice,&requested,nullptr,0,nullptr);
    check(changed==DISP_CHANGE_SUCCESSFUL,QString("actual display mode changed to %1 Hz").arg(hz));if(changed!=DISP_CHANGE_SUCCESSFUL)continue;wait(1800);
+   DEVMODEW actual{};actual.dmSize=sizeof(actual);EnumDisplaySettingsW(display.szDevice,ENUM_CURRENT_SETTINGS,&actual);
+   if(int(actual.dmDisplayFrequency)!=hz){refreshPhases.append(QJsonObject{{"requestedHz",hz},{"available",false},{"actualHz",int(actual.dmDisplayFrequency)}});ChangeDisplaySettingsExW(display.szDevice,&original,nullptr,0,nullptr);continue;}
    window->showNormal();window->requestActivate();SetWindowPos(qaWindow,HWND_TOPMOST,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE);window->update();wait(350);
    check(window->isExposed(),QString("native test window is exposed at %1 Hz").arg(hz));
   }
@@ -160,7 +172,7 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
    if(i%2==0){const auto cardStart=qpcMs();click("expandSubscription-"+subscriptionId);animationWindows.append(QJsonObject{{"startQpcMs",cardStart},{"endQpcMs",cardStart+eval("SwirlMotion.dialogDuration").toDouble()},{"kind","subscription"},{"requestedHz",hz}});}
    wait(260);
   }
-  refreshPhases.append(QJsonObject{{"requestedHz",hz},{"qtRefreshHz",window->screen()->refreshRate()},{"startQpcMs",phaseStart},{"endQpcMs",qpcMs()},{"resources",resources()}});
+  refreshPhases.append(QJsonObject{{"requestedHz",hz},{"available",true},{"qtRefreshHz",window->screen()->refreshRate()},{"startQpcMs",phaseStart},{"endQpcMs",qpcMs()},{"resources",resources()}});
  }
  const double performanceEnd=qpcMs();
  QObject::disconnect(frameConnection);std::sort(intervals.begin(),intervals.end());double mean=0;for(double ms:intervals)mean+=ms;if(!intervals.isEmpty())mean/=intervals.size();

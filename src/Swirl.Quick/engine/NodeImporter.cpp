@@ -1,4 +1,5 @@
 #include "NodeImporter.h"
+#include "SubscriptionNormalizer.h"
 #include "../third_party/fkYAML/node.hpp"
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -74,18 +75,39 @@ bool safeOptions(const QJsonValue &value) {
     return true;
 }
 }
+QJsonObject NodeImporter::strictJsonObject(const QByteArray &bytes){
+    if(bytes.isEmpty()||bytes.size()>MaximumBytes||!safeShape(bytes))return {};
+    QJsonParseError error;const auto json=QJsonDocument::fromJson(bytes,&error);if(error.error!=QJsonParseError::NoError||!json.isObject())return {};
+    try{const auto parsed=fkyaml::node::deserialize(bytes.constData(),bytes.constData()+bytes.size());int budget=100000;return convert(parsed,0,budget).toObject();}catch(...){return {};}
+}
 NodeImporter::Result NodeImporter::parse(const QByteArray &bytes) {
     Result result;
     if(bytes.isEmpty() || bytes.size()>MaximumBytes || !safeShape(bytes)) {
         result.error=QStringLiteral("导入内容为空、超过 4 MiB 或嵌套过深；原节点保持不变。"); return result;
     }
     QJsonValue root;
+    const auto normalized=SubscriptionNormalizer::normalize(bytes);
+    result.format=normalized.format;
+    if(!normalized.error.isEmpty()){result.error=normalized.error;return result;}
+    const auto effective=normalized.decodedDocument.isEmpty()?bytes:normalized.decodedDocument;
+    if(!safeShape(effective)){result.error=QStringLiteral("订阅解码后嵌套过深。");return result;}
+    if(normalized.handled){
+        // QJsonDocument accepts duplicate keys. Validate the original JSON
+        // with the existing strict parser before adapting sing-box objects.
+        if(effective.trimmed().startsWith('{')){
+            try{const auto checked=fkyaml::node::deserialize(effective.constData(),effective.constData()+effective.size());int budget=100000;convert(checked,0,budget);}
+            catch(...){result.error=QStringLiteral("JSON 含重复键、无效结构或过深嵌套。");return result;}
+        }
+        root=normalized.nodes;
+    }
+    else {
     try {
-        auto yaml=fkyaml::node::deserialize(bytes.constData(),bytes.constData()+bytes.size());
+        auto yaml=fkyaml::node::deserialize(effective.constData(),effective.constData()+effective.size());
         int budget=100000; root=convert(yaml,0,budget);
     } catch(...) {
         // Parser messages can quote password/token-bearing input; never expose them.
         result.error=QStringLiteral("无法解析 Clash YAML/JSON：请检查格式、重复键、锚点循环和嵌套层数。"); return result;
+    }
     }
     QJsonArray array;
     if(root.isArray())array=root.toArray();
@@ -100,6 +122,10 @@ NodeImporter::Result NodeImporter::parse(const QByteArray &bytes) {
     QSet<QString> names;
     for(int i=0;i<array.size();++i) {
         auto params=array[i].toObject(); ProxyNode n;
+        n.sourceFormat=normalized.format;
+        if(normalized.handled){n.originalConfiguration=normalized.originals.value(i);n.conversionIssues=normalized.issues.value(i);}
+        else n.originalConfiguration=params;
+        if(!n.conversionIssues.isEmpty())++result.incompleteNodes;
         n.id=QUuid::createUuid().toString(QUuid::WithoutBraces);
         n.name=params.take("name").toString().trimmed();n.protocol=params.take("type").toString().toLower();
         n.host=params.take("server").toString().trimmed();

@@ -23,7 +23,7 @@ public:
     Q_INVOKABLE void importClipboard();
     Q_INVOKABLE void importFile(const QUrl &file);
     Q_INVOKABLE void importUrl(const QUrl &url);
-    Q_INVOKABLE bool saveSubscription(const QString &id,const QString &name,const QUrl &url,int intervalMinutes,bool enabled);
+    Q_INVOKABLE bool saveSubscription(const QString &id,const QString &name,const QUrl &url,int intervalMinutes,bool enabled,const QString &formatHint={});
     Q_INVOKABLE bool removeSubscription(const QString &id);
     Q_INVOKABLE void refreshSubscription(const QString &id);
     Q_INVOKABLE void refreshAll();
@@ -45,7 +45,7 @@ private:
     QHash<QString,QString> m_errors;
     QHash<QString,qint64> m_attempts;
     std::function<qint64()> m_clock;
-    QString m_message,m_source;
+    QString m_message,m_source,m_formatHint="auto";
     bool m_busy=false;
     int m_proxyPort=0;
 };

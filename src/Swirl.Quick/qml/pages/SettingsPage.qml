@@ -222,6 +222,10 @@ Item {
                                 }
                             }
                             Text {
+                                text:"当前引擎："+engineController.engineName+(engineController.engineReason?"\n"+engineController.engineReason:"")
+                                color:Theme.muted;font.pixelSize:Theme.fontSize(12);wrapMode:Text.Wrap;Layout.fillWidth:true
+                            }
+                            Text {
                                 objectName:"engineProcessText"
                                 text:"进程："+(engineController.processAlive?"运行中 · PID "+engineController.processId:"未运行")+"　API："+(engineController.apiHealthy?"健康":"未就绪")
                                 color:Theme.muted; font.pixelSize:Theme.fontSize(12); wrapMode:Text.Wrap; Layout.fillWidth:true

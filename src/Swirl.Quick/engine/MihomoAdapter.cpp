@@ -267,6 +267,10 @@ bool MihomoAdapter::prepareConfiguration() {
         m_generatedConfig+="authentication: "+QString::fromUtf8(QJsonDocument(QJsonArray{m_options.lanUsername+":"+m_options.lanPassword}).toJson(QJsonDocument::Compact))+"\n";
         m_generatedConfig+=m_options.lanSkipLocalAuthentication?"skip-auth-prefixes: ['127.0.0.1/8', '::1/128']\n":"skip-auth-prefixes: []\n";
     }
+    else if(!m_options.inboundUsername.isEmpty()){
+        m_generatedConfig+="authentication: "+QString::fromUtf8(QJsonDocument(QJsonArray{m_options.inboundUsername+":"+m_options.inboundPassword}).toJson(QJsonDocument::Compact))+"\n";
+        m_generatedConfig+="skip-auth-prefixes: []\n";
+    }
     if(m_options.tunEnabled&&(!m_options.selectedNodeId.isEmpty()||m_options.directSession)) {
         const QJsonObject tun{{"enable",true},{"device","Swirl"},{"stack","gvisor"},{"auto-route",true},
             {"auto-detect-interface",true},{"strict-route",!m_options.gatewayForwarding},{"mtu",1500},{"dns-hijack",QJsonArray{"any:53","tcp://any:53"}}};
@@ -331,9 +335,15 @@ void MihomoAdapter::start(const EngineStartOptions &options) {
     unlockExecutable(); m_directory.reset(); m_uptime.invalidate();
     m_secret.clear(); m_generatedConfig.clear(); m_output.clear();
     m_options = options; m_status = {}; m_failureExit = false;
+    for(const auto &node:options.nodes)if(node.id==options.selectedNodeId&&!node.conversionIssues.isEmpty()){
+        fail(Error::InvalidNode,QStringLiteral("此节点存在未映射的订阅选项，不能安全执行。原始配置已加密保留；请使用完整 Clash 节点配置重新导入。"));return;
+    }
+    m_options.nodes.removeIf([](const ProxyNode &node){return !node.conversionIssues.isEmpty();});
     m_status.executablePath = options.executablePath;
     m_status.controlEndpoint = QStringLiteral("http://127.0.0.1:%1").arg(options.controlPort);
     m_status.state = State::Validating; publish();
+    if(options.inboundUsername.isEmpty()!=options.inboundPassword.isEmpty()||options.inboundUsername.toUtf8().size()>255||options.inboundPassword.toUtf8().size()>255||options.inboundUsername.contains(':')||options.inboundUsername.contains(QRegularExpression("[\\x00-\\x1f]"))||options.inboundPassword.contains(QRegularExpression("[\\x00-\\x1f]"))||
+       (options.allowLan&&!options.inboundUsername.isEmpty()&&(options.inboundUsername!=options.lanUsername||options.inboundPassword!=options.lanPassword||options.lanSkipLocalAuthentication))){fail(Error::InvalidOptions,QStringLiteral("入站认证参数无效或与 LAN 认证冲突；未启动无认证回退。"));return;}
     if (!QFileInfo(options.executablePath).isAbsolute() || options.controlPort == 0 ||
         options.expectedSha256.size() != 64 || QByteArray::fromHex(options.expectedSha256).size() != 32 ||
         options.expectedVersion.isEmpty() || options.startupTimeoutMs < 100 ||
@@ -344,7 +354,7 @@ void MihomoAdapter::start(const EngineStartOptions &options) {
         fail(Error::OwnershipFailed, QStringLiteral("无法建立 Windows 进程归属 Job；已拒绝启动。")); return;
     }
     QSet<QString> nodeIds;
-    for (const auto &node : options.nodes) {
+    for (const auto &node : m_options.nodes) {
         const auto error=ProxyNode::validate(node);
         if (!error.isEmpty() || nodeIds.contains(node.id)) { fail(Error::InvalidNode, error.isEmpty()?QStringLiteral("节点标识重复。"):error); return; }
         nodeIds.insert(node.id);
@@ -354,7 +364,7 @@ void MihomoAdapter::start(const EngineStartOptions &options) {
             visited.insert(cursor->id);const auto target=cursor->parameters.value("dialer-proxy").toString();
             if(target.isEmpty())break;
             const auto source=cursor->sourceId;cursor=nullptr;
-            for(const auto &candidate:options.nodes)if(candidate.sourceId==source && candidate.name==target){cursor=&candidate;break;}
+            for(const auto &candidate:m_options.nodes)if(candidate.sourceId==source && candidate.name==target){cursor=&candidate;break;}
             if(!cursor){fail(Error::InvalidNode,QStringLiteral("链式代理引用了未保存的节点。"));return;}
         }
     }
@@ -552,7 +562,7 @@ void MihomoAdapter::probeNode(const QUrl &url) {
             nodeFailure(QStringLiteral("所选节点的真实可用性检测失败；实际请求未执行。请检查服务器、凭据或网络。")); return;
         }
         m_status.nodeHealth=NodeHealth::Available; m_status.latencyMs=delay.toInt(); m_status.requestState=RequestState::InProgress; publish();
-        m_probeNetwork.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,QStringLiteral("127.0.0.1"),m_options.proxyPort));
+        m_probeNetwork.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,QStringLiteral("127.0.0.1"),m_options.proxyPort,m_options.inboundUsername.isEmpty()&&m_options.allowLan&&!m_options.lanSkipLocalAuthentication?m_options.lanUsername:m_options.inboundUsername,m_options.inboundUsername.isEmpty()&&m_options.allowLan&&!m_options.lanSkipLocalAuthentication?m_options.lanPassword:m_options.inboundPassword));
         QNetworkRequest actual(url);
         actual.setAttribute(QNetworkRequest::RedirectPolicyAttribute,QNetworkRequest::ManualRedirectPolicy);
         actual.setAttribute(QNetworkRequest::CacheLoadControlAttribute,QNetworkRequest::AlwaysNetwork);

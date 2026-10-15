@@ -45,11 +45,11 @@ void NodeImportService::importFile(const QUrl &file) {
 void NodeImportService::importUrl(const QUrl &url) {
     if(m_busy)return;
     if(!NodeStore::allowedSubscriptionUrl(url)){m_message=QStringLiteral("请使用 HTTPS 地址；只有本机测试地址允许 HTTP。");emit changed();return;}
-    m_busy=true;m_source.clear();m_message=QStringLiteral("正在安全下载节点配置…");emit changed();m_deadline.start();download(url);
+    m_busy=true;m_source.clear();m_formatHint="auto";m_message=QStringLiteral("正在安全下载节点配置…");emit changed();m_deadline.start();download(url);
 }
-bool NodeImportService::saveSubscription(const QString &id,const QString &name,const QUrl &url,int interval,bool enabled) {
+bool NodeImportService::saveSubscription(const QString &id,const QString &name,const QUrl &url,int interval,bool enabled,const QString &formatHint) {
     if(m_busy)return false;
-    const bool ok=m_store->saveSubscription(id,name,url,interval,enabled);
+    const bool ok=m_store->saveSubscription(id,name,url,interval,enabled,formatHint);
     m_message=ok?QStringLiteral("订阅已加密保存；自动更新设置已生效。"):m_store->error();
     if(ok && !id.isEmpty())m_errors.remove(id);
     emit changed();return ok;
@@ -80,7 +80,7 @@ void NodeImportService::next() {
     while(!m_queue.isEmpty()) {
         const auto id=m_queue.dequeue();
         for(const auto &s:m_store->subscriptions())if(s.id==id){
-            m_source=id;m_busy=true;m_attempts.insert(id,m_clock());m_message=QStringLiteral("正在更新订阅（地址已隐藏）…");emit changed();
+            m_source=id;m_formatHint=s.formatHint;m_busy=true;m_attempts.insert(id,m_clock());m_message=QStringLiteral("正在更新订阅（地址已隐藏）…");emit changed();
             m_deadline.start();download(s.url);return;
         }
     }
@@ -89,7 +89,8 @@ void NodeImportService::download(const QUrl &url,int redirects) {
     if(!NodeStore::allowedSubscriptionUrl(url) || redirects>5){finish(QStringLiteral("订阅重定向不安全或次数过多；旧节点保持不变。"));return;}
     QNetworkRequest request(url);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,QNetworkRequest::ManualRedirectPolicy);
-    request.setRawHeader("User-Agent","Clash.Meta/1.19.32 Swirl/1.0");
+    const QHash<QString,QByteArray> agents{{"auto","Clash.Meta/1.19.32 Swirl/1.0"},{"loon","Loon/1.0"},{"shadowrocket","Shadowrocket/2.2.67"},{"surge","Surge/5.0"},{"quantumult-x","Quantumult X/1.0"},{"sing-box","sing-box/1.12"}};
+    request.setRawHeader("User-Agent",agents.value(m_formatHint,agents.value("auto")));
     request.setRawHeader("Accept","application/yaml, application/json, text/plain");
     request.setTransferTimeout(15000);
     const bool local=url.host()=="localhost"||url.host()=="127.0.0.1"||url.host()=="::1";
@@ -124,7 +125,8 @@ void NodeImportService::parse(QByteArray bytes) {
             if(!result){guard->finish(result.error);return;}
             const auto count=result.nodes.size();
             if(!guard->m_store->importNodes(std::move(result.nodes),guard->m_source)){guard->finish(guard->m_store->error());return;}
-            guard->m_message=QStringLiteral("已导入 %1 个真实配置节点；可用性与实际请求需连接后检测。").arg(count);
+            guard->m_message=QStringLiteral("%1 · 已解析并保存 %2 个节点；实际联网需检测。").arg(result.format).arg(count);
+            if(result.incompleteNodes)guard->m_message+=QStringLiteral(" %1 个节点含未映射选项，原始差异已加密保留，拒绝静默执行。").arg(result.incompleteNodes);
             emit guard->nodesApplied();guard->finish();
         },Qt::QueuedConnection);
     });

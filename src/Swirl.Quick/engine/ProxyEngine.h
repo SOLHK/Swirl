@@ -34,6 +34,7 @@ struct EngineStartOptions {
     QVariantMap dnsConfig;
     QStringList customRules;
     QVariantList customGroups;
+    QString inboundUsername,inboundPassword;
 };
 
 class ProxyEngine : public QObject {
@@ -57,6 +58,7 @@ public:
         qint64 processId = 0;
         qint64 uptimeSeconds = 0;
         QString version;
+        QString engineName="Mihomo 兼容",engineKind="compatibility",sessionId,engineReason;
         QString mode;
         QString executablePath;
         QString configPath;

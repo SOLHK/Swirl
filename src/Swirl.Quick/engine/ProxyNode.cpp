@@ -5,6 +5,7 @@
 #include <QUuid>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include "SwirlProtocolRegistry.h"
 #include <functional>
 
 static bool safeParameters(const QJsonValue &value,int depth,int &budget) {
@@ -34,6 +35,7 @@ static bool validHost(const QString &host) {
     return true;
 }
 QString ProxyNode::validate(const ProxyNode &n) {
+    if(QJsonDocument(n.originalConfiguration).toJson(QJsonDocument::Compact).size()>256*1024||n.conversionIssues.size()>32||n.sourceFormat.size()>128)return QStringLiteral("订阅原始差异超过保存上限。");
     int budget=10000;
     if(QJsonDocument(n.parameters).toJson(QJsonDocument::Compact).size()>256*1024 || !safeParameters(n.parameters,0,budget))return QStringLiteral("扩展选项超出安全范围：不允许本地文件、系统网络设置、额外监听、脚本或关闭证书验证。");
     if(n.protocol=="ssh" && !n.parameters.value("private-key").toString().isEmpty() && !n.parameters.value("private-key").toString().contains("PRIVATE KEY"))return QStringLiteral("SSH 私钥须为内嵌 PEM，不能引用本地文件。");
@@ -71,5 +73,9 @@ QStringList ProxyNode::protocols() {
 }
 QVariantMap ProxyNode::publicInfo() const {
     return {{"id",id},{"name",name},{"protocol",protocol},{"host",host},{"port",port},
-        {"cipher",cipher},{"serverName",serverName},{"sourceId",sourceId},{"hasCredentials",!password.isEmpty() || !parameters.isEmpty()}};
+        {"cipher",cipher},{"serverName",serverName},{"sourceId",sourceId},{"sourceFormat",sourceFormat},
+        {"configurationState",conversionIssues.isEmpty()?QStringLiteral("已解析 · 待联网测试"):QStringLiteral("已解析 · 含未支持选项")},
+        {"conversionIssues",conversionIssues},{"capability",SwirlProtocolRegistry::describe(*this)},
+        {"normalizationNotes",originalConfiguration.value("_swirl-default-client-fingerprint").toBool()?QStringLiteral("源配置未指定 Reality 指纹；Swirl 使用 chrome。"):QString()},
+        {"hasCredentials",!password.isEmpty() || !parameters.isEmpty()}};
 }

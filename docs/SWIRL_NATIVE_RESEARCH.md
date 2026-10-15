@@ -38,7 +38,7 @@ v2rayN 在生成配置后才停止旧核心并启动新核心，订阅与配置�
 | DNS / TLS | 基础解析与 Qt 验证 TLS；高级 DNS 与传输兼容暂交 Mihomo |
 | Routing / RuleEngine | 阶段性支持边界明确；未原生实现的进程/地理/MRS/TUN 路由交兼容引擎 |
 
-基础联网通过后再推进加密协议；Shadowsocks、Trojan、VMess、VLESS、SSR 的原生状态分别记录，不以 URI 解析或配置校验替代协议互操作。公开网络请求与本地隔离请求分开，商业订阅尚无本轮授权测试材料。
+基础联网通过后再推进加密协议；Shadowsocks、Trojan、VMess、VLESS、SSR 的原生状态分别记录，不以 URI 解析或配置校验替代协议互操作。公开网络请求与本地隔离请求分开，本轮后续已获商业订阅授权，VLESS/Reality 的实际 HTTP/HTTPS 与更新重连结果见 PR12_NATIVE_ACCEPTANCE.md；不以其替代其他协议覆盖。
 
 ## 许可证与复用决定
 

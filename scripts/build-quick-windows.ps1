@@ -27,7 +27,7 @@ try {
     $exe = (Resolve-Path $exe).Path
     & (Join-Path $PSScriptRoot 'stage-mihomo.ps1') -Destination (Split-Path $exe) -Archive $MihomoArchive
     if ($InputTests) {
-        ctest --test-dir $BuildDir -C Release -R 'swirl-engine-(contract|real)|swirl-node-real-chain|swirl-import-subscription|swirl-motion|swirl-hero|swirl-font|swirl-local-extensions|swirl-gateway-network|swirl-telemetry-accounting' --output-on-failure
+        ctest --test-dir $BuildDir -C Release -R 'swirl-engine-(contract|real)|swirl-native-engine|swirl-subscription-formats|swirl-appearance-ui|swirl-node-real-chain|swirl-import-subscription|swirl-motion|swirl-hero|swirl-font|swirl-local-extensions|swirl-gateway-network|swirl-telemetry-accounting' --output-on-failure
         if ($LASTEXITCODE) { throw "Engine contract, integration or QML checks failed." }
         $test = Start-Process $exe -ArgumentList '--engine-self-test' -WindowStyle Hidden -Wait -PassThru
         if ($test.ExitCode) { throw "Native engine QML checks failed: $($test.ExitCode)." }
@@ -72,7 +72,7 @@ try {
     Copy-Item src/Swirl.Quick/packaging/licenses (Join-Path $DistDir "licenses") -Recurse
     $documentation = Join-Path $DistDir 'docs'
     New-Item -ItemType Directory -Force -Path $documentation | Out-Null
-    Copy-Item -LiteralPath 'src/Swirl.Quick/CAPTURE.md','docs/LOCAL_EXTENSIONS.md','docs/FONTS.md','docs/ANIMATION_DEPENDENCY_RESEARCH.md','docs/PR12_GRAPHICS_UPGRADE.md' -Destination $documentation
+    Copy-Item -LiteralPath 'src/Swirl.Quick/CAPTURE.md','docs/LOCAL_EXTENSIONS.md','docs/FONTS.md','docs/ANIMATION_DEPENDENCY_RESEARCH.md','docs/PR12_GRAPHICS_UPGRADE.md','docs/PR12_NATIVE_ACCEPTANCE.md','docs/PR12_NATIVE_UI_FIXES.md','docs/SWIRL_NATIVE_RESEARCH.md' -Destination $documentation
     $dist = (Resolve-Path $DistDir).Path
     $out = (Resolve-Path $OutDir).Path
     & $Nsis /INPUTCHARSET UTF8 "/DAPP_DIST=$dist" "/DOUT_DIR=$out" "/DAPP_ICON=$icon" src/Swirl.Quick/packaging/Swirl.nsi

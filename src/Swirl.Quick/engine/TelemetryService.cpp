@@ -48,7 +48,7 @@ QString TelemetryService::formatBytes(double bytes) const {
 }
 int TelemetryService::activeProcesses() const {QSet<QString> names;for(const auto &r:m_status.connections){const auto name=r.toMap().value("process").toString();if(!name.isEmpty()&&name!="未知进程")names.insert(name);}return names.size();}
 void TelemetryService::ingest(const ProxyEngine::Status &status){
- const auto epoch=QString::number(status.processId);
+ const auto epoch=QString::number(status.processId)+"/"+status.sessionId;
  if(status.processAlive&&m_epoch!=epoch){m_epoch=epoch;m_seen.clear();m_lastConnections=0;m_lastTraffic=0;m_lastUp=0;m_lastDown=0;m_externalIp.clear();m_latencies.clear();}
  const auto route=epoch+"/"+status.selectedNodeId+"/"+status.mode;
  if(route!=m_routeEpoch){m_routeEpoch=route;m_externalIp.clear();m_latencies.clear();m_failedMeasurements.clear();m_internetDiagnostic.clear();}
@@ -78,7 +78,7 @@ void TelemetryService::ingest(const ProxyEngine::Status &status){
    if(row.value("category")=="proxy")add(bucket,"proxy",du+dd);
    const auto interval=status.connectionsAt-old.value("lastSeen").toLongLong();
    row["uploadRate"]=!old.isEmpty()&&interval>0?double(du)*1000/interval:0;row["downloadRate"]=!old.isEmpty()&&interval>0?double(dd)*1000/interval:0;
-   row["accountedDay"]=date;row["lastSeen"]=status.connectionsAt;row["status"]="活动";
+   row["accountedDay"]=date;row["lastSeen"]=status.connectionsAt;row["status"]=row.value("closed").toBool()?"已结束":"活动";
    row["up"]=formatBytes(u);row["down"]=formatBytes(d);row["time"]=QDateTime::fromString(row.value("time").toString(),Qt::ISODateWithMs).toLocalTime().toString("MM-dd HH:mm:ss");
    m_seen[id]=row;
   }

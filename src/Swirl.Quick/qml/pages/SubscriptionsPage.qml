@@ -8,7 +8,7 @@ Item {
  id:page
  property string expandedId:""
  property string editingId:""
- function edit(record){editingId=record?record.id:"";displayName.text=record?record.name:"";urlField.text="";interval.currentIndex=record?Math.max(0,[360,720,1440,10080].indexOf(record.intervalMinutes)):0;autoEnabled.checked=record?record.enabled:true;addDialog.open()}
+ function edit(record){editingId=record?record.id:"";displayName.text=record?record.name:"";urlField.text="";formatPreference.currentIndex=record?Math.max(0,["auto","loon","shadowrocket","surge","quantumult-x","sing-box"].indexOf(record.formatHint)):0;interval.currentIndex=record?Math.max(0,[360,720,1440,10080].indexOf(record.intervalMinutes)):0;autoEnabled.checked=record?record.enabled:true;addDialog.open()}
  readonly property var providers:engineController.imports.providers
  SwirlAnimatedModel{id:subscriptionModel;source:page.listed;keyRole:"id"}
  readonly property var listed:providers.filter(function(r){return r.name.toLowerCase().indexOf(search.text.toLowerCase())>=0})
@@ -95,6 +95,9 @@ Item {
             Text { text:"HTTPS 订阅地址"; color:Theme.text }
             SwirlTextField { id:urlField;objectName:"subscriptionUrl"; Layout.fillWidth:true;echoMode:TextInput.Password; placeholderText:page.editingId.length?"留空保留已加密地址":"https://…";Accessible.name:"订阅地址" }
             Text { text:"应用运行时按设定间隔更新；只导入节点，不执行远程全局配置。"; color:Theme.muted; font.pixelSize:Theme.fontSize(11); Layout.fillWidth:true; wrapMode:Text.WordWrap }
+            Text{text:"订阅格式偏好";color:Theme.text}
+            SwirlComboBox{id:formatPreference;Layout.fillWidth:true;model:["自动 / Clash","Loon","Shadowrocket / 通用","Surge / Surfboard","Quantumult X","sing-box"];Accessible.name:"订阅格式偏好"}
+            Text{text:"向服务端请求此客户端格式；下载后仍检测实际内容，不把客户端格式当成协议。";color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
             SwirlComboBox {id:interval;Layout.fillWidth:true;model:["每 6 小时","每 12 小时","每天","每周"];Accessible.name:"自动更新间隔"}
             RowLayout {Layout.fillWidth:true;Text {text:"自动更新";color:Theme.text;Layout.fillWidth:true}SwirlToggle {id:autoEnabled;checked:true}}
             Text {text:engineController.imports.message;color:Theme.orange;Layout.fillWidth:true;wrapMode:Text.Wrap;font.pixelSize:Theme.fontSize(11)}
@@ -105,7 +108,7 @@ Item {
                 SwirlButton { text:AppState.zh("Cancel"); onClicked:addDialog.close() }
                 SwirlButton { enabled:!engineController.imports.busy && displayName.text.trim().length>0 && (page.editingId.length>0 || urlField.text.trim().length>0);
                     objectName:"saveSubscription";text:"保存并更新"; primary:true
-                    onClicked:{if(engineController.imports.saveSubscription(page.editingId,displayName.text,urlField.text.trim(),[360,720,1440,10080][interval.currentIndex],autoEnabled.checked)){var id=page.editingId||engineController.imports.providers[engineController.imports.providers.length-1].id;addDialog.close();engineController.imports.refreshSubscription(id)}}
+                    onClicked:{if(engineController.imports.saveSubscription(page.editingId,displayName.text,urlField.text.trim(),[360,720,1440,10080][interval.currentIndex],autoEnabled.checked,["auto","loon","shadowrocket","surge","quantumult-x","sing-box"][formatPreference.currentIndex])){var id=page.editingId||engineController.imports.providers[engineController.imports.providers.length-1].id;addDialog.close();engineController.imports.refreshSubscription(id)}}
                 }
             }
         }

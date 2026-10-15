@@ -333,9 +333,9 @@ sourceComponent:settingsSheet.section==="subscriptions"?subscriptions:settingsSh
         running:smokeTestMode; repeat:true; interval:200
         property int index:0
         onTriggered:{
-            if(index>=AppState.allPageIds.length){console.info("SMOKE_PAGES",index);stop();smokeFinished.start();return}
+            if(index>=AppState.allPageIds.length){console.info("SMOKE_PAGES",index);stop();window.navigationSmokeCompleted();return}
             AppState.currentPage=AppState.allPageIds[index++]
         }
     }
-    Timer { id:smokeFinished; interval:300; onTriggered:Qt.quit() }
+    signal navigationSmokeCompleted()
 }

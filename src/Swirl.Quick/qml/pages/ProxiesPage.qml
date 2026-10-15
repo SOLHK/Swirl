@@ -50,7 +50,7 @@ Item {
                     onRowSelected:function(row){page.selectedId=row.id;engineController.chooseNode(row.id)}
                     onRowActivated:function(row,sourceRow){nodeHero.start(sourceRow)}
                 }
-                SwirlEmptyState {anchors.centerIn:parent;visible:page.viewRows.length===0;headline:"没有保存的节点";detail:"添加节点，或导入 Clash 配置与订阅"}
+                SwirlEmptyState {anchors.centerIn:parent;visible:page.viewRows.length===0;headline:"没有保存的节点";detail:"添加节点，或导入配置、URI 与订阅"}
             }
             ScrollView {
                 id:detailScroll;Layout.preferredWidth:Theme.dp(280);Layout.minimumWidth:Theme.dp(280);Layout.maximumWidth:Theme.dp(280);Layout.fillHeight:true;clip:true
@@ -108,6 +108,9 @@ Item {
             ColumnLayout {
                 Layout.fillWidth:true;spacing:Theme.dp(12);opacity:Math.max(0,Math.min(1,(nodeHero.reveal-0.25)/0.65))
                 Text {text:page.selected?page.selected.protocol+" · "+page.selected.address:"选择一个节点开始连接";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.WrapAnywhere}
+                Text {text:page.selected?(page.selected.sourceFormat||"手动节点")+" · "+page.selected.capability.engine:"";color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
+                Text {text:page.selected?page.selected.normalizationNotes||"":"";visible:text.length>0;color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
+                Text {text:page.selected?((page.selected.conversionIssues||[]).join("\n")):"";visible:text.length>0;color:Theme.orange;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
                 SwirlStatusBadge {busy:engineController.nodeBusy||engineController.tests.busy;label:engineController.activeProxyPort>0?"127.0.0.1:"+engineController.activeProxyPort:engineController.nodeStateText;tone:engineController.nodeError.length?"warning":engineController.apiHealthy?"success":"neutral"}
                 SwirlButton {objectName:"nodeConnectButton";Layout.fillWidth:true;implicitHeight:Theme.dp(36);text:engineController.nodeBusy?"连接中…":engineController.activeNodeId===page.selectedId&&engineController.processAlive?"断开节点":"连接节点";iconName:"link";primary:true;enabled:page.selected!==null&&!engineController.nodeBusy;onClicked:{if(engineController.activeNodeId===page.selectedId&&engineController.processAlive)engineController.disconnectNode();else engineController.connectNode(page.selectedId)}}
                 RowLayout {
@@ -147,7 +150,7 @@ Item {
                     SwirlTextField {id:nodeUuid;visible:["vmess","vless"].indexOf(nodeProtocol.currentText)>=0;Layout.fillWidth:true;echoMode:TextInput.Password;placeholderText:page.editingId.length?"UUID 留空保留原值":"UUID";Accessible.name:"节点 UUID"}
                     Text {text:"协议扩展选项（JSON，留空保留已保存选项）";color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
                     SwirlTextField {id:nodeOptions;objectName:"nodeOptionsField";Layout.fillWidth:true;echoMode:TextInput.Password;placeholderText:'{"network":"ws","ws-opts":{"path":"/"}}';Accessible.name:"协议扩展选项"}
-                    Text {text:"复杂协议推荐导入 Clash 节点配置。凭据由 Windows DPAPI 保护；引擎连接时进一步校验协议参数。";color:Theme.muted;font.pixelSize:Theme.fontSize(11);wrapMode:Text.Wrap;Layout.fillWidth:true}
+                    Text {text:"支持 Clash、Surge、Loon、Quantumult X、sing-box 与 URI。凭据由 Windows DPAPI 保护；未映射参数会保留并阻止执行。";color:Theme.muted;font.pixelSize:Theme.fontSize(11);wrapMode:Text.Wrap;Layout.fillWidth:true}
                     Text {text:engineController.nodeError;color:Theme.orange;font.pixelSize:Theme.fontSize(11);wrapMode:Text.Wrap;Layout.fillWidth:true}
                 }
             }
@@ -160,7 +163,7 @@ Item {
     }
 
     FileDialog {
-        id:configFile;title:"导入 Clash 配置";nameFilters:["Clash 配置 (*.yaml *.yml *.json)","所有文件 (*)"]
+        id:configFile;title:"导入节点配置";nameFilters:["节点配置 (*.yaml *.yml *.json *.conf *.txt)","所有文件 (*)"]
         onAccepted:engineController.imports.importFile(selectedFile)
     }
     SwirlDialog {
@@ -169,14 +172,14 @@ Item {
             width:parent.width;spacing:Theme.dp(12)
             ScrollView {id:importForm;Layout.fillWidth:true;Layout.preferredHeight:Math.min(Theme.dp(340),page.height*0.55);clip:true;ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
                 ColumnLayout {width:importForm.availableWidth;spacing:Theme.dp(12)
-            Text {text:"Clash YAML / JSON（仅导入节点）";color:Theme.text;Layout.fillWidth:true;wrapMode:Text.Wrap}
+            Text {text:"配置 / Base64 / URI（仅导入节点）";color:Theme.text;Layout.fillWidth:true;wrapMode:Text.Wrap}
             RowLayout {
                 Layout.fillWidth:true
                 SwirlButton {objectName:"importClipboardButton";text:"从剪贴板导入";enabled:!engineController.imports.busy;onClicked:engineController.imports.importClipboard()}
                 SwirlButton {text:"选择文件";enabled:!engineController.imports.busy;onClicked:configFile.open()}
             }
             ScrollView {Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(130);clip:true
-                TextArea {id:importContent;objectName:"importContentField";placeholderText:"粘贴完整 Clash 配置或 proxies 节点列表";wrapMode:TextEdit.Wrap;font:importAddress.font;color:Theme.text;selectByMouse:true;Accessible.name:"待导入的 Clash 配置";background:Rectangle {color:Theme.field;radius:Theme.controlRadius;border.color:Theme.border;border.width:1}}
+                TextArea {id:importContent;objectName:"importContentField";placeholderText:"粘贴 Clash、Surge、Loon、Quantumult X、sing-box 配置或节点 URI";wrapMode:TextEdit.Wrap;font:importAddress.font;color:Theme.text;selectByMouse:true;Accessible.name:"待导入的节点配置";background:Rectangle {color:Theme.field;radius:Theme.controlRadius;border.color:Theme.border;border.width:1}}
             }
             Text {text:"HTTPS 订阅地址（本次导入）";color:Theme.text}
             SwirlTextField {id:importAddress;Layout.fillWidth:true;echoMode:TextInput.Password;placeholderText:"https://…";Accessible.name:"一次性导入地址"}
