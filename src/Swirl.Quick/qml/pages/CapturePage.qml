@@ -13,7 +13,7 @@ Item {
  component SectionTitle:SwirlText {renderType:Text.NativeRendering;color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold;Layout.fillWidth:true}
  ScrollView {
   id:scroll;anchors.fill:parent;clip:true;ScrollBar.horizontal.policy:ScrollBar.AlwaysOff;ScrollBar.vertical:SwirlScrollBar {}
-  ColumnLayout {width:scroll.availableWidth;spacing:Theme.dp(14)
+  ColumnLayout {width:Math.floor(scroll.availableWidth);spacing:Theme.dp(14)
    RowLayout {Layout.fillWidth:true;Layout.leftMargin:Theme.dp(24);Layout.rightMargin:Theme.dp(24);Layout.topMargin:Theme.dp(24)
     SwirlText {renderType:Text.NativeRendering;text:"捕获 HTTP 内容";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.Bold;Layout.fillWidth:true}
     SwirlToggle {objectName:"captureToggle";large:true;checked:page.captureProvider.running;onToggled:{if(checked){page.applyLimits();page.captureProvider.start(8899)}else page.captureProvider.stop()}Accessible.name:"捕获 HTTP 内容"}

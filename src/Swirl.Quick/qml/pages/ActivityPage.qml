@@ -27,7 +27,7 @@ Item {
  ScrollView {
   id:scroll;anchors.fill:parent;clip:true;ScrollBar.horizontal.policy:ScrollBar.AlwaysOff;ScrollBar.vertical:SwirlScrollBar {}
   ColumnLayout {
-   width:Math.min(scroll.availableWidth,Theme.dp(1050));x:Math.round((scroll.availableWidth-width)/2);spacing:Theme.dp(14)
+   width:Math.floor(Math.min(scroll.availableWidth,Theme.dp(1050)));x:Math.round((scroll.availableWidth-width)/2);spacing:Theme.dp(14)
    RowLayout {Layout.fillWidth:true;Layout.topMargin:Theme.dp(4);spacing:Theme.dp(12)
     SwirlText {renderType:Text.NativeRendering;text:"活动";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold;Layout.fillWidth:true}
     SwirlStatusBadge {label:page.proxyState;tone:page.engineController.systemProxy.owned&&page.engineController.systemProxy.enabled?"success":page.engineController.systemProxy.error.length?"warning":"neutral";HoverHandler {id:proxyHover}ToolTip.visible:proxyHover.hovered&&page.engineController.systemProxy.error.length>0;ToolTip.text:page.engineController.systemProxy.error;ToolTip.delay:600}
@@ -57,7 +57,7 @@ Item {
         ColumnLayout {required property var modelData;Layout.fillWidth:true;Layout.minimumWidth:0;spacing:Theme.dp(3);Label {text:modelData.label}SwirlText {renderType:Text.NativeRendering;text:modelData.value;color:Theme.text;font.pixelSize:Theme.fontSize(13);Layout.fillWidth:true;elide:Text.ElideRight}}
        }
       }
-      ColumnLayout {id:diagnosticDetails;Layout.fillWidth:true;spacing:Theme.dp(9);opacity:Math.max(0,Math.min(1,(diagnostic.reveal-0.2)/0.65));enabled:diagnostic.expanded
+      ColumnLayout {id:diagnosticDetails;Layout.fillWidth:true;spacing:Theme.dp(9);enabled:diagnostic.expanded
        Rectangle {Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(1);color:Theme.border}
        SwirlText {renderType:Text.NativeRendering;text:page.telemetry.internetDiagnostic.advice||"点击刷新，发起真实的 HTTPS 请求。";color:Theme.text;Layout.fillWidth:true;wrapMode:Text.Wrap;font.pixelSize:Theme.fontSize(12)}
        Label {text:"引擎："+(page.engineController.processAlive?"运行中":"未运行")+" · 接口："+(page.engineController.apiHealthy?"正常":"未就绪")+" · 端口："+(page.engineController.activeProxyPort||"未开放");Layout.fillWidth:true;wrapMode:Text.Wrap}
@@ -95,7 +95,7 @@ Item {
        RowLayout {Layout.fillWidth:true;Value {id:totalValue;Layout.fillWidth:true;text:page.bytes(page.totals.total,page.totals.sampled)}SwirlIconButton {iconName:"chevron-right";quiet:true;onClicked:page.trafficFrom(totalValue,"totalTraffic");Accessible.name:"详细流量统计"}}
        RowLayout {Layout.fillWidth:true;Label {text:"直连 "+(page.distribution[1]?page.distribution[1].value:"—");Layout.fillWidth:true}Label {text:"代理 "+(page.distribution[0]?page.distribution[0].value:"—")}}
        Rectangle {Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(5);radius:height/2;color:Theme.field
-        Rectangle {height:parent.height;radius:height/2;color:Theme.accentIndigo;width:page.totals.total>0?parent.width*Math.max(0,Math.min(1,(page.distribution[1]?page.distribution[1].bytes:0)/page.totals.total)):0}
+        Rectangle {height:parent.height;radius:height/2;color:Theme.accentIndigo;width:Math.round(page.totals.total>0?parent.width*Math.max(0,Math.min(1,(page.distribution[1]?page.distribution[1].bytes:0)/page.totals.total)):0)}
        }
       }
      }

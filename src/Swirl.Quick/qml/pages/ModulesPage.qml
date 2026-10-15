@@ -11,9 +11,9 @@ Item {
  ColumnLayout{anchors.fill:parent;anchors.margins:Theme.dp(24);spacing:Theme.dp(12)
   RowLayout{Layout.fillWidth:true;SwirlText {text:"模块";color:Theme.text;font.pixelSize:Theme.fontSize(24);font.weight:Font.DemiBold;Layout.fillWidth:true}SwirlButton{objectName:"localModuleImport";text:"安装本地模块…";onClicked:moduleFile.open()}}
   SwirlText {text:"模块覆盖 DNS、规则和策略组；从上向下应用，底部模块优先。停用全部模块后恢复基础配置。";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.WordWrap}
-  ListView{id:moduleList;objectName:"localModuleList";Layout.fillWidth:true;Layout.fillHeight:true;clip:true;spacing:Theme.dp(10);model:extensionsProvider.modules
+  ListView { pixelAligned: true;id:moduleList;objectName:"localModuleList";Layout.fillWidth:true;Layout.fillHeight:true;clip:true;spacing:Theme.dp(10);model:extensionsProvider.modules
    SwirlText {visible:moduleList.count===0;anchors.centerIn:parent;text:"没有已安装模块";color:Theme.muted;font.pixelSize:Theme.fontSize(16)}
-   delegate:Rectangle{required property var modelData;required property int index;width:moduleList.width;height:Theme.dp(126);radius:Theme.cardRadius;color:page.selectedId===modelData.id?Theme.selected:Theme.field
+   delegate:Rectangle{required property var modelData;required property int index;width:Math.floor(moduleList.width);height:Theme.dp(126);radius:Theme.cardRadius;color:page.selectedId===modelData.id?Theme.selected:Theme.field
     Column{x:Theme.dp(16);y:Theme.dp(16);width:parent.width-Theme.dp(84);spacing:Theme.dp(6)
      SwirlText {text:parent.parent.modelData.name;textFormat:Text.PlainText;color:Theme.text;font.pixelSize:Theme.fontSize(15);font.weight:Font.DemiBold}
      SwirlText {text:parent.parent.modelData.description;textFormat:Text.PlainText;color:Theme.muted;font.pixelSize:Theme.fontSize(12);width:parent.width;wrapMode:Text.WordWrap;maximumLineCount:2;elide:Text.ElideRight}

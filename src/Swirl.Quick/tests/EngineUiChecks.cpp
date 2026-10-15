@@ -29,8 +29,25 @@ int runEngineUiChecks(QQuickWindow *window, EngineController *controller, Captur
     };
     const auto click = [&](const QString &name) {
         auto *target = item(name); check(target != nullptr, "engine control exists");
-        if (target) QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier,
-            target->mapToScene(QPointF(target->width()/2, target->height()/2)).toPoint());
+        if (target) {
+            // The engine buttons are below the fold at normal window height.
+            // Scroll their actual Flickable into view before sending input.
+            for(auto *parent=target->parentItem();parent;parent=parent->parentItem()) {
+                const auto currentY=parent->property("contentY");
+                const auto contentHeight=parent->property("contentHeight");
+                if(!currentY.isValid()||!contentHeight.isValid()||contentHeight.toDouble()<=parent->height())continue;
+                const auto top=target->mapToItem(parent,QPointF(0,0)).y();
+                const auto bottom=top+target->height();
+                if(top<0||bottom>parent->height()) {
+                    const auto maximum=contentHeight.toDouble()-parent->height();
+                    const auto centered=currentY.toDouble()+top-(parent->height()-target->height())/2;
+                    parent->setProperty("contentY",qBound(0.0,centered,maximum));
+                    QCoreApplication::processEvents();
+                }
+            }
+            QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier,
+                target->mapToScene(QPointF(target->width()/2, target->height()/2)).toPoint());
+        }
         QTest::qWait(100);
     };
     window->resize(1450, 884);

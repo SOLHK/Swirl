@@ -31,7 +31,7 @@ Item {
                     anchors.fill:parent; anchors.margins:Theme.dp(13); spacing:Theme.dp(10)
                     SwirlText { text:"捕获历史"; color:Theme.text; font.pixelSize:Theme.fontSize(14); font.weight:Font.DemiBold }
                     SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:"筛选请求" }
-                    ListView {
+                    ListView { pixelAligned: true;
                     add: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";from:0;to:1;duration:SwirlMotion.duration} }
                     remove: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.duration} }
                     move: Transition {enabled:!SwirlMotion.reduced;SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration}}
@@ -41,7 +41,7 @@ Item {
                             return (r.method+" "+r.path).toLowerCase().indexOf(search.text.toLowerCase())>=0
                         })
                         delegate:Rectangle {
-                            width:ListView.view.width; height:Theme.dp(51); radius:Theme.roundedRadius(width,height)
+                            width:Math.floor(ListView.view.width); height:Theme.dp(51); radius:Theme.roundedRadius(width,height)
                             color:page.selectedRequest===modelData.id?Theme.selected:tap.containsMouse?Theme.hover:"transparent"
                             ColumnLayout {
                                 anchors.fill:parent; anchors.margins:Theme.dp(8); spacing:Theme.dp(3)
@@ -80,7 +80,7 @@ Item {
                         radius:Theme.roundedRadius(width,height); color:Theme.field; border.color:Theme.border
                         ScrollView {
                             anchors.fill:parent; anchors.margins:Theme.dp(9)
-                            TextArea {
+                            TextArea { renderType: TextEdit.NativeRendering; font.weight: Theme.bodyFontWeight; font.hintingPreference: Font.PreferFullHinting; Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) }
                                 id:bodyEditor
                                 text:""
                                 font.family:"Cascadia Code"; font.pixelSize:Theme.fontSize(12); color:Theme.text
@@ -107,7 +107,7 @@ Item {
                         radius:Theme.roundedRadius(width,height); color:Theme.field; border.color:Theme.border
                         ScrollView {
                             anchors.fill:parent; anchors.margins:Theme.dp(9)
-                            TextArea {
+                            TextArea { renderType: TextEdit.NativeRendering; font.weight: Theme.bodyFontWeight; font.hintingPreference: Font.PreferFullHinting; Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) }
                                 readOnly:true; text:page.resultMessage
                                 color:Theme.text; font.family:"Cascadia Code"; font.pixelSize:Theme.fontSize(12)
                                 wrapMode:Text.WrapAnywhere; selectByMouse:true

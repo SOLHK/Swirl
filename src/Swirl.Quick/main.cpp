@@ -1,5 +1,6 @@
 #include <QGuiApplication>
 #include "app/FontManager.h"
+#include "app/FontRendering.h"
 #if defined(SWIRL_UI_TESTS) && defined(Q_OS_WIN)
 #include "tests/third_party/renderdoc_app.h"
 #endif
@@ -31,7 +32,6 @@
 #include <QStandardPaths>
 #include <QSettings>
 #include <QTemporaryDir>
-#include <QFontDatabase>
 #include "app/ModuleDraftStore.h"
 #include "app/ExtensionService.h"
 #include "app/MotionPolicy.h"
@@ -80,6 +80,7 @@ int main(int argc, char *argv[])
 #ifdef Q_OS_WIN
     SetCurrentProcessExplicitAppUserModelID(L"SOLHK.Swirl.Desktop");
 #endif
+    configureSwirlFontRendering();
     // Keep fractional Windows monitor scale factors (125%, 150%, 175%) intact;
     // Qt then exposes logical geometry and raster DPR per screen.
     QGuiApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);
@@ -146,7 +147,15 @@ int main(int argc, char *argv[])
         if(!app.arguments().contains("--preview-preserve-settings"))isolatedSettings.clear();
         isolatedSettings.sync();
     }
-    FontManager fontManager;
+    QTemporaryDir previewFonts;
+    FontManager fontManager(nullptr,previewMode?previewFonts.path():QString());
+    if(previewMode)for(const auto &argument:app.arguments()){
+        if(argument.startsWith("--preview-font-file=")){
+            if(!fontManager.importFont(QUrl::fromLocalFile(argument.mid(20))))return 3;
+        }else if(argument.startsWith("--preview-font-family=")){
+            if(!fontManager.selectFamily(argument.mid(22)))return 3;
+        }
+    }
     WindowsBackdrop backdrop;
     WindowsBackdrop settingsBackdrop;
     WindowsBackdrop panelBackdrop;
@@ -195,10 +204,6 @@ int main(int argc, char *argv[])
     const QString previewPath = nativeFramePath.isEmpty()?argumentValue(QStringLiteral("--capture-preview=")):nativeFramePath;
     const QString previewPage = argumentValue(QStringLiteral("--preview-page="));
     const QString previewTheme = argumentValue(QStringLiteral("--preview-theme="));
-    const QString previewFontFile = argumentValue(QStringLiteral("--preview-font-file="));
-    if(previewMode && !previewFontFile.isEmpty() && QFontDatabase::addApplicationFont(previewFontFile)<0) {
-        qCritical()<<"Preview font file could not be loaded";return 2;
-    }
     const QString previewFont = argumentValue(QStringLiteral("--preview-font="));
     if(previewMode && !previewFont.isEmpty() && !fontManager.selectFamily(previewFont)) {
         qCritical()<<"Preview font unavailable:"<<previewFont;return 2;
@@ -211,6 +216,8 @@ int main(int argc, char *argv[])
         else if(interaction){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-input-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-input-diagnostics.txt");}
         QFile::remove(QCoreApplication::applicationDirPath() + QStringLiteral("/Swirl-diagnostics.txt"));
         qInstallMessageHandler(recordQtDiagnostic);
+        qInfo()<<"Font rendering"<<qgetenv("QT_QPA_PLATFORM")<<fontManager.currentFamily()
+               <<"NativeRendering / FullHinting";
     }
     engine.rootContext()->setContextProperty("previewPage", previewPage);
     engine.rootContext()->setContextProperty("previewCaptureMode", previewMode);
@@ -335,8 +342,10 @@ int main(int argc, char *argv[])
     }
     const auto previewSection=argumentValue(QStringLiteral("--preview-section="));
     if(rootWindow && !previewSection.isEmpty()) {
-        if(auto *loader=rootWindow->findChild<QObject *>(QStringLiteral("pageLoader")))
-            if(auto *page=qvariant_cast<QObject *>(loader->property("item")))page->setProperty("section",previewSection);
+        QTimer::singleShot(350,rootWindow,[rootWindow,previewSection]{
+            if(auto *loader=rootWindow->findChild<QObject *>(QStringLiteral("pageLoader")))
+                if(auto *page=qvariant_cast<QObject *>(loader->property("item")))page->setProperty("section",previewSection);
+        });
     }
     const auto previewScale=argumentValue(QStringLiteral("--preview-ui-scale="));
     if(rootWindow && !previewScale.isEmpty()) {

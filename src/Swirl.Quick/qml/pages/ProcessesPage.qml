@@ -63,7 +63,7 @@ Item {
  }
  SwirlDialog{id:meteredDialog;title:"计费网络模式";ColumnLayout{width:parent.width;spacing:Theme.dp(12)
   SwirlText {renderType:Text.NativeRendering;text:"默认阻止所有程序的网络，仅允许下面的程序继续按分流规则访问。启用时自动开启增强模式，并保持规则判定。";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.WordWrap}
-  TextArea{id:allowedProcesses;objectName:"meteredAllowlistEditor";Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(140);placeholderText:"每行一个程序名，例如 chrome.exe";font.pixelSize:Theme.fontSize(13);selectByMouse:true;wrapMode:TextEdit.NoWrap}
+  TextArea { renderType: TextEdit.NativeRendering; font.weight: Theme.bodyFontWeight; font.hintingPreference: Font.PreferFullHinting; Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) }id:allowedProcesses;objectName:"meteredAllowlistEditor";Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(140);placeholderText:"每行一个程序名，例如 chrome.exe";font.pixelSize:Theme.fontSize(13);selectByMouse:true;wrapMode:TextEdit.NoWrap}
   SwirlText {renderType:Text.NativeRendering;text:page.engineController.networkConfigurationError||page.engineController.routingError;color:Theme.orange;Layout.fillWidth:true;wrapMode:Text.WordWrap;font.pixelSize:Theme.fontSize(12)}
   RowLayout{Layout.alignment:Qt.AlignRight;SwirlButton{text:"取消";onClicked:meteredDialog.close()}SwirlButton{text:"保存";primary:true;onClicked:{if(page.engineController.configureMeteredAllowlist(allowedProcesses.text.split(/\r?\n/).filter(s=>s.trim().length>0)))meteredDialog.close()}}}
  }}

@@ -174,7 +174,7 @@ ApplicationWindow {
             settingsOriginTitle=titleItem.text || ""
             settingsOriginFontSize=titleItem.font?titleItem.font.pixelSize:Theme.fontSize(16)
         }
-        if(!settingsSheet.visible){settingsSheet.x=window.x+(window.width-settingsSheet.width)/2;settingsSheet.y=Math.max(0,Math.min(window.y,Screen.desktopAvailableHeight-settingsSheet.height))}
+        if(!settingsSheet.visible){settingsSheet.x=Math.round(window.x+(window.width-settingsSheet.width)/2);settingsSheet.y=Math.round(Math.max(0,Math.min(window.y,Screen.desktopAvailableHeight-settingsSheet.height)))}
         settingsSheet.section=route;settingsSheet.updateSettingsSection();settingsSheet.show()
         settingsTransition.moveTo(1);settingsSheet.raise();settingsSheet.requestActivate()
     }
@@ -188,19 +188,19 @@ ApplicationWindow {
         readonly property rect destination:window.settingsDestinationRect
         readonly property real handoff:Math.max(0,Math.min(1,(reveal-0.7)/0.3))
         SwirlGlassPanel {
-            x:window.settingsOriginRect.x+(parent.destination.x-window.settingsOriginRect.x)*parent.reveal
-            y:window.settingsOriginRect.y+(parent.destination.y-window.settingsOriginRect.y)*parent.reveal
-            width:window.settingsOriginRect.width+(parent.destination.width-window.settingsOriginRect.width)*parent.reveal
-            height:window.settingsOriginRect.height+(parent.destination.height-window.settingsOriginRect.height)*parent.reveal
+            x:Math.round(window.settingsOriginRect.x+(parent.destination.x-window.settingsOriginRect.x)*parent.reveal)
+            y:Math.round(window.settingsOriginRect.y+(parent.destination.y-window.settingsOriginRect.y)*parent.reveal)
+            width:Math.round(window.settingsOriginRect.width+(parent.destination.width-window.settingsOriginRect.width)*parent.reveal)
+            height:Math.round(window.settingsOriginRect.height+(parent.destination.height-window.settingsOriginRect.height)*parent.reveal)
             cornerRadius:Theme.cardRadius+(Theme.windowRadius-Theme.cardRadius)*parent.reveal
             material:"floating";independentCard:false;opacity:1-parent.handoff
         }
         SwirlText {
-            x:window.settingsOriginTitleRect.x+(parent.destination.x+Theme.dp(64)-window.settingsOriginTitleRect.x)*parent.reveal
-            y:window.settingsOriginTitleRect.y+(parent.destination.y+Theme.dp(12)-window.settingsOriginTitleRect.y)*parent.reveal
-            width:window.settingsOriginTitleRect.width+(Math.max(0,parent.destination.width-Theme.dp(128))-window.settingsOriginTitleRect.width)*parent.reveal
-            height:window.settingsOriginTitleRect.height+(Theme.dp(28)-window.settingsOriginTitleRect.height)*parent.reveal
-            text:window.settingsOriginTitle;color:Theme.text;opacity:1-parent.handoff
+            x:Math.round(window.settingsOriginTitleRect.x+(parent.destination.x+Theme.dp(64)-window.settingsOriginTitleRect.x)*parent.reveal)
+            y:Math.round(window.settingsOriginTitleRect.y+(parent.destination.y+Theme.dp(12)-window.settingsOriginTitleRect.y)*parent.reveal)
+            width:Math.round(window.settingsOriginTitleRect.width+(Math.max(0,parent.destination.width-Theme.dp(128))-window.settingsOriginTitleRect.width)*parent.reveal)
+            height:Math.round(window.settingsOriginTitleRect.height+(Theme.dp(28)-window.settingsOriginTitleRect.height)*parent.reveal)
+            text:window.settingsOriginTitle;color:Theme.text;visible:parent.handoff<1
             font.pixelSize:Math.round(window.settingsOriginFontSize+(Theme.fontSize(15)-window.settingsOriginFontSize)*parent.reveal)
             font.weight:Font.DemiBold;elide:Text.ElideRight;verticalAlignment:Text.AlignVCenter
         }
@@ -225,7 +225,13 @@ ApplicationWindow {
         readonly property real reveal:settingsTransition.progress
         property bool closeApproved:false
         SwirlTransitionCoordinator{id:settingsTransition;duration:SwirlMotion.dialogDuration
-            onMovingChanged:if(!moving && destination===0 && settingsSheet.visible){settingsSheet.closeApproved=true;settingsSheet.close()}
+            onMovingChanged:if(!moving && destination===0 && settingsSheet.visible)
+                Qt.callLater(function(){
+                    if(!settingsTransition.moving && settingsTransition.destination===0 && settingsSheet.visible){
+                        settingsSheet.closeApproved=true
+                        settingsSheet.close()
+                    }
+                })
         }
 
         property string savedFingerprint:""

@@ -35,10 +35,10 @@ Item {
             model:4
             SwirlText {
                 required property int index
-                width:Theme.dp(66); height:(plot.height-Theme.dp(1))/3
+                width:Theme.dp(66); height:Math.round((plot.height-Theme.dp(1))/3)
                 text:engineController.telemetry.formatBytes(graph.maximum*(1-index/3))+"/s"
                 color:Theme.muted; font.pixelSize:Theme.fontSize(16); horizontalAlignment:Text.AlignRight; rightPadding:Theme.dp(0)
-                y:index*(plot.height-Theme.dp(1))/3-Theme.dp(8)
+                y:Math.round(index*(plot.height-Theme.dp(1))/3-Theme.dp(8))
             }
         }
     }
@@ -86,7 +86,7 @@ Item {
             model:5
             SwirlText {
                 required property int index
-                width:plot.width/5; font.pixelSize:Theme.fontSize(14); color:Theme.muted
+                width:Math.round(plot.width*(index+1)/5)-Math.round(plot.width*index/5); font.pixelSize:Theme.fontSize(14); color:Theme.muted
                 horizontalAlignment:index===0?Text.AlignLeft:index===4?Text.AlignRight:Text.AlignHCenter
                 text:index===4 ? "现在" : graph.rangeIndex===0 ? ["1分钟前","45秒前","30秒前","15秒前"][index] : (graph.rangeMinutes*(1-index/4))+"分钟前"
             }

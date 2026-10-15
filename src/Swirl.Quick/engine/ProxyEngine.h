@@ -12,6 +12,7 @@ struct EngineStartOptions {
     QByteArray expectedSha256;
     QString expectedVersion;
     quint16 controlPort = 9097;
+    bool autoControlPort = false;
     int startupTimeoutMs = 10000;
     int requestTimeoutMs = 1000;
     int healthIntervalMs = 2000;

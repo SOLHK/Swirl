@@ -10,12 +10,12 @@ ColumnLayout {
     SwirlText { text:"当前字体 · "+fontManager.currentFamily; color:Theme.text; font.family:Theme.fontFamily; font.pixelSize:Theme.fontSize(15); Layout.fillWidth:true; wrapMode:Text.Wrap }
     RowLayout {
         Layout.fillWidth:true
-        SwirlSearchField { id:search; objectName:"fontSearch"; Layout.fillWidth:true; placeholderText:"搜索字体，如 PingFang、MiSans" }
+        SwirlSearchField { id:search; objectName:"fontSearch"; Layout.fillWidth:true; placeholderText:"搜索字体，如 HarmonyOS Sans SC" }
         SwirlButton { objectName:"fontReset"; text:"恢复自动选择"; onClicked:fontManager.reset() }
     }
     SwirlGlassPanel {
         Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(240)
-        ListView {
+        ListView { pixelAligned: true;
             id:fontList; objectName:"fontFamilyList"; anchors.fill:parent; anchors.margins:Theme.dp(6); clip:true
             model:fontManager.families.filter(function(family){return family.toLowerCase().indexOf(search.text.toLowerCase())>=0})
             ScrollBar.vertical:SwirlScrollBar {}
@@ -46,15 +46,15 @@ ColumnLayout {
     RowLayout {
         Layout.fillWidth:true
         SwirlButton { objectName:"fontImport"; text:"导入字体文件…"; onClicked:fontFile.open() }
-        SwirlText { text:"支持 TTF、OTF、TTC，仅供 Swirl 使用"; color:Theme.muted; font.pixelSize:Theme.fontSize(11); Layout.fillWidth:true; wrapMode:Text.Wrap }
+        SwirlText { text:"支持 TTF、OTF、TTC，最大 128 MiB，仅供 Swirl 使用"; color:Theme.muted; font.pixelSize:Theme.fontSize(11); Layout.fillWidth:true; wrapMode:Text.Wrap }
     }
     SwirlText { text:fontManager.error; visible:text.length>0; color:Theme.red; Layout.fillWidth:true; wrapMode:Text.Wrap; font.pixelSize:Theme.fontSize(12) }
-    SwirlText { text:"自动选择优先使用已安装的 PingFang SC，其次为内置 HarmonyOS Sans SC，最后回退到系统字体。列表按每种字体实际预览，缺失字符由系统补全；手动选择与导入只在本机生效。"; color:Theme.muted; Layout.fillWidth:true; wrapMode:Text.Wrap; font.pixelSize:Theme.fontSize(12) }
+    SwirlText { text:"默认使用内置 HarmonyOS Sans SC（鸿蒙）。手动选择会单独保存；恢复自动选择可切回鸿蒙。PingFang UI 已合并字重别名，并针对正文使用可变字重优化。"; color:Theme.muted; Layout.fillWidth:true; wrapMode:Text.Wrap; font.pixelSize:Theme.fontSize(12) }
     SwirlText { text:"Swirl 使用 HarmonyOS Sans 字体。Copyright 2021 Huawei Device Co., Ltd.\n字体按 HarmonyOS Sans Fonts License Agreement 分发，随软件提供的字体文件保持官方原样。"; color:Theme.muted; Layout.fillWidth:true; wrapMode:Text.Wrap; font.pixelSize:Theme.fontSize(11) }
     SwirlButton { objectName:"fontLicense"; text:"查看鸿蒙字体许可"; onClicked:licenseDialog.open() }
     FileDialog { id:fontFile; title:"选择字体文件"; nameFilters:["字体文件 (*.ttf *.otf *.ttc)"]; onAccepted:fontManager.importFont(selectedFile) }
     SwirlDialog {
         id:licenseDialog; title:"HarmonyOS Sans 字体许可"; guardChanges:false; implicitWidth:Math.min(Theme.dp(720),parent.width-Theme.dp(40)); implicitHeight:Math.min(Theme.dp(540),parent.height-Theme.dp(40))
-        ScrollView { anchors.fill:parent; clip:true; TextArea { text:fontManager.licenseText; readOnly:true; selectByMouse:true; textFormat:TextEdit.PlainText; wrapMode:TextEdit.Wrap; color:Theme.text; font.family:Theme.fontFamily; font.pixelSize:Theme.fontSize(12); background:Item {} } }
+        ScrollView { anchors.fill:parent; clip:true; TextArea { renderType: TextEdit.NativeRendering; font.weight: Theme.bodyFontWeight; font.hintingPreference: Font.PreferFullHinting; Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) } text:fontManager.licenseText; readOnly:true; selectByMouse:true; textFormat:TextEdit.PlainText; wrapMode:TextEdit.Wrap; color:Theme.text; font.family:Theme.fontFamily; font.pixelSize:Theme.fontSize(12); background:Item {} } }
     }
 }

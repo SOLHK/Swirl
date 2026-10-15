@@ -62,7 +62,7 @@ Item {
             Layout.fillWidth:true
             SwirlComboBox {objectName:"nodeSourceFilter";visible:page.sources.length>0;implicitWidth:Theme.dp(170);model:["全部来源"].concat(page.sources.map(s=>s.name));currentIndex:Math.max(0,page.sources.findIndex(s=>s.id===page.sourceId)+1);onActivated:page.sourceId=currentIndex>0?page.sources[currentIndex-1].id:"";Accessible.name:"筛选订阅来源"}
             SwirlText {renderType:Text.NativeRendering;text:page.viewRows.length+" / "+page.sourceRows.length+" 个节点";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true}
-            SwirlText {renderType:Text.NativeRendering;text:engineController.tests.message||engineController.stateText+" · "+engineController.nodeStateText;color:Theme.muted;font.pixelSize:Theme.fontSize(12);elide:Text.ElideRight;Layout.maximumWidth:page.width*0.55}
+            SwirlText {renderType:Text.NativeRendering;text:engineController.tests.message||engineController.stateText+" · "+engineController.nodeStateText;color:Theme.muted;font.pixelSize:Theme.fontSize(12);elide:Text.ElideRight;Layout.maximumWidth:Math.floor(page.width*0.55)}
         }
         RowLayout {
             Layout.fillWidth:true;Layout.fillHeight:true;spacing:Theme.dp(16)
@@ -109,7 +109,7 @@ Item {
                             SwirlTextField {objectName:"nodeProxyPort";Layout.preferredWidth:Theme.dp(88);text:String(engineController.proxyPort);enabled:engineController.canStart;validator:IntValidator {bottom:1;top:65535}horizontalAlignment:TextInput.AlignHCenter;onEditingFinished:{if(acceptableInput)engineController.proxyPort=Number(text);text=String(engineController.proxyPort)}Accessible.name:"本机代理端口"}
                         }
                         Rectangle {Layout.fillWidth:true;implicitHeight:Theme.dp(1);color:Theme.border}
-                        SwirlText {renderType:Text.NativeRendering;objectName:"nodeRequestState";text:engineController.tests.busy?engineController.tests.message:page.tested.time?(page.tested.success?"请求成功":"请求失败")+" · HTTP "+page.tested.http+" · "+(page.tested.latency>=0?page.tested.latency+" ms":"无延迟结果")+(page.tested.error?"\n"+page.tested.error:""):engineController.requestStateText;color:engineController.tests.busy?Theme.muted:page.tested.time?(page.tested.success?Theme.green:Theme.orange):engineController.requestSucceeded?Theme.green:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
+                        SwirlText {renderType:Text.NativeRendering;objectName:"nodeRequestState";text:engineController.tests.busy?engineController.tests.message:page.tested.time?(page.tested.success?"独立测试成功（不代表已连接）":"独立测试失败")+" · HTTP "+page.tested.http+" · "+(page.tested.latency>=0?page.tested.latency+" ms":"无延迟结果")+(page.tested.error?"\n"+page.tested.error:""):engineController.requestStateText;color:engineController.tests.busy?Theme.muted:page.tested.time?(page.tested.success?Theme.green:Theme.orange):engineController.requestSucceeded?Theme.green:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
                         SwirlText {renderType:Text.NativeRendering;text:engineController.nodeError||engineController.error;visible:text.length>0;color:Theme.orange;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
                     }
                 }
@@ -149,7 +149,7 @@ Item {
                 ToolTip.text:nodeDetailTitle.text;ToolTip.delay:600
             }
             ColumnLayout {
-                Layout.fillWidth:true;spacing:Theme.dp(10);opacity:Math.max(0,Math.min(1,(nodeHero.reveal-0.25)/0.65))
+                Layout.fillWidth:true;spacing:Theme.dp(10)
                 RowLayout {
                     Layout.fillWidth:true;spacing:Theme.dp(8)
                     SwirlStatusBadge {label:page.selected?page.selected.protocol.toUpperCase():"未选择";tone:"neutral"}
@@ -177,7 +177,7 @@ Item {
         ColumnLayout {
             width:parent.width;spacing:Theme.dp(12)
             ScrollView {
-                id:form;Layout.fillWidth:true;Layout.preferredHeight:Math.min(Theme.dp(380),page.height*0.6);clip:true;ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
+                id:form;Layout.fillWidth:true;Layout.preferredHeight:Math.floor(Math.min(Theme.dp(380),page.height*0.6));clip:true;ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
                 ColumnLayout {
                     width:form.availableWidth;spacing:Theme.dp(10)
                     SwirlText {renderType:Text.NativeRendering;text:"名称";color:Theme.muted}
@@ -218,7 +218,7 @@ Item {
         id:importDialog;objectName:"nodeImportDialog";title:"一键导入节点";onClosed:{importContent.text="";importAddress.text=""}
         ColumnLayout {
             width:parent.width;spacing:Theme.dp(12)
-            ScrollView {id:importForm;Layout.fillWidth:true;Layout.preferredHeight:Math.min(Theme.dp(340),page.height*0.55);clip:true;ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
+            ScrollView {id:importForm;Layout.fillWidth:true;Layout.preferredHeight:Math.floor(Math.min(Theme.dp(340),page.height*0.55));clip:true;ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
                 ColumnLayout {width:importForm.availableWidth;spacing:Theme.dp(12)
             SwirlText {renderType:Text.NativeRendering;text:"配置 / Base64 / URI（仅导入节点）";color:Theme.text;Layout.fillWidth:true;wrapMode:Text.Wrap}
             RowLayout {
@@ -227,7 +227,7 @@ Item {
                 SwirlButton {text:"选择文件";enabled:!engineController.imports.busy;onClicked:configFile.open()}
             }
             ScrollView {Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(130);clip:true
-                TextArea {id:importContent;objectName:"importContentField";placeholderText:"粘贴 Clash、Surge、Loon、Quantumult X、sing-box 配置或节点 URI";wrapMode:TextEdit.Wrap;font:importAddress.font;color:Theme.text;selectByMouse:true;Accessible.name:"待导入的节点配置";background:Rectangle {color:Theme.field;radius:Theme.controlRadius;border.color:Theme.border;border.width:1}}
+                TextArea { renderType: TextEdit.NativeRendering; font.weight: Theme.bodyFontWeight; font.hintingPreference: Font.PreferFullHinting; Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) }id:importContent;objectName:"importContentField";placeholderText:"粘贴 Clash、Surge、Loon、Quantumult X、sing-box 配置或节点 URI";wrapMode:TextEdit.Wrap;font.family:importAddress.font.family;font.pixelSize:importAddress.font.pixelSize;color:Theme.text;selectByMouse:true;Accessible.name:"待导入的节点配置";background:Rectangle {color:Theme.field;radius:Theme.controlRadius;border.color:Theme.border;border.width:1}}
             }
             SwirlText {renderType:Text.NativeRendering;text:"HTTPS 订阅地址（本次导入）";color:Theme.text}
             SwirlTextField {id:importAddress;Layout.fillWidth:true;echoMode:TextInput.Password;placeholderText:"https://…";Accessible.name:"一次性导入地址"}

@@ -8,7 +8,7 @@ SwirlGlassPanel {
     property real expandedHeight: collapsedHeight
     readonly property real reveal: clock.progress
     readonly property bool moving: clock.moving
-    height: collapsedHeight+(expandedHeight-collapsedHeight)*reveal
+    height: Math.round(collapsedHeight+(expandedHeight-collapsedHeight)*reveal)
     cornerRadius: Theme.independentCardRadius
     clip: true
     interactive: true

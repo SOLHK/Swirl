@@ -10,7 +10,7 @@ Item {
  component GatewayMenuItem:MenuItem{
   implicitHeight:visible?Theme.dp(26):0;height:implicitHeight;font.family:Theme.fontFamily;font.pixelSize:Theme.fontSize(12)
   background:Rectangle{radius:Theme.dp(6);color:parent.highlighted?Theme.accent:"transparent"}
-  contentItem:SwirlText {text:parent.text;leftPadding:Theme.dp(8);rightPadding:Theme.dp(8);font:parent.font;color:parent.highlighted?"white":parent.enabled?Theme.text:Theme.muted;verticalAlignment:Text.AlignVCenter;elide:Text.ElideRight}
+  contentItem:SwirlText {text:parent.text;leftPadding:Theme.dp(8);rightPadding:Theme.dp(8);font.family:parent.font.family;font.pixelSize:parent.font.pixelSize;font.weight:parent.font.weight;color:parent.highlighted?"white":parent.enabled?Theme.text:Theme.muted;verticalAlignment:Text.AlignVCenter;elide:Text.ElideRight}
  }
  id:page;property string selectedId:"";property int sortIndex:3
  readonly property var records:{let rows=gatewayProvider.devices.map(r=>Object.assign({},r));if(sortIndex===0)rows.sort((a,b)=>b.total-a.total);else if(sortIndex===1)rows.sort((a,b)=>b.speed-a.speed);else if(sortIndex===2)rows.sort((a,b)=>a.name.localeCompare(b.name));else if(sortIndex===3)rows.sort((a,b)=>ipNumber(a.ip)-ipNumber(b.ip));else if(sortIndex===4)rows.sort((a,b)=>b.lastSeen-a.lastSeen);return rows}
@@ -21,17 +21,17 @@ Item {
  function openGatewayMenu(){gatewayMenu.popup(gearButton,Theme.dp(12),Theme.dp(10))}
  SwirlText {x:Theme.dp(24);y:Theme.dp(30);text:"设备";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.Bold}
  SwirlComboBox{id:deviceSort;objectName:"deviceSortPicker";anchors.right:parent.right;anchors.rightMargin:Theme.dp(20);y:Theme.dp(34);width:Theme.dp(208);height:Theme.dp(24);model:["按流量排序","按速度排序","按名称排序","按 IP 排序","按 DHCP 最后出现时间排序"];currentIndex:page.sortIndex;onActivated:page.sortIndex=currentIndex}
- Item{x:Theme.dp(24);y:Theme.dp(90);width:(parent.width-Theme.dp(70))/2;height:parent.height-y-Theme.dp(72)
+ Item{x:Theme.dp(24);y:Theme.dp(90);width:Math.floor((parent.width-Theme.dp(70))/2);height:parent.height-y-Theme.dp(72)
   SwirlText {visible:page.records.length===0;anchors.centerIn:parent;text:"无设备";color:Theme.muted;font.pixelSize:Theme.fontSize(17);font.weight:Font.DemiBold}
   SwirlDataTable{visible:page.records.length>0;anchors.fill:parent;rows:page.records;selectedId:page.selectedId;columns:[{key:"name",label:"设备",w:160},{key:"ip",label:"IP 地址",w:153}];onRowSelected:r=>page.selectedId=r.id}
  }
- ReferenceOutline{anchors.right:parent.right;anchors.rightMargin:Theme.dp(24);y:Theme.dp(90);width:(parent.width-Theme.dp(90))/2;height:parent.height-y-Theme.dp(24)
+ ReferenceOutline{anchors.right:parent.right;anchors.rightMargin:Theme.dp(24);y:Theme.dp(90);width:Math.floor((parent.width-Theme.dp(90))/2);height:parent.height-y-Theme.dp(24)
   Column{visible:page.selected!==null;anchors.fill:parent;anchors.margins:Theme.dp(20);spacing:Theme.dp(14)
    SwirlText {text:page.selected?page.selected.name:"";textFormat:Text.PlainText;color:Theme.text;font.pixelSize:Theme.fontSize(18)}
    SwirlText {text:page.selected?"IP 地址："+page.selected.ip+"\n上传："+page.selected.upload+"\n下载："+page.selected.download+"\n速度："+page.selected.speedText+"\nMAC："+page.selected.mac+"\n状态："+page.selected.status+"\n租约到期："+new Date(page.selected.expires*1000).toLocaleString():"";textFormat:Text.PlainText;color:Theme.muted;font.pixelSize:Theme.fontSize(12);width:parent.width;wrapMode:Text.WrapAnywhere}
   }
  }
- Item{x:Theme.dp(24);anchors.bottom:parent.bottom;anchors.bottomMargin:Theme.dp(10);width:(parent.width-Theme.dp(70))/2;height:Theme.dp(64)
+ Item{x:Theme.dp(24);anchors.bottom:parent.bottom;anchors.bottomMargin:Theme.dp(10);width:Math.floor((parent.width-Theme.dp(70))/2);height:Theme.dp(64)
   Rectangle{width:parent.width;height:Theme.dp(1);color:Theme.border}
   SwirlText {y:Theme.dp(15);text:"网关模式";color:Theme.text;font.pixelSize:Theme.fontSize(13);font.weight:Font.DemiBold}
   SwirlToggle{objectName:"gatewayToggle";x:Theme.dp(68);y:Theme.dp(15);enabled:!gatewayProvider.busy;checked:gatewayProvider.running;onToggled:{const wanted=checked;if(wanted){if(!gatewayProvider.configured)page.configureGateway();else if(!gatewayProvider.start())AppState.notice(gatewayProvider.error)}else gatewayProvider.stop();checked=Qt.binding(()=>gatewayProvider.running)}Accessible.name:"网关模式"}

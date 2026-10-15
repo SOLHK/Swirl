@@ -42,7 +42,7 @@ Qt TLS 上游不能在保留读侧的同时独立发送 TLS `close_notify`；依
 
 ### 字体和动画
 
-沿用当前已存在的 Windows 原生文字渲染、整数逻辑尺寸、SDR 与前景直接绘制，没有移植旧包的整体 HDR/遮罩结构。本次补齐自动 PingFang SC → HarmonyOS Sans SC → 系统字体，资源缺失时安全回退，逐字体真实字形预览，恢复自动选择；手动字体偏好保留。
+沿用当前已存在的 Windows 原生文字渲染、整数逻辑尺寸、SDR 与前景直接绘制，没有移植旧包的整体 HDR/遮罩结构。当前自动字体顺序在 Windows 为 HarmonyOS Sans SC → Microsoft YaHei UI → 系统字体，在 macOS 为 HarmonyOS Sans SC → PingFang SC；资源缺失时安全回退，逐字体真实字形预览，恢复自动选择；手动字体偏好保留。
 
 原卡片正反几何机制来自 `b7f058f`。适配当前功能中心的真实设置入口，使用已有可逆过渡时钟展开实时 Glass 表面与原生标题，再与保留的独立设置窗口交接；关闭时反向返回。保留 Activity 的共享标题入口、Registry、缓存与确认逻辑。不固定 FPS，也不因累计慢帧永久关闭动画。
 

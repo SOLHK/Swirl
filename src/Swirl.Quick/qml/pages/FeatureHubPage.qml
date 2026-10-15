@@ -19,7 +19,7 @@ Item {
                 model:[
                     {title:"通用",icon:"settings",route:"settings",description:"基础配置与应用行为"},
                     {title:"外观",icon:"appearance",route:"appearance",description:"主题、文字大小与动画"},
-                    {title:"字体",icon:"typography",route:"fonts",description:"苹方优先，也可选择本机字体"},
+                    {title:"字体",icon:"typography",route:"fonts",description:"按系统选择清晰字体，也可导入本机字体"},
                     {title:"DNS",icon:"dns",route:"dns",description:"解析服务与本地映射"},
                     {title:"模块",icon:"modules",route:"modules",description:"管理配置扩展模块"},
                     {title:"配置",icon:"profiles",route:"profiles",description:"管理与切换本地配置"},
@@ -30,7 +30,7 @@ Item {
                     id: entry; required property var modelData
                     readonly property Item motionTitle:entryTitle
                     objectName:"settings-"+modelData.route
-                    width:(grid.width-(grid.columns-1)*grid.spacing)/grid.columns; height:Theme.dp(156)
+                    width:Math.floor((grid.width-(grid.columns-1)*grid.spacing)/grid.columns); height:Theme.dp(156)
                     padding:Theme.cardPadding; hoverEnabled:true
                     readonly property real transfer: page.Window.window.settingsOrigin===entry ? page.Window.window.settingsOriginProgress : 0
                     motionScale:(enabled && down?SwirlMotion.pressScale:1)*(1-0.045*transfer)

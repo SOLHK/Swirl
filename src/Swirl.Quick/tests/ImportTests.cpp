@@ -154,13 +154,22 @@ external-controller: 0.0.0.0:9090
         QVERIFY(controller.requestSucceeded());QVERIFY(network.a.forwarded>=2);QCOMPARE(network.b.forwarded,0);
         const auto pid=controller.processId();network.b.username.clear();network.b.password.clear();
         source.content=socks(network.b.serverPort());imports->refreshSubscription(sid);
-        QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),5000);QTRY_VERIFY_WITH_TIMEOUT(controller.apiHealthy()&&controller.processId()!=pid,18000);
-        QCOMPARE(controller.selectedNodeId(),id);QVERIFY(!controller.requestSucceeded());
-        controller.testNode(network.url());QTRY_VERIFY_WITH_TIMEOUT(!controller.nodeBusy(),8000);QVERIFY(controller.requestSucceeded());QVERIFY(network.b.forwarded>=2);
+        QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),5000);
+        QVERIFY(controller.apiHealthy());QCOMPARE(controller.processId(),pid);
+        QCOMPARE(controller.selectedNodeId(),id);
+        const auto forwardedBefore=network.a.forwarded;
+        controller.testNode(network.url());QTRY_VERIFY_WITH_TIMEOUT(!controller.nodeBusy(),8000);
+        QVERIFY(controller.requestSucceeded());QVERIFY(network.a.forwarded>forwardedBefore);QCOMPARE(network.b.forwarded,0);
+        // A refresh must preserve existing streams. The updated node snapshot
+        // is applied only after the user explicitly disconnects and reconnects.
+        controller.stop();QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive(),4000);
+        controller.connectNode(id);QTRY_VERIFY_WITH_TIMEOUT(controller.apiHealthy(),18000);
+        controller.testNode(network.url());QTRY_VERIFY_WITH_TIMEOUT(!controller.nodeBusy(),8000);
+        QVERIFY(controller.requestSucceeded());QVERIFY(network.b.forwarded>=2);
         controller.stop();QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive(),4000);QTcpServer reuse;QVERIFY(reuse.listen(QHostAddress::LocalHost,controller.proxyPort()));
         reuse.close();imports->refreshSubscription(sid);controller.stop();
         QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),5000);QTest::qWait(300);QVERIFY(!controller.processAlive());
-        qInfo()<<"IMPORTED_REAL_CHAIN: selected A -> subscription refresh -> selected B; real owned engine restarted; no remote environment claimed";
+        qInfo()<<"IMPORTED_REAL_CHAIN: selected A remains live through refresh; manual reconnect selects B; no remote environment claimed";
     }
 };
 QTEST_GUILESS_MAIN(ImportTests)

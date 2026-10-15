@@ -16,9 +16,11 @@ Rectangle {
     }
     border.width:Theme.borderWidth
     border.color:Theme.pillRim
-    layer.enabled:subtleShadow && Theme.effectsSupported
-    layer.effect:MultiEffect {
-        shadowEnabled:true; shadowBlur:0.35; shadowVerticalOffset:3
-        shadowOpacity:Theme.dark ? 0.12 : 0.05; shadowColor:"#000000"
+    RectangularShadow {
+        anchors.fill:parent; z:-1
+        visible:surface.subtleShadow && Theme.effectsSupported
+        radius:surface.radius; blur:Theme.dp(8)
+        offset:Qt.vector2d(0,Theme.dp(3))
+        color:Theme.withAlpha("#000000",Theme.dark ? 0.12 : 0.05)
     }
 }

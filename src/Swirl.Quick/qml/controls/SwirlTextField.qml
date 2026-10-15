@@ -4,15 +4,16 @@ import SwirlQuick
 TextField {
     renderType:TextInput.NativeRendering
     font.hintingPreference:Font.PreferFullHinting
+    Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) }
     id: control
     implicitHeight:Theme.controlHeight
     leftPadding:Theme.controlPadding; rightPadding:Theme.controlPadding
-    opacity:enabled?1:0.45
-    color: Theme.text
+    color: enabled ? Theme.text : Theme.muted
     selectionColor: Theme.accent
     selectedTextColor: "white"
     placeholderTextColor: Theme.muted
     font.family: Theme.fontFamily
+    font.weight: Theme.bodyFontWeight
     font.pixelSize:Theme.fontSize(13)
     background: Rectangle {
         radius: Theme.controlRadius

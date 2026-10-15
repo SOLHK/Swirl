@@ -72,7 +72,7 @@ Item {
                     SwirlText { text:AppState.zh("耗时明细尚未采集"); color:Theme.text; font.pixelSize:Theme.fontSize(13); font.weight:Font.DemiBold; Layout.fillWidth:true }
                     SwirlText { text:AppState.zh("0           100           200           300 ms"); color:Theme.muted; font.pixelSize:Theme.fontSize(10) }
                 }
-                ListView {
+                ListView { pixelAligned: true;
                     add: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";from:0;to:1;duration:SwirlMotion.duration} }
                     remove: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.duration} }
                     move: Transition {enabled:!SwirlMotion.reduced;SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration}}
@@ -80,7 +80,7 @@ Item {
                     Layout.fillWidth:true; Layout.fillHeight:true; clip:true; spacing:Theme.dp(3)
                     model:[]
                     delegate:RowLayout {
-                        width:ListView.view.width; height:Theme.dp(20); spacing:Theme.dp(10)
+                        width:Math.floor(ListView.view.width); height:Theme.dp(20); spacing:Theme.dp(10)
                         SwirlText {
                             Layout.preferredWidth:Theme.dp(180)
                             text:modelData.method+" "+modelData.path
@@ -89,8 +89,8 @@ Item {
                         Item {
                             Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(17)
                             Rectangle {
-                                x:parent.width*Number(modelData.waterfall)/100
-                                width:Math.max(Theme.dp(6),Math.min(parent.width-x,parent.width*Number.parseInt(modelData.duration)/640))
+                                x:Math.round(parent.width*Number(modelData.waterfall)/100)
+                                width:Math.round(Math.max(Theme.dp(6),Math.min(parent.width-x,parent.width*Number.parseInt(modelData.duration)/640)))
                                 height:Theme.dp(12); radius:Theme.roundedRadius(width,height)
                                 color:page.selected&&page.selected.id===modelData.id?Theme.green:Theme.accent
                                 opacity:0.8

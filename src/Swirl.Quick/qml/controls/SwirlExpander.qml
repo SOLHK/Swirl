@@ -6,7 +6,7 @@ Item {
     property bool expanded:false
     property real reveal:expanded?1:0
     implicitHeight:body.implicitHeight*reveal
-    opacity:reveal;clip:true;enabled:expanded
+    clip:true;enabled:expanded
     Behavior on reveal{enabled:!SwirlMotion.reduced;NumberAnimation{duration:SwirlMotion.expandDuration;easing.type:Easing.OutCubic}}
     Column{id:body;width:expander.width}
 }

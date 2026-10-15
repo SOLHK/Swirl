@@ -12,7 +12,7 @@ Item {
  component Title:SwirlText {renderType:Text.NativeRendering;color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold;Layout.fillWidth:true}
  ScrollView {
   id:scroll;anchors.fill:parent;clip:true;ScrollBar.horizontal.policy:ScrollBar.AlwaysOff;ScrollBar.vertical:SwirlScrollBar {}
-  ColumnLayout {width:scroll.availableWidth;spacing:Theme.dp(14)
+  ColumnLayout {width:Math.floor(scroll.availableWidth);spacing:Theme.dp(14)
    RowLayout {Layout.fillWidth:true;Layout.margins:Theme.dp(24);Layout.bottomMargin:0
     SwirlText {renderType:Text.NativeRendering;text:"HTTPS 解密";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.Bold;Layout.fillWidth:true}
     SwirlToggle {objectName:"tlsToggle";large:true;enabled:captureProvider.tls.ready;checked:captureProvider.tls.enabled;onToggled:captureProvider.tls.enabled=checked;Accessible.name:"HTTPS 解密"}
@@ -54,8 +54,8 @@ Item {
       RowLayout {Layout.fillWidth:true;Title {text:"MitM 主机名"}SwirlText {renderType:Text.NativeRendering;text:page.domainRows.length+" 项";color:Theme.muted;font.pixelSize:Theme.fontSize(12)}}
       Note {text:"仅解密列表中的域名，支持 *.example.com 等通配符。"}
       SwirlButton {objectName:"addMitmHostname";text:"添加主机名";iconName:"plus";Layout.fillWidth:true;onClicked:hostDialog.open()}
-      ListView {Layout.fillWidth:true;Layout.preferredHeight:Math.min(Theme.dp(260),contentHeight);visible:page.domainRows.length>0;clip:true;model:page.domainRows;spacing:Theme.dp(4);ScrollBar.vertical:SwirlScrollBar {}
-       delegate:RowLayout {required property string modelData;width:ListView.view.width;height:Theme.controlHeight
+      ListView { pixelAligned: true;Layout.fillWidth:true;Layout.preferredHeight:Math.min(Theme.dp(260),contentHeight);visible:page.domainRows.length>0;clip:true;model:page.domainRows;spacing:Theme.dp(4);ScrollBar.vertical:SwirlScrollBar {}
+       delegate:RowLayout {required property string modelData;width:Math.floor(ListView.view.width);height:Theme.controlHeight
         SwirlText {renderType:Text.NativeRendering;Layout.fillWidth:true;text:modelData;color:Theme.text;font.pixelSize:Theme.fontSize(13);elide:Text.ElideRight}
         SwirlIconButton {quiet:true;iconName:"dismiss";tooltip:"删除主机名";Accessible.name:"删除 MitM 主机名";onClicked:captureProvider.tls.removeHostname(modelData)}
        }

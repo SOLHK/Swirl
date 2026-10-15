@@ -21,7 +21,7 @@ Item {
   SwirlText { text:engineController.imports.message||"管理订阅、节点更新和自动更新周期";color:Theme.muted;Layout.fillWidth:true;wrapMode:Text.Wrap;font.pixelSize:Theme.fontSize(12) }
   SwirlSearchField { id:search;Layout.fillWidth:true;placeholderText:"搜索订阅名称" }
   ScrollView { id:scroll;objectName:"subscriptionsSinglePanel";Layout.fillWidth:true;Layout.fillHeight:true;clip:true;ScrollBar.horizontal.policy:ScrollBar.AlwaysOff;ScrollBar.vertical:SwirlScrollBar {}
-   ListView { id:subscriptionList;objectName:"subscriptionList";model:subscriptionModel;spacing:Theme.gap;clip:true
+   ListView { pixelAligned: true; id:subscriptionList;objectName:"subscriptionList";model:subscriptionModel;spacing:Theme.gap;clip:true
     add:Transition{enabled:!SwirlMotion.reduced;NumberAnimation{property:"opacity";from:0;to:1;duration:SwirlMotion.duration}}
     remove:Transition{enabled:!SwirlMotion.reduced;NumberAnimation{property:"opacity";to:0;duration:SwirlMotion.exitDuration}}
     displaced:Transition{enabled:!SwirlMotion.reduced;NumberAnimation{property:"y";duration:SwirlMotion.expandDuration;easing.type:Easing.OutCubic}}
@@ -29,7 +29,7 @@ Item {
       id:provider;objectName:'subscriptionCard-'+record.id
       required property var entry;readonly property var record:entry
       expanded:page.expandedId===record.id
-      width:subscriptionList.width
+      width:Math.floor(subscriptionList.width)
       collapsedHeight:header.implicitHeight+actions.implicitHeight+2*Theme.cardPadding+Theme.dp(14)
       expandedHeight:collapsedHeight+detailBody.implicitHeight+Theme.dp(18)
       ColumnLayout {
@@ -45,7 +45,7 @@ Item {
       Item {
         x:Theme.cardPadding;y:header.y+header.implicitHeight+Theme.dp(14);width:parent.width-2*Theme.cardPadding
         height:detailBody.implicitHeight*provider.reveal;clip:true
-        opacity:Math.max(0,Math.min(1,(provider.reveal-0.20)/0.65));enabled:provider.expanded
+        enabled:provider.expanded
         ColumnLayout {id:detailBody;width:parent.width;spacing:Theme.dp(12)
           Rectangle {Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(1);color:Theme.border}
           RowLayout {Layout.fillWidth:true
@@ -87,7 +87,7 @@ Item {
         id:addDialog;objectName:"subscriptionDialog"; title:"订阅来源";onClosed:urlField.text=""
         ColumnLayout {
             width:parent.width; spacing:Theme.dp(12)
-            ScrollView {id:subscriptionForm;Layout.fillWidth:true;Layout.preferredHeight:Math.min(Theme.dp(330),page.height*0.6);clip:true;ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
+            ScrollView {id:subscriptionForm;Layout.fillWidth:true;Layout.preferredHeight:Math.floor(Math.min(Theme.dp(330),page.height*0.6));clip:true;ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
         ScrollBar.vertical:SwirlScrollBar {}
                 ColumnLayout {width:subscriptionForm.availableWidth;spacing:Theme.dp(12)
             SwirlText { text:AppState.zh("Display name"); color:Theme.text }

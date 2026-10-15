@@ -104,7 +104,7 @@ Item {
                     SwirlText { text:"功能"; font.pixelSize:Theme.fontSize(10); color:Theme.muted }
                     ScrollView {
                         Layout.fillWidth:true
-                        Layout.preferredHeight:Math.min(Theme.dp(260),page.height*0.34)
+                        Layout.preferredHeight:Math.floor(Math.min(Theme.dp(260),page.height*0.34))
                         clip:true
                         ColumnLayout {
                             width:parent.width; spacing:Theme.dp(4)
@@ -128,7 +128,7 @@ Item {
                         color:Theme.field; radius:Theme.roundedRadius(width,height); border.color:Theme.border
                         ScrollView {
                             anchors.fill:parent; anchors.margins:Theme.dp(8)
-                            TextArea {
+                            TextArea { renderType: TextEdit.NativeRendering; font.weight: Theme.bodyFontWeight; font.hintingPreference: Font.PreferFullHinting; Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) }
                                 text:"# Swirl\nfeature: "+page.selected+"\nstatus: not connected\n\n# Changes will not affect system settings."
                                 color:Theme.text
                                 font.family:"Cascadia Code"; font.pixelSize:Theme.fontSize(11)

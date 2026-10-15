@@ -41,10 +41,10 @@ Item {
     Binding { target: hero.targetItem; property: "opacity"; value: 0; when: hero.moving && hero.targetItem!==null; restoreMode: Binding.RestoreBindingOrValue }
     SwirlText {
         visible: hero.moving
-        x: hero.origin.x+(hero.targetRect.x-hero.origin.x)*hero.progress
-        y: hero.origin.y+(hero.targetRect.y-hero.origin.y)*hero.progress
-        width: hero.origin.width+(hero.targetRect.width-hero.origin.width)*hero.progress
-        height: hero.origin.height+(hero.targetRect.height-hero.origin.height)*hero.progress
+        x: Math.round(hero.origin.x+(hero.targetRect.x-hero.origin.x)*hero.progress)
+        y: Math.round(hero.origin.y+(hero.targetRect.y-hero.origin.y)*hero.progress)
+        width: Math.round(hero.origin.width+(hero.targetRect.width-hero.origin.width)*hero.progress)
+        height: Math.round(hero.origin.height+(hero.targetRect.height-hero.origin.height)*hero.progress)
         text: hero.title; textFormat: Text.PlainText; color: Theme.text
         font.family: Theme.fontFamily
         font.pixelSize: Math.round(hero.sourceFont+((hero.targetItem?hero.targetItem.font.pixelSize:hero.sourceFont)-hero.sourceFont)*hero.progress)

@@ -101,7 +101,7 @@ Item {
                     }
                     ScrollView {
                         Layout.fillWidth: true; Layout.preferredHeight: Theme.dp(138); clip: true
-                        TextArea { objectName: "captureDetail"; text: page.detailText(); readOnly: true; selectByMouse: true; color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontSize(12); wrapMode: TextEdit.Wrap; background: Item {} }
+                        TextArea { renderType: TextEdit.NativeRendering; font.weight: Theme.bodyFontWeight; font.hintingPreference: Font.PreferFullHinting; Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) } objectName: "captureDetail"; text: page.detailText(); readOnly: true; selectByMouse: true; color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontSize(12); wrapMode: TextEdit.Wrap; background: Item {} }
                     }
                 }
             }

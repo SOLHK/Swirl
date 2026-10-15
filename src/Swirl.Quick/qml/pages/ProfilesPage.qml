@@ -34,7 +34,7 @@ Item {
    SwirlTextField{id:profileName;Layout.fillWidth:true;placeholderText:"配置名称"}
    SwirlComboBox{id:profileMode;model:["rule","global","direct"];Layout.fillWidth:true}
    SwirlText {text:"JSON 字段：dns、rules、groups。保存后点击“使用配置”应用。";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.WordWrap}
-   ScrollView{Layout.fillWidth:true;Layout.fillHeight:true;clip:true;TextArea{id:profileSource;selectByMouse:true;textFormat:TextEdit.PlainText;font.family:"Cascadia Code";font.pixelSize:Theme.fontSize(12);wrapMode:TextEdit.NoWrap}}
+   ScrollView{Layout.fillWidth:true;Layout.fillHeight:true;clip:true;TextArea { renderType: TextEdit.NativeRendering; font.weight: Theme.bodyFontWeight; font.hintingPreference: Font.PreferFullHinting; Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) }id:profileSource;selectByMouse:true;textFormat:TextEdit.PlainText;font.family:"Cascadia Code";font.pixelSize:Theme.fontSize(12);wrapMode:TextEdit.NoWrap}}
    SwirlText {text:extensionsProvider.error;textFormat:Text.PlainText;color:Theme.orange;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.WordWrap}
    RowLayout{Layout.alignment:Qt.AlignRight;SwirlButton{text:"取消";onClicked:profileEditor.close()}SwirlButton{text:"保存";primary:true;enabled:profileName.text.trim().length>0;onClicked:{if(extensionsProvider.saveProfile(profileEditor.profileId,profileName.text,profileSource.text,profileMode.currentText))profileEditor.close()}}}
   }

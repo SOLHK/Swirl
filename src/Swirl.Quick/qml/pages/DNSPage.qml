@@ -21,7 +21,7 @@ Item {
  Flickable{id:dnsBody;objectName:"motion-dns-scroll";y:Theme.dp(66);width:parent.width;height:parent.height-y-Theme.dp(40);clip:true;contentWidth:width;contentHeight:Math.max(height,Theme.dp(642));boundsBehavior:Flickable.StopAtBounds
  ScrollBar.vertical:ScrollBar{policy:dnsBody.contentHeight>dnsBody.height?ScrollBar.AsNeeded:ScrollBar.AlwaysOff}
  Item{width:dnsBody.width;height:dnsBody.contentHeight
- Item{x:Theme.dp(20);y:Theme.dp(14);width:(parent.width-Theme.dp(40))/2;height:Theme.dp(305)
+ Item{x:Theme.dp(20);y:Theme.dp(14);width:Math.floor((parent.width-Theme.dp(40))/2);height:Theme.dp(305)
   Label{x:Theme.dp(8);text:"DNS 服务器";font.weight:Font.DemiBold}
   Group{y:Theme.dp(24);width:parent.width;height:Theme.dp(118)
    Column{x:Theme.dp(16);y:Theme.dp(8);spacing:0;width:parent.width-Theme.dp(32)
@@ -39,7 +39,7 @@ Item {
    Note{x:Theme.dp(16);y:Theme.dp(48);width:parent.width-Theme.dp(32);text:"如果在此配置了 DNS 服务器，传统 DNS 将仅用于连通性测试和解析服务器域名。\n支持：https://、tls:// 和 tcp://。"}
   }
  }
- Item{anchors.right:parent.right;anchors.rightMargin:Theme.dp(20);y:Theme.dp(14);width:(parent.width-Theme.dp(88))/2;height:Theme.dp(305)
+ Item{anchors.right:parent.right;anchors.rightMargin:Theme.dp(20);y:Theme.dp(14);width:Math.floor((parent.width-Theme.dp(88))/2);height:Theme.dp(305)
   Label{x:Theme.dp(8);text:"DNS 选项";font.weight:Font.DemiBold}
   Group{y:Theme.dp(24);width:parent.width;height:Theme.dp(150)
    Label{x:Theme.dp(16);y:Theme.dp(12);text:"从 hosts 中读取 DNS 记录"}

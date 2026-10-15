@@ -11,7 +11,7 @@ Item {
         Rectangle {anchors.fill:parent;color:bench.impulse?"black":"#27416B"}
         Repeater {model:bench.impulse?0:64
             Rectangle {required property int index;x:(index%8)*bench.width/8;y:Math.floor(index/8)*bench.height/8;width:bench.width/8;height:bench.height/8;color:Qt.hsla((index*0.17)%1,0.65,0.55,1);radius:Math.min(width,height)/4
-                Text {anchors.centerIn:parent;text:"Swirl "+index;color:"white";font.pixelSize:bench.height/25}
+                Text {x:Math.round((parent.width-width)/2);y:Math.round((parent.height-height)/2);text:"Swirl "+index;color:"white";font.pixelSize:Math.round(bench.height/25);font.hintingPreference:Font.PreferFullHinting;renderType:Text.NativeRendering}
             }
         }
         Rectangle {visible:bench.impulse;x:Math.floor(parent.width/2)-4;width:8;height:parent.height;color:"white"}

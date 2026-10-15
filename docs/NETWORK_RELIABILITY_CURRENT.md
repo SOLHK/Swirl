@@ -27,6 +27,14 @@
 - 后台订阅刷新只更新节点库，当前运行配置保留到用户手动断开重连。新增节点和凭据更新不会静默应用到运行中的连接。
 - 控制 API 暂时异常时，抓包入口和订阅下载继续使用仍在运行的代理端口，不因健康标志短暂失败而切为直连。
 
+### Codex 在系统代理下的路由一致性
+
+Mihomo 的智能分流配置现在把 `chatgpt.com`、`openai.com`、`oaistatic.com`、`oaiusercontent.com`、`auth0.com` 和 `statsigapi.net` 明确交给当前 `SWIRL` 节点选择器。这些域名规则位于国内域名及 IP 规则集之前，避免同一 Codex 会话中的 HTTPS / WebSocket 请求因规则集或 CDN 地址匹配而被分到直连。用户主动设置的自定义规则仍排在这些默认规则之前；切换 `SWIRL` 选中节点只影响新连接，已有连接保留原出口。Swirl 不调用 Mihomo 的连接清空接口，也不会为延迟测试自动关闭活跃业务连接。
+
+此调整参考 [openai/codex#18647](https://github.com/openai/codex/issues/18647) 的代理侧案例：报告者发现 OpenAI 专属组若固定在失效节点，而主选择器使用另一可用节点，规则模式下的流式会话会反复重连。它是用户环境中的诊断线索，并不证明本机截图的 `request timed out` 就由规则分流引起。现有日志只有脱敏的 Mihomo 握手失败事件，仍需在实际选定节点、系统代理归属和 Codex 会话中复测。
+
+另有 [openai/codex#18471](https://github.com/openai/codex/issues/18471) 的 Windows A/B 报告指出，仅设 Windows 系统代理时 Codex 的 WebSocket 路径可能没有继承该代理，显式代理环境变量才成功握手。Swirl 设置页只提供当前混合端口的进程级环境变量示例，不擅自改 Codex 的配置、用户环境变量或其传输 provider。自定义 HTTP/SSE provider 也不是 Swirl 能保证生效的 Mihomo 选项。
+
 普通明文 HTTP 请求继续沿用单请求、长度校验与关闭策略，避免将后续不同目标的代理请求误当作同一个源站字节流。此次未宣称原生普通 HTTP 支持所有连接池、分块请求或代理流水线用法；需要这些能力可选择兼容引擎。
 
 ## TLS 半关闭与主动兼容入口
@@ -69,3 +77,7 @@ Windows 策略、权限、磁盘或系统调用本身失败仍可能阻止自动
 编译和获准的纯内存检查结果由最终交付报告单独记录。所有真实 Codex 重连、长任务、节点切换、DNS/规则/TUN 与视觉结果均等待用户填写验收，当前没有人工验收通过结论。
 
 官方依据：[微软代理选项说明](https://learn.microsoft.com/zh-cn/windows/win32/api/wininet/ns-wininet-internet_per_conn_optiona)、[Mihomo KeepAlive 配置](https://github.com/MetaCubeX/Meta-Docs/blob/main/docs/config/general.en.md)、[Qt 6.8 原生 socket 关闭实现](https://github.com/qt/qtbase/blob/6.8/src/network/socket/qnativesocketengine_win.cpp)。
+
+## 多实例与端口冲突
+
+控制 API 默认尝试 9097；自动模式发现被占用时，会预留操作系统分配的空闲回环端口，配置和界面同步显示实际端口。手动指定控制端口仍严格使用指定值并报告冲突。公开代理端口不会静默更改：若 7898 被另一个 Swirl 或其他程序占用，需要关闭重复实例或在界面更换代理端口。独立节点测速使用自己的测试会话，测试成功并不等于主代理会话已连接；节点页现已明确区分。

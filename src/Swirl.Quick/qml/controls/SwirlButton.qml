@@ -11,7 +11,7 @@ SwirlMotionButton {
     property bool development: false
     Accessible.description:development?"研发中，此操作尚未实现。":""
     property string iconName: ""
-    implicitWidth: Math.max(Theme.dp(76), contents.implicitWidth + Theme.dp(24))
+    implicitWidth: Math.round(Math.max(Theme.dp(76), contents.implicitWidth + Theme.dp(24)))
     implicitHeight:Theme.controlHeight
     hoverEnabled: true
     font.family: Theme.fontFamily
@@ -29,18 +29,18 @@ SwirlMotionButton {
         opacity:control.enabled?1:0.45
     }
     contentItem: Item {
-        opacity:control.enabled?1:0.45
         implicitWidth: contents.implicitWidth
         implicitHeight: contents.implicitHeight
         RowLayout {
         id: contents
-        anchors.centerIn:parent
-        width:Math.min(implicitWidth,parent.width)
+        x:Math.round((parent.width-width)/2)
+        y:Math.round((parent.height-height)/2)
+        width:Math.round(Math.min(implicitWidth,parent.width))
         spacing:Theme.dp(8)
         SwirlIcon {
             visible: control.iconName !== ""
             name: control.iconName; size:Theme.dp(16)
-            color: control.primary ? "white" : control.danger ? Theme.red : Theme.muted
+            color: !control.enabled ? Theme.muted : control.primary ? "white" : control.danger ? Theme.red : Theme.muted
         }
         SwirlText {
             text: AppState.zh(control.text)+(control.development?" · 研发中":"")
@@ -48,7 +48,7 @@ SwirlMotionButton {
             font.pixelSize: control.font.pixelSize
             font.weight: Font.Medium
             Layout.fillWidth: true; elide: Text.ElideRight
-            color: control.primary ? "white" : control.danger ? Theme.red : Theme.text
+            color: !control.enabled ? Theme.muted : control.primary ? "white" : control.danger ? Theme.red : Theme.text
             Layout.alignment: Qt.AlignVCenter
             horizontalAlignment:Text.AlignHCenter
             verticalAlignment:Text.AlignVCenter

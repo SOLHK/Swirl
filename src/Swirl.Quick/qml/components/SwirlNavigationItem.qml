@@ -54,7 +54,7 @@ SwirlMotionButton {
             visible: !entry.compact; Layout.fillWidth: true
             text: entry.title; color: Theme.text
             font.pixelSize:Theme.fontSize(13); font.family: Theme.fontFamily
-            font.weight:entry.chosen?Font.Medium:Font.Normal
+            font.weight:entry.chosen?Font.DemiBold:Theme.bodyFontWeight
             elide: Text.ElideRight
         }
     }

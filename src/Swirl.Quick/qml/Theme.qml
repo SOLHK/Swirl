@@ -115,6 +115,8 @@ QtObject {
     readonly property real borderWidth: dp(1)
     readonly property real shadowOpacity: 0.05
     readonly property string fontFamily: fontManager.currentFamily
+    readonly property int bodyFontWeight: Font.Medium
+    function variableAxesFor(family, weight) { return fontManager.variableAxesFor(family, weight) }
     function dp(value) { return value === 0 ? 0 : Math.round(value * uiScale) }
     function fontSize(value) { return Math.max(12, Math.round(dp(value))) }
     function setScalePercent(percent) {

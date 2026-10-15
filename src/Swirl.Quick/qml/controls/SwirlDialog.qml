@@ -35,8 +35,10 @@ Dialog {
     }
     onAboutToHide:{dismissing=true;if(heroSource)heroClock.moveTo(0)}
     onClosed:{dismissals.pop(dialog);scale=1;opacity=1}
-    width: Math.min(Theme.dp(470), parent ? parent.width-Theme.dp(40) : Theme.dp(470))
-    anchors.centerIn: Overlay.overlay
+    parent:Overlay.overlay
+    width: Math.floor(Math.min(Theme.dp(470), parent ? parent.width-Theme.dp(40) : Theme.dp(470)))
+    x:parent ? Math.round((parent.width-width)/2) : 0
+    y:parent ? Math.round((parent.height-height)/2) : 0
     padding:Theme.dp(23)
     closePolicy: Popup.NoAutoClose
     Dialog {
@@ -44,7 +46,10 @@ Dialog {
         property var owner:dialog.ownerWindow
         function requestDismiss(){close()}
         modal:true;focus:true;title:"放弃未保存的修改？"
-        anchors.centerIn:Overlay.overlay;width:Math.min(Theme.dp(400),dialog.width)
+        parent:Overlay.overlay
+        width:Math.floor(Math.min(Theme.dp(400),dialog.width))
+        x:parent ? Math.round((parent.width-width)/2) : 0
+        y:parent ? Math.round((parent.height-height)/2) : 0
         closePolicy:Popup.NoAutoClose
         enter:Transition{enabled:!SwirlMotion.reduced;ParallelAnimation{NumberAnimation{property:"opacity";from:0;to:1;duration:SwirlMotion.dialogDuration}}}
         exit:Transition{enabled:!SwirlMotion.reduced;ParallelAnimation{NumberAnimation{property:"opacity";to:0;duration:SwirlMotion.exitDuration}}}
@@ -82,9 +87,9 @@ Dialog {
         id:heroBackground
         readonly property point origin:dialog.heroSource?dialog.heroSource.mapToItem(heroBackground,0,0):Qt.point(0,0)
         SwirlContinuousSurface {
-            x:heroBackground.origin.x*(1-dialog.heroProgress);y:heroBackground.origin.y*(1-dialog.heroProgress)
-            width:dialog.heroSource?dialog.heroSource.width+(parent.width-dialog.heroSource.width)*dialog.heroProgress:parent.width
-            height:dialog.heroSource?dialog.heroSource.height+(parent.height-dialog.heroSource.height)*dialog.heroProgress:parent.height
+            x:Math.round(heroBackground.origin.x*(1-dialog.heroProgress));y:Math.round(heroBackground.origin.y*(1-dialog.heroProgress))
+            width:Math.round(dialog.heroSource?dialog.heroSource.width+(parent.width-dialog.heroSource.width)*dialog.heroProgress:parent.width)
+            height:Math.round(dialog.heroSource?dialog.heroSource.height+(parent.height-dialog.heroSource.height)*dialog.heroProgress:parent.height)
             color: Theme.material("floating")
             radius:Theme.dp(dialog.heroSource?10+17*dialog.heroProgress:27)
             antialiasing:true; border.width:Theme.dp(1);border.color:Theme.glassRim

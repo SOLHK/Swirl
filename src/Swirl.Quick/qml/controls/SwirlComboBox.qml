@@ -8,24 +8,27 @@ ComboBox {
     hoverEnabled: true
     // Let ComboBox own pointer grabs, keyboard activation and popup focus.
     // Opening its popup through an overlay MouseArea bypasses that lifecycle.
-    opacity:enabled?1:0.45
     focusPolicy:Qt.StrongFocus
     font.family: Theme.fontFamily
+    font.weight: Theme.bodyFontWeight
     font.hintingPreference:Font.PreferFullHinting
+    Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) }
     font.pixelSize:Theme.fontSize(13)
     leftPadding:Theme.controlPadding; rightPadding:Theme.dp(28)
     topPadding:Theme.dp(4); bottomPadding:Theme.dp(4)
     contentItem: SwirlText {renderType:Text.NativeRendering;
         text: AppState.zh(control.displayText)
-        color: Theme.text
-        font: control.font
+        color: control.enabled ? Theme.text : Theme.muted
+        font.family: control.font.family
+        font.pixelSize: control.font.pixelSize
+        font.weight: control.font.weight
         verticalAlignment: Text.AlignVCenter
         horizontalAlignment:Text.AlignLeft
         elide: Text.ElideRight
         leftPadding:0; rightPadding:0
     }
     indicator: Image {
-        x:control.width-width-Theme.dp(6);y:(control.height-height)/2;width:Theme.dp(14);height:width
+        x:Math.round(control.width-width-Theme.dp(6));y:Math.round((control.height-height)/2);width:Theme.dp(14);height:width
         source:"image://swirl/chevron-up-down/"+Theme.text.toString().slice(1)
     }
     background: SwirlContinuousSurface {
@@ -81,7 +84,7 @@ ComboBox {
             radius: Theme.popupRadius; antialiasing:true
             border.width:Theme.dp(1); border.color: Theme.pillRim
         }
-        contentItem: ListView {
+        contentItem: ListView { pixelAligned: true;
                     add: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";to:1;duration:SwirlMotion.duration} }
                     remove: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.duration} }
                     move: Transition {enabled:!SwirlMotion.reduced;SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration}}

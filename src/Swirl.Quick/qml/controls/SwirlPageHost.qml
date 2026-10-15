@@ -38,7 +38,7 @@ Item {
     property bool initialized: false
     clip: moving
     Item { id:viewport; anchors.fill:parent; clip:host.contained || host.moving }
-    function snap(value) { return Math.round(value*Screen.devicePixelRatio)/Screen.devicePixelRatio }
+    function snap(value) { return Math.round(value) }
     function pageOffset(route) { return route === "overview" || route === "activity" ? 0 : Theme.dp(0) }
     function settleLayout(root) {
         if(!root)return
@@ -119,8 +119,8 @@ Item {
         z:40;visible:host.heroData!==null && host.moving
         x:host.snap(host.surfaceStart.x+(host.surfaceEnd.x-host.surfaceStart.x)*host.position)
         y:host.snap(host.surfaceStart.y+(host.surfaceEnd.y-host.surfaceStart.y)*host.position)
-        width:host.surfaceStart.width+(host.surfaceEnd.width-host.surfaceStart.width)*host.position
-        height:host.surfaceStart.height+(host.surfaceEnd.height-host.surfaceStart.height)*host.position
+        width:host.snap(host.surfaceStart.width+(host.surfaceEnd.width-host.surfaceStart.width)*host.position)
+        height:host.snap(host.surfaceStart.height+(host.surfaceEnd.height-host.surfaceStart.height)*host.position)
         opacity:host.heroData && host.heroData.reverse?Math.min(1,host.position*4):Math.min(1,(1-host.position)*4)
     }
     NumberAnimation { id:travel; target:host; property:"progress"; from:0; to:1; duration:host.heroData?SwirlMotion.expandDuration:SwirlMotion.pageDuration; easing.type:Easing.OutCubic; onFinished:host.finish() }

@@ -5,6 +5,7 @@ import "../components"
 TextField {
     renderType:TextInput.NativeRendering
     font.hintingPreference:Font.PreferFullHinting
+    Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) }
     id: control
     property bool borderless:false
     implicitHeight:Theme.controlHeight
@@ -14,11 +15,11 @@ TextField {
     rightPadding: Theme.dp(control.objectName === "pageSearch" && control.width > Theme.dp(130) ? 64 : 15)
     placeholderText: "搜索"
     placeholderTextColor: Theme.muted
-    opacity:enabled?1:0.45
-    color: Theme.text
+    color: enabled ? Theme.text : Theme.muted
     selectedTextColor: "white"
     selectionColor: Theme.accent
     font.family: Theme.fontFamily
+    font.weight: Theme.bodyFontWeight
     font.pixelSize:Theme.fontSize(13)
     background: SwirlPillSurface {
         hovered:control.hovered||control.activeFocus

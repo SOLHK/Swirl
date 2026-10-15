@@ -36,7 +36,7 @@ Item {
                     ColumnLayout {
                     width:detailScroll0.availableWidth; height:Math.max(implicitHeight,detailScroll0.availableHeight); spacing:Theme.dp(9)
                     SwirlText { text:"网络实用工具"; color:Theme.muted; font.pixelSize:Theme.fontSize(11); leftPadding:Theme.dp(8) }
-                    ListView {
+                    ListView { pixelAligned: true;
                     add: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";from:0;to:1;duration:SwirlMotion.duration} }
                     remove: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.duration} }
                     move: Transition {enabled:!SwirlMotion.reduced;SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration}}
@@ -44,7 +44,7 @@ Item {
                         Layout.fillWidth:true; Layout.fillHeight:true; clip:true; spacing:Theme.dp(4)
                         model:page.tools
                         delegate:Rectangle {
-                            width:ListView.view.width; height:Theme.dp(40); radius:Theme.roundedRadius(width,height)
+                            width:Math.floor(ListView.view.width); height:Theme.dp(40); radius:Theme.roundedRadius(width,height)
                             color:page.tool===modelData?Theme.selected:area.containsMouse?Theme.hover:"transparent"
                             RowLayout {
                                 anchors.fill:parent; anchors.leftMargin:Theme.dp(10)
@@ -101,7 +101,7 @@ Item {
                         color:Theme.field; border.color:Theme.border; radius:Theme.roundedRadius(width,height)
                         ScrollView {
                             anchors.fill:parent; anchors.margins:Theme.dp(12)
-                            TextArea {
+                            TextArea { renderType: TextEdit.NativeRendering; font.weight: Theme.bodyFontWeight; font.hintingPreference: Font.PreferFullHinting; Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) }
                                 readOnly:true; selectByMouse:true
                                 text:page.result
                                 color:Theme.text

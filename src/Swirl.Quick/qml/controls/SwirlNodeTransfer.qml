@@ -13,10 +13,10 @@ Item {
         const p=targetSlot.mapToItem(transfer.parent,0,0)
         return Qt.rect(p.x,p.y,targetSlot.width,targetSlot.height)
     }
-    readonly property real cardX:moving?origin.x+(destination.x-origin.x)*progress:destination.x
-    readonly property real cardY:moving?origin.y+(destination.y-origin.y)*progress:destination.y
-    readonly property real cardWidth:moving?origin.width+(destination.width-origin.width)*progress:destination.width
-    readonly property real cardHeight:moving?origin.height+(destination.height-origin.height)*progress:destination.height
+    readonly property real cardX:Math.round(moving?origin.x+(destination.x-origin.x)*progress:destination.x)
+    readonly property real cardY:Math.round(moving?origin.y+(destination.y-origin.y)*progress:destination.y)
+    readonly property real cardWidth:Math.round(moving?origin.width+(destination.width-origin.width)*progress:destination.width)
+    readonly property real cardHeight:Math.round(moving?origin.height+(destination.height-origin.height)*progress:destination.height)
     readonly property real reveal:moving?progress:1
     function start(row){
         const current=moving?Qt.rect(cardX,cardY,cardWidth,cardHeight):null

@@ -84,7 +84,7 @@ Item {
                     SwirlText {text:"条目与优先级 · "+page.records.length+" 项";color:Theme.text;font.pixelSize:Theme.fontSize(18);Layout.fillWidth:true}
                     SwirlButton {objectName:"moduleAddButton";text:"添加条目";primary:true;font.pixelSize:Theme.fontSize(15);onClicked:{page.editing=-1;nameField.text="";valueField.text="";rowDialog.open()}}
                 }
-                ListView {
+                ListView { pixelAligned: true;
                     objectName:"motion-record-list"
                     add: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";from:0;to:1;duration:SwirlMotion.duration} }
                     remove: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.duration} }
@@ -95,7 +95,7 @@ Item {
                         required property int index
                         required property var entry
                         readonly property var modelData:entry
-                        width:ListView.view.width;height:Theme.dp(72);radius:Theme.controlRadius;color:Theme.material("field")
+                        width:Math.floor(ListView.view.width);height:Theme.dp(72);radius:Theme.controlRadius;color:Theme.material("field")
                         RowLayout {
                             anchors.fill:parent;anchors.margins:Theme.dp(12);spacing:Theme.dp(12)
                             SwirlToggle {checked:modelData.enabled!==false;onToggled:{var rows=page.records.slice();rows[index]=Object.assign({},modelData,{enabled:checked});page.records=rows;page.dirty=true}}

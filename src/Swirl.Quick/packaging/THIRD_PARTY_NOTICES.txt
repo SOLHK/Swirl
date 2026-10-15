@@ -27,6 +27,13 @@ Module-specific license and third-party metadata:
 https://code.qt.io/cgit/qt/qtbase.git/tree/LICENSES?h=v6.10.3
 https://code.qt.io/cgit/qt/qtdeclarative.git/tree/LICENSES?h=v6.10.3
 
+FreeType 2.14.2, bundled inside Qt, is used for Windows font rasterization.
+Portions of this software are copyright (C) 1996-2025 The FreeType Project
+(https://freetype.org/). All rights reserved.
+License: licenses/FreeType-FTL.txt
+Corresponding Qt-vendored source:
+https://github.com/qt/qtbase/tree/v6.10.3/src/3rdparty/freetype
+
 MinGW builds also contain GCC/libstdc++ runtime libraries under GPL version 3
 with the GCC Runtime Library Exception (see licenses/). Source and notices:
 https://gcc.gnu.org/releases.html

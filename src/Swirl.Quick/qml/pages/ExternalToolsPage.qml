@@ -33,9 +33,9 @@ Item {
    SwirlText {text:"网络控制与调试";color:Theme.text;font.family:Theme.fontFamily;font.pixelSize:Theme.fontSize(15);font.weight:Font.Medium}
    SwirlSegmentedControl{Layout.fillWidth:true;options:["按客户端","按主机名"];currentIndex:page.filterIndex;onActivated:index=>page.filterIndex=index}
    SwirlButton{Layout.fillWidth:true;text:"全部 · "+page.sourceRows.length;quiet:page.selectedGroup!=="";onClicked:page.selectedGroup=""}
-   ListView{
+   ListView { pixelAligned: true;
     Layout.fillWidth:true;Layout.fillHeight:true;clip:true;spacing:Theme.dp(4);model:page.groupNames
-    delegate:SwirlButton{required property string modelData;width:ListView.view.width;text:modelData;quiet:page.selectedGroup!==modelData;onClicked:page.selectedGroup=modelData}
+    delegate:SwirlButton{required property string modelData;width:Math.floor(ListView.view.width);text:modelData;quiet:page.selectedGroup!==modelData;onClicked:page.selectedGroup=modelData}
     ScrollBar.vertical:SwirlScrollBar{}
    }
    SwirlText {text:engineController.connected?"引擎已连接":"引擎未连接";color:engineController.connected?Theme.green:Theme.muted;font.pixelSize:Theme.fontSize(12)}

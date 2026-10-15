@@ -35,6 +35,7 @@ QByteArray protectLanPassword(const QByteArray &input,bool decrypt) {
 }
 EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject *parent, QString storePath,bool realAcceptance)
     : QObject(parent), m_engine(std::move(engine)), m_store(storePath),m_imports(&m_store,this),m_telemetry(storePath.isEmpty()?QString():storePath+".telemetry",storePath.isEmpty()||realAcceptance) {
+    m_options.autoControlPort=true;
     connect(m_engine.get(),&ProxyEngine::statusChanged,this,[this]{m_telemetry.ingest(m_engine->status());});
     connect(&m_telemetry,&TelemetryService::changed,this,&EngineController::statusChanged);
     connect(&m_tests,&NodeTestService::changed,this,&EngineController::nodesChanged);
@@ -76,6 +77,10 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
     if(m_options.routingMode!="rule"&&m_options.routingMode!="global"&&m_options.routingMode!="direct")m_options.routingMode="rule";
     if(m_options.meteredNetwork)m_options.routingMode="rule";
     connect(m_engine.get(),&ProxyEngine::statusChanged,this,[this] {
+        const int runtimePort=QUrl(m_engine->status().controlEndpoint).port();
+        if(m_options.autoControlPort && runtimePort>0 && runtimePort!=m_options.controlPort){
+            m_options.controlPort=quint16(runtimePort);emit optionsChanged();
+        }
         const auto s=m_engine->status();
         m_diagnostics.setProxyPort(s.processAlive?s.proxyPort:0);
         if(s.state!=m_previousEngineState){
@@ -121,7 +126,8 @@ void EngineController::setExecutablePath(const QString &path) {
     m_options.executablePath = path; emit optionsChanged();
 }
 void EngineController::setControlPort(int port) {
-    if (!canStart() || port < 1 || port > 65535 || m_options.controlPort == port) return;
+    if (!canStart() || port < 1 || port > 65535) return;
+    m_options.autoControlPort=false;
     m_options.controlPort = quint16(port); emit optionsChanged();
 }
 QString EngineController::stateText() const {

@@ -62,7 +62,7 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
   check(origin&&origin->property("transfer").toDouble()==0&&origin->hasActiveFocus(),"return restores originating card geometry and keyboard focus");
   click("settings-subscriptions");wait(350);check(settingsPage&&eval("settingsLoader.item").value<QObject *>()==settingsPage,"secondary route cache retains the original subscription page");QTest::keyClick(sheet,Qt::Key_Escape);wait(350);
   click("settings-fonts");wait(350);
-  check(sheet->isVisible()&&eval("settingsLoader.item.section==='字体' && Theme.fontFamily===fontManager.defaultFamily").toBool(),"More font entry opens the real default HarmonyOS font settings");
+  check(sheet->isVisible()&&eval("settingsLoader.item.section==='字体' && Theme.fontFamily===fontManager.defaultFamily").toBool(),"More font entry opens the platform default font settings");
   check(find(sheet->contentItem(),"fontFamilyList")&&find(sheet->contentItem(),"fontImport")&&find(sheet->contentItem(),"fontReset"),"font chooser, import and reset controls are available in the native settings window");
   if(!qApp->arguments().contains("--hero-no-recording"))sheet->grabWindow().save(directory+"/font-settings.png");
   QTest::keyClick(sheet,Qt::Key_Escape);wait(350);

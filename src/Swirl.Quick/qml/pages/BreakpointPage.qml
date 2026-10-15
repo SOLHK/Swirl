@@ -71,7 +71,7 @@ Item {
                         radius:Theme.roundedRadius(width,height); color:Theme.field; border.color:Theme.border
                         ScrollView {
                             anchors.fill:parent; anchors.margins:Theme.dp(8)
-                            TextArea {
+                            TextArea { renderType: TextEdit.NativeRendering; font.weight: Theme.bodyFontWeight; font.hintingPreference: Font.PreferFullHinting; Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) }
                                 id:editor
                                 text:"研发中；没有被拦截的请求。"
                                 color:Theme.text; font.family:"Cascadia Code"; font.pixelSize:Theme.fontSize(12)

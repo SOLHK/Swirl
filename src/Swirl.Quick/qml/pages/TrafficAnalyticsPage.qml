@@ -13,7 +13,7 @@ Item {
  property string kind:"domains"
  readonly property var totals:(telemetry.revision,telemetry.summary(period))
  ScrollView { id:scroll;anchors.fill:parent;clip:true;ScrollBar.horizontal.policy:ScrollBar.AlwaysOff;ScrollBar.vertical:SwirlScrollBar {}
-  ColumnLayout { width:scroll.availableWidth;spacing:Theme.gap
+  ColumnLayout { width:Math.floor(scroll.availableWidth);spacing:Theme.gap
    RowLayout { Layout.fillWidth:true
     SwirlText { text:"流量分析";font.pixelSize:Theme.fontSize(30);font.weight:Font.DemiBold;color:Theme.text;Layout.fillWidth:true }
     SwirlButton {text:"返回";visible:SwirlMotion.returnShared && SwirlMotion.returnShared.route===AppState.currentPage;onClicked:SwirlMotion.returnToHub(totalTraffic)}

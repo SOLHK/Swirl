@@ -21,7 +21,7 @@ Item {
                 ColumnLayout {
                     anchors.fill:parent; anchors.margins:Theme.dp(12); spacing:Theme.dp(8)
                     SwirlText { text:AppState.zh("PREFERENCES"); color:Theme.muted; font.pixelSize:Theme.fontSize(11); leftPadding:Theme.dp(8); topPadding:Theme.dp(6) }
-                    ListView {
+                    ListView { pixelAligned: true;
                     add: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";from:0;to:1;duration:SwirlMotion.duration} }
                     remove: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.duration} }
                     move: Transition {enabled:!SwirlMotion.reduced;SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration}}
@@ -120,8 +120,8 @@ Item {
                                         Binding { target:scaleSlider; property:"value"; value:Theme.uiScale; when:!scaleSlider.pressed }
                                     background: Rectangle {
                                         x: scaleSlider.leftPadding
-                                        y: scaleSlider.topPadding + scaleSlider.availableHeight / 2 - height / 2
-                                        width: scaleSlider.availableWidth
+                                        y: Math.round(scaleSlider.topPadding + scaleSlider.availableHeight / 2 - height / 2)
+                                        width: Math.round(scaleSlider.availableWidth)
                                         height:Theme.dp(7)
                                         radius:Theme.roundedRadius(width,height)
                                         color: Theme.material("field")
@@ -130,13 +130,13 @@ Item {
                                         Rectangle {
                                             height: parent.height
                                             radius:Theme.roundedRadius(width,height)
-                                            width: scaleSlider.visualPosition * parent.width
+                                            width: Math.round(scaleSlider.visualPosition * parent.width)
                                             color: Theme.accent
                                         }
                                     }
                                     handle: Rectangle {
-                                        x: scaleSlider.leftPadding + scaleSlider.visualPosition * (scaleSlider.availableWidth - width)
-                                        y: scaleSlider.topPadding + scaleSlider.availableHeight / 2 - height / 2
+                                        x: Math.round(scaleSlider.leftPadding + scaleSlider.visualPosition * (scaleSlider.availableWidth - width))
+                                        y: Math.round(scaleSlider.topPadding + scaleSlider.availableHeight / 2 - height / 2)
                                         implicitWidth:Theme.dp(20); implicitHeight:Theme.dp(20)
                                         radius:Theme.roundedRadius(width,height)
                                         color: "#FBFDFF"
@@ -212,7 +212,7 @@ Item {
                             }
                             SwirlText { text:engineController.diagnostics.stateText; color:Theme.muted; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
                             SwirlText { text:"仅点击后向所填目标发送请求：本机端口 → CONNECT → TLS / HTTP 或 WebSocket Upgrade 与随机 Ping/Pong。地址可能需要登录或子协议；诊断失败不等于 Codex 服务故障，10 秒观察不代替长期实测。"; color:Theme.muted; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
-                            TextArea { readOnly:true; selectByMouse:true; visible:engineController.diagnostics.entries.length>0; text:engineController.diagnostics.report; Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(160); wrapMode:TextEdit.Wrap; font.family:Theme.fontFamily; font.pixelSize:Theme.fontSize(12); renderType:TextEdit.NativeRendering; color:Theme.text; background:Rectangle { color:Theme.surface; radius:Theme.dp(14); border.color:Theme.border } }
+                            TextArea { renderType: TextEdit.NativeRendering; font.weight: Theme.bodyFontWeight; font.hintingPreference: Font.PreferFullHinting; Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) } readOnly:true; selectByMouse:true; visible:engineController.diagnostics.entries.length>0; text:engineController.diagnostics.report; Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(160); wrapMode:TextEdit.Wrap; font.family:Theme.fontFamily; font.pixelSize:Theme.fontSize(12); color:Theme.text; background:Rectangle { color:Theme.surface; radius:Theme.dp(14); border.color:Theme.border } }
                             RowLayout {
                                 SwirlButton { text:"保存诊断报告"; onClicked:{const path=engineController.diagnostics.saveReport();AppState.notice(path.length>0?"诊断报告已保存："+path:"无法保存诊断报告")} }
                                 SwirlButton { text:"清空记录"; enabled:!engineController.diagnostics.busy; onClicked:engineController.diagnostics.clear() }
@@ -224,7 +224,7 @@ Item {
                                 SwirlToggle { checked:engineController.preferCompatibility; enabled:engineController.canStart; onToggled:engineController.preferCompatibility=checked }
                             }
                             SwirlText { text:"断开后修改并重新连接生效，节点、DNS、规则和 TUN 配置保持原值。依赖 TLS EOF 定界或原生协议尚不兼容时可主动启用。"; color:Theme.muted; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
-                            TextArea { readOnly:true; selectByMouse:true; text:engineController.proxyEnvironmentAdvice; Layout.fillWidth:true; wrapMode:TextEdit.Wrap; font.family:Theme.fontFamily; font.pixelSize:Theme.fontSize(12); renderType:TextEdit.NativeRendering; color:Theme.text; background:null }
+                            TextArea { renderType: TextEdit.NativeRendering; font.weight: Theme.bodyFontWeight; font.hintingPreference: Font.PreferFullHinting; Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) } readOnly:true; selectByMouse:true; text:engineController.proxyEnvironmentAdvice; Layout.fillWidth:true; wrapMode:TextEdit.Wrap; font.family:Theme.fontFamily; font.pixelSize:Theme.fontSize(12); color:Theme.text; background:null }
                             SwirlText { text:"原生隧道取消 120 秒空闲断开，采用 TCP KeepAlive；节点切换对新连接生效，现有连接保持原出口。DNS、国内外分流、用户规则、策略组和 TUN 沿用当前配置。原生 TLS 上游保留反向读取，但 Qt 不支持独立 TLS 半关闭；依赖 EOF 定界的 TLS 请求仍需兼容引擎。"; color:Theme.muted; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
                             Rectangle { Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(1); color:Theme.border }
                             RowLayout {

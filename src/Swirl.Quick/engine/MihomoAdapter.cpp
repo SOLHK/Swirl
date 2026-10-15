@@ -201,6 +201,8 @@ bool MihomoAdapter::prepareConfiguration() {
             m_generatedConfig += QStringLiteral(
                 "rule-providers:\n  cn-domain:\n    type: file\n    behavior: domain\n    format: mrs\n    path: ./cn-domain.mrs\n"
                 "  cn-ip:\n    type: file\n    behavior: ipcidr\n    format: mrs\n    path: ./cn-ip.mrs\n");
+            // Keep Codex HTTPS and WebSocket hosts on the active SWIRL selector
+            // before a CN ruleset or CDN IP can route one endpoint directly.
             m_generatedConfig.replace("rules: []\n",QStringLiteral(
                 "rules:\n  - IP-CIDR,127.0.0.0/8,DIRECT,no-resolve\n  - IP-CIDR,10.0.0.0/8,DIRECT,no-resolve\n"
                 "  - IP-CIDR,172.16.0.0/12,DIRECT,no-resolve\n  - IP-CIDR,192.168.0.0/16,DIRECT,no-resolve\n"
@@ -212,6 +214,9 @@ bool MihomoAdapter::prepareConfiguration() {
                 "  - DOMAIN-SUFFIX,googleusercontent.com,SWIRL\n  - DOMAIN-SUFFIX,youtube.com,SWIRL\n"
                 "  - DOMAIN-SUFFIX,youtu.be,SWIRL\n  - DOMAIN-SUFFIX,ytimg.com,SWIRL\n"
                 "  - DOMAIN-SUFFIX,googlevideo.com,SWIRL\n  - DOMAIN-SUFFIX,ggpht.com,SWIRL\n"
+                "  - DOMAIN-SUFFIX,chatgpt.com,SWIRL\n  - DOMAIN-SUFFIX,openai.com,SWIRL\n"
+                "  - DOMAIN-SUFFIX,oaistatic.com,SWIRL\n  - DOMAIN-SUFFIX,oaiusercontent.com,SWIRL\n"
+                "  - DOMAIN-SUFFIX,auth0.com,SWIRL\n  - DOMAIN-SUFFIX,statsigapi.net,SWIRL\n"
                 "  - RULE-SET,cn-domain,DIRECT\n  - RULE-SET,cn-ip,DIRECT\n  - MATCH,SWIRL\n"));
             // Internal DNS serves Mihomo only: no system DNS or listener changes.
             // Foreign domain resolution uses DoH through SWIRL; proxy bootstrap
@@ -284,7 +289,20 @@ bool MihomoAdapter::prepareConfiguration() {
     return file.write(bytes) == bytes.size() && file.commit();
 }
 
-bool MihomoAdapter::reserveControlPort() { return reservePort(m_reservation,m_options.controlPort); }
+bool MihomoAdapter::reserveControlPort() {
+    if(reservePort(m_reservation,m_options.controlPort))return true;
+    if(!m_options.autoControlPort)return false;
+    // The authenticated controller is private to this session. Keep a real
+    // reservation on an OS-assigned port instead of colliding with another app.
+    for(int attempt=0;attempt<3;++attempt){
+        if(!reservePort(m_reservation,0))return false;
+        if(m_reservation.serverPort()!=m_options.proxyPort){
+            m_options.controlPort=m_reservation.serverPort();return true;
+        }
+        m_reservation.close();
+    }
+    return false;
+}
 bool MihomoAdapter::reservePort(QTcpServer &server, quint16 port) {
 #ifdef Q_OS_WIN
     // A wildcard listener using SO_REUSEADDR can coexist with a specific bind
@@ -382,12 +400,13 @@ void MihomoAdapter::start(const EngineStartOptions &options) {
         fail(Error::PortConflict, QStringLiteral("本机控制端口 %1 已占用或不允许绑定；请更换端口。").arg(options.controlPort));
         unlockExecutable(); return;
     }
+    m_status.controlEndpoint=QStringLiteral("http://127.0.0.1:%1").arg(m_options.controlPort);
     if (!prepareConfiguration()) {
         fail(Error::ConfigurationFailed, QStringLiteral("无法创建安全运行配置，或国内规则数据缺失/哈希校验失败。请修复安装，未使用空规则回退。"));
         unlockExecutable(); return;
     }
     if ((!options.selectedNodeId.isEmpty()||options.directSession) && !reservePort(m_proxyReservation,options.proxyPort)) {
-        fail(Error::PortConflict,QStringLiteral("本机代理端口 %1 已占用或不允许绑定。").arg(options.proxyPort));
+        fail(Error::PortConflict,QStringLiteral("本机代理端口 %1 已占用或不允许绑定。请检查是否同时运行了多个 Swirl 或其他代理程序，或更换设置中的本机代理端口。").arg(options.proxyPort));
         unlockExecutable(); m_directory.reset(); return;
     }
     m_deadline.start(options.startupTimeoutMs);

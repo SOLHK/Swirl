@@ -20,7 +20,7 @@ Item {
   id:scroll;anchors.fill:parent;anchors.margins:Theme.dp(24);clip:true
   ScrollBar.horizontal.policy:ScrollBar.AlwaysOff;ScrollBar.vertical:SwirlScrollBar {}
  ColumnLayout {
-  width:scroll.availableWidth;spacing:Theme.dp(16)
+  width:Math.floor(scroll.availableWidth);spacing:Theme.dp(16)
   SwirlText {renderType:Text.NativeRendering;text:"策略";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.Bold}
   SwirlSegmentedControl {Layout.fillWidth:true;Layout.maximumWidth:Theme.dp(600);rounded:true;objectName:"routingModePicker";optionIcons:["code","network","route"];options:["直接连接","全局代理","规则判定"];textPixelSize:13;accentSelection:true;currentIndex:page.modeIndex;enabled:!page.engineController.busy&&!page.engineController.routingBusy;onActivated:index=>page.engineController.setRoutingMode(["direct","global","rule"][index])}
   SwirlText {renderType:Text.NativeRendering;text:["直接连接目标服务器。","所有流量通过代理处理。","根据规则系统判定处理方式。"][page.modeIndex];color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
@@ -29,7 +29,7 @@ Item {
    Grid {id:nodeGrid;x:Theme.dp(16);y:Theme.dp(16);width:parent.width-Theme.dp(32);columns:page.nodeColumns;spacing:Theme.dp(12)
     Repeater {model:page.engineController.nodes.slice(page.nodePage*page.nodesPerPage,(page.nodePage+1)*page.nodesPerPage)
      SwirlMotionButton {
-      id:node;required property var modelData;width:(nodeGrid.width-(nodeGrid.columns-1)*nodeGrid.spacing)/nodeGrid.columns;height:Theme.dp(94);padding:Theme.dp(12);hoverEnabled:true
+      id:node;required property var modelData;width:Math.floor((nodeGrid.width-(nodeGrid.columns-1)*nodeGrid.spacing)/nodeGrid.columns);height:Theme.dp(94);padding:Theme.dp(12);hoverEnabled:true
       background:Rectangle {radius:Theme.controlRadius;color:node.down?Theme.pressed:node.hovered?Theme.hover:node.modelData.id===page.engineController.selectedNodeId?Theme.selected:Theme.field;border.width:node.activeFocus?2:1;border.color:node.activeFocus?Theme.focusBorder:Theme.border}
       contentItem:ColumnLayout {spacing:Theme.dp(8)
        SwirlText {renderType:Text.NativeRendering;Layout.fillWidth:true;Layout.fillHeight:true;text:node.modelData.name;color:Theme.text;font.pixelSize:Theme.fontSize(13);wrapMode:Text.Wrap;maximumLineCount:2;elide:Text.ElideRight}
@@ -48,11 +48,11 @@ Item {
   }
   }
   RowLayout {Layout.fillWidth:true;SwirlText {renderType:Text.NativeRendering;text:"策略组";color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold;Layout.fillWidth:true}SwirlButton {objectName:"addPolicyGroup";text:"添加策略组";onClicked:page.editGroup(null,null)}}
-  ListView {
+  ListView { pixelAligned: true;
    Layout.fillWidth:true;Layout.preferredHeight:page.groups.length===0?Theme.dp(130):Math.min(Theme.dp(400),contentHeight);spacing:Theme.dp(12);clip:true;model:groupModel;ScrollBar.vertical:SwirlScrollBar {}
    SwirlEmptyState {anchors.centerIn:parent;width:parent.width;visible:page.groups.length===0;headline:"尚无策略组";detail:"添加策略组以组织节点与路由。"}
    delegate:SwirlMotionButton {
-    id:group;required property var entry;readonly property var modelData:entry;objectName:"policyCard-"+modelData.name;width:ListView.view.width;height:Math.max(Theme.dp(88),contentItem.implicitHeight+2*Theme.cardPadding);padding:Theme.cardPadding
+    id:group;required property var entry;readonly property var modelData:entry;objectName:"policyCard-"+modelData.name;width:Math.floor(ListView.view.width);height:Math.ceil(Math.max(Theme.dp(88),contentItem.implicitHeight+2*Theme.cardPadding));padding:Theme.cardPadding
     background:SwirlContinuousSurface {radius:Theme.dp(20);color:Theme.field;border.width:Theme.borderWidth;border.color:Theme.border}
     contentItem:RowLayout {SwirlIcon {name:"layers";color:Theme.accent;size:Theme.dp(28)}ColumnLayout {Layout.fillWidth:true;SwirlText {renderType:Text.NativeRendering;Layout.fillWidth:true;wrapMode:Text.Wrap;text:group.modelData.name;color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold}SwirlText {renderType:Text.NativeRendering;text:group.modelData.type+" · "+group.modelData.proxies.length+" 个子策略";color:Theme.muted;font.pixelSize:Theme.fontSize(12)}}SwirlIcon {name:"chevron-right";size:Theme.dp(18)}}
     onClicked:page.editGroup(modelData,group)
@@ -66,9 +66,9 @@ Item {
    SwirlTextField {id:groupName;objectName:"policyGroupName";Layout.fillWidth:true;placeholderText:"策略组名称";readOnly:groupEditor.groupName.length>0}
    SwirlComboBox {id:groupType;objectName:"policyGroupType";Layout.fillWidth:true;model:["手动选择","自动测试","故障转移","负载均衡"]}
    SwirlText {renderType:Text.NativeRendering;text:"子策略";color:Theme.text;font.pixelSize:Theme.fontSize(13)}
-   ListView {
+   ListView { pixelAligned: true;
     Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(190);clip:true;model:[{id:"DIRECT",name:"DIRECT"},{id:"REJECT",name:"REJECT"}].concat(page.engineController.nodes);ScrollBar.vertical:SwirlScrollBar {}
-    delegate:ReferenceCheckBox {required property var modelData;width:ListView.view.width;text:modelData.name;checked:groupEditor.members.indexOf(modelData.id)>=0;onToggled:{const id=modelData.id;groupEditor.members=checked?groupEditor.members.concat([id]):groupEditor.members.filter(member=>member!==id)}}
+    delegate:ReferenceCheckBox {required property var modelData;width:Math.floor(ListView.view.width);text:modelData.name;checked:groupEditor.members.indexOf(modelData.id)>=0;onToggled:{const id=modelData.id;groupEditor.members=checked?groupEditor.members.concat([id]):groupEditor.members.filter(member=>member!==id)}}
    }
    SwirlText {renderType:Text.NativeRendering;text:page.engineController.networkConfigurationError;color:Theme.orange;Layout.fillWidth:true;wrapMode:Text.WordWrap;font.pixelSize:Theme.fontSize(12)}
    RowLayout {Layout.alignment:Qt.AlignRight

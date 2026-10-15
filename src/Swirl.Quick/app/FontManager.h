@@ -2,6 +2,8 @@
 #include <QObject>
 #include <QStringList>
 #include <QUrl>
+#include <QVariantMap>
+#include <QHash>
 
 class FontManager final : public QObject {
     Q_OBJECT
@@ -12,6 +14,7 @@ class FontManager final : public QObject {
     Q_PROPERTY(QString licenseText READ licenseText CONSTANT)
 public:
     explicit FontManager(QObject *parent=nullptr, const QString &storageDirectory=QString());
+    ~FontManager() override;
     QString currentFamily() const { return m_family; }
     QString defaultFamily() const { return m_defaultFamily; }
     QStringList families() const;
@@ -19,6 +22,7 @@ public:
     QString licenseText() const;
     Q_INVOKABLE bool selectFamily(const QString &family);
     Q_INVOKABLE bool importFont(const QUrl &file);
+    Q_INVOKABLE QVariantMap variableAxesFor(const QString &family, int weight) const;
     Q_INVOKABLE void reset();
 signals:
     void currentFamilyChanged();
@@ -28,4 +32,6 @@ private:
     bool fail(const QString &message);
     void apply(const QString &family);
     QString m_family, m_defaultFamily, m_harmonyFamily, m_error, m_directory;
+    mutable QHash<QString,bool> m_variablePingFang;
+    QList<int> m_fontIds;
 };

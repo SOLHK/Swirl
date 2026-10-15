@@ -20,6 +20,7 @@
 #include <QUuid>
 #include <QJsonArray>
 #include <QSaveFile>
+#include <QFileInfo>
 
 static quint16 freePort(){QTcpServer server;server.listen(QHostAddress::LocalHost,0);return server.serverPort();}
 static ProxyNode node(QString name,quint16 port){ProxyNode n;n.id=QUuid::createUuid().toString(QUuid::WithoutBraces);n.name=name;n.protocol="socks5";n.host="127.0.0.1";n.port=port;return n;}
@@ -182,6 +183,33 @@ private slots:
         auto destination=network.url();destination.setHost("fixture.test");QNetworkRequest request(destination);request.setRawHeader("Connection","close");
         auto *reply=client.get(request);QSignalSpy done(reply,&QNetworkReply::finished);QVERIFY(done.wait(8000));QCOMPARE(reply->error(),QNetworkReply::NoError);QCOMPARE(reply->readAll(),QByteArray("DIRECT-BYPASS"));
         QCOMPARE(network.a.forwarded,0);QVERIFY(network.httpRequests>0);
+        engine.stop();QTRY_VERIFY_WITH_TIMEOUT(!engine.status().processAlive,4000);
+    }
+    void codexDomainsUseTheActiveSelectorBeforeRegionalRules() {
+        auto opts=options();
+        opts.nodes={node("Selected",9)};opts.selectedNodeId=opts.nodes.first().id;
+        opts.smartRouting=true;
+        opts.rulesDirectory=QFileInfo(QString::fromUtf8(SWIRL_TEST_MANIFEST)).absolutePath()+"/rules";
+        MihomoAdapter engine;engine.start(opts);QTRY_VERIFY_WITH_TIMEOUT(engine.status().apiHealthy,18000);
+        QFile configuration(engine.status().configPath);QVERIFY(configuration.open(QIODevice::ReadOnly));
+        const auto config=configuration.readAll();
+        const auto regional=config.indexOf("  - RULE-SET,cn-domain,DIRECT\n");QVERIFY(regional>0);
+        for(const auto &domain:{"chatgpt.com","openai.com","oaistatic.com","oaiusercontent.com","auth0.com","statsigapi.net"}) {
+            const auto rule=QByteArray("  - DOMAIN-SUFFIX,")+domain+",SWIRL\n";
+            const auto position=config.indexOf(rule);QVERIFY2(position>0&&position<regional,domain);
+        }
+        QVERIFY(config.contains("\"name\":\"SWIRL\""));
+        engine.stop();QTRY_VERIFY_WITH_TIMEOUT(!engine.status().processAlive,4000);
+    }
+    void automaticControlPortAvoidsExistingListener() {
+        QTcpServer occupied;QVERIFY(occupied.listen(QHostAddress::LocalHost,0));
+        auto opts=options();opts.controlPort=occupied.serverPort();opts.autoControlPort=true;
+        MihomoAdapter engine;engine.start(opts);
+        QTRY_VERIFY_WITH_TIMEOUT(engine.status().apiHealthy,18000);
+        const int actual=QUrl(engine.status().controlEndpoint).port();
+        QVERIFY(actual>0);QVERIFY(actual!=occupied.serverPort());QVERIFY(occupied.isListening());
+        QFile configuration(engine.status().configPath);QVERIFY(configuration.open(QIODevice::ReadOnly));
+        QVERIFY(configuration.readAll().contains(QByteArray("127.0.0.1:")+QByteArray::number(actual)));
         engine.stop();QTRY_VERIFY_WITH_TIMEOUT(!engine.status().processAlive,4000);
     }
     void isolatedBatchNeverChangesMainSelection() {

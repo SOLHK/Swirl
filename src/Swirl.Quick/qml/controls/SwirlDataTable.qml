@@ -72,7 +72,7 @@ Item {
                                 color:table.minimal?Theme.muted:Theme.text
                                 font.pixelSize:Theme.fontSize(table.headerPixelSize)
                                 font.family:Theme.fontFamily
-                                font.weight:Font.Normal
+                                font.weight:Theme.bodyFontWeight
                                 anchors.fill:parent
                                 anchors.leftMargin:table.cellPadding
                                 anchors.rightMargin:Theme.dp(8)
