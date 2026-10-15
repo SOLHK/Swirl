@@ -16,11 +16,24 @@ FontManager::FontManager(QObject *parent, const QString &storageDirectory) : QOb
         const auto names=QFontDatabase::applicationFontFamilies(id);
         if(m_defaultFamily.isEmpty()&&!names.isEmpty())m_defaultFamily=names.first();
     }
-    if(m_defaultFamily.isEmpty())qFatal("Bundled HarmonyOS Sans font could not be loaded");
+    m_harmonyFamily=m_defaultFamily;
     m_directory=storageDirectory.isEmpty()?QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/fonts":storageDirectory;
     QDir directory(m_directory);
     for(const auto &file:directory.entryList({"*.ttf","*.otf","*.ttc"},QDir::Files))
         QFontDatabase::addApplicationFont(directory.filePath(file));
+    const auto available=QFontDatabase::families();
+    // Use only an already installed/imported PingFang face. It is never bundled.
+    // Failure to load an optional font must not prevent the application opening.
+    for(const auto &candidate : {QStringLiteral("PingFang SC"),m_harmonyFamily,
+                                QStringLiteral("Microsoft YaHei UI"),QStringLiteral("Microsoft YaHei"),
+                                QStringLiteral("Segoe UI"),QFontDatabase::systemFont(QFontDatabase::GeneralFont).family()}) {
+        if(!candidate.isEmpty() && available.contains(candidate,Qt::CaseInsensitive)) {
+            for(const auto &name:available)
+                if(name.compare(candidate,Qt::CaseInsensitive)==0){m_defaultFamily=name;break;}
+            break;
+        }
+    }
+    if(m_defaultFamily.isEmpty())m_defaultFamily=QGuiApplication::font().family();
     const auto requested=QSettings().value("Fonts/family",m_defaultFamily).toString();
     apply(families().contains(requested)?requested:m_defaultFamily);
 }
@@ -49,7 +62,9 @@ bool FontManager::fail(const QString &message)
 void FontManager::apply(const QString &family)
 {
     m_error.clear();emit errorChanged();
-    QFont font=QGuiApplication::font();font.setFamily(family);
+    QFont font=QGuiApplication::font();
+    QStringList fallbacks{family,m_harmonyFamily,QStringLiteral("Microsoft YaHei UI"),QStringLiteral("Segoe UI")};
+    fallbacks.removeAll(QString());fallbacks.removeDuplicates();font.setFamilies(fallbacks);
     font.setHintingPreference(QFont::PreferFullHinting);
     font.setStyleStrategy(QFont::PreferAntialias);
     QGuiApplication::setFont(font);
@@ -85,4 +100,9 @@ bool FontManager::importFont(const QUrl &url)
     return selectFamily(names.first());
 }
 
-void FontManager::reset(){selectFamily(m_defaultFamily);}
+void FontManager::reset()
+{
+    QSettings settings;settings.remove("Fonts/family");settings.sync();
+    if(settings.status()!=QSettings::NoError){fail(QStringLiteral("无法保存自动字体设置。"));return;}
+    apply(m_defaultFamily);
+}

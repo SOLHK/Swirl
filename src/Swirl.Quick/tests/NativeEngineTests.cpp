@@ -21,6 +21,45 @@ class NativeEngineTests:public QObject {
     QByteArray exchange(QTcpSocket &socket,const QByteArray &bytes,int minimum=1){socket.write(bytes);QByteArray result;QTest::qWaitFor([&]{result+=socket.readAll();return result.size()>=minimum||socket.state()==QAbstractSocket::UnconnectedState;},4000);return result;}
     QSslConfiguration original;
 private slots:
+    void explicitCompatibilityPreferenceKeepsNetworkOptions() {
+        EngineStartOptions o;o.routingMode="global";o.directSession=true;
+        QVERIFY(SwirlProtocolRegistry::nativeSessionReason(o).isEmpty());
+        o.preferCompatibility=true;
+        QVERIFY(SwirlProtocolRegistry::nativeSessionReason(o).contains("用户选择"));
+        QVERIFY(o.directSession);QCOMPARE(o.routingMode,QString("global"));
+    }
+    void websocketUpgradeAndExistingStreamSurviveNativeNodeSwitch() {
+        // Compiled fixture only unless the user explicitly runs it. All peers
+        // are loopback servers with fixture credentials; no subscriptions.
+        ControlledNetwork net;QVERIFY(net.start());QTcpServer origin;QVERIFY(origin.listen(QHostAddress::LocalHost));
+        net.a.targetPorts.append(origin.serverPort());net.b.targetPorts.append(origin.serverPort());
+        connect(&origin,&QTcpServer::newConnection,&origin,[&origin]{while(origin.hasPendingConnections()){
+            auto *peer=origin.nextPendingConnection();connect(peer,&QTcpSocket::disconnected,peer,&QObject::deleteLater);
+            connect(peer,&QTcpSocket::readyRead,peer,[peer]{
+                auto input=peer->readAll();
+                if(peer->property("upgraded").toBool()){peer->write(input);return;}
+                input=peer->property("request").toByteArray()+input;peer->setProperty("request",input);
+                const auto end=input.indexOf("\r\n\r\n");if(end<0)return;
+                if(!input.contains("Connection: Upgrade\r\n")||!input.contains("Upgrade: websocket\r\n")){peer->abort();return;}
+                peer->setProperty("upgraded",true);
+                peer->write("HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n"+input.mid(end+4));
+            });
+        }});
+        auto o=options();auto a=node(net.a.serverPort()),b=node(net.b.serverPort());b.username=QString::fromUtf8(net.b.username);b.password=QString::fromUtf8(net.b.password);o.nodes={a,b};o.selectedNodeId=a.id;
+        SwirlEngineManager engine;engine.start(o);QCOMPARE(engine.status().engineKind,QString("native"));
+        QTcpSocket client;client.setProxy(QNetworkProxy::NoProxy);client.connectToHost(QHostAddress::LocalHost,o.proxyPort);QTRY_COMPARE(client.state(),QAbstractSocket::ConnectedState);
+        const auto url=QStringLiteral("http://127.0.0.1:%1/socket").arg(origin.serverPort()).toUtf8();
+        const auto response=exchange(client,"GET "+url+" HTTP/1.1\r\nHost: fixture\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Key: fixture\r\nSec-WebSocket-Version: 13\r\n\r\n");
+        QVERIFY(response.startsWith("HTTP/1.1 101"));const auto session=engine.status().sessionId;const auto pid=engine.status().processId;
+        QCOMPARE(exchange(client,"before-switch"),QByteArray("before-switch"));engine.selectNode(b.id);
+        QCOMPARE(engine.status().selectedNodeId,b.id);QCOMPARE(engine.status().sessionId,session);QCOMPARE(engine.status().processId,pid);
+        QCOMPARE(exchange(client,"after-switch"),QByteArray("after-switch"));QCOMPARE(fetch(net.url(),o),QByteArray("exit-B"));
+        const QByteArray payload(1024*1024,'w');client.write(payload);QByteArray received;
+        QTRY_COMPARE_WITH_TIMEOUT((received+=client.readAll()).size(),payload.size(),6000);QCOMPARE(received,payload);
+        net.b.reject=true;QVERIFY(fetch(net.url(),o).startsWith("ERROR"));
+        QCOMPARE(engine.status().engineKind,QString("native"));QCOMPARE(exchange(client,"after-new-request-failure"),QByteArray("after-new-request-failure"));
+        client.abort();engine.stop();
+    }
     void initTestCase(){original=QSslConfiguration::defaultConfiguration();QFile f(QString::fromUtf8(SWIRL_FIXTURE_DIR)+"/localhost-cert.pem");QVERIFY(f.open(QIODevice::ReadOnly));auto ssl=original;ssl.addCaCertificate(QSslCertificate(f.readAll()));QSslConfiguration::setDefaultConfiguration(ssl);}
     void cleanupTestCase(){QSslConfiguration::setDefaultConfiguration(original);}
     void nativePublicInternetThroughExplicitLocalEgress(){

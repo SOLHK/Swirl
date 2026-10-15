@@ -27,5 +27,5 @@ signals:
 private:
     bool fail(const QString &message);
     void apply(const QString &family);
-    QString m_family, m_defaultFamily, m_error, m_directory;
+    QString m_family, m_defaultFamily, m_harmonyFamily, m_error, m_directory;
 };

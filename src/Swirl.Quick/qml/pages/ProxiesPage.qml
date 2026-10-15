@@ -7,13 +7,10 @@ import "../components"
 import "../controls"
 Item {
     id:page
-    property string selectedId:engineController.selectedNodeId
+    readonly property string selectedId:engineController.selectedNodeId
     readonly property var allNodes:engineController.nodes
-    Connections {
-        target:engineController
-        function onSelectionChanged(){page.selectedId=engineController.selectedNodeId}
-    }
     readonly property var selected:allNodes.find(n=>n.id===page.selectedId)||null
+    readonly property bool selectedActive:selected!==null&&engineController.processAlive&&engineController.activeNodeId===selectedId
     property string sourceId:""
     property string countryCode:""
     readonly property var sources:engineController.imports.providers
@@ -35,8 +32,8 @@ Item {
     readonly property var protocols:engineController.supportedProtocols
     function selectRow(row) {
         // Update the mounted inspector now. Persist/switch without a card flight.
-        selectedId=row.id;nodeHero.opened=true
-        if(!engineController.chooseNode(row.id)){selectedId=engineController.selectedNodeId;AppState.notice(engineController.nodeError)}
+        if(engineController.chooseNode(row.id))nodeHero.opened=true
+        else AppState.notice(engineController.nodeError)
     }
     property string editingId:""
     readonly property var tested:engineController.tests.results[selectedId]||({})
@@ -73,9 +70,9 @@ Item {
                 Layout.fillWidth:true;Layout.preferredWidth:1;Layout.minimumWidth:Theme.dp(250);Layout.fillHeight:true;cornerRadius:Theme.independentCardRadius
                 color:Theme.surface;border.width:0
                 SwirlDataTable {
-                    id:nodeTable;objectName:"realNodeTable";minimal:true;managedSelection:true;incrementalRows:true;animateRowChanges:false;animateLatency:true;itemHeight:Theme.dp(40);headerHeight:Theme.tableHeaderHeight;textPixelSize:13
+                    id:nodeTable;objectName:"realNodeTable";minimal:true;managedSelection:true;incrementalRows:true;animateRowChanges:false;animateLatency:true;itemHeight:Theme.dp(44);headerHeight:Theme.tableHeaderHeight;textPixelSize:13
                     anchors.fill:parent;anchors.margins:Theme.dp(16);rows:page.viewRows;selectedId:page.selectedId
-                    columns:[{key:"name",label:"节点名称",w:235},{key:"protocol",label:"协议",w:82},{key:"latency",label:"延迟",w:76},{key:"status",label:"状态",w:92}]
+                    columns:[{key:"name",label:"节点名称",w:235,min:126},{key:"protocol",label:"协议",w:82,min:68},{key:"latency",label:"延迟",w:76,min:68},{key:"status",label:"状态",w:92,min:90}]
                     onRowSelected:function(row){page.selectRow(row)}
                 }
                 SwirlEmptyState {anchors.centerIn:parent;visible:page.viewRows.length===0;headline:page.allNodes.length?"没有匹配的节点":"没有保存的节点";detail:page.allNodes.length?"调整搜索、协议或地区筛选。":"添加节点，或导入配置、URI 与订阅"}
@@ -85,12 +82,12 @@ Item {
                 ScrollBar.horizontal.policy:ScrollBar.AlwaysOff;ScrollBar.vertical:SwirlScrollBar {}
                 ColumnLayout {width:detailScroll.availableWidth;spacing:Theme.dp(14)
                 Item {
-                    id:summarySlot;Layout.fillWidth:true;Layout.preferredHeight:summaryBody.implicitHeight+2*Theme.cardPadding
+                    id:summarySlot;Layout.fillWidth:true;Layout.preferredHeight:nodeHero.opened||nodeHero.moving?summaryBody.implicitHeight+2*Theme.cardPadding:Theme.dp(60)
                     SwirlText {renderType:Text.NativeRendering;anchors.centerIn:parent;visible:!nodeHero.opened&&!nodeHero.moving;text:"选择节点查看详情";color:Theme.muted;font.pixelSize:Theme.fontSize(13)}
                 }
                 Item {
                     id:requestSlot
-                    Layout.fillWidth:true;Layout.preferredHeight:requestOptions.implicitHeight+2*Theme.cardPadding
+                    visible:nodeHero.opened||nodeHero.moving;Layout.fillWidth:true;Layout.preferredHeight:requestOptions.implicitHeight+2*Theme.cardPadding
                 SwirlGlassPanel {
                     objectName:"nodeRequestSurface"
                     parent:requestSlot
@@ -102,12 +99,16 @@ Item {
                     visible:nodeHero.opened;opacity:1
                     cornerRadius:Theme.independentCardRadius;color:Theme.surface;border.width:0
                     ColumnLayout {
-                        id:requestOptions;x:Theme.cardPadding;y:Theme.cardPadding;width:parent.width-2*Theme.cardPadding;spacing:Theme.dp(10)
-                        SwirlText {renderType:Text.NativeRendering;text:"请求与端口";color:Theme.text;font.pixelSize:Theme.fontSize(13);font.weight:Font.Medium}
+                        id:requestOptions;x:Theme.cardPadding;y:Theme.cardPadding;width:parent.width-2*Theme.cardPadding;spacing:Theme.dp(9)
+                        SwirlText {renderType:Text.NativeRendering;text:"请求与端口";color:Theme.text;font.pixelSize:Theme.fontSize(14);font.weight:Font.Medium}
                         SwirlText {renderType:Text.NativeRendering;text:"测试 URL";color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
-                        SwirlTextField {id:testUrl;objectName:"nodeTestUrl";Layout.fillWidth:true;text:"https://www.gstatic.com/generate_204";enabled:!engineController.nodeBusy;Accessible.name:"真实请求测试地址"}
-                        SwirlText {renderType:Text.NativeRendering;text:"本机代理端口";color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
-                        SwirlTextField {objectName:"nodeProxyPort";Layout.fillWidth:true;text:String(engineController.proxyPort);enabled:engineController.canStart;validator:IntValidator {bottom:1;top:65535}onEditingFinished:engineController.proxyPort=Number(text);Accessible.name:"本机代理端口"}
+                        SwirlTextField {id:testUrl;objectName:"nodeTestUrl";Layout.fillWidth:true;text:"https://www.gstatic.com/generate_204";enabled:!engineController.nodeBusy&&!engineController.tests.busy;selectByMouse:true;Accessible.name:"真实请求测试地址"}
+                        RowLayout {
+                            Layout.fillWidth:true;spacing:Theme.dp(10)
+                            SwirlText {renderType:Text.NativeRendering;text:"本机代理端口";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true}
+                            SwirlTextField {objectName:"nodeProxyPort";Layout.preferredWidth:Theme.dp(88);text:String(engineController.proxyPort);enabled:engineController.canStart;validator:IntValidator {bottom:1;top:65535}horizontalAlignment:TextInput.AlignHCenter;onEditingFinished:{if(acceptableInput)engineController.proxyPort=Number(text);text=String(engineController.proxyPort)}Accessible.name:"本机代理端口"}
+                        }
+                        Rectangle {Layout.fillWidth:true;implicitHeight:Theme.dp(1);color:Theme.border}
                         SwirlText {renderType:Text.NativeRendering;objectName:"nodeRequestState";text:engineController.tests.busy?engineController.tests.message:page.tested.time?(page.tested.success?"请求成功":"请求失败")+" · HTTP "+page.tested.http+" · "+(page.tested.latency>=0?page.tested.latency+" ms":"无延迟结果")+(page.tested.error?"\n"+page.tested.error:""):engineController.requestStateText;color:engineController.tests.busy?Theme.muted:page.tested.time?(page.tested.success?Theme.green:Theme.orange):engineController.requestSucceeded?Theme.green:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
                         SwirlText {renderType:Text.NativeRendering;text:engineController.nodeError||engineController.error;visible:text.length>0;color:Theme.orange;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
                     }
@@ -134,24 +135,37 @@ Item {
         ColumnLayout {
             id:summaryBody;x:Theme.cardPadding;y:Theme.dp(6)+(Theme.cardPadding-Theme.dp(6))*nodeHero.reveal;width:parent.width-2*Theme.cardPadding;spacing:Theme.dp(12)
             RowLayout {
-                Layout.fillWidth:true;spacing:Theme.dp(10)*nodeHero.reveal
-                SwirlIcon {name:"globe";size:Theme.dp(30);Layout.preferredWidth:Theme.dp(30)*nodeHero.reveal;opacity:nodeHero.reveal;color:Theme.accent}
-                SwirlText {renderType:Text.NativeRendering;id:nodeDetailTitle;objectName:"nodeDetailTitle";text:page.selected?page.selected.name:"未选择节点";textFormat:Text.PlainText;color:Theme.text;font.family:Theme.fontFamily;font.pixelSize:Theme.fontSize(19);font.weight:Font.Medium;Layout.fillWidth:true;wrapMode:Text.Wrap;maximumLineCount:3;elide:Text.ElideRight}
+                Layout.fillWidth:true;spacing:Theme.dp(8)*nodeHero.reveal
+                SwirlIcon {name:"globe";size:Theme.dp(22);Layout.preferredWidth:Theme.dp(22)*nodeHero.reveal;opacity:nodeHero.reveal;color:Theme.accent}
+                SwirlText {renderType:Text.NativeRendering;text:"节点详情";color:Theme.text;font.pixelSize:Theme.fontSize(14);font.weight:Font.Medium;Layout.fillWidth:true}
                 SwirlIconButton {objectName:"nodeReturnButton";implicitWidth:Theme.dp(24);implicitHeight:Theme.dp(26);iconName:"chevron-left";quiet:true;opacity:nodeHero.reveal;tooltip:"返回节点列表";onClicked:nodeHero.returnTo(nodeTable.selectedItem)}
             }
+            SwirlText {
+                id:nodeDetailTitle;objectName:"nodeDetailTitle";renderType:Text.NativeRendering
+                text:page.selected?page.selected.name:"未选择节点";textFormat:Text.PlainText;color:Theme.text;font.family:Theme.fontFamily;font.pixelSize:Theme.fontSize(18);font.weight:Font.Medium
+                Layout.fillWidth:true;wrapMode:Text.Wrap;activeFocusOnTab:true
+                HoverHandler {id:nodeNameHover}
+                ToolTip.visible:page.selected!==null&&(nodeNameHover.hovered||activeFocus)
+                ToolTip.text:nodeDetailTitle.text;ToolTip.delay:600
+            }
             ColumnLayout {
-                Layout.fillWidth:true;spacing:Theme.dp(12);opacity:Math.max(0,Math.min(1,(nodeHero.reveal-0.25)/0.65))
-                SwirlText {renderType:Text.NativeRendering;text:page.selected?page.selected.protocol+" · "+page.selected.address:"选择一个节点开始连接";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.WrapAnywhere}
+                Layout.fillWidth:true;spacing:Theme.dp(10);opacity:Math.max(0,Math.min(1,(nodeHero.reveal-0.25)/0.65))
+                RowLayout {
+                    Layout.fillWidth:true;spacing:Theme.dp(8)
+                    SwirlStatusBadge {label:page.selected?page.selected.protocol.toUpperCase():"未选择";tone:"neutral"}
+                    SwirlStatusBadge {Layout.fillWidth:false;busy:engineController.nodeBusy;label:page.selectedActive?engineController.nodeStateText:"未连接";tone:page.selectedActive?(engineController.nodeError.length?"warning":"accent"):"neutral"}
+                }
+                SwirlText {renderType:Text.NativeRendering;text:page.selected?page.selected.address:"选择一个节点开始连接";textFormat:Text.PlainText;color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
                 SwirlText {renderType:Text.NativeRendering;text:page.selected?(page.selected.sourceFormat||"手动节点")+" · "+page.selected.capability.engine:"";color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
                 SwirlText {renderType:Text.NativeRendering;text:page.selected?page.selected.normalizationNotes||"":"";visible:text.length>0;color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
                 SwirlText {renderType:Text.NativeRendering;text:page.selected?((page.selected.conversionIssues||[]).join("\n")):"";visible:text.length>0;color:Theme.orange;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
-                SwirlStatusBadge {busy:engineController.nodeBusy||engineController.tests.busy;label:engineController.activeProxyPort>0?"127.0.0.1:"+engineController.activeProxyPort:engineController.nodeStateText;tone:engineController.nodeError.length?"warning":engineController.apiHealthy?"success":"neutral"}
-                SwirlButton {objectName:"nodeConnectButton";Layout.fillWidth:true;implicitHeight:Theme.controlHeight;text:engineController.nodeBusy?"连接中…":engineController.activeNodeId===page.selectedId&&engineController.processAlive?"断开节点":"连接节点";iconName:"link";primary:true;enabled:page.selected!==null&&!engineController.nodeBusy;onClicked:{if(engineController.activeNodeId===page.selectedId&&engineController.processAlive)engineController.disconnectNode();else engineController.connectNode(page.selectedId)}}
-                RowLayout {
-                    Layout.fillWidth:true;spacing:Theme.dp(6)
-                    SwirlButton {objectName:"nodeTestButton";text:"测试请求";quiet:true;iconName:"activity";Layout.fillWidth:true;enabled:page.selected!==null&&!engineController.tests.busy;onClicked:engineController.testSelectedNode(page.selectedId,testUrl.text)}
-                    SwirlIconButton {objectName:"nodeEditButton";iconName:"edit";quiet:true;implicitWidth:Theme.controlHeight;implicitHeight:Theme.controlHeight;tooltip:"编辑节点";enabled:page.selected!==null&&engineController.canStart;onClicked:page.edit(page.selected)}
-                    SwirlIconButton {objectName:"nodeDeleteButton";iconName:"trash";iconColor:Theme.red;quiet:true;implicitWidth:Theme.controlHeight;implicitHeight:Theme.controlHeight;tooltip:"删除节点";enabled:page.selected!==null&&engineController.canStart;onClicked:{if(engineController.deleteNode(page.selectedId))page.selectedId=""}}
+                SwirlText {renderType:Text.NativeRendering;text:page.selectedActive&&engineController.activeProxyPort>0?"本机入口  127.0.0.1:"+engineController.activeProxyPort:"";visible:text.length>0;color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true}
+                GridLayout {
+                    Layout.fillWidth:true;columns:2;rowSpacing:Theme.dp(8);columnSpacing:Theme.dp(8)
+                    SwirlButton {objectName:"nodeConnectButton";Layout.fillWidth:true;Layout.preferredWidth:1;implicitHeight:Theme.controlHeight;text:engineController.nodeBusy?"连接中…":page.selectedActive?"断开节点":"连接节点";primary:true;enabled:page.selected!==null&&!engineController.nodeBusy;onClicked:{if(page.selectedActive)engineController.disconnectNode();else engineController.connectNode(page.selectedId)}}
+                    SwirlButton {objectName:"nodeTestButton";text:engineController.tests.busy?"测试中…":"测试请求";Layout.fillWidth:true;Layout.preferredWidth:1;enabled:page.selected!==null&&!engineController.tests.busy&&/^https?:\/\/\S+$/i.test(testUrl.text.trim());onClicked:engineController.testSelectedNode(page.selectedId,testUrl.text.trim())}
+                    SwirlButton {objectName:"nodeEditButton";text:"编辑节点";Layout.fillWidth:true;Layout.preferredWidth:1;enabled:page.selected!==null&&engineController.canStart;onClicked:page.edit(page.selected)}
+                    SwirlButton {objectName:"nodeDeleteButton";text:"删除节点";danger:true;Layout.fillWidth:true;Layout.preferredWidth:1;enabled:page.selected!==null&&engineController.canStart;onClicked:engineController.deleteNode(page.selectedId)}
                 }
             }
         }
@@ -191,7 +205,7 @@ Item {
             RowLayout {
                 Layout.alignment:Qt.AlignRight
                 SwirlButton {text:"取消";onClicked:addDialog.close()}
-                SwirlButton {objectName:"nodeSaveButton";text:"保存";primary:true;enabled:nodeName.text.trim().length>0&&(nodePort.acceptableInput||["wireguard","tailscale","zerotier","easytier","openvpn"].indexOf(nodeProtocol.currentText)>=0);onClicked:{var input={id:page.editingId,name:nodeName.text,protocol:nodeProtocol.currentText,host:nodeHost.text,port:Number(nodePort.text),username:nodeUsername.text,password:nodePassword.text,replaceCredentials:replaceCredentials.checked,cipher:nodeProtocol.currentText==="ss"?(nodeCipher.editText||nodeCipher.currentText):"",serverName:nodeSni.text};try{if(nodeOptions.text.trim().length)input.options=JSON.parse(nodeOptions.text);if(nodeUuid.text.trim().length){if(!input.options)input.options={};input.options.uuid=nodeUuid.text.trim()}}catch(e){AppState.notice("扩展选项须为合法 JSON 对象");return}if(engineController.saveNode(input)){addDialog.close();page.selectedId=page.editingId||engineController.nodes[engineController.nodes.length-1].id}}}
+                SwirlButton {objectName:"nodeSaveButton";text:"保存";primary:true;enabled:nodeName.text.trim().length>0&&(nodePort.acceptableInput||["wireguard","tailscale","zerotier","easytier","openvpn"].indexOf(nodeProtocol.currentText)>=0);onClicked:{var input={id:page.editingId,name:nodeName.text,protocol:nodeProtocol.currentText,host:nodeHost.text,port:Number(nodePort.text),username:nodeUsername.text,password:nodePassword.text,replaceCredentials:replaceCredentials.checked,cipher:nodeProtocol.currentText==="ss"?(nodeCipher.editText||nodeCipher.currentText):"",serverName:nodeSni.text};try{if(nodeOptions.text.trim().length)input.options=JSON.parse(nodeOptions.text);if(nodeUuid.text.trim().length){if(!input.options)input.options={};input.options.uuid=nodeUuid.text.trim()}}catch(e){AppState.notice("扩展选项须为合法 JSON 对象");return}if(engineController.saveNode(input)){engineController.chooseNode(page.editingId||engineController.nodes[engineController.nodes.length-1].id);nodeHero.opened=true;addDialog.close()}}}
             }
         }
     }

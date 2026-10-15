@@ -5,6 +5,7 @@
 #include "SystemProxySession.h"
 #include "TelemetryService.h"
 #include "NodeTestService.h"
+#include "ConnectionDiagnostics.h"
 #include <memory>
 
 // QML sees only Swirl's generic business facade. Engine implementations are injected in C++.
@@ -65,6 +66,9 @@ class EngineController final : public QObject {
     Q_PROPERTY(QVariantMap dnsConfiguration READ dnsConfiguration NOTIFY optionsChanged)
     Q_PROPERTY(QVariantList policyGroups READ policyGroups NOTIFY optionsChanged)
     Q_PROPERTY(QString networkConfigurationError READ networkConfigurationError NOTIFY optionsChanged)
+    Q_PROPERTY(ConnectionDiagnostics* diagnostics READ diagnostics CONSTANT)
+    Q_PROPERTY(QString proxyEnvironmentAdvice READ proxyEnvironmentAdvice NOTIFY optionsChanged)
+    Q_PROPERTY(bool preferCompatibility READ preferCompatibility WRITE setPreferCompatibility NOTIFY optionsChanged)
 public:
     explicit EngineController(std::unique_ptr<ProxyEngine> engine, QObject *parent = nullptr, QString storePath = {},bool realAcceptance=false);
     QString executablePath() const { return m_options.executablePath; }
@@ -127,6 +131,10 @@ public:
     QVariantMap dnsConfiguration() const { return m_options.dnsConfig; }
     QVariantList policyGroups() const { return m_options.customGroups; }
     QString networkConfigurationError() const { return m_networkError; }
+    ConnectionDiagnostics *diagnostics() {return &m_diagnostics;}
+    QString proxyEnvironmentAdvice() const;
+    bool preferCompatibility() const {return m_options.preferCompatibility;}
+    void setPreferCompatibility(bool enabled);
     bool tunRequested() const { return m_options.tunEnabled; }
     Q_INVOKABLE void setCaptureProxyPort(int port);
     bool tunEnabled() const { return m_engine->status().tunEnabled&&apiHealthy()&&processAlive(); }
@@ -170,6 +178,9 @@ private:
     SystemProxySession m_systemProxy;
     TelemetryService m_telemetry;
     NodeTestService m_tests;
+    ConnectionDiagnostics m_diagnostics;
+    QString m_previousProxyState;
+    ProxyEngine::State m_previousEngineState=ProxyEngine::State::Stopped;
     bool saveNetworkConfiguration();
     bool networkEditAllowed();
     void startConfiguredSession();

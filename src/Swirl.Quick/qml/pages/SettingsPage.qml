@@ -197,6 +197,37 @@ Item {
                         ColumnLayout {
                             visible:page.section==="代理"; Layout.fillWidth:true; spacing:Theme.dp(17)
                             RowLayout {
+                                Layout.fillWidth:true; spacing:Theme.dp(10)
+                                SwirlText { text:engineController.systemProxy.owned?(engineController.systemProxy.enabled?"系统代理已接管":"接管状态未确认 · 快照已保留"):engineController.systemProxy.systemEnabled?"其他应用启用了系统代理":"未接管系统代理"; color:Theme.text; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(14) }
+                                SwirlButton { text:engineController.systemProxy.owned?"释放 / 恢复系统代理":"接管系统代理"; enabled:engineController.systemProxy.owned||engineController.connected; onClicked:engineController.setSystemProxy(!engineController.systemProxy.owned) }
+                            }
+                            SwirlText { visible:engineController.systemProxy.error.length>0; text:engineController.systemProxy.error; color:Theme.orange; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
+                            SwirlText { text:"沿用 Swirl 的本地 DPAPI 恢复快照与独立守护进程。其他程序修改代理后让出控制权；控制 API 短时异常不会释放仍在运行的代理。"; color:Theme.muted; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
+                            Rectangle { Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(1); color:Theme.border }
+                            SwirlText { text:"本地连接诊断"; color:Theme.text; font.pixelSize:Theme.fontSize(14); font.weight:Font.DemiBold }
+                            RowLayout {
+                                Layout.fillWidth:true; spacing:Theme.dp(10)
+                                SwirlTextField { id:diagnosticUrl; objectName:"diagnosticUrlField"; Layout.fillWidth:true; placeholderText:"https://目标地址 或 wss://目标路径"; enabled:!engineController.diagnostics.busy; Accessible.name:"用户指定的连接诊断地址" }
+                                SwirlButton { text:engineController.diagnostics.busy?"取消":"开始诊断"; enabled:engineController.diagnostics.busy||engineController.activeProxyPort>0; onClicked:engineController.diagnostics.busy?engineController.diagnostics.cancel():engineController.diagnostics.run(diagnosticUrl.text) }
+                            }
+                            SwirlText { text:engineController.diagnostics.stateText; color:Theme.muted; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
+                            SwirlText { text:"仅点击后向所填目标发送请求：本机端口 → CONNECT → TLS / HTTP 或 WebSocket Upgrade 与随机 Ping/Pong。地址可能需要登录或子协议；诊断失败不等于 Codex 服务故障，10 秒观察不代替长期实测。"; color:Theme.muted; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
+                            TextArea { readOnly:true; selectByMouse:true; visible:engineController.diagnostics.entries.length>0; text:engineController.diagnostics.report; Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(160); wrapMode:TextEdit.Wrap; font.family:Theme.fontFamily; font.pixelSize:Theme.fontSize(12); renderType:TextEdit.NativeRendering; color:Theme.text; background:Rectangle { color:Theme.surface; radius:Theme.dp(14); border.color:Theme.border } }
+                            RowLayout {
+                                SwirlButton { text:"保存诊断报告"; onClicked:{const path=engineController.diagnostics.saveReport();AppState.notice(path.length>0?"诊断报告已保存："+path:"无法保存诊断报告")} }
+                                SwirlButton { text:"清空记录"; enabled:!engineController.diagnostics.busy; onClicked:engineController.diagnostics.clear() }
+                            }
+                            SwirlText { text:"Codex 与其他应用兼容建议"; color:Theme.text; font.pixelSize:Theme.fontSize(14); font.weight:Font.DemiBold }
+                            RowLayout {
+                                Layout.fillWidth:true
+                                SwirlText { text:"优先使用 Mihomo 兼容引擎"; color:Theme.text; font.pixelSize:Theme.fontSize(14); Layout.fillWidth:true }
+                                SwirlToggle { checked:engineController.preferCompatibility; enabled:engineController.canStart; onToggled:engineController.preferCompatibility=checked }
+                            }
+                            SwirlText { text:"断开后修改并重新连接生效，节点、DNS、规则和 TUN 配置保持原值。依赖 TLS EOF 定界或原生协议尚不兼容时可主动启用。"; color:Theme.muted; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
+                            TextArea { readOnly:true; selectByMouse:true; text:engineController.proxyEnvironmentAdvice; Layout.fillWidth:true; wrapMode:TextEdit.Wrap; font.family:Theme.fontFamily; font.pixelSize:Theme.fontSize(12); renderType:TextEdit.NativeRendering; color:Theme.text; background:null }
+                            SwirlText { text:"原生隧道取消 120 秒空闲断开，采用 TCP KeepAlive；节点切换对新连接生效，现有连接保持原出口。DNS、国内外分流、用户规则、策略组和 TUN 沿用当前配置。原生 TLS 上游保留反向读取，但 Qt 不支持独立 TLS 半关闭；依赖 EOF 定界的 TLS 请求仍需兼容引擎。"; color:Theme.muted; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
+                            Rectangle { Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(1); color:Theme.border }
+                            RowLayout {
                                 Layout.fillWidth:true
                                 SwirlText { text:"代理引擎"; color:Theme.text; font.pixelSize:Theme.fontSize(14); Layout.fillWidth:true }
                                 SwirlStatusBadge { objectName:"engineStatusBadge"; label:engineController.stateText; tone:engineController.apiHealthy?"success":"accent" }

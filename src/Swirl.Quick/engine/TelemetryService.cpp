@@ -46,14 +46,15 @@ QString TelemetryService::formatBytes(double bytes) const {
  const QStringList units={"B","KB","MB","GB","TB"};int i=0;while(bytes>=1024&&i<4){bytes/=1024;++i;}
  return QString::number(bytes,'f',i?1:0)+" "+units[i];
 }
-int TelemetryService::activeProcesses() const {QSet<QString> names;for(const auto &r:m_status.connections){const auto name=r.toMap().value("process").toString();if(!name.isEmpty()&&name!="未知进程")names.insert(name);}return names.size();}
+int TelemetryService::activeConnections() const {int count=0;for(const auto &r:m_status.connections)if(!r.toMap().value("closed").toBool())++count;return count;}
+int TelemetryService::activeProcesses() const {QSet<QString> names;for(const auto &r:m_status.connections){const auto row=r.toMap();if(row.value("closed").toBool())continue;const auto name=row.value("process").toString();if(!name.isEmpty()&&name!="未知进程")names.insert(name);}return names.size();}
 void TelemetryService::ingest(const ProxyEngine::Status &status){
  const auto epoch=QString::number(status.processId)+"/"+status.sessionId;
  if(status.processAlive&&m_epoch!=epoch){m_epoch=epoch;m_seen.clear();m_lastConnections=0;m_lastTraffic=0;m_lastUp=0;m_lastDown=0;m_externalIp.clear();m_latencies.clear();}
  const auto route=epoch+"/"+status.selectedNodeId+"/"+status.mode;
  if(route!=m_routeEpoch){m_routeEpoch=route;m_externalIp.clear();m_latencies.clear();m_failedMeasurements.clear();m_internetDiagnostic.clear();}
  m_status=status;
- if(!status.apiHealthy){for(auto it=m_seen.begin();it!=m_seen.end();++it)(*it)["status"]="已结束";publish();return;}
+ if(!status.apiHealthy){for(auto it=m_seen.begin();it!=m_seen.end();++it)if(it->value("status")!="已结束")(*it)["status"]=status.processAlive?QStringLiteral("采样中断"):QStringLiteral("已结束");publish();return;}
  if(status.connectionsAt>m_lastConnections){
   m_lastConnections=status.connectionsAt;const auto date=QDateTime::fromMSecsSinceEpoch(status.connectionsAt).date().toString(Qt::ISODate);
   auto day=m_days.value(date).toObject();day["sampled"]=true;

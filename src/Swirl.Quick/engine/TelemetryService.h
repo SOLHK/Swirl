@@ -31,7 +31,7 @@ public:
  bool connectionsSampled() const;
  double downloadRate() const { return m_status.downloadRate; }
  double uploadRate() const { return m_status.uploadRate; }
- int activeConnections() const { return m_status.connections.size(); }
+ int activeConnections() const;
  int activeProcesses() const;
  QVariantList connections() const;
  QVariantMap latencies() const { return m_latencies; }

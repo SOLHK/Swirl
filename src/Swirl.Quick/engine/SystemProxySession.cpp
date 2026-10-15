@@ -109,9 +109,10 @@ bool writeConnection(const QJsonObject &value) {
     INTERNET_PER_CONN_OPTION_LISTW list{};list.dwSize=sizeof(list);list.dwOptionCount=4;list.pOptions=options;
     return InternetSetOptionW(nullptr,INTERNET_OPTION_PER_CONNECTION_OPTION,&list,sizeof(list));
 }
-void notifyProxyChange() {
-    InternetSetOptionW(nullptr,INTERNET_OPTION_SETTINGS_CHANGED,nullptr,0);
-    InternetSetOptionW(nullptr,INTERNET_OPTION_REFRESH,nullptr,0);
+bool notifyProxyChange() {
+    const bool changed=InternetSetOptionW(nullptr,INTERNET_OPTION_SETTINGS_CHANGED,nullptr,0);
+    const bool refreshed=InternetSetOptionW(nullptr,INTERNET_OPTION_REFRESH,nullptr,0);
+    return changed&&refreshed;
 }
 QString stamp(HANDLE process) {
     FILETIME created{},exit{},kernel{},user{};
@@ -120,8 +121,11 @@ QString stamp(HANDLE process) {
 }
 bool alive(const QJsonObject &record, const char *key, const char *timeKey) {
     auto h=OpenProcess(SYNCHRONIZE|PROCESS_QUERY_LIMITED_INFORMATION,FALSE,DWORD(record.value(key).toDouble()));
-    if(!h)return false;
-    const bool result=stamp(h)==record.value(timeKey).toString()&&WaitForSingleObject(h,0)==WAIT_TIMEOUT;
+    // Access denied/query failure is not proof that the GUI/engine died. Be
+    // conservative and retain ownership until a process can be proven dead.
+    if(!h)return GetLastError()!=ERROR_INVALID_PARAMETER;
+    const auto identity=stamp(h);const auto waited=WaitForSingleObject(h,0);
+    const bool result=identity.isEmpty()||waited==WAIT_FAILED||(identity==record.value(timeKey).toString()&&waited==WAIT_TIMEOUT);
     CloseHandle(h);return result;
 }
 QString nativeError() { return QStringLiteral("Windows 系统代理操作失败（错误 %1）。").arg(GetLastError()); }
@@ -149,8 +153,9 @@ QJsonObject SystemProxySession::snapshot(QString *error) {
     INTERNET_PER_CONN_OPTION_LISTW list{};list.dwSize=sizeof(list);list.dwOptionCount=4;list.pOptions=options;
     DWORD size=sizeof(list);
     if(!InternetQueryOptionW(nullptr,INTERNET_OPTION_PER_CONNECTION_OPTION,&list,&size)) {
+        for(int i=1;i<4;++i){if(options[i].Value.pszValue)GlobalFree(options[i].Value.pszValue);options[i].Value.pszValue=nullptr;}
         options[0].dwOption=INTERNET_PER_CONN_FLAGS;size=sizeof(list);
-        if(!InternetQueryOptionW(nullptr,INTERNET_OPTION_PER_CONNECTION_OPTION,&list,&size)){if(error)*error=nativeError();return {};}
+        if(!InternetQueryOptionW(nullptr,INTERNET_OPTION_PER_CONNECTION_OPTION,&list,&size)){for(int i=1;i<4;++i)if(options[i].Value.pszValue)GlobalFree(options[i].Value.pszValue);if(error)*error=nativeError();return {};}
     }
     QJsonObject result{{"flags",int(options[0].Value.dwValue)}};
     const char *keys[]={"server","bypass","pac"};
@@ -186,7 +191,7 @@ bool SystemProxySession::apply(const QJsonObject &value, QString *error) {
         return false;
     }
     // Publish only after both representations agree.
-    notifyProxyChange();
+    if(!notifyProxyChange()){if(error)*error=QStringLiteral("代理设置已写入，但 Windows 刷新通知失败；恢复记录已保留。");return false;}
     if(!matchesSettings(snapshot(),value)){if(error)*error=QStringLiteral("Windows 实际代理配置与写入值不一致。");return false;}return true;
 #else
     Q_UNUSED(value);if(error)*error=QStringLiteral("系统代理仅支持 Windows。");return false;
@@ -203,6 +208,10 @@ bool SystemProxySession::recover(const QString &journal, QString *error, bool re
     if(requireDeadOwner&&alive(record,"owner","ownerTime")){if(error)*error=QStringLiteral("另一个 Swirl 正在管理系统代理。");return false;}
 #endif
     const auto current=snapshot(error);if(current.isEmpty())return false;
+    if(record.value("applyUnconfirmed").toBool()&&!matchesSettings(current,record.value("applied").toObject())&&!matchesSettings(current,record.value("original").toObject())) {
+        if(error)*error=QStringLiteral("代理写入曾中途失败，当前配置既非原始值也非完整接管值；已保留恢复快照，请检查 Windows 代理，未覆盖来源不明的修改。");
+        return false;
+    }
     if(matchesSettings(current,record.value("applied").toObject())&&!apply(record.value("original").toObject(),error))return false;
     // If any setting changed externally, relinquish ownership without writing.
     return QFile::remove(journal);
@@ -220,7 +229,7 @@ bool SystemProxySession::enable(int port, qint64 enginePid) {
     #ifdef Q_OS_WIN
     applied.insert("registry",proxyRegistry(applied.value("server").toString(),applied.value("bypass").toString()));
     #endif
-    QJsonObject record{{"schema",2},{"session",QUuid::createUuid().toString()},{"owner",double(QCoreApplication::applicationPid())},{"engine",double(enginePid)},{"original",original},{"applied",applied}};
+    QJsonObject record{{"schema",2},{"session",QUuid::createUuid().toString()},{"owner",double(QCoreApplication::applicationPid())},{"engine",double(enginePid)},{"original",original},{"applied",applied},{"applyUnconfirmed",true}};
 #ifdef Q_OS_WIN
     record.insert("ownerTime",stamp(GetCurrentProcess()));
     auto h=OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION,FALSE,DWORD(enginePid));if(!h){m_error=QStringLiteral("无法验证引擎进程身份。");emit changed();return false;}
@@ -239,7 +248,18 @@ bool SystemProxySession::enable(int port, qint64 enginePid) {
         m_error=QStringLiteral("安全恢复守护进程未就绪，未启用系统代理。");QFile::remove(m_journal);emit changed();return false;
     }
     if(snapshot()!=original){m_error=QStringLiteral("其他软件刚刚修改了系统代理，请重试。");QFile::remove(m_journal);emit changed();return false;}
-    if(!apply(applied,&m_error)){lock.unlock();recover(m_journal,nullptr,false);emit changed();return false;}
+    if(!apply(applied,&m_error)){
+        lock.unlock();const bool recovered=recover(m_journal,nullptr,false,record.value("session").toString());
+        if(!recovered&&QFile::exists(m_journal)) {
+            // Writes can land before refresh/readback fails. Keep a recoverable
+            // owner state instead of discarding the original PAC snapshot.
+            m_session=record.value("session").toString();m_owned=true;m_enabled=false;
+            m_error+=QStringLiteral(" 当前状态未确认，恢复快照与守护进程已保留；可重试释放代理。");
+        }
+        emit changed();return false;
+    }
+    record.insert("applyUnconfirmed",false);
+    if(!write(m_journal,record))m_error=QStringLiteral("代理已确认启用，但恢复记录确认标记未能更新；原始快照与守护仍保留。");
     m_session=record.value("session").toString();m_owned=true;m_enabled=true;emit changed();return true;
 }
 bool SystemProxySession::disable() {
@@ -248,12 +268,19 @@ bool SystemProxySession::disable() {
     if(ok)m_owned=false;refresh();emit changed();return ok;
 }
 void SystemProxySession::refresh() {
-    const auto record=read(m_journal);const auto current=snapshot();
+    const auto record=read(m_journal);QString readError;const auto current=snapshot(&readError);
     // A transient WinINET read failure is not an external ownership change.
     // Retain the encrypted recovery record so the independent guard can act.
-    if(current.isEmpty())return;
+    if(current.isEmpty()||(m_owned&&record.isEmpty()&&QFile::exists(m_journal))) {
+        const bool wasEnabled=m_enabled;m_enabled=false;
+        if(m_owned)m_error=readError.isEmpty()?QStringLiteral("恢复记录暂时无法读取；接管状态未确认，快照已保留。"):readError;
+        if(wasEnabled||m_owned)emit changed();return;
+    }
     const bool ownSession=!m_session.isEmpty()&&record.value("session").toString()==m_session;
     const bool same=ownSession&&matchesSettings(current,record.value("applied").toObject());
+    if(m_owned&&ownSession&&record.value("applyUnconfirmed").toBool()&&!same&&!matchesSettings(current,record.value("original").toObject())) {
+        m_enabled=false;m_error=QStringLiteral("代理部分写入或外部修改的来源尚未确认；恢复快照已保留，请检查 Windows 代理。");emit changed();return;
+    }
     if(m_owned&&!same){m_owned=false;if(ownSession)QFile::remove(m_journal);m_error=QStringLiteral("系统代理已由外部修改或安全恢复，Swirl 已放弃控制。");}
     const bool enabled=m_owned&&same;
     const bool systemEnabled=(current.value("flags").toInt()&2)!=0;
@@ -270,7 +297,14 @@ int SystemProxySession::guard(const QString &journal) {
     if(!ready.open(QIODevice::WriteOnly)){CloseHandle(owner);return 5;}ready.write("ready");ready.close();
     // Handle GUI death AND engine death. No fixed delay leaves a dead localhost
     // proxy behind while the GUI still appears alive.
-    while(read(journal).value("session")==record.value("session")&&WaitForSingleObject(owner,250)==WAIT_TIMEOUT&&alive(record,"engine","engineTime")) {}
+    for(;;) {
+        const auto snapshot=read(journal);
+        if(!QFile::exists(journal)){CloseHandle(owner);QFile::remove(journal+".ready");return 0;}
+        if(!snapshot.isEmpty()&&snapshot.value("session")!=record.value("session")){CloseHandle(owner);return 0;}
+        const auto waited=WaitForSingleObject(owner,250);
+        if(waited==WAIT_FAILED){CloseHandle(owner);return 3;}
+        if(waited==WAIT_OBJECT_0||!alive(record,"engine","engineTime"))break;
+    }
     CloseHandle(owner);
     if(read(journal).value("session")==record.value("session")) {
         QFile::remove(journal+".ready");

@@ -14,6 +14,7 @@ public:
     void setRoutingMode(const QString &) override;
     Status status()const override;
     QString configurationSummary()const override;
+    qsizetype activeStreamCount()const;
 private:
     struct Private;
     std::unique_ptr<Private> d;

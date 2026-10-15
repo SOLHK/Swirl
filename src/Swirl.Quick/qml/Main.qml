@@ -40,7 +40,7 @@ ApplicationWindow {
     function previewScrollBottom() { if(pageLoader.item && pageLoader.item.scrollToBottom)pageLoader.item.scrollToBottom() }
     property real swirlWindowRadius:Theme.windowRadius
     readonly property real shellRadius:window.visibility===Window.Maximized || window.visibility===Window.FullScreen ? 0 : Theme.windowRadius
-    Binding { target:window.captureProviderContext; property:"upstreamProxyPort"; value:window.engineControllerContext.apiHealthy?window.engineControllerContext.activeProxyPort:0 }
+    Binding { target:window.captureProviderContext; property:"upstreamProxyPort"; value:window.engineControllerContext.processAlive?window.engineControllerContext.activeProxyPort:0 }
     Connections { target:window.captureProviderContext; function onStateChanged(){window.engineControllerContext.setCaptureProxyPort(window.captureProviderContext.running?window.captureProviderContext.port:0)} }
     Connections { target:backdrop; function onChanged() { Theme.backdropActive=backdrop.active } }
     Binding { target:Theme; property:"windowActive"; value:previewState==="inactive"?false:window.active }
@@ -154,16 +154,57 @@ ApplicationWindow {
     function openDashboard(){dashboardWindow.show();dashboardWindow.raise();dashboardWindow.requestActivate()}
     function openCaptureInspector(){captureInspectorDialog.open()}
     property Item settingsOrigin:null
+    property rect settingsOriginRect:Qt.rect(0,0,0,0)
+    property rect settingsOriginTitleRect:Qt.rect(0,0,0,0)
+    property string settingsOriginTitle:""
+    property real settingsOriginFontSize:Theme.fontSize(16)
     readonly property real settingsOriginProgress:settingsTransition.progress
+    readonly property bool settingsOriginMoving:settingsOrigin!==null && settingsTransition.moving && !SwirlMotion.reduced
+    readonly property rect settingsDestinationRect:Qt.rect(settingsSheet.x-window.x,settingsSheet.y-window.y,settingsSheet.width,settingsSheet.height)
     function openSettings(route,origin){
         if(settingsSheet.visible && route!==settingsSheet.section && (dismissals.hasPopup(settingsSheet) || (settingsSheet.section==='dns' && settingsSheet.savedFingerprint!==dismissals.fingerprint(settingsLoader.item)))) { settingsSheet.raise(); settingsSheet.requestActivate(); return }
         settingsSheet.closeApproved=false
         settingsOrigin=origin || null
+        if(settingsOrigin) {
+            const point=settingsOrigin.mapToItem(window.contentItem,0,0)
+            settingsOriginRect=Qt.rect(point.x,point.y,settingsOrigin.width,settingsOrigin.height)
+            const titleItem=settingsOrigin.motionTitle || settingsOrigin
+            const titlePoint=titleItem.mapToItem(window.contentItem,0,0)
+            settingsOriginTitleRect=Qt.rect(titlePoint.x,titlePoint.y,titleItem.width,titleItem.height)
+            settingsOriginTitle=titleItem.text || ""
+            settingsOriginFontSize=titleItem.font?titleItem.font.pixelSize:Theme.fontSize(16)
+        }
         if(!settingsSheet.visible){settingsSheet.x=window.x+(window.width-settingsSheet.width)/2;settingsSheet.y=Math.max(0,Math.min(window.y,Screen.desktopAvailableHeight-settingsSheet.height))}
         settingsSheet.section=route;settingsSheet.updateSettingsSection();settingsSheet.show()
         settingsTransition.moveTo(1);settingsSheet.raise();settingsSheet.requestActivate()
     }
     function closeSettings(){settingsSheet.close()}
+    // Restore the original card-to-detail geometric path using the existing
+    // reversible settings clock. Native settings windows and their cache stay
+    // intact; only the material and live glyphs travel through the main scene.
+    Item {
+        anchors.fill:parent;z:997;visible:window.settingsOriginMoving
+        readonly property real reveal:window.settingsOriginProgress
+        readonly property rect destination:window.settingsDestinationRect
+        readonly property real handoff:Math.max(0,Math.min(1,(reveal-0.7)/0.3))
+        SwirlGlassPanel {
+            x:window.settingsOriginRect.x+(parent.destination.x-window.settingsOriginRect.x)*parent.reveal
+            y:window.settingsOriginRect.y+(parent.destination.y-window.settingsOriginRect.y)*parent.reveal
+            width:window.settingsOriginRect.width+(parent.destination.width-window.settingsOriginRect.width)*parent.reveal
+            height:window.settingsOriginRect.height+(parent.destination.height-window.settingsOriginRect.height)*parent.reveal
+            cornerRadius:Theme.cardRadius+(Theme.windowRadius-Theme.cardRadius)*parent.reveal
+            material:"floating";independentCard:false;opacity:1-parent.handoff
+        }
+        SwirlText {
+            x:window.settingsOriginTitleRect.x+(parent.destination.x+Theme.dp(64)-window.settingsOriginTitleRect.x)*parent.reveal
+            y:window.settingsOriginTitleRect.y+(parent.destination.y+Theme.dp(12)-window.settingsOriginTitleRect.y)*parent.reveal
+            width:window.settingsOriginTitleRect.width+(Math.max(0,parent.destination.width-Theme.dp(128))-window.settingsOriginTitleRect.width)*parent.reveal
+            height:window.settingsOriginTitleRect.height+(Theme.dp(28)-window.settingsOriginTitleRect.height)*parent.reveal
+            text:window.settingsOriginTitle;color:Theme.text;opacity:1-parent.handoff
+            font.pixelSize:Math.round(window.settingsOriginFontSize+(Theme.fontSize(15)-window.settingsOriginFontSize)*parent.reveal)
+            font.weight:Font.DemiBold;elide:Text.ElideRight;verticalAlignment:Text.AlignVCenter
+        }
+    }
     function openRewriteEditor(kind,title){rewriteRulesDialog.kind=kind;rewriteRulesDialog.title=title;rewriteRulesDialog.open()}
     RewriteRulesDialog{id:rewriteRulesDialog}
     SwirlSecondaryWindow {
@@ -177,6 +218,7 @@ ApplicationWindow {
     SwirlSecondaryWindow {
         composition:settingsBackdrop
         id:settingsSheet;objectName:"settingsSheet";
+        opacity:window.settingsOriginMoving?Math.max(0,Math.min(1,(settingsTransition.progress-0.7)/0.3)):1
         property string section:"dns";visible:false;width:Math.min(Theme.dp(900),Screen.desktopAvailableWidth);height:Math.min(Theme.dp(790),Screen.desktopAvailableHeight);title:section==="subscriptions"?"Swirl 订阅管理":section==="proxies"?"Swirl 节点管理":section==="profiles"?"Swirl 配置":section==="modules"?"Swirl 模块":section==="scripts"?"Swirl 脚本":"Swirl 设置";flags:Qt.Window|Qt.FramelessWindowHint;modality:Qt.WindowModal;transientParent:window;color:"transparent"
         function closeSettings(){settingsSheet.close()}
         function updateSettingsSection(){if(settingsLoader.item&&settingsLoader.item.section!==undefined)settingsLoader.item.section=section==="appearance"?"外观":section==="fonts"?"字体":section==="license"?"关于 Swirl":"常规"}

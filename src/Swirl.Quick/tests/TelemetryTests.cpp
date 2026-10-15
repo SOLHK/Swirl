@@ -10,6 +10,17 @@ class TelemetryTests:public QObject {
  Q_OBJECT
  ProxyEngine::Status sample(qint64 time,int up,int down){ProxyEngine::Status s;s.processAlive=true;s.processId=1;s.apiHealthy=true;s.connectionsAt=time;s.trafficAt=time;s.uploadTotal=up;s.downloadTotal=down;s.uploadRate=up;s.downloadRate=down;s.connections={QVariantMap{{"id","connection-a"},{"host","fixture.test"},{"process","fixture.exe"},{"policy","DIRECT"},{"category","direct"},{"uploadBytes",up},{"downloadBytes",down},{"time",QDateTime::fromMSecsSinceEpoch(time).toString(Qt::ISODateWithMs)}}};return s;}
 private slots:
+ void closedSnapshotsAreNotActiveAndControlFailureIsNotClosure(){
+  QTemporaryDir temp;TelemetryService model(temp.filePath("activity-state.json"),false);
+  auto s=sample(QDateTime::currentMSecsSinceEpoch(),10,20);
+  auto closed=s.connections.first().toMap();closed["id"]="closed";closed["process"]="retired.exe";closed["closed"]=true;
+  s.connections.append(closed);model.ingest(s);
+  QCOMPARE(model.activeConnections(),1);QCOMPARE(model.activeProcesses(),1);
+  s.apiHealthy=false;model.ingest(s);
+  auto rows=model.connections();for(const auto &r:rows)if(r.toMap().value("id")=="connection-a")QCOMPARE(r.toMap().value("status").toString(),QStringLiteral("采样中断"));
+  s.processAlive=false;model.ingest(s);
+  for(const auto &r:model.connections())QCOMPARE(r.toMap().value("status").toString(),QStringLiteral("已结束"));
+ }
  void internetUsesExplicitProxyAndActualHttpResponse(){
   QTemporaryDir temp;TelemetryService model(temp.filePath("diagnostic.json"),false);
   QTcpServer proxy;QVERIFY(proxy.listen(QHostAddress::LocalHost,0));QByteArray request;

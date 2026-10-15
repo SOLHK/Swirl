@@ -16,11 +16,17 @@ private slots:
         QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,directory.path());
         QSettings().clear();
         FontManager manager(nullptr,directory.filePath("fonts"));
-        QVERIFY(manager.defaultFamily().contains("HarmonyOS"));
+        const auto installed=QFontDatabase::families();
+        if(installed.contains("PingFang SC",Qt::CaseInsensitive))
+            QCOMPARE(manager.defaultFamily().compare("PingFang SC",Qt::CaseInsensitive),0);
+        else
+            QVERIFY(manager.defaultFamily().contains("HarmonyOS"));
         QCOMPARE(manager.currentFamily(),manager.defaultFamily());
         QCOMPARE(QGuiApplication::font().family(),manager.defaultFamily());
         QVERIFY(manager.licenseText().contains("Copyright 2021 Huawei Device Co., Ltd."));
-        QVERIFY(QFontDatabase::styles(manager.defaultFamily()).size()>=3);
+        const auto harmony=installed.filter("HarmonyOS",Qt::CaseInsensitive);
+        QVERIFY(!harmony.isEmpty());
+        QVERIFY(QFontDatabase::styles(harmony.first()).size()>=3);
         auto alternative=manager.families();alternative.removeAll(manager.defaultFamily());
         QVERIFY(!alternative.isEmpty());
         QVERIFY(manager.selectFamily(alternative.first()));

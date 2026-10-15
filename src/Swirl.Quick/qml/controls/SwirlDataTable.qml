@@ -1,6 +1,5 @@
 import QtQuick
 import QtQuick.Controls
-import QtQuick.Effects
 import SwirlQuick
 import "../components"
 Item {
@@ -25,8 +24,23 @@ Item {
     property real cellPadding:Theme.dp(12)
     property real stripeInset:0
     property real stripeRadius:0
-    readonly property real totalWidth:columns.reduce(function(v,c){return v+Theme.dp(c.w)},0)
-    function columnWidth(column) { return Math.max(Theme.dp(12),width*Theme.dp(column.w)/totalWidth) }
+    readonly property real totalWidth:columns.reduce(function(v,c){return v+c.w},0)
+    readonly property real minimumGridWidth:columns.reduce(function(v,c){return v+Theme.dp(c.min||12)},0)
+    readonly property real gridWidth:Math.max(Math.floor(width),minimumGridWidth)
+    // Rounded cumulative edges keep header/body columns aligned at all scales.
+    function columnWidth(column) {
+        let before=0
+        for(const item of columns){if(item.key===column.key)break;before+=item.w}
+        const flexible=Math.max(0,gridWidth-minimumGridWidth)
+        return Theme.dp(column.min||12)+Math.round(flexible*(before+column.w)/totalWidth)-Math.round(flexible*before/totalWidth)
+    }
+    function chooseRow(row,activate) {
+        if(!row)return
+        selectedItem=row
+        if(!incrementalRows&&!managedSelection)selectedId=String(row.record.id||row.record.name)
+        rowSelected(row.record)
+        if(activate)rowActivated(row.record,minimal?row:row.titleElement)
+    }
     signal rowSelected(var record)
     signal rowActivated(var record, Item titleItem)
     signal rowEdited(var record, Item rowItem)
@@ -36,15 +50,14 @@ Item {
     Flickable {
         id:horizontal
         anchors.fill:parent
-        contentWidth:table.columns.reduce(function(v,c){return v+table.columnWidth(c)},0)
+        contentWidth:table.gridWidth
         contentHeight:height
         flickableDirection:Flickable.HorizontalFlick
         boundsBehavior:Flickable.StopAtBounds
-        Column {
-            width:horizontal.contentWidth
-            spacing:Theme.dp(0)
+        pixelAligned:true
+        ScrollBar.horizontal:SwirlScrollBar {policy:horizontal.contentWidth>horizontal.width?ScrollBar.AsNeeded:ScrollBar.AlwaysOff}
             Rectangle {
-                width:parent.width; height:table.headerHeight
+                z:1;width:horizontal.contentWidth;height:table.headerHeight
                 color:Theme.field
                 radius: Theme.tableRadius
                 Row {
@@ -62,6 +75,7 @@ Item {
                                 font.weight:Font.Normal
                                 anchors.fill:parent
                                 anchors.leftMargin:table.cellPadding
+                                anchors.rightMargin:Theme.dp(8)
                                 verticalAlignment:Text.AlignVCenter
                                 elide:Text.ElideRight
                             }
@@ -75,21 +89,33 @@ Item {
                     move: Transition {enabled:table.animateRowChanges && !SwirlMotion.reduced;SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration}}
                     displaced: Transition { enabled:table.animateRowChanges && !SwirlMotion.reduced; SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration} }
                 id:list
+                objectName:"tableRowsViewport"
                 Repeater {model:table.fillEmptyRows?Math.max(0,Math.ceil((list.height-table.rows.length*table.itemHeight)/table.emptyStripeHeight)):0
                     Rectangle{required property int index;x:table.stripeInset;y:table.rows.length*table.itemHeight+index*table.emptyStripeHeight;width:list.width-2*table.stripeInset;height:table.emptyStripeHeight;radius:table.stripeRadius;color:(index+table.rows.length)%2?Theme.field:Theme.surface;z:-1}
                 }
-                width:parent.width
-                height:Math.max(0,horizontal.height-table.headerHeight)
+                y:table.headerHeight
+                width:horizontal.contentWidth
+                height:Math.max(0,horizontal.height-table.headerHeight-(horizontal.contentWidth>horizontal.width?Theme.dp(10):0))
                 clip:true
                 model:table.incrementalRows?stableRows:table.rows
                 boundsBehavior:Flickable.StopAtBounds
-                ScrollBar.vertical:ScrollBar {}
+                pixelAligned:true
+                activeFocusOnTab:true
+                keyNavigationEnabled:true
+                highlightMoveDuration:0
+                Keys.onReturnPressed:table.chooseRow(currentItem,true)
+                Keys.onEnterPressed:table.chooseRow(currentItem,true)
+                Keys.onSpacePressed:table.chooseRow(currentItem,true)
+                ScrollBar.vertical:SwirlScrollBar {parent:table;z:11;anchors.right:parent.right;y:table.headerHeight;height:list.height}
                 delegate:Rectangle {
                     id:recordRow
                     z:1
                     width:list.width; height:table.itemHeight
                     property var record:table.incrementalRows?model.entry:modelData
                     property Item titleElement:null
+                    Accessible.role:Accessible.ListItem
+                    Accessible.selected:table.selectedId===String(record.id||record.name)
+                    Accessible.name:table.columns.map(c=>c.label+"："+String(recordRow.record[c.key]===undefined?"":recordRow.record[c.key])).join("，")
                     radius:table.minimal?Theme.dp(10):0
                     color:table.selectedId===String(record.id||record.name) ? (table.minimal?Theme.withAlpha(Theme.accent,0.12):Theme.selected) :
                           mouse.containsMouse ? (table.minimal?Theme.withAlpha(Theme.accent,0.055):Theme.hover) : table.minimal?"transparent":(index%2?Theme.field:Theme.surface)
@@ -120,17 +146,19 @@ Item {
                                     verticalAlignment:Text.AlignVCenter
                                     elide:Text.ElideRight
                                 }
+                                HoverHandler {id:cellHover}
+                                ToolTip.visible:cellHover.hovered&&cell.truncated
+                                ToolTip.text:cell.raw;ToolTip.delay:600
                             }
                         }
                     }
                     MouseArea {
                         id:mouse; anchors.fill:parent; hoverEnabled:true
+                        cursorShape:Qt.PointingHandCursor
                         acceptedButtons:Qt.LeftButton|Qt.RightButton
                         onClicked:function(event){
-                            table.selectedItem=recordRow
-                            if(!table.incrementalRows&&!table.managedSelection)table.selectedId=String(recordRow.record.id||recordRow.record.name)
-                            table.rowSelected(recordRow.record)
-                            if(event.button===Qt.LeftButton)table.rowActivated(recordRow.record,table.minimal?recordRow:recordRow.titleElement)
+                            list.forceActiveFocus();list.currentIndex=index
+                            table.chooseRow(recordRow,event.button===Qt.LeftButton)
                             if(event.button===Qt.RightButton) contextMenu.popup()
                         }
                         onDoubleClicked:table.rowEdited(recordRow.record,recordRow)
@@ -143,7 +171,6 @@ Item {
                     }
                 }
             }
-        }
         Item {visible:table.gridLines;y:table.headerHeight;width:horizontal.contentWidth;height:horizontal.height-table.headerHeight;z:3
             Row{anchors.fill:parent;Repeater{model:table.columns;Item{width:table.columnWidth(modelData);height:parent.height;Rectangle{visible:index>0;width:Theme.dp(1);height:parent.height;color:Theme.border}}}}
         }

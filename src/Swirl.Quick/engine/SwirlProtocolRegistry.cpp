@@ -20,6 +20,7 @@ QString SwirlProtocolRegistry::nativeNodeReason(const ProxyNode &node){
     return ProxyNode::validate(node);
 }
 QString SwirlProtocolRegistry::nativeSessionReason(const EngineStartOptions &o){
+    if(o.preferCompatibility)return QStringLiteral("用户选择优先使用 Mihomo 兼容引擎；保持相同节点与网络配置。");
     if(o.tunEnabled||o.gatewayForwarding||o.allowLan||o.meteredNetwork)return QStringLiteral("TUN、网关、LAN 或进程计费策略继续由 Mihomo 执行。");
     if(!o.dnsConfig.isEmpty()||!o.customRules.isEmpty()||!o.customGroups.isEmpty())return QStringLiteral("自定义 DNS、规则及策略组继续由 Mihomo 执行。");
     if(o.routingMode=="rule"&&o.smartRouting&&!o.directSession)return QStringLiteral("国内外 MRS 分流继续由 Mihomo 执行；全局基础代理可使用原生引擎。");

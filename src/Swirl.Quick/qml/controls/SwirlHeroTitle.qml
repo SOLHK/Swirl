@@ -8,6 +8,7 @@ Item {
     property string title: ""
     property rect origin: Qt.rect(0,0,0,0)
     property real sourceFont: Theme.fontSize(12)
+    property int duration:SwirlMotion.pageDuration
     readonly property bool moving: clock.moving
     readonly property real progress: clock.progress
     // The target is mapped again as the window/layout changes. Only two small
@@ -34,7 +35,7 @@ Item {
         clock.finish()
         sourceItem = null; targetItem = null; title = ""
     }
-    SwirlTransitionCoordinator { id: clock; duration: SwirlMotion.pageDuration }
+    SwirlTransitionCoordinator { id: clock; duration: hero.duration }
     Connections { target: clock; function onMovingChanged() { if (!clock.moving) { hero.sourceItem=null; hero.targetItem=null; hero.title="" } } }
     Binding { target: hero.sourceItem; property: "opacity"; value: 0; when: hero.moving && hero.sourceItem!==null; restoreMode: Binding.RestoreBindingOrValue }
     Binding { target: hero.targetItem; property: "opacity"; value: 0; when: hero.moving && hero.targetItem!==null; restoreMode: Binding.RestoreBindingOrValue }
@@ -46,7 +47,7 @@ Item {
         height: hero.origin.height+(hero.targetRect.height-hero.origin.height)*hero.progress
         text: hero.title; textFormat: Text.PlainText; color: Theme.text
         font.family: Theme.fontFamily
-        font.pixelSize: hero.sourceFont+((hero.targetItem?hero.targetItem.font.pixelSize:hero.sourceFont)-hero.sourceFont)*hero.progress
+        font.pixelSize: Math.round(hero.sourceFont+((hero.targetItem?hero.targetItem.font.pixelSize:hero.sourceFont)-hero.sourceFont)*hero.progress)
         font.weight: Font.DemiBold
         verticalAlignment: Text.AlignVCenter
         horizontalAlignment: Text.AlignLeft

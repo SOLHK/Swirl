@@ -28,6 +28,8 @@ target_sources(SwirlEngine PRIVATE engine/ProxyNode.h engine/ProxyNode.cpp engin
 target_sources(SwirlEngine PRIVATE engine/NodeImporter.h engine/NodeImporter.cpp)
 target_sources(SwirlEngine PRIVATE engine/SubscriptionNormalizer.h engine/SubscriptionNormalizer.cpp)
 target_sources(SwirlEngine PRIVATE engine/SwirlProtocolRegistry.h engine/SwirlProtocolRegistry.cpp engine/SwirlProxyEngine.h engine/SwirlProxyEngine.cpp)
+target_sources(SwirlEngine PRIVATE engine/NativeDuplexRelay.h engine/NativeDuplexRelay.cpp)
+target_sources(SwirlEngine PRIVATE engine/ConnectionDiagnostics.h engine/ConnectionDiagnostics.cpp)
 target_sources(SwirlEngine PRIVATE engine/SwirlEngineManager.h engine/SwirlEngineManager.cpp)
 target_sources(SwirlEngine PRIVATE engine/SwirlUdpExchange.h engine/SwirlUdpExchange.cpp)
 target_sources(SwirlEngine PRIVATE engine/NodeImportService.h engine/NodeImportService.cpp)

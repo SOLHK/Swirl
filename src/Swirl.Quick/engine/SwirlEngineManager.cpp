@@ -31,20 +31,45 @@ void SwirlEngineManager::changed(ProxyEngine *engine){
         if(engine->status().state==State::Stopped&&m_pending){auto target=m_pending;m_pending=nullptr;m_transition=false;m_active=target;m_session=QUuid::createUuid().toString(QUuid::WithoutBraces);m_active->start(m_options);}
         emit statusChanged();return;
     }
+    const auto actual=engine->status();
+    if(!actual.nodeBusy&&!actual.selectedNodeId.isEmpty())m_options.selectedNodeId=actual.selectedNodeId;
     emit statusChanged();
     if(m_active==&m_compatibility&&m_fallback&&!m_probe.isEmpty()&&engine->status().state==State::Running){auto url=m_probe;m_probe=QUrl();m_active->probeNode(url);}
     else if(m_active==&m_native&&engine->status().requestState==RequestState::Failed)fallback("NativeProbeFailed");
 }
 void SwirlEngineManager::fallback(const QString &code){
     if(m_fallback||m_transition||m_active!=&m_native||m_options.directSession||m_options.routingMode=="direct")return;
+    if(m_native.activeStreamCount()>0){
+        m_reason=QStringLiteral("本次新连接失败（%1）；其他已建立连接继续运行。需要兼容引擎时请手动断开重连。").arg(code);
+        emit diagnostic("EngineManager","FallbackDeferredToPreserveStreams",m_reason);return;
+    }
     m_fallback=true;m_reason=QStringLiteral("原生连接失败（%1），已用同一节点重试 Mihomo；未切换直连。").arg(code);
     const auto generation=m_generation;
-    QTimer::singleShot(0,this,[this,generation]{if(generation!=m_generation||m_active!=&m_native)return;emit diagnostic("EngineManager","CompatibilityFallback",m_reason);activate(&m_compatibility);});
+    QTimer::singleShot(0,this,[this,generation]{
+        if(generation!=m_generation||m_active!=&m_native)return;
+        // A different handshake may have completed since fallback was queued.
+        if(m_native.activeStreamCount()>0){m_fallback=false;m_reason="兼容引擎切换已延后，以保留刚建立的连接。";emit diagnostic("EngineManager","FallbackDeferredToPreserveStreams",m_reason);return;}
+        emit diagnostic("EngineManager","CompatibilityFallback",m_reason);activate(&m_compatibility);
+    });
 }
 void SwirlEngineManager::stop(){++m_generation;m_pending=nullptr;m_transition=false;m_probe=QUrl();if(m_active)m_active->stop();else emit statusChanged();}
 void SwirlEngineManager::refresh(){if(m_active)m_active->refresh();}
-void SwirlEngineManager::selectNode(const QString &id){auto options=m_options;options.selectedNodeId=id;options.directSession=false;start(options);}
-void SwirlEngineManager::setRoutingMode(const QString &mode){auto options=m_options;options.routingMode=mode;start(options);}
+void SwirlEngineManager::selectNode(const QString &id){
+    auto options=m_options;options.selectedNodeId=id;options.directSession=false;
+    if(m_active==&m_compatibility&&!m_transition&&m_active->status().processAlive){m_options=options;m_active->selectNode(id);return;}
+    const auto reason=SwirlProtocolRegistry::nativeSessionReason(options);
+    if(m_active==&m_native&&!m_transition&&reason.isEmpty()&&m_active->status().processAlive){m_options=options;m_active->selectNode(id);return;}
+    if(m_active==&m_native&&m_native.activeStreamCount()>0){m_reason="所选节点需要切换引擎；为保留现有连接，请手动断开后连接该节点。";emit diagnostic("EngineManager","EngineSwitchRequiresReconnect",m_reason);emit statusChanged();return;}
+    start(options);
+}
+void SwirlEngineManager::setRoutingMode(const QString &mode){
+    auto options=m_options;options.routingMode=mode;
+    if(m_active==&m_compatibility&&!m_transition&&m_active->status().processAlive){m_options=options;m_active->setRoutingMode(mode);return;}
+    const auto reason=SwirlProtocolRegistry::nativeSessionReason(options);
+    if(m_active==&m_native&&!m_transition&&reason.isEmpty()&&m_active->status().processAlive){m_options=options;m_active->setRoutingMode(mode);return;}
+    if(m_active==&m_native&&m_native.activeStreamCount()>0){m_reason="新路由模式需要切换引擎；为保留现有连接，请手动断开重连。";emit diagnostic("EngineManager","RoutingSwitchRequiresReconnect",m_reason);emit statusChanged();return;}
+    start(options);
+}
 void SwirlEngineManager::probeNode(const QUrl &url){m_probe=url;if(m_active)m_active->probeNode(url);}
 ProxyEngine::Status SwirlEngineManager::status()const{
     auto status=m_active?m_active->status():Status{};status.engineReason=m_reason;

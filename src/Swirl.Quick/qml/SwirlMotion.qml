@@ -39,8 +39,14 @@ QtObject {
                y>popup.height*2/3 ? (x<popup.width/3?Item.BottomLeft:x>popup.width*2/3?Item.BottomRight:Item.Bottom) : Item.Center
     }
     function navigateFrom(item, route, targetKey) {
-        shared={source:item,targetKey:targetKey || "title",text:item.text || ""}
-        returnShared={route:route,previous:AppState.currentPage,source:item,targetKey:targetKey || "title"}
+        const titleItem=item.motionTitle || item
+        const surface=item.motionSurface || (item.motionTitle?item:null)
+        // Existing Activity/traffic links remain title-only. A card explicitly
+        // supplies its material/heading and keeps the original shared boundary.
+        shared={source:titleItem,surface:surface,route:route,previous:AppState.currentPage,
+            targetKey:targetKey || "title",text:titleItem.text || ""}
+        returnShared={route:route,previous:AppState.currentPage,source:titleItem,
+            surface:surface,targetKey:targetKey || "title"}
         AppState.navigate(route)
     }
     function returnToHub(item) {

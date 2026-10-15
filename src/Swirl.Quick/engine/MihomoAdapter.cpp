@@ -148,6 +148,7 @@ bool MihomoAdapter::prepareConfiguration() {
         "allow-lan: false\nbind-address: '127.0.0.1'\nmode: direct\n"
         "port: 0\nsocks-port: 0\nmixed-port: 0\nredir-port: 0\ntproxy-port: 0\n"
         "ipv6: false\nlog-level: warning\nfind-process-mode: always\ngeodata-mode: false\n"
+        "disable-keep-alive: false\nkeep-alive-idle: 30\nkeep-alive-interval: 15\ntcp-concurrent: true\n"
         "geo-auto-update: false\nprofile:\n  store-selected: false\n  store-fake-ip: false\n"
         "tun:\n  enable: false\n  auto-route: false\n  auto-detect-interface: false\n"
         "dns:\n  enable: false\nproxies: []\nproxy-groups: []\nrules: []\n")
@@ -524,19 +525,22 @@ void MihomoAdapter::selectNode(const QString &id) {
     m_nodeReply=reply; boundReply(reply,m_options.requestTimeoutMs);
     connect(reply,&QNetworkReply::finished,this,[this,reply,generation,id,request] {
         reply->deleteLater(); if(generation!=m_nodeGeneration)return; m_nodeReply=nullptr;
-        if (reply->error()!=QNetworkReply::NoError || reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()!=204) {
-            fail(Error::SelectionFailed,QStringLiteral("节点切换未获得控制接口确认，已停止引擎以避免错误出口。")); return;
-        }
+        // Even when PUT's response is lost, the selection may have succeeded.
+        // Reconcile with GET instead of killing unrelated application tunnels.
         auto *verify=m_network.get(request); m_nodeReply=verify; boundReply(verify,m_options.requestTimeoutMs);
         connect(verify,&QNetworkReply::finished,this,[this,verify,generation,id] {
             verify->deleteLater(); if(generation!=m_nodeGeneration)return; m_nodeReply=nullptr;
             const auto object=QJsonDocument::fromJson(verify->readAll()).object();
-            if (verify->error()!=QNetworkReply::NoError || verify->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()!=200 || object.value("now").toString()!=id) {
-                fail(Error::SelectionFailed,QStringLiteral("无法确认当前节点，已停止引擎。")); return;
+            const auto actual=object.value("now").toString();
+            if (verify->error()!=QNetworkReply::NoError || verify->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()!=200 ||
+                std::none_of(m_options.nodes.begin(),m_options.nodes.end(),[&](const ProxyNode &n){return n.id==actual;})) {
+                m_status.nodeBusy=false;m_selectionPending=false;
+                apiFailure(Error::SelectionFailed,QStringLiteral("切换结果暂未确认；保留引擎与现有连接，请等待控制接口恢复后重试。"));return;
             }
-            m_options.selectedNodeId=id; m_status.selectedNodeId=id; m_status.nodeBusy=false;
+            m_options.selectedNodeId=actual; m_status.selectedNodeId=actual; m_status.nodeBusy=false;
             m_selectionPending=false;
-            m_status.latencyMs=-1; m_status.responseCode=0; m_status.nodeMessage.clear(); publish();
+            m_status.latencyMs=-1; m_status.responseCode=0;
+            m_status.nodeMessage=actual==id?QString():QStringLiteral("此次切换未生效，引擎仍使用原节点；现有连接已保留。");publish();
         });
     });
 }
@@ -604,9 +608,8 @@ void MihomoAdapter::refresh() {
 }
 
 void MihomoAdapter::apiFailure(Error error, const QString &message) {
-    if(m_selectionPending){fail(Error::SelectionFailed,QStringLiteral("节点切换期间控制接口异常，已停止引擎以避免错误出口。"));return;}
-    cancelNodeRequests(); m_status.nodeHealth=NodeHealth::Unknown; m_status.requestState=RequestState::NotTested;
-    m_status.nodeMessage.clear(); m_status.latencyMs=-1; m_status.responseCode=0;
+    // Polling belongs to the control plane. A short polling timeout must not
+    // stop forwarding or cancel independently bounded selection/probe requests.
     m_status.apiHealthy = false;
     // Startup retries are bounded by the original deadline; never reset it.
     if (m_status.state != State::Starting) m_status.state = State::Degraded;
@@ -721,12 +724,13 @@ void MihomoAdapter::readConnections() {
     const auto generation=m_generation;
     QNetworkRequest req(QUrl(m_status.controlEndpoint+"/connections"));
     req.setRawHeader("Authorization","Bearer "+m_secret);req.setTransferTimeout(1500);
-    auto reply=m_network.get(req);m_connectionsReply=reply;
+    req.setAttribute(QNetworkRequest::RedirectPolicyAttribute,QNetworkRequest::ManualRedirectPolicy);
+    auto reply=m_network.get(req);m_connectionsReply=reply;reply->setReadBufferSize(1024*1024+1);
     connect(reply,&QNetworkReply::readyRead,this,[reply]{if(reply->bytesAvailable()>1024*1024)reply->abort();});
     connect(reply,&QNetworkReply::finished,this,[this,reply,generation]{
         reply->deleteLater();if(generation!=m_generation)return;m_connectionsReply=nullptr;
         if(reply->error()!=QNetworkReply::NoError||reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()!=200){m_status.telemetryError=QStringLiteral("连接采集失败");publish();return;}
-        const auto bytes=reply->readAll();if(bytes.size()>1024*1024)return;
+        const auto bytes=reply->readAll();if(bytes.size()>1024*1024){m_status.telemetryError=QStringLiteral("连接接口响应超出 1 MiB 上限");publish();return;}
         QJsonParseError parseError;const auto doc=QJsonDocument::fromJson(bytes,&parseError);
         // Mihomo serializes its nil Go slice as null when no connections are
         // active. This valid idle snapshot still carries final byte counters.

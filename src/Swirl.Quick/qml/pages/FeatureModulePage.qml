@@ -9,6 +9,8 @@ Item {
     id:page
     SwirlAnimatedModel {id:animatedRecords;source:page.records}
     property string moduleId:""
+    readonly property Item motionSurface:detailPanel
+    readonly property var heroTargets:({title:moduleTitle})
     readonly property var feature:FeatureCatalog.find(moduleId)
     property var settings:({})
     property var records:[]
@@ -35,7 +37,7 @@ Item {
             SwirlIconButton {iconName:"chevron-left";tooltip:"功能模块中心";onClicked:SwirlMotion.returnToHub(detailPanel)}
             ColumnLayout {
                 Layout.fillWidth:true;spacing:Theme.dp(5)
-                SwirlText {text:page.feature ? page.feature.title : "功能模块";font.pixelSize:Theme.fontSize(25);font.weight:Font.DemiBold;color:Theme.text}
+                SwirlText {id:moduleTitle;text:page.feature ? page.feature.title : "功能模块";font.pixelSize:Theme.fontSize(25);font.weight:Font.DemiBold;color:Theme.text}
                 SwirlText {text:page.feature ? page.feature.sub : "";font.pixelSize:Theme.fontSize(14);color:Theme.muted;Layout.fillWidth:true;elide:Text.ElideRight}
             }
             SwirlButton {text:"导入草稿";font.pixelSize:Theme.fontSize(14);onClicked:importDialog.open()}

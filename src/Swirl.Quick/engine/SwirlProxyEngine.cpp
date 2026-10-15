@@ -1,5 +1,6 @@
 #include "SwirlProxyEngine.h"
 #include "SwirlProtocolRegistry.h"
+#include "NativeDuplexRelay.h"
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <QSslSocket>
@@ -18,6 +19,7 @@
 #include <QSet>
 #include <QRegularExpression>
 #include <functional>
+#include <algorithm>
 #include <cstring>
 
 namespace {
@@ -49,36 +51,37 @@ public:
     enum Stage{Detect,SocksHello,SocksAuth,SocksRequest,HttpRequest,Waiting,Streaming};
     QTcpSocket *client,*upstream=nullptr;
     ProxyNode node;
-    bool direct=false,closing=false,http=false,tunnel=true,remoteEnded=false,notified=false;
+    bool direct=false,closing=false,http=false,tunnel=true,upgrade=false,remoteEnded=false,notified=false;
+    NativeDuplexRelay *relay=nullptr;
     QString endReason;
     Stage stage=Detect;
     int outboundStage=0;
     QByteArray buffer,upBuffer,initial,username,password;
-    QString host,id=QUuid::createUuid().toString(QUuid::WithoutBraces);
+    QString host,sourceIp,id=QUuid::createUuid().toString(QUuid::WithoutBraces);
     quint16 port=0;
     qint64 uploaded=0,downloaded=0,upDebt=0,downDebt=0,bodyRemaining=0;
-    QTimer deadline,idle;
+    QTimer deadline;
     QString started=QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs);
     std::function<void(qint64,qint64)> bytes;
     std::function<void(NativeSession *,const QString &)> ended;
     NativeSession(QTcpSocket *socket,ProxyNode selected,bool bypass,const EngineStartOptions &options,QObject *parent):QObject(parent),client(socket),node(std::move(selected)),direct(bypass),username(options.inboundUsername.toUtf8()),password(options.inboundPassword.toUtf8()){
         client->setParent(this);client->setProxy(QNetworkProxy::NoProxy);client->setReadBufferSize(ReadLimit);
-        deadline.setSingleShot(true);deadline.setInterval(qBound(100,options.startupTimeoutMs,30000));idle.setSingleShot(true);idle.setInterval(120000);
+        sourceIp=client->peerAddress().toString();client->setSocketOption(QAbstractSocket::KeepAliveOption,1);client->setSocketOption(QAbstractSocket::LowDelayOption,1);
+        deadline.setSingleShot(true);deadline.setInterval(qBound(100,options.startupTimeoutMs,30000));
         connect(&deadline,&QTimer::timeout,this,[this]{fail("ConnectionTimeout",504,6);});
-        connect(&idle,&QTimer::timeout,this,[this]{fail("IdleTimeout",504,6);});
         connect(client,&QTcpSocket::readyRead,this,[this]{consume();});
-        connect(client,&QTcpSocket::bytesWritten,this,[this](qint64 count){const auto skip=qMin(count,downDebt);downDebt-=skip;downloaded+=count-skip;if(bytes)bytes(0,count-skip);pumpDown();});
+        connect(client,&QTcpSocket::bytesWritten,this,[this](qint64 count){const auto skip=qMin(count,downDebt);downDebt-=skip;downloaded+=count-skip;if(bytes)bytes(0,count-skip);if(stage==Streaming&&tunnel)attachRelay();else pumpDown();});
         connect(client,&QTcpSocket::disconnected,this,[this]{if(!closing)finish({});notifyEnd();deleteLater();});
         connect(client,&QTcpSocket::errorOccurred,this,[this](auto error){if(!closing&&error!=QAbstractSocket::RemoteHostClosedError)finish("ClientDisconnected");});
         deadline.start();
     }
-    QVariantMap snapshot(bool closed=false)const{return {{"id",id},{"host",host},{"ip",host},{"port",port},{"sourceIp",client->peerAddress().toString()},{"process","未知进程"},{"policy",direct?QString("DIRECT"):node.name},{"category",direct?QString("direct"):QString("proxy")},{"network","TCP"},{"uploadBytes",uploaded},{"downloadBytes",downloaded},{"time",started},{"closed",closed}};}
+    QVariantMap snapshot(bool closed=false)const{return {{"id",id},{"host",host},{"ip",host},{"port",port},{"sourceIp",sourceIp},{"process","未知进程"},{"policy",direct?QString("DIRECT"):node.name},{"category",direct?QString("direct"):QString("proxy")},{"network","TCP"},{"uploadBytes",uploaded},{"downloadBytes",downloaded},{"time",started},{"closed",closed}};}
     void notifyEnd(){if(notified)return;notified=true;if(ended)ended(this,endReason);}
     void cancel(){finish({});client->abort();notifyEnd();}
     void sendClientHandshake(const QByteArray &value){downDebt+=value.size();client->write(value);}
     void sendUpHandshake(const QByteArray &value){upDebt+=value.size();upstream->write(value);}
     void finish(const QString &reason){
-        if(closing)return;closing=true;endReason=reason;deadline.stop();idle.stop();if(upstream)upstream->abort();
+        if(closing)return;closing=true;endReason=reason;deadline.stop();if(relay)relay->cancel();if(upstream)upstream->abort();
         if(client->state()==QAbstractSocket::UnconnectedState){notifyEnd();deleteLater();}else client->disconnectFromHost();
         QTimer::singleShot(1000,this,[this]{client->abort();notifyEnd();deleteLater();});
     }
@@ -121,7 +124,7 @@ public:
             tunnel=request[0]=="CONNECT";const QUrl target(QString::fromUtf8((tunnel?QByteArray("http://"):QByteArray())+request[1]),QUrl::StrictMode);
             host=target.host();const int targetPort=target.port(tunnel?-1:80);
             if(!target.isValid()||host.isEmpty()||targetPort<1||targetPort>65535||!target.userInfo().isEmpty()||target.hasFragment()||(!tunnel&&target.scheme()!="http")||(tunnel&&(!target.path().isEmpty()||target.hasQuery()))){fail("InvalidHttpTarget",400);return;}port=quint16(targetPort);
-            QByteArray auth,headers;bool lengthSeen=false,hostSeen=false;QStringList hopHeaders;
+            QByteArray auth,headers,upgradeHeader;bool lengthSeen=false,hostSeen=false;QStringList hopHeaders;
             for(const auto &line:lines){const auto at=line.indexOf(':');if(at<1){fail("InvalidHttpHeader",400);return;}if(line.left(at).trimmed().toLower()=="connection")for(const auto &key:line.mid(at+1).trimmed().toLower().split(','))hopHeaders.append(QString::fromLatin1(key.trimmed()));}
             for(const auto &key:QStringList{"content-length","transfer-encoding","host","proxy-authorization"})if(hopHeaders.contains(key)){fail("InvalidHopByHopHeader",400);return;}
             for(const auto &line:lines){
@@ -129,18 +132,22 @@ public:
                 if(!headerToken(line.left(at))){fail("InvalidHttpHeader",400);return;}for(unsigned char c:value)if((c<32&&c!=9)||c==127){fail("InvalidHttpHeader",400);return;}
                 if(key=="proxy-authorization"){if(!auth.isEmpty()){fail("DuplicateProxyAuthentication",400);return;}auth=value;continue;}
                 if(key=="host"){if(hostSeen){fail("DuplicateHost",400);return;}hostSeen=true;continue;}
-                if(key=="transfer-encoding"||key=="upgrade"){fail("HttpExtensionUnsupported",501);return;}
+                if(key=="transfer-encoding"){fail("HttpExtensionUnsupported",501);return;}
+                if(key=="upgrade"){if(!upgradeHeader.isEmpty()||value.toLower()!="websocket"){fail("HttpUpgradeUnsupported",501);return;}upgradeHeader=value;continue;}
                 if(key=="content-length"){bool ok=false;const auto length=value.toLongLong(&ok);if(!ok||!QRegularExpression("^[0-9]+$").match(QString::fromLatin1(value)).hasMatch()||length<0||length>1024LL*1024*1024||lengthSeen){fail("InvalidContentLength",400);return;}lengthSeen=true;bodyRemaining=length;}
                 if(key=="proxy-connection"||key=="connection"||key=="keep-alive"||hopHeaders.contains(QString::fromLatin1(key)))continue;
                 headers+=line.trimmed()+"\r\n";
             }
             if(!username.isEmpty()&&!equalSecret(auth,"Basic "+(username+":"+password).toBase64())){fail("InboundAuthenticationFailed",407);return;}
+            upgrade=!upgradeHeader.isEmpty();
+            if(upgrade&&(tunnel||request[0]!="GET"||!hopHeaders.contains("upgrade")||bodyRemaining>0)){fail("InvalidWebSocketUpgrade",400);return;}
             const auto tail=buffer.mid(end+4);
             if(tunnel)initial=tail;
             else {
-                if(tail.size()>bodyRemaining){fail("HttpPipeliningUnsupported",400);return;}
-                bodyRemaining-=tail.size();auto path=target.path(QUrl::FullyEncoded).toUtf8();if(path.isEmpty())path="/";if(target.hasQuery())path+="?"+target.query(QUrl::FullyEncoded).toUtf8();
-                initial=request[0]+" "+path+" HTTP/1.1\r\nHost: "+authority(host,port)+"\r\nConnection: close\r\n"+headers+"\r\n"+tail;
+                if(!upgrade&&tail.size()>bodyRemaining){fail("HttpPipeliningUnsupported",400);return;}
+                if(!upgrade)bodyRemaining-=tail.size();auto path=target.path(QUrl::FullyEncoded).toUtf8();if(path.isEmpty())path="/";if(target.hasQuery())path+="?"+target.query(QUrl::FullyEncoded).toUtf8();
+                initial=request[0]+" "+path+" HTTP/1.1\r\nHost: "+authority(host,port)+"\r\n"+
+                    (upgrade?QByteArray("Connection: Upgrade\r\nUpgrade: websocket\r\n"):QByteArray("Connection: close\r\n"))+headers+"\r\n"+tail;
             }
             buffer.clear();connectOutbound();
         }
@@ -150,8 +157,9 @@ public:
         if(tls){auto ssl=new QSslSocket(this);ssl->setProtocol(QSsl::TlsV1_2OrLater);auto config=QSslConfiguration::defaultConfiguration();QList<QByteArray> alpn;for(const auto &v:node.parameters.value("alpn").toArray())alpn.append(v.toString().toUtf8());if(!alpn.isEmpty())config.setAllowedNextProtocols(alpn);ssl->setSslConfiguration(config);upstream=ssl;connect(ssl,&QSslSocket::encrypted,this,[this]{beginHandshake();});connect(ssl,&QSslSocket::sslErrors,this,[this](const QList<QSslError> &){fail("TlsVerificationFailed");});}
         else {upstream=new QTcpSocket(this);connect(upstream,&QTcpSocket::connected,this,[this]{beginHandshake();});}
         upstream->setProxy(QNetworkProxy::NoProxy);upstream->setReadBufferSize(ReadLimit);
+        upstream->setSocketOption(QAbstractSocket::KeepAliveOption,1);upstream->setSocketOption(QAbstractSocket::LowDelayOption,1);
         connect(upstream,&QTcpSocket::readyRead,this,[this]{if(stage==Streaming)pumpDown();else consumeUpstream();});
-        connect(upstream,&QTcpSocket::bytesWritten,this,[this](qint64 count){const auto skip=qMin(count,upDebt);upDebt-=skip;uploaded+=count-skip;if(bytes)bytes(count-skip,0);pumpUp();});
+        connect(upstream,&QTcpSocket::bytesWritten,this,[this](qint64 count){const auto skip=qMin(count,upDebt);upDebt-=skip;uploaded+=count-skip;if(bytes)bytes(count-skip,0);if(stage==Streaming&&tunnel)attachRelay();else pumpUp();});
         connect(upstream,&QTcpSocket::errorOccurred,this,[this](auto error){if(!closing&&error!=QAbstractSocket::RemoteHostClosedError)fail(error==QAbstractSocket::HostNotFoundError?"DnsLookupFailed":error==QAbstractSocket::ConnectionRefusedError?"UpstreamConnectionRefused":"UpstreamNetworkError");});
         connect(upstream,&QTcpSocket::disconnected,this,[this]{if(closing)return;if(stage!=Streaming){fail("UpstreamHandshakeClosed");return;}remoteEnded=true;pumpDown();});
         if(tls)static_cast<QSslSocket *>(upstream)->connectToHostEncrypted(node.host,node.port,node.serverName.isEmpty()?node.host:node.serverName);
@@ -159,6 +167,7 @@ public:
     }
     void beginHandshake(){
         if(closing)return;
+        NativeDuplexRelay::configureKeepAlive(upstream);
         if(direct){ready();return;}
         if(node.protocol=="http"){
             const auto dest=authority(host,port);QByteArray headers="CONNECT "+dest+" HTTP/1.1\r\nHost: "+dest+"\r\n";
@@ -194,24 +203,40 @@ public:
     }
     void sendSocksConnect(){const auto dest=address(host,port);if(dest.isEmpty()){fail("InvalidDestination");return;}outboundStage=2;sendUpHandshake(QByteArray::fromHex("050100")+dest);}
     void ready(){
-        if(closing)return;stage=Streaming;deadline.stop();idle.start();
+        if(closing)return;stage=Streaming;deadline.stop();
         if(http&&tunnel)sendClientHandshake("HTTP/1.1 200 Connection Established\r\n\r\n");
         else if(!http)sendClientHandshake(QByteArray::fromHex("050000")+address(upstream->localAddress().toString(),upstream->localPort()));
+        // CONNECT/SOCKS and a forwarded WebSocket Upgrade are opaque streams.
+        // The origin's actual 101 or rejection passes through unchanged.
+        // No idle deadline is applied: a quiet Codex task may legitimately wait.
+        if(upgrade)tunnel=true;
+        if(tunnel){attachRelay();return;}
         if(!initial.isEmpty()){upstream->write(initial);initial.clear();}
         if(!upBuffer.isEmpty()){client->write(upBuffer);upBuffer.clear();}
         pumpUp();pumpDown();
     }
     void pumpUp(){
         if(closing||stage!=Streaming||!upstream)return;
+        if(tunnel){attachRelay();return;}
         const auto room=WriteLimit-upstream->bytesToWrite();if(room<=0)return;
         if(http&&!tunnel&&bodyRemaining==0){client->read(ReadLimit);return;}
         const auto amount=qMin(qMin(room,ReadLimit),http&&!tunnel?bodyRemaining:ReadLimit);
-        const auto data=client->read(amount);if(data.isEmpty())return;upstream->write(data);if(http&&!tunnel)bodyRemaining-=data.size();idle.start();
+        const auto data=client->read(amount);if(data.isEmpty())return;upstream->write(data);if(http&&!tunnel)bodyRemaining-=data.size();
     }
     void pumpDown(){
-        if(closing||stage!=Streaming||!upstream)return;const auto room=WriteLimit-client->bytesToWrite();
-        if(room>0){const auto data=upstream->read(qMin(room,ReadLimit));if(!data.isEmpty()){client->write(data);idle.start();}}
+        if(closing||stage!=Streaming||!upstream)return;if(tunnel){attachRelay();return;}const auto room=WriteLimit-client->bytesToWrite();
+        if(room>0){const auto data=upstream->read(qMin(room,ReadLimit));if(!data.isEmpty())client->write(data);}
         if(remoteEnded&&upstream->bytesAvailable()==0)finish({});
+    }
+    void attachRelay(){
+        if(closing||relay||stage!=Streaming||!upstream||client->bytesToWrite()>0||upstream->bytesToWrite()>0)return;
+        auto stream=new NativeDuplexRelay(this);
+        // Disable session callbacks before closing the old duplicated handles.
+        client->disconnect(this);upstream->disconnect(this);
+        stream->transferred=[this](qint64 up,qint64 down){uploaded+=up;downloaded+=down;if(bytes)bytes(up,down);};
+        stream->finished=[this](const QString &reason){closing=true;endReason=reason;notifyEnd();deleteLater();};
+        if(!stream->attach(client,upstream,std::move(initial),std::move(upBuffer))){delete stream;fail("StreamRelayOwnershipFailed");return;}
+        relay=stream;initial.clear();upBuffer.clear();
     }
 };
 }
@@ -234,6 +259,7 @@ struct SwirlProxyEngine::Private {
 SwirlProxyEngine::SwirlProxyEngine(QObject *parent):ProxyEngine(parent),d(std::make_unique<Private>(this)){}
 SwirlProxyEngine::~SwirlProxyEngine(){stop();}
 ProxyEngine::Status SwirlProxyEngine::status()const{return d->status;}
+qsizetype SwirlProxyEngine::activeStreamCount()const{return std::count_if(d->sessions.cbegin(),d->sessions.cend(),[](const NativeSession *s){return s->stage==NativeSession::Streaming&&!s->closing;});}
 QString SwirlProxyEngine::configurationSummary()const{return QStringLiteral("Swirl 原生 · 本机混合 HTTP/SOCKS5 监听 · TCP 流量转发 · 内存控制接口；凭据已隐藏。");}
 void SwirlProxyEngine::start(const EngineStartOptions &o){
     if(d->listener.isListening())return;stop();d->options=o;d->status={};d->status.engineName="Swirl 原生";d->status.engineKind="native";d->status.sessionId=QUuid::createUuid().toString(QUuid::WithoutBraces);d->status.mode=o.routingMode;
@@ -254,8 +280,19 @@ void SwirlProxyEngine::refresh(){
     d->status.connectionsAt=d->status.trafficAt=now;d->status.uptimeSeconds=d->uptime.elapsed()/1000;
     const auto elapsed=d->rateClock.restart();if(elapsed>0){d->status.uploadRate=double(d->status.uploadTotal-d->lastUp)*1000/elapsed;d->status.downloadRate=double(d->status.downloadTotal-d->lastDown)*1000/elapsed;}d->lastUp=d->status.uploadTotal;d->lastDown=d->status.downloadTotal;emit statusChanged();
 }
-void SwirlProxyEngine::selectNode(const QString &id){auto o=d->options;o.selectedNodeId=id;o.directSession=false;stop();start(o);}
-void SwirlProxyEngine::setRoutingMode(const QString &mode){auto o=d->options;o.routingMode=mode;stop();start(o);}
+void SwirlProxyEngine::selectNode(const QString &id){
+    if(!d->listener.isListening())return;auto options=d->options;options.selectedNodeId=id;options.directSession=false;
+    const auto reason=SwirlProtocolRegistry::nativeSessionReason(options);
+    if(!reason.isEmpty()){emit diagnostic("SwirlNative","SelectionUnsupported",reason);return;}
+    d->options=options;d->status.selectedNodeId=id;d->status.directSession=false;d->status.nodeHealth=NodeHealth::Unknown;
+    d->status.requestState=RequestState::NotTested;d->status.latencyMs=-1;d->status.nodeMessage.clear();
+    emit diagnostic("SwirlNative","NodeSelectedPreservingStreams","节点已切换：新连接使用新节点，已建立连接保留原出口。");refresh();
+}
+void SwirlProxyEngine::setRoutingMode(const QString &mode){
+    auto options=d->options;options.routingMode=mode;
+    const auto reason=SwirlProtocolRegistry::nativeSessionReason(options);if(!reason.isEmpty()){emit diagnostic("SwirlNative","RoutingUnsupported",reason);return;}
+    d->options=options;d->status.mode=mode;emit diagnostic("SwirlNative","RoutingChangedPreservingStreams","路由模式仅用于新连接；现有隧道继续运行。");refresh();
+}
 void SwirlProxyEngine::probeNode(const QUrl &url){
     if(!d->listener.isListening()||d->reply)return;
     if(!url.isValid()||(url.scheme()!="http"&&url.scheme()!="https")||url.host().isEmpty()||!url.userInfo().isEmpty()||url.hasFragment()){d->status.requestState=RequestState::Failed;d->status.nodeMessage="测试地址必须为不含凭据的 HTTP/HTTPS URL。";emit statusChanged();return;}

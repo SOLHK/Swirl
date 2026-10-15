@@ -19,7 +19,7 @@ Item {
                 model:[
                     {title:"通用",icon:"settings",route:"settings",description:"基础配置与应用行为"},
                     {title:"外观",icon:"appearance",route:"appearance",description:"主题、文字大小与动画"},
-                    {title:"字体",icon:"typography",route:"fonts",description:"默认鸿蒙，也可选择其他字体"},
+                    {title:"字体",icon:"typography",route:"fonts",description:"苹方优先，也可选择本机字体"},
                     {title:"DNS",icon:"dns",route:"dns",description:"解析服务与本地映射"},
                     {title:"模块",icon:"modules",route:"modules",description:"管理配置扩展模块"},
                     {title:"配置",icon:"profiles",route:"profiles",description:"管理与切换本地配置"},
@@ -28,11 +28,13 @@ Item {
                     {title:"节点管理",icon:"proxies",route:"proxies",description:"连接、测速与编辑节点"}]
                 SwirlMotionButton {
                     id: entry; required property var modelData
+                    readonly property Item motionTitle:entryTitle
                     objectName:"settings-"+modelData.route
                     width:(grid.width-(grid.columns-1)*grid.spacing)/grid.columns; height:Theme.dp(156)
                     padding:Theme.cardPadding; hoverEnabled:true
                     readonly property real transfer: page.Window.window.settingsOrigin===entry ? page.Window.window.settingsOriginProgress : 0
                     motionScale:(enabled && down?SwirlMotion.pressScale:1)*(1-0.045*transfer)
+                    opacity:page.Window.window.settingsOrigin===entry && page.Window.window.settingsOriginMoving?0:1
                     background:Rectangle {
                         color:entry.hovered?Theme.hover:Theme.material("content"); radius:Theme.cardRadius
                         border.width:Theme.borderWidth; border.color:entry.activeFocus?Theme.focusBorder:Theme.border
@@ -41,7 +43,7 @@ Item {
                     contentItem:Column {
                         spacing:Theme.dp(12)
                         SwirlIcon { name:entry.modelData.icon; size:Theme.dp(34); color:Theme.accent }
-                        SwirlText { text:entry.modelData.title; color:Theme.text; font.pixelSize:Theme.fontSize(16); font.weight:Font.DemiBold }
+                        SwirlText { id:entryTitle;text:entry.modelData.title; color:Theme.text; font.pixelSize:Theme.fontSize(16); font.weight:Font.DemiBold }
                         SwirlText { width:parent.width; text:entry.modelData.description; color:Theme.muted; font.pixelSize:Theme.fontSize(11); wrapMode:Text.WordWrap }
                     }
                     onClicked: page.Window.window.openSettings(modelData.route,entry)

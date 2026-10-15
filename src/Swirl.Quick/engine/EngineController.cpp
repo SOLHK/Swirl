@@ -39,6 +39,7 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
     connect(&m_telemetry,&TelemetryService::changed,this,&EngineController::statusChanged);
     connect(&m_tests,&NodeTestService::changed,this,&EngineController::nodesChanged);
     connect(m_engine.get(),&ProxyEngine::diagnostic,this,&EngineController::diagnostic);
+    connect(this,&EngineController::diagnostic,&m_diagnostics,[this](const QString &module,const QString &code,const QString &message){m_diagnostics.noteEvent(module+" / "+code,message);});
     QFile manifest(QStringLiteral(":/engine/mihomo-manifest.json"));
     if (manifest.open(QIODevice::ReadOnly)) {
         const auto object = QJsonDocument::fromJson(manifest.readAll()).object();
@@ -65,18 +66,27 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
     m_options.smartRouting=storePath.isEmpty()||realAcceptance;
     connect(&m_systemProxy,&SystemProxySession::changed,this,[this] {
         if(!m_systemProxy.owned()&&!m_systemProxy.error().isEmpty())m_proxyRequested=false;
+        const auto state=m_systemProxy.owned()?(m_systemProxy.enabled()?QStringLiteral("Swirl 已接管 Windows 系统代理"):QStringLiteral("接管状态未确认，恢复快照已保留")):QStringLiteral("Swirl 未接管 Windows 系统代理");
+        if(state!=m_previousProxyState){m_previousProxyState=state;m_diagnostics.noteEvent(QStringLiteral("Windows 系统代理"),state);}
     });
     m_options.rulesDirectory=QCoreApplication::applicationDirPath()+"/rules";
     QSettings settings;
+    m_options.preferCompatibility=settings.value("Proxy/preferCompatibility",false).toBool();
     m_options.routingMode=settings.value("Proxy/routingMode","rule").toString();
     if(m_options.routingMode!="rule"&&m_options.routingMode!="global"&&m_options.routingMode!="direct")m_options.routingMode="rule";
     if(m_options.meteredNetwork)m_options.routingMode="rule";
     connect(m_engine.get(),&ProxyEngine::statusChanged,this,[this] {
         const auto s=m_engine->status();
-        m_imports.setDownloadProxy(s.apiHealthy?s.proxyPort:0);
-        if(s.state==ProxyEngine::State::Stopping||s.state==ProxyEngine::State::Stopped||s.state==ProxyEngine::State::Failed||s.state==ProxyEngine::State::Degraded) {
+        m_diagnostics.setProxyPort(s.processAlive?s.proxyPort:0);
+        if(s.state!=m_previousEngineState){
+            if(s.state==ProxyEngine::State::Degraded)m_diagnostics.noteEvent(QStringLiteral("控制接口异常"),QStringLiteral("控制接口采样暂时失败；保留现有数据隧道与系统代理。"));
+            else if(s.state==ProxyEngine::State::Failed)m_diagnostics.noteEvent(QStringLiteral("Swirl 引擎异常"),s.message);
+            m_previousEngineState=s.state;
+        }
+        m_imports.setDownloadProxy(s.processAlive?s.proxyPort:0);
+        if(s.state==ProxyEngine::State::Stopping||s.state==ProxyEngine::State::Stopped||s.state==ProxyEngine::State::Failed) {
             m_systemProxy.disable();
-            if(s.state==ProxyEngine::State::Failed||s.state==ProxyEngine::State::Degraded)m_proxyRequested=false;
+            if(s.state==ProxyEngine::State::Failed)m_proxyRequested=false;
         } else if(s.state==ProxyEngine::State::Running&&s.apiHealthy&&m_proxyRequested&&!m_systemProxy.owned()&&!m_proxyChecking)setSystemProxy(true);
     });
     if(m_options.tunEnabled&&!elevated()){m_options.tunEnabled=false;m_options.meteredNetwork=false;m_routingError=QStringLiteral("增强模式需要管理员权限，本次启动保持关闭。");}
@@ -89,13 +99,11 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
     connect(&m_imports,&NodeImportService::changed,this,&EngineController::statusChanged);
     connect(&m_imports,&NodeImportService::nodesApplied,this,[this]{
         m_nodeError.clear();
-        // A source refresh changes credentials/options too. Restart the owned
-        // process with the new snapshot; never leave the UI ahead of the engine.
+        // A background subscription refresh must not interrupt live Codex/WS
+        // streams. The current immutable engine snapshot lives until reconnect.
         if(m_connectionRequested && (processAlive() || busy())) {
-            m_options.nodes=m_store.nodes();m_options.selectedNodeId=m_store.selectedId();
-            m_restartPending=!m_options.selectedNodeId.isEmpty()||m_options.directSession;
-            if(!m_restartPending){m_connectionRequested=false;m_nodeError=QStringLiteral("更新移除了当前节点；已停止连接，请重新选择。");}
-            m_engine->stop();
+            m_nodeError=QStringLiteral("节点库已更新；当前连接继续使用启动时配置。新增节点与凭据更新在手动断开重连后生效。");
+            emit diagnostic("EngineController","SubscriptionUpdateDeferred",m_nodeError);
         }
         emit nodesChanged();
     });
@@ -106,7 +114,7 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
             QTimer::singleShot(0,this,[this]{if(m_connectionRequested && (!m_options.selectedNodeId.isEmpty()||m_options.directSession))m_engine->start(m_options);});
         }
     });
-    connect(QCoreApplication::instance(), &QCoreApplication::aboutToQuit, m_engine.get(), &ProxyEngine::stop);
+    connect(QCoreApplication::instance(), &QCoreApplication::aboutToQuit, this,[this]{m_systemProxy.disable();m_engine->stop();});
 }
 void EngineController::setExecutablePath(const QString &path) {
     if (!canStart() || m_options.executablePath == path) return;
@@ -136,7 +144,7 @@ bool EngineController::busy() const {
     return state == ProxyEngine::State::Validating || state == ProxyEngine::State::Starting || state == ProxyEngine::State::Stopping;
 }
 void EngineController::start() { if (canStart()) { m_connectionRequested=false;m_options.nodes=m_store.nodes(); m_options.selectedNodeId.clear();m_options.directSession=false; m_engine->start(m_options); } }
-void EngineController::stop() { m_proxyRequested=false;m_systemProxy.disable(); m_connectionRequested=false;m_restartPending=false; m_options.selectedNodeId.clear();m_options.directSession=false; m_engine->stop(); }
+void EngineController::stop() { m_diagnostics.noteEvent(QStringLiteral("Swirl 操作"),QStringLiteral("用户停止引擎，现有本机代理连接将关闭。"));m_proxyRequested=false;m_systemProxy.disable(); m_connectionRequested=false;m_restartPending=false; m_options.selectedNodeId.clear();m_options.directSession=false; m_engine->stop(); }
 void EngineController::refresh() { m_engine->refresh(); }
 
 QVariantList EngineController::nodes() const {
@@ -228,6 +236,7 @@ void EngineController::setRoutingMode(const QString &mode) {
     emit statusChanged();
 }
 void EngineController::setSystemProxy(bool enabled) {
+    m_diagnostics.noteEvent(QStringLiteral("Swirl 操作"),enabled?QStringLiteral("用户请求启用系统代理。"):QStringLiteral("用户请求释放系统代理并恢复原设置。"));
     m_routingError.clear();m_proxyRequested=enabled;
     if(!enabled){m_systemProxy.disable();emit statusChanged();return;}
     if(m_systemProxy.owned()||m_proxyChecking)return;
@@ -250,6 +259,19 @@ void EngineController::setSystemProxy(bool enabled) {
     connect(timer,&QTimer::timeout,this,failed);
     connect(socket,&QTcpSocket::errorOccurred,this,[failed](QAbstractSocket::SocketError){failed();});
     socket->connectToHost(QHostAddress::LocalHost,quint16(m_captureProxyPort>0?m_captureProxyPort:s.proxyPort));
+}
+QString EngineController::proxyEnvironmentAdvice() const {
+    return QStringLiteral("从新的 PowerShell 会话启动支持代理变量的应用：\n"
+        "$env:HTTP_PROXY='http://127.0.0.1:%1'\n$env:HTTPS_PROXY='http://127.0.0.1:%1'\n"
+        "$env:ALL_PROXY='http://127.0.0.1:%1'\n$env:NO_PROXY='localhost,127.0.0.1,::1'\n"
+        "Codex 是否读取系统代理或这些变量取决于具体版本。完全退出后从该会话重新启动，已有进程不会自动继承。"
+        "忽略两者的应用请使用自身代理设置，或由用户主动开启现有 TUN 增强模式。"
+        "本页只提供建议，不写入环境变量、.codex 配置文件或密钥。").arg(m_options.proxyPort);
+}
+void EngineController::setPreferCompatibility(bool enabled) {
+    if(!canStart()){m_routingError=QStringLiteral("请先断开当前连接，再修改引擎兼容设置。");emit statusChanged();return;}
+    if(m_options.preferCompatibility==enabled)return;m_options.preferCompatibility=enabled;
+    QSettings().setValue("Proxy/preferCompatibility",enabled);emit optionsChanged();
 }
 
 bool EngineController::networkEditAllowed() {

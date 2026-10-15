@@ -7,6 +7,7 @@
 
 // Swirl-owned contract. No Mihomo JSON or transport objects cross this boundary.
 struct EngineStartOptions {
+    bool preferCompatibility=false;
     QString executablePath;
     QByteArray expectedSha256;
     QString expectedVersion;
