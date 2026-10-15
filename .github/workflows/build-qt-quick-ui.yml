@@ -75,7 +75,7 @@ jobs:
       - name: Engine contract, real Mihomo and QML lifecycle checks
         shell: pwsh
         run: |
-          ctest --test-dir build/swirl-quick -C Release -R "swirl-(engine|node|import)-|swirl-font-selection|swirl-motion|swirl-telemetry-accounting|swirl-diagnostic-export" --output-on-failure
+          ctest --test-dir build/swirl-quick -C Release -R "swirl-(engine|node|import)-|swirl-native-engine|swirl-subscription-formats|swirl-appearance-ui|swirl-font-selection|swirl-motion|swirl-telemetry-accounting|swirl-diagnostic-export" --output-on-failure
           if ($LASTEXITCODE -ne 0) {
             Get-Content build/swirl-quick/engine-contract.txt, build/swirl-quick/engine-real.txt -ErrorAction SilentlyContinue
             throw "Engine checks failed"
@@ -91,6 +91,10 @@ jobs:
             build/swirl-quick/engine-real.txt
             build/swirl-quick/node-chain.txt
             build/swirl-quick/import-subscription.txt
+            build/swirl-quick/native-engine.txt
+            build/swirl-quick/subscription-formats.txt
+            build/swirl-quick/Release/Swirl-appearance.txt
+            build/swirl-quick/Release/Swirl-appearance-restore.txt
             build/swirl-quick/motion-report.json
             build/swirl-quick/Release/Swirl-diagnostics.txt
             build/swirl-quick/Release/Swirl-node-ui-diagnostics.txt
@@ -233,7 +237,7 @@ jobs:
           Copy-Item -LiteralPath $icon -Destination "installer-bin/Swirl-brand-phase3-v2.ico"
           Copy-Item "src/Swirl.Quick/packaging/licenses" "installer-bin/licenses" -Recurse -Force
           New-Item -ItemType Directory -Force -Path "installer-bin/docs" | Out-Null
-          Copy-Item -LiteralPath 'src/Swirl.Quick/CAPTURE.md','docs/LOCAL_EXTENSIONS.md','docs/FONTS.md','docs/ANIMATION_DEPENDENCY_RESEARCH.md','docs/PR12_GRAPHICS_UPGRADE.md' -Destination "installer-bin/docs"
+          Copy-Item -LiteralPath 'src/Swirl.Quick/CAPTURE.md','docs/LOCAL_EXTENSIONS.md','docs/FONTS.md','docs/ANIMATION_DEPENDENCY_RESEARCH.md','docs/PR12_GRAPHICS_UPGRADE.md','docs/PR12_NATIVE_ACCEPTANCE.md','docs/PR12_NATIVE_UI_FIXES.md','docs/SWIRL_NATIVE_RESEARCH.md' -Destination "installer-bin/docs"
           Remove-Item -Path "installer-bin/Swirl-*-preview.png", "installer-bin/Swirl-diagnostics.txt" -ErrorAction SilentlyContinue
           if (!(Test-Path "installer-bin/Swirl.exe")) { throw "Missing Swirl.exe" }
       - name: Install NSIS packaging tools
