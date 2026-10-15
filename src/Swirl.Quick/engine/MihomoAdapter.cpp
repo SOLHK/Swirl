@@ -226,7 +226,12 @@ bool MihomoAdapter::prepareConfiguration() {
                 "  default-nameserver: [system]\n  proxy-server-nameserver: [system]\n"
                 "  direct-nameserver: [system]\n  direct-nameserver-follow-policy: false\n"
                 "  nameserver: ['https://1.1.1.1/dns-query#SWIRL']\n"
-                "  nameserver-policy:\n    'rule-set:cn-domain': [system]\n"));
+                "  nameserver-policy:\n"
+                "    '+.chatgpt.com': ['https://1.1.1.1/dns-query#SWIRL']\n"
+                "    '+.openai.com': ['https://1.1.1.1/dns-query#SWIRL']\n"
+                "    '+.oaistatic.com': ['https://1.1.1.1/dns-query#SWIRL']\n"
+                "    '+.oaiusercontent.com': ['https://1.1.1.1/dns-query#SWIRL']\n"
+                "    'rule-set:cn-domain': [system]\n"));
         } else m_generatedConfig.replace("rules: []\n","rules: ['MATCH,SWIRL']\n");
     }
     if(!m_options.selectedNodeId.isEmpty() || m_options.directSession) {
@@ -282,6 +287,23 @@ bool MihomoAdapter::prepareConfiguration() {
             {"auto-detect-interface",true},{"strict-route",!m_options.gatewayForwarding},{"mtu",1500},{"dns-hijack",QJsonArray{"any:53","tcp://any:53"}}};
         m_generatedConfig.replace("tun:\n  enable: false\n  auto-route: false\n  auto-detect-interface: false\n","tun: "+QString::fromUtf8(QJsonDocument(tun).toJson(QJsonDocument::Compact))+"\n");
         if(m_generatedConfig.contains("dns:\n  enable: false\n"))m_generatedConfig.replace("dns:\n  enable: false\n","dns: {enable: true, enhanced-mode: redir-host, nameserver: [system]}\n");
+    }
+    // Diagnose explicit user overrides; do not silently rewrite user rules or
+    // copy client-specific Clash Verge settings into a Mihomo configuration.
+    const QStringList protectedDomains{"chatgpt.com","openai.com","oaistatic.com","oaiusercontent.com"};
+    int ruleIndex=0;
+    for(const auto &rule:m_options.customRules){
+        ++ruleIndex;const auto parts=rule.split(',');if(parts.size()<3)continue;
+        const auto pattern=parts[1].toLower();bool affects=false;
+        if(parts[0]=="PROCESS-NAME")affects=pattern=="codex.exe"||pattern=="chatgpt.exe";
+        else if(parts[0]=="DOMAIN"||parts[0]=="DOMAIN-SUFFIX")for(const auto &domain:protectedDomains)
+            affects=affects||pattern==domain||pattern.endsWith("."+domain)||(parts[0]=="DOMAIN-SUFFIX"&&domain.endsWith("."+pattern));
+        if(affects&&parts[2]!="SWIRL"&&parts[2]!="GLOBAL")emit diagnostic("Mihomo","CodexRoutingOverride",QStringLiteral("第 %1 条自定义规则覆盖了 Codex 默认选择器；请核对实际连接链，未自动改写规则。").arg(ruleIndex));
+    }
+    for(const auto &value:m_options.dnsConfig.value("hosts").toList()){
+        const auto name=value.toMap().value("name").toString().toLower();
+        for(const auto &domain:protectedDomains)if(name==domain||name.endsWith("."+domain))
+            emit diagnostic("Mihomo","CodexDnsHostOverride",QStringLiteral("存在 Codex/OpenAI 域名的显式 hosts 映射；重连时需核对映射，未清空系统或用户 DNS 缓存。"));
     }
     QSaveFile file(m_status.configPath);
     if (!file.open(QIODevice::WriteOnly) || !file.setPermissions(QFile::ReadOwner | QFile::WriteOwner)) return false;
@@ -350,7 +372,7 @@ bool MihomoAdapter::reservePort(QTcpServer &server, quint16 port) {
 void MihomoAdapter::start(const EngineStartOptions &options) {
     if (m_process.state() != QProcess::NotRunning || m_status.state == State::Validating ||
         m_status.state == State::Starting || m_status.state == State::Stopping) return;
-    cancelRequest(); cancelNodeRequests(); m_poll.stop(); m_deadline.stop(); m_killTimer.stop();
+    m_modeUnconfirmed=false;cancelRequest(); cancelNodeRequests(); m_poll.stop(); m_deadline.stop(); m_killTimer.stop();
     unlockExecutable(); m_directory.reset(); m_uptime.invalidate();
     m_secret.clear(); m_generatedConfig.clear(); m_output.clear();
     m_options = options; m_status = {}; m_failureExit = false;
@@ -606,7 +628,7 @@ void MihomoAdapter::probeNode(const QUrl &url) {
 
 void MihomoAdapter::stop() {
     if (m_status.state == State::Stopped) return;
-    m_failureExit = false; cancelRequest();
+    m_modeUnconfirmed=false; m_failureExit = false; cancelRequest();
     cancelNodeRequests(); m_proxyReservation.close();
     m_status.proxyPort=0; m_status.nodeHealth=NodeHealth::Unknown; m_status.requestState=RequestState::NotTested;
     m_status.nodeMessage.clear(); m_status.latencyMs=-1; m_status.responseCode=0;
@@ -678,6 +700,11 @@ void MihomoAdapter::request(bool version) {
             this->request(false); return;
         }
         const bool connected=!m_options.selectedNodeId.isEmpty()||m_options.directSession;
+        const auto actualMode=object.value("mode").toString();
+        if(m_modeUnconfirmed && QStringList{"rule","global","direct"}.contains(actualMode) && (!m_options.meteredNetwork||actualMode=="rule")){
+            m_options.routingMode=actualMode;m_modeUnconfirmed=false;
+            emit diagnostic("Mihomo","RoutingModeReconciled",QStringLiteral("已核实实际路由模式为 %1；没有清空现有连接。").arg(actualMode));
+        }
         bool safe = object.value(QStringLiteral("mode")).toString() == (connected ? m_options.routingMode:QStringLiteral("direct")) &&
             object.value(QStringLiteral("allow-lan")) == QJsonValue(connected&&m_options.allowLan) &&
             object.value(QStringLiteral("tun")).isObject() &&
@@ -711,8 +738,10 @@ void MihomoAdapter::setRoutingMode(const QString &mode) {
     connect(reply,&QNetworkReply::finished,this,[this,reply,generation,mode] {
         reply->deleteLater();if(generation!=m_generation)return;m_modeReply=nullptr;
         if(reply->error()!=QNetworkReply::NoError||reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt()!=204){
-            fail(Error::ConfigurationFailed,QStringLiteral("分流模式更新失败；已停止引擎避免显示与实际出口不一致。"));return;}
-        m_options.routingMode=mode;
+            m_modeUnconfirmed=true;m_status.routingBusy=false;
+            apiFailure(Error::ApiUnavailable,QStringLiteral("路由控制响应未确认；正在读取实际模式，保留已有连接。"));
+            refresh();return;}
+        m_modeUnconfirmed=true;m_options.routingMode=mode;
         m_status.nodeHealth=NodeHealth::Unknown;m_status.requestState=RequestState::NotTested;
         m_status.nodeMessage.clear();m_status.apiHealthy=false;publish();refresh();
     });

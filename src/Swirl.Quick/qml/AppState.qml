@@ -10,6 +10,7 @@ QtObject {
     property bool detailOpen: true
     property int trafficPeriod:0
     property string trafficSelectedProcess:""
+    property string trafficSelectedDevice:""
     readonly property string mode: engineController.routingMode==="rule"?"规则判定":engineController.routingMode==="global"?"全局代理":"直接连接"
     readonly property string policy: "固定节点"
     readonly property string selectedNode: engineController.selectedNodeName

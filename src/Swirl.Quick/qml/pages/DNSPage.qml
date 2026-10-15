@@ -8,10 +8,11 @@ import "../controls"
 Item {
  function preparePreviewState(state){if(state==="dns-focus")serverAddress.forceActiveFocus()}
  id:page;
- function finishSettings(){const w=page.Window.window;if(w.objectName==="settingsSheet")w.discardApproved=true;w.closeSettings()}
+ function persistExitDraft(){moduleDrafts.save("feature-dns-exit",{pending:true,mode:serverMode,servers:serverAddress.text,encrypted:encryptedUrl.text,hosts:hostRows,useHosts:readHosts.checked,respectRules:respectRules.checked})}
+ function finishSettings(){moduleDrafts.save("feature-dns-exit",{});const w=page.Window.window;if(w.objectName==="settingsSheet")w.discardApproved=true;w.closeSettings()}
  Rectangle{y:Theme.dp(66);width:parent.width;height:parent.height-y-Theme.dp(40);color:Theme.dark?Theme.primaryContainer:"#F9F9F9";z:-1}
  property int serverMode:0;property var hostRows:[];property string selectedId:""
- Component.onCompleted:{const config=engineController.dnsConfiguration;serverMode=config.mode||0;serverAddress.text=config.servers||"";encryptedUrl.text=config.encrypted||"";hostRows=config.hosts||[];readHosts.checked=config.useHosts!==false;respectRules.checked=config.respectRules===true}
+ Component.onCompleted:{const saved=moduleDrafts.load("feature-dns-exit");const config=saved.pending?saved:engineController.dnsConfiguration;serverMode=config.mode||0;serverAddress.text=config.servers||"";encryptedUrl.text=config.encrypted||"";hostRows=config.hosts||[];readHosts.checked=config.useHosts!==false;respectRules.checked=config.respectRules===true}
  component Label:SwirlText {color:Theme.text;font.pixelSize:Theme.fontSize(13)}
  component Note:SwirlText {color:Theme.muted;font.pixelSize:Theme.fontSize(11);lineHeightMode:Text.FixedHeight;lineHeight:Theme.dp(14);wrapMode:Text.WordWrap;width:parent.width}
  component Group:Rectangle{radius:Theme.subCardRadius;color:Theme.field}

@@ -53,7 +53,8 @@ public:
     ProxyNode node;
     bool direct=false,closing=false,http=false,tunnel=true,upgrade=false,remoteEnded=false,notified=false;
     NativeDuplexRelay *relay=nullptr;
-    QString endReason;
+    QString endReason,closeInitiator;
+    int socketErrorCode=-1,upstreamReplyCode=-1;
     Stage stage=Detect;
     int outboundStage=0;
     QByteArray buffer,upBuffer,initial,username,password;
@@ -61,6 +62,8 @@ public:
     quint16 port=0;
     qint64 uploaded=0,downloaded=0,upDebt=0,downDebt=0,bodyRemaining=0;
     QTimer deadline;
+    QElapsedTimer lifetime;
+    qint64 handshakeMs=-1,firstDownMs=-1,lastUpMs=-1,lastDownMs=-1;
     QString started=QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs);
     std::function<void(qint64,qint64)> bytes;
     std::function<void(NativeSession *,const QString &)> ended;
@@ -70,14 +73,14 @@ public:
         deadline.setSingleShot(true);deadline.setInterval(qBound(100,options.startupTimeoutMs,30000));
         connect(&deadline,&QTimer::timeout,this,[this]{fail("ConnectionTimeout",504,6);});
         connect(client,&QTcpSocket::readyRead,this,[this]{consume();});
-        connect(client,&QTcpSocket::bytesWritten,this,[this](qint64 count){const auto skip=qMin(count,downDebt);downDebt-=skip;downloaded+=count-skip;if(bytes)bytes(0,count-skip);if(stage==Streaming&&tunnel)attachRelay();else pumpDown();});
+        connect(client,&QTcpSocket::bytesWritten,this,[this](qint64 count){const auto skip=qMin(count,downDebt);downDebt-=skip;downloaded+=count-skip;if(count>skip){lastDownMs=lifetime.elapsed();if(firstDownMs<0)firstDownMs=lastDownMs;}if(bytes)bytes(0,count-skip);if(stage==Streaming&&tunnel)attachRelay();else pumpDown();});
         connect(client,&QTcpSocket::disconnected,this,[this]{if(!closing)finish({});notifyEnd();deleteLater();});
         connect(client,&QTcpSocket::errorOccurred,this,[this](auto error){if(!closing&&error!=QAbstractSocket::RemoteHostClosedError)finish("ClientDisconnected");});
-        deadline.start();
+        lifetime.start();deadline.start();
     }
-    QVariantMap snapshot(bool closed=false)const{return {{"id",id},{"host",host},{"ip",host},{"port",port},{"sourceIp",sourceIp},{"process","未知进程"},{"policy",direct?QString("DIRECT"):node.name},{"category",direct?QString("direct"):QString("proxy")},{"network","TCP"},{"uploadBytes",uploaded},{"downloadBytes",downloaded},{"time",started},{"closed",closed}};}
+    QVariantMap snapshot(bool closed=false)const{return {{"id",id},{"host",host},{"ip",host},{"port",port},{"sourceIp",sourceIp},{"process","未知进程"},{"policy",direct?QString("DIRECT"):node.name},{"category",direct?QString("direct"):QString("proxy")},{"network","TCP"},{"uploadBytes",uploaded},{"downloadBytes",downloaded},{"time",started},{"closed",closed},{"elapsedMs",lifetime.elapsed()},{"handshakeMs",handshakeMs},{"firstDownMs",firstDownMs},{"lastUpMs",lastUpMs},{"lastDownMs",lastDownMs},{"closeReason",endReason},{"closeInitiator",closeInitiator},{"socketErrorCode",socketErrorCode},{"upstreamReplyCode",upstreamReplyCode}};}
     void notifyEnd(){if(notified)return;notified=true;if(ended)ended(this,endReason);}
-    void cancel(){finish({});client->abort();notifyEnd();}
+    void cancel(){closeInitiator="Application";finish("ApplicationStopped");client->abort();notifyEnd();}
     void sendClientHandshake(const QByteArray &value){downDebt+=value.size();client->write(value);}
     void sendUpHandshake(const QByteArray &value){upDebt+=value.size();upstream->write(value);}
     void finish(const QString &reason){
@@ -159,8 +162,8 @@ public:
         upstream->setProxy(QNetworkProxy::NoProxy);upstream->setReadBufferSize(ReadLimit);
         upstream->setSocketOption(QAbstractSocket::KeepAliveOption,1);upstream->setSocketOption(QAbstractSocket::LowDelayOption,1);
         connect(upstream,&QTcpSocket::readyRead,this,[this]{if(stage==Streaming)pumpDown();else consumeUpstream();});
-        connect(upstream,&QTcpSocket::bytesWritten,this,[this](qint64 count){const auto skip=qMin(count,upDebt);upDebt-=skip;uploaded+=count-skip;if(bytes)bytes(count-skip,0);if(stage==Streaming&&tunnel)attachRelay();else pumpUp();});
-        connect(upstream,&QTcpSocket::errorOccurred,this,[this](auto error){if(!closing&&error!=QAbstractSocket::RemoteHostClosedError)fail(error==QAbstractSocket::HostNotFoundError?"DnsLookupFailed":error==QAbstractSocket::ConnectionRefusedError?"UpstreamConnectionRefused":"UpstreamNetworkError");});
+        connect(upstream,&QTcpSocket::bytesWritten,this,[this](qint64 count){const auto skip=qMin(count,upDebt);upDebt-=skip;uploaded+=count-skip;if(count>skip)lastUpMs=lifetime.elapsed();if(bytes)bytes(count-skip,0);if(stage==Streaming&&tunnel)attachRelay();else pumpUp();});
+        connect(upstream,&QTcpSocket::errorOccurred,this,[this](auto error){socketErrorCode=int(error);if(!closing&&error!=QAbstractSocket::RemoteHostClosedError)fail(error==QAbstractSocket::HostNotFoundError?"DnsLookupFailed":error==QAbstractSocket::ConnectionRefusedError?"UpstreamConnectionRefused":"UpstreamNetworkError");});
         connect(upstream,&QTcpSocket::disconnected,this,[this]{if(closing)return;if(stage!=Streaming){fail("UpstreamHandshakeClosed");return;}remoteEnded=true;pumpDown();});
         if(tls)static_cast<QSslSocket *>(upstream)->connectToHostEncrypted(node.host,node.port,node.serverName.isEmpty()?node.host:node.serverName);
         else upstream->connectToHost(direct?host:node.host,direct?port:node.port);
@@ -184,7 +187,7 @@ public:
         if(closing||!upstream)return;upBuffer+=upstream->read(ReadLimit-upBuffer.size());
         if(node.protocol=="http"){
             const auto end=upBuffer.indexOf("\r\n\r\n");if(end<0){if(upBuffer.size()>=ReadLimit)fail("UpstreamHeaderTooLarge");return;}
-            const auto line=upBuffer.left(upBuffer.indexOf("\r\n")).split(' ');const auto status=line.size()>1?line[1].toInt():0;
+            const auto line=upBuffer.left(upBuffer.indexOf("\r\n")).split(' ');const auto status=line.size()>1?line[1].toInt():0;upstreamReplyCode=status;
             if(line.size()<2||(!line[0].startsWith("HTTP/1."))||status!=200){fail(status==407?"UpstreamAuthenticationFailed":"UpstreamConnectRejected");return;}
             upBuffer.remove(0,end+4);ready();return;
         }
@@ -197,13 +200,13 @@ public:
         }
         if(outboundStage==1){if(upBuffer.size()<2)return;if(upBuffer[0]!=1||upBuffer[1]!=0){fail("UpstreamAuthenticationFailed");return;}upBuffer.remove(0,2);sendSocksConnect();}
         if(outboundStage==2){
-            if(upBuffer.size()<4)return;if(upBuffer[0]!=5||upBuffer[1]!=0||upBuffer[2]!=0){fail("UpstreamConnectRejected");return;}
+            if(upBuffer.size()<4)return;upstreamReplyCode=quint8(upBuffer[1]);if(upBuffer[0]!=5||upBuffer[1]!=0||upBuffer[2]!=0){fail("UpstreamConnectRejected");return;}
             QString bound;quint16 bindPort;const auto length=readAddress(upBuffer.mid(3),bound,bindPort);if(length==0)return;if(length<0){fail("InvalidUpstreamReply");return;}upBuffer.remove(0,3+length);ready();
         }
     }
     void sendSocksConnect(){const auto dest=address(host,port);if(dest.isEmpty()){fail("InvalidDestination");return;}outboundStage=2;sendUpHandshake(QByteArray::fromHex("050100")+dest);}
     void ready(){
-        if(closing)return;stage=Streaming;deadline.stop();
+        if(closing)return;stage=Streaming;handshakeMs=lifetime.elapsed();deadline.stop();
         if(http&&tunnel)sendClientHandshake("HTTP/1.1 200 Connection Established\r\n\r\n");
         else if(!http)sendClientHandshake(QByteArray::fromHex("050000")+address(upstream->localAddress().toString(),upstream->localPort()));
         // CONNECT/SOCKS and a forwarded WebSocket Upgrade are opaque streams.
@@ -233,8 +236,8 @@ public:
         auto stream=new NativeDuplexRelay(this);
         // Disable session callbacks before closing the old duplicated handles.
         client->disconnect(this);upstream->disconnect(this);
-        stream->transferred=[this](qint64 up,qint64 down){uploaded+=up;downloaded+=down;if(bytes)bytes(up,down);};
-        stream->finished=[this](const QString &reason){closing=true;endReason=reason;notifyEnd();deleteLater();};
+        stream->transferred=[this](qint64 up,qint64 down){uploaded+=up;downloaded+=down;if(up)lastUpMs=lifetime.elapsed();if(down){lastDownMs=lifetime.elapsed();if(firstDownMs<0)firstDownMs=lastDownMs;}if(bytes)bytes(up,down);};
+        stream->finished=[this,stream](const QString &reason){closeInitiator=stream->closeInitiator;closing=true;endReason=reason;notifyEnd();deleteLater();};
         if(!stream->attach(client,upstream,std::move(initial),std::move(upBuffer))){delete stream;fail("StreamRelayOwnershipFailed");return;}
         relay=stream;initial.clear();upBuffer.clear();
     }
@@ -251,7 +254,9 @@ struct SwirlProxyEngine::Private {
             ProxyNode node;for(const auto &n:options.nodes)if(n.id==options.selectedNodeId)node=n;
             auto session=new NativeSession(socket,node,options.directSession||options.routingMode=="direct",options,q);sessions.insert(session);
             session->bytes=[this](qint64 up,qint64 down){status.uploadTotal+=up;status.downloadTotal+=down;};
-            session->ended=[this](NativeSession *s,const QString &reason){sessions.remove(s);completed.append(s->snapshot(true));while(completed.size()>256)completed.removeFirst();if(!reason.isEmpty())emit q->diagnostic("SwirlNative",reason,QStringLiteral("原生连接失败：%1；未切换为直连。").arg(reason));};
+            session->ended=[this](NativeSession *s,const QString &reason){sessions.remove(s);completed.append(s->snapshot(true));while(completed.size()>256)completed.removeFirst();emit q->diagnostic("SwirlNative","ConnectionClosed",QStringLiteral("id=%1 host=%2:%3 close=%4 initiator=%5 socket=%6 upstreamReply=%7 elapsedMs=%8 handshakeMs=%9 firstDownMs=%10 lastUpMs=%11 lastDownMs=%12 up=%13 down=%14")
+                .arg(s->id,s->host).arg(s->port).arg(reason.isEmpty()?QStringLiteral("OrderlyOrUnattributedEof"):reason,s->closeInitiator.isEmpty()?QStringLiteral("unknown"):s->closeInitiator)
+                .arg(s->socketErrorCode).arg(s->upstreamReplyCode).arg(s->lifetime.elapsed()).arg(s->handshakeMs).arg(s->firstDownMs).arg(s->lastUpMs).arg(s->lastDownMs).arg(s->uploaded).arg(s->downloaded));if(!reason.isEmpty())emit q->diagnostic("SwirlNative",reason,QStringLiteral("原生连接失败：%1；未切换为直连。").arg(reason));};
             if(socket->bytesAvailable())session->consume();
         }});
     }
@@ -259,6 +264,7 @@ struct SwirlProxyEngine::Private {
 SwirlProxyEngine::SwirlProxyEngine(QObject *parent):ProxyEngine(parent),d(std::make_unique<Private>(this)){}
 SwirlProxyEngine::~SwirlProxyEngine(){stop();}
 ProxyEngine::Status SwirlProxyEngine::status()const{return d->status;}
+qsizetype SwirlProxyEngine::activeConnectionCount()const{return std::count_if(d->sessions.cbegin(),d->sessions.cend(),[](const NativeSession *s){return !s->closing;});}
 qsizetype SwirlProxyEngine::activeStreamCount()const{return std::count_if(d->sessions.cbegin(),d->sessions.cend(),[](const NativeSession *s){return s->stage==NativeSession::Streaming&&!s->closing;});}
 QString SwirlProxyEngine::configurationSummary()const{return QStringLiteral("Swirl 原生 · 本机混合 HTTP/SOCKS5 监听 · TCP 流量转发 · 内存控制接口；凭据已隐藏。");}
 void SwirlProxyEngine::start(const EngineStartOptions &o){

@@ -43,6 +43,19 @@ class NodeTests:public QObject {
         return body;
     }
 private slots:
+    void probesNeverInheritNetworkOwnership(){
+        auto source=options();source.tunEnabled=true;source.gatewayForwarding=true;source.allowLan=true;source.meteredNetwork=true;
+        source.meteredAllowlist={"Codex.exe"};source.lanUsername="private";source.lanPassword="private";
+        source.inboundUsername="private";source.inboundPassword="private";source.directSession=true;
+        source.dnsConfig={{"mode",2},{"servers","198.18.0.1"}};source.customRules={"MATCH,REJECT"};
+        source.customGroups={QVariantMap{{"name","stale"},{"type","select"},{"proxies",QStringList{"DIRECT"}}}};
+        const auto isolated=NodeTestService::isolatedOptions(source);
+        QVERIFY(!isolated.tunEnabled);QVERIFY(!isolated.gatewayForwarding);QVERIFY(!isolated.allowLan);QVERIFY(!isolated.meteredNetwork);
+        QVERIFY(!isolated.directSession);QVERIFY(isolated.dnsConfig.isEmpty());QVERIFY(isolated.customRules.isEmpty());QVERIFY(isolated.customGroups.isEmpty());
+        QVERIFY(isolated.lanPassword.isEmpty());QVERIFY(isolated.inboundPassword.isEmpty());QCOMPARE(isolated.routingMode,QString("global"));
+        QCOMPARE(isolated.expectedSha256,source.expectedSha256);QCOMPARE(isolated.executablePath,source.executablePath);
+    }
+
     void regionLabelsDoNotInventLocations() {
         QCOMPARE(NodeRegion::fromName(QStringLiteral("🇭🇰 HK 01")).code,QString("HK"));
         QCOMPARE(NodeRegion::fromName(QStringLiteral("日本 东京 02")).code,QString("JP"));
@@ -199,6 +212,11 @@ private slots:
             const auto position=config.indexOf(rule);QVERIFY2(position>0&&position<regional,domain);
         }
         QVERIFY(config.contains("\"name\":\"SWIRL\""));
+        QVERIFY(config.contains("\"name\":\"GLOBAL\",\"proxies\":[\"SWIRL\"]"));
+        QVERIFY(config.contains("'+.chatgpt.com': ['https://1.1.1.1/dns-query#SWIRL']"));
+        QVERIFY(config.contains("'+.openai.com': ['https://1.1.1.1/dns-query#SWIRL']"));
+        QVERIFY(config.contains("enhanced-mode: redir-host"));QVERIFY(config.contains("store-fake-ip: false"));
+        QVERIFY(!config.contains("auto_close_connection"));
         engine.stop();QTRY_VERIFY_WITH_TIMEOUT(!engine.status().processAlive,4000);
     }
     void automaticControlPortAvoidsExistingListener() {
@@ -216,11 +234,18 @@ private slots:
         ControlledNetwork network;QVERIFY(network.start());network.b.reject=true;
         auto opts=options();opts.nodes={node("A",network.a.serverPort()),node("B",network.b.serverPort())};opts.selectedNodeId=opts.nodes.first().id;
         MihomoAdapter main;main.start(opts);QTRY_VERIFY_WITH_TIMEOUT(main.status().apiHealthy,18000);const auto pid=main.status().processId;
-        NodeTestService tests;tests.start(opts,{opts.nodes[0].id,opts.nodes[1].id},network.url());QTRY_VERIFY_WITH_TIMEOUT(!tests.busy(),45000);
+        auto probeOptions=opts;probeOptions.tunEnabled=true;probeOptions.gatewayForwarding=true;probeOptions.allowLan=true;probeOptions.meteredNetwork=true;
+        probeOptions.customRules={"MATCH,REJECT"};probeOptions.dnsConfig={{"mode",2},{"servers","198.18.0.1"}};
+        NodeTestService tests;tests.start(probeOptions,{opts.nodes[0].id,opts.nodes[1].id},network.url());
+        for(auto *runner:tests.findChildren<MihomoAdapter *>()){
+            QFile file(runner->status().configPath);QVERIFY(file.open(QIODevice::ReadOnly));const auto generated=file.readAll();
+            QVERIFY(generated.contains("tun:\n  enable: false"));QVERIFY(generated.contains("allow-lan: false"));QVERIFY(!generated.contains("198.18.0.1"));QVERIFY(!generated.contains("MATCH,REJECT"));
+        }
+        QTRY_VERIFY_WITH_TIMEOUT(!tests.busy(),45000);
         if(tests.succeeded()!=1)qInfo()<<"BATCH_RESULT"<<tests.results();
         QCOMPARE(tests.completed(),2);QCOMPARE(tests.succeeded(),1);QCOMPARE(tests.failed(),1);QVERIFY(tests.result(opts.nodes[0].id).value("success").toBool());QVERIFY(!tests.result(opts.nodes[1].id).value("success").toBool());
         QCOMPARE(main.status().selectedNodeId,opts.nodes.first().id);QCOMPARE(main.status().processId,pid);QVERIFY(network.a.forwarded>=2);
-        tests.start(opts,{opts.nodes[0].id,opts.nodes[1].id},network.url());tests.cancel();QVERIFY(!tests.busy());main.stop();QTRY_VERIFY_WITH_TIMEOUT(!main.status().processAlive,4000);
+        tests.start(opts,{opts.nodes[0].id,opts.nodes[1].id},network.url());tests.cancel();QTRY_VERIFY_WITH_TIMEOUT(!tests.busy(),5000);main.stop();QTRY_VERIFY_WITH_TIMEOUT(!main.status().processAlive,4000);
     }
     void authenticTrafficStreamAndConnectionHistory() {
         ControlledNetwork network;QVERIFY(network.start());QTcpServer origin;QVERIFY(origin.listen(QHostAddress::LocalHost,0));network.a.targetPorts.append(origin.serverPort());

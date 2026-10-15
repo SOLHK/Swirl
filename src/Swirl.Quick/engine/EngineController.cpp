@@ -82,6 +82,12 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
             m_options.controlPort=quint16(runtimePort);emit optionsChanged();
         }
         const auto s=m_engine->status();
+        if(m_meteredPending && s.state==ProxyEngine::State::Running && s.tunEnabled)m_meteredPending=false;
+        if(m_meteredPending && s.state==ProxyEngine::State::Failed){
+            m_meteredPending=false;m_options.meteredNetwork=false;
+            m_options.tunEnabled=m_meteredOldTun;m_options.routingMode=m_meteredOldMode;
+            m_routingError=QStringLiteral("计费模式未生效：")+s.message;saveNetworkConfiguration();
+        }
         m_diagnostics.setProxyPort(s.processAlive?s.proxyPort:0);
         if(s.state!=m_previousEngineState){
             if(s.state==ProxyEngine::State::Degraded)m_diagnostics.noteEvent(QStringLiteral("控制接口异常"),QStringLiteral("控制接口采样暂时失败；保留现有数据隧道与系统代理。"));
@@ -114,12 +120,12 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
     });
     connect(m_engine.get(),&ProxyEngine::statusChanged,this,[this] {
         emit nodesChanged();
-        if (m_restartPending && m_engine->status().state==ProxyEngine::State::Stopped) {
+        if (!m_shuttingDown && m_restartPending && m_engine->status().state==ProxyEngine::State::Stopped) {
             m_restartPending=false;
-            QTimer::singleShot(0,this,[this]{if(m_connectionRequested && (!m_options.selectedNodeId.isEmpty()||m_options.directSession))m_engine->start(m_options);});
+            QTimer::singleShot(0,this,[this]{if(!m_shuttingDown && m_connectionRequested && (!m_options.selectedNodeId.isEmpty()||m_options.directSession))m_engine->start(m_options);});
         }
     });
-    connect(QCoreApplication::instance(), &QCoreApplication::aboutToQuit, this,[this]{m_systemProxy.disable();m_engine->stop();});
+    connect(QCoreApplication::instance(), &QCoreApplication::aboutToQuit, this,[this]{shutdown();});
 }
 void EngineController::setExecutablePath(const QString &path) {
     if (!canStart() || m_options.executablePath == path) return;
@@ -151,6 +157,11 @@ bool EngineController::busy() const {
 }
 void EngineController::start() { if (canStart()) { m_connectionRequested=false;m_options.nodes=m_store.nodes(); m_options.selectedNodeId.clear();m_options.directSession=false; m_engine->start(m_options); } }
 void EngineController::stop() { m_diagnostics.noteEvent(QStringLiteral("Swirl 操作"),QStringLiteral("用户停止引擎，现有本机代理连接将关闭。"));m_proxyRequested=false;m_systemProxy.disable(); m_connectionRequested=false;m_restartPending=false; m_options.selectedNodeId.clear();m_options.directSession=false; m_engine->stop(); }
+void EngineController::shutdown() {
+    if(m_shuttingDown)return;
+    m_shuttingDown=true;m_connectionRequested=false;m_restartPending=false;m_proxyRequested=false;
+    m_imports.shutdown();m_tests.cancel();m_systemProxy.disable();m_engine->stop();
+}
 void EngineController::refresh() { m_engine->refresh(); }
 
 QVariantList EngineController::nodes() const {
@@ -202,6 +213,7 @@ bool EngineController::deleteNode(const QString &id) {
     m_nodeError.clear();const bool ok=m_store.removeNode(id);emit nodesChanged();return ok;
 }
 bool EngineController::chooseNode(const QString &id) {
+    if(m_shuttingDown)return false;
     if(nodeBusy())return false;
     if(processAlive()&&!activeNodeId().isEmpty()&&!apiHealthy()){m_nodeError=QStringLiteral("控制接口未就绪，不能切换节点。");emit selectionChanged();return false;}
     m_nodeError.clear();const bool ok=m_store.select(id);
@@ -209,6 +221,7 @@ bool EngineController::chooseNode(const QString &id) {
     emit selectionChanged();return ok;
 }
 void EngineController::connectNode(const QString &id) {
+    if(m_shuttingDown)return;
     if(id.isEmpty()){if(!busy()&&!m_imports.busy())startConfiguredSession();return;}
     if(nodeBusy() || !chooseNode(id))return;
     if(processAlive() && !activeNodeId().isEmpty())return;
@@ -218,6 +231,7 @@ void EngineController::connectNode(const QString &id) {
     else m_engine->start(m_options);
 }
 void EngineController::startConfiguredSession() {
+    if(m_shuttingDown)return;
     m_connectionRequested=true;
     m_options.nodes=m_store.nodes();m_options.selectedNodeId=m_store.selectedId();
     m_options.directSession=m_options.selectedNodeId.isEmpty();
@@ -226,8 +240,8 @@ void EngineController::startConfiguredSession() {
     emit statusChanged();
 }
 void EngineController::testNode(const QUrl &url) { if(!nodeBusy())m_engine->probeNode(url); }
-void EngineController::testAllNodes(const QUrl &url) { auto options=m_options;options.nodes=m_store.nodes();QStringList ids;for(const auto &node:options.nodes)ids.append(node.id);m_tests.start(options,ids,url); }
-void EngineController::testSelectedNode(const QString &id,const QUrl &url) { auto options=m_options;options.nodes=m_store.nodes();m_tests.start(options,{id},url); }
+void EngineController::testAllNodes(const QUrl &url) { if(m_shuttingDown)return; auto options=m_options;options.nodes=m_store.nodes();QStringList ids;for(const auto &node:options.nodes)ids.append(node.id);m_tests.start(options,ids,url); }
+void EngineController::testSelectedNode(const QString &id,const QUrl &url) { if(m_shuttingDown)return; auto options=m_options;options.nodes=m_store.nodes();m_tests.start(options,{id},url); }
 void EngineController::disconnectNode() { stop(); }
 
 void EngineController::setRoutingMode(const QString &mode) {
@@ -242,6 +256,7 @@ void EngineController::setRoutingMode(const QString &mode) {
     emit statusChanged();
 }
 void EngineController::setSystemProxy(bool enabled) {
+    if(m_shuttingDown)return;
     m_diagnostics.noteEvent(QStringLiteral("Swirl 操作"),enabled?QStringLiteral("用户请求启用系统代理。"):QStringLiteral("用户请求释放系统代理并恢复原设置。"));
     m_routingError.clear();m_proxyRequested=enabled;
     if(!enabled){m_systemProxy.disable();emit statusChanged();return;}
@@ -479,5 +494,6 @@ bool EngineController::setMeteredEnabled(bool enabled) {
     else {m_options.tunEnabled=m_tunBeforeMetered;m_options.routingMode=m_modeBeforeMetered;}
     m_options.meteredNetwork=enabled;
     if(!saveNetworkConfiguration()){m_options.meteredNetwork=!enabled;m_options.tunEnabled=oldTun;m_options.routingMode=oldMode;return false;}
+    m_meteredPending=enabled;m_meteredOldTun=oldTun;m_meteredOldMode=oldMode;
     if(enabled||processAlive())startConfiguredSession();emit statusChanged();return true;
 }

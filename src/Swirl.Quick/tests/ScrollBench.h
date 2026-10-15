@@ -32,8 +32,8 @@ static int recordInteractionSequence(QQuickWindow *window,const QString &directo
 static int runScrollBench(QQuickWindow *window, const QString &output) {
     auto eval=[&](const QString &code){QQmlExpression e(qmlContext(window),window,code);return e.evaluate();};
     auto wait=[](int ms){QEventLoop loop;QTimer::singleShot(ms,&loop,&QEventLoop::quit);loop.exec();};
-    window->resize(914,672);window->show();
-    eval("Theme.reduceMotion=false;Theme.mode='Light';AppState.navigate('activity')");wait(700);
+    window->resize(800,672);window->show();
+    eval("Theme.reduceMotion=false;Theme.mode='Light';AppState.navigate('activity')");wait(700);eval("pageLoader.item.diagnosticOpen=true");wait(200);
     const bool live=qEnvironmentVariableIsSet("SWIRL_SCROLL_LIVE");
     auto *controller=qobject_cast<EngineController *>(qmlEngine(window)->rootContext()->contextProperty("engineController").value<QObject *>());
     ControlledNetwork peers;QNetworkAccessManager client;QTimer traffic;int successfulRequests=0;
@@ -61,26 +61,37 @@ static int runScrollBench(QQuickWindow *window, const QString &output) {
     std::function<QQuickItem *(QQuickItem *)> findScroll=[&](QQuickItem *root)->QQuickItem *{if(root->property("contentY").isValid()&&root->property("contentHeight").toDouble()>root->height())return root;for(auto *child:root->childItems())if(auto *found=findScroll(child))return found;return nullptr;};
     auto *scroll=findScroll(qvariant_cast<QQuickItem *>(eval("pageLoader.item")));
     double minY=1e9,maxY=-1e9;
-    QTimer input;input.setTimerType(Qt::PreciseTimer);input.setInterval(16);int tick=0;
+    QTimer input;input.setTimerType(Qt::PreciseTimer);input.setInterval(50);int tick=0;int direction=-1;
     QObject::connect(&input,&QTimer::timeout,window,[&]{
-        const QPointF p(window->width()*0.65,window->height()*0.65);
-        const int delta=(tick++/40)%2?8:-8;
-        QWheelEvent wheel(p,window->mapToGlobal(p.toPoint()),QPoint(0,delta),QPoint(0,delta>0?120:-120),Qt::NoButton,Qt::NoModifier,Qt::ScrollUpdate,false);
+        const QPointF p=scroll?scroll->mapToScene(QPointF(8,scroll->height()/2)):QPointF(window->width()*0.65,window->height()*0.65);
+        ++tick;
+        if(scroll){const auto y=scroll->property("contentY").toDouble();const auto end=scroll->property("contentHeight").toDouble()-scroll->height();if(y>=end-1)direction=1;else if(y<=1)direction=-1;}
+        const int delta=direction*120;
+        QWheelEvent wheel(p,window->mapToGlobal(p.toPoint()),QPoint(),QPoint(0,delta),Qt::NoButton,Qt::NoModifier,Qt::NoScrollPhase,false);
+        wheel.setTimestamp(quint64(timer.elapsed()+1));
         const auto start=now();QCoreApplication::sendEvent(window,&wheel);dispatch.append((now()-start)/1e6);
         if(scroll){const auto y=scroll->property("contentY").toDouble();minY=qMin(minY,y);maxY=qMax(maxY,y);}
-        window->update(); // Continuous render workload, including time spent at boundaries.
+        // Rendering is driven by input/content updates, not a forced continuous loop.
     });
+#ifdef Q_OS_WIN
+    const auto cpu=[](){FILETIME created,exit,kernel,user;GetProcessTimes(GetCurrentProcess(),&created,&exit,&kernel,&user);ULARGE_INTEGER k,u;k.LowPart=kernel.dwLowDateTime;k.HighPart=kernel.dwHighDateTime;u.LowPart=user.dwLowDateTime;u.HighPart=user.dwHighDateTime;return double(k.QuadPart+u.QuadPart)/10000.;};
+    const auto cpuStart=cpu();
+#endif
     input.start();wait(30000);input.stop();
     for(auto connection:{a,b,c,d,e})QObject::disconnect(connection);
     const auto stats=[](QList<double> values){std::sort(values.begin(),values.end());QJsonArray raw;for(auto v:values)raw.append(v);return QJsonObject{{"count",values.size()},{"p50",values.isEmpty()?0:values[values.size()/2]},{"p95",values.isEmpty()?0:values[qMin(values.size()-1,qsizetype(values.size()*.95))]},{"p99",values.isEmpty()?0:values[qMin(values.size()-1,qsizetype(values.size()*.99))]},{"max",values.isEmpty()?0:values.last()},{"over16_67",std::count_if(values.begin(),values.end(),[](double v){return v>16.67;})},{"over33_33",std::count_if(values.begin(),values.end(),[](double v){return v>33.33;})},{"samplesMs",raw}};};
     QMutexLocker lock(&mutex);
     QJsonObject report{{"qt",qVersion()},{"graphicsApi",int(window->rendererInterface()->graphicsApi())},{"width",window->width()},{"height",window->height()},{"dpr",window->devicePixelRatio()},{"refreshHz",window->screen()->refreshRate()},{"frameIntervals",stats(frames)},{"syncCpu",stats(sync)},{"renderSubmissionCpu",stats(render)},{"inputDispatchGui",stats(dispatch)},{"dataCondition","isolated disconnected store; actual telemetry stale timer; no fabricated network samples"},{"limitations","frameSwapped is not presentation timing; render CPU is not GPU time; no connected traffic acceptance"}};
-    report["minContentY"]=minY;report["maxContentY"]=maxY;report["continuousUpdateRequested"]=true;
+    report["minContentY"]=minY;report["maxContentY"]=maxY;report["continuousUpdateRequested"]=false;report["input"]="synthetic angle wheel, 50ms timer, full-range reversals; not hardware input or presentation FPS";report["scrollExtent"]=scroll?scroll->property("contentHeight").toDouble()-scroll->height():0;
+#ifdef Q_OS_WIN
+    PROCESS_MEMORY_COUNTERS memory{};memory.cb=sizeof(memory);GetProcessMemoryInfo(GetCurrentProcess(),&memory,sizeof(memory));
+    report["processCpuMs"]=cpu()-cpuStart;report["workingSetBytes"]=double(memory.WorkingSetSize);report["peakWorkingSetBytes"]=double(memory.PeakWorkingSetSize);
+#endif
     report["gpu"]=QString::fromUtf8(deviceName);report["threadedRenderLoop"]=threaded;
     if(live){report["dataCondition"]="real HTTP over loopback SOCKS5 through production engine; isolated node store; system proxy unchanged";report["successfulRequests"]=successfulRequests;report["forwardedRequests"]=peers.a.forwarded;report["telemetrySampled"]=controller->telemetry()->sampled();report["measuredTotalBytes"]=controller->telemetry()->summary().value("total").toDouble();}
     QDir().mkpath(QFileInfo(output).absolutePath());QFile file(output);if(!file.open(QIODevice::WriteOnly))return 2;file.write(QJsonDocument(report).toJson());
     window->grabWindow().save(QFileInfo(output).absolutePath()+"/activity.png");
     const bool liveVerified=!live||(successfulRequests>=100&&peers.a.forwarded>=100&&controller->telemetry()->sampled()&&controller->telemetry()->summary().value("total").toDouble()>0);
     if(live){traffic.stop();controller->disconnectNode();}
-    return frames.isEmpty()||!liveVerified?1:0;
+    return frames.isEmpty()||!liveVerified||!scroll||maxY-minY<0.8*(scroll->property("contentHeight").toDouble()-scroll->height())?1:0;
 }

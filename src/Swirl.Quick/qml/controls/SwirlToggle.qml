@@ -17,7 +17,7 @@ Switch {
         width: control.width; height: control.height
         radius: height * 0.5
         color: control.checked ? Theme.primaryControl : Theme.dark ? "#626262" : "#DADADD"
-        border.width: Theme.dp(control.activeFocus ? 2 : 0)
+        border.width: Theme.dp(control.visualFocus ? 2 : 0)
         border.color: Theme.focusBorder
         opacity: control.enabled?(control.hovered ? 0.88 : 1):0.45
         Behavior on opacity{NumberAnimation{duration:SwirlMotion.hoverDuration}}

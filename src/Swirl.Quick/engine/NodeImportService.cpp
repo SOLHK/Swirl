@@ -67,7 +67,13 @@ void NodeImportService::refreshSubscription(const QString &id) {
 void NodeImportService::refreshAll() {
     for(const auto &s:m_store->subscriptions())if(!m_queue.contains(s.id) && !(m_busy&&m_source==s.id))m_queue.enqueue(s.id);next();
 }
+void NodeImportService::shutdown() {
+    m_shuttingDown=true;m_timer.stop();m_deadline.stop();m_queue.clear();
+    if(m_reply){m_reply->disconnect(this);m_reply->abort();m_reply->deleteLater();m_reply=nullptr;}
+    m_busy=false;
+}
 void NodeImportService::checkDue() {
+    if(m_shuttingDown)return;
     if(m_busy || !m_queue.isEmpty())return;
     const auto now=m_clock();
     for(const auto &s:m_store->subscriptions())if(s.enabled &&
@@ -76,6 +82,7 @@ void NodeImportService::checkDue() {
     next();
 }
 void NodeImportService::next() {
+    if(m_shuttingDown)return;
     if(m_busy)return;
     while(!m_queue.isEmpty()) {
         const auto id=m_queue.dequeue();

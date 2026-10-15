@@ -57,6 +57,10 @@ ExtensionService::ExtensionService(EngineController *engine,QString path,QObject
         else if(code!=0||parse.error!=QJsonParseError::NoError||!result.value("ok").toBool())m_error=result.value("error").toString(QStringLiteral("脚本执行失败或触及资源限制。"));
         else {m_error.clear();m_output=QString::fromUtf8(QJsonDocument(QJsonObject{{"result",result.value("result")},{"logs",result.value("logs")}}).toJson(QJsonDocument::Indented));}emit changed();});
 }
+void ExtensionService::shutdown(){
+    m_configurationPending=false;m_timeout.stop();
+    if(busy()){m_process.terminate();QTimer::singleShot(750,this,[this]{if(busy())m_process.kill();});}
+}
 ExtensionService::~ExtensionService(){m_timeout.stop();if(busy()){m_process.kill();m_process.waitForFinished(2000);}
 #ifdef Q_OS_WIN
     if(m_workerJob)CloseHandle(HANDLE(m_workerJob));

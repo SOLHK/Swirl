@@ -2,6 +2,7 @@
 #include "MihomoAdapter.h"
 #include <QQueue>
 #include <QHash>
+#include <QSet>
 
 // Each tested node owns an isolated engine and loopback ports. Tests cannot
 // alter the main engine's selection, routing mode or Windows system proxy.
@@ -17,9 +18,10 @@ class NodeTestService final : public QObject {
 public:
  using QObject::QObject;
  ~NodeTestService() override;
+ static EngineStartOptions isolatedOptions(const EngineStartOptions &);
  void start(const EngineStartOptions &,const QStringList &ids,const QUrl &url);
  Q_INVOKABLE void cancel();
- bool busy() const { return !m_queue.isEmpty()||!m_running.isEmpty(); }
+ bool busy() const { return !m_queue.isEmpty()||!m_running.isEmpty()||!m_retiring.isEmpty(); }
  int completed() const { return m_completed; }
  int total() const { return m_total; }
  int succeeded() const { return m_succeeded; }
@@ -32,11 +34,13 @@ signals:
  void diagnostic(const QString &code,const QString &message);
 private:
  void next();
+ void retire(MihomoAdapter *runner);
  void finish(const QString &,MihomoAdapter *,const QVariantMap &);
  EngineStartOptions m_options;
  QUrl m_url;
  QQueue<QString> m_queue;
  QHash<QString,MihomoAdapter *> m_running;
+ QSet<MihomoAdapter *> m_retiring;
  QVariantMap m_results;
  int m_completed=0,m_total=0,m_succeeded=0,m_failed=0;
  QString m_message;

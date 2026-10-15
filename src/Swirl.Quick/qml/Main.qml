@@ -222,6 +222,7 @@ ApplicationWindow {
         settingsSheet.section=route;settingsSheet.updateSettingsSection();settingsSheet.show()
         settingsTransition.moveTo(1);settingsSheet.raise();settingsSheet.requestActivate()
     }
+    function persistExitDrafts(){if(settingsSheet.section==="dns"&&settingsLoader.item&&settingsLoader.item.persistExitDraft)settingsLoader.item.persistExitDraft()}
     function closeSettings(){settingsSheet.close()}
     // Restore the original card-to-detail geometric path using the existing
     // reversible settings clock. Native settings windows and their cache stay

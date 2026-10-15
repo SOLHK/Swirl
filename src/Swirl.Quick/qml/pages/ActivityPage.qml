@@ -54,8 +54,16 @@ Item {
   readonly property Item motionTitle:metricValue
   readonly property Item motionSurface:metric
   Layout.fillWidth:true;Layout.minimumWidth:0;Layout.preferredHeight:Theme.dp(132)
+  function activate(){key==="activeConnections"?SwirlMotion.navigateFrom(metric,"connections",key):page.trafficFrom(metric,key)}
+  SwirlMotionButton {
+   anchors.fill:parent;anchors.bottomMargin:metric.cumulative?Theme.dp(48):0
+   objectName:"activityMetricHit_"+metric.key
+   Accessible.name:metric.label+"详情";onClicked:metric.activate()
+   background:Rectangle {radius:Theme.cardRadius;color:parent.down?Theme.selected:parent.hovered?Theme.hover:"transparent";border.width:parent.visualFocus?1:0;border.color:Theme.focusBorder}
+   contentItem:Item {}
+  }
   ColumnLayout {anchors.fill:parent;anchors.margins:Theme.dp(14);spacing:Theme.dp(6)
-   RowLayout {Layout.fillWidth:true;Label {text:metric.label;Layout.fillWidth:true}SwirlIconButton {implicitWidth:Theme.dp(22);implicitHeight:Theme.dp(22);iconName:"chevron-right";quiet:true;Accessible.name:metric.label+"详情";onClicked:metric.key==="activeConnections"?SwirlMotion.navigateFrom(metric,"connections",metric.key):page.trafficFrom(metric,metric.key)}}
+   RowLayout {Layout.fillWidth:true;Label {text:metric.label;Layout.fillWidth:true}SwirlIconButton {implicitWidth:Theme.dp(22);implicitHeight:Theme.dp(22);iconName:"chevron-right";quiet:true;Accessible.name:metric.label+"详情";onClicked:metric.activate()}}
    Value {id:metricValue;text:metric.value;Layout.fillWidth:true}
    Label {visible:!metric.cumulative;text:metric.hint;Layout.fillWidth:true}
    SwirlSegmentedControl {visible:metric.cumulative;Layout.fillWidth:true;options:["今日","本月"];currentIndex:page.period;onActivated:index=>page.period=index}
@@ -130,10 +138,10 @@ Item {
      RowLayout {Layout.fillWidth:true;SwirlText {text:"流量来源";color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold;Layout.fillWidth:true}SwirlButton {text:"查看全部";quiet:true;onClicked:{AppState.trafficPeriod=page.period===0?0:3;AppState.navigate(page.rankingKind===0?"processes":page.rankingKind===1?"gateway":"traffic")}}}
      SwirlSegmentedControl {Layout.preferredWidth:Math.min(parent.width,Theme.dp(360));options:["进程","设备","域名","策略"];currentIndex:page.rankingKind;onActivated:index=>page.rankingKind=index}
      Repeater {model:page.ranks
-      SwirlMotionButton {id:rank;required property var modelData;Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(32);padding:Theme.dp(4);hoverEnabled:true
+      SwirlMotionButton {id:rank;readonly property Item motionTitle:rankName;readonly property Item motionSurface:background;required property var modelData;Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(32);padding:Theme.dp(4);hoverEnabled:true
        background:Rectangle {color:rank.down?Theme.pressed:rank.hovered?Theme.hover:"transparent";radius:Theme.controlRadius}
        contentItem:RowLayout {SwirlText {id:rankName;Layout.fillWidth:true;text:rank.modelData.name;color:Theme.text;elide:Text.ElideRight;font.pixelSize:Theme.fontSize(13)}Label {text:rank.modelData.value}}
-       onClicked:{AppState.trafficPeriod=page.period===0?0:3;if(page.rankingKind===0){AppState.trafficSelectedProcess=modelData.name;SwirlMotion.navigateFrom(rankName,"processes","processName")}else AppState.navigate(page.rankingKind===1?"gateway":"traffic")}
+       onClicked:{AppState.trafficPeriod=page.period===0?0:3;if(page.rankingKind===0){AppState.trafficSelectedProcess=modelData.name;SwirlMotion.navigateFrom(rank,"processes","processName")}else if(page.rankingKind===1){AppState.trafficSelectedDevice=modelData.name;SwirlMotion.navigateFrom(rank,"gateway","deviceName")}else AppState.navigate("traffic")}
       }
      }
      Label {visible:page.ranks.length===0;text:"尚未采集排行数据";Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(56)}

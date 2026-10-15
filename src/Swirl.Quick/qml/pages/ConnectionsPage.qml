@@ -10,6 +10,7 @@ Item {
     SwirlTransitionCoordinator {id:detailClock;duration:SwirlMotion.dialogDuration;Component.onCompleted:{destination=AppState.detailOpen?1:0;finish()}}
     Connections {target:AppState;function onDetailOpenChanged(){detailClock.moveTo(AppState.detailOpen?1:0)}}
     readonly property var heroTargets:({activeConnections:activeCount})
+    readonly property var motionSurfaces:({activeConnections:connectionSummary})
     property var visibleRows:{
         if(!visible)return []
         var q=search.text.toLowerCase()
@@ -29,7 +30,9 @@ Item {
         anchors.fill:parent
         anchors.leftMargin:Theme.dp(23); anchors.rightMargin:Theme.dp(23); anchors.bottomMargin:Theme.dp(14)
         spacing:Theme.dp(14)
-        RowLayout {Layout.fillWidth:true;SwirlText {text:"活动连接";color:Theme.text;font.pixelSize:Theme.fontSize(22);Layout.fillWidth:true}SwirlText {id:activeCount;text:engineController.telemetry.connectionsSampled?String(engineController.telemetry.activeConnections):"—";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold}SwirlButton {text:"返回";visible:SwirlMotion.returnShared && SwirlMotion.returnShared.route===AppState.currentPage;onClicked:SwirlMotion.returnToHub(activeCount)}}
+        SwirlGlassPanel {id:connectionSummary;Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(72)
+         RowLayout {anchors.fill:parent;anchors.margins:Theme.dp(16);SwirlText {text:"活动连接";color:Theme.text;font.pixelSize:Theme.fontSize(22);Layout.fillWidth:true}SwirlText {id:activeCount;text:engineController.telemetry.connectionsSampled?String(engineController.telemetry.activeConnections):"—";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold}SwirlButton {text:"返回";visible:SwirlMotion.returnShared && SwirlMotion.returnShared.route===AppState.currentPage;onClicked:SwirlMotion.returnToHub(activeCount)}}
+        }
         RowLayout {
             Layout.fillWidth:true; spacing:Theme.dp(10)
             SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:AppState.zh("搜索域名、IP、进程或策略") }
@@ -50,7 +53,7 @@ Item {
                 Layout.fillWidth:true; Layout.fillHeight:true
                 clip:true
                 SwirlDataTable {
-                    anchors.fill:parent; anchors.margins:Theme.dp(1)
+                    id:connectionTable;anchors.fill:parent; anchors.margins:Theme.dp(1)
                     incrementalRows:true;animateRowChanges:false;rows:page.visibleRows
                     selectedId:page.selected?page.selected.id:""
                     columns:[
@@ -60,7 +63,7 @@ Item {
                         {key:"down",label:AppState.zh("DOWNLOAD"),w:100},{key:"latency",label:AppState.zh("LATENCY"),w:95},
                         {key:"time",label:AppState.zh("SINCE"),w:88},{key:"status",label:AppState.zh("状态"),w:88}
                     ]
-                    onRowSelected:function(record){page.selected=record;AppState.detailOpen=true}
+                    onRowSelected:function(record){page.selected=record;AppState.detailOpen=true;connectionDetail.present(connectionTable.selectedItem)}
                 }
                 SwirlEmptyState {
                     visible:page.visibleRows.length===0
@@ -69,11 +72,10 @@ Item {
                     detail:AppState.zh("Adjust the search or status filter")
                 }
             }
-            SwirlGlassPanel {
-                visible:AppState.detailOpen||detailClock.moving
+            SwirlLinkedDetail {
+                id:connectionDetail;animationLayer:page;sourceViewport:connectionTable;detailOpen:AppState.detailOpen
+                visible:AppState.detailOpen||moving
                 enabled:AppState.detailOpen
-                opacity:detailClock.progress
-                transform:Translate{x:SwirlMotion.reduced?0:Theme.dp(16)*(1-detailClock.progress)}
                 Layout.preferredWidth:Theme.dp(290); Layout.fillHeight:true
                 ColumnLayout {
                     anchors.fill:parent; anchors.margins:Theme.dp(20); spacing:Theme.dp(12)

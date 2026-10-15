@@ -7,7 +7,7 @@ QtObject {
     property bool backdropActive: false
     property bool windowActive:true
     // Windows supplies blur and luminosity. These are only the Swirl overlay.
-    readonly property color nativeTint: dark ? "#1E2B43" : "#EAF1FF"
+    readonly property color nativeTint: dark ? "#292C31" : "#EEF0F3"
     readonly property real nativeTintOpacity: dark ? 0.90 : 0.86
     // Retained for the opt-in synthetic blur benchmark, never desktop sampling.
     property real glassBlurStrength: 0.85
@@ -39,8 +39,8 @@ QtObject {
     // Neutral QML tint above the native window backdrop. Fall back to opacity 1.
     readonly property color sidebarBase: dark ? "#292C31" : "#EEF0F3"
     // Content materials are composed inside the system-owned HWND outline.
-    readonly property real sidebarOpacity: transparency && backdropActive ? (dark ? 0.92 : 0.88) : 1.0
-    readonly property real workspaceOpacity:transparency && backdropActive ? (dark ? 0.96 : 0.94) : 1.0
+    readonly property real sidebarOpacity: transparency && backdropActive ? (dark ? 0.78 : 0.72) : 1.0
+    readonly property real workspaceOpacity:transparency && backdropActive ? (dark ? 0.88 : 0.84) : 1.0
     readonly property real settingsOpacity:dark?0.98:0.96
     readonly property real popupOpacity:transparency && backdropActive ? (dark?0.98:0.99) : 1.0
     readonly property color sidebar: withAlpha(sidebarBase, sidebarOpacity)

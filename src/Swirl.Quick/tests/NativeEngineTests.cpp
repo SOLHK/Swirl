@@ -1,4 +1,7 @@
 #include "engine/SwirlProxyEngine.h"
+#include "engine/ThreadedEngine.h"
+#include <future>
+#include <atomic>
 #include "engine/SwirlEngineManager.h"
 #include "engine/SwirlProtocolRegistry.h"
 #include "engine/SwirlUdpExchange.h"
@@ -21,6 +24,51 @@ class NativeEngineTests:public QObject {
     QByteArray exchange(QTcpSocket &socket,const QByteArray &bytes,int minimum=1){socket.write(bytes);QByteArray result;QTest::qWaitFor([&]{result+=socket.readAll();return result.size()>=minimum||socket.state()==QAbstractSocket::UnconnectedState;},4000);return result;}
     QSslConfiguration original;
 private slots:
+    void threadedTunnelSurvivesUiStallAndIdle() {
+        QThread peerThread;QObject peerContext;peerContext.moveToThread(&peerThread);peerThread.start();
+        quint16 port=0;QTcpServer *server=nullptr;
+        QMetaObject::invokeMethod(&peerContext,[&]{
+            server=new QTcpServer(&peerContext);server->listen(QHostAddress::LocalHost);port=server->serverPort();
+            connect(server,&QTcpServer::newConnection,server,[server]{while(auto *socket=server->nextPendingConnection()){
+                connect(socket,&QTcpSocket::readyRead,socket,[socket]{socket->write(socket->readAll());});
+                connect(socket,&QTcpSocket::disconnected,socket,&QObject::deleteLater);
+            }});
+        },Qt::BlockingQueuedConnection);
+        ThreadedEngine engine;auto o=options();o.directSession=true;engine.start(o);
+        const bool ready=QTest::qWaitFor([&]{return engine.status().state==ProxyEngine::State::Running;},5000);
+        std::atomic<int> packets{0};
+        const int seconds=qMax(4,qEnvironmentVariableIntValue("SWIRL_LONG_STREAM_SECONDS"));
+        auto client=std::async(std::launch::async,[&]{
+            if(!ready)return false;
+            QTcpSocket socket;socket.setProxy(QNetworkProxy::NoProxy);socket.connectToHost(QHostAddress::LocalHost,o.proxyPort);
+            if(!socket.waitForConnected(3000))return false;
+            socket.write("CONNECT 127.0.0.1:"+QByteArray::number(port)+" HTTP/1.1\r\nHost: fixture\r\n\r\n");
+            if(!socket.waitForReadyRead(3000)||!socket.readAll().startsWith("HTTP/1.1 200"))return false;
+            QElapsedTimer clock;clock.start();bool idleDone=false;
+            while(clock.elapsed()<seconds*1000){
+                if(seconds>=1200&&!idleDone&&clock.elapsed()>2000){QThread::sleep(135);idleDone=true;}
+                const QByteArray block(16384,char(packets.load()%127));socket.write(block);
+                QByteArray received;QElapsedTimer deadline;deadline.start();
+                while(received.size()<block.size()&&deadline.elapsed()<3000){
+                    if(!socket.bytesAvailable()&&!socket.waitForReadyRead(1000))continue;
+                    received+=socket.readAll();
+                }
+                if(received!=block)return false;
+                ++packets;QThread::msleep(20);
+            }
+            socket.disconnectFromHost();return true;
+        });
+        QThread::msleep(1800); // Deliberately block the UI/test thread.
+        const int duringStall=packets.load();
+        while(client.wait_for(std::chrono::milliseconds(0))!=std::future_status::ready)QTest::qWait(20);
+        const bool complete=client.get();engine.stop();
+        const bool stopped=QTest::qWaitFor([&]{return engine.status().state==ProxyEngine::State::Stopped;},5000);
+        QMetaObject::invokeMethod(&peerContext,[&]{delete server;peerContext.moveToThread(QCoreApplication::instance()->thread());},Qt::BlockingQueuedConnection);
+        peerThread.quit();peerThread.wait();
+        qInfo()<<"Threaded tunnel seconds"<<seconds<<"packets during UI stall"<<duringStall<<"total"<<packets.load();
+        QVERIFY(ready);QVERIFY(duringStall>10);QVERIFY(complete);QVERIFY(stopped);
+    }
+
     void explicitCompatibilityPreferenceKeepsNetworkOptions() {
         EngineStartOptions o;o.routingMode="global";o.directSession=true;
         QVERIFY(SwirlProtocolRegistry::nativeSessionReason(o).isEmpty());

@@ -17,7 +17,13 @@ Item {
  property bool detailHasSelection:selected!==null
  onDetailHasSelectionChanged:{if(visible)detailClock.moveTo(detailHasSelection?1:0);else{detailClock.destination=detailHasSelection?1:0;detailClock.finish()}}
  SwirlTransitionCoordinator {id:detailClock;duration:SwirlMotion.dialogDuration}
- readonly property var selected:records.find(r=>r.id===selectedId)||null
+ readonly property var trafficDevice:engineController.telemetry.ranking("devices",AppState.trafficPeriod,100).find(r=>r.name===AppState.trafficSelectedDevice)||null
+ readonly property var selected:records.find(r=>r.id===selectedId)||trafficDevice
+ readonly property var heroTargets:({deviceName:deviceDetailName})
+ readonly property var motionSurfaces:({deviceName:deviceDetailSurface.motionSurface})
+ function selectRequested(){const row=records.find(r=>r.name===AppState.trafficSelectedDevice||r.ip===AppState.trafficSelectedDevice);selectedId=row?row.id:""}
+ Component.onCompleted:selectRequested()
+ Connections {target:AppState;function onTrafficSelectedDeviceChanged(){page.selectRequested()}}
  function ipNumber(ip){return ip.split(".").reduce((n,v)=>n*256+Number(v),0)}
  function configureGateway(){gatewayDialog.open()}
  function preparePreviewState(state){if(state==="device-sort")deviceSort.popup.open();else if(state==="device-settings")page.openGatewayMenu()}
@@ -26,12 +32,12 @@ Item {
  SwirlComboBox{id:deviceSort;objectName:"deviceSortPicker";anchors.right:parent.right;anchors.rightMargin:Theme.dp(20);y:Theme.dp(34);width:Theme.dp(208);height:Theme.dp(24);model:["按流量排序","按速度排序","按名称排序","按 IP 排序","按 DHCP 最后出现时间排序"];currentIndex:page.sortIndex;onActivated:page.sortIndex=currentIndex}
  Item{x:Theme.dp(24);y:Theme.dp(90);width:Math.floor((parent.width-Theme.dp(70))/2);height:parent.height-y-Theme.dp(72)
   SwirlText {visible:page.records.length===0;anchors.centerIn:parent;text:"无设备";color:Theme.muted;font.pixelSize:Theme.fontSize(17);font.weight:Font.DemiBold}
-  SwirlDataTable{visible:page.records.length>0;anchors.fill:parent;incrementalRows:true;animateRowChanges:false;rows:page.records;selectedId:page.selectedId;columns:[{key:"name",label:"设备",w:160},{key:"ip",label:"IP 地址",w:153}];onRowSelected:r=>page.selectedId=r.id}
+  SwirlDataTable{id:deviceTable;visible:page.records.length>0;anchors.fill:parent;incrementalRows:true;animateRowChanges:false;rows:page.records;selectedId:page.selectedId;columns:[{key:"name",label:"设备",w:160},{key:"ip",label:"IP 地址",w:153}];onRowSelected:r=>{page.selectedId=r.id;deviceDetailSurface.present(deviceTable.selectedItem)}}
  }
- ReferenceOutline{anchors.right:parent.right;anchors.rightMargin:Theme.dp(24);y:Theme.dp(90);width:Math.floor((parent.width-Theme.dp(90))/2);height:parent.height-y-Theme.dp(24)
-  Column{transform:Translate{x:SwirlMotion.reduced?0:Theme.dp(16)*(1-detailClock.progress)} visible:page.selected!==null;anchors.fill:parent;anchors.margins:Theme.dp(20);spacing:Theme.dp(14)
-   SwirlText {text:page.selected?page.selected.name:"";textFormat:Text.PlainText;color:Theme.text;font.pixelSize:Theme.fontSize(18)}
-   SwirlText {text:page.selected?"IP 地址："+page.selected.ip+"\n上传："+page.selected.upload+"\n下载："+page.selected.download+"\n速度："+page.selected.speedText+"\nMAC："+page.selected.mac+"\n状态："+page.selected.status+"\n租约到期："+new Date(page.selected.expires*1000).toLocaleString():"";textFormat:Text.PlainText;color:Theme.muted;font.pixelSize:Theme.fontSize(12);width:parent.width;wrapMode:Text.WrapAnywhere}
+ SwirlLinkedDetail{id:deviceDetailSurface;animationLayer:page;sourceViewport:deviceTable;detailOpen:page.selected!==null;anchors.right:parent.right;anchors.rightMargin:Theme.dp(24);y:Theme.dp(90);width:Math.floor((parent.width-Theme.dp(90))/2);height:parent.height-y-Theme.dp(24)
+  Column{visible:page.selected!==null;anchors.fill:parent;anchors.margins:Theme.dp(20);spacing:Theme.dp(14)
+   SwirlText {id:deviceDetailName;text:page.selected?page.selected.name:"";textFormat:Text.PlainText;color:Theme.text;font.pixelSize:Theme.fontSize(18)}
+   SwirlText {text:page.selected?"IP 地址："+(page.selected.ip||page.selected.name)+"\n上传："+page.selected.upload+"\n下载："+page.selected.download+"\n速度："+(page.selected.speedText||"—")+"\nMAC："+(page.selected.mac||"—")+"\n状态："+(page.selected.status||"已采集流量")+"\n租约到期："+(page.selected.expires?new Date(page.selected.expires*1000).toLocaleString():"—"):"";textFormat:Text.PlainText;color:Theme.muted;font.pixelSize:Theme.fontSize(12);width:parent.width;wrapMode:Text.WrapAnywhere}
   }
  }
  Item{x:Theme.dp(24);anchors.bottom:parent.bottom;anchors.bottomMargin:Theme.dp(10);width:Math.floor((parent.width-Theme.dp(70))/2);height:Theme.dp(64)

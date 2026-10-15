@@ -42,7 +42,7 @@ GatewayService::GatewayService(EngineController *engine,QString path,QObject *pa
     connect(m_engine,&EngineController::statusChanged,this,[this]{if(m_phase==Phase::WaitingTun){if(m_engine->gatewayForwardingReady())startForwarding();else if(!m_engine->busy()&&!m_engine->processAlive()){m_deadline.stop();m_phase=Phase::Idle;m_error=m_engine->error();m_engine->setGatewayForwarding(false);emit changed();}}
         else if(m_forwarding&&!m_engine->tunEnabled()&&!busy())stop();});
 }
-GatewayService::~GatewayService(){m_deadline.stop();QObject::disconnect(&m_dhcp,nullptr,this,nullptr);QObject::disconnect(&m_process,nullptr,this,nullptr);QObject::disconnect(m_engine,nullptr,this,nullptr);m_dhcp.stop();if(m_process.state()!=QProcess::NotRunning){if(!m_process.waitForFinished(35000)){m_process.kill();m_process.waitForFinished(2000);}}
+GatewayService::~GatewayService(){m_deadline.stop();QObject::disconnect(&m_dhcp,nullptr,this,nullptr);QObject::disconnect(&m_process,nullptr,this,nullptr);QObject::disconnect(m_engine,nullptr,this,nullptr);m_dhcp.stop();if(m_process.state()!=QProcess::NotRunning){if(!m_process.waitForFinished(m_shutdown?1000:35000)){m_process.kill();m_process.waitForFinished(2000);}}
     if(recoveryNeeded())GatewayRouting::cleanup(m_journal);m_engine->setGatewayForwarding(false);}
 bool GatewayService::recoveryNeeded() const {return QFileInfo::exists(m_journal);}
 QVariantList GatewayService::devices() const {auto rows=m_dhcp.leases();const auto traffic=m_engine->telemetry()->ranking("devices",0,512);
@@ -96,9 +96,19 @@ void GatewayService::processFinished(int code) {
     }
     if(m_phase==Phase::Stopping){m_forwarding=false;m_phase=Phase::Idle;if(code!=0)m_error=QStringLiteral("接口转发恢复失败，恢复记录已保留：")+QString::fromUtf8(m_process.readAllStandardError().left(2048));m_engine->setGatewayForwarding(false);emit changed();}
 }
-void GatewayService::runCleanup(){m_phase=Phase::Stopping;m_dhcp.stop();if(!recoveryNeeded()){m_forwarding=false;m_phase=Phase::Idle;m_engine->setGatewayForwarding(false);emit changed();return;}
+void GatewayService::runCleanup(){if(m_shutdownExpired){m_phase=Phase::Idle;m_forwarding=false;return;}m_phase=Phase::Stopping;m_dhcp.stop();if(!recoveryNeeded()){m_forwarding=false;m_phase=Phase::Idle;m_engine->setGatewayForwarding(false);emit changed();return;}
     QFile journal(m_journal);if(!journal.open(QIODevice::ReadOnly)||journal.size()>16384||!GatewayRouting::validJournal(QJsonDocument::fromJson(journal.readAll()).object())){m_phase=Phase::Idle;m_forwarding=false;m_error=QStringLiteral("转发恢复记录无效，已停止 DHCP 并保留记录，未自动修改接口。");m_engine->setGatewayForwarding(false);emit changed();return;}journal.close();
     m_deadline.start(50000);GatewayRouting::prepareProcess(m_process,GatewayRouting::cleanupScript(m_journal));m_process.start();emit changed();}
+void GatewayService::shutdown(){
+    m_shutdown=true;stop();
+    QTimer::singleShot(6500,this,[this]{
+        m_shutdownExpired=true;
+        if(m_process.state()!=QProcess::NotRunning){
+            m_error=QStringLiteral("退出时网关清理超时；恢复记录已保留。");
+            m_process.kill();
+        }
+    });
+}
 void GatewayService::stop(){if(m_phase==Phase::Starting){m_stopping=true;emit changed();return;}if(m_phase==Phase::Stopping)return;if(m_phase==Phase::WaitingTun){m_deadline.stop();m_phase=Phase::Idle;m_engine->setGatewayForwarding(false);emit changed();return;}runCleanup();}
 bool GatewayService::recover(){if(busy()||running())return false;if(!m_engine->elevated()){m_error=QStringLiteral("恢复接口状态需要管理员权限。");emit changed();return false;}m_error.clear();runCleanup();return true;}
 bool GatewayService::exportClients(const QUrl &destination){if(!destination.isLocalFile())return false;QByteArray bytes="MAC,IP,Name\r\n";auto rows=m_dhcp.reservations();for(const auto &lease:m_dhcp.leases()){const auto row=lease.toMap();bool exists=false;for(const auto &entry:rows)if(entry.toMap().value("mac")==row.value("mac"))exists=true;if(!exists)rows.append(row);}

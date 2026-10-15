@@ -83,7 +83,7 @@ public:
     bool processAlive() const { return m_engine->status().processAlive; }
     bool apiHealthy() const { return m_engine->status().apiHealthy; }
     bool busy() const;
-    bool canStart() const { return !busy() && !processAlive() && !m_imports.busy(); }
+    bool canStart() const { return !m_shuttingDown && !busy() && !processAlive() && !m_imports.busy(); }
     QString version() const { return m_engine->status().version; }
     QString engineName() const { return m_engine->status().engineName; }
     QString engineKind() const { return m_engine->status().engineKind; }
@@ -95,6 +95,7 @@ public:
     QString controlEndpoint() const { return m_engine->status().controlEndpoint; }
     Q_INVOKABLE void start();
     Q_INVOKABLE void stop();
+    void shutdown();
     Q_INVOKABLE void refresh();
     QVariantList nodes() const;
     QVariantList nodeCatalog() const { return m_store.publicRows(); }
@@ -139,7 +140,7 @@ public:
     Q_INVOKABLE void setCaptureProxyPort(int port);
     bool tunEnabled() const { return m_engine->status().tunEnabled&&apiHealthy()&&processAlive(); }
     bool elevated() const;
-    bool meteredEnabled() const { return m_options.meteredNetwork; }
+    bool meteredEnabled() const { return m_options.meteredNetwork && tunEnabled(); }
     QStringList meteredAllowlist() const { return m_options.meteredAllowlist; }
     Q_INVOKABLE bool setMeteredEnabled(bool enabled);
     Q_INVOKABLE bool configureMeteredAllowlist(const QStringList &processes);
@@ -171,6 +172,9 @@ signals:
     void optionsChanged();
     void nodesChanged();
 private:
+    bool m_shuttingDown=false;
+    bool m_meteredPending=false,m_meteredOldTun=false;
+    QString m_meteredOldMode;
     std::unique_ptr<ProxyEngine> m_engine;
     EngineStartOptions m_options;
     NodeStore m_store;

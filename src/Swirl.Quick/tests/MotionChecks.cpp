@@ -143,7 +143,9 @@ int runMotionVisualChecks(QQuickWindow *window, const QString &directory) {
     return errors?1:0;
 }
 #include "ScrollBench.h"
+#include "SixAChecks.h"
 int runMotionChecks(QQuickWindow *window, const QString &output) {
+    if(qEnvironmentVariableIsSet("SWIRL_6A_CHECKS"))return runSixAChecks(window,output);
     if(qEnvironmentVariableIsSet("SWIRL_RECORD_INTERACTIONS"))return recordInteractionSequence(window,output);
     if(qEnvironmentVariableIsSet("SWIRL_SCROLL_BENCH"))return runScrollBench(window,output);
     // Use the application's event dispatcher for timing. QTest::qWait polls

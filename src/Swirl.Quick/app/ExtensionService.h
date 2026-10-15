@@ -23,6 +23,7 @@ public:
     QString profileName() const;
     QString error() const {return m_error;}
     QString output() const {return m_output;}
+    void shutdown();
     bool busy() const {return m_process.state()!=QProcess::NotRunning;}
     Q_INVOKABLE bool saveScript(const QString &id,const QString &name,const QString &source);
     Q_INVOKABLE bool importScript(const QUrl &source);

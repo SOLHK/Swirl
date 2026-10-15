@@ -14,6 +14,8 @@ public:
     ~NativeDuplexRelay() override;
     bool attach(QTcpSocket *client,QTcpSocket *upstream,QByteArray initialUp,QByteArray initialDown);
     void cancel();
+    QString closeInitiator;
+    QString observedError;
     static void configureKeepAlive(QTcpSocket *socket);
     std::function<void(qint64,qint64)> transferred;
     std::function<void(const QString &)> finished;

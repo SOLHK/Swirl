@@ -27,6 +27,7 @@ public:
     Q_INVOKABLE bool removeSubscription(const QString &id);
     Q_INVOKABLE void refreshSubscription(const QString &id);
     Q_INVOKABLE void refreshAll();
+    void shutdown();
     void setDownloadProxy(int port) { m_proxyPort=port; }
 signals:
     void changed();
@@ -46,6 +47,6 @@ private:
     QHash<QString,qint64> m_attempts;
     std::function<qint64()> m_clock;
     QString m_message,m_source,m_formatHint="auto";
-    bool m_busy=false;
+    bool m_busy=false,m_shuttingDown=false;
     int m_proxyPort=0;
 };

@@ -1,4 +1,6 @@
 #include <QGuiApplication>
+#include "app/SingleInstance.h"
+#include "app/ShutdownCoordinator.h"
 #include "app/FontManager.h"
 #include "app/FontRendering.h"
 #if defined(SWIRL_UI_TESTS) && defined(Q_OS_WIN)
@@ -27,6 +29,9 @@
 #include <QMouseEvent>
 #include <QDebug>
 #include <QFile>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QTcpServer>
 #include <QTextStream>
 #include <QCoreApplication>
 #include <QQmlExpression>
@@ -64,6 +69,7 @@
 #include "network/GatewayService.h"
 #include "engine/MihomoAdapter.h"
 #include "engine/SwirlEngineManager.h"
+#include "engine/ThreadedEngine.h"
 #include "engine/EngineController.h"
 
 // Collect Qt/QML diagnostics in a file because the Windows GUI subsystem
@@ -93,7 +99,7 @@ int main(int argc, char *argv[])
     app.setApplicationName(QStringLiteral("Swirl"));
     app.setOrganizationName(QStringLiteral("SOLHK"));
     app.setOrganizationDomain(QStringLiteral("solhk.dev"));
-    app.setApplicationVersion(QStringLiteral("1.0.0-phase3-preview"));
+    app.setApplicationVersion(QStringLiteral("1.0.0-test-6A+")+QStringLiteral(SWIRL_BUILD_REVISION));
 #ifdef SWIRL_UI_TESTS
 #ifdef Q_OS_WIN
     // Read-only native QA capture, limited to the actual Windows taskbar.
@@ -148,7 +154,16 @@ int main(int argc, char *argv[])
     }
 #endif
     const bool realAcceptance=!runtimeStore.isEmpty()&&!runtimeCommands.isEmpty()&&!runtimeState.isEmpty();
-    const bool isolatedRun=realAcceptance||heroTest||nodeTest||motionTest||engineTest||hdrDisplayTest||hdrTest||app.arguments().contains("--interaction-test")||app.arguments().contains("--capture-self-test")||app.arguments().contains("--gateway-self-test")||app.arguments().contains("--smoke-test")||app.arguments().contains("--window-test")||previewMode;
+    bool lifecycleTest=false;
+#ifdef SWIRL_UI_TESTS
+    lifecycleTest=app.arguments().contains("--lifecycle-test");
+#endif
+    const bool isolatedRun=lifecycleTest||realAcceptance||heroTest||nodeTest||motionTest||engineTest||hdrDisplayTest||hdrTest||app.arguments().contains("--interaction-test")||app.arguments().contains("--capture-self-test")||app.arguments().contains("--gateway-self-test")||app.arguments().contains("--smoke-test")||app.arguments().contains("--window-test")||previewMode;
+    SingleInstance instance;
+    if(lifecycleTest || (!isolatedRun && !appearanceTest)) {
+        const auto ownership=instance.acquire(lifecycleTest?QStringLiteral("isolated-lifecycle-test"):QStringLiteral("production"));
+        if(ownership!=SingleInstance::Primary)return ownership==SingleInstance::Activated?0:10;
+    }
     if(isolatedRun||appearanceTest) {
         QStandardPaths::setTestModeEnabled(true);
         QSettings::setDefaultFormat(QSettings::IniFormat);
@@ -176,7 +191,7 @@ int main(int argc, char *argv[])
     QTemporaryDir isolatedNodes;
     std::unique_ptr<ProxyEngine> runtimeEngine;
     if(nodeTest||engineTest)runtimeEngine=std::make_unique<MihomoAdapter>(); // Pinned legacy regression fixtures.
-    else runtimeEngine=std::make_unique<SwirlEngineManager>();
+    else runtimeEngine=std::make_unique<ThreadedEngine>();
     EngineController engineController(std::move(runtimeEngine),nullptr,realAcceptance?runtimeStore:isolatedRun?isolatedNodes.filePath("nodes.dpapi"):QString(),realAcceptance);
     ExtensionService extensions(&engineController,isolatedRun?isolatedNodes.filePath("extensions.dpapi"):QString());
     GatewayService gateway(&engineController,isolatedRun?isolatedNodes.filePath("gateway.json"):QString());
@@ -252,6 +267,35 @@ int main(int argc, char *argv[])
         return 1;
     auto *rootWindow = qobject_cast<QQuickWindow *>(engine.rootObjects().constFirst());
     if(rootWindow)rootWindow->setIcon(icon);
+    std::unique_ptr<ShutdownCoordinator> shutdown;
+    if(rootWindow && (lifecycleTest || (!isolatedRun && !appearanceTest))) {
+        app.setQuitOnLastWindowClosed(false);
+        shutdown=std::make_unique<ShutdownCoordinator>(rootWindow,[&]{
+            QMetaObject::invokeMethod(rootWindow,"persistExitDrafts");
+            engineController.shutdown();extensions.shutdown();capture.stop();gateway.shutdown();
+            QSettings().sync();
+        },[&]{return engineController.processAlive()||engineController.busy()||engineController.tests()->busy()||gateway.busy()||extensions.busy();});
+        instance.activate=[&]{if(!shutdown->started()){rootWindow->showNormal();rootWindow->raise();rootWindow->requestActivate();}};
+    }
+#ifdef SWIRL_UI_TESTS
+    if(rootWindow&&lifecycleTest){
+        const auto fixture=qEnvironmentVariable("SWIRL_LIFECYCLE_ENGINE");
+        if(!fixture.isEmpty()){
+            QTcpServer reserve;reserve.listen(QHostAddress::LocalHost);const auto port=reserve.serverPort();reserve.close();
+            engineController.setProxyPort(port);engineController.setRoutingMode("global");
+            engineController.setPreferCompatibility(fixture=="compatibility");
+            QObject::connect(&engineController,&EngineController::statusChanged,&app,[&]{if(engineController.processAlive())app.setProperty("lifecycleEnginePid",engineController.processId());});
+            engineController.connectNode("");
+        }
+        QObject::connect(&app,&QCoreApplication::aboutToQuit,&app,[&]{
+            const auto path=qEnvironmentVariable("SWIRL_LIFECYCLE_REPORT");
+            if(!path.isEmpty()){QFile file(path);if(file.open(QIODevice::WriteOnly))file.write(QJsonDocument(QJsonObject{{"pid",double(QCoreApplication::applicationPid())},{"enginePid",app.property("lifecycleEnginePid").toString()},{"shutdownMs",double(app.property("shutdownDurationMs").toLongLong())},{"executable",QCoreApplication::applicationFilePath()}}).toJson());}
+        });
+        QTimer::singleShot(250,rootWindow,[rootWindow]{QMetaObject::invokeMethod(rootWindow,"openDashboard");});
+        const auto delay=qEnvironmentVariableIntValue("SWIRL_LIFECYCLE_EXIT_MS");
+        QTimer::singleShot(delay>0?delay:2500,rootWindow,[rootWindow]{rootWindow->close();});
+    }
+#endif
     // All smoke state is isolated. Finish with exit(), as other QA drivers do,
     // rather than the user-facing window close/unsaved-change quit path.
     QTimer smokeFinish;smokeFinish.setSingleShot(true);smokeFinish.setInterval(0);

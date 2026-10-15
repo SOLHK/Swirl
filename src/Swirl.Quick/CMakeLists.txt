@@ -13,6 +13,11 @@ add_executable(SwirlScriptRunner tools/ScriptRunner.cpp)
 target_link_libraries(SwirlScriptRunner PRIVATE Qt6::Core Qt6::Qml)
 target_compile_definitions(SwirlScriptRunner PRIVATE NOMINMAX)
 qt_add_executable(Swirl WIN32 main.cpp app/DismissalController.h app/DismissalController.cpp app/SystemDataProvider.cpp app/SystemDataProvider.h app/WindowsBackdrop.cpp app/WindowsBackdrop.h network/CaptureService.cpp network/CaptureService.h app/ModuleDraftStore.cpp app/ModuleDraftStore.h)
+execute_process(COMMAND git rev-parse --short HEAD WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" OUTPUT_VARIABLE SWIRL_BUILD_REVISION OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+if(NOT SWIRL_BUILD_REVISION)
+ set(SWIRL_BUILD_REVISION "source-archive")
+endif()
+target_compile_definitions(Swirl PRIVATE SWIRL_BUILD_REVISION="${SWIRL_BUILD_REVISION}")
 target_sources(Swirl PRIVATE app/FontManager.h app/FontManager.cpp)
 qt_add_resources(Swirl harmony_fonts PREFIX "/swirl/fonts" BASE "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts" FILES
  assets/fonts/HarmonyOS_Sans_SC_Regular.ttf assets/fonts/HarmonyOS_Sans_SC_Medium.ttf assets/fonts/HarmonyOS_Sans_SC_Bold.ttf assets/fonts/LICENSE_HarmonyOS_Sans.txt)
@@ -64,6 +69,7 @@ qt_add_resources(Swirl engine_manifest PREFIX "/engine" BASE "${CMAKE_CURRENT_SO
  FILES packaging/mihomo-manifest.json)
 set(SWIRL_QML_FILES
  qml/controls/SwirlText.qml
+ qml/controls/SwirlLinkedDetail.qml
  qml/controls/SwirlNodeTransfer.qml
  qml/components/SwirlFontSettings.qml
  qml/components/SwirlSecondaryWindow.qml
@@ -223,6 +229,12 @@ if(SWIRL_BUILD_UI_TESTS)
  if(MSVC)
   target_compile_options(SwirlNativeTests PRIVATE /utf-8)
  endif()
+ add_executable(SwirlNetworkRegressionTests tests/NetworkRegressionTests.cpp)
+ target_link_libraries(SwirlNetworkRegressionTests PRIVATE SwirlEngine Qt6::Test)
+ qt_add_resources(SwirlNetworkRegressionTests regression_manifest PREFIX "/engine" BASE "${CMAKE_CURRENT_SOURCE_DIR}/packaging" FILES packaging/mihomo-manifest.json)
+ target_compile_definitions(SwirlNetworkRegressionTests PRIVATE SWIRL_TEST_MANIFEST="${CMAKE_CURRENT_SOURCE_DIR}/packaging/mihomo-manifest.json" SWIRL_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
+ add_test(NAME swirl-stream-regression COMMAND SwirlNetworkRegressionTests -o stream-regression.txt,txt)
+ set_tests_properties(swirl-stream-regression PROPERTIES TIMEOUT 180)
  add_test(NAME swirl-native-engine COMMAND SwirlNativeTests -o native-engine.txt,txt)
  set_tests_properties(swirl-native-engine PROPERTIES TIMEOUT 180)
  add_executable(SwirlImportTests tests/ImportTests.cpp tests/ControlledNetwork.h)

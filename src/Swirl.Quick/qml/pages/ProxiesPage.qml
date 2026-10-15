@@ -31,8 +31,8 @@ Item {
         (protocolFilter.currentIndex===0||n.protocol===page.protocols[protocolFilter.currentIndex-1]) && (!countryCode||n.regionCode===countryCode)).map(n=>nodeById[n.id]||n)
     readonly property var protocols:engineController.supportedProtocols
     function selectRow(row) {
-        // Update the mounted inspector now. Persist/switch without a card flight.
-        if(engineController.chooseNode(row.id))nodeHero.opened=true
+        // One mounted surface follows the selected row; interrupted motion starts here.
+        if(engineController.chooseNode(row.id))nodeHero.start(nodeTable.selectedItem)
         else AppState.notice(engineController.nodeError)
     }
     property string editingId:""
@@ -82,7 +82,7 @@ Item {
                 ScrollBar.horizontal.policy:ScrollBar.AlwaysOff;ScrollBar.vertical:SwirlScrollBar {}
                 ColumnLayout {width:detailScroll.availableWidth;spacing:Theme.dp(14)
                 Item {
-                    id:summarySlot;Layout.fillWidth:true;Layout.preferredHeight:nodeHero.opened||nodeHero.moving?summaryBody.implicitHeight+2*Theme.cardPadding:Theme.dp(60)
+                    id:summarySlot;Layout.fillWidth:true;Layout.preferredHeight:summaryBody.implicitHeight+2*Theme.cardPadding
                     SwirlText {renderType:Text.NativeRendering;anchors.centerIn:parent;visible:!nodeHero.opened&&!nodeHero.moving;text:"选择节点查看详情";color:Theme.muted;font.pixelSize:Theme.fontSize(13)}
                 }
                 Item {
@@ -96,7 +96,8 @@ Item {
                     width:requestSlot.width
                     height:requestSlot.height
                     z:1;clip:true
-                    visible:nodeHero.opened;opacity:1
+                    visible:nodeHero.opened||nodeHero.moving;opacity:nodeHero.progress
+                    transform:Translate{x:Theme.dp(-24)*(1-nodeHero.progress)}
                     cornerRadius:Theme.independentCardRadius;color:Theme.surface;border.width:0
                     ColumnLayout {
                         id:requestOptions;x:Theme.cardPadding;y:Theme.cardPadding;width:parent.width-2*Theme.cardPadding;spacing:Theme.dp(9)
@@ -118,30 +119,18 @@ Item {
             }
         }
     }
-    Item {
-        id:nodeHero;objectName:"nodeHero"
-        property bool opened:true
-        readonly property bool moving:nodeDetailClock.moving
-        readonly property real progress:nodeDetailClock.progress
-        readonly property real reveal:1 // Text, icons and spacing never stretch.
-        property Item returnFocus:null
-        onOpenedChanged:nodeDetailClock.moveTo(opened?1:0)
-        function returnTo(row){returnFocus=row;opened=false}
-        SwirlTransitionCoordinator {id:nodeDetailClock;duration:SwirlMotion.dialogDuration
-            Component.onCompleted:{destination=nodeHero.opened?1:0;finish()}
-            onMovingChanged:if(!moving&&!nodeHero.opened&&nodeHero.returnFocus)nodeHero.returnFocus.forceActiveFocus()
-        }
+    SwirlNodeTransfer {
+        id:nodeHero;objectName:"nodeHero";targetSlot:summarySlot;sourceViewport:nodeTable
     }
     SwirlGlassPanel {
         id:nodeIdentity;objectName:"nodeIdentitySurface"
-        parent:summarySlot
-        x:0;y:0
-        width:summarySlot.width;height:summarySlot.height
-        visible:nodeHero.opened||nodeHero.moving;z:1;clip:true;opacity:nodeHero.progress
-        transform:Translate{x:SwirlMotion.reduced?0:Theme.dp(16)*(1-nodeHero.progress)}
+        parent:page
+        x:nodeHero.cardX;y:nodeHero.cardY
+        width:nodeHero.cardWidth;height:nodeHero.cardHeight
+        visible:nodeHero.opened||nodeHero.moving;z:20;clip:true;opacity:SwirlMotion.reduced?nodeHero.progress:1
         cornerRadius:Theme.independentCardRadius;color:Theme.surface;border.width:0
         ColumnLayout {
-            id:summaryBody;x:Theme.cardPadding;y:Theme.dp(6)+(Theme.cardPadding-Theme.dp(6))*nodeHero.reveal;width:parent.width-2*Theme.cardPadding;spacing:Theme.dp(12)
+            id:summaryBody;x:Theme.cardPadding;y:Theme.dp(6)+(Theme.cardPadding-Theme.dp(6))*nodeHero.reveal;width:summarySlot.width-2*Theme.cardPadding;opacity:Math.max(0,Math.min(1,(nodeHero.reveal-0.18)/0.65));spacing:Theme.dp(12)
             RowLayout {
                 Layout.fillWidth:true;spacing:Theme.dp(8)*nodeHero.reveal
                 SwirlIcon {name:"globe";size:Theme.dp(22);Layout.preferredWidth:Theme.dp(22)*nodeHero.reveal;opacity:nodeHero.reveal;color:Theme.accent}

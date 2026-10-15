@@ -15,6 +15,7 @@ public:
     Status status()const override;
     QString configurationSummary()const override;
     qsizetype activeStreamCount()const;
+    qsizetype activeConnectionCount()const;
 private:
     struct Private;
     std::unique_ptr<Private> d;

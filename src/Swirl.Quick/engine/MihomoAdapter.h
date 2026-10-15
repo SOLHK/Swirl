@@ -71,4 +71,5 @@ private:
     quint64 m_generation = 0;
     bool m_failureExit = false;
     bool m_selectionPending = false;
+    bool m_modeUnconfirmed = false;
 };

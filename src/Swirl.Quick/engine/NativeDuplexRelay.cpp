@@ -63,7 +63,7 @@ struct NativeDuplexRelay::Private {
         }
         if(tls){tls->disconnect(q);tls->abort();tls=nullptr;}
     }
-    void end(const QString &reason){if(stopped)return;close();if(q->finished)q->finished(reason);}
+    void end(const QString &reason){if(stopped)return;if(!reason.isEmpty())q->observedError=reason;close();if(q->finished)q->finished(q->observedError);}
     void watch(Side &side){
         side.read=new QSocketNotifier(qintptr(side.handle),QSocketNotifier::Read,q);
         side.write=new QSocketNotifier(qintptr(side.handle),QSocketNotifier::Write,q);side.write->setEnabled(false);
@@ -75,7 +75,7 @@ struct NativeDuplexRelay::Private {
         const auto room=QueueLimit-queue.size();if(room<=0)return true;
         char data[Chunk];const int amount=::recv(side.handle,data,int(qMin<qint64>(room,Chunk)),0);
         if(amount>0)queue.append(data,amount);
-        else if(amount==0)side.eof=true;
+        else if(amount==0){side.eof=true;if(q->closeInitiator.isEmpty())q->closeInitiator=label;}
         else {const auto error=socketError();if(!wouldBlock(error)){end(label+QStringLiteral("SocketError:%1").arg(error));return false;}}
         return true;
     }
@@ -138,8 +138,8 @@ bool NativeDuplexRelay::attach(QTcpSocket *client,QTcpSocket *upstream,QByteArra
     if(d->tls){
         connect(d->tls,&QTcpSocket::readyRead,this,[this]{d->pump();});
         connect(d->tls,&QTcpSocket::bytesWritten,this,[this](qint64 count){if(transferred)transferred(count,0);d->pump();});
-        connect(d->tls,&QTcpSocket::disconnected,this,[this]{d->server.eof=true;d->pump();});
-        connect(d->tls,&QTcpSocket::errorOccurred,this,[this](auto error){if(error!=QAbstractSocket::RemoteHostClosedError)d->end(QStringLiteral("UpstreamTlsSocketError:%1").arg(int(error)));});
+        connect(d->tls,&QTcpSocket::disconnected,this,[this]{if(closeInitiator.isEmpty())closeInitiator="Upstream";d->server.eof=true;d->pump();});
+        connect(d->tls,&QTcpSocket::errorOccurred,this,[this](auto error){observedError=QStringLiteral("UpstreamTlsSocketError:%1").arg(int(error));if(error!=QAbstractSocket::RemoteHostClosedError)d->end(observedError);});
     }
     QTimer::singleShot(0,this,[this]{d->pump();});return true;
 }

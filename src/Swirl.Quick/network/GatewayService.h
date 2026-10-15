@@ -30,6 +30,7 @@ public:
     Q_INVOKABLE bool configure(const QVariantMap &configuration);
     Q_INVOKABLE bool start();
     Q_INVOKABLE void stop();
+    void shutdown();
     Q_INVOKABLE bool recover();
     Q_INVOKABLE bool exportClients(const QUrl &destination);
     Q_INVOKABLE bool importClients(const QUrl &source);
@@ -49,5 +50,5 @@ private:
     QProcess m_process;
     QTimer m_deadline;
     Phase m_phase=Phase::Idle;
-    bool m_configured=false,m_forwarding=false,m_stopping=false;
+    bool m_configured=false,m_forwarding=false,m_stopping=false,m_shutdown=false,m_shutdownExpired=false;
 };

@@ -39,7 +39,7 @@ void SwirlEngineManager::changed(ProxyEngine *engine){
 }
 void SwirlEngineManager::fallback(const QString &code){
     if(m_fallback||m_transition||m_active!=&m_native||m_options.directSession||m_options.routingMode=="direct")return;
-    if(m_native.activeStreamCount()>0){
+    if(m_native.activeConnectionCount()>0){
         m_reason=QStringLiteral("本次新连接失败（%1）；其他已建立连接继续运行。需要兼容引擎时请手动断开重连。").arg(code);
         emit diagnostic("EngineManager","FallbackDeferredToPreserveStreams",m_reason);return;
     }
@@ -48,7 +48,7 @@ void SwirlEngineManager::fallback(const QString &code){
     QTimer::singleShot(0,this,[this,generation]{
         if(generation!=m_generation||m_active!=&m_native)return;
         // A different handshake may have completed since fallback was queued.
-        if(m_native.activeStreamCount()>0){m_fallback=false;m_reason="兼容引擎切换已延后，以保留刚建立的连接。";emit diagnostic("EngineManager","FallbackDeferredToPreserveStreams",m_reason);return;}
+        if(m_native.activeConnectionCount()>0){m_fallback=false;m_reason="兼容引擎切换已延后，以保留刚建立的连接。";emit diagnostic("EngineManager","FallbackDeferredToPreserveStreams",m_reason);return;}
         emit diagnostic("EngineManager","CompatibilityFallback",m_reason);activate(&m_compatibility);
     });
 }
@@ -59,7 +59,7 @@ void SwirlEngineManager::selectNode(const QString &id){
     if(m_active==&m_compatibility&&!m_transition&&m_active->status().processAlive){m_options=options;m_active->selectNode(id);return;}
     const auto reason=SwirlProtocolRegistry::nativeSessionReason(options);
     if(m_active==&m_native&&!m_transition&&reason.isEmpty()&&m_active->status().processAlive){m_options=options;m_active->selectNode(id);return;}
-    if(m_active==&m_native&&m_native.activeStreamCount()>0){m_reason="所选节点需要切换引擎；为保留现有连接，请手动断开后连接该节点。";emit diagnostic("EngineManager","EngineSwitchRequiresReconnect",m_reason);emit statusChanged();return;}
+    if(m_active==&m_native&&m_native.activeConnectionCount()>0){m_reason="所选节点需要切换引擎；为保留现有连接，请手动断开后连接该节点。";emit diagnostic("EngineManager","EngineSwitchRequiresReconnect",m_reason);emit statusChanged();return;}
     start(options);
 }
 void SwirlEngineManager::setRoutingMode(const QString &mode){
@@ -67,7 +67,7 @@ void SwirlEngineManager::setRoutingMode(const QString &mode){
     if(m_active==&m_compatibility&&!m_transition&&m_active->status().processAlive){m_options=options;m_active->setRoutingMode(mode);return;}
     const auto reason=SwirlProtocolRegistry::nativeSessionReason(options);
     if(m_active==&m_native&&!m_transition&&reason.isEmpty()&&m_active->status().processAlive){m_options=options;m_active->setRoutingMode(mode);return;}
-    if(m_active==&m_native&&m_native.activeStreamCount()>0){m_reason="新路由模式需要切换引擎；为保留现有连接，请手动断开重连。";emit diagnostic("EngineManager","RoutingSwitchRequiresReconnect",m_reason);emit statusChanged();return;}
+    if(m_active==&m_native&&m_native.activeConnectionCount()>0){m_reason="新路由模式需要切换引擎；为保留现有连接，请手动断开重连。";emit diagnostic("EngineManager","RoutingSwitchRequiresReconnect",m_reason);emit statusChanged();return;}
     start(options);
 }
 void SwirlEngineManager::probeNode(const QUrl &url){m_probe=url;if(m_active)m_active->probeNode(url);}

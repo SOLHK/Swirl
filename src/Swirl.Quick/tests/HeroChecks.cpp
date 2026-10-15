@@ -90,16 +90,18 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
   auto hero=item("nodeHero");auto identity=item("nodeIdentitySurface");auto requestSurface=item("nodeRequestSurface");
   check(controller->selectedNodeName()=="Fixture node 001","node selection reaches the actual clicked row");
   check(item("nodeDetailTitle")&&item("nodeDetailTitle")->property("text").toString()==controller->selectedNodeName(),"detail title updates in the click handler without an animation wait");
-  check(hero&&!hero->property("moving").toBool()&&identity&&requestSurface&&identity->isVisible()&&requestSurface->isVisible()&&requestSurface->opacity()==1,"identity and request controls are immediately visible at full opacity");
+  check(hero&&hero->property("moving").toBool()&&identity&&requestSurface&&identity->isVisible(),"node selection starts the restored boundary transition with mounted detail controls");
   check(dispatchMs<100,"180-node click dispatch completes within 100 ms");
   qInfo()<<"NODE_CLICK_DISPATCH_MS"<<dispatchMs;record("node-local");
+  check(QTest::qWaitFor([&]{return hero&&!hero->property("moving").toBool()&&requestSurface&&requestSurface->isVisible()&&requestSurface->opacity()>0.99;},2000),"detail controls reach full opacity after the boundary transition");
   const auto identityRect=identity?QRectF(identity->position(),identity->size()):QRectF();
   double slowest=dispatchMs;
   for(int i=0;i<10;++i){response.restart();QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,point(i%6));const auto ms=response.nsecsElapsed()/1000000.0;nodeClickMs.append(ms);slowest=qMax(slowest,ms);wait(12);}
   check(item("nodeDetailTitle")&&item("nodeDetailTitle")->property("text").toString()==controller->selectedNodeName(),"rapid selection keeps the latest clicked node");
-  check(identity&&identity==item("nodeIdentitySurface")&&QRectF(identity->position(),identity->size())==identityRect,"rapid selection reuses the fixed inspector geometry");
+  check(QTest::qWaitFor([&]{return hero&&!hero->property("moving").toBool();},2000),"rapid selection settles the last requested boundary");
+  check(identity&&identity==item("nodeIdentitySurface")&&QRectF(identity->position(),identity->size())==identityRect,"rapid selection retains the same inspector and returns to its settled geometry");
   check(slowest<100,"all rapid node click dispatches complete within 100 ms");qInfo()<<"NODE_CLICK_MAX_MS"<<slowest;
-  check(table->scale()==1&&eval("motionPolicy.activeGrabCount===0 && SwirlTransitionRegistry.activeCount===0").toBool(),"node selection creates no table textures or shared-flight resources");
+  check(table->scale()==1&&eval("motionPolicy.activeGrabCount===0 && SwirlTransitionRegistry.activeCount===0").toBool(),"settled node selection retains no table textures or transient transition resources");
   click("nodeReturnButton");record("node-return");
   check(hero&&!hero->property("opened").toBool(),"return closes the inspector immediately");
   QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,point(3));wait(50);

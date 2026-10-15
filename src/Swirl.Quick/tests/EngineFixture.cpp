@@ -28,6 +28,8 @@ int main(int argc, char **argv) {
     const auto port = QRegularExpression("127\\.0\\.0\\.1:(\\d+)").match(content).captured(1).toUShort();
     const auto secret = QRegularExpression("secret: '([^']+)'").match(content).captured(1).toLatin1();
     if (mode == "no-api") return app.exec();
+    QString routingMode=QRegularExpression("(?:^|\\n)mode: ([a-z]+)").match(content).captured(1);
+    const auto mixedPort=QRegularExpression("mixed-port: ([0-9]+)").match(content).captured(1).toInt();
     QTcpServer server;
     if (!server.listen(QHostAddress::LocalHost, port)) return 5;
     QObject::connect(&server, &QTcpServer::newConnection, &app, [&] {
@@ -45,14 +47,25 @@ int main(int argc, char **argv) {
                 const bool authenticated = request.contains("Authorization: Bearer " + secret + "\r\n");
                 int status = authenticated && activeMode != "auth" ? 200 : 401;
                 QByteArray body;
-                if (status == 401) body = "{}";
+                if (request.startsWith("PATCH /configs ") && status!=401) {
+                    const auto length=QRegularExpression("(?i)Content-Length: ([0-9]+)").match(QString::fromLatin1(request)).captured(1).toInt();
+                    const auto offset=request.indexOf("\r\n\r\n")+4;
+                    if(request.size()-offset<length)return;
+                    if(activeMode=="patch-reject"){status=500;body="{}";}
+                    else {
+                        routingMode=QJsonDocument::fromJson(request.mid(offset,length)).object().value("mode").toString();
+                        if(activeMode=="patch-apply-drop"){socket->abort();return;}
+                        status=204;
+                    }
+                }
+                else if (status == 401) body = "{}";
                 else if (activeMode == "bad-json") body = "{invalid";
                 else if (activeMode == "oversize") body = QByteArray(100000, 'x');
                 else if (request.startsWith("GET /version "))
                     body = activeMode == "wrong-version" ? "{\"version\":\"wrong\",\"meta\":true}" : "{\"version\":\"vfixture\",\"meta\":true}";
                 else if (request.startsWith("GET /configs ")) {
-                    QJsonObject object{{"mode", "direct"}, {"allow-lan", false},
-                        {"port", 0}, {"socks-port", 0}, {"mixed-port", 0}, {"redir-port", 0}, {"tproxy-port", 0},
+                    QJsonObject object{{"mode", routingMode}, {"allow-lan", false},
+                        {"port", 0}, {"socks-port", 0}, {"mixed-port", mixedPort}, {"redir-port", 0}, {"tproxy-port", 0},
                         {"tun", QJsonObject{{"enable", activeMode == "unsafe"}}}};
                     body = QJsonDocument(object).toJson(QJsonDocument::Compact);
                 } else { status = 404; body = "{}"; }

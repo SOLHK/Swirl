@@ -62,6 +62,23 @@ class EngineTests : public QObject {
         QFile file(path); QVERIFY(file.open(QIODevice::WriteOnly)); QCOMPARE(file.write(value), qint64(value.size()));
     }
 private slots:
+    void routingResponseFailurePreservesProcess_data(){
+        QTest::addColumn<QByteArray>("failure");QTest::addColumn<QString>("actual");
+        QTest::newRow("applied-but-response-lost")<<QByteArray("patch-apply-drop")<<QString("global");
+        QTest::newRow("rejected-keeps-old-mode")<<QByteArray("patch-reject")<<QString("rule");
+    }
+    void routingResponseFailurePreservesProcess(){
+        QFETCH(QByteArray,failure);QFETCH(QString,actual);
+        QTemporaryDir temporary;const auto control=temporary.filePath("control");qputenv("SWIRL_FIXTURE_CONTROL",control.toUtf8());
+        auto o=options();o.directSession=true;QTcpServer reserve;QVERIFY(reserve.listen(QHostAddress::LocalHost));o.proxyPort=reserve.serverPort();reserve.close();
+        MihomoAdapter engine;engine.start(o);QTRY_VERIFY_WITH_TIMEOUT(engine.status().apiHealthy,5000);const auto pid=engine.status().processId;
+        QFile file(control);QVERIFY(file.open(QIODevice::WriteOnly));file.write(failure);file.close();
+        engine.setRoutingMode("global");
+        QTRY_VERIFY_WITH_TIMEOUT(!engine.status().routingBusy&&engine.status().apiHealthy,5000);
+        QCOMPARE(engine.status().processId,pid);QVERIFY(processExists(pid));QCOMPARE(engine.status().mode,actual);
+        engine.stop();QTRY_VERIFY_WITH_TIMEOUT(!engine.status().processAlive,4000);qunsetenv("SWIRL_FIXTURE_CONTROL");
+    }
+
     void initTestCase() { QStandardPaths::setTestModeEnabled(true); }
     void cleanup() { qunsetenv("SWIRL_FIXTURE_MODE"); qunsetenv("SWIRL_FIXTURE_CONTROL"); }
     void networkPreferencesValidateAndPersist() {
