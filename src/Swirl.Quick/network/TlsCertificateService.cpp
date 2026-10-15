@@ -216,15 +216,15 @@ void TlsCertificateService::load() {
 TlsCertificateService::Identity TlsCertificateService::identityFor(const QString &host) {
     if(m_cache.contains(host))return m_cache.value(host);
 #ifdef Q_OS_WIN
-    if(!ready()||host.size()>253||!QRegularExpression("^[A-Za-z0-9_.:-]+$").match(host).hasMatch())return {};
-    KeyPair key;if(!key.create())return {};
-    const auto root=m_certificate.toDer();auto *context=CertCreateCertificateContext(X509_ASN_ENCODING,reinterpret_cast<const BYTE *>(root.constData()),root.size());if(!context)return {};
+    if(!ready()||host.size()>253||!QRegularExpression("^[A-Za-z0-9_.:-]+$").match(host).hasMatch())return Identity{QSslCertificate{}, QSslKey{}};
+    KeyPair key;if(!key.create())return Identity{QSslCertificate{}, QSslKey{}};
+    const auto root=m_certificate.toDer();auto *context=CertCreateCertificateContext(X509_ASN_ENCODING,reinterpret_cast<const BYTE *>(root.constData()),root.size());if(!context)return Identity{QSslCertificate{}, QSslKey{}};
     const QByteArray issuer(reinterpret_cast<const char *>(context->pCertInfo->Subject.pbData),context->pCertInfo->Subject.cbData);CertFreeCertificateContext(context);
     Identity identity{QSslCertificate(certificateFor(key.provider,d->provider,issuer,host,false),QSsl::Der),sslKey(exportBlob(key.key))};
-    if(identity.certificate.isNull()||identity.key.isNull()){m_error=QStringLiteral("无法为目标主机创建 TLS 证书。");emit changed();return {};}
+    if(identity.certificate.isNull()||identity.key.isNull()){m_error=QStringLiteral("无法为目标主机创建 TLS 证书。");emit changed();return Identity{QSslCertificate{}, QSslKey{}};}
     if(m_cache.size()>=50)m_cache.clear();m_cache.insert(host,identity);return identity;
 #else
-    Q_UNUSED(host);return {};
+    Q_UNUSED(host);return Identity{QSslCertificate{}, QSslKey{}};
 #endif
 }
 bool TlsCertificateService::trusted() const {
