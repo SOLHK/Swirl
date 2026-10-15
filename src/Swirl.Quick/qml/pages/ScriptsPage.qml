@@ -23,8 +23,8 @@ Item {
    SwirlButton{text:"Script Editor…";enabled:page.selected!==null&&!extensionsProvider.busy;onClicked:page.editScript(false)}
   }
  }
- FileDialog{id:scriptFile;title:"导入本地 JavaScript";nameFilters:["JavaScript (*.js)"];onAccepted:extensionsProvider.importScript(selectedFile)}
- SwirlDialog{id:scriptEditor;objectName:"localScriptEditor";title:"Script Editor";width:Math.min(Theme.dp(780),page.width-Theme.dp(24));height:Math.min(Theme.dp(650),page.height-Theme.dp(24));property string scriptId:""
+ FileDialog{id:scriptFile;parentWindow:page.Window.window;objectName:"settingsScriptFileDialog";title:"导入本地 JavaScript";nameFilters:["JavaScript (*.js)"];onAccepted:extensionsProvider.importScript(selectedFile)}
+ SwirlDialog{ownerItem:page;id:scriptEditor;objectName:"localScriptEditor";title:"Script Editor";width:Math.min(Theme.dp(780),page.width-Theme.dp(24));height:Math.min(Theme.dp(650),page.height-Theme.dp(24));property string scriptId:""
   ColumnLayout{anchors.fill:parent;spacing:Theme.dp(8)
    SwirlTextField{id:scriptName;objectName:"localScriptName";Layout.fillWidth:true;placeholderText:"脚本名称";enabled:!extensionsProvider.busy}
    SwirlText {text:"定义 function main(input)，返回 JSON 可表示的值；可使用 console.log。";color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.WordWrap}

@@ -58,6 +58,7 @@ ComboBox {
         }
     }
     popup: Popup {
+        parent:control
         focus:true
         popupType:Popup.Window
         transformOrigin:Item.TopLeft

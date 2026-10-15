@@ -53,7 +53,7 @@ Item {
    SwirlEmptyState {anchors.centerIn:parent;width:parent.width;visible:page.groups.length===0;headline:"尚无策略组";detail:"添加策略组以组织节点与路由。"}
    delegate:SwirlMotionButton {
     id:group;required property var entry;readonly property var modelData:entry;objectName:"policyCard-"+modelData.name;width:Math.floor(ListView.view.width);height:Math.ceil(Math.max(Theme.dp(88),contentItem.implicitHeight+2*Theme.cardPadding));padding:Theme.cardPadding
-    background:SwirlContinuousSurface {radius:Theme.dp(20);color:Theme.field;border.width:Theme.borderWidth;border.color:Theme.border}
+    background:SwirlContinuousSurface {radius:Theme.cardRadius;color:Theme.field;border.width:Theme.borderWidth;border.color:Theme.border}
     contentItem:RowLayout {SwirlIcon {name:"layers";color:Theme.accent;size:Theme.dp(28)}ColumnLayout {Layout.fillWidth:true;SwirlText {renderType:Text.NativeRendering;Layout.fillWidth:true;wrapMode:Text.Wrap;text:group.modelData.name;color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold}SwirlText {renderType:Text.NativeRendering;text:group.modelData.type+" · "+group.modelData.proxies.length+" 个子策略";color:Theme.muted;font.pixelSize:Theme.fontSize(12)}}SwirlIcon {name:"chevron-right";size:Theme.dp(18)}}
     onClicked:page.editGroup(modelData,group)
    }

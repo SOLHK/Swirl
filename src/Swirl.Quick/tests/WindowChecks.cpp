@@ -64,7 +64,8 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     if(!backdrop->isCaptureForeground()){qCritical()<<"Native validation blocked: target is covered or the Windows secure desktop is active";return 3;}
     const auto radius=state("Theme.windowRadius").toReal()*window->devicePixelRatio();
     const auto region=CreateRectRgn(0,0,0,0);
-    check(GetWindowRgn(testHwnd,region)==ERROR,"native hard region is removed so it cannot cut antialiased pixels");
+    check(backdrop->exactCorners() ? GetWindowRgn(testHwnd,region)!=ERROR : GetWindowRgn(testHwnd,region)==ERROR,
+          "exact HWND contour has a native region; system-preset windows do not stack an extra region");
     DeleteObject(region);
     const auto cornerCoverage=[&](){
         const auto rendered=window->grabWindow();int partial=0,total=0;
@@ -77,7 +78,8 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     const auto normalCorner=cornerCoverage();
     check(backdrop->nativeCorners() || normalCorner.second>=5,"system manages the final contour or fallback has antialiased corners");
     state("Theme.setScalePercent(125)");QTest::qWait(150);
-    check(backdrop->nativeCorners() || cornerCoverage().first<normalCorner.first,"native corners remain system managed or Qt alpha follows manual UI zoom");
+    check(qAbs(state("Theme.windowRadius").toReal()-10.0*96.0/72.0)<0.001,
+          "10pt window contour stays independent of manual content zoom");
     state("Theme.resetScale()");QTest::qWait(150);
     // Increasing the minimum geometry for manual UI zoom can enlarge the
     // window. Restore the capture bounds so the bottom corners remain on the
@@ -119,12 +121,13 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     const auto sample=[](const QImage &img,qreal x,qreal y){if(img.isNull())return QColor();return img.pixelColor(qBound(0,int(x*img.width()),img.width()-1),qBound(0,int(y*img.height()),img.height()-1));};
     const auto distance=[](QColor a,QColor b){return qAbs(a.red()-b.red())+qAbs(a.green()-b.green())+qAbs(a.blue()-b.blue());};
     auto *outline=find(window->contentItem(),"windowOutline");
-    check(outline && (backdrop->nativeCorners() ? !outline->isVisible() : outline->isVisible()),"window uses exactly one native or fallback outline");
+    const bool qmlRim=backdrop->exactCorners() || !backdrop->nativeCorners();
+    check(outline && outline->isVisible()==qmlRim,"window uses one rim matching its exact or system-preset contour");
     const auto outlined=grab("outline-enabled");
     if(outline)outline->setVisible(false);QTest::qWait(200);
     const auto borderless=grab("outline-disabled-comparison");
-    check(backdrop->nativeCorners() ? distance(sample(outlined,0.5,0),sample(borderless,0.5,0))<=3 : distance(sample(outlined,0.5,0),sample(borderless,0.5,0))>12,"DWM frame is independent of the fallback QML outline");
-    if(outline)outline->setVisible(!backdrop->nativeCorners());QTest::qWait(200);
+    check(qmlRim ? distance(sample(outlined,0.5,0),sample(borderless,0.5,0))>12 : distance(sample(outlined,0.5,0),sample(borderless,0.5,0))<=3,"only the selected rim paints the window border");
+    if(outline)outline->setVisible(qmlRim);QTest::qWait(200);
 #ifdef Q_OS_WIN
     const auto nativeIcon=reinterpret_cast<HICON>(SendMessageW(testHwnd,WM_GETICON,ICON_BIG,0));
     check(nativeIcon!=nullptr,"Windows taskbar receives an explicit large icon");
@@ -161,12 +164,15 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     const int sidebarChange=distance(sample(red,0.01,0.83),sample(blue,0.01,0.83));
     const int contentChange=distance(sample(red,0.995,0.5),sample(blue,0.995,0.5));
     qInfo()<<"Native pixel delta: sidebar="<<sidebarChange<<"content="<<contentChange<<"DPR="<<window->devicePixelRatio()<<backdrop->status();
-    check(backdrop->active()&&backdrop->status().contains("Desktop Acrylic"),"DWM owns live Desktop Acrylic composition");
-    check(sidebarChange>=4&&sidebarChange<40,"dense pale-blue material limits desktop transmission in the sidebar");
-    check(contentChange>=4&&contentChange<40,"dense material limits desktop transmission in the workspace gutter");
+    const bool exactOpaque=backdrop->exactCorners();
+    check(exactOpaque ? !backdrop->active()&&backdrop->status().contains("exact 10pt")
+                      : backdrop->active()&&backdrop->status().contains("Desktop Acrylic"),
+          "composition reports exact-contour opaque fallback or the supported system Acrylic path");
+    check(exactOpaque ? sidebarChange<=3 : sidebarChange>=4&&sidebarChange<40,"sidebar follows the effective composition capability");
+    check(exactOpaque ? contentChange<=3 : contentChange>=4&&contentChange<40,"workspace gutter follows the effective composition capability");
     // Cards remain readable while the shell and page gutter reveal the desktop.
     const auto materialAlpha=window->grabWindow().pixelColor(int(window->width()*0.995*window->devicePixelRatio()),int(window->height()*0.5*window->devicePixelRatio())).alpha();
-    check(materialAlpha>=215&&materialAlpha<=225,"cool-blue tint covers 86 percent of the native blurred backdrop");
+    check(exactOpaque ? materialAlpha==255 : materialAlpha>=215&&materialAlpha<=225,"exact contour is opaque; supported Acrylic uses its 86 percent tint");
     // Move Swirl relative to a split-color native QML window to verify position-
     // dependent composition. The scene is a test window, not a wallpaper image.
     QQuickItem split;
@@ -180,7 +186,8 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     auto left=grab("backdrop-moved-left");
     window->setPosition(available.topLeft()+QPoint(available.width()/2,30));QTest::qWait(600);
     auto right=grab("backdrop-moved-right");
-    check(distance(sample(left,0.01,0.83),sample(right,0.01,0.83))>1,"moving Swirl changes the actual DWM backdrop in screen coordinates");
+    const auto moveDelta=distance(sample(left,0.01,0.83),sample(right,0.01,0.83));
+    check(exactOpaque ? moveDelta<=3 : moveDelta>1,"moving follows opaque fallback or actual screen-position Acrylic composition");
     const qreal sidebar=state("window.actualSidebarWidth * window.contentScale").toReal();
     window->setPosition(available.topLeft()+QPoint(int(available.width()/2-sidebar/2),30));QTest::qWait(600);
     auto edge=grab("backdrop-blurred-edge");
@@ -191,7 +198,8 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     int intermediate=0;
     for(int x=cx-50;x<=cx+50;++x){const int value=edge.pixelColor(x,row).red();if(value>low+2&&value<high-2)++intermediate;}
     qInfo()<<"Alpha edge profile: left="<<a<<"right="<<b<<"intermediate pixels="<<intermediate;
-    check(backdrop->active() && intermediate>0,"native Acrylic blurs the external split-color edge");
+    check(exactOpaque ? !backdrop->active()&&intermediate==0 : backdrop->active()&&intermediate>0,
+          "exact contour blocks the external edge; supported native Acrylic blurs it");
     delete rectangle;
     window->setPosition(available.topLeft()+QPoint(60,40));
     state("Theme.transparency=false");QTest::qWait(500);
@@ -202,7 +210,9 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     check(distance(sample(opaqueBlue,0.01,0.83),sample(opaqueRed,0.01,0.83))<=3,"disabled transparency gives opaque sidebar fallback");
     check(distance(sample(opaqueBlue,0.995,0.5),sample(opaqueRed,0.995,0.5))<=3,"disabled transparency gives opaque page fallback");
     state("Theme.transparency=true;Theme.mode='Dark'");QTest::qWait(500);grab("overview-native-dark");
-    check(backdrop->active()&&backdrop->status().contains("Desktop Acrylic"),"dark theme retains native Desktop Acrylic");
+    check(exactOpaque ? !backdrop->active()&&backdrop->status().contains("exact 10pt")
+                      : backdrop->active()&&backdrop->status().contains("Desktop Acrylic"),
+          "dark theme retains its effective contour and composition capability");
     state("Theme.mode='Light'");
     auto *title=find(window->contentItem(),"titleDragArea");
     check(title,"title drag region exists");

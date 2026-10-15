@@ -185,8 +185,8 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
     };
     auto settle=[&](int timeout=2500) {
         QElapsedTimer timer;timer.start();
-        do {wait(20);} while((host->property("moving").toBool()||host->property("pendingGrab").toBool())&&timer.elapsed()<timeout);
-        return !host->property("moving").toBool()&&!host->property("pendingGrab").toBool();
+        do {wait(20);} while((host->property("moving").toBool()||host->property("pendingGrab").toBool()||eval("settingsFlight.moving").toBool())&&timer.elapsed()<timeout);
+        return !host->property("moving").toBool()&&!host->property("pendingGrab").toBool()&&!eval("settingsFlight.moving").toBool();
     };
     auto route=[&](const QString &id) {eval("AppState.navigate('"+id+"')");wait(25);return settle();};
     auto memory=[]()->qint64 {
@@ -342,9 +342,9 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
     check("revisit-memory-growth-below-24MiB",growth<24*1024*1024);
     route("featurehub");
     auto *card=findVisual(qobject_cast<QQuickItem *>(item()),"settings-dns");check("settings-tile-present",card!=nullptr);
-    if(card){QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,card->mapToScene(QPointF(card->width()/2,card->height()/2)).toPoint());wait(200);
+    if(card){QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,card->mapToScene(QPointF(card->width()/2,card->height()/2)).toPoint());settle(2000);
         QQuickWindow *sheet=nullptr;for(auto *candidate:QGuiApplication::allWindows())if(candidate->objectName()=="settingsSheet")sheet=qobject_cast<QQuickWindow *>(candidate);
-        check("settings-tile-opens-native-sheet",sheet&&sheet->isVisible());if(sheet)sheet->hide();
+        check("settings-tile-opens-native-sheet",sheet&&sheet->isVisible());if(sheet){sheet->close();settle(2000);}
         check("native-sheet-preserves-hub",item()==hub);window->requestActivate();
     }
     route("feature-system");

@@ -76,14 +76,14 @@ QtObject {
     readonly property color statusGreen: dark ? "#75DD91" : "#00B832"
     readonly property color orange: dark ? "#F5C67D" : "#FF9229"
     readonly property color red: dark ? "#FF9A93" : "#CF3029"
-    // Logical design units: Qt applies screen DPI; dp applies only user UI zoom.
-    // Large surfaces follow the supplied ~12 pt visual reference, while nested
-    // cards and controls have smaller corners. Circular controls use geometry.
-    readonly property real windowRadius: dp(8)
-    readonly property real containerRadius: dp(20)
-    readonly property real radius: containerRadius
+    // One typographic point is 96/72 Windows logical pixels. Keep the HWND
+    // contour independent of content zoom; Qt maps these DIP to screen pixels.
+    readonly property real windowRadius: 10 * 96 / 72
+    // Cards at the same hierarchy share a token, including the settings grid.
     readonly property real cardRadius: dp(20)
-    readonly property real independentCardRadius: dp(20)
+    readonly property real containerRadius: cardRadius
+    readonly property real radius: containerRadius
+    readonly property real independentCardRadius: cardRadius
     readonly property real tileRadius: dp(12)
     readonly property real tableRadius: dp(10)
     readonly property real segmentedRadius: dp(10)

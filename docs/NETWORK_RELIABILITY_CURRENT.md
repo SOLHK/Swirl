@@ -1,5 +1,7 @@
 # 当前源码的连接可靠性修复
 
+> 本文件保留基于 `0ae36d6` 的前次修复记录。2026-10-16 的真实 Codex 代理 A/B、异常系统 DNS、HTTP 503 与代理恢复结果见 [6A 后续验收记录](NETWORK_RELIABILITY_6A.md)。历史回环或配置检查不能代替最新桌面全通道验收。
+
 本次修复基于用户指定目录中的 `0ae36d6`，在本地 `test` 分支增量实施。保留该版本的 Swirl 原生引擎、Mihomo 兼容引擎、DPAPI 系统代理快照、独立 ProxyGuard、真实 TelemetryService、TUN、网关、LAN、DNS、国内外 MRS 分流、用户规则和策略组。没有使用旧版本的系统代理管理器覆盖这些实现。
 
 ## 已定位的 Swirl 自身断连因素

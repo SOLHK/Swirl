@@ -168,6 +168,7 @@ Item {
         }
     }
     SwirlDialog {
+        ownerItem:page
         id:addDialog;objectName:"proxyAddDialog";title:page.editingId.length?"编辑代理节点":"添加代理节点"
         width:Math.min(Theme.dp(890),parent?parent.width-Theme.dp(30):Theme.dp(890));height:Math.min(Theme.dp(713),parent?parent.height-Theme.dp(30):Theme.dp(713))
         onClosed:{nodePassword.text="";nodeUsername.text="";nodeUuid.text="";nodeOptions.text=""}
@@ -208,10 +209,12 @@ Item {
     }
 
     FileDialog {
+        parentWindow:page.Window.window;objectName:"settingsNodeFileDialog"
         id:configFile;title:"导入节点配置";nameFilters:["节点配置 (*.yaml *.yml *.json *.conf *.txt)","所有文件 (*)"]
         onAccepted:engineController.imports.importFile(selectedFile)
     }
     SwirlDialog {
+        ownerItem:page
         id:importDialog;objectName:"nodeImportDialog";title:"一键导入节点";onClosed:{importContent.text="";importAddress.text=""}
         ColumnLayout {
             width:parent.width;spacing:Theme.dp(12)

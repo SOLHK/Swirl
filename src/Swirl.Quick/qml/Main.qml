@@ -39,6 +39,8 @@ ApplicationWindow {
     function preparePreviewState(state){const item=previewPage==="dns"?settingsLoader.item:pageLoader.item;if(item&&item.preparePreviewState)item.preparePreviewState(state)}
     function previewScrollBottom() { if(pageLoader.item && pageLoader.item.scrollToBottom)pageLoader.item.scrollToBottom() }
     property real swirlWindowRadius:Theme.windowRadius
+    // DWM's ROUND preference is a system preset, not an exact 10pt radius.
+    property bool swirlExactWindowRadius:true
     readonly property real shellRadius:window.visibility===Window.Maximized || window.visibility===Window.FullScreen ? 0 : Theme.windowRadius
     Binding { target:window.captureProviderContext; property:"upstreamProxyPort"; value:window.engineControllerContext.processAlive?window.engineControllerContext.activeProxyPort:0 }
     Connections { target:window.captureProviderContext; function onStateChanged(){window.engineControllerContext.setCaptureProxyPort(window.captureProviderContext.running?window.captureProviderContext.port:0)} }
@@ -198,56 +200,38 @@ ApplicationWindow {
     function openDashboard(){dashboardWindow.show();dashboardWindow.raise();dashboardWindow.requestActivate()}
     function openCaptureInspector(){captureInspectorDialog.open()}
     property Item settingsOrigin:null
-    property rect settingsOriginRect:Qt.rect(0,0,0,0)
-    property rect settingsOriginTitleRect:Qt.rect(0,0,0,0)
-    property string settingsOriginTitle:""
-    property real settingsOriginFontSize:Theme.fontSize(16)
-    readonly property real settingsOriginProgress:settingsTransition.progress
-    readonly property bool settingsOriginMoving:settingsOrigin!==null && settingsTransition.moving && !SwirlMotion.reduced
-    readonly property rect settingsDestinationRect:Qt.rect(settingsSheet.x-window.x,settingsSheet.y-window.y,settingsSheet.width,settingsSheet.height)
+    readonly property real settingsOriginProgress:settingsFlight.reveal
+    readonly property bool settingsOriginMoving:settingsOrigin!==null && settingsFlight.moving
     function openSettings(route,origin){
-        if(settingsSheet.visible && route!==settingsSheet.section && (dismissals.hasPopup(settingsSheet) || (settingsSheet.section==='dns' && settingsSheet.savedFingerprint!==dismissals.fingerprint(settingsLoader.item)))) { settingsSheet.raise(); settingsSheet.requestActivate(); return }
+        if((settingsSheet.visible || settingsFlight.moving) && route!==settingsSheet.section && (dismissals.hasPopup(settingsSheet) || (settingsSheet.section==='dns' && settingsSheet.savedFingerprint!==dismissals.fingerprint(settingsLoader.item)))) { settingsSheet.raise(); settingsSheet.requestActivate(); return }
         settingsSheet.closeApproved=false
-        settingsOrigin=origin || null
-        if(settingsOrigin) {
-            const point=settingsOrigin.mapToItem(window.contentItem,0,0)
-            settingsOriginRect=Qt.rect(point.x,point.y,settingsOrigin.width,settingsOrigin.height)
-            const titleItem=settingsOrigin.motionTitle || settingsOrigin
-            const titlePoint=titleItem.mapToItem(window.contentItem,0,0)
-            settingsOriginTitleRect=Qt.rect(titlePoint.x,titlePoint.y,titleItem.width,titleItem.height)
-            settingsOriginTitle=titleItem.text || ""
-            settingsOriginFontSize=titleItem.font?titleItem.font.pixelSize:Theme.fontSize(16)
+        // Repeated entry into the already open route preserves both its page
+        // and its geometry. A reversal keeps the currently displayed boundary.
+        if(settingsSheet.visible && !settingsFlight.moving) {
+            settingsSheet.section=route;settingsSheet.updateSettingsSection()
+            settingsSheet.raise();settingsSheet.requestActivate();return
         }
-        if(!settingsSheet.visible){settingsSheet.x=Math.round(window.x+(window.width-settingsSheet.width)/2);settingsSheet.y=Math.round(Math.max(0,Math.min(window.y,Screen.desktopAvailableHeight-settingsSheet.height)))}
-        settingsSheet.section=route;settingsSheet.updateSettingsSection();settingsSheet.show()
-        settingsTransition.moveTo(1);settingsSheet.raise();settingsSheet.requestActivate()
+        settingsOrigin=origin || settingsOrigin
+        if(!settingsFlight.moving){settingsSheet.x=Math.round(window.x+(window.width-settingsSheet.width)/2);settingsSheet.y=Math.round(Math.max(0,Math.min(window.y,Screen.desktopAvailableHeight-settingsSheet.height)))}
+        settingsSheet.section=route;settingsSheet.updateSettingsSection()
+        settingsSheet.discardApproved=false
+        Qt.callLater(function(){settingsSheet.savedFingerprint=dismissals.fingerprint(settingsLoader.item)})
+        if(SwirlMotion.reduced || !settingsOrigin) {
+            settingsFlight.phase="Detail";settingsFlight.origin=settingsOrigin
+            settingsSheet.show();settingsSheet.raise();settingsSheet.requestActivate()
+        } else settingsFlight.expand(settingsOrigin)
     }
     function persistExitDrafts(){if(settingsSheet.section==="dns"&&settingsLoader.item&&settingsLoader.item.persistExitDraft)settingsLoader.item.persistExitDraft()}
-    function closeSettings(){settingsSheet.close()}
-    // Restore the original card-to-detail geometric path using the existing
-    // reversible settings clock. Native settings windows and their cache stay
-    // intact; only the material and live glyphs travel through the main scene.
-    Item {
-        anchors.fill:parent;z:997;visible:window.settingsOriginMoving
-        readonly property real reveal:window.settingsOriginProgress
-        readonly property rect destination:window.settingsDestinationRect
-        readonly property real handoff:Math.max(0,Math.min(1,(reveal-0.7)/0.3))
-        SwirlGlassPanel {
-            x:Math.round(window.settingsOriginRect.x+(parent.destination.x-window.settingsOriginRect.x)*parent.reveal)
-            y:Math.round(window.settingsOriginRect.y+(parent.destination.y-window.settingsOriginRect.y)*parent.reveal)
-            width:Math.round(window.settingsOriginRect.width+(parent.destination.width-window.settingsOriginRect.width)*parent.reveal)
-            height:Math.round(window.settingsOriginRect.height+(parent.destination.height-window.settingsOriginRect.height)*parent.reveal)
-            cornerRadius:Theme.cardRadius+(Theme.windowRadius-Theme.cardRadius)*parent.reveal
-            material:"floating";independentCard:false;opacity:1-parent.handoff
-        }
-        SwirlText {
-            x:Math.round(window.settingsOriginTitleRect.x+(parent.destination.x+Theme.dp(64)-window.settingsOriginTitleRect.x)*parent.reveal)
-            y:Math.round(window.settingsOriginTitleRect.y+(parent.destination.y+Theme.dp(12)-window.settingsOriginTitleRect.y)*parent.reveal)
-            width:Math.round(window.settingsOriginTitleRect.width+(Math.max(0,parent.destination.width-Theme.dp(128))-window.settingsOriginTitleRect.width)*parent.reveal)
-            height:Math.round(window.settingsOriginTitleRect.height+(Theme.dp(28)-window.settingsOriginTitleRect.height)*parent.reveal)
-            text:window.settingsOriginTitle;color:Theme.text;visible:parent.handoff<1
-            font.pixelSize:Math.round(window.settingsOriginFontSize+(Theme.fontSize(15)-window.settingsOriginFontSize)*parent.reveal)
-            font.weight:Font.DemiBold;elide:Text.ElideRight;verticalAlignment:Text.AlignVCenter
+    function closeSettings(){settingsSheet.requestClose()}
+    SwirlSettingsTransfer {
+        id:settingsFlight;objectName:"settingsTransfer"
+        ownerWindow:window;detailWindow:settingsSheet;composition:settingsBackdrop
+        onMovingChanged:if(moving)dismissals.push(settingsFlight,settingsFlight);else dismissals.pop(settingsFlight)
+        onEntered:{settingsSheet.show();settingsSheet.raise();settingsSheet.requestActivate()}
+        onReturned:{
+            settingsSheet.closeApproved=true;settingsSheet.close()
+            if(window.settingsOrigin && window.settingsOrigin.visible)window.settingsOrigin.forceActiveFocus()
+            window.settingsOrigin=null;window.requestActivate()
         }
     }
     function openRewriteEditor(kind,title){rewriteRulesDialog.kind=kind;rewriteRulesDialog.title=title;rewriteRulesDialog.open()}
@@ -263,37 +247,29 @@ ApplicationWindow {
     SwirlSecondaryWindow {
         composition:settingsBackdrop
         id:settingsSheet;objectName:"settingsSheet";
-        opacity:window.settingsOriginMoving?Math.max(0,Math.min(1,(settingsTransition.progress-0.7)/0.3)):1
+        property bool swirlExactWindowRadius:true
         property string section:"dns";visible:false;width:Math.min(Theme.dp(900),Screen.desktopAvailableWidth);height:Math.min(Theme.dp(790),Screen.desktopAvailableHeight);title:section==="subscriptions"?"Swirl 订阅管理":section==="proxies"?"Swirl 节点管理":section==="profiles"?"Swirl 配置":section==="modules"?"Swirl 模块":section==="scripts"?"Swirl 脚本":"Swirl 设置";flags:Qt.Window|Qt.FramelessWindowHint;modality:Qt.WindowModal;transientParent:window;color:"transparent"
-        function closeSettings(){settingsSheet.close()}
-        function updateSettingsSection(){if(settingsLoader.item&&settingsLoader.item.section!==undefined)settingsLoader.item.section=section==="appearance"?"外观":section==="fonts"?"字体":section==="license"?"关于 Swirl":"常规"}
-        readonly property real reveal:settingsTransition.progress
-        property bool closeApproved:false
-        SwirlTransitionCoordinator{id:settingsTransition;duration:SwirlMotion.dialogDuration
-            onMovingChanged:if(!moving && destination===0 && settingsSheet.visible)
-                Qt.callLater(function(){
-                    if(!settingsTransition.moving && settingsTransition.destination===0 && settingsSheet.visible){
-                        settingsSheet.closeApproved=true
-                        settingsSheet.close()
-                    }
-                })
+        function closeSettings(){requestClose()}
+        function requestClose(){
+            if(!discardApproved && dismissals.hasPopup(settingsSheet)){dismissals.dismiss(settingsSheet);return}
+            if(section==="dns" && !discardApproved && savedFingerprint!==dismissals.fingerprint(settingsLoader.item)){settingsDiscard.open();return}
+            if(SwirlMotion.reduced || settingsFlight.phase==="Idle"){
+                // requestClose can run inside QWindow's closing signal. A
+                // recursive close() is ignored by Qt, leaving a modal HWND
+                // visible despite an Idle clock. Hide it synchronously.
+                hide();closeApproved=false;settingsFlight.reset()
+                if(window.settingsOrigin && window.settingsOrigin.visible)window.settingsOrigin.forceActiveFocus()
+                window.settingsOrigin=null;window.requestActivate()
+            } else settingsFlight.collapse()
         }
-
+        function updateSettingsSection(){if(settingsLoader.item&&settingsLoader.item.section!==undefined)settingsLoader.item.section=section==="appearance"?"外观":section==="fonts"?"字体":section==="license"?"关于 Swirl":"常规"}
+        readonly property real reveal:settingsFlight.reveal
+        property bool closeApproved:false
         property string savedFingerprint:""
         property bool discardApproved:false
-        onVisibleChanged:if(visible){discardApproved=false;closeApproved=false;settingsTransition.moveTo(1);Qt.callLater(function(){savedFingerprint=dismissals.fingerprint(settingsLoader.item)})}else{
-            settingsTransition.destination=0;settingsTransition.finish()
-            if(window.settingsOrigin && window.settingsOrigin.visible)window.settingsOrigin.forceActiveFocus()
-            window.settingsOrigin=null
-        }
         onClosing:close=>{
-            if(!discardApproved && dismissals.hasPopup(settingsSheet)){close.accepted=false;dismissals.dismiss(settingsSheet);return}
-            // DNS is an unapplied page form. Other settings persist on change.
-            if(section==="dns" && !discardApproved && savedFingerprint!==dismissals.fingerprint(settingsLoader.item)) {
-                close.accepted=false;settingsDiscard.open();return
-            }
-            if(!closeApproved && !SwirlMotion.reduced){close.accepted=false;if(settingsTransition.destination!==0){settingsTransition.moveTo(0)}return}
-            closeApproved=false;window.requestActivate()
+            if(!closeApproved){close.accepted=false;requestClose()}
+            else closeApproved=false
         }
         onSectionChanged:updateSettingsSection()
         SwirlDialog {
@@ -303,11 +279,11 @@ ApplicationWindow {
                 SwirlText {text:"DNS 修改尚未应用。";color:Theme.text}
                 RowLayout {Layout.alignment:Qt.AlignRight
                     SwirlButton {text:"继续编辑";onClicked:settingsDiscard.close()}
-                    SwirlButton {text:"放弃修改";danger:true;onClicked:{settingsSheet.discardApproved=true;settingsDiscard.close();Qt.callLater(function(){settingsSheet.close()})}}
+                    SwirlButton {text:"放弃修改";danger:true;onClicked:{settingsSheet.discardApproved=true;settingsDiscard.close();Qt.callLater(settingsSheet.requestClose)}}
                 }
             }
         }
-        SwirlPageHost{id:settingsLoader;routeKey:settingsSheet.section;anchors.left:parent.left;anchors.right:parent.right;anchors.top:parent.top;anchors.bottom:parent.bottom;clip:true
+        SwirlPageHost{id:settingsLoader;animateRoutes:false;parent:settingsFlight.ownsContent?settingsFlight.bodySurface:settingsSheet.bodySurface;routeKey:settingsSheet.section;anchors.fill:parent;clip:true
 sourceComponent:settingsSheet.section==="subscriptions"?subscriptions:settingsSheet.section==="proxies"?proxies:settingsSheet.section==="dns"?dns:settingsSheet.section==="modules"?modules:settingsSheet.section==="profiles"?profiles:settingsSheet.section==="scripts"?scripts:settings;onItemChanged:Qt.callLater(settingsSheet.updateSettingsSection)}
     }
     SwirlDialog {
@@ -374,9 +350,10 @@ sourceComponent:settingsSheet.section==="subscriptions"?subscriptions:settingsSh
     Component { id:workbench; WorkbenchPage { pageId:parent.routeId } }
 
     Timer { interval:1000; running:true; repeat:true; onTriggered:AppState.tickTraffic() }
-    // Compatibility outline only. Native windows use one compositor contour.
+    // Exact-region windows use this single matching rim; other native windows
+    // retain their DWM rim. The native region clips all children at once.
     SwirlContinuousSurface {
-        objectName:"windowOutline";visible:!backdrop.nativeCorners
+        objectName:"windowOutline";visible:backdrop.exactCorners || !backdrop.nativeCorners
         anchors.fill:parent;z:998;color:"transparent";antialiasing:true
         radius:window.shellRadius
         border.width:window.visibility===Window.Maximized?0:1/Screen.devicePixelRatio

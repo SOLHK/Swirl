@@ -52,9 +52,10 @@ ColumnLayout {
     SwirlText { text:"默认使用内置 HarmonyOS Sans SC（鸿蒙）。手动选择会单独保存；恢复自动选择可切回鸿蒙。PingFang UI 已合并字重别名，并针对正文使用可变字重优化。"; color:Theme.muted; Layout.fillWidth:true; wrapMode:Text.Wrap; font.pixelSize:Theme.fontSize(12) }
     SwirlText { text:"Swirl 使用 HarmonyOS Sans 字体。Copyright 2021 Huawei Device Co., Ltd.\n字体按 HarmonyOS Sans Fonts License Agreement 分发，随软件提供的字体文件保持官方原样。"; color:Theme.muted; Layout.fillWidth:true; wrapMode:Text.Wrap; font.pixelSize:Theme.fontSize(11) }
     SwirlButton { objectName:"fontLicense"; text:"查看鸿蒙字体许可"; onClicked:licenseDialog.open() }
-    FileDialog { id:fontFile; title:"选择字体文件"; nameFilters:["字体文件 (*.ttf *.otf *.ttc)"]; onAccepted:fontManager.importFont(selectedFile) }
+    FileDialog { id:fontFile;parentWindow:root.Window.window;objectName:"settingsFontFileDialog"; title:"选择字体文件"; nameFilters:["字体文件 (*.ttf *.otf *.ttc)"]; onAccepted:fontManager.importFont(selectedFile) }
     SwirlDialog {
-        id:licenseDialog; title:"HarmonyOS Sans 字体许可"; guardChanges:false; implicitWidth:Math.min(Theme.dp(720),parent.width-Theme.dp(40)); implicitHeight:Math.min(Theme.dp(540),parent.height-Theme.dp(40))
+        ownerItem:root
+        id:licenseDialog; title:"HarmonyOS Sans 字体许可"; guardChanges:false; implicitWidth:Math.min(Theme.dp(720),parent?parent.width-Theme.dp(40):Theme.dp(720)); implicitHeight:Math.min(Theme.dp(540),parent?parent.height-Theme.dp(40):Theme.dp(540))
         ScrollView { anchors.fill:parent; clip:true; TextArea { renderType: TextEdit.NativeRendering; font.weight: Theme.bodyFontWeight; font.hintingPreference: Font.PreferFullHinting; Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) } text:fontManager.licenseText; readOnly:true; selectByMouse:true; textFormat:TextEdit.PlainText; wrapMode:TextEdit.Wrap; color:Theme.text; font.family:Theme.fontFamily; font.pixelSize:Theme.fontSize(12); background:Item {} } }
     }
 }

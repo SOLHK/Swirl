@@ -74,6 +74,7 @@ Item {
   }
  }
     SwirlDialog {
+        ownerItem:page
         id:deleteDialog;title:"删除订阅？";property string recordId:"";guardChanges:false
         ColumnLayout {width:parent.width
             SwirlText {text:"删除订阅，已导入的节点将保留为手动节点。";color:Theme.text;wrapMode:Text.Wrap;Layout.fillWidth:true}
@@ -84,6 +85,7 @@ Item {
         }
     }
     SwirlDialog {
+        ownerItem:page
         id:addDialog;objectName:"subscriptionDialog"; title:"订阅来源";onClosed:urlField.text=""
         ColumnLayout {
             width:parent.width; spacing:Theme.dp(12)

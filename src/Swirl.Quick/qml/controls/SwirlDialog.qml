@@ -8,6 +8,9 @@ Dialog {
     property Item returnFocus:null
     property bool guardChanges:true
     property Item heroSource:null
+    // Pages that move between native scenes provide their declaration owner.
+    // Overlay.overlay on the Popup itself otherwise retains the first scene.
+    property Item ownerItem:null
     readonly property real heroProgress:heroClock.progress
     SwirlTransitionCoordinator { id:heroClock;parent:dialog.background;duration:SwirlMotion.dialogDuration }
     Binding {target:dialog.contentItem;property:"opacity";value:Math.max(0,Math.min(1,(dialog.heroProgress-0.18)/0.65));when:dialog.heroSource!==null;restoreMode:Binding.RestoreBindingOrValue}
@@ -15,7 +18,7 @@ Dialog {
     Binding {target:dialog.contentItem;property:"enabled";value:false;when:dialog.dismissing;restoreMode:Binding.RestoreBindingOrValue}
     property bool dismissing:false
     property string savedFingerprint:""
-    readonly property var ownerWindow:parent ? parent.Window.window : null
+    readonly property var ownerWindow:ownerItem?ownerItem.Window.window:parent ? parent.Window.window : null
     function markSaved(){savedFingerprint=dismissals.fingerprint(contentItem)}
     function requestDismiss(){
         if(!visible || dismissing)return
@@ -40,7 +43,7 @@ Dialog {
     onOpened:markSaved()
     onAboutToHide:{dismissing=true;if(heroSource)heroClock.moveTo(0)}
     onClosed:{dismissals.pop(dialog);scale=1;opacity=1;if(returnFocus && returnFocus.visible)returnFocus.forceActiveFocus()}
-    parent:Overlay.overlay
+    parent:ownerItem?ownerItem.Overlay.overlay:Overlay.overlay
     width: Math.floor(Math.min(Theme.dp(470), parent ? parent.width-Theme.dp(40) : Theme.dp(470)))
     x:parent ? Math.round((parent.width-width)/2) : 0
     y:parent ? Math.round((parent.height-height)/2) : 0
@@ -51,7 +54,7 @@ Dialog {
         property var owner:dialog.ownerWindow
         function requestDismiss(){close()}
         modal:true;focus:true;title:"放弃未保存的修改？"
-        parent:Overlay.overlay
+        parent:dialog.parent
         width:Math.floor(Math.min(Theme.dp(400),dialog.width))
         x:parent ? Math.round((parent.width-width)/2) : 0
         y:parent ? Math.round((parent.height-height)/2) : 0

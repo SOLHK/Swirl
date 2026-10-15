@@ -55,7 +55,7 @@ Item { Rectangle {anchors.fill:parent;color:'#536BB4'}
         check(!image.isNull()&&image.save(directory+"/"+name+".png"),name+": actual DWM image saved");
         int corner=0,material=0;DwmGetWindowAttribute(hwnd,33,&corner,sizeof(corner));DwmGetWindowAttribute(hwnd,38,&material,sizeof(material));
         qInfo()<<name<<"DPR"<<w->devicePixelRatio()<<"styles"<<QString::number(GetWindowLongPtrW(hwnd,GWL_STYLE),16)<<QString::number(GetWindowLongPtrW(hwnd,GWL_EXSTYLE),16)<<"DWM"<<corner<<material;
-        if(!baseline){check(corner==2&&material==(backdrop->active()?3:1),name+": native corner preference and effective material confirmed");check(!(GetWindowLongPtrW(hwnd,GWL_EXSTYLE)&WS_EX_LAYERED),name+": no layered HWND blocking native corners");check(!(GetWindowLongPtrW(hwnd,GWL_STYLE)&WS_CAPTION),name+": only Swirl traffic lights, no native caption buttons");
+        if(!baseline){const bool exact=w->property("swirlExactWindowRadius").toBool();check(corner==(exact?1:2)&&material==(backdrop->active()?3:1),name+": exact-region or native-preset contour and effective material confirmed");check(!(GetWindowLongPtrW(hwnd,GWL_EXSTYLE)&WS_EX_LAYERED),name+": no layered HWND blocking native composition");check(!(GetWindowLongPtrW(hwnd,GWL_STYLE)&WS_CAPTION),name+": only Swirl traffic lights, no native caption buttons");
             // The fixture is visible outside the system contour. Each tip must
             // match the nearby desktop rather than QML's light-blue rectangle.
             const auto desktop=GetDC(nullptr);int matches=0;

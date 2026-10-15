@@ -25,7 +25,7 @@ $environment=@(foreach($scope in @('Process','User','Machine')){foreach($name in
     [pscustomobject]@{scope=$scope;name=$name;configured=!!$value;endpoint=if($name -ne 'NO_PROXY'){EndpointSummary $value}else{$null}}
 }})
 $interfaces=@(Get-NetIPInterface -ErrorAction SilentlyContinue | Where-Object InterfaceAlias -match 'Swirl|Clash|TUN|Wintun' | Select-Object InterfaceAlias,InterfaceIndex,AddressFamily,ConnectionState,InterfaceMetric)
-$dns=@(Get-DnsClientCache -ErrorAction SilentlyContinue | Where-Object Entry -match '(^|\.)(chatgpt|openai|oaistatic|oaiusercontent)\.com$' | Select-Object Entry,RecordType,Data,TimeToLive)
+$dns=@(Get-DnsClientCache -ErrorAction SilentlyContinue | Where-Object Entry -match '(^|\.)(chatgpt|openai|oaistatic|oaiusercontent)\.com$' | Select-Object Entry,@{Name='RecordType';Expression={$_.Type}},Data,TimeToLive)
 $report=@{timestamp=(Get-Date).ToString('o');processes=$inventory;tcp=$tcp;windowsProxy=$proxy;winHttp=(netsh winhttp show proxy | Out-String).Trim();environment=$environment;tunCandidates=$interfaces;dnsCache=$dns;
     limitations=@('Process environment is the collector environment, not an inspection of already-running Codex processes.','TCP endpoints do not reveal encrypted WebSocket or SSE contents.','A TUN adapter name is a candidate, not proof of effective routing.','A loopback proxy connection and a TUN interface can coexist without proving a loop.')}
 $destination=[IO.Path]::GetFullPath($OutputPath)

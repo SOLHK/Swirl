@@ -18,11 +18,12 @@ int runOverviewChecks(QQuickWindow *window) {
     const auto state=[&](const QString &code){QQmlExpression expression(qmlContext(window),window,code);const auto result=expression.evaluate();if(expression.hasError())qCritical()<<expression.error();return result;};
     const auto wait=[&](const std::function<bool()> &condition){QElapsedTimer timer;timer.start();while(!condition()&&timer.elapsed()<3500)QTest::qWait(20);return condition();};
     std::function<QQuickItem *(QQuickItem *,const QString &)> find;
-    find=[&](QQuickItem *parent,const QString &name)->QQuickItem *{if(parent->objectName()==name)return parent;for(auto *child:parent->childItems())if(auto *result=find(child,name))return result;return nullptr;};
+    find=[&](QQuickItem *parent,const QString &name)->QQuickItem *{if(parent->objectName()==name&&parent->isVisible())return parent;for(auto *child:parent->childItems())if(auto *result=find(child,name))return result;return nullptr;};
     const auto item=[&](const char *name,QQuickWindow *target=nullptr){return find((target?target:window)->contentItem(),QString::fromLatin1(name));};
-    const auto settled=[&]{wait([&]{return !state("pageLoader.moving || pageLoader.pendingGrab").toBool();});};
+    const auto settled=[&]{wait([&]{return !state("pageLoader.moving || pageLoader.pendingGrab || settingsFlight.moving || (settingsFlight.phase==='Detail' && settingsFlight.visible)").toBool();});};
     const auto click=[&](const char *name,QQuickWindow *target=nullptr){auto *control=item(name,target);if(!control){check(false,"native input target exists");return false;}auto *w=target?target:window;QTest::mouseClick(w,Qt::LeftButton,Qt::NoModifier,control->mapToScene(QPointF(control->width()/2,control->height()/2)).toPoint());QTest::qWait(80);settled();return true;};
     const auto type=[&](const char *name,const QString &text,QQuickWindow *target=nullptr){auto *control=item(name,target);if(!control){check(false,"editable input exists");return;}control->forceActiveFocus();auto *w=target?target:window;QTest::keyClick(w,Qt::Key_A,Qt::ControlModifier);for(const auto character:text)QTest::keyClick(w,character.toLatin1());QTest::qWait(50);};
+    const auto ownsPopup=[&](QObject *popup,QQuickWindow *expected){auto *visual=popup?qobject_cast<QQuickItem *>(popup->property("parent").value<QObject *>()):nullptr;return visual&&visual->window()==expected;};
     check(state("AppState.measuredDown===0 && AppState.measuredUp===0 && !engineController.processAlive").toBool(),"initial traffic and core state come from the stopped engine");
     for(const auto *route:{"activity","overview","processes","gateway","policies","rules","capture","tls","rewrite","featurehub"}){
         const auto control=QString("nav-")+route;click(control.toUtf8().constData());
@@ -50,6 +51,12 @@ int runOverviewChecks(QQuickWindow *window) {
     check(sheet&&sheet->isVisible()&&state("settingsSheet.section==='subscriptions'").toBool(),"More opens the existing subscription manager directly");
     if(sheet){
         click("addSubscription",sheet);QTest::qWait(300);
+        if(auto *popup=window->findChild<QObject *>("subscriptionDialog")){
+            auto *visual=qobject_cast<QQuickItem *>(popup->property("parent").value<QObject *>());
+            auto *declared=qobject_cast<QQuickItem *>(popup->parent());
+            qInfo()<<"POPUP_OWNER_EVIDENCE"<<"visible"<<popup->property("visible")<<"opened"<<popup->property("opened")<<"declarationWindow"<<(declared?declared->window():nullptr)<<"overlayWindow"<<(visual?visual->window():nullptr)<<"expected"<<sheet;
+            check(ownsPopup(popup,sheet)&&popup->property("ownerWindow").value<QObject *>()==sheet&&item("subscriptionName",sheet),"migrated subscription form belongs to the exposed native settings window");
+        }
         QTest::keyClick(sheet,Qt::Key_Escape);QTest::qWait(350);
         check(sheet->isVisible()&&state("dismissals.count===0").toBool(),"one Escape closes only the subscription form and preserves its settings window");
         click("addSubscription",sheet);QTest::qWait(300);type("subscriptionName","Unsaved fixture",sheet);
@@ -57,11 +64,15 @@ int runOverviewChecks(QQuickWindow *window) {
         check(state("AppState.currentPage==='featurehub'").toBool(),"navigation shortcuts cannot bypass a modal draft");
         QTest::keyClick(sheet,Qt::Key_Escape);QTest::qWait(300);
         check(sheet->isVisible()&&state("dismissals.count===2").toBool(),"dirty subscription form asks before discarding");
+        if(auto *popup=window->findChild<QObject *>("subscriptionDialog"))check(ownsPopup(popup->findChild<QObject *>("discardChangesPrompt"),sheet),"nested discard prompt follows its native form owner");
         QTest::keyClick(sheet,Qt::Key_Escape);QTest::qWait(300);
         check(state("dismissals.count===1").toBool(),"Escape cancels discard confirmation and preserves the edited form");
         QTest::keyClick(sheet,Qt::Key_Escape);QTest::qWait(300);click("discardChangesConfirm",sheet);QTest::qWait(350);
         QTest::keyClick(sheet,Qt::Key_Escape);QTest::qWait(100);
         check(wait([&]{return !sheet->isVisible();})&&window->isVisible(),"next Escape closes settings while the main window stays open");
+        window->requestActivate();click("settings-subscriptions");click("addSubscription",sheet);QTest::qWait(300);
+        check(ownsPopup(window->findChild<QObject *>("subscriptionDialog"),sheet)&&item("subscriptionName",sheet),"cached form keeps its current native overlay after return and reopen");
+        QTest::keyClick(sheet,Qt::Key_Escape);QTest::qWait(350);QTest::keyClick(sheet,Qt::Key_Escape);check(wait([&]{return !sheet->isVisible();}),"cached form and sheet still dismiss independently after reopening");
         window->requestActivate();QTest::keyClick(window,Qt::Key_Escape);QTest::qWait(100);
         check(window->isVisible(),"Escape on the main page never exits Swirl");
     }
@@ -85,6 +96,7 @@ int runOverviewChecks(QQuickWindow *window) {
         click("windowMinimizeButton",sheet);check(sheet->visibility()==QWindow::Minimized,"secondary yellow button minimizes");
         sheet->showNormal();sheet->requestActivate();QTest::qWait(100);QTest::keyClick(sheet,Qt::Key_Escape);QTest::qWait(100);check(wait([&]{return !sheet->isVisible();})&&window->isVisible(),"Escape dismisses the secondary window");
     }
+    settled();check(state("dismissals.count===0").toBool(),"completed settings return releases its modal layer before global shortcuts");
     window->requestActivate();QTest::keyClick(window,Qt::Key_K,Qt::ControlModifier);QTest::qWait(100);type("pageSearch","DNS");QTest::keyClick(window,Qt::Key_Return);settled();
     check(state("AppState.currentPage==='dns'").toBool(),"Ctrl+K searches and navigates from actual keyboard input");
     state("AppState.navigate('scripts')");QTest::qWait(50);settled();click("scriptAddButton");type("localScriptName","UI script");type("localScriptSource","function main(input){return {sum:input.a+input.b};}");type("localScriptInput","{\"a\":20,\"b\":22}");click("localScriptSave");

@@ -29,11 +29,13 @@ Item {
                 SwirlMotionButton {
                     id: entry; required property var modelData
                     readonly property Item motionTitle:entryTitle
+                    readonly property string motionIcon:modelData.icon
+                    readonly property string motionDescription:modelData.description
                     objectName:"settings-"+modelData.route
                     width:Math.floor((grid.width-(grid.columns-1)*grid.spacing)/grid.columns); height:Theme.dp(156)
                     padding:Theme.cardPadding; hoverEnabled:true
                     readonly property real transfer: page.Window.window.settingsOrigin===entry ? page.Window.window.settingsOriginProgress : 0
-                    motionScale:(enabled && down?SwirlMotion.pressScale:1)*(1-0.045*transfer)
+                    motionScale:enabled && down?SwirlMotion.pressScale:1
                     opacity:page.Window.window.settingsOrigin===entry && page.Window.window.settingsOriginMoving?0:1
                     background:Rectangle {
                         color:entry.hovered?Theme.hover:Theme.material("content"); radius:Theme.cardRadius

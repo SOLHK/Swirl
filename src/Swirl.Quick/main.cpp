@@ -50,6 +50,7 @@
 #include "tests/CaptureChecks.h"
 #include "tests/GatewayChecks.h"
 #include "tests/WindowChecks.h"
+#include "tests/WindowRadiusChecks.h"
 #include "tests/UiQualityChecks.h"
 #include "tests/HdrChecks.h"
 #include "tests/EngineUiChecks.h"
@@ -136,6 +137,7 @@ int main(int argc, char *argv[])
     }
 #endif
     const bool heroTest=app.arguments().contains("--hero-test");
+    const bool radiusTest=app.arguments().contains("--window-radius-test");
     const bool appearanceTest=app.arguments().contains("--appearance-test")||app.arguments().contains("--appearance-restore-test");
     const bool uiQualityTest=app.arguments().contains("--ui-quality-test");
     bool previewMode=uiQualityTest;
@@ -158,7 +160,7 @@ int main(int argc, char *argv[])
 #ifdef SWIRL_UI_TESTS
     lifecycleTest=app.arguments().contains("--lifecycle-test");
 #endif
-    const bool isolatedRun=lifecycleTest||realAcceptance||heroTest||nodeTest||motionTest||engineTest||hdrDisplayTest||hdrTest||app.arguments().contains("--interaction-test")||app.arguments().contains("--capture-self-test")||app.arguments().contains("--gateway-self-test")||app.arguments().contains("--smoke-test")||app.arguments().contains("--window-test")||previewMode;
+    const bool isolatedRun=lifecycleTest||realAcceptance||heroTest||radiusTest||nodeTest||motionTest||engineTest||hdrDisplayTest||hdrTest||app.arguments().contains("--interaction-test")||app.arguments().contains("--capture-self-test")||app.arguments().contains("--gateway-self-test")||app.arguments().contains("--smoke-test")||app.arguments().contains("--window-test")||previewMode;
     SingleInstance instance;
     if(lifecycleTest || (!isolatedRun && !appearanceTest)) {
         const auto ownership=instance.acquire(lifecycleTest?QStringLiteral("isolated-lifecycle-test"):QStringLiteral("production"));
@@ -234,7 +236,7 @@ int main(int argc, char *argv[])
         qCritical()<<"Preview font unavailable:"<<previewFont;return 2;
     }
     const QString previewState = argumentValue(QStringLiteral("--preview-state="));
-    if (appearanceTest || heroTest || nodeTest || motionTest || previewMode || engineTest || hdrDisplayTest || hdrTest || smoke || interaction || captureTest || gatewayTest || windowTest || !previewPath.isEmpty()) {
+    if (appearanceTest || heroTest || radiusTest || nodeTest || motionTest || previewMode || engineTest || hdrDisplayTest || hdrTest || smoke || interaction || captureTest || gatewayTest || windowTest || !previewPath.isEmpty()) {
         if(uiQualityTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-ui-quality.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-ui-quality.txt");}
         if(appearanceTest){const QString file=app.arguments().contains("--appearance-restore-test")?"Swirl-appearance-restore.txt":"Swirl-appearance.txt";app.setProperty("qtDiagnosticFile",file);QFile::remove(QCoreApplication::applicationDirPath()+"/"+file);}
         if(nodeTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-node-ui-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-node-ui-diagnostics.txt");}
@@ -455,6 +457,14 @@ int main(int argc, char *argv[])
         return 4;
 #endif
     }
+    if (radiusTest) {
+#ifdef SWIRL_UI_TESTS
+        const auto output=argumentValue(QStringLiteral("--window-radius-output="));
+        QTimer::singleShot(400,&app,[&app,rootWindow,&backdrop,output]{app.exit(runWindowRadiusChecks(rootWindow,&backdrop,output));});
+#else
+        return 4;
+#endif
+    }
     if(gatewayTest){
 #ifdef SWIRL_UI_TESTS
         QTimer::singleShot(400,&app,[&app]{app.exit(runGatewayChecks());});
@@ -485,12 +495,14 @@ int main(int argc, char *argv[])
                 QQmlExpression expression(qmlContext(window),window,QStringLiteral("preparePreviewState(previewState)"));expression.evaluate();
                 if(expression.hasError())qWarning()<<expression.error();
             });
-            if(!nativeFramePath.isEmpty())QTimer::singleShot(400,&app,[&app,&backdrop]{if(!backdrop.prepareNativeCapture()){qCritical()<<"Native capture blocked: cannot activate target window";app.exit(3);}});
-            QTimer::singleShot(900, &app, [window, previewPage, previewPath, nativeFramePath, &backdrop, &app, &previewCaptured]() {
+            auto *captureBackdrop=previewPage=="dns"?&settingsBackdrop:previewPage=="external"?&panelBackdrop:&backdrop;
+            if(!nativeFramePath.isEmpty())QTimer::singleShot(400,&app,[&app,captureBackdrop]{if(!captureBackdrop->prepareNativeCapture()){qCritical()<<"Native capture blocked: cannot activate target window";app.exit(3);}});
+            QTimer::singleShot(900, &app, [window, previewPage, previewPath, nativeFramePath, captureBackdrop, &app, &previewCaptured]() {
                 QQuickWindow *captureWindow=window;
-                if(previewPage=="dns"||previewPage=="external")for(auto *candidate:QGuiApplication::allWindows())if(candidate->isVisible()&&candidate!=window)if(auto *quick=qobject_cast<QQuickWindow *>(candidate)){captureWindow=quick;break;}
-                if(!nativeFramePath.isEmpty()&&!backdrop.isCaptureForeground()){qCritical()<<"Native capture blocked: target window lost foreground";backdrop.finishNativeCapture();app.exit(3);return;}
-                QImage screenshot = nativeFramePath.isEmpty()?captureWindow->grabWindow():window->screen()->grabWindow(0,window->x(),window->y(),window->width(),window->height()).toImage();
+                const QString targetName=previewPage=="dns"?"settingsSheet":previewPage=="external"?"dashboardWindow":QString();
+                if(!targetName.isEmpty())for(auto *candidate:QGuiApplication::allWindows())if(candidate->isVisible()&&candidate->objectName()==targetName)if(auto *quick=qobject_cast<QQuickWindow *>(candidate)){captureWindow=quick;break;}
+                if(!nativeFramePath.isEmpty()&&!captureBackdrop->isCaptureForeground()){qCritical()<<"Native capture blocked: target window lost foreground";captureBackdrop->finishNativeCapture();app.exit(3);return;}
+                QImage screenshot = nativeFramePath.isEmpty()?captureWindow->grabWindow():captureWindow->screen()->grabWindow(0,captureWindow->x(),captureWindow->y(),captureWindow->width(),captureWindow->height()).toImage();
                 if(nativeFramePath.isEmpty()&&captureWindow==window){
                     QList<QQuickWindow *> popups;QRect bounds=window->geometry();
                     for(auto *candidate:QGuiApplication::allWindows())if(candidate!=window&&candidate->isVisible()&&candidate->flags().testFlag(Qt::Popup))if(auto *quick=qobject_cast<QQuickWindow *>(candidate)){popups.append(quick);bounds=bounds.united(candidate->geometry());}
@@ -505,13 +517,13 @@ int main(int argc, char *argv[])
                 if (!screenshot.isNull() && screenshot.save(previewPath)) {
                     previewCaptured=true;
                     qInfo() << (nativeFramePath.isEmpty()?"Saved Qt UI render:":"Saved Windows compositor screenshot:") << previewPath;
-                    qInfo()<<"Capture geometry"<<window->geometry()<<"DPR"<<window->devicePixelRatio()<<backdrop.status();
+                    qInfo()<<"Capture geometry"<<captureWindow->geometry()<<"DPR"<<captureWindow->devicePixelRatio()<<captureBackdrop->status();
                     QQmlExpression scaleState(qmlContext(window),window,QStringLiteral("Theme.uiScale"));
                     qInfo()<<"Capture UI scale"<<scaleState.evaluate();
-                    if(!nativeFramePath.isEmpty())backdrop.finishNativeCapture();
+                    if(!nativeFramePath.isEmpty())captureBackdrop->finishNativeCapture();
                     return;
                 }
-                if(!nativeFramePath.isEmpty()){backdrop.finishNativeCapture();qCritical()<<"Native capture failed; no synthetic fallback used";app.exit(3);return;}
+                if(!nativeFramePath.isEmpty()){captureBackdrop->finishNativeCapture();qCritical()<<"Native capture failed; no synthetic fallback used";app.exit(3);return;}
 
                 // The offscreen QPA plugin may not support QQuickWindow::grabWindow().
                 // Grab the rendered Quick item asynchronously as a software fallback.
@@ -540,5 +552,5 @@ int main(int argc, char *argv[])
     // This also keeps scripted page-navigation shutdown free of incubation warnings.
     if (auto *controller = engine.incubationController())
         controller->incubateFor(100);
-    return (heroTest || nodeTest || motionTest || previewMode || engineTest || smoke || interaction || captureTest || gatewayTest || windowTest || !previewPath.isEmpty()) && qmlWarnings ? 2 : result;
+    return (heroTest || radiusTest || nodeTest || motionTest || previewMode || engineTest || smoke || interaction || captureTest || gatewayTest || windowTest || !previewPath.isEmpty()) && qmlWarnings ? 2 : result;
 }

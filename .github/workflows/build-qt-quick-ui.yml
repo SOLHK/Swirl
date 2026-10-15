@@ -2,7 +2,7 @@ name: Build Swirl Qt Quick UI (Preview)
 
 on:
   push:
-    branches: [test]
+    branches: [main, test]
   pull_request:
     branches: [test, main]
   workflow_dispatch:
@@ -20,6 +20,9 @@ jobs:
     steps:
       - name: Checkout original repository and UI branch
         uses: actions/checkout@v4
+      - name: Validate scoped Codex proxy launcher
+        shell: pwsh
+        run: ./tools/tests/Test-CodexProxyLauncher.ps1
       - name: Set up Qt desktop SDK
         uses: jurplel/install-qt-action@v4
         with:
@@ -72,10 +75,13 @@ jobs:
           # CTest launches Swirl from the build directory, separate from dist.
           New-Item -ItemType Directory -Force "build/swirl-quick/Release/lib" | Out-Null
           Copy-Item -LiteralPath $fontDir -Destination "build/swirl-quick/Release/lib/fonts" -Recurse -Force
-      - name: Engine contract, real Mihomo and QML lifecycle checks
+      - name: Engine, stream and QML regression checks
         shell: pwsh
         run: |
-          ctest --test-dir build/swirl-quick -C Release -R "swirl-(engine|node|import)-|swirl-native-engine|swirl-subscription-formats|swirl-appearance-ui|swirl-font-selection|swirl-motion|swirl-telemetry-accounting|swirl-diagnostic-export" --output-on-failure
+          # Include registered stream, shared-element and settings regressions.
+          # Later steps run the three excluded UI/capture drivers against dist.
+          # System proxy recovery needs a separately controlled test environment.
+          ctest --test-dir build/swirl-quick -C Release -E "^swirl-(system-proxy-recovery|overview-input|all-pages|capture-network)$" --output-on-failure
           if ($LASTEXITCODE -ne 0) {
             Get-Content build/swirl-quick/engine-contract.txt, build/swirl-quick/engine-real.txt -ErrorAction SilentlyContinue
             throw "Engine checks failed"
@@ -92,10 +98,12 @@ jobs:
             build/swirl-quick/node-chain.txt
             build/swirl-quick/import-subscription.txt
             build/swirl-quick/native-engine.txt
+            build/swirl-quick/stream-regression.txt
             build/swirl-quick/subscription-formats.txt
             build/swirl-quick/Release/Swirl-appearance.txt
             build/swirl-quick/Release/Swirl-appearance-restore.txt
             build/swirl-quick/motion-report.json
+            build/swirl-quick/hero-evidence/
             build/swirl-quick/Release/Swirl-diagnostics.txt
             build/swirl-quick/Release/Swirl-node-ui-diagnostics.txt
           if-no-files-found: warn
@@ -297,5 +305,5 @@ jobs:
             --repo "${GITHUB_REPOSITORY}" \
             --target "${GITHUB_SHA}" \
             --title "Swirl · 测试版 ${SHORT_SHA}" \
-            --notes "测试版：保留现有 Qt UI 与 HDR；设置 → 代理提供真实 Mihomo 进程启停、版本与认证 API 健康检查；不接管系统代理、不启用 TUN。包含真实本机 HTTP 抓包及 CONNECT 记录。支持手动 SOCKS5、Shadowsocks、Trojan 节点，本机代理与真实请求验证；没有演示数据，未实现功能保持禁用。请勿作为正式版本使用。" \
+            --notes "Windows 开发测试版：C++23 / Qt Quick，Swirl 原生 TCP 与 Mihomo 兼容引擎，真实节点与订阅、路由和网络活动监控、本机 HTTP/HTTPS 调试。系统代理、TUN、LAN 和证书信任需用户明确启用；高级协议与实际网络环境的验证范围请查阅随版本文档。没有演示联网成功，未实现功能保持禁用。请勿作为正式版本使用。" \
             --prerelease

@@ -27,9 +27,9 @@ Item {
    SwirlButton{text:"使用配置";primary:true;enabled:page.selected!==null&&engineController.canStart;onClicked:extensionsProvider.useProfile(page.selectedId)}
   }
  }
- FileDialog{id:profileImport;title:"导入 Swirl 配置";nameFilters:["Swirl 配置 (*.json)"];onAccepted:extensionsProvider.importProfile(selectedFile)}
- FileDialog{id:profileExport;title:"导出 Swirl 配置";fileMode:FileDialog.SaveFile;nameFilters:["Swirl 配置 (*.json)"];defaultSuffix:"json";onAccepted:extensionsProvider.exportProfile(page.selectedId,selectedFile)}
- SwirlDialog{id:profileEditor;objectName:"localProfileEditor";title:"配置编辑器";width:Math.min(Theme.dp(760),page.width-Theme.dp(24));height:Math.min(Theme.dp(600),page.height-Theme.dp(24));property string profileId:""
+ FileDialog{id:profileImport;parentWindow:page.Window.window;objectName:"settingsProfileImportDialog";title:"导入 Swirl 配置";nameFilters:["Swirl 配置 (*.json)"];onAccepted:extensionsProvider.importProfile(selectedFile)}
+ FileDialog{id:profileExport;parentWindow:page.Window.window;objectName:"settingsProfileExportDialog";title:"导出 Swirl 配置";fileMode:FileDialog.SaveFile;nameFilters:["Swirl 配置 (*.json)"];defaultSuffix:"json";onAccepted:extensionsProvider.exportProfile(page.selectedId,selectedFile)}
+ SwirlDialog{ownerItem:page;id:profileEditor;objectName:"localProfileEditor";title:"配置编辑器";width:Math.min(Theme.dp(760),page.width-Theme.dp(24));height:Math.min(Theme.dp(600),page.height-Theme.dp(24));property string profileId:""
   ColumnLayout{anchors.fill:parent;spacing:Theme.dp(10)
    SwirlTextField{id:profileName;Layout.fillWidth:true;placeholderText:"配置名称"}
    SwirlComboBox{id:profileMode;model:["rule","global","direct"];Layout.fillWidth:true}

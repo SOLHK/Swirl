@@ -71,6 +71,7 @@ set(SWIRL_QML_FILES
  qml/controls/SwirlText.qml
  qml/controls/SwirlLinkedDetail.qml
  qml/controls/SwirlNodeTransfer.qml
+ qml/controls/SwirlSettingsTransfer.qml
  qml/components/SwirlFontSettings.qml
  qml/components/SwirlSecondaryWindow.qml
  qml/components/SwirlWindowTitleBar.qml

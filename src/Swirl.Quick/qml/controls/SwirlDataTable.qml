@@ -171,6 +171,7 @@ Item {
                         onDoubleClicked:table.rowEdited(recordRow.record,recordRow)
                         SwirlContextMenu {
                             id:contextMenu
+                            parent:mouse
                             payload:table.columns.map(function(c){
                                 return c.label + ": " + String(recordRow.record[c.key] === undefined?"":recordRow.record[c.key])
                             }).join("\n")

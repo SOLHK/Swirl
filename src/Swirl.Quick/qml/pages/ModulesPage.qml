@@ -26,5 +26,5 @@ Item {
   SwirlText {text:extensionsProvider.error||(!engineController.canStart?"请先断开引擎，再更改模块状态和生效顺序。":"");color:Theme.orange;font.pixelSize:Theme.fontSize(12);textFormat:Text.PlainText;Layout.fillWidth:true;wrapMode:Text.WordWrap}
   RowLayout{SwirlButton{text:"上移";enabled:page.selectedId.length>0&&engineController.canStart;onClicked:extensionsProvider.moveModule(page.selectedId,-1)}SwirlButton{text:"下移";enabled:page.selectedId.length>0&&engineController.canStart;onClicked:extensionsProvider.moveModule(page.selectedId,1)}SwirlButton{text:"移除";enabled:page.selectedId.length>0&&engineController.canStart;onClicked:extensionsProvider.removeModule(page.selectedId)}}
  }
- FileDialog{id:moduleFile;title:"安装 Swirl 本地配置模块";nameFilters:["Swirl 配置模块 (*.json)"];onAccepted:extensionsProvider.importModule(selectedFile)}
+ FileDialog{id:moduleFile;parentWindow:page.Window.window;objectName:"settingsModuleFileDialog";title:"安装 Swirl 本地配置模块";nameFilters:["Swirl 配置模块 (*.json)"];onAccepted:extensionsProvider.importModule(selectedFile)}
 }

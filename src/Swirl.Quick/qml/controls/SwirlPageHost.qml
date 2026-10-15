@@ -13,6 +13,7 @@ Item {
  property var leavingLoader:null
  property int generation:0
  property bool initialized:false
+ property bool animateRoutes:true
  readonly property Item item:activeLoader?activeLoader.item:null
  readonly property int cachedPageCount:Object.keys(pages).length
  readonly property bool moving:travel.running
@@ -79,7 +80,7 @@ Item {
   accessOrder=accessOrder.filter(key=>key!==routeKey).concat([routeKey])
   for(const key of Object.keys(pages)){pages[key].visible=pages[key]===next || pages[key]===previous;pages[key].enabled=pages[key]===next}
   progress=0
-  if(!previous || SwirlMotion.reduced){finish();return}
+  if(!previous || SwirlMotion.reduced || !animateRoutes){finish();return}
   // Let normal Qt polish settle layouts once. No recursive per-item polishing.
   next.item.ensurePolished()
   Qt.callLater(function(){
