@@ -5,6 +5,12 @@
 class DiagnosticTests:public QObject {
  Q_OBJECT
 private slots:
+ void activityCountIncludesNonFailureEvents(){
+  QTemporaryDir temp;
+  {DiagnosticService log(temp.path());log.record("INFO","Engine","Connected","connected");log.record("WARN","Import","Notice","notice");log.record("DEBUG","Qt","Trace","trace");QCOMPARE(log.eventCount(),2);}
+  {DiagnosticService log(temp.path());QCOMPARE(log.eventCount(),2);log.acknowledge();QCOMPARE(log.eventCount(),0);}
+  {DiagnosticService log(temp.path());QCOMPARE(log.eventCount(),0);log.record("INFO","Import","Updated","updated");QCOMPARE(log.eventCount(),1);}
+ }
  void clearSurvivesRestart(){
   QTemporaryDir temp;
   {DiagnosticService log(temp.path());log.record("ERROR","Fixture","OldFailure","old");log.clearView();QCOMPARE(log.eventCount(),0);QVERIFY(log.records().isEmpty());}
@@ -21,7 +27,7 @@ private slots:
  void clearAtRotationBoundary(){
   QTemporaryDir temp;
   {DiagnosticService log(temp.path());for(int i=0;i<140;++i)log.record("ERROR","Fixture","Large",QString(8192,'x'));log.clearView();log.record("INFO","Fixture","AfterClear","retained");}
-  DiagnosticService restored(temp.path());QCOMPARE(restored.eventCount(),0);QCOMPARE(restored.records().size(),1);QCOMPARE(restored.records().first().toMap().value("code").toString(),QStringLiteral("AfterClear"));
+  DiagnosticService restored(temp.path());QCOMPARE(restored.eventCount(),1);QCOMPARE(restored.records().size(),1);QCOMPARE(restored.records().first().toMap().value("code").toString(),QStringLiteral("AfterClear"));
  }
  void redactionAndZip(){QTemporaryDir temp;DiagnosticService log(temp.path());
   const auto secrets=QStringLiteral("token=FIXTURE-TOKEN password: FIXTURE-PASSWORD Cookie: private-cookie\nhttps://fixture.test/sub?secret=PRIVATE-URL\nuuid: 11111111-1111-4111-8111-111111111111\n-----BEGIN PRIVATE KEY-----\nPRIVATE-KEY\n-----END PRIVATE KEY-----");

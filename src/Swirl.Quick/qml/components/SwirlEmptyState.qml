@@ -7,12 +7,12 @@ ColumnLayout {
     property string detail:"Try another filter"
     spacing:Theme.dp(8)
     SwirlIcon { name:"search"; size:Theme.dp(32); color:Theme.muted; Layout.alignment:Qt.AlignHCenter }
-    Text {
+    SwirlText {
         text:state.headline; color:Theme.text
         font.pixelSize:Theme.fontSize(16); font.weight:Font.DemiBold
         Layout.fillWidth:true;horizontalAlignment:Text.AlignHCenter;wrapMode:Text.Wrap
     }
-    Text {
+    SwirlText {
         text:state.detail; color:Theme.muted
         font.pixelSize:Theme.fontSize(12)
         Layout.fillWidth:true;horizontalAlignment:Text.AlignHCenter;wrapMode:Text.Wrap

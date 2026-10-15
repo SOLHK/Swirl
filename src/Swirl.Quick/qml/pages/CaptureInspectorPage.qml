@@ -42,9 +42,9 @@ Item {
                 anchors.fill: parent
                 anchors.margins: Theme.dp(16)
                 spacing: Theme.dp(11)
-                Text { text: "抓包设置"; color: Theme.text; font.pixelSize: Theme.fontSize(20); font.weight: Font.DemiBold }
+                SwirlText { text: "抓包设置"; color: Theme.text; font.pixelSize: Theme.fontSize(20); font.weight: Font.DemiBold }
                 SwirlStatusBadge { label: page.captureProvider.running ? "监听中 · 真实" : "未启动"; tone: page.captureProvider.running ? "success" : "neutral" }
-                Text { text: "本机端口"; color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
+                SwirlText { text: "本机端口"; color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
                 SwirlTextField {
                     id: portField
                     objectName: "capturePortField"
@@ -65,8 +65,8 @@ Item {
                         }
                     }
                 }
-                Text { text: page.captureProvider.running ? "127.0.0.1:" + page.captureProvider.port : "监听地址仅在开始后启用。"; color: Theme.muted; font.pixelSize: Theme.fontSize(12); wrapMode: Text.WordWrap; Layout.fillWidth: true }
-                Text { text: page.captureProvider.error.length ? page.captureProvider.error : "将客户端 HTTP/HTTPS 代理指向捕获端口即可捕获。配置 CA 和 MitM 主机名后可解密 HTTPS 正文。"; color: page.captureProvider.error.length ? Theme.red : Theme.muted; font.pixelSize: Theme.fontSize(12); wrapMode: Text.WordWrap; Layout.fillWidth: true }
+                SwirlText { text: page.captureProvider.running ? "127.0.0.1:" + page.captureProvider.port : "监听地址仅在开始后启用。"; color: Theme.muted; font.pixelSize: Theme.fontSize(12); wrapMode: Text.WordWrap; Layout.fillWidth: true }
+                SwirlText { text: page.captureProvider.error.length ? page.captureProvider.error : "将客户端 HTTP/HTTPS 代理指向捕获端口即可捕获。配置 CA 和 MitM 主机名后可解密 HTTPS 正文。"; color: page.captureProvider.error.length ? Theme.red : Theme.muted; font.pixelSize: Theme.fontSize(12); wrapMode: Text.WordWrap; Layout.fillWidth: true }
                 Item { Layout.fillHeight: true }
                 SwirlButton { text: "清空"; Layout.fillWidth: true; onClicked: { page.captureProvider.clear(); page.selectedId = "" } }
                 SwirlButton { objectName: "captureExportButton"; text: "导出 HAR"; Layout.fillWidth: true; enabled: page.captureProvider.sessions.length > 0; onClicked: exportDialog.open() }
@@ -76,9 +76,9 @@ Item {
             Layout.fillWidth: true; Layout.fillHeight: true; spacing: Theme.dp(8)
             RowLayout {
                 Layout.fillWidth: true; spacing: Theme.dp(10)
-                Text { text: "HTTP 请求"; color: Theme.text; font.pixelSize: Theme.fontSize(20); font.weight: Font.DemiBold }
+                SwirlText { text: "HTTP 请求"; color: Theme.text; font.pixelSize: Theme.fontSize(20); font.weight: Font.DemiBold }
                 SwirlSearchField { Layout.fillWidth: true; placeholderText: "筛选域名、方法或状态"; onTextChanged: page.query = text }
-                Text { text: page.captureProvider.sessions.length + " 条 · " + page.captureProvider.activeCount + " 个活动连接"; color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
+                SwirlText { text: page.captureProvider.sessions.length + " 条 · " + page.captureProvider.activeCount + " 个活动连接"; color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
             }
             SwirlGlassPanel {
                 Layout.fillWidth: true; Layout.fillHeight: true; cornerRadius: Theme.containerRadius
@@ -92,11 +92,11 @@ Item {
                             columns: [{key:"method",label:"方法",w:80},{key:"host",label:"目标",w:190},{key:"status",label:"状态",w:65},{key:"protocol",label:"类型",w:110},{key:"duration",label:"耗时",w:90},{key:"size",label:"下载",w:90}]
                             onRowSelected: function(row) { page.selectedId = row.id }
                         }
-                        Text { visible: page.captureProvider.sessions.length === 0; anchors.centerIn: parent; text: page.captureProvider.running ? "等待应用通过代理发送请求…" : "开始抓包后，请求会显示在这里。"; color: Theme.muted; font.pixelSize: Theme.fontSize(13) }
+                        SwirlText { visible: page.captureProvider.sessions.length === 0; anchors.centerIn: parent; text: page.captureProvider.running ? "等待应用通过代理发送请求…" : "开始抓包后，请求会显示在这里。"; color: Theme.muted; font.pixelSize: Theme.fontSize(13) }
                     }
                     RowLayout {
                         Layout.fillWidth: true
-                        Text { text: "请求详情"; color: Theme.text; font.pixelSize: Theme.fontSize(14); font.weight: Font.DemiBold }
+                        SwirlText { text: "请求详情"; color: Theme.text; font.pixelSize: Theme.fontSize(14); font.weight: Font.DemiBold }
                         SwirlSegmentedControl { id: detailTabs; options: ["概览", "请求", "响应"]; Layout.preferredWidth: Theme.dp(228) }
                     }
                     ScrollView {
@@ -105,7 +105,7 @@ Item {
                     }
                 }
             }
-            Text { text: "认证、Cookie 与常见 URL 密钥已隐藏；正文预览最多 64 KiB，HTTP 响应上限 2 MiB。HAR 文件仍可能包含请求正文。"; color: Theme.muted; font.pixelSize: Theme.fontSize(11); wrapMode: Text.WordWrap; Layout.fillWidth: true }
+            SwirlText { text: "认证、Cookie 与常见 URL 密钥已隐藏；正文预览最多 64 KiB，HTTP 响应上限 2 MiB。HAR 文件仍可能包含请求正文。"; color: Theme.muted; font.pixelSize: Theme.fontSize(11); wrapMode: Text.WordWrap; Layout.fillWidth: true }
         }
     }
     FileDialog {

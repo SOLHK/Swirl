@@ -8,9 +8,36 @@ import "../controls"
 Item {
     id:page
     property string selectedId:engineController.selectedNodeId
-    readonly property var selected:engineController.nodes.find(function(n){return n.id===page.selectedId})||null
-    readonly property var viewRows:engineController.nodes.filter(function(n){return (n.name+" "+n.host).toLowerCase().indexOf(search.text.toLowerCase())>=0&&(protocolFilter.currentIndex===0||n.protocol===page.protocols[protocolFilter.currentIndex-1])}).sort(function(a,b){return a.name.localeCompare(b.name)})
+    readonly property var allNodes:engineController.nodes
+    Connections {
+        target:engineController
+        function onSelectionChanged(){page.selectedId=engineController.selectedNodeId}
+    }
+    readonly property var selected:allNodes.find(n=>n.id===page.selectedId)||null
+    property string sourceId:""
+    property string countryCode:""
+    readonly property var sources:engineController.imports.providers
+    readonly property var sourceRows:allNodes.filter(n=>!sourceId || n.sourceId===sourceId)
+    // Region options/order depend only on metadata, never on latency telemetry.
+    readonly property var catalogRows:engineController.nodeCatalog.filter(n=>!sourceId || n.sourceId===sourceId)
+    readonly property var nodeById:{const rows={};for(const node of allNodes)rows[node.id]=node;return rows}
+    readonly property var countries:{
+        const names={}
+        for(const node of catalogRows)names[node.regionCode]=node.regionName
+        return Object.keys(names).sort((a,b)=>names[a].localeCompare(names[b])).map(code=>({code:code,name:names[code]}))
+    }
+    onSourcesChanged:if(sourceId && !sources.some(s=>s.id===sourceId))sourceId=""
+    onCountriesChanged:if(countryCode && !countries.some(c=>c.code===countryCode))countryCode=""
+    readonly property var sortedRows:catalogRows.slice().sort((a,b)=>a.name.localeCompare(b.name))
+    readonly property string searchQuery:search.text.trim().toLowerCase()
+    readonly property var viewRows:sortedRows.filter(n=>(n.name+" "+n.host).toLowerCase().indexOf(searchQuery)>=0 &&
+        (protocolFilter.currentIndex===0||n.protocol===page.protocols[protocolFilter.currentIndex-1]) && (!countryCode||n.regionCode===countryCode)).map(n=>nodeById[n.id]||n)
     readonly property var protocols:engineController.supportedProtocols
+    function selectRow(row) {
+        // Update the mounted inspector now. Persist/switch without a card flight.
+        selectedId=row.id;nodeHero.opened=true
+        if(!engineController.chooseNode(row.id)){selectedId=engineController.selectedNodeId;AppState.notice(engineController.nodeError)}
+    }
     property string editingId:""
     readonly property var tested:engineController.tests.results[selectedId]||({})
     function edit(node) {
@@ -23,7 +50,7 @@ Item {
         anchors.fill:parent;anchors.margins:Theme.dp(24);spacing:Theme.dp(16)
         RowLayout {
             Layout.fillWidth:true;spacing:Theme.dp(12)
-            Text {text:"节点";color:Theme.text;font.family:Theme.fontFamily;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold;Layout.fillWidth:true}
+            SwirlText {renderType:Text.NativeRendering;text:"节点";color:Theme.text;font.family:Theme.fontFamily;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold;Layout.fillWidth:true}
             SwirlButton {objectName:"allNodesTestButton";text:engineController.tests.busy?"取消测速":"测速";quiet:true;iconName:"activity";enabled:engineController.nodes.length>0;onClicked:engineController.tests.busy?engineController.tests.cancel():engineController.testAllNodes(testUrl.text)}
             SwirlButton {objectName:"nodeImportButton";text:"导入";quiet:true;iconName:"download";enabled:!engineController.imports.busy;onClicked:importDialog.open()}
             SwirlButton {objectName:"nodeAddButton";text:"添加节点";iconName:"plus";primary:true;enabled:engineController.canStart;onClicked:page.edit(null)}
@@ -31,12 +58,14 @@ Item {
         RowLayout {
             Layout.fillWidth:true;spacing:Theme.dp(12)
             SwirlSearchField {id:search;objectName:"nodeSearchField";Layout.fillWidth:true;implicitHeight:Theme.controlHeight;placeholderText:"搜索节点名称或服务器";font.pixelSize:Theme.fontSize(13)}
-            SwirlComboBox {id:protocolFilter;objectName:"proxyRegionCombo";implicitHeight:Theme.controlHeight;implicitWidth:Theme.dp(136);model:["全部协议"].concat(page.protocols)}
+            SwirlComboBox {id:protocolFilter;objectName:"proxyRegionCombo";implicitHeight:Theme.controlHeight;implicitWidth:Theme.dp(136);model:["全部协议"].concat(page.protocols);Accessible.name:"按协议筛选节点"}
+            SwirlComboBox {id:countryFilter;objectName:"nodeCountryFilter";implicitWidth:Theme.dp(148);model:["全部地区"].concat(page.countries.map(c=>c.name));currentIndex:Math.max(0,page.countries.findIndex(c=>c.code===page.countryCode)+1);onActivated:page.countryCode=currentIndex>0?page.countries[currentIndex-1].code:"";Accessible.name:"按国家或地区筛选节点"}
         }
         RowLayout {
             Layout.fillWidth:true
-            Text {text:page.viewRows.length+" 个节点";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true}
-            Text {text:engineController.tests.message||engineController.stateText+" · "+engineController.nodeStateText;color:Theme.muted;font.pixelSize:Theme.fontSize(12);elide:Text.ElideRight;Layout.maximumWidth:page.width*0.55}
+            SwirlComboBox {objectName:"nodeSourceFilter";visible:page.sources.length>0;implicitWidth:Theme.dp(170);model:["全部来源"].concat(page.sources.map(s=>s.name));currentIndex:Math.max(0,page.sources.findIndex(s=>s.id===page.sourceId)+1);onActivated:page.sourceId=currentIndex>0?page.sources[currentIndex-1].id:"";Accessible.name:"筛选订阅来源"}
+            SwirlText {renderType:Text.NativeRendering;text:page.viewRows.length+" / "+page.sourceRows.length+" 个节点";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true}
+            SwirlText {renderType:Text.NativeRendering;text:engineController.tests.message||engineController.stateText+" · "+engineController.nodeStateText;color:Theme.muted;font.pixelSize:Theme.fontSize(12);elide:Text.ElideRight;Layout.maximumWidth:page.width*0.55}
         }
         RowLayout {
             Layout.fillWidth:true;Layout.fillHeight:true;spacing:Theme.dp(16)
@@ -44,44 +73,43 @@ Item {
                 Layout.fillWidth:true;Layout.preferredWidth:1;Layout.minimumWidth:Theme.dp(250);Layout.fillHeight:true;cornerRadius:Theme.independentCardRadius
                 color:Theme.surface;border.width:0
                 SwirlDataTable {
-                    id:nodeTable;objectName:"realNodeTable";minimal:true;incrementalRows:true;animateLatency:true;itemHeight:Theme.dp(40);headerHeight:Theme.tableHeaderHeight;textPixelSize:13
+                    id:nodeTable;objectName:"realNodeTable";minimal:true;managedSelection:true;incrementalRows:true;animateRowChanges:false;animateLatency:true;itemHeight:Theme.dp(40);headerHeight:Theme.tableHeaderHeight;textPixelSize:13
                     anchors.fill:parent;anchors.margins:Theme.dp(16);rows:page.viewRows;selectedId:page.selectedId
                     columns:[{key:"name",label:"节点名称",w:235},{key:"protocol",label:"协议",w:82},{key:"latency",label:"延迟",w:76},{key:"status",label:"状态",w:92}]
-                    onRowSelected:function(row){page.selectedId=row.id;engineController.chooseNode(row.id)}
-                    onRowActivated:function(row,sourceRow){nodeHero.start(sourceRow)}
+                    onRowSelected:function(row){page.selectRow(row)}
                 }
-                SwirlEmptyState {anchors.centerIn:parent;visible:page.viewRows.length===0;headline:"没有保存的节点";detail:"添加节点，或导入配置、URI 与订阅"}
+                SwirlEmptyState {anchors.centerIn:parent;visible:page.viewRows.length===0;headline:page.allNodes.length?"没有匹配的节点":"没有保存的节点";detail:page.allNodes.length?"调整搜索、协议或地区筛选。":"添加节点，或导入配置、URI 与订阅"}
             }
             ScrollView {
-                id:detailScroll;Layout.preferredWidth:Theme.dp(280);Layout.minimumWidth:Theme.dp(280);Layout.maximumWidth:Theme.dp(280);Layout.fillHeight:true;clip:true
+                id:detailScroll;Layout.preferredWidth:Theme.dp(300);Layout.minimumWidth:Theme.dp(280);Layout.maximumWidth:Theme.dp(340);Layout.fillHeight:true;clip:true
                 ScrollBar.horizontal.policy:ScrollBar.AlwaysOff;ScrollBar.vertical:SwirlScrollBar {}
                 ColumnLayout {width:detailScroll.availableWidth;spacing:Theme.dp(14)
                 Item {
                     id:summarySlot;Layout.fillWidth:true;Layout.preferredHeight:summaryBody.implicitHeight+2*Theme.cardPadding
-                    Text {anchors.centerIn:parent;visible:!nodeHero.opened&&!nodeHero.moving;text:"选择节点查看详情";color:Theme.muted;font.pixelSize:Theme.fontSize(13)}
+                    SwirlText {renderType:Text.NativeRendering;anchors.centerIn:parent;visible:!nodeHero.opened&&!nodeHero.moving;text:"选择节点查看详情";color:Theme.muted;font.pixelSize:Theme.fontSize(13)}
                 }
                 Item {
                     id:requestSlot
                     Layout.fillWidth:true;Layout.preferredHeight:requestOptions.implicitHeight+2*Theme.cardPadding
                 SwirlGlassPanel {
                     objectName:"nodeRequestSurface"
-                    parent:nodeHero.moving?page:requestSlot
-                    x:nodeHero.moving?nodeHero.cardX:0
-                    y:nodeHero.moving?nodeHero.cardY+nodeHero.cardHeight+Theme.dp(14)*nodeHero.reveal:0
-                    width:nodeHero.moving?nodeHero.cardWidth:requestSlot.width
-                    height:nodeHero.moving?requestSlot.height*nodeHero.reveal:requestSlot.height
-                    z:nodeHero.moving?59:1;clip:true
-                    visible:nodeHero.opened||nodeHero.moving;opacity:nodeHero.moving?nodeHero.reveal:1
+                    parent:requestSlot
+                    x:0
+                    y:0
+                    width:requestSlot.width
+                    height:requestSlot.height
+                    z:1;clip:true
+                    visible:nodeHero.opened;opacity:1
                     cornerRadius:Theme.independentCardRadius;color:Theme.surface;border.width:0
                     ColumnLayout {
                         id:requestOptions;x:Theme.cardPadding;y:Theme.cardPadding;width:parent.width-2*Theme.cardPadding;spacing:Theme.dp(10)
-                        Text {text:"请求与端口";color:Theme.text;font.pixelSize:Theme.fontSize(13);font.weight:Font.Medium}
-                        Text {text:"测试 URL";color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
+                        SwirlText {renderType:Text.NativeRendering;text:"请求与端口";color:Theme.text;font.pixelSize:Theme.fontSize(13);font.weight:Font.Medium}
+                        SwirlText {renderType:Text.NativeRendering;text:"测试 URL";color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
                         SwirlTextField {id:testUrl;objectName:"nodeTestUrl";Layout.fillWidth:true;text:"https://www.gstatic.com/generate_204";enabled:!engineController.nodeBusy;Accessible.name:"真实请求测试地址"}
-                        Text {text:"本机代理端口";color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
+                        SwirlText {renderType:Text.NativeRendering;text:"本机代理端口";color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
                         SwirlTextField {objectName:"nodeProxyPort";Layout.fillWidth:true;text:String(engineController.proxyPort);enabled:engineController.canStart;validator:IntValidator {bottom:1;top:65535}onEditingFinished:engineController.proxyPort=Number(text);Accessible.name:"本机代理端口"}
-                        Text {objectName:"nodeRequestState";text:engineController.tests.busy?engineController.tests.message:page.tested.time?(page.tested.success?"请求成功":"请求失败")+" · HTTP "+page.tested.http+" · "+(page.tested.latency>=0?page.tested.latency+" ms":"无延迟结果")+(page.tested.error?"\n"+page.tested.error:""):engineController.requestStateText;color:engineController.tests.busy?Theme.muted:page.tested.time?(page.tested.success?Theme.green:Theme.orange):engineController.requestSucceeded?Theme.green:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
-                        Text {text:engineController.nodeError||engineController.error;visible:text.length>0;color:Theme.orange;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
+                        SwirlText {renderType:Text.NativeRendering;objectName:"nodeRequestState";text:engineController.tests.busy?engineController.tests.message:page.tested.time?(page.tested.success?"请求成功":"请求失败")+" · HTTP "+page.tested.http+" · "+(page.tested.latency>=0?page.tested.latency+" ms":"无延迟结果")+(page.tested.error?"\n"+page.tested.error:""):engineController.requestStateText;color:engineController.tests.busy?Theme.muted:page.tested.time?(page.tested.success?Theme.green:Theme.orange):engineController.requestSucceeded?Theme.green:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
+                        SwirlText {renderType:Text.NativeRendering;text:engineController.nodeError||engineController.error;visible:text.length>0;color:Theme.orange;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
                     }
                 }
                 }
@@ -89,28 +117,34 @@ Item {
             }
         }
     }
-    SwirlNodeTransfer {id:nodeHero;objectName:"nodeHero";targetSlot:summarySlot}
+    Item {
+        id:nodeHero;objectName:"nodeHero"
+        property bool opened:true
+        readonly property bool moving:false
+        readonly property real reveal:1
+        function returnTo(row){opened=false}
+    }
     SwirlGlassPanel {
         id:nodeIdentity;objectName:"nodeIdentitySurface"
-        parent:nodeHero.moving?page:summarySlot
-        x:nodeHero.moving?nodeHero.cardX:0;y:nodeHero.moving?nodeHero.cardY:0
-        width:nodeHero.moving?nodeHero.cardWidth:summarySlot.width;height:nodeHero.moving?nodeHero.cardHeight:summarySlot.height
-        visible:nodeHero.opened||nodeHero.moving;z:nodeHero.moving?60:1;clip:true
-        cornerRadius:Theme.dp(10+10*nodeHero.reveal);color:Theme.surface;border.width:0
+        parent:summarySlot
+        x:0;y:0
+        width:summarySlot.width;height:summarySlot.height
+        visible:nodeHero.opened;z:1;clip:true
+        cornerRadius:Theme.independentCardRadius;color:Theme.surface;border.width:0
         ColumnLayout {
             id:summaryBody;x:Theme.cardPadding;y:Theme.dp(6)+(Theme.cardPadding-Theme.dp(6))*nodeHero.reveal;width:parent.width-2*Theme.cardPadding;spacing:Theme.dp(12)
             RowLayout {
                 Layout.fillWidth:true;spacing:Theme.dp(10)*nodeHero.reveal
                 SwirlIcon {name:"globe";size:Theme.dp(30);Layout.preferredWidth:Theme.dp(30)*nodeHero.reveal;opacity:nodeHero.reveal;color:Theme.accent}
-                Text {id:nodeDetailTitle;objectName:"nodeDetailTitle";text:page.selected?page.selected.name:"未选择节点";textFormat:Text.PlainText;color:Theme.text;font.family:Theme.fontFamily;font.pixelSize:Theme.fontSize(13+6*nodeHero.reveal);font.weight:Font.Medium;Layout.fillWidth:true;wrapMode:Text.Wrap;maximumLineCount:3;elide:Text.ElideRight}
+                SwirlText {renderType:Text.NativeRendering;id:nodeDetailTitle;objectName:"nodeDetailTitle";text:page.selected?page.selected.name:"未选择节点";textFormat:Text.PlainText;color:Theme.text;font.family:Theme.fontFamily;font.pixelSize:Theme.fontSize(19);font.weight:Font.Medium;Layout.fillWidth:true;wrapMode:Text.Wrap;maximumLineCount:3;elide:Text.ElideRight}
                 SwirlIconButton {objectName:"nodeReturnButton";implicitWidth:Theme.dp(24);implicitHeight:Theme.dp(26);iconName:"chevron-left";quiet:true;opacity:nodeHero.reveal;tooltip:"返回节点列表";onClicked:nodeHero.returnTo(nodeTable.selectedItem)}
             }
             ColumnLayout {
                 Layout.fillWidth:true;spacing:Theme.dp(12);opacity:Math.max(0,Math.min(1,(nodeHero.reveal-0.25)/0.65))
-                Text {text:page.selected?page.selected.protocol+" · "+page.selected.address:"选择一个节点开始连接";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.WrapAnywhere}
-                Text {text:page.selected?(page.selected.sourceFormat||"手动节点")+" · "+page.selected.capability.engine:"";color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
-                Text {text:page.selected?page.selected.normalizationNotes||"":"";visible:text.length>0;color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
-                Text {text:page.selected?((page.selected.conversionIssues||[]).join("\n")):"";visible:text.length>0;color:Theme.orange;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
+                SwirlText {renderType:Text.NativeRendering;text:page.selected?page.selected.protocol+" · "+page.selected.address:"选择一个节点开始连接";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.WrapAnywhere}
+                SwirlText {renderType:Text.NativeRendering;text:page.selected?(page.selected.sourceFormat||"手动节点")+" · "+page.selected.capability.engine:"";color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
+                SwirlText {renderType:Text.NativeRendering;text:page.selected?page.selected.normalizationNotes||"":"";visible:text.length>0;color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
+                SwirlText {renderType:Text.NativeRendering;text:page.selected?((page.selected.conversionIssues||[]).join("\n")):"";visible:text.length>0;color:Theme.orange;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
                 SwirlStatusBadge {busy:engineController.nodeBusy||engineController.tests.busy;label:engineController.activeProxyPort>0?"127.0.0.1:"+engineController.activeProxyPort:engineController.nodeStateText;tone:engineController.nodeError.length?"warning":engineController.apiHealthy?"success":"neutral"}
                 SwirlButton {objectName:"nodeConnectButton";Layout.fillWidth:true;implicitHeight:Theme.controlHeight;text:engineController.nodeBusy?"连接中…":engineController.activeNodeId===page.selectedId&&engineController.processAlive?"断开节点":"连接节点";iconName:"link";primary:true;enabled:page.selected!==null&&!engineController.nodeBusy;onClicked:{if(engineController.activeNodeId===page.selectedId&&engineController.processAlive)engineController.disconnectNode();else engineController.connectNode(page.selectedId)}}
                 RowLayout {
@@ -132,26 +166,26 @@ Item {
                 id:form;Layout.fillWidth:true;Layout.preferredHeight:Math.min(Theme.dp(380),page.height*0.6);clip:true;ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
                 ColumnLayout {
                     width:form.availableWidth;spacing:Theme.dp(10)
-                    Text {text:"名称";color:Theme.muted}
+                    SwirlText {renderType:Text.NativeRendering;text:"名称";color:Theme.muted}
                     SwirlTextField {id:nodeName;objectName:"nodeNameField";Layout.fillWidth:true;Accessible.name:"节点名称"}
                     SwirlComboBox {id:nodeProtocol;objectName:"nodeProtocolField";Layout.fillWidth:true;model:page.protocols;Accessible.name:"节点协议"}
-                    Text {text:"服务器";color:Theme.muted}
+                    SwirlText {renderType:Text.NativeRendering;text:"服务器";color:Theme.muted}
                     SwirlTextField {id:nodeHost;objectName:"nodeHostField";Layout.fillWidth:true;placeholderText:"域名或 IP";Accessible.name:"节点服务器"}
-                    Text {text:"端口";color:Theme.muted}
+                    SwirlText {renderType:Text.NativeRendering;text:"端口";color:Theme.muted}
                     SwirlTextField {id:nodePort;objectName:"nodePortField";Layout.fillWidth:true;validator:IntValidator {bottom:1;top:65535}Accessible.name:"节点端口"}
                     SwirlTextField {id:nodeUsername;objectName:"nodeUsernameField";visible:["socks5","http","ssh","mieru","gost-relay","trusttunnel"].indexOf(nodeProtocol.currentText)>=0;Layout.fillWidth:true;placeholderText:page.editingId.length?"用户名留空保留原值":"SOCKS5 用户名（可选）";echoMode:TextInput.Password;Accessible.name:"SOCKS5 用户名"}
                     SwirlTextField {id:nodePassword;objectName:"nodePasswordField";Layout.fillWidth:true;placeholderText:page.editingId.length?"密码留空保留原值":"密码 / 密钥（按协议填写）";echoMode:TextInput.Password;Accessible.name:"节点密码"}
                     RowLayout {visible:page.editingId.length>0;Layout.fillWidth:true
-                        Text {text:"替换凭据（留空可清除 SOCKS5 认证）";color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
+                        SwirlText {renderType:Text.NativeRendering;text:"替换凭据（留空可清除 SOCKS5 认证）";color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
                         SwirlToggle {id:replaceCredentials;objectName:"nodeReplaceCredentials";checked:false}
                     }
                     SwirlComboBox {id:nodeCipher;visible:nodeProtocol.currentIndex===1;Layout.fillWidth:true;editable:true;model:["aes-128-gcm","aes-256-gcm","chacha20-ietf-poly1305","2022-blake3-aes-128-gcm","2022-blake3-aes-256-gcm","2022-blake3-chacha20-poly1305"];Accessible.name:"Shadowsocks 加密方式"}
                     SwirlTextField {id:nodeSni;visible:["trojan","vmess","vless","hysteria","hysteria2","tuic","anytls","masque","trusttunnel"].indexOf(nodeProtocol.currentText)>=0;Layout.fillWidth:true;placeholderText:"TLS SNI（留空使用服务器）";Accessible.name:"Trojan SNI"}
                     SwirlTextField {id:nodeUuid;visible:["vmess","vless"].indexOf(nodeProtocol.currentText)>=0;Layout.fillWidth:true;echoMode:TextInput.Password;placeholderText:page.editingId.length?"UUID 留空保留原值":"UUID";Accessible.name:"节点 UUID"}
-                    Text {text:"协议扩展选项（JSON，留空保留已保存选项）";color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
+                    SwirlText {renderType:Text.NativeRendering;text:"协议扩展选项（JSON，留空保留已保存选项）";color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
                     SwirlTextField {id:nodeOptions;objectName:"nodeOptionsField";Layout.fillWidth:true;echoMode:TextInput.Password;placeholderText:'{"network":"ws","ws-opts":{"path":"/"}}';Accessible.name:"协议扩展选项"}
-                    Text {text:"支持 Clash、Surge、Loon、Quantumult X、sing-box 与 URI。凭据由 Windows DPAPI 保护；未映射参数会保留并阻止执行。";color:Theme.muted;font.pixelSize:Theme.fontSize(11);wrapMode:Text.Wrap;Layout.fillWidth:true}
-                    Text {text:engineController.nodeError;color:Theme.orange;font.pixelSize:Theme.fontSize(11);wrapMode:Text.Wrap;Layout.fillWidth:true}
+                    SwirlText {renderType:Text.NativeRendering;text:"支持 Clash、Surge、Loon、Quantumult X、sing-box 与 URI。凭据由 Windows DPAPI 保护；未映射参数会保留并阻止执行。";color:Theme.muted;font.pixelSize:Theme.fontSize(11);wrapMode:Text.Wrap;Layout.fillWidth:true}
+                    SwirlText {renderType:Text.NativeRendering;text:engineController.nodeError;color:Theme.orange;font.pixelSize:Theme.fontSize(11);wrapMode:Text.Wrap;Layout.fillWidth:true}
                 }
             }
             RowLayout {
@@ -172,7 +206,7 @@ Item {
             width:parent.width;spacing:Theme.dp(12)
             ScrollView {id:importForm;Layout.fillWidth:true;Layout.preferredHeight:Math.min(Theme.dp(340),page.height*0.55);clip:true;ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
                 ColumnLayout {width:importForm.availableWidth;spacing:Theme.dp(12)
-            Text {text:"配置 / Base64 / URI（仅导入节点）";color:Theme.text;Layout.fillWidth:true;wrapMode:Text.Wrap}
+            SwirlText {renderType:Text.NativeRendering;text:"配置 / Base64 / URI（仅导入节点）";color:Theme.text;Layout.fillWidth:true;wrapMode:Text.Wrap}
             RowLayout {
                 Layout.fillWidth:true
                 SwirlButton {objectName:"importClipboardButton";text:"从剪贴板导入";enabled:!engineController.imports.busy;onClicked:engineController.imports.importClipboard()}
@@ -181,9 +215,9 @@ Item {
             ScrollView {Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(130);clip:true
                 TextArea {id:importContent;objectName:"importContentField";placeholderText:"粘贴 Clash、Surge、Loon、Quantumult X、sing-box 配置或节点 URI";wrapMode:TextEdit.Wrap;font:importAddress.font;color:Theme.text;selectByMouse:true;Accessible.name:"待导入的节点配置";background:Rectangle {color:Theme.field;radius:Theme.controlRadius;border.color:Theme.border;border.width:1}}
             }
-            Text {text:"HTTPS 订阅地址（本次导入）";color:Theme.text}
+            SwirlText {renderType:Text.NativeRendering;text:"HTTPS 订阅地址（本次导入）";color:Theme.text}
             SwirlTextField {id:importAddress;Layout.fillWidth:true;echoMode:TextInput.Password;placeholderText:"https://…";Accessible.name:"一次性导入地址"}
-            Text {text:engineController.imports.message;color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
+            SwirlText {renderType:Text.NativeRendering;text:engineController.imports.message;color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
                 }
             }
             RowLayout {Layout.alignment:Qt.AlignRight

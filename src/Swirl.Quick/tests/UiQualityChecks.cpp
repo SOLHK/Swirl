@@ -15,6 +15,7 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QImage>
+#include <QFont>
 #include <functional>
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -65,14 +66,34 @@ Item { Rectangle {anchors.fill:parent;color:'#536BB4'}
         if(!image.isNull()){const int n=qRound(36*w->devicePixelRatio());int index=0;for(auto p:{QPoint(0,0),QPoint(image.width()-n,0),QPoint(0,image.height()-n),QPoint(image.width()-n,image.height()-n)})image.copy(QRect(p,QSize(n,n))).save(directory+QString("/%1-corner-%2.png").arg(name).arg(index++));}
         return image;
     };
+    auto auditText=[&](QQuickWindow *window,const QString &route) {
+        int glyphs=0,native=0,layered=0,scaled=0,small=0,wrongFamily=0;
+        std::function<void(QQuickItem *)> scan=[&](QQuickItem *item) {
+            if(!item->isVisible())return;
+            if(item->property("text").isValid() && item->property("renderType").isValid()) {
+                ++glyphs;if(item->property("renderType").toInt()==1)++native;
+                const auto font=item->property("font").value<QFont>();if(font.pixelSize()>0&&font.pixelSize()<12)++small;
+                if(font.family()!=QGuiApplication::font().family()){++wrongFamily;qInfo()<<"TEXT_FONT_MISMATCH"<<item->property("text").toString().left(30)<<font.family();}
+                for(auto *p=item;p;p=p->parentItem()) {
+                    QQmlExpression layer(qmlContext(window),p,"layer.enabled");
+                    if(layer.evaluate().toBool()){++layered;break;}
+                }
+                for(auto *p=item;p;p=p->parentItem())if(p->scale()!=1){++scaled;break;}
+            }
+            for(auto *child:item->childItems())scan(child);
+        };scan(window->contentItem());
+        qInfo()<<"TEXT_AUDIT"<<route<<"glyphs"<<glyphs<<"native"<<native<<"layered"<<layered<<"scaled"<<scaled<<"small"<<small;
+        check(glyphs>0 && glyphs==native && !layered && !scaled && !small && !wrongFamily,route+": selected font, native text >=12px, no textured or scaled glyph ancestors");
+    };
     main->resize(914,672);
-    for(const auto &route:QStringList{"activity","processes","policies","rules","capture","featurehub"}){eval(QString("AppState.navigate('%1')").arg(route));QTest::qWait(250);const auto frame=capture(main,route);
+    for(const auto &route:QStringList{"activity","overview","processes","policies","rules","capture","tls","featurehub"}){eval(QString("AppState.navigate('%1')").arg(route));QTest::qWait(250);const auto frame=capture(main,route);if(!baseline)auditText(main,route);
         if(!baseline && route=="capture"){eval("pageLoader.item.scrollToBottom()");QTest::qWait(150);capture(main,"capture-bottom");}
         if(!baseline && route=="activity" && !frame.isNull()){
             const auto ratio=main->devicePixelRatio();const auto a=frame.pixelColor(qRound(195*ratio),qRound(20*ratio)),b=frame.pixelColor(qRound(195*ratio),qRound(45*ratio));
             const int delta=qAbs(a.red()-b.red())+qAbs(a.green()-b.green())+qAbs(a.blue()-b.blue());qInfo()<<"TITLE_BAND_DELTA"<<delta;check(delta<5,"traffic lights and proxy row have no horizontal caption band");
         }
     }
+    if(!baseline){auto *events=find(main->contentItem(),"eventsCapsule");check(events&&!events->property("label").toString().contains("警告")&&events->property("tone").toString()!="warning","top capsule uses event rather than warning semantics");}
     eval("AppState.navigate('activity')");QTest::qWait(150);
     pattern->setVisible(true);QTest::qWait(200);
     const auto textFrame=capture(main,"background-text");
@@ -91,7 +112,7 @@ Item { Rectangle {anchors.fill:parent;color:'#536BB4'}
     if(!baseline){check(eval("pageLoader.item.nodePages>1").toBool(),"many nodes have explicit pages");auto *next=find(main->contentItem(),"nextNodePage");check(next&&next->isVisible()&&next->isEnabled(),"next node page is visible and operable");if(next){QTest::mouseClick(main,Qt::LeftButton,Qt::NoModifier,next->mapToScene(QPointF(next->width()/2,next->height()/2)).toPoint());QTest::qWait(100);check(eval("pageLoader.item.nodePage===1").toBool(),"pagination responds to real mouse input");capture(main,"policies-page-2");}}
     for(const auto &route:QStringList{"proxies","settings","subscriptions"}){
         eval(QString("window.openSettings('%1')").arg(route));QTest::qWait(250);auto *sheet=main->findChild<QQuickWindow *>("settingsSheet");check(sheet&&sheet->isVisible(),route+": separate HWND opens");if(!sheet)continue;
-        sheet->resize(qMin(900,area.width()-60),qMin(790,area.height()-50));capture(sheet,route=="proxies"?"nodes":route);
+        sheet->resize(qMin(900,area.width()-60),qMin(790,area.height()-50));capture(sheet,route=="proxies"?"nodes":route);if(!baseline)auditText(sheet,route);
         if(route=="proxies"&&!baseline){auto *search=find(sheet->contentItem(),"nodeSearchField"),*combo=find(sheet->contentItem(),"proxyRegionCombo");check(search&&combo&&qAbs(search->height()-combo->height())<1,"node search and protocol filter share height");}
         sheet->hide();
     }
@@ -99,6 +120,11 @@ Item { Rectangle {anchors.fill:parent;color:'#536BB4'}
     eval("Theme.mode='Dark';AppState.navigate('activity')");QTest::qWait(200);capture(main,"activity-dark");eval("Theme.transparency=false");QTest::qWait(200);
     if(!baseline)check(!backdrop->active(),"transparency off disables system material");
     capture(main,"opaque-fallback"); // stored even though material is NONE
+    if(!baseline){
+        check(eval("fontManager.selectFamily('Microsoft YaHei UI')").toBool(),"live font alternative is available");
+        eval("Theme.mode='Light';AppState.navigate('capture')");QTest::qWait(150);
+        capture(main,"capture-font-switch");auditText(main,"capture-live-font-switch");
+    }
     delete pattern;behind.hide();main->hide();
     QFile report(directory+"/quality-report.json");if(report.open(QIODevice::WriteOnly))report.write(QJsonDocument(QJsonObject{{"baseline",baseline},{"dpr",main->devicePixelRatio()},{"checks",results},{"failures",failures}}).toJson());
     qInfo()<<"UI_QUALITY_CHECKS"<<results.size()<<"failures"<<failures;return failures?2:0;

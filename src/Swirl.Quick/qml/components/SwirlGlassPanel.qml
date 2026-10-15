@@ -16,13 +16,12 @@ Rectangle {
     color: independentCard ? Theme.independentCard : Theme.material(material)
     border.width: independentCard ? 0 : Theme.borderWidth
     border.color: selected ? Theme.focusBorder : interactive && cardHover.hovered?Theme.withAlpha(Theme.focusBorder,0.35):Theme.border
-    layer.enabled: independentCard && Theme.effectsSupported
-    layer.effect: MultiEffect {
-        shadowEnabled:true
-        shadowBlur:0.25
-        shadowVerticalOffset:3
-        shadowOpacity:Theme.cardShadowOpacity
-        shadowColor:"#000000"
+    // Analytic background-only shadow: no offscreen capture of child text.
+    RectangularShadow {
+        anchors.fill: parent; z: -1
+        visible: panel.independentCard && Theme.effectsSupported
+        radius: panel.radius; blur: Theme.dp(10); offset: Qt.vector2d(0,Theme.dp(2))
+        color: Theme.withAlpha("#000000",Theme.cardShadowOpacity)
     }
     Behavior on color { ColorAnimation { duration: Theme.motion } }
 }

@@ -18,7 +18,7 @@ Item {
                 objectName:index===0?"windowCloseButton":index===1?"windowMinimizeButton":"windowMaximizeButton"
                 background:Rectangle {anchors.centerIn:parent;width:Theme.dp(14);height:width;radius:width/2;color:lamp.modelData;border.width:lamp.activeFocus?Theme.dp(2):0;border.color:Theme.focusBorder}
                 contentItem:Item {
-                    Text {anchors.centerIn:parent;visible:groupHover.hovered && lamp.index<2;text:lamp.index===0?"×":"−";font.family:Theme.fontFamily;font.pixelSize:Theme.fontSize(11);font.weight:Font.Bold;color:lamp.index===0?"#6B1510":"#6A4B00"}
+                    SwirlText {anchors.centerIn:parent;visible:groupHover.hovered && lamp.index<2;text:lamp.index===0?"×":"−";font.family:Theme.fontFamily;font.pixelSize:Theme.fontSize(11);font.weight:Font.Bold;color:lamp.index===0?"#6B1510":"#6A4B00"}
                     Canvas {
                         id:glyph;anchors.centerIn:parent;width:Theme.dp(12);height:width;visible:groupHover.hovered && lamp.index===2
                         onVisibleChanged:if(visible)requestPaint()

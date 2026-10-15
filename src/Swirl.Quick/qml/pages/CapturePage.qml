@@ -9,13 +9,13 @@ Item {
  id:page;required property var captureProvider
  function scrollToBottom(){scroll.contentItem.contentY=Math.max(0,scroll.contentItem.contentHeight-scroll.availableHeight)}
  function applyLimits(){captureProvider.setLimits([3,5,10,0][timeLimit.currentIndex],[50,100,500,0][sizeLimit.currentIndex],[100,500,1000][countLimit.currentIndex])}
- component Note:Text {color:Theme.muted;font.pixelSize:Theme.fontSize(12);lineHeight:1.35;wrapMode:Text.Wrap;Layout.fillWidth:true}
- component SectionTitle:Text {color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold;Layout.fillWidth:true}
+ component Note:SwirlText {renderType:Text.NativeRendering;color:Theme.muted;font.pixelSize:Theme.fontSize(12);lineHeight:1.5;wrapMode:Text.Wrap;Layout.fillWidth:true}
+ component SectionTitle:SwirlText {renderType:Text.NativeRendering;color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold;Layout.fillWidth:true}
  ScrollView {
   id:scroll;anchors.fill:parent;clip:true;ScrollBar.horizontal.policy:ScrollBar.AlwaysOff;ScrollBar.vertical:SwirlScrollBar {}
-  ColumnLayout {width:scroll.availableWidth;spacing:Theme.gap
+  ColumnLayout {width:scroll.availableWidth;spacing:Theme.dp(14)
    RowLayout {Layout.fillWidth:true;Layout.leftMargin:Theme.dp(24);Layout.rightMargin:Theme.dp(24);Layout.topMargin:Theme.dp(24)
-    Text {text:"捕获 HTTP 内容";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.Bold;Layout.fillWidth:true}
+    SwirlText {renderType:Text.NativeRendering;text:"捕获 HTTP 内容";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.Bold;Layout.fillWidth:true}
     SwirlToggle {objectName:"captureToggle";large:true;checked:page.captureProvider.running;onToggled:{if(checked){page.applyLimits();page.captureProvider.start(8899)}else page.captureProvider.stop()}Accessible.name:"捕获 HTTP 内容"}
    }
    Note {Layout.leftMargin:Theme.dp(24);Layout.rightMargin:Theme.dp(24);text:page.captureProvider.error||"捕获 HTTP 请求与内容。开启后会增加内存和存储开销，请仅在需要时使用；HTTPS 内容需要配合 MITM。"}
@@ -52,11 +52,11 @@ Item {
       ColumnLayout {id:limitsBody;anchors.left:parent.left;anchors.right:parent.right;anchors.top:parent.top;anchors.margins:Theme.cardPadding;spacing:Theme.dp(12)
        SectionTitle {text:"捕获限制器"}
        GridLayout {Layout.fillWidth:true;columns:2;columnSpacing:Theme.dp(8);rowSpacing:Theme.dp(12)
-        Text {text:"时间限制";color:Theme.text;font.pixelSize:Theme.fontSize(13)}
+        SwirlText {renderType:Text.NativeRendering;text:"时间限制";color:Theme.text;font.pixelSize:Theme.fontSize(13)}
         SwirlComboBox {id:timeLimit;Layout.fillWidth:true;Layout.minimumWidth:0;onActivated:page.applyLimits();model:["3 分钟","5 分钟","10 分钟","无限制"]}
-        Text {text:"尺寸限制";color:Theme.text;font.pixelSize:Theme.fontSize(13)}
+        SwirlText {renderType:Text.NativeRendering;text:"尺寸限制";color:Theme.text;font.pixelSize:Theme.fontSize(13)}
         SwirlComboBox {id:sizeLimit;Layout.fillWidth:true;Layout.minimumWidth:0;onActivated:page.applyLimits();model:["50 MB","100 MB","500 MB","无限制"]}
-        Text {text:"数量限制";color:Theme.text;font.pixelSize:Theme.fontSize(13)}
+        SwirlText {renderType:Text.NativeRendering;text:"数量限制";color:Theme.text;font.pixelSize:Theme.fontSize(13)}
         SwirlComboBox {id:countLimit;Layout.fillWidth:true;Layout.minimumWidth:0;onActivated:page.applyLimits();model:["100 请求","500 请求","1000 请求"]}
        }
        Note {text:"达到任一限制时，自动停止本次 HTTP 捕获。"}
@@ -75,5 +75,5 @@ Item {
    Item {Layout.preferredHeight:Theme.dp(24)}
   }
  }
- SwirlDialog{id:filterDialog;title:"HTTP 捕获过滤器";ColumnLayout{width:parent.width;SwirlTextField{id:captureFilter;Layout.fillWidth:true;text:page.captureProvider.filter;placeholderText:"URL 包含文本 (留空捕获全部)"}SwirlButton{text:"应用过滤器";onClicked:{page.captureProvider.filter=captureFilter.text;filterDialog.close()}}Text{text:"查看实际捕获的 HTTP 请求与 CONNECT 隧道。";color:Theme.text;font.pixelSize:Theme.fontSize(13);Layout.fillWidth:true;wrapMode:Text.WordWrap}SwirlButton{text:"打开请求面板";onClicked:{filterDialog.close();page.Window.window.openDashboard()}}}}
+ SwirlDialog{id:filterDialog;title:"HTTP 捕获过滤器";ColumnLayout{width:parent.width;SwirlTextField{id:captureFilter;Layout.fillWidth:true;text:page.captureProvider.filter;placeholderText:"URL 包含文本 (留空捕获全部)"}SwirlButton{text:"应用过滤器";onClicked:{page.captureProvider.filter=captureFilter.text;filterDialog.close()}}SwirlText {renderType:Text.NativeRendering;text:"查看实际捕获的 HTTP 请求与 CONNECT 隧道。";color:Theme.text;font.pixelSize:Theme.fontSize(13);Layout.fillWidth:true;wrapMode:Text.WordWrap}SwirlButton{text:"打开请求面板";onClicked:{filterDialog.close();page.Window.window.openDashboard()}}}}
 }

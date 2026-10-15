@@ -34,7 +34,7 @@ QVariantMap SystemDataProvider::diagnosticSnapshot() const {
         {"systemProxyError",m_engine->systemProxy()->error()},{"networkType",currentNetwork().value("type")},
         {"trafficSampled",t->sampled()},{"connectionsSampled",t->connectionsSampled()},{"activeConnections",t->activeConnections()},
         {"activeProcesses",t->activeProcesses()},{"uploadRate",t->uploadRate()},{"downloadRate",t->downloadRate()},{"today",t->summary()},
-        {"latencies",t->latencies()},{"storageError",t->storageError()},{"pendingErrors",m_diagnostics->eventCount()},
+        {"latencies",t->latencies()},{"storageError",t->storageError()},{"pendingEvents",m_diagnostics->eventCount()},
         {"loginAuthenticationVerified",false}};
 }
 QVariantMap SystemDataProvider::currentNetwork() const {

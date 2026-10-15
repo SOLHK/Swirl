@@ -1,4 +1,5 @@
 #include "ProxyNode.h"
+#include "NodeRegion.h"
 #include <QHostAddress>
 #include <QRegularExpression>
 #include <QUrl>
@@ -72,7 +73,9 @@ QStringList ProxyNode::protocols() {
         "trusttunnel","openvpn","tailscale","zerotier","easytier"};
 }
 QVariantMap ProxyNode::publicInfo() const {
+    const auto region=NodeRegion::fromName(name);
     return {{"id",id},{"name",name},{"protocol",protocol},{"host",host},{"port",port},
+        {"regionCode",region.code},{"regionName",region.name},
         {"cipher",cipher},{"serverName",serverName},{"sourceId",sourceId},{"sourceFormat",sourceFormat},
         {"configurationState",conversionIssues.isEmpty()?QStringLiteral("已解析 · 待联网测试"):QStringLiteral("已解析 · 含未支持选项")},
         {"conversionIssues",conversionIssues},{"capability",SwirlProtocolRegistry::describe(*this)},

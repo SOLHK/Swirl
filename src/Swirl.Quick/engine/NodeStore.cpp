@@ -35,6 +35,7 @@ static QByteArray protect(const QByteArray &input, bool decrypt) {
 static QJsonObject serialize(const ProxyNode &n) {
     auto result = QJsonObject::fromVariantMap(n.publicInfo());
     result.remove("capability");result.remove("configurationState");result.remove("normalizationNotes");
+    result.remove("regionCode");result.remove("regionName");
     result.remove("hasCredentials"); result.insert("username", n.username); result.insert("password", n.password);
     result.insert("options",n.parameters);
     result.insert("originalConfiguration",n.originalConfiguration);
@@ -55,9 +56,17 @@ static ProxyNode deserialize(const QVariantMap &m) {
 NodeStore::NodeStore(QString path, QObject *parent) : QObject(parent), m_path(std::move(path)) {
     if (m_path.isEmpty()) m_path=QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/nodes.dpapi";
     load();
+    // Non-secret selection sidecar. Invalid/stale IDs never override the store.
+    QFile selection(m_path+".selected");
+    if(m_healthy && selection.open(QIODevice::ReadOnly) && selection.size()<=256) {
+        const auto object=QJsonDocument::fromJson(selection.readAll()).object();
+        const auto id=object.value("selected").toString();
+        if(object.contains("selected") && (id.isEmpty() || std::any_of(m_nodes.cbegin(),m_nodes.cend(),[&](const auto &n){return n.id==id;})))m_selected=id;
+    }
 }
 QVariantList NodeStore::publicRows() const {
-    QVariantList result; for (const auto &n : m_nodes) result.append(n.publicInfo()); return result;
+    if(m_publicRows.isEmpty())for(const auto &n:m_nodes)m_publicRows.append(n.publicInfo());
+    return m_publicRows;
 }
 void NodeStore::load() {
     QFile file(m_path);
@@ -110,7 +119,7 @@ bool NodeStore::write(const QList<ProxyNode> &nodes, const QString &selected, co
     if (!file.open(QIODevice::WriteOnly) || !file.setPermissions(QFile::ReadOwner|QFile::WriteOwner) || file.write(bytes)!=bytes.size() || !file.commit()) {
         m_error=QStringLiteral("节点配置无法安全保存，旧配置保持不变。"); return false;
     }
-    m_nodes=nodes; m_selected=selected;m_subscriptions=subscriptions; m_error.clear(); emit changed(); return true;
+    m_nodes=nodes; m_publicRows.clear(); m_selected=selected;m_subscriptions=subscriptions; m_error.clear(); emit changed(); return true;
 }
 bool NodeStore::saveNode(const QVariantMap &input) {
     auto n=deserialize(input); auto nodes=m_nodes; int index=-1;
@@ -140,7 +149,15 @@ bool NodeStore::select(const QString &id) {
     if (!id.isEmpty() && std::none_of(m_nodes.begin(),m_nodes.end(),[&](const ProxyNode &n){return n.id==id;})) {
         m_error=QStringLiteral("选择的节点不存在。"); return false;
     }
-    return write(m_nodes,id,m_subscriptions);
+    if(!m_healthy){m_error=QStringLiteral("节点库无法解密；选择未保存。");return false;}
+    if(m_selected==id){m_error.clear();return true;}
+    QSaveFile file(m_path+".selected");
+    const auto bytes=QJsonDocument(QJsonObject{{"selected",id}}).toJson(QJsonDocument::Compact);
+    if(!QDir().mkpath(QFileInfo(m_path).absolutePath()) || !file.open(QIODevice::WriteOnly) ||
+       !file.setPermissions(QFile::ReadOwner|QFile::WriteOwner) || file.write(bytes)!=bytes.size() || !file.commit()){
+        m_error=QStringLiteral("无法保存节点选择，原选择保持不变。");return false;
+    }
+    m_selected=id;m_error.clear();emit selectionChanged();return true;
 }
 bool NodeStore::allowedSubscriptionUrl(const QUrl &url) {
     const bool secure=url.scheme()=="https";

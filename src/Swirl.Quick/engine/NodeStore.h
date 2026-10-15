@@ -34,11 +34,13 @@ public:
     static bool allowedSubscriptionUrl(const QUrl &url);
 signals:
     void changed();
+    void selectionChanged();
 private:
     bool write(const QList<ProxyNode> &nodes, const QString &selected, const QList<NodeSubscription> &subscriptions);
     void load();
     QString m_path, m_selected, m_error;
     QList<ProxyNode> m_nodes;
+    mutable QVariantList m_publicRows;
     QList<NodeSubscription> m_subscriptions;
     bool m_healthy = true;
 };

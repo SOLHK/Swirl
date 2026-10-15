@@ -3,6 +3,8 @@ import QtQuick.Controls
 import SwirlQuick
 import "../components"
 TextField {
+    renderType:TextInput.NativeRendering
+    font.hintingPreference:Font.PreferFullHinting
     id: control
     property bool borderless:false
     implicitHeight:Theme.controlHeight
@@ -30,7 +32,7 @@ TextField {
         Behavior on color { ColorAnimation { duration: Theme.motion } }
         Behavior on border.color { ColorAnimation { duration: Theme.motion } }
     }
-    Text { visible:control.objectName === "pageSearch" && control.width > Theme.dp(130); anchors.right:parent.right; anchors.rightMargin:Theme.dp(12); anchors.verticalCenter:parent.verticalCenter; text:"Ctrl+K"; color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
+    SwirlText { visible:control.objectName === "pageSearch" && control.width > Theme.dp(130); anchors.right:parent.right; anchors.rightMargin:Theme.dp(12); anchors.verticalCenter:parent.verticalCenter; text:"Ctrl+K"; color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
     SwirlIcon {
         anchors.left: parent.left; anchors.leftMargin:Theme.dp(8)
         anchors.verticalCenter: parent.verticalCenter

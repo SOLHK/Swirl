@@ -8,6 +8,7 @@ Item {
     property var columns:[{key:"name",label:"名称",w:220}]
     property var rows:[]
     property bool incrementalRows:false
+    property bool managedSelection:false
     property bool animateRowChanges:true
     property bool animateLatency:false
     property bool minimal:false
@@ -30,9 +31,7 @@ Item {
     signal rowActivated(var record, Item titleItem)
     signal rowEdited(var record, Item rowItem)
     clip:true
-    layer.enabled:Theme.effectsSupported && !minimal
-    layer.effect:MultiEffect { maskEnabled:true; maskSource:cornerMask }
-    SwirlContinuousSurface { id:cornerMask; anchors.fill:parent; radius:Theme.tableRadius; layer.enabled:true; visible:false; color:"white" }
+    // Rectangular viewport clipping keeps glyphs on the native render path.
     SwirlContinuousSurface { anchors.fill:parent; visible:!table.minimal; radius:Theme.tableRadius; color:"transparent"; border.width:Theme.borderWidth; border.color:Theme.border; z:10 }
     Flickable {
         id:horizontal
@@ -47,7 +46,7 @@ Item {
             Rectangle {
                 width:parent.width; height:table.headerHeight
                 color:Theme.field
-                radius: table.minimal ? Theme.tableRadius : 0
+                radius: Theme.tableRadius
                 Row {
                     anchors.fill:parent
                     Repeater {
@@ -55,7 +54,7 @@ Item {
                         delegate:Item {
                             width:table.columnWidth(modelData); height:table.headerHeight
                             Rectangle{visible:index>0 && !table.minimal;x:0;y:Theme.dp(5);width:Theme.dp(1);height:parent.height-Theme.dp(10);color:Theme.border}
-                            Text {
+                            SwirlText {renderType:Text.NativeRendering;
                                 text:AppState.zh(modelData.label)
                                 color:table.minimal?Theme.muted:Theme.text
                                 font.pixelSize:Theme.fontSize(table.headerPixelSize)
@@ -102,7 +101,7 @@ Item {
                             model:table.columns
                             delegate:Item {
                                 width:table.columnWidth(modelData); height:table.itemHeight
-                                Text {
+                                SwirlText {renderType:Text.NativeRendering;
                                     anchors.fill:parent
                                     anchors.leftMargin:table.cellPadding; anchors.rightMargin:Theme.dp(8)
                                     id:cell
@@ -129,7 +128,7 @@ Item {
                         acceptedButtons:Qt.LeftButton|Qt.RightButton
                         onClicked:function(event){
                             table.selectedItem=recordRow
-                            if(!table.incrementalRows)table.selectedId=String(recordRow.record.id||recordRow.record.name)
+                            if(!table.incrementalRows&&!table.managedSelection)table.selectedId=String(recordRow.record.id||recordRow.record.name)
                             table.rowSelected(recordRow.record)
                             if(event.button===Qt.LeftButton)table.rowActivated(recordRow.record,table.minimal?recordRow:recordRow.titleElement)
                             if(event.button===Qt.RightButton) contextMenu.popup()

@@ -20,7 +20,7 @@ Item {
         anchors.fill:parent; anchors.margins:Theme.dp(23); spacing:Theme.dp(13)
         RowLayout {
             Layout.fillWidth:true
-            Text { text:"此页为请求调试；查看真实会话请进入抓包。"; color:Theme.muted; font.pixelSize:Theme.fontSize(14); Layout.fillWidth:true }
+            SwirlText { text:"此页为请求调试；查看真实会话请进入抓包。"; color:Theme.muted; font.pixelSize:Theme.fontSize(14); Layout.fillWidth:true }
             SwirlButton { text:"打开真实抓包"; iconName:"capture"; font.pixelSize:Theme.fontSize(15); onClicked:AppState.navigate("capture") }
         }
         RowLayout {
@@ -33,7 +33,7 @@ Item {
         RowLayout {
             Layout.fillWidth:true
             SwirlStatusBadge { label:"研发中"; tone:"accent" }
-            Text { text:displayRows.length+" 条本地"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
+            SwirlText { text:displayRows.length+" 条本地"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
             SwirlButton { text:AppState.zh("Record"); iconName:"play"; onClicked:AppState.notice("抓包记录") }
             SwirlButton { text:AppState.zh("Clear"); onClicked:{selected=null;AppState.notice("清空抓包")} }
         }
@@ -69,8 +69,8 @@ Item {
                 anchors.fill:parent; anchors.margins:Theme.dp(12); spacing:Theme.dp(6)
                 RowLayout {
                     Layout.fillWidth:true
-                    Text { text:AppState.zh("耗时明细尚未采集"); color:Theme.text; font.pixelSize:Theme.fontSize(13); font.weight:Font.DemiBold; Layout.fillWidth:true }
-                    Text { text:AppState.zh("0           100           200           300 ms"); color:Theme.muted; font.pixelSize:Theme.fontSize(10) }
+                    SwirlText { text:AppState.zh("耗时明细尚未采集"); color:Theme.text; font.pixelSize:Theme.fontSize(13); font.weight:Font.DemiBold; Layout.fillWidth:true }
+                    SwirlText { text:AppState.zh("0           100           200           300 ms"); color:Theme.muted; font.pixelSize:Theme.fontSize(10) }
                 }
                 ListView {
                     add: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";from:0;to:1;duration:SwirlMotion.duration} }
@@ -81,7 +81,7 @@ Item {
                     model:[]
                     delegate:RowLayout {
                         width:ListView.view.width; height:Theme.dp(20); spacing:Theme.dp(10)
-                        Text {
+                        SwirlText {
                             Layout.preferredWidth:Theme.dp(180)
                             text:modelData.method+" "+modelData.path
                             font.pixelSize:Theme.fontSize(10); color:Theme.muted; elide:Text.ElideRight
@@ -96,7 +96,7 @@ Item {
                                 opacity:0.8
                             }
                         }
-                        Text { text:modelData.duration; Layout.preferredWidth:Theme.dp(54); font.pixelSize:Theme.fontSize(10); color:Theme.muted }
+                        SwirlText { text:modelData.duration; Layout.preferredWidth:Theme.dp(54); font.pixelSize:Theme.fontSize(10); color:Theme.muted }
                     }
                 }
             }
@@ -107,7 +107,7 @@ Item {
                 text:page.waterfallOpen?"隐藏瀑布图":"显示瀑布图"
                 iconName:"chart"; quiet:false; onClicked:page.waterfallOpen=!page.waterfallOpen
             }
-            Text { text:"研发中"; color:Theme.muted; font.pixelSize:Theme.fontSize(11); Layout.fillWidth:true }
+            SwirlText { text:"研发中"; color:Theme.muted; font.pixelSize:Theme.fontSize(11); Layout.fillWidth:true }
             SwirlButton { text:AppState.zh("Replay"); onClicked:AppState.currentPage="replay" }
             SwirlButton { text:AppState.zh("Breakpoint"); onClicked:AppState.currentPage="breakpoint" }
         }

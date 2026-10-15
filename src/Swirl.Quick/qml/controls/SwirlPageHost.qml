@@ -35,6 +35,7 @@ Item {
     property bool initialized: false
     clip: moving
     Item { id:viewport; anchors.fill:parent; clip:host.contained || host.moving }
+    function snap(value) { return Math.round(value*Screen.devicePixelRatio)/Screen.devicePixelRatio }
     function pageOffset(route) { return route === "overview" || route === "activity" ? 0 : Theme.dp(0) }
     function releaseShared() {
         if (SwirlMotion.shared && SwirlMotion.shared.grabId) motionPolicy.releaseGrab(SwirlMotion.shared.grabId)
@@ -87,9 +88,9 @@ Item {
         Loader { parent:viewport; property string routeId; x:0; y:host.pageOffset(routeId); width:host.width; height:host.height-host.pageOffset(routeId); visible:false }
     }
     Binding { target:host.activeLoader; property:"opacity"; value:host.moving ? host.position : 1; when:host.activeLoader!==null }
-    Binding { target:host.activeLoader; property:"y"; value:host.activeLoader ? host.pageOffset(host.activeLoader.routeId)+(host.moving?AppState.navigationDirection*Theme.dp(6)*(1-host.position):0) : 0; when:host.activeLoader!==null }
+    Binding { target:host.activeLoader; property:"y"; value:host.activeLoader ? host.snap(host.pageOffset(host.activeLoader.routeId)+(host.moving?AppState.navigationDirection*Theme.dp(6)*(1-host.position):0)) : 0; when:host.activeLoader!==null }
     Binding { target:host.leavingLoader; property:"opacity"; value:1-host.position; when:host.leavingLoader!==null }
-    Binding { target:host.leavingLoader; property:"y"; value:host.leavingLoader ? host.pageOffset(host.leavingLoader.routeId)-AppState.navigationDirection*Theme.dp(3)*host.position : 0; when:host.leavingLoader!==null }
+    Binding { target:host.leavingLoader; property:"y"; value:host.leavingLoader ? host.snap(host.pageOffset(host.leavingLoader.routeId)-AppState.navigationDirection*Theme.dp(3)*host.position) : 0; when:host.leavingLoader!==null }
     NumberAnimation { id:travel; target:host; property:"progress"; from:0; to:1; duration:SwirlMotion.pageDuration; easing.type:Easing.OutCubic; onFinished:host.finish() }
     SwirlHeroTitle {id:hero;anchors.fill:parent}
 }

@@ -51,8 +51,8 @@ Item {
                 anchors.fill:parent; anchors.margins:Theme.dp(18)
                 ColumnLayout {
                     Layout.fillWidth:true; spacing:Theme.dp(6)
-                    Text { text:AppState.page(page.pageId).title+"工作区"; color:Theme.text; font.pixelSize:Theme.fontSize(20); font.weight:Font.DemiBold }
-                    Text { text:featureList.length+" 个功能区域研发中，保留布局供后续接入。"; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
+                    SwirlText { text:AppState.page(page.pageId).title+"工作区"; color:Theme.text; font.pixelSize:Theme.fontSize(20); font.weight:Font.DemiBold }
+                    SwirlText { text:featureList.length+" 个功能区域研发中，保留布局供后续接入。"; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
                 }
                 SwirlStatusBadge { label:"研发中"; tone:"warning" }
                 SwirlButton { development:true; enabled:false; text:"新建"; primary:true; onClicked:addDialog.open() }
@@ -64,7 +64,7 @@ Item {
             visible:pageId==="dashboard"||pageId==="traffic"
             ColumnLayout {
                 anchors.fill:parent; anchors.margins:Theme.dp(16)
-                Text { text:"流量详情 · 研发中"; color:Theme.text; font.pixelSize:Theme.fontSize(15); font.weight:Font.DemiBold }
+                SwirlText { text:"流量详情 · 研发中"; color:Theme.text; font.pixelSize:Theme.fontSize(15); font.weight:Font.DemiBold }
                 SwirlTrafficChart { Layout.fillWidth:true; Layout.fillHeight:true }
             }
         }
@@ -99,9 +99,9 @@ Item {
                     ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
                     ColumnLayout {
                     width:detailScroll0.availableWidth; height:Math.max(implicitHeight,detailScroll0.availableHeight); spacing:Theme.dp(11)
-                    Text { text:"模块详情"; color:Theme.text; font.pixelSize:Theme.fontSize(16); font.weight:Font.DemiBold }
-                    Text { text:page.selected; color:Theme.accent; font.pixelSize:Theme.fontSize(14); font.weight:Font.DemiBold; Layout.fillWidth:true; wrapMode:Text.WordWrap }
-                    Text { text:"功能"; font.pixelSize:Theme.fontSize(10); color:Theme.muted }
+                    SwirlText { text:"模块详情"; color:Theme.text; font.pixelSize:Theme.fontSize(16); font.weight:Font.DemiBold }
+                    SwirlText { text:page.selected; color:Theme.accent; font.pixelSize:Theme.fontSize(14); font.weight:Font.DemiBold; Layout.fillWidth:true; wrapMode:Text.WordWrap }
+                    SwirlText { text:"功能"; font.pixelSize:Theme.fontSize(10); color:Theme.muted }
                     ScrollView {
                         Layout.fillWidth:true
                         Layout.preferredHeight:Math.min(Theme.dp(260),page.height*0.34)
@@ -112,7 +112,7 @@ Item {
                                 model:page.featureList
                                 RowLayout {
                                     Layout.fillWidth:true
-                                    Text {
+                                    SwirlText {
                                         Layout.fillWidth:true
                                         text:modelData; color:Theme.text; font.pixelSize:Theme.fontSize(12); elide:Text.ElideRight
                                         MouseArea { anchors.fill:parent; onClicked:page.selected=modelData }
@@ -122,7 +122,7 @@ Item {
                             }
                         }
                     }
-                    Text { text:"编辑器 / 输出"; color:Theme.muted; font.pixelSize:Theme.fontSize(10) }
+                    SwirlText { text:"编辑器 / 输出"; color:Theme.muted; font.pixelSize:Theme.fontSize(10) }
                     Rectangle {
                         Layout.fillWidth:true; Layout.fillHeight:true
                         color:Theme.field; radius:Theme.roundedRadius(width,height); border.color:Theme.border
@@ -152,7 +152,7 @@ Item {
         title:"创建记录"
         ColumnLayout {
             width:parent.width; spacing:Theme.dp(13)
-            Text { text:"记录名称"; color:Theme.text }
+            SwirlText { text:"记录名称"; color:Theme.text }
             SwirlTextField { id:nameField; Layout.fillWidth:true; placeholderText:"请输入名称" }
             RowLayout {
                 Layout.alignment:Qt.AlignRight

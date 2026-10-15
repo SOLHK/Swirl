@@ -38,7 +38,7 @@ Menu {
             SwirlPressMotion{}
             text: AppState.zh(String(modelData))
             height:Theme.dp(36)
-            contentItem: Text {
+            contentItem: SwirlText {
                 text: parent.text; color: Theme.text
                 font.pixelSize:Theme.fontSize(12); font.family: Theme.fontFamily
                 leftPadding:Theme.dp(12); verticalAlignment: Text.AlignVCenter

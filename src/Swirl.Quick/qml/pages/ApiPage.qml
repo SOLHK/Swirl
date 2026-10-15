@@ -19,8 +19,8 @@ Item {
                 SwirlIcon { name:"terminal"; size:Theme.dp(31); color:Theme.accent }
                 ColumnLayout {
                     Layout.fillWidth:true; spacing:Theme.dp(6)
-                    Text { text:"本地控制 API"; font.pixelSize:Theme.fontSize(20); color:Theme.text; font.weight:Font.DemiBold }
-                    Text { text:"API 未启动 · 命令行仅提供参考"; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
+                    SwirlText { text:"本地控制 API"; font.pixelSize:Theme.fontSize(20); color:Theme.text; font.weight:Font.DemiBold }
+                    SwirlText { text:"API 未启动 · 命令行仅提供参考"; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
                 }
                 SwirlStatusBadge { label:"研发中"; tone:"warning" }
             }
@@ -49,12 +49,12 @@ Item {
                 ColumnLayout {
                     visible:page.tab!=="API 管理"
                     anchors.fill:parent; anchors.margins:Theme.dp(18); spacing:Theme.dp(15)
-                    Text { text:AppState.zh(page.tab); color:Theme.text; font.pixelSize:Theme.fontSize(17); font.weight:Font.DemiBold }
+                    SwirlText { text:AppState.zh(page.tab); color:Theme.text; font.pixelSize:Theme.fontSize(17); font.weight:Font.DemiBold }
                     Repeater {
                         model:[]
                         RowLayout {
                             Layout.fillWidth:true
-                            Text { text:modelData; color:Theme.text; font.family:"Cascadia Code"; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
+                            SwirlText { text:modelData; color:Theme.text; font.family:"Cascadia Code"; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
                             SwirlButton { development:true; enabled:false; text:"预览"; onClicked:AppState.notice("命令行 / API ") }
                         }
                     }
@@ -68,10 +68,10 @@ Item {
                     ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
                     ColumnLayout {
                     width:detailScroll0.availableWidth; height:Math.max(implicitHeight,detailScroll0.availableHeight); spacing:Theme.dp(12)
-                    Text { text:"请求"; color:Theme.text; font.pixelSize:Theme.fontSize(16); font.weight:Font.DemiBold }
+                    SwirlText { text:"请求"; color:Theme.text; font.pixelSize:Theme.fontSize(16); font.weight:Font.DemiBold }
                     SwirlComboBox { id:methodInput; Layout.fillWidth:true; model:["GET","POST","PUT","DELETE"] }
                     SwirlTextField { id:pathInput; Layout.fillWidth:true; text:"/v1/status" }
-                    Text { text:"JSON 响应预览"; color:Theme.muted; font.pixelSize:Theme.fontSize(10) }
+                    SwirlText { text:"JSON 响应预览"; color:Theme.muted; font.pixelSize:Theme.fontSize(10) }
                     Rectangle {
                         Layout.fillWidth:true; Layout.fillHeight:true
                         radius:Theme.roundedRadius(width,height); color:Theme.field; border.color:Theme.border
@@ -95,13 +95,13 @@ Item {
         id:settingsDialog; title:"本地 API 设置"
         ColumnLayout {
             width:parent.width; spacing:Theme.dp(12)
-            Text { text:"监听地址"; color:Theme.text }
+            SwirlText { text:"监听地址"; color:Theme.text }
             SwirlTextField { Layout.fillWidth:true; text:"127.0.0.1"; readOnly:true }
-            Text { text:"端口"; color:Theme.text }
+            SwirlText { text:"端口"; color:Theme.text }
             SwirlTextField { Layout.fillWidth:true; text:"6170"; validator:IntValidator { bottom:1024; top:65535 } }
             RowLayout {
                 Layout.fillWidth:true
-                Text { text:"允许 API 请求（仅界面开关）"; Layout.fillWidth:true; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
+                SwirlText { text:"允许 API 请求（仅界面开关）"; Layout.fillWidth:true; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
                 SwirlToggle { enabled:false;checked:false; onToggled:AppState.notice("API 监听服务") }
             }
 

@@ -12,10 +12,10 @@ Item {
  Rectangle{y:Theme.dp(66);width:parent.width;height:parent.height-y-Theme.dp(40);color:Theme.dark?Theme.primaryContainer:"#F9F9F9";z:-1}
  property int serverMode:0;property var hostRows:[];property string selectedId:""
  Component.onCompleted:{const config=engineController.dnsConfiguration;serverMode=config.mode||0;serverAddress.text=config.servers||"";encryptedUrl.text=config.encrypted||"";hostRows=config.hosts||[];readHosts.checked=config.useHosts!==false;respectRules.checked=config.respectRules===true}
- component Label:Text{color:Theme.text;font.pixelSize:Theme.fontSize(13)}
- component Note:Text{color:Theme.muted;font.pixelSize:Theme.fontSize(11);lineHeightMode:Text.FixedHeight;lineHeight:Theme.dp(14);wrapMode:Text.WordWrap;width:parent.width}
+ component Label:SwirlText {color:Theme.text;font.pixelSize:Theme.fontSize(13)}
+ component Note:SwirlText {color:Theme.muted;font.pixelSize:Theme.fontSize(11);lineHeightMode:Text.FixedHeight;lineHeight:Theme.dp(14);wrapMode:Text.WordWrap;width:parent.width}
  component Group:Rectangle{radius:Theme.subCardRadius;color:Theme.field}
- Text{x:Theme.dp(24);y:Theme.dp(18);text:"DNS";color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold}
+ SwirlText {x:Theme.dp(24);y:Theme.dp(18);text:"DNS";color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold}
  Note{x:Theme.dp(24);y:Theme.dp(43);text:"本地 DNS 映射和 DNS 相关设置。"}
  Rectangle{y:Theme.dp(66);width:parent.width;height:Theme.dp(1);color:Theme.border}
  Flickable{id:dnsBody;objectName:"motion-dns-scroll";y:Theme.dp(66);width:parent.width;height:parent.height-y-Theme.dp(40);clip:true;contentWidth:width;contentHeight:Math.max(height,Theme.dp(642));boundsBehavior:Flickable.StopAtBounds
@@ -28,7 +28,7 @@ Item {
     Repeater{model:["使用系统 DNS 服务器","使用系统 DNS 服务器和额外的服务器","使用自定义的服务器"]
      RadioButton{objectName:"dnsMode-"+index;required property string modelData;required property int index;text:modelData;checked:page.serverMode===index;onClicked:page.serverMode=index;implicitHeight:Theme.dp(24);font.pixelSize:Theme.fontSize(13);padding:0;spacing:Theme.dp(6)
       indicator:Rectangle{Behavior on color{ColorAnimation{duration:SwirlMotion.switchDuration}}width:Theme.dp(16);height:width;radius:width/2;color:parent.checked?Theme.accent:"#DEDEDF";anchors.verticalCenter:parent.verticalCenter;Rectangle{opacity:parent.parent.checked?1:0;Behavior on opacity{NumberAnimation{duration:SwirlMotion.switchDuration}}anchors.centerIn:parent;width:Theme.dp(5);height:width;radius:width/2;color:"white"}}
-      contentItem:Text{text:parent.text;leftPadding:Theme.dp(22);color:Theme.text;font.pixelSize:Theme.fontSize(13);verticalAlignment:Text.AlignVCenter}}
+      contentItem:SwirlText {text:parent.text;leftPadding:Theme.dp(22);color:Theme.text;font.pixelSize:Theme.fontSize(13);verticalAlignment:Text.AlignVCenter}}
     }
     SwirlTextField{id:serverAddress;objectName:"dnsServerAddress";width:parent.width;height:Theme.dp(26);placeholderText:"服务器地址 (逗号分隔)";font.pixelSize:Theme.fontSize(12)}
    }

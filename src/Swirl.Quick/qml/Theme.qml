@@ -51,14 +51,14 @@ QtObject {
     readonly property color pillRim: dark ? "#4D5C73" : "#CCD8EB"
     readonly property color pillTop: dark ? "#333333" : "#E5E5E7"
     readonly property color pillBottom: pillTop
-    readonly property color text: dark ? "#DDDDDD" : "#202327"
+    readonly property color text: dark ? "#F0F2F5" : "#202327"
     readonly property color magenta: "#D92DF3"
     readonly property color cyan: "#06B5F4"
-    readonly property color muted: dark ? "#AAB8CA" : "#596C80"
-    readonly property color accent: dark ? "#80B7FF" : "#007AFF"
+    readonly property color muted: dark ? "#B8C4D4" : "#465A70"
+    readonly property color accent: dark ? "#80B7FF" : "#0066CC"
     readonly property color accentIndigo: "#5856D6"
     readonly property color speedAccent: dark ? "#80B7FF" : "#007AFF"
-    readonly property color primaryControl: dark ? "#2165AF" : "#007AFF"
+    readonly property color primaryControl: dark ? "#2165AF" : "#0068D9"
     readonly property color navigationAccent: dark ? "#9AC8FF" : "#007AFF"
     readonly property color navigationSelected: withAlpha(dark ? "#FFFFFF" : "#000000", dark ? 0.12 : 0.05)
     readonly property color navigationPressed: dark ? "#636871" : "#B4BAC3"
@@ -92,7 +92,7 @@ QtObject {
     readonly property real secondaryRadius: popupRadius
     readonly property real controlRadius: dp(8)
     readonly property real buttonRadius: controlRadius
-    readonly property real sidebarWidth: dp(200)
+    readonly property real sidebarWidth: dp(208)
     readonly property real pageInset: dp(6)
     readonly property real space: dp(4)
     readonly property real cardPadding: dp(20)
@@ -107,7 +107,7 @@ QtObject {
     readonly property real gap: dp(16)
     readonly property real windowMinimumWidth: dp(914)
     readonly property real windowMinimumHeight: dp(672)
-    readonly property real sidebarRowHeight: dp(38)
+    readonly property real sidebarRowHeight: dp(40)
     readonly property real sidebarRowInset: dp(10)
     readonly property real sidebarRowRadius: dp(8)
     readonly property real mainContainerShadowOpacity: 0.10
@@ -115,8 +115,8 @@ QtObject {
     readonly property real borderWidth: dp(1)
     readonly property real shadowOpacity: 0.05
     readonly property string fontFamily: fontManager.currentFamily
-    function dp(value) { return value === 0 ? 0 : Math.round(value * uiScale * 100) / 100 }
-    function fontSize(value) { return Math.max(11, Math.round(dp(value))) }
+    function dp(value) { return value === 0 ? 0 : Math.round(value * uiScale) }
+    function fontSize(value) { return Math.max(12, Math.round(dp(value))) }
     function setScalePercent(percent) {
         appearanceSettings.followSystemScale = false
         appearanceSettings.savedScalePercent = Math.max(75, Math.min(150, Math.round(percent)))

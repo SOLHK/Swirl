@@ -31,7 +31,7 @@
 int runHeroChecks(QQuickWindow *window,EngineController *controller,const QString &directory) {
  if(!window||!controller)return 3;QDir().mkpath(directory);
  auto wait=[](int milliseconds){QEventLoop loop;QTimer timer;timer.setTimerType(Qt::PreciseTimer);timer.setSingleShot(true);QObject::connect(&timer,&QTimer::timeout,&loop,&QEventLoop::quit);timer.start(milliseconds);loop.exec();};
- QJsonArray checks;int failures=0;
+ QJsonArray checks;int failures=0;QJsonArray nodeClickMs;
  auto check=[&](bool value,const QString &name){checks.append(QJsonObject{{"name",name},{"passed",value}});if(!value)++failures;qInfo()<<"HERO_CHECK"<<name<<value;};
  auto eval=[&](const QString &code){QQmlExpression expression(qmlContext(window),window,code);auto result=expression.evaluate();if(expression.hasError()){++failures;qWarning()<<expression.error();}return result;};
  std::function<QQuickItem *(QQuickItem *,const QString &)> find;
@@ -75,7 +75,7 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
  click("expandSubscription-"+subscriptionId);wait(50);
  check(card&&card->height()>collapsed&&card->property("reveal").toDouble()>0,"subscription expands its actual boundary immediately");
  record("subscription-open");check(card&&card==item("subscriptionCard-"+subscriptionId)&&card->property("expanded").toBool(),"expanded subscription keeps the same delegate and stable ID");
- click("expandSubscription-"+subscriptionId);record("subscription-return");check(card&&qAbs(card->height()-collapsed)<0.5,"subscription returns to its original boundary");
+ click("expandSubscription-"+subscriptionId);record("subscription-return");check(QTest::qWaitFor([&]{return card&&!card->property("moving").toBool()&&qAbs(card->height()-collapsed)<0.5;},1000),"subscription returns to its original boundary");
  for(int i=0;i<8;++i){click("expandSubscription-"+subscriptionId);wait(15);}wait(350);
  check(card&&card==item("subscriptionCard-"+subscriptionId)&&!card->property("moving").toBool(),"rapid subscription reversals settle without replacement or a stuck clock");
  eval("Theme.reduceMotion=true");click("expandSubscription-"+subscriptionId);check(card&&!card->property("moving").toBool()&&card->property("reveal").toDouble()==1,"reduced motion commits final geometry directly");eval("Theme.reduceMotion=false");
@@ -84,23 +84,33 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
  route("proxies");auto table=item("realNodeTable");
  check(table&&eval("pageLoader.item.viewRows.length===180").toBool(),"node list exposes all 180 records");
  if(table){auto point=[&](int row){return table->mapToScene(QPointF(65,table->property("headerHeight").toDouble()+table->property("itemHeight").toInt()*(row+0.5))).toPoint();};
-  QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,point(1));wait(60);auto hero=item("nodeHero");auto identity=item("nodeIdentitySurface");
-  qInfo()<<"NODE_SURFACE"<<table->size()<<(identity?identity->size():QSizeF())<<(hero?hero->property("moving"):QVariant())<<(hero?hero->property("origin"):QVariant());
+  QElapsedTimer response;response.start();
+  QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,point(1));
+  const double dispatchMs=response.nsecsElapsed()/1000000.0;nodeClickMs.append(dispatchMs);
+  auto hero=item("nodeHero");auto identity=item("nodeIdentitySurface");auto requestSurface=item("nodeRequestSurface");
   check(controller->selectedNodeName()=="Fixture node 001","node selection reaches the actual clicked row");
-  check(hero&&hero->property("moving").toBool()&&identity&&identity->height()>table->property("itemHeight").toInt()&&table->scale()==1,"the actual local node card expands from the selected row while the table and wallpaper stay stationary");record("node-local");
-  // Start another real transfer and inspect both surfaces while it is moving.
-  QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,point(2));wait(60);
-  auto requestSurface=item("nodeRequestSurface");
-  check(hero&&hero->property("moving").toBool()&&requestSurface&&requestSurface->isVisible()&&requestSurface->opacity()>0&&requestSurface->opacity()<1&&identity&&requestSurface->y()>=identity->y()+identity->height(),"node identity and request surfaces share one continuous transition");
-  check(identity&&identity==item("nodeIdentitySurface"),"node detail uses the same real card and controls throughout the transfer");
-  for(int i=0;i<10;++i){QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,point(i%6));wait(12);}wait(350);
-  check(item("nodeDetailTitle")&&item("nodeDetailTitle")->property("text").toString()==controller->selectedNodeName(),"rapid node selection displays the latest real selection");
-  check(table->scale()==1&&hero&&!hero->property("moving").toBool()&&eval("motionPolicy.activeGrabCount===0 && SwirlTransitionRegistry.activeCount===0").toBool(),"local transition releases its references with zero table textures");
-  click("nodeReturnButton");record("node-return");wait(350);
-  check(hero&&!hero->property("opened").toBool()&&!hero->property("moving").toBool(),"node detail card returns to its selected row and restores the list");
-  QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,point(3));wait(350);
+  check(item("nodeDetailTitle")&&item("nodeDetailTitle")->property("text").toString()==controller->selectedNodeName(),"detail title updates in the click handler without an animation wait");
+  check(hero&&!hero->property("moving").toBool()&&identity&&requestSurface&&identity->isVisible()&&requestSurface->isVisible()&&requestSurface->opacity()==1,"identity and request controls are immediately visible at full opacity");
+  check(dispatchMs<100,"180-node click dispatch completes within 100 ms");
+  qInfo()<<"NODE_CLICK_DISPATCH_MS"<<dispatchMs;record("node-local");
+  const auto identityRect=identity?QRectF(identity->position(),identity->size()):QRectF();
+  double slowest=dispatchMs;
+  for(int i=0;i<10;++i){response.restart();QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,point(i%6));const auto ms=response.nsecsElapsed()/1000000.0;nodeClickMs.append(ms);slowest=qMax(slowest,ms);wait(12);}
+  check(item("nodeDetailTitle")&&item("nodeDetailTitle")->property("text").toString()==controller->selectedNodeName(),"rapid selection keeps the latest clicked node");
+  check(identity&&identity==item("nodeIdentitySurface")&&QRectF(identity->position(),identity->size())==identityRect,"rapid selection reuses the fixed inspector geometry");
+  check(slowest<100,"all rapid node click dispatches complete within 100 ms");qInfo()<<"NODE_CLICK_MAX_MS"<<slowest;
+  check(table->scale()==1&&eval("motionPolicy.activeGrabCount===0 && SwirlTransitionRegistry.activeCount===0").toBool(),"node selection creates no table textures or shared-flight resources");
+  click("nodeReturnButton");record("node-return");
+  check(hero&&!hero->property("opened").toBool(),"return closes the inspector immediately");
+  QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,point(3));wait(50);
  }
  snapshot("nodes-180");check(!controller->processAlive(),"rendering fixture selection never starts a proxy or fabricates a connection");
+ if(auto *search=item("nodeSearchField")) {
+  QElapsedTimer filter;filter.start();search->setProperty("text","179");const double filterMs=filter.nsecsElapsed()/1000000.0;
+  check(eval("pageLoader.item.viewRows.length===1 && pageLoader.item.viewRows[0].name==='Fixture node 179'").toBool(),"tail search prunes a large prefix and keeps the real node ID");
+  check(filterMs<100,"180-node tail filter updates within 100 ms");qInfo()<<"NODE_FILTER_DISPATCH_MS"<<filterMs;
+  search->setProperty("text","");check(eval("pageLoader.item.viewRows.length===180").toBool(),"clearing search restores the entire catalog");
+ }
  route("featurehub");snapshot("more");route("activity");snapshot("activity");eval("Theme.mode='Dark'");snapshot("activity-dark");eval("Theme.mode='Light'");
  eval("window.openDashboard()");wait(350);QQuickWindow *panel=nullptr;for(auto candidate:QGuiApplication::allWindows())if(candidate->objectName()=="dashboardWindow")panel=qobject_cast<QQuickWindow *>(candidate);
  check(panel&&panel->isVisible(),"real network panel opens in its native window");
@@ -182,6 +192,6 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
  if(sweep){const auto before=resources();window->showMinimized();wait(60000);const auto after=resources();background={{"durationMs",60000},{"cpuMs",after.value("cpuMs").toDouble()-before.value("cpuMs").toDouble()},{"before",before},{"after",after}};window->showNormal();wait(350);}
  check(eval("motionPolicy.activeGrabCount===0 && SwirlTransitionRegistry.activeCount===0").toBool(),"all transition resources are idle after repeated use");
  QFile report(directory+"/hero-report.json");if(!report.open(QIODevice::WriteOnly))return 3;
- report.write(QJsonDocument(QJsonObject{{"checks",checks},{"failures",failures},{"dxgiPresentations",displaySamples},{"dxgiStatisticsErrors",statisticsErrors},{"animationWindows",animationWindows},{"refreshPhases",refreshPhases},{"resourceBefore",resourceBefore},{"resourceAfter",resources()},{"minimizedIdle",background},{"performanceStartQpcMs",performanceStart},{"performanceEndQpcMs",performanceEnd},{"reportedRefreshHz",window->screen()->refreshRate()},{"nativeDpr",window->devicePixelRatio()},{"sampleCount",intervals.size()},{"meanFrameDeliveryMs",mean},{"p95FrameDeliveryMs",intervals.isEmpty()?0:intervals[qMin(intervals.size()-1,qsizetype(intervals.size()*0.95))]},{"p99FrameDeliveryMs",intervals.isEmpty()?0:intervals[qMin(intervals.size()-1,qsizetype(intervals.size()*0.99))]},{"method","Passive Qt frameSwapped delivery during native interaction, excluding screenshot readback. These intervals are not hardware display presentation FPS; use external PresentMon data for presentation evidence."}}).toJson());
+ report.write(QJsonDocument(QJsonObject{{"nodeClickDispatchMs",nodeClickMs},{"checks",checks},{"failures",failures},{"dxgiPresentations",displaySamples},{"dxgiStatisticsErrors",statisticsErrors},{"animationWindows",animationWindows},{"refreshPhases",refreshPhases},{"resourceBefore",resourceBefore},{"resourceAfter",resources()},{"minimizedIdle",background},{"performanceStartQpcMs",performanceStart},{"performanceEndQpcMs",performanceEnd},{"reportedRefreshHz",window->screen()->refreshRate()},{"nativeDpr",window->devicePixelRatio()},{"sampleCount",intervals.size()},{"meanFrameDeliveryMs",mean},{"p95FrameDeliveryMs",intervals.isEmpty()?0:intervals[qMin(intervals.size()-1,qsizetype(intervals.size()*0.95))]},{"p99FrameDeliveryMs",intervals.isEmpty()?0:intervals[qMin(intervals.size()-1,qsizetype(intervals.size()*0.99))]},{"method","Passive Qt frameSwapped delivery during native interaction, excluding screenshot readback. These intervals are not hardware display presentation FPS; use external PresentMon data for presentation evidence."}}).toJson());
  return failures?2:0;
 }

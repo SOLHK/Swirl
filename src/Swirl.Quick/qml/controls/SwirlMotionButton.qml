@@ -3,7 +3,7 @@ import QtQuick.Controls
 import SwirlQuick
 Button {
     id: control
-    // Transform the paint nodes, keeping layout and mouse/keyboard hit areas fixed.
+    // Press depth affects the background; text and hit areas stay at full scale.
     property real motionScale: enabled && down ? SwirlMotion.pressScale : 1
     property real clickLight:0
     Behavior on motionScale {
@@ -11,7 +11,6 @@ Button {
         NumberAnimation {duration:control.down?SwirlMotion.pressDuration:SwirlMotion.hoverDuration;easing.type:control.down?Easing.OutCubic:Easing.OutBack;easing.overshoot:0.45}
     }
     Binding { target:control.background; property:"scale"; value:control.motionScale; when:control.background!==null }
-    Binding { target:control.contentItem; property:"scale"; value:control.motionScale; when:control.contentItem!==null }
     onPressed: SwirlMotion.noteTrigger(control)
     onClicked:if(enabled && visible && !SwirlMotion.reduced)lightPulse.restart()
     onVisibleChanged:if(!visible){lightPulse.stop();clickLight=0}

@@ -2,6 +2,8 @@ import QtQuick
 import QtQuick.Controls
 import SwirlQuick
 TextField {
+    renderType:TextInput.NativeRendering
+    font.hintingPreference:Font.PreferFullHinting
     id: control
     implicitHeight:Theme.controlHeight
     leftPadding:Theme.controlPadding; rightPadding:Theme.controlPadding

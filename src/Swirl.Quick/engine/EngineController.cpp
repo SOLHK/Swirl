@@ -83,6 +83,9 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
     m_options.executablePath = QCoreApplication::applicationDirPath() + QStringLiteral("/core/mihomo.exe");
     connect(m_engine.get(), &ProxyEngine::statusChanged, this, &EngineController::statusChanged);
     connect(&m_store,&NodeStore::changed,this,&EngineController::nodesChanged);
+    connect(&m_store,&NodeStore::changed,this,&EngineController::nodeCatalogChanged);
+    connect(&m_store,&NodeStore::selectionChanged,this,&EngineController::selectionChanged);
+    connect(this,&EngineController::nodesChanged,this,&EngineController::selectionChanged);
     connect(&m_imports,&NodeImportService::changed,this,&EngineController::statusChanged);
     connect(&m_imports,&NodeImportService::nodesApplied,this,[this]{
         m_nodeError.clear();
@@ -186,10 +189,10 @@ bool EngineController::deleteNode(const QString &id) {
 }
 bool EngineController::chooseNode(const QString &id) {
     if(nodeBusy())return false;
-    if(processAlive()&&!activeNodeId().isEmpty()&&!apiHealthy()){m_nodeError=QStringLiteral("控制接口未就绪，不能切换节点。");emit nodesChanged();return false;}
+    if(processAlive()&&!activeNodeId().isEmpty()&&!apiHealthy()){m_nodeError=QStringLiteral("控制接口未就绪，不能切换节点。");emit selectionChanged();return false;}
     m_nodeError.clear();const bool ok=m_store.select(id);
     if(ok&&processAlive()&&!activeNodeId().isEmpty())m_engine->selectNode(id);
-    emit nodesChanged();return ok;
+    emit selectionChanged();return ok;
 }
 void EngineController::connectNode(const QString &id) {
     if(id.isEmpty()){if(!busy()&&!m_imports.busy())startConfiguredSession();return;}

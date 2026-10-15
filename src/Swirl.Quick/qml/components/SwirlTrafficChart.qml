@@ -33,7 +33,7 @@ Item {
         x:Theme.dp(0); y:Theme.dp(4); width:Theme.dp(66); height:plot.height
         Repeater {
             model:4
-            Text {
+            SwirlText {
                 required property int index
                 width:Theme.dp(66); height:(plot.height-Theme.dp(1))/3
                 text:engineController.telemetry.formatBytes(graph.maximum*(1-index/3))+"/s"
@@ -84,7 +84,7 @@ Item {
         x:plot.x; y:parent.height-Theme.dp(22); width:plot.width
         Repeater {
             model:5
-            Text {
+            SwirlText {
                 required property int index
                 width:plot.width/5; font.pixelSize:Theme.fontSize(14); color:Theme.muted
                 horizontalAlignment:index===0?Text.AlignLeft:index===4?Text.AlignRight:Text.AlignHCenter

@@ -31,6 +31,7 @@
 #include <QStandardPaths>
 #include <QSettings>
 #include <QTemporaryDir>
+#include <QFontDatabase>
 #include "app/ModuleDraftStore.h"
 #include "app/ExtensionService.h"
 #include "app/MotionPolicy.h"
@@ -194,6 +195,14 @@ int main(int argc, char *argv[])
     const QString previewPath = nativeFramePath.isEmpty()?argumentValue(QStringLiteral("--capture-preview=")):nativeFramePath;
     const QString previewPage = argumentValue(QStringLiteral("--preview-page="));
     const QString previewTheme = argumentValue(QStringLiteral("--preview-theme="));
+    const QString previewFontFile = argumentValue(QStringLiteral("--preview-font-file="));
+    if(previewMode && !previewFontFile.isEmpty() && QFontDatabase::addApplicationFont(previewFontFile)<0) {
+        qCritical()<<"Preview font file could not be loaded";return 2;
+    }
+    const QString previewFont = argumentValue(QStringLiteral("--preview-font="));
+    if(previewMode && !previewFont.isEmpty() && !fontManager.selectFamily(previewFont)) {
+        qCritical()<<"Preview font unavailable:"<<previewFont;return 2;
+    }
     const QString previewState = argumentValue(QStringLiteral("--preview-state="));
     if (appearanceTest || heroTest || nodeTest || motionTest || previewMode || engineTest || hdrDisplayTest || hdrTest || smoke || interaction || captureTest || gatewayTest || windowTest || !previewPath.isEmpty()) {
         if(uiQualityTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-ui-quality.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-ui-quality.txt");}

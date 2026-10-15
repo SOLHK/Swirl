@@ -17,7 +17,7 @@ Item {
         RowLayout {
             Layout.fillWidth:true
             SwirlStatusBadge { label:"离线 HTTP 请求编辑器"; tone:"accent" }
-            Text { text:"请求不会实际发送"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
+            SwirlText { text:"请求不会实际发送"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
             SwirlButton { development:true; enabled:false; text:"对比"; onClicked:comparePopup.open() }
             SwirlButton { development:true; enabled:false; text:"发送"; iconName:"play"; primary:true; onClicked:AppState.notice("研发中") }
         }
@@ -29,7 +29,7 @@ Item {
                 SplitView.preferredWidth:Theme.dp(272); SplitView.minimumWidth:Theme.dp(200)
                 ColumnLayout {
                     anchors.fill:parent; anchors.margins:Theme.dp(13); spacing:Theme.dp(10)
-                    Text { text:"捕获历史"; color:Theme.text; font.pixelSize:Theme.fontSize(14); font.weight:Font.DemiBold }
+                    SwirlText { text:"捕获历史"; color:Theme.text; font.pixelSize:Theme.fontSize(14); font.weight:Font.DemiBold }
                     SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:"筛选请求" }
                     ListView {
                     add: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";from:0;to:1;duration:SwirlMotion.duration} }
@@ -45,8 +45,8 @@ Item {
                             color:page.selectedRequest===modelData.id?Theme.selected:tap.containsMouse?Theme.hover:"transparent"
                             ColumnLayout {
                                 anchors.fill:parent; anchors.margins:Theme.dp(8); spacing:Theme.dp(3)
-                                Text { text:modelData.method+"   "+modelData.path; font.pixelSize:Theme.fontSize(12); color:Theme.text; Layout.fillWidth:true; elide:Text.ElideRight }
-                                Text { text:modelData.host+" · "+modelData.version; color:Theme.muted; font.pixelSize:Theme.fontSize(10); Layout.fillWidth:true; elide:Text.ElideRight }
+                                SwirlText { text:modelData.method+"   "+modelData.path; font.pixelSize:Theme.fontSize(12); color:Theme.text; Layout.fillWidth:true; elide:Text.ElideRight }
+                                SwirlText { text:modelData.host+" · "+modelData.version; color:Theme.muted; font.pixelSize:Theme.fontSize(10); Layout.fillWidth:true; elide:Text.ElideRight }
                             }
                             MouseArea {
                                 id:tap; anchors.fill:parent; hoverEnabled:true
@@ -61,7 +61,7 @@ Item {
                 SplitView.fillWidth:true; SplitView.minimumWidth:Theme.dp(400)
                 ColumnLayout {
                     anchors.fill:parent; anchors.margins:Theme.dp(17); spacing:Theme.dp(12)
-                    Text { text:"请求编辑器"; color:Theme.text; font.pixelSize:Theme.fontSize(17); font.weight:Font.DemiBold }
+                    SwirlText { text:"请求编辑器"; color:Theme.text; font.pixelSize:Theme.fontSize(17); font.weight:Font.DemiBold }
                     RowLayout {
                         Layout.fillWidth:true
                         SwirlComboBox { id:verb; model:["GET","POST","PUT","PATCH","DELETE","HEAD"] }
@@ -91,7 +91,7 @@ Item {
                     }
                     RowLayout {
                         Layout.fillWidth:true
-                        Text { text:"执行历史："+page.history.length+" 次操作"; color:Theme.muted; font.pixelSize:Theme.fontSize(11); Layout.fillWidth:true }
+                        SwirlText { text:"执行历史："+page.history.length+" 次操作"; color:Theme.muted; font.pixelSize:Theme.fontSize(11); Layout.fillWidth:true }
                         SwirlButton { development:true; enabled:false; text:"重置"; onClicked:AppState.notice("研发中") }
                     }
                 }
@@ -100,7 +100,7 @@ Item {
                 SplitView.preferredWidth:Theme.dp(300); SplitView.minimumWidth:Theme.dp(230)
                 ColumnLayout {
                     anchors.fill:parent; anchors.margins:Theme.dp(17); spacing:Theme.dp(12)
-                    Text { text:"响应预览"; color:Theme.text; font.pixelSize:Theme.fontSize(16); font.weight:Font.DemiBold }
+                    SwirlText { text:"响应预览"; color:Theme.text; font.pixelSize:Theme.fontSize(16); font.weight:Font.DemiBold }
                     SwirlStatusBadge { label:""; tone:"accent" }
                     Rectangle {
                         Layout.fillWidth:true; Layout.fillHeight:true
@@ -124,8 +124,8 @@ Item {
         id:comparePopup; title:"重放对比"
         ColumnLayout {
             width:parent.width; spacing:Theme.dp(11)
-            Text { text:"原始请求与本地重放对比"; color:Theme.text; font.pixelSize:Theme.fontSize(13); Layout.fillWidth:true }
-            Text {
+            SwirlText { text:"原始请求与本地重放对比"; color:Theme.text; font.pixelSize:Theme.fontSize(13); Layout.fillWidth:true }
+            SwirlText {
                 text:"研发中"
                 color:Theme.muted; font.family:"Cascadia Code"; font.pixelSize:Theme.fontSize(11)
                 Layout.fillWidth:true; wrapMode:Text.WordWrap

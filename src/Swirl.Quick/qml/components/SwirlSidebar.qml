@@ -18,7 +18,7 @@ Item {
     required property var modelData;required property int index
     width:parent.width;spacing:0
     Item { width:parent.width;height:modelData.title.length?Theme.dp(36):0
-     Text {x:Theme.dp(7);anchors.bottom:parent.bottom;anchors.bottomMargin:Theme.dp(5);text:modelData.title;color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
+     SwirlText {x:Theme.dp(7);anchors.bottom:parent.bottom;anchors.bottomMargin:Theme.dp(5);text:modelData.title;color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
     }
     Repeater {model:modelData.pages
      SwirlNavigationItem {required property var modelData;width:parent.width;pageId:modelData.id;title:modelData.title;iconName:modelData.icon;onActivated:AppState.navigate(pageId)}

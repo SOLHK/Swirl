@@ -4,7 +4,7 @@ Swirl 使用 C++23、Qt 6 Quick/QML 和独立 Mihomo。主界面按照提供的 
 
 ## 构建
 
-需要 Windows x64、Qt 6.8+（本机验证 6.10.3）、匹配的 MSVC 2022 或 MinGW 13.1、CMake 3.25+、Ninja；安装包另需 NSIS 3.11。编译器、CMake、Ninja 加入 PATH，不能混用 MSVC 和 MinGW Qt。
+需要 Windows x64、Qt 6.9+（本机验证 6.10.3，卡片背景采用 6.9 引入的 RectangularShadow）、匹配的 MSVC 2022 或 MinGW 13.1、CMake 3.25+、Ninja；安装包另需 NSIS 3.11。编译器、CMake、Ninja 加入 PATH，不能混用 MSVC 和 MinGW Qt。
 
 ```powershell
 cmake -S src/Swirl.Quick -B build/quick -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=C:/Qt/6.10.3/mingw_64 -DSWIRL_BUILD_UI_TESTS=ON

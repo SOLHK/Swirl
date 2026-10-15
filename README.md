@@ -18,7 +18,7 @@ Swirl 品牌图标以 SVG 为唯一设计源：浅色为黑色祥云结、灰白
 - Windows 系统代理、Mihomo TUN、局域网认证代理、DNS 与规则/策略组、计费网络进程白名单。
 - URL/Header/Body 重写、静态 Mock 与 TCP 端口转发；本地 JavaScript、配置模块覆盖和配置切换。
 - 自研 DHCP 与 Mihomo TUN 网关转发控制；专用 LAN 端到端实机验证尚待完成。
-- 保留 Qt 界面、主题、圆角、SVG、HDR 和窗口交互；移除演示数据与模拟成功，未实现功能显示空数据并禁用执行。
+- 保留 Qt 界面、主题、圆角、SVG 和窗口交互；常规窗口使用直接 SDR 渲染保证文字清晰，HDR shader 保留在独立诊断路径。移除演示数据与模拟成功，未实现功能显示空数据并禁用执行。
 - 56 个模块入口和实际本地配置草稿，草稿不代表对应网络服务已经实现。
 
 详见 [第二阶段使用、测试和限制](docs/PHASE2_REAL_NODES.md)、[抓包说明](src/Swirl.Quick/CAPTURE.md)。
@@ -29,7 +29,7 @@ Swirl 品牌图标以 SVG 为唯一设计源：浅色为黑色祥云结、灰白
 
 测试版 Windows 安装程序在 [Releases](https://github.com/SOLHK/Swirl/releases) 的预发布版本中，以 `Swirl-Setup.exe` 提供。安装前退出已运行的 Swirl。预览版没有代码签名，请仅在信任项目及发布者时运行。
 
-自行构建需要 Windows x64、Qt 6.8+、CMake、C++23 编译器及 NSIS。Qt 6.10.3 已用于验收，详细操作见 [Windows 构建说明](src/Swirl.Quick/BUILDING.md)。`test` 分支的 [Qt CI](https://github.com/SOLHK/Swirl/actions/workflows/build-qt-quick-ui.yml) 负责实际编译、交互、抓包、页面 smoke、截图和打包；[源码结构校验](https://github.com/SOLHK/Swirl/actions/workflows/build-windows.yml) 负责拒绝旧 .NET 文件，它不是另一个 Windows 应用构建。
+自行构建需要 Windows x64、Qt 6.9+、CMake、C++23 编译器及 NSIS。Qt 6.10.3 已用于验收，详细操作见 [Windows 构建说明](src/Swirl.Quick/BUILDING.md)。`test` 分支的 [Qt CI](https://github.com/SOLHK/Swirl/actions/workflows/build-qt-quick-ui.yml) 负责实际编译、交互、抓包、页面 smoke、截图和打包；[源码结构校验](https://github.com/SOLHK/Swirl/actions/workflows/build-windows.yml) 负责拒绝旧 .NET 文件，它不是另一个 Windows 应用构建。
 
 Qt 1.0 的既有本机验收记录：39 项输入、32 项 HTTP 抓包、41 项 Windows 原生窗口、61 页面启动及 28 项隔离安装/更新/卸载检查。跨系统、多物理显示器与长时间压力测试未充分验证；删除旧代码后的 CI 结果请以对应 GitHub run 为准。
 

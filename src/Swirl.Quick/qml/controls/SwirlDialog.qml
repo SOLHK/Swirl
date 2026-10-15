@@ -31,7 +31,7 @@ Dialog {
         transformOrigin=SwirlMotion.popupOrigin(dialog)
         if(heroSource){scale=1;opacity=1;heroClock.progress=0;heroClock.moveTo(1)}
         else if(SwirlMotion.reduced){scale=1;opacity=1}
-        else if(scale===1 && opacity===1){scale=0.96;opacity=0}
+        else opacity=0
     }
     onAboutToHide:{dismissing=true;if(heroSource)heroClock.moveTo(0)}
     onClosed:{dismissals.pop(dialog);scale=1;opacity=1}
@@ -46,13 +46,13 @@ Dialog {
         modal:true;focus:true;title:"放弃未保存的修改？"
         anchors.centerIn:Overlay.overlay;width:Math.min(Theme.dp(400),dialog.width)
         closePolicy:Popup.NoAutoClose
-        enter:Transition{enabled:!SwirlMotion.reduced;ParallelAnimation{NumberAnimation{property:"opacity";from:0;to:1;duration:SwirlMotion.dialogDuration}NumberAnimation{property:"scale";from:0.97;to:1;duration:SwirlMotion.dialogDuration;easing.type:Easing.OutCubic}}}
-        exit:Transition{enabled:!SwirlMotion.reduced;ParallelAnimation{NumberAnimation{property:"opacity";to:0;duration:SwirlMotion.exitDuration}NumberAnimation{property:"scale";to:0.97;duration:SwirlMotion.exitDuration}}}
+        enter:Transition{enabled:!SwirlMotion.reduced;ParallelAnimation{NumberAnimation{property:"opacity";from:0;to:1;duration:SwirlMotion.dialogDuration}}}
+        exit:Transition{enabled:!SwirlMotion.reduced;ParallelAnimation{NumberAnimation{property:"opacity";to:0;duration:SwirlMotion.exitDuration}}}
         onAboutToShow:dismissals.push(discardPrompt,owner)
         onClosed:dismissals.pop(discardPrompt)
         background:SwirlContinuousSurface{radius:Theme.popupRadius;color:Theme.material("floating");border.color:Theme.border;border.width:Theme.borderWidth}
         contentItem:ColumnLayout {
-            Text {text:"关闭后将丢失尚未保存的内容。";color:Theme.text;wrapMode:Text.Wrap;Layout.fillWidth:true}
+            SwirlText {text:"关闭后将丢失尚未保存的内容。";color:Theme.text;wrapMode:Text.Wrap;Layout.fillWidth:true}
             RowLayout {Layout.alignment:Qt.AlignRight
                 SwirlButton {text:"继续编辑";onClicked:discardPrompt.close()}
                 SwirlButton {objectName:"discardChangesConfirm";text:"放弃修改";danger:true;onClicked:{discardPrompt.close();dialog.close()}}
@@ -63,15 +63,14 @@ Dialog {
         enabled:!SwirlMotion.reduced && dialog.heroSource===null
         ParallelAnimation {
             NumberAnimation { property:"opacity";to:1; duration: SwirlMotion.dialogDuration }
-            NumberAnimation { property:"scale";to:1;duration:SwirlMotion.dialogDuration;easing.type:Easing.OutCubic }
         }
     }
-    exit: Transition { enabled:!SwirlMotion.reduced; ParallelAnimation { NumberAnimation {property:"opacity";to:0;duration:dialog.heroSource?SwirlMotion.dialogDuration:SwirlMotion.exitDuration} NumberAnimation {property:"scale";to:dialog.heroSource?1:0.96;duration:dialog.heroSource?SwirlMotion.dialogDuration:SwirlMotion.exitDuration;easing.type:Easing.InCubic} } }
+    exit: Transition { enabled:!SwirlMotion.reduced; ParallelAnimation { NumberAnimation {property:"opacity";to:0;duration:dialog.heroSource?SwirlMotion.dialogDuration:SwirlMotion.exitDuration}  } }
     font.family: Theme.fontFamily
     header: Item {
         implicitHeight:Theme.dp(47)
         opacity:dialog.heroSource?Math.max(0,Math.min(1,(dialog.heroProgress-0.18)/0.65)):1
-        Text {
+        SwirlText {
             text: dialog.title
             color: Theme.text; font.pixelSize:Theme.fontSize(18); font.weight: Font.DemiBold
             anchors.left: parent.left; anchors.leftMargin:dialog.leftPadding

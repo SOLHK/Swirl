@@ -16,7 +16,7 @@ Rectangle {
     color: tone === "success" ? (Theme.dark ? "#82407765" : "#B6DCF6EA") :
            tone === "warning" ? (Theme.dark ? "#A36B4B30" : "#B9FFF0DA") :
            tone === "accent" ? Theme.selected : Theme.material("secondary")
-    Text {
+    SwirlText {
         id: caption
         anchors.centerIn: parent
         anchors.horizontalCenterOffset:badge.busy?Theme.dp(8):0

@@ -18,7 +18,7 @@ Item {
         onDoubleClicked:bar.targetWindow.visibility===Window.Maximized?bar.targetWindow.showNormal():bar.targetWindow.showMaximized()
     }
     SwirlTrafficLights{x:Theme.dp(8);anchors.verticalCenter:parent.verticalCenter;targetWindow:bar.targetWindow}
-    Text {
+    SwirlText {
         anchors.centerIn:parent;width:Math.max(0,parent.width-Theme.dp(200));horizontalAlignment:Text.AlignHCenter
         text:bar.targetWindow.title;color:Theme.text;font.pixelSize:Theme.fontSize(12);elide:Text.ElideRight
     }

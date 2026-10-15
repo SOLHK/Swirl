@@ -7,7 +7,7 @@ import "../components"
 import "../controls"
 Item {
     id: page
-    Text { x:Theme.dp(24); y:Theme.dp(30); text:"设置"; color:Theme.text; font.pixelSize:Theme.fontSize(26); font.weight:Font.Bold }
+    SwirlText { x:Theme.dp(24); y:Theme.dp(30); text:"设置"; color:Theme.text; font.pixelSize:Theme.fontSize(26); font.weight:Font.Bold }
     Rectangle { y:Theme.dp(78); width:parent.width; height:Theme.dp(1); color:Theme.border }
     ScrollView {
         id: scroll; x:Theme.dp(24); y:Theme.dp(94); width:parent.width-Theme.dp(48); height:parent.height-y-Theme.dp(20)
@@ -41,8 +41,8 @@ Item {
                     contentItem:Column {
                         spacing:Theme.dp(12)
                         SwirlIcon { name:entry.modelData.icon; size:Theme.dp(34); color:Theme.accent }
-                        Text { text:entry.modelData.title; color:Theme.text; font.pixelSize:Theme.fontSize(16); font.weight:Font.DemiBold }
-                        Text { width:parent.width; text:entry.modelData.description; color:Theme.muted; font.pixelSize:Theme.fontSize(11); wrapMode:Text.WordWrap }
+                        SwirlText { text:entry.modelData.title; color:Theme.text; font.pixelSize:Theme.fontSize(16); font.weight:Font.DemiBold }
+                        SwirlText { width:parent.width; text:entry.modelData.description; color:Theme.muted; font.pixelSize:Theme.fontSize(11); wrapMode:Text.WordWrap }
                     }
                     onClicked: page.Window.window.openSettings(modelData.route,entry)
                     Accessible.name:modelData.title

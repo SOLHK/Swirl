@@ -18,7 +18,7 @@ Item {
         RowLayout {
             Layout.fillWidth:true
             SwirlStatusBadge { label:"响应映射"; tone:"accent" }
-            Text { text:"不会读取文件或重定向实际请求"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
+            SwirlText { text:"不会读取文件或重定向实际请求"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
             SwirlButton { development:true; enabled:false; text:"新建映射"; primary:true; onClicked:newDialog.open() }
         }
         RowLayout {
@@ -51,19 +51,19 @@ Item {
                     ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
                     ColumnLayout {
                     width:detailScroll0.availableWidth; height:Math.max(implicitHeight,detailScroll0.availableHeight); spacing:Theme.dp(12)
-                    Text { text:"映射详情"; color:Theme.text; font.pixelSize:Theme.fontSize(16); font.weight:Font.DemiBold }
-                    Text { text:page.selectedTab; color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
-                    Text { text:"显示名称"; color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
+                    SwirlText { text:"映射详情"; color:Theme.text; font.pixelSize:Theme.fontSize(16); font.weight:Font.DemiBold }
+                    SwirlText { text:page.selectedTab; color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
+                    SwirlText { text:"显示名称"; color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
                     SwirlTextField { id:nameField; Layout.fillWidth:true; placeholderText:"映射名称" }
-                    Text { text:"匹配请求 URL"; color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
+                    SwirlText { text:"匹配请求 URL"; color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
                     SwirlTextField { id:matchField; Layout.fillWidth:true; placeholderText:"https://example.test/*" }
-                    Text { text:page.selectedTab==="本地映射"?"替换文件或目录":"远程替换 URL"; color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
+                    SwirlText { text:page.selectedTab==="本地映射"?"替换文件或目录":"远程替换 URL"; color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
                     SwirlTextField { id:targetField; Layout.fillWidth:true; placeholderText:page.selectedTab==="本地映射"?"fixtures/file.json":"https://mirror.example.test/" }
-                    Text { text:"预览"; color:Theme.muted; font.pixelSize:Theme.fontSize(10) }
+                    SwirlText { text:"预览"; color:Theme.muted; font.pixelSize:Theme.fontSize(10) }
                     Rectangle {
                         Layout.fillWidth:true; Layout.fillHeight:true
                         radius:Theme.roundedRadius(width,height); color:Theme.field; border.color:Theme.border
-                        Text {
+                        SwirlText {
                             anchors.fill:parent; anchors.margins:Theme.dp(12)
                             text:(matchField.text||"原始 URL")+"\n  ↓\n"+(targetField.text||"替换目标")+
                                  "\n\n尚未接入网络或文件操作。"
@@ -84,9 +84,9 @@ Item {
         id:newDialog; title:"创建响应映射"
         ColumnLayout {
             width:parent.width; spacing:Theme.dp(12)
-            Text { text:"请求 URL 匹配表达式"; color:Theme.text }
+            SwirlText { text:"请求 URL 匹配表达式"; color:Theme.text }
             SwirlTextField { id:urlInput; Layout.fillWidth:true; placeholderText:"https://example.test/api/*" }
-            Text { text:page.selectedTab==="本地映射"?"本地文件路径":"远程替换 URL"; color:Theme.text }
+            SwirlText { text:page.selectedTab==="本地映射"?"本地文件路径":"远程替换 URL"; color:Theme.text }
             SwirlTextField { id:destination; Layout.fillWidth:true; placeholderText:page.selectedTab==="本地映射"?"fixtures/response.json":"https://mirror.example.test/" }
             RowLayout {
                 Layout.alignment:Qt.AlignRight

@@ -7,7 +7,7 @@ import "../controls"
 ColumnLayout {
     id: root
     spacing:Theme.dp(14)
-    Text { text:"当前字体 · "+fontManager.currentFamily; color:Theme.text; font.family:Theme.fontFamily; font.pixelSize:Theme.fontSize(15); Layout.fillWidth:true; wrapMode:Text.Wrap }
+    SwirlText { text:"当前字体 · "+fontManager.currentFamily; color:Theme.text; font.family:Theme.fontFamily; font.pixelSize:Theme.fontSize(15); Layout.fillWidth:true; wrapMode:Text.Wrap }
     RowLayout {
         Layout.fillWidth:true
         SwirlSearchField { id:search; objectName:"fontSearch"; Layout.fillWidth:true; placeholderText:"搜索字体，如 PingFang、MiSans" }
@@ -27,24 +27,24 @@ ColumnLayout {
                 background:SwirlContinuousSurface { radius:Theme.dp(7); color:parent.down?Theme.pressed:fontManager.currentFamily===parent.modelData?Theme.selected:parent.hovered?Theme.hover:"transparent" }
                 Accessible.name:modelData
             }
-            Text { anchors.centerIn:parent; visible:fontList.count===0; text:"没有匹配的字体，可导入本地字体文件"; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
+            SwirlText { anchors.centerIn:parent; visible:fontList.count===0; text:"没有匹配的字体，可导入本地字体文件"; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
         }
     }
     SwirlGlassPanel {
         Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(106)
         Column { anchors.fill:parent; anchors.margins:Theme.dp(16); spacing:Theme.dp(8)
-            Text { text:"字形预览 · 连接让世界更近"; font.family:fontManager.currentFamily; font.pixelSize:Theme.fontSize(21); font.weight:Font.DemiBold; color:Theme.text }
-            Text { text:"Swirl · 0123456789 · 240 Hz"; font.family:fontManager.currentFamily; font.pixelSize:Theme.fontSize(15); color:Theme.muted }
+            SwirlText { text:"字形预览 · 连接让世界更近"; font.family:fontManager.currentFamily; font.pixelSize:Theme.fontSize(21); font.weight:Font.DemiBold; color:Theme.text }
+            SwirlText { text:"Swirl · 0123456789 · 240 Hz"; font.family:fontManager.currentFamily; font.pixelSize:Theme.fontSize(15); color:Theme.muted }
         }
     }
     RowLayout {
         Layout.fillWidth:true
         SwirlButton { objectName:"fontImport"; text:"导入字体文件…"; onClicked:fontFile.open() }
-        Text { text:"支持 TTF、OTF、TTC，仅供 Swirl 使用"; color:Theme.muted; font.pixelSize:Theme.fontSize(11); Layout.fillWidth:true; wrapMode:Text.Wrap }
+        SwirlText { text:"支持 TTF、OTF、TTC，仅供 Swirl 使用"; color:Theme.muted; font.pixelSize:Theme.fontSize(11); Layout.fillWidth:true; wrapMode:Text.Wrap }
     }
-    Text { text:fontManager.error; visible:text.length>0; color:Theme.red; Layout.fillWidth:true; wrapMode:Text.Wrap; font.pixelSize:Theme.fontSize(12) }
-    Text { text:"苹方、MiSans 等字体安装后会出现在列表中，也可导入你持有的字体文件。选择立即生效并自动保存；未选择时默认使用 HarmonyOS Sans。"; color:Theme.muted; Layout.fillWidth:true; wrapMode:Text.Wrap; font.pixelSize:Theme.fontSize(12) }
-    Text { text:"Swirl 使用 HarmonyOS Sans 字体。Copyright 2021 Huawei Device Co., Ltd.\n字体按 HarmonyOS Sans Fonts License Agreement 分发，随软件提供的字体文件保持官方原样。"; color:Theme.muted; Layout.fillWidth:true; wrapMode:Text.Wrap; font.pixelSize:Theme.fontSize(11) }
+    SwirlText { text:fontManager.error; visible:text.length>0; color:Theme.red; Layout.fillWidth:true; wrapMode:Text.Wrap; font.pixelSize:Theme.fontSize(12) }
+    SwirlText { text:"苹方、MiSans 等字体安装后会出现在列表中，也可导入你持有的字体文件。选择立即生效并自动保存；未选择时默认使用 HarmonyOS Sans。"; color:Theme.muted; Layout.fillWidth:true; wrapMode:Text.Wrap; font.pixelSize:Theme.fontSize(12) }
+    SwirlText { text:"Swirl 使用 HarmonyOS Sans 字体。Copyright 2021 Huawei Device Co., Ltd.\n字体按 HarmonyOS Sans Fonts License Agreement 分发，随软件提供的字体文件保持官方原样。"; color:Theme.muted; Layout.fillWidth:true; wrapMode:Text.Wrap; font.pixelSize:Theme.fontSize(11) }
     SwirlButton { objectName:"fontLicense"; text:"查看鸿蒙字体许可"; onClicked:licenseDialog.open() }
     FileDialog { id:fontFile; title:"选择字体文件"; nameFilters:["字体文件 (*.ttf *.otf *.ttc)"]; onAccepted:fontManager.importFont(selectedFile) }
     SwirlDialog {

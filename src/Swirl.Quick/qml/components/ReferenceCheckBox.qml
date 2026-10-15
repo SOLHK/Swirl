@@ -10,5 +10,5 @@ spacing:Theme.dp(6);implicitHeight:Theme.dp(22)
   Behavior on color{ColorAnimation{duration:SwirlMotion.switchDuration}}
   Image {opacity:control.checked?1:0;scale:control.checked?1:0.75;Behavior on opacity{NumberAnimation{duration:SwirlMotion.switchDuration}}Behavior on scale{enabled:!SwirlMotion.reduced;SwirlSpring{}}anchors.fill:parent;anchors.margins:Theme.dp(2);source:"image://swirl/checkmark/ffffff"}
  }
- contentItem:Text {leftPadding:Theme.dp(22);text:control.text;font.pixelSize:Theme.fontSize(13);color:control.enabled?Theme.text:Theme.muted;verticalAlignment:Text.AlignVCenter}
+ contentItem:SwirlText {leftPadding:Theme.dp(22);text:control.text;font.pixelSize:Theme.fontSize(13);color:control.enabled?Theme.text:Theme.muted;verticalAlignment:Text.AlignVCenter}
 }

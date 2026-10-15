@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 set(SWIRL_TEST_FONT_DIRECTORY "C:/Windows/Fonts" CACHE PATH "Offscreen test font directory")
 option(SWIRL_BUILD_UI_TESTS "Build the Qt input-driven overview checks" OFF)
-find_package(Qt6 6.8 REQUIRED COMPONENTS Quick Qml QuickControls2 Network Svg GuiPrivate ShaderTools)
+find_package(Qt6 6.9 REQUIRED COMPONENTS Quick Qml QuickControls2 Network Svg GuiPrivate ShaderTools)
 qt_standard_project_setup(REQUIRES 6.8)
 qt_policy(SET QTP0004 NEW)
 add_subdirectory(third_party)
@@ -61,6 +61,7 @@ add_dependencies(Swirl SwirlScriptRunner)
 qt_add_resources(Swirl engine_manifest PREFIX "/engine" BASE "${CMAKE_CURRENT_SOURCE_DIR}/packaging"
  FILES packaging/mihomo-manifest.json)
 set(SWIRL_QML_FILES
+ qml/controls/SwirlText.qml
  qml/controls/SwirlNodeTransfer.qml
  qml/components/SwirlFontSettings.qml
  qml/components/SwirlSecondaryWindow.qml

@@ -17,7 +17,7 @@ Item {
         RowLayout {
             Layout.fillWidth:true
             SwirlStatusBadge { label:"未启用实时拦截"; tone:"warning" }
-            Text { text:"仅编辑暂停请求，不会影响实际网络"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
+            SwirlText { text:"仅编辑暂停请求，不会影响实际网络"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
             SwirlButton { development:true; enabled:false; text:"添加断点"; primary:true; onClicked:ruleDialog.open() }
         }
         SwirlGlassPanel {
@@ -26,8 +26,8 @@ Item {
                 anchors.fill:parent; anchors.margins:Theme.dp(18); spacing:Theme.dp(15)
                 ColumnLayout {
                     Layout.fillWidth:true; spacing:Theme.dp(5)
-                    Text { text:"断点队列"; color:Theme.text; font.pixelSize:Theme.fontSize(18); font.weight:Font.DemiBold }
-                    Text { text:"请求均为本地，不会暂停浏览器。"; color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
+                    SwirlText { text:"断点队列"; color:Theme.text; font.pixelSize:Theme.fontSize(18); font.weight:Font.DemiBold }
+                    SwirlText { text:"请求均为本地，不会暂停浏览器。"; color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
                 }
                 SwirlStatusBadge { label:page.records.filter(function(r){return r.status==="Paused"}).length+" 已暂停"; tone:"accent" }
                 SwirlButton { development:true; enabled:false; text:"全部继续"; onClicked:AppState.notice("研发中")}
@@ -52,10 +52,10 @@ Item {
                     anchors.fill:parent; anchors.margins:Theme.dp(17); spacing:Theme.dp(13)
                     RowLayout {
                         Layout.fillWidth:true
-                        Text { text:"暂停请求编辑器"; color:Theme.text; font.pixelSize:Theme.fontSize(17); font.weight:Font.DemiBold; Layout.fillWidth:true }
+                        SwirlText { text:"暂停请求编辑器"; color:Theme.text; font.pixelSize:Theme.fontSize(17); font.weight:Font.DemiBold; Layout.fillWidth:true }
                         SwirlStatusBadge { label:page.selected?page.selected.status:"尚未选择"; tone:"accent" }
                     }
-                    Text {
+                    SwirlText {
                         Layout.fillWidth:true; elide:Text.ElideMiddle; color:Theme.muted; font.pixelSize:Theme.fontSize(12)
                         text:page.selected?("https://"+page.selected.host+page.selected.url):"选择请求后查看详情"
                     }
@@ -111,9 +111,9 @@ Item {
         id:ruleDialog; title:"添加断点匹配条件"
         ColumnLayout {
             width:parent.width; spacing:Theme.dp(12)
-            Text { text:"URL 匹配表达式"; color:Theme.text }
+            SwirlText { text:"URL 匹配表达式"; color:Theme.text }
             SwirlTextField { id:matcher; Layout.fillWidth:true; placeholderText:"/api/*" }
-            Text { text:"请求阶段"; color:Theme.text }
+            SwirlText { text:"请求阶段"; color:Theme.text }
             SwirlComboBox { model:["发送请求前","收到响应后"] }
             RowLayout {
                 Layout.alignment:Qt.AlignRight

@@ -2,6 +2,7 @@
 #include "engine/NodeTestService.h"
 #include "engine/TelemetryService.h"
 #include "engine/NodeStore.h"
+#include "engine/NodeRegion.h"
 #include "engine/NodeImporter.h"
 #include "engine/NodeImportService.h"
 #include "engine/EngineController.h"
@@ -41,6 +42,44 @@ class NodeTests:public QObject {
         return body;
     }
 private slots:
+    void regionLabelsDoNotInventLocations() {
+        QCOMPARE(NodeRegion::fromName(QStringLiteral("🇭🇰 HK 01")).code,QString("HK"));
+        QCOMPARE(NodeRegion::fromName(QStringLiteral("日本 东京 02")).code,QString("JP"));
+        QCOMPARE(NodeRegion::fromName(QStringLiteral("SG-03")).code,QString("SG"));
+        QCOMPARE(NodeRegion::fromName(QStringLiteral("印度尼西亚 01")).code,QString("ID"));
+        QCOMPARE(NodeRegion::fromName(QStringLiteral("🇳🇿 Auckland")).code,QString("NZ"));
+        QCOMPARE(NodeRegion::fromName(QStringLiteral("business proxy")).code,QString("unknown"));
+        QCOMPARE(NodeRegion::fromName(QStringLiteral("JPX private")).code,QString("unknown"));
+        QCOMPARE(NodeRegion::fromName(QStringLiteral("节点 001")).code,QString("unknown"));
+    }
+    void selectingDoesNotRewriteCredentialsOrInvalidateRows() {
+        QTemporaryDir temp;const auto path=temp.filePath("nodes.dpapi");NodeStore store(path);
+        QList<ProxyNode> nodes;for(int i=0;i<180;++i)nodes.append(node(QString("HK node %1").arg(i),1080));
+        QVERIFY(store.importNodes(nodes));
+        QFile encrypted(path);QVERIFY(encrypted.open(QIODevice::ReadOnly));const auto original=encrypted.readAll();encrypted.close();
+        QSignalSpy changed(&store,&NodeStore::changed),selection(&store,&NodeStore::selectionChanged);
+        const auto first=nodes.first().id,last=nodes.last().id;
+        QVERIFY(store.select(first));QVERIFY(store.select(last));QVERIFY(store.select(last));
+        QCOMPARE(changed.size(),0);QCOMPARE(selection.size(),2);
+        QVERIFY(encrypted.open(QIODevice::ReadOnly));QCOMPARE(encrypted.readAll(),original);encrypted.close();
+        NodeStore loaded(path);QCOMPARE(loaded.selectedId(),last);QCOMPARE(loaded.nodes().size(),180);
+        QVERIFY(loaded.removeNode(last));NodeStore removed(path);QVERIFY(removed.selectedId().isEmpty());
+        QVERIFY(removed.select(first));QVERIFY(removed.select({}));NodeStore cleared(path);QVERIFY(cleared.selectedId().isEmpty());
+        QFile sidecar(path+".selected");QVERIFY(sidecar.open(QIODevice::WriteOnly));sidecar.write("{\"selected\":\"nonexistent\"}");sidecar.close();
+        NodeStore stale(path);QVERIFY(stale.selectedId().isEmpty());
+        QVERIFY(QFile::remove(path+".selected"));QVERIFY(QDir().mkdir(path+".selected"));
+        QVERIFY(!stale.select(first));QVERIFY(stale.selectedId().isEmpty());QVERIFY(!stale.error().isEmpty());
+    }
+    void selectionLeavesCatalogAndNodeRowsStable() {
+        QTemporaryDir temp;EngineController controller(std::make_unique<SwirlEngineManager>(),nullptr,temp.filePath("catalog.dpapi"));
+        QVERIFY(controller.saveNode({{"name","HK fixture"},{"protocol","http"},{"host","127.0.0.1"},{"port",9}}));
+        const auto id=controller.nodes().first().toMap().value("id").toString();
+        QSignalSpy catalog(&controller,&EngineController::nodeCatalogChanged),rows(&controller,&EngineController::nodesChanged);
+        QVERIFY(controller.chooseNode(id));QCOMPARE(catalog.size(),0);QCOMPARE(rows.size(),0);
+        QCOMPARE(controller.nodeCatalog().first().toMap().value("regionCode").toString(),QString("HK"));
+        QVERIFY(controller.saveNode({{"id",id},{"name","JP fixture"},{"protocol","http"},{"host","127.0.0.1"},{"port",9}}));
+        QCOMPARE(catalog.size(),1);QCOMPARE(controller.nodeCatalog().first().toMap().value("regionCode").toString(),QString("JP"));
+    }
     void userAuthorizedLiveSubscription() {
         const auto subscription=qEnvironmentVariable("SWIRL_LIVE_SUBSCRIPTION_URL");
         if(subscription.isEmpty())QSKIP("Requires an explicitly user-authorized subscription supplied in the environment");

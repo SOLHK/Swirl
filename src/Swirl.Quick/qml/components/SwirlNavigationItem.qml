@@ -48,13 +48,13 @@ SwirlMotionButton {
         transform:Translate{x:entry.selectionX;y:entry.selectionY}
     }
     contentItem: RowLayout {
-        spacing:Theme.dp(8)
-        SwirlIcon { name: "nav-"+entry.pageId; size:Theme.dp(16); color: Theme.muted }
-        Text {
+        spacing:Theme.dp(10)
+        SwirlIcon { name: "nav-"+entry.pageId; size:Theme.dp(18); color:entry.chosen?Theme.navigationAccent:entry.hovered?Theme.text:Theme.muted }
+        SwirlText {renderType:Text.NativeRendering;
             visible: !entry.compact; Layout.fillWidth: true
             text: entry.title; color: Theme.text
             font.pixelSize:Theme.fontSize(13); font.family: Theme.fontFamily
-            font.weight: Font.Normal
+            font.weight:entry.chosen?Font.Medium:Font.Normal
             elide: Text.ElideRight
         }
     }

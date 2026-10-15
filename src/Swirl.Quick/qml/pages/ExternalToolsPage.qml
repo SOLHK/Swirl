@@ -30,7 +30,7 @@ Item {
   anchors.fill:parent;anchors.margins:Theme.dp(16);spacing:Theme.dp(16)
   ColumnLayout{
    Layout.preferredWidth:Theme.dp(190);Layout.fillHeight:true;spacing:Theme.dp(12)
-   Text{text:"网络控制与调试";color:Theme.text;font.family:Theme.fontFamily;font.pixelSize:Theme.fontSize(15);font.weight:Font.Medium}
+   SwirlText {text:"网络控制与调试";color:Theme.text;font.family:Theme.fontFamily;font.pixelSize:Theme.fontSize(15);font.weight:Font.Medium}
    SwirlSegmentedControl{Layout.fillWidth:true;options:["按客户端","按主机名"];currentIndex:page.filterIndex;onActivated:index=>page.filterIndex=index}
    SwirlButton{Layout.fillWidth:true;text:"全部 · "+page.sourceRows.length;quiet:page.selectedGroup!=="";onClicked:page.selectedGroup=""}
    ListView{
@@ -38,7 +38,7 @@ Item {
     delegate:SwirlButton{required property string modelData;width:ListView.view.width;text:modelData;quiet:page.selectedGroup!==modelData;onClicked:page.selectedGroup=modelData}
     ScrollBar.vertical:SwirlScrollBar{}
    }
-   Text{text:engineController.connected?"引擎已连接":"引擎未连接";color:engineController.connected?Theme.green:Theme.muted;font.pixelSize:Theme.fontSize(12)}
+   SwirlText {text:engineController.connected?"引擎已连接":"引擎未连接";color:engineController.connected?Theme.green:Theme.muted;font.pixelSize:Theme.fontSize(12)}
   }
   ColumnLayout{
    Layout.fillWidth:true;Layout.fillHeight:true;spacing:Theme.dp(10)
@@ -46,9 +46,9 @@ Item {
    RowLayout{
     Layout.fillWidth:true
     SwirlSearchField{objectName:"dashboardSearch";Layout.fillWidth:true;placeholderText:"搜索当前记录";onTextChanged:page.query=text}
-    Text{text:page.records.length+" 项";color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
+    SwirlText {text:page.records.length+" 项";color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
    }
-   Text{Layout.fillWidth:true;wrapMode:Text.Wrap;font.pixelSize:Theme.fontSize(12);text:page.tabIndex===2?"当前显示已保存的 Hosts 配置 · DNS 查询历史研发中":page.feedback||captureProvider.error||engineController.error;visible:text.length>0;color:page.tabIndex===2?Theme.muted:Theme.orange}
+   SwirlText {Layout.fillWidth:true;wrapMode:Text.Wrap;font.pixelSize:Theme.fontSize(12);text:page.tabIndex===2?"当前显示已保存的 Hosts 配置 · DNS 查询历史研发中":page.feedback||captureProvider.error||engineController.error;visible:text.length>0;color:page.tabIndex===2?Theme.muted:Theme.orange}
    SwirlGlassPanel{
     Layout.fillWidth:true;Layout.fillHeight:true;cornerRadius:Theme.independentCardRadius;clip:true
     SwirlDataTable{objectName:"dashboardTable";anchors.fill:parent;anchors.margins:Theme.dp(16);stripeInset:Theme.dp(6);stripeRadius:Theme.tileRadius;cellPadding:Theme.controlPadding;fillEmptyRows:false;headerHeight:Theme.tableHeaderHeight;itemHeight:Theme.tableRowHeight;rows:page.records;columns:page.columns;onRowSelected:r=>{if(page.tabIndex===0)page.Window.window.openCaptureInspector();else page.feedback="已选择："+String(r.host||r.name||r.code||r.ip||"记录")}}

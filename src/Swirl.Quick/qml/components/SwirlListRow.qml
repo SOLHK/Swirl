@@ -20,7 +20,7 @@ SwirlMotionButton {
     contentItem:RowLayout {
         spacing:Theme.dp(24)
         SwirlIcon { name:row.iconName; size:Theme.dp(25) }
-        Text { text:row.title; color:Theme.muted; font.pixelSize:Theme.fontSize(17); Layout.fillWidth:true; elide:Text.ElideRight }
+        SwirlText { text:row.title; color:Theme.muted; font.pixelSize:Theme.fontSize(17); Layout.fillWidth:true; elide:Text.ElideRight }
         SwirlIcon { visible:row.arrow; name:"chevron-right"; size:Theme.dp(17) }
     }
     Accessible.name:title

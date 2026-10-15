@@ -35,8 +35,8 @@ Item {
             SwirlIconButton {iconName:"chevron-left";tooltip:"功能模块中心";onClicked:SwirlMotion.returnToHub(detailPanel)}
             ColumnLayout {
                 Layout.fillWidth:true;spacing:Theme.dp(5)
-                Text {text:page.feature ? page.feature.title : "功能模块";font.pixelSize:Theme.fontSize(25);font.weight:Font.DemiBold;color:Theme.text}
-                Text {text:page.feature ? page.feature.sub : "";font.pixelSize:Theme.fontSize(14);color:Theme.muted;Layout.fillWidth:true;elide:Text.ElideRight}
+                SwirlText {text:page.feature ? page.feature.title : "功能模块";font.pixelSize:Theme.fontSize(25);font.weight:Font.DemiBold;color:Theme.text}
+                SwirlText {text:page.feature ? page.feature.sub : "";font.pixelSize:Theme.fontSize(14);color:Theme.muted;Layout.fillWidth:true;elide:Text.ElideRight}
             }
             SwirlButton {text:"导入草稿";font.pixelSize:Theme.fontSize(14);onClicked:importDialog.open()}
             SwirlButton {text:"导出草稿";font.pixelSize:Theme.fontSize(14);onClicked:exportDialog.open()}
@@ -47,7 +47,7 @@ Item {
             SwirlSegmentedControl {implicitWidth:Theme.dp(285);options:["配置","条目","说明"];currentIndex:page.tab;onActivated:function(index){page.tab=index}}
             Item {Layout.fillWidth:true}
             SwirlStatusBadge{label:"研发中 · 服务未接入";tone:"warning"}
-            Text {text:page.dirty ? "尚未保存" : page.savedAt.length ? "已保存 · "+page.savedAt : "未接入 · 本地界面草稿";color:Theme.muted;font.pixelSize:Theme.fontSize(13)}
+            SwirlText {text:page.dirty ? "尚未保存" : page.savedAt.length ? "已保存 · "+page.savedAt : "未接入 · 本地界面草稿";color:Theme.muted;font.pixelSize:Theme.fontSize(13)}
         }
         SwirlGlassPanel {
             id:detailPanel;objectName:"motion-detail"
@@ -57,13 +57,13 @@ Item {
                 ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
                 ColumnLayout {
                     width:formScroll.availableWidth;spacing:Theme.dp(16)
-                    Text {text:"配置只保存到本机界面草稿。当前不会设置代理、安装证书、创建网卡或启动此模块的服务。";color:Theme.muted;font.pixelSize:Theme.fontSize(14);Layout.fillWidth:true;wrapMode:Text.WordWrap}
+                    SwirlText {text:"配置只保存到本机界面草稿。当前不会设置代理、安装证书、创建网卡或启动此模块的服务。";color:Theme.muted;font.pixelSize:Theme.fontSize(14);Layout.fillWidth:true;wrapMode:Text.WordWrap}
                     Repeater {
                         model:page.feature ? page.feature.fields : []
                         RowLayout {
                             required property var modelData
                             Layout.fillWidth:true;spacing:Theme.dp(24)
-                            Text {text:modelData.label;color:Theme.text;font.pixelSize:Theme.fontSize(16);Layout.preferredWidth:Theme.dp(175);wrapMode:Text.WordWrap}
+                            SwirlText {text:modelData.label;color:Theme.text;font.pixelSize:Theme.fontSize(16);Layout.preferredWidth:Theme.dp(175);wrapMode:Text.WordWrap}
                             Loader {
                                 Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(44)
                                 property var field:modelData
@@ -72,14 +72,14 @@ Item {
                         }
                     }
                     Rectangle {Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(1);color:Theme.border}
-                    Text {text:"凭据字段填写引用名称即可；此草稿存储不适合保存实际密码或私钥。";color:Theme.muted;font.pixelSize:Theme.fontSize(13);Layout.fillWidth:true;wrapMode:Text.WordWrap}
+                    SwirlText {text:"凭据字段填写引用名称即可；此草稿存储不适合保存实际密码或私钥。";color:Theme.muted;font.pixelSize:Theme.fontSize(13);Layout.fillWidth:true;wrapMode:Text.WordWrap}
                 }
             }
             ColumnLayout {
                 anchors.fill:parent;anchors.margins:Theme.dp(22);spacing:Theme.dp(14);visible:page.tab===1
                 RowLayout {
                     Layout.fillWidth:true
-                    Text {text:"条目与优先级 · "+page.records.length+" 项";color:Theme.text;font.pixelSize:Theme.fontSize(18);Layout.fillWidth:true}
+                    SwirlText {text:"条目与优先级 · "+page.records.length+" 项";color:Theme.text;font.pixelSize:Theme.fontSize(18);Layout.fillWidth:true}
                     SwirlButton {objectName:"moduleAddButton";text:"添加条目";primary:true;font.pixelSize:Theme.fontSize(15);onClicked:{page.editing=-1;nameField.text="";valueField.text="";rowDialog.open()}}
                 }
                 ListView {
@@ -97,23 +97,23 @@ Item {
                         RowLayout {
                             anchors.fill:parent;anchors.margins:Theme.dp(12);spacing:Theme.dp(12)
                             SwirlToggle {checked:modelData.enabled!==false;onToggled:{var rows=page.records.slice();rows[index]=Object.assign({},modelData,{enabled:checked});page.records=rows;page.dirty=true}}
-                            ColumnLayout {Layout.fillWidth:true;spacing:Theme.dp(3);Text {text:modelData.name || "未命名";color:Theme.text;font.pixelSize:Theme.fontSize(16)}Text {text:modelData.value || "—";color:Theme.muted;font.pixelSize:Theme.fontSize(13);Layout.fillWidth:true;elide:Text.ElideRight}}
+                            ColumnLayout {Layout.fillWidth:true;spacing:Theme.dp(3);SwirlText {text:modelData.name || "未命名";color:Theme.text;font.pixelSize:Theme.fontSize(16)}SwirlText {text:modelData.value || "—";color:Theme.muted;font.pixelSize:Theme.fontSize(13);Layout.fillWidth:true;elide:Text.ElideRight}}
                             SwirlButton {text:"↑";quiet:false;implicitWidth:Theme.dp(36);enabled:index>0;onClicked:page.reorder(index,-1)}
                             SwirlButton {text:"↓";quiet:false;implicitWidth:Theme.dp(36);enabled:index<page.records.length-1;onClicked:page.reorder(index,1)}
                             SwirlButton {text:"编辑";quiet:false;font.pixelSize:Theme.fontSize(14);onClicked:{page.editing=index;nameField.text=modelData.name;valueField.text=modelData.value;rowDialog.open()}}
                             SwirlButton {text:"删除";quiet:false;danger:true;font.pixelSize:Theme.fontSize(14);onClicked:{page.records=page.records.filter(function(r,i){return i!==index});page.dirty=true}}
                         }
                     }
-                    Text {visible:page.records.length===0;anchors.centerIn:parent;text:"暂无条目，点击添加建立配置草稿。";color:Theme.muted;font.pixelSize:Theme.fontSize(16)}
+                    SwirlText {visible:page.records.length===0;anchors.centerIn:parent;text:"暂无条目，点击添加建立配置草稿。";color:Theme.muted;font.pixelSize:Theme.fontSize(16)}
                 }
             }
             ColumnLayout {
                 anchors.fill:parent;anchors.margins:Theme.dp(26);spacing:Theme.dp(17);visible:page.tab===2
                 SwirlIcon {name:page.feature ? page.feature.icon : "grid";size:Theme.dp(38);color:Theme.accent}
-                Text {text:"模块界面已具备，实际功能待接入";font.pixelSize:Theme.fontSize(22);font.weight:Font.DemiBold;color:Theme.text}
-                Text {text:page.feature ? page.feature.sub : "";color:Theme.muted;font.pixelSize:Theme.fontSize(16);Layout.fillWidth:true;wrapMode:Text.WordWrap}
-                Text {text:"可以编辑参数、增删条目、调整优先级、切换草稿启停、保存以及导入导出 JSON。这里的启用选项仅表示草稿意图，不代表操作系统或网络服务已经开启。";color:Theme.muted;font.pixelSize:Theme.fontSize(15);Layout.fillWidth:true;wrapMode:Text.WordWrap}
-                Text {text:"Apple / 移动平台专有能力保留参考模块，Windows 的实际实现方式需后续确定。";color:Theme.muted;font.pixelSize:Theme.fontSize(15);Layout.fillWidth:true;wrapMode:Text.WordWrap}
+                SwirlText {text:"模块界面已具备，实际功能待接入";font.pixelSize:Theme.fontSize(22);font.weight:Font.DemiBold;color:Theme.text}
+                SwirlText {text:page.feature ? page.feature.sub : "";color:Theme.muted;font.pixelSize:Theme.fontSize(16);Layout.fillWidth:true;wrapMode:Text.WordWrap}
+                SwirlText {text:"可以编辑参数、增删条目、调整优先级、切换草稿启停、保存以及导入导出 JSON。这里的启用选项仅表示草稿意图，不代表操作系统或网络服务已经开启。";color:Theme.muted;font.pixelSize:Theme.fontSize(15);Layout.fillWidth:true;wrapMode:Text.WordWrap}
+                SwirlText {text:"Apple / 移动平台专有能力保留参考模块，Windows 的实际实现方式需后续确定。";color:Theme.muted;font.pixelSize:Theme.fontSize(15);Layout.fillWidth:true;wrapMode:Text.WordWrap}
                 Item {Layout.fillHeight:true}
             }
         }

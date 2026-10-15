@@ -15,6 +15,7 @@ SwirlMotionButton {
     implicitHeight:Theme.controlHeight
     hoverEnabled: true
     font.family: Theme.fontFamily
+    font.hintingPreference:Font.PreferFullHinting
     font.pixelSize:Theme.fontSize(13)
     leftPadding:Theme.dp(12); rightPadding:Theme.dp(12)
     topPadding:Theme.dp(4); bottomPadding:Theme.dp(4)
@@ -41,7 +42,7 @@ SwirlMotionButton {
             name: control.iconName; size:Theme.dp(16)
             color: control.primary ? "white" : control.danger ? Theme.red : Theme.muted
         }
-        Text {
+        SwirlText {
             text: AppState.zh(control.text)+(control.development?" · 研发中":"")
             font.family: control.font.family
             font.pixelSize: control.font.pixelSize

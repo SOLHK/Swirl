@@ -21,16 +21,16 @@ Item {
         RowLayout {
             Layout.fillWidth:true
             SwirlStatusBadge { label:"日志记录"; tone:"accent" }
-            Text { text:displayLogs.length+" 条诊断事件"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
+            SwirlText { text:displayLogs.length+" 条诊断事件"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
             SwirlButton { text:"导出诊断报告"; iconName:"folder"; onClicked:diagnosticFile.open() }
-            SwirlButton { text:"标记已处理";enabled:diagnostics.eventCount>0;onClicked:diagnostics.acknowledge() }
+            SwirlButton { text:"标记已读";enabled:diagnostics.eventCount>0;onClicked:diagnostics.acknowledge() }
             SwirlButton { text:"清空"; danger:true; onClicked:{systemProvider.clearLogs();page.selected=null} }
         }
         RowLayout {
             Layout.fillWidth:true
             SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:"搜索消息、级别或组件" }
             SwirlComboBox { id:level; model:["全部级别","INFO","DEBUG","WARN","ERROR"] }
-            Text { text:"跟随最新日志"; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
+            SwirlText { text:"跟随最新日志"; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
             SwirlToggle { checked:page.followTail; onToggled:page.followTail=checked }
         }
         RowLayout {
@@ -60,22 +60,22 @@ Item {
                         ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
                         ColumnLayout {
                     width:detailScroll0.availableWidth; spacing:Theme.dp(12)
-                    Text { text:"事件详情"; color:Theme.text; font.pixelSize:Theme.fontSize(16); font.weight:Font.DemiBold }
+                    SwirlText { text:"事件详情"; color:Theme.text; font.pixelSize:Theme.fontSize(16); font.weight:Font.DemiBold }
                     SwirlStatusBadge { label:page.selected?page.selected.level:"未选择"; tone:page.selected&&page.selected.level==="ERROR"?"warning":"neutral" }
                     Repeater {
                         model:[["TIME",page.selected?page.selected.time:"—"],["COMPONENT",page.selected?page.selected.source:"—"],
                                ["MESSAGE",page.selected?page.selected.message:"—"]]
                         ColumnLayout {
                             Layout.fillWidth:true; spacing:Theme.dp(4)
-                            Text { text:AppState.zh(modelData[0]); font.pixelSize:Theme.fontSize(10); color:Theme.muted }
-                            Text { text:AppState.zh(modelData[1]); font.pixelSize:Theme.fontSize(12); color:Theme.text; Layout.fillWidth:true; wrapMode:Text.WordWrap }
+                            SwirlText { text:AppState.zh(modelData[0]); font.pixelSize:Theme.fontSize(10); color:Theme.muted }
+                            SwirlText { text:AppState.zh(modelData[1]); font.pixelSize:Theme.fontSize(12); color:Theme.text; Layout.fillWidth:true; wrapMode:Text.WordWrap }
                         }
                     }
                     Rectangle { Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(1); color:Theme.border }
-                    Text { text:"诊断事件"; color:Theme.muted; font.pixelSize:Theme.fontSize(10) }
-                    Text {
+                    SwirlText { text:"诊断事件"; color:Theme.muted; font.pixelSize:Theme.fontSize(10) }
+                    SwirlText {
                         Layout.fillWidth:true
-                        text:"仅记录 Swirl 可观测的故障。日志已脱敏并限制大小；诊断 ZIP 保存在本机，不会自动上传。"
+                        text:"记录 Swirl 可观测的活动与诊断事件。日志已脱敏并限制大小；诊断 ZIP 保存在本机，不会自动上传。"
                         color:Theme.muted; font.pixelSize:Theme.fontSize(12); wrapMode:Text.WordWrap
                     }
 

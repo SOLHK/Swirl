@@ -50,7 +50,7 @@ DiagnosticService::DiagnosticService(QString directory,QObject *parent):QObject(
  // The last append can take a rotated file slightly beyond 1 MiB.
  QFile recent(m_directory+"/events.jsonl");if(recent.open(QIODevice::ReadOnly)&&recent.size()<=2*1024*1024){for(const auto &line:recent.readAll().split('\n')){auto row=QJsonDocument::fromJson(line).object();if(row.isEmpty())continue;
   if(row.value("source")=="Diagnostics"&&row.value("code")=="EventsCleared"){m_records.clear();m_events=0;continue;}
-  m_records.prepend(row.toVariantMap());if(row.value("level")=="ERROR")m_events=qMin(500,m_events+1);if(row.value("source")=="Diagnostics"&&row.value("code")=="EventsAcknowledged")m_events=0;while(m_records.size()>500)m_records.removeLast();}}
+  m_records.prepend(row.toVariantMap());if(QStringList{"INFO","WARN","ERROR"}.contains(row.value("level").toString()))m_events=qMin(500,m_events+1);if(row.value("source")=="Diagnostics"&&row.value("code")=="EventsAcknowledged")m_events=0;while(m_records.size()>500)m_records.removeLast();}}
 }
 DiagnosticService::~DiagnosticService(){if(active==this){qInstallMessageHandler(nullptr);active=nullptr;}}
 QString DiagnosticService::redact(QString text){
@@ -72,15 +72,15 @@ void DiagnosticService::record(const QString &level,const QString &module,const 
  {QMutexLocker lock(&m_mutex);
   // Serialize clear/acknowledge with producers, including their durable marker.
   if(module=="Diagnostics"&&code=="EventsCleared"){m_records.clear();m_events=0;}
-  else {m_records.prepend(row);while(m_records.size()>500)m_records.removeLast();if(level=="ERROR")m_events=qMin(500,m_events+1);if(module=="Diagnostics"&&code=="EventsAcknowledged")m_events=0;}
+  else {m_records.prepend(row);while(m_records.size()>500)m_records.removeLast();if(level=="INFO"||level=="WARN"||level=="ERROR")m_events=qMin(500,m_events+1);if(module=="Diagnostics"&&code=="EventsAcknowledged")m_events=0;}
   const auto path=m_directory+"/events.jsonl";if(QFileInfo(path).size()>1024*1024){QFile::remove(path+".3");for(int n=2;n>=1;--n)QFile::rename(path+"."+QString::number(n),path+"."+QString::number(n+1));QFile::rename(path,path+".1");}
   QFile file(path);if(file.open(QIODevice::WriteOnly|QIODevice::Append)){file.write(QJsonDocument(QJsonObject::fromVariantMap(row)).toJson(QJsonDocument::Compact));file.write("\n");}
  }emit changed();
 }
 QVariantList DiagnosticService::records() const {QMutexLocker lock(&m_mutex);return m_records;}
 int DiagnosticService::eventCount() const {QMutexLocker lock(&m_mutex);return m_events;}
-void DiagnosticService::acknowledge(){record("INFO","Diagnostics","EventsAcknowledged","已将当前重要事件标记为已处理");}
-void DiagnosticService::clearView(){record("INFO","Diagnostics","EventsCleared","已清空事件列表与未处理计数");}
+void DiagnosticService::acknowledge(){record("INFO","Diagnostics","EventsAcknowledged","已将当前事件标记为已读");}
+void DiagnosticService::clearView(){record("INFO","Diagnostics","EventsCleared","已清空事件列表与未读计数");}
 void DiagnosticService::installQtHandler(){active=this;qInstallMessageHandler(qtHandler);
 #ifdef Q_OS_WIN
  const auto path=QDir::toNativeSeparators(m_directory+"/crash-code.txt").left(32767);path.toWCharArray(crashPath);crashPath[path.size()]=0;SetUnhandledExceptionFilter(recordCrash);std::set_terminate(recordTerminate);

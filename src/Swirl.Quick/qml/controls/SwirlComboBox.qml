@@ -11,10 +11,11 @@ ComboBox {
     opacity:enabled?1:0.45
     focusPolicy:Qt.StrongFocus
     font.family: Theme.fontFamily
+    font.hintingPreference:Font.PreferFullHinting
     font.pixelSize:Theme.fontSize(13)
     leftPadding:Theme.controlPadding; rightPadding:Theme.dp(28)
     topPadding:Theme.dp(4); bottomPadding:Theme.dp(4)
-    contentItem: Text {
+    contentItem: SwirlText {renderType:Text.NativeRendering;
         text: AppState.zh(control.displayText)
         color: Theme.text
         font: control.font
@@ -33,7 +34,7 @@ ComboBox {
         color: control.pressed ? Theme.pressed : control.hovered ? Theme.hover : Theme.buttonBase
         border.width:control.activeFocus?Theme.dp(2):Theme.borderWidth
         border.color: control.activeFocus ? Theme.focusBorder : Theme.controlBorder
-        Behavior on color { ColorAnimation { duration: SwirlMotion.duration } }
+        Behavior on color { ColorAnimation { duration: Math.min(100,SwirlMotion.duration) } }
     }
     delegate: ItemDelegate {
         objectName:"swirlComboOption-"+index
@@ -42,7 +43,7 @@ ComboBox {
         height:Theme.controlHeight
         text: String(modelData)
         highlighted: control.highlightedIndex === index
-        contentItem: Text {
+        contentItem: SwirlText {renderType:Text.NativeRendering;
             text: AppState.zh(parent.text)
             color: parent.highlighted ? "white" : Theme.text; font.pixelSize:Theme.fontSize(13); font.family: Theme.fontFamily
             verticalAlignment: Text.AlignVCenter; leftPadding:Theme.dp(24)
@@ -50,7 +51,7 @@ ComboBox {
         }
         background: Rectangle {
             radius: Theme.controlRadius; antialiasing:true; color: parent.highlighted ? Theme.accent : "transparent"
-            Behavior on color { ColorAnimation { duration: SwirlMotion.duration } }
+            Behavior on color { ColorAnimation { duration: Math.min(100,SwirlMotion.duration) } }
         }
     }
     popup: Popup {
@@ -59,7 +60,7 @@ ComboBox {
         transformOrigin:Item.TopLeft
     onAboutToShow: {
         if(SwirlMotion.reduced){scale=1;opacity=1}
-        else if(scale===1 && opacity===1){scale=0.96;opacity=0}
+        else opacity=0
     }
     onClosed:{scale=1;opacity=1}
 
@@ -71,11 +72,10 @@ ComboBox {
         enter: Transition {
         enabled:!SwirlMotion.reduced
             ParallelAnimation {
-                NumberAnimation { property:"opacity";to:1; duration: SwirlMotion.duration }
-                NumberAnimation{property:"scale";to:1;duration:SwirlMotion.dialogDuration;easing.type:Easing.OutCubic}
+                NumberAnimation { property:"opacity";to:1; duration: Math.min(100,SwirlMotion.duration) }
             }
         }
-        exit: Transition { enabled:!SwirlMotion.reduced; ParallelAnimation { NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.duration} NumberAnimation {property:"scale";to:0.96;duration:SwirlMotion.duration;easing.type:Easing.InCubic} } }
+        exit: Transition { enabled:!SwirlMotion.reduced; ParallelAnimation { NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.duration} } }
         background: Rectangle {
             color:Theme.surface
             radius: Theme.popupRadius; antialiasing:true

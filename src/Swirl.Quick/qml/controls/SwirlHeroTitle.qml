@@ -38,7 +38,7 @@ Item {
     Connections { target: clock; function onMovingChanged() { if (!clock.moving) { hero.sourceItem=null; hero.targetItem=null; hero.title="" } } }
     Binding { target: hero.sourceItem; property: "opacity"; value: 0; when: hero.moving && hero.sourceItem!==null; restoreMode: Binding.RestoreBindingOrValue }
     Binding { target: hero.targetItem; property: "opacity"; value: 0; when: hero.moving && hero.targetItem!==null; restoreMode: Binding.RestoreBindingOrValue }
-    Text {
+    SwirlText {
         visible: hero.moving
         x: hero.origin.x+(hero.targetRect.x-hero.origin.x)*hero.progress
         y: hero.origin.y+(hero.targetRect.y-hero.origin.y)*hero.progress

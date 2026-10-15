@@ -13,7 +13,7 @@ QtObject {
     readonly property int pressDuration:ms(110)
     readonly property int hoverDuration:ms(150)
     readonly property int switchDuration:ms(180)
-    readonly property int pageDuration:ms(264)
+    readonly property int pageDuration:ms(160)
     readonly property int dialogDuration:ms(264)
     readonly property int exitDuration:ms(160)
     readonly property int expandDuration:ms(288)

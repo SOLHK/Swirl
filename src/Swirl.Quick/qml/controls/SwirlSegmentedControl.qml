@@ -37,7 +37,7 @@ Item {
                     color:control.currentIndex!==index && parent.hovered?Theme.withAlpha(Theme.hover,0.5):"transparent"
                     Behavior on color{ColorAnimation{duration:SwirlMotion.hoverDuration}}
                 }
-                contentItem: Text {
+                contentItem: SwirlText {
                     text: AppState.zh(String(modelData))
                     color:control.currentIndex===index&&control.accentSelection?"white":control.currentIndex===index?Theme.text:Theme.muted
                     leftPadding:control.optionIcons.length?Theme.dp(18):0

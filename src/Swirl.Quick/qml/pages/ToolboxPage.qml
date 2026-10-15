@@ -12,20 +12,20 @@ Item {
     property var tools:["DNS 查询","TCP 连通性","Traceroute","HTTP 请求","TLS 证书检查","端口检查","IP 地址查询","Whois","连接测试","网络接口信息"]
     ColumnLayout {
         anchors.fill:parent; anchors.margins:Theme.dp(23); spacing:Theme.dp(14)
-        Text { text:"网络诊断";font.weight:Font.DemiBold; font.pixelSize:Theme.fontSize(28);color:Theme.text }
+        SwirlText { text:"网络诊断";font.weight:Font.DemiBold; font.pixelSize:Theme.fontSize(28);color:Theme.text }
         RowLayout {
             Layout.fillWidth:true
-            Text {text:engineController.telemetry.measurementState||"尚未测量";color:Theme.muted;Layout.fillWidth:true}
+            SwirlText {text:engineController.telemetry.measurementState||"尚未测量";color:Theme.muted;Layout.fillWidth:true}
             SwirlButton {text:"开始检测";enabled:engineController.telemetry.measurementState!=="正在测量";onClicked:{engineController.telemetry.measureNetwork();if(engineController.selectedNodeId.length&&!engineController.tests.busy)engineController.testSelectedNode(engineController.selectedNodeId,"https://www.gstatic.com/generate_204")}}
         }
         SwirlGlassPanel { Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(155)
             ColumnLayout {anchors.fill:parent;anchors.margins:Theme.cardPadding;spacing:Theme.dp(10)
-                Text {text:"互联网 TCP："+(engineController.telemetry.latencies.internet||"未采集")+"  ·  默认网关 ICMP："+(engineController.telemetry.latencies.router||"未采集")+"  ·  DNS 查询："+(engineController.telemetry.latencies.dns||"未采集");color:Theme.text;Layout.fillWidth:true;wrapMode:Text.Wrap}
-                Text {text:"外部 IP："+(engineController.telemetry.externalIp||"未检测")+"  ·  "+systemProvider.currentNetwork().type;color:Theme.text;Layout.fillWidth:true;wrapMode:Text.Wrap}
-                Text {text:"互联网测量为直连 TCP 握手；网关来自当前活动网卡；出口检测经实际 Swirl 分流。节点检测使用独立引擎。";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
+                SwirlText {text:"互联网 TCP："+(engineController.telemetry.latencies.internet||"未采集")+"  ·  默认网关 ICMP："+(engineController.telemetry.latencies.router||"未采集")+"  ·  DNS 查询："+(engineController.telemetry.latencies.dns||"未采集");color:Theme.text;Layout.fillWidth:true;wrapMode:Text.Wrap}
+                SwirlText {text:"外部 IP："+(engineController.telemetry.externalIp||"未检测")+"  ·  "+systemProvider.currentNetwork().type;color:Theme.text;Layout.fillWidth:true;wrapMode:Text.Wrap}
+                SwirlText {text:"互联网测量为直连 TCP 握手；网关来自当前活动网卡；出口检测经实际 Swirl 分流。节点检测使用独立引擎。";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
             }
         }
-        Text { text:"其他自定义工具（研发中）"; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
+        SwirlText { text:"其他自定义工具（研发中）"; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
         RowLayout {
             Layout.fillWidth:true; Layout.fillHeight:true; spacing:Theme.dp(15)
             SwirlGlassPanel {
@@ -35,7 +35,7 @@ Item {
                     ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
                     ColumnLayout {
                     width:detailScroll0.availableWidth; height:Math.max(implicitHeight,detailScroll0.availableHeight); spacing:Theme.dp(9)
-                    Text { text:"网络实用工具"; color:Theme.muted; font.pixelSize:Theme.fontSize(11); leftPadding:Theme.dp(8) }
+                    SwirlText { text:"网络实用工具"; color:Theme.muted; font.pixelSize:Theme.fontSize(11); leftPadding:Theme.dp(8) }
                     ListView {
                     add: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";from:0;to:1;duration:SwirlMotion.duration} }
                     remove: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.duration} }
@@ -49,7 +49,7 @@ Item {
                             RowLayout {
                                 anchors.fill:parent; anchors.leftMargin:Theme.dp(10)
                                 SwirlIcon { name:"tool"; size:Theme.dp(17); color:Theme.muted }
-                                Text { text:modelData; color:Theme.text; font.pixelSize:Theme.fontSize(12); elide:Text.ElideRight; Layout.fillWidth:true }
+                                SwirlText { text:modelData; color:Theme.text; font.pixelSize:Theme.fontSize(12); elide:Text.ElideRight; Layout.fillWidth:true }
                             }
                             MouseArea { id:area; anchors.fill:parent; hoverEnabled:true; onClicked:AppState.notice("研发中") }
                         }
@@ -65,13 +65,13 @@ Item {
                         Layout.fillWidth:true
                         ColumnLayout {
                             Layout.fillWidth:true
-                            Text { text:page.tool; color:Theme.text; font.pixelSize:Theme.fontSize(22); font.weight:Font.DemiBold }
-                            Text { text:"独立检查面板"; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
+                            SwirlText { text:page.tool; color:Theme.text; font.pixelSize:Theme.fontSize(22); font.weight:Font.DemiBold }
+                            SwirlText { text:"独立检查面板"; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
                         }
                         SwirlStatusBadge { label:"本地"; tone:"accent" }
                     }
                     Rectangle { Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(1); color:Theme.border }
-                    Text { text:page.tool==="网络接口信息"?"网卡名称":"目标域名、地址或 URL"; color:Theme.text; font.pixelSize:Theme.fontSize(13) }
+                    SwirlText { text:page.tool==="网络接口信息"?"网卡名称":"目标域名、地址或 URL"; color:Theme.text; font.pixelSize:Theme.fontSize(13) }
                     SwirlTextField {
                         id:target; Layout.fillWidth:true
                         placeholderText:page.tool==="HTTP 请求"?"https://example.test/path":"example.test"
@@ -95,7 +95,7 @@ Item {
                             onClicked:AppState.notice("研发中")
                         }
                     }
-                    Text { text:"结果"; color:Theme.muted; font.pixelSize:Theme.fontSize(11); font.weight:Font.DemiBold }
+                    SwirlText { text:"结果"; color:Theme.muted; font.pixelSize:Theme.fontSize(11); font.weight:Font.DemiBold }
                     Rectangle {
                         Layout.fillWidth:true; Layout.fillHeight:true
                         color:Theme.field; border.color:Theme.border; radius:Theme.roundedRadius(width,height)

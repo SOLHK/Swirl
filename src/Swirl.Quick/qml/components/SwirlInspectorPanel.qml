@@ -23,7 +23,7 @@ SwirlGlassPanel {
         spacing:Theme.dp(13)
         RowLayout {
             Layout.fillWidth:true
-            Text {
+            SwirlText {
                 Layout.fillWidth:true
                 text:record?record.method+"  "+record.host:"请求详情"
                 color:Theme.text; font.pixelSize:Theme.fontSize(15); font.weight:Font.DemiBold
@@ -100,7 +100,7 @@ SwirlGlassPanel {
                     fillMode:Image.PreserveAspectFit
                     Layout.alignment:Qt.AlignHCenter
                 }
-                Text {
+                SwirlText {
                     text:"Swirl 图像预览"
                     color:Theme.muted; font.pixelSize:Theme.fontSize(11)
                     Layout.alignment:Qt.AlignHCenter
@@ -111,7 +111,7 @@ SwirlGlassPanel {
             Layout.fillWidth:true
             SwirlButton { text:"Copy"; iconName:"code"; onClicked:{systemProvider.copyText(inspector.detailsText()); AppState.toast="已复制请求详情"} }
             Item { Layout.fillWidth:true }
-            Text { text:"响应详情"; color:Theme.muted; font.pixelSize:Theme.fontSize(10) }
+            SwirlText { text:"响应详情"; color:Theme.muted; font.pixelSize:Theme.fontSize(10) }
         }
     }
 }

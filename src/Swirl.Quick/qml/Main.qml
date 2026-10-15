@@ -12,30 +12,11 @@ ApplicationWindow {
     readonly property var engineControllerContext: engineController
     readonly property var systemProviderContext: systemProvider
     readonly property var captureProviderContext: captureProvider
-    // Qt 6.10 RHI requests FP16 scRGB and falls back to SDR when unsupported.
-    // Version-specific Qt hook; HdrOutput checks the actual swapchain format.
-    property string _qt_sg_hdr_format:"scrgb"
-    Component {
-        id:hdrComposite
-        ShaderEffect {
-            property var source
-            property vector2d outputSize:Qt.vector2d(window.width,window.height)
-            property real hdrActive:hdrOutput.active?1:0
-            property real whiteScale:hdrOutput.whiteScale
-            property real peakValue:hdrOutput.peakValue
-            property real glowEnabled:hdrOutput.glowEnabled?1:0
-            property vector4d redLamp:Qt.vector4d(Theme.dp(20),Theme.dp(16),Theme.dp(7),1)
-            property vector4d yellowLamp:Qt.vector4d(Theme.dp(47),redLamp.y,redLamp.z,1)
-            property vector4d greenLamp:Qt.vector4d(Theme.dp(74),redLamp.y,redLamp.z,1)
-            fragmentShader:"qrc:/swirl/shaders/hdr-ui.frag.qsb"
-        }
-    }
-    Binding { target:window.contentItem.layer; property:"enabled"; value:hdrOutput.active }
-    Binding { target:window.contentItem.layer; property:"effect"; value:hdrComposite }
-    // Qt Controls popups live in the overlay, outside ApplicationWindow content.
-    readonly property Item popupOverlay:window.contentItem ? window.contentItem.Overlay.overlay : null
-    Binding { target:window.popupOverlay ? window.popupOverlay.layer : null; property:"enabled"; value:hdrOutput.active; when:window.popupOverlay!==null }
-    Binding { target:window.popupOverlay ? window.popupOverlay.layer : null; property:"effect"; value:hdrComposite; when:window.popupOverlay!==null }
+    // Use Qt's standard SDR swapchain, also on an HDR desktop. Qt Quick 2D
+    // cannot color-manage all foreground primitives via a window-wide shader
+    // without text entering another texture. Clarity takes priority until that
+    // path can operate per primitive. HDR capability/readback remains available
+    // in the dedicated test renderer; no foreground postprocessing is applied.
     visible:true
     width:Theme.dp(914); height:Theme.dp(672)
     // Qt Quick reports logical dimensions and handles each QScreen's device
@@ -123,7 +104,7 @@ ApplicationWindow {
             id:mainArea; x:window.actualSidebarWidth+window.sidebarGutter; width:parent.width-x-Theme.dp(12); height:parent.height
             RowLayout {
                 id:toolbar; visible:AppState.currentPage==="activity"; x:Theme.dp(4); y:Theme.dp(8); width:parent.width-Theme.dp(14); height:Theme.statusHeight; spacing:Theme.dp(8)
-                SwirlStatusCapsule { objectName:"eventsCapsule"; Layout.preferredWidth:implicitWidth; Layout.preferredHeight:Theme.statusHeight; label:systemProvider.eventCount>0?systemProvider.eventCount+" 个事件":"暂无警告";tone:systemProvider.eventCount>0?"warning":"neutral"; onClicked:AppState.navigate("logs") }
+                SwirlStatusCapsule { objectName:"eventsCapsule"; Layout.preferredWidth:implicitWidth; Layout.preferredHeight:Theme.statusHeight; label:systemProvider.eventCount>0?systemProvider.eventCount+" 个事件":"暂无事件";tone:systemProvider.eventCount>0?"info":"neutral";detail:"查看事件与活动记录"; onClicked:AppState.navigate("logs") }
                 Item { Layout.fillWidth:true }
                 SwirlStatusCapsule { objectName:"proxyCapsule"; Layout.preferredWidth:implicitWidth; Layout.preferredHeight:Theme.statusHeight; label:engineController.systemProxy.systemEnabled&&!engineController.systemProxy.owned?"系统代理 · 其他应用":"系统代理";tone:engineController.systemProxy.error.length||engineController.routingError.length?"warning":engineController.systemProxy.systemEnabled?"success":"neutral";detail:engineController.systemProxy.error||engineController.routingError||(engineController.systemProxy.systemEnabled&&!engineController.systemProxy.owned?"系统代理由其他应用启用，点击让 Swirl 接管":engineController.systemProxy.enabled?"系统代理已开启，点击关闭":"系统代理已关闭，点击开启"); enabled:!engineController.busy; onClicked:{window.proxyRequestedAction=!engineController.systemProxy.enabled;window.proxyTogglePending=true;engineController.setSystemProxy(window.proxyRequestedAction);window.showProxyError()} }
                 SwirlStatusCapsule { objectName:"tunCapsule"; Layout.preferredWidth:implicitWidth; Layout.preferredHeight:Theme.statusHeight; label:"增强模式";detail:engineController.routingError||(engineController.tunEnabled?"增强模式已开启，点击关闭":"点击开启增强模式接管网络"); tone:engineController.tunEnabled?"success":"neutral"; enabled:!engineController.busy; onClicked:{if(!engineController.setTunEnabled(!engineController.tunRequested))AppState.notice(engineController.routingError||engineController.networkConfigurationError)} }
@@ -226,7 +207,7 @@ ApplicationWindow {
             id:settingsDiscard;objectName:"settingsDiscard";title:"放弃未保存的修改？";guardChanges:false
             parent:settingsSheet.contentItem
             ColumnLayout { width:parent.width;spacing:Theme.dp(14)
-                Text {text:"DNS 修改尚未应用。";color:Theme.text}
+                SwirlText {text:"DNS 修改尚未应用。";color:Theme.text}
                 RowLayout {Layout.alignment:Qt.AlignRight
                     SwirlButton {text:"继续编辑";onClicked:settingsDiscard.close()}
                     SwirlButton {text:"放弃修改";danger:true;onClicked:{settingsSheet.discardApproved=true;settingsDiscard.close();Qt.callLater(function(){settingsSheet.close()})}}
@@ -315,7 +296,7 @@ sourceComponent:settingsSheet.section==="subscriptions"?subscriptions:settingsSh
         anchors.horizontalCenter:parent.horizontalCenter; anchors.bottom:parent.bottom; anchors.bottomMargin:Theme.dp(28)
         width:Math.min(Theme.dp(570),window.width-Theme.dp(40)); height:Theme.dp(48); radius:Theme.controlRadius
         color:Theme.material("floating"); border.color:Theme.border
-        Text { anchors.fill:parent; anchors.margins:Theme.dp(12); text:AppState.toast; color:Theme.muted; font.pixelSize:Theme.fontSize(14); verticalAlignment:Text.AlignVCenter; elide:Text.ElideRight }
+        SwirlText { anchors.fill:parent; anchors.margins:Theme.dp(12); text:AppState.toast; color:Theme.muted; font.pixelSize:Theme.fontSize(14); verticalAlignment:Text.AlignVCenter; elide:Text.ElideRight }
     }
     Timer {
         running:smokeTestMode; repeat:true; interval:200

@@ -31,13 +31,14 @@ class EngineController final : public QObject {
     Q_PROPERTY(QString configurationSummary READ configurationSummary NOTIFY statusChanged)
     Q_PROPERTY(QString controlEndpoint READ controlEndpoint NOTIFY statusChanged)
     Q_PROPERTY(QVariantList nodes READ nodes NOTIFY nodesChanged)
-    Q_PROPERTY(QString selectedNodeId READ selectedNodeId NOTIFY nodesChanged)
-    Q_PROPERTY(QString selectedNodeName READ selectedNodeName NOTIFY nodesChanged)
+    Q_PROPERTY(QVariantList nodeCatalog READ nodeCatalog NOTIFY nodeCatalogChanged)
+    Q_PROPERTY(QString selectedNodeId READ selectedNodeId NOTIFY selectionChanged)
+    Q_PROPERTY(QString selectedNodeName READ selectedNodeName NOTIFY selectionChanged)
     Q_PROPERTY(bool connected READ connected NOTIFY statusChanged)
     Q_PROPERTY(QString activeNodeId READ activeNodeId NOTIFY statusChanged)
     Q_PROPERTY(QString nodeStateText READ nodeStateText NOTIFY statusChanged)
     Q_PROPERTY(QString requestStateText READ requestStateText NOTIFY statusChanged)
-    Q_PROPERTY(QString nodeError READ nodeError NOTIFY nodesChanged)
+    Q_PROPERTY(QString nodeError READ nodeError NOTIFY selectionChanged)
     Q_PROPERTY(bool nodeBusy READ nodeBusy NOTIFY statusChanged)
     Q_PROPERTY(bool requestSucceeded READ requestSucceeded NOTIFY statusChanged)
     Q_PROPERTY(int proxyPort READ proxyPort WRITE setProxyPort NOTIFY optionsChanged)
@@ -92,6 +93,7 @@ public:
     Q_INVOKABLE void stop();
     Q_INVOKABLE void refresh();
     QVariantList nodes() const;
+    QVariantList nodeCatalog() const { return m_store.publicRows(); }
     QString selectedNodeId() const { return m_store.selectedId(); }
     QString selectedNodeName() const;
     bool connected() const { const auto s=m_engine->status();return s.apiHealthy&&s.processAlive&&(!s.selectedNodeId.isEmpty()||s.directSession); }
@@ -154,6 +156,8 @@ public:
     Q_INVOKABLE void setRoutingMode(const QString &mode);
     Q_INVOKABLE void setSystemProxy(bool enabled);
 signals:
+    void nodeCatalogChanged();
+    void selectionChanged();
     void diagnostic(const QString &module,const QString &code,const QString &message);
     void statusChanged();
     void optionsChanged();

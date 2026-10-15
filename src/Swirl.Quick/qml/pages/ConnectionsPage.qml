@@ -26,7 +26,7 @@ Item {
         anchors.fill:parent
         anchors.leftMargin:Theme.dp(23); anchors.rightMargin:Theme.dp(23); anchors.bottomMargin:Theme.dp(14)
         spacing:Theme.dp(14)
-        RowLayout {Layout.fillWidth:true;Text {text:"活动连接";color:Theme.text;font.pixelSize:Theme.fontSize(22);Layout.fillWidth:true}Text {id:activeCount;text:engineController.telemetry.connectionsSampled?String(engineController.telemetry.activeConnections):"—";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold}SwirlButton {text:"返回";visible:SwirlMotion.returnShared && SwirlMotion.returnShared.route===AppState.currentPage;onClicked:SwirlMotion.returnToHub(activeCount)}}
+        RowLayout {Layout.fillWidth:true;SwirlText {text:"活动连接";color:Theme.text;font.pixelSize:Theme.fontSize(22);Layout.fillWidth:true}SwirlText {id:activeCount;text:engineController.telemetry.connectionsSampled?String(engineController.telemetry.activeConnections):"—";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold}SwirlButton {text:"返回";visible:SwirlMotion.returnShared && SwirlMotion.returnShared.route===AppState.currentPage;onClicked:SwirlMotion.returnToHub(activeCount)}}
         RowLayout {
             Layout.fillWidth:true; spacing:Theme.dp(10)
             SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:AppState.zh("搜索域名、IP、进程或策略") }
@@ -38,7 +38,7 @@ Item {
         RowLayout {
             Layout.fillWidth:true; spacing:Theme.dp(8)
             SwirlStatusBadge { label:visibleRows.length+" 条记录"; tone:"accent" }
-            Text { text:AppState.zh("Click a row to examine a connection"); color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
+            SwirlText { text:AppState.zh("Click a row to examine a connection"); color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
             SwirlButton { text:AppState.detailOpen?"隐藏详情":"显示详情"; quiet:false; onClicked:AppState.detailOpen=!AppState.detailOpen }
         }
         RowLayout {
@@ -76,7 +76,7 @@ Item {
                         ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
                         ColumnLayout {
                     width:detailScroll0.availableWidth; spacing:Theme.dp(15)
-                    Text { text:AppState.zh("Connection details"); color:Theme.text; font.pixelSize:Theme.fontSize(16); font.weight:Font.DemiBold }
+                    SwirlText { text:AppState.zh("Connection details"); color:Theme.text; font.pixelSize:Theme.fontSize(16); font.weight:Font.DemiBold }
                     SwirlStatusBadge { label:page.selected?page.selected.status.toUpperCase():"尚未选择"; tone:page.selected?"success":"neutral" }
                     Repeater {
                         model:[
@@ -93,8 +93,8 @@ Item {
                         ]
                         ColumnLayout {
                             Layout.fillWidth:true; spacing:Theme.dp(3)
-                            Text { text:AppState.zh(modelData[0]); color:Theme.muted; font.pixelSize:Theme.fontSize(10) }
-                            Text { text:AppState.zh(modelData[1]); color:Theme.text; font.pixelSize:Theme.fontSize(13); elide:Text.ElideRight; Layout.fillWidth:true }
+                            SwirlText { text:AppState.zh(modelData[0]); color:Theme.muted; font.pixelSize:Theme.fontSize(10) }
+                            SwirlText { text:AppState.zh(modelData[1]); color:Theme.text; font.pixelSize:Theme.fontSize(13); elide:Text.ElideRight; Layout.fillWidth:true }
                         }
                     }
 

@@ -84,7 +84,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         auto *socket=subscriptions.nextPendingConnection();
         QObject::connect(socket,&QTcpSocket::readyRead,socket,[&,socket]{
             socket->readAll();if(socket->property("responded").toBool())return;socket->setProperty("responded",true);++subscriptionRequests;
-            const auto content=QString("proxies: [{name: Subscription fixture, type: socks5, server: 127.0.0.1, port: %1}]\n").arg(net.a.serverPort()).toUtf8();
+            const auto content=QString("proxies: [{name: %2 fixture, type: socks5, server: 127.0.0.1, port: %1}]\n").arg(net.a.serverPort()).arg(subscriptionRequests==1?"HK":"JP").toUtf8();
             QTimer::singleShot(600,socket,[socket,content]{socket->write("HTTP/1.1 200 OK\r\nContent-Length: "+QByteArray::number(content.size())+"\r\nConnection: close\r\n\r\n"+content);socket->disconnectFromHost();});
         });
         QObject::connect(socket,&QTcpSocket::disconnected,socket,&QObject::deleteLater);
@@ -98,6 +98,26 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         for(int frame=0;frame<25;++frame){QTest::qWait(40);window->grabWindow().scaledToWidth(1000,Qt::SmoothTransformation).save(businessQa+QString("/business-frames/%1.png").arg(frame,3,10,QChar('0')));}
     }
     check(QTest::qWaitFor([&]{return !controller->imports()->busy();},8000)&&controller->imports()->providers().size()==1&&controller->nodes().size()==1&&subscriptionRequests==1,"subscription UI saves HTTPS source and imports an actual node");
+    eval("AppState.navigate('proxies')");QTest::qWait(350);
+    check(eval("pageLoader.item.countries.length===1 && pageLoader.item.countries[0].code==='HK'").toBool(),"country filter contains only the imported subscription's actual Hong Kong label");
+    eval("pageLoader.item.countryCode='HK'");
+    check(eval("pageLoader.item.viewRows.length===1").toBool(),"country filter combines with the real imported node list");
+    const auto subscriptionSource=controller->imports()->providers().first().toMap().value("id").toString();
+    check(controller->saveNode({{"name","JP manual HTTP"},{"protocol","http"},{"host","127.0.0.1"},{"port",9}}),"manual node adds a second region outside the subscription");
+    const auto manualId=controller->nodes().last().toMap().value("id").toString();
+    check(eval("pageLoader.item.countries.length===2").toBool(),"all sources exposes both actual regions");
+    eval("pageLoader.item.countryCode='JP'");
+    check(eval("pageLoader.item.viewRows.length===1").toBool(),"Japan selection shows only the manual Japan node");
+    fill("nodeSearchField","manual");
+    auto *protocol=item("proxyRegionCombo");if(protocol)protocol->setProperty("currentIndex",controller->supportedProtocols().indexOf("http")+1);
+    check(eval("pageLoader.item.viewRows.length===1").toBool(),"search, protocol and country filters compose");
+    fill("nodeSearchField","unmatched");check(eval("pageLoader.item.viewRows.length===0").toBool(),"combined filters never leak unmatched nodes");
+    fill("nodeSearchField","");if(protocol)protocol->setProperty("currentIndex",0);
+    eval(QString("pageLoader.item.sourceId='%1'").arg(subscriptionSource));
+    check(eval("pageLoader.item.countries.length===1 && pageLoader.item.countries[0].code==='HK' && pageLoader.item.countryCode==='' && pageLoader.item.viewRows.length===1").toBool(),"switching subscription scopes countries and clears a country absent from that source");
+    check(controller->deleteNode(manualId),"remove manual filter fixture");
+    eval("pageLoader.item.countryCode='HK'");
+    eval("AppState.navigate('subscriptions')");QTest::qWait(350);
     if(!controller->imports()->providers().isEmpty()) {
         const auto id=controller->imports()->providers().first().toMap().value("id").toString();
         QPointer<QQuickItem> card=item("subscriptionCard-"+id);
@@ -108,6 +128,9 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         fill("subscriptionName","Edited subscription fixture");click("saveSubscription");
         check(QTest::qWaitFor([&]{return !controller->imports()->busy();},8000)&&controller->imports()->providers().first().toMap().value("name").toString()=="Edited subscription fixture"&&subscriptionRequests==2,"editing preserves encrypted URL and refreshes the real source");
         check(card&&item("subscriptionCard-"+id)==card,"subscription refresh keeps the same card delegate and expanded state");
+        eval("AppState.navigate('proxies')");QTest::qWait(350);
+        check(eval("pageLoader.item.countries.length===1 && pageLoader.item.countries[0].code==='JP' && pageLoader.item.countryCode==='' && pageLoader.item.viewRows.length===1").toBool(),"subscription refresh replaces country options and clears an obsolete country selection");
+        eval("AppState.navigate('subscriptions')");QTest::qWait(350);
         const auto qa=qEnvironmentVariable("SWIRL_UI_QA_DIRECTORY");
         if(!qa.isEmpty()){QDir().mkpath(qa);window->grabWindow().save(qa+"/subscription-success.png");}
         subscriptions.close();click("refreshSubscription-"+id);
