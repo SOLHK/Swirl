@@ -8,7 +8,7 @@ Item {
     id:page
     readonly property bool implemented:true
     property string tool:"DNS 查询"
-    property string result:"上方诊断使用真实测量；下面的自定义工具尚未实现。"
+    property string result:"上方诊断使用真实测量；下面的自定义工具研发中。"
     property var tools:["DNS 查询","TCP 连通性","Traceroute","HTTP 请求","TLS 证书检查","端口检查","IP 地址查询","Whois","连接测试","网络接口信息"]
     ColumnLayout {
         anchors.fill:parent; anchors.margins:Theme.dp(23); spacing:Theme.dp(14)
@@ -25,7 +25,7 @@ Item {
                 Text {text:"互联网测量为直连 TCP 握手；网关来自当前活动网卡；出口检测经实际 Swirl 分流。节点检测使用独立引擎。";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
             }
         }
-        Text { text:"其他自定义工具（尚未实现）"; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
+        Text { text:"其他自定义工具（研发中）"; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
         RowLayout {
             Layout.fillWidth:true; Layout.fillHeight:true; spacing:Theme.dp(15)
             SwirlGlassPanel {
@@ -51,7 +51,7 @@ Item {
                                 SwirlIcon { name:"tool"; size:Theme.dp(17); color:Theme.muted }
                                 Text { text:modelData; color:Theme.text; font.pixelSize:Theme.fontSize(12); elide:Text.ElideRight; Layout.fillWidth:true }
                             }
-                            MouseArea { id:area; anchors.fill:parent; hoverEnabled:true; onClicked:AppState.notice("尚未实现") }
+                            MouseArea { id:area; anchors.fill:parent; hoverEnabled:true; onClicked:AppState.notice("研发中") }
                         }
                     }
                 }
@@ -89,10 +89,10 @@ Item {
                             validator:IntValidator { bottom:1; top:65535 }
                         }
                         Item { Layout.fillWidth:true }
-                        SwirlButton { enabled:false;
+                        SwirlButton { development:true; enabled:false;
                             text:"运行"; primary:true; iconName:"play"
 
-                            onClicked:AppState.notice("尚未实现")
+                            onClicked:AppState.notice("研发中")
                         }
                     }
                     Text { text:"结果"; color:Theme.muted; font.pixelSize:Theme.fontSize(11); font.weight:Font.DemiBold }
@@ -111,7 +111,7 @@ Item {
                             }
                         }
                     }
-                    SwirlButton { enabled:false; text:"复制结果"; onClicked:AppState.notice("尚未实现") }
+                    SwirlButton { development:true; enabled:false; text:"复制结果"; onClicked:AppState.notice("研发中") }
                 }
             }
         }

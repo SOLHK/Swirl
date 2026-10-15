@@ -102,18 +102,10 @@ ApplicationWindow {
         target:Theme; property:"pageBranch"
         value:pageLoader.routeKey==="activity" || pageLoader.routeKey==="overview" || pageLoader.routeKey==="rewrite" ? "A" : "B"
     }
-    SwirlContinuousSurface {
-        id:windowCornerMask
-        width:window.width; height:window.height
-        radius:window.shellRadius; antialiasing:true
-        color:"white"; visible:false; layer.enabled:true
-    }
     Item {
         id:scaledCanvas
-        // Clip all page layers, including controls' shadows, to the same soft
-        // window outline. Background rectangles alone cannot clip descendants.
-        layer.enabled:Theme.effectsSupported
-        layer.effect:MultiEffect { maskEnabled:true; maskSource:windowCornerMask }
+        // Only the wallpaper material is sampled offscreen. Text and controls
+        // remain native scene-graph nodes at the window's physical resolution.
         width:window.width; height:window.height
         SwirlGlassMaterial {anchors.fill:parent;targetWindow:window}
 
@@ -200,8 +192,8 @@ ApplicationWindow {
         onVisibleChanged:if(visible)panelBackdrop.apply(dashboardWindow,Theme.transparency,Theme.dark)
         visible:false;width:Theme.dp(1300);height:Theme.dp(600);minimumWidth:Theme.dp(914);minimumHeight:Theme.dp(560);title:"Swirl 面板";flags:Qt.Window|Qt.FramelessWindowHint;color:"transparent"
         function openCaptureInspector(){window.openCaptureInspector()}
-        SwirlContinuousSurface{id:dashboardMask;anchors.fill:parent;radius:panelBackdrop.nativeCorners || (dashboardWindow.visibility===Window.Maximized || dashboardWindow.visibility===Window.FullScreen)?0:Theme.dp(24);visible:false;layer.enabled:true;color:"white"}
-        Item{anchors.fill:parent;layer.enabled:Theme.effectsSupported;layer.effect:MultiEffect{maskEnabled:true;maskSource:dashboardMask}
+        property real swirlWindowRadius:Theme.dp(24)
+        Item{anchors.fill:parent
         SwirlGlassMaterial{anchors.fill:parent;targetWindow:dashboardWindow}
         SwirlWindowTitleBar{id:dashboardTitleBar;anchors.left:parent.left;anchors.right:parent.right;targetWindow:dashboardWindow}
         ExternalToolsPage{anchors.left:parent.left;anchors.right:parent.right;anchors.top:dashboardTitleBar.bottom;anchors.bottom:parent.bottom;clip:true}
@@ -236,8 +228,8 @@ ApplicationWindow {
             closeApproved=false;window.requestActivate()
         }
         onSectionChanged:updateSettingsSection()
-        SwirlContinuousSurface{id:settingsMask;anchors.fill:parent;radius:settingsBackdrop.nativeCorners || (settingsSheet.visibility===Window.Maximized || settingsSheet.visibility===Window.FullScreen)?0:Theme.dp(27);visible:false;layer.enabled:true;color:"white"}
-        Item{anchors.fill:parent;opacity:settingsSheet.reveal;layer.enabled:Theme.effectsSupported;layer.effect:MultiEffect{maskEnabled:true;maskSource:settingsMask}
+        property real swirlWindowRadius:Theme.dp(27)
+        Item{anchors.fill:parent;opacity:settingsSheet.reveal
         SwirlGlassMaterial{anchors.fill:parent;targetWindow:settingsSheet}
         SwirlWindowTitleBar{id:settingsTitleBar;anchors.left:parent.left;anchors.right:parent.right;targetWindow:settingsSheet}
         SwirlDialog {

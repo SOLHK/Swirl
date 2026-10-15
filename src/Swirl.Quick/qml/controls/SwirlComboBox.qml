@@ -6,7 +6,9 @@ ComboBox {
     implicitWidth:Theme.dp(146)
     implicitHeight:Theme.dp(24)
     hoverEnabled: true
-    MouseArea { anchors.fill:parent;acceptedButtons:Qt.LeftButton;onClicked:{control.forceActiveFocus();if(control.popup.visible)control.popup.close();else control.popup.open()} }
+    // Let ComboBox own pointer grabs, keyboard activation and popup focus.
+    // Opening its popup through an overlay MouseArea bypasses that lifecycle.
+    focusPolicy:Qt.StrongFocus
     font.family: Theme.fontFamily
     font.pixelSize:Theme.fontSize(13)
     leftPadding:Theme.dp(8); rightPadding:Theme.dp(20)
@@ -33,6 +35,7 @@ ComboBox {
         Behavior on color { ColorAnimation { duration: SwirlMotion.duration } }
     }
     delegate: ItemDelegate {
+        objectName:"swirlComboOption-"+index
         SwirlPressMotion{}
         width: control.popup.availableWidth
         height:Theme.dp(24)

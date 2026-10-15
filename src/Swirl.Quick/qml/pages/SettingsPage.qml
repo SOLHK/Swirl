@@ -52,7 +52,7 @@ Item {
                         width:options.availableWidth; spacing:Theme.dp(17)
                         Text { text:AppState.zh(page.section); color:Theme.text; font.pixelSize:Theme.fontSize(23); font.weight:Font.DemiBold }
                         Text {
-                            text:page.section==="外观"?"主题、窗口材质、动画与界面缩放。":page.section==="字体"?"选择喜欢的字体，立即应用并自动保存。":page.section==="代理"?"引擎、真实节点与当前用户系统代理 · 国内外分流。":page.section==="关于 Swirl"?"版本与项目信息":"此项尚未实现。"
+                            text:page.section==="外观"?"主题、窗口材质、动画与界面缩放。":page.section==="字体"?"选择喜欢的字体，立即应用并自动保存。":page.section==="代理"?"引擎、真实节点与当前用户系统代理 · 国内外分流。":page.section==="关于 Swirl"?"版本与项目信息":"此项研发中。"
                             color:Theme.muted; wrapMode:Text.WordWrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12)
                         }
                         Rectangle { Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(1); color:Theme.border }
@@ -66,9 +66,10 @@ Item {
                                     Text { text:AppState.zh("Choose light, dark or follow Windows"); color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
                                 }
                                 SwirlComboBox {
+                                    objectName:"themeModePicker"
                                     model:["跟随系统","浅色","深色"]
                                     currentIndex:["System","Light","Dark"].indexOf(Theme.mode)
-                                    onActivated:Theme.mode=["System","Light","Dark"][currentIndex]
+                                    onActivated:function(index){Theme.mode=["System","Light","Dark"][index]}
                                 }
                             }
                             RowLayout {
@@ -179,7 +180,7 @@ Item {
                                         model:modelData==="默认策略"?["自动选择","直连"]:modelData==="解析器选择"?["系统 DNS","加密 DNS"]:["自动","手动指定"]
                                         Accessible.name:modelData
                                     }
-                                    SwirlButton { enabled:false;
+                                    SwirlButton { development:true; enabled:false;
                                         visible:page.section==="快捷键"
                                         text:modelData==="全局搜索快捷键"?"Ctrl+K":modelData==="页面导航快捷键"?"Alt+← / →":"未设置"
                                         Accessible.name:modelData

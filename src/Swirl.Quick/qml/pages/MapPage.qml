@@ -19,13 +19,13 @@ Item {
             Layout.fillWidth:true
             SwirlStatusBadge { label:"响应映射"; tone:"accent" }
             Text { text:"不会读取文件或重定向实际请求"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
-            SwirlButton { enabled:false; text:"新建映射"; primary:true; onClicked:newDialog.open() }
+            SwirlButton { development:true; enabled:false; text:"新建映射"; primary:true; onClicked:newDialog.open() }
         }
         RowLayout {
             Layout.fillWidth:true
             Repeater {
                 model:["本地映射","远程映射"]
-                SwirlButton { enabled:false; text:modelData; quiet:page.selectedTab!==modelData; onClicked:AppState.notice("尚未实现") }
+                SwirlButton { development:true; enabled:false; text:modelData; quiet:page.selectedTab!==modelData; onClicked:AppState.notice("研发中") }
             }
             Item { Layout.fillWidth:true }
             SwirlSearchField { id:search; implicitWidth:Theme.dp(260); placeholderText:"筛选映射 URL" }
@@ -70,10 +70,10 @@ Item {
                             color:Theme.text; font.family:"Cascadia Code"; font.pixelSize:Theme.fontSize(11); wrapMode:Text.WrapAnywhere
                         }
                     }
-                    SwirlButton { enabled:false;
+                    SwirlButton { development:true; enabled:false;
                         text:"保存映射"; primary:true
 
-                        onClicked:AppState.notice("尚未实现")
+                        onClicked:AppState.notice("研发中")
                     }
                 }
                 }
@@ -90,11 +90,11 @@ Item {
             SwirlTextField { id:destination; Layout.fillWidth:true; placeholderText:page.selectedTab==="本地映射"?"fixtures/response.json":"https://mirror.example.test/" }
             RowLayout {
                 Layout.alignment:Qt.AlignRight
-                SwirlButton { enabled:false; text:"取消"; onClicked:newDialog.close() }
-                SwirlButton { enabled:false;
+                SwirlButton { development:true; enabled:false; text:"取消"; onClicked:newDialog.close() }
+                SwirlButton { development:true; enabled:false;
                     text:"添加"; primary:true
 
-                    onClicked:AppState.notice("尚未实现")
+                    onClicked:AppState.notice("研发中")
                 }
             }
         }

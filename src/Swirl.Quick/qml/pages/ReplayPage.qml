@@ -18,8 +18,8 @@ Item {
             Layout.fillWidth:true
             SwirlStatusBadge { label:"离线 HTTP 请求编辑器"; tone:"accent" }
             Text { text:"请求不会实际发送"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
-            SwirlButton { enabled:false; text:"对比"; onClicked:comparePopup.open() }
-            SwirlButton { enabled:false; text:"发送"; iconName:"play"; primary:true; onClicked:AppState.notice("尚未实现") }
+            SwirlButton { development:true; enabled:false; text:"对比"; onClicked:comparePopup.open() }
+            SwirlButton { development:true; enabled:false; text:"发送"; iconName:"play"; primary:true; onClicked:AppState.notice("研发中") }
         }
         SplitView {
             Layout.fillHeight:true; Layout.fillWidth:true
@@ -50,11 +50,11 @@ Item {
                             }
                             MouseArea {
                                 id:tap; anchors.fill:parent; hoverEnabled:true
-                                onClicked:AppState.notice("尚未实现")
+                                onClicked:AppState.notice("研发中")
                             }
                         }
                     }
-                    SwirlButton { enabled:false; Layout.fillWidth:true; text:"导入 HAR"; onClicked:AppState.notice("导入 HAR") }
+                    SwirlButton { development:true; enabled:false; Layout.fillWidth:true; text:"导入 HAR"; onClicked:AppState.notice("导入 HAR") }
                 }
             }
             SwirlGlassPanel {
@@ -71,7 +71,7 @@ Item {
                         Layout.fillWidth:true
                         Repeater {
                             model:["Headers","Body","Cookies","Query"]
-                            SwirlButton { enabled:false; text:modelData; quiet:requestTab.current!==modelData; onClicked:requestTab.current=modelData }
+                            SwirlButton { development:true; enabled:false; text:modelData; quiet:requestTab.current!==modelData; onClicked:requestTab.current=modelData }
                         }
                     }
                     QtObject { id:requestTab; property string current:"Headers" }
@@ -92,7 +92,7 @@ Item {
                     RowLayout {
                         Layout.fillWidth:true
                         Text { text:"执行历史："+page.history.length+" 次操作"; color:Theme.muted; font.pixelSize:Theme.fontSize(11); Layout.fillWidth:true }
-                        SwirlButton { enabled:false; text:"重置"; onClicked:AppState.notice("尚未实现") }
+                        SwirlButton { development:true; enabled:false; text:"重置"; onClicked:AppState.notice("研发中") }
                     }
                 }
             }
@@ -115,7 +115,7 @@ Item {
                             }
                         }
                     }
-                    SwirlButton { enabled:false; text:"查看对比"; onClicked:comparePopup.open() }
+                    SwirlButton { development:true; enabled:false; text:"查看对比"; onClicked:comparePopup.open() }
                 }
             }
         }
@@ -126,7 +126,7 @@ Item {
             width:parent.width; spacing:Theme.dp(11)
             Text { text:"原始请求与本地重放对比"; color:Theme.text; font.pixelSize:Theme.fontSize(13); Layout.fillWidth:true }
             Text {
-                text:"尚未实现"
+                text:"研发中"
                 color:Theme.muted; font.family:"Cascadia Code"; font.pixelSize:Theme.fontSize(11)
                 Layout.fillWidth:true; wrapMode:Text.WordWrap
             }

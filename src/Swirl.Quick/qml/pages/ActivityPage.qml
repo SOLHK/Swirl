@@ -32,10 +32,10 @@ Item {
      }
     }
    }
-   GridLayout {Layout.fillWidth:true;columns:4;columnSpacing:Theme.dp(14);rowSpacing:Theme.dp(14)
+   GridLayout {Layout.fillWidth:true;columns:3;columnSpacing:Theme.dp(14);rowSpacing:Theme.dp(14)
     SwirlHeroCard {
      id:diagnostic;objectName:"internetDiagnosticCard";Layout.columnSpan:2;Layout.fillWidth:true;Layout.minimumWidth:0;Layout.preferredWidth:2;Layout.preferredHeight:height;Layout.alignment:Qt.AlignTop
-     collapsedHeight:Theme.dp(152);expandedHeight:collapsedHeight+diagnosticDetails.implicitHeight+Theme.dp(16)
+     collapsedHeight:Theme.dp(184);expandedHeight:collapsedHeight+diagnosticDetails.implicitHeight+Theme.dp(16)
      expanded:page.diagnosticOpen;cornerRadius:Theme.independentCardRadius
      ColumnLayout {x:Theme.dp(16);y:Theme.dp(14);width:parent.width-Theme.dp(32);spacing:Theme.dp(8)
       RowLayout {Layout.fillWidth:true;spacing:Theme.dp(6)
@@ -59,17 +59,18 @@ Item {
       }
      }
     }
-    Repeater {model:["上传","下载"]
-     Card {required property string modelData;required property int index;Layout.fillWidth:true;Layout.minimumWidth:0;Layout.preferredWidth:1;Layout.preferredHeight:Theme.dp(152);Layout.alignment:Qt.AlignTop
-      ColumnLayout {anchors.fill:parent;anchors.margins:Theme.dp(16);spacing:Theme.dp(8)
-       RowLayout {Layout.fillWidth:true;Label {text:modelData;Layout.fillWidth:true}SwirlIcon {name:index===0?"upload":"download";color:index===0?Theme.accentIndigo:Theme.cyan;size:Theme.dp(17)}}
-       Value {id:rate;Layout.fillWidth:true;text:page.bytes(index===0?page.telemetry.uploadRate:page.telemetry.downloadRate,page.telemetry.sampled);font.pixelSize:Theme.fontSize(25)}
-       RowLayout {Layout.fillWidth:true;Label {text:page.telemetry.sampled?"每秒":"等待采样";Layout.fillWidth:true}SwirlIconButton {iconName:"chevron-right";quiet:true;onClicked:page.trafficFrom(rate,index===0?"uploadRate":"downloadRate");Accessible.name:modelData+"流量分析"}}
+    ColumnLayout {Layout.fillWidth:true;Layout.minimumWidth:0;Layout.preferredWidth:1;Layout.alignment:Qt.AlignTop;spacing:Theme.dp(12)
+     Repeater {model:["上传","下载"]
+     Card {required property string modelData;required property int index;Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(86)
+      ColumnLayout {anchors.fill:parent;anchors.margins:Theme.dp(12);spacing:Theme.dp(4)
+       RowLayout {Layout.fillWidth:true;Label {text:modelData+(page.telemetry.sampled?" / 秒":" · 等待采样");Layout.fillWidth:true}SwirlIcon {name:index===0?"upload":"download";color:index===0?Theme.accentIndigo:Theme.cyan;size:Theme.dp(15)}}
+       RowLayout {Layout.fillWidth:true;Value {id:rate;Layout.fillWidth:true;text:page.bytes(index===0?page.telemetry.uploadRate:page.telemetry.downloadRate,page.telemetry.sampled);font.pixelSize:Theme.fontSize(22)}SwirlIconButton {iconName:"chevron-right";quiet:true;onClicked:page.trafficFrom(rate,index===0?"uploadRate":"downloadRate");Accessible.name:modelData+"流量分析"}}
       }
      }
     }
+    }
    }
-   RowLayout {Layout.fillWidth:true;spacing:Theme.dp(14);Layout.alignment:Qt.AlignTop
+   RowLayout {Layout.fillWidth:true;spacing:Theme.dp(14);Layout.alignment:Qt.AlignTop;layoutDirection:Qt.RightToLeft
     ColumnLayout {Layout.fillWidth:true;Layout.preferredWidth:1;Layout.minimumWidth:0;spacing:Theme.dp(14)
      Card {Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(126)
       ColumnLayout {anchors.fill:parent;anchors.margins:Theme.dp(16);spacing:Theme.dp(5)
@@ -89,7 +90,7 @@ Item {
       }
      }
     }
-    Card {Layout.fillWidth:true;Layout.preferredWidth:1;Layout.minimumWidth:0;Layout.preferredHeight:Theme.dp(310)
+    Card {Layout.fillWidth:true;Layout.preferredWidth:2;Layout.minimumWidth:0;Layout.preferredHeight:Theme.dp(310)
      ColumnLayout {anchors.fill:parent;anchors.margins:Theme.dp(16);spacing:Theme.dp(10)
       RowLayout {Layout.fillWidth:true;Label {text:"流量趋势";Layout.fillWidth:true}SwirlSegmentedControl {Layout.preferredWidth:Theme.dp(126);options:["全部","仅代理"];currentIndex:page.trafficKind;onActivated:index=>page.trafficKind=index}}
       SwirlDailyTrafficChart {Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(76);proxyOnly:page.trafficKind===1}

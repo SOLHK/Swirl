@@ -46,6 +46,7 @@ Item {
             Layout.fillWidth:true
             SwirlSegmentedControl {implicitWidth:Theme.dp(285);options:["配置","条目","说明"];currentIndex:page.tab;onActivated:function(index){page.tab=index}}
             Item {Layout.fillWidth:true}
+            SwirlStatusBadge{label:"研发中 · 服务未接入";tone:"warning"}
             Text {text:page.dirty ? "尚未保存" : page.savedAt.length ? "已保存 · "+page.savedAt : "未接入 · 本地界面草稿";color:Theme.muted;font.pixelSize:Theme.fontSize(13)}
         }
         SwirlGlassPanel {

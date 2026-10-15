@@ -29,8 +29,7 @@ Item {
  Column {
   x:Theme.dp(10);width:parent.width-Theme.dp(20);anchors.bottom:parent.bottom;anchors.bottomMargin:Theme.dp(12);spacing:0
   SwirlNavigationItem {width:parent.width;pageId:"featurehub";title:"更多";iconName:"sliders";onActivated:AppState.navigate(pageId)}
-  Item{width:parent.width;height:Theme.dp(12)}
-  Rectangle {x:Theme.dp(5);width:parent.width-Theme.dp(10);height:Theme.dp(1);color:Theme.border}
+  Item{width:parent.width;height:Theme.dp(8)}
   SwirlNavigationItem {width:parent.width;pageId:"external";title:"面板";iconName:"gauge";onActivated:sidebar.Window.window.openDashboard()}
  }
  Popup {

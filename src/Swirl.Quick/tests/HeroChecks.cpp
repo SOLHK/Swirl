@@ -87,6 +87,10 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
   qInfo()<<"NODE_SURFACE"<<table->size()<<(identity?identity->size():QSizeF())<<(hero?hero->property("moving"):QVariant())<<(hero?hero->property("origin"):QVariant());
   check(controller->selectedNodeName()=="Fixture node 001","node selection reaches the actual clicked row");
   check(hero&&hero->property("moving").toBool()&&identity&&identity->height()>table->property("itemHeight").toInt()&&table->scale()==1,"the actual local node card expands from the selected row while the table and wallpaper stay stationary");record("node-local");
+  // Start another real transfer and inspect both surfaces while it is moving.
+  QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,point(2));wait(60);
+  auto requestSurface=item("nodeRequestSurface");
+  check(hero&&hero->property("moving").toBool()&&requestSurface&&requestSurface->isVisible()&&requestSurface->opacity()>0&&requestSurface->opacity()<1&&identity&&requestSurface->y()>=identity->y()+identity->height(),"node identity and request surfaces share one continuous transition");
   check(identity&&identity==item("nodeIdentitySurface"),"node detail uses the same real card and controls throughout the transfer");
   for(int i=0;i<10;++i){QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,point(i%6));wait(12);}wait(350);
   check(item("nodeDetailTitle")&&item("nodeDetailTitle")->property("text").toString()==controller->selectedNodeName(),"rapid node selection displays the latest real selection");

@@ -32,7 +32,7 @@ Item {
         }
         RowLayout {
             Layout.fillWidth:true
-            SwirlStatusBadge { label:"尚未实现"; tone:"accent" }
+            SwirlStatusBadge { label:"研发中"; tone:"accent" }
             Text { text:displayRows.length+" 条本地"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
             SwirlButton { text:AppState.zh("Record"); iconName:"play"; onClicked:AppState.notice("抓包记录") }
             SwirlButton { text:AppState.zh("Clear"); onClicked:{selected=null;AppState.notice("清空抓包")} }
@@ -107,7 +107,7 @@ Item {
                 text:page.waterfallOpen?"隐藏瀑布图":"显示瀑布图"
                 iconName:"chart"; quiet:false; onClicked:page.waterfallOpen=!page.waterfallOpen
             }
-            Text { text:"尚未实现"; color:Theme.muted; font.pixelSize:Theme.fontSize(11); Layout.fillWidth:true }
+            Text { text:"研发中"; color:Theme.muted; font.pixelSize:Theme.fontSize(11); Layout.fillWidth:true }
             SwirlButton { text:AppState.zh("Replay"); onClicked:AppState.currentPage="replay" }
             SwirlButton { text:AppState.zh("Breakpoint"); onClicked:AppState.currentPage="breakpoint" }
         }

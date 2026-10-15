@@ -150,6 +150,11 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     check(cornerShowsBackground(red.pixelColor(0,0)) && cornerShowsBackground(red.pixelColor(red.width()-1,0)) && cornerShowsBackground(red.pixelColor(0,red.height()-1)) && cornerShowsBackground(red.pixelColor(red.width()-1,red.height()-1)),
           "all four composed corners show desktop or its native shadow without material fill");
     const auto cornerAlpha=window->grabWindow();
+    check(cornerAlpha.save(directory+"/window-alpha.png"),"native-resolution alpha surface saved for corner inspection");
+    const int cornerExtent=qMin(qMin(cornerAlpha.width(),cornerAlpha.height()),qCeil(state("Theme.windowRadius").toReal()*window->devicePixelRatio())+8);
+    const QList<QPoint> origins{{0,0},{cornerAlpha.width()-cornerExtent,0},{0,cornerAlpha.height()-cornerExtent},{cornerAlpha.width()-cornerExtent,cornerAlpha.height()-cornerExtent}};
+    for(int i=0;i<origins.size();++i)check(cornerAlpha.copy(QRect(origins[i],QSize(cornerExtent,cornerExtent))).save(directory+QString("/corner-%1-alpha.png").arg(i)),"individual corner alpha sample saved");
+    check(state("!scaledCanvas.layer.enabled").toBool(),"native text is outside the wallpaper offscreen texture");
     check(cornerAlpha.pixelColor(0,0).alpha()==0&&cornerAlpha.pixelColor(cornerAlpha.width()-1,0).alpha()==0&&cornerAlpha.pixelColor(0,cornerAlpha.height()-1).alpha()==0&&cornerAlpha.pixelColor(cornerAlpha.width()-1,cornerAlpha.height()-1).alpha()==0,"all four rendered corner tips are completely transparent");
     background.setColor(QColor("#2464D8"));QTest::qWait(800);
     auto blue=grab("backdrop-blue");
@@ -157,11 +162,11 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     const int contentChange=distance(sample(red,0.995,0.5),sample(blue,0.995,0.5));
     qInfo()<<"Native pixel delta: sidebar="<<sidebarChange<<"content="<<contentChange<<"DPR="<<window->devicePixelRatio()<<backdrop->status();
     check(!backdrop->active()&&backdrop->status().contains("Swirl wallpaper"),"Swirl RHI material owns composition with DWM Acrylic disabled");
-    check(sidebarChange>10&&sidebarChange<100,"single pale-blue material preserves controlled desktop transparency in the sidebar");
-    check(contentChange>10&&contentChange<100,"the same single material reveals the desktop through the workspace gutter");
+    check(sidebarChange>=4&&sidebarChange<40,"dense pale-blue material limits desktop transmission in the sidebar");
+    check(contentChange>=4&&contentChange<40,"dense material limits desktop transmission in the workspace gutter");
     // Cards remain readable while the shell and page gutter reveal the desktop.
     const auto materialAlpha=window->grabWindow().pixelColor(int(window->width()*0.995*window->devicePixelRatio()),int(window->height()*0.5*window->devicePixelRatio())).alpha();
-    check(materialAlpha>=200&&materialAlpha<250,"the single glass surface has real alpha rather than an opaque wallpaper replacement");
+    check(materialAlpha>=245&&materialAlpha<=251,"dense glass retains a measured 96-98 percent alpha surface");
     // Move Swirl relative to a split-color native QML window to verify position-
     // dependent composition. The scene is a test window, not a wallpaper image.
     QQuickItem split;

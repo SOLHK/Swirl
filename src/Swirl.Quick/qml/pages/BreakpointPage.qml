@@ -18,7 +18,7 @@ Item {
             Layout.fillWidth:true
             SwirlStatusBadge { label:"未启用实时拦截"; tone:"warning" }
             Text { text:"仅编辑暂停请求，不会影响实际网络"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
-            SwirlButton { enabled:false; text:"添加断点"; primary:true; onClicked:ruleDialog.open() }
+            SwirlButton { development:true; enabled:false; text:"添加断点"; primary:true; onClicked:ruleDialog.open() }
         }
         SwirlGlassPanel {
             Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(88)
@@ -30,7 +30,7 @@ Item {
                     Text { text:"请求均为本地，不会暂停浏览器。"; color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
                 }
                 SwirlStatusBadge { label:page.records.filter(function(r){return r.status==="Paused"}).length+" 已暂停"; tone:"accent" }
-                SwirlButton { enabled:false; text:"全部继续"; onClicked:AppState.notice("尚未实现")}
+                SwirlButton { development:true; enabled:false; text:"全部继续"; onClicked:AppState.notice("研发中")}
             }
         }
         RowLayout {
@@ -63,7 +63,7 @@ Item {
                         Layout.fillWidth:true
                         Repeater {
                             model:["Headers","Body","Query"]
-                            SwirlButton { enabled:false; text:modelData; quiet:page.tab!==modelData; onClicked:page.tab=modelData }
+                            SwirlButton { development:true; enabled:false; text:modelData; quiet:page.tab!==modelData; onClicked:page.tab=modelData }
                         }
                     }
                     Rectangle {
@@ -73,7 +73,7 @@ Item {
                             anchors.fill:parent; anchors.margins:Theme.dp(8)
                             TextArea {
                                 id:editor
-                                text:"尚未实现；没有被拦截的请求。"
+                                text:"研发中；没有被拦截的请求。"
                                 color:Theme.text; font.family:"Cascadia Code"; font.pixelSize:Theme.fontSize(12)
                                 selectByMouse:true; wrapMode:Text.WrapAnywhere
                                 background:Rectangle { color:"transparent" }
@@ -82,15 +82,15 @@ Item {
                     }
                     RowLayout {
                         Layout.fillWidth:true
-                        SwirlButton { enabled:false;
+                        SwirlButton { development:true; enabled:false;
                             text:"继续"; primary:true;
                             onClicked:page.changeStatus("Continued")
                         }
-                        SwirlButton { enabled:false;
+                        SwirlButton { development:true; enabled:false;
                             text:"修改并继续";
-                            onClicked:AppState.notice("尚未实现")
+                            onClicked:AppState.notice("研发中")
                         }
-                        SwirlButton { enabled:false;
+                        SwirlButton { development:true; enabled:false;
                             text:"丢弃"; danger:true;
                             onClicked:page.changeStatus("Dropped")
                         }
@@ -117,9 +117,9 @@ Item {
             SwirlComboBox { model:["发送请求前","收到响应后"] }
             RowLayout {
                 Layout.alignment:Qt.AlignRight
-                SwirlButton { enabled:false; text:"取消"; onClicked:ruleDialog.close() }
-                SwirlButton { enabled:false; text:"添加"; primary:true;
-                    onClicked:AppState.notice("尚未实现")
+                SwirlButton { development:true; enabled:false; text:"取消"; onClicked:ruleDialog.close() }
+                SwirlButton { development:true; enabled:false; text:"添加"; primary:true;
+                    onClicked:AppState.notice("研发中")
                 }
             }
         }

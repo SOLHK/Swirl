@@ -2,8 +2,8 @@ pragma Singleton
 import QtQuick
 import QtCore
 QtObject {
-    property string mode: "Light"
-    property bool transparency: true
+    property alias mode: appearanceStore.savedMode
+    property alias transparency: appearanceStore.savedTransparency
     property bool backdropActive: false
     property bool windowActive:true
     // Tint the real desktop through the Qt alpha surface, including the page gutter.
@@ -12,16 +12,20 @@ QtObject {
     readonly property color shellBottom:withAlpha(dark?"#1E2C3F":windowActive?"#DEECFA":"#E7F1FC",shellOpacity)
     property real glassBlurStrength: 0.85
     property int glassQuality: 1
-    property real glassTintAmount: 0.72
-    readonly property real glassSurfaceOpacity: dark ? 0.97 : 0.96
+    property real glassTintAmount: 0.86
+    readonly property real glassSurfaceOpacity: dark ? 0.98 : 0.975
     readonly property bool effectsSupported: gpuEffectsSupported
-    property bool reduceMotion: false
+    property alias reduceMotion: appearanceStore.savedReduceMotion
     property string pageBranch: "B"
     // Qt already maps QML logical pixels to each screen's DPI. Automatic mode
     // therefore uses the native 100% logical design scale; manual scaling is a
     // separate, persistent preference and never overrides Windows DPI.
     property Settings appearanceSettings: Settings {
+        id: appearanceStore
         category: "Appearance"
+        property string savedMode: "System"
+        property bool savedTransparency: true
+        property bool savedReduceMotion: false
         property int savedScalePercent: 100
         property bool followSystemScale: true
     }

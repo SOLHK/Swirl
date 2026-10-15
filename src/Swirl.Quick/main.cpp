@@ -48,6 +48,7 @@
 #include "tests/MotionChecks.h"
 #include "tests/MaterialChecks.h"
 #include "tests/HeroChecks.h"
+#include "tests/AppearanceChecks.h"
 #endif
 #include "app/SystemDataProvider.h"
 #include "app/WindowsBackdrop.h"
@@ -116,6 +117,7 @@ int main(int argc, char *argv[])
     QQuickStyle::setStyle(QStringLiteral("Basic"));
     const bool motionTest=app.arguments().contains("--motion-test");
     const bool heroTest=app.arguments().contains("--hero-test");
+    const bool appearanceTest=app.arguments().contains("--appearance-test")||app.arguments().contains("--appearance-restore-test");
     bool previewMode=false;
     for(const QString &argument:app.arguments())
         if(argument.startsWith(QStringLiteral("--material-test-output="))||argument.startsWith(QStringLiteral("--viewport-test-output="))||argument.startsWith(QStringLiteral("--motion-demo-output="))||argument.startsWith(QStringLiteral("--motion-visual-dir="))||argument.startsWith(QStringLiteral("--capture-preview="))||argument.startsWith(QStringLiteral("--capture-native-frame=")))previewMode=true;
@@ -133,7 +135,7 @@ int main(int argc, char *argv[])
 #endif
     const bool realAcceptance=!runtimeStore.isEmpty()&&!runtimeCommands.isEmpty()&&!runtimeState.isEmpty();
     const bool isolatedRun=realAcceptance||heroTest||nodeTest||motionTest||engineTest||hdrDisplayTest||hdrTest||app.arguments().contains("--interaction-test")||app.arguments().contains("--capture-self-test")||app.arguments().contains("--gateway-self-test")||app.arguments().contains("--smoke-test")||app.arguments().contains("--window-test")||previewMode;
-    if(isolatedRun) {
+    if(isolatedRun||appearanceTest) {
         QStandardPaths::setTestModeEnabled(true);
         QSettings::setDefaultFormat(QSettings::IniFormat);
         QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation));
@@ -189,7 +191,8 @@ int main(int argc, char *argv[])
     const QString previewPage = argumentValue(QStringLiteral("--preview-page="));
     const QString previewTheme = argumentValue(QStringLiteral("--preview-theme="));
     const QString previewState = argumentValue(QStringLiteral("--preview-state="));
-    if (heroTest || nodeTest || motionTest || previewMode || engineTest || hdrDisplayTest || hdrTest || smoke || interaction || captureTest || gatewayTest || windowTest || !previewPath.isEmpty()) {
+    if (appearanceTest || heroTest || nodeTest || motionTest || previewMode || engineTest || hdrDisplayTest || hdrTest || smoke || interaction || captureTest || gatewayTest || windowTest || !previewPath.isEmpty()) {
+        if(appearanceTest){const QString file=app.arguments().contains("--appearance-restore-test")?"Swirl-appearance-restore.txt":"Swirl-appearance.txt";app.setProperty("qtDiagnosticFile",file);QFile::remove(QCoreApplication::applicationDirPath()+"/"+file);}
         if(nodeTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-node-ui-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-node-ui-diagnostics.txt");}
         else if(interaction){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-input-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-input-diagnostics.txt");}
         QFile::remove(QCoreApplication::applicationDirPath() + QStringLiteral("/Swirl-diagnostics.txt"));
@@ -255,7 +258,10 @@ int main(int argc, char *argv[])
     const auto materialDirectory=argumentValue(QStringLiteral("--material-test-output="));
     const auto demoDirectory=argumentValue(QStringLiteral("--motion-demo-output="));
     const auto visualDirectory=argumentValue(QStringLiteral("--motion-visual-dir="));
-    if(heroTest) {
+    if(appearanceTest){
+        const bool restore=app.arguments().contains("--appearance-restore-test");
+        QTimer::singleShot(450,&app,[&app,rootWindow,restore]{app.exit(runAppearanceChecks(rootWindow,restore));});
+    } else if(heroTest) {
         const auto directory=argumentValue(QStringLiteral("--hero-output="));
         const auto armFile=argumentValue(QStringLiteral("--hero-arm-file="));
         if(armFile.isEmpty())QTimer::singleShot(450,&app,[&app,rootWindow,&engineController,directory]{app.exit(runHeroChecks(rootWindow,&engineController,directory));});

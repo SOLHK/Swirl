@@ -22,17 +22,17 @@ Item {
                     Text { text:"本地控制 API"; font.pixelSize:Theme.fontSize(20); color:Theme.text; font.weight:Font.DemiBold }
                     Text { text:"API 未启动 · 命令行仅提供参考"; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
                 }
-                SwirlStatusBadge { label:"服务未启动"; tone:"warning" }
+                SwirlStatusBadge { label:"研发中"; tone:"warning" }
             }
         }
         RowLayout {
             Layout.fillWidth:true
             Repeater {
                 model:["API 管理","命令行指令","Permissions","访问日志"]
-                SwirlButton { enabled:false; text:modelData; quiet:page.tab!==modelData; onClicked:page.tab=modelData }
+                SwirlButton { development:true; enabled:false; text:modelData; quiet:page.tab!==modelData; onClicked:page.tab=modelData }
             }
             Item { Layout.fillWidth:true }
-            SwirlButton { enabled:false; text:"服务设置"; onClicked:settingsDialog.open() }
+            SwirlButton { development:true; enabled:false; text:"服务设置"; onClicked:settingsDialog.open() }
         }
         RowLayout {
             Layout.fillWidth:true; Layout.fillHeight:true; spacing:Theme.dp(14)
@@ -55,7 +55,7 @@ Item {
                         RowLayout {
                             Layout.fillWidth:true
                             Text { text:modelData; color:Theme.text; font.family:"Cascadia Code"; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
-                            SwirlButton { enabled:false; text:"预览"; onClicked:AppState.notice("命令行 / API ") }
+                            SwirlButton { development:true; enabled:false; text:"预览"; onClicked:AppState.notice("命令行 / API ") }
                         }
                     }
                     Item { Layout.fillHeight:true }
@@ -79,13 +79,13 @@ Item {
                             anchors.fill:parent; anchors.margins:Theme.dp(9)
                             TextArea {
                                 readOnly:true
-                                text:"尚未实现；未发起 API 请求。"
+                                text:"研发中；未发起 API 请求。"
                                 color:Theme.text; font.family:"Cascadia Code"; font.pixelSize:Theme.fontSize(11)
                                 wrapMode:Text.WrapAnywhere; background:Rectangle { color:"transparent" }
                             }
                         }
                     }
-                    SwirlButton { enabled:false; text:"本地测试"; primary:true; onClicked:AppState.notice("未发送 API 请求") }
+                    SwirlButton { development:true; enabled:false; text:"本地测试"; primary:true; onClicked:AppState.notice("未发送 API 请求") }
                 }
                 }
             }

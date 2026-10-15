@@ -13,10 +13,10 @@ QtObject {
     readonly property int pressDuration:ms(110)
     readonly property int hoverDuration:ms(150)
     readonly property int switchDuration:ms(180)
-    readonly property int pageDuration:ms(220)
-    readonly property int dialogDuration:ms(220)
+    readonly property int pageDuration:ms(264)
+    readonly property int dialogDuration:ms(264)
     readonly property int exitDuration:ms(160)
-    readonly property int expandDuration:ms(240)
+    readonly property int expandDuration:ms(288)
     readonly property real pressScale: reduced ? 1 : 0.972
     property bool transitioning: false
     readonly property bool busy: transitioning || SwirlTransitionRegistry.activeCount>0

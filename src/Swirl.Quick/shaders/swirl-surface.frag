@@ -16,7 +16,7 @@ void main() {
     float r=clamp(cornerRadius,0.0,min(surfaceSize.x,surfaceSize.y)*0.5);
     vec2 q=abs((qt_TexCoord0-0.5)*surfaceSize)-surfaceSize*0.5+r;
     vec2 k=max(q,vec2(0.0));
-    float d=sqrt(sqrt(dot(k*k,k*k)))+min(max(q.x,q.y),0.0)-r;
+    float d=pow(max(dot(k*k,k*k),0.00000001),0.25)+min(max(q.x,q.y),0.0)-r;
     float aa=max(fwidth(d),0.001);
     float coverage=1.0-smoothstep(-aa,0.0,d);
     float edge=borderWidth>0.0?smoothstep(-borderWidth-aa,-borderWidth,d):0.0;

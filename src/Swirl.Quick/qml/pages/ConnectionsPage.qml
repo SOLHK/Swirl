@@ -32,8 +32,8 @@ Item {
             SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:AppState.zh("搜索域名、IP、进程或策略") }
             SwirlComboBox { id:status; model:["全部状态","活动","已结束"] }
             SwirlComboBox { id:sort; model:["域名","延迟","下载","进程"] }
-            SwirlButton { enabled:false; text:AppState.zh("导出"); iconName:"folder"; onClicked:AppState.notice("导出连接记录") }
-            SwirlButton { enabled:false; text:AppState.zh("Clear"); onClicked:{selected=null;AppState.notice("清空连接记录")} }
+            SwirlButton { development:true; enabled:false; text:AppState.zh("导出"); iconName:"folder"; onClicked:AppState.notice("导出连接记录") }
+            SwirlButton { development:true; enabled:false; text:AppState.zh("Clear"); onClicked:{selected=null;AppState.notice("清空连接记录")} }
         }
         RowLayout {
             Layout.fillWidth:true; spacing:Theme.dp(8)
@@ -101,8 +101,7 @@ Item {
                         }
                     }
 
-                    SwirlButton {
-                        enabled:false; Layout.fillWidth:true; text:AppState.zh("Terminate connection"); danger:true
+                    SwirlButton { development:true; enabled:false; Layout.fillWidth:true; text:AppState.zh("Terminate connection"); danger:true
                         onClicked:AppState.notice("Terminate connection")
                     }
 

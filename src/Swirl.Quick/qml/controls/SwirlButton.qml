@@ -8,6 +8,8 @@ SwirlMotionButton {
     property bool primary: false
     property bool quiet: false
     property bool danger: false
+    property bool development: false
+    Accessible.description:development?"研发中，此操作尚未实现。":""
     property string iconName: ""
     implicitWidth: Math.max(Theme.dp(76), contents.implicitWidth + Theme.dp(24))
     implicitHeight:Theme.dp(30)
@@ -40,7 +42,7 @@ SwirlMotionButton {
             color: control.primary ? "white" : control.danger ? Theme.red : Theme.muted
         }
         Text {
-            text: AppState.zh(control.text)
+            text: AppState.zh(control.text)+(control.development?" · 研发中":"")
             font.family: control.font.family
             font.pixelSize: control.font.pixelSize
             font.weight: Font.Medium

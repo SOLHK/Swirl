@@ -4,13 +4,14 @@ Item {
     id: glass
     required property var targetWindow
     property real tintAmount: Theme.glassTintAmount
+    readonly property real cornerRadius:targetWindow.visibility===Window.Maximized || targetWindow.visibility===Window.FullScreen ? 0 : (targetWindow.swirlWindowRadius || Theme.windowRadius)
     readonly property var description: {
         wallpaperBackdrop.revision
         targetWindow.screen; targetWindow.screen.width; targetWindow.screen.height
         return wallpaperBackdrop.describe(targetWindow)
     }
     readonly property bool enabledEffects: Theme.effectsSupported && Theme.transparency && targetWindow.visible && targetWindow.visibility!==Window.Minimized
-    Rectangle {anchors.fill:parent;radius:Theme.windowRadius;visible:!effect.item || !effect.item.ready;color:Theme.dark?"#233044":"#E7F2FD"}
+    SwirlContinuousSurface {anchors.fill:parent;radius:glass.cornerRadius;visible:!effect.item || !effect.item.ready;color:Theme.dark?"#233044":"#E7F2FD"}
     Loader {
         id:effect;anchors.fill:parent;active:glass.enabledEffects
         sourceComponent:Item {
@@ -23,6 +24,8 @@ Item {
                 property color tint:Theme.dark?"#22334B":"#E7F3FF"
                 property real tintAmount:glass.tintAmount
                 property real surfaceOpacity:Theme.glassSurfaceOpacity
+                property vector2d surfaceSize:Qt.vector2d(width,height)
+                property real cornerRadius:glass.cornerRadius
                 fragmentShader:"qrc:/swirl/shaders/swirl-glass.frag.qsb"
             }
         }

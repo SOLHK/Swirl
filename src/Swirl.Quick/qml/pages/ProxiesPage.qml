@@ -60,9 +60,18 @@ Item {
                     id:summarySlot;Layout.fillWidth:true;Layout.preferredHeight:summaryBody.implicitHeight+Theme.dp(32)
                     Text {anchors.centerIn:parent;visible:!nodeHero.opened&&!nodeHero.moving;text:"选择节点查看详情";color:Theme.muted;font.pixelSize:Theme.fontSize(13)}
                 }
-                SwirlGlassPanel {
+                Item {
+                    id:requestSlot
                     Layout.fillWidth:true;Layout.preferredHeight:requestOptions.implicitHeight+Theme.dp(32)
-                    visible:nodeHero.opened||nodeHero.moving;opacity:nodeHero.moving?Math.max(0,(nodeHero.reveal-0.5)*2):1
+                SwirlGlassPanel {
+                    objectName:"nodeRequestSurface"
+                    parent:nodeHero.moving?page:requestSlot
+                    x:nodeHero.moving?nodeHero.cardX:0
+                    y:nodeHero.moving?nodeHero.cardY+nodeHero.cardHeight+Theme.dp(14)*nodeHero.reveal:0
+                    width:nodeHero.moving?nodeHero.cardWidth:requestSlot.width
+                    height:nodeHero.moving?requestSlot.height*nodeHero.reveal:requestSlot.height
+                    z:nodeHero.moving?59:1;clip:true
+                    visible:nodeHero.opened||nodeHero.moving;opacity:nodeHero.moving?nodeHero.reveal:1
                     cornerRadius:Theme.independentCardRadius;color:Theme.surface;border.width:0
                     ColumnLayout {
                         id:requestOptions;x:Theme.dp(16);y:Theme.dp(16);width:parent.width-Theme.dp(32);spacing:Theme.dp(10)
@@ -74,6 +83,7 @@ Item {
                         Text {objectName:"nodeRequestState";text:engineController.tests.busy?engineController.tests.message:page.tested.time?(page.tested.success?"请求成功":"请求失败")+" · HTTP "+page.tested.http+" · "+(page.tested.latency>=0?page.tested.latency+" ms":"无延迟结果")+(page.tested.error?"\n"+page.tested.error:""):engineController.requestStateText;color:engineController.tests.busy?Theme.muted:page.tested.time?(page.tested.success?Theme.green:Theme.orange):engineController.requestSucceeded?Theme.green:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
                         Text {text:engineController.nodeError||engineController.error;visible:text.length>0;color:Theme.orange;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
                     }
+                }
                 }
                 }
             }

@@ -52,10 +52,10 @@ Item {
                 ColumnLayout {
                     Layout.fillWidth:true; spacing:Theme.dp(6)
                     Text { text:AppState.page(page.pageId).title+"工作区"; color:Theme.text; font.pixelSize:Theme.fontSize(20); font.weight:Font.DemiBold }
-                    Text { text:featureList.length+" 个可交互功能区域，使用"; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
+                    Text { text:featureList.length+" 个功能区域研发中，保留布局供后续接入。"; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
                 }
-                SwirlStatusBadge { label:page.pageId==="gateway"?"规划中":"界面"; tone:page.pageId==="gateway"?"warning":"accent" }
-                SwirlButton { enabled:false; text:"新建"; primary:true; onClicked:addDialog.open() }
+                SwirlStatusBadge { label:"研发中"; tone:"warning" }
+                SwirlButton { development:true; enabled:false; text:"新建"; primary:true; onClicked:addDialog.open() }
             }
         }
         SwirlGlassPanel {
@@ -64,7 +64,7 @@ Item {
             visible:pageId==="dashboard"||pageId==="traffic"
             ColumnLayout {
                 anchors.fill:parent; anchors.margins:Theme.dp(16)
-                Text { text:"流量数据 · 样本"; color:Theme.text; font.pixelSize:Theme.fontSize(15); font.weight:Font.DemiBold }
+                Text { text:"流量详情 · 研发中"; color:Theme.text; font.pixelSize:Theme.fontSize(15); font.weight:Font.DemiBold }
                 SwirlTrafficChart { Layout.fillWidth:true; Layout.fillHeight:true }
             }
         }
@@ -72,8 +72,8 @@ Item {
             Layout.fillWidth:true
             SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:"搜索记录" }
             SwirlComboBox { id:filter; model:["全部","已启用","","规划中"] }
-            SwirlButton { enabled:false; text:"刷新"; onClicked:AppState.notice("尚未实现") }
-            SwirlButton { enabled:false; text:"导出"; onClicked:AppState.notice("导出"+page.pageId) }
+            SwirlButton { development:true; enabled:false; text:"刷新"; onClicked:AppState.notice("研发中") }
+            SwirlButton { development:true; enabled:false; text:"导出"; onClicked:AppState.notice("导出"+page.pageId) }
         }
         RowLayout {
             Layout.fillWidth:true; Layout.fillHeight:true; spacing:Theme.dp(15)
@@ -139,8 +139,8 @@ Item {
                     }
                     RowLayout {
                         Layout.fillWidth:true
-                        SwirlButton { enabled:false; text:page.pageId==="replay"?"发送":"应用"; onClicked:AppState.notice(text) }
-                        SwirlButton { enabled:false; text:"更多"; quiet:false; onClicked:AppState.notice("更多选项") }
+                        SwirlButton { development:true; enabled:false; text:page.pageId==="replay"?"发送":"应用"; onClicked:AppState.notice(text) }
+                        SwirlButton { development:true; enabled:false; text:"更多"; quiet:false; onClicked:AppState.notice("更多选项") }
                     }
                 }
                 }
@@ -156,10 +156,10 @@ Item {
             SwirlTextField { id:nameField; Layout.fillWidth:true; placeholderText:"请输入名称" }
             RowLayout {
                 Layout.alignment:Qt.AlignRight
-                SwirlButton { enabled:false; text:"取消"; onClicked:addDialog.close() }
-                SwirlButton { enabled:false;
+                SwirlButton { development:true; enabled:false; text:"取消"; onClicked:addDialog.close() }
+                SwirlButton { development:true; enabled:false;
                     text:"添加"; primary:true;
-                    onClicked:AppState.notice("尚未实现")
+                    onClicked:AppState.notice("研发中")
                 }
             }
         }

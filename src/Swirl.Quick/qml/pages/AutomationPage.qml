@@ -15,18 +15,18 @@ Item {
         anchors.fill:parent; anchors.margins:Theme.dp(23); spacing:Theme.dp(14)
         RowLayout {
             Layout.fillWidth:true
-            SwirlStatusBadge { label:"计划任务未连接"; tone:"warning" }
-            Text { text:"触发条件、定时表达式及操作均为"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
-            SwirlButton { enabled:false; text:"新建自动化"; primary:true; onClicked:newDialog.open() }
+            SwirlStatusBadge { label:"研发中"; tone:"warning" }
+            Text { text:"计划任务服务研发中；触发条件与动作尚未执行。"; color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
+            SwirlButton { development:true; enabled:false; text:"新建自动化"; primary:true; onClicked:newDialog.open() }
         }
         RowLayout {
             Layout.fillWidth:true
             Repeater {
                 model:["Tasks","History","Conditions"]
-                SwirlButton { enabled:false; text:modelData; quiet:page.tab!==modelData; onClicked:page.tab=modelData }
+                SwirlButton { development:true; enabled:false; text:modelData; quiet:page.tab!==modelData; onClicked:page.tab=modelData }
             }
             Item { Layout.fillWidth:true }
-            SwirlButton { enabled:false; text:"全部运行"; iconName:"play"; onClicked:AppState.notice("运行自动化任务") }
+            SwirlButton { development:true; enabled:false; text:"全部运行"; iconName:"play"; onClicked:AppState.notice("运行自动化任务") }
         }
         RowLayout {
             Layout.fillWidth:true; Layout.fillHeight:true; spacing:Theme.dp(14)
@@ -83,8 +83,8 @@ Item {
                         }
                     }
 
-                    SwirlButton { enabled:false; text:"检查规则"; onClicked:AppState.notice("检查自动化") }
-                    SwirlButton { enabled:false; text:"保存预览"; primary:true; onClicked:AppState.notice("保存自动化预览") }
+                    SwirlButton { development:true; enabled:false; text:"检查规则"; onClicked:AppState.notice("检查自动化") }
+                    SwirlButton { development:true; enabled:false; text:"保存预览"; primary:true; onClicked:AppState.notice("保存自动化预览") }
 
                 }
             }
@@ -100,10 +100,10 @@ Item {
             SwirlComboBox { id:triggerInput; Layout.fillWidth:true; model:["Scheduled","网络变化","HTTP 事件","错误事件"] }
             RowLayout {
                 Layout.alignment:Qt.AlignRight
-                SwirlButton { enabled:false; text:"取消"; onClicked:newDialog.close() }
-                SwirlButton { enabled:false;
+                SwirlButton { development:true; enabled:false; text:"取消"; onClicked:newDialog.close() }
+                SwirlButton { development:true; enabled:false;
                     text:"创建"; primary:true;
-                    onClicked:AppState.notice("尚未实现")
+                    onClicked:AppState.notice("研发中")
                 }
             }
         }
