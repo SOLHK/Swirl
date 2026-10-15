@@ -6,50 +6,72 @@ import "../components"
 import "../controls"
 Item {
     id:page
+    readonly property bool implemented:true
     property string tool:"DNS 查询"
-    property string result:"No test has been run.\nEnter a target and choose Run demo."
+    property string result:"上方诊断使用真实测量；下面的自定义工具研发中。"
     property var tools:["DNS 查询","TCP 连通性","Traceroute","HTTP 请求","TLS 证书检查","端口检查","IP 地址查询","Whois","连接测试","网络接口信息"]
     ColumnLayout {
-        anchors.fill:parent; anchors.margins:23; spacing:14
-        Text { text:"选择网络诊断工具，结果均为本地模拟。"; color:Theme.muted; font.pixelSize:12 }
+        anchors.fill:parent; anchors.margins:Theme.dp(23); spacing:Theme.dp(14)
+        SwirlText { text:"网络诊断";font.weight:Font.DemiBold; font.pixelSize:Theme.fontSize(28);color:Theme.text }
         RowLayout {
-            Layout.fillWidth:true; Layout.fillHeight:true; spacing:15
+            Layout.fillWidth:true
+            SwirlText {text:engineController.telemetry.measurementState||"尚未测量";color:Theme.muted;Layout.fillWidth:true}
+            SwirlButton {text:"开始检测";enabled:engineController.telemetry.measurementState!=="正在测量";onClicked:{engineController.telemetry.measureNetwork();if(engineController.selectedNodeId.length&&!engineController.tests.busy)engineController.testSelectedNode(engineController.selectedNodeId,"https://www.gstatic.com/generate_204")}}
+        }
+        SwirlGlassPanel { Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(155)
+            ColumnLayout {anchors.fill:parent;anchors.margins:Theme.cardPadding;spacing:Theme.dp(10)
+                SwirlText {text:"互联网 TCP："+(engineController.telemetry.latencies.internet||"未采集")+"  ·  默认网关 ICMP："+(engineController.telemetry.latencies.router||"未采集")+"  ·  DNS 查询："+(engineController.telemetry.latencies.dns||"未采集");color:Theme.text;Layout.fillWidth:true;wrapMode:Text.Wrap}
+                SwirlText {text:"外部 IP："+(engineController.telemetry.externalIp||"未检测")+"  ·  "+systemProvider.currentNetwork().type;color:Theme.text;Layout.fillWidth:true;wrapMode:Text.Wrap}
+                SwirlText {text:"互联网测量为直连 TCP 握手；网关来自当前活动网卡；出口检测经实际 Swirl 分流。节点检测使用独立引擎。";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
+            }
+        }
+        SwirlText { text:"其他自定义工具（研发中）"; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
+        RowLayout {
+            Layout.fillWidth:true; Layout.fillHeight:true; spacing:Theme.dp(15)
             SwirlGlassPanel {
-                Layout.preferredWidth:235; Layout.fillHeight:true
-                ColumnLayout {
-                    anchors.fill:parent; anchors.margins:13; spacing:9
-                    Text { text:"网络实用工具"; color:Theme.muted; font.pixelSize:11; leftPadding:8 }
-                    ListView {
-                        Layout.fillWidth:true; Layout.fillHeight:true; clip:true; spacing:4
+                Layout.preferredWidth:Theme.dp(235); Layout.fillHeight:true
+                ScrollView {
+                    id:detailScroll0; anchors.fill:parent; anchors.margins:Theme.dp(13); clip:true
+                    ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
+                    ColumnLayout {
+                    width:detailScroll0.availableWidth; height:Math.max(implicitHeight,detailScroll0.availableHeight); spacing:Theme.dp(9)
+                    SwirlText { text:"网络实用工具"; color:Theme.muted; font.pixelSize:Theme.fontSize(11); leftPadding:Theme.dp(8) }
+                    ListView { pixelAligned: true;
+                    add: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";from:0;to:1;duration:SwirlMotion.duration} }
+                    remove: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.duration} }
+                    move: Transition {enabled:!SwirlMotion.reduced;SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration}}
+                    displaced: Transition { enabled:!SwirlMotion.reduced; SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration} }
+                        Layout.fillWidth:true; Layout.fillHeight:true; clip:true; spacing:Theme.dp(4)
                         model:page.tools
                         delegate:Rectangle {
-                            width:ListView.view.width; height:40; radius:Theme.roundedRadius(width,height)
+                            width:Math.floor(ListView.view.width); height:Theme.dp(40); radius:Theme.roundedRadius(width,height)
                             color:page.tool===modelData?Theme.selected:area.containsMouse?Theme.hover:"transparent"
                             RowLayout {
-                                anchors.fill:parent; anchors.leftMargin:10
-                                SwirlIcon { name:"tool"; size:17; color:Theme.muted }
-                                Text { text:modelData; color:Theme.text; font.pixelSize:12; elide:Text.ElideRight; Layout.fillWidth:true }
+                                anchors.fill:parent; anchors.leftMargin:Theme.dp(10)
+                                SwirlIcon { name:"tool"; size:Theme.dp(17); color:Theme.muted }
+                                SwirlText { text:modelData; color:Theme.text; font.pixelSize:Theme.fontSize(12); elide:Text.ElideRight; Layout.fillWidth:true }
                             }
-                            MouseArea { id:area; anchors.fill:parent; hoverEnabled:true; onClicked:{page.tool=modelData;page.result="No test has been run.\nEnter a target and choose Run demo."} }
+                            MouseArea { id:area; anchors.fill:parent; hoverEnabled:true; onClicked:AppState.notice("研发中") }
                         }
                     }
+                }
                 }
             }
             SwirlGlassPanel {
                 Layout.fillWidth:true; Layout.fillHeight:true
                 ColumnLayout {
-                    anchors.fill:parent; anchors.margins:23; spacing:17
+                    anchors.fill:parent; anchors.margins:Theme.dp(23); spacing:Theme.dp(17)
                     RowLayout {
                         Layout.fillWidth:true
                         ColumnLayout {
                             Layout.fillWidth:true
-                            Text { text:page.tool; color:Theme.text; font.pixelSize:22; font.weight:Font.DemiBold }
-                            Text { text:"独立检查面板"; color:Theme.muted; font.pixelSize:12 }
+                            SwirlText { text:page.tool; color:Theme.text; font.pixelSize:Theme.fontSize(22); font.weight:Font.DemiBold }
+                            SwirlText { text:"独立检查面板"; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
                         }
-                        SwirlStatusBadge { label:"本地模拟"; tone:"accent" }
+                        SwirlStatusBadge { label:"本地"; tone:"accent" }
                     }
-                    Rectangle { Layout.fillWidth:true; height:1; color:Theme.border }
-                    Text { text:page.tool==="网络接口信息"?"网卡名称":"目标域名、地址或 URL"; color:Theme.text; font.pixelSize:13 }
+                    Rectangle { Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(1); color:Theme.border }
+                    SwirlText { text:page.tool==="网络接口信息"?"网卡名称":"目标域名、地址或 URL"; color:Theme.text; font.pixelSize:Theme.fontSize(13) }
                     SwirlTextField {
                         id:target; Layout.fillWidth:true
                         placeholderText:page.tool==="HTTP 请求"?"https://example.test/path":"example.test"
@@ -62,40 +84,34 @@ Item {
                         }
                         SwirlTextField {
                             visible:page.tool==="端口检查" || page.tool==="TCP 连通性"
-                            Layout.preferredWidth:130
+                            Layout.preferredWidth:Theme.dp(130)
                             placeholderText:"端口（443）"
                             validator:IntValidator { bottom:1; top:65535 }
                         }
                         Item { Layout.fillWidth:true }
-                        SwirlButton {
-                            text:"运行演示"; primary:true; iconName:"play"
-                            enabled:target.text.trim().length>0
-                            onClicked:{
-                                page.result="模拟结果 · "+page.tool+"\n"+
-                                            "目标："+target.text+"\n"+
-                                            "Status: No network requests were made.\n"+
-                                            "Backend connection: not configured.\n\n"+
-                                            "此面板预留给未来的网络工具模块。"
-                            }
+                        SwirlButton { development:true; enabled:false;
+                            text:"运行"; primary:true; iconName:"play"
+
+                            onClicked:AppState.notice("研发中")
                         }
                     }
-                    Text { text:"结果"; color:Theme.muted; font.pixelSize:11; font.weight:Font.DemiBold }
+                    SwirlText { text:"结果"; color:Theme.muted; font.pixelSize:Theme.fontSize(11); font.weight:Font.DemiBold }
                     Rectangle {
                         Layout.fillWidth:true; Layout.fillHeight:true
                         color:Theme.field; border.color:Theme.border; radius:Theme.roundedRadius(width,height)
                         ScrollView {
-                            anchors.fill:parent; anchors.margins:12
-                            TextArea {
+                            anchors.fill:parent; anchors.margins:Theme.dp(12)
+                            TextArea { renderType: TextEdit.NativeRendering; font.weight: Theme.bodyFontWeight; font.hintingPreference: Font.PreferFullHinting; Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) }
                                 readOnly:true; selectByMouse:true
                                 text:page.result
                                 color:Theme.text
                                 wrapMode:Text.Wrap
-                                font.family:"Cascadia Code"; font.pixelSize:12
+                                font.family:"Cascadia Code"; font.pixelSize:Theme.fontSize(12)
                                 background:Rectangle { color:"transparent" }
                             }
                         }
                     }
-                    SwirlButton { text:"复制结果"; onClicked:{demoProvider.copyText(page.result);AppState.toast="已复制诊断预览"} }
+                    SwirlButton { development:true; enabled:false; text:"复制结果"; onClicked:AppState.notice("研发中") }
                 }
             }
         }

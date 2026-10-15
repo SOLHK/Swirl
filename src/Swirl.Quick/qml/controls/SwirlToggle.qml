@@ -5,25 +5,35 @@ import SwirlQuick
 Switch {
     id: control
     property bool large: false
-    implicitWidth: large ? 86 : 60
-    implicitHeight: large ? 46 : 32
-    padding: 0
+    property real motionScale:down?SwirlMotion.pressScale:1
+    Behavior on motionScale {enabled:!SwirlMotion.reduced;SwirlSpring{}}
+    Binding {target:control.indicator;property:"scale";value:control.motionScale}
+    onPressed:SwirlMotion.noteTrigger(control)
+    implicitWidth: Theme.dp(large ? 52 : 36)
+    implicitHeight: Theme.dp(large ? 24 : 17)
+    padding:Theme.dp(0)
     hoverEnabled: true
     indicator: Rectangle {
         width: control.width; height: control.height
         radius: height * 0.5
         color: control.checked ? Theme.primaryControl : Theme.dark ? "#626262" : "#DADADD"
-        border.width: control.activeFocus ? 2 : 0
+        border.width: Theme.dp(control.visualFocus ? 2 : 0)
         border.color: Theme.focusBorder
-        opacity: control.hovered ? 0.88 : 1
+        opacity: control.enabled?(control.hovered ? 0.88 : 1):0.45
+        Behavior on opacity{NumberAnimation{duration:SwirlMotion.hoverDuration}}
         Rectangle {
-            width: parent.height - 8; height: width
-            x: control.checked ? parent.width - width - 4 : 4; y: 4
+            property real thumbPosition:control.checked?1:0
+            width: parent.height - Theme.dp(4); height: width
+            x:Math.round(Theme.dp(2)+(parent.width-width-2*Theme.dp(2))*thumbPosition); y:Theme.dp(2)
             radius: height * 0.5
             color: "#FEFEFF"
-            layer.enabled: Theme.effectsSupported
-            layer.effect: MultiEffect { shadowEnabled:true; shadowBlur:0.35; shadowVerticalOffset:2; shadowColor:"#30000000" }
-            Behavior on x { NumberAnimation { duration: Theme.motion; easing.type: Easing.OutCubic } }
+            RectangularShadow {
+                anchors.fill:parent; z:-1
+                visible:Theme.effectsSupported
+                radius:parent.radius; blur:Theme.dp(6)
+                offset:Qt.vector2d(0,Theme.dp(2)); color:"#30000000"
+            }
+            Behavior on thumbPosition {enabled:!SwirlMotion.reduced;NumberAnimation {duration:SwirlMotion.switchDuration;easing.type:Easing.OutCubic}}
         }
         Behavior on color { ColorAnimation { duration: Theme.motion } }
     }

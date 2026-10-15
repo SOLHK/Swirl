@@ -2,7 +2,7 @@ name: Build Swirl Qt Quick UI (Preview)
 
 on:
   push:
-    branches: [test]
+    branches: [main, test]
   pull_request:
     branches: [test, main]
   workflow_dispatch:
@@ -20,6 +20,9 @@ jobs:
     steps:
       - name: Checkout original repository and UI branch
         uses: actions/checkout@v4
+      - name: Validate scoped Codex proxy launcher
+        shell: pwsh
+        run: ./tools/tests/Test-CodexProxyLauncher.ps1
       - name: Set up Qt desktop SDK
         uses: jurplel/install-qt-action@v4
         with:
@@ -27,10 +30,11 @@ jobs:
           host: windows
           target: desktop
           arch: win64_msvc2022_64
+          modules: qtshadertools
           cache: true
       - name: Configure Qt UI independently
         shell: pwsh
-        run: cmake -S src/Swirl.Quick -B build/swirl-quick -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=ON
+        run: cmake -S src/Swirl.Quick -B build/swirl-quick -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=ON -DSWIRL_TEST_FONT_DIRECTORY="${{ github.workspace }}/build/swirl-quick/Release/lib/fonts"
       - name: Build UI
         shell: pwsh
         run: cmake --build build/swirl-quick --config Release --parallel
@@ -39,7 +43,17 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           Copy-Item build/swirl-quick/Release/Swirl.exe dist/
+          Copy-Item build/swirl-quick/Release/SwirlProxyGuard.exe dist/
+          Copy-Item build/swirl-quick/Release/SwirlGatewayGuard.exe dist/
+          Copy-Item build/swirl-quick/Release/SwirlScriptRunner.exe dist/
+          Copy-Item src/Swirl.Quick/packaging/rules dist/rules -Recurse
+          Copy-Item src/Swirl.Quick/packaging/rules build/swirl-quick/Release/rules -Recurse
           windeployqt --release --qmldir src/Swirl.Quick/qml dist/Swirl.exe
+      - name: Stage pinned and verified Mihomo for integration and installer
+        shell: pwsh
+        run: |
+          ./scripts/stage-mihomo.ps1 -Destination dist
+          Copy-Item -LiteralPath dist/core -Destination build/swirl-quick/Release/core -Recurse
       # Qt's offscreen QPA font database reads appdir/lib/fonts and does not
       # automatically discover the fonts installed on a Windows CI runner.
       # These fixtures are used for synthetic screenshot tests ONLY.
@@ -58,6 +72,43 @@ jobs:
           Invoke-WebRequest -Uri $notoUrl -OutFile $notoFile -ErrorAction Stop
           if ((Get-Item $notoFile).Length -lt 10000000) { throw "Noto Sans SC fixture download is incomplete." }
           Write-Host "Qt offscreen font fixtures ready; they will NOT be included in the artifact."
+          # CTest launches Swirl from the build directory, separate from dist.
+          New-Item -ItemType Directory -Force "build/swirl-quick/Release/lib" | Out-Null
+          Copy-Item -LiteralPath $fontDir -Destination "build/swirl-quick/Release/lib/fonts" -Recurse -Force
+      - name: Engine, stream and QML regression checks
+        shell: pwsh
+        run: |
+          # Include registered stream, shared-element and settings regressions.
+          # Later steps run the three excluded UI/capture drivers against dist.
+          # System proxy recovery needs a separately controlled test environment.
+          ctest --test-dir build/swirl-quick -C Release -E "^swirl-(system-proxy-recovery|overview-input|all-pages|capture-network)$" --output-on-failure
+          if ($LASTEXITCODE -ne 0) {
+            Get-Content build/swirl-quick/engine-contract.txt, build/swirl-quick/engine-real.txt -ErrorAction SilentlyContinue
+            throw "Engine checks failed"
+          }
+      - name: Upload engine test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-Engine-Test-Evidence
+          path: |
+            build/swirl-quick/Testing/Temporary/LastTest.log
+            build/swirl-quick/engine-contract.txt
+            build/swirl-quick/engine-real.txt
+            build/swirl-quick/node-chain.txt
+            build/swirl-quick/import-subscription.txt
+            build/swirl-quick/native-engine.txt
+            build/swirl-quick/stream-regression.txt
+            build/swirl-quick/subscription-formats.txt
+            build/swirl-quick/Release/Swirl-appearance.txt
+            build/swirl-quick/Release/Swirl-appearance-restore.txt
+            build/swirl-quick/motion-report.json
+            build/swirl-quick/hero-evidence/
+            build/swirl-quick/Release/Swirl-diagnostics.txt
+            build/swirl-quick/Release/Swirl-node-ui-diagnostics.txt
+            build/swirl-quick/Release/Swirl-motion-diagnostics.txt
+            build/swirl-quick/Release/Swirl-hero-diagnostics.txt
+          if-no-files-found: warn
       - name: Overview mouse and keyboard input checks
         shell: pwsh
         run: |
@@ -109,6 +160,8 @@ jobs:
             @{ file = "Swirl-Overview-200-preview.png"; page = "overview"; theme = "light"; size = "1464x930"; scale = "2" },
             @{ file = "Swirl-Minimum-preview.png"; page = "overview"; theme = "light"; size = "1000x650"; scale = "1" },
             @{ file = "Swirl-Minimum-bottom-preview.png"; page = "overview"; theme = "light"; size = "1000x650"; scale = "1.5"; bottom = $true },
+            @{ file = "Swirl-Compact-preview.png"; page = "overview"; theme = "light"; size = "800x560"; scale = "1" },
+            @{ file = "Swirl-Compact-200-preview.png"; page = "overview"; theme = "light"; size = "800x560"; scale = "2" },
             @{ file = "Swirl-Large-preview.png"; page = "overview"; theme = "light"; size = "1920x1219"; scale = "1" },
             @{ file = "Swirl-Inspector-preview.png"; page = "inspector"; theme = "dark"; size = "1464x930"; scale = "1" },
             @{ file = "Swirl-ModuleHub-preview.png"; page = "featurehub"; theme = "light"; size = "1464x930"; scale = "1" },
@@ -155,6 +208,14 @@ jobs:
           path: preview-diagnostics/
           if-no-files-found: warn
           retention-days: 14
+      - name: Upload rendered Qt Quick UI previews
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-Quick-UI-Previews
+          path: dist/Swirl-*-preview.png
+          if-no-files-found: warn
+          retention-days: 14
       - name: Remove CI-only font fixtures from portable ZIP
         if: always()
         shell: pwsh
@@ -170,6 +231,9 @@ jobs:
           cmake --build build/swirl-quick --config Release --parallel
           if ($LASTEXITCODE -ne 0) { throw "Production build failed" }
           Copy-Item build/swirl-quick/Release/Swirl.exe dist/ -Force
+          Copy-Item build/swirl-quick/Release/SwirlProxyGuard.exe dist/
+          Copy-Item build/swirl-quick/Release/SwirlGatewayGuard.exe dist/
+          Copy-Item build/swirl-quick/Release/SwirlScriptRunner.exe dist/
           Remove-Item -LiteralPath "dist/Qt6Test.dll" -ErrorAction SilentlyContinue
       - name: Prepare standalone installer files
         shell: pwsh
@@ -177,8 +241,13 @@ jobs:
           New-Item -ItemType Directory -Force -Path installer-bin, out | Out-Null
           Copy-Item -Path "dist/*" -Destination "installer-bin" -Recurse -Force
           Copy-Item "src/Swirl.Quick/packaging/THIRD_PARTY_NOTICES.txt" "installer-bin/"
-          Copy-Item "src/Swirl.Quick/assets/swirl.ico" "installer-bin/Swirl-brand-100.ico"
+          $icon = "build/swirl-quick/brand/Swirl.ico"
+          if (!(Test-Path -LiteralPath $icon)) { throw "Missing SVG-derived Windows icon: $icon" }
+          Copy-Item -LiteralPath $icon -Destination "installer-bin/Swirl-brand-phase3.ico"
+          Copy-Item -LiteralPath $icon -Destination "installer-bin/Swirl-brand-phase3-v2.ico"
           Copy-Item "src/Swirl.Quick/packaging/licenses" "installer-bin/licenses" -Recurse -Force
+          New-Item -ItemType Directory -Force -Path "installer-bin/docs" | Out-Null
+          Copy-Item -LiteralPath 'src/Swirl.Quick/CAPTURE.md','docs/LOCAL_EXTENSIONS.md','docs/FONTS.md','docs/ANIMATION_DEPENDENCY_RESEARCH.md','docs/PR12_GRAPHICS_UPGRADE.md','docs/PR12_NATIVE_ACCEPTANCE.md','docs/PR12_NATIVE_UI_FIXES.md','docs/SWIRL_NATIVE_RESEARCH.md' -Destination "installer-bin/docs"
           Remove-Item -Path "installer-bin/Swirl-*-preview.png", "installer-bin/Swirl-diagnostics.txt" -ErrorAction SilentlyContinue
           if (!(Test-Path "installer-bin/Swirl.exe")) { throw "Missing Swirl.exe" }
       - name: Install NSIS packaging tools
@@ -193,7 +262,8 @@ jobs:
           $nsis = "C:/Program Files (x86)/NSIS/makensis.exe"
           $appDist = (Resolve-Path "installer-bin").Path
           $outDir = (Resolve-Path "out").Path
-          & $nsis /INPUTCHARSET UTF8 "/DAPP_DIST=$appDist" "/DOUT_DIR=$outDir" "src/Swirl.Quick/packaging/Swirl.nsi"
+          $icon = (Resolve-Path "build/swirl-quick/brand/Swirl.ico").Path
+          & $nsis /INPUTCHARSET UTF8 "/DAPP_DIST=$appDist" "/DOUT_DIR=$outDir" "/DAPP_ICON=$icon" "src/Swirl.Quick/packaging/Swirl.nsi"
           if ($LASTEXITCODE -ne 0) { throw "NSIS packaging failed ($LASTEXITCODE)" }
           if (!(Test-Path "out/Swirl-Setup.exe")) { throw "Installer missing" }
           if ((Get-Item "out/Swirl-Setup.exe").Length -lt 10000000) { throw "Installer suspiciously small" }
@@ -237,5 +307,5 @@ jobs:
             --repo "${GITHUB_REPOSITORY}" \
             --target "${GITHUB_SHA}" \
             --title "Swirl · 测试版 ${SHORT_SHA}" \
-            --notes "测试版 Qt 界面：参考图比例、56 个功能入口及配置草稿、覆盖安装；包含真实本机 HTTP 抓包及 CONNECT 隧道记录；代理/配置页面仍为演示，尚未接入完整核心。请勿作为正式版本使用。" \
+            --notes "Windows 开发测试版：C++23 / Qt Quick，Swirl 原生 TCP 与 Mihomo 兼容引擎，真实节点与订阅、路由和网络活动监控、本机 HTTP/HTTPS 调试。系统代理、TUN、LAN 和证书信任需用户明确启用；高级协议与实际网络环境的验证范围请查阅随版本文档。没有演示联网成功，未实现功能保持禁用。请勿作为正式版本使用。" \
             --prerelease

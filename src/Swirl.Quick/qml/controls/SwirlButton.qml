@@ -3,49 +3,56 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import SwirlQuick
 import "../components"
-Button {
+SwirlMotionButton {
     id: control
     property bool primary: false
     property bool quiet: false
     property bool danger: false
+    property bool development: false
+    Accessible.description:development?"研发中，此操作尚未实现。":""
     property string iconName: ""
-    implicitWidth: Math.max(76, contents.implicitWidth + 36)
-    implicitHeight: 44
+    implicitWidth: Math.round(Math.max(Theme.dp(76), contents.implicitWidth + Theme.dp(24)))
+    implicitHeight:Theme.controlHeight
     hoverEnabled: true
     font.family: Theme.fontFamily
-    font.pixelSize: 17
-    leftPadding: 12; rightPadding: 12
-    background: SwirlPillSurface {
-        primary: control.primary
-        gradient:control.quiet && !control.hovered && !control.down ? null : pillGradient
-        property Gradient pillGradient:Gradient {
-            GradientStop { position:0; color:control.primary ? Theme.primaryControl : control.down ? Theme.pressed : control.hovered ? Theme.hover : Theme.pillTop }
-            GradientStop { position:1; color:control.primary ? Theme.primaryControl : control.down ? Theme.pressed : control.hovered ? Theme.hover : Theme.pillBottom }
-        }
-        hovered: control.hovered || control.activeFocus
-        pressed: control.down
-        subtleShadow: !control.quiet
-        opacity: control.enabled ? 1 : 0.45
-        color: control.quiet && !control.hovered && !control.down ? "transparent" :
-               control.primary ? Theme.primaryControl : control.down ? Theme.pressed : control.hovered ? Theme.hover : Theme.buttonBase
-        border.color: control.activeFocus ? Theme.focusBorder : control.quiet ? "transparent" : Theme.pillRim
+    font.hintingPreference:Font.PreferFullHinting
+    font.pixelSize:Theme.fontSize(13)
+    leftPadding:Theme.dp(12); rightPadding:Theme.dp(12)
+    topPadding:Theme.dp(4); bottomPadding:Theme.dp(4)
+    property bool outlined:false
+    background:SwirlContinuousSurface {
+        radius:Theme.controlRadius
+        color:control.primary?(control.down?Qt.darker(Theme.primaryControl,1.15):control.hovered?Qt.lighter(Theme.primaryControl,1.08):Theme.primaryControl):control.down?Theme.pressed:control.hovered?Theme.hover:control.quiet?"transparent":Theme.buttonBase
+        border.width:control.activeFocus?Theme.dp(2):control.primary||control.quiet?0:Theme.borderWidth
+        border.color:control.activeFocus?Theme.focusBorder:Theme.controlBorder
+        Behavior on color {ColorAnimation{duration:SwirlMotion.hoverDuration}}
+        opacity:control.enabled?1:0.45
     }
-    contentItem: RowLayout {
+    contentItem: Item {
+        implicitWidth: contents.implicitWidth
+        implicitHeight: contents.implicitHeight
+        RowLayout {
         id: contents
-        spacing: 8
+        x:Math.round((parent.width-width)/2)
+        y:Math.round((parent.height-height)/2)
+        width:Math.round(Math.min(implicitWidth,parent.width))
+        spacing:Theme.dp(8)
         SwirlIcon {
             visible: control.iconName !== ""
-            name: control.iconName; size: 23
-            color: control.primary ? "white" : control.danger ? Theme.red : Theme.muted
+            name: control.iconName; size:Theme.dp(16)
+            color: !control.enabled ? Theme.muted : control.primary ? "white" : control.danger ? Theme.red : Theme.muted
         }
-        Text {
-            text: control.text
+        SwirlText {
+            text: AppState.zh(control.text)+(control.development?" · 研发中":"")
             font.family: control.font.family
             font.pixelSize: control.font.pixelSize
-            font.weight: Font.Normal
+            font.weight: Font.Medium
             Layout.fillWidth: true; elide: Text.ElideRight
-            color: control.primary ? "white" : control.danger ? Theme.red : Theme.text
+            color: !control.enabled ? Theme.muted : control.primary ? "white" : control.danger ? Theme.red : Theme.text
             Layout.alignment: Qt.AlignVCenter
+            horizontalAlignment:Text.AlignHCenter
+            verticalAlignment:Text.AlignVCenter
+        }
         }
     }
     Accessible.name: text

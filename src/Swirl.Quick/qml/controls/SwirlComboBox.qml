@@ -3,74 +3,93 @@ import QtQuick.Controls
 import SwirlQuick
 ComboBox {
     id: control
-    implicitWidth: 146
-    implicitHeight: 44
+    implicitWidth:Theme.dp(146)
+    implicitHeight:Theme.controlHeight
     hoverEnabled: true
-    font.family: "Microsoft YaHei UI"
-    font.pixelSize: 17
-    leftPadding: 15; rightPadding: 31
-    contentItem: Text {
-        text: control.displayText
-        color: Theme.text
-        font: control.font
+    // Let ComboBox own pointer grabs, keyboard activation and popup focus.
+    // Opening its popup through an overlay MouseArea bypasses that lifecycle.
+    focusPolicy:Qt.StrongFocus
+    font.family: Theme.fontFamily
+    font.weight: Theme.bodyFontWeight
+    font.hintingPreference:Font.PreferFullHinting
+    Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) }
+    font.pixelSize:Theme.fontSize(13)
+    leftPadding:Theme.controlPadding; rightPadding:Theme.dp(28)
+    topPadding:Theme.dp(4); bottomPadding:Theme.dp(4)
+    contentItem: SwirlText {renderType:Text.NativeRendering;
+        text: AppState.zh(control.displayText)
+        color: control.enabled ? Theme.text : Theme.muted
+        font.family: control.font.family
+        font.pixelSize: control.font.pixelSize
+        font.weight: control.font.weight
         verticalAlignment: Text.AlignVCenter
+        horizontalAlignment:Text.AlignLeft
         elide: Text.ElideRight
-        leftPadding: 4; rightPadding: 4
+        leftPadding:0; rightPadding:0
     }
-    indicator: Canvas {
-        id: chevron
-        x: control.width-width-13; y: (control.height-height)/2
-        width: 14; height: 14
-        onPaint: {
-            var ctx=getContext("2d")
-            ctx.reset(); ctx.strokeStyle=Theme.muted
-            ctx.lineWidth=1.65; ctx.lineCap="round"; ctx.lineJoin="round"
-            ctx.beginPath(); ctx.moveTo(3,5); ctx.lineTo(7,9); ctx.lineTo(11,5); ctx.stroke()
-        }
-        Connections { target: Theme; function onMutedChanged() { chevron.requestPaint() } }
+    indicator: Image {
+        x:Math.round(control.width-width-Theme.dp(6));y:Math.round((control.height-height)/2);width:Theme.dp(14);height:width
+        source:"image://swirl/chevron-up-down/"+Theme.text.toString().slice(1)
     }
-    background: SwirlPillSurface {
-        pressed:control.pressed;hovered:control.hovered
-        radius: Theme.pillRadius(height)
+    background: SwirlContinuousSurface {
+        radius: Theme.controlRadius
         antialiasing: true
-        color: control.pressed ? Theme.pressed : control.hovered ? Theme.hover : Theme.material("field")
-        border.width: 1
-        border.color: control.activeFocus ? Theme.focusBorder : Theme.pillRim
-        Behavior on color { ColorAnimation { duration: Theme.motion } }
+        color: control.pressed ? Theme.pressed : control.hovered ? Theme.hover : Theme.buttonBase
+        border.width:control.activeFocus?Theme.dp(2):Theme.borderWidth
+        border.color: control.activeFocus ? Theme.focusBorder : Theme.controlBorder
+        Behavior on color { ColorAnimation { duration: Math.min(100,SwirlMotion.duration) } }
     }
     delegate: ItemDelegate {
-        width: control.width
-        height: 36
+        objectName:"swirlComboOption-"+index
+        SwirlPressMotion{}
+        width: control.popup.availableWidth
+        height:Theme.controlHeight
         text: String(modelData)
         highlighted: control.highlightedIndex === index
-        contentItem: Text {
-            text: parent.text
-            color: Theme.text; font.pixelSize: 17; font.family: "Microsoft YaHei UI"
-            verticalAlignment: Text.AlignVCenter; leftPadding: 12
+        contentItem: SwirlText {renderType:Text.NativeRendering;
+            text: AppState.zh(parent.text)
+            color: parent.highlighted ? "white" : Theme.text; font.pixelSize:Theme.fontSize(13); font.family: Theme.fontFamily
+            verticalAlignment: Text.AlignVCenter; leftPadding:Theme.dp(24)
+            Image{visible:control.currentIndex===index;x:Theme.dp(3);anchors.verticalCenter:parent.verticalCenter;width:Theme.dp(14);height:width;source:"image://swirl/checkmark/"+(parent.parent.highlighted?"ffffff":Theme.text.toString().slice(1))}
         }
         background: Rectangle {
-            radius: Theme.controlRadius; color: parent.highlighted ? Theme.selected : "transparent"
-            Behavior on color { ColorAnimation { duration: Theme.motion } }
+            radius: Theme.controlRadius; antialiasing:true; color: parent.highlighted ? Theme.accent : "transparent"
+            Behavior on color { ColorAnimation { duration: Math.min(100,SwirlMotion.duration) } }
         }
     }
     popup: Popup {
-        y: control.height + 7
+        parent:control
+        focus:true
+        popupType:Popup.Window
+        transformOrigin:Item.TopLeft
+    onAboutToShow: {
+        if(SwirlMotion.reduced){scale=1;opacity=1}
+        else opacity=0
+    }
+    onClosed:{scale=1;opacity=1}
+
+        y: control.height+Theme.dp(4)
+        x:0
         width: control.width
-        padding: 6
-        implicitHeight: Math.min(290, contentItem.implicitHeight+12)
+        padding:Theme.dp(5)
+        implicitHeight: Math.min(Theme.dp(290), contentItem.implicitHeight+Theme.dp(12))
         enter: Transition {
+        enabled:!SwirlMotion.reduced
             ParallelAnimation {
-                NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.motion }
-                NumberAnimation { property: "scale"; from: 0.97; to: 1; duration: Theme.motion; easing.type: Easing.OutCubic }
+                NumberAnimation { property:"opacity";to:1; duration: Math.min(100,SwirlMotion.duration) }
             }
         }
-        exit: Transition { NumberAnimation { property: "opacity"; from: 1; to: 0; duration: Theme.motion } }
+        exit: Transition { enabled:!SwirlMotion.reduced; ParallelAnimation { NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.duration} } }
         background: Rectangle {
-            color: Theme.material("floating")
-            radius: Theme.secondaryRadius
-            border.width: 1; border.color: Theme.pillRim
+            color:Theme.surface
+            radius: Theme.popupRadius; antialiasing:true
+            border.width:Theme.dp(1); border.color: Theme.pillRim
         }
-        contentItem: ListView {
+        contentItem: ListView { pixelAligned: true;
+                    add: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";to:1;duration:SwirlMotion.duration} }
+                    remove: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.duration} }
+                    move: Transition {enabled:!SwirlMotion.reduced;SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration}}
+                    displaced: Transition { enabled:!SwirlMotion.reduced; SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration} }
             clip: true
             implicitHeight: contentHeight
             model: control.popup.visible ? control.delegateModel : null

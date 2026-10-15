@@ -1,106 +1,79 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import QtQuick.Dialogs
 import SwirlQuick
 import "../components"
 import "../controls"
 Item {
-    id:page
-    property string selectedId:""
-    readonly property var filteredRows:{
-        var query=filter.text.trim().toLowerCase()
-        return captureProvider.sessions.filter(function(r){return (r.url+r.method+r.statusText).toLowerCase().indexOf(query)>=0})
+ id:page;required property var captureProvider
+ function scrollToBottom(){scroll.contentItem.contentY=Math.max(0,scroll.contentItem.contentHeight-scroll.availableHeight)}
+ function applyLimits(){captureProvider.setLimits([3,5,10,0][timeLimit.currentIndex],[50,100,500,0][sizeLimit.currentIndex],[100,500,1000][countLimit.currentIndex])}
+ component Note:SwirlText {renderType:Text.NativeRendering;color:Theme.muted;font.pixelSize:Theme.fontSize(12);lineHeight:1.5;wrapMode:Text.Wrap;Layout.fillWidth:true}
+ component SectionTitle:SwirlText {renderType:Text.NativeRendering;color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold;Layout.fillWidth:true}
+ ScrollView {
+  id:scroll;anchors.fill:parent;clip:true;ScrollBar.horizontal.policy:ScrollBar.AlwaysOff;ScrollBar.vertical:SwirlScrollBar {}
+  ColumnLayout {width:Math.floor(scroll.availableWidth);spacing:Theme.dp(14)
+   RowLayout {Layout.fillWidth:true;Layout.leftMargin:Theme.dp(24);Layout.rightMargin:Theme.dp(24);Layout.topMargin:Theme.dp(24)
+    SwirlText {renderType:Text.NativeRendering;text:"捕获 HTTP 内容";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.Bold;Layout.fillWidth:true}
+    SwirlToggle {objectName:"captureToggle";large:true;checked:page.captureProvider.running;onToggled:{if(checked){page.applyLimits();page.captureProvider.start(8899)}else page.captureProvider.stop()}Accessible.name:"捕获 HTTP 内容"}
+   }
+   Note {Layout.leftMargin:Theme.dp(24);Layout.rightMargin:Theme.dp(24);text:page.captureProvider.error||"捕获 HTTP 请求与内容。开启后会增加内存和存储开销，请仅在需要时使用；HTTPS 内容需要配合 MITM。"}
+   RowLayout {Layout.fillWidth:true;Layout.leftMargin:Theme.dp(24);Layout.rightMargin:Theme.dp(24);spacing:Theme.gap;Layout.alignment:Qt.AlignTop
+    ColumnLayout {Layout.fillWidth:true;Layout.preferredWidth:1;Layout.minimumWidth:0;Layout.alignment:Qt.AlignTop;spacing:Theme.gap
+     SwirlGlassPanel {Layout.fillWidth:true;Layout.preferredHeight:visibilityBody.implicitHeight+2*Theme.cardPadding
+      ColumnLayout {id:visibilityBody;anchors.left:parent.left;anchors.right:parent.right;anchors.top:parent.top;anchors.margins:Theme.cardPadding;spacing:Theme.dp(12)
+       SectionTitle {text:"可见性"}
+       Note {text:"内存记录保留最近请求的摘要，HTTP 捕获同时保存请求内容。"}
+       SwirlButton {text:"设置内存记录过滤器…";Layout.fillWidth:true;onClicked:filterDialog.open()}
+       SwirlButton {text:"设置 HTTP 捕获过滤器…";Layout.fillWidth:true;onClicked:filterDialog.open()}
+      }
+     }
+     SwirlGlassPanel {Layout.fillWidth:true;Layout.preferredHeight:diskBody.implicitHeight+2*Theme.cardPadding
+      ColumnLayout {id:diskBody;anchors.left:parent.left;anchors.right:parent.right;anchors.top:parent.top;anchors.margins:Theme.cardPadding;spacing:Theme.dp(12)
+       SectionTitle {text:"磁盘 HTTP 捕获"}
+       Note {text:page.captureProvider.running?"本地地址：127.0.0.1:"+page.captureProvider.port:"尚未启动捕获"}
+       SwirlButton {text:"在面板中显示";Layout.fillWidth:true;onClicked:page.Window.window.openDashboard()}
+       Note {text:"从请求面板导出 HAR。仅解密 MITM 主机列表中的 HTTPS 请求。"}
+      }
+     }
+     SwirlGlassPanel {Layout.fillWidth:true;Layout.preferredHeight:displayBody.implicitHeight+2*Theme.cardPadding
+      ColumnLayout {id:displayBody;anchors.left:parent.left;anchors.right:parent.right;anchors.top:parent.top;anchors.margins:Theme.cardPadding;spacing:Theme.dp(10)
+       SectionTitle {text:"显示"}
+       ReferenceCheckBox {text:"合并系统进程 · 研发中";checked:true;enabled:false}
+       Note {text:"将系统进程的统计合并到单一项目。"}
+       ReferenceCheckBox {text:"应用包合并 · 研发中";checked:true;enabled:false}
+       Note {text:"将应用及其子进程合并统计。"}
+      }
+     }
     }
-    readonly property var selected:{
-        var rows=captureProvider.sessions
-        for(var i=0;i<rows.length;i++)if(rows[i].id===selectedId)return rows[i]
-        return null
+    ColumnLayout {Layout.fillWidth:true;Layout.preferredWidth:1;Layout.minimumWidth:0;Layout.alignment:Qt.AlignTop;spacing:Theme.gap
+     SwirlGlassPanel {Layout.fillWidth:true;Layout.preferredHeight:limitsBody.implicitHeight+2*Theme.cardPadding
+      ColumnLayout {id:limitsBody;anchors.left:parent.left;anchors.right:parent.right;anchors.top:parent.top;anchors.margins:Theme.cardPadding;spacing:Theme.dp(12)
+       SectionTitle {text:"捕获限制器"}
+       GridLayout {Layout.fillWidth:true;columns:2;columnSpacing:Theme.dp(8);rowSpacing:Theme.dp(12)
+        SwirlText {renderType:Text.NativeRendering;text:"时间限制";color:Theme.text;font.pixelSize:Theme.fontSize(13)}
+        SwirlComboBox {id:timeLimit;Layout.fillWidth:true;Layout.minimumWidth:0;onActivated:page.applyLimits();model:["3 分钟","5 分钟","10 分钟","无限制"]}
+        SwirlText {renderType:Text.NativeRendering;text:"尺寸限制";color:Theme.text;font.pixelSize:Theme.fontSize(13)}
+        SwirlComboBox {id:sizeLimit;Layout.fillWidth:true;Layout.minimumWidth:0;onActivated:page.applyLimits();model:["50 MB","100 MB","500 MB","无限制"]}
+        SwirlText {renderType:Text.NativeRendering;text:"数量限制";color:Theme.text;font.pixelSize:Theme.fontSize(13)}
+        SwirlComboBox {id:countLimit;Layout.fillWidth:true;Layout.minimumWidth:0;onActivated:page.applyLimits();model:["100 请求","500 请求","1000 请求"]}
+       }
+       Note {text:"达到任一限制时，自动停止本次 HTTP 捕获。"}
+      }
+     }
+     SwirlGlassPanel {Layout.fillWidth:true;Layout.preferredHeight:mitmBody.implicitHeight+2*Theme.cardPadding
+      ColumnLayout {id:mitmBody;anchors.left:parent.left;anchors.right:parent.right;anchors.top:parent.top;anchors.margins:Theme.cardPadding;spacing:Theme.dp(12)
+       SectionTitle {text:"捕获 MITM 覆写"}
+       ReferenceCheckBox {text:"自动开启 MITM";checked:page.captureProvider.autoMitmEnabled;onToggled:page.captureProvider.autoMitmEnabled=checked}
+       SwirlButton {text:"编辑 MITM 主机名…";Layout.fillWidth:true;onClicked:AppState.navigate("tls")}
+       Note {text:"仅对已配置的主机名生效，使用前需配置 CA。"}
+      }
+     }
     }
-    function detailText() {
-        if(!selected)return "选择左侧会话查看真实请求与响应。\n\nHTTPS CONNECT 只显示目标和流量，没有解密 TLS。"
-        if(detailTabs.currentIndex===0)return selected.method+" "+selected.url+"\n"+selected.status+" · "+selected.statusText+"\n"+selected.time+" · "+selected.duration+"\n上传 "+selected.upBytes+" B · 下载 "+selected.downBytes+" B\n\n"+(selected.tunnel?"这是 HTTPS 隧道元数据，不能查看加密正文。":"明文 HTTP 会话。")+(selected.truncated?"\n正文预览超过 64 KiB 或响应达到限制。":"")
-        if(detailTabs.currentIndex===1)return selected.requestHeaders+"\n\n"+(selected.requestBody||"无请求正文")
-        return selected.responseHeaders+"\n\n"+(selected.responseBody||"无响应正文")
-    }
-    ColumnLayout {
-        anchors.fill:parent; spacing:14
-        SwirlGlassPanel {
-            Layout.fillWidth:true; Layout.preferredHeight:183
-            ColumnLayout {
-                anchors.fill:parent; anchors.margins:20; spacing:10
-                RowLayout {
-                    Layout.fillWidth:true; spacing:16
-                    SwirlIcon { name:"capture"; size:32; color:Theme.accent }
-                    ColumnLayout {
-                        Layout.fillWidth:true; spacing:3
-                        Text { text:"抓包"; color:Theme.text; font.pixelSize:25; font.weight:Font.DemiBold }
-                        Text { text:"真实 HTTP 会话捕获 · HTTPS CONNECT 隧道记录"; color:Theme.muted; font.pixelSize:15; Layout.fillWidth:true; elide:Text.ElideRight }
-                    }
-                    SwirlStatusBadge { label:captureProvider.running?"监听中 · 真实":"未启动"; tone:captureProvider.running?"success":"neutral" }
-                }
-                RowLayout {
-                    Layout.fillWidth:true; spacing:12
-                    Text { text:"本机端口"; font.pixelSize:15; color:Theme.muted }
-                    SwirlTextField { id:portField; objectName:"capturePortField"; text:"8899"; enabled:!captureProvider.running; Layout.preferredWidth:105; validator:IntValidator{bottom:0;top:65535} Accessible.name:"抓包监听端口" }
-                    SwirlButton {
-                        objectName:"captureStartButton"; text:captureProvider.running?"停止抓包":"开始抓包"; primary:!captureProvider.running; font.pixelSize:15
-                        onClicked:{
-                            if(captureProvider.running){captureProvider.stop();AppState.addEvent("已停止真实抓包","neutral")}
-                            else if(captureProvider.start(Number(portField.text))){AppState.addEvent("开始 HTTP 抓包 · 本机端口 "+captureProvider.port,"success")}
-                        }
-                    }
-                    Text { text:captureProvider.running?"127.0.0.1:"+captureProvider.port:"仅在点击开始后监听"; color:Theme.muted; font.pixelSize:14; Layout.fillWidth:true; elide:Text.ElideRight }
-                    SwirlButton { text:"清空"; font.pixelSize:15; onClicked:{captureProvider.clear();page.selectedId=""} }
-                    SwirlButton { objectName:"captureExportButton"; text:"导出 HAR"; font.pixelSize:15; enabled:captureProvider.sessions.length>0; onClicked:exportDialog.open() }
-                }
-                Text {
-                    Layout.fillWidth:true; text:captureProvider.error.length?captureProvider.error:"将浏览器或测试工具的 HTTP/HTTPS 代理设为此地址即可捕获；不自动修改系统代理。HTTPS 正文解密和全网卡 PCAP 尚未接入。"
-                    color:captureProvider.error.length?Theme.red:Theme.muted; font.pixelSize:14; wrapMode:Text.WordWrap
-                }
-            }
-        }
-        RowLayout {
-            Layout.fillWidth:true; spacing:12
-            SwirlSearchField { id:filter; Layout.fillWidth:true; placeholderText:"筛选真实会话：域名、方法或状态…" }
-            Text { text:captureProvider.sessions.length+" 条 · "+captureProvider.activeCount+" 个活动连接"; color:Theme.muted; font.pixelSize:14 }
-        }
-        RowLayout {
-            Layout.fillWidth:true; Layout.fillHeight:true; spacing:14
-            SwirlGlassPanel {
-                Layout.fillWidth:true; Layout.fillHeight:true; Layout.preferredWidth:730
-                SwirlDataTable {
-                    objectName:"captureTable"; anchors.fill:parent; anchors.margins:8
-                    textPixelSize:14; headerPixelSize:14
-                    rows:page.filteredRows
-                    columns:[{key:"method",label:"方法",w:80},{key:"host",label:"目标",w:190},{key:"status",label:"状态",w:65},{key:"protocol",label:"类型",w:110},{key:"duration",label:"耗时",w:90},{key:"size",label:"下载",w:90}]
-                    selectedId:page.selectedId
-                    onRowSelected:function(row){page.selectedId=row.id}
-                }
-                Text { visible:captureProvider.sessions.length===0; anchors.centerIn:parent; text:captureProvider.running?"等待应用通过代理发送请求…":"开始抓包后，真实会话会显示在这里。"; color:Theme.muted; font.pixelSize:15 }
-            }
-            SwirlGlassPanel {
-                Layout.fillWidth:true; Layout.fillHeight:true; Layout.preferredWidth:350
-                ColumnLayout {
-                    anchors.fill:parent; anchors.margins:18; spacing:12
-                    Text { text:"会话详情"; color:Theme.text; font.pixelSize:20; font.weight:Font.DemiBold }
-                    SwirlSegmentedControl { id:detailTabs; Layout.fillWidth:true; options:["概览","请求","响应"] }
-                    ScrollView {
-                        Layout.fillWidth:true; Layout.fillHeight:true; clip:true
-                        TextArea {
-                            objectName:"captureDetail"; text:page.detailText(); readOnly:true; selectByMouse:true
-                            color:Theme.text; font.family:Theme.fontFamily; font.pixelSize:14; wrapMode:TextEdit.Wrap
-                            background:Item{}
-                        }
-                    }
-                }
-            }
-        }
-        Text { Layout.fillWidth:true; text:"敏感认证/Cookie 头和常见 URL 密钥已隐藏；正文预览最多 64 KiB，HTTP 响应上限 2 MiB。导出文件仍可能包含请求正文。"; color:Theme.muted; font.pixelSize:12; wrapMode:Text.WordWrap }
-    }
-    FileDialog {
-        id:exportDialog; title:"导出真实抓包会话"; fileMode:FileDialog.SaveFile
-        nameFilters:["HTTP Archive (*.har)"]; defaultSuffix:"har"
-        onAccepted:{if(captureProvider.exportHar(selectedFile))AppState.toast="真实会话已导出为 HAR。"}
-    }
+   }
+   Item {Layout.preferredHeight:Theme.dp(24)}
+  }
+ }
+ SwirlDialog{id:filterDialog;title:"HTTP 捕获过滤器";ColumnLayout{width:parent.width;SwirlTextField{id:captureFilter;Layout.fillWidth:true;text:page.captureProvider.filter;placeholderText:"URL 包含文本 (留空捕获全部)"}SwirlButton{text:"应用过滤器";onClicked:{page.captureProvider.filter=captureFilter.text;filterDialog.close()}}SwirlText {renderType:Text.NativeRendering;text:"查看实际捕获的 HTTP 请求与 CONNECT 隧道。";color:Theme.text;font.pixelSize:Theme.fontSize(13);Layout.fillWidth:true;wrapMode:Text.WordWrap}SwirlButton{text:"打开请求面板";onClicked:{filterDialog.close();page.Window.window.openDashboard()}}}}
 }

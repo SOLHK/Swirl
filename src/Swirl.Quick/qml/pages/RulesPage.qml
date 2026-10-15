@@ -1,156 +1,54 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import SwirlQuick
 import "../components"
 import "../controls"
-
 Item {
-    id: page
-    property var selectedRule:null
-    property var rules:[
-        {id:"001",order:"001",type:"DOMAIN-SUFFIX",pattern:"example.test",policy:"自动选择",enabled:"Enabled",hits:"148"},
-        {id:"002",order:"002",type:"DOMAIN-KEYWORD",pattern:"updates",policy:"DIRECT",enabled:"Enabled",hits:"92"},
-        {id:"003",order:"003",type:"IP-CIDR",pattern:"203.0.113.0/24",policy:"全局 / 新加坡",enabled:"Enabled",hits:"31"},
-        {id:"004",order:"004",type:"PROCESS-NAME",pattern:"Browser.exe",policy:"DIRECT",enabled:"Disabled",hits:"0"},
-        {id:"005",order:"005",type:"FINAL",pattern:"MATCH",policy:"自动选择",enabled:"Enabled",hits:"468"}
-    ]
-    readonly property var displayRules:rules.filter(function(r){
-        return (r.type+" "+r.pattern+" "+r.policy).toLowerCase().indexOf(search.text.toLowerCase())>=0 &&
-               (policyFilter.currentText==="全部策略"||r.policy===policyFilter.currentText)
-    })
-    ColumnLayout {
-        anchors.fill:parent; anchors.margins:23; spacing:14
-        RowLayout {
-            Layout.fillWidth:true
-            SwirlStatusBadge { label:AppState.zh("ORDERED DEMO RULESET"); tone:"accent" }
-            Text { text:AppState.zh("Priority is evaluated top to bottom in this preview."); color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
-            SwirlButton { text:AppState.zh("测试规则"); iconName:"activity"; onClicked:testDialog.open() }
-            SwirlButton { text:AppState.zh("New rule"); primary:true; onClicked:editorDialog.open() }
-        }
-        RowLayout {
-            Layout.fillWidth:true
-            SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:AppState.zh("Search pattern, type or target strategy") }
-            SwirlComboBox { id:policyFilter; model:["全部策略","自动选择","DIRECT","全局 / 新加坡","REJECT"] }
-            SwirlButton { text:AppState.zh("Import"); onClicked:AppState.notice("导入规则") }
-            SwirlButton { text:AppState.zh("Export"); onClicked:AppState.notice("导出规则") }
-        }
-        RowLayout {
-            Layout.fillWidth:true; Layout.fillHeight:true; spacing:14
-            SwirlGlassPanel {
-                Layout.fillWidth:true; Layout.fillHeight:true; clip:true
-                SwirlDataTable {
-                    anchors.fill:parent; anchors.margins:1
-                    rows:page.displayRules; selectedId:page.selectedRule?page.selectedRule.id:""
-                    columns:[{key:"order",label:AppState.zh("PRIORITY"),w:82},{key:"type",label:AppState.zh("TYPE"),w:170},
-                             {key:"pattern",label:AppState.zh("MATCH PATTERN"),w:208},{key:"policy",label:AppState.zh("POLICY"),w:126},
-                             {key:"hits",label:AppState.zh("HITS"),w:77},{key:"enabled",label:AppState.zh("STATE"),w:100}]
-                    onRowSelected:function(r){page.selectedRule=r}
-                }
-                SwirlEmptyState {
-                    visible:page.displayRules.length===0; anchors.centerIn:parent
-                    headline:AppState.zh("No matching rules")
-                }
-            }
-            SwirlGlassPanel {
-                Layout.preferredWidth:310; Layout.fillHeight:true
-                ColumnLayout {
-                    anchors.fill:parent; anchors.margins:18; spacing:13
-                    Text { text:AppState.zh("Rule inspection"); color:Theme.text; font.pixelSize:16; font.weight:Font.DemiBold }
-                    SwirlStatusBadge { label:page.selectedRule?page.selectedRule.enabled:"请选择规则"; tone:"accent" }
-                    Repeater {
-                        model:[
-                            ["PRIORITY",page.selectedRule?page.selectedRule.order:"—"],
-                            ["MATCHER",page.selectedRule?page.selectedRule.type:"—"],
-                            ["PATTERN",page.selectedRule?page.selectedRule.pattern:"—"],
-                            ["STRATEGY",page.selectedRule?page.selectedRule.policy:"—"],
-                            ["模拟命中",page.selectedRule?page.selectedRule.hits:"—"]
-                        ]
-                        ColumnLayout {
-                            Layout.fillWidth:true; spacing:4
-                            Text { text:modelData[0]; color:Theme.muted; font.pixelSize:10 }
-                            Text { text:modelData[1]; color:Theme.text; font.pixelSize:13; Layout.fillWidth:true; elide:Text.ElideRight }
-                        }
-                    }
-                    Rectangle { Layout.fillWidth:true; height:1; color:Theme.border }
-                    RowLayout {
-                        Layout.fillWidth:true
-                        Text { text:AppState.zh("Enable rule"); color:Theme.text; Layout.fillWidth:true }
-                        SwirlToggle {
-                            checked:page.selectedRule&&page.selectedRule.enabled==="Enabled"
-                            onToggled:{
-                                if(page.selectedRule) {
-                                    var arr=page.rules.map(function(r){return r.id===page.selectedRule.id?
-                                        {id:r.id,order:r.order,type:r.type,pattern:r.pattern,policy:r.policy,
-                                         enabled:checked?"Enabled":"Disabled",hits:r.hits}:r})
-                                    page.rules=arr
-                                    page.selectedRule=arr.filter(function(r){return r.id===page.selectedRule.id})[0]
-                                }
-                            }
-                        }
-                    }
-                    Item { Layout.fillHeight:true }
-                    SwirlButton { text:AppState.zh("Edit selected"); onClicked:editorDialog.open() }
-                    SwirlButton { text:AppState.zh("View match details"); quiet:true; onClicked:AppState.notice("规则命中详情") }
-                }
-            }
-        }
+ id:page;required property var engineController;property string query:"";property var selectedRule:null
+ property Item selectedRowItem:null
+ property int editingIndex:-1
+ function editRule(rule,source){
+  if(!rule || rule.customIndex===undefined || engineController.processAlive)return
+  editingIndex=rule.customIndex;ruleEditor.heroSource=source
+  ruleType.currentIndex=ruleType.model.indexOf(rule.type==='FINAL'?'MATCH':rule.type)
+  rulePattern.text=rule.pattern;rulePolicy.currentIndex=rulePolicy.model.indexOf(rule.policy)
+  ruleEditor.open()
+ }
+ readonly property var displayRules:engineController.routingRules.filter(r=>(r.type+" "+r.pattern+" "+r.policy).toLowerCase().indexOf(query.toLowerCase())>=0)
+ ColumnLayout {
+  anchors.fill:parent;anchors.margins:Theme.dp(24);spacing:Theme.gap
+  RowLayout {Layout.fillWidth:true
+   SwirlText {renderType:Text.NativeRendering;text:"规则";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.Bold;Layout.fillWidth:true}
+  }
+  SwirlText {renderType:Text.NativeRendering;text:"规则按从上至下的顺序测试；双击自定义规则可编辑。";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
+  SwirlGlassPanel {Layout.fillWidth:true;Layout.preferredHeight:Math.min(ruleArea.implicitHeight+2*Theme.cardPadding,Math.max(Theme.dp(240),page.height-Theme.dp(150)));Layout.maximumHeight:Math.max(Theme.dp(200),page.height-Theme.dp(150))
+   ColumnLayout {id:ruleArea;anchors.fill:parent;anchors.margins:Theme.cardPadding;spacing:Theme.dp(12)
+    RowLayout {Layout.fillWidth:true
+     SwirlText {renderType:Text.NativeRendering;text:"路由规则";color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold;Layout.fillWidth:true}
+     SwirlText {renderType:Text.NativeRendering;text:page.displayRules.length+" 条规则";color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
+     SwirlSearchField {objectName:"rulesSearch";Layout.preferredWidth:Math.floor(Math.min(Theme.dp(240),page.width*0.36));placeholderText:"搜索类型、值或策略";onTextChanged:page.query=text}
     }
-    SwirlDialog {
-        id:editorDialog; title:"规则编辑器"
-        ColumnLayout {
-            width:parent.width; spacing:13
-            Text { text:AppState.zh("Rule type"); color:Theme.text }
-            SwirlComboBox { id:typeInput; Layout.fillWidth:true; model:["DOMAIN-SUFFIX","DOMAIN-KEYWORD","IP-CIDR","PROCESS-NAME","FINAL"] }
-            Text { text:AppState.zh("Match pattern"); color:Theme.text }
-            SwirlTextField { id:patternInput; Layout.fillWidth:true; placeholderText:AppState.zh("example.test") }
-            Text { text:AppState.zh("Target policy"); color:Theme.text }
-            SwirlComboBox { id:policyInput; Layout.fillWidth:true; model:["自动选择","DIRECT","全局 / 新加坡","REJECT"] }
-            Text { text:AppState.zh("Changes are local to the UI; no routing rules are installed."); color:Theme.muted; font.pixelSize:11; Layout.fillWidth:true; wrapMode:Text.Wrap }
-            RowLayout {
-                Layout.alignment:Qt.AlignRight
-                SwirlButton { text:AppState.zh("Cancel"); onClicked:editorDialog.close() }
-                SwirlButton {
-                    text:AppState.zh("Add demo rule"); primary:true
-                    enabled:patternInput.text.trim().length>0
-                    onClicked:{
-                        var n=page.rules.length+1
-                        page.rules=page.rules.concat([{id:"R"+n,order:String(n).padStart(3,"0"),
-                            type:typeInput.currentText,pattern:patternInput.text.trim(),
-                            policy:policyInput.currentText,enabled:"Enabled",hits:"0"}])
-                        patternInput.text=""
-                        editorDialog.close()
-                    }
-                }
-            }
-        }
+    SwirlDataTable {id:ruleTable;objectName:"rulesTable";textPixelSize:13;headerPixelSize:12;Layout.fillWidth:true;Layout.fillHeight:true;Layout.preferredHeight:Theme.tableHeaderHeight+Math.max(1,page.displayRules.length)*Theme.tableRowHeight;visible:page.displayRules.length>0;incrementalRows:true;animateRowChanges:page.query.length===0;rows:page.displayRules;selectedId:page.selectedRule?page.selectedRule.id:"";fillEmptyRows:false;columns:[{key:"order",label:"ID",w:40},{key:"type",label:"类型",w:125},{key:"pattern",label:"值",w:230},{key:"policy",label:"策略",w:100},{key:"hits",label:"使用",w:50}];onRowSelected:r=>page.selectedRule=r;onRowEdited:(r,source)=>page.editRule(r,source)}
+    SwirlEmptyState {visible:page.displayRules.length===0;Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(130);headline:page.query.length?"没有匹配的规则":"尚无路由规则";detail:page.query.length?"尝试其他关键词，或清空搜索。":"添加自定义规则以控制流量的处理方式。"}
+    RowLayout {Layout.fillWidth:true;spacing:Theme.dp(8)
+     SwirlButton {objectName:"addRoutingRule";text:"添加";iconName:"plus";onClicked:{page.editingIndex=-1;ruleEditor.heroSource=null;rulePattern.text="";ruleEditor.open()}}
+     SwirlButton {objectName:"editRoutingRule";text:"编辑";enabled:page.selectedRule!==null&&page.selectedRule.customIndex!==undefined&&!page.engineController.processAlive;onClicked:page.editRule(page.selectedRule,ruleTable.selectedItem)}
+     SwirlButton {objectName:"removeRoutingRule";text:"删除";enabled:page.selectedRule!==null&&page.selectedRule.customIndex!==undefined&&!page.engineController.processAlive;onClicked:{if(page.engineController.removeRoutingRule(page.selectedRule.customIndex))page.selectedRule=null;else AppState.notice(page.engineController.networkConfigurationError)}}
+     Item {Layout.fillWidth:true}
+     SwirlButton {text:"重置计数器";development:true;enabled:false}
     }
-    SwirlDialog {
-        id:testDialog; title:"规则匹配测试"
-        ColumnLayout {
-            width:parent.width; spacing:13
-            Text { text:AppState.zh("Host or IP to evaluate"); color:Theme.text }
-            SwirlTextField { id:testInput; Layout.fillWidth:true; placeholderText:AppState.zh("api.example.test") }
-            Rectangle {
-                Layout.fillWidth:true; implicitHeight:68; radius:Theme.roundedRadius(width,height); color:Theme.field
-                Text {
-                    anchors.fill:parent; anchors.margins:12
-                    text:AppState.zh("Demo evaluator only.\nNo real DNS lookup or proxy routing occurs.")
-                    color:Theme.muted; font.pixelSize:12; wrapMode:Text.WordWrap
-                }
-            }
-            RowLayout {
-                Layout.alignment:Qt.AlignRight
-                SwirlButton { text:AppState.zh("Close"); onClicked:testDialog.close() }
-                SwirlButton {
-                    text:AppState.zh("Evaluate"); primary:true; enabled:testInput.text.trim().length>0
-                    onClicked:{
-                        var match=page.rules.find(function(r){return r.type==="DOMAIN-SUFFIX" && testInput.text.endsWith(r.pattern)})
-                        AppState.notice("测试匹配："+(match?match.policy:"最终策略 · 自动选择"))
-                        testDialog.close()
-                    }
-                }
-            }
-        }
-    }
+   }
+  }
+  Item {Layout.fillHeight:true}
+ }
+
+ SwirlDialog{id:ruleEditor;title:page.editingIndex>=0?"编辑规则":"新增规则";ColumnLayout{width:parent.width;spacing:Theme.dp(14)
+  RowLayout{Layout.fillWidth:true;SwirlText {renderType:Text.NativeRendering;text:"类型：";color:Theme.text}SwirlComboBox{id:ruleType;Layout.fillWidth:true;model:["DOMAIN","DOMAIN-SUFFIX","DOMAIN-KEYWORD","IP-CIDR","IP-CIDR6","PROCESS-NAME","DST-PORT","SRC-IP-CIDR","MATCH"]}}
+  RowLayout{Layout.fillWidth:true;SwirlText {renderType:Text.NativeRendering;text:"值：";color:Theme.text}SwirlTextField{id:rulePattern;objectName:"rulePattern";Layout.fillWidth:true;enabled:ruleType.currentText!=="MATCH";placeholderText:"example.com"}}
+  RowLayout{Layout.fillWidth:true;SwirlText {renderType:Text.NativeRendering;text:"策略：";color:Theme.text}SwirlComboBox{id:rulePolicy;Layout.fillWidth:true;model:["DIRECT","REJECT","SWIRL"].concat(page.engineController.policyGroups.map(g=>g.name))}}
+  SwirlText {renderType:Text.NativeRendering;text:page.engineController.networkConfigurationError;color:Theme.orange;Layout.fillWidth:true;wrapMode:Text.WordWrap;font.pixelSize:Theme.fontSize(12)}
+  RowLayout{Layout.alignment:Qt.AlignRight;SwirlButton{text:"取消";onClicked:ruleEditor.close()}SwirlButton{objectName:"saveRoutingRule";text:page.editingIndex>=0?"保存":"添加";primary:true;onClicked:{if(page.engineController.saveRoutingRule(ruleType.currentText,rulePattern.text,rulePolicy.currentText,page.editingIndex)){page.selectedRule=null;ruleEditor.close()}}}}
+ }}
 }

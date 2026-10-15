@@ -1,3 +1,4 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -5,56 +6,50 @@ import SwirlQuick
 import "../components"
 import "../controls"
 Item {
-    id:page
-    property string category:"全部"
-    readonly property var filtered:FeatureCatalog.entries.filter(function(f){return (page.category==="全部" || f.group===page.category) && (f.title+" "+f.keywords).toLowerCase().indexOf(search.text.toLowerCase())>=0})
-    ColumnLayout {
-        anchors.fill:parent; spacing:14
-        RowLayout {
-            Layout.fillWidth:true; Layout.topMargin:14; spacing:16
-            ColumnLayout {
-                Layout.fillWidth:true; spacing:6
-                Text {text:"功能模块";color:Theme.text;font.pixelSize:27;font.weight:Font.DemiBold}
-                Text {text:FeatureCatalog.entries.length+" 个入口 · 配置草稿与界面预览";color:Theme.muted;font.pixelSize:15;Layout.fillWidth:true;elide:Text.ElideRight}
-            }
-            SwirlSearchField {id:search;objectName:"moduleSearch";Layout.preferredWidth:280;placeholderText:"搜索模块或协议…"}
-        }
-        Text {text:"真实 HTTP 抓包已接入。其他页面用于配置与交互预览，保存草稿不会启动网络服务。";color:Theme.muted;font.pixelSize:14;Layout.fillWidth:true;wrapMode:Text.WordWrap}
-        ScrollView {
-            Layout.fillWidth:true; Layout.preferredHeight:45
-            ScrollBar.vertical.policy:ScrollBar.AlwaysOff
-            Row {spacing:8;Repeater {
-                model:["全部"].concat(FeatureCatalog.categories)
-                SwirlButton {required property string modelData;text:modelData;implicitHeight:38;font.pixelSize:14;quiet:page.category!==modelData;onClicked:page.category=modelData}
-            }}
-        }
-        ScrollView {
-            id:scroll;Layout.fillWidth:true;Layout.fillHeight:true;clip:true
-            ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
-            GridLayout {
-                width:scroll.availableWidth;columns:width>=1000 ? 3 : width>=620 ? 2 : 1;columnSpacing:14;rowSpacing:14
-                Repeater {
-                    model:page.filtered
-                    Button {
-                        required property var modelData
-                        Layout.fillWidth:true;Layout.preferredHeight:148
-                        hoverEnabled:true;padding:18
-                        background:SwirlGlassPanel {color:parent.down ? Theme.selected : parent.hovered ? Theme.hover : Theme.surface}
-                        contentItem:ColumnLayout {
-                            spacing:8
-                            RowLayout {
-                                Layout.fillWidth:true;spacing:12
-                                SwirlIcon {name:modelData.icon;size:26;color:Theme.accent}
-                                Text {text:modelData.title;font.pixelSize:18;font.weight:Font.DemiBold;color:Theme.text;Layout.fillWidth:true;elide:Text.ElideRight}
-                                SwirlIcon {name:"chevron-right";size:16}
-                            }
-                            Text {text:modelData.sub;color:Theme.muted;font.pixelSize:14;Layout.fillWidth:true;wrapMode:Text.WordWrap;maximumLineCount:2;elide:Text.ElideRight}
-                            Item {Layout.fillHeight:true}
-                            Text {text:modelData.id==="capture" ? "HTTP 已接入" : modelData.id.indexOf("feature-")===0 ? "配置草稿" : "交互预览";color:modelData.id==="capture" ? Theme.green : Theme.muted;font.pixelSize:12}
-                        }
-                        onClicked:AppState.navigate(modelData.id)
-                        Accessible.name:modelData.title
+    id: page
+    SwirlText { x:Theme.dp(24); y:Theme.dp(30); text:"设置"; color:Theme.text; font.pixelSize:Theme.fontSize(26); font.weight:Font.Bold }
+    Rectangle { y:Theme.dp(78); width:parent.width; height:Theme.dp(1); color:Theme.border }
+    ScrollView {
+        id: scroll; x:Theme.dp(24); y:Theme.dp(94); width:parent.width-Theme.dp(48); height:parent.height-y-Theme.dp(20)
+        clip:true; ScrollBar.horizontal.policy:ScrollBar.AlwaysOff; ScrollBar.vertical:SwirlScrollBar {}
+        Grid {
+            id: grid; width:scroll.availableWidth
+            columns:Math.max(1,Math.floor(width/Theme.dp(210))); spacing:Theme.dp(10)
+            Repeater {
+                model:[
+                    {title:"通用",icon:"settings",route:"settings",description:"基础配置与应用行为"},
+                    {title:"外观",icon:"appearance",route:"appearance",description:"主题、文字大小与动画"},
+                    {title:"字体",icon:"typography",route:"fonts",description:"按系统选择清晰字体，也可导入本机字体"},
+                    {title:"DNS",icon:"dns",route:"dns",description:"解析服务与本地映射"},
+                    {title:"模块",icon:"modules",route:"modules",description:"管理配置扩展模块"},
+                    {title:"配置",icon:"profiles",route:"profiles",description:"管理与切换本地配置"},
+                    {title:"脚本",icon:"scripts",route:"scripts",description:"运行本地 JavaScript 扩展"},
+                    {title:"订阅管理",icon:"subscriptions",route:"subscriptions",description:"更新节点与自动更新周期"},
+                    {title:"节点管理",icon:"proxies",route:"proxies",description:"连接、测速与编辑节点"}]
+                SwirlMotionButton {
+                    id: entry; required property var modelData
+                    readonly property Item motionTitle:entryTitle
+                    readonly property string motionIcon:modelData.icon
+                    readonly property string motionDescription:modelData.description
+                    objectName:"settings-"+modelData.route
+                    width:Math.floor((grid.width-(grid.columns-1)*grid.spacing)/grid.columns); height:Theme.dp(156)
+                    padding:Theme.cardPadding; hoverEnabled:true
+                    readonly property real transfer: page.Window.window.settingsOrigin===entry ? page.Window.window.settingsOriginProgress : 0
+                    motionScale:enabled && down?SwirlMotion.pressScale:1
+                    opacity:page.Window.window.settingsOrigin===entry && page.Window.window.settingsOriginMoving?0:1
+                    background:Rectangle {
+                        color:entry.hovered?Theme.hover:Theme.material("content"); radius:Theme.cardRadius
+                        border.width:Theme.borderWidth; border.color:entry.activeFocus?Theme.focusBorder:Theme.border
+                        Behavior on color { ColorAnimation { duration:SwirlMotion.hoverDuration } }
                     }
+                    contentItem:Column {
+                        spacing:Theme.dp(12)
+                        SwirlIcon { name:entry.modelData.icon; size:Theme.dp(34); color:Theme.accent }
+                        SwirlText { id:entryTitle;text:entry.modelData.title; color:Theme.text; font.pixelSize:Theme.fontSize(16); font.weight:Font.DemiBold }
+                        SwirlText { width:parent.width; text:entry.modelData.description; color:Theme.muted; font.pixelSize:Theme.fontSize(11); wrapMode:Text.WordWrap }
+                    }
+                    onClicked: page.Window.window.openSettings(modelData.route,entry)
+                    Accessible.name:modelData.title
                 }
             }
         }

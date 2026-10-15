@@ -1,187 +1,106 @@
 #include "OverviewChecks.h"
 #include <QQuickWindow>
 #include <QQuickItem>
+#include <QGuiApplication>
+#include <QScreen>
 #include <QQmlContext>
 #include <QQmlExpression>
-#include <QQmlEngine>
+#include <QElapsedTimer>
 #include <QTest>
 #include <QDebug>
+#include <QDir>
 #include <functional>
-#include <QTemporaryDir>
-#include <QFile>
-#include "../app/ModuleDraftStore.h"
 
-int runOverviewChecks(QQuickWindow *window)
-{
-    int failures = 0, checks = 0;
-    const auto check = [&](bool condition, const char *name) {
-        ++checks;
-        if (!condition) { ++failures; qCritical() << "FAIL" << name; }
-        else qInfo() << "PASS" << name;
-    };
-    if (!window) return 1;
-    window->resize(1450,884);
-    QTest::qWait(150);
-    const auto state = [&](const QString &expression) {
-        QQmlExpression eval(qmlContext(window), window, expression);
-        const auto result = eval.evaluate();
-        if (eval.hasError()) qCritical() << eval.error();
-        return result;
-    };
-    // Repeater delegates and popup content can be visually reparented, so use
-    // the actual scene tree rather than only QObject ownership.
-    std::function<QQuickItem *(QQuickItem *,const QString &)> findVisual;
-    findVisual = [&](QQuickItem *parent,const QString &name) -> QQuickItem * {
-        if (parent->objectName()==name) return parent;
-        for (auto *child:parent->childItems())
-            if (auto *found=findVisual(child,name)) return found;
-        return nullptr;
-    };
-    const auto item = [&](const char *name) { return findVisual(window->contentItem(),QString::fromLatin1(name)); };
-    const auto click = [&](QQuickItem *target, qreal fraction = 0.5) {
-        if (!target) { check(false,"input target exists"); return; }
-        // The overview retains its trends and tools below the primary status
-        // panels. Scroll the real viewport before sending input to those items.
-        if (auto *scroll = item("overviewScroll")) {
-            auto *viewport = qobject_cast<QQuickItem *>(
-                qvariant_cast<QObject *>(scroll->property("contentItem")));
-            bool insideViewport = false;
-            for (auto *parent = target; parent; parent = parent->parentItem())
-                if (parent == viewport) { insideViewport = true; break; }
-            if (viewport && insideViewport) {
-                const qreal top = target->mapToItem(viewport, QPointF()).y();
-                const qreal bottom = top + target->height();
-                const qreal delta = top < 0 ? top :
-                    bottom > viewport->height() ? bottom - viewport->height() : 0;
-                if (delta != 0) {
-                    const qreal maximum = qMax<qreal>(0,
-                        viewport->property("contentHeight").toReal() - viewport->height());
-                    viewport->setProperty("contentY", qBound<qreal>(0,
-                        viewport->property("contentY").toReal() + delta, maximum));
-                    QTest::qWait(100);
-                }
-            }
-        }
-        QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,
-                          target->mapToScene(QPointF(target->width()*fraction,target->height()/2)).toPoint());
-        QTest::qWait(250);
-    };
-    check(state("AppState.demoDown === 0 && AppState.demoUp === 0 && AppState.demoConnections === 0").toBool(),"offline counters zero");
-    check(state("AppState.connectionState.indexOf('演示') >= 0 && AppState.demoMode").toBool(),"overview state cannot claim a real engine connection");
-    check(state("Theme.canvas.toString() === '#f7f7f8' && Theme.surface.toString() === '#ffffff'").toBool(),"all pages share neutral canvas and white card tokens");
-    check(state("Theme.radius === 18 && Theme.roundedRadius(100,24) === 12").toBool(),"small controls clamp the shared radius to their geometry");
-    auto *metric = item("downloadMetric");
-    check(metric && metric->property("value").toString()=="0 KB/s","offline metric rendered as zero");
-    auto *chart = item("overviewChart");
-    check(chart && chart->property("series").toString()=="down","download is the only default curve");
-    click(item("connectionSwitch"));
-    check(state("AppState.proxyOn && AppState.demoDown > 0 && AppState.demoConnections > 0").toBool(),"mouse starts demonstration connection");
-    click(item("systemProxyToggle"));
-    click(item("tunToggle"));
-    check(state("AppState.systemProxyOn && AppState.tunOn && AppState.proxyOn").toBool(),"demo system and TUN switches belong to a connected demo session");
-    click(item("connectionSwitch"));
-    check(state("!AppState.proxyOn && AppState.demoDown === 0 && AppState.demoUp === 0 && AppState.demoConnections === 0").toBool(),"mouse disconnect resets counters");
-    check(state("!AppState.systemProxyOn && !AppState.tunOn").toBool(),"disconnect clears demo system proxy and TUN states");
-    check(state("AppState.recentEvents[0].title === '已断开演示连接'").toBool(),"disconnect recorded at current time");
-    auto *combo=item("modeCombo");
-    click(combo);
-    QTest::keyClick(window,Qt::Key_Down);
-    QTest::keyClick(window,Qt::Key_Return);
-    QTest::qWait(250);
-    check(state("AppState.mode === '全局'").toBool(),"mode popup keyboard selection");
-    state("pageLoader.item.showDetails = true");
-    QTest::qWait(150);
-    click(item("seriesSelector"),0.5);
-    check(chart && chart->property("series").toString()=="up","upload selection replaces download");
-    click(item("seriesSelector"),0.85);
-    check(chart && chart->property("series").toString()=="total","total selection displays cumulative series");
-    click(item("rangeSelector"),0.62);
-    check(chart && chart->property("rangeIndex").toInt()==2,"six-hour range input");
-    click(item("nodePickerButton"));
-    auto *popup=window->findChild<QObject *>("nodePicker");
-    check(popup && popup->property("opened").toBool(),"node picker opens from button");
-    click(item("hongKongNode"));
-    check(state("AppState.selectedNode === '香港 · 01' && AppState.selectedNodeRegion === 'HK' && AppState.selectedNodeProtocol === 'Hysteria2' && AppState.selectedNodeLatency === 52").toBool(),"node choice updates region protocol and historical latency");
-    click(item("nodePickerButton"));
-    QTest::keyClick(window,Qt::Key_Escape);
-    QTest::qWait(250);
-    check(popup && !popup->property("visible").toBool(),"node picker dismisses with Escape");
-    QTest::keyClick(window,Qt::Key_K,Qt::ControlModifier);
-    QTest::qWait(50);
-    auto *search=item("pageSearch");
-    check(search && search->hasActiveFocus(),"Ctrl+K focuses search");
-    if(search) search->setProperty("text",QStringLiteral("HTTP"));
-    QTest::keyClick(window,Qt::Key_Return);
-    QTest::qWait(250);
-    check(state("AppState.currentPage === 'inspector'").toBool(),"search navigates to HTTP inspector");
-    click(item("historyBackButton"));
-    check(state("AppState.currentPage === 'overview'").toBool(),"mouse history button remains clickable below title drag region");
-    QTest::keyClick(window,Qt::Key_Right,Qt::AltModifier);
-    QTest::qWait(250);
-    QTest::keyClick(window,Qt::Key_Left,Qt::AltModifier);
-    QTest::qWait(250);
-    check(state("AppState.currentPage === 'overview'").toBool(),"Alt+Left returns through navigation history");
-    QTest::keyClick(window,Qt::Key_Right,Qt::AltModifier);
-    QTest::qWait(250);
-    check(state("AppState.currentPage === 'inspector'").toBool(),"Alt+Right restores forward destination");
-    QTest::keyClick(window,Qt::Key_1,Qt::ControlModifier);
-    QTest::qWait(150);
-    auto *loader=item("pageLoader");
-    check(loader && loader->y()+loader->height()<=window->height()-16,"overview has bottom margin at reference size");
-    window->resize(1000,650);
-    QTest::qWait(150);
-    check(loader && loader->width()>0 && loader->height()>0,"minimum size leaves usable scrolling viewport");
-    QMetaObject::invokeMethod(window,"previewScrollBottom");
-    QTest::qWait(150);
-    auto *importRow=item("importConfigRow");
-    check(importRow && importRow->mapToScene(QPointF(0,importRow->height())).y()<=window->height()-17,
-          "last bottom row is fully reachable at minimum size");
-    window->resize(1450,884);
-    QTest::keyClick(window,Qt::Key_K,Qt::ControlModifier);
-    if(auto *captureSearch=item("pageSearch"))captureSearch->setProperty("text",QStringLiteral("抓包"));
-    QTest::keyClick(window,Qt::Key_Return);QTest::qWait(250);
-    check(state("AppState.currentPage === 'capture' && !captureProvider.running").toBool(),"search opens real capture page without starting listener");
-    if(auto *port=item("capturePortField"))port->setProperty("text","0");
-    click(item("captureStartButton"));
-    check(state("captureProvider.running && captureProvider.port > 0").toBool(),"capture start button opens actual loopback listener");
-    click(item("captureStartButton"));
-    check(state("!captureProvider.running").toBool(),"capture stop button closes actual listener");
-    QTest::keyClick(window,Qt::Key_K,Qt::ControlModifier);
-    if(auto *moduleSearch=item("pageSearch"))moduleSearch->setProperty("text",QStringLiteral("DHCP"));
-    QTest::keyClick(window,Qt::Key_Return);QTest::qWait(250);
-    check(state("AppState.currentPage === 'feature-dhcp' && !captureProvider.running").toBool(),"search opens dedicated DHCP module without network listener");
-    auto *firstToggle=item("moduleFirstToggle");
-    const bool before=firstToggle && firstToggle->property("checked").toBool();
-    click(firstToggle);
-    click(item("moduleSaveButton"));
-    check(state("moduleDrafts.load('feature-dhcp').settings.f0").toBool()!=before,"module toggle is saved as actual local draft");
-    state("AppState.navigate('featurehub')");QTest::qWait(200);
-    check(item("moduleSearch")!=nullptr,"module hub renders searchable catalog");
-    check(state("FeatureCatalog.entries.length===56").toBool(),"catalog contains 56 capability entries");
-    state("AppState.navigate('feature-dhcp')");QTest::qWait(200);
-    check(item("moduleFirstToggle") && item("moduleFirstToggle")->property("checked").toBool()!=before,"module draft restored after navigation");
-    // Drive record creation through the page, then reload the persisted list.
-    if(auto *loaderItem=item("pageLoader")) {
-        if(auto *modulePage=qvariant_cast<QObject *>(loaderItem->property("item")))modulePage->setProperty("tab",1);
+int runOverviewChecks(QQuickWindow *window) {
+    int failures=0,checks=0;
+    const auto check=[&](bool ok,const char *name){++checks;if(ok)qInfo()<<"PASS"<<name;else {++failures;qCritical()<<"FAIL"<<name;}};
+    if(!window)return 1;window->resize(914,672);window->show();window->requestActivate();QTest::qWait(150);
+    const auto state=[&](const QString &code){QQmlExpression expression(qmlContext(window),window,code);const auto result=expression.evaluate();if(expression.hasError())qCritical()<<expression.error();return result;};
+    const auto wait=[&](const std::function<bool()> &condition){QElapsedTimer timer;timer.start();while(!condition()&&timer.elapsed()<3500)QTest::qWait(20);return condition();};
+    std::function<QQuickItem *(QQuickItem *,const QString &)> find;
+    find=[&](QQuickItem *parent,const QString &name)->QQuickItem *{if(parent->objectName()==name&&parent->isVisible())return parent;for(auto *child:parent->childItems())if(auto *result=find(child,name))return result;return nullptr;};
+    const auto item=[&](const char *name,QQuickWindow *target=nullptr){return find((target?target:window)->contentItem(),QString::fromLatin1(name));};
+    const auto settled=[&]{wait([&]{return !state("pageLoader.moving || pageLoader.pendingGrab || settingsFlight.moving || (settingsFlight.phase==='Detail' && settingsFlight.visible)").toBool();});};
+    const auto click=[&](const char *name,QQuickWindow *target=nullptr){auto *control=item(name,target);if(!control){check(false,"native input target exists");return false;}auto *w=target?target:window;QTest::mouseClick(w,Qt::LeftButton,Qt::NoModifier,control->mapToScene(QPointF(control->width()/2,control->height()/2)).toPoint());QTest::qWait(80);settled();return true;};
+    const auto type=[&](const char *name,const QString &text,QQuickWindow *target=nullptr){auto *control=item(name,target);if(!control){check(false,"editable input exists");return;}control->forceActiveFocus();auto *w=target?target:window;QTest::keyClick(w,Qt::Key_A,Qt::ControlModifier);for(const auto character:text)QTest::keyClick(w,character.toLatin1());QTest::qWait(50);};
+    const auto ownsPopup=[&](QObject *popup,QQuickWindow *expected){auto *visual=popup?qobject_cast<QQuickItem *>(popup->property("parent").value<QObject *>()):nullptr;return visual&&visual->window()==expected;};
+    check(state("AppState.measuredDown===0 && AppState.measuredUp===0 && !engineController.processAlive").toBool(),"initial traffic and core state come from the stopped engine");
+    for(const auto *route:{"activity","overview","processes","gateway","policies","rules","capture","tls","rewrite","featurehub"}){
+        const auto control=QString("nav-")+route;click(control.toUtf8().constData());
+        check(wait([&]{return state(QString("AppState.currentPage === '%1' && pageLoader.item !== null").arg(route)).toBool();}),"sidebar mouse input loads its real page");
     }
-    QTest::qWait(100);click(item("moduleAddButton"));
-    if(auto *name=item("moduleEntryName"))name->setProperty("text",QStringLiteral("UI test reservation"));
-    if(auto *value=item("moduleEntryValue"))value->setProperty("text",QStringLiteral("192.0.2.20"));
-    click(item("moduleEntryConfirm"));click(item("moduleSaveButton"));
-    check(state("moduleDrafts.load('feature-dhcp').records.some(function(r){return r.name==='UI test reservation' && r.value==='192.0.2.20'})").toBool(),"entry dialog persists actual module record");
-    auto *store=qobject_cast<ModuleDraftStore *>(qmlContext(window)->contextProperty("moduleDrafts").value<QObject *>());
-    QTemporaryDir temp;
-    if(store && temp.isValid()) {
-        const auto draft=store->load("feature-dhcp");
-        const auto file=QUrl::fromLocalFile(temp.filePath("draft.json"));
-        check(store->exportFile(file,"feature-dhcp",draft),"draft JSON export writes actual file");
-        check(store->importFile(file,"feature-dhcp")==draft,"draft JSON roundtrip retains settings and ordered records");
-        check(store->importFile(file,"feature-dns").isEmpty() && !store->lastError().isEmpty(),"draft import rejects wrong module");
-        QFile bad(temp.filePath("bad.json"));
-        if(!bad.open(QIODevice::WriteOnly))return 2;
-        bad.write("{broken");bad.close();
-        check(store->importFile(QUrl::fromLocalFile(bad.fileName()),"feature-dhcp").isEmpty() && !store->lastError().isEmpty(),"draft import rejects malformed JSON");
-    } else check(false,"draft test fixture exists");
-    qInfo() << "Overview input checks:" << checks << "checks," << failures << "failures";
-    return failures ? 2 : 0;
+    click("nav-rules");click("addRoutingRule");type("rulePattern","example.test");click("saveRoutingRule");
+    check(state("engineController.routingRules.some(r=>r.pattern==='example.test' && r.policy==='DIRECT')").toBool(),"rule editor mouse and keyboard input persists a real rule");
+    type("rulesSearch","example.test");check(state("pageLoader.item.displayRules.length===1").toBool(),"rules search filters saved rules");
+    check(wait([&]{return state("dismissals.count===0").toBool();}),"rule dialog releases its modal shield before table input");
+    if(auto *table=item("rulesTable")){QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,table->mapToScene(QPointF(60,39)).toPoint());QTest::qWait(50);}else check(false,"rules table exists");
+    click("removeRoutingRule");check(state("!engineController.routingRules.some(r=>r.pattern==='example.test')").toBool(),"selected custom rule can be removed by its editor action");
+    click("nav-capture");click("captureToggle");check(state("captureProvider.running && captureProvider.port===8899").toBool(),"capture toggle starts the actual loopback listener");
+    click("captureToggle");check(state("!captureProvider.running").toBool(),"capture toggle closes the listener");
+    click("nav-tls");click("certificateAction-0");check(wait([&]{return state("captureProvider.tls.ready").toBool();}),"certificate action generates an actual protected local CA");
+    check(state("!captureProvider.tls.enabled && !captureProvider.tls.trusted").toBool(),"CA generation keeps interception and system trust opt-in");
+    click("tlsToggle");check(state("captureProvider.tls.enabled").toBool(),"TLS control enables interception after certificate creation");click("tlsToggle");
+    click("nav-featurehub");click("settings-dns");
+    QQuickWindow *sheet=nullptr;for(auto *candidate:QGuiApplication::allWindows())if(candidate->objectName()=="settingsSheet")sheet=qobject_cast<QQuickWindow *>(candidate);
+    check(sheet&&sheet->isVisible()&&sheet->width()==qMin(900,sheet->screen()->availableGeometry().width())&&sheet->height()==qMin(790,sheet->screen()->availableGeometry().height()),"DNS opens a separate native sheet with room for its title bar");
+    if(sheet){const auto originalHeight=sheet->height();sheet->resize(900,500);QTest::qWait(50);auto *apply=item("applyDns",sheet);check(apply&&apply->mapToScene(QPointF(0,0)).y()+apply->height()<=sheet->height(),"DNS Apply remains visible on a short native viewport");sheet->resize(900,originalHeight);QTest::qWait(50);click("dnsMode-2",sheet);type("dnsServerAddress","127.0.0.1",sheet);click("applyDns",sheet);
+        check(wait([&]{return !sheet->isVisible();})&&state("engineController.dnsConfiguration.mode===2 && engineController.dnsConfiguration.servers==='127.0.0.1'").toBool(),"DNS Apply validates, persists and closes the native sheet");
+        window->requestActivate();click("settings-dns");type("dnsServerAddress","192.0.2.53",sheet);click("cancelDns",sheet);
+        check(wait([&]{return !sheet->isVisible();})&&state("engineController.dnsConfiguration.servers==='127.0.0.1'").toBool(),"DNS Cancel closes the sheet without applying draft edits");}
+    window->requestActivate();click("nav-featurehub");click("settings-subscriptions");
+    check(sheet&&sheet->isVisible()&&state("settingsSheet.section==='subscriptions'").toBool(),"More opens the existing subscription manager directly");
+    if(sheet){
+        click("addSubscription",sheet);QTest::qWait(300);
+        if(auto *popup=window->findChild<QObject *>("subscriptionDialog")){
+            auto *visual=qobject_cast<QQuickItem *>(popup->property("parent").value<QObject *>());
+            auto *declared=qobject_cast<QQuickItem *>(popup->parent());
+            qInfo()<<"POPUP_OWNER_EVIDENCE"<<"visible"<<popup->property("visible")<<"opened"<<popup->property("opened")<<"declarationWindow"<<(declared?declared->window():nullptr)<<"overlayWindow"<<(visual?visual->window():nullptr)<<"expected"<<sheet;
+            check(ownsPopup(popup,sheet)&&popup->property("ownerWindow").value<QObject *>()==sheet&&item("subscriptionName",sheet),"migrated subscription form belongs to the exposed native settings window");
+        }
+        QTest::keyClick(sheet,Qt::Key_Escape);QTest::qWait(350);
+        check(sheet->isVisible()&&state("dismissals.count===0").toBool(),"one Escape closes only the subscription form and preserves its settings window");
+        click("addSubscription",sheet);QTest::qWait(300);type("subscriptionName","Unsaved fixture",sheet);
+        QTest::keyClick(sheet,Qt::Key_1,Qt::ControlModifier);QTest::qWait(50);
+        check(state("AppState.currentPage==='featurehub'").toBool(),"navigation shortcuts cannot bypass a modal draft");
+        QTest::keyClick(sheet,Qt::Key_Escape);QTest::qWait(300);
+        check(sheet->isVisible()&&state("dismissals.count===2").toBool(),"dirty subscription form asks before discarding");
+        if(auto *popup=window->findChild<QObject *>("subscriptionDialog"))check(ownsPopup(popup->findChild<QObject *>("discardChangesPrompt"),sheet),"nested discard prompt follows its native form owner");
+        QTest::keyClick(sheet,Qt::Key_Escape);QTest::qWait(300);
+        check(state("dismissals.count===1").toBool(),"Escape cancels discard confirmation and preserves the edited form");
+        QTest::keyClick(sheet,Qt::Key_Escape);QTest::qWait(300);click("discardChangesConfirm",sheet);QTest::qWait(350);
+        QTest::keyClick(sheet,Qt::Key_Escape);QTest::qWait(100);
+        check(wait([&]{return !sheet->isVisible();})&&window->isVisible(),"next Escape closes settings while the main window stays open");
+        window->requestActivate();click("settings-subscriptions");click("addSubscription",sheet);QTest::qWait(300);
+        check(ownsPopup(window->findChild<QObject *>("subscriptionDialog"),sheet)&&item("subscriptionName",sheet),"cached form keeps its current native overlay after return and reopen");
+        QTest::keyClick(sheet,Qt::Key_Escape);QTest::qWait(350);QTest::keyClick(sheet,Qt::Key_Escape);check(wait([&]{return !sheet->isVisible();}),"cached form and sheet still dismiss independently after reopening");
+        window->requestActivate();QTest::keyClick(window,Qt::Key_Escape);QTest::qWait(100);
+        check(window->isVisible(),"Escape on the main page never exits Swirl");
+    }
+    window->requestActivate();click("nav-external");QQuickWindow *dashboard=nullptr;for(auto *candidate:QGuiApplication::allWindows())if(candidate->objectName()=="dashboardWindow")dashboard=qobject_cast<QQuickWindow *>(candidate);
+    check(dashboard&&dashboard->isVisible()&&dashboard->width()==1300,"Panel opens the independent native request window");
+    if(dashboard){check(item("windowCloseButton",dashboard)&&item("windowMinimizeButton",dashboard)&&item("windowMaximizeButton",dashboard),"request panel has all three window controls");click("windowCloseButton",dashboard);check(!dashboard->isVisible()&&window->isVisible(),"panel red button closes only the panel");}
+    if(sheet){
+        for(const auto *route:{"profiles","appearance","license","dns","modules","scripts","subscriptions"}){
+            state(QString("window.openSettings('%1')").arg(route));QTest::qWait(100);
+            check(sheet->isVisible()&&item("windowCloseButton",sheet)&&item("windowMinimizeButton",sheet)&&item("windowMaximizeButton",sheet),"every secondary route has visible window controls");
+            check(state("settingsLoader.mapToItem(settingsSheet.contentItem,Qt.point(0,0)).y>=settingsSheet.titleBarHeight").toBool(),"secondary page starts below the title bar");
+            if(QString::fromLatin1(route)=="license"){
+                const auto *brand=item("brandVector",sheet);check(brand&&brand->isVisible()&&brand->width()>=104,"About page displays the enlarged brand mark after reopening Appearance");
+            }
+            const auto qaDirectory=qEnvironmentVariable("SWIRL_UI_QA_DIRECTORY");
+            if(!qaDirectory.isEmpty()){QDir().mkpath(qaDirectory);check(sheet->grabWindow().save(qaDirectory+"/"+route+".png"),"secondary window render saved for visual review");}
+            click("windowCloseButton",sheet);check(wait([&]{return !sheet->isVisible();})&&window->isVisible(),"secondary red button closes only its window");
+        }
+        state("window.openSettings('profiles')");QTest::qWait(100);click("windowMaximizeButton",sheet);check(sheet->visibility()==QWindow::FullScreen,"secondary green button enters full screen");
+        click("windowMaximizeButton",sheet);check(sheet->visibility()==QWindow::Windowed,"secondary green button restores");
+        click("windowMinimizeButton",sheet);check(sheet->visibility()==QWindow::Minimized,"secondary yellow button minimizes");
+        sheet->showNormal();sheet->requestActivate();QTest::qWait(100);QTest::keyClick(sheet,Qt::Key_Escape);QTest::qWait(100);check(wait([&]{return !sheet->isVisible();})&&window->isVisible(),"Escape dismisses the secondary window");
+    }
+    settled();check(state("dismissals.count===0").toBool(),"completed settings return releases its modal layer before global shortcuts");
+    window->requestActivate();QTest::keyClick(window,Qt::Key_K,Qt::ControlModifier);QTest::qWait(100);type("pageSearch","DNS");QTest::keyClick(window,Qt::Key_Return);settled();
+    check(state("AppState.currentPage==='dns'").toBool(),"Ctrl+K searches and navigates from actual keyboard input");
+    state("AppState.navigate('scripts')");QTest::qWait(50);settled();click("scriptAddButton");type("localScriptName","UI script");type("localScriptSource","function main(input){return {sum:input.a+input.b};}");type("localScriptInput","{\"a\":20,\"b\":22}");click("localScriptSave");
+    check(state("extensionsProvider.scripts.length===1").toBool(),"script editor persists actual local JavaScript");click("localScriptRun");
+    check(wait([&]{return state("!extensionsProvider.busy && extensionsProvider.output.length>0").toBool();})&&state("JSON.parse(extensionsProvider.output).result.sum===42").toBool(),"Evaluate runs the saved script with real JSON input in its separate process");
+    qInfo()<<"Reference interaction checks:"<<checks<<"checks,"<<failures<<"failures";return failures?2:0;
 }

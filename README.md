@@ -1,62 +1,83 @@
 # Swirl
 
-<img src="src/Swirl.Quick/assets/icons/swirl_wave_mark.svg" width="88" alt="Swirl 波浪标志">
+<picture><source media="(prefers-color-scheme: dark)" srcset="src/Swirl.Quick/assets/icons/swirl_knot_dark.svg"><img src="src/Swirl.Quick/assets/icons/swirl_knot_light.svg" width="88" alt="Swirl 祥云结标志"></picture>
 
-**Swirl** 是面向 Windows 的专业网络工具项目，使用 **C++23 + Qt 6 Quick/QML** 开发统一的桌面界面、HTTP 调试与后续代理管理功能。界面设计借鉴 macOS 应用的简洁布局与细腻材质，运行于 Windows。
+Swirl 是面向 Windows 的网络工具，使用 **C++23、Qt 6 Quick/QML** 构建桌面界面，提供代理连接、网络活动监控与 HTTP 调试。基础 TCP 代理由 Swirl 原生引擎处理，复杂协议、规则分流与 TUN 等能力由固定版本 Mihomo 兼容引擎执行。
 
-> **🧪 当前状态：Swirl 1.0 UI Preview（`1.0.0-preview`）。** 仓库当前仅保留 C++23 / Qt 6 代码和构建链；原 WPF/.NET 项目与安装器已退出当前源码树。**这仍是功能预览，不是已完成代理核心的正式客户端。**
+> **当前状态：Windows 开发测试版。** 当前程序版本为 `1.0.0-test-6A+<源码提交>`，尚未发布正式版。功能是否可用以实际运行状态为准；协议可导入、配置可保存，不代表所有远程节点、专用 LAN 或高级功能已经验证。
 
-[![Qt UI 测试构建](https://github.com/SOLHK/Swirl/actions/workflows/build-qt-quick-ui.yml/badge.svg?branch=test)](https://github.com/SOLHK/Swirl/actions/workflows/build-qt-quick-ui.yml) · [测试版安装程序（EXE）](https://github.com/SOLHK/Swirl/releases) · [test 分支](https://github.com/SOLHK/Swirl/tree/test) · [Qt 1.0 验收记录](docs/UI_1_0_VALIDATION.md)
+主窗口采用 10pt 精确轮廓，同级卡片共用圆角规范。Windows Acrylic 与该自定义轮廓组合会出现方角，因此精确轮廓窗口使用现有中性回退材质及兼容阴影。见 [实现说明](docs/SETTINGS_CARD_REPAIR.md) 和 [转场、输入及资源实测](docs/SETTINGS_TRANSFER_VALIDATION.md)。
+
+[![Windows Qt 构建与测试](https://github.com/SOLHK/Swirl/actions/workflows/build-qt-quick-ui.yml/badge.svg?branch=main)](https://github.com/SOLHK/Swirl/actions/workflows/build-qt-quick-ui.yml) · [测试版安装程序](https://github.com/SOLHK/Swirl/releases) · [测试分支](https://github.com/SOLHK/Swirl/tree/test)
+
+## 主要功能与边界
+
+| 功能 | 当前实现 |
+| --- | --- |
+| 代理连接 | 统一 `ProxyEngine` 接口，网络引擎运行在独立线程。Swirl 原生支持 DIRECT、HTTP CONNECT、SOCKS5 与基础 Trojan TLS/TCP；复杂传输与未覆盖能力交给 Mihomo，失败不会静默绕过节点直连。 |
+| 节点与订阅 | 手动管理节点、订阅导入与定时刷新；节点凭据及订阅地址由当前 Windows 用户的 DPAPI 加密保存。多种格式经过归一化，未知选项保留并明确提示。具体节点能否联网仍需测试。 |
+| 路由与 DNS | 规则、全局、直连模式，自定义 DNS、规则与策略组。默认 OpenAI 相关域名使用同一代理选择器；用户自定义覆盖需结合诊断核查。 |
+| Windows 系统代理 | 通过明确操作启用当前用户的系统代理。接管前保存恢复快照，正常退出或守护检测到进程退出时按归属恢复；外部软件改动后不会覆盖其设置。 |
+| 网络活动 | 从真实引擎采集连接、进程、流量与延迟，支持活动、节点、连接和进程详情。没有采样或未连接时显示空状态。设备信息依赖实际网络采样，不代表已完成所有 LAN 场景验收。 |
+| HTTP 工具 | 本机 HTTP 捕获、CONNECT 隧道、按主机名解密的 HTTPS HTTP/1.1 与 HTTP/2，以及 HAR 导出、URL/Header/Body 重写、静态 Mock、TCP 端口转发。HTTPS 内容处理需要配置 CA 并成功解密。 |
+| 设置与本地扩展 | 主题、字体、减少动态效果、配置草稿、本地 JavaScript 手动执行与配置模块覆盖。设置卡片与详情保留当前交互状态；草稿入口不等于对应网络服务已实现。 |
+| TUN、LAN 与网关 | 已有 Mihomo TUN、局域网认证代理、计费网络进程白名单及自研 DHCP/网关控制路径。TUN/网关需要相应权限，专用 LAN 与真实设备互通仍需单独验证。 |
+
+长连接保护包括独立的节点测速配置、订阅刷新延后应用，以及控制接口异常时保留仍可转发的连接。这些机制有隔离回归测试；**不能据此保证所有 Codex、WebSocket 或 SSE 会话已通过真实远端验收**。主动断开、退出程序或需要重新连接的配置变更仍会关闭对应连接。
+
+尚未完成的能力包括原生 UDP Relay、自动屏蔽 QUIC、HTTP/3 解密、完整断点暂停/编辑、WebSocket 帧检查及 HTTP 脚本挂钩。WireGuard 等通过兼容引擎提供配置路径，完整私有组网互通未全面验证；不兼容 Surge Ponte 私有协议。
+
+详见 [原生与兼容引擎边界](docs/PR12_NATIVE_ACCEPTANCE.md)、[HTTP 捕获说明](src/Swirl.Quick/CAPTURE.md) 和 [本地扩展格式](docs/LOCAL_EXTENSIONS.md)。这些文档中的历史测试记录保留其原始提交和验证范围。
 
 ## 最新界面截图
 
-以下图片来自 [Qt 1.0 UI 验收提交 `0fb2ad8`](https://github.com/SOLHK/Swirl/commit/0fb2ad8b2779ae0f621b8dd4f3f69c12eaf95585) 安装后的 Windows EXE 实机合成截图，不是设计概念图。节点、流量、延迟和连接状态的示例值**不能当作真实联网数据**。
+以下截图来自本次修改后实际构建并运行的 Windows 程序，保留完整应用窗口。截图处于未连接状态，没有填充虚构的节点、流量或性能数据。截图记录界面外观，不能替代网络功能验证。
 
-### 浅色总览
+### 网络活动
 
-![Swirl 1.0 Qt 浅色总览](docs/screenshots/ui-1-0-Swirl-overview.png)
+![Swirl 当前网络活动窗口](docs/screenshots/current-activity.png)
 
-### 暗色与连接演示
+### 设置首页
 
-| 暗色界面 | 连接演示（示例数据） |
-| --- | --- |
-| ![Swirl Qt 深色总览](docs/screenshots/ui-1-0-Swirl-dark.png) | ![Swirl Qt 连接演示](docs/screenshots/ui-1-0-Swirl-overview-demo.png) |
+![Swirl 当前设置九宫格](docs/screenshots/current-settings.png)
 
-[截图索引](docs/screenshots/README.md) · [验收与限制](docs/UI_1_0_VALIDATION.md)
+### 设置详情
 
-## 当前真正实现的功能
+![Swirl 当前设置卡片详情](docs/screenshots/current-settings-detail.png)
 
-- **Qt 原生桌面界面**：统一圆角与主题，浅色/深色总览、导航与工具页，Windows DWM Desktop Acrylic 条件式合成和不透明回退。
-- **HTTP 会话抓包**：用户手动启动本机显式 HTTP 代理后，可查看 HTTP 请求与响应、记录 CONNECT 隧道、按条件过滤并导出 HAR；不会自动修改系统代理，**不会解密 HTTPS 正文**。
-- **工具目录和草稿**：56 个模块入口、32 个可编辑配置草稿页，支持本地保存及 JSON 导入导出；这不意味着对应服务已能执行。
-- **测试安装程序**：从 Qt 源码打包为 Windows x64 NSIS `Swirl-Setup.exe`，支持覆盖更新和保留用户设置，当前未签名。
+[截图来源与历史索引](docs/screenshots/README.md)
 
-## 仍在开发
+## 安装与使用
 
-| 领域 | 当前状态 |
-| --- | --- |
-| Mihomo 代理引擎、节点/订阅/策略组 | **尚未接入**，目前为 Qt 演示交互 |
-| 系统代理、TUN、真实流量/延迟与连接分析 | **尚未实现**实际接管，界面相关数字是演示 |
-| DNS 分流、真实规则执行、脚本扩展、请求改写 | 保留界面/草稿，后续接入引擎和服务 |
-| HTTPS MITM、WebSocket 帧检查、PCAP 抓包 | 当前 HTTP 抓包不具备这些能力 |
+[Releases](https://github.com/SOLHK/Swirl/releases) 中的预发布版本提供 Windows x64 `Swirl-Setup.exe`。下载安装前核对对应提交与构建结果，并退出已运行的旧版 Swirl。当前安装程序未签名。
 
-**架构方向：** 未来在 C++23 中增加独立的 `ProxyEngine` 抽象和 Mihomo 适配层，再逐步接入 Qt 页面，避免将代理内核与 UI 绑定。**此抽象目前是规划，未在代码中实现。** 详见 [架构说明](docs/ARCHITECTURE.md)、[Surge 功能对照](docs/SURGE_FEATURE_MATRIX.md) 和 [Qt 抓包说明](src/Swirl.Quick/CAPTURE.md)。
+添加或导入节点后，先检查节点能力说明并完成实际联网测试，再按需要启用系统代理。TUN、LAN、网关和证书信任需要各自明确的启用操作；保存草稿不会自动开启这些服务。不同应用读取系统代理或环境变量的方式不同，应通过实际连接路径诊断确认代理是否生效。
 
-## 下载和构建
+本机验收发现，仅切换 Windows 系统代理时，部分 Codex 后台请求仍直连；新建 CLI 进程显式继承代理变量后可完成请求及 135 秒工具等待后的输出，期间仍有一次服务端 HTTP 503。可先用 PowerShell 7 执行 `./tools/Start-CodexWithSystemProxy.ps1 -CheckOnly`，核对当前显式回环代理与桌面程序路径，再自行完全退出 Codex 桌面并运行该脚本启动。它只为新进程及其继承环境的后代设置代理变量，不修改持久环境或 Codex 配置；发现已有桌面进程会拒绝启动。完整桌面重新启动后的所有通道尚未验收，详见 [真实测试结果与启动方法](docs/NETWORK_RELIABILITY_6A.md#仅为新-codex-桌面进程设置代理)。
 
-测试版 Windows 安装程序在 [Releases](https://github.com/SOLHK/Swirl/releases) 的预发布版本中，以 `Swirl-Setup.exe` 提供。安装前退出已运行的 Swirl。预览版没有代码签名，请仅在信任项目及发布者时运行。
+## 开发与构建
 
-自行构建需要 Windows x64、Qt 6.8+、CMake、C++23 编译器及 NSIS。Qt 6.10.3 已用于验收，详细操作见 [Windows 构建说明](src/Swirl.Quick/BUILDING.md)。`test` 分支的 [Qt CI](https://github.com/SOLHK/Swirl/actions/workflows/build-qt-quick-ui.yml) 负责实际编译、交互、抓包、页面 smoke、截图和打包；[源码结构校验](https://github.com/SOLHK/Swirl/actions/workflows/build-windows.yml) 负责拒绝旧 .NET 文件，它不是另一个 Windows 应用构建。
+需要 Windows x64、Qt 6.9+、CMake 3.25+ 与匹配 Qt 的 C++23 编译器；当前验证环境为 Qt 6.10.3。可使用 MSVC 2022 或 MinGW 13.1，不能混用两种工具链的 Qt 库。制作安装程序另需 NSIS。
 
-Qt 1.0 的既有本机验收记录：39 项输入、32 项 HTTP 抓包、41 项 Windows 原生窗口、61 页面启动及 28 项隔离安装/更新/卸载检查。跨系统、多物理显示器与长时间压力测试未充分验证；删除旧代码后的 CI 结果请以对应 GitHub run 为准。
+```powershell
+cmake -S src/Swirl.Quick -B build/quick -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=C:/Qt/6.10.3/mingw_64 -DSWIRL_BUILD_UI_TESTS=ON
+cmake --build build/quick --parallel 6
+./scripts/stage-mihomo.ps1 -Destination build/quick
+ctest --test-dir build/quick -E "^swirl-system-proxy-recovery$" --output-on-failure
+```
+
+系统代理恢复测试会临时修改当前用户的 Windows 代理，应在专用环境单独执行。常规网络回归使用隔离的本机服务，真实远程节点、Codex 登录及长时间输出、TUN 和专用 LAN 验收需另行记录。生产包必须重新配置 `SWIRL_BUILD_UI_TESTS=OFF`，不携带测试驱动。完整步骤见 [Windows 构建说明](src/Swirl.Quick/BUILDING.md)。
+
+[Windows Qt CI](https://github.com/SOLHK/Swirl/actions/workflows/build-qt-quick-ui.yml) 对 `main`、`test` 的推送及相关 PR 执行编译、回归、截图与打包；只有 `test` 分支推送自动产生测试版预发布安装程序。CI 生成的离屏截图是渲染检查，不代表真实网络或物理显示性能。构建状态请以对应提交的 GitHub Actions 结果为准。
 
 ## 仓库结构
 
 | 位置 | 内容 |
 | --- | --- |
-| [`src/Swirl.Quick/`](src/Swirl.Quick/) | C++23、Qt Quick/QML、网络抓包、交互测试、NSIS 打包 |
-| [`scripts/`](scripts/) | Qt Windows 构建及 GitHub 分支保护辅助工具 |
-| [`docs/`](docs/) | 架构、功能边界、截图与验收报告 |
-| [`.github/workflows/`](.github/workflows/) | Qt 实际构建、源码结构检查、正式分支保护 |
+| [`src/Swirl.Quick/`](src/Swirl.Quick/) | C++23、Qt Quick/QML、代理引擎、HTTP 工具、测试与 NSIS 打包 |
+| [`scripts/`](scripts/) | Windows 构建、核心暂存及分支保护辅助工具 |
+| [`tools/`](tools/) | 连接路径诊断与本机取证工具 |
+| [`docs/`](docs/) | 架构、功能边界、截图与验收记录 |
+| [`.github/workflows/`](.github/workflows/) | Windows Qt 构建、源码检查及正式分支保护 |
 
-新开发先进入 [`test`](https://github.com/SOLHK/Swirl/tree/test) 验证，正式分支 [`main`](https://github.com/SOLHK/Swirl/tree/main) 仅在仓库所有者授权并通过保护检查后更新；不自动创建正式版 Release。旧 C# / WPF 项目不再位于当前分支，但可在删除前的 [备份分支](https://github.com/SOLHK/Swirl/tree/backup/pre-qt-only-20261012) 和 Git 历史中查阅。
+`test` 用于开发验证，`main` 更新需仓库所有者授权并遵守分支保护。更新主分支不代表发布正式版。旧 C# / WPF 代码保留在 [备份分支](https://github.com/SOLHK/Swirl/tree/backup/pre-qt-only-20261012) 与 Git 历史中。

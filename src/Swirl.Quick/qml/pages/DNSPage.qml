@@ -1,170 +1,64 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import SwirlQuick
 import "../components"
 import "../controls"
-
 Item {
-    id: page
-    property string tab: "查询日志"
-    property var selectedRecord: null
-    property var dnsRecords: [
-        {id:"Q100",domain:"api.example.test",type:"A",answer:"203.0.113.42",server:"DoH / 首选",duration:"23 ms",result:"NOERROR"},
-        {id:"Q101",domain:"cdn.example.test",type:"AAAA",answer:"2001:db8::20",server:"DoQ / 备用",duration:"35 ms",result:"NOERROR"},
-        {id:"Q102",domain:"private.example.test",type:"A",answer:"192.0.2.15",server:"Hosts",duration:"0 ms",result:"HOSTS"},
-        {id:"Q103",domain:"blocked.example.test",type:"A",answer:"-",server:"规则解析器",duration:"4 ms",result:"BLOCKED"},
-        {id:"Q104",domain:"assets.example.test",type:"CNAME",answer:"edge.example.test",server:"DoH / 首选",duration:"19 ms",result:"NOERROR"}
-    ]
-    readonly property var visibleRecords:dnsRecords.filter(function(r){
-        return (r.domain+" "+r.answer+" "+r.type).toLowerCase().indexOf(search.text.toLowerCase())>=0
-    })
-    ColumnLayout {
-        anchors.fill:parent; anchors.margins:23; spacing:14
-        RowLayout {
-            Layout.fillWidth:true
-            SwirlStatusBadge { label:AppState.zh("DEMO DNS ENGINE"); tone:"accent" }
-            Text { text:AppState.zh("Requests are local fixtures · no name resolution occurs"); color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
-            SwirlButton { text:AppState.zh("Test Resolver"); iconName:"activity"; primary:true; onClicked:testDialog.open() }
-        }
-        SwirlGlassPanel {
-            Layout.fillWidth:true; Layout.preferredHeight:130
-            RowLayout {
-                anchors.fill:parent; anchors.margins:20; spacing:22
-                ColumnLayout {
-                    Layout.fillWidth:true; spacing:7
-                    Text { text:AppState.zh("Primary resolver"); color:Theme.muted; font.pixelSize:11 }
-                    Text { text:AppState.zh("https://dns.example.test/dns-query"); color:Theme.text; font.pixelSize:17; font.weight:Font.DemiBold; elide:Text.ElideRight; Layout.fillWidth:true }
-                    Text { text:AppState.zh("DoH · DNSSEC option · synthetic endpoint"); color:Theme.muted; font.pixelSize:12 }
-                }
-                Rectangle { width:1; Layout.fillHeight:true; color:Theme.border }
-                ColumnLayout {
-                    spacing:8; Layout.preferredWidth:190
-                    Text { text:AppState.zh("Protocols enabled"); color:Theme.muted; font.pixelSize:11 }
-                    RowLayout {
-                        SwirlStatusBadge { label:AppState.zh("DoH"); tone:"success" }
-                        SwirlStatusBadge { label:AppState.zh("DoT"); tone:"accent" }
-                        SwirlStatusBadge { label:AppState.zh("DoQ"); tone:"accent" }
-                    }
-                    Text { text:AppState.zh("IPv4 + IPv6 · Fake-IP Preview"); color:Theme.muted; font.pixelSize:11 }
-                }
-            }
-        }
-        RowLayout {
-            Layout.fillWidth:true; spacing:7
-            Repeater {
-                model:["查询日志","Resolvers","Hosts","Cache","Fake-IP"]
-                SwirlButton { text:modelData; quiet:page.tab!==modelData; onClicked:page.tab=modelData }
-            }
-            Item { Layout.fillWidth:true }
-            SwirlButton { text:AppState.zh("清空演示"); onClicked:{page.dnsRecords=[];page.selectedRecord=null} }
-        }
-        RowLayout {
-            Layout.fillWidth:true; spacing:12; visible:page.tab==="查询日志"
-            SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:AppState.zh("Search DNS domain, answer or record type") }
-            SwirlComboBox { model:["全部记录类型","A","AAAA","CNAME","TXT","HTTPS"] }
-        }
-        RowLayout {
-            Layout.fillWidth:true; Layout.fillHeight:true; spacing:14
-            SwirlGlassPanel {
-                Layout.fillWidth:true; Layout.fillHeight:true; clip:true
-                SwirlDataTable {
-                    visible:page.tab==="查询日志"
-                    anchors.fill:parent; anchors.margins:1
-                    rows:page.visibleRecords
-                    selectedId:page.selectedRecord?page.selectedRecord.id:""
-                    columns:[{key:"domain",label:AppState.zh("DOMAIN"),w:245},{key:"type",label:AppState.zh("TYPE"),w:70},
-                             {key:"answer",label:AppState.zh("ANSWER"),w:175},{key:"server",label:AppState.zh("RESOLVER"),w:130},
-                             {key:"duration",label:AppState.zh("时间"),w:85},{key:"result",label:AppState.zh("RESULT"),w:95}]
-                    onRowSelected:function(r){page.selectedRecord=r}
-                }
-                ColumnLayout {
-                    visible:page.tab!=="查询日志"
-                    anchors.fill:parent; anchors.margins:18; spacing:14
-                    Text { text:page.tab; color:Theme.text; font.pixelSize:18; font.weight:Font.DemiBold }
-                    Repeater {
-                        model:page.tab==="Resolvers"?
-                            ["Primary  ·  DoH  ·  https://dns.example.test/dns-query",
-                             "Secondary  ·  DoT  ·  tls://resolver.example.test",
-                             "Experimental  ·  DoQ  ·  quic://dns3.example.test"]:
-                            page.tab==="Hosts"?
-                            ["internal.example.test  →  192.0.2.15",
-                             "lab.example.test  →  2001:db8::42"]:
-                            page.tab==="Cache"?
-                            ["api.example.test  ·  TTL 120 s","cdn.example.test · TTL 245 s"]:
-                            ["Fake-IP range  198.18.0.0/15","Exclusions  *.local, *.lan"]
-                        RowLayout {
-                            Layout.fillWidth:true
-                            Text { text:modelData; Layout.fillWidth:true; color:Theme.text; font.pixelSize:12; elide:Text.ElideRight }
-                            SwirlToggle { onToggled:AppState.notice("DNS "+page.tab) }
-                        }
-                    }
-                    Item { Layout.fillHeight:true }
-                    SwirlButton { text:AppState.zh("Add ")+page.tab+" entry"; onClicked:editDialog.open() }
-                }
-            }
-            SwirlGlassPanel {
-                Layout.preferredWidth:284; Layout.fillHeight:true
-                ColumnLayout {
-                    anchors.fill:parent; anchors.margins:18; spacing:14
-                    Text { text:AppState.zh("DNS 检查"); font.pixelSize:16; font.weight:Font.DemiBold; color:Theme.text }
-                    SwirlStatusBadge { label:page.selectedRecord?page.selectedRecord.result:"尚未选择"; tone:page.selectedRecord?"success":"neutral" }
-                    Repeater {
-                        model:[
-                            ["DOMAIN",page.selectedRecord?page.selectedRecord.domain:"—"],
-                            ["ANSWER",page.selectedRecord?page.selectedRecord.answer:"—"],
-                            ["RECORD TYPE",page.selectedRecord?page.selectedRecord.type:"—"],
-                            ["RESOLVER",page.selectedRecord?page.selectedRecord.server:"—"],
-                            ["ELAPSED",page.selectedRecord?page.selectedRecord.duration:"—"]
-                        ]
-                        ColumnLayout {
-                            Layout.fillWidth:true; spacing:4
-                            Text { text:modelData[0]; color:Theme.muted; font.pixelSize:10 }
-                            Text { text:modelData[1]; color:Theme.text; font.pixelSize:13; Layout.fillWidth:true; elide:Text.ElideRight }
-                        }
-                    }
-                    Item { Layout.fillHeight:true }
-                    SwirlButton { text:AppState.zh("复制解析结果"); onClicked:{if(page.selectedRecord)demoProvider.copyText(page.selectedRecord.answer);AppState.toast="Copied synthetic DNS answer"} }
-                    SwirlButton { text:AppState.zh("Edit mapping"); onClicked:editDialog.open() }
-                }
-            }
-        }
+ function preparePreviewState(state){if(state==="dns-focus")serverAddress.forceActiveFocus()}
+ id:page;
+ function persistExitDraft(){moduleDrafts.save("feature-dns-exit",{pending:true,mode:serverMode,servers:serverAddress.text,encrypted:encryptedUrl.text,hosts:hostRows,useHosts:readHosts.checked,respectRules:respectRules.checked})}
+ function finishSettings(){moduleDrafts.save("feature-dns-exit",{});const w=page.Window.window;if(w.objectName==="settingsSheet")w.discardApproved=true;w.closeSettings()}
+ Rectangle{y:Theme.dp(66);width:parent.width;height:parent.height-y-Theme.dp(40);color:Theme.dark?Theme.primaryContainer:"#F9F9F9";z:-1}
+ property int serverMode:0;property var hostRows:[];property string selectedId:""
+ Component.onCompleted:{const saved=moduleDrafts.load("feature-dns-exit");const config=saved.pending?saved:engineController.dnsConfiguration;serverMode=config.mode||0;serverAddress.text=config.servers||"";encryptedUrl.text=config.encrypted||"";hostRows=config.hosts||[];readHosts.checked=config.useHosts!==false;respectRules.checked=config.respectRules===true}
+ component Label:SwirlText {color:Theme.text;font.pixelSize:Theme.fontSize(13)}
+ component Note:SwirlText {color:Theme.muted;font.pixelSize:Theme.fontSize(11);lineHeightMode:Text.FixedHeight;lineHeight:Theme.dp(14);wrapMode:Text.WordWrap;width:parent.width}
+ component Group:Rectangle{radius:Theme.subCardRadius;color:Theme.field}
+ SwirlText {x:Theme.dp(24);y:Theme.dp(18);text:"DNS";color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold}
+ Note{x:Theme.dp(24);y:Theme.dp(43);text:"本地 DNS 映射和 DNS 相关设置。"}
+ Rectangle{y:Theme.dp(66);width:parent.width;height:Theme.dp(1);color:Theme.border}
+ Flickable{id:dnsBody;objectName:"motion-dns-scroll";y:Theme.dp(66);width:parent.width;height:parent.height-y-Theme.dp(40);clip:true;contentWidth:width;contentHeight:Math.max(height,Theme.dp(642));boundsBehavior:Flickable.StopAtBounds
+ ScrollBar.vertical:ScrollBar{policy:dnsBody.contentHeight>dnsBody.height?ScrollBar.AsNeeded:ScrollBar.AlwaysOff}
+ Item{width:dnsBody.width;height:dnsBody.contentHeight
+ Item{x:Theme.dp(20);y:Theme.dp(14);width:Math.floor((parent.width-Theme.dp(40))/2);height:Theme.dp(305)
+  Label{x:Theme.dp(8);text:"DNS 服务器";font.weight:Font.DemiBold}
+  Group{y:Theme.dp(24);width:parent.width;height:Theme.dp(118)
+   Column{x:Theme.dp(16);y:Theme.dp(8);spacing:0;width:parent.width-Theme.dp(32)
+    Repeater{model:["使用系统 DNS 服务器","使用系统 DNS 服务器和额外的服务器","使用自定义的服务器"]
+     RadioButton{objectName:"dnsMode-"+index;required property string modelData;required property int index;text:modelData;checked:page.serverMode===index;onClicked:page.serverMode=index;implicitHeight:Theme.dp(24);font.pixelSize:Theme.fontSize(13);padding:0;spacing:Theme.dp(6)
+      indicator:Rectangle{Behavior on color{ColorAnimation{duration:SwirlMotion.switchDuration}}width:Theme.dp(16);height:width;radius:width/2;color:parent.checked?Theme.accent:"#DEDEDF";anchors.verticalCenter:parent.verticalCenter;Rectangle{opacity:parent.parent.checked?1:0;Behavior on opacity{NumberAnimation{duration:SwirlMotion.switchDuration}}anchors.centerIn:parent;width:Theme.dp(5);height:width;radius:width/2;color:"white"}}
+      contentItem:SwirlText {text:parent.text;leftPadding:Theme.dp(22);color:Theme.text;font.pixelSize:Theme.fontSize(13);verticalAlignment:Text.AlignVCenter}}
     }
-    SwirlDialog {
-        id:testDialog; title:"解析器测试"
-        ColumnLayout {
-            width:parent.width; spacing:13
-            Text { text:AppState.zh("域名"); color:Theme.text }
-            SwirlTextField { id:domainInput; Layout.fillWidth:true; placeholderText:AppState.zh("example.test") }
-            Text { text:AppState.zh("This test returns an explanatory demo result. No DNS packets are sent."); color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true; wrapMode:Text.WordWrap }
-            RowLayout {
-                Layout.alignment:Qt.AlignRight
-                SwirlButton { text:AppState.zh("取消"); onClicked:testDialog.close() }
-                SwirlButton {
-                    text:AppState.zh("Run demo"); primary:true
-                    enabled:domainInput.text.includes(".")&&domainInput.text.indexOf(" ")<0
-                    onClicked:{testDialog.close();AppState.notice("Resolve "+domainInput.text)}
-                }
-            }
-        }
-    }
-    SwirlDialog {
-        id:editDialog; title:"编辑 DNS 映射"
-        ColumnLayout {
-            width:parent.width; spacing:12
-            Text { text:AppState.zh("Hostname"); color:Theme.text }
-            SwirlTextField { id:hostInput; Layout.fillWidth:true; placeholderText:AppState.zh("internal.example.test") }
-            Text { text:AppState.zh("Target / answer"); color:Theme.text }
-            SwirlTextField { id:answerInput; Layout.fillWidth:true; placeholderText:AppState.zh("192.0.2.15") }
-            RowLayout {
-                Layout.alignment:Qt.AlignRight
-                SwirlButton { text:AppState.zh("取消"); onClicked:editDialog.close() }
-                SwirlButton {
-                    text:AppState.zh("应用演示"); primary:true
-                    enabled:hostInput.text.includes(".")&&answerInput.text.trim().length>0
-                    onClicked:{editDialog.close();AppState.notice("DNS mapping")}
-                }
-            }
-        }
-    }
+    SwirlTextField{id:serverAddress;objectName:"dnsServerAddress";width:parent.width;height:Theme.dp(26);placeholderText:"服务器地址 (逗号分隔)";font.pixelSize:Theme.fontSize(12)}
+   }
+  }
+  Label{x:Theme.dp(8);y:Theme.dp(160);text:"加密 DNS";font.weight:Font.DemiBold}
+  Group{y:Theme.dp(184);width:parent.width;height:Theme.dp(123)
+   SwirlTextField{id:encryptedUrl;x:Theme.dp(16);y:Theme.dp(12);width:parent.width-Theme.dp(32);height:Theme.dp(26);placeholderText:"加密 DNS URL";font.pixelSize:Theme.fontSize(12)}
+   Note{x:Theme.dp(16);y:Theme.dp(48);width:parent.width-Theme.dp(32);text:"如果在此配置了 DNS 服务器，传统 DNS 将仅用于连通性测试和解析服务器域名。\n支持：https://、tls:// 和 tcp://。"}
+  }
+ }
+ Item{anchors.right:parent.right;anchors.rightMargin:Theme.dp(20);y:Theme.dp(14);width:Math.floor((parent.width-Theme.dp(88))/2);height:Theme.dp(305)
+  Label{x:Theme.dp(8);text:"DNS 选项";font.weight:Font.DemiBold}
+  Group{y:Theme.dp(24);width:parent.width;height:Theme.dp(150)
+   Label{x:Theme.dp(16);y:Theme.dp(12);text:"从 hosts 中读取 DNS 记录"}
+   SwirlToggle{id:readHosts;anchors.right:parent.right;anchors.rightMargin:Theme.dp(16);y:Theme.dp(10);checked:true}
+   Rectangle{x:Theme.dp(16);y:Theme.dp(40);width:parent.width-Theme.dp(32);height:Theme.dp(1);color:Theme.border}
+   Label{x:Theme.dp(16);y:Theme.dp(53);text:"对使用代理的请求强制使用本地 DNS 映射结果";font.pixelSize:Theme.fontSize(12)}
+   SwirlToggle{id:respectRules;anchors.right:parent.right;anchors.rightMargin:Theme.dp(16);y:Theme.dp(49)}
+   Note{x:Theme.dp(16);y:Theme.dp(78);width:parent.width-Theme.dp(32);text:"默认情况下，当使用代理策略时，DNS 解析永远在代理服务器进行。开启该选项后，匹配本地 DNS 映射的域名将使用本地映射结果的 IP 地址发起代理请求。"}
+  }
+  Label{x:Theme.dp(8);y:Theme.dp(189);text:"DDNS";font.weight:Font.DemiBold}
+  Group{y:Theme.dp(212);width:parent.width;height:Theme.dp(38);Label{x:Theme.dp(16);anchors.verticalCenter:parent.verticalCenter;text:"Swirl 私有 DDNS"}SwirlButton{anchors.right:parent.right;anchors.rightMargin:Theme.dp(16);anchors.verticalCenter:parent.verticalCenter;text:"配置…";enabled:false}}
+ }
+ Label{x:Theme.dp(28);y:Theme.dp(341);text:"本地 DNS 映射";font.weight:Font.DemiBold}
+ Rectangle{x:Theme.dp(20);y:Theme.dp(365);width:parent.width-Theme.dp(40);height:parent.height-y-Theme.dp(18);radius:Theme.tableRadius;border.color:Theme.border;color:Theme.surface;clip:true
+  SwirlDataTable{gridLines:true;cellPadding:Theme.dp(10);anchors.fill:parent;anchors.bottomMargin:Theme.dp(30);fillEmptyRows:true;itemHeight:Theme.dp(26);rows:page.hostRows;columns:[{key:"selector",label:"",w:52},{key:"name",label:"域名",w:236},{key:"value",label:"值",w:236},{key:"server",label:"DNS 服务器",w:160},{key:"comment",label:"注释",w:170}];onRowSelected:r=>page.selectedId=r.id}
+  Rectangle{anchors.bottom:parent.bottom;width:parent.width;height:Theme.dp(30);color:Theme.tableToolbar;Row{x:Theme.dp(12);anchors.verticalCenter:parent.verticalCenter;spacing:Theme.dp(6);SwirlButton{text:"+";implicitWidth:Theme.dp(40);implicitHeight:Theme.dp(22);onClicked:mappingDialog.open()}SwirlButton{text:"−";implicitWidth:Theme.dp(40);implicitHeight:Theme.dp(22);enabled:page.selectedId.length>0;onClicked:page.hostRows=page.hostRows.filter(r=>r.id!==page.selectedId)}}}
+ }
+ }}
+ Rectangle{anchors.bottom:parent.bottom;width:parent.width;height:Theme.dp(40);color:"transparent";Row{anchors.right:parent.right;anchors.rightMargin:Theme.dp(24);anchors.verticalCenter:parent.verticalCenter;spacing:Theme.dp(14);SwirlButton{objectName:"cancelDns";text:"取消";onClicked:{page.finishSettings()}}SwirlButton{objectName:"applyDns";text:"应用";primary:true;onClicked:{if(engineController.configureDns({mode:page.serverMode,servers:serverAddress.text,encrypted:encryptedUrl.text,hosts:page.hostRows,useHosts:readHosts.checked,respectRules:respectRules.checked})){AppState.notice("DNS 配置已保存，连接时应用到 Mihomo");page.finishSettings()}else AppState.notice(engineController.networkConfigurationError)}}}}
+ SwirlDialog{ownerItem:page;id:mappingDialog;title:"新增本地 DNS 映射";ColumnLayout{width:parent.width;SwirlTextField{id:host;Layout.fillWidth:true;placeholderText:"域名"}SwirlTextField{id:address;Layout.fillWidth:true;placeholderText:"IP 地址"}RowLayout{Layout.alignment:Qt.AlignRight;SwirlButton{text:"取消";onClicked:mappingDialog.close()}SwirlButton{text:"添加";primary:true;enabled:host.text.trim().length>0&&address.text.trim().length>0;onClicked:{page.hostRows=page.hostRows.concat([{id:String(Date.now()),name:host.text.trim(),value:address.text.trim(),server:"",comment:""}]);mappingDialog.close()}}}}}
 }

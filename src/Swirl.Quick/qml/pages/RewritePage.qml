@@ -1,119 +1,29 @@
+pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import SwirlQuick
 import "../components"
 import "../controls"
-
 Item {
-    id:page
-    property string category:"URL 重写"
-    property var chosen:null
-    property var rules:[
-        {id:"rw1",category:"URL 重写",pattern:"^https://api.example.test/old",action:"替换 URL",status:"Enabled",hits:"37"},
-        {id:"rw2",category:"请求头重写",pattern:"*.example.test",action:"设置 X-Demo",status:"Enabled",hits:"148"},
-        {id:"rw3",category:"响应体重写",pattern:"/v1/user",action:"JSON 模拟",status:"Disabled",hits:"0"},
-        {id:"rw4",category:"Redirect",pattern:"/v1/legacy",action:"302 重定向",status:"Enabled",hits:"12"},
-        {id:"rw5",category:"Reject",pattern:"/ads/*",action:"拒绝请求",status:"Enabled",hits:"83"},
-        {id:"rw6",category:"模拟响应",pattern:"/api/config",action:"模拟 JSON",status:"Enabled",hits:"24"}
-    ]
-    readonly property var showRows:rules.filter(function(r){
-        return r.category===page.category && (r.pattern+" "+r.action).toLowerCase().indexOf(query.text.toLowerCase())>=0
-    })
-    ColumnLayout {
-        anchors.fill:parent; anchors.margins:23; spacing:14
-        RowLayout {
-            Layout.fillWidth:true
-            SwirlStatusBadge { label:"HTTP 重写演示"; tone:"accent" }
-            Text { text:"本地规则编辑器 · 不拦截真实流量"; color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
-            SwirlButton { text:"导入"; onClicked:AppState.notice("导入重写规则") }
-            SwirlButton { text:"新建重写"; primary:true; onClicked:editorDialog.open() }
-        }
-        Flow {
-            Layout.fillWidth:true; Layout.preferredHeight:42; spacing:6
-            Repeater {
-                model:["URL 重写","请求头重写","响应体重写","Redirect","Reject","模拟响应"]
-                SwirlButton { text:modelData; quiet:page.category!==modelData; onClicked:{page.category=modelData;page.chosen=null} }
-            }
-        }
-        RowLayout {
-            Layout.fillWidth:true
-            SwirlSearchField { id:query; Layout.fillWidth:true; placeholderText:"搜索表达式或操作" }
-            SwirlStatusBadge { label:showRows.length+" 条规则"; tone:"accent" }
-            SwirlButton { text:"测试规则"; onClicked:AppState.notice("重写匹配测试") }
-        }
-        RowLayout {
-            Layout.fillWidth:true; Layout.fillHeight:true; spacing:14
-            SwirlGlassPanel {
-                Layout.fillWidth:true; Layout.fillHeight:true; clip:true
-                SwirlDataTable {
-                    anchors.fill:parent; anchors.margins:1
-                    rows:page.showRows
-                    selectedId:page.chosen?page.chosen.id:""
-                    columns:[{key:"pattern",label:"匹配表达式",w:280},{key:"action",label:"操作",w:160},
-                             {key:"hits",label:"命中次数",w:72},{key:"status",label:"状态",w:105}]
-                    onRowSelected:function(r){page.chosen=r}
-                }
-                SwirlEmptyState { visible:page.showRows.length===0; anchors.centerIn:parent; headline:"没有重写规则"; detail:"添加本地示例" }
-            }
-            SwirlGlassPanel {
-                Layout.preferredWidth:323; Layout.fillHeight:true
-                ColumnLayout {
-                    anchors.fill:parent; anchors.margins:17; spacing:12
-                    Text { text:"重写编辑器"; color:Theme.text; font.pixelSize:17; font.weight:Font.DemiBold }
-                    Text { text:page.chosen?page.chosen.pattern:"从列表中选择规则"; color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true; wrapMode:Text.WrapAnywhere }
-                    Text { text:"匹配表达式"; color:Theme.muted; font.pixelSize:10 }
-                    SwirlTextField { id:expression; Layout.fillWidth:true; text:page.chosen?page.chosen.pattern:""; placeholderText:"https://example.test/.*" }
-                    Text { text:"操作"; color:Theme.muted; font.pixelSize:10 }
-                    SwirlComboBox { id:action; Layout.fillWidth:true; model:["替换 URL","设置请求头","替换响应体","302 重定向","拒绝请求","模拟 JSON"] }
-                    Text { text:"结果预览"; color:Theme.muted; font.pixelSize:10 }
-                    Rectangle {
-                        Layout.fillWidth:true; Layout.fillHeight:true
-                        radius:Theme.roundedRadius(width,height); color:Theme.field; border.color:Theme.border
-                        ScrollView {
-                            anchors.fill:parent; anchors.margins:9
-                            TextArea {
-                                readOnly:true
-                                text:"规则匹配："+(page.chosen?page.chosen.hits:"0")+" simulated hits\n"+
-                                     "输入："+(page.chosen?page.chosen.pattern:"—")+"\n"+
-                                     "输出："+(page.chosen?page.chosen.action:"—")+
-                                     "\n\nNo outgoing requests are changed."
-                                font.family:"Cascadia Code"; font.pixelSize:11
-                                color:Theme.text; wrapMode:Text.WrapAnywhere
-                                background:Rectangle { color:"transparent" }
-                            }
-                        }
-                    }
-                    RowLayout {
-                        Layout.fillWidth:true
-                        SwirlButton { text:"预览"; onClicked:AppState.notice("预览"+page.category) }
-                        SwirlButton { text:"应用演示"; primary:true; onClicked:AppState.notice("应用重写") }
-                    }
-                }
-            }
-        }
-    }
-    SwirlDialog {
-        id:editorDialog; title:"添加重写规则"
-        ColumnLayout {
-            width:parent.width; spacing:12
-            Text { text:"匹配表达式"; color:Theme.text }
-            SwirlTextField { id:newPattern; Layout.fillWidth:true; placeholderText:"https://example.test/api/.*" }
-            Text { text:"操作"; color:Theme.text }
-            SwirlComboBox { id:newAction; Layout.fillWidth:true; model:["替换 URL","设置请求头","替换响应体","302 重定向","拒绝请求","模拟 JSON"] }
-            Text { text:"表达式仅用于演示，不会拦截网络或执行正则匹配。"; color:Theme.muted; font.pixelSize:11; Layout.fillWidth:true; wrapMode:Text.WordWrap }
-            RowLayout {
-                Layout.alignment:Qt.AlignRight
-                SwirlButton { text:"取消"; onClicked:editorDialog.close() }
-                SwirlButton {
-                    text:"添加演示"; primary:true; enabled:newPattern.text.trim().length>2
-                    onClicked:{
-                        page.rules=page.rules.concat([{id:"rw"+Date.now(),category:page.category,
-                            pattern:newPattern.text.trim(),action:newAction.currentText,status:"Enabled",hits:"0"}])
-                        newPattern.text="";editorDialog.close()
-                    }
-                }
-            }
-        }
-    }
+ id:page
+ function preparePreviewState(state){if(state==="rewrite-on")captureProvider.rewriteEnabled=true}
+ component RewriteCard:SwirlGlassPanel {
+  id:card;property string title;property string description;property string moduleId;property string buttonText
+  width:Theme.dp(336);height:Theme.dp(134);cornerRadius:Theme.independentCardRadius
+  SwirlText {x:Theme.dp(16);y:Theme.dp(16);text:card.title;color:Theme.text;font.pixelSize:Theme.fontSize(13);font.weight:Font.DemiBold}
+  SwirlText {x:Theme.dp(16);y:Theme.dp(42);width:Theme.dp(304);text:card.description;color:Theme.muted;font.pixelSize:Theme.fontSize(11);wrapMode:Text.WordWrap}
+  SwirlText {x:Theme.dp(16);y:Theme.dp(101);text:captureProvider.rewriteRules.filter(r=>r.kind===card.moduleId).length+" 条规则"+(captureProvider.rewriteEnabled?"生效中":"已停用");color:Theme.text;font.pixelSize:Theme.fontSize(11)}
+  SwirlButton{anchors.right:parent.right;anchors.rightMargin:Theme.dp(16);y:Theme.dp(96);implicitHeight:Theme.dp(24);text:card.buttonText;onClicked:page.Window.window.openRewriteEditor(card.moduleId,card.title)}
+ }
+ Flickable{anchors.fill:parent;contentWidth:Theme.dp(698);contentHeight:Theme.dp(574);clip:true
+  SwirlText {x:Theme.dp(4);y:Theme.dp(6);text:"重写 & 映射";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.Bold}
+  SwirlToggle{x:Theme.dp(156);y:Theme.dp(10);large:true;checked:captureProvider.rewriteEnabled;onToggled:captureProvider.rewriteEnabled=checked;Accessible.name:"重写与映射"}
+  RewriteCard{x:Theme.dp(4);y:Theme.dp(80);title:"URL 重定向";description:"重定向 HTTP 请求。此功能也称为 Map Remote。Swirl 可以用 3 种不同的方法重写请求的 URL。有关更多信息，请查看手册。";buttonText:"编辑 URL 重定向规则…";moduleId:"redirect"}
+  RewriteCard{x:Theme.dp(356);y:Theme.dp(80);title:"Header 重写";description:"Swirl 可以修改发送到服务器的 HTTP Header，以及修改返回响应的 Header。";buttonText:"编辑 Header 重写规则…";moduleId:"header"}
+  RewriteCard{x:Theme.dp(4);y:Theme.dp(220);title:"Mock";description:"你可以模拟 API 服务器并返回静态响应。此功能也可称为 Map Local 或 API Mocking。如果你想动态返回响应，请使用脚本。";buttonText:"编辑 Mock 规则…";moduleId:"mock"}
+  RewriteCard{x:Theme.dp(356);y:Theme.dp(220);title:"Body 重写";description:"Swirl 可以重写 HTTP 请求或响应的 Body，用正则表达式替换原始内容。如果你需要进行更灵活的修改，请使用脚本。";buttonText:"编辑 Body 重写规则…";moduleId:"body"}
+  RewriteCard{x:Theme.dp(4);y:Theme.dp(360);title:"端口转发";description:"将传入的 TCP 连接从本地监听端口转发到指定的目标地址。";buttonText:"编辑端口转发规则…";moduleId:"forward"}
+  SwirlText {x:Theme.dp(18);y:Theme.dp(506);text:"以上计数包含了模块中的规则。";color:Theme.muted;font.pixelSize:Theme.fontSize(11)}
+ }
 }

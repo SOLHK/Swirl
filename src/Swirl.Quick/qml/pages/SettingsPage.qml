@@ -7,30 +7,33 @@ import "../controls"
 Item {
     id:page
     property string section:"外观"
-    property var sections:["常规","外观","代理","TUN","DNS","端口","系统集成","启动","通知","数据管理","隐私与安全","快捷键","关于 Swirl"]
+    property var sections:["常规","外观","字体","代理","TUN","DNS","端口","系统集成","启动","通知","数据管理","隐私与安全","快捷键","关于 Swirl"]
     ColumnLayout {
-        anchors.fill:parent; anchors.margins:23; spacing:14
+        anchors.fill:parent; anchors.margins:Theme.dp(23); spacing:Theme.dp(14)
         RowLayout {
             Layout.fillWidth:true
-            Text { text:AppState.zh("Personalize how Swirl looks and behaves"); color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
-            SwirlStatusBadge { label:AppState.zh("LOCAL UI PREFERENCES"); tone:"accent" }
+            SwirlText { text:AppState.zh("Personalize how Swirl looks and behaves"); color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true }
         }
         RowLayout {
-            Layout.fillWidth:true; Layout.fillHeight:true; spacing:15
+            Layout.fillWidth:true; Layout.fillHeight:true; spacing:Theme.dp(15)
             SwirlGlassPanel {
-                Layout.preferredWidth:229; Layout.fillHeight:true
+                Layout.preferredWidth:Math.max(Theme.dp(140),Math.min(Theme.dp(210),page.width*0.25)); Layout.fillHeight:true
                 ColumnLayout {
-                    anchors.fill:parent; anchors.margins:12; spacing:8
-                    Text { text:AppState.zh("PREFERENCES"); color:Theme.muted; font.pixelSize:11; leftPadding:8; topPadding:6 }
-                    ListView {
+                    anchors.fill:parent; anchors.margins:Theme.dp(12); spacing:Theme.dp(8)
+                    SwirlText { text:AppState.zh("PREFERENCES"); color:Theme.muted; font.pixelSize:Theme.fontSize(11); leftPadding:Theme.dp(8); topPadding:Theme.dp(6) }
+                    ListView { pixelAligned: true;
+                    add: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";from:0;to:1;duration:SwirlMotion.duration} }
+                    remove: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.duration} }
+                    move: Transition {enabled:!SwirlMotion.reduced;SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration}}
+                    displaced: Transition { enabled:!SwirlMotion.reduced; SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration} }
                         Layout.fillWidth:true; Layout.fillHeight:true
-                        model:page.sections; clip:true; spacing:3
+                        model:page.sections; clip:true; spacing:Theme.dp(3)
                         delegate:Rectangle {
-                            width:ListView.view.width; height:36; radius:Theme.roundedRadius(width,height)
+                            width:ListView.view.width; height:Theme.dp(36); radius:Theme.roundedRadius(width,height)
                             color:page.section===modelData?Theme.selected:hover.containsMouse?Theme.hover:"transparent"
-                            Text {
-                                anchors.fill:parent; anchors.leftMargin:11
-                                text:AppState.zh(modelData); color:Theme.text; font.pixelSize:12
+                            SwirlText {
+                                anchors.fill:parent; anchors.leftMargin:Theme.dp(11)
+                                text:AppState.zh(modelData); color:Theme.text; font.pixelSize:Theme.fontSize(12)
                                 verticalAlignment:Text.AlignVCenter; elide:Text.ElideRight
                             }
                             MouseArea { id:hover; anchors.fill:parent; hoverEnabled:true; onClicked:page.section=modelData }
@@ -42,116 +45,267 @@ Item {
                 Layout.fillWidth:true; Layout.fillHeight:true
                 ScrollView {
                     id:options
-                    anchors.fill:parent; anchors.margins:24
+                    anchors.fill:parent; anchors.margins:Theme.dp(24)
                     clip:true
                     ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
+                    ScrollBar.vertical:SwirlScrollBar {}
                     ColumnLayout {
-                        width:options.availableWidth; spacing:17
-                        Text { text:AppState.zh(page.section); color:Theme.text; font.pixelSize:23; font.weight:Font.DemiBold }
-                        Text {
-                            text:page.section==="外观"?"跟随系统的色彩、玻璃材质、动画与界面缩放。":"当前仅供预览，不会修改操作系统设置。"
-                            color:Theme.muted; wrapMode:Text.WordWrap; Layout.fillWidth:true; font.pixelSize:12
+                        width:options.availableWidth; spacing:Theme.dp(17)
+                        SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:AppState.zh(page.section); color:Theme.text; font.pixelSize:Theme.fontSize(23); font.weight:Font.DemiBold }
+                        SwirlText {
+                            text:page.section==="外观"?"主题、窗口材质、动画与界面缩放。":page.section==="字体"?"选择喜欢的字体，立即应用并自动保存。":page.section==="代理"?"引擎、真实节点与当前用户系统代理 · 国内外分流。":page.section==="关于 Swirl"?"版本与项目信息":"此项研发中。"
+                            color:Theme.muted; wrapMode:Text.WordWrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12)
                         }
-                        Rectangle { Layout.fillWidth:true; height:1; color:Theme.border }
+                        Rectangle { Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(1); color:Theme.border }
                         ColumnLayout {
-                            visible:page.section==="外观"; spacing:21; Layout.fillWidth:true
-                            RowLayout {
+                            visible:page.section==="外观"; spacing:Theme.dp(21); Layout.fillWidth:true
+                            GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
                                 Layout.fillWidth:true
                                 ColumnLayout {
                                     Layout.fillWidth:true
-                                    Text { text:AppState.zh("Color theme"); color:Theme.text; font.pixelSize:14; font.weight:Font.DemiBold }
-                                    Text { text:AppState.zh("Choose light, dark or follow Windows"); color:Theme.muted; font.pixelSize:11 }
+                                    SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:AppState.zh("Color theme"); color:Theme.text; font.pixelSize:Theme.fontSize(14); font.weight:Font.DemiBold }
+                                    SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:AppState.zh("Choose light, dark or follow Windows"); color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
                                 }
                                 SwirlComboBox {
+                                    objectName:"themeModePicker"
                                     model:["跟随系统","浅色","深色"]
                                     currentIndex:["System","Light","Dark"].indexOf(Theme.mode)
-                                    onActivated:Theme.mode=["System","Light","Dark"][currentIndex]
+                                    onActivated:function(index){Theme.mode=["System","Light","Dark"][index]}
                                 }
                             }
-                            RowLayout {
+                            GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
                                 Layout.fillWidth:true
                                 ColumnLayout {
                                     Layout.fillWidth:true
-                                    Text { text:AppState.zh("Windows backdrop material"); color:Theme.text; font.pixelSize:14 }
-                                    Text { text:AppState.zh("Uses DWM on supported Windows 11 systems"); color:Theme.muted; font.pixelSize:11 }
+                                    SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:"磨砂背景"; color:Theme.text; font.pixelSize:Theme.fontSize(14) }
+                                    SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:"使用 Windows 原生窗口背景材质"; color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
                                 }
                                 SwirlToggle { checked:Theme.transparency; onToggled:Theme.transparency=checked }
                             }
-                            RowLayout {
+                            GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
                                 Layout.fillWidth:true
                                 ColumnLayout {
                                     Layout.fillWidth:true
-                                    Text { text:AppState.zh("Reduce motion"); color:Theme.text; font.pixelSize:14 }
-                                    Text { text:AppState.zh("Disable most transition animations"); color:Theme.muted; font.pixelSize:11 }
+                                    SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:AppState.zh("Reduce motion"); color:Theme.text; font.pixelSize:Theme.fontSize(14) }
+                                    SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:AppState.zh("Disable most transition animations"); color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
                                 }
                                 SwirlToggle { checked:Theme.reduceMotion; onToggled:Theme.reduceMotion=checked }
                             }
-                            RowLayout {
-                                Layout.fillWidth:true
-                                ColumnLayout {
+                            ColumnLayout {
+                                Layout.fillWidth:true; spacing:Theme.dp(10)
+                                GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
                                     Layout.fillWidth:true
-                                    Text { text:AppState.zh("Interface scale"); color:Theme.text; font.pixelSize:14 }
-                                    Text { text:Math.round(Theme.uiScale*100)+"%"; color:Theme.muted; font.pixelSize:11 }
+                                    ColumnLayout {
+                                        Layout.fillWidth:true
+                                        SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:"界面缩放"; color:Theme.text; font.pixelSize:Theme.fontSize(14); font.weight:Font.DemiBold }
+                                        SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:Theme.followSystemScale?"自动跟随 Windows 显示缩放 · Qt 原生 DPI":"手动缩放 · "+Math.round(Theme.uiScale*100)+"%"; color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
+                                    }
+                                    SwirlComboBox {
+                                        objectName:"scaleModeCombo"
+                                        implicitWidth:Theme.dp(176)
+                                        model:["自动跟随系统","手动自定义"]
+                                        currentIndex:Theme.followSystemScale?0:1
+                                        onActivated:currentIndex===0?Theme.followSystem():Theme.setScalePercent(Theme.uiScale*100)
+                                        Accessible.name:"界面缩放模式"
+                                    }
                                 }
-                                Slider {
-                                    id: scaleSlider
-                                    Layout.preferredWidth:200
-                                    from:0.9; to:1.25; stepSize:0.05
-                                    value:Theme.uiScale
-                                    onMoved:Theme.uiScale=value
+                                GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
+                                    Layout.fillWidth:true;
+                                    Slider {
+                                        id: scaleSlider
+                                        Layout.fillWidth:true; Layout.minimumWidth:Theme.dp(120)
+                                        objectName:"scaleSlider"
+                                        from:0.75; to:1.5; stepSize:0.01
+                                        enabled:!Theme.followSystemScale
+                                        onMoved:Theme.setScalePercent(Math.round(value*100))
+                                        Binding { target:scaleSlider; property:"value"; value:Theme.uiScale; when:!scaleSlider.pressed }
                                     background: Rectangle {
                                         x: scaleSlider.leftPadding
-                                        y: scaleSlider.topPadding + scaleSlider.availableHeight / 2 - height / 2
-                                        width: scaleSlider.availableWidth
-                                        height: 7
+                                        y: Math.round(scaleSlider.topPadding + scaleSlider.availableHeight / 2 - height / 2)
+                                        width: Math.round(scaleSlider.availableWidth)
+                                        height:Theme.dp(7)
                                         radius:Theme.roundedRadius(width,height)
                                         color: Theme.material("field")
-                                        border.width: 1
+                                        border.width:Theme.dp(1)
                                         border.color: Theme.glassRim
                                         Rectangle {
                                             height: parent.height
                                             radius:Theme.roundedRadius(width,height)
-                                            width: scaleSlider.visualPosition * parent.width
+                                            width: Math.round(scaleSlider.visualPosition * parent.width)
                                             color: Theme.accent
                                         }
                                     }
                                     handle: Rectangle {
-                                        x: scaleSlider.leftPadding + scaleSlider.visualPosition * (scaleSlider.availableWidth - width)
-                                        y: scaleSlider.topPadding + scaleSlider.availableHeight / 2 - height / 2
-                                        implicitWidth: 20; implicitHeight: 20
+                                        x: Math.round(scaleSlider.leftPadding + scaleSlider.visualPosition * (scaleSlider.availableWidth - width))
+                                        y: Math.round(scaleSlider.topPadding + scaleSlider.availableHeight / 2 - height / 2)
+                                        implicitWidth:Theme.dp(20); implicitHeight:Theme.dp(20)
                                         radius:Theme.roundedRadius(width,height)
                                         color: "#FBFDFF"
-                                        border.width: 1
+                                        border.width:Theme.dp(1)
                                         border.color: Theme.glassRim
                                     }
+                                    }
+                                    SwirlButton { text:"恢复默认"; enabled:!Theme.followSystemScale || Theme.uiScale!==1.0; onClicked:Theme.resetScale() }
                                 }
                             }
                             SwirlStatusBadge { label:AppState.zh("CHANGES ARE LOCAL TO THIS UI PREVIEW"); tone:"accent" }
                         }
                         ColumnLayout {
-                            visible:page.section!=="外观"; Layout.fillWidth:true; spacing:17
+                            visible:page.section!=="外观"&&page.section!=="字体"&&page.section!=="关于 Swirl"&&page.section!=="代理"; Layout.fillWidth:true; spacing:Theme.dp(17)
                             Repeater {
                                 model:page.section==="代理"?["系统代理","默认策略","进程绕过","代理身份验证"]:
                                       page.section==="DNS"?["解析器选择","加密 DNS","IPv6","虚拟 IP 处理"]:
                                       page.section==="TUN"?["TUN 入口","网卡选择","路由排除","网关 DNS"]:
                                       page.section==="端口"?["HTTP 端口","SOCKS 端口","API 端口","端口冲突提醒"]:
                                       page.section==="隐私与安全"?["敏感数据脱敏","本地加密","证书信任","诊断授权"]:
-                                      page.section==="关于 Swirl"?["版本","构建信息","第三方组件","项目链接"]:
-                                      ["启用功能","默认行为","高级选项","诊断"]
-                                RowLayout {
+                                      page.section==="启动"?["开机启动","启动时最小化","恢复上次窗口"]:
+                                      page.section==="通知"?["连接状态通知","订阅更新通知","错误通知"]:
+                                      page.section==="系统集成"?["显示托盘图标","关闭窗口后保留托盘","桌面通知"]:
+                                      page.section==="数据管理"?["保留连接历史","保留请求日志","自动清理过期记录"]:
+                                      page.section==="快捷键"?["全局搜索快捷键","窗口显示快捷键","页面导航快捷键"]:
+                                      ["关闭窗口时保留后台","记住窗口尺寸","显示工具提示"]
+                                GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
                                     Layout.fillWidth:true
                                     ColumnLayout {
                                         Layout.fillWidth:true
-                                        Text { text:AppState.zh(modelData); color:Theme.text; font.pixelSize:14 }
-                                        Text { text:AppState.zh("Preview configuration, not applied"); color:Theme.muted; font.pixelSize:11 }
+                                        SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:AppState.zh(modelData); color:Theme.text; font.pixelSize:Theme.fontSize(14) }
                                     }
-                                    SwirlToggle { onToggled:AppState.notice(modelData) }
+                                    SwirlTextField { enabled:false;
+                                        visible:page.section==="端口"&&modelData.indexOf("端口")>=0&&modelData!=="端口冲突提醒"
+                                        implicitWidth:Theme.dp(156); text:modelData==="HTTP 端口"?"7890":modelData==="SOCKS 端口"?"7891":"9090"
+                                        validator:IntValidator { bottom:1; top:65535 }
+                                        Accessible.name:modelData
+                                    }
+                                    SwirlComboBox { enabled:false;
+                                        visible:modelData==="默认策略"||modelData==="解析器选择"||modelData==="网卡选择"
+                                        model:modelData==="默认策略"?["自动选择","直连"]:modelData==="解析器选择"?["系统 DNS","加密 DNS"]:["自动","手动指定"]
+                                        Accessible.name:modelData
+                                    }
+                                    SwirlButton { development:true; enabled:false;
+                                        visible:page.section==="快捷键"
+                                        text:modelData==="全局搜索快捷键"?"Ctrl+K":modelData==="页面导航快捷键"?"Alt+← / →":"未设置"
+                                        Accessible.name:modelData
+                                    }
+                                    SwirlToggle { enabled:false;
+                                        visible:page.section!=="快捷键"&&!(page.section==="端口"&&modelData!=="端口冲突提醒")&&modelData!=="默认策略"&&modelData!=="解析器选择"&&modelData!=="网卡选择"
+                                        onToggled:AppState.notice(modelData)
+                                        Accessible.name:modelData
+                                    }
                                 }
                             }
-                            Rectangle { Layout.fillWidth:true; height:1; color:Theme.border }
-                            SwirlButton { text:AppState.zh("Open advanced options"); onClicked:AppState.notice(page.section+"选项") }
+                            Rectangle { Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(1); color:Theme.border }
                         }
-                        Item { Layout.preferredHeight:25 }
+                        ColumnLayout {
+                            visible:page.section==="代理"; Layout.fillWidth:true; spacing:Theme.dp(17)
+                            GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
+                                Layout.fillWidth:true;
+                                SwirlText {Layout.minimumWidth:0; text:engineController.systemProxy.owned?(engineController.systemProxy.enabled?"系统代理已接管":"接管状态未确认 · 快照已保留"):engineController.systemProxy.systemEnabled?"其他应用启用了系统代理":"未接管系统代理"; color:Theme.text; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(14) }
+                                SwirlButton { text:engineController.systemProxy.owned?"释放 / 恢复系统代理":"接管系统代理"; enabled:engineController.systemProxy.owned||engineController.connected; onClicked:engineController.setSystemProxy(!engineController.systemProxy.owned) }
+                            }
+                            SwirlText {Layout.minimumWidth:0; visible:engineController.systemProxy.error.length>0; text:engineController.systemProxy.error; color:Theme.orange; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
+                            SwirlText {Layout.minimumWidth:0; text:"沿用 Swirl 的本地 DPAPI 恢复快照与独立守护进程。其他程序修改代理后让出控制权；控制 API 短时异常不会释放仍在运行的代理。"; color:Theme.muted; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
+                            Rectangle { Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(1); color:Theme.border }
+                            SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:"本地连接诊断"; color:Theme.text; font.pixelSize:Theme.fontSize(14); font.weight:Font.DemiBold }
+                            GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
+                                Layout.fillWidth:true;
+                                SwirlTextField { id:diagnosticUrl; objectName:"diagnosticUrlField"; Layout.fillWidth:true; placeholderText:"https://目标地址 或 wss://目标路径"; enabled:!engineController.diagnostics.busy; Accessible.name:"用户指定的连接诊断地址" }
+                                SwirlButton { text:engineController.diagnostics.busy?"取消":"开始诊断"; enabled:engineController.diagnostics.busy||engineController.activeProxyPort>0; onClicked:engineController.diagnostics.busy?engineController.diagnostics.cancel():engineController.diagnostics.run(diagnosticUrl.text) }
+                            }
+                            SwirlText {Layout.minimumWidth:0; text:engineController.diagnostics.stateText; color:Theme.muted; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
+                            SwirlText {Layout.minimumWidth:0; text:"仅点击后向所填目标发送请求：本机端口 → CONNECT → TLS / HTTP 或 WebSocket Upgrade 与随机 Ping/Pong。地址可能需要登录或子协议；诊断失败不等于 Codex 服务故障，10 秒观察不代替长期实测。"; color:Theme.muted; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
+                            TextArea { renderType: TextEdit.NativeRendering; font.weight: Theme.bodyFontWeight; font.hintingPreference: Font.PreferFullHinting; Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) } readOnly:true; selectByMouse:true; visible:engineController.diagnostics.entries.length>0; text:engineController.diagnostics.report; Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(160); wrapMode:TextEdit.Wrap; font.family:Theme.fontFamily; font.pixelSize:Theme.fontSize(12); color:Theme.text; background:Rectangle { color:Theme.surface; radius:Theme.dp(14); border.color:Theme.border } }
+                            GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
+                                SwirlButton { text:"保存诊断报告"; onClicked:{const path=engineController.diagnostics.saveReport();AppState.notice(path.length>0?"诊断报告已保存："+path:"无法保存诊断报告")} }
+                                SwirlButton { text:"清空记录"; enabled:!engineController.diagnostics.busy; onClicked:engineController.diagnostics.clear() }
+                            }
+                            SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:"Codex 与其他应用兼容建议"; color:Theme.text; font.pixelSize:Theme.fontSize(14); font.weight:Font.DemiBold }
+                            GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
+                                Layout.fillWidth:true
+                                SwirlText {Layout.minimumWidth:0;wrapMode:Text.Wrap; text:"优先使用 Mihomo 兼容引擎"; color:Theme.text; font.pixelSize:Theme.fontSize(14); Layout.fillWidth:true }
+                                SwirlToggle { checked:engineController.preferCompatibility; enabled:engineController.canStart; onToggled:engineController.preferCompatibility=checked }
+                            }
+                            SwirlText {Layout.minimumWidth:0; text:"断开后修改并重新连接生效，节点、DNS、规则和 TUN 配置保持原值。依赖 TLS EOF 定界或原生协议尚不兼容时可主动启用。"; color:Theme.muted; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
+                            TextArea { renderType: TextEdit.NativeRendering; font.weight: Theme.bodyFontWeight; font.hintingPreference: Font.PreferFullHinting; Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) } readOnly:true; selectByMouse:true; text:engineController.proxyEnvironmentAdvice; Layout.fillWidth:true; wrapMode:TextEdit.Wrap; font.family:Theme.fontFamily; font.pixelSize:Theme.fontSize(12); color:Theme.text; background:null }
+                            SwirlText {Layout.minimumWidth:0; text:"原生隧道取消 120 秒空闲断开，采用 TCP KeepAlive；节点切换对新连接生效，现有连接保持原出口。DNS、国内外分流、用户规则、策略组和 TUN 沿用当前配置。原生 TLS 上游保留反向读取，但 Qt 不支持独立 TLS 半关闭；依赖 EOF 定界的 TLS 请求仍需兼容引擎。"; color:Theme.muted; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
+                            Rectangle { Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(1); color:Theme.border }
+                            GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
+                                Layout.fillWidth:true
+                                SwirlText {Layout.minimumWidth:0;wrapMode:Text.Wrap; text:"代理引擎"; color:Theme.text; font.pixelSize:Theme.fontSize(14); Layout.fillWidth:true }
+                                SwirlStatusBadge { objectName:"engineStatusBadge"; label:engineController.stateText; tone:engineController.apiHealthy?"success":"accent" }
+                            }
+                            SwirlText {
+                                objectName:"engineErrorText"; visible:engineController.error.length>0
+                                text:engineController.error; color:Theme.orange; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12)
+                            }
+                            SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:"程序路径"; color:Theme.text; font.pixelSize:Theme.fontSize(14) }
+                            SwirlTextField {
+                                objectName:"enginePathField"; Layout.fillWidth:true; text:engineController.executablePath
+                                enabled:engineController.canStart; onEditingFinished:engineController.executablePath=text
+                                Accessible.name:"已校验引擎程序路径"
+                            }
+                            GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
+                                Layout.fillWidth:true
+                                SwirlText {Layout.minimumWidth:0;wrapMode:Text.Wrap; text:"本机控制端口"; color:Theme.text; font.pixelSize:Theme.fontSize(14); Layout.fillWidth:true }
+                                SwirlTextField {
+                                    objectName:"enginePortField"; implicitWidth:Theme.dp(156); text:String(engineController.controlPort)
+                                    enabled:engineController.canStart; validator:IntValidator { bottom:1; top:65535 }
+                                    onEditingFinished:engineController.controlPort=Number(text)
+                                    Accessible.name:"本机引擎控制端口"
+                                }
+                            }
+                            SwirlText {
+                                text:"当前引擎："+engineController.engineName+(engineController.engineReason?"\n"+engineController.engineReason:"")
+                                color:Theme.muted;font.pixelSize:Theme.fontSize(12);wrapMode:Text.Wrap;Layout.fillWidth:true
+                            }
+                            SwirlText {
+                                objectName:"engineProcessText"
+                                text:"进程："+(engineController.processAlive?"运行中 · PID "+engineController.processId:"未运行")+"　API："+(engineController.apiHealthy?"健康":"未就绪")
+                                color:Theme.muted; font.pixelSize:Theme.fontSize(12); wrapMode:Text.Wrap; Layout.fillWidth:true
+                            }
+                            SwirlText {
+                                text:"已校验版本："+engineController.expectedVersion+"　运行版本："+(engineController.version||"未读取")+"　运行时间："+engineController.uptimeSeconds+" 秒"
+                                color:Theme.muted; font.pixelSize:Theme.fontSize(12); wrapMode:Text.Wrap; Layout.fillWidth:true
+                            }
+                            SwirlText {
+                                text:"SHA-256："+engineController.expectedSha256
+                                color:Theme.muted; font.pixelSize:Theme.fontSize(11); wrapMode:Text.WrapAnywhere; Layout.fillWidth:true
+                            }
+                            GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
+                                SwirlButton { objectName:"engineStartButton"; text:"启动引擎"; enabled:engineController.canStart; onClicked:engineController.start(); Accessible.name:text }
+                                SwirlButton { objectName:"engineStopButton"; text:"停止引擎"; enabled:engineController.processAlive||engineController.busy; onClicked:engineController.stop(); Accessible.name:text }
+                                SwirlButton { text:"检查状态"; enabled:engineController.processAlive&&!engineController.busy; onClicked:engineController.refresh(); Accessible.name:text }
+                            }
+                            SwirlText {
+                                text:engineController.configPath.length>0?"运行配置："+engineController.configPath:"运行配置在启动时由 Swirl 生成。"
+                                color:Theme.muted; font.pixelSize:Theme.fontSize(11); wrapMode:Text.WrapAnywhere; Layout.fillWidth:true
+                            }
+                            SwirlText {
+                                text:engineController.configurationSummary; visible:text.length>0
+                                color:Theme.muted; font.pixelSize:Theme.fontSize(11); wrapMode:Text.WrapAnywhere; Layout.fillWidth:true
+                            }
+                        }
+                        SwirlFontSettings { visible:page.section==="字体"; Layout.fillWidth:true }
+                        ColumnLayout {
+                            visible:page.section==="关于 Swirl"; Layout.fillWidth:true; spacing:Theme.dp(18)
+                            SwirlBrandIcon { Layout.alignment:Qt.AlignHCenter; Layout.preferredWidth:Theme.dp(104); Layout.preferredHeight:Theme.dp(104) }
+                            SwirlText {Layout.minimumWidth:0;wrapMode:Text.Wrap; text:"Swirl"; Layout.fillWidth:true; horizontalAlignment:Text.AlignHCenter; color:Theme.text; font.pixelSize:Theme.fontSize(30); font.weight:Font.DemiBold }
+                            SwirlText {Layout.minimumWidth:0;wrapMode:Text.Wrap; text:"网络代理工具"; Layout.fillWidth:true; horizontalAlignment:Text.AlignHCenter; color:Theme.muted; font.pixelSize:Theme.fontSize(14) }
+                            Rectangle { Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(1); color:Theme.border }
+                            Repeater {
+                                model:[["版本",Qt.application.version.replace("-preview"," · 开发版")],["开发者","SOLHK"],["界面框架","Qt 6 Quick"],["平台","Windows 64 位"]]
+                                GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
+                                    Layout.fillWidth:true
+                                    SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:AppState.zh(modelData[0]); color:Theme.muted; font.pixelSize:Theme.fontSize(14) }
+                                    Item { Layout.fillWidth:true }
+                                    SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:AppState.zh(modelData[1]); color:Theme.text; font.pixelSize:Theme.fontSize(14) }
+                                }
+                            }
+                            SwirlText {Layout.minimumWidth:0; text:"Swirl 使用 HarmonyOS Sans 字体。Copyright 2021 Huawei Device Co., Ltd.\n完整许可可在字体设置中查看。"; Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
+                            SwirlButton { text:"字体与许可"; onClicked:page.section="字体" }
+                            SwirlButton { text:"项目主页"; Layout.alignment:Qt.AlignHCenter; onClicked:Qt.openUrlExternally("https://github.com/SOLHK/Swirl") }
+                            SwirlText {Layout.minimumWidth:0;wrapMode:Text.Wrap; text:"第三方组件：Qt、MinGW 运行库、Mihomo（GPL-3.0）、HarmonyOS Sans"; Layout.fillWidth:true; horizontalAlignment:Text.AlignHCenter; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
+                        }
+                        Item { Layout.preferredHeight:Theme.dp(25) }
                     }
                 }
             }

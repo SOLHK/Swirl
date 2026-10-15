@@ -1,0 +1,17 @@
+[
+  {
+    "file": "HarmonyOS_Sans_SC_Bold.ttf",
+    "sha256": "9aa37f5edd6bf15af8b8b1655b8455753cd61abaf5d53454d4966261923b6c61",
+    "bytes": 8158924
+  },
+  {
+    "file": "HarmonyOS_Sans_SC_Medium.ttf",
+    "sha256": "564b0d89943402e4b90fe764bc5726fee12ddbd7d4f681f5150b5b8271e685e8",
+    "bytes": 8227216
+  },
+  {
+    "file": "HarmonyOS_Sans_SC_Regular.ttf",
+    "sha256": "2deabf97eaf17958dc24746b922779d9913008526daf1c853903547505a8f9ca",
+    "bytes": 8261060
+  }
+]

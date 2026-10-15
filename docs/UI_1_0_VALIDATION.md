@@ -56,11 +56,11 @@ Qt 6 的 alpha 无边框 HWND 会带 `WS_EX_LAYERED`，且吞掉 `WM_NCACTIVATE`
 
 ## SVG 来源
 
-实际侧栏 Logo：`src/Swirl.Quick/assets/icons/swirl_wave_mark.svg`。
+实际侧栏 Logo：`src/Swirl.Quick/assets/icons/swirl_knot_mark_light.svg` / `swirl_knot_mark_dark.svg`。
 
 Git blob SHA：`103c08a25e88255483cd2b08a2399f79d9db0ec2`，与远端基线一致，SVG 内容未修改。通过 Qt SVG 渲染同一图形生成透明 ICO；安装快捷方式使用新资源名 `Swirl-brand-100.ico`，避免继续引用旧风筝缓存。
 
-仓库另有 `swirl_wave_light.svg`、`swirl_wave_dark.svg`。窗口应用图标和侧栏均直接使用无底板的 mark。通用 UI 矢量资源位于 `src/Swirl.Quick/assets/icons/ui/`。应用/域名排行使用文字徽标，未逐个复制参考图中的第三方品牌 Logo。
+现有 `swirl_knot_light.svg`、`swirl_knot_dark.svg` 是带中性灰底的应用图标；侧栏按主题使用黑/白无底板祥云结 mark。以下历史验收截图保留拍摄时的旧图标。通用 UI 矢量资源位于 `src/Swirl.Quick/assets/icons/ui/`。应用/域名排行使用文字徽标，未逐个复制参考图中的第三方品牌 Logo。
 
 ## 本机实际验证
 

@@ -4,136 +4,113 @@ import QtQuick.Layouts
 import SwirlQuick
 import "../components"
 import "../controls"
-
 Item {
-    id:page
-    property var chosen:null
-    property bool scheduleEnabled:true
-    property var providers:[
-        {id:"s1",name:"主订阅 · 新加坡",source:"https://provider.example.test/sub/primary",nodes:48,used:34,limit:100,
-         update:"2026-10-10 13:20",status:"Healthy",interval:"6 hours"},
-        {id:"s2",name:"旅行节点",source:"https://provider.example.test/sub/travel",nodes:16,used:69,limit:150,
-         update:"2026-10-09 21:05",status:"Healthy",interval:"12 hours"},
-        {id:"s3",name:"备用订阅",source:"https://provider.example.test/sub/backup",nodes:0,used:0,limit:100,
-         update:"2026-10-07 12:45",status:"错误（模拟）",interval:"最近 24 小时"}
-    ]
-    readonly property var listed:providers.filter(function(r){
-        return (r.name+" "+r.source).toLowerCase().indexOf(search.text.toLowerCase())>=0
-    })
-    ColumnLayout {
-        anchors.fill:parent; anchors.margins:23; spacing:14
-        RowLayout {
-            Layout.fillWidth:true
-            SwirlStatusBadge { label:AppState.zh("订阅管理 · 模拟数据"); tone:"accent" }
-            Text { text:AppState.zh("No remote URLs are requested or saved."); color:Theme.muted; font.pixelSize:12; Layout.fillWidth:true }
-            SwirlButton { text:AppState.zh("Update all (demo)"); iconName:"refresh"; onClicked:AppState.notice("更新订阅") }
-            SwirlButton { text:AppState.zh("Add subscription"); primary:true; onClicked:addDialog.open() }
+ id:page
+ property string expandedId:""
+ property string editingId:""
+ function edit(record){editingId=record?record.id:"";displayName.text=record?record.name:"";urlField.text="";formatPreference.currentIndex=record?Math.max(0,["auto","loon","shadowrocket","surge","quantumult-x","sing-box"].indexOf(record.formatHint)):0;interval.currentIndex=record?Math.max(0,[360,720,1440,10080].indexOf(record.intervalMinutes)):0;autoEnabled.checked=record?record.enabled:true;addDialog.open()}
+ readonly property var providers:engineController.imports.providers
+ SwirlAnimatedModel{id:subscriptionModel;source:page.listed;keyRole:"id"}
+ readonly property var listed:providers.filter(function(r){return r.name.toLowerCase().indexOf(search.text.toLowerCase())>=0})
+ ColumnLayout { anchors.fill:parent;anchors.margins:Theme.dp(24);spacing:Theme.gap
+  RowLayout { Layout.fillWidth:true
+   SwirlText { text:"订阅管理";color:Theme.text;font.pixelSize:Theme.fontSize(30);font.weight:Font.DemiBold;Layout.fillWidth:true }
+   SwirlButton { text:"更新全部";enabled:!engineController.imports.busy;onClicked:engineController.imports.refreshAll() }
+   SwirlButton { objectName:"addSubscription";text:"添加订阅";primary:true;enabled:!engineController.imports.busy;onClicked:page.edit(null) }
+  }
+  SwirlText { text:engineController.imports.message||"管理订阅、节点更新和自动更新周期";color:Theme.muted;Layout.fillWidth:true;wrapMode:Text.Wrap;font.pixelSize:Theme.fontSize(12) }
+  SwirlSearchField { id:search;Layout.fillWidth:true;placeholderText:"搜索订阅名称" }
+  ScrollView { id:scroll;objectName:"subscriptionsSinglePanel";Layout.fillWidth:true;Layout.fillHeight:true;clip:true;ScrollBar.horizontal.policy:ScrollBar.AlwaysOff;ScrollBar.vertical:SwirlScrollBar {}
+   ListView { pixelAligned: true; id:subscriptionList;objectName:"subscriptionList";model:subscriptionModel;spacing:Theme.gap;clip:true
+    add:Transition{enabled:!SwirlMotion.reduced;NumberAnimation{property:"opacity";from:0;to:1;duration:SwirlMotion.duration}}
+    remove:Transition{enabled:!SwirlMotion.reduced;NumberAnimation{property:"opacity";to:0;duration:SwirlMotion.exitDuration}}
+    displaced:Transition{enabled:!SwirlMotion.reduced;NumberAnimation{property:"y";duration:SwirlMotion.expandDuration;easing.type:Easing.OutCubic}}
+    delegate:SwirlHeroCard {
+      id:provider;objectName:'subscriptionCard-'+record.id
+      required property var entry;readonly property var record:entry
+      expanded:page.expandedId===record.id
+      width:Math.floor(subscriptionList.width)
+      collapsedHeight:header.implicitHeight+actions.implicitHeight+2*Theme.cardPadding+Theme.dp(14)
+      expandedHeight:collapsedHeight+detailBody.implicitHeight+Theme.dp(18)
+      ColumnLayout {
+        id:header;x:Theme.cardPadding;y:Theme.cardPadding;width:parent.width-2*Theme.cardPadding;spacing:Theme.dp(9)
+        RowLayout {Layout.fillWidth:true
+          SwirlText {objectName:'subscriptionTitle-'+provider.record.id;text:provider.record.name;textFormat:Text.PlainText;color:Theme.text;font.pixelSize:Theme.fontSize(18+4*provider.reveal);font.weight:Font.DemiBold;Layout.fillWidth:true;elide:Text.ElideRight}
+          SwirlStatusBadge {busy:provider.record.status==='正在更新';label:provider.record.status;tone:provider.record.status==='已保存真实节点'?'success':provider.record.status==='更新失败'?'warning':'neutral'}
+          SwirlText {text:provider.record.nodes+' 个节点';color:Theme.muted}
         }
-        RowLayout {
-            Layout.fillWidth:true; spacing:12
-            SwirlSearchField { id:search; Layout.fillWidth:true; placeholderText:AppState.zh("Search subscription providers") }
-            Text { text:AppState.zh("Auto update"); color:Theme.muted; font.pixelSize:12 }
-            SwirlToggle { checked:page.scheduleEnabled; onToggled:page.scheduleEnabled=checked }
-            SwirlComboBox { model:["Every 6 hours","Every 12 hours","Daily","Weekly","Off"] }
-        }
-        RowLayout {
-            Layout.fillWidth:true; Layout.fillHeight:true; spacing:14
-            SwirlGlassPanel {
-                Layout.fillWidth:true; Layout.fillHeight:true
-                ScrollView {
-                    id:scroll
-                    anchors.fill:parent; anchors.margins:16; clip:true
-                    ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
-                    ColumnLayout {
-                        width:scroll.availableWidth; spacing:12
-                        Repeater {
-                            model:page.listed
-                            SwirlGlassPanel {
-                                id:provider
-                                property var record:modelData
-                                Layout.fillWidth:true
-                                Layout.preferredHeight:151
-                                selected:page.chosen&&page.chosen.id===record.id
-                                ColumnLayout {
-                                    anchors.fill:parent; anchors.margins:15; spacing:9
-                                    RowLayout {
-                                        Layout.fillWidth:true
-                                        SwirlIcon { name:"refresh"; size:18; color:Theme.accent }
-                                        Text { text:record.name; color:Theme.text; font.pixelSize:15; font.weight:Font.DemiBold; Layout.fillWidth:true }
-                                        SwirlStatusBadge { label:record.status; tone:record.status==="Healthy"?"success":"warning" }
-                                    }
-                                    Text { text:record.source; color:Theme.muted; font.pixelSize:11; Layout.fillWidth:true; elide:Text.ElideMiddle }
-                                    Rectangle {
-                                        Layout.fillWidth:true; height:7; radius:Theme.roundedRadius(width,height); color:Theme.field
-                                        Rectangle { width:parent.width*record.used/record.limit; height:parent.height; radius:Theme.roundedRadius(width,height); color:record.used/record.limit>.75?Theme.orange:Theme.accent }
-                                    }
-                                    RowLayout {
-                                        Layout.fillWidth:true
-                                        Text { text:record.used+" GB / "+record.limit+" GB · 模拟流量"; color:Theme.muted; font.pixelSize:11; Layout.fillWidth:true }
-                                        Text { text:record.nodes+" 个节点"; color:Theme.text; font.pixelSize:11 }
-                                    }
-                                    RowLayout {
-                                        Layout.fillWidth:true
-                                        Text { text:AppState.zh("Updated ")+record.update; color:Theme.muted; font.pixelSize:11; Layout.fillWidth:true }
-                                        SwirlButton { text:AppState.zh("Details"); quiet:true; onClicked:page.chosen=record }
-                                        SwirlButton { text:AppState.zh("Refresh"); iconName:"refresh"; onClicked:AppState.notice("刷新订阅源"+record.name) }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+        SwirlText {text:'最近更新：'+provider.record.update;color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
+        SwirlText {text:provider.record.error;visible:text.length>0;color:Theme.orange;Layout.fillWidth:true;wrapMode:Text.Wrap;font.pixelSize:Theme.fontSize(12)}
+      }
+      Item {
+        x:Theme.cardPadding;y:header.y+header.implicitHeight+Theme.dp(14);width:parent.width-2*Theme.cardPadding
+        height:detailBody.implicitHeight*provider.reveal;clip:true
+        enabled:provider.expanded
+        ColumnLayout {id:detailBody;width:parent.width;spacing:Theme.dp(12)
+          Rectangle {Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(1);color:Theme.border}
+          RowLayout {Layout.fillWidth:true
+            ColumnLayout {Layout.fillWidth:true;spacing:Theme.dp(5)
+              SwirlText {text:'自动更新';color:Theme.text;font.pixelSize:Theme.fontSize(14);font.weight:Font.DemiBold}
+              SwirlText {text:provider.record.enabled?'每 '+provider.record.intervalMinutes+' 分钟':'自动更新已关闭';color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
             }
-            SwirlGlassPanel {
-                Layout.preferredWidth:284; Layout.fillHeight:true
-                ColumnLayout {
-                    anchors.fill:parent; anchors.margins:18; spacing:13
-                    Text { text:AppState.zh("Provider inspector"); color:Theme.text; font.pixelSize:16; font.weight:Font.DemiBold }
-                    Text {
-                        text:page.chosen?page.chosen.name:"请选择订阅"
-                        color:Theme.accent; font.pixelSize:15; font.weight:Font.DemiBold
-                        wrapMode:Text.WordWrap; Layout.fillWidth:true
-                    }
-                    Repeater {
-                        model:[["STATUS",page.chosen?page.chosen.status:"—"],
-                               ["NODES",page.chosen?String(page.chosen.nodes):"—"],
-                               ["上次更新",page.chosen?page.chosen.update:"—"],
-                               ["自动刷新",page.chosen?page.chosen.interval:"—"],
-                               ["已用流量",page.chosen?page.chosen.used+" GB":"—"],
-                               ["流量限额",page.chosen?page.chosen.limit+" GB":"—"]]
-                        ColumnLayout {
-                            Layout.fillWidth:true; spacing:3
-                            Text { text:modelData[0]; color:Theme.muted; font.pixelSize:10 }
-                            Text { text:modelData[1]; color:Theme.text; font.pixelSize:13; Layout.fillWidth:true; elide:Text.ElideRight }
-                        }
-                    }
-                    Item { Layout.fillHeight:true }
-                    SwirlButton { text:AppState.zh("编辑订阅源"); onClicked:addDialog.open() }
-                    SwirlButton { text:AppState.zh("View update errors"); onClicked:AppState.notice("订阅错误详情") }
-                }
+            SwirlToggle {checked:provider.record.enabled;enabled:!engineController.imports.busy;onToggled:engineController.imports.saveSubscription(provider.record.id,provider.record.name,'',provider.record.intervalMinutes,checked)}
+          }
+          SwirlText {text:provider.record.enabled?'下次预计：'+provider.record.nextUpdate:'可在编辑中调整更新周期';color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
+          SwirlText {text:'订阅地址已加密隐藏。更新失败时保留现有节点。';color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
+        }
+      }
+      RowLayout {
+        id:actions;x:Theme.cardPadding;y:provider.height-Theme.cardPadding-implicitHeight;width:parent.width-2*Theme.cardPadding;spacing:Theme.dp(8)
+        SwirlButton {objectName:'expandSubscription-'+provider.record.id;text:provider.expanded?'收起详情':'展开详情';onClicked:page.expandedId=provider.expanded?'':provider.record.id;Accessible.name:text+' '+provider.record.name}
+        Item {Layout.fillWidth:true}
+        SwirlButton {objectName:'refreshSubscription-'+provider.record.id;text:'刷新';enabled:!engineController.imports.busy;onClicked:engineController.imports.refreshSubscription(provider.record.id)}
+        SwirlButton {objectName:'editSubscription-'+provider.record.id;text:'编辑';enabled:!engineController.imports.busy;onClicked:page.edit(provider.record)}
+        SwirlButton {objectName:'deleteSubscription-'+provider.record.id;text:'删除';danger:true;enabled:!engineController.imports.busy;onClicked:{deleteDialog.recordId=provider.record.id;deleteDialog.open()}}
+      }
+    }
+    footer:SwirlText {visible:page.listed.length===0;text:"暂无订阅。添加订阅后，可在卡片内查看更新状态。";color:Theme.muted;width:subscriptionList.width;wrapMode:Text.Wrap}
+
+   }
+  }
+ }
+    SwirlDialog {
+        ownerItem:page
+        id:deleteDialog;title:"删除订阅？";property string recordId:"";guardChanges:false
+        ColumnLayout {width:parent.width
+            SwirlText {text:"删除订阅，已导入的节点将保留为手动节点。";color:Theme.text;wrapMode:Text.Wrap;Layout.fillWidth:true}
+            RowLayout {Layout.alignment:Qt.AlignRight
+                SwirlButton {text:"取消";onClicked:deleteDialog.close()}
+                SwirlButton {objectName:"confirmSubscriptionDelete";text:"删除";danger:true;onClicked:{engineController.imports.removeSubscription(deleteDialog.recordId);deleteDialog.close()}}
             }
         }
     }
     SwirlDialog {
-        id:addDialog; title:"订阅来源"
+        ownerItem:page
+        id:addDialog;objectName:"subscriptionDialog"; title:"订阅来源";onClosed:urlField.text=""
         ColumnLayout {
-            width:parent.width; spacing:12
-            Text { text:AppState.zh("Display name"); color:Theme.text }
-            SwirlTextField { id:displayName; Layout.fillWidth:true; placeholderText:AppState.zh("My subscription") }
-            Text { text:AppState.zh("HTTPS URL (stored only in preview memory)"); color:Theme.text }
-            SwirlTextField { id:urlField; Layout.fillWidth:true; placeholderText:AppState.zh("https://provider.example.test/sub") }
-            Text { text:AppState.zh("Real subscriptions, credentials and tokens are not downloaded or saved."); color:Theme.muted; font.pixelSize:11; Layout.fillWidth:true; wrapMode:Text.WordWrap }
+            width:parent.width; spacing:Theme.dp(12)
+            ScrollView {id:subscriptionForm;Layout.fillWidth:true;Layout.preferredHeight:Math.floor(Math.min(Theme.dp(330),page.height*0.6));clip:true;ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
+        ScrollBar.vertical:SwirlScrollBar {}
+                ColumnLayout {width:subscriptionForm.availableWidth;spacing:Theme.dp(12)
+            SwirlText { text:AppState.zh("Display name"); color:Theme.text }
+            SwirlTextField { id:displayName;objectName:"subscriptionName"; Layout.fillWidth:true; placeholderText:AppState.zh("My subscription") }
+            SwirlText { text:"HTTPS 订阅地址"; color:Theme.text }
+            SwirlTextField { id:urlField;objectName:"subscriptionUrl"; Layout.fillWidth:true;echoMode:TextInput.Password; placeholderText:page.editingId.length?"留空保留已加密地址":"https://…";Accessible.name:"订阅地址" }
+            SwirlText { text:"应用运行时按设定间隔更新；只导入节点，不执行远程全局配置。"; color:Theme.muted; font.pixelSize:Theme.fontSize(11); Layout.fillWidth:true; wrapMode:Text.WordWrap }
+            SwirlText {text:"订阅格式偏好";color:Theme.text}
+            SwirlComboBox{id:formatPreference;Layout.fillWidth:true;model:["自动 / Clash","Loon","Shadowrocket / 通用","Surge / Surfboard","Quantumult X","sing-box"];Accessible.name:"订阅格式偏好"}
+            SwirlText {text:"向服务端请求此客户端格式；下载后仍检测实际内容，不把客户端格式当成协议。";color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
+            SwirlComboBox {id:interval;Layout.fillWidth:true;model:["每 6 小时","每 12 小时","每天","每周"];Accessible.name:"自动更新间隔"}
+            RowLayout {Layout.fillWidth:true;SwirlText {text:"自动更新";color:Theme.text;Layout.fillWidth:true}SwirlToggle {id:autoEnabled;checked:true}}
+            SwirlText {text:engineController.imports.message;color:Theme.orange;Layout.fillWidth:true;wrapMode:Text.Wrap;font.pixelSize:Theme.fontSize(11)}
+                }
+            }
             RowLayout {
                 Layout.alignment:Qt.AlignRight
                 SwirlButton { text:AppState.zh("Cancel"); onClicked:addDialog.close() }
-                SwirlButton {
-                    text:AppState.zh("添加演示"); primary:true
-                    enabled:displayName.text.trim().length>0&&urlField.text.startsWith("https://")
-                    onClicked:{
-                        page.providers=page.providers.concat([{id:"s"+Date.now(),name:displayName.text.trim(),
-                            source:urlField.text.trim(),nodes:0,used:0,limit:100,update:"Never",status:"未检查",interval:"最近 24 小时"}])
-                        displayName.text="";urlField.text="";addDialog.close()
-                    }
+                SwirlButton { enabled:!engineController.imports.busy && displayName.text.trim().length>0 && (page.editingId.length>0 || urlField.text.trim().length>0);
+                    objectName:"saveSubscription";text:"保存并更新"; primary:true
+                    onClicked:{if(engineController.imports.saveSubscription(page.editingId,displayName.text,urlField.text.trim(),[360,720,1440,10080][interval.currentIndex],autoEnabled.checked,["auto","loon","shadowrocket","surge","quantumult-x","sing-box"][formatPreference.currentIndex])){var id=page.editingId||engineController.imports.providers[engineController.imports.providers.length-1].id;addDialog.close();engineController.imports.refreshSubscription(id)}}
                 }
             }
         }

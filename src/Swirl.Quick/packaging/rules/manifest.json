@@ -1,0 +1,16 @@
+{
+  "files": [
+    {
+      "sha256": "e92bda4f0b9f05623663a882331a320ab4e266cada2046d3828a94572cdded46",
+      "name": "cn-domain.mrs",
+      "bytes": 540748
+    },
+    {
+      "sha256": "d95b3d125f6c74ce3c15e19ef794f142de91e21c3b8fb7767e76aebfabff5149",
+      "name": "cn-ip.mrs",
+      "bytes": 37538
+    }
+  ],
+  "source": "MetaCubeX/meta-rules-dat",
+  "commit": "83c8208bdfae92b1caaa29745f51f233b6f1847e"
+}

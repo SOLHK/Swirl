@@ -3,6 +3,8 @@
 #include <QSvgRenderer>
 #include <QPainter>
 #include <QColor>
+#include <QQueue>
+#include <QBitArray>
 QImage SvgIconProvider::requestImage(const QString &id, QSize *size, const QSize &requested)
 {
     const auto parts=id.split('/');
@@ -12,7 +14,10 @@ QImage SvgIconProvider::requestImage(const QString &id, QSize *size, const QSize
     if (!file.open(QIODevice::ReadOnly)) return {};
     QByteArray svg=file.readAll();
     const QColor tint("#"+parts.value(1));
-    if (tint.isValid()) svg.replace("#17181B",tint.name(QColor::HexRgb).toUtf8());
+    if (tint.isValid()) {
+        svg.replace("#17181B",tint.name(QColor::HexRgb).toUtf8());
+        svg.replace("#212121",tint.name(QColor::HexRgb).toUtf8());
+    }
     const QSize dimensions=requested.isValid()?requested:QSize(24,24);
     QImage image(dimensions,QImage::Format_ARGB32_Premultiplied);
     image.fill(Qt::transparent);

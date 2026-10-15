@@ -2,33 +2,41 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import SwirlQuick
-Button {
+import "../controls"
+SwirlMotionButton {
     id: entry
+    objectName:"nav-"+pageId
     property string pageId: "overview"
     property string title: "总览"
     property string iconName: "home"
     property bool compact: false
     readonly property bool chosen: AppState.currentPage === pageId
     signal activated()
-    implicitHeight: 33
-    implicitWidth: compact ? 58 : 250
-    leftPadding: 16; rightPadding: 12
+    property var selectionOwner:null
+    pressMotion:false
+    Component.onCompleted:if(selectionOwner)selectionOwner.registerEntry(entry)
+    Component.onDestruction:if(selectionOwner)selectionOwner.unregisterEntry(entry)
+    implicitHeight:Theme.sidebarRowHeight
+    implicitWidth: Theme.dp(compact ? 58 : 180)
+    leftPadding:Theme.dp(8); rightPadding:Theme.dp(10)
+    topPadding:0; bottomPadding:0
     hoverEnabled: true
     background: Rectangle {
-        radius: Theme.roundedRadius(width,height)
-        color: entry.down ? Theme.pressed : entry.chosen ? Theme.selected : entry.hovered ? Theme.hover : "transparent"
-        border.width: entry.visualFocus ? 2 : 0
-        border.color: Theme.focusBorder
-        Behavior on color { ColorAnimation { duration: Theme.motion } }
+        radius:Theme.sidebarRowRadius
+        color:!entry.chosen && entry.down?Theme.withAlpha(Theme.text,0.05):!entry.chosen && entry.hovered?Theme.withAlpha(Theme.text,0.025):"transparent"
+        Behavior on color {ColorAnimation{duration:SwirlMotion.hoverDuration}}
+        antialiasing:true
+        border.width:Theme.dp(entry.visualFocus?2:0)
+        border.color:Theme.focusBorder
     }
     contentItem: RowLayout {
-        spacing: 18
-        SwirlIcon { name: entry.iconName; size: 22; color: Theme.text }
-        Text {
+        spacing:Theme.dp(10)
+        SwirlIcon { name: "nav-"+entry.pageId; size:Theme.dp(18); color:entry.chosen?Theme.navigationAccent:entry.hovered?Theme.text:Theme.muted }
+        SwirlText {renderType:Text.NativeRendering;
             visible: !entry.compact; Layout.fillWidth: true
             text: entry.title; color: Theme.text
-            font.pixelSize: 17; font.family: Theme.fontFamily
-            font.weight: Font.Normal
+            font.pixelSize:Theme.fontSize(13); font.family: Theme.fontFamily
+            font.weight:entry.chosen?Font.DemiBold:Font.Medium
             elide: Text.ElideRight
         }
     }
@@ -37,6 +45,6 @@ Button {
     Accessible.role: Accessible.ListItem
     Accessible.selectable: true
     Accessible.selected: chosen
-    ToolTip.visible: hovered && compact
+    ToolTip.visible: hovered && compact && !previewCaptureMode
     ToolTip.text: title
 }

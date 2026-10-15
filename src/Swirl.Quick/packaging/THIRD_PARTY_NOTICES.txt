@@ -1,10 +1,21 @@
-Swirl - Qt Quick UI demonstration
+Swirl - Windows development preview
 
-This installer contains the Swirl Qt UI. Proxy, DNS, node latency and overview
-traffic remain demonstrations. The opt-in loopback HTTP capture service is
-real; CONNECT records tunnel metadata without TLS decryption.
-The original WPF/.NET network implementation remains in the source repository
-and is not started by the Qt UI.
+This build includes a separate Mihomo engine, real proxy configuration,
+optional Windows system proxy/TUN, HTTP capture and scoped HTTPS decryption,
+rewrites, local JavaScript execution, configuration overlays and DHCP gateway
+control. Credentials and local private keys use Windows DPAPI. Network
+takeover and certificate trust require explicit user actions. Unimplemented
+features remain unavailable. See the source documentation for limitations.
+
+Mihomo v1.19.32, Copyright MetaCubeX and other contributors, is bundled as an
+unmodified, separate executable under GPL version 3. Its full license is in
+licenses/mihomo-GPL-3.0.txt. Version, upstream asset URL, archive SHA-256 and
+executable SHA-256 are recorded in core/mihomo-manifest.json. Swirl verifies
+the executable against its compiled-in manifest before each launch.
+Corresponding upstream source for this exact version:
+https://github.com/MetaCubeX/mihomo/tree/v1.19.32
+https://github.com/MetaCubeX/mihomo/archive/refs/tags/v1.19.32.tar.gz
+Mihomo API documentation: https://wiki.metacubex.one/en/api/
 
 Qt 6.10.3 is dynamically linked. Copyright The Qt Company Ltd. and other
 contributors. Qt is used under LGPL version 3; corresponding license texts
@@ -16,6 +27,13 @@ Module-specific license and third-party metadata:
 https://code.qt.io/cgit/qt/qtbase.git/tree/LICENSES?h=v6.10.3
 https://code.qt.io/cgit/qt/qtdeclarative.git/tree/LICENSES?h=v6.10.3
 
+FreeType 2.14.2, bundled inside Qt, is used for Windows font rasterization.
+Portions of this software are copyright (C) 1996-2025 The FreeType Project
+(https://freetype.org/). All rights reserved.
+License: licenses/FreeType-FTL.txt
+Corresponding Qt-vendored source:
+https://github.com/qt/qtbase/tree/v6.10.3/src/3rdparty/freetype
+
 MinGW builds also contain GCC/libstdc++ runtime libraries under GPL version 3
 with the GCC Runtime Library Exception (see licenses/). Source and notices:
 https://gcc.gnu.org/releases.html
@@ -24,5 +42,40 @@ https://www.mingw-w64.org/license/
 Swirl source and reproducible Windows build instructions:
 https://github.com/SOLHK/Swirl/tree/test/src/Swirl.Quick
 
-Windows fonts used during validation are system-installed fonts and are not
-redistributed in this installer. The Swirl kite assets are derived from the icon supplied by the user. All outline UI icons are drawn by QML Canvas code.
+Other Windows fonts used during validation are system-installed fonts and are
+not redistributed in this installer. Swirl's brand SVG artwork is preserved;
+interface glyphs are independently authored for Swirl.
+
+fkYAML v0.5.0 — MIT — Copyright Kensuke Fukutani (2023-2026)
+https://github.com/fktn-k/fkYAML
+License: licenses/fkYAML-MIT.txt
+
+MetaCubeX/meta-rules-dat - GPL-3.0
+China domain/IP MRS data pinned to commit 83c8208bdfae92b1caaa29745f51f233b6f1847e.
+https://github.com/MetaCubeX/meta-rules-dat
+License and SHA-256 manifest: rules/LICENSE, rules/manifest.json
+nghttp2 1.70.0
+Native HTTP/2 framing and flow control library, statically linked.
+Copyright (c) 2012 Tatsuhiro Tsujikawa. MIT license.
+License: licenses/nghttp2-MIT.txt
+Source: https://github.com/nghttp2/nghttp2/releases/tag/v1.70.0
+
+Original Swirl interface icons
+All packaged UI SVG glyphs were independently authored for Swirl.
+
+Animation development tools and references (not runtime dependencies)
+Qt Quick Effect Maker v6.10.3 was used to bake the original Swirl click-light
+shader project. The GPL/commercial development tool is not included in this
+package. Original Swirl shader sources are compiled through Qt ShaderTools.
+RiveQtQuickPlugin2 and FluentUI for QML were researched, but their runtime,
+example code, fonts and animation assets are not included. The application
+uses its existing Qt Quick motion implementation and native fallbacks.
+Verification and license inventory: docs/ANIMATION_DEPENDENCY_RESEARCH.md
+
+HarmonyOS Sans SC — Copyright 2021 Huawei Device Co., Ltd.
+Swirl uses unmodified Regular, Medium and Bold fonts from the official
+OpenHarmony resources repository, commit 0d79cad76b37ba0f3ccb1323c83833c78e0860de.
+Licensed under HarmonyOS Sans Fonts License Agreement, not MIT or OFL.
+Full license: licenses/HarmonyOS-Sans.txt (also embedded and shown in Font Settings).
+Source: https://github.com/openharmony/resources/tree/0d79cad76b37ba0f3ccb1323c83833c78e0860de/fonts
+Other fonts are selected from the local system or imported by the user.

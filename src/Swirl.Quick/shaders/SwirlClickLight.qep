@@ -1,0 +1,51 @@
+{
+  "QEP": {
+    "QQEM": "0.44",
+    "version": 1,
+    "exportName": "SwirlClickLight",
+    "exportDirectory": ".",
+    "exportFlags": 6,
+    "connections": [
+      {
+        "fromId": 0,
+        "toId": 1
+      }
+    ],
+    "settings": {
+      "headings": [
+        "// Swirl click-light shader. Original shader math; generated with Qt Quick Effect Maker 6.10.3."
+      ]
+    },
+    "nodes": [
+      {
+        "name": "Main",
+        "nodeId": 0,
+        "type": 0,
+        "x": 140,
+        "y": 30,
+        "vertexCode": [
+          "void main() {",
+          "    texCoord = qt_MultiTexCoord0;",
+          "    gl_Position = qt_Matrix * qt_Vertex;",
+          "}"
+        ],
+        "fragmentCode": [
+          "void main() {",
+          "    vec2 p = (texCoord - vec2(0.5)) * vec2(1.5, 1.0);",
+          "    float shine = exp(-5.0 * dot(p, p));",
+          "    vec2 edge = smoothstep(vec2(0.0), vec2(0.12), texCoord) * smoothstep(vec2(0.0), vec2(0.12), vec2(1.0) - texCoord);",
+          "    float alpha = shine * edge.x * edge.y;",
+          "    fragColor = vec4(vec3(alpha), alpha) * qt_Opacity;",
+          "}"
+        ]
+      },
+      {
+        "name": "Output",
+        "nodeId": 1,
+        "type": 1,
+        "x": 140,
+        "y": 240
+      }
+    ]
+  }
+}
