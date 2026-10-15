@@ -52,4 +52,9 @@ add_library(SwirlHttp2 STATIC
 )
 set_target_properties(SwirlHttp2 PROPERTIES AUTOMOC OFF C_STANDARD 11)
 target_compile_definitions(SwirlHttp2 PRIVATE BUILDING_NGHTTP2 HAVE_CONFIG_H PUBLIC NGHTTP2_STATICLIB)
+# The public header exposes deprecated ssize_t callbacks by default.
+# MSVC has no ssize_t; Swirl consumes only the modern nghttp2_ssize APIs.
+if(MSVC)
+  target_compile_definitions(SwirlHttp2 INTERFACE NGHTTP2_NO_SSIZE_T)
+endif()
 target_include_directories(SwirlHttp2 PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated" PUBLIC nghttp2/lib/includes "${CMAKE_CURRENT_BINARY_DIR}/generated")
