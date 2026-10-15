@@ -17,6 +17,10 @@ class MotionPolicy final : public QObject {
 public:
     explicit MotionPolicy(QObject *parent=nullptr);
     bool systemReducedMotion() const;
+#ifdef SWIRL_UI_TESTS
+    // Process-local fixture injection; never changes the OS accessibility policy.
+    void setSystemReducedMotionOverrideForTest(int policy);
+#endif
     bool alwaysShowScrollbars() const;
     bool complexMotion() const { return m_complex.load(); }
     void attach(QQuickWindow *);
@@ -37,6 +41,9 @@ signals:
     void grabsChanged();
 private:
     std::atomic_bool m_complex{true};
+#ifdef SWIRL_UI_TESTS
+    int m_systemReducedMotionOverrideForTest=-1;
+#endif
     int m_nextGrab=0;
     QHash<int,QSharedPointer<QQuickItemGrabResult>> m_grabs;
 };

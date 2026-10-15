@@ -427,8 +427,12 @@ void MihomoAdapter::start(const EngineStartOptions &options) {
         fail(Error::ConfigurationFailed, QStringLiteral("无法创建安全运行配置，或国内规则数据缺失/哈希校验失败。请修复安装，未使用空规则回退。"));
         unlockExecutable(); return;
     }
-    if ((!options.selectedNodeId.isEmpty()||options.directSession) && !reservePort(m_proxyReservation,options.proxyPort)) {
-        fail(Error::PortConflict,QStringLiteral("本机代理端口 %1 已占用或不允许绑定。请检查是否同时运行了多个 Swirl 或其他代理程序，或更换设置中的本机代理端口。").arg(options.proxyPort));
+    // Mihomo's mixed listener binds TCP and UDP on the same port. If its UDP
+    // bind fails it can close TCP while /configs still advertises mixed-port.
+    if ((!options.selectedNodeId.isEmpty()||options.directSession) &&
+        (!reservePort(m_proxyReservation,options.proxyPort) ||
+         !m_proxyUdpReservation.bind(QHostAddress::LocalHost,options.proxyPort,QUdpSocket::DontShareAddress))) {
+        fail(Error::PortConflict,QStringLiteral("本机代理端口 %1 的 TCP 或 UDP 已占用或不允许绑定。请检查是否同时运行了多个 Swirl 或其他代理程序，或更换设置中的本机代理端口。").arg(options.proxyPort));
         unlockExecutable(); m_directory.reset(); return;
     }
     m_deadline.start(options.startupTimeoutMs);
@@ -458,6 +462,7 @@ void MihomoAdapter::launch(Stage stage) {
         m_status.state = State::Starting;
         m_reservation.close();
         m_proxyReservation.close();
+        m_proxyUdpReservation.close();
         m_uptime.start();
     }
     m_process.setArguments(args);
@@ -507,7 +512,7 @@ void MihomoAdapter::processFinished(int code, QProcess::ExitStatus exitStatus) {
 void MihomoAdapter::fail(Error error, const QString &message) {
     m_failureExit = true;
     m_poll.stop(); m_deadline.stop(); m_reservation.close(); cancelRequest();
-    m_proxyReservation.close(); cancelNodeRequests();
+    m_proxyReservation.close(); m_proxyUdpReservation.close(); cancelNodeRequests();
     m_status.proxyPort=0; m_status.nodeHealth=NodeHealth::Unknown; m_status.requestState=RequestState::NotTested;
     m_status.nodeMessage.clear(); m_status.latencyMs=-1; m_status.responseCode=0;
     m_status.state = State::Failed; m_status.error = error; m_status.message = message;
@@ -519,6 +524,7 @@ void MihomoAdapter::fail(Error error, const QString &message) {
 void MihomoAdapter::cancelRequest() {
     // Invalidate callbacks BEFORE abort(), which can emit finished inline.
     ++m_generation;
+    if(m_startupListener){auto *socket=m_startupListener.data();m_startupListener=nullptr;socket->disconnect(this);socket->abort();socket->deleteLater();}
     if(m_connectionsReply){m_connectionsReply->abort();m_connectionsReply->deleteLater();m_connectionsReply=nullptr;}
     if(m_trafficReply){auto reply=m_trafficReply.data();m_trafficReply=nullptr;reply->disconnect(this);reply->abort();reply->deleteLater();}
     if(m_logsReply){auto reply=m_logsReply.data();m_logsReply=nullptr;reply->disconnect(this);reply->abort();reply->deleteLater();}m_logsBuffer.clear();
@@ -620,7 +626,7 @@ void MihomoAdapter::probeNode(const QUrl &url) {
             const bool ok=probe->error()==QNetworkReply::NoError && code>=200 && code<400;
             m_status.requestState=ok?RequestState::Succeeded:RequestState::Failed;
             m_status.nodeMessage=ok?QStringLiteral("真实请求成功：本机代理按当前 %1 模式完成请求（HTTP %2）。").arg(m_status.mode).arg(code)
-                :QStringLiteral("本机代理的实际请求失败（HTTP %1）；请检查当前分流、节点或直连网络。").arg(code);
+                :QStringLiteral("本机代理的实际请求失败（HTTP %1，网络错误 %2）；请检查当前分流、节点或直连网络。").arg(code).arg(int(probe->error()));
             publish();
         });
     });
@@ -629,7 +635,7 @@ void MihomoAdapter::probeNode(const QUrl &url) {
 void MihomoAdapter::stop() {
     if (m_status.state == State::Stopped) return;
     m_modeUnconfirmed=false; m_failureExit = false; cancelRequest();
-    cancelNodeRequests(); m_proxyReservation.close();
+    cancelNodeRequests(); m_proxyReservation.close(); m_proxyUdpReservation.close();
     m_status.proxyPort=0; m_status.nodeHealth=NodeHealth::Unknown; m_status.requestState=RequestState::NotTested;
     m_status.nodeMessage.clear(); m_status.latencyMs=-1; m_status.responseCode=0;
     m_poll.stop(); m_deadline.stop(); m_reservation.close();
@@ -715,10 +721,42 @@ void MihomoAdapter::request(bool version) {
         if (!safe) {
             fail(Error::ConfigurationFailed, QStringLiteral("引擎运行配置不符合 Swirl 安全约束；已停止进程。")); return;
         }
-        m_status.mode = connected?m_options.routingMode:QStringLiteral("direct");
-        m_status.state = State::Running; m_status.apiHealthy = true;m_status.gatewayForwarding=m_options.gatewayForwarding;m_status.directSession=m_options.directSession&&m_options.selectedNodeId.isEmpty();m_status.tunEnabled=connected&&m_options.tunEnabled;m_status.allowLan=connected&&m_options.allowLan;
-        m_status.error = Error::None; m_status.message.clear(); m_status.routingBusy=false;m_deadline.stop(); publish();readConnections();readTraffic();readLogs();
+        if(m_status.state==State::Starting && connected){verifyStartupListener();return;}
+        publishRunning();
     });
+}
+
+void MihomoAdapter::verifyStartupListener() {
+    if(m_startupListener || m_status.state!=State::Starting)return;
+    // This is a local startup readiness check, not a recurring health probe.
+    // It does not send application traffic or extend the original deadline.
+    auto *socket=new QTcpSocket(this);m_startupListener=socket;
+    socket->setProxy(QNetworkProxy::NoProxy);const auto generation=m_generation;
+    const auto rejected=[this,socket,generation](QAbstractSocket::SocketError error){
+        if(generation!=m_generation || m_startupListener!=socket)return;
+        m_startupListener=nullptr;socket->disconnect(this);socket->abort();socket->deleteLater();
+        apiFailure(Error::ApiUnavailable,QStringLiteral("控制接口已核验，但本机代理监听尚未就绪（socket 错误 %1）；继续等待原启动期限。").arg(int(error)));
+    };
+    connect(socket,&QTcpSocket::errorOccurred,this,rejected);
+    connect(socket,&QTcpSocket::connected,this,[this,socket,generation]{
+        if(generation!=m_generation || m_startupListener!=socket)return;
+        m_startupListener=nullptr;socket->disconnect(this);socket->abort();socket->deleteLater();
+        if(m_status.state==State::Starting)publishRunning();
+    });
+    auto *timer=new QTimer(socket);timer->setSingleShot(true);
+    connect(timer,&QTimer::timeout,this,[rejected]{rejected(QAbstractSocket::SocketTimeoutError);});
+    timer->start(m_options.requestTimeoutMs);
+    socket->connectToHost(QHostAddress::LocalHost,m_options.proxyPort);
+}
+
+void MihomoAdapter::publishRunning() {
+    const bool connected=!m_options.selectedNodeId.isEmpty() || m_options.directSession;
+    m_status.mode=connected?m_options.routingMode:QStringLiteral("direct");
+    m_status.state=State::Running;m_status.apiHealthy=true;m_status.gatewayForwarding=m_options.gatewayForwarding;
+    m_status.directSession=m_options.directSession&&m_options.selectedNodeId.isEmpty();
+    m_status.tunEnabled=connected&&m_options.tunEnabled;m_status.allowLan=connected&&m_options.allowLan;
+    m_status.error=Error::None;m_status.message.clear();m_status.routingBusy=false;m_deadline.stop();
+    publish();readConnections();readTraffic();readLogs();
 }
 
 void MihomoAdapter::setRoutingMode(const QString &mode) {

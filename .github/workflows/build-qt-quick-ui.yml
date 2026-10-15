@@ -106,6 +106,8 @@ jobs:
             build/swirl-quick/hero-evidence/
             build/swirl-quick/Release/Swirl-diagnostics.txt
             build/swirl-quick/Release/Swirl-node-ui-diagnostics.txt
+            build/swirl-quick/Release/Swirl-motion-diagnostics.txt
+            build/swirl-quick/Release/Swirl-hero-diagnostics.txt
           if-no-files-found: warn
       - name: Overview mouse and keyboard input checks
         shell: pwsh

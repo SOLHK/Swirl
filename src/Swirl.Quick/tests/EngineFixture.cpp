@@ -30,6 +30,16 @@ int main(int argc, char **argv) {
     if (mode == "no-api") return app.exec();
     QString routingMode=QRegularExpression("(?:^|\\n)mode: ([a-z]+)").match(content).captured(1);
     const auto mixedPort=QRegularExpression("mixed-port: ([0-9]+)").match(content).captured(1).toInt();
+    QTcpServer mixedListener;
+    if(mixedPort>0 && mode!="no-mixed-listener") {
+        if(!mixedListener.listen(QHostAddress::LocalHost,quint16(mixedPort)))return 6;
+        QObject::connect(&mixedListener,&QTcpServer::newConnection,&app,[&]{
+            while(auto *socket=mixedListener.nextPendingConnection()) {
+                QObject::connect(socket,&QTcpSocket::disconnected,socket,&QObject::deleteLater);
+                QObject::connect(socket,&QTcpSocket::readyRead,socket,[socket]{socket->write(socket->readAll());});
+            }
+        });
+    }
     QTcpServer server;
     if (!server.listen(QHostAddress::LocalHost, port)) return 5;
     QObject::connect(&server, &QTcpServer::newConnection, &app, [&] {

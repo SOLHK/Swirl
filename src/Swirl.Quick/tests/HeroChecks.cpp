@@ -1,5 +1,6 @@
 #include "HeroChecks.h"
 #include "engine/EngineController.h"
+#include "app/MotionPolicy.h"
 #include <QQuickWindow>
 #include <QQuickItem>
 #include <QRegion>
@@ -44,10 +45,17 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
  QJsonArray checks;int failures=0;QJsonArray nodeClickMs;QJsonArray settingsRetargetSamples;
  auto check=[&](bool value,const QString &name){checks.append(QJsonObject{{"name",name},{"passed",value}});if(!value)++failures;qInfo()<<"HERO_CHECK"<<name<<value;};
  auto eval=[&](const QString &code){QQmlExpression expression(qmlContext(window),window,code);auto result=expression.evaluate();if(expression.hasError()){++failures;qWarning()<<expression.error();}return result;};
+ auto *policy=qobject_cast<MotionPolicy *>(qmlContext(window)->contextProperty("motionPolicy").value<QObject *>());
+ if(!policy)return 3;
+ const bool actualSystemReducedMotion=policy->systemReducedMotion();
+ struct RestoreSystemMotion {MotionPolicy *policy;~RestoreSystemMotion(){policy->setSystemReducedMotionOverrideForTest(-1);}} restoreSystemMotion{policy};
+ policy->setSystemReducedMotionOverrideForTest(0);
+ qInfo()<<"HERO_MOTION_POLICY"<<"actualSystemReducedMotion"<<actualSystemReducedMotion<<"fixtureOverride"<<0;
+ quint64 settingsFrames=0,settingsRequestFrame=0;
  std::function<QQuickItem *(QQuickItem *,const QString &)> find;
  find=[&](QQuickItem *parent,const QString &name)->QQuickItem *{if(parent->objectName()==name&&parent->isVisible())return parent;for(auto child:parent->childItems())if(auto match=find(child,name))return match;return nullptr;};
  auto item=[&](const QString &name,QQuickWindow *owner=nullptr){return find((owner?owner:window)->contentItem(),name);};
- auto click=[&](const QString &name,QQuickWindow *owner=nullptr){auto control=item(name,owner);if(!control){check(false,"input exists: "+name);return;}QTest::mouseClick(owner?owner:window,Qt::LeftButton,Qt::NoModifier,control->mapToScene(QPointF(control->width()/2,control->height()/2)).toPoint());};
+ auto click=[&](const QString &name,QQuickWindow *owner=nullptr){auto control=item(name,owner);if(!control){check(false,"input exists: "+name);return;}if(name.startsWith("settings-"))settingsRequestFrame=settingsFrames;QTest::mouseClick(owner?owner:window,Qt::LeftButton,Qt::NoModifier,control->mapToScene(QPointF(control->width()/2,control->height()/2)).toPoint());};
  auto route=[&](const QString &name){eval("AppState.navigate('"+name+"')");wait(350);};
  const bool recording=!QCoreApplication::arguments().contains("--hero-no-recording");
  QQuickWindow *settingsFlight=nullptr;
@@ -61,10 +69,13 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
  struct RestoreQaStack {QQuickWindow *window;~RestoreQaStack(){window->setFlag(Qt::WindowStaysOnTopHint,false);}} restoreQaStack{window};
 #endif
  eval("Theme.mode='Light';Theme.transparency=true;Theme.reduceMotion=false;SwirlMotion.speed=1");route("featurehub");
+ check(!eval("SwirlMotion.reduced").toBool(),"animated fixture resolves independently of the Windows accessibility preference");
  check(item("settings-proxies")&&item("settings-subscriptions")&&!item("settings-license"),"More has direct node/subscription entries and no paid license entry");
  QJsonArray settingsPerformance;
  settingsFlight=qobject_cast<QQuickWindow *>(eval("settingsFlight").value<QObject *>());
  auto *profileSheet=qobject_cast<QQuickWindow *>(eval("settingsSheet").value<QObject *>());
+ QObject settingsFrameScope;
+ if(profileSheet)QObject::connect(profileSheet,&QQuickWindow::frameSwapped,&settingsFrameScope,[&]{++settingsFrames;},Qt::QueuedConnection);
  const auto awaitSettings=[&](const std::function<bool()> &condition,int timeout=3000){
   if(!settingsFlight||!profileSheet)return false;QElapsedTimer budget;budget.start();
   while(!condition()&&budget.elapsed()<timeout){
@@ -80,7 +91,7 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
   }
   return condition();
  };
- const auto nativeSettingsReady=[&]{return profileSheet&&profileSheet->isVisible()&&profileSheet->isExposed()&&settingsFlight&&!settingsFlight->isVisible()&&!settingsFlight->property("moving").toBool();};
+ const auto nativeSettingsReady=[&]{return profileSheet&&profileSheet->isVisible()&&profileSheet->isExposed()&&settingsFrames>settingsRequestFrame&&settingsFlight&&!settingsFlight->isVisible()&&!settingsFlight->property("moving").toBool()&&eval("settingsLoader.activeLoader && settingsLoader.activeLoader.routeId===settingsSheet.section && (settingsLoader.item.section===undefined || settingsLoader.item.section===(settingsSheet.section==='appearance'?'外观':settingsSheet.section==='fonts'?'字体':settingsSheet.section==='license'?'关于 Swirl':'常规'))").toBool();};
  const auto settingsReturned=[&]{return settingsFlight&&settingsFlight->property("phase")=="Idle"&&!settingsFlight->isVisible()&&!profileSheet->isVisible();};
  int settingsRounds=3;
  for(const auto &argument:QCoreApplication::arguments())if(argument.startsWith("--hero-settings-rounds=")){bool ok=false;const auto value=argument.mid(QString("--hero-settings-rounds=").size()).toInt(&ok);if(ok)settingsRounds=qBound(1,value,30);}
@@ -103,17 +114,21 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
     const bool opened=awaitSettings(nativeSettingsReady);const auto opening=probe.finish();entering.append(opening.intervals);
     transitions.append(QJsonObject{{"route",routeId},{"direction","enter"},{"cacheHit",cacheHit},{"firstFrameMs",opening.firstFrameMs},{"firstFrameReveal",opening.firstReveal},{"firstFrameRect",QJsonObject{{"x",opening.firstRect.x()},{"y",opening.firstRect.y()},{"width",opening.firstRect.width()},{"height",opening.firstRect.height()}}},{"requestToCompletedMs",requestClock.elapsed()},{"intervals",summary(opening.intervals)}});
     check(opened,"passive setting performance run reaches its native page");
+    check(opening.firstFrameMs>=0&&!opening.intervals.isEmpty(),"animated settings entry supplies real moving-window frame samples");
     requestClock.restart();probe.begin();QTest::keyClick(profileSheet,Qt::Key_Escape);
     const bool closed=awaitSettings(settingsReturned);const auto closing=probe.finish();returning.append(closing.intervals);
     transitions.append(QJsonObject{{"route",routeId},{"direction","return"},{"firstFrameMs",closing.firstFrameMs},{"firstFrameReveal",closing.firstReveal},{"firstFrameRect",QJsonObject{{"x",closing.firstRect.x()},{"y",closing.firstRect.y()},{"width",closing.firstRect.width()},{"height",closing.firstRect.height()}}},{"requestToCompletedMs",requestClock.elapsed()},{"intervals",summary(closing.intervals)}});
     check(closed,"passive setting performance run returns to its card");
+    check(closing.firstFrameMs>=0&&!closing.intervals.isEmpty(),"animated settings return supplies real moving-window frame samples");
    }
    const auto after=settingsResources();settingsPerformance.append(QJsonObject{{"round",round+1},{"wallMs",roundClock.elapsed()},{"before",before},{"after",after},{"cpuMs",after.value("cpuMs").toDouble()-before.value("cpuMs").toDouble()},{"enter",summary(entering)},{"return",summary(returning)},{"transitions",transitions}});
   }
   QObject::disconnect(connection);
   const auto beforeIdle=settingsResources();wait(3000);const auto afterIdle=settingsResources();
-  QFile performance(directory+"/settings-performance.json");if(performance.open(QIODevice::WriteOnly))performance.write(QJsonDocument(QJsonObject{{"rounds",settingsPerformance},{"failures",failures},{"checks",checks},{"beforeNaturalIdle",beforeIdle},{"afterNaturalIdle",afterIdle},{"naturalIdleMs",3000},{"qtRefreshHz",window->screen()->refreshRate()},{"nativeDpr",window->devicePixelRatio()},{"method","Signal-driven event loop; passive frameSwapped intervals from the moving settings transfer window only. No screenshot, forced update, garbage collection or resource release in this segment. No physical display mode change. Cache-hit metadata distinguishes first construction from warm visits. All intervals including long frames retained; Qt delivery times are not hardware presentation FPS. Process private/working-set counters do not separately attribute GPU backing allocations."}}).toJson());
-  if(QCoreApplication::arguments().contains("--hero-settings-only"))return failures?2:0;
+  const bool settingsOnly=QCoreApplication::arguments().contains("--hero-settings-only");
+  if(settingsOnly){policy->setSystemReducedMotionOverrideForTest(-1);check(policy->systemReducedMotion()==actualSystemReducedMotion,"settings performance fixture restores the actual Windows accessibility policy");}
+  QFile performance(directory+"/settings-performance.json");if(performance.open(QIODevice::WriteOnly))performance.write(QJsonDocument(QJsonObject{{"actualSystemReducedMotion",actualSystemReducedMotion},{"animatedSystemPolicyFixture",0},{"rounds",settingsPerformance},{"failures",failures},{"checks",checks},{"beforeNaturalIdle",beforeIdle},{"afterNaturalIdle",afterIdle},{"naturalIdleMs",3000},{"qtRefreshHz",window->screen()->refreshRate()},{"nativeDpr",window->devicePixelRatio()},{"method","Signal-driven event loop; passive frameSwapped intervals from the moving settings transfer window only. No screenshot, forced update, garbage collection or resource release in this segment. No physical display mode change. Cache-hit metadata distinguishes first construction from warm visits. All intervals including long frames retained; Qt delivery times are not hardware presentation FPS. Process private/working-set counters do not separately attribute GPU backing allocations."}}).toJson());
+  if(settingsOnly)return failures?2:0;
  }
  auto origin=item("settings-subscriptions");click("settings-subscriptions");
  QQuickWindow *sheet=nullptr;for(auto candidate:QGuiApplication::allWindows())if(candidate->objectName()=="settingsSheet")sheet=qobject_cast<QQuickWindow *>(candidate);
@@ -189,6 +204,13 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
   const auto resizedTarget=settingsFlight->property("toRect").toRectF();
   check(qAbs(resizedTarget.x()-resizedOrigin.x())<0.5&&qAbs(resizedTarget.y()-resizedOrigin.y())<0.5,"return uses the freshly laid out card coordinates instead of the opening snapshot");
   check(QTest::qWaitFor([&]{return settingsFlight->property("phase")=="Idle";},2000),"return recalculates the grid card after the main window resizes");
+  policy->setSystemReducedMotionOverrideForTest(1);
+  click("settings-subscriptions");
+  check(awaitSettings(nativeSettingsReady)&&eval("motionPolicy.systemReducedMotion && SwirlMotion.reduced && !Theme.reduceMotion").toBool()&&eval("settingsLoader.item").value<QObject *>()==cachedPage,"system accessibility reduction opens the same native cached page without a moving surface");
+  check(!settingsFlight->property("moving").toBool()&&eval("SwirlTransitionRegistry.activeCount===0").toBool(),"system accessibility reduction creates no settings transition clock");
+  QTest::keyClick(sheet,Qt::Key_Escape);
+  check(awaitSettings(settingsReturned),"system accessibility reduction Escape hides the modal and restores its source");
+  policy->setSystemReducedMotionOverrideForTest(0);
   click("settings-subscriptions");wait(35);eval("Theme.reduceMotion=true");
   check(QTest::qWaitFor([&]{return sheet->isVisible()&&!settingsFlight->isVisible();},1000)&&eval("settingsLoader.item").value<QObject *>()==cachedPage,"changing reduced motion finishes geometry and retains the same cached page");
   QTest::keyClick(sheet,Qt::Key_Escape);wait(40);check(!sheet->isVisible()&&settingsFlight->property("phase")=="Idle","reduced-motion Escape hides the native modal window without a recursive close event");eval("Theme.reduceMotion=false");window->resize(1100,850);
@@ -341,7 +363,9 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
  QJsonObject background;
  if(sweep){const auto before=resources();window->showMinimized();wait(60000);const auto after=resources();background={{"durationMs",60000},{"cpuMs",after.value("cpuMs").toDouble()-before.value("cpuMs").toDouble()},{"before",before},{"after",after}};window->showNormal();wait(350);}
  check(eval("motionPolicy.activeGrabCount===0 && SwirlTransitionRegistry.activeCount===0").toBool(),"all transition resources are idle after repeated use");
+ policy->setSystemReducedMotionOverrideForTest(-1);
+ check(policy->systemReducedMotion()==actualSystemReducedMotion,"hero fixture restores the actual Windows accessibility policy");
  QFile report(directory+"/hero-report.json");if(!report.open(QIODevice::WriteOnly))return 3;
- report.write(QJsonDocument(QJsonObject{{"settingsRetargetSamples",settingsRetargetSamples},{"nodeClickDispatchMs",nodeClickMs},{"checks",checks},{"failures",failures},{"dxgiPresentations",displaySamples},{"dxgiStatisticsErrors",statisticsErrors},{"animationWindows",animationWindows},{"refreshPhases",refreshPhases},{"resourceBefore",resourceBefore},{"resourceAfter",resources()},{"minimizedIdle",background},{"performanceStartQpcMs",performanceStart},{"performanceEndQpcMs",performanceEnd},{"reportedRefreshHz",window->screen()->refreshRate()},{"nativeDpr",window->devicePixelRatio()},{"sampleCount",intervals.size()},{"meanFrameDeliveryMs",mean},{"p95FrameDeliveryMs",intervals.isEmpty()?0:intervals[qMin(intervals.size()-1,qsizetype(intervals.size()*0.95))]},{"p99FrameDeliveryMs",intervals.isEmpty()?0:intervals[qMin(intervals.size()-1,qsizetype(intervals.size()*0.99))]},{"method","Passive Qt frameSwapped delivery during native interaction, excluding screenshot readback. These intervals are not hardware display presentation FPS; use external PresentMon data for presentation evidence."}}).toJson());
+ report.write(QJsonDocument(QJsonObject{{"actualSystemReducedMotion",actualSystemReducedMotion},{"animatedSystemPolicyFixture",0},{"systemReducedPolicyFixture",1},{"restoredSystemPolicy",policy->systemReducedMotion()==actualSystemReducedMotion},{"settingsRetargetSamples",settingsRetargetSamples},{"nodeClickDispatchMs",nodeClickMs},{"checks",checks},{"failures",failures},{"dxgiPresentations",displaySamples},{"dxgiStatisticsErrors",statisticsErrors},{"animationWindows",animationWindows},{"refreshPhases",refreshPhases},{"resourceBefore",resourceBefore},{"resourceAfter",resources()},{"minimizedIdle",background},{"performanceStartQpcMs",performanceStart},{"performanceEndQpcMs",performanceEnd},{"reportedRefreshHz",window->screen()->refreshRate()},{"nativeDpr",window->devicePixelRatio()},{"sampleCount",intervals.size()},{"meanFrameDeliveryMs",mean},{"p95FrameDeliveryMs",intervals.isEmpty()?0:intervals[qMin(intervals.size()-1,qsizetype(intervals.size()*0.95))]},{"p99FrameDeliveryMs",intervals.isEmpty()?0:intervals[qMin(intervals.size()-1,qsizetype(intervals.size()*0.99))]},{"method","Passive Qt frameSwapped delivery during native interaction, excluding screenshot readback. These intervals are not hardware display presentation FPS; use external PresentMon data for presentation evidence."}}).toJson());
  return failures?2:0;
 }

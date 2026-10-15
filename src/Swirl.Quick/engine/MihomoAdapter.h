@@ -5,6 +5,8 @@
 #include <QNetworkAccessManager>
 #include <QPointer>
 #include <QTcpServer>
+#include <QTcpSocket>
+#include <QUdpSocket>
 #include <QTemporaryDir>
 #include <QTimer>
 #include <QFile>
@@ -40,6 +42,8 @@ private:
     bool prepareConfiguration();
     bool reserveControlPort();
     bool reservePort(QTcpServer &server, quint16 port);
+    void verifyStartupListener();
+    void publishRunning();
     void cancelNodeRequests();
     void nodeFailure(const QString &message);
     bool lockAndVerifyExecutable();
@@ -49,6 +53,8 @@ private:
     QPointer<QNetworkReply> m_reply;
     QTcpServer m_reservation;
     QTcpServer m_proxyReservation;
+    QUdpSocket m_proxyUdpReservation;
+    QPointer<QTcpSocket> m_startupListener;
     QNetworkAccessManager m_probeNetwork;
     QPointer<QNetworkReply> m_nodeReply, m_probeReply;
     QPointer<QNetworkReply> m_modeReply;

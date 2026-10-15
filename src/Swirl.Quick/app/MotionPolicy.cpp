@@ -34,12 +34,23 @@ MotionPolicy::MotionPolicy(QObject *parent):QObject(parent) {
     connect(this,&QObject::destroyed,qApp,[events]{qApp->removeNativeEventFilter(events);delete events;});
 }
 bool MotionPolicy::systemReducedMotion() const {
+#ifdef SWIRL_UI_TESTS
+    if(m_systemReducedMotionOverrideForTest>=0)return m_systemReducedMotionOverrideForTest==1;
+#endif
 #ifdef Q_OS_WIN
     BOOL enabled=TRUE;
     if(SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION,0,&enabled,0))return !enabled;
 #endif
     return false;
 }
+#ifdef SWIRL_UI_TESTS
+void MotionPolicy::setSystemReducedMotionOverrideForTest(int policy) {
+    const int bounded=qBound(-1,policy,1);
+    if(m_systemReducedMotionOverrideForTest==bounded)return;
+    m_systemReducedMotionOverrideForTest=bounded;
+    emit policyChanged();
+}
+#endif
 bool MotionPolicy::alwaysShowScrollbars() const {
 #ifdef Q_OS_WIN
     return QSettings("HKEY_CURRENT_USER\\Control Panel\\Accessibility",QSettings::NativeFormat).value("DynamicScrollbars",1).toInt()==0;

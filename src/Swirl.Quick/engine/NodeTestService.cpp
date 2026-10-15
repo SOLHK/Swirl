@@ -3,8 +3,17 @@
 #include <QSet>
 #include <QDateTime>
 #include <QPointer>
+#include <QUdpSocket>
 namespace {
-quint16 freePort(){QTcpServer server;if(!server.listen(QHostAddress::LocalHost,0))return 0;return server.serverPort();}
+quint16 freePort(quint16 excludedPort=0){
+ QTcpServer tcp;QUdpSocket udp;
+ for(int attempt=0;attempt<16;++attempt){
+  if(!tcp.listen(QHostAddress::LocalHost,0))return 0;
+  if(tcp.serverPort()!=excludedPort && udp.bind(QHostAddress::LocalHost,tcp.serverPort(),QUdpSocket::DontShareAddress))return tcp.serverPort();
+  tcp.close();
+ }
+ return 0;
+}
 }
 NodeTestService::~NodeTestService(){cancel();}
 EngineStartOptions NodeTestService::isolatedOptions(const EngineStartOptions &source){
@@ -26,8 +35,7 @@ void NodeTestService::start(const EngineStartOptions &options,const QStringList 
 }
 void NodeTestService::next(){
  while(m_running.size()+m_retiring.size()<3&&!m_queue.isEmpty()){
-  const auto id=m_queue.dequeue();auto opts=isolatedOptions(m_options);opts.selectedNodeId=id;opts.controlPort=freePort();opts.proxyPort=freePort();opts.healthIntervalMs=2000;opts.requestTimeoutMs=3000;opts.startupTimeoutMs=20000;
-  while(opts.controlPort==opts.proxyPort&&opts.controlPort)opts.proxyPort=freePort();
+  const auto id=m_queue.dequeue();auto opts=isolatedOptions(m_options);opts.selectedNodeId=id;opts.controlPort=freePort();opts.proxyPort=freePort(opts.controlPort);opts.healthIntervalMs=2000;opts.requestTimeoutMs=3000;opts.startupTimeoutMs=20000;
   // Include only the selected node and its explicit dialer dependencies.
   QSet<QString> needed{id};bool added=true;while(added){added=false;for(const auto &node:m_options.nodes)if(needed.contains(node.id)){const auto dependency=node.parameters.value("dialer-proxy").toString();for(const auto &other:m_options.nodes)if(other.sourceId==node.sourceId&&(other.name==dependency||other.id==dependency)&&!needed.contains(other.id)){needed.insert(other.id);added=true;}}}
   opts.nodes.clear();for(const auto &node:m_options.nodes)if(needed.contains(node.id))opts.nodes.append(node);

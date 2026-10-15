@@ -1,4 +1,5 @@
 #include "MotionChecks.h"
+#include "app/MotionPolicy.h"
 #include <QQuickWindow>
 #include <QQuickItem>
 #include <QQuickItemGrabResult>
@@ -171,6 +172,18 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
     };
     auto *host=window->findChild<QQuickItem *>("pageLoader");
     if(!host)return 1;
+    auto *policy=qobject_cast<MotionPolicy *>(qmlContext(window)->contextProperty("motionPolicy").value<QObject *>());
+    check("motion-policy-present",policy!=nullptr);
+    if(!policy)return 1;
+    const bool nativeSystemReducedMotion=policy->systemReducedMotion();
+    // CI may legitimately disable client animations. Exercise the animated
+    // branch deterministically in this test process, then check both reduced
+    // paths independently. The production executable has no override API.
+    policy->setSystemReducedMotionOverrideForTest(0);
+    struct RestoreSystemMotionPolicy {
+        MotionPolicy *policy;
+        ~RestoreSystemMotionPolicy(){policy->setSystemReducedMotionOverrideForTest(-1);}
+    } restoreSystemMotionPolicy{policy};
     auto item=[&] {return qvariant_cast<QObject *>(host->property("item"));};
     std::function<QQuickItem *(QQuickItem *,const QString &)> findVisual;
     findVisual=[&](QQuickItem *root,const QString &name)->QQuickItem * {
@@ -200,6 +213,7 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
     eval("Theme.reduceMotion=false;Theme.transparency=false;Theme.mode='Light';AppState.toast=''");
     wait(120);
     const bool reduced=eval("SwirlMotion.reduced").toBool();
+    check("animated-test-policy-is-active",!reduced);
     check("initial-page-present",item()!=nullptr);
     route("featurehub");
     auto *hub=item();
@@ -364,16 +378,29 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
     route("settings");
     check("reduced-motion-immediate",!host->property("moving").toBool()&&host->property("progress").toDouble()==1);
     check("reduced-motion-no-global-transition",!eval("SwirlMotion.transitioning").toBool());
+    eval("Theme.reduceMotion=false");
+    policy->setSystemReducedMotionOverrideForTest(1);
+    route("rules");
+    check("system-reduced-motion-immediate",eval("SwirlMotion.reduced").toBool()&&!host->property("moving").toBool()&&host->property("progress").toDouble()==1);
+    check("system-reduced-motion-no-global-transition",!eval("SwirlMotion.transitioning").toBool());
+    policy->setSystemReducedMotionOverrideForTest(0);
+    eval("Theme.reduceMotion=true");
+    check("application-reduced-motion-wins-over-animated-system-policy",eval("SwirlMotion.reduced").toBool());
     int idleFrames=0;
     auto idleConnection=QObject::connect(window,&QQuickWindow::frameSwapped,window,[&]{++idleFrames;});
     wait(650);QObject::disconnect(idleConnection);
     check("idle-no-animation-loop",idleFrames<=4);
+    policy->setSystemReducedMotionOverrideForTest(-1);
+    const bool systemPolicyRestored=policy->systemReducedMotion()==nativeSystemReducedMotion;
+    check("system-motion-policy-restored",systemPolicyRestored);
     std::sort(intervals.begin(),intervals.end());
     std::sort(warmIntervals.begin(),warmIntervals.end());
     QJsonObject performance{{"renderer",int(window->rendererInterface()->graphicsApi())},
         {"qt",qVersion()},{"dpr",window->devicePixelRatio()},
         {"refreshHz",window->screen()?window->screen()->refreshRate():0},
-        {"systemReducedMotion",reduced},{"frames",intervals.size()},
+        {"systemReducedMotion",nativeSystemReducedMotion},{"testSystemReducedMotionOverride",0},
+        {"effectiveReducedMotionDuringAnimatedChecks",reduced},{"injectedSystemReducedPathTested",true},
+        {"systemPolicyRestoreOnReturn",-1},{"systemPolicyRestored",systemPolicyRestored},{"frames",intervals.size()},
         {"medianFrameMs",intervals.isEmpty()?0:intervals[intervals.size()/2]},
         {"p95FrameMs",intervals.isEmpty()?0:intervals[qMin(intervals.size()-1,qsizetype(intervals.size()*0.95))]},
         {"warmFrames",warmIntervals.size()},

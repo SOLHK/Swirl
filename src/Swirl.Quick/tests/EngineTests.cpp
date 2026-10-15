@@ -11,6 +11,7 @@
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QTest>
+#include <QTcpSocket>
 #ifdef Q_OS_WIN
 #include <windows.h>
 #endif
@@ -148,6 +149,21 @@ private slots:
         QCOMPARE(engine.status().error, ProxyEngine::Error::PortConflict); QVERIFY(!engine.status().processAlive);
         QVERIFY(occupied.isListening());
     }
+    void healthyApiWithoutMixedListenerNeverBecomesReady() {
+        qputenv("SWIRL_FIXTURE_MODE","no-mixed-listener");
+        auto config=options();config.directSession=true;config.startupTimeoutMs=1200;
+        QTcpServer freePort;QVERIFY(freePort.listen(QHostAddress::LocalHost));
+        config.proxyPort=freePort.serverPort();freePort.close();
+        MihomoAdapter engine;bool reportedReady=false;
+        connect(&engine,&ProxyEngine::statusChanged,&engine,[&]{
+            reportedReady=reportedReady || engine.status().state==ProxyEngine::State::Running;
+        });
+        engine.start(config);
+        QTRY_COMPARE_WITH_TIMEOUT(engine.status().state,ProxyEngine::State::Failed,4000);
+        QCOMPARE(engine.status().error,ProxyEngine::Error::StartupTimeout);
+        QVERIFY(!reportedReady);QVERIFY(!engine.status().apiHealthy);
+        QTRY_VERIFY_WITH_TIMEOUT(!engine.status().processAlive,3000);
+    }
     void failures_data() {
         QTest::addColumn<QByteArray>("mode"); QTest::addColumn<int>("error");
         QTest::newRow("config-rejected") << QByteArray("config-error") << int(ProxyEngine::Error::ConfigurationFailed);
@@ -194,19 +210,29 @@ private slots:
     void healthFailureAndRecovery() {
         QTemporaryDir temp; QVERIFY(temp.isValid()); const auto control = temp.filePath("control");
         writeControl(control, "ok"); qputenv("SWIRL_FIXTURE_CONTROL", control.toUtf8());
-        MihomoAdapter engine; engine.start(options());
+        auto config=options();config.directSession=true;
+        QTcpServer freePort;QVERIFY(freePort.listen(QHostAddress::LocalHost));
+        config.proxyPort=freePort.serverPort();freePort.close();
+        MihomoAdapter engine; engine.start(config);
         QTRY_COMPARE_WITH_TIMEOUT(engine.status().state, ProxyEngine::State::Running, 5000);
         const auto pid = engine.status().processId;
+        QTcpSocket tunnel;tunnel.setProxy(QNetworkProxy::NoProxy);
+        tunnel.connectToHost(QHostAddress::LocalHost,config.proxyPort);
+        QTRY_COMPARE_WITH_TIMEOUT(tunnel.state(),QAbstractSocket::ConnectedState,2000);
         for (const auto &mode : {QByteArray("timeout"), QByteArray("auth"), QByteArray("bad-json"), QByteArray("oversize")}) {
             writeControl(control, mode);
             QTRY_COMPARE_WITH_TIMEOUT(engine.status().state, ProxyEngine::State::Degraded, 3000);
             QVERIFY(engine.status().processAlive); QVERIFY(!engine.status().apiHealthy); QCOMPARE(engine.status().processId, pid);
+            const auto marker=QByteArray("healthy-tunnel-")+mode;
+            tunnel.write(marker);QByteArray received;
+            QTRY_VERIFY_WITH_TIMEOUT((received+=tunnel.readAll())==marker,2000);
             QVERIFY(!engine.status().message.isEmpty());
             if (mode == "auth") QCOMPARE(engine.status().error, ProxyEngine::Error::AuthenticationFailed);
             if (mode == "bad-json") QCOMPARE(engine.status().error, ProxyEngine::Error::InvalidResponse);
             writeControl(control, "ok");
             QTRY_COMPARE_WITH_TIMEOUT(engine.status().state, ProxyEngine::State::Running, 3000);
             QVERIFY(engine.status().apiHealthy); QVERIFY(engine.status().message.isEmpty());
+            QCOMPARE(tunnel.state(),QAbstractSocket::ConnectedState);
         }
         engine.stop(); QTRY_COMPARE_WITH_TIMEOUT(engine.status().state, ProxyEngine::State::Stopped, 4000);
     }

@@ -31,6 +31,37 @@ $env:SWIRL_LONG_STREAM_SECONDS='1200'
 
 测试覆盖真实本地 TLS、RFC6455 Upgrade/帧/ping/close、分块 SSE、服务端拒绝、截断流、慢接收、测速、节点切换、失败的新拨号与仍健康的旧流、规则/全局模式、实际导入服务更新。20 分钟 CONNECT 回环测试包含 135 秒空闲及 1.8 秒 GUI 线程阻塞。它们不等于真实 Codex 会话验收。
 
+## 已复现的 Mixed 监听启动就绪问题
+
+后续排查发现一个独立的启动缺陷：固定 Mihomo `v1.19.32` 的 mixed listener 先建立 TCP，再绑定同端口 UDP。UDP 绑定失败时，内核会关闭已经建立的 TCP listener，但 `/configs` 仍可能报告该 mixed-port。旧 `MihomoAdapter` 只核对认证 API 和配置便宣布 `Running`，没有确认实际 TCP 监听可用。[固定版本监听实现](https://github.com/MetaCubeX/mihomo/blob/v1.19.32/listener/listener.go)
+
+使用已校验的固定内核、独占 UDP 端口和同端口空闲 TCP 进行回环复现：内核实际记录 UDP bind 失败，控制 API 仍返回 HTTP 200 和该 mixed-port，实际 TCP 无法连接。数字地址 `127.0.0.1` 与 `localhost` 均失败；fixture 的 fetch/probe 本来就使用 `127.0.0.1`，因此不能仅用 localhost 的 IPv6 优先解释这个缺陷。
+
+修复同时预留 TCP/UDP，在原有启动期限内异步确认回环 TCP listener 后才宣布就绪。随机分配的独立测速端口也同时检查两种协议，并限定分配尝试次数；用户指定的主代理端口不会静默更换。该 TCP 检查只发生于启动阶段，后续控制 API 失败和恢复继续保留进程及健康业务流，没有延长超时或增加无限重试。实际代理请求失败信息同时保留 HTTP 状态和 Qt 网络错误编号。
+
+已实际完成旧实现失败、新实现通过的回归：
+
+- `occupiedUdpPortCannotReportMixedListenerReady`：旧实现进入 `Running`、错误为 `None`；修复后报告 `PortConflict`，不启动内核，原 UDP 占用者保持绑定。旧/新退出码分别为 1/0。
+- `healthyApiWithoutMixedListenerNeverBecomesReady`：旧实现错误宣布 `Running`；修复后在原启动期限内未获得 listener 时报告 `StartupTimeout`，从未宣布就绪。旧/新退出码分别为 1/0。
+- `healthFailureAndRecovery`：API 超时、认证失败、无效 JSON 和超大响应期间，真实 TCP tunnel 持续回显；API 恢复后同一进程和连接仍保留。
+
+Qt 6.10.3 / MinGW 13.1 / Release 的完整网络回归 4/4 组通过，总耗时 168.95 秒。以下为 QtTest 报告的计数，含各组初始化及清理：
+
+| CTest 组 | 通过 | 失败 | 有意跳过 |
+|---|---:|---:|---:|
+| `swirl-node-real-chain` | 22 | 0 | 1 |
+| `swirl-stream-regression` | 7 | 0 | 0 |
+| `swirl-engine-contract` | 24 | 0 | 1 |
+| `swirl-engine-real` | 3 | 0 | 0 |
+
+节点组跳过需要额外授权的在线订阅；合同组跳过的实际内核项已在单独的 `swirl-engine-real` 组运行。交付证据目录 `evidence/network-readiness` 保留 `red-udp-conflict.txt`、`red-missing-listener.txt`、`green-udp-conflict.txt`、`green-readiness-health.txt`、四组完整日志及白名单 `summary.json`。可在测试构建目录复核：
+
+```powershell
+ctest --test-dir <build> -R '^swirl-(engine-contract|engine-real|node-real-chain|stream-regression)$' --output-on-failure
+```
+
+**归因边界：**提交 `9223346` 的首个 test push CI 出现节点/流回归失败，而同一提交的独立 PR CI 中这两组全部通过。旧 CI 未记录当时确切 UDP 占用或内核 bind 失败，不能把其中每次 Qt `REQUEST_ERROR_101`，或 Codex 所有重连，都唯一归因于本次复现的路径。上述计数为本地修复后实测，不代表后续 CI 已通过，也不代表 Codex Desktop 全通道、真实 TUN 或此前 HTTP 503 已修复。本轮回归没有修改系统代理、Codex 配置或 TUN，没有停止用户应用。
+
 ## 只读现场诊断
 
 ```powershell

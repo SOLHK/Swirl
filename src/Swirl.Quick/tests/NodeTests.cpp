@@ -21,8 +21,17 @@
 #include <QJsonArray>
 #include <QSaveFile>
 #include <QFileInfo>
+#include <QUdpSocket>
 
-static quint16 freePort(){QTcpServer server;server.listen(QHostAddress::LocalHost,0);return server.serverPort();}
+static quint16 freePort(){
+    QTcpServer tcp;QUdpSocket udp;
+    for(int attempt=0;attempt<16;++attempt){
+        if(!tcp.listen(QHostAddress::LocalHost,0))return 0;
+        if(udp.bind(QHostAddress::LocalHost,tcp.serverPort(),QUdpSocket::DontShareAddress))return tcp.serverPort();
+        tcp.close();
+    }
+    return 0;
+}
 static ProxyNode node(QString name,quint16 port){ProxyNode n;n.id=QUuid::createUuid().toString(QUuid::WithoutBraces);n.name=name;n.protocol="socks5";n.host="127.0.0.1";n.port=port;return n;}
 class NodeTests:public QObject {
     Q_OBJECT
@@ -39,7 +48,7 @@ class NodeTests:public QObject {
         auto *reply=client.get(request);QSignalSpy done(reply,&QNetworkReply::finished);
         if(!done.wait(8000)){qInfo()<<"FIXTURE_TIMEOUT relays"<<net.a.forwarded<<net.b.forwarded<<"origins"<<net.httpRequests<<net.httpsRequests<<"sslBackend"<<QSslSocket::activeBackend();reply->abort();return "REQUEST_TIMEOUT";}
         const auto body=reply->readAll();const int code=reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-        if(reply->error()!=QNetworkReply::NoError || code!=200){qInfo()<<"FIXTURE_REQUEST_FAILURE HTTP"<<code<<"relays"<<net.a.forwarded<<net.b.forwarded<<"origins"<<net.httpRequests<<net.httpsRequests;return QByteArray("REQUEST_ERROR_")+QByteArray::number(reply->error());}
+        if(reply->error()!=QNetworkReply::NoError || code!=200){qInfo()<<"FIXTURE_REQUEST_FAILURE HTTP"<<code<<"networkError"<<int(reply->error())<<reply->errorString()<<"relays"<<net.a.forwarded<<net.b.forwarded<<"origins"<<net.httpRequests<<net.httpsRequests;return QByteArray("REQUEST_ERROR_")+QByteArray::number(reply->error());}
         return body;
     }
 private slots:
@@ -383,6 +392,21 @@ private slots:
             QVERIFY(!engine.configurationSummary().contains("fixture-secret"));
             engine.stop();QTRY_COMPARE_WITH_TIMEOUT(engine.status().state,ProxyEngine::State::Stopped,4000);
         }
+    }
+    void occupiedUdpPortCannotReportMixedListenerReady() {
+        QUdpSocket occupied;
+        QVERIFY(occupied.bind(QHostAddress::LocalHost,0,QUdpSocket::DontShareAddress));
+        QTcpServer tcpAvailable;
+        QVERIFY(tcpAvailable.listen(QHostAddress::LocalHost,occupied.localPort()));
+        tcpAvailable.close();
+        auto config=options();config.directSession=true;config.proxyPort=occupied.localPort();
+        while(config.controlPort==config.proxyPort)config.controlPort=freePort();
+        MihomoAdapter engine;engine.start(config);
+        QTRY_VERIFY_WITH_TIMEOUT(engine.status().state==ProxyEngine::State::Failed ||
+                                 engine.status().state==ProxyEngine::State::Running,18000);
+        QCOMPARE(engine.status().error,ProxyEngine::Error::PortConflict);
+        QVERIFY(!engine.status().apiHealthy);QVERIFY(!engine.status().processAlive);
+        QCOMPARE(occupied.state(),QAbstractSocket::BoundState);
     }
     void verifiedRoutingProviders() {
         ControlledNetwork net;QVERIFY(net.start());auto config=options();

@@ -10,14 +10,25 @@
 #include <QSignalSpy>
 #include <QNetworkProxy>
 #include <QUuid>
+#include <QUdpSocket>
 
 // Real TLS, RFC6455 handshake/masked frames and chunked SSE over the actual
 // mixed listener. Loopback peers only; never enable TUN or change Windows proxy.
 class NetworkRegressionTests : public QObject {
  Q_OBJECT
+ static quint16 freeMixedPort(){
+  QTcpServer tcp;QUdpSocket udp;
+  for(int attempt=0;attempt<16;++attempt){
+   if(!tcp.listen(QHostAddress::LocalHost))return 0;
+   if(udp.bind(QHostAddress::LocalHost,tcp.serverPort(),QUdpSocket::DontShareAddress))return tcp.serverPort();
+   tcp.close();
+  }
+  return 0;
+ }
  EngineStartOptions options(ControlledNetwork &net,bool compatibility,const QString &mode){
   EngineStartOptions o;o.preferCompatibility=compatibility;o.routingMode=mode;
-  QTcpServer reserve;reserve.listen(QHostAddress::LocalHost);o.proxyPort=reserve.serverPort();reserve.close();
+  o.proxyPort=freeMixedPort();
+  QTcpServer reserve;
   reserve.listen(QHostAddress::LocalHost);o.controlPort=reserve.serverPort();reserve.close();
   QFile file(QString::fromUtf8(SWIRL_TEST_MANIFEST));file.open(QIODevice::ReadOnly);const auto m=QJsonDocument::fromJson(file.readAll()).object();
   o.expectedSha256=m["executableSha256"].toString().toLatin1();o.expectedVersion=m["version"].toString();
@@ -110,7 +121,9 @@ private slots:
   QByteArray bytes;QVERIFY(receive(websocket,bytes,"Sec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo="));
   auto probeOptions=o;probeOptions.tunEnabled=true;probeOptions.meteredNetwork=true;probeOptions.allowLan=true;
   NodeTestService probes;probes.start(probeOptions,{o.nodes.first().id},net.url());
-  QVERIFY(QTest::qWaitFor([&]{return !probes.busy();},30000));QCOMPARE(probes.succeeded(),1);
+  QVERIFY(QTest::qWaitFor([&]{return !probes.busy();},30000));
+  if(probes.succeeded()!=1)qInfo()<<"ISOLATED_PROBE_FAILURE"<<probes.result(o.nodes.first().id);
+  QCOMPARE(probes.succeeded(),1);
   QCOMPARE(engine.status().processId,pid);QCOMPARE(engine.status().sessionId,session);
   engine.selectNode(o.nodes.last().id);QVERIFY(QTest::qWaitFor([&]{return engine.status().selectedNodeId==o.nodes.last().id;},5000));
   bytes.clear();websocket.write(frame("alive-after-probe-and-switch"));QVERIFY(receive(websocket,bytes,"alive-after-probe-and-switch"));
