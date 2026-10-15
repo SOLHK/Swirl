@@ -87,7 +87,7 @@ Item {
                     SwirlGlassPanel {
                         Layout.fillWidth: true; Layout.fillHeight: true; cornerRadius: Theme.tableRadius; clip: true
                         SwirlDataTable {
-                            objectName: "captureTable"; anchors.fill: parent; rows: page.filteredRows; selectedId: page.selectedId
+                            objectName: "captureTable"; anchors.fill: parent; incrementalRows:true;animateRowChanges:false;rows: page.filteredRows; selectedId: page.selectedId
                             textPixelSize: 12; headerPixelSize: 11
                             columns: [{key:"method",label:"方法",w:80},{key:"host",label:"目标",w:190},{key:"status",label:"状态",w:65},{key:"protocol",label:"类型",w:110},{key:"duration",label:"耗时",w:90},{key:"size",label:"下载",w:90}]
                             onRowSelected: function(row) { page.selectedId = row.id }

@@ -61,7 +61,7 @@ ApplicationWindow {
             window.width=windowSettings.normalWidth
             window.height=windowSettings.normalHeight
         } else {
-            window.width=minimumWidth
+            window.width=Math.max(Theme.dp(914),minimumWidth)
             window.height=minimumHeight
         }
         geometryReady=true
@@ -102,18 +102,20 @@ ApplicationWindow {
         SwirlSidebar { id:sidebar; width:window.actualSidebarWidth; height:parent.height; compactByWindow:false }
         Item {
             id:mainArea; x:window.actualSidebarWidth+window.sidebarGutter; width:parent.width-x-Theme.dp(12); height:parent.height
+            Rectangle {anchors.fill:parent;color:Theme.withAlpha(Theme.canvas,Theme.workspaceOpacity);radius:Theme.containerRadius}
             RowLayout {
-                id:toolbar; visible:AppState.currentPage==="activity"; x:Theme.dp(4); y:Theme.dp(8); width:parent.width-Theme.dp(14); height:Theme.statusHeight; spacing:Theme.dp(8)
+                id:toolbar; visible:AppState.currentPage==="activity"; x:Theme.pagePadding; y:Theme.dp(16); width:parent.width-2*Theme.pagePadding; height:Theme.dp(32); spacing:Theme.dp(8)
+                SwirlText {text:"活动";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold;Layout.fillWidth:true}
                 SwirlStatusCapsule { objectName:"eventsCapsule"; Layout.preferredWidth:implicitWidth; Layout.preferredHeight:Theme.statusHeight; label:systemProvider.eventCount>0?systemProvider.eventCount+" 个事件":"暂无事件";tone:systemProvider.eventCount>0?"info":"neutral";detail:"查看事件与活动记录"; onClicked:AppState.navigate("logs") }
-                Item { Layout.fillWidth:true }
-                SwirlStatusCapsule { objectName:"proxyCapsule"; Layout.preferredWidth:implicitWidth; Layout.preferredHeight:Theme.statusHeight; label:engineController.systemProxy.systemEnabled&&!engineController.systemProxy.owned?"系统代理 · 其他应用":"系统代理";tone:engineController.systemProxy.error.length||engineController.routingError.length?"warning":engineController.systemProxy.systemEnabled?"success":"neutral";detail:engineController.systemProxy.error||engineController.routingError||(engineController.systemProxy.systemEnabled&&!engineController.systemProxy.owned?"系统代理由其他应用启用，点击让 Swirl 接管":engineController.systemProxy.enabled?"系统代理已开启，点击关闭":"系统代理已关闭，点击开启"); enabled:!engineController.busy; onClicked:{window.proxyRequestedAction=!engineController.systemProxy.enabled;window.proxyTogglePending=true;engineController.setSystemProxy(window.proxyRequestedAction);window.showProxyError()} }
+                SwirlStatusCapsule {id:proxyCapsule;objectName:"proxyCapsule";Layout.preferredWidth:implicitWidth;Layout.preferredHeight:Theme.statusHeight;label:window.proxyStatusLabel;tone:window.proxyTogglePending?"info":engineController.systemProxy.error.length||engineController.routingError.length?"warning":engineController.systemProxy.owned&&engineController.systemProxy.enabled?"success":"neutral";detail:"查看系统代理状态与操作";onClicked:proxyPanel.toggle()}
+
                 SwirlStatusCapsule { objectName:"tunCapsule"; Layout.preferredWidth:implicitWidth; Layout.preferredHeight:Theme.statusHeight; label:"增强模式";detail:engineController.routingError||(engineController.tunEnabled?"增强模式已开启，点击关闭":"点击开启增强模式接管网络"); tone:engineController.tunEnabled?"success":"neutral"; enabled:!engineController.busy; onClicked:{if(!engineController.setTunEnabled(!engineController.tunRequested))AppState.notice(engineController.routingError||engineController.networkConfigurationError)} }
                 SwirlButton { visible:captureProvider.running; text:"抓包中 · "+captureProvider.sessions.length; iconName:"capture"; font.pixelSize:Theme.fontSize(14); onClicked:AppState.navigate("capture") }
 
             }
             SwirlPageHost {
                 routeKey:AppState.currentPage==="requestlogs" || AppState.currentPage==="dashboard" ? "activity" : AppState.currentPage
-                id:pageLoader; objectName:"pageLoader"; x:Theme.dp(0); y:AppState.currentPage==="activity" || AppState.currentPage==="overview" || AppState.currentPage==="rewrite" ? Theme.dp(40):Theme.dp(12); width:parent.width; height:parent.height-y-Theme.dp(12)
+                id:pageLoader; objectName:"pageLoader"; x:Theme.dp(0); y:Theme.dp(12); width:parent.width; height:parent.height-y-Theme.dp(12)
                 sourceComponent:AppState.currentPage==="overview" ? overview :
                                 AppState.currentPage==="activity" || AppState.currentPage==="requestlogs" || AppState.currentPage==="dashboard" ? activity :
                                 AppState.currentPage==="capture" ? capturePage :
@@ -148,7 +150,49 @@ ApplicationWindow {
     }
     property bool proxyTogglePending:false
     property bool proxyRequestedAction:false
-    function showProxyError(){if(!proxyTogglePending)return;const message=engineController.systemProxy.error||engineController.routingError;if(message.length){AppState.notice(message);proxyTogglePending=false}else if(proxyRequestedAction?engineController.systemProxy.owned:!engineController.systemProxy.enabled){if(!engineController.busy)proxyTogglePending=false}}
+    readonly property string proxyStatusLabel:proxyTogglePending?"系统代理 · 正在切换":engineController.systemProxy.error.length||engineController.routingError.length?"系统代理 · 接管失败":engineController.systemProxy.owned&&engineController.systemProxy.enabled?"系统代理 · Swirl":engineController.systemProxy.systemEnabled?"系统代理 · 其他应用":"系统代理 · 未启用"
+    function showProxyError(){if(!proxyTogglePending)return;const message=engineController.systemProxy.error||engineController.routingError;if(message.length || (!engineController.busy && (proxyRequestedAction?engineController.systemProxy.owned:!engineController.systemProxy.enabled)))proxyTogglePending=false}
+    // A local reversible surface. The toolbar slot and business prerequisites remain intact.
+    MouseArea {anchors.fill:parent;z:99;visible:proxyPanel.visible;onClicked:proxyPanel.requestDismiss()}
+    Popup {
+        id:proxyPanel;objectName:"proxyStatusPanel";parent:Overlay.overlay
+        property bool desired:false
+        readonly property real reveal:proxyClock.progress
+        property point origin:Qt.point(0,0)
+        function updateOrigin(){if(parent)origin=proxyCapsule.mapToItem(parent,0,0)}
+        function toggle(){if(desired){requestDismiss();return}updateOrigin();desired=true;open();proxyClock.moveTo(1)}
+        function requestDismiss(){desired=false;proxyClock.moveTo(0)}
+        width:Math.min(Theme.dp(360),window.width-Theme.dp(32));height:proxyBody.implicitHeight+Theme.dp(40)
+        x:Math.max(Theme.dp(16),Math.min(window.width-width-Theme.dp(16),origin.x+proxyCapsule.width-width));y:origin.y
+        padding:Theme.dp(20);focus:true;modal:false;closePolicy:Popup.NoAutoClose
+        onAboutToShow:dismissals.push(proxyPanel,window)
+        onClosed:{dismissals.pop(proxyPanel);desired=false;proxyCapsule.forceActiveFocus()}
+        SwirlTransitionCoordinator {id:proxyClock;duration:SwirlMotion.dialogDuration;onMovingChanged:if(!moving&&!proxyPanel.desired&&progress===0)proxyPanel.close()}
+        Connections {target:AppState;function onCurrentPageChanged(){proxyPanel.requestDismiss()}}
+        Connections {target:window;function onWidthChanged(){if(proxyPanel.visible)Qt.callLater(proxyPanel.updateOrigin)}function onHeightChanged(){if(proxyPanel.visible)Qt.callLater(proxyPanel.updateOrigin)}}
+        Binding {target:proxyCapsule;property:"opacity";value:0;when:proxyPanel.visible;restoreMode:Binding.RestoreBindingOrValue}
+        background:SwirlGlassPanel {
+            color:Theme.surface
+            x:(proxyPanel.origin.x-proxyPanel.x)*(1-proxyPanel.reveal)
+            y:0;width:proxyCapsule.width+(proxyPanel.width-proxyCapsule.width)*proxyPanel.reveal
+            height:proxyCapsule.height+(proxyPanel.height-proxyCapsule.height)*proxyPanel.reveal
+            cornerRadius:proxyCapsule.height/2+(Theme.popupRadius-proxyCapsule.height/2)*proxyPanel.reveal
+        }
+        contentItem:ColumnLayout {
+            id:proxyBody;spacing:Theme.dp(14)
+            Keys.onEscapePressed:proxyPanel.requestDismiss()
+            SwirlText {text:window.proxyStatusLabel;color:Theme.text;font.pixelSize:Theme.fontSize(11+3*proxyPanel.reveal);font.weight:Font.DemiBold;Layout.fillWidth:true;wrapMode:Text.Wrap
+                transform:Translate{x:(proxyPanel.origin.x-proxyPanel.x+Theme.dp(21)-proxyPanel.leftPadding)*(1-proxyPanel.reveal);y:(proxyCapsule.height-height)/2*(1-proxyPanel.reveal)-proxyPanel.topPadding*(1-proxyPanel.reveal)}
+            }
+            SwirlText {opacity:proxyPanel.reveal;text:engineController.systemProxy.error||engineController.routingError||(engineController.systemProxy.owned&&engineController.systemProxy.enabled?"Swirl 已接管系统代理。":engineController.systemProxy.systemEnabled?"系统代理由其他应用启用。Swirl 尚未接管。":!engineController.processAlive?"引擎未运行，请先选择并连接节点。":!engineController.apiHealthy?"控制接口尚未就绪，请检查节点连接。":"可以启用系统代理，让支持系统代理的应用使用当前节点。");color:engineController.systemProxy.error.length||engineController.routingError.length?Theme.orange:Theme.muted;font.pixelSize:Theme.fontSize(13);Layout.fillWidth:true;wrapMode:Text.Wrap}
+            RowLayout {opacity:proxyPanel.reveal;Layout.fillWidth:true
+                SwirlButton {text:"节点与策略";quiet:true;onClicked:{proxyPanel.requestDismiss();AppState.navigate("proxies")}}
+                Item {Layout.fillWidth:true}
+                SwirlButton {objectName:"proxyPanelAction";text:window.proxyTogglePending?"正在切换…":engineController.systemProxy.enabled?"关闭代理":"接管代理";enabled:!engineController.busy&&!window.proxyTogglePending;onClicked:{window.proxyRequestedAction=!engineController.systemProxy.enabled;window.proxyTogglePending=true;engineController.setSystemProxy(window.proxyRequestedAction);window.showProxyError()}}
+            }
+            SwirlButton {text:"关闭";quiet:true;Layout.alignment:Qt.AlignRight;onClicked:proxyPanel.requestDismiss()}
+        }
+    }
     Connections{target:engineController;function onStatusChanged(){window.showProxyError()}}
     Connections{target:engineController.systemProxy;function onChanged(){window.showProxyError()}}
     function openDashboard(){dashboardWindow.show();dashboardWindow.raise();dashboardWindow.requestActivate()}
@@ -342,9 +386,9 @@ sourceComponent:settingsSheet.section==="subscriptions"?subscriptions:settingsSh
     Rectangle {
         visible:AppState.toast.length>0; z:999
         anchors.horizontalCenter:parent.horizontalCenter; anchors.bottom:parent.bottom; anchors.bottomMargin:Theme.dp(28)
-        width:Math.min(Theme.dp(570),window.width-Theme.dp(40)); height:Theme.dp(48); radius:Theme.controlRadius
+        width:Math.min(Theme.dp(380),window.width-Theme.dp(40)); height:Math.max(Theme.dp(48),toastText.implicitHeight+Theme.dp(24)); radius:Theme.controlRadius
         color:Theme.material("floating"); border.color:Theme.border
-        SwirlText { anchors.fill:parent; anchors.margins:Theme.dp(12); text:AppState.toast; color:Theme.muted; font.pixelSize:Theme.fontSize(14); verticalAlignment:Text.AlignVCenter; elide:Text.ElideRight }
+        SwirlText { id:toastText; anchors.left:parent.left;anchors.right:parent.right;anchors.verticalCenter:parent.verticalCenter; anchors.margins:Theme.dp(12);wrapMode:Text.Wrap; text:AppState.toast; color:Theme.muted; font.pixelSize:Theme.fontSize(14); verticalAlignment:Text.AlignVCenter; elide:Text.ElideRight }
     }
     Timer {
         running:smokeTestMode; repeat:true; interval:200

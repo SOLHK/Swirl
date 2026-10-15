@@ -17,7 +17,7 @@ Item {
         RowLayout {
             Layout.fillWidth:true; Layout.fillHeight:true; spacing:Theme.dp(15)
             SwirlGlassPanel {
-                Layout.preferredWidth:Theme.dp(229); Layout.fillHeight:true
+                Layout.preferredWidth:Math.max(Theme.dp(140),Math.min(Theme.dp(210),page.width*0.25)); Layout.fillHeight:true
                 ColumnLayout {
                     anchors.fill:parent; anchors.margins:Theme.dp(12); spacing:Theme.dp(8)
                     SwirlText { text:AppState.zh("PREFERENCES"); color:Theme.muted; font.pixelSize:Theme.fontSize(11); leftPadding:Theme.dp(8); topPadding:Theme.dp(6) }
@@ -48,9 +48,10 @@ Item {
                     anchors.fill:parent; anchors.margins:Theme.dp(24)
                     clip:true
                     ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
+                    ScrollBar.vertical:SwirlScrollBar {}
                     ColumnLayout {
                         width:options.availableWidth; spacing:Theme.dp(17)
-                        SwirlText { text:AppState.zh(page.section); color:Theme.text; font.pixelSize:Theme.fontSize(23); font.weight:Font.DemiBold }
+                        SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:AppState.zh(page.section); color:Theme.text; font.pixelSize:Theme.fontSize(23); font.weight:Font.DemiBold }
                         SwirlText {
                             text:page.section==="外观"?"主题、窗口材质、动画与界面缩放。":page.section==="字体"?"选择喜欢的字体，立即应用并自动保存。":page.section==="代理"?"引擎、真实节点与当前用户系统代理 · 国内外分流。":page.section==="关于 Swirl"?"版本与项目信息":"此项研发中。"
                             color:Theme.muted; wrapMode:Text.WordWrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12)
@@ -58,12 +59,12 @@ Item {
                         Rectangle { Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(1); color:Theme.border }
                         ColumnLayout {
                             visible:page.section==="外观"; spacing:Theme.dp(21); Layout.fillWidth:true
-                            RowLayout {
+                            GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
                                 Layout.fillWidth:true
                                 ColumnLayout {
                                     Layout.fillWidth:true
-                                    SwirlText { text:AppState.zh("Color theme"); color:Theme.text; font.pixelSize:Theme.fontSize(14); font.weight:Font.DemiBold }
-                                    SwirlText { text:AppState.zh("Choose light, dark or follow Windows"); color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
+                                    SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:AppState.zh("Color theme"); color:Theme.text; font.pixelSize:Theme.fontSize(14); font.weight:Font.DemiBold }
+                                    SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:AppState.zh("Choose light, dark or follow Windows"); color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
                                 }
                                 SwirlComboBox {
                                     objectName:"themeModePicker"
@@ -72,32 +73,32 @@ Item {
                                     onActivated:function(index){Theme.mode=["System","Light","Dark"][index]}
                                 }
                             }
-                            RowLayout {
+                            GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
                                 Layout.fillWidth:true
                                 ColumnLayout {
                                     Layout.fillWidth:true
-                                    SwirlText { text:"磨砂背景"; color:Theme.text; font.pixelSize:Theme.fontSize(14) }
-                                    SwirlText { text:"使用本地壁纸生成模糊材质"; color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
+                                    SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:"磨砂背景"; color:Theme.text; font.pixelSize:Theme.fontSize(14) }
+                                    SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:"使用 Windows 原生窗口背景材质"; color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
                                 }
                                 SwirlToggle { checked:Theme.transparency; onToggled:Theme.transparency=checked }
                             }
-                            RowLayout {
+                            GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
                                 Layout.fillWidth:true
                                 ColumnLayout {
                                     Layout.fillWidth:true
-                                    SwirlText { text:AppState.zh("Reduce motion"); color:Theme.text; font.pixelSize:Theme.fontSize(14) }
-                                    SwirlText { text:AppState.zh("Disable most transition animations"); color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
+                                    SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:AppState.zh("Reduce motion"); color:Theme.text; font.pixelSize:Theme.fontSize(14) }
+                                    SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:AppState.zh("Disable most transition animations"); color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
                                 }
                                 SwirlToggle { checked:Theme.reduceMotion; onToggled:Theme.reduceMotion=checked }
                             }
                             ColumnLayout {
                                 Layout.fillWidth:true; spacing:Theme.dp(10)
-                                RowLayout {
+                                GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
                                     Layout.fillWidth:true
                                     ColumnLayout {
                                         Layout.fillWidth:true
-                                        SwirlText { text:"界面缩放"; color:Theme.text; font.pixelSize:Theme.fontSize(14); font.weight:Font.DemiBold }
-                                        SwirlText { text:Theme.followSystemScale?"自动跟随 Windows 显示缩放 · Qt 原生 DPI":"手动缩放 · "+Math.round(Theme.uiScale*100)+"%"; color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
+                                        SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:"界面缩放"; color:Theme.text; font.pixelSize:Theme.fontSize(14); font.weight:Font.DemiBold }
+                                        SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:Theme.followSystemScale?"自动跟随 Windows 显示缩放 · Qt 原生 DPI":"手动缩放 · "+Math.round(Theme.uiScale*100)+"%"; color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
                                     }
                                     SwirlComboBox {
                                         objectName:"scaleModeCombo"
@@ -108,8 +109,8 @@ Item {
                                         Accessible.name:"界面缩放模式"
                                     }
                                 }
-                                RowLayout {
-                                    Layout.fillWidth:true; spacing:Theme.dp(12)
+                                GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
+                                    Layout.fillWidth:true;
                                     Slider {
                                         id: scaleSlider
                                         Layout.fillWidth:true; Layout.minimumWidth:Theme.dp(120)
@@ -163,11 +164,11 @@ Item {
                                       page.section==="数据管理"?["保留连接历史","保留请求日志","自动清理过期记录"]:
                                       page.section==="快捷键"?["全局搜索快捷键","窗口显示快捷键","页面导航快捷键"]:
                                       ["关闭窗口时保留后台","记住窗口尺寸","显示工具提示"]
-                                RowLayout {
+                                GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
                                     Layout.fillWidth:true
                                     ColumnLayout {
                                         Layout.fillWidth:true
-                                        SwirlText { text:AppState.zh(modelData); color:Theme.text; font.pixelSize:Theme.fontSize(14) }
+                                        SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:AppState.zh(modelData); color:Theme.text; font.pixelSize:Theme.fontSize(14) }
                                     }
                                     SwirlTextField { enabled:false;
                                         visible:page.section==="端口"&&modelData.indexOf("端口")>=0&&modelData!=="端口冲突提醒"
@@ -196,55 +197,55 @@ Item {
                         }
                         ColumnLayout {
                             visible:page.section==="代理"; Layout.fillWidth:true; spacing:Theme.dp(17)
-                            RowLayout {
-                                Layout.fillWidth:true; spacing:Theme.dp(10)
-                                SwirlText { text:engineController.systemProxy.owned?(engineController.systemProxy.enabled?"系统代理已接管":"接管状态未确认 · 快照已保留"):engineController.systemProxy.systemEnabled?"其他应用启用了系统代理":"未接管系统代理"; color:Theme.text; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(14) }
+                            GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
+                                Layout.fillWidth:true;
+                                SwirlText {Layout.minimumWidth:0; text:engineController.systemProxy.owned?(engineController.systemProxy.enabled?"系统代理已接管":"接管状态未确认 · 快照已保留"):engineController.systemProxy.systemEnabled?"其他应用启用了系统代理":"未接管系统代理"; color:Theme.text; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(14) }
                                 SwirlButton { text:engineController.systemProxy.owned?"释放 / 恢复系统代理":"接管系统代理"; enabled:engineController.systemProxy.owned||engineController.connected; onClicked:engineController.setSystemProxy(!engineController.systemProxy.owned) }
                             }
-                            SwirlText { visible:engineController.systemProxy.error.length>0; text:engineController.systemProxy.error; color:Theme.orange; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
-                            SwirlText { text:"沿用 Swirl 的本地 DPAPI 恢复快照与独立守护进程。其他程序修改代理后让出控制权；控制 API 短时异常不会释放仍在运行的代理。"; color:Theme.muted; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
+                            SwirlText {Layout.minimumWidth:0; visible:engineController.systemProxy.error.length>0; text:engineController.systemProxy.error; color:Theme.orange; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
+                            SwirlText {Layout.minimumWidth:0; text:"沿用 Swirl 的本地 DPAPI 恢复快照与独立守护进程。其他程序修改代理后让出控制权；控制 API 短时异常不会释放仍在运行的代理。"; color:Theme.muted; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
                             Rectangle { Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(1); color:Theme.border }
-                            SwirlText { text:"本地连接诊断"; color:Theme.text; font.pixelSize:Theme.fontSize(14); font.weight:Font.DemiBold }
-                            RowLayout {
-                                Layout.fillWidth:true; spacing:Theme.dp(10)
+                            SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:"本地连接诊断"; color:Theme.text; font.pixelSize:Theme.fontSize(14); font.weight:Font.DemiBold }
+                            GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
+                                Layout.fillWidth:true;
                                 SwirlTextField { id:diagnosticUrl; objectName:"diagnosticUrlField"; Layout.fillWidth:true; placeholderText:"https://目标地址 或 wss://目标路径"; enabled:!engineController.diagnostics.busy; Accessible.name:"用户指定的连接诊断地址" }
                                 SwirlButton { text:engineController.diagnostics.busy?"取消":"开始诊断"; enabled:engineController.diagnostics.busy||engineController.activeProxyPort>0; onClicked:engineController.diagnostics.busy?engineController.diagnostics.cancel():engineController.diagnostics.run(diagnosticUrl.text) }
                             }
-                            SwirlText { text:engineController.diagnostics.stateText; color:Theme.muted; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
-                            SwirlText { text:"仅点击后向所填目标发送请求：本机端口 → CONNECT → TLS / HTTP 或 WebSocket Upgrade 与随机 Ping/Pong。地址可能需要登录或子协议；诊断失败不等于 Codex 服务故障，10 秒观察不代替长期实测。"; color:Theme.muted; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
+                            SwirlText {Layout.minimumWidth:0; text:engineController.diagnostics.stateText; color:Theme.muted; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
+                            SwirlText {Layout.minimumWidth:0; text:"仅点击后向所填目标发送请求：本机端口 → CONNECT → TLS / HTTP 或 WebSocket Upgrade 与随机 Ping/Pong。地址可能需要登录或子协议；诊断失败不等于 Codex 服务故障，10 秒观察不代替长期实测。"; color:Theme.muted; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
                             TextArea { renderType: TextEdit.NativeRendering; font.weight: Theme.bodyFontWeight; font.hintingPreference: Font.PreferFullHinting; Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) } readOnly:true; selectByMouse:true; visible:engineController.diagnostics.entries.length>0; text:engineController.diagnostics.report; Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(160); wrapMode:TextEdit.Wrap; font.family:Theme.fontFamily; font.pixelSize:Theme.fontSize(12); color:Theme.text; background:Rectangle { color:Theme.surface; radius:Theme.dp(14); border.color:Theme.border } }
-                            RowLayout {
+                            GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
                                 SwirlButton { text:"保存诊断报告"; onClicked:{const path=engineController.diagnostics.saveReport();AppState.notice(path.length>0?"诊断报告已保存："+path:"无法保存诊断报告")} }
                                 SwirlButton { text:"清空记录"; enabled:!engineController.diagnostics.busy; onClicked:engineController.diagnostics.clear() }
                             }
-                            SwirlText { text:"Codex 与其他应用兼容建议"; color:Theme.text; font.pixelSize:Theme.fontSize(14); font.weight:Font.DemiBold }
-                            RowLayout {
+                            SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:"Codex 与其他应用兼容建议"; color:Theme.text; font.pixelSize:Theme.fontSize(14); font.weight:Font.DemiBold }
+                            GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
                                 Layout.fillWidth:true
-                                SwirlText { text:"优先使用 Mihomo 兼容引擎"; color:Theme.text; font.pixelSize:Theme.fontSize(14); Layout.fillWidth:true }
+                                SwirlText {Layout.minimumWidth:0;wrapMode:Text.Wrap; text:"优先使用 Mihomo 兼容引擎"; color:Theme.text; font.pixelSize:Theme.fontSize(14); Layout.fillWidth:true }
                                 SwirlToggle { checked:engineController.preferCompatibility; enabled:engineController.canStart; onToggled:engineController.preferCompatibility=checked }
                             }
-                            SwirlText { text:"断开后修改并重新连接生效，节点、DNS、规则和 TUN 配置保持原值。依赖 TLS EOF 定界或原生协议尚不兼容时可主动启用。"; color:Theme.muted; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
+                            SwirlText {Layout.minimumWidth:0; text:"断开后修改并重新连接生效，节点、DNS、规则和 TUN 配置保持原值。依赖 TLS EOF 定界或原生协议尚不兼容时可主动启用。"; color:Theme.muted; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
                             TextArea { renderType: TextEdit.NativeRendering; font.weight: Theme.bodyFontWeight; font.hintingPreference: Font.PreferFullHinting; Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) } readOnly:true; selectByMouse:true; text:engineController.proxyEnvironmentAdvice; Layout.fillWidth:true; wrapMode:TextEdit.Wrap; font.family:Theme.fontFamily; font.pixelSize:Theme.fontSize(12); color:Theme.text; background:null }
-                            SwirlText { text:"原生隧道取消 120 秒空闲断开，采用 TCP KeepAlive；节点切换对新连接生效，现有连接保持原出口。DNS、国内外分流、用户规则、策略组和 TUN 沿用当前配置。原生 TLS 上游保留反向读取，但 Qt 不支持独立 TLS 半关闭；依赖 EOF 定界的 TLS 请求仍需兼容引擎。"; color:Theme.muted; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
+                            SwirlText {Layout.minimumWidth:0; text:"原生隧道取消 120 秒空闲断开，采用 TCP KeepAlive；节点切换对新连接生效，现有连接保持原出口。DNS、国内外分流、用户规则、策略组和 TUN 沿用当前配置。原生 TLS 上游保留反向读取，但 Qt 不支持独立 TLS 半关闭；依赖 EOF 定界的 TLS 请求仍需兼容引擎。"; color:Theme.muted; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
                             Rectangle { Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(1); color:Theme.border }
-                            RowLayout {
+                            GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
                                 Layout.fillWidth:true
-                                SwirlText { text:"代理引擎"; color:Theme.text; font.pixelSize:Theme.fontSize(14); Layout.fillWidth:true }
+                                SwirlText {Layout.minimumWidth:0;wrapMode:Text.Wrap; text:"代理引擎"; color:Theme.text; font.pixelSize:Theme.fontSize(14); Layout.fillWidth:true }
                                 SwirlStatusBadge { objectName:"engineStatusBadge"; label:engineController.stateText; tone:engineController.apiHealthy?"success":"accent" }
                             }
                             SwirlText {
                                 objectName:"engineErrorText"; visible:engineController.error.length>0
                                 text:engineController.error; color:Theme.orange; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12)
                             }
-                            SwirlText { text:"程序路径"; color:Theme.text; font.pixelSize:Theme.fontSize(14) }
+                            SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:"程序路径"; color:Theme.text; font.pixelSize:Theme.fontSize(14) }
                             SwirlTextField {
                                 objectName:"enginePathField"; Layout.fillWidth:true; text:engineController.executablePath
                                 enabled:engineController.canStart; onEditingFinished:engineController.executablePath=text
                                 Accessible.name:"已校验引擎程序路径"
                             }
-                            RowLayout {
+                            GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
                                 Layout.fillWidth:true
-                                SwirlText { text:"本机控制端口"; color:Theme.text; font.pixelSize:Theme.fontSize(14); Layout.fillWidth:true }
+                                SwirlText {Layout.minimumWidth:0;wrapMode:Text.Wrap; text:"本机控制端口"; color:Theme.text; font.pixelSize:Theme.fontSize(14); Layout.fillWidth:true }
                                 SwirlTextField {
                                     objectName:"enginePortField"; implicitWidth:Theme.dp(156); text:String(engineController.controlPort)
                                     enabled:engineController.canStart; validator:IntValidator { bottom:1; top:65535 }
@@ -269,7 +270,7 @@ Item {
                                 text:"SHA-256："+engineController.expectedSha256
                                 color:Theme.muted; font.pixelSize:Theme.fontSize(11); wrapMode:Text.WrapAnywhere; Layout.fillWidth:true
                             }
-                            RowLayout {
+                            GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
                                 SwirlButton { objectName:"engineStartButton"; text:"启动引擎"; enabled:engineController.canStart; onClicked:engineController.start(); Accessible.name:text }
                                 SwirlButton { objectName:"engineStopButton"; text:"停止引擎"; enabled:engineController.processAlive||engineController.busy; onClicked:engineController.stop(); Accessible.name:text }
                                 SwirlButton { text:"检查状态"; enabled:engineController.processAlive&&!engineController.busy; onClicked:engineController.refresh(); Accessible.name:text }
@@ -287,22 +288,22 @@ Item {
                         ColumnLayout {
                             visible:page.section==="关于 Swirl"; Layout.fillWidth:true; spacing:Theme.dp(18)
                             SwirlBrandIcon { Layout.alignment:Qt.AlignHCenter; Layout.preferredWidth:Theme.dp(104); Layout.preferredHeight:Theme.dp(104) }
-                            SwirlText { text:"Swirl"; Layout.fillWidth:true; horizontalAlignment:Text.AlignHCenter; color:Theme.text; font.pixelSize:Theme.fontSize(30); font.weight:Font.DemiBold }
-                            SwirlText { text:"网络代理工具"; Layout.fillWidth:true; horizontalAlignment:Text.AlignHCenter; color:Theme.muted; font.pixelSize:Theme.fontSize(14) }
+                            SwirlText {Layout.minimumWidth:0;wrapMode:Text.Wrap; text:"Swirl"; Layout.fillWidth:true; horizontalAlignment:Text.AlignHCenter; color:Theme.text; font.pixelSize:Theme.fontSize(30); font.weight:Font.DemiBold }
+                            SwirlText {Layout.minimumWidth:0;wrapMode:Text.Wrap; text:"网络代理工具"; Layout.fillWidth:true; horizontalAlignment:Text.AlignHCenter; color:Theme.muted; font.pixelSize:Theme.fontSize(14) }
                             Rectangle { Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(1); color:Theme.border }
                             Repeater {
                                 model:[["版本",Qt.application.version.replace("-preview"," · 开发版")],["开发者","SOLHK"],["界面框架","Qt 6 Quick"],["平台","Windows 64 位"]]
-                                RowLayout {
+                                GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
                                     Layout.fillWidth:true
-                                    SwirlText { text:AppState.zh(modelData[0]); color:Theme.muted; font.pixelSize:Theme.fontSize(14) }
+                                    SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:AppState.zh(modelData[0]); color:Theme.muted; font.pixelSize:Theme.fontSize(14) }
                                     Item { Layout.fillWidth:true }
-                                    SwirlText { text:AppState.zh(modelData[1]); color:Theme.text; font.pixelSize:Theme.fontSize(14) }
+                                    SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:AppState.zh(modelData[1]); color:Theme.text; font.pixelSize:Theme.fontSize(14) }
                                 }
                             }
-                            SwirlText { text:"Swirl 使用 HarmonyOS Sans 字体。Copyright 2021 Huawei Device Co., Ltd.\n完整许可可在字体设置中查看。"; Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
+                            SwirlText {Layout.minimumWidth:0; text:"Swirl 使用 HarmonyOS Sans 字体。Copyright 2021 Huawei Device Co., Ltd.\n完整许可可在字体设置中查看。"; Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
                             SwirlButton { text:"字体与许可"; onClicked:page.section="字体" }
                             SwirlButton { text:"项目主页"; Layout.alignment:Qt.AlignHCenter; onClicked:Qt.openUrlExternally("https://github.com/SOLHK/Swirl") }
-                            SwirlText { text:"第三方组件：Qt、MinGW 运行库、Mihomo（GPL-3.0）、HarmonyOS Sans"; Layout.fillWidth:true; horizontalAlignment:Text.AlignHCenter; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
+                            SwirlText {Layout.minimumWidth:0;wrapMode:Text.Wrap; text:"第三方组件：Qt、MinGW 运行库、Mihomo（GPL-3.0）、HarmonyOS Sans"; Layout.fillWidth:true; horizontalAlignment:Text.AlignHCenter; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
                         }
                         Item { Layout.preferredHeight:Theme.dp(25) }
                     }

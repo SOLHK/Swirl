@@ -5,6 +5,7 @@ import SwirlQuick
 import "../components"
 Dialog {
     id: dialog
+    property Item returnFocus:null
     property bool guardChanges:true
     property Item heroSource:null
     readonly property real heroProgress:heroClock.progress
@@ -25,6 +26,7 @@ Dialog {
     focus: true
     transformOrigin:Item.Center
     onAboutToShow: {
+        returnFocus=ownerWindow?ownerWindow.activeFocusItem:null
         dismissing=false;modal=true
         dismissals.push(dialog,ownerWindow)
         transformOrigin=SwirlMotion.popupOrigin(dialog)
@@ -37,7 +39,7 @@ Dialog {
     // the popup reports opened, so an untouched form never prompts to discard.
     onOpened:markSaved()
     onAboutToHide:{dismissing=true;if(heroSource)heroClock.moveTo(0)}
-    onClosed:{dismissals.pop(dialog);scale=1;opacity=1}
+    onClosed:{dismissals.pop(dialog);scale=1;opacity=1;if(returnFocus && returnFocus.visible)returnFocus.forceActiveFocus()}
     parent:Overlay.overlay
     width: Math.floor(Math.min(Theme.dp(470), parent ? parent.width-Theme.dp(40) : Theme.dp(470)))
     x:parent ? Math.round((parent.width-width)/2) : 0
@@ -94,7 +96,7 @@ Dialog {
             width:Math.round(dialog.heroSource?dialog.heroSource.width+(parent.width-dialog.heroSource.width)*dialog.heroProgress:parent.width)
             height:Math.round(dialog.heroSource?dialog.heroSource.height+(parent.height-dialog.heroSource.height)*dialog.heroProgress:parent.height)
             color: Theme.material("floating")
-            radius:Theme.dp(dialog.heroSource?10+17*dialog.heroProgress:27)
+            radius:dialog.heroSource?Theme.buttonRadius+(Theme.popupRadius-Theme.buttonRadius)*dialog.heroProgress:Theme.popupRadius
             antialiasing:true; border.width:Theme.dp(1);border.color:Theme.glassRim
         }
     }

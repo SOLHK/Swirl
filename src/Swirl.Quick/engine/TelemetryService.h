@@ -4,6 +4,7 @@
 #include <QNetworkAccessManager>
 #include <QTimer>
 #include <QSet>
+#include <QDate>
 
 // Single model shared by overview, connections, processes and analytics.
 // Only authenticated adapter observations enter the accounting model.
@@ -64,6 +65,8 @@ private:
  bool m_networkEnabled=true,m_dirty=false;
  qint64 m_lastConnections=0,m_lastTraffic=0,m_lastUp=0,m_lastDown=0;
  ProxyEngine::Status m_status;
+ mutable QHash<int,QJsonObject> m_periodCache;
+ mutable QDate m_periodCacheDate;
  QJsonObject m_days;
  QHash<QString,QVariantMap> m_seen;
  QVariantList m_history;

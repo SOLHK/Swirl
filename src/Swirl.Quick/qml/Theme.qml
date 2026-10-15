@@ -80,42 +80,45 @@ QtObject {
     // Large surfaces follow the supplied ~12 pt visual reference, while nested
     // cards and controls have smaller corners. Circular controls use geometry.
     readonly property real windowRadius: dp(8)
-    readonly property real containerRadius: dp(24)
+    readonly property real containerRadius: dp(20)
     readonly property real radius: containerRadius
     readonly property real cardRadius: dp(20)
     readonly property real independentCardRadius: dp(20)
-    readonly property real tileRadius: dp(8)
+    readonly property real tileRadius: dp(12)
     readonly property real tableRadius: dp(10)
-    readonly property real segmentedRadius: dp(6)
-    readonly property real segmentedSelectedRadius: dp(4)
-    readonly property real popupRadius: dp(10)
+    readonly property real segmentedRadius: dp(10)
+    readonly property real segmentedSelectedRadius: dp(8)
+    readonly property real popupRadius: dp(20)
     readonly property real secondaryRadius: popupRadius
-    readonly property real controlRadius: dp(8)
+    readonly property real controlRadius: dp(10)
     readonly property real buttonRadius: controlRadius
     readonly property real sidebarWidth: dp(208)
     readonly property real pageInset: dp(6)
     readonly property real space: dp(4)
+    readonly property real pagePadding: dp(24)
+    readonly property real sectionGap: dp(20)
+    readonly property real compactGap: dp(8)
     readonly property real cardPadding: dp(20)
     readonly property real controlHeight: dp(32)
     readonly property real controlPadding: dp(12)
     readonly property real tableHeaderHeight: dp(36)
     readonly property real tableRowHeight: dp(40)
     readonly property real statusHeight: dp(26)
-    readonly property real subCardRadius: dp(10)
+    readonly property real subCardRadius: dp(12)
     readonly property real capsuleHeight: dp(22)
     readonly property real groupGap: dp(10)
     readonly property real gap: dp(16)
-    readonly property real windowMinimumWidth: dp(914)
+    readonly property real windowMinimumWidth: dp(760)
     readonly property real windowMinimumHeight: dp(672)
     readonly property real sidebarRowHeight: dp(40)
     readonly property real sidebarRowInset: dp(10)
-    readonly property real sidebarRowRadius: dp(8)
+    readonly property real sidebarRowRadius: sidebarRowHeight / 2
     readonly property real mainContainerShadowOpacity: 0.10
     readonly property real cardShadowOpacity: 0.06
     readonly property real borderWidth: dp(1)
     readonly property real shadowOpacity: 0.05
     readonly property string fontFamily: fontManager.currentFamily
-    readonly property int bodyFontWeight: Font.Medium
+    readonly property int bodyFontWeight: Font.Normal
     function variableAxesFor(family, weight) { return fontManager.variableAxesFor(family, weight) }
     function dp(value) { return value === 0 ? 0 : Math.round(value * uiScale) }
     function fontSize(value) { return Math.max(12, Math.round(dp(value))) }
@@ -127,7 +130,7 @@ QtObject {
     function resetScale() { appearanceSettings.savedScalePercent = 100; appearanceSettings.followSystemScale = true }
     function withAlpha(color, alpha) { const value=Qt.tint(color, "transparent"); return Qt.rgba(value.r,value.g,value.b,alpha) }
     function roundedRadius(width, height) { return Math.min(controlRadius, width * 0.5, height * 0.5) }
-    function pillRadius(height) { return Math.min(buttonRadius, height * 0.5) }
+    function pillRadius(height) { return height * 0.5 }
     readonly property int motion: SwirlMotion.duration
     function material(kind) {
         if (kind === "sidebar") return sidebar

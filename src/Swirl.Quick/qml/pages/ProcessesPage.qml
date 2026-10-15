@@ -12,7 +12,10 @@ Item {
  function selectRequested(){const row=processes.find(r=>r.name===AppState.trafficSelectedProcess);if(row)selectedId=row.id}
  Component.onCompleted:selectRequested()
  Connections {target:AppState;function onTrafficSelectedProcessChanged(){page.selectRequested()}function onTrafficPeriodChanged(){Qt.callLater(page.selectRequested)}}
- readonly property var processes:{let rows=(telemetry.revision,telemetry.ranking("apps",AppState.trafficPeriod,100));if(sortIndex===1)rows.sort((a,b)=>b.speed-a.speed);else if(sortIndex===2)rows.sort((a,b)=>a.name.localeCompare(b.name));return rows}
+ readonly property var processes:{if(!visible)return [];let rows=(telemetry.revision,telemetry.ranking("apps",AppState.trafficPeriod,100));if(sortIndex===1)rows.sort((a,b)=>b.speed-a.speed);else if(sortIndex===2)rows.sort((a,b)=>a.name.localeCompare(b.name));return rows}
+ property bool detailHasSelection:selected!==null
+ onDetailHasSelectionChanged:{if(visible)detailClock.moveTo(detailHasSelection?1:0);else{detailClock.destination=detailHasSelection?1:0;detailClock.finish()}}
+ SwirlTransitionCoordinator {id:detailClock;duration:SwirlMotion.dialogDuration}
  readonly property var selected:processes.find(r=>r.id===selectedId)||null
  ColumnLayout {
   anchors.fill:parent;anchors.margins:Theme.dp(24);spacing:Theme.gap
@@ -30,14 +33,14 @@ Item {
       SwirlText {renderType:Text.NativeRendering;text:"应用流量";color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold;Layout.fillWidth:true}
       SwirlText {renderType:Text.NativeRendering;text:page.processes.length+" 个进程";color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
      }
-     SwirlDataTable {objectName:"processTable";Layout.fillWidth:true;Layout.fillHeight:true;visible:page.processes.length>0;rows:page.processes;selectedId:page.selectedId;minimal:true;textPixelSize:13;headerPixelSize:12;itemHeight:Theme.dp(38);columns:[{key:"name",label:"进程",w:220},{key:"value",label:"总流量",w:110}];onRowSelected:r=>page.selectedId=r.id}
+     SwirlDataTable {objectName:"processTable";Layout.fillWidth:true;Layout.fillHeight:true;visible:page.processes.length>0;incrementalRows:true;animateRowChanges:false;rows:page.processes;selectedId:page.selectedId;minimal:true;textPixelSize:13;headerPixelSize:12;itemHeight:Theme.dp(38);columns:[{key:"name",label:"进程",w:220},{key:"value",label:"总流量",w:110}];onRowSelected:r=>page.selectedId=r.id}
      Item {visible:page.processes.length===0;Layout.fillWidth:true;Layout.fillHeight:true
       SwirlEmptyState {anchors.centerIn:parent;width:Math.max(0,parent.width-Theme.dp(16));headline:"尚无进程流量";detail:"连接节点并产生网络流量后，这里会显示实际采集的应用。"}
      }
     }
    }
    SwirlGlassPanel {Layout.fillWidth:true;Layout.preferredWidth:2;Layout.fillHeight:true
-    ColumnLayout {visible:page.selected!==null;anchors.fill:parent;anchors.margins:Theme.cardPadding;spacing:Theme.dp(16)
+    ColumnLayout {transform:Translate{x:SwirlMotion.reduced?0:Theme.dp(16)*(1-detailClock.progress)} visible:page.selected!==null;anchors.fill:parent;anchors.margins:Theme.cardPadding;spacing:Theme.dp(16)
      SwirlText {renderType:Text.NativeRendering;text:"进程详情";color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
      SwirlText {renderType:Text.NativeRendering;id:processDetailName;text:page.selected?page.selected.name:"";color:Theme.text;font.pixelSize:Theme.fontSize(18);font.weight:Font.DemiBold;Layout.fillWidth:true;wrapMode:Text.WrapAnywhere}
      Rectangle {Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(1);color:Theme.border}

@@ -7,8 +7,11 @@ import "../controls"
 Item {
     id:page
     property var selected:null
+    SwirlTransitionCoordinator {id:detailClock;duration:SwirlMotion.dialogDuration;Component.onCompleted:{destination=AppState.detailOpen?1:0;finish()}}
+    Connections {target:AppState;function onDetailOpenChanged(){detailClock.moveTo(AppState.detailOpen?1:0)}}
     readonly property var heroTargets:({activeConnections:activeCount})
     property var visibleRows:{
+        if(!visible)return []
         var q=search.text.toLowerCase()
         var s=sort.currentText
         var state=status.currentText
@@ -48,7 +51,7 @@ Item {
                 clip:true
                 SwirlDataTable {
                     anchors.fill:parent; anchors.margins:Theme.dp(1)
-                    rows:page.visibleRows
+                    incrementalRows:true;animateRowChanges:false;rows:page.visibleRows
                     selectedId:page.selected?page.selected.id:""
                     columns:[
                         {key:"host",label:AppState.zh("HOST"),w:220},{key:"ip",label:AppState.zh("IP ADDRESS"),w:125},
@@ -57,7 +60,7 @@ Item {
                         {key:"down",label:AppState.zh("DOWNLOAD"),w:100},{key:"latency",label:AppState.zh("LATENCY"),w:95},
                         {key:"time",label:AppState.zh("SINCE"),w:88},{key:"status",label:AppState.zh("状态"),w:88}
                     ]
-                    onRowSelected:function(record){page.selected=record}
+                    onRowSelected:function(record){page.selected=record;AppState.detailOpen=true}
                 }
                 SwirlEmptyState {
                     visible:page.visibleRows.length===0
@@ -67,7 +70,10 @@ Item {
                 }
             }
             SwirlGlassPanel {
-                visible:AppState.detailOpen
+                visible:AppState.detailOpen||detailClock.moving
+                enabled:AppState.detailOpen
+                opacity:detailClock.progress
+                transform:Translate{x:SwirlMotion.reduced?0:Theme.dp(16)*(1-detailClock.progress)}
                 Layout.preferredWidth:Theme.dp(290); Layout.fillHeight:true
                 ColumnLayout {
                     anchors.fill:parent; anchors.margins:Theme.dp(20); spacing:Theme.dp(12)
@@ -77,7 +83,7 @@ Item {
                         ColumnLayout {
                     width:detailScroll0.availableWidth; spacing:Theme.dp(15)
                     SwirlText { text:AppState.zh("Connection details"); color:Theme.text; font.pixelSize:Theme.fontSize(16); font.weight:Font.DemiBold }
-                    SwirlStatusBadge { label:page.selected?page.selected.status.toUpperCase():"尚未选择"; tone:page.selected?"success":"neutral" }
+                    SwirlStatusBadge { label:page.selected?page.selected.status.toUpperCase():"尚未选择"; tone:page.selected&&page.selected.status==="活动"?"success":"neutral" }
                     Repeater {
                         model:[
                             ["Host",page.selected?page.selected.host:"—"],

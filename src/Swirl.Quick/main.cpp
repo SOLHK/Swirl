@@ -5,6 +5,9 @@
 #include "tests/third_party/renderdoc_app.h"
 #endif
 #include <QQmlApplicationEngine>
+#ifdef SWIRL_UI_TESTS
+#include <QQmlDebuggingEnabler>
+#endif
 #include <QQmlContext>
 #include <QQmlError>
 #include <QIcon>
@@ -119,6 +122,13 @@ int main(int argc, char *argv[])
     // Swirl draws its own visual controls, so explicitly use the customizable style.
     QQuickStyle::setStyle(QStringLiteral("Basic"));
     const bool motionTest=app.arguments().contains("--motion-test");
+#ifdef SWIRL_UI_TESTS
+    // Opt-in tracing in the isolated test executable only. No debugger in packages.
+    if(motionTest && qEnvironmentVariableIsSet("SWIRL_QML_PROFILE")) {
+        QQmlDebuggingEnabler::setServices(QQmlDebuggingEnabler::profilerServices());
+        QQmlDebuggingEnabler::enableDebugging(false);
+    }
+#endif
     const bool heroTest=app.arguments().contains("--hero-test");
     const bool appearanceTest=app.arguments().contains("--appearance-test")||app.arguments().contains("--appearance-restore-test");
     const bool uiQualityTest=app.arguments().contains("--ui-quality-test");

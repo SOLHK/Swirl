@@ -31,7 +31,7 @@ Item {
     function reorder(index,step) {var next=records.slice();var other=index+step;if(other<0 || other>=next.length)return;var row=next[index];next[index]=next[other];next[other]=row;records=next;dirty=true}
     onModuleIdChanged:if(moduleId.length)restore()
     ColumnLayout {
-        anchors.fill:parent;spacing:Theme.dp(14)
+        anchors.fill:parent;anchors.margins:Theme.pagePadding;spacing:Theme.sectionGap
         RowLayout {
             Layout.fillWidth:true;Layout.topMargin:12;spacing:Theme.dp(15)
             SwirlIconButton {iconName:"chevron-left";tooltip:"功能模块中心";onClicked:SwirlMotion.returnToHub(detailPanel)}

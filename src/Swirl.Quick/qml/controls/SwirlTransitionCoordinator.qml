@@ -9,12 +9,14 @@ Item {
     property int duration: SwirlMotion.expandDuration
     property bool retargeting:false
     readonly property bool moving: retargeting || travel.running
+    property int generation:0
     property int token: 0
     Component.onCompleted: {token=SwirlTransitionRegistry.allocate();if(moving)SwirlTransitionRegistry.setActive(token,true)}
     function moveTo(value) {
         // Retargeting is one continuous operation. Do not briefly publish
         // "finished" while stopping the old direction: a native window could
         // otherwise close itself before the reverse clock has even started.
+        ++generation
         retargeting=true
         travel.stop()
         destination = Math.max(0, Math.min(1, value))
@@ -29,6 +31,7 @@ Item {
         travel.start()
         retargeting=false
     }
+    function stop() {retargeting=true;travel.stop();retargeting=false}
     function finish() { retargeting=true;travel.stop();progress=destination;retargeting=false }
     onMovingChanged: SwirlTransitionRegistry.setActive(token, moving)
     Component.onDestruction: SwirlTransitionRegistry.setActive(token, false)

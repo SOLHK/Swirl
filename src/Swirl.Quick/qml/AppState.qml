@@ -393,5 +393,7 @@ QtObject {
                 if (groups[i].pages[j].id === id) return groups[i].pages[j]
         return groups[0].pages[0]
     }
-    function notice(label) { toast=String(label) }
+    property string lastNotice:""
+    property double lastNoticeAt:0
+    function notice(label) {const message=String(label),now=Date.now();if(message===lastNotice && now-lastNoticeAt<2500)return;lastNotice=message;lastNoticeAt=now;toast=message}
 }

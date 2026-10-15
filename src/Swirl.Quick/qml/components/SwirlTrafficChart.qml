@@ -4,9 +4,9 @@ import SwirlQuick
 Item {
     id:graph
     // Retain the API used by the existing analytics pages.
-    property var points: (engineController.telemetry.revision,engineController.telemetry.historyPoints(series,[60,60,300,3600][rangeIndex]))
+    property var points: visible ? (engineController.telemetry.revision,engineController.telemetry.historyPoints(series,[60,60,300,3600][rangeIndex])) : []
     property var samples: points.map(function(p){return p.value})
-    readonly property real endTime: (engineController.telemetry.revision,Date.now())
+    readonly property real endTime: visible ? (engineController.telemetry.revision,Date.now()) : 0
     readonly property real startTime: endTime-rangeMinutes*60000
     property bool showUpload: false
     property bool showDownload: true
@@ -19,7 +19,7 @@ Item {
     function valueAt(i) { return baseHistory[i] || 0 }
     function nearestIndex(fraction){if(!points.length)return -1;var target=startTime+fraction*(endTime-startTime),best=-1,distance=3000;for(var i=0;i<points.length;i++){var delta=Math.abs(points[i].time-target);if(delta<distance){distance=delta;best=i}}return best}
     function repaint(){if(visible && Window.window && Window.window.visibility!==Window.Minimized)plot.requestPaint()}
-    function transition(){if(!visible || SwirlMotion.reduced){updateAnimation.stop();reveal=1;return}reveal=0.3;updateAnimation.restart()}
+    function transition(){updateAnimation.stop();reveal=1;repaint()}
     onVisibleChanged:if(visible)repaint();else updateAnimation.stop()
     onSeriesChanged:transition()
     onRangeIndexChanged:transition()
@@ -27,7 +27,7 @@ Item {
     onSamplesChanged:repaint()
     implicitHeight:Theme.dp(130); implicitWidth:Theme.dp(550)
     NumberAnimation { id:updateAnimation; target:graph; property:"reveal"; to:1; duration:Theme.motion; easing.type:Easing.OutCubic }
-    Connections { target:AppState; function onMeasurementTickChanged(){graph.repaint()} function onProxyOnChanged(){graph.transition()} }
+    Connections { target:AppState; function onMeasurementTickChanged(){graph.repaint()} function onProxyOnChanged(){graph.repaint()} }
     Connections { target:Theme; function onDarkChanged(){graph.repaint()} }
     Item {
         x:Theme.dp(0); y:Theme.dp(4); width:Theme.dp(66); height:plot.height

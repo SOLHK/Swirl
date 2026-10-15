@@ -142,7 +142,10 @@ int runMotionVisualChecks(QQuickWindow *window, const QString &directory) {
     qInfo()<<"MOTION_VISUAL_CAPTURES"<<captures.size()<<"errors"<<errors;
     return errors?1:0;
 }
+#include "ScrollBench.h"
 int runMotionChecks(QQuickWindow *window, const QString &output) {
+    if(qEnvironmentVariableIsSet("SWIRL_RECORD_INTERACTIONS"))return recordInteractionSequence(window,output);
+    if(qEnvironmentVariableIsSet("SWIRL_SCROLL_BENCH"))return runScrollBench(window,output);
     // Use the application's event dispatcher for timing. QTest::qWait polls
     // with sleeps, which can quantize Windows samples to 15.6 ms and prevent
     // the animation driver from receiving native high-refresh frame events.
@@ -161,7 +164,7 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
     auto eval=[&](const QString &code) {
         QQmlExpression e(qmlContext(window),window,code);
         auto value=e.evaluate();
-        if(e.hasError()){qWarning()<<e.error();++failures;}
+        if(e.hasError()){qWarning()<<e.error();check("expression: "+e.error().toString(),false);}
         return value;
     };
     auto *host=window->findChild<QQuickItem *>("pageLoader");
@@ -242,11 +245,61 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
         check("click-light-stops-after-release",button->property("clickLight").toDouble()==0);
         QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,p);wait(60);
         auto *shader=button->findChild<QObject *>("clickLightShaderLoader");
-        const bool expectedShader=eval("Theme.effectsSupported && motionPolicy.complexMotion && !SwirlMotion.reduced").toBool();
-        check("click-light-uses-supported-backend",shader && shader->property("active").toBool()==expectedShader);
-        wait(300);
-        check("click-light-unloads-shader-when-idle",shader&&!shader->property("active").toBool());
+        check("ordinary-click-has-no-light-overlay",shader==nullptr && button->property("clickLight").toDouble()==0);
+        const auto beforeRoute=eval("AppState.currentPage").toString();
+        QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,p);
+        QTest::mouseMove(window,QPoint(window->width()-15,window->height()-15));
+        QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,QPoint(window->width()-15,window->height()-15));wait(220);
+        check("drag-away-cancels-activation",eval("AppState.currentPage").toString()==beforeRoute && !button->property("down").toBool());
+        button->forceActiveFocus();QTest::keyClick(window,Qt::Key_Space);wait(250);
+        check("keyboard-activation-keeps-stable-hit-area",button->scale()==1 && !button->property("down").toBool());
+
     } else check("navigation-button-present",false);
+    auto *indicator=findVisual(window->contentItem(),"sidebarSelectionIndicator");
+    check("one-sidebar-indicator-present",indicator!=nullptr);
+    const QStringList sidebarRoutes={"activity","overview","processes","gateway","policies","rules","capture","tls","rewrite","featurehub"};
+    for(int i=0;i<30;++i){
+        auto *entry=findVisual(window->contentItem(),"nav-"+sidebarRoutes[(i%2?29-i:i)%sidebarRoutes.size()]);
+        if(entry)QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,entry->mapToScene(QPointF(entry->width()/2,entry->height()/2)).toPoint());
+        wait(20);
+        check("sidebar-single-owner-"+QString::number(i),indicator&&findVisual(window->contentItem(),"sidebarSelectionIndicator")==indicator);
+    }
+    settle();wait(300);
+    check("sidebar-selection-reaches-last-click",eval("AppState.currentPage==='activity'").toBool());
+    route("activity");
+    auto *activity=qobject_cast<QQuickItem *>(item());
+    auto *upload=findVisual(activity,"activityUpload");
+    auto *activityScroll=findVisual(activity,"activityScroll");
+    check("activity-four-metrics-present",upload&&findVisual(activity,"activityDownload")&&findVisual(activity,"activityConnections")&&findVisual(activity,"activityTotal"));
+    if(activityScroll)activityScroll->setProperty("contentY",20);
+    if(upload){
+        qmlEngine(window)->rootContext()->setContextProperty("motionTestOrigin",upload);
+        eval("SwirlMotion.navigateFrom(motionTestOrigin,'traffic','uploadRate')");wait(65);
+        check("metric-shares-matching-surface",host->property("heroData").isValid() && host->property("sourceSurface").value<QObject *>()==upload);
+        const auto partial=host->property("progress").toDouble();
+        eval("SwirlMotion.returnToHub(null)");wait(25);
+        check("immediate-return-reverses-live-transition",item()==activity && partial>0 && partial<1 && host->property("moving").toBool());
+        eval("SwirlMotion.navigateFrom(motionTestOrigin,'traffic','uploadRate')");wait(25);
+        check("reopen-keeps-latest-route",eval("AppState.currentPage==='traffic'").toBool());
+        settle();eval("SwirlMotion.returnToHub(null)");wait(25);settle();
+        check("activity-return-preserves-scroll",item()==activity&&activityScroll&&qAbs(activityScroll->property("contentY").toDouble()-20)<1);
+        check("shared-surfaces-restored",!upload->property("surfaceHidden").toBool()&&host->property("sourceSurface").value<QObject *>()==nullptr);
+    }
+    auto *capsule=findVisual(window->contentItem(),"proxyCapsule");
+    if(capsule){
+        const auto at=capsule->mapToScene(QPointF(capsule->width()/2,capsule->height()/2)).toPoint();
+        const auto toast=eval("AppState.toast").toString();
+        QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,at);wait(70);
+        check("proxy-capsule-opens-local-status",eval("proxyPanel.visible && proxyPanel.desired").toBool());
+        check("proxy-panel-anchored-to-capsule",eval("proxyPanel.x>=window.actualSidebarWidth && Math.abs(proxyPanel.x+proxyPanel.width-proxyPanel.origin.x-proxyCapsule.width)<2").toBool());
+        eval("proxyPanel.requestDismiss()");wait(20);eval("proxyPanel.toggle()");wait(320);
+        check("proxy-panel-reverses-without-stale-close",eval("proxyPanel.visible && proxyPanel.reveal===1").toBool());
+        check("opening-status-does-not-toggle-proxy-or-toast",eval("AppState.toast").toString()==toast&&!eval("window.proxyTogglePending").toBool());
+        eval("proxyPanel.requestDismiss()");wait(320);
+        check("proxy-panel-restores-focus-and-source",!eval("proxyPanel.visible").toBool()&&capsule->opacity()==1&&capsule->hasActiveFocus());
+        QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,at);wait(60);QTest::keyClick(window,Qt::Key_Escape);wait(320);
+        check("proxy-panel-escape-uses-same-close-path",!eval("proxyPanel.visible").toBool()&&capsule->opacity()==1);
+    }
     QList<double> intervals;QList<double> warmIntervals;bool warmPhase=false;bool measuring=true;QMutex frameMutex;
     QElapsedTimer clock;clock.start();qint64 last=0;
     auto connection=QObject::connect(window,&QQuickWindow::frameSwapped,window,[&] {
@@ -316,6 +369,7 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
     std::sort(intervals.begin(),intervals.end());
     std::sort(warmIntervals.begin(),warmIntervals.end());
     QJsonObject performance{{"renderer",int(window->rendererInterface()->graphicsApi())},
+        {"qt",qVersion()},{"dpr",window->devicePixelRatio()},
         {"refreshHz",window->screen()?window->screen()->refreshRate():0},
         {"systemReducedMotion",reduced},{"frames",intervals.size()},
         {"medianFrameMs",intervals.isEmpty()?0:intervals[intervals.size()/2]},
@@ -327,7 +381,8 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
         {"activeGrabs",eval("motionPolicy.activeGrabCount").toInt()},
         {"cachedPages",host->property("cachedPageCount").toInt()},
         {"memoryBytes",memory()},{"revisitGrowthBytes",growth},{"idleFrames",idleFrames}};
-    QJsonObject report{{"checks",checks},{"failures",failures},{"performance",performance}};
+    QJsonObject report{{"checks",checks},{"failures",failures},{"performance",performance},
+        {"diagnostics",QJsonDocument::fromJson(eval("JSON.stringify(systemProvider.logs())").toString().toUtf8()).array()}};
     if(!output.isEmpty()) {
         QDir().mkpath(QFileInfo(output).absolutePath());QFile file(output);
         if(!file.open(QIODevice::WriteOnly))return 1;

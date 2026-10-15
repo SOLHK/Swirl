@@ -7,8 +7,15 @@ Item {
     property var columns:[{key:"name",label:"名称",w:220}]
     property var rows:[]
     property bool incrementalRows:false
+    property bool followTail:false
+    property string anchorKey:""
+    property real anchorOffset:0
+    property bool wasAtEnd:true
+    function saveViewport(){if(!list)return;wasAtEnd=list.atYEnd;const index=list.indexAt(1,list.contentY+1);anchorKey=index>=0&&index<stableRows.count?stableRows.get(index).motionKey:"";anchorOffset=index*itemHeight-list.contentY}
+    function restoreViewport(){if(!list)return;if(followTail&&wasAtEnd){list.positionViewAtEnd();return}if(!anchorKey.length)return;for(let i=0;i<stableRows.count;i++)if(stableRows.get(i).motionKey===anchorKey){list.contentY=Math.max(0,Math.min(i*itemHeight-anchorOffset,Math.max(0,list.contentHeight-list.height)));return}}
+    Connections {target:stableRows;function onAboutToSync(){table.saveViewport()}function onSynced(){Qt.callLater(table.restoreViewport)}}
     property bool managedSelection:false
-    property bool animateRowChanges:true
+    property bool animateRowChanges:false
     property bool animateLatency:false
     property bool minimal:false
     SwirlAnimatedModel{id:stableRows;source:table.incrementalRows?table.rows:[];keyRole:"id"}
@@ -54,7 +61,7 @@ Item {
         contentHeight:height
         flickableDirection:Flickable.HorizontalFlick
         boundsBehavior:Flickable.StopAtBounds
-        pixelAligned:true
+        pixelAligned:false
         ScrollBar.horizontal:SwirlScrollBar {policy:horizontal.contentWidth>horizontal.width?ScrollBar.AsNeeded:ScrollBar.AlwaysOff}
             Rectangle {
                 z:1;width:horizontal.contentWidth;height:table.headerHeight
@@ -99,7 +106,7 @@ Item {
                 clip:true
                 model:table.incrementalRows?stableRows:table.rows
                 boundsBehavior:Flickable.StopAtBounds
-                pixelAligned:true
+                pixelAligned:false
                 activeFocusOnTab:true
                 keyNavigationEnabled:true
                 highlightMoveDuration:0

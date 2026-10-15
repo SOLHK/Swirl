@@ -20,9 +20,14 @@ int runAppearanceChecks(QQuickWindow *window,bool restoreOnly) {
     std::function<QQuickItem *(QQuickItem *,const QString &)> find=[&](QQuickItem *item,const QString &name)->QQuickItem *{if(item->objectName()==name)return item;for(auto *child:item->childItems())if(auto *match=find(child,name))return match;return nullptr;};
     auto *picker=find(window->contentItem(),"themeModePicker");check(picker&&picker->isVisible()&&picker->isEnabled(),"theme picker is visible and enabled");
     if(picker){
+        window->resize(800,672);QTest::qWait(150);
         auto select=[&](int index){
             window->requestActivate();
-            QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,picker->mapToScene(QPointF(picker->width()/2,picker->height()/2)).toPoint());QTest::qWait(150);
+            const auto center=picker->mapToScene(QPointF(picker->width()/2,picker->height()/2));
+            const bool inside=QRectF(QPointF(0,0),window->size()).contains(center);
+            check(inside,"theme picker hit area stays inside the narrow viewport");
+            if(!inside)return;
+            QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,center.toPoint());QTest::qWait(150);
             QQuickWindow *popup=nullptr;for(auto *candidate:QGuiApplication::allWindows())if(candidate->isVisible()&&candidate->flags().testFlag(Qt::Popup))popup=qobject_cast<QQuickWindow *>(candidate);
             check(popup!=nullptr,"theme click opens the native popup");
             if(popup){

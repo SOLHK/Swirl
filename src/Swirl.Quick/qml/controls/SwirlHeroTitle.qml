@@ -31,6 +31,15 @@ Item {
         clock.progress = 0
         clock.moveTo(1)
     }
+    function reverse() {
+        if(!sourceItem || !targetItem)return
+        const oldSource=sourceItem,oldTarget=targetItem
+        const current=Qt.rect(label.x,label.y,label.width,label.height)
+        const currentFont=label.font.pixelSize
+        clock.stop()
+        sourceItem=oldTarget;targetItem=oldSource;title=oldTarget.text||"";origin=current;sourceFont=currentFont
+        clock.progress=0;clock.moveTo(1)
+    }
     function cancel() {
         clock.finish()
         sourceItem = null; targetItem = null; title = ""
@@ -40,11 +49,12 @@ Item {
     Binding { target: hero.sourceItem; property: "opacity"; value: 0; when: hero.moving && hero.sourceItem!==null; restoreMode: Binding.RestoreBindingOrValue }
     Binding { target: hero.targetItem; property: "opacity"; value: 0; when: hero.moving && hero.targetItem!==null; restoreMode: Binding.RestoreBindingOrValue }
     SwirlText {
+        id:label
         visible: hero.moving
-        x: Math.round(hero.origin.x+(hero.targetRect.x-hero.origin.x)*hero.progress)
-        y: Math.round(hero.origin.y+(hero.targetRect.y-hero.origin.y)*hero.progress)
-        width: Math.round(hero.origin.width+(hero.targetRect.width-hero.origin.width)*hero.progress)
-        height: Math.round(hero.origin.height+(hero.targetRect.height-hero.origin.height)*hero.progress)
+        x: hero.origin.x+(hero.targetRect.x-hero.origin.x)*hero.progress
+        y: hero.origin.y+(hero.targetRect.y-hero.origin.y)*hero.progress
+        width: hero.origin.width+(hero.targetRect.width-hero.origin.width)*hero.progress
+        height: hero.origin.height+(hero.targetRect.height-hero.origin.height)*hero.progress
         text: hero.title; textFormat: Text.PlainText; color: Theme.text
         font.family: Theme.fontFamily
         font.pixelSize: Math.round(hero.sourceFont+((hero.targetItem?hero.targetItem.font.pixelSize:hero.sourceFont)-hero.sourceFont)*hero.progress)

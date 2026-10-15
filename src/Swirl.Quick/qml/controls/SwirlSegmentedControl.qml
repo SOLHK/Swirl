@@ -17,7 +17,7 @@ Item {
     Rectangle { anchors.fill:parent; radius:control.rounded ? height/2 : Theme.segmentedRadius; color:control.rounded?(control.accentSelection?Theme.buttonBase:Theme.surface):Theme.material("field"); border.width:control.rounded?0:Theme.borderWidth; border.color:Theme.border }
     Rectangle {
         property real selectionPosition:control.currentIndex
-        x:Math.round((control.rounded?0:Theme.dp(2))+(control.width-(control.rounded?0:Theme.dp(4)))*selectionPosition/Math.max(1,control.options.length));y:control.rounded?0:Theme.dp(2)
+        x:(control.rounded?0:Theme.dp(2))+(control.width-(control.rounded?0:Theme.dp(4)))*selectionPosition/Math.max(1,control.options.length);y:control.rounded?0:Theme.dp(2)
         width:control.segmentWidth(control.currentIndex)
         height:control.height-(control.rounded?0:Theme.dp(4))
         radius:control.rounded?height/2:Theme.segmentedSelectedRadius

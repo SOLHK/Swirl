@@ -10,6 +10,17 @@ class TelemetryTests:public QObject {
  Q_OBJECT
  ProxyEngine::Status sample(qint64 time,int up,int down){ProxyEngine::Status s;s.processAlive=true;s.processId=1;s.apiHealthy=true;s.connectionsAt=time;s.trafficAt=time;s.uploadTotal=up;s.downloadTotal=down;s.uploadRate=up;s.downloadRate=down;s.connections={QVariantMap{{"id","connection-a"},{"host","fixture.test"},{"process","fixture.exe"},{"policy","DIRECT"},{"category","direct"},{"uploadBytes",up},{"downloadBytes",down},{"time",QDateTime::fromMSecsSinceEpoch(time).toString(Qt::ISODateWithMs)}}};return s;}
 private slots:
+ void cachedPeriodInvalidatesWithoutErasingHistory(){
+  QTemporaryDir temp;TelemetryService model(temp.filePath("cache.json"),false);
+  auto status=sample(QDateTime::currentMSecsSinceEpoch(),10,20);model.ingest(status);
+  QCOMPARE(model.summary().value("total").toInt(),30);model.distribution();model.ranking("apps");
+  status=sample(status.connectionsAt+1000,20,40);model.ingest(status);
+  QCOMPARE(model.summary().value("total").toInt(),60);
+  QCOMPARE(model.ranking("apps").first().toMap().value("total").toInt(),60);
+  status.processAlive=false;status.apiHealthy=false;model.ingest(status);
+  QVERIFY(!model.sampled());QCOMPARE(model.summary().value("total").toInt(),60);
+  QCOMPARE(model.ranking("apps").first().toMap().value("speed").toDouble(),0.0);
+ }
  void closedSnapshotsAreNotActiveAndControlFailureIsNotClosure(){
   QTemporaryDir temp;TelemetryService model(temp.filePath("activity-state.json"),false);
   auto s=sample(QDateTime::currentMSecsSinceEpoch(),10,20);

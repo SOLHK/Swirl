@@ -12,27 +12,10 @@ SwirlMotionButton {
     property bool compact: false
     readonly property bool chosen: AppState.currentPage === pageId
     signal activated()
-    property real selectionX:0
-    property real selectionY:0
-    property bool selectionReady:false
-    function updateSelection() {
-        if(!chosen || !selectionReady)return
-        const target=entry.mapToItem(null,0,0)
-        const old=SwirlMotion.navigationRect
-        selectionX=old && !SwirlMotion.reduced ? old.x-target.x : 0
-        selectionY=old && !SwirlMotion.reduced ? old.y-target.y : 0
-        SwirlMotion.navigationRect=Qt.rect(target.x,target.y,width,height)
-        settleX.restart();settleY.restart()
-    }
-    onChosenChanged: {
-        if(!chosen && selectionReady) {
-            const p=entry.mapToItem(null,selectionX,selectionY)
-            SwirlMotion.navigationRect=Qt.rect(p.x,p.y,width,height)
-        } else Qt.callLater(updateSelection)
-    }
-    Component.onCompleted:{selectionReady=true;Qt.callLater(updateSelection)}
-    SwirlSpring {id:settleX;target:entry;property:"selectionX";to:0}
-    SwirlSpring {id:settleY;target:entry;property:"selectionY";to:0;epsilon:0.1}
+    property var selectionOwner:null
+    pressMotion:false
+    Component.onCompleted:if(selectionOwner)selectionOwner.registerEntry(entry)
+    Component.onDestruction:if(selectionOwner)selectionOwner.unregisterEntry(entry)
     implicitHeight:Theme.sidebarRowHeight
     implicitWidth: Theme.dp(compact ? 58 : 180)
     leftPadding:Theme.dp(8); rightPadding:Theme.dp(10)
@@ -40,12 +23,11 @@ SwirlMotionButton {
     hoverEnabled: true
     background: Rectangle {
         radius:Theme.sidebarRowRadius
-        color:entry.chosen?(entry.down?Theme.navigationPressed:Theme.navigationSelected):entry.hovered?Theme.withAlpha(Theme.hover,0.45):"transparent"
+        color:!entry.chosen && entry.down?Theme.withAlpha(Theme.text,0.05):!entry.chosen && entry.hovered?Theme.withAlpha(Theme.text,0.025):"transparent"
         Behavior on color {ColorAnimation{duration:SwirlMotion.hoverDuration}}
         antialiasing:true
         border.width:Theme.dp(entry.visualFocus?2:0)
         border.color:Theme.focusBorder
-        transform:Translate{x:entry.selectionX;y:entry.selectionY}
     }
     contentItem: RowLayout {
         spacing:Theme.dp(10)
@@ -54,7 +36,7 @@ SwirlMotionButton {
             visible: !entry.compact; Layout.fillWidth: true
             text: entry.title; color: Theme.text
             font.pixelSize:Theme.fontSize(13); font.family: Theme.fontFamily
-            font.weight:entry.chosen?Font.DemiBold:Theme.bodyFontWeight
+            font.weight:entry.chosen?Font.DemiBold:Font.Medium
             elide: Text.ElideRight
         }
     }

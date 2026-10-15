@@ -10,20 +10,21 @@ QtObject {
     readonly property real damping: 0.28
     function ms(value){return reduced ? 0 : Math.round(value/Math.max(0.25,speed))}
     readonly property int duration:ms(180)
-    readonly property int pressDuration:ms(110)
-    readonly property int hoverDuration:ms(150)
-    readonly property int switchDuration:ms(180)
-    readonly property int pageDuration:ms(160)
+    readonly property int pressDuration:ms(80)
+    readonly property int releaseDuration:ms(190)
+    readonly property int selectionDuration:ms(260)
+    readonly property int hoverDuration:ms(120)
+    readonly property int switchDuration:ms(210)
+    readonly property int pageDuration:ms(190)
     readonly property int dialogDuration:ms(264)
     readonly property int exitDuration:ms(160)
-    readonly property int expandDuration:ms(288)
-    readonly property real pressScale: reduced ? 1 : 0.972
+    readonly property int expandDuration:ms(360)
+    readonly property real pressScale: reduced ? 1 : 0.98
     property bool transitioning: false
     readonly property bool busy: transitioning || SwirlTransitionRegistry.activeCount>0
     onBusyChanged:motionPolicy.setTransitioning(busy)
     property var triggerRect: Qt.rect(0,0,0,0)
-    property var navigationRect: null
-    property var shared: null
+        property var shared: null
     property var returnShared: null
     property int sharedGeneration: 0
     function noteTrigger(item) {
@@ -41,9 +42,8 @@ QtObject {
     function navigateFrom(item, route, targetKey) {
         const titleItem=item.motionTitle || item
         const surface=item.motionSurface || (item.motionTitle?item:null)
-        // Existing Activity/traffic links remain title-only. A card explicitly
-        // supplies its material/heading and keeps the original shared boundary.
-        shared={source:titleItem,surface:surface,route:route,previous:AppState.currentPage,
+        // Stable semantic keys pair the same metric and its surface across routes.
+        shared={generation:++sharedGeneration,source:titleItem,surface:surface,route:route,previous:AppState.currentPage,
             targetKey:targetKey || "title",text:titleItem.text || ""}
         returnShared={route:route,previous:AppState.currentPage,source:titleItem,
             surface:surface,targetKey:targetKey || "title"}

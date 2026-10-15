@@ -9,12 +9,15 @@ import "../controls"
 Item {
     id: page
     property var selected:null
+ property bool detailHasSelection:selected!==null
+ onDetailHasSelectionChanged:{if(visible)detailClock.moveTo(detailHasSelection?1:0);else{detailClock.destination=detailHasSelection?1:0;detailClock.finish()}}
+ SwirlTransitionCoordinator {id:detailClock;duration:SwirlMotion.dialogDuration}
     property bool followTail:true
-    property var records:(systemProvider.revision,systemProvider.logs())
+    property var records:visible?(systemProvider.revision,systemProvider.logs()):[]
     readonly property var displayLogs:records.filter(function(r){
         return (r.message+" "+r.source+" "+r.level).toLowerCase().indexOf(search.text.toLowerCase())>=0 &&
                (level.currentText==="全部级别"||r.level===level.currentText)
-    }).map(function(r,i){return {id:"log-"+i,time:r.time,level:r.level,source:r.source,message:r.message}})
+    }).map(function(r){return {id:r.id||[r.time,r.correlation,r.source,r.code].join("/"),time:r.time,level:r.level,source:r.source,message:r.message}}).reverse()
     FileDialog { id:diagnosticFile;title:"导出诊断报告";fileMode:FileDialog.SaveFile;nameFilters:["诊断 ZIP (*.zip)"];defaultSuffix:"zip";onAccepted:{diagnostics.exportReport(selectedFile,systemProvider.diagnosticSnapshot());AppState.toast=diagnostics.exportMessage} }
     ColumnLayout {
         anchors.fill:parent; anchors.margins:Theme.dp(23); spacing:Theme.dp(13)
@@ -39,7 +42,7 @@ Item {
                 Layout.fillWidth:true; Layout.fillHeight:true; clip:true
                 SwirlDataTable {
                     anchors.fill:parent; anchors.margins:Theme.dp(1)
-                    rows:page.displayLogs
+                    rows:page.displayLogs;incrementalRows:true;followTail:page.followTail;animateRowChanges:false
                     selectedId:page.selected?page.selected.id:""
                     columns:[{key:"time",label:"时间",w:108},{key:"level",label:"级别",w:84},
                              {key:"source",label:"来源",w:104},{key:"message",label:"信息",w:570}]
@@ -53,6 +56,7 @@ Item {
             }
             SwirlGlassPanel {
                 Layout.preferredWidth:Theme.dp(289); Layout.fillHeight:true
+                transform:Translate{x:SwirlMotion.reduced?0:Theme.dp(16)*(1-detailClock.progress)}
                 ColumnLayout {
                     anchors.fill:parent; anchors.margins:Theme.dp(18); spacing:Theme.dp(12)
                     ScrollView {
@@ -82,7 +86,7 @@ Item {
                         }
                     }
 
-                    SwirlButton { text:"恢复日志"; onClicked:page.records=(systemProvider.revision,systemProvider.logs()) }
+                    SwirlButton { text:"恢复日志"; onClicked:page.records=Qt.binding(()=>page.visible?(systemProvider.revision,systemProvider.logs()):[]) }
 
                 }
             }

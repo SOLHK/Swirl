@@ -8,6 +8,7 @@ QtObject {
     function allocate() { return ++serial }
     function setActive(token, moving) {
         if(token===0)return
+        if(Boolean(active[token])===moving)return
         const next = Object.assign({}, active)
         if (moving) next[token] = true
         else delete next[token]

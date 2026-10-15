@@ -121,16 +121,24 @@ Item {
     Item {
         id:nodeHero;objectName:"nodeHero"
         property bool opened:true
-        readonly property bool moving:false
-        readonly property real reveal:1
-        function returnTo(row){opened=false}
+        readonly property bool moving:nodeDetailClock.moving
+        readonly property real progress:nodeDetailClock.progress
+        readonly property real reveal:1 // Text, icons and spacing never stretch.
+        property Item returnFocus:null
+        onOpenedChanged:nodeDetailClock.moveTo(opened?1:0)
+        function returnTo(row){returnFocus=row;opened=false}
+        SwirlTransitionCoordinator {id:nodeDetailClock;duration:SwirlMotion.dialogDuration
+            Component.onCompleted:{destination=nodeHero.opened?1:0;finish()}
+            onMovingChanged:if(!moving&&!nodeHero.opened&&nodeHero.returnFocus)nodeHero.returnFocus.forceActiveFocus()
+        }
     }
     SwirlGlassPanel {
         id:nodeIdentity;objectName:"nodeIdentitySurface"
         parent:summarySlot
         x:0;y:0
         width:summarySlot.width;height:summarySlot.height
-        visible:nodeHero.opened;z:1;clip:true
+        visible:nodeHero.opened||nodeHero.moving;z:1;clip:true;opacity:nodeHero.progress
+        transform:Translate{x:SwirlMotion.reduced?0:Theme.dp(16)*(1-nodeHero.progress)}
         cornerRadius:Theme.independentCardRadius;color:Theme.surface;border.width:0
         ColumnLayout {
             id:summaryBody;x:Theme.cardPadding;y:Theme.dp(6)+(Theme.cardPadding-Theme.dp(6))*nodeHero.reveal;width:parent.width-2*Theme.cardPadding;spacing:Theme.dp(12)
