@@ -3,20 +3,21 @@ import QtQuick.Controls
 import SwirlQuick
 TextField {
     id: control
-    implicitHeight:Theme.dp(26)
-    leftPadding:Theme.dp(8); rightPadding:Theme.dp(8)
+    implicitHeight:Theme.controlHeight
+    leftPadding:Theme.controlPadding; rightPadding:Theme.controlPadding
+    opacity:enabled?1:0.45
     color: Theme.text
     selectionColor: Theme.accent
     selectedTextColor: "white"
     placeholderTextColor: Theme.muted
     font.family: Theme.fontFamily
-    font.pixelSize:Theme.fontSize(12)
+    font.pixelSize:Theme.fontSize(13)
     background: Rectangle {
         radius: Theme.controlRadius
         antialiasing: true
-        color:Theme.dark?Theme.field:Theme.surface
-        border.width: Theme.dp(control.activeFocus ? 3 : 1)
-        border.color: control.activeFocus ? (Theme.dark?Theme.focusBorder:"#80ABFF") : Theme.controlBorder
+        color:control.hovered&&!control.activeFocus?Theme.hover:Theme.dark?Theme.field:Theme.surface
+        border.width: Theme.dp(control.activeFocus ? 2 : 1)
+        border.color: control.activeFocus ? Theme.focusBorder : Theme.controlBorder
         Behavior on color { ColorAnimation { duration: Theme.motion } }
         Behavior on border.width {NumberAnimation{duration:SwirlMotion.hoverDuration}}
         Behavior on border.color { ColorAnimation { duration: Theme.motion } }

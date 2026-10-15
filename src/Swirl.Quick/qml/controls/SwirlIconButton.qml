@@ -9,11 +9,11 @@ SwirlMotionButton {
     property bool quiet:false
     property real iconSize:Theme.dp(16)
     property color iconColor:Theme.muted
-    implicitWidth:Theme.dp(46); implicitHeight:Theme.dp(46)
+    implicitWidth:Theme.controlHeight; implicitHeight:Theme.controlHeight
     hoverEnabled: true
     background: SwirlPillSurface {
         Behavior on color { ColorAnimation {duration:SwirlMotion.duration} }
-        radius:Math.min(width,height)/2
+        radius:Theme.controlRadius
         color:control.quiet?"transparent":Theme.buttonBase
         gradient:null
         border.width:control.quiet?0:Theme.borderWidth

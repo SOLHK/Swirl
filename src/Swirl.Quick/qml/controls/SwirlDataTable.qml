@@ -14,10 +14,10 @@ Item {
     SwirlAnimatedModel{id:stableRows;source:table.incrementalRows?table.rows:[];keyRole:"id"}
     property string selectedId:""
     property Item selectedItem:null
-    property int itemHeight:Theme.dp(43)
+    property int itemHeight:Theme.tableRowHeight
     property int textPixelSize:12
     property int headerPixelSize:11
-    property real headerHeight:Theme.dp(26)
+    property real headerHeight:Theme.tableHeaderHeight
     property real emptyStripeHeight:itemHeight
     property bool fillEmptyRows:false
     property bool gridLines:false
@@ -46,8 +46,8 @@ Item {
             spacing:Theme.dp(0)
             Rectangle {
                 width:parent.width; height:table.headerHeight
-                color:Theme.surface
-                radius: 0
+                color:Theme.field
+                radius: table.minimal ? Theme.tableRadius : 0
                 Row {
                     anchors.fill:parent
                     Repeater {
@@ -80,7 +80,7 @@ Item {
                     Rectangle{required property int index;x:table.stripeInset;y:table.rows.length*table.itemHeight+index*table.emptyStripeHeight;width:list.width-2*table.stripeInset;height:table.emptyStripeHeight;radius:table.stripeRadius;color:(index+table.rows.length)%2?Theme.field:Theme.surface;z:-1}
                 }
                 width:parent.width
-                height:Math.floor(Math.max(0,horizontal.height-table.headerHeight)/table.itemHeight)*table.itemHeight
+                height:Math.max(0,horizontal.height-table.headerHeight)
                 clip:true
                 model:table.incrementalRows?stableRows:table.rows
                 boundsBehavior:Flickable.StopAtBounds

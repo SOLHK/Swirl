@@ -5,27 +5,28 @@ import "../components"
 TextField {
     id: control
     property bool borderless:false
-    implicitHeight:Theme.dp(42)
+    implicitHeight:Theme.controlHeight
     implicitWidth:Theme.dp(225)
-    leftPadding:Theme.dp(24)
+    leftPadding:Theme.dp(32)
     topPadding:Theme.dp(4); bottomPadding:Theme.dp(4)
     rightPadding: Theme.dp(control.objectName === "pageSearch" && control.width > Theme.dp(130) ? 64 : 15)
     placeholderText: "搜索"
     placeholderTextColor: Theme.muted
+    opacity:enabled?1:0.45
     color: Theme.text
     selectedTextColor: "white"
     selectionColor: Theme.accent
     font.family: Theme.fontFamily
-    font.pixelSize:Theme.fontSize(16)
+    font.pixelSize:Theme.fontSize(13)
     background: SwirlPillSurface {
-        hovered:control.activeFocus
-        radius: height/2
+        hovered:control.hovered||control.activeFocus
+        radius: Theme.controlRadius
         gradient: null
         subtleShadow: false
         antialiasing: true
         color:Theme.dark?Theme.field:Theme.surface
         border.width:Theme.dp(control.activeFocus?2:control.borderless?0:1)
-        border.color: control.activeFocus ? Theme.focusBorder : Theme.pillRim
+        border.color: control.activeFocus ? Theme.focusBorder : Theme.controlBorder
         Behavior on color { ColorAnimation { duration: Theme.motion } }
         Behavior on border.color { ColorAnimation { duration: Theme.motion } }
     }

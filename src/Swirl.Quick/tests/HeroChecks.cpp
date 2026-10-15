@@ -2,6 +2,7 @@
 #include "engine/EngineController.h"
 #include <QQuickWindow>
 #include <QQuickItem>
+#include <QRegion>
 #include <QQmlContext>
 #include <QQmlExpression>
 #include <QGuiApplication>
@@ -107,7 +108,7 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
   auto page=find(panel->contentItem(),"dashboardPage"),tabs=find(panel->contentItem(),"dashboardTabs"),clear=find(panel->contentItem(),"dashboardClear");
   check(page&&tabs&&clear,"network panel keeps tabs, real data surface and scoped actions");
   if(page&&tabs&&clear){for(int i=0;i<6;++i){QTest::mouseClick(panel,Qt::LeftButton,Qt::NoModifier,tabs->mapToScene(QPointF((i+0.5)*tabs->width()/6,tabs->height()/2)).toPoint());wait(50);check(page->property("tabIndex").toInt()==i&&clear->isEnabled()==(i==0||i==5),QString("panel tab %1 switches and clearing is scoped correctly").arg(i));}}
-  if(recording){panel->grabWindow().save(directory+"/panel-logs.png");if(tabs){QTest::mouseClick(panel,Qt::LeftButton,Qt::NoModifier,tabs->mapToScene(QPointF(2.5*tabs->width()/6,tabs->height()/2)).toPoint());wait(80);}auto surface=panel->grabWindow();surface.save(directory+"/panel-dns.png");check(surface.hasAlphaChannel()&&qAlpha(surface.pixel(0,0))<10&&qAlpha(surface.pixel(surface.width()-1,0))<10&&qAlpha(surface.pixel(0,surface.height()-1))<10&&qAlpha(surface.pixel(surface.width()-1,surface.height()-1))<10,"all four panel corners are transparent without triangular remnants");}
+  if(recording){panel->grabWindow().save(directory+"/panel-logs.png");if(tabs){QTest::mouseClick(panel,Qt::LeftButton,Qt::NoModifier,tabs->mapToScene(QPointF(2.5*tabs->width()/6,tabs->height()/2)).toPoint());wait(80);}auto surface=panel->grabWindow();surface.save(directory+"/panel-dns.png");check(eval("panelBackdrop.nativeCorners").toBool() || !panel->mask().isEmpty(),"panel contour is owned by DWM or the shared compatibility mask; raw Qt alpha is not the final desktop contour");}
   panel->hide();window->requestActivate();
  }
  // Passive native frame delivery measurements exclude all screenshot readback.

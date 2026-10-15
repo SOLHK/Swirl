@@ -14,25 +14,50 @@ Item {
  Connections {target:AppState;function onTrafficSelectedProcessChanged(){page.selectRequested()}function onTrafficPeriodChanged(){Qt.callLater(page.selectRequested)}}
  readonly property var processes:{let rows=(telemetry.revision,telemetry.ranking("apps",AppState.trafficPeriod,100));if(sortIndex===1)rows.sort((a,b)=>b.speed-a.speed);else if(sortIndex===2)rows.sort((a,b)=>a.name.localeCompare(b.name));return rows}
  readonly property var selected:processes.find(r=>r.id===selectedId)||null
- Text{x:Theme.dp(24);y:Theme.dp(30);text:"进程";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.Bold}
- SwirlComboBox{objectName:"processSortPicker";anchors.right:parent.right;anchors.rightMargin:Theme.dp(20);y:Theme.dp(34);width:Theme.dp(112);height:Theme.dp(24);model:["按流量排序","按速度排序","按名称排序"];onActivated:page.sortIndex=currentIndex}
- Item{x:Theme.dp(24);y:Theme.dp(90);width:(parent.width-Theme.dp(70))/2;height:parent.height-y-Theme.dp(72)
-  Text{visible:page.processes.length===0;anchors.centerIn:parent;text:"无进程";color:Theme.muted;font.pixelSize:Theme.fontSize(17);font.weight:Font.DemiBold}
-  SwirlDataTable{visible:page.processes.length>0;anchors.fill:parent;rows:page.processes;itemHeight:Theme.dp(40);columns:[{key:"name",label:"进程",w:210},{key:"value",label:"流量",w:110}];onRowSelected:r=>page.selectedId=r.id}
- }
- ReferenceOutline{anchors.right:parent.right;anchors.rightMargin:Theme.dp(24);y:Theme.dp(90);width:(parent.width-Theme.dp(90))/2;height:parent.height-y-Theme.dp(24)
-  Column{visible:page.selected!==null;anchors.fill:parent;anchors.margins:Theme.dp(20);spacing:Theme.dp(12)
-   Text{id:processDetailName;text:page.selected?page.selected.name:"";color:Theme.text;font.pixelSize:Theme.fontSize(18);width:parent.width;wrapMode:Text.WrapAnywhere}
-   Text{text:page.selected?"上传  "+page.selected.upload+"\n下载  "+page.selected.download+"\n连接  "+page.selected.connections:"";color:Theme.muted;font.pixelSize:Theme.fontSize(13)}
-   SwirlButton{text:"查看连接";onClicked:page.Window.window.openDashboard()}
+ ColumnLayout {
+  anchors.fill:parent;anchors.margins:Theme.dp(24);spacing:Theme.gap
+  RowLayout {Layout.fillWidth:true
+   Text {text:"进程";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.Bold;Layout.fillWidth:true}
+   SwirlComboBox {objectName:"processSortPicker";Layout.preferredWidth:Theme.dp(146);model:["按流量排序","按速度排序","按名称排序"];onActivated:page.sortIndex=currentIndex}
   }
- }
- Item{x:Theme.dp(24);anchors.bottom:parent.bottom;anchors.bottomMargin:Theme.dp(10);width:(parent.width-Theme.dp(70))/2;height:Theme.dp(64)
-  Rectangle{width:parent.width;height:Theme.dp(1);color:Theme.border}
-  Text{y:Theme.dp(15);text:"计费网络模式";color:Theme.text;font.pixelSize:Theme.fontSize(13);font.weight:Font.DemiBold}
-  SwirlToggle{objectName:"meteredToggle";x:Theme.dp(96);y:Theme.dp(15);enabled:!page.engineController.busy;checked:page.engineController.meteredEnabled;onToggled:{if(!page.engineController.setMeteredEnabled(checked))AppState.notice(page.engineController.routingError);checked=Qt.binding(()=>page.engineController.meteredEnabled)}Accessible.name:"计费网络模式"}
-  SwirlIconButton{quiet:true;anchors.right:parent.right;y:Theme.dp(10);width:Theme.dp(26);height:width;iconName:"settings";onClicked:{allowedProcesses.text=page.engineController.meteredAllowlist.join("\n");meteredDialog.open()}}
-  Text{y:Theme.dp(41);width:parent.width;text:"启动后所有进程将默认禁止使用网络。适用于按流量计费的网络，如数据网络热点。";color:Theme.muted;font.pixelSize:Theme.fontSize(10);wrapMode:Text.WordWrap}
+  Text {text:"按实际采集的流量查看应用，选择进程查看连接摘要。";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
+  RowLayout {Layout.fillWidth:true;Layout.fillHeight:true;spacing:Theme.gap
+   SwirlGlassPanel {Layout.fillWidth:true;Layout.preferredWidth:3;Layout.fillHeight:true
+    ColumnLayout {anchors.fill:parent;anchors.margins:Theme.cardPadding;spacing:Theme.dp(12)
+     RowLayout {Layout.fillWidth:true
+      Text {text:"应用流量";color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold;Layout.fillWidth:true}
+      Text {text:page.processes.length+" 个进程";color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
+     }
+     SwirlDataTable {objectName:"processTable";Layout.fillWidth:true;Layout.fillHeight:true;visible:page.processes.length>0;rows:page.processes;selectedId:page.selectedId;minimal:true;columns:[{key:"name",label:"进程",w:220},{key:"value",label:"总流量",w:110}];onRowSelected:r=>page.selectedId=r.id}
+     Item {visible:page.processes.length===0;Layout.fillWidth:true;Layout.fillHeight:true
+      SwirlEmptyState {anchors.centerIn:parent;width:Math.max(0,parent.width-Theme.dp(16));headline:"尚无进程流量";detail:"连接节点并产生网络流量后，这里会显示实际采集的应用。"}
+     }
+    }
+   }
+   SwirlGlassPanel {Layout.fillWidth:true;Layout.preferredWidth:2;Layout.fillHeight:true
+    ColumnLayout {visible:page.selected!==null;anchors.fill:parent;anchors.margins:Theme.cardPadding;spacing:Theme.dp(16)
+     Text {text:"进程详情";color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
+     Text {id:processDetailName;text:page.selected?page.selected.name:"";color:Theme.text;font.pixelSize:Theme.fontSize(18);font.weight:Font.DemiBold;Layout.fillWidth:true;wrapMode:Text.WrapAnywhere}
+     Rectangle {Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(1);color:Theme.border}
+     Repeater {model:page.selected?[{label:"上传",value:page.selected.upload},{label:"下载",value:page.selected.download},{label:"连接",value:page.selected.connections}]:[]
+      RowLayout {required property var modelData;Layout.fillWidth:true;Text {text:modelData.label;color:Theme.muted;font.pixelSize:Theme.fontSize(13);Layout.fillWidth:true}Text {text:String(modelData.value);color:Theme.text;font.pixelSize:Theme.fontSize(13)}}
+     }
+     Item {Layout.fillHeight:true}
+     SwirlButton {text:"查看连接";Layout.fillWidth:true;onClicked:page.Window.window.openDashboard()}
+    }
+    SwirlEmptyState {visible:page.selected===null;anchors.centerIn:parent;width:Math.max(0,parent.width-2*Theme.cardPadding);headline:"选择一个进程";detail:"从左侧选择应用，查看上传、下载和连接摘要。"}
+   }
+  }
+  SwirlGlassPanel {Layout.fillWidth:true;Layout.preferredHeight:meteredBody.implicitHeight+2*Theme.cardPadding
+   ColumnLayout {id:meteredBody;anchors.left:parent.left;anchors.right:parent.right;anchors.top:parent.top;anchors.margins:Theme.cardPadding;spacing:Theme.dp(8)
+    RowLayout {Layout.fillWidth:true
+     Text {text:"计费网络模式";color:Theme.text;font.pixelSize:Theme.fontSize(13);font.weight:Font.DemiBold;Layout.fillWidth:true}
+     SwirlToggle {objectName:"meteredToggle";enabled:!page.engineController.busy;checked:page.engineController.meteredEnabled;onToggled:{if(!page.engineController.setMeteredEnabled(checked))AppState.notice(page.engineController.routingError);checked=Qt.binding(()=>page.engineController.meteredEnabled)}Accessible.name:"计费网络模式"}
+     SwirlIconButton {quiet:true;iconName:"settings";tooltip:"计费网络允许列表";onClicked:{allowedProcesses.text=page.engineController.meteredAllowlist.join("\n");meteredDialog.open()}}
+    }
+    Text {text:"启用后仅允许指定进程访问网络，适用于按流量计费的网络与热点。";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
+   }
+  }
  }
  SwirlDialog{id:meteredDialog;title:"计费网络模式";ColumnLayout{width:parent.width;spacing:Theme.dp(12)
   Text{text:"默认阻止所有程序的网络，仅允许下面的程序继续按分流规则访问。启用时自动开启增强模式，并保持规则判定。";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.WordWrap}

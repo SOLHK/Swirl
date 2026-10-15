@@ -10,11 +10,11 @@ ColumnLayout {
     Text {
         text:state.headline; color:Theme.text
         font.pixelSize:Theme.fontSize(16); font.weight:Font.DemiBold
-        Layout.alignment:Qt.AlignHCenter
+        Layout.fillWidth:true;horizontalAlignment:Text.AlignHCenter;wrapMode:Text.Wrap
     }
     Text {
         text:state.detail; color:Theme.muted
         font.pixelSize:Theme.fontSize(12)
-        Layout.alignment:Qt.AlignHCenter
+        Layout.fillWidth:true;horizontalAlignment:Text.AlignHCenter;wrapMode:Text.Wrap
     }
 }

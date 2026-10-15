@@ -63,6 +63,7 @@ qt_add_resources(Swirl engine_manifest PREFIX "/engine" BASE "${CMAKE_CURRENT_SO
 set(SWIRL_QML_FILES
  qml/controls/SwirlNodeTransfer.qml
  qml/components/SwirlFontSettings.qml
+ qml/components/SwirlSecondaryWindow.qml
  qml/components/SwirlWindowTitleBar.qml
  qml/controls/RewriteRulesDialog.qml
  qml/components/ReferenceSection.qml qml/components/ReferenceOutline.qml qml/components/ReferenceCheckBox.qml qml/pages/CaptureInspectorPage.qml
@@ -118,7 +119,6 @@ qt_add_resources(Swirl brand PREFIX "/swirl" BASE "${SWIRL_ASSET_PATH}" FILES
 )
 qt_add_shaders(Swirl hdr_ui PREFIX "/swirl" BASE "${CMAKE_CURRENT_SOURCE_DIR}" FILES shaders/hdr-ui.frag shaders/swirlclicklight.frag shaders/swirlclicklight.vert)
 qt_add_shaders(Swirl glass_ui PREFIX "/swirl" BASE "${CMAKE_CURRENT_SOURCE_DIR}" FILES shaders/swirl-surface.frag shaders/swirl-blur.frag shaders/swirl-glass.frag)
-target_sources(Swirl PRIVATE app/WallpaperBackdrop.h app/WallpaperBackdrop.cpp)
 if(WIN32)
  target_link_libraries(Swirl PRIVATE ole32 uuid)
 endif()
@@ -143,6 +143,7 @@ if(SWIRL_BUILD_UI_TESTS)
  qt_add_resources(SwirlFontTests harmony_test_fonts PREFIX "/swirl/fonts" BASE "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts" FILES
   assets/fonts/HarmonyOS_Sans_SC_Regular.ttf assets/fonts/HarmonyOS_Sans_SC_Medium.ttf assets/fonts/HarmonyOS_Sans_SC_Bold.ttf assets/fonts/LICENSE_HarmonyOS_Sans.txt)
  target_sources(Swirl PRIVATE tests/GatewayChecks.cpp tests/GatewayChecks.h tests/HdrChecks.cpp tests/HdrChecks.h tests/OverviewChecks.cpp tests/OverviewChecks.h tests/CaptureChecks.cpp tests/CaptureChecks.h tests/WindowChecks.cpp tests/WindowChecks.h)
+ target_sources(Swirl PRIVATE tests/UiQualityChecks.h tests/UiQualityChecks.cpp)
  target_sources(Swirl PRIVATE tests/RuntimeEvidence.cpp tests/RuntimeEvidence.h)
  target_sources(Swirl PRIVATE tests/MaterialChecks.cpp tests/MaterialChecks.h)
  target_sources(Swirl PRIVATE tests/HeroChecks.cpp tests/HeroChecks.h)

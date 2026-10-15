@@ -9,7 +9,7 @@ Rectangle {
     HoverHandler{id:cardHover;enabled:panel.interactive}
     Behavior on border.color{ColorAnimation{duration:SwirlMotion.hoverDuration}}
     property real cornerRadius: floating ? Theme.popupRadius : Theme.cardRadius
-    property bool independentCard: Theme.pageBranch === "A" && !floating
+    property bool independentCard: !floating
     readonly property bool floating: material === "floating"
     radius: cornerRadius
     antialiasing: true

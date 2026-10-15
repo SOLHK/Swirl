@@ -12,7 +12,7 @@ SwirlMotionButton {
     Accessible.description:development?"研发中，此操作尚未实现。":""
     property string iconName: ""
     implicitWidth: Math.max(Theme.dp(76), contents.implicitWidth + Theme.dp(24))
-    implicitHeight:Theme.dp(30)
+    implicitHeight:Theme.controlHeight
     hoverEnabled: true
     font.family: Theme.fontFamily
     font.pixelSize:Theme.fontSize(13)
@@ -20,10 +20,10 @@ SwirlMotionButton {
     topPadding:Theme.dp(4); bottomPadding:Theme.dp(4)
     property bool outlined:false
     background:SwirlContinuousSurface {
-        radius:height/2
+        radius:Theme.controlRadius
         color:control.primary?(control.down?Qt.darker(Theme.primaryControl,1.15):control.hovered?Qt.lighter(Theme.primaryControl,1.08):Theme.primaryControl):control.down?Theme.pressed:control.hovered?Theme.hover:control.quiet?"transparent":Theme.buttonBase
-        border.width:control.activeFocus?Theme.dp(2):control.primary||control.quiet?0:Theme.dp(0.7)
-        border.color:control.activeFocus?Theme.focusBorder:Theme.withAlpha(Theme.dark?"#A9BDD5":"#7892B1",0.24)
+        border.width:control.activeFocus?Theme.dp(2):control.primary||control.quiet?0:Theme.borderWidth
+        border.color:control.activeFocus?Theme.focusBorder:Theme.controlBorder
         Behavior on color {ColorAnimation{duration:SwirlMotion.hoverDuration}}
         opacity:control.enabled?1:0.45
     }

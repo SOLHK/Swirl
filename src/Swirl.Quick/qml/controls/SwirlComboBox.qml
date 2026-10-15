@@ -4,21 +4,22 @@ import SwirlQuick
 ComboBox {
     id: control
     implicitWidth:Theme.dp(146)
-    implicitHeight:Theme.dp(24)
+    implicitHeight:Theme.controlHeight
     hoverEnabled: true
     // Let ComboBox own pointer grabs, keyboard activation and popup focus.
     // Opening its popup through an overlay MouseArea bypasses that lifecycle.
+    opacity:enabled?1:0.45
     focusPolicy:Qt.StrongFocus
     font.family: Theme.fontFamily
     font.pixelSize:Theme.fontSize(13)
-    leftPadding:Theme.dp(8); rightPadding:Theme.dp(20)
+    leftPadding:Theme.controlPadding; rightPadding:Theme.dp(28)
     topPadding:Theme.dp(4); bottomPadding:Theme.dp(4)
     contentItem: Text {
         text: AppState.zh(control.displayText)
         color: Theme.text
         font: control.font
         verticalAlignment: Text.AlignVCenter
-        horizontalAlignment:Text.AlignHCenter
+        horizontalAlignment:Text.AlignLeft
         elide: Text.ElideRight
         leftPadding:0; rightPadding:0
     }
@@ -27,18 +28,18 @@ ComboBox {
         source:"image://swirl/chevron-up-down/"+Theme.text.toString().slice(1)
     }
     background: SwirlContinuousSurface {
-        radius: Math.min(height/2,Theme.dp(9))
+        radius: Theme.controlRadius
         antialiasing: true
         color: control.pressed ? Theme.pressed : control.hovered ? Theme.hover : Theme.buttonBase
-        border.width:Theme.dp(0.7)
-        border.color: control.activeFocus ? Theme.focusBorder : Theme.withAlpha(Theme.dark?"#A9BDD5":"#7892B1",0.24)
+        border.width:control.activeFocus?Theme.dp(2):Theme.borderWidth
+        border.color: control.activeFocus ? Theme.focusBorder : Theme.controlBorder
         Behavior on color { ColorAnimation { duration: SwirlMotion.duration } }
     }
     delegate: ItemDelegate {
         objectName:"swirlComboOption-"+index
         SwirlPressMotion{}
         width: control.popup.availableWidth
-        height:Theme.dp(24)
+        height:Theme.controlHeight
         text: String(modelData)
         highlighted: control.highlightedIndex === index
         contentItem: Text {
@@ -62,8 +63,8 @@ ComboBox {
     }
     onClosed:{scale=1;opacity=1}
 
-        y: -control.currentIndex*Theme.dp(24)-Theme.dp(3)
-        x:-Theme.dp(12)
+        y: control.height+Theme.dp(4)
+        x:0
         width: control.width
         padding:Theme.dp(5)
         implicitHeight: Math.min(Theme.dp(290), contentItem.implicitHeight+Theme.dp(12))
@@ -76,7 +77,7 @@ ComboBox {
         }
         exit: Transition { enabled:!SwirlMotion.reduced; ParallelAnimation { NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.duration} NumberAnimation {property:"scale";to:0.96;duration:SwirlMotion.duration;easing.type:Easing.InCubic} } }
         background: Rectangle {
-            color:Theme.dark?Theme.field:"#EDF8FC"
+            color:Theme.surface
             radius: Theme.popupRadius; antialiasing:true
             border.width:Theme.dp(1); border.color: Theme.pillRim
         }

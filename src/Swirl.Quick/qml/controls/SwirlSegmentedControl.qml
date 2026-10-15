@@ -10,8 +10,9 @@ Item {
     property bool accentSelection: false
     property int textPixelSize: 11
     property bool rounded: false
+    opacity:enabled?1:0.45
     signal activated(int index, string value)
-    implicitHeight:Theme.dp(25); implicitWidth:Theme.dp(295)
+    implicitHeight:Theme.statusHeight; implicitWidth:Theme.dp(295)
     Rectangle { anchors.fill:parent; radius:control.rounded ? height/2 : Theme.segmentedRadius; color:control.rounded?(control.accentSelection?Theme.buttonBase:Theme.surface):Theme.material("field"); border.width:control.rounded?0:Theme.borderWidth; border.color:Theme.border }
     Rectangle {
         x:(control.rounded?0:Theme.dp(2))+control.currentIndex*width;y:control.rounded?0:Theme.dp(2)
@@ -32,6 +33,7 @@ Item {
                 hoverEnabled:true
                 background: Rectangle {
                     radius:control.rounded ? height/2 : Theme.segmentedSelectedRadius
+                    border.width:parent.activeFocus?Theme.dp(2):0;border.color:Theme.focusBorder
                     color:control.currentIndex!==index && parent.hovered?Theme.withAlpha(Theme.hover,0.5):"transparent"
                     Behavior on color{ColorAnimation{duration:SwirlMotion.hoverDuration}}
                 }

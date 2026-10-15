@@ -72,7 +72,7 @@ int runOverviewChecks(QQuickWindow *window) {
         for(const auto *route:{"profiles","appearance","license","dns","modules","scripts","subscriptions"}){
             state(QString("window.openSettings('%1')").arg(route));QTest::qWait(100);
             check(sheet->isVisible()&&item("windowCloseButton",sheet)&&item("windowMinimizeButton",sheet)&&item("windowMaximizeButton",sheet),"every secondary route has visible window controls");
-            check(state("settingsLoader.y>=settingsTitleBar.height").toBool(),"secondary page starts below the title bar");
+            check(state("settingsLoader.mapToItem(settingsSheet.contentItem,Qt.point(0,0)).y>=settingsSheet.titleBarHeight").toBool(),"secondary page starts below the title bar");
             if(QString::fromLatin1(route)=="license"){
                 const auto *brand=item("brandVector",sheet);check(brand&&brand->isVisible()&&brand->width()>=104,"About page displays the enlarged brand mark after reopening Appearance");
             }

@@ -6,14 +6,12 @@ QtObject {
     property alias transparency: appearanceStore.savedTransparency
     property bool backdropActive: false
     property bool windowActive:true
-    // Tint the real desktop through the Qt alpha surface, including the page gutter.
-    readonly property real shellOpacity:transparency && backdropActive ? (dark?0.94:0.90) : 1.0
-    readonly property color shellTop:withAlpha(dark?"#233044":windowActive?"#EAF4FF":"#EDF5FD",shellOpacity)
-    readonly property color shellBottom:withAlpha(dark?"#1E2C3F":windowActive?"#DEECFA":"#E7F1FC",shellOpacity)
+    // Windows supplies blur and luminosity. These are only the Swirl overlay.
+    readonly property color nativeTint: dark ? "#1E2B43" : "#EAF1FF"
+    readonly property real nativeTintOpacity: dark ? 0.90 : 0.86
+    // Retained for the opt-in synthetic blur benchmark, never desktop sampling.
     property real glassBlurStrength: 0.85
     property int glassQuality: 1
-    property real glassTintAmount: 0.86
-    readonly property real glassSurfaceOpacity: dark ? 0.98 : 0.975
     readonly property bool effectsSupported: gpuEffectsSupported
     property alias reduceMotion: appearanceStore.savedReduceMotion
     property string pageBranch: "B"
@@ -40,7 +38,7 @@ QtObject {
     readonly property color raised: dark ? "#292929" : "#F7F7F7"
     // Neutral QML tint above the native window backdrop. Fall back to opacity 1.
     readonly property color sidebarBase: dark ? "#292C31" : "#EEF0F3"
-    // Native per-pixel alpha preserves the shared corner outline.
+    // Content materials are composed inside the system-owned HWND outline.
     readonly property real sidebarOpacity: transparency && backdropActive ? (dark ? 0.92 : 0.88) : 1.0
     readonly property real workspaceOpacity:transparency && backdropActive ? (dark ? 0.96 : 0.94) : 1.0
     readonly property real settingsOpacity:dark?0.98:0.96
@@ -50,7 +48,7 @@ QtObject {
     readonly property color glassRim: border
     readonly property color glassGlint: dark ? "#4A4A4A" : "#FFFFFF"
     readonly property color glassShadow: dark ? "#50000000" : "#18000000"
-    readonly property color pillRim: dark ? "#505050" : "#D9DBDE"
+    readonly property color pillRim: dark ? "#4D5C73" : "#CCD8EB"
     readonly property color pillTop: dark ? "#333333" : "#E5E5E7"
     readonly property color pillBottom: pillTop
     readonly property color text: dark ? "#DDDDDD" : "#202327"
@@ -66,13 +64,13 @@ QtObject {
     readonly property color navigationPressed: dark ? "#636871" : "#B4BAC3"
     readonly property color selected: dark ? "#484848" : "#E3E4E7"
     readonly property color segmentSelected: dark ? "#546173" : "#FFFFFF"
-    readonly property color hover: dark ? "#3A3A3A" : "#E3E3E3"
-    readonly property color pressed: dark ? "#505050" : "#D8D8D8"
+    readonly property color hover: dark ? "#3A4B65" : "#E6EDFA"
+    readonly property color pressed: dark ? "#465A78" : "#D7E3F7"
     readonly property color controlBorder: pillRim
     readonly property color focusBorder: dark ? "#9AC8FF" : "#005BBF"
     readonly property color tableToolbar: dark ? "#333333" : "#ECECED"
     readonly property color buttonBase: dark ? "#3C4654" : "#F8FAFD"
-    readonly property color field: dark ? "#353535" : "#F4F4F5"
+    readonly property color field: dark ? "#2C3A50" : "#F2F5FC"
     readonly property color capsuleSurface: dark ? "#38383C" : "#ECEDEF"
     readonly property color green: dark ? "#75DD91" : "#30C759"
     readonly property color statusGreen: dark ? "#75DD91" : "#00B832"
@@ -81,23 +79,28 @@ QtObject {
     // Logical design units: Qt applies screen DPI; dp applies only user UI zoom.
     // Large surfaces follow the supplied ~12 pt visual reference, while nested
     // cards and controls have smaller corners. Circular controls use geometry.
-    readonly property real windowRadius: dp(28)
+    readonly property real windowRadius: dp(8)
     readonly property real containerRadius: dp(24)
     readonly property real radius: containerRadius
-    readonly property real cardRadius: pageBranch === "A" ? dp(20) : dp(10)
+    readonly property real cardRadius: dp(20)
     readonly property real independentCardRadius: dp(20)
     readonly property real tileRadius: dp(8)
-    readonly property real tableRadius: dp(4)
+    readonly property real tableRadius: dp(10)
     readonly property real segmentedRadius: dp(6)
     readonly property real segmentedSelectedRadius: dp(4)
     readonly property real popupRadius: dp(10)
     readonly property real secondaryRadius: popupRadius
     readonly property real controlRadius: dp(8)
-    readonly property real buttonRadius: dp(6)
+    readonly property real buttonRadius: controlRadius
     readonly property real sidebarWidth: dp(200)
     readonly property real pageInset: dp(6)
     readonly property real space: dp(4)
-    readonly property real cardPadding: dp(16)
+    readonly property real cardPadding: dp(20)
+    readonly property real controlHeight: dp(32)
+    readonly property real controlPadding: dp(12)
+    readonly property real tableHeaderHeight: dp(36)
+    readonly property real tableRowHeight: dp(40)
+    readonly property real statusHeight: dp(26)
     readonly property real subCardRadius: dp(10)
     readonly property real capsuleHeight: dp(22)
     readonly property real groupGap: dp(10)

@@ -30,11 +30,11 @@ Item {
                     id: entry; required property var modelData
                     objectName:"settings-"+modelData.route
                     width:(grid.width-(grid.columns-1)*grid.spacing)/grid.columns; height:Theme.dp(156)
-                    padding:Theme.dp(16); hoverEnabled:true
+                    padding:Theme.cardPadding; hoverEnabled:true
                     readonly property real transfer: page.Window.window.settingsOrigin===entry ? page.Window.window.settingsOriginProgress : 0
                     motionScale:(enabled && down?SwirlMotion.pressScale:1)*(1-0.045*transfer)
                     background:Rectangle {
-                        color:entry.hovered?Theme.hover:Theme.material("content"); radius:Theme.dp(20)
+                        color:entry.hovered?Theme.hover:Theme.material("content"); radius:Theme.cardRadius
                         border.width:Theme.borderWidth; border.color:entry.activeFocus?Theme.focusBorder:Theme.border
                         Behavior on color { ColorAnimation { duration:SwirlMotion.hoverDuration } }
                     }

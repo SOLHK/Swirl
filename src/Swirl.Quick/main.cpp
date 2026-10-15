@@ -34,7 +34,6 @@
 #include "app/ModuleDraftStore.h"
 #include "app/ExtensionService.h"
 #include "app/MotionPolicy.h"
-#include "app/WallpaperBackdrop.h"
 #include "app/DismissalController.h"
 #ifdef SWIRL_UI_TESTS
 #include "tests/OverviewChecks.h"
@@ -42,6 +41,7 @@
 #include "tests/CaptureChecks.h"
 #include "tests/GatewayChecks.h"
 #include "tests/WindowChecks.h"
+#include "tests/UiQualityChecks.h"
 #include "tests/HdrChecks.h"
 #include "tests/EngineUiChecks.h"
 #include "tests/NodeUiChecks.h"
@@ -119,7 +119,8 @@ int main(int argc, char *argv[])
     const bool motionTest=app.arguments().contains("--motion-test");
     const bool heroTest=app.arguments().contains("--hero-test");
     const bool appearanceTest=app.arguments().contains("--appearance-test")||app.arguments().contains("--appearance-restore-test");
-    bool previewMode=false;
+    const bool uiQualityTest=app.arguments().contains("--ui-quality-test");
+    bool previewMode=uiQualityTest;
     for(const QString &argument:app.arguments())
         if(argument.startsWith(QStringLiteral("--material-test-output="))||argument.startsWith(QStringLiteral("--viewport-test-output="))||argument.startsWith(QStringLiteral("--motion-demo-output="))||argument.startsWith(QStringLiteral("--motion-visual-dir="))||argument.startsWith(QStringLiteral("--capture-preview="))||argument.startsWith(QStringLiteral("--capture-native-frame=")))previewMode=true;
     const bool hdrTest=app.arguments().contains("--hdr-self-test");
@@ -163,7 +164,6 @@ int main(int argc, char *argv[])
     diagnostics.installQtHandler();
     SystemDataProvider systemData(&capture,&engineController,&diagnostics);
     MotionPolicy motionPolicy;
-    WallpaperBackdrop wallpaperBackdrop(isolatedRun&&!app.arguments().contains("--preview-real-wallpaper"));
     DismissalController dismissals;
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("fontManager", &fontManager);
@@ -196,6 +196,7 @@ int main(int argc, char *argv[])
     const QString previewTheme = argumentValue(QStringLiteral("--preview-theme="));
     const QString previewState = argumentValue(QStringLiteral("--preview-state="));
     if (appearanceTest || heroTest || nodeTest || motionTest || previewMode || engineTest || hdrDisplayTest || hdrTest || smoke || interaction || captureTest || gatewayTest || windowTest || !previewPath.isEmpty()) {
+        if(uiQualityTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-ui-quality.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-ui-quality.txt");}
         if(appearanceTest){const QString file=app.arguments().contains("--appearance-restore-test")?"Swirl-appearance-restore.txt":"Swirl-appearance.txt";app.setProperty("qtDiagnosticFile",file);QFile::remove(QCoreApplication::applicationDirPath()+"/"+file);}
         if(nodeTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-node-ui-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-node-ui-diagnostics.txt");}
         else if(interaction){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-input-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-input-diagnostics.txt");}
@@ -204,8 +205,6 @@ int main(int argc, char *argv[])
     }
     engine.rootContext()->setContextProperty("previewPage", previewPage);
     engine.rootContext()->setContextProperty("previewCaptureMode", previewMode);
-    engine.addImageProvider("swirlwallpaper",new WallpaperImages);
-    engine.rootContext()->setContextProperty("wallpaperBackdrop",&wallpaperBackdrop);
     engine.rootContext()->setContextProperty("gpuEffectsSupported", QQuickWindow::graphicsApi()!=QSGRendererInterface::Software && qEnvironmentVariable("QT_QUICK_BACKEND")!=QStringLiteral("software"));
     engine.rootContext()->setContextProperty("previewTheme", previewTheme);
     engine.rootContext()->setContextProperty("previewState", previewState);
@@ -364,6 +363,15 @@ int main(int argc, char *argv[])
         });
 #else
         qWarning() << "Rebuild with -DSWIRL_BUILD_UI_TESTS=ON to run input checks.";
+        return 4;
+#endif
+    }
+    if (uiQualityTest) {
+#ifdef SWIRL_UI_TESTS
+        const auto output=argumentValue(QStringLiteral("--ui-quality-output="));
+        const bool baseline=app.arguments().contains("--ui-quality-baseline");
+        QTimer::singleShot(500,&app,[&app,rootWindow,&backdrop,output,baseline]{app.exit(runUiQualityChecks(rootWindow,&backdrop,output,baseline));});
+#else
         return 4;
 #endif
     }

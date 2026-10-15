@@ -94,8 +94,8 @@ ApplicationWindow {
     }
     Connections {
         target: Theme
-        function onTransparencyChanged() { backdrop.apply(window, Theme.transparency, Theme.dark);settingsBackdrop.apply(settingsSheet,Theme.transparency,Theme.dark);panelBackdrop.apply(dashboardWindow,Theme.transparency,Theme.dark) }
-        function onDarkChanged() { backdrop.apply(window, Theme.transparency, Theme.dark);settingsBackdrop.apply(settingsSheet,Theme.transparency,Theme.dark);panelBackdrop.apply(dashboardWindow,Theme.transparency,Theme.dark) }
+        function onTransparencyChanged() { backdrop.apply(window, Theme.transparency, Theme.dark) }
+        function onDarkChanged() { backdrop.apply(window, Theme.transparency, Theme.dark) }
         function onUiScaleChanged() { backdrop.apply(window, Theme.transparency, Theme.dark) }
     }
     Binding {
@@ -104,8 +104,7 @@ ApplicationWindow {
     }
     Item {
         id:scaledCanvas
-        // Only the wallpaper material is sampled offscreen. Text and controls
-        // remain native scene-graph nodes at the window's physical resolution.
+        // DWM supplies the native material underneath the sharp QML content.
         width:window.width; height:window.height
         SwirlGlassMaterial {anchors.fill:parent;targetWindow:window}
 
@@ -123,11 +122,11 @@ ApplicationWindow {
         Item {
             id:mainArea; x:window.actualSidebarWidth+window.sidebarGutter; width:parent.width-x-Theme.dp(12); height:parent.height
             RowLayout {
-                id:toolbar; visible:AppState.currentPage==="activity"; x:Theme.dp(4); y:Theme.dp(8); width:parent.width-Theme.dp(14); height:Theme.dp(22); spacing:Theme.dp(10)
-                SwirlStatusCapsule { objectName:"eventsCapsule"; Layout.preferredWidth:Theme.dp(236); Layout.preferredHeight:Theme.dp(22); label:systemProvider.eventCount>0?systemProvider.eventCount+" 个事件":"暂无警告";tone:systemProvider.eventCount>0?"warning":"neutral"; onClicked:AppState.navigate("logs") }
+                id:toolbar; visible:AppState.currentPage==="activity"; x:Theme.dp(4); y:Theme.dp(8); width:parent.width-Theme.dp(14); height:Theme.statusHeight; spacing:Theme.dp(8)
+                SwirlStatusCapsule { objectName:"eventsCapsule"; Layout.preferredWidth:implicitWidth; Layout.preferredHeight:Theme.statusHeight; label:systemProvider.eventCount>0?systemProvider.eventCount+" 个事件":"暂无警告";tone:systemProvider.eventCount>0?"warning":"neutral"; onClicked:AppState.navigate("logs") }
                 Item { Layout.fillWidth:true }
-                SwirlStatusCapsule { objectName:"proxyCapsule"; Layout.preferredWidth:Theme.dp(130); Layout.preferredHeight:Theme.dp(22); label:engineController.systemProxy.systemEnabled&&!engineController.systemProxy.owned?"系统代理 · 其他应用":"系统代理";tone:engineController.systemProxy.error.length||engineController.routingError.length?"warning":engineController.systemProxy.systemEnabled?"success":"neutral";detail:engineController.systemProxy.error||engineController.routingError||(engineController.systemProxy.systemEnabled&&!engineController.systemProxy.owned?"系统代理由其他应用启用，点击让 Swirl 接管":engineController.systemProxy.enabled?"系统代理已开启，点击关闭":"系统代理已关闭，点击开启"); enabled:!engineController.busy; onClicked:{window.proxyRequestedAction=!engineController.systemProxy.enabled;window.proxyTogglePending=true;engineController.setSystemProxy(window.proxyRequestedAction);window.showProxyError()} }
-                SwirlStatusCapsule { objectName:"tunCapsule"; Layout.preferredWidth:Theme.dp(130); Layout.preferredHeight:Theme.dp(22); label:"增强模式";detail:engineController.routingError||(engineController.tunEnabled?"增强模式已开启，点击关闭":"点击开启增强模式接管网络"); tone:engineController.tunEnabled?"success":"neutral"; enabled:!engineController.busy; onClicked:{if(!engineController.setTunEnabled(!engineController.tunRequested))AppState.notice(engineController.routingError||engineController.networkConfigurationError)} }
+                SwirlStatusCapsule { objectName:"proxyCapsule"; Layout.preferredWidth:implicitWidth; Layout.preferredHeight:Theme.statusHeight; label:engineController.systemProxy.systemEnabled&&!engineController.systemProxy.owned?"系统代理 · 其他应用":"系统代理";tone:engineController.systemProxy.error.length||engineController.routingError.length?"warning":engineController.systemProxy.systemEnabled?"success":"neutral";detail:engineController.systemProxy.error||engineController.routingError||(engineController.systemProxy.systemEnabled&&!engineController.systemProxy.owned?"系统代理由其他应用启用，点击让 Swirl 接管":engineController.systemProxy.enabled?"系统代理已开启，点击关闭":"系统代理已关闭，点击开启"); enabled:!engineController.busy; onClicked:{window.proxyRequestedAction=!engineController.systemProxy.enabled;window.proxyTogglePending=true;engineController.setSystemProxy(window.proxyRequestedAction);window.showProxyError()} }
+                SwirlStatusCapsule { objectName:"tunCapsule"; Layout.preferredWidth:implicitWidth; Layout.preferredHeight:Theme.statusHeight; label:"增强模式";detail:engineController.routingError||(engineController.tunEnabled?"增强模式已开启，点击关闭":"点击开启增强模式接管网络"); tone:engineController.tunEnabled?"success":"neutral"; enabled:!engineController.busy; onClicked:{if(!engineController.setTunEnabled(!engineController.tunRequested))AppState.notice(engineController.routingError||engineController.networkConfigurationError)} }
                 SwirlButton { visible:captureProvider.running; text:"抓包中 · "+captureProvider.sessions.length; iconName:"capture"; font.pixelSize:Theme.fontSize(14); onClicked:AppState.navigate("capture") }
 
             }
@@ -186,22 +185,17 @@ ApplicationWindow {
     function closeSettings(){settingsSheet.close()}
     function openRewriteEditor(kind,title){rewriteRulesDialog.kind=kind;rewriteRulesDialog.title=title;rewriteRulesDialog.open()}
     RewriteRulesDialog{id:rewriteRulesDialog}
-    Window {
+    SwirlSecondaryWindow {
+        composition:panelBackdrop
         id:dashboardWindow;objectName:"dashboardWindow";function openProxyControl(){hide();AppState.navigate("policies");window.show();window.raise();window.requestActivate()}
-        property bool swirlDismissibleWindow:true
-        onVisibleChanged:if(visible)panelBackdrop.apply(dashboardWindow,Theme.transparency,Theme.dark)
         visible:false;width:Theme.dp(1300);height:Theme.dp(600);minimumWidth:Theme.dp(914);minimumHeight:Theme.dp(560);title:"Swirl 面板";flags:Qt.Window|Qt.FramelessWindowHint;color:"transparent"
         function openCaptureInspector(){window.openCaptureInspector()}
-        property real swirlWindowRadius:Theme.dp(24)
-        Item{anchors.fill:parent
-        SwirlGlassMaterial{anchors.fill:parent;targetWindow:dashboardWindow}
-        SwirlWindowTitleBar{id:dashboardTitleBar;anchors.left:parent.left;anchors.right:parent.right;targetWindow:dashboardWindow}
-        ExternalToolsPage{anchors.left:parent.left;anchors.right:parent.right;anchors.top:dashboardTitleBar.bottom;anchors.bottom:parent.bottom;clip:true}
-        }
+        ExternalToolsPage{anchors.fill:parent;clip:true}
     }
-    Window {
+
+    SwirlSecondaryWindow {
+        composition:settingsBackdrop
         id:settingsSheet;objectName:"settingsSheet";
-        property bool swirlDismissibleWindow:true
         property string section:"dns";visible:false;width:Math.min(Theme.dp(900),Screen.desktopAvailableWidth);height:Math.min(Theme.dp(790),Screen.desktopAvailableHeight);title:section==="subscriptions"?"Swirl 订阅管理":section==="proxies"?"Swirl 节点管理":section==="profiles"?"Swirl 配置":section==="modules"?"Swirl 模块":section==="scripts"?"Swirl 脚本":"Swirl 设置";flags:Qt.Window|Qt.FramelessWindowHint;modality:Qt.WindowModal;transientParent:window;color:"transparent"
         function closeSettings(){settingsSheet.close()}
         function updateSettingsSection(){if(settingsLoader.item&&settingsLoader.item.section!==undefined)settingsLoader.item.section=section==="appearance"?"外观":section==="fonts"?"字体":section==="license"?"关于 Swirl":"常规"}
@@ -213,7 +207,7 @@ ApplicationWindow {
 
         property string savedFingerprint:""
         property bool discardApproved:false
-        onVisibleChanged:if(visible){settingsBackdrop.apply(settingsSheet,Theme.transparency,Theme.dark);discardApproved=false;closeApproved=false;settingsTransition.moveTo(1);Qt.callLater(function(){savedFingerprint=dismissals.fingerprint(settingsLoader.item)})}else{
+        onVisibleChanged:if(visible){discardApproved=false;closeApproved=false;settingsTransition.moveTo(1);Qt.callLater(function(){savedFingerprint=dismissals.fingerprint(settingsLoader.item)})}else{
             settingsTransition.destination=0;settingsTransition.finish()
             if(window.settingsOrigin && window.settingsOrigin.visible)window.settingsOrigin.forceActiveFocus()
             window.settingsOrigin=null
@@ -228,10 +222,6 @@ ApplicationWindow {
             closeApproved=false;window.requestActivate()
         }
         onSectionChanged:updateSettingsSection()
-        property real swirlWindowRadius:Theme.dp(27)
-        Item{anchors.fill:parent;opacity:settingsSheet.reveal
-        SwirlGlassMaterial{anchors.fill:parent;targetWindow:settingsSheet}
-        SwirlWindowTitleBar{id:settingsTitleBar;anchors.left:parent.left;anchors.right:parent.right;targetWindow:settingsSheet}
         SwirlDialog {
             id:settingsDiscard;objectName:"settingsDiscard";title:"放弃未保存的修改？";guardChanges:false
             parent:settingsSheet.contentItem
@@ -243,9 +233,8 @@ ApplicationWindow {
                 }
             }
         }
-        SwirlPageHost{id:settingsLoader;routeKey:settingsSheet.section;anchors.left:parent.left;anchors.right:parent.right;anchors.top:settingsTitleBar.bottom;anchors.bottom:parent.bottom;clip:true
+        SwirlPageHost{id:settingsLoader;routeKey:settingsSheet.section;anchors.left:parent.left;anchors.right:parent.right;anchors.top:parent.top;anchors.bottom:parent.bottom;clip:true
 sourceComponent:settingsSheet.section==="subscriptions"?subscriptions:settingsSheet.section==="proxies"?proxies:settingsSheet.section==="dns"?dns:settingsSheet.section==="modules"?modules:settingsSheet.section==="profiles"?profiles:settingsSheet.section==="scripts"?scripts:settings;onItemChanged:Qt.callLater(settingsSheet.updateSettingsSection)}
-        }
     }
     SwirlDialog {
         id:captureInspectorDialog;title:"HTTP 请求详情";width:Math.min(Theme.dp(1000),window.width-Theme.dp(20));height:Math.min(Theme.dp(650),window.height-Theme.dp(20));padding:Theme.dp(14)
@@ -311,10 +300,9 @@ sourceComponent:settingsSheet.section==="subscriptions"?subscriptions:settingsSh
     Component { id:workbench; WorkbenchPage { pageId:parent.routeId } }
 
     Timer { interval:1000; running:true; repeat:true; onTriggered:AppState.tickTraffic() }
-    // A thin outline gives overlapping pale windows a visible boundary. Qt
-    // owns the rounded HDR outline, so do not enable a mismatched DWM rectangle.
+    // Compatibility outline only. Native windows use one compositor contour.
     SwirlContinuousSurface {
-        objectName:"windowOutline"
+        objectName:"windowOutline";visible:!backdrop.nativeCorners
         anchors.fill:parent;z:998;color:"transparent";antialiasing:true
         radius:window.shellRadius
         border.width:window.visibility===Window.Maximized?0:1/Screen.devicePixelRatio

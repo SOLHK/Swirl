@@ -37,7 +37,7 @@ Item {
      id:diagnostic;objectName:"internetDiagnosticCard";Layout.columnSpan:2;Layout.fillWidth:true;Layout.minimumWidth:0;Layout.preferredWidth:2;Layout.preferredHeight:height;Layout.alignment:Qt.AlignTop
      collapsedHeight:Theme.dp(184);expandedHeight:collapsedHeight+diagnosticDetails.implicitHeight+Theme.dp(16)
      expanded:page.diagnosticOpen;cornerRadius:Theme.independentCardRadius
-     ColumnLayout {x:Theme.dp(16);y:Theme.dp(14);width:parent.width-Theme.dp(32);spacing:Theme.dp(8)
+     ColumnLayout {x:Theme.cardPadding;y:Theme.cardPadding;width:parent.width-2*Theme.cardPadding;spacing:Theme.dp(8)
       RowLayout {Layout.fillWidth:true;spacing:Theme.dp(6)
        Label {text:"互联网延迟";Layout.fillWidth:true}
        SwirlIconButton {objectName:"networkDiagnosticButton";iconName:"refresh";quiet:true;enabled:page.telemetry.measurementState!=="正在测量";onClicked:page.telemetry.measureNetwork();Accessible.name:"网络诊断";ToolTip.visible:hovered;ToolTip.text:"发起网络诊断";ToolTip.delay:650}
@@ -62,7 +62,7 @@ Item {
     ColumnLayout {Layout.fillWidth:true;Layout.minimumWidth:0;Layout.preferredWidth:1;Layout.alignment:Qt.AlignTop;spacing:Theme.dp(12)
      Repeater {model:["上传","下载"]
      Card {required property string modelData;required property int index;Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(86)
-      ColumnLayout {anchors.fill:parent;anchors.margins:Theme.dp(12);spacing:Theme.dp(4)
+      ColumnLayout {anchors.fill:parent;anchors.margins:Theme.dp(16);spacing:Theme.dp(4)
        RowLayout {Layout.fillWidth:true;Label {text:modelData+(page.telemetry.sampled?" / 秒":" · 等待采样");Layout.fillWidth:true}SwirlIcon {name:index===0?"upload":"download";color:index===0?Theme.accentIndigo:Theme.cyan;size:Theme.dp(15)}}
        RowLayout {Layout.fillWidth:true;Value {id:rate;Layout.fillWidth:true;text:page.bytes(index===0?page.telemetry.uploadRate:page.telemetry.downloadRate,page.telemetry.sampled);font.pixelSize:Theme.fontSize(22)}SwirlIconButton {iconName:"chevron-right";quiet:true;onClicked:page.trafficFrom(rate,index===0?"uploadRate":"downloadRate");Accessible.name:modelData+"流量分析"}}
       }
@@ -72,15 +72,17 @@ Item {
    }
    RowLayout {Layout.fillWidth:true;spacing:Theme.dp(14);Layout.alignment:Qt.AlignTop;layoutDirection:Qt.RightToLeft
     ColumnLayout {Layout.fillWidth:true;Layout.preferredWidth:1;Layout.minimumWidth:0;spacing:Theme.dp(14)
-     Card {Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(126)
-      ColumnLayout {anchors.fill:parent;anchors.margins:Theme.dp(16);spacing:Theme.dp(5)
+     Card {Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(142)
+      ColumnLayout {anchors.fill:parent;anchors.margins:Theme.cardPadding;spacing:Theme.dp(8)
        RowLayout {Layout.fillWidth:true;Label {text:"活动连接";Layout.fillWidth:true}SwirlIconButton {iconName:"chevron-right";quiet:true;onClicked:SwirlMotion.navigateFrom(connectionValue,"connections","activeConnections");Accessible.name:"连接记录"}}
        RowLayout {Layout.fillWidth:true;Value {id:connectionValue;text:page.telemetry.connectionsSampled?String(page.telemetry.activeConnections):"—";Layout.fillWidth:true}Label {text:page.telemetry.connectionsSampled?page.telemetry.activeProcesses+" 个进程":"等待采样"}}
-       Label {text:"DHCP 设备 "+gatewayProvider.devices.filter(r=>r.status==="租用中").length}
+       Rectangle {Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(1);color:Theme.border}
+       Label {text:"DHCP 设备  "+gatewayProvider.devices.filter(r=>r.status==="租用中").length;Layout.fillWidth:true}
+       Item {Layout.fillHeight:true}
       }
      }
-     Card {Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(170)
-      ColumnLayout {anchors.fill:parent;anchors.margins:Theme.dp(16);spacing:Theme.dp(8)
+     Card {Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(160)
+      ColumnLayout {anchors.fill:parent;anchors.margins:Theme.cardPadding;spacing:Theme.dp(8)
        RowLayout {Layout.fillWidth:true;Label {text:"总流量";Layout.fillWidth:true}SwirlSegmentedControl {Layout.preferredWidth:Theme.dp(116);options:["今日","本月"];currentIndex:page.period;onActivated:index=>page.period=index}}
        RowLayout {Layout.fillWidth:true;Value {id:totalValue;Layout.fillWidth:true;text:page.bytes(page.totals.total,page.totals.sampled)}SwirlIconButton {iconName:"chevron-right";quiet:true;onClicked:page.trafficFrom(totalValue,"totalTraffic");Accessible.name:"详细流量统计"}}
        RowLayout {Layout.fillWidth:true;Label {text:"直连 "+(page.distribution[1]?page.distribution[1].value:"—");Layout.fillWidth:true}Label {text:"代理 "+(page.distribution[0]?page.distribution[0].value:"—")}}
@@ -90,8 +92,8 @@ Item {
       }
      }
     }
-    Card {Layout.fillWidth:true;Layout.preferredWidth:2;Layout.minimumWidth:0;Layout.preferredHeight:Theme.dp(310)
-     ColumnLayout {anchors.fill:parent;anchors.margins:Theme.dp(16);spacing:Theme.dp(10)
+    Card {Layout.fillWidth:true;Layout.preferredWidth:2;Layout.minimumWidth:0;Layout.preferredHeight:Theme.dp(316)
+     ColumnLayout {anchors.fill:parent;anchors.margins:Theme.cardPadding;spacing:Theme.dp(10)
       RowLayout {Layout.fillWidth:true;Label {text:"流量趋势";Layout.fillWidth:true}SwirlSegmentedControl {Layout.preferredWidth:Theme.dp(126);options:["全部","仅代理"];currentIndex:page.trafficKind;onActivated:index=>page.trafficKind=index}}
       SwirlDailyTrafficChart {Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(76);proxyOnly:page.trafficKind===1}
       SwirlSegmentedControl {Layout.fillWidth:true;options:["进程与设备","域名","策略"];currentIndex:page.rankingKind;onActivated:index=>page.rankingKind=index}

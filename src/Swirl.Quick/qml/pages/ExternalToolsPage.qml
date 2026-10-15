@@ -51,7 +51,7 @@ Item {
    Text{Layout.fillWidth:true;wrapMode:Text.Wrap;font.pixelSize:Theme.fontSize(12);text:page.tabIndex===2?"当前显示已保存的 Hosts 配置 · DNS 查询历史研发中":page.feedback||captureProvider.error||engineController.error;visible:text.length>0;color:page.tabIndex===2?Theme.muted:Theme.orange}
    SwirlGlassPanel{
     Layout.fillWidth:true;Layout.fillHeight:true;cornerRadius:Theme.independentCardRadius;clip:true
-    SwirlDataTable{objectName:"dashboardTable";anchors.fill:parent;anchors.margins:Theme.dp(8);stripeInset:Theme.dp(6);stripeRadius:Theme.tileRadius;cellPadding:Theme.dp(8);fillEmptyRows:false;headerHeight:Theme.dp(30);itemHeight:Theme.dp(32);rows:page.records;columns:page.columns;onRowSelected:r=>{if(page.tabIndex===0)page.Window.window.openCaptureInspector();else page.feedback="已选择："+String(r.host||r.name||r.code||r.ip||"记录")}}
+    SwirlDataTable{objectName:"dashboardTable";anchors.fill:parent;anchors.margins:Theme.dp(16);stripeInset:Theme.dp(6);stripeRadius:Theme.tileRadius;cellPadding:Theme.controlPadding;fillEmptyRows:false;headerHeight:Theme.tableHeaderHeight;itemHeight:Theme.tableRowHeight;rows:page.records;columns:page.columns;onRowSelected:r=>{if(page.tabIndex===0)page.Window.window.openCaptureInspector();else page.feedback="已选择："+String(r.host||r.name||r.code||r.ip||"记录")}}
     SwirlEmptyState{anchors.centerIn:parent;visible:page.records.length===0;headline:page.query.length?"没有匹配的记录":"暂无记录";detail:page.tabIndex===0?"开启捕获并通过捕获端口发起真实请求。":page.tabIndex===2?"Hosts 可在 DNS 设置中配置；查询历史研发中。":"连接和流量仅在取得真实数据后显示。"}
    }
    Flow{
