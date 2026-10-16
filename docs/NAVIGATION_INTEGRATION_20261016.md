@@ -186,3 +186,19 @@ Production startup diagnostics record only these policy booleans and duration,
 without credentials or user data. Tests-OFF production startup and actual card
 input are verified separately from the deterministic test overrides. The earlier
 69f3cca preview is superseded by this policy correction.
+
+## Reverse functional-content continuity
+
+Production UI input revealed that the shrinking card and shared title moved
+while the outgoing functional page stayed at its final screen position. The
+title could therefore cross its own description during the return. The page
+host now carries the live body by the same spatial displacement as its card,
+without resizing its layout or replacing its controls. A quick reversal or
+resize snapshots the body's current presentation offset before retargeting;
+the next expanded endpoint restores the normal zero offset.
+
+Nine new regression cases reproduced this defect before the repair, then
+verified that the actual page center and card have the same displacement
+during return. A return-to-reopen case additionally checks that the live body
+does not jump when direction changes and that the same cached page survives.
+This is separate from the endpoint pixel comparisons and passive timing data.
