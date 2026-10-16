@@ -10,6 +10,7 @@ class WindowsBackdrop final : public QObject, public QAbstractNativeEventFilter 
     Q_OBJECT
     Q_PROPERTY(bool active READ active NOTIFY changed)
     Q_PROPERTY(bool translucent READ translucent NOTIFY changed)
+    Q_PROPERTY(bool sidebarBlur READ sidebarBlur NOTIFY changed)
     Q_PROPERTY(bool nativeCorners READ nativeCorners NOTIFY changed)
     Q_PROPERTY(bool exactCorners READ exactCorners NOTIFY changed)
     Q_PROPERTY(qreal cornerRadius READ cornerRadius NOTIFY changed)
@@ -20,6 +21,7 @@ public:
     ~WindowsBackdrop() override;
     bool active() const { return m_active; }
     bool translucent() const { return m_translucent; }
+    bool sidebarBlur() const { return m_sidebarBlur; }
     bool nativeCorners() const { return m_nativeCorners; }
     bool exactCorners() const { return m_exactCorners; }
     qreal cornerRadius() const { return m_cornerRadius; }
@@ -49,6 +51,10 @@ private:
     bool m_captureWasTopmost = false;
     bool m_enabled = false, m_dark = false, m_active = false, m_nativeCorners = false;
     bool m_translucent = false;
+    bool m_sidebarBlur = false;
+    quintptr m_sidebarHandle = 0;
+    void updateSidebarBlur();
+    void destroySidebarBlur();
     bool m_exactCorners = false;
     qreal m_cornerRadius = 0;
     QSize m_regionSize;

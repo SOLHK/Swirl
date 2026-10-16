@@ -46,8 +46,9 @@ ApplicationWindow {
     Connections { target:window.captureProviderContext; function onStateChanged(){window.engineControllerContext.setCaptureProxyPort(window.captureProviderContext.running?window.captureProviderContext.port:0)} }
     Connections { target:backdrop; function onChanged() { Theme.backdropActive=backdrop.active;Theme.backdropTranslucent=backdrop.translucent } }
     Binding { target:Theme; property:"windowActive"; value:previewState==="inactive"?false:window.active }
-    readonly property real sidebarGutter:Theme.pageInset
+    readonly property real sidebarGutter:0
     readonly property real actualSidebarWidth:Theme.sidebarWidth
+    readonly property real swirlSidebarWidth:actualSidebarWidth
     Settings { id:windowSettings; category:"Window"; property int normalWidth:0; property int normalHeight:0 }
     onWidthChanged:if(geometryReady && visibility===Window.Windowed)windowSettings.normalWidth=Math.round(width)
     onHeightChanged:if(geometryReady && visibility===Window.Windowed)windowSettings.normalHeight=Math.round(height)
@@ -89,7 +90,10 @@ ApplicationWindow {
         id:scaledCanvas
         // DWM supplies the native material underneath the sharp QML content.
         width:window.width; height:window.height
-        SwirlGlassMaterial {anchors.fill:parent;targetWindow:window}
+        SwirlGlassMaterial {
+            anchors.fill:parent;targetWindow:window
+            sidebarWidth:window.actualSidebarWidth
+        }
 
         MouseArea {
             objectName:"titleDragArea"
@@ -104,7 +108,6 @@ ApplicationWindow {
         SwirlSidebar { id:sidebar; width:window.actualSidebarWidth; height:parent.height; compactByWindow:false }
         Item {
             id:mainArea; x:window.actualSidebarWidth+window.sidebarGutter; width:parent.width-x-Theme.dp(12); height:parent.height
-            Rectangle {anchors.fill:parent;color:Theme.withAlpha(Theme.canvas,Theme.workspaceOpacity);radius:Theme.containerRadius}
             RowLayout {
                 id:toolbar; visible:AppState.currentPage==="activity"; x:Theme.pagePadding; y:Theme.dp(16); width:parent.width-2*Theme.pagePadding; height:Theme.dp(32); spacing:Theme.dp(8)
                 SwirlText {text:"活动";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold;Layout.fillWidth:true}
@@ -226,17 +229,7 @@ ApplicationWindow {
     }
     function persistExitDrafts(){if(settingsSheet.section==="dns"&&settingsLoader.item&&settingsLoader.item.persistExitDraft)settingsLoader.item.persistExitDraft()}
     function closeSettings(){settingsSheet.requestClose()}
-    SwirlSettingsTransfer {
-        id:settingsFlight;objectName:"settingsTransfer"
-        ownerWindow:window;detailWindow:settingsSheet;composition:settingsBackdrop
-        onMovingChanged:if(moving)dismissals.push(settingsFlight,settingsFlight);else dismissals.pop(settingsFlight)
-        onEntered:{settingsSheet.show();settingsSheet.raise();settingsSheet.requestActivate()}
-        onReturned:{
-            settingsSheet.closeApproved=true;settingsSheet.close()
-            if(window.settingsOrigin && window.settingsOrigin.visible)window.settingsOrigin.forceActiveFocus()
-            window.settingsOrigin=null;window.requestActivate()
-        }
-    }
+    readonly property var settingsFlight:settingsSheet
     function openRewriteEditor(kind,title){rewriteRulesDialog.kind=kind;rewriteRulesDialog.title=title;rewriteRulesDialog.open()}
     RewriteRulesDialog{id:rewriteRulesDialog}
     SwirlSecondaryWindow {
@@ -247,9 +240,15 @@ ApplicationWindow {
         ExternalToolsPage{anchors.fill:parent;clip:true}
     }
 
-    SwirlSecondaryWindow {
+    SwirlSettingsTransfer {
         composition:settingsBackdrop
         id:settingsSheet;objectName:"settingsSheet";
+        ownerWindow:window
+        onEntered:{settingsSheet.raise();settingsSheet.requestActivate()}
+        onReturned:{
+            if(window.settingsOrigin && window.settingsOrigin.visible)window.settingsOrigin.forceActiveFocus()
+            window.settingsOrigin=null;window.requestActivate()
+        }
         property string section:"dns";visible:false;width:Math.min(Theme.dp(900),Screen.desktopAvailableWidth);height:Math.min(Theme.dp(790),Screen.desktopAvailableHeight);title:section==="subscriptions"?"Swirl 订阅管理":section==="proxies"?"Swirl 节点管理":section==="profiles"?"Swirl 配置":section==="modules"?"Swirl 模块":section==="scripts"?"Swirl 脚本":"Swirl 设置";flags:Qt.Window|Qt.FramelessWindowHint;modality:Qt.WindowModal;transientParent:window;color:"transparent"
         function closeSettings(){requestClose()}
         function requestClose(){
@@ -265,7 +264,6 @@ ApplicationWindow {
             } else settingsFlight.collapse()
         }
         function updateSettingsSection(){if(settingsLoader.item&&settingsLoader.item.section!==undefined)settingsLoader.item.section=section==="appearance"?"外观":section==="fonts"?"字体":section==="license"?"关于 Swirl":"常规"}
-        readonly property real reveal:settingsFlight.reveal
         property bool closeApproved:false
         property string savedFingerprint:""
         property bool discardApproved:false
@@ -287,7 +285,7 @@ ApplicationWindow {
         }
         // Native flight needs the destination and its draft fingerprint ready
         // together. Route animations remain enabled inside this window.
-        SwirlPageHost{id:settingsLoader;incubateRoutes:false;parent:settingsFlight.ownsContent?settingsFlight.bodySurface:settingsSheet.bodySurface;routeKey:settingsSheet.section;anchors.fill:parent;clip:true
+        SwirlPageHost{id:settingsLoader;incubateRoutes:false;parent:settingsSheet.bodySurface;routeKey:settingsSheet.section;anchors.fill:parent;clip:true
 sourceComponent:settingsSheet.section==="subscriptions"?subscriptions:settingsSheet.section==="proxies"?proxies:settingsSheet.section==="dns"?dns:settingsSheet.section==="modules"?modules:settingsSheet.section==="profiles"?profiles:settingsSheet.section==="scripts"?scripts:settings;onItemChanged:Qt.callLater(settingsSheet.updateSettingsSection)}
     }
     SwirlDialog {

@@ -2,23 +2,22 @@ import QtQuick
 import SwirlQuick
 import "../components"
 
-// A single live surface owns the flight. The native detail window is opaque
-// and only becomes visible after this surface reaches its final rectangle.
-// This tool window covers the union of the source and destination, so a detail
-// taller than the main window is not clipped by the main window's swapchain.
+// One HWND owns entry, live details and return. Content never changes windows.
+// During motion its bounds cover the source/destination union; the inner
+// surface animates without resizing a native window on every frame.
 Window {
     id: flight
     required property var ownerWindow
-    required property var detailWindow
+    readonly property var detailWindow:flight
     required property var composition
     property Item origin: null
     readonly property alias bodySurface: body
     property string phase: "Idle"
     readonly property bool moving: phase === "Expanding" || phase === "Collapsing"
-    readonly property bool ownsContent: moving
+    readonly property bool ownsContent: true
     readonly property bool swirlDismissibleWindow: true
-    readonly property real reveal: fromReveal + (toReveal-fromReveal)*clock.progress
-    readonly property rect surfaceRect: Qt.rect(fromRect.x+(toRect.x-fromRect.x)*clock.progress,
+    readonly property real reveal: phase==="Detail"?1:fromReveal + (toReveal-fromReveal)*clock.progress
+    readonly property rect surfaceRect: phase==="Detail"?Qt.rect(x,y,width,height):Qt.rect(fromRect.x+(toRect.x-fromRect.x)*clock.progress,
                                                fromRect.y+(toRect.y-fromRect.y)*clock.progress,
                                                fromRect.width+(toRect.width-fromRect.width)*clock.progress,
                                                fromRect.height+(toRect.height-fromRect.height)*clock.progress)
@@ -31,13 +30,13 @@ Window {
     property color sourceColor: Theme.material("content")
     property real fromRadius:Theme.cardRadius
     property real toRadius:Theme.cardRadius
-    readonly property real surfaceRadius:fromRadius+(toRadius-fromRadius)*clock.progress
+    readonly property real surfaceRadius:phase==="Detail"?(visibility===Window.Maximized || visibility===Window.FullScreen?0:Theme.windowRadius):fromRadius+(toRadius-fromRadius)*clock.progress
     property color fromColor:Theme.material("content")
     property color toColor:Theme.material("content")
     readonly property color destinationColor:Theme.withAlpha(Theme.nativeTint,
         composition.active && Theme.transparency ? Theme.nativeTintOpacity :
         composition.translucent && Theme.transparency ? Theme.alphaTintOpacity : 1)
-    readonly property color surfaceColor:Qt.rgba(fromColor.r+(toColor.r-fromColor.r)*clock.progress,
+    readonly property color surfaceColor:phase==="Detail"?destinationColor:Qt.rgba(fromColor.r+(toColor.r-fromColor.r)*clock.progress,
                                                fromColor.g+(toColor.g-fromColor.g)*clock.progress,
                                                fromColor.b+(toColor.b-fromColor.b)*clock.progress,
                                                fromColor.a+(toColor.a-fromColor.a)*clock.progress)
@@ -47,6 +46,8 @@ Window {
     property real sourceContentWidth:1
     property bool fadeFallback: false
     property int generation: 0
+    property bool waitingForFirstFrame: false
+    property int initialFrames: 0
     // Internal regression evidence samples the exact handler boundary; native
     // input delivery may advance the animation before a test regains control.
     property rect retargetRequestedRect:Qt.rect(0,0,1,1)
@@ -63,7 +64,17 @@ Window {
     modality: Qt.WindowModal
     color: "transparent"
     visible: false
-    title: detailWindow.title
+    property real swirlWindowRadius:Theme.windowRadius
+    property bool swirlExactWindowRadius:true
+    readonly property bool swirlSuppressShadow:moving
+    readonly property real titleBarHeight:header.height
+    minimumWidth:Math.min(Theme.dp(760),Screen.desktopAvailableWidth)
+    minimumHeight:Math.min(Theme.dp(560),Screen.desktopAvailableHeight)
+    Connections {
+        target:Theme
+        function onTransparencyChanged(){flight.composition.apply(flight,Theme.transparency,Theme.dark)}
+        function onDarkChanged(){flight.composition.apply(flight,Theme.transparency,Theme.dark)}
+    }
 
     function rectangleFor(item) {
         if (!item || !item.visible || item.width <= 0 || item.height <= 0) return null
@@ -93,6 +104,8 @@ Window {
         retargetRequestedRect=current;retargetRequestedReveal=currentReveal;retargetRequestedRadius=currentRadius
         retargeting=true
         ++generation
+        waitingForFirstFrame=!visible
+        initialFrames=waitingForFirstFrame?2:0
         clock.stop()
         fromRect=current;toRect=rectangle;fromReveal=currentReveal;toReveal=value
         fromRadius=currentRadius;toRadius=value===1?Theme.windowRadius:origin && origin.background?origin.background.radius:sourceRadius
@@ -103,12 +116,14 @@ Window {
         retargeting=false
         show();raise();requestActivate()
         clock.duration=Math.max(1,Math.round(SwirlMotion.dialogDuration*Math.max(0.35,Math.abs(value-currentReveal))))
-        clock.moveTo(1)
+        // Do not spend the beginning of the animation constructing a hidden
+        // swapchain. Present its source rectangle before advancing the clock.
+        if(!waitingForFirstFrame)clock.moveTo(1)
     }
     function expand(source) {
         const wasMoving=moving
         origin=source || null
-        destinationRect=Qt.rect(detailWindow.x,detailWindow.y,detailWindow.width,detailWindow.height)
+        if(!wasMoving)destinationRect=Qt.rect(detailWindow.x,detailWindow.y,detailWindow.width,detailWindow.height)
         const sourceRect=rectangleFor(origin)
         fadeFallback=sourceRect===null
         if(!wasMoving) {
@@ -136,23 +151,34 @@ Window {
         sourceContentWidth=origin && origin.contentItem?origin.contentItem.width:sourceRect?Math.max(0,sourceRect.width-2*Theme.cardPadding):sourceContentWidth
         fadeFallback=sourceRect===null
         animate(sourceRect || surfaceRect,0,"Collapsing")
-        detailWindow.hide()
+
     }
     function complete() {
-        if(clock.moving || !moving)return
+        if(waitingForFirstFrame || clock.moving || !moving)return
         if(phase==="Expanding") {
-            phase="Detail"
-            // Reparenting happens only at this endpoint. The native window
-            // receives the same cached page, with no duplicate page or texture.
-            entered()
+            x=destinationRect.x;y=destinationRect.y;width=destinationRect.width;height=destinationRect.height
+            phase="Detail";composition.apply(flight,Theme.transparency,Theme.dark);entered()
         } else {
-            phase="Idle";hide();returned()
+            hide();phase="Idle"
+            x=destinationRect.x;y=destinationRect.y;width=destinationRect.width;height=destinationRect.height
+            returned()
         }
     }
-    function settle() { if(moving){clock.finish();complete()} }
+    function settle() {if(moving){waitingForFirstFrame=false;clock.moveTo(1);clock.finish();complete()}}
     function closeSettings() { detailWindow.requestClose() }
     function requestDismiss() { detailWindow.requestClose() }
-    function reset() { ++generation;clock.stop();phase="Idle";hide();origin=null }
+    function reset() {++generation;waitingForFirstFrame=false;clock.stop();phase="Idle";hide();origin=null}
+    onFrameSwapped: {
+        if(waitingForFirstFrame && moving){
+            // A reused HWND may still deliver the previous hide's queued
+            // swap. Keep the origin stable through a fresh render cycle.
+            if(--initialFrames>0)requestUpdate()
+            else {
+                waitingForFirstFrame=false
+                clock.moveTo(1)
+            }
+        }
+    }
     function updateContour(){
         if(visible && !retargeting)composition.applyTransientClip(flight,Qt.rect(surfaceRect.x-x,surfaceRect.y-y,surfaceRect.width,surfaceRect.height),surfaceRadius)
     }
@@ -160,20 +186,18 @@ Window {
     onYChanged:updateContour()
     onRetargetingChanged:if(!retargeting)updateContour()
     onVisibleChanged:if(visible)updateContour();else composition.clearTransientClip(flight)
-    onClosing: close=>{close.accepted=false;detailWindow.requestClose()}
     SwirlTransitionCoordinator {
         id:clock
         onProgressChanged:flight.updateContour()
         onMovingChanged:if(!moving && flight.moving)Qt.callLater(flight.complete)
     }
     Connections {target:SwirlMotion;function onReducedChanged(){if(SwirlMotion.reduced)flight.settle()}}
-    Connections {target:flight.detailWindow;function onFrameSwapped(){if(flight.phase==="Detail" && flight.visible){flight.hide();flight.detailWindow.raise();flight.detailWindow.requestActivate()}}}
     QtObject {
         id:windowActions
         readonly property string title:flight.detailWindow.title
         readonly property int visibility:flight.detailWindow.visibility
         function close(){flight.detailWindow.requestClose()}
-        function finish(){flight.settle();flight.hide()}
+        function finish(){flight.settle()}
         function showMinimized(){finish();flight.detailWindow.showMinimized()}
         function showFullScreen(){finish();flight.detailWindow.showFullScreen()}
         function showMaximized(){finish();flight.detailWindow.showMaximized()}
@@ -182,6 +206,7 @@ Window {
     }
     Item {
         id: frame
+
         objectName:"settingsTransferSurface"
         x:flight.surfaceRect.x-flight.x;y:flight.surfaceRect.y-flight.y
         width:flight.surfaceRect.width;height:flight.surfaceRect.height
@@ -203,10 +228,10 @@ Window {
             SwirlText {text:flight.sourceDescription;color:Theme.muted;font.pixelSize:Theme.fontSize(11);width:parent.width;wrapMode:Text.WordWrap}
         }
         Item {
-            width:flight.destinationRect.width;height:flight.destinationRect.height
+            width:flight.moving?flight.destinationRect.width:flight.width;height:flight.moving?flight.destinationRect.height:flight.height
             opacity:Math.max(0,Math.min(1,(flight.reveal-0.22)/0.56))
             SwirlWindowTitleBar {id:header;objectName:"settingsTransferTitleBar";anchors.left:parent.left;anchors.right:parent.right;targetWindow:windowActions}
-            Item {id:body;x:0;y:header.height;width:parent.width;height:parent.height-header.height;clip:true;enabled:false}
+            Item {id:body;x:0;y:header.height;width:parent.width;height:parent.height-header.height;clip:true;enabled:!flight.moving}
         }
         WindowEdge {anchors.fill:parent;z:10000;radius:flight.surfaceRadius}
     }

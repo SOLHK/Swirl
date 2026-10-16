@@ -102,6 +102,7 @@ WindowsBackdrop::WindowsBackdrop(QObject *parent) : QObject(parent) {
     if (qApp) qApp->installNativeEventFilter(this);
 }
 WindowsBackdrop::~WindowsBackdrop() {
+    destroySidebarBlur();
     destroyCompatibilityShadow();
     if (qApp) qApp->removeNativeEventFilter(this);
 }
@@ -111,10 +112,11 @@ void WindowsBackdrop::apply(QObject *object, bool enabled, bool dark) {
     if (m_window != window) {
         if (m_window) m_window->removeEventFilter(this);
         destroyCompatibilityShadow();
+        destroySidebarBlur();
         m_window = window;
         window->installEventFilter(this);
         connect(window, &QObject::destroyed, this, [this, window] {
-            if (!m_window || m_window.data() == window) destroyCompatibilityShadow();
+            if (!m_window || m_window.data() == window) {destroyCompatibilityShadow();destroySidebarBlur();}
         });
     }
     m_enabled = enabled; m_dark = dark; refresh();
@@ -203,6 +205,7 @@ void WindowsBackdrop::refresh() {
 }
 void WindowsBackdrop::updateCornerMask() {
     if (!m_window || QGuiApplication::platformName() == QStringLiteral("offscreen")) return;
+    updateSidebarBlur();
     const bool rectangular = m_window->visibility() == QWindow::Maximized || m_window->visibility() == QWindow::FullScreen;
     const auto requested = m_window->property("swirlWindowRadius").toReal();
     const auto radius = requested > 0 ? requested : 10.0 * 96.0 / 72.0;
@@ -294,7 +297,7 @@ void WindowsBackdrop::updateCompatibilityShadow() {
         if (visible == m_shadowVisible) return;
         m_shadowVisible = visible; emit changed();
     };
-    if (!m_window || !m_exactCorners || !m_window->isVisible()
+    if (!m_window || !m_exactCorners || !m_window->isVisible() || m_window->property("swirlSuppressShadow").toBool()
         || m_window->visibility() == QWindow::Maximized || m_window->visibility() == QWindow::FullScreen
         || m_window->visibility() == QWindow::Minimized) {
         if (m_shadowHandle) ShowWindow(reinterpret_cast<HWND>(m_shadowHandle), SW_HIDE);
@@ -344,6 +347,66 @@ void WindowsBackdrop::updateCompatibilityShadow() {
     const bool visible = SetWindowPos(shadow, target, bounds.left - padding, bounds.top - padding, 0, 0,
         SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_SHOWWINDOW);
     setVisible(visible);
+#endif
+}
+void WindowsBackdrop::destroySidebarBlur() {
+#ifdef Q_OS_WIN
+    if(m_sidebarHandle)DestroyWindow(reinterpret_cast<HWND>(m_sidebarHandle));
+#endif
+    m_sidebarHandle=0;
+    if(m_sidebarBlur){m_sidebarBlur=false;emit changed();}
+}
+void WindowsBackdrop::updateSidebarBlur() {
+#ifdef Q_OS_WIN
+    const auto width=m_window?m_window->property("swirlSidebarWidth").toReal():0;
+    const bool available=m_window && m_translucent && width>0;
+    if(!available){destroySidebarBlur();return;}
+    if(!m_sidebarHandle){
+        static const auto registered=[] {
+            WNDCLASSEXW cls{};cls.cbSize=sizeof(cls);cls.hInstance=GetModuleHandleW(nullptr);
+            cls.lpfnWndProc=[](HWND hwnd,UINT message,WPARAM wp,LPARAM lp)->LRESULT {
+                if(message==WM_NCCALCSIZE && wp)return 0;
+                return shadowWindowProc(hwnd,message,wp,lp);
+            };
+            cls.lpszClassName=L"SwirlSidebarAcrylic";return RegisterClassExW(&cls);
+        }();
+        if(!registered)return;
+        const HWND blur=CreateWindowExW(WS_EX_TOOLWINDOW|WS_EX_NOACTIVATE|WS_EX_TRANSPARENT,
+            L"SwirlSidebarAcrylic",L"",WS_POPUP|WS_THICKFRAME,0,0,0,0,nullptr,nullptr,GetModuleHandleW(nullptr),nullptr);
+        if(!blur)return;
+        const int material=1,corner=2,nc=1;const DWORD border=0xFFFFFFFE;
+        const BOOL dark=m_dark;const MARGINS margins{-1,-1,-1,-1};
+        DwmSetWindowAttribute(blur,2,&nc,sizeof(nc));
+        DwmSetWindowAttribute(blur,33,&corner,sizeof(corner));
+        DwmSetWindowAttribute(blur,34,&border,sizeof(border));
+        DwmSetWindowAttribute(blur,20,&dark,sizeof(dark));
+        if(FAILED(DwmSetWindowAttribute(blur,38,&material,sizeof(material))) || FAILED(DwmExtendFrameIntoClientArea(blur,&margins))){DestroyWindow(blur);return;}
+        // Desktop Acrylic becomes opaque for an inactive helper HWND. Use
+        // the compositor's blur policy for this non-activating visual only.
+        // Resolve the optional API dynamically and keep the alpha fallback
+        // when Windows does not expose it; never claim a blur from alpha.
+        struct AccentPolicy {int state;int flags;DWORD tint;int animation;};
+        struct CompositionData {int attribute;void *data;SIZE_T size;};
+        using SetComposition=BOOL(WINAPI *)(HWND,CompositionData *);
+        const auto setComposition=reinterpret_cast<SetComposition>(GetProcAddress(GetModuleHandleW(L"user32.dll"),"SetWindowCompositionAttribute"));
+        AccentPolicy accent{3,0,0,0};CompositionData data{19,&accent,sizeof(accent)};
+        if(!setComposition || !setComposition(blur,&data)){DestroyWindow(blur);return;}
+        m_sidebarHandle=reinterpret_cast<quintptr>(blur);
+        m_sidebarBlur=true;emit changed();
+    }
+    const HWND blur=reinterpret_cast<HWND>(m_sidebarHandle);
+    if(!m_window->isVisible() || m_window->visibility()==QWindow::Minimized){ShowWindow(blur,SW_HIDE);return;}
+    const HWND shell=reinterpret_cast<HWND>(m_window->winId());RECT bounds{};
+    if(!GetWindowRect(shell,&bounds))return;
+    const BOOL dark=m_dark;DwmSetWindowAttribute(blur,20,&dark,sizeof(dark));
+    const auto dpr=m_window->devicePixelRatio();const int inset=qMax(1,qCeil(dpr));
+    // This compositor-only sibling stays inside the exact shell contour.
+    // Its system-rounded corners never paint outside the shell's AA edge;
+    // the opaque workspace covers its right edge. No desktop capture, CPU
+    // blur, foreground texture, timer or input handling is involved.
+    SetWindowPos(blur,shell,bounds.left+inset,bounds.top+inset,
+        qRound((width+20)*dpr)-inset,bounds.bottom-bounds.top-2*inset,
+        SWP_NOACTIVATE|SWP_NOOWNERZORDER|SWP_SHOWWINDOW);
 #endif
 }
 void WindowsBackdrop::scheduleCornerUpdate() {

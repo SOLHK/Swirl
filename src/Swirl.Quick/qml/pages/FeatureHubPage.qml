@@ -36,7 +36,9 @@ Item {
                     padding:Theme.cardPadding; hoverEnabled:true
                     readonly property real transfer: page.Window.window.settingsOrigin===entry ? page.Window.window.settingsOriginProgress : 0
                     motionScale:enabled && down?SwirlMotion.pressScale:1
-                    opacity:page.Window.window.settingsOrigin===entry && page.Window.window.settingsOriginMoving?0:1
+                    // Keep the real card painted underneath the native flight.
+                    // Hiding it on input leaves a hole until that HWND presents.
+                    opacity:1
                     background:Rectangle {
                         color:entry.hovered?Theme.hover:Theme.material("content"); radius:Theme.cardRadius
                         border.width:Theme.borderWidth; border.color:entry.activeFocus?Theme.focusBorder:Theme.border

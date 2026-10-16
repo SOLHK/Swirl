@@ -174,7 +174,7 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     check(exactOpaque ? !backdrop->active()&&backdrop->status().contains("exact 10pt")
                       : (backdrop->active()&&backdrop->status().contains("Desktop Acrylic"))||(backdrop->translucent()&&backdrop->status().contains("Alpha translucency")),
           "composition reports native Acrylic, exact alpha, or a policy-required opaque fallback");
-    check(exactOpaque ? sidebarChange<=3 : sidebarChange>=4&&sidebarChange<40,"sidebar follows the effective composition capability");
+    check(exactOpaque ? sidebarChange<=3 : sidebarChange>=4&&sidebarChange<(backdrop->sidebarBlur()?160:40),"sidebar follows the effective composition capability");
     check(exactOpaque ? contentChange<=3 : contentChange>=4&&contentChange<40,"workspace gutter follows the effective composition capability");
     // Cards remain readable while the shell and page gutter reveal the desktop.
     const auto materialAlpha=window->grabWindow().pixelColor(int(window->width()*0.995*window->devicePixelRatio()),int(window->height()*0.5*window->devicePixelRatio())).alpha();
@@ -204,8 +204,8 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     int intermediate=0;
     for(int x=cx-50;x<=cx+50;++x){const int value=edge.pixelColor(x,row).red();if(value>low+2&&value<high-2)++intermediate;}
     qInfo()<<"Alpha edge profile: left="<<a<<"right="<<b<<"intermediate pixels="<<intermediate;
-    check(backdrop->translucent() ? !backdrop->active()&&high-low>3 : exactOpaque ? !backdrop->active()&&intermediate==0 : backdrop->active()&&intermediate>0,
-          "alpha path transmits the real background; only native Acrylic is described as blur");
+    check(backdrop->sidebarBlur() ? intermediate>=12&&high-low>3 : backdrop->translucent() ? !backdrop->active()&&high-low>3 : exactOpaque ? !backdrop->active()&&intermediate==0 : backdrop->active()&&intermediate>0,
+          "sidebar Acrylic spreads the real desktop edge across at least twelve pixels; alpha fallback is not blur");
     delete rectangle;
     window->setPosition(available.topLeft()+QPoint(60,40));
     state("Theme.transparency=false");QTest::qWait(500);

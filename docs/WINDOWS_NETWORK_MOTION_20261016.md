@@ -118,3 +118,42 @@ guard or adding a release-approval label.
 The branch must not be represented as fully accepted or merged solely because
 compilation and controlled tests pass. The current user task conditions merging
 to `main` on completed acceptance; unresolved gates keep it in review.
+
+## Follow-up: More-card frame continuity and sidebar blur
+
+The user observed start/middle/end flashes despite earlier geometry checks.
+An intermediate endpoint-snapshot handoff also crashed during frame readback;
+that build and its incomplete capture batch are rejected. The implementation
+now uses ONE native settings window for entry, live details and return. The
+page never reparents to another window, and no endpoint screenshot is used.
+The same inner surface animates within a fixed source/destination union;
+at the endpoint the native bounds settle to the detail rectangle. The source
+card stays painted while the first native frame prepares. Native window-state
+operations settle synchronously. Existing expand/reverse animations remain.
+
+The extra rounded workspace background and sidebar gutter were removed after
+the user identified the unwanted two-panel appearance. Tint now transitions
+continuously from the frosted sidebar to the workspace within one shell.
+The sidebar now uses a separate non-activating, input-transparent compositor
+blur surface inside the shell contour. DWM Desktop Acrylic on an inactive
+helper became opaque in the actual desktop test, so the optional compositor
+accent blur policy is resolved dynamically. This undocumented Windows policy
+is capability-dependent; failure retains the explicit alpha fallback. This is
+not an implementation of macOS materials. Foreground text never goes through
+a blur texture. Light/dark tint alpha is 0.60/0.58, while the workspace remains
+readable. Native desktop tests passed 65 checks: red/blue sidebar delta 146,
+with 90 intermediate pixels across the controlled split-color edge; disabling
+transparency removes the effect. Minimize, restore, resize and exact corners
+also passed. No desktop image is sampled by the production implementation.
+
+The selected Singapore exit completed verified TLS/HTTP responses to all six
+OpenAI probe hosts. The independent route-verified proxy measurement was 632 ms
+and HTTP 204. A separate ephemeral Codex CLI process, explicitly given the
+isolated proxy environment, returned the expected sentinel in 6092 ms with
+exit code 0. Raw CLI output and credentials were not retained. This proves that
+request through that exit, not desktop OAuth or long-lived remote-control
+WebSocket acceptance. The earlier UAE exit timeout remains valid evidence
+about that exit. The isolated engine was stopped; the original encrypted node
+store SHA-256 remained unchanged and system proxy ownership was not taken.
+
+Final single-window follow-up: HeroChecks passed 229 checks with frame capture enabled; WindowChecks passed 65 checks. Earlier failed/crashed batches are retained only as rejected diagnostics, not acceptance. Physical display and desktop OAuth release gates remain open.
