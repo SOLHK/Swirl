@@ -48,7 +48,14 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     if(check(QTest::qWaitFor([&]{return controller->apiHealthy();},15000),"UI starts actual pinned Mihomo")) {
         check(!controller->requestSucceeded(),"running engine does not imply successful request");fill("nodeTestUrl",net.url().toString());click("nodeTestButton");
         check(QTest::qWaitFor([&]{return !controller->tests()->busy();},41000)&&controller->tests()->result(controller->selectedNodeId()).value("success").toBool()&&net.a.forwarded>=2&&net.b.forwarded==0,"UI real request passes only through selected node A");
-        const auto pid=controller->processId();select(1);
+        const auto pid=controller->processId();
+        const auto selectedBeforeNavigation=controller->selectedNodeId();
+        for(const auto &route:QStringList{"featurehub","settings","appearance","fonts","dns","modules","profiles","scripts","subscriptions","proxies"}){
+            eval("AppState.navigate('"+route+"')");
+            check(QTest::qWaitFor([&]{auto *active=host?qvariant_cast<QObject *>(host->property("activeLoader")):nullptr;return active&&active->property("routeId").toString()==route&&!host->property("moving").toBool()&&!host->property("pendingGrab").toBool();},3500),"live navigation settles inside the main host");
+            check(controller->processId()==pid&&controller->apiHealthy()&&controller->selectedNodeId()==selectedBeforeNavigation,"all settings routes preserve the real running proxy and selected node");
+        }
+        select(1);
         check(QTest::qWaitFor([&]{return !controller->nodeBusy();},5000)&&controller->activeNodeId()==controller->selectedNodeId()&&controller->processId()==pid,"row selection switches real engine node without restarting");
         check(!controller->tests()->result(controller->selectedNodeId()).value("success").toBool(),"new selected node has no inherited request result");click("nodeTestButton");
         check(QTest::qWaitFor([&]{return !controller->tests()->busy();},41000)&&controller->tests()->result(controller->selectedNodeId()).value("success").toBool()&&net.b.forwarded>=2,"UI new requests use authenticated selected node B");
@@ -163,10 +170,10 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         clipper.setVisible(true);QMetaObject::invokeMethod(hero,"start",Q_ARG(QVariant,QVariant::fromValue(&row)));QTest::qWait(45);
         const auto reveal=hero->property("reveal").toReal();
         QMetaObject::invokeMethod(hero,"returnTo",Q_ARG(QVariant,QVariant::fromValue(&row)));
-        check(qAbs(hero->property("reveal").toReal()-reveal)<0.01,"node reversal preserves content opacity at the handoff");
+        check(qAbs(hero->property("retargetRequestedReveal").toReal()-hero->property("retargetCommittedReveal").toReal())<0.001,"node reversal preserves content opacity at the handler handoff");
         QTest::qWait(30);const auto closingReveal=hero->property("reveal").toReal();
         QMetaObject::invokeMethod(hero,"start",Q_ARG(QVariant,QVariant::fromValue(&row)));
-        check(qAbs(hero->property("reveal").toReal()-closingReveal)<0.01,"node reopen preserves partially revealed content");
+        check(qAbs(hero->property("retargetRequestedReveal").toReal()-hero->property("retargetCommittedReveal").toReal())<0.001,"node reopen preserves partially revealed content at the handler handoff");
         QTest::qWait(400);
     }
     const auto qa=qEnvironmentVariable("SWIRL_UI_QA_DIRECTORY");

@@ -15,7 +15,9 @@ Item {
  property int geometryRevision:0
  function refreshGeometry(){++geometryRevision}
  Connections {target:transfer.parent;function onWidthChanged(){Qt.callLater(transfer.refreshGeometry)}function onHeightChanged(){Qt.callLater(transfer.refreshGeometry)}}
- readonly property bool moving:clock.moving
+ readonly property bool moving:configuring || clock.moving
+ property real retargetRequestedReveal:0
+ property real retargetCommittedReveal:0
  readonly property string phase:moving?(opened?(retargeting?"Retargeting":"Opening"):"Closing"):(opened?"Open":"Closed")
  readonly property real progress:moving?fromReveal+(toReveal-fromReveal)*clock.progress:(opened?1:0)
  readonly property rect destination:{
@@ -52,14 +54,16 @@ Item {
   const wasOpen=opened&&!moving
   const current=moving?currentRect():(wasOpen?destination:sourceRect(row))
   const currentReveal=reveal
+  retargetRequestedReveal=currentReveal
   configuring=true;clock.stop();sourceRow=row;retargeting=wasOpen
-  opened=true;fromReveal=currentReveal;toReveal=1;fromRect=current;toRect=destination;clock.progress=0;clock.moveTo(1);configuring=false
+  opened=true;fromReveal=currentReveal;toReveal=1;fromRect=current;toRect=destination;clock.progress=0;retargetCommittedReveal=reveal;clock.moveTo(1);configuring=false
  }
  function returnTo(row){
   const current=currentRect()
   const currentReveal=reveal
+  retargetRequestedReveal=currentReveal
   configuring=true;clock.stop();retargeting=false;sourceRow=row
-  opened=false;fromReveal=currentReveal;toReveal=0;fromRect=current;toRect=sourceRect(row);clock.progress=0;clock.moveTo(1);configuring=false
+  opened=false;fromReveal=currentReveal;toReveal=0;fromRect=current;toRect=sourceRect(row);clock.progress=0;retargetCommittedReveal=reveal;clock.moveTo(1);configuring=false
  }
  onOpenedChanged:if(!configuring){if(opened)start(sourceRow);else returnTo(sourceRow)}
  onDestinationChanged:if(moving&&!configuring){

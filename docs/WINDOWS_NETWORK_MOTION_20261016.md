@@ -1,5 +1,9 @@
 # Windows network, motion and composition repair — acceptance record
 
+Settings-window and sidebar-only material descriptions below are historical.
+The current main-window navigation and whole-shell material implementation is
+documented in [NAVIGATION_INTEGRATION_20261016.md](NAVIGATION_INTEGRATION_20261016.md).
+
 Base: `ea047b7` (`main`, fetched again during this work). Qt 6.10.3, MinGW
 13.1, Release, Windows 11, D3D11. This is an implementation and evidence
 record, **not a declaration that Codex desktop authentication is fixed**.

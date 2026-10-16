@@ -174,11 +174,18 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     check(exactOpaque ? !backdrop->active()&&backdrop->status().contains("exact 10pt")
                       : (backdrop->active()&&backdrop->status().contains("Desktop Acrylic"))||(backdrop->translucent()&&backdrop->status().contains("Alpha translucency")),
           "composition reports native Acrylic, exact alpha, or a policy-required opaque fallback");
-    check(exactOpaque ? sidebarChange<=3 : sidebarChange>=4&&sidebarChange<(backdrop->sidebarBlur()?160:40),"sidebar follows the effective composition capability");
-    check(exactOpaque ? contentChange<=3 : contentChange>=4&&contentChange<40,"workspace gutter follows the effective composition capability");
+    check(exactOpaque ? sidebarChange<=3 : sidebarChange>=4&&sidebarChange<(backdrop->blurActive()?160:40),"sidebar follows the effective composition capability");
+    check(exactOpaque ? contentChange<=3 : contentChange>=4&&contentChange<(backdrop->blurActive()?160:40),"workspace follows the effective composition capability");
+    if(backdrop->blurActive()){
+        check(qAbs(sidebarChange-contentChange)<=8,"sidebar and workspace transmit the same live desktop material");
+        const auto scale=window->devicePixelRatio();const auto divider=state("window.actualSidebarWidth").toReal();
+        const auto lhs=red.pixelColor(qRound((divider-12)*scale),qRound(8*scale));
+        const auto rhs=red.pixelColor(qRound((divider+12)*scale),qRound(8*scale));
+        check(distance(lhs,rhs)<=3,"the former sidebar boundary has no vertical tint seam");
+    }
     // Cards remain readable while the shell and page gutter reveal the desktop.
     const auto materialAlpha=window->grabWindow().pixelColor(int(window->width()*0.995*window->devicePixelRatio()),int(window->height()*0.5*window->devicePixelRatio())).alpha();
-    check(exactOpaque ? materialAlpha==255 : backdrop->translucent()?materialAlpha>=232&&materialAlpha<=242:materialAlpha>=215&&materialAlpha<=225,"actual alpha matches the selected material, including restrained exact-contour translucency");
+    check(exactOpaque ? materialAlpha==255 : backdrop->blurActive()?materialAlpha>=187&&materialAlpha<=191:backdrop->translucent()?materialAlpha>=232&&materialAlpha<=242:materialAlpha>=215&&materialAlpha<=225,"actual alpha matches the single material tint");
     // Move Swirl relative to a split-color native QML window to verify position-
     // dependent composition. The scene is a test window, not a wallpaper image.
     QQuickItem split;
@@ -204,7 +211,7 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     int intermediate=0;
     for(int x=cx-50;x<=cx+50;++x){const int value=edge.pixelColor(x,row).red();if(value>low+2&&value<high-2)++intermediate;}
     qInfo()<<"Alpha edge profile: left="<<a<<"right="<<b<<"intermediate pixels="<<intermediate;
-    check(backdrop->sidebarBlur() ? intermediate>=12&&high-low>3 : backdrop->translucent() ? !backdrop->active()&&high-low>3 : exactOpaque ? !backdrop->active()&&intermediate==0 : backdrop->active()&&intermediate>0,
+    check(backdrop->blurActive() ? intermediate>=12&&high-low>3 : backdrop->translucent() ? !backdrop->active()&&high-low>3 : exactOpaque ? !backdrop->active()&&intermediate==0 : backdrop->active()&&intermediate>0,
           "sidebar Acrylic spreads the real desktop edge across at least twelve pixels; alpha fallback is not blur");
     delete rectangle;
     window->setPosition(available.topLeft()+QPoint(60,40));

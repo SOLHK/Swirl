@@ -10,7 +10,7 @@ SwirlMotionButton {
     property string title: "总览"
     property string iconName: "home"
     property bool compact: false
-    readonly property bool chosen: AppState.currentPage === pageId
+    readonly property bool chosen: AppState.sidebarPage === pageId
     signal activated()
     property var selectionOwner:null
     pressMotion:false

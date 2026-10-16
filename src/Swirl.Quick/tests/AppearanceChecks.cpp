@@ -16,7 +16,7 @@ int runAppearanceChecks(QQuickWindow *window,bool restoreOnly) {
     auto check=[&](bool ok,const char *name){qInfo()<<(ok?"PASS":"FAIL")<<name;if(!ok)++failures;};
     auto eval=[&](const QString &code){QQmlExpression e(qmlContext(window),window,code);auto value=e.evaluate();check(!e.hasError(),"appearance expression is valid");return value;};
     if(restoreOnly){check(eval("Theme.mode==='Dark' && Theme.dark").toBool(),"new process restores saved dark theme");return failures?2:0;}
-    eval("Theme.reduceMotion=true;AppState.navigate('settings')");QTest::qWait(350);
+    eval("Theme.reduceMotion=true;AppState.navigate('appearance')");QTest::qWait(350);
     std::function<QQuickItem *(QQuickItem *,const QString &)> find=[&](QQuickItem *item,const QString &name)->QQuickItem *{if(item->objectName()==name)return item;for(auto *child:item->childItems())if(auto *match=find(child,name))return match;return nullptr;};
     auto *picker=find(window->contentItem(),"themeModePicker");check(picker&&picker->isVisible()&&picker->isEnabled(),"theme picker is visible and enabled");
     if(picker){

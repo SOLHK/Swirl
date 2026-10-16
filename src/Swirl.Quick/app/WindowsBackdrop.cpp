@@ -102,7 +102,7 @@ WindowsBackdrop::WindowsBackdrop(QObject *parent) : QObject(parent) {
     if (qApp) qApp->installNativeEventFilter(this);
 }
 WindowsBackdrop::~WindowsBackdrop() {
-    destroySidebarBlur();
+    destroyBackdropBlur();
     destroyCompatibilityShadow();
     if (qApp) qApp->removeNativeEventFilter(this);
 }
@@ -112,11 +112,11 @@ void WindowsBackdrop::apply(QObject *object, bool enabled, bool dark) {
     if (m_window != window) {
         if (m_window) m_window->removeEventFilter(this);
         destroyCompatibilityShadow();
-        destroySidebarBlur();
+        destroyBackdropBlur();
         m_window = window;
         window->installEventFilter(this);
         connect(window, &QObject::destroyed, this, [this, window] {
-            if (!m_window || m_window.data() == window) {destroyCompatibilityShadow();destroySidebarBlur();}
+            if (!m_window || m_window.data() == window) {destroyCompatibilityShadow();destroyBackdropBlur();}
         });
     }
     m_enabled = enabled; m_dark = dark; refresh();
@@ -205,7 +205,7 @@ void WindowsBackdrop::refresh() {
 }
 void WindowsBackdrop::updateCornerMask() {
     if (!m_window || QGuiApplication::platformName() == QStringLiteral("offscreen")) return;
-    updateSidebarBlur();
+    updateBackdropBlur();
     const bool rectangular = m_window->visibility() == QWindow::Maximized || m_window->visibility() == QWindow::FullScreen;
     const auto requested = m_window->property("swirlWindowRadius").toReal();
     const auto radius = requested > 0 ? requested : 10.0 * 96.0 / 72.0;
@@ -349,30 +349,30 @@ void WindowsBackdrop::updateCompatibilityShadow() {
     setVisible(visible);
 #endif
 }
-void WindowsBackdrop::destroySidebarBlur() {
+void WindowsBackdrop::destroyBackdropBlur() {
 #ifdef Q_OS_WIN
-    if(m_sidebarHandle)DestroyWindow(reinterpret_cast<HWND>(m_sidebarHandle));
+    if(m_blurHandle)DestroyWindow(reinterpret_cast<HWND>(m_blurHandle));
 #endif
-    m_sidebarHandle=0;
-    if(m_sidebarBlur){m_sidebarBlur=false;emit changed();}
+    m_blurHandle=0;
+    if(m_blurActive){m_blurActive=false;emit changed();}
 }
-void WindowsBackdrop::updateSidebarBlur() {
+void WindowsBackdrop::updateBackdropBlur() {
 #ifdef Q_OS_WIN
-    const auto width=m_window?m_window->property("swirlSidebarWidth").toReal():0;
+    const auto width=m_window && m_window->property("swirlUnifiedBlur").toBool()?m_window->width():0;
     const bool available=m_window && m_translucent && width>0;
-    if(!available){destroySidebarBlur();return;}
-    if(!m_sidebarHandle){
+    if(!available){destroyBackdropBlur();return;}
+    if(!m_blurHandle){
         static const auto registered=[] {
             WNDCLASSEXW cls{};cls.cbSize=sizeof(cls);cls.hInstance=GetModuleHandleW(nullptr);
             cls.lpfnWndProc=[](HWND hwnd,UINT message,WPARAM wp,LPARAM lp)->LRESULT {
                 if(message==WM_NCCALCSIZE && wp)return 0;
                 return shadowWindowProc(hwnd,message,wp,lp);
             };
-            cls.lpszClassName=L"SwirlSidebarAcrylic";return RegisterClassExW(&cls);
+            cls.lpszClassName=L"SwirlUnifiedBackdrop";return RegisterClassExW(&cls);
         }();
         if(!registered)return;
         const HWND blur=CreateWindowExW(WS_EX_TOOLWINDOW|WS_EX_NOACTIVATE|WS_EX_TRANSPARENT,
-            L"SwirlSidebarAcrylic",L"",WS_POPUP|WS_THICKFRAME,0,0,0,0,nullptr,nullptr,GetModuleHandleW(nullptr),nullptr);
+            L"SwirlUnifiedBackdrop",L"",WS_POPUP|WS_THICKFRAME,0,0,0,0,nullptr,nullptr,GetModuleHandleW(nullptr),nullptr);
         if(!blur)return;
         const int material=1,corner=2,nc=1;const DWORD border=0xFFFFFFFE;
         const BOOL dark=m_dark;const MARGINS margins{-1,-1,-1,-1};
@@ -391,21 +391,20 @@ void WindowsBackdrop::updateSidebarBlur() {
         const auto setComposition=reinterpret_cast<SetComposition>(GetProcAddress(GetModuleHandleW(L"user32.dll"),"SetWindowCompositionAttribute"));
         AccentPolicy accent{3,0,0,0};CompositionData data{19,&accent,sizeof(accent)};
         if(!setComposition || !setComposition(blur,&data)){DestroyWindow(blur);return;}
-        m_sidebarHandle=reinterpret_cast<quintptr>(blur);
-        m_sidebarBlur=true;emit changed();
+        m_blurHandle=reinterpret_cast<quintptr>(blur);
+        m_blurActive=true;emit changed();
     }
-    const HWND blur=reinterpret_cast<HWND>(m_sidebarHandle);
+    const HWND blur=reinterpret_cast<HWND>(m_blurHandle);
     if(!m_window->isVisible() || m_window->visibility()==QWindow::Minimized){ShowWindow(blur,SW_HIDE);return;}
     const HWND shell=reinterpret_cast<HWND>(m_window->winId());RECT bounds{};
     if(!GetWindowRect(shell,&bounds))return;
     const BOOL dark=m_dark;DwmSetWindowAttribute(blur,20,&dark,sizeof(dark));
     const auto dpr=m_window->devicePixelRatio();const int inset=qMax(1,qCeil(dpr));
-    // This compositor-only sibling stays inside the exact shell contour.
-    // Its system-rounded corners never paint outside the shell's AA edge;
-    // the opaque workspace covers its right edge. No desktop capture, CPU
-    // blur, foreground texture, timer or input handling is involved.
+    // One compositor-only surface covers the entire shell. Sidebar and
+    // workspace sample the same live backdrop, with one uniform tint above.
+    // No desktop capture, CPU blur, foreground texture or timer is involved.
     SetWindowPos(blur,shell,bounds.left+inset,bounds.top+inset,
-        qRound((width+20)*dpr)-inset,bounds.bottom-bounds.top-2*inset,
+        bounds.right-bounds.left-2*inset,bounds.bottom-bounds.top-2*inset,
         SWP_NOACTIVATE|SWP_NOOWNERZORDER|SWP_SHOWWINDOW);
 #endif
 }

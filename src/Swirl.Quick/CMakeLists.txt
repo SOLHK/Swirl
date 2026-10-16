@@ -72,7 +72,6 @@ set(SWIRL_QML_FILES
  qml/controls/SwirlText.qml
  qml/controls/SwirlLinkedDetail.qml
  qml/controls/SwirlNodeTransfer.qml
- qml/controls/SwirlSettingsTransfer.qml
  qml/components/SwirlFontSettings.qml
  qml/components/SwirlSecondaryWindow.qml
  qml/components/SwirlWindowTitleBar.qml
@@ -158,7 +157,7 @@ if(SWIRL_BUILD_UI_TESTS)
  target_sources(Swirl PRIVATE tests/UiQualityChecks.h tests/UiQualityChecks.cpp)
  target_sources(Swirl PRIVATE tests/RuntimeEvidence.cpp tests/RuntimeEvidence.h)
  target_sources(Swirl PRIVATE tests/MaterialChecks.cpp tests/MaterialChecks.h)
- target_sources(Swirl PRIVATE tests/HeroChecks.cpp tests/HeroChecks.h)
+ target_sources(Swirl PRIVATE tests/HeroChecks.cpp tests/HeroChecks.h tests/NavigationChecks.cpp tests/NavigationChecks.h)
  target_sources(Swirl PRIVATE tests/AppearanceChecks.cpp tests/AppearanceChecks.h)
  add_test(NAME swirl-appearance-ui COMMAND Swirl --appearance-test)
  set_tests_properties(swirl-appearance-ui PROPERTIES TIMEOUT 45 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
@@ -281,6 +280,8 @@ if(SWIRL_BUILD_UI_TESTS)
  add_test(NAME swirl-motion COMMAND Swirl --motion-test --motion-output=motion-report.json)
  if(WIN32)
   add_test(NAME swirl-hero COMMAND Swirl --hero-test --hero-output=hero-evidence)
+  add_test(NAME swirl-navigation-ui COMMAND Swirl --navigation-test --navigation-output=navigation-evidence --hero-no-recording)
+  set_tests_properties(swirl-navigation-ui PROPERTIES TIMEOUT 90 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
   set_tests_properties(swirl-hero PROPERTIES TIMEOUT 120 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
  endif()
  set_tests_properties(swirl-motion PROPERTIES TIMEOUT 120

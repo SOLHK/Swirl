@@ -18,6 +18,9 @@ Item {
     property bool animateRowChanges:false
     property bool animateLatency:false
     property bool minimal:false
+    property alias scrollPosition:list.contentY
+    function scrollToBeginning(){list.positionViewAtBeginning()}
+    readonly property int renderedRows:list.contentItem.children.length
     SwirlAnimatedModel{id:stableRows;source:table.incrementalRows?table.rows:[];keyRole:"id"}
     property string selectedId:""
     property Item selectedItem:null

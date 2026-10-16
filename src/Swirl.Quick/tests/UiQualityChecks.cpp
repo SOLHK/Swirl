@@ -119,10 +119,10 @@ Item { Rectangle {anchors.fill:parent;color:'#536BB4'}
     eval("AppState.navigate('policies')");QTest::qWait(200);capture(main,"policies-many");
     if(!baseline){check(eval("pageLoader.item.nodePages>1").toBool(),"many nodes have explicit pages");auto *next=find(main->contentItem(),"nextNodePage");check(next&&next->isVisible()&&next->isEnabled(),"next node page is visible and operable");if(next){QTest::mouseClick(main,Qt::LeftButton,Qt::NoModifier,next->mapToScene(QPointF(next->width()/2,next->height()/2)).toPoint());QTest::qWait(100);check(eval("pageLoader.item.nodePage===1").toBool(),"pagination responds to real mouse input");capture(main,"policies-page-2");}}
     for(const auto &route:QStringList{"proxies","settings","subscriptions"}){
-        eval(QString("window.openSettings('%1')").arg(route));QTest::qWait(250);auto *sheet=main->findChild<QQuickWindow *>("settingsSheet");check(sheet&&sheet->isVisible(),route+": separate HWND opens");if(!sheet)continue;
-        sheet->resize(qMin(900,area.width()-60),qMin(790,area.height()-50));capture(sheet,route=="proxies"?"nodes":route);if(!baseline)auditText(sheet,route);
-        if(route=="proxies"&&!baseline){auto *search=find(sheet->contentItem(),"nodeSearchField"),*combo=find(sheet->contentItem(),"proxyRegionCombo");check(search&&combo&&qAbs(search->height()-combo->height())<1,"node search and protocol filter share height");}
-        sheet->hide();
+        eval(QString("window.openSettings('%1')").arg(route));QTest::qWait(450);
+        check(eval("pageLoader.item.Window.window===window").toBool(),route+": route belongs to main HWND");
+        capture(main,route=="proxies"?"nodes":route);if(!baseline)auditText(main,route);
+        if(route=="proxies"&&!baseline){auto *search=find(main->contentItem(),"nodeSearchField"),*combo=find(main->contentItem(),"proxyRegionCombo");check(search&&combo&&qAbs(search->height()-combo->height())<1,"node search and protocol filter share height");}
     }
     eval("window.openDashboard()");QTest::qWait(200);auto *panel=main->findChild<QQuickWindow *>("dashboardWindow");if(panel){panel->resize(qMin(1300,area.width()-60),600);capture(panel,"panel");panel->hide();}
     eval("Theme.mode='Dark';AppState.navigate('activity')");QTest::qWait(200);capture(main,"activity-dark");eval("Theme.transparency=false");QTest::qWait(200);
