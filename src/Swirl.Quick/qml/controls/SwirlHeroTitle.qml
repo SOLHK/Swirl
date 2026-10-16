@@ -52,6 +52,13 @@ Item {
         sourceWeight=currentWeight
         sourceBaseline=currentBaseline
     }
+    function retarget() {
+        if(!active || !targetItem)return
+        const current=Qt.rect(label.x,label.y,label.width,label.height)
+        const currentFont=label.font.pixelSize,currentWeight=label.font.weight,currentBaseline=label.baselineOffset
+        if(handoff>0.5)title=targetItem.text||title
+        origin=current;sourceFont=currentFont;sourceWeight=currentWeight;sourceBaseline=currentBaseline
+    }
     function cancel() {
         active=false
         sourceItem = null; targetItem = null; title = ""

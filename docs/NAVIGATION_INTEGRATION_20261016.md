@@ -130,3 +130,27 @@ Navigation checks freeze each of the nine real expansions at its final animated
 value, verify that the live title is already visible, and compare rendered pixels
 before and after retirement. These endpoint tests supplement actual interaction
 recordings and DPI runs; readback images do not measure physical presentation FPS.
+
+The final continuous expansion keeps the white source-card material as the
+destination page's own rounded surface, without a page border or full-page
+shadow. It no longer fades that material to a transparent canvas in the middle
+of opening. A single linear phase drives smooth spatial curves: the card reaches
+its destination first, while its functional content completes a subtle 1.5%
+growth and reveal. Press feedback and reversible navigation remain enabled.
+The surface type is retained while hidden, so clearing navigation metadata cannot
+activate a full-page shadow. A stable clip node and exact endpoint interpolation
+avoid a native hinted-text shift during retirement. Resizing retargets the title
+from its currently displayed geometry. A cancellable 32 ms terminal commit keeps
+the identical final scene present before releasing the shared layer.
+
+Endpoint fixtures now let the actual animation run to completion before holding
+its final scene; they no longer visibly jump an early animation to the endpoint.
+Moving screenshot readback is opt-in. Passive performance sampling runs 36 warm
+forward/reverse transitions with a normal QEventLoop, without screenshots,
+expression polling or QTest's sleep-driven wait loop during motion. On the
+current 120 Hz Windows 11 display it recorded 1,578 active delivery samples:
+p95 8.74 ms, p99 9.12 ms, maximum 19.81 ms; one interval exceeded 1.5 refresh
+budgets and none exceeded 2.5. All-delivery p95 including the stationary terminal
+commit was 8.81 ms. These are Qt frame delivery observations, not a claim of
+physical display presentation FPS. All nine endpoint comparisons changed zero
+pixels in this run.
