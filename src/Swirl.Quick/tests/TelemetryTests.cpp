@@ -6,10 +6,72 @@
 #include <QNetworkReply>
 #include <QTcpServer>
 #include <QTcpSocket>
+#include "ControlledNetwork.h"
+#include "engine/SwirlProxyEngine.h"
+#include "engine/MihomoAdapter.h"
+#include <QJsonDocument>
 class TelemetryTests:public QObject {
  Q_OBJECT
  ProxyEngine::Status sample(qint64 time,int up,int down){ProxyEngine::Status s;s.processAlive=true;s.processId=1;s.apiHealthy=true;s.connectionsAt=time;s.trafficAt=time;s.uploadTotal=up;s.downloadTotal=down;s.uploadRate=up;s.downloadRate=down;s.connections={QVariantMap{{"id","connection-a"},{"host","fixture.test"},{"process","fixture.exe"},{"policy","DIRECT"},{"category","direct"},{"uploadBytes",up},{"downloadBytes",down},{"time",QDateTime::fromMSecsSinceEpoch(time).toString(Qt::ISODateWithMs)}}};return s;}
 private slots:
+ void proxyLatencyVerifiesRealTlsAndSelectedNodeChain_data(){QTest::addColumn<bool>("compatibility");QTest::newRow("native")<<false;QTest::newRow("mihomo")<<true;}
+ void proxyLatencyVerifiesRealTlsAndSelectedNodeChain(){
+  QFETCH(bool,compatibility);
+  ControlledNetwork net;QVERIFY(net.start());
+  QTcpServer reservation;QVERIFY(reservation.listen(QHostAddress::LocalHost,0));
+  EngineStartOptions options;options.proxyPort=reservation.serverPort();reservation.close();
+  ProxyNode node;node.id=QUuid::createUuid().toString(QUuid::WithoutBraces);node.name="Probe node";node.protocol="socks5";node.host="127.0.0.1";node.port=net.a.serverPort();options.nodes={node};options.selectedNodeId=node.id;
+  std::unique_ptr<ProxyEngine> engine;
+  if(compatibility){
+   engine=std::make_unique<MihomoAdapter>();QFile manifest(":/engine/mihomo-manifest.json");QVERIFY(manifest.open(QIODevice::ReadOnly));const auto config=QJsonDocument::fromJson(manifest.readAll()).object();
+   options.executablePath=QCoreApplication::applicationDirPath()+"/core/mihomo.exe";options.expectedSha256=config.value("executableSha256").toString().toLatin1();options.expectedVersion=config.value("version").toString();options.healthIntervalMs=250;
+   QTcpServer control;QVERIFY(control.listen(QHostAddress::LocalHost,0));options.controlPort=control.serverPort();control.close();
+  }else engine=std::make_unique<SwirlProxyEngine>();
+  engine->start(options);QTRY_VERIFY_WITH_TIMEOUT(engine->status().apiHealthy,15000);
+  const auto original=QSslConfiguration::defaultConfiguration();auto trusted=original;trusted.addCaCertificate(net.certificate);QSslConfiguration::setDefaultConfiguration(trusted);
+  struct Restore {QSslConfiguration value;~Restore(){QSslConfiguration::setDefaultConfiguration(value);}} restore{original};
+  QVariantMap result;QPointer<ProxyLatencyProbe> probe;
+  auto connection=connect(engine.get(),&ProxyEngine::statusChanged,this,[&]{if(probe)probe->observe(engine->status());});
+  QTimer refresh;connect(&refresh,&QTimer::timeout,engine.get(),&ProxyEngine::refresh);refresh.start(50);
+  probe=new ProxyLatencyProbe(engine->status(),net.url(true),[&](const QVariantMap &r){result=r;},this);
+  QTRY_VERIFY_WITH_TIMEOUT(!result.isEmpty(),10000);
+  QVERIFY2(result.value("success").toBool(),qPrintable(result.value("state").toString()));
+  QVERIFY(result.value("routeVerified").toBool());QVERIFY(net.a.forwarded>0);QCOMPARE(net.b.forwarded,0);
+  QVERIFY(result.value("elapsedMs").toLongLong()>=0);
+  // Same real proxy/TLS path, but an expected node that does not match the
+  // observed raw chain must not be presented as a successful node measurement.
+  result.clear();auto different=engine->status();different.selectedNodeId="other-node";
+  probe=new ProxyLatencyProbe(different,net.url(true),[&](const QVariantMap &r){result=r;},this);
+  QTRY_VERIFY_WITH_TIMEOUT(!result.isEmpty(),10000);QCOMPARE(result.value("code").toString(),QString("route-mismatch"));
+  QSslConfiguration::setDefaultConfiguration(original);result.clear();
+  probe=new ProxyLatencyProbe(engine->status(),net.url(true),[&](const QVariantMap &r){result=r;},this);
+  QTRY_VERIFY_WITH_TIMEOUT(!result.isEmpty(),10000);QCOMPARE(result.value("code").toString(),QString("tls"));
+  disconnect(connection);engine->stop();
+ }
+ void httpProbeRejectsObsoleteRoundTrip(){
+  QTemporaryDir temp;TelemetryService model(temp.filePath("proxy.json"),false);
+  QTcpServer proxy;QVERIFY(proxy.listen(QHostAddress::LocalHost,0));
+  QPointer<QTcpSocket> pending;QByteArray request;
+  connect(&proxy,&QTcpServer::newConnection,this,[&]{pending=proxy.nextPendingConnection();connect(pending,&QTcpSocket::readyRead,this,[&]{request+=pending->readAll();});});
+  auto status=sample(QDateTime::currentMSecsSinceEpoch(),0,0);status.proxyPort=proxy.serverPort();status.selectedNodeId="A";model.ingest(status);
+
+  model.m_measurements=1;model.measureHttp("internet",QUrl("http://fixture.invalid/proxy"),true);
+  QTRY_VERIFY_WITH_TIMEOUT(request.contains("\r\n\r\n"),3000);
+  QVERIFY(request.startsWith("GET http://fixture.invalid/proxy HTTP/1.1"));
+  pending->write("HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");pending->disconnectFromHost();
+  QTRY_COMPARE(model.m_measurements,0);QVERIFY(model.internetDiagnostic().value("success").toBool());
+
+  request.clear();model.m_measurements=1;model.measureHttp("internet",QUrl("http://fixture.invalid/proxy"),true);
+  QTRY_VERIFY_WITH_TIMEOUT(request.contains("\r\n\r\n"),3000);
+  // A -> B -> A must still invalidate the first A request (string IDs alone cannot).
+  status.selectedNodeId="B";model.ingest(status);status.selectedNodeId="A";model.ingest(status);
+  pending->write("HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");pending->disconnectFromHost();
+  QTRY_COMPARE(model.m_measurements,0);QVERIFY(model.internetDiagnostic().isEmpty());
+  QCOMPARE(model.latencies().value("proxy").toString(),QStringLiteral("尚未测量"));
+  QCOMPARE(model.measurementState(),QStringLiteral("尚未测量"));
+  proxy.close();model.m_measurements=1;model.measureHttp("internet",QUrl("http://fixture.invalid/proxy"),true);
+  QTRY_COMPARE(model.m_measurements,0);QCOMPARE(model.internetDiagnostic().value("code").toString(),QString("proxy-port"));
+ }
  void cachedPeriodInvalidatesWithoutErasingHistory(){
   QTemporaryDir temp;TelemetryService model(temp.filePath("cache.json"),false);
   auto status=sample(QDateTime::currentMSecsSinceEpoch(),10,20);model.ingest(status);

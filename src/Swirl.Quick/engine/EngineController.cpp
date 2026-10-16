@@ -14,6 +14,9 @@
 #include <QRegularExpression>
 #include <QNetworkInterface>
 #include <QTemporaryDir>
+#include <QFutureWatcher>
+#include <QPromise>
+#include <QThreadPool>
 #include "MihomoAdapter.h"
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -126,6 +129,9 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
         }
     });
     connect(QCoreApplication::instance(), &QCoreApplication::aboutToQuit, this,[this]{shutdown();});
+    auto *interfaces=new QTimer(this);interfaces->setInterval(15000);
+    connect(interfaces,&QTimer::timeout,this,&EngineController::refreshLanAddresses);interfaces->start();
+    QTimer::singleShot(0,this,&EngineController::refreshLanAddresses);
 }
 void EngineController::setExecutablePath(const QString &path) {
     if (!canStart() || m_options.executablePath == path) return;
@@ -449,7 +455,24 @@ void EngineController::setCaptureProxyPort(int port) {
 }
 
 QStringList EngineController::lanAddresses() const {
-    QStringList result;for(const auto &address:QNetworkInterface::allAddresses())if(address.protocol()==QAbstractSocket::IPv4Protocol&&!address.isLoopback()&&!address.isNull())result.append(address.toString());return result;
+    return m_lanAddresses;
+}
+void EngineController::refreshLanAddresses(){
+    // GetAdaptersAddresses was running inside a QML text binding on every
+    // status tick, including while its LAN dialog was closed (profiled ~9ms).
+    if(m_lanScanPending||m_shuttingDown)return;m_lanScanPending=true;
+    auto promise=std::make_shared<QPromise<QList<QNetworkInterface>>>();
+    auto *watcher=new QFutureWatcher<QList<QNetworkInterface>>(this);
+    connect(watcher,&QFutureWatcher<QList<QNetworkInterface>>::finished,this,[this,watcher]{
+        m_interfaces=watcher->result();watcher->deleteLater();m_lanScanPending=false;
+        QStringList addresses;for(const auto &iface:m_interfaces)for(const auto &entry:iface.addressEntries()){const auto address=entry.ip();if(address.protocol()==QAbstractSocket::IPv4Protocol&&!address.isLoopback()&&!address.isNull())addresses.append(address.toString());}
+        if(addresses!=m_lanAddresses){m_lanAddresses=addresses;emit lanAddressesChanged();}
+        emit interfacesChanged();
+    });
+    watcher->setFuture(promise->future());
+    QThreadPool::globalInstance()->start([promise]{
+        promise->start();promise->addResult(QNetworkInterface::allInterfaces());promise->finish();
+    });
 }
 bool EngineController::configureLan(const QString &username,const QString &password) {
     if(!networkEditAllowed())return false;

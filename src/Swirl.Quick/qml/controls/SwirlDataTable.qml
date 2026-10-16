@@ -62,7 +62,7 @@ Item {
         flickableDirection:Flickable.HorizontalFlick
         boundsBehavior:Flickable.StopAtBounds
         pixelAligned:false
-        ScrollBar.horizontal:SwirlScrollBar {policy:horizontal.contentWidth>horizontal.width?ScrollBar.AsNeeded:ScrollBar.AlwaysOff}
+        ScrollBar.horizontal:SwirlScrollBar {policy:horizontal.contentWidth>horizontal.width?ScrollBar.AlwaysOn:ScrollBar.AlwaysOff}
             Rectangle {
                 z:1;width:horizontal.contentWidth;height:table.headerHeight
                 color:Theme.field

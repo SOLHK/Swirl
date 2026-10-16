@@ -11,15 +11,17 @@ Item {
  property int maximumCachedPages:28
  property var activeLoader:null
  property var leavingLoader:null
+ property var pendingLoader:null
  property int generation:0
  property bool initialized:false
  property bool animateRoutes:true
+ property bool incubateRoutes:true
+ property int transitionToken:0
  readonly property Item item:activeLoader?activeLoader.item:null
  readonly property int cachedPageCount:Object.keys(pages).length
  readonly property bool moving:travel.running
- readonly property bool pendingGrab:false
+ readonly property bool pendingGrab:pendingLoader!==null
  property real progress:1
- property real departureOpacity:1
  readonly property real position:Math.max(0,Math.min(1,progress))
  property var heroData:null
  property Item sourceSurface:null
@@ -34,7 +36,7 @@ Item {
  function surfaceFor(page,key){return page.motionSurfaces && page.motionSurfaces[key] || page.motionSurface || null}
  function trimCache(){
   const next=Object.assign({},pages),saved=Object.assign({},savedPages)
-  for(const key of accessOrder){if(Object.keys(next).length<=maximumCachedPages)break;const loader=next[key];if(!loader || loader===activeLoader || loader===leavingLoader || !loader.item || !loader.item.exportCacheState || (SwirlMotion.returnShared && SwirlMotion.returnShared.previous===key))continue;saved[key]=loader.item.exportCacheState();loader.destroy();delete next[key]}
+  for(const key of accessOrder){if(Object.keys(next).length<=maximumCachedPages)break;const loader=next[key];if(!loader || loader===activeLoader || loader===leavingLoader || loader===pendingLoader || !loader.item || !loader.item.exportCacheState || (SwirlMotion.returnShared && SwirlMotion.returnShared.previous===key))continue;saved[key]=loader.item.exportCacheState();loader.destroy();delete next[key]}
   pages=next;savedPages=saved
  }
  function releaseShared(){SwirlMotion.shared=null}
@@ -46,39 +48,54 @@ Item {
   releaseSurfaces()
   travel.stop();hero.cancel();progress=1
   sourceSurface=null;targetSurface=null;heroData=null
-  if(leavingLoader){leavingLoader.visible=false;leavingLoader.enabled=false}
+  for(const key of Object.keys(pages)){const loader=pages[key];loader.visible=loader===activeLoader;loader.enabled=loader===activeLoader;loader.startOpacity=loader===activeLoader?1:0;loader.endOpacity=loader.startOpacity}
   leavingLoader=null
   if(activeLoader){activeLoader.visible=true;activeLoader.enabled=true}
-  SwirlMotion.transitioning=false;trimCache()
+  SwirlTransitionRegistry.setActive(transitionToken,false);trimCache()
   const back=SwirlMotion.returnShared;if(back && back.previous===routeKey && back.source && back.source.visible)back.source.forceActiveFocus()
+ }
+ function captureOpacities(next){
+  // Snapshot all live layers before retargeting. A third click must not drop
+  // the still-visible first page or reset the incoming page to transparent.
+  const values=Object.keys(pages).map(key=>({loader:pages[key],alpha:pages[key].visible?pages[key].opacity:0}))
+  for(const value of values){value.loader.startOpacity=value.alpha;value.loader.endOpacity=value.loader===next?1:0;value.loader.visible=value.alpha>0||value.loader===next;value.loader.enabled=value.loader===next}
  }
  function requestRoute(){
   if(!initialized || !sourceComponent || !routeKey.length)return
   const token=++generation
   let next=pages[routeKey]
-  if(!next){next=pageFactory.createObject(viewport,{routeId:routeKey,sourceComponent:sourceComponent});if(!next || !next.item){if(next)next.destroy();releaseShared();return}if(savedPages[routeKey]&&next.item.restoreCacheState)next.item.restoreCacheState(savedPages[routeKey]);const copy=Object.assign({},pages);copy[routeKey]=next;pages=copy}
+  if(!next){
+   // Incubate cold pages across frames while the current live page stays
+   // visible. The initial page remains synchronous so startup has content.
+   next=pageFactory.createObject(viewport,{routeId:routeKey,asynchronous:incubateRoutes&&activeLoader!==null,sourceComponent:sourceComponent})
+   if(!next){releaseShared();return}
+   const copy=Object.assign({},pages);copy[routeKey]=next;pages=copy
+  }
+  if(next.status===Loader.Loading){pendingLoader=next;return}
+  pendingLoader=null
+  if(!next.item){const copy=Object.assign({},pages);delete copy[routeKey];pages=copy;next.destroy();releaseShared();return}
+  if(!next.stateRestored){if(savedPages[routeKey]&&next.item.restoreCacheState)next.item.restoreCacheState(savedPages[routeKey]);next.stateRestored=true}
   if(next===activeLoader){releaseShared();return}
   const request=SwirlMotion.shared,back=SwirlMotion.returnShared
   releaseShared()
   // Reverse the same two live trees without visiting either endpoint.
   if(moving && next===leavingLoader){
+   captureOpacities(next)
    travel.stop();const previous=activeLoader;activeLoader=leavingLoader;leavingLoader=previous
-   const rect=surfaceStart;surfaceStart=surfaceEnd;surfaceEnd=rect
+   const rect=surfaceStart;surfaceStart=Qt.rect(morph.x,morph.y,morph.width,morph.height);surfaceEnd=rect
    const surface=sourceSurface;sourceSurface=targetSurface;targetSurface=surface
-   progress=1-progress;activeLoader.enabled=true;leavingLoader.enabled=false
+   progress=0;activeLoader.enabled=true;leavingLoader.enabled=false
    hero.reverse();animate();return
   }
   // A third route supersedes stale preparation and callbacks immediately.
   const carry=moving&&heroData?Qt.rect(morph.x,morph.y,morph.width,morph.height):null
-  const previousOpacity=activeLoader?activeLoader.opacity:1
+  captureOpacities(next)
   travel.stop();hero.cancel()
-  if(leavingLoader)leavingLoader.visible=false
   releaseSurfaces();sourceSurface=null;targetSurface=null;heroData=null
   const previous=activeLoader
   if(previous)motionPolicy.leavePage(previous.item)
-  leavingLoader=previous;activeLoader=next;departureOpacity=previousOpacity
+  leavingLoader=previous;activeLoader=next
   accessOrder=accessOrder.filter(key=>key!==routeKey).concat([routeKey])
-  for(const key of Object.keys(pages)){pages[key].visible=pages[key]===next || pages[key]===previous;pages[key].enabled=pages[key]===next}
   progress=0
   if(!previous || SwirlMotion.reduced || !animateRoutes){finish();return}
   // Let normal Qt polish settle layouts once. No recursive per-item polishing.
@@ -94,22 +111,31 @@ Item {
    animate()
   })
  }
- function animate(){SwirlMotion.transitioning=true;travel.from=progress;travel.to=1;travel.duration=Math.max(1,(heroData?SwirlMotion.expandDuration:SwirlMotion.pageDuration)*(1-progress));travel.start()}
+ function animate(){SwirlTransitionRegistry.setActive(transitionToken,true);travel.from=progress;travel.to=1;travel.duration=Math.max(1,(heroData?SwirlMotion.expandDuration:SwirlMotion.pageDuration)*(1-progress));travel.start()}
  function retargetGeometry(){
   if(!moving || !heroData || !valid(targetSurface))return
   const current=Qt.rect(morph.x,morph.y,morph.width,morph.height)
+  captureOpacities(activeLoader)
   travel.stop();surfaceStart=current;surfaceEnd=rectFor(targetSurface);progress=0;animate()
  }
  onWidthChanged:Qt.callLater(retargetGeometry)
  onHeightChanged:Qt.callLater(retargetGeometry)
  onRouteKeyChanged:Qt.callLater(requestRoute)
- Component.onCompleted:{initialized=true;Qt.callLater(requestRoute)}
- Component.onDestruction:{releaseSurfaces();initialized=false;++generation;releaseShared();SwirlMotion.transitioning=false;SwirlMotion.returnShared=null}
+ Component.onCompleted:{transitionToken=SwirlTransitionRegistry.allocate();initialized=true;Qt.callLater(requestRoute)}
+ Component.onDestruction:{releaseSurfaces();initialized=false;++generation;releaseShared();SwirlTransitionRegistry.setActive(transitionToken,false);SwirlMotion.returnShared=null}
  Connections {target:SwirlMotion;function onReducedChanged(){if(SwirlMotion.reduced){++host.generation;host.finish()}}}
- Component {id:pageFactory;Loader {property string routeId;x:0;y:0;width:host.width;height:host.height;visible:false}}
- // The two pages never paint full content over each other. Shared text lives above them.
- Binding {target:host.activeLoader;property:"opacity";value:host.leavingLoader?Math.max(0,2*host.position-1):1;when:host.activeLoader!==null}
- Binding {target:host.leavingLoader;property:"opacity";value:host.departureOpacity*Math.max(0,1-2*host.position);when:host.leavingLoader!==null}
+ Component {id:pageFactory;Loader {
+  id:cachedLoader
+  property string routeId
+  property bool stateRestored:false
+  onStatusChanged:if(cachedLoader===host.pendingLoader && status!==Loader.Loading)Qt.callLater(host.requestRoute)
+  property real startOpacity:0
+  property real endOpacity:0
+  opacity:startOpacity+(endOpacity-startOpacity)*host.position
+  x:0;y:0;width:host.width;height:host.height;visible:false
+ }}
+ // Live trees cross-fade continuously; shared surfaces and titles keep their
+ // independent geometry animation. Only the destination accepts input.
  SwirlGlassPanel {
   id:morph;objectName:"sharedSurface";z:0;visible:host.heroData!==null
   x:host.surfaceStart.x+(host.surfaceEnd.x-host.surfaceStart.x)*host.position

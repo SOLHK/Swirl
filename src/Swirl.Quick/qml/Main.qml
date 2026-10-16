@@ -44,7 +44,7 @@ ApplicationWindow {
     readonly property real shellRadius:window.visibility===Window.Maximized || window.visibility===Window.FullScreen ? 0 : Theme.windowRadius
     Binding { target:window.captureProviderContext; property:"upstreamProxyPort"; value:window.engineControllerContext.processAlive?window.engineControllerContext.activeProxyPort:0 }
     Connections { target:window.captureProviderContext; function onStateChanged(){window.engineControllerContext.setCaptureProxyPort(window.captureProviderContext.running?window.captureProviderContext.port:0)} }
-    Connections { target:backdrop; function onChanged() { Theme.backdropActive=backdrop.active } }
+    Connections { target:backdrop; function onChanged() { Theme.backdropActive=backdrop.active;Theme.backdropTranslucent=backdrop.translucent } }
     Binding { target:Theme; property:"windowActive"; value:previewState==="inactive"?false:window.active }
     readonly property real sidebarGutter:Theme.pageInset
     readonly property real actualSidebarWidth:Theme.sidebarWidth
@@ -188,7 +188,7 @@ ApplicationWindow {
             }
             SwirlText {opacity:proxyPanel.reveal;text:engineController.systemProxy.error||engineController.routingError||(engineController.systemProxy.owned&&engineController.systemProxy.enabled?"Swirl 已接管系统代理。":engineController.systemProxy.systemEnabled?"系统代理由其他应用启用。Swirl 尚未接管。":!engineController.processAlive?"引擎未运行，请先选择并连接节点。":!engineController.apiHealthy?"控制接口尚未就绪，请检查节点连接。":"可以启用系统代理，让支持系统代理的应用使用当前节点。");color:engineController.systemProxy.error.length||engineController.routingError.length?Theme.orange:Theme.muted;font.pixelSize:Theme.fontSize(13);Layout.fillWidth:true;wrapMode:Text.Wrap}
             RowLayout {opacity:proxyPanel.reveal;Layout.fillWidth:true
-                SwirlButton {text:"节点与策略";quiet:true;onClicked:{proxyPanel.requestDismiss();AppState.navigate("proxies")}}
+                SwirlButton {objectName:"proxyNodesButton";text:"节点与策略";onClicked:{proxyPanel.requestDismiss();AppState.navigate("proxies")}}
                 Item {Layout.fillWidth:true}
                 SwirlButton {objectName:"proxyPanelAction";text:window.proxyTogglePending?"正在切换…":engineController.systemProxy.enabled?"关闭代理":"接管代理";enabled:!engineController.busy&&!window.proxyTogglePending;onClicked:{window.proxyRequestedAction=!engineController.systemProxy.enabled;window.proxyTogglePending=true;engineController.setSystemProxy(window.proxyRequestedAction);window.showProxyError()}}
             }
@@ -247,7 +247,6 @@ ApplicationWindow {
     SwirlSecondaryWindow {
         composition:settingsBackdrop
         id:settingsSheet;objectName:"settingsSheet";
-        property bool swirlExactWindowRadius:true
         property string section:"dns";visible:false;width:Math.min(Theme.dp(900),Screen.desktopAvailableWidth);height:Math.min(Theme.dp(790),Screen.desktopAvailableHeight);title:section==="subscriptions"?"Swirl 订阅管理":section==="proxies"?"Swirl 节点管理":section==="profiles"?"Swirl 配置":section==="modules"?"Swirl 模块":section==="scripts"?"Swirl 脚本":"Swirl 设置";flags:Qt.Window|Qt.FramelessWindowHint;modality:Qt.WindowModal;transientParent:window;color:"transparent"
         function closeSettings(){requestClose()}
         function requestClose(){
@@ -283,7 +282,9 @@ ApplicationWindow {
                 }
             }
         }
-        SwirlPageHost{id:settingsLoader;animateRoutes:false;parent:settingsFlight.ownsContent?settingsFlight.bodySurface:settingsSheet.bodySurface;routeKey:settingsSheet.section;anchors.fill:parent;clip:true
+        // Native flight needs the destination and its draft fingerprint ready
+        // together. Route animations remain enabled inside this window.
+        SwirlPageHost{id:settingsLoader;incubateRoutes:false;parent:settingsFlight.ownsContent?settingsFlight.bodySurface:settingsSheet.bodySurface;routeKey:settingsSheet.section;anchors.fill:parent;clip:true
 sourceComponent:settingsSheet.section==="subscriptions"?subscriptions:settingsSheet.section==="proxies"?proxies:settingsSheet.section==="dns"?dns:settingsSheet.section==="modules"?modules:settingsSheet.section==="profiles"?profiles:settingsSheet.section==="scripts"?scripts:settings;onItemChanged:Qt.callLater(settingsSheet.updateSettingsSection)}
     }
     SwirlDialog {
@@ -360,6 +361,7 @@ sourceComponent:settingsSheet.section==="subscriptions"?subscriptions:settingsSh
         border.color:Theme.dark?Qt.rgba(1,1,1,window.active?0.30:0.20):Qt.rgba(0,0,0,window.active?0.12:0.08)
     }
     Timer { id:toastTimer; interval:3200; onTriggered:AppState.toast="" }
+    WindowEdge {anchors.fill:parent;z:10000;radius:window.shellRadius}
     Connections { target:AppState; function onToastChanged(){if(AppState.toast.length)toastTimer.restart()} }
     Rectangle {
         visible:AppState.toast.length>0; z:999

@@ -64,7 +64,7 @@ if __name__ == "__main__":
         parser.error("ports must be between 1 and 65535")
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
         futures = [pool.submit(probe, port, host) for port in args.ports
-                   for host in ("chatgpt.com", "openai.com", "ws.chatgpt.com")]
+                   for host in ("auth.openai.com", "api.openai.com", "chatgpt.com", "openai.com", "ws.chatgpt.com", "codex-cloud-backend.chatgpt.com")]
         results = [future.result() for future in futures]
     report = dict(utc=datetime.datetime.now(datetime.timezone.utc).isoformat(),
                   limitation="No authentication, WebSocket upgrade or SSE stream is tested. Proxy resolves targets; this does not inspect its DNS answer.",

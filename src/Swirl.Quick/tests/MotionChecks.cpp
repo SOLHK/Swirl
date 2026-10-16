@@ -323,7 +323,7 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
         QMutexLocker lock(&frameMutex);
         const double delta=double(now-last)/1000000.0;
         if(!measuring)return;
-        if(last && delta<100){intervals<<delta;if(warmPhase)warmIntervals<<delta;}
+        if(last){intervals<<delta;if(warmPhase)warmIntervals<<delta;}
         last=now;
     },Qt::DirectConnection);
     const QStringList stress={"overview","settings","proxies","featurehub","capture","connections","rules","logs"};
@@ -332,6 +332,7 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
         wait(23);
         if(i%7==0)window->resize(900+i*2,650+i);
         check("rapid-switch-has-live-page-"+QString::number(i),item()!=nullptr);
+        check("rapid-switch-retains-visible-content-"+QString::number(i),eval("Object.keys(pageLoader.pages).reduce((sum,key)=>sum+(pageLoader.pages[key].visible?pageLoader.pages[key].opacity:0),0)>0.99").toBool());
     }
     check("rapid-switch-settles",settle(3500));
     check("latest-route-wins",qvariant_cast<QObject *>(host->property("activeLoader"))->property("routeId").toString()==stress[39%stress.size()]);
@@ -403,6 +404,10 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
         {"systemPolicyRestoreOnReturn",-1},{"systemPolicyRestored",systemPolicyRestored},{"frames",intervals.size()},
         {"medianFrameMs",intervals.isEmpty()?0:intervals[intervals.size()/2]},
         {"p95FrameMs",intervals.isEmpty()?0:intervals[qMin(intervals.size()-1,qsizetype(intervals.size()*0.95))]},
+        {"p99FrameMs",intervals.isEmpty()?0:intervals[qMin(intervals.size()-1,qsizetype(intervals.size()*0.99))]},
+        {"over60HzBudget",int(std::count_if(intervals.begin(),intervals.end(),[](double ms){return ms>1000.0/60;}))},
+        {"over120HzBudget",int(std::count_if(intervals.begin(),intervals.end(),[](double ms){return ms>1000.0/120;}))},
+        {"longFramesOver50Ms",int(std::count_if(intervals.begin(),intervals.end(),[](double ms){return ms>50;}))},
         {"warmFrames",warmIntervals.size()},
         {"warmMedianFrameMs",warmIntervals.isEmpty()?0:warmIntervals[warmIntervals.size()/2]},
         {"warmP95FrameMs",warmIntervals.isEmpty()?0:warmIntervals[qMin(warmIntervals.size()-1,qsizetype(warmIntervals.size()*0.95))]},

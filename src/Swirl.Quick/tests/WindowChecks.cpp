@@ -64,8 +64,9 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     if(!backdrop->isCaptureForeground()){qCritical()<<"Native validation blocked: target is covered or the Windows secure desktop is active";return 3;}
     const auto radius=state("Theme.windowRadius").toReal()*window->devicePixelRatio();
     const auto region=CreateRectRgn(0,0,0,0);
-    check(backdrop->exactCorners() ? GetWindowRgn(testHwnd,region)!=ERROR : GetWindowRgn(testHwnd,region)==ERROR,
-          "exact HWND contour has a native region; system-preset windows do not stack an extra region");
+    const bool binaryContour=backdrop->exactCorners()&&window->rendererInterface()->graphicsApi()==QSGRendererInterface::Software;
+    check(binaryContour ? GetWindowRgn(testHwnd,region)!=ERROR : GetWindowRgn(testHwnd,region)==ERROR,
+          "GPU alpha contour has no integer region; software retains compatibility clip");
     DeleteObject(region);
     const auto cornerCoverage=[&](){
         const auto rendered=window->grabWindow();int partial=0,total=0;
@@ -153,6 +154,11 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     check(cornerShowsBackground(red.pixelColor(0,0)) && cornerShowsBackground(red.pixelColor(red.width()-1,0)) && cornerShowsBackground(red.pixelColor(0,red.height()-1)) && cornerShowsBackground(red.pixelColor(red.width()-1,red.height()-1)),
           "all four composed corners show desktop or its native shadow without material fill");
     const auto cornerAlpha=window->grabWindow();
+    if(backdrop->exactCorners()&&window->rendererInterface()->graphicsApi()!=QSGRendererInterface::Software){
+        int fractional=0;const int extent=qCeil(backdrop->cornerRadius()*window->devicePixelRatio());
+        for(int y=0;y<extent;++y)for(int x=0;x<extent;++x){const int a=cornerAlpha.pixelColor(x,y).alpha();if(a>0&&a<255)++fractional;}
+        check(fractional>3,"exact GPU corners preserve fractional alpha coverage");
+    }
     check(cornerAlpha.save(directory+"/window-alpha.png"),"native-resolution alpha surface saved for corner inspection");
     const int cornerExtent=qMin(qMin(cornerAlpha.width(),cornerAlpha.height()),qCeil(state("Theme.windowRadius").toReal()*window->devicePixelRatio())+8);
     const QList<QPoint> origins{{0,0},{cornerAlpha.width()-cornerExtent,0},{0,cornerAlpha.height()-cornerExtent},{cornerAlpha.width()-cornerExtent,cornerAlpha.height()-cornerExtent}};
@@ -164,15 +170,15 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     const int sidebarChange=distance(sample(red,0.01,0.83),sample(blue,0.01,0.83));
     const int contentChange=distance(sample(red,0.995,0.5),sample(blue,0.995,0.5));
     qInfo()<<"Native pixel delta: sidebar="<<sidebarChange<<"content="<<contentChange<<"DPR="<<window->devicePixelRatio()<<backdrop->status();
-    const bool exactOpaque=backdrop->exactCorners();
+    const bool exactOpaque=backdrop->exactCorners()&&!backdrop->translucent();
     check(exactOpaque ? !backdrop->active()&&backdrop->status().contains("exact 10pt")
-                      : backdrop->active()&&backdrop->status().contains("Desktop Acrylic"),
-          "composition reports exact-contour opaque fallback or the supported system Acrylic path");
+                      : (backdrop->active()&&backdrop->status().contains("Desktop Acrylic"))||(backdrop->translucent()&&backdrop->status().contains("Alpha translucency")),
+          "composition reports native Acrylic, exact alpha, or a policy-required opaque fallback");
     check(exactOpaque ? sidebarChange<=3 : sidebarChange>=4&&sidebarChange<40,"sidebar follows the effective composition capability");
     check(exactOpaque ? contentChange<=3 : contentChange>=4&&contentChange<40,"workspace gutter follows the effective composition capability");
     // Cards remain readable while the shell and page gutter reveal the desktop.
     const auto materialAlpha=window->grabWindow().pixelColor(int(window->width()*0.995*window->devicePixelRatio()),int(window->height()*0.5*window->devicePixelRatio())).alpha();
-    check(exactOpaque ? materialAlpha==255 : materialAlpha>=215&&materialAlpha<=225,"exact contour is opaque; supported Acrylic uses its 86 percent tint");
+    check(exactOpaque ? materialAlpha==255 : backdrop->translucent()?materialAlpha>=232&&materialAlpha<=242:materialAlpha>=215&&materialAlpha<=225,"actual alpha matches the selected material, including restrained exact-contour translucency");
     // Move Swirl relative to a split-color native QML window to verify position-
     // dependent composition. The scene is a test window, not a wallpaper image.
     QQuickItem split;
@@ -198,8 +204,8 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     int intermediate=0;
     for(int x=cx-50;x<=cx+50;++x){const int value=edge.pixelColor(x,row).red();if(value>low+2&&value<high-2)++intermediate;}
     qInfo()<<"Alpha edge profile: left="<<a<<"right="<<b<<"intermediate pixels="<<intermediate;
-    check(exactOpaque ? !backdrop->active()&&intermediate==0 : backdrop->active()&&intermediate>0,
-          "exact contour blocks the external edge; supported native Acrylic blurs it");
+    check(backdrop->translucent() ? !backdrop->active()&&high-low>3 : exactOpaque ? !backdrop->active()&&intermediate==0 : backdrop->active()&&intermediate>0,
+          "alpha path transmits the real background; only native Acrylic is described as blur");
     delete rectangle;
     window->setPosition(available.topLeft()+QPoint(60,40));
     state("Theme.transparency=false");QTest::qWait(500);
@@ -211,7 +217,7 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     check(distance(sample(opaqueBlue,0.995,0.5),sample(opaqueRed,0.995,0.5))<=3,"disabled transparency gives opaque page fallback");
     state("Theme.transparency=true;Theme.mode='Dark'");QTest::qWait(500);grab("overview-native-dark");
     check(exactOpaque ? !backdrop->active()&&backdrop->status().contains("exact 10pt")
-                      : backdrop->active()&&backdrop->status().contains("Desktop Acrylic"),
+                      : (backdrop->active()&&backdrop->status().contains("Desktop Acrylic"))||(backdrop->translucent()&&backdrop->status().contains("Alpha translucency")),
           "dark theme retains its effective contour and composition capability");
     state("Theme.mode='Light'");
     auto *title=find(window->contentItem(),"titleDragArea");

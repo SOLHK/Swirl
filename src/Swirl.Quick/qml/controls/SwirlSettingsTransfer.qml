@@ -205,5 +205,6 @@ Window {
             SwirlWindowTitleBar {id:header;objectName:"settingsTransferTitleBar";anchors.left:parent.left;anchors.right:parent.right;targetWindow:windowActions}
             Item {id:body;x:0;y:header.height;width:parent.width;height:parent.height-header.height;clip:true;enabled:false}
         }
+        WindowEdge {anchors.fill:parent;z:10000;radius:flight.surfaceRadius}
     }
 }

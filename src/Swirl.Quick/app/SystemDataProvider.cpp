@@ -9,6 +9,7 @@
 #include <QUrl>
 
 SystemDataProvider::SystemDataProvider(CaptureService *capture,EngineController *engine,DiagnosticService *diagnostics):m_capture(capture),m_engine(engine),m_diagnostics(diagnostics) {
+    connect(engine,&EngineController::interfacesChanged,this,[this]{++m_revision;emit dataChanged();});
     connect(capture,&CaptureService::sessionsChanged,this,[this]{++m_revision;emit dataChanged();});
     connect(diagnostics,&DiagnosticService::changed,this,[this]{++m_revision;emit dataChanged();});
     connect(engine,&EngineController::statusChanged,this,[this]{
@@ -38,7 +39,7 @@ QVariantMap SystemDataProvider::diagnosticSnapshot() const {
         {"loginAuthenticationVerified",false}};
 }
 QVariantMap SystemDataProvider::currentNetwork() const {
-    for(const auto &iface:QNetworkInterface::allInterfaces()) {
+    for(const auto &iface:m_engine->networkInterfaces()) {
         const auto flags=iface.flags();
         if(!(flags&QNetworkInterface::IsUp) || !(flags&QNetworkInterface::IsRunning) || (flags&QNetworkInterface::IsLoopBack))continue;
         if(iface.type()!=QNetworkInterface::Wifi && iface.type()!=QNetworkInterface::Ethernet)continue;

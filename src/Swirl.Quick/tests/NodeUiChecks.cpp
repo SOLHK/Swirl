@@ -142,5 +142,45 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         check(controller->imports()->providers().isEmpty()&&controller->nodes().size()==1,"confirmed deletion retains nodes as documented");
         controller->deleteNode(controller->nodes().first().toMap().value("id").toString());
     }
+    // Large-list layout/transfer fixture uses reserved local endpoints only.
+    QString batch="proxies:\n";
+    for(int i=0;i<180;++i)batch+=QString("  - {name: 'Node %1 long readable name', type: http, server: 127.0.0.1, port: %2}\n").arg(i,3,10,QChar('0')).arg(26000+i);
+    controller->imports()->importText(batch);
+    check(QTest::qWaitFor([&]{return !controller->imports()->busy();},8000)&&controller->nodes().size()==180,"180-node fixture imported");
+    eval("AppState.navigate('proxies');Theme.reduceMotion=false");QTest::qWait(400);
+    window->resize(window->minimumWidth(),window->minimumHeight());QTest::qWait(250);
+    auto *table=item("realNodeTable"),*hero=item("nodeHero");
+    check(table&&table->property("gridWidth").toReal()<=table->width()+1,"all four columns fit minimum-width node viewport");
+    if(table&&hero){
+        // A partially clipped row in both axes must never fly from its full rect.
+        QQuickItem clipper(table);clipper.setClip(true);clipper.setSize(QSizeF(100,80));clipper.setPosition(QPointF(10,10));
+        QQuickItem row(&clipper);row.setPosition(QPointF(-40,-10));row.setSize(QSizeF(200,60));
+        QVariant result;QMetaObject::invokeMethod(hero,"sourceRect",Q_RETURN_ARG(QVariant,result),Q_ARG(QVariant,QVariant::fromValue(&row)));
+        const auto rect=result.toRectF();check(qAbs(rect.width()-100)<1&&qAbs(rect.height()-50)<1,"node flight intersects horizontal and vertical clipping ancestors");
+        clipper.setVisible(false);
+        QMetaObject::invokeMethod(hero,"sourceRect",Q_RETURN_ARG(QVariant,result),Q_ARG(QVariant,QVariant::fromValue(&row)));
+        check(result.toRectF()!=rect,"invisible row uses explicit fallback origin");
+        clipper.setVisible(true);QMetaObject::invokeMethod(hero,"start",Q_ARG(QVariant,QVariant::fromValue(&row)));QTest::qWait(45);
+        const auto reveal=hero->property("reveal").toReal();
+        QMetaObject::invokeMethod(hero,"returnTo",Q_ARG(QVariant,QVariant::fromValue(&row)));
+        check(qAbs(hero->property("reveal").toReal()-reveal)<0.01,"node reversal preserves content opacity at the handoff");
+        QTest::qWait(30);const auto closingReveal=hero->property("reveal").toReal();
+        QMetaObject::invokeMethod(hero,"start",Q_ARG(QVariant,QVariant::fromValue(&row)));
+        check(qAbs(hero->property("reveal").toReal()-closingReveal)<0.01,"node reopen preserves partially revealed content");
+        QTest::qWait(400);
+    }
+    const auto qa=qEnvironmentVariable("SWIRL_UI_QA_DIRECTORY");
+    if(!qa.isEmpty()){QDir().mkpath(qa);window->grabWindow().save(qa+"/nodes-minimum-180.png");}
+    for(int i=0;i<180;++i){
+        auto *viewport=item("tableRowsViewport");
+        if(viewport)QMetaObject::invokeMethod(viewport,"positionViewAtIndex",Q_ARG(int,i),Q_ARG(int,0));
+        QTest::qWait(5);
+        if(table&&viewport){const auto y=table->property("headerHeight").toReal()+(i+0.5)*table->property("itemHeight").toReal()-viewport->property("contentY").toReal();QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,table->mapToScene(QPointF(45,y)).toPoint());}
+    }
+    check(QTest::qWaitFor([&]{return hero&&!hero->property("moving").toBool();},3500),"180 rapid node selections settle");
+    check(eval("pageLoader.item.selected.name.indexOf('179')>=0").toBool(),"last of all 180 rows receives the final click");
+    auto *identity=item("nodeIdentitySurface");
+    check(identity&&identity->parentItem()!=hero->parentItem(),"settled node details return to scroll ownership");
+    if(!qa.isEmpty())window->grabWindow().save(qa+"/nodes-selected-minimum.png");
     qInfo()<<"Node UI checks:"<<checks<<"checks,"<<failures<<"failures";return failures?2:0;
 }

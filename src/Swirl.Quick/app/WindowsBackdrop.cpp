@@ -121,7 +121,7 @@ void WindowsBackdrop::apply(QObject *object, bool enabled, bool dark) {
 }
 void WindowsBackdrop::refresh() {
     if (!m_window) return;
-    bool active = false, corners = false;
+    bool active = false, corners = false, translucent = false;
     QString status = QStringLiteral("Opaque: unsupported platform");
 #ifdef Q_OS_WIN
     if (QGuiApplication::platformName() != QStringLiteral("offscreen")) {
@@ -172,8 +172,12 @@ void WindowsBackdrop::refresh() {
         // custom region on Windows 11. Keep exact corners free of pale square
         // tips by using the existing opaque palette for this capability case.
         // The saved transparency preference is retained for preset windows.
-        const bool allowed = m_enabled && !exact && !software && !batterySaver && !remote && contrastKnown && !(contrast.dwFlags & HCF_HIGHCONTRASTON)
+        const bool transparencyAllowed = m_enabled && !software && !batterySaver && !remote && contrastKnown && !(contrast.dwFlags & HCF_HIGHCONTRASTON)
             && transparencyKnown && transparency && compositionEnabled;
+        const bool allowed = transparencyAllowed && !exact;
+        // Preserve subtle live desktop transmission with exact AA corners.
+        // This is alpha composition, explicitly not system Acrylic blur.
+        translucent = transparencyAllowed && exact;
         // Windows 11 22H2+: Desktop Acrylic samples the LIVE compositor.
         // Mica intentionally uses wallpaper; it cannot satisfy live blur-behind.
         const int backdrop = allowed ? 3 : 1; // DWMSBT_TRANSIENTWINDOW / NONE
@@ -183,14 +187,15 @@ void WindowsBackdrop::refresh() {
         active = allowed && SUCCEEDED(material) && SUCCEEDED(frame);
         status = active ? QStringLiteral("Windows Desktop Acrylic: DWM live backdrop, %1 contour").arg(exact ? QStringLiteral("exact HWND") : QStringLiteral("native preset"))
             : !m_enabled ? QStringLiteral("Opaque: application transparency disabled")
-            : exact ? QStringLiteral("Opaque: exact 10pt contour (system Acrylic paints outside custom regions)")
+            : translucent ? QStringLiteral("Alpha translucency: exact 10pt contour; system Acrylic unavailable for custom contours")
+            : exact ? QStringLiteral("Opaque: exact 10pt contour; system transparency policy or renderer requires fallback")
             : software ? QStringLiteral("Opaque: software renderer")
             : batterySaver ? QStringLiteral("Opaque: battery saver")
             : remote ? QStringLiteral("Opaque: remote desktop session")
             : QStringLiteral("Opaque: native backdrop unavailable (DWM 0x%1)").arg(quint32(material),8,16,QChar('0'));    } else status = QStringLiteral("Opaque: offscreen renderer");
 #endif
-    if (active != m_active || corners != m_nativeCorners || status != m_status) {
-        m_active = active; m_nativeCorners = corners; m_status = status;
+    if (active != m_active || translucent != m_translucent || corners != m_nativeCorners || status != m_status) {
+        m_active = active; m_translucent = translucent; m_nativeCorners = corners; m_status = status;
         qInfo().noquote() << "Window composition:" << status;
         emit changed();
     }
@@ -211,10 +216,14 @@ void WindowsBackdrop::updateCornerMask() {
         const qreal effectiveRadius = rectangular ? 0 : radius;
         if (m_exactCorners && m_regionSize == physicalSize && qFuzzyCompare(m_regionDpr, dpr)
             && qFuzzyCompare(m_cornerRadius + 1, effectiveRadius + 1)) { updateCompatibilityShadow(); return; }
-        const HRGN region = rectangular ? nullptr : roundedWindowRegion(physicalSize.width(), physicalSize.height(), radius * dpr);
-        if (!rectangular && !region) return;
+        const bool software=QQuickWindow::graphicsApi()==QSGRendererInterface::Software;
+        // Accelerated windows feather the final framebuffer alpha using four
+        // tiny WindowEdge quads. An integer HRGN would cut those AA samples off.
+        // Software remains an explicitly reported binary compatibility path.
+        const HRGN region = rectangular || !software ? nullptr : roundedWindowRegion(physicalSize.width(), physicalSize.height(), radius * dpr);
+        if (!rectangular && software && !region) return;
         // Windows takes ownership only after a successful SetWindowRgn.
-        if (!SetWindowRgn(hwnd, region, TRUE)) {
+        if (!SetWindowRgn(hwnd, region, FALSE)) {
             if (region) DeleteObject(region);
             qWarning() << "Exact window contour failed" << GetLastError();
             return;
@@ -243,6 +252,11 @@ void WindowsBackdrop::applyTransientClip(QObject *object, const QRectF &logicalR
     auto *window = qobject_cast<QQuickWindow *>(object);
     if (!window || window == m_window || logicalRect.isEmpty()) return;
 #ifdef Q_OS_WIN
+    if(QQuickWindow::graphicsApi()!=QSGRendererInterface::Software){
+        // The flight surface owns an alpha edge too. Avoid a synchronous
+        // HWND region rebuild/redraw on every animation tick.
+        return;
+    }
     const qreal dpr = window->devicePixelRatio();
     const int left = qRound(logicalRect.x() * dpr), top = qRound(logicalRect.y() * dpr);
     const int right = qRound((logicalRect.x() + logicalRect.width()) * dpr);
