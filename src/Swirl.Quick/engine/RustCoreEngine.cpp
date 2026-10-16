@@ -29,17 +29,28 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
   if(it==o.nodes.cend())return "未选择节点。";
   const auto &n=*it;
   if(!n.conversionIssues.isEmpty()||!ProxyNode::validate(n).isEmpty())return "节点含无效或未映射参数，Rust 拒绝执行。";
-  if(!QStringList{"http","socks5","trojan"}.contains(n.protocol))return "此节点协议尚未迁移到 Rust；未使用外部内核。";
-  const QSet<QString> allowed{"tls","udp","sni","servername","alpn","skip-cert-verify"};
+  if(!QStringList{"http","socks5","trojan","ss"}.contains(n.protocol))return "此节点协议尚未迁移到 Rust；未使用外部内核。";
+  const QSet<QString> allowed=n.protocol=="ss"?QSet<QString>{"udp","plugin","plugin-opts"}:QSet<QString>{"tls","udp","sni","servername","alpn","skip-cert-verify"};
   for(auto p=n.parameters.begin();p!=n.parameters.end();++p)if(!allowed.contains(p.key()))return "Rust 尚未实现此传输或扩展参数。";
   for(const auto &key:QStringList{"tls","udp","skip-cert-verify"})if(n.parameters.contains(key)&&!n.parameters.value(key).isBool())return "Rust 布尔参数类型无效。";
-  if(n.parameters.value("udp").toBool()||n.parameters.value("skip-cert-verify").toBool())return "Rust 尚不支持该出口的代理 UDP，且不允许关闭证书验证。";
+  if((n.protocol!="ss"&&n.parameters.value("udp").toBool())||n.parameters.value("skip-cert-verify").toBool())return "Rust 尚不支持该出口的代理 UDP，且不允许关闭证书验证。";
   for(const auto &key:QStringList{"sni","servername"})if(n.parameters.contains(key)&&(!n.parameters.value(key).isString()||n.parameters.value(key).toString()!=n.serverName))return "TLS 名称字段不一致。";
   if(n.protocol=="trojan"&&n.parameters.contains("tls")&&!n.parameters.value("tls").toBool())return "Trojan 必须使用 TLS。";
   const bool tls=n.protocol=="trojan"||n.parameters.value("tls").toBool();
   if(!tls&&(!n.serverName.isEmpty()||n.parameters.contains("alpn")))return "未启用 TLS 却含 TLS 参数。";
-  QJsonObject outbound{{"type",n.protocol=="http"?"http_connect":n.protocol},{"host",n.host},{"port",n.port}};
-  if(n.protocol=="trojan")outbound["password"]=n.password;
+  QJsonObject outbound{{"type",n.protocol=="http"?"http_connect":n.protocol=="ss"?"shadowsocks":n.protocol},{"host",n.host},{"port",n.port}};
+  if(n.protocol=="ss"){
+   if(!n.username.isEmpty()||!QStringList{"aes-128-gcm","aes-256-gcm","chacha20-ietf-poly1305"}.contains(n.cipher))return "Rust 尚未实现此 Shadowsocks 加密或认证方式。";
+   outbound["password"]=n.password;outbound["cipher"]=n.cipher;
+   if(n.parameters.contains("plugin")){
+    if(!n.parameters.value("plugin").isString()||!QStringList{"obfs","obfs-local"}.contains(n.parameters.value("plugin").toString())||!n.parameters.value("plugin-opts").isObject())return "Rust 尚未实现此 Shadowsocks 插件。";
+    const auto plugin=n.parameters.value("plugin-opts").toObject();
+    for(auto p=plugin.begin();p!=plugin.end();++p)if(p.key()!="mode"&&p.key()!="host")return "Rust 尚未映射此混淆参数。";
+    if(plugin.value("mode").toString()!="http"||!plugin.value("host").isString()||plugin.value("host").toString().isEmpty())return "Rust 目前只支持显式主机的 HTTP 混淆。";
+    outbound["obfs_http"]=QJsonObject{{"host",plugin.value("host")}};
+   }else if(n.parameters.contains("plugin-opts"))return "缺少 Shadowsocks 插件类型。";
+  }
+  else if(n.protocol=="trojan")outbound["password"]=n.password;
   else if(!n.username.isEmpty()||!n.password.isEmpty())outbound["auth"]=QJsonObject{{"username",n.username},{"password",n.password}};
   if(tls){
    auto alpn=n.parameters.value("alpn");if(!alpn.isUndefined()&&!alpn.isArray())return "ALPN 格式无效。";

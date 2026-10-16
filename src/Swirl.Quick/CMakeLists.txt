@@ -54,7 +54,16 @@ if(SWIRL_USE_RUST_CORE)
   COMMAND "${SWIRL_CARGO}" build --release --locked --manifest-path "${SWIRL_RUST_SOURCE}/Cargo.toml" --target-dir "${SWIRL_RUST_TARGET}" -p swirl-api
   DEPENDS ${SWIRL_RUST_INPUTS} "${SWIRL_RUST_SOURCE}/Cargo.toml" "${SWIRL_RUST_SOURCE}/Cargo.lock"
   VERBATIM)
- add_custom_target(SwirlRustCore DEPENDS "${SWIRL_RUST_TARGET}/release/swirl_api.dll")
+ # Refresh the deployed DLL even when only Rust sources changed and no Qt
+ # target needs relinking (POST_BUILD alone leaves a stale runtime in that case).
+ set(SWIRL_RUST_STAGE "${CMAKE_CURRENT_BINARY_DIR}")
+ if(CMAKE_CONFIGURATION_TYPES)
+  set(SWIRL_RUST_STAGE "${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>")
+ endif()
+ add_custom_target(SwirlRustCore
+  COMMAND "${CMAKE_COMMAND}" -E make_directory "${SWIRL_RUST_STAGE}"
+  COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${SWIRL_RUST_TARGET}/release/swirl_api.dll" "${SWIRL_RUST_STAGE}/swirl_api.dll"
+  DEPENDS "${SWIRL_RUST_TARGET}/release/swirl_api.dll")
  add_dependencies(SwirlEngine SwirlRustCore)
  target_compile_definitions(SwirlEngine PUBLIC SWIRL_USE_RUST_CORE)
  add_custom_command(TARGET Swirl POST_BUILD COMMAND "${CMAKE_COMMAND}" -E copy_if_different

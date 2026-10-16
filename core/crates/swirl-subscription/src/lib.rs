@@ -25,10 +25,24 @@ pub struct Tls {
 }
 
 #[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ObfsHttp {
+    pub host: String,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Outbound {
     Direct,
     Reject,
+    Shadowsocks {
+        host: String,
+        port: u16,
+        password: String,
+        cipher: String,
+        #[serde(default)]
+        obfs_http: Option<ObfsHttp>,
+    },
     Socks5 {
         host: String,
         port: u16,
@@ -167,6 +181,24 @@ impl Config {
                 return Err("NodeId");
             }
             match &node.outbound {
+                Outbound::Shadowsocks {
+                    host,
+                    port,
+                    password,
+                    cipher,
+                    obfs_http,
+                } => {
+                    if !valid_host(host)
+                        || *port == 0
+                        || password.is_empty()
+                        || password.len() > 1024
+                        || !["aes-128-gcm", "aes-256-gcm", "chacha20-ietf-poly1305"]
+                            .contains(&cipher.as_str())
+                        || obfs_http.as_ref().is_some_and(|o| !valid_host(&o.host))
+                    {
+                        return Err("ShadowsocksParameters");
+                    }
+                }
                 Outbound::Socks5 {
                     host, port, auth, ..
                 }

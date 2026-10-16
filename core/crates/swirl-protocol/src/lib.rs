@@ -1,5 +1,9 @@
 //! Swirl-owned HTTP/SOCKS state machines. Underlying Tokio is generic socket I/O.
 use base64::{Engine, engine::general_purpose::STANDARD};
+mod shadowsocks;
+pub use shadowsocks::{
+    decrypt_datagram as ss_decrypt_datagram, encrypt_datagram as ss_encrypt_datagram,
+};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use swirl_dns::Resolver;
 use swirl_subscription::{Credentials, Outbound, valid_host};
@@ -407,6 +411,7 @@ pub async fn connect(
     let (host, port, auth, tls) = match outbound {
         Outbound::Direct => return Ok(Box::new(connect_tcp(resolver, target).await?)),
         Outbound::Reject => return Err("RouteRejected"),
+        Outbound::Shadowsocks { host, port, .. } => (host, *port, None, None),
         Outbound::Socks5 {
             host,
             port,
@@ -436,6 +441,33 @@ pub async fn connect(
     } else {
         Box::new(tcp)
     };
+    if let Outbound::Shadowsocks {
+        password,
+        cipher,
+        obfs_http,
+        ..
+    } = outbound
+    {
+        let mut encrypted = shadowsocks::Stream::new(
+            stream,
+            password,
+            cipher,
+            obfs_http.as_ref().map(|o| o.host.clone()),
+            port,
+        )
+        .map_err(|_| "ShadowsocksSetup")?;
+        let mut address = Vec::new();
+        target.encode(&mut address)?;
+        encrypted
+            .write_all(&address)
+            .await
+            .map_err(|_| "ShadowsocksHandshakeWrite")?;
+        encrypted
+            .flush()
+            .await
+            .map_err(|_| "ShadowsocksHandshakeWrite")?;
+        return Ok(Box::new(encrypted));
+    }
     if let Outbound::Trojan { password, .. } = outbound {
         use sha2::{Digest, Sha224};
         let mut request = format!("{:x}\r\n", Sha224::digest(password.as_bytes())).into_bytes();

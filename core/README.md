@@ -39,14 +39,14 @@ optional public HTTPS checks; it does not claim private-node performance.
 | Crate | Actual implementation | Not yet implemented |
 |---|---|---|
 | swirl-subscription | Versioned typed Swirl IR; bounded content detection for Clash YAML/JSON, sing-box JSON, URI/Base64 and INI; raw/unknown field preservation; redacted protocol/transport/TLS/cipher matrix; fully mapped TCP test candidates | Complete client-specific config execution and integrated subscription updating; existing C++ adapters and Python capture retained |
-| swirl-protocol | Mixed HTTP/CONNECT/SOCKS5 input, input auth, HTTP CONNECT/SOCKS5 upstream auth, Trojan TLS framing | SOCKS4, SS/SSR/VMess/VLESS/REALITY/QUIC families and protocol UDP |
+| swirl-protocol | Mixed HTTP/CONNECT/SOCKS5 input, input auth, HTTP CONNECT/SOCKS5 upstream auth, Trojan TLS framing, SS AEAD TCP/UDP and simple-obfs HTTP TCP framing | SOCKS4, SS2022/SSR/VMess/VLESS/REALITY/QUIC families, other protocol UDP and obfs TLS |
 | swirl-transport | rustls TLS with verification/SNI/ALPN, bounded duplex copying, independent half-close, live byte counters | WS/gRPC/XHTTP protocol transports, mux, QUIC; application WS/SSE opaque tunneling is a different layer |
 | swirl-routing | Ordered domain/exact/suffix/IP-CIDR, explicit DIRECT/REJECT/node selection | GEOIP/GEOSITE, groups/failover; custom routing is currently exposed through IR API, not the legacy Qt configuration mapper |
 | swirl-dns | System resolver, 8-query concurrency limit, 256-entry cache with 30-second policy lifetime, max 16 addresses | Authoritative DNS TTL handling, DoH/DoT/DNS split/Fake-IP |
-| swirl-core | Two Tokio workers, max 256 sessions, immutable per-session plan, atomic updates, stop/cancel, stats; SOCKS5 UDP ASSOCIATE with explicit DIRECT routes | UDP via proxy protocols, TUN, platform network takeover |
+| swirl-core | Two Tokio workers, max 256 sessions, immutable per-session plan, atomic updates, stop/cancel, stats; SOCKS5 UDP ASSOCIATE with explicit DIRECT or SS AEAD routes | Other protocol UDP, TUN, platform network takeover |
 | swirl-api | ABI v1 caller-buffer JSON, lifecycle handles, start/configure/select/snapshot/stop; local stdin harness | More advanced policy/config schemas and persisted IR migration |
 
-The Qt adapter exposes supported HTTP/SOCKS5/Trojan nodes using the existing
+The Qt adapter exposes supported HTTP/SOCKS5/Trojan/SS AEAD nodes using the existing
 controls. Unsupported options fail explicitly before startup or selection. In
 particular, old default smart-routing/TUN/custom DNS sessions are not silently
 downgraded to global/direct. Existing stored nodes and unselected unsupported
@@ -75,6 +75,45 @@ entries. String credentials retain their type, and conflicting canonical/alias
 parameters fail explicitly instead of overwriting one another. Anonymous test
 cases distinguish parsed, blocked, not-tested, passed and failed evidence;
 unsupported certificate policies and TCP Fast Open have explicit diagnostics.
+
+## Shadowsocks AEAD implementation
+
+Swirl owns SIP004/SIP007 framing, address encoding, nonce sequencing, stream
+state and UDP association handling. Supported ciphers are aes-128-gcm,
+aes-256-gcm and chacha20-ietf-poly1305. ring provides AEAD, HKDF-SHA1 and OS random
+bytes; RustCrypto md-5 implements the protocol's legacy password derivation.
+No complete proxy core or simple-obfs executable/library is linked or launched.
+HTTP obfs is its wire framing implemented in Rust, not TLS or WebSocket security.
+
+TCP chunks are at most 16383 bytes; malformed lengths, truncated records, bad
+tags, reflected salts and counter exhaustion fail closed. Authenticated empty
+chunks yield cooperatively. Partial reads/writes retain state, buffers are bounded,
+and half-close drains encrypted output before shutting down its socket direction.
+The process-local TCP replay window is 600 seconds and UDP is 30 seconds, with
+separate 65536-entry caps. Exhaustion fails closed; unexpired entries are not
+evicted. This is bounded process-lifetime replay protection, not persistent
+protection across application restarts or arbitrarily old replays.
+
+SS UDP has independent random salt and zero nonce for each authenticated packet.
+The SOCKS association owns both UDP sockets, pins the local client, tracks at most
+64 remote endpoints for 30 seconds, and refuses ambiguous key/route reuse for the
+same endpoint. Payload statistics exclude AEAD and SOCKS framing. HTTP obfs applies
+only to TCP. SS proxy UDP has independent Python-peer evidence; private-provider
+UDP has not been tested. Oversized packets and SOCKS fragments are dropped.
+
+The offline mapper supports plain SS AEAD and explicit HTTP obfs options from
+Clash and supported INI forms. Unknown options, unsupported plugins, TFO=true,
+SS2022 and insecure Trojan certificate policies remain explicit execution blockers.
+No source parameters are altered to make a test pass. Private nodes stay local.
+
+Protocol references: https://shadowsocks.org/doc/aead.html and the official
+simple-obfs HTTP wire implementation at
+https://github.com/shadowsocks/simple-obfs/blob/master/src/obfs_http.c .
+The latter is a protocol reference only; no GPL source is copied into the product.
+Independent Python cryptography peers exercise all three ciphers, TCP/UDP,
+HTTP obfs, IPv4/IPv6/domain targets, partial records, half-close, tampering,
+replay and the Qt facade. Run `tools/tests/test_shadowsocks.py` with
+SWIRL_RUST_HARNESS and optionally SWIRL_RUST_QT_TESTS pointing to built executables.
 
 ## Bounds and ownership
 

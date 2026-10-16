@@ -11,5 +11,8 @@ swirl-subscription.workspace = true
 swirl-dns.workspace = true
 swirl-transport.workspace = true
 sha2.workspace = true
+ring.workspace = true
+md-5.workspace = true
+zeroize.workspace = true
 [lints]
 workspace = true

@@ -319,6 +319,12 @@ async fn session(
             .await
             .map_err(|_| "InitialWriteTimeout")?
             .map_err(|_| "InitialWrite")?;
+        // Flush framed output before waiting for more client data, otherwise
+        // the initial HTTP request can remain buffered indefinitely.
+        timeout(limit, upstream.flush())
+            .await
+            .map_err(|_| "InitialWriteTimeout")?
+            .map_err(|_| "InitialWrite")?;
         counters
             .upload
             .fetch_add(request.initial.len() as u64, Ordering::Relaxed);
@@ -341,7 +347,6 @@ async fn udp_associate(
     counters: Arc<Counters>,
     total: Arc<Counters>,
 ) -> Result<()> {
-    // First phase: UDP ASSOCIATE executes explicit DIRECT/REJECT routes only.
     // Unsupported proxy UDP is an error, never silently converted to DIRECT.
     let requested_ip: IpAddr = request
         .target
@@ -369,7 +374,7 @@ async fn udp_associate(
     } else {
         Some(SocketAddr::new(peer.ip(), request.target.port))
     };
-    let mut destinations: HashMap<SocketAddr, Instant> = HashMap::new();
+    let mut destinations: HashMap<SocketAddr, (Instant, String)> = HashMap::new();
     let (mut from_client, mut from_v4, mut from_v6) = ([0u8; 65535], [0u8; 65535], [0u8; 65535]);
     let mut closed = [0; 1];
     loop {
@@ -383,22 +388,33 @@ async fn udp_associate(
                 client=Some(source);
                 if cursor.len()>65507 {continue;}
                 let node=swirl_routing::select(&config,&target.host)?;
-                if !matches!(node.outbound,Outbound::Direct){return Err("UdpProxyUnsupportedOrRejected");}
-                let address=resolver.resolve(&target.host,target.port).await?.into_iter().next().ok_or("DnsEmpty")?;
-                destinations.retain(|_,at|at.elapsed()<Duration::from_secs(30));
+                let (host,port,packet)=match &node.outbound {
+                    Outbound::Direct=>(target.host.clone(),target.port,cursor.to_vec()),
+                    Outbound::Shadowsocks{host,port,password,cipher,..}=>{
+                        let mut plain=Vec::new();target.encode(&mut plain)?;plain.extend(cursor);
+                        let Ok(wire)=swirl_protocol::ss_encrypt_datagram(password,cipher,&plain) else {continue;};
+                        (host.clone(),*port,wire)
+                    },
+                    _=>return Err("UdpProxyUnsupportedOrRejected"),
+                };
+                let address=resolver.resolve(&host,port).await?.into_iter().next().ok_or("DnsEmpty")?;
+                destinations.retain(|_,(at,_)|at.elapsed()<Duration::from_secs(30));
                 if destinations.len()>=64 && !destinations.contains_key(&address){continue;}
+                // One peer socket cannot ambiguously represent different keys/routes.
+                if destinations.get(&address).is_some_and(|(_,id)|id!=&node.id){continue;}
                 let socket=if address.is_ipv4(){&v4}else{&v6};
-                let count=socket.send_to(cursor,address).await.map_err(|_|"UdpSend")?;
-                destinations.insert(address,Instant::now());
+                socket.send_to(&packet,address).await.map_err(|_|"UdpSend")?;
+                let count=cursor.len();
+                destinations.insert(address,(Instant::now(),node.id.clone()));
                 counters.upload.fetch_add(count as u64,Ordering::Relaxed);total.upload.fetch_add(count as u64,Ordering::Relaxed);
             }
             packet=v4.recv_from(&mut from_v4)=>{
                 let (n,source)=packet.map_err(|_|"UdpReceive")?;
-                udp_response(&relay,client,source,&from_v4[..n],&destinations,&counters,&total).await?;
+                udp_response(&relay,client,source,&from_v4[..n],&destinations,&config,(&counters,&total)).await?;
             }
             packet=v6.recv_from(&mut from_v6)=>{
                 let (n,source)=packet.map_err(|_|"UdpReceive")?;
-                udp_response(&relay,client,source,&from_v6[..n],&destinations,&counters,&total).await?;
+                udp_response(&relay,client,source,&from_v6[..n],&destinations,&config,(&counters,&total)).await?;
             }
         }
     }
@@ -408,25 +424,50 @@ async fn udp_response(
     client: Option<SocketAddr>,
     source: SocketAddr,
     payload: &[u8],
-    destinations: &HashMap<SocketAddr, Instant>,
-    counters: &Counters,
-    total: &Counters,
+    destinations: &HashMap<SocketAddr, (Instant, String)>,
+    config: &Config,
+    counts: (&Counters, &Counters),
 ) -> Result<()> {
+    let (counters, total) = counts;
     let Some(client) = client else {
         return Ok(());
     };
-    if destinations
-        .get(&source)
-        .is_none_or(|at| at.elapsed() >= Duration::from_secs(30))
-    {
+    let Some((at, id)) = destinations.get(&source) else {
+        return Ok(());
+    };
+    if at.elapsed() >= Duration::from_secs(30) {
         return Ok(());
     }
+    let node = config
+        .nodes
+        .iter()
+        .find(|n| &n.id == id)
+        .ok_or("UdpRouteMissing")?;
+    let decoded;
+    let (target, payload) = if let Outbound::Shadowsocks {
+        password, cipher, ..
+    } = &node.outbound
+    {
+        let Ok(plain) = swirl_protocol::ss_decrypt_datagram(password, cipher, payload) else {
+            return Ok(());
+        };
+        decoded = plain;
+        let mut cursor = decoded.as_slice();
+        let Ok(target) = swirl_protocol::read_target(&mut cursor, false).await else {
+            return Ok(());
+        };
+        (target, cursor)
+    } else {
+        (
+            Target {
+                host: source.ip().to_string(),
+                port: source.port(),
+            },
+            payload,
+        )
+    };
     let mut data = vec![0, 0, 0];
-    Target {
-        host: source.ip().to_string(),
-        port: source.port(),
-    }
-    .encode(&mut data)?;
+    target.encode(&mut data)?;
     data.extend(payload);
     if data.len() > 65507 {
         return Ok(());

@@ -1,7 +1,7 @@
 //! Content-based, offline format inspection. Original data is never included in
 //! the public report. Only explicitly supported and fully mapped TCP nodes can
 //! yield an executable isolated-test outbound; all original fields are retained.
-use crate::{Config, Credentials, Limits, Node, Outbound, Tls};
+use crate::{Config, Credentials, Limits, Node, ObfsHttp, Outbound, Tls};
 use base64::{
     Engine,
     engine::general_purpose::{STANDARD, STANDARD_NO_PAD, URL_SAFE, URL_SAFE_NO_PAD},
@@ -381,6 +381,141 @@ fn parse(bytes: &[u8], depth: usize) -> Result<(&'static str, Value, Vec<Value>)
     }
     Err("UnknownConfigurationShape")
 }
+fn ss_outbound(raw: &Value, family: &str) -> Result<Outbound, &'static str> {
+    if family == "xray-v2ray-json" {
+        return Err("UnmappedFields");
+    }
+    let object = raw.as_object().ok_or("UnmappedFields")?;
+    let known = [
+        "type",
+        "name",
+        "tag",
+        "server",
+        "port",
+        "server_port",
+        "password",
+        "cipher",
+        "method",
+        "udp",
+        "network",
+        "tfo",
+        "plugin",
+        "plugin-opts",
+        "obfs",
+        "obfs-host",
+        "raw-uri",
+        "raw-ini",
+    ];
+    if object.keys().any(|k| !known.contains(&k.as_str())) {
+        return Err("UnmappedFields");
+    }
+    if raw
+        .get("network")
+        .is_some_and(|v| v.as_str() != Some("tcp"))
+    {
+        return Err("TransportNotImplemented");
+    }
+    if raw.get("tfo").is_some_and(|v| v.as_bool() != Some(false)) {
+        return Err("TcpFastOpenNotImplemented");
+    }
+    if raw.get("udp").is_some_and(|v| !v.is_boolean()) {
+        return Err("UnmappedOrInvalidParameters");
+    }
+    let cipher = raw
+        .get("cipher")
+        .or_else(|| raw.get("method"))
+        .and_then(Value::as_str)
+        .ok_or("CipherNotImplemented")?;
+    if raw.get("cipher").is_some() && raw.get("method").is_some() && raw["cipher"] != raw["method"]
+    {
+        return Err("ConflictingCipher");
+    }
+    if !["aes-128-gcm", "aes-256-gcm", "chacha20-ietf-poly1305"].contains(&cipher) {
+        return Err("CipherNotImplemented");
+    }
+    let obfs_http = if let Some(plugin) = raw.get("plugin") {
+        if !matches!(plugin.as_str(), Some("obfs" | "obfs-local"))
+            || raw.get("obfs").is_some()
+            || raw.get("obfs-host").is_some()
+        {
+            return Err("PluginNotImplemented");
+        }
+        let options = raw
+            .get("plugin-opts")
+            .and_then(Value::as_object)
+            .ok_or("PluginParameters")?;
+        if options
+            .keys()
+            .any(|k| !["mode", "host"].contains(&k.as_str()))
+            || options.get("mode").and_then(Value::as_str) != Some("http")
+        {
+            return Err("PluginNotImplemented");
+        }
+        Some(ObfsHttp {
+            host: options
+                .get("host")
+                .and_then(Value::as_str)
+                .ok_or("PluginParameters")?
+                .to_string(),
+        })
+    } else if raw.get("obfs").is_some() {
+        if raw["obfs"].as_str() != Some("http") || raw.get("plugin-opts").is_some() {
+            return Err("PluginNotImplemented");
+        }
+        Some(ObfsHttp {
+            host: raw
+                .get("obfs-host")
+                .and_then(Value::as_str)
+                .ok_or("PluginParameters")?
+                .to_string(),
+        })
+    } else {
+        if raw.get("plugin-opts").is_some() || raw.get("obfs-host").is_some() {
+            return Err("PluginParameters");
+        }
+        None
+    };
+    let host = raw
+        .get("server")
+        .and_then(Value::as_str)
+        .ok_or("NodeParameters")?
+        .to_string();
+    let port = raw
+        .get("port")
+        .or_else(|| raw.get("server_port"))
+        .and_then(|p| {
+            p.as_u64()
+                .or_else(|| p.as_str().and_then(|s| s.parse().ok()))
+        })
+        .and_then(|p| u16::try_from(p).ok())
+        .ok_or("NodeParameters")?;
+    let password = raw
+        .get("password")
+        .and_then(Value::as_str)
+        .ok_or("NodeParameters")?
+        .to_string();
+    let outbound = Outbound::Shadowsocks {
+        host,
+        port,
+        password,
+        cipher: cipher.into(),
+        obfs_http,
+    };
+    let config = Config {
+        schema: 1,
+        listen: "127.0.0.1:0".parse().expect("constant"),
+        selected: "isolated".into(),
+        nodes: vec![Node {
+            id: "isolated".into(),
+            outbound: outbound.clone(),
+        }],
+        rules: vec![],
+        inbound_auth: None,
+        limits: Limits::default(),
+    };
+    config.validate()?;
+    Ok(outbound)
+}
 fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Option<Outbound>) {
     let kind = protocol(
         raw.get("type")
@@ -478,11 +613,26 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
         "tls-verification",
     ];
     let unrecognized = raw.as_object().map_or(1, |o| {
-        o.keys().filter(|k| !known.contains(&k.as_str())).count()
+        o.keys()
+            .filter(|k| {
+                !known.contains(&k.as_str())
+                    && !(kind == "ss"
+                        && ["plugin", "plugin-opts", "obfs", "obfs-host"].contains(&k.as_str()))
+            })
+            .count()
     });
     let udp = raw.get("udp").and_then(Value::as_bool) == Some(true);
     let mut diagnostic = "ProtocolNotImplemented";
     let mut candidate = None;
+    if kind == "ss" {
+        match ss_outbound(raw, family) {
+            Ok(outbound) => {
+                candidate = Some(outbound);
+                diagnostic = "TcpCandidateNotYetVerified";
+            }
+            Err(reason) => diagnostic = reason,
+        }
+    }
     if ["http", "socks5", "trojan"].contains(&kind) {
         diagnostic = "UnmappedOrInvalidParameters";
         let host = raw
@@ -660,7 +810,7 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
             udp_declared: udp,
             unrecognized_fields: unrecognized,
             native_tcp_candidate: candidate.is_some(),
-            native_udp_supported: false,
+            native_udp_supported: kind == "ss" && candidate.is_some(),
             real_network_verified: false,
             diagnostic,
         },
@@ -761,6 +911,32 @@ mod tests {
         assert_eq!(r.report.nodes[0].protocol, "ss");
         assert_eq!(r.report.nodes[0].version, "cipher-family-2022");
         assert!(!r.report.nodes[0].native_tcp_candidate);
+    }
+    #[test]
+    fn ss_aead_http_obfs_maps_without_losing_unsupported_options() {
+        let input=br#"{"proxies":[{"type":"ss","server":"example.org","port":443,"cipher":"aes-128-gcm","password":"fixture","udp":true,"plugin":"obfs","plugin-opts":{"mode":"http","host":"obfs.example"}}]}"#;
+        let result = inspect(input);
+        assert!(result.report.nodes[0].native_tcp_candidate);
+        assert!(result.report.nodes[0].native_udp_supported);
+        assert_eq!(result.original, input);
+        match result.tcp_candidates[0].as_ref().unwrap() {
+            Outbound::Shadowsocks {
+                obfs_http: Some(obfs),
+                ..
+            } => assert_eq!(obfs.host, "obfs.example"),
+            _ => panic!("incorrect mapping"),
+        }
+        for options in [
+            r#""mode":"tls","host":"obfs.example""#,
+            r#""mode":"http","host":"obfs.example","extra":"retained""#,
+        ] {
+            let text = String::from_utf8(input.to_vec())
+                .unwrap()
+                .replace(r#""mode":"http","host":"obfs.example""#, options);
+            let rejected = inspect(text.as_bytes());
+            assert!(!rejected.report.nodes[0].native_tcp_candidate);
+            assert_eq!(rejected.original, text.as_bytes());
+        }
     }
     #[test]
     fn base64_uri_and_ini() {
