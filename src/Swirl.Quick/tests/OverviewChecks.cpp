@@ -9,6 +9,7 @@
 #include <QTest>
 #include <QDebug>
 #include <QDir>
+#include <QTcpServer>
 #include <functional>
 
 int runOverviewChecks(QQuickWindow *window) {
@@ -35,7 +36,13 @@ int runOverviewChecks(QQuickWindow *window) {
     check(wait([&]{return state("dismissals.count===0").toBool();}),"rule dialog releases its modal shield before table input");
     if(auto *table=item("rulesTable")){QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,table->mapToScene(QPointF(60,39)).toPoint());QTest::qWait(50);}else check(false,"rules table exists");
     click("removeRoutingRule");check(state("!engineController.routingRules.some(r=>r.pattern==='example.test')").toBool(),"selected custom rule can be removed by its editor action");
-    click("nav-capture");click("captureToggle");check(state("captureProvider.running && captureProvider.port===8899").toBool(),"capture toggle starts the actual loopback listener");
+    click("nav-capture");
+    // The user's capture service may already own the normal UI port. This
+    // isolated fixture exercises the same toggle on its own ephemeral port.
+    QTcpServer reservation;const bool reserved=reservation.listen(QHostAddress::LocalHost,0);const auto capturePort=reservation.serverPort();reservation.close();
+    check(reserved,"capture fixture obtains its own loopback port");
+    state(QString("pageLoader.item.listenerPort=%1").arg(capturePort));click("captureToggle");
+    check(state(QString("captureProvider.running && captureProvider.port===%1").arg(capturePort)).toBool(),"capture toggle starts the actual loopback listener");
     click("captureToggle");check(state("!captureProvider.running").toBool(),"capture toggle closes the listener");
     click("nav-tls");click("certificateAction-0");check(wait([&]{return state("captureProvider.tls.ready").toBool();}),"certificate action generates an actual protected local CA");
     check(state("!captureProvider.tls.enabled && !captureProvider.tls.trusted").toBool(),"CA generation keeps interception and system trust opt-in");

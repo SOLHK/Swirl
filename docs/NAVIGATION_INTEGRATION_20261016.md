@@ -154,3 +154,11 @@ budgets and none exceeded 2.5. All-delivery p95 including the stationary termina
 commit was 8.81 ms. These are Qt frame delivery observations, not a claim of
 physical display presentation FPS. All nine endpoint comparisons changed zero
 pixels in this run.
+
+The fresh local suite passed 22 of 23 groups initially. The remaining Overview
+capture-toggle check assumed the user's normal port 8899 was free; an owned
+exclusive-bind probe confirmed it was occupied (Windows error 10048). The fixture
+now obtains its own ephemeral loopback port and passes it through the same page
+toggle; the production default remains 8899. Its targeted rerun passed, including
+real listener start/stop and all modal/navigation checks. No existing listener or
+user application was stopped. First-failure evidence is retained in the report.

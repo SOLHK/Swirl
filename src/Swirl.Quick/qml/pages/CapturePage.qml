@@ -7,6 +7,7 @@ import "../components"
 import "../controls"
 Item {
  id:page;required property var captureProvider
+ property int listenerPort:8899
  function scrollToBottom(){scroll.contentItem.contentY=Math.max(0,scroll.contentItem.contentHeight-scroll.availableHeight)}
  function applyLimits(){captureProvider.setLimits([3,5,10,0][timeLimit.currentIndex],[50,100,500,0][sizeLimit.currentIndex],[100,500,1000][countLimit.currentIndex])}
  component Note:SwirlText {renderType:Text.NativeRendering;color:Theme.muted;font.pixelSize:Theme.fontSize(12);lineHeight:1.5;wrapMode:Text.Wrap;Layout.fillWidth:true}
@@ -16,7 +17,7 @@ Item {
   ColumnLayout {width:Math.floor(scroll.availableWidth);spacing:Theme.dp(14)
    RowLayout {Layout.fillWidth:true;Layout.leftMargin:Theme.dp(24);Layout.rightMargin:Theme.dp(24);Layout.topMargin:Theme.dp(24)
     SwirlText {renderType:Text.NativeRendering;text:"捕获 HTTP 内容";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.Bold;Layout.fillWidth:true}
-    SwirlToggle {objectName:"captureToggle";large:true;checked:page.captureProvider.running;onToggled:{if(checked){page.applyLimits();page.captureProvider.start(8899)}else page.captureProvider.stop()}Accessible.name:"捕获 HTTP 内容"}
+    SwirlToggle {objectName:"captureToggle";large:true;checked:page.captureProvider.running;onToggled:{if(checked){page.applyLimits();page.captureProvider.start(page.listenerPort)}else page.captureProvider.stop()}Accessible.name:"捕获 HTTP 内容"}
    }
    Note {Layout.leftMargin:Theme.dp(24);Layout.rightMargin:Theme.dp(24);text:page.captureProvider.error||"捕获 HTTP 请求与内容。开启后会增加内存和存储开销，请仅在需要时使用；HTTPS 内容需要配合 MITM。"}
    RowLayout {Layout.fillWidth:true;Layout.leftMargin:Theme.dp(24);Layout.rightMargin:Theme.dp(24);spacing:Theme.gap;Layout.alignment:Qt.AlignTop
