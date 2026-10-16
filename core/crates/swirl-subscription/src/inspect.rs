@@ -499,6 +499,7 @@ fn ss_outbound(raw: &Value, family: &str) -> Result<Outbound, &'static str> {
         port,
         password,
         cipher: cipher.into(),
+        udp: raw.get("udp").and_then(Value::as_bool).unwrap_or(false),
         obfs_http,
     };
     let config = Config {
@@ -810,7 +811,7 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
             udp_declared: udp,
             unrecognized_fields: unrecognized,
             native_tcp_candidate: candidate.is_some(),
-            native_udp_supported: kind == "ss" && candidate.is_some(),
+            native_udp_supported: kind == "ss" && udp && candidate.is_some(),
             real_network_verified: false,
             diagnostic,
         },

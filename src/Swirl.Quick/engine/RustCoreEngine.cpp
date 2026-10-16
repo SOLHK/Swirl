@@ -41,7 +41,7 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
   QJsonObject outbound{{"type",n.protocol=="http"?"http_connect":n.protocol=="ss"?"shadowsocks":n.protocol},{"host",n.host},{"port",n.port}};
   if(n.protocol=="ss"){
    if(!n.username.isEmpty()||!QStringList{"aes-128-gcm","aes-256-gcm","chacha20-ietf-poly1305"}.contains(n.cipher))return "Rust 尚未实现此 Shadowsocks 加密或认证方式。";
-   outbound["password"]=n.password;outbound["cipher"]=n.cipher;
+   outbound["password"]=n.password;outbound["cipher"]=n.cipher;outbound["udp"]=n.parameters.value("udp").toBool();
    if(n.parameters.contains("plugin")){
     if(!n.parameters.value("plugin").isString()||!QStringList{"obfs","obfs-local"}.contains(n.parameters.value("plugin").toString())||!n.parameters.value("plugin-opts").isObject())return "Rust 尚未实现此 Shadowsocks 插件。";
     const auto plugin=n.parameters.value("plugin-opts").toObject();

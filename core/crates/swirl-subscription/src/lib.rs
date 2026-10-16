@@ -41,6 +41,8 @@ pub enum Outbound {
         password: String,
         cipher: String,
         #[serde(default)]
+        udp: bool,
+        #[serde(default)]
         obfs_http: Option<ObfsHttp>,
     },
     Socks5 {
@@ -187,6 +189,7 @@ impl Config {
                     password,
                     cipher,
                     obfs_http,
+                    ..
                 } => {
                     if !valid_host(host)
                         || *port == 0

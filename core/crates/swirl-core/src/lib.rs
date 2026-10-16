@@ -390,7 +390,7 @@ async fn udp_associate(
                 let node=swirl_routing::select(&config,&target.host)?;
                 let (host,port,packet)=match &node.outbound {
                     Outbound::Direct=>(target.host.clone(),target.port,cursor.to_vec()),
-                    Outbound::Shadowsocks{host,port,password,cipher,..}=>{
+                    Outbound::Shadowsocks{host,port,password,cipher,udp:true,..}=>{
                         let mut plain=Vec::new();target.encode(&mut plain)?;plain.extend(cursor);
                         let Ok(wire)=swirl_protocol::ss_encrypt_datagram(password,cipher,&plain) else {continue;};
                         (host.clone(),*port,wire)

@@ -124,12 +124,12 @@ class ShadowsocksTests(unittest.TestCase):
     def command(self,**data):
         self.process.stdin.write(json.dumps(data)+'\n');self.process.stdin.flush()
         return json.loads(self.process.stdout.readline())
-    def setup_peer(self,method='aes-128-gcm',obfs=False,mode='echo',salt=None):
+    def setup_peer(self,method='aes-128-gcm',obfs=False,mode='echo',salt=None,udp_enabled=True):
         server=Peer(('127.0.0.1',0),Handler)
         server.method=method;server.obfs=obfs;server.mode=mode;server.fixed_salt=salt
         server.targets=[];server.headers=[];server.errors=[];server.received=0
         threading.Thread(target=server.serve_forever,daemon=True).start();self.servers.append(server)
-        outbound={'type':'shadowsocks','host':'127.0.0.1','port':server.server_address[1],'password':PASSWORD,'cipher':method}
+        outbound={'type':'shadowsocks','host':'127.0.0.1','port':server.server_address[1],'password':PASSWORD,'cipher':method,'udp':udp_enabled}
         if obfs:outbound['obfs_http']={'host':'obfs.example'}
         result=self.command(op='start',config={'schema':1,'listen':'127.0.0.1:0','selected':'node','nodes':[{'id':'node','outbound':outbound}]})
         self.assertTrue(result['ok'],result);self.handle=result['handle'];self.port=int(result['status']['address'].rsplit(':',1)[1])
@@ -215,5 +215,14 @@ class ShadowsocksTests(unittest.TestCase):
                 with self.assertRaises(socket.timeout):client.recvfrom(65535)
                 self.assertEqual(len(udp.received),count)
             self.command(op='stop',handle=self.handle)
+    def test_explicit_udp_false_never_sends_to_server(self):
+        peer=self.setup_peer(udp_enabled=False)
+        with socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as remote, socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as client, socket.create_connection(('127.0.0.1',self.port),timeout=3) as control:
+            remote.bind(peer.server_address);remote.settimeout(.2)
+            control.sendall(b'\x05\x01\x00');self.assertEqual(exact(control,2),b'\x05\x00')
+            control.sendall(b'\x05\x03\x00\x01'+bytes(6));self.assertEqual(exact(control,3),b'\x05\x00\x00')
+            relay=target(control);client.sendto(b'\x00\x00\x00\x01\x7f\x00\x00\x01\x00\x35blocked',relay)
+            self.assertEqual(control.recv(1),b'')
+            with self.assertRaises(socket.timeout):remote.recvfrom(1024)
 
 if __name__=='__main__':unittest.main(verbosity=2)

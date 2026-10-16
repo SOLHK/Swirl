@@ -95,6 +95,8 @@ evicted. This is bounded process-lifetime replay protection, not persistent
 protection across application restarts or arbitrarily old replays.
 
 SS UDP has independent random salt and zero nonce for each authenticated packet.
+SS IR must explicitly set `udp: true`; missing/false keeps UDP disabled. Import
+and Qt mappings preserve this choice instead of enabling UDP implicitly.
 The SOCKS association owns both UDP sockets, pins the local client, tracks at most
 64 remote endpoints for 30 seconds, and refuses ambiguous key/route reuse for the
 same endpoint. Payload statistics exclude AEAD and SOCKS framing. HTTP obfs applies
