@@ -48,9 +48,8 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
   check(await([&]{return !controller->imports()->busy();},8000)&&controller->nodes().size()==180,"standalone navigation fixture imports 180 local node records");
  }
  auto *policy=qobject_cast<MotionPolicy *>(qmlContext(window)->contextProperty("motionPolicy").value<QObject *>());
- const bool standalone=qApp->arguments().contains("--navigation-test");
- if(standalone&&policy)policy->setSystemReducedMotionOverrideForTest(0);
- struct RestorePolicy {MotionPolicy *policy;bool enabled;~RestorePolicy(){if(enabled&&policy)policy->setSystemReducedMotionOverrideForTest(-1);}} restorePolicy{policy,standalone};
+ const auto nativeMotionPolicy=QJsonDocument::fromJson(eval("JSON.stringify({systemReduced:motionPolicy.systemReducedMotion,followSystem:Theme.followSystemMotion,applicationReduced:Theme.reduceMotion,effectiveReduced:SwirlMotion.reduced,expandDuration:SwirlMotion.expandDuration})").toString().toUtf8()).object();
+ check(policy&&!nativeMotionPolicy.value("followSystem").toBool()&&!nativeMotionPolicy.value("applicationReduced").toBool()&&!nativeMotionPolicy.value("effectiveReduced").toBool()&&nativeMotionPolicy.value("expandDuration").toInt()>0,"fresh application defaults keep full animation under the actual system policy without an override");
  const auto handle=window->winId();const auto geometry=window->geometry();
  const auto pid=controller->processId();const auto selected=controller->selectedNodeId();const auto nodeCount=controller->nodes().size();
  eval("Theme.reduceMotion=false;SwirlMotion.speed=1");check(route("featurehub"),"card hub settles before input");
@@ -200,6 +199,6 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
   auto percentile=[&](double fraction){return intervals.isEmpty()?0:intervals[qMin(intervals.size()-1,qsizetype(intervals.size()*fraction))];};
   performance={{"cycles",18},{"samples",intervals.size()},{"reportedRefreshHz",refresh},{"p50Ms",percentile(0.50)},{"p95Ms",percentile(0.95)},{"p99Ms",percentile(0.99)},{"maxMs",intervals.isEmpty()?0:intervals.last()},{"over1_5Budgets",overBudget},{"over2_5Budgets",overDouble},{"allDeliverySamples",allIntervals.size()},{"allDeliveryP95Ms",allIntervals.isEmpty()?0:allIntervals[qMin(allIntervals.size()-1,qsizetype(allIntervals.size()*0.95))]},{"method","Passive Qt frameSwapped intervals during 36 warm forward/reverse transitions driven by a normal QEventLoop; no QTest sleep polling, screenshot readback or per-frame expression polling. Active samples cover 20 ms through duration minus 20 ms; all-delivery statistics additionally retain the stationary commit tail. Delivery intervals are not physical display presentation FPS."}};
  }
- QFile file(directory+"/navigation-report.json");if(file.open(QIODevice::WriteOnly))file.write(QJsonDocument(QJsonObject{{"checks",checks},{"endpointSamples",endpointSamples},{"performance",performance},{"failures",failures},{"nativeHandleUnchanged",window->winId()==handle},{"dpr",window->devicePixelRatio()}}).toJson());
+ QFile file(directory+"/navigation-report.json");if(file.open(QIODevice::WriteOnly))file.write(QJsonDocument(QJsonObject{{"checks",checks},{"nativeMotionPolicy",nativeMotionPolicy},{"endpointSamples",endpointSamples},{"performance",performance},{"failures",failures},{"nativeHandleUnchanged",window->winId()==handle},{"dpr",window->devicePixelRatio()}}).toJson());
  return failures;
 }

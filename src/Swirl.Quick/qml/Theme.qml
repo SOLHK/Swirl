@@ -18,6 +18,7 @@ QtObject {
     property int glassQuality: 1
     readonly property bool effectsSupported: gpuEffectsSupported
     property alias reduceMotion: appearanceStore.savedReduceMotion
+    property alias followSystemMotion: appearanceStore.savedFollowSystemMotion
     property string pageBranch: "B"
     // Qt already maps QML logical pixels to each screen's DPI. Automatic mode
     // therefore uses the native 100% logical design scale; manual scaling is a
@@ -28,6 +29,7 @@ QtObject {
         property string savedMode: "System"
         property bool savedTransparency: true
         property bool savedReduceMotion: false
+        property bool savedFollowSystemMotion: false
         property int savedScalePercent: 100
         property bool followSystemScale: true
     }

@@ -162,3 +162,27 @@ now obtains its own ephemeral loopback port and passes it through the same page
 toggle; the production default remains 8899. Its targeted rerun passed, including
 real listener start/stop and all modal/navigation checks. No existing listener or
 user application was stopped. First-failure evidence is retained in the report.
+
+## Production animation policy acceptance
+
+The user's 12.mp4 revealed a gap in the preview acceptance: Windows returned
+reduced client-area motion while Swirl's own Reduce Motion preference was false.
+The previous implicit OR with the Windows preference made every production
+duration zero. Animated test fixtures had overridden that policy, so their
+successful expansion recordings did not prove the production default.
+
+Swirl now defaults to its own full animation preference. The existing explicit
+Reduce Motion control remains, and a separately persisted Follow System Motion
+option lets users opt into the operating system's animation preference. No
+Windows setting is changed. Standalone navigation no longer overrides the native
+policy: it records and checks the actual effective production defaults before
+exercising the nine cards. The initial native-policy run recorded systemReduced
+true, followSystem false, applicationReduced false, effectiveReduced false and
+expandDuration 360; its endpoint comparisons passed. Motion tests additionally
+inject reduced system policy with following both off and on, and appearance
+tests verify that the explicit preference survives a new process.
+
+Production startup diagnostics record only these policy booleans and duration,
+without credentials or user data. Tests-OFF production startup and actual card
+input are verified separately from the deterministic test overrides. The earlier
+69f3cca preview is superseded by this policy correction.
