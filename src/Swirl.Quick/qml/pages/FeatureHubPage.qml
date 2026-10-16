@@ -8,7 +8,6 @@ import "../controls"
 Item {
     id: page
     SwirlText { x:Theme.dp(24); y:Theme.dp(30); text:"设置"; color:Theme.text; font.pixelSize:Theme.fontSize(26); font.weight:Font.Bold }
-    Rectangle { y:Theme.dp(78); width:parent.width; height:Theme.dp(1); color:Theme.border }
     ScrollView {
         id: scroll; x:Theme.dp(24); y:Theme.dp(94); width:parent.width-Theme.dp(48); height:parent.height-y-Theme.dp(20)
         clip:true; ScrollBar.horizontal.policy:ScrollBar.AlwaysOff; ScrollBar.vertical:SwirlScrollBar {}
@@ -34,13 +33,18 @@ Item {
                     objectName:"settings-"+modelData.route
                     width:Math.floor((grid.width-(grid.columns-1)*grid.spacing)/grid.columns); height:Theme.dp(156)
                     padding:Theme.cardPadding; hoverEnabled:true
-                    readonly property real transfer: page.Window.window.settingsOrigin===entry ? page.Window.window.settingsOriginProgress : 0
+                    readonly property Item motionSurface:background
                     motionScale:enabled && down?SwirlMotion.pressScale:1
-                    opacity:page.Window.window.settingsOrigin===entry && page.Window.window.settingsOriginMoving?0:1
+                    // The cached hub stays mounted during in-window navigation.
+                    opacity:1
                     background:Rectangle {
-                        color:entry.hovered?Theme.hover:Theme.material("content"); radius:Theme.cardRadius
-                        border.width:Theme.borderWidth; border.color:entry.activeFocus?Theme.focusBorder:Theme.border
-                        Behavior on color { ColorAnimation { duration:SwirlMotion.hoverDuration } }
+                        id:entrySurface
+                        property bool surfaceHidden:false
+                        color:Theme.material("content"); radius:Theme.cardRadius
+                        opacity:surfaceHidden?0:1
+                        border.width:surfaceHidden?0:Theme.borderWidth; border.color:entry.activeFocus||entry.hovered?Theme.focusBorder:Theme.border
+                        Behavior on color { enabled:!entrySurface.surfaceHidden; ColorAnimation { duration:SwirlMotion.hoverDuration } }
+                        Behavior on border.color { enabled:!entrySurface.surfaceHidden; ColorAnimation { duration:SwirlMotion.hoverDuration } }
                     }
                     contentItem:Column {
                         spacing:Theme.dp(12)

@@ -10,7 +10,7 @@ Rectangle {
     readonly property bool nativeMaterial: composition.active && Theme.transparency
     readonly property real cornerRadius: composition.nativeCorners ? 0 : Theme.windowRadius
     anchors.fill: parent
-    color: Theme.withAlpha(Theme.nativeTint, nativeMaterial ? Theme.nativeTintOpacity : 1)
+    color: Theme.withAlpha(Theme.nativeTint, composition.blurActive && Theme.transparency ? (Theme.dark?0.80:0.74) : nativeMaterial ? Theme.nativeTintOpacity : composition.translucent && Theme.transparency ? Theme.alphaTintOpacity : 1)
     // Native HWND clipping is applied AFTER every QML child is composed.
     radius: 0
 }

@@ -20,7 +20,7 @@ public:
     Sample finish(){m_collecting=false;QMutexLocker lock(&m_mutex);return {m_intervals,m_first?double(m_first-m_request)/1000000.0:-1,m_firstReveal,m_firstRect};}
     void frame(){if(!m_collecting.load()||!m_moving.load())return;const auto now=m_clock.nsecsElapsed();QMutexLocker lock(&m_mutex);if(!m_first){m_first=now;m_firstReveal=m_currentReveal;m_firstRect=m_currentRect;}if(m_previous)m_intervals.append(double(now-m_previous)/1000000.0);m_previous=now;}
 public slots:
-    void syncMoving(){m_moving=m_window&&m_window->property("moving").toBool();}
+    void syncMoving(){m_moving=m_window&&m_window->property("moving").toBool();if(m_moving.load())syncSurface();}
     void syncSurface(){if(!m_window)return;const auto reveal=m_window->property("reveal").toReal();const auto rect=m_window->property("surfaceRect").toRectF();QMutexLocker lock(&m_mutex);m_currentReveal=reveal;m_currentRect=rect;}
 private:
     QPointer<QQuickWindow> m_window;

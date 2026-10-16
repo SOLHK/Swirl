@@ -18,6 +18,9 @@ Item {
     property bool animateRowChanges:false
     property bool animateLatency:false
     property bool minimal:false
+    property alias scrollPosition:list.contentY
+    function scrollToBeginning(){list.positionViewAtBeginning()}
+    readonly property int renderedRows:list.contentItem.children.length
     SwirlAnimatedModel{id:stableRows;source:table.incrementalRows?table.rows:[];keyRole:"id"}
     property string selectedId:""
     property Item selectedItem:null
@@ -62,7 +65,7 @@ Item {
         flickableDirection:Flickable.HorizontalFlick
         boundsBehavior:Flickable.StopAtBounds
         pixelAligned:false
-        ScrollBar.horizontal:SwirlScrollBar {policy:horizontal.contentWidth>horizontal.width?ScrollBar.AsNeeded:ScrollBar.AlwaysOff}
+        ScrollBar.horizontal:SwirlScrollBar {policy:horizontal.contentWidth>horizontal.width?ScrollBar.AlwaysOn:ScrollBar.AlwaysOff}
             Rectangle {
                 z:1;width:horizontal.contentWidth;height:table.headerHeight
                 color:Theme.field

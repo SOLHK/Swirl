@@ -66,22 +66,18 @@ int runMotionDemo(QQuickWindow *window,const QString &directory) {
     window->resize(1100,860);window->requestActivate();
     eval("Theme.reduceMotion=false;Theme.transparency=false;Theme.mode='Light';AppState.navigate('featurehub')");
     QTest::qWait(450);
-    QQuickWindow *sheet=nullptr;
-    for(auto *candidate:QGuiApplication::allWindows())if(candidate->objectName()=="settingsSheet")sheet=qobject_cast<QQuickWindow *>(candidate);
-    if(!sheet)return 2;
     int failures=0;
     for(int frame=0;frame<80;++frame) {
         if(frame==0)QTest::mouseMove(window,point(window,"settings-subscriptions"));
         if(frame==5)QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,point(window,"settings-subscriptions"));
         if(frame==8)QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,point(window,"settings-subscriptions"));
-        if(frame==25)QTest::mousePress(sheet,Qt::LeftButton,Qt::NoModifier,point(sheet,"addSubscription"));
-        if(frame==28)QTest::mouseRelease(sheet,Qt::LeftButton,Qt::NoModifier,point(sheet,"addSubscription"));
-        if(frame==48)QTest::keyClick(sheet,Qt::Key_Escape);
-        if(frame==60)QTest::keyClick(sheet,Qt::Key_Escape);
+        if(frame==25)QTest::mousePress(window,Qt::LeftButton,Qt::NoModifier,point(window,"addSubscription"));
+        if(frame==28)QTest::mouseRelease(window,Qt::LeftButton,Qt::NoModifier,point(window,"addSubscription"));
+        if(frame==48)QTest::keyClick(window,Qt::Key_Escape);
+        if(frame==60)QTest::keyClick(window,Qt::Key_Escape);
         if(frame==65)QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,point(window,"nav-overview"));
         QTest::qWait(40);
         auto image=window->grabWindow();
-        if(sheet->isVisible()) {QPainter painter(&image);painter.drawImage(sheet->position()-window->position(),sheet->grabWindow());}
         if(!image.scaledToWidth(825,Qt::SmoothTransformation).save(directory+QString("/%1.png").arg(frame,3,10,QChar('0'))))++failures;
     }
     return failures?1:0;
@@ -198,8 +194,8 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
     };
     auto settle=[&](int timeout=2500) {
         QElapsedTimer timer;timer.start();
-        do {wait(20);} while((host->property("moving").toBool()||host->property("pendingGrab").toBool()||eval("settingsFlight.moving").toBool())&&timer.elapsed()<timeout);
-        return !host->property("moving").toBool()&&!host->property("pendingGrab").toBool()&&!eval("settingsFlight.moving").toBool();
+        do {wait(20);} while((host->property("moving").toBool()||host->property("pendingGrab").toBool())&&timer.elapsed()<timeout);
+        return !host->property("moving").toBool()&&!host->property("pendingGrab").toBool();
     };
     auto route=[&](const QString &id) {eval("AppState.navigate('"+id+"')");wait(25);return settle();};
     auto memory=[]()->qint64 {
@@ -323,7 +319,7 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
         QMutexLocker lock(&frameMutex);
         const double delta=double(now-last)/1000000.0;
         if(!measuring)return;
-        if(last && delta<100){intervals<<delta;if(warmPhase)warmIntervals<<delta;}
+        if(last){intervals<<delta;if(warmPhase)warmIntervals<<delta;}
         last=now;
     },Qt::DirectConnection);
     const QStringList stress={"overview","settings","proxies","featurehub","capture","connections","rules","logs"};
@@ -332,6 +328,7 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
         wait(23);
         if(i%7==0)window->resize(900+i*2,650+i);
         check("rapid-switch-has-live-page-"+QString::number(i),item()!=nullptr);
+        check("rapid-switch-retains-visible-content-"+QString::number(i),eval("Object.keys(pageLoader.pages).reduce((sum,key)=>sum+(pageLoader.pages[key].visible?pageLoader.pages[key].opacity:0),0)>0.99").toBool());
     }
     check("rapid-switch-settles",settle(3500));
     check("latest-route-wins",qvariant_cast<QObject *>(host->property("activeLoader"))->property("routeId").toString()==stress[39%stress.size()]);
@@ -357,9 +354,9 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
     route("featurehub");
     auto *card=findVisual(qobject_cast<QQuickItem *>(item()),"settings-dns");check("settings-tile-present",card!=nullptr);
     if(card){QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,card->mapToScene(QPointF(card->width()/2,card->height()/2)).toPoint());settle(2000);
-        QQuickWindow *sheet=nullptr;for(auto *candidate:QGuiApplication::allWindows())if(candidate->objectName()=="settingsSheet")sheet=qobject_cast<QQuickWindow *>(candidate);
-        check("settings-tile-opens-native-sheet",sheet&&sheet->isVisible());if(sheet){sheet->close();settle(2000);}
-        check("native-sheet-preserves-hub",item()==hub);window->requestActivate();
+        check("settings-tile-opens-main-route",eval("AppState.currentPage==='dns' && pageLoader.item.Window.window===window").toBool());
+        eval("window.closeSettings()");settle(2000);
+        check("main-route-preserves-hub",item()==hub);window->requestActivate();
     }
     route("feature-system");
     auto *module=item();
@@ -403,6 +400,10 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
         {"systemPolicyRestoreOnReturn",-1},{"systemPolicyRestored",systemPolicyRestored},{"frames",intervals.size()},
         {"medianFrameMs",intervals.isEmpty()?0:intervals[intervals.size()/2]},
         {"p95FrameMs",intervals.isEmpty()?0:intervals[qMin(intervals.size()-1,qsizetype(intervals.size()*0.95))]},
+        {"p99FrameMs",intervals.isEmpty()?0:intervals[qMin(intervals.size()-1,qsizetype(intervals.size()*0.99))]},
+        {"over60HzBudget",int(std::count_if(intervals.begin(),intervals.end(),[](double ms){return ms>1000.0/60;}))},
+        {"over120HzBudget",int(std::count_if(intervals.begin(),intervals.end(),[](double ms){return ms>1000.0/120;}))},
+        {"longFramesOver50Ms",int(std::count_if(intervals.begin(),intervals.end(),[](double ms){return ms>50;}))},
         {"warmFrames",warmIntervals.size()},
         {"warmMedianFrameMs",warmIntervals.isEmpty()?0:warmIntervals[warmIntervals.size()/2]},
         {"warmP95FrameMs",warmIntervals.isEmpty()?0:warmIntervals[qMin(warmIntervals.size()-1,qsizetype(warmIntervals.size()*0.95))]},

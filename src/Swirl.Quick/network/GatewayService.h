@@ -14,7 +14,7 @@ class GatewayService final : public QObject {
     Q_PROPERTY(bool recoveryNeeded READ recoveryNeeded NOTIFY changed)
     Q_PROPERTY(QString error READ error NOTIFY changed)
     Q_PROPERTY(QVariantMap configuration READ configuration NOTIFY changed)
-    Q_PROPERTY(QVariantList interfaces READ interfaces NOTIFY changed)
+    Q_PROPERTY(QVariantList interfaces READ interfaces NOTIFY interfacesChanged)
     Q_PROPERTY(QVariantList devices READ devices NOTIFY changed)
 public:
     explicit GatewayService(EngineController *engine,QString path={},QObject *parent=nullptr);
@@ -35,6 +35,7 @@ public:
     Q_INVOKABLE bool exportClients(const QUrl &destination);
     Q_INVOKABLE bool importClients(const QUrl &source);
 signals:
+    void interfacesChanged();
     void changed();
 private:
     enum class Phase {Idle,WaitingTun,Starting,Stopping};
