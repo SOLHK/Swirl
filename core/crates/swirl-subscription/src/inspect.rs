@@ -237,10 +237,13 @@ fn ini(text: &str) -> Result<Vec<Value>, &'static str> {
         }
         let (name, value) = line.split_once('=').ok_or("IniAssignment")?;
         let fields = csv(value)?;
+        let qx = section == "[server_local]";
+        if !qx && matches!(protocol(&fields[0]), "direct" | "reject") {
+            continue;
+        }
         if fields.len() < 2 {
             return Err("IniFields");
         }
-        let qx = section == "[server_local]";
         let (kind, host, port, start) = if qx {
             let (host, port) = fields[0].rsplit_once(':').ok_or("IniEndpoint")?;
             (
@@ -270,9 +273,6 @@ fn ini(text: &str) -> Result<Vec<Value>, &'static str> {
         for field in &fields[start..] {
             if let Some((key, value)) = field.split_once('=') {
                 let key = key.trim();
-                if !seen.insert(key) {
-                    return Err("DuplicateIniParameter");
-                }
                 let canonical = match key {
                     "encrypt-method" | "method" => "cipher",
                     "tls-host" | "tls-name" => "sni",
@@ -281,10 +281,20 @@ fn ini(text: &str) -> Result<Vec<Value>, &'static str> {
                     "fast-open" => "tfo",
                     _ => key,
                 };
-                n[canonical] = match value.trim().to_ascii_lowercase().as_str() {
-                    "true" => true.into(),
-                    "false" => false.into(),
-                    _ => value.trim().into(),
+                if !seen.insert(canonical) || n.get(canonical).is_some() {
+                    return Err("DuplicateIniParameter");
+                }
+                n[canonical] = if matches!(
+                    canonical,
+                    "udp" | "tls" | "tfo" | "skip-cert-verify" | "tls-verification"
+                ) {
+                    match value.trim().to_ascii_lowercase().as_str() {
+                        "true" => true.into(),
+                        "false" => false.into(),
+                        _ => value.trim().into(),
+                    }
+                } else {
+                    value.trim().into()
                 };
             } else {
                 let key = match (kind, positional) {
@@ -311,7 +321,11 @@ fn parse(bytes: &[u8], depth: usize) -> Result<(&'static str, Value, Vec<Value>)
     if text.is_empty() {
         return Err("EmptyDocument");
     }
-    if text.starts_with('[')
+    if text
+        .lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty() && !line.starts_with(['#', ';']))
+        .is_some_and(|line| line.starts_with('['))
         && text.lines().any(|l| {
             matches!(
                 l.trim().to_ascii_lowercase().as_str(),
@@ -496,6 +510,19 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
         });
         let tls_invalid = tls_obj.is_some_and(|v| !v.is_boolean() && !v.is_object())
             || (kind == "trojan" && tls_obj.and_then(Value::as_bool) == Some(false));
+        diagnostic = if skip {
+            "CertificateVerificationDisabledUnsupported"
+        } else if raw.get("tfo").and_then(Value::as_bool) == Some(true) {
+            "TcpFastOpenNotImplemented"
+        } else if reality {
+            "RealityNotImplemented"
+        } else if transport != "tcp" {
+            "TransportNotImplemented"
+        } else if unrecognized > 0 || tls_unknown {
+            "UnmappedFields"
+        } else {
+            diagnostic
+        };
         // TFO is preserved; a true request is not silently claimed as implemented.
         if unrecognized == 0
             && ["username", "password", "server", "sni", "servername"]
@@ -748,6 +775,25 @@ mod tests {
         assert_eq!(r.original,b"[Proxy]\nlabel = Trojan, example.org, 443, password=fixture, sni=example.org\n[Rule]\nFINAL,DIRECT");
     }
     #[test]
+    fn ini_comments_and_builtin_policies_do_not_hide_nodes() {
+        let input = b"# exported configuration\n; another comment\n[General]\nloglevel=notify\n[Proxy]\nDIRECT = direct\nBLOCK = reject\nfixture = trojan, example.org, 443, password=fixture\n[Rule]\nFINAL,DIRECT";
+        let r = inspect(input);
+        assert!(r.report.parsed, "{:?}", r.report.error);
+        assert_eq!(r.report.format, "ini");
+        assert_eq!(r.report.nodes.len(), 1);
+        assert!(r.report.nodes[0].native_tcp_candidate);
+        assert_eq!(r.original, input);
+    }
+    #[test]
+    fn ini_string_credentials_and_alias_collisions() {
+        let r = inspect(b"[Proxy]\nfixture = trojan, example.org, 443, password=true");
+        assert_eq!(r.originals[0]["password"], "true");
+        assert!(r.report.nodes[0].native_tcp_candidate);
+        let r = inspect(b"[Proxy]\nfixture = trojan, example.org, 443, password=x, tls-host=example.org, sni=other.example");
+        assert!(!r.report.parsed);
+        assert_eq!(r.report.error, Some("DuplicateIniParameter"));
+    }
+    #[test]
     fn duplicate_keys_and_remote_tags_fail() {
         for value in [
             "proxies: []\nproxies: []",
@@ -761,6 +807,19 @@ mod tests {
     fn unsupported_transport_and_bool_rejected() {
         let r=inspect(br#"{"proxies":[{"type":"trojan","server":"example.org","port":443,"password":"s","network":"ws"},{"type":"trojan","server":"example.org","port":443,"password":"s","skip-cert-verify":"false"}]}"#);
         assert!(r.report.nodes.iter().all(|n| !n.native_tcp_candidate));
+    }
+    #[test]
+    fn unsupported_tls_policy_is_explicit_and_preserved() {
+        let input = br#"{"proxies":[{"type":"trojan","server":"example.org","port":443,"password":"x","skip-cert-verify":true},{"type":"trojan","server":"example.org","port":443,"password":"x","tfo":true}]}"#;
+        let r = inspect(input);
+        assert_eq!(
+            r.report.nodes[0].diagnostic,
+            "CertificateVerificationDisabledUnsupported"
+        );
+        assert_eq!(r.report.nodes[1].diagnostic, "TcpFastOpenNotImplemented");
+        assert!(r.tcp_candidates.iter().all(Option::is_none));
+        assert_eq!(r.original, input);
+        assert_eq!(r.originals[0]["skip-cert-verify"], true);
     }
     #[test]
     fn json_with_resource_urls_is_not_misclassified_as_uri() {

@@ -21,6 +21,23 @@ spec.loader.exec_module(cap)
 BODY = b'{"proxies":[{"name":"synthetic","type":"socks5","server":"example.org","port":1080}]}'
 
 
+class EvidenceTests(unittest.TestCase):
+    def test_generated_cases_require_network_evidence(self):
+        spec = importlib.util.spec_from_file_location('analysis_cases', Path(__file__).parents[1] / 'Analyze-CapturedSubscriptions.py')
+        analysis = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(analysis)
+        report = {'nodes': [
+            {'index': i, 'native_tcp_candidate': i != 1, 'native_udp_supported': False,
+             'diagnostic': 'ProtocolNotImplemented' if i == 1 else 'TcpCandidateNotYetVerified'}
+            for i in range(1, 6)]}
+        cases = analysis.test_cases(report, [
+            {'node': 2, 'success': False, 'code': 'NotTested'},
+            {'node': 3, 'success': False, 'code': 'TlsFailed'},
+            {'node': 4, 'success': True, 'phase': 'http'}])
+        self.assertEqual([c['tcp'] for c in cases], ['blocked', 'not-tested', 'failed', 'passed', 'not-tested'])
+        self.assertTrue(all(c['udp'] == 'blocked' and c['fullConfiguration'] == 'not-tested' for c in cases))
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args):
         pass

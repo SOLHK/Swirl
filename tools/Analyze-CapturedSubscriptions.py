@@ -74,6 +74,26 @@ def test_node(harness,outbound,target):
         reader.join(timeout=1);process.stdout.close()
 
 
+def test_cases(report, probes):
+    """Generate anonymous cases without equating parse success with execution."""
+    outcomes = {probe['node']: probe for probe in probes}
+    cases = []
+    for node in report.get('nodes', []):
+        case = {'node': node['index'], 'parse': 'passed',
+                'tcp': 'blocked', 'tcpReason': node['diagnostic'],
+                'udp': 'not-tested' if node['native_udp_supported'] else 'blocked',
+                'fullConfiguration': 'not-tested'}
+        if node['native_tcp_candidate']:
+            probe = outcomes.get(node['index'], {})
+            if not probe or probe.get('code') == 'NotTested':
+                case.update(tcp='not-tested', tcpReason='NoNetworkEvidence')
+            else:
+                case.update(tcp='passed' if probe.get('success') else 'failed',
+                            tcpReason=probe.get('code', probe.get('phase', 'ProbeCompleted')))
+        cases.append(case)
+    return cases
+
+
 def analyze(cache_dir,inspector,private_output,harness=None,test_limit=0,target='https://example.com/'):
     cache_dir=Path(cache_dir).resolve();index=capture.read_private(cache_dir/'index.dpapi')
     documents=[];public=[];tested=0;seen_nodes={};seen_documents={}
@@ -87,7 +107,8 @@ def analyze(cache_dir,inspector,private_output,harness=None,test_limit=0,target=
         if checksum!=record['decodedSha256']:raise capture.CaptureError('CacheIntegrityFailed')
         if checksum in seen_documents:
             prior=seen_documents[checksum];documents[prior]['sources'].extend(entry['sources'])
-            public.append({'source':number,'sameContentAs':documents[prior]['sourceOrdinal'],'report':documents[prior]['analysis']['report']})
+            public.append({'source':number,'sameContentAs':documents[prior]['sourceOrdinal'],'report':documents[prior]['analysis']['report'],
+                           'tests':test_cases(documents[prior]['analysis']['report'],documents[prior]['probes'])})
             continue
         try:
             result=subprocess.run([str(inspector),'--private-json'],input=decoded,capture_output=True,timeout=30,check=False)
@@ -110,7 +131,8 @@ def analyze(cache_dir,inspector,private_output,harness=None,test_limit=0,target=
                 analysis['report']['nodes'][node_index-1]['real_network_verified']=True
         seen_documents[checksum]=len(documents)
         documents.append({'sourceOrdinal':number,'sources':entry['sources'],'cacheFile':entry['file'],'analysis':analysis,'probes':probes})
-        public.append({'source':number,'sourceMappings':len(entry['sources']),'report':analysis['report'],'probes':probes})
+        public.append({'source':number,'sourceMappings':len(entry['sources']),'report':analysis['report'],'probes':probes,
+                       'tests':test_cases(analysis['report'],probes)})
     capture.save_private(private_output,{'schema':1,'documents':documents,'testTarget':target,'report':public})
     return {'schema':1,'sourceRequests':len(index['entries']),'distinctDocuments':len(documents),'realTcpProbes':tested,
             'privateDetailsEncrypted':True,'fullConfigurationExecutionVerified':False,'sources':public}

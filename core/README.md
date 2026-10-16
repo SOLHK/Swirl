@@ -70,6 +70,11 @@ UDP and full-config semantics remain separately unverified. It reads cache after
 the website window closes and never needs a subscription refresh for offline work.
 Local exports use `SubscriptionCapture.py import-file <file> <cache>` with no
 network access. Original downloads and local exports stay encrypted outside Git.
+INI detection accepts leading comments and standalone DIRECT/REJECT policy
+entries. String credentials retain their type, and conflicting canonical/alias
+parameters fail explicitly instead of overwriting one another. Anonymous test
+cases distinguish parsed, blocked, not-tested, passed and failed evidence;
+unsupported certificate policies and TCP Fast Open have explicit diagnostics.
 
 ## Bounds and ownership
 
@@ -102,7 +107,9 @@ Rust tests use actual loopback sockets and independent Python protocol peers.
 Public HEAD tests through Rust DIRECT only establish that path, not remote
 SOCKS/Trojan provider operation. TLS/Trojan loopback tests establish the tested
 framing and certificate behavior, not all public servers or private extensions.
-TUN, real subscriptions, Codex remote control, mobile actions, long soak tests,
+Local private subscription capture and offline parsing have been exercised;
+this does not establish working provider connections. TUN, real provider traffic,
+Codex remote control, mobile actions, long soak tests,
 visual acceptance and non-Windows products are still unverified.
 
 The original C++ native engine, encrypted NodeStore, importers, proxy recovery,
