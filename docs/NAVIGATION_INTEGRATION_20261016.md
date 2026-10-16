@@ -82,3 +82,23 @@ than requiring the removed settings HWND. The latter passed 61 checks.
 Earlier independent-settings-window reports describe superseded architecture.
 The previous task's desktop OAuth and long-lived remote-control checks remain
 separate from this navigation acceptance; no desktop authentication was restarted.
+
+## Windows startup readiness follow-up
+
+The navigation release passed its complete Windows CI, but two parallel staging
+runs of the same tree exposed intermittent Mihomo readiness failures in node,
+native compatibility and subscription tests. Startup was waiting for the
+steady health interval (normally two seconds) before its first authenticated
+API check. The native fixture also supplied a three-second native handshake
+budget to the real three-stage Mihomo compatibility launch.
+
+The adapter now probes when the engine process starts and uses a bounded
+200 ms cadence only until authenticated API/config and mixed-listener readiness
+are verified. It then restores the configured health interval. The original
+total startup deadline, process ownership, authentication and forwarding rules
+remain unchanged. A deterministic fixture initially stalls the API while the
+steady interval exceeds the entire startup deadline: it failed before this
+change and passes after it. Compatibility-only fixtures now give the real
+engine a 15-second launch budget matching their existing readiness waits;
+native handshake deadline tests retain their explicitly short bounds. API
+failure diagnostics include the numeric network error without raw endpoints.
