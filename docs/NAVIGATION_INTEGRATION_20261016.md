@@ -69,6 +69,11 @@ pixels in the controlled blur-edge profile. These are compositor pixel tests,
 not a claimed macOS material implementation.
 
 Final test results and commit/CI status are recorded in the delivered report.
+The complete local CTest run exercised 22 groups: 20 passed initially. The
+remaining two were repaired and passed on targeted rerun: the native stream
+assertion now waits for the published final telemetry snapshot, and Overview
+input checks validate the new main-window routes and modal ownership rather
+than requiring the removed settings HWND. The latter passed 61 checks.
 Earlier independent-settings-window reports describe superseded architecture.
 The previous task's desktop OAuth and long-lived remote-control checks remain
 separate from this navigation acceptance; no desktop authentication was restarted.
