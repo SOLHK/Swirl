@@ -104,7 +104,11 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
   check(QTest::qWaitFor([&]{return eval("pageLoader.moving && !pageLoader.pendingGrab").toBool();},4000),"endpoint fixture starts the real expansion: "+id);
   auto *clock=window->findChild<QObject *>("pageTravel");
   if(clock)QMetaObject::invokeMethod(clock,"stop");
-  eval("pageLoader.progress=1");QTest::qWait(25);
+  eval("pageLoader.progress=1");
+  // We jumped to the endpoint early. Let independent hover/enable/switch
+  // feedback settle before comparing retirement, without disabling it or
+  // accepting its changing pixels as a page-completion difference.
+  QTest::qWait(eval("SwirlMotion.hoverDuration+SwirlMotion.switchDuration+40").toInt());
   auto *sharedTitle=item("pageHeroTitle");
   auto *target=sharedTitle?sharedTitle->property("targetItem").value<QQuickItem *>():nullptr;
   check(sharedTitle&&target&&target->opacity()>0.999&&sharedTitle->property("handoff").toDouble()>0.999,"real destination title is visible before shared-layer retirement: "+id);
