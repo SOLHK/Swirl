@@ -5,7 +5,7 @@ QtObject {
     id: motion
     // Animation policy only: no colors, sizes, fonts or layout tokens live here.
     property real speed: 1
-    readonly property bool reduced: Theme.reduceMotion || motionPolicy.systemReducedMotion
+    readonly property bool reduced: Theme.reduceMotion || (Theme.followSystemMotion && motionPolicy.systemReducedMotion)
     readonly property real spring: 3.2 * speed * speed
     readonly property real damping: 0.28
     function ms(value){return reduced ? 0 : Math.round(value/Math.max(0.25,speed))}
@@ -43,9 +43,9 @@ QtObject {
         const titleItem=item.motionTitle || item
         const surface=item.motionSurface || (item.motionTitle?item:null)
         // Stable semantic keys pair the same metric and its surface across routes.
-        shared={generation:++sharedGeneration,source:titleItem,surface:surface,route:route,previous:AppState.currentPage,
+        shared={generation:++sharedGeneration,source:titleItem,surface:surface,card:item,route:route,previous:AppState.currentPage,
             targetKey:targetKey || "title",text:titleItem.text || ""}
-        returnShared={route:route,previous:AppState.currentPage,source:titleItem,
+        returnShared={route:route,previous:AppState.currentPage,source:titleItem,card:item,
             surface:surface,targetKey:targetKey || "title"}
         AppState.navigate(route)
     }

@@ -2,6 +2,9 @@ pragma Singleton
 import QtQuick
 QtObject {
     property string currentPage: "activity"
+    readonly property var settingsRoutes:["settings","appearance","fonts","dns","modules","profiles","scripts","subscriptions","proxies"]
+    readonly property bool inSettings:settingsRoutes.indexOf(currentPage)>=0
+    readonly property string sidebarPage:inSettings?"featurehub":currentPage
     property bool sidebarCollapsed: false
     readonly property string connectionState: engineController.stateText
     readonly property bool proxyOn: engineController.connected

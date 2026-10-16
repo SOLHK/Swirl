@@ -52,10 +52,10 @@ void NodeTestService::next(){
   connect(deadline,&QTimer::timeout,this,[this,runner,id]{finish(id,runner,{{"success",false},{"latency",-1},{"http",0},{"error","节点测试超时"}});});deadline->start();
   connect(runner,&ProxyEngine::statusChanged,this,[this,runner,id]{
    if(m_running.value(id)!=runner)return;const auto status=runner->status();
-   if(status.state==ProxyEngine::State::Failed){finish(id,runner,{{"success",false},{"latency",-1},{"http",0},{"error",status.message}});return;}
+   if(status.state==ProxyEngine::State::Failed){finish(id,runner,{{"success",false},{"latency",-1},{"http",0},{"phase","startup"},{"engineError",int(status.error)},{"error",status.message}});return;}
    if(status.apiHealthy&&!runner->property("probeStarted").toBool()){runner->setProperty("probeStarted",true);QPointer<ProxyEngine> guard(runner);QTimer::singleShot(0,runner,[this,guard]{if(guard)guard->probeNode(m_url);});}
    if(runner->property("probeStarted").toBool()&&!status.nodeBusy&&(status.requestState==ProxyEngine::RequestState::Succeeded||status.requestState==ProxyEngine::RequestState::Failed||status.nodeHealth==ProxyEngine::NodeHealth::Unavailable)){
-    finish(id,runner,{{"success",status.requestState==ProxyEngine::RequestState::Succeeded},{"latency",status.latencyMs},{"http",status.responseCode},{"error",status.requestState==ProxyEngine::RequestState::Succeeded?QString():status.nodeMessage}});
+    finish(id,runner,{{"success",status.requestState==ProxyEngine::RequestState::Succeeded},{"latency",status.latencyMs},{"http",status.responseCode},{"phase",status.nodeHealth==ProxyEngine::NodeHealth::Unavailable?"availability":"request"},{"error",status.requestState==ProxyEngine::RequestState::Succeeded?QString():status.nodeMessage}});
    }
   });runner->start(opts);
  }

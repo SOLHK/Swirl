@@ -251,8 +251,9 @@ private slots:
             QVERIFY(generated.contains("tun:\n  enable: false"));QVERIFY(generated.contains("allow-lan: false"));QVERIFY(!generated.contains("198.18.0.1"));QVERIFY(!generated.contains("MATCH,REJECT"));
         }
         QTRY_VERIFY_WITH_TIMEOUT(!tests.busy(),45000);
-        if(tests.succeeded()!=1)qInfo()<<"BATCH_RESULT"<<tests.results();
+        if(tests.succeeded()!=1 || tests.result(opts.nodes[1].id).value("phase").toString()!="availability")qInfo()<<"BATCH_RESULT"<<tests.results();
         QCOMPARE(tests.completed(),2);QCOMPARE(tests.succeeded(),1);QCOMPARE(tests.failed(),1);QVERIFY(tests.result(opts.nodes[0].id).value("success").toBool());QVERIFY(!tests.result(opts.nodes[1].id).value("success").toBool());
+        QCOMPARE(tests.result(opts.nodes[1].id).value("phase").toString(),QString("availability"));
         QCOMPARE(main.status().selectedNodeId,opts.nodes.first().id);QCOMPARE(main.status().processId,pid);QVERIFY(network.a.forwarded>=2);
         tests.start(opts,{opts.nodes[0].id,opts.nodes[1].id},network.url());tests.cancel();QTRY_VERIFY_WITH_TIMEOUT(!tests.busy(),5000);main.stop();QTRY_VERIFY_WITH_TIMEOUT(!main.status().processAlive,4000);
     }

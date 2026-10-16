@@ -6,6 +6,8 @@ import "../components"
 import "../controls"
 Item {
     id:page
+    readonly property Item motionTitle:routeTitle
+
     property string section:"外观"
     property var sections:["常规","外观","字体","代理","TUN","DNS","端口","系统集成","启动","通知","数据管理","隐私与安全","快捷键","关于 Swirl"]
     ColumnLayout {
@@ -51,7 +53,7 @@ Item {
                     ScrollBar.vertical:SwirlScrollBar {}
                     ColumnLayout {
                         width:options.availableWidth; spacing:Theme.dp(17)
-                        SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:AppState.zh(page.section); color:Theme.text; font.pixelSize:Theme.fontSize(23); font.weight:Font.DemiBold }
+                        SwirlText {id:routeTitle;Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:AppState.zh(page.section); color:Theme.text; font.pixelSize:Theme.fontSize(23); font.weight:Font.DemiBold }
                         SwirlText {
                             text:page.section==="外观"?"主题、窗口材质、动画与界面缩放。":page.section==="字体"?"选择喜欢的字体，立即应用并自动保存。":page.section==="代理"?"引擎、真实节点与当前用户系统代理 · 国内外分流。":page.section==="关于 Swirl"?"版本与项目信息":"此项研发中。"
                             color:Theme.muted; wrapMode:Text.WordWrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12)
@@ -90,6 +92,15 @@ Item {
                                     SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:AppState.zh("Disable most transition animations"); color:Theme.muted; font.pixelSize:Theme.fontSize(11) }
                                 }
                                 SwirlToggle { checked:Theme.reduceMotion; onToggled:Theme.reduceMotion=checked }
+                            }
+                            GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
+                                Layout.fillWidth:true
+                                ColumnLayout {
+                                    Layout.fillWidth:true
+                                    SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap;text:"跟随系统动态效果";color:Theme.text;font.pixelSize:Theme.fontSize(14)}
+                                    SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap;text:"开启后，遵循系统的动画效果设置。";color:Theme.muted;font.pixelSize:Theme.fontSize(11)}
+                                }
+                                SwirlToggle {objectName:"followSystemMotionToggle";checked:Theme.followSystemMotion;onToggled:Theme.followSystemMotion=checked}
                             }
                             ColumnLayout {
                                 Layout.fillWidth:true; spacing:Theme.dp(10)

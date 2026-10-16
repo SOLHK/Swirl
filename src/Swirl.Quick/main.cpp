@@ -58,6 +58,7 @@
 #include "tests/MotionChecks.h"
 #include "tests/MaterialChecks.h"
 #include "tests/HeroChecks.h"
+#include "tests/NavigationChecks.h"
 #include "tests/AppearanceChecks.h"
 #endif
 #include "app/SystemDataProvider.h"
@@ -137,6 +138,7 @@ int main(int argc, char *argv[])
     }
 #endif
     const bool heroTest=app.arguments().contains("--hero-test");
+    const bool navigationTest=app.arguments().contains("--navigation-test");
     const bool radiusTest=app.arguments().contains("--window-radius-test");
     const bool appearanceTest=app.arguments().contains("--appearance-test")||app.arguments().contains("--appearance-restore-test");
     const bool uiQualityTest=app.arguments().contains("--ui-quality-test");
@@ -160,7 +162,7 @@ int main(int argc, char *argv[])
 #ifdef SWIRL_UI_TESTS
     lifecycleTest=app.arguments().contains("--lifecycle-test");
 #endif
-    const bool isolatedRun=lifecycleTest||realAcceptance||heroTest||radiusTest||nodeTest||motionTest||engineTest||hdrDisplayTest||hdrTest||app.arguments().contains("--interaction-test")||app.arguments().contains("--capture-self-test")||app.arguments().contains("--gateway-self-test")||app.arguments().contains("--smoke-test")||app.arguments().contains("--window-test")||previewMode;
+    const bool isolatedRun=lifecycleTest||realAcceptance||heroTest||navigationTest||radiusTest||nodeTest||motionTest||engineTest||hdrDisplayTest||hdrTest||app.arguments().contains("--interaction-test")||app.arguments().contains("--capture-self-test")||app.arguments().contains("--gateway-self-test")||app.arguments().contains("--smoke-test")||app.arguments().contains("--window-test")||previewMode;
     SingleInstance instance;
     if(lifecycleTest || (!isolatedRun && !appearanceTest)) {
         const auto ownership=instance.acquire(lifecycleTest?QStringLiteral("isolated-lifecycle-test"):QStringLiteral("production"));
@@ -184,7 +186,6 @@ int main(int argc, char *argv[])
         }
     }
     WindowsBackdrop backdrop;
-    WindowsBackdrop settingsBackdrop;
     WindowsBackdrop panelBackdrop;
     HdrOutput hdrOutput;
     QTemporaryDir isolatedTls;
@@ -205,7 +206,6 @@ int main(int argc, char *argv[])
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("fontManager", &fontManager);
     engine.rootContext()->setContextProperty("motionPolicy", &motionPolicy);
-    engine.rootContext()->setContextProperty("settingsBackdrop", &settingsBackdrop);
     engine.rootContext()->setContextProperty("panelBackdrop", &panelBackdrop);
     engine.rootContext()->setContextProperty("dismissals", &dismissals);
     engine.addImageProvider(QStringLiteral("swirl"),new SvgIconProvider);
@@ -236,7 +236,7 @@ int main(int argc, char *argv[])
         qCritical()<<"Preview font unavailable:"<<previewFont;return 2;
     }
     const QString previewState = argumentValue(QStringLiteral("--preview-state="));
-    if (appearanceTest || heroTest || radiusTest || nodeTest || motionTest || previewMode || engineTest || hdrDisplayTest || hdrTest || smoke || interaction || captureTest || gatewayTest || windowTest || !previewPath.isEmpty()) {
+    if (appearanceTest || heroTest || navigationTest || radiusTest || nodeTest || motionTest || previewMode || engineTest || hdrDisplayTest || hdrTest || smoke || interaction || captureTest || gatewayTest || windowTest || !previewPath.isEmpty()) {
         if(uiQualityTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-ui-quality.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-ui-quality.txt");}
         if(appearanceTest){const QString file=app.arguments().contains("--appearance-restore-test")?"Swirl-appearance-restore.txt":"Swirl-appearance.txt";app.setProperty("qtDiagnosticFile",file);QFile::remove(QCoreApplication::applicationDirPath()+"/"+file);}
         if(heroTest){app.setProperty("qtDiagnosticFile",QStringLiteral("Swirl-hero-diagnostics.txt"));QFile::remove(QCoreApplication::applicationDirPath()+"/Swirl-hero-diagnostics.txt");}
@@ -339,7 +339,10 @@ int main(int argc, char *argv[])
     const auto materialDirectory=argumentValue(QStringLiteral("--material-test-output="));
     const auto demoDirectory=argumentValue(QStringLiteral("--motion-demo-output="));
     const auto visualDirectory=argumentValue(QStringLiteral("--motion-visual-dir="));
-    if(appearanceTest){
+    if(navigationTest){
+        const auto directory=argumentValue(QStringLiteral("--navigation-output="));
+        QTimer::singleShot(450,&app,[&app,rootWindow,&engineController,directory]{app.exit(runNavigationChecks(rootWindow,&engineController,directory));});
+    } else if(appearanceTest){
         const bool restore=app.arguments().contains("--appearance-restore-test");
         QTimer::singleShot(450,&app,[&app,rootWindow,restore]{app.exit(runAppearanceChecks(rootWindow,restore));});
     } else if(heroTest) {
@@ -497,11 +500,11 @@ int main(int argc, char *argv[])
                 QQmlExpression expression(qmlContext(window),window,QStringLiteral("preparePreviewState(previewState)"));expression.evaluate();
                 if(expression.hasError())qWarning()<<expression.error();
             });
-            auto *captureBackdrop=previewPage=="dns"?&settingsBackdrop:previewPage=="external"?&panelBackdrop:&backdrop;
+            auto *captureBackdrop=previewPage=="external"?&panelBackdrop:&backdrop;
             if(!nativeFramePath.isEmpty())QTimer::singleShot(400,&app,[&app,captureBackdrop]{if(!captureBackdrop->prepareNativeCapture()){qCritical()<<"Native capture blocked: cannot activate target window";app.exit(3);}});
             QTimer::singleShot(900, &app, [window, previewPage, previewPath, nativeFramePath, captureBackdrop, &app, &previewCaptured]() {
                 QQuickWindow *captureWindow=window;
-                const QString targetName=previewPage=="dns"?"settingsSheet":previewPage=="external"?"dashboardWindow":QString();
+                const QString targetName=previewPage=="external"?"dashboardWindow":QString();
                 if(!targetName.isEmpty())for(auto *candidate:QGuiApplication::allWindows())if(candidate->isVisible()&&candidate->objectName()==targetName)if(auto *quick=qobject_cast<QQuickWindow *>(candidate)){captureWindow=quick;break;}
                 if(!nativeFramePath.isEmpty()&&!captureBackdrop->isCaptureForeground()){qCritical()<<"Native capture blocked: target window lost foreground";captureBackdrop->finishNativeCapture();app.exit(3);return;}
                 QImage screenshot = nativeFramePath.isEmpty()?captureWindow->grabWindow():captureWindow->screen()->grabWindow(0,captureWindow->x(),captureWindow->y(),captureWindow->width(),captureWindow->height()).toImage();

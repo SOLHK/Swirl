@@ -29,7 +29,10 @@ MihomoAdapter::MihomoAdapter(QObject *parent) : ProxyEngine(parent) {
     m_network.setProxy(QNetworkProxy::NoProxy);
     m_deadline.setSingleShot(true);
     m_killTimer.setSingleShot(true);
-    connect(&m_process, &QProcess::started, this, [this] { publish(); });
+    connect(&m_process, &QProcess::started, this, [this] {
+        publish();
+        if(m_stage==Stage::Engine)refresh();
+    });
     connect(&m_process, &QProcess::finished, this, &MihomoAdapter::processFinished);
     connect(&m_process, &QProcess::errorOccurred, this, [this](QProcess::ProcessError error) {
         if (error == QProcess::FailedToStart) {
@@ -351,7 +354,11 @@ bool MihomoAdapter::reservePort(QTcpServer &server, quint16 port) {
     // Exclusive binding detects both existing loopback and wildcard listeners.
     WSADATA winsock{};
     if (WSAStartup(MAKEWORD(2, 2), &winsock) != 0) return false;
-    SOCKET descriptor = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    // Concurrent cores must not inherit another adapter's port reservation.
+    // Closing it in the parent would otherwise leave the child holding the
+    // listener, preventing the intended core from binding either endpoint.
+    SOCKET descriptor = WSASocketW(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0,
+                                  WSA_FLAG_OVERLAPPED | WSA_FLAG_NO_HANDLE_INHERIT);
     bool ready = false;
     if (descriptor != INVALID_SOCKET) {
         const BOOL exclusive = TRUE;
@@ -478,7 +485,10 @@ void MihomoAdapter::launch(Stage stage) {
     SetThreadErrorMode(previousErrorMode, nullptr);
 #endif
     publish();
-    if (stage == Stage::Engine) m_poll.start(m_options.healthIntervalMs);
+    // Readiness is not a steady-state health poll. Probe promptly while the
+    // authenticated API and mixed listener come up, within the original total
+    // startup deadline; a two-second health cadence can consume most of it.
+    if (stage == Stage::Engine) m_poll.start(qMin(200,m_options.healthIntervalMs));
 }
 
 void MihomoAdapter::processFinished(int code, QProcess::ExitStatus exitStatus) {
@@ -689,7 +699,7 @@ void MihomoAdapter::request(bool version) {
         if (reply->error() != QNetworkReply::NoError || http != 200) {
             apiFailure(Error::ApiUnavailable, reply->property("swirlTimeout").toBool()
                 ? QStringLiteral("Mihomo 控制接口请求超时；进程状态与 API 健康状态分别显示。")
-                : QStringLiteral("Mihomo 控制接口不可用（HTTP %1）。").arg(http)); return;
+                : QStringLiteral("Mihomo 控制接口不可用（HTTP %1，网络错误 %2）。").arg(http).arg(int(reply->error()))); return;
         }
         const auto bytes = reply->readAll();
         QJsonParseError error;
@@ -757,6 +767,7 @@ void MihomoAdapter::publishRunning() {
     m_status.directSession=m_options.directSession&&m_options.selectedNodeId.isEmpty();
     m_status.tunEnabled=connected&&m_options.tunEnabled;m_status.allowLan=connected&&m_options.allowLan;
     m_status.error=Error::None;m_status.message.clear();m_status.routingBusy=false;m_deadline.stop();
+    if(m_poll.interval()!=m_options.healthIntervalMs)m_poll.setInterval(m_options.healthIntervalMs);
     publish();readConnections();readTraffic();readLogs();
 }
 
@@ -831,10 +842,10 @@ void MihomoAdapter::readConnections() {
         const auto array=snapshot.value("connections").toArray();
         for(const auto &entry:array) {
             if(rows.size()>=2000)break;
-            const auto c=entry.toObject(),m=c.value("metadata").toObject();QStringList chain;
+            const auto c=entry.toObject(),m=c.value("metadata").toObject();QStringList chain,nodeChain;
             if(!validCounter(c.value("upload"))||!validCounter(c.value("download"))||c.value("id").toString().isEmpty())continue;
             for(const auto &hop:c.value("chains").toArray()) {
-                auto label=hop.toString();
+                auto label=hop.toString();nodeChain.append(label);
                 for(const auto &node:m_options.nodes)if(node.id==label){label=node.name;break;}
                 chain.append(label);
             }
@@ -843,7 +854,7 @@ void MihomoAdapter::readConnections() {
                 {"host",m.value("host").toString().isEmpty()?m.value("destinationIP").toString():m.value("host").toString()},{"ip",m.value("destinationIP").toString()},{"sourceIp",m.value("sourceIP").toString()},
                 {"process",QFileInfo(m.value("processPath").toString().isEmpty()?m.value("process").toString():m.value("processPath").toString()).fileName().isEmpty()?QStringLiteral("未知进程"):QFileInfo(m.value("processPath").toString().isEmpty()?m.value("process").toString():m.value("processPath").toString()).fileName()},
                 {"protocol",m.value("network").toString()+" / "+m.value("type").toString()},
-                {"policy",chain.join(QStringLiteral(" → "))},{"rule",rule},
+                {"policy",chain.join(QStringLiteral(" → "))},{"rule",rule},{"sourcePort",m.value("sourcePort").toVariant().toInt()},{"nodeChain",nodeChain},
                 {"category",chain.contains("REJECT")||chain.contains("REJECT-DROP")?"reject":chain.contains("DIRECT")?"direct":chain.isEmpty()?"other":"proxy"},
                 {"uploadBytes",qint64(c.value("upload").toDouble())},{"downloadBytes",qint64(c.value("download").toDouble())},
                 {"up",QString::number(qint64(c.value("upload").toDouble()))+" B"},

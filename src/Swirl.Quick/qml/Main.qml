@@ -36,7 +36,7 @@ ApplicationWindow {
     palette.light:Theme.buttonBase
     palette.mid:Theme.controlBorder
     property bool swirlTransparencyEnabled:Theme.transparency
-    function preparePreviewState(state){const item=previewPage==="dns"?settingsLoader.item:pageLoader.item;if(item&&item.preparePreviewState)item.preparePreviewState(state)}
+    function preparePreviewState(state){const item=pageLoader.item;if(item&&item.preparePreviewState)item.preparePreviewState(state)}
     function previewScrollBottom() { if(pageLoader.item && pageLoader.item.scrollToBottom)pageLoader.item.scrollToBottom() }
     property real swirlWindowRadius:Theme.windowRadius
     // DWM's ROUND preference is a system preset, not an exact 10pt radius.
@@ -44,10 +44,11 @@ ApplicationWindow {
     readonly property real shellRadius:window.visibility===Window.Maximized || window.visibility===Window.FullScreen ? 0 : Theme.windowRadius
     Binding { target:window.captureProviderContext; property:"upstreamProxyPort"; value:window.engineControllerContext.processAlive?window.engineControllerContext.activeProxyPort:0 }
     Connections { target:window.captureProviderContext; function onStateChanged(){window.engineControllerContext.setCaptureProxyPort(window.captureProviderContext.running?window.captureProviderContext.port:0)} }
-    Connections { target:backdrop; function onChanged() { Theme.backdropActive=backdrop.active } }
+    Connections { target:backdrop; function onChanged() { Theme.backdropActive=backdrop.active;Theme.backdropTranslucent=backdrop.translucent } }
     Binding { target:Theme; property:"windowActive"; value:previewState==="inactive"?false:window.active }
-    readonly property real sidebarGutter:Theme.pageInset
+    readonly property real sidebarGutter:0
     readonly property real actualSidebarWidth:Theme.sidebarWidth
+    readonly property bool swirlUnifiedBlur:true
     Settings { id:windowSettings; category:"Window"; property int normalWidth:0; property int normalHeight:0 }
     onWidthChanged:if(geometryReady && visibility===Window.Windowed)windowSettings.normalWidth=Math.round(width)
     onHeightChanged:if(geometryReady && visibility===Window.Windowed)windowSettings.normalHeight=Math.round(height)
@@ -69,6 +70,7 @@ ApplicationWindow {
         geometryReady=true
         backdrop.apply(window,Theme.transparency,Theme.dark)
         AppState.initializeHistory()
+        console.info("MOTION_POLICY",JSON.stringify({systemReduced:motionPolicy.systemReducedMotion,followSystem:Theme.followSystemMotion,applicationReduced:Theme.reduceMotion,effectiveReduced:SwirlMotion.reduced,expandDuration:SwirlMotion.expandDuration}))
         if(previewTheme==="dark")Theme.mode="Dark"
         else if(previewTheme==="light")Theme.mode="Light"
         if(previewPage.length)AppState.currentPage=previewPage
@@ -89,7 +91,9 @@ ApplicationWindow {
         id:scaledCanvas
         // DWM supplies the native material underneath the sharp QML content.
         width:window.width; height:window.height
-        SwirlGlassMaterial {anchors.fill:parent;targetWindow:window}
+        SwirlGlassMaterial {
+            anchors.fill:parent;targetWindow:window
+        }
 
         MouseArea {
             objectName:"titleDragArea"
@@ -104,7 +108,6 @@ ApplicationWindow {
         SwirlSidebar { id:sidebar; width:window.actualSidebarWidth; height:parent.height; compactByWindow:false }
         Item {
             id:mainArea; x:window.actualSidebarWidth+window.sidebarGutter; width:parent.width-x-Theme.dp(12); height:parent.height
-            Rectangle {anchors.fill:parent;color:Theme.withAlpha(Theme.canvas,Theme.workspaceOpacity);radius:Theme.containerRadius}
             RowLayout {
                 id:toolbar; visible:AppState.currentPage==="activity"; x:Theme.pagePadding; y:Theme.dp(16); width:parent.width-2*Theme.pagePadding; height:Theme.dp(32); spacing:Theme.dp(8)
                 SwirlText {text:"活动";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold;Layout.fillWidth:true}
@@ -115,9 +118,22 @@ ApplicationWindow {
                 SwirlButton { visible:captureProvider.running; text:"抓包中 · "+captureProvider.sessions.length; iconName:"capture"; font.pixelSize:Theme.fontSize(14); onClicked:AppState.navigate("capture") }
 
             }
+            SwirlButton {
+                id:settingsBack
+                objectName:"settingsBackButton";z:60
+                x:Theme.pagePadding;y:Theme.dp(12);height:Theme.dp(32)
+                text:"返回";iconName:"chevron-left";quiet:true
+                visible:AppState.inSettings
+                opacity:pageLoader.pendingGrab?0:pageLoader.heroData && pageLoader.heroData.key==="settings"?
+                    (pageLoader.heroData.returning?0:pageLoader.ramp(pageLoader.position,0.84,0.94)):
+                    pageLoader.activeLoader && pageLoader.activeLoader.routeId===AppState.currentPage?1:0
+                enabled:opacity>0.99
+                onClicked:window.closeSettings()
+                Accessible.name:"返回上一页，保留当前设置草稿"
+            }
             SwirlPageHost {
                 routeKey:AppState.currentPage==="requestlogs" || AppState.currentPage==="dashboard" ? "activity" : AppState.currentPage
-                id:pageLoader; objectName:"pageLoader"; x:Theme.dp(0); y:Theme.dp(12); width:parent.width; height:parent.height-y-Theme.dp(12)
+                id:pageLoader; objectName:"pageLoader";insetRoutes:AppState.settingsRoutes;routeInset:settingsBack.height+Theme.compactGap; x:Theme.dp(0); y:Theme.dp(12); width:parent.width; height:parent.height-y-Theme.dp(12)
                 sourceComponent:AppState.currentPage==="overview" ? overview :
                                 AppState.currentPage==="activity" || AppState.currentPage==="requestlogs" || AppState.currentPage==="dashboard" ? activity :
                                 AppState.currentPage==="capture" ? capturePage :
@@ -127,6 +143,8 @@ ApplicationWindow {
                                 AppState.currentPage==="inspector" ? inspector :
                                 AppState.currentPage==="scripts" ? scripts :
                                 AppState.currentPage==="settings" ? settings :
+                                AppState.currentPage==="appearance" ? appearance :
+                                AppState.currentPage==="fonts" ? fonts :
                                 AppState.currentPage==="toolbox" ? toolbox :
                                 AppState.currentPage==="dns" ? dns :
                                 AppState.currentPage==="rules" ? rules :
@@ -188,7 +206,7 @@ ApplicationWindow {
             }
             SwirlText {opacity:proxyPanel.reveal;text:engineController.systemProxy.error||engineController.routingError||(engineController.systemProxy.owned&&engineController.systemProxy.enabled?"Swirl 已接管系统代理。":engineController.systemProxy.systemEnabled?"系统代理由其他应用启用。Swirl 尚未接管。":!engineController.processAlive?"引擎未运行，请先选择并连接节点。":!engineController.apiHealthy?"控制接口尚未就绪，请检查节点连接。":"可以启用系统代理，让支持系统代理的应用使用当前节点。");color:engineController.systemProxy.error.length||engineController.routingError.length?Theme.orange:Theme.muted;font.pixelSize:Theme.fontSize(13);Layout.fillWidth:true;wrapMode:Text.Wrap}
             RowLayout {opacity:proxyPanel.reveal;Layout.fillWidth:true
-                SwirlButton {text:"节点与策略";quiet:true;onClicked:{proxyPanel.requestDismiss();AppState.navigate("proxies")}}
+                SwirlButton {objectName:"proxyNodesButton";text:"节点与策略";onClicked:{proxyPanel.requestDismiss();AppState.navigate("proxies")}}
                 Item {Layout.fillWidth:true}
                 SwirlButton {objectName:"proxyPanelAction";text:window.proxyTogglePending?"正在切换…":engineController.systemProxy.enabled?"关闭代理":"接管代理";enabled:!engineController.busy&&!window.proxyTogglePending;onClicked:{window.proxyRequestedAction=!engineController.systemProxy.enabled;window.proxyTogglePending=true;engineController.setSystemProxy(window.proxyRequestedAction);window.showProxyError()}}
             }
@@ -199,40 +217,18 @@ ApplicationWindow {
     Connections{target:engineController.systemProxy;function onChanged(){window.showProxyError()}}
     function openDashboard(){dashboardWindow.show();dashboardWindow.raise();dashboardWindow.requestActivate()}
     function openCaptureInspector(){captureInspectorDialog.open()}
-    property Item settingsOrigin:null
-    readonly property real settingsOriginProgress:settingsFlight.reveal
-    readonly property bool settingsOriginMoving:settingsOrigin!==null && settingsFlight.moving
-    function openSettings(route,origin){
-        if((settingsSheet.visible || settingsFlight.moving) && route!==settingsSheet.section && (dismissals.hasPopup(settingsSheet) || (settingsSheet.section==='dns' && settingsSheet.savedFingerprint!==dismissals.fingerprint(settingsLoader.item)))) { settingsSheet.raise(); settingsSheet.requestActivate(); return }
-        settingsSheet.closeApproved=false
-        // Repeated entry into the already open route preserves both its page
-        // and its geometry. A reversal keeps the currently displayed boundary.
-        if(settingsSheet.visible && !settingsFlight.moving) {
-            settingsSheet.section=route;settingsSheet.updateSettingsSection()
-            settingsSheet.raise();settingsSheet.requestActivate();return
-        }
-        settingsOrigin=origin || settingsOrigin
-        if(!settingsFlight.moving){settingsSheet.x=Math.round(window.x+(window.width-settingsSheet.width)/2);settingsSheet.y=Math.round(Math.max(0,Math.min(window.y,Screen.desktopAvailableHeight-settingsSheet.height)))}
-        settingsSheet.section=route;settingsSheet.updateSettingsSection()
-        settingsSheet.discardApproved=false
-        Qt.callLater(function(){settingsSheet.savedFingerprint=dismissals.fingerprint(settingsLoader.item)})
-        if(SwirlMotion.reduced || !settingsOrigin) {
-            settingsFlight.phase="Detail";settingsFlight.origin=settingsOrigin
-            settingsSheet.show();settingsSheet.raise();settingsSheet.requestActivate()
-        } else settingsFlight.expand(settingsOrigin)
+    function openSettings(route,origin) {
+        if(AppState.settingsRoutes.indexOf(route)<0)return
+        if(origin)SwirlMotion.navigateFrom(origin,route,"settings")
+        else AppState.navigate(route)
     }
-    function persistExitDrafts(){if(settingsSheet.section==="dns"&&settingsLoader.item&&settingsLoader.item.persistExitDraft)settingsLoader.item.persistExitDraft()}
-    function closeSettings(){settingsSheet.requestClose()}
-    SwirlSettingsTransfer {
-        id:settingsFlight;objectName:"settingsTransfer"
-        ownerWindow:window;detailWindow:settingsSheet;composition:settingsBackdrop
-        onMovingChanged:if(moving)dismissals.push(settingsFlight,settingsFlight);else dismissals.pop(settingsFlight)
-        onEntered:{settingsSheet.show();settingsSheet.raise();settingsSheet.requestActivate()}
-        onReturned:{
-            settingsSheet.closeApproved=true;settingsSheet.close()
-            if(window.settingsOrigin && window.settingsOrigin.visible)window.settingsOrigin.forceActiveFocus()
-            window.settingsOrigin=null;window.requestActivate()
-        }
+    function closeSettings() {
+        if(AppState.historyIndex>0)AppState.goBack()
+        else AppState.navigate("featurehub")
+    }
+    function persistExitDrafts(){
+        const loader=pageLoader.pages["dns"]
+        if(loader && loader.item && loader.item.persistExitDraft)loader.item.persistExitDraft()
     }
     function openRewriteEditor(kind,title){rewriteRulesDialog.kind=kind;rewriteRulesDialog.title=title;rewriteRulesDialog.open()}
     RewriteRulesDialog{id:rewriteRulesDialog}
@@ -244,48 +240,6 @@ ApplicationWindow {
         ExternalToolsPage{anchors.fill:parent;clip:true}
     }
 
-    SwirlSecondaryWindow {
-        composition:settingsBackdrop
-        id:settingsSheet;objectName:"settingsSheet";
-        property bool swirlExactWindowRadius:true
-        property string section:"dns";visible:false;width:Math.min(Theme.dp(900),Screen.desktopAvailableWidth);height:Math.min(Theme.dp(790),Screen.desktopAvailableHeight);title:section==="subscriptions"?"Swirl 订阅管理":section==="proxies"?"Swirl 节点管理":section==="profiles"?"Swirl 配置":section==="modules"?"Swirl 模块":section==="scripts"?"Swirl 脚本":"Swirl 设置";flags:Qt.Window|Qt.FramelessWindowHint;modality:Qt.WindowModal;transientParent:window;color:"transparent"
-        function closeSettings(){requestClose()}
-        function requestClose(){
-            if(!discardApproved && dismissals.hasPopup(settingsSheet)){dismissals.dismiss(settingsSheet);return}
-            if(section==="dns" && !discardApproved && savedFingerprint!==dismissals.fingerprint(settingsLoader.item)){settingsDiscard.open();return}
-            if(SwirlMotion.reduced || settingsFlight.phase==="Idle"){
-                // requestClose can run inside QWindow's closing signal. A
-                // recursive close() is ignored by Qt, leaving a modal HWND
-                // visible despite an Idle clock. Hide it synchronously.
-                hide();closeApproved=false;settingsFlight.reset()
-                if(window.settingsOrigin && window.settingsOrigin.visible)window.settingsOrigin.forceActiveFocus()
-                window.settingsOrigin=null;window.requestActivate()
-            } else settingsFlight.collapse()
-        }
-        function updateSettingsSection(){if(settingsLoader.item&&settingsLoader.item.section!==undefined)settingsLoader.item.section=section==="appearance"?"外观":section==="fonts"?"字体":section==="license"?"关于 Swirl":"常规"}
-        readonly property real reveal:settingsFlight.reveal
-        property bool closeApproved:false
-        property string savedFingerprint:""
-        property bool discardApproved:false
-        onClosing:close=>{
-            if(!closeApproved){close.accepted=false;requestClose()}
-            else closeApproved=false
-        }
-        onSectionChanged:updateSettingsSection()
-        SwirlDialog {
-            id:settingsDiscard;objectName:"settingsDiscard";title:"放弃未保存的修改？";guardChanges:false
-            parent:settingsSheet.contentItem
-            ColumnLayout { width:parent.width;spacing:Theme.dp(14)
-                SwirlText {text:"DNS 修改尚未应用。";color:Theme.text}
-                RowLayout {Layout.alignment:Qt.AlignRight
-                    SwirlButton {text:"继续编辑";onClicked:settingsDiscard.close()}
-                    SwirlButton {text:"放弃修改";danger:true;onClicked:{settingsSheet.discardApproved=true;settingsDiscard.close();Qt.callLater(settingsSheet.requestClose)}}
-                }
-            }
-        }
-        SwirlPageHost{id:settingsLoader;animateRoutes:false;parent:settingsFlight.ownsContent?settingsFlight.bodySurface:settingsSheet.bodySurface;routeKey:settingsSheet.section;anchors.fill:parent;clip:true
-sourceComponent:settingsSheet.section==="subscriptions"?subscriptions:settingsSheet.section==="proxies"?proxies:settingsSheet.section==="dns"?dns:settingsSheet.section==="modules"?modules:settingsSheet.section==="profiles"?profiles:settingsSheet.section==="scripts"?scripts:settings;onItemChanged:Qt.callLater(settingsSheet.updateSettingsSection)}
-    }
     SwirlDialog {
         id:captureInspectorDialog;title:"HTTP 请求详情";width:Math.min(Theme.dp(1000),window.width-Theme.dp(20));height:Math.min(Theme.dp(650),window.height-Theme.dp(20));padding:Theme.dp(14)
         CaptureInspectorPage{captureProvider:window.captureProviderContext;anchors.fill:parent}
@@ -310,6 +264,7 @@ sourceComponent:settingsSheet.section==="subscriptions"?subscriptions:settingsSh
     }
     Shortcut { sequence:"Alt+Space"; context:Qt.ApplicationShortcut; onActivated:backdrop.showSystemMenu() }
     Shortcut { enabled:dismissals.count===0;sequence:"Ctrl+K"; context:Qt.ApplicationShortcut; onActivated:sidebar.openSearch() }
+    Shortcut { enabled:dismissals.count===0 && AppState.inSettings;sequence:"Esc";onActivated:window.closeSettings() }
     Shortcut { enabled:dismissals.count===0;sequence:"Alt+Left"; onActivated:AppState.goBack() }
     Shortcut { enabled:dismissals.count===0;sequence:"Alt+Right"; onActivated:AppState.goForward() }
     Shortcut { enabled:dismissals.count===0;sequence:"Ctrl+1"; onActivated:AppState.navigate("overview") }
@@ -329,7 +284,9 @@ sourceComponent:settingsSheet.section==="subscriptions"?subscriptions:settingsSh
     Component { id:proxies; ProxiesPage {} }
     Component { id:inspector; InspectorPage {} }
     Component { id:scripts; ScriptsPage {} }
-    Component { id:settings; SettingsPage {} }
+    Component { id:settings; SettingsPage {section:"常规"} }
+    Component { id:appearance; SettingsPage {section:"外观"} }
+    Component { id:fonts; SettingsPage {section:"字体"} }
     Component { id:toolbox; ToolboxPage {} }
     Component { id:dns; DNSPage {} }
     Component { id:rules; RulesPage { engineController:window.engineControllerContext } }
@@ -360,6 +317,7 @@ sourceComponent:settingsSheet.section==="subscriptions"?subscriptions:settingsSh
         border.color:Theme.dark?Qt.rgba(1,1,1,window.active?0.30:0.20):Qt.rgba(0,0,0,window.active?0.12:0.08)
     }
     Timer { id:toastTimer; interval:3200; onTriggered:AppState.toast="" }
+    WindowEdge {anchors.fill:parent;z:10000;radius:window.shellRadius}
     Connections { target:AppState; function onToastChanged(){if(AppState.toast.length)toastTimer.restart()} }
     Rectangle {
         visible:AppState.toast.length>0; z:999

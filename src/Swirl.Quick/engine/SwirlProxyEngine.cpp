@@ -59,7 +59,7 @@ public:
     int outboundStage=0;
     QByteArray buffer,upBuffer,initial,username,password;
     QString host,sourceIp,id=QUuid::createUuid().toString(QUuid::WithoutBraces);
-    quint16 port=0;
+    quint16 port=0,sourcePort=0;
     qint64 uploaded=0,downloaded=0,upDebt=0,downDebt=0,bodyRemaining=0;
     QTimer deadline;
     QElapsedTimer lifetime;
@@ -69,7 +69,7 @@ public:
     std::function<void(NativeSession *,const QString &)> ended;
     NativeSession(QTcpSocket *socket,ProxyNode selected,bool bypass,const EngineStartOptions &options,QObject *parent):QObject(parent),client(socket),node(std::move(selected)),direct(bypass),username(options.inboundUsername.toUtf8()),password(options.inboundPassword.toUtf8()){
         client->setParent(this);client->setProxy(QNetworkProxy::NoProxy);client->setReadBufferSize(ReadLimit);
-        sourceIp=client->peerAddress().toString();client->setSocketOption(QAbstractSocket::KeepAliveOption,1);client->setSocketOption(QAbstractSocket::LowDelayOption,1);
+        sourceIp=client->peerAddress().toString();sourcePort=client->peerPort();client->setSocketOption(QAbstractSocket::KeepAliveOption,1);client->setSocketOption(QAbstractSocket::LowDelayOption,1);
         deadline.setSingleShot(true);deadline.setInterval(qBound(100,options.startupTimeoutMs,30000));
         connect(&deadline,&QTimer::timeout,this,[this]{fail("ConnectionTimeout",504,6);});
         connect(client,&QTcpSocket::readyRead,this,[this]{consume();});
@@ -78,7 +78,7 @@ public:
         connect(client,&QTcpSocket::errorOccurred,this,[this](auto error){if(!closing&&error!=QAbstractSocket::RemoteHostClosedError)finish("ClientDisconnected");});
         lifetime.start();deadline.start();
     }
-    QVariantMap snapshot(bool closed=false)const{return {{"id",id},{"host",host},{"ip",host},{"port",port},{"sourceIp",sourceIp},{"process","未知进程"},{"policy",direct?QString("DIRECT"):node.name},{"category",direct?QString("direct"):QString("proxy")},{"network","TCP"},{"uploadBytes",uploaded},{"downloadBytes",downloaded},{"time",started},{"closed",closed},{"elapsedMs",lifetime.elapsed()},{"handshakeMs",handshakeMs},{"firstDownMs",firstDownMs},{"lastUpMs",lastUpMs},{"lastDownMs",lastDownMs},{"closeReason",endReason},{"closeInitiator",closeInitiator},{"socketErrorCode",socketErrorCode},{"upstreamReplyCode",upstreamReplyCode}};}
+    QVariantMap snapshot(bool closed=false)const{return {{"id",id},{"host",host},{"ip",host},{"port",port},{"sourceIp",sourceIp},{"sourcePort",sourcePort},{"nodeChain",direct?QStringList{}:QStringList{node.id}},{"process","未知进程"},{"policy",direct?QString("DIRECT"):node.name},{"category",direct?QString("direct"):QString("proxy")},{"network","TCP"},{"uploadBytes",uploaded},{"downloadBytes",downloaded},{"time",started},{"closed",closed},{"elapsedMs",lifetime.elapsed()},{"handshakeMs",handshakeMs},{"firstDownMs",firstDownMs},{"lastUpMs",lastUpMs},{"lastDownMs",lastDownMs},{"closeReason",endReason},{"closeInitiator",closeInitiator},{"socketErrorCode",socketErrorCode},{"upstreamReplyCode",upstreamReplyCode}};}
     void notifyEnd(){if(notified)return;notified=true;if(ended)ended(this,endReason);}
     void cancel(){closeInitiator="Application";finish("ApplicationStopped");client->abort();notifyEnd();}
     void sendClientHandshake(const QByteArray &value){downDebt+=value.size();client->write(value);}

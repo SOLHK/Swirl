@@ -15,8 +15,9 @@ int runAppearanceChecks(QQuickWindow *window,bool restoreOnly) {
     int failures=0;
     auto check=[&](bool ok,const char *name){qInfo()<<(ok?"PASS":"FAIL")<<name;if(!ok)++failures;};
     auto eval=[&](const QString &code){QQmlExpression e(qmlContext(window),window,code);auto value=e.evaluate();check(!e.hasError(),"appearance expression is valid");return value;};
-    if(restoreOnly){check(eval("Theme.mode==='Dark' && Theme.dark").toBool(),"new process restores saved dark theme");return failures?2:0;}
-    eval("Theme.reduceMotion=true;AppState.navigate('settings')");QTest::qWait(350);
+    if(restoreOnly){check(eval("Theme.mode==='Dark' && Theme.dark && Theme.followSystemMotion").toBool(),"new process restores saved dark theme and explicit system-motion preference");return failures?2:0;}
+    eval("Theme.reduceMotion=true;AppState.navigate('appearance')");
+    check(QTest::qWaitFor([&]{return eval("pageLoader.item && !pageLoader.pendingGrab && !pageLoader.moving && pageLoader.activeLoader.routeId==='appearance'").toBool();},3500),"appearance page settles before input");
     std::function<QQuickItem *(QQuickItem *,const QString &)> find=[&](QQuickItem *item,const QString &name)->QQuickItem *{if(item->objectName()==name)return item;for(auto *child:item->childItems())if(auto *match=find(child,name))return match;return nullptr;};
     auto *picker=find(window->contentItem(),"themeModePicker");check(picker&&picker->isVisible()&&picker->isEnabled(),"theme picker is visible and enabled");
     if(picker){
@@ -44,8 +45,8 @@ int runAppearanceChecks(QQuickWindow *window,bool restoreOnly) {
         select(2);
     }
     check(eval("!scaledCanvas.layer.enabled").toBool(),"text canvas is not a resampled window texture");
-    eval("Theme.appearanceSettings.sync()");QTest::qWait(250);
-    QSettings settings;settings.sync();check(settings.value("Appearance/savedMode").toString()=="Dark","chosen theme is persisted");
+    eval("Theme.followSystemMotion=true;Theme.appearanceSettings.sync()");QTest::qWait(250);
+    QSettings settings;check(QTest::qWaitFor([&]{settings.sync();return settings.value("Appearance/savedMode").toString()=="Dark"&&settings.value("Appearance/savedFollowSystemMotion").toBool();},3000),"chosen theme and motion preference are persisted");
     QProcess child;child.start(QCoreApplication::applicationFilePath(),{"--appearance-restore-test","--preview-preserve-settings"});
     check(child.waitForFinished(15000)&&child.exitStatus()==QProcess::NormalExit&&child.exitCode()==0,"fresh application process confirms theme restoration");
     qInfo()<<"APPEARANCE_CHECKS failures"<<failures;return failures?2:0;

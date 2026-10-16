@@ -5,6 +5,8 @@
 #include <QTimer>
 #include <QSet>
 #include <QDate>
+#include <QPointer>
+#include "ProxyLatencyProbe.h"
 
 // Single model shared by overview, connections, processes and analytics.
 // Only authenticated adapter observations enter the accounting model.
@@ -22,6 +24,7 @@ class TelemetryService final : public QObject {
  Q_PROPERTY(QString externalIp READ externalIp NOTIFY changed)
  Q_PROPERTY(QString measurementState READ measurementState NOTIFY changed)
  Q_PROPERTY(QVariantMap internetDiagnostic READ internetDiagnostic NOTIFY changed)
+ Q_PROPERTY(QVariantMap proxyDiagnostic READ proxyDiagnostic NOTIFY changed)
  Q_PROPERTY(QString storageError READ storageError NOTIFY changed)
 public:
  explicit TelemetryService(QString path={},bool networkMeasurements=true,QObject *parent=nullptr);
@@ -39,6 +42,7 @@ public:
  QString externalIp() const { return m_externalIp; }
  QString measurementState() const { return m_measurementState; }
  QVariantMap internetDiagnostic() const { return m_internetDiagnostic; }
+ QVariantMap proxyDiagnostic() const { return m_proxyDiagnostic; }
  QString storageError() const { return m_storageError; }
  Q_INVOKABLE QVariantMap summary(int period=0) const;
  Q_INVOKABLE QVariantList ranking(const QString &kind,int period=0,int limit=50) const;
@@ -60,6 +64,8 @@ private:
  QJsonObject periodData(int period) const;
  void measureHttp(const QString &key,const QUrl &url,bool throughProxy,bool ip=false);
  void recordInternetResult(int networkError,int http,bool throughProxy,qint64 elapsed);
+
+ void finishMeasurement(quint64 generation);
  QString m_path,m_epoch,m_routeEpoch,m_storageError,m_externalIp,m_measurementState;
  int m_revision=0,m_measurements=0;
  bool m_networkEnabled=true,m_dirty=false;
@@ -72,6 +78,9 @@ private:
  QVariantList m_history;
  QVariantMap m_latencies;
  QVariantMap m_internetDiagnostic;
+ QVariantMap m_proxyDiagnostic;
+ quint64 m_routeGeneration=0;
+ QPointer<ProxyLatencyProbe> m_proxyProbe;
  QUrl m_internetProbe{QStringLiteral("https://www.gstatic.com/generate_204")};
  QSet<QString> m_failedMeasurements;
  QTimer m_save,m_measure,m_stale;

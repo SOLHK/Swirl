@@ -8,7 +8,7 @@ Item {
  id:sidebar
  property int geometryRevision:0
  property var entries:({})
- readonly property Item selectedEntry:entries[AppState.currentPage] || null
+ readonly property Item selectedEntry:entries[AppState.sidebarPage] || null
  function registerEntry(item){const next=Object.assign({},entries);next[item.pageId]=item;entries=next}
  function unregisterEntry(item){const next=Object.assign({},entries);delete next[item.pageId];entries=next}
  // A single visual owner: retarget y from its rendered position, in local coordinates.

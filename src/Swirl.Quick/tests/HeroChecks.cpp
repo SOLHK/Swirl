@@ -1,4 +1,5 @@
 #include "HeroChecks.h"
+#include "NavigationChecks.h"
 #include "engine/EngineController.h"
 #include "app/MotionPolicy.h"
 #include <QQuickWindow>
@@ -51,15 +52,13 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
  struct RestoreSystemMotion {MotionPolicy *policy;~RestoreSystemMotion(){policy->setSystemReducedMotionOverrideForTest(-1);}} restoreSystemMotion{policy};
  policy->setSystemReducedMotionOverrideForTest(0);
  qInfo()<<"HERO_MOTION_POLICY"<<"actualSystemReducedMotion"<<actualSystemReducedMotion<<"fixtureOverride"<<0;
- quint64 settingsFrames=0,settingsRequestFrame=0;
  std::function<QQuickItem *(QQuickItem *,const QString &)> find;
  find=[&](QQuickItem *parent,const QString &name)->QQuickItem *{if(parent->objectName()==name&&parent->isVisible())return parent;for(auto child:parent->childItems())if(auto match=find(child,name))return match;return nullptr;};
  auto item=[&](const QString &name,QQuickWindow *owner=nullptr){return find((owner?owner:window)->contentItem(),name);};
- auto click=[&](const QString &name,QQuickWindow *owner=nullptr){auto control=item(name,owner);if(!control){check(false,"input exists: "+name);return;}if(name.startsWith("settings-"))settingsRequestFrame=settingsFrames;QTest::mouseClick(owner?owner:window,Qt::LeftButton,Qt::NoModifier,control->mapToScene(QPointF(control->width()/2,control->height()/2)).toPoint());};
+ auto click=[&](const QString &name,QQuickWindow *owner=nullptr){auto control=item(name,owner);if(!control){check(false,"input exists: "+name);return;}QTest::mouseClick(owner?owner:window,Qt::LeftButton,Qt::NoModifier,control->mapToScene(QPointF(control->width()/2,control->height()/2)).toPoint());};
  auto route=[&](const QString &name){eval("AppState.navigate('"+name+"')");wait(350);};
- const bool recording=!QCoreApplication::arguments().contains("--hero-no-recording");
- QQuickWindow *settingsFlight=nullptr;
- auto snapshot=[&](const QString &name,QQuickWindow *sheet=nullptr){if(!recording)return true;auto image=window->grabWindow();QPainter painter(&image);if(settingsFlight&&settingsFlight->isVisible())painter.drawImage(settingsFlight->position()-window->position(),settingsFlight->grabWindow());if(sheet&&sheet->isVisible())painter.drawImage(sheet->position()-window->position(),sheet->grabWindow());painter.end();return image.save(directory+"/"+name+".png");};
+ const bool recording=!QCoreApplication::arguments().contains("--hero-no-recording")&&!qEnvironmentVariableIsSet("SWIRL_QA_NO_RECORDING");
+ auto snapshot=[&](const QString &name,QQuickWindow *sheet=nullptr){if(!recording)return true;auto image=window->grabWindow();QPainter painter(&image);if(sheet&&sheet->isVisible())painter.drawImage(sheet->position()-window->position(),sheet->grabWindow());painter.end();return image.save(directory+"/"+name+".png");};
  auto record=[&](const QString &name,QQuickWindow *sheet=nullptr){if(!recording)return;QDir().mkpath(directory+"/"+name);QElapsedTimer clock;clock.start();QJsonArray timestamps;for(int frame=0;frame<26;++frame){const auto file=QString("%1.png").arg(frame,3,10,QChar('0'));const auto start=clock.nsecsElapsed()/1000000.0;snapshot(name+"/"+file.chopped(4),sheet);timestamps.append(QJsonObject{{"file",file},{"captureStartMs",start},{"captureEndMs",clock.nsecsElapsed()/1000000.0}});wait(10);}QFile output(directory+"/"+name+"/frame-timestamps.json");if(output.open(QIODevice::WriteOnly))output.write(QJsonDocument(QJsonObject{{"frames",timestamps},{"durationMs",clock.nsecsElapsed()/1000000.0},{"method","Actual monotonic readback times; requested 10ms waits are not an assumed frame rate. Qt window readbacks do not capture the final DWM desktop contour."}}).toJson());};
  window->resize(1100,850);window->setPosition(window->screen()->availableGeometry().topLeft()+QPoint(40,40));window->show();window->requestActivate();
 #ifdef Q_OS_WIN
@@ -71,172 +70,9 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
  eval("Theme.mode='Light';Theme.transparency=true;Theme.reduceMotion=false;SwirlMotion.speed=1");route("featurehub");
  check(!eval("SwirlMotion.reduced").toBool(),"animated fixture resolves independently of the Windows accessibility preference");
  check(item("settings-proxies")&&item("settings-subscriptions")&&!item("settings-license"),"More has direct node/subscription entries and no paid license entry");
- QJsonArray settingsPerformance;
- settingsFlight=qobject_cast<QQuickWindow *>(eval("settingsFlight").value<QObject *>());
- auto *profileSheet=qobject_cast<QQuickWindow *>(eval("settingsSheet").value<QObject *>());
- QObject settingsFrameScope;
- if(profileSheet)QObject::connect(profileSheet,&QQuickWindow::frameSwapped,&settingsFrameScope,[&]{++settingsFrames;},Qt::QueuedConnection);
- const auto awaitSettings=[&](const std::function<bool()> &condition,int timeout=3000){
-  if(!settingsFlight||!profileSheet)return false;QElapsedTimer budget;budget.start();
-  while(!condition()&&budget.elapsed()<timeout){
-   QEventLoop loop;QTimer deadline;deadline.setSingleShot(true);
-   QObject::connect(&deadline,&QTimer::timeout,&loop,&QEventLoop::quit);
-   QObject::connect(profileSheet,&QWindow::visibleChanged,&loop,&QEventLoop::quit);
-   QObject::connect(settingsFlight,&QWindow::visibleChanged,&loop,&QEventLoop::quit);
-   QObject::connect(settingsFlight,SIGNAL(movingChanged()),&loop,SLOT(quit()));
-   QObject::connect(profileSheet,&QQuickWindow::frameSwapped,&loop,&QEventLoop::quit,Qt::QueuedConnection);
-   QObject::connect(window,&QQuickWindow::activeFocusItemChanged,&loop,&QEventLoop::quit);
-   QObject::connect(window,&QWindow::activeChanged,&loop,&QEventLoop::quit);
-   deadline.start(qMax(1,timeout-int(budget.elapsed())));loop.exec();
-  }
-  return condition();
- };
- const auto nativeSettingsReady=[&]{return profileSheet&&profileSheet->isVisible()&&profileSheet->isExposed()&&settingsFrames>settingsRequestFrame&&settingsFlight&&!settingsFlight->isVisible()&&!settingsFlight->property("moving").toBool()&&eval("settingsLoader.activeLoader && settingsLoader.activeLoader.routeId===settingsSheet.section && (settingsLoader.item.section===undefined || settingsLoader.item.section===(settingsSheet.section==='appearance'?'外观':settingsSheet.section==='fonts'?'字体':settingsSheet.section==='license'?'关于 Swirl':'常规'))").toBool();};
- const auto settingsReturned=[&]{return settingsFlight&&settingsFlight->property("phase")=="Idle"&&!settingsFlight->isVisible()&&!profileSheet->isVisible();};
- int settingsRounds=3;
- for(const auto &argument:QCoreApplication::arguments())if(argument.startsWith("--hero-settings-rounds=")){bool ok=false;const auto value=argument.mid(QString("--hero-settings-rounds=").size()).toInt(&ok);if(ok)settingsRounds=qBound(1,value,30);}
- const auto settingsResources=[&]{
-  auto snapshot=heroProcessResources();QSet<QObject *> visited;std::function<void(QObject *)> count;
-  count=[&](QObject *object){if(!object||visited.contains(object))return;visited.insert(object);for(auto *child:object->children())count(child);if(auto *visual=qobject_cast<QQuickItem *>(object))for(auto *child:visual->childItems())count(child);};
-  count(eval("settingsLoader").value<QObject *>());snapshot.insert("cachedPages",eval("settingsLoader.cachedPageCount").toInt());snapshot.insert("qmlObjects",visited.size());return snapshot;
- };
- if(settingsFlight&&profileSheet){
-  SettingsFrameProbe probe(settingsFlight);
-  QObject::connect(settingsFlight,SIGNAL(movingChanged()),&probe,SLOT(syncMoving()),Qt::DirectConnection);
-  QObject::connect(settingsFlight,&QQuickWindow::afterAnimating,&probe,&SettingsFrameProbe::syncSurface,Qt::DirectConnection);
-  auto connection=QObject::connect(settingsFlight,&QQuickWindow::frameSwapped,settingsFlight,[&]{probe.frame();},Qt::DirectConnection);
-  const auto summary=[&](QList<double> values){QJsonArray raw;for(const auto value:values)raw.append(value);std::sort(values.begin(),values.end());int over16=0,over33=0,overTwo=0;const auto budget=1000/qMax(1.0,window->screen()->refreshRate());for(const auto value:values){over16+=value>16.667;over33+=value>33.333;overTwo+=value>2*budget;}return QJsonObject{{"samples",values.size()},{"p95Ms",values.isEmpty()?0:values[qMin(values.size()-1,qsizetype(values.size()*0.95))]},{"p99Ms",values.isEmpty()?0:values[qMin(values.size()-1,qsizetype(values.size()*0.99))]},{"maxMs",values.isEmpty()?0:values.last()},{"over16_67Ms",over16},{"over33_33Ms",over33},{"overTwoDisplayPeriods",overTwo},{"rawIntervalsMs",raw}};};
-  for(int round=0;round<settingsRounds;++round){
-   const auto before=settingsResources();QElapsedTimer roundClock;roundClock.start();QList<double> entering,returning;QJsonArray transitions;
-   for(const auto *entry:{"settings","appearance","fonts","dns","modules","profiles","scripts","subscriptions","proxies"}){
-    const auto routeId=QString::fromLatin1(entry);const bool cacheHit=eval("settingsLoader.pages['"+routeId+"']!==undefined").toBool();
-    QElapsedTimer requestClock;requestClock.start();probe.begin();click("settings-"+routeId);
-    const bool opened=awaitSettings(nativeSettingsReady);const auto opening=probe.finish();entering.append(opening.intervals);
-    transitions.append(QJsonObject{{"route",routeId},{"direction","enter"},{"cacheHit",cacheHit},{"firstFrameMs",opening.firstFrameMs},{"firstFrameReveal",opening.firstReveal},{"firstFrameRect",QJsonObject{{"x",opening.firstRect.x()},{"y",opening.firstRect.y()},{"width",opening.firstRect.width()},{"height",opening.firstRect.height()}}},{"requestToCompletedMs",requestClock.elapsed()},{"intervals",summary(opening.intervals)}});
-    check(opened,"passive setting performance run reaches its native page");
-    check(opening.firstFrameMs>=0&&!opening.intervals.isEmpty(),"animated settings entry supplies real moving-window frame samples");
-    requestClock.restart();probe.begin();QTest::keyClick(profileSheet,Qt::Key_Escape);
-    const bool closed=awaitSettings(settingsReturned);const auto closing=probe.finish();returning.append(closing.intervals);
-    transitions.append(QJsonObject{{"route",routeId},{"direction","return"},{"firstFrameMs",closing.firstFrameMs},{"firstFrameReveal",closing.firstReveal},{"firstFrameRect",QJsonObject{{"x",closing.firstRect.x()},{"y",closing.firstRect.y()},{"width",closing.firstRect.width()},{"height",closing.firstRect.height()}}},{"requestToCompletedMs",requestClock.elapsed()},{"intervals",summary(closing.intervals)}});
-    check(closed,"passive setting performance run returns to its card");
-    check(closing.firstFrameMs>=0&&!closing.intervals.isEmpty(),"animated settings return supplies real moving-window frame samples");
-   }
-   const auto after=settingsResources();settingsPerformance.append(QJsonObject{{"round",round+1},{"wallMs",roundClock.elapsed()},{"before",before},{"after",after},{"cpuMs",after.value("cpuMs").toDouble()-before.value("cpuMs").toDouble()},{"enter",summary(entering)},{"return",summary(returning)},{"transitions",transitions}});
-  }
-  QObject::disconnect(connection);
-  const auto beforeIdle=settingsResources();wait(3000);const auto afterIdle=settingsResources();
-  const bool settingsOnly=QCoreApplication::arguments().contains("--hero-settings-only");
-  if(settingsOnly){policy->setSystemReducedMotionOverrideForTest(-1);check(policy->systemReducedMotion()==actualSystemReducedMotion,"settings performance fixture restores the actual Windows accessibility policy");}
-  QFile performance(directory+"/settings-performance.json");if(performance.open(QIODevice::WriteOnly))performance.write(QJsonDocument(QJsonObject{{"actualSystemReducedMotion",actualSystemReducedMotion},{"animatedSystemPolicyFixture",0},{"rounds",settingsPerformance},{"failures",failures},{"checks",checks},{"beforeNaturalIdle",beforeIdle},{"afterNaturalIdle",afterIdle},{"naturalIdleMs",3000},{"qtRefreshHz",window->screen()->refreshRate()},{"nativeDpr",window->devicePixelRatio()},{"method","Signal-driven event loop; passive frameSwapped intervals from the moving settings transfer window only. No screenshot, forced update, garbage collection or resource release in this segment. No physical display mode change. Cache-hit metadata distinguishes first construction from warm visits. All intervals including long frames retained; Qt delivery times are not hardware presentation FPS. Process private/working-set counters do not separately attribute GPU backing allocations."}}).toJson());
-  if(settingsOnly)return failures?2:0;
- }
- auto origin=item("settings-subscriptions");click("settings-subscriptions");
- QQuickWindow *sheet=nullptr;for(auto candidate:QGuiApplication::allWindows())if(candidate->objectName()=="settingsSheet")sheet=qobject_cast<QQuickWindow *>(candidate);
-#ifdef Q_OS_WIN
- if(sheet){sheet->setFlag(Qt::WindowStaysOnTopHint,true);SetWindowPos(reinterpret_cast<HWND>(sheet->winId()),HWND_TOPMOST,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE);}
-#endif
- settingsFlight=qobject_cast<QQuickWindow *>(eval("settingsFlight").value<QObject *>());
- check(sheet&&settingsFlight&&settingsFlight->isVisible()&&!sheet->isVisible()&&eval("settingsFlight.phase==='Expanding' && settingsSheet.section==='subscriptions'").toBool(),"settings entry responds synchronously with one shared surface before the native handoff");
- if(settingsFlight){
-  wait(35);
-  check(eval("settingsFlight.reveal>0 && settingsFlight.reveal<1 && settingsLoader.parent===settingsFlight.bodySurface && settingsLoader.width===settingsSheet.width").toBool(),"real cached detail content is mounted at a fixed width inside the moving boundary");
-  check(origin&&origin->opacity()==0&&eval("settingsFlight.sourceIcon==='subscriptions' && settingsFlight.sourceTitle==='订阅管理'").toBool(),"source card is replaced by its icon and title without a duplicate surface");
- }
- record("more-open",sheet);
- check(awaitSettings(nativeSettingsReady),"native window is opaque after the single live surface completes its handoff");
- if(sheet&&settingsFlight){check(origin&&origin->property("transfer").toDouble()>0.99,"source card keeps its shared return identity while native sheet is open");
-  auto settingsPage=eval("settingsLoader.item").value<QObject *>();QTest::keyClick(sheet,Qt::Key_Escape);record("more-return",sheet);check(awaitSettings(settingsReturned)&&window->isVisible(),"Escape returns from the native sheet without closing the main window");
-  check(awaitSettings([&]{return origin&&origin->property("transfer").toDouble()==0&&origin->hasActiveFocus();}),"return restores originating card geometry and keyboard focus");
-  click("settings-subscriptions");check(awaitSettings(nativeSettingsReady)&&settingsPage&&eval("settingsLoader.item").value<QObject *>()==settingsPage,"secondary route cache retains the original subscription page");QTest::keyClick(sheet,Qt::Key_Escape);check(awaitSettings(settingsReturned),"cached subscription return finishes before the next entry accepts input");
-  click("settings-fonts");check(awaitSettings(nativeSettingsReady),"font entry completes its native handoff before inspecting its controls");
-  check(sheet->isVisible()&&eval("settingsLoader.item.section==='字体' && Theme.fontFamily===fontManager.defaultFamily").toBool(),"More font entry opens the platform default font settings");
-  check(find(sheet->contentItem(),"fontFamilyList")&&find(sheet->contentItem(),"fontImport")&&find(sheet->contentItem(),"fontReset"),"font chooser, import and reset controls are available in the native settings window");
-  if(recording&&nativeSettingsReady())sheet->grabWindow().save(directory+"/font-settings.png");
-  QTest::keyClick(sheet,Qt::Key_Escape);check(awaitSettings(settingsReturned),"font settings return finishes before interruption checks");
-  for(const double fraction:{0.25,0.5,0.75}){
-   click("settings-subscriptions");
-   check(QTest::qWaitFor([&]{return settingsFlight->property("reveal").toDouble()>=fraction;},1000),"settings opening reaches the requested interruption sample");
-   const auto before=settingsFlight->property("surfaceRect").toRectF();
-   const auto revealBefore=settingsFlight->property("reveal").toDouble();
-   if(fraction==0.5)click("windowCloseButton",settingsFlight);else QTest::keyClick(settingsFlight,Qt::Key_Escape);
-   const auto after=settingsFlight->property("surfaceRect").toRectF();
-   const auto requested=settingsFlight->property("retargetRequestedRect").toRectF(),committed=settingsFlight->property("retargetCommittedRect").toRectF();
-   settingsRetargetSamples.append(QJsonObject{{"fraction",fraction},{"inputBeforeX",before.x()},{"inputAfterX",after.x()},{"inputBeforeReveal",revealBefore},{"inputAfterReveal",settingsFlight->property("reveal").toDouble()},{"handlerRequestedX",requested.x()},{"handlerCommittedX",committed.x()},{"handlerRequestedWidth",requested.width()},{"handlerCommittedWidth",committed.width()}});
-   check(requested==committed&&settingsFlight->property("retargetRequestedReveal")==settingsFlight->property("retargetCommittedReveal")&&settingsFlight->property("phase")=="Collapsing","real Escape and close-button reversal preserve the handler's exact displayed boundary and reveal");
-   check(QTest::qWaitFor([&]{return settingsFlight->property("phase")=="Idle"&&!sheet->isVisible();},2000),"interrupted settings return releases its window and clock");
-  }
-  for(const auto *entry:{"settings","appearance","fonts","dns","modules","profiles","scripts","subscriptions","proxies"}){
-   const auto name=QString("settings-")+QString::fromLatin1(entry);auto *source=item(name);
-   const auto geometry=source?QRectF(source->position(),source->size()):QRectF();
-   click(name);
-   check(QTest::qWaitFor([&]{return sheet->isVisible()&&!settingsFlight->isVisible();},2500),"all nine setting entries finish a real native handoff");
-   if(auto *page=eval("settingsLoader.item").value<QObject *>()){
-    for(auto *object:page->findChildren<QObject *>()){
-     if(auto *owner=object->property("ownerItem").value<QQuickItem *>()){
-      auto *overlay=object->property("parent").value<QQuickItem *>();
-      check(owner->window()==sheet&&overlay&&overlay->window()==sheet,"cached settings dialog overlay follows its declaration page: "+QString::fromLatin1(entry));
-     }
-     if(object->objectName().startsWith("settings")&&object->property("parentWindow").isValid())check(object->property("parentWindow").value<QWindow *>()==sheet,"native file picker follows migrated page: "+object->objectName());
-    }
-   }
-   const auto routeId=QString::fromLatin1(entry);
-   const auto formButton=routeId=="profiles"?QString("profileAddButton"):routeId=="scripts"?QString("scriptAddButton"):routeId=="proxies"?QString("nodeImportButton"):routeId=="fonts"?QString("fontLicense"):QString();
-   if(!formButton.isEmpty()){
-    if(auto *button=item(formButton,sheet))for(auto *ancestor=button->parentItem();ancestor;ancestor=ancestor->parentItem())if(ancestor->property("contentY").isValid()){
-     const auto maximum=qMax(0.0,ancestor->property("contentHeight").toDouble()-ancestor->height());
-     ancestor->setProperty("contentY",qBound(0.0,ancestor->property("contentY").toDouble()+button->mapToItem(ancestor,QPointF(button->width()/2,button->height()/2)).y()-ancestor->height()/2,maximum));
-    }
-    wait(20);
-    click(formButton,sheet);wait(300);check(eval("dismissals.count===1").toBool(),"migrated settings form opens its native modal: "+routeId);
-    QTest::keyClick(sheet,Qt::Key_Escape);wait(300);check(sheet->isVisible()&&eval("dismissals.count===0").toBool(),"native Escape dismisses only the migrated form: "+routeId);
-   }
-   check(source&&source->position()==geometry.topLeft()&&source->size()==geometry.size()&&source->property("motionScale").toDouble()==1,"setting flight leaves the grid slot and card scale unchanged");
-   QTest::keyClick(sheet,Qt::Key_Escape);
-   check(QTest::qWaitFor([&]{return settingsFlight->property("phase")=="Idle"&&!settingsFlight->isVisible();},2000),"all nine setting returns clean up the temporary surface");
-  }
-  click("settings-subscriptions");wait(40);const auto expansion=settingsFlight->property("surfaceRect").toRectF();eval("window.openSettings('subscriptions',window.settingsOrigin)");
-  check(settingsFlight->property("surfaceRect").toRectF()==expansion,"repeated opening retargets the current boundary without returning to its origin");
-  eval("window.closeSettings()");wait(25);const auto collapsing=settingsFlight->property("surfaceRect").toRectF();eval("window.openSettings('subscriptions',window.settingsOrigin)");
-  check(settingsFlight->property("surfaceRect").toRectF()==collapsing,"reopening during collapse reverses the same surface");
-  check(QTest::qWaitFor([&]{return sheet->isVisible()&&!settingsFlight->isVisible();},2000),"rapid opening and return settle at the last requested route");
-  check(eval("settingsLoader.enabled && settingsLoader.parent===settingsSheet.bodySurface").toBool(),"only the native page accepts form input after handoff");
-  auto *cachedPage=eval("settingsLoader.item").value<QObject *>();window->resize(1000,760);wait(80);const auto resizedOrigin=origin->mapToGlobal(QPointF(0,0));QTest::keyClick(sheet,Qt::Key_Escape);
-  const auto resizedTarget=settingsFlight->property("toRect").toRectF();
-  check(qAbs(resizedTarget.x()-resizedOrigin.x())<0.5&&qAbs(resizedTarget.y()-resizedOrigin.y())<0.5,"return uses the freshly laid out card coordinates instead of the opening snapshot");
-  check(QTest::qWaitFor([&]{return settingsFlight->property("phase")=="Idle";},2000),"return recalculates the grid card after the main window resizes");
-  policy->setSystemReducedMotionOverrideForTest(1);
-  click("settings-subscriptions");
-  check(awaitSettings(nativeSettingsReady)&&eval("motionPolicy.systemReducedMotion && SwirlMotion.reduced && !Theme.reduceMotion").toBool()&&eval("settingsLoader.item").value<QObject *>()==cachedPage,"system accessibility reduction opens the same native cached page without a moving surface");
-  check(!settingsFlight->property("moving").toBool()&&eval("SwirlTransitionRegistry.activeCount===0").toBool(),"system accessibility reduction creates no settings transition clock");
-  QTest::keyClick(sheet,Qt::Key_Escape);
-  check(awaitSettings(settingsReturned),"system accessibility reduction Escape hides the modal and restores its source");
-  policy->setSystemReducedMotionOverrideForTest(0);
-  click("settings-subscriptions");wait(35);eval("Theme.reduceMotion=true");
-  check(QTest::qWaitFor([&]{return sheet->isVisible()&&!settingsFlight->isVisible();},1000)&&eval("settingsLoader.item").value<QObject *>()==cachedPage,"changing reduced motion finishes geometry and retains the same cached page");
-  QTest::keyClick(sheet,Qt::Key_Escape);wait(40);check(!sheet->isVisible()&&settingsFlight->property("phase")=="Idle","reduced-motion Escape hides the native modal window without a recursive close event");eval("Theme.reduceMotion=false");window->resize(1100,850);
-  click("settings-subscriptions");wait(35);auto *fontSource=item("settings-fonts");const auto beforeRouteChange=settingsFlight->property("surfaceRect").toRectF();
-  QMetaObject::invokeMethod(window,"openSettings",Q_ARG(QVariant,QString("fonts")),Q_ARG(QVariant,QVariant::fromValue(fontSource)));
-  check(settingsFlight->property("surfaceRect").toRectF()==beforeRouteChange&&eval("settingsSheet.section==='fonts' && settingsFlight.sourceTitle==='字体'").toBool(),"a different entry supersedes the route while retaining the currently displayed boundary");
-  check(QTest::qWaitFor([&]{return sheet->isVisible()&&!settingsFlight->isVisible();},2000),"superseded entry hands off only its latest page");QTest::keyClick(sheet,Qt::Key_Escape);
-  check(QTest::qWaitFor([&]{return settingsFlight->property("phase")=="Idle";},2000),"superseded entry returns to its own original grid slot");
-  click("settings-subscriptions");check(QTest::qWaitFor([&]{return sheet->isVisible()&&!settingsFlight->isVisible();},2000),"hidden-source fallback setup reaches a real detail window");origin->setVisible(false);QTest::keyClick(sheet,Qt::Key_Escape);
-  check(settingsFlight->property("fadeFallback").toBool(),"an unavailable return card uses a stable fade rather than a flight to stale coordinates");
-  check(QTest::qWaitFor([&]{return settingsFlight->property("phase")=="Idle";},2000),"fallback return releases its temporary window");origin->setVisible(true);
-  click("settings-subscriptions");wait(70);auto *flightHeader=item("settingsTransferTitleBar",settingsFlight);
-  if(flightHeader)QTest::mouseDClick(settingsFlight,Qt::LeftButton,Qt::NoModifier,flightHeader->mapToScene(QPointF(flightHeader->width()/2,flightHeader->height()/2)).toPoint());
-  check(QTest::qWaitFor([&]{return sheet->visibility()==QWindow::Maximized&&!settingsFlight->isVisible();},1500),"double-clicking the moving title bar finishes the transfer and maximizes the real detail window");
-  QTest::mouseDClick(sheet,Qt::LeftButton,Qt::NoModifier,QPoint(sheet->width()/2,qRound(sheet->property("titleBarHeight").toReal()/2)));
-  check(QTest::qWaitFor([&]{return sheet->visibility()==QWindow::Windowed;},1500),"double-clicking the native title bar restores its window");QTest::keyClick(sheet,Qt::Key_Escape);
-  check(QTest::qWaitFor([&]{return settingsFlight->property("phase")=="Idle";},2000),"maximized interruption leaves no transfer window on return");
-  click("settings-subscriptions");wait(70);click("windowMaximizeButton",settingsFlight);
-  check(QTest::qWaitFor([&]{return sheet->visibility()==QWindow::FullScreen&&!settingsFlight->isVisible();},1500),"the moving green control hands off to the real full-screen window");click("windowMaximizeButton",sheet);
-  check(QTest::qWaitFor([&]{return sheet->visibility()==QWindow::Windowed;},1500),"the native green control restores its original behavior");QTest::keyClick(sheet,Qt::Key_Escape);
-  check(QTest::qWaitFor([&]{return settingsFlight->property("phase")=="Idle";},2000),"full-screen interruption returns to the card cleanly");
-  click("settings-subscriptions");wait(70);click("windowMinimizeButton",settingsFlight);
-  check(QTest::qWaitFor([&]{return sheet->visibility()==QWindow::Minimized&&!settingsFlight->isVisible();},1500),"the moving yellow control minimizes the native window after finishing the transfer");sheet->showNormal();sheet->requestActivate();wait(80);QTest::keyClick(sheet,Qt::Key_Escape);
-  check(QTest::qWaitFor([&]{return settingsFlight->property("phase")=="Idle";},2000),"restoring a minimized interruption leaves no partial transition");
-  check(eval("SwirlTransitionRegistry.activeCount===0 && motionPolicy.activeGrabCount===0").toBool(),"setting flight leaves no active clock or foreground capture after settling");
- }
+ QString yaml="proxies:\n";for(int i=0;i<180;++i)yaml+=QString("  - {name: 'Fixture node %1', type: socks5, server: 127.0.0.1, port: 9}\n").arg(i,3,10,QChar('0'));
+ controller->imports()->importText(yaml);check(QTest::qWaitFor([&]{return !controller->imports()->busy();},8000)&&controller->nodes().size()==180,"180 synthetic node records imported by the real importer for rendering stress only");
+ failures+=runNavigationChecks(window,controller,directory);
  // Synthetic metadata stays in the application's isolated DPAPI test store.
  // No fixture is connected and no measured network result is fabricated.
  check(controller->imports()->saveSubscription("","Animation fixture",QUrl("https://fixture.invalid/subscription"),360,false),"subscription metadata saved by the actual encrypted store");
@@ -249,9 +85,8 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
  for(int i=0;i<8;++i){click("expandSubscription-"+subscriptionId);wait(15);}wait(350);
  check(card&&card==item("subscriptionCard-"+subscriptionId)&&!card->property("moving").toBool(),"rapid subscription reversals settle without replacement or a stuck clock");
  eval("Theme.reduceMotion=true");click("expandSubscription-"+subscriptionId);check(card&&!card->property("moving").toBool()&&card->property("reveal").toDouble()==1,"reduced motion commits final geometry directly");eval("Theme.reduceMotion=false");
- QString yaml="proxies:\n";for(int i=0;i<180;++i)yaml+=QString("  - {name: 'Fixture node %1', type: socks5, server: 127.0.0.1, port: 9}\n").arg(i,3,10,QChar('0'));
- controller->imports()->importText(yaml);check(QTest::qWaitFor([&]{return !controller->imports()->busy();},8000)&&controller->nodes().size()==180,"180 synthetic node records imported by the real importer for rendering stress only");
  route("proxies");auto table=item("realNodeTable");
+ if(table)QMetaObject::invokeMethod(table,"scrollToBeginning");wait(35);
  check(table&&eval("pageLoader.item.viewRows.length===180").toBool(),"node list exposes all 180 records");
  if(table){auto point=[&](int row){return table->mapToScene(QPointF(65,table->property("headerHeight").toDouble()+table->property("itemHeight").toInt()*(row+0.5))).toPoint();};
   QElapsedTimer response;response.start();
