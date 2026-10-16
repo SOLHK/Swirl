@@ -378,6 +378,13 @@ bool MihomoAdapter::reservePort(QTcpServer &server, quint16 port) {
 }
 
 void MihomoAdapter::start(const EngineStartOptions &options) {
+#ifdef SWIRL_USE_RUST_CORE
+    Q_UNUSED(options);
+    // Compile-time gate covers legacy diagnostics and staged controllers too.
+    // A Rust-only build must never launch the retained reference adapter.
+    m_status={};m_status.state=State::Failed;m_status.error=Error::InvalidOptions;
+    m_status.message="Rust 专用构建禁止启动外部代理内核。";publish();return;
+#endif
     if (m_process.state() != QProcess::NotRunning || m_status.state == State::Validating ||
         m_status.state == State::Starting || m_status.state == State::Stopping) return;
     m_modeUnconfirmed=false;cancelRequest(); cancelNodeRequests(); m_poll.stop(); m_deadline.stop(); m_killTimer.stop();

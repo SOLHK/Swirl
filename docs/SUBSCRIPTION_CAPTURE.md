@@ -24,7 +24,9 @@ Fill all exports available from all platforms in this single manifest:
   Karing, Streisand, V2Box and other exports offered by the provider.
 - Related provider lists, rule sets, remote DNS/config resources and exact
   redirect targets if known. Each URL is a separate entry; kind is `resource`.
-- Client/export version, known protocols and transports. Unknown is acceptable.
+- Client/export labels if available. Protocol versions, transports, TLS/REALITY,
+  ciphers and capabilities are detected locally from content; users do not need
+  to supply unknown technical fields. Missing versions remain explicitly unknown.
 - `exportOf`: same subscription/account exported for multiple clients (use an
   anonymous group label). Identical URL + headers + window group downloads once;
   different User-Agent/authorization stays separate. Provenance stays encrypted.
@@ -113,6 +115,20 @@ modified by capture. Concurrent capture runs are rejected. After a hard process
 crash, inspect for an active run before manually removing its stale capture.lock.
 
 ## Offline integrity and C++ import
+
+Rust content inspection is now available without altering the UI:
+
+```
+py -3 tools/SubscriptionCapture.py import-file <local-export> <private-cache>
+py -3 tools/Analyze-CapturedSubscriptions.py --cache <private-cache> --inspector <swirl-inspect.exe> --private-output <private-analysis.dpapi> --report <redacted-report.json>
+```
+
+All original fields are retained in encrypted input/results. The Rust inspector
+detects actual YAML/JSON/URI/Base64/INI content, not the link's display name.
+`--harness <swirl-api.exe> --test-limit N` explicitly enables at most N isolated
+TCP HTTPS HEAD probes after acquisition; it does not validate UDP or all settings.
+Use only with the user's node testing authorization. Never log `--private-json`
+inspector stdout; the analysis utility captures it in memory and encrypts it.
 
 ```
 py -3 tools/SubscriptionCapture.py replay <cache-response.dpapi>

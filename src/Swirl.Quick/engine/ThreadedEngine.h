@@ -1,5 +1,8 @@
 #pragma once
 #include "SwirlEngineManager.h"
+#ifdef SWIRL_USE_RUST_CORE
+#include "RustCoreEngine.h"
+#endif
 #include <QThread>
 
 // Production facade: all listeners, sockets, DNS and engine control live on a
@@ -11,7 +14,11 @@ public:
         m_context->moveToThread(&m_thread);
         connect(&m_thread,&QThread::finished,m_context,&QObject::deleteLater);
         connect(&m_thread,&QThread::started,m_context,[this]{
+#ifdef SWIRL_USE_RUST_CORE
+            m_engine=new RustCoreEngine(m_context);
+#else
             m_engine=new SwirlEngineManager(m_context);
+#endif
             connect(m_engine,&ProxyEngine::statusChanged,m_context,[this]{
                 const auto status=m_engine->status();const auto summary=m_engine->configurationSummary();
                 const auto rules=m_engine->routingRules();const auto epoch=m_workerEpoch;
@@ -53,7 +60,7 @@ private:
     template<class F> void post(F action){QMetaObject::invokeMethod(m_context,[this,action]{action(m_engine);},Qt::QueuedConnection);}
     QThread m_thread;
     QObject *m_context=nullptr;
-    SwirlEngineManager *m_engine=nullptr; // Worker thread only.
+    ProxyEngine *m_engine=nullptr; // Worker thread only.
     Status m_status;
     QString m_summary;
     QVariantList m_rules;

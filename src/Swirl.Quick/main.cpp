@@ -193,8 +193,12 @@ int main(int argc, char *argv[])
     ModuleDraftStore drafts;
     QTemporaryDir isolatedNodes;
     std::unique_ptr<ProxyEngine> runtimeEngine;
+#ifndef SWIRL_USE_RUST_CORE
     if(nodeTest||engineTest)runtimeEngine=std::make_unique<MihomoAdapter>(); // Pinned legacy regression fixtures.
     else runtimeEngine=std::make_unique<ThreadedEngine>();
+#else
+    runtimeEngine=std::make_unique<ThreadedEngine>();
+#endif
     EngineController engineController(std::move(runtimeEngine),nullptr,realAcceptance?runtimeStore:isolatedRun?isolatedNodes.filePath("nodes.dpapi"):QString(),realAcceptance);
     ExtensionService extensions(&engineController,isolatedRun?isolatedNodes.filePath("extensions.dpapi"):QString());
     GatewayService gateway(&engineController,isolatedRun?isolatedNodes.filePath("gateway.json"):QString());

@@ -575,6 +575,32 @@ def capture(manifest, authorization, cache):
         lock.unlink(missing_ok=True)
 
 
+def import_local(source, cache):
+    source=Path(source).resolve()
+    if str(source).startswith('\\\\') or not source.is_file() or source.stat().st_size>MAX_BODY:
+        raise CaptureError('LocalInputRejected')
+    raw=source.read_bytes()
+    document_status(raw, '')
+    cache=Path(cache).resolve();cache.mkdir(parents=True,exist_ok=True)
+    lock=cache/'capture.lock'
+    try:fd=os.open(lock,os.O_CREAT|os.O_EXCL|os.O_WRONLY)
+    except FileExistsError:raise CaptureError('CacheBusy') from None
+    os.close(fd)
+    try:
+        index_path=cache/'index.dpapi'
+        index=read_private(index_path) if index_path.exists() else {'schema':1,'entries':{}}
+        key=digest(packed(['local-file',str(source)]));batch=uuid.uuid4().hex
+        origin={'id':'local-export','kind':'root','localPath':str(source)}
+        record={'schema':1,'source':origin,'sources':[origin],'final_url':'local-export',
+                'fetchedAt':dt.datetime.now(UTC).isoformat(),'headers':{},'rawBase64':base64.b64encode(raw).decode('ascii'),
+                'rawSha256':digest(raw),'decodedSha256':digest(raw),'classification':'CapturedUnvalidated','references':[]}
+        file=f'{batch}/{key}.dpapi';save_private(cache/file,record)
+        if read_private(cache/file)['rawSha256']!=digest(raw):raise CaptureError('CacheIntegrityFailed')
+        index['entries'][key]={'file':file,'sources':[origin]};save_private(index_path,index)
+        return {'code':'LocalExportCached','bytes':len(raw),'networkRequests':0}
+    finally:lock.unlink(missing_ok=True)
+
+
 def replay(cache_file, inspector=None, store=None):
     record = read_private(cache_file)
     raw = base64.b64decode(record["rawBase64"], validate=True)
@@ -625,6 +651,9 @@ def main():
     p.add_argument("cache_file", type=Path)
     p.add_argument("--inspector", type=Path)
     p.add_argument("--store", type=Path)
+    p = sub.add_parser("import-file")
+    p.add_argument("source",type=Path)
+    p.add_argument("cache",type=Path)
     args = parser.parse_args()
     try:
         if args.command == "seal":
@@ -642,6 +671,8 @@ def main():
             result = {"code": "ManifestCheckedNoNetwork", "entries": len(manifest["entries"]), "groups": len(manifest["groups"])}
         elif args.command == "capture":
             result = capture(read_private(args.manifest), json.loads(args.authorization.read_text(encoding="utf-8-sig")), args.cache)
+        elif args.command == 'import-file':
+            result=import_local(args.source,args.cache)
         else:
             result = replay(args.cache_file, args.inspector, args.store)
         print(json.dumps(result, ensure_ascii=True))

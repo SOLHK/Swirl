@@ -2,6 +2,9 @@
 #include "MihomoAdapter.h"
 #include "SwirlProxyEngine.h"
 #include "SwirlProtocolRegistry.h"
+#ifdef SWIRL_USE_RUST_CORE
+#include "RustCoreEngine.h"
+#endif
 #include <QTcpServer>
 #include <QSet>
 #include <QDateTime>
@@ -45,9 +48,14 @@ void NodeTestService::next(){
   opts.nodes.clear();for(const auto &node:m_options.nodes)if(needed.contains(node.id))opts.nodes.append(node);
   // Test a natively supported node through its actual native implementation.
   // No automatic compatibility retry can turn a native failure into success.
+#ifdef SWIRL_USE_RUST_CORE
+  ProxyEngine *runner=new RustCoreEngine(this);
+  runner->setProperty("probeEngineKind","rust");
+#else
   const bool native=SwirlProtocolRegistry::nativeSessionReason(opts).isEmpty();
   ProxyEngine *runner=native?static_cast<ProxyEngine *>(new SwirlProxyEngine(this)):static_cast<ProxyEngine *>(new MihomoAdapter(this));
   runner->setProperty("probeEngineKind",native?"native":"compatibility");
+#endif
   m_running[id]=runner;auto deadline=new QTimer(runner);deadline->setSingleShot(true);deadline->setInterval(40000);
   connect(deadline,&QTimer::timeout,this,[this,runner,id]{finish(id,runner,{{"success",false},{"latency",-1},{"http",0},{"error","节点测试超时"}});});deadline->start();
   connect(runner,&ProxyEngine::statusChanged,this,[this,runner,id]{

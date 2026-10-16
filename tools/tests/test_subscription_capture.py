@@ -145,6 +145,35 @@ class CaptureTests(unittest.TestCase):
         with self.assertRaises(cap.CaptureError):
             cap.read_private(path)
 
+    def test_local_export_encrypted_without_network(self):
+        path=Path(self.temp.name)/'export.yaml'
+        path.write_bytes(BODY)
+        before=sum(self.server.hits.values())
+        result=cap.import_local(path,self.cache)
+        self.assertEqual(result['networkRequests'],0)
+        self.assertEqual(sum(self.server.hits.values()),before)
+        index=cap.read_private(self.cache/'index.dpapi')
+        cached=self.cache/next(iter(index['entries'].values()))['file']
+        self.assertNotIn(b'example.org',cached.read_bytes())
+        self.assertEqual(cap.replay(cached)['code'],'OfflineIntegrityPassed')
+
+    @unittest.skipUnless(os.environ.get('SWIRL_RUST_INSPECTOR'), 'Rust offline inspector is opt-in')
+    def test_rust_offline_pipeline_preserves_private_fields(self):
+        module_spec=importlib.util.spec_from_file_location('analysis',Path(__file__).parents[1]/'Analyze-CapturedSubscriptions.py')
+        analysis=importlib.util.module_from_spec(module_spec);module_spec.loader.exec_module(analysis)
+        path=Path(self.temp.name)/'export.yaml'
+        path.write_bytes(b'proxies:\n - {name: PRIVATE_NAME, type: trojan, server: private.example.org, port: 443, password: PRIVATE_SECRET, future-field: PRIVATE_VALUE}\ndns: {enable: true}\n')
+        cap.import_local(path,self.cache)
+        private=Path(self.temp.name)/'analysis.dpapi'
+        report=analysis.analyze(self.cache,os.environ['SWIRL_RUST_INSPECTOR'],private)
+        self.assertEqual(report['realTcpProbes'],0)
+        self.assertTrue(report['sources'][0]['report']['parsed'])
+        self.assertNotIn('PRIVATE',json.dumps(report))
+        self.assertNotIn('private.example.org',json.dumps(report))
+        self.assertNotIn(b'PRIVATE_SECRET',private.read_bytes())
+        saved=cap.read_private(private)
+        self.assertEqual(saved['documents'][0]['analysis']['nodes'][0]['future-field'],'PRIVATE_VALUE')
+
     def test_gzip_raw_preserved_and_offline_replay(self):
         report = self.run_capture("/gzip")
         self.assertEqual(report["captured"], 1)

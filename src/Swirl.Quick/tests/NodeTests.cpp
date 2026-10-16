@@ -254,7 +254,13 @@ private slots:
         if(tests.succeeded()!=1 || tests.result(opts.nodes[1].id).value("phase").toString()!="availability")qInfo()<<"BATCH_RESULT"<<tests.results();
         QCOMPARE(tests.completed(),2);QCOMPARE(tests.succeeded(),1);QCOMPARE(tests.failed(),1);QVERIFY(tests.result(opts.nodes[0].id).value("success").toBool());QVERIFY(!tests.result(opts.nodes[1].id).value("success").toBool());
         QCOMPARE(tests.result(opts.nodes[1].id).value("phase").toString(),QString("availability"));
-        QCOMPARE(main.status().selectedNodeId,opts.nodes.first().id);QCOMPARE(main.status().processId,pid);QVERIFY(network.a.forwarded>=2);
+        QCOMPARE(main.status().selectedNodeId,opts.nodes.first().id);QCOMPARE(main.status().processId,pid);
+        // Native probes perform one real request, without the legacy adapter's
+        // extra availability request. Prove the main route independently.
+        QCOMPARE(tests.result(opts.nodes[0].id).value("engineKind").toString(),QString("native"));
+        const auto beforeMainRequest=network.a.forwarded;
+        main.probeNode(network.url());QTRY_COMPARE_WITH_TIMEOUT(main.status().requestState,ProxyEngine::RequestState::Succeeded,10000);
+        QVERIFY(network.a.forwarded>beforeMainRequest);QVERIFY(network.a.forwarded>=2);
         tests.start(opts,{opts.nodes[0].id,opts.nodes[1].id},network.url());tests.cancel();QTRY_VERIFY_WITH_TIMEOUT(!tests.busy(),5000);main.stop();QTRY_VERIFY_WITH_TIMEOUT(!main.status().processAlive,4000);
     }
     void authenticTrafficStreamAndConnectionHistory() {
