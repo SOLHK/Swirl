@@ -137,6 +137,7 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
 #endif
  settingsFlight=qobject_cast<QQuickWindow *>(eval("settingsFlight").value<QObject *>());
  check(sheet&&settingsFlight&&settingsFlight->isVisible()&&!sheet->isVisible()&&eval("settingsFlight.phase==='Expanding' && settingsSheet.section==='subscriptions'").toBool(),"settings entry responds synchronously with one shared surface before the native handoff");
+ check(eval("Math.abs(settingsFlight.toColor.a-(settingsBackdrop.active?Theme.nativeTintOpacity:settingsBackdrop.translucent?Theme.alphaTintOpacity:1))<0.005").toBool(),"settings flight resolves destination translucency before its first handoff");
  if(settingsFlight){
   wait(35);
   check(eval("settingsFlight.reveal>0 && settingsFlight.reveal<1 && settingsLoader.parent===settingsFlight.bodySurface && settingsLoader.width===settingsSheet.width").toBool(),"real cached detail content is mounted at a fixed width inside the moving boundary");

@@ -34,6 +34,9 @@ Window {
     readonly property real surfaceRadius:fromRadius+(toRadius-fromRadius)*clock.progress
     property color fromColor:Theme.material("content")
     property color toColor:Theme.material("content")
+    readonly property color destinationColor:Theme.withAlpha(Theme.nativeTint,
+        composition.active && Theme.transparency ? Theme.nativeTintOpacity :
+        composition.translucent && Theme.transparency ? Theme.alphaTintOpacity : 1)
     readonly property color surfaceColor:Qt.rgba(fromColor.r+(toColor.r-fromColor.r)*clock.progress,
                                                fromColor.g+(toColor.g-fromColor.g)*clock.progress,
                                                fromColor.b+(toColor.b-fromColor.b)*clock.progress,
@@ -93,7 +96,7 @@ Window {
         clock.stop()
         fromRect=current;toRect=rectangle;fromReveal=currentReveal;toReveal=value
         fromRadius=currentRadius;toRadius=value===1?Theme.windowRadius:origin && origin.background?origin.background.radius:sourceRadius
-        fromColor=currentColor;toColor=value===1?Theme.nativeTint:origin && origin.background?origin.background.color:sourceColor
+        fromColor=currentColor;toColor=value===1?destinationColor:origin && origin.background?origin.background.color:sourceColor
         phase=nextPhase;clock.progress=0;clock.destination=0
         cover(current,rectangle)
         retargetCommittedRect=surfaceRect;retargetCommittedReveal=reveal;retargetCommittedRadius=surfaceRadius
@@ -127,7 +130,7 @@ Window {
             destinationRect=Qt.rect(detailWindow.x,detailWindow.y,detailWindow.width,detailWindow.height)
             fromRect=destinationRect;toRect=destinationRect;fromReveal=1;toReveal=1;clock.progress=0;clock.destination=0
             fromRadius=detailWindow.visibility===Window.FullScreen || detailWindow.visibility===Window.Maximized?0:Theme.windowRadius;toRadius=fromRadius
-            fromColor=Theme.nativeTint;toColor=fromColor
+            fromColor=destinationColor;toColor=fromColor
         }
         const sourceRect=rectangleFor(origin)
         sourceContentWidth=origin && origin.contentItem?origin.contentItem.width:sourceRect?Math.max(0,sourceRect.width-2*Theme.cardPadding):sourceContentWidth

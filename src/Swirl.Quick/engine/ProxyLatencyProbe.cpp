@@ -17,7 +17,7 @@ ProxyLatencyProbe::ProxyLatencyProbe(const ProxyEngine::Status &status,const QUr
  connect(&m_socket,&QSslSocket::errorOccurred,this,[this](QAbstractSocket::SocketError error){
   if(m_done||(m_response&&error==QAbstractSocket::RemoteHostClosedError))return;
   m_networkError=int(error);
-  if(error==QAbstractSocket::SslHandshakeFailedError)finish("tls",QStringLiteral("TLS 验证失败"));
+  if(error==QAbstractSocket::SslHandshakeFailedError)finish("tls",QStringLiteral("TLS 握手失败"));
   else if(m_phase=="connect")finish("proxy-port",QStringLiteral("入口异常"));
   else finish("transport",QStringLiteral("代理连接失败"));
  });

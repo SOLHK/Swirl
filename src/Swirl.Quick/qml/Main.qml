@@ -214,6 +214,9 @@ ApplicationWindow {
         settingsOrigin=origin || settingsOrigin
         if(!settingsFlight.moving){settingsSheet.x=Math.round(window.x+(window.width-settingsSheet.width)/2);settingsSheet.y=Math.round(Math.max(0,Math.min(window.y,Screen.desktopAvailableHeight-settingsSheet.height)))}
         settingsSheet.section=route;settingsSheet.updateSettingsSection()
+        // Resolve the hidden destination's material before flight so its
+        // final alpha matches the real HWND at handoff without a tint jump.
+        settingsBackdrop.apply(settingsSheet,Theme.transparency,Theme.dark)
         settingsSheet.discardApproved=false
         Qt.callLater(function(){settingsSheet.savedFingerprint=dismissals.fingerprint(settingsLoader.item)})
         if(SwirlMotion.reduced || !settingsOrigin) {

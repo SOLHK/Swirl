@@ -91,6 +91,21 @@ desktop composition as well as native-resolution alpha readback.
 
 ## Remaining release gates
 
+Final unobstructed local reruns: all four process-scale corner runs passed
+(100/125/150/200%), node UI passed 134 checks, and the final hero run passed
+246 checks including matching translucent flight/native-window handoff.
+The post-optimization profiler sample reduced the overview address binding
+from 13 calls / 93.527 ms inclusive to 1 / 0.011 ms, and the gateway interface
+binding from 13 / 48.095 ms to 1 / 0.037 ms. These compare two intermediate
+builds in this run, not a controlled original-main benchmark. Cold settings
+first-frame latency reached 133.95 ms in one run; cached rounds were
+11.43–15.21 ms. This limitation is retained rather than hidden by the average.
+
+Repository policy requires `fix -> test`, then an explicitly approved
+`test -> main` promotion. PR #17 targets `test`; the initial direct-main draft
+correctly failed the production guard and was retargeted, without changing the
+guard or adding a release-approval label.
+
 1. Complete desktop Codex restart with the intended proxy environment and real
    OAuth login, without interrupting the current working chat.
 2. Real long-lived Responses, remote-control WebSocket, commercial-node switch

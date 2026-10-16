@@ -143,7 +143,7 @@ void TelemetryService::recordInternetResult(int error,int http,bool proxy,qint64
  if(success){code="ok";state=QStringLiteral("请求成功");advice=proxy?QStringLiteral("HTTPS 已通过 Swirl 当前代理策略；此结果仅代表本次检测请求。"):QStringLiteral("直连 HTTPS 请求成功；未验证代理节点。");}
  else if(m_status.error==ProxyEngine::Error::SelectionFailed){code="policy";state=QStringLiteral("策略选择失败");advice=QStringLiteral("检查所选节点和代理策略。");}
  else if(proxy && m_status.nodeHealth==ProxyEngine::NodeHealth::Unavailable){code="node";state=QStringLiteral("节点不可用");advice=QStringLiteral("尝试测速或切换节点，再检测实际请求。");}
- else if(error==int(QNetworkReply::SslHandshakeFailedError)){code="tls";state=QStringLiteral("TLS 验证失败");advice=QStringLiteral("检查证书信任与系统时间；不要关闭证书校验。");}
+ else if(error==int(QNetworkReply::SslHandshakeFailedError)){code="tls";state=QStringLiteral("TLS 握手失败");advice=QStringLiteral("检查证书信任与系统时间；不要关闭证书校验。");}
  else if(error==int(QNetworkReply::HostNotFoundError)||error==int(QNetworkReply::ProxyNotFoundError)){code="dns";state=QStringLiteral("DNS 解析失败");advice=QStringLiteral("检查系统 DNS 与 Swirl DNS 配置。");}
  else if(error==int(QNetworkReply::TimeoutError)||error==int(QNetworkReply::OperationCanceledError)){code="timeout";state=QStringLiteral("检测超时");advice=QStringLiteral("检查网络、节点可达性或稍后重试。");}
  else if(proxy && (error==int(QNetworkReply::ProxyConnectionRefusedError)||error==int(QNetworkReply::ConnectionRefusedError))){code="proxy-port";state=QStringLiteral("本地代理端口不可用");advice=QStringLiteral("确认 Mihomo 正在运行，且本地代理端口正常监听。");}

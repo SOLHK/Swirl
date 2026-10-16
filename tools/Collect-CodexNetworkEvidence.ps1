@@ -15,7 +15,7 @@ $selected=@($processes | Where-Object {
 $ids=@($selected.ProcessId)
 $inventory=@($selected | ForEach-Object {
     [pscustomobject]@{pid=$_.ProcessId;parent=$_.ParentProcessId;name=$_.Name;path=$_.ExecutablePath;created=$_.CreationDate;
-        role=if($_.Name -ieq 'codex.exe' -and $_.CommandLine -match 'app-server'){'Codex app-server'}elseif($_.ExecutablePath -match '\\OpenAI\.Codex_'){'Codex desktop process'}else{'proxy or helper'}}
+        role=if($_.Name -ieq 'codex.exe' -and $_.CommandLine -match 'app-server'){'Codex app-server'}elseif($_.ExecutablePath -match '\\OpenAI\.Codex_'){'Codex desktop process'}elseif($_.Name -match '^(msedge|chrome)\.exe$'){'browser process'}else{'proxy or helper'}}
 })
 $tcp=@(Get-NetTCPConnection -ErrorAction SilentlyContinue | Where-Object OwningProcess -in $ids | Select-Object OwningProcess,State,LocalAddress,LocalPort,RemoteAddress,RemotePort)
 $settings=Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings'
