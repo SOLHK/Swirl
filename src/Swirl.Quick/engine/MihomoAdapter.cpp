@@ -354,7 +354,11 @@ bool MihomoAdapter::reservePort(QTcpServer &server, quint16 port) {
     // Exclusive binding detects both existing loopback and wildcard listeners.
     WSADATA winsock{};
     if (WSAStartup(MAKEWORD(2, 2), &winsock) != 0) return false;
-    SOCKET descriptor = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    // Concurrent cores must not inherit another adapter's port reservation.
+    // Closing it in the parent would otherwise leave the child holding the
+    // listener, preventing the intended core from binding either endpoint.
+    SOCKET descriptor = WSASocketW(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0,
+                                  WSA_FLAG_OVERLAPPED | WSA_FLAG_NO_HANDLE_INHERIT);
     bool ready = false;
     if (descriptor != INVALID_SOCKET) {
         const BOOL exclusive = TRUE;
