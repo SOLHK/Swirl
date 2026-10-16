@@ -102,3 +102,31 @@ change and passes after it. Compatibility-only fixtures now give the real
 engine a 15-second launch budget matching their existing readiness waits;
 native handshake deadline tests retain their explicitly short bounds. API
 failure diagnostics include the numeric network error without raw endpoints.
+
+The stronger concurrent-node regression then exposed a separate Windows handle
+ownership defect: raw Winsock reservation sockets were inheritable. A concurrently
+launched core could retain another adapter's control and mixed-listener handles
+after the parent closed them, so the intended core could not bind its endpoints.
+Reservations now use WSASocketW with WSA_FLAG_NO_HANDLE_INHERIT atomically, while
+retaining overlapped I/O and exclusive binding. Port selection and system network
+settings remain unchanged. The failing-node fixture must reach the actual node
+availability check; a startup timeout is no longer accepted as the expected
+failure. It failed before this fix and completed in 5.5 seconds after it.
+Reference: https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsasocketw
+
+## Expansion completion follow-up
+
+The shared title and surface previously owned separate clocks. The title was
+hidden until its clock stopped, then replaced by the live title during cleanup;
+its baseline and font weight also differed from some destination titles.
+The page host now owns the shared title's progress as well as the boundary.
+The real title enters before the shared layer retires, using the destination
+typography and an interpolated text baseline. The expanding card's material
+also reaches its destination before cleanup. Mid-flight reversal snapshots the
+title before resetting progress, preserving its current displayed position.
+All original press, expansion, page reveal and reverse animations remain.
+
+Navigation checks freeze each of the nine real expansions at its final animated
+value, verify that the live title is already visible, and compare rendered pixels
+before and after retirement. These endpoint tests supplement actual interaction
+recordings and DPI runs; readback images do not measure physical presentation FPS.

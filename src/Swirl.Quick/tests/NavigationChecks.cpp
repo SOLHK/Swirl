@@ -18,7 +18,7 @@
 #include <functional>
 
 int runNavigationChecks(QQuickWindow *window,EngineController *controller,const QString &directory) {
- int failures=0;QJsonArray checks;QDir().mkpath(directory);
+ int failures=0;QJsonArray checks,endpointSamples;QDir().mkpath(directory);
  auto check=[&](bool ok,const QString &name){checks.append(QJsonObject{{"name",name},{"passed",ok}});if(!ok)++failures;qInfo()<<"NAVIGATION_CHECK"<<name<<ok;};
  auto eval=[&](const QString &code){QQmlExpression expression(qmlContext(window),window,code);auto value=expression.evaluate();if(expression.hasError()){qWarning()<<expression.error();++failures;}return value;};
  std::function<QQuickItem *(QQuickItem *,const QString &)> find;
@@ -60,7 +60,7 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
     unframed&=QQmlExpression(qmlContext(morph),morph,"!settingsTransition || color.a<0.01 || Math.abs(color.r-(host.heroData.returning?host.heroData.toColor.r:host.heroData.fromColor.r))<0.005").evaluate().toBool();
     unframed&=QQmlExpression(qmlContext(morph),morph,"!settingsTransition || color.a<0.01 || (Math.abs(color.r-Theme.material('content').r)<0.005 && Math.abs(color.g-Theme.material('content').g)<0.005 && Math.abs(color.b-Theme.material('content').b)<0.005)").evaluate().toBool();
    }
-   if(round==0&&id=="subscriptions"&&!qApp->arguments().contains("--hero-no-recording")&&eval("pageLoader.moving").toBool()){
+   if(round==0&&id=="subscriptions"&&!qApp->arguments().contains("--hero-no-recording")){
     const QString path=directory+"/settings-expansion";QDir().mkpath(path);
     const auto name=QString("%1.png").arg(frame++,3,10,QChar('0'));
     window->grabWindow().save(path+"/"+name);
@@ -96,6 +96,32 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
   if(!qApp->arguments().contains("--hero-no-recording")&&(id=="dns"||id=="proxies"||id=="appearance"))window->grabWindow().save(directory+"/"+id+"-embedded.png");
   click("settingsBackButton");check(settle()&&eval("AppState.currentPage==='featurehub'").toBool()&&eval("pageLoader.item").value<QObject *>()==hub,"back returns to the same cached hub: "+id);
  }
+ // Hold the actual final animation value before retiring the shared layer.
+ // Its pixels must already equal the committed page; otherwise completion
+ // swaps a hidden title, material or clip boundary in a single frame.
+ for(const auto &id:routes){
+  click("settings-"+id);
+  check(QTest::qWaitFor([&]{return eval("pageLoader.moving && !pageLoader.pendingGrab").toBool();},4000),"endpoint fixture starts the real expansion: "+id);
+  auto *clock=window->findChild<QObject *>("pageTravel");
+  if(clock)QMetaObject::invokeMethod(clock,"stop");
+  eval("pageLoader.progress=1");QTest::qWait(25);
+  auto *sharedTitle=item("pageHeroTitle");
+  auto *target=sharedTitle?sharedTitle->property("targetItem").value<QQuickItem *>():nullptr;
+  check(sharedTitle&&target&&target->opacity()>0.999&&sharedTitle->property("handoff").toDouble()>0.999,"real destination title is visible before shared-layer retirement: "+id);
+  const auto before=window->grabWindow().convertToFormat(QImage::Format_ARGB32);
+  eval("pageLoader.finish()");QTest::qWait(25);
+  const auto after=window->grabWindow().convertToFormat(QImage::Format_ARGB32);
+  qint64 changed=0;
+  if(before.size()==after.size())for(int y=0;y<before.height();++y){
+   const auto *a=reinterpret_cast<const QRgb *>(before.constScanLine(y));const auto *b=reinterpret_cast<const QRgb *>(after.constScanLine(y));
+   for(int x=0;x<before.width();++x)if(qMax(qMax(qAbs(qRed(a[x])-qRed(b[x])),qAbs(qGreen(a[x])-qGreen(b[x]))),qMax(qAbs(qBlue(a[x])-qBlue(b[x])),qAbs(qAlpha(a[x])-qAlpha(b[x]))))>2)++changed;
+  }
+  const double changedRatio=before.isNull()?1:double(changed)/(before.width()*before.height());
+  check(!before.isNull()&&before.size()==after.size()&&changedRatio<0.0005,"final expanded frame and committed page have no visual jump: "+id);
+  endpointSamples.append(QJsonObject{{"route",id},{"changedPixels",double(changed)},{"changedRatio",changedRatio}});
+  if(!qApp->arguments().contains("--hero-no-recording")){before.save(directory+"/"+id+"-before-retirement.png");after.save(directory+"/"+id+"-after-retirement.png");}
+  click("settingsBackButton");check(settle(),"endpoint fixture returns to the card hub: "+id);
+ }
  const auto cacheCount=eval("pageLoader.cachedPageCount").toInt();
  for(int i=0;i<27;++i){eval("window.openSettings('"+routes[i%routes.size()]+"')");QTest::qWait(9);}
  check(settle()&&eval("AppState.currentPage==='proxies'").toBool(),"rapid requests settle at the last requested route");
@@ -115,6 +141,6 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
  check(controller->processId()==pid&&controller->selectedNodeId()==selected&&controller->nodes().size()==nodeCount,"navigation preserves proxy process, selected node and stored records");
  check(eval("motionPolicy.activeGrabCount===0 && SwirlTransitionRegistry.activeCount===0").toBool(),"navigation releases all transient resources");
  route("featurehub");
- QFile file(directory+"/navigation-report.json");if(file.open(QIODevice::WriteOnly))file.write(QJsonDocument(QJsonObject{{"checks",checks},{"failures",failures},{"nativeHandleUnchanged",window->winId()==handle},{"dpr",window->devicePixelRatio()}}).toJson());
+ QFile file(directory+"/navigation-report.json");if(file.open(QIODevice::WriteOnly))file.write(QJsonDocument(QJsonObject{{"checks",checks},{"endpointSamples",endpointSamples},{"failures",failures},{"nativeHandleUnchanged",window->winId()==handle},{"dpr",window->devicePixelRatio()}}).toJson());
  return failures;
 }

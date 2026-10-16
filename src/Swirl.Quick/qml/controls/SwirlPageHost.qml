@@ -58,8 +58,9 @@ Item {
  }
  function finish(){
   preparing=false
+  travel.stop();progress=1
   releaseSurfaces()
-  travel.stop();hero.cancel();progress=1
+  hero.cancel()
   sourceSurface=null;targetSurface=null;heroData=null
   for(const key of Object.keys(pages)){const loader=pages[key];loader.visible=loader===activeLoader;loader.enabled=loader===activeLoader;loader.startOpacity=loader===activeLoader?1:0;loader.endOpacity=loader.startOpacity}
   leavingLoader=null
@@ -100,9 +101,10 @@ Item {
    const color=sampledColor(morph);if(heroData && heroData.key==="settings")heroData=Object.assign({},heroData,{fromColor:color,toColor:heroData.fromColor,returning:!heroData.returning})
    const rect=surfaceStart;surfaceStart=current;surfaceEnd=rect
    const surface=sourceSurface;sourceSurface=targetSurface;targetSurface=surface
+   hero.reverse()
    progress=0;activeLoader.enabled=true;leavingLoader.enabled=false
    retargetCommittedRect=Qt.rect(morph.x,morph.y,morph.width,morph.height)
-   hero.reverse();animate();return
+   animate();return
   }
   // A third route supersedes stale preparation and callbacks immediately.
   const carry=moving&&heroData?Qt.rect(morph.x,morph.y,morph.width,morph.height):null
@@ -124,7 +126,6 @@ Item {
    if(request){from=request.surface;to=request.targetKey==="settings"?next.item:surfaceFor(next.item,request.targetKey);source=request.source;target=request.targetKey==="settings"?next.item.motionTitle:next.item.heroTargets?next.item.heroTargets[request.targetKey]:null}
    else if(back && back.previous===routeKey && back.route===previous.routeId){from=back.targetKey==="settings"?previous.item:surfaceFor(previous.item,back.targetKey);to=back.surface;source=back.targetKey==="settings"?previous.item.motionTitle:previous.item.heroTargets?previous.item.heroTargets[back.targetKey]:null;target=back.source}
    if(valid(from)&&valid(to)){sourceSurface=from;targetSurface=to;surfaceStart=carry||rectFor(from);surfaceEnd=rectFor(to);heroData={key:request?request.targetKey:back.targetKey,card:request?request.card:back.card,returning:!request,fromColor:sampledColor(from),toColor:sampledColor(to)};if(from.surfaceHidden!==undefined)from.surfaceHidden=true;if(to.surfaceHidden!==undefined)to.surfaceHidden=true}
-   hero.duration=heroData?SwirlMotion.expandDuration:SwirlMotion.pageDuration
    if(valid(source)&&valid(target))hero.start(source,target,source.text||"")
    animate()
   })
@@ -181,7 +182,7 @@ Item {
  SwirlGlassPanel {
   id:morph;objectName:"sharedSurface";parent:viewport;z:1;visible:host.heroData!==null
   readonly property bool settingsTransition:host.heroData!==null && host.heroData.key==="settings"
-  readonly property real materialReveal:settingsTransition?host.ramp(host.position,host.heroData.returning?0:0.65,host.heroData.returning?0.35:1):host.position
+  readonly property real materialReveal:settingsTransition?host.ramp(host.position,host.heroData.returning?0:0.65,host.heroData.returning?0.35:0.92):host.position
   independentCard:!settingsTransition
   border.width:0
   x:host.surfaceStart.x+(host.surfaceEnd.x-host.surfaceStart.x)*host.position
@@ -205,6 +206,6 @@ Item {
    SwirlText {width:parent.width;text:parent.card && parent.card.motionDescription!==undefined?parent.card.motionDescription:"";font.pixelSize:Theme.fontSize(11);color:Theme.muted;wrapMode:Text.WordWrap}
   }
  }
- NumberAnimation {id:travel;target:host;property:"progress";easing.type:Easing.OutCubic;onFinished:host.finish()}
- SwirlHeroTitle {id:hero;anchors.fill:parent}
+ NumberAnimation {id:travel;objectName:"pageTravel";target:host;property:"progress";easing.type:Easing.OutCubic;onFinished:host.finish()}
+ SwirlHeroTitle {id:hero;objectName:"pageHeroTitle";anchors.fill:parent;progress:host.position}
 }
