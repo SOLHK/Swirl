@@ -63,6 +63,17 @@ class EngineTests : public QObject {
         QFile file(path); QVERIFY(file.open(QIODevice::WriteOnly)); QCOMPARE(file.write(value), qint64(value.size()));
     }
 private slots:
+    void startupReadinessDoesNotWaitForSteadyHealthCadence(){
+        QTemporaryDir temporary;const auto control=temporary.filePath("control");
+        writeControl(control,"timeout");qputenv("SWIRL_FIXTURE_CONTROL",control.toUtf8());
+        auto config=options();config.startupTimeoutMs=2500;config.healthIntervalMs=10000;
+        QTimer::singleShot(450,this,[control]{writeControl(control,"");});
+        MihomoAdapter engine;QElapsedTimer elapsed;elapsed.start();engine.start(config);
+        QTRY_VERIFY_WITH_TIMEOUT(engine.status().apiHealthy,3000);
+        QVERIFY(elapsed.elapsed()<config.startupTimeoutMs);
+        QCOMPARE(engine.status().state,ProxyEngine::State::Running);
+        engine.stop();QTRY_VERIFY_WITH_TIMEOUT(!engine.status().processAlive,4000);
+    }
     void loginHandshakeLogRetainsReasonWithoutBreakingTunnel(){
         qputenv("SWIRL_FIXTURE_MODE","login-tls-eof");
         auto config=options();config.directSession=true;

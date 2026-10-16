@@ -63,7 +63,8 @@ private slots:
             if(trojan)QVERIFY(store.saveNode({{"id",n.id},{"name",n.name},{"protocol",n.protocol},{"host",n.host},{"port",n.port},{"options",QVariantMap{{"fingerprint",QString::fromLatin1(peers.fingerprint)}}}}));
             NodeStore reloaded(store.filePath());QCOMPARE(reloaded.nodes().size(),1);QCOMPARE(reloaded.nodes().first().sourceId,sourceId);
             EngineStartOptions opts;opts.executablePath=QCoreApplication::applicationDirPath()+"/core/mihomo.exe";QFile binary(opts.executablePath);QVERIFY(binary.open(QIODevice::ReadOnly));QCryptographicHash hash(QCryptographicHash::Sha256);QVERIFY(hash.addData(&binary));opts.expectedSha256=hash.result().toHex();opts.expectedVersion="v1.19.32";opts.controlPort=ControlledProtocolPeers::port();opts.proxyPort=ControlledProtocolPeers::port();while(opts.proxyPort==opts.controlPort)opts.proxyPort=ControlledProtocolPeers::port();opts.nodes=reloaded.nodes();opts.selectedNodeId=n.id;opts.routingMode="global";
-            MihomoAdapter engine;engine.start(opts);QTRY_VERIFY_WITH_TIMEOUT(engine.status().apiHealthy,15000);
+            opts.startupTimeoutMs=15000;
+            MihomoAdapter engine;engine.start(opts);QTRY_VERIFY2_WITH_TIMEOUT(engine.status().apiHealthy,qPrintable(formats[i]+": "+engine.status().message),15000);
             QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",opts.proxyPort));
             const int forwarded=network.a.forwarded;
             for(bool tls:{false,true}){QNetworkRequest request(network.url(tls));request.setTransferTimeout(5000);auto reply=client.get(request);QSignalSpy finished(reply,&QNetworkReply::finished);QTRY_VERIFY_WITH_TIMEOUT(!finished.isEmpty(),7000);QCOMPARE(reply->error(),QNetworkReply::NoError);QCOMPARE(reply->readAll(),QByteArray("exit-A"));reply->deleteLater();}

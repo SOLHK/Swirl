@@ -93,6 +93,15 @@ Item {
                                 }
                                 SwirlToggle { checked:Theme.reduceMotion; onToggled:Theme.reduceMotion=checked }
                             }
+                            GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
+                                Layout.fillWidth:true
+                                ColumnLayout {
+                                    Layout.fillWidth:true
+                                    SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap;text:"跟随系统动态效果";color:Theme.text;font.pixelSize:Theme.fontSize(14)}
+                                    SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap;text:"开启后，遵循系统的动画效果设置。";color:Theme.muted;font.pixelSize:Theme.fontSize(11)}
+                                }
+                                SwirlToggle {objectName:"followSystemMotionToggle";checked:Theme.followSystemMotion;onToggled:Theme.followSystemMotion=checked}
+                            }
                             ColumnLayout {
                                 Layout.fillWidth:true; spacing:Theme.dp(10)
                                 GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;

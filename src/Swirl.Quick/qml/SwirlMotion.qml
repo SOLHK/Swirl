@@ -5,7 +5,7 @@ QtObject {
     id: motion
     // Animation policy only: no colors, sizes, fonts or layout tokens live here.
     property real speed: 1
-    readonly property bool reduced: Theme.reduceMotion || motionPolicy.systemReducedMotion
+    readonly property bool reduced: Theme.reduceMotion || (Theme.followSystemMotion && motionPolicy.systemReducedMotion)
     readonly property real spring: 3.2 * speed * speed
     readonly property real damping: 0.28
     function ms(value){return reduced ? 0 : Math.round(value/Math.max(0.25,speed))}

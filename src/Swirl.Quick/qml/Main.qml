@@ -70,6 +70,7 @@ ApplicationWindow {
         geometryReady=true
         backdrop.apply(window,Theme.transparency,Theme.dark)
         AppState.initializeHistory()
+        console.info("MOTION_POLICY",JSON.stringify({systemReduced:motionPolicy.systemReducedMotion,followSystem:Theme.followSystemMotion,applicationReduced:Theme.reduceMotion,effectiveReduced:SwirlMotion.reduced,expandDuration:SwirlMotion.expandDuration}))
         if(previewTheme==="dark")Theme.mode="Dark"
         else if(previewTheme==="light")Theme.mode="Light"
         if(previewPage.length)AppState.currentPage=previewPage
@@ -124,7 +125,7 @@ ApplicationWindow {
                 text:"返回";iconName:"chevron-left";quiet:true
                 visible:AppState.inSettings
                 opacity:pageLoader.pendingGrab?0:pageLoader.heroData && pageLoader.heroData.key==="settings"?
-                    (pageLoader.heroData.returning?0:pageLoader.ramp(pageLoader.position,0.82,1)):
+                    (pageLoader.heroData.returning?0:pageLoader.ramp(pageLoader.position,0.84,0.94)):
                     pageLoader.activeLoader && pageLoader.activeLoader.routeId===AppState.currentPage?1:0
                 enabled:opacity>0.99
                 onClicked:window.closeSettings()
