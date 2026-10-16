@@ -7,3 +7,10 @@ dist/
 build/
 system-proxy-tests.txt
 routing-tests.txt
+
+# Private subscription acquisition material must never be committed.
+__pycache__/
+*.pyc
+*.dpapi
+*.private
+private-capture/

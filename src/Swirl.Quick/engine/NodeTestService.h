@@ -1,5 +1,5 @@
 #pragma once
-#include "MihomoAdapter.h"
+#include "ProxyEngine.h"
 #include <QQueue>
 #include <QHash>
 #include <QSet>
@@ -34,13 +34,13 @@ signals:
  void diagnostic(const QString &code,const QString &message);
 private:
  void next();
- void retire(MihomoAdapter *runner);
- void finish(const QString &,MihomoAdapter *,const QVariantMap &);
+ void retire(ProxyEngine *runner);
+ void finish(const QString &,ProxyEngine *,const QVariantMap &);
  EngineStartOptions m_options;
  QUrl m_url;
  QQueue<QString> m_queue;
- QHash<QString,MihomoAdapter *> m_running;
- QSet<MihomoAdapter *> m_retiring;
+ QHash<QString,ProxyEngine *> m_running;
+ QSet<ProxyEngine *> m_retiring;
  QVariantMap m_results;
  int m_completed=0,m_total=0,m_succeeded=0,m_failed=0;
  QString m_message;

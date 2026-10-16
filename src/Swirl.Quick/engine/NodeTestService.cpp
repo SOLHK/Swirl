@@ -1,4 +1,7 @@
 #include "NodeTestService.h"
+#include "MihomoAdapter.h"
+#include "SwirlProxyEngine.h"
+#include "SwirlProtocolRegistry.h"
 #include <QTcpServer>
 #include <QSet>
 #include <QDateTime>
@@ -22,6 +25,7 @@ EngineStartOptions NodeTestService::isolatedOptions(const EngineStartOptions &so
  EngineStartOptions result;
  result.executablePath=source.executablePath;result.expectedSha256=source.expectedSha256;result.expectedVersion=source.expectedVersion;
  result.nodes=source.nodes;result.rulesDirectory=source.rulesDirectory;
+ result.preferCompatibility=source.preferCompatibility;
  result.routingMode="global";result.smartRouting=false;
  result.healthIntervalMs=2000;result.requestTimeoutMs=3000;result.startupTimeoutMs=20000;
  return result;
@@ -39,24 +43,29 @@ void NodeTestService::next(){
   // Include only the selected node and its explicit dialer dependencies.
   QSet<QString> needed{id};bool added=true;while(added){added=false;for(const auto &node:m_options.nodes)if(needed.contains(node.id)){const auto dependency=node.parameters.value("dialer-proxy").toString();for(const auto &other:m_options.nodes)if(other.sourceId==node.sourceId&&(other.name==dependency||other.id==dependency)&&!needed.contains(other.id)){needed.insert(other.id);added=true;}}}
   opts.nodes.clear();for(const auto &node:m_options.nodes)if(needed.contains(node.id))opts.nodes.append(node);
-  auto runner=new MihomoAdapter(this);m_running[id]=runner;auto deadline=new QTimer(runner);deadline->setSingleShot(true);deadline->setInterval(40000);
+  // Test a natively supported node through its actual native implementation.
+  // No automatic compatibility retry can turn a native failure into success.
+  const bool native=SwirlProtocolRegistry::nativeSessionReason(opts).isEmpty();
+  ProxyEngine *runner=native?static_cast<ProxyEngine *>(new SwirlProxyEngine(this)):static_cast<ProxyEngine *>(new MihomoAdapter(this));
+  runner->setProperty("probeEngineKind",native?"native":"compatibility");
+  m_running[id]=runner;auto deadline=new QTimer(runner);deadline->setSingleShot(true);deadline->setInterval(40000);
   connect(deadline,&QTimer::timeout,this,[this,runner,id]{finish(id,runner,{{"success",false},{"latency",-1},{"http",0},{"error","节点测试超时"}});});deadline->start();
   connect(runner,&ProxyEngine::statusChanged,this,[this,runner,id]{
    if(m_running.value(id)!=runner)return;const auto status=runner->status();
    if(status.state==ProxyEngine::State::Failed){finish(id,runner,{{"success",false},{"latency",-1},{"http",0},{"error",status.message}});return;}
-   if(status.apiHealthy&&!runner->property("probeStarted").toBool()){runner->setProperty("probeStarted",true);QPointer<MihomoAdapter> guard(runner);QTimer::singleShot(0,runner,[this,guard]{if(guard)guard->probeNode(m_url);});}
+   if(status.apiHealthy&&!runner->property("probeStarted").toBool()){runner->setProperty("probeStarted",true);QPointer<ProxyEngine> guard(runner);QTimer::singleShot(0,runner,[this,guard]{if(guard)guard->probeNode(m_url);});}
    if(runner->property("probeStarted").toBool()&&!status.nodeBusy&&(status.requestState==ProxyEngine::RequestState::Succeeded||status.requestState==ProxyEngine::RequestState::Failed||status.nodeHealth==ProxyEngine::NodeHealth::Unavailable)){
     finish(id,runner,{{"success",status.requestState==ProxyEngine::RequestState::Succeeded},{"latency",status.latencyMs},{"http",status.responseCode},{"error",status.requestState==ProxyEngine::RequestState::Succeeded?QString():status.nodeMessage}});
    }
   });runner->start(opts);
  }
 }
-void NodeTestService::finish(const QString &id,MihomoAdapter *runner,const QVariantMap &result){
+void NodeTestService::finish(const QString &id,ProxyEngine *runner,const QVariantMap &result){
  if(m_running.value(id)!=runner)return;m_running.remove(id);retire(runner);
- auto row=result;row["time"]=QDateTime::currentDateTime().toString(Qt::ISODate);m_results[id]=row;++m_completed;if(row.value("success").toBool())++m_succeeded;else{++m_failed;emit diagnostic("NodeTestFailed",row.value("error").toString());}
+ auto row=result;row["engineKind"]=runner->property("probeEngineKind");row["time"]=QDateTime::currentDateTime().toString(Qt::ISODate);m_results[id]=row;++m_completed;if(row.value("success").toBool())++m_succeeded;else{++m_failed;emit diagnostic("NodeTestFailed",row.value("error").toString());}
  m_message=QString("%1/%2 · 成功 %3 · 失败 %4").arg(m_completed).arg(m_total).arg(m_succeeded).arg(m_failed);emit changed();QTimer::singleShot(0,this,&NodeTestService::next);
 }
-void NodeTestService::retire(MihomoAdapter *runner){
+void NodeTestService::retire(ProxyEngine *runner){
  runner->disconnect(this);m_retiring.insert(runner);
  const auto release=[this,runner]{
   if(runner->status().processAlive || runner->status().state==ProxyEngine::State::Stopping)return;

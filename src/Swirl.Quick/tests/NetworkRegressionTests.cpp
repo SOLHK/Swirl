@@ -49,6 +49,27 @@ class NetworkRegressionTests : public QObject {
   socket.setPeerVerifyName("localhost");socket.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",o.proxyPort));socket.connectToHostEncrypted("127.0.0.1",port);
  }
 private slots:
+ void explicitOrRequiredCompatibilityProbeIsReported(){
+  ControlledNetwork net;QVERIFY(net.start());
+  for(bool explicitPreference:{false,true}){
+   auto o=options(net,explicitPreference,"global");o.executablePath="missing-test-compatibility.exe";
+   if(!explicitPreference)o.nodes.first().parameters["udp"]=true;
+   NodeTestService probes;probes.start(o,{o.nodes.first().id},net.url());
+   QVERIFY(QTest::qWaitFor([&]{return !probes.busy();},5000));
+   QCOMPARE(probes.failed(),1);QCOMPARE(probes.succeeded(),0);
+   QCOMPARE(probes.result(o.nodes.first().id).value("engineKind").toString(),QString("compatibility"));
+  }
+ }
+ void nativeProbeFailureDoesNotFallbackOrBypass(){
+  ControlledNetwork net;QVERIFY(net.start());auto o=options(net,false,"global");
+  o.executablePath="must-not-run-compatibility.exe";
+  net.a.reject=true;const auto requests=net.httpRequests;
+  NodeTestService probes;probes.start(o,{o.nodes.first().id},net.url());
+  QVERIFY(QTest::qWaitFor([&]{return !probes.busy();},10000));
+  QCOMPARE(probes.failed(),1);QCOMPARE(probes.succeeded(),0);
+  QCOMPARE(probes.result(o.nodes.first().id).value("engineKind").toString(),QString("native"));
+  QCOMPARE(net.httpRequests,requests);
+ }
  void importedNodeUpdatesPreserveExistingTunnel(){
   ControlledNetwork net;QVERIFY(net.start());QTcpServer origin;QVERIFY(origin.listen(QHostAddress::LocalHost));net.a.targetPorts.append(origin.serverPort());
   connect(&origin,&QTcpServer::newConnection,&origin,[&]{while(auto *socket=origin.nextPendingConnection()){
@@ -124,6 +145,7 @@ private slots:
   QVERIFY(QTest::qWaitFor([&]{return !probes.busy();},30000));
   if(probes.succeeded()!=1)qInfo()<<"ISOLATED_PROBE_FAILURE"<<probes.result(o.nodes.first().id);
   QCOMPARE(probes.succeeded(),1);
+  QCOMPARE(probes.result(o.nodes.first().id).value("engineKind").toString(),compatibility?QString("compatibility"):QString("native"));
   QCOMPARE(engine.status().processId,pid);QCOMPARE(engine.status().sessionId,session);
   engine.selectNode(o.nodes.last().id);QVERIFY(QTest::qWaitFor([&]{return engine.status().selectedNodeId==o.nodes.last().id;},5000));
   bytes.clear();websocket.write(frame("alive-after-probe-and-switch"));QVERIFY(receive(websocket,bytes,"alive-after-probe-and-switch"));
