@@ -70,6 +70,7 @@ ApplicationWindow {
         geometryReady=true
         backdrop.apply(window,Theme.transparency,Theme.dark)
         AppState.initializeHistory()
+        console.info("MOTION_POLICY",JSON.stringify({systemReduced:motionPolicy.systemReducedMotion,followSystem:Theme.followSystemMotion,applicationReduced:Theme.reduceMotion,effectiveReduced:SwirlMotion.reduced,expandDuration:SwirlMotion.expandDuration}))
         if(previewTheme==="dark")Theme.mode="Dark"
         else if(previewTheme==="light")Theme.mode="Light"
         if(previewPage.length)AppState.currentPage=previewPage

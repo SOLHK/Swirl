@@ -286,7 +286,10 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
     if(activityScroll)activityScroll->setProperty("contentY",20);
     if(upload){
         qmlEngine(window)->rootContext()->setContextProperty("motionTestOrigin",upload);
-        eval("SwirlMotion.navigateFrom(motionTestOrigin,'traffic','uploadRate')");wait(65);
+        eval("SwirlMotion.navigateFrom(motionTestOrigin,'traffic','uploadRate')");
+        QElapsedTimer metricReady;metricReady.start();
+        while(host->property("sourceSurface").value<QObject *>()!=upload&&metricReady.elapsed()<1500)wait(5);
+        wait(35);
         check("metric-shares-matching-surface",host->property("heroData").isValid() && host->property("sourceSurface").value<QObject *>()==upload);
         const auto partial=host->property("progress").toDouble();
         eval("SwirlMotion.returnToHub(null)");wait(25);
@@ -377,9 +380,13 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
     check("reduced-motion-no-global-transition",!eval("SwirlMotion.transitioning").toBool());
     eval("Theme.reduceMotion=false");
     policy->setSystemReducedMotionOverrideForTest(1);
+    eval("Theme.followSystemMotion=false");
+    check("application-full-motion-remains-enabled-with-reduced-system-policy",!eval("SwirlMotion.reduced").toBool()&&eval("SwirlMotion.expandDuration>0").toBool());
+    eval("Theme.followSystemMotion=true");
     route("rules");
     check("system-reduced-motion-immediate",eval("SwirlMotion.reduced").toBool()&&!host->property("moving").toBool()&&host->property("progress").toDouble()==1);
     check("system-reduced-motion-no-global-transition",!eval("SwirlMotion.transitioning").toBool());
+    eval("Theme.followSystemMotion=false");
     policy->setSystemReducedMotionOverrideForTest(0);
     eval("Theme.reduceMotion=true");
     check("application-reduced-motion-wins-over-animated-system-policy",eval("SwirlMotion.reduced").toBool());
