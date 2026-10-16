@@ -46,6 +46,7 @@ jobs:
           Copy-Item build/swirl-quick/Release/SwirlProxyGuard.exe dist/
           Copy-Item build/swirl-quick/Release/SwirlGatewayGuard.exe dist/
           Copy-Item build/swirl-quick/Release/SwirlScriptRunner.exe dist/
+          Copy-Item build/swirl-quick/Release/SwirlCodexLauncher.exe dist/
           Copy-Item src/Swirl.Quick/packaging/rules dist/rules -Recurse
           Copy-Item src/Swirl.Quick/packaging/rules build/swirl-quick/Release/rules -Recurse
           windeployqt --release --qmldir src/Swirl.Quick/qml dist/Swirl.exe
@@ -234,6 +235,7 @@ jobs:
           Copy-Item build/swirl-quick/Release/SwirlProxyGuard.exe dist/
           Copy-Item build/swirl-quick/Release/SwirlGatewayGuard.exe dist/
           Copy-Item build/swirl-quick/Release/SwirlScriptRunner.exe dist/
+          Copy-Item build/swirl-quick/Release/SwirlCodexLauncher.exe dist/
           Remove-Item -LiteralPath "dist/Qt6Test.dll" -ErrorAction SilentlyContinue
       - name: Prepare standalone installer files
         shell: pwsh
@@ -248,6 +250,7 @@ jobs:
           Copy-Item "src/Swirl.Quick/packaging/licenses" "installer-bin/licenses" -Recurse -Force
           New-Item -ItemType Directory -Force -Path "installer-bin/docs" | Out-Null
           Copy-Item -LiteralPath 'src/Swirl.Quick/CAPTURE.md','docs/LOCAL_EXTENSIONS.md','docs/FONTS.md','docs/ANIMATION_DEPENDENCY_RESEARCH.md','docs/PR12_GRAPHICS_UPGRADE.md','docs/PR12_NATIVE_ACCEPTANCE.md','docs/PR12_NATIVE_UI_FIXES.md','docs/SWIRL_NATIVE_RESEARCH.md' -Destination "installer-bin/docs"
+          Copy-Item -LiteralPath 'docs/CODEX_LOGIN_WINDOWS.md','docs/NETWORK_RELIABILITY_6A.md' -Destination "installer-bin/docs"
           Remove-Item -Path "installer-bin/Swirl-*-preview.png", "installer-bin/Swirl-diagnostics.txt" -ErrorAction SilentlyContinue
           if (!(Test-Path "installer-bin/Swirl.exe")) { throw "Missing Swirl.exe" }
       - name: Install NSIS packaging tools

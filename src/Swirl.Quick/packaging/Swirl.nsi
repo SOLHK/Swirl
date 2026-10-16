@@ -80,6 +80,7 @@ Section "安装 Swirl"
     regular:
     CreateDirectory "$SMPROGRAMS\\Swirl"
     CreateShortCut "$SMPROGRAMS\\Swirl\\Swirl.lnk" "$INSTDIR\\Swirl.exe" "" "$INSTDIR\\Swirl-brand-phase3-v2.ico" 0
+    CreateShortCut "$SMPROGRAMS\\Swirl\\通过 Swirl 启动 Codex.lnk" "$INSTDIR\\SwirlCodexLauncher.exe" "" "$INSTDIR\\Swirl-brand-phase3-v2.ico" 0
     CreateShortCut "$DESKTOP\\Swirl.lnk" "$INSTDIR\\Swirl.exe" "" "$INSTDIR\\Swirl-brand-phase3-v2.ico" 0
     ExecWait '"$INSTDIR\SwirlProxyGuard.exe" --repair-shortcut "$DESKTOP\Swirl.lnk" "$INSTDIR\Swirl.exe" "$INSTDIR\Swirl-brand-phase3-v2.ico"' $0
     StrCmp $0 0 +2
@@ -110,6 +111,7 @@ Section "Uninstall"
     StrCmp $IsolatedInstall "1" isolated_uninstall
     Delete "$DESKTOP\\Swirl.lnk"
     Delete "$SMPROGRAMS\\Swirl\\Swirl.lnk"
+    Delete "$SMPROGRAMS\\Swirl\\通过 Swirl 启动 Codex.lnk"
     RMDir "$SMPROGRAMS\\Swirl"
     DeleteRegKey HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl"
     DeleteRegKey HKCU "Software\\Swirl"

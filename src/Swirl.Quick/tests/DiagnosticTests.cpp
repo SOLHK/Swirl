@@ -1,10 +1,36 @@
 #include "app/DiagnosticService.h"
+#include "engine/MihomoLogDiagnostic.h"
 #include <QTest>
 #include <QTemporaryDir>
 #include <QFile>
 class DiagnosticTests:public QObject {
  Q_OBJECT
 private slots:
+ void mihomoFailureReasons_data(){
+  QTest::addColumn<QString>("reason");QTest::addColumn<QString>("code");QTest::addColumn<QString>("detail");
+  const auto row=[](const char *name,const char *reason,const char *code,const char *detail){QTest::newRow(name)<<QString::fromUtf8(reason)<<QString::fromUtf8(code)<<QString::fromUtf8(detail);};
+  row("proxy-auth","407 Proxy Authentication Required","ProxyAuthenticationFailure","407");
+  row("socks-auth","socks5 authentication failed","ProxyAuthenticationFailure","认证被拒绝");
+  row("dns","dns resolve failed: no such host","DNSFailure","域名不存在");
+  row("dns-timeout","all DNS requests failed: i/o timeout","DNSFailure","解析失败");
+  row("tls-eof","TLS handshake EOF","TLSFailure","EOF");
+  row("certificate","x509: certificate signed by unknown authority","TLSFailure","证书校验失败");
+  row("reset","read: connection reset by peer","UpstreamConnectionReset","被重置");
+  row("refused","connect: connection refused","UpstreamConnectionRefused","被拒绝");
+  row("timeout","context deadline exceeded","UpstreamTimeout","超时");
+  row("eof","unexpected EOF","UpstreamEOF","阶段未确定");
+ }
+ void mihomoFailureReasons(){
+  QFETCH(QString,reason);QFETCH(QString,code);QFETCH(QString,detail);
+  const auto payload="[TCP] dial NODE-DNS-TLS (match RuleSet/private-rule) 192.168.1.1:5678 --> auth.openai.com:443 error: "+reason+" via https://user:SECRET@private-node.invalid/path?token=PRIVATE";
+  const auto fault=classifyMihomoLog(payload);QCOMPARE(fault.code,code);QVERIFY(fault.message.contains(detail));QVERIFY(fault.message.contains("auth.openai.com:443"));
+  for(const auto &secret:{"SECRET","PRIVATE","private-node","private-rule","192.168","5678","NODE-DNS-TLS"})QVERIFY2(!fault.message.contains(secret),secret);
+ }
+ void mihomoPreambleDoesNotInventFailure(){
+  const auto fault=classifyMihomoLog("[TCP] dial DNS TLS certificate rule --> private.example:443 error: opaque failure");
+  QCOMPARE(fault.code,QStringLiteral("RouteHandshakeFailure"));QVERIFY(!fault.message.contains("private.example"));
+  QCOMPARE(classifyMihomoLog("warning tls EOF at private-node").code,QStringLiteral("RouteHandshakeFailure"));
+ }
  void activityCountIncludesNonFailureEvents(){
   QTemporaryDir temp;
   {DiagnosticService log(temp.path());log.record("INFO","Engine","Connected","connected");log.record("WARN","Import","Notice","notice");log.record("DEBUG","Qt","Trace","trace");QCOMPARE(log.eventCount(),2);}

@@ -1,4 +1,5 @@
 #include "MihomoAdapter.h"
+#include "MihomoLogDiagnostic.h"
 #include <cmath>
 #include <QDateTime>
 #include <QCryptographicHash>
@@ -883,10 +884,8 @@ void MihomoAdapter::readLogs() {
         if(generation!=m_generation)return;m_logsBuffer+=reply->readAll();if(m_logsBuffer.size()>65536){reply->abort();return;}
         while(m_logsBuffer.contains('\n')){const auto end=m_logsBuffer.indexOf('\n');const auto line=m_logsBuffer.left(end);m_logsBuffer.remove(0,end+1);const auto event=QJsonDocument::fromJson(line).object();if(event.isEmpty())continue;
             const auto payload=event.value("payload").toString();
-            // Raw engine messages can contain endpoint addresses or remote
-            // credentials. Forward only an observed fault category and level.
-            const auto code=payload.contains("dns",Qt::CaseInsensitive)?QStringLiteral("DNSFailure"):payload.contains("tls",Qt::CaseInsensitive)||payload.contains("certificate",Qt::CaseInsensitive)?QStringLiteral("TLSFailure"):payload.contains("rule",Qt::CaseInsensitive)?QStringLiteral("RuleFailure"):QStringLiteral("RouteHandshakeFailure");
-            emit diagnostic("Mihomo",code,QStringLiteral("引擎报告 %1：%2（敏感的原始端点内容已省略）").arg(event.value("type").toString(),code));
+            const auto fault=classifyMihomoLog(payload);
+            emit diagnostic("Mihomo",fault.code,fault.message);
         }
     });
     connect(reply,&QNetworkReply::finished,this,[this,reply,generation]{reply->deleteLater();if(generation!=m_generation)return;m_logsReply=nullptr;m_logsBuffer.clear();});
