@@ -77,7 +77,7 @@ Item {
   ScrollBar.vertical:SwirlScrollBar {}
   ColumnLayout {
    id:content;x:Theme.pagePadding;width:scroll.width-2*Theme.pagePadding;spacing:Theme.sectionGap
-   SwirlGlassPanel {Layout.fillWidth:true;Layout.preferredHeight:connectionContent.implicitHeight+Theme.dp(28);cornerRadius:Theme.subCardRadius
+   SwirlGlassPanel {Layout.fillWidth:true;Layout.preferredHeight:connectionContent.implicitHeight+Theme.dp(28);cornerRadius:Theme.cardRadius
     ColumnLayout {id:connectionContent;anchors.left:parent.left;anchors.right:parent.right;anchors.top:parent.top;anchors.margins:Theme.dp(14);spacing:Theme.dp(10)
      RowLayout {Layout.fillWidth:true
       Rectangle {width:Theme.dp(7);height:width;radius:width/2;color:page.nodeConnected&&page.engineController.apiHealthy?Theme.statusGreen:Theme.muted}
@@ -130,6 +130,7 @@ Item {
       Label {text:"出站："+(page.telemetry.internetDiagnostic.route||"尚未检测")+" · 节点："+page.activeNodeName;Layout.fillWidth:true;wrapMode:Text.Wrap;elide:Text.ElideNone}
       Label {text:page.proxyState;Layout.fillWidth:true;wrapMode:Text.Wrap;elide:Text.ElideNone}
       Label {text:page.telemetry.internetDiagnostic.http!==undefined?"HTTP "+page.telemetry.internetDiagnostic.http+" · 错误码 "+page.telemetry.internetDiagnostic.networkError+" · "+page.telemetry.internetDiagnostic.elapsedMs+" ms":"尚无 HTTPS 检测结果";Layout.fillWidth:true;wrapMode:Text.Wrap;elide:Text.ElideNone}
+      Label {text:"代理："+(page.telemetry.latencies.proxy||"尚未测量")+" · "+(page.telemetry.proxyDiagnostic.detail||"通过当前代理入口单独测量 HTTPS 往返。")+(page.telemetry.proxyDiagnostic.networkError!==undefined?" · HTTP "+page.telemetry.proxyDiagnostic.http+" · 错误码 "+page.telemetry.proxyDiagnostic.networkError:"");Layout.fillWidth:true;wrapMode:Text.Wrap;elide:Text.ElideNone}
      }
     }
    }

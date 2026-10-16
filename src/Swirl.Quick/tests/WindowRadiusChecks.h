@@ -70,8 +70,9 @@ inline int runWindowRadiusChecks(QQuickWindow *window, WindowsBackdrop *backdrop
         GetWindowRect(hwnd, &bounds);
         const int width = bounds.right - bounds.left, height = bounds.bottom - bounds.top;
         const qreal radius = 10.0 * 96.0 / 72.0 * window->devicePixelRatio();
-        bool symmetric = kind == COMPLEXREGION, geometric = symmetric;
-        for (int y = 0; y <= qCeil(radius); ++y) {
+        const bool alpha=window->rendererInterface()->graphicsApi()!=QSGRendererInterface::Software;
+        bool symmetric = alpha?kind==ERROR:kind==COMPLEXREGION, geometric = symmetric;
+        for (int y = 0; !alpha && y <= qCeil(radius); ++y) {
             for (int x = 0; x <= qCeil(radius); ++x) {
                 const bool present = PtInRegion(region, x, y);
                 symmetric = symmetric && present == bool(PtInRegion(region, width - 1 - x, y))
@@ -81,8 +82,8 @@ inline int runWindowRadiusChecks(QQuickWindow *window, WindowsBackdrop *backdrop
                 geometric = geometric && present == (dx * dx + dy * dy <= radius * radius);
             }
         }
-        check(backdrop->exactCorners() && symmetric, phase + ": all four physical corner regions are identical");
-        check(geometric, phase + ": native pixel centres follow the 10pt circular boundary");
+        check(backdrop->exactCorners() && symmetric, phase + ": contour ownership matches renderer");
+        check(geometric, phase + ": accelerated alpha has no binary clip; software keeps compatibility region");
         check(qAbs(backdrop->cornerRadius() - 10.0 * 96.0 / 72.0) < 0.0001, phase + ": active logical radius is 10pt");
         DeleteObject(region);
     };
@@ -140,6 +141,9 @@ inline int runWindowRadiusChecks(QQuickWindow *window, WindowsBackdrop *backdrop
     DeleteDC(memory); ReleaseDC(nullptr, desktop);
     check(!image.isNull() && image.save(directory + "/window-and-shadow.png"), "actual compositor contour and shadow saved");
     int shadowPixels = 0;
+    const auto alphaImage=window->grabWindow();int fractionalAlpha=0;
+    if(!alphaImage.isNull())for(int y=0;y<qCeil(14*dpr);++y)for(int x=0;x<qCeil(14*dpr);++x){const auto a=alphaImage.pixelColor(x,y).alpha();if(a>0&&a<255)++fractionalAlpha;}
+    check(fractionalAlpha>3,"GPU contour contains fractional coverage instead of an integer staircase");
     int outsideCornerPixels = 0, outsideCornerBrightPixels = 0;
     if (!image.isNull()) {
         image.copy(padding, padding, width, height).save(directory + "/window.png");
@@ -149,7 +153,7 @@ inline int runWindowRadiusChecks(QQuickWindow *window, WindowsBackdrop *backdrop
         const qreal cornerRadius = 10.0 * 96.0 / 72.0 * dpr;
         for (int y = 0; y < qCeil(cornerRadius); ++y) for (int x = 0; x < qCeil(cornerRadius); ++x) {
             const qreal dx = cornerRadius - x - 0.5, dy = cornerRadius - y - 0.5;
-            if (dx * dx + dy * dy <= cornerRadius * cornerRadius) continue;
+            if (std::hypot(dx,dy) <= cornerRadius + 0.75) continue;
             for (int i = 0; i < 4; ++i) {
                 const auto pixel = image.pixelColor(padding + (i % 2 ? width - 1 - x : x),
                     padding + (i / 2 ? height - 1 - y : y));

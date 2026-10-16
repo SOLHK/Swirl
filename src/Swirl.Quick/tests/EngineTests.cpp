@@ -63,6 +63,23 @@ class EngineTests : public QObject {
         QFile file(path); QVERIFY(file.open(QIODevice::WriteOnly)); QCOMPARE(file.write(value), qint64(value.size()));
     }
 private slots:
+    void loginHandshakeLogRetainsReasonWithoutBreakingTunnel(){
+        qputenv("SWIRL_FIXTURE_MODE","login-tls-eof");
+        auto config=options();config.directSession=true;
+        QTcpServer reserve;QVERIFY(reserve.listen(QHostAddress::LocalHost));config.proxyPort=reserve.serverPort();reserve.close();
+        MihomoAdapter engine;QSignalSpy diagnostics(&engine,&ProxyEngine::diagnostic);engine.start(config);
+        QTRY_VERIFY_WITH_TIMEOUT(engine.status().apiHealthy,5000);const auto pid=engine.status().processId;
+        QTcpSocket tunnel;tunnel.setProxy(QNetworkProxy::NoProxy);tunnel.connectToHost(QHostAddress::LocalHost,quint16(config.proxyPort));
+        QTRY_COMPARE_WITH_TIMEOUT(tunnel.state(),QAbstractSocket::ConnectedState,2000);
+        QTRY_VERIFY_WITH_TIMEOUT(std::any_of(diagnostics.cbegin(),diagnostics.cend(),[](const auto &row){return row.at(1).toString()=="TLSFailure";}),3000);
+        for(const auto &row:diagnostics)if(row.at(1).toString()=="TLSFailure") {
+            const auto message=row.at(2).toString();QVERIFY(message.contains("EOF"));QVERIFY(message.contains("auth.openai.com:443"));
+            for(const auto &secret:{"PRIVATE-SECRET","PRIVATE-RULE","private-node","NODE-DNS-TLS","192.168","5678"})QVERIFY2(!message.contains(secret),secret);
+        }
+        tunnel.write("ongoing-stream");QTRY_COMPARE_WITH_TIMEOUT(tunnel.bytesAvailable(),qint64(14),2000);QCOMPARE(tunnel.readAll(),QByteArray("ongoing-stream"));
+        QCOMPARE(engine.status().processId,pid);QVERIFY(engine.status().apiHealthy);QVERIFY(processExists(pid));
+        engine.stop();QTRY_VERIFY_WITH_TIMEOUT(!engine.status().processAlive,4000);
+    }
     void routingResponseFailurePreservesProcess_data(){
         QTest::addColumn<QByteArray>("failure");QTest::addColumn<QString>("actual");
         QTest::newRow("applied-but-response-lost")<<QByteArray("patch-apply-drop")<<QString("global");

@@ -43,9 +43,9 @@ QtObject {
         const titleItem=item.motionTitle || item
         const surface=item.motionSurface || (item.motionTitle?item:null)
         // Stable semantic keys pair the same metric and its surface across routes.
-        shared={generation:++sharedGeneration,source:titleItem,surface:surface,route:route,previous:AppState.currentPage,
+        shared={generation:++sharedGeneration,source:titleItem,surface:surface,card:item,route:route,previous:AppState.currentPage,
             targetKey:targetKey || "title",text:titleItem.text || ""}
-        returnShared={route:route,previous:AppState.currentPage,source:titleItem,
+        returnShared={route:route,previous:AppState.currentPage,source:titleItem,card:item,
             surface:surface,targetKey:targetKey || "title"}
         AppState.navigate(route)
     }

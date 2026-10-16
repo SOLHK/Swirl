@@ -20,7 +20,7 @@ int runOverviewChecks(QQuickWindow *window) {
     std::function<QQuickItem *(QQuickItem *,const QString &)> find;
     find=[&](QQuickItem *parent,const QString &name)->QQuickItem *{if(parent->objectName()==name&&parent->isVisible())return parent;for(auto *child:parent->childItems())if(auto *result=find(child,name))return result;return nullptr;};
     const auto item=[&](const char *name,QQuickWindow *target=nullptr){return find((target?target:window)->contentItem(),QString::fromLatin1(name));};
-    const auto settled=[&]{wait([&]{return !state("pageLoader.moving || pageLoader.pendingGrab || settingsFlight.moving || (settingsFlight.phase==='Detail' && settingsFlight.visible)").toBool();});};
+    const auto settled=[&]{wait([&]{return !state("pageLoader.moving || pageLoader.pendingGrab").toBool();});};
     const auto click=[&](const char *name,QQuickWindow *target=nullptr){auto *control=item(name,target);if(!control){check(false,"native input target exists");return false;}auto *w=target?target:window;QTest::mouseClick(w,Qt::LeftButton,Qt::NoModifier,control->mapToScene(QPointF(control->width()/2,control->height()/2)).toPoint());QTest::qWait(80);settled();return true;};
     const auto type=[&](const char *name,const QString &text,QQuickWindow *target=nullptr){auto *control=item(name,target);if(!control){check(false,"editable input exists");return;}control->forceActiveFocus();auto *w=target?target:window;QTest::keyClick(w,Qt::Key_A,Qt::ControlModifier);for(const auto character:text)QTest::keyClick(w,character.toLatin1());QTest::qWait(50);};
     const auto ownsPopup=[&](QObject *popup,QQuickWindow *expected){auto *visual=popup?qobject_cast<QQuickItem *>(popup->property("parent").value<QObject *>()):nullptr;return visual&&visual->window()==expected;};
@@ -41,60 +41,52 @@ int runOverviewChecks(QQuickWindow *window) {
     check(state("!captureProvider.tls.enabled && !captureProvider.tls.trusted").toBool(),"CA generation keeps interception and system trust opt-in");
     click("tlsToggle");check(state("captureProvider.tls.enabled").toBool(),"TLS control enables interception after certificate creation");click("tlsToggle");
     click("nav-featurehub");click("settings-dns");
-    QQuickWindow *sheet=nullptr;for(auto *candidate:QGuiApplication::allWindows())if(candidate->objectName()=="settingsSheet")sheet=qobject_cast<QQuickWindow *>(candidate);
-    check(sheet&&sheet->isVisible()&&sheet->width()==qMin(900,sheet->screen()->availableGeometry().width())&&sheet->height()==qMin(790,sheet->screen()->availableGeometry().height()),"DNS opens a separate native sheet with room for its title bar");
-    if(sheet){const auto originalHeight=sheet->height();sheet->resize(900,500);QTest::qWait(50);auto *apply=item("applyDns",sheet);check(apply&&apply->mapToScene(QPointF(0,0)).y()+apply->height()<=sheet->height(),"DNS Apply remains visible on a short native viewport");sheet->resize(900,originalHeight);QTest::qWait(50);click("dnsMode-2",sheet);type("dnsServerAddress","127.0.0.1",sheet);click("applyDns",sheet);
-        check(wait([&]{return !sheet->isVisible();})&&state("engineController.dnsConfiguration.mode===2 && engineController.dnsConfiguration.servers==='127.0.0.1'").toBool(),"DNS Apply validates, persists and closes the native sheet");
-        window->requestActivate();click("settings-dns");type("dnsServerAddress","192.0.2.53",sheet);click("cancelDns",sheet);
-        check(wait([&]{return !sheet->isVisible();})&&state("engineController.dnsConfiguration.servers==='127.0.0.1'").toBool(),"DNS Cancel closes the sheet without applying draft edits");}
-    window->requestActivate();click("nav-featurehub");click("settings-subscriptions");
-    check(sheet&&sheet->isVisible()&&state("settingsSheet.section==='subscriptions'").toBool(),"More opens the existing subscription manager directly");
-    if(sheet){
-        click("addSubscription",sheet);QTest::qWait(300);
-        if(auto *popup=window->findChild<QObject *>("subscriptionDialog")){
-            auto *visual=qobject_cast<QQuickItem *>(popup->property("parent").value<QObject *>());
-            auto *declared=qobject_cast<QQuickItem *>(popup->parent());
-            qInfo()<<"POPUP_OWNER_EVIDENCE"<<"visible"<<popup->property("visible")<<"opened"<<popup->property("opened")<<"declarationWindow"<<(declared?declared->window():nullptr)<<"overlayWindow"<<(visual?visual->window():nullptr)<<"expected"<<sheet;
-            check(ownsPopup(popup,sheet)&&popup->property("ownerWindow").value<QObject *>()==sheet&&item("subscriptionName",sheet),"migrated subscription form belongs to the exposed native settings window");
-        }
-        QTest::keyClick(sheet,Qt::Key_Escape);QTest::qWait(350);
-        check(sheet->isVisible()&&state("dismissals.count===0").toBool(),"one Escape closes only the subscription form and preserves its settings window");
-        click("addSubscription",sheet);QTest::qWait(300);type("subscriptionName","Unsaved fixture",sheet);
-        QTest::keyClick(sheet,Qt::Key_1,Qt::ControlModifier);QTest::qWait(50);
-        check(state("AppState.currentPage==='featurehub'").toBool(),"navigation shortcuts cannot bypass a modal draft");
-        QTest::keyClick(sheet,Qt::Key_Escape);QTest::qWait(300);
-        check(sheet->isVisible()&&state("dismissals.count===2").toBool(),"dirty subscription form asks before discarding");
-        if(auto *popup=window->findChild<QObject *>("subscriptionDialog"))check(ownsPopup(popup->findChild<QObject *>("discardChangesPrompt"),sheet),"nested discard prompt follows its native form owner");
-        QTest::keyClick(sheet,Qt::Key_Escape);QTest::qWait(300);
-        check(state("dismissals.count===1").toBool(),"Escape cancels discard confirmation and preserves the edited form");
-        QTest::keyClick(sheet,Qt::Key_Escape);QTest::qWait(300);click("discardChangesConfirm",sheet);QTest::qWait(350);
-        QTest::keyClick(sheet,Qt::Key_Escape);QTest::qWait(100);
-        check(wait([&]{return !sheet->isVisible();})&&window->isVisible(),"next Escape closes settings while the main window stays open");
-        window->requestActivate();click("settings-subscriptions");click("addSubscription",sheet);QTest::qWait(300);
-        check(ownsPopup(window->findChild<QObject *>("subscriptionDialog"),sheet)&&item("subscriptionName",sheet),"cached form keeps its current native overlay after return and reopen");
-        QTest::keyClick(sheet,Qt::Key_Escape);QTest::qWait(350);QTest::keyClick(sheet,Qt::Key_Escape);check(wait([&]{return !sheet->isVisible();}),"cached form and sheet still dismiss independently after reopening");
-        window->requestActivate();QTest::keyClick(window,Qt::Key_Escape);QTest::qWait(100);
-        check(window->isVisible(),"Escape on the main page never exits Swirl");
-    }
+    const auto nativeHandle=window->winId();
+    check(state("AppState.currentPage==='dns' && pageLoader.item!==null").toBool(),"DNS opens inside the main navigation host");
+    const auto originalSize=window->size();window->resize(window->minimumWidth(),window->minimumHeight());QTest::qWait(80);
+    auto *apply=item("applyDns");check(apply&&apply->mapToScene(QPointF(0,0)).y()+apply->height()<=window->height(),"DNS Apply remains visible at the minimum main viewport");
+    window->resize(originalSize);QTest::qWait(80);click("dnsMode-2");type("dnsServerAddress","127.0.0.1");click("applyDns");
+    check(state("AppState.currentPage==='featurehub' && engineController.dnsConfiguration.mode===2 && engineController.dnsConfiguration.servers==='127.0.0.1'").toBool(),"DNS Apply validates, persists and returns to the settings hub");
+    click("settings-dns");type("dnsServerAddress","192.0.2.53");click("cancelDns");
+    check(state("AppState.currentPage==='featurehub' && engineController.dnsConfiguration.servers==='127.0.0.1'").toBool(),"DNS Cancel returns without applying draft edits");
+    click("settings-subscriptions");
+    check(state("AppState.currentPage==='subscriptions'").toBool(),"More opens the complete subscription manager in the main window");
+    click("addSubscription");QTest::qWait(300);
+    if(auto *popup=window->findChild<QObject *>("subscriptionDialog"))
+        check(ownsPopup(popup,window)&&popup->property("ownerWindow").value<QObject *>()==window&&item("subscriptionName"),"subscription form belongs to the original main overlay");
+    else check(false,"subscription dialog exists");
+    QTest::keyClick(window,Qt::Key_Escape);QTest::qWait(350);
+    check(state("AppState.currentPage==='subscriptions' && dismissals.count===0").toBool(),"one Escape closes only the subscription form and preserves its page");
+    click("addSubscription");QTest::qWait(300);type("subscriptionName","Unsaved fixture");
+    QTest::keyClick(window,Qt::Key_1,Qt::ControlModifier);QTest::qWait(50);
+    check(state("AppState.currentPage==='subscriptions'").toBool(),"navigation shortcuts cannot bypass a modal draft");
+    QTest::keyClick(window,Qt::Key_Escape);QTest::qWait(300);
+    check(state("AppState.currentPage==='subscriptions' && dismissals.count===2").toBool(),"dirty subscription form asks before discarding");
+    if(auto *popup=window->findChild<QObject *>("subscriptionDialog"))check(ownsPopup(popup->findChild<QObject *>("discardChangesPrompt"),window),"nested discard prompt keeps the main overlay owner");
+    QTest::keyClick(window,Qt::Key_Escape);QTest::qWait(300);
+    check(state("dismissals.count===1").toBool(),"Escape cancels discard confirmation and preserves the edited form");
+    QTest::keyClick(window,Qt::Key_Escape);QTest::qWait(300);click("discardChangesConfirm");QTest::qWait(350);
+    QTest::keyClick(window,Qt::Key_Escape);settled();
+    check(state("AppState.currentPage==='featurehub'").toBool()&&window->isVisible(),"next Escape returns to the hub while the main window stays open");
+    click("settings-subscriptions");click("addSubscription");QTest::qWait(300);
+    check(ownsPopup(window->findChild<QObject *>("subscriptionDialog"),window)&&item("subscriptionName"),"cached form retains its main overlay after back and reopen");
+    QTest::keyClick(window,Qt::Key_Escape);QTest::qWait(350);QTest::keyClick(window,Qt::Key_Escape);settled();
+    check(state("AppState.currentPage==='featurehub'").toBool(),"cached form and its page dismiss independently after reopening");
+    QTest::keyClick(window,Qt::Key_Escape);QTest::qWait(100);check(window->isVisible(),"Escape on the hub never exits Swirl");
     window->requestActivate();click("nav-external");QQuickWindow *dashboard=nullptr;for(auto *candidate:QGuiApplication::allWindows())if(candidate->objectName()=="dashboardWindow")dashboard=qobject_cast<QQuickWindow *>(candidate);
     check(dashboard&&dashboard->isVisible()&&dashboard->width()==1300,"Panel opens the independent native request window");
     if(dashboard){check(item("windowCloseButton",dashboard)&&item("windowMinimizeButton",dashboard)&&item("windowMaximizeButton",dashboard),"request panel has all three window controls");click("windowCloseButton",dashboard);check(!dashboard->isVisible()&&window->isVisible(),"panel red button closes only the panel");}
-    if(sheet){
-        for(const auto *route:{"profiles","appearance","license","dns","modules","scripts","subscriptions"}){
-            state(QString("window.openSettings('%1')").arg(route));QTest::qWait(100);
-            check(sheet->isVisible()&&item("windowCloseButton",sheet)&&item("windowMinimizeButton",sheet)&&item("windowMaximizeButton",sheet),"every secondary route has visible window controls");
-            check(state("settingsLoader.mapToItem(settingsSheet.contentItem,Qt.point(0,0)).y>=settingsSheet.titleBarHeight").toBool(),"secondary page starts below the title bar");
-            if(QString::fromLatin1(route)=="license"){
-                const auto *brand=item("brandVector",sheet);check(brand&&brand->isVisible()&&brand->width()>=104,"About page displays the enlarged brand mark after reopening Appearance");
-            }
-            const auto qaDirectory=qEnvironmentVariable("SWIRL_UI_QA_DIRECTORY");
-            if(!qaDirectory.isEmpty()){QDir().mkpath(qaDirectory);check(sheet->grabWindow().save(qaDirectory+"/"+route+".png"),"secondary window render saved for visual review");}
-            click("windowCloseButton",sheet);check(wait([&]{return !sheet->isVisible();})&&window->isVisible(),"secondary red button closes only its window");
+    for(const auto *route:{"settings","appearance","fonts","profiles","dns","modules","scripts","subscriptions","proxies"}){
+        state(QString("window.openSettings('%1')").arg(route));QTest::qWait(80);settled();
+        auto *page=qobject_cast<QQuickItem *>(state("pageLoader.item").value<QObject *>());
+        check(page&&page->window()==window&&window->winId()==nativeHandle&&item("windowCloseButton")&&item("windowMinimizeButton")&&item("windowMaximizeButton"),"every settings route uses the original main shell and its controls");
+        if(QString::fromLatin1(route)=="appearance"){
+            state("pageLoader.item.section='关于 Swirl'");QTest::qWait(80);
+            const auto *brand=item("brandVector");check(brand&&brand->isVisible()&&brand->width()>=104,"About retains the enlarged brand mark inside the settings page");
         }
-        state("window.openSettings('profiles')");QTest::qWait(100);click("windowMaximizeButton",sheet);check(sheet->visibility()==QWindow::FullScreen,"secondary green button enters full screen");
-        click("windowMaximizeButton",sheet);check(sheet->visibility()==QWindow::Windowed,"secondary green button restores");
-        click("windowMinimizeButton",sheet);check(sheet->visibility()==QWindow::Minimized,"secondary yellow button minimizes");
-        sheet->showNormal();sheet->requestActivate();QTest::qWait(100);QTest::keyClick(sheet,Qt::Key_Escape);QTest::qWait(100);check(wait([&]{return !sheet->isVisible();})&&window->isVisible(),"Escape dismisses the secondary window");
+        const auto qaDirectory=qEnvironmentVariable("SWIRL_UI_QA_DIRECTORY");
+        if(!qaDirectory.isEmpty()){QDir().mkpath(qaDirectory);check(window->grabWindow().save(qaDirectory+"/"+route+".png"),"embedded page render saved for visual review");}
+        click("settingsBackButton");check(state("AppState.currentPage==='featurehub'").toBool()&&window->isVisible(),"back returns from each settings route without closing the shell");
     }
     settled();check(state("dismissals.count===0").toBool(),"completed settings return releases its modal layer before global shortcuts");
     window->requestActivate();QTest::keyClick(window,Qt::Key_K,Qt::ControlModifier);QTest::qWait(100);type("pageSearch","DNS");QTest::keyClick(window,Qt::Key_Return);settled();

@@ -6,6 +6,8 @@ import "../components"
 import "../controls"
 Item {
  id:page
+    readonly property Item motionTitle:routeTitle
+
  property string expandedId:""
  property string editingId:""
  function edit(record){editingId=record?record.id:"";displayName.text=record?record.name:"";urlField.text="";formatPreference.currentIndex=record?Math.max(0,["auto","loon","shadowrocket","surge","quantumult-x","sing-box"].indexOf(record.formatHint)):0;interval.currentIndex=record?Math.max(0,[360,720,1440,10080].indexOf(record.intervalMinutes)):0;autoEnabled.checked=record?record.enabled:true;addDialog.open()}
@@ -14,7 +16,7 @@ Item {
  readonly property var listed:providers.filter(function(r){return r.name.toLowerCase().indexOf(search.text.toLowerCase())>=0})
  ColumnLayout { anchors.fill:parent;anchors.margins:Theme.dp(24);spacing:Theme.gap
   RowLayout { Layout.fillWidth:true
-   SwirlText { text:"订阅管理";color:Theme.text;font.pixelSize:Theme.fontSize(30);font.weight:Font.DemiBold;Layout.fillWidth:true }
+   SwirlText {id:routeTitle; text:"订阅管理";color:Theme.text;font.pixelSize:Theme.fontSize(30);font.weight:Font.DemiBold;Layout.fillWidth:true }
    SwirlButton { text:"更新全部";enabled:!engineController.imports.busy;onClicked:engineController.imports.refreshAll() }
    SwirlButton { objectName:"addSubscription";text:"添加订阅";primary:true;enabled:!engineController.imports.busy;onClicked:page.edit(null) }
   }

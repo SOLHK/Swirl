@@ -8,6 +8,7 @@ Window {
     readonly property real titleBarHeight: titleBar.height
     property bool swirlDismissibleWindow: true
     property real swirlWindowRadius: Theme.windowRadius
+    property bool swirlExactWindowRadius: true
     flags: Qt.Window | Qt.FramelessWindowHint
     color: "transparent"
     minimumWidth: Math.min(Theme.dp(760), Screen.desktopAvailableWidth)
@@ -30,4 +31,5 @@ Window {
         border.width:shell.visibility===Window.Maximized || shell.visibility===Window.FullScreen?0:1/Screen.devicePixelRatio
         border.color:Theme.dark?Qt.rgba(1,1,1,shell.active?0.30:0.20):Qt.rgba(0,0,0,shell.active?0.12:0.08)
     }
+    WindowEdge {parent:shell.contentItem;anchors.fill:parent;z:10000;radius:shell.visibility===Window.Maximized || shell.visibility===Window.FullScreen?0:Theme.windowRadius}
 }

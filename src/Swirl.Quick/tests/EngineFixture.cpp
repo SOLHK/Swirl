@@ -73,6 +73,9 @@ int main(int argc, char **argv) {
                 else if (activeMode == "oversize") body = QByteArray(100000, 'x');
                 else if (request.startsWith("GET /version "))
                     body = activeMode == "wrong-version" ? "{\"version\":\"wrong\",\"meta\":true}" : "{\"version\":\"vfixture\",\"meta\":true}";
+                else if (request.startsWith("GET /logs?") && activeMode=="login-tls-eof") {
+                    body=QJsonDocument(QJsonObject{{"type","warning"},{"payload","[TCP] dial NODE-DNS-TLS (match RuleSet/PRIVATE-RULE) 192.168.1.1:5678 --> auth.openai.com:443 error: TLS handshake EOF via https://user:PRIVATE-SECRET@private-node.invalid/path"}}).toJson(QJsonDocument::Compact)+"\n";
+                }
                 else if (request.startsWith("GET /configs ")) {
                     QJsonObject object{{"mode", routingMode}, {"allow-lan", false},
                         {"port", 0}, {"socks-port", 0}, {"mixed-port", mixedPort}, {"redir-port", 0}, {"tproxy-port", 0},

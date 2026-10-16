@@ -24,10 +24,12 @@ qt_add_resources(Swirl harmony_fonts PREFIX "/swirl/fonts" BASE "${CMAKE_CURRENT
 add_library(SwirlEngine STATIC
  app/DiagnosticService.h app/DiagnosticService.cpp
  engine/TelemetryService.h engine/TelemetryService.cpp
+ engine/ProxyLatencyProbe.h engine/ProxyLatencyProbe.cpp
  engine/NodeTestService.h engine/NodeTestService.cpp
  engine/SystemProxySession.h engine/SystemProxySession.cpp
  engine/ProxyEngine.h engine/OwnedProcess.h engine/OwnedProcess.cpp
  engine/MihomoAdapter.h engine/MihomoAdapter.cpp
+ engine/MihomoLogDiagnostic.h engine/MihomoLogDiagnostic.cpp
  engine/EngineController.h engine/EngineController.cpp)
 target_sources(SwirlEngine PRIVATE engine/ProxyNode.h engine/ProxyNode.cpp engine/NodeStore.h engine/NodeStore.cpp)
 target_sources(SwirlEngine PRIVATE engine/NodeImporter.h engine/NodeImporter.cpp)
@@ -44,6 +46,20 @@ target_link_libraries(SwirlExtensions PUBLIC SwirlEngine Qt6::Core Qt6::Qml)
 target_include_directories(SwirlExtensions PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(SwirlEngine PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 if(WIN32)
+ add_library(SwirlCodexLaunchSupport STATIC tools/CodexLaunchSupport.h tools/CodexLaunchSupport.cpp)
+ target_include_directories(SwirlCodexLaunchSupport PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+ target_compile_definitions(SwirlCodexLaunchSupport PUBLIC NOMINMAX UNICODE _UNICODE)
+ target_link_libraries(SwirlCodexLaunchSupport PUBLIC wininet advapi32 ws2_32)
+ add_executable(SwirlCodexLauncher WIN32 tools/CodexLauncher.cpp)
+ target_link_libraries(SwirlCodexLauncher PRIVATE SwirlCodexLaunchSupport shell32 user32)
+ if(MSVC)
+  set_property(TARGET SwirlCodexLaunchSupport SwirlCodexLauncher PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+  target_compile_options(SwirlCodexLaunchSupport PRIVATE /utf-8)
+  target_compile_options(SwirlCodexLauncher PRIVATE /utf-8)
+ else()
+  target_link_options(SwirlCodexLauncher PRIVATE -municode -static)
+ endif()
+ add_dependencies(Swirl SwirlCodexLauncher)
  target_compile_definitions(SwirlEngine PUBLIC NOMINMAX)
  target_link_libraries(SwirlEngine PRIVATE advapi32 ws2_32 iphlpapi crypt32 wininet)
  add_executable(SwirlGatewayGuard WIN32 tools/GatewayGuard.cpp network/GatewayRouting.cpp)
@@ -71,7 +87,6 @@ set(SWIRL_QML_FILES
  qml/controls/SwirlText.qml
  qml/controls/SwirlLinkedDetail.qml
  qml/controls/SwirlNodeTransfer.qml
- qml/controls/SwirlSettingsTransfer.qml
  qml/components/SwirlFontSettings.qml
  qml/components/SwirlSecondaryWindow.qml
  qml/components/SwirlWindowTitleBar.qml
@@ -116,7 +131,7 @@ qt_add_qml_module(Swirl
     RESOURCE_PREFIX /qt/qml
     NO_GENERATE_EXTRA_QMLDIRS
     QML_FILES ${SWIRL_QML_FILES}
-    SOURCES app/JavascriptHighlighter.h app/JavascriptHighlighter.cpp
+    SOURCES app/JavascriptHighlighter.h app/JavascriptHighlighter.cpp app/WindowEdge.h app/WindowEdge.cpp
 )
 set(SWIRL_ASSET_PATH "${CMAKE_CURRENT_SOURCE_DIR}/assets")
 file(GLOB SWIRL_UI_ICONS CONFIGURE_DEPENDS "${SWIRL_ASSET_PATH}/icons/ui/*.svg")
@@ -129,6 +144,7 @@ qt_add_resources(Swirl brand PREFIX "/swirl" BASE "${SWIRL_ASSET_PATH}" FILES
 )
 qt_add_shaders(Swirl hdr_ui PREFIX "/swirl" BASE "${CMAKE_CURRENT_SOURCE_DIR}" FILES shaders/hdr-ui.frag shaders/swirlclicklight.frag shaders/swirlclicklight.vert)
 qt_add_shaders(Swirl glass_ui PREFIX "/swirl" BASE "${CMAKE_CURRENT_SOURCE_DIR}" FILES shaders/swirl-surface.frag shaders/swirl-blur.frag shaders/swirl-glass.frag)
+qt_add_shaders(Swirl window_edge BATCHABLE PREFIX "/swirl" BASE "${CMAKE_CURRENT_SOURCE_DIR}" FILES shaders/window-edge.vert shaders/window-edge.frag)
 if(WIN32)
  target_link_libraries(Swirl PRIVATE ole32 uuid)
 endif()
@@ -156,7 +172,7 @@ if(SWIRL_BUILD_UI_TESTS)
  target_sources(Swirl PRIVATE tests/UiQualityChecks.h tests/UiQualityChecks.cpp)
  target_sources(Swirl PRIVATE tests/RuntimeEvidence.cpp tests/RuntimeEvidence.h)
  target_sources(Swirl PRIVATE tests/MaterialChecks.cpp tests/MaterialChecks.h)
- target_sources(Swirl PRIVATE tests/HeroChecks.cpp tests/HeroChecks.h)
+ target_sources(Swirl PRIVATE tests/HeroChecks.cpp tests/HeroChecks.h tests/NavigationChecks.cpp tests/NavigationChecks.h)
  target_sources(Swirl PRIVATE tests/AppearanceChecks.cpp tests/AppearanceChecks.h)
  add_test(NAME swirl-appearance-ui COMMAND Swirl --appearance-test)
  set_tests_properties(swirl-appearance-ui PROPERTIES TIMEOUT 45 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
@@ -164,6 +180,18 @@ if(SWIRL_BUILD_UI_TESTS)
  target_link_libraries(Swirl PRIVATE Qt6::Test)
  target_compile_definitions(Swirl PRIVATE SWIRL_UI_TESTS)
  enable_testing()
+ if(WIN32)
+  add_executable(SwirlCodexLauncherTests tests/CodexLauncherTests.cpp)
+  target_link_libraries(SwirlCodexLauncherTests PRIVATE SwirlCodexLaunchSupport)
+  if(MSVC)
+   set_property(TARGET SwirlCodexLauncherTests PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+   target_compile_options(SwirlCodexLauncherTests PRIVATE /utf-8)
+  else()
+   target_link_options(SwirlCodexLauncherTests PRIVATE -municode -static)
+  endif()
+  add_test(NAME swirl-codex-proxy-launcher COMMAND SwirlCodexLauncherTests)
+  set_tests_properties(swirl-codex-proxy-launcher PROPERTIES TIMEOUT 15)
+ endif()
  add_test(NAME swirl-font-selection COMMAND SwirlFontTests)
  set_tests_properties(swirl-font-selection PROPERTIES TIMEOUT 30 ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QPA_FONTDIR=${SWIRL_TEST_FONT_DIRECTORY}")
  if(WIN32)
@@ -181,6 +209,8 @@ if(SWIRL_BUILD_UI_TESTS)
  set_tests_properties(swirl-local-extensions PROPERTIES TIMEOUT 60)
  add_executable(SwirlTelemetryTests tests/TelemetryTests.cpp)
  target_link_libraries(SwirlTelemetryTests PRIVATE SwirlEngine Qt6::Test)
+ target_compile_definitions(SwirlTelemetryTests PRIVATE SWIRL_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
+ qt_add_resources(SwirlTelemetryTests telemetry_engine_manifest PREFIX "/engine" BASE "${CMAKE_CURRENT_SOURCE_DIR}/packaging" FILES packaging/mihomo-manifest.json)
  if(MSVC)
   target_compile_options(SwirlTelemetryTests PRIVATE /utf-8)
  endif()
@@ -277,6 +307,8 @@ if(SWIRL_BUILD_UI_TESTS)
  add_test(NAME swirl-motion COMMAND Swirl --motion-test --motion-output=motion-report.json)
  if(WIN32)
   add_test(NAME swirl-hero COMMAND Swirl --hero-test --hero-output=hero-evidence)
+  add_test(NAME swirl-navigation-ui COMMAND Swirl --navigation-test --navigation-output=navigation-evidence --hero-no-recording)
+  set_tests_properties(swirl-navigation-ui PROPERTIES TIMEOUT 90 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
   set_tests_properties(swirl-hero PROPERTIES TIMEOUT 120 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
  endif()
  set_tests_properties(swirl-motion PROPERTIES TIMEOUT 120

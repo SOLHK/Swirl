@@ -1,4 +1,5 @@
 #include "MihomoAdapter.h"
+#include "MihomoLogDiagnostic.h"
 #include <cmath>
 #include <QDateTime>
 #include <QCryptographicHash>
@@ -830,10 +831,10 @@ void MihomoAdapter::readConnections() {
         const auto array=snapshot.value("connections").toArray();
         for(const auto &entry:array) {
             if(rows.size()>=2000)break;
-            const auto c=entry.toObject(),m=c.value("metadata").toObject();QStringList chain;
+            const auto c=entry.toObject(),m=c.value("metadata").toObject();QStringList chain,nodeChain;
             if(!validCounter(c.value("upload"))||!validCounter(c.value("download"))||c.value("id").toString().isEmpty())continue;
             for(const auto &hop:c.value("chains").toArray()) {
-                auto label=hop.toString();
+                auto label=hop.toString();nodeChain.append(label);
                 for(const auto &node:m_options.nodes)if(node.id==label){label=node.name;break;}
                 chain.append(label);
             }
@@ -842,7 +843,7 @@ void MihomoAdapter::readConnections() {
                 {"host",m.value("host").toString().isEmpty()?m.value("destinationIP").toString():m.value("host").toString()},{"ip",m.value("destinationIP").toString()},{"sourceIp",m.value("sourceIP").toString()},
                 {"process",QFileInfo(m.value("processPath").toString().isEmpty()?m.value("process").toString():m.value("processPath").toString()).fileName().isEmpty()?QStringLiteral("未知进程"):QFileInfo(m.value("processPath").toString().isEmpty()?m.value("process").toString():m.value("processPath").toString()).fileName()},
                 {"protocol",m.value("network").toString()+" / "+m.value("type").toString()},
-                {"policy",chain.join(QStringLiteral(" → "))},{"rule",rule},
+                {"policy",chain.join(QStringLiteral(" → "))},{"rule",rule},{"sourcePort",m.value("sourcePort").toVariant().toInt()},{"nodeChain",nodeChain},
                 {"category",chain.contains("REJECT")||chain.contains("REJECT-DROP")?"reject":chain.contains("DIRECT")?"direct":chain.isEmpty()?"other":"proxy"},
                 {"uploadBytes",qint64(c.value("upload").toDouble())},{"downloadBytes",qint64(c.value("download").toDouble())},
                 {"up",QString::number(qint64(c.value("upload").toDouble()))+" B"},
@@ -883,10 +884,8 @@ void MihomoAdapter::readLogs() {
         if(generation!=m_generation)return;m_logsBuffer+=reply->readAll();if(m_logsBuffer.size()>65536){reply->abort();return;}
         while(m_logsBuffer.contains('\n')){const auto end=m_logsBuffer.indexOf('\n');const auto line=m_logsBuffer.left(end);m_logsBuffer.remove(0,end+1);const auto event=QJsonDocument::fromJson(line).object();if(event.isEmpty())continue;
             const auto payload=event.value("payload").toString();
-            // Raw engine messages can contain endpoint addresses or remote
-            // credentials. Forward only an observed fault category and level.
-            const auto code=payload.contains("dns",Qt::CaseInsensitive)?QStringLiteral("DNSFailure"):payload.contains("tls",Qt::CaseInsensitive)||payload.contains("certificate",Qt::CaseInsensitive)?QStringLiteral("TLSFailure"):payload.contains("rule",Qt::CaseInsensitive)?QStringLiteral("RuleFailure"):QStringLiteral("RouteHandshakeFailure");
-            emit diagnostic("Mihomo",code,QStringLiteral("引擎报告 %1：%2（敏感的原始端点内容已省略）").arg(event.value("type").toString(),code));
+            const auto fault=classifyMihomoLog(payload);
+            emit diagnostic("Mihomo",fault.code,fault.message);
         }
     });
     connect(reply,&QNetworkReply::finished,this,[this,reply,generation]{reply->deleteLater();if(generation!=m_generation)return;m_logsReply=nullptr;m_logsBuffer.clear();});

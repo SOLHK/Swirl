@@ -7,6 +7,8 @@ import "../components"
 import "../controls"
 Item {
     id:page
+    readonly property Item motionTitle:routeTitle
+
     readonly property string selectedId:engineController.selectedNodeId
     readonly property var allNodes:engineController.nodes
     readonly property var selected:allNodes.find(n=>n.id===page.selectedId)||null
@@ -47,7 +49,7 @@ Item {
         anchors.fill:parent;anchors.margins:Theme.dp(24);spacing:Theme.dp(16)
         RowLayout {
             Layout.fillWidth:true;spacing:Theme.dp(12)
-            SwirlText {renderType:Text.NativeRendering;text:"节点";color:Theme.text;font.family:Theme.fontFamily;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold;Layout.fillWidth:true}
+            SwirlText {id:routeTitle;renderType:Text.NativeRendering;text:"节点";color:Theme.text;font.family:Theme.fontFamily;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold;Layout.fillWidth:true}
             SwirlButton {objectName:"allNodesTestButton";text:engineController.tests.busy?"取消测速":"测速";quiet:true;iconName:"activity";enabled:engineController.nodes.length>0;onClicked:engineController.tests.busy?engineController.tests.cancel():engineController.testAllNodes(testUrl.text)}
             SwirlButton {objectName:"nodeImportButton";text:"导入";quiet:true;iconName:"download";enabled:!engineController.imports.busy;onClicked:importDialog.open()}
             SwirlButton {objectName:"nodeAddButton";text:"添加节点";iconName:"plus";primary:true;enabled:engineController.canStart;onClicked:page.edit(null)}
@@ -67,18 +69,19 @@ Item {
         RowLayout {
             Layout.fillWidth:true;Layout.fillHeight:true;spacing:Theme.dp(16)
             SwirlGlassPanel {
-                Layout.fillWidth:true;Layout.preferredWidth:1;Layout.minimumWidth:Theme.dp(250);Layout.fillHeight:true;cornerRadius:Theme.independentCardRadius
+                Layout.fillWidth:true;Layout.preferredWidth:1;Layout.minimumWidth:Theme.dp(262);Layout.fillHeight:true;cornerRadius:Theme.independentCardRadius
                 color:Theme.surface;border.width:0
                 SwirlDataTable {
                     id:nodeTable;objectName:"realNodeTable";minimal:true;managedSelection:true;incrementalRows:true;animateRowChanges:false;animateLatency:true;itemHeight:Theme.dp(44);headerHeight:Theme.tableHeaderHeight;textPixelSize:13
                     anchors.fill:parent;anchors.margins:Theme.dp(16);rows:page.viewRows;selectedId:page.selectedId
-                    columns:[{key:"name",label:"节点名称",w:235,min:126},{key:"protocol",label:"协议",w:82,min:68},{key:"latency",label:"延迟",w:76,min:68},{key:"status",label:"状态",w:92,min:90}]
+                    cellPadding:Theme.dp(8)
+                    columns:[{key:"name",label:"节点名称",w:235,min:76},{key:"protocol",label:"协议",w:82,min:44},{key:"latency",label:"延迟",w:76,min:52},{key:"status",label:"状态",w:92,min:58}]
                     onRowSelected:function(row){page.selectRow(row)}
                 }
                 SwirlEmptyState {anchors.centerIn:parent;visible:page.viewRows.length===0;headline:page.allNodes.length?"没有匹配的节点":"没有保存的节点";detail:page.allNodes.length?"调整搜索、协议或地区筛选。":"添加节点，或导入配置、URI 与订阅"}
             }
             ScrollView {
-                id:detailScroll;Layout.preferredWidth:Theme.dp(300);Layout.minimumWidth:Theme.dp(280);Layout.maximumWidth:Theme.dp(340);Layout.fillHeight:true;clip:true
+                id:detailScroll;Layout.preferredWidth:Math.min(Theme.dp(300),page.width*0.43);Layout.minimumWidth:Theme.dp(180);Layout.maximumWidth:Theme.dp(340);Layout.fillHeight:true;clip:true
                 ScrollBar.horizontal.policy:ScrollBar.AlwaysOff;ScrollBar.vertical:SwirlScrollBar {}
                 ColumnLayout {width:detailScroll.availableWidth;spacing:Theme.dp(14)
                 Item {
@@ -124,8 +127,10 @@ Item {
     }
     SwirlGlassPanel {
         id:nodeIdentity;objectName:"nodeIdentitySurface"
-        parent:page
-        x:nodeHero.cardX;y:nodeHero.cardY
+        // While settled the real ScrollView owns clipping and scrolling.
+        // Only the moving shared card escapes it for the flight.
+        parent:nodeHero.moving?page:summarySlot
+        x:nodeHero.moving?nodeHero.cardX:0;y:nodeHero.moving?nodeHero.cardY:0
         width:nodeHero.cardWidth;height:nodeHero.cardHeight
         visible:nodeHero.opened||nodeHero.moving;z:20;clip:true;opacity:SwirlMotion.reduced?nodeHero.progress:1
         cornerRadius:Theme.independentCardRadius;color:Theme.surface;border.width:0

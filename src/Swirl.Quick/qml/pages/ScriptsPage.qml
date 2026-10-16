@@ -7,11 +7,13 @@ import SwirlQuick
 import "../components"
 import "../controls"
 Item {
- id:page;property string selectedId:""
+ id:page;
+    readonly property Item motionTitle:routeTitle
+property string selectedId:""
  readonly property var selected:extensionsProvider.scripts.find(r=>r.id===selectedId)||null
  function editScript(fresh){scriptEditor.scriptId=fresh?"":selectedId;scriptName.text=fresh?"":selected.name;scriptCode.text=fresh?"function main(input) {\n    console.log('Swirl local script');\n    return input;\n}\n":selected.source;scriptInput.text="{}";scriptEditor.open()}
  ColumnLayout{anchors.fill:parent;anchors.margins:Theme.dp(24);spacing:Theme.dp(12)
-  SwirlText {text:"脚本";color:Theme.text;font.pixelSize:Theme.fontSize(24);font.weight:Font.DemiBold}
+  SwirlText {id:routeTitle;text:"脚本";color:Theme.text;font.pixelSize:Theme.fontSize(24);font.weight:Font.DemiBold}
   SwirlText {text:"本地 JavaScript 脚本在独立进程中执行，输入和结果使用 JSON。";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.WordWrap}
   SwirlDataTable{objectName:"localScriptTable";Layout.fillWidth:true;Layout.fillHeight:true;fillEmptyRows:true;rows:extensionsProvider.scripts;selectedId:page.selectedId;columns:[{key:"type",label:"类型",w:140},{key:"name",label:"名称",w:260}];onRowSelected:r=>page.selectedId=r.id}
   SwirlText {text:extensionsProvider.error;color:Theme.orange;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.WordWrap;textFormat:Text.PlainText}

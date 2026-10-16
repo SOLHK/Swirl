@@ -1,4 +1,5 @@
 #pragma once
+#include <QNetworkInterface>
 #include "ProxyEngine.h"
 #include "NodeStore.h"
 #include "NodeImportService.h"
@@ -59,7 +60,7 @@ class EngineController final : public QObject {
     Q_PROPERTY(bool lanEnabled READ lanEnabled NOTIFY statusChanged)
     Q_PROPERTY(bool lanConfigured READ lanConfigured NOTIFY optionsChanged)
     Q_PROPERTY(QString lanUsername READ lanUsername NOTIFY optionsChanged)
-    Q_PROPERTY(QStringList lanAddresses READ lanAddresses NOTIFY statusChanged)
+    Q_PROPERTY(QStringList lanAddresses READ lanAddresses NOTIFY lanAddressesChanged)
     Q_PROPERTY(bool tunRequested READ tunRequested NOTIFY statusChanged)
     Q_PROPERTY(bool tunEnabled READ tunEnabled NOTIFY statusChanged)
     Q_PROPERTY(bool elevated READ elevated CONSTANT)
@@ -148,6 +149,7 @@ public:
     bool lanConfigured() const { return !m_options.lanUsername.isEmpty() && !m_options.lanPassword.isEmpty(); }
     QString lanUsername() const { return m_options.lanUsername; }
     QStringList lanAddresses() const;
+    QList<QNetworkInterface> networkInterfaces() const { return m_interfaces; }
     Q_INVOKABLE bool configureLan(const QString &username,const QString &password);
     Q_INVOKABLE bool setLanEnabled(bool enabled);
     bool gatewayForwardingReady() const { return tunEnabled() && m_engine->status().gatewayForwarding; }
@@ -165,6 +167,8 @@ public:
     Q_INVOKABLE void setRoutingMode(const QString &mode);
     Q_INVOKABLE void setSystemProxy(bool enabled);
 signals:
+    void lanAddressesChanged();
+    void interfacesChanged();
     void nodeCatalogChanged();
     void selectionChanged();
     void diagnostic(const QString &module,const QString &code,const QString &message);
@@ -172,6 +176,10 @@ signals:
     void optionsChanged();
     void nodesChanged();
 private:
+    void refreshLanAddresses();
+    QStringList m_lanAddresses;
+    QList<QNetworkInterface> m_interfaces;
+    bool m_lanScanPending=false;
     bool m_shuttingDown=false;
     bool m_meteredPending=false,m_meteredOldTun=false;
     QString m_meteredOldMode;
