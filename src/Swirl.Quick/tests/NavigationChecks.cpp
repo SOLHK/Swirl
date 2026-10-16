@@ -58,6 +58,7 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
    if(auto *morph=item("sharedSurface")){
     unframed&=!morph->property("independentCard").toBool()&&morph->property("radius").toDouble()>0&&QQmlExpression(qmlContext(morph),morph,"border.width===0").evaluate().toBool();
     unframed&=QQmlExpression(qmlContext(morph),morph,"!settingsTransition || color.a<0.01 || Math.abs(color.r-(host.heroData.returning?host.heroData.toColor.r:host.heroData.fromColor.r))<0.005").evaluate().toBool();
+    unframed&=QQmlExpression(qmlContext(morph),morph,"!settingsTransition || color.a<0.01 || (Math.abs(color.r-Theme.material('content').r)<0.005 && Math.abs(color.g-Theme.material('content').g)<0.005 && Math.abs(color.b-Theme.material('content').b)<0.005)").evaluate().toBool();
    }
    if(round==0&&id=="subscriptions"&&!qApp->arguments().contains("--hero-no-recording")&&eval("pageLoader.moving").toBool()){
     const QString path=directory+"/settings-expansion";QDir().mkpath(path);

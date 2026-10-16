@@ -40,10 +40,11 @@ Item {
                     background:Rectangle {
                         id:entrySurface
                         property bool surfaceHidden:false
-                        color:entry.hovered?Theme.hover:Theme.material("content"); radius:Theme.cardRadius
+                        color:Theme.material("content"); radius:Theme.cardRadius
                         opacity:surfaceHidden?0:1
-                        border.width:surfaceHidden?0:Theme.borderWidth; border.color:entry.activeFocus?Theme.focusBorder:Theme.border
+                        border.width:surfaceHidden?0:Theme.borderWidth; border.color:entry.activeFocus||entry.hovered?Theme.focusBorder:Theme.border
                         Behavior on color { enabled:!entrySurface.surfaceHidden; ColorAnimation { duration:SwirlMotion.hoverDuration } }
+                        Behavior on border.color { enabled:!entrySurface.surfaceHidden; ColorAnimation { duration:SwirlMotion.hoverDuration } }
                     }
                     contentItem:Column {
                         spacing:Theme.dp(12)

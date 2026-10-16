@@ -37,6 +37,11 @@ square page border; ordinary internal cards retain their existing styling.
 The hub's decorative full-width header divider is removed. Its back control
 appears only near the completed expansion, reads "返回", and is absent on
 the hub; it no longer overlaps a still-visible "设置" card page.
+The source card keeps the regular white content material in the light theme
+instead of replacing it with the blue hover fill. Hover feedback moves to the
+existing rounded border with the same color transition duration; press and
+expansion motion stay enabled. The navigation fixture checks all RGB channels
+against the normal card material throughout the expanding surface's lifetime.
 
 The visible material seam came from a sidebar-only native blur surface and a
 different workspace tint, followed by a gradient used to soften their boundary.
