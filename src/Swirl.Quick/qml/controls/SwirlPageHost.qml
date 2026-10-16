@@ -65,7 +65,7 @@ Item {
   releaseSurfaces()
   hero.cancel()
   sourceSurface=null;targetSurface=null;heroData=null
-  for(const key of Object.keys(pages)){const loader=pages[key];loader.visible=loader===activeLoader;loader.enabled=loader===activeLoader;loader.startOpacity=loader===activeLoader?1:0;loader.endOpacity=loader.startOpacity}
+  for(const key of Object.keys(pages)){const loader=pages[key];loader.visible=loader===activeLoader;loader.enabled=loader===activeLoader;loader.startOpacity=loader===activeLoader?1:0;loader.endOpacity=loader.startOpacity;loader.startShift=Qt.point(0,0);loader.endShift=Qt.point(0,0)}
   leavingLoader=null
   if(activeLoader){activeLoader.visible=true;activeLoader.enabled=true}
   SwirlTransitionRegistry.setActive(transitionToken,false);trimCache()
@@ -74,8 +74,12 @@ Item {
  function captureOpacities(next){
   // Snapshot all live layers before retargeting. A third click must not drop
   // the still-visible first page or reset the incoming page to transparent.
-  const values=Object.keys(pages).map(key=>({loader:pages[key],alpha:pages[key].visible?pages[key].opacity:0}))
-  for(const value of values){value.loader.startOpacity=value.alpha;value.loader.endOpacity=value.loader===next?1:0;value.loader.visible=value.alpha>0||value.loader===next;value.loader.enabled=value.loader===next}
+  const values=Object.keys(pages).map(key=>({loader:pages[key],alpha:pages[key].visible?pages[key].opacity:0,shift:pages[key].contentShift}))
+  for(const value of values){value.loader.startOpacity=value.alpha;value.loader.endOpacity=value.loader===next?1:0;value.loader.startShift=value.shift;value.loader.endShift=Qt.point(0,0);value.loader.visible=value.alpha>0||value.loader===next;value.loader.enabled=value.loader===next}
+ }
+ function carryReturningContent(){
+  if(heroData && heroData.key==="settings" && heroData.returning && leavingLoader)
+   leavingLoader.endShift=Qt.point(leavingLoader.startShift.x+surfaceEnd.x-surfaceStart.x,leavingLoader.startShift.y+surfaceEnd.y-surfaceStart.y)
  }
  function requestRoute(){
   if(!initialized || !sourceComponent || !routeKey.length)return
@@ -99,12 +103,13 @@ Item {
   if(moving && next===leavingLoader){
    const current=Qt.rect(morph.x,morph.y,morph.width,morph.height)
    retargetRequestedRect=current
+   hero.reverse()
    captureOpacities(next)
    travel.stop();const previous=activeLoader;activeLoader=leavingLoader;leavingLoader=previous
    const color=sampledColor(morph);if(heroData && heroData.key==="settings")heroData=Object.assign({},heroData,{fromColor:color,toColor:heroData.fromColor,returning:!heroData.returning})
    const rect=surfaceStart;surfaceStart=current;surfaceEnd=rect
    const surface=sourceSurface;sourceSurface=targetSurface;targetSurface=surface
-   hero.reverse()
+   carryReturningContent()
    progress=0;activeLoader.enabled=true;leavingLoader.enabled=false
    retargetCommittedRect=Qt.rect(morph.x,morph.y,morph.width,morph.height)
    animate();return
@@ -135,6 +140,7 @@ Item {
     surfaceStart=carry||(surfaceKind==="settings"&&!request?Qt.rect(previous.x,previous.y,previous.width,previous.height):rectFor(from))
     surfaceEnd=surfaceKind==="settings"&&request?Qt.rect(next.x,next.y,next.width,next.height):rectFor(to)
     heroData={key:surfaceKind,card:request?request.card:back.card,returning:!request,fromColor:sampledColor(from),toColor:sampledColor(to)}
+    carryReturningContent()
     if(from.surfaceHidden!==undefined)from.surfaceHidden=true;if(to.surfaceHidden!==undefined)to.surfaceHidden=true
    }
    if(valid(source)&&valid(target))hero.start(source,target,source.text||"")
@@ -145,9 +151,9 @@ Item {
  function retargetGeometry(){
   if(!moving || !heroData || !valid(targetSurface))return
   const current=Qt.rect(morph.x,morph.y,morph.width,morph.height)
-  captureOpacities(activeLoader)
   hero.retarget()
-  travel.stop();surfaceStart=current;surfaceEnd=heroData.key==="settings"&&!heroData.returning?Qt.rect(activeLoader.x,activeLoader.y,activeLoader.width,activeLoader.height):rectFor(targetSurface);progress=0;animate()
+  captureOpacities(activeLoader)
+  travel.stop();surfaceStart=current;surfaceEnd=heroData.key==="settings"&&!heroData.returning?Qt.rect(activeLoader.x,activeLoader.y,activeLoader.width,activeLoader.height):rectFor(targetSurface);carryReturningContent();progress=0;animate()
  }
  onWidthChanged:Qt.callLater(retargetGeometry)
  onHeightChanged:Qt.callLater(retargetGeometry)
@@ -166,6 +172,9 @@ Item {
   property bool stateRestored:false
   property real startOpacity:0
   property real endOpacity:0
+  property point startShift:Qt.point(0,0)
+  property point endShift:Qt.point(0,0)
+  readonly property point contentShift:Qt.point(host.interpolate(startShift.x,endShift.x,host.surfacePosition),host.interpolate(startShift.y,endShift.y,host.surfacePosition))
   opacity:startOpacity+(endOpacity-startOpacity)*host.pageReveal
   x:0;y:host.insetFor(routeId);width:host.width;height:host.height-y;visible:false
   z:host.heroData && host.heroData.key==="settings" && host.heroData.returning?
@@ -196,7 +205,10 @@ Item {
    Loader {
     id:pageContent
     readonly property string routeId:cachedLoader.routeId
-    x:-revealViewport.x;y:-revealViewport.y;width:cachedLoader.width;height:cachedLoader.height
+    // On return the live body travels with the shrinking card instead of
+    // remaining stationary underneath its moving shared title. Retargeting
+    // snapshots this presentation offset without changing the page layout.
+    x:-revealViewport.x+cachedLoader.contentShift.x;y:-revealViewport.y+cachedLoader.contentShift.y;width:cachedLoader.width;height:cachedLoader.height
     // Functional content grows gently inside the expanding card. Opacity is
     // already captured on retarget, so rapid reversals preserve this scale too.
     scale:host.insetRoutes.indexOf(cachedLoader.routeId)>=0?host.interpolate(0.985,1,cachedLoader.opacity):1

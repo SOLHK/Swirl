@@ -107,7 +107,18 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
    if(table)check(table->property("renderedRows").toInt()>0&&table->property("renderedRows").toInt()<60,"180-node table only mounts the visible virtualized rows");
   }
   if(!qApp->arguments().contains("--hero-no-recording")&&(id=="dns"||id=="proxies"||id=="appearance"))window->grabWindow().save(directory+"/"+id+"-embedded.png");
-  click("settingsBackButton");check(settle()&&eval("AppState.currentPage==='featurehub'").toBool()&&eval("pageLoader.item").value<QObject *>()==hub,"back returns to the same cached hub: "+id);
+  const auto contentCenter=page?page->mapToScene(QPointF(page->width()/2,page->height()/2)):QPointF();
+  click("settingsBackButton");
+  if(round==0){
+   const bool returning=await([&]{return eval("pageLoader.moving && pageLoader.heroData && pageLoader.heroData.returning").toBool();},2000);
+   wait(70);
+   auto *boundary=item("sharedSurface");
+   const auto origin=eval("pageLoader.surfaceStart").toRectF();
+   const auto contentTravel=page?page->mapToScene(QPointF(page->width()/2,page->height()/2))-contentCenter:QPointF();
+   const auto surfaceTravel=boundary?boundary->position()-origin.topLeft():QPointF();
+   check(returning&&boundary&&surfaceTravel.manhattanLength()>1&&(contentTravel-surfaceTravel).manhattanLength()<0.5,"returning functional content travels with its card instead of crossing the shared title: "+id);
+  }
+  check(settle()&&eval("AppState.currentPage==='featurehub'").toBool()&&eval("pageLoader.item").value<QObject *>()==hub,"back returns to the same cached hub: "+id);
  }
  // Observe a real late frame before either layer is retired, with enough
  // duration to sample the final one percent without stopping the animation.
@@ -164,6 +175,17 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
  qInfo()<<"NAVIGATION_REVERSE"<<before<<after;
  check(surface&&eval("pageLoader.retargetRequestedRect===pageLoader.retargetCommittedRect").toBool(),"mid-flight back reverses from the current displayed boundary");
  check(settle()&&eval("AppState.currentPage==='featurehub'").toBool(),"interrupted expansion returns cleanly");
+ click("settings-subscriptions");check(settle(),"return retarget fixture expands normally");
+ click("settingsBackButton");
+ check(await([&]{return eval("pageLoader.moving && pageLoader.heroData && pageLoader.heroData.returning && pageLoader.position>0.15").toBool();},2000),"return retarget fixture reaches a moving content frame");
+ auto *clock=window->findChild<QObject *>("pageTravel");if(clock)QMetaObject::invokeMethod(clock,"pause");
+ auto *returningPage=qobject_cast<QQuickItem *>(pages.value("subscriptions"));
+ const auto centerBefore=returningPage?returningPage->mapToScene(QPointF(returningPage->width()/2,returningPage->height()/2)):QPointF();
+ eval("window.openSettings('subscriptions')");QCoreApplication::processEvents();
+ const auto centerAfter=returningPage?returningPage->mapToScene(QPointF(returningPage->width()/2,returningPage->height()/2)):QPointF();
+ check(returningPage&&(centerAfter-centerBefore).manhattanLength()<0.5,"reopening a returning card preserves its currently displayed functional content position");
+ check(settle()&&eval("pageLoader.item").value<QObject *>()==returningPage,"return reversal reuses and settles the same page");
+ click("settingsBackButton");check(settle(),"return retarget fixture settles back at the hub");
  route("proxies");auto *page=qobject_cast<QQuickItem *>(pages.value("proxies"));
  window->resize(window->minimumWidth(),window->minimumHeight());wait(180);
  auto *table=item("realNodeTable");check(table&&page&&table->mapToItem(page,QPointF()).x()>=0&&table->mapToItem(page,QPointF(table->width(),table->height())).x()<=page->width()+1,"node table fits the main content at minimum window size");
