@@ -89,6 +89,54 @@ fn tcp_large_transfer_halfclose_and_exact_counters() {
     assert!(TcpListener::bind(port).is_ok());
 }
 #[test]
+fn resolving_cidr_pins_destination_and_rule_updates_preserve_stream() {
+    use std::net::ToSocketAddrs;
+    let address = ("localhost", 0).to_socket_addrs().unwrap().next().unwrap();
+    let listener = TcpListener::bind(address).unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let worker = thread::spawn(move || {
+        let (mut socket, _) = listener.accept().unwrap();
+        socket
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .unwrap();
+        let mut data = [0; 5];
+        socket.read_exact(&mut data).unwrap();
+        socket.write_all(&data).unwrap();
+    });
+    let mut c = config();
+    c.selected = "reject".into();
+    c.rules = serde_json::from_value(json!([
+        {"matcher":{"type":"cidr","value":"127.0.0.0/8","resolve":true},"outbound":"direct"},
+        {"matcher":{"type":"cidr","value":"::1/128","resolve":true},"outbound":"direct"}
+    ]))
+    .unwrap();
+    let core = Core::start(c.clone()).unwrap();
+    let mut old = TcpStream::connect(core.address()).unwrap();
+    old.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+    write!(
+        old,
+        "CONNECT localhost:{port} HTTP/1.1\r\nHost: localhost:{port}\r\n\r\n"
+    )
+    .unwrap();
+    assert!(header(&mut old).starts_with(b"HTTP/1.1 200"));
+    c.rules =
+        serde_json::from_value(json!([{"matcher":{"type":"match"},"outbound":"reject"}])).unwrap();
+    core.configure(c).unwrap();
+    old.write_all(b"alive").unwrap();
+    let mut data = [0; 5];
+    old.read_exact(&mut data).unwrap();
+    assert_eq!(&data, b"alive");
+    let mut new = TcpStream::connect(core.address()).unwrap();
+    new.set_read_timeout(Some(Duration::from_secs(3))).unwrap();
+    write!(
+        new,
+        "CONNECT localhost:{port} HTTP/1.1\r\nHost: localhost:{port}\r\n\r\n"
+    )
+    .unwrap();
+    assert!(header(&mut new).starts_with(b"HTTP/1.1 502"));
+    worker.join().unwrap();
+}
+#[test]
 fn atomic_update_preserves_existing_stream_and_rejects_new() {
     let mut core = Core::start(config()).unwrap();
     let (port, peer) = echo();
@@ -149,10 +197,18 @@ fn socks5_fragmented_ipv6_and_bad_command() {
 }
 #[test]
 fn udp_associate_preserves_boundaries_and_rejects_fragments() {
-    let core = Core::start(config()).unwrap();
     let peer = UdpSocket::bind("127.0.0.1:0").unwrap();
     peer.set_read_timeout(Some(Duration::from_secs(3))).unwrap();
     let target = peer.local_addr().unwrap();
+    let mut c = config();
+    c.selected = "reject".into();
+    c.rules = serde_json::from_value(json!([
+        {"matcher":{"type":"source_cidr","value":"192.0.2.0/24"},"outbound":"reject"},
+        {"matcher":{"type":"destination_port","value":target.port()},"outbound":"direct"},
+        {"matcher":{"type":"match"},"outbound":"reject"}
+    ]))
+    .unwrap();
+    let core = Core::start(c).unwrap();
     let worker = thread::spawn(move || {
         for _ in 0..2 {
             let mut data = [0; 4096];

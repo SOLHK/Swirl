@@ -7,7 +7,57 @@
 #include <QNetworkRequest>
 #include <QUuid>
 #include <QSet>
+#include <QHostAddress>
+#include <QRegularExpression>
 #include <algorithm>
+
+namespace {
+QString routingConfiguration(const EngineStartOptions &o,const QString &selected,QJsonArray *nodes,QJsonArray *rules){
+ if(o.directSession||o.routingMode!="rule")return {};
+ if(o.customRules.size()>1000)return "Rust 自定义规则数量超过限制。";
+ QString direct="swirl-rule-direct",reject="swirl-rule-reject";
+ while(direct==selected)direct+='-';while(reject==selected)reject+='-';
+ bool needsDirect=false,needsReject=false;int index=0;
+ for(const auto &line:o.customRules){
+  ++index;const auto invalid=[index]{return QString("第 %1 条规则无效或 Rust 尚未支持；未忽略该规则。").arg(index);};
+  if(line.size()>2300||line.contains('\n')||line.contains('\r')||line.contains(QChar(0)))return invalid();
+  auto parts=line.split(',');for(auto &part:parts)part=part.trimmed();
+  const auto type=parts.value(0);const bool final=type=="MATCH";
+  const bool cidr=type=="IP-CIDR"||type=="IP-CIDR6";
+  const bool noResolve=cidr&&parts.size()==4&&parts[3]=="no-resolve";
+  if(parts.size()!=(final?2:3)&&!noResolve)return invalid();
+  const auto pattern=final?QString():parts[1];const auto policy=parts[final?1:2];
+  QJsonObject matcher;
+  if(final)matcher={{"type","match"}};
+  else if(type=="DOMAIN"||type=="DOMAIN-SUFFIX"){
+   if(pattern.size()>253||!QRegularExpression("^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$").match(pattern).hasMatch())return invalid();
+   matcher={{"type",type=="DOMAIN"?"domain":"domain_suffix"},{"value",pattern.toLower()}};
+  }else if(type=="DOMAIN-KEYWORD"){
+   if(!QRegularExpression("^[A-Za-z0-9_.-]{1,253}$").match(pattern).hasMatch())return invalid();
+   matcher={{"type","domain_keyword"},{"value",pattern.toLower()}};
+  }else if(cidr||type=="SRC-IP-CIDR"){
+   if(!pattern.contains('/'))return invalid();
+   const auto subnet=QHostAddress::parseSubnet(pattern);
+   if(subnet.first.isNull()||subnet.second<0||(type=="IP-CIDR"&&subnet.first.protocol()!=QAbstractSocket::IPv4Protocol)||(type=="IP-CIDR6"&&subnet.first.protocol()!=QAbstractSocket::IPv6Protocol))return invalid();
+   matcher={{"type",cidr?"cidr":"source_cidr"},{"value",subnet.first.toString()+"/"+QString::number(subnet.second)}};
+   if(cidr)matcher["resolve"]=!noResolve;
+  }else if(type=="DST-PORT"){
+   bool ok=false;const auto port=pattern.toUInt(&ok);
+   if(!ok||port==0||port>65535||!QRegularExpression("^[0-9]+$").match(pattern).hasMatch())return invalid();
+   matcher={{"type","destination_port"},{"value",int(port)}};
+  }else return invalid();
+  QString outbound;
+  if(policy=="SWIRL")outbound=selected;
+  else if(policy=="DIRECT"){outbound=direct;needsDirect=true;}
+  else if(policy=="REJECT"){outbound=reject;needsReject=true;}
+  else return invalid();
+  rules->append(QJsonObject{{"matcher",matcher},{"outbound",outbound}});
+ }
+ if(needsDirect)nodes->append(QJsonObject{{"id",direct},{"outbound",QJsonObject{{"type","direct"}}}});
+ if(needsReject)nodes->append(QJsonObject{{"id",reject},{"outbound",QJsonObject{{"type","reject"}}}});
+ return {};
+}
+}
 
 RustCoreEngine::RustCoreEngine(QObject *parent):ProxyEngine(parent){
  m_poll.setInterval(250);connect(&m_poll,&QTimer::timeout,this,&RustCoreEngine::refresh);
@@ -16,9 +66,18 @@ RustCoreEngine::RustCoreEngine(QObject *parent):ProxyEngine(parent){
 }
 RustCoreEngine::~RustCoreEngine(){stop();}
 QString RustCoreEngine::configurationSummary()const{return "Swirl Core Rust · Mixed HTTP/SOCKS5 · 原生 TCP/有界 UDP · 无外部内核回退";}
+QVariantList RustCoreEngine::routingRules()const{
+ QVariantList rows;int order=0;const bool direct=m_options.directSession||m_options.routingMode=="direct";
+ if(!direct&&m_options.routingMode=="rule")for(const auto &line:m_options.customRules){
+  const auto parts=line.split(',');const bool final=parts.value(0).trimmed()=="MATCH";
+  rows.append(QVariantMap{{"id",QString::number(order)},{"order",order},{"customIndex",order},{"type",final?"FINAL":parts.value(0).trimmed()},{"pattern",final?QString():parts.value(1).trimmed()},{"policy",parts.value(final?1:2).trimmed()},{"hits","—"}});++order;
+ }
+ rows.append(QVariantMap{{"id","final"},{"order",order},{"type","FINAL"},{"pattern",""},{"policy",direct?"DIRECT":"SWIRL"},{"hits","—"}});
+ return rows;
+}
 QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *output){
- if(o.preferCompatibility||o.tunEnabled||o.gatewayForwarding||o.allowLan||o.meteredNetwork||!o.dnsConfig.isEmpty()||!o.customRules.isEmpty()||!o.customGroups.isEmpty()||(o.smartRouting&&o.routingMode=="rule"&&!o.directSession))
-  return "当前 Rust 阶段尚未迁移此会话的 TUN、LAN、DNS、规则或兼容模式；已拒绝启动，不回退外部内核。";
+ if(o.preferCompatibility||o.tunEnabled||o.gatewayForwarding||o.allowLan||o.meteredNetwork||!o.dnsConfig.isEmpty()||!o.customGroups.isEmpty()||(o.smartRouting&&o.routingMode=="rule"&&!o.directSession))
+  return "当前 Rust 阶段尚未迁移此会话的 TUN、LAN、自定义 DNS、策略组、智能规则库或兼容模式；已拒绝启动，不回退外部内核。";
  if(o.routingMode!="global"&&o.routingMode!="rule"&&o.routingMode!="direct")return "Rust 路由模式无效。";
  QJsonArray nodes;QString selected=o.selectedNodeId;
  if(o.directSession||o.routingMode=="direct") {selected="explicit-direct";nodes.append(QJsonObject{{"id",selected},{"outbound",QJsonObject{{"type","direct"}}}});}
@@ -65,7 +124,8 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
   }
   nodes.append(QJsonObject{{"id",n.id},{"outbound",outbound}});
  }
- QJsonObject config{{"schema",1},{"listen",QString("127.0.0.1:%1").arg(o.proxyPort)},{"selected",selected},{"nodes",nodes},
+ QJsonArray rules;const auto routingError=routingConfiguration(o,selected,&nodes,&rules);if(!routingError.isEmpty())return routingError;
+ QJsonObject config{{"schema",1},{"listen",QString("127.0.0.1:%1").arg(o.proxyPort)},{"selected",selected},{"nodes",nodes},{"rules",rules},
   {"limits",QJsonObject{{"max_connections",128},{"handshake_timeout_ms",qBound(100,o.startupTimeoutMs,30000)}}}};
  if(!o.inboundUsername.isEmpty()||!o.inboundPassword.isEmpty())config["inbound_auth"]=QJsonObject{{"username",o.inboundUsername},{"password",o.inboundPassword}};
  *output=config;return {};

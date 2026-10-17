@@ -284,14 +284,20 @@ async fn session(
         )
         .await;
     }
-    let node = swirl_routing::select(&config, &request.target.host)?;
+    let (node, routed_target) = match route(&config, &request.target, peer.ip(), &resolver).await {
+        Ok(route) => route,
+        Err(error) => {
+            let _ = swirl_protocol::reply(&mut inbound, request.kind, false).await;
+            return Err(error);
+        }
+    };
     state.records.lock().map_err(|_| "StatsState")?.insert(
         id,
         Record {
             peer,
-            category: if matches!(node.outbound, Outbound::Direct) {
+            category: if matches!(node.outbound, Outbound::Direct {}) {
                 "direct"
-            } else if matches!(node.outbound, Outbound::Reject) {
+            } else if matches!(node.outbound, Outbound::Reject {}) {
                 "reject"
             } else {
                 "proxy"
@@ -305,7 +311,7 @@ async fn session(
     );
     let connected = timeout(
         limit,
-        swirl_protocol::connect(&node.outbound, &request.target, &resolver, limit),
+        swirl_protocol::connect(&node.outbound, &routed_target, &resolver, limit),
     )
     .await
     .map_err(|_| "UpstreamTimeout")
@@ -342,6 +348,45 @@ async fn session(
         .map_err(|_| "StreamIo")
 }
 
+async fn route<'a>(
+    config: &'a Config,
+    target: &Target,
+    source: std::net::IpAddr,
+    resolver: &Resolver,
+) -> Result<(&'a swirl_subscription::Node, Target)> {
+    use swirl_routing::Decision;
+    match swirl_routing::select(config, &target.host, target.port, source, None)? {
+        Decision::Node(node) => Ok((node, target.clone())),
+        Decision::Resolve => {
+            let addresses = timeout(
+                Duration::from_millis(config.limits.handshake_timeout_ms),
+                resolver.resolve(&target.host, target.port),
+            )
+            .await
+            .map_err(|_| "RouteDnsTimeout")??;
+            // Match and dial the same address. Do not retry another DNS answer
+            // under the first address's policy or let an upstream resolve again.
+            let address = addresses.first().ok_or("RouteDnsEmpty")?;
+            match swirl_routing::select(
+                config,
+                &target.host,
+                target.port,
+                source,
+                Some(&addresses),
+            )? {
+                Decision::Node(node) => Ok((
+                    node,
+                    Target {
+                        host: address.ip().to_string(),
+                        port: target.port,
+                    },
+                )),
+                Decision::Resolve => Err("RouteDnsUnresolved"),
+            }
+        }
+    }
+}
+
 struct UdpDispatch {
     address: SocketAddr,
     packet: Vec<u8>,
@@ -367,10 +412,11 @@ async fn prepare_udp(
     resolver: Arc<Resolver>,
     target: Target,
     payload: Vec<u8>,
+    source: std::net::IpAddr,
 ) -> Result<UdpDispatch> {
-    let node = swirl_routing::select(&config, &target.host)?;
+    let (node, target) = route(&config, &target, source, &resolver).await?;
     let (host, port, packet) = match &node.outbound {
-        Outbound::Direct => (target.host.clone(), target.port, payload.clone()),
+        Outbound::Direct {} => (target.host.clone(), target.port, payload.clone()),
         Outbound::Shadowsocks {
             host,
             port,
@@ -463,7 +509,7 @@ async fn udp_associate(
                 client=Some(source);
                 if cursor.len()>65507 {continue;}
                 if pending.len()>=4{udp_drop(&counters,&total);continue;}
-                pending.spawn(prepare_udp(config.clone(),resolver.clone(),target,cursor.to_vec()));
+                pending.spawn(prepare_udp(config.clone(),resolver.clone(),target,cursor.to_vec(),source.ip()));
             }
             packet=v4.recv_from(&mut from_v4)=>{
                 let (n,source)=match packet {Ok(v)=>v,Err(e) if transient_udp(&e)=>{udp_drop(&counters,&total);continue;},Err(_)=>return Err("UdpReceive")};

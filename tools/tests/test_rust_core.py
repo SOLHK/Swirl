@@ -234,6 +234,20 @@ class RustCoreIntegration(unittest.TestCase):
                     s.sendall(b'hello-independent-peer'); self.assertEqual(exact(s, 22), b'hello-independent-peer')
                 self.assertEqual(server.accepted, 1)
                 self.assertTrue(self.command(op='stop', handle=self.handle)['ok'])
+
+    def test_resolving_rules_send_the_matched_ip_to_upstream(self):
+        server=self.server('vless')
+        outbound={'type':'vless','host':'127.0.0.1','port':server.server_address[1],
+                  'uuid':'00112233-4455-6677-8899-aabbccddeeff'}
+        self.start(outbound,rules=[
+            {'matcher':{'type':'cidr','value':'127.0.0.0/8','resolve':True},'outbound':'node'},
+            {'matcher':{'type':'cidr','value':'::1/128','resolve':True},'outbound':'node'}])
+        with socket.create_connection(('127.0.0.1',self.port),timeout=5) as s:
+            s.sendall(b'CONNECT localhost:443 HTTP/1.1\r\nHost: localhost:443\r\n\r\n')
+            self.assertIn(b'200',header(s));s.sendall(b'pinned');self.assertEqual(exact(s,6),b'pinned')
+        self.assertEqual(len(server.requests),1)
+        self.assertTrue(ipaddress.ip_address(server.requests[0][0]).is_loopback)
+        self.assertEqual(server.requests[0][1],443)
     def test_vless_tcp_tls_addresses_and_invalid_responses(self):
         for tls in (False,True):
             server=self.server('vless',tls=tls)

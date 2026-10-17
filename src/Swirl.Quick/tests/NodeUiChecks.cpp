@@ -30,6 +30,21 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         check(QTest::qWaitFor([&]{auto *hero=item("nodeHero");return hero&&!hero->property("moving").toBool();},3500),"node card settles before next coordinate-based input");
     };
     ControlledNetwork net;if(!check(net.start(),"controlled real TCP endpoints start"))return 2;
+    const auto probeSelected=[&](SocksPeer &selected,SocksPeer &other,const char *label){
+        const auto forwarded=selected.forwarded,otherForwarded=other.forwarded;
+        const auto before=net.httpRequestsByExit;
+        click("nodeTestButton");
+        const bool finished=QTest::qWaitFor([&]{return !controller->tests()->busy();},41000);
+        const bool passed=finished&&controller->tests()->result(controller->selectedNodeId()).value("success").toBool()
+            &&selected.forwarded>forwarded&&other.forwarded==otherForwarded
+            &&net.httpRequestsByExit.value(selected.label)>before.value(selected.label)
+            &&net.httpRequestsByExit.value(other.label)==before.value(other.label)
+            &&net.httpRequestsByExit.value("DIRECT-BYPASS")==before.value("DIRECT-BYPASS");
+        // Native probes make one request. Assert the actual origin route, not
+        // the old compatibility probe's incidental two-connection count.
+        if(!passed)qInfo()<<"Probe evidence"<<finished<<selected.forwarded-forwarded<<other.forwarded-otherForwarded<<net.httpRequestsByExit;
+        check(passed,label);
+    };
     window->resize(1450,884);eval("AppState.navigate('proxies')");
     auto *host=window->findChild<QObject *>("pageLoader");
     check(QTest::qWaitFor([&]{auto *active=host?qvariant_cast<QObject *>(host->property("activeLoader")):nullptr;return active && active->property("routeId").toString()=="proxies" && !host->property("moving").toBool() && !host->property("pendingGrab").toBool();},3500),"node navigation animation settles before input");
@@ -46,8 +61,8 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     proxyPort.close();controlPort.close();
     select(0);click("nodeConnectButton");
     if(check(QTest::qWaitFor([&]{return controller->apiHealthy();},15000),"UI starts actual pinned Mihomo")) {
-        check(!controller->requestSucceeded(),"running engine does not imply successful request");fill("nodeTestUrl",net.url().toString());click("nodeTestButton");
-        check(QTest::qWaitFor([&]{return !controller->tests()->busy();},41000)&&controller->tests()->result(controller->selectedNodeId()).value("success").toBool()&&net.a.forwarded>=2&&net.b.forwarded==0,"UI real request passes only through selected node A");
+        check(!controller->requestSucceeded(),"running engine does not imply successful request");fill("nodeTestUrl",net.url().toString());
+        probeSelected(net.a,net.b,"UI real request passes only through selected node A");
         const auto pid=controller->processId();
         const auto selectedBeforeNavigation=controller->selectedNodeId();
         for(const auto &route:QStringList{"featurehub","settings","appearance","fonts","dns","modules","profiles","scripts","subscriptions","proxies"}){
@@ -57,8 +72,8 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         }
         select(1);
         check(QTest::qWaitFor([&]{return !controller->nodeBusy();},5000)&&controller->activeNodeId()==controller->selectedNodeId()&&controller->processId()==pid,"row selection switches real engine node without restarting");
-        check(!controller->tests()->result(controller->selectedNodeId()).value("success").toBool(),"new selected node has no inherited request result");click("nodeTestButton");
-        check(QTest::qWaitFor([&]{return !controller->tests()->busy();},41000)&&controller->tests()->result(controller->selectedNodeId()).value("success").toBool()&&net.b.forwarded>=2,"UI new requests use authenticated selected node B");
+        check(!controller->tests()->result(controller->selectedNodeId()).value("success").toBool(),"new selected node has no inherited request result");
+        probeSelected(net.b,net.a,"UI new requests use authenticated selected node B");
         check(item("nodeRequestState")&&item("nodeRequestState")->property("text").toString().contains("成功"),"visible request state follows actual result");click("nodeConnectButton");
         check(QTest::qWaitFor([&]{return controller->canStart();},4000)&&!controller->processAlive(),"UI disconnect reaps engine");
     }

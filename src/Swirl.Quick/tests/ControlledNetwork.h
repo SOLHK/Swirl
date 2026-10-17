@@ -84,6 +84,7 @@ public:
     SocksPeer a{&exits,"exit-A"}, b{&exits,"exit-B"};
     QSslCertificate certificate;
     int httpRequests=0,httpsRequests=0;
+    QHash<QString,int> httpRequestsByExit;
     bool start() {
         QFile cert(QString::fromUtf8(SWIRL_FIXTURE_DIR)+"/localhost-cert.pem"),key(QString::fromUtf8(SWIRL_FIXTURE_DIR)+"/localhost-key.pem");
         if(!cert.open(QIODevice::ReadOnly)||!key.open(QIODevice::ReadOnly))return false;
@@ -106,6 +107,7 @@ private:
                     if(!request.contains("\r\n\r\n"))return;
                     if(tls)++httpsRequests;else ++httpRequests;
                     const auto exit=exits.value(socket->peerPort(),"DIRECT-BYPASS");
+                    if(!tls)++httpRequestsByExit[exit];
                     const auto body=exit.toUtf8();
                     socket->write("HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nConnection: close\r\nContent-Length: "+QByteArray::number(body.size())+"\r\n\r\n"+body);
                     socket->disconnectFromHost();

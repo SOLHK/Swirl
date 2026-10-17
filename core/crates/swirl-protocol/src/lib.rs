@@ -411,8 +411,8 @@ pub async fn connect(
     handshake_limit: std::time::Duration,
 ) -> Result<swirl_transport::BoxStream> {
     let (host, port, auth, tls) = match outbound {
-        Outbound::Direct => return Ok(Box::new(connect_tcp(resolver, target).await?)),
-        Outbound::Reject => return Err("RouteRejected"),
+        Outbound::Direct {} => return Ok(Box::new(connect_tcp(resolver, target).await?)),
+        Outbound::Reject {} => return Err("RouteRejected"),
         Outbound::Shadowsocks { host, port, .. } => (host, *port, None, None),
         Outbound::Socks5 {
             host,

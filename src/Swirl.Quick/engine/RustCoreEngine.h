@@ -21,6 +21,7 @@ public:
  void probeNode(const QUrl &) override;
  Status status() const override {return m_status;}
  QString configurationSummary() const override;
+ QVariantList routingRules() const override;
  static QString configuration(const EngineStartOptions &,QJsonObject *);
 private:
  using Command=qintptr(*)(const unsigned char *,size_t,unsigned char *,size_t);

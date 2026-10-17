@@ -33,8 +33,8 @@ pub struct ObfsHttp {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Outbound {
-    Direct,
-    Reject,
+    Direct {},
+    Reject {},
     Vless {
         host: String,
         port: u16,
@@ -84,9 +84,28 @@ pub struct Node {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Matcher {
-    Domain { value: String },
-    DomainSuffix { value: String },
-    Cidr { value: ipnet::IpNet },
+    Domain {
+        value: String,
+    },
+    DomainSuffix {
+        value: String,
+    },
+    DomainKeyword {
+        value: String,
+    },
+    Cidr {
+        value: ipnet::IpNet,
+        // Existing schema-1 CIDR rules remain literal-IP-only by default.
+        #[serde(default)]
+        resolve: bool,
+    },
+    SourceCidr {
+        value: ipnet::IpNet,
+    },
+    DestinationPort {
+        value: u16,
+    },
+    Match {},
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -290,6 +309,16 @@ impl Config {
                 {
                     return Err("RuleDomain");
                 }
+                Matcher::DomainKeyword { value }
+                    if value.is_empty()
+                        || value.len() > 253
+                        || !value
+                            .bytes()
+                            .all(|b| b.is_ascii_alphanumeric() || b".-_".contains(&b)) =>
+                {
+                    return Err("RuleKeyword");
+                }
+                Matcher::DestinationPort { value: 0 } => return Err("RulePort"),
                 _ => {}
             }
         }
@@ -342,5 +371,34 @@ mod tests {
     #[test]
     fn duplicate_schema_rejected() {
         assert!(Config::parse(br#"{"schema":1,"schema":1,"listen":"127.0.0.1:0","selected":"d","nodes":[{"id":"d","outbound":{"type":"direct"}}]}"#).is_err());
+    }
+    #[test]
+    fn invalid_routing_fields_fail_before_activation() {
+        for kind in ["direct", "reject"] {
+            let data = format!(
+                r#"{{"schema":1,"listen":"127.0.0.1:0","selected":"d","nodes":[{{"id":"d","outbound":{{"type":"{kind}","unmapped":"value"}}}}]}}"#
+            );
+            assert!(
+                Config::parse(data.as_bytes()).is_err(),
+                "unknown {kind} field accepted"
+            );
+        }
+        for matcher in [
+            r#"{"type":"destination_port","value":0}"#,
+            r#"{"type":"destination_port","value":65536}"#,
+            r#"{"type":"domain_keyword","value":""}"#,
+            r#"{"type":"domain_keyword","value":"bad\\nkeyword"}"#,
+            r#"{"type":"source_cidr","value":"127.0.0.1/33"}"#,
+            r#"{"type":"cidr","value":"127.0.0.0/8","resolve":"false"}"#,
+            r#"{"type":"match","ignored":"field"}"#,
+        ] {
+            let data = format!(
+                r#"{{"schema":1,"listen":"127.0.0.1:0","selected":"d","nodes":[{{"id":"d","outbound":{{"type":"direct"}}}}],"rules":[{{"matcher":{matcher},"outbound":"d"}}]}}"#
+            );
+            assert!(
+                Config::parse(data.as_bytes()).is_err(),
+                "accepted {matcher}"
+            );
+        }
     }
 }
