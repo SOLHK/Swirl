@@ -18,6 +18,42 @@ class RustCoreTests:public QObject {
   o.nodes={n};o.selectedNodeId=n.id;return o;
  }
 private slots:
+ void strictDotMapsExistingFieldWithoutResolvingOrChangingUi(){
+  ControlledNetwork net;QVERIFY(net.start());auto o=options(net);o.routingMode="direct";
+  o.dnsConfig={{"mode",0},{"servers",""},{"encrypted","tls://DNS.fixture.invalid:8853"},{"useHosts",false},
+   {"hosts",QVariantList{QVariantMap{{"name","dns.fixture.invalid"},{"value","127.0.0.1"}}}}};
+  QJsonObject config;QVERIFY(RustCoreEngine::configuration(o,&config).isEmpty());
+  const auto dns=config["dns"].toObject();const auto endpoints=dns["tls_servers"].toArray();QCOMPARE(endpoints.size(),1);
+  const auto endpoint=endpoints.first().toObject();QCOMPARE(endpoint["address"].toString(),QString("127.0.0.1:8853"));
+  QCOMPARE(endpoint["tls"].toObject()["server_name"].toString(),QString("dns.fixture.invalid"));
+  QCOMPARE(endpoint["tls"].toObject()["alpn"].toArray(),QJsonArray{"dot"});
+  QVERIFY(dns["servers"].toArray().isEmpty());QVERIFY(!dns["use_system_hosts"].toBool());
+  // Configuration acceptance only; independent TLS peers verify authentication.
+  RustCoreEngine engine;engine.start(o);QVERIFY2(engine.status().state==ProxyEngine::State::Running,qPrintable(engine.status().message));engine.stop();
+  o.dnsConfig["hosts"]=QVariantList{};o.dnsConfig["encrypted"]="tls://127.0.0.1";
+  QVERIFY(RustCoreEngine::configuration(o,&config).isEmpty());
+  QCOMPARE(config["dns"].toObject()["tls_servers"].toArray().first().toObject()["address"].toString(),QString("127.0.0.1:853"));
+  o.dnsConfig["encrypted"]="tls://[::1]:8853/";
+  QVERIFY(RustCoreEngine::configuration(o,&config).isEmpty());
+  const auto v6=config["dns"].toObject()["tls_servers"].toArray().first().toObject();
+  QCOMPARE(v6["address"].toString(),QString("[::1]:8853"));QCOMPARE(v6["tls"].toObject()["server_name"].toString(),QString("::1"));
+ }
+ void strictDotRejectsAmbiguousOrUnimplementedBootstrap(){
+  ControlledNetwork net;QVERIFY(net.start());auto o=options(net);o.routingMode="direct";
+  o.dnsConfig={{"mode",0},{"servers",""},{"useHosts",false},{"hosts",QVariantList{}}};
+  const QJsonObject sentinel{{"unchanged",true}};
+  for(const auto &url:QStringList{"https://dns.fixture.invalid/dns-query","tcp://127.0.0.1","tls://dns.fixture.invalid",
+    "tls://127.0.0.1:0","tls://0.0.0.0","tls://[::]","tls://224.0.0.1","tls://127.0.0.1:99999",
+    "tls://user@127.0.0.1","tls://127.0.0.1?insecure=true","tls://127.0.0.1#name","tls://127.0.0.1/path",
+    "tls://%31%32%37.0.0.1","tls://127.0.0.1,other","tls://[fe80::1%251]"}){
+   o.dnsConfig["encrypted"]=url;QJsonObject config=sentinel;
+   QVERIFY2(!RustCoreEngine::configuration(o,&config).isEmpty(),qPrintable(url));QCOMPARE(config,sentinel);
+  }
+  o.dnsConfig["encrypted"]="tls://127.0.0.1";o.dnsConfig["servers"]="127.0.0.1";
+  QJsonObject config;QVERIFY(!RustCoreEngine::configuration(o,&config).isEmpty());
+  o.dnsConfig["servers"]="";o.dnsConfig["mode"]=1;QVERIFY(!RustCoreEngine::configuration(o,&config).isEmpty());
+  o.dnsConfig["mode"]=2;QVERIFY(!RustCoreEngine::configuration(o,&config).isEmpty());
+ }
  void customDnsMapsServersWithoutChangingSystemSettings(){
   ControlledNetwork net;QVERIFY(net.start());auto o=options(net);o.routingMode="direct";
   o.dnsConfig={{"mode",2},{"servers","127.0.0.1, ::1"},{"useHosts",false},{"hosts",QVariantList{QVariantMap{{"name","local.fixture.invalid"},{"value","127.0.0.1"}}}}};
@@ -86,7 +122,8 @@ private slots:
  void rulesValidateAllFieldsAndPreserveUnsupportedImports(){
   ControlledNetwork net;QVERIFY(net.start());auto o=options(net);o.routingMode="rule";
   auto unsupported=o.nodes.first();unsupported.id="unused";unsupported.protocol="vmess";o.nodes.append(unsupported);
-  o.customRules={"DOMAIN,localhost,SWIRL","DOMAIN-SUFFIX,example.org,DIRECT","DOMAIN-KEYWORD,ads,REJECT","IP-CIDR,127.0.0.0/8,DIRECT,no-resolve","IP-CIDR6,::1/128,DIRECT","SRC-IP-CIDR,127.0.0.0/8,DIRECT","DST-PORT,443,SWIRL","MATCH,REJECT"};
+  o.customRules={"DOMAIN,localhost,SWIRL","DOMAIN-SUFFIX,example.org,DIRECT","DOMAIN-KEYWORD,ads,REJECT","IP-CIDR,127.0.0.0/8,DIRECT,no-resolve","IP-CIDR6,::1/128,DIRECT","SRC-IP-CIDR,127.0.0.1/33,DIRECT","DST-PORT,443,SWIRL","MATCH,REJECT"};
+  o.customRules[5]="SRC-IP-CIDR,127.0.0.0/8,DIRECT";
   QJsonObject config;QVERIFY(RustCoreEngine::configuration(o,&config).isEmpty());
   QCOMPARE(config["nodes"].toArray().size(),3);QCOMPARE(config["rules"].toArray().size(),8);
   RustCoreEngine engine;engine.start(o);QCOMPARE(engine.status().state,ProxyEngine::State::Running);engine.stop();
