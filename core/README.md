@@ -9,7 +9,7 @@ are implemented and tested. This is **not the completed all-protocol product**.
 ## Build and verification
 
 Use stable Rust and a native C toolchain (ring builds C/assembly cryptography).
-Windows local validation: rustc 1.99.1, GNU x64, Qt 6.10.3, MinGW 13.1.0.
+Previous Windows local validation: rustc 1.99.1, GNU x64, Qt 6.10.3, MinGW 13.1.0.
 Cargo.lock pins dependencies; CI additionally checks Windows MSVC.
 
 ```text
@@ -34,28 +34,44 @@ the built swirl-api executable. No global certificate trust changes occur.
 `tools/Benchmark-RustCore.py` records loopback latency/throughput/CPU/memory and
 optional public HTTPS checks; it does not claim private-node performance.
 
+## Strict DoT stage
+
+DNS-over-TLS is now implemented in Rust using explicit IP bootstrap endpoints
+and separately verified authentication names. The existing DNS wire parser and
+rustls transport are reused. A/AAAA/CNAME queries reuse one authenticated stream
+per lookup, with bounded deadlines, generation-isolated TTL caches and no
+plaintext/system-DNS fallback. `tools/tests/test_dns_tls.py` supplies independent
+synthetic TLS peers; it is run by Rust CI alongside the original protocol tests.
+
+The existing Qt encrypted-DNS field maps a strict `tls://` URL; domain URLs need
+an exact local IP mapping. No GUI is changed. DoT currently connects directly to
+the configured resolver, not through proxy policy. DoH, system bootstrap, mixed
+resolver mode, DNS split and negative caching remain later stages. See
+[DoT semantics, configuration and evidence boundaries](../docs/RUST_DOT.md).
+
 ## Implemented boundary
 
 | Crate | Actual implementation | Not yet implemented |
 |---|---|---|
-| swirl-subscription | Versioned typed Swirl IR; bounded content detection for Clash YAML/JSON, sing-box JSON, URI/Base64 and INI; raw/unknown field preservation; redacted protocol/transport/TLS/cipher matrix; fully mapped TCP test candidates | Complete client-specific config execution and integrated subscription updating; existing C++ adapters and Python capture retained |
+| swirl-subscription | Versioned typed Swirl IR; bounded content detection for Clash YAML/JSON, sing-box JSON, URI/Base64 and INI; raw/unknown field preservation; redacted protocol/transport/TLS/cipher matrix; fully mapped TCP test candidates; validated explicit DoT settings | Complete client-specific config execution and integrated subscription updating; existing C++ adapters and Python capture retained |
 | swirl-protocol | Mixed HTTP/CONNECT/SOCKS5 input, input auth, HTTP CONNECT/SOCKS5 upstream auth, Trojan TLS framing, SS AEAD TCP/UDP, simple-obfs HTTP TCP, VLESS v0 TCP with optional verified TLS | SOCKS4, SS2022/SSR/VMess/REALITY/QUIC families, VLESS Vision/mux/encryption extensions, other protocol UDP and obfs TLS |
 | swirl-transport | rustls TLS with verification/SNI/ALPN, bounded duplex copying, independent half-close, live byte counters | WS/gRPC/XHTTP protocol transports, mux, QUIC; application WS/SSE opaque tunneling is a different layer |
 | swirl-routing | Ordered domain/suffix/keyword, source/destination CIDR, destination port and final rules; lazy system DNS and pinned IP decisions; Qt rules map DIRECT/REJECT/selected node/manual groups; atomic selector updates | Process rules, GEOIP/GEOSITE/MRS, nested/automatic groups/failover, policy-aware multi-address retries |
-| swirl-dns | Rust-owned custom DNS UDP/TCP retry, validated A/AAAA/CNAME and bounded positive TTL cache; system resolver, exact hosts through Qt, immutable caches, shared 8-query budget, max 16 addresses | Combined system/custom mode, encrypted DNS, EDNS/DNSSEC, negative cache, DNS split/Fake-IP |
+| swirl-dns | Rust custom UDP/TCP DNS and strict DoT with explicit IP bootstrap; validated A/AAAA/CNAME and bounded positive TTL cache; system resolver, exact hosts through Qt, immutable caches, shared 8-query budget, max 16 addresses | Combined system/custom mode, DoH, proxy-routed encrypted DNS, domain bootstrap, EDNS/DNSSEC, negative cache, DNS split/Fake-IP |
 | swirl-core | Two Tokio workers, max 256 sessions, immutable per-session plan, atomic updates, stop/cancel, stats; SOCKS5 UDP ASSOCIATE with explicit DIRECT or SS AEAD routes | Other protocol UDP, TUN, platform network takeover |
 | swirl-api | ABI v1 caller-buffer JSON, lifecycle handles, start/configure/select/snapshot/stop; local stdin harness | More advanced policy/config schemas and persisted IR migration |
 
 The Qt adapter exposes supported HTTP/SOCKS5/Trojan/SS AEAD/VLESS TCP nodes using the existing
 controls. Unsupported options fail explicitly before startup or selection. In
-particular, old default smart-routing/TUN/encrypted DNS sessions are not silently
+particular, old default smart-routing/TUN/unsupported DNS sessions are not silently
 downgraded to global/direct. Existing stored nodes and unselected unsupported
 imports are preserved. Complete product migration still requires those features.
 Custom rule mode is now connected to the existing rule editor and runtime rule
 list. See [native routing semantics and evidence](../docs/RUST_NATIVE_ROUTING.md),
 including no-resolve, mode switches, DNS address pinning and unsupported options.
-The existing system/custom DNS modes and local mappings now execute in Rust; see
-[local DNS semantics and limits](../docs/RUST_LOCAL_DNS.md).
+The existing system/custom DNS modes and local mappings execute in Rust; see
+[local DNS semantics and limits](../docs/RUST_LOCAL_DNS.md) and the newer
+[strict DoT stage](../docs/RUST_DOT.md).
 
 The Rust-only build is an opt-in development artifact, not a replacement that
 silently removes capabilities from the user's normal installation.
@@ -169,12 +185,14 @@ it does not silently ignore unsupported pins or certificate options.
 
 Rust tests use actual loopback sockets and independent Python protocol peers.
 Public HEAD tests through Rust DIRECT only establish that path, not remote
-SOCKS/Trojan provider operation. TLS/Trojan loopback tests establish the tested
+SOCKS/Trojan provider operation. TLS/Trojan/DoT loopback tests establish the tested
 framing and certificate behavior, not all public servers or private extensions.
 Local private subscription capture and offline parsing have been exercised;
 this does not establish working provider connections. TUN, real provider traffic,
 Codex remote control, mobile actions, long soak tests,
 visual acceptance and non-Windows products are still unverified.
+The current DoT stage uses CI for native builds and synthetic peers; the user's
+personal Windows/public-or-private resolver testing remains deferred.
 
 The original C++ native engine, encrypted NodeStore, importers, proxy recovery,
 subscription capture utility and regression tests remain available. No Go/C#
@@ -185,6 +203,8 @@ network core or pre-existing Rust workspace was present in the audited baseline.
 - SOCKS5: https://www.rfc-editor.org/rfc/rfc1928
 - SOCKS username/password: https://www.rfc-editor.org/rfc/rfc1929
 - HTTP message syntax: https://www.rfc-editor.org/rfc/rfc9112
+- DNS over TLS: https://www.rfc-editor.org/rfc/rfc7858
+- DNS privacy profiles: https://www.rfc-editor.org/rfc/rfc8310
 - Trojan: https://trojan-gfw.github.io/trojan/protocol.html
 - Tokio half-close semantics: https://docs.rs/tokio/latest/tokio/io/fn.copy_bidirectional.html
 - rustls: https://rustls.dev/docs/rustls/index.html

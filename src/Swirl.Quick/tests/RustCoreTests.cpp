@@ -122,8 +122,7 @@ private slots:
  void rulesValidateAllFieldsAndPreserveUnsupportedImports(){
   ControlledNetwork net;QVERIFY(net.start());auto o=options(net);o.routingMode="rule";
   auto unsupported=o.nodes.first();unsupported.id="unused";unsupported.protocol="vmess";o.nodes.append(unsupported);
-  o.customRules={"DOMAIN,localhost,SWIRL","DOMAIN-SUFFIX,example.org,DIRECT","DOMAIN-KEYWORD,ads,REJECT","IP-CIDR,127.0.0.0/8,DIRECT,no-resolve","IP-CIDR6,::1/128,DIRECT","SRC-IP-CIDR,127.0.0.1/33,DIRECT","DST-PORT,443,SWIRL","MATCH,REJECT"};
-  o.customRules[5]="SRC-IP-CIDR,127.0.0.0/8,DIRECT";
+  o.customRules={"DOMAIN,localhost,SWIRL","DOMAIN-SUFFIX,example.org,DIRECT","DOMAIN-KEYWORD,ads,REJECT","IP-CIDR,127.0.0.0/8,DIRECT,no-resolve","IP-CIDR6,::1/128,DIRECT","SRC-IP-CIDR,127.0.0.0/8,DIRECT","DST-PORT,443,SWIRL","MATCH,REJECT"};
   QJsonObject config;QVERIFY(RustCoreEngine::configuration(o,&config).isEmpty());
   QCOMPARE(config["nodes"].toArray().size(),3);QCOMPARE(config["rules"].toArray().size(),8);
   RustCoreEngine engine;engine.start(o);QCOMPARE(engine.status().state,ProxyEngine::State::Running);engine.stop();

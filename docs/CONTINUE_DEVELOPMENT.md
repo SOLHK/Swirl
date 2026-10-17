@@ -1,10 +1,18 @@
 # Swirl 接续开发入口
 
-更新日期：2026-10-17。当前阶段已在 Rust 中新增自定义 DNS 的 UDP 查询、TCP 重试、A/AAAA/CNAME、正向 TTL 缓存及现有 Qt 配置映射。代码及功能以本文件所在的 `test` 提交为准；下文 `72d5bd5` 的记录是上一阶段历史验证。
+更新日期：2026-10-17。本轮从 `fbebb28` 接续，实现 Rust 严格 DoT（DNS over TLS）和现有 Qt 加密 DNS 字段映射；UDP/TCP/A/AAAA/CNAME/TTL 基础继续复用。详见 [DoT 实现、限制和验收](RUST_DOT.md)。DoH、域名 bootstrap 策略及 DNS 分流仍未完成。代码及功能以本文件所在的 `test` 提交为准，历史测试记录不代表本轮真实节点验收。
+
+## 当前接手注意事项
+
+- 用户已授权在 GitHub 上继续开发并推送 `test`，不使用 Gemini；个人 Windows/私有节点测试等其 Codex 额度恢复后再做。
+- 新增 DoT 的配置验证、Rust 网络实现、11 项独立 TLS 对端测试，以及 Qt 现有字段映射测试。CI 运行记录在 [PR #22](https://github.com/SOLHK/Swirl/pull/22) 和对应提交 Actions 中；不得将测试文件存在当作已执行。
+- DoT 目前使用明确 IP bootstrap，域名 URL 需已有精确本地 IP 映射；保持证书认证名。没有系统 DNS 引导、明文回退或经代理策略发送 DoT。DoH、混合 DNS 模式、负缓存等后续单独推进。
+- 页面、布局、动效、系统代理和私有订阅未改动。无需重新开启订阅下载窗口。
+- 在电脑上继续时先同步 `origin/test`，核对基线及未提交修改；以 `SWIRL_USE_RUST_CORE=ON` 构建，不能把默认历史兼容构建当作 Rust 验收。
 
 ## 仓库是否完整
 
-**当前已实现的软件项目源码已全部提交到 SOLHK/Swirl 的 `test`。**
+**当前已实现的软件项目源码已提交到 SOLHK/Swirl 的 `test`。**
 这与“所有规划功能已完成”不同：Rust 全量迁移仍在进行。
 开始前执行 `git fetch origin`、核对 `origin/test`、工作区状态及当前分支，避免从旧的 `main` 继续。
 
@@ -18,7 +26,7 @@
 历史 `build-current-portable.ps1` / `build-quick-windows.ps1` 面向兼容构建，不能直接当 Rust 打包脚本。
 本机交付 ZIP 不一定等于 GitHub Releases 上最近的旧版安装程序，必须核对提交和内核身份。
 
-本次完整性检查：`72d5bd5` 纯 Git 导出包含 630 个文件，无源码子模块、LFS 占位文件或
+历史完整性检查：`72d5bd5` 纯 Git 导出包含 630 个文件，无源码子模块、LFS 占位文件或
 构建缓存之外的被忽略文件；从独立导出目录读取 Cargo workspace 得到全部 7 个 crate，
 Qt/Rust CMake configure/generate 成功。此检查不声称重新完成了一次全量编译，已有构建测试见下文。
 
@@ -44,14 +52,14 @@ Qt/Rust CMake configure/generate 成功。此检查不声称重新完成了一�
 |---|---|
 | `core/crates/swirl-protocol` | HTTP/CONNECT/SOCKS5 入站；HTTP CONNECT、SOCKS5、Trojan TLS、SS AEAD TCP/UDP、simple-obfs HTTP、基础 VLESS v0 TCP/TLS |
 | `core/crates/swirl-routing` | 顺序域名/后缀/关键词、目标端口、来源/目标 CIDR、MATCH；手动 selector |
-| `core/crates/swirl-dns` | 自研 Rust DNS 报文/UDP/TCP 重试/A/AAAA/CNAME/TTL；有界系统解析、精确 hosts、本地映射开关、各代缓存隔离及共享并发上限 |
+| `core/crates/swirl-dns` | 自研 Rust DNS 报文/UDP/TCP/严格 DoT/A/AAAA/CNAME/TTL；有界系统解析、精确 hosts、各代缓存隔离及共享并发上限 |
 | `core/crates/swirl-core` | 有界运行时、不可变会话配置、原子节点/组/配置更新、旧 TCP/UDP 保留原出口、流量统计 |
-| `core/crates/swirl-subscription` | typed IR、Clash YAML/JSON、sing-box JSON、URI/Base64、部分 INI 识别与保留、脱敏能力报告；并非所有格式都可执行 |
+| `core/crates/swirl-subscription` | typed IR、Clash YAML/JSON、sing-box JSON、URI/Base64、部分 INI 识别与保留、脱敏能力报告；新增有界严格 DoT 配置；并非所有格式都可执行 |
 | `core/crates/swirl-transport` / `swirl-api` | 验证 TLS、背压/半关闭；ABI v1 JSON 控制、stdin harness、离线 inspector |
-| `src/Swirl.Quick/engine/RustCoreEngine.*` | 现有 Qt 控制层到 Rust DLL；规则、手动组和本地 DNS 映射；明确拒绝未迁移会话 |
-| `tools/` | 私有采集/离线分析、独立协议对端、Codex 本地代理配置管理与测试 |
+| `src/Swirl.Quick/engine/RustCoreEngine.*` / `RustDnsConfiguration.h` | 现有 Qt 控制层到 Rust DLL；规则、手动组、本地 DNS 与显式 DoT 映射；明确拒绝未迁移会话 |
+| `tools/` | 私有采集/离线分析、独立协议/DoT 对端、Codex 本地代理配置管理与测试 |
 
-关键边界：[规则与手动组](RUST_NATIVE_ROUTING.md)、[本地 DNS](RUST_LOCAL_DNS.md)、
+关键边界：[规则与手动组](RUST_NATIVE_ROUTING.md)、[本地 DNS](RUST_LOCAL_DNS.md)、[DoT](RUST_DOT.md)、
 [SS-02 审核处理](SS02_REVIEW_DISPOSITION.md)、[Codex 管理](CODEX_PROXY_MANAGEMENT.md)。
 手动组没有新增 UI 选择按钮；默认首成员或明确 default-selected，API 支持 select_group。
 智能 MRS 路由尚未迁移，因此启用该默认设置的会话仍会被 Rust 拒绝；不可静默降级为全局。
@@ -82,6 +90,7 @@ $env:SWIRL_RUST_INSPECTOR=(Resolve-Path build/rust-qt/rust-target/release/swirl-
 $env:SWIRL_RUST_QT_TESTS=(Resolve-Path build/rust-qt/SwirlRustCoreTests.exe).Path
 py -3 tools/tests/test_rust_core.py
 py -3 tools/tests/test_shadowsocks.py
+py -3 tools/tests/test_dns_tls.py
 py -3 tools/tests/test_subscription_capture.py
 py -3 tools/tests/test_codex_management.py
 ```
@@ -98,21 +107,23 @@ Rust 预览部署至少需 Swirl.exe、swirl_api.dll、各辅助 EXE、Qt/QML �
 
 ## 已有验证与仍需做的工作
 
-当前自定义 DNS 阶段：本机 Rust 43 项、独立协议 28 项（含 IPv6 DNS 服务端和 TCP 重试）、
+DoT 阶段的实际提交、CI 与待个人电脑验收范围见 [DoT 文档](RUST_DOT.md) 和 [PR #22](https://github.com/SOLHK/Swirl/pull/22)。不沿用旧数字证明新实现；此轮未访问私有节点或修改个人 Windows 网络。
+
+上一自定义 UDP/TCP DNS 阶段：本机 Rust 43 项、独立协议 28 项（含 IPv6 DNS 服务端和 TCP 重试）、
 采集/离线 23 项及 Qt Rust CTest 通过；fmt/check/clippy 通过。DNS 核心报文与网络执行代码
-在 `core/crates/swirl-dns/src/wire.rs`，Qt 只转换已有设置。此阶段不声称真实公网 DNS、
-私有节点 DNS、DoH/DoT、EDNS 或 DNSSEC 已验证；对应新提交的跨平台结果查看 Actions。
+在 `core/crates/swirl-dns/src/wire.rs`，Qt 只转换已有设置。该历史阶段没有验证真实公网 DNS、
+私有节点 DNS、DoH/DoT、EDNS 或 DNSSEC；对应提交跨平台结果查看 Actions。
 
 `72d5bd5` 本机 Windows GNU/Qt 6.10.3：39 项 Rust、23 项独立协议（含 Qt SS/VLESS 对端）、
 23 项采集/离线测试，以及 Qt Rust CTest 通过。fmt/check/clippy 通过。独立 SDK PATH 的预览启动、
 ZIP CRC、包内 DLL 哈希及私有内容扫描通过。GNU 链接器仍有 `.drectve` 警告，未隐藏。
 这些本机结果不替代对应提交的 GitHub CI；查看 [该提交 Actions](https://github.com/SOLHK/Swirl/actions?query=branch%3Atest)。
 规则阶段 `7c7b884` 的旧版节点 UI 164 项通过；该修复已包含在当前源码。
-本地缓存 14 份导出、12 个不同文档离线解析通过；本提交未做私有节点 TCP/UDP 联网验收。
+本地缓存 14 份导出、12 个不同文档离线解析通过；本轮没有新增私有节点 TCP/UDP 联网验收。
 
 建议后续按阶段实现并分别推送：
 
-1. 加密 DNS及系统/自定义混合模式：自定义 IP DNS 的 Rust UDP/TCP 基础已完成，接着定义 DoH/DoT、bootstrap、证书、分流与负缓存语义；不要重复重写现有报文/TTL实现。
+1. DoH、bootstrap 策略、系统/自定义混合模式、分流与负缓存：明确 IP 的 DoT 已补充，继续定义加密解析的路由和多地址重试；不要重复重写 UDP/TCP/DoT 报文与 TTL 基础。
 2. 自动测速、fallback/load-balance：有界健康检查、明确选择语义、不重放已有请求、保留旧连接，不能把 manual 解析冒充自动组。
 3. 智能规则库/MRS、进程规则与 DNS 分流；保持原始配置和未知字段，禁止静默略过。
 4. WS/gRPC/XHTTP、REALITY/Vision、VMess/SS2022、QUIC 等缺少的协议/传输，分别提供互操作证据。
