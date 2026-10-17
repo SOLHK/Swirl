@@ -86,9 +86,7 @@ mod tests {
 
     #[test]
     fn tls_cannot_downgrade_or_exceed_endpoint_budget() {
-        assert!(
-            config(json!({"tls_servers": [endpoint()], "servers": ["127.0.0.1:53"]})).is_err()
-        );
+        assert!(config(json!({"tls_servers": [endpoint()], "servers": ["127.0.0.1:53"]})).is_err());
         assert!(config(json!({"tls_servers": [endpoint(), endpoint()]})).is_err());
         let servers: Vec<_> = (853..858)
             .map(|port| {
