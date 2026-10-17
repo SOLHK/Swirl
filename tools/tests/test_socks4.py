@@ -288,7 +288,29 @@ class Socks4Integration(unittest.TestCase):
         self.start(self.config(inbound_auth={'username': 'user', 'password': 'password'}))
         with self.socket() as stream:
             stream.sendall(b'\x04\x01' + struct.pack('!H', origin.server_address[1]) + socket.inet_aton('127.0.0.1') + b'user\0')
-            self.assertEqual(exact(stream, 8)[:2], b'\0\x5b')
+            # Early password-policy rejection leaves the request unread. TCP
+            # may deliver EOF/RST before all denial bytes, notably on Windows.
+            reply = b''
+            try:
+                while len(reply) < 8:
+                    part = stream.recv(8 - len(reply))
+                    if not part:
+                        break
+                    reply += part
+            except ConnectionResetError:
+                pass
+            self.assertEqual(reply, (b'\0\x5b' + b'\0' * 6)[:len(reply)])
+        # A transport close alone cannot prove authentication was enforced.
+        deadline = time.monotonic() + 2
+        while True:
+            status = self.command(op='snapshot', handle=self.handle)['status']
+            if status['active'] == 0 or time.monotonic() >= deadline:
+                break
+        self.assertEqual(status['accepted'], 1)
+        self.assertEqual(status['active'], 0)
+        self.assertEqual(status['failed'], 1)
+        self.assertEqual(status['last_error'], 'InboundAuthentication')
+        self.assertEqual(status['connections'], [])
         self.assertEqual(origin.accepted, 0)
 
     def test_invalid_command_userid_domain_and_zero_port_are_rejected(self):
