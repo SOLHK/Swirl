@@ -1,7 +1,7 @@
 //! Bounded system resolver and cache. DoH/DoT/Fake-IP are not claimed here.
 use std::{
     collections::HashMap,
-    net::SocketAddr,
+    net::{IpAddr, SocketAddr},
     sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
@@ -11,21 +11,41 @@ type Cache = HashMap<(String, u16), (Instant, Vec<SocketAddr>)>;
 pub struct Resolver {
     cache: Mutex<Cache>,
     permits: Arc<Semaphore>,
+    hosts: HashMap<String, IpAddr>,
 }
 impl Default for Resolver {
     fn default() -> Self {
         Self {
             cache: Mutex::new(HashMap::new()),
             permits: Arc::new(Semaphore::new(8)),
+            hosts: HashMap::new(),
         }
     }
 }
 impl Resolver {
+    /// Each immutable configuration owns a separate cache and host table, while
+    /// every generation shares the same cap on still-running OS lookups.
+    pub fn with_hosts(&self, hosts: &[swirl_subscription::HostMapping]) -> Self {
+        Self {
+            cache: Mutex::new(HashMap::new()),
+            permits: self.permits.clone(),
+            hosts: hosts
+                .iter()
+                .map(|h| (h.name.to_ascii_lowercase(), h.address))
+                .collect(),
+        }
+    }
+    pub fn mapped_host(&self, host: &str) -> Option<IpAddr> {
+        self.hosts.get(&host.to_ascii_lowercase()).copied()
+    }
     pub async fn resolve(&self, host: &str, port: u16) -> Result<Vec<SocketAddr>, &'static str> {
         if port == 0 || !swirl_subscription::valid_host(host) {
             return Err("DnsInvalidTarget");
         }
         if let Ok(ip) = host.parse() {
+            return Ok(vec![SocketAddr::new(ip, port)]);
+        }
+        if let Some(ip) = self.mapped_host(host) {
             return Ok(vec![SocketAddr::new(ip, port)]);
         }
         let key = (host.to_ascii_lowercase(), port);
@@ -76,5 +96,38 @@ mod tests {
         assert!(r.resolve("::1", 80).await.unwrap()[0].is_ipv6());
         assert!(!r.resolve("localhost", 80).await.unwrap().is_empty());
         assert!(r.resolve("bad\nhost", 80).await.is_err());
+    }
+    #[tokio::test]
+    async fn host_maps_are_case_insensitive_and_generations_share_only_budget() {
+        use swirl_subscription::HostMapping;
+        let root = Resolver::default();
+        let old = root.with_hosts(&[HostMapping {
+            name: "Fixture.Invalid".into(),
+            address: "127.0.0.1".parse().unwrap(),
+        }]);
+        let next = old.with_hosts(&[HostMapping {
+            name: "fixture.invalid".into(),
+            address: "::1".parse().unwrap(),
+        }]);
+        assert!(Arc::ptr_eq(&old.permits, &next.permits));
+        assert_eq!(
+            old.resolve("FIXTURE.INVALID", 80).await.unwrap(),
+            vec!["127.0.0.1:80".parse().unwrap()]
+        );
+        assert_eq!(
+            next.resolve("fixture.invalid", 443).await.unwrap(),
+            vec!["[::1]:443".parse().unwrap()]
+        );
+        assert!(next.resolve("fixture.invalid", 0).await.is_err());
+        old.cache.lock().unwrap().insert(
+            ("cached.invalid".into(), 80),
+            (Instant::now(), vec!["127.0.0.9:80".parse().unwrap()]),
+        );
+        assert!(next.cache.lock().unwrap().is_empty());
+        assert!(root.mapped_host("fixture.invalid").is_none());
+        assert_eq!(
+            old.resolve("fixture.invalid", 80).await.unwrap()[0].ip(),
+            "127.0.0.1".parse::<IpAddr>().unwrap()
+        );
     }
 }

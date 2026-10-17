@@ -586,6 +586,7 @@ fn ss_outbound(raw: &Value, family: &str) -> Result<Outbound, &'static str> {
         }],
         rules: vec![],
         selectors: vec![],
+        dns: Default::default(),
         inbound_auth: None,
         limits: Limits::default(),
     };
@@ -929,6 +930,7 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
                     }],
                     rules: Vec::new(),
                     selectors: Vec::new(),
+                    dns: Default::default(),
                     inbound_auth: None,
                     limits: Limits::default(),
                 };

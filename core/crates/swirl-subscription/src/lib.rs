@@ -126,6 +126,22 @@ pub struct Selector {
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct HostMapping {
+    pub name: String,
+    pub address: std::net::IpAddr,
+}
+
+#[derive(Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Dns {
+    #[serde(default)]
+    pub hosts: Vec<HostMapping>,
+    #[serde(default)]
+    pub force_proxy_hosts: bool,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Limits {
     pub max_connections: usize,
     pub handshake_timeout_ms: u64,
@@ -150,6 +166,8 @@ pub struct Config {
     pub rules: Vec<Rule>,
     #[serde(default)]
     pub selectors: Vec<Selector>,
+    #[serde(default)]
+    pub dns: Dns,
     #[serde(default)]
     pub inbound_auth: Option<Credentials>,
     #[serde(default)]
@@ -224,11 +242,21 @@ impl Config {
             || self.nodes.len() > 512
             || self.rules.len() > 4096
             || self.selectors.len() > 128
+            || self.dns.hosts.len() > 512
             || !(1..=256).contains(&self.limits.max_connections)
             || !(100..=30000).contains(&self.limits.handshake_timeout_ms)
             || !valid_auth(&self.inbound_auth)
         {
             return Err("ConfigBounds");
+        }
+        let mut host_names = HashSet::new();
+        for host in &self.dns.hosts {
+            if !valid_host(&host.name)
+                || host.name.parse::<std::net::IpAddr>().is_ok()
+                || !host_names.insert(host.name.to_ascii_lowercase())
+            {
+                return Err("DnsHostMapping");
+            }
         }
         let mut ids = HashSet::new();
         for node in &self.nodes {
@@ -428,6 +456,23 @@ mod tests {
                 Config::parse(data.as_bytes()).is_err(),
                 "accepted {selector}"
             );
+        }
+    }
+    #[test]
+    fn dns_rejects_ambiguous_mapping_and_unknown_settings() {
+        for dns in [
+            r#"{"hosts":[{"name":"a.test","address":"127.0.0.1"},{"name":"A.test","address":"::1"}]}"#,
+            r#"{"hosts":[{"name":"*.test","address":"127.0.0.1"}]}"#,
+            r#"{"hosts":[{"name":"127.0.0.1","address":"::1"}]}"#,
+            r#"{"hosts":[{"name":"a.test","address":"not-ip"}]}"#,
+            r#"{"hosts":[{"name":"a.test","address":"127.0.0.1","server":"other"}]}"#,
+            r#"{"force_proxy_hosts":"true"}"#,
+            r#"{"nameserver":"unknown"}"#,
+        ] {
+            let data = format!(
+                r#"{{"schema":1,"listen":"127.0.0.1:0","selected":"d","nodes":[{{"id":"d","outbound":{{"type":"direct"}}}}],"dns":{dns}}}"#
+            );
+            assert!(Config::parse(data.as_bytes()).is_err(), "accepted {dns}");
         }
     }
     #[test]

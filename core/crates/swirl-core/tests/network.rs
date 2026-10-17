@@ -231,6 +231,10 @@ fn udp_associate_preserves_boundaries_and_rejects_fragments() {
     peer.set_read_timeout(Some(Duration::from_secs(3))).unwrap();
     let target = peer.local_addr().unwrap();
     let mut c = config();
+    c.dns.hosts = vec![swirl_subscription::HostMapping {
+        name: "udp.fixture.invalid".into(),
+        address: "127.0.0.1".parse().unwrap(),
+    }];
     c.selected = "reject".into();
     c.selectors = serde_json::from_value(
         json!([{"id":"udp-manual","members":["direct","reject"],"selected":"direct"}]),
@@ -242,7 +246,7 @@ fn udp_associate_preserves_boundaries_and_rejects_fragments() {
         {"matcher":{"type":"match"},"outbound":"reject"}
     ]))
     .unwrap();
-    let core = Core::start(c).unwrap();
+    let core = Core::start(c.clone()).unwrap();
     let worker = thread::spawn(move || {
         for _ in 0..2 {
             let mut data = [0; 4096];
@@ -267,7 +271,9 @@ fn udp_associate_preserves_boundaries_and_rejects_fragments() {
         .set_read_timeout(Some(Duration::from_secs(3)))
         .unwrap();
     for payload in [b"first".as_slice(), b"second-message".as_slice()] {
-        let mut packet = vec![0, 0, 0, 1, 127, 0, 0, 1];
+        let name = b"udp.fixture.invalid";
+        let mut packet = vec![0, 0, 0, 3, name.len() as u8];
+        packet.extend(name);
         packet.extend(target.port().to_be_bytes());
         packet.extend(payload);
         client.send_to(&packet, ("127.0.0.1", port)).unwrap();
@@ -275,6 +281,9 @@ fn udp_associate_preserves_boundaries_and_rejects_fragments() {
         let (n, _) = client.recv_from(&mut output).unwrap();
         assert_eq!(&output[10..n], payload);
         core.select_group("udp-manual", "reject").unwrap();
+        c.dns.hosts.clear();
+        c.selectors[0].selected = "reject".into();
+        core.configure(c.clone()).unwrap();
     }
     worker.join().unwrap();
     drop(control);

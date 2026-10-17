@@ -42,18 +42,20 @@ optional public HTTPS checks; it does not claim private-node performance.
 | swirl-protocol | Mixed HTTP/CONNECT/SOCKS5 input, input auth, HTTP CONNECT/SOCKS5 upstream auth, Trojan TLS framing, SS AEAD TCP/UDP, simple-obfs HTTP TCP, VLESS v0 TCP with optional verified TLS | SOCKS4, SS2022/SSR/VMess/REALITY/QUIC families, VLESS Vision/mux/encryption extensions, other protocol UDP and obfs TLS |
 | swirl-transport | rustls TLS with verification/SNI/ALPN, bounded duplex copying, independent half-close, live byte counters | WS/gRPC/XHTTP protocol transports, mux, QUIC; application WS/SSE opaque tunneling is a different layer |
 | swirl-routing | Ordered domain/suffix/keyword, source/destination CIDR, destination port and final rules; lazy system DNS and pinned IP decisions; Qt rules map DIRECT/REJECT/selected node/manual groups; atomic selector updates | Process rules, GEOIP/GEOSITE/MRS, nested/automatic groups/failover, policy-aware multi-address retries |
-| swirl-dns | System resolver, 8-query concurrency limit, 256-entry cache with 30-second policy lifetime, max 16 addresses | Authoritative DNS TTL handling, DoH/DoT/DNS split/Fake-IP |
+| swirl-dns | System resolver and exact local host maps through Qt settings, optional mapped proxy targets, immutable plan-owned caches, shared 8-query concurrency limit, 256-entry cache with 30-second policy lifetime, max 16 addresses | Custom DNS servers, authoritative TTL handling, DoH/DoT/DNS split/Fake-IP |
 | swirl-core | Two Tokio workers, max 256 sessions, immutable per-session plan, atomic updates, stop/cancel, stats; SOCKS5 UDP ASSOCIATE with explicit DIRECT or SS AEAD routes | Other protocol UDP, TUN, platform network takeover |
 | swirl-api | ABI v1 caller-buffer JSON, lifecycle handles, start/configure/select/snapshot/stop; local stdin harness | More advanced policy/config schemas and persisted IR migration |
 
 The Qt adapter exposes supported HTTP/SOCKS5/Trojan/SS AEAD/VLESS TCP nodes using the existing
 controls. Unsupported options fail explicitly before startup or selection. In
-particular, old default smart-routing/TUN/custom DNS sessions are not silently
+particular, old default smart-routing/TUN/custom DNS server sessions are not silently
 downgraded to global/direct. Existing stored nodes and unselected unsupported
 imports are preserved. Complete product migration still requires those features.
 Custom rule mode is now connected to the existing rule editor and runtime rule
 list. See [native routing semantics and evidence](../docs/RUST_NATIVE_ROUTING.md),
 including no-resolve, mode switches, DNS address pinning and unsupported options.
+The existing system DNS mode and local mappings now execute in Rust; see
+[local DNS semantics and limits](../docs/RUST_LOCAL_DNS.md).
 
 The Rust-only build is an opt-in development artifact, not a replacement that
 silently removes capabilities from the user's normal installation.

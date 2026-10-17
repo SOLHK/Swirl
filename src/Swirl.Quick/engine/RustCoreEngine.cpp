@@ -12,6 +12,30 @@
 #include <algorithm>
 
 namespace {
+QString dnsConfiguration(const EngineStartOptions &o,QJsonObject *output){
+ const auto dns=QJsonObject::fromVariantMap(o.dnsConfig);
+ const auto invalid=[] {return QString("Rust DNS 目前支持系统解析和精确域名的本地 IP 映射；此配置含无效或尚未支持的 DNS 选项。");};
+ for(auto it=dns.begin();it!=dns.end();++it)if(!QStringList{"mode","servers","encrypted","hosts","useHosts","respectRules"}.contains(it.key()))return invalid();
+ if(dns.contains("mode")&&(!dns.value("mode").isDouble()||dns.value("mode").toDouble()!=0))return invalid();
+ for(const auto &key:QStringList{"servers","encrypted"})if(dns.contains(key)&&(!dns.value(key).isString()||!dns.value(key).toString().trimmed().isEmpty()))return invalid();
+ for(const auto &key:QStringList{"useHosts","respectRules"})if(dns.contains(key)&&!dns.value(key).isBool())return invalid();
+ // OS resolution cannot disable the OS hosts file independently.
+ if(dns.contains("useHosts")&&!dns.value("useHosts").toBool())return invalid();
+ if(dns.contains("hosts")&&!dns.value("hosts").isArray())return invalid();
+ const auto hosts=dns.value("hosts").toArray();if(hosts.size()>512)return invalid();
+ QSet<QString> seen;QJsonArray mapped;
+ for(const auto &value:hosts){
+  if(!value.isObject())return invalid();const auto row=value.toObject();
+  for(auto it=row.begin();it!=row.end();++it)if(!QStringList{"id","name","value","server","comment"}.contains(it.key()))return invalid();
+  for(const auto &key:QStringList{"id","server","comment"})if(row.contains(key)&&!row.value(key).isNull()&&!row.value(key).isString())return invalid();
+  if(!row.value("server").toString().isEmpty()||!row.value("name").isString()||!row.value("value").isString())return invalid();
+  const auto name=row.value("name").toString().toLower();QHostAddress address;
+  if(name.size()>253||!QRegularExpression("^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$").match(name).hasMatch()||!QHostAddress(name).isNull()||seen.contains(name)||!address.setAddress(row.value("value").toString())||!address.scopeId().isEmpty())return invalid();
+  seen.insert(name);mapped.append(QJsonObject{{"name",name},{"address",address.toString()}});
+ }
+ *output=QJsonObject{{"hosts",mapped},{"force_proxy_hosts",dns.value("respectRules").toBool()}};return {};
+}
+
 QString routingConfiguration(const EngineStartOptions &o,const QString &selected,QJsonArray *nodes,QJsonArray *rules,QJsonArray *selectors){
  if(o.directSession||o.routingMode!="rule")return {};
  if(o.customRules.size()>1000)return "Rust 自定义规则数量超过限制。";
@@ -113,9 +137,10 @@ QVariantList RustCoreEngine::routingRules()const{
  return rows;
 }
 QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *output){
- if(o.preferCompatibility||o.tunEnabled||o.gatewayForwarding||o.allowLan||o.meteredNetwork||!o.dnsConfig.isEmpty()||(o.smartRouting&&o.routingMode=="rule"&&!o.directSession))
-  return "当前 Rust 阶段尚未迁移此会话的 TUN、LAN、自定义 DNS、智能规则库或兼容模式；已拒绝启动，不回退外部内核。";
+ if(o.preferCompatibility||o.tunEnabled||o.gatewayForwarding||o.allowLan||o.meteredNetwork||(o.smartRouting&&o.routingMode=="rule"&&!o.directSession))
+  return "当前 Rust 阶段尚未迁移此会话的 TUN、LAN、智能规则库或兼容模式；已拒绝启动，不回退外部内核。";
  if(o.routingMode!="global"&&o.routingMode!="rule"&&o.routingMode!="direct")return "Rust 路由模式无效。";
+ QJsonObject dns;const auto dnsError=dnsConfiguration(o,&dns);if(!dnsError.isEmpty())return dnsError;
  QJsonArray nodes;QString selected=o.selectedNodeId;
  if(o.directSession||o.routingMode=="direct") {selected="explicit-direct";nodes.append(QJsonObject{{"id",selected},{"outbound",QJsonObject{{"type","direct"}}}});}
  else {
@@ -162,7 +187,7 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
   nodes.append(QJsonObject{{"id",n.id},{"outbound",outbound}});
  }
  QJsonArray rules,selectors;const auto routingError=routingConfiguration(o,selected,&nodes,&rules,&selectors);if(!routingError.isEmpty())return routingError;
- QJsonObject config{{"schema",1},{"listen",QString("127.0.0.1:%1").arg(o.proxyPort)},{"selected",selected},{"nodes",nodes},{"rules",rules},{"selectors",selectors},
+ QJsonObject config{{"schema",1},{"listen",QString("127.0.0.1:%1").arg(o.proxyPort)},{"selected",selected},{"nodes",nodes},{"rules",rules},{"selectors",selectors},{"dns",dns},
   {"limits",QJsonObject{{"max_connections",128},{"handshake_timeout_ms",qBound(100,o.startupTimeoutMs,30000)}}}};
  if(!o.inboundUsername.isEmpty()||!o.inboundPassword.isEmpty())config["inbound_auth"]=QJsonObject{{"username",o.inboundUsername},{"password",o.inboundPassword}};
  *output=config;return {};

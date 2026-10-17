@@ -263,6 +263,38 @@ class RustCoreIntegration(unittest.TestCase):
             old.sendall(b'old-alive');self.assertEqual(exact(old,9),b'old-alive')
             new,response=self.tunnel(server.server_address[1]);new.close();self.assertIn(b'502',response)
         self.assertEqual(server.accepted,1)
+
+    def test_local_hosts_follow_proxy_toggle_and_preserve_tls_name(self):
+        for force in (False,True):
+            server=self.server('vless',tls=True)
+            outbound={'type':'vless','host':'proxy.fixture.invalid','port':server.server_address[1],
+                      'uuid':'00112233-4455-6677-8899-aabbccddeeff',
+                      'tls':{'server_name':'localhost','ca_der_base64':self.ca}}
+            self.start(outbound,dns={'hosts':[{'name':'proxy.fixture.invalid','address':'127.0.0.1'},
+                                             {'name':'target.fixture.invalid','address':'127.0.0.7'}],
+                                    'force_proxy_hosts':force})
+            with socket.create_connection(('127.0.0.1',self.port),timeout=5) as s:
+                s.sendall(b'CONNECT target.fixture.invalid:443 HTTP/1.1\r\nHost: target.fixture.invalid:443\r\n\r\n')
+                self.assertIn(b'200',header(s));s.sendall(b'mapped');self.assertEqual(exact(s,6),b'mapped')
+            self.assertEqual(server.requests,[('127.0.0.7' if force else 'target.fixture.invalid',443)])
+            self.assertTrue(self.command(op='stop',handle=self.handle)['ok'])
+
+    def test_hosts_update_preserves_old_stream_and_new_target(self):
+        server=self.server('echo')
+        cfg=self.start(dns={'hosts':[{'name':'local.fixture.invalid','address':'127.0.0.1'}]})
+        with socket.create_connection(('127.0.0.1',self.port),timeout=5) as old:
+            port=server.server_address[1]
+            old.sendall(f'CONNECT local.fixture.invalid:{port} HTTP/1.1\r\nHost: local.fixture.invalid\r\n\r\n'.encode())
+            self.assertIn(b'200',header(old))
+            cfg['dns']['hosts'][0]['name']='updated.fixture.invalid'
+            self.assertTrue(self.command(op='configure',handle=self.handle,config=cfg)['ok'])
+            old.sendall(b'old');self.assertEqual(exact(old,3),b'old')
+            with socket.create_connection(('127.0.0.1',self.port),timeout=5) as new:
+                new.sendall(f'CONNECT updated.fixture.invalid:{port} HTTP/1.1\r\nHost: updated.fixture.invalid\r\n\r\n'.encode())
+                self.assertIn(b'200',header(new));new.sendall(b'new');self.assertEqual(exact(new,3),b'new')
+            bad=json.loads(json.dumps(cfg));bad['dns']['hosts'].append({'name':'UPDATED.FIXTURE.INVALID','address':'::1'})
+            self.assertFalse(self.command(op='configure',handle=self.handle,config=bad)['ok'])
+        self.assertEqual(server.accepted,2)
     def test_vless_tcp_tls_addresses_and_invalid_responses(self):
         for tls in (False,True):
             server=self.server('vless',tls=tls)

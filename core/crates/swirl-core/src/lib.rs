@@ -76,11 +76,15 @@ pub struct Snapshot {
     pub last_error: &'static str,
     pub connections: Vec<Connection>,
 }
+struct Plan {
+    config: Arc<Config>,
+    resolver: Arc<Resolver>,
+}
 pub struct Core {
     runtime: Option<Runtime>,
     stop: watch::Sender<bool>,
     task: Option<JoinHandle<()>>,
-    plan: Arc<RwLock<Arc<Config>>>,
+    plan: Arc<RwLock<Arc<Plan>>>,
     state: Arc<State>,
     address: SocketAddr,
 }
@@ -100,10 +104,13 @@ impl Core {
             .map_err(|_| "ListenerBind")?;
         let address = listener.local_addr().map_err(|_| "ListenerAddress")?;
         let capacity = config.limits.max_connections;
-        let plan = Arc::new(RwLock::new(Arc::new(config)));
+        let resolver = Arc::new(Resolver::default().with_hosts(&config.dns.hosts));
+        let plan = Arc::new(RwLock::new(Arc::new(Plan {
+            config: Arc::new(config),
+            resolver,
+        })));
         let state = Arc::new(State::default());
         state.generation.store(1, Ordering::Relaxed);
-        let resolver = Arc::new(Resolver::default());
         let (stop, mut stopped) = watch::channel(false);
         let task=runtime.spawn({let plan=plan.clone();let state=state.clone();async move {
             let permits=Arc::new(Semaphore::new(capacity));
@@ -116,8 +123,9 @@ impl Core {
                     accepted=listener.accept()=>{
                         let Ok((socket,peer))=accepted else {break;};
                         let Ok(permit)=permits.clone().try_acquire_owned() else {state.rejected.fetch_add(1,Ordering::Relaxed);continue;};
-                        let Ok(config)=plan.read().map(|c|c.clone()) else {break;};
-                        let state=state.clone();let resolver=resolver.clone();
+                        let Ok(current)=plan.read().map(|c|c.clone()) else {break;};
+                        let config=current.config.clone();let resolver=current.resolver.clone();
+                        let state=state.clone();
                         let id=state.accepted.fetch_add(1,Ordering::Relaxed)+1;
                         state.active.fetch_add(1,Ordering::Relaxed);
                         let guard=SessionGuard {state:state.clone(),id};
@@ -145,27 +153,34 @@ impl Core {
     pub fn configure(&self, config: Config) -> Result<()> {
         config.validate()?;
         let mut plan = self.plan.write().map_err(|_| "ConfigState")?;
-        if config.listen != plan.listen
-            || config.limits.max_connections != plan.limits.max_connections
+        if config.listen != plan.config.listen
+            || config.limits.max_connections != plan.config.limits.max_connections
         {
             return Err("ListenerChangeRequiresRestart");
         }
-        *plan = Arc::new(config);
+        let resolver = Arc::new(plan.resolver.with_hosts(&config.dns.hosts));
+        *plan = Arc::new(Plan {
+            config: Arc::new(config),
+            resolver,
+        });
         self.state.generation.fetch_add(1, Ordering::Relaxed);
         Ok(())
     }
     pub fn select_node(&self, id: &str) -> Result<()> {
         let mut plan = self.plan.write().map_err(|_| "ConfigState")?;
-        let mut next = (**plan).clone();
+        let mut next = (*plan.config).clone();
         next.selected = id.to_owned();
         next.validate()?;
-        *plan = Arc::new(next);
+        *plan = Arc::new(Plan {
+            config: Arc::new(next),
+            resolver: plan.resolver.clone(),
+        });
         self.state.generation.fetch_add(1, Ordering::Relaxed);
         Ok(())
     }
     pub fn select_group(&self, id: &str, member: &str) -> Result<()> {
         let mut plan = self.plan.write().map_err(|_| "ConfigState")?;
-        let mut next = (**plan).clone();
+        let mut next = (*plan.config).clone();
         let selector = next
             .selectors
             .iter_mut()
@@ -176,7 +191,10 @@ impl Core {
         }
         selector.selected = member.to_owned();
         next.validate()?;
-        *plan = Arc::new(next);
+        *plan = Arc::new(Plan {
+            config: Arc::new(next),
+            resolver: plan.resolver.clone(),
+        });
         self.state.generation.fetch_add(1, Ordering::Relaxed);
         Ok(())
     }
@@ -191,8 +209,9 @@ impl Core {
             engine: "swirl-rust",
             address: self.address,
             generation: self.state.generation.load(Ordering::Relaxed),
-            selected: plan.selected.clone(),
+            selected: plan.config.selected.clone(),
             selectors: plan
+                .config
                 .selectors
                 .iter()
                 .map(|s| (s.id.clone(), s.selected.clone()))
@@ -379,7 +398,16 @@ async fn route<'a>(
 ) -> Result<(&'a swirl_subscription::Node, Target)> {
     use swirl_routing::Decision;
     match swirl_routing::select(config, &target.host, target.port, source, None)? {
-        Decision::Node(node) => Ok((node, target.clone())),
+        Decision::Node(node) => {
+            let mut routed = target.clone();
+            if config.dns.force_proxy_hosts
+                && !matches!(node.outbound, Outbound::Reject {})
+                && let Some(ip) = resolver.mapped_host(&target.host)
+            {
+                routed.host = ip.to_string();
+            }
+            Ok((node, routed))
+        }
         Decision::Resolve => {
             let addresses = timeout(
                 Duration::from_millis(config.limits.handshake_timeout_ms),
