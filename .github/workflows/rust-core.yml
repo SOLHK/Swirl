@@ -37,6 +37,8 @@ jobs:
           python ../tools/tests/test_shadowsocks.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python ../tools/tests/test_subscription_capture.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python ../tools/tests/test_codex_management.py
       - uses: actions/upload-artifact@v4
         with:
           name: Swirl-Rust-Core-Windows
@@ -45,6 +47,9 @@ jobs:
             core/target/release/swirl-api.exe
             core/target/release/swirl-inspect.exe
             core/Cargo.lock
+            tools/SwirlCodexManage.py
+            tools/SubscriptionCapture.py
+            docs/CODEX_PROXY_MANAGEMENT.md
       - name: Install Qt for Rust control adapter
         uses: jurplel/install-qt-action@v4
         with:

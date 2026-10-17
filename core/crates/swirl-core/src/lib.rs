@@ -54,6 +54,7 @@ pub struct Connection {
     pub ended: bool,
     pub upload: u64,
     pub download: u64,
+    pub udp_dropped: u64,
     pub elapsed_ms: u64,
 }
 #[derive(Serialize)]
@@ -70,6 +71,7 @@ pub struct Snapshot {
     pub rejected: u64,
     pub upload: u64,
     pub download: u64,
+    pub udp_dropped: u64,
     pub last_error: &'static str,
     pub connections: Vec<Connection>,
 }
@@ -179,6 +181,7 @@ impl Core {
             rejected: self.state.rejected.load(Ordering::Relaxed),
             upload: self.state.totals.upload.load(Ordering::Relaxed),
             download: self.state.totals.download.load(Ordering::Relaxed),
+            udp_dropped: self.state.totals.udp_dropped.load(Ordering::Relaxed),
             last_error: *self.state.last_error.lock().map_err(|_| "StatsState")?,
             connections: records
                 .iter()
@@ -193,6 +196,7 @@ impl Core {
                     ended: r.ended,
                     upload: r.counters.upload.load(Ordering::Relaxed),
                     download: r.counters.download.load(Ordering::Relaxed),
+                    udp_dropped: r.counters.udp_dropped.load(Ordering::Relaxed),
                     elapsed_ms: r.started.elapsed().as_millis() as u64,
                 })
                 .collect(),
@@ -338,6 +342,65 @@ async fn session(
         .map_err(|_| "StreamIo")
 }
 
+struct UdpDispatch {
+    address: SocketAddr,
+    packet: Vec<u8>,
+    payload_len: usize,
+    node_id: String,
+}
+fn udp_drop(local: &Counters, total: &Counters) {
+    local.udp_dropped.fetch_add(1, Ordering::Relaxed);
+    total.udp_dropped.fetch_add(1, Ordering::Relaxed);
+}
+fn transient_udp(error: &std::io::Error) -> bool {
+    matches!(
+        error.kind(),
+        std::io::ErrorKind::ConnectionReset
+            | std::io::ErrorKind::ConnectionRefused
+            | std::io::ErrorKind::HostUnreachable
+            | std::io::ErrorKind::NetworkUnreachable
+            | std::io::ErrorKind::Interrupted
+    )
+}
+async fn prepare_udp(
+    config: Arc<Config>,
+    resolver: Arc<Resolver>,
+    target: Target,
+    payload: Vec<u8>,
+) -> Result<UdpDispatch> {
+    let node = swirl_routing::select(&config, &target.host)?;
+    let (host, port, packet) = match &node.outbound {
+        Outbound::Direct => (target.host.clone(), target.port, payload.clone()),
+        Outbound::Shadowsocks {
+            host,
+            port,
+            password,
+            cipher,
+            udp: true,
+            ..
+        } => {
+            let mut plain = Vec::new();
+            target.encode(&mut plain)?;
+            plain.extend(&payload);
+            let wire = swirl_protocol::ss_encrypt_datagram(password, cipher, &plain)
+                .map_err(|_| "UdpEncode")?;
+            (host.clone(), *port, wire)
+        }
+        _ => return Err("UdpProxyUnsupportedOrRejected"),
+    };
+    let address = resolver
+        .resolve(&host, port)
+        .await?
+        .into_iter()
+        .next()
+        .ok_or("DnsEmpty")?;
+    Ok(UdpDispatch {
+        address,
+        packet,
+        payload_len: payload.len(),
+        node_id: node.id.clone(),
+    })
+}
 async fn udp_associate(
     mut control: TcpStream,
     peer: SocketAddr,
@@ -377,43 +440,37 @@ async fn udp_associate(
     let mut destinations: HashMap<SocketAddr, (Instant, String)> = HashMap::new();
     let (mut from_client, mut from_v4, mut from_v6) = ([0u8; 65535], [0u8; 65535], [0u8; 65535]);
     let mut closed = [0; 1];
+    // A bounded per-association preparation queue lets DNS wait independently
+    // from received replies. Dropping the JoinSet cancels all queued work.
+    let mut pending: JoinSet<Result<UdpDispatch>> = JoinSet::new();
     loop {
         tokio::select! {
             _=control.read(&mut closed)=>return Ok(()),
+            Some(prepared)=pending.join_next(), if !pending.is_empty()=>{
+                let dispatch=match prepared {Ok(Ok(d))=>d,_=>{udp_drop(&counters,&total);continue;}};
+                destinations.retain(|_,(at,_)|at.elapsed()<Duration::from_secs(30));
+                if (destinations.len()>=64 && !destinations.contains_key(&dispatch.address)) || destinations.get(&dispatch.address).is_some_and(|(_,id)|id!=&dispatch.node_id){udp_drop(&counters,&total);continue;}
+                let socket=if dispatch.address.is_ipv4(){&v4}else{&v6};
+                if socket.send_to(&dispatch.packet,dispatch.address).await.is_err(){udp_drop(&counters,&total);continue;}
+                destinations.insert(dispatch.address,(Instant::now(),dispatch.node_id));
+                counters.upload.fetch_add(dispatch.payload_len as u64,Ordering::Relaxed);total.upload.fetch_add(dispatch.payload_len as u64,Ordering::Relaxed);
+            }
             packet=relay.recv_from(&mut from_client)=>{
-                let (n,source)=packet.map_err(|_|"UdpReceive")?;
+                let (n,source)=match packet {Ok(v)=>v,Err(e) if transient_udp(&e)=>{udp_drop(&counters,&total);continue;},Err(_)=>return Err("UdpReceive")};
                 if source.ip()!=peer.ip() || client.is_some_and(|p|p!=source) || n<4 || from_client[..3]!=[0,0,0]{continue;}
                 let mut cursor=&from_client[3..n];
                 let Ok(target)=swirl_protocol::read_target(&mut cursor,false).await else {continue;};
                 client=Some(source);
                 if cursor.len()>65507 {continue;}
-                let node=swirl_routing::select(&config,&target.host)?;
-                let (host,port,packet)=match &node.outbound {
-                    Outbound::Direct=>(target.host.clone(),target.port,cursor.to_vec()),
-                    Outbound::Shadowsocks{host,port,password,cipher,udp:true,..}=>{
-                        let mut plain=Vec::new();target.encode(&mut plain)?;plain.extend(cursor);
-                        let Ok(wire)=swirl_protocol::ss_encrypt_datagram(password,cipher,&plain) else {continue;};
-                        (host.clone(),*port,wire)
-                    },
-                    _=>return Err("UdpProxyUnsupportedOrRejected"),
-                };
-                let address=resolver.resolve(&host,port).await?.into_iter().next().ok_or("DnsEmpty")?;
-                destinations.retain(|_,(at,_)|at.elapsed()<Duration::from_secs(30));
-                if destinations.len()>=64 && !destinations.contains_key(&address){continue;}
-                // One peer socket cannot ambiguously represent different keys/routes.
-                if destinations.get(&address).is_some_and(|(_,id)|id!=&node.id){continue;}
-                let socket=if address.is_ipv4(){&v4}else{&v6};
-                socket.send_to(&packet,address).await.map_err(|_|"UdpSend")?;
-                let count=cursor.len();
-                destinations.insert(address,(Instant::now(),node.id.clone()));
-                counters.upload.fetch_add(count as u64,Ordering::Relaxed);total.upload.fetch_add(count as u64,Ordering::Relaxed);
+                if pending.len()>=4{udp_drop(&counters,&total);continue;}
+                pending.spawn(prepare_udp(config.clone(),resolver.clone(),target,cursor.to_vec()));
             }
             packet=v4.recv_from(&mut from_v4)=>{
-                let (n,source)=packet.map_err(|_|"UdpReceive")?;
+                let (n,source)=match packet {Ok(v)=>v,Err(e) if transient_udp(&e)=>{udp_drop(&counters,&total);continue;},Err(_)=>return Err("UdpReceive")};
                 udp_response(&relay,client,source,&from_v4[..n],&destinations,&config,(&counters,&total)).await?;
             }
             packet=v6.recv_from(&mut from_v6)=>{
-                let (n,source)=packet.map_err(|_|"UdpReceive")?;
+                let (n,source)=match packet {Ok(v)=>v,Err(e) if transient_udp(&e)=>{udp_drop(&counters,&total);continue;},Err(_)=>return Err("UdpReceive")};
                 udp_response(&relay,client,source,&from_v6[..n],&destinations,&config,(&counters,&total)).await?;
             }
         }
@@ -472,7 +529,10 @@ async fn udp_response(
     if data.len() > 65507 {
         return Ok(());
     }
-    relay.send_to(&data, client).await.map_err(|_| "UdpSend")?;
+    if relay.send_to(&data, client).await.is_err() {
+        udp_drop(counters, total);
+        return Ok(());
+    }
     counters
         .download
         .fetch_add(payload.len() as u64, Ordering::Relaxed);

@@ -17,6 +17,7 @@ pub struct NodeCapability {
     pub protocol: &'static str,
     pub version: &'static str,
     pub transport: &'static str,
+    pub obfuscation: &'static str,
     pub tls: &'static str,
     pub cipher: &'static str,
     pub udp_declared: bool,
@@ -114,6 +115,70 @@ fn yaml(text: &str) -> Result<Value, &'static str> {
     options.budget = Some(budget);
     serde_saphyr::from_str_with_options(text, options).map_err(|_| "DocumentSyntaxOrBudget")
 }
+fn plugin_options(value: &str) -> Result<(String, serde_json::Map<String, Value>), &'static str> {
+    if value.len() > 8192 {
+        return Err("PluginParametersLimit");
+    }
+    // SIP002/SIP003 delimiters may be escaped. Splitting on ';' loses their meaning.
+    let mut fields = Vec::new();
+    let mut field = String::new();
+    let mut equal = None;
+    let mut escaped = false;
+    for c in value.chars() {
+        if escaped {
+            if !matches!(c, ':' | ';' | '=' | '\\') {
+                return Err("PluginEscape");
+            }
+            field.push(c);
+            escaped = false;
+        } else {
+            match c {
+                '\\' => escaped = true,
+                ';' => {
+                    if fields.len() >= 64 {
+                        return Err("PluginParametersLimit");
+                    }
+                    if field.is_empty() {
+                        return Err("PluginParameters");
+                    }
+                    fields.push((std::mem::take(&mut field), equal.take()));
+                }
+                '=' => {
+                    if equal.is_some() {
+                        return Err("PluginParameters");
+                    }
+                    equal = Some(field.len());
+                    field.push(c);
+                }
+                _ => field.push(c),
+            }
+        }
+    }
+    if escaped || field.is_empty() {
+        return Err("PluginParameters");
+    }
+    fields.push((field, equal));
+    let (name, separator) = fields.remove(0);
+    if separator.is_some() || name.is_empty() {
+        return Err("PluginParameters");
+    }
+    let mut options = serde_json::Map::new();
+    for (field, equal) in fields {
+        let (key, value) = match equal {
+            Some(i) => (&field[..i], Value::String(field[i + 1..].into())),
+            None => (field.as_str(), Value::Bool(true)),
+        };
+        let key = match key {
+            "obfs" => "mode",
+            "obfs-host" => "host",
+            _ => key,
+        };
+        if key.is_empty() || options.insert(key.into(), value).is_some() {
+            return Err("DuplicatePluginParameter");
+        }
+    }
+    Ok((name, options))
+}
 fn uri(line: &str) -> Result<Value, &'static str> {
     if let Some(encoded) = line.strip_prefix("vmess://") {
         let raw: Value =
@@ -176,6 +241,15 @@ fn uri(line: &str) -> Result<Value, &'static str> {
     for (key, value) in u.query_pairs() {
         if !seen.insert(key.to_string()) {
             return Err("DuplicateUriParameter");
+        }
+        if n["type"] == "ss" && key == "plugin" {
+            if n.get("plugin").is_some() || n.get("plugin-opts").is_some() {
+                return Err("ConflictingUriParameter");
+            }
+            let (name, options) = plugin_options(&value)?;
+            n["plugin"] = name.into();
+            n["plugin-opts"] = options.into();
+            continue;
         }
         let key = match key.as_ref() {
             "type" => "network",
@@ -381,32 +455,32 @@ fn parse(bytes: &[u8], depth: usize) -> Result<(&'static str, Value, Vec<Value>)
     }
     Err("UnknownConfigurationShape")
 }
+const SS_FIELDS: &[&str] = &[
+    "type",
+    "name",
+    "tag",
+    "server",
+    "port",
+    "server_port",
+    "password",
+    "cipher",
+    "method",
+    "udp",
+    "network",
+    "tfo",
+    "plugin",
+    "plugin-opts",
+    "obfs",
+    "obfs-host",
+    "raw-uri",
+    "raw-ini",
+];
 fn ss_outbound(raw: &Value, family: &str) -> Result<Outbound, &'static str> {
     if family == "xray-v2ray-json" {
         return Err("UnmappedFields");
     }
     let object = raw.as_object().ok_or("UnmappedFields")?;
-    let known = [
-        "type",
-        "name",
-        "tag",
-        "server",
-        "port",
-        "server_port",
-        "password",
-        "cipher",
-        "method",
-        "udp",
-        "network",
-        "tfo",
-        "plugin",
-        "plugin-opts",
-        "obfs",
-        "obfs-host",
-        "raw-uri",
-        "raw-ini",
-    ];
-    if object.keys().any(|k| !known.contains(&k.as_str())) {
+    if object.keys().any(|k| !SS_FIELDS.contains(&k.as_str())) {
         return Err("UnmappedFields");
     }
     if raw
@@ -434,7 +508,7 @@ fn ss_outbound(raw: &Value, family: &str) -> Result<Outbound, &'static str> {
         return Err("CipherNotImplemented");
     }
     let obfs_http = if let Some(plugin) = raw.get("plugin") {
-        if !matches!(plugin.as_str(), Some("obfs" | "obfs-local"))
+        if !matches!(plugin.as_str(), Some("obfs" | "obfs-local" | "simple-obfs"))
             || raw.get("obfs").is_some()
             || raw.get("obfs-host").is_some()
         {
@@ -543,6 +617,26 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
         ],
         "unknown",
     );
+    let obfuscation = if kind == "ss" && (raw.get("plugin").is_some() || raw.get("obfs").is_some())
+    {
+        if raw
+            .get("plugin")
+            .is_none_or(|p| matches!(p.as_str(), Some("obfs" | "obfs-local" | "simple-obfs")))
+        {
+            allowed(
+                raw.pointer("/plugin-opts/mode")
+                    .or_else(|| raw.get("obfs"))
+                    .and_then(Value::as_str)
+                    .unwrap_or(""),
+                &["http", "tls"],
+                "declared-unrecognized",
+            )
+        } else {
+            "declared-unrecognized"
+        }
+    } else {
+        "none"
+    };
     let tls_obj = raw.get("tls");
     let reality = raw.get("reality-opts").is_some()
         || raw.pointer("/tls/reality").is_some()
@@ -616,9 +710,11 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
     let unrecognized = raw.as_object().map_or(1, |o| {
         o.keys()
             .filter(|k| {
-                !known.contains(&k.as_str())
-                    && !(kind == "ss"
-                        && ["plugin", "plugin-opts", "obfs", "obfs-host"].contains(&k.as_str()))
+                if kind == "ss" {
+                    !SS_FIELDS.contains(&k.as_str())
+                } else {
+                    !known.contains(&k.as_str())
+                }
             })
             .count()
     });
@@ -744,6 +840,7 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
                                 protocol: kind,
                                 version,
                                 transport,
+                                obfuscation,
                                 tls: "tls",
                                 cipher,
                                 udp_declared: udp,
@@ -806,6 +903,7 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
             protocol: kind,
             version,
             transport,
+            obfuscation,
             tls,
             cipher,
             udp_declared: udp,
@@ -893,6 +991,41 @@ pub fn inspect(bytes: &[u8]) -> Inspection {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn sip002_plugin_mapping_escaping_and_unknown_retention() {
+        let prefix = "ss://YWVzLTEyOC1nY206Zml4dHVyZQ@example.org:443/?plugin=";
+        for name in ["obfs-local", "simple-obfs", "obfs"] {
+            let input = format!("{prefix}{name}%3Bobfs%3Dhttp%3Bobfs-host%3Dobfs.example");
+            let r = inspect(input.as_bytes());
+            assert!(r.report.nodes[0].native_tcp_candidate);
+            assert_eq!(r.report.nodes[0].obfuscation, "http");
+            assert_eq!(r.original, input.as_bytes());
+        }
+        let (_, options) = plugin_options(r"obfs-local;future=a\;b\=c\\d\:e;flag").unwrap();
+        assert_eq!(options["future"], r"a;b=c\d:e");
+        assert_eq!(options["flag"], true);
+        for tail in [
+            "%3Bobfs%3Dhttp%3Bmode%3Dtls",
+            "%3Bflag%3Bflag",
+            "%3Bhost%3Dx%5C",
+        ] {
+            assert!(
+                !inspect(format!("{prefix}obfs-local{tail}").as_bytes())
+                    .report
+                    .parsed
+            );
+        }
+        let input = format!(
+            "{prefix}obfs-local%3Bobfs%3Dhttp%3Bobfs-host%3Dobfs.example%3Bobfs-uri%3D%2Fcustom"
+        );
+        let r = inspect(input.as_bytes());
+        assert!(r.report.parsed);
+        assert!(!r.report.nodes[0].native_tcp_candidate);
+        assert_eq!(r.originals[0]["plugin-opts"]["obfs-uri"], "/custom");
+        let r=inspect(br#"{"proxies":[{"type":"ss","server":"example.org","port":443,"cipher":"aes-128-gcm","password":"fixture","tls":true}]}"#);
+        assert!(!r.report.nodes[0].native_tcp_candidate);
+        assert_eq!(r.report.nodes[0].unrecognized_fields, 1);
+    }
     #[test]
     fn private_fields_retained_not_reported() {
         let input=b"proxies:\n - {name: SECRET_NAME, type: trojan, server: edge.example, port: 443, password: SECRET_PASSWORD, private-extension: SECRET_VALUE}\ndns: {enable: true}\n";

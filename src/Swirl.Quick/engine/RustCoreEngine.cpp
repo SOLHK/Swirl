@@ -43,7 +43,7 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
    if(!n.username.isEmpty()||!QStringList{"aes-128-gcm","aes-256-gcm","chacha20-ietf-poly1305"}.contains(n.cipher))return "Rust 尚未实现此 Shadowsocks 加密或认证方式。";
    outbound["password"]=n.password;outbound["cipher"]=n.cipher;outbound["udp"]=n.parameters.value("udp").toBool();
    if(n.parameters.contains("plugin")){
-    if(!n.parameters.value("plugin").isString()||!QStringList{"obfs","obfs-local"}.contains(n.parameters.value("plugin").toString())||!n.parameters.value("plugin-opts").isObject())return "Rust 尚未实现此 Shadowsocks 插件。";
+    if(!n.parameters.value("plugin").isString()||!QStringList{"obfs","obfs-local","simple-obfs"}.contains(n.parameters.value("plugin").toString())||!n.parameters.value("plugin-opts").isObject())return "Rust 尚未实现此 Shadowsocks 插件。";
     const auto plugin=n.parameters.value("plugin-opts").toObject();
     for(auto p=plugin.begin();p!=plugin.end();++p)if(p.key()!="mode"&&p.key()!="host")return "Rust 尚未映射此混淆参数。";
     if(plugin.value("mode").toString()!="http"||!plugin.value("host").isString()||plugin.value("host").toString().isEmpty())return "Rust 目前只支持显式主机的 HTTP 混淆。";

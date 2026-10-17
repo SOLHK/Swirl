@@ -15,7 +15,7 @@ use std::{
     time::{Duration, Instant},
 };
 use swirl_transport::BoxStream;
-use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+use tokio::io::{AsyncRead, AsyncWrite, BufReader, ReadBuf};
 use zeroize::Zeroizing;
 
 const MAX_CHUNK: usize = 0x3fff;
@@ -186,7 +186,7 @@ enum Stage {
     Payload,
 }
 pub struct Stream {
-    inner: BoxStream,
+    inner: BufReader<BoxStream>,
     algorithm: &'static aead::Algorithm,
     master: Zeroizing<Vec<u8>>,
     sender: Cipher,
@@ -222,7 +222,9 @@ impl Stream {
         let sender = Cipher::new(algorithm, &master, &salt)?;
         let header = http_host.as_ref().map(|_| Vec::new());
         Ok(Self {
-            inner,
+            // Header parsing may request one byte, but never one socket read per
+            // byte. Bytes following CRLFCRLF remain buffered for AEAD parsing.
+            inner: BufReader::with_capacity(4096, inner),
             algorithm,
             master,
             sender,
@@ -403,6 +405,69 @@ impl AsyncWrite for Stream {
 #[cfg(test)]
 mod tests {
     use super::*;
+    struct Counted {
+        inner: tokio::io::DuplexStream,
+        reads: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    }
+    impl AsyncRead for Counted {
+        fn poll_read(
+            mut self: Pin<&mut Self>,
+            cx: &mut Context<'_>,
+            buf: &mut ReadBuf<'_>,
+        ) -> Poll<io::Result<()>> {
+            self.reads
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            Pin::new(&mut self.inner).poll_read(cx, buf)
+        }
+    }
+    impl AsyncWrite for Counted {
+        fn poll_write(
+            mut self: Pin<&mut Self>,
+            cx: &mut Context<'_>,
+            b: &[u8],
+        ) -> Poll<io::Result<usize>> {
+            Pin::new(&mut self.inner).poll_write(cx, b)
+        }
+        fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+            Pin::new(&mut self.inner).poll_flush(cx)
+        }
+        fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+            Pin::new(&mut self.inner).poll_shutdown(cx)
+        }
+    }
+    #[tokio::test]
+    async fn coalesced_http_header_and_ciphertext_are_buffered_without_loss() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let (client, mut peer) = tokio::io::duplex(4096);
+        let reads = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let mut client = Stream::new(
+            Box::new(Counted {
+                inner: client,
+                reads: reads.clone(),
+            }),
+            "fixture",
+            "aes-128-gcm",
+            Some("obfs.example".into()),
+            80,
+        )
+        .unwrap();
+        let mut salt = [0; 16];
+        SystemRandom::new().fill(&mut salt).unwrap();
+        let mut cipher = Cipher::new(&aead::AES_128_GCM, &master("fixture", 16), &salt).unwrap();
+        let mut length = vec![0, 7];
+        cipher.seal(&mut length).unwrap();
+        let mut payload = b"payload".to_vec();
+        cipher.seal(&mut payload).unwrap();
+        let mut wire = b"HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\n\r\n".to_vec();
+        wire.extend(salt);
+        wire.extend(length);
+        wire.extend(payload);
+        peer.write_all(&wire).await.unwrap();
+        let mut got = [0; 7];
+        client.read_exact(&mut got).await.unwrap();
+        assert_eq!(&got, b"payload");
+        assert_eq!(reads.load(std::sync::atomic::Ordering::Relaxed), 1);
+    }
     #[test]
     fn nonce_overflow_fails_closed() {
         let mut c = Cipher::new(&aead::AES_128_GCM, &[7; 16], &[8; 16]).unwrap();

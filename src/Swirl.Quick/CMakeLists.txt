@@ -56,13 +56,9 @@ if(SWIRL_USE_RUST_CORE)
   VERBATIM)
  # Refresh the deployed DLL even when only Rust sources changed and no Qt
  # target needs relinking (POST_BUILD alone leaves a stale runtime in that case).
- set(SWIRL_RUST_STAGE "${CMAKE_CURRENT_BINARY_DIR}")
- if(CMAKE_CONFIGURATION_TYPES)
-  set(SWIRL_RUST_STAGE "${CMAKE_CURRENT_BINARY_DIR}/$<CONFIG>")
- endif()
  add_custom_target(SwirlRustCore
-  COMMAND "${CMAKE_COMMAND}" -E make_directory "${SWIRL_RUST_STAGE}"
-  COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${SWIRL_RUST_TARGET}/release/swirl_api.dll" "${SWIRL_RUST_STAGE}/swirl_api.dll"
+  COMMAND "${CMAKE_COMMAND}" -E make_directory "$<TARGET_FILE_DIR:Swirl>"
+  COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${SWIRL_RUST_TARGET}/release/swirl_api.dll" "$<TARGET_FILE_DIR:Swirl>/swirl_api.dll"
   DEPENDS "${SWIRL_RUST_TARGET}/release/swirl_api.dll")
  add_dependencies(SwirlEngine SwirlRustCore)
  target_compile_definitions(SwirlEngine PUBLIC SWIRL_USE_RUST_CORE)
@@ -89,6 +85,11 @@ if(WIN32)
   target_link_options(SwirlCodexLauncher PRIVATE -municode -static)
  endif()
  add_dependencies(Swirl SwirlCodexLauncher)
+ add_custom_target(SwirlCodexManagementTools
+  COMMAND "${CMAKE_COMMAND}" -E make_directory "$<TARGET_FILE_DIR:Swirl>"
+  COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/../../tools/SwirlCodexManage.py" "$<TARGET_FILE_DIR:Swirl>/SwirlCodexManage.py"
+  COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/../../tools/SubscriptionCapture.py" "$<TARGET_FILE_DIR:Swirl>/SubscriptionCapture.py")
+ add_dependencies(Swirl SwirlCodexManagementTools)
  target_compile_definitions(SwirlEngine PUBLIC NOMINMAX)
  target_link_libraries(SwirlEngine PRIVATE advapi32 ws2_32 iphlpapi crypt32 wininet)
  add_executable(SwirlGatewayGuard WIN32 tools/GatewayGuard.cpp network/GatewayRouting.cpp)
@@ -212,6 +213,9 @@ if(SWIRL_BUILD_UI_TESTS)
  if(SWIRL_USE_RUST_CORE)
   add_executable(SwirlRustCoreTests tests/RustCoreTests.cpp)
   target_link_libraries(SwirlRustCoreTests PRIVATE SwirlEngine Qt6::Test)
+  add_custom_command(TARGET SwirlRustCore POST_BUILD
+   COMMAND "${CMAKE_COMMAND}" -E make_directory "$<TARGET_FILE_DIR:SwirlRustCoreTests>"
+   COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${SWIRL_RUST_TARGET}/release/swirl_api.dll" "$<TARGET_FILE_DIR:SwirlRustCoreTests>/swirl_api.dll")
   target_compile_definitions(SwirlRustCoreTests PRIVATE SWIRL_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
   if(MSVC)
    target_compile_options(SwirlRustCoreTests PRIVATE /utf-8)

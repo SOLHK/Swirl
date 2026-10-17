@@ -222,7 +222,9 @@ class ShadowsocksTests(unittest.TestCase):
             control.sendall(b'\x05\x01\x00');self.assertEqual(exact(control,2),b'\x05\x00')
             control.sendall(b'\x05\x03\x00\x01'+bytes(6));self.assertEqual(exact(control,3),b'\x05\x00\x00')
             relay=target(control);client.sendto(b'\x00\x00\x00\x01\x7f\x00\x00\x01\x00\x35blocked',relay)
-            self.assertEqual(control.recv(1),b'')
+            control.settimeout(.2)
+            with self.assertRaises(socket.timeout):control.recv(1)
             with self.assertRaises(socket.timeout):remote.recvfrom(1024)
+            self.assertGreater(self.command(op='snapshot',handle=self.handle)['status']['udp_dropped'],0)
 
 if __name__=='__main__':unittest.main(verbosity=2)

@@ -218,6 +218,73 @@ fn inbound_authentication_and_resource_limit() {
     assert!(core.snapshot().unwrap().rejected >= 1);
     assert_eq!(core.snapshot().unwrap().active, 0);
 }
+
+#[test]
+fn udp_reject_dns_and_icmp_do_not_kill_association_or_change_snapshot() {
+    let mut c = config();
+    c.rules.push(
+        serde_json::from_value(
+            json!({"matcher":{"type":"domain","value":"blocked.invalid"},"outbound":"reject"}),
+        )
+        .unwrap(),
+    );
+    let core = Core::start(c.clone()).unwrap();
+    let peer = UdpSocket::bind("127.0.0.1:0").unwrap();
+    peer.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+    let good = peer.local_addr().unwrap().port();
+    let closed = UdpSocket::bind("127.0.0.1:0").unwrap();
+    let bad = closed.local_addr().unwrap().port();
+    drop(closed);
+    let worker = thread::spawn(move || {
+        for _ in 0..2 {
+            let mut buf = [0; 128];
+            let (n, from) = peer.recv_from(&mut buf).unwrap();
+            peer.send_to(&buf[..n], from).unwrap();
+        }
+    });
+    let mut control = TcpStream::connect(core.address()).unwrap();
+    control
+        .set_read_timeout(Some(Duration::from_secs(3)))
+        .unwrap();
+    control.write_all(&[5, 1, 0]).unwrap();
+    let mut greeting = [0; 2];
+    control.read_exact(&mut greeting).unwrap();
+    control.write_all(&[5, 3, 0, 1, 0, 0, 0, 0, 0, 0]).unwrap();
+    let mut response = [0; 10];
+    control.read_exact(&mut response).unwrap();
+    assert_eq!(response[1], 0);
+    let relay = ("127.0.0.1", u16::from_be_bytes([response[8], response[9]]));
+    let client = UdpSocket::bind("127.0.0.1:0").unwrap();
+    client
+        .set_read_timeout(Some(Duration::from_secs(3)))
+        .unwrap();
+    for domain in ["blocked.invalid", "swirl-nonexistent.invalid"] {
+        let mut p = vec![0, 0, 0, 3, domain.len() as u8];
+        p.extend(domain.as_bytes());
+        p.extend([0, 53, 7]);
+        client.send_to(&p, relay).unwrap();
+    }
+    let mut p = vec![0, 0, 0, 1, 127, 0, 0, 1];
+    p.extend(bad.to_be_bytes());
+    p.extend(b"unreachable");
+    client.send_to(&p, relay).unwrap();
+    thread::sleep(Duration::from_millis(80));
+    for round in 0..2 {
+        let mut p = vec![0, 0, 0, 1, 127, 0, 0, 1];
+        p.extend(good.to_be_bytes());
+        p.extend(b"alive");
+        client.send_to(&p, relay).unwrap();
+        let mut data = [0; 128];
+        let (n, _) = client.recv_from(&mut data).unwrap();
+        assert_eq!(&data[10..n], b"alive");
+        if round == 0 {
+            c.selected = "reject".into();
+            core.configure(c.clone()).unwrap();
+        }
+    }
+    assert!(core.snapshot().unwrap().udp_dropped > 0);
+    worker.join().unwrap();
+}
 #[test]
 fn failed_socks_auth_never_reaches_target_or_direct() {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();

@@ -102,9 +102,14 @@ The SOCKS association owns both UDP sockets, pins the local client, tracks at mo
 same endpoint. Payload statistics exclude AEAD and SOCKS framing. HTTP obfs applies
 only to TCP. SS proxy UDP has independent Python-peer evidence; private-provider
 UDP has not been tested. Oversized packets and SOCKS fragments are dropped.
+Per-datagram route/DNS/send failures and recoverable ICMP socket errors are
+counted as `udp_dropped` without closing the association. Up to four bounded
+preparation tasks keep DNS waits from blocking incoming replies. Existing
+associations retain their immutable configuration snapshot across updates.
 
 The offline mapper supports plain SS AEAD and explicit HTTP obfs options from
-Clash and supported INI forms. Unknown options, unsupported plugins, TFO=true,
+Clash, supported INI forms and SIP002 plugin strings with escaped delimiters.
+Unknown options, unsupported plugins, TFO=true,
 SS2022 and insecure Trojan certificate policies remain explicit execution blockers.
 No source parameters are altered to make a test pass. Private nodes stay local.
 
@@ -124,7 +129,7 @@ SWIRL_RUST_HARNESS and optionally SWIRL_RUST_QT_TESTS pointing to built executab
   on established TCP streams. Duplex uses two 16 KiB buffers with backpressure.
 - UDP control connection owns one association; exact client IP/port pinning,
   fragments dropped, <=64 recent destinations with 30-second response allowance,
-  <=65507-byte datagrams. Only explicit DIRECT routes execute UDP in this phase.
+  <=65507-byte datagrams. Only explicit DIRECT or SS AEAD (`udp: true`) routes execute UDP in this phase.
 - Resolver permits remain owned by pending OS lookup tasks after caller timeout,
   limiting detached work. Runtime shutdown waits at most 500ms for OS resolver
   work; Qt uses PreventUnloadHint so late OS completion cannot call unloaded code.
