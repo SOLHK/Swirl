@@ -187,7 +187,7 @@ void RustCoreEngine::selectNode(const QString &id){
  QJsonObject config;const auto reason=configuration(options,&config);if(!reason.isEmpty()){emit diagnostic("SwirlRust","SelectionUnsupported",reason);return;}
  const auto result=call({{"op","configure"},{"handle",qint64(m_handle)},{"config",config}});
  if(!result["ok"].toBool()){emit diagnostic("SwirlRust","SelectionFailed",result["error"].toString());return;}
- m_options=options;m_status.selectedNodeId=id;m_status.directSession=false;m_status.requestState=RequestState::NotTested;refresh();
+ m_options=options;m_status.selectedNodeId=id;m_status.directSession=options.directSession||options.routingMode=="direct";m_status.requestState=RequestState::NotTested;refresh();
 }
 void RustCoreEngine::setRoutingMode(const QString &mode){
  if(!m_handle)return;auto options=m_options;options.routingMode=mode;QJsonObject config;const auto reason=configuration(options,&config);
