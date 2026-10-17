@@ -1,4 +1,5 @@
 """Independent loopback SOCKS4/4a peers and origins for the Rust harness."""
+import base64
 import json
 import os
 import select
@@ -6,8 +7,11 @@ import socket
 import socketserver
 import struct
 import subprocess
+import tempfile
 import threading
+import time
 import unittest
+from pathlib import Path
 from test_rust_core import exact, header
 
 
@@ -41,6 +45,18 @@ class Origin(socketserver.BaseRequestHandler):
                 self.request.sendall(data)
         except (OSError, EOFError):
             pass
+
+
+class HttpOrigin(socketserver.BaseRequestHandler):
+    def handle(self):
+        self.request.settimeout(5)
+        self.server.accepted += 1
+        request = header(self.request)
+        self.server.requests.append(request)
+        assert request.startswith(b'GET /socks4/')
+        body = b'socks4-native-http'
+        self.request.sendall(b'HTTP/1.1 200 OK\r\nContent-Length: ' + str(len(body)).encode()
+                             + b'\r\nConnection: close\r\n\r\n' + body)
 
 
 class Peer(socketserver.BaseRequestHandler):
@@ -188,6 +204,72 @@ class Socks4Integration(unittest.TestCase):
                 self.stop()
         self.assertEqual(peer.forwarded, 2)
         self.assertEqual(origin.accepted, 2)
+
+    @unittest.skipUnless(os.environ.get('SWIRL_RUST_INSPECTOR'), 'set SWIRL_RUST_INSPECTOR')
+    def test_subscription_candidates_forward_through_independent_peer(self):
+        origin, peer = self.server(Origin), self.server(Peer)
+        port, expected = peer.server_address[1], 0
+        for version, remote in (('4', False), ('4a', True)):
+            kind = 'socks' + version
+            uri = f'{kind}://import%3Afixture@127.0.0.1:{port}#synthetic'
+            sing = json.dumps({'outbounds': [{'type': 'socks', 'version': version, 'tag': 'synthetic',
+                              'server': '127.0.0.1', 'server_port': port, 'username': 'import:fixture', 'network': 'tcp'}]})
+            yaml = f"proxies: [{{name: synthetic, type: {kind}, server: 127.0.0.1, port: {port}, username: 'import:fixture'}}]"
+            documents = (uri, base64.b64encode(uri.encode()).decode(), yaml, sing,
+                         base64.b64encode(sing.encode()).decode())
+            for index, document in enumerate(documents):
+                with self.subTest(version=version, source=index):
+                    result = subprocess.run([os.environ['SWIRL_RUST_INSPECTOR'], '--private-json'],
+                                            input=document, capture_output=True, text=True, timeout=5)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    inspected = json.loads(result.stdout)
+                    self.assertTrue(inspected['report']['nodes'][0]['native_tcp_candidate'])
+                    self.assertFalse(inspected['report']['nodes'][0]['real_network_verified'])
+                    candidate = inspected['tcpCandidates'][0]
+                    self.assertEqual(candidate['type'], 'socks4')
+                    self.assertEqual(candidate['remote_dns'], remote)
+                    self.start(self.config(candidate, dns={'hosts': [{'name': 'origin.fixture.invalid', 'address': '127.0.0.1'}]}))
+                    try:
+                        stream, response = self.http(origin.server_address[1], 'origin.fixture.invalid')
+                        with stream:
+                            self.assertIn(b' 200 ', response)
+                            self.assert_echo_and_halfclose(stream, b'native-import-roundtrip')
+                        expected += 1
+                        self.assertEqual(peer.requests[-1], ('origin.fixture.invalid' if remote else '127.0.0.1',
+                                                             origin.server_address[1], b'import:fixture'))
+                        deadline = time.monotonic() + 2
+                        while True:
+                            status = self.command(op='snapshot', handle=self.handle)['status']
+                            if status['active'] == 0 or time.monotonic() >= deadline:
+                                break
+                            time.sleep(0.01)
+                        self.assertEqual(status['accepted'], 1)
+                        self.assertEqual(status['active'], 0)
+                        self.assertEqual(status['failed'], 0)
+                        self.assertEqual(status['last_error'], '')
+                        self.assertGreater(status['upload'], 0)
+                        self.assertGreater(status['download'], 0)
+                    finally:
+                        self.stop()
+        self.assertEqual(peer.forwarded, expected)
+        self.assertEqual(origin.accepted, expected)
+
+    @unittest.skipUnless(os.environ.get('SWIRL_RUST_QT_TESTS'), 'Qt integration executable required')
+    def test_qt_imported_socks4_and_4a_data_path(self):
+        origin, peer = self.server(HttpOrigin), self.server(Peer)
+        env = {**os.environ, 'SWIRL_SOCKS4_REFERENCE_PORT': str(peer.server_address[1]),
+               'SWIRL_SOCKS4_ORIGIN_PORT': str(origin.server_address[1])}
+        with tempfile.TemporaryDirectory() as folder:
+            log = Path(folder) / 'qt.txt'
+            result = subprocess.run([os.environ['SWIRL_RUST_QT_TESTS'], 'socks4ThroughIndependentPeer',
+                                     '-o', str(log) + ',txt'], env=env, capture_output=True, text=True, timeout=40)
+            output = log.read_text(encoding='utf-8') if log.exists() else 'Qt log unavailable'
+            self.assertEqual(result.returncode, 0, output + result.stdout + result.stderr)
+        self.assertEqual(peer.requests, [('127.0.0.1', origin.server_address[1], b'qt-user:fixture')] * 3
+                         + [('origin.fixture.invalid', origin.server_address[1], b'qt-user:fixture')] * 3)
+        self.assertEqual(peer.forwarded, 6)
+        self.assertEqual(origin.accepted, 6)
+        self.assertEqual(len(origin.requests), 6)
 
     def test_rejected_or_wrong_version_upstream_never_falls_back(self):
         origin = self.server(Origin)

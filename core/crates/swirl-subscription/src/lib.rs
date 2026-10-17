@@ -2,7 +2,9 @@
 //! No Mihomo configuration or proxy engine is an internal execution dependency.
 use serde::{Deserialize, Serialize};
 mod dns_tls;
+mod policy;
 mod websocket;
+pub use policy::{HealthProbe, PolicyStrategy, ProbeTarget};
 pub use websocket::WebSocket;
 pub mod inspect;
 pub use dns_tls::DnsTlsServer;
@@ -131,13 +133,19 @@ pub struct Rule {
     pub outbound: String,
 }
 
-/// Explicit manual selector. Members are concrete nodes, not nested groups.
+/// Explicit policy group. Manual groups can contain validated groups; automatic
+/// groups probe concrete nodes and never replay application requests.
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Selector {
     pub id: String,
     pub members: Vec<String>,
+    #[serde(default)]
     pub selected: String,
+    #[serde(default)]
+    pub strategy: PolicyStrategy,
+    #[serde(default)]
+    pub probe: Option<HealthProbe>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -416,9 +424,6 @@ impl Config {
                 return Err("TlsParameters");
             }
         }
-        if !ids.contains(self.selected.as_str()) {
-            return Err("SelectedNodeMissing");
-        }
         let mut selector_ids = HashSet::new();
         for selector in &self.selectors {
             if selector.id.is_empty()
@@ -432,18 +437,25 @@ impl Config {
             {
                 return Err("SelectorId");
             }
+        }
+        if !ids.contains(self.selected.as_str()) && !selector_ids.contains(self.selected.as_str()) {
+            return Err("SelectedNodeMissing");
+        }
+        for selector in &self.selectors {
             let mut members = HashSet::new();
             if selector.members.is_empty()
                 || selector.members.len() > 512
-                || selector
-                    .members
-                    .iter()
-                    .any(|id| !ids.contains(id.as_str()) || !members.insert(id.as_str()))
-                || !members.contains(selector.selected.as_str())
+                || selector.members.iter().any(|id| {
+                    (!ids.contains(id.as_str()) && !selector_ids.contains(id.as_str()))
+                        || !members.insert(id.as_str())
+                })
+                || (selector.strategy == PolicyStrategy::Manual
+                    && !members.contains(selector.selected.as_str()))
             {
                 return Err("SelectorMembers");
             }
         }
+        self.validate_policies()?;
         for rule in &self.rules {
             if !ids.contains(rule.outbound.as_str())
                 && !selector_ids.contains(rule.outbound.as_str())

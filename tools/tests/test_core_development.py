@@ -53,6 +53,10 @@ jobs:
           python ../tools/tests/test_subscription_capture.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python ../tools/tests/test_codex_management.py
+      - name: Run Qt to Rust integration without Mihomo
+        working-directory: .
+        run: |
+          python tools/tests/test_rust_core.py RustCoreIntegration.test_vless_qt_data_path
 """
 
 ENVIRONMENT = {
@@ -71,6 +75,7 @@ REQUIRED_TESTS = (
     "test_socks4.py",
     "test_websocket_transport.py",
     "test_core_development.py",
+    "test_policy_groups.py",
 )
 
 
@@ -107,6 +112,13 @@ class CoreDevelopmentTests(unittest.TestCase):
         self.assertIn("        if: always() && runner.os == 'Linux'\n", portable)
         self.assertIn("          path: CORE_PUBLIC_NETWORK.json\n", portable)
         self.assertNotIn("Verify-PublicRustCore.py", windows)
+        for command in (
+            "          python tools/tests/test_socks4.py Socks4Integration.test_qt_imported_socks4_and_4a_data_path\n",
+            "          python tools/tests/test_websocket_transport.py WebSocketTransportTests.test_qt_vless_websocket_data_path\n",
+        ):
+            self.assertEqual(windows.count(command), 1)
+            self.assertIn(command + "          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }\n", windows)
+        self.assertIn('          export SWIRL_RUST_INSPECTOR="$PWD/target/release/swirl-inspect"\n', portable)
         # Reversing only the reviewed additions must recover every original byte.
         restored = updated.replace(
             "    branches: [test, main, work/core-completion-20261017]\n",
@@ -116,6 +128,9 @@ class CoreDevelopmentTests(unittest.TestCase):
             command = f"          python ../tools/tests/{name}\n"
             restored = restored.replace(command + "          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }\n", "")
             restored = restored.replace(command, "")
+        restored = restored.replace('          export SWIRL_RUST_INSPECTOR="$PWD/target/release/swirl-inspect"\n', '')
+        qt_anchor = "          python tools/tests/test_rust_core.py RustCoreIntegration.test_vless_qt_data_path\n"
+        restored = restored[:restored.index(qt_anchor)] + qt_anchor
         restored = restored.replace(
             "      - name: Native public HTTPS and DoH verification\n"
             "        if: runner.os == 'Linux'\n"
@@ -134,6 +149,26 @@ class CoreDevelopmentTests(unittest.TestCase):
     def test_idempotence_prevents_repeated_app_commits(self):
         first = development.updated_workflow(FIXTURE)
         self.assertEqual(development.updated_workflow(first), first)
+
+    def test_previous_successful_workflow_upgrades_without_duplicate_suites(self):
+        final = development.updated_workflow(FIXTURE)
+        previous = final.replace("          python ../tools/tests/test_policy_groups.py\n"
+                                 "          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }\n", "")
+        previous = previous.replace("          python ../tools/tests/test_policy_groups.py\n", "")
+        previous = previous.replace('          export SWIRL_RUST_INSPECTOR="$PWD/target/release/swirl-inspect"\n', '')
+        qt_anchor = "          python tools/tests/test_rust_core.py RustCoreIntegration.test_vless_qt_data_path\n"
+        previous = previous[:previous.index(qt_anchor)] + qt_anchor
+        self.assertEqual(development.updated_workflow(previous), final)
+
+    def test_partial_qt_and_policy_additions_fail_closed(self):
+        final = development.updated_workflow(FIXTURE)
+        for source in (
+            final.replace("          python ../tools/tests/test_policy_groups.py\n", "", 1),
+            final.replace("          python tools/tests/test_websocket_transport.py WebSocketTransportTests.test_qt_vless_websocket_data_path\n", ""),
+            final + "          python tools/tests/test_socks4.py Socks4Integration.test_qt_imported_socks4_and_4a_data_path\n",
+        ):
+            with self.subTest(tail=source[-100:]), self.assertRaises(ValueError):
+                development.updated_workflow(source)
 
     def test_branch_and_menu_drift_fail_closed(self):
         for source in (
@@ -207,6 +242,7 @@ class CoreDevelopmentTests(unittest.TestCase):
     def test_missing_suite_prevents_workflow_claiming_it_is_covered(self):
         for missing in (
             "tools/tests/test_websocket_transport.py",
+            "tools/tests/test_policy_groups.py",
             "tools/Verify-PublicRustCore.py",
         ):
             with self.subTest(missing=missing), tempfile.TemporaryDirectory() as temporary:

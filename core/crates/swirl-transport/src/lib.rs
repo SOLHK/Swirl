@@ -18,8 +18,10 @@ pub trait Stream: AsyncRead + AsyncWrite + Unpin + Send {}
 impl<T: AsyncRead + AsyncWrite + Unpin + Send> Stream for T {}
 pub type BoxStream = Box<dyn Stream>;
 
-pub async fn secure(
-    stream: tokio::net::TcpStream,
+/// Authenticate TLS over a native byte stream, including an already negotiated
+/// proxy tunnel. The same verification path applies to direct and nested TLS.
+pub async fn secure<S: Stream + 'static>(
+    stream: S,
     tls: &swirl_subscription::Tls,
 ) -> Result<BoxStream, &'static str> {
     use tokio_rustls::{

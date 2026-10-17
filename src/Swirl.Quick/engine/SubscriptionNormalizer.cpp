@@ -87,7 +87,7 @@ void uri(Result &r,const QString &line){
     }
     const QUrl url(effective,QUrl::StrictMode);QUrlQuery q(url);
     if(!url.isValid()||url.host().isEmpty()||url.port(-1)<1||url.port()>65535){r.error="节点 URI 的服务器或端口无效。";return;}
-    const auto p=protocol(scheme);if(!QStringList{"ss","trojan","vless","socks5","http"}.contains(p)){r.error="尚未支持此 URI 协议；请提供原生 Clash 配置。";return;}
+    const auto p=protocol(scheme);if(!QStringList{"ss","trojan","vless","socks4","socks4a","socks5","http"}.contains(p)){r.error="尚未支持此 URI 协议；请提供原生 Clash 配置。";return;}
     node={{"name",url.fragment(QUrl::FullyDecoded)},{"type",p},{"server",url.host()},{"port",url.port()}};
     if(p=="ss"){
         QString auth=userInfo(url);if(!auth.contains(':'))auth=QString::fromUtf8(base64(auth.toUtf8()));
@@ -97,10 +97,15 @@ void uri(Result &r,const QString &line){
     else if(p=="vless"){node["uuid"]=url.userName(QUrl::FullyDecoded);}
     else {
         node["username"]=url.userName(QUrl::FullyDecoded);node["password"]=url.password(QUrl::FullyDecoded);
-        if(url.password().isEmpty()&&!url.userName().isEmpty()){
+        if(p!="socks4"&&p!="socks4a"&&url.password().isEmpty()&&!url.userName().isEmpty()){
             const auto auth=QString::fromUtf8(base64(url.userName(QUrl::FullyDecoded).toUtf8()));const auto at=auth.indexOf(':');
             if(at>0){node["username"]=auth.left(at);node["password"]=auth.mid(at+1);}
         }
+    }
+    if(p=="socks4"||p=="socks4a"){
+        if(!url.path().isEmpty()&&url.path()!="/"){r.error="SOCKS4/4a URI 不支持路径参数。";return;}
+        if(!q.isEmpty())issue(issues,"SOCKS4/4a URI 的查询扩展尚未映射，原始配置已保留。");
+        append(r,node,QJsonObject{{"uri",line}},issues);return;
     }
     if(scheme=="https"||p=="trojan")node["tls"]=true;
     QString network,path,host;
@@ -140,6 +145,16 @@ void singBox(Result &r,const QJsonArray &array){
         const auto raw=value.toObject();const auto type=raw.value("type").toString();
         if(QStringList{"direct","block","dns","selector","urltest"}.contains(type))continue;
         QStringList issues;QJsonObject n{{"name",raw.value("tag")},{"type",protocol(type)},{"server",raw.value("server")},{"port",raw.value("server_port")}};
+        // sing-box's SOCKS version is a string. Keep 4 versus 4a explicit so
+        // destination DNS never changes silently while normalizing the node.
+        const auto version=raw.value("version").toString();
+        if(type=="socks"&&(version=="4"||version=="4a")){
+            n["type"]="socks"+version;
+            for(const auto &key:QStringList{"username","password","network"})if(raw.contains(key))n[key]=raw.value(key);
+            const QSet<QString> known{"type","tag","server","server_port","version","username","password","network"};
+            for(auto it=raw.begin();it!=raw.end();++it)if(!known.contains(it.key()))issue(issues,"sing-box SOCKS4/4a 含未映射扩展，原始配置已保留。");
+            append(r,n,raw,issues);if(!r.error.isEmpty())return;continue;
+        }
         const QMap<QString,QString> mappings{{"username","username"},{"password","password"},{"uuid","uuid"},{"method","cipher"},{"alter_id","alterId"},{"security","cipher"},{"flow","flow"},{"detour","dialer-proxy"},{"up_mbps","up"},{"down_mbps","down"}};
         for(auto it=mappings.begin();it!=mappings.end();++it)if(raw.contains(it.key()))n[it.value()]=raw.value(it.key());
         const auto tls=raw.value("tls").toObject();
@@ -248,7 +263,7 @@ SubscriptionNormalizer::Result SubscriptionNormalizer::normalize(const QByteArra
         return r;
     }
     if(text.startsWith('[')&&!json.isArray()&&(text.contains("[Proxy]",Qt::CaseInsensitive)||text.contains("[server_local]",Qt::CaseInsensitive))){ini(r,text);return r;}
-    if(QRegularExpression("^(ss|ssr|trojan|vmess|vless|socks5|socks|http|https)://",QRegularExpression::CaseInsensitiveOption).match(text).hasMatch()){
+    if(QRegularExpression("^(ss|ssr|trojan|vmess|vless|socks4a|socks4|socks5|socks|http|https)://",QRegularExpression::CaseInsensitiveOption).match(text).hasMatch()){
         r.handled=true;r.format="通用 URI / Shadowrocket";
         for(const auto &line:text.split('\n')){const auto value=line.trimmed();if(value.isEmpty()||value.startsWith('#'))continue;uri(r,value);if(!r.error.isEmpty())break;}return r;
     }

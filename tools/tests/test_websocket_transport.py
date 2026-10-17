@@ -19,6 +19,7 @@ import threading
 import time
 import unittest
 from types import SimpleNamespace
+from pathlib import Path
 from test_rust_core import certificates, exact, header, target
 
 UUID = '00112233-4455-6677-8899-aabbccddeeff'
@@ -126,6 +127,18 @@ class GatedOrigin(socketserver.BaseRequestHandler):
         # Keep the origin open while the client reads the tail, so EOF is not
         # needed to make progress in either forwarding direction.
         self.request.recv(1)
+
+
+class HttpOrigin(socketserver.BaseRequestHandler):
+    def handle(self):
+        self.request.settimeout(5)
+        self.server.accepted += 1
+        request = header(self.request)
+        self.server.requests.append(request)
+        assert request.startswith(b'GET /websocket HTTP/1.1\r\n')
+        body = b'w' * 131073
+        self.request.sendall(b'HTTP/1.1 200 OK\r\nContent-Length: ' + str(len(body)).encode()
+                             + b'\r\nConnection: close\r\n\r\n' + body)
 
 
 class Peer(socketserver.BaseRequestHandler):
@@ -351,6 +364,25 @@ class WebSocketTransportTests(unittest.TestCase):
                 self.assertIn(b'coalesced', peer.pongs)
                 self.assertGreater(len(set(peer.masks)), 1)
                 self.stop()
+
+    @unittest.skipUnless(os.environ.get('SWIRL_RUST_QT_TESTS'), 'Qt integration executable required')
+    def test_qt_vless_websocket_data_path(self):
+        origin, peer = self.server(HttpOrigin), self.server(Peer)
+        env = {**os.environ, 'SWIRL_WS_REFERENCE_PORT': str(peer.server_address[1]),
+               'SWIRL_WS_ORIGIN_PORT': str(origin.server_address[1])}
+        with tempfile.TemporaryDirectory() as folder:
+            log = Path(folder) / 'qt.txt'
+            result = subprocess.run([os.environ['SWIRL_RUST_QT_TESTS'], 'webSocketThroughIndependentPeer',
+                                     '-o', str(log) + ',txt'], env=env, capture_output=True, text=True, timeout=15)
+            output = log.read_text(encoding='utf-8') if log.exists() else 'Qt log unavailable'
+            self.assertEqual(result.returncode, 0, output + result.stdout + result.stderr)
+        self.assertEqual(peer.destinations, [('origin.fixture.invalid', origin.server_address[1])])
+        self.assertEqual(peer.forwarded, 1)
+        self.assertEqual(origin.accepted, 1)
+        self.assertEqual(len(origin.requests), 1)
+        self.assertGreater(peer.upstream_bytes, 0)
+        self.assertGreaterEqual(peer.downstream_bytes, 131073)
+        self.assertGreater(len(peer.masks), 0)
 
     def test_fragmented_binary_messages_and_interleaved_ping_are_not_payload(self):
         origin, peer = self.server(Origin), self.server(Peer, mode='fragmented')

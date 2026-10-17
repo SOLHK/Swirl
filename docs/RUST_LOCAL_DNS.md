@@ -1,5 +1,14 @@
 # Rust system/custom DNS and local host mappings
 
+**Scope update, 2026-10-17:** this document describes shared resolver/host behavior
+and the original system/UDP/TCP DNS stage. Rust also implements strict DoT and
+HTTP/1.1 DoH. See the [current encrypted-DNS overview](../core/README.md#encrypted-dns-dot-and-http11-doh),
+the [historical DoT stage](RUST_DOT.md), and
+[earlier DoH/public-network evidence](RUST_WS_VALIDATION_20261017.md).
+The old DoT-only document's HTTPS exclusions belong to its earlier scope.
+Current regression counts and source/CI identities are tracked in
+[the policy-stage validation](RUST_POLICY_VALIDATION_20261017.md).
+
 The existing DNS page can now configure the Rust runtime's system resolver and
 exact local domain-to-IP mappings, or up to four custom IP DNS servers. The UI layout, controls and stored source
 configuration are unchanged. This implementation does not write system DNS,
@@ -12,6 +21,11 @@ system hosts files, certificates, routes or proxy settings.
   existing UI. Typed IR `dns.servers` accepts IP socket addresses, allowing
   isolated non-privileged test ports. DNS requests use Swirl's Rust wire parser
   and Tokio sockets, not the OS lookup API or an external proxy/resolver core.
+- Strict encrypted DNS reuses the existing `mode: 0` settings container with
+  traditional servers empty and an explicit `tls://` or `https://` URL. The Rust
+  resolver then executes DoT/DoH rather than OS network lookup. IP endpoints or
+  an exact local mapping for the resolver name supply bootstrap; details and
+  separate authentication-name verification are in the current overview above.
 - Exact domain names mapped to one IPv4 or IPv6 address, case-insensitively.
 - Local mappings for DIRECT targets and for locally resolved proxy server names.
 - The existing page's force-local-mapping toggle (`respectRules`) maps to the
@@ -29,12 +43,16 @@ Application TLS bytes and the configured upstream TLS verification/SNI name are
 not changed by an address override. No certificate verification is disabled.
 
 The OS resolver still reads the OS hosts file, so `useHosts: false` is rejected
-in system mode. In custom mode the switch controls a bounded snapshot of the
+in pure system mode when encrypted DNS is absent. In custom or encrypted mode
+the switch controls a bounded snapshot of the
 OS hosts file read at configuration time; explicit application mappings take
 precedence. No system lookup fallback is performed in custom mode.
-Extra/system-combined server mode, nonempty encrypted server fields,
+Extra/system-combined server mode, simultaneous plaintext and encrypted servers,
 per-entry DNS servers, wildcard/regex mappings and unknown fields are rejected
-before startup. There is no DoH, DoT, TCP-only server URL, Fake-IP or DNS listener here.
+before startup. The plaintext custom-server path described below has no TCP-only
+server URL; it uses TCP when a validated UDP response requests truncation retry.
+DoT/DoH are separate implemented encrypted paths. Fake-IP and a local DNS listener
+remain unimplemented.
 Known entry IDs/comments are retained in the original stored configuration;
 they are metadata, not execution instructions.
 
@@ -53,8 +71,10 @@ generation. Node/group-only API selection shares the existing resolver.
 
 Across all generations of one core, unresolved OS lookups share eight permits.
 A timed-out/cancelled OS lookup holds its permit until the underlying lookup
-actually finishes. Each plan's cache remains bounded to 256 entries, with the
-existing 30-second policy lifetime and at most 16 addresses per query. Local
+actually finishes. Each plan's cache remains bounded to 256 entries, with a
+30-second policy lifetime for system results and at most 16 addresses per query.
+Custom/encrypted positive results instead use the bounded authoritative TTL;
+DoH also applies its HTTP cache-age restrictions. Local
 mappings are evaluated before the OS cache and do not consume lookup permits.
 System-cache expiration is a policy bound rather than authoritative DNS TTL.
 
@@ -72,7 +92,7 @@ bad lengths and trailing data are rejected or excluded from the answer.
 
 Server failures/timeouts may try the next explicitly configured server; NXDOMAIN
 is terminal. No failed custom query falls through to the system resolver.
-Each server gets at most 900 ms including its A/AAAA and CNAME/TCP work, and all
+Each plaintext server gets at most 900 ms including its A/AAAA and CNAME/TCP work, and all
 servers together are bounded to 3 seconds after admission. Both address-family
 queries must complete successfully (NODATA is allowed); a broken family may make
 the lookup fail even if the other family returned addresses. That is a current
@@ -80,7 +100,9 @@ availability limitation, not evidence of full DNS interoperability.
 
 Positive cache lifetime is the minimum relevant address/CNAME TTL, capped at
 300 seconds and reduced by lookup elapsed time. TTL zero is not cached. There
-is no negative/SOA cache, EDNS negotiation, DNSSEC validation or encrypted DNS.
+is no negative/SOA cache, EDNS negotiation or DNSSEC validation. DNS split,
+automatic domain bootstrap and proxy-routed encrypted DNS also remain separate
+future work; the existence of DoT/DoH does not provide those features.
 System-hosts snapshots are bounded to 1 MiB and 4096 names; comment encoding does
 not invalidate otherwise ASCII entries. Reconfiguration replaces this snapshot.
 The resolver does not modify any OS files or settings.
@@ -110,3 +132,7 @@ port 53 or changing the host's DNS configuration.
 All network fixtures use loopback and synthetic names/credentials. No private
 subscription refresh, production DNS change or real-provider DNS acceptance is
 implied by these tests. Complete product DNS migration remains unfinished.
+The encrypted suites are `tools/tests/test_dns_tls.py` and
+`tools/tests/test_dns_https.py`; their source presence is not itself a result for
+a new commit. Earlier strict public DIRECT/DoH checks and current regression
+execution are recorded separately in the validation documents linked above.

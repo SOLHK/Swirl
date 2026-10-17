@@ -1,6 +1,7 @@
 #include "engine/RustCoreEngine.h"
 #include "engine/ThreadedEngine.h"
 #include "engine/NodeTestService.h"
+#include "engine/NodeImporter.h"
 #include "engine/SwirlProtocolRegistry.h"
 #include "ControlledNetwork.h"
 #include <QTest>
@@ -9,6 +10,7 @@
 #include <QNetworkProxy>
 #include <QUuid>
 #include <QJsonArray>
+#include <QJsonDocument>
 
 class RustCoreTests:public QObject {
  Q_OBJECT
@@ -18,6 +20,107 @@ class RustCoreTests:public QObject {
   o.nodes={n};o.selectedNodeId=n.id;return o;
  }
 private slots:
+ void socks4ImportsMapAndAcceptAcrossNativeAbi(){
+  ControlledNetwork net;QVERIFY(net.start());auto o=options(net);
+  for(const auto &version:QStringList{"4","4a"}){
+   const auto protocol="socks"+version;
+   const auto uri=QString("%1://user%3Afixture@127.0.0.1:1080#fixture").arg(protocol).toUtf8();
+   const auto sing=QJsonDocument(QJsonObject{{"outbounds",QJsonArray{QJsonObject{{"type","socks"},{"tag","fixture"},{"version",version},{"server","127.0.0.1"},{"server_port",1080},{"username","user:fixture"},{"network","tcp"}}}}}).toJson();
+   const auto yaml=QString("proxies: [{name: fixture, type: %1, server: 127.0.0.1, port: 1080, username: 'user:fixture'}]").arg(protocol).toUtf8();
+   const auto json=QJsonDocument(QJsonObject{{"proxies",QJsonArray{QJsonObject{{"name","fixture"},{"type",protocol},{"server","127.0.0.1"},{"port",1080},{"username","user:fixture"},{"password",""},{"udp",false},{"tls",false}}}}}).toJson();
+   for(const auto &source:QList<QByteArray>{uri,uri.toBase64(),yaml,json,sing,sing.toBase64()}){
+    const auto parsed=NodeImporter::parse(source);QVERIFY2(bool(parsed),qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);
+    const auto &node=parsed.nodes.first();QCOMPARE(node.protocol,protocol);QCOMPARE(node.username,QString("user:fixture"));QVERIFY(node.password.isEmpty());
+    QVERIFY(node.conversionIssues.isEmpty());QVERIFY(!node.originalConfiguration.isEmpty());
+    o.nodes=parsed.nodes;o.selectedNodeId=node.id;QJsonObject config;
+    const auto error=RustCoreEngine::configuration(o,&config);QVERIFY2(error.isEmpty(),qPrintable(error));
+    const QJsonObject expected{{"type","socks4"},{"host","127.0.0.1"},{"port",1080},{"user_id","user:fixture"},{"remote_dns",version=="4a"}};
+    QCOMPARE(config["nodes"].toArray().first().toObject()["outbound"].toObject(),expected);
+    RustCoreEngine engine;engine.start(o);QVERIFY2(engine.status().state==ProxyEngine::State::Running,qPrintable(engine.status().message));
+    QCOMPARE(engine.status().engineKind,QString("rust"));engine.stop();
+    QVERIFY(SwirlProtocolRegistry::nativeNodeReason(node).isEmpty());
+   }
+  }
+  const auto userid=NodeImporter::parse("socks4://dXNlcjpwYXNz@127.0.0.1:1080#fixture");
+  QVERIFY(bool(userid));QCOMPARE(userid.nodes.first().username,QString("dXNlcjpwYXNz"));QVERIFY(userid.nodes.first().password.isEmpty());
+ }
+ void socks4ImportsRejectAuthenticationAndUnmappedExtensions(){
+  ControlledNetwork net;QVERIFY(net.start());auto o=options(net);
+  const QJsonObject base{{"name","fixture"},{"type","socks4a"},{"server","127.0.0.1"},{"port",1080}};
+  const QList<QJsonObject> mutations{
+   {{"password","must-not-be-discarded"}},{{"password",1}},{{"username",1}},
+   {{"username",QString("x")+QChar(0)+"y"}},{{"username",QString(128,QChar(0x00e9))}},
+   {{"port","1080"}},{{"port",1080.5}},{{"port",0}},{{"port",65536}},
+   {{"tls",true}},{{"tls","false"}},{{"udp",true}},{{"udp","false"}},
+   {{"sni","tls.fixture.invalid"}},{{"sni",1}},{{"cipher","none"}},{{"cipher",1}},
+   {{"tfo",true}},{{"network","ws"}},{{"network","udp"}},{{"remote_dns",false}},
+   {{"future-option","preserved"}},{{"server_port",1080}}
+  };
+  const QJsonObject sentinel{{"unchanged",true}};
+  for(const auto &mutation:mutations){
+   auto node=base;for(auto it=mutation.begin();it!=mutation.end();++it)node[it.key()]=it.value();
+   const auto parsed=NodeImporter::parse(QJsonDocument(QJsonObject{{"proxies",QJsonArray{node}}}).toJson());
+   if(!parsed)continue;
+   QCOMPARE(parsed.nodes.first().originalConfiguration,node);
+   o.nodes=parsed.nodes;o.selectedNodeId=parsed.nodes.first().id;QJsonObject config=sentinel;
+   QVERIFY2(!RustCoreEngine::configuration(o,&config).isEmpty(),qPrintable(QString::fromUtf8(QJsonDocument(mutation).toJson())));QCOMPARE(config,sentinel);
+  }
+  for(const auto &uri:QList<QByteArray>{"socks4://user:password@127.0.0.1:1080#fixture", "socks4a://127.0.0.1:1080/path#fixture", "socks4://127.0.0.1:1080?remote_dns=true#fixture"}){
+   const auto parsed=NodeImporter::parse(uri);if(!parsed)continue;
+   o.nodes=parsed.nodes;o.selectedNodeId=parsed.nodes.first().id;QJsonObject config=sentinel;
+   QVERIFY(!RustCoreEngine::configuration(o,&config).isEmpty());QCOMPARE(config,sentinel);
+  }
+  for(const auto &version:QList<QJsonValue>{4,QJsonValue(),"4A","6",false}){
+   const auto parsed=NodeImporter::parse(QJsonDocument(QJsonObject{{"outbounds",QJsonArray{QJsonObject{{"type","socks"},{"tag","fixture"},{"version",version},{"server","127.0.0.1"},{"server_port",1080}}}}}).toJson());
+   if(!parsed)continue;
+   QVERIFY(!parsed.nodes.first().conversionIssues.isEmpty());o.nodes=parsed.nodes;o.selectedNodeId=parsed.nodes.first().id;QJsonObject config=sentinel;
+   QVERIFY(!RustCoreEngine::configuration(o,&config).isEmpty());QCOMPARE(config,sentinel);
+  }
+ }
+ void socks4ThroughIndependentPeer(){
+  bool validPeer=false,validOrigin=false;
+  const int peer=qEnvironmentVariableIntValue("SWIRL_SOCKS4_REFERENCE_PORT",&validPeer),origin=qEnvironmentVariableIntValue("SWIRL_SOCKS4_ORIGIN_PORT",&validOrigin);
+  if(!validPeer||!validOrigin)QSKIP("Independent Python SOCKS4/4a peer supplies isolated ports in its integration run.");
+  QVERIFY(peer>0&&peer<=65535&&origin>0&&origin<=65535);
+  ControlledNetwork net;QVERIFY(net.start());auto o=options(net);
+  o.dnsConfig={{"mode",0},{"useHosts",true},{"hosts",QVariantList{QVariantMap{{"name","origin.fixture.invalid"},{"value","127.0.0.1"}}}}};
+  for(const auto &version:QStringList{"4","4a"}){
+   const auto protocol="socks"+version;
+   const auto uri=QString("%1://qt-user%3Afixture@127.0.0.1:%2#fixture").arg(protocol).arg(peer).toUtf8();
+   const auto sing=QJsonDocument(QJsonObject{{"outbounds",QJsonArray{QJsonObject{{"type","socks"},{"tag","fixture"},{"version",version},{"server","127.0.0.1"},{"server_port",peer},{"username","qt-user:fixture"},{"network","tcp"}}}}}).toJson();
+   const auto yaml=QString("proxies: [{name: fixture, type: %1, server: 127.0.0.1, port: %2, username: 'qt-user:fixture'}]").arg(protocol).arg(peer).toUtf8();
+   for(const auto &source:QList<QByteArray>{uri,sing,yaml}){
+    const auto parsed=NodeImporter::parse(source);QVERIFY2(bool(parsed),qPrintable(parsed.error));
+    o.nodes=parsed.nodes;o.selectedNodeId=parsed.nodes.first().id;
+    RustCoreEngine engine;engine.start(o);QVERIFY2(engine.status().state==ProxyEngine::State::Running,qPrintable(engine.status().message));
+    QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",o.proxyPort));
+    QNetworkRequest request(QUrl(QString("http://origin.fixture.invalid:%1/socks4/%2").arg(origin).arg(version)));
+    request.setTransferTimeout(5000);request.setRawHeader("Connection","close");
+    auto reply=client.get(request);QVERIFY(QTest::qWaitFor([&]{return reply->isFinished();},6000));
+    QCOMPARE(reply->error(),QNetworkReply::NoError);QCOMPARE(reply->readAll(),QByteArray("socks4-native-http"));
+    QVERIFY(QTest::qWaitFor([&]{return engine.status().uploadTotal>0&&engine.status().downloadTotal>0;},2000));
+    QCOMPARE(engine.status().engineKind,QString("rust"));QCOMPARE(engine.status().processId,QCoreApplication::applicationPid());engine.stop();
+   }
+  }
+ }
+ void webSocketThroughIndependentPeer(){
+  bool validPeer=false,validOrigin=false;
+  const int peer=qEnvironmentVariableIntValue("SWIRL_WS_REFERENCE_PORT",&validPeer),origin=qEnvironmentVariableIntValue("SWIRL_WS_ORIGIN_PORT",&validOrigin);
+  if(!validPeer||!validOrigin)QSKIP("Independent Python VLESS WS peer supplies isolated ports in its integration run.");
+  QVERIFY(peer>0&&peer<=65535&&origin>0&&origin<=65535);
+  ControlledNetwork net;QVERIFY(net.start());auto o=options(net);
+  const auto source=QString("vless://00112233-4455-6677-8899-aabbccddeeff@127.0.0.1:%1?type=ws&path=%2Fws%3Ffixture%3D1&host=ws.fixture.invalid#fixture").arg(peer).toUtf8();
+  const auto parsed=NodeImporter::parse(source);QVERIFY2(bool(parsed),qPrintable(parsed.error));QVERIFY(parsed.nodes.first().conversionIssues.isEmpty());
+  o.nodes=parsed.nodes;o.selectedNodeId=parsed.nodes.first().id;
+  RustCoreEngine engine;engine.start(o);QVERIFY2(engine.status().state==ProxyEngine::State::Running,qPrintable(engine.status().message));
+  QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",o.proxyPort));
+  QNetworkRequest request(QUrl(QString("http://origin.fixture.invalid:%1/websocket").arg(origin)));
+  request.setTransferTimeout(5000);request.setRawHeader("Connection","close");
+  auto reply=client.get(request);QVERIFY(QTest::qWaitFor([&]{return reply->isFinished();},6000));
+  QCOMPARE(reply->error(),QNetworkReply::NoError);QCOMPARE(reply->readAll(),QByteArray(131073,'w'));
+  QVERIFY(QTest::qWaitFor([&]{return engine.status().uploadTotal>0&&engine.status().downloadTotal>=131073;},2000));
+  QCOMPARE(engine.status().engineKind,QString("rust"));QCOMPARE(engine.status().processId,QCoreApplication::applicationPid());engine.stop();
+ }
  void webSocketMapsExistingFieldsAndRustAcceptsConfiguration(){
   ControlledNetwork net;QVERIFY(net.start());auto o=options(net);
   auto &node=o.nodes.first();node.protocol="vless";

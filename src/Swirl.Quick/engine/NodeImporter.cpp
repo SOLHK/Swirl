@@ -128,6 +128,15 @@ NodeImporter::Result NodeImporter::parse(const QByteArray &bytes) {
         if(!n.conversionIssues.isEmpty())++result.incompleteNodes;
         n.id=QUuid::createUuid().toString(QUuid::WithoutBraces);
         n.name=params.take("name").toString().trimmed();n.protocol=params.take("type").toString().toLower();
+        if(n.protocol=="socks4"||n.protocol=="socks4a"){
+            const auto port=params.value("port");
+            if(!port.isDouble()||port.toDouble()!=port.toInt()||port.toInt()<1||port.toInt()>65535){
+                result.nodes.clear();result.error=QStringLiteral("第 %1 个节点：SOCKS4/4a 端口须为 1–65535 的整数。").arg(i+1);return result;
+            }
+            for(const auto &key:QStringList{"username","password","cipher","sni"})if(params.contains(key)&&!params.value(key).isString()){
+                result.nodes.clear();result.error=QStringLiteral("第 %1 个节点：SOCKS4/4a 凭据或安全参数类型无效。").arg(i+1);return result;
+            }
+        }
         n.host=params.take("server").toString().trimmed();
         const auto portValue=params.take("port");bool portOk=false;
         const auto port=portValue.toVariant().toString().toInt(&portOk);

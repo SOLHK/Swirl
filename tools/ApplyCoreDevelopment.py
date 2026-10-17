@@ -2,8 +2,9 @@
 
 The only writable file is .github/workflows/rust-core.yml. The update enables
 its existing jobs on this development branch, adds the already implemented
-DoH, SOCKS4 and WebSocket peer suites, and runs fixed public-network checks with
-an evidence artifact on Linux. It does not change permissions, secrets,
+DoH, SOCKS4, WebSocket and automatic-policy peer suites, and runs fixed public-network
+checks with an evidence artifact on Linux. The current stage also runs the SOCKS4
+and WS Qt forwarding peers after the existing Qt build. It does not change permissions, secrets,
 existing actions, release jobs, pull-request triggers or any product source.
 
 Run ``python tools/ApplyCoreDevelopment.py --check`` to run the safety tests and
@@ -36,6 +37,11 @@ ADDITIONAL_TESTS = (
     "test_websocket_transport.py",
     "test_core_development.py",
 )
+POLICY_TEST = "test_policy_groups.py"
+QT_PEER_TESTS = (
+    "test_socks4.py Socks4Integration.test_qt_imported_socks4_and_4a_data_path",
+    "test_websocket_transport.py WebSocketTransportTests.test_qt_vless_websocket_data_path",
+)
 PUBLIC_PROBE = Path("tools/Verify-PublicRustCore.py")
 PUBLIC_VALIDATION_STEPS = """      - name: Native public HTTPS and DoH verification
         if: runner.os == 'Linux'
@@ -50,12 +56,15 @@ PUBLIC_VALIDATION_STEPS = """      - name: Native public HTTPS and DoH verificat
 """
 
 
-def _replace_checked(source: str, before: str, after: str, label: str) -> str:
-    """Accept only one reviewed old block or exactly one already updated block."""
-    previous = source.count(before)
+def _replace_checked(source: str, before: str, after: str, label: str,
+                     intermediate: str | None = None) -> str:
+    """Accept only an exact reviewed historical or final block, once."""
+    historical = (before,) if intermediate is None else (before, intermediate)
+    previous = sum(source.count(block) for block in historical)
     updated = source.count(after)
     if previous == 1 and updated == 0:
-        return source.replace(before, after, 1)
+        original = next(block for block in historical if source.count(block) == 1)
+        return source.replace(original, after, 1)
     if previous == 0 and updated == 1:
         return source
     raise ValueError(f"Rust CI {label} has drifted or is ambiguous; review required")
@@ -63,6 +72,13 @@ def _replace_checked(source: str, before: str, after: str, label: str) -> str:
 
 def updated_workflow(source: str) -> str:
     """Return a bounded, idempotent update; validate all blocks before any write."""
+    stage_counts = (
+        source.count(f"          python ../tools/tests/{POLICY_TEST}\n"),
+        source.count('          export SWIRL_RUST_INSPECTOR="$PWD/target/release/swirl-inspect"\n'),
+        *(source.count(f"          python tools/tests/{test}\n") for test in QT_PEER_TESTS),
+    )
+    if stage_counts not in ((0, 0, 0, 0), (2, 1, 1, 1)):
+        raise ValueError("Rust CI policy/Qt stage is only partially present; review required")
     source = _replace_checked(
         source,
         "  push:\n    branches: [test, main]\n",
@@ -77,20 +93,43 @@ def updated_workflow(source: str) -> str:
     source = _replace_checked(
         source,
         anchor + portable_tail,
-        anchor + portable_tests + PUBLIC_VALIDATION_STEPS + portable_tail,
+        anchor + portable_tests + f"          python ../tools/tests/{POLICY_TEST}\n" + PUBLIC_VALIDATION_STEPS + portable_tail,
         "portable peer menu",
+        intermediate=anchor + portable_tests + PUBLIC_VALIDATION_STEPS + portable_tail,
     )
     windows_tail = "          python ../tools/tests/test_subscription_capture.py\n"
     windows_tests = "".join(
         f"          python ../tools/tests/{name}\n" + WINDOWS_STATUS_GUARD
         for name in ADDITIONAL_TESTS
     )
-    return _replace_checked(
+    source = _replace_checked(
         source,
         anchor + WINDOWS_STATUS_GUARD + windows_tail,
-        anchor + WINDOWS_STATUS_GUARD + windows_tests + windows_tail,
+        anchor + WINDOWS_STATUS_GUARD + windows_tests + f"          python ../tools/tests/{POLICY_TEST}\n" + WINDOWS_STATUS_GUARD + windows_tail,
         "Windows peer menu",
+        intermediate=anchor + WINDOWS_STATUS_GUARD + windows_tests + windows_tail,
     )
+    portable_environment = '          export SWIRL_RUST_HARNESS="$PWD/target/release/swirl-api"\n'
+    first_test = '          python ../tools/tests/test_rust_core.py\n'
+    source = _replace_checked(
+        source,
+        portable_environment + first_test,
+        portable_environment + '          export SWIRL_RUST_INSPECTOR="$PWD/target/release/swirl-inspect"\n' + first_test,
+        "portable inspector identity",
+    )
+    # The currently reviewed workflow ends with this exact Qt command. Requiring
+    # the entire tail prevents partially added/duplicated commands being accepted.
+    qt_anchor = "          python tools/tests/test_rust_core.py RustCoreIntegration.test_vless_qt_data_path\n"
+    qt_after = qt_anchor + WINDOWS_STATUS_GUARD + "".join(
+        f"          python tools/tests/{test}\n" + WINDOWS_STATUS_GUARD for test in QT_PEER_TESTS
+    )
+    if source.count(qt_anchor) != 1:
+        raise ValueError("Rust CI Qt peer menu has drifted or is ambiguous; review required")
+    if source.endswith(qt_after):
+        return source
+    if source.endswith(qt_anchor):
+        return source[:-len(qt_anchor)] + qt_after
+    raise ValueError("Rust CI Qt peer menu has drifted or is ambiguous; review required")
 
 
 def validate_context(environment: Mapping[str, str]) -> None:
@@ -118,7 +157,7 @@ def prepare_update(repository: Path) -> tuple[Path, str, str]:
     # workflow; writes still occur only in the existing Linux App job.
     before = path.read_text(encoding="utf-8")
     after = updated_workflow(before)
-    for name in ADDITIONAL_TESTS:
+    for name in (*ADDITIONAL_TESTS, POLICY_TEST):
         if not (repository / "tools/tests" / name).is_file():
             raise ValueError(f"Required CI suite is missing: {name}")
     if not (repository / PUBLIC_PROBE).is_file():

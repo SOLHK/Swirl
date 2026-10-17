@@ -131,8 +131,9 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
   if(it==o.nodes.cend())return "未选择节点。";
   const auto &n=*it;
   if(!n.conversionIssues.isEmpty()||!ProxyNode::validate(n).isEmpty())return "节点含无效或未映射参数，Rust 拒绝执行。";
-  if(!QStringList{"http","socks5","trojan","ss","vless"}.contains(n.protocol))return "此节点协议尚未迁移到 Rust；未使用外部内核。";
-  QSet<QString> allowed=n.protocol=="ss"?QSet<QString>{"udp","plugin","plugin-opts"}:QSet<QString>{"tls","udp","sni","servername","alpn","skip-cert-verify"};
+  if(!QStringList{"http","socks4","socks4a","socks5","trojan","ss","vless"}.contains(n.protocol))return "此节点协议尚未迁移到 Rust；未使用外部内核。";
+  const bool socks4=n.protocol=="socks4"||n.protocol=="socks4a";
+  QSet<QString> allowed=socks4?QSet<QString>{"tls","udp","network","tfo","skip-cert-verify"}:n.protocol=="ss"?QSet<QString>{"udp","plugin","plugin-opts"}:QSet<QString>{"tls","udp","sni","servername","alpn","skip-cert-verify"};
   if(n.protocol=="vless")allowed.unite(QSet<QString>{"uuid","flow","encryption"});
   if(n.protocol=="vless"||n.protocol=="trojan")allowed.unite(QSet<QString>{"network","ws-opts"});
   for(auto p=n.parameters.begin();p!=n.parameters.end();++p)if(!allowed.contains(p.key()))return "Rust 尚未实现此传输或扩展参数。";
@@ -142,8 +143,13 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
   if(n.protocol=="trojan"&&n.parameters.contains("tls")&&!n.parameters.value("tls").toBool())return "Trojan 必须使用 TLS。";
   const bool tls=n.protocol=="trojan"||n.parameters.value("tls").toBool();
   if(!tls&&(!n.serverName.isEmpty()||n.parameters.contains("alpn")))return "未启用 TLS 却含 TLS 参数。";
-  QJsonObject outbound{{"type",n.protocol=="http"?"http_connect":n.protocol=="ss"?"shadowsocks":n.protocol},{"host",n.host},{"port",n.port}};
-  if(n.protocol=="ss"){
+  QJsonObject outbound{{"type",socks4?"socks4":n.protocol=="http"?"http_connect":n.protocol=="ss"?"shadowsocks":n.protocol},{"host",n.host},{"port",n.port}};
+  if(socks4){
+   if(tls||!n.cipher.isEmpty()||(n.parameters.contains("tfo")&&n.parameters.value("tfo")!=QJsonValue(false)))return "SOCKS4/4a 不支持 TLS、密码加密或 TCP Fast Open。";
+   if(n.parameters.contains("network")&&n.parameters.value("network")!=QJsonValue(QStringLiteral("tcp")))return "SOCKS4/4a 此阶段只支持 TCP。";
+   outbound["user_id"]=n.username;outbound["remote_dns"]=n.protocol=="socks4a";
+  }
+  else if(n.protocol=="ss"){
    if(!n.username.isEmpty()||!QStringList{"aes-128-gcm","aes-256-gcm","chacha20-ietf-poly1305"}.contains(n.cipher))return "Rust 尚未实现此 Shadowsocks 加密或认证方式。";
    outbound["password"]=n.password;outbound["cipher"]=n.cipher;outbound["udp"]=n.parameters.value("udp").toBool();
    if(n.parameters.contains("plugin")){

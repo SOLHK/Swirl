@@ -2,6 +2,8 @@
 //! the public report. Only explicitly supported and fully mapped TCP nodes can
 //! yield an executable isolated-test outbound; all original fields are retained.
 use crate::{Config, Credentials, Limits, Node, ObfsHttp, Outbound, Tls};
+#[path = "inspect_socks4.rs"]
+mod inspect_socks4;
 #[path = "inspect_websocket.rs"]
 mod inspect_websocket;
 use base64::{
@@ -81,6 +83,8 @@ fn protocol(value: &str) -> &'static str {
         "shadowsocksr" | "ssr" => "ssr",
         "http" | "https" => "http",
         "socks" | "socks5" | "socks5-tls" => "socks5",
+        "socks4" => "socks4",
+        "socks4a" => "socks4a",
         "trojan" => "trojan",
         "vless" => "vless",
         "vmess" => "vmess",
@@ -215,6 +219,9 @@ fn uri(line: &str) -> Result<Value, &'static str> {
         );
     }
     let u = url::Url::parse(&source).map_err(|_| "UriSyntax")?;
+    if matches!(u.scheme(), "socks4" | "socks4a") && !matches!(u.path(), "" | "/") {
+        return Err("Socks4UriPath");
+    }
     let mut n = json!({"type":protocol(u.scheme()),"server":u.host_str().ok_or("UriHost")?,"port":u.port().or_else(||if u.scheme()=="https"{Some(443)}else{None}).ok_or("UriPort")?,"raw-uri":line});
     match n["type"].as_str().unwrap_or("") {
         "ss" => {
@@ -235,6 +242,15 @@ fn uri(line: &str) -> Result<Value, &'static str> {
                 n["password"] = percent(pass)?.into();
             }
         }
+    }
+    if matches!(u.scheme(), "socks4" | "socks4a") {
+        // Proxy URI query extensions have no mapped SOCKS4 semantics. Retain
+        // the original and report them instead of reusing another protocol's
+        // authentication, TLS, or transport query aliases.
+        if u.query().is_some_and(|query| !query.is_empty()) {
+            n["unmapped-socks4-query"] = true.into();
+        }
+        return Ok(n);
     }
     if u.scheme() == "https" {
         n["tls"] = true.into();
@@ -602,6 +618,12 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
             .and_then(Value::as_str)
             .unwrap_or(""),
     );
+    if matches!(kind, "socks4" | "socks4a")
+        || (raw.get("type").and_then(Value::as_str) == Some("socks")
+            && matches!(raw.get("version").and_then(Value::as_str), Some("4" | "4a")))
+    {
+        return inspect_socks4::inspect(raw, index, family);
+    }
     let transport_raw = raw
         .get("network")
         .and_then(Value::as_str)

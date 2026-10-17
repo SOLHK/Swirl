@@ -5,7 +5,7 @@ use std::{
     net::{TcpListener, TcpStream, UdpSocket},
     sync::{
         Arc,
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     thread,
     time::Duration,
@@ -409,4 +409,213 @@ fn failed_socks_auth_never_reaches_target_or_direct() {
     assert!(header(&mut s).starts_with(b"HTTP/1.1 502"));
     reference.join().unwrap();
     assert_eq!(seen.load(Ordering::SeqCst), 1);
+}
+
+struct HealthPeer {
+    port: u16,
+    requests: Arc<AtomicUsize>,
+    stopped: Arc<AtomicBool>,
+    worker: Option<thread::JoinHandle<()>>,
+}
+impl HealthPeer {
+    fn new() -> Self {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        listener.set_nonblocking(true).unwrap();
+        let requests = Arc::new(AtomicUsize::new(0));
+        let stopped = Arc::new(AtomicBool::new(false));
+        let counted = requests.clone();
+        let stop = stopped.clone();
+        let worker = thread::spawn(move || {
+            while !stop.load(Ordering::SeqCst) {
+                let mut socket = match listener.accept() {
+                    Ok((socket, _)) => socket,
+                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                        thread::sleep(Duration::from_millis(5));
+                        continue;
+                    }
+                    Err(error) => panic!("health accept: {error}"),
+                };
+                socket
+                    .set_read_timeout(Some(Duration::from_millis(500)))
+                    .unwrap();
+                let mut request = Vec::new();
+                while request.len() < 8192 && !request.ends_with(b"\r\n\r\n") {
+                    let mut byte = [0];
+                    if socket.read_exact(&mut byte).is_err() {
+                        break;
+                    }
+                    request.push(byte[0]);
+                }
+                if request.ends_with(b"\r\n\r\n") {
+                    counted.fetch_add(1, Ordering::SeqCst);
+                    let _ = socket.write_all(b"HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+                }
+            }
+        });
+        Self {
+            port,
+            requests,
+            stopped,
+            worker: Some(worker),
+        }
+    }
+    fn url(&self) -> String {
+        format!("http://127.0.0.1:{}/health", self.port)
+    }
+    fn count(&self) -> usize {
+        self.requests.load(Ordering::SeqCst)
+    }
+}
+impl Drop for HealthPeer {
+    fn drop(&mut self) {
+        self.stopped.store(true, Ordering::SeqCst);
+        if let Some(worker) = self.worker.take() {
+            worker.join().unwrap();
+        }
+    }
+}
+fn automatic_config(peer: &HealthPeer) -> Config {
+    Config::parse(serde_json::to_vec(&json!({"schema":1,"listen":"127.0.0.1:0","selected":"outer",
+        "nodes":[{"id":"a","outbound":{"type":"direct"}},{"id":"b","outbound":{"type":"direct"}},{"id":"deny","outbound":{"type":"reject"}}],
+        "selectors":[{"id":"g","members":["a","b"],"strategy":"fallback","probe":{"url":peer.url(),"interval_ms":1000,"timeout_ms":500}},
+            {"id":"outer","members":["g","a"],"selected":"g"}]
+    })).unwrap().as_slice()).unwrap()
+}
+fn await_healthy(core: &Core) {
+    for _ in 0..300 {
+        if core.snapshot().unwrap().policies["g"]
+            .members
+            .iter()
+            .all(|member| member.healthy)
+        {
+            return;
+        }
+        thread::sleep(Duration::from_millis(10));
+    }
+    panic!("native health checks did not complete");
+}
+
+#[test]
+fn automatic_health_generation_manual_selection_and_stop_preserve_lifetimes() {
+    let first = HealthPeer::new();
+    let second = HealthPeer::new();
+    let mut c = automatic_config(&first);
+    let mut core = Core::start(c.clone()).unwrap();
+    await_healthy(&core);
+    let (port, worker) = echo();
+    let mut old = connect(&core, port);
+    assert_eq!(core.snapshot().unwrap().connections[0].node, "a");
+    let checks = core.snapshot().unwrap().policies["g"].checks;
+    core.select_node("b").unwrap();
+    core.select_group("outer", "a").unwrap();
+    let status = core.snapshot().unwrap();
+    assert!(status.policies["g"].checks >= checks);
+    assert!(
+        status.policies["g"]
+            .members
+            .iter()
+            .all(|member| member.healthy)
+    );
+    assert_eq!(core.select_group("g", "b"), Err("AutomaticPolicySelection"));
+    let generation = core.snapshot().unwrap().generation;
+    let mut invalid = c.clone();
+    invalid.selected = "missing".into();
+    assert!(core.configure(invalid).is_err());
+    assert_eq!(core.snapshot().unwrap().generation, generation);
+    c.selectors[0].probe.as_mut().unwrap().url = second.url();
+    core.configure(c.clone()).unwrap();
+    await_healthy(&core);
+    // Let cancellation of an already queued old-generation request settle.
+    thread::sleep(Duration::from_millis(50));
+    let old_count = first.count();
+    thread::sleep(Duration::from_millis(1100));
+    assert_eq!(
+        first.count(),
+        old_count,
+        "replaced probe worker kept running"
+    );
+    old.write_all(b"kept-alive").unwrap();
+    let mut data = [0; 10];
+    old.read_exact(&mut data).unwrap();
+    assert_eq!(&data, b"kept-alive");
+    core.stop();
+    thread::sleep(Duration::from_millis(50));
+    let stopped_count = second.count();
+    thread::sleep(Duration::from_millis(1100));
+    assert_eq!(
+        second.count(),
+        stopped_count,
+        "stop left a probe worker alive"
+    );
+    assert_eq!(core.configure(c), Err("CoreStopped"));
+    assert_eq!(core.select_node("a"), Err("CoreStopped"));
+    worker.join().unwrap();
+}
+
+#[test]
+fn automatic_udp_association_retains_choices_after_policy_replacement() {
+    let health = HealthPeer::new();
+    let mut c = automatic_config(&health);
+    let core = Core::start(c.clone()).unwrap();
+    await_healthy(&core);
+    let peer = UdpSocket::bind("127.0.0.1:0").unwrap();
+    peer.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+    let target = peer.local_addr().unwrap();
+    let worker = thread::spawn(move || {
+        for _ in 0..2 {
+            let mut bytes = [0; 64];
+            let (n, from) = peer.recv_from(&mut bytes).unwrap();
+            peer.send_to(&bytes[..n], from).unwrap();
+        }
+    });
+    let association = || {
+        let mut control = TcpStream::connect(core.address()).unwrap();
+        control
+            .set_read_timeout(Some(Duration::from_secs(3)))
+            .unwrap();
+        control.write_all(&[5, 1, 0]).unwrap();
+        let mut greeting = [0; 2];
+        control.read_exact(&mut greeting).unwrap();
+        assert_eq!(greeting, [5, 0]);
+        control.write_all(&[5, 3, 0, 1, 0, 0, 0, 0, 0, 0]).unwrap();
+        let mut reply = [0; 10];
+        control.read_exact(&mut reply).unwrap();
+        assert_eq!(reply[1], 0);
+        (
+            control,
+            ("127.0.0.1", u16::from_be_bytes([reply[8], reply[9]])),
+        )
+    };
+    let (_control, relay) = association();
+    let client = UdpSocket::bind("127.0.0.1:0").unwrap();
+    client
+        .set_read_timeout(Some(Duration::from_secs(3)))
+        .unwrap();
+    let mut packet = vec![0, 0, 0, 1, 127, 0, 0, 1];
+    packet.extend(target.port().to_be_bytes());
+    packet.extend(b"pinned");
+    for round in 0..2 {
+        client.send_to(&packet, relay).unwrap();
+        let mut response = [0; 64];
+        let (n, _) = client.recv_from(&mut response).unwrap();
+        assert_eq!(&response[10..n], b"pinned");
+        if round == 0 {
+            c.selectors[0] =
+                serde_json::from_value(json!({"id":"g","members":["deny"],"selected":"deny"}))
+                    .unwrap();
+            core.configure(c.clone()).unwrap();
+        }
+    }
+    let dropped = core.snapshot().unwrap().udp_dropped;
+    let (_new_control, new_relay) = association();
+    client.send_to(&packet, new_relay).unwrap();
+    for _ in 0..100 {
+        if core.snapshot().unwrap().udp_dropped > dropped {
+            break;
+        }
+        thread::sleep(Duration::from_millis(10));
+    }
+    assert!(core.snapshot().unwrap().udp_dropped > dropped);
+    worker.join().unwrap();
 }

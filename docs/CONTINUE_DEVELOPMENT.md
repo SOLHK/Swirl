@@ -1,20 +1,34 @@
 # Swirl 接续开发入口
 
-更新日期：2026-10-17。本轮从 `work/core-completion-20261017@8bd89f2` 接续；`main@87409c0` 尚无 Rust workspace。开发分支已经继承 main 的界面/动效修复，不能从 main 重新实现已有 Rust 工作。
+更新日期：2026-10-17。本轮从 `work/core-completion-20261017@0bf2666` 接续。开发分支已经继承既有界面/动效修复与全部 Rust 工作，不能从 main 重新实现已有模块。
 
 ## 当前接手注意事项
 
 - **当前唯一开发分支：`work/core-completion-20261017`。** 用户最新指令覆盖历史 `test` 要求；不改 main、不强推。已配置的 GitHub App/Secrets 沿用，不重新配置。
 - 用户已明确持续授权本开发分支的修复、测试与 GitHub 写入（“始终允许”）；在既有权限内继续实施，无需重复询问同一开发分支的常规提交。
-- 当前已执行的 Rust 能力新增 DoH、SOCKS4/4a、VLESS WS/WSS 与 Trojan WSS，复用既有 DNS、协议、TLS 和会话代码。本轮修复独立 WS 对端的 Pong 调度阻塞及 Rust 连续 Ping 误断连。详细范围和本轮结果见 [阶段验收](RUST_WS_VALIDATION_20261017.md)。
-- **自动测速、fallback 和负载均衡尚未接入。** 三个 `policy.rs` / `probe.rs` 候选文件没有进入 crate 模块树，内部测试也未执行。不能用提交标题或 workspace 编译通过证明它们完成。见 [真实架构审计](RUST_CORE_AUDIT_20261017.md)。
-- SOCKS4/4a 目前只在 Rust IR/API 和原生数据路径执行；Qt 节点转换和 Rust subscription inspector 尚未接入。WS 已有现有 Qt 字段映射，本轮增加专项映射/拒绝测试；Qt 映射通过与真实 Qt WS 转发是不同证据。
+- 原生 IR/API 已接入嵌套手动组、`url_test`、`fallback`、`load_balance`、经实际出口的 HTTP/HTTPS 健康探测和会话策略视图。此前未编译的候选模块现在实际参与构建与测试；详见 [原生策略组](RUST_NATIVE_POLICIES.md) 和 [本轮阶段验收](RUST_POLICY_VALIDATION_20261017.md)。Qt 自动组/嵌套组转换仍未迁移。
+- 健康视图在 listener accept 时固定；旧 TCP/UDP 保留原出口，完整配置替换/stop 取消旧探测。失败应用请求不重放，无健康成员不静默直连；四个跨配置代共享探测名额和有界期限限制后台工作。
+- SOCKS4/4a 的 Rust subscription inspector 与 Qt 节点转换已接入，十个本地 inspector 至独立对端的真实会话通过。Qt 新增 SOCKS4/4a、VLESS WS 的真实转发槽；本地没有 Qt SDK，槽执行必须以 Windows CI 为准。
+- WebSocket 关闭预算现在从最早关闭意图开始，覆盖拥塞队列、旧数据、Close 写入/flush、对端回复和底层 shutdown。既有 DoH、WS/WSS 及协议握手继续复用，没有重写已有传输。
 - 当前阶段默认产品仍保留 C++/Mihomo 兼容构建。必须用 `SWIRL_USE_RUST_CORE=ON` 验证原生 Rust；该模式不会回退完整外部内核。智能 MRS、TUN、LAN 和未迁移协议仍会明确拒绝。
 - 私有订阅/缓存不进 Git 或 CI；无需开启用户十分钟订阅更新窗口。只使用合成对端和明确的固定公共目标做本轮验证，不修改系统代理或 DNS。
-- 以 [阶段验收](RUST_WS_VALIDATION_20261017.md) 中准确提交/Actions 结果为准；下方旧 DoT、Windows 本机记录仅是历史证据。
-- **本轮实现与 App 工作流更新已经推送。** 精确提交和 CI 状态见下表；App 写入成功与网络、Qt 回归通过分别记录。
+- 以 [本轮阶段验收](RUST_POLICY_VALIDATION_20261017.md) 中准确提交/Actions 结果为准；下方 WS/DoT、Windows 本机旧记录均是历史证据，不能证明本轮代码已通过远端门禁。
 
-## 本轮远端提交与验收状态
+## 本轮验收状态
+
+| 内容 | 当前执行证据 |
+|---|---|
+| Rust 格式、check、clippy、workspace 测试及 release 构建 | 全部通过；83 项 Rust 测试通过，0 失败/跳过 |
+| 本地 Python 回归合计 | 134 项中 97 通过、37 明确跳过、0 失败；其中策略独立对端 13/13 通过 |
+| 可区分 UDP 出口 | 两个独立 SS 出口共六次往返；健康切换和完整配置替换后旧关联仍固定原出口 |
+| 本地固定公网尝试 | 三项在 DNS/连接阶段失败；[原始 JSON](evidence/RUST_PUBLIC_NETWORK_20261017_POLICY_LOCAL.json) 保留，未计作通过 |
+| 本轮提交、App 工作流更新及三平台/Qt/公网 CI | 本地验收记录写入时尚未推送；提交后依据实际 Actions 更新，不预先宣称成功 |
+
+工作流更新器已通过 13 项安全回归和精确 +9 行预览；复用既有 App 更新目标 Rust workflow，
+增加策略对端、portable inspector 和 Windows SOCKS4/WS Qt 实测，不调整 App 或 Secrets。
+完整命令、边界、哈希和各项跳过原因见 [本轮阶段验收](RUST_POLICY_VALIDATION_20261017.md)。
+
+## 上一阶段远端提交与验收（历史）
 
 | 内容 | 证据 | 当前状态 |
 |---|---|---|
@@ -36,7 +50,7 @@
 #22 的严格公网报告时间为 11:50:27 UTC，三项均通过；11:56:56 UTC 三平台整体成功。两轮 Rust binary SHA-256 完全一致：
 `7e83e9b89232f4712335ca9e4d8e6f3dacbb52b5f2daefbe357055792ce132d9`。
 这证明所测 DIRECT/DoH 路径的真实请求与正常关闭，不代表私有提供商、WS 节点、UDP 或 TUN 已验证。
-Windows Qt 的成功不替代 Qt WS 真实转发、个人电脑视觉验收或其他平台的桌面产品验证。
+上一阶段 Windows Qt 的成功不替代本轮新增 Qt WS 真实转发、个人电脑视觉验收或其他平台的桌面产品验证。
 
 ## 仓库是否完整
 
@@ -79,15 +93,15 @@ Qt/Rust CMake configure/generate 成功。此检查不声称重新完成了一�
 | 位置 | 已实现 |
 |---|---|
 | `core/crates/swirl-protocol` | HTTP/CONNECT/SOCKS4/4a/5 入站；HTTP CONNECT、SOCKS4/4a/5、Trojan TLS、SS AEAD TCP/UDP、simple-obfs HTTP、基础 VLESS v0 TCP/TLS；VLESS WS/WSS、Trojan WSS |
-| `core/crates/swirl-routing` | 顺序域名/后缀/关键词、目标端口、来源/目标 CIDR、MATCH；手动 selector |
+| `core/crates/swirl-routing` | 顺序域名/后缀/关键词、目标端口、来源/目标 CIDR、MATCH；有界嵌套手动组与自动组会话选择 |
 | `core/crates/swirl-dns` | 自研 Rust DNS 报文/UDP/TCP/严格 DoT/HTTP-1.1 DoH/A/AAAA/CNAME/TTL；有界系统解析、精确 hosts、各代缓存隔离及共享并发上限 |
-| `core/crates/swirl-core` | 有界运行时、不可变会话配置、原子节点/组/配置更新、旧 TCP/UDP 保留原出口、流量统计 |
-| `core/crates/swirl-subscription` | typed IR、Clash YAML/JSON、sing-box JSON、URI/Base64、部分 INI 识别与保留、脱敏能力报告；严格 DoT/DoH/WS 配置；并非所有格式都可执行，SOCKS4 导入未接入 |
+| `core/crates/swirl-core` | 有界运行时、不可变会话配置/健康视图、原子节点/组/配置更新、旧 TCP/UDP 保留原出口、流量统计；四名额健康探测、过期与取消、测速/fallback/轮询 |
+| `core/crates/swirl-subscription` | typed IR、Clash YAML/JSON、sing-box JSON、URI/Base64、部分 INI 识别与保留、脱敏能力报告；严格 DoT/DoH/WS/策略字段和图验证；有限 SOCKS4/4a 导入已接入，并非所有格式都可执行 |
 | `core/crates/swirl-transport` / `swirl-api` | 验证 TLS、背压/半关闭；ABI v1 JSON 控制、stdin harness、离线 inspector |
-| `src/Swirl.Quick/engine/RustCoreEngine.*` / `RustDnsConfiguration.h` | 现有 Qt 控制层到 Rust DLL；规则、手动组、本地 DNS 与显式 DoT/DoH/WS 映射；明确拒绝未迁移会话 |
-| `tools/` | 私有采集/离线分析、独立协议/DoT 对端、Codex 本地代理配置管理与测试 |
+| `src/Swirl.Quick/engine/RustCoreEngine.*` / `RustDnsConfiguration.h` | 现有 Qt 控制层到 Rust DLL；规则、有限手动组、本地 DNS 与显式 DoT/DoH/WS/SOCKS4 映射；明确拒绝未迁移会话 |
+| `tools/` | 私有采集/离线分析、独立协议/DoT/DoH/策略对端、Codex 本地代理配置管理、受限工作流更新与测试 |
 
-关键边界：[规则与手动组](RUST_NATIVE_ROUTING.md)、[本地 DNS](RUST_LOCAL_DNS.md)、[DoT](RUST_DOT.md)、
+关键边界：[规则与 Qt 手动组](RUST_NATIVE_ROUTING.md)、[原生策略](RUST_NATIVE_POLICIES.md)、[本地 DNS](RUST_LOCAL_DNS.md)、[DoT](RUST_DOT.md)、
 [SS-02 审核处理](SS02_REVIEW_DISPOSITION.md)、[Codex 管理](CODEX_PROXY_MANAGEMENT.md)。
 手动组没有新增 UI 选择按钮；默认首成员或明确 default-selected，API 支持 select_group。
 智能 MRS 路由尚未迁移，因此启用该默认设置的会话仍会被 Rust 拒绝；不可静默降级为全局。
@@ -122,6 +136,7 @@ py -3 tools/tests/test_dns_tls.py
 py -3 tools/tests/test_dns_https.py
 py -3 tools/tests/test_socks4.py
 py -3 tools/tests/test_websocket_transport.py
+py -3 tools/tests/test_policy_groups.py
 py -3 tools/tests/test_core_development.py
 py -3 tools/tests/test_subscription_capture.py
 py -3 tools/tests/test_codex_management.py
@@ -129,7 +144,7 @@ py -3 tools/tests/test_codex_management.py
 
 Qt DLL 需在 PATH 或由 windeployqt 部署。MSVC 多配置输出的 EXE 位于 `Release/`，调整上述路径。
 核心 DLL、harness 与 inspector 必须来自同一次构建。Python 脚本中需 C++ 私有导入器或真实 Codex CLI
-的可选测试需要额外环境变量；跳过项必须报告。不要把普通 CTest 中 SS/VLESS 外部对端的跳过项当通过，
+的可选测试需要额外环境变量；跳过项必须报告。不要把普通 CTest 中 SS/VLESS/SOCKS4/WS 外部对端的跳过项当通过，
 上面的 Python 测试设置 Qt 路径后会运行对应槽。
 
 Rust 预览部署至少需 Swirl.exe、swirl_api.dll、各辅助 EXE、Qt/QML 运行库以及适用许可证。
@@ -153,14 +168,13 @@ ZIP CRC、包内 DLL 哈希及私有内容扫描通过。GNU 链接器仍有 `.d
 规则阶段 `7c7b884` 的旧版节点 UI 164 项通过；该修复已包含在当前源码。
 本地缓存 14 份导出、12 个不同文档离线解析通过；本轮没有新增私有节点 TCP/UDP 联网验收。
 
-严格公网门禁与三项真实请求已在 #22 Linux 完成，三平台回归及 Windows Qt 也已通过。
-下一开发阶段优先接入现有自动组候选，并按以下顺序逐项实现和推送：
+上一阶段严格公网门禁与三项真实请求已在 #22 Linux 完成，三平台回归及 Windows Qt 也已通过。
+本阶段实际接入原生自动组、SOCKS4 导入与统一 WS 关闭预算；后续按以下边界逐项实现和推送：
 
-1. 把现有自动组候选接入 Swirl IR、原生健康探测、会话策略快照与 API，补独立 HTTP/HTTPS 对端测试。必须验证失败不重放请求、不静默直连、健康状态过期、配置切换保留旧 TCP/UDP 会话，以及停止后无探测任务。
-2. 补 SOCKS4/4a 的订阅与 Qt 参数转换，复用已完成握手；补 Qt WS 实际转发对端证据，不把纯映射测试当互操作。
-3. DNS bootstrap/多地址/分流/负缓存与智能 MRS/进程规则。DoT、HTTP-1.1 DoH、UDP/TCP 报文与 TTL 已接入，不重复重写。
-4. gRPC/XHTTP、REALITY/Vision、VMess/SS2022、QUIC 等缺少协议与传输，分别提供互操作证据。WS 基础已实现，本轮仅覆盖明确的有限组合。
-5. TUN、LAN、网关、平台权限/系统代理接管与异常恢复；不擅自改变用户当前网络。
-6. 完整订阅到产品配置的 Rust 接管、私有节点授权验收、长期/弱网/性能验证，最后才移除旧内核依赖。
+1. Qt 自动组/嵌套组映射与完整订阅策略接管，保留现有 UI，并为实际 Qt 控制流提供独立对端证据；未知参数继续拒绝或保留报告。
+2. DNS 负缓存需校验 NXDOMAIN/NODATA/SOA，缓存身份按主机共享；多地址有界连接需保留规则固定的 IP 语义。继续推进 bootstrap/分流及智能 MRS/进程规则。既有 DoT、HTTP-1.1 DoH、UDP/TCP 报文和 TTL 不重复重写。
+3. gRPC/XHTTP、REALITY/Vision、VMess/SS2022、QUIC 等缺少协议与传输，分别提供互操作证据。WS 基础已实现，本轮只覆盖明确的有限组合。
+4. TUN、LAN、网关、平台权限/系统代理接管与异常恢复；不擅自改变用户当前网络。
+5. 完整订阅到产品配置的 Rust 接管、私有节点授权验收、长期/弱网/性能验证，最后才移除旧内核依赖。
 
 不要重写已完成模块或删掉兼容构建来制造“全自研完成”。所有阶段仍需保留 UI 与用户数据。

@@ -20,14 +20,56 @@ use swirl_subscription::WebSocket;
 use swirl_transport::BoxStream;
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, DuplexStream, ReadBuf},
-    sync::mpsc,
+    sync::{mpsc, watch},
     task::JoinHandle,
-    time::{Duration, timeout},
+    time::{Duration, Instant, sleep_until},
 };
 
 const BUFFER: usize = 16384;
 const MAX_MESSAGE: u64 = 1024 * 1024;
+const CLOSE_TIMEOUT: Duration = Duration::from_secs(2);
 type Control = (u8, Vec<u8>);
+
+#[derive(Clone)]
+struct CloseBudget {
+    deadline: watch::Sender<Option<Instant>>,
+}
+impl Default for CloseBudget {
+    fn default() -> Self {
+        Self {
+            deadline: watch::channel(None).0,
+        }
+    }
+}
+impl CloseBudget {
+    fn start(&self) {
+        // Queueing, writes, flush, peer acknowledgement and transport shutdown
+        // share this first deadline. Repeated shutdown/Close cannot extend it.
+        self.deadline.send_if_modified(|deadline| {
+            if deadline.is_some() {
+                return false;
+            }
+            *deadline = Some(Instant::now() + CLOSE_TIMEOUT);
+            true
+        });
+    }
+    async fn started(&self) -> Instant {
+        let mut signal = self.deadline.subscribe();
+        loop {
+            if let Some(deadline) = *signal.borrow_and_update() {
+                return deadline;
+            }
+            // self owns a Sender for this entire wait, so it cannot close.
+            signal
+                .changed()
+                .await
+                .expect("close budget sender is alive");
+        }
+    }
+    async fn expired(&self) {
+        sleep_until(self.started().await).await;
+    }
+}
 fn invalid(reason: &'static str) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, reason)
 }
@@ -127,6 +169,7 @@ async fn read_frames<R: AsyncRead + Unpin, W: AsyncWrite + Unpin>(
     mut wire: R,
     mut app: W,
     controls: mpsc::Sender<Control>,
+    close: &CloseBudget,
 ) -> io::Result<()> {
     let mut fragmented = false;
     let mut message_size = 0u64;
@@ -193,6 +236,7 @@ async fn read_frames<R: AsyncRead + Unpin, W: AsyncWrite + Unpin>(
                     if !close_valid(&data) {
                         return Err(invalid("WebSocketClose"));
                     }
+                    close.start();
                     controls
                         .send((8, data))
                         .await
@@ -219,52 +263,82 @@ async fn write_frames<W: AsyncWrite + Unpin, R: AsyncRead + Unpin>(
     mut wire: W,
     mut app: R,
     mut controls: mpsc::Receiver<Control>,
+    close: &CloseBudget,
 ) -> io::Result<()> {
     let mut buffer = [0; BUFFER];
+    let mut sent_close = false;
     loop {
         tokio::select! {
             biased;
             control = controls.recv() => {
                 let Some((opcode, data)) = control else { return Err(invalid("WebSocketControlClosed")); };
+                if opcode == 8 {
+                    if !sent_close {
+                        send_frame(&mut wire, opcode, &data).await?;
+                    }
+                    return wire.shutdown().await;
+                }
                 send_frame(&mut wire, opcode, &data).await?;
-                if opcode == 8 { return wire.shutdown().await; }
             }
-            read = app.read(&mut buffer) => {
+            read = app.read(&mut buffer), if !sent_close => {
                 let size = read?;
                 if size == 0 {
+                    close.start();
                     send_frame(&mut wire, 8, &1000u16.to_be_bytes()).await?;
-                    return wire.shutdown().await;
+                    sent_close = true;
+                    // RFC 6455 5.5.2 still requires Pong until a peer Close.
+                    // Keep the control receiver and wire write half alive,
+                    // but never send another application frame after Close.
+                    continue;
                 }
                 send_frame(&mut wire, 2, &buffer[..size]).await?;
             }
         }
     }
 }
-async fn drive(wire: BoxStream, app: &mut DuplexStream) -> io::Result<()> {
+async fn drive(wire: BoxStream, app: &mut DuplexStream, close: &CloseBudget) -> io::Result<()> {
     let (read_wire, write_wire) = tokio::io::split(wire);
     let (read_app, write_app) = tokio::io::split(app);
     let (controls, control_rx) = mpsc::channel(8);
-    let read = read_frames(read_wire, write_app, controls);
-    let write = write_frames(write_wire, read_app, control_rx);
-    tokio::pin!(read, write);
-    // Once either direction closes, finish the WS close exchange promptly.
-    // Idle applications have no arbitrary keepalive/read timeout.
+    let read = read_frames(read_wire, write_app, controls, close);
+    let write = write_frames(write_wire, read_app, control_rx, close);
+    // Start timing at the first close request, before either direction can
+    // stall on a full control queue or wire. Both futures are owned here and
+    // dropped together on timeout, error or driver cancellation. Idle
+    // applications have no arbitrary keepalive/read timeout.
     tokio::select! {
-        result = &mut read => {
-            result?;
-            timeout(Duration::from_secs(2), write).await.map_err(|_| invalid("WebSocketCloseTimeout"))??;
-        }
-        result = &mut write => {
-            result?;
-            timeout(Duration::from_secs(2), read).await.map_err(|_| invalid("WebSocketCloseTimeout"))??;
-        }
+        biased;
+        () = close.expired() => Err(invalid("WebSocketCloseTimeout")),
+        result = async { tokio::try_join!(read, write)?; Ok(()) } => result,
     }
-    Ok(())
 }
 struct Stream {
     io: DuplexStream,
     driver: JoinHandle<()>,
     ended: Arc<AtomicU8>,
+    close: CloseBudget,
+}
+impl Stream {
+    fn new(wire: BoxStream) -> Self {
+        let (io, mut app) = tokio::io::duplex(BUFFER);
+        let ended = Arc::new(AtomicU8::new(0));
+        let result = ended.clone();
+        let close = CloseBudget::default();
+        let driver_close = close.clone();
+        let driver = tokio::spawn(async move {
+            let success = drive(wire, &mut app, &driver_close).await.is_ok();
+            result.store(if success { 1 } else { 2 }, Ordering::Release);
+            // app remains owned until result has been published, so EOF cannot
+            // race the error status or disguise malformed/truncated WS as success.
+            drop(app);
+        });
+        Self {
+            io,
+            driver,
+            ended,
+            close,
+        }
+    }
 }
 impl Drop for Stream {
     fn drop(&mut self) {
@@ -304,7 +378,11 @@ impl AsyncWrite for Stream {
         Pin::new(&mut self.get_mut().io).poll_flush(cx)
     }
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        Pin::new(&mut self.get_mut().io).poll_shutdown(cx)
+        let this = self.get_mut();
+        // The writer may be blocked sending an earlier data frame and unable
+        // to read application EOF. Bound shutdown from the caller's request.
+        this.close.start();
+        Pin::new(&mut this.io).poll_shutdown(cx)
     }
 }
 pub(super) async fn connect(
@@ -333,22 +411,109 @@ pub(super) async fn connect(
         response.push(wire.read_u8().await.map_err(|_| "WebSocketUpgradeRead")?);
     }
     check_upgrade(&response, &key)?;
-    let (io, mut app) = tokio::io::duplex(BUFFER);
-    let ended = Arc::new(AtomicU8::new(0));
-    let result = ended.clone();
-    let driver = tokio::spawn(async move {
-        let success = drive(wire, &mut app).await.is_ok();
-        result.store(if success { 1 } else { 2 }, Ordering::Release);
-        // app remains owned until result has been published, so EOF cannot
-        // race the error status or disguise malformed/truncated WS as success.
-        drop(app);
-    });
-    Ok(Box::new(Stream { io, driver, ended }))
+    Ok(Box::new(Stream::new(wire)))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::{sync::Mutex, task::Waker};
+    use tokio::sync::{Notify, oneshot};
+    use tokio::time::{advance, timeout};
+
+    #[derive(Default)]
+    struct Gate {
+        state: Mutex<(bool, Option<Waker>)>,
+        reached: Notify,
+    }
+    impl Gate {
+        fn block(&self) {
+            self.state.lock().unwrap().0 = true;
+        }
+        fn release(&self) {
+            let waker = {
+                let mut state = self.state.lock().unwrap();
+                state.0 = false;
+                state.1.take()
+            };
+            if let Some(waker) = waker {
+                waker.wake();
+            }
+        }
+        fn poll(&self, cx: &mut Context<'_>) -> Poll<()> {
+            let mut state = self.state.lock().unwrap();
+            if state.0 {
+                state.1 = Some(cx.waker().clone());
+                self.reached.notify_one();
+                Poll::Pending
+            } else {
+                Poll::Ready(())
+            }
+        }
+    }
+    #[derive(Default)]
+    struct Gates {
+        write: Gate,
+        flush: Gate,
+        shutdown: Gate,
+    }
+    struct GatedWire {
+        io: DuplexStream,
+        gates: Arc<Gates>,
+        dropped: Option<oneshot::Sender<()>>,
+    }
+    impl Drop for GatedWire {
+        fn drop(&mut self) {
+            if let Some(dropped) = self.dropped.take() {
+                let _ = dropped.send(());
+            }
+        }
+    }
+    impl AsyncRead for GatedWire {
+        fn poll_read(
+            self: Pin<&mut Self>,
+            cx: &mut Context<'_>,
+            buffer: &mut ReadBuf<'_>,
+        ) -> Poll<io::Result<()>> {
+            Pin::new(&mut self.get_mut().io).poll_read(cx, buffer)
+        }
+    }
+    impl AsyncWrite for GatedWire {
+        fn poll_write(
+            self: Pin<&mut Self>,
+            cx: &mut Context<'_>,
+            data: &[u8],
+        ) -> Poll<io::Result<usize>> {
+            let this = self.get_mut();
+            std::task::ready!(this.gates.write.poll(cx));
+            Pin::new(&mut this.io).poll_write(cx, data)
+        }
+        fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+            let this = self.get_mut();
+            std::task::ready!(this.gates.flush.poll(cx));
+            Pin::new(&mut this.io).poll_flush(cx)
+        }
+        fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+            let this = self.get_mut();
+            std::task::ready!(this.gates.shutdown.poll(cx));
+            Pin::new(&mut this.io).poll_shutdown(cx)
+        }
+    }
+    fn gated_wire() -> (BoxStream, DuplexStream, Arc<Gates>, oneshot::Receiver<()>) {
+        let (io, peer) = tokio::io::duplex(BUFFER);
+        let gates = Arc::new(Gates::default());
+        let (dropped, observe_drop) = oneshot::channel();
+        (
+            Box::new(GatedWire {
+                io,
+                gates: gates.clone(),
+                dropped: Some(dropped),
+            }),
+            peer,
+            gates,
+            observe_drop,
+        )
+    }
 
     fn server_frame(opcode: u8, fin: bool, data: &[u8]) -> Vec<u8> {
         let mut frame = vec![opcode | if fin { 128 } else { 0 }];
@@ -387,6 +552,240 @@ mod tests {
         }
         (header[0] & 15, data)
     }
+
+    #[tokio::test(start_paused = true)]
+    async fn one_close_deadline_covers_write_flush_peer_reply_and_shutdown() {
+        timeout(Duration::from_secs(3), async {
+            let (wire, mut peer, gates, dropped) = gated_wire();
+            gates.write.block();
+            gates.flush.block();
+            gates.shutdown.block();
+            let (mut application, mut app) = tokio::io::duplex(32);
+            let close = CloseBudget::default();
+            let driver_close = close.clone();
+            let start = Instant::now();
+            let driver = tokio::spawn(async move { drive(wire, &mut app, &driver_close).await });
+            application.shutdown().await.unwrap();
+            gates.write.reached.notified().await;
+            assert_eq!(close.started().await, start + CLOSE_TIMEOUT);
+
+            advance(Duration::from_millis(500)).await;
+            gates.write.release();
+            assert_eq!(
+                client_frame(&mut peer).await,
+                (8, 1000u16.to_be_bytes().to_vec())
+            );
+            gates.flush.reached.notified().await;
+            advance(Duration::from_millis(500)).await;
+            gates.flush.release();
+
+            advance(Duration::from_millis(500)).await;
+            peer.write_all(&server_frame(8, true, &1000u16.to_be_bytes()))
+                .await
+                .unwrap();
+            gates.shutdown.reached.notified().await;
+            // Peer Close and repeated local close requests must not restart it.
+            close.start();
+            assert_eq!(close.started().await, start + CLOSE_TIMEOUT);
+            advance(Duration::from_millis(499)).await;
+            assert!(!driver.is_finished());
+            advance(Duration::from_millis(1)).await;
+            assert_eq!(
+                driver.await.unwrap().unwrap_err().to_string(),
+                "WebSocketCloseTimeout"
+            );
+            dropped.await.unwrap();
+            assert_eq!(Instant::now() - start, CLOSE_TIMEOUT);
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn peer_close_behind_a_full_control_queue_has_a_deadline() {
+        timeout(Duration::from_secs(3), async {
+            let (wire, mut peer, gates, dropped) = gated_wire();
+            gates.write.block();
+            let mut frames = Vec::new();
+            // One Pong is stuck in write_all; eight more fill the queue.
+            for value in 0..9 {
+                frames.extend(server_frame(9, true, &[value]));
+            }
+            frames.extend(server_frame(8, true, &1000u16.to_be_bytes()));
+            peer.write_all(&frames).await.unwrap();
+            let (_application, mut app) = tokio::io::duplex(32);
+            let close = CloseBudget::default();
+            let driver_close = close.clone();
+            let start = Instant::now();
+            let driver = tokio::spawn(async move { drive(wire, &mut app, &driver_close).await });
+            assert_eq!(close.started().await, start + CLOSE_TIMEOUT);
+            gates.write.reached.notified().await;
+            advance(CLOSE_TIMEOUT - Duration::from_millis(1)).await;
+            assert!(!driver.is_finished());
+            advance(Duration::from_millis(1)).await;
+            assert_eq!(
+                driver.await.unwrap().unwrap_err().to_string(),
+                "WebSocketCloseTimeout"
+            );
+            dropped.await.unwrap();
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn local_shutdown_bounds_a_previously_backpressured_data_frame() {
+        timeout(Duration::from_secs(3), async {
+            let (wire, _peer, gates, dropped) = gated_wire();
+            gates.write.block();
+            let mut stream = Stream::new(wire);
+            stream
+                .write_all(b"request already being framed")
+                .await
+                .unwrap();
+            gates.write.reached.notified().await;
+            assert!(stream.close.deadline.borrow().is_none());
+            stream.shutdown().await.unwrap();
+            advance(CLOSE_TIMEOUT).await;
+            (&mut stream.driver).await.unwrap();
+            assert_eq!(stream.ended.load(Ordering::Acquire), 2);
+            assert_eq!(
+                stream.read_u8().await.unwrap_err().to_string(),
+                "WebSocketTransportClosed"
+            );
+            dropped.await.unwrap();
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn silent_peer_and_repeated_shutdown_cannot_extend_the_close_budget() {
+        timeout(Duration::from_secs(3), async {
+            let (wire, mut peer, _gates, dropped) = gated_wire();
+            let mut stream = Stream::new(wire);
+            let start = Instant::now();
+            stream.shutdown().await.unwrap();
+            assert_eq!(client_frame(&mut peer).await.0, 8);
+            advance(Duration::from_secs(1)).await;
+            stream.shutdown().await.unwrap();
+            assert_eq!(stream.close.started().await, start + CLOSE_TIMEOUT);
+            advance(Duration::from_secs(1)).await;
+            (&mut stream.driver).await.unwrap();
+            assert_eq!(stream.ended.load(Ordering::Acquire), 2);
+            dropped.await.unwrap();
+            let mut trailing = Vec::new();
+            peer.read_to_end(&mut trailing).await.unwrap();
+            assert!(trailing.is_empty());
+            assert_eq!(Instant::now() - start, CLOSE_TIMEOUT);
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn local_eof_flushes_queued_data_and_answers_ping_until_peer_close() {
+        timeout(CLOSE_TIMEOUT, async {
+            let (wire, mut peer, _gates, dropped) = gated_wire();
+            let mut stream = Stream::new(wire);
+            stream.write_all(b"queued before EOF").await.unwrap();
+            stream.shutdown().await.unwrap();
+            assert_eq!(
+                client_frame(&mut peer).await,
+                (2, b"queued before EOF".to_vec())
+            );
+            assert_eq!(
+                client_frame(&mut peer).await,
+                (8, 1000u16.to_be_bytes().to_vec())
+            );
+            assert!(stream.write_all(b"after Close").await.is_err());
+            peer.write_all(&server_frame(9, true, b"still closing"))
+                .await
+                .unwrap();
+            assert_eq!(
+                client_frame(&mut peer).await,
+                (10, b"still closing".to_vec())
+            );
+            peer.write_all(&server_frame(8, true, &1000u16.to_be_bytes()))
+                .await
+                .unwrap();
+            let mut data = Vec::new();
+            stream.read_to_end(&mut data).await.unwrap();
+            assert!(data.is_empty());
+            (&mut stream.driver).await.unwrap();
+            assert_eq!(stream.ended.load(Ordering::Acquire), 1);
+            dropped.await.unwrap();
+            // A simultaneous/acknowledged Close must not send a second Close.
+            peer.read_to_end(&mut data).await.unwrap();
+            assert!(data.is_empty());
+        })
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn transport_eof_without_peer_close_is_never_reported_as_success() {
+        for local_close in [false, true] {
+            timeout(CLOSE_TIMEOUT, async {
+                let (wire, mut peer, _gates, dropped) = gated_wire();
+                let mut stream = Stream::new(wire);
+                if local_close {
+                    stream.shutdown().await.unwrap();
+                    assert_eq!(client_frame(&mut peer).await.0, 8);
+                }
+                peer.shutdown().await.unwrap();
+                assert_eq!(
+                    stream.read_u8().await.unwrap_err().to_string(),
+                    "WebSocketTransportClosed"
+                );
+                (&mut stream.driver).await.unwrap();
+                assert_eq!(stream.ended.load(Ordering::Acquire), 2);
+                dropped.await.unwrap();
+            })
+            .await
+            .unwrap();
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn idle_has_no_deadline_and_drop_cancels_blocked_drivers() {
+        for state in 0..3 {
+            let (wire, mut peer, gates, dropped) = gated_wire();
+            let mut stream = Stream::new(wire);
+            match state {
+                0 => {
+                    advance(Duration::from_secs(86400)).await;
+                    assert!(!stream.driver.is_finished());
+                    assert!(stream.close.deadline.borrow().is_none());
+                }
+                1 => {
+                    gates.write.block();
+                    stream.write_all(b"pending write").await.unwrap();
+                    gates.write.reached.notified().await;
+                }
+                _ => {
+                    gates.write.block();
+                    let mut frames = Vec::new();
+                    for value in 0..9 {
+                        frames.extend(server_frame(9, true, &[value]));
+                    }
+                    frames.extend(server_frame(8, true, &1000u16.to_be_bytes()));
+                    peer.write_all(&frames).await.unwrap();
+                    stream.close.started().await;
+                }
+            }
+            let driver = stream.driver.abort_handle();
+            drop(stream);
+            // Observe owned wire destruction, not just an abort request. A
+            // leaked close task would still wait for its two-second deadline.
+            timeout(Duration::from_millis(1), dropped)
+                .await
+                .unwrap()
+                .unwrap();
+            assert!(driver.is_finished());
+        }
+    }
+
     #[test]
     fn handshake_token_and_unsolicited_extensions() {
         let key = "dGhlIHNhbXBsZSBub25jZQ==";
@@ -427,7 +826,11 @@ mod tests {
         ] {
             let mut data = bytes;
             let (tx, _rx) = mpsc::channel(8);
-            assert!(read_frames(&mut data, tokio::io::sink(), tx).await.is_err());
+            assert!(
+                read_frames(&mut data, tokio::io::sink(), tx, &CloseBudget::default())
+                    .await
+                    .is_err()
+            );
         }
     }
 
@@ -442,7 +845,8 @@ mod tests {
         wire.extend(server_frame(8, true, &1000u16.to_be_bytes()));
         expected.push((8, 1000u16.to_be_bytes().to_vec()));
         let (tx, mut rx) = mpsc::channel(8);
-        let read = read_frames(wire.as_slice(), tokio::io::sink(), tx);
+        let close = CloseBudget::default();
+        let read = read_frames(wire.as_slice(), tokio::io::sink(), tx, &close);
         let drain = async {
             let mut received = Vec::new();
             while let Some(control) = rx.recv().await {
@@ -468,7 +872,12 @@ mod tests {
         drop(rx);
         let error = timeout(
             Duration::from_secs(2),
-            read_frames(bytes.as_slice(), tokio::io::sink(), tx),
+            read_frames(
+                bytes.as_slice(),
+                tokio::io::sink(),
+                tx,
+                &CloseBudget::default(),
+            ),
         )
         .await
         .unwrap()
@@ -483,7 +892,9 @@ mod tests {
             // fragment, forcing partial reads/writes in both directions.
             let (wire, server) = tokio::io::duplex(31);
             let (application, mut app) = tokio::io::duplex(17);
-            let driver = tokio::spawn(async move { drive(Box::new(wire), &mut app).await });
+            let driver = tokio::spawn(async move {
+                drive(Box::new(wire), &mut app, &CloseBudget::default()).await
+            });
             let upload: Vec<_> = (0..BUFFER + 11).map(|i| i as u8).collect();
             let download: Vec<_> = (0..BUFFER * 2 + 7).map(|i| (i % 251) as u8).collect();
             let fragments = download.chunks(1024).len();

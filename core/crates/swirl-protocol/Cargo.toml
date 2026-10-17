@@ -14,5 +14,7 @@ sha2.workspace = true
 ring.workspace = true
 md-5.workspace = true
 zeroize.workspace = true
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }
 [lints]
 workspace = true

@@ -49,7 +49,13 @@ QString ProxyNode::validate(const ProxyNode &n) {
     if (QUuid(n.id).isNull()) return QStringLiteral("节点标识无效。");
     if (n.name.trimmed().isEmpty() || n.name.size() > 128 || n.name.contains(QRegularExpression("[\\x00-\\x1f]")))
         return QStringLiteral("节点名称不能为空、超过 128 字符或包含控制字符。");
-    if (!protocols().contains(n.protocol)) return QStringLiteral("固定版本引擎不支持此节点协议。");
+    bool supportedProtocol=protocols().contains(n.protocol);
+#ifdef SWIRL_USE_RUST_CORE
+    // Imported native protocols do not expand the existing editor dropdown or
+    // claim that the retained Mihomo compatibility build can execute them.
+    supportedProtocol=supportedProtocol||n.protocol=="socks4"||n.protocol=="socks4a";
+#endif
+    if (!supportedProtocol) return QStringLiteral("固定版本引擎不支持此节点协议。");
     const bool peerTransport=QStringList{"wireguard","tailscale","zerotier","easytier","openvpn"}.contains(n.protocol);
     const bool portRange=(n.protocol=="mieru" && !n.parameters.value("port-range").toString().isEmpty()) ||
         (QStringList{"hysteria","hysteria2"}.contains(n.protocol) && !n.parameters.value("ports").toString().isEmpty());
@@ -57,6 +63,10 @@ QString ProxyNode::validate(const ProxyNode &n) {
     if (n.password.size() > 4096 || n.username.size() > 255) return QStringLiteral("凭据长度超过支持范围。");
     if (n.protocol == "socks5" && (n.username.toUtf8().size()>255 || n.password.toUtf8().size()>255)) return QStringLiteral("SOCKS5 凭据不能超过 255 字节。");
     if (n.protocol == "socks5" && (n.username.isEmpty() != n.password.isEmpty())) return QStringLiteral("SOCKS5 用户名与密码须同时填写或同时留空。");
+    if (n.protocol == "socks4" || n.protocol == "socks4a") {
+        if(!n.password.isEmpty())return QStringLiteral("SOCKS4/4a 不支持密码认证；用户名仅映射 USERID。");
+        if(n.username.toUtf8().size()>255||n.username.contains(QRegularExpression("[\\x00-\\x1f\\x7f-\\x9f]")))return QStringLiteral("SOCKS4 USERID 不能超过 255 字节或包含控制字符。");
+    }
     if (QStringList{"ss","ssr","trojan","anytls","mieru"}.contains(n.protocol) && n.password.isEmpty()) return QStringLiteral("此协议必须填写密码。");
     if ((n.protocol=="vmess" || n.protocol=="vless") && QUuid(n.parameters.value("uuid").toString()).isNull()) return QStringLiteral("此协议需要有效 UUID。");
     if (n.protocol == "ss" && n.cipher.isEmpty()) return QStringLiteral("Shadowsocks 加密方式不能为空；具体算法由引擎校验。");

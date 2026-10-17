@@ -1,9 +1,11 @@
 //! Swirl-owned HTTP/SOCKS state machines. Underlying Tokio is generic socket I/O.
 use base64::{Engine, engine::general_purpose::STANDARD};
+mod probe;
 mod shadowsocks;
 mod socks4;
 mod vless;
 mod websocket;
+pub use probe::health_probe;
 pub use shadowsocks::{
     decrypt_datagram as ss_decrypt_datagram, encrypt_datagram as ss_encrypt_datagram,
 };

@@ -1,4 +1,7 @@
 //! Rust-owned runtime, sockets, scheduling, statistics and immutable session plans.
+mod policy;
+pub use policy::{MemberHealth, PolicyReport};
+use policy::{PolicyRuntime, PolicyView};
 use serde::Serialize;
 use std::{
     collections::{BTreeMap, HashMap},
@@ -11,7 +14,7 @@ use std::{
 };
 use swirl_dns::Resolver;
 use swirl_protocol::{Inbound, Result, Target};
-use swirl_subscription::{Config, Outbound};
+use swirl_subscription::{Config, Outbound, PolicyStrategy};
 use swirl_transport::Counters;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -65,6 +68,7 @@ pub struct Snapshot {
     pub generation: u64,
     pub selected: String,
     pub selectors: BTreeMap<String, String>,
+    pub policies: BTreeMap<String, PolicyReport>,
     pub running: bool,
     pub active: usize,
     pub accepted: u64,
@@ -79,6 +83,21 @@ pub struct Snapshot {
 struct Plan {
     config: Arc<Config>,
     resolver: Arc<Resolver>,
+    policies: Arc<PolicyRuntime>,
+}
+struct SessionPlan {
+    config: Arc<Config>,
+    resolver: Arc<Resolver>,
+    policies: Arc<PolicyView>,
+}
+impl Plan {
+    fn session(&self) -> Result<Arc<SessionPlan>> {
+        Ok(Arc::new(SessionPlan {
+            config: self.config.clone(),
+            resolver: self.resolver.clone(),
+            policies: Arc::new(self.policies.view(&self.config)?),
+        }))
+    }
 }
 pub struct Core {
     runtime: Option<Runtime>,
@@ -105,9 +124,16 @@ impl Core {
         let address = listener.local_addr().map_err(|_| "ListenerAddress")?;
         let capacity = config.limits.max_connections;
         let resolver = Arc::new(Resolver::default().with_config(&config.dns)?);
+        let config = Arc::new(config);
+        let policies = Arc::new(PolicyRuntime::new(
+            runtime.handle().clone(),
+            config.clone(),
+            resolver.clone(),
+        ));
         let plan = Arc::new(RwLock::new(Arc::new(Plan {
-            config: Arc::new(config),
+            config,
             resolver,
+            policies,
         })));
         let state = Arc::new(State::default());
         state.generation.store(1, Ordering::Relaxed);
@@ -124,14 +150,14 @@ impl Core {
                         let Ok((socket,peer))=accepted else {break;};
                         let Ok(permit)=permits.clone().try_acquire_owned() else {state.rejected.fetch_add(1,Ordering::Relaxed);continue;};
                         let Ok(current)=plan.read().map(|c|c.clone()) else {break;};
-                        let config=current.config.clone();let resolver=current.resolver.clone();
+                        let Ok(session_plan)=current.session() else {break;};
                         let state=state.clone();
                         let id=state.accepted.fetch_add(1,Ordering::Relaxed)+1;
                         state.active.fetch_add(1,Ordering::Relaxed);
                         let guard=SessionGuard {state:state.clone(),id};
                         sessions.spawn(async move {
                             let _permit=permit;let _guard=guard;
-                            if let Err(code)=session(socket,peer,config,resolver,state.clone(),id).await {
+                            if let Err(code)=session(socket,peer,session_plan,state.clone(),id).await {
                                 state.failed.fetch_add(1,Ordering::Relaxed);
                                 if let Ok(mut error)=state.last_error.lock(){*error=code;}
                             }
@@ -139,6 +165,7 @@ impl Core {
                     }
                 }
             }
+            if let Ok(current)=plan.read() {current.policies.stop();}
             sessions.abort_all();while sessions.join_next().await.is_some() {}
         }});
         Ok(Self {
@@ -151,6 +178,9 @@ impl Core {
         })
     }
     pub fn configure(&self, config: Config) -> Result<()> {
+        if self.runtime.is_none() {
+            return Err("CoreStopped");
+        }
         config.validate()?;
         let mut plan = self.plan.write().map_err(|_| "ConfigState")?;
         if config.listen != plan.config.listen
@@ -159,14 +189,23 @@ impl Core {
             return Err("ListenerChangeRequiresRestart");
         }
         let resolver = Arc::new(plan.resolver.with_config(&config.dns)?);
+        let config = Arc::new(config);
+        let policies = Arc::new(plan.policies.reconfigured(config.clone(), resolver.clone()));
+        // All fallible validation has completed. Stop the replaced worker even
+        // if an old session still owns its immutable configuration and choices.
+        plan.policies.stop();
         *plan = Arc::new(Plan {
-            config: Arc::new(config),
+            config,
             resolver,
+            policies,
         });
         self.state.generation.fetch_add(1, Ordering::Relaxed);
         Ok(())
     }
     pub fn select_node(&self, id: &str) -> Result<()> {
+        if self.runtime.is_none() {
+            return Err("CoreStopped");
+        }
         let mut plan = self.plan.write().map_err(|_| "ConfigState")?;
         let mut next = (*plan.config).clone();
         next.selected = id.to_owned();
@@ -174,11 +213,15 @@ impl Core {
         *plan = Arc::new(Plan {
             config: Arc::new(next),
             resolver: plan.resolver.clone(),
+            policies: plan.policies.clone(),
         });
         self.state.generation.fetch_add(1, Ordering::Relaxed);
         Ok(())
     }
     pub fn select_group(&self, id: &str, member: &str) -> Result<()> {
+        if self.runtime.is_none() {
+            return Err("CoreStopped");
+        }
         let mut plan = self.plan.write().map_err(|_| "ConfigState")?;
         let mut next = (*plan.config).clone();
         let selector = next
@@ -186,6 +229,9 @@ impl Core {
             .iter_mut()
             .find(|s| s.id == id)
             .ok_or("SelectorMissing")?;
+        if selector.strategy != PolicyStrategy::Manual {
+            return Err("AutomaticPolicySelection");
+        }
         if !selector.members.iter().any(|id| id == member) {
             return Err("SelectorMemberMissing");
         }
@@ -194,6 +240,7 @@ impl Core {
         *plan = Arc::new(Plan {
             config: Arc::new(next),
             resolver: plan.resolver.clone(),
+            policies: plan.policies.clone(),
         });
         self.state.generation.fetch_add(1, Ordering::Relaxed);
         Ok(())
@@ -203,6 +250,7 @@ impl Core {
     }
     pub fn snapshot(&self) -> Result<Snapshot> {
         let plan = self.plan.read().map_err(|_| "ConfigState")?;
+        let policies = plan.policies.report(&plan.config)?;
         let records = self.state.records.lock().map_err(|_| "StatsState")?;
         Ok(Snapshot {
             schema: 1,
@@ -210,12 +258,11 @@ impl Core {
             address: self.address,
             generation: self.state.generation.load(Ordering::Relaxed),
             selected: plan.config.selected.clone(),
-            selectors: plan
-                .config
-                .selectors
+            selectors: policies
                 .iter()
-                .map(|s| (s.id.clone(), s.selected.clone()))
+                .map(|(id, policy)| (id.clone(), policy.selected.clone().unwrap_or_default()))
                 .collect(),
+            policies,
             running: self.task.as_ref().is_some_and(|t| !t.is_finished()),
             active: self.state.active.load(Ordering::Relaxed),
             accepted: self.state.accepted.load(Ordering::Relaxed),
@@ -245,6 +292,9 @@ impl Core {
         })
     }
     pub fn stop(&mut self) {
+        if let Ok(plan) = self.plan.read() {
+            plan.policies.stop();
+        }
         let _ = self.stop.send(true);
         if let Some(runtime) = self.runtime.take() {
             if let Some(task) = self.task.take() {
@@ -288,11 +338,12 @@ impl Drop for SessionGuard {
 async fn session(
     mut inbound: TcpStream,
     peer: SocketAddr,
-    config: Arc<Config>,
-    resolver: Arc<Resolver>,
+    plan: Arc<SessionPlan>,
     state: Arc<State>,
     id: u64,
 ) -> Result<()> {
+    let config = &plan.config;
+    let resolver = &plan.resolver;
     inbound.set_nodelay(true).map_err(|_| "SocketOptions")?;
     let limit = Duration::from_millis(config.limits.handshake_timeout_ms);
     let request = timeout(
@@ -315,18 +366,9 @@ async fn session(
                 counters: counters.clone(),
             },
         );
-        return udp_associate(
-            inbound,
-            peer,
-            request,
-            config,
-            resolver,
-            counters,
-            state.totals.clone(),
-        )
-        .await;
+        return udp_associate(inbound, peer, request, plan, counters, state.totals.clone()).await;
     }
-    let (node, routed_target) = match route(&config, &request.target, peer.ip(), &resolver).await {
+    let (node, routed_target) = match route(&plan, &request.target, peer.ip()).await {
         Ok(route) => route,
         Err(error) => {
             let _ = swirl_protocol::reply(&mut inbound, request.kind, false).await;
@@ -353,7 +395,7 @@ async fn session(
     );
     let connected = timeout(
         limit,
-        swirl_protocol::connect(&node.outbound, &routed_target, &resolver, limit),
+        swirl_protocol::connect(&node.outbound, &routed_target, resolver, limit),
     )
     .await
     .map_err(|_| "UpstreamTimeout")
@@ -391,13 +433,15 @@ async fn session(
 }
 
 async fn route<'a>(
-    config: &'a Config,
+    plan: &'a SessionPlan,
     target: &Target,
     source: std::net::IpAddr,
-    resolver: &Resolver,
 ) -> Result<(&'a swirl_subscription::Node, Target)> {
+    let config = &plan.config;
+    let resolver = &plan.resolver;
     use swirl_routing::Decision;
-    match swirl_routing::select(config, &target.host, target.port, source, None)? {
+    let choose = |id: &str| plan.policies.choose(id);
+    match swirl_routing::select_with(config, &target.host, target.port, source, None, &choose)? {
         Decision::Node(node) => {
             let mut routed = target.clone();
             if config.dns.force_proxy_hosts
@@ -418,12 +462,13 @@ async fn route<'a>(
             // Match and dial the same address. Do not retry another DNS answer
             // under the first address's policy or let an upstream resolve again.
             let address = addresses.first().ok_or("RouteDnsEmpty")?;
-            match swirl_routing::select(
+            match swirl_routing::select_with(
                 config,
                 &target.host,
                 target.port,
                 source,
                 Some(&addresses),
+                &choose,
             )? {
                 Decision::Node(node) => Ok((
                     node,
@@ -459,13 +504,12 @@ fn transient_udp(error: &std::io::Error) -> bool {
     )
 }
 async fn prepare_udp(
-    config: Arc<Config>,
-    resolver: Arc<Resolver>,
+    plan: Arc<SessionPlan>,
     target: Target,
     payload: Vec<u8>,
     source: std::net::IpAddr,
 ) -> Result<UdpDispatch> {
-    let (node, target) = route(&config, &target, source, &resolver).await?;
+    let (node, target) = route(&plan, &target, source).await?;
     let (host, port, packet) = match &node.outbound {
         Outbound::Direct {} => (target.host.clone(), target.port, payload.clone()),
         Outbound::Shadowsocks {
@@ -485,7 +529,8 @@ async fn prepare_udp(
         }
         _ => return Err("UdpProxyUnsupportedOrRejected"),
     };
-    let address = resolver
+    let address = plan
+        .resolver
         .resolve(&host, port)
         .await?
         .into_iter()
@@ -502,8 +547,7 @@ async fn udp_associate(
     mut control: TcpStream,
     peer: SocketAddr,
     request: Inbound,
-    config: Arc<Config>,
-    resolver: Arc<Resolver>,
+    plan: Arc<SessionPlan>,
     counters: Arc<Counters>,
     total: Arc<Counters>,
 ) -> Result<()> {
@@ -560,15 +604,15 @@ async fn udp_associate(
                 client=Some(source);
                 if cursor.len()>65507 {continue;}
                 if pending.len()>=4{udp_drop(&counters,&total);continue;}
-                pending.spawn(prepare_udp(config.clone(),resolver.clone(),target,cursor.to_vec(),source.ip()));
+                pending.spawn(prepare_udp(plan.clone(),target,cursor.to_vec(),source.ip()));
             }
             packet=v4.recv_from(&mut from_v4)=>{
                 let (n,source)=match packet {Ok(v)=>v,Err(e) if transient_udp(&e)=>{udp_drop(&counters,&total);continue;},Err(_)=>return Err("UdpReceive")};
-                udp_response(&relay,client,source,&from_v4[..n],&destinations,&config,(&counters,&total)).await?;
+                udp_response(&relay,client,source,&from_v4[..n],&destinations,&plan.config,(&counters,&total)).await?;
             }
             packet=v6.recv_from(&mut from_v6)=>{
                 let (n,source)=match packet {Ok(v)=>v,Err(e) if transient_udp(&e)=>{udp_drop(&counters,&total);continue;},Err(_)=>return Err("UdpReceive")};
-                udp_response(&relay,client,source,&from_v6[..n],&destinations,&config,(&counters,&total)).await?;
+                udp_response(&relay,client,source,&from_v6[..n],&destinations,&plan.config,(&counters,&total)).await?;
             }
         }
     }

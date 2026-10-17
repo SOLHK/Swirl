@@ -1,6 +1,6 @@
 //! Ordered routing over immutable, validated IR. No implicit DIRECT fallback.
 use std::net::{IpAddr, SocketAddr};
-use swirl_subscription::{Config, Matcher, Node};
+use swirl_subscription::{Config, Matcher, Node, PolicyStrategy};
 
 pub enum Decision<'a> {
     Node(&'a Node),
@@ -15,6 +15,21 @@ pub fn select<'a>(
     port: u16,
     source: IpAddr,
     resolved: Option<&[SocketAddr]>,
+) -> Result<Decision<'a>, &'static str> {
+    select_with(config, host, port, source, resolved, &|_| {
+        Err("AutomaticPolicyRequiresRuntime")
+    })
+}
+
+/// Apply the same ordered rules with an immutable session's automatic choices.
+/// The callback must return a concrete member; it cannot replace a failed exit.
+pub fn select_with<'a>(
+    config: &'a Config,
+    host: &str,
+    port: u16,
+    source: IpAddr,
+    resolved: Option<&[SocketAddr]>,
+    choose: &impl Fn(&str) -> Result<String, &'static str>,
 ) -> Result<Decision<'a>, &'static str> {
     let host = host.to_ascii_lowercase();
     let ip = host.parse::<std::net::IpAddr>().ok();
@@ -58,15 +73,28 @@ pub fn select<'a>(
             break;
         }
     }
-    if let Some(selector) = config.selectors.iter().find(|s| s.id == id) {
-        id = &selector.selected;
+    let mut id = id.to_owned();
+    // The validated graph has at most sixteen groups on any path. Keep this
+    // runtime bound too, so callers cannot accidentally route unvalidated IR.
+    for _ in 0..=16 {
+        if let Some(node) = config.nodes.iter().find(|n| n.id == id) {
+            return Ok(Decision::Node(node));
+        }
+        let group = config
+            .selectors
+            .iter()
+            .find(|s| s.id == id)
+            .ok_or("RouteNotFound")?;
+        id = if group.strategy == PolicyStrategy::Manual {
+            group.selected.clone()
+        } else {
+            choose(&group.id)?
+        };
+        if !group.members.contains(&id) {
+            return Err("PolicySelectionNotMember");
+        }
     }
-    config
-        .nodes
-        .iter()
-        .find(|n| n.id == id)
-        .map(Decision::Node)
-        .ok_or("RouteNotFound")
+    Err("PolicyDepth")
 }
 
 #[cfg(test)]
@@ -120,5 +148,33 @@ mod tests {
             panic!()
         };
         assert_eq!(n.id, "deny");
+    }
+
+    #[test]
+    fn nested_and_automatic_groups_require_a_valid_runtime_choice() {
+        let c = Config::parse(br#"{"schema":1,"listen":"127.0.0.1:0","selected":"outer","nodes":[{"id":"allow","outbound":{"type":"direct"}},{"id":"deny","outbound":{"type":"reject"}}],"selectors":[{"id":"outer","members":["automatic"],"selected":"automatic"},{"id":"automatic","members":["allow"],"strategy":"fallback","probe":{"url":"http://127.0.0.1/"}}]}"#).unwrap();
+        let source = "127.0.0.1".parse().unwrap();
+        assert!(matches!(
+            select(&c, "example.test", 80, source, None),
+            Err("AutomaticPolicyRequiresRuntime")
+        ));
+        let Decision::Node(node) = select_with(&c, "example.test", 80, source, None, &|id| {
+            assert_eq!(id, "automatic");
+            Ok("allow".into())
+        })
+        .unwrap() else {
+            panic!()
+        };
+        assert_eq!(node.id, "allow");
+        assert!(matches!(
+            select_with(&c, "example.test", 80, source, None, &|_| Ok("deny".into())),
+            Err("PolicySelectionNotMember")
+        ));
+        assert!(matches!(
+            select_with(&c, "example.test", 80, source, None, &|_| Err(
+                "NoHealthyPolicyMember"
+            )),
+            Err("NoHealthyPolicyMember")
+        ));
     }
 }
