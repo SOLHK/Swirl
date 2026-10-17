@@ -1,5 +1,6 @@
 #include "engine/MihomoAdapter.h"
 #include "engine/EngineController.h"
+#include "LoopbackPortLease.h"
 #include <QCoreApplication>
 #include <QCryptographicHash>
 #include <QJsonDocument>
@@ -28,7 +29,14 @@ class EngineTests : public QObject {
         if (!file.open(QIODevice::ReadOnly)) return result;
         QCryptographicHash hash(QCryptographicHash::Sha256); hash.addData(&file);
         result.expectedSha256 = hash.result().toHex(); result.expectedVersion = "vfixture";
-        QTcpServer port; port.listen(QHostAddress::LocalHost, 0); result.controlPort = port.serverPort();
+        LoopbackPortLease ports;
+        if (!ports.reserve()) {
+            QTest::qFail(qPrintable(ports.errorString()), __FILE__, __LINE__);
+            result.controlPort = 0;
+            return result;
+        }
+        result.controlPort = ports.controlPort();
+        result.proxyPort = ports.proxyPort();
         result.startupTimeoutMs = 2500; result.requestTimeoutMs = 150; result.healthIntervalMs = 100;
         return result;
     }
@@ -63,6 +71,35 @@ class EngineTests : public QObject {
         QFile file(path); QVERIFY(file.open(QIODevice::WriteOnly)); QCOMPARE(file.write(value), qint64(value.size()));
     }
 private slots:
+    void mixedPortLeaseReservesAndReleasesBothTransports() {
+        LoopbackPortLease ports;
+        QVERIFY2(ports.reserve(), qPrintable(ports.errorString()));
+        QVERIFY(ports.proxyPort() > 0);
+        QVERIFY(ports.controlPort() > 0);
+        QVERIFY(ports.proxyPort() != ports.controlPort());
+        QUdpSocket conflict;
+        conflict.setProxy(QNetworkProxy::NoProxy);
+        QVERIFY(!conflict.bind(QHostAddress::LocalHost, ports.proxyPort(), QUdpSocket::DontShareAddress));
+        ports.release();
+        QTcpServer tcp, controller;
+        tcp.setProxy(QNetworkProxy::NoProxy);
+        controller.setProxy(QNetworkProxy::NoProxy);
+        QVERIFY(tcp.listen(QHostAddress::LocalHost, ports.proxyPort()));
+        QVERIFY(controller.listen(QHostAddress::LocalHost, ports.controlPort()));
+        QVERIFY(conflict.bind(QHostAddress::LocalHost, ports.proxyPort(), QUdpSocket::DontShareAddress));
+    }
+    void occupiedMixedUdpPortIsRejectedWithoutStarting() {
+        auto config = options();
+        config.directSession = true;
+        QUdpSocket occupied;
+        occupied.setProxy(QNetworkProxy::NoProxy);
+        QVERIFY(occupied.bind(QHostAddress::LocalHost, config.proxyPort, QUdpSocket::DontShareAddress));
+        MihomoAdapter engine;
+        engine.start(config);
+        QCOMPARE(engine.status().error, ProxyEngine::Error::PortConflict);
+        QVERIFY(!engine.status().processAlive);
+        QCOMPARE(occupied.state(), QAbstractSocket::BoundState);
+    }
     void startupReadinessDoesNotWaitForSteadyHealthCadence(){
         QTemporaryDir temporary;const auto control=temporary.filePath("control");
         writeControl(control,"timeout");qputenv("SWIRL_FIXTURE_CONTROL",control.toUtf8());
@@ -77,9 +114,8 @@ private slots:
     void loginHandshakeLogRetainsReasonWithoutBreakingTunnel(){
         qputenv("SWIRL_FIXTURE_MODE","login-tls-eof");
         auto config=options();config.directSession=true;
-        QTcpServer reserve;QVERIFY(reserve.listen(QHostAddress::LocalHost));config.proxyPort=reserve.serverPort();reserve.close();
         MihomoAdapter engine;QSignalSpy diagnostics(&engine,&ProxyEngine::diagnostic);engine.start(config);
-        QTRY_VERIFY_WITH_TIMEOUT(engine.status().apiHealthy,5000);const auto pid=engine.status().processId;
+        QTRY_VERIFY2_WITH_TIMEOUT(engine.status().apiHealthy,qPrintable(engine.status().message),5000);const auto pid=engine.status().processId;
         QTcpSocket tunnel;tunnel.setProxy(QNetworkProxy::NoProxy);tunnel.connectToHost(QHostAddress::LocalHost,quint16(config.proxyPort));
         QTRY_COMPARE_WITH_TIMEOUT(tunnel.state(),QAbstractSocket::ConnectedState,2000);
         QTRY_VERIFY_WITH_TIMEOUT(std::any_of(diagnostics.cbegin(),diagnostics.cend(),[](const auto &row){return row.at(1).toString()=="TLSFailure";}),3000);
@@ -99,8 +135,8 @@ private slots:
     void routingResponseFailurePreservesProcess(){
         QFETCH(QByteArray,failure);QFETCH(QString,actual);
         QTemporaryDir temporary;const auto control=temporary.filePath("control");qputenv("SWIRL_FIXTURE_CONTROL",control.toUtf8());
-        auto o=options();o.directSession=true;QTcpServer reserve;QVERIFY(reserve.listen(QHostAddress::LocalHost));o.proxyPort=reserve.serverPort();reserve.close();
-        MihomoAdapter engine;engine.start(o);QTRY_VERIFY_WITH_TIMEOUT(engine.status().apiHealthy,5000);const auto pid=engine.status().processId;
+        auto o=options();o.directSession=true;
+        MihomoAdapter engine;engine.start(o);QTRY_VERIFY2_WITH_TIMEOUT(engine.status().apiHealthy,qPrintable(engine.status().message),5000);const auto pid=engine.status().processId;
         QFile file(control);QVERIFY(file.open(QIODevice::WriteOnly));file.write(failure);file.close();
         engine.setRoutingMode("global");
         QTRY_VERIFY_WITH_TIMEOUT(!engine.status().routingBusy&&engine.status().apiHealthy,5000);
@@ -136,6 +172,7 @@ private slots:
         QVERIFY(controller.saveRoutingRule("DOMAIN-SUFFIX","edited.fixture.test","Local",0));
         QCOMPARE(controller.routingRules().size(),ruleCount);
         QVERIFY(!controller.saveRoutingRule("DOMAIN","invalid.fixture.test","DIRECT",99));
+        QCOMPARE(controller.routingRules().first().toMap().value("policy").toString(),QStringLiteral("Local"));
         QCOMPARE(controller.routingRules().first().toMap().value("pattern").toString(),QStringLiteral("edited.fixture.test"));
         QVERIFY(!controller.removePolicyGroup("Local"));
         EngineController restored(std::make_unique<MihomoAdapter>(),nullptr,store);
@@ -180,8 +217,6 @@ private slots:
     void healthyApiWithoutMixedListenerNeverBecomesReady() {
         qputenv("SWIRL_FIXTURE_MODE","no-mixed-listener");
         auto config=options();config.directSession=true;config.startupTimeoutMs=1200;
-        QTcpServer freePort;QVERIFY(freePort.listen(QHostAddress::LocalHost));
-        config.proxyPort=freePort.serverPort();freePort.close();
         MihomoAdapter engine;bool reportedReady=false;
         connect(&engine,&ProxyEngine::statusChanged,&engine,[&]{
             reportedReady=reportedReady || engine.status().state==ProxyEngine::State::Running;
@@ -239,8 +274,6 @@ private slots:
         QTemporaryDir temp; QVERIFY(temp.isValid()); const auto control = temp.filePath("control");
         writeControl(control, "ok"); qputenv("SWIRL_FIXTURE_CONTROL", control.toUtf8());
         auto config=options();config.directSession=true;
-        QTcpServer freePort;QVERIFY(freePort.listen(QHostAddress::LocalHost));
-        config.proxyPort=freePort.serverPort();freePort.close();
         MihomoAdapter engine; engine.start(config);
         QTRY_COMPARE_WITH_TIMEOUT(engine.status().state, ProxyEngine::State::Running, 5000);
         const auto pid = engine.status().processId;

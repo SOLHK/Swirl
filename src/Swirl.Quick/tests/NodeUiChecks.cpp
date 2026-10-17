@@ -1,5 +1,6 @@
 #include "NodeUiChecks.h"
 #include "ControlledNetwork.h"
+#include "LoopbackPortLease.h"
 #include "engine/EngineController.h"
 #include <QQuickWindow>
 #include <QQuickItem>
@@ -55,12 +56,19 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     fill("nodeHostField","127.0.0.1");click("nodeSaveButton");check(controller->nodes().size()==1,"UI saves first real node");
     click("nodeAddButton");fill("nodeNameField","B");fill("nodeHostField","127.0.0.1");fill("nodePortField",QString::number(net.b.serverPort()));fill("nodeUsernameField",QString::fromUtf8(net.b.username));fill("nodePasswordField",QString::fromUtf8(net.b.password));
     check(item("nodePasswordField")&&item("nodePasswordField")->property("echoMode").toInt()==2,"credential field is masked");click("nodeSaveButton");check(controller->nodes().size()==2,"UI saves authenticated SOCKS5 node");
-    QTcpServer proxyPort,controlPort;
-    if(!check(proxyPort.listen(QHostAddress::LocalHost,0)&&controlPort.listen(QHostAddress::LocalHost,0),"distinct UI test ports are reserved together"))return 2;
-    controller->setProxyPort(proxyPort.serverPort());controller->setControlPort(controlPort.serverPort());
-    proxyPort.close();controlPort.close();
+    LoopbackPortLease ports;
+    if(!check(ports.reserve(),"distinct UI TCP/UDP and control ports are reserved together")) {
+        qInfo()<<"Port reservation evidence"<<ports.errorString();return 2;
+    }
+    controller->setProxyPort(ports.proxyPort());controller->setControlPort(ports.controlPort());
+    ports.release();
+    const auto waitEngineReady=[&]{
+        const bool ready=QTest::qWaitFor([&]{return controller->apiHealthy();},15000);
+        if(!ready)qInfo()<<"Engine startup evidence"<<controller->stateText()<<controller->errorCode()<<controller->error();
+        return ready;
+    };
     select(0);click("nodeConnectButton");
-    if(check(QTest::qWaitFor([&]{return controller->apiHealthy();},15000),"UI starts actual pinned Mihomo")) {
+    if(check(waitEngineReady(),"UI starts actual pinned Mihomo")) {
         check(!controller->requestSucceeded(),"running engine does not imply successful request");fill("nodeTestUrl",net.url().toString());
         probeSelected(net.a,net.b,"UI real request passes only through selected node A");
         const auto pid=controller->processId();
@@ -90,7 +98,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     check(item("importContentField") && item("importContentField")->property("text").toString().isEmpty(),"import clears credential-bearing input after submission");
     auto *dialog=window->findChild<QObject *>("nodeImportDialog");if(dialog)QMetaObject::invokeMethod(dialog,"close");QTest::qWait(350);
     select(0);click("nodeConnectButton");
-    check(QTest::qWaitFor([&]{return controller->apiHealthy();},15000),"UI imported node starts real Mihomo");
+    check(waitEngineReady(),"UI imported node starts real Mihomo");
     fill("nodeTestUrl",net.url().toString());click("nodeTestButton");
     check(QTest::qWaitFor([&]{return !controller->tests()->busy();},41000) && controller->tests()->result(controller->selectedNodeId()).value("success").toBool(),"UI imported node forwards a real HTTP request");
     controller->stop();check(QTest::qWaitFor([&]{return !controller->processAlive();},4000),"UI imported node cleanup reaps owned engine");
