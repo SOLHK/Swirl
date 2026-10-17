@@ -1,20 +1,50 @@
 # Swirl 接续开发入口
 
-更新日期：2026-10-17。本轮从 `work/core-completion-20261017@0bf2666` 接续。开发分支已经继承既有界面/动效修复与全部 Rust 工作，不能从 main 重新实现已有模块。
+更新日期：2026-10-17 UTC。本轮 DNS 与订阅验证阶段从 `work/core-completion-20261017@8c17218` 接续。开发分支已经继承既有界面/动效修复与全部 Rust 工作，不能从 main 重新实现已有模块。
 
 ## 当前接手注意事项
 
 - **当前唯一开发分支：`work/core-completion-20261017`。** 用户最新指令覆盖历史 `test` 要求；不改 main、不强推。已配置的 GitHub App/Secrets 沿用，不重新配置。
 - 用户已明确持续授权本开发分支的修复、测试与 GitHub 写入（“始终允许”）；在既有权限内继续实施，无需重复询问同一开发分支的常规提交。
-- 原生 IR/API 已接入嵌套手动组、`url_test`、`fallback`、`load_balance`、经实际出口的 HTTP/HTTPS 健康探测和会话策略视图。此前未编译的候选模块现在实际参与构建与测试；详见 [原生策略组](RUST_NATIVE_POLICIES.md) 和 [本轮阶段验收](RUST_POLICY_VALIDATION_20261017.md)。Qt 自动组/嵌套组转换仍未迁移。
+- 原生 IR/API 已接入嵌套手动组、`url_test`、`fallback`、`load_balance`、经实际出口的 HTTP/HTTPS 健康探测和会话策略视图。此前未编译的候选模块已经实际参与构建与测试；详见 [原生策略组](RUST_NATIVE_POLICIES.md) 和 [上一策略阶段验收](RUST_POLICY_VALIDATION_20261017.md)。Qt 自动组/嵌套组转换仍未迁移。
 - 健康视图在 listener accept 时固定；旧 TCP/UDP 保留原出口，完整配置替换/stop 取消旧探测。失败应用请求不重放，无健康成员不静默直连；四个跨配置代共享探测名额和有界期限限制后台工作。
 - SOCKS4/4a 的 Rust subscription inspector 与 Qt 节点转换已接入，十个本地 inspector 至独立对端的真实会话通过。Windows #25 新增 SOCKS4/4a 六个 Qt 转发会话、VLESS WS 的 131073 字节真实响应均通过；Qt CTest 与既有 SS/VLESS 对端也通过。本地 Linux 没有 Qt SDK，不能把 Windows 证据外推为各平台桌面验收。
 - WebSocket 关闭预算现在从最早关闭意图开始，覆盖拥塞队列、旧数据、Close 写入/flush、对端回复和底层 shutdown。既有 DoH、WS/WSS 及协议握手继续复用，没有重写已有传输。
 - 当前阶段默认产品仍保留 C++/Mihomo 兼容构建。必须用 `SWIRL_USE_RUST_CORE=ON` 验证原生 Rust；该模式不会回退完整外部内核。智能 MRS、TUN、LAN 和未迁移协议仍会明确拒绝。
-- 私有订阅/缓存不进 Git 或 CI；无需开启用户十分钟订阅更新窗口。只使用合成对端和明确的固定公共目标做本轮验证，不修改系统代理或 DNS。
-- 以 [本轮阶段验收](RUST_POLICY_VALIDATION_20261017.md) 中准确提交/Actions 结果为准；下方 WS/DoT、Windows 本机旧记录均是历史证据，不能证明本轮代码已通过远端门禁。
+- DNS 缓存已按大小写规范化的主机共享 IP 集合，并接入严格 SOA 的 NXDOMAIN/NODATA 负缓存；UDP/TCP、DoT、DoH 共用校验与合并逻辑。RFC 9520 的解析失败缓存、DNS 分流及自动 bootstrap 仍未实现。
+- 用户已授权使用 `Swirl-Private-Tests` 中现有加密归档，在私有 Actions 内仅于内存解密、通过 stdin 交给原生 inspector/harness，只保存白名单报告。此项是旧版“私有缓存不进 CI”表述的明确例外；原始 URL、令牌、节点凭据和解密配置仍不得进入公开 Git/CI、日志或外部转换服务。未获新窗口授权，不刷新订阅 URL。
+- 现有 GitHub 归档含 #9、#10 两份 Clash YAML 正文，原生 inspector 已确认分别为 90 个 SS、90 个 Trojan；[固定版本采集记录](https://github.com/SOLHK/Swirl-Private-Tests/blob/3c3fa41b09d1120cda81969a1ac3892b8c458f75/README.md)记载其余 14 项为 HTTP 403，现有缓存没有正文可供解密。SS 有 90 个 TCP 候选，但前三个两轮实测均未通过，诊断为 `UpstreamTimeout`；Trojan 全部声明关闭证书校验，按既有规则拒绝转换为可执行候选。这不说明实际服务器证书无效，也不能把 SS 超时归因为密码或节点失效。
+- 用户 Windows 机器上的项目、生成/下载文件、skills 和工具均放在 `D:\Codex`；写入 `C:` 的必要例外需用户明确允许。当前云端 Linux 工作区无法访问该盘，GitHub 推送不等于已保存到用户 D 盘。
+- 以 [本轮 DNS 与订阅验证](RUST_DNS_SUBSCRIPTION_VALIDATION_20261017.md) 中准确提交/Actions 结果为准；下方策略、WS/DoT 和 Windows 本机旧记录均为历史证据，不能证明本轮代码已通过远端门禁。
 
 ## 本轮验收状态
+
+| 内容 | 当前执行证据 |
+|---|---|
+| Rust 格式、check、clippy、workspace 测试及 release 构建 | 全部通过；90 项 Rust 测试通过，0 失败/跳过 |
+| 首轮完整本地 Release Python 回归 | 12 套件共 156 项，119 通过、37 明确跳过、0 失败；各套件退出码均为 0 |
+| 新增 DNS 负缓存独立对端 | 原 15 项语义测试及后补 3 项端口分配测试共 18/18 通过；另有 5/5 旧 DNS 定向回归通过 |
+| 新增原生出口 probe 边界 | 6/6 通过；包含实际 Rust harness 访问独立拒绝连接的 SS 对端 |
+| 私有测试工具合成回归 | 补充静态错误码白名单后 9/9 通过，独立于公开 Python 总数；覆盖脱敏、密钥环境清除、失败报告和有界抽样 |
+| 本轮源码与测试修正 | [`95b4fbc`](https://github.com/SOLHK/Swirl/commit/95b4fbc8f58b166a93fcc10b648bef39d396c4d6) 实现，App [`95b46f4`](https://github.com/SOLHK/Swirl/commit/95b46f4e3494feede242650324ac6ea542912c4a) 仅增加 6 行测试；[`fa37637`](https://github.com/SOLHK/Swirl/commit/fa376375bd67e77b8253eee4bcf40d4633b08c3d) 修正 Windows 早拒绝测试假设；[`f13c695`](https://github.com/SOLHK/Swirl/commit/f13c695ab1747e84de8594bfe208bd278b6149a6) 修正 DNS 对端配对端口分配 |
+| 最终 Linux/macOS CI | [Swirl Rust Core #30](https://github.com/SOLHK/Swirl/actions/runs/39055991802)，实际源码 `f13c695`；两平台各 90 Rust 通过，125 Python 中 121 通过、4 Qt 跳过、0 失败 |
+| 最终 Windows/Qt CI | 同一 #30；90 Rust 通过，初次 159 Python 中 153 通过、6 跳过；Qt CTest 1/1（3.14 秒），四项独立 Qt 对端全部补跑通过，最终 159 个独立 Python 用例为 157 通过、2 个可选项跳过 |
+| 最终严格公网门禁 | 同一 #30 Linux；[原始 VERIFIED JSON](evidence/RUST_PUBLIC_NETWORK_20261017_DNS_VERIFIED.json)，3/3 通过：HTTP 200/301/200、验证证书的 TLS 1.3、正常关闭、双向流量、每项 `accepted=1 / active=0 / failed=0`，无会话错误 |
+| 现有加密归档的原生 SS/Trojan 抽样 | 两份解析通过；三个 SS 样本 `UpstreamTimeout`、零目标流量，Trojan 因关闭证书校验未执行；[私有报告](https://github.com/SOLHK/Swirl-Private-Tests/blob/ae7ebe3e409c254012aa82cb47117b7620c87e9f/reports/native-core-95b4fbc-20261017.json) 如实保留联网失败 |
+
+37 个跳过包括四项 Windows Qt 对端、22 项 Windows DPAPI 采集、10 项 Windows DPAPI 管理和一项
+可选真实 Codex CLI。一次 release 链接错误后原命令重试成功，根因未确定；完整命令、结果及证据边界见
+[本轮阶段记录](RUST_DNS_SUBSCRIPTION_VALIDATION_20261017.md)。
+`f13c695` 的 Rust `core` 树与共享 verifier 均与私有固定版本 `95b4fbc` 完全相同。
+公共 #30 已于 2026-10-17 18:08:08 UTC 三平台整体成功；同一源码的
+[App #27](https://github.com/SOLHK/Swirl/actions/runs/39055991875) 也成功。Windows 余下两个可选跳过项
+为 C++ importer 和真实 Codex CLI；Linux/macOS 的 Qt 跳过项不计为已验收桌面支持。
+本轮此前 Windows reset 和 Linux 端口碰撞的失败运行、具体修正及最终源码身份均记录在阶段文档中。
+私有原生测试已经执行；尚未取得私有节点的联网通过证据，不能把解析或转换成功计作通过。
+
+## 策略、SOCKS4 与 WebSocket 阶段验收（历史，#25）
+
+以下是上一阶段 `58969bc` / `5dbe762` 的已完成证据，详见 [策略阶段记录](RUST_POLICY_VALIDATION_20261017.md)。
 
 | 内容 | 当前执行证据 |
 |---|---|
@@ -22,18 +52,18 @@
 | 本地 Python 回归合计 | 134 项中 97 通过、37 明确跳过、0 失败；其中策略独立对端 13/13 通过 |
 | 可区分 UDP 出口 | 两个独立 SS 出口共六次往返；健康切换和完整配置替换后旧关联仍固定原出口 |
 | 本地固定公网尝试 | 三项在 DNS/连接阶段失败；[原始 JSON](evidence/RUST_PUBLIC_NETWORK_20261017_POLICY_LOCAL.json) 保留，未计作通过 |
-| 本轮源码提交 | [`58969bc`](https://github.com/SOLHK/Swirl/commit/58969bce15f9995573f15661bbd1ca75530938af)，已推送；远端源码树与本地验收暂存树一致 |
+| 该阶段源码提交 | [`58969bc`](https://github.com/SOLHK/Swirl/commit/58969bce15f9995573f15661bbd1ca75530938af)，已推送；远端源码树与本地验收暂存树一致 |
 | App 工作流提交 | [`5dbe762`](https://github.com/SOLHK/Swirl/commit/5dbe762d4b85543939d8ca476451f137e210a559)，仅 `rust-core.yml` +9；[Core implementation validation #21](https://github.com/SOLHK/Swirl/actions/runs/39033743434) 成功 |
-| 本轮 Linux/macOS CI | [Swirl Rust Core #25](https://github.com/SOLHK/Swirl/actions/runs/39033762503)，实际提交 `5dbe762`；两平台均成功，各 83 Rust、96/100 Python 通过，4 Qt 跳过；策略 13/13 |
-| 本轮 Windows/Qt CI | 同一 #25 全部成功；83 Rust，初次 134 Python 中 128 通过、6 跳过；Qt CTest 1/1（3.12 秒），随后 SS/VLESS/SOCKS4/WS 四项独立 Qt 对端全部补跑通过，余下两项可选私有 importer/真实 CLI 未执行 |
-| 本轮严格公网门禁 | 同一 #25 Linux；[原始 VERIFIED JSON](evidence/RUST_PUBLIC_NETWORK_20261017_POLICY_VERIFIED.json)；三项 HTTP 200/301/200、认证 TLS 1.3、正常关闭、双向流量、每项 `accepted=1 / active=0 / failed=0`，无会话错误 |
+| 该阶段 Linux/macOS CI | [Swirl Rust Core #25](https://github.com/SOLHK/Swirl/actions/runs/39033762503)，实际提交 `5dbe762`；两平台均成功，各 83 Rust、96/100 Python 通过，4 Qt 跳过；策略 13/13 |
+| 该阶段 Windows/Qt CI | 同一 #25 全部成功；83 Rust，初次 134 Python 中 128 通过、6 跳过；Qt CTest 1/1（3.12 秒），随后 SS/VLESS/SOCKS4/WS 四项独立 Qt 对端全部补跑通过，余下两项可选私有 importer/真实 CLI 未执行 |
+| 该阶段严格公网门禁 | 同一 #25 Linux；[原始 VERIFIED JSON](evidence/RUST_PUBLIC_NETWORK_20261017_POLICY_VERIFIED.json)；三项 HTTP 200/301/200、认证 TLS 1.3、正常关闭、双向流量、每项 `accepted=1 / active=0 / failed=0`，无会话错误 |
 
 工作流更新器已通过 13 项安全回归；App 实际提交与精确 +9 行预览的 SHA-256 均为
 `50308ecf9ca19e1da4e26893ecb9c6aa8291dc5161976795cf89b4310dc89293`。
 新增策略对端、portable inspector 和 Windows SOCKS4/WS Qt 实测，不调整 App 或 Secrets。
 #25 三平台整体于 2026-10-17 12:55:06 UTC 成功完成。公网报告准确标记 `5dbe762`、干净工作区，
 CI release harness SHA-256 为 `914ee31cac2e00f75bb78bde55a22f68e60c6e98b4af8e6e71d906b59b5e1da0`。
-完整命令、边界、哈希和各项跳过原因见 [本轮阶段验收](RUST_POLICY_VALIDATION_20261017.md)。
+完整命令、边界、哈希和各项跳过原因见 [该阶段验收](RUST_POLICY_VALIDATION_20261017.md)。
 
 ## 上一阶段远端提交与验收（历史）
 
@@ -57,7 +87,7 @@ CI release harness SHA-256 为 `914ee31cac2e00f75bb78bde55a22f68e60c6e98b4af8e6e
 #22 的严格公网报告时间为 11:50:27 UTC，三项均通过；11:56:56 UTC 三平台整体成功。两轮 Rust binary SHA-256 完全一致：
 `7e83e9b89232f4712335ca9e4d8e6f3dacbb52b5f2daefbe357055792ce132d9`。
 这证明所测 DIRECT/DoH 路径的真实请求与正常关闭，不代表私有提供商、WS 节点、UDP 或 TUN 已验证。
-上一阶段 Windows Qt 的成功不替代本轮新增 Qt WS 真实转发、个人电脑视觉验收或其他平台的桌面产品验证。
+该阶段 Windows Qt 的成功不替代后续 Qt WS 真实转发、个人电脑视觉验收或其他平台的桌面产品验证。
 
 ## 仓库是否完整
 
@@ -89,7 +119,7 @@ Qt/Rust CMake configure/generate 成功。此检查不声称重新完成了一�
 2. 保留现有 UI 布局、视觉和交互；继续 Rust 自研数据路径，不包装完整外部代理内核冒充自研。
 3. 独立实现和审查，不要求常规 Gemini 审核。用户现已允许换开发者/模型继续，旧“唯一集成人”描述不是阻止接手的理由。
 4. 未知参数保留并报告；不关闭 TLS 校验、不伪造兼容性、不静默直连或自动重放请求。
-5. 原有订阅已在本机缓存；无须为离线开发重新打开订阅更新窗口。若确需新材料，一次性集中收齐。
+5. 继续使用已缓存材料；现有 GitHub 加密归档只有两份正文，其余 14 项是 HTTP 403 未取得内容。按上述授权在私有 Actions 验证现有归档，无须重新打开更新窗口；若确需刷新或补齐正文，须另获开启指令。
 6. 分开记录解析、参数转换、合成对端、私有节点、UDP、TUN、性能和跨平台证据。未测不能称通过。
 7. 用户额度有限，优先完成具体实现与必要验证，不反复重审历史方案。每阶段更新本文件或对应能力文档。
 
@@ -101,7 +131,7 @@ Qt/Rust CMake configure/generate 成功。此检查不声称重新完成了一�
 |---|---|
 | `core/crates/swirl-protocol` | HTTP/CONNECT/SOCKS4/4a/5 入站；HTTP CONNECT、SOCKS4/4a/5、Trojan TLS、SS AEAD TCP/UDP、simple-obfs HTTP、基础 VLESS v0 TCP/TLS；VLESS WS/WSS、Trojan WSS |
 | `core/crates/swirl-routing` | 顺序域名/后缀/关键词、目标端口、来源/目标 CIDR、MATCH；有界嵌套手动组与自动组会话选择 |
-| `core/crates/swirl-dns` | 自研 Rust DNS 报文/UDP/TCP/严格 DoT/HTTP-1.1 DoH/A/AAAA/CNAME/TTL；有界系统解析、精确 hosts、各代缓存隔离及共享并发上限 |
+| `core/crates/swirl-dns` | 自研 Rust DNS 报文/UDP/TCP/严格 DoT/HTTP-1.1 DoH/A/AAAA/CNAME/TTL；按主机缓存 IP 集合、严格 SOA 负缓存、有界系统解析、精确 hosts、各代缓存隔离及共享并发上限 |
 | `core/crates/swirl-core` | 有界运行时、不可变会话配置/健康视图、原子节点/组/配置更新、旧 TCP/UDP 保留原出口、流量统计；四名额健康探测、过期与取消、测速/fallback/轮询 |
 | `core/crates/swirl-subscription` | typed IR、Clash YAML/JSON、sing-box JSON、URI/Base64、部分 INI 识别与保留、脱敏能力报告；严格 DoT/DoH/WS/策略字段和图验证；有限 SOCKS4/4a 导入已接入，并非所有格式都可执行 |
 | `core/crates/swirl-transport` / `swirl-api` | 验证 TLS、背压/半关闭；ABI v1 JSON 控制、stdin harness、离线 inspector |
@@ -114,6 +144,8 @@ Qt/Rust CMake configure/generate 成功。此检查不声称重新完成了一�
 智能 MRS 路由尚未迁移，因此启用该默认设置的会话仍会被 Rust 拒绝；不可静默降级为全局。
 
 ## 从 GitHub 独立构建
+
+用户 Windows 机器上先进入 `D:\Codex` 再克隆；Qt SDK、工具链和构建目录也应位于该目录下。
 
 ```sh
 git clone --branch work/core-completion-20261017 https://github.com/SOLHK/Swirl.git
@@ -130,7 +162,7 @@ Windows 示例在仓库根目录执行，Qt 路径需替换为实际 SDK。Qt Mi
 Qt MSVC 库必须搭配 MSVC。CMake 3.25+，Qt 6.10.3（含 ShaderTools），Rust stable、匹配 C 编译器及 Python 3.11+。
 
 ```powershell
-cmake -S src/Swirl.Quick -B build/rust-qt -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=C:/Qt/6.10.3/mingw_64 -DSWIRL_USE_RUST_CORE=ON -DSWIRL_BUILD_UI_TESTS=ON
+cmake -S src/Swirl.Quick -B build/rust-qt -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=D:/Codex/Qt/6.10.3/mingw_64 -DSWIRL_USE_RUST_CORE=ON -DSWIRL_BUILD_UI_TESTS=ON
 cmake --build build/rust-qt --target Swirl SwirlRustCoreTests --parallel 6
 ctest --test-dir build/rust-qt -R '^swirl-rust-qt-integration$' --output-on-failure
 py -3 -m pip install cryptography==50.0.2
@@ -141,9 +173,11 @@ py -3 tools/tests/test_rust_core.py
 py -3 tools/tests/test_shadowsocks.py
 py -3 tools/tests/test_dns_tls.py
 py -3 tools/tests/test_dns_https.py
+py -3 tools/tests/test_dns_negative.py
 py -3 tools/tests/test_socks4.py
 py -3 tools/tests/test_websocket_transport.py
 py -3 tools/tests/test_policy_groups.py
+py -3 tools/tests/test_native_probe.py
 py -3 tools/tests/test_core_development.py
 py -3 tools/tests/test_subscription_capture.py
 py -3 tools/tests/test_codex_management.py
@@ -161,7 +195,7 @@ Rust 预览部署至少需 Swirl.exe、swirl_api.dll、各辅助 EXE、Qt/QML �
 
 ## 已有验证与仍需做的工作
 
-DoT 阶段的实际提交、CI 与待个人电脑验收范围见 [DoT 文档](RUST_DOT.md) 和 [PR #22](https://github.com/SOLHK/Swirl/pull/22)。不沿用旧数字证明新实现；此轮未访问私有节点或修改个人 Windows 网络。
+DoT 阶段的实际提交、CI 与待个人电脑验收范围见 [DoT 文档](RUST_DOT.md) 和 [PR #22](https://github.com/SOLHK/Swirl/pull/22)。不沿用旧数字证明新实现；本轮私有节点测试状态以新阶段记录为准，未修改个人 Windows 网络。
 
 上一自定义 UDP/TCP DNS 阶段：本机 Rust 43 项、独立协议 28 项（含 IPv6 DNS 服务端和 TCP 重试）、
 采集/离线 23 项及 Qt Rust CTest 通过；fmt/check/clippy 通过。DNS 核心报文与网络执行代码
@@ -173,15 +207,16 @@ DoT 阶段的实际提交、CI 与待个人电脑验收范围见 [DoT 文档](RU
 ZIP CRC、包内 DLL 哈希及私有内容扫描通过。GNU 链接器仍有 `.drectve` 警告，未隐藏。
 这些本机结果不替代对应提交的 GitHub CI；查看 [该提交 Actions](https://github.com/SOLHK/Swirl/actions?query=branch%3Atest)。
 规则阶段 `7c7b884` 的旧版节点 UI 164 项通过；该修复已包含在当前源码。
-本地缓存 14 份导出、12 个不同文档离线解析通过；本轮没有新增私有节点 TCP/UDP 联网验收。
+更早的本机记录为缓存 14 份导出、12 个不同文档离线解析通过；该历史统计不能证明现有 GitHub 归档已取得全部 16 项正文，也不包含本轮私有节点联网验收。
 
-上一阶段严格公网门禁与三项真实请求已在 #22 Linux 完成，三平台回归及 Windows Qt 也已通过。
-本阶段实际接入原生自动组、SOCKS4 导入与统一 WS 关闭预算；后续按以下边界逐项实现和推送：
+上一策略阶段的三平台、Windows Qt 和严格公网门禁已在 #25 完成。当前阶段完成主机级 DNS 缓存、
+严格 SOA 负缓存和私有原生抽样工具的验证；公共 #30 三平台、Windows Qt 和严格公网门禁已通过，
+私有实测已登记且未通过。后续按以下边界继续：
 
 1. Qt 自动组/嵌套组映射与完整订阅策略接管，保留现有 UI，并为实际 Qt 控制流提供独立对端证据；未知参数继续拒绝或保留报告。
-2. DNS 负缓存需校验 NXDOMAIN/NODATA/SOA，缓存身份按主机共享；多地址有界连接需保留规则固定的 IP 语义。继续推进 bootstrap/分流及智能 MRS/进程规则。既有 DoT、HTTP-1.1 DoH、UDP/TCP 报文和 TTL 不重复重写。
+2. DNS 主机缓存与 NXDOMAIN/NODATA/SOA 已实现；RFC 9520 失败缓存、多地址有界连接、bootstrap/分流及智能 MRS/进程规则仍待推进。多地址连接必须保留规则固定的 IP 语义；既有 DoT、HTTP-1.1 DoH、UDP/TCP 报文和 TTL 不重复重写。
 3. gRPC/XHTTP、REALITY/Vision、VMess/SS2022、QUIC 等缺少协议与传输，分别提供互操作证据。WS 基础已实现，本轮只覆盖明确的有限组合。
 4. TUN、LAN、网关、平台权限/系统代理接管与异常恢复；不擅自改变用户当前网络。
-5. 完整订阅到产品配置的 Rust 接管、私有节点授权验收、长期/弱网/性能验证，最后才移除旧内核依赖。
+5. 完整订阅到产品配置的 Rust 接管、私有 SS 上游超时定位及节点联网验收、长期/弱网/性能验证，最后才移除旧内核依赖；现有缓存测试授权继续有效，补采缺失正文另需新的下载窗口。
 
 不要重写已完成模块或删掉兼容构建来制造“全自研完成”。所有阶段仍需保留 UI 与用户数据。
