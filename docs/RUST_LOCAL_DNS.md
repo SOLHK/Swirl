@@ -225,10 +225,13 @@ its completed earlier-stage results are recorded in the DNS/subscription
 validation document. The current connection work adds nine Rust dial tests,
 including deterministic stalled-address/cancellation/deadline cases and actual
 loopback TCP fallback, plus two SS initial-write/lazy-response regressions.
-All 101 local Rust workspace tests passed on this stage's implementation.
-`tools/tests/test_connection_stages.py` passed all eight independent
-DNS/TCP/TLS/protocol fixture cases locally; the exact source and later CI evidence belong in the
-current connection/policy validation record. New Qt automatic/nested-group
-mapping is implemented in this stage, with Windows/Qt CI still pending at this
-update. None of these local results establishes a passing private node or an
-updated subscription body.
+All 101 Rust workspace tests passed locally and on Linux, macOS and Windows in
+[Rust Core #32](https://github.com/SOLHK/Swirl/actions/runs/39061540612), pinned to
+`99ad9b3e71b7aeb9b5ff1f8c418550561f59fd63`. The eight independent
+DNS/TCP/TLS/protocol cases in `tools/tests/test_connection_stages.py` also passed
+on all three platforms. Windows Qt build, CTest 1/1 and four independent Qt
+protocol supplements passed. Exact counts and scope belong in the current
+connection/policy validation record. The separate strict public native DoH check
+passed; three cached SS samples failed at `tcp_connect`, with no per-address or
+DNS timing in that report. No private node passed. Subscription refresh and
+authenticated archive merge are recorded separately from these DNS tests.

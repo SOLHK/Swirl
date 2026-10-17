@@ -45,15 +45,24 @@ It also connects the existing Qt custom-group settings to nested manual selector
 and the supported native automatic policies. The UI and stored source settings
 are preserved; unsupported semantics still fail before activation.
 
-Local Rust fmt, check, strict clippy and all 101 workspace tests have passed.
-Windows compilation, Qt execution and cross-platform CI for these new changes
-remain pending at this update. Exact source identities, independent Python
-results and subsequent CI outcomes belong in the
+Implementation commit `11eafea` and cross-platform fixture correction
+`99ad9b3e71b7aeb9b5ff1f8c418550561f59fd63` are pushed. The latter passed
+[Rust Core #32](https://github.com/SOLHK/Swirl/actions/runs/39061540612) on all
+three platforms and [App #29](https://github.com/SOLHK/Swirl/actions/runs/39061540617).
+Each platform passed fmt, check, strict clippy, 101 workspace tests and release
+builds. Linux/macOS each passed 131 of 135 Python cases, with four explicit Qt
+skips. Windows passed 167 of 169 distinct Python cases after four Qt supplements;
+only optional C++ importer and real CLI cases remain skipped. Windows Qt/MSVC
+build and CTest passed 1/1 in 6.92 seconds. Exact results, skips and source identities belong in the
 [current connection/policy validation](../docs/RUST_CONNECTION_POLICY_VALIDATION_20261017.md).
-No private-provider connection has been accepted as passing by this document.
-The earlier SS `UpstreamTimeout` samples do not establish whether their failure
-was DNS, TCP, protocol or the provider; the new diagnostics make a subsequent
-test more specific without presuming its outcome.
+The subsequent evidence update changes only documentation; preserve it when
+continuing from the actual branch HEAD. No private-provider connection passed.
+The current three cached SS samples report `UpstreamTcpTimeout` at `tcp_connect`,
+before HTTP obfuscation or SS authentication. The report does not include DNS
+or per-address timing and does not establish why the endpoints were unreachable.
+All 90 cached Trojan entries remain rejected because their configuration disables
+certificate verification. Three strict public native DIRECT/DoH checks passed;
+their success is separate from private-provider validation.
 
 The preceding [DNS/subscription stage](../docs/RUST_DNS_SUBSCRIPTION_VALIDATION_20261017.md)
 already completed hostname-shared positive caching and validated SOA negative
@@ -269,8 +278,10 @@ they cannot probe another group. Load balancing requires an explicit
 `strategy: round-robin`, because the native per-session behavior does not implement
 Mihomo's default hashing semantics. Unknown fields, unsafe probe settings,
 missing members and cycles fail before startup or saving. Source mappings and
-Qt regressions are implemented; Windows Qt execution and CI for this addition
-remain pending at this update. Historical #25/#30 Qt results do not validate it.
+Qt regressions were built and executed in Windows #32 at `99ad9b3`: CTest 1/1
+passed, together with all four independent Qt protocol supplements. This includes
+the new nested automatic-policy data paths, round robin and atomic settings tests;
+the successful CTest log does not publish an internal QtTest case total.
 
 The Rust-only build is an opt-in development artifact, not a replacement that
 silently removes capabilities from the user's normal installation.

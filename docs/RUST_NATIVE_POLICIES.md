@@ -38,8 +38,9 @@ Qt 自动组必须提供 HTTP/HTTPS `url`；`interval` 使用秒（默认 300，
 不能将“IR 支持轮询”描述成所有旧负载均衡配置均已兼容。
 
 新增 Qt 用例覆盖三种自动组的前向嵌套真实转发、双出口轮询、失败不改走全局出口/直连、
-错误激活保留当前运行配置以及完整组 map 保存。当前源码的 Windows Qt 编译和执行证据
-**仍待本轮 CI 核验**，历史 Rust/API 结果不替代该验证。准确提交与运行结果见
+错误激活保留当前运行配置以及完整组 map 保存。源码 `99ad9b3` 的 Windows Qt/MSVC 编译及
+[Rust Core #32](https://github.com/SOLHK/Swirl/actions/runs/39061540612) 已通过：CTest 1/1（6.92 秒），
+四项独立 Qt 协议测试补跑全部通过。成功 CTest 日志没有内部 QtTest Totals，不另造用例总数。准确结果见
 [连接诊断与 Qt 策略阶段记录](RUST_CONNECTION_POLICY_VALIDATION_20261017.md)。
 其他 Qt 路由边界见 [原生路由](RUST_NATIVE_ROUTING.md)；下文原始 Rust 阶段结果继续按其历史范围解释。
 
