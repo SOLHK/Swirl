@@ -1,10 +1,5 @@
-"""One-time, checked source refactoring on the isolated core development branch.
-
-No user configuration, network requests, credentials, or platform settings.
-The workflow commits the resulting real source before compiling and testing it.
-"""
+"""Checked one-time native core source integration. No network or user settings."""
 from pathlib import Path
-
 changes = {}
 def read(path):
     return changes.get(path, Path(path).read_text(encoding='utf-8'))
@@ -33,7 +28,6 @@ if '    Socks4 {' not in read(sub):
                     return Err("Socks4Parameters");
                 }
                 Outbound::Vless {''')
-
 proto = 'core/crates/swirl-protocol/src/lib.rs'
 if 'mod socks4;' not in read(proto):
     change(proto, 'mod shadowsocks;', 'mod shadowsocks;\nmod socks4;')
@@ -51,12 +45,10 @@ if 'mod socks4;' not in read(proto):
         Outbound::Socks4 { host, port, user_id, remote_dns } => {
             return socks4::connect(host, *port, user_id, *remote_dns, target, resolver).await;
         }''')
-
 dns = 'core/crates/swirl-dns/src/lib.rs'
 if 'DoH/Fake-IP are not claimed.' in read(dns):
     change(dns, '//! Bounded system/custom/strict TLS DNS resolver. DoH/Fake-IP are not claimed.',
            '//! Bounded system/custom/DoT/HTTP-1.1 DoH resolver. Fake-IP is not implemented.')
-
 qt = 'src/Swirl.Quick/engine/RustDnsConfiguration.h'
 if '// Native DoH and DoT existing-field mapping.' not in read(qt):
     text = read(qt)
@@ -102,7 +94,6 @@ if '// Native DoH and DoT existing-field mapping.' not in read(qt):
     text = text.replace('精确映射和严格 DoT', '精确映射、严格 DoT 和 DoH POST')
     text = text.replace('Rust DoT 此阶段', 'Rust 加密 DNS 此阶段')
     changes[qt] = text
-
 qt_test = 'src/Swirl.Quick/tests/RustCoreTests.cpp'
 if ' void nativeDohMapsExistingHttpsField(){' not in read(qt_test):
     change(qt_test, 'private slots:\n', '''private slots:
@@ -123,27 +114,8 @@ if ' void nativeDohMapsExistingHttpsField(){' not in read(qt_test):
   }
  }
 ''')
-
-workflow = '.github/workflows/rust-core.yml'
-if 'test_dns_https.py' not in read(workflow):
-    lines = read(workflow).splitlines(keepends=True)
-    out = []
-    i = 0
-    while i < len(lines):
-        out.append(lines[i])
-        if 'python ../tools/tests/test_dns_tls.py' in lines[i]:
-            windows = i + 1 < len(lines) and 'if ($LASTEXITCODE' in lines[i+1]
-            guard = lines[i+1] if windows else ''
-            if windows:
-                out.append(guard)
-                i += 1
-            for test in ['test_dns_https.py', 'test_socks4.py']:
-                out.append('          python ../tools/tests/' + test + '\n')
-                if windows:
-                    out.append(guard)
-        i += 1
-    changes[workflow] = ''.join(out)
-
+# Workflow files are deliberately excluded: CI's contents token has no workflow
+# write permission. The dedicated validation workflow already runs these peers.
 for name, text in changes.items():
     Path(name).write_text(text, encoding='utf-8')
     print('Updated source:', name)
