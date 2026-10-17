@@ -12,12 +12,48 @@
 #include <algorithm>
 
 namespace {
-QString routingConfiguration(const EngineStartOptions &o,const QString &selected,QJsonArray *nodes,QJsonArray *rules){
+QString routingConfiguration(const EngineStartOptions &o,const QString &selected,QJsonArray *nodes,QJsonArray *rules,QJsonArray *selectors){
  if(o.directSession||o.routingMode!="rule")return {};
  if(o.customRules.size()>1000)return "Rust 自定义规则数量超过限制。";
- QString direct="swirl-rule-direct",reject="swirl-rule-reject";
- while(direct==selected)direct+='-';while(reject==selected)reject+='-';
+ QSet<QString> reserved;for(const auto &n:o.nodes)reserved.insert(n.id);
+ const auto unique=[&](const QString &base){QString id=base;int suffix=0;while(reserved.contains(id))id=base+'-'+QString::number(++suffix);reserved.insert(id);return id;};
+ const auto direct=unique("swirl-rule-direct"),reject=unique("swirl-rule-reject");
  bool needsDirect=false,needsReject=false;int index=0;
+ QHash<QString,QString> groups;QSet<QString> included{selected};
+ if(o.customGroups.size()>128)return "Rust 手动策略组数量超过限制。";
+ for(const auto &value:o.customGroups){
+  const auto group=QJsonObject::fromVariantMap(value.toMap());
+  const auto name=group.value("name").toString();
+  const auto invalid=[] {return QString("Rust 策略组参数无效或尚未支持；目前只支持具体节点组成的手动 select 组。");};
+  for(auto it=group.begin();it!=group.end();++it)if(!QStringList{"name","type","proxies","default-selected","url","interval"}.contains(it.key()))return invalid();
+  if(name.isEmpty()||name!=name.trimmed()||name.size()>100||name.contains(QRegularExpression("[,\\x00-\\x1f\\x7f]"))||QStringList{"DIRECT","REJECT","SWIRL","GLOBAL"}.contains(name)||groups.contains(name)||group.value("type").toString()!="select"||!group.value("proxies").isArray())return invalid();
+  // The existing editor includes these health-check settings on every type.
+  // Select groups do not schedule probes; only its exact editor defaults are
+  // accepted so arbitrary active health-check configurations are not ignored.
+  if(group.contains("url")&&group.value("url").toString()!="https://www.gstatic.com/generate_204")return invalid();
+  if(group.contains("interval")&&(!group.value("interval").isDouble()||group.value("interval").toDouble()!=300))return invalid();
+  const auto members=group.value("proxies").toArray();if(members.isEmpty()||members.size()>512)return invalid();
+  QJsonArray mapped;QSet<QString> seen;QHash<QString,QString> memberIds;
+  for(const auto &memberValue:members){
+   if(!memberValue.isString())return invalid();const auto member=memberValue.toString();if(seen.contains(member))return invalid();seen.insert(member);
+   QString id=member;
+   if(member=="DIRECT"){id=direct;needsDirect=true;}
+   else if(member=="REJECT"){id=reject;needsReject=true;}
+   else if(!included.contains(member)){
+    // Reuse precisely the same protocol validation as the top-level selection.
+    // Clearing groups/rules makes this a single bounded leaf conversion.
+    auto leaf=o;leaf.customGroups.clear();leaf.customRules.clear();leaf.routingMode="global";leaf.smartRouting=false;leaf.selectedNodeId=member;
+    QJsonObject config;if(!RustCoreEngine::configuration(leaf,&config).isEmpty())return invalid();
+    nodes->append(config.value("nodes").toArray().first());included.insert(member);if(nodes->size()>510)return invalid();
+   }
+   memberIds.insert(member,id);mapped.append(id);
+  }
+  QString chosen=members.first().toString();
+  if(group.contains("default-selected")){if(!group.value("default-selected").isString())return invalid();chosen=group.value("default-selected").toString();}
+  if(!memberIds.contains(chosen))return invalid();
+  const auto id=unique("swirl-group-"+QString::number(groups.size()));groups.insert(name,id);
+  selectors->append(QJsonObject{{"id",id},{"members",mapped},{"selected",memberIds.value(chosen)}});
+ }
  for(const auto &line:o.customRules){
   ++index;const auto invalid=[index]{return QString("第 %1 条规则无效或 Rust 尚未支持；未忽略该规则。").arg(index);};
   if(line.size()>2300||line.contains('\n')||line.contains('\r')||line.contains(QChar(0)))return invalid();
@@ -50,6 +86,7 @@ QString routingConfiguration(const EngineStartOptions &o,const QString &selected
   if(policy=="SWIRL")outbound=selected;
   else if(policy=="DIRECT"){outbound=direct;needsDirect=true;}
   else if(policy=="REJECT"){outbound=reject;needsReject=true;}
+  else if(groups.contains(policy))outbound=groups.value(policy);
   else return invalid();
   rules->append(QJsonObject{{"matcher",matcher},{"outbound",outbound}});
  }
@@ -76,14 +113,14 @@ QVariantList RustCoreEngine::routingRules()const{
  return rows;
 }
 QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *output){
- if(o.preferCompatibility||o.tunEnabled||o.gatewayForwarding||o.allowLan||o.meteredNetwork||!o.dnsConfig.isEmpty()||!o.customGroups.isEmpty()||(o.smartRouting&&o.routingMode=="rule"&&!o.directSession))
-  return "当前 Rust 阶段尚未迁移此会话的 TUN、LAN、自定义 DNS、策略组、智能规则库或兼容模式；已拒绝启动，不回退外部内核。";
+ if(o.preferCompatibility||o.tunEnabled||o.gatewayForwarding||o.allowLan||o.meteredNetwork||!o.dnsConfig.isEmpty()||(o.smartRouting&&o.routingMode=="rule"&&!o.directSession))
+  return "当前 Rust 阶段尚未迁移此会话的 TUN、LAN、自定义 DNS、智能规则库或兼容模式；已拒绝启动，不回退外部内核。";
  if(o.routingMode!="global"&&o.routingMode!="rule"&&o.routingMode!="direct")return "Rust 路由模式无效。";
  QJsonArray nodes;QString selected=o.selectedNodeId;
  if(o.directSession||o.routingMode=="direct") {selected="explicit-direct";nodes.append(QJsonObject{{"id",selected},{"outbound",QJsonObject{{"type","direct"}}}});}
  else {
-  // Only the selected route is executable. Unsupported unselected imports stay
-  // in NodeStore and do not prevent connecting a supported node.
+  // First map the default route. Manual groups add their referenced members.
+  // Unreferenced unsupported imports remain in NodeStore without activation.
   const auto it=std::find_if(o.nodes.cbegin(),o.nodes.cend(),[&](const auto &n){return n.id==selected;});
   if(it==o.nodes.cend())return "未选择节点。";
   const auto &n=*it;
@@ -124,8 +161,8 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
   }
   nodes.append(QJsonObject{{"id",n.id},{"outbound",outbound}});
  }
- QJsonArray rules;const auto routingError=routingConfiguration(o,selected,&nodes,&rules);if(!routingError.isEmpty())return routingError;
- QJsonObject config{{"schema",1},{"listen",QString("127.0.0.1:%1").arg(o.proxyPort)},{"selected",selected},{"nodes",nodes},{"rules",rules},
+ QJsonArray rules,selectors;const auto routingError=routingConfiguration(o,selected,&nodes,&rules,&selectors);if(!routingError.isEmpty())return routingError;
+ QJsonObject config{{"schema",1},{"listen",QString("127.0.0.1:%1").arg(o.proxyPort)},{"selected",selected},{"nodes",nodes},{"rules",rules},{"selectors",selectors},
   {"limits",QJsonObject{{"max_connections",128},{"handshake_timeout_ms",qBound(100,o.startupTimeoutMs,30000)}}}};
  if(!o.inboundUsername.isEmpty()||!o.inboundPassword.isEmpty())config["inbound_auth"]=QJsonObject{{"username",o.inboundUsername},{"password",o.inboundPassword}};
  *output=config;return {};

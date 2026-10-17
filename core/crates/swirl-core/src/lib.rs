@@ -64,6 +64,7 @@ pub struct Snapshot {
     pub address: SocketAddr,
     pub generation: u64,
     pub selected: String,
+    pub selectors: BTreeMap<String, String>,
     pub running: bool,
     pub active: usize,
     pub accepted: u64,
@@ -154,13 +155,30 @@ impl Core {
         Ok(())
     }
     pub fn select_node(&self, id: &str) -> Result<()> {
-        let config = {
-            let plan = self.plan.read().map_err(|_| "ConfigState")?;
-            let mut next = (**plan).clone();
-            next.selected = id.to_owned();
-            next
-        };
-        self.configure(config)
+        let mut plan = self.plan.write().map_err(|_| "ConfigState")?;
+        let mut next = (**plan).clone();
+        next.selected = id.to_owned();
+        next.validate()?;
+        *plan = Arc::new(next);
+        self.state.generation.fetch_add(1, Ordering::Relaxed);
+        Ok(())
+    }
+    pub fn select_group(&self, id: &str, member: &str) -> Result<()> {
+        let mut plan = self.plan.write().map_err(|_| "ConfigState")?;
+        let mut next = (**plan).clone();
+        let selector = next
+            .selectors
+            .iter_mut()
+            .find(|s| s.id == id)
+            .ok_or("SelectorMissing")?;
+        if !selector.members.iter().any(|id| id == member) {
+            return Err("SelectorMemberMissing");
+        }
+        selector.selected = member.to_owned();
+        next.validate()?;
+        *plan = Arc::new(next);
+        self.state.generation.fetch_add(1, Ordering::Relaxed);
+        Ok(())
     }
     pub fn address(&self) -> SocketAddr {
         self.address
@@ -174,6 +192,11 @@ impl Core {
             address: self.address,
             generation: self.state.generation.load(Ordering::Relaxed),
             selected: plan.selected.clone(),
+            selectors: plan
+                .selectors
+                .iter()
+                .map(|s| (s.id.clone(), s.selected.clone()))
+                .collect(),
             running: self.task.as_ref().is_some_and(|t| !t.is_finished()),
             active: self.state.active.load(Ordering::Relaxed),
             accepted: self.state.accepted.load(Ordering::Relaxed),

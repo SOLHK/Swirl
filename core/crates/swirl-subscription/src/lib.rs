@@ -115,6 +115,15 @@ pub struct Rule {
     pub outbound: String,
 }
 
+/// Explicit manual selector. Members are concrete nodes, not nested groups.
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Selector {
+    pub id: String,
+    pub members: Vec<String>,
+    pub selected: String,
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Limits {
@@ -139,6 +148,8 @@ pub struct Config {
     pub nodes: Vec<Node>,
     #[serde(default)]
     pub rules: Vec<Rule>,
+    #[serde(default)]
+    pub selectors: Vec<Selector>,
     #[serde(default)]
     pub inbound_auth: Option<Credentials>,
     #[serde(default)]
@@ -212,6 +223,7 @@ impl Config {
             || self.nodes.is_empty()
             || self.nodes.len() > 512
             || self.rules.len() > 4096
+            || self.selectors.len() > 128
             || !(1..=256).contains(&self.limits.max_connections)
             || !(100..=30000).contains(&self.limits.handshake_timeout_ms)
             || !valid_auth(&self.inbound_auth)
@@ -299,8 +311,35 @@ impl Config {
         if !ids.contains(self.selected.as_str()) {
             return Err("SelectedNodeMissing");
         }
+        let mut selector_ids = HashSet::new();
+        for selector in &self.selectors {
+            if selector.id.is_empty()
+                || selector.id.len() > 64
+                || !selector
+                    .id
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b"-_".contains(&b))
+                || ids.contains(selector.id.as_str())
+                || !selector_ids.insert(selector.id.as_str())
+            {
+                return Err("SelectorId");
+            }
+            let mut members = HashSet::new();
+            if selector.members.is_empty()
+                || selector.members.len() > 512
+                || selector
+                    .members
+                    .iter()
+                    .any(|id| !ids.contains(id.as_str()) || !members.insert(id.as_str()))
+                || !members.contains(selector.selected.as_str())
+            {
+                return Err("SelectorMembers");
+            }
+        }
         for rule in &self.rules {
-            if !ids.contains(rule.outbound.as_str()) {
+            if !ids.contains(rule.outbound.as_str())
+                && !selector_ids.contains(rule.outbound.as_str())
+            {
                 return Err("RuleNodeMissing");
             }
             match &rule.matcher {
@@ -371,6 +410,25 @@ mod tests {
     #[test]
     fn duplicate_schema_rejected() {
         assert!(Config::parse(br#"{"schema":1,"schema":1,"listen":"127.0.0.1:0","selected":"d","nodes":[{"id":"d","outbound":{"type":"direct"}}]}"#).is_err());
+    }
+    #[test]
+    fn selectors_reject_missing_duplicate_nested_and_unknown_members() {
+        for selector in [
+            r#"{"id":"d","members":["d"],"selected":"d"}"#,
+            r#"{"id":"g","members":[],"selected":"d"}"#,
+            r#"{"id":"g","members":["d","d"],"selected":"d"}"#,
+            r#"{"id":"g","members":["d"],"selected":"missing"}"#,
+            r#"{"id":"g","members":["g"],"selected":"g"}"#,
+            r#"{"id":"g","members":["d"],"selected":"d","type":"fallback"}"#,
+        ] {
+            let data = format!(
+                r#"{{"schema":1,"listen":"127.0.0.1:0","selected":"d","nodes":[{{"id":"d","outbound":{{"type":"direct"}}}}],"selectors":[{selector}]}}"#
+            );
+            assert!(
+                Config::parse(data.as_bytes()).is_err(),
+                "accepted {selector}"
+            );
+        }
     }
     #[test]
     fn invalid_routing_fields_fail_before_activation() {

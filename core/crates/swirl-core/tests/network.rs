@@ -137,6 +137,36 @@ fn resolving_cidr_pins_destination_and_rule_updates_preserve_stream() {
     worker.join().unwrap();
 }
 #[test]
+fn manual_selector_updates_only_new_streams_and_rejects_non_members() {
+    let mut c = config();
+    c.selectors = serde_json::from_value(
+        json!([{"id":"manual","members":["direct","reject"],"selected":"direct"}]),
+    )
+    .unwrap();
+    c.rules =
+        serde_json::from_value(json!([{"matcher":{"type":"match"},"outbound":"manual"}])).unwrap();
+    let core = Core::start(c).unwrap();
+    let (port, worker) = echo();
+    let mut old = connect(&core, port);
+    core.select_group("manual", "reject").unwrap();
+    let generation = core.snapshot().unwrap().generation;
+    assert!(core.select_group("manual", "missing").is_err());
+    assert!(core.select_group("missing", "direct").is_err());
+    let state = core.snapshot().unwrap();
+    assert_eq!(state.generation, generation);
+    assert_eq!(state.selectors["manual"], "reject");
+    old.write_all(b"still-alive").unwrap();
+    let mut data = [0; 11];
+    old.read_exact(&mut data).unwrap();
+    assert_eq!(&data, b"still-alive");
+    let mut new = TcpStream::connect(core.address()).unwrap();
+    new.set_read_timeout(Some(Duration::from_secs(3))).unwrap();
+    write!(new, "CONNECT 127.0.0.1:{port} HTTP/1.1\r\nHost: x\r\n\r\n").unwrap();
+    assert!(header(&mut new).starts_with(b"HTTP/1.1 502"));
+    drop(old);
+    worker.join().unwrap();
+}
+#[test]
 fn atomic_update_preserves_existing_stream_and_rejects_new() {
     let mut core = Core::start(config()).unwrap();
     let (port, peer) = echo();
@@ -202,9 +232,13 @@ fn udp_associate_preserves_boundaries_and_rejects_fragments() {
     let target = peer.local_addr().unwrap();
     let mut c = config();
     c.selected = "reject".into();
+    c.selectors = serde_json::from_value(
+        json!([{"id":"udp-manual","members":["direct","reject"],"selected":"direct"}]),
+    )
+    .unwrap();
     c.rules = serde_json::from_value(json!([
         {"matcher":{"type":"source_cidr","value":"192.0.2.0/24"},"outbound":"reject"},
-        {"matcher":{"type":"destination_port","value":target.port()},"outbound":"direct"},
+        {"matcher":{"type":"destination_port","value":target.port()},"outbound":"udp-manual"},
         {"matcher":{"type":"match"},"outbound":"reject"}
     ]))
     .unwrap();
@@ -240,6 +274,7 @@ fn udp_associate_preserves_boundaries_and_rejects_fragments() {
         let mut output = [0; 4096];
         let (n, _) = client.recv_from(&mut output).unwrap();
         assert_eq!(&output[10..n], payload);
+        core.select_group("udp-manual", "reject").unwrap();
     }
     worker.join().unwrap();
     drop(control);

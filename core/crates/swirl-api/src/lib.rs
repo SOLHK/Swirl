@@ -14,11 +14,28 @@ pub const OUTPUT_CAPACITY: usize = 1024 * 1024;
 #[derive(Deserialize)]
 #[serde(tag = "op", rename_all = "snake_case", deny_unknown_fields)]
 enum Command {
-    Start { config: Config },
-    Configure { handle: u64, config: Config },
-    Select { handle: u64, id: String },
-    Snapshot { handle: u64 },
-    Stop { handle: u64 },
+    Start {
+        config: Config,
+    },
+    Configure {
+        handle: u64,
+        config: Config,
+    },
+    Select {
+        handle: u64,
+        id: String,
+    },
+    SelectGroup {
+        handle: u64,
+        id: String,
+        member: String,
+    },
+    Snapshot {
+        handle: u64,
+    },
+    Stop {
+        handle: u64,
+    },
 }
 #[derive(Default)]
 pub struct Controller {
@@ -67,6 +84,13 @@ impl Controller {
             Command::Snapshot { handle } => Ok(
                 json!({"ok":true,"status":self.cores.get(&handle).ok_or("UnknownHandle")?.snapshot()?}),
             ),
+            Command::SelectGroup { handle, id, member } => {
+                self.cores
+                    .get(&handle)
+                    .ok_or("UnknownHandle")?
+                    .select_group(&id, &member)?;
+                Ok(json!({"ok":true}))
+            }
             Command::Stop { handle } => {
                 let mut core = self.cores.remove(&handle).ok_or("UnknownHandle")?;
                 core.stop();

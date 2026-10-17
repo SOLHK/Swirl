@@ -58,6 +58,9 @@ pub fn select<'a>(
             break;
         }
     }
+    if let Some(selector) = config.selectors.iter().find(|s| s.id == id) {
+        id = &selector.selected;
+    }
     config
         .nodes
         .iter()

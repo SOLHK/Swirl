@@ -248,6 +248,21 @@ class RustCoreIntegration(unittest.TestCase):
         self.assertEqual(len(server.requests),1)
         self.assertTrue(ipaddress.ip_address(server.requests[0][0]).is_loopback)
         self.assertEqual(server.requests[0][1],443)
+
+    def test_manual_selector_api_preserves_stream_and_never_falls_back(self):
+        server=self.server('echo')
+        self.start(nodes=[{'id':'node','outbound':{'type':'direct'}},{'id':'deny','outbound':{'type':'reject'}}],
+                   selectors=[{'id':'manual','members':['node','deny'],'selected':'node'}],
+                   rules=[{'matcher':{'type':'match'},'outbound':'manual'}])
+        old,response=self.tunnel(server.server_address[1]);self.assertIn(b'200',response)
+        with old:
+            self.assertTrue(self.command(op='select_group',handle=self.handle,id='manual',member='deny')['ok'])
+            state=self.command(op='snapshot',handle=self.handle)['status'];self.assertEqual(state['selectors'],{'manual':'deny'})
+            self.assertFalse(self.command(op='select_group',handle=self.handle,id='manual',member='missing')['ok'])
+            self.assertEqual(self.command(op='snapshot',handle=self.handle)['status']['generation'],state['generation'])
+            old.sendall(b'old-alive');self.assertEqual(exact(old,9),b'old-alive')
+            new,response=self.tunnel(server.server_address[1]);new.close();self.assertIn(b'502',response)
+        self.assertEqual(server.accepted,1)
     def test_vless_tcp_tls_addresses_and_invalid_responses(self):
         for tls in (False,True):
             server=self.server('vless',tls=tls)

@@ -585,6 +585,7 @@ fn ss_outbound(raw: &Value, family: &str) -> Result<Outbound, &'static str> {
             outbound: outbound.clone(),
         }],
         rules: vec![],
+        selectors: vec![],
         inbound_auth: None,
         limits: Limits::default(),
     };
@@ -927,6 +928,7 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
                         outbound: outbound.clone(),
                     }],
                     rules: Vec::new(),
+                    selectors: Vec::new(),
                     inbound_auth: None,
                     limits: Limits::default(),
                 };

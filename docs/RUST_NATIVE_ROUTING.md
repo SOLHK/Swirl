@@ -15,8 +15,8 @@ The existing Qt rule editor now feeds executable rules to Swirl Rust when
 | DST-PORT | destination_port | One destination port, 1–65535 |
 | MATCH | match | Unconditional rule at its original position |
 
-Rules execute from top to bottom. Supported policies are DIRECT, REJECT and
-SWIRL (the selected node). The unmatched default remains the selected node.
+Rules execute from top to bottom. Supported policies are DIRECT, REJECT,
+SWIRL (the selected node), and validated manual select groups. The unmatched default remains the selected node.
 Qt generates collision-free IDs for its explicit direct/reject exits. Unsupported
 unselected imported nodes remain stored but are not activated.
 
@@ -26,10 +26,45 @@ list before an atomic update. Even unsupported rules below MATCH are rejected;
 they are not silently lost. Running rule rows are supplied through the existing
 engine interface. Hit counts remain unavailable, displayed as “—”.
 
-Process rules, rule providers/MRS/GeoIP, automatic smart routing, policy groups,
+Process rules, rule providers/MRS/GeoIP, automatic smart routing, automatic policy groups,
 port ranges, regex and logical expressions are not implemented here. Active
 unsupported rules fail with their index. Existing smart-routing sessions remain
 blocked in the Rust preview until their provider semantics are implemented.
+
+## Manual policy groups
+
+The existing group editor's `select` groups map to typed Rust selectors. Members
+must be concrete supported nodes, DIRECT or REJECT. The first ordered member is
+selected on startup; an explicitly supplied `default-selected` must name a member.
+The unchanged editor has no separate live group-member selection control. Its
+global node buttons continue to change SWIRL, not every custom group.
+
+The local Rust control API provides
+`{"op":"select_group","handle":1,"id":"group-id","member":"node-id"}`.
+It atomically changes only that selector for new connections. Snapshots report
+selector IDs and their selected members. Existing streams/UDP associations keep
+their original plan. Invalid groups or members do not advance the generation or
+mutate the plan. Node selection now also holds the same write lock throughout
+its read/modify/commit to avoid lost concurrent selector changes.
+
+The mapper validates every declared group and member in rule mode. Duplicate
+names/members, missing nodes, nested groups, unsupported protocols, arbitrary
+extra fields, non-member defaults and automatic group types fail explicitly.
+Inactive groups remain stored in global/direct mode. Limits are 128 selectors,
+512 members per selector and 512 total executable nodes (Qt reserves two slots
+for built-in policies). There is no fallback, retry/replay, group health probing,
+load balancing or imported group nesting. A failed selected member stays failed.
+
+The editor unconditionally stores its default health URL and 300-second interval
+on manual groups too. Only these exact defaults or absent values are accepted as
+inactive metadata; no request is scheduled. Other health-check settings are
+rejected rather than silently accepted. This is a narrow manual-selector subset,
+not full select-group compatibility including health-check side effects.
+
+Qt loopback tests route through authenticated member B while global selection is
+A, then verify global mode uses A and a failed B never falls back. Rust and the
+independent Python API peer test live selection, old TCP survival, invalid-member
+rollback and no implicit DIRECT; UDP tests retain the old selector snapshot.
 
 ## DNS and connection lifetime
 
@@ -80,3 +115,4 @@ platforms are not validated by these jobs. No private subscription is used by CI
 Rule terminology and no-resolve reference:
 https://wiki.metacubex.one/en/config/rules/ . This documents an implemented subset;
 it does not claim complete provider, process, DNS or policy-group compatibility.
+Manual-group terminology: https://wiki.metacubex.one/en/config/proxy-groups/select/ .
