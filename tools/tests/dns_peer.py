@@ -1,4 +1,6 @@
 """Independent, synthetic UDP/TCP DNS peer. Loopback only; no system changes."""
+from contextlib import ExitStack
+import errno
 import socketserver
 import socket
 import struct
@@ -59,9 +61,19 @@ class DnsPeer:
                     pass
 
         host='::1' if ipv6 else '127.0.0.1'
-        self.udp = UDP((host, 0), UDPHandler)
-        self.port = self.udp.server_address[1]
-        self.tcp = TCP((host, self.port), TCPHandler)
+        # A free UDP port can already be occupied by TCP. Hold both sockets
+        # before starting either server, and release a failed partial pair.
+        for attempt in range(8):
+            try:
+                with ExitStack() as cleanup:
+                    self.udp = cleanup.enter_context(UDP((host, 0), UDPHandler))
+                    self.port = self.udp.server_address[1]
+                    self.tcp = cleanup.enter_context(TCP((host, self.port), TCPHandler))
+                    cleanup.pop_all()
+                break
+            except OSError as error:
+                if error.errno != errno.EADDRINUSE or attempt == 7:
+                    raise
         for server in (self.udp, self.tcp):
             threading.Thread(target=server.serve_forever, daemon=True).start()
 

@@ -4,9 +4,11 @@ All DNS and origin traffic stays on loopback. No private subscription, system
 DNS, certificate store or external proxy core is used. Existing UDP/DoT/DoH
 fixtures supply transport framing only; this file independently encodes denials.
 """
+import errno
 import json
 import os
 import socket
+import socketserver
 import struct
 import subprocess
 import tempfile
@@ -14,11 +16,79 @@ import threading
 import time
 import types
 import unittest
+from unittest import mock
 
 from dns_peer import DnsPeer, name
 from test_dns_tls import DotPeer
 from test_dns_https import DohPeer
 from test_rust_core import Reference, Handler, certificates, exact, header
+
+
+class DnsPeerAllocationTests(unittest.TestCase):
+    def test_pair_retries_collision_and_releases_failed_sockets(self):
+        original = socketserver.TCPServer.server_bind
+        for collision_kind in (socket.SOCK_DGRAM, socket.SOCK_STREAM):
+            with self.subTest(collision_kind=collision_kind):
+                created, rejected = [], []
+
+                def collide_once(server):
+                    created.append(server)
+                    if server.socket_type == collision_kind and not rejected:
+                        rejected.append(server)
+                        raise OSError(errno.EADDRINUSE, 'controlled bind collision')
+                    original(server)
+
+                with mock.patch.object(socketserver.TCPServer, 'server_bind', collide_once):
+                    peer = DnsPeer()
+                try:
+                    self.assertEqual(len(rejected), 1)
+                    self.assertEqual(peer.udp.server_address[1], peer.tcp.server_address[1])
+                    self.assertTrue(all(server.socket.fileno() == -1 for server in created[:-2]))
+                    for server in (peer.udp, peer.tcp):
+                        self.assertFalse(server.allow_reuse_address)
+                        self.assertFalse(server.allow_reuse_port)
+                    self.assertEqual(peer.queries, [])
+                finally:
+                    peer.close()
+                self.assertTrue(all(server.socket.fileno() == -1 for server in created))
+
+    def test_pair_allocation_stops_after_bounded_collisions(self):
+        original = socketserver.TCPServer.server_bind
+        created = []
+
+        def always_collide(server):
+            created.append(server)
+            if server.socket_type == socket.SOCK_STREAM:
+                raise OSError(errno.EADDRINUSE, 'controlled bind collision')
+            original(server)
+
+        with mock.patch.object(socketserver.TCPServer, 'server_bind', always_collide):
+            with self.assertRaises(OSError) as caught:
+                DnsPeer()
+        self.assertEqual(caught.exception.errno, errno.EADDRINUSE)
+        self.assertEqual(sum(server.socket_type == socket.SOCK_STREAM for server in created), 8)
+        self.assertTrue(all(server.socket.fileno() == -1 for server in created))
+
+    def test_pair_allocation_cleans_up_other_errors_without_retry(self):
+        original = socketserver.TCPServer.server_bind
+        for failing_kind in (socket.SOCK_DGRAM, socket.SOCK_STREAM):
+            for failure in (PermissionError(errno.EACCES, 'controlled bind denial'),
+                            RuntimeError('controlled non-socket failure')):
+                with self.subTest(failing_kind=failing_kind, failure=type(failure).__name__):
+                    created = []
+
+                    def fail(server):
+                        created.append(server)
+                        if server.socket_type == failing_kind:
+                            raise failure
+                        original(server)
+
+                    with mock.patch.object(socketserver.TCPServer, 'server_bind', fail):
+                        with self.assertRaises(type(failure)) as caught:
+                            DnsPeer()
+                    self.assertIs(caught.exception, failure)
+                    self.assertEqual(len(created), 1 if failing_kind == socket.SOCK_DGRAM else 2)
+                    self.assertTrue(all(server.socket.fileno() == -1 for server in created))
 
 
 def record(owner, kind, body, ttl, qclass=1):
