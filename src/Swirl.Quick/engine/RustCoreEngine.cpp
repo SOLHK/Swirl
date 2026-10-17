@@ -11,6 +11,7 @@
 #include <QHostAddress>
 #include <QRegularExpression>
 #include <algorithm>
+#include <functional>
 
 namespace {
 QString dnsConfiguration(const EngineStartOptions &o,QJsonObject *output){
@@ -25,40 +26,94 @@ QString routingConfiguration(const EngineStartOptions &o,const QString &selected
  const auto direct=unique("swirl-rule-direct"),reject=unique("swirl-rule-reject");
  bool needsDirect=false,needsReject=false;int index=0;
  QHash<QString,QString> groups;QSet<QString> included{selected};
- if(o.customGroups.size()>128)return "Rust 手动策略组数量超过限制。";
+ const auto invalidGroup=[] {return QString("Rust 策略组参数无效或尚未支持；配置保持原值，未忽略该组。");};
+ if(o.customGroups.size()>128)return "Rust 策略组数量超过限制。";
+ // Allocate every name before resolving members so forward references have
+ // the same meaning as backward references. Node IDs and group names may not
+ // be ambiguous, and generated IR IDs never collide with stored node IDs.
  for(const auto &value:o.customGroups){
+  if(!QJsonValue::fromVariant(value).isObject())return invalidGroup();
   const auto group=QJsonObject::fromVariantMap(value.toMap());
   const auto name=group.value("name").toString();
-  const auto invalid=[] {return QString("Rust 策略组参数无效或尚未支持；目前只支持具体节点组成的手动 select 组。");};
-  for(auto it=group.begin();it!=group.end();++it)if(!QStringList{"name","type","proxies","default-selected","url","interval"}.contains(it.key()))return invalid();
-  if(name.isEmpty()||name!=name.trimmed()||name.size()>100||name.contains(QRegularExpression("[,\\x00-\\x1f\\x7f]"))||QStringList{"DIRECT","REJECT","SWIRL","GLOBAL"}.contains(name)||groups.contains(name)||group.value("type").toString()!="select"||!group.value("proxies").isArray())return invalid();
-  // The existing editor includes these health-check settings on every type.
-  // Select groups do not schedule probes; only its exact editor defaults are
-  // accepted so arbitrary active health-check configurations are not ignored.
-  if(group.contains("url")&&group.value("url").toString()!="https://www.gstatic.com/generate_204")return invalid();
-  if(group.contains("interval")&&(!group.value("interval").isDouble()||group.value("interval").toDouble()!=300))return invalid();
-  const auto members=group.value("proxies").toArray();if(members.isEmpty()||members.size()>512)return invalid();
+  if(name.isEmpty()||name!=name.trimmed()||name.size()>100||name.contains(QRegularExpression("[,\\x00-\\x1f\\x7f]"))||QStringList{"DIRECT","REJECT","SWIRL","GLOBAL"}.contains(name)||groups.contains(name))return invalidGroup();
+  for(const auto &node:o.nodes)if(node.id==name)return invalidGroup();
+  groups.insert(name,unique("swirl-group-"+QString::number(groups.size())));
+ }
+ QHash<QString,QStringList> edges;int automaticCount=0,probeCount=0;
+ for(const auto &value:o.customGroups){
+  const auto group=QJsonObject::fromVariantMap(value.toMap());const auto name=group.value("name").toString();
+  const auto type=group.value("type").toString();const bool manual=type=="select";
+  if(!QStringList{"select","url-test","fallback","load-balance"}.contains(type)||!group.value("proxies").isArray())return invalidGroup();
+  const QStringList allowed=manual?QStringList{"name","type","proxies","default-selected","url","interval"}
+   :QStringList{"name","type","proxies","url","interval","timeout","expected-status","tolerance","strategy"};
+  for(auto it=group.begin();it!=group.end();++it)if(!allowed.contains(it.key()))return invalidGroup();
+  QJsonObject selector{{"id",groups.value(name)}};
+  if(manual){
+   // The existing editor writes these exact placeholders on manual groups.
+   // Custom probe settings must not be silently discarded on select groups.
+   if(group.contains("url")&&group.value("url").toString()!="https://www.gstatic.com/generate_204")return invalidGroup();
+   if(group.contains("interval")&&(!group.value("interval").isDouble()||group.value("interval").toDouble()!=300))return invalidGroup();
+  }else{
+   if(type=="load-balance"){
+    // Mihomo defaults to hashing, while native Swirl implements per-session
+    // round robin. An absent/different strategy cannot be safely translated.
+    if(group.value("strategy").toString()!="round-robin")return "Rust 负载均衡目前只支持显式 strategy=round-robin；未将默认哈希策略改成轮询。";
+   }else if(group.contains("strategy"))return invalidGroup();
+   const auto integer=[&](const QString &key,int fallback,int low,int high){
+    if(!group.contains(key))return fallback;const auto v=group.value(key);
+    if(!v.isDouble()||v.toDouble()<low||v.toDouble()>high||v.toDouble()!=v.toInt())return -1;return v.toInt();
+   };
+   // URL is explicit. Seconds in existing Qt groups become milliseconds in
+   // Swirl IR. The exact expected status defaults to the editor's 204 target.
+   const auto text=group.value("url").toString();const QUrl url(text,QUrl::StrictMode);
+   const auto host=url.host();const auto address=QHostAddress(host);
+   const QRegularExpression hostSyntax("^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$");
+   if(text.size()>2048||!QRegularExpression("^[\\x21-\\x7e]+$").match(text).hasMatch()||text.contains('\\')||!url.isValid()
+    ||!QStringList{"http","https"}.contains(url.scheme())||!url.userInfo().isEmpty()||url.hasFragment()||url.authority().contains('@')
+    ||host.isEmpty()||host.size()>253||(!address.scopeId().isEmpty())||(address.isNull()&&!hostSyntax.match(host).hasMatch())||url.port(80)<1)return invalidGroup();
+   const int interval=integer("interval",300,1,3600),timeout=integer("timeout",5000,100,30000),status=integer("expected-status",204,200,299),tolerance=integer("tolerance",0,0,10000);
+   if(interval<0||timeout<0||timeout>interval*1000||status<0||tolerance<0||(type!="url-test"&&tolerance!=0))return invalidGroup();
+   selector["strategy"]=type=="url-test"?"url_test":type=="fallback"?"fallback":"load_balance";
+   selector["probe"]=QJsonObject{{"url",text},{"interval_ms",interval*1000},{"timeout_ms",timeout},{"expected_status",status},{"tolerance_ms",tolerance}};
+  }
+  const auto members=group.value("proxies").toArray();if(members.isEmpty()||members.size()>(manual?512:64))return invalidGroup();
+  if(!manual&&(++automaticCount>32||(probeCount+=members.size())>512))return invalidGroup();
   QJsonArray mapped;QSet<QString> seen;QHash<QString,QString> memberIds;
   for(const auto &memberValue:members){
-   if(!memberValue.isString())return invalid();const auto member=memberValue.toString();if(seen.contains(member))return invalid();seen.insert(member);
+   if(!memberValue.isString())return invalidGroup();const auto member=memberValue.toString();if(member.isEmpty()||seen.contains(member))return invalidGroup();seen.insert(member);
    QString id=member;
    if(member=="DIRECT"){id=direct;needsDirect=true;}
-   else if(member=="REJECT"){id=reject;needsReject=true;}
+   else if(member=="REJECT"){if(!manual)return invalidGroup();id=reject;needsReject=true;}
+   else if(groups.contains(member)){
+    if(!manual)return "Rust 自动策略组成员必须是具体节点；尚未支持自动组探测嵌套组。";
+    id=groups.value(member);edges[name].append(member);
+   }
    else if(!included.contains(member)){
     // Reuse precisely the same protocol validation as the top-level selection.
     // Clearing groups/rules makes this a single bounded leaf conversion.
     auto leaf=o;leaf.customGroups.clear();leaf.customRules.clear();leaf.routingMode="global";leaf.smartRouting=false;leaf.selectedNodeId=member;
-    QJsonObject config;if(!RustCoreEngine::configuration(leaf,&config).isEmpty())return invalid();
-    nodes->append(config.value("nodes").toArray().first());included.insert(member);if(nodes->size()>510)return invalid();
+    QJsonObject config;if(!RustCoreEngine::configuration(leaf,&config).isEmpty())return invalidGroup();
+    nodes->append(config.value("nodes").toArray().first());included.insert(member);if(nodes->size()>512)return invalidGroup();
    }
    memberIds.insert(member,id);mapped.append(id);
   }
-  QString chosen=members.first().toString();
-  if(group.contains("default-selected")){if(!group.value("default-selected").isString())return invalid();chosen=group.value("default-selected").toString();}
-  if(!memberIds.contains(chosen))return invalid();
-  const auto id=unique("swirl-group-"+QString::number(groups.size()));groups.insert(name,id);
-  selectors->append(QJsonObject{{"id",id},{"members",mapped},{"selected",memberIds.value(chosen)}});
+  selector["members"]=mapped;
+  if(manual){
+   QString chosen=members.first().toString();
+   if(group.contains("default-selected")){if(!group.value("default-selected").isString())return invalidGroup();chosen=group.value("default-selected").toString();}
+   if(!memberIds.contains(chosen))return invalidGroup();selector["selected"]=memberIds.value(chosen);
+  }
+  selectors->append(selector);
  }
+ // Validate every edge, including inactive alternatives. This mirrors the
+ // native IR's 16-group depth bound before saving or activating Qt settings.
+ QSet<QString> visiting;QHash<QString,int> depths;
+ const std::function<int(const QString &)> depth=[&](const QString &name){
+  if(visiting.contains(name))return 17;if(depths.contains(name))return depths.value(name);
+  visiting.insert(name);int longest=1;for(const auto &member:edges.value(name)){longest=qMax(longest,1+depth(member));if(longest>16)break;}
+  visiting.remove(name);depths.insert(name,longest);return longest;
+ };
+ for(auto it=groups.cbegin();it!=groups.cend();++it)if(depth(it.key())>16)return "Rust 策略组存在循环或超过 16 层嵌套；未应用配置。";
  for(const auto &line:o.customRules){
   ++index;const auto invalid=[index]{return QString("第 %1 条规则无效或 Rust 尚未支持；未忽略该规则。").arg(index);};
   if(line.size()>2300||line.contains('\n')||line.contains('\r')||line.contains(QChar(0)))return invalid();
@@ -97,6 +152,7 @@ QString routingConfiguration(const EngineStartOptions &o,const QString &selected
  }
  if(needsDirect)nodes->append(QJsonObject{{"id",direct},{"outbound",QJsonObject{{"type","direct"}}}});
  if(needsReject)nodes->append(QJsonObject{{"id",reject},{"outbound",QJsonObject{{"type","reject"}}}});
+ if(nodes->size()>512)return invalidGroup();
  return {};
 }
 }
@@ -106,8 +162,14 @@ RustCoreEngine::RustCoreEngine(QObject *parent):ProxyEngine(parent){
  m_network.setProxy(QNetworkProxy::NoProxy);
  m_status.engineName="Swirl Core Rust";m_status.engineKind="rust";
 }
-RustCoreEngine::~RustCoreEngine(){stop();}
+// Owners can destroy their telemetry members before their engine member.
+// Shutdown during destruction must not signal those partially destroyed owners.
+RustCoreEngine::~RustCoreEngine(){disconnect();stop();}
 QString RustCoreEngine::configurationSummary()const{return "Swirl Core Rust · Mixed HTTP/SOCKS5 · 原生 TCP/有界 UDP · 无外部内核回退";}
+QString RustCoreEngine::validatePolicyGroups(const QList<ProxyNode> &nodes,const QVariantList &groups){
+ EngineStartOptions options;options.nodes=nodes;options.customGroups=groups;
+ QJsonArray mapped,rules,selectors;return routingConfiguration(options,{},&mapped,&rules,&selectors);
+}
 QVariantList RustCoreEngine::routingRules()const{
  QVariantList rows;int order=0;const bool direct=m_options.directSession||m_options.routingMode=="direct";
  if(!direct&&m_options.routingMode=="rule")for(const auto &line:m_options.customRules){
@@ -125,7 +187,7 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
  QJsonArray nodes;QString selected=o.selectedNodeId;
  if(o.directSession||o.routingMode=="direct") {selected="explicit-direct";nodes.append(QJsonObject{{"id",selected},{"outbound",QJsonObject{{"type","direct"}}}});}
  else {
-  // First map the default route. Manual groups add their referenced members.
+  // First map the default route. Policy groups add their referenced members.
   // Unreferenced unsupported imports remain in NodeStore without activation.
   const auto it=std::find_if(o.nodes.cbegin(),o.nodes.cend(),[&](const auto &n){return n.id==selected;});
   if(it==o.nodes.cend())return "未选择节点。";

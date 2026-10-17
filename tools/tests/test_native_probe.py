@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import socket
 import threading
+import time
 import unittest
 from unittest import mock
 
@@ -60,6 +61,21 @@ class ProbeConfiguration(unittest.TestCase):
         doh = verifier.probe_configuration(encrypted_dns=True)
         self.assertFalse(doh["dns"]["use_system_hosts"])
         self.assertEqual(doh["dns"]["tls_servers"][0]["tls"]["server_name"], "cloudflare-dns.com")
+
+    def test_failure_stage_is_preserved_without_leaking_arbitrary_peer_text(self):
+        for stage, expected in (("tcp_connect", "tcp_connect"),
+                                ("tls_handshake", "tls_handshake"),
+                                ("PRIVATE_STAGE_CANARY", "unknown"), ([], "unknown")):
+            with self.subTest(stage=stage):
+                status = {"accepted": 1, "active": 0, "failed": 1, "upload": 0,
+                          "download": 0, "last_error": "UpstreamTcpTimeout",
+                          "last_error_stage": stage, "connections": [{"ended": True}]}
+                result = {}
+                verifier.settled_snapshot(lambda *args, **kwargs: {"ok": True, "status": status},
+                                         1, time.monotonic() + 1, result)
+                self.assertEqual(result["core"]["last_error_stage"], expected)
+                self.assertNotIn("PRIVATE_STAGE_CANARY", json.dumps(result))
+                self.assertEqual(verifier.native_traffic_error(result["core"]), "NativeRelayFailed")
 
     @unittest.skipUnless(os.environ.get("SWIRL_RUST_HARNESS"), "Rust harness required")
     def test_rejecting_independent_ss_peer_is_a_failed_native_probe(self):

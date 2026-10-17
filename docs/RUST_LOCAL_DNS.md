@@ -6,8 +6,13 @@ HTTP/1.1 DoH. See the [current encrypted-DNS overview](../core/README.md#encrypt
 the [historical DoT stage](RUST_DOT.md), and
 [earlier DoH/public-network evidence](RUST_WS_VALIDATION_20261017.md).
 The old DoT-only document's HTTPS exclusions belong to its earlier scope.
-Current regression counts and source/CI identities are tracked in
-[the policy-stage validation](RUST_POLICY_VALIDATION_20261017.md).
+Hostname-shared positive caching and validated SOA negative caching were completed
+in the [preceding DNS/subscription stage](RUST_DNS_SUBSCRIPTION_VALIDATION_20261017.md).
+The current stage adds bounded TCP address fallback after resolution, one outbound
+establishment deadline and static failure-stage diagnostics. Current regression
+counts and source/CI identities are tracked in
+[connection/policy validation](RUST_CONNECTION_POLICY_VALIDATION_20261017.md);
+earlier policy and DNS CI results do not validate the new connection changes.
 
 The existing DNS page can now configure the Rust runtime's system resolver and
 exact local domain-to-IP mappings, or up to four custom IP DNS servers. The UI layout, controls and stored source
@@ -85,6 +90,63 @@ the available address set; an empty other family is not a claim that this
 family's records do not exist. Configuration generations still own separate
 caches, and local mappings still take precedence.
 
+## Using resolved addresses for TCP
+
+The native outbound connector now resolves a domain once and tries only the
+returned address set. It deduplicates the at-most-16 socket addresses, retains
+the resolver's first-family preference and order within each address family,
+and interleaves IPv4/IPv6 attempts. New launches while attempts are pending are
+staggered by 250 ms, with at most two pending TCP sockets. A completed failure or
+retired attempt releases its slot immediately for the next address. This prevents
+an immediate refusal from wasting the entire budget of a 100 ms handshake.
+An attempt started while further untried addresses
+remain has a two-second slot limit; the last address, or a singleton, retains
+the original overall deadline's remaining time. This allows a later answer to
+be attempted when earlier answers stall, with a bounded resource cost.
+
+DNS resolution, all TCP attempts, upstream TLS, WebSocket Upgrade and native
+proxy negotiation share one absolute deadline inside `swirl-protocol::connect`.
+Each phase uses the remainder; retries do not reset it. Resolver-specific bounds
+still apply inside this deadline. The inbound handshake and a rule-required DNS
+lookup before outbound selection keep their existing separate limits.
+
+The address set is available only after the current resolver completes its
+lookup. In particular, the A/AAAA completion requirement below has not changed.
+This is staggered TCP fallback, not full RFC 8305 asynchronous DNS behavior,
+network-history ranking, dynamic address updates or NAT64 synthesis. The two-second
+slot cap is a Swirl resource tradeoff rather than an RFC-mandated connect timeout.
+
+For DIRECT without a resolving destination-IP rule, the connector may try the
+target's returned addresses. For a proxy, it may try the proxy server's returned
+addresses; a normal target domain still goes to that same proxy for remote
+resolution. If routing has pinned a target IP, or a host mapping supplies one IP,
+only that literal is used. The original domain is never re-resolved to try another
+destination under the first address's CIDR policy. Policy-aware reevaluation of
+alternative destination addresses remains future work.
+
+Once TCP succeeds, all other connection futures and their sockets are dropped
+before sending TLS, proxy authentication or application bytes. Certificate,
+authentication, protocol or application failures do not cause another address or
+route to be tried. There is no silent DIRECT fallback or request replay.
+
+Snapshots now expose a static `last_error_stage`, and each connection record has
+an `error` and `failure_stage`. DNS expiry in the connector is
+`UpstreamDnsTimeout` / `dns`; TCP expiry is `UpstreamTcpTimeout` /
+`tcp_connect`; immediate TCP failures retain `UpstreamConnectFailed`.
+TLS, WebSocket Upgrade, protocol and initial HTTP-obfs writes have distinct
+categories, while ambiguous errors remain `unknown`. These fields identify the
+failed boundary, not a proven provider or credential fault. See the
+[full diagnostic table](../core/README.md#tcp-address-fallback-and-connection-diagnostics).
+
+The scheduler was independently implemented after reviewing
+[RFC 8305 sections 4–5](https://www.rfc-editor.org/rfc/rfc8305), the
+[sing-box resolved-address interface](https://github.com/SagerNet/sing-box/blob/testing/protocol/direct/outbound.go)
+and the [Tokio TCP API](https://docs.rs/tokio/latest/tokio/net/struct.TcpStream.html).
+Immediate fallback after a completed failure is also exercised by
+[Go's standard-library dial tests](https://github.com/golang/go/blob/master/src/net/dial_test.go).
+This completed-failure policy is not a claim of full RFC 8305 timing conformance.
+No external proxy implementation is used for these connections.
+
 ## Custom DNS wire behavior
 
 `core/crates/swirl-dns/src/wire.rs` implements the query/response protocol in Rust.
@@ -159,5 +221,14 @@ a new commit. Earlier strict public DIRECT/DoH checks and current regression
 execution are recorded separately in the validation documents linked above.
 The new `tools/tests/test_dns_negative.py` exercises negative caching through
 independent loopback DNS peers and actual native control/forwarding calls;
-the current-stage results belong to the exact tested commit recorded in
-`docs/CONTINUE_DEVELOPMENT.md`.
+its completed earlier-stage results are recorded in the DNS/subscription
+validation document. The current connection work adds nine Rust dial tests,
+including deterministic stalled-address/cancellation/deadline cases and actual
+loopback TCP fallback, plus two SS initial-write/lazy-response regressions.
+All 101 local Rust workspace tests passed on this stage's implementation.
+`tools/tests/test_connection_stages.py` passed all eight independent
+DNS/TCP/TLS/protocol fixture cases locally; the exact source and later CI evidence belong in the
+current connection/policy validation record. New Qt automatic/nested-group
+mapping is implemented in this stage, with Windows/Qt CI still pending at this
+update. None of these local results establishes a passing private node or an
+updated subscription body.

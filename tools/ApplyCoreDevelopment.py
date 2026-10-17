@@ -4,7 +4,7 @@ The only writable file is .github/workflows/rust-core.yml. The update enables
 its existing jobs on this development branch, adds the already implemented
 DoH, SOCKS4, WebSocket and automatic-policy peer suites, and runs fixed public-network
 checks with an evidence artifact on Linux. The current stage adds negative DNS
-and isolated native-outbound probe regressions alongside the existing SOCKS4
+and isolated native-outbound probe and connection-stage regressions alongside the existing SOCKS4
 and WS Qt forwarding peers. It does not change permissions, secrets,
 existing actions, release jobs, pull-request triggers or any product source.
 
@@ -39,7 +39,7 @@ ADDITIONAL_TESTS = (
     "test_core_development.py",
 )
 POLICY_TEST = "test_policy_groups.py"
-DNS_PROBE_TESTS = ("test_dns_negative.py", "test_native_probe.py")
+DNS_PROBE_TESTS = ("test_dns_negative.py", "test_native_probe.py", "test_connection_stages.py")
 QT_PEER_TESTS = (
     "test_socks4.py Socks4Integration.test_qt_imported_socks4_and_4a_data_path",
     "test_websocket_transport.py WebSocketTransportTests.test_qt_vless_websocket_data_path",
@@ -144,11 +144,19 @@ def updated_workflow(source: str) -> str:
     portable_after = policy + added_portable + PUBLIC_VALIDATION_STEPS
     windows_after = policy + WINDOWS_STATUS_GUARD + added_windows + "          python ../tools/tests/test_subscription_capture.py\n"
     counts = tuple(source.count(f"          python ../tools/tests/{name}\n") for name in DNS_PROBE_TESTS)
-    if counts == (2, 2):
+    if counts == (2, 2, 2):
         if source.count(portable_after) != 1 or source.count(windows_after) != 1:
             raise ValueError("Rust CI DNS/probe menus have drifted; review required")
         source = source.replace(portable_after, portable, 1).replace(windows_after, windows, 1)
-    elif counts != (0, 0):
+    elif counts == (2, 2, 0):
+        # The verified DNS stage predates the connection-stage peer suite.
+        command = "          python ../tools/tests/test_connection_stages.py\n"
+        old_portable = portable_after.replace(command, "")
+        old_windows = windows_after.replace(command + WINDOWS_STATUS_GUARD, "")
+        if source.count(old_portable) != 1 or source.count(old_windows) != 1:
+            raise ValueError("Rust CI previous DNS/probe menus have drifted; review required")
+        source = source.replace(old_portable, portable, 1).replace(old_windows, windows, 1)
+    elif counts != (0, 0, 0):
         raise ValueError("Rust CI DNS/probe stage is only partially present; review required")
     source = _previous_workflow(source)
     source = _replace_checked(source, portable, portable_after, "portable DNS/probe menu")

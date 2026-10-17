@@ -1,23 +1,32 @@
 # Swirl 接续开发入口
 
-更新日期：2026-10-17 UTC。本轮 DNS 与订阅验证阶段从 `work/core-completion-20261017@8c17218` 接续。开发分支已经继承既有界面/动效修复与全部 Rust 工作，不能从 main 重新实现已有模块。
+更新日期：2026-10-17 UTC。本轮限时采集、连接阶段与 Qt 策略转换从 `work/core-completion-20261017@d27fcc74ed549f2219f97da1f5c56a83bace3ac1` 接续。开发分支已经继承既有界面/动效修复与全部 Rust 工作，不能从 main 重新实现已有模块。
 
 ## 当前接手注意事项
 
 - **当前唯一开发分支：`work/core-completion-20261017`。** 用户最新指令覆盖历史 `test` 要求；不改 main、不强推。已配置的 GitHub App/Secrets 沿用，不重新配置。
 - 用户已明确持续授权本开发分支的修复、测试与 GitHub 写入（“始终允许”）；在既有权限内继续实施，无需重复询问同一开发分支的常规提交。
-- 原生 IR/API 已接入嵌套手动组、`url_test`、`fallback`、`load_balance`、经实际出口的 HTTP/HTTPS 健康探测和会话策略视图。此前未编译的候选模块已经实际参与构建与测试；详见 [原生策略组](RUST_NATIVE_POLICIES.md) 和 [上一策略阶段验收](RUST_POLICY_VALIDATION_20261017.md)。Qt 自动组/嵌套组转换仍未迁移。
+- 原生 IR/API 已接入嵌套手动组、`url_test`、`fallback`、`load_balance`、经实际出口的 HTTP/HTTPS 健康探测和会话策略视图。本轮 Qt 完整配置转换和 Controller 保存已接入前向手动嵌套、url-test/fallback、显式 round-robin；默认哈希负载均衡和自动组嵌套仍拒绝。QML 控件不变，详细边界见 [原生策略组](RUST_NATIVE_POLICIES.md)；当前 Windows 验收另见本轮记录，不能套用历史成功。
 - 健康视图在 listener accept 时固定；旧 TCP/UDP 保留原出口，完整配置替换/stop 取消旧探测。失败应用请求不重放，无健康成员不静默直连；四个跨配置代共享探测名额和有界期限限制后台工作。
 - SOCKS4/4a 的 Rust subscription inspector 与 Qt 节点转换已接入，十个本地 inspector 至独立对端的真实会话通过。Windows #25 新增 SOCKS4/4a 六个 Qt 转发会话、VLESS WS 的 131073 字节真实响应均通过；Qt CTest 与既有 SS/VLESS 对端也通过。本地 Linux 没有 Qt SDK，不能把 Windows 证据外推为各平台桌面验收。
 - WebSocket 关闭预算现在从最早关闭意图开始，覆盖拥塞队列、旧数据、Close 写入/flush、对端回复和底层 shutdown。既有 DoH、WS/WSS 及协议握手继续复用，没有重写已有传输。
 - 当前阶段默认产品仍保留 C++/Mihomo 兼容构建。必须用 `SWIRL_USE_RUST_CORE=ON` 验证原生 Rust；该模式不会回退完整外部内核。智能 MRS、TUN、LAN 和未迁移协议仍会明确拒绝。
 - DNS 缓存已按大小写规范化的主机共享 IP 集合，并接入严格 SOA 的 NXDOMAIN/NODATA 负缓存；UDP/TCP、DoT、DoH 共用校验与合并逻辑。RFC 9520 的解析失败缓存、DNS 分流及自动 bootstrap 仍未实现。
+- 本轮已实现同一解析结果的有界多地址 TCP：最多两个待完成连接、250ms 间隔、原有总期限，TCP 获胜后先取消其他候选再发送协议数据。保留 CIDR 固定 IP，不在 TLS/认证失败后重试。Snapshot 增加白名单失败阶段和每连接静态错误；延迟 SS/混淆响应错误仍属 StreamIo，不假定初始写入就是认证成功。
 - 用户已授权使用 `Swirl-Private-Tests` 中现有加密归档，在私有 Actions 内仅于内存解密、通过 stdin 交给原生 inspector/harness，只保存白名单报告。此项是旧版“私有缓存不进 CI”表述的明确例外；原始 URL、令牌、节点凭据和解密配置仍不得进入公开 Git/CI、日志或外部转换服务。未获新窗口授权，不刷新订阅 URL。
-- 现有 GitHub 归档含 #9、#10 两份 Clash YAML 正文，原生 inspector 已确认分别为 90 个 SS、90 个 Trojan；[固定版本采集记录](https://github.com/SOLHK/Swirl-Private-Tests/blob/3c3fa41b09d1120cda81969a1ac3892b8c458f75/README.md)记载其余 14 项为 HTTP 403，现有缓存没有正文可供解密。SS 有 90 个 TCP 候选，但前三个两轮实测均未通过，诊断为 `UpstreamTimeout`；Trojan 全部声明关闭证书校验，按既有规则拒绝转换为可执行候选。这不说明实际服务器证书无效，也不能把 SS 超时归因为密码或节点失效。
-- 用户 Windows 机器上的项目、生成/下载文件、skills 和工具均放在 `D:\Codex`；写入 `C:` 的必要例外需用户明确允许。当前云端 Linux 工作区无法访问该盘，GitHub 推送不等于已保存到用户 D 盘。
-- 以 [本轮 DNS 与订阅验证](RUST_DNS_SUBSCRIPTION_VALIDATION_20261017.md) 中准确提交/Actions 结果为准；下方策略、WS/DoT 和 Windows 本机旧记录均为历史证据，不能证明本轮代码已通过远端门禁。
+- 本轮窗口内云端 16 项均为 HTTP 403；随后现有 Windows 采集器取得 #9/#10 的有效更新（212456/210026 字节），其余 14 项仍为 403。实际 2 份更新、0 个新增、14 个缺失，逐份加密推送到独立窗口归档，旧有效归档保留。固定截止 18:39:54 UTC，最后请求于 18:38:29 完成，之后禁止刷新。归档离线校验/原生抽样状态见本轮记录。上一阶段两份 Clash YAML 各 90 个 SS/Trojan，三个 SS 样本 UpstreamTimeout；Trojan 配置关闭证书验证而拒绝，不代表其实际证书无效。
+- 用户本轮明确追加“可以在C盘，速度”，因此允许复用现有 C 盘 Windows runner。默认 D:\Codex 偏好与该次明确授权分别保留。当前云端 Linux 工作区不等于用户 Windows 磁盘，GitHub 推送不等于已保存到 D 盘。
+- 当前结果以 [连接与 Qt 策略阶段验收](RUST_CONNECTION_POLICY_VALIDATION_20261017.md) 为准；[DNS 与订阅阶段](RUST_DNS_SUBSCRIPTION_VALIDATION_20261017.md)及下方旧运行均为历史证据，不能证明本轮代码已通过远端门禁。
 
 ## 本轮验收状态
+
+- Rust fmt、check、Clippy `-D warnings`、101 项 workspace 测试和 release 构建已通过；补充短预算下立即 TCP 拒绝应立即接续的回归。
+- 本地 13 套 Python 共 169 项，132 通过、37 明确跳过、0 失败；新增连接阶段 8/8、原生 probe 7/7、工作流更新器 15/15。
+- 37 个跳过为四项 Windows Qt 对端、22 项 Windows DPAPI 采集、10 项 Windows DPAPI 管理和可选真实 Codex CLI。不能算作本机通过。
+- Qt 新增组数据路径和持久化测试已写入，但本地无 Qt SDK，需本轮 Windows CI 编译执行。
+- 本轮公开源码提交、三平台 CI、严格公网及固定源码私有节点证据完成后补记于 [阶段记录](RUST_CONNECTION_POLICY_VALIDATION_20261017.md)。尚无私有节点联网通过证据。
+
+## DNS 与订阅阶段验收（历史，#30）
 
 | 内容 | 当前执行证据 |
 |---|---|
@@ -135,7 +144,7 @@ Qt/Rust CMake configure/generate 成功。此检查不声称重新完成了一�
 | `core/crates/swirl-core` | 有界运行时、不可变会话配置/健康视图、原子节点/组/配置更新、旧 TCP/UDP 保留原出口、流量统计；四名额健康探测、过期与取消、测速/fallback/轮询 |
 | `core/crates/swirl-subscription` | typed IR、Clash YAML/JSON、sing-box JSON、URI/Base64、部分 INI 识别与保留、脱敏能力报告；严格 DoT/DoH/WS/策略字段和图验证；有限 SOCKS4/4a 导入已接入，并非所有格式都可执行 |
 | `core/crates/swirl-transport` / `swirl-api` | 验证 TLS、背压/半关闭；ABI v1 JSON 控制、stdin harness、离线 inspector |
-| `src/Swirl.Quick/engine/RustCoreEngine.*` / `RustDnsConfiguration.h` | 现有 Qt 控制层到 Rust DLL；规则、有限手动组、本地 DNS 与显式 DoT/DoH/WS/SOCKS4 映射；明确拒绝未迁移会话 |
+| `src/Swirl.Quick/engine/RustCoreEngine.*` / `RustDnsConfiguration.h` | 现有 Qt 控制层到 Rust DLL；规则、前向嵌套手动组、自动组叶子及显式轮询、本地 DNS 与 DoT/DoH/WS/SOCKS4 映射；明确拒绝未迁移语义 |
 | `tools/` | 私有采集/离线分析、独立协议/DoT/DoH/策略对端、Codex 本地代理配置管理、受限工作流更新与测试 |
 
 关键边界：[规则与 Qt 手动组](RUST_NATIVE_ROUTING.md)、[原生策略](RUST_NATIVE_POLICIES.md)、[本地 DNS](RUST_LOCAL_DNS.md)、[DoT](RUST_DOT.md)、
@@ -174,6 +183,7 @@ py -3 tools/tests/test_shadowsocks.py
 py -3 tools/tests/test_dns_tls.py
 py -3 tools/tests/test_dns_https.py
 py -3 tools/tests/test_dns_negative.py
+py -3 tools/tests/test_connection_stages.py
 py -3 tools/tests/test_socks4.py
 py -3 tools/tests/test_websocket_transport.py
 py -3 tools/tests/test_policy_groups.py
@@ -209,14 +219,15 @@ ZIP CRC、包内 DLL 哈希及私有内容扫描通过。GNU 链接器仍有 `.d
 规则阶段 `7c7b884` 的旧版节点 UI 164 项通过；该修复已包含在当前源码。
 更早的本机记录为缓存 14 份导出、12 个不同文档离线解析通过；该历史统计不能证明现有 GitHub 归档已取得全部 16 项正文，也不包含本轮私有节点联网验收。
 
-上一策略阶段的三平台、Windows Qt 和严格公网门禁已在 #25 完成。当前阶段完成主机级 DNS 缓存、
-严格 SOA 负缓存和私有原生抽样工具的验证；公共 #30 三平台、Windows Qt 和严格公网门禁已通过，
-私有实测已登记且未通过。后续按以下边界继续：
+此前 #25/#30 的三平台、Windows Qt 和严格公网门禁是历史证据。本轮已经实现 Qt 组转换、
+有界 TCP 多地址和失败阶段，并先完成限时采集。最新验收以阶段记录中的源码和运行身份为准。
+后续按以下边界继续：
 
-1. Qt 自动组/嵌套组映射与完整订阅策略接管，保留现有 UI，并为实际 Qt 控制流提供独立对端证据；未知参数继续拒绝或保留报告。
-2. DNS 主机缓存与 NXDOMAIN/NODATA/SOA 已实现；RFC 9520 失败缓存、多地址有界连接、bootstrap/分流及智能 MRS/进程规则仍待推进。多地址连接必须保留规则固定的 IP 语义；既有 DoT、HTTP-1.1 DoH、UDP/TCP 报文和 TTL 不重复重写。
-3. gRPC/XHTTP、REALITY/Vision、VMess/SS2022、QUIC 等缺少协议与传输，分别提供互操作证据。WS 基础已实现，本轮只覆盖明确的有限组合。
-4. TUN、LAN、网关、平台权限/系统代理接管与异常恢复；不擅自改变用户当前网络。
-5. 完整订阅到产品配置的 Rust 接管、私有 SS 上游超时定位及节点联网验收、长期/弱网/性能验证，最后才移除旧内核依赖；现有缓存测试授权继续有效，补采缺失正文另需新的下载窗口。
+1. 优先核对新失败阶段的私有 SS 抽样，按 DNS/TCP/TLS/混淆/协议证据定位，不增加总超时掩盖问题，不由三个样本推断整份订阅失效。
+2. 完整订阅到 Swirl IR/Qt 的组、DNS、路由字段继续逐项转换；当前 Qt 组映射已实现的子集不重写。缺省哈希负载均衡、自动组嵌套和旧 QML 无法编辑的字段仍需明确处理，不能静默丢失。
+3. DNS 主机缓存、NXDOMAIN/NODATA/SOA 与已解析地址的 TCP 回退已实现；RFC 9520 失败缓存、渐进 DNS、bootstrap/分流及智能 MRS/进程规则仍待推进。保持规则固定 IP，不重写既有加密 DNS/报文/TTL。
+4. gRPC/XHTTP、REALITY/Vision、VMess/SS2022、QUIC 等缺少协议与传输，分别提供互操作证据。WS 基础已实现，本轮只覆盖明确的有限组合。
+5. TUN、LAN、网关、平台权限/系统代理接管与异常恢复；不擅自改变用户当前网络。
+6. 私有节点联网验收、长期/弱网/性能验证，最后才移除旧内核依赖；现有缓存测试授权继续有效，补采缺失正文另需新的下载窗口。
 
 不要重写已完成模块或删掉兼容构建来制造“全自研完成”。所有阶段仍需保留 UI 与用户数据。

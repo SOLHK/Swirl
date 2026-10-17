@@ -8,6 +8,7 @@ use swirl_transport::BoxStream;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
+    time::Instant,
 };
 
 async fn terminated(stream: &mut TcpStream, limit: usize) -> Result<Vec<u8>> {
@@ -72,6 +73,7 @@ pub(super) async fn connect(
     remote_dns: bool,
     target: &Target,
     resolver: &Resolver,
+    deadline: Instant,
 ) -> Result<BoxStream> {
     let mut domain = None;
     let ip = match target.host.parse::<IpAddr>() {
@@ -81,18 +83,21 @@ pub(super) async fn connect(
             domain = Some(target.host.as_str());
             Ipv4Addr::new(0, 0, 0, 1)
         }
-        Err(_) => resolver
-            .resolve(&target.host, target.port)
-            .await?
-            .iter()
-            .find_map(|a| {
-                if let IpAddr::V4(ip) = a.ip() {
-                    Some(ip)
-                } else {
-                    None
-                }
-            })
-            .ok_or("Socks4Ipv6Unsupported")?,
+        Err(_) => super::within(
+            deadline,
+            "UpstreamDnsTimeout",
+            resolver.resolve(&target.host, target.port),
+        )
+        .await?
+        .iter()
+        .find_map(|a| {
+            if let IpAddr::V4(ip) = a.ip() {
+                Some(ip)
+            } else {
+                None
+            }
+        })
+        .ok_or("Socks4Ipv6Unsupported")?,
     };
     if domain.is_none() && ip.octets()[..3] == [0, 0, 0] {
         return Err("Socks4AmbiguousAddress");
@@ -110,6 +115,7 @@ pub(super) async fn connect(
             host: host.to_owned(),
             port,
         },
+        deadline,
     )
     .await?;
     let mut request = vec![4, 1];
@@ -121,17 +127,21 @@ pub(super) async fn connect(
         request.extend(domain.as_bytes());
         request.push(0);
     }
-    stream
-        .write_all(&request)
-        .await
-        .map_err(|_| "Socks4Write")?;
-    let mut reply = [0; 8];
-    stream
-        .read_exact(&mut reply)
-        .await
-        .map_err(|_| "Socks4Read")?;
-    if reply[0] != 0 || reply[1] != 90 {
-        return Err("Socks4Rejected");
-    }
+    super::within(deadline, "UpstreamProtocolTimeout", async {
+        stream
+            .write_all(&request)
+            .await
+            .map_err(|_| "Socks4Write")?;
+        let mut reply = [0; 8];
+        stream
+            .read_exact(&mut reply)
+            .await
+            .map_err(|_| "Socks4Read")?;
+        if reply[0] != 0 || reply[1] != 90 {
+            return Err("Socks4Rejected");
+        }
+        Ok(())
+    })
+    .await?;
     Ok(Box::new(stream))
 }

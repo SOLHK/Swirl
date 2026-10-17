@@ -78,6 +78,7 @@ REQUIRED_TESTS = (
     "test_policy_groups.py",
     "test_dns_negative.py",
     "test_native_probe.py",
+    "test_connection_stages.py",
 )
 
 
@@ -155,7 +156,7 @@ class CoreDevelopmentTests(unittest.TestCase):
     def test_previous_successful_workflow_upgrades_without_duplicate_suites(self):
         final = development.updated_workflow(FIXTURE)
         previous = final
-        for name in ("test_dns_negative.py", "test_native_probe.py"):
+        for name in ("test_dns_negative.py", "test_native_probe.py", "test_connection_stages.py"):
             command = f"          python ../tools/tests/{name}\n"
             previous = previous.replace(command + development.WINDOWS_STATUS_GUARD, "")
             previous = previous.replace(command, "")
@@ -180,7 +181,7 @@ class CoreDevelopmentTests(unittest.TestCase):
     def test_previous_dns_stage_upgrades_and_partial_new_menus_are_rejected(self):
         final = development.updated_workflow(FIXTURE)
         previous = final
-        for name in ("test_dns_negative.py", "test_native_probe.py"):
+        for name in ("test_dns_negative.py", "test_native_probe.py", "test_connection_stages.py"):
             command = f"          python ../tools/tests/{name}\n"
             previous = previous.replace(command + development.WINDOWS_STATUS_GUARD, "")
             previous = previous.replace(command, "")
@@ -191,6 +192,17 @@ class CoreDevelopmentTests(unittest.TestCase):
             final.replace(command, command * 2, 1),
             final.replace(command + development.WINDOWS_STATUS_GUARD, command),
         ):
+            with self.subTest(menu=broken[-100:]), self.assertRaises(ValueError):
+                development.updated_workflow(broken)
+
+    def test_connection_suite_upgrades_verified_dns_stage_without_partial_acceptance(self):
+        final = development.updated_workflow(FIXTURE)
+        command = "          python ../tools/tests/test_connection_stages.py\n"
+        previous = final.replace(command + development.WINDOWS_STATUS_GUARD, "").replace(command, "")
+        self.assertEqual(development.updated_workflow(previous), final)
+        for broken in (final.replace(command, "", 1),
+                       final.replace(command, command * 2, 1),
+                       final.replace(command + development.WINDOWS_STATUS_GUARD, command)):
             with self.subTest(menu=broken[-100:]), self.assertRaises(ValueError):
                 development.updated_workflow(broken)
 
@@ -269,6 +281,7 @@ class CoreDevelopmentTests(unittest.TestCase):
             "tools/tests/test_policy_groups.py",
             "tools/tests/test_dns_negative.py",
             "tools/tests/test_native_probe.py",
+            "tools/tests/test_connection_stages.py",
             "tools/Verify-PublicRustCore.py",
         ):
             with self.subTest(missing=missing), tempfile.TemporaryDirectory() as temporary:

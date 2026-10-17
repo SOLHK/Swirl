@@ -3,6 +3,7 @@
 #include "engine/NodeTestService.h"
 #include "engine/NodeImporter.h"
 #include "engine/SwirlProtocolRegistry.h"
+#include "engine/EngineController.h"
 #include "ControlledNetwork.h"
 #include <QTest>
 #include <QNetworkAccessManager>
@@ -11,6 +12,7 @@
 #include <QUuid>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QTemporaryDir>
 
 class RustCoreTests:public QObject {
  Q_OBJECT
@@ -287,6 +289,86 @@ private slots:
   group["type"]="select";group["proxies"]=QStringList{b.id,"missing"};o.customGroups={group};QVERIFY(!RustCoreEngine::configuration(o,&config).isEmpty());
   group["proxies"]=QStringList{b.id,b.id};o.customGroups={group};QVERIFY(!RustCoreEngine::configuration(o,&config).isEmpty());
   group["proxies"]=QStringList{b.id};group["default-selected"]=b.id;group["url"]="https://unmapped.invalid/check";o.customGroups={group};QVERIFY(!RustCoreEngine::configuration(o,&config).isEmpty());
+ }
+ void nestedAutomaticGroupsUseNativeDataPath_data(){
+  QTest::addColumn<QString>("type");
+  QTest::newRow("url-test")<<QString("url-test");
+  QTest::newRow("fallback")<<QString("fallback");
+  QTest::newRow("round-robin")<<QString("load-balance");
+ }
+ void nestedAutomaticGroupsUseNativeDataPath(){
+  QFETCH(QString,type);
+  ControlledNetwork net;QVERIFY(net.start());auto o=options(net);o.routingMode="rule";
+  auto b=o.nodes.first();b.id=QUuid::createUuid().toString(QUuid::WithoutBraces);b.port=net.b.serverPort();b.username=QString::fromUtf8(net.b.username);b.password=QString::fromUtf8(net.b.password);o.nodes.append(b);
+  QVariantMap automatic{{"name","自动组"},{"type",type},{"proxies",QStringList{b.id}},{"url",net.url().toString()},{"interval",1},{"timeout",500},{"expected-status",200}};
+  if(type=="load-balance")automatic["strategy"]="round-robin";
+  // Both forward references cross the Qt conversion and actual Rust ABI.
+  o.customGroups={QVariantMap{{"name","外层"},{"type","select"},{"proxies",QStringList{"中层"}}},
+   QVariantMap{{"name","中层"},{"type","select"},{"proxies",QStringList{o.selectedNodeId,"自动组"}},{"default-selected","自动组"}},automatic};
+  o.customRules={"MATCH,外层"};const auto original=o.customGroups;QJsonObject config;
+  const auto error=RustCoreEngine::configuration(o,&config);QVERIFY2(error.isEmpty(),qPrintable(error));QCOMPARE(o.customGroups,original);
+  const auto groups=config["selectors"].toArray();QCOMPARE(groups.size(),3);
+  QCOMPARE(groups[0].toObject()["selected"],groups[1].toObject()["id"]);QCOMPARE(groups[1].toObject()["selected"],groups[2].toObject()["id"]);
+  const auto probe=groups[2].toObject()["probe"].toObject();QCOMPARE(probe["interval_ms"].toInt(),1000);QCOMPARE(probe["timeout_ms"].toInt(),500);QCOMPARE(probe["expected_status"].toInt(),200);
+  QVERIFY(!groups[2].toObject().contains("selected"));
+  RustCoreEngine engine;engine.start(o);QVERIFY2(engine.status().state==ProxyEngine::State::Running,qPrintable(engine.status().message));
+  QNetworkReply::NetworkError requestError=QNetworkReply::NoError;
+  const auto request=[&]{requestError=QNetworkReply::NoError;QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",o.proxyPort));QNetworkRequest req(net.url());req.setTransferTimeout(2000);auto reply=client.get(req);if(!QTest::qWaitFor([&]{return reply->isFinished();},3000))return QByteArray("timed-out");requestError=reply->error();return reply->readAll();};
+  // Readiness is established by an actual routed response, not merely by the
+  // listener being up. Initial requests may fail before the first probe.
+  QVERIFY(QTest::qWaitFor([&]{return request()==QByteArray("exit-B");},5000));
+  QCOMPARE(net.a.forwarded,0);QCOMPARE(net.httpRequestsByExit.value("DIRECT-BYPASS"),0);
+  net.b.reject=true;const auto failed=request();QVERIFY(requestError!=QNetworkReply::NoError);QVERIFY(failed!=QByteArray("exit-A")&&failed!=QByteArray("exit-B")&&failed!=QByteArray("DIRECT-BYPASS")&&failed!=QByteArray("timed-out"));
+  QCOMPARE(net.a.forwarded,0);QCOMPARE(net.httpRequestsByExit.value("DIRECT-BYPASS"),0);
+  engine.setRoutingMode("global");QCOMPARE(request(),QByteArray("exit-A"));QCOMPARE(engine.status().engineKind,QString("rust"));engine.stop();
+  // Invalid inactive settings cannot replace the running global plan when a
+  // later mode switch would activate the entire membership graph.
+  auto cycle=o.customGroups[1].toMap();cycle["proxies"]=QStringList{o.selectedNodeId,"外层"};cycle["default-selected"]=o.selectedNodeId;o.customGroups[1]=cycle;o.routingMode="global";
+  engine.start(o);QCOMPARE(engine.status().state,ProxyEngine::State::Running);engine.setRoutingMode("rule");
+  QCOMPARE(engine.status().mode,QString("global"));QCOMPARE(request(),QByteArray("exit-A"));engine.stop();
+ }
+ void roundRobinPolicyBalancesNewNativeSessions(){
+  ControlledNetwork net;QVERIFY(net.start());auto o=options(net);o.routingMode="rule";
+  auto b=o.nodes.first();b.id=QUuid::createUuid().toString(QUuid::WithoutBraces);b.port=net.b.serverPort();b.username=QString::fromUtf8(net.b.username);b.password=QString::fromUtf8(net.b.password);o.nodes.append(b);
+  o.customGroups={QVariantMap{{"name","轮询"},{"type","load-balance"},{"strategy","round-robin"},{"proxies",QStringList{o.selectedNodeId,b.id}},{"url",net.url().toString()},{"interval",1},{"timeout",500},{"expected-status",200}}};o.customRules={"MATCH,轮询"};
+  RustCoreEngine engine;engine.start(o);QVERIFY2(engine.status().state==ProxyEngine::State::Running,qPrintable(engine.status().message));
+  const auto request=[&]{QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",o.proxyPort));QNetworkRequest req(net.url());req.setTransferTimeout(2000);auto reply=client.get(req);if(!QTest::qWaitFor([&]{return reply->isFinished();},3000))return QByteArray("timed-out");return reply->readAll();};
+  QVERIFY(QTest::qWaitFor([&]{return net.httpRequestsByExit.value("exit-A")>0&&net.httpRequestsByExit.value("exit-B")>0;},4000));
+  // A response can arrive just before its health record is committed. Wait
+  // for both paths to be selected, then require the following exact alternation.
+  QByteArray previous;QVERIFY(QTest::qWaitFor([&]{const auto first=request(),second=request();if((first=="exit-A"&&second=="exit-B")||(first=="exit-B"&&second=="exit-A")){previous=second;return true;}return false;},4000));
+  for(int i=0;i<4;++i){const auto next=request();QCOMPARE(next,previous=="exit-A"?QByteArray("exit-B"):QByteArray("exit-A"));previous=next;}
+  QCOMPARE(net.httpRequestsByExit.value("DIRECT-BYPASS"),0);engine.stop();
+ }
+ void policyConversionRejectsUnknownSemanticsAndBounds(){
+  ControlledNetwork net;QVERIFY(net.start());auto o=options(net);o.routingMode="rule";
+  const QVariantMap automatic{{"name","auto"},{"type","url-test"},{"proxies",QStringList{o.selectedNodeId}},{"url",net.url().toString()},{"interval",1},{"timeout",500},{"expected-status",200}};
+  const QJsonObject sentinel{{"unchanged",true}};
+  const QVariantList mutations{
+   QVariantMap{{"url",QVariant()}},QVariantMap{{"url","https://user:secret@host/"}},QVariantMap{{"url","https://@host/"}},QVariantMap{{"url","http://host/#fragment"}},QVariantMap{{"url","http://host/\\path"}},QVariantMap{{"url","file:///local"}},QVariantMap{{"url","http://host:0/"}},QVariantMap{{"url","http://host:65536/"}},
+   QVariantMap{{"interval",0}},QVariantMap{{"interval",1.5}},QVariantMap{{"interval","1"}},QVariantMap{{"interval",3601}},QVariantMap{{"timeout",99}},QVariantMap{{"timeout",1001}},QVariantMap{{"timeout",true}},QVariantMap{{"expected-status",302}},QVariantMap{{"expected-status","200-299"}},QVariantMap{{"tolerance",10001}},
+   QVariantMap{{"type","fallback"},{"tolerance",1}},QVariantMap{{"type","load-balance"}},QVariantMap{{"type","load-balance"},{"strategy","consistent-hashing"}},QVariantMap{{"type","load-balance"},{"strategy","sticky-sessions"}},QVariantMap{{"strategy","round-robin"}},QVariantMap{{"default-selected",o.selectedNodeId}},
+   QVariantMap{{"lazy",true}},QVariantMap{{"skip-cert-verify",true}},QVariantMap{{"use",QStringList{"provider"}}},QVariantMap{{"future-field",1}},QVariantMap{{"proxies",QStringList{"REJECT"}}},QVariantMap{{"proxies",QStringList{"missing"}}},QVariantMap{{"proxies",QStringList{o.selectedNodeId,o.selectedNodeId}}},QVariantMap{{"proxies",QVariantList{1}}},QVariantMap{{"name",o.selectedNodeId}}
+  };
+  for(const auto &value:mutations){auto group=automatic;const auto mutation=value.toMap();for(auto it=mutation.begin();it!=mutation.end();++it)group[it.key()]=it.value();o.customGroups={group};QJsonObject config=sentinel;QVERIFY2(!RustCoreEngine::configuration(o,&config).isEmpty(),qPrintable(QString::fromUtf8(QJsonDocument::fromVariant(mutation).toJson())));QCOMPARE(config,sentinel);}
+  auto missing=automatic;missing.remove("url");o.customGroups={missing};QJsonObject config=sentinel;QVERIFY(!RustCoreEngine::configuration(o,&config).isEmpty());QCOMPARE(config,sentinel);
+  auto nested=automatic;nested["proxies"]=QStringList{"manual"};o.customGroups={nested,QVariantMap{{"name","manual"},{"type","select"},{"proxies",QStringList{o.selectedNodeId}}}};QVERIFY(!RustCoreEngine::configuration(o,&config).isEmpty());
+  for(const int count:{16,17}){o.customGroups.clear();for(int i=0;i<count;++i)o.customGroups.append(QVariantMap{{"name",QString("g%1").arg(i)},{"type","select"},{"proxies",QStringList{i+1<count?QString("g%1").arg(i+1):o.selectedNodeId}}});QCOMPARE(RustCoreEngine::configuration(o,&config).isEmpty(),count==16);if(count==16){RustCoreEngine engine;engine.start(o);QVERIFY2(engine.status().state==ProxyEngine::State::Running,qPrintable(engine.status().message));engine.stop();}}
+  o.customGroups.clear();for(int i=0;i<33;++i){auto group=automatic;group["name"]=QString("auto%1").arg(i);o.customGroups.append(group);}QVERIFY(!RustCoreEngine::configuration(o,&config).isEmpty());
+ }
+ void policySettingsPreserveFullMapsAndRejectInvalidReplacements(){
+  QTemporaryDir directory;QVERIFY(directory.isValid());EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,directory.filePath("nodes.dpapi"));
+  const QVariantMap outer{{"name","outer"},{"type","select"},{"proxies",QStringList{"DIRECT","automatic"}},{"default-selected","automatic"}};
+  const QVariantMap automatic{{"name","automatic"},{"type","load-balance"},{"strategy","round-robin"},{"proxies",QStringList{"DIRECT"}},{"url","https://www.gstatic.com/generate_204"},{"interval",10},{"timeout",250},{"expected-status",204}};
+  const QVariantList groups{outer,automatic};const QVariantMap input{{"groups",groups},{"rules",QStringList{"MATCH,outer"}}};
+  QVERIFY2(controller.replaceNetworkConfiguration(input),qPrintable(controller.networkConfigurationError()));QCOMPARE(controller.policyGroups(),groups);
+  QVERIFY(controller.savePolicyGroup("automatic","load-balance",{"DIRECT"}));QCOMPARE(controller.policyGroups(),groups);
+  auto changed=automatic;changed["future-option"]=true;auto invalid=input;invalid["groups"]=QVariantList{outer,changed};
+  QVERIFY(!controller.replaceNetworkConfiguration(invalid));QCOMPARE(controller.policyGroups(),groups);
+  invalid["groups"]=QString("not-an-array");QVERIFY(!controller.replaceNetworkConfiguration(invalid));QCOMPARE(controller.policyGroups(),groups);
+  QVERIFY(!controller.savePolicyGroup("outer","select",{"DIRECT"}));QCOMPARE(controller.policyGroups(),groups);
+  QVERIFY(!controller.removePolicyGroup("automatic"));QCOMPARE(controller.policyGroups(),groups);
+  QFile persisted(directory.filePath("nodes.dpapi.network.json"));QVERIFY(persisted.open(QIODevice::ReadOnly));QCOMPARE(QJsonDocument::fromJson(persisted.readAll()).object()["groups"].toArray(),QJsonArray::fromVariantList(groups));
  }
  void rulesUseActualRustDataPathAndModeSwitches(){
   ControlledNetwork net;QVERIFY(net.start());auto o=options(net);o.routingMode="rule";

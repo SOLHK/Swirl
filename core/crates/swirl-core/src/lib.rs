@@ -32,6 +32,7 @@ struct Record {
     node: String,
     started: Instant,
     ended: bool,
+    error: &'static str,
     counters: Arc<Counters>,
 }
 #[derive(Default)]
@@ -55,6 +56,8 @@ pub struct Connection {
     pub port: u16,
     pub node: String,
     pub ended: bool,
+    pub error: &'static str,
+    pub failure_stage: &'static str,
     pub upload: u64,
     pub download: u64,
     pub udp_dropped: u64,
@@ -78,6 +81,7 @@ pub struct Snapshot {
     pub download: u64,
     pub udp_dropped: u64,
     pub last_error: &'static str,
+    pub last_error_stage: &'static str,
     pub connections: Vec<Connection>,
 }
 struct Plan {
@@ -160,6 +164,10 @@ impl Core {
                             if let Err(code)=session(socket,peer,session_plan,state.clone(),id).await {
                                 state.failed.fetch_add(1,Ordering::Relaxed);
                                 if let Ok(mut error)=state.last_error.lock(){*error=code;}
+                                if let Ok(mut records)=state.records.lock()
+                                    && let Some(record)=records.get_mut(&id) {
+                                    record.error=code;
+                                }
                             }
                         });
                     }
@@ -252,6 +260,7 @@ impl Core {
         let plan = self.plan.read().map_err(|_| "ConfigState")?;
         let policies = plan.policies.report(&plan.config)?;
         let records = self.state.records.lock().map_err(|_| "StatsState")?;
+        let last_error = *self.state.last_error.lock().map_err(|_| "StatsState")?;
         Ok(Snapshot {
             schema: 1,
             engine: "swirl-rust",
@@ -271,7 +280,8 @@ impl Core {
             upload: self.state.totals.upload.load(Ordering::Relaxed),
             download: self.state.totals.download.load(Ordering::Relaxed),
             udp_dropped: self.state.totals.udp_dropped.load(Ordering::Relaxed),
-            last_error: *self.state.last_error.lock().map_err(|_| "StatsState")?,
+            last_error,
+            last_error_stage: swirl_protocol::failure_stage(last_error),
             connections: records
                 .iter()
                 .map(|(id, r)| Connection {
@@ -283,6 +293,8 @@ impl Core {
                     port: r.target.port,
                     node: r.node.clone(),
                     ended: r.ended,
+                    error: r.error,
+                    failure_stage: swirl_protocol::failure_stage(r.error),
                     upload: r.counters.upload.load(Ordering::Relaxed),
                     download: r.counters.download.load(Ordering::Relaxed),
                     udp_dropped: r.counters.udp_dropped.load(Ordering::Relaxed),
@@ -363,6 +375,7 @@ async fn session(
                 node: "udp-routed".into(),
                 started: Instant::now(),
                 ended: false,
+                error: "",
                 counters: counters.clone(),
             },
         );
@@ -390,16 +403,11 @@ async fn session(
             node: node.id.clone(),
             started: Instant::now(),
             ended: false,
+            error: "",
             counters: counters.clone(),
         },
     );
-    let connected = timeout(
-        limit,
-        swirl_protocol::connect(&node.outbound, &routed_target, resolver, limit),
-    )
-    .await
-    .map_err(|_| "UpstreamTimeout")
-    .and_then(|r| r);
+    let connected = swirl_protocol::connect(&node.outbound, &routed_target, resolver, limit).await;
     let mut upstream = match connected {
         Ok(s) => s,
         Err(e) => {

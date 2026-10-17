@@ -1,10 +1,14 @@
 //! Swirl-owned HTTP/SOCKS state machines. Underlying Tokio is generic socket I/O.
 use base64::{Engine, engine::general_purpose::STANDARD};
+mod diagnostics;
+mod dial;
 mod probe;
 mod shadowsocks;
 mod socks4;
 mod vless;
 mod websocket;
+pub use diagnostics::failure_stage;
+use dial::{connect_tcp, within};
 pub use probe::health_probe;
 pub use shadowsocks::{
     decrypt_datagram as ss_decrypt_datagram, encrypt_datagram as ss_encrypt_datagram,
@@ -15,6 +19,7 @@ use swirl_subscription::{Credentials, Outbound, valid_host};
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
+    time::Instant,
 };
 
 pub type Result<T> = std::result::Result<T, &'static str>;
@@ -404,23 +409,19 @@ pub async fn reply(stream: &mut TcpStream, kind: InboundKind, ok: bool) -> Resul
     };
     stream.write_all(&bytes).await.map_err(|_| "InboundReply")
 }
-pub async fn connect_tcp(resolver: &Resolver, target: &Target) -> Result<TcpStream> {
-    for address in resolver.resolve(&target.host, target.port).await? {
-        if let Ok(stream) = TcpStream::connect(address).await {
-            stream.set_nodelay(true).map_err(|_| "SocketOptions")?;
-            return Ok(stream);
-        }
-    }
-    Err("UpstreamConnectFailed")
-}
 pub async fn connect(
     outbound: &Outbound,
     target: &Target,
     resolver: &Resolver,
     handshake_limit: std::time::Duration,
 ) -> Result<swirl_transport::BoxStream> {
+    // DNS, all address attempts, TLS and protocol negotiation share this one
+    // budget. A successful TCP connection ends address fallback permanently.
+    let deadline = Instant::now() + handshake_limit;
     let (host, port, auth, tls) = match outbound {
-        Outbound::Direct {} => return Ok(Box::new(connect_tcp(resolver, target).await?)),
+        Outbound::Direct {} => {
+            return Ok(Box::new(connect_tcp(resolver, target, deadline).await?));
+        }
         Outbound::Reject {} => return Err("RouteRejected"),
         Outbound::Socks4 {
             host,
@@ -428,7 +429,16 @@ pub async fn connect(
             user_id,
             remote_dns,
         } => {
-            return socks4::connect(host, *port, user_id, *remote_dns, target, resolver).await;
+            return socks4::connect(
+                host,
+                *port,
+                user_id,
+                *remote_dns,
+                target,
+                resolver,
+                deadline,
+            )
+            .await;
         }
         Outbound::Shadowsocks { host, port, .. } => (host, *port, None, None),
         Outbound::Socks5 {
@@ -456,10 +466,16 @@ pub async fn connect(
             host: host.clone(),
             port,
         },
+        deadline,
     )
     .await?;
     let mut stream: swirl_transport::BoxStream = if let Some(tls) = tls {
-        swirl_transport::secure(tcp, tls).await?
+        within(
+            deadline,
+            "UpstreamTlsTimeout",
+            swirl_transport::secure(tcp, tls),
+        )
+        .await?
     } else {
         Box::new(tcp)
     };
@@ -470,8 +486,40 @@ pub async fn connect(
         _ => None,
     };
     if let Some(ws) = ws {
-        stream = websocket::connect(stream, ws).await?;
+        stream = within(
+            deadline,
+            "WebSocketUpgradeTimeout",
+            websocket::connect(stream, ws),
+        )
+        .await?;
     }
+    let timeout_code = if matches!(
+        outbound,
+        Outbound::Shadowsocks {
+            obfs_http: Some(_),
+            ..
+        }
+    ) {
+        "ShadowsocksObfsWriteTimeout"
+    } else {
+        "UpstreamProtocolTimeout"
+    };
+    within(
+        deadline,
+        timeout_code,
+        handshake(outbound, target, stream, auth, port, handshake_limit),
+    )
+    .await
+}
+
+async fn handshake(
+    outbound: &Outbound,
+    target: &Target,
+    mut stream: swirl_transport::BoxStream,
+    auth: Option<&Credentials>,
+    port: u16,
+    handshake_limit: std::time::Duration,
+) -> Result<swirl_transport::BoxStream> {
     if let Outbound::Shadowsocks {
         password,
         cipher,
@@ -479,6 +527,11 @@ pub async fn connect(
         ..
     } = outbound
     {
+        let write_error = if obfs_http.is_some() {
+            "ShadowsocksObfsWrite"
+        } else {
+            "ShadowsocksHandshakeWrite"
+        };
         let mut encrypted = shadowsocks::Stream::new(
             stream,
             password,
@@ -492,11 +545,8 @@ pub async fn connect(
         encrypted
             .write_all(&address)
             .await
-            .map_err(|_| "ShadowsocksHandshakeWrite")?;
-        encrypted
-            .flush()
-            .await
-            .map_err(|_| "ShadowsocksHandshakeWrite")?;
+            .map_err(|_| write_error)?;
+        encrypted.flush().await.map_err(|_| write_error)?;
         return Ok(Box::new(encrypted));
     }
     if let Outbound::Trojan { password, .. } = outbound {
@@ -609,4 +659,85 @@ pub async fn connect(
         }
     }
     Ok(stream)
+}
+
+#[cfg(test)]
+mod connect_tests {
+    use super::*;
+    use std::time::Duration;
+
+    fn ss(obfs: bool) -> Outbound {
+        Outbound::Shadowsocks {
+            host: "fixture.invalid".into(),
+            port: 443,
+            password: "local-synthetic-only".into(),
+            cipher: "aes-128-gcm".into(),
+            udp: false,
+            obfs_http: obfs.then(|| swirl_subscription::ObfsHttp {
+                host: "obfs.invalid".into(),
+            }),
+        }
+    }
+
+    #[tokio::test]
+    async fn shadowsocks_initial_write_reports_plain_and_obfs_failures_separately() {
+        let target = Target {
+            host: "target.invalid".into(),
+            port: 443,
+        };
+        for (obfs, expected) in [
+            (false, "ShadowsocksHandshakeWrite"),
+            (true, "ShadowsocksObfsWrite"),
+        ] {
+            let (stream, peer) = tokio::io::duplex(256);
+            drop(peer);
+            let error = handshake(
+                &ss(obfs),
+                &target,
+                Box::new(stream),
+                None,
+                443,
+                Duration::from_secs(1),
+            )
+            .await
+            .err()
+            .unwrap();
+            assert_eq!(error, expected);
+            assert_eq!(
+                failure_stage(error),
+                if obfs {
+                    "http_obfs"
+                } else {
+                    "protocol_handshake"
+                }
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn shadowsocks_obfs_does_not_wait_for_application_response_during_connect() {
+        let (stream, mut peer) = tokio::io::duplex(4096);
+        let target = Target {
+            host: "target.invalid".into(),
+            port: 443,
+        };
+        let connected = tokio::time::timeout(
+            Duration::from_millis(100),
+            handshake(
+                &ss(true),
+                &target,
+                Box::new(stream),
+                None,
+                443,
+                Duration::from_secs(1),
+            ),
+        )
+        .await
+        .expect("connection establishment must not await a lazy response")
+        .unwrap();
+        let mut prefix = [0; 4];
+        peer.read_exact(&mut prefix).await.unwrap();
+        assert_eq!(&prefix, b"GET ");
+        drop(connected);
+    }
 }

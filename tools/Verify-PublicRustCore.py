@@ -25,6 +25,9 @@ import time
 PROBE_TIMEOUT_SECONDS = 45
 CLEANUP_RESERVE_SECONDS = 5
 CONTROL_ERRORS = (OSError, EOFError, ValueError, KeyError, TypeError, RuntimeError, queue.Empty)
+FAILURE_STAGES = frozenset({"", "dns", "tcp_connect", "tls_handshake", "websocket_upgrade",
+                            "protocol_handshake", "http_obfs", "initial_write", "stream_io",
+                            "routing", "inbound", "unknown"})
 
 
 def remaining(deadline, maximum):
@@ -80,6 +83,9 @@ def settled_snapshot(command, handle, deadline, outcome):
                     for record in connections)):
             raise ValueError("CoreSnapshotShape")
         outcome["core"] = {key: state[key] for key in (*keys, "last_error")}
+        stage = state.get("last_error_stage", "")
+        outcome["core"]["last_error_stage"] = (
+            stage if isinstance(stage, str) and stage in FAILURE_STAGES else "unknown")
         outcome["core"]["recorded_connections"] = len(connections)
         # A header can arrive before relay shutdown is accounted. The guard
         # decrements active before marking its record ended, so wait for both.
@@ -91,7 +97,7 @@ def settled_snapshot(command, handle, deadline, outcome):
 def native_traffic_error(state):
     if state["active"] != 0:
         return "NativeConnectionsNotSettled"
-    if state["failed"] != 0 or state["last_error"]:
+    if state["failed"] != 0 or state["last_error"] or state.get("last_error_stage", ""):
         return "NativeRelayFailed"
     if state["recorded_connections"] != 1:
         return "NativeConnectionRecordCount"

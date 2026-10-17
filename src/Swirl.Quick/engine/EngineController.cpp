@@ -18,6 +18,9 @@
 #include <QPromise>
 #include <QThreadPool>
 #include "MihomoAdapter.h"
+#ifdef SWIRL_USE_RUST_CORE
+#include "RustCoreEngine.h"
+#endif
 #ifdef Q_OS_WIN
 #include <windows.h>
 #include <wincrypt.h>
@@ -317,7 +320,16 @@ bool EngineController::validateNetworkConfiguration(const QVariantMap &input,QVa
     const auto reject=[&]{m_networkError=staged.networkConfigurationError();emit optionsChanged();return false;};
     const auto dns=input.value("dns").toMap();if(!dns.isEmpty()&&!staged.configureDns(dns))return reject();
     const auto groups=input.value("groups").toList();if(groups.size()>128){m_networkError=QStringLiteral("最多支持 128 个策略组。");emit optionsChanged();return false;}
+#ifdef SWIRL_USE_RUST_CORE
+    if(input.contains("groups")&&!QJsonValue::fromVariant(input.value("groups")).isArray()){m_networkError=QStringLiteral("策略组必须是数组。");emit optionsChanged();return false;}
+    // Preserve the exact maps, including probe/default selection fields. A
+    // whole-graph conversion validates forward references before any save.
+    const auto groupError=RustCoreEngine::validatePolicyGroups(staged.m_store.nodes(),groups);
+    if(!groupError.isEmpty()){m_networkError=groupError;emit optionsChanged();return false;}
+    staged.m_options.customGroups=groups;
+#else
     for(const auto &entry:groups){const auto group=entry.toMap();if(!staged.savePolicyGroup(group.value("name").toString(),group.value("type").toString(),group.value("proxies").toStringList()))return reject();}
+#endif
     for(const auto &value:input.value("rules").toStringList()){const auto parts=value.split(',');
         if(parts.size()==2&&parts[0]=="MATCH"){if(!staged.saveRoutingRule("MATCH","",parts[1]))return reject();}
         else if(parts.size()==3){if(!staged.saveRoutingRule(parts[0],parts[1],parts[2]))return reject();}
@@ -402,18 +414,31 @@ bool EngineController::savePolicyGroup(const QString &name,const QString &type,c
        !QStringList{"select","url-test","fallback","load-balance"}.contains(type)||members.isEmpty()) {
         m_networkError=QStringLiteral("策略组名称、类型或子策略无效。");emit optionsChanged();return false;
     }
+    auto groups=m_options.customGroups;
+    int position=-1;for(int i=0;i<groups.size();++i)if(groups[i].toMap().value("name")==name.trimmed())position=i;
+    QVariantMap group{{"name",name.trimmed()},{"type",type},{"proxies",members},{"url","https://www.gstatic.com/generate_204"},{"interval",300}};
+#ifdef SWIRL_USE_RUST_CORE
+    // The existing editor edits name/type/members only; keep stored options it
+    // cannot display, and reject incompatible combinations instead of erasing.
+    if(position>=0){group=groups[position].toMap();group["type"]=type;group["proxies"]=members;}
+#else
     QStringList available={"DIRECT","REJECT"};for(const auto &node:m_store.nodes())available.append(node.id);
     for(const auto &member:members)if(!available.contains(member)){m_networkError=QStringLiteral("策略组包含不存在的节点。");emit optionsChanged();return false;}
-    auto groups=m_options.customGroups;
-    const QVariantMap group{{"name",name.trimmed()},{"type",type},{"proxies",members},{"url","https://www.gstatic.com/generate_204"},{"interval",300}};
-    int position=-1;for(int i=0;i<groups.size();++i)if(groups[i].toMap().value("name")==name.trimmed())position=i;
+#endif
     if(position>=0)groups[position]=group;else groups.append(group);
+#ifdef SWIRL_USE_RUST_CORE
+    const auto groupError=RustCoreEngine::validatePolicyGroups(m_store.nodes(),groups);
+    if(!groupError.isEmpty()){m_networkError=groupError;emit optionsChanged();return false;}
+#endif
     const auto before=m_options.customGroups;m_options.customGroups=groups;
     if(saveNetworkConfiguration())return true;m_options.customGroups=before;emit optionsChanged();return false;
 }
 bool EngineController::removePolicyGroup(const QString &name) {
     if(!networkEditAllowed())return false;
     for(const auto &rule:m_options.customRules)if(rule.section(',',-1)==name){m_networkError=QStringLiteral("请先删除引用此策略组的规则。");emit optionsChanged();return false;}
+#ifdef SWIRL_USE_RUST_CORE
+    for(const auto &value:m_options.customGroups){const auto group=value.toMap();if(group.value("name")!=name&&group.value("proxies").toStringList().contains(name)){m_networkError=QStringLiteral("请先移除其他策略组对此组的引用。");emit optionsChanged();return false;}}
+#endif
     const auto before=m_options.customGroups;
     for(int i=m_options.customGroups.size()-1;i>=0;--i)if(m_options.customGroups[i].toMap().value("name")==name)m_options.customGroups.removeAt(i);
     if(saveNetworkConfiguration())return true;m_options.customGroups=before;emit optionsChanged();return false;

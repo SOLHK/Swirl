@@ -45,6 +45,7 @@ jobs:
           python ../tools/tests/test_policy_groups.py
           python ../tools/tests/test_dns_negative.py
           python ../tools/tests/test_native_probe.py
+          python ../tools/tests/test_connection_stages.py
       - name: Native public HTTPS and DoH verification
         if: runner.os == 'Linux'
         run: python ../tools/Verify-PublicRustCore.py --harness target/release/swirl-api --output ../CORE_PUBLIC_NETWORK.json
@@ -98,6 +99,8 @@ jobs:
           python ../tools/tests/test_dns_negative.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python ../tools/tests/test_native_probe.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python ../tools/tests/test_connection_stages.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python ../tools/tests/test_subscription_capture.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

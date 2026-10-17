@@ -23,6 +23,7 @@ public:
  QString configurationSummary() const override;
  QVariantList routingRules() const override;
  static QString configuration(const EngineStartOptions &,QJsonObject *);
+ static QString validatePolicyGroups(const QList<ProxyNode> &,const QVariantList &);
 private:
  using Command=qintptr(*)(const unsigned char *,size_t,unsigned char *,size_t);
  QJsonObject call(QJsonObject);

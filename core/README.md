@@ -38,31 +38,57 @@ optional public HTTPS checks; it does not claim private-node performance.
 ## Current development branch and evidence
 
 Continue `work/core-completion-20261017`, not the older main or test head. The
-current stage continues from `0bf2666` and makes the earlier automatic-policy
+current connection/policy stage continues from `d27fcc74ed549f2219f97da1f5c56a83bace3ac1`.
+It adds bounded TCP fallback across an already resolved address set, one deadline
+for outbound DNS/TCP/TLS/protocol establishment, and static failure-stage fields.
+It also connects the existing Qt custom-group settings to nested manual selectors
+and the supported native automatic policies. The UI and stored source settings
+are preserved; unsupported semantics still fail before activation.
+
+Local Rust fmt, check, strict clippy and all 101 workspace tests have passed.
+Windows compilation, Qt execution and cross-platform CI for these new changes
+remain pending at this update. Exact source identities, independent Python
+results and subsequent CI outcomes belong in the
+[current connection/policy validation](../docs/RUST_CONNECTION_POLICY_VALIDATION_20261017.md).
+No private-provider connection has been accepted as passing by this document.
+The earlier SS `UpstreamTimeout` samples do not establish whether their failure
+was DNS, TCP, protocol or the provider; the new diagnostics make a subsequent
+test more specific without presuming its outcome.
+
+The preceding [DNS/subscription stage](../docs/RUST_DNS_SUBSCRIPTION_VALIDATION_20261017.md)
+already completed hostname-shared positive caching and validated SOA negative
+caching. Its three-platform #30 evidence is bound to `f13c695`, not to the new
+connection or Qt group changes. Earlier evidence is retained below with its
+original scope.
+
+### Historical policy, SOCKS4 and WebSocket-close evidence: 58969bc and 5dbe762
+
+The earlier policy stage continued from `0bf2666` and made the automatic-policy
 candidates executable: nested manual groups, native HTTP/HTTPS health probes,
 `url_test`, `fallback`, per-session `load_balance`, immutable session choices,
 bounded scheduling and cancellation are connected to the IR, router and API.
 See [policy semantics](../docs/RUST_NATIVE_POLICIES.md) and the
-[current stage validation](../docs/RUST_POLICY_VALIDATION_20261017.md) for tested
+[historical policy validation](../docs/RUST_POLICY_VALIDATION_20261017.md) for tested
 source identities, results, skips and remaining work.
 
-This stage also connects SOCKS4/4a subscription-inspector conversion and the
+That stage also connected SOCKS4/4a subscription-inspector conversion and the
 existing Qt import/adapter chain, preserving USERID and local/remote DNS
 semantics. New Qt SOCKS4 and VLESS WS forwarding slots use independent Python
 peers and passed Windows CI on `5dbe762`: six imported SOCKS4/4a HTTP sessions and
 a 131073-byte VLESS WS origin response. Qt CTest passed 1/1 in 3.12 seconds;
-the existing independent SS/VLESS Qt paths also passed. Automatic/nested policy
-groups remain an IR/API capability without Qt group-editor mapping.
+the existing independent SS/VLESS Qt paths also passed. At that stage,
+automatic/nested policy groups were an IR/API capability without Qt group-editor
+mapping; the current mapping is described separately below.
 
 WebSocket shutdown now has one two-second budget starting at the first close
 request, covering queued output, writes, flush, peer close and transport shutdown.
 Local Rust fmt, check, clippy, workspace tests and release compilation have passed
-for the current integration. [Swirl Rust Core #25](https://github.com/SOLHK/Swirl/actions/runs/39033762503)
+for that integration. [Swirl Rust Core #25](https://github.com/SOLHK/Swirl/actions/runs/39033762503)
 passed on Linux/macOS/Windows with 83 Rust tests each, all 13 independent policy
 tests on each platform, and three strict Linux public HTTPS/DIRECT/DoH checks.
 The implementation commit is `58969bc`; the existing App added only nine reviewed
 workflow lines in `5dbe762`. Complete Python counts, explicit skips, Qt results
-and downloaded public evidence belong in the current validation record above.
+and downloaded public evidence belong in the historical policy validation record.
 QML and product UI are preserved. The
 [architecture audit](../docs/RUST_CORE_AUDIT_20261017.md) is explicitly a historical
 `8bd89f2` audit, with a header pointing to these subsequent changes.
@@ -70,8 +96,8 @@ QML and product UI are preserved. The
 ### Historical WebSocket and public-network evidence: 510c62a through c0eb221
 
 The following commits, counts, binary hashes and Actions runs belong to the
-previous WebSocket/public-network stage. They do not validate the newer policy,
-SOCKS4 conversion, Qt peer slots or shutdown changes described above.
+previous WebSocket/public-network stage. They do not validate the later policy,
+SOCKS4 conversion, Qt peer slots, shutdown or current connection-stage changes.
 
 That stage's WebSocket implementation was published as
 [`510c62a`](https://github.com/SOLHK/Swirl/commit/510c62ade64418c76241bbe76ae118c5040dad92).
@@ -114,9 +140,9 @@ identifies `c0eb221` and the same Rust binary SHA-256 as the initial run;
 see the stage validation above for both reports and the controlled comparison.
 
 At that historical baseline, the three policy/probe files were unintegrated
-candidates. The current stage declares them in their crate roots, connects the
-runtime call paths and executes their tests; the newer evidence is recorded
-separately in the policy validation document.
+candidates. The later policy stage declared them in their crate roots, connected
+the runtime call paths and executed their tests; that evidence is recorded
+separately in the historical policy validation document.
 
 ## Encrypted DNS: DoT and HTTP/1.1 DoH
 
@@ -131,32 +157,98 @@ The same resolver now also executes authenticated RFC 8484 HTTP/1.1 POST with
 bounded HTTP headers, exact/chunked bodies and cache-age handling. Existing Qt
 encrypted-DNS fields map strict `tls://` or `https://` URLs; domain URLs need an
 exact local IP mapping. No GUI is changed. Encrypted DNS connects directly to the
-explicit resolver, not through proxy policy. System bootstrap, mixed resolver
-mode, DNS split, negative caching and HTTP/2 remain later work. DoH has its own
+explicit resolver, not through proxy policy. Positive entries are shared by
+hostname across destination ports. Validated NXDOMAIN and combined A/AAAA NODATA
+use SOA negative caching, including CNAME and DoH cache-age restrictions; see
+[local DNS cache semantics](../docs/RUST_LOCAL_DNS.md).
+System bootstrap, mixed resolver mode, DNS split, RFC 9520 resolution-failure
+caching and HTTP/2 remain later work. DoH has its own
 independent peer suite, `tools/tests/test_dns_https.py`. See the historical
 [DoT semantics](../docs/RUST_DOT.md), the earlier
 [DoH/public-network evidence](../docs/RUST_WS_VALIDATION_20261017.md) and the
-current regression results in [policy stage validation](../docs/RUST_POLICY_VALIDATION_20261017.md).
+[completed DNS-stage validation](../docs/RUST_DNS_SUBSCRIPTION_VALIDATION_20261017.md)
+and the [current connection/policy validation](../docs/RUST_CONNECTION_POLICY_VALIDATION_20261017.md).
 The old DoT-only document's exclusions do not override the implemented DoH
 behavior described here.
+
+## TCP address fallback and connection diagnostics
+
+`swirl-protocol::connect` creates one absolute outbound-establishment deadline.
+Locally resolving the target or proxy endpoint, every TCP address attempt, TLS,
+WebSocket Upgrade and protocol negotiation consume that same budget. The existing
+inbound handshake and route-required DNS lookup retain their separate limits.
+No timeout is increased to make a failed node appear usable.
+
+The dialer uses only the resolver's returned socket addresses, at most 16. It
+removes duplicates, preserves the resolver's first-family preference and ordering
+within each family, and interleaves the families. While attempts are still pending,
+new launches are staggered by 250 ms, with at most two pending sockets. A failed
+or retired attempt frees its slot immediately for the next address, avoiding an
+artificial delay that would exhaust a valid 100 ms handshake budget. If untried
+addresses remain when an attempt is launched, that attempt is capped at two
+seconds so later addresses can obtain a slot; the last address, or a single-address
+result, keeps the remaining overall
+budget. This cap is a local resource/availability tradeoff, not an RFC requirement.
+
+The current resolver returns its address set after lookup completion. This change
+does not implement full RFC 8305 DNS answer streaming, address history, network
+interface selection or NAT64 synthesis. It follows the address-interleaving and
+stagger/cancel principles in [RFC 8305 sections 4–5](https://www.rfc-editor.org/rfc/rfc8305),
+with independently written scheduling over Tokio socket futures. The
+[sing-box resolved-address dialer interface](https://github.com/SagerNet/sing-box/blob/testing/protocol/direct/outbound.go)
+and [Tokio TCP API](https://docs.rs/tokio/latest/tokio/net/struct.TcpStream.html)
+were reviewed as primary design references; no proxy-core implementation is copied.
+The immediate completed-failure behavior follows the observable behavior covered
+by [Go's standard-library dial tests](https://github.com/golang/go/blob/master/src/net/dial_test.go).
+RFC 8305 also specifies a minimum attempt delay; this bounded fast-failure policy
+is not presented as complete conformance to every RFC timing requirement.
+
+Route-pinned IP literals remain single-address destinations. The dialer never
+re-resolves their original hostname or borrows another address's policy. For a
+normal proxy domain target, only the configured proxy endpoint is resolved
+locally; the target domain remains in the native proxy request. A winning TCP
+connection drops all losing futures before TLS or proxy/application bytes.
+TLS, certificate, authentication or protocol failure never restarts address
+selection or falls back to a different proxy or DIRECT.
+
+Snapshot `last_error_stage` describes the latest recorded failure. Each connection
+record has its own static `error` and `failure_stage`; successful records use empty
+strings. These values contain no server-supplied text or credentials.
+
+| Failure stage | Representative static error codes |
+|---|---|
+| `dns` | `UpstreamDnsTimeout`, existing `Dns*` and `RouteDns*` errors |
+| `tcp_connect` | `UpstreamTcpTimeout`, `UpstreamConnectFailed`, `UpstreamAddressLimit` |
+| `tls_handshake` | `UpstreamTlsTimeout`, `TlsVerificationOrHandshake` |
+| `websocket_upgrade` | `WebSocketUpgradeTimeout`, existing Upgrade validation/read/write errors |
+| `protocol_handshake` | `UpstreamProtocolTimeout`, existing authentication/rejection and protocol-write errors |
+| `http_obfs` | `ShadowsocksObfsWrite`, `ShadowsocksObfsWriteTimeout` |
+
+The HTTP-obfs category covers the initial framed write. Its later lazy response
+and SS decryption errors still surface as `StreamIo`; no fixed first-response
+idle timeout is added. Other known boundaries include `initial_write`, `inbound`
+and `routing`; ambiguous legacy errors remain `unknown`. A stage narrows where
+the failure occurred without claiming that a password, server certificate or
+provider is the root cause. Current tests and private-node limitations are tracked
+in [connection/policy validation](../docs/RUST_CONNECTION_POLICY_VALIDATION_20261017.md).
 
 ## Implemented boundary
 
 | Crate | Actual implementation | Not yet implemented |
 |---|---|---|
-| swirl-subscription | Versioned typed Swirl IR; bounded content detection for Clash YAML/JSON, sing-box JSON, URI/Base64 and INI; raw/unknown field preservation; redacted capability matrix; mapped TCP/WS and SOCKS4/4a candidates; validated DoT/DoH settings, explicit probes and bounded policy membership graphs | Complete client-specific config execution and integrated subscription updating; existing C++ adapters and Python capture retained; imported complete automatic-group configurations are not automatically executable |
-| swirl-protocol | Mixed HTTP/CONNECT/SOCKS4/4a/5 input, input auth, HTTP CONNECT/SOCKS4/4a/5 upstream, Trojan TLS, SS AEAD TCP/UDP, simple-obfs HTTP TCP, VLESS v0 TCP/TLS; native VLESS WS/WSS and Trojan WSS framing; HTTP/HTTPS health requests through native outbounds, with one WS close deadline | SS2022/SSR/VMess/REALITY/QUIC families, VLESS Vision/mux/encryption extensions, other protocol UDP and obfs TLS |
+| swirl-subscription | Versioned typed Swirl IR; bounded content detection for Clash YAML/JSON, sing-box JSON, URI/Base64 and INI; raw/unknown field preservation; redacted capability matrix; mapped TCP/WS and SOCKS4/4a candidates; validated DoT/DoH settings, explicit probes and bounded policy membership graphs | Complete client-specific config execution and integrated subscription updating; existing C++ adapters and Python capture retained; arbitrary imported full configurations and unsupported group semantics are not automatically executable |
+| swirl-protocol | Mixed HTTP/CONNECT/SOCKS4/4a/5 input, input auth, HTTP CONNECT/SOCKS4/4a/5 upstream, Trojan TLS, SS AEAD TCP/UDP, simple-obfs HTTP TCP, VLESS v0 TCP/TLS; native VLESS WS/WSS and Trojan WSS framing; native HTTP/HTTPS health requests; bounded multi-address TCP, one establishment deadline and static failure stages | SS2022/SSR/VMess/REALITY/QUIC families, VLESS Vision/mux/encryption extensions, other protocol UDP and obfs TLS; full RFC 8305 asynchronous DNS behavior |
 | swirl-transport | rustls TLS with verification/SNI/ALPN, including origin TLS over an existing native proxy stream; bounded duplex copying, independent TCP half-close and live byte counters; the bounded WS driver currently resides in swirl-protocol | gRPC/XHTTP, mux and QUIC; WS close is full duplex and does not promise TCP half-close semantics |
-| swirl-routing | Ordered domain/suffix/keyword, source/destination CIDR, destination port and final rules; lazy configured DNS and pinned IP decisions; bounded nested manual groups and session-bound automatic choices; Qt maps its existing narrower manual subset | Process rules, GEOIP/GEOSITE/MRS, policy-aware multi-address retries and Qt automatic/nested-group conversion |
-| swirl-dns | Rust custom UDP/TCP DNS, strict DoT and HTTP/1.1 DoH with explicit IP bootstrap; validated A/AAAA/CNAME and bounded positive TTL cache; system resolver, exact hosts through Qt, immutable caches, shared 8-query budget, max 16 addresses | Combined system/custom mode, proxy-routed encrypted DNS, domain bootstrap, EDNS/DNSSEC, negative cache, DNS split/Fake-IP |
+| swirl-routing | Ordered domain/suffix/keyword, source/destination CIDR, destination port and final rules; lazy configured DNS and pinned IP decisions; bounded nested manual groups and session-bound automatic choices; Qt mappings for nested manual and supported automatic groups | Process rules, GEOIP/GEOSITE/MRS, reevaluation/retry of alternative destination IPs after CIDR-based selection; automatic-group members that are themselves groups |
+| swirl-dns | Rust custom UDP/TCP DNS, strict DoT and HTTP/1.1 DoH with explicit IP bootstrap; validated A/AAAA/CNAME, hostname-shared positive TTL cache and strict SOA negative cache; system resolver, exact hosts through Qt, immutable caches, shared 8-query budget, max 16 addresses | Combined system/custom mode, proxy-routed encrypted DNS, domain bootstrap, EDNS/DNSSEC, RFC 9520 failure cache, DNS split/Fake-IP |
 | swirl-core | Two Tokio workers, max 256 sessions, immutable per-session configuration and policy view; bounded health scheduling, `url_test`/`fallback`/round-robin groups, atomic updates, stop/cancel and stats; SOCKS5 UDP ASSOCIATE with explicit DIRECT or SS AEAD routes | Other protocol UDP, TUN, platform network takeover and long-duration performance validation |
-| swirl-api | ABI v1 caller-buffer JSON, lifecycle handles, start/configure/select/select_group/snapshot/stop; explicit policy input and redacted health reports; local stdin harness | Complete product configuration migration and persisted IR migration |
+| swirl-api | ABI v1 caller-buffer JSON, lifecycle handles, start/configure/select/select_group/snapshot/stop; explicit policy input and redacted health reports; per-connection static errors/stages and snapshot last-error stage; local stdin harness | Complete product configuration migration and persisted IR migration |
 
 The Qt adapter contains mappings for supported HTTP/SOCKS4/4a/5/Trojan/SS AEAD/VLESS
 nodes, including the limited VLESS/Trojan WS combinations, through existing
 controls. SOCKS4/4a now has subscription-inspector conversion plus Qt import,
-normalization and Rust-IR mapping. The new Qt mappings and independent forwarding
-slots passed the current stage's Windows #25 CTest and Python peers; this is not
+normalization and Rust-IR mapping. Those SOCKS4/WS forwarding slots passed the
+historical Windows #25 CTest and Python peers; this is not
 a complete desktop package or personal-machine visual check. SOCKS4 USERID is not password authentication;
 unsupported passwords, TLS, UDP and other extensions are rejected explicitly.
 Unsupported options fail explicitly before startup or selection. In
@@ -170,12 +262,24 @@ The existing system/custom DNS modes and local mappings execute in Rust; see
 [local DNS semantics and limits](../docs/RUST_LOCAL_DNS.md) and the newer
 [strict DoT stage](../docs/RUST_DOT.md).
 
+The current Qt adapter additionally maps existing `select` groups with bounded,
+acyclic nested references, and `url-test`, `fallback` and `load-balance` groups
+with explicit HTTP/HTTPS health URLs. Automatic groups require concrete members;
+they cannot probe another group. Load balancing requires an explicit
+`strategy: round-robin`, because the native per-session behavior does not implement
+Mihomo's default hashing semantics. Unknown fields, unsafe probe settings,
+missing members and cycles fail before startup or saving. Source mappings and
+Qt regressions are implemented; Windows Qt execution and CI for this addition
+remain pending at this update. Historical #25/#30 Qt results do not validate it.
+
 The Rust-only build is an opt-in development artifact, not a replacement that
 silently removes capabilities from the user's normal installation.
 
 `swirl-inspect` reads a document on stdin and reports only anonymous capabilities.
 The explicit `--private-json` pipeline returns original parsed fields and isolated
-TCP candidates and must only feed local encrypted persistence. It never derives
+TCP candidates. It may feed authorized local encrypted persistence or in-memory
+evaluation in the approved private archive workflow, never public logs or artifacts.
+It never derives
 protocol support from subscription/client/node display names. Missing versions
 remain `not-declared`. Unknown fields remain in the original/parsed document and
 block executable conversion when their semantics are not known. YAML has explicit
@@ -187,7 +291,8 @@ It can generate bounded Rust-only HTTPS HEAD tests for supported TCP candidates;
 UDP and full-config semantics remain separately unverified. It reads cache after
 the website window closes and never needs a subscription refresh for offline work.
 Local exports use `SubscriptionCapture.py import-file <file> <cache>` with no
-network access. Original downloads and local exports stay encrypted outside Git.
+network access. Plaintext downloads and local exports stay out of Git; the approved
+private repository retains encrypted archives and whitelisted reports only.
 INI detection accepts leading comments and standalone DIRECT/REJECT policy
 entries. String credentials retain their type, and conflicting canonical/alias
 parameters fail explicitly instead of overwriting one another. Anonymous test
@@ -229,7 +334,8 @@ The offline mapper supports plain SS AEAD and explicit HTTP obfs options from
 Clash, supported INI forms and SIP002 plugin strings with escaped delimiters.
 Unknown options, unsupported plugins, TFO=true,
 SS2022 and insecure Trojan certificate policies remain explicit execution blockers.
-No source parameters are altered to make a test pass. Private nodes stay local.
+No source parameters are altered to make a test pass. Private node material stays
+within the authorized local or private encrypted-archive workflows.
 
 Protocol references: https://shadowsocks.org/doc/aead.html and the official
 simple-obfs HTTP wire implementation at
@@ -262,6 +368,9 @@ https://github.com/XTLS/Xray-core/blob/main/proxy/vless/encoding/encoding.go .
   freeze at TCP accept; an established UDP association keeps the same view.
 - HTTP headers <=16 KiB/64 fields; handshake <=30 seconds. No blanket idle timer
   on established TCP streams. Duplex uses two 16 KiB buffers with backpressure.
+- Outbound DNS, bounded TCP address attempts, TLS and proxy handshake share one
+  deadline. At most two TCP candidates wait concurrently; no post-TCP-success
+  address retry, authentication downgrade or application replay is permitted.
 - UDP control connection owns one association; exact client IP/port pinning,
   fragments dropped, <=64 recent destinations with 30-second response allowance,
   <=65507-byte datagrams. Only explicit DIRECT or SS AEAD (`udp: true`) routes execute UDP in this phase.
@@ -303,7 +412,7 @@ The earlier local public-network attempt failed and remains recorded separately.
 These are earlier-stage binary hashes and results, not current-source evidence.
 Exact historical run identities, the initial and verified reports and scope are recorded in
 [`RUST_WS_VALIDATION_20261017.md`](../docs/RUST_WS_VALIDATION_20261017.md).
-Use [`RUST_POLICY_VALIDATION_20261017.md`](../docs/RUST_POLICY_VALIDATION_20261017.md)
+Use [`RUST_CONNECTION_POLICY_VALIDATION_20261017.md`](../docs/RUST_CONNECTION_POLICY_VALIDATION_20261017.md)
 for the current stage's test counts, exact commit and actual CI status.
 Public DIRECT success does not prove a provider's WS endpoint,
 private subscription or all product settings. The user's personal Windows
@@ -313,8 +422,9 @@ The original C++ native engine, encrypted NodeStore, importers, proxy recovery,
 subscription capture utility and regression tests remain available. No Go/C#
 network core or Rust workspace was present in the audited `main` baseline
 `87409c0bf9c957ef113f84c176c5a1529c27b9df`. The development branch already
-contained the Rust workspace when the earlier WS stage began at `8bd89f2`;
-the current policy stage continues that work from `0bf2666`.
+contained the Rust workspace when the earlier WS stage began at `8bd89f2`.
+The policy stage continued from `0bf2666`, the completed DNS stage followed it,
+and the current connection/Qt-policy stage continues from `d27fcc7`.
 
 ## Primary specifications
 
@@ -325,6 +435,7 @@ the current policy stage continues that work from `0bf2666`.
 - DNS over HTTPS: https://www.rfc-editor.org/rfc/rfc8484
 - WebSocket framing and control: https://www.rfc-editor.org/rfc/rfc6455
 - DNS privacy profiles: https://www.rfc-editor.org/rfc/rfc8310
+- TCP address-interleaving and stagger/cancel principles: https://www.rfc-editor.org/rfc/rfc8305
 - Trojan: https://trojan-gfw.github.io/trojan/protocol.html
 - Tokio half-close semantics: https://docs.rs/tokio/latest/tokio/io/fn.copy_bidirectional.html
 - rustls: https://rustls.dev/docs/rustls/index.html

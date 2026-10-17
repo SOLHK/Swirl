@@ -12,10 +12,36 @@ Rust IR/API 已执行手动嵌套组、`url_test`、`fallback` 和按新会话�
 不运行 Mihomo 或其他完整外部代理内核。DNS、代理握手、TLS 和传输复用现有 Rust 模块。
 TLS 仍使用 rustls/WebPKI 等成熟依赖，Swirl 不自行实现密码算法。
 
-现有 Qt 组编辑器到 Rust 的转换仍只接受原来的有限手动组，不支持自动组或嵌套组输入。
-本阶段的自动组入口是 typed IR 与本地控制 API，没有增加或重排 QML 控件。
-现有 Qt 布局、动画及存储的组配置保持原有边界，不能将 Rust API 测试当作 Qt 自动组产品验收。
-具体 Qt 路由子集见 [原生路由](RUST_NATIVE_ROUTING.md)。
+2026-10-17 后续 Qt 转换增量已经接入现有 `RustCoreEngine` 和 Rust 构建的
+`EngineController`，没有增加或重排 QML 控件。完整配置替换保留组 map 中的
+`default-selected`、探测字段和显式负载均衡算法，先验证整个成员图，再保存配置。
+手动 `select` 组可前向引用另一个手动组或自动组；自动组仍只接受具体节点，不能包含嵌套组或 REJECT。
+循环、未声明成员、重复成员、未知字段、无效默认选择和资源上限均明确拒绝，失败不覆盖已保存配置。
+现有编辑器修改同名组的类型或成员时保留其未显示的字段；不再通过丢掉探测或选择字段来使配置通过。
+被其他组引用的组不能直接删除。
+
+Qt 配置中的 `url-test`、`fallback` 分别转成原生 `url_test`、`fallback`。
+`load-balance` 必须显式声明 `strategy: round-robin` 才能转成原生 `load_balance`。
+Mihomo 默认的 `consistent-hashing` 与 Swirl 当前的逐会话轮询含义不同；缺省算法、显式哈希和
+`sticky-sessions` 均被拒绝，不能静默改为轮询。[Mihomo 算法定义](https://wiki.metacubex.one/en/config/proxy-groups/load-balance/)
+是本轮转换边界的参考，未复制其实现代码。
+
+Qt 自动组必须提供 HTTP/HTTPS `url`；`interval` 使用秒（默认 300，范围 1–3600），
+转换为 IR 的毫秒；`timeout` 使用毫秒（默认 5000，范围 100–30000，且不大于间隔）。
+`expected-status` 是精确的整数 2xx（默认 204），不接受范围字符串；`tolerance` 使用毫秒
+（默认 0，范围 0–10000），仅 `url-test` 允许非零。不接受 URL 凭据、片段或关闭 TLS 验证。
+手动组仍只兼容编辑器自动附带的固定 `url`/`interval` 占位值，不静默忽略自定义探测设置。
+
+**现有 QML 边界保持不变：**成员选择器仍只列出具体节点和 DIRECT/REJECT，没有新增嵌套组选择项，
+也没有算法或探测高级字段控件。嵌套和完整探测配置通过已有配置 map/Controller 入口执行。
+编辑器目前不能指定负载均衡算法，因此旧的无 `strategy` 负载均衡组仍会明确拒绝；
+不能将“IR 支持轮询”描述成所有旧负载均衡配置均已兼容。
+
+新增 Qt 用例覆盖三种自动组的前向嵌套真实转发、双出口轮询、失败不改走全局出口/直连、
+错误激活保留当前运行配置以及完整组 map 保存。当前源码的 Windows Qt 编译和执行证据
+**仍待本轮 CI 核验**，历史 Rust/API 结果不替代该验证。准确提交与运行结果见
+[连接诊断与 Qt 策略阶段记录](RUST_CONNECTION_POLICY_VALIDATION_20261017.md)。
+其他 Qt 路由边界见 [原生路由](RUST_NATIVE_ROUTING.md)；下文原始 Rust 阶段结果继续按其历史范围解释。
 
 ## Schema 1 的增量字段
 
