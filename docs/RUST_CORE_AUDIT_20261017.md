@@ -102,11 +102,15 @@
 
 本审计代理未编译 Qt、未运行私有节点、公网流量、Windows 外观/TUN、没有查看 App 私钥/Secrets、没有 git commit/push。后续代码修改与运行结果由主代理另记录。
 
-## 随后获授权补充的 Qt WS 回归（待 Windows CI）
+## 随后补充的 Qt WS 回归（Windows CI 已通过）
 
 主代理授权后，仅修改 `src/Swirl.Quick/tests/RustCoreTests.cpp`，新增两个槽：
 
 - `webSocketMapsExistingFieldsAndRustAcceptsConfiguration`：VLESS WS 默认 Host/path、VLESS WSS 显式 Host/path 与 SNI/ALPN 分离、Trojan 默认强制 TLS；每种配置交给真实 Rust ABI 启动/停止，断言运行状态和 Rust 身份。这是配置映射与 ABI 接受测试，不是 Qt WS 真实转发测试。
 - `webSocketRejectsUnsupportedParametersWithoutPartialConfiguration`：覆盖未实现传输、TCP 附带 WS 参数、错误类型、early data、自定义/重复/注入请求头、歧义路径、HTTP/2 ALPN、未实现 UDP、关闭证书验证、VLESS flow；验证返回失败且输出对象保持哨兵值，并验证启动拒绝、无活动内核。
 
-已完成 `git diff --check -- src/Swirl.Quick/tests/RustCoreTests.cpp`，退出码 0。未执行本地 Qt 编译/CTest；当前环境没有可调用的 pkg-config，主代理将使用 Windows Rust CI 编译与执行。没有改 QML、Rust 协议源文件、自动组或 Secrets，没有提交/push。
+本地 `git diff --check -- src/Swirl.Quick/tests/RustCoreTests.cpp` 通过，未在本地编译 Qt。
+随后 [Swirl Rust Core #21 的 Windows job](https://github.com/SOLHK/Swirl/actions/runs/39029167841/job/117385982751)
+已对 `a60c446fdb54c10753c2d367752c4e0275a89922` 构建并运行该目标，CTest 1/1 通过（3.09 秒）。
+既有独立 Shadowsocks/VLESS Qt 对端测试也随后分别通过。WS 专项仍属于配置映射/拒绝和 Rust ABI 验证；
+Qt WS 的完整对端转发及视觉验收没有因此变为已完成。最新阶段提交和严格公网证据见 [阶段验收](RUST_WS_VALIDATION_20261017.md)。

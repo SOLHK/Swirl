@@ -61,11 +61,27 @@ peers successfully. Windows Qt CTest also passed 1/1 in 3.09 seconds, including
 the new WS configuration acceptance/rejection regressions. Actual forwarding
 through the Qt WS mapping remains a separate, unverified case.
 
-The first public-network run received responses for all three fixed HTTP/TLS checks, but every
-runtime snapshot reported `failed=1` and `last_error=StreamIo`. Its successful
-workflow step does not establish error-free session cleanup. The stricter public
-verifier and its follow-up run remain pending; see the stage validation linked
-above for the original results and limits.
+The follow-up verification fix is published as
+[`c0eb221`](https://github.com/SOLHK/Swirl/commit/c0eb2211ea646da023119e9458139d538a311000).
+The first public run's `failed=1` / `StreamIo` came from the verification client
+closing its TLS socket without completing TLS and TCP shutdown. The client now
+completes TLS shutdown, half-closes TCP and drains EOF; the verifier requires
+zero session errors and completed connection records. The Rust relay was unchanged.
+[Core implementation validation #19](https://github.com/SOLHK/Swirl/actions/runs/39030037978)
+passed. In [Swirl Rust Core #22](https://github.com/SOLHK/Swirl/actions/runs/39030038029),
+Linux, macOS and Windows each passed 57 Rust tests, 69 of 71 Python
+protocol/verifier cases (two Qt-dependent skips), and all 11 workflow regression
+tests. Windows then passed the Qt CTest target (1/1, 3.17 seconds) and separately
+ran both Qt forwarding cases successfully. The complete run finished successfully
+at 2026-10-17 11:56:56 UTC.
+
+The #22 Linux job passed all three strict public HTTPS/DIRECT and native DoH
+checks with authenticated TLS 1.3, HTTP 200/301/200 and positive traffic counters.
+Each session had `orderly_close=true`, `accepted=1`, `active=0`, `failed=0`,
+an empty `last_error` and exactly one recorded connection. The
+[verified report](../docs/evidence/RUST_PUBLIC_NETWORK_20261017_VERIFIED.json)
+identifies `c0eb221` and the same Rust binary SHA-256 as the initial run;
+see the stage validation above for both reports and the controlled comparison.
 
 The three `swirl-subscription/src/policy.rs`, `swirl-protocol/src/probe.rs` and
 `swirl-core/src/policy.rs` files are **unintegrated candidates**. They are not
@@ -234,22 +250,24 @@ Local private subscription capture and offline parsing have been exercised;
 this does not establish working provider connections. TUN, real provider traffic,
 Codex remote control, mobile actions, long soak tests,
 visual acceptance and non-Windows products are still unverified.
-The committed App workflow update adds separate public-origin HTTPS and native
-DoH checks with fixed endpoints and actual byte counters. The first Linux CI run
-received HTTP 200, 301 and 200 after verified TLS 1.3 handshakes, with positive
-native traffic counters. All three sessions also recorded `failed=1` and
-`last_error=StreamIo`; these results establish HTTP/TLS connectivity and still
-require a stricter cleanup gate and follow-up verification. The earlier local
-public-network attempt failed and is not a success claim. Exact run identities,
-the original report and remaining verification are recorded in
+The committed App workflow runs separate public-origin HTTPS and native DoH
+checks with fixed endpoints and actual byte counters. The #22 Linux run passed
+the stricter HTTP/TLS, connection-count, traffic and orderly-shutdown gates.
+The initial run's `failed=1` / `StreamIo` was resolved by fixing verification-client
+shutdown. Both runs used Rust binary SHA-256
+`7e83e9b89232f4712335ca9e4d8e6f3dacbb52b5f2daefbe357055792ce132d9`.
+The earlier local public-network attempt failed and remains recorded separately.
+Exact run identities, the initial and verified reports and scope are recorded in
 [`RUST_WS_VALIDATION_20261017.md`](../docs/RUST_WS_VALIDATION_20261017.md).
-A public DIRECT success would not prove a provider's WS endpoint,
+Public DIRECT success does not prove a provider's WS endpoint,
 private subscription or all product settings. The user's personal Windows
 visual/private-node testing remains deferred.
 
 The original C++ native engine, encrypted NodeStore, importers, proxy recovery,
 subscription capture utility and regression tests remain available. No Go/C#
-network core or pre-existing Rust workspace was present in the audited baseline.
+network core or Rust workspace was present in the audited `main` baseline
+`87409c0bf9c957ef113f84c176c5a1529c27b9df`. The development branch already
+contained the Rust workspace when this stage began at `8bd89f2`.
 
 ## Primary specifications
 

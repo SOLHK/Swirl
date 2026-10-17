@@ -118,7 +118,44 @@ TCP 写半关闭并读取 EOF，双方正常完成关闭且 `active=0 / failed=0
 
 在既有 `test_rust_core.py` 中新增 4 项独立 TLS/网络回归与 1 项缺失连接记录的负向检查。
 完整 23 项套件先通过 22 项并跳过 1 项 Qt；补入最后的缺记录检查及源站完成事件后，最终 5 项专项再次全部通过。
-最终文件共有 24 项测试，完整跨平台计数及严格公网结果将由下一次 CI 补录。
+最终文件共有 24 项测试。第二阶段提交为
+[`c0eb2211ea646da023119e9458139d538a311000`](https://github.com/SOLHK/Swirl/commit/c0eb2211ea646da023119e9458139d538a311000)，
+由 [Swirl Rust Core #22](https://github.com/SOLHK/Swirl/actions/runs/39030038029) 验证。
+
+### 第二阶段完整 CI：三平台及 Windows Qt 通过
+
+#22 在 `c0eb221` 上运行，于 2026-10-17 11:56:56 UTC 整体完成，结论为 success。
+
+| Job / 验证 | 实际结果 |
+|---|---|
+| [Linux](https://github.com/SOLHK/Swirl/actions/runs/39030038029/job/117388485791) | Rust 57 项通过；Python 协议/验证器共 71 项，69 项通过、2 项 Qt 跳过；工作流回归 11 项通过；严格公网 3 项通过 |
+| [macOS](https://github.com/SOLHK/Swirl/actions/runs/39030038029/job/117388485801) | 同样通过 Rust 57 项、Python 69 项及工作流 11 项，2 项 Qt 跳过；公网按设计不在此平台运行 |
+| [Windows](https://github.com/SOLHK/Swirl/actions/runs/39030038029/job/117388485663) | 同样通过 Rust 57 项、Python 69 项及工作流 11 项；后续 Qt 构建及 CTest 1/1 通过（3.17 秒） |
+| Windows 后续独立 Qt 对端 | SS HTTP obfs 与 VLESS 的两项实际 Qt 转发分别执行并通过，覆盖此前因 Qt 尚未构建而跳过的两项 |
+| Windows 采集/Codex 附加套件 | 采集 23 项中 22 项通过、1 项因未提供 C++ importer 跳过；Codex 11 项中 10 项通过、1 项真实 CLI 显式 opt-in 测试跳过 |
+
+每个平台的协议回归均包含全部 10 项 WS 测试和新增 5 项公网验证器回归。
+fmt、check、Clippy `-D warnings`、locked workspace tests 与 release 构建均通过。
+Qt WS 专项仍只验收映射、拒绝与 Rust ABI 配置；上述实际 Qt 转发是既有 SS/VLESS 路径。
+
+### 严格公网验收：3 项全部通过
+
+#22 的 [Linux job](https://github.com/SOLHK/Swirl/actions/runs/39030038029/job/117388485791) 已通过严格验证。
+报告时间为 2026-10-17 11:50:27 UTC（北京时间 19:50:27）。
+原始输出保存为 [VERIFIED JSON](evidence/RUST_PUBLIC_NETWORK_20261017_VERIFIED.json)，
+准确提交为 `c0eb221`、工作区来源干净、运行时均为 `swirl-rust`。
+
+| 固定公开目标与路径 | HTTP | TLS | 上传 / 下载字节 | 正常关闭 | 最终会话 |
+|---|---|---|---|---|---|
+| 系统 DNS → Rust DIRECT → example.com HEAD / | 200 | 认证 TLS 1.3 | 700 / 4,793 | 是 | accepted=1、active=0、failed=0 |
+| 系统 DNS → Rust DIRECT → www.rust-lang.org HEAD / | 301，不跟随重定向 | 认证 TLS 1.3 | 690 / 5,386 | 是 | accepted=1、active=0、failed=0 |
+| Rust 原生 DoH → DIRECT → example.com HEAD / | 200 | 认证 TLS 1.3 | 700 / 4,791 | 是 | accepted=1、active=0、failed=0 |
+
+三个结果的 `last_error` 均为空、`recorded_connections=1`、`orderly_close=true`，控制通道和进程清理成功。
+DoH 显式使用 `1.1.1.1:443`、认证名 `cloudflare-dns.com`、`/dns-query`，不回退系统 DNS。
+两轮 Rust binary SHA-256 完全相同：
+`7e83e9b89232f4712335ca9e4d8e6f3dacbb52b5f2daefbe357055792ce132d9`。
+这是验证客户端收尾修正前后的对照，没有更换或弱化 Rust relay。
 
 公网验证脚本另已检查统一 45 秒预算、慢速响应头截止时间、控制回复上限、损坏/关闭控制管道及自有进程清理。
 源码身份的 Git 调用明确以脚本定位的仓库根目录运行；从 CI 的 `core/` 工作目录执行的模拟验证通过，
@@ -155,6 +192,11 @@ TCP 写半关闭并读取 EOF，双方正常完成关闭且 `active=0 / failed=0
 被测提交为完整 `a60c446fdb54c10753c2d367752c4e0275a89922`；11:36:22 UTC 撤销短期 App Token。
 App 自身推送产生的 [Core implementation validation #18](https://github.com/SOLHK/Swirl/actions/runs/39029167834)
 按已有防循环条件跳过时，不应算作 Rust 测试通过；验收应读取 #17 的实际被测提交与 #21 的三平台结果。
+
+[Core implementation validation #19](https://github.com/SOLHK/Swirl/actions/runs/39030037978)
+也已在 `c0eb221` 上成功完成。更新脚本报告 `Rust CI gates already current`，
+修改前后 SHA-256 同为上述 `c40f0a47...`，没有生成重复 App 提交；其 Rust 57 项、Python 协议/验证器
+69 项通过、2 项 Qt 跳过，与 #22 的完整平台结果相互对应。
 
 第一次连接器创建 tree 曾返回 `user rejected MCP tool call`。用户随后明确“始终允许”，重试已成功，
 该阻塞已解除。本地旧提交 `f0ed42f` 与远端 `510c62a` 的作者/时间元数据不同，源码 tree 相同。

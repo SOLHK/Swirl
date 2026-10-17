@@ -5,6 +5,7 @@
 ## 当前接手注意事项
 
 - **当前唯一开发分支：`work/core-completion-20261017`。** 用户最新指令覆盖历史 `test` 要求；不改 main、不强推。已配置的 GitHub App/Secrets 沿用，不重新配置。
+- 用户已明确持续授权本开发分支的修复、测试与 GitHub 写入（“始终允许”）；在既有权限内继续实施，无需重复询问同一开发分支的常规提交。
 - 当前已执行的 Rust 能力新增 DoH、SOCKS4/4a、VLESS WS/WSS 与 Trojan WSS，复用既有 DNS、协议、TLS 和会话代码。本轮修复独立 WS 对端的 Pong 调度阻塞及 Rust 连续 Ping 误断连。详细范围和本轮结果见 [阶段验收](RUST_WS_VALIDATION_20261017.md)。
 - **自动测速、fallback 和负载均衡尚未接入。** 三个 `policy.rs` / `probe.rs` 候选文件没有进入 crate 模块树，内部测试也未执行。不能用提交标题或 workspace 编译通过证明它们完成。见 [真实架构审计](RUST_CORE_AUDIT_20261017.md)。
 - SOCKS4/4a 目前只在 Rust IR/API 和原生数据路径执行；Qt 节点转换和 Rust subscription inspector 尚未接入。WS 已有现有 Qt 字段映射，本轮增加专项映射/拒绝测试；Qt 映射通过与真实 Qt WS 转发是不同证据。
@@ -21,14 +22,20 @@
 | App 自动提交工作流更新 | [`a60c446`](https://github.com/SOLHK/Swirl/commit/a60c446fdb54c10753c2d367752c4e0275a89922)、[Core implementation validation #17](https://github.com/SOLHK/Swirl/actions/runs/39029146435) | App 生成 Token、checkout、提交并推送 workflow 均成功；唯一改动为 `rust-core.yml` +23/-1 |
 | Linux、macOS、Windows Rust 与独立协议验证 | [Swirl Rust Core #21](https://github.com/SOLHK/Swirl/actions/runs/39029167841)，`a60c446` | 三平台均成功；各 57 项 Rust 测试、64 项独立 Python 协议测试通过，初次协议运行各有 2 项 Qt 测试跳过 |
 | Windows Qt 与独立对端 | 同一 #21 的 Windows job | Qt CTest 1/1 通过，用时 3.09 秒；随后 SS Qt 与 VLESS Qt 对独立对端的真实转发分别通过，补足前述 2 项 Qt 跳过；Qt WS 仍只有配置映射/拒绝证据 |
-| 初次公网 HTTP/TLS 与原生 DoH 路径 | 同一 #21 的 Linux job；[阶段验收及原始报告](RUST_WS_VALIDATION_20261017.md) | 收到 HTTP 200/301/200，均通过 TLS 1.3 认证且原生流量大于零；三个会话仍为 `failed=1`、`last_error=StreamIo`，严格清理门禁待下一补丁复验 |
+| 初次公网 HTTP/TLS 与原生 DoH 路径 | 同一 #21 的 Linux job；[阶段验收及原始报告](RUST_WS_VALIDATION_20261017.md) | 收到 HTTP 200/301/200、认证 TLS 1.3 和真实流量；当时三个会话为 `failed=1`、`last_error=StreamIo`，未满足正常关闭验收，已由下述验证客户端补丁处理 |
+| 公网验证客户端收尾与严格门禁修复 | [`c0eb221`](https://github.com/SOLHK/Swirl/commit/c0eb2211ea646da023119e9458139d538a311000)、[Core implementation validation #19](https://github.com/SOLHK/Swirl/actions/runs/39030037978) | 已推送，#19 成功；修复 TLS/TCP 收尾并要求零会话错误，没有修改 Rust relay |
+| 严格公网 HTTP/TLS 与原生 DoH 路径 | [Swirl Rust Core #22](https://github.com/SOLHK/Swirl/actions/runs/39030038029)，`c0eb221`；[VERIFIED JSON](evidence/RUST_PUBLIC_NETWORK_20261017_VERIFIED.json) | Linux 三项全部通过：HTTP 200/301/200、认证 TLS 1.3、双向流量非零、`orderly_close=true`，每项 `accepted=1 / active=0 / failed=0`、`last_error` 为空、连接记录为 1 |
+| 第二阶段跨平台回归 | 同一 #22，已整体成功 | Linux/macOS/Windows 各 57 项 Rust 通过；Python 协议/验证器共 71 项，69 项通过、2 项 Qt 跳过；另有 11 项工作流回归通过。Windows 随后 Qt CTest 1/1 通过（3.17 秒），两项独立 Qt 转发分别通过，补足前述 Qt 跳过 |
 
 已核对 App 提交的 `.github/workflows/rust-core.yml` SHA-256：
 `c40f0a47abafd50a7ebe6782c25572578544920263439d3ac249125a22c6e9e8`，与本地审核的预期内容一致。
 这次真实提交/推送证明 Workflows 写权限已生效；没有重新配置 App、修改 Secrets 或改动 main。
 本地已通过的测试、明确跳过项和失败的公网尝试见 [阶段验收](RUST_WS_VALIDATION_20261017.md)；
-#21 于 2026-10-17 11:42:56 UTC 完成且整体成功。初次公网脚本只检查 HTTP 状态与流量，
-因此该 step 的绿色结果不能证明会话无错误关闭；下一补丁必须收紧门禁并重新验证。
+#21 于 2026-10-17 11:42:56 UTC 完成且整体成功，但初次公网门禁未检查会话正常关闭。
+独立对照确认其 `StreamIo` 来自验证客户端直接关闭 TLS socket；`c0eb221` 修复客户端收尾并收紧门禁，
+#22 的严格公网报告时间为 11:50:27 UTC，三项均通过；11:56:56 UTC 三平台整体成功。两轮 Rust binary SHA-256 完全一致：
+`7e83e9b89232f4712335ca9e4d8e6f3dacbb52b5f2daefbe357055792ce132d9`。
+这证明所测 DIRECT/DoH 路径的真实请求与正常关闭，不代表私有提供商、WS 节点、UDP 或 TUN 已验证。
 Windows Qt 的成功不替代 Qt WS 真实转发、个人电脑视觉验收或其他平台的桌面产品验证。
 
 ## 仓库是否完整
@@ -146,8 +153,8 @@ ZIP CRC、包内 DLL 哈希及私有内容扫描通过。GNU 链接器仍有 `.d
 规则阶段 `7c7b884` 的旧版节点 UI 164 项通过；该修复已包含在当前源码。
 本地缓存 14 份导出、12 个不同文档离线解析通过；本轮没有新增私有节点 TCP/UDP 联网验收。
 
-当前立即任务是完成公网验证脚本的严格会话清理门禁，并重新记录实际 HTTP/TLS、流量和
-`failed` / `last_error` 结果；不能用 #21 的初次连接成功代替这一步。随后按阶段实现并分别推送：
+严格公网门禁与三项真实请求已在 #22 Linux 完成，三平台回归及 Windows Qt 也已通过。
+下一开发阶段优先接入现有自动组候选，并按以下顺序逐项实现和推送：
 
 1. 把现有自动组候选接入 Swirl IR、原生健康探测、会话策略快照与 API，补独立 HTTP/HTTPS 对端测试。必须验证失败不重放请求、不静默直连、健康状态过期、配置切换保留旧 TCP/UDP 会话，以及停止后无探测任务。
 2. 补 SOCKS4/4a 的订阅与 Qt 参数转换，复用已完成握手；补 Qt WS 实际转发对端证据，不把纯映射测试当互操作。
