@@ -142,6 +142,18 @@ subscription_capture 23、codex_management 11。
 - 初次 Clippy 指出新增错误记录代码的 `collapsible_if`；改为 Rust 2024 let-chain 后通过，没有 lint 豁免。
 - 私有 [Windows fixture 39058955854](https://github.com/SOLHK/Swirl-Private-Tests/actions/runs/39058955854)
   因旧夹具未提供新必需的截止时间而失败。修正必须补明确夹具期限，不能放松真实采集期限；后续结果另记。
+- 实现已推送为 [`11eafea6bc58cef32ce2adc8e2fdd0f681175a80`](https://github.com/SOLHK/Swirl/commit/11eafea6bc58cef32ce2adc8e2fdd0f681175a80)，
+  本地已测 Git tree 与远端均为 `0488342ec700b15f522bb355af2a15f45bcf3eae`。
+  [Automation 39060793624](https://github.com/SOLHK/Swirl/actions/runs/39060793624) 成功；
+  [首轮三平台 39060793620](https://github.com/SOLHK/Swirl/actions/runs/39060793620) 中各平台 101 Rust 测试通过，
+  Linux 协议及严格公网门禁通过，macOS/Windows 在新增 Python 夹具失败，因此整体不能记为通过。
+  macOS 六项因绑定 `127.0.0.2` 得到 `EADDRNOTAVAIL`；macOS 一项和 Windows 两项因为绑定但不监听的 TCP
+  端口未立即拒绝，实际是 `UpstreamTcpTimeout`，与夹具期待的 `UpstreamConnectFailed` 不同。
+  修正仅涉及独立服务端：使用已配置的 IPv4 `127.0.0.1` / IPv6 `::1`，明确 IPv6-only；
+  拒绝端口先关闭 TCP reservation，再用真实 OS 连接验证 `ConnectionRefusedError`，关键用例结束后再次验证。
+  两个等待明确 OS 拒绝的用例使用 3 秒夹具预算；原生产品超时规则和 TLS/协议短期限测试不改。
+  仍精确断言拒绝错误码、零应用流量、禁止 TLS 后重新选择地址及 CIDR IP 固定，没有接受“任一错误即可通过”。
+  关闭端口不能永久占有该 TCP 端口，前后检查缩小并检测占用竞争，不声称消灭所有 TOCTOU。
 
 ## 后续边界
 

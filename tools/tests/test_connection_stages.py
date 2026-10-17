@@ -27,6 +27,22 @@ class ObservedReference(Reference):
         super().process_request(request, address)
 
 
+class IPv6Reference(ObservedReference):
+    address_family = socket.AF_INET6
+
+    def server_bind(self):
+        self.socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+        super().server_bind()
+
+
+class IPv6SsPeer(SsPeer):
+    address_family = socket.AF_INET6
+
+    def server_bind(self):
+        self.socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+        super().server_bind()
+
+
 class StallHandler(socketserver.BaseRequestHandler):
     def handle(self):
         self.request.settimeout(3)
@@ -74,7 +90,7 @@ class ConnectionStageTests(unittest.TestCase):
         cls.untrusted.cleanup()
 
     def setUp(self):
-        self.peers, self.servers, self.guards = [], [], []
+        self.peers, self.servers = [], []
         self.process = subprocess.Popen([os.environ['SWIRL_RUST_HARNESS']], stdin=subprocess.PIPE,
                                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         self.addCleanup(self.close)
@@ -96,8 +112,6 @@ class ConnectionStageTests(unittest.TestCase):
             for server in self.servers:
                 server.shutdown()
                 server.server_close()
-            for guard in self.guards:
-                guard.close()
         errors = self.process.stderr.read()
         self.process.stdout.close()
         self.process.stderr.close()
@@ -111,7 +125,7 @@ class ConnectionStageTests(unittest.TestCase):
         self.process.stdin.flush()
         return json.loads(self.process.stdout.readline())
 
-    def dns(self, answers=('127.0.0.2', '127.0.0.1'), silent=False):
+    def dns(self, answers=('127.0.0.1', '::1'), silent=False):
         peer = DnsPeer(mode='silent' if silent else 'normal')
         if not silent:
             peer.answers = answers
@@ -120,7 +134,8 @@ class ConnectionStageTests(unittest.TestCase):
         return peer
 
     def server(self, protocol='echo', host='127.0.0.1', port=0, tls=None, stall=False):
-        server = ObservedReference((host, port), StallHandler if stall else Handler)
+        server_type = IPv6Reference if ':' in host else ObservedReference
+        server = server_type((host, port), StallHandler if stall else Handler)
         server.protocol, server.tls = protocol, tls
         server.requests, server.errors, server.accepted = [], [], 0
         server.tcp_connections = 0
@@ -129,16 +144,23 @@ class ConnectionStageTests(unittest.TestCase):
         self.servers.append(server)
         return server
 
-    def refuse(self, port=0, host='127.0.0.2'):
-        guard = socket.socket()
-        try:
+    def refuse(self, port=0, host='127.0.0.1'):
+        # A bound non-listening socket blackholes SYNs on some platforms.
+        # Close the reservation, then require an actual OS refusal. The other
+        # live endpoint is IPv6-only, not an unconfigured 127.0.0.2 alias.
+        with socket.socket() as guard:
             guard.bind((host, port))
-        except BaseException:
-            guard.close()
-            raise
-        # Reserve the address/port without listen(), making refusal deterministic.
-        self.guards.append(guard)
-        return guard.getsockname()[1]
+            port = guard.getsockname()[1]
+        self.assert_refused(host, port)
+        return port
+
+    def assert_refused(self, host, port):
+        # Allow OS rejection delivery, not a TLS/protocol timeout or test skip.
+        # The two native refusal cases use the same 3s fixture-only budget.
+        with socket.socket() as check:
+            check.settimeout(3)
+            with self.assertRaises(ConnectionRefusedError):
+                check.connect((host, port))
 
     def start(self, outbound, peer=None, rules=None, timeout_ms=1200):
         config = {'schema': 1, 'listen': '127.0.0.1:0', 'selected': 'node',
@@ -180,7 +202,7 @@ class ConnectionStageTests(unittest.TestCase):
         return state
 
     def test_direct_tries_next_resolved_address_and_reuses_host_cache(self):
-        origin = self.server()
+        origin = self.server(host='::1')
         port = origin.server_address[1]
         self.refuse(port)
         peer = self.dns()
@@ -198,7 +220,7 @@ class ConnectionStageTests(unittest.TestCase):
         self.assertEqual(len(peer.queries), 2)
 
     def test_http_obfs_ss_uses_resolved_proxy_addresses_without_resolving_target(self):
-        server = SsPeer(('127.0.0.1', 0), SsHandler)
+        server = IPv6SsPeer(('::1', 0), SsHandler)
         server.method, server.obfs, server.mode, server.fixed_salt = 'aes-128-gcm', True, 'echo', None
         server.targets, server.headers, server.errors, server.received = [], [], [], 0
         threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -221,17 +243,18 @@ class ConnectionStageTests(unittest.TestCase):
         self.assertEqual({q[0] for q in peer.queries}, {'proxy.fixture.invalid'})
 
     def test_resolving_cidr_rule_pins_failed_address_without_trying_other_answer(self):
-        origin = self.server()
+        origin = self.server(host='::1')
         port = origin.server_address[1]
         self.refuse(port)
         peer = self.dns()
         self.start({'type': 'direct'}, peer, rules=[
-            {'matcher': {'type': 'cidr', 'value': '127.0.0.2/32', 'resolve': True}, 'outbound': 'node'},
-            {'matcher': {'type': 'match'}, 'outbound': 'deny'}])
+            {'matcher': {'type': 'cidr', 'value': '127.0.0.1/32', 'resolve': True}, 'outbound': 'node'},
+            {'matcher': {'type': 'match'}, 'outbound': 'deny'}], timeout_ms=3000)
         self.tunnel(port=port, success=False).close()
         self.settled(failed=1, error='UpstreamConnectFailed', stage='tcp_connect')
         self.assertEqual(origin.tcp_connections, 0)
         self.assertEqual(len(peer.queries), 2)
+        self.assert_refused('127.0.0.1', port)
 
     def test_dns_timeout_is_not_misreported_as_tcp_or_protocol_timeout(self):
         peer = self.dns(silent=True)
@@ -245,19 +268,20 @@ class ConnectionStageTests(unittest.TestCase):
     def test_refused_tcp_is_distinct_from_dns_and_has_no_protocol_traffic(self):
         port = self.refuse(host='127.0.0.1')
         self.start({'type': 'shadowsocks', 'host': '127.0.0.1', 'port': port,
-                    'password': PASSWORD, 'cipher': 'aes-128-gcm'})
+                    'password': PASSWORD, 'cipher': 'aes-128-gcm'}, timeout_ms=3000)
         self.tunnel(success=False).close()
         state = self.settled(failed=1, error='UpstreamConnectFailed', stage='tcp_connect')
         self.assertEqual((state['upload'], state['download']), (0, 0))
+        self.assert_refused('127.0.0.1', port)
 
     def test_tls_timeout_does_not_restart_on_another_resolved_address(self):
         first = self.server(stall=True)
         port = first.server_address[1]
-        second = self.server(host='127.0.0.2', port=port)
+        second = self.server(host='::1', port=port)
         self.start({'type': 'trojan', 'host': 'proxy.fixture.invalid', 'port': port,
                     'password': 'synthetic-trojan',
                     'tls': {'server_name': 'localhost', 'ca_der_base64': self.ca}},
-                   self.dns(('127.0.0.1', '127.0.0.2')), timeout_ms=400)
+                   self.dns(), timeout_ms=400)
         self.tunnel(success=False).close()
         self.settled(failed=1, error='UpstreamTlsTimeout', stage='tls_handshake')
         self.assertTrue(first.received.is_set())
@@ -266,9 +290,9 @@ class ConnectionStageTests(unittest.TestCase):
     def test_protocol_timeout_after_tcp_success_has_its_own_stage(self):
         first = self.server(stall=True)
         port = first.server_address[1]
-        second = self.server(host='127.0.0.2', port=port)
+        second = self.server(host='::1', port=port)
         self.start({'type': 'socks5', 'host': 'proxy.fixture.invalid', 'port': port},
-                   self.dns(('127.0.0.1', '127.0.0.2')), timeout_ms=400)
+                   self.dns(), timeout_ms=400)
         self.tunnel(success=False).close()
         self.settled(failed=1, error='UpstreamProtocolTimeout', stage='protocol_handshake')
         self.assertTrue(first.received.is_set())
@@ -277,11 +301,11 @@ class ConnectionStageTests(unittest.TestCase):
     def test_untrusted_certificate_cannot_select_an_alternate_trusted_peer(self):
         first = self.server('http_connect', tls=self.other_context)
         port = first.server_address[1]
-        second = self.server('http_connect', host='127.0.0.2', port=port, tls=self.context)
+        second = self.server('http_connect', host='::1', port=port, tls=self.context)
         self.start({'type': 'http_connect', 'host': 'proxy.fixture.invalid', 'port': port,
                     'auth': {'username': 'fixture-user', 'password': 'fixture-password'},
                     'tls': {'server_name': 'localhost', 'ca_der_base64': self.ca}},
-                   self.dns(('127.0.0.1', '127.0.0.2')))
+                   self.dns())
         self.tunnel(success=False).close()
         self.settled(failed=1, error='TlsVerificationOrHandshake', stage='tls_handshake')
         self.assertEqual(first.tcp_connections, 1)
