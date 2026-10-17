@@ -2,6 +2,8 @@
 //! the public report. Only explicitly supported and fully mapped TCP nodes can
 //! yield an executable isolated-test outbound; all original fields are retained.
 use crate::{Config, Credentials, Limits, Node, ObfsHttp, Outbound, Tls};
+#[path = "inspect_websocket.rs"]
+mod inspect_websocket;
 use base64::{
     Engine,
     engine::general_purpose::{STANDARD, STANDARD_NO_PAD, URL_SAFE, URL_SAFE_NO_PAD},
@@ -619,6 +621,9 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
         ],
         "unknown",
     );
+    if transport == "ws" && matches!(kind, "vless" | "trojan") {
+        return inspect_websocket::inspect(raw, index, family);
+    }
     let obfuscation = if kind == "ss" && (raw.get("plugin").is_some() || raw.get("obfs").is_some())
     {
         if raw
@@ -899,12 +904,14 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
                     port: port as u16,
                     uuid: raw.get("uuid").and_then(Value::as_str).unwrap_or("").into(),
                     tls,
+                    websocket: None,
                 }),
                 "trojan" => tls.map(|tls| Outbound::Trojan {
                     host,
                     port: port as u16,
                     password,
                     tls,
+                    websocket: None,
                 }),
                 "http" => Some(Outbound::HttpConnect {
                     host,

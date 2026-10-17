@@ -3,6 +3,7 @@ use base64::{Engine, engine::general_purpose::STANDARD};
 mod shadowsocks;
 mod socks4;
 mod vless;
+mod websocket;
 pub use shadowsocks::{
     decrypt_datagram as ss_decrypt_datagram, encrypt_datagram as ss_encrypt_datagram,
 };
@@ -460,6 +461,15 @@ pub async fn connect(
     } else {
         Box::new(tcp)
     };
+    let ws = match outbound {
+        Outbound::Vless { websocket, .. } | Outbound::Trojan { websocket, .. } => {
+            websocket.as_ref()
+        }
+        _ => None,
+    };
+    if let Some(ws) = ws {
+        stream = websocket::connect(stream, ws).await?;
+    }
     if let Outbound::Shadowsocks {
         password,
         cipher,

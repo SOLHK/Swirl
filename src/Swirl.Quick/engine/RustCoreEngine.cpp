@@ -134,6 +134,7 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
   if(!QStringList{"http","socks5","trojan","ss","vless"}.contains(n.protocol))return "此节点协议尚未迁移到 Rust；未使用外部内核。";
   QSet<QString> allowed=n.protocol=="ss"?QSet<QString>{"udp","plugin","plugin-opts"}:QSet<QString>{"tls","udp","sni","servername","alpn","skip-cert-verify"};
   if(n.protocol=="vless")allowed.unite(QSet<QString>{"uuid","flow","encryption"});
+  if(n.protocol=="vless"||n.protocol=="trojan")allowed.unite(QSet<QString>{"network","ws-opts"});
   for(auto p=n.parameters.begin();p!=n.parameters.end();++p)if(!allowed.contains(p.key()))return "Rust 尚未实现此传输或扩展参数。";
   for(const auto &key:QStringList{"tls","udp","skip-cert-verify"})if(n.parameters.contains(key)&&!n.parameters.value(key).isBool())return "Rust 布尔参数类型无效。";
   if((n.protocol!="ss"&&n.parameters.value("udp").toBool())||n.parameters.value("skip-cert-verify").toBool())return "Rust 尚不支持该出口的代理 UDP，且不允许关闭证书验证。";
@@ -164,6 +165,28 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
   if(tls){
    auto alpn=n.parameters.value("alpn");if(!alpn.isUndefined()&&!alpn.isArray())return "ALPN 格式无效。";
    outbound["tls"]=QJsonObject{{"server_name",n.serverName.isEmpty()?n.host:n.serverName},{"alpn",alpn.isUndefined()?QJsonArray{}:alpn.toArray()}};
+  }
+  // Native WS mapping; no QML changes.
+  if(n.parameters.contains("network")||n.parameters.contains("ws-opts")){
+   const auto network=n.parameters.value("network");
+   if(!network.isString()||(network.toString()!="tcp"&&network.toString()!="ws"))return "Rust 尚未实现此传输。";
+   if(network.toString()=="ws"){
+    if(n.parameters.contains("ws-opts")&&!n.parameters.value("ws-opts").isObject())return "WebSocket 配置类型无效。";
+    const auto ws=n.parameters.value("ws-opts").toObject();
+    for(auto p=ws.begin();p!=ws.end();++p)if(p.key()!="path"&&p.key()!="headers")return "WebSocket 含未实现的扩展，未忽略。";
+    if(ws.contains("path")&&!ws.value("path").isString())return "WebSocket 路径类型无效。";
+    QString host=n.host.contains(':')?"["+n.host+"]":n.host;
+    if(ws.contains("headers")){
+     if(!ws.value("headers").isObject())return "WebSocket 请求头类型无效。";
+     const auto headers=ws.value("headers").toObject();if(headers.size()>1)return "WebSocket 此阶段只支持 Host 请求头。";
+     for(auto h=headers.begin();h!=headers.end();++h){if(h.key().compare("host",Qt::CaseInsensitive)!=0||!h.value().isString())return "WebSocket 请求头尚未实现。";host=h.value().toString();}
+    }
+    const auto path=ws.contains("path")?ws.value("path").toString():QString("/");
+    if(host.isEmpty()||host.contains(QRegularExpression("[\\s/@?#]"))||!path.startsWith('/')||path.startsWith("//")||path.size()>2048||path.contains(QRegularExpression("[\\s#]")))return "WebSocket Host 或路径无效。";
+    const auto alpn=outbound.value("tls").toObject().value("alpn").toArray();
+    if(!alpn.isEmpty()&&alpn!=QJsonArray{"http/1.1"})return "WebSocket 目前仅支持 HTTP/1.1 ALPN。";
+    outbound["websocket"]=QJsonObject{{"host",host},{"path",path}};
+   }else if(n.parameters.contains("ws-opts"))return "TCP 传输不能附带 WebSocket 配置。";
   }
   nodes.append(QJsonObject{{"id",n.id},{"outbound",outbound}});
  }

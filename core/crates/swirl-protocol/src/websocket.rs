@@ -3,27 +3,52 @@
 //! The owned driver is aborted on Drop. WebSocket close is full-duplex; TCP
 //! half-close semantics are deliberately not claimed for a WS transport.
 use base64::{Engine, engine::general_purpose::STANDARD};
-use ring::{digest, rand::{SecureRandom, SystemRandom}};
-use std::{io, pin::Pin, sync::{Arc, atomic::{AtomicU8, Ordering}}, task::{Context, Poll}};
+use ring::{
+    digest,
+    rand::{SecureRandom, SystemRandom},
+};
+use std::{
+    io,
+    pin::Pin,
+    sync::{
+        Arc,
+        atomic::{AtomicU8, Ordering},
+    },
+    task::{Context, Poll},
+};
 use swirl_subscription::WebSocket;
 use swirl_transport::BoxStream;
-use tokio::{io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, DuplexStream, ReadBuf},
-    sync::mpsc, task::JoinHandle, time::{Duration, timeout}};
+use tokio::{
+    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, DuplexStream, ReadBuf},
+    sync::mpsc,
+    task::JoinHandle,
+    time::{Duration, timeout},
+};
 
 const BUFFER: usize = 16384;
 const MAX_MESSAGE: u64 = 1024 * 1024;
 type Control = (u8, Vec<u8>);
-fn invalid(reason: &'static str) -> io::Error { io::Error::new(io::ErrorKind::InvalidData, reason) }
+fn invalid(reason: &'static str) -> io::Error {
+    io::Error::new(io::ErrorKind::InvalidData, reason)
+}
 fn accept_key(key: &str) -> String {
     let value = format!("{key}258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
     // SHA-1 here is the protocol's non-secret handshake token, not TLS security.
-    STANDARD.encode(digest::digest(&digest::SHA1_FOR_LEGACY_USE_ONLY, value.as_bytes()))
+    STANDARD.encode(digest::digest(
+        &digest::SHA1_FOR_LEGACY_USE_ONLY,
+        value.as_bytes(),
+    ))
 }
 fn check_upgrade(data: &[u8], key: &str) -> Result<(), &'static str> {
     let mut headers = [httparse::EMPTY_HEADER; 64];
     let mut response = httparse::Response::new(&mut headers);
-    if !response.parse(data).map_err(|_| "WebSocketUpgradeSyntax")?.is_complete()
-        || response.version != Some(1) || response.code != Some(101) {
+    if !response
+        .parse(data)
+        .map_err(|_| "WebSocketUpgradeSyntax")?
+        .is_complete()
+        || response.version != Some(1)
+        || response.code != Some(101)
+    {
         return Err("WebSocketUpgradeRejected");
     }
     let mut accept = None;
@@ -33,14 +58,24 @@ fn check_upgrade(data: &[u8], key: &str) -> Result<(), &'static str> {
         let value = std::str::from_utf8(header.value).map_err(|_| "WebSocketUpgradeSyntax")?;
         match header.name.to_ascii_lowercase().as_str() {
             "sec-websocket-accept" => {
-                if accept.replace(value.trim()).is_some() { return Err("WebSocketDuplicateAccept"); }
+                if accept.replace(value.trim()).is_some() {
+                    return Err("WebSocketDuplicateAccept");
+                }
             }
             "upgrade" => {
-                if upgrade || !value.trim().eq_ignore_ascii_case("websocket") { return Err("WebSocketUpgradeProtocol"); }
+                if upgrade || !value.trim().eq_ignore_ascii_case("websocket") {
+                    return Err("WebSocketUpgradeProtocol");
+                }
                 upgrade = true;
             }
-            "connection" => connection |= value.split(',').any(|s| s.trim().eq_ignore_ascii_case("upgrade")),
-            "sec-websocket-extensions" | "sec-websocket-protocol" | "transfer-encoding" => return Err("WebSocketUnsolicitedExtension"),
+            "connection" => {
+                connection |= value
+                    .split(',')
+                    .any(|s| s.trim().eq_ignore_ascii_case("upgrade"))
+            }
+            "sec-websocket-extensions" | "sec-websocket-protocol" | "transfer-encoding" => {
+                return Err("WebSocketUnsolicitedExtension");
+            }
             "content-length" if value.trim() != "0" => return Err("WebSocketUpgradeBody"),
             _ => {}
         }
@@ -52,28 +87,47 @@ fn check_upgrade(data: &[u8], key: &str) -> Result<(), &'static str> {
 }
 
 fn close_valid(data: &[u8]) -> bool {
-    if data.is_empty() { return true; }
-    if data.len() < 2 { return false; }
+    if data.is_empty() {
+        return true;
+    }
+    if data.len() < 2 {
+        return false;
+    }
     let code = u16::from_be_bytes([data[0], data[1]]);
     // Registered standard codes plus application/private-use ranges only.
     (matches!(code, 1000..=1003 | 1007..=1014) || (3000..=4999).contains(&code))
         && std::str::from_utf8(&data[2..]).is_ok()
 }
-async fn send_frame<W: AsyncWrite + Unpin>(writer: &mut W, opcode: u8, data: &[u8]) -> io::Result<()> {
+async fn send_frame<W: AsyncWrite + Unpin>(
+    writer: &mut W,
+    opcode: u8,
+    data: &[u8],
+) -> io::Result<()> {
     let mut mask = [0; 4];
-    SystemRandom::new().fill(&mut mask).map_err(|_| invalid("WebSocketRandom"))?;
+    SystemRandom::new()
+        .fill(&mut mask)
+        .map_err(|_| invalid("WebSocketRandom"))?;
     let mut frame = Vec::with_capacity(data.len() + 14);
     frame.push(0x80 | opcode);
-    if data.len() < 126 { frame.push(0x80 | data.len() as u8); }
-    else if data.len() <= 65535 { frame.push(0xfe); frame.extend((data.len() as u16).to_be_bytes()); }
-    else { frame.push(0xff); frame.extend((data.len() as u64).to_be_bytes()); }
+    if data.len() < 126 {
+        frame.push(0x80 | data.len() as u8);
+    } else if data.len() <= 65535 {
+        frame.push(0xfe);
+        frame.extend((data.len() as u16).to_be_bytes());
+    } else {
+        frame.push(0xff);
+        frame.extend((data.len() as u64).to_be_bytes());
+    }
     frame.extend(mask);
     frame.extend(data.iter().enumerate().map(|(i, b)| b ^ mask[i % 4]));
     writer.write_all(&frame).await?;
     writer.flush().await
 }
 async fn read_frames<R: AsyncRead + Unpin, W: AsyncWrite + Unpin>(
-    mut wire: R, mut app: W, controls: mpsc::Sender<Control>) -> io::Result<()> {
+    mut wire: R,
+    mut app: W,
+    controls: mpsc::Sender<Control>,
+) -> io::Result<()> {
     let mut fragmented = false;
     let mut message_size = 0u64;
     let mut fragments = 0u32;
@@ -83,20 +137,43 @@ async fn read_frames<R: AsyncRead + Unpin, W: AsyncWrite + Unpin>(
         wire.read_exact(&mut header).await?;
         let fin = header[0] & 0x80 != 0;
         let opcode = header[0] & 15;
-        if header[0] & 0x70 != 0 || header[1] & 0x80 != 0 { return Err(invalid("WebSocketFlags")); }
+        if header[0] & 0x70 != 0 || header[1] & 0x80 != 0 {
+            return Err(invalid("WebSocketFlags"));
+        }
         let encoded = header[1] & 127;
         let size = match encoded {
-            126 => { let size = u64::from(wire.read_u16().await?); if size < 126 { return Err(invalid("WebSocketLength")); } size }
-            127 => { let size = wire.read_u64().await?; if size < 65536 || size >> 63 != 0 { return Err(invalid("WebSocketLength")); } size }
+            126 => {
+                let size = u64::from(wire.read_u16().await?);
+                if size < 126 {
+                    return Err(invalid("WebSocketLength"));
+                }
+                size
+            }
+            127 => {
+                let size = wire.read_u64().await?;
+                if size < 65536 || size >> 63 != 0 {
+                    return Err(invalid("WebSocketLength"));
+                }
+                size
+            }
             size => u64::from(size),
         };
         match opcode {
             0 | 2 => {
-                if (opcode == 0) != fragmented { return Err(invalid("WebSocketFragmentOrder")); }
-                if opcode == 2 { message_size = 0; fragments = 0; }
-                message_size = message_size.checked_add(size).ok_or_else(|| invalid("WebSocketMessageLimit"))?;
+                if (opcode == 0) != fragmented {
+                    return Err(invalid("WebSocketFragmentOrder"));
+                }
+                if opcode == 2 {
+                    message_size = 0;
+                    fragments = 0;
+                }
+                message_size = message_size
+                    .checked_add(size)
+                    .ok_or_else(|| invalid("WebSocketMessageLimit"))?;
                 fragments += 1;
-                if message_size > MAX_MESSAGE || fragments > 1024 { return Err(invalid("WebSocketMessageLimit")); }
+                if message_size > MAX_MESSAGE || fragments > 1024 {
+                    return Err(invalid("WebSocketMessageLimit"));
+                }
                 fragmented = !fin;
                 let mut remaining = size;
                 while remaining != 0 {
@@ -107,16 +184,24 @@ async fn read_frames<R: AsyncRead + Unpin, W: AsyncWrite + Unpin>(
                 }
             }
             8..=10 => {
-                if !fin || size > 125 { return Err(invalid("WebSocketControlFrame")); }
+                if !fin || size > 125 {
+                    return Err(invalid("WebSocketControlFrame"));
+                }
                 let mut data = vec![0; size as usize];
                 wire.read_exact(&mut data).await?;
                 if opcode == 8 {
-                    if !close_valid(&data) { return Err(invalid("WebSocketClose")); }
-                    controls.try_send((8, data)).map_err(|_| invalid("WebSocketControlLimit"))?;
+                    if !close_valid(&data) {
+                        return Err(invalid("WebSocketClose"));
+                    }
+                    controls
+                        .try_send((8, data))
+                        .map_err(|_| invalid("WebSocketControlLimit"))?;
                     return Ok(());
                 }
                 if opcode == 9 {
-                    controls.try_send((10, data)).map_err(|_| invalid("WebSocketControlLimit"))?;
+                    controls
+                        .try_send((10, data))
+                        .map_err(|_| invalid("WebSocketControlLimit"))?;
                 }
             }
             // Proxy transports carry binary bytes, never text messages.
@@ -125,7 +210,10 @@ async fn read_frames<R: AsyncRead + Unpin, W: AsyncWrite + Unpin>(
     }
 }
 async fn write_frames<W: AsyncWrite + Unpin, R: AsyncRead + Unpin>(
-    mut wire: W, mut app: R, mut controls: mpsc::Receiver<Control>) -> io::Result<()> {
+    mut wire: W,
+    mut app: R,
+    mut controls: mpsc::Receiver<Control>,
+) -> io::Result<()> {
     let mut buffer = [0; BUFFER];
     loop {
         tokio::select! {
@@ -167,22 +255,43 @@ async fn drive(wire: BoxStream, app: &mut DuplexStream) -> io::Result<()> {
     }
     Ok(())
 }
-struct Stream { io: DuplexStream, driver: JoinHandle<()>, ended: Arc<AtomicU8> }
-impl Drop for Stream { fn drop(&mut self) { self.driver.abort(); } }
+struct Stream {
+    io: DuplexStream,
+    driver: JoinHandle<()>,
+    ended: Arc<AtomicU8>,
+}
+impl Drop for Stream {
+    fn drop(&mut self) {
+        self.driver.abort();
+    }
+}
 impl AsyncRead for Stream {
-    fn poll_read(self: Pin<&mut Self>, cx: &mut Context<'_>, buffer: &mut ReadBuf<'_>) -> Poll<io::Result<()>> {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buffer: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
         let this = self.get_mut();
         let before = buffer.filled().len();
         let remaining = buffer.remaining();
         match Pin::new(&mut this.io).poll_read(cx, buffer) {
-            Poll::Ready(Ok(())) if remaining > 0 && buffer.filled().len() == before
-                && this.ended.load(Ordering::Acquire) != 1 => Poll::Ready(Err(invalid("WebSocketTransportClosed"))),
+            Poll::Ready(Ok(()))
+                if remaining > 0
+                    && buffer.filled().len() == before
+                    && this.ended.load(Ordering::Acquire) != 1 =>
+            {
+                Poll::Ready(Err(invalid("WebSocketTransportClosed")))
+            }
             other => other,
         }
     }
 }
 impl AsyncWrite for Stream {
-    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, data: &[u8]) -> Poll<io::Result<usize>> {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        data: &[u8],
+    ) -> Poll<io::Result<usize>> {
         Pin::new(&mut self.get_mut().io).poll_write(cx, data)
     }
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
@@ -192,17 +301,29 @@ impl AsyncWrite for Stream {
         Pin::new(&mut self.get_mut().io).poll_shutdown(cx)
     }
 }
-pub(super) async fn connect(mut wire: BoxStream, settings: &WebSocket) -> Result<BoxStream, &'static str> {
+pub(super) async fn connect(
+    mut wire: BoxStream,
+    settings: &WebSocket,
+) -> Result<BoxStream, &'static str> {
     settings.validate()?;
     let mut nonce = [0; 16];
-    SystemRandom::new().fill(&mut nonce).map_err(|_| "WebSocketRandom")?;
+    SystemRandom::new()
+        .fill(&mut nonce)
+        .map_err(|_| "WebSocketRandom")?;
     let key = STANDARD.encode(nonce);
-    let request = format!("GET {} HTTP/1.1\r\nHost: {}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: {key}\r\n\r\n", settings.path, settings.host);
-    wire.write_all(request.as_bytes()).await.map_err(|_| "WebSocketUpgradeWrite")?;
+    let request = format!(
+        "GET {} HTTP/1.1\r\nHost: {}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: {key}\r\n\r\n",
+        settings.path, settings.host
+    );
+    wire.write_all(request.as_bytes())
+        .await
+        .map_err(|_| "WebSocketUpgradeWrite")?;
     wire.flush().await.map_err(|_| "WebSocketUpgradeWrite")?;
     let mut response = Vec::new();
     while !response.ends_with(b"\r\n\r\n") {
-        if response.len() >= BUFFER { return Err("WebSocketUpgradeLimit"); }
+        if response.len() >= BUFFER {
+            return Err("WebSocketUpgradeLimit");
+        }
         response.push(wire.read_u8().await.map_err(|_| "WebSocketUpgradeRead")?);
     }
     check_upgrade(&response, &key)?;
@@ -211,12 +332,12 @@ pub(super) async fn connect(mut wire: BoxStream, settings: &WebSocket) -> Result
     let result = ended.clone();
     let driver = tokio::spawn(async move {
         let success = drive(wire, &mut app).await.is_ok();
-        result.store(if success {1} else {2}, Ordering::Release);
+        result.store(if success { 1 } else { 2 }, Ordering::Release);
         // app remains owned until result has been published, so EOF cannot
         // race the error status or disguise malformed/truncated WS as success.
         drop(app);
     });
-    Ok(Box::new(Stream {io, driver, ended}))
+    Ok(Box::new(Stream { io, driver, ended }))
 }
 
 #[cfg(test)]
@@ -226,9 +347,17 @@ mod tests {
     fn handshake_token_and_unsolicited_extensions() {
         let key = "dGhlIHNhbXBsZSBub25jZQ==";
         assert_eq!(accept_key(key), "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=");
-        let valid = format!("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: keep-alive, Upgrade\r\nSec-WebSocket-Accept: {}\r\n", accept_key(key));
+        let valid = format!(
+            "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: keep-alive, Upgrade\r\nSec-WebSocket-Accept: {}\r\n",
+            accept_key(key)
+        );
         assert!(check_upgrade(format!("{valid}\r\n").as_bytes(), key).is_ok());
-        for extra in ["Sec-WebSocket-Extensions: permessage-deflate", "Sec-WebSocket-Protocol: injected", "Sec-WebSocket-Accept: wrong", "Transfer-Encoding: chunked"] {
+        for extra in [
+            "Sec-WebSocket-Extensions: permessage-deflate",
+            "Sec-WebSocket-Protocol: injected",
+            "Sec-WebSocket-Accept: wrong",
+            "Transfer-Encoding: chunked",
+        ] {
             assert!(check_upgrade(format!("{valid}{extra}\r\n\r\n").as_bytes(), key).is_err());
         }
     }
@@ -245,7 +374,13 @@ mod tests {
     }
     #[tokio::test]
     async fn invalid_server_frame_headers_fail_before_releasing_data() {
-        for bytes in [&b"\x82\x80"[..], &b"\xc2\x00"[..], &b"\x80\x01x"[..], &b"\x89\x7e\x00\x01x"[..], &b"\x82\x7f\x80\0\0\0\0\0\0\0"[..]] {
+        for bytes in [
+            &b"\x82\x80"[..],
+            &b"\xc2\x00"[..],
+            &b"\x80\x01x"[..],
+            &b"\x89\x7e\x00\x01x"[..],
+            &b"\x82\x7f\x80\0\0\0\0\0\0\0"[..],
+        ] {
             let mut data = bytes;
             let (tx, _rx) = mpsc::channel(8);
             assert!(read_frames(&mut data, tokio::io::sink(), tx).await.is_err());

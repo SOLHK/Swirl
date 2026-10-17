@@ -2,6 +2,8 @@
 //! No Mihomo configuration or proxy engine is an internal execution dependency.
 use serde::{Deserialize, Serialize};
 mod dns_tls;
+mod websocket;
+pub use websocket::WebSocket;
 pub mod inspect;
 pub use dns_tls::DnsTlsServer;
 use std::{collections::HashSet, net::SocketAddr};
@@ -43,6 +45,8 @@ pub enum Outbound {
         uuid: String,
         #[serde(default)]
         tls: Option<Tls>,
+        #[serde(default)]
+        websocket: Option<WebSocket>,
     },
     Shadowsocks {
         host: String,
@@ -81,6 +85,8 @@ pub enum Outbound {
         port: u16,
         password: String,
         tls: Tls,
+        #[serde(default)]
+        websocket: Option<WebSocket>,
     },
 }
 
@@ -376,6 +382,19 @@ impl Config {
                 {
                     return Err("NodeParameters");
                 }
+                _ => {}
+            }
+            match &node.outbound {
+                Outbound::Vless {
+                    websocket: Some(ws),
+                    tls,
+                    ..
+                } => ws.validate_tls(tls.as_ref())?,
+                Outbound::Trojan {
+                    websocket: Some(ws),
+                    tls,
+                    ..
+                } => ws.validate_tls(Some(tls))?,
                 _ => {}
             }
             let tls = match &node.outbound {
