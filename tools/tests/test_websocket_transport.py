@@ -177,14 +177,16 @@ class Peer(socketserver.BaseRequestHandler):
                                 if not data:
                                     return
                                 origin.sendall(data)
+                                self.server.upstream_bytes += len(data)
                             else:
                                 data = origin.recv(16384)
                                 if not data:
                                     stream.sendall(frame(8, b'\x03\xe8'))
                                     return
                                 framed.sendall(data)
-        except (EOFError, OSError, ssl.SSLError):
-            pass
+                                self.server.downstream_bytes += len(data)
+        except (EOFError, OSError, ssl.SSLError) as exc:
+            self.server.peer_diagnostics.append(f'{type(exc).__name__}: {exc}')
         finally:
             self.server.active -= 1
 
@@ -230,6 +232,8 @@ class WebSocketTransportTests(unittest.TestCase):
         server.protocol, server.context, server.mode = protocol, self.context if tls else None, mode
         server.requests, server.destinations, server.errors, server.masks, server.pongs = [], [], [], [], []
         server.active = server.forwarded = server.accepted = server.received = server.unexpected = 0
+        server.upstream_bytes = server.downstream_bytes = 0
+        server.peer_diagnostics = []
         threading.Thread(target=server.serve_forever, daemon=True).start()
         self.servers.append(server)
         return server
@@ -298,7 +302,15 @@ class WebSocketTransportTests(unittest.TestCase):
         stream, response = self.tunnel(origin)
         with stream:
             self.assertIn(b' 200 ', response)
-            self.echo(stream)
+            try:
+                self.echo(stream)
+            except (EOFError, TimeoutError, ConnectionError) as exc:
+                self.fail(f'fragmented WebSocket echo failed: {type(exc).__name__}: {exc}; '
+                          f'origin.accepted={origin.accepted}, origin.received={origin.received}, '
+                          f'peer.forwarded={peer.forwarded}, peer.active={peer.active}, '
+                          f'upstream_bytes={peer.upstream_bytes}, downstream_bytes={peer.downstream_bytes}, '
+                          f'pongs={len(peer.pongs)}, masks={len(peer.masks)}, '
+                          f'peer_diagnostics={peer.peer_diagnostics!r}, peer_errors={peer.errors!r}')
             stream.sendall(b'after-ping')
             self.assertEqual(exact(stream, 10), b'after-ping')
         self.assertIn(b'interleaved', peer.pongs)
