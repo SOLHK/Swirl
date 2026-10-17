@@ -8,7 +8,7 @@
 - 用户已明确持续授权本开发分支的修复、测试与 GitHub 写入（“始终允许”）；在既有权限内继续实施，无需重复询问同一开发分支的常规提交。
 - 原生 IR/API 已接入嵌套手动组、`url_test`、`fallback`、`load_balance`、经实际出口的 HTTP/HTTPS 健康探测和会话策略视图。此前未编译的候选模块现在实际参与构建与测试；详见 [原生策略组](RUST_NATIVE_POLICIES.md) 和 [本轮阶段验收](RUST_POLICY_VALIDATION_20261017.md)。Qt 自动组/嵌套组转换仍未迁移。
 - 健康视图在 listener accept 时固定；旧 TCP/UDP 保留原出口，完整配置替换/stop 取消旧探测。失败应用请求不重放，无健康成员不静默直连；四个跨配置代共享探测名额和有界期限限制后台工作。
-- SOCKS4/4a 的 Rust subscription inspector 与 Qt 节点转换已接入，十个本地 inspector 至独立对端的真实会话通过。Qt 新增 SOCKS4/4a、VLESS WS 的真实转发槽；本地没有 Qt SDK，槽执行必须以 Windows CI 为准。
+- SOCKS4/4a 的 Rust subscription inspector 与 Qt 节点转换已接入，十个本地 inspector 至独立对端的真实会话通过。Windows #25 新增 SOCKS4/4a 六个 Qt 转发会话、VLESS WS 的 131073 字节真实响应均通过；Qt CTest 与既有 SS/VLESS 对端也通过。本地 Linux 没有 Qt SDK，不能把 Windows 证据外推为各平台桌面验收。
 - WebSocket 关闭预算现在从最早关闭意图开始，覆盖拥塞队列、旧数据、Close 写入/flush、对端回复和底层 shutdown。既有 DoH、WS/WSS 及协议握手继续复用，没有重写已有传输。
 - 当前阶段默认产品仍保留 C++/Mihomo 兼容构建。必须用 `SWIRL_USE_RUST_CORE=ON` 验证原生 Rust；该模式不会回退完整外部内核。智能 MRS、TUN、LAN 和未迁移协议仍会明确拒绝。
 - 私有订阅/缓存不进 Git 或 CI；无需开启用户十分钟订阅更新窗口。只使用合成对端和明确的固定公共目标做本轮验证，不修改系统代理或 DNS。
@@ -22,10 +22,17 @@
 | 本地 Python 回归合计 | 134 项中 97 通过、37 明确跳过、0 失败；其中策略独立对端 13/13 通过 |
 | 可区分 UDP 出口 | 两个独立 SS 出口共六次往返；健康切换和完整配置替换后旧关联仍固定原出口 |
 | 本地固定公网尝试 | 三项在 DNS/连接阶段失败；[原始 JSON](evidence/RUST_PUBLIC_NETWORK_20261017_POLICY_LOCAL.json) 保留，未计作通过 |
-| 本轮提交、App 工作流更新及三平台/Qt/公网 CI | 本地验收记录写入时尚未推送；提交后依据实际 Actions 更新，不预先宣称成功 |
+| 本轮源码提交 | [`58969bc`](https://github.com/SOLHK/Swirl/commit/58969bce15f9995573f15661bbd1ca75530938af)，已推送；远端源码树与本地验收暂存树一致 |
+| App 工作流提交 | [`5dbe762`](https://github.com/SOLHK/Swirl/commit/5dbe762d4b85543939d8ca476451f137e210a559)，仅 `rust-core.yml` +9；[Core implementation validation #21](https://github.com/SOLHK/Swirl/actions/runs/39033743434) 成功 |
+| 本轮 Linux/macOS CI | [Swirl Rust Core #25](https://github.com/SOLHK/Swirl/actions/runs/39033762503)，实际提交 `5dbe762`；两平台均成功，各 83 Rust、96/100 Python 通过，4 Qt 跳过；策略 13/13 |
+| 本轮 Windows/Qt CI | 同一 #25 全部成功；83 Rust，初次 134 Python 中 128 通过、6 跳过；Qt CTest 1/1（3.12 秒），随后 SS/VLESS/SOCKS4/WS 四项独立 Qt 对端全部补跑通过，余下两项可选私有 importer/真实 CLI 未执行 |
+| 本轮严格公网门禁 | 同一 #25 Linux；[原始 VERIFIED JSON](evidence/RUST_PUBLIC_NETWORK_20261017_POLICY_VERIFIED.json)；三项 HTTP 200/301/200、认证 TLS 1.3、正常关闭、双向流量、每项 `accepted=1 / active=0 / failed=0`，无会话错误 |
 
-工作流更新器已通过 13 项安全回归和精确 +9 行预览；复用既有 App 更新目标 Rust workflow，
-增加策略对端、portable inspector 和 Windows SOCKS4/WS Qt 实测，不调整 App 或 Secrets。
+工作流更新器已通过 13 项安全回归；App 实际提交与精确 +9 行预览的 SHA-256 均为
+`50308ecf9ca19e1da4e26893ecb9c6aa8291dc5161976795cf89b4310dc89293`。
+新增策略对端、portable inspector 和 Windows SOCKS4/WS Qt 实测，不调整 App 或 Secrets。
+#25 三平台整体于 2026-10-17 12:55:06 UTC 成功完成。公网报告准确标记 `5dbe762`、干净工作区，
+CI release harness SHA-256 为 `914ee31cac2e00f75bb78bde55a22f68e60c6e98b4af8e6e71d906b59b5e1da0`。
 完整命令、边界、哈希和各项跳过原因见 [本轮阶段验收](RUST_POLICY_VALIDATION_20261017.md)。
 
 ## 上一阶段远端提交与验收（历史）

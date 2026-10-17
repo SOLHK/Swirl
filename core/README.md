@@ -49,15 +49,21 @@ source identities, results, skips and remaining work.
 This stage also connects SOCKS4/4a subscription-inspector conversion and the
 existing Qt import/adapter chain, preserving USERID and local/remote DNS
 semantics. New Qt SOCKS4 and VLESS WS forwarding slots use independent Python
-peers. These Qt source changes still require the current commit's Windows CI
-build and execution; their existence is not a Qt pass. Automatic/nested policy
+peers and passed Windows CI on `5dbe762`: six imported SOCKS4/4a HTTP sessions and
+a 131073-byte VLESS WS origin response. Qt CTest passed 1/1 in 3.12 seconds;
+the existing independent SS/VLESS Qt paths also passed. Automatic/nested policy
 groups remain an IR/API capability without Qt group-editor mapping.
 
 WebSocket shutdown now has one two-second budget starting at the first close
 request, covering queued output, writes, flush, peer close and transport shutdown.
 Local Rust fmt, check, clippy, workspace tests and release compilation have passed
-for the current integration; final counts and remote results belong in the
-current validation record above. QML and product UI are preserved. The
+for the current integration. [Swirl Rust Core #25](https://github.com/SOLHK/Swirl/actions/runs/39033762503)
+passed on Linux/macOS/Windows with 83 Rust tests each, all 13 independent policy
+tests on each platform, and three strict Linux public HTTPS/DIRECT/DoH checks.
+The implementation commit is `58969bc`; the existing App added only nine reviewed
+workflow lines in `5dbe762`. Complete Python counts, explicit skips, Qt results
+and downloaded public evidence belong in the current validation record above.
+QML and product UI are preserved. The
 [architecture audit](../docs/RUST_CORE_AUDIT_20261017.md) is explicitly a historical
 `8bd89f2` audit, with a header pointing to these subsequent changes.
 
@@ -150,8 +156,8 @@ The Qt adapter contains mappings for supported HTTP/SOCKS4/4a/5/Trojan/SS AEAD/V
 nodes, including the limited VLESS/Trojan WS combinations, through existing
 controls. SOCKS4/4a now has subscription-inspector conversion plus Qt import,
 normalization and Rust-IR mapping. The new Qt mappings and independent forwarding
-slots must still be built and run on Windows for this stage; earlier Qt success
-does not establish these new paths. SOCKS4 USERID is not password authentication;
+slots passed the current stage's Windows #25 CTest and Python peers; this is not
+a complete desktop package or personal-machine visual check. SOCKS4 USERID is not password authentication;
 unsupported passwords, TLS, UDP and other extensions are rejected explicitly.
 Unsupported options fail explicitly before startup or selection. In
 particular, old default smart-routing/TUN/unsupported DNS sessions are not silently

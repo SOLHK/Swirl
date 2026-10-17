@@ -3,7 +3,12 @@
 日期：2026-10-17。唯一开发分支：`work/core-completion-20261017`。
 接续基线：`0bf2666e118134d25071cd93e743702cba672f83`。
 本阶段实际修改并运行原生 Rust 源码，未改 main、QML 界面、系统代理或系统 DNS，也未访问私有订阅。
-本文区分实现、执行证据和待执行门禁；旧提交的 CI 成功不作为本阶段通过证据。
+本文区分实现、执行证据和具体门禁；旧提交的 CI 成功不作为本阶段通过证据。
+
+源码实现已推送为 [`58969bc`](https://github.com/SOLHK/Swirl/commit/58969bce15f9995573f15661bbd1ca75530938af)。
+GitHub 工具生成的源码树 `9a5dd9e15f897d08073609ed6d18d28292ae1151` 与本地验收暂存树逐字节一致。
+既有 App 随后提交 [`5dbe762`](https://github.com/SOLHK/Swirl/commit/5dbe762d4b85543939d8ca476451f137e210a559)，
+唯一改动是 `rust-core.yml` 增加 9 行，Rust/Qt/Python 实现与前一提交完全相同。
 
 ## 本阶段交付
 
@@ -90,7 +95,7 @@ Rust 专用 Qt 构建允许已校验的 SOCKS4 导入；兼容构建维持拒绝
   请求独立 HTTP 源站的 131073 字节响应，并检查掩码、目标地址和最终会话计数。
   Qt 槽的源码与 Python 对端存在，不等于本地 Linux 已实际执行 Qt。
 
-## 公网尝试与待执行的远端门禁
+## 本地公网尝试与远端门禁
 
 本地 2026-10-17 12:31:38 UTC 的固定公网尝试失败，保留
 [原始失败 JSON](evidence/RUST_PUBLIC_NETWORK_20261017_POLICY_LOCAL.json)。
@@ -104,18 +109,79 @@ Rust 专用 Qt 构建允许已校验的 SOCKS4 导入；兼容构建维持拒绝
 | `example.com:443` | 原生 DoH，经 `1.1.1.1:443` bootstrap | `DnsHttpsConnect`；无应用流量 |
 
 三项均为 `accepted=1 / active=0 / failed=1`，不能称公网验证通过。
-最终公网验收将在 GitHub Actions 使用同一提交的 release harness，严格要求认证 TLS、
+远端公网验收使用同一提交的 release harness，严格要求认证 TLS、
 预期 HTTP 状态、双向流量、正常关闭、`failed=0`、空 `last_error` 和一条连接记录。
 公共 DIRECT/DoH 证据不外推到私有节点、WS 服务提供商、UDP、TUN 或长期性能。
 
-本阶段尚未推送时，远端状态明确为待执行。完成后在本节登记实际源码提交、App 工作流提交、
-运行 URL、job 结论和公开证据；不得提前登记成功。
+### 当前提交的严格公网通过证据
+
+`5dbe762` 的 #25 Linux job 于 **2026-10-17 12:48:17 UTC** 完成三项公网检查，
+原始附件已下载并保留为 [VERIFIED JSON](evidence/RUST_PUBLIC_NETWORK_20261017_POLICY_VERIFIED.json)。
+报告标记 `tracked_worktree_clean=true`，二进制 SHA-256 为
+`914ee31cac2e00f75bb78bde55a22f68e60c6e98b4af8e6e71d906b59b5e1da0`。
+它是当前提交在 CI 生成的二进制，不能与前述本地构建或上一阶段哈希混用。
+
+| 公共目标 | DNS 路径 | HTTP | Core 上传/下载字节 | 会话收尾 |
+|---|---|---|---|---|
+| `example.com:443` | system | 200 | 700 / 4790 | 通过 |
+| `www.rust-lang.org:443` | system | 301 | 690 / 5386 | 通过 |
+| `example.com:443` | 原生 DoH，显式 Cloudflare IP bootstrap | 200 | 700 / 4790 | 通过 |
+
+三项均为认证 TLS 1.3，`certificate_verified=true`、`orderly_close=true`，
+每项 `accepted=1 / active=0 / failed=0`、`last_error=""`、`recorded_connections=1`。
+这里的 301 是固定公网 HEAD 验收预期状态；健康探测自身仍按配置精确匹配 2xx，不跟随重定向。
+
+[GitHub 原始附件](https://github.com/SOLHK/Swirl/actions/runs/39033762503/artifacts/12101273040)
+ZIP SHA-256 为 `09ab062d72b63a9caf4f1e3695ed8ab6a73e0a0e0f7e07378276ab953400f83f`，
+下载字节已与上传日志核对一致；解压 JSON 的 SHA-256 为
+`67d7ec841062582c5a56c93812bb7b8d48267f4018aab507800eabc74b932974`。
+
+本轮远端运行入口：
+
+| 运行 | 实际作用 | 当前状态 |
+|---|---|---|
+| [Core implementation validation #21](https://github.com/SOLHK/Swirl/actions/runs/39033743434) | 由 `58969bc` 触发；日志明确实际测试 `5dbe762` | 成功，12:47:53 UTC 完成；App 提交、83 Rust、13 更新器回归及基础独立对端均成功 |
+| [Swirl Rust Core #25 / Linux](https://github.com/SOLHK/Swirl/actions/runs/39033762503/job/117399364540) | `5dbe762`；83 Rust、100 Python、三项严格公网 | 成功；Python 96 通过、4 Qt 跳过；策略 13/13；公网 3/3 |
+| [Swirl Rust Core #25 / macOS](https://github.com/SOLHK/Swirl/actions/runs/39033762503/job/117399364475) | `5dbe762`；83 Rust、100 Python | 成功；Python 96 通过、4 Qt 跳过；策略 13/13 |
+| [Swirl Rust Core #25 / Windows](https://github.com/SOLHK/Swirl/actions/runs/39033762503/job/117399364415) | `5dbe762`；MSVC Rust、独立协议、Qt CTest 与四个独立 Qt 对端 | 全部成功；83 Rust；初次 134 Python 中 128 通过、6 跳过；随后四项 Qt 独立补跑均通过 |
+
+`58969bc` 同时触发的 #24 使用更新前测试菜单，不能代替 #25 的新增门禁。
+App 自己触发的 Core implementation validation #22 按既有防递归条件跳过；
+该跳过不作为实现验收，实际 App 执行和源码验证以 #21 为准。
+Core #21 的基础独立对端菜单共 74 项，69 通过、5 跳过：四项需要 Qt，另一项需要 inspector。
+同一源码的 #25 Linux/macOS 已实际执行新增 inspector 和 13 项 Python 策略门禁，不能用 Core #21
+的基础菜单代替它们；各平台 Qt 跳过项也不能被错误计入通过数。
+
+#25 三平台整体于 **2026-10-17 12:55:06 UTC** 成功完成。
+各平台均通过 fmt/check/clippy、83 项 Rust 和 release 构建；Python 策略套件分别为
+Linux 13/13（5.232 秒）、macOS 13/13（7.176 秒）、Windows 13/13（6.353 秒）。
+
+### Windows Qt 的真实执行
+
+Qt 6.10.3 / MSVC 构建 `SwirlRustCoreTests`，以 `SWIRL_USE_RUST_CORE=ON` 链接本轮 Rust 动态库。
+CTest `swirl-rust-qt-integration` **1/1 通过，3.12 秒**，包含 SOCKS4 参数接受、拒绝和 ABI 转换回归。
+需要外部端口的槽随后由 Python 独立对端设置环境并明确指定槽名执行：
+
+| 独立测试 | 实际结果 | 转发证据 |
+|---|---|---|
+| `ShadowsocksTests.test_qt_facade_http_obfs_with_udp_declared` | 通过，0.668 秒 | 既有 SS AEAD / HTTP obfs Qt 路径保持通过 |
+| `RustCoreIntegration.test_vless_qt_data_path` | 通过，0.662 秒 | 既有 VLESS Qt 原生转发保持通过 |
+| `Socks4Integration.test_qt_imported_socks4_and_4a_data_path` | 通过，2.453 秒 | URI、sing-box JSON、YAML × SOCKS4/4a，共六个 Qt 导入至独立对端 HTTP 会话；检查 USERID、本地 IP/远程域名、完整响应与零会话错误 |
+| `WebSocketTransportTests.test_qt_vless_websocket_data_path` | 通过，1.166 秒 | Qt VLESS WS 请求实际源站 131073 字节响应，验证掩码、目标、数据及正常关闭计数 |
+
+Windows 初次 134 项中的六个跳过为上述四项 Qt、一项可选 C++ 私有缓存 importer 和
+一项 opt-in 真实 Codex CLI。四项 Qt 已按表补足，余下两项没有执行；Linux/macOS 的 Qt 跳过
+也不被改写为该平台桌面验收通过。测试通过不代表所有 Python daemon 请求线程都被逐个 join。
+
+CI 仅构建/执行 Qt 控制适配测试目标，没有本轮完整 Swirl 桌面安装包或个人机器视觉验收。
+`windeployqt` 的日志仍保留 dxcompiler/dxil 与 VCINSTALLDIR 提示；不能用测试目标成功宣称
+发行包运行库齐备。没有为消除提示而更改用户系统环境。
 
 ## CI 的具体增量
 
 复用已有 App 的 Contents/Workflows 权限及限定分支的自动更新入口。
 本次提交修改已受保护的 `tools/ApplyCoreDevelopment.py` 及其测试，
-不修改 App Secrets 或调用工作流；App 将精确更新 `rust-core.yml`：
+不修改 App Secrets 或调用工作流；App 已在 `5dbe762` 精确更新 `rust-core.yml`：
 
 1. Linux/macOS 导出同次构建的 `SWIRL_RUST_INSPECTOR`，使新增 SOCKS4 inspector 数据路径实际执行。
 2. Linux/macOS 与 Windows 添加 `test_policy_groups.py`，保留失败退出门禁。
@@ -123,9 +189,9 @@ Rust 专用 Qt 构建允许已校验的 SOCKS4 导入；兼容构建维持拒绝
 
 审核前工作流 SHA-256 为
 `c40f0a47abafd50a7ebe6782c25572578544920263439d3ac249125a22c6e9e8`；
-精确 +9 行后预期为
+精确 +9 行后的预期和实际 SHA-256 均为
 `50308ecf9ca19e1da4e26893ecb9c6aa8291dc5161976795cf89b4310dc89293`。
-只有实际 App 提交及对应 Actions 完成后，才能确认远端执行增量生效。
+App 提交内容已与本地审核结果核对一致；测试执行结论按上方具体 Actions 登记。
 
 ## 复现与后续边界
 
