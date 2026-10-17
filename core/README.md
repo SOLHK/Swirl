@@ -25,8 +25,9 @@ Configure the real desktop with CMake options `SWIRL_USE_RUST_CORE=ON` and
 `Swirl` and `SwirlRustCoreTests`, then run CTest `swirl-rust-qt-integration`.
 No Mihomo executable is staged into this build. The retained MihomoAdapter has a
 compile-time start rejection in this mode, including legacy diagnostic callers.
-Production data forwarding and node probes use RustCoreEngine through the
-existing ThreadedEngine worker. The old build and tests remain separately usable.
+Production sessions use RustCoreEngine through the existing ThreadedEngine
+worker; isolated node tests instantiate RustCoreEngine directly. Forwarding and
+protocol tasks execute in Rust. The old build and tests remain separately usable.
 
 Python `tools/tests/test_rust_core.py` uses an independent socket/TLS peer and
 ephemeral CA/leaf certificates (cryptography 50.0.2). Set SWIRL_RUST_HARNESS to
@@ -34,7 +35,20 @@ the built swirl-api executable. No global certificate trust changes occur.
 `tools/Benchmark-RustCore.py` records loopback latency/throughput/CPU/memory and
 optional public HTTPS checks; it does not claim private-node performance.
 
-## Strict DoT stage
+## Current development branch and evidence
+
+Continue `work/core-completion-20261017`, not the older main or test head. The
+2026-10-17 stage fixes the independent WebSocket peer's control-frame scheduling
+and the native bounded Ping/Pong queue. See the [actual architecture audit](../docs/RUST_CORE_AUDIT_20261017.md)
+and [stage validation](../docs/RUST_WS_VALIDATION_20261017.md) for exact tested
+commits, failures, skips and remaining work. QML and product UI are preserved.
+
+The three `swirl-subscription/src/policy.rs`, `swirl-protocol/src/probe.rs` and
+`swirl-core/src/policy.rs` files are **unintegrated candidates**. They are not
+declared by their crate roots and their tests are not executed. Automatic
+url-test/fallback/load-balance is not a runtime capability yet.
+
+## Encrypted DNS: DoT and HTTP/1.1 DoH
 
 DNS-over-TLS is now implemented in Rust using explicit IP bootstrap endpoints
 and separately verified authentication names. The existing DNS wire parser and
@@ -43,26 +57,31 @@ per lookup, with bounded deadlines, generation-isolated TTL caches and no
 plaintext/system-DNS fallback. `tools/tests/test_dns_tls.py` supplies independent
 synthetic TLS peers; it is run by Rust CI alongside the original protocol tests.
 
-The existing Qt encrypted-DNS field maps a strict `tls://` URL; domain URLs need
-an exact local IP mapping. No GUI is changed. DoT currently connects directly to
-the configured resolver, not through proxy policy. DoH, system bootstrap, mixed
-resolver mode, DNS split and negative caching remain later stages. See
-[DoT semantics, configuration and evidence boundaries](../docs/RUST_DOT.md).
+The same resolver now also executes authenticated RFC 8484 HTTP/1.1 POST with
+bounded HTTP headers, exact/chunked bodies and cache-age handling. Existing Qt
+encrypted-DNS fields map strict `tls://` or `https://` URLs; domain URLs need an
+exact local IP mapping. No GUI is changed. Encrypted DNS connects directly to the
+explicit resolver, not through proxy policy. System bootstrap, mixed resolver
+mode, DNS split, negative caching and HTTP/2 remain later work. DoH has its own
+independent peer suite, `tools/tests/test_dns_https.py`. See the historical
+[DoT semantics](../docs/RUST_DOT.md) and the current stage evidence linked above.
 
 ## Implemented boundary
 
 | Crate | Actual implementation | Not yet implemented |
 |---|---|---|
-| swirl-subscription | Versioned typed Swirl IR; bounded content detection for Clash YAML/JSON, sing-box JSON, URI/Base64 and INI; raw/unknown field preservation; redacted protocol/transport/TLS/cipher matrix; fully mapped TCP test candidates; validated explicit DoT settings | Complete client-specific config execution and integrated subscription updating; existing C++ adapters and Python capture retained |
-| swirl-protocol | Mixed HTTP/CONNECT/SOCKS5 input, input auth, HTTP CONNECT/SOCKS5 upstream auth, Trojan TLS framing, SS AEAD TCP/UDP, simple-obfs HTTP TCP, VLESS v0 TCP with optional verified TLS | SOCKS4, SS2022/SSR/VMess/REALITY/QUIC families, VLESS Vision/mux/encryption extensions, other protocol UDP and obfs TLS |
-| swirl-transport | rustls TLS with verification/SNI/ALPN, bounded duplex copying, independent half-close, live byte counters | WS/gRPC/XHTTP protocol transports, mux, QUIC; application WS/SSE opaque tunneling is a different layer |
+| swirl-subscription | Versioned typed Swirl IR; bounded content detection for Clash YAML/JSON, sing-box JSON, URI/Base64 and INI; raw/unknown field preservation; redacted capability matrix; mapped TCP/WS candidates; validated explicit DoT/DoH settings | Complete client-specific config execution, SOCKS4 inspector conversion and integrated subscription updating; existing C++ adapters and Python capture retained |
+| swirl-protocol | Mixed HTTP/CONNECT/SOCKS4/4a/5 input, input auth, HTTP CONNECT/SOCKS4/4a/5 upstream, Trojan TLS, SS AEAD TCP/UDP, simple-obfs HTTP TCP, VLESS v0 TCP/TLS; native VLESS WS/WSS and Trojan WSS framing | SS2022/SSR/VMess/REALITY/QUIC families, VLESS Vision/mux/encryption extensions, other protocol UDP and obfs TLS |
+| swirl-transport | rustls TLS with verification/SNI/ALPN, bounded duplex copying, independent TCP half-close, live byte counters; the bounded WS driver currently resides in swirl-protocol | gRPC/XHTTP, mux and QUIC; WS close is full duplex and does not promise TCP half-close semantics |
 | swirl-routing | Ordered domain/suffix/keyword, source/destination CIDR, destination port and final rules; lazy system DNS and pinned IP decisions; Qt rules map DIRECT/REJECT/selected node/manual groups; atomic selector updates | Process rules, GEOIP/GEOSITE/MRS, nested/automatic groups/failover, policy-aware multi-address retries |
-| swirl-dns | Rust custom UDP/TCP DNS and strict DoT with explicit IP bootstrap; validated A/AAAA/CNAME and bounded positive TTL cache; system resolver, exact hosts through Qt, immutable caches, shared 8-query budget, max 16 addresses | Combined system/custom mode, DoH, proxy-routed encrypted DNS, domain bootstrap, EDNS/DNSSEC, negative cache, DNS split/Fake-IP |
+| swirl-dns | Rust custom UDP/TCP DNS, strict DoT and HTTP/1.1 DoH with explicit IP bootstrap; validated A/AAAA/CNAME and bounded positive TTL cache; system resolver, exact hosts through Qt, immutable caches, shared 8-query budget, max 16 addresses | Combined system/custom mode, proxy-routed encrypted DNS, domain bootstrap, EDNS/DNSSEC, negative cache, DNS split/Fake-IP |
 | swirl-core | Two Tokio workers, max 256 sessions, immutable per-session plan, atomic updates, stop/cancel, stats; SOCKS5 UDP ASSOCIATE with explicit DIRECT or SS AEAD routes | Other protocol UDP, TUN, platform network takeover |
 | swirl-api | ABI v1 caller-buffer JSON, lifecycle handles, start/configure/select/snapshot/stop; local stdin harness | More advanced policy/config schemas and persisted IR migration |
 
-The Qt adapter exposes supported HTTP/SOCKS5/Trojan/SS AEAD/VLESS TCP nodes using the existing
-controls. Unsupported options fail explicitly before startup or selection. In
+The Qt adapter exposes supported HTTP/SOCKS5/Trojan/SS AEAD/VLESS nodes, including
+the limited VLESS/Trojan WS mappings, through existing controls. SOCKS4/4a is
+currently an IR/API capability without Qt or subscription-inspector conversion.
+Unsupported options fail explicitly before startup or selection. In
 particular, old default smart-routing/TUN/unsupported DNS sessions are not silently
 downgraded to global/direct. Existing stored nodes and unselected unsupported
 imports are preserved. Complete product migration still requires those features.
@@ -152,7 +171,7 @@ is decoded lazily because the peer may wait for application data; partial header
 bytes survive cancellation and a partial-header deadline uses the configured
 handshake limit. Waiting for the first application response has no fixed idle
 cutoff. Unknown versions, nonempty addons, flow/Vision, REALITY, multiplexing,
-other transports, UDP and encryption extensions are rejected rather than stripped.
+gRPC/XHTTP/QUIC transports, UDP and encryption extensions are rejected rather than stripped.
 Python independent peers verify plain/TLS forwarding, invalid UUID, certificate
 name rejection and malformed response prefixes; a Qt peer test verifies the
 existing product adapter. Private-provider VLESS is unverified. Reference:
@@ -191,8 +210,14 @@ Local private subscription capture and offline parsing have been exercised;
 this does not establish working provider connections. TUN, real provider traffic,
 Codex remote control, mobile actions, long soak tests,
 visual acceptance and non-Windows products are still unverified.
-The current DoT stage uses CI for native builds and synthetic peers; the user's
-personal Windows/public-or-private resolver testing remains deferred.
+The reviewed App workflow update will add separate public-origin HTTPS and native
+DoH checks with fixed endpoints and actual byte counters. It has not yet been
+applied or run: the connector rejected the initial GitHub write. The exact
+blocker and pending evidence are recorded in
+[`RUST_WS_VALIDATION_20261017.md`](../docs/RUST_WS_VALIDATION_20261017.md).
+A public DIRECT success would not prove a provider's WS endpoint,
+private subscription or all product settings. The user's personal Windows
+visual/private-node testing remains deferred.
 
 The original C++ native engine, encrypted NodeStore, importers, proxy recovery,
 subscription capture utility and regression tests remain available. No Go/C#
@@ -204,6 +229,8 @@ network core or pre-existing Rust workspace was present in the audited baseline.
 - SOCKS username/password: https://www.rfc-editor.org/rfc/rfc1929
 - HTTP message syntax: https://www.rfc-editor.org/rfc/rfc9112
 - DNS over TLS: https://www.rfc-editor.org/rfc/rfc7858
+- DNS over HTTPS: https://www.rfc-editor.org/rfc/rfc8484
+- WebSocket framing and control: https://www.rfc-editor.org/rfc/rfc6455
 - DNS privacy profiles: https://www.rfc-editor.org/rfc/rfc8310
 - Trojan: https://trojan-gfw.github.io/trojan/protocol.html
 - Tokio half-close semantics: https://docs.rs/tokio/latest/tokio/io/fn.copy_bidirectional.html

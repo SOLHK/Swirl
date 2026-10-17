@@ -18,6 +18,77 @@ class RustCoreTests:public QObject {
   o.nodes={n};o.selectedNodeId=n.id;return o;
  }
 private slots:
+ void webSocketMapsExistingFieldsAndRustAcceptsConfiguration(){
+  ControlledNetwork net;QVERIFY(net.start());auto o=options(net);
+  auto &node=o.nodes.first();node.protocol="vless";
+  node.parameters={{"uuid","00112233-4455-6677-8899-aabbccddeeff"},{"network","ws"}};
+  QJsonObject config;auto error=RustCoreEngine::configuration(o,&config);
+  QVERIFY2(error.isEmpty(),qPrintable(error));
+  auto outbound=config["nodes"].toArray().first().toObject()["outbound"].toObject();
+  const QJsonObject defaults{{"host","127.0.0.1"},{"path","/"}};
+  QCOMPARE(outbound["websocket"].toObject(),defaults);QVERIFY(!outbound.contains("tls"));
+  // Configuration acceptance crosses the actual Rust ABI. Independent framed
+  // peers exercise forwarding; this test does not claim Qt WS interoperability.
+  RustCoreEngine engine;engine.start(o);
+  QVERIFY2(engine.status().state==ProxyEngine::State::Running,qPrintable(engine.status().message));
+  QCOMPARE(engine.status().engineKind,QString("rust"));engine.stop();
+
+  node.serverName="tls.fixture.invalid";
+  node.parameters["tls"]=true;node.parameters["sni"]=node.serverName;
+  node.parameters["alpn"]=QJsonArray{"http/1.1"};
+  node.parameters["ws-opts"]=QJsonObject{{"path","/proxy%20path?client=fixture"},
+    {"headers",QJsonObject{{"hOsT","ws.fixture.invalid:8443"}}}};
+  error=RustCoreEngine::configuration(o,&config);QVERIFY2(error.isEmpty(),qPrintable(error));
+  outbound=config["nodes"].toArray().first().toObject()["outbound"].toObject();
+  const QJsonObject explicitWs{{"host","ws.fixture.invalid:8443"},{"path","/proxy%20path?client=fixture"}};
+  QCOMPARE(outbound["websocket"].toObject(),explicitWs);
+  QCOMPARE(outbound["tls"].toObject()["server_name"].toString(),node.serverName);
+  QCOMPARE(outbound["tls"].toObject()["alpn"].toArray(),QJsonArray{"http/1.1"});
+  engine.start(o);
+  QVERIFY2(engine.status().state==ProxyEngine::State::Running,qPrintable(engine.status().message));engine.stop();
+
+  node.protocol="trojan";node.password="synthetic-ws-password";
+  node.parameters.remove("uuid");node.parameters.remove("tls");
+  error=RustCoreEngine::configuration(o,&config);QVERIFY2(error.isEmpty(),qPrintable(error));
+  outbound=config["nodes"].toArray().first().toObject()["outbound"].toObject();
+  QCOMPARE(outbound["type"].toString(),QString("trojan"));
+  QCOMPARE(outbound["websocket"].toObject(),explicitWs);
+  QCOMPARE(outbound["tls"].toObject()["server_name"].toString(),node.serverName);
+  engine.start(o);
+  QVERIFY2(engine.status().state==ProxyEngine::State::Running,qPrintable(engine.status().message));engine.stop();
+ }
+ void webSocketRejectsUnsupportedParametersWithoutPartialConfiguration(){
+  ControlledNetwork net;QVERIFY(net.start());auto valid=options(net);
+  auto &node=valid.nodes.first();node.protocol="vless";node.serverName="tls.fixture.invalid";
+  node.parameters={{"uuid","00112233-4455-6677-8899-aabbccddeeff"},{"network","ws"},{"tls",true},
+    {"sni",node.serverName},{"alpn",QJsonArray{"http/1.1"}},
+    {"ws-opts",QJsonObject{{"path","/proxy"},{"headers",QJsonObject{{"Host","ws.fixture.invalid"}}}}}};
+  struct RejectedCase {const char *name;QJsonObject parameters;};
+  const RejectedCase cases[]{
+   {"unsupported transport",{{"network","grpc"}}},
+   {"WS options on TCP",{{"network","tcp"}}},
+   {"invalid options type",{{"ws-opts","invalid"}}},
+   {"early data unsupported",{{"ws-opts",QJsonObject{{"max-early-data",2048}}}}},
+   {"extra request header",{{"ws-opts",QJsonObject{{"headers",QJsonObject{{"Cookie","fixture=1"}}}}}}},
+   {"duplicate Host aliases",{{"ws-opts",QJsonObject{{"headers",QJsonObject{{"Host","ws.fixture.invalid"},{"host","other.fixture.invalid"}}}}}}},
+   {"header injection",{{"ws-opts",QJsonObject{{"headers",QJsonObject{{"Host","ws.fixture.invalid\r\nX-Fixture: 1"}}}}}}},
+   {"ambiguous request target",{{"ws-opts",QJsonObject{{"path","//other.fixture.invalid/proxy"}}}}},
+   {"unsupported ALPN",{{"alpn",QJsonArray{"h2"}}}},
+   {"unsupported proxy UDP",{{"udp",true}}},
+   {"disabled certificate verification",{{"skip-cert-verify",true}}},
+   {"unsupported VLESS flow",{{"flow","xtls-rprx-vision"}}}
+  };
+  const QJsonObject sentinel{{"unchanged",true}};
+  for(const auto &test:cases){
+   auto bad=valid;auto &parameters=bad.nodes.first().parameters;
+   for(auto it=test.parameters.begin();it!=test.parameters.end();++it)parameters[it.key()]=it.value();
+   QJsonObject config=sentinel;
+   QVERIFY2(!RustCoreEngine::configuration(bad,&config).isEmpty(),test.name);QCOMPARE(config,sentinel);
+   RustCoreEngine engine;engine.start(bad);
+   QCOMPARE(engine.status().state,ProxyEngine::State::Failed);
+   QCOMPARE(engine.status().error,ProxyEngine::Error::InvalidOptions);QVERIFY(!engine.status().processAlive);
+  }
+ }
  void nativeDohMapsExistingHttpsField(){
   ControlledNetwork net;QVERIFY(net.start());auto o=options(net);o.routingMode="direct";
   o.dnsConfig={{"mode",0},{"servers",""},{"encrypted","https://DNS.fixture.invalid:8443/dns-query"},{"useHosts",false},

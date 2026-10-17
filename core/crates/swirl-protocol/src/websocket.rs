@@ -194,14 +194,20 @@ async fn read_frames<R: AsyncRead + Unpin, W: AsyncWrite + Unpin>(
                         return Err(invalid("WebSocketClose"));
                     }
                     controls
-                        .try_send((8, data))
-                        .map_err(|_| invalid("WebSocketControlLimit"))?;
+                        .send((8, data))
+                        .await
+                        .map_err(|_| invalid("WebSocketControlClosed"))?;
                     return Ok(());
                 }
                 if opcode == 9 {
+                    // A coalesced burst may fill the bounded queue before the
+                    // writer is polled. Apply backpressure instead of treating
+                    // valid control traffic as a malformed frame. The driver
+                    // polls both directions and Drop cancels a blocked send.
                     controls
-                        .try_send((10, data))
-                        .map_err(|_| invalid("WebSocketControlLimit"))?;
+                        .send((10, data))
+                        .await
+                        .map_err(|_| invalid("WebSocketControlClosed"))?;
                 }
             }
             // Proxy transports carry binary bytes, never text messages.
@@ -343,6 +349,44 @@ pub(super) async fn connect(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn server_frame(opcode: u8, fin: bool, data: &[u8]) -> Vec<u8> {
+        let mut frame = vec![opcode | if fin { 128 } else { 0 }];
+        if data.len() < 126 {
+            frame.push(data.len() as u8);
+        } else {
+            assert!(data.len() <= 65535);
+            frame.push(126);
+            frame.extend((data.len() as u16).to_be_bytes());
+        }
+        frame.extend(data);
+        frame
+    }
+
+    async fn client_frame<R: AsyncRead + Unpin>(reader: &mut R) -> (u8, Vec<u8>) {
+        let mut header = [0; 2];
+        reader.read_exact(&mut header).await.unwrap();
+        assert_eq!(header[0] & 0xf0, 0x80);
+        assert_ne!(header[1] & 0x80, 0);
+        let size = match header[1] & 127 {
+            126 => {
+                let size = reader.read_u16().await.unwrap();
+                assert!(size >= 126);
+                usize::from(size)
+            }
+            127 => panic!("client frames must respect the fixed transport buffer"),
+            size => usize::from(size),
+        };
+        assert!(size <= BUFFER);
+        let mut mask = [0; 4];
+        reader.read_exact(&mut mask).await.unwrap();
+        let mut data = vec![0; size];
+        reader.read_exact(&mut data).await.unwrap();
+        for (i, byte) in data.iter_mut().enumerate() {
+            *byte ^= mask[i % 4];
+        }
+        (header[0] & 15, data)
+    }
     #[test]
     fn handshake_token_and_unsolicited_extensions() {
         let key = "dGhlIHNhbXBsZSBub25jZQ==";
@@ -385,5 +429,135 @@ mod tests {
             let (tx, _rx) = mpsc::channel(8);
             assert!(read_frames(&mut data, tokio::io::sink(), tx).await.is_err());
         }
+    }
+
+    #[tokio::test]
+    async fn coalesced_ping_burst_backpressures_the_bounded_control_queue() {
+        let mut wire = Vec::new();
+        let mut expected = Vec::new();
+        for i in 0u16..32 {
+            wire.extend(server_frame(9, true, &i.to_be_bytes()));
+            expected.push((10, i.to_be_bytes().to_vec()));
+        }
+        wire.extend(server_frame(8, true, &1000u16.to_be_bytes()));
+        expected.push((8, 1000u16.to_be_bytes().to_vec()));
+        let (tx, mut rx) = mpsc::channel(8);
+        let read = read_frames(wire.as_slice(), tokio::io::sink(), tx);
+        let drain = async {
+            let mut received = Vec::new();
+            while let Some(control) = rx.recv().await {
+                received.push(control);
+            }
+            received
+        };
+        let (result, received) = timeout(Duration::from_secs(2), async {
+            // Poll the reader first with all 33 controls immediately available.
+            // try_send fails on the ninth control before the writer can drain.
+            tokio::join!(biased; read, drain)
+        })
+        .await
+        .unwrap();
+        result.unwrap();
+        assert_eq!(received, expected);
+    }
+
+    #[tokio::test]
+    async fn closed_control_receiver_fails_without_waiting_or_releasing_payload() {
+        let bytes = server_frame(9, true, b"ping");
+        let (tx, rx) = mpsc::channel(8);
+        drop(rx);
+        let error = timeout(
+            Duration::from_secs(2),
+            read_frames(bytes.as_slice(), tokio::io::sink(), tx),
+        )
+        .await
+        .unwrap()
+        .unwrap_err();
+        assert_eq!(error.to_string(), "WebSocketControlClosed");
+    }
+
+    #[tokio::test]
+    async fn full_duplex_fragmented_transfer_and_ping_survive_backpressure() {
+        timeout(Duration::from_secs(3), async {
+            // Both buffers are far smaller than one application write or WS
+            // fragment, forcing partial reads/writes in both directions.
+            let (wire, server) = tokio::io::duplex(31);
+            let (application, mut app) = tokio::io::duplex(17);
+            let driver = tokio::spawn(async move { drive(Box::new(wire), &mut app).await });
+            let upload: Vec<_> = (0..BUFFER + 11).map(|i| i as u8).collect();
+            let download: Vec<_> = (0..BUFFER * 2 + 7).map(|i| (i % 251) as u8).collect();
+            let fragments = download.chunks(1024).len();
+            let (mut server_read, mut server_write) = tokio::io::split(server);
+            let (received_tx, received_rx) = tokio::sync::oneshot::channel();
+            let send = async {
+                for (index, data) in download.chunks(1024).enumerate() {
+                    server_write
+                        .write_all(&server_frame(
+                            if index == 0 { 2 } else { 0 },
+                            index + 1 == fragments,
+                            data,
+                        ))
+                        .await
+                        .unwrap();
+                    server_write
+                        .write_all(&server_frame(9, true, &(index as u16).to_be_bytes()))
+                        .await
+                        .unwrap();
+                }
+                received_rx.await.unwrap();
+                server_write
+                    .write_all(&server_frame(8, true, &1000u16.to_be_bytes()))
+                    .await
+                    .unwrap();
+            };
+            let receive = async {
+                let mut received = Vec::new();
+                let mut pongs = 0;
+                let mut completed = Some(received_tx);
+                loop {
+                    let (opcode, data) = client_frame(&mut server_read).await;
+                    match opcode {
+                        2 => received.extend(data),
+                        10 => {
+                            assert_eq!(data, (pongs as u16).to_be_bytes());
+                            pongs += 1;
+                        }
+                        8 => {
+                            assert_eq!(data, 1000u16.to_be_bytes());
+                            break;
+                        }
+                        _ => panic!("unexpected client opcode"),
+                    }
+                    assert!(received.len() <= upload.len());
+                    assert!(pongs <= fragments);
+                    if received.len() == upload.len()
+                        && pongs == fragments
+                        && let Some(completed) = completed.take()
+                    {
+                        completed.send(()).unwrap();
+                    }
+                }
+                assert_eq!(received, upload);
+                assert_eq!(pongs, fragments);
+            };
+            let (mut application_read, mut application_write) = tokio::io::split(application);
+            let application_upload = application_write.write_all(&upload);
+            let application_download = async {
+                let mut data = Vec::new();
+                application_read.read_to_end(&mut data).await.unwrap();
+                assert_eq!(data, download);
+            };
+            let (_, _, uploaded, _, result) = tokio::join!(
+                send,
+                receive,
+                application_upload,
+                application_download,
+                driver
+            );
+            uploaded.unwrap();
+            result.unwrap().unwrap();
+        })
+        .await
+        .unwrap();
     }
 }

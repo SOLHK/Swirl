@@ -1,11 +1,187 @@
-"""Checked source maintenance for the native core branch; no workflow changes."""
+"""Apply the reviewed Rust CI gates using the existing scoped GitHub App job.
+
+The only writable file is .github/workflows/rust-core.yml. The update enables
+its existing jobs on this development branch, adds the already implemented
+DoH, SOCKS4 and WebSocket peer suites, and runs fixed public-network checks with
+an evidence artifact on Linux. It does not change permissions, secrets,
+existing actions, release jobs, pull-request triggers or any product source.
+
+Run ``python tools/ApplyCoreDevelopment.py --check`` to run the safety tests and
+review the exact diff without writing. With no arguments, writes are restricted
+to this repository's existing development workflow and push ref. The caller
+already owns committing and pushing the change through its GitHub App token.
+"""
+
+import argparse
+from collections.abc import Mapping
+import difflib
+import hashlib
+import os
 from pathlib import Path
-path = Path('core/crates/swirl-subscription/src/inspect.rs')
-text = path.read_text(encoding='utf-8')
-# WS now has both dedicated positive and negative tests. Retain these older
-# unsupported-transport assertions using gRPC, which is still not implemented.
-text = text.replace('            "&type=ws",', '            "&type=grpc",')
-old = '"password":"s","network":"ws"},{"type":"trojan"'
-new = '"password":"s","network":"grpc"},{"type":"trojan"'
-text = text.replace(old, new)
-path.write_text(text, encoding='utf-8')
+import subprocess
+import sys
+import tempfile
+
+
+REPOSITORY = "SOLHK/Swirl"
+DEVELOPMENT_REF = "refs/heads/work/core-completion-20261017"
+WORKFLOW = Path(".github/workflows/rust-core.yml")
+CALLER_WORKFLOW = (
+    f"{REPOSITORY}/.github/workflows/core-development.yml@{DEVELOPMENT_REF}"
+)
+WINDOWS_STATUS_GUARD = "          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }\n"
+ADDITIONAL_TESTS = (
+    "test_dns_https.py",
+    "test_socks4.py",
+    "test_websocket_transport.py",
+    "test_core_development.py",
+)
+PUBLIC_PROBE = Path("tools/Verify-PublicRustCore.py")
+PUBLIC_VALIDATION_STEPS = """      - name: Native public HTTPS and DoH verification
+        if: runner.os == 'Linux'
+        run: python ../tools/Verify-PublicRustCore.py --harness target/release/swirl-api --output ../CORE_PUBLIC_NETWORK.json
+      - name: Preserve public network evidence
+        if: always() && runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-Core-Public-Network
+          path: CORE_PUBLIC_NETWORK.json
+          retention-days: 7
+"""
+
+
+def _replace_checked(source: str, before: str, after: str, label: str) -> str:
+    """Accept only one reviewed old block or exactly one already updated block."""
+    previous = source.count(before)
+    updated = source.count(after)
+    if previous == 1 and updated == 0:
+        return source.replace(before, after, 1)
+    if previous == 0 and updated == 1:
+        return source
+    raise ValueError(f"Rust CI {label} has drifted or is ambiguous; review required")
+
+
+def updated_workflow(source: str) -> str:
+    """Return a bounded, idempotent update; validate all blocks before any write."""
+    source = _replace_checked(
+        source,
+        "  push:\n    branches: [test, main]\n",
+        "  push:\n    branches: [test, main, work/core-completion-20261017]\n",
+        "push branch list",
+    )
+    anchor = "          python ../tools/tests/test_dns_tls.py\n"
+    portable_tail = "  windows-rust:\n"
+    portable_tests = "".join(
+        f"          python ../tools/tests/{name}\n" for name in ADDITIONAL_TESTS
+    )
+    source = _replace_checked(
+        source,
+        anchor + portable_tail,
+        anchor + portable_tests + PUBLIC_VALIDATION_STEPS + portable_tail,
+        "portable peer menu",
+    )
+    windows_tail = "          python ../tools/tests/test_subscription_capture.py\n"
+    windows_tests = "".join(
+        f"          python ../tools/tests/{name}\n" + WINDOWS_STATUS_GUARD
+        for name in ADDITIONAL_TESTS
+    )
+    return _replace_checked(
+        source,
+        anchor + WINDOWS_STATUS_GUARD + windows_tail,
+        anchor + WINDOWS_STATUS_GUARD + windows_tests + windows_tail,
+        "Windows peer menu",
+    )
+
+
+def validate_context(environment: Mapping[str, str]) -> None:
+    expected = {
+        "GITHUB_ACTIONS": "true",
+        "GITHUB_REPOSITORY": REPOSITORY,
+        "GITHUB_REF": DEVELOPMENT_REF,
+        "GITHUB_EVENT_NAME": "push",
+        "GITHUB_WORKFLOW_REF": CALLER_WORKFLOW,
+    }
+    for name, value in expected.items():
+        if environment.get(name) != value:
+            # Do not print environment values: this helper never reads tokens.
+            raise ValueError(f"Workflow writes are disabled in this {name} context")
+
+
+def prepare_update(repository: Path) -> tuple[Path, str, str]:
+    repository = repository.resolve()
+    path = repository / WORKFLOW
+    if path.is_symlink() or path.resolve() != path:
+        raise ValueError("Rust CI target must be a regular file within the repository")
+    if not path.is_file():
+        raise ValueError("The existing Rust CI workflow is required")
+    # Git checkouts may use CRLF on Windows. Both styles represent the same
+    # workflow; writes still occur only in the existing Linux App job.
+    before = path.read_text(encoding="utf-8")
+    after = updated_workflow(before)
+    for name in ADDITIONAL_TESTS:
+        if not (repository / "tools/tests" / name).is_file():
+            raise ValueError(f"Required CI suite is missing: {name}")
+    if not (repository / PUBLIC_PROBE).is_file():
+        raise ValueError("The required native public-network verification script is missing")
+    return path, before, after
+
+
+def apply_update(repository: Path, environment: Mapping[str, str]) -> bool:
+    validate_context(environment)
+    path, before, after = prepare_update(repository)
+    if before == after:
+        return False
+    temporary_path = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            dir=path.parent, prefix=".rust-core-", suffix=".tmp", delete=False
+        ) as temporary:
+            temporary_path = Path(temporary.name)
+            temporary.write(after.encode("utf-8"))
+        temporary_path.chmod(path.stat().st_mode)
+        temporary_path.replace(path)
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
+    return True
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--check", action="store_true", help="Run safety tests and show the diff without writes"
+    )
+    options = parser.parse_args()
+    repository = Path(__file__).resolve().parent.parent
+    if not options.check:
+        validate_context(os.environ)
+    # This is an explicit, mandatory gate in the existing App job; a missing or
+    # failing safety suite prevents any workflow mutation or automatic commit.
+    subprocess.run(
+        [sys.executable, str(repository / "tools/tests/test_core_development.py")],
+        cwd=repository,
+        check=True,
+    )
+    _, before, after = prepare_update(repository)
+    print(f"Reviewed workflow: {WORKFLOW.as_posix()}", flush=True)
+    print(f"Before SHA-256: {hashlib.sha256(before.encode()).hexdigest()}", flush=True)
+    print(f"After SHA-256:  {hashlib.sha256(after.encode()).hexdigest()}", flush=True)
+    if options.check:
+        sys.stdout.writelines(
+            difflib.unified_diff(
+                before.splitlines(keepends=True), after.splitlines(keepends=True),
+                fromfile=WORKFLOW.as_posix(), tofile=WORKFLOW.as_posix(),
+            )
+        )
+    else:
+        changed = apply_update(repository, os.environ)
+        print("Applied reviewed Rust CI update" if changed else "Rust CI gates already current")
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except (OSError, UnicodeError, ValueError, subprocess.CalledProcessError) as error:
+        print(f"Core development validation failed: {error}", file=sys.stderr)
+        raise SystemExit(1) from error

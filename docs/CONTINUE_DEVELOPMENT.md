@@ -1,20 +1,23 @@
 # Swirl 接续开发入口
 
-更新日期：2026-10-17。本轮从 `fbebb28` 接续，实现 Rust 严格 DoT（DNS over TLS）和现有 Qt 加密 DNS 字段映射；UDP/TCP/A/AAAA/CNAME/TTL 基础继续复用。详见 [DoT 实现、限制和验收](RUST_DOT.md)。DoH、域名 bootstrap 策略及 DNS 分流仍未完成。代码及功能以本文件所在的 `test` 提交为准，历史测试记录不代表本轮真实节点验收。
+更新日期：2026-10-17。本轮从 `work/core-completion-20261017@8bd89f2` 接续；`main@87409c0` 尚无 Rust workspace。开发分支已经继承 main 的界面/动效修复，不能从 main 重新实现已有 Rust 工作。
 
 ## 当前接手注意事项
 
-- 用户已授权在 GitHub 上继续开发并推送 `test`，不使用 Gemini；个人 Windows/私有节点测试等其 Codex 额度恢复后再做。
-- 新增 DoT 的配置验证、Rust 网络实现、11 项独立 TLS 对端测试，以及 Qt 现有字段映射测试。CI 运行记录在 [PR #22](https://github.com/SOLHK/Swirl/pull/22) 和对应提交 Actions 中；不得将测试文件存在当作已执行。
-- DoT 目前使用明确 IP bootstrap，域名 URL 需已有精确本地 IP 映射；保持证书认证名。没有系统 DNS 引导、明文回退或经代理策略发送 DoT。DoH、混合 DNS 模式、负缓存等后续单独推进。
-- 页面、布局、动效、系统代理和私有订阅未改动。无需重新开启订阅下载窗口。
-- 在电脑上继续时先同步 `origin/test`，核对基线及未提交修改；以 `SWIRL_USE_RUST_CORE=ON` 构建，不能把默认历史兼容构建当作 Rust 验收。
+- **当前唯一开发分支：`work/core-completion-20261017`。** 用户最新指令覆盖历史 `test` 要求；不改 main、不强推。已配置的 GitHub App/Secrets 沿用，不重新配置。
+- 当前已执行的 Rust 能力新增 DoH、SOCKS4/4a、VLESS WS/WSS 与 Trojan WSS，复用既有 DNS、协议、TLS 和会话代码。本轮修复独立 WS 对端的 Pong 调度阻塞及 Rust 连续 Ping 误断连。详细范围和本轮结果见 [阶段验收](RUST_WS_VALIDATION_20261017.md)。
+- **自动测速、fallback 和负载均衡尚未接入。** 三个 `policy.rs` / `probe.rs` 候选文件没有进入 crate 模块树，内部测试也未执行。不能用提交标题或 workspace 编译通过证明它们完成。见 [真实架构审计](RUST_CORE_AUDIT_20261017.md)。
+- SOCKS4/4a 目前只在 Rust IR/API 和原生数据路径执行；Qt 节点转换和 Rust subscription inspector 尚未接入。WS 已有现有 Qt 字段映射，本轮增加专项映射/拒绝测试；Qt 映射通过与真实 Qt WS 转发是不同证据。
+- 当前阶段默认产品仍保留 C++/Mihomo 兼容构建。必须用 `SWIRL_USE_RUST_CORE=ON` 验证原生 Rust；该模式不会回退完整外部内核。智能 MRS、TUN、LAN 和未迁移协议仍会明确拒绝。
+- 私有订阅/缓存不进 Git 或 CI；无需开启用户十分钟订阅更新窗口。只使用合成对端和明确的固定公共目标做本轮验证，不修改系统代理或 DNS。
+- 以 [阶段验收](RUST_WS_VALIDATION_20261017.md) 中准确提交/Actions 结果为准；下方旧 DoT、Windows 本机记录仅是历史证据。
+- **本轮提交仍待推送：** 本地 Rust/独立网络回归通过，但 GitHub 连接器的创建提交树调用返回 `user rejected MCP tool call`。远端开发分支仍为 `8bd89f2`；新的跨平台、Qt、公网和 App 工作流写入验收未运行。恢复写入后，先推送本轮已审阅提交，再核对 App 自动提交和 Actions，不能把本地通过当成远端通过。
 
 ## 仓库是否完整
 
-**当前已实现的软件项目源码已提交到 SOLHK/Swirl 的 `test`。**
+**当前源码位于 SOLHK/Swirl 的 `work/core-completion-20261017`，包含原 test 分支完成的 Rust 工作。**
 这与“所有规划功能已完成”不同：Rust 全量迁移仍在进行。
-开始前执行 `git fetch origin`、核对 `origin/test`、工作区状态及当前分支，避免从旧的 `main` 继续。
+开始前执行 `git fetch origin`、核对 `origin/work/core-completion-20261017`、工作区状态及当前分支，避免从旧的 main/test 覆盖接手后的工作。
 
 仓库包括 Qt/C++/QML 界面和平台代码、Rust 七个 crate、Cargo.lock、依赖清单、
 本地合成测试、GitHub Actions、字体/图标、规则资源、vendored nghttp2 源码及构建脚本。
@@ -36,7 +39,7 @@ Qt/Rust CMake configure/generate 成功。此检查不声称重新完成了一�
 
 ## 必须延续的约束
 
-1. 每完成一个可验证阶段，提交并推送 **test**，然后核对远端提交。不得推送、合并或重置 main。
+1. 每完成一个可验证阶段，提交并推送 **work/core-completion-20261017**，然后核对远端提交及实际被测试的 SHA。不得推送、合并或重置 main。
 2. 保留现有 UI 布局、视觉和交互；继续 Rust 自研数据路径，不包装完整外部代理内核冒充自研。
 3. 独立实现和审查，不要求常规 Gemini 审核。用户现已允许换开发者/模型继续，旧“唯一集成人”描述不是阻止接手的理由。
 4. 未知参数保留并报告；不关闭 TLS 校验、不伪造兼容性、不静默直连或自动重放请求。
@@ -50,13 +53,13 @@ Qt/Rust CMake configure/generate 成功。此检查不声称重新完成了一�
 
 | 位置 | 已实现 |
 |---|---|
-| `core/crates/swirl-protocol` | HTTP/CONNECT/SOCKS5 入站；HTTP CONNECT、SOCKS5、Trojan TLS、SS AEAD TCP/UDP、simple-obfs HTTP、基础 VLESS v0 TCP/TLS |
+| `core/crates/swirl-protocol` | HTTP/CONNECT/SOCKS4/4a/5 入站；HTTP CONNECT、SOCKS4/4a/5、Trojan TLS、SS AEAD TCP/UDP、simple-obfs HTTP、基础 VLESS v0 TCP/TLS；VLESS WS/WSS、Trojan WSS |
 | `core/crates/swirl-routing` | 顺序域名/后缀/关键词、目标端口、来源/目标 CIDR、MATCH；手动 selector |
-| `core/crates/swirl-dns` | 自研 Rust DNS 报文/UDP/TCP/严格 DoT/A/AAAA/CNAME/TTL；有界系统解析、精确 hosts、各代缓存隔离及共享并发上限 |
+| `core/crates/swirl-dns` | 自研 Rust DNS 报文/UDP/TCP/严格 DoT/HTTP-1.1 DoH/A/AAAA/CNAME/TTL；有界系统解析、精确 hosts、各代缓存隔离及共享并发上限 |
 | `core/crates/swirl-core` | 有界运行时、不可变会话配置、原子节点/组/配置更新、旧 TCP/UDP 保留原出口、流量统计 |
-| `core/crates/swirl-subscription` | typed IR、Clash YAML/JSON、sing-box JSON、URI/Base64、部分 INI 识别与保留、脱敏能力报告；新增有界严格 DoT 配置；并非所有格式都可执行 |
+| `core/crates/swirl-subscription` | typed IR、Clash YAML/JSON、sing-box JSON、URI/Base64、部分 INI 识别与保留、脱敏能力报告；严格 DoT/DoH/WS 配置；并非所有格式都可执行，SOCKS4 导入未接入 |
 | `core/crates/swirl-transport` / `swirl-api` | 验证 TLS、背压/半关闭；ABI v1 JSON 控制、stdin harness、离线 inspector |
-| `src/Swirl.Quick/engine/RustCoreEngine.*` / `RustDnsConfiguration.h` | 现有 Qt 控制层到 Rust DLL；规则、手动组、本地 DNS 与显式 DoT 映射；明确拒绝未迁移会话 |
+| `src/Swirl.Quick/engine/RustCoreEngine.*` / `RustDnsConfiguration.h` | 现有 Qt 控制层到 Rust DLL；规则、手动组、本地 DNS 与显式 DoT/DoH/WS 映射；明确拒绝未迁移会话 |
 | `tools/` | 私有采集/离线分析、独立协议/DoT 对端、Codex 本地代理配置管理与测试 |
 
 关键边界：[规则与手动组](RUST_NATIVE_ROUTING.md)、[本地 DNS](RUST_LOCAL_DNS.md)、[DoT](RUST_DOT.md)、
@@ -67,7 +70,7 @@ Qt/Rust CMake configure/generate 成功。此检查不声称重新完成了一�
 ## 从 GitHub 独立构建
 
 ```sh
-git clone --branch test https://github.com/SOLHK/Swirl.git
+git clone --branch work/core-completion-20261017 https://github.com/SOLHK/Swirl.git
 cd Swirl/core
 cargo fmt --all -- --check
 cargo check --workspace --locked
@@ -91,6 +94,10 @@ $env:SWIRL_RUST_QT_TESTS=(Resolve-Path build/rust-qt/SwirlRustCoreTests.exe).Pat
 py -3 tools/tests/test_rust_core.py
 py -3 tools/tests/test_shadowsocks.py
 py -3 tools/tests/test_dns_tls.py
+py -3 tools/tests/test_dns_https.py
+py -3 tools/tests/test_socks4.py
+py -3 tools/tests/test_websocket_transport.py
+py -3 tools/tests/test_core_development.py
 py -3 tools/tests/test_subscription_capture.py
 py -3 tools/tests/test_codex_management.py
 ```
@@ -123,11 +130,11 @@ ZIP CRC、包内 DLL 哈希及私有内容扫描通过。GNU 链接器仍有 `.d
 
 建议后续按阶段实现并分别推送：
 
-1. DoH、bootstrap 策略、系统/自定义混合模式、分流与负缓存：明确 IP 的 DoT 已补充，继续定义加密解析的路由和多地址重试；不要重复重写 UDP/TCP/DoT 报文与 TTL 基础。
-2. 自动测速、fallback/load-balance：有界健康检查、明确选择语义、不重放已有请求、保留旧连接，不能把 manual 解析冒充自动组。
-3. 智能规则库/MRS、进程规则与 DNS 分流；保持原始配置和未知字段，禁止静默略过。
-4. WS/gRPC/XHTTP、REALITY/Vision、VMess/SS2022、QUIC 等缺少的协议/传输，分别提供互操作证据。
-5. TUN、LAN、网关、权限/系统代理所有权接管与异常恢复；不擅自改用户当前网络。
-6. 完整订阅到产品配置的 Rust 接管、长期/弱网/性能验证，最后才移除旧内核依赖。
+1. 把现有自动组候选接入 Swirl IR、原生健康探测、会话策略快照与 API，补独立 HTTP/HTTPS 对端测试。必须验证失败不重放请求、不静默直连、健康状态过期、配置切换保留旧 TCP/UDP 会话，以及停止后无探测任务。
+2. 补 SOCKS4/4a 的订阅与 Qt 参数转换，复用已完成握手；补 Qt WS 实际转发对端证据，不把纯映射测试当互操作。
+3. DNS bootstrap/多地址/分流/负缓存与智能 MRS/进程规则。DoT、HTTP-1.1 DoH、UDP/TCP 报文与 TTL 已接入，不重复重写。
+4. gRPC/XHTTP、REALITY/Vision、VMess/SS2022、QUIC 等缺少协议与传输，分别提供互操作证据。WS 基础已实现，本轮仅覆盖明确的有限组合。
+5. TUN、LAN、网关、平台权限/系统代理接管与异常恢复；不擅自改变用户当前网络。
+6. 完整订阅到产品配置的 Rust 接管、私有节点授权验收、长期/弱网/性能验证，最后才移除旧内核依赖。
 
 不要重写已完成模块或删掉兼容构建来制造“全自研完成”。所有阶段仍需保留 UI 与用户数据。

@@ -18,6 +18,7 @@ import tempfile
 import threading
 import time
 import unittest
+from types import SimpleNamespace
 from test_rust_core import certificates, exact, header, target
 
 UUID = '00112233-4455-6677-8899-aabbccddeeff'
@@ -37,7 +38,17 @@ class Framed:
         self.stream, self.server, self.buffer = stream, server, b''
 
     def recv(self, size):
-        while not self.buffer:
+        # Protocol handshakes need application bytes and may wait across control
+        # frames. The bidirectional forwarding loop must use recv_frame instead:
+        # a readable socket may contain only a Pong, with no more upload coming.
+        while True:
+            data = self.recv_frame(size)
+            if data is not None:
+                return data
+
+    def recv_frame(self, size):
+        """Consume at most one frame; None means control/empty data, not EOF."""
+        if not self.buffer:
             h = exact(self.stream, 2)
             assert h[0] & 0x70 == 0 and h[1] & 0x80
             opcode = h[0] & 15
@@ -55,12 +66,16 @@ class Framed:
             self.server.masks.append(mask)
             if opcode == 10:
                 self.server.pongs.append(payload)
-                continue
+                if payload == b'tail-gate':
+                    self.server.pong_seen.set()
+                return None
             if opcode == 8:
                 self.stream.sendall(frame(8, payload))
                 return b''
             assert opcode == 2 and h[0] & 128
             self.buffer = payload
+            if not payload:
+                return None
         data, self.buffer = self.buffer[:size], self.buffer[size:]
         return data
 
@@ -70,6 +85,9 @@ class Framed:
             packet = frame(2, data[:middle], False) + frame(9, b'interleaved') + frame(0, data[middle:])
         else:
             packet = frame(2, data)
+        if self.server.mode == 'pong-gated' and self.server.destinations and not self.server.gate_sent:
+            packet += frame(9, b'tail-gate')
+            self.server.gate_sent = True
         self.stream.sendall(packet)
 
 
@@ -93,6 +111,21 @@ class Origin(socketserver.BaseRequestHandler):
                 self.request.sendall(data)
         except (OSError, EOFError):
             pass
+
+
+class GatedOrigin(socketserver.BaseRequestHandler):
+    """Release a response tail only after the peer consumes a control-only Pong."""
+    def handle(self):
+        self.request.settimeout(6)
+        self.server.accepted += 1
+        assert exact(self.request, 7) == b'request'
+        self.server.received += 7
+        self.request.sendall(b'prefix')
+        assert self.server.pong_seen.wait(3), 'client did not answer the tail-gate Ping'
+        self.request.sendall(b'tail-without-another-upload')
+        # Keep the origin open while the client reads the tail, so EOF is not
+        # needed to make progress in either forwarding direction.
+        self.request.recv(1)
 
 
 class Peer(socketserver.BaseRequestHandler):
@@ -128,7 +161,10 @@ class Peer(socketserver.BaseRequestHandler):
                     response += b'Sec-WebSocket-Accept: ' + accept + b'\r\n'
                 if self.server.mode == 'status':
                     response = b'HTTP/1.1 302 Redirect\r\nLocation: http://127.0.0.1:9/\r\n'
-                stream.sendall(response + b'\r\n' + frame(9, b'coalesced'))
+                pings = [b'coalesced']
+                if self.server.mode == 'ping-burst':
+                    pings.extend(i.to_bytes(2, 'big') for i in range(32))
+                stream.sendall(response + b'\r\n' + b''.join(frame(9, ping) for ping in pings))
                 if self.server.mode in ('bad-accept', 'extension', 'duplicate', 'status'):
                     self.server.unexpected += len(stream.recv(1024))
                     return
@@ -168,12 +204,16 @@ class Peer(socketserver.BaseRequestHandler):
                     self.server.forwarded += 1
                     while True:
                         buffered = bool(framed.buffer) or isinstance(stream, ssl.SSLSocket) and stream.pending() > 0
-                        ready = [stream] if buffered else select.select([stream, origin], [], [], 6)[0]
+                        ready = select.select([stream, origin], [], [], 0 if buffered else 6)[0]
+                        if buffered and stream not in ready:
+                            ready.append(stream)
                         if not ready:
                             return
                         for source in ready:
                             if source is stream:
-                                data = framed.recv(16384)
+                                data = framed.recv_frame(16384)
+                                if data is None:
+                                    continue
                                 if not data:
                                     return
                                 origin.sendall(data)
@@ -189,6 +229,20 @@ class Peer(socketserver.BaseRequestHandler):
             self.server.peer_diagnostics.append(f'{type(exc).__name__}: {exc}')
         finally:
             self.server.active -= 1
+
+
+class WebSocketPeerTests(unittest.TestCase):
+    def test_control_only_and_empty_frames_return_to_the_forwarding_loop(self):
+        for opcode, payload in ((10, b'only-pong'), (2, b'')):
+            with self.subTest(opcode=opcode):
+                peer, client = socket.socketpair()
+                with peer, client:
+                    peer.settimeout(0.25)
+                    state = SimpleNamespace(masks=[], pongs=[])
+                    masked = bytes(x ^ b'MASK'[i % 4] for i, x in enumerate(payload))
+                    client.sendall(bytes([0x80 | opcode, 0x80 | len(payload)]) + b'MASK' + masked)
+                    self.assertIsNone(Framed(peer, state).recv_frame(16384))
+                    self.assertEqual(state.pongs, [payload] if opcode == 10 else [])
 
 
 @unittest.skipUnless(os.environ.get('SWIRL_RUST_HARNESS'), 'set SWIRL_RUST_HARNESS')
@@ -234,6 +288,8 @@ class WebSocketTransportTests(unittest.TestCase):
         server.active = server.forwarded = server.accepted = server.received = server.unexpected = 0
         server.upstream_bytes = server.downstream_bytes = 0
         server.peer_diagnostics = []
+        server.pong_seen = threading.Event()
+        server.gate_sent = False
         threading.Thread(target=server.serve_forever, daemon=True).start()
         self.servers.append(server)
         return server
@@ -314,6 +370,35 @@ class WebSocketTransportTests(unittest.TestCase):
             stream.sendall(b'after-ping')
             self.assertEqual(exact(stream, 10), b'after-ping')
         self.assertIn(b'interleaved', peer.pongs)
+
+    def test_control_only_pong_does_not_block_the_origin_response_tail(self):
+        for tls in (False, True):
+            with self.subTest(tls=tls):
+                origin, peer = self.server(GatedOrigin), self.server(Peer, tls=tls, mode='pong-gated')
+                origin.pong_seen = peer.pong_seen
+                self.start(self.config(peer))
+                stream, response = self.tunnel(origin)
+                with stream:
+                    self.assertIn(b' 200 ', response)
+                    stream.sendall(b'request')
+                    expected = b'prefixtail-without-another-upload'
+                    self.assertEqual(exact(stream, len(expected)), expected)
+                    self.assertIn(b'tail-gate', peer.pongs)
+                    self.assertEqual(origin.received, 7)
+                self.stop()
+
+    def test_coalesced_ping_burst_preserves_the_connection_and_all_pongs(self):
+        for tls in (False, True):
+            with self.subTest(tls=tls):
+                origin, peer = self.server(Origin), self.server(Peer, tls=tls, mode='ping-burst')
+                self.start(self.config(peer))
+                stream, response = self.tunnel(origin)
+                with stream:
+                    self.assertIn(b' 200 ', response)
+                    self.echo(stream, 32769)
+                    self.assertEqual(peer.pongs, [b'coalesced'] + [i.to_bytes(2, 'big') for i in range(32)])
+                self.assertEqual(origin.received, 32769)
+                self.stop()
 
     def test_bad_upgrades_fail_without_sending_credentials_or_origin_traffic(self):
         origin = self.server(Origin)
