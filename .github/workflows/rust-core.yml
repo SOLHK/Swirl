@@ -36,6 +36,7 @@ jobs:
           export SWIRL_RUST_HARNESS="$PWD/target/release/swirl-api"
           python ../tools/tests/test_rust_core.py
           python ../tools/tests/test_shadowsocks.py
+          python ../tools/tests/test_dns_tls.py
   windows-rust:
     runs-on: windows-2022
     timeout-minutes: 25
@@ -63,6 +64,8 @@ jobs:
           python ../tools/tests/test_rust_core.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python ../tools/tests/test_shadowsocks.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python ../tools/tests/test_dns_tls.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python ../tools/tests/test_subscription_capture.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

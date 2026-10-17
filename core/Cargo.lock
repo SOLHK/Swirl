@@ -603,6 +603,7 @@ version = "0.1.0"
 dependencies = [
  "ring",
  "swirl-subscription",
+ "swirl-transport",
  "tokio",
 ]
 

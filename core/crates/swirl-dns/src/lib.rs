@@ -1,4 +1,5 @@
-//! Bounded system/custom DNS resolver. DoH/DoT/Fake-IP are not claimed here.
+//! Bounded system/custom/strict TLS DNS resolver. DoH/Fake-IP are not claimed.
+mod dot;
 mod wire;
 use std::{
     collections::HashMap,
@@ -6,6 +7,7 @@ use std::{
     sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
+use swirl_subscription::DnsTlsServer;
 use tokio::{net::lookup_host, sync::Semaphore, time::timeout};
 
 type Cache = HashMap<(String, u16), (Instant, Vec<SocketAddr>)>;
@@ -14,6 +16,7 @@ pub struct Resolver {
     permits: Arc<Semaphore>,
     hosts: HashMap<String, IpAddr>,
     servers: Vec<SocketAddr>,
+    tls_servers: Vec<DnsTlsServer>,
     system_hosts: HashMap<String, IpAddr>,
 }
 impl Default for Resolver {
@@ -23,6 +26,7 @@ impl Default for Resolver {
             permits: Arc::new(Semaphore::new(8)),
             hosts: HashMap::new(),
             servers: Vec::new(),
+            tls_servers: Vec::new(),
             system_hosts: HashMap::new(),
         }
     }
@@ -39,13 +43,16 @@ impl Resolver {
                 .map(|h| (h.name.to_ascii_lowercase(), h.address))
                 .collect(),
             servers: Vec::new(),
+            tls_servers: Vec::new(),
             system_hosts: HashMap::new(),
         }
     }
     pub fn with_config(&self, dns: &swirl_subscription::Dns) -> Result<Self, &'static str> {
+        dns.validate_tls()?;
         let mut result = self.with_hosts(&dns.hosts);
         result.servers = dns.servers.clone();
-        if !dns.servers.is_empty() && dns.use_system_hosts {
+        result.tls_servers = dns.tls_servers.clone();
+        if (!dns.servers.is_empty() || !dns.tls_servers.is_empty()) && dns.use_system_hosts {
             result.system_hosts = system_hosts()?;
         }
         Ok(result)
@@ -78,15 +85,19 @@ impl Resolver {
             .await
             .map_err(|_| "DnsBusy")?
             .map_err(|_| "DnsStopped")?;
-        if !self.servers.is_empty() {
+        if !self.servers.is_empty() || !self.tls_servers.is_empty() {
             let _permit = permit;
             let started = Instant::now();
-            let (addresses, ttl) = timeout(
-                Duration::from_secs(3),
-                wire::resolve(&self.servers, host, port),
-            )
-            .await
-            .map_err(|_| "DnsTimeout")??;
+            let resolution = async {
+                if self.tls_servers.is_empty() {
+                    wire::resolve(&self.servers, host, port).await
+                } else {
+                    dot::resolve(&self.tls_servers, host, port).await
+                }
+            };
+            let (addresses, ttl) = timeout(Duration::from_secs(3), resolution)
+                .await
+                .map_err(|_| "DnsTimeout")??;
             let expires = started + Duration::from_secs(u64::from(ttl));
             if expires > Instant::now() {
                 let mut cache = self.cache.lock().map_err(|_| "DnsState")?;

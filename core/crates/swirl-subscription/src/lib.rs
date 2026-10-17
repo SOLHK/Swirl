@@ -1,7 +1,9 @@
 //! Swirl IR v1. External documents remain available even if execution is rejected.
 //! No Mihomo configuration or proxy engine is an internal execution dependency.
 use serde::{Deserialize, Serialize};
+mod dns_tls;
 pub mod inspect;
+pub use dns_tls::DnsTlsServer;
 use std::{collections::HashSet, net::SocketAddr};
 
 pub const MAX_DOCUMENT: usize = 1024 * 1024;
@@ -140,6 +142,9 @@ pub struct Dns {
     pub force_proxy_hosts: bool,
     #[serde(default)]
     pub servers: Vec<SocketAddr>,
+    /// Strict DoT endpoints; mutually exclusive with plaintext servers.
+    #[serde(default)]
+    pub tls_servers: Vec<DnsTlsServer>,
     #[serde(default = "default_true")]
     pub use_system_hosts: bool,
 }
@@ -152,6 +157,7 @@ impl Default for Dns {
             hosts: Vec::new(),
             force_proxy_hosts: false,
             servers: Vec::new(),
+            tls_servers: Vec::new(),
             use_system_hosts: true,
         }
     }
@@ -266,13 +272,16 @@ impl Config {
                 .servers
                 .iter()
                 .any(|s| s.port() == 0 || s.ip().is_unspecified() || s.ip().is_multicast())
-            || (self.dns.servers.is_empty() && !self.dns.use_system_hosts)
+            || (self.dns.servers.is_empty()
+                && self.dns.tls_servers.is_empty()
+                && !self.dns.use_system_hosts)
             || !(1..=256).contains(&self.limits.max_connections)
             || !(100..=30000).contains(&self.limits.handshake_timeout_ms)
             || !valid_auth(&self.inbound_auth)
         {
             return Err("ConfigBounds");
         }
+        self.dns.validate_tls()?;
         let mut host_names = HashSet::new();
         let mut servers = HashSet::new();
         for server in &self.dns.servers {

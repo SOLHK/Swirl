@@ -8,7 +8,7 @@ use tokio::{
     time::{Duration, timeout},
 };
 type Result<T> = std::result::Result<T, &'static str>;
-const MAX_PACKET: usize = 16384;
+pub(super) const MAX_PACKET: usize = 16384;
 
 fn word(data: &[u8], at: usize) -> Result<u16> {
     let bytes = data.get(at..at + 2).ok_or("DnsTruncated")?;
@@ -59,7 +59,7 @@ fn name(data: &[u8], cursor: &mut usize) -> Result<String> {
     }
     Err("DnsCompressionDepth")
 }
-fn query(host: &str, kind: u16) -> Result<Vec<u8>> {
+pub(super) fn query(host: &str, kind: u16) -> Result<Vec<u8>> {
     let mut id = [0; 2];
     SystemRandom::new().fill(&mut id).map_err(|_| "DnsRandom")?;
     let mut data = vec![id[0], id[1], 1, 0, 0, 1, 0, 0, 0, 0, 0, 0];
@@ -75,16 +75,16 @@ fn query(host: &str, kind: u16) -> Result<Vec<u8>> {
     data.extend([0, 1]);
     Ok(data)
 }
-struct Answer {
-    addresses: Vec<IpAddr>,
-    alias: Option<String>,
-    ttl: u32,
+pub(super) struct Answer {
+    pub(super) addresses: Vec<IpAddr>,
+    pub(super) alias: Option<String>,
+    pub(super) ttl: u32,
 }
-enum Response {
+pub(super) enum Response {
     Truncated,
     Answer(Answer),
 }
-fn parse(data: &[u8], request: &[u8], host: &str, kind: u16) -> Result<Response> {
+pub(super) fn parse(data: &[u8], request: &[u8], host: &str, kind: u16) -> Result<Response> {
     if data.len() < 12 || data.len() > MAX_PACKET || word(data, 0)? != word(request, 0)? {
         return Err("DnsIdentity");
     }
