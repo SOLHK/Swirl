@@ -1,0 +1,70 @@
+name: Core implementation validation
+on:
+  push:
+    branches: [work/core-completion-20261017]
+concurrency:
+  group: core-implementation-validation
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  core:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/core-completion-20261017
+      - name: Install Rust tools
+        run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy
+      - name: Apply checked core refactoring and format the development branch
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/work/core-completion-20261017
+          if test -f tools/ApplyCoreDevelopment.py; then python tools/ApplyCoreDevelopment.py; fi
+          cargo fmt --manifest-path core/Cargo.toml --all
+          # Only this development branch is writable, never test or main.
+          git add core src/Swirl.Quick/engine src/Swirl.Quick/tests .github/workflows/rust-core.yml
+          if ! git diff --cached --quiet; then
+            git -c user.name='Swirl core development' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Apply native core integration and canonical Rust formatting'
+            git push origin HEAD:refs/heads/work/core-completion-20261017
+          fi
+          git rev-parse HEAD | tee CORE_TESTED_COMMIT
+      - name: Rust static and unit checks
+        working-directory: core
+        run: |
+          cargo fmt --all -- --check
+          cargo check --workspace --locked
+          cargo clippy --workspace --all-targets --locked -- -D warnings
+          cargo test --workspace --locked
+          cargo build --release --locked -p swirl-api
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - name: Independent network peers
+        run: |
+          set -euo pipefail
+          python -m pip install cryptography==50.0.2
+          export SWIRL_RUST_HARNESS="$PWD/core/target/release/swirl-api"
+          python tools/tests/test_rust_core.py
+          python tools/tests/test_shadowsocks.py
+          python tools/tests/test_dns_tls.py
+          python tools/tests/test_dns_https.py
+          if test -f tools/tests/test_socks4.py; then python tools/tests/test_socks4.py; fi
+          if test -f tools/tests/test_websocket_transport.py; then python tools/tests/test_websocket_transport.py; fi
+      - name: Export exact source and result identity
+        if: always()
+        run: |
+          git archive HEAD core tools/tests src/Swirl.Quick/engine src/Swirl.Quick/tests > core-tested-source.tar
+          git status --porcelain > CORE_WORKTREE_STATE
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Core-development-evidence
+          path: |
+            CORE_TESTED_COMMIT
+            CORE_WORKTREE_STATE
+            core-tested-source.tar
+          retention-days: 7
