@@ -4,19 +4,31 @@ on:
     branches: [work/core-completion-20261017]
 concurrency:
   group: core-implementation-validation
-  cancel-in-progress: true
+  # App-token pushes start a new run; keep the original run alive to finish validation.
+  cancel-in-progress: false
 permissions:
   contents: read
 jobs:
   core:
+    # Skip the follow-up run created by this job's own App-token push.
+    if: ${{ !contains(github.event.head_commit.message, '[swirl-core-autofix]') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
-      contents: write
+      contents: read
     steps:
+      - name: Generate scoped Swirl GitHub App token
+        id: swirl-app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.SWIRL_APP_ID }}
+          private-key: ${{ secrets.SWIRL_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-workflows: write
       - uses: actions/checkout@v4
         with:
           ref: work/core-completion-20261017
+          token: ${{ steps.swirl-app-token.outputs.token }}
       - name: Install Rust tools
         run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy
       - name: Apply checked core refactoring and format the development branch
@@ -28,7 +40,7 @@ jobs:
           # Only this development branch is writable, never test or main.
           git add core src/Swirl.Quick/engine src/Swirl.Quick/tests .github/workflows/rust-core.yml
           if ! git diff --cached --quiet; then
-            git -c user.name='Swirl core development' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Apply native core integration and canonical Rust formatting'
+            git -c user.name='Swirl core development' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Apply native core integration and canonical Rust formatting [swirl-core-autofix]'
             git push origin HEAD:refs/heads/work/core-completion-20261017
           fi
           git rev-parse HEAD | tee CORE_TESTED_COMMIT
