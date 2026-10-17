@@ -1,12 +1,12 @@
 # Swirl 接续开发入口
 
-更新日期：2026-10-17。本轮从 `fbebb28` 接续，实现 Rust 严格 DoT（DNS over TLS）和现有 Qt 加密 DNS 字段映射；UDP/TCP/A/AAAA/CNAME/TTL 基础继续复用。详见 [DoT 实现、限制和验收](RUST_DOT.md)。DoH、域名 bootstrap 策略及 DNS 分流仍未完成。代码及功能以本文件所在的 `test` 提交为准，历史测试记录不代表本轮真实节点验收。
+更新日期：2026-10-17。本轮先同步 GitHub `test` 到 `866c437`，保留已完成的 DoT 和 Windows 回归修复，新增 Rust DoH（HTTP/1.1 POST）及现有 HTTPS DNS 字段映射。详见 [DoH 实现和边界](RUST_DOH.md)。DoH HTTP/2、自动 bootstrap、混合模式及 DNS 分流仍未完成。代码以本文件所在的 `test` 提交为准，历史测试不代替本轮验证。
 
 ## 当前接手注意事项
 
 - 用户已授权在 GitHub 上继续开发并推送 `test`，不使用 Gemini；个人 Windows/私有节点测试等其 Codex 额度恢复后再做。
 - 新增 DoT 的配置验证、Rust 网络实现、11 项独立 TLS 对端测试，以及 Qt 现有字段映射测试。CI 运行记录在 [PR #22](https://github.com/SOLHK/Swirl/pull/22) 和对应提交 Actions 中；不得将测试文件存在当作已执行。
-- DoT 目前使用明确 IP bootstrap，域名 URL 需已有精确本地 IP 映射；保持证书认证名。没有系统 DNS 引导、明文回退或经代理策略发送 DoT。DoH、混合 DNS 模式、负缓存等后续单独推进。
+- DoT/DoH 使用明确 IP bootstrap，域名 URL 需已有精确本地 IP 映射；保持证书认证名。没有系统 DNS 引导、明文回退或经代理策略发送加密 DNS。DoH HTTP/2、混合 DNS 模式、负缓存等后续单独推进。
 - 页面、布局、动效、系统代理和私有订阅未改动。无需重新开启订阅下载窗口。
 - 在电脑上继续时先同步 `origin/test`，核对基线及未提交修改；以 `SWIRL_USE_RUST_CORE=ON` 构建，不能把默认历史兼容构建当作 Rust 验收。
 
@@ -107,6 +107,11 @@ Rust 预览部署至少需 Swirl.exe、swirl_api.dll、各辅助 EXE、Qt/QML �
 
 ## 已有验证与仍需做的工作
 
+本轮 DoH 阶段：新增 11 项独立 HTTPS 对端测试全部通过，原有 11 项 DoT 回归通过；
+Rust workspace 49 项通过，fmt/check/clippy 通过。Qt 现有 HTTPS 字段映射和错误参数拒绝
+由 RustCoreTests 验证。测试使用合成 loopback 对端，未访问私有节点、更新订阅或修改系统网络。
+新提交的 Windows/Linux/macOS CI 状态须查看 Actions，不从旧提交推断。
+
 DoT 阶段的实际提交、CI 与待个人电脑验收范围见 [DoT 文档](RUST_DOT.md) 和 [PR #22](https://github.com/SOLHK/Swirl/pull/22)。不沿用旧数字证明新实现；此轮未访问私有节点或修改个人 Windows 网络。
 
 上一自定义 UDP/TCP DNS 阶段：本机 Rust 43 项、独立协议 28 项（含 IPv6 DNS 服务端和 TCP 重试）、
@@ -123,7 +128,7 @@ ZIP CRC、包内 DLL 哈希及私有内容扫描通过。GNU 链接器仍有 `.d
 
 建议后续按阶段实现并分别推送：
 
-1. DoH、bootstrap 策略、系统/自定义混合模式、分流与负缓存：明确 IP 的 DoT 已补充，继续定义加密解析的路由和多地址重试；不要重复重写 UDP/TCP/DoT 报文与 TTL 基础。
+1. DoH HTTP/2、bootstrap 策略、系统/自定义混合模式、分流与负缓存：明确 IP 的 DoT 和 DoH HTTP/1.1 POST 已补充，继续定义连接复用、加密解析路由和多地址重试；不要重复重写已有 DNS 报文与 TTL 基础。
 2. 自动测速、fallback/load-balance：有界健康检查、明确选择语义、不重放已有请求、保留旧连接，不能把 manual 解析冒充自动组。
 3. 智能规则库/MRS、进程规则与 DNS 分流；保持原始配置和未知字段，禁止静默略过。
 4. WS/gRPC/XHTTP、REALITY/Vision、VMess/SS2022、QUIC 等缺少的协议/传输，分别提供互操作证据。

@@ -1,7 +1,9 @@
 //! Swirl IR v1. External documents remain available even if execution is rejected.
 //! No Mihomo configuration or proxy engine is an internal execution dependency.
 use serde::{Deserialize, Serialize};
+mod dns_https;
 mod dns_tls;
+pub use dns_https::DnsHttpsServer;
 pub mod inspect;
 pub use dns_tls::DnsTlsServer;
 use std::{collections::HashSet, net::SocketAddr};
@@ -145,6 +147,8 @@ pub struct Dns {
     /// Strict DoT endpoints; mutually exclusive with plaintext servers.
     #[serde(default)]
     pub tls_servers: Vec<DnsTlsServer>,
+    #[serde(default)]
+    pub https_servers: Vec<DnsHttpsServer>,
     #[serde(default = "default_true")]
     pub use_system_hosts: bool,
 }
@@ -158,6 +162,7 @@ impl Default for Dns {
             force_proxy_hosts: false,
             servers: Vec::new(),
             tls_servers: Vec::new(),
+            https_servers: Vec::new(),
             use_system_hosts: true,
         }
     }
@@ -274,6 +279,7 @@ impl Config {
                 .any(|s| s.port() == 0 || s.ip().is_unspecified() || s.ip().is_multicast())
             || (self.dns.servers.is_empty()
                 && self.dns.tls_servers.is_empty()
+                && self.dns.https_servers.is_empty()
                 && !self.dns.use_system_hosts)
             || !(1..=256).contains(&self.limits.max_connections)
             || !(100..=30000).contains(&self.limits.handshake_timeout_ms)

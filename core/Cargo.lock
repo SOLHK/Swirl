@@ -601,6 +601,7 @@ dependencies = [
 name = "swirl-dns"
 version = "0.1.0"
 dependencies = [
+ "httparse",
  "ring",
  "swirl-subscription",
  "swirl-transport",

@@ -1,4 +1,5 @@
-//! Bounded system/custom/strict TLS DNS resolver. DoH/Fake-IP are not claimed.
+//! Bounded system/custom/strict DoT and HTTP/1.1 DoH resolver. No Fake-IP.
+mod doh;
 mod dot;
 mod wire;
 use std::{
@@ -7,7 +8,7 @@ use std::{
     sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
-use swirl_subscription::DnsTlsServer;
+use swirl_subscription::{DnsHttpsServer, DnsTlsServer};
 use tokio::{net::lookup_host, sync::Semaphore, time::timeout};
 
 type Cache = HashMap<(String, u16), (Instant, Vec<SocketAddr>)>;
@@ -17,6 +18,7 @@ pub struct Resolver {
     hosts: HashMap<String, IpAddr>,
     servers: Vec<SocketAddr>,
     tls_servers: Vec<DnsTlsServer>,
+    https_servers: Vec<DnsHttpsServer>,
     system_hosts: HashMap<String, IpAddr>,
 }
 impl Default for Resolver {
@@ -27,6 +29,7 @@ impl Default for Resolver {
             hosts: HashMap::new(),
             servers: Vec::new(),
             tls_servers: Vec::new(),
+            https_servers: Vec::new(),
             system_hosts: HashMap::new(),
         }
     }
@@ -44,6 +47,7 @@ impl Resolver {
                 .collect(),
             servers: Vec::new(),
             tls_servers: Vec::new(),
+            https_servers: Vec::new(),
             system_hosts: HashMap::new(),
         }
     }
@@ -52,7 +56,10 @@ impl Resolver {
         let mut result = self.with_hosts(&dns.hosts);
         result.servers = dns.servers.clone();
         result.tls_servers = dns.tls_servers.clone();
-        if (!dns.servers.is_empty() || !dns.tls_servers.is_empty()) && dns.use_system_hosts {
+        result.https_servers = dns.https_servers.clone();
+        if (!dns.servers.is_empty() || !dns.tls_servers.is_empty() || !dns.https_servers.is_empty())
+            && dns.use_system_hosts
+        {
             result.system_hosts = system_hosts()?;
         }
         Ok(result)
@@ -85,11 +92,16 @@ impl Resolver {
             .await
             .map_err(|_| "DnsBusy")?
             .map_err(|_| "DnsStopped")?;
-        if !self.servers.is_empty() || !self.tls_servers.is_empty() {
+        if !self.servers.is_empty()
+            || !self.tls_servers.is_empty()
+            || !self.https_servers.is_empty()
+        {
             let _permit = permit;
             let started = Instant::now();
             let resolution = async {
-                if self.tls_servers.is_empty() {
+                if !self.https_servers.is_empty() {
+                    doh::resolve(&self.https_servers, host, port).await
+                } else if self.tls_servers.is_empty() {
                     wire::resolve(&self.servers, host, port).await
                 } else {
                     dot::resolve(&self.tls_servers, host, port).await

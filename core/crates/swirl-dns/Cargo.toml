@@ -8,5 +8,6 @@ tokio.workspace = true
 swirl-subscription.workspace = true
 swirl-transport.workspace = true
 ring.workspace = true
+httparse.workspace = true
 [lints]
 workspace = true

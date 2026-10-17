@@ -23,7 +23,7 @@ inline QString endpoint(const QHostAddress &address, int port) {
 inline QString configuration(const QVariantMap &input, QJsonObject *output) {
     const auto dns = QJsonObject::fromVariantMap(input);
     const auto invalid = [] {
-        return QString("Rust DNS 支持系统解析、自定义 IP DNS、精确映射和严格 DoT；配置含无效或尚未支持的选项。");
+        return QString("Rust DNS 支持系统解析、自定义 IP DNS、精确映射、严格 DoT/DoH；配置含无效或尚未支持的选项。");
     };
     for (auto it = dns.begin(); it != dns.end(); ++it)
         if (!QStringList{"mode", "servers", "encrypted", "hosts", "useHosts", "respectRules"}.contains(it.key()))
@@ -39,7 +39,7 @@ inline QString configuration(const QVariantMap &input, QJsonObject *output) {
     // Bootstrap via traditional DNS and mixed system/custom mode are separate
     // future stages. Never silently query an application target in plaintext.
     if (!encrypted.isEmpty() && (custom || !rawServers.trimmed().isEmpty()))
-        return "Rust DoT 此阶段请使用系统模式、留空传统服务器，并用显式 IP 或精确本地映射指定 DoT 端点。";
+        return "Rust 加密 DNS 请使用系统模式、留空传统服务器，并用显式 IP 或精确本地映射指定端点。";
     if (!custom && !rawServers.trimmed().isEmpty()) return invalid();
     QJsonArray servers;
     QSet<QString> serverSet;
@@ -82,18 +82,19 @@ inline QString configuration(const QVariantMap &input, QJsonObject *output) {
         seen.insert(name);
         mapped.append(QJsonObject{{"name", name}, {"address", address.toString()}});
     }
-    QJsonArray tlsServers;
+    QJsonArray tlsServers,httpsServers;
     if (!encrypted.isEmpty()) {
         // Restrict the literal syntax before QUrl normalizes it. Reject userinfo,
         // percent escapes, paths and query options rather than silently stripping.
-        const QRegularExpression syntax("^tls://(?:\\[[0-9A-Fa-f:]+\\]|[A-Za-z0-9.-]+)(?::[0-9]{1,5})?/?$");
+        const bool https=encrypted.startsWith("https://");
+        const QRegularExpression syntax(https?"^https://(?:\\[[0-9A-Fa-f:]+\\]|[A-Za-z0-9.-]+)(?::[0-9]{1,5})?(?:/[^\\s#\\\\{}]*)?$":"^tls://(?:\\[[0-9A-Fa-f:]+\\]|[A-Za-z0-9.-]+)(?::[0-9]{1,5})?/?$");
         const QUrl url(encrypted, QUrl::StrictMode);
         if (encrypted.size() > 1024 || !syntax.match(encrypted).hasMatch()
-            || !url.isValid() || url.scheme() != "tls" || !url.userInfo().isEmpty()
-            || url.hasQuery() || url.hasFragment() || (!url.path().isEmpty() && url.path() != "/"))
+            || !url.isValid() || url.scheme() != (https?"https":"tls") || !url.userInfo().isEmpty()
+            || url.hasFragment() || (!https&&(url.hasQuery()||(!url.path().isEmpty()&&url.path()!="/"))))
             return invalid();
         const auto name = url.host().toLower();
-        const int port = url.port(853);
+        const int port = url.port(https?443:853);
         if (port < 1 || port > 65535 || name.size() > 253 || name.isEmpty()) return invalid();
         QHostAddress address;
         if (!address.setAddress(name)) {
@@ -104,10 +105,14 @@ inline QString configuration(const QVariantMap &input, QJsonObject *output) {
                     address.setAddress(host.value("address").toString());
             }
             if (address.isNull())
-                return "Rust DoT 服务器域名需要精确本地 IP 映射；未使用系统 DNS 引导或明文回退。";
+                return "Rust 加密 DNS 服务器域名需要精确本地 IP 映射；未使用系统 DNS 引导或明文回退。";
         }
         if (!usableAddress(address)) return invalid();
-        tlsServers.append(QJsonObject{
+        if(https){
+            auto path=url.path(QUrl::FullyEncoded);if(path.isEmpty())path="/";if(url.hasQuery())path+='?'+url.query(QUrl::FullyEncoded);
+            if(path.startsWith("//"))return invalid();
+            httpsServers.append(QJsonObject{{"address",endpoint(address,port)},{"path",path},{"tls",QJsonObject{{"server_name",name},{"alpn",QJsonArray{"http/1.1"}}}}});
+        }else tlsServers.append(QJsonObject{
             {"address", endpoint(address, port)},
             {"tls", QJsonObject{{"server_name", name}, {"alpn", QJsonArray{"dot"}}}}
         });
@@ -116,6 +121,7 @@ inline QString configuration(const QVariantMap &input, QJsonObject *output) {
         {"servers", servers}, {"use_system_hosts", !dns.contains("useHosts") || dns.value("useHosts").toBool()}};
     // Leave legacy JSON unchanged when the new feature is inactive.
     if (!tlsServers.isEmpty()) result["tls_servers"] = tlsServers;
+    if (!httpsServers.isEmpty()) result["https_servers"] = httpsServers;
     *output = result;
     return {};
 }

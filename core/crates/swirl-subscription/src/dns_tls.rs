@@ -15,6 +15,7 @@ impl Dns {
     /// Validate the additive TLS settings independently of the caller. Mixing
     /// cleartext and TLS resolvers would introduce an implicit downgrade path.
     pub fn validate_tls(&self) -> Result<(), &'static str> {
+        self.validate_https()?;
         if self.tls_servers.len() > 4 {
             return Err("DnsTlsServerLimit");
         }

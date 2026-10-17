@@ -18,6 +18,15 @@ class RustCoreTests:public QObject {
   o.nodes={n};o.selectedNodeId=n.id;return o;
  }
 private slots:
+ void strictDohMapsHttpsIdentityPathAndBootstrap(){
+  ControlledNetwork net;QVERIFY(net.start());auto o=options(net);o.routingMode="direct";
+  o.dnsConfig={{"mode",0},{"servers",""},{"encrypted","https://DNS.fixture.invalid:8443/dns-query?fixture=1"},{"useHosts",false},{"hosts",QVariantList{QVariantMap{{"name","dns.fixture.invalid"},{"value","127.0.0.1"}}}}};
+  QJsonObject config;QVERIFY(RustCoreEngine::configuration(o,&config).isEmpty());const auto dns=config["dns"].toObject();const auto endpoint=dns["https_servers"].toArray().first().toObject();
+  QCOMPARE(endpoint["address"].toString(),QString("127.0.0.1:8443"));QCOMPARE(endpoint["path"].toString(),QString("/dns-query?fixture=1"));QCOMPARE(endpoint["tls"].toObject()["server_name"].toString(),QString("dns.fixture.invalid"));QCOMPARE(endpoint["tls"].toObject()["alpn"].toArray(),QJsonArray{"http/1.1"});QVERIFY(!dns.contains("tls_servers"));
+  RustCoreEngine engine;engine.start(o);QVERIFY2(engine.status().state==ProxyEngine::State::Running,qPrintable(engine.status().message));engine.stop();
+  o.dnsConfig["hosts"]=QVariantList{};o.dnsConfig["encrypted"]="https://[::1]/dns-query";QVERIFY(RustCoreEngine::configuration(o,&config).isEmpty());QCOMPARE(config["dns"].toObject()["https_servers"].toArray().first().toObject()["address"].toString(),QString("[::1]:443"));
+  for(const auto &url:QStringList{"https://dns.fixture.invalid/dns-query","https://user@127.0.0.1/dns-query","https://127.0.0.1/dns-query#fragment","https://127.0.0.1//other.test","https://127.0.0.1/dns-query{?dns}","https://127.0.0.1/dns-query%xx","https://127.0.0.1:0/dns-query","http://127.0.0.1/dns-query"}){o.dnsConfig["encrypted"]=url;QVERIFY2(!RustCoreEngine::configuration(o,&config).isEmpty(),qPrintable(url));}
+ }
  void strictDotMapsExistingFieldWithoutResolvingOrChangingUi(){
   ControlledNetwork net;QVERIFY(net.start());auto o=options(net);o.routingMode="direct";
   o.dnsConfig={{"mode",0},{"servers",""},{"encrypted","tls://DNS.fixture.invalid:8853"},{"useHosts",false},

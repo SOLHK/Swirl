@@ -45,9 +45,15 @@ synthetic TLS peers; it is run by Rust CI alongside the original protocol tests.
 
 The existing Qt encrypted-DNS field maps a strict `tls://` URL; domain URLs need
 an exact local IP mapping. No GUI is changed. DoT currently connects directly to
-the configured resolver, not through proxy policy. DoH, system bootstrap, mixed
+the configured resolver, not through proxy policy. DoH HTTP/2, system bootstrap, mixed
 resolver mode, DNS split and negative caching remain later stages. See
 [DoT semantics, configuration and evidence boundaries](../docs/RUST_DOT.md).
+
+Strict HTTP/1.1 POST DoH is now implemented in Rust with explicit IP bootstrap,
+verified TLS, bounded Content-Length/chunked responses and DNS/HTTP cache-age
+handling. The existing `https://` DNS field maps to `dns.https_servers` without
+UI changes. See [DoH semantics and validation](../docs/RUST_DOH.md). HTTP/2/3,
+GET/templates, pooling and automatic discovery remain unsupported.
 
 ## Implemented boundary
 
@@ -57,7 +63,7 @@ resolver mode, DNS split and negative caching remain later stages. See
 | swirl-protocol | Mixed HTTP/CONNECT/SOCKS5 input, input auth, HTTP CONNECT/SOCKS5 upstream auth, Trojan TLS framing, SS AEAD TCP/UDP, simple-obfs HTTP TCP, VLESS v0 TCP with optional verified TLS | SOCKS4, SS2022/SSR/VMess/REALITY/QUIC families, VLESS Vision/mux/encryption extensions, other protocol UDP and obfs TLS |
 | swirl-transport | rustls TLS with verification/SNI/ALPN, bounded duplex copying, independent half-close, live byte counters | WS/gRPC/XHTTP protocol transports, mux, QUIC; application WS/SSE opaque tunneling is a different layer |
 | swirl-routing | Ordered domain/suffix/keyword, source/destination CIDR, destination port and final rules; lazy system DNS and pinned IP decisions; Qt rules map DIRECT/REJECT/selected node/manual groups; atomic selector updates | Process rules, GEOIP/GEOSITE/MRS, nested/automatic groups/failover, policy-aware multi-address retries |
-| swirl-dns | Rust custom UDP/TCP DNS and strict DoT with explicit IP bootstrap; validated A/AAAA/CNAME and bounded positive TTL cache; system resolver, exact hosts through Qt, immutable caches, shared 8-query budget, max 16 addresses | Combined system/custom mode, DoH, proxy-routed encrypted DNS, domain bootstrap, EDNS/DNSSEC, negative cache, DNS split/Fake-IP |
+| swirl-dns | Rust UDP/TCP DNS, strict DoT and HTTP/1.1 POST DoH with explicit IP bootstrap; validated A/AAAA/CNAME and bounded TTL/HTTP-age cache; system resolver, exact hosts, immutable caches, shared 8-query budget, max 16 addresses | Combined system/custom mode, HTTP/2 DoH, proxy-routed encrypted DNS, domain bootstrap, EDNS/DNSSEC, negative cache, DNS split/Fake-IP |
 | swirl-core | Two Tokio workers, max 256 sessions, immutable per-session plan, atomic updates, stop/cancel, stats; SOCKS5 UDP ASSOCIATE with explicit DIRECT or SS AEAD routes | Other protocol UDP, TUN, platform network takeover |
 | swirl-api | ABI v1 caller-buffer JSON, lifecycle handles, start/configure/select/snapshot/stop; local stdin harness | More advanced policy/config schemas and persisted IR migration |
 

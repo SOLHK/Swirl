@@ -37,6 +37,7 @@ jobs:
           python ../tools/tests/test_rust_core.py
           python ../tools/tests/test_shadowsocks.py
           python ../tools/tests/test_dns_tls.py
+          python ../tools/tests/test_dns_https.py
   windows-rust:
     runs-on: windows-2022
     timeout-minutes: 25
@@ -66,6 +67,8 @@ jobs:
           python ../tools/tests/test_shadowsocks.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python ../tools/tests/test_dns_tls.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python ../tools/tests/test_dns_https.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python ../tools/tests/test_subscription_capture.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
