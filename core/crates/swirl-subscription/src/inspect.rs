@@ -1050,7 +1050,7 @@ mod tests {
         assert!(!r.report.nodes[0].native_udp_supported);
         for suffix in [
             "&flow=xtls-rprx-vision",
-            "&type=ws",
+            "&type=grpc",
             "&encryption=mlkem768x25519plus.native.0rtt",
         ] {
             let text = format!("{base}{suffix}");
@@ -1205,7 +1205,7 @@ mod tests {
     }
     #[test]
     fn unsupported_transport_and_bool_rejected() {
-        let r=inspect(br#"{"proxies":[{"type":"trojan","server":"example.org","port":443,"password":"s","network":"ws"},{"type":"trojan","server":"example.org","port":443,"password":"s","skip-cert-verify":"false"}]}"#);
+        let r=inspect(br#"{"proxies":[{"type":"trojan","server":"example.org","port":443,"password":"s","network":"grpc"},{"type":"trojan","server":"example.org","port":443,"password":"s","skip-cert-verify":"false"}]}"#);
         assert!(r.report.nodes.iter().all(|n| !n.native_tcp_candidate));
     }
     #[test]
