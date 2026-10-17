@@ -1,5 +1,7 @@
 # Swirl
 
+> **继续 Rust 内核开发请从 `test` 分支开始**，先读 [接续开发与仓库完整性说明](docs/CONTINUE_DEVELOPMENT.md)、[合并开发约束](docs/SWIRL_CORE_DEVELOPMENT_CONTRACT.md) 和 [Rust 实际能力及构建](core/README.md)。当前仓库包含完整 Qt 桌面源码和进行中的 Rust 内核源码。`SWIRL_USE_RUST_CORE=ON` 启用 Rust；默认 OFF 仍是历史兼容构建。下文常规安装与打包步骤主要描述历史兼容构建，不能据此判断 Rust 能力。每个完成阶段验证后提交并推送 `test`；未经用户明确授权不得更新 `main`。
+
 <picture><source media="(prefers-color-scheme: dark)" srcset="src/Swirl.Quick/assets/icons/swirl_knot_dark.svg"><img src="src/Swirl.Quick/assets/icons/swirl_knot_light.svg" width="88" alt="Swirl 祥云结标志"></picture>
 
 Swirl 是面向 Windows 的网络工具，使用 **C++23、Qt 6 Quick/QML** 构建桌面界面，提供代理连接、网络活动监控与 HTTP 调试。基础 TCP 代理由 Swirl 原生引擎处理，复杂协议、规则分流与 TUN 等能力由固定版本 Mihomo 兼容引擎执行。
