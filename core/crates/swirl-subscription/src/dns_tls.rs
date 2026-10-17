@@ -16,8 +16,12 @@ pub struct DnsTlsServer {
 }
 
 fn valid_https_path(path: &str) -> bool {
-    if !path.starts_with('/') || path.starts_with("//") || path.len() > 1024
-        || !path.bytes().all(|b| (33..=126).contains(&b) && !b"?#\\".contains(&b))
+    if !path.starts_with('/')
+        || path.starts_with("//")
+        || path.len() > 1024
+        || !path
+            .bytes()
+            .all(|b| (33..=126).contains(&b) && !b"?#\\".contains(&b))
     {
         return false;
     }
@@ -49,7 +53,9 @@ impl Dns {
         let mut seen = HashSet::new();
         for server in &self.tls_servers {
             let address = server.address;
-            if address.port() == 0 || address.ip().is_unspecified() || address.ip().is_multicast()
+            if address.port() == 0
+                || address.ip().is_unspecified()
+                || address.ip().is_multicast()
                 || matches!(address, SocketAddr::V6(a) if a.scope_id() != 0)
                 || !seen.insert(address)
             {
@@ -103,7 +109,10 @@ mod tests {
         let encoded = serde_json::to_vec(&cfg).unwrap();
         let decoded = Config::parse(&encoded).unwrap();
         assert_eq!(decoded.dns.tls_servers.len(), 1);
-        assert_eq!(decoded.dns.tls_servers[0].tls.server_name, "dns.fixture.invalid");
+        assert_eq!(
+            decoded.dns.tls_servers[0].tls.server_name,
+            "dns.fixture.invalid"
+        );
         assert!(decoded.dns.tls_servers[0].https_path.is_none());
         assert!(!decoded.dns.use_system_hosts);
         let mut ipv6 = endpoint();
@@ -117,20 +126,32 @@ mod tests {
     fn tls_cannot_downgrade_or_exceed_endpoint_budget() {
         assert!(config(json!({"tls_servers": [endpoint()], "servers": ["127.0.0.1:53"]})).is_err());
         assert!(config(json!({"tls_servers": [endpoint(), endpoint()]})).is_err());
-        let servers: Vec<_> = (853..858).map(|port| {
-            let mut server = endpoint();
-            server["address"] = json!(format!("127.0.0.1:{port}"));
-            server
-        }).collect();
+        let servers: Vec<_> = (853..858)
+            .map(|port| {
+                let mut server = endpoint();
+                server["address"] = json!(format!("127.0.0.1:{port}"));
+                server
+            })
+            .collect();
         assert!(config(json!({"tls_servers": servers})).is_err());
     }
 
     #[test]
     fn tls_rejects_ambiguous_addresses_names_and_options() {
-        for address in ["127.0.0.1:0", "0.0.0.0:853", "[::]:853", "224.0.0.1:853", "[fe80::1%1]:853", "dns.fixture.invalid:853"] {
+        for address in [
+            "127.0.0.1:0",
+            "0.0.0.0:853",
+            "[::]:853",
+            "224.0.0.1:853",
+            "[fe80::1%1]:853",
+            "dns.fixture.invalid:853",
+        ] {
             let mut server = endpoint();
             server["address"] = json!(address);
-            assert!(config(json!({"tls_servers": [server]})).is_err(), "accepted {address}");
+            assert!(
+                config(json!({"tls_servers": [server]})).is_err(),
+                "accepted {address}"
+            );
         }
         for name in ["", "bad host", "x\r\nInjected: 1", "*.example.org"] {
             let mut server = endpoint();
@@ -154,10 +175,26 @@ mod tests {
         assert!(config(json!({"tls_servers": [server.clone()]})).is_err());
         server["tls"]["alpn"] = json!(["http/1.1"]);
         let cfg = config(json!({"tls_servers": [server.clone()]})).unwrap();
-        assert_eq!(cfg.dns.tls_servers[0].https_path.as_deref(), Some("/dns-query"));
-        for path in ["", "dns-query", "//other.invalid", "/bad path", "/dns?dns=x", "/dns#fragment", "/bad\\path", "/bad%", "/x\r\nInjected: 1"] {
+        assert_eq!(
+            cfg.dns.tls_servers[0].https_path.as_deref(),
+            Some("/dns-query")
+        );
+        for path in [
+            "",
+            "dns-query",
+            "//other.invalid",
+            "/bad path",
+            "/dns?dns=x",
+            "/dns#fragment",
+            "/bad\\path",
+            "/bad%",
+            "/x\r\nInjected: 1",
+        ] {
             server["https_path"] = json!(path);
-            assert!(config(json!({"tls_servers": [server.clone()]})).is_err(), "accepted {path:?}");
+            assert!(
+                config(json!({"tls_servers": [server.clone()]})).is_err(),
+                "accepted {path:?}"
+            );
         }
         server["https_path"] = json!("/dns-query");
         server["tls"]["alpn"] = json!(["h2"]);

@@ -22,7 +22,9 @@ struct Metadata {
 }
 fn token(name: &str) -> bool {
     !name.is_empty()
-        && name.bytes().all(|b| b.is_ascii_alphanumeric() || b"!#$%&'*+-.^_`|~".contains(&b))
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"!#$%&'*+-.^_`|~".contains(&b))
 }
 fn field(line: &str) -> Result<(&str, &str)> {
     let (name, value) = line.split_once(':').ok_or("DnsHttpsHeader")?;
@@ -43,7 +45,9 @@ fn metadata(data: &[u8]) -> Result<Metadata> {
     let mut status = lines.next().ok_or("DnsHttpsStatus")?.splitn(3, ' ');
     if !matches!(status.next(), Some("HTTP/1.1" | "HTTP/1.0"))
         || status.next() != Some("200")
-        || status.next().is_none_or(|s| s.bytes().any(|b| b < 32 || b == 127))
+        || status
+            .next()
+            .is_none_or(|s| s.bytes().any(|b| b < 32 || b == 127))
     {
         return Err("DnsHttpsStatus");
     }
@@ -56,8 +60,10 @@ fn metadata(data: &[u8]) -> Result<Metadata> {
         }
         let (key, value) = field(line)?;
         let key = key.to_ascii_lowercase();
-        if matches!(key.as_str(), "content-length" | "transfer-encoding" | "content-type" | "content-encoding" | "age")
-            && !seen.insert(key.clone())
+        if matches!(
+            key.as_str(),
+            "content-length" | "transfer-encoding" | "content-type" | "content-encoding" | "age"
+        ) && !seen.insert(key.clone())
         {
             return Err("DnsHttpsDuplicateHeader");
         }
@@ -76,7 +82,13 @@ fn metadata(data: &[u8]) -> Result<Metadata> {
                 result.chunked = true;
             }
             "content-type" => {
-                if !value.split(';').next().unwrap_or("").trim().eq_ignore_ascii_case("application/dns-message") {
+                if !value
+                    .split(';')
+                    .next()
+                    .unwrap_or("")
+                    .trim()
+                    .eq_ignore_ascii_case("application/dns-message")
+                {
                     return Err("DnsHttpsContentType");
                 }
                 content_type = true;
@@ -138,7 +150,10 @@ async fn response<R: AsyncRead + Unpin>(stream: &mut R) -> Result<(Vec<u8>, Meta
     let mut body = Vec::new();
     if let Some(size) = meta.length {
         body.resize(size, 0);
-        stream.read_exact(&mut body).await.map_err(|_| "DnsHttpsRead")?;
+        stream
+            .read_exact(&mut body)
+            .await
+            .map_err(|_| "DnsHttpsRead")?;
     } else if meta.chunked {
         let mut complete = false;
         for _ in 0..256 {
@@ -164,8 +179,17 @@ async fn response<R: AsyncRead + Unpin>(stream: &mut R) -> Result<(Vec<u8>, Meta
                         complete = true;
                         break;
                     }
-                    let (name, _) = field(std::str::from_utf8(&trailer).map_err(|_| "DnsHttpsHeader")?)?;
-                    if matches!(name.to_ascii_lowercase().as_str(), "content-length" | "transfer-encoding" | "content-type" | "content-encoding" | "cache-control" | "age") {
+                    let (name, _) =
+                        field(std::str::from_utf8(&trailer).map_err(|_| "DnsHttpsHeader")?)?;
+                    if matches!(
+                        name.to_ascii_lowercase().as_str(),
+                        "content-length"
+                            | "transfer-encoding"
+                            | "content-type"
+                            | "content-encoding"
+                            | "cache-control"
+                            | "age"
+                    ) {
                         return Err("DnsHttpsTrailer");
                     }
                 }
@@ -176,9 +200,15 @@ async fn response<R: AsyncRead + Unpin>(stream: &mut R) -> Result<(Vec<u8>, Meta
             }
             let start = body.len();
             body.resize(start + size, 0);
-            stream.read_exact(&mut body[start..]).await.map_err(|_| "DnsHttpsRead")?;
+            stream
+                .read_exact(&mut body[start..])
+                .await
+                .map_err(|_| "DnsHttpsRead")?;
             let mut end = [0; 2];
-            stream.read_exact(&mut end).await.map_err(|_| "DnsHttpsRead")?;
+            stream
+                .read_exact(&mut end)
+                .await
+                .map_err(|_| "DnsHttpsRead")?;
             if end != *b"\r\n" {
                 return Err("DnsHttpsChunk");
             }
@@ -187,7 +217,11 @@ async fn response<R: AsyncRead + Unpin>(stream: &mut R) -> Result<(Vec<u8>, Meta
             return Err("DnsHttpsChunkLimit");
         }
     } else {
-        stream.take((MAX_PACKET + 1) as u64).read_to_end(&mut body).await.map_err(|_| "DnsHttpsRead")?;
+        stream
+            .take((MAX_PACKET + 1) as u64)
+            .read_to_end(&mut body)
+            .await
+            .map_err(|_| "DnsHttpsRead")?;
     }
     if !(12..=MAX_PACKET).contains(&body.len()) {
         return Err("DnsHttpsBodyLimit");
@@ -201,21 +235,47 @@ async fn exchange(server: &DnsTlsServer, host: &str, kind: u16) -> Result<Answer
     request[1] = 0;
     let path = server.https_path.as_deref().ok_or("DnsHttpsPath")?;
     let name = &server.tls.server_name;
-    let authority = if name.contains(':') { format!("[{name}]") } else { name.clone() };
-    let authority = if server.address.port() == 443 { authority } else { format!("{authority}:{}", server.address.port()) };
-    let tcp = TcpStream::connect(server.address).await.map_err(|_| "DnsHttpsConnect")?;
-    let mut stream: BoxStream = secure(tcp, &server.tls).await.map_err(|_| "DnsHttpsVerificationOrHandshake")?;
-    let header = format!("POST {path} HTTP/1.1\r\nHost: {authority}\r\nAccept: application/dns-message\r\nContent-Type: application/dns-message\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", request.len());
-    stream.write_all(header.as_bytes()).await.map_err(|_| "DnsHttpsWrite")?;
-    stream.write_all(&request).await.map_err(|_| "DnsHttpsWrite")?;
+    let authority = if name.contains(':') {
+        format!("[{name}]")
+    } else {
+        name.clone()
+    };
+    let authority = if server.address.port() == 443 {
+        authority
+    } else {
+        format!("{authority}:{}", server.address.port())
+    };
+    let tcp = TcpStream::connect(server.address)
+        .await
+        .map_err(|_| "DnsHttpsConnect")?;
+    let mut stream: BoxStream = secure(tcp, &server.tls)
+        .await
+        .map_err(|_| "DnsHttpsVerificationOrHandshake")?;
+    let header = format!(
+        "POST {path} HTTP/1.1\r\nHost: {authority}\r\nAccept: application/dns-message\r\nContent-Type: application/dns-message\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        request.len()
+    );
+    stream
+        .write_all(header.as_bytes())
+        .await
+        .map_err(|_| "DnsHttpsWrite")?;
+    stream
+        .write_all(&request)
+        .await
+        .map_err(|_| "DnsHttpsWrite")?;
     stream.flush().await.map_err(|_| "DnsHttpsWrite")?;
     let (data, meta) = response(&mut stream).await?;
     let mut answer = match wire::parse(&data, &request, host, kind)? {
         Response::Answer(answer) => answer,
         Response::Truncated => return Err("DnsHttpsTruncated"),
     };
-    answer.ttl = if meta.no_cache { 0 } else {
-        answer.ttl.min(meta.max_age.unwrap_or(u32::MAX)).saturating_sub(meta.age)
+    answer.ttl = if meta.no_cache {
+        0
+    } else {
+        answer
+            .ttl
+            .min(meta.max_age.unwrap_or(u32::MAX))
+            .saturating_sub(meta.age)
     };
     Ok(answer)
 }
@@ -238,12 +298,21 @@ async fn family(server: &DnsTlsServer, host: &str, kind: u16) -> Result<Answer> 
     }
     Err("DnsAliasDepth")
 }
-pub(super) async fn lookup(server: &DnsTlsServer, host: &str, port: u16) -> Result<(Vec<SocketAddr>, u32)> {
+pub(super) async fn lookup(
+    server: &DnsTlsServer,
+    host: &str,
+    port: u16,
+) -> Result<(Vec<SocketAddr>, u32)> {
     let a = family(server, host, 1).await?;
     let aaaa = family(server, host, 28).await?;
     let ttl = a.ttl.min(aaaa.ttl);
-    let addresses: Vec<_> = a.addresses.into_iter().chain(aaaa.addresses).take(16)
-        .map(|ip| SocketAddr::new(ip, port)).collect();
+    let addresses: Vec<_> = a
+        .addresses
+        .into_iter()
+        .chain(aaaa.addresses)
+        .take(16)
+        .map(|ip| SocketAddr::new(ip, port))
+        .collect();
     if addresses.is_empty() {
         return Err("DnsEmpty");
     }
@@ -261,8 +330,18 @@ mod tests {
         assert_eq!(meta.age, 8);
         assert_eq!(meta.max_age, Some(20));
         assert!(meta.no_cache);
-        for suffix in ["Content-Length: 12\r\nContent-Length: 12", "Content-Length: 12\r\nTransfer-Encoding: chunked", "Content-Length: +12", "Transfer-Encoding: gzip, chunked", "Content-Encoding: gzip", " folded: value", "Age: -1"] {
-            let head = format!("HTTP/1.1 200 OK\r\nContent-Type: application/dns-message\r\n{suffix}\r\n\r\n");
+        for suffix in [
+            "Content-Length: 12\r\nContent-Length: 12",
+            "Content-Length: 12\r\nTransfer-Encoding: chunked",
+            "Content-Length: +12",
+            "Transfer-Encoding: gzip, chunked",
+            "Content-Encoding: gzip",
+            " folded: value",
+            "Age: -1",
+        ] {
+            let head = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/dns-message\r\n{suffix}\r\n\r\n"
+            );
             assert!(metadata(head.as_bytes()).is_err(), "accepted {suffix}");
         }
     }
@@ -270,8 +349,15 @@ mod tests {
     async fn chunked_body_is_exact_and_bounded() {
         let mut raw = &b"HTTP/1.1 200 OK\r\nContent-Type: application/dns-message\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n7;fixture=1\r\n world!\r\n0\r\nX-Fixture: ok\r\n\r\n"[..];
         assert_eq!(response(&mut raw).await.unwrap().0, b"hello world!");
-        for body in ["ffff\r\n", "-1\r\n", "0\r\nAge: 0\r\n\r\n", "c\r\ntoo short"] {
-            let text = format!("HTTP/1.1 200 OK\r\nContent-Type: application/dns-message\r\nTransfer-Encoding: chunked\r\n\r\n{body}");
+        for body in [
+            "ffff\r\n",
+            "-1\r\n",
+            "0\r\nAge: 0\r\n\r\n",
+            "c\r\ntoo short",
+        ] {
+            let text = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/dns-message\r\nTransfer-Encoding: chunked\r\n\r\n{body}"
+            );
             assert!(response(&mut text.as_bytes()).await.is_err());
         }
     }

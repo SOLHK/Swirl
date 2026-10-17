@@ -17,15 +17,24 @@ type Result<T> = std::result::Result<T, &'static str>;
 
 async fn exchange(stream: &mut BoxStream, host: &str, kind: u16) -> Result<Answer> {
     let request = wire::query(host, kind)?;
-    stream.write_all(&(request.len() as u16).to_be_bytes()).await.map_err(|_| "DnsTlsWrite")?;
-    stream.write_all(&request).await.map_err(|_| "DnsTlsWrite")?;
+    stream
+        .write_all(&(request.len() as u16).to_be_bytes())
+        .await
+        .map_err(|_| "DnsTlsWrite")?;
+    stream
+        .write_all(&request)
+        .await
+        .map_err(|_| "DnsTlsWrite")?;
     stream.flush().await.map_err(|_| "DnsTlsWrite")?;
     let size = stream.read_u16().await.map_err(|_| "DnsTlsRead")? as usize;
     if !(12..=MAX_PACKET).contains(&size) {
         return Err("DnsTlsSize");
     }
     let mut data = vec![0; size];
-    stream.read_exact(&mut data).await.map_err(|_| "DnsTlsRead")?;
+    stream
+        .read_exact(&mut data)
+        .await
+        .map_err(|_| "DnsTlsRead")?;
     match wire::parse(&data, &request, host, kind)? {
         Response::Answer(answer) => Ok(answer),
         Response::Truncated => Err("DnsTlsTruncated"),
@@ -56,7 +65,9 @@ async fn lookup(server: &DnsTlsServer, host: &str, port: u16) -> Result<(Vec<Soc
     if server.https_path.is_some() {
         return doh::lookup(server, host, port).await;
     }
-    let tcp = TcpStream::connect(server.address).await.map_err(|_| "DnsTlsConnect")?;
+    let tcp = TcpStream::connect(server.address)
+        .await
+        .map_err(|_| "DnsTlsConnect")?;
     let mut stream = secure(tcp, &server.tls).await.map_err(|e| match e {
         "TlsTrustAnchor" => "DnsTlsTrustAnchor",
         "TlsServerName" => "DnsTlsServerName",
@@ -65,8 +76,13 @@ async fn lookup(server: &DnsTlsServer, host: &str, port: u16) -> Result<(Vec<Soc
     let a = family(&mut stream, host, 1).await?;
     let aaaa = family(&mut stream, host, 28).await?;
     let ttl = a.ttl.min(aaaa.ttl);
-    let addresses: Vec<_> = a.addresses.into_iter().chain(aaaa.addresses).take(16)
-        .map(|ip| SocketAddr::new(ip, port)).collect();
+    let addresses: Vec<_> = a
+        .addresses
+        .into_iter()
+        .chain(aaaa.addresses)
+        .take(16)
+        .map(|ip| SocketAddr::new(ip, port))
+        .collect();
     if addresses.is_empty() {
         return Err("DnsEmpty");
     }
@@ -74,13 +90,18 @@ async fn lookup(server: &DnsTlsServer, host: &str, port: u16) -> Result<(Vec<Soc
     Ok((addresses, ttl))
 }
 
-pub(super) async fn resolve(servers: &[DnsTlsServer], host: &str, port: u16) -> Result<(Vec<SocketAddr>, u32)> {
+pub(super) async fn resolve(
+    servers: &[DnsTlsServer],
+    host: &str,
+    port: u16,
+) -> Result<(Vec<SocketAddr>, u32)> {
     let mut error = "DnsNoServers";
     for server in servers {
         // Resolver also owns a total three-second execution budget. All TLS and
         // A/AAAA/CNAME HTTP exchanges share this endpoint deadline.
         let result = timeout(Duration::from_millis(1400), lookup(server, host, port))
-            .await.unwrap_or(Err("DnsTlsTimeout"));
+            .await
+            .unwrap_or(Err("DnsTlsTimeout"));
         match result {
             Ok(answer) => return Ok(answer),
             Err("DnsNameError") => return Err("DnsNameError"),
