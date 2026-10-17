@@ -76,6 +76,8 @@ REQUIRED_TESTS = (
     "test_websocket_transport.py",
     "test_core_development.py",
     "test_policy_groups.py",
+    "test_dns_negative.py",
+    "test_native_probe.py",
 )
 
 
@@ -152,7 +154,12 @@ class CoreDevelopmentTests(unittest.TestCase):
 
     def test_previous_successful_workflow_upgrades_without_duplicate_suites(self):
         final = development.updated_workflow(FIXTURE)
-        previous = final.replace("          python ../tools/tests/test_policy_groups.py\n"
+        previous = final
+        for name in ("test_dns_negative.py", "test_native_probe.py"):
+            command = f"          python ../tools/tests/{name}\n"
+            previous = previous.replace(command + development.WINDOWS_STATUS_GUARD, "")
+            previous = previous.replace(command, "")
+        previous = previous.replace("          python ../tools/tests/test_policy_groups.py\n"
                                  "          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }\n", "")
         previous = previous.replace("          python ../tools/tests/test_policy_groups.py\n", "")
         previous = previous.replace('          export SWIRL_RUST_INSPECTOR="$PWD/target/release/swirl-inspect"\n', '')
@@ -169,6 +176,23 @@ class CoreDevelopmentTests(unittest.TestCase):
         ):
             with self.subTest(tail=source[-100:]), self.assertRaises(ValueError):
                 development.updated_workflow(source)
+
+    def test_previous_dns_stage_upgrades_and_partial_new_menus_are_rejected(self):
+        final = development.updated_workflow(FIXTURE)
+        previous = final
+        for name in ("test_dns_negative.py", "test_native_probe.py"):
+            command = f"          python ../tools/tests/{name}\n"
+            previous = previous.replace(command + development.WINDOWS_STATUS_GUARD, "")
+            previous = previous.replace(command, "")
+        self.assertEqual(development.updated_workflow(previous), final)
+        command = "          python ../tools/tests/test_dns_negative.py\n"
+        for broken in (
+            final.replace(command, "", 1),
+            final.replace(command, command * 2, 1),
+            final.replace(command + development.WINDOWS_STATUS_GUARD, command),
+        ):
+            with self.subTest(menu=broken[-100:]), self.assertRaises(ValueError):
+                development.updated_workflow(broken)
 
     def test_branch_and_menu_drift_fail_closed(self):
         for source in (
@@ -243,6 +267,8 @@ class CoreDevelopmentTests(unittest.TestCase):
         for missing in (
             "tools/tests/test_websocket_transport.py",
             "tools/tests/test_policy_groups.py",
+            "tools/tests/test_dns_negative.py",
+            "tools/tests/test_native_probe.py",
             "tools/Verify-PublicRustCore.py",
         ):
             with self.subTest(missing=missing), tempfile.TemporaryDirectory() as temporary:

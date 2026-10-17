@@ -3,8 +3,8 @@
 //! explicit DoH uses bounded HTTP/1.1 POST exchanges, without a connection pool.
 #[path = "doh.rs"]
 mod doh;
-use crate::wire::{self, Answer, MAX_PACKET, Response};
-use std::{collections::HashSet, net::SocketAddr};
+use crate::wire::{self, Answer, MAX_PACKET, Resolution, Response};
+use std::collections::HashSet;
 use swirl_subscription::DnsTlsServer;
 use swirl_transport::{BoxStream, secure};
 use tokio::{
@@ -61,9 +61,9 @@ async fn family(stream: &mut BoxStream, host: &str, kind: u16) -> Result<Answer>
     Err("DnsAliasDepth")
 }
 
-async fn lookup(server: &DnsTlsServer, host: &str, port: u16) -> Result<(Vec<SocketAddr>, u32)> {
+async fn lookup(server: &DnsTlsServer, host: &str) -> Result<Resolution> {
     if server.https_path.is_some() {
-        return doh::lookup(server, host, port).await;
+        return doh::lookup(server, host).await;
     }
     let tcp = TcpStream::connect(server.address)
         .await
@@ -74,37 +74,22 @@ async fn lookup(server: &DnsTlsServer, host: &str, port: u16) -> Result<(Vec<Soc
         _ => "DnsTlsVerificationOrHandshake",
     })?;
     let a = family(&mut stream, host, 1).await?;
-    let aaaa = family(&mut stream, host, 28).await?;
-    let ttl = a.ttl.min(aaaa.ttl);
-    let addresses: Vec<_> = a
-        .addresses
-        .into_iter()
-        .chain(aaaa.addresses)
-        .take(16)
-        .map(|ip| SocketAddr::new(ip, port))
-        .collect();
-    if addresses.is_empty() {
-        return Err("DnsEmpty");
-    }
+    let aaaa = family(&mut stream, host, 28).await;
+    let result = wire::combine(Ok(a), aaaa);
     let _ = timeout(Duration::from_millis(100), stream.shutdown()).await;
-    Ok((addresses, ttl))
+    result
 }
 
-pub(super) async fn resolve(
-    servers: &[DnsTlsServer],
-    host: &str,
-    port: u16,
-) -> Result<(Vec<SocketAddr>, u32)> {
+pub(super) async fn resolve(servers: &[DnsTlsServer], host: &str) -> Result<Resolution> {
     let mut error = "DnsNoServers";
     for server in servers {
         // Resolver also owns a total three-second execution budget. All TLS and
         // A/AAAA/CNAME HTTP exchanges share this endpoint deadline.
-        let result = timeout(Duration::from_millis(1400), lookup(server, host, port))
+        let result = timeout(Duration::from_millis(1400), lookup(server, host))
             .await
             .unwrap_or(Err("DnsTlsTimeout"));
         match result {
             Ok(answer) => return Ok(answer),
-            Err("DnsNameError") => return Err("DnsNameError"),
             Err(e) => error = e,
         }
     }

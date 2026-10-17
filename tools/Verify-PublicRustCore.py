@@ -4,7 +4,9 @@ Uses only fixed public endpoints and a DIRECT route, with no existing proxy,
 private subscription, trust-store changes or provider credentials. The DoH case
 uses Rust's authenticated DNS transport with explicit IP bootstrap; it cannot
 fall back to system DNS. A failure is evidence, never silently retried elsewhere.
-This is public-origin evidence, not remote proxy-provider or TUN acceptance.
+The CLI remains public-origin evidence, not remote proxy-provider or TUN
+acceptance. An authorized in-memory caller may pass one SS/Trojan outbound to
+probe(); that caller must redact the returned diagnostics before saving them.
 """
 import argparse
 import datetime
@@ -98,7 +100,37 @@ def native_traffic_error(state):
     return None
 
 
-def probe(harness, host, encrypted_dns=False):
+def probe_configuration(encrypted_dns=False, outbound=None):
+    selected = "public-direct" if outbound is None else "anonymous-node"
+    if outbound is not None:
+        fields = {
+            "shadowsocks": {"type", "host", "port", "password", "cipher", "udp", "obfs_http"},
+            "trojan": {"type", "host", "port", "password", "tls", "websocket"},
+        }
+        if (not isinstance(outbound, dict) or not isinstance(outbound.get("type"), str)
+                or outbound["type"] not in fields
+                or not set(outbound).issubset(fields[outbound["type"]])
+                or encrypted_dns):
+            raise ValueError("IsolatedOutboundRejected")
+    config = {"schema": 1, "listen": "127.0.0.1:0", "selected": selected,
+              "nodes": [{"id": selected, "outbound":
+                         {"type": "direct"} if outbound is None else outbound}],
+              "limits": {"max_connections": 2, "handshake_timeout_ms": 10000}}
+    if encrypted_dns:
+        config["dns"] = {"use_system_hosts": False, "tls_servers": [{
+            "address": "1.1.1.1:443", "https_path": "/dns-query",
+            "tls": {"server_name": "cloudflare-dns.com", "alpn": ["http/1.1"]}}]}
+    # The initial command fits an empty 4 KiB stdin pipe even if the child
+    # fails before reading. No caller-supplied rules, groups or DIRECT fallback.
+    encoded = json.dumps({"op": "start", "config": config})
+    if len(encoded.encode("utf-8")) + 1 > 4096:
+        raise ValueError("ProbeConfigurationLimit")
+    return json.loads(encoded)["config"]
+
+
+def probe(harness, host, encrypted_dns=False, *, outbound=None):
+    config = probe_configuration(encrypted_dns, outbound)
+    selected = config["selected"]
     started = time.monotonic()
     deadline = started + PROBE_TIMEOUT_SECONDS
     # All work phases share one cutoff; cleanup consumes a reserved part of
@@ -106,16 +138,11 @@ def probe(harness, host, encrypted_dns=False):
     work_deadline = deadline - CLEANUP_RESERVE_SECONDS
     outcome = {"host": host, "port": 443, "method": "HEAD", "path": "/",
                "dns": "native-doh" if encrypted_dns else "system",
-               "route": "explicit-native-direct", "success": False}
-    config = {"schema": 1, "listen": "127.0.0.1:0", "selected": "public-direct",
-              "nodes": [{"id": "public-direct", "outbound": {"type": "direct"}}],
-              "limits": {"max_connections": 2, "handshake_timeout_ms": 10000}}
+               "route": "explicit-native-direct" if outbound is None else "explicit-native-outbound",
+               "success": False}
     if encrypted_dns:
         outcome["dns_endpoint"] = "https://cloudflare-dns.com/dns-query"
         outcome["dns_bootstrap"] = "1.1.1.1:443"
-        config["dns"] = {"use_system_hosts": False, "tls_servers": [{
-            "address": "1.1.1.1:443", "https_path": "/dns-query",
-            "tls": {"server_name": "cloudflare-dns.com", "alpn": ["http/1.1"]}}]}
     process = None
     reader = None
     replies = queue.Queue(maxsize=4)
@@ -188,7 +215,7 @@ def probe(harness, host, encrypted_dns=False):
         state = result["status"]
         if not isinstance(state, dict):
             raise ValueError("CoreStatusShape")
-        if state["engine"] != "swirl-rust" or state["selected"] != "public-direct":
+        if state["engine"] != "swirl-rust" or state["selected"] != selected:
             raise RuntimeError("CoreIdentityMismatch")
         outcome["engine"] = state["engine"]
         if not isinstance(state["address"], str):
@@ -208,6 +235,7 @@ def probe(harness, host, encrypted_dns=False):
             raw.sendall(f"CONNECT {authority} HTTP/1.1\r\nHost: {authority}\r\n\r\n".encode())
             if not read_header(raw, work_deadline).startswith(b"HTTP/1.1 200 "):
                 raise RuntimeError("NativeConnectRejected")
+            outcome["native_connect_accepted"] = True
             phase = "origin-tls"
             with ssl.create_default_context().wrap_socket(
                     raw, server_hostname=host, do_handshake_on_connect=False) as tls:
@@ -242,6 +270,7 @@ def probe(harness, host, encrypted_dns=False):
                 # Keep the last two seconds of the original budget for process
                 # termination if a broken control channel does not acknowledge.
                 state = settled_snapshot(command, handle, deadline - 2, outcome)
+                outcome["native_session_settled"] = True
                 traffic_error = native_traffic_error(state)
                 if outcome["success"] and traffic_error:
                     outcome.update(success=False, failure_phase="accounting",

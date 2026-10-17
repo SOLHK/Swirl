@@ -1,8 +1,8 @@
 //! Native RFC 8484 DoH POST over authenticated HTTP/1.1. No redirects, OS
 //! bootstrap, cookies, plaintext fallback, or external proxy engine. A fresh
 //! connection per DNS exchange deliberately avoids ambiguous keep-alive reuse.
-use crate::wire::{self, Answer, MAX_PACKET, Response};
-use std::{collections::HashSet, net::SocketAddr};
+use crate::wire::{self, Answer, MAX_PACKET, Resolution, Response};
+use std::collections::HashSet;
 use swirl_subscription::DnsTlsServer;
 use swirl_transport::{BoxStream, secure};
 use tokio::{
@@ -298,25 +298,10 @@ async fn family(server: &DnsTlsServer, host: &str, kind: u16) -> Result<Answer> 
     }
     Err("DnsAliasDepth")
 }
-pub(super) async fn lookup(
-    server: &DnsTlsServer,
-    host: &str,
-    port: u16,
-) -> Result<(Vec<SocketAddr>, u32)> {
+pub(super) async fn lookup(server: &DnsTlsServer, host: &str) -> Result<Resolution> {
     let a = family(server, host, 1).await?;
-    let aaaa = family(server, host, 28).await?;
-    let ttl = a.ttl.min(aaaa.ttl);
-    let addresses: Vec<_> = a
-        .addresses
-        .into_iter()
-        .chain(aaaa.addresses)
-        .take(16)
-        .map(|ip| SocketAddr::new(ip, port))
-        .collect();
-    if addresses.is_empty() {
-        return Err("DnsEmpty");
-    }
-    Ok((addresses, ttl))
+    let aaaa = family(server, host, 28).await;
+    wire::combine(Ok(a), aaaa)
 }
 
 #[cfg(test)]

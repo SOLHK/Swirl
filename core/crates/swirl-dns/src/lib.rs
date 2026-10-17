@@ -10,7 +10,7 @@ use std::{
 use swirl_subscription::DnsTlsServer;
 use tokio::{net::lookup_host, sync::Semaphore, time::timeout};
 
-type Cache = HashMap<(String, u16), (Instant, Vec<SocketAddr>)>;
+type Cache = HashMap<String, (Instant, wire::Outcome)>;
 pub struct Resolver {
     cache: Mutex<Cache>,
     permits: Arc<Semaphore>,
@@ -73,12 +73,12 @@ impl Resolver {
         if let Some(ip) = self.system_hosts.get(&host.to_ascii_lowercase()) {
             return Ok(vec![SocketAddr::new(*ip, port)]);
         }
-        let key = (host.to_ascii_lowercase(), port);
+        let key = host.to_ascii_lowercase();
         {
             let mut cache = self.cache.lock().map_err(|_| "DnsState")?;
             cache.retain(|_, (expires, _)| *expires > Instant::now());
-            if let Some((_, addresses)) = cache.get(&key) {
-                return Ok(addresses.clone());
+            if let Some((_, outcome)) = cache.get(&key) {
+                return outcome.for_port(port);
             }
         }
         let permit = timeout(Duration::from_secs(3), self.permits.clone().acquire_owned())
@@ -90,23 +90,23 @@ impl Resolver {
             let started = Instant::now();
             let resolution = async {
                 if self.tls_servers.is_empty() {
-                    wire::resolve(&self.servers, host, port).await
+                    wire::resolve(&self.servers, host).await
                 } else {
-                    dot::resolve(&self.tls_servers, host, port).await
+                    dot::resolve(&self.tls_servers, host).await
                 }
             };
-            let (addresses, ttl) = timeout(Duration::from_secs(3), resolution)
+            let answer = timeout(Duration::from_secs(3), resolution)
                 .await
                 .map_err(|_| "DnsTimeout")??;
-            let expires = started + Duration::from_secs(u64::from(ttl));
+            let expires = started + Duration::from_secs(u64::from(answer.ttl));
             if expires > Instant::now() {
                 let mut cache = self.cache.lock().map_err(|_| "DnsState")?;
                 if cache.len() >= 256 {
                     cache.clear();
                 }
-                cache.insert(key, (expires, addresses.clone()));
+                cache.insert(key, (expires, answer.outcome.clone()));
             }
-            return Ok(addresses);
+            return answer.outcome.for_port(port);
         }
         // Keep the permit until the underlying OS lookup actually finishes even
         // if the caller times out/cancels. This bounds detached blocking lookups.
@@ -115,7 +115,7 @@ impl Resolver {
             let _permit = permit;
             lookup_host((host, port))
                 .await
-                .map(|a| a.take(16).collect::<Vec<_>>())
+                .map(|a| a.take(16).map(|address| address.ip()).collect::<Vec<_>>())
         });
         let addresses = timeout(Duration::from_secs(3), lookup)
             .await
@@ -125,15 +125,16 @@ impl Resolver {
         if addresses.is_empty() {
             return Err("DnsEmpty");
         }
+        let outcome = wire::Outcome::Addresses(addresses);
         let mut cache = self.cache.lock().map_err(|_| "DnsState")?;
         if cache.len() >= 256 {
             cache.clear();
         }
         cache.insert(
             key,
-            (Instant::now() + Duration::from_secs(30), addresses.clone()),
+            (Instant::now() + Duration::from_secs(30), outcome.clone()),
         );
-        Ok(addresses)
+        outcome.for_port(port)
     }
 }
 
@@ -229,8 +230,11 @@ mod tests {
         );
         assert!(next.resolve("fixture.invalid", 0).await.is_err());
         old.cache.lock().unwrap().insert(
-            ("cached.invalid".into(), 80),
-            (Instant::now(), vec!["127.0.0.9:80".parse().unwrap()]),
+            "cached.invalid".into(),
+            (
+                Instant::now(),
+                wire::Outcome::Addresses(vec!["127.0.0.9".parse().unwrap()]),
+            ),
         );
         assert!(next.cache.lock().unwrap().is_empty());
         assert!(root.mapped_host("fixture.invalid").is_none());
@@ -238,5 +242,49 @@ mod tests {
             old.resolve("fixture.invalid", 80).await.unwrap()[0].ip(),
             "127.0.0.1".parse::<IpAddr>().unwrap()
         );
+    }
+
+    #[tokio::test]
+    async fn cached_ip_sets_share_hosts_and_attach_each_requested_port() {
+        let resolver = Resolver::default();
+        resolver.cache.lock().unwrap().insert(
+            "cached.invalid".into(),
+            (
+                Instant::now() + Duration::from_secs(30),
+                wire::Outcome::Addresses(vec![
+                    "127.0.0.9".parse().unwrap(),
+                    "::1".parse().unwrap(),
+                ]),
+            ),
+        );
+        for port in [80, 443, 8443] {
+            let addresses = resolver.resolve("CACHED.INVALID", port).await.unwrap();
+            assert_eq!(addresses.len(), 2);
+            assert!(addresses.iter().all(|address| address.port() == port));
+        }
+        assert_eq!(resolver.cache.lock().unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn negative_cache_is_shared_across_ports_but_not_configurations() {
+        let resolver = Resolver::default();
+        for (name, negative, expected) in [
+            ("missing.invalid", wire::Negative::NameError, "DnsNameError"),
+            ("empty.invalid", wire::Negative::NoData, "DnsEmpty"),
+        ] {
+            resolver.cache.lock().unwrap().insert(
+                name.into(),
+                (
+                    Instant::now() + Duration::from_secs(30),
+                    wire::Outcome::Negative(negative),
+                ),
+            );
+            for port in [80, 443] {
+                assert_eq!(resolver.resolve(name, port).await, Err(expected));
+            }
+        }
+        let next = resolver.with_hosts(&[]);
+        assert!(next.cache.lock().unwrap().is_empty());
+        assert!(Arc::ptr_eq(&resolver.permits, &next.permits));
     }
 }

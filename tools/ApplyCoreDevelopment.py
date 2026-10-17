@@ -3,8 +3,9 @@
 The only writable file is .github/workflows/rust-core.yml. The update enables
 its existing jobs on this development branch, adds the already implemented
 DoH, SOCKS4, WebSocket and automatic-policy peer suites, and runs fixed public-network
-checks with an evidence artifact on Linux. The current stage also runs the SOCKS4
-and WS Qt forwarding peers after the existing Qt build. It does not change permissions, secrets,
+checks with an evidence artifact on Linux. The current stage adds negative DNS
+and isolated native-outbound probe regressions alongside the existing SOCKS4
+and WS Qt forwarding peers. It does not change permissions, secrets,
 existing actions, release jobs, pull-request triggers or any product source.
 
 Run ``python tools/ApplyCoreDevelopment.py --check`` to run the safety tests and
@@ -38,6 +39,7 @@ ADDITIONAL_TESTS = (
     "test_core_development.py",
 )
 POLICY_TEST = "test_policy_groups.py"
+DNS_PROBE_TESTS = ("test_dns_negative.py", "test_native_probe.py")
 QT_PEER_TESTS = (
     "test_socks4.py Socks4Integration.test_qt_imported_socks4_and_4a_data_path",
     "test_websocket_transport.py WebSocketTransportTests.test_qt_vless_websocket_data_path",
@@ -70,7 +72,7 @@ def _replace_checked(source: str, before: str, after: str, label: str,
     raise ValueError(f"Rust CI {label} has drifted or is ambiguous; review required")
 
 
-def updated_workflow(source: str) -> str:
+def _previous_workflow(source: str) -> str:
     """Return a bounded, idempotent update; validate all blocks before any write."""
     stage_counts = (
         source.count(f"          python ../tools/tests/{POLICY_TEST}\n"),
@@ -132,6 +134,27 @@ def updated_workflow(source: str) -> str:
     raise ValueError("Rust CI Qt peer menu has drifted or is ambiguous; review required")
 
 
+def updated_workflow(source: str) -> str:
+    """Extend only the two reviewed test menus; reject partial/duplicate additions."""
+    policy = f"          python ../tools/tests/{POLICY_TEST}\n"
+    portable = policy + PUBLIC_VALIDATION_STEPS
+    windows = policy + WINDOWS_STATUS_GUARD + "          python ../tools/tests/test_subscription_capture.py\n"
+    added_portable = "".join(f"          python ../tools/tests/{name}\n" for name in DNS_PROBE_TESTS)
+    added_windows = "".join(f"          python ../tools/tests/{name}\n" + WINDOWS_STATUS_GUARD for name in DNS_PROBE_TESTS)
+    portable_after = policy + added_portable + PUBLIC_VALIDATION_STEPS
+    windows_after = policy + WINDOWS_STATUS_GUARD + added_windows + "          python ../tools/tests/test_subscription_capture.py\n"
+    counts = tuple(source.count(f"          python ../tools/tests/{name}\n") for name in DNS_PROBE_TESTS)
+    if counts == (2, 2):
+        if source.count(portable_after) != 1 or source.count(windows_after) != 1:
+            raise ValueError("Rust CI DNS/probe menus have drifted; review required")
+        source = source.replace(portable_after, portable, 1).replace(windows_after, windows, 1)
+    elif counts != (0, 0):
+        raise ValueError("Rust CI DNS/probe stage is only partially present; review required")
+    source = _previous_workflow(source)
+    source = _replace_checked(source, portable, portable_after, "portable DNS/probe menu")
+    return _replace_checked(source, windows, windows_after, "Windows DNS/probe menu")
+
+
 def validate_context(environment: Mapping[str, str]) -> None:
     expected = {
         "GITHUB_ACTIONS": "true",
@@ -157,7 +180,7 @@ def prepare_update(repository: Path) -> tuple[Path, str, str]:
     # workflow; writes still occur only in the existing Linux App job.
     before = path.read_text(encoding="utf-8")
     after = updated_workflow(before)
-    for name in (*ADDITIONAL_TESTS, POLICY_TEST):
+    for name in (*ADDITIONAL_TESTS, POLICY_TEST, *DNS_PROBE_TESTS):
         if not (repository / "tools/tests" / name).is_file():
             raise ValueError(f"Required CI suite is missing: {name}")
     if not (repository / PUBLIC_PROBE).is_file():

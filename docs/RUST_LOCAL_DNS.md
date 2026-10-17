@@ -1,6 +1,6 @@
 # Rust system/custom DNS and local host mappings
 
-**Scope update, 2026-10-17:** this document describes shared resolver/host behavior
+**Scope update, 2026-10-17 UTC:** this document describes shared resolver/host behavior
 and the original system/UDP/TCP DNS stage. Rust also implements strict DoT and
 HTTP/1.1 DoH. See the [current encrypted-DNS overview](../core/README.md#encrypted-dns-dot-and-http11-doh),
 the [historical DoT stage](RUST_DOT.md), and
@@ -78,6 +78,13 @@ DoH also applies its HTTP cache-age restrictions. Local
 mappings are evaluated before the OS cache and do not consume lookup permits.
 System-cache expiration is a policy bound rather than authoritative DNS TTL.
 
+Cache identity is now the lowercase hostname, independent of the application's
+destination port. Cached IP addresses receive the requested port on return, so
+HTTP and HTTPS to the same hostname can share a lookup. Positive entries store
+the available address set; an empty other family is not a claim that this
+family's records do not exist. Configuration generations still own separate
+caches, and local mappings still take precedence.
+
 ## Custom DNS wire behavior
 
 `core/crates/swirl-dns/src/wire.rs` implements the query/response protocol in Rust.
@@ -99,8 +106,19 @@ the lookup fail even if the other family returned addresses. That is a current
 availability limitation, not evidence of full DNS interoperability.
 
 Positive cache lifetime is the minimum relevant address/CNAME TTL, capped at
-300 seconds and reduced by lookup elapsed time. TTL zero is not cached. There
-is no negative/SOA cache, EDNS negotiation or DNSSEC validation. DNS split,
+300 seconds and reduced by lookup elapsed time. TTL zero is not cached.
+Validated NXDOMAIN and combined A/AAAA NODATA can now use a negative cache:
+only a structurally valid IN SOA in the authority section, covering the actual
+CNAME terminal name, supplies the lifetime. It is bounded by both SOA TTL and
+SOA MINIMUM, relevant CNAME TTLs and the 300-second local maximum. Absent,
+unrelated, malformed or zero-lifetime SOA data cannot create a reusable negative
+entry. Inconsistent A/AAAA answers fail rather than poisoning the cache.
+DoT and DoH use the same DNS parsing and combination logic; DoH HTTP Age and
+cache restrictions also constrain negative results.
+
+Timeouts, SERVFAIL, REFUSED and transport errors remain failures, never
+NXDOMAIN. RFC 9520 failure-cache suppression is not implemented by this stage;
+neither are EDNS negotiation or DNSSEC validation. DNS split,
 automatic domain bootstrap and proxy-routed encrypted DNS also remain separate
 future work; the existence of DoT/DoH does not provide those features.
 System-hosts snapshots are bounded to 1 MiB and 4096 names; comment encoding does
@@ -112,7 +130,10 @@ lookups. Ordinary proxy target domain names still go to the proxy unless the
 existing mapping or resolving-rule semantics require an IP; custom DNS alone
 does not silently change remote target resolution into local resolution.
 
-Wire-format reference: https://www.rfc-editor.org/rfc/rfc1035.html .
+Primary references: [DNS wire format (RFC 1035)](https://www.rfc-editor.org/rfc/rfc1035.html),
+[negative answers and SOA lifetime (RFC 2308)](https://www.rfc-editor.org/rfc/rfc2308.html),
+and [the separate resolution-failure cache requirements (RFC 9520)](https://www.rfc-editor.org/rfc/rfc9520.html).
+The implementation is independently written for the existing Swirl resolver.
 
 ## Verification
 
@@ -136,3 +157,7 @@ The encrypted suites are `tools/tests/test_dns_tls.py` and
 `tools/tests/test_dns_https.py`; their source presence is not itself a result for
 a new commit. Earlier strict public DIRECT/DoH checks and current regression
 execution are recorded separately in the validation documents linked above.
+The new `tools/tests/test_dns_negative.py` exercises negative caching through
+independent loopback DNS peers and actual native control/forwarding calls;
+the current-stage results belong to the exact tested commit recorded in
+`docs/CONTINUE_DEVELOPMENT.md`.
