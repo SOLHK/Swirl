@@ -54,6 +54,14 @@ pub enum Outbound {
         #[serde(default)]
         obfs_http: Option<ObfsHttp>,
     },
+    Socks4 {
+        host: String,
+        port: u16,
+        #[serde(default)]
+        user_id: String,
+        #[serde(default = "default_true")]
+        remote_dns: bool,
+    },
     Socks5 {
         host: String,
         port: u16,
@@ -312,6 +320,18 @@ impl Config {
                 return Err("NodeId");
             }
             match &node.outbound {
+                Outbound::Socks4 {
+                    host,
+                    port,
+                    user_id,
+                    ..
+                } if !valid_host(host)
+                    || *port == 0
+                    || user_id.len() > 255
+                    || user_id.chars().any(char::is_control) =>
+                {
+                    return Err("Socks4Parameters");
+                }
                 Outbound::Vless {
                     host, port, uuid, ..
                 } if !valid_host(host) || *port == 0 || uuid_bytes(uuid).is_none() => {

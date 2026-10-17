@@ -1,6 +1,7 @@
 //! Swirl-owned HTTP/SOCKS state machines. Underlying Tokio is generic socket I/O.
 use base64::{Engine, engine::general_purpose::STANDARD};
 mod shadowsocks;
+mod socks4;
 mod vless;
 pub use shadowsocks::{
     decrypt_datagram as ss_decrypt_datagram, encrypt_datagram as ss_encrypt_datagram,
@@ -111,6 +112,7 @@ pub async fn read_target<R: AsyncRead + Unpin>(stream: &mut R, allow_zero: bool)
 
 #[derive(Clone, Copy)]
 pub enum InboundKind {
+    Socks4,
     Socks5,
     HttpConnect,
     HttpForward,
@@ -145,6 +147,9 @@ async fn http_header(stream: &mut TcpStream, mut data: Vec<u8>) -> Result<(Vec<u
 
 pub async fn accept(stream: &mut TcpStream, auth: &Option<Credentials>) -> Result<Inbound> {
     let first = stream.read_u8().await.map_err(|_| "InboundClosed")?;
+    if first == 4 {
+        return socks4::accept(stream, auth).await;
+    }
     if first == 5 {
         return accept_socks(stream, auth).await;
     }
@@ -382,6 +387,7 @@ async fn accept_http(
 }
 pub async fn reply(stream: &mut TcpStream, kind: InboundKind, ok: bool) -> Result<()> {
     let bytes = match kind {
+        InboundKind::Socks4 => vec![0, if ok { 90 } else { 91 }, 0, 0, 0, 0, 0, 0],
         InboundKind::Socks5 => {
             if ok {
                 vec![5, 0, 0, 1, 0, 0, 0, 0, 0, 0]
@@ -413,6 +419,14 @@ pub async fn connect(
     let (host, port, auth, tls) = match outbound {
         Outbound::Direct {} => return Ok(Box::new(connect_tcp(resolver, target).await?)),
         Outbound::Reject {} => return Err("RouteRejected"),
+        Outbound::Socks4 {
+            host,
+            port,
+            user_id,
+            remote_dns,
+        } => {
+            return socks4::connect(host, *port, user_id, *remote_dns, target, resolver).await;
+        }
         Outbound::Shadowsocks { host, port, .. } => (host, *port, None, None),
         Outbound::Socks5 {
             host,

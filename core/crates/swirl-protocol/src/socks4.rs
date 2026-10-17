@@ -5,7 +5,10 @@ use std::net::{IpAddr, Ipv4Addr};
 use swirl_dns::Resolver;
 use swirl_subscription::{Credentials, valid_host};
 use swirl_transport::BoxStream;
-use tokio::{io::{AsyncReadExt, AsyncWriteExt}, net::TcpStream};
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::TcpStream,
+};
 
 async fn terminated(stream: &mut TcpStream, limit: usize) -> Result<Vec<u8>> {
     let mut data = Vec::new();
@@ -30,7 +33,10 @@ pub(super) async fn accept(stream: &mut TcpStream, auth: &Option<Credentials>) -
         }
         let port = stream.read_u16().await.map_err(|_| "Socks4Read")?;
         let mut address = [0; 4];
-        stream.read_exact(&mut address).await.map_err(|_| "Socks4Read")?;
+        stream
+            .read_exact(&mut address)
+            .await
+            .map_err(|_| "Socks4Read")?;
         let _user = terminated(stream, 255).await?;
         let host = if address[..3] == [0, 0, 0] && address[3] != 0 {
             let bytes = terminated(stream, 253).await?;
@@ -45,17 +51,28 @@ pub(super) async fn accept(stream: &mut TcpStream, auth: &Option<Credentials>) -
         if port == 0 || !valid_host(&host) || host == "0.0.0.0" {
             return Err("InvalidTarget");
         }
-        Ok(Inbound {kind: InboundKind::Socks4, target: Target {host, port}, initial: Vec::new(), udp: false})
-    }.await;
+        Ok(Inbound {
+            kind: InboundKind::Socks4,
+            target: Target { host, port },
+            initial: Vec::new(),
+            udp: false,
+        })
+    }
+    .await;
     if result.is_err() {
         let _ = stream.write_all(&[0, 91, 0, 0, 0, 0, 0, 0]).await;
     }
     result
 }
 
-pub(super) async fn connect(host: &str, port: u16, user_id: &str, remote_dns: bool,
-    target: &Target, resolver: &Resolver) -> Result<BoxStream>
-{
+pub(super) async fn connect(
+    host: &str,
+    port: u16,
+    user_id: &str,
+    remote_dns: bool,
+    target: &Target,
+    resolver: &Resolver,
+) -> Result<BoxStream> {
     let mut domain = None;
     let ip = match target.host.parse::<IpAddr>() {
         Ok(IpAddr::V4(ip)) => ip,
@@ -64,19 +81,37 @@ pub(super) async fn connect(host: &str, port: u16, user_id: &str, remote_dns: bo
             domain = Some(target.host.as_str());
             Ipv4Addr::new(0, 0, 0, 1)
         }
-        Err(_) => resolver.resolve(&target.host, target.port).await?.iter()
-            .find_map(|a| if let IpAddr::V4(ip) = a.ip() {Some(ip)} else {None})
+        Err(_) => resolver
+            .resolve(&target.host, target.port)
+            .await?
+            .iter()
+            .find_map(|a| {
+                if let IpAddr::V4(ip) = a.ip() {
+                    Some(ip)
+                } else {
+                    None
+                }
+            })
             .ok_or("Socks4Ipv6Unsupported")?,
     };
     if domain.is_none() && ip.octets()[..3] == [0, 0, 0] {
         return Err("Socks4AmbiguousAddress");
     }
-    if user_id.len() > 255 || user_id.chars().any(char::is_control)
-        || target.port == 0 || !valid_host(&target.host)
+    if user_id.len() > 255
+        || user_id.chars().any(char::is_control)
+        || target.port == 0
+        || !valid_host(&target.host)
     {
         return Err("Socks4Parameters");
     }
-    let mut stream = super::connect_tcp(resolver, &Target {host: host.to_owned(), port}).await?;
+    let mut stream = super::connect_tcp(
+        resolver,
+        &Target {
+            host: host.to_owned(),
+            port,
+        },
+    )
+    .await?;
     let mut request = vec![4, 1];
     request.extend(target.port.to_be_bytes());
     request.extend(ip.octets());
@@ -86,9 +121,15 @@ pub(super) async fn connect(host: &str, port: u16, user_id: &str, remote_dns: bo
         request.extend(domain.as_bytes());
         request.push(0);
     }
-    stream.write_all(&request).await.map_err(|_| "Socks4Write")?;
+    stream
+        .write_all(&request)
+        .await
+        .map_err(|_| "Socks4Write")?;
     let mut reply = [0; 8];
-    stream.read_exact(&mut reply).await.map_err(|_| "Socks4Read")?;
+    stream
+        .read_exact(&mut reply)
+        .await
+        .map_err(|_| "Socks4Read")?;
     if reply[0] != 0 || reply[1] != 90 {
         return Err("Socks4Rejected");
     }

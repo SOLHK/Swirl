@@ -1,4 +1,4 @@
-//! Bounded system/custom/strict TLS DNS resolver. DoH/Fake-IP are not claimed.
+//! Bounded system/custom/DoT/HTTP-1.1 DoH resolver. Fake-IP is not implemented.
 mod dot;
 mod wire;
 use std::{

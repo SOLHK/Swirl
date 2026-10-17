@@ -18,6 +18,22 @@ class RustCoreTests:public QObject {
   o.nodes={n};o.selectedNodeId=n.id;return o;
  }
 private slots:
+ void nativeDohMapsExistingHttpsField(){
+  ControlledNetwork net;QVERIFY(net.start());auto o=options(net);o.routingMode="direct";
+  o.dnsConfig={{"mode",0},{"servers",""},{"encrypted","https://DNS.fixture.invalid:8443/dns-query"},{"useHosts",false},
+    {"hosts",QVariantList{QVariantMap{{"name","dns.fixture.invalid"},{"value","127.0.0.1"}}}}};
+  QJsonObject config;QVERIFY2(RustCoreEngine::configuration(o,&config).isEmpty(),"DoH configuration maps");
+  const auto endpoint=config["dns"].toObject()["tls_servers"].toArray().first().toObject();
+  QCOMPARE(endpoint["address"].toString(),QString("127.0.0.1:8443"));
+  QCOMPARE(endpoint["https_path"].toString(),QString("/dns-query"));
+  QCOMPARE(endpoint["tls"].toObject()["server_name"].toString(),QString("dns.fixture.invalid"));
+  QCOMPARE(endpoint["tls"].toObject()["alpn"].toArray(),QJsonArray{"http/1.1"});
+  RustCoreEngine engine;engine.start(o);QVERIFY2(engine.status().state==ProxyEngine::State::Running,qPrintable(engine.status().message));engine.stop();
+  const QJsonObject sentinel{{"unchanged",true}};
+  for(const auto &url:QStringList{"http://127.0.0.1/dns-query","https://missing.invalid/dns-query","https://user@127.0.0.1/dns-query","https://127.0.0.1/dns-query?x=1","https://127.0.0.1/dns-query#x","https://127.0.0.1:0/dns-query","https://127.0.0.1//bad"}){
+   o.dnsConfig["encrypted"]=url;config=sentinel;QVERIFY2(!RustCoreEngine::configuration(o,&config).isEmpty(),qPrintable(url));QCOMPARE(config,sentinel);
+  }
+ }
  void strictDotMapsExistingFieldWithoutResolvingOrChangingUi(){
   ControlledNetwork net;QVERIFY(net.start());auto o=options(net);o.routingMode="direct";
   o.dnsConfig={{"mode",0},{"servers",""},{"encrypted","tls://DNS.fixture.invalid:8853"},{"useHosts",false},
