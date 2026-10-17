@@ -1,6 +1,7 @@
 #include "engine/RustCoreEngine.h"
 #include "engine/ThreadedEngine.h"
 #include "engine/NodeTestService.h"
+#include "engine/SwirlProtocolRegistry.h"
 #include "ControlledNetwork.h"
 #include <QTest>
 #include <QNetworkAccessManager>
@@ -16,6 +17,25 @@ class RustCoreTests:public QObject {
   o.nodes={n};o.selectedNodeId=n.id;return o;
  }
 private slots:
+ void vlessThroughIndependentPeer(){
+  bool valid=false;const int port=qEnvironmentVariableIntValue("SWIRL_VLESS_REFERENCE_PORT",&valid);
+  if(!valid)QSKIP("Independent VLESS peer supplies the port in its integration run.");
+  ControlledNetwork net;QVERIFY(net.start());auto o=options(net);auto &n=o.nodes.first();
+  n.protocol="vless";n.host="127.0.0.1";n.port=quint16(port);n.parameters={{"uuid","00112233-4455-6677-8899-aabbccddeeff"}};
+  RustCoreEngine engine;engine.start(o);QCOMPARE(engine.status().state,ProxyEngine::State::Running);
+  QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",o.proxyPort));
+  QNetworkRequest request(QUrl("http://origin.example/vless"));request.setTransferTimeout(5000);
+  auto reply=client.get(request);QVERIFY(QTest::qWaitFor([&]{return reply->isFinished();},6000));
+  QCOMPARE(reply->error(),QNetworkReply::NoError);QCOMPARE(reply->readAll(),QByteArray("vless-ok"));engine.stop();
+ }
+ void capabilityUsesTheSelectedRustRuntime(){
+  ControlledNetwork net;QVERIFY(net.start());auto o=options(net);auto n=o.nodes.first();
+  n.protocol="ss";n.password="fixture";n.cipher="aes-128-gcm";n.parameters={{"udp",true}};
+  auto capability=SwirlProtocolRegistry::describe(n);QVERIFY(capability["native"].toBool());QVERIFY(!capability["compatible"].toBool());QVERIFY(!capability["engine"].toString().contains("Mihomo"));
+  n.protocol="vless";n.password.clear();n.cipher.clear();n.parameters={{"uuid","00112233-4455-6677-8899-aabbccddeeff"}};
+  QVERIFY(SwirlProtocolRegistry::nativeNodeReason(n).isEmpty());
+  n.parameters["flow"]="xtls-rprx-vision";QVERIFY(!SwirlProtocolRegistry::nativeNodeReason(n).isEmpty());
+ }
  void shadowsocksThroughIndependentPeer(){
   bool valid=false;const int port=qEnvironmentVariableIntValue("SWIRL_SS_REFERENCE_PORT",&valid);
   if(!valid)QSKIP("Independent Python SS peer supplies the isolated port in its integration run.");

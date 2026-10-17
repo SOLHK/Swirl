@@ -2,7 +2,14 @@
 #include <QSet>
 #include <QJsonArray>
 #include <QSslSocket>
+#ifdef SWIRL_USE_RUST_CORE
+#include "RustCoreEngine.h"
+#endif
 QString SwirlProtocolRegistry::nativeNodeReason(const ProxyNode &node){
+#ifdef SWIRL_USE_RUST_CORE
+    EngineStartOptions o;o.routingMode="global";o.nodes={node};o.selectedNodeId=node.id;
+    QJsonObject ignored;return RustCoreEngine::configuration(o,&ignored);
+#else
     if(!node.conversionIssues.isEmpty())return QStringLiteral("存在未映射的订阅选项，不能安全执行。");
     if(!QStringList{"http","socks5","trojan"}.contains(node.protocol))return QStringLiteral("此协议的原生实现研发中，继续使用 Mihomo。");
     const QSet<QString> allowed{"tls","udp","sni","servername","alpn","skip-cert-verify"};
@@ -18,8 +25,12 @@ QString SwirlProtocolRegistry::nativeNodeReason(const ProxyNode &node){
     if(node.parameters.value("skip-cert-verify").toBool())return QStringLiteral("原生 TLS 不允许关闭证书验证。");
     if((node.protocol=="trojan"||node.parameters.value("tls").toBool())&&!QSslSocket::supportsSsl())return QStringLiteral("当前 TLS 后端不可用。");
     return ProxyNode::validate(node);
+#endif
 }
 QString SwirlProtocolRegistry::nativeSessionReason(const EngineStartOptions &o){
+#ifdef SWIRL_USE_RUST_CORE
+    QJsonObject ignored;return RustCoreEngine::configuration(o,&ignored);
+#else
     if(o.preferCompatibility)return QStringLiteral("用户选择优先使用 Mihomo 兼容引擎；保持相同节点与网络配置。");
     if(o.tunEnabled||o.gatewayForwarding||o.allowLan||o.meteredNetwork)return QStringLiteral("TUN、网关、LAN 或进程计费策略继续由 Mihomo 执行。");
     if(!o.dnsConfig.isEmpty()||!o.customRules.isEmpty()||!o.customGroups.isEmpty())return QStringLiteral("自定义 DNS、规则及策略组继续由 Mihomo 执行。");
@@ -28,8 +39,14 @@ QString SwirlProtocolRegistry::nativeSessionReason(const EngineStartOptions &o){
     if(o.directSession||o.routingMode=="direct")return {};
     for(const auto &n:o.nodes)if(n.id==o.selectedNodeId)return nativeNodeReason(n);
     return QStringLiteral("未选择可执行节点。");
+#endif
 }
 QVariantMap SwirlProtocolRegistry::describe(const ProxyNode &n){
+#ifdef SWIRL_USE_RUST_CORE
+    const auto reason=nativeNodeReason(n);
+    return {{"native",reason.isEmpty()},{"compatible",false},{"engine",reason.isEmpty()?QStringLiteral("Swirl Rust 原生"):QStringLiteral("Rust 尚未支持")},{"reason",reason},{"tested",false}};
+#else
     const auto reason=nativeNodeReason(n);const bool compatible=ProxyNode::protocols().contains(n.protocol)&&n.conversionIssues.isEmpty();
     return {{"native",reason.isEmpty()},{"compatible",compatible},{"engine",reason.isEmpty()?QStringLiteral("Swirl 原生（TCP）"):compatible?QStringLiteral("Mihomo 兼容"):QStringLiteral("尚未支持")},{"reason",reason},{"tested",false}};
+#endif
 }

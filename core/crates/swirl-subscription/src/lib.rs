@@ -35,6 +35,13 @@ pub struct ObfsHttp {
 pub enum Outbound {
     Direct,
     Reject,
+    Vless {
+        host: String,
+        port: u16,
+        uuid: String,
+        #[serde(default)]
+        tls: Option<Tls>,
+    },
     Shadowsocks {
         host: String,
         port: u16,
@@ -133,6 +140,28 @@ pub fn valid_host(host: &str) -> bool {
                         .all(|b| b.is_ascii_alphanumeric() || b == b'-')
             }))
 }
+pub fn uuid_bytes(value: &str) -> Option<[u8; 16]> {
+    if value.len() != 36 || !value.is_ascii() {
+        return None;
+    }
+    let mut compact = String::with_capacity(32);
+    for (i, c) in value.chars().enumerate() {
+        if [8, 13, 18, 23].contains(&i) {
+            if c != '-' {
+                return None;
+            }
+        } else if c.is_ascii_hexdigit() {
+            compact.push(c);
+        } else {
+            return None;
+        }
+    }
+    let mut bytes = [0; 16];
+    for (i, b) in bytes.iter_mut().enumerate() {
+        *b = u8::from_str_radix(&compact[i * 2..i * 2 + 2], 16).ok()?;
+    }
+    Some(bytes)
+}
 fn valid_auth(auth: &Option<Credentials>) -> bool {
     auth.as_ref().is_none_or(|a| {
         !a.username.is_empty()
@@ -183,6 +212,11 @@ impl Config {
                 return Err("NodeId");
             }
             match &node.outbound {
+                Outbound::Vless {
+                    host, port, uuid, ..
+                } if !valid_host(host) || *port == 0 || uuid_bytes(uuid).is_none() => {
+                    return Err("VlessParameters");
+                }
                 Outbound::Shadowsocks {
                     host,
                     port,
@@ -225,7 +259,9 @@ impl Config {
                 _ => {}
             }
             let tls = match &node.outbound {
-                Outbound::Socks5 { tls, .. } | Outbound::HttpConnect { tls, .. } => tls.as_ref(),
+                Outbound::Socks5 { tls, .. }
+                | Outbound::HttpConnect { tls, .. }
+                | Outbound::Vless { tls, .. } => tls.as_ref(),
                 Outbound::Trojan { tls, .. } => Some(tls),
                 _ => None,
             };

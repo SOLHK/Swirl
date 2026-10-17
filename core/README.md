@@ -1,4 +1,4 @@
-# Swirl Core: first executable Rust migration
+# Swirl Core: native Rust runtime and staged product migration
 
 This workspace lives inside the existing Swirl product repository. The Qt/QML
 interface is unchanged. It replaces actual forwarding with Rust when configured
@@ -39,14 +39,14 @@ optional public HTTPS checks; it does not claim private-node performance.
 | Crate | Actual implementation | Not yet implemented |
 |---|---|---|
 | swirl-subscription | Versioned typed Swirl IR; bounded content detection for Clash YAML/JSON, sing-box JSON, URI/Base64 and INI; raw/unknown field preservation; redacted protocol/transport/TLS/cipher matrix; fully mapped TCP test candidates | Complete client-specific config execution and integrated subscription updating; existing C++ adapters and Python capture retained |
-| swirl-protocol | Mixed HTTP/CONNECT/SOCKS5 input, input auth, HTTP CONNECT/SOCKS5 upstream auth, Trojan TLS framing, SS AEAD TCP/UDP and simple-obfs HTTP TCP framing | SOCKS4, SS2022/SSR/VMess/VLESS/REALITY/QUIC families, other protocol UDP and obfs TLS |
+| swirl-protocol | Mixed HTTP/CONNECT/SOCKS5 input, input auth, HTTP CONNECT/SOCKS5 upstream auth, Trojan TLS framing, SS AEAD TCP/UDP, simple-obfs HTTP TCP, VLESS v0 TCP with optional verified TLS | SOCKS4, SS2022/SSR/VMess/REALITY/QUIC families, VLESS Vision/mux/encryption extensions, other protocol UDP and obfs TLS |
 | swirl-transport | rustls TLS with verification/SNI/ALPN, bounded duplex copying, independent half-close, live byte counters | WS/gRPC/XHTTP protocol transports, mux, QUIC; application WS/SSE opaque tunneling is a different layer |
 | swirl-routing | Ordered domain/exact/suffix/IP-CIDR, explicit DIRECT/REJECT/node selection | GEOIP/GEOSITE, groups/failover; custom routing is currently exposed through IR API, not the legacy Qt configuration mapper |
 | swirl-dns | System resolver, 8-query concurrency limit, 256-entry cache with 30-second policy lifetime, max 16 addresses | Authoritative DNS TTL handling, DoH/DoT/DNS split/Fake-IP |
 | swirl-core | Two Tokio workers, max 256 sessions, immutable per-session plan, atomic updates, stop/cancel, stats; SOCKS5 UDP ASSOCIATE with explicit DIRECT or SS AEAD routes | Other protocol UDP, TUN, platform network takeover |
 | swirl-api | ABI v1 caller-buffer JSON, lifecycle handles, start/configure/select/snapshot/stop; local stdin harness | More advanced policy/config schemas and persisted IR migration |
 
-The Qt adapter exposes supported HTTP/SOCKS5/Trojan/SS AEAD nodes using the existing
+The Qt adapter exposes supported HTTP/SOCKS5/Trojan/SS AEAD/VLESS TCP nodes using the existing
 controls. Unsupported options fail explicitly before startup or selection. In
 particular, old default smart-routing/TUN/custom DNS sessions are not silently
 downgraded to global/direct. Existing stored nodes and unselected unsupported
@@ -123,6 +123,19 @@ replay and the Qt facade. Run `tools/tests/test_shadowsocks.py` with
 SWIRL_RUST_HARNESS and optionally SWIRL_RUST_QT_TESTS pointing to built executables.
 
 ## Bounds and ownership
+
+VLESS supports the version-0 TCP request layout used by the reference Xray
+implementation, canonical UUID authentication, IPv4/IPv6/domain target encoding,
+and optional generic TLS. It does not import or execute Xray. The response prefix
+is decoded lazily because the peer may wait for application data; partial header
+bytes survive cancellation and a partial-header deadline uses the configured
+handshake limit. Waiting for the first application response has no fixed idle
+cutoff. Unknown versions, nonempty addons, flow/Vision, REALITY, multiplexing,
+other transports, UDP and encryption extensions are rejected rather than stripped.
+Python independent peers verify plain/TLS forwarding, invalid UUID, certificate
+name rejection and malformed response prefixes; a Qt peer test verifies the
+existing product adapter. Private-provider VLESS is unverified. Reference:
+https://github.com/XTLS/Xray-core/blob/main/proxy/vless/encoding/encoding.go .
 
 - IR/control input <=1 MiB, <=512 nodes, <=4096 rules, <=256 active sessions.
 - HTTP headers <=16 KiB/64 fields; handshake <=30 seconds. No blanket idle timer

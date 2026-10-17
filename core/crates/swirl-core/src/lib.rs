@@ -305,7 +305,7 @@ async fn session(
     );
     let connected = timeout(
         limit,
-        swirl_protocol::connect(&node.outbound, &request.target, &resolver),
+        swirl_protocol::connect(&node.outbound, &request.target, &resolver, limit),
     )
     .await
     .map_err(|_| "UpstreamTimeout")

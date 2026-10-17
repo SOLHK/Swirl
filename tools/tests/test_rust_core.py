@@ -132,6 +132,23 @@ class Handler(socketserver.BaseRequestHandler):
                     assert exact(s, 3) == b'\r\n\x01'
                     destination = target(s)
                     assert exact(s, 2) == b'\r\n'
+                elif protocol.startswith('vless'):
+                    assert exact(s,1)==b'\x00'
+                    if exact(s,16)!=bytes.fromhex('00112233445566778899aabbccddeeff'):return
+                    assert exact(s,2)==b'\x00\x01'
+                    port=int.from_bytes(exact(s,2),'big');kind=exact(s,1)[0]
+                    if kind==1:host=socket.inet_ntop(socket.AF_INET,exact(s,4))
+                    elif kind==3:host=socket.inet_ntop(socket.AF_INET6,exact(s,16))
+                    else:
+                        assert kind==2;host=exact(s,exact(s,1)[0]).decode()
+                    destination=(host,port);self.server.requests.append(destination)
+                    if protocol=='vless-bad-version':s.sendall(b'\x01\x00NEVER');return
+                    if protocol=='vless-addons':s.sendall(b'\x00\x01\x00NEVER');return
+                    if protocol=='vless-truncated':s.sendall(b'\x00');return
+                    s.sendall(b'\x00');s.sendall(b'\x00')
+                    if protocol=='vless-http-origin':
+                        assert header(s).startswith(b'GET /vless HTTP/1.1')
+                        s.sendall(b'HTTP/1.1 200 OK\r\nContent-Length: 8\r\nConnection: close\r\n\r\nvless-ok');return
                 elif protocol == 'http-origin':
                     data = header(s); self.server.requests.append(data)
                     if data.startswith(b'GET /ws '):
@@ -217,6 +234,44 @@ class RustCoreIntegration(unittest.TestCase):
                     s.sendall(b'hello-independent-peer'); self.assertEqual(exact(s, 22), b'hello-independent-peer')
                 self.assertEqual(server.accepted, 1)
                 self.assertTrue(self.command(op='stop', handle=self.handle)['ok'])
+    def test_vless_tcp_tls_addresses_and_invalid_responses(self):
+        for tls in (False,True):
+            server=self.server('vless',tls=tls)
+            outbound={'type':'vless','host':'127.0.0.1','port':server.server_address[1],'uuid':'00112233-4455-6677-8899-aabbccddeeff'}
+            if tls:outbound['tls']={'server_name':'localhost','ca_der_base64':self.ca}
+            self.start(outbound)
+            for address in ('example.org:443','127.0.0.1:443','[::1]:443'):
+                with socket.create_connection(('127.0.0.1',self.port),timeout=3) as s:
+                    s.sendall(f'CONNECT {address} HTTP/1.1\r\nHost: {address}\r\n\r\n'.encode());self.assertIn(b'200',header(s))
+                    data=os.urandom(65536);s.sendall(data);self.assertEqual(exact(s,len(data)),data)
+            self.assertEqual(server.requests,[('example.org',443),('127.0.0.1',443),('::1',443)])
+            self.command(op='stop',handle=self.handle)
+        for mode in ('vless-bad-version','vless-addons','vless-truncated'):
+            server=self.server(mode)
+            self.start({'type':'vless','host':'127.0.0.1','port':server.server_address[1],'uuid':'00112233-4455-6677-8899-aabbccddeeff'})
+            with self.tunnel(443)[0] as s:self.assertEqual(s.recv(64),b'')
+            self.assertEqual(self.command(op='snapshot',handle=self.handle)['status']['download'],0)
+            self.command(op='stop',handle=self.handle)
+    def test_vless_uuid_and_tls_fail_closed(self):
+        server=self.server('vless',tls=True)
+        for identity,tls in [('00112233-4455-6677-8899-aabbccddee00',{'server_name':'localhost','ca_der_base64':self.ca}),
+                             ('00112233-4455-6677-8899-aabbccddeeff',{'server_name':'wrong.example','ca_der_base64':self.ca})]:
+            self.start({'type':'vless','host':'127.0.0.1','port':server.server_address[1],'uuid':identity,'tls':tls})
+            s,response=self.tunnel(443)
+            with s:
+                if tls['server_name']=='wrong.example':self.assertIn(b'502',response)
+                else:self.assertEqual(s.recv(1),b'')
+            self.command(op='stop',handle=self.handle)
+        self.assertEqual(server.accepted,0)
+    @unittest.skipUnless(os.environ.get('SWIRL_RUST_QT_TESTS'),'Qt executable required')
+    def test_vless_qt_data_path(self):
+        server=self.server('vless-http-origin')
+        with tempfile.TemporaryDirectory() as folder:
+            log=Path(folder)/'qt.txt'
+            result=subprocess.run([os.environ['SWIRL_RUST_QT_TESTS'],'vlessThroughIndependentPeer','-o',str(log)+',txt'],
+                env={**os.environ,'SWIRL_VLESS_REFERENCE_PORT':str(server.server_address[1])},capture_output=True,timeout=15)
+            self.assertEqual(result.returncode,0,log.read_text(encoding='utf-8') if log.exists() else 'Qt log unavailable')
+        self.assertEqual(server.requests,[('origin.example',80)])
 
     def test_tls_http_socks_and_trojan_with_validated_certificate(self):
         for protocol in ('http_connect','socks5','trojan'):

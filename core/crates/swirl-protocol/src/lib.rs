@@ -1,6 +1,7 @@
 //! Swirl-owned HTTP/SOCKS state machines. Underlying Tokio is generic socket I/O.
 use base64::{Engine, engine::general_purpose::STANDARD};
 mod shadowsocks;
+mod vless;
 pub use shadowsocks::{
     decrypt_datagram as ss_decrypt_datagram, encrypt_datagram as ss_encrypt_datagram,
 };
@@ -407,6 +408,7 @@ pub async fn connect(
     outbound: &Outbound,
     target: &Target,
     resolver: &Resolver,
+    handshake_limit: std::time::Duration,
 ) -> Result<swirl_transport::BoxStream> {
     let (host, port, auth, tls) = match outbound {
         Outbound::Direct => return Ok(Box::new(connect_tcp(resolver, target).await?)),
@@ -427,6 +429,9 @@ pub async fn connect(
         Outbound::Trojan {
             host, port, tls, ..
         } => (host, *port, None, Some(tls)),
+        Outbound::Vless {
+            host, port, tls, ..
+        } => (host, *port, None, tls.as_ref()),
     };
     let tcp = connect_tcp(
         resolver,
@@ -480,6 +485,16 @@ pub async fn connect(
             .map_err(|_| "TrojanHandshakeWrite")?;
         stream.flush().await.map_err(|_| "TrojanHandshakeWrite")?;
         return Ok(stream);
+    }
+    if let Outbound::Vless { uuid, .. } = outbound {
+        stream
+            .write_all(&vless::request(uuid, target)?)
+            .await
+            .map_err(|_| "VlessHandshakeWrite")?;
+        stream.flush().await.map_err(|_| "VlessHandshakeWrite")?;
+        // The server may wait for application data before responding. Decode
+        // its prefix lazily, retaining partial reads and never forwarding it.
+        return Ok(Box::new(vless::Stream::new(stream, handshake_limit)));
     }
     if matches!(outbound, Outbound::Socks5 { .. }) {
         let method = if auth.is_some() { 2 } else { 0 };

@@ -714,6 +714,8 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
                     !SS_FIELDS.contains(&k.as_str())
                 } else {
                     !known.contains(&k.as_str())
+                        && !(kind == "vless"
+                            && ["uuid", "flow", "encryption"].contains(&k.as_str()))
                 }
             })
             .count()
@@ -730,7 +732,7 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
             Err(reason) => diagnostic = reason,
         }
     }
-    if ["http", "socks5", "trojan"].contains(&kind) {
+    if ["http", "socks5", "trojan", "vless"].contains(&kind) {
         diagnostic = "UnmappedOrInvalidParameters";
         let host = raw
             .get("server")
@@ -755,8 +757,33 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
             o.keys()
                 .any(|k| !["enabled", "server_name", "alpn", "insecure"].contains(&k.as_str()))
         });
+        let declared_tls = tls_obj
+            .and_then(Value::as_bool)
+            .or_else(|| raw.pointer("/tls/enabled").and_then(Value::as_bool));
+        let security = raw.get("security").and_then(Value::as_str);
+        let names = [
+            raw.get("sni"),
+            raw.get("servername"),
+            raw.pointer("/tls/server_name"),
+        ];
+        let first_name = names.iter().flatten().next().copied();
         let tls_invalid = tls_obj.is_some_and(|v| !v.is_boolean() && !v.is_object())
-            || (kind == "trojan" && tls_obj.and_then(Value::as_bool) == Some(false));
+            || (kind == "trojan" && declared_tls == Some(false))
+            || matches!(
+                (declared_tls, security),
+                (Some(false), Some("tls")) | (Some(true), Some("none"))
+            )
+            || ["/tls/enabled", "/tls/insecure"]
+                .iter()
+                .any(|p| raw.pointer(p).is_some_and(|v| !v.is_boolean()))
+            || names
+                .iter()
+                .flatten()
+                .any(|n| !n.is_string() || Some(*n) != first_name)
+            || (!tls_enabled
+                && tls_obj
+                    .and_then(Value::as_object)
+                    .is_some_and(|o| o.keys().any(|k| k != "enabled")));
         diagnostic = if skip {
             "CertificateVerificationDisabledUnsupported"
         } else if raw.get("tfo").and_then(Value::as_bool) == Some(true) {
@@ -772,6 +799,13 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
         };
         // TFO is preserved; a true request is not silently claimed as implemented.
         if unrecognized == 0
+            && (kind != "vless"
+                || (raw.get("username").is_none()
+                    && raw.get("password").is_none()
+                    && raw.get("flow").is_none_or(|v| v.as_str() == Some(""))
+                    && raw
+                        .get("encryption")
+                        .is_none_or(|v| v.as_str() == Some("none"))))
             && ["username", "password", "server", "sni", "servername"]
                 .iter()
                 .all(|key| raw.get(*key).is_none_or(Value::is_string))
@@ -858,6 +892,12 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
                 None
             };
             let outbound = match kind {
+                "vless" => Some(Outbound::Vless {
+                    host,
+                    port: port as u16,
+                    uuid: raw.get("uuid").and_then(Value::as_str).unwrap_or("").into(),
+                    tls,
+                }),
                 "trojan" => tls.map(|tls| Outbound::Trojan {
                     host,
                     port: port as u16,
@@ -991,6 +1031,45 @@ pub fn inspect(bytes: &[u8]) -> Inspection {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn vless_base_tls_maps_but_flow_and_reality_never_downgrade() {
+        let base = "vless://00112233-4455-6677-8899-aabbccddeeff@example.org:443?security=tls&encryption=none";
+        let r = inspect(base.as_bytes());
+        assert!(r.report.nodes[0].native_tcp_candidate);
+        assert!(!r.report.nodes[0].native_udp_supported);
+        for suffix in [
+            "&flow=xtls-rprx-vision",
+            "&type=ws",
+            "&encryption=mlkem768x25519plus.native.0rtt",
+        ] {
+            let text = format!("{base}{suffix}");
+            assert!(
+                !inspect(text.as_bytes())
+                    .report
+                    .nodes
+                    .first()
+                    .is_some_and(|n| n.native_tcp_candidate)
+            );
+        }
+        let reality = base.replace("security=tls", "security=reality");
+        assert!(!inspect(reality.as_bytes()).report.nodes[0].native_tcp_candidate);
+        let encrypted = base.replace("encryption=none", "encryption=unsupported");
+        let r = inspect(encrypted.as_bytes());
+        assert!(r.report.parsed);
+        assert!(!r.report.nodes[0].native_tcp_candidate);
+        for tls in [
+            r#"{"enabled":"true"}"#,
+            r#"{"enabled":false,"server_name":"example.org"}"#,
+            r#"{"enabled":true,"insecure":"false"}"#,
+        ] {
+            let text = format!(
+                r#"{{"outbounds":[{{"type":"vless","server":"example.org","server_port":443,"uuid":"00112233-4455-6677-8899-aabbccddeeff","tls":{tls}}}]}}"#
+            );
+            assert!(!inspect(text.as_bytes()).report.nodes[0].native_tcp_candidate);
+        }
+        let conflicting = base.to_owned() + "&sni=example.org&servername=other.example";
+        assert!(!inspect(conflicting.as_bytes()).report.nodes[0].native_tcp_candidate);
+    }
     #[test]
     fn sip002_plugin_mapping_escaping_and_unknown_retention() {
         let prefix = "ss://YWVzLTEyOC1nY206Zml4dHVyZQ@example.org:443/?plugin=";

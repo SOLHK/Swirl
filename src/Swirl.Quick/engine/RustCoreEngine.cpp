@@ -29,8 +29,9 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
   if(it==o.nodes.cend())return "未选择节点。";
   const auto &n=*it;
   if(!n.conversionIssues.isEmpty()||!ProxyNode::validate(n).isEmpty())return "节点含无效或未映射参数，Rust 拒绝执行。";
-  if(!QStringList{"http","socks5","trojan","ss"}.contains(n.protocol))return "此节点协议尚未迁移到 Rust；未使用外部内核。";
-  const QSet<QString> allowed=n.protocol=="ss"?QSet<QString>{"udp","plugin","plugin-opts"}:QSet<QString>{"tls","udp","sni","servername","alpn","skip-cert-verify"};
+  if(!QStringList{"http","socks5","trojan","ss","vless"}.contains(n.protocol))return "此节点协议尚未迁移到 Rust；未使用外部内核。";
+  QSet<QString> allowed=n.protocol=="ss"?QSet<QString>{"udp","plugin","plugin-opts"}:QSet<QString>{"tls","udp","sni","servername","alpn","skip-cert-verify"};
+  if(n.protocol=="vless")allowed.unite(QSet<QString>{"uuid","flow","encryption"});
   for(auto p=n.parameters.begin();p!=n.parameters.end();++p)if(!allowed.contains(p.key()))return "Rust 尚未实现此传输或扩展参数。";
   for(const auto &key:QStringList{"tls","udp","skip-cert-verify"})if(n.parameters.contains(key)&&!n.parameters.value(key).isBool())return "Rust 布尔参数类型无效。";
   if((n.protocol!="ss"&&n.parameters.value("udp").toBool())||n.parameters.value("skip-cert-verify").toBool())return "Rust 尚不支持该出口的代理 UDP，且不允许关闭证书验证。";
@@ -49,6 +50,12 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
     if(plugin.value("mode").toString()!="http"||!plugin.value("host").isString()||plugin.value("host").toString().isEmpty())return "Rust 目前只支持显式主机的 HTTP 混淆。";
     outbound["obfs_http"]=QJsonObject{{"host",plugin.value("host")}};
    }else if(n.parameters.contains("plugin-opts"))return "缺少 Shadowsocks 插件类型。";
+  }
+  else if(n.protocol=="vless"){
+   if(!n.username.isEmpty()||!n.password.isEmpty())return "VLESS 只支持 UUID 认证。";
+   if(n.parameters.contains("flow")&&(!n.parameters.value("flow").isString()||!n.parameters.value("flow").toString().isEmpty()))return "Rust 尚未实现 VLESS flow/Vision。";
+   if(n.parameters.contains("encryption")&&n.parameters.value("encryption").toString()!="none")return "Rust 尚未实现该 VLESS encryption 扩展。";
+   outbound["uuid"]=QUuid(n.parameters.value("uuid").toString()).toString(QUuid::WithoutBraces);
   }
   else if(n.protocol=="trojan")outbound["password"]=n.password;
   else if(!n.username.isEmpty()||!n.password.isEmpty())outbound["auth"]=QJsonObject{{"username",n.username},{"password",n.password}};
