@@ -43,6 +43,30 @@ and the native bounded Ping/Pong queue. See the [actual architecture audit](../d
 and [stage validation](../docs/RUST_WS_VALIDATION_20261017.md) for exact tested
 commits, failures, skips and remaining work. QML and product UI are preserved.
 
+The implementation is published as
+[`510c62a`](https://github.com/SOLHK/Swirl/commit/510c62ade64418c76241bbe76ae118c5040dad92).
+The existing GitHub App job then successfully pushed
+[`a60c446`](https://github.com/SOLHK/Swirl/commit/a60c446fdb54c10753c2d367752c4e0275a89922),
+changing only `.github/workflows/rust-core.yml` (+23/-1). The resulting workflow
+SHA-256 is `c40f0a47abafd50a7ebe6782c25572578544920263439d3ac249125a22c6e9e8`.
+[Core implementation validation #17](https://github.com/SOLHK/Swirl/actions/runs/39029146435)
+records the successful App-token generation, checkout and workflow commit/push;
+this establishes actual Workflows write access without changing the App or Secrets.
+[Swirl Rust Core #21](https://github.com/SOLHK/Swirl/actions/runs/39029167841)
+completed successfully on `a60c446` at 2026-10-17 11:42:56 UTC. Linux, macOS and
+Windows each passed 57 Rust tests and 64 independent Python protocol tests.
+The two Qt-dependent Python cases were skipped in those initial protocol runs;
+Windows subsequently executed both the SS and VLESS Qt paths against independent
+peers successfully. Windows Qt CTest also passed 1/1 in 3.09 seconds, including
+the new WS configuration acceptance/rejection regressions. Actual forwarding
+through the Qt WS mapping remains a separate, unverified case.
+
+The first public-network run received responses for all three fixed HTTP/TLS checks, but every
+runtime snapshot reported `failed=1` and `last_error=StreamIo`. Its successful
+workflow step does not establish error-free session cleanup. The stricter public
+verifier and its follow-up run remain pending; see the stage validation linked
+above for the original results and limits.
+
 The three `swirl-subscription/src/policy.rs`, `swirl-protocol/src/probe.rs` and
 `swirl-core/src/policy.rs` files are **unintegrated candidates**. They are not
 declared by their crate roots and their tests are not executed. Automatic
@@ -210,10 +234,14 @@ Local private subscription capture and offline parsing have been exercised;
 this does not establish working provider connections. TUN, real provider traffic,
 Codex remote control, mobile actions, long soak tests,
 visual acceptance and non-Windows products are still unverified.
-The reviewed App workflow update will add separate public-origin HTTPS and native
-DoH checks with fixed endpoints and actual byte counters. It has not yet been
-applied or run: the connector rejected the initial GitHub write. The exact
-blocker and pending evidence are recorded in
+The committed App workflow update adds separate public-origin HTTPS and native
+DoH checks with fixed endpoints and actual byte counters. The first Linux CI run
+received HTTP 200, 301 and 200 after verified TLS 1.3 handshakes, with positive
+native traffic counters. All three sessions also recorded `failed=1` and
+`last_error=StreamIo`; these results establish HTTP/TLS connectivity and still
+require a stricter cleanup gate and follow-up verification. The earlier local
+public-network attempt failed and is not a success claim. Exact run identities,
+the original report and remaining verification are recorded in
 [`RUST_WS_VALIDATION_20261017.md`](../docs/RUST_WS_VALIDATION_20261017.md).
 A public DIRECT success would not prove a provider's WS endpoint,
 private subscription or all product settings. The user's personal Windows

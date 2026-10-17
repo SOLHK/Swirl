@@ -46,6 +46,58 @@ def read_header(stream, deadline):
     return bytes(data)
 
 
+def close_https(stream, deadline):
+    # SSLSocket.close() does not exchange close_notify. Closing immediately
+    # after the HEAD headers can reset a TCP socket with an unread TLS alert,
+    # causing a real relay error even though HTTP status parsing succeeded.
+    stream.settimeout(remaining(deadline, 12))
+    with stream.unwrap() as plain:
+        plain.settimeout(remaining(deadline, 12))
+        plain.shutdown(socket.SHUT_WR)
+        if plain.recv(1):
+            raise RuntimeError("UnexpectedDataAfterTlsClose")
+
+
+def settled_snapshot(command, handle, deadline, outcome):
+    while True:
+        result = command(deadline, op="snapshot", handle=handle)
+        if not result.get("ok"):
+            raise RuntimeError("SnapshotRejected")
+        state = result["status"]
+        if not isinstance(state, dict):
+            raise ValueError("CoreSnapshotShape")
+        keys = ("accepted", "active", "failed", "upload", "download")
+        for key in keys:
+            if type(state[key]) is not int or state[key] < 0:
+                raise ValueError("CoreSnapshotShape")
+        if not isinstance(state["last_error"], str):
+            raise ValueError("CoreSnapshotShape")
+        connections = state["connections"]
+        if (not isinstance(connections, list) or len(connections) > 256 or
+                any(not isinstance(record, dict) or type(record.get("ended")) is not bool
+                    for record in connections)):
+            raise ValueError("CoreSnapshotShape")
+        outcome["core"] = {key: state[key] for key in (*keys, "last_error")}
+        outcome["core"]["recorded_connections"] = len(connections)
+        # A header can arrive before relay shutdown is accounted. The guard
+        # decrements active before marking its record ended, so wait for both.
+        if state["active"] == 0 and all(record["ended"] for record in connections):
+            return outcome["core"]
+        time.sleep(remaining(deadline, 0.02))
+
+
+def native_traffic_error(state):
+    if state["active"] != 0:
+        return "NativeConnectionsNotSettled"
+    if state["failed"] != 0 or state["last_error"]:
+        return "NativeRelayFailed"
+    if state["recorded_connections"] != 1:
+        return "NativeConnectionRecordCount"
+    if state["accepted"] != 1 or not state["upload"] or not state["download"]:
+        return "MissingNativeTraffic"
+    return None
+
+
 def probe(harness, host, encrypted_dns=False):
     started = time.monotonic()
     deadline = started + PROBE_TIMEOUT_SECONDS
@@ -173,6 +225,9 @@ def probe(harness, host, encrypted_dns=False):
                 outcome["http_status"] = code
                 if not 200 <= code < 400:
                     raise RuntimeError("HttpStatusRejected")
+                phase = "origin-close"
+                close_https(tls, work_deadline)
+                outcome["orderly_close"] = True
                 outcome["success"] = True
     except CONTROL_ERRORS as error:
         outcome["failure_phase"] = phase
@@ -186,23 +241,11 @@ def probe(harness, host, encrypted_dns=False):
             try:
                 # Keep the last two seconds of the original budget for process
                 # termination if a broken control channel does not acknowledge.
-                result = command(deadline - 2, op="snapshot", handle=handle)
-                if not result.get("ok"):
-                    raise RuntimeError("SnapshotRejected")
-                state = result["status"]
-                if not isinstance(state, dict):
-                    raise ValueError("CoreSnapshotShape")
-                for key in ("accepted", "failed", "upload", "download"):
-                    if type(state[key]) is not int or state[key] < 0:
-                        raise ValueError("CoreSnapshotShape")
-                if not isinstance(state["last_error"], str):
-                    raise ValueError("CoreSnapshotShape")
-                outcome["core"] = {key: state[key] for key in
-                                   ("accepted", "failed", "upload", "download", "last_error")}
-                if outcome["success"] and (state["accepted"] != 1 or
-                                            not state["upload"] or not state["download"]):
+                state = settled_snapshot(command, handle, deadline - 2, outcome)
+                traffic_error = native_traffic_error(state)
+                if outcome["success"] and traffic_error:
                     outcome.update(success=False, failure_phase="accounting",
-                                   error="MissingNativeTraffic")
+                                   error=traffic_error)
             except CONTROL_ERRORS as error:
                 cleanup_failure("CoreSnapshotFailed", error)
             try:

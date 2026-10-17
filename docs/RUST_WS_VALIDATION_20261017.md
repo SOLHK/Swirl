@@ -4,6 +4,10 @@
 main 为 `87409c0bf9c957ef113f84c176c5a1529c27b9df`，本轮不改 main。此文区分源码、编译、独立网络对端、
 Qt 配置映射、公网目标及私有节点，不把一个层级的结果代替另一个层级。
 
+修复源码已推送为 [`510c62ade64418c76241bbe76ae118c5040dad92`](https://github.com/SOLHK/Swirl/commit/510c62ade64418c76241bbe76ae118c5040dad92)，
+其 Git tree `9a04e97bb170d717be031019bc1adceb8c92c1a7` 与本地已验证提交 `f0ed42f` 完全一致。
+现有 App 随后提交 [`a60c446fdb54c10753c2d367752c4e0275a89922`](https://github.com/SOLHK/Swirl/commit/a60c446fdb54c10753c2d367752c4e0275a89922)，仅更新 Rust CI 工作流。
+
 ## 接手时的真实状态
 
 - 全量获取仓库及分支历史后核实：main 尚无 Rust workspace；开发分支已继承 main 的连续卡片导航与动画修复。
@@ -66,8 +70,23 @@ writer 还未得到调度，reader 就把正常排队当成 `WebSocketControlLim
 | Linux 采集/Codex 管理附加测试 | 1 项证据分类通过；Windows DPAPI/真实 CLI 相关项明确跳过，不算通过 |
 
 新增 2 个 Qt 测试槽验证 VLESS WS、VLESS WSS、Trojan WSS 现有字段映射和实际 Rust ABI 配置接受，
-以及 12 类危险/不支持参数拒绝与输出原子性。本地没有 Qt SDK，需以本轮 Windows CI 实际结果补录；
-即使配置测试通过，也不能称已验证 Qt WS 真实转发。
+以及 12 类危险/不支持参数拒绝与输出原子性。本地没有 Qt SDK；本轮 Windows CI 已完成这些测试目标的构建及运行，
+但配置测试通过仍不能称已验证 Qt WS 真实转发。
+
+## 第一阶段远端 CI 结果
+
+[Swirl Rust Core #21](https://github.com/SOLHK/Swirl/actions/runs/39029167841) 在
+`a60c446fdb54c10753c2d367752c4e0275a89922` 上运行，2026-10-17 11:42:56 UTC 完成，结论为 success。
+
+| Job | 实际结果 |
+|---|---|
+| [Linux](https://github.com/SOLHK/Swirl/actions/runs/39029167841/job/117385982804) | Rust 57 项、独立协议 64 项、工作流安全 11 项通过；2 项 Qt 在此平台跳过 |
+| [macOS](https://github.com/SOLHK/Swirl/actions/runs/39029167841/job/117385982566) | 同上；公网按设计仅 Linux 执行，macOS 公网 step 跳过 |
+| [Windows](https://github.com/SOLHK/Swirl/actions/runs/39029167841/job/117385982751) | Rust 57 项、独立协议 64 项、工作流安全 11 项通过；Qt 构建与 CTest 1/1 通过（3.09 秒） |
+| Windows 后续独立 Qt 对端 | Shadowsocks HTTP obfs 与 VLESS 的两项真实 Qt 转发分别运行并通过，补足独立协议步骤先前因未构建 Qt 而跳过的两项 |
+
+上述协议回归包括 WS 10 项，原失败的分片/Ping 测试在三平台均通过。首次公网 step 虽然 success，
+存在下面单独记录的关闭错误，因此不把工作流绿色结果扩展成无错误会话的完整验收。
 
 ## 公网验证与环境边界
 
@@ -77,7 +96,29 @@ writer 还未得到调度，reader 就把正常排队当成 `WebSocketControlLim
 
 本地实际尝试失败：系统解析出现 `DnsLookupFailed`/`DnsTimeout`，明确 IP 的 DoH 出现 `DnsHttpsConnect`。
 独立 Python 原生 socket 对相同域名也报 `gaierror`，因此本地环境不能作为公网成功证据。
-GitHub Actions 将执行同一脚本并保存准确提交、binary SHA-256、时间、HTTP 状态、TLS 与计数；结果需要等待实际运行补录。
+GitHub Actions #21 的 [Linux job](https://github.com/SOLHK/Swirl/actions/runs/39029167841/job/117385982804)
+已执行同一脚本。2026-10-17 11:36:23 UTC（北京时间 19:36:23），三个 HEAD 请求均完成 TLS 1.3 证书校验，
+分别收到 200、301、200。原生运行时均为 `swirl-rust`，来源工作区干净。
+
+不过，原始报告的每个会话都记录 `failed=1`、`last_error=StreamIo`。当时脚本仅要求 HTTP 状态及真实流量，
+因此 CI 公网 step 返回成功；不能把这个绿色 step 当成正常关闭的完整验收。
+保留 [未经改写的第一次 JSON](evidence/RUST_PUBLIC_NETWORK_20261017_INITIAL.json)，
+其 binary SHA-256 为 `7e83e9b89232f4712335ca9e4d8e6f3dacbb52b5f2daefbe357055792ce132d9`。
+该记录保留用于与后续严格门禁的输出比较，不覆盖或删除首次失败统计。
+
+### 第二阶段：修复验证客户端收尾并收紧门禁
+
+相同独立本地 TLS 源站和真实 Rust DIRECT harness 的隔离实验已确认：只读 HEAD 头后直接关闭 SSL socket，
+源站报 `SSLEOFError`，原生会话以 `failed=1 / StreamIo` 结束；仅将验证客户端改为 TLS `unwrap()`、
+TCP 写半关闭并读取 EOF，双方正常完成关闭且 `active=0 / failed=0 / last_error=""`。Rust relay 未修改。
+
+最终验证器在原 45 秒总预算内完成关闭、等待 `active=0` 且连接记录全部 `ended`，
+明确要求只有一条实际连接记录、接受数为 1、双向字节非零、错误计数为零、错误字符串为空，再允许整体成功。
+控制通道、stop 或子进程清理出错仍会使结果失败，TLS 认证和三个固定公开目标保持不变。
+
+在既有 `test_rust_core.py` 中新增 4 项独立 TLS/网络回归与 1 项缺失连接记录的负向检查。
+完整 23 项套件先通过 22 项并跳过 1 项 Qt；补入最后的缺记录检查及源站完成事件后，最终 5 项专项再次全部通过。
+最终文件共有 24 项测试，完整跨平台计数及严格公网结果将由下一次 CI 补录。
 
 公网验证脚本另已检查统一 45 秒预算、慢速响应头截止时间、控制回复上限、损坏/关闭控制管道及自有进程清理。
 源码身份的 Git 调用明确以脚本定位的仓库根目录运行；从 CI 的 `core/` 工作目录执行的模拟验证通过，
@@ -97,24 +138,26 @@ GitHub Actions 将执行同一脚本并保存准确提交、binary SHA-256、时
 本地 `--check` 展示的工作流 SHA-256 为：
 
 - 原始：`670ace2b30c0456f6a3d0dcc35c6c11583e9c95dcf3138c5e8843b0a6916b1b9`
-- 预期更新：`c40f0a47abafd50a7ebe6782c25572578544920263439d3ac249125a22c6e9e8`
+- 预期及远端实际更新：`c40f0a47abafd50a7ebe6782c25572578544920263439d3ac249125a22c6e9e8`
 
-必须验证 App 自动提交确有该 workflow diff、成功推送开发分支、远端内容哈希匹配、三平台运行使用相同提交。
-仅 Token 生成成功或自动提交后的跳过运行不算实证。此阶段提交后再补录真实提交与 Actions 结论。
+### 已取得的 App 写入证据
 
-### 本次实际写入阻塞
+| 证据 | 实际结果 |
+|---|---|
+| 修复源码提交 | `510c62a`，12 个源码、测试和文档文件，不含直接 workflow 修改 |
+| [Core implementation validation #17](https://github.com/SOLHK/Swirl/actions/runs/39029146435) | job `117385925803` 已完成且 success；Rust 57 项与独立协议回归通过，App 应用/提交/推送成功 |
+| App 自动提交 | `a60c446`，唯一父级为 `510c62a`，唯一文件为 `.github/workflows/rust-core.yml`，23 行新增、1 行删除 |
+| 远端文件校验 | 5,789 字节，SHA-256 与预先审核结果完全相同 |
+| [Swirl Rust Core #21](https://github.com/SOLHK/Swirl/actions/runs/39029167841) | `actor=swirl-core-automation[bot]`、`event=push`、`head_sha=a60c446...`，已触发三平台测试 |
 
-已尝试通过 GitHub 连接器创建基于原始开发分支 tree 的阶段提交树，内容为本轮 12 个源码、测试和文档文件，
-未包含 `.github/workflows` 直接修改。调用被拒绝，唯一返回原文为 `user rejected MCP tool call`，未给出具体原因。
-因此没有创建或推送远端提交，也没有触发本轮 Actions。此结果不能解释成 GitHub App 的 Workflows 权限不足，
-因为执行尚未到 App job 或其 `git push`。
+以上证明现有 App 已实际写入并推送该工作流，且其 push 能触发目标 CI。无需重新配置 App 或 Secrets。
+完整 #17 日志在 11:33:37 UTC 明确打印 `510c62a..a60c446 HEAD -> work/core-completion-20261017`，
+被测提交为完整 `a60c446fdb54c10753c2d367752c4e0275a89922`；11:36:22 UTC 撤销短期 App Token。
+App 自身推送产生的 [Core implementation validation #18](https://github.com/SOLHK/Swirl/actions/runs/39029167834)
+按已有防循环条件跳过时，不应算作 Rust 测试通过；验收应读取 #17 的实际被测提交与 #21 的三平台结果。
 
-拒绝后通过只读 API 再次核实：开发分支仍为 `8bd89f2d59e582040d88ae52ef1b253beff3d33e`，
-main 仍为 `87409c0bf9c957ef113f84c176c5a1529c27b9df`。本轮修复保存在本地阶段提交中，
-待允许该具体 GitHub 写入后续传；不改 App/Secrets，也不换写入通道绕过拒绝。
-
-恢复后的顺序是：推送已测试的开发分支提交；核对现有 App 对 `rust-core.yml` 的真实自动提交和内容哈希；
-等待该提交的 Linux/macOS/Windows 与公网结果；把准确提交、Actions URL、失败或跳过原因补入本文件。
+第一次连接器创建 tree 曾返回 `user rejected MCP tool call`。用户随后明确“始终允许”，重试已成功，
+该阻塞已解除。本地旧提交 `f0ed42f` 与远端 `510c62a` 的作者/时间元数据不同，源码 tree 相同。
 
 ## 下一阶段与未完成项
 

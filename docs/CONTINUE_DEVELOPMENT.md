@@ -11,7 +11,25 @@
 - 当前阶段默认产品仍保留 C++/Mihomo 兼容构建。必须用 `SWIRL_USE_RUST_CORE=ON` 验证原生 Rust；该模式不会回退完整外部内核。智能 MRS、TUN、LAN 和未迁移协议仍会明确拒绝。
 - 私有订阅/缓存不进 Git 或 CI；无需开启用户十分钟订阅更新窗口。只使用合成对端和明确的固定公共目标做本轮验证，不修改系统代理或 DNS。
 - 以 [阶段验收](RUST_WS_VALIDATION_20261017.md) 中准确提交/Actions 结果为准；下方旧 DoT、Windows 本机记录仅是历史证据。
-- **本轮提交仍待推送：** 本地 Rust/独立网络回归通过，但 GitHub 连接器的创建提交树调用返回 `user rejected MCP tool call`。远端开发分支仍为 `8bd89f2`；新的跨平台、Qt、公网和 App 工作流写入验收未运行。恢复写入后，先推送本轮已审阅提交，再核对 App 自动提交和 Actions，不能把本地通过当成远端通过。
+- **本轮实现与 App 工作流更新已经推送。** 精确提交和 CI 状态见下表；App 写入成功与网络、Qt 回归通过分别记录。
+
+## 本轮远端提交与验收状态
+
+| 内容 | 证据 | 当前状态 |
+|---|---|---|
+| Rust WS 背压与独立对端调度修复、专项回归和文档 | [`510c62a`](https://github.com/SOLHK/Swirl/commit/510c62ade64418c76241bbe76ae118c5040dad92) | 已推送开发分支 |
+| App 自动提交工作流更新 | [`a60c446`](https://github.com/SOLHK/Swirl/commit/a60c446fdb54c10753c2d367752c4e0275a89922)、[Core implementation validation #17](https://github.com/SOLHK/Swirl/actions/runs/39029146435) | App 生成 Token、checkout、提交并推送 workflow 均成功；唯一改动为 `rust-core.yml` +23/-1 |
+| Linux、macOS、Windows Rust 与独立协议验证 | [Swirl Rust Core #21](https://github.com/SOLHK/Swirl/actions/runs/39029167841)，`a60c446` | 三平台均成功；各 57 项 Rust 测试、64 项独立 Python 协议测试通过，初次协议运行各有 2 项 Qt 测试跳过 |
+| Windows Qt 与独立对端 | 同一 #21 的 Windows job | Qt CTest 1/1 通过，用时 3.09 秒；随后 SS Qt 与 VLESS Qt 对独立对端的真实转发分别通过，补足前述 2 项 Qt 跳过；Qt WS 仍只有配置映射/拒绝证据 |
+| 初次公网 HTTP/TLS 与原生 DoH 路径 | 同一 #21 的 Linux job；[阶段验收及原始报告](RUST_WS_VALIDATION_20261017.md) | 收到 HTTP 200/301/200，均通过 TLS 1.3 认证且原生流量大于零；三个会话仍为 `failed=1`、`last_error=StreamIo`，严格清理门禁待下一补丁复验 |
+
+已核对 App 提交的 `.github/workflows/rust-core.yml` SHA-256：
+`c40f0a47abafd50a7ebe6782c25572578544920263439d3ac249125a22c6e9e8`，与本地审核的预期内容一致。
+这次真实提交/推送证明 Workflows 写权限已生效；没有重新配置 App、修改 Secrets 或改动 main。
+本地已通过的测试、明确跳过项和失败的公网尝试见 [阶段验收](RUST_WS_VALIDATION_20261017.md)；
+#21 于 2026-10-17 11:42:56 UTC 完成且整体成功。初次公网脚本只检查 HTTP 状态与流量，
+因此该 step 的绿色结果不能证明会话无错误关闭；下一补丁必须收紧门禁并重新验证。
+Windows Qt 的成功不替代 Qt WS 真实转发、个人电脑视觉验收或其他平台的桌面产品验证。
 
 ## 仓库是否完整
 
@@ -128,7 +146,8 @@ ZIP CRC、包内 DLL 哈希及私有内容扫描通过。GNU 链接器仍有 `.d
 规则阶段 `7c7b884` 的旧版节点 UI 164 项通过；该修复已包含在当前源码。
 本地缓存 14 份导出、12 个不同文档离线解析通过；本轮没有新增私有节点 TCP/UDP 联网验收。
 
-建议后续按阶段实现并分别推送：
+当前立即任务是完成公网验证脚本的严格会话清理门禁，并重新记录实际 HTTP/TLS、流量和
+`failed` / `last_error` 结果；不能用 #21 的初次连接成功代替这一步。随后按阶段实现并分别推送：
 
 1. 把现有自动组候选接入 Swirl IR、原生健康探测、会话策略快照与 API，补独立 HTTP/HTTPS 对端测试。必须验证失败不重放请求、不静默直连、健康状态过期、配置切换保留旧 TCP/UDP 会话，以及停止后无探测任务。
 2. 补 SOCKS4/4a 的订阅与 Qt 参数转换，复用已完成握手；补 Qt WS 实际转发对端证据，不把纯映射测试当互操作。
