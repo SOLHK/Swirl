@@ -20,6 +20,7 @@ import tempfile
 import threading
 import time
 import unittest
+from dns_peer import DnsPeer
 from cryptography import x509
 from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import hashes, serialization
@@ -295,6 +296,78 @@ class RustCoreIntegration(unittest.TestCase):
             bad=json.loads(json.dumps(cfg));bad['dns']['hosts'].append({'name':'UPDATED.FIXTURE.INVALID','address':'::1'})
             self.assertFalse(self.command(op='configure',handle=self.handle,config=bad)['ok'])
         self.assertEqual(server.accepted,2)
+
+    def dns_peer(self,mode='normal',ttl=30):
+        peer=DnsPeer(mode,ttl);self.addCleanup(peer.close);return peer
+
+    def named_tunnel(self,host,port):
+        s=socket.create_connection(('127.0.0.1',self.port),timeout=5)
+        s.sendall(f'CONNECT {host}:{port} HTTP/1.1\r\nHost: {host}:{port}\r\n\r\n'.encode())
+        return s,header(s)
+
+    def test_custom_dns_cache_expiry_and_zero_ttl(self):
+        dns=self.dns_peer(ttl=1);server=self.server('echo')
+        config=self.start(dns={'servers':[dns.address],'use_system_hosts':False})
+        for _ in range(2):
+            s,response=self.named_tunnel('cache.fixture.invalid',server.server_address[1])
+            with s:self.assertIn(b'200',response);s.sendall(b'dns');self.assertEqual(exact(s,3),b'dns')
+        self.assertEqual(len(dns.queries),2)
+        time.sleep(1.1)
+        s,response=self.named_tunnel('cache.fixture.invalid',server.server_address[1]);s.close();self.assertIn(b'200',response)
+        self.assertEqual(len(dns.queries),4)
+        dns.ttl=0;self.assertTrue(self.command(op='configure',handle=self.handle,config=config)['ok'])
+        for _ in range(2):
+            s,response=self.named_tunnel('zero.fixture.invalid',server.server_address[1]);s.close();self.assertIn(b'200',response)
+        self.assertEqual(len(dns.queries),8)
+
+    def test_custom_dns_cname_tcp_retry_and_declared_server_failover(self):
+        server=self.server('echo')
+        for mode in ('cname','truncated','normal'):
+            dns=self.dns_peer(mode);bad=self.dns_peer('servfail')
+            self.start(dns={'servers':[bad.address,dns.address],'use_system_hosts':False})
+            s,response=self.named_tunnel('dns.fixture.invalid',server.server_address[1])
+            with s:self.assertIn(b'200',response);s.sendall(b'wire');self.assertEqual(exact(s,4),b'wire')
+            self.assertTrue(bad.queries)
+            if mode=='cname':self.assertTrue(any(q[0]=='alias.fixture.invalid' for q in dns.queries))
+            if mode=='truncated':self.assertEqual(sum(q[2] for q in dns.queries),2)
+            self.assertTrue(self.command(op='stop',handle=self.handle)['ok'])
+
+    def test_custom_dns_errors_never_fall_back_to_system(self):
+        server=self.server('echo')
+        for mode in ('wrong-id','wrong-question','trailing','nxdomain','silent'):
+            dns=self.dns_peer(mode)
+            self.start(dns={'servers':[dns.address],'use_system_hosts':False})
+            began=time.monotonic();s,response=self.named_tunnel('localhost',server.server_address[1]);s.close()
+            self.assertIn(b'502',response);self.assertLess(time.monotonic()-began,4)
+            self.assertTrue(self.command(op='stop',handle=self.handle)['ok'])
+        self.assertEqual(server.accepted,0)
+
+    def test_custom_dns_udp_target_and_nxdomain_is_terminal(self):
+        dns=self.dns_peer();echo=socket.socket(socket.AF_INET,socket.SOCK_DGRAM);echo.bind(('127.0.0.1',0));echo.settimeout(4)
+        self.addCleanup(echo.close)
+        def worker():
+            data,peer=echo.recvfrom(1024);echo.sendto(data,peer)
+        thread=threading.Thread(target=worker);thread.start()
+        self.start(dns={'servers':[dns.address],'use_system_hosts':False})
+        with socket.create_connection(('127.0.0.1',self.port),timeout=4) as control:
+            control.sendall(b'\x05\x01\x00');self.assertEqual(exact(control,2),b'\x05\x00')
+            control.sendall(b'\x05\x03\x00\x01'+bytes(6));reply=exact(control,10);self.assertEqual(reply[1],0)
+            with socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as udp:
+                udp.settimeout(4);name=b'udp.fixture.invalid';packet=b'\0\0\0\x03'+bytes([len(name)])+name+echo.getsockname()[1].to_bytes(2,'big')+b'udp-dns'
+                udp.sendto(packet,('127.0.0.1',int.from_bytes(reply[8:10],'big')));data,_=udp.recvfrom(1024);self.assertEqual(data[10:],b'udp-dns')
+        thread.join(4);self.assertFalse(thread.is_alive());self.assertTrue(self.command(op='stop',handle=self.handle)['ok'])
+        for mode in ('nxdomain','mixed-negative'):
+            missing=self.dns_peer(mode);unused=self.dns_peer()
+            self.start(dns={'servers':[missing.address,unused.address],'use_system_hosts':False})
+            s,response=self.named_tunnel('missing.fixture.invalid',443);s.close();self.assertIn(b'502',response);self.assertFalse(unused.queries)
+            self.assertTrue(self.command(op='stop',handle=self.handle)['ok'])
+
+    def test_custom_dns_ipv6_server_and_tcp_retry(self):
+        dns=DnsPeer('truncated',ipv6=True);self.addCleanup(dns.close);server=self.server('echo')
+        self.start(dns={'servers':[dns.address],'use_system_hosts':False})
+        s,response=self.named_tunnel('ipv6.fixture.invalid',server.server_address[1])
+        with s:self.assertIn(b'200',response);s.sendall(b'v6dns');self.assertEqual(exact(s,5),b'v6dns')
+        self.assertEqual(sum(q[2] for q in dns.queries),2)
     def test_vless_tcp_tls_addresses_and_invalid_responses(self):
         for tls in (False,True):
             server=self.server('vless',tls=tls)

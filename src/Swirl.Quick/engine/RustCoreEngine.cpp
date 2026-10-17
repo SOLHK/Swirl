@@ -14,13 +14,25 @@
 namespace {
 QString dnsConfiguration(const EngineStartOptions &o,QJsonObject *output){
  const auto dns=QJsonObject::fromVariantMap(o.dnsConfig);
- const auto invalid=[] {return QString("Rust DNS 目前支持系统解析和精确域名的本地 IP 映射；此配置含无效或尚未支持的 DNS 选项。");};
+ const auto invalid=[] {return QString("Rust DNS 支持系统解析、自定义 IP 服务器和精确本地映射；此配置含无效或尚未支持的 DNS 选项。");};
  for(auto it=dns.begin();it!=dns.end();++it)if(!QStringList{"mode","servers","encrypted","hosts","useHosts","respectRules"}.contains(it.key()))return invalid();
- if(dns.contains("mode")&&(!dns.value("mode").isDouble()||dns.value("mode").toDouble()!=0))return invalid();
- for(const auto &key:QStringList{"servers","encrypted"})if(dns.contains(key)&&(!dns.value(key).isString()||!dns.value(key).toString().trimmed().isEmpty()))return invalid();
+ if(dns.contains("mode")&&(!dns.value("mode").isDouble()||(dns.value("mode").toDouble()!=0&&dns.value("mode").toDouble()!=2)))return invalid();
+ const bool custom=dns.value("mode").toInt()==2;
+ if(dns.contains("encrypted")&&(!dns.value("encrypted").isString()||!dns.value("encrypted").toString().trimmed().isEmpty()))return invalid();
+ if(dns.contains("servers")&&!dns.value("servers").isString())return invalid();
+ QJsonArray servers;QSet<QString> serverSet;const auto rawServers=dns.value("servers").toString();
+ if(!custom&&!rawServers.trimmed().isEmpty())return invalid();
+ if(custom){
+  for(const auto &part:rawServers.split(',')){
+   QHostAddress address;if(!address.setAddress(part.trimmed())||!address.scopeId().isEmpty()||address.isMulticast()||address==QHostAddress(QHostAddress::AnyIPv4)||address==QHostAddress(QHostAddress::AnyIPv6))return invalid();
+   const auto value=address.toString();if(serverSet.contains(value))return invalid();serverSet.insert(value);
+   servers.append(address.protocol()==QAbstractSocket::IPv6Protocol?"["+value+"]:53":value+":53");
+  }
+  if(servers.isEmpty()||servers.size()>4)return invalid();
+ }
  for(const auto &key:QStringList{"useHosts","respectRules"})if(dns.contains(key)&&!dns.value(key).isBool())return invalid();
  // OS resolution cannot disable the OS hosts file independently.
- if(dns.contains("useHosts")&&!dns.value("useHosts").toBool())return invalid();
+ if(!custom&&dns.contains("useHosts")&&!dns.value("useHosts").toBool())return invalid();
  if(dns.contains("hosts")&&!dns.value("hosts").isArray())return invalid();
  const auto hosts=dns.value("hosts").toArray();if(hosts.size()>512)return invalid();
  QSet<QString> seen;QJsonArray mapped;
@@ -33,7 +45,7 @@ QString dnsConfiguration(const EngineStartOptions &o,QJsonObject *output){
   if(name.size()>253||!QRegularExpression("^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$").match(name).hasMatch()||!QHostAddress(name).isNull()||seen.contains(name)||!address.setAddress(row.value("value").toString())||!address.scopeId().isEmpty())return invalid();
   seen.insert(name);mapped.append(QJsonObject{{"name",name},{"address",address.toString()}});
  }
- *output=QJsonObject{{"hosts",mapped},{"force_proxy_hosts",dns.value("respectRules").toBool()}};return {};
+ *output=QJsonObject{{"hosts",mapped},{"force_proxy_hosts",dns.value("respectRules").toBool()},{"servers",servers},{"use_system_hosts",!dns.contains("useHosts")||dns.value("useHosts").toBool()}};return {};
 }
 
 QString routingConfiguration(const EngineStartOptions &o,const QString &selected,QJsonArray *nodes,QJsonArray *rules,QJsonArray *selectors){

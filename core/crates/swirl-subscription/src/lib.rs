@@ -131,13 +131,30 @@ pub struct HostMapping {
     pub address: std::net::IpAddr,
 }
 
-#[derive(Clone, Default, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Dns {
     #[serde(default)]
     pub hosts: Vec<HostMapping>,
     #[serde(default)]
     pub force_proxy_hosts: bool,
+    #[serde(default)]
+    pub servers: Vec<SocketAddr>,
+    #[serde(default = "default_true")]
+    pub use_system_hosts: bool,
+}
+fn default_true() -> bool {
+    true
+}
+impl Default for Dns {
+    fn default() -> Self {
+        Self {
+            hosts: Vec::new(),
+            force_proxy_hosts: false,
+            servers: Vec::new(),
+            use_system_hosts: true,
+        }
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -243,6 +260,13 @@ impl Config {
             || self.rules.len() > 4096
             || self.selectors.len() > 128
             || self.dns.hosts.len() > 512
+            || self.dns.servers.len() > 4
+            || self
+                .dns
+                .servers
+                .iter()
+                .any(|s| s.port() == 0 || s.ip().is_unspecified() || s.ip().is_multicast())
+            || (self.dns.servers.is_empty() && !self.dns.use_system_hosts)
             || !(1..=256).contains(&self.limits.max_connections)
             || !(100..=30000).contains(&self.limits.handshake_timeout_ms)
             || !valid_auth(&self.inbound_auth)
@@ -250,6 +274,14 @@ impl Config {
             return Err("ConfigBounds");
         }
         let mut host_names = HashSet::new();
+        let mut servers = HashSet::new();
+        for server in &self.dns.servers {
+            if !servers.insert(*server)
+                || matches!(server,SocketAddr::V6(address) if address.scope_id()!=0)
+            {
+                return Err("DnsServerAddress");
+            }
+        }
         for host in &self.dns.hosts {
             if !valid_host(&host.name)
                 || host.name.parse::<std::net::IpAddr>().is_ok()
@@ -468,6 +500,11 @@ mod tests {
             r#"{"hosts":[{"name":"a.test","address":"127.0.0.1","server":"other"}]}"#,
             r#"{"force_proxy_hosts":"true"}"#,
             r#"{"nameserver":"unknown"}"#,
+            r#"{"servers":["127.0.0.1:0"]}"#,
+            r#"{"servers":["0.0.0.0:53"]}"#,
+            r#"{"servers":["224.0.0.1:53"]}"#,
+            r#"{"servers":["127.0.0.1:53","127.0.0.1:53"]}"#,
+            r#"{"use_system_hosts":false}"#,
         ] {
             let data = format!(
                 r#"{{"schema":1,"listen":"127.0.0.1:0","selected":"d","nodes":[{{"id":"d","outbound":{{"type":"direct"}}}}],"dns":{dns}}}"#

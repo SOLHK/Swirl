@@ -104,7 +104,7 @@ impl Core {
             .map_err(|_| "ListenerBind")?;
         let address = listener.local_addr().map_err(|_| "ListenerAddress")?;
         let capacity = config.limits.max_connections;
-        let resolver = Arc::new(Resolver::default().with_hosts(&config.dns.hosts));
+        let resolver = Arc::new(Resolver::default().with_config(&config.dns)?);
         let plan = Arc::new(RwLock::new(Arc::new(Plan {
             config: Arc::new(config),
             resolver,
@@ -158,7 +158,7 @@ impl Core {
         {
             return Err("ListenerChangeRequiresRestart");
         }
-        let resolver = Arc::new(plan.resolver.with_hosts(&config.dns.hosts));
+        let resolver = Arc::new(plan.resolver.with_config(&config.dns)?);
         *plan = Arc::new(Plan {
             config: Arc::new(config),
             resolver,

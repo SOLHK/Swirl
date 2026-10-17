@@ -4,7 +4,7 @@
 
 <picture><source media="(prefers-color-scheme: dark)" srcset="src/Swirl.Quick/assets/icons/swirl_knot_dark.svg"><img src="src/Swirl.Quick/assets/icons/swirl_knot_light.svg" width="88" alt="Swirl 祥云结标志"></picture>
 
-Swirl 是面向 Windows 的网络工具，使用 **C++23、Qt 6 Quick/QML** 构建桌面界面，提供代理连接、网络活动监控与 HTTP 调试。基础 TCP 代理由 Swirl 原生引擎处理，复杂协议、规则分流与 TUN 等能力由固定版本 Mihomo 兼容引擎执行。
+Swirl 是面向 Windows 的网络工具，桌面界面保留 **C++23、Qt 6 Quick/QML**，**自研代理内核使用 Rust**，源码位于 [`core/`](core/)。Rust 负责协议、TCP/UDP、DNS、路由和运行时，Qt 只对接控制接口。完整迁移尚未结束：`SWIRL_USE_RUST_CORE=ON` 构建运行 Rust 并拒绝未支持功能，默认 OFF 的历史兼容构建仍保留原有 C++/Mihomo 路径。两者的能力和验证不能混为一谈。
 
 > **当前状态：Windows 开发测试版。** 当前程序版本为 `1.0.0-test-6A+<源码提交>`，尚未发布正式版。功能是否可用以实际运行状态为准；协议可导入、配置可保存，不代表所有远程节点、专用 LAN 或高级功能已经验证。
 

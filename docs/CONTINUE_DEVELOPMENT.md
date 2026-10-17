@@ -1,7 +1,6 @@
 # Swirl 接续开发入口
 
-更新日期：2026-10-17。最后一个功能提交：`72d5bd5032d92cf814fccd8052714ecf3ea16e28`。
-本文件所在提交只补接续文档，不代表新的功能构建。
+更新日期：2026-10-17。当前阶段已在 Rust 中新增自定义 DNS 的 UDP 查询、TCP 重试、A/AAAA/CNAME、正向 TTL 缓存及现有 Qt 配置映射。代码及功能以本文件所在的 `test` 提交为准；下文 `72d5bd5` 的记录是上一阶段历史验证。
 
 ## 仓库是否完整
 
@@ -45,7 +44,7 @@ Qt/Rust CMake configure/generate 成功。此检查不声称重新完成了一�
 |---|---|
 | `core/crates/swirl-protocol` | HTTP/CONNECT/SOCKS5 入站；HTTP CONNECT、SOCKS5、Trojan TLS、SS AEAD TCP/UDP、simple-obfs HTTP、基础 VLESS v0 TCP/TLS |
 | `core/crates/swirl-routing` | 顺序域名/后缀/关键词、目标端口、来源/目标 CIDR、MATCH；手动 selector |
-| `core/crates/swirl-dns` | 有界系统解析、精确 IPv4/IPv6 hosts、本地映射代理开关、各代缓存隔离和共享 DNS 并发上限 |
+| `core/crates/swirl-dns` | 自研 Rust DNS 报文/UDP/TCP 重试/A/AAAA/CNAME/TTL；有界系统解析、精确 hosts、本地映射开关、各代缓存隔离及共享并发上限 |
 | `core/crates/swirl-core` | 有界运行时、不可变会话配置、原子节点/组/配置更新、旧 TCP/UDP 保留原出口、流量统计 |
 | `core/crates/swirl-subscription` | typed IR、Clash YAML/JSON、sing-box JSON、URI/Base64、部分 INI 识别与保留、脱敏能力报告；并非所有格式都可执行 |
 | `core/crates/swirl-transport` / `swirl-api` | 验证 TLS、背压/半关闭；ABI v1 JSON 控制、stdin harness、离线 inspector |
@@ -99,6 +98,11 @@ Rust 预览部署至少需 Swirl.exe、swirl_api.dll、各辅助 EXE、Qt/QML �
 
 ## 已有验证与仍需做的工作
 
+当前自定义 DNS 阶段：本机 Rust 43 项、独立协议 28 项（含 IPv6 DNS 服务端和 TCP 重试）、
+采集/离线 23 项及 Qt Rust CTest 通过；fmt/check/clippy 通过。DNS 核心报文与网络执行代码
+在 `core/crates/swirl-dns/src/wire.rs`，Qt 只转换已有设置。此阶段不声称真实公网 DNS、
+私有节点 DNS、DoH/DoT、EDNS 或 DNSSEC 已验证；对应新提交的跨平台结果查看 Actions。
+
 `72d5bd5` 本机 Windows GNU/Qt 6.10.3：39 项 Rust、23 项独立协议（含 Qt SS/VLESS 对端）、
 23 项采集/离线测试，以及 Qt Rust CTest 通过。fmt/check/clippy 通过。独立 SDK PATH 的预览启动、
 ZIP CRC、包内 DLL 哈希及私有内容扫描通过。GNU 链接器仍有 `.drectve` 警告，未隐藏。
@@ -108,7 +112,7 @@ ZIP CRC、包内 DLL 哈希及私有内容扫描通过。GNU 链接器仍有 `.d
 
 建议后续按阶段实现并分别推送：
 
-1. 自定义 DNS 服务器及加密 DNS：先定义解析和路由语义、超时/缓存/证书策略、合成 DNS 对端，再映射现有 UI。
+1. 加密 DNS及系统/自定义混合模式：自定义 IP DNS 的 Rust UDP/TCP 基础已完成，接着定义 DoH/DoT、bootstrap、证书、分流与负缓存语义；不要重复重写现有报文/TTL实现。
 2. 自动测速、fallback/load-balance：有界健康检查、明确选择语义、不重放已有请求、保留旧连接，不能把 manual 解析冒充自动组。
 3. 智能规则库/MRS、进程规则与 DNS 分流；保持原始配置和未知字段，禁止静默略过。
 4. WS/gRPC/XHTTP、REALITY/Vision、VMess/SS2022、QUIC 等缺少的协议/传输，分别提供互操作证据。

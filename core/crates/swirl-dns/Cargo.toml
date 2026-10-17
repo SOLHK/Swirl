@@ -6,5 +6,6 @@ publish.workspace = true
 [dependencies]
 tokio.workspace = true
 swirl-subscription.workspace = true
+ring.workspace = true
 [lints]
 workspace = true
