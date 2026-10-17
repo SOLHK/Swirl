@@ -1,7 +1,7 @@
 name: Swirl Rust Core
 on:
   push:
-    branches: [test, main]
+    branches: [test, main, work/core-completion-20261017]
   pull_request:
     branches: [test, main]
   workflow_dispatch:
@@ -37,6 +37,20 @@ jobs:
           python ../tools/tests/test_rust_core.py
           python ../tools/tests/test_shadowsocks.py
           python ../tools/tests/test_dns_tls.py
+          python ../tools/tests/test_dns_https.py
+          python ../tools/tests/test_socks4.py
+          python ../tools/tests/test_websocket_transport.py
+          python ../tools/tests/test_core_development.py
+      - name: Native public HTTPS and DoH verification
+        if: runner.os == 'Linux'
+        run: python ../tools/Verify-PublicRustCore.py --harness target/release/swirl-api --output ../CORE_PUBLIC_NETWORK.json
+      - name: Preserve public network evidence
+        if: always() && runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-Core-Public-Network
+          path: CORE_PUBLIC_NETWORK.json
+          retention-days: 7
   windows-rust:
     runs-on: windows-2022
     timeout-minutes: 25
@@ -66,6 +80,14 @@ jobs:
           python ../tools/tests/test_shadowsocks.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python ../tools/tests/test_dns_tls.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python ../tools/tests/test_dns_https.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python ../tools/tests/test_socks4.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python ../tools/tests/test_websocket_transport.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python ../tools/tests/test_core_development.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python ../tools/tests/test_subscription_capture.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
