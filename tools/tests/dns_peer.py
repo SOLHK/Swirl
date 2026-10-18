@@ -64,15 +64,22 @@ class DnsPeer:
         # A free UDP port can already be occupied by TCP. Hold both sockets
         # before starting either server, and release a failed partial pair.
         for attempt in range(8):
+            selected_udp_port = False
             try:
                 with ExitStack() as cleanup:
                     self.udp = cleanup.enter_context(UDP((host, 0), UDPHandler))
                     self.port = self.udp.server_address[1]
+                    selected_udp_port = True
                     self.tcp = cleanup.enter_context(TCP((host, self.port), TCPHandler))
                     cleanup.pop_all()
                 break
             except OSError as error:
-                if error.errno != errno.EADDRINUSE or attempt == 7:
+                # On Windows, a UDP-assigned port may be TCP-excluded or held
+                # exclusively: binding the TCP half then returns WSAEACCES.
+                # Retry only this selected-port case, never generic EACCES or
+                # denial of the initial ephemeral UDP allocation.
+                reserved_tcp_port = selected_udp_port and getattr(error, 'winerror', None) == 10013
+                if (error.errno != errno.EADDRINUSE and not reserved_tcp_port) or attempt == 7:
                     raise
         for server in (self.udp, self.tcp):
             threading.Thread(target=server.serve_forever, daemon=True).start()

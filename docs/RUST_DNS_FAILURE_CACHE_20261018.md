@@ -58,6 +58,53 @@ Already-running identical queries remain bounded by the existing permit pool.
 Full regression totals, desktop build completion and final CI identities are
 recorded in the follow-up evidence commit after their actual completion.
 
+## First CI result and Windows fixture correction
+
+Implementation commit `cafdd62a556165bb5796fcac7f9fd8ef95643143` was pushed and
+read back. [Core run 39097322603](https://github.com/SOLHK/Swirl/actions/runs/39097322603)
+finished **failure**: Linux and macOS passed, but Windows failed three existing
+DNS tests while constructing the Python TCP listener (`WinError 10013`), before
+any Rust DNS request. [App run 39097322594](https://github.com/SOLHK/Swirl/actions/runs/39097322594)
+passed. These failures remain part of the record.
+
+The paired UDP/TCP fixture already retried address-in-use eight times. Windows
+can also reject the TCP half of a UDP-selected port with WSAEACCES when that port
+is excluded or exclusively bound. The correction retries that specific Windows
+error only after the UDP port was selected, retaining the eight-attempt bound,
+socket cleanup, and all functional assertions. Initial UDP permission denial and
+generic EACCES still fail immediately. No socket reuse, privileges, firewall or
+product timeout changes were made. Synthetic tests cover recovery, exhaustion
+and initial UDP denial, including resource release.
+
+References consulted before the fixture correction:
+[Microsoft SO_EXCLUSIVEADDRUSE](https://learn.microsoft.com/en-us/windows/win32/winsock/so-exclusiveaddruse),
+[excluded-port WSAEACCES](https://learn.microsoft.com/en-us/troubleshoot/windows-server/networking/error-10013-wsaeacces-is-returned),
+and [CPython socketserver](https://github.com/python/cpython/blob/main/Lib/socketserver.py).
+The CI stack trace establishes a bind failure; it does not identify the runner's
+specific reservation owner.
+
+The full local desktop `Swirl` target also built successfully. Initial Python
+regression was 204 cases / 197 passed / seven skipped; the four Qt peer followups
+raised actual coverage to 201 passed. The remaining three skips are unavailable
+symlink privilege, optional C++ importer, and opt-in real Codex CLI. The added
+Windows allocation regression raises the independent DNS suite to 23 cases.
+
+Local public DIRECT checks for example.com and www.rust-lang.org passed TLS 1.3,
+HTTP 200/301, bidirectional accounting and orderly close. The native Cloudflare
+DoH check failed at `DnsTlsTimeout`. Independent Python and Rust TCP controls to
+the same public bootstrap endpoint both timed out within their shared ten-second
+diagnostic budget. These are public-endpoint controls, not the private SS samples.
+
+Private helper commit `0a92d1789e5ca8bc9b09f11cd7c62d7aaac7615b` fixes Windows
+`.exe` discovery; 43 helper tests passed locally. Its automatic
+[private run 39097562489](https://github.com/SOLHK/Swirl-Private-Tests/actions/runs/39097562489)
+used the workflow's unchanged pinned source `44488e7`, successfully decrypted and
+inspected all 16 cached subscriptions, then **failed** the three fixed SS TCP
+comparisons (Python 0/3, Rust 0/3; no protocol probes). The fresh redacted evidence
+is in private commit `1374be0cfe6f97884ab416c48515c0adf3ff2844`. This is a new hosted
+Linux run, not Windows evidence; no subscriptions were refreshed. Original
+encrypted archives and Secrets remain unchanged.
+
 ## Subscription evidence boundary
 
 The current private repository HEAD was verified as

@@ -25,6 +25,39 @@ from test_rust_core import Reference, Handler, certificates, exact, header
 
 
 class DnsPeerAllocationTests(unittest.TestCase):
+    def test_windows_reserved_tcp_port_retry_is_bounded_and_does_not_mask_udp_denial(self):
+        original = socketserver.TCPServer.server_bind
+        for failing_kind, fail_count in ((socket.SOCK_STREAM, 1),
+                                         (socket.SOCK_STREAM, 8),
+                                         (socket.SOCK_DGRAM, 1)):
+            with self.subTest(failing_kind=failing_kind, fail_count=fail_count):
+                created, rejected = [], []
+                failure = PermissionError(errno.EACCES, 'synthetic reserved port')
+                failure.winerror = 10013
+
+                def bind(server):
+                    created.append(server)
+                    if server.socket_type == failing_kind and len(rejected) < fail_count:
+                        rejected.append(server)
+                        raise failure
+                    original(server)
+
+                with mock.patch.object(socketserver.TCPServer, 'server_bind', bind):
+                    if failing_kind == socket.SOCK_STREAM and fail_count == 1:
+                        peer = DnsPeer()
+                        try:
+                            self.assertEqual(peer.udp.server_address[1], peer.tcp.server_address[1])
+                            self.assertFalse(peer.tcp.allow_reuse_address)
+                            self.assertTrue(all(server.socket.fileno() == -1 for server in created[:-2]))
+                        finally:
+                            peer.close()
+                    else:
+                        with self.assertRaises(PermissionError) as caught:
+                            DnsPeer()
+                        self.assertIs(caught.exception, failure)
+                self.assertEqual(len(rejected), fail_count)
+                self.assertTrue(all(server.socket.fileno() == -1 for server in created))
+
     def test_pair_retries_collision_and_releases_failed_sockets(self):
         original = socketserver.TCPServer.server_bind
         for collision_kind in (socket.SOCK_DGRAM, socket.SOCK_STREAM):
