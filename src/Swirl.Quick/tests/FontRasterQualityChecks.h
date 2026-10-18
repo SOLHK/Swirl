@@ -75,6 +75,3 @@ void FontTests::optionalRasterQualityMatrix()
     QFile report(output+"/raster-quality.json");QVERIFY(report.open(QIODevice::WriteOnly));report.write(QJsonDocument(QJsonObject{{"dpr",dpr},{"qtRefreshRate",window.screen()->refreshRate()},{"qpa",qEnvironmentVariable("QT_QPA_PLATFORM")},{"scaleOverride",qEnvironmentVariable("QT_SCALE_FACTOR")},{"caseCount",cases.size()},{"ancestorTranslationAligned",ancestorAligned},{"scaleTransformPreserved",scalePreserved},{"alignedAfterScaleRestore",restoredAligned},{"idleFrameCount120ms",idleFrames.count()},{"idleStable",idleStable},{"failures",failures},{"cases",cases},{"method","Each target point size and real axes rendered anew. Compare live QQuickWindow output with direct same-engine target-size origin-zero raster by integer pixel indexing (no image translation/filtering); record the effective snapped screen origin separately. This avoids native glyph subpixel-rounding differences from drawing the reference at a fractional logical origin. Also check plus padded ink and glyph-outline/fallback checks. No image resizing, sharpening or postprocessing. This detects pipeline regressions, not every intrinsic outline defect or physical-panel perception."}}).toJson());report.close();
     QCOMPARE(failures,0);
 }
-
-
-
