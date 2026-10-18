@@ -71,6 +71,26 @@ inline int runFontUiChecks(QQuickWindow *window,FontManager *manager,const QStri
         dragMemory.append(double(memory()));
     }
     const auto repeatedMemory=memory();
+    // A finite sequence of NEW fractional triples, separate from repeated-coordinate warmup.
+    QJsonArray distinctMemory;int distinctCount=0;bool distinctBudgetExceeded=false;
+    QElapsedTimer distinctTimer;distinctTimer.start();
+    for(int block=0;block<16;++block){
+        for(int j=0;j<64;++j){
+            const int i=block*64+j;
+            manager->setPreviewAxis("HGHT",1.125+i*998.5/1024.0);
+            manager->setPreviewAxis("wght",100.125+((i*617)%1024)*799.5/1024.0);
+            manager->setPreviewAxis("wdth",80.0125+((i*389)%1024)*39.95/1024.0);
+            ++distinctCount;QTest::qWait(12);
+        }
+        distinctMemory.append(QJsonObject{{"coordinates",distinctCount},{"privateBytes",double(memory())},{"elapsedMs",double(distinctTimer.elapsed())}});
+        if(memory()>1024LL*1024*1024){distinctBudgetExceeded=true;break;}
+    }
+    const auto distinctEndMemory=memory();
+    manager->resetPreviewAxes();QTest::qWait(3000);const auto distinctIdleMemory=memory();
+    check(!distinctBudgetExceeded,"finite new-coordinate stress stays below 1 GiB private bytes");
+    // Later assertions deliberately keep the same confirmed fixture as the earlier test.
+    manager->setPreviewAxis("wdth",109.75);
+
     const auto lateGrowth=dragMemory.last().toDouble()-dragMemory.at(dragMemory.size()-3).toDouble();
     check(warmMemory<0||lateGrowth<16LL*1024*1024,"repeated identical coordinate set reaches a memory plateau");
     check(page&&qvariant_cast<QObject *>(loader->property("item"))==page,"axis updates retain the settings page instance");
@@ -129,7 +149,7 @@ inline int runFontUiChecks(QQuickWindow *window,FontManager *manager,const QStri
     }
     QFile report(output+"/font-ui-report.json");if(report.open(QIODevice::WriteOnly))report.write(QJsonDocument(QJsonObject{
         {"privateBytesBeforeManager",QCoreApplication::instance()->property("fontBeforeManagerBytes").toDouble()},{"privateBytesAfterBundledFonts",QCoreApplication::instance()->property("fontAfterManagerBytes").toDouble()},{"privateBytesAfterPrivateFont",QCoreApplication::instance()->property("fontAfterImportBytes").toDouble()},{"dialogTextItems",popupText},{"dialogCaptures",popupCaptures},{"checks",checks},{"failures",failures},{"dpr",window->devicePixelRatio()},{"updateCount",180},{"updateLoopMs",double(updateMs)},
-        {"dragMemoryBytes",dragMemory},{"privateBytesBefore",double(beforeMemory)},{"privateBytesAfterWarmDrag",double(warmMemory)},{"privateBytesAfterRepeatedDrag",double(repeatedMemory)},{"privateBytesAfter",double(memory())},{"frameIntervalsMs",frameIntervals},{"pages",pageAudits},
+        {"distinctCoordinates",distinctCount},{"distinctMemoryBytes",distinctMemory},{"distinctBudgetExceeded",distinctBudgetExceeded},{"privateBytesAfterDistinct",double(distinctEndMemory)},{"privateBytesAfterDistinctResetAndIdle",double(distinctIdleMemory)},{"distinctIdleMs",3000},{"dragMemoryBytes",dragMemory},{"privateBytesBefore",double(beforeMemory)},{"privateBytesAfterWarmDrag",double(warmMemory)},{"privateBytesAfterRepeatedDrag",double(repeatedMemory)},{"privateBytesAfter",double(memory())},{"frameIntervalsMs",frameIntervals},{"pages",pageAudits},
         {"captureKind","raw QQuickWindow render; not physical-screen or remote-compression evidence"}}).toJson());
     return failures?2:0;
 }

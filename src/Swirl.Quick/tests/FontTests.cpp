@@ -116,6 +116,8 @@ private slots:
     void optionalRestartRead();
     void optionalRenderMatrix();
     void optionalNativePointSizes();
+    void optionalMetadataReplacement();
+    void malformedImportPreservesState();
     void nativeGlyphsHaveNoColourFringes(){
         if(QGuiApplication::platformName()!=QStringLiteral("windows"))QSKIP("Requires the native Windows platform");
         QTemporaryDir directory;
@@ -230,6 +232,25 @@ Window { width:850; height:230; color:"white"; visible:true
         manager.resetPreviewAxes();QCOMPARE(manager.previewValues(),defaults);
         QVERIFY(manager.importFont(QUrl::fromLocalFile(ttc)));
         QCOMPARE(QDir(directory.filePath("fonts")).entryList(QDir::Files).size(),1);
+        QVERIFY(manager.choosePreviewFamily("PingFang UI TC"));
+        QVERIFY(manager.setPreviewAxis("HGHT",811));
+        QVERIFY(manager.setPreviewAxis("wght",628.5));
+        QVERIFY(manager.setPreviewAxis("wdth",91.25));
+        const auto collectionDraft=manager.previewValues();
+        QVERIFY(manager.importFont(QUrl::fromLocalFile(ttc)));
+        QCOMPARE(manager.previewFamily(),QStringLiteral("PingFang UI TC"));
+        QCOMPARE(manager.previewValues(),collectionDraft);
+        // A different collection stages its deterministic preferred family;
+        // the active confirmed profile is unchanged until explicit Apply.
+        const auto confirmedFamily=manager.currentFamily();
+        QFile otherSource(":/swirl/fonts/HarmonyOS_Sans_SC_Regular.ttf");QVERIFY(otherSource.open(QIODevice::ReadOnly));
+        QFile otherInput(directory.filePath("other.ttf"));QVERIFY(otherInput.open(QIODevice::WriteOnly));otherInput.write(otherSource.readAll());otherInput.close();
+        QVERIFY(manager.importFont(QUrl::fromLocalFile(otherInput.fileName())));
+        QCOMPARE(manager.previewFamily(),manager.defaultFamily());
+        QCOMPARE(manager.currentFamily(),confirmedFamily);
+        QVERIFY(manager.importFont(QUrl::fromLocalFile(ttc)));
+        QCOMPARE(manager.previewFamily(),QStringLiteral("PingFang UI SC"));
+        QCOMPARE(manager.currentFamily(),confirmedFamily);
     }
 void FontTests::optionalRestartRead(){
         const auto directory=qEnvironmentVariable("SWIRL_FONT_RESTORE_ROOT");
@@ -348,6 +369,58 @@ Window { width:1000; height:880; visible:true; color:"white"
     QFile file(output+"/native-point-sizes.json");QVERIFY(file.open(QIODevice::WriteOnly));
     file.write(QJsonDocument(QJsonObject{{"dpr",window->devicePixelRatio()},{"qpa",QString::fromUtf8(qgetenv("QT_QPA_PLATFORM"))},{"cases",cases},
         {"kind","unprocessed Qt window renders at current display DPR; physical appearance not observed"}}).toJson());
+}
+
+void FontTests::optionalMetadataReplacement()
+{
+    const auto fixtures=qEnvironmentVariable("SWIRL_FONT_METADATA_FIXTURES");
+    if(fixtures.isEmpty())QSKIP("Original synthetic metadata fixtures not supplied");
+    const int staticId=QFontDatabase::addApplicationFont(fixtures+"/static.ttf");QVERIFY(staticId>=0);
+    const auto family=QFontDatabase::applicationFontFamilies(staticId).first();
+    QTemporaryDir directory;QSettings::setDefaultFormat(QSettings::IniFormat);
+    QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,directory.path());QSettings().clear();
+    FontManager manager(nullptr,directory.filePath("fonts"));QVERIFY(manager.choosePreviewFamily(family));
+    QVERIFY(manager.previewAxes().isEmpty());
+    QQmlEngine engine;engine.rootContext()->setContextProperty("fixture",&manager);QQmlComponent component(&engine);
+    component.setData("import QtQml\nQtObject { property int count: fixture.previewAxes.length; property real high: count ? fixture.previewAxes[0].maximum : -1 }",QUrl());
+    QScopedPointer<QObject> model(component.create());QVERIFY(model);QCOMPARE(model->property("count").toInt(),0);
+    // Remove the prior registration to make the selected physical face unambiguous.
+    // The family name stays identical, exercising metadata notifications rather than name changes.
+    QVERIFY(QFontDatabase::removeApplicationFont(staticId));
+    QVERIFY(manager.importFont(QUrl::fromLocalFile(fixtures+"/variable.ttf")));
+    QCOMPARE(manager.previewFamily(),family);QCOMPARE(manager.previewAxes().size(),1);
+    QTRY_COMPARE(model->property("count").toInt(),1);
+    QCOMPARE(manager.previewValues().value("HGHT").toInt(),500);
+    QVERIFY(manager.setPreviewAxis("HGHT",800));
+    for(int id=0;id<64;++id)if(QFontDatabase::applicationFontFamilies(id).contains(family))QFontDatabase::removeApplicationFont(id);
+    QVERIFY(manager.importFont(QUrl::fromLocalFile(fixtures+"/range.ttf")));
+    QCOMPARE(manager.previewFamily(),family);QTRY_COMPARE(model->property("high").toDouble(),600);
+    QCOMPARE(manager.previewValues().value("HGHT").toInt(),600);
+}
+
+void FontTests::malformedImportPreservesState()
+{
+    QTemporaryDir directory;QSettings::setDefaultFormat(QSettings::IniFormat);
+    QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,directory.path());QSettings().clear();
+    FontManager manager(nullptr,directory.filePath("fonts"));
+    const auto active=manager.currentFamily(),draft=manager.previewFamily();const auto values=manager.previewValues();
+    const QList<QByteArray> broken{
+        QByteArray::fromHex("7474636600010000"), // TTC missing count/offsets
+        QByteArray::fromHex("74746366000100000000000200000010"), // incomplete face directory
+        QByteArray::fromHex("00010000000100000000000066766172000000000000001c0000001000010000001000020001001400000008"), // missing fvar axis record
+        QByteArray::fromHex("0001000000010000000000006676617200000000fffffff000000010") // table outside file
+    };
+    int index=0;
+    for(const auto &bytes:broken){
+        QFile file(directory.filePath(QString("broken-%1.ttc").arg(index++)));QVERIFY(file.open(QIODevice::WriteOnly));
+        QCOMPARE(file.write(bytes),bytes.size());file.close();QVERIFY(!manager.importFont(QUrl::fromLocalFile(file.fileName())));
+        QCOMPARE(manager.currentFamily(),active);QCOMPARE(manager.previewFamily(),draft);QCOMPARE(manager.previewValues(),values);
+    }
+    QFile oversized(directory.filePath("oversized.ttf"));QVERIFY(oversized.open(QIODevice::WriteOnly));
+    QVERIFY(oversized.resize(128LL*1024*1024+1));oversized.close();
+    QVERIFY(!manager.importFont(QUrl::fromLocalFile(oversized.fileName())));
+    QCOMPARE(manager.currentFamily(),active);QCOMPARE(manager.previewFamily(),draft);
+    QVERIFY(QDir(directory.filePath("fonts")).entryList(QDir::Files).isEmpty());
 }
 
 int main(int argc,char **argv){

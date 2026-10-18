@@ -13,7 +13,7 @@ class FontManager final : public QObject {
     Q_PROPERTY(QStringList families READ families NOTIFY familiesChanged)
     Q_PROPERTY(QString error READ error NOTIFY errorChanged)
     Q_PROPERTY(QString previewFamily READ previewFamily NOTIFY previewFamilyChanged)
-    Q_PROPERTY(QVariantList previewAxes READ previewAxes NOTIFY previewFamilyChanged)
+    Q_PROPERTY(QVariantList previewAxes READ previewAxes NOTIFY previewAxesChanged)
     Q_PROPERTY(QVariantMap previewValues READ previewValues NOTIFY previewValuesChanged)
     Q_PROPERTY(QStringList importedFamilies READ importedFamilies NOTIFY familiesChanged)
     Q_PROPERTY(int configurationRevision READ configurationRevision NOTIFY configurationChanged)
@@ -47,6 +47,7 @@ signals:
     void errorChanged();
     void previewFamilyChanged();
     void previewValuesChanged();
+    void previewAxesChanged();
     void configurationChanged();
 private:
     bool fail(const QString &message);

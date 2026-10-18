@@ -11,9 +11,49 @@
 #include <QSaveFile>
 #include <QSettings>
 #include <cmath>
+#include <QtEndian>
 #include "StoragePaths.h"
 
 namespace {
+// Validate container and fvar bounds before passing untrusted bytes to a font engine.
+// This is a structural guard, not a replacement for the engine's complete sanitizer.
+bool validSfntFile(QFile &file)
+{
+    const quint64 length=file.size();
+    auto read=[&](quint64 offset,quint64 size){
+        if(offset>length||size>length-offset||!file.seek(qint64(offset)))return QByteArray();
+        return file.read(qint64(size));
+    };
+    auto u16=[](const QByteArray &data,int at){return qFromBigEndian<quint16>(data.constData()+at);};
+    auto u32=[](const QByteArray &data,int at){return qFromBigEndian<quint32>(data.constData()+at);};
+    const auto header=read(0,12);if(header.size()!=12)return false;
+    QList<quint32> faces;
+    if(header.first(4)=="ttcf"){
+        const auto version=u32(header,4),count=u32(header,8);
+        if((version!=0x10000&&version!=0x20000)||!count||quint64(count)>((length-12)/4))return false;
+        const auto offsets=read(12,quint64(count)*4);if(quint64(offsets.size())!=quint64(count)*4)return false;
+        for(quint32 i=0;i<count;++i)faces.append(u32(offsets,int(i*4)));
+    }else faces.append(0);
+    for(const auto face:faces){
+        const auto sfnt=read(face,12);if(sfnt.size()!=12)return false;
+        const auto signature=u32(sfnt,0);
+        if(signature!=0x10000&&signature!=0x4f54544f&&signature!=0x74727565&&signature!=0x74797031)return false;
+        const auto count=u16(sfnt,4);if(!count)return false;
+        const auto directory=read(quint64(face)+12,quint64(count)*16);if(directory.size()!=count*16)return false;
+        for(int i=0;i<count;++i){
+            const quint64 offset=u32(directory,i*16+8),size=u32(directory,i*16+12);
+            if(offset>length||size>length-offset)return false;
+            if(directory.mid(i*16,4)!="fvar")continue;
+            const auto variable=read(offset,qMin(size,quint64(16)));
+            if(variable.size()!=16||u32(variable,0)!=0x10000)return false;
+            const quint64 start=u16(variable,4),axes=u16(variable,8),axisSize=u16(variable,10),instances=u16(variable,12),instanceSize=u16(variable,14);
+            if(start<16||!axes||axisSize<20||start>size||axes*axisSize>size-start)return false;
+            if(instances&&(instanceSize<4+axes*4||instances*instanceSize>size-start-axes*axisSize))return false;
+        }
+    }
+    return file.seek(0);
+}
+
 QString canonicalFamily(const QString &family, const QStringList &available)
 {
     const QStringList regions{"SC","TC","HK","MO","JA"};
@@ -190,7 +230,7 @@ bool FontManager::choosePreviewFamily(const QString &family)
     m_previewFamily=family;
     m_previewValues=normalizedAxes(family,family==m_family?m_values:QVariantMap());
     m_error.clear();emit errorChanged();
-    emit previewFamilyChanged();emit previewValuesChanged();m_saveTimer.start();return true;
+    emit previewFamilyChanged();emit previewAxesChanged();emit previewValuesChanged();m_saveTimer.start();return true;
 }
 
 bool FontManager::setPreviewAxis(const QString &tag,double value)
@@ -234,7 +274,7 @@ bool FontManager::applyPreview()
 void FontManager::discardPreview()
 {
     m_previewFamily=m_family;m_previewValues=m_values;
-    emit previewFamilyChanged();emit previewValuesChanged();savePreview();
+    emit previewFamilyChanged();emit previewAxesChanged();emit previewValuesChanged();savePreview();
 }
 
 bool FontManager::selectFamily(const QString &requestedFamily)
@@ -253,13 +293,23 @@ bool FontManager::importFont(const QUrl &url)
     constexpr qint64 maxFontBytes=128LL*1024*1024;
     if(!QStringList{"ttf","otf","ttc"}.contains(suffix)||!input.open(QIODevice::ReadOnly)||input.size()<=0||input.size()>maxFontBytes)
         return fail(QStringLiteral("无法读取字体，请选择不超过 128 MiB 的 TTF、OTF 或 TTC 文件。"));
+    if(!validSfntFile(input))return fail(tr("The font container or variation table is truncated or invalid. The active font was preserved."));
+    const auto stageCollection=[this](const QStringList &names){
+        QStringList collection;
+        const auto available=QFontDatabase::families();
+        for(const auto &name:names)collection.append(canonicalFamily(name,available));
+        collection.removeDuplicates();collection.sort(Qt::CaseInsensitive);
+        if(collection.contains(m_previewFamily))return true; // preserve this collection's unsaved draft
+        const auto preferred=collection.contains("PingFang UI SC")?QStringLiteral("PingFang UI SC"):collection.value(0);
+        return choosePreviewFamily(preferred);
+    };
     QCryptographicHash hash(QCryptographicHash::Sha256);
     if(!hash.addData(&input))return fail(tr("Could not read the font file."));
     const auto path=m_directory+"/"+QString::fromLatin1(hash.result().toHex())+"."+suffix;
     const auto absolutePath=QFileInfo(path).absoluteFilePath();
     if(m_loadedPaths.contains(absolutePath)) {
         const auto names=QFontDatabase::applicationFontFamilies(m_loadedPaths.value(absolutePath));
-        if(!names.isEmpty())return choosePreviewFamily(canonicalFamily(names.first(),QFontDatabase::families()));
+        if(!names.isEmpty())return stageCollection(names);
     }
     const int sourceId=QFontDatabase::addApplicationFont(input.fileName());
     const auto names=QFontDatabase::applicationFontFamilies(sourceId);
@@ -267,9 +317,6 @@ bool FontManager::importFont(const QUrl &url)
         if(sourceId>=0)QFontDatabase::removeApplicationFont(sourceId);
         return fail(tr("The file is not a usable font. The active font was preserved."));
     }
-    QString selected=names.first();
-    for(const auto &name:names)
-        if(name.compare(QStringLiteral("PingFang UI SC"),Qt::CaseInsensitive)==0){selected=name;break;}
     const bool alreadySaved=QFile::exists(path);
     bool saved=alreadySaved;
     if(!saved && QDir().mkpath(m_directory) && input.seek(0)){
@@ -296,8 +343,10 @@ bool FontManager::importFont(const QUrl &url)
     m_fontIds.append(savedId);
     m_loadedPaths.insert(absolutePath,savedId);
     m_importedFamilies.append(names);m_axisMetadata.clear();refreshFamilies();
-    emit familiesChanged();
-    return choosePreviewFamily(canonicalFamily(selected,QFontDatabase::families()));
+    // Registration can change metadata without changing the selected family name.
+    m_previewValues=normalizedAxes(m_previewFamily,m_previewValues);
+    emit familiesChanged();emit previewAxesChanged();emit previewValuesChanged();m_saveTimer.start();
+    return stageCollection(names);
 }
 
 void FontManager::reset()
