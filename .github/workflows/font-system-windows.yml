@@ -122,9 +122,10 @@ jobs:
         id: application
         if: ${{ !cancelled() && steps.build.outcome == 'success' && (github.event_name == 'push' || inputs.build_full_application) }}
         run: |
-          # Compile the existing default application configuration unchanged.
-          # No core, subscription, network, installer, or live proxy tests run.
-          cmake -S src/Swirl.Quick -B build/swirl-font-application -G 'Visual Studio 17 2022' -A x64 -DSWIRL_BUILD_UI_TESTS=OFF 2>&1 | Tee-Object build/font-evidence/application-configure.log
+          # Compile Swirl with its existing UI checks so FontUiChecks and
+          # FontFrameChecks are type-checked too. Build only the Swirl target;
+          # do not run the application or this directory's unrelated tests.
+          cmake -S src/Swirl.Quick -B build/swirl-font-application -G 'Visual Studio 17 2022' -A x64 -DSWIRL_BUILD_UI_TESTS=ON 2>&1 | Tee-Object build/font-evidence/application-configure.log
           if ($LASTEXITCODE -ne 0) { throw 'Complete application configuration failed' }
           cmake --build build/swirl-font-application --target Swirl --config Release --parallel 2 2>&1 | Tee-Object build/font-evidence/application-build.log
           if ($LASTEXITCODE -ne 0) { throw 'Complete application compilation failed' }

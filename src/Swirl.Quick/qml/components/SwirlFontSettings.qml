@@ -49,6 +49,23 @@ ColumnLayout {
         }
     }
     SwirlText { text:fontManager.previewFamily; color:Theme.text; font.pixelSize:Theme.fontSize(14); Layout.fillWidth:true; wrapMode:Text.Wrap }
+    RowLayout {
+        visible:fontManager.previewAxes.length>0
+        Layout.fillWidth:true
+        SwirlText {
+            text:fontManager.previewAutomatic?"自动适配 · 保留字号与字重层级":"手动可变轴 · 高级设置"
+            color:Theme.muted; font.pixelSize:Theme.fontSize(12); Layout.fillWidth:true; wrapMode:Text.Wrap
+        }
+        SwirlText {text:"手动调整";color:Theme.text;font.pixelSize:Theme.fontSize(12)}
+        SwirlToggle {
+            id:manualMode
+            objectName:"fontManualMode"
+            checked:!fontManager.previewAutomatic
+            onToggled:{fontManager.setPreviewAutomatic(!checked);checked=Qt.binding(function(){return !fontManager.previewAutomatic})}
+            Accessible.name:"手动调整可变轴"
+            Accessible.description:"关闭后恢复自动适配，保留已保存的手动参数。"
+        }
+    }
     Repeater {
         model:fontManager.previewAxes
         delegate:ColumnLayout {
@@ -56,6 +73,7 @@ ColumnLayout {
             required property var modelData
             readonly property string tag:modelData.tag
             readonly property real axisValue:Number(fontManager.previewValues[tag])
+            visible:!fontManager.previewAutomatic
             Layout.fillWidth:true; spacing:Theme.dp(4)
             RowLayout {
                 Layout.fillWidth:true
@@ -77,13 +95,22 @@ ColumnLayout {
                 SwirlTextField {
                     id:axisInput
                     objectName:"fontAxisInput_"+axisRow.tag
+                    property string editingFamily:""
+                    property bool userEdited:false
                     Layout.preferredWidth:Theme.dp(108)
                     text:String(Number(axisRow.axisValue.toFixed(4)))
                     selectByMouse:true
                     validator:DoubleValidator { bottom:axisRow.modelData.minimum; top:axisRow.modelData.maximum; decimals:4; notation:DoubleValidator.StandardNotation; locale:"C" }
                     inputMethodHints:Qt.ImhFormattedNumbersOnly
+                    onActiveFocusChanged:if(activeFocus){editingFamily=fontManager.previewFamily;userEdited=false}
+                    onTextEdited:userEdited=true
                     onEditingFinished:{
-                        if(acceptableInput)fontManager.setPreviewAxis(axisRow.tag,Number(text))
+                        // Hiding manual controls or replacing the family can
+                        // finish editing too. An unchanged rounded display must
+                        // never replace a saved coordinate with higher precision.
+                        if(userEdited && !fontManager.previewAutomatic && editingFamily===fontManager.previewFamily && acceptableInput)
+                            fontManager.setPreviewAxis(axisRow.tag,Number(text))
+                        userEdited=false
                         text=Qt.binding(function(){return String(Number(axisRow.axisValue.toFixed(4)))})
                     }
                     Accessible.name:axisRow.tag+" 数值"
@@ -101,6 +128,7 @@ ColumnLayout {
             Repeater {
                 model:["苹方字体显示效果测试","The quick brown fox jumps over the lazy dog.","0123456789","@ # ¥ % &"]
                 delegate:VariableFontPreview {
+                    id:previewLine
                     required property string modelData
                     required property int index
                     objectName:"fontPreviewLine_"+index
@@ -109,8 +137,9 @@ ColumnLayout {
                     color:Theme.text
                     font.family:fontManager.previewFamily; font.styleName:""
                     font.pixelSize:Theme.fontSize(index===0?21:15)
+                    font.weight:index===0?Font.DemiBold:Theme.bodyFontWeight
                     font.hintingPreference:Font.PreferFullHinting
-                    font.variableAxes:fontManager.previewValues
+                    SwirlFontBinding {target:previewLine;preview:true;textRole:previewLine.index===0?"pageTitle":"body"}
                 }
             }
         }
@@ -118,10 +147,10 @@ ColumnLayout {
     Flow {
         Layout.fillWidth:true; spacing:Theme.dp(8)
         SwirlButton { objectName:"fontApply"; text:"应用到整个界面"; primary:true; onClicked:fontManager.applyPreview() }
-        SwirlButton { objectName:"fontAxesReset"; text:"恢复全部轴默认值"; enabled:fontManager.previewAxes.length>0; onClicked:fontManager.resetPreviewAxes() }
+        SwirlButton { objectName:"fontAxesReset"; text:"恢复全部轴默认值"; visible:!fontManager.previewAutomatic; enabled:fontManager.previewAxes.length>0; onClicked:fontManager.resetPreviewAxes() }
         SwirlButton { objectName:"fontPreviewDiscard"; text:"恢复已应用配置"; onClicked:fontManager.discardPreview() }
     }
-    SwirlText { text:"预览自动保存并在重启后恢复。确认后应用到整个界面，保留各级字号。"; color:Theme.muted; Layout.fillWidth:true; wrapMode:Text.Wrap; font.pixelSize:Theme.fontSize(12) }
+    SwirlText { text:"默认自动适配，无需调节可变轴。预览和手动参数自动保存；确认后应用到整个界面，保留各级字号。"; color:Theme.muted; Layout.fillWidth:true; wrapMode:Text.Wrap; font.pixelSize:Theme.fontSize(12) }
     RowLayout {
         Layout.fillWidth:true
         SwirlButton { objectName:"fontImport"; text:"导入字体文件…"; onClicked:fontFile.open() }
@@ -134,6 +163,6 @@ ColumnLayout {
     SwirlDialog {
         ownerItem:root
         id:licenseDialog; objectName:"fontLicenseDialog"; title:"HarmonyOS Sans 字体许可"; guardChanges:false; implicitWidth:Math.min(Theme.dp(720),parent?parent.width-Theme.dp(40):Theme.dp(720)); implicitHeight:Math.min(Theme.dp(540),parent?parent.height-Theme.dp(40):Theme.dp(540))
-        ScrollView { anchors.fill:parent; clip:true; TextArea { renderType: TextEdit.NativeRendering; font.weight: Theme.bodyFontWeight; font.hintingPreference: Font.PreferFullHinting; Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) } text:fontManager.licenseText; readOnly:true; selectByMouse:true; textFormat:TextEdit.PlainText; wrapMode:TextEdit.Wrap; color:Theme.text; font.family:Theme.fontFamily; font.pixelSize:Theme.fontSize(12); background:Item {} } }
+        ScrollView { anchors.fill:parent; clip:true; SwirlTextArea { text:fontManager.licenseText; readOnly:true; selectByMouse:true; textFormat:TextEdit.PlainText; wrapMode:TextEdit.Wrap; color:Theme.text; font.family:Theme.fontFamily; font.pixelSize:Theme.fontSize(12); background:Item {} } }
     }
 }

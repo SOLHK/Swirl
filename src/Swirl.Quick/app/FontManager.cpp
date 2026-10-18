@@ -1,4 +1,5 @@
 #include "FontManager.h"
+#include "FontAxisPolicy.h"
 #include <QCryptographicHash>
 #include <QDir>
 #include <QFile>
@@ -10,11 +11,18 @@
 #include <QGuiApplication>
 #include <QSaveFile>
 #include <QSettings>
+#include <QDataStream>
 #include <cmath>
 #include <QtEndian>
 #include "StoragePaths.h"
 
 namespace {
+QString profileKey(const QString &family)
+{
+    return QStringLiteral("Fonts/profiles/")
+        + QString::fromLatin1(QCryptographicHash::hash(family.toUtf8(), QCryptographicHash::Sha256).toHex())
+        + QLatin1Char('/');
+}
 // Validate container and fvar bounds before passing untrusted bytes to a font engine.
 // This is a structural guard, not a replacement for the engine's complete sanitizer.
 bool validSfntFile(QFile &file)
@@ -113,19 +121,95 @@ FontManager::FontManager(QObject *parent, const QString &storageDirectory) : QOb
     m_saveTimer.setSingleShot(true);
     m_saveTimer.setInterval(200);
     connect(&m_saveTimer,&QTimer::timeout,this,&FontManager::savePreview);
+    migrateSettings();
     const auto requested=canonicalFamily(QSettings().value("Fonts/family",m_defaultFamily).toString(),available);
     m_family=families().contains(requested)?requested:m_defaultFamily;
-    m_values=normalizedAxes(m_family,QSettings().value("Fonts/axes").toMap());
-    apply(m_family);
-    const auto draft=QSettings().value("Fonts/previewFamily",m_family).toString();
+    const auto profile=profileFor(m_family);
+    m_automatic=profile.automatic;
+    m_values=normalizedAxes(m_family,profile.values);
+    apply(m_family,false);
+    const auto draft=canonicalFamily(QSettings().value("Fonts/previewFamily",m_family).toString(),available);
     m_previewFamily=families().contains(draft)?draft:m_family;
-    m_previewValues=normalizedAxes(m_previewFamily,QSettings().value("Fonts/previewAxes",m_values).toMap());
+    const auto draftProfile=profileFor(m_previewFamily);
+    const bool savedDraft=draft==m_previewFamily;
+    m_previewAutomatic=savedDraft?QSettings().value("Fonts/previewAutomatic",draftProfile.automatic).toBool():draftProfile.automatic;
+    m_previewValues=normalizedAxes(m_previewFamily,savedDraft
+        ?QSettings().value("Fonts/previewAxes",draftProfile.values).toMap():draftProfile.values);
+    m_databaseTimer.setSingleShot(true);
+    m_databaseTimer.setInterval(0);
+    connect(&m_databaseTimer,&QTimer::timeout,this,&FontManager::refreshFontDatabase);
+    connect(qGuiApp,&QGuiApplication::fontDatabaseChanged,this,[this]{
+        // Invalidate immediately, then coalesce multiple add/remove events from
+        // an import into one notification after the final registration settles.
+        m_axisMetadata.clear();m_resolvedAxes.clear();m_databaseTimer.start();
+    });
 }
 
 FontManager::~FontManager()
 {
     if(m_saveTimer.isActive())savePreview();
+    disconnect(qGuiApp,nullptr,this,nullptr);
+    m_databaseTimer.stop();
     for(const int id:m_fontIds)QFontDatabase::removeApplicationFont(id);
+}
+
+void FontManager::migrateSettings()
+{
+    QSettings settings;
+    if(settings.value("Fonts/schemaVersion",0).toInt()>=2)return;
+    const auto family=canonicalFamily(settings.value("Fonts/family",m_defaultFamily).toString(),m_availableFamilies);
+    const auto values=settings.value("Fonts/axes").toMap();
+    const auto draft=canonicalFamily(settings.value("Fonts/previewFamily",family).toString(),m_availableFamilies);
+    const auto draftValues=settings.value("Fonts/previewAxes",draft==family?values:QVariantMap()).toMap();
+    // V1 stored exact coordinates without recording whether they were defaults
+    // or intentionally edited. Preserve every nonempty saved selection as manual.
+    // Keep a verbatim settings backup, even for a font temporarily unavailable.
+    QVariantMap backup;
+    for(const auto &key:QStringList{"family","axes","previewFamily","previewAxes"})
+        if(settings.contains("Fonts/"+key))backup.insert(key,settings.value("Fonts/"+key));
+    settings.setValue("Fonts/legacyV1",backup);
+    writeProfile(settings,family,values,values.isEmpty());
+    settings.setValue("Fonts/automatic",values.isEmpty());
+    settings.setValue("Fonts/previewAutomatic",draftValues.isEmpty());
+    settings.setValue("Fonts/schemaVersion",2);
+    settings.sync();
+    if(settings.status()!=QSettings::NoError)fail(tr("Could not migrate the font settings; the original values are retained."));
+}
+
+FontManager::Profile FontManager::profileFor(const QString &family) const
+{
+    QSettings settings;const auto key=profileKey(family);
+    if(settings.value(key+"family").toString()!=family)return {};
+    return {settings.value(key+"automatic",true).toBool(),settings.value(key+"manualAxes").toMap()};
+}
+
+void FontManager::writeProfile(QSettings &settings,const QString &family,
+                               const QVariantMap &values,bool automatic) const
+{
+    const auto key=profileKey(family);
+    settings.setValue(key+"family",family);
+    settings.setValue(key+"automatic",automatic);
+    settings.setValue(key+"manualAxes",values);
+}
+
+void FontManager::writePreview(QSettings &settings) const
+{
+    settings.setValue("Fonts/previewFamily",m_previewFamily);
+    settings.setValue("Fonts/previewAxes",m_previewValues);
+    settings.setValue("Fonts/previewAutomatic",m_previewAutomatic);
+}
+
+void FontManager::refreshFontDatabase()
+{
+    const auto previousFamilies=m_availableFamilies;
+    m_axisMetadata.clear();m_resolvedAxes.clear();refreshFamilies();
+    // Preserve the selected family and its saved profile when a resource goes
+    // away: QFont's existing fallback chain renders it until it is available.
+    if(m_availableFamilies.contains(m_previewFamily))
+        m_previewValues=normalizedAxes(m_previewFamily,m_previewValues);
+    apply(m_family,false);
+    if(previousFamilies!=m_availableFamilies)emit familiesChanged();
+    emit previewAxesChanged();emit previewValuesChanged();
 }
 
 void FontManager::refreshFamilies()
@@ -158,9 +242,12 @@ bool FontManager::fail(const QString &message)
     m_error=message;emit errorChanged();return false;
 }
 
-void FontManager::apply(const QString &family)
+void FontManager::apply(const QString &family,bool clearError)
 {
-    m_error.clear();emit errorChanged();
+    const bool familyChanged=m_family!=family;
+    m_family=family;
+    m_resolvedAxes.clear();
+    if(clearError){m_error.clear();emit errorChanged();}
     QFont font=QGuiApplication::font();
     font.setStyleName(QString());
     font.clearVariableAxes();
@@ -178,20 +265,25 @@ void FontManager::apply(const QString &family)
     fallbacks.removeAll(QString());fallbacks.removeDuplicates();font.setFamilies(fallbacks);
     font.setHintingPreference(QFont::PreferFullHinting);
     font.setStyleStrategy(QFont::PreferAntialias);
-    for(auto it=m_values.cbegin();it!=m_values.cend();++it)
+    // Automatic axes are resolved per text item. Putting wght/opsz on the
+    // inherited application font would override descendants' weight/size.
+    const auto applied=m_automatic?QVariantMap():normalizedAxes(family,m_values);
+    for(auto it=applied.cbegin();it!=applied.cend();++it)
         if(const auto tag=QFont::Tag::fromString(it.key().toLatin1()))font.setVariableAxis(*tag,it.value().toFloat());
     QGuiApplication::setFont(font);
+    if(familyChanged)emit currentFamilyChanged();
     ++m_revision;emit configurationChanged();
-    if(m_family!=family){m_family=family;emit currentFamilyChanged();}
 }
 
 QVariantList FontManager::axesFor(const QString &family) const
 {
     if(!m_availableFamilies.contains(family))return {};
     if(m_axisMetadata.contains(family))return m_axisMetadata.value(family);
-    QFont font(family);font.setStyleName(QString());
+    QFont font(family);font.setStyleName(QString());font.clearVariableAxes();
+    const QFontInfo info(font);
+    if(canonicalFamily(info.family(),m_availableFamilies)!=family)return {};
     QVariantList result;
-    for(const auto &axis:QFontInfo(font).variableAxes()) {
+    for(const auto &axis:info.variableAxes()) {
         const auto low=axis.minimumValue(),high=axis.maximumValue(),value=axis.defaultValue();
         if(!std::isfinite(low)||!std::isfinite(high)||!std::isfinite(value)||low>value||value>high)continue;
         result.append(QVariantMap{{"tag",QString::fromLatin1(axis.tag().toString())},{"name",axis.name()},
@@ -205,22 +297,55 @@ QVariantList FontManager::axesFor(const QString &family) const
 
 QVariantMap FontManager::normalizedAxes(const QString &family,const QVariantMap &values) const
 {
-    QVariantMap result;
-    for(const auto &entry:axesFor(family)) {
-        const auto axis=entry.toMap();const auto tag=axis.value("tag").toString();
-        bool ok=false;double value=values.value(tag,axis.value("defaultValue")).toDouble(&ok);
-        if(!ok||!std::isfinite(value))value=axis.value("defaultValue").toDouble();
-        result.insert(tag,qBound(axis.value("minimum").toDouble(),value,axis.value("maximum").toDouble()));
-    }
-    return result;
+    return FontAxisPolicy::normalized(axesFor(family),values);
 }
 
 QVariantMap FontManager::variableAxesFor(const QString &family,int weight) const
 {
-    Q_UNUSED(weight);
-    // Exact chosen coordinates apply throughout the UI; pixel-size hierarchy is retained.
-    // Unselected catalogue families use their own defaults, not the active font's axes.
-    return family==m_family?m_values:normalizedAxes(family,{});
+    return resolvedAxes(family,weight,-1,-1,96,1,QString());
+}
+
+QVariantMap FontManager::resolvedAxes(const QString &family,int weight,
+    double pixelSize,double pointSize,double logicalDpi,double dpr,const QString &role) const
+{
+    QByteArray key;QDataStream stream(&key,QIODevice::WriteOnly);
+    stream<<family<<weight<<pixelSize<<pointSize<<logicalDpi<<dpr<<role;
+    if(const auto *cached=m_resolvedAxes.object(key))return *cached;
+    FontAxisPolicy::Request request;
+    request.family=family;request.role=role;request.weight=weight;
+    request.pixelSize=pixelSize;request.pointSize=pointSize;
+    request.logicalDpi=logicalDpi;request.devicePixelRatio=dpr;
+    request.manual=family==m_family&&!m_automatic;
+    const auto result=FontAxisPolicy::resolve(axesFor(family),request,request.manual?m_values:QVariantMap());
+    m_resolvedAxes.insert(key,new QVariantMap(result));
+    return result;
+}
+
+QVariantMap FontManager::previewResolvedAxes(int weight,double pixelSize,
+    double pointSize,double logicalDpi,double dpr,const QString &role) const
+{
+    FontAxisPolicy::Request request;
+    request.family=m_previewFamily;request.role=role;request.weight=weight;
+    request.pixelSize=pixelSize;request.pointSize=pointSize;
+    request.logicalDpi=logicalDpi;request.devicePixelRatio=dpr;
+    request.manual=!m_previewAutomatic;
+    return FontAxisPolicy::resolve(axesFor(m_previewFamily),request,m_previewValues);
+}
+
+QVariantMap FontManager::resolvedAxesForFont(const QFont &font,
+    double logicalDpi,double dpr,const QString &role) const
+{
+    // QML's size getters synthesize the other unit. Only the native QFont
+    // retains which unit was specified; never infer that from two QML numbers.
+    return resolvedAxes(font.family(),int(font.weight()),font.pixelSize(),
+                        font.pointSizeF(),logicalDpi,dpr,role);
+}
+
+QVariantMap FontManager::previewResolvedAxesForFont(const QFont &font,
+    double logicalDpi,double dpr,const QString &role) const
+{
+    return previewResolvedAxes(int(font.weight()),font.pixelSize(),font.pointSizeF(),
+                               logicalDpi,dpr,role);
 }
 
 bool FontManager::choosePreviewFamily(const QString &family)
@@ -228,9 +353,12 @@ bool FontManager::choosePreviewFamily(const QString &family)
     if(!families().contains(family))return fail(tr("Font family is unavailable."));
     if(m_previewFamily==family)return true;
     m_previewFamily=family;
-    m_previewValues=normalizedAxes(family,family==m_family?m_values:QVariantMap());
+    const auto profile=profileFor(family);
+    m_previewValues=normalizedAxes(family,family==m_family?m_values:profile.values);
+    m_previewAutomatic=family==m_family?m_automatic:profile.automatic;
     m_error.clear();emit errorChanged();
-    emit previewFamilyChanged();emit previewAxesChanged();emit previewValuesChanged();m_saveTimer.start();return true;
+    emit previewFamilyChanged();emit previewAxesChanged();emit previewValuesChanged();
+    emit previewAutomaticChanged();m_saveTimer.start();return true;
 }
 
 bool FontManager::setPreviewAxis(const QString &tag,double value)
@@ -240,12 +368,22 @@ bool FontManager::setPreviewAxis(const QString &tag,double value)
         const auto axis=entry.toMap();if(axis.value("tag").toString()!=tag)continue;
         if(value<axis.value("minimum").toDouble()||value>axis.value("maximum").toDouble())
             return fail(tr("Axis value is outside the font's range."));
+        // Editing a valid coordinate is an explicit manual action, including
+        // entering the current default value. Invalid input never changes mode.
+        setPreviewAutomatic(false);
         if(m_previewValues.value(tag).toDouble()==value)return true;
         m_previewValues.insert(tag,value);
         if(!m_error.isEmpty()){m_error.clear();emit errorChanged();}
         emit previewValuesChanged();m_saveTimer.start();return true;
     }
     return fail(tr("This font does not contain the requested axis."));
+}
+
+void FontManager::setPreviewAutomatic(bool automatic)
+{
+    if(m_previewAutomatic==automatic)return;
+    m_previewAutomatic=automatic;
+    emit previewAutomaticChanged();m_saveTimer.start();
 }
 
 void FontManager::resetPreviewAxes()
@@ -257,8 +395,7 @@ void FontManager::resetPreviewAxes()
 void FontManager::savePreview()
 {
     m_saveTimer.stop();QSettings settings;
-    settings.setValue("Fonts/previewFamily",m_previewFamily);
-    settings.setValue("Fonts/previewAxes",m_previewValues);settings.sync();
+    writePreview(settings);settings.sync();
     if(settings.status()!=QSettings::NoError)fail(tr("Could not save the font preview."));
 }
 
@@ -266,15 +403,21 @@ bool FontManager::applyPreview()
 {
     QSettings settings;
     settings.setValue("Fonts/family",m_previewFamily);
-    settings.setValue("Fonts/axes",m_previewValues);settings.sync();
+    settings.setValue("Fonts/axes",m_previewValues);
+    settings.setValue("Fonts/automatic",m_previewAutomatic);
+    writeProfile(settings,m_previewFamily,m_previewValues,m_previewAutomatic);
+    writePreview(settings);settings.sync();
     if(settings.status()!=QSettings::NoError)return fail(tr("Could not save the font configuration."));
-    m_values=m_previewValues;apply(m_previewFamily);savePreview();return true;
+    m_saveTimer.stop();m_values=m_previewValues;m_automatic=m_previewAutomatic;
+    apply(m_previewFamily);return true;
 }
 
 void FontManager::discardPreview()
 {
-    m_previewFamily=m_family;m_previewValues=m_values;
-    emit previewFamilyChanged();emit previewAxesChanged();emit previewValuesChanged();savePreview();
+    m_previewFamily=m_family;m_previewValues=normalizedAxes(m_family,m_values);
+    m_previewAutomatic=m_automatic;
+    emit previewFamilyChanged();emit previewAxesChanged();emit previewValuesChanged();
+    emit previewAutomaticChanged();savePreview();
 }
 
 bool FontManager::selectFamily(const QString &requestedFamily)
@@ -342,7 +485,7 @@ bool FontManager::importFont(const QUrl &url)
     }
     m_fontIds.append(savedId);
     m_loadedPaths.insert(absolutePath,savedId);
-    m_importedFamilies.append(names);m_axisMetadata.clear();refreshFamilies();
+    m_importedFamilies.append(names);m_axisMetadata.clear();m_resolvedAxes.clear();refreshFamilies();
     // Registration can change metadata without changing the selected family name.
     m_previewValues=normalizedAxes(m_previewFamily,m_previewValues);
     emit familiesChanged();emit previewAxesChanged();emit previewValuesChanged();m_saveTimer.start();
@@ -351,7 +494,8 @@ bool FontManager::importFont(const QUrl &url)
 
 void FontManager::reset()
 {
-    QSettings settings;settings.remove("Fonts/family");settings.remove("Fonts/axes");settings.sync();
-    if(settings.status()!=QSettings::NoError){fail(QStringLiteral("无法保存自动字体设置。"));return;}
-    m_values=normalizedAxes(m_defaultFamily,{});apply(m_defaultFamily);discardPreview();
+    // Reset the active selection, keeping other families' manual profiles.
+    if(!choosePreviewFamily(m_defaultFamily))return;
+    setPreviewAutomatic(true);
+    applyPreview();
 }

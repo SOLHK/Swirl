@@ -7,7 +7,7 @@ import "../components"
 import "../controls"
 Item {
     id: page
-    SwirlText { x:Theme.dp(24); y:Theme.dp(30); text:"设置"; color:Theme.text; font.pixelSize:Theme.fontSize(26); font.weight:Font.Bold }
+    SwirlText {textRole:"pageTitle"; x:Theme.dp(24); y:Theme.dp(30); text:"设置"; color:Theme.text; font.pixelSize:Theme.fontSize(26); font.weight:Font.Bold }
     ScrollView {
         id: scroll; x:Theme.dp(24); y:Theme.dp(94); width:parent.width-Theme.dp(48); height:parent.height-y-Theme.dp(20)
         clip:true; ScrollBar.horizontal.policy:ScrollBar.AlwaysOff; ScrollBar.vertical:SwirlScrollBar {}

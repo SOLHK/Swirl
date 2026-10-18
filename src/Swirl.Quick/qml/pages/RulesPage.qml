@@ -20,7 +20,7 @@ Item {
  ColumnLayout {
   anchors.fill:parent;anchors.margins:Theme.dp(24);spacing:Theme.gap
   RowLayout {Layout.fillWidth:true
-   SwirlText {renderType:Text.NativeRendering;text:"规则";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.Bold;Layout.fillWidth:true}
+   SwirlText {textRole:"pageTitle";renderType:Text.NativeRendering;text:"规则";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.Bold;Layout.fillWidth:true}
   }
   SwirlText {renderType:Text.NativeRendering;text:"规则按从上至下的顺序测试；双击自定义规则可编辑。";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
   SwirlGlassPanel {Layout.fillWidth:true;Layout.preferredHeight:Math.min(ruleArea.implicitHeight+2*Theme.cardPadding,Math.max(Theme.dp(240),page.height-Theme.dp(150)));Layout.maximumHeight:Math.max(Theme.dp(200),page.height-Theme.dp(150))

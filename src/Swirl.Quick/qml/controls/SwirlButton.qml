@@ -15,6 +15,8 @@ SwirlMotionButton {
     implicitHeight:Theme.controlHeight
     hoverEnabled: true
     font.family: Theme.fontFamily
+    font.weight: Font.Medium
+    SwirlFontBinding { target: control; textRole: "button" }
     font.hintingPreference:Font.PreferFullHinting
     font.pixelSize:Theme.fontSize(13)
     leftPadding:Theme.dp(12); rightPadding:Theme.dp(12)
@@ -46,7 +48,8 @@ SwirlMotionButton {
             text: AppState.zh(control.text)+(control.development?" · 研发中":"")
             font.family: control.font.family
             font.pixelSize: control.font.pixelSize
-            font.weight: Font.Medium
+            font.weight: control.font.weight
+            textRole: "button"
             Layout.fillWidth: true; elide: Text.ElideRight
             color: !control.enabled ? Theme.muted : control.primary ? "white" : control.danger ? Theme.red : Theme.text
             Layout.alignment: Qt.AlignVCenter

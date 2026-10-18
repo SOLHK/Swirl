@@ -42,8 +42,8 @@ Item {
  Connections {target:page.telemetry;function onChanged(){page.snapshotDirty=true}}
  Timer {interval:250;running:page.visible&&page.snapshotDirty;repeat:true;onTriggered:page.refreshSnapshot()}
  Timer {interval:10000;running:page.visible;repeat:true;onTriggered:page.network=page.systemProvider.currentNetwork()}
- component Label:SwirlText {color:Theme.muted;font.pixelSize:Theme.fontSize(12);elide:Text.ElideRight}
- component Value:SwirlText {color:Theme.text;font.pixelSize:Theme.fontSize(23);font.weight:Font.DemiBold;elide:Text.ElideRight}
+ component Label:SwirlText {textRole:"auxiliary";color:Theme.muted;font.pixelSize:Theme.fontSize(12);elide:Text.ElideRight}
+ component Value:SwirlText {textRole:"data";color:Theme.text;font.pixelSize:Theme.fontSize(23);font.weight:Font.DemiBold;elide:Text.ElideRight}
  component Metric:SwirlGlassPanel {
   id:metric
   property string label
@@ -87,7 +87,7 @@ Item {
      }
      GridLayout {Layout.fillWidth:true;columns:page.wide?4:2;columnSpacing:Theme.dp(16);rowSpacing:Theme.dp(8)
       Repeater {model:[{label:"网络",value:page.network.type||"尚未检测"},{label:"配置",value:extensionsProvider.profileName},{label:"出站",value:AppState.mode},{label:"外部 IP",value:page.telemetry.externalIp||"尚未检测"}]
-       Label {required property var modelData;text:modelData.label+"  "+modelData.value;Layout.fillWidth:true;Layout.minimumWidth:0;HoverHandler{id:infoHover}ToolTip.visible:infoHover.hovered&&truncated;ToolTip.text:text;ToolTip.delay:650}
+       Label {id:infoLabel;required property var modelData;text:modelData.label+"  "+modelData.value;Layout.fillWidth:true;Layout.minimumWidth:0;HoverHandler{id:infoHover}SwirlToolTip {parent:infoLabel;visible:infoHover.hovered&&infoLabel.truncated;text:infoLabel.text;delay:650}}
       }
      }
     }
@@ -112,7 +112,7 @@ Item {
      ColumnLayout {x:Theme.cardPadding;y:Theme.cardPadding;width:parent.width-2*Theme.cardPadding;spacing:Theme.dp(10)
       RowLayout {Layout.fillWidth:true
        SwirlText {text:"网络质量";color:Theme.text;font.pixelSize:Theme.fontSize(15);font.weight:Font.DemiBold;Layout.fillWidth:true}
-       SwirlIconButton {objectName:"networkDiagnosticButton";iconName:"refresh";quiet:true;enabled:page.telemetry.measurementState!=="正在测量";onClicked:page.telemetry.measureNetwork();Accessible.name:"网络诊断";ToolTip.visible:hovered;ToolTip.text:"发起网络诊断";ToolTip.delay:650}
+       SwirlIconButton {id:networkDiagnosticButton;objectName:"networkDiagnosticButton";iconName:"refresh";quiet:true;enabled:page.telemetry.measurementState!=="正在测量";onClicked:page.telemetry.measureNetwork();Accessible.name:"网络诊断";SwirlToolTip {parent:networkDiagnosticButton;visible:networkDiagnosticButton.hovered;text:"发起网络诊断";delay:650}}
        SwirlIconButton {objectName:"networkDiagnosticDetails";iconName:page.diagnosticOpen?"chevron-left":"chevron-right";quiet:true;onClicked:page.diagnosticOpen=!page.diagnosticOpen;Accessible.name:page.diagnosticOpen?"收起检测详情":"查看检测详情"}
       }
       Label {text:"互联网延迟";Layout.fillWidth:true}

@@ -9,6 +9,9 @@
 #include <QSGSimpleTextureNode>
 #include <QSGTexture>
 #include <QScopedPointer>
+#include <QGuiApplication>
+#include <QScreen>
+#include <cmath>
 #ifdef SWIRL_UI_TESTS
 #include <chrono>
 static qint64 rasterClockNs() { return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count(); }
@@ -32,13 +35,44 @@ VariableFontPreview::VariableFontPreview(QQuickItem *parent) : QQuickItem(parent
     setAntialiasing(true);
     m_pixelAlignment=new PreviewPixelAlignment(this);
     auto transforms=transform();transforms.append(&transforms,m_pixelAlignment);
+    // A newly registered or removed face can change an unchanged QFont's
+    // result. Qt clears its engine cache; invalidate our retained texture too.
+    connect(qGuiApp,&QGuiApplication::fontDatabaseChanged,this,&VariableFontPreview::scheduleRaster);
     connectAlignmentWindow();
 }
 void VariableFontPreview::connectAlignmentWindow()
 {
     QObject::disconnect(m_alignmentConnection);
-    if(window())m_alignmentConnection=connect(window(),&QQuickWindow::afterAnimating,this,&VariableFontPreview::alignRaster);
+    QObject::disconnect(m_screenConnection);
+    if(window()){
+        m_alignmentConnection=connect(window(),&QQuickWindow::afterAnimating,this,&VariableFontPreview::alignRaster);
+        m_screenConnection=connect(window(),&QQuickWindow::screenChanged,this,&VariableFontPreview::observeScreen);
+    }
+    observeScreen();
     alignRaster();
+}
+void VariableFontPreview::observeScreen()
+{
+    QObject::disconnect(m_logicalDpiConnection);
+    auto *screen=window()?window()->screen():QGuiApplication::primaryScreen();
+    if(screen)m_logicalDpiConnection=connect(screen,&QScreen::logicalDotsPerInchChanged,
+                                            this,&VariableFontPreview::updateDisplayMetrics);
+    updateDisplayMetrics();
+}
+void VariableFontPreview::updateDisplayMetrics()
+{
+    const auto *screen=window()?window()->screen():QGuiApplication::primaryScreen();
+    qreal x=screen?screen->logicalDotsPerInchX():96;
+    qreal y=screen?screen->logicalDotsPerInchY():96;
+    if(!std::isfinite(x)||x<=0)x=96;
+    if(!std::isfinite(y)||y<=0)y=96;
+    if(qFuzzyCompare(x,m_logicalDpiX)&&qFuzzyCompare(y,m_logicalDpiY))return;
+    m_logicalDpiX=x;m_logicalDpiY=y;
+    // QTextLayout's paint device controls point-size metrics. Keep the source
+    // QFont unchanged and express logical DPI here; DPR is applied by the raster.
+    m_metricsDevice.setDotsPerMeterX(qRound(x/0.0254));
+    m_metricsDevice.setDotsPerMeterY(qRound(y/0.0254));
+    scheduleRaster();
 }
 void VariableFontPreview::alignRaster()
 {
@@ -58,6 +92,7 @@ void VariableFontPreview::alignRaster()
 void VariableFontPreview::scheduleRaster()
 {
     // QQuickItem polish coalesces only rendering work; model axes stay exact and immediate.
+    m_rasterDirty=true;
     polish();update();
 }
 void VariableFontPreview::setText(const QString &text)
@@ -74,12 +109,15 @@ void VariableFontPreview::setColor(const QColor &color)
 }
 void VariableFontPreview::updatePolish()
 {
-    if(width()<=0)return;
+    // QQuickWindow also forces polish on unchanged screen notifications. Only
+    // raster after one of our actual inputs (including resources) invalidates it.
+    if(!m_rasterDirty||width()<=0)return;
+    m_rasterDirty=false;
     alignRaster();
 #ifdef SWIRL_UI_TESTS
     const auto started=m_measureRaster?rasterClockNs():0;
 #endif
-    QTextLayout layout(m_text,m_font);QTextOption option;
+    QTextLayout layout(m_text,m_font,&m_metricsDevice);QTextOption option;
     option.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);layout.setTextOption(option);
     layout.beginLayout();qreal y=0;
     while(true){auto line=layout.createLine();if(!line.isValid())break;
@@ -100,6 +138,8 @@ void VariableFontPreview::updatePolish()
     const int right=qCeil(qMax(width(),ink.right())*dpr)+2,bottom=qCeil(qMax(y,ink.bottom())*dpr)+2;
     m_rasterOffset=QPointF(left/dpr,top/dpr);
     QImage image(QSize(qMax(1,right-left),qMax(1,bottom-top)),QImage::Format_ARGB32_Premultiplied);
+    image.setDotsPerMeterX(m_metricsDevice.dotsPerMeterX());
+    image.setDotsPerMeterY(m_metricsDevice.dotsPerMeterY());
     image.setDevicePixelRatio(dpr);image.fill(Qt::transparent);
     QPainter painter(&image);painter.setPen(m_color);painter.setRenderHint(QPainter::TextAntialiasing,true);
     painter.translate(-m_rasterOffset);layout.draw(&painter,QPointF());painter.end();

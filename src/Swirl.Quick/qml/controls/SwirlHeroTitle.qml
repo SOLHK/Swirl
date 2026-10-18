@@ -67,6 +67,7 @@ Item {
     Binding { target: hero.targetItem; property: "opacity"; value: hero.handoff; when: hero.moving && hero.targetItem!==null; restoreMode: Binding.RestoreBindingOrValue }
     SwirlText {
         id:label;objectName:"sharedTitle"
+        textRole:hero.targetItem && hero.targetItem.textRole ? hero.targetItem.textRole : "pageTitle"
         visible: hero.moving
         opacity:1-hero.handoff
         x: hero.origin.x+(hero.targetRect.x-hero.origin.x)*hero.progress

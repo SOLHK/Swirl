@@ -53,11 +53,22 @@ inline int runFontUiChecks(QQuickWindow *window,FontManager *manager,const QStri
     QPointer<QObject> page=loader?qvariant_cast<QObject *>(loader->property("item")):nullptr;
     check(page,"settings page exists");if(!page)return 2;
     page->setProperty("section",QStringLiteral("字体"));QTest::qWait(200);
+    auto *manual=get("fontManualMode");
+    check(manual,"manual font mode control exists");
+    if(manual){manual->setProperty("checked",true);check(QMetaObject::invokeMethod(manual,"toggled"),"enable explicit manual font mode");}
+    check(!manager->previewAutomatic(),"advanced axis controls use manual preview mode");
+    QTest::qWait(50);
     auto *slider=get("fontAxisSlider_HGHT"),*input=get("fontAxisInput_wdth");
     check(slider&&input,"dynamic slider and numeric controls exist");
     if(slider){slider->setProperty("value",800);check(QMetaObject::invokeMethod(slider,"moved"),"slider moved handler");}
     check(manager->previewValues().value("HGHT").toDouble()==800,"slider edits actual HGHT coordinate");
-    if(input){input->setProperty("text","109.75");check(QMetaObject::invokeMethod(input,"editingFinished"),"numeric commit handler");}
+    if(input){
+        input->forceActiveFocus();
+        check(input->hasActiveFocus(),"numeric editor gains focus before a user edit");
+        input->setProperty("text","109.75");
+        check(QMetaObject::invokeMethod(input,"textEdited"),"numeric editor receives an explicit user edit");
+        check(QMetaObject::invokeMethod(input,"editingFinished"),"numeric commit handler");
+    }
     check(manager->previewValues().value("wdth").toDouble()==109.75,"numeric editor accepts fractional axis values");
     const auto originalApplied=manager->variableAxesFor(manager->currentFamily(),400);
     const auto beforeMemory=memory();QElapsedTimer updates;updates.start();QJsonArray frameIntervals;QElapsedTimer frameTimer;frameTimer.start();

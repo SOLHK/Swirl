@@ -19,6 +19,12 @@ class FontCiReportTests(unittest.TestCase):
             "initTestCase": "pass", "defaultSelectionAndPersistence": "pass",
             "importKeepsOriginalFile": "pass", "malformedImportPreservesState": "pass",
             "optionalMetadataReplacement": "pass", "optionalCffImport": "pass",
+            "automaticAxesRespectDesignAndDpi": "pass", "manualProfilesAndAutomaticRestore": "pass",
+            "automaticProfilesRestartAcrossProcess": "pass", "legacyAxisSettingsArePreserved": "pass",
+            "automaticAxesProduceRealGlyphsAndFallback": "pass", "fontCachesAreBoundedAndStable": "pass",
+            "displayContextHasBoundedLifecycle": "pass", "qmlLiveAutomaticFonts": "pass",
+            "fontDisplayContextLifetime": "pass", "previewFontResourcesInvalidateRaster": "pass",
+            "previewWindowMetricsAndIdleStability": "pass",
             "importOptionalPingFangUiCollection": "skip", "cleanupTestCase": "pass",
         }
         self.write("font-selection.xml", self.selection)
@@ -35,7 +41,7 @@ class FontCiReportTests(unittest.TestCase):
 
     def test_skipped_private_fixture_is_separate_from_passes(self):
         result = font_report.summarize(self.root, False)
-        self.assertEqual(result["countsExcludingLifecycle"], {"pass": 6, "skip": 1})
+        self.assertEqual(result["countsExcludingLifecycle"], {"pass": 17, "skip": 1})
         self.assertEqual(result["errors"], [])
         self.assertFalse(result["physicalDpiVerified"])
         self.assertFalse(result["refresh240HzVerified"])
@@ -75,6 +81,14 @@ class FontCiReportTests(unittest.TestCase):
         self.selection["automaticModeUsesActualQmlControl"] = "skip"
         self.write("font-selection.xml", self.selection)
         self.assertTrue(any("Unexpected public font case skip" in error for error in font_report.summarize(self.root, False)["errors"]))
+
+    def test_missing_registered_qml_or_restart_case_fails_gate(self):
+        for name in ("qmlLiveAutomaticFonts", "automaticProfilesRestartAcrossProcess"):
+            with self.subTest(name=name):
+                missing = dict(self.selection)
+                del missing[name]
+                self.write("font-selection.xml", missing)
+                self.assertTrue(any(name in error for error in font_report.summarize(self.root, False)["errors"]))
 
 
 if __name__ == "__main__":

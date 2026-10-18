@@ -165,7 +165,13 @@ inline int runFontFrameChecks(QQuickWindow *window,FontManager *manager,const QS
         page=loader?qvariant_cast<QObject *>(loader->property("item")):nullptr;
         if(page&&page->metaObject()->indexOfProperty("section")>=0&&!loader->property("moving").toBool())break;QTest::qWait(20);
     }
-    if(!page)return 3;page->setProperty("section",QStringLiteral("字体"));QTest::qWait(300);QMetaObject::invokeMethod(page,"scrollToBottom");QTest::qWait(150);
+    if(!page)return 3;page->setProperty("section",QStringLiteral("字体"));QTest::qWait(300);
+    // Setup only: the existing axis benchmark explicitly measures manual
+    // sliders. Automatic mode intentionally hides those advanced controls.
+    auto *manual=fontFrameFind(window->contentItem(),"fontManualMode");
+    if(!manual)return 3;manual->setProperty("checked",true);
+    if(!QMetaObject::invokeMethod(manual,"toggled")||manager->previewAutomatic())return 3;
+    QTest::qWait(100);QMetaObject::invokeMethod(page,"scrollToBottom");QTest::qWait(150);
     auto *slider=fontFrameFind(window->contentItem(),"fontAxisSlider_HGHT");QList<VariableFontPreview *> lines;
     for(int i=0;i<4;++i)if(auto *line=qobject_cast<VariableFontPreview *>(fontFrameFind(window->contentItem(),"fontPreviewLine_"+QString::number(i))))lines.append(line);
     if(!slider||lines.size()!=4)return 3;

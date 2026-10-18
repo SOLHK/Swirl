@@ -55,7 +55,7 @@ Item {
                     ScrollBar.vertical:SwirlScrollBar {}
                     ColumnLayout {
                         width:options.availableWidth; spacing:Theme.dp(17)
-                        SwirlText {id:routeTitle;Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:AppState.zh(page.section); color:Theme.text; font.pixelSize:Theme.fontSize(23); font.weight:Font.DemiBold }
+                        SwirlText {textRole:"pageTitle";id:routeTitle;Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:AppState.zh(page.section); color:Theme.text; font.pixelSize:Theme.fontSize(23); font.weight:Font.DemiBold }
                         SwirlText {
                             text:page.section==="外观"?"主题、窗口材质、动画与界面缩放。":page.section==="字体"?"预览字体与可变轴，确认后应用到整个界面。":page.section==="代理"?"引擎、真实节点与当前用户系统代理 · 国内外分流。":page.section==="关于 Swirl"?"版本与项目信息":"此项研发中。"
                             color:Theme.muted; wrapMode:Text.WordWrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12)
@@ -226,7 +226,7 @@ Item {
                             }
                             SwirlText {Layout.minimumWidth:0; text:engineController.diagnostics.stateText; color:Theme.muted; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
                             SwirlText {Layout.minimumWidth:0; text:"仅点击后向所填目标发送请求：本机端口 → CONNECT → TLS / HTTP 或 WebSocket Upgrade 与随机 Ping/Pong。地址可能需要登录或子协议；诊断失败不等于 Codex 服务故障，10 秒观察不代替长期实测。"; color:Theme.muted; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
-                            TextArea { renderType: TextEdit.NativeRendering; font.weight: Theme.bodyFontWeight; font.hintingPreference: Font.PreferFullHinting; Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) } readOnly:true; selectByMouse:true; visible:engineController.diagnostics.entries.length>0; text:engineController.diagnostics.report; Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(160); wrapMode:TextEdit.Wrap; font.family:Theme.fontFamily; font.pixelSize:Theme.fontSize(12); color:Theme.text; background:Rectangle { color:Theme.surface; radius:Theme.dp(14); border.color:Theme.border } }
+                            SwirlTextArea { readOnly:true; selectByMouse:true; visible:engineController.diagnostics.entries.length>0; text:engineController.diagnostics.report; Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(160); wrapMode:TextEdit.Wrap; font.family:Theme.fontFamily; font.pixelSize:Theme.fontSize(12); color:Theme.text; background:Rectangle { color:Theme.surface; radius:Theme.dp(14); border.color:Theme.border } }
                             GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
                                 SwirlButton { text:"保存诊断报告"; onClicked:{const path=engineController.diagnostics.saveReport();AppState.notice(path.length>0?"诊断报告已保存："+path:"无法保存诊断报告")} }
                                 SwirlButton { text:"清空记录"; enabled:!engineController.diagnostics.busy; onClicked:engineController.diagnostics.clear() }
@@ -238,7 +238,7 @@ Item {
                                 SwirlToggle { checked:engineController.preferCompatibility; enabled:engineController.canStart; onToggled:engineController.preferCompatibility=checked }
                             }
                             SwirlText {Layout.minimumWidth:0; text:"断开后修改并重新连接生效，节点、DNS、规则和 TUN 配置保持原值。依赖 TLS EOF 定界或原生协议尚不兼容时可主动启用。"; color:Theme.muted; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
-                            TextArea { renderType: TextEdit.NativeRendering; font.weight: Theme.bodyFontWeight; font.hintingPreference: Font.PreferFullHinting; Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) } readOnly:true; selectByMouse:true; text:engineController.proxyEnvironmentAdvice; Layout.fillWidth:true; wrapMode:TextEdit.Wrap; font.family:Theme.fontFamily; font.pixelSize:Theme.fontSize(12); color:Theme.text; background:null }
+                            SwirlTextArea { readOnly:true; selectByMouse:true; text:engineController.proxyEnvironmentAdvice; Layout.fillWidth:true; wrapMode:TextEdit.Wrap; font.family:Theme.fontFamily; font.pixelSize:Theme.fontSize(12); color:Theme.text; background:null }
                             SwirlText {Layout.minimumWidth:0; text:"原生隧道取消 120 秒空闲断开，采用 TCP KeepAlive；节点切换对新连接生效，现有连接保持原出口。DNS、国内外分流、用户规则、策略组和 TUN 沿用当前配置。原生 TLS 上游保留反向读取，但 Qt 不支持独立 TLS 半关闭；依赖 EOF 定界的 TLS 请求仍需兼容引擎。"; color:Theme.muted; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
                             Rectangle { Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(1); color:Theme.border }
                             GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
@@ -301,7 +301,7 @@ Item {
                         ColumnLayout {
                             visible:page.section==="关于 Swirl"; Layout.fillWidth:true; spacing:Theme.dp(18)
                             SwirlBrandIcon { Layout.alignment:Qt.AlignHCenter; Layout.preferredWidth:Theme.dp(104); Layout.preferredHeight:Theme.dp(104) }
-                            SwirlText {Layout.minimumWidth:0;wrapMode:Text.Wrap; text:"Swirl"; Layout.fillWidth:true; horizontalAlignment:Text.AlignHCenter; color:Theme.text; font.pixelSize:Theme.fontSize(30); font.weight:Font.DemiBold }
+                            SwirlText {textRole:"largeTitle";Layout.minimumWidth:0;wrapMode:Text.Wrap; text:"Swirl"; Layout.fillWidth:true; horizontalAlignment:Text.AlignHCenter; color:Theme.text; font.pixelSize:Theme.fontSize(30); font.weight:Font.DemiBold }
                             SwirlText {Layout.minimumWidth:0;wrapMode:Text.Wrap; text:"网络代理工具"; Layout.fillWidth:true; horizontalAlignment:Text.AlignHCenter; color:Theme.muted; font.pixelSize:Theme.fontSize(14) }
                             Rectangle { Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(1); color:Theme.border }
                             Repeater {
@@ -321,17 +321,17 @@ Item {
                                 columns:parent.width<Theme.dp(430)?1:2
                                 columnSpacing:Theme.compactGap; rowSpacing:Theme.compactGap
                                 SwirlButton {
+                                    id: officialChannelButton
                                     objectName:"officialChannelButton"; text:"官方频道"
                                     Accessible.description:"通过默认浏览器打开 Swirl官方频道（Telegram）"
-                                    ToolTip.visible:hovered||activeFocus; ToolTip.delay:500
-                                    ToolTip.text:"Swirl官方频道 · https://t.me/SwirlUpdates"
+                                    SwirlToolTip {parent:officialChannelButton;visible:officialChannelButton.hovered||officialChannelButton.activeFocus;delay:500;text:"Swirl官方频道 · https://t.me/SwirlUpdates"}
                                     onClicked:Qt.openUrlExternally("https://t.me/SwirlUpdates")
                                 }
                                 SwirlButton {
+                                    id: communityGroupButton
                                     objectName:"communityGroupButton"; text:"用户交流群"
                                     Accessible.description:"通过默认浏览器打开 Swirl交流群（Telegram）"
-                                    ToolTip.visible:hovered||activeFocus; ToolTip.delay:500
-                                    ToolTip.text:"Swirl交流群 · https://t.me/SwirlHQ"
+                                    SwirlToolTip {parent:communityGroupButton;visible:communityGroupButton.hovered||communityGroupButton.activeFocus;delay:500;text:"Swirl交流群 · https://t.me/SwirlHQ"}
                                     onClicked:Qt.openUrlExternally("https://t.me/SwirlHQ")
                                 }
                             }

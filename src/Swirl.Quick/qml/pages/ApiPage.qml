@@ -19,7 +19,7 @@ Item {
                 SwirlIcon { name:"terminal"; size:Theme.dp(31); color:Theme.accent }
                 ColumnLayout {
                     Layout.fillWidth:true; spacing:Theme.dp(6)
-                    SwirlText { text:"本地控制 API"; font.pixelSize:Theme.fontSize(20); color:Theme.text; font.weight:Font.DemiBold }
+                    SwirlText {textRole:"pageTitle"; text:"本地控制 API"; font.pixelSize:Theme.fontSize(20); color:Theme.text; font.weight:Font.DemiBold }
                     SwirlText { text:"API 未启动 · 命令行仅提供参考"; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
                 }
                 SwirlStatusBadge { label:"研发中"; tone:"warning" }
@@ -77,7 +77,7 @@ Item {
                         radius:Theme.roundedRadius(width,height); color:Theme.field; border.color:Theme.border
                         ScrollView {
                             anchors.fill:parent; anchors.margins:Theme.dp(9)
-                            TextArea { renderType: TextEdit.NativeRendering; font.weight: Theme.bodyFontWeight; font.hintingPreference: Font.PreferFullHinting; Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) }
+                            SwirlTextArea {
                                 readOnly:true
                                 text:"研发中；未发起 API 请求。"
                                 color:Theme.text; font.family:"Cascadia Code"; font.pixelSize:Theme.fontSize(11)

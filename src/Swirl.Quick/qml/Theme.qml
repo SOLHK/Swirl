@@ -126,9 +126,16 @@ QtObject {
     readonly property string fontFamily: fontManager.currentFamily
     readonly property int bodyFontWeight: Font.Normal
     readonly property int fontRevision: fontManager.configurationRevision
-    function variableAxesFor(family, weight) {
+    function variableAxesFor(font, logicalDpi, dpr, role) {
         const revision = fontRevision // establish a binding dependency for same-family axis updates
-        return fontManager.variableAxesFor(family, weight)
+        return fontManager.resolvedAxesForFont(font, logicalDpi, dpr, role)
+    }
+    function previewVariableAxesFor(font, logicalDpi, dpr, role) {
+        const revision = fontRevision
+        const family = fontManager.previewFamily
+        const automatic = fontManager.previewAutomatic
+        const values = fontManager.previewValues
+        return fontManager.previewResolvedAxesForFont(font, logicalDpi, dpr, role)
     }
     function dp(value) { return value === 0 ? 0 : Math.round(value * uiScale) }
     function fontSize(value) { return Math.max(12, Math.round(dp(value))) }

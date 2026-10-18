@@ -47,14 +47,21 @@ protected:
 private:
     void scheduleRaster();
     void connectAlignmentWindow();
+    void observeScreen();
+    void updateDisplayMetrics();
     void alignRaster();
     PreviewPixelAlignment *m_pixelAlignment=nullptr;
     QMetaObject::Connection m_alignmentConnection;
+    QMetaObject::Connection m_screenConnection;
+    QMetaObject::Connection m_logicalDpiConnection;
+    qreal m_logicalDpiX=0, m_logicalDpiY=0;
+    QImage m_metricsDevice{1,1,QImage::Format_ARGB32_Premultiplied};
     QString m_text;
     QFont m_font;
     QColor m_color=Qt::black;
     QImage m_raster;
     QPointF m_rasterOffset;
+    bool m_rasterDirty=true;
     quint64 m_rasterRevision=0;
 #ifdef SWIRL_UI_TESTS
     std::atomic_bool m_measureRaster{false};

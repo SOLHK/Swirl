@@ -5,6 +5,10 @@
 #include <QVariantMap>
 #include <QHash>
 #include <QTimer>
+#include <QCache>
+#include <QFont>
+
+class QSettings;
 
 class FontManager final : public QObject {
     Q_OBJECT
@@ -17,6 +21,8 @@ class FontManager final : public QObject {
     Q_PROPERTY(QVariantMap previewValues READ previewValues NOTIFY previewValuesChanged)
     Q_PROPERTY(QStringList importedFamilies READ importedFamilies NOTIFY familiesChanged)
     Q_PROPERTY(int configurationRevision READ configurationRevision NOTIFY configurationChanged)
+    Q_PROPERTY(bool automatic READ automatic NOTIFY configurationChanged)
+    Q_PROPERTY(bool previewAutomatic READ previewAutomatic NOTIFY previewAutomaticChanged)
     Q_PROPERTY(QString licenseText READ licenseText CONSTANT)
 public:
     explicit FontManager(QObject *parent=nullptr, const QString &storageDirectory=QString());
@@ -31,16 +37,32 @@ public:
     QVariantMap previewValues() const { return m_previewValues; }
     QStringList importedFamilies() const { return m_importedFamilies; }
     int configurationRevision() const { return m_revision; }
+    bool automatic() const { return m_automatic; }
+    bool previewAutomatic() const { return m_previewAutomatic; }
     Q_INVOKABLE QVariantList axesFor(const QString &family) const;
     Q_INVOKABLE bool choosePreviewFamily(const QString &family);
     Q_INVOKABLE bool setPreviewAxis(const QString &tag, double value);
+    Q_INVOKABLE void setPreviewAutomatic(bool automatic);
     Q_INVOKABLE void resetPreviewAxes();
     Q_INVOKABLE bool applyPreview();
     Q_INVOKABLE void discardPreview();
     Q_INVOKABLE bool selectFamily(const QString &family);
     Q_INVOKABLE bool importFont(const QUrl &file);
     Q_INVOKABLE QVariantMap variableAxesFor(const QString &family, int weight) const;
+    Q_INVOKABLE QVariantMap resolvedAxes(const QString &family, int weight,
+        double pixelSize, double pointSize, double logicalDpi, double dpr,
+        const QString &role) const;
+    Q_INVOKABLE QVariantMap previewResolvedAxes(int weight, double pixelSize,
+        double pointSize, double logicalDpi, double dpr, const QString &role) const;
+    Q_INVOKABLE QVariantMap resolvedAxesForFont(const QFont &font,
+        double logicalDpi, double dpr, const QString &role) const;
+    Q_INVOKABLE QVariantMap previewResolvedAxesForFont(const QFont &font,
+        double logicalDpi, double dpr, const QString &role) const;
     Q_INVOKABLE void reset();
+#ifdef SWIRL_UI_TESTS
+    int metadataCacheSize() const { return m_axisMetadata.size(); }
+    int resolutionCacheSize() const { return m_resolvedAxes.size(); }
+#endif
 signals:
     void currentFamilyChanged();
     void familiesChanged();
@@ -48,20 +70,31 @@ signals:
     void previewFamilyChanged();
     void previewValuesChanged();
     void previewAxesChanged();
+    void previewAutomaticChanged();
     void configurationChanged();
 private:
     bool fail(const QString &message);
-    void apply(const QString &family);
+    void apply(const QString &family, bool clearError = true);
     QString m_family, m_defaultFamily, m_harmonyFamily, m_error, m_directory;
     QVariantMap normalizedAxes(const QString &family, const QVariantMap &values) const;
     void savePreview();
     void refreshFamilies();
+    void refreshFontDatabase();
+    void migrateSettings();
+    struct Profile { bool automatic = true; QVariantMap values; };
+    Profile profileFor(const QString &family) const;
+    void writeProfile(QSettings &settings, const QString &family,
+                      const QVariantMap &values, bool automatic) const;
+    void writePreview(QSettings &settings) const;
     QString m_previewFamily;
     QStringList m_availableFamilies, m_importedFamilies;
     QVariantMap m_previewValues, m_values;
     mutable QHash<QString,QVariantList> m_axisMetadata;
+    mutable QCache<QByteArray,QVariantMap> m_resolvedAxes{256};
     QHash<QString,int> m_loadedPaths;
     QTimer m_saveTimer;
+    QTimer m_databaseTimer;
+    bool m_automatic = true, m_previewAutomatic = true;
     int m_revision=0;
     QList<int> m_fontIds;
 };

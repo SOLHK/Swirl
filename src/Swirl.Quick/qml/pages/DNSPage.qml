@@ -15,9 +15,9 @@ Item {
  property int serverMode:0;property var hostRows:[];property string selectedId:""
  Component.onCompleted:{const saved=moduleDrafts.load("feature-dns-exit");const config=saved.pending?saved:engineController.dnsConfiguration;serverMode=config.mode||0;serverAddress.text=config.servers||"";encryptedUrl.text=config.encrypted||"";hostRows=config.hosts||[];readHosts.checked=config.useHosts!==false;respectRules.checked=config.respectRules===true}
  component Label:SwirlText {color:Theme.text;font.pixelSize:Theme.fontSize(13)}
- component Note:SwirlText {color:Theme.muted;font.pixelSize:Theme.fontSize(11);lineHeightMode:Text.FixedHeight;lineHeight:Theme.dp(14);wrapMode:Text.WordWrap;width:parent.width}
+ component Note:SwirlText {textRole:"auxiliary";color:Theme.muted;font.pixelSize:Theme.fontSize(11);lineHeightMode:Text.FixedHeight;lineHeight:Theme.dp(14);wrapMode:Text.WordWrap;width:parent.width}
  component Group:SwirlGlassPanel {}
- SwirlText {id:routeTitle;x:Theme.pagePadding;y:Theme.pagePadding;text:"DNS";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold}
+ SwirlText {textRole:"pageTitle";id:routeTitle;x:Theme.pagePadding;y:Theme.pagePadding;text:"DNS";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold}
  Note{x:Theme.pagePadding;y:routeTitle.y+routeTitle.height+Theme.dp(8);text:"本地 DNS 映射和 DNS 相关设置。"}
  readonly property bool narrow:width<Theme.dp(600)
  readonly property real optionsHeight:Math.max(Theme.dp(305),dnsServerColumn.implicitHeight+Theme.dp(40))

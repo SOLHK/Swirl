@@ -14,7 +14,7 @@ Item {
   id:scroll;anchors.fill:parent;clip:true;ScrollBar.horizontal.policy:ScrollBar.AlwaysOff;ScrollBar.vertical:SwirlScrollBar {}
   ColumnLayout {width:Math.floor(scroll.availableWidth);spacing:Theme.dp(14)
    RowLayout {Layout.fillWidth:true;Layout.margins:Theme.dp(24);Layout.bottomMargin:0
-    SwirlText {renderType:Text.NativeRendering;text:"HTTPS 解密";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.Bold;Layout.fillWidth:true}
+    SwirlText {textRole:"pageTitle";renderType:Text.NativeRendering;text:"HTTPS 解密";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.Bold;Layout.fillWidth:true}
     SwirlToggle {objectName:"tlsToggle";large:true;enabled:captureProvider.tls.ready;checked:captureProvider.tls.enabled;onToggled:captureProvider.tls.enabled=checked;Accessible.name:"HTTPS 解密"}
    }
    Note {Layout.leftMargin:Theme.dp(24);Layout.rightMargin:Theme.dp(24);text:"配置本机 CA 证书与需要解密的主机名，通过 MitM 查看 HTTPS 请求内容。"}

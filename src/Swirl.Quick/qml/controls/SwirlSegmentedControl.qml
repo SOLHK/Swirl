@@ -44,6 +44,7 @@ Item {
                     color:!control.enabled?Theme.muted:control.currentIndex===index&&control.accentSelection?"white":control.currentIndex===index?Theme.text:Theme.muted
                     leftPadding:control.optionIcons.length?Theme.dp(18):0
                     SwirlIcon{visible:control.optionIcons.length>index;name:control.optionIcons[index]||"link";size:Theme.dp(16);color:parent.color;x:Math.round((parent.width-parent.contentWidth)/2-Theme.dp(22));anchors.verticalCenter:parent.verticalCenter}
+                    textRole:"button"
                     font.pixelSize:Theme.fontSize(control.textPixelSize); font.family:Theme.fontFamily
                     horizontalAlignment:Text.AlignHCenter; verticalAlignment:Text.AlignVCenter
                 }

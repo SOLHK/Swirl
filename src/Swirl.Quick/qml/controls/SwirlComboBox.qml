@@ -12,11 +12,12 @@ ComboBox {
     font.family: Theme.fontFamily
     font.weight: Theme.bodyFontWeight
     font.hintingPreference:Font.PreferFullHinting
-    Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) }
+    SwirlFontBinding { target: control; textRole: "input" }
     font.pixelSize:Theme.fontSize(13)
     leftPadding:Theme.controlPadding; rightPadding:Theme.dp(28)
     topPadding:Theme.dp(4); bottomPadding:Theme.dp(4)
     contentItem: SwirlText {renderType:Text.NativeRendering;
+        textRole:"input"
         text: AppState.zh(control.displayText)
         color: control.enabled ? Theme.text : Theme.muted
         font.family: control.font.family
@@ -47,6 +48,7 @@ ComboBox {
         text: String(modelData)
         highlighted: control.highlightedIndex === index
         contentItem: SwirlText {renderType:Text.NativeRendering;
+            textRole:"list"
             text: AppState.zh(parent.text)
             color: parent.highlighted ? "white" : Theme.text; font.pixelSize:Theme.fontSize(13); font.family: Theme.fontFamily
             verticalAlignment: Text.AlignVCenter; leftPadding:Theme.dp(24)

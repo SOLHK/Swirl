@@ -49,7 +49,7 @@ Item {
         anchors.fill:parent;anchors.margins:Theme.dp(24);spacing:Theme.dp(16)
         RowLayout {
             Layout.fillWidth:true;spacing:Theme.dp(12)
-            SwirlText {id:routeTitle;renderType:Text.NativeRendering;text:"节点";color:Theme.text;font.family:Theme.fontFamily;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold;Layout.fillWidth:true}
+            SwirlText {textRole:"pageTitle";id:routeTitle;renderType:Text.NativeRendering;text:"节点";color:Theme.text;font.family:Theme.fontFamily;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold;Layout.fillWidth:true}
             SwirlButton {objectName:"allNodesTestButton";text:engineController.tests.busy?"取消测速":"测速";quiet:true;iconName:"activity";enabled:engineController.nodes.length>0;onClicked:engineController.tests.busy?engineController.tests.cancel():engineController.testAllNodes(testUrl.text)}
             SwirlButton {objectName:"nodeImportButton";text:"导入";quiet:true;iconName:"download";enabled:!engineController.imports.busy;onClicked:importDialog.open()}
             SwirlButton {objectName:"nodeAddButton";text:"添加节点";iconName:"plus";primary:true;enabled:engineController.canStart;onClicked:page.edit(null)}
@@ -147,8 +147,7 @@ Item {
                 text:page.selected?page.selected.name:"未选择节点";textFormat:Text.PlainText;color:Theme.text;font.family:Theme.fontFamily;font.pixelSize:Theme.fontSize(18);font.weight:Font.Medium
                 Layout.fillWidth:true;wrapMode:Text.Wrap;activeFocusOnTab:true
                 HoverHandler {id:nodeNameHover}
-                ToolTip.visible:page.selected!==null&&(nodeNameHover.hovered||activeFocus)
-                ToolTip.text:nodeDetailTitle.text;ToolTip.delay:600
+                SwirlToolTip {parent:nodeDetailTitle;visible:page.selected!==null&&(nodeNameHover.hovered||nodeDetailTitle.activeFocus);text:nodeDetailTitle.text;delay:600}
             }
             ColumnLayout {
                 Layout.fillWidth:true;spacing:Theme.dp(10)
@@ -232,7 +231,7 @@ Item {
                 SwirlButton {text:"选择文件";enabled:!engineController.imports.busy;onClicked:configFile.open()}
             }
             ScrollView {Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(130);clip:true
-                TextArea { renderType: TextEdit.NativeRendering; font.weight: Theme.bodyFontWeight; font.hintingPreference: Font.PreferFullHinting; Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) }id:importContent;objectName:"importContentField";placeholderText:"粘贴 Clash、Surge、Loon、Quantumult X、sing-box 配置或节点 URI";wrapMode:TextEdit.Wrap;font.family:importAddress.font.family;font.pixelSize:importAddress.font.pixelSize;color:Theme.text;selectByMouse:true;Accessible.name:"待导入的节点配置";background:Rectangle {color:Theme.field;radius:Theme.controlRadius;border.color:Theme.border;border.width:1}}
+                SwirlTextArea {id:importContent;objectName:"importContentField";placeholderText:"粘贴 Clash、Surge、Loon、Quantumult X、sing-box 配置或节点 URI";wrapMode:TextEdit.Wrap;font.family:importAddress.font.family;font.pixelSize:importAddress.font.pixelSize;color:Theme.text;selectByMouse:true;Accessible.name:"待导入的节点配置";background:Rectangle {color:Theme.field;radius:Theme.controlRadius;border.color:Theme.border;border.width:1}}
             }
             SwirlText {renderType:Text.NativeRendering;text:"HTTPS 订阅地址（本次导入）";color:Theme.text}
             SwirlTextField {id:importAddress;Layout.fillWidth:true;echoMode:TextInput.Password;placeholderText:"https://…";Accessible.name:"一次性导入地址"}

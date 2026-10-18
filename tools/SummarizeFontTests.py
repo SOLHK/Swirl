@@ -38,11 +38,16 @@ def read_cases(path: Path) -> list[dict]:
 
 def summarize(build: Path, require_windows: bool) -> dict:
     reports = ["font-selection.xml", "font-axis-policy.xml"]
-    required = [("font-selection.xml", "defaultSelectionAndPersistence"),
-                ("font-selection.xml", "importKeepsOriginalFile"),
-                ("font-selection.xml", "malformedImportPreservesState"),
-                ("font-selection.xml", "optionalMetadataReplacement"),
-                ("font-selection.xml", "optionalCffImport")]
+    required = [("font-selection.xml", name) for name in (
+        "defaultSelectionAndPersistence", "importKeepsOriginalFile",
+        "malformedImportPreservesState", "optionalMetadataReplacement",
+        "optionalCffImport", "automaticAxesRespectDesignAndDpi",
+        "manualProfilesAndAutomaticRestore", "automaticProfilesRestartAcrossProcess",
+        "legacyAxisSettingsArePreserved", "automaticAxesProduceRealGlyphsAndFallback",
+        "fontCachesAreBoundedAndStable", "displayContextHasBoundedLifecycle",
+        "qmlLiveAutomaticFonts", "fontDisplayContextLifetime",
+        "previewFontResourcesInvalidateRaster", "previewWindowMetricsAndIdleStability",
+    )]
     if require_windows:
         reports.append("font-native-raster.xml")
         required.append(("font-native-raster.xml", "nativeGlyphsHaveNoColourFringes"))

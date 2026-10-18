@@ -99,9 +99,15 @@ private slots:
         QVERIFY(manager.selectFamily(QStringLiteral("苹方UI-简")));
         QCOMPARE(manager.currentFamily(),QStringLiteral("PingFang UI SC"));
         QVERIFY(!manager.families().contains(QStringLiteral("PingFang UI SC Thin")));
+        // Automatic mode must preserve the existing body/title weight hierarchy.
+        QVERIFY(manager.automatic());
+        QCOMPARE(manager.variableAxesFor(manager.currentFamily(),400).value("wght").toInt(),400);
+        QCOMPARE(manager.variableAxesFor(manager.currentFamily(),600).value("wght").toInt(),600);
+        QCOMPARE(manager.variableAxesFor(manager.currentFamily(),400).value("wdth").toInt(),100);
+        // Retain V1's exact-coordinate contract as an explicit manual check.
+        manager.setPreviewAutomatic(false);QVERIFY(manager.applyPreview());
         QCOMPARE(manager.variableAxesFor(manager.currentFamily(),400).value("wght").toInt(),500);
         QCOMPARE(manager.variableAxesFor(manager.currentFamily(),600).value("wght").toInt(),500);
-        QCOMPARE(manager.variableAxesFor(manager.currentFamily(),400).value("wdth").toInt(),100);
         QVERIFY(manager.variableAxesFor(manager.defaultFamily(),400).isEmpty());
         QCOMPARE(QGuiApplication::font().hintingPreference(),QFont::PreferFullHinting);
         QVERIFY(QGuiApplication::font().styleStrategy() & QFont::PreferAntialias);
@@ -123,6 +129,17 @@ private slots:
     void optionalPaintedPreviewAxes();
     void optionalRasterQualityMatrix();
     void optionalCffImport();
+    void automaticAxesRespectDesignAndDpi();
+    void manualProfilesAndAutomaticRestore();
+    void automaticProfilesRestartAcrossProcess();
+    void legacyAxisSettingsArePreserved();
+    void automaticAxesProduceRealGlyphsAndFallback();
+    void fontCachesAreBoundedAndStable();
+    void displayContextHasBoundedLifecycle();
+    void qmlLiveAutomaticFonts();
+    void fontDisplayContextLifetime();
+    void previewFontResourcesInvalidateRaster();
+    void previewWindowMetricsAndIdleStability();
     void nativeGlyphsHaveNoColourFringes(){
         if(QGuiApplication::platformName()!=QStringLiteral("windows"))QSKIP("Requires the native Windows platform");
         QTemporaryDir directory;
@@ -475,6 +492,9 @@ void FontTests::optionalCffImport()
 }
 
 #include "FontRasterQualityChecks.h"
+#include "FontAutomationChecks.h"
+#include "FontQmlChecks.h"
+#include "FontPreviewInvalidationChecks.h"
 
 int main(int argc,char **argv){
     configureSwirlFontRendering();

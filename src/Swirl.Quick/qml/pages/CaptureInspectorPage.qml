@@ -42,7 +42,7 @@ Item {
                 anchors.fill: parent
                 anchors.margins: Theme.dp(16)
                 spacing: Theme.dp(11)
-                SwirlText { text: "抓包设置"; color: Theme.text; font.pixelSize: Theme.fontSize(20); font.weight: Font.DemiBold }
+                SwirlText {textRole:"pageTitle"; text: "抓包设置"; color: Theme.text; font.pixelSize: Theme.fontSize(20); font.weight: Font.DemiBold }
                 SwirlStatusBadge { label: page.captureProvider.running ? "监听中 · 真实" : "未启动"; tone: page.captureProvider.running ? "success" : "neutral" }
                 SwirlText { text: "本机端口"; color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
                 SwirlTextField {
@@ -76,7 +76,7 @@ Item {
             Layout.fillWidth: true; Layout.fillHeight: true; spacing: Theme.dp(8)
             RowLayout {
                 Layout.fillWidth: true; spacing: Theme.dp(10)
-                SwirlText { text: "HTTP 请求"; color: Theme.text; font.pixelSize: Theme.fontSize(20); font.weight: Font.DemiBold }
+                SwirlText {textRole:"pageTitle"; text: "HTTP 请求"; color: Theme.text; font.pixelSize: Theme.fontSize(20); font.weight: Font.DemiBold }
                 SwirlSearchField { Layout.fillWidth: true; placeholderText: "筛选域名、方法或状态"; onTextChanged: page.query = text }
                 SwirlText { text: page.captureProvider.sessions.length + " 条 · " + page.captureProvider.activeCount + " 个活动连接"; color: Theme.muted; font.pixelSize: Theme.fontSize(12) }
             }
@@ -101,7 +101,7 @@ Item {
                     }
                     ScrollView {
                         Layout.fillWidth: true; Layout.preferredHeight: Theme.dp(138); clip: true
-                        TextArea { renderType: TextEdit.NativeRendering; font.weight: Theme.bodyFontWeight; font.hintingPreference: Font.PreferFullHinting; Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) } objectName: "captureDetail"; text: page.detailText(); readOnly: true; selectByMouse: true; color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontSize(12); wrapMode: TextEdit.Wrap; background: Item {} }
+                        SwirlTextArea { objectName: "captureDetail"; text: page.detailText(); readOnly: true; selectByMouse: true; color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontSize(12); wrapMode: TextEdit.Wrap; background: Item {} }
                     }
                 }
             }

@@ -26,6 +26,7 @@ ApplicationWindow {
     minimumWidth:Theme.windowMinimumWidth; minimumHeight:Theme.windowMinimumHeight
     title:"Swirl"; flags:Qt.Window | Qt.FramelessWindowHint; color:"transparent"
     font.family:Theme.fontFamily; font.pixelSize:Theme.fontSize(16)
+    SwirlFontBinding { target: window; fontWindow: window; textRole: "body" }
     palette.window:Theme.canvas
     palette.base:Theme.material("field")
     palette.button:Theme.buttonBase
@@ -110,7 +111,7 @@ ApplicationWindow {
             id:mainArea; x:window.actualSidebarWidth+window.sidebarGutter; width:parent.width-x-Theme.dp(12); height:parent.height
             RowLayout {
                 id:toolbar; visible:AppState.currentPage==="activity"; x:Theme.pagePadding; y:Theme.dp(16); width:parent.width-2*Theme.pagePadding; height:Theme.dp(32); spacing:Theme.dp(8)
-                SwirlText {text:"活动";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold;Layout.fillWidth:true}
+                SwirlText {textRole:"pageTitle";text:"活动";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold;Layout.fillWidth:true}
                 SwirlStatusCapsule { objectName:"eventsCapsule"; Layout.preferredWidth:implicitWidth; Layout.preferredHeight:Theme.statusHeight; label:systemProvider.eventCount>0?systemProvider.eventCount+" 个事件":"暂无事件";tone:systemProvider.eventCount>0?"info":"neutral";detail:"查看事件与活动记录"; onClicked:AppState.navigate("logs") }
                 SwirlStatusCapsule {id:proxyCapsule;objectName:"proxyCapsule";Layout.preferredWidth:implicitWidth;Layout.preferredHeight:Theme.statusHeight;label:window.proxyStatusLabel;tone:window.proxyTogglePending?"info":engineController.systemProxy.error.length||engineController.routingError.length?"warning":engineController.systemProxy.owned&&engineController.systemProxy.enabled?"success":"neutral";detail:"查看系统代理状态与操作";onClicked:proxyPanel.toggle()}
 

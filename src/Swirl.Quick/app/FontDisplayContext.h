@@ -8,7 +8,9 @@
 
 // A single observer is attached to each rendering window. Text items share it;
 // moving a window or changing its screen never creates a per-frame font scan.
-class FontDisplayContext final : public QObject {
+// Qt's generated QML registration derives QQmlElement<T> even for an attached,
+// uncreatable type, so this class must not be final.
+class FontDisplayContext : public QObject {
     Q_OBJECT
     QML_ELEMENT
     QML_UNCREATABLE("FontDisplayContext is attached to a Window")

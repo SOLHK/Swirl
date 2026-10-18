@@ -39,10 +39,15 @@ version and CMake's actual Qt version, compiler ID and pointer size. It saves th
 actual compiler version, language standard and generator in `font-toolchain.txt`.
 MinGW packages are not combined with MSVC objects.
 
-Each push then attempts a separate complete `Swirl` application compilation in
-the repository's existing default application configuration. A font test failure
-remains a failure even if that compile succeeds. This extra build does not run
-the application, change its core choice or exercise live network/proxy settings.
+Each push then attempts a separate complete `Swirl` application compilation with
+the existing `SWIRL_BUILD_UI_TESTS=ON` option. This compiles the existing
+`FontUiChecks.h` and `FontFrameChecks.h` code paths, including setup of the advanced
+manual-mode control. The build explicitly selects only `--target Swirl`; it does
+not build every unrelated test target or run CTest in that application directory.
+A font test failure remains a failure even if that compile succeeds. This extra
+build does not run the application, change its core choice or exercise live
+network/proxy settings. Compiling the private-font UI/240 Hz test code does not
+count as executing those tests.
 An unavailable external dependency is a real failed configure/build step, with
 its original log retained. No installer or runnable package is published by this
 font verification job.
@@ -75,6 +80,8 @@ checks to actually pass:
 | Font selection | Default family and settings persistence; unchanged imported bytes; malformed file rejection |
 | Synthetic font metadata | Same-family registration replacement/range change; original CFF import and raster |
 | Independent axis policy | Every registered policy case; a skip fails this gate |
+| Public font integration | Automatic/manual profiles, independent-process restart, legacy migration, real multi-axis glyph/fallback rendering, and bounded caches |
+| Actual QML and preview integration | Existing controls and live mode/family updates, display-context lifetime, font-resource invalidation, and idle raster stability |
 | Windows native raster | `nativeGlyphsHaveNoColourFringes`; a skip fails this gate |
 
 The offscreen selection/QML suite explicitly uses Qt Quick's software backend,
@@ -88,7 +95,9 @@ font test is removed, weakened, or reclassified as a passing case. Parser
 regressions verify that missing reports, private skips, required synthetic skips,
 skipped policy cases and failed lifecycle callbacks retain distinct outcomes.
 The existing private/child/native-only cases are explicitly listed: any new
-public test that unexpectedly skips also fails the report gate.
+public test that unexpectedly skips also fails the report gate. The current
+automatic-font integration cases are required by name, so an accidentally
+unregistered QML or restart slot cannot disappear from an otherwise green report.
 
 ## Evidence and limits
 

@@ -28,7 +28,7 @@ Item {
  function configureGateway(){gatewayDialog.open()}
  function preparePreviewState(state){if(state==="device-sort")deviceSort.popup.open();else if(state==="device-settings")page.openGatewayMenu()}
  function openGatewayMenu(){gatewayMenu.popup(gearButton,Theme.dp(12),Theme.dp(10))}
- SwirlText {x:Theme.dp(24);y:Theme.dp(30);text:"设备";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.Bold}
+ SwirlText {textRole:"pageTitle";x:Theme.dp(24);y:Theme.dp(30);text:"设备";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.Bold}
  SwirlComboBox{id:deviceSort;objectName:"deviceSortPicker";anchors.right:parent.right;anchors.rightMargin:Theme.dp(20);y:Theme.dp(34);width:Theme.dp(208);height:Theme.dp(24);model:["按流量排序","按速度排序","按名称排序","按 IP 排序","按 DHCP 最后出现时间排序"];currentIndex:page.sortIndex;onActivated:page.sortIndex=currentIndex}
  Item{x:Theme.dp(24);y:Theme.dp(90);width:Math.floor((parent.width-Theme.dp(70))/2);height:parent.height-y-Theme.dp(72)
   SwirlText {visible:page.records.length===0;anchors.centerIn:parent;text:"无设备";color:Theme.muted;font.pixelSize:Theme.fontSize(17);font.weight:Font.DemiBold}
