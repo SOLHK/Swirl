@@ -19,6 +19,15 @@
 #include <psapi.h>
 #endif
 
+inline qint64 fontUiPrivateBytes(){
+#ifdef Q_OS_WIN
+        PROCESS_MEMORY_COUNTERS_EX counters{};
+        if(K32GetProcessMemoryInfo(GetCurrentProcess(),reinterpret_cast<PROCESS_MEMORY_COUNTERS *>(&counters),sizeof(counters)))return counters.PrivateUsage;
+#endif
+        return -1;
+}
+
+
 // Runs only in the existing isolated preview process; never controls another app.
 inline int runFontUiChecks(QQuickWindow *window,FontManager *manager,const QString &output)
 {
@@ -30,13 +39,7 @@ inline int runFontUiChecks(QQuickWindow *window,FontManager *manager,const QStri
         if(item->objectName()==name)return item;for(auto *child:item->childItems())if(auto *found=find(child,name))return found;return nullptr;};
     auto get=[&](const QString &name){return find(window->contentItem(),name);};
     auto capture=[&](const QString &name){const auto image=window->grabWindow();check(!image.isNull()&&image.save(output+"/"+name+".png"),"raw Qt render: "+name);};
-    auto memory=[]()->qint64{
-#ifdef Q_OS_WIN
-        PROCESS_MEMORY_COUNTERS_EX counters{};
-        if(K32GetProcessMemoryInfo(GetCurrentProcess(),reinterpret_cast<PROCESS_MEMORY_COUNTERS *>(&counters),sizeof(counters)))return counters.PrivateUsage;
-#endif
-        return -1;
-    };
+    auto memory=[](){return fontUiPrivateBytes();};
     window->resize(1100,900);window->hide();window->show();QTest::qWait(150);
     eval("AppState.navigate('settings')");QTest::qWait(350);
     auto *loader=window->findChild<QObject *>("pageLoader");
@@ -75,6 +78,10 @@ inline int runFontUiChecks(QQuickWindow *window,FontManager *manager,const QStri
     manager->setPreviewAxis("HGHT",800);manager->setPreviewAxis("wght",575);
     auto *apply=get("fontApply");check(apply&&QMetaObject::invokeMethod(apply,"clicked"),"apply button handler");QTest::qWait(100);
     check(manager->variableAxesFor(manager->currentFamily(),400).value("HGHT").toInt()==800,"confirmed HGHT propagates globally");
+    for(const auto &tag:QStringList{"wght","wdth","HGHT"}){
+        auto *field=get("fontAxisInput_"+tag);
+        check(field&&field->property("font").value<QFont>().variableAxisValue(QFont::Tag("HGHT"))==800,"input control live font: "+tag);
+    }
     capture("settings-top");
     // Scroll only this app's settings Flickable; do not alter Windows scaling.
     std::function<void(QQuickItem *)> scroll=[&](QQuickItem *item){
@@ -84,6 +91,27 @@ inline int runFontUiChecks(QQuickWindow *window,FontManager *manager,const QStri
         for(auto *child:item->childItems())scroll(child);
     };
     scroll(qobject_cast<QQuickItem *>(page.data()));QTest::qWait(100);capture("settings-bottom");
+    auto *license=get("fontLicense");
+    check(license&&QMetaObject::invokeMethod(license,"clicked"),"font license dialog opens");QTest::qWait(350);
+    int popupText=0,popupWrong=0;QJsonArray popupCaptures;
+    auto *dialog=window->findChild<QObject *>("fontLicenseDialog");
+    check(dialog&&dialog->property("visible").toBool(),"license popup is visible in its owner overlay");
+    if(dialog){
+        std::function<void(QQuickItem *)> inspect=[&](QQuickItem *item){
+            if(!item)return;
+            if(item->isVisible()&&(item->inherits("QQuickText")||item->inherits("QQuickTextEdit"))&&!item->property("text").toString().isEmpty()){
+                const auto font=item->property("font").value<QFont>();
+                if(font.family()==manager->currentFamily()){++popupText;if(font.variableAxisValue(QFont::Tag("HGHT"))!=800)++popupWrong;}
+            }
+            for(auto *child:item->childItems())inspect(child);
+        };
+        inspect(qvariant_cast<QQuickItem *>(dialog->property("contentItem")));
+        inspect(qvariant_cast<QQuickItem *>(dialog->property("header")));
+        capture("font-license-dialog");popupCaptures.append("font-license-dialog.png");
+        QMetaObject::invokeMethod(dialog,"close");
+    }
+    check(popupText>0&&popupWrong==0,"dialog text inherits confirmed axes");
+    QTest::qWait(150);
     QJsonArray pageAudits;
     for(const auto &route:QStringList{"overview","proxies","capture","settings"}){
         eval(QString("AppState.navigate('%1')").arg(route));QTest::qWait(300);
@@ -100,7 +128,7 @@ inline int runFontUiChecks(QQuickWindow *window,FontManager *manager,const QStri
         pageAudits.append(QJsonObject{{"page",route},{"textItems",checked},{"wrongAxes",wrong}});capture(route);
     }
     QFile report(output+"/font-ui-report.json");if(report.open(QIODevice::WriteOnly))report.write(QJsonDocument(QJsonObject{
-        {"checks",checks},{"failures",failures},{"dpr",window->devicePixelRatio()},{"updateCount",180},{"updateLoopMs",double(updateMs)},
+        {"privateBytesBeforeManager",QCoreApplication::instance()->property("fontBeforeManagerBytes").toDouble()},{"privateBytesAfterBundledFonts",QCoreApplication::instance()->property("fontAfterManagerBytes").toDouble()},{"privateBytesAfterPrivateFont",QCoreApplication::instance()->property("fontAfterImportBytes").toDouble()},{"dialogTextItems",popupText},{"dialogCaptures",popupCaptures},{"checks",checks},{"failures",failures},{"dpr",window->devicePixelRatio()},{"updateCount",180},{"updateLoopMs",double(updateMs)},
         {"dragMemoryBytes",dragMemory},{"privateBytesBefore",double(beforeMemory)},{"privateBytesAfterWarmDrag",double(warmMemory)},{"privateBytesAfterRepeatedDrag",double(repeatedMemory)},{"privateBytesAfter",double(memory())},{"frameIntervalsMs",frameIntervals},{"pages",pageAudits},
         {"captureKind","raw QQuickWindow render; not physical-screen or remote-compression evidence"}}).toJson());
     return failures?2:0;

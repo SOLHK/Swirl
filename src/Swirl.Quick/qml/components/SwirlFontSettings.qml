@@ -132,7 +132,7 @@ ColumnLayout {
     FileDialog { id:fontFile;parentWindow:root.Window.window;objectName:"settingsFontFileDialog"; title:"选择字体文件"; nameFilters:["字体文件 (*.ttf *.otf *.ttc)"]; onAccepted:fontManager.importFont(selectedFile) }
     SwirlDialog {
         ownerItem:root
-        id:licenseDialog; title:"HarmonyOS Sans 字体许可"; guardChanges:false; implicitWidth:Math.min(Theme.dp(720),parent?parent.width-Theme.dp(40):Theme.dp(720)); implicitHeight:Math.min(Theme.dp(540),parent?parent.height-Theme.dp(40):Theme.dp(540))
+        id:licenseDialog; objectName:"fontLicenseDialog"; title:"HarmonyOS Sans 字体许可"; guardChanges:false; implicitWidth:Math.min(Theme.dp(720),parent?parent.width-Theme.dp(40):Theme.dp(720)); implicitHeight:Math.min(Theme.dp(540),parent?parent.height-Theme.dp(40):Theme.dp(540))
         ScrollView { anchors.fill:parent; clip:true; TextArea { renderType: TextEdit.NativeRendering; font.weight: Theme.bodyFontWeight; font.hintingPreference: Font.PreferFullHinting; Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) } text:fontManager.licenseText; readOnly:true; selectByMouse:true; textFormat:TextEdit.PlainText; wrapMode:TextEdit.Wrap; color:Theme.text; font.family:Theme.fontFamily; font.pixelSize:Theme.fontSize(12); background:Item {} } }
     }
 }

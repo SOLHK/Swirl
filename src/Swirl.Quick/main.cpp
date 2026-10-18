@@ -145,7 +145,8 @@ int main(int argc, char *argv[])
     const bool appearanceTest=app.arguments().contains("--appearance-test")||app.arguments().contains("--appearance-restore-test");
     const bool uiQualityTest=app.arguments().contains("--ui-quality-test");
     const bool fontUiTest=app.arguments().contains("--font-ui-test");
-    bool previewMode=uiQualityTest||fontUiTest;
+    const bool fontReview=app.arguments().contains("--font-review");
+    bool previewMode=uiQualityTest||fontUiTest||fontReview;
     for(const QString &argument:app.arguments())
         if(argument.startsWith(QStringLiteral("--material-test-output="))||argument.startsWith(QStringLiteral("--viewport-test-output="))||argument.startsWith(QStringLiteral("--motion-demo-output="))||argument.startsWith(QStringLiteral("--motion-visual-dir="))||argument.startsWith(QStringLiteral("--capture-preview="))||argument.startsWith(QStringLiteral("--capture-native-frame=")))previewMode=true;
     const bool hdrTest=app.arguments().contains("--hdr-self-test");
@@ -180,15 +181,24 @@ int main(int argc, char *argv[])
         if(!app.arguments().contains("--preview-preserve-settings"))isolatedSettings.clear();
         isolatedSettings.sync();
     }
+#ifdef SWIRL_UI_TESTS
+    if(fontUiTest)app.setProperty("fontBeforeManagerBytes",fontUiPrivateBytes());
+#endif
     QTemporaryDir previewFonts;
-    FontManager fontManager(nullptr,previewMode?previewFonts.path():QString());
+    FontManager fontManager(nullptr,previewMode&&!fontReview?previewFonts.path():QString());
+#ifdef SWIRL_UI_TESTS
+    if(fontUiTest)app.setProperty("fontAfterManagerBytes",fontUiPrivateBytes());
+#endif
     if(previewMode)for(const auto &argument:app.arguments()){
         if(argument.startsWith("--preview-font-file=")){
-            if(!fontManager.importFont(QUrl::fromLocalFile(argument.mid(20)))||!fontManager.applyPreview())return 3;
+            if(!fontManager.importFont(QUrl::fromLocalFile(argument.mid(20)))||(!fontReview&&!fontManager.applyPreview()))return 3;
         }else if(argument.startsWith("--preview-font-family=")){
             if(!fontManager.selectFamily(argument.mid(22)))return 3;
         }
     }
+#ifdef SWIRL_UI_TESTS
+    if(fontUiTest)app.setProperty("fontAfterImportBytes",fontUiPrivateBytes());
+#endif
     WindowsBackdrop backdrop;
     WindowsBackdrop panelBackdrop;
     HdrOutput hdrOutput;

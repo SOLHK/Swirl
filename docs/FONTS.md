@@ -28,9 +28,15 @@ HarmonyOS Sans Fonts License Agreement 允许将未修改的字体随非字体�
 
 完整官方文本保存在 `src/Swirl.Quick/assets/fonts/LICENSE_HarmonyOS_Sans.txt` 和 `src/Swirl.Quick/packaging/licenses/HarmonyOS-Sans.txt`，嵌入应用，并可从字体设置查看。“关于 Swirl”同样显示字体使用声明。
 
-## PingFang UI 可变字体
+## 可变字体与 TTC 家族
 
-用户提供的 Tahoe TTC 包含 wght（字重）与 wdth（字宽）轴，但没有 TrueType hinting 指令。设置 FullHinting 不能给字体补出缺失的指令。Windows 下统一使用其基本地区字族，合并中文别名与 Thin/Light 等命名实例，避免把固定字重实例当作完整 UI 字族。正文通过真实 wght=500、wdth=100 绘制；显式标题字重仍分别使用 500/600/700。其他字体不应用这些轴。文字继续使用原生渲染，未转换或修改字体文件。
+管理器通过 Qt 的 OpenType 轴元数据动态生成滑块、数值输入、范围、当前值和默认重置，不依赖固定的字体名称或三个轴列表。每个已导入 TTC 家族可独立选择；静态 TTF/OTF 字体显示无可变轴。应用中的预览和实际 UI 均通过 `font.variableAxes` / `QFont::setVariableAxis` 传递坐标，不生成静态字体，不使用缩放或变换模拟自定义轴。
+
+本机用户字体的五面 SC/TC/HK/MO/JA 实测均包含 wght（100–900，默认500）、wdth（80–120，默认100）和 HGHT（1–1000，默认500）。隐藏标志不会隐藏管理器内的轴控件。字体没有 TrueType hinting 指令，FullHinting 不能补造缺失指令。其他字体使用各自真实范围和默认值。
+
+“应用到整个界面”使用所选坐标；标题、正文和各控件原有字号层级保持不变。选择字体、拖动和数值编辑只更新预览，应用后更新当前家族的 QML 绑定。拖动不重建页面、不重新加载文件；只缓存有限的家族元数据，未缓存每个拖动坐标。相同文件按 SHA-256 去重。确认配置与预览草稿分别保存，启动时重新校验可用家族、轴和范围。
+
+用户自备字体不随应用或 CI 分发。不要把字体、字体实验副本或本机截图上传到公开仓库。相关二进制默认被 Git 忽略；已合法随项目提供的 HarmonyOS 文件不受忽略规则影响。
 
 ## Windows 字形栅格器
 
@@ -38,6 +44,10 @@ HarmonyOS Sans Fonts License Agreement 允许将未修改的字体随非字体�
 
 同一 Qt 6.10.3 / 150% DPI 场景的对照中，DirectWrite 原生字形有彩色毛边；仅设置 QFont 的 NoSubpixelAntialias 未能消除 Qt Quick 最终绘制的彩边。FreeType 的灰度字形改善了这一问题。2026-10-15 从 OpenHarmony 上游重新下载的 Regular 与内置文件 SHA-256 一致，因此没有替换、加粗或重写字体文件。Qt 官方平台参数说明：https://doc.qt.io/qt-6/qguiapplication.html#QGuiApplication 。
 
-显式 `QT_QPA_PLATFORM=windows:fontengine=directwrite` 或 `-platform windows:fontengine=directwrite` 可用于开发对照；offscreen 等测试平台不会被覆盖。发布验收须在未设置这些覆盖参数时检查实际页面、输入框、切换字体与不同 DPI，不能用“成功启动”代替清晰度检查。
+显式 `QT_QPA_PLATFORM=windows:fontengine=native` 或 `-platform windows:fontengine=native` 可用于开发对照；offscreen 等测试平台不会被覆盖。发布验收须在未设置这些覆盖参数时检查实际页面、输入框、切换字体与不同 DPI，不能用“成功启动”代替清晰度检查。
 
-正文统一使用 Medium（500）：鸿蒙使用随包提供的真实 Medium 文件，苹方使用 wght=500 的可变轮廓。标题保留 600/700 层级，字体二进制不做人工描粗。
+默认静态 HarmonyOS 的既有字重规则不变。对于用户确认的可变字体，各级文字使用确认的轴坐标，同时保留字号层级。没有描边、阴影、人工加粗或字体字节修改。
+
+2026-10-18 的本机对照保留了 FreeType 与原生 DirectWrite 两套未后处理的测试窗口图。灰度/彩色边缘计数只能说明栅格差异，不能代替在具体面板上的人眼评价，也不能保证所有应用与 macOS 相同。当前激活模式为2560×1600、150%、120Hz；Windows另列同分辨率240Hz。尚未改变系统模式，240Hz物理验收及跨屏DPI迁移需单独完成。详见 `VARIABLE_FONT_STAGE_20261018.md`。
+
+独立验收可使用 `--font-review --preview-preserve-settings --preview-page=fonts`，并设置已有的 `SWIRL_TEST_ROOT`。该模式使用独立字体目录和设置；导入不自动确认，不替换原运行应用。可在其中持续拖动、确认配置和重启验证。

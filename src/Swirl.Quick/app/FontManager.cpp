@@ -201,7 +201,8 @@ bool FontManager::setPreviewAxis(const QString &tag,double value)
         if(value<axis.value("minimum").toDouble()||value>axis.value("maximum").toDouble())
             return fail(tr("Axis value is outside the font's range."));
         if(m_previewValues.value(tag).toDouble()==value)return true;
-        m_previewValues.insert(tag,value);m_error.clear();emit errorChanged();
+        m_previewValues.insert(tag,value);
+        if(!m_error.isEmpty()){m_error.clear();emit errorChanged();}
         emit previewValuesChanged();m_saveTimer.start();return true;
     }
     return fail(tr("This font does not contain the requested axis."));
