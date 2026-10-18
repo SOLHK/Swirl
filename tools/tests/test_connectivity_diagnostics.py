@@ -399,9 +399,50 @@ print(json.dumps(report), flush=True)
                 "worker_start_ms", "queue_wait_ms")
             if type(raw.get(key)) is int
         }), flush=True)
-        report = DIAG.safe_report(raw, "python-socket")
-        self.assertEqual(report["error_code"], "UpstreamDnsTimeout")
-        self.assertEqual(report["attempted_count"], 0)
+        self.assertEqual(raw["error_code"], "UpstreamDnsTimeout")
+        self.assertEqual(raw["failure_stage"], "dns")
+        self.assertIs(raw["ok"], False)
+        self.assertEqual(raw["attempted_count"], 0)
+        self.assertEqual(raw["tcp_elapsed_ms"], 0)
+        self.assertEqual(raw["attempts"], [])
+        self.assertEqual(raw["total_elapsed_ms"], raw["dns_elapsed_ms"])
+        # This is the process-lifecycle check: the real stalled worker must not
+        # prevent exit within the unchanged parent timeout. macOS can wake a
+        # timed condition wait late (158 ms observed for a 30 ms deadline).
+        # A late measurement must be rejected, never clipped or called valid.
+        if raw["dns_elapsed_ms"] > raw["dns_budget_ms"] + DIAG.TIMING_SLACK_MS:
+            with self.assertRaisesRegex(ValueError, "^DiagnosticOutputInvalid$"):
+                DIAG.safe_report(raw, "python-socket")
+        else:
+            report = DIAG.safe_report(raw, "python-socket")
+            self.assertEqual(report["error_code"], "UpstreamDnsTimeout")
+
+    def test_late_dns_wait_never_dials_or_becomes_valid_budget_evidence(self):
+        # The deadline/validation contract is deterministic even when the OS
+        # scheduler suspends a thread beyond its requested wait. Exercise both
+        # an empty queue and a DNS result delivered after the absolute deadline.
+        for answer_arrives in (False, True):
+            clock = [0.0]
+            def delayed_get(*args, **kwargs):
+                clock[0] = 0.158
+                if not answer_arrives:
+                    raise DIAG.queue.Empty()
+                return True, [row(socket.AF_INET, ("127.0.0.1", 443))]
+            with self.subTest(answer_arrives=answer_arrives), \
+                    patch.object(DIAG.time, "monotonic", side_effect=lambda: clock[0]), \
+                    patch.object(DIAG.queue.Queue, "get", side_effect=delayed_get), \
+                    patch.object(DIAG.threading, "Thread"), \
+                    patch.object(DIAG.socket, "socket") as connect:
+                report = DIAG.diagnose_python({"host": "fixture.invalid", "port": 443,
+                                              "total_budget_ms": 100, "dns_budget_ms": 30})
+            connect.assert_not_called()
+            self.assertEqual(report["error_code"], "UpstreamDnsTimeout")
+            self.assertEqual(report["dns_elapsed_ms"], 158)
+            self.assertEqual(report["total_elapsed_ms"], 158)
+            self.assertEqual(report["attempted_count"], 0)
+            self.assertEqual(report["attempts"], [])
+            with self.assertRaisesRegex(ValueError, "^DiagnosticOutputInvalid$"):
+                DIAG.safe_report(report, "python-socket")
 
     def test_report_validator_rejects_inconsistent_budgets_and_trace(self):
         changes = [

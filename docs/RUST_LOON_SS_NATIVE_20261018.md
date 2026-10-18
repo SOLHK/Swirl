@@ -50,3 +50,25 @@ The raw encrypted cache and provenance are unchanged by inspection.
 Actual provider probes, final CI conclusions, final hashes and remaining work will
 be recorded after validation. New proxy protocols and Windows TUN are not completed
 by this import and forwarding stage.
+
+## DNS lifecycle and deadline test correction
+
+The focused real stalled-worker test passed on macOS while the same test after
+full-suite execution measured DNS=158ms (budget=30ms), with no TCP. The existing
+validator correctly rejected this sample. Additional instrumentation separates
+thread startup from condition-wait duration; observed isolated runs had 0ms thread
+startup and variable wait duration. The exact scheduler source is not established.
+
+The process-lifecycle regression now always asserts DNS timeout, no TCP/no attempts,
+unchanged raw elapsed measurements and exit inside the original three-second parent
+timeout. When the real OS observation exceeds the original validation envelope,
+it must produce DiagnosticOutputInvalid, rather than falsely claiming a compliant
+measurement. A deterministic additional test exercises both a stalled queue and
+a successful DNS answer delivered at 158ms: neither may dial; both must retain
+158ms and fail the unchanged validator. This corrects the test's assumption that
+an OS wakeup always falls inside a 100ms scheduling allowance. No product timeout,
+TIMING_SLACK_MS, DNS implementation or validation condition is changed.
+
+References reviewed: CPython's [condition wait implementation](https://github.com/python/cpython/blob/3.14/Python/parking_lot.c)
+and [queue deadline loop](https://github.com/python/cpython/blob/3.14/Lib/queue.py).
+Local diagnostic suite: 21 passed. Final three-platform results remain pending.
