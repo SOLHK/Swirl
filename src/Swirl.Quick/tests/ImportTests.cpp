@@ -8,6 +8,7 @@
 #include "app/StoragePaths.h"
 #include <QTemporaryDir>
 #include <QJsonDocument>
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QSignalSpy>
 #include <QNetworkProxy>
@@ -59,6 +60,30 @@ private slots:
         for(const auto &body:{QByteArray("[Proxy]\nA = socks5, 127.0.0.1, 1080\nBypass = direct\n"),QByteArray(R"({"outbounds":[{"type":"socks","tag":"A","server":"127.0.0.1","server_port":1080},{"type":"direct","tag":"bypass"}]})")}){
             const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));QVERIFY(!parsed.configuration.isEmpty());
         }
+    }
+    void iniTransportAliasesCannotDowngradeSecurity() {
+        for(const auto &protocol:{"vless","trojan"}) {
+            const QByteArray prefix=QByteArray("[Proxy]\nfixture = ")+protocol+",example.org,443,"+(QByteArray(protocol)=="vless"?"11111111-1111-4111-8111-111111111111":"synthetic")+",";
+            for(const auto &options:{"transport=reality", "transport=reality,tls=true", "tls=true,transport=reality", "transport=ws,ws=false", "ws=false,transport=ws", "obfs=ws,ws=false", "ws=false,obfs=ws", "transport=tcp,obfs=ws", "obfs=ws,transport=tcp", "transport=grpc,ws=true", "ws=true,transport=grpc", "transport=tls,public-key=synthetic", "public-key=synthetic,transport=tls", "transport="})
+                for(const auto &body:{prefix+options,(prefix+options).toBase64()})QVERIFY2(!NodeImporter::parse(body),options);
+            const QByteArray key="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+            const auto reality=NodeImporter::parse(prefix+"transport=reality,public-key="+key);QVERIFY(reality);QVERIFY(reality.nodes.first().parameters.contains("reality-opts"));
+            for(const auto &options:{"transport=ws,ws=true", "ws=true,transport=ws", "obfs=wss,transport=ws", "transport=ws,obfs=wss"}){const auto parsed=NodeImporter::parse(prefix+options);QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.first().parameters.value("network"),QJsonValue("ws"));}
+        }
+    }
+    void iniCompleteProfileHasClosedExecutionSemantics() {
+        const QByteArray original="[Proxy]\nA = socks5,127.0.0.1,1080\nDIRECT = direct\nREJECT = reject\n[Proxy Group]\nroute = select,A,DIRECT\nnested = select,route,REJECT\n[Rule]\nDOMAIN,exact.invalid,REJECT\nDOMAIN-SUFFIX,suffix.invalid,route\nDOMAIN-KEYWORD,keyword,nested\nFINAL,route\n";
+        for(const auto &body:{original,original.toBase64()}) {
+            const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);QCOMPARE(parsed.configurationFormat,QString("ini"));QCOMPARE(parsed.configuration["document"],QJsonValue(QString::fromUtf8(original).trimmed()));
+            QCOMPARE(parsed.executionConfiguration["proxy-groups"].toArray().size(),2);const auto rules=parsed.executionConfiguration["rules"].toArray();QCOMPARE(rules.size(),4);QCOMPARE(rules.last(),QJsonValue("MATCH,route"));
+            QTemporaryDir directory;NodeStore store(directory.filePath("nodes.dpapi"));NodeImportService importer(&store);importer.importText(QString::fromUtf8(body));QTRY_VERIFY_WITH_TIMEOUT(!importer.busy(),4000);QVERIFY(store.nodes().isEmpty());
+        }
+        QList<QByteArray> rejected;
+        for(const auto &tail:{"[General]\ndns-server=192.0.2.53\n", "[Remote Rule]\nhttps://fixture.invalid/rules,policy=route\n", "[Future]\nopaque=value\n", "DOMAIN,late.invalid,route\n"})rejected.append(original+tail);
+        for(const auto &replacement:{"route = url-test,A,DIRECT", "route = select,A,A", "route = select,A,policy-path=remote", "route = select", "route = select,A\nroute = select,DIRECT"}) {auto body=original;body.replace("route = select,A,DIRECT",replacement);rejected.append(body);}
+        for(const auto &replacement:{"IP-CIDR,192.0.2.0/24,route", "PROCESS-NAME,fixture.exe,route", "DOMAIN,exact.invalid,route,no-resolve"}) {auto body=original;body.replace("DOMAIN,exact.invalid,REJECT",replacement);rejected.append(body);}
+        {auto body=original;body.replace("DIRECT = direct\n","DIRECT = direct\nDIRECT = direct\n");rejected.append(body);body=original;body.replace("DIRECT = direct","Bypass = direct");rejected.append(body);body=original;body.replace("FINAL,route\n","");rejected.append(body);}
+        for(const auto &body:rejected)for(const auto &wrapped:{body,body.toBase64()}){const auto parsed=NodeImporter::parse(wrapped);QVERIFY2(parsed,qPrintable(parsed.error));QVERIFY(!parsed.configuration.isEmpty());QVERIFY2(parsed.executionConfiguration.isEmpty(),"Unknown profile semantics became executable");}
     }
     void iniEnvelopeAndWrappedJsonFailClosed() {
         const QByteArray node="A = socks5, 127.0.0.1, 1080\n";

@@ -15,6 +15,7 @@ public:
         QList<QStringList> issues;
         QString format,error,configurationFormat;
         QJsonObject configuration; // Unapplied source semantics; never silently discard them.
+        QJsonObject executionConfiguration; // Validated complete-profile subset; original stays separate.
         QByteArray decodedDocument;
     };
     static Result normalize(const QByteArray &document,int depth=0);

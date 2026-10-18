@@ -44,8 +44,8 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
     : QObject(parent), m_engine(std::move(engine)), m_store(storePath),m_imports(&m_store,this),m_telemetry(storePath.isEmpty()?QString():storePath+".telemetry",storePath.isEmpty()||realAcceptance) {
     m_options.autoControlPort=true;
     m_imports.setConfigurationApplier([this](const NodeImporter::Result &result,const QString &sourceId,QString *error) {
-        const auto &configuration=result.configuration;
-        if(configuration.isEmpty()) {
+        const auto &configuration=result.configurationFormat=="ini"?result.executionConfiguration:result.configuration;
+        if(result.configuration.isEmpty()) {
             NodeStore::ImportPlan plan;
             if(!m_store.prepareImport(result.nodes,sourceId,&plan)){*error=m_store.error();return false;}
 #ifdef SWIRL_USE_RUST_CORE
@@ -58,7 +58,7 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
 #ifndef SWIRL_USE_RUST_CORE
         *error=QStringLiteral("完整订阅事务当前仅在 Rust 模式提供；旧配置保持不变。");return false;
 #else
-        if(result.configurationFormat!="clash") {
+        if(result.configurationFormat!="clash"&&(result.configurationFormat!="ini"||configuration.isEmpty())) {
             *error=QStringLiteral("此格式的完整配置尚未映射；未应用节点或全局配置，原有设置保持不变。");return false;
         }
         // First executable document profile: self-contained Clash groups/rules.
@@ -82,7 +82,7 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
         }
         const QVariantMap mapped{{"groups",configuration.value("proxy-groups").toVariant()},{"rules",configuration.value("rules").toVariant()}};
         auto input=mapped;if(!configuration.contains("proxy-groups"))input.remove("groups");if(!configuration.contains("rules"))input.remove("rules");
-        if(!importNodesAndConfiguration(result.nodes,sourceId,input,configuration)){*error=m_networkError;return false;}
+        if(!importNodesAndConfiguration(result.nodes,sourceId,input,result.configuration,result.configurationFormat)){*error=m_networkError;return false;}
         return true;
 #endif
     });
@@ -426,9 +426,9 @@ bool EngineController::saveNetworkConfiguration() {
     }
     emit optionsChanged();emit statusChanged();return true;
 }
-bool EngineController::importNodesAndConfiguration(const QList<ProxyNode> &incoming,const QString &sourceId,const QVariantMap &input,const QJsonObject &original) {
+bool EngineController::importNodesAndConfiguration(const QList<ProxyNode> &incoming,const QString &sourceId,const QVariantMap &input,const QJsonObject &original,const QString &sourceFormat) {
 #ifndef SWIRL_USE_RUST_CORE
-    Q_UNUSED(incoming);Q_UNUSED(sourceId);Q_UNUSED(input);Q_UNUSED(original);
+    Q_UNUSED(incoming);Q_UNUSED(sourceId);Q_UNUSED(input);Q_UNUSED(original);Q_UNUSED(sourceFormat);
     m_networkError=QStringLiteral("完整订阅事务当前仅在 Rust 模式提供。");return false;
 #else
     // Only this owner may apply while its importer is busy. Existing active
@@ -442,6 +442,16 @@ bool EngineController::importNodesAndConfiguration(const QList<ProxyNode> &incom
     // A subscription profile without DNS instructions must not erase the
     // user's secure resolver/hosts configuration and fall back to the system.
     if(!mapped.contains("dns"))mapped["dns"]=m_options.dnsConfig;
+    // Refreshing the same provider retains a valid manual choice. A different
+    // provider (or an unowned pasted document) cannot inherit another profile's
+    // selection merely by using the same group name.
+    QHash<QString,QString> previousChoices;
+    const auto previousOwner=m_store.networkConfiguration().value("importedConfiguration").toObject().value("sourceId").toString();
+    if(!sourceId.isEmpty() && previousOwner==sourceId)for(const auto &entry:m_options.customGroups) {
+        const auto group=entry.toMap();const auto members=group.value("proxies").toStringList();
+        if(group.value("type").toString()=="select" && !members.isEmpty())
+            previousChoices.insert(group.value("name").toString(),group.value("default-selected",members.first()).toString());
+    }
     QVariantList groups;const auto names=plan.nameToId();
     QSet<QString> groupNames;for(const auto &entry:input.value("groups").toList())groupNames.insert(entry.toMap().value("name").toString());
     for(const auto &reserved:QStringList{"DIRECT","REJECT","SWIRL","GLOBAL"})if(names.contains(reserved)) {
@@ -467,6 +477,9 @@ bool EngineController::importNodesAndConfiguration(const QList<ProxyNode> &incom
             const auto name=group.value("default-selected").toString();
             if(!raw.toArray().contains(QJsonValue(name))){m_networkError=QStringLiteral("默认策略必须使用文档中声明的成员名称。");return false;}
             group["default-selected"]=names.value(name,name);
+        }else if(group.value("type").toString()=="select") {
+            const auto previous=previousChoices.value(group.value("name").toString());
+            if(!previous.isEmpty() && members.contains(previous) && previous!=members.first())group["default-selected"]=previous;
         }
         groups.append(group);
     }
@@ -492,7 +505,7 @@ bool EngineController::importNodesAndConfiguration(const QList<ProxyNode> &incom
     if(!original.isEmpty()){m_nativeDocumentRouting=true;m_options.smartRouting=false;}
     m_options.dnsConfig=canonical.value("dns").toMap();m_options.customRules=canonical.value("rules").toStringList();m_options.customGroups=canonical.value("groups").toList();
     auto snapshot=serializedNetworkConfiguration();
-    if(!snapshot.isEmpty() && !original.isEmpty())snapshot.insert("importedConfiguration",QJsonObject{{"format","clash"},{"sourceId",sourceId},{"configuration",original}});
+    if(!snapshot.isEmpty() && !original.isEmpty())snapshot.insert("importedConfiguration",QJsonObject{{"format",sourceFormat},{"sourceId",sourceId},{"configuration",original}});
     if(snapshot.isEmpty() || !m_store.commitImport(plan,snapshot)) {
         if(!snapshot.isEmpty())m_networkError=m_store.error();
         m_nativeDocumentRouting=previousNative;m_options.smartRouting=previousSmart;

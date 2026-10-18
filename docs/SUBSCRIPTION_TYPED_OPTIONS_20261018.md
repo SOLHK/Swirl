@@ -1,3 +1,5 @@
+Exact implementation `5f1fd1347ba4f82854e3f773f90e093c3074ce40` verified: Rust CI39114652890 (Windows/Linux/macOS) and implementation39114652905 all successful. See `evidence/SUBSCRIPTION_TYPED_OPTIONS_20261018_VERIFIED.json`. The later INI REALITY/transport alias finding is handled separately in the INI profile stage; these CI results do not prove all dialect semantics equivalent.
+
 # Subscription typed options and credential preservation, 2026-10-18
 
 This stage fixes concrete disagreements between Qt import, native inspection and execution. It does not make every format, protocol or complete configuration executable.

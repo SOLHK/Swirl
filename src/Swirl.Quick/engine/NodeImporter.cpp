@@ -94,6 +94,7 @@ NodeImporter::Result NodeImporter::parse(const QByteArray &bytes) {
     const auto normalized=SubscriptionNormalizer::normalize(bytes);
     result.format=normalized.format;
     result.configuration=normalized.configuration;
+    result.executionConfiguration=normalized.executionConfiguration;
     result.configurationFormat=normalized.configurationFormat;
     if(!normalized.error.isEmpty()){result.error=normalized.error;return result;}
     const auto effective=normalized.decodedDocument.isEmpty()?bytes:normalized.decodedDocument;

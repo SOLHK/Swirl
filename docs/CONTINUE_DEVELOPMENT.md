@@ -1,3 +1,15 @@
+# Latest checkpoint: INI executable subset and transport safety (2026-10-18)
+
+This checkpoint supersedes older next-task/status paragraphs below. Base `5f1fd1347ba4f82854e3f773f90e093c3074ce40` is verified with successful three-platform Rust CI39114652890 and implementation39114652905. The new INI product profile/atomic refresh/transport safety patch is locally validated; read `INI_PROFILE_TRANSACTION_20261018.md` and its evidence. Current patch's exact commit and CI are still pending commit/push and must not borrow the base CI result.
+
+Native Qt 43 passed/0 failed/5 external-peer hooks; native+compatibility import boundary suites passed; independent WS/WSS11 and SS/Loon9 passed; full Windows application built. Existing overall weighted acceptance10.83%, old complete-profile0/18 and new REALITY59/59 unsupported remain unchanged. No real-node or supplier request in this stage.
+
+New unlimited source: one successful encrypted capture, HTTP200,59 VLESS/TCP/REALITY (55 Vision). Immediate next work is REALITY TLS integration and independent interoperability; R0/R1 isolated foundations are not a working node protocol. Old08:25 window closed with0 requests/0 new responses. Never refresh expired sources.
+
+D-drive sole source checkout: D:/Codex/work/Swirl. Branch work/core-completion-20261017. Font task is queued after subscription work in D:/Codex/outputs/QUEUED_FONT_TASK.md; no font or system/UI modification performed. D:/Codex/outputs/INI_PROFILE_REVIEW_20261018.md is the static review; final test evidence is separate.
+
+---
+
 # Latest checkpoint: typed subscription options and new test source (2026-10-18)
 
 Current completed DNS baseline: `f81eab6e2eaf5a2d9f1f538a4ce04cde268797c0`; Rust CI39113224090 and implementation39113224086 all successful. The next subscription patch is locally validated and being committed; see [typed-options stage](SUBSCRIPTION_TYPED_OPTIONS_20261018.md) for exact source/log hashes and remaining scope. Do not apply old CI to new code.

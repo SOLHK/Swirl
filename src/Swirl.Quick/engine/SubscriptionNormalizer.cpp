@@ -210,6 +210,47 @@ void singBox(Result &r,const QJsonArray &array){
     }
     if(r.nodes.isEmpty())r.error="sing-box 配置没有可导入的远端代理节点。";
 }
+// A deliberately closed, complete INI profile: manual groups and domain rules.
+// Source text is retained independently. Any additional section/option keeps
+// the profile unexecutable rather than silently inheriting different semantics.
+QJsonObject iniProfile(const QString &document,const QJsonArray &nodes){
+    QString section;QJsonArray groups,rules;QSet<QString> proxyNames,nodeNames,groupNames,declaredProxyNames;bool final=false,hasRules=false;
+    auto nameValid=[](const QString &name){return !name.isEmpty()&&!name.contains(',')&&!name.contains('=')&&!name.contains('\n');};
+    for(const auto &value:nodes){const auto name=value.toObject().value("name").toString();if(!nameValid(name)||nodeNames.contains(name))return {};nodeNames.insert(name);}
+    for(const auto &raw:document.split('\n')){
+        const auto line=raw.trimmed();if(line.isEmpty()||line.startsWith('#')||line.startsWith(';')||line.startsWith("//"))continue;
+        if(line.startsWith('[')){
+            const auto close=line.indexOf(']');if(close<0)return {};section=line.mid(1,close-1).trimmed().toLower();
+            if(section!="proxy"&&section!="proxy group"&&section!="rule")return {};
+            if(section=="rule")hasRules=true;continue;
+        }
+        if(section=="proxy"||section=="proxy group"){
+            const auto equal=line.indexOf('=');if(equal<1)return {};const auto name=clean(line.left(equal));if(!nameValid(name))return {};
+            bool ok=false;const auto fields=csv(line.mid(equal+1),&ok);if(!ok||fields.isEmpty())return {};const auto kind=clean(fields.first()).toLower();
+            if(section=="proxy"){
+                if(declaredProxyNames.contains(name))return {};declaredProxyNames.insert(name);
+                if(kind=="direct"||kind=="reject"){
+                    if(fields.size()!=1||name!=(kind=="direct"?"DIRECT":"REJECT"))return {};
+                }else {if(proxyNames.contains(name))return {};proxyNames.insert(name);}
+            }else {
+                if(kind!="select"||fields.size()<2||groupNames.contains(name))return {};groupNames.insert(name);QJsonArray members;QSet<QString> seen;
+                for(auto it=fields.cbegin()+1;it!=fields.cend();++it){const auto member=clean(*it);if(!nameValid(member)||seen.contains(member))return {};seen.insert(member);members.append(member);}
+                groups.append(QJsonObject{{"name",name},{"type","select"},{"proxies",members}});
+            }
+        }else if(section=="rule"){
+            if(final)return {};bool ok=false;auto fields=csv(line,&ok);if(!ok||fields.isEmpty())return {};for(auto &field:fields)field=clean(field);
+            const auto kind=fields.first().toUpper();
+            if(kind=="FINAL"){
+                if(fields.size()!=2||!nameValid(fields[1]))return {};rules.append("MATCH,"+fields[1]);final=true;
+            }else {
+                if(!QStringList{"DOMAIN","DOMAIN-SUFFIX","DOMAIN-KEYWORD"}.contains(kind)||fields.size()!=3||fields[1].isEmpty()||fields[1].contains(',')||!nameValid(fields[2]))return {};
+                rules.append(kind+","+fields[1]+","+fields[2]);
+            }
+        }else return {};
+    }
+    if(!hasRules||!final||proxyNames!=nodeNames)return {};
+    return {{"proxy-groups",groups},{"rules",rules}};
+}
 void ini(Result &r,const QString &document){
     r.handled=true;r.format="Surge / Surfboard / Loon";r.configurationFormat="ini";QString section;
     QSet<QString> sections;
@@ -236,10 +277,18 @@ void ini(Result &r,const QString &document){
         if(left.isEmpty()){r.error="INI 节点名称或协议为空；未应用配置。";return;}
         const bool loonObfs=!qx&&clean(fields.first()).compare("shadowsocks",Qt::CaseInsensitive)==0&&fields.size()>=7
             &&std::all_of(fields.cbegin()+3,fields.cbegin()+7,[](const QString &f){return assignment(f)<0;});
-        QJsonObject n;QStringList issues;QString host,network,path,wsHost;int port=0;
+        QJsonObject n;QStringList issues;QString host,network,path,wsHost,security;bool networkSet=false;int port=0;
         if(qx){r.format="Quantumult X";if(!endpoint(clean(fields.takeFirst()),host,port)){r.error="Quantumult X 节点地址无效。";return;}n["type"]=protocol(left);if(left.compare("https",Qt::CaseInsensitive)==0||left.compare("socks5-tls",Qt::CaseInsensitive)==0)n["tls"]=true;}
         else {n["name"]=left;const auto type=clean(fields.takeFirst());n["type"]=protocol(type);if(type.compare("https",Qt::CaseInsensitive)==0||type.compare("socks5-tls",Qt::CaseInsensitive)==0)n["tls"]=true;if(QStringList{"direct","reject","reject-tinygif"}.contains(n.value("type").toString())){preserve();continue;}if(fields.size()<2){r.error="INI 节点缺少服务器或端口。";return;}host=clean(fields.takeFirst());port=clean(fields.takeFirst()).toInt();}
         n["server"]=host;n["port"]=port;const auto p=n.value("type").toString();
+        auto setNetwork=[&](const QString &value){
+            if(value.isEmpty() || (networkSet && network!=value)){r.error="INI 传输参数冲突或为空；未应用配置。";return false;}
+            network=value;networkSet=true;return true;
+        };
+        auto setSecurity=[&](const QString &value){
+            if(!security.isEmpty() && security!=value){r.error="INI 安全传输参数冲突；未应用配置。";return false;}
+            security=value;return true;
+        };
         auto setTls=[&](bool enabled){
             if(n.contains("tls")&&n.value("tls")!=QJsonValue(enabled)){r.error="INI TLS 参数冲突；未应用配置。";return false;}
             n["tls"]=enabled;return true;
@@ -293,25 +342,31 @@ void ini(Result &r,const QString &document){
             else if(key=="tfo"||key=="fast-open")n["tfo"]=enabled;
             else if(key=="flow")n["flow"]=value;
             else if(key=="transport"){
-                if(value=="tls"||value=="reality"){if(!setTls(true))return;}
-                else network=value;
+                if(value=="tls"||value=="reality"){
+                    if(!setSecurity(value)||!setTls(true))return;
+                    if(value=="reality"&&!n.contains("reality-opts"))n["reality-opts"]=QJsonObject();
+                }else if(value=="wss"){if(!setNetwork("ws")||!setTls(true))return;}
+                else if(!setNetwork(value))return;
             }
-            else if(key=="public-key"||key=="short-id"){auto reality=n.value("reality-opts").toObject();reality[key]=value;n["reality-opts"]=reality;if(!setTls(true))return;}
+            else if(key=="public-key"||key=="short-id"){if(!setSecurity("reality"))return;auto reality=n.value("reality-opts").toObject();reality[key]=value;n["reality-opts"]=reality;if(!setTls(true))return;}
             else if(key=="client-fingerprint")n[key]=value;
             else if(key=="underlying-proxy")n["dialer-proxy"]=value;
-            else if(key=="ws")network=enabled?"ws":QString();
+            else if(key=="ws"){if(!setNetwork(enabled?"ws":"tcp"))return;}
             else if(key=="obfs-uri"&&p=="ss"){auto opts=n.value("plugin-opts").toObject();opts[key]=value;n["plugin-opts"]=opts;issue(issues,"INI Shadowsocks 混淆路径尚未支持，原始配置已保留。");}
             else if(key=="ws-path"||key=="obfs-uri")path=value;
             else if(key=="ws-headers"){
                 const auto header=value.section(':',0,0);if(header.compare("Host",Qt::CaseInsensitive)==0)wsHost=value.section(':',1);else issue(issues,"INI WebSocket 头部映射尚未完成。");
             }else if(key=="obfs"||(key=="obfs-name"&&p=="ss")){
                 if(p=="ss"){n["plugin"]="obfs";auto opts=n.value("plugin-opts").toObject();opts["mode"]=value;n["plugin-opts"]=opts;}
-                else if(value=="ws"||value=="wss"){network="ws";if(value=="wss"&&!setTls(true))return;}else issue(issues,"INI 节点的伪装传输尚未映射。");
+                else if(value=="ws"||value=="wss"){if(!setNetwork("ws"))return;if(value=="wss"&&!setTls(true))return;}else issue(issues,"INI 节点的伪装传输尚未映射。");
             }else if(key=="obfs-host"){
                 if(p=="ss"){auto opts=n.value("plugin-opts").toObject();opts["host"]=value;n["plugin-opts"]=opts;}else wsHost=value;
             }else if(key=="alterid")n["alterId"]=value.toInt();
             else if(key=="aead"){if(!enabled)issue(issues,"旧 VMess 非 AEAD 行为需要原生 Clash 配置。");}
             else if(key!="group")issue(issues,"INI 节点包含未映射选项，原始配置已保留。");
+        }
+        if(security=="reality"&&n.value("reality-opts").toObject().value("public-key").toString().isEmpty()) {
+            r.error="INI REALITY 缺少公钥；未降级为普通 TLS。";return;
         }
         if(p=="trojan"){
             if(n.contains("tls")&&!n.value("tls").toBool())issue(issues,"未加密的 Trojan 传输尚未支持。");
@@ -320,6 +375,7 @@ void ini(Result &r,const QString &document){
         transport(n,network,path,wsHost,issues);append(r,n,QJsonObject{{"line",line}},issues);if(!r.error.isEmpty())return;
     }
     if(r.nodes.isEmpty())r.error="此 INI 配置不包含可导入的代理节点。";
+    else if(!r.configuration.isEmpty())r.executionConfiguration=iniProfile(document,r.nodes);
 }
 }
 
