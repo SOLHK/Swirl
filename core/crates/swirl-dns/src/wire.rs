@@ -2,6 +2,7 @@
 //! engine. Connected UDP sockets validate peer; TC responses retry over TCP.
 use ring::rand::{SecureRandom, SystemRandom};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+use swirl_subscription::DnsQueryFamily;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpStream, UdpSocket},
@@ -372,6 +373,33 @@ async fn family(server: SocketAddr, host: &str, kind: u16) -> Result<Answer> {
     }
     Err("DnsAliasDepth")
 }
+/// A completed single-family lookup needs only that family's SOA proof. Never
+/// invent a response for a family that policy prohibited us from requesting.
+pub(super) fn single(answer: Answer) -> Result<Resolution> {
+    if answer.negative == Some(Negative::NameError) {
+        return Ok(Resolution {
+            outcome: Outcome::Negative(Negative::NameError),
+            ttl: if answer.negative_cacheable {
+                answer.ttl
+            } else {
+                0
+            },
+        });
+    }
+    if answer.addresses.is_empty() {
+        if !answer.negative_cacheable {
+            return Err("DnsEmpty");
+        }
+        return Ok(Resolution {
+            outcome: Outcome::Negative(Negative::NoData),
+            ttl: answer.ttl,
+        });
+    }
+    Ok(Resolution {
+        outcome: Outcome::Addresses(answer.addresses),
+        ttl: answer.ttl,
+    })
+}
 pub(super) fn combine(a: Result<Answer>, aaaa: Result<Answer>) -> Result<Resolution> {
     // Preserve a received NXDOMAIN as terminal if the other family failed,
     // but never turn that partial result into a cached denial.
@@ -425,12 +453,22 @@ pub(super) fn combine(a: Result<Answer>, aaaa: Result<Answer>) -> Result<Resolut
         ttl,
     })
 }
-pub(super) async fn resolve(servers: &[SocketAddr], host: &str) -> Result<Resolution> {
+pub(super) async fn resolve(
+    servers: &[SocketAddr],
+    host: &str,
+    query_family: DnsQueryFamily,
+) -> Result<Resolution> {
     let mut error = "DnsNoServers";
     for server in servers {
         let result = timeout(Duration::from_millis(900), async {
-            let (a, aaaa) = tokio::join!(family(*server, host, 1), family(*server, host, 28));
-            combine(a, aaaa)
+            match query_family {
+                DnsQueryFamily::Ipv4Only => single(family(*server, host, 1).await?),
+                DnsQueryFamily::Dual => {
+                    let (a, aaaa) =
+                        tokio::join!(family(*server, host, 1), family(*server, host, 28));
+                    combine(a, aaaa)
+                }
+            }
         })
         .await
         .unwrap_or(Err("DnsTimeout"));

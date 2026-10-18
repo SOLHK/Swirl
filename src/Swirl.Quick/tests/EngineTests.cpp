@@ -148,6 +148,17 @@ private slots:
 
     void initTestCase() { QStandardPaths::setTestModeEnabled(true);SwirlPaths::initializeTestStorage();QSettings::setDefaultFormat(QSettings::IniFormat);QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,SwirlPaths::writableLocation(QStandardPaths::AppConfigLocation)); }
     void cleanup() { qunsetenv("SWIRL_FIXTURE_MODE"); qunsetenv("SWIRL_FIXTURE_CONTROL"); }
+    void nativeDnsQueryPolicyCannotBeLostOrRunByCompatibilityCore() {
+        QTemporaryDir directory;const auto path=directory.filePath("nodes.dpapi");NodeStore seed(path);
+        const QJsonObject dns{{"mode",2},{"servers","127.0.0.1"},{"queryFamily","ipv4_only"},{"useHosts",false}};
+        QVERIFY(seed.saveNetworkConfiguration(QJsonObject{{"schema",1},{"dns",dns}}));
+        EngineController controller(std::make_unique<MihomoAdapter>(),nullptr,path);QCOMPARE(QJsonObject::fromVariantMap(controller.dnsConfiguration()),dns);
+        QFile file(path);QVERIFY(file.open(QIODevice::ReadOnly));const auto before=file.readAll();file.close();
+        QVERIFY(!controller.configureDns({{"mode",2},{"servers","::1"}}));QCOMPARE(QJsonObject::fromVariantMap(controller.dnsConfiguration()),dns);
+        QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),before);file.close();
+        MihomoAdapter adapter;auto config=options();config.dnsConfig=dns.toVariantMap();adapter.start(config);
+        QCOMPARE(adapter.status().error,ProxyEngine::Error::InvalidOptions);QVERIFY(!adapter.status().processAlive);
+    }
     void networkPreferencesValidateAndPersist() {
         QTemporaryDir directory;const auto store=directory.filePath("nodes.dpapi");
         EngineController controller(std::make_unique<MihomoAdapter>(),nullptr,store);

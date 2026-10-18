@@ -20,6 +20,7 @@
 #include "MihomoAdapter.h"
 #ifdef SWIRL_USE_RUST_CORE
 #include "RustCoreEngine.h"
+#include "RustDnsConfiguration.h"
 #endif
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -502,6 +503,17 @@ bool EngineController::importNodesAndConfiguration(const QList<ProxyNode> &incom
 }
 bool EngineController::configureDns(const QVariantMap &input) {
     if(!networkEditAllowed())return false;
+#ifdef SWIRL_USE_RUST_CORE
+    // The existing settings page sends its visible fields only. Preserve an
+    // imported query policy unless the caller explicitly supplies a replacement.
+    auto requested=input;
+    if(!requested.contains("queryFamily") && m_options.dnsConfig.contains("queryFamily"))
+        requested.insert("queryFamily",m_options.dnsConfig.value("queryFamily"));
+    QJsonObject validatedDns;const auto error=SwirlRustDns::configuration(requested,&validatedDns);
+    if(!error.isEmpty()){m_networkError=error;emit optionsChanged();return false;}
+#else
+    if(input.contains("queryFamily") || m_options.dnsConfig.contains("queryFamily")){m_networkError=QStringLiteral("当前兼容内核不能执行已保存的 DNS 查询策略，请使用 Rust 内核。");emit optionsChanged();return false;}
+#endif
     const auto mode=input.value("mode",0).toInt();
     if(mode<0||mode>2){m_networkError=QStringLiteral("无效 DNS 模式。");emit optionsChanged();return false;}
     QStringList servers;
@@ -532,6 +544,9 @@ bool EngineController::configureDns(const QVariantMap &input) {
     const auto before=m_options.dnsConfig;
     m_options.dnsConfig={{"mode",mode},{"servers",servers.join(',')},{"encrypted",encrypted},{"hosts",hosts},
         {"useHosts",input.value("useHosts",true).toBool()},{"respectRules",input.value("respectRules",false).toBool()}};
+#ifdef SWIRL_USE_RUST_CORE
+    if(requested.contains("queryFamily"))m_options.dnsConfig.insert("queryFamily",requested.value("queryFamily"));
+#endif
     if(saveNetworkConfiguration())return true;m_options.dnsConfig=before;emit optionsChanged();return false;
 }
 bool EngineController::saveRoutingRule(const QString &type,const QString &pattern,const QString &policy,int index) {

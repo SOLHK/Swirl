@@ -356,6 +356,27 @@ private slots:
    QCOMPARE(engine.status().error,ProxyEngine::Error::InvalidOptions);QVERIFY(!engine.status().processAlive);
   }
  }
+ void dnsQueryFamilyMapsStrictlyAndPersistsAcrossLegacyEdits(){
+  ControlledNetwork net;QVERIFY(net.start());auto o=options(net);o.routingMode="direct";
+  const QJsonObject sentinel{{"unchanged",true}};
+  for(const auto &encrypted:QStringList{"","tls://127.0.0.1","https://127.0.0.1/dns-query"}) {
+   o.dnsConfig={{"mode",encrypted.isEmpty()?2:0},{"servers",encrypted.isEmpty()?"::1":""},{"encrypted",encrypted},{"useHosts",false},{"queryFamily","ipv4_only"}};
+   QJsonObject output;QVERIFY(RustCoreEngine::configuration(o,&output).isEmpty());QCOMPARE(output["dns"].toObject()["query_family"].toString(),QString("ipv4_only"));
+   for(const auto &bad:QVariantList{false,0,QVariant{},QString("ipv6_only"),QString("IPV4_ONLY")}){
+    const auto original=o.dnsConfig;o.dnsConfig["queryFamily"]=bad;output=sentinel;QVERIFY(!RustCoreEngine::configuration(o,&output).isEmpty());QCOMPARE(output,sentinel);o.dnsConfig=original;
+   }
+  }
+  QTemporaryDir directory;const auto path=directory.filePath("nodes.dpapi");EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,path);
+  const QVariantMap initial{{"mode",2},{"servers","127.0.0.1"},{"useHosts",false},{"queryFamily","ipv4_only"}};
+  QVERIFY(controller.configureDns(initial));
+  auto edit=initial;edit.remove("queryFamily");edit["servers"]="::1";QVERIFY(controller.configureDns(edit));QCOMPARE(controller.dnsConfiguration().value("queryFamily").toString(),QString("ipv4_only"));
+  EngineController restored(std::make_unique<RustCoreEngine>(),nullptr,path);QCOMPARE(restored.dnsConfiguration(),controller.dnsConfiguration());
+  QFile file(path);QVERIFY(file.open(QIODevice::ReadOnly));const auto before=file.readAll();file.close();const auto saved=controller.dnsConfiguration();
+  for(const auto &bad:QVariantList{false,QVariant{},QString("future")}){edit["queryFamily"]=bad;QVERIFY(!controller.configureDns(edit));QCOMPARE(controller.dnsConfiguration(),saved);}
+  QVERIFY(!controller.configureDns({{"mode",0},{"useHosts",true}}));QCOMPARE(controller.dnsConfiguration(),saved);
+  QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),before);file.close();
+  QVERIFY(controller.configureDns({{"mode",0},{"useHosts",true},{"queryFamily","dual"}}));QCOMPARE(controller.dnsConfiguration().value("queryFamily").toString(),QString("dual"));
+ }
  void nativeDohMapsExistingHttpsField(){
   ControlledNetwork net;QVERIFY(net.start());auto o=options(net);o.routingMode="direct";
   o.dnsConfig={{"mode",0},{"servers",""},{"encrypted","https://DNS.fixture.invalid:8443/dns-query"},{"useHosts",false},

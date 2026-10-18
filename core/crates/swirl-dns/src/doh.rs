@@ -3,7 +3,7 @@
 //! connection per DNS exchange deliberately avoids ambiguous keep-alive reuse.
 use crate::wire::{self, Answer, MAX_PACKET, Resolution, Response};
 use std::collections::HashSet;
-use swirl_subscription::DnsTlsServer;
+use swirl_subscription::{DnsQueryFamily, DnsTlsServer};
 use swirl_transport::{BoxStream, secure};
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWriteExt},
@@ -298,10 +298,16 @@ async fn family(server: &DnsTlsServer, host: &str, kind: u16) -> Result<Answer> 
     }
     Err("DnsAliasDepth")
 }
-pub(super) async fn lookup(server: &DnsTlsServer, host: &str) -> Result<Resolution> {
+pub(super) async fn lookup(
+    server: &DnsTlsServer,
+    host: &str,
+    query_family: DnsQueryFamily,
+) -> Result<Resolution> {
     let a = family(server, host, 1).await?;
-    let aaaa = family(server, host, 28).await;
-    wire::combine(Ok(a), aaaa)
+    match query_family {
+        DnsQueryFamily::Ipv4Only => wire::single(a),
+        DnsQueryFamily::Dual => wire::combine(Ok(a), family(server, host, 28).await),
+    }
 }
 
 #[cfg(test)]

@@ -5,7 +5,7 @@
 mod doh;
 use crate::wire::{self, Answer, MAX_PACKET, Resolution, Response};
 use std::collections::HashSet;
-use swirl_subscription::DnsTlsServer;
+use swirl_subscription::{DnsQueryFamily, DnsTlsServer};
 use swirl_transport::{BoxStream, secure};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -61,9 +61,13 @@ async fn family(stream: &mut BoxStream, host: &str, kind: u16) -> Result<Answer>
     Err("DnsAliasDepth")
 }
 
-async fn lookup(server: &DnsTlsServer, host: &str) -> Result<Resolution> {
+async fn lookup(
+    server: &DnsTlsServer,
+    host: &str,
+    query_family: DnsQueryFamily,
+) -> Result<Resolution> {
     if server.https_path.is_some() {
-        return doh::lookup(server, host).await;
+        return doh::lookup(server, host, query_family).await;
     }
     let tcp = TcpStream::connect(server.address)
         .await
@@ -74,20 +78,29 @@ async fn lookup(server: &DnsTlsServer, host: &str) -> Result<Resolution> {
         _ => "DnsTlsVerificationOrHandshake",
     })?;
     let a = family(&mut stream, host, 1).await?;
-    let aaaa = family(&mut stream, host, 28).await;
-    let result = wire::combine(Ok(a), aaaa);
+    let result = match query_family {
+        DnsQueryFamily::Ipv4Only => wire::single(a),
+        DnsQueryFamily::Dual => wire::combine(Ok(a), family(&mut stream, host, 28).await),
+    };
     let _ = timeout(Duration::from_millis(100), stream.shutdown()).await;
     result
 }
 
-pub(super) async fn resolve(servers: &[DnsTlsServer], host: &str) -> Result<Resolution> {
+pub(super) async fn resolve(
+    servers: &[DnsTlsServer],
+    host: &str,
+    query_family: DnsQueryFamily,
+) -> Result<Resolution> {
     let mut error = "DnsNoServers";
     for server in servers {
         // Resolver also owns a total three-second execution budget. All TLS and
         // A/AAAA/CNAME HTTP exchanges share this endpoint deadline.
-        let result = timeout(Duration::from_millis(1400), lookup(server, host))
-            .await
-            .unwrap_or(Err("DnsTlsTimeout"));
+        let result = timeout(
+            Duration::from_millis(1400),
+            lookup(server, host, query_family),
+        )
+        .await
+        .unwrap_or(Err("DnsTlsTimeout"));
         match result {
             Ok(answer) => return Ok(answer),
             Err(e) => error = e,

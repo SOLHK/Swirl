@@ -19,6 +19,20 @@ exact local domain-to-IP mappings, or up to four custom IP DNS servers. The UI l
 configuration are unchanged. This implementation does not write system DNS,
 system hosts files, certificates, routes or proxy settings.
 
+## Explicit query family (2026-10-18)
+
+The native IR now supports `query_family: "dual" | "ipv4_only"`, with an omitted
+field retaining dual A+AAAA behavior. Only explicit custom/encrypted upstreams
+can use `ipv4_only`; the OS lookup path is rejected rather than querying both
+families and filtering results. IPv6 literal targets, exact hosts mappings,
+IPv6 DNS endpoints and proxy-side remote resolution are separate concerns.
+Single-family NXDOMAIN/NODATA uses the actual A response's SOA evidence and TTL,
+including CNAME and DoH cache hints. Configuration replacement starts a fresh
+cache. Qt `queryFamily` is preserved by old-page partial edits; an explicit full
+replacement uses its own defaults. Compatibility builds refuse native query
+policies. [Tests, boundaries and source binding](RUST_DNS_QUERY_FAMILY_20261018.md)
+remain distinct from full subscription DNS compatibility, which is not enabled.
+
 ## Executed settings
 
 - System DNS mode (`mode: 0`), with empty custom/encrypted server fields.

@@ -1,0 +1,203 @@
+{
+  "recorded_at_utc": "2026-10-18T08:53:34.619791+00:00",
+  "base_commit": "ad0db7e54ea036067bc7bd58bbfbc206135bb1b0",
+  "implementation_binding": "LF-normalized source hashes in this commit; exact implementation SHA and CI will be recorded in follow-up verification",
+  "source_sha256_lf": {
+    ".github/workflows/rust-core.yml": "baa3b9f155989f1360e82b18db58d0cf1c312ef76a3b7abf1352a54ff01eb75f",
+    "core/crates/swirl-dns/src/doh.rs": "3c16891567a27ea1d66e03e5bf4dedf04b1fff394dfa7b374900295f70f32481",
+    "core/crates/swirl-dns/src/dot.rs": "6e643f9233f7470d86997ec5a44dc95afbb98ecdf4ef24c39c6f1b74fd80c34c",
+    "core/crates/swirl-dns/src/lib.rs": "0c2e01332d02c471fee76240270f344988f1fc79da27ac50a94987fb4fb7439c",
+    "core/crates/swirl-dns/src/wire.rs": "44150266189f66e9dcb84b69d2be887c898f3782f3679167348e76cc7d748184",
+    "core/crates/swirl-subscription/src/dns_tls.rs": "55858b949bc90232d90959483b0b4224e22283233a6b21ceeec6c144f714be9c",
+    "core/crates/swirl-subscription/src/lib.rs": "98f09cddb788b4374bd9a88221ad9cd8154bab4f1b3f3f7f3a0273aa62564589",
+    "src/Swirl.Quick/CMakeLists.txt": "6434febc3740f9327d45ae79d6aa79ea6650c9c84741a0e8edcc54f3ccb05e31",
+    "src/Swirl.Quick/engine/EngineController.cpp": "34713de0c7afbbcd71d4452b7160669485f8454c396d5e5ffd0824f9b836b938",
+    "src/Swirl.Quick/engine/MihomoAdapter.cpp": "1851a6b5b871c78e878b1b96079a4dcc155d2896e3fb6d552d7f79bcadc0e3a3",
+    "src/Swirl.Quick/engine/RustDnsConfiguration.h": "2ac86b45a9e20f30933f5611ab5e983a80e5a3bc66a8406951266192c6c3b645",
+    "src/Swirl.Quick/tests/EngineTests.cpp": "a3c8140c05dd7d8c5836aed4c959873fc4bd0b633c22c7f579dc7c9960b72a31",
+    "src/Swirl.Quick/tests/RustCoreTests.cpp": "fa3de577c52cdd4bf4aecfbd5e27b337088ac37ca0b00c3c2113baf2247c8779",
+    "tools/tests/test_dns_negative.py": "8af2354210c7557b38b87d3370906c2b4b846ec84043f77ca2e1dad4eba62217"
+  },
+  "validation": {
+    "cargo_fmt_check": true,
+    "cargo_check_workspace": true,
+    "cargo_clippy_workspace_all_targets_deny_warnings": true,
+    "cargo_test_workspace": {
+      "passed": 138,
+      "failed": 0,
+      "ignored": 0
+    },
+    "independent_dns": {
+      "tests": 30,
+      "failed": 0,
+      "provider_requests": 0,
+      "node_requests": 0,
+      "loopback_only": true
+    },
+    "dot_regression": {
+      "tests": 11,
+      "failed": 0
+    },
+    "doh_regression": {
+      "tests": 9,
+      "failed": 0
+    },
+    "qt_native": {
+      "passed": 38,
+      "failed": 0,
+      "skipped": 5,
+      "skip_reason": "Independent protocol peer ports are supplied in separate existing CI suites; not falsely counted as pass."
+    },
+    "qt_compatibility": {
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0
+    },
+    "compatibility_ctest": {
+      "passed": 1,
+      "failed": 0
+    },
+    "development_tests": {
+      "ran": 19,
+      "skipped": 1,
+      "failed": 0,
+      "skip_reason": "Existing Windows symlink privilege unavailable."
+    }
+  },
+  "review_corrections": [
+    "Derived serde enum accepted object form; changed to strict String deserialization and added object negative tests.",
+    "Compatibility core could ignore persisted queryFamily and old edits could remove it; both startup and settings now reject without mutation.",
+    "Initial IPv6 test fixture accidentally passed ipv6 in allocation test and not UDP helper; preserved NameError log, fixed scoped call, asserted real ::1 bound address, repeated full 30 tests.",
+    "New CI step at end violated unchanged strict Qt peer-menu guard; moved step before final native Qt run and reran 19 development tests."
+  ],
+  "initial_red": {
+    "test": "test_ipv4_only_omits_aaaa_and_preserves_tcp_retry_and_cname",
+    "failures": 4,
+    "reason": "Old implementation rejected query_family at command parsing"
+  },
+  "limitations": [
+    "Complete Clash DNS import remains rejected; hosts/localhost/routing/bootstrap semantics still need implementation.",
+    "No new GUI control; existing page preserves stored policy, explicit full configuration replacement has its own defaults.",
+    "Pure OS path rejects ipv4_only; literal/static IPv6 and remote proxy-side DNS are not disabled.",
+    "No real subscription/node or global packet-capture validation in this stage.",
+    "MinGW release linker emits existing corrupt .drectve warnings; builds succeed; strict clippy succeeds.",
+    "Full self-development weighted acceptance remains 10.83%, not implementation percentage."
+  ],
+  "ci": {
+    "status": "pending exact implementation commit"
+  },
+  "logs": [
+    {
+      "path": "D:\\Codex\\work\\dns-query-family-fmt.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "D:\\Codex\\work\\dns-query-family-check.log",
+      "bytes": 648,
+      "sha256": "678d4379dfb5fe33a8e3fde3df12b0a059a3b001a786adb9f4da6b17573d5654"
+    },
+    {
+      "path": "D:\\Codex\\work\\dns-query-family-clippy.log",
+      "bytes": 648,
+      "sha256": "6f96b6c7e059fc93cf507cf23606ffc48408b20dcd903994b2cb7dc6689749e1"
+    },
+    {
+      "path": "D:\\Codex\\work\\dns-query-family-workspace.log",
+      "bytes": 15724,
+      "sha256": "3d252639a3289ae30d8932c4532539dc472318e71cf44fa8b748038c6598db56"
+    },
+    {
+      "path": "D:\\Codex\\work\\dns-query-family-build.log",
+      "bytes": 917,
+      "sha256": "d11145ece05f0d82ba346ab8038413f95a370fdde6a9e3459980c5d3a27935a4"
+    },
+    {
+      "path": "D:\\Codex\\work\\dns-query-family-peers-verified.log",
+      "bytes": 5095,
+      "sha256": "f165b9b0ec676b641c993bba03f97e6df0c446f24347b3959e115a5d935e919d"
+    },
+    {
+      "path": "D:\\Codex\\work\\dns-query-family-dot.log",
+      "bytes": 116,
+      "sha256": "667bd5594be5fe2267ab397d55c55f9e616a361e6255a0d3cab9b85bac1cbea0"
+    },
+    {
+      "path": "D:\\Codex\\work\\dns-query-family-doh.log",
+      "bytes": 1321,
+      "sha256": "4c98e11b3c8f6770bccc35dbf7877d997b481a833021fbd45debc6aa5bde15a8"
+    },
+    {
+      "path": "D:\\Codex\\work\\dns-query-family-qt-build-final.log",
+      "bytes": 1853,
+      "sha256": "17354ede989072e72d8f9238b4c8473f9719cbd989a3151129d25956808b313d"
+    },
+    {
+      "path": "D:\\Codex\\work\\dns-query-family-qt-final.log",
+      "bytes": 4259,
+      "sha256": "17d4fbdc76f4a423446a7e515aff5432860646bd834203b64506ddb0160fc434"
+    },
+    {
+      "path": "D:\\Codex\\work\\dns-query-family-compat.log",
+      "bytes": 522,
+      "sha256": "3c58b0087ec100dabdd180610cd1a731ea66c260ffaf1b38563b43e6ef916904"
+    },
+    {
+      "path": "D:\\Codex\\work\\dns-query-family-compat-ctest.log",
+      "bytes": 246,
+      "sha256": "f92b1d95d3f7c2c0547e8cec89336b4aa95137de6100d7fcb820eca108009dae"
+    },
+    {
+      "path": "D:\\Codex\\work\\dns-query-family-development-verified.log",
+      "bytes": 4182,
+      "sha256": "1f411ee92746dc105aaef5ad653fac77bc4b9e96115a7a2bc14aa777355cc8c5"
+    },
+    {
+      "path": "D:\\Codex\\work\\dns-query-family-red.log",
+      "bytes": 4127,
+      "sha256": "cb3099dc3ffab803896acfdc8723f29cf684d2ee8889be2862c39f54588e9b3c"
+    },
+    {
+      "path": "D:\\Codex\\work\\dns-query-family-peers-final.log",
+      "bytes": 6038,
+      "sha256": "c95e5efeed07db7e037f9ee76b065b2e3654e3e62fb0df5107924b28db861abe"
+    },
+    {
+      "path": "D:\\Codex\\work\\dns-query-family-ipv6-corrected.log",
+      "bytes": 919,
+      "sha256": "e542adfdf054698825a5b787bad5838a2e9db0ad69ad2ca8c110aa034823df25"
+    },
+    {
+      "path": "D:\\Codex\\work\\dns-query-family-development-checks.log",
+      "bytes": 5641,
+      "sha256": "42778022d81df68c0a7fa75092db1743cfc9ee4e53b9a9f53b95f7590c83fc8f"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "D:\\Codex\\work\\Swirl\\core\\target\\release\\swirl-api.exe",
+      "bytes": 4123591,
+      "sha256": "0a8afda85e84a77c54bb1ae6e9cc9b37d0a4bd37b42d2a9fba29950ae5915e5f"
+    },
+    {
+      "path": "D:\\Codex\\work\\build-rust-qt\\swirl_api.dll",
+      "bytes": 7426420,
+      "sha256": "8961ae56e8aebe0540439c28a6d946e27c068dcd4eed229282503fd037e37ad4"
+    },
+    {
+      "path": "D:\\Codex\\work\\build-rust-qt\\Swirl.exe",
+      "bytes": 56822000,
+      "sha256": "6b962651ae2f8219bce6067c9f7be623fb1d13710716adb5c5c487c09a37f210"
+    },
+    {
+      "path": "D:\\Codex\\work\\build-rust-qt\\SwirlRustCoreTests.exe",
+      "bytes": 2532784,
+      "sha256": "ab498b7afba14ebf36d9d163fcd2d34ab67c5a789ab6bbdeec1b5f1ccc1798cd"
+    },
+    {
+      "path": "D:\\Codex\\work\\build-compat-atomic\\SwirlEngineTests.exe",
+      "bytes": 2027846,
+      "sha256": "7c56b2639fa17488955d11672097d6379e12419b7190b03d9c6648965b18e59d"
+    }
+  ]
+}

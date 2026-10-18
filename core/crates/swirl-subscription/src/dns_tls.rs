@@ -102,6 +102,52 @@ mod tests {
     }
 
     #[test]
+    fn query_family_is_strict_defaults_to_dual_and_requires_explicit_upstream() {
+        use crate::DnsQueryFamily;
+        let legacy = config(json!({})).unwrap();
+        assert_eq!(legacy.dns.query_family, DnsQueryFamily::Dual);
+        assert!(
+            serde_json::to_value(&legacy.dns)
+                .unwrap()
+                .get("query_family")
+                .is_none()
+        );
+        for server in [
+            json!({"servers": ["[::1]:53"]}),
+            json!({"tls_servers": [endpoint()]}),
+        ] {
+            let mut dns = server;
+            dns["query_family"] = json!("ipv4_only");
+            let cfg = config(dns).unwrap();
+            assert_eq!(cfg.dns.query_family, DnsQueryFamily::Ipv4Only);
+            let decoded = Config::parse(&serde_json::to_vec(&cfg).unwrap()).unwrap();
+            assert_eq!(decoded.dns.query_family, DnsQueryFamily::Ipv4Only);
+        }
+        assert!(matches!(
+            config(json!({"query_family":"ipv4_only"})),
+            Err("DnsQueryFamilyRequiresExplicitServer")
+        ));
+        for value in [
+            json!(false),
+            json!(0),
+            json!(null),
+            json!("ipv6_only"),
+            json!("IPV4_ONLY"),
+            json!({"dual": null}),
+            json!({"ipv4_only": null}),
+            json!([]),
+        ] {
+            assert!(config(json!({"servers":["127.0.0.1:53"],"query_family":value})).is_err());
+        }
+        assert!(
+            serde_json::from_slice::<crate::Dns>(
+                br#"{"servers":["127.0.0.1:53"],"query_family":"dual","query_family":"ipv4_only"}"#
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
     fn legacy_dns_and_explicit_tls_round_trip() {
         assert!(config(json!({})).unwrap().dns.tls_servers.is_empty());
         assert!(config(json!({"servers": ["127.0.0.1:53"]})).is_ok());

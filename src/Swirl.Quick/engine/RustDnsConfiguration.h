@@ -26,12 +26,16 @@ inline QString configuration(const QVariantMap &input, QJsonObject *output) {
         return QString("Rust DNS 支持系统解析、自定义 IP DNS、精确映射、严格 DoT 和 DoH POST；配置含无效或尚未支持的选项。");
     };
     for (auto it = dns.begin(); it != dns.end(); ++it)
-        if (!QStringList{"mode", "servers", "encrypted", "hosts", "useHosts", "respectRules"}.contains(it.key()))
+        if (!QStringList{"mode", "servers", "encrypted", "hosts", "useHosts", "respectRules", "queryFamily"}.contains(it.key()))
             return invalid();
     if (dns.contains("mode") && (!dns.value("mode").isDouble()
         || (dns.value("mode").toDouble() != 0 && dns.value("mode").toDouble() != 2)))
         return invalid();
     const bool custom = dns.value("mode").toInt() == 2;
+    const auto familyValue = dns.value("queryFamily");
+    if (dns.contains("queryFamily") && (!familyValue.isString()
+        || !QStringList{"dual", "ipv4_only"}.contains(familyValue.toString()))) return invalid();
+    const auto family = dns.contains("queryFamily") ? familyValue.toString() : QString("dual");
     for (const auto &key : QStringList{"servers", "encrypted"})
         if (dns.contains(key) && !dns.value(key).isString()) return invalid();
     const auto encrypted = dns.value("encrypted").toString().trimmed();
@@ -41,6 +45,8 @@ inline QString configuration(const QVariantMap &input, QJsonObject *output) {
     if (!encrypted.isEmpty() && (custom || !rawServers.trimmed().isEmpty()))
         return "Rust 加密 DNS 此阶段请使用系统模式、留空传统服务器，并用显式 IP 或精确本地映射指定 DoT 端点。";
     if (!custom && !rawServers.trimmed().isEmpty()) return invalid();
+    if (family != "dual" && !custom && encrypted.isEmpty())
+        return QStringLiteral("该 DNS 查询策略需要明确的 DNS 服务器；系统解析暂不支持限制查询类型。");
     QJsonArray servers;
     QSet<QString> serverSet;
     if (custom) {
@@ -121,6 +127,7 @@ inline QString configuration(const QVariantMap &input, QJsonObject *output) {
         {"servers", servers}, {"use_system_hosts", !dns.contains("useHosts") || dns.value("useHosts").toBool()}};
     // Leave legacy JSON unchanged when the new feature is inactive.
     if (!tlsServers.isEmpty()) result["tls_servers"] = tlsServers;
+    if (family != "dual") result["query_family"] = family;
     *output = result;
     return {};
 }

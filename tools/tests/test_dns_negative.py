@@ -226,21 +226,23 @@ class DnsNegativeIntegration(unittest.TestCase):
         self.process.stdin.flush()
         return json.loads(self.process.stdout.readline())
 
-    def peer(self, transport='udp', cache='', age=0, **plan):
+    def peer(self, transport='udp', cache='', age=0, ipv6=False, **plan):
         if transport == 'doh':
-            peer = DohPeer(self.context, cache=cache, age=age)
+            peer = DohPeer(self.context, cache=cache, age=age, ipv6=ipv6)
         elif transport == 'dot':
-            peer = DotPeer(self.context)
+            peer = DotPeer(self.context, ipv6=ipv6)
         else:
-            peer = DnsPeer()
+            peer = DnsPeer(ipv6=ipv6)
         peer.transport, peer.plan = transport, plan
         peer.respond = types.MethodType(respond, peer)
         self.peers.append(peer)
         return peer
 
-    def config(self, peers):
+    def config(self, peers, query_family=None):
         peers = peers if isinstance(peers, list) else [peers]
         dns = {'use_system_hosts': False}
+        if query_family is not None:
+            dns['query_family'] = query_family
         if peers[0].transport == 'udp':
             dns['servers'] = [peer.address for peer in peers]
         else:
@@ -256,8 +258,8 @@ class DnsNegativeIntegration(unittest.TestCase):
         return {'schema': 1, 'listen': '127.0.0.1:0', 'selected': 'direct',
                 'nodes': [{'id': 'direct', 'outbound': {'type': 'direct'}}], 'dns': dns}
 
-    def start(self, peers):
-        result = self.command(op='start', config=self.config(peers))
+    def start(self, peers, query_family=None):
+        result = self.command(op='start', config=self.config(peers, query_family))
         self.assertTrue(result['ok'], result)
         self.handle = result['handle']
         self.port = int(result['status']['address'].rsplit(':', 1)[1])
@@ -540,6 +542,116 @@ class DnsNegativeIntegration(unittest.TestCase):
         self.assertEqual(len(peer.queries), 514)
         self.connect(host='negative-0.fixture.invalid', expected='DnsNameError')
         self.assertEqual(len(peer.queries), 516, 'oldest retained denial must have been evicted')
+
+
+    def test_ipv4_only_omits_aaaa_and_preserves_tcp_retry_and_cname(self):
+        port = self.origin()
+        for transport, damage in (('udp', None), ('udp', 'udp-tc'), ('dot', None), ('doh', None)):
+            with self.subTest(transport=transport, damage=damage):
+                peer = self.peer(transport, families={1: 'positive', 28: 'silent'},
+                                 alias='alias.fixture.invalid', followup=True, damage=damage)
+                self.start(peer, 'ipv4_only')
+                self.connect(port)
+                expected = [('negative.fixture.invalid', 1, transport != 'udp'),
+                            ('alias.fixture.invalid', 1, transport != 'udp')]
+                if damage:
+                    expected = [(host, kind, tcp) for host, kind, _ in expected for tcp in (False, True)]
+                self.assertEqual(peer.queries, expected)
+                self.connect(port)
+                self.assertEqual(peer.queries, expected, 'A-only positive response must be cached')
+                self.stop()
+
+    def test_ipv4_only_negative_soa_cache_expires_without_querying_aaaa(self):
+        port = self.origin()
+        for transport in ('udp', 'dot', 'doh'):
+            for state, error in (('nx', 'DnsNameError'), ('nodata', 'DnsEmpty')):
+                with self.subTest(transport=transport, state=state):
+                    peer = self.peer(transport, families={1: state, 28: 'silent'}, minimum=1)
+                    self.start(peer, 'ipv4_only')
+                    self.connect(expected=error)
+                    self.connect(8443, 'NEGATIVE.FIXTURE.INVALID', expected=error)
+                    self.assertEqual(peer.queries, [('negative.fixture.invalid', 1, transport != 'udp')])
+                    self.make_positive(peer)
+                    time.sleep(1.1)
+                    self.connect(port)
+                    self.assertEqual([kind for _, kind, _ in peer.queries], [1, 1])
+                    self.stop()
+
+    def test_ipv4_only_unproven_empty_failover_and_zero_ttl_denial(self):
+        port = self.origin()
+        for transport in ('udp', 'dot', 'doh'):
+            with self.subTest(transport=transport):
+                empty = self.peer(transport, state='nodata', soa_types=())
+                good = self.peer(transport, families={1: 'positive', 28: 'silent'})
+                self.start([empty, good], 'ipv4_only')
+                self.connect(port)
+                self.assertEqual([kind for _, kind, _ in empty.queries], [1])
+                self.assertEqual([kind for _, kind, _ in good.queries], [1])
+                self.stop()
+                for state, error in (('nx', 'DnsNameError'), ('nodata', 'DnsEmpty')):
+                    terminal = self.peer(transport, state=state, minimum=0)
+                    unused = self.peer(transport, state='positive')
+                    self.start([terminal, unused], 'ipv4_only')
+                    self.connect(expected=error)
+                    self.connect(expected=error)
+                    self.assertEqual([kind for _, kind, _ in terminal.queries], [1, 1])
+                    self.assertEqual(unused.queries, [])
+                    self.stop()
+
+    def test_ipv4_only_can_query_an_ipv6_upstream_on_all_transports(self):
+        port = self.origin()
+        for transport in ('udp', 'dot', 'doh'):
+            with self.subTest(transport=transport):
+                peer = self.peer(transport, ipv6=True, families={1: 'positive', 28: 'silent'})
+                self.assertTrue(peer.address.startswith('[::1]:'), peer.address)
+                self.assertEqual(peer.tcp.server_address[0], '::1')
+                self.start(peer, 'ipv4_only')
+                self.connect(port)
+                self.assertEqual(peer.queries, [('negative.fixture.invalid', 1, transport != 'udp')])
+                self.stop()
+
+    def test_ipv4_only_nxdomain_without_soa_is_terminal_but_never_cached(self):
+        for transport in ('udp', 'dot', 'doh'):
+            with self.subTest(transport=transport):
+                negative = self.peer(transport, state='nx', soa_types=())
+                unused = self.peer(transport, state='positive')
+                self.start([negative, unused], 'ipv4_only')
+                self.connect(expected='DnsNameError')
+                self.connect(8443, expected='DnsNameError')
+                self.assertEqual([kind for _, kind, _ in negative.queries], [1, 1])
+                self.assertEqual(unused.queries, [])
+                self.stop()
+
+    def test_ipv4_only_doh_age_and_no_store_bound_single_family_cache(self):
+        for cache, age in (('no-store', 0), ('max-age=2', 2)):
+            with self.subTest(cache=cache, age=age):
+                peer = self.peer('doh', state='nodata', cache=cache, age=age)
+                self.start(peer, 'ipv4_only')
+                self.connect(expected='DnsEmpty')
+                self.connect(8443, expected='DnsEmpty')
+                self.assertEqual([kind for _, kind, _ in peer.queries], [1, 1])
+                self.stop()
+
+    def test_query_family_reconfiguration_discards_the_previous_cache(self):
+        port = self.origin()
+        for transport in ('udp', 'dot', 'doh'):
+            with self.subTest(transport=transport):
+                peer = self.peer(transport, families={1: 'positive', 28: 'nodata'})
+                self.start(peer)
+                self.connect(port)
+                self.assertEqual(sorted(kind for _, kind, _ in peer.queries), [1, 28])
+                self.assertTrue(self.command(op='configure', handle=self.handle,
+                                            config=self.config(peer, 'ipv4_only'))['ok'])
+                peer.plan = {'families': {1: 'nodata', 28: 'silent'}}
+                self.connect(expected='DnsEmpty')
+                self.assertEqual([kind for _, kind, _ in peer.queries[2:]], [1])
+                self.make_positive(peer)
+                self.assertTrue(self.command(op='configure', handle=self.handle,
+                                            config=self.config(peer))['ok'])
+                self.connect(port)
+                self.assertEqual(sorted(kind for _, kind, _ in peer.queries[3:]), [1, 28])
+                self.stop()
+
 
 
 if __name__ == '__main__':

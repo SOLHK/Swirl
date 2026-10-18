@@ -7,13 +7,14 @@ use std::{
     sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
-use swirl_subscription::DnsTlsServer;
+use swirl_subscription::{DnsQueryFamily, DnsTlsServer};
 use tokio::{net::lookup_host, sync::Semaphore, time::timeout};
 
 type Cache = HashMap<String, (Instant, wire::Outcome)>;
 type Lookup = Result<Vec<SocketAddr>, &'static str>;
 const FAILURE_TTL: Duration = Duration::from_secs(1);
 pub struct Resolver {
+    query_family: DnsQueryFamily,
     cache: Mutex<Cache>,
     permits: Arc<Semaphore>,
     hosts: HashMap<String, IpAddr>,
@@ -24,6 +25,7 @@ pub struct Resolver {
 impl Default for Resolver {
     fn default() -> Self {
         Self {
+            query_family: DnsQueryFamily::Dual,
             cache: Mutex::new(HashMap::new()),
             permits: Arc::new(Semaphore::new(8)),
             hosts: HashMap::new(),
@@ -86,6 +88,7 @@ impl Resolver {
     /// every generation shares the same cap on still-running OS lookups.
     pub fn with_hosts(&self, hosts: &[swirl_subscription::HostMapping]) -> Self {
         Self {
+            query_family: DnsQueryFamily::Dual,
             cache: Mutex::new(HashMap::new()),
             permits: self.permits.clone(),
             hosts: hosts
@@ -98,8 +101,10 @@ impl Resolver {
         }
     }
     pub fn with_config(&self, dns: &swirl_subscription::Dns) -> Result<Self, &'static str> {
+        dns.validate_query_family()?;
         dns.validate_tls()?;
         let mut result = self.with_hosts(&dns.hosts);
+        result.query_family = dns.query_family;
         result.servers = dns.servers.clone();
         result.tls_servers = dns.tls_servers.clone();
         if (!dns.servers.is_empty() || !dns.tls_servers.is_empty()) && dns.use_system_hosts {
@@ -140,9 +145,9 @@ impl Resolver {
             let started = Instant::now();
             let resolution = async {
                 if self.tls_servers.is_empty() {
-                    wire::resolve(&self.servers, host).await
+                    wire::resolve(&self.servers, host, self.query_family).await
                 } else {
-                    dot::resolve(&self.tls_servers, host).await
+                    dot::resolve(&self.tls_servers, host, self.query_family).await
                 }
             };
             let answer = timeout(Duration::from_secs(3), resolution)
@@ -243,6 +248,40 @@ fn parse_hosts(data: &[u8]) -> Result<HashMap<String, IpAddr>, &'static str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[tokio::test]
+    async fn ipv4_query_policy_preserves_literal_and_static_ipv6_without_os_fallback() {
+        use swirl_subscription::{Dns, HostMapping};
+        let root = Resolver::default();
+        let mut dns = Dns {
+            query_family: DnsQueryFamily::Ipv4Only,
+            ..Dns::default()
+        };
+        assert!(matches!(
+            root.with_config(&dns),
+            Err("DnsQueryFamilyRequiresExplicitServer")
+        ));
+        dns.servers = vec!["[::1]:5353".parse().unwrap()];
+        dns.use_system_hosts = false;
+        dns.hosts = vec![HostMapping {
+            name: "static.invalid".into(),
+            address: "::1".parse().unwrap(),
+        }];
+        let resolver = root.with_config(&dns).unwrap();
+        assert_eq!(
+            resolver.resolve("::1", 80).await.unwrap(),
+            vec!["[::1]:80".parse().unwrap()]
+        );
+        assert_eq!(
+            resolver.resolve("STATIC.INVALID", 443).await.unwrap(),
+            vec!["[::1]:443".parse().unwrap()]
+        );
+        resolver.remember_failure("cached.invalid".into(), "DnsTimeout");
+        dns.query_family = DnsQueryFamily::Dual;
+        let next = resolver.with_config(&dns).unwrap();
+        assert!(next.cached("cached.invalid", 443).unwrap().is_none());
+        assert!(Arc::ptr_eq(&resolver.permits, &next.permits));
+    }
+
     #[test]
     fn failure_cache_preserves_code_deadline_and_successful_answers() {
         let resolver = Resolver::default();
@@ -321,21 +360,27 @@ mod tests {
 
     #[tokio::test]
     async fn cancelled_upstream_query_does_not_create_failure_cache() {
-        let peer = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
-        let resolver = Resolver {
-            servers: vec![peer.local_addr().unwrap()],
-            ..Resolver::default()
-        };
-        assert!(
-            timeout(
-                Duration::from_millis(20),
-                resolver.resolve("cancelled.invalid", 443)
-            )
-            .await
-            .is_err()
-        );
-        assert!(resolver.cache.lock().unwrap().is_empty());
-        assert_eq!(resolver.permits.available_permits(), 8);
+        for query_family in [DnsQueryFamily::Dual, DnsQueryFamily::Ipv4Only] {
+            let peer = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+            let resolver = Arc::new(Resolver {
+                query_family,
+                servers: vec![peer.local_addr().unwrap()],
+                ..Resolver::default()
+            });
+            let owned = resolver.clone();
+            let pending =
+                tokio::spawn(async move { owned.resolve("cancelled.invalid", 443).await });
+            let mut packet = [0u8; 512];
+            // Cancellation follows observed network work, not a scheduler delay.
+            timeout(Duration::from_secs(1), peer.recv_from(&mut packet))
+                .await
+                .unwrap()
+                .unwrap();
+            pending.abort();
+            assert!(pending.await.unwrap_err().is_cancelled());
+            assert!(resolver.cache.lock().unwrap().is_empty());
+            assert_eq!(resolver.permits.available_permits(), 8);
+        }
     }
 
     #[test]

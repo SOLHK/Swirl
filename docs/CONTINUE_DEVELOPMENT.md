@@ -1,3 +1,11 @@
+# Native DNS query-family checkpoint (local validation complete)
+
+Base/evidence head ad0db7e54ea036067bc7bd58bbfbc206135bb1b0. The current implementation adds explicit A-only DNS across UDP/TCP/DoT/DoH, strict IR/Qt mapping, persisted-policy compatibility protection and cache-generation isolation. All local checks passed after recorded fixes; see RUST_DNS_QUERY_FAMILY_20261018.md and its structured evidence. Exact implementation SHA/CI will be bound after commit. Existing fbef399 CI is historical evidence only.
+
+The next user-directed work is concrete subscription compatibility: reproduce Qt SubscriptionNormalizer boolean and canonical-alias conflicts against Rust validation, using independent synthetic cases and mature converter references. Do not recreate existing IR, copy GPL/AGPL converter code or drop complete-profile semantics. No supplier refresh is authorized after 08:33:30 UTC; latest window captured nothing. Weighted acceptance remains 10.83%.
+
+---
+
 # Closed 08:25:51 subscription window: no capture
 
 Hard cutoff 2026-10-18 08:33:30 UTC has passed. Supplier requests 0, new encrypted responses 0. Physical-WLAN destination route preflight passed. Initial automatic approval rejected relayed authorization; the single evidence-backed review retry timed out before CreateProcess, so neither capture script nor capture directory was created. No pending supplier process exists; late approval cannot reopen the window. Existing encrypted cache is preserved. See docs/evidence/CAPTURE_082551_WINDOW_BLOCKED_20261018.json and D:/Codex/outputs/capture-082551-direct-preflight.json. Do not retry supplier refresh.

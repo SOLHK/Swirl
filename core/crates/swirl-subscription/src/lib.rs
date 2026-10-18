@@ -155,9 +155,36 @@ pub struct HostMapping {
     pub address: std::net::IpAddr,
 }
 
+/// Which wire record families explicit DNS upstreams may query. This does not
+/// disable IPv6 literal destinations or exact static host mappings.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", try_from = "String")]
+pub enum DnsQueryFamily {
+    #[default]
+    Dual,
+    Ipv4Only,
+}
+impl TryFrom<String> for DnsQueryFamily {
+    type Error = &'static str;
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match value.as_str() {
+            "dual" => Ok(Self::Dual),
+            "ipv4_only" => Ok(Self::Ipv4Only),
+            _ => Err("DnsQueryFamilyValue"),
+        }
+    }
+}
+impl DnsQueryFamily {
+    fn is_default(&self) -> bool {
+        *self == Self::Dual
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Dns {
+    #[serde(default, skip_serializing_if = "DnsQueryFamily::is_default")]
+    pub query_family: DnsQueryFamily,
     #[serde(default)]
     pub hosts: Vec<HostMapping>,
     #[serde(default)]
@@ -173,9 +200,22 @@ pub struct Dns {
 fn default_true() -> bool {
     true
 }
+impl Dns {
+    pub fn validate_query_family(&self) -> Result<(), &'static str> {
+        // Filtering OS lookup results would not prevent unrequested wire queries.
+        if self.query_family != DnsQueryFamily::Dual
+            && self.servers.is_empty()
+            && self.tls_servers.is_empty()
+        {
+            return Err("DnsQueryFamilyRequiresExplicitServer");
+        }
+        Ok(())
+    }
+}
 impl Default for Dns {
     fn default() -> Self {
         Self {
+            query_family: DnsQueryFamily::Dual,
             hosts: Vec::new(),
             force_proxy_hosts: false,
             servers: Vec::new(),
@@ -303,6 +343,7 @@ impl Config {
         {
             return Err("ConfigBounds");
         }
+        self.dns.validate_query_family()?;
         self.dns.validate_tls()?;
         let mut host_names = HashSet::new();
         let mut servers = HashSet::new();

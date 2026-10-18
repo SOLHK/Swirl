@@ -206,6 +206,16 @@ candidates. The later policy stage declared them in their crate roots, connected
 the runtime call paths and executed their tests; that evidence is recorded
 separately in the historical policy validation document.
 
+## Explicit DNS query family
+
+Native `dns.query_family` accepts strict strings `dual` (the unchanged default)
+and `ipv4_only`. The latter sends A queries only to explicit UDP/TCP/DoT/DoH
+upstreams; pure OS lookup rejects it. It does not disable IPv6 literal targets,
+static hosts, IPv6 upstream endpoints, or remote DNS performed by a proxy server.
+Qt maps `queryFamily` and preserves it across legacy settings edits; compatibility
+builds reject the native policy instead of dropping it. No UI control or complete
+Clash DNS import is enabled. See [scope and verification](../docs/RUST_DNS_QUERY_FAMILY_20261018.md).
+
 ## Encrypted DNS: DoT and HTTP/1.1 DoH
 
 DNS-over-TLS is now implemented in Rust using explicit IP bootstrap endpoints
@@ -223,8 +233,9 @@ explicit resolver, not through proxy policy. Positive entries are shared by
 hostname across destination ports. Validated NXDOMAIN and combined A/AAAA NODATA
 use SOA negative caching, including CNAME and DoH cache-age restrictions; see
 [local DNS cache semantics](../docs/RUST_LOCAL_DNS.md).
-System bootstrap, mixed resolver mode, DNS split, RFC 9520 resolution-failure
-caching and HTTP/2 remain later work. DoH has its own
+Bounded one-second resolution-failure caching is implemented; see
+[failure-cache evidence](../docs/RUST_DNS_FAILURE_CACHE_20261018.md).
+System bootstrap, mixed resolver mode, DNS split and HTTP/2 remain later work. DoH has its own
 independent peer suite, `tools/tests/test_dns_https.py`. See the historical
 [DoT semantics](../docs/RUST_DOT.md), the earlier
 [DoH/public-network evidence](../docs/RUST_WS_VALIDATION_20261017.md) and the
