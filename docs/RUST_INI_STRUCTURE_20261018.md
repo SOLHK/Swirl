@@ -78,3 +78,36 @@ Mihomo respect-rules is not equivalent to Qt respectRules/force_proxy_hosts.
 No new provider-node network test, TUN, full application package, or long-duration
 performance run was performed by this parser stage. Prior real-node evidence must
 retain its original source/environment identity.
+## Windows test launch incident and current execution environment
+
+The user supplied a screenshot of `SwirlRustCoreTests.exe` reporting missing
+`Qt6Gui.dll`. The screenshot was downloaded to D:\Codex\outputs\IMG_2177.jpeg
+and inspected locally. Existing Qt6Gui/Qt6Core/Qt6Test DLLs are version 6.10.3.0;
+both the test executable and Qt6Gui.dll are PE x64. They were not missing from
+the installed toolchain. The initial unfiltered CTest environment omitted its Qt
+runtime bin directory. Earlier targeted reruns used the corrected process-local
+PATH and passed; no test was restarted after the user reported the dialog.
+
+The actual unfiltered command was `ctest --test-dir D:\Codex\work\build-rust-qt
+--output-on-failure`. Its log is D:\Codex\work\ini-qt-unfiltered-aborted.log:
+`swirl-appearance-ui` timed out at 45.01 seconds, then the run entered
+`swirl-rust-qt-integration`. The appearance timeout remains unresolved and has
+not been attributed to the INI patch. The successful targeted command used
+`-R '^swirl-rust-qt-integration$'` with the Qt bin directory on that process PATH;
+its separate log is D:\Codex\work\ini-qt-ctest.log (1/1, 6.33 seconds).
+Four independent Qt protocol peer suites also passed before the user's report.
+
+D:\Codex\work\swirl-env.ps1 now includes the existing Qt runtime and real CMake
+binary directories for the calling process only. The local wrapper
+D:\Codex\work\Run-Qt-Rust-Integration.ps1 checks required DLL existence and x64
+PE architecture and restricts CTest to that integration test. Its ValidateOnly
+preflight passed with test_started=false. No software or DLL was downloaded, no
+global PATH was edited, and no currently running user application was terminated.
+
+The current delegated execution is supplied by the desktop application's local
+Codex exec-server, connected to the cloud environment. It is not a separately
+created visible desktop Codex project task. Exact local state-db lookups found
+neither the delegated execution thread nor the parent conversation. Desktop
+list_threads/send_message_to_thread calls failed with MCP -32000. No competing
+writer/task was created to work around that visibility issue. New module edits
+and local test launches were paused to investigate the user-reported environment.
