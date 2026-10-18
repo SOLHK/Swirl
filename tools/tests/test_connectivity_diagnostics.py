@@ -121,12 +121,15 @@ class ConnectivityDiagnostics(unittest.TestCase):
                 self.assertEqual(peer.recv(1), b"")
 
     def test_refusal_is_distinct_and_does_not_consume_full_budget(self):
-        with socket.socket() as reserved:
-            reserved.bind(("127.0.0.1", 0))
-            endpoint = reserved.getsockname()
-            report = DIAG.diagnose_python(
-                {"host": "private.invalid", "port": endpoint[1], "total_budget_ms": 500},
-                resolver=lambda *args, **kwargs: [row(socket.AF_INET, endpoint)])
+        # A bound, non-listening socket is not a portable refusal fixture:
+        # Windows and macOS can leave its incoming connection pending.
+        with socket.socket() as closed_listener:
+            closed_listener.bind(("127.0.0.1", 0))
+            closed_listener.listen()
+            endpoint = closed_listener.getsockname()
+        report = DIAG.diagnose_python(
+            {"host": "private.invalid", "port": endpoint[1], "total_budget_ms": 500},
+            resolver=lambda *args, **kwargs: [row(socket.AF_INET, endpoint)])
         self.assertFalse(report["ok"])
         self.assertEqual(report["attempts"][0]["outcome"], "refused")
         self.assertEqual(report["error_code"], "UpstreamConnectFailed")
@@ -147,12 +150,31 @@ class ConnectivityDiagnostics(unittest.TestCase):
         self.assertEqual(report["tcp_elapsed_ms"], 0)
 
     def test_refused_first_address_immediately_falls_back(self):
-        with socket.socket() as reserved, socket.socket() as listener:
-            reserved.bind(("127.0.0.1", 0))
+        def unexpected_wait(*_):
+            self.fail("An immediate refusal must open the next slot without waiting")
+        network = VirtualNetwork(
+            lambda _, sock: errno.ECONNREFUSED if sock.ordinal == 1 else 0, unexpected_wait)
+        immediate = network.diagnose(
+            {"host": "fixture.invalid", "port": 1, "total_budget_ms": 200},
+            [row(socket.AF_INET, ("127.0.0.1", port)) for port in (1, 2)])
+        self.assertTrue(immediate["ok"])
+        self.assertEqual([entry["outcome"] for entry in immediate["attempts"]], ["refused", "success"])
+        self.assertEqual(immediate["attempts"][1]["started_ms"], 0)
+        self.assertEqual(network.peak, 1)
+        self.assertEqual(network.alive, 0)
+        DIAG.safe_report(immediate, "python-socket")
+
+        with socket.socket() as listener:
             listener.bind(("127.0.0.1", 0))
             listener.listen()
             listener.settimeout(1)
-            rows = [row(socket.AF_INET, reserved.getsockname()),
+            # Allocate both endpoints before closing the refusal listener, so
+            # the accepting listener cannot reuse its port.
+            with socket.socket() as closed_listener:
+                closed_listener.bind(("127.0.0.1", 0))
+                closed_listener.listen()
+                refused_endpoint = closed_listener.getsockname()
+            rows = [row(socket.AF_INET, refused_endpoint),
                     row(socket.AF_INET, listener.getsockname()),
                     row(socket.AF_INET, listener.getsockname())]
             report = DIAG.diagnose_python(
