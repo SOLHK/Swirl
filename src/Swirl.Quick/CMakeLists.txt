@@ -152,8 +152,7 @@ add_dependencies(Swirl SwirlScriptRunner)
 qt_add_resources(Swirl engine_manifest PREFIX "/engine" BASE "${CMAKE_CURRENT_SOURCE_DIR}/packaging"
  FILES packaging/mihomo-manifest.json)
 set(SWIRL_QML_FILES
- qml/controls/SwirlText.qml qml/controls/SwirlFontBinding.qml
- qml/controls/SwirlTextArea.qml qml/controls/SwirlToolTip.qml
+ qml/controls/SwirlText.qml
  qml/controls/SwirlLinkedDetail.qml
  qml/controls/SwirlNodeTransfer.qml
  qml/components/SwirlFontSettings.qml
