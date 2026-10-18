@@ -53,6 +53,7 @@
 #include "tests/WindowChecks.h"
 #include "tests/WindowRadiusChecks.h"
 #include "tests/UiQualityChecks.h"
+#include "tests/FontUiChecks.h"
 #include "tests/HdrChecks.h"
 #include "tests/EngineUiChecks.h"
 #include "tests/NodeUiChecks.h"
@@ -143,7 +144,8 @@ int main(int argc, char *argv[])
     const bool radiusTest=app.arguments().contains("--window-radius-test");
     const bool appearanceTest=app.arguments().contains("--appearance-test")||app.arguments().contains("--appearance-restore-test");
     const bool uiQualityTest=app.arguments().contains("--ui-quality-test");
-    bool previewMode=uiQualityTest;
+    const bool fontUiTest=app.arguments().contains("--font-ui-test");
+    bool previewMode=uiQualityTest||fontUiTest;
     for(const QString &argument:app.arguments())
         if(argument.startsWith(QStringLiteral("--material-test-output="))||argument.startsWith(QStringLiteral("--viewport-test-output="))||argument.startsWith(QStringLiteral("--motion-demo-output="))||argument.startsWith(QStringLiteral("--motion-visual-dir="))||argument.startsWith(QStringLiteral("--capture-preview="))||argument.startsWith(QStringLiteral("--capture-native-frame=")))previewMode=true;
     const bool hdrTest=app.arguments().contains("--hdr-self-test");
@@ -182,7 +184,7 @@ int main(int argc, char *argv[])
     FontManager fontManager(nullptr,previewMode?previewFonts.path():QString());
     if(previewMode)for(const auto &argument:app.arguments()){
         if(argument.startsWith("--preview-font-file=")){
-            if(!fontManager.importFont(QUrl::fromLocalFile(argument.mid(20))))return 3;
+            if(!fontManager.importFont(QUrl::fromLocalFile(argument.mid(20)))||!fontManager.applyPreview())return 3;
         }else if(argument.startsWith("--preview-font-family=")){
             if(!fontManager.selectFamily(argument.mid(22)))return 3;
         }
@@ -448,6 +450,14 @@ int main(int argc, char *argv[])
         });
 #else
         qWarning() << "Rebuild with -DSWIRL_BUILD_UI_TESTS=ON to run input checks.";
+        return 4;
+#endif
+    }
+    if(fontUiTest) {
+#ifdef SWIRL_UI_TESTS
+        const auto output=argumentValue(QStringLiteral("--font-ui-output="));
+        QTimer::singleShot(500,&app,[&app,rootWindow,&fontManager,output]{app.exit(runFontUiChecks(rootWindow,&fontManager,output));});
+#else
         return 4;
 #endif
     }

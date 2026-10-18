@@ -13,6 +13,18 @@
 #include <QQmlEngine>
 #include <QQmlComponent>
 #include <QQmlContext>
+#include <QRawFont>
+#include <QPainter>
+#include <QFontMetricsF>
+#include <QCryptographicHash>
+#include <QElapsedTimer>
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QScreen>
+#include <QProcess>
+#include <QProcessEnvironment>
+#include <limits>
 class FontTests : public QObject {
     Q_OBJECT
 private slots:
@@ -61,6 +73,7 @@ private slots:
         QFile source(":/swirl/fonts/HarmonyOS_Sans_SC_Regular.ttf");QVERIFY(source.open(QIODevice::ReadOnly));const auto original=source.readAll();
         QFile input(directory.filePath("font.ttf"));QVERIFY(input.open(QIODevice::WriteOnly));QCOMPARE(input.write(original),original.size());input.close();
         QVERIFY2(manager.importFont(QUrl::fromLocalFile(input.fileName())),qPrintable(manager.error()));
+        QVERIFY(manager.applyPreview());
         const auto copies=QDir(directory.filePath("fonts")).entryList(QDir::Files);QCOMPARE(copies.size(),1);
         QFile saved(directory.filePath("fonts/"+copies.first()));QVERIFY(saved.open(QIODevice::ReadOnly));QCOMPARE(saved.readAll(),original);
         QVERIFY(QFile::remove(input.fileName()));
@@ -78,13 +91,14 @@ private slots:
         QFile source(sourcePath);
         QVERIFY(source.exists());
         QVERIFY2(manager.importFont(QUrl::fromLocalFile(sourcePath)),qPrintable(manager.error()));
+        QVERIFY(manager.applyPreview());
         QCOMPARE(manager.defaultFamily(),automaticFamily);
         QCOMPARE(manager.currentFamily(),QStringLiteral("PingFang UI SC"));
         QVERIFY(manager.selectFamily(QStringLiteral("苹方UI-简")));
         QCOMPARE(manager.currentFamily(),QStringLiteral("PingFang UI SC"));
         QVERIFY(!manager.families().contains(QStringLiteral("PingFang UI SC Thin")));
         QCOMPARE(manager.variableAxesFor(manager.currentFamily(),400).value("wght").toInt(),500);
-        QCOMPARE(manager.variableAxesFor(manager.currentFamily(),600).value("wght").toInt(),600);
+        QCOMPARE(manager.variableAxesFor(manager.currentFamily(),600).value("wght").toInt(),500);
         QCOMPARE(manager.variableAxesFor(manager.currentFamily(),400).value("wdth").toInt(),100);
         QVERIFY(manager.variableAxesFor(manager.defaultFamily(),400).isEmpty());
         QCOMPARE(QGuiApplication::font().hintingPreference(),QFont::PreferFullHinting);
@@ -98,6 +112,10 @@ private slots:
         restarted.reset();
         QCOMPARE(restarted.currentFamily(),automaticFamily);
     }
+    void optionalVariableAxesAndLivePreview();
+    void optionalRestartRead();
+    void optionalRenderMatrix();
+    void optionalNativePointSizes();
     void nativeGlyphsHaveNoColourFringes(){
         if(QGuiApplication::platformName()!=QStringLiteral("windows"))QSKIP("Requires the native Windows platform");
         QTemporaryDir directory;
@@ -108,7 +126,7 @@ private slots:
         const auto ttc=qEnvironmentVariable("SWIRL_TEST_TTC");
         if(!ttc.isEmpty())fontFiles.append(ttc);
         for(const auto &file:fontFiles){
-            if(!file.isEmpty())QVERIFY(manager.importFont(QUrl::fromLocalFile(file)));
+            if(!file.isEmpty()){QVERIFY(manager.importFont(QUrl::fromLocalFile(file)));QVERIFY(manager.applyPreview());}
             QQmlEngine engine;
             engine.rootContext()->setContextProperty("fixtureFamily",manager.currentFamily());
             QQmlComponent component(&engine);
@@ -139,6 +157,199 @@ Window { width:500; height:80; color:"white"; visible:true
         }
     }
 };
+void FontTests::optionalVariableAxesAndLivePreview(){
+        const auto ttc=qEnvironmentVariable("SWIRL_TEST_TTC");
+        if(ttc.isEmpty())QSKIP("Local-only variable font fixture not supplied");
+        QTemporaryDir directory;
+        QSettings::setDefaultFormat(QSettings::IniFormat);
+        QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,directory.path());
+        QSettings().clear();
+        FontManager manager(nullptr,directory.filePath("fonts"));
+        const auto active=manager.currentFamily();
+        QVERIFY(manager.importFont(QUrl::fromLocalFile(ttc)));
+        QCOMPARE(manager.currentFamily(),active); // import/drag never silently apply
+        QCOMPARE(manager.previewFamily(),QStringLiteral("PingFang UI SC"));
+        QCOMPARE(manager.importedFamilies().size(),5);
+        const auto defaults=manager.previewValues();
+        QCOMPARE(defaults.value("wght").toInt(),500);
+        QCOMPARE(defaults.value("wdth").toInt(),100);
+        QCOMPARE(defaults.value("HGHT").toInt(),500);
+        for(const auto &family:manager.importedFamilies()){
+            QVERIFY(manager.choosePreviewFamily(family));
+            QCOMPARE(manager.previewAxes().size(),3); // includes hidden axes
+            QCOMPARE(manager.previewValues(),defaults);
+        }
+        QVERIFY(manager.choosePreviewFamily("PingFang UI SC"));
+        QVERIFY(!manager.setPreviewAxis("fake",1));
+        QVERIFY(!manager.setPreviewAxis("HGHT",0));
+        QVERIFY(!manager.setPreviewAxis("HGHT",std::numeric_limits<double>::quiet_NaN()));
+        QCOMPARE(manager.previewValues(),defaults);
+        // A live QML Text consumes the actual OpenType axis. No transforms or static instances.
+        QQmlEngine engine;engine.rootContext()->setContextProperty("fixture",&manager);
+        QQmlComponent component(&engine);
+        component.setData(R"(
+import QtQuick
+Window { width:850; height:230; color:"white"; visible:true
+ Text { objectName:"preview"; x:16; y:16; color:"black";
+ text:"苹方字体显示效果测试\nThe quick brown fox jumps over the lazy dog.\n0123456789\n@ # ¥ % &";
+ font.family:fixture.previewFamily; font.pixelSize:25; font.styleName:"";
+ font.variableAxes:fixture.previewValues; font.hintingPreference:Font.PreferFullHinting;
+ renderType:Text.NativeRendering }
+})",QUrl());
+        QScopedPointer<QObject> root(component.create());
+        QVERIFY2(root,qPrintable(component.errorString()));
+        auto *window=qobject_cast<QQuickWindow *>(root.data());QVERIFY(window);
+        window->hide();window->show();QVERIFY(QTest::qWaitForWindowExposed(window));
+        auto *preview=root->findChild<QObject *>("preview");QVERIFY(preview);
+        QImage before;QTRY_VERIFY(!(before=window->grabWindow()).isNull());
+        const auto output=qEnvironmentVariable("SWIRL_FONT_EVIDENCE");
+        if(!output.isEmpty()){QDir().mkpath(output);QVERIFY(before.save(output+"/original-default-live.png"));}
+        QVERIFY(manager.setPreviewAxis("HGHT",1000));
+        QTRY_COMPARE(preview->property("font").value<QFont>().variableAxisValue(QFont::Tag("HGHT")),1000);
+        QImage after;QTRY_VERIFY(!(after=window->grabWindow()).isNull()&&after!=before);
+        if(!output.isEmpty())QVERIFY(after.save(output+"/original-HGHT1000-live.png"));
+        QCOMPARE(manager.currentFamily(),active);
+        QVERIFY(manager.setPreviewAxis("wdth",113.25));
+        QVERIFY(manager.setPreviewAxis("wght",623.5));
+        QVERIFY(manager.applyPreview());
+        QCOMPARE(QGuiApplication::font().variableAxisValue(QFont::Tag("HGHT")),1000);
+        QCOMPARE(manager.variableAxesFor(manager.currentFamily(),400).value("wdth").toDouble(),113.25);
+        // A second same-family apply must invalidate QML dependents.
+        const int revision=manager.configurationRevision();
+        QVERIFY(manager.setPreviewAxis("HGHT",250));QVERIFY(manager.applyPreview());
+        QVERIFY(manager.configurationRevision()>revision);
+        QVERIFY(manager.setPreviewAxis("HGHT",750)); // unconfirmed draft also survives restart
+        QTest::qWait(250);
+        QProcess child;auto environment=QProcessEnvironment::systemEnvironment();
+        environment.insert("SWIRL_FONT_RESTORE_ROOT",directory.path());child.setProcessEnvironment(environment);
+        child.start(QCoreApplication::applicationFilePath(),{"optionalRestartRead"});
+        QVERIFY(child.waitForFinished(15000));
+        QCOMPARE(child.exitStatus(),QProcess::NormalExit);
+        QVERIFY2(child.exitCode()==0,child.readAllStandardOutput().constData());
+        manager.discardPreview();QCOMPARE(manager.previewValues().value("HGHT").toInt(),250);
+        manager.resetPreviewAxes();QCOMPARE(manager.previewValues(),defaults);
+        QVERIFY(manager.importFont(QUrl::fromLocalFile(ttc)));
+        QCOMPARE(QDir(directory.filePath("fonts")).entryList(QDir::Files).size(),1);
+    }
+void FontTests::optionalRestartRead(){
+        const auto directory=qEnvironmentVariable("SWIRL_FONT_RESTORE_ROOT");
+        if(directory.isEmpty())QSKIP("Only run as the independent restoration child");
+        QSettings::setDefaultFormat(QSettings::IniFormat);
+        QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,directory);
+        FontManager manager(nullptr,directory+"/fonts");
+        QCOMPARE(manager.currentFamily(),QStringLiteral("PingFang UI SC"));
+        QCOMPARE(manager.variableAxesFor(manager.currentFamily(),400).value("HGHT").toInt(),250);
+        QCOMPARE(manager.previewValues().value("HGHT").toInt(),750);
+        QCOMPARE(manager.previewValues().value("wdth").toDouble(),113.25);
+        QCOMPARE(manager.previewValues().value("wght").toDouble(),623.5);
+    }
+void FontTests::optionalRenderMatrix(){
+        const auto ttc=qEnvironmentVariable("SWIRL_TEST_TTC");
+        const auto output=qEnvironmentVariable("SWIRL_FONT_EVIDENCE");
+        if(ttc.isEmpty()||output.isEmpty())QSKIP("Local-only matrix requires fixture and evidence directory");
+        QTemporaryDir directory;
+        QSettings::setDefaultFormat(QSettings::IniFormat);
+        QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,directory.path());QSettings().clear();
+        FontManager manager(nullptr,directory.filePath("fonts"));QVERIFY(manager.importFont(QUrl::fromLocalFile(ttc)));
+        QDir().mkpath(output);
+        QJsonObject report{{"platform",QGuiApplication::platformName()},{"qpa",QString::fromUtf8(qgetenv("QT_QPA_PLATFORM"))},
+            {"qt",qVersion()},{"scaleKind","QImage devicePixelRatio simulation; not a system scale change"}};
+        QJsonArray screens;
+        for(const auto *screen:QGuiApplication::screens())screens.append(QJsonObject{
+            {"name",screen->name()},{"width",screen->geometry().width()},{"height",screen->geometry().height()},
+            {"devicePixelRatio",screen->devicePixelRatio()},{"logicalDpi",screen->logicalDotsPerInch()},
+            {"physicalDpi",screen->physicalDotsPerInch()},{"refreshRate",screen->refreshRate()}});
+        report.insert("screens",screens);
+        const QString sample=QStringLiteral("苹方字体显示效果测试\nThe quick brown fox jumps over the lazy dog.\n0123456789\n@ # ¥ % &");
+        auto fontFor=[&](const QString &family,const QVariantMap &values,int points){
+            QFont font(family);font.setPointSize(points);font.setStyleName(QString());font.setHintingPreference(QFont::PreferFullHinting);
+            for(auto it=values.cbegin();it!=values.cend();++it)if(auto tag=QFont::Tag::fromString(it.key().toLatin1()))font.setVariableAxis(*tag,it.value().toFloat());
+            return font;
+        };
+        auto render=[&](const QFont &font,qreal scale){
+            QImage image(QSize(800*scale,180*scale),QImage::Format_ARGB32_Premultiplied);image.setDevicePixelRatio(scale);
+            image.setDotsPerMeterX(qRound(96/0.0254));image.setDotsPerMeterY(qRound(96/0.0254));image.fill(Qt::white);
+            QPainter painter(&image);painter.setPen(Qt::black);painter.setFont(font);
+            painter.drawText(QRectF(16,12,768,156),Qt::AlignLeft|Qt::AlignTop,sample);painter.end();return image;
+        };
+        const auto defaults=manager.previewValues();
+        QJsonArray axisChecks;
+        for(const auto &family:manager.importedFamilies()){
+            QVERIFY(manager.choosePreviewFamily(family));
+            for(const auto &entry:manager.previewAxes()){
+                const auto axis=entry.toMap();const auto tag=axis.value("tag").toString();
+                auto low=defaults,high=defaults;low[tag]=axis["minimum"];high[tag]=axis["maximum"];
+                const auto lowFont=fontFor(family,low,16),highFont=fontFor(family,high,16);
+                const auto lowRaw=QRawFont::fromFont(lowFont),highRaw=QRawFont::fromFont(highFont);
+                QVERIFY(lowRaw.isValid()&&highRaw.isValid());
+                const auto a=render(lowFont,1),b=render(highFont,1);
+                QVERIFY2(a!=b,qPrintable(family+" axis "+tag+" did not affect actual raster output"));
+                const bool metrics=QFontMetricsF(lowFont).height()==QFontMetricsF(highFont).height();
+                axisChecks.append(QJsonObject{{"family",family},{"axis",tag},{"rasterChanged",true},{"lineHeightStable",metrics},
+                    {"lowFamily",lowRaw.familyName()},{"highFamily",highRaw.familyName()}});
+            }
+        }
+        report.insert("axes",axisChecks);QJsonArray cases;
+        QElapsedTimer timer;timer.start();int count=0;
+        for(const int points:{9,10,11,12,13,14,16})for(const qreal scale:{1.,1.25,1.5,1.75,2.}){
+            for(const double wght:{100.,500.,900.})for(const double wdth:{80.,100.,120.})for(const double hght:{1.,500.,1000.}){
+                const QVariantMap values{{"wght",wght},{"wdth",wdth},{"HGHT",hght}};
+                const auto font=fontFor("PingFang UI SC",values,points);QElapsedTimer sampleTimer;sampleTimer.start();
+                const auto image=render(font,scale);const auto elapsed=sampleTimer.nsecsElapsed();
+                const auto hash=QCryptographicHash::hash(QByteArrayView(reinterpret_cast<const char *>(image.constBits()),image.sizeInBytes()),QCryptographicHash::Sha256).toHex();
+                int ink=0,borderInk=0;
+                for(int y=0;y<image.height();++y)for(int x=0;x<image.width();++x)if(qGray(image.pixel(x,y))<240){++ink;if(x==0||y==0||x==image.width()-1||y==image.height()-1)++borderInk;}
+                QVERIFY(ink>0);QVERIFY(borderInk==0);
+                cases.append(QJsonObject{{"points",points},{"scale",scale},{"wght",wght},{"wdth",wdth},{"HGHT",hght},
+                    {"sha256",QString::fromLatin1(hash)},{"rasterMs",elapsed/1000000.0},{"inkPixels",ink},{"borderInk",borderInk},
+                    {"lineHeight",QFontMetricsF(font).height()}});
+                if(wght==500&&wdth==100&&hght==500)QVERIFY(image.save(output+QString("/original-%1pt-%2pct-simulated.png").arg(points).arg(qRound(scale*100))));
+                ++count;
+            }
+        }
+        report.insert("samples",cases);report.insert("count",count);report.insert("elapsedMs",double(timer.elapsed()));
+        QFile file(output+"/matrix.json");QVERIFY(file.open(QIODevice::WriteOnly));file.write(QJsonDocument(report).toJson());
+        qInfo()<<"Render matrix"<<count<<"samples in"<<timer.elapsed()<<"ms; simulated DPI, original font only";
+    }
+
+void FontTests::optionalNativePointSizes()
+{
+    const auto ttc=qEnvironmentVariable("SWIRL_TEST_TTC"),output=qEnvironmentVariable("SWIRL_FONT_EVIDENCE");
+    if(ttc.isEmpty()||output.isEmpty()||QGuiApplication::platformName()!="windows")QSKIP("Local Windows font fixture required");
+    QTemporaryDir directory;QSettings::setDefaultFormat(QSettings::IniFormat);
+    QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,directory.path());QSettings().clear();
+    FontManager manager(nullptr,directory.filePath("fonts"));QVERIFY(manager.importFont(QUrl::fromLocalFile(ttc)));
+    QQmlEngine engine;engine.rootContext()->setContextProperty("fixture",&manager);QQmlComponent component(&engine);
+    component.setData(R"qml(
+import QtQuick
+Window { width:1000; height:880; visible:true; color:"white"
+ Column { x:16; y:12; spacing:8
+  Repeater { model:[9,10,11,12,13,14,16]
+   delegate:Text { required property int modelData; text:modelData+" pt · 苹方字体显示效果测试\nThe quick brown fox jumps over the lazy dog.\n0123456789  @ # ¥ % &";
+    color:"black"; font.family:fixture.previewFamily; font.pointSize:modelData;
+    font.variableAxes:fixture.previewValues; font.hintingPreference:Font.PreferFullHinting; renderType:Text.NativeRendering }
+  }
+ }
+})qml",QUrl());
+    QScopedPointer<QObject> root(component.create());QVERIFY2(root,qPrintable(component.errorString()));
+    auto *window=qobject_cast<QQuickWindow *>(root.data());QVERIFY(window);window->hide();window->show();QVERIFY(QTest::qWaitForWindowExposed(window));
+    QDir().mkpath(output);QJsonArray cases;QList<QVariantMap> coordinates{manager.previewValues()};
+    for(const auto &entry:manager.previewAxes()){
+        const auto axis=entry.toMap();for(const auto &bound:{"minimum","maximum"}){auto values=manager.previewValues();values[axis["tag"].toString()]=axis[bound];coordinates.append(values);}
+    }
+    for(double w:{100.,900.})for(double d:{80.,120.})for(double h:{1.,1000.})coordinates.append({{"wght",w},{"wdth",d},{"HGHT",h}});
+    int index=0;
+    for(const auto &values:coordinates){
+        for(auto it=values.cbegin();it!=values.cend();++it)QVERIFY(manager.setPreviewAxis(it.key(),it.value().toDouble()));
+        QTest::qWait(45);QImage image;QTRY_VERIFY(!(image=window->grabWindow()).isNull());
+        const auto name=QString("/native-9-16pt-case-%1.png").arg(index++);QVERIFY(image.save(output+name));
+        cases.append(QJsonObject{{"file",name.mid(1)},{"axes",QJsonObject::fromVariantMap(values)}});
+    }
+    QFile file(output+"/native-point-sizes.json");QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write(QJsonDocument(QJsonObject{{"dpr",window->devicePixelRatio()},{"qpa",QString::fromUtf8(qgetenv("QT_QPA_PLATFORM"))},{"cases",cases},
+        {"kind","unprocessed Qt window renders at current display DPR; physical appearance not observed"}}).toJson());
+}
+
 int main(int argc,char **argv){
     configureSwirlFontRendering();
     QGuiApplication::setHighDpiScaleFactorRoundingPolicy(Qt::HighDpiScaleFactorRoundingPolicy::PassThrough);

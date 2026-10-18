@@ -125,7 +125,11 @@ QtObject {
     readonly property real shadowOpacity: 0.05
     readonly property string fontFamily: fontManager.currentFamily
     readonly property int bodyFontWeight: Font.Normal
-    function variableAxesFor(family, weight) { return fontManager.variableAxesFor(family, weight) }
+    readonly property int fontRevision: fontManager.configurationRevision
+    function variableAxesFor(family, weight) {
+        const revision = fontRevision // establish a binding dependency for same-family axis updates
+        return fontManager.variableAxesFor(family, weight)
+    }
     function dp(value) { return value === 0 ? 0 : Math.round(value * uiScale) }
     function fontSize(value) { return Math.max(12, Math.round(dp(value))) }
     function setScalePercent(percent) {
