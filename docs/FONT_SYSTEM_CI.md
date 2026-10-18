@@ -6,8 +6,9 @@
 `work/core-completion-20261017` and checks out the triggering **commit SHA**, not a
 moving branch tip. It never writes a branch, edits an App, uses private
 subscription archives, or reads a private font. It also declares a manual trigger
-on that same branch; `build_full_application=false` omits only the extra full
-application compilation, not the font test targets. The initial execution uses
+on that same branch; `build_full_application=false` omits the extra full
+application compilation and application navigation smoke, not the font test
+targets. The initial execution uses
 the development-branch push. GitHub's manual-run UI depends on default-branch
 workflow registration, so a Run workflow button is not promised while this file
 exists only on the development branch. No main-branch change is made to expose
@@ -21,6 +22,7 @@ corresponding references are:
 - [install-qt-action's documented MSVC 2022 architecture](https://github.com/jurplel/install-qt-action/tree/v4).
 - [Qt 6.10.3 offscreen platform source](https://github.com/qt/qtbase/blob/v6.10.3/src/plugins/platforms/offscreen/qoffscreenintegration.cpp).
 - [Qt 6.10.3 XML test result writer](https://github.com/qt/qtbase/blob/v6.10.3/src/testlib/qxmltestlogger.cpp).
+- [PowerShell Start-Process argument quoting and process handling](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.management/start-process).
 - [GitHub Actions standard runner billing](https://docs.github.com/en/actions/concepts/billing-and-usage)
   and [usage limits](https://docs.github.com/en/actions/reference/limits).
 
@@ -39,18 +41,51 @@ version and CMake's actual Qt version, compiler ID and pointer size. It saves th
 actual compiler version, language standard and generator in `font-toolchain.txt`.
 MinGW packages are not combined with MSVC objects.
 
-Each push then attempts a separate complete `Swirl` application compilation with
-the existing `SWIRL_BUILD_UI_TESTS=ON` option. This compiles the existing
+After both the font CTest step and strict case report succeed, each push attempts
+a separate complete `Swirl` application compilation with the existing
+`SWIRL_BUILD_UI_TESTS=ON` option. This compiles the existing
 `FontUiChecks.h` and `FontFrameChecks.h` code paths, including setup of the advanced
 manual-mode control. The build explicitly selects only `--target Swirl`; it does
 not build every unrelated test target or run CTest in that application directory.
-A font test failure remains a failure even if that compile succeeds. This extra
-build does not run the application, change its core choice or exercise live
-network/proxy settings. Compiling the private-font UI/240 Hz test code does not
+A font test or report failure skips this extra compilation and uploads the
+available failure evidence without first waiting for the full application build.
+`stages.json` records CTest, strict-report, application-build and font-smoke
+outcomes separately; a skipped application build is not a successful compilation.
+Compiling the private-font UI/240 Hz test code does not
 count as executing those tests.
 An unavailable external dependency is a real failed configure/build step, with
 its original log retained. No installer or runnable package is published by this
 font verification job.
+
+## Isolated application navigation smoke
+
+After the complete application builds, the job starts that actual `Swirl.exe`
+with the existing `--smoke-test --font-review` test entry. It imports the original
+`automation.ttf` fixture, then selects `Swirl Automation Probe` so that the
+application applies its default automatic font profile. The file path and family
+arguments are explicitly quoted and retain that import-before-selection order.
+Each run creates an absolute, unique `SWIRL_TEST_ROOT` under the runner's temporary
+directory for settings, imported fixture copies, caches and temporary state. It
+does not activate capture or change live network/proxy settings.
+
+The `--font-review` smoke variant waits for the active route's loader, item and
+transition to be ready before requesting the next route. The ordinary smoke
+entry and normal application behavior retain their existing timing. The workflow
+uses `Start-Process` and explicitly waits up to 60 seconds for the Windows GUI
+process. A pass requires exit code zero, the actual font-rendering diagnostic
+naming `Swirl Automation Probe`, one positive `SMOKE_PAGES` completion count, and
+the same number of `FONT_SMOKE_ROUTE_READY` records. The application also returns
+a failure if it observed QML warnings. The count comes from the actual run, not
+a hardcoded number of pages.
+
+`font-smoke.json` saves only `exitCode`, `navigationRequests`, `readyRoutes` and
+the observed `font`; separate diagnostic/stdout/stderr logs retain failures.
+The isolated state directory and its font copies are not uploaded. This checks
+real application route loading and transition readiness with an imported variable
+font. Several routes may reuse one page component; the count is not a count of
+unique rendered pages, inspected QML files, opened popups or screenshots. Software
+offscreen navigation cannot establish physical glyph clarity, pixel acceptance,
+cross-monitor DPI behavior or animation frame pacing.
 
 ## Test sources, executed cases and skips
 
@@ -88,6 +123,16 @@ The offscreen selection/QML suite explicitly uses Qt Quick's software backend,
 as an offscreen integration check. The separate Windows native raster target
 unsets that override and runs the Windows/D3D11 path; software offscreen results
 are not evidence of D3D11 glyph quality.
+
+Only the test step sets `QT_FORCE_STDERR_LOGGING=1`. In Qt 6.10.3, the Windows
+[plain test logger](https://github.com/qt/qtbase/blob/v6.10.3/src/testlib/qplaintestlogger.cpp)
+can send its nominal stdout output to `OutputDebugStringA` when no console is
+attached. The
+[logging override](https://github.com/qt/qtbase/blob/v6.10.3/src/corelib/global/qlogging.cpp)
+keeps those diagnostics in the CTest capture. Structured XML remains the test
+evidence; the public restart check verifies its child's complete XML and actual
+case results rather than depending on captured console text. This setting does
+not change the application build's font rendering or any test assertions.
 
 The full FontTests executable still executes all registered cases. Existing
 private render matrices and pixel tolerance **2** remain unchanged. No private

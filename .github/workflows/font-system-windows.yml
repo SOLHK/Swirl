@@ -18,7 +18,7 @@ on:
   workflow_dispatch:
     inputs:
       build_full_application:
-        description: Also compile the complete existing Swirl application
+        description: Also compile Swirl and run isolated font navigation smoke
         type: boolean
         default: true
 
@@ -110,26 +110,88 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Independent font build failed' }
       - name: Run all registered font checks
         id: tests
+        env:
+          # Qt's Windows plain logger otherwise uses OutputDebugString when
+          # the hosted process has no console. Keep failures in CTest logs.
+          QT_FORCE_STDERR_LOGGING: '1'
         run: |
           ctest --test-dir build/swirl-font-tests -C Release -R '^swirl-font-' --no-tests=error --output-on-failure --output-junit "$PWD/build/font-evidence/ctest.xml" 2>&1 | Tee-Object build/font-evidence/ctest.log
           if ($LASTEXITCODE -ne 0) { throw 'Font checks failed; inspect individual QTest cases and skips' }
       - name: Report individual passes, failures, and skips
+        id: report
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: |
           python tools/SummarizeFontTests.py --build build/swirl-font-tests --output build/font-evidence/font-results.json --require-windows
           if ($LASTEXITCODE -ne 0) { throw 'Missing, failed, or unexpectedly skipped required font checks' }
       - name: Compile the complete application when requested
         id: application
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && (github.event_name == 'push' || inputs.build_full_application) }}
+        if: ${{ !cancelled() && steps.tests.outcome == 'success' && steps.report.outcome == 'success' && (github.event_name == 'push' || inputs.build_full_application) }}
         run: |
           # Compile Swirl with its existing UI checks so FontUiChecks and
           # FontFrameChecks are type-checked too. Build only the Swirl target;
-          # do not run the application or this directory's unrelated tests.
+          # do not run this directory's unrelated tests.
           cmake -S src/Swirl.Quick -B build/swirl-font-application -G 'Visual Studio 17 2022' -A x64 -DSWIRL_BUILD_UI_TESTS=ON 2>&1 | Tee-Object build/font-evidence/application-configure.log
           if ($LASTEXITCODE -ne 0) { throw 'Complete application configuration failed' }
           cmake --build build/swirl-font-application --target Swirl --config Release --parallel 2 2>&1 | Tee-Object build/font-evidence/application-build.log
           if ($LASTEXITCODE -ne 0) { throw 'Complete application compilation failed' }
           if (!(Test-Path build/swirl-font-application/Release/Swirl.exe)) { throw 'Swirl executable missing after build' }
+      - name: Run isolated font navigation smoke in the complete application
+        id: smoke
+        if: ${{ !cancelled() && steps.application.outcome == 'success' }}
+        timeout-minutes: 3
+        env:
+          QT_QPA_PLATFORM: offscreen
+          QT_QUICK_BACKEND: software
+          QT_QPA_FONTDIR: ${{ github.workspace }}/build/font-offscreen
+        run: |
+          $exe = (Resolve-Path build/swirl-font-application/Release/Swirl.exe).Path
+          $fixture = (Resolve-Path build/font-fixtures/automation.ttf).Path
+          $family = 'Swirl Automation Probe'
+          $evidenceDirectory = (Resolve-Path build/font-evidence).Path
+          $diagnosticPath = Join-Path (Split-Path $exe) 'Swirl-diagnostics.txt'
+          $env:SWIRL_TEST_ROOT = Join-Path $env:RUNNER_TEMP ('swirl-font-smoke-' + [guid]::NewGuid().ToString('N'))
+          New-Item -ItemType Directory -Path $env:SWIRL_TEST_ROOT | Out-Null
+          # Start-Process joins argument arrays. Quote each whole value-bearing
+          # argument in one string, preserving spaces and import-before-apply.
+          $arguments = '--smoke-test --font-review "--preview-font-file={0}" "--preview-font-family={1}"' -f $fixture, $family
+          $process = $null
+          $exitCode = $null
+          $timedOut = $false
+          $diagnostics = ''
+          $navigationRequests = 0
+          $readyRoutes = 0
+          $observedFamily = ''
+          $completionCount = 0
+          try {
+            $process = Start-Process -FilePath $exe -ArgumentList $arguments -WorkingDirectory $env:SWIRL_TEST_ROOT -PassThru -NoNewWindow -RedirectStandardOutput (Join-Path $evidenceDirectory 'font-smoke-stdout.log') -RedirectStandardError (Join-Path $evidenceDirectory 'font-smoke-stderr.log')
+            # Keep a process handle while explicitly waiting for the GUI executable.
+            $null = $process.Handle
+            if (!$process.WaitForExit(60000)) {
+              $timedOut = $true
+              $process.Kill()
+              if (!$process.WaitForExit(5000)) { throw 'Font smoke process did not terminate after timeout' }
+            }
+            $process.Refresh()
+            $exitCode = $process.ExitCode
+          } finally {
+            if (Test-Path -LiteralPath $diagnosticPath) {
+              Copy-Item -LiteralPath $diagnosticPath -Destination (Join-Path $evidenceDirectory 'font-smoke-diagnostics.log')
+              $diagnostics = [string](Get-Content -Raw -LiteralPath $diagnosticPath)
+              $completion = [regex]::Matches($diagnostics, '(?m)^\d+:\s+(?:qml:\s+)?SMOKE_PAGES\s+([1-9][0-9]*)[ \t]*\r?$')
+              $completionCount = $completion.Count
+              if ($completionCount -eq 1) { $navigationRequests = [int]$completion[0].Groups[1].Value }
+              $readyRoutes = [regex]::Matches($diagnostics, '(?m)^\d+:\s+(?:qml:\s+)?FONT_SMOKE_ROUTE_READY\s+\S+\s+\S+[ \t]*\r?$').Count
+              $fontLog = [regex]::Matches($diagnostics, '(?m)^\d+:\s+Font rendering\s+"offscreen"\s+"([^"]+)"\s+NativeRendering / FullHinting[ \t]*\r?$')
+              if ($fontLog.Count -eq 1) { $observedFamily = $fontLog[0].Groups[1].Value }
+              Get-Content -LiteralPath $diagnosticPath
+            }
+            @{ exitCode = $exitCode; navigationRequests = $navigationRequests; readyRoutes = $readyRoutes; font = $observedFamily
+            } | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $evidenceDirectory 'font-smoke.json')
+          }
+          if ($timedOut) { throw 'Font navigation smoke exceeded 60 seconds' }
+          if ($null -eq $exitCode -or $exitCode -ne 0) { throw "Font navigation smoke failed: exit code $exitCode" }
+          if ($observedFamily -cne $family) { throw 'Font navigation smoke did not apply the original variable font' }
+          if ($completionCount -ne 1 -or $navigationRequests -le 0 -or $readyRoutes -ne $navigationRequests) { throw 'Font navigation smoke did not finish every requested route with its loader and transition ready' }
       - name: Record actual stage outcomes
         if: always()
         env:
@@ -137,11 +199,14 @@ jobs:
           CONFIGURE_OUTCOME: ${{ steps.configure.outcome }}
           BUILD_OUTCOME: ${{ steps.build.outcome }}
           TEST_OUTCOME: ${{ steps.tests.outcome }}
+          REPORT_OUTCOME: ${{ steps.report.outcome }}
           APPLICATION_OUTCOME: ${{ steps.application.outcome }}
+          SMOKE_OUTCOME: ${{ steps.smoke.outcome }}
         run: |
           New-Item -ItemType Directory -Force build/font-evidence | Out-Null
           @{ qt = $env:QT_OUTCOME; configure = $env:CONFIGURE_OUTCOME; fontBuild = $env:BUILD_OUTCOME;
-             fontCTest = $env:TEST_OUTCOME; applicationBuild = $env:APPLICATION_OUTCOME
+             fontCTest = $env:TEST_OUTCOME; fontReport = $env:REPORT_OUTCOME; applicationBuild = $env:APPLICATION_OUTCOME;
+             fontSmoke = $env:SMOKE_OUTCOME
           } | ConvertTo-Json | Set-Content -Encoding utf8 build/font-evidence/stages.json
           Get-Content build/font-evidence/stages.json | Add-Content $env:GITHUB_STEP_SUMMARY
       - name: Upload whitelisted build and test evidence

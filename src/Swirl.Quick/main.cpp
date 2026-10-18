@@ -274,6 +274,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("previewTheme", previewTheme);
     engine.rootContext()->setContextProperty("previewState", previewState);
     engine.rootContext()->setContextProperty("smokeTestMode", smoke);
+    engine.rootContext()->setContextProperty("fontSmokeReadyMode", smoke && fontReview);
     engine.rootContext()->setContextProperty("systemProvider", &systemData);
     engine.rootContext()->setContextProperty("extensionsProvider", &extensions);
     engine.rootContext()->setContextProperty("diagnostics", &diagnostics);

@@ -3,6 +3,7 @@
 #include "FontAutomationRasterChecks.h"
 #include "app/FontDisplayContext.h"
 #include <QSignalSpy>
+#include <QXmlStreamReader>
 
 namespace {
 void isolateFontSettings(const QTemporaryDir &directory)
@@ -148,7 +149,12 @@ void FontTests::automaticProfilesRestartAcrossProcess()
     environment.insert("SWIRL_FONT_AUTOMATION_CHILD_ROOT",directory.path());
     child.setProcessEnvironment(environment);
     child.setProcessChannelMode(QProcess::MergedChannels);
-    child.start(QCoreApplication::applicationFilePath(),{"automaticProfilesRestartAcrossProcess"});
+    // A Windows Qt child can complete successfully without forwarding its
+    // diagnostic output to these pipes. Require a fresh, structured QTest
+    // report instead of treating a console message as proof of execution.
+    const auto reportPath=directory.filePath("restart-child.xml");
+    child.start(QCoreApplication::applicationFilePath(),
+        {"automaticProfilesRestartAcrossProcess","-o",reportPath+",xml"});
     QVERIFY2(child.waitForStarted(5000),qPrintable(child.errorString()));
     const bool finished=child.waitForFinished(10000);
     if(!finished){child.kill();child.waitForFinished(1000);}
@@ -156,7 +162,37 @@ void FontTests::automaticProfilesRestartAcrossProcess()
     QVERIFY2(finished,output.constData());
     QCOMPARE(child.exitStatus(),QProcess::NormalExit);
     QVERIFY2(child.exitCode()==0,output.constData());
-    QVERIFY2(output.contains("Restored automatic selection"),output.constData());
+    QFile reportFile(reportPath);
+    QVERIFY2(reportFile.open(QIODevice::ReadOnly),qPrintable(reportFile.errorString()));
+    const auto report=reportFile.readAll();
+    QXmlStreamReader xml(report);
+    QMap<QString,QStringList> incidents;
+    QString function;
+    bool expectedRoot=false,completedRestoration=false;
+    while(!xml.atEnd()){
+        xml.readNext();
+        if(!xml.isStartElement())continue;
+        if(xml.name()==QLatin1String("TestCase"))
+            expectedRoot=xml.attributes().value("name")==QLatin1String("FontTests");
+        else if(xml.name()==QLatin1String("TestFunction"))
+            function=xml.attributes().value("name").toString();
+        else if(xml.name()==QLatin1String("Incident"))
+            incidents[function].append(xml.attributes().value("type").toString());
+        else if(xml.name()==QLatin1String("Description")){
+            const auto description=xml.readElementText();
+            if(function==QLatin1String("automaticProfilesRestartAcrossProcess")
+                &&description.contains("Restored automatic selection"))
+                completedRestoration=true;
+        }
+    }
+    QVERIFY2(!xml.hasError(),qPrintable(xml.errorString()));
+    QVERIFY2(expectedRoot,report.constData());
+    const QMap<QString,QStringList> expectedIncidents{
+        {"initTestCase",{"pass"}},
+        {"automaticProfilesRestartAcrossProcess",{"pass"}},
+        {"cleanupTestCase",{"pass"}}};
+    QVERIFY2(incidents==expectedIncidents,report.constData());
+    QVERIFY2(completedRestoration,report.constData());
 }
 
 void FontTests::legacyAxisSettingsArePreserved()

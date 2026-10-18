@@ -331,6 +331,14 @@ ApplicationWindow {
         running:smokeTestMode; repeat:true; interval:200
         property int index:0
         onTriggered:{
+            // Font review waits for real route loading and transition state;
+            // the existing standalone smoke driver retains its rapid cadence.
+            if(fontSmokeReadyMode){
+                const loader=pageLoader.activeLoader
+                if(pageLoader.pendingGrab || pageLoader.moving || !loader ||
+                    loader.status!==Loader.Ready || !loader.item || loader.routeId!==pageLoader.routeKey)return
+                if(index>0)console.info("FONT_SMOKE_ROUTE_READY",AppState.allPageIds[index-1],loader.routeId)
+            }
             if(index>=AppState.allPageIds.length){console.info("SMOKE_PAGES",index);stop();window.navigationSmokeCompleted();return}
             AppState.currentPage=AppState.allPageIds[index++]
         }
