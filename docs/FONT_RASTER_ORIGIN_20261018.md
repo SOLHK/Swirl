@@ -1,5 +1,7 @@
 # Preview raster origin correction — 2026-10-18
 
+Follow-up: the44 unresolved cases below were diagnosed and repaired in [the native texture stage](FONT_NATIVE_TEXTURE_20261018.md). This document preserves the earlier checkpoint.
+
 A stationary VariableFontPreview positioned on half a physical pixel was filtering its already-native raster a second time. At actual Windows 150% / 120Hz, the 9pt sample differed from direct native drawing at 6958 pixels, maximum channel delta128. Integer placement matched. This is a reproducible preview-compositing defect, not evidence of damaged font outlines.
 
 The fix adds a render-only translation of at most about half a physical pixel for unscaled surfaces. It does not change layout x/y/width/height, line metrics, glyph spacing, font bytes or axes. HGHT/wght/wdth still use real QFont variable axes: this transform never implements or simulates an axis. Rotation, scale and additional transform effects retain their existing filtered rendering. Parent motion is observed after animation; unchanged offsets do not dirty frames. The original parent position is used rather than feeding floating-point transformed output back into alignment.

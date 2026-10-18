@@ -79,7 +79,7 @@ inline QJsonObject runFontFramePhase(QQuickWindow *window,FontManager *manager,Q
             if(trace->rasters.size()<8192)trace->rasters.push_back({seq,index,false,matches,begin,end});
             if(matches&&seq>0){trace->readyMasks[seq]|=1<<index;if(trace->readyMasks[seq]==15)trace->readySequence.store(seq);}
         },Qt::DirectConnection));
-        connections.append(QObject::connect(line,&VariableFontPreview::paintMeasured,&receiver,[trace,index](qint64 begin,qint64 end){
+        connections.append(QObject::connect(line,&VariableFontPreview::textureMeasured,&receiver,[trace,index](qint64 begin,qint64 end){
             if(!trace->enabled.load())return;std::lock_guard guard(trace->mutex);
             if(trace->rasters.size()<8192)trace->rasters.push_back({trace->readySequence.load(),index,true,true,begin,end});
         },Qt::DirectConnection));
@@ -136,7 +136,7 @@ inline QJsonObject runFontFramePhase(QQuickWindow *window,FontManager *manager,Q
         if(frame.queued)previous=frame.queued;
     }
     for(const auto &sample:trace->rasters){
-        rawRasters.append(QJsonObject{{"sequence",sample.sequence},{"line",sample.line},{"paintCopy",sample.paint},{"axesMatch",sample.axesMatch},{"beginMs",ms(sample.begin)},{"endMs",ms(sample.end)}});
+        rawRasters.append(QJsonObject{{"sequence",sample.sequence},{"line",sample.line},{"textureUpdate",sample.paint},{"axesMatch",sample.axesMatch},{"beginMs",ms(sample.begin)},{"endMs",ms(sample.end)}});
         if(!sample.paint&&sample.axesMatch){readyAt[sample.sequence]=qMax(readyAt.value(sample.sequence),sample.end);rasterSums[sample.sequence]+=double(sample.end-sample.begin)/1e6;}
         if(sample.sequence>warmup)(sample.paint?paint:raster).push_back(double(sample.end-sample.begin)/1e6);
     }
@@ -153,7 +153,7 @@ inline QJsonObject runFontFramePhase(QQuickWindow *window,FontManager *manager,Q
     std::vector<double> totalRaster;for(auto it=rasterSums.cbegin();it!=rasterSums.cend();++it)if(it.key()>warmup&&trace->readyMasks.value(it.key())==15)totalRaster.push_back(it.value());
     const bool inputWorked=mode!="slider"||changes>total/2;
     return {{"mode",mode},{"round",round},{"completed",completed},{"inputWorked",inputWorked},{"warmupFrames",warmup},{"requestedSampleFrames",samples},{"frameCallbacks",callbacks},{"inputCount",issued},{"representedMeasuredInputs",represented},{"elapsedMs",double(finished-started)/1e6},{"privateBytes",double(fontUiPrivateBytes())},{"renderThread",QString::number(trace->renderThread)},{"guiThread",QString::number(reinterpret_cast<quintptr>(QThread::currentThreadId()))},
-        {"queuedPresentIntervalMs",fontFrameStats(intervals)},{"sceneSyncWallMs",fontFrameStats(sync)},{"renderRecordWallMs",fontFrameStats(record)},{"postRecordToSubmitWallMs",fontFrameStats(submit)},{"wholeFrameWallMs",fontFrameStats(whole)},{"rasterLineWallMs",fontFrameStats(raster)},{"rasterFourLinesWallMs",fontFrameStats(totalRaster)},{"paintImageCopyWallMs",fontFrameStats(paint)},{"inputHandlerWallMs",fontFrameStats(handling)},{"driverQueueDelayMs",fontFrameStats(driver)},{"inputToAllRastersMs",fontFrameStats(rasterLatency)},{"inputToQueuedPresentMs",fontFrameStats(latency)},{"frames",rawFrames},{"rasters",rawRasters},{"inputs",rawInputs}};
+        {"queuedPresentIntervalMs",fontFrameStats(intervals)},{"sceneSyncWallMs",fontFrameStats(sync)},{"renderRecordWallMs",fontFrameStats(record)},{"postRecordToSubmitWallMs",fontFrameStats(submit)},{"wholeFrameWallMs",fontFrameStats(whole)},{"rasterLineWallMs",fontFrameStats(raster)},{"rasterFourLinesWallMs",fontFrameStats(totalRaster)},{"textureUpdateCpuWallMs",fontFrameStats(paint)},{"inputHandlerWallMs",fontFrameStats(handling)},{"driverQueueDelayMs",fontFrameStats(driver)},{"inputToAllRastersMs",fontFrameStats(rasterLatency)},{"inputToQueuedPresentMs",fontFrameStats(latency)},{"frames",rawFrames},{"rasters",rawRasters},{"inputs",rawInputs}};
 }
 
 inline int runFontFrameChecks(QQuickWindow *window,FontManager *manager,const QString &output) {

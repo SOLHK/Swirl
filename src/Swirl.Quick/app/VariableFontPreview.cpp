@@ -5,6 +5,10 @@
 #include <QTextOption>
 #include <QtMath>
 #include <QMatrix4x4>
+#include <QGlyphRun>
+#include <QSGSimpleTextureNode>
+#include <QSGTexture>
+#include <QScopedPointer>
 #ifdef SWIRL_UI_TESTS
 #include <chrono>
 static qint64 rasterClockNs() { return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count(); }
@@ -22,8 +26,9 @@ private:
     QPointF m_offset;
 };
 
-VariableFontPreview::VariableFontPreview(QQuickItem *parent) : QQuickPaintedItem(parent)
+VariableFontPreview::VariableFontPreview(QQuickItem *parent) : QQuickItem(parent)
 {
+    setFlag(ItemHasContents,true);
     setAntialiasing(true);
     m_pixelAlignment=new PreviewPixelAlignment(this);
     auto transforms=transform();transforms.append(&transforms,m_pixelAlignment);
@@ -81,10 +86,24 @@ void VariableFontPreview::updatePolish()
         line.setLineWidth(width());line.setPosition(QPointF(0,y));y+=line.height();}
     layout.endLayout();setImplicitHeight(qCeil(y));
     const qreal dpr=window()?window()->effectiveDevicePixelRatio():1;
-    QImage image(QSize(qCeil(width()*dpr),qMax(1,qCeil(y*dpr))),QImage::Format_ARGB32_Premultiplied);
+    QRectF ink=layout.boundingRect();
+    for(const auto &run:layout.glyphRuns()){
+        const auto raw=run.rawFont();const auto glyphs=run.glyphIndexes();const auto positions=run.positions();
+        // A layout-supplied run rectangle can describe its line/selection box.
+        // Union actual glyph extents as well, including overshoot above the ascent.
+        ink=ink.united(run.boundingRect());
+        for(qsizetype i=0;i<qMin(glyphs.size(),positions.size());++i)
+            ink=ink.united(raw.boundingRect(glyphs[i]).translated(positions[i]));
+    }
+    // Keep native overhang and AA coverage without changing line spacing or advances.
+    const int left=qFloor(qMin(0.,ink.left())*dpr)-2,top=qFloor(qMin(0.,ink.top())*dpr)-2;
+    const int right=qCeil(qMax(width(),ink.right())*dpr)+2,bottom=qCeil(qMax(y,ink.bottom())*dpr)+2;
+    m_rasterOffset=QPointF(left/dpr,top/dpr);
+    QImage image(QSize(qMax(1,right-left),qMax(1,bottom-top)),QImage::Format_ARGB32_Premultiplied);
     image.setDevicePixelRatio(dpr);image.fill(Qt::transparent);
     QPainter painter(&image);painter.setPen(m_color);painter.setRenderHint(QPainter::TextAntialiasing,true);
-    layout.draw(&painter,QPointF());painter.end();m_raster=std::move(image);
+    painter.translate(-m_rasterOffset);layout.draw(&painter,QPointF());painter.end();
+    m_raster=std::move(image);++m_rasterRevision;
     update();
 #ifdef SWIRL_UI_TESTS
     if(started)emit rasterMeasured(started,rasterClockNs());
@@ -92,25 +111,44 @@ void VariableFontPreview::updatePolish()
 }
 void VariableFontPreview::geometryChange(const QRectF &next,const QRectF &previous)
 {
-    QQuickPaintedItem::geometryChange(next,previous);
+    QQuickItem::geometryChange(next,previous);
     if(next.width()!=previous.width())scheduleRaster();
     if(next.topLeft()!=previous.topLeft())alignRaster();
 }
 void VariableFontPreview::itemChange(ItemChange change,const ItemChangeData &data)
 {
-    QQuickPaintedItem::itemChange(change,data);
+    QQuickItem::itemChange(change,data);
     if(change==ItemSceneChange&&m_pixelAlignment)connectAlignmentWindow();
     if(change==ItemDevicePixelRatioHasChanged||change==ItemSceneChange)scheduleRaster();
 }
-void VariableFontPreview::paint(QPainter *painter)
+QRectF VariableFontPreview::boundingRect() const
 {
-    // One native raster at the current DPR, with no resampling or sharpening.
-    // Keep only this frame's image; do not cache images or fonts by coordinate.
+    return QRectF(QPointF(),size()).united(QRectF(m_rasterOffset,m_raster.deviceIndependentSize()));
+}
+class PreviewTextureNode : public QSGSimpleTextureNode {
+public:
+    quint64 revision=0;
+    QScopedPointer<QSGTexture> ownedTexture;
+};
+QSGNode *VariableFontPreview::updatePaintNode(QSGNode *oldNode,UpdatePaintNodeData *)
+{
+    if(m_raster.isNull()||!window()){delete oldNode;return nullptr;}
+    auto *node=static_cast<PreviewTextureNode *>(oldNode);
+    if(!node)node=new PreviewTextureNode;
 #ifdef SWIRL_UI_TESTS
     const auto started=m_measureRaster?rasterClockNs():0;
 #endif
-    painter->drawImage(QPointF(),m_raster);
+    if(node->revision!=m_rasterRevision){
+        auto *texture=window()->createTextureFromImage(m_raster);
+        if(!texture){delete node;return nullptr;}
+        node->setTexture(texture);node->ownedTexture.reset(texture);node->revision=m_rasterRevision;
+    }
+    // Physical image dimensions determine the quad. Never fit a rounded texture
+    // back into the logical line box; that would resample at fractional DPRs.
+    node->setRect(QRectF(m_rasterOffset,m_raster.deviceIndependentSize()));
+    node->setFiltering(QSGTexture::Linear);
 #ifdef SWIRL_UI_TESTS
-    if(started)emit paintMeasured(started,rasterClockNs());
+    if(started)emit textureMeasured(started,rasterClockNs());
 #endif
+    return node;
 }
