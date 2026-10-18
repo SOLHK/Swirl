@@ -371,7 +371,16 @@ print(json.dumps(report), flush=True)
         process = subprocess.run([sys.executable, "-c", code], capture_output=True, timeout=3)
         self.assertEqual(process.returncode, 0)
         self.assertEqual(process.stderr, b"")
-        report = DIAG.safe_report(json.loads(process.stdout), "python-socket")
+        raw = json.loads(process.stdout)
+        # This child uses only the synthetic fixture above. Preserve the measured
+        # timing on failure without printing any target or arbitrary child text.
+        print("STALLED DNS OBSERVATION: " + json.dumps({
+            key: raw.get(key) for key in (
+                "total_budget_ms", "dns_budget_ms", "dns_elapsed_ms",
+                "tcp_elapsed_ms", "total_elapsed_ms", "attempted_count")
+            if type(raw.get(key)) is int
+        }), flush=True)
+        report = DIAG.safe_report(raw, "python-socket")
         self.assertEqual(report["error_code"], "UpstreamDnsTimeout")
         self.assertEqual(report["attempted_count"], 0)
 
