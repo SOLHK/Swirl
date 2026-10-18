@@ -8,6 +8,8 @@
 #endif
 #include <QtQml/qqmlregistration.h>
 
+class PreviewPixelAlignment;
+
 // Keep a single painted surface per live preview instead of scene-graph glyph
 // textures for the stream of variable-font coordinates. The font engine and
 // OpenType axes are unchanged; this class never registers or instances a font.
@@ -43,6 +45,10 @@ protected:
     void updatePolish() override;
 private:
     void scheduleRaster();
+    void connectAlignmentWindow();
+    void alignRaster();
+    PreviewPixelAlignment *m_pixelAlignment=nullptr;
+    QMetaObject::Connection m_alignmentConnection;
     QString m_text;
     QFont m_font;
     QColor m_color=Qt::black;

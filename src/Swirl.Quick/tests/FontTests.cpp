@@ -121,6 +121,7 @@ private slots:
     void optionalMetadataReplacement();
     void malformedImportPreservesState();
     void optionalPaintedPreviewAxes();
+    void optionalRasterQualityMatrix();
     void optionalCffImport();
     void nativeGlyphsHaveNoColourFringes(){
         if(QGuiApplication::platformName()!=QStringLiteral("windows"))QSKIP("Requires the native Windows platform");
@@ -472,6 +473,8 @@ void FontTests::optionalCffImport()
     int ink=0;for(int y=0;y<image.height();++y)for(int x=0;x<image.width();++x)if(qGray(image.pixel(x,y))<240)++ink;
     QVERIFY(ink>20);
 }
+
+#include "FontRasterQualityChecks.h"
 
 int main(int argc,char **argv){
     configureSwirlFontRendering();
