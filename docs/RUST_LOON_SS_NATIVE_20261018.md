@@ -33,13 +33,13 @@ and wire formats were studied; no reference code was copied or new dependency ad
 - Rebuilt Qt CTest passed. The independent Python SS test now drives both Loon
   imports through NodeImporter -> RustCoreEngine -> Rust SS and HTTP obfs -> peer,
   as well as the previous explicitly configured SS case. All three sessions passed.
-- Other existing independent protocol, DNS, control and capture suites are being
-  checked; exact conclusions and CI identities will be appended after completion.
+- Other existing independent protocol, DNS, control and capture suites passed;
+  exact results and CI identities appear below.
 - The new DNS-worker diagnostic first passed independently on all three platforms.
   Full macOS CI still reproduced the unchanged timeout-validation error: observed
   DNS time 158 ms for a 30 ms budget, no TCP attempted. The isolated macOS test
   measured 38 ms. Timing observations now separate worker startup and queue wait;
-  production budgets and validator tolerance are unchanged. This is not yet fixed.
+  production budgets and validator tolerance are unchanged. This observation preceded the test-contract correction documented below.
 
 Offline replay of all 18 cached entries now parses 18/18, with 1558 node records
 including duplicated sources and 450 TCP candidate records. The previously
@@ -47,8 +47,7 @@ unparsed local entry 15 now yields 90 HTTP-obfs SS candidates. This is not a
 claim that all nodes connect or full configuration policy/DNS/routing executes.
 The raw encrypted cache and provenance are unchanged by inspection.
 
-Actual provider probes, final CI conclusions, final hashes and remaining work will
-be recorded after validation. New proxy protocols and Windows TUN are not completed
+Provider results, final CI conclusions, hashes and remaining work are recorded below. New proxy protocols and Windows TUN are not completed
 by this import and forwarding stage.
 
 ## DNS lifecycle and deadline test correction
@@ -71,4 +70,71 @@ TIMING_SLACK_MS, DNS implementation or validation condition is changed.
 
 References reviewed: CPython's [condition wait implementation](https://github.com/python/cpython/blob/3.14/Python/parking_lot.c)
 and [queue deadline loop](https://github.com/python/cpython/blob/3.14/Lib/queue.py).
-Local diagnostic suite: 21 passed. Final three-platform results remain pending.
+Local diagnostic suite: 21 passed. Final three-platform results are verified below.
+
+## Final local and provider evidence
+
+The native product change is `4ea41397386bed2678f8af41ba110965037f421d`.
+Validation source `d7e79df2f1519da97507d2d3a1a92ff869543017` adds only diagnostic
+regressions/documentation; Rust/Qt product sources, production diagnostic code and
+native HTTPS verifier are identical. The local Release binary hashes are in the
+structured evidence. This is not a new proxy-protocol implementation.
+
+All 18 cached entries parse; 1558 records and 450 TCP candidate records include
+repeated exports. Local entry 15 contributes 90 newly usable SS/HTTP-obfs candidates.
+Its first three original-order nodes passed independent Python and Rust DNS/TCP
+on the user's Windows network: one IPv4/no IPv6 per engine, one attempted address,
+none remaining, paired durations 328/375/266ms. Native SS HTTP-obfs/AEAD strict HTTPS
+then passed TLS1.3, HTTP200, bidirectional accounting, orderly close and
+active=0/failed=0 for all three. They were not substituted for the older fixed samples.
+
+The [final private Windows run](https://github.com/SOLHK/Swirl-Private-Tests/actions/runs/39104294687)
+was success, with private workflow source `381f3c608e4363870e57529437650efa53ad8cfd`
+and exact public source `d7e79df2f1519da97507d2d3a1a92ff869543017`.
+It passed 52 private helper tests, exact 16/16 remote URL matching against 18 local
+entries, and five nonempty equal executable-candidate parameter groups. No local
+body is byte-identical to the remote body, so source configurations remain separate.
+The immutable old #9 nodes 1/2/3 again passed both TCP engines and strict native HTTPS.
+The documentation-only private follow-up is `7ac895141a29ce3aa86f6afba7a3b7a9fce972d8`.
+Secrets and ciphertext are unchanged; no supplier refresh or plaintext upload occurred.
+
+Local validation: 132 Rust tests, fmt/check/Clippy -D warnings, Release, rebuilt Qt
+CTest, four independent Qt peer suites, and 208 Python tests passed after the Qt
+reruns. Three explicit local skips remain: optional real Codex CLI, optional C++
+DPAPI importer, and symlink creation without Windows privilege. An initial local
+workflow-test subprocess decoded output using GBK; rerunning with process-local
+PYTHONUTF8=1 passed without that decoding exception. No global environment was changed.
+The existing MinGW .drectve linker warning remains, with successful linking.
+
+UI/QML, active user config, system proxy, routes, firewall and adapters were untouched.
+Full subscription policy/DNS/routing execution and all-node/UDP acceptance are not
+implied. REALITY/Vision, VMess, SS2022, gRPC/XHTTP, Hysteria2/TUIC and Windows TUN remain
+separate incomplete stages. The new protocol priority should use real cached demand,
+including the 59 VLESS/REALITY records, rather than claiming those can execute.
+
+## Exact-source final CI
+
+All final runs completed successfully on `d7e79df2f1519da97507d2d3a1a92ff869543017`:
+
+- [Rust Core: Linux, macOS, Windows](https://github.com/SOLHK/Swirl/actions/runs/39104085584).
+- [Core implementation validation](https://github.com/SOLHK/Swirl/actions/runs/39104085583).
+- [Focused DNS worker diagnostic](https://github.com/SOLHK/Swirl/actions/runs/39104085580).
+
+Each platform passed 132 Rust tests, static gates and native Release build. Linux
+and macOS each ran 174 Python cases: 170 passed and four Qt-only cases skipped.
+Windows completed 209 Python passes after the four separate Qt peer reruns; two
+optional cases remain skipped (real Codex CLI and the standalone C++ DPAPI importer).
+Cloud Windows Qt CTest and all four Python-driven Qt peer suites passed, including
+both new Loon imports in the SS peer suite. Full application packaging, GUI visual
+acceptance and long-duration performance were not run in this stage.
+
+Earlier runs 39103115921 and 39103629123 failed on the original macOS timing test;
+those failures and measured 158/151ms waits remain in the structured record.
+Final macOS recorded a 46ms real wait and passed the new deterministic 158ms
+late-answer/no-dial/validator-rejection cases. Scheduling latency was not hidden or
+reclassified as a valid budget observation; the original product checks remain intact.
+
+[Machine-readable source, binary and test evidence](evidence/RUST_LOON_SS_20261018_VERIFIED.json)
+contains exact revisions, local artifact hashes, anonymous counts and bounded network
+outcomes only. The subsequent handoff commit is documentation-only and is not claimed
+as a separately built or tested product revision.

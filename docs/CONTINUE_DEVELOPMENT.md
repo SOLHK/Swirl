@@ -1,5 +1,7 @@
 # Swirl 接续开发入口
 
+最新阶段：[旧式 Loon SS 原生转发及跨平台诊断验收](RUST_LOON_SS_NATIVE_20261018.md)。功能源码4ea4139，最终测试源码d7e79df：三平台CI、Qt集成、私有复核均成功；18/18缓存入口可解析，新增入口的前三个SS节点严格HTTPS通过。旧macOS测试失败已定位为唤醒时延假设并修正测试契约，产品超时与校验器不变。订阅窗口仍关闭，继续仅使用D盘加密缓存。
+
 最新采集及导入阶段见 [本机订阅窗口与旧式 Loon Trojan](RUST_SUBSCRIPTION_WINDOW_20261018_LOCAL.md)。新窗口18个入口均已加密保存到D盘，供应商请求已停止；原始缓存保留。双源与固定SS本机实测已通过；Linux/Windows CI成功，macOS同一DNS诊断测试两次失败，详情和准确源码SHA见该记录。
 
 **最新补记：原密钥通过已有 GitHub Secret / Windows runner 在内存中复用，无需用户寻找或重发。**
