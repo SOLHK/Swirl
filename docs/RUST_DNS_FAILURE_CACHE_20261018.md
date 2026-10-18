@@ -1,5 +1,31 @@
 # Windows native DNS failure-cache stage
 
+**Final verified source: `b903b8b1d9c5e0c40c3dee5033447900665d1835`.**
+[Core 39097773884](https://github.com/SOLHK/Swirl/actions/runs/39097773884) and
+[App 39097773891](https://github.com/SOLHK/Swirl/actions/runs/39097773891) both
+finished **success**. The final handoff commit changes documentation/evidence
+only; it is not a newly built source revision. [Structured evidence](evidence/RUST_DNS_FAILURE_CACHE_20261018_VERIFIED.json).
+
+| Environment | Rust/checks/Release | Python | Qt |
+|---|---|---|---|
+| User Windows GNU | 128 passed; fmt/check/strict Clippy/Release passed | 205 unique cases: 202 passed, 3 explicit skips | Full app built; CTest 1/1; four independent peers passed |
+| Hosted Linux | 128 passed; all build gates passed | 167 passed, four Qt skips | Not run |
+| Hosted macOS | 128 passed; all build gates passed | 167 passed, four Qt skips | Not run |
+| Hosted Windows MSVC | 128 passed; all build gates passed | 203/205 passed after four Qt followups; two optional skips remain | CTest 1/1, 6.69 seconds; four independent peers passed |
+
+Actual implementation/test files changed:
+
+- `core/crates/swirl-dns/src/lib.rs`: bounded failure cache and resolver tests.
+- `core/crates/swirl-dns/src/wire.rs`: separate cached-failure outcome.
+- `tools/tests/test_dns_negative.py`: independent failure/recovery and port-allocation tests.
+- `tools/tests/dns_peer.py`: bounded Windows reserved-port handling in the test peer.
+- Private repository `scripts/test_native_core.py` and `scripts/test_native_core_unit.py`:
+  Windows executable discovery and identity/rejection tests. No Qt/C++/QML changes.
+
+Private final documentation HEAD is `f0b69bc7324ff2972c29beaee26fe19c47d110d3`,
+following code `0a92d17` and actual Linux failure-evidence commit `1374be0`.
+All five ciphertexts match the earlier recorded hashes; no secure archive changed.
+
 Baseline: `126d9f6fa8fc92aebabaa2ee0f971865cfa2520c`, branch
 `work/core-completion-20261017`. Work, dependencies copied for reuse, build output
 and diagnostics are under `D:\Codex`; existing C-drive tools are read in place.

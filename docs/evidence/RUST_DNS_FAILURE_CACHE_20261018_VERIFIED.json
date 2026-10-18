@@ -1,0 +1,125 @@
+{
+  "schema": 1,
+  "date": "2026-10-18",
+  "implementation_commit": "cafdd62a556165bb5796fcac7f9fd8ef95643143",
+  "tested_source_commit": "b903b8b1d9c5e0c40c3dee5033447900665d1835",
+  "branch": "work/core-completion-20261017",
+  "public_main_baseline": "87409c0bf9c957ef113f84c176c5a1529c27b9df",
+  "local_windows": {
+    "root": "D:\\Codex",
+    "rust_tests_passed": 128,
+    "rust_fmt": "passed",
+    "rust_check": "passed",
+    "rust_clippy_warnings_denied": "passed",
+    "release": "passed_with_existing_gnu_drectve_warning",
+    "python_unique_cases": 205,
+    "python_passed": 202,
+    "python_skipped": 3,
+    "skip_reasons": [
+      "symlink_privilege_unavailable",
+      "optional_cpp_importer",
+      "opt_in_real_codex_cli"
+    ],
+    "dns_independent_tests_passed": 23,
+    "qt_app_build": "passed",
+    "qt_ctest_passed": 1,
+    "qt_ctest_seconds": 6.71,
+    "qt_independent_peer_tests_passed": 4,
+    "private_helper_tests_passed": 43
+  },
+  "ci": {
+    "core_run": 39097773884,
+    "conclusion": "success",
+    "app_run": 39097773891,
+    "app_conclusion": "success",
+    "jobs": [
+      {
+        "name": "linux",
+        "id": 117587670090,
+        "conclusion": "success",
+        "rust_passed": 128,
+        "python_passed": 167,
+        "python_skipped": 4
+      },
+      {
+        "name": "macos",
+        "id": 117587669939,
+        "conclusion": "success",
+        "rust_passed": 128,
+        "python_passed": 167,
+        "python_skipped": 4
+      },
+      {
+        "name": "windows",
+        "id": 117587670019,
+        "conclusion": "success",
+        "rust_passed": 128,
+        "python_unique_cases": 205,
+        "python_passed_after_qt_followups": 203,
+        "python_skipped_remaining": 2,
+        "qt_ctest_passed": 1,
+        "qt_ctest_seconds": 6.69,
+        "qt_independent_peer_tests_passed": 4
+      }
+    ]
+  },
+  "preserved_failure": {
+    "core_run": 39097322603,
+    "commit": "cafdd62a556165bb5796fcac7f9fd8ef95643143",
+    "conclusion": "failure",
+    "platform": "windows",
+    "failure": "PythonDnsPeerTcpBindWinError10013",
+    "linux": "success",
+    "macos": "success",
+    "correction": "bounded_retry_for_selected_port_only_no_product_change"
+  },
+  "public_network": {
+    "windows": {
+      "native_direct_tls_https_orderly_close_passed": 2,
+      "native_doh": "DnsTlsTimeout",
+      "independent_bootstrap_tcp": "both_python_and_rust_timeout"
+    },
+    "hosted_linux": {
+      "native_direct_and_doh_passed": 3,
+      "strict_certificate_validation": true,
+      "orderly_close": true
+    }
+  },
+  "subscriptions": {
+    "supplier_refresh_requests": 0,
+    "local_manifest_entries": 18,
+    "local_distinct_urls": 17,
+    "local_cached_bodies": 14,
+    "local_distinct_decoded_bodies": 12,
+    "local_body_integrity_verified": true,
+    "local_parsed_records": 12,
+    "local_unrecognized_records": 2,
+    "local_matches_to_current_remote_body_hashes": 0,
+    "local_matches_to_fixed_old_body_hash": 0,
+    "exact_url_and_node_comparison": "blocked_missing_original_archive_key",
+    "github_current_entries": 16,
+    "github_distinct_current_bodies": 7,
+    "github_node_records": 1440,
+    "current_five_ciphertexts_match_recorded_hashes": true
+  },
+  "private": {
+    "code_commit": "0a92d1789e5ca8bc9b09f11cd7c62d7aaac7615b",
+    "report_commit": "1374be0cfe6f97884ab416c48515c0adf3ff2844",
+    "documentation_head": "f0b69bc7324ff2972c29beaee26fe19c47d110d3",
+    "run": 39097562489,
+    "conclusion": "failure",
+    "tested_native_source": "44488e7a88c66125164e85720278be052f4aa74b",
+    "hosted_linux_decrypted_and_parsed": 16,
+    "fixed_samples": 3,
+    "python_tcp_passed": 0,
+    "rust_tcp_passed": 0,
+    "protocol_attempted": 0,
+    "windows_fixed_sample_test": "MissingArchiveKey",
+    "ciphertext_changes": 0
+  },
+  "limits": [
+    "No provider SS handshake, obfs, AEAD or HTTPS success established",
+    "No new VMess, SS2022, REALITY, Vision, gRPC, XHTTP, Hysteria2 or TUIC implementation",
+    "No TUN, Fake-IP, full configuration execution, performance or personal UI acceptance claim"
+  ]
+}
