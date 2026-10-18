@@ -1,7 +1,7 @@
 {
   "recorded_at_utc": "2026-10-18T08:53:34.619791+00:00",
   "base_commit": "ad0db7e54ea036067bc7bd58bbfbc206135bb1b0",
-  "implementation_binding": "LF-normalized source hashes in this commit; exact implementation SHA and CI will be recorded in follow-up verification",
+  "implementation_binding": "Exact implementation commit and successful CI runs verified; source hashes retained.",
   "source_sha256_lf": {
     ".github/workflows/rust-core.yml": "baa3b9f155989f1360e82b18db58d0cf1c312ef76a3b7abf1352a54ff01eb75f",
     "core/crates/swirl-dns/src/doh.rs": "3c16891567a27ea1d66e03e5bf4dedf04b1fff394dfa7b374900295f70f32481",
@@ -81,10 +81,65 @@
     "Pure OS path rejects ipv4_only; literal/static IPv6 and remote proxy-side DNS are not disabled.",
     "No real subscription/node or global packet-capture validation in this stage.",
     "MinGW release linker emits existing corrupt .drectve warnings; builds succeed; strict clippy succeeds.",
-    "Full self-development weighted acceptance remains 10.83%, not implementation percentage."
+    "Full self-development weighted acceptance remains 10.83%, not implementation percentage.",
+    "Compatibility guard applies to binaries built from f81eab6 or later, not historically released older binaries. Full configuration replacement deliberately uses its own defaults for omitted policy."
   ],
   "ci": {
-    "status": "pending exact implementation commit"
+    "verified_at_utc": "2026-10-18T09:13:29.795334+00:00",
+    "runs": [
+      {
+        "id": 39113224086,
+        "name": "Core implementation validation",
+        "status": "completed",
+        "conclusion": "success",
+        "sha": "f81eab6e2eaf5a2d9f1f538a4ce04cde268797c0",
+        "url": "https://github.com/SOLHK/Swirl/actions/runs/39113224086",
+        "jobs": [
+          {
+            "id": 117633576234,
+            "name": "core",
+            "status": "completed",
+            "conclusion": "success",
+            "active": [],
+            "failed": []
+          }
+        ]
+      },
+      {
+        "id": 39113224090,
+        "name": "Swirl Rust Core",
+        "status": "completed",
+        "conclusion": "success",
+        "sha": "f81eab6e2eaf5a2d9f1f538a4ce04cde268797c0",
+        "url": "https://github.com/SOLHK/Swirl/actions/runs/39113224090",
+        "jobs": [
+          {
+            "id": 117633576174,
+            "name": "windows-rust",
+            "status": "completed",
+            "conclusion": "success",
+            "active": [],
+            "failed": []
+          },
+          {
+            "id": 117633576419,
+            "name": "portable-rust (macos-latest)",
+            "status": "completed",
+            "conclusion": "success",
+            "active": [],
+            "failed": []
+          },
+          {
+            "id": 117633576508,
+            "name": "portable-rust (ubuntu-latest)",
+            "status": "completed",
+            "conclusion": "success",
+            "active": [],
+            "failed": []
+          }
+        ]
+      }
+    ]
   },
   "logs": [
     {
@@ -199,5 +254,6 @@
       "bytes": 2027846,
       "sha256": "7c56b2639fa17488955d11672097d6379e12419b7190b03d9c6648965b18e59d"
     }
-  ]
+  ],
+  "implementation_commit": "f81eab6e2eaf5a2d9f1f538a4ce04cde268797c0"
 }

@@ -1,0 +1,69 @@
+{
+  "schema": 1,
+  "source_kind": "user_supplied_new_unlimited_test_subscription",
+  "authorization_message": "Sentinel_3bf14d8251c481918fe177bd3f91d89f",
+  "supplier_requests": 1,
+  "old_supplier_requests": 0,
+  "node_requests": 0,
+  "redirects_followed": 0,
+  "proxy_mode": "direct",
+  "tls_validation": true,
+  "plaintext_written": false,
+  "started_at_utc": "2026-10-18T09:10:07.621897+00:00",
+  "http_status": 200,
+  "raw_bytes": 5009,
+  "raw_sha256": "ffdf11b35160dc0e71877cdd4a19eeeddff1ef08ecd1da55d51a3d3091f3bc4f",
+  "response_ciphertext_sha256": "288bd721093c07fb425201996143c273a8407f3786460acc7a11658083d84dd1",
+  "encrypted_readback_verified": true,
+  "decoded_bytes": 27280,
+  "decoded_sha256": "b4e711b207786a1fe2d21a6fb7440c62265f9289868b06f0ee6165a05d75d82f",
+  "format": "base64",
+  "recognized": true,
+  "parsed": true,
+  "parse_error": null,
+  "node_count": 59,
+  "protocol_counts": {
+    "vless": 59
+  },
+  "native_tcp_candidates": 0,
+  "complete_configuration_execution_supported": false,
+  "unfetched_reference_count": 0,
+  "inspector_sha256": "9e32f382f22f1ffc165861b1d61c7d2fcb07a555ba46106e3d94e4a33ea2b336",
+  "result": "encrypted_and_inspected",
+  "finished_at_utc": "2026-10-18T09:10:09.078729+00:00",
+  "capability_summary": {
+    "protocol": {
+      "vless": 59
+    },
+    "transport": {
+      "tcp": 59
+    },
+    "tls": {
+      "reality": 59
+    },
+    "diagnostic": {
+      "RealityNotImplemented": 59
+    },
+    "unrecognized_field_total": 472,
+    "node_requests": 0,
+    "content_type": "text/html"
+  },
+  "feature_summary": {
+    "feature_counts": {
+      "flow:absent": 4,
+      "fp:chrome": 59,
+      "encryption:none": 59,
+      "security:reality": 59,
+      "type:tcp": 59,
+      "flow:xtls-rprx-vision": 55
+    },
+    "node_requests": 0,
+    "supplier_requests": 0
+  },
+  "network_acceptance": {
+    "attempted_nodes": 0,
+    "verified_nodes": 0,
+    "blocked_nodes": 59,
+    "reason": "REALITY not implemented; 55 additionally require Vision; no security downgrade or external core used."
+  }
+}

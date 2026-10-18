@@ -1,3 +1,11 @@
+# Latest checkpoint: typed subscription options and new test source (2026-10-18)
+
+Current completed DNS baseline: `f81eab6e2eaf5a2d9f1f538a4ce04cde268797c0`; Rust CI39113224090 and implementation39113224086 all successful. The next subscription patch is locally validated and being committed; see [typed-options stage](SUBSCRIPTION_TYPED_OPTIONS_20261018.md) for exact source/log hashes and remaining scope. Do not apply old CI to new code.
+
+New unlimited source: one authorized request,HTTP200,59 VLESS/TCP/REALITY nodes (55 Vision), encrypted under `D:\Codex\work\private-capture-new-test-20261018`; no node requests because native REALITY is missing. Old08:25 window remains0 requests/0 new saves. Do not refresh old sources.
+
+Next: bind new commit/CI, continue complete-profile compatibility with static select/local domain rules; investigate native REALITY TLS backend and pinned peer interoperability. Existing complete-profile0/18 and weighted full-goal10.83% remain unchanged. No UI, user settings, drivers or system network settings were changed.
+
 # Native DNS query-family checkpoint (local validation complete)
 
 Base/evidence head ad0db7e54ea036067bc7bd58bbfbc206135bb1b0. The current implementation adds explicit A-only DNS across UDP/TCP/DoT/DoH, strict IR/Qt mapping, persisted-policy compatibility protection and cache-generation isolation. All local checks passed after recorded fixes; see RUST_DNS_QUERY_FAMILY_20261018.md and its structured evidence. Exact implementation SHA/CI will be bound after commit. Existing fbef399 CI is historical evidence only.

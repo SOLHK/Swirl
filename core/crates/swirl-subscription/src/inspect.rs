@@ -311,14 +311,16 @@ fn uri(line: &str) -> Result<Value, &'static str> {
             n["plugin-opts"] = options.into();
             continue;
         }
-        let (key, paired_alias) = match key.as_ref() {
-            "type" => ("network", Some("network")),
-            "network" => ("network", Some("type")),
-            "sni" => ("sni", Some("peer")),
-            "peer" => ("sni", Some("sni")),
-            "allowInsecure" => ("skip-cert-verify", Some("skip-cert-verify")),
-            "skip-cert-verify" => ("skip-cert-verify", Some("allowInsecure")),
-            _ => (key.as_ref(), None),
+        let (key, aliases): (&str, &[&str]) = match key.as_ref() {
+            "type" => ("network", &["type", "network"]),
+            "network" => ("network", &["type", "network"]),
+            "sni" => ("sni", &["sni", "peer"]),
+            "peer" => ("sni", &["sni", "peer"]),
+            "allowInsecure" | "insecure" | "skip-cert-verify" => (
+                "skip-cert-verify",
+                &["allowInsecure", "insecure", "skip-cert-verify"],
+            ),
+            _ => (key.as_ref(), &[]),
         };
         let value = if matches!(key, "skip-cert-verify" | "udp") {
             match value.as_ref() {
@@ -333,7 +335,13 @@ fn uri(line: &str) -> Result<Value, &'static str> {
             // Only distinct, known aliases may share an identical typed value.
             // raw-uri retains both spellings; no authority or credential field
             // can be overwritten, and repeated source keys still fail above.
-            if paired_alias.is_some_and(|alias| seen.contains(alias)) && previous == &value {
+            if aliases
+                .iter()
+                .filter(|alias| seen.contains(**alias))
+                .count()
+                > 1
+                && previous == &value
+            {
                 continue;
             }
             return Err("ConflictingUriParameter");
@@ -342,26 +350,55 @@ fn uri(line: &str) -> Result<Value, &'static str> {
     }
     Ok(n)
 }
-fn csv(text: &str) -> Result<Vec<String>, &'static str> {
+fn clean_ini(text: &str) -> String {
+    let text = text.trim();
+    if text.len() >= 2
+        && ((text.starts_with('"') && text.ends_with('"'))
+            || (text.starts_with('\'') && text.ends_with('\'')))
+    {
+        let quote = text.chars().next().unwrap();
+        text[1..text.len() - 1]
+            .replace(&format!("\\{quote}"), &quote.to_string())
+            .replace("\\\\", "\\")
+    } else {
+        text.to_string()
+    }
+}
+fn csv(text: &str) -> Result<Vec<(String, bool)>, &'static str> {
     let mut out = Vec::new();
     let mut field = String::new();
     let mut quote = None;
+    let mut escaped = false;
+    let finish = |field: &str| {
+        let raw = field.trim();
+        (clean_ini(raw), raw.starts_with(['"', '\'']))
+    };
     for c in text.chars() {
+        if escaped {
+            field.push(c);
+            escaped = false;
+            continue;
+        }
+        if c == '\\' && quote.is_some() {
+            escaped = true;
+            field.push(c);
+            continue;
+        }
         if quote == Some(c) {
             quote = None;
         } else if quote.is_none() && (c == '"' || c == '\'') {
             quote = Some(c);
         } else if c == ',' && quote.is_none() {
-            out.push(field.trim().to_string());
+            out.push(finish(&field));
             field.clear();
-        } else {
-            field.push(c);
+            continue;
         }
+        field.push(c);
     }
-    if quote.is_some() {
+    if quote.is_some() || escaped {
         return Err("IniQuotation");
     }
-    out.push(field.trim().to_string());
+    out.push(finish(&field));
     Ok(out)
 }
 // Only the section envelope is common across these client formats. Rule,
@@ -419,7 +456,7 @@ fn ini(text: &str) -> Result<Vec<Value>, &'static str> {
         if name.trim().is_empty() {
             return Err("IniAssignment");
         }
-        let fields = csv(value)?;
+        let (fields, quoted): (Vec<_>, Vec<_>) = csv(value)?.into_iter().unzip();
         let qx = section == "server_local";
         if !qx && matches!(protocol(&fields[0]), "direct" | "reject") {
             continue;
@@ -457,24 +494,28 @@ fn ini(text: &str) -> Result<Vec<Value>, &'static str> {
         let loon_obfs = !qx
             && fields[0].eq_ignore_ascii_case("shadowsocks")
             && fields.len() >= 7
-            && fields[3..7].iter().all(|field| !field.contains('='));
+            && (3..7).all(|index| quoted[index] || !fields[index].contains('='));
         let mut positional = 0;
         let mut seen = std::collections::HashSet::new();
-        for field in &fields[start..] {
+        for (index, field) in fields[start..].iter().enumerate() {
             // Older Loon Trojan exports use key:value after the password.
             // Do not interpret a colon inside the positional password as a key.
-            let parameter = field.split_once('=').or_else(|| {
-                if qx || kind != "trojan" || n.get("password").is_none() {
-                    return None;
-                }
-                field.split_once(':').filter(|(key, _)| {
-                    let key = key.trim();
-                    !key.is_empty()
-                        && key
-                            .bytes()
-                            .all(|b| b.is_ascii_alphanumeric() || b"-_".contains(&b))
+            let parameter = if quoted[start + index] {
+                None
+            } else {
+                field.split_once('=').or_else(|| {
+                    if qx || kind != "trojan" || n.get("password").is_none() {
+                        return None;
+                    }
+                    field.split_once(':').filter(|(key, _)| {
+                        let key = key.trim();
+                        !key.is_empty()
+                            && key
+                                .bytes()
+                                .all(|b| b.is_ascii_alphanumeric() || b"-_".contains(&b))
+                    })
                 })
-            });
+            };
             if let Some((key, value)) = parameter {
                 let key = key.trim();
                 let canonical = match key {
@@ -489,17 +530,18 @@ fn ini(text: &str) -> Result<Vec<Value>, &'static str> {
                 if !seen.insert(canonical) || n.get(canonical).is_some() {
                     return Err("DuplicateIniParameter");
                 }
+                let value = clean_ini(value);
                 n[canonical] = if matches!(
                     canonical,
                     "udp" | "tls" | "tfo" | "skip-cert-verify" | "tls-verification"
                 ) {
-                    match value.trim().to_ascii_lowercase().as_str() {
+                    match value.to_ascii_lowercase().as_str() {
                         "true" => true.into(),
                         "false" => false.into(),
-                        _ => value.trim().into(),
+                        _ => value.into(),
                     }
                 } else {
-                    value.trim().into()
+                    value.into()
                 };
             } else {
                 let key = match (kind, positional) {
@@ -515,6 +557,19 @@ fn ini(text: &str) -> Result<Vec<Value>, &'static str> {
                 n[key] = field.as_str().into();
                 positional += 1;
             }
+        }
+        let source_protocol = if qx { name.trim() } else { &fields[0] };
+        if kind == "trojan"
+            || ["https", "socks5-tls"]
+                .iter()
+                .any(|p| source_protocol.eq_ignore_ascii_case(p))
+        {
+            if n.get("tls")
+                .is_some_and(|value| value != &Value::Bool(true))
+            {
+                return Err("ConflictingIniTls");
+            }
+            n["tls"] = true.into();
         }
         nodes.push(n);
     }
@@ -1444,6 +1499,69 @@ mod tests {
                 }
             }
         }
+    }
+    #[test]
+    fn ini_implicit_tls_cannot_be_downgraded() {
+        for protocol in ["https", "socks5-tls", "trojan"] {
+            for option in ["", ",tls=true", ",over-tls=TRUE"] {
+                let source = format!(
+                    "[Proxy]\nfixture = {protocol},example.org,443,password=synthetic{option}"
+                );
+                let nodes = ini(&source).unwrap();
+                assert_eq!(nodes[0]["tls"], true);
+            }
+            for option in ["tls=false", "over-tls=false", "tls=unknown"] {
+                let source = format!(
+                    "[Proxy]\nfixture = {protocol},example.org,443,password=synthetic,{option}"
+                );
+                assert!(ini(&source).is_err());
+            }
+        }
+    }
+    #[test]
+    fn quoted_ini_credentials_preserve_spaces_and_escaped_quotes() {
+        for field in [
+            r#""  fixture=with,comma:and\"quote\\slash  ""#,
+            r#"password="  fixture=with,comma:and\"quote\\slash  ""#,
+        ] {
+            let source = format!("[Proxy]\nfixture = trojan,example.org,443,{field}");
+            let nodes = ini(&source).unwrap();
+            assert_eq!(
+                nodes[0]["password"],
+                "  fixture=with,comma:and\"quote\\slash  "
+            );
+        }
+    }
+    #[test]
+    fn uri_insecure_alias_is_typed_and_never_overwrites() {
+        for query in [
+            "insecure=0&allowInsecure=false&skip-cert-verify=0",
+            "skip-cert-verify=false&insecure=false&allowInsecure=0",
+        ] {
+            let value = uri(&format!("trojan://synthetic@example.org:443?{query}")).unwrap();
+            assert_eq!(value["skip-cert-verify"], Value::Bool(false));
+            assert!(value.get("insecure").is_none());
+        }
+        for query in [
+            "insecure=off",
+            "insecure=FALSE",
+            "insecure=0&insecure=0",
+            "insecure=0&allowInsecure=1",
+            "skip-cert-verify=true&insecure=false",
+        ] {
+            assert!(uri(&format!("trojan://synthetic@example.org:443?{query}")).is_err());
+        }
+    }
+    #[test]
+    fn quoted_ini_password_delimiters_remain_credentials() {
+        let nodes=ini("[Proxy]\nfixture = trojan,example.org,443,\"secret:with,comma=plus+percent%25\",tls-name:tls.example.org,skip-cert-verify:false").unwrap();
+        assert_eq!(nodes[0]["password"], "secret:with,comma=plus+percent%25");
+        assert_eq!(nodes[0]["sni"], "tls.example.org");
+        assert_eq!(nodes[0]["skip-cert-verify"], false);
+        assert!(ini("[Proxy]\nfixture = trojan,example.org,443,\"secret=a\",password=b").is_err());
+        let nodes=ini("[Proxy]\nfixture = Shadowsocks,example.org,443,aes-128-gcm,\"secret=a,b:c\",http,obfs.example").unwrap();
+        assert_eq!(nodes[0]["password"], "secret=a,b:c");
+        assert_eq!(nodes[0]["obfs"], "http");
     }
     #[test]
     fn unequal_aliases_repeated_keys_and_invalid_booleans_fail_closed() {

@@ -82,6 +82,51 @@ private slots:
             const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));QVERIFY(parsed.configuration.isEmpty());
         }
     }
+    void typedOptionsAndAliasesCannotOverwriteImportedState() {
+        const QByteArray ini="[Proxy]\nfixture = trojan, example.org, 443, fixture-secret, ";
+        const QByteArray uri="trojan://fixture-secret@example.org:443?";
+        QList<QByteArray> rejected;
+        for(const auto &option:{"udp=maybe","tls=garbage","skip-cert-verify=off","tls-verification=on","fast-open=2","ws=invalid","aead=invalid","tls=1","password=second","sni=a.example,tls-name=b.example","fast-open=false,tfo=false","skip-cert-verify=false,tls-verification=false"})rejected.append(ini+option);
+        for(const auto &option:{"udp=maybe","insecure=off","allowInsecure=FALSE","peer=a.example&sni=b.example","allowInsecure=0&insecure=1","skip-cert-verify=false&insecure=true","sni=a.example&sni=a.example"})rejected.append(uri+option);
+        for(const auto &plugin:{"obfs-local%3Bobfs%3Dhttp%3Bobfs%3Dtls", "obfs-local%3Bobfs%3Dhttp%3Bmode%3Dhttp", "simple-obfs%3Bobfs-host%3Da.example%3Bhost%3Db.example"})rejected.append(QByteArray("ss://YWVzLTEyOC1nY206c3ludGhldGlj@example.org:443?plugin=")+plugin);
+        rejected.append("[Proxy]\nfixture = trojan,example.org,443,password=first,second");
+        rejected.append("[Proxy]\nfixture = vless,example.org,443,11111111-1111-4111-8111-111111111111,uuid=22222222-2222-4222-8222-222222222222");
+        rejected.append("[Proxy]\nfixture = socks5,example.org,1080,fixture,fixture-secret,password=second");
+        for(const auto &declaration:{"https,example.org,443,tls=false", "socks5-tls,example.org,443,over-tls=false", "http,example.org,443,tls=false,transport=tls", "http,example.org,443,transport=tls,tls=false"})rejected.append(QByteArray("[Proxy]\nfixture = ")+declaration);
+        rejected.append(uri+"security=none");
+        for(const auto &protocol:{"https","socks5-tls"})rejected.append(QByteArray("[server_local]\n")+protocol+"=example.org:443,tag=fixture,over-tls=false");
+        for(const auto &body:rejected)for(const auto &wrapped:{body,body.toBase64()}){
+            const auto parsed=NodeImporter::parse(wrapped);QVERIFY2(!parsed,"Malformed or conflicting typed option was accepted");
+            QTemporaryDir directory;NodeStore store(directory.filePath("nodes.dpapi"));NodeImportService service(&store);
+            const auto seed=NodeImporter::parse("proxies: [{name: retained, type: socks5, server: 127.0.0.1, port: 1081}]");QVERIFY(seed);QVERIFY(store.importNodes(seed.nodes));
+            QFile file(store.filePath());QVERIFY(file.open(QIODevice::ReadOnly));const auto before=file.readAll();file.close();
+            service.importText(QString::fromUtf8(wrapped));QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),4000);QCOMPARE(store.nodes().size(),1);QCOMPARE(store.nodes().first().name,QString("retained"));
+            QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),before);QVERIFY(!service.message().contains("fixture-secret"));
+        }
+    }
+    void legacyLoonAndEquivalentUriAliasesRetainTypedValues() {
+        for(const auto &protocol:{"https","socks5-tls"})for(const auto &suffix:{"",",tls=true"}){
+            const auto parsed=NodeImporter::parse(QByteArray("[server_local]\n")+protocol+"=example.org:443,tag=fixture"+suffix);QVERIFY(parsed);QCOMPARE(parsed.nodes.first().parameters.value("tls"),QJsonValue(true));
+        }
+        const QByteArray ini="[Proxy]\nfixture = trojan, example.org, 443, \"secret:with,comma=plus+percent%25\", tls-name:tls.example.org, skip-cert-verify:FALSE, fast-open:false";
+        for(const auto &body:{ini,ini.toBase64()}){
+            const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);const auto &n=parsed.nodes.first();
+            QCOMPARE(n.password,QString("secret:with,comma=plus+percent%25"));QCOMPARE(n.serverName,QString("tls.example.org"));QVERIFY(n.conversionIssues.isEmpty());
+            QCOMPARE(n.parameters.value("tls"),QJsonValue(true));QCOMPARE(n.parameters.value("skip-cert-verify"),QJsonValue(false));QCOMPARE(n.parameters.value("tfo"),QJsonValue(false));QVERIFY(!n.originalConfiguration.isEmpty());
+        }
+        for(const auto &declaration:{QByteArray("\"Shadowsocks\",example.org,443,aes-128-gcm,\"  secret=a,b:c  \",http,obfs.example"),QByteArray("trojan,example.org,443,\"  secret=a,b:c  \"")}){
+            const auto parsed=NodeImporter::parse("[Proxy]\nfixture = "+declaration);QVERIFY(parsed);QVERIFY(parsed.nodes.first().conversionIssues.isEmpty());QCOMPARE(parsed.nodes.first().password,QString("  secret=a,b:c  "));
+        }
+        for(const auto &field:{QByteArray("\"  fixture=with,comma:and\\\"quote\\\\slash  \""),QByteArray("password=\"  fixture=with,comma:and\\\"quote\\\\slash  \"")}){
+            const auto parsed=NodeImporter::parse("[Proxy]\nfixture = trojan,example.org,443,"+field);QVERIFY(parsed);QCOMPARE(parsed.nodes.first().password,QString("  fixture=with,comma:and\"quote\\slash  "));
+        }
+        for(const auto &options:{"peer=tls.example.org&sni=tls.example.org&allowInsecure=0&insecure=false&skip-cert-verify=false", "sni=tls.example.org&peer=tls.example.org&skip-cert-verify=0&insecure=0&allowInsecure=false"}){
+            const auto body=QByteArray("trojan://secret%3Awith%2Ccomma%3Dplus%2Bpercent%2525@example.org:443?")+options;
+            for(const auto &wrapped:{body,body.toBase64()}){
+                const auto parsed=NodeImporter::parse(wrapped);QVERIFY2(parsed,qPrintable(parsed.error));const auto &n=parsed.nodes.first();QCOMPARE(n.password,QString("secret:with,comma=plus+percent%25"));QCOMPARE(n.serverName,QString("tls.example.org"));QCOMPARE(n.parameters.value("skip-cert-verify"),QJsonValue(false));QVERIFY(n.conversionIssues.isEmpty());
+            }
+        }
+    }
     void completeConfigurationWithoutOwnerDoesNotDiscardGlobals() {
         QTemporaryDir directory;NodeStore store(directory.filePath("nodes.dpapi"));NodeImportService imports(&store);
         imports.importText("proxies: [{name: A, type: socks5, server: 127.0.0.1, port: 1080}]\nrules: [MATCH,DIRECT]\n");

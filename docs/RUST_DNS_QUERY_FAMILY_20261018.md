@@ -19,7 +19,7 @@ Qt maps `queryFamily` without new controls. Legacy DNS-page partial edits preser
 - Compatibility settings/startup protection: 4 Qt results passed (including init/cleanup), and its new CTest passed. CI includes this guard before its unchanged final native peer suite.
 - Development workflow checks: 19 ran, 1 existing symlink-privilege skip, 0 failures.
 
-[Structured evidence](evidence/RUST_DNS_QUERY_FAMILY_20261018_VERIFIED.json) includes source, binary and log hashes. Exact-commit CI is pending until the implementation is pushed; old fbef399 CI does not validate this change. MinGW's existing release linker warning is recorded, not suppressed.
+[Structured evidence](evidence/RUST_DNS_QUERY_FAMILY_20261018_VERIFIED.json) includes source, binary and log hashes. Implementation commit `f81eab6e2eaf5a2d9f1f538a4ce04cde268797c0` passed all three platforms in [Rust CI 39113224090](https://github.com/SOLHK/Swirl/actions/runs/39113224090) and [implementation validation 39113224086](https://github.com/SOLHK/Swirl/actions/runs/39113224086). MinGW's existing release linker warning is recorded, not suppressed.
 
 ## Failures found and repaired
 
@@ -32,3 +32,5 @@ Reviewed [RFC 3596](https://www.rfc-editor.org/rfc/rfc3596.html), [RFC 2308](htt
 Complete subscription DNS still needs explicit hosts/localhost precedence, routing/no-resolve behavior, bootstrap and upstream policy mapping. Fake-IP, DNS split and TUN remain incomplete. No provider refresh or real-node request occurred here. The 08:25:51 window ended with 0 requests/0 captures due execution approval failure; the existing encrypted cache remains intact. Fixed weighted acceptance remains 10.83%.
 
 Next user-directed task: use mature converter architectures as references, then reproduce and fix concrete Qt/Rust subscription-validation discrepancies (typed boolean values and canonical alias conflicts in Trojan INI/URI) before expanding formats. Preserve existing IR and atomic import; implement supported semantics rather than only accumulating rejection paths.
+
+Compatibility protection applies to binaries built from this implementation or later. Historical older releases cannot be assumed to recognize the new field. Complete configuration replacement deliberately uses the replacement defaults when the policy is omitted.

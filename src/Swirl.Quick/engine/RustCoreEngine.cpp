@@ -201,6 +201,8 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
   if(!QStringList{"http","socks4","socks4a","socks5","trojan","ss","vless"}.contains(n.protocol))return "此节点协议尚未迁移到 Rust；未使用外部内核。";
   const bool socks4=n.protocol=="socks4"||n.protocol=="socks4a";
   QSet<QString> allowed=socks4?QSet<QString>{"tls","udp","network","tfo","skip-cert-verify"}:n.protocol=="ss"?QSet<QString>{"udp","plugin","plugin-opts"}:QSet<QString>{"tls","udp","sni","servername","alpn","skip-cert-verify"};
+  allowed.insert("tfo");
+  if(n.parameters.contains("tfo")&&n.parameters.value("tfo")!=QJsonValue(false))return "Rust 尚未实现 TCP Fast Open；必须明确为 false。";
   if(n.protocol=="vless")allowed.unite(QSet<QString>{"uuid","flow","encryption"});
   if(n.protocol=="vless"||n.protocol=="trojan")allowed.unite(QSet<QString>{"network","ws-opts"});
   for(auto p=n.parameters.begin();p!=n.parameters.end();++p)if(!allowed.contains(p.key()))return "Rust 尚未实现此传输或扩展参数。";
