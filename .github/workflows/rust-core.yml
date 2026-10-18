@@ -26,7 +26,7 @@ jobs:
       - run: cargo check --workspace --locked
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo test --workspace --locked
-      - run: cargo build --release --locked -p swirl-api
+      - run: cargo build --release --locked --workspace --lib --bins
       - uses: actions/setup-python@v5
         with:
           python-version: '3.14'
@@ -35,6 +35,10 @@ jobs:
           python -m pip install cryptography==50.0.2
           export SWIRL_RUST_HARNESS="$PWD/target/release/swirl-api"
           export SWIRL_RUST_INSPECTOR="$PWD/target/release/swirl-inspect"
+          export SWIRL_RUST_DIAGNOSTIC="$PWD/target/release/swirl-diagnose"
+          test -x "$SWIRL_RUST_HARNESS"
+          test -x "$SWIRL_RUST_INSPECTOR"
+          test -x "$SWIRL_RUST_DIAGNOSTIC"
           python ../tools/tests/test_rust_core.py
           python ../tools/tests/test_shadowsocks.py
           python ../tools/tests/test_dns_tls.py
@@ -46,6 +50,8 @@ jobs:
           python ../tools/tests/test_dns_negative.py
           python ../tools/tests/test_native_probe.py
           python ../tools/tests/test_connection_stages.py
+          python ../tools/tests/test_connectivity_diagnostics.py
+          python ../tools/tests/test_subscription_import.py
       - name: Native public HTTPS and DoH verification
         if: runner.os == 'Linux'
         run: python ../tools/Verify-PublicRustCore.py --harness target/release/swirl-api --output ../CORE_PUBLIC_NETWORK.json
@@ -70,7 +76,7 @@ jobs:
       - run: cargo check --workspace --locked
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo test --workspace --locked
-      - run: cargo build --release --locked -p swirl-api
+      - run: cargo build --release --locked --workspace --lib --bins
       - uses: actions/setup-python@v5
         with:
           python-version: '3.14'
@@ -80,6 +86,10 @@ jobs:
           python -m pip install cryptography==50.0.2
           $env:SWIRL_RUST_HARNESS=(Resolve-Path target/release/swirl-api.exe).Path
           $env:SWIRL_RUST_INSPECTOR=(Resolve-Path target/release/swirl-inspect.exe).Path
+          $env:SWIRL_RUST_DIAGNOSTIC=(Resolve-Path target/release/swirl-diagnose.exe).Path
+          if (-not (Test-Path $env:SWIRL_RUST_HARNESS -PathType Leaf)) { throw 'Required Rust test binary missing' }
+          if (-not (Test-Path $env:SWIRL_RUST_INSPECTOR -PathType Leaf)) { throw 'Required Rust test binary missing' }
+          if (-not (Test-Path $env:SWIRL_RUST_DIAGNOSTIC -PathType Leaf)) { throw 'Required Rust test binary missing' }
           python ../tools/tests/test_rust_core.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python ../tools/tests/test_shadowsocks.py
@@ -102,6 +112,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python ../tools/tests/test_connection_stages.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python ../tools/tests/test_connectivity_diagnostics.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python ../tools/tests/test_subscription_import.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python ../tools/tests/test_subscription_capture.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python ../tools/tests/test_codex_management.py
@@ -112,6 +126,7 @@ jobs:
             core/target/release/swirl_api.dll
             core/target/release/swirl-api.exe
             core/target/release/swirl-inspect.exe
+            core/target/release/swirl-diagnose.exe
             core/Cargo.lock
             tools/SwirlCodexManage.py
             tools/SubscriptionCapture.py

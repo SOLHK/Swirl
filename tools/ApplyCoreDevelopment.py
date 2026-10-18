@@ -5,8 +5,10 @@ its existing jobs on this development branch, adds the already implemented
 DoH, SOCKS4, WebSocket and automatic-policy peer suites, and runs fixed public-network
 checks with an evidence artifact on Linux. The current stage adds negative DNS
 and isolated native-outbound probe and connection-stage regressions alongside the existing SOCKS4
-and WS Qt forwarding peers. It does not change permissions, secrets,
-existing actions, release jobs, pull-request triggers or any product source.
+and WS Qt forwarding peers. The current update includes independent connectivity
+and subscription-import gates, required-binary checks, all native release bins,
+and the Windows diagnostic artifact. It does not change permissions, secrets,
+existing actions, pull-request triggers or any product source.
 
 Run ``python tools/ApplyCoreDevelopment.py --check`` to run the safety tests and
 review the exact diff without writing. With no arguments, writes are restricted
@@ -40,6 +42,14 @@ ADDITIONAL_TESTS = (
 )
 POLICY_TEST = "test_policy_groups.py"
 DNS_PROBE_TESTS = ("test_dns_negative.py", "test_native_probe.py", "test_connection_stages.py")
+CONNECTIVITY_IMPORT_TESTS = ("test_connectivity_diagnostics.py", "test_subscription_import.py")
+PREVIOUS_RELEASE_BUILD = "      - run: cargo build --release --locked -p swirl-api\n"
+RELEASE_BUILD = "      - run: cargo build --release --locked --workspace --lib --bins\n"
+PORTABLE_DIAGNOSTIC = '          export SWIRL_RUST_DIAGNOSTIC="$PWD/target/release/swirl-diagnose"\n'
+WINDOWS_DIAGNOSTIC = "          $env:SWIRL_RUST_DIAGNOSTIC=(Resolve-Path target/release/swirl-diagnose.exe).Path\n"
+DIAGNOSTIC_ARTIFACT = "            core/target/release/swirl-diagnose.exe\n"
+DIAGNOSTIC_TOOL = Path("tools/Diagnose-NativeConnectivity.py")
+DIAGNOSTIC_SOURCE = Path("core/crates/swirl-api/src/bin/swirl-diagnose.rs")
 QT_PEER_TESTS = (
     "test_socks4.py Socks4Integration.test_qt_imported_socks4_and_4a_data_path",
     "test_websocket_transport.py WebSocketTransportTests.test_qt_vless_websocket_data_path",
@@ -134,7 +144,7 @@ def _previous_workflow(source: str) -> str:
     raise ValueError("Rust CI Qt peer menu has drifted or is ambiguous; review required")
 
 
-def updated_workflow(source: str) -> str:
+def _connection_workflow(source: str) -> str:
     """Extend only the two reviewed test menus; reject partial/duplicate additions."""
     policy = f"          python ../tools/tests/{POLICY_TEST}\n"
     portable = policy + PUBLIC_VALIDATION_STEPS
@@ -163,6 +173,79 @@ def updated_workflow(source: str) -> str:
     return _replace_checked(source, windows, windows_after, "Windows DNS/probe menu")
 
 
+def _connectivity_blocks(windows: bool) -> tuple[tuple[str, str, str], ...]:
+    """The complete reviewed addition for one existing job, including its binaries."""
+    first_test = "          python ../tools/tests/test_rust_core.py\n"
+    command = "          python ../tools/tests/test_connection_stages.py\n"
+    if windows:
+        inspector = "          $env:SWIRL_RUST_INSPECTOR=(Resolve-Path target/release/swirl-inspect.exe).Path\n"
+        diagnostic = WINDOWS_DIAGNOSTIC
+        status_guard = WINDOWS_STATUS_GUARD
+        tail = "          python ../tools/tests/test_subscription_capture.py\n"
+        binary_checks = "".join(
+            f"          if (-not (Test-Path $env:{name} -PathType Leaf)) {{ throw 'Required Rust test binary missing' }}\n"
+            for name in ("SWIRL_RUST_HARNESS", "SWIRL_RUST_INSPECTOR", "SWIRL_RUST_DIAGNOSTIC")
+        )
+    else:
+        inspector = '          export SWIRL_RUST_INSPECTOR="$PWD/target/release/swirl-inspect"\n'
+        diagnostic = PORTABLE_DIAGNOSTIC
+        status_guard = ""
+        tail = PUBLIC_VALIDATION_STEPS
+        binary_checks = "".join(
+            f'          test -x "${name}"\n'
+            for name in ("SWIRL_RUST_HARNESS", "SWIRL_RUST_INSPECTOR", "SWIRL_RUST_DIAGNOSTIC")
+        )
+    new_tests = "".join(
+        f"          python ../tools/tests/{name}\n" + status_guard for name in CONNECTIVITY_IMPORT_TESTS
+    )
+    blocks = (
+        (PREVIOUS_RELEASE_BUILD, RELEASE_BUILD, "release library/binary targets"),
+        (inspector + first_test, inspector + diagnostic + binary_checks + first_test,
+         "required native test binaries"),
+        (command + status_guard + tail, command + status_guard + new_tests + tail,
+         "connectivity/import peer menu"),
+    )
+    if windows:
+        inspector_artifact = "            core/target/release/swirl-inspect.exe\n"
+        lock_artifact = "            core/Cargo.lock\n"
+        blocks += ((inspector_artifact + lock_artifact,
+                    inspector_artifact + DIAGNOSTIC_ARTIFACT + lock_artifact,
+                    "Windows diagnostic artifact"),)
+    return blocks
+
+
+def updated_workflow(source: str) -> str:
+    """Upgrade a reviewed historical stage atomically, or validate the complete new stage."""
+    separator = "  windows-rust:\n"
+    if source.count(separator) != 1:
+        raise ValueError("Rust CI job boundaries have drifted; review required")
+    counts = (
+        *(source.count(f"          python ../tools/tests/{name}\n") for name in CONNECTIVITY_IMPORT_TESTS),
+        source.count(PORTABLE_DIAGNOSTIC), source.count(WINDOWS_DIAGNOSTIC),
+        source.count(DIAGNOSTIC_ARTIFACT), source.count(RELEASE_BUILD),
+    )
+    present = counts != (0, 0, 0, 0, 0, 0)
+    if present and counts != (2, 2, 1, 1, 1, 2):
+        raise ValueError("Rust CI connectivity/import stage is only partially present; review required")
+    parts = source.split(separator)
+    if present:
+        # Remove only exact final blocks before invoking all historical checks.
+        # A partial stage or a missing guard must never be silently repaired.
+        for index, part in enumerate(parts):
+            for before, after, label in _connectivity_blocks(windows=index == 1):
+                if part.count(after) != 1 or part.count(before) != 0:
+                    raise ValueError(f"Rust CI {label} has drifted; review required")
+                part = part.replace(after, before, 1)
+            parts[index] = part
+    source = _connection_workflow(separator.join(parts))
+    parts = source.split(separator)
+    for index, part in enumerate(parts):
+        for before, after, label in _connectivity_blocks(windows=index == 1):
+            part = _replace_checked(part, before, after, label)
+        parts[index] = part
+    return separator.join(parts)
+
+
 def validate_context(environment: Mapping[str, str]) -> None:
     expected = {
         "GITHUB_ACTIONS": "true",
@@ -188,11 +271,14 @@ def prepare_update(repository: Path) -> tuple[Path, str, str]:
     # workflow; writes still occur only in the existing Linux App job.
     before = path.read_text(encoding="utf-8")
     after = updated_workflow(before)
-    for name in (*ADDITIONAL_TESTS, POLICY_TEST, *DNS_PROBE_TESTS):
+    for name in (*ADDITIONAL_TESTS, POLICY_TEST, *DNS_PROBE_TESTS, *CONNECTIVITY_IMPORT_TESTS):
         if not (repository / "tools/tests" / name).is_file():
             raise ValueError(f"Required CI suite is missing: {name}")
     if not (repository / PUBLIC_PROBE).is_file():
         raise ValueError("The required native public-network verification script is missing")
+    for relative in (DIAGNOSTIC_TOOL, DIAGNOSTIC_SOURCE):
+        if not (repository / relative).is_file():
+            raise ValueError(f"Required native diagnostic source is missing: {relative.as_posix()}")
     return path, before, after
 
 

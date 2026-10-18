@@ -7,7 +7,8 @@ mod shadowsocks;
 mod socks4;
 mod vless;
 mod websocket;
-pub use diagnostics::failure_stage;
+pub use diagnostics::{TcpAttempt, TcpDiagnostic, TcpOutcome, failure_stage};
+pub use dial::diagnose_tcp;
 use dial::{connect_tcp, within};
 pub use probe::health_probe;
 pub use shadowsocks::{

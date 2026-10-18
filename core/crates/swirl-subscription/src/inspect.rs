@@ -185,6 +185,41 @@ fn plugin_options(value: &str) -> Result<(String, serde_json::Map<String, Value>
     }
     Ok((name, options))
 }
+fn legacy_ss(encoded: &str, original: &str) -> Result<Value, &'static str> {
+    // The legacy format does not follow RFC3986: the decoded password is
+    // literal, including '@', '/', '#', and '%'. Only its final authority is
+    // split further. Never send the decoded credentials through a URL parser.
+    let decoded = String::from_utf8(decode(encoded.as_bytes())?).map_err(|_| "UriEncoding")?;
+    let (auth, authority) = decoded.rsplit_once('@').ok_or("SsAuthentication")?;
+    let (cipher, password) = auth.split_once(':').ok_or("SsAuthentication")?;
+    let (host, port) = authority.rsplit_once(':').ok_or("UriPort")?;
+    let host = if let Some(host) = host.strip_prefix('[') {
+        host.strip_suffix(']')
+            .ok_or("UriHost")?
+            .parse::<std::net::Ipv6Addr>()
+            .map_err(|_| "UriHost")?
+            .to_string()
+    } else {
+        host.to_owned()
+    };
+    let port = port.parse::<u16>().map_err(|_| "UriPort")?;
+    Ok(
+        json!({"type":"ss","server":host,"port":port,"cipher":cipher,"password":password,"raw-uri":original}),
+    )
+}
+fn ss_percent(value: &str) -> Result<String, &'static str> {
+    let bytes = value.as_bytes();
+    for (i, byte) in bytes.iter().enumerate() {
+        if *byte == b'%'
+            && bytes
+                .get(i + 1..i + 3)
+                .is_none_or(|pair| !pair.iter().all(u8::is_ascii_hexdigit))
+        {
+            return Err("InvalidUriEncoding");
+        }
+    }
+    percent(value)
+}
 fn uri(line: &str) -> Result<Value, &'static str> {
     if let Some(encoded) = line.strip_prefix("vmess://") {
         let raw: Value =
@@ -208,29 +243,34 @@ fn uri(line: &str) -> Result<Value, &'static str> {
             json!({"type":"ssr","server":fields[0],"port":fields[1],"protocol":fields[2],"cipher":fields[3],"obfs":fields[4],"raw-uri":line}),
         );
     }
-    let mut source = line.to_owned();
-    if let Some(rest) = line.strip_prefix("ss://")
-        && !rest.contains('@')
-    {
+    if let Some(rest) = line.strip_prefix("ss://") {
         let main = rest.split('#').next().unwrap_or(rest);
-        source = format!(
-            "ss://{}",
-            String::from_utf8(decode(main.as_bytes())?).map_err(|_| "UriEncoding")?
-        );
+        if !main.contains('@') {
+            return legacy_ss(main, line);
+        }
     }
-    let u = url::Url::parse(&source).map_err(|_| "UriSyntax")?;
+    let u = url::Url::parse(line).map_err(|_| "UriSyntax")?;
     if matches!(u.scheme(), "socks4" | "socks4a") && !matches!(u.path(), "" | "/") {
         return Err("Socks4UriPath");
     }
-    let mut n = json!({"type":protocol(u.scheme()),"server":u.host_str().ok_or("UriHost")?,"port":u.port().or_else(||if u.scheme()=="https"{Some(443)}else{None}).ok_or("UriPort")?,"raw-uri":line});
+    // URL serialization brackets IPv6 addresses; the typed IR expects an IP
+    // literal, not an authority. Keep the exact URI in raw-uri for preservation.
+    let host = match u.host().ok_or("UriHost")? {
+        url::Host::Domain(host) => host.to_owned(),
+        url::Host::Ipv4(address) => address.to_string(),
+        url::Host::Ipv6(address) => address.to_string(),
+    };
+    let mut n = json!({"type":protocol(u.scheme()),"server":host,"port":u.port().or_else(||if u.scheme()=="https"{Some(443)}else{None}).ok_or("UriPort")?,"raw-uri":line});
     match n["type"].as_str().unwrap_or("") {
         "ss" => {
-            let auth = if let Some(pass) = u.password() {
-                format!("{}:{}", percent(u.username())?, percent(pass)?)
+            let (cipher, password) = if let Some(pass) = u.password() {
+                (ss_percent(u.username())?, ss_percent(pass)?)
             } else {
-                String::from_utf8(decode(u.username().as_bytes())?).map_err(|_| "UriEncoding")?
+                let auth = String::from_utf8(decode(ss_percent(u.username())?.as_bytes())?)
+                    .map_err(|_| "UriEncoding")?;
+                let (cipher, password) = auth.split_once(':').ok_or("SsAuthentication")?;
+                (cipher.to_owned(), password.to_owned())
             };
-            let (cipher, password) = auth.split_once(':').ok_or("SsAuthentication")?;
             n["cipher"] = cipher.into();
             n["password"] = password.into();
         }
@@ -269,17 +309,16 @@ fn uri(line: &str) -> Result<Value, &'static str> {
             n["plugin-opts"] = options.into();
             continue;
         }
-        let key = match key.as_ref() {
-            "type" => "network",
-            "security" => "security",
-            "sni" | "peer" => "sni",
-            "allowInsecure" => "skip-cert-verify",
-            _ => key.as_ref(),
+        let (key, paired_alias) = match key.as_ref() {
+            "type" => ("network", Some("network")),
+            "network" => ("network", Some("type")),
+            "sni" => ("sni", Some("peer")),
+            "peer" => ("sni", Some("sni")),
+            "allowInsecure" => ("skip-cert-verify", Some("skip-cert-verify")),
+            "skip-cert-verify" => ("skip-cert-verify", Some("allowInsecure")),
+            _ => (key.as_ref(), None),
         };
-        if n.get(key).is_some() {
-            return Err("ConflictingUriParameter");
-        }
-        n[key] = if key == "skip-cert-verify" {
+        let value = if matches!(key, "skip-cert-verify" | "udp") {
             match value.as_ref() {
                 "1" | "true" => Value::Bool(true),
                 "0" | "false" => Value::Bool(false),
@@ -288,6 +327,16 @@ fn uri(line: &str) -> Result<Value, &'static str> {
         } else {
             Value::String(value.into_owned())
         };
+        if let Some(previous) = n.get(key) {
+            // Only distinct, known aliases may share an identical typed value.
+            // raw-uri retains both spellings; no authority or credential field
+            // can be overwritten, and repeated source keys still fail above.
+            if paired_alias.is_some_and(|alias| seen.contains(alias)) && previous == &value {
+                continue;
+            }
+            return Err("ConflictingUriParameter");
+        }
+        n[key] = value;
     }
     Ok(n)
 }
@@ -394,6 +443,9 @@ fn ini(text: &str) -> Result<Vec<Value>, &'static str> {
                     ("ss", 1) | ("trojan", 0) => "password",
                     _ => "unmapped-positional",
                 };
+                if n.get(key).is_some() {
+                    return Err("DuplicateIniParameter");
+                }
                 n[key] = field.as_str().into();
                 positional += 1;
             }
@@ -1195,6 +1247,336 @@ mod tests {
         let r=inspect(b"[Proxy]\nlabel = Trojan, example.org, 443, password=fixture, sni=example.org\n[Rule]\nFINAL,DIRECT");
         assert!(r.report.nodes[0].native_tcp_candidate);
         assert_eq!(r.original,b"[Proxy]\nlabel = Trojan, example.org, 443, password=fixture, sni=example.org\n[Rule]\nFINAL,DIRECT");
+    }
+    #[test]
+    fn equivalent_distinct_uri_aliases_preserve_originals_and_typed_values() {
+        for (first, second, key, expected) in [
+            (
+                "peer=local%68ost",
+                "sni=localhost",
+                "sni",
+                json!("localhost"),
+            ),
+            ("type=t%63p", "network=tcp", "network", json!("tcp")),
+            (
+                "allowInsecure=0",
+                "skip-cert-verify=false",
+                "skip-cert-verify",
+                json!(false),
+            ),
+        ] {
+            for query in [format!("{first}&{second}"), format!("{second}&{first}")] {
+                let uri = format!("trojan://fixture@example.org:443?{query}");
+                for input in [uri.clone(), STANDARD.encode(uri.as_bytes())] {
+                    let result = inspect(input.as_bytes());
+                    assert!(result.report.parsed, "{:?}", result.report.error);
+                    assert!(result.report.nodes[0].native_tcp_candidate);
+                    assert!(!result.report.nodes[0].real_network_verified);
+                    assert_eq!(result.originals[0][key], expected);
+                    assert_eq!(result.originals[0]["raw-uri"], uri);
+                    assert_eq!(result.original, input.as_bytes());
+                    let report = serde_json::to_string(&result.report).unwrap();
+                    assert!(!report.contains("fixture"));
+                    assert!(!report.contains("example.org"));
+                }
+            }
+        }
+    }
+    #[test]
+    fn unequal_aliases_repeated_keys_and_invalid_booleans_fail_closed() {
+        for (expected, queries) in [
+            (
+                "ConflictingUriParameter",
+                &[
+                    "peer=first.example&sni=second.example",
+                    "sni=second.example&peer=first.example",
+                    "peer=&sni=second.example",
+                    "type=tcp&network=ws",
+                    "network=ws&type=tcp",
+                    "allowInsecure=0&skip-cert-verify=true",
+                    "skip-cert-verify=true&allowInsecure=0",
+                ][..],
+            ),
+            (
+                "DuplicateUriParameter",
+                &[
+                    "sni=first.example&sni=first.example",
+                    "sni=first.example&%73ni=first.example",
+                    "peer=first.example&sni=first.example&peer=first.example",
+                    "type=tcp&type=tcp",
+                    "allowInsecure=0&allowInsecure=false",
+                    "udp=0&udp=false",
+                ][..],
+            ),
+            (
+                "InvalidUriBoolean",
+                &[
+                    "allowInsecure=TRUE&skip-cert-verify=true",
+                    "skip-cert-verify=false&allowInsecure=",
+                    "allowInsecure=0&skip-cert-verify=no",
+                    "udp=TRUE",
+                    "udp=2",
+                    "udp=",
+                ][..],
+            ),
+        ] {
+            for query in queries {
+                let input = format!("trojan://fixture@example.org:443?{query}");
+                let result = inspect(input.as_bytes());
+                assert_eq!(result.report.error, Some(expected));
+                assert!(!result.report.parsed);
+                assert!(result.tcp_candidates.is_empty());
+                assert_eq!(result.original, input.as_bytes());
+            }
+        }
+    }
+    #[test]
+    fn alias_coalescing_cannot_override_authority_authentication_or_plugin_options() {
+        for input in [
+            "trojan://fixture@example.org:443?password=fixture",
+            "trojan://fixture@example.org:443?server=example.org",
+            "trojan://fixture@example.org:443?port=443",
+            "trojan://fixture@example.org:443?raw-uri=retained",
+            "vless://00112233-4455-6677-8899-aabbccddeeff@example.org:443?uuid=00112233-4455-6677-8899-aabbccddeeff",
+            "https://fixture@example.org:8443?tls=true",
+            "ss://aes-128-gcm:fixture@example.org:443?cipher=aes-128-gcm",
+            "ss://aes-128-gcm:fixture@example.org:443?plugin=obfs-local%3Bobfs%3Dhttp%3Bobfs-host%3Dexample.org&plugin-opts=retained",
+            "ss://aes-128-gcm:fixture@example.org:443?plugin-opts=retained&plugin=obfs-local%3Bobfs%3Dhttp%3Bobfs-host%3Dexample.org",
+        ] {
+            let result = inspect(input.as_bytes());
+            assert_eq!(result.report.error, Some("ConflictingUriParameter"));
+            assert!(result.tcp_candidates.is_empty());
+            assert_eq!(result.original, input.as_bytes());
+        }
+    }
+    #[test]
+    fn uri_udp_boolean_mapping_preserves_capability_and_certificate_limits() {
+        for (udp, declared) in [("0", false), ("false", false), ("1", true), ("true", true)] {
+            let input = format!(
+                "trojan://fixture@example.org:443?allowInsecure=0&peer=example.org&sni=example.org&udp={udp}"
+            );
+            let result = inspect(input.as_bytes());
+            assert!(result.report.parsed);
+            assert!(result.report.nodes[0].native_tcp_candidate);
+            assert_eq!(result.originals[0]["udp"], declared);
+            assert_eq!(result.report.nodes[0].udp_declared, declared);
+            assert!(!result.report.nodes[0].native_udp_supported);
+            assert_eq!(result.originals[0]["raw-uri"], input);
+            assert_eq!(result.original, input.as_bytes());
+            for query in [
+                "allowInsecure=1&skip-cert-verify=true",
+                "skip-cert-verify=true&allowInsecure=1",
+            ] {
+                let unsafe_input = input.replace("allowInsecure=0", query);
+                let rejected = inspect(unsafe_input.as_bytes());
+                assert!(rejected.report.parsed);
+                assert_eq!(rejected.originals[0]["skip-cert-verify"], true);
+                assert!(!rejected.report.nodes[0].native_tcp_candidate);
+                assert!(!rejected.report.nodes[0].native_udp_supported);
+                assert_eq!(rejected.report.nodes[0].udp_declared, declared);
+                assert_eq!(
+                    rejected.report.nodes[0].diagnostic,
+                    "CertificateVerificationDisabledUnsupported"
+                );
+                assert_eq!(rejected.original, unsafe_input.as_bytes());
+            }
+        }
+    }
+    #[test]
+    fn ipv6_uri_hosts_are_literals_in_typed_outbounds() {
+        let uuid = "00112233-4455-6677-8899-aabbccddeeff";
+        let inputs = [
+            "ss://YWVzLTEyOC1nY206Zml4dHVyZQ@[2001:db8::1234]:443".to_owned(),
+            "ss://aes-128-gcm:fixture%3Apass@[2001:db8::1234]:443".to_owned(),
+            "trojan://fixture@[2001:db8::1234]:443?sni=proxy.example".to_owned(),
+            format!("vless://{uuid}@[2001:db8::1234]:443?encryption=none"),
+            format!("vless://{uuid}@[2001:db8::1234]:443?type=ws&path=%2Fsocket"),
+            "socks5://fixture:password@[2001:db8::1234]:1080".to_owned(),
+            "http://fixture:password@[2001:db8::1234]:8080".to_owned(),
+        ];
+        for input in inputs {
+            let result = inspect(input.as_bytes());
+            assert!(result.report.parsed, "{:?}", result.report.error);
+            assert!(result.report.nodes[0].native_tcp_candidate);
+            assert!(!result.report.nodes[0].real_network_verified);
+            let outbound =
+                serde_json::to_value(result.tcp_candidates[0].as_ref().unwrap()).unwrap();
+            assert_eq!(outbound["host"], "2001:db8::1234");
+            assert_eq!(result.originals[0]["server"], "2001:db8::1234");
+            assert_eq!(result.originals[0]["raw-uri"], input);
+            assert_eq!(result.original, input.as_bytes());
+        }
+    }
+    #[test]
+    fn ipv6_base64_subscription_preserves_ss_authentication_and_unknowns() {
+        let password = "fixture:/%40?#+";
+        let user = URL_SAFE_NO_PAD.encode(format!("aes-128-gcm:{password}"));
+        let input = format!("ss://{user}@[2001:db8::1]:8388#synthetic");
+        for engine in [&STANDARD, &STANDARD_NO_PAD, &URL_SAFE, &URL_SAFE_NO_PAD] {
+            let wrapped = engine.encode(input.as_bytes());
+            let result = inspect(wrapped.as_bytes());
+            assert_eq!(result.report.format, "base64");
+            assert!(result.report.nodes[0].native_tcp_candidate);
+            let outbound =
+                serde_json::to_value(result.tcp_candidates[0].as_ref().unwrap()).unwrap();
+            assert_eq!(outbound["host"], "2001:db8::1");
+            assert_eq!(outbound["password"], password);
+            assert_eq!(result.original, wrapped.as_bytes());
+            assert_eq!(result.originals[0]["raw-uri"], input);
+        }
+        let unknown = format!("ss://{user}@[2001:db8::1]:8388?future=retained");
+        let result = inspect(unknown.as_bytes());
+        assert!(result.report.parsed);
+        assert!(!result.report.nodes[0].native_tcp_candidate);
+        assert_eq!(result.originals[0]["future"], "retained");
+        assert_eq!(result.original, unknown.as_bytes());
+    }
+    #[test]
+    fn legacy_ss_passwords_keep_reserved_characters_and_literal_percent_sequences() {
+        for password in ["test/!@#:", "literal%40/%2f?@#:%GG", "space and\t密钥@"] {
+            for authority in ["example.org:8388", "[2001:db8::2]:8388", "::1:8388"] {
+                let decoded = format!("chacha20-ietf-poly1305:{password}@{authority}");
+                let uri = format!(
+                    "ss://{}#operator@synthetic",
+                    STANDARD_NO_PAD.encode(decoded.as_bytes())
+                );
+                for input in [uri.clone(), URL_SAFE.encode(uri.as_bytes())] {
+                    let result = inspect(input.as_bytes());
+                    assert!(result.report.parsed, "{:?}", result.report.error);
+                    assert!(result.report.nodes[0].native_tcp_candidate);
+                    let outbound =
+                        serde_json::to_value(result.tcp_candidates[0].as_ref().unwrap()).unwrap();
+                    assert_eq!(outbound["password"], password);
+                    assert_eq!(outbound["port"], 8388);
+                    assert_eq!(outbound["cipher"], "chacha20-ietf-poly1305");
+                    let expected_host = authority.rsplit_once(':').unwrap().0;
+                    assert_eq!(outbound["host"], expected_host.trim_matches(['[', ']']));
+                    assert_eq!(result.originals[0]["raw-uri"], uri);
+                    assert_eq!(result.original, input.as_bytes());
+                    assert!(
+                        !serde_json::to_string(&result.report)
+                            .unwrap()
+                            .contains(password)
+                    );
+                }
+            }
+        }
+    }
+    #[test]
+    fn sip002_percent_encoding_is_distinct_from_legacy_password_text() {
+        let legacy = format!(
+            "ss://{}",
+            STANDARD.encode("aes-128-gcm:%40@example.org:8388")
+        );
+        let legacy_result = inspect(legacy.as_bytes());
+        assert_eq!(legacy_result.originals[0]["password"], "%40");
+        let sip = inspect(b"ss://aes-128-gcm:%40@example.org:8388");
+        assert!(sip.report.nodes[0].native_tcp_candidate);
+        assert_eq!(sip.originals[0]["password"], "@");
+        let ambiguous = inspect(b"ss://aes-128-gcm%3Ainjected:fixture@example.org:8388");
+        assert!(!ambiguous.report.nodes[0].native_tcp_candidate);
+        assert_eq!(ambiguous.originals[0]["cipher"], "aes-128-gcm:injected");
+        assert_eq!(ambiguous.originals[0]["password"], "fixture");
+        for invalid in ["%", "%0", "%GG", "%FF"] {
+            let input = format!("ss://aes-128-gcm:{invalid}@example.org:8388");
+            let result = inspect(input.as_bytes());
+            assert_eq!(result.report.error, Some("InvalidUriEncoding"));
+            assert!(result.tcp_candidates.is_empty());
+            assert_eq!(result.original, input.as_bytes());
+            let input = format!(
+                "ss://{}",
+                STANDARD.encode(format!("aes-128-gcm:{invalid}@example.org:8388"))
+            );
+            let result = inspect(input.as_bytes());
+            assert!(result.report.nodes[0].native_tcp_candidate);
+            assert_eq!(result.originals[0]["password"], invalid);
+        }
+    }
+    #[test]
+    fn sip002_base64_userinfo_can_escape_its_padding() {
+        let encoded = STANDARD.encode("aes-128-gcm:f");
+        assert!(encoded.ends_with("=="));
+        let input = format!("ss://{}@[::1]:8388", encoded.replace('=', "%3D"));
+        let result = inspect(input.as_bytes());
+        assert!(result.report.nodes[0].native_tcp_candidate);
+        assert_eq!(result.originals[0]["password"], "f");
+        assert_eq!(result.originals[0]["server"], "::1");
+        assert_eq!(result.original, input.as_bytes());
+    }
+    #[test]
+    fn legacy_ss_does_not_discard_authority_options_or_accept_unknown_ciphers() {
+        for authority in [
+            "example.org:443/extra",
+            "example.org:443?plugin=unmapped",
+            "[not-an-ip]:443",
+            "[::1:443",
+            "example.org/path:443",
+            "example.org:0",
+        ] {
+            let input = format!(
+                "ss://{}",
+                STANDARD.encode(format!("aes-128-gcm:fixture@{authority}"))
+            );
+            let result = inspect(input.as_bytes());
+            assert!(result.tcp_candidates.iter().all(Option::is_none));
+            assert_eq!(result.original, input.as_bytes());
+        }
+        let input = format!(
+            "ss://{}",
+            STANDARD.encode("unknown-cipher:fixture@example.org:8388")
+        );
+        let result = inspect(input.as_bytes());
+        assert!(result.report.parsed);
+        assert!(!result.report.nodes[0].native_tcp_candidate);
+        assert_eq!(result.report.nodes[0].diagnostic, "CipherNotImplemented");
+        assert_eq!(result.originals[0]["cipher"], "unknown-cipher");
+    }
+    #[test]
+    fn malformed_ipv6_authorities_do_not_become_candidates() {
+        for host in [
+            "[2001:db8::1",
+            "[[2001:db8::1]]",
+            "[fe80::1%25eth0]",
+            "[not-an-ip]",
+        ] {
+            let input = format!("ss://YWVzLTEyOC1nY206Zml4dHVyZQ@{host}:443");
+            let result = inspect(input.as_bytes());
+            assert!(!result.report.parsed);
+            assert!(result.tcp_candidates.is_empty());
+            assert_eq!(result.original, input.as_bytes());
+        }
+    }
+    #[test]
+    fn ini_positional_and_named_authentication_cannot_overwrite_each_other() {
+        for declaration in [
+            "ss, example.org, 443, cipher=aes-256-gcm, aes-128-gcm, fixture",
+            "ss, example.org, 443, encrypt-method=aes-128-gcm, aes-128-gcm, fixture",
+            "ss, example.org, 443, aes-128-gcm, password=first, second",
+            "ss, example.org, 443, password=first, aes-128-gcm, second",
+            "ss, example.org, 443, aes-128-gcm, fixture, method=aes-256-gcm",
+            "ss, example.org, 443, aes-128-gcm, first, password=second",
+            "trojan, example.org, 443, password=first, second",
+            "trojan, example.org, 443, first, password=second",
+        ] {
+            let input = format!("[Proxy]\nfixture = {declaration}\n");
+            let result = inspect(input.as_bytes());
+            assert_eq!(result.report.error, Some("DuplicateIniParameter"));
+            assert!(!result.report.parsed);
+            assert!(result.tcp_candidates.is_empty());
+            assert_eq!(result.original, input.as_bytes());
+        }
+        for declaration in [
+            "ss, example.org, 443, aes-128-gcm, fixture",
+            "ss, example.org, 443, encrypt-method=aes-128-gcm, password=fixture",
+            "trojan, example.org, 443, fixture",
+            "trojan, example.org, 443, password=fixture",
+        ] {
+            let input = format!("[Proxy]\nfixture = {declaration}\n");
+            let result = inspect(input.as_bytes());
+            assert!(result.report.parsed);
+            assert!(result.report.nodes[0].native_tcp_candidate);
+            assert_eq!(result.original, input.as_bytes());
+        }
     }
     #[test]
     fn ini_comments_and_builtin_policies_do_not_hide_nodes() {

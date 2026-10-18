@@ -6,6 +6,9 @@ propagation. No test contacts GitHub or accesses credentials.
 """
 
 from pathlib import Path
+import os
+import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -30,6 +33,7 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
+      - run: cargo build --release --locked -p swirl-api
       - name: Independent portable protocol peers
         run: |
           python -m pip install cryptography==50.0.2
@@ -39,11 +43,13 @@ jobs:
           python ../tools/tests/test_dns_tls.py
   windows-rust:
     steps:
+      - run: cargo build --release --locked -p swirl-api
       - name: Independent TLS and protocol peers
         shell: pwsh
         run: |
           python -m pip install cryptography==50.0.2
           $env:SWIRL_RUST_HARNESS=(Resolve-Path target/release/swirl-api.exe).Path
+          $env:SWIRL_RUST_INSPECTOR=(Resolve-Path target/release/swirl-inspect.exe).Path
           python ../tools/tests/test_rust_core.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python ../tools/tests/test_shadowsocks.py
@@ -53,6 +59,14 @@ jobs:
           python ../tools/tests/test_subscription_capture.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python ../tools/tests/test_codex_management.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-Rust-Core-Windows
+          path: |
+            core/target/release/swirl_api.dll
+            core/target/release/swirl-api.exe
+            core/target/release/swirl-inspect.exe
+            core/Cargo.lock
       - name: Run Qt to Rust integration without Mihomo
         working-directory: .
         run: |
@@ -79,7 +93,28 @@ REQUIRED_TESTS = (
     "test_dns_negative.py",
     "test_native_probe.py",
     "test_connection_stages.py",
+    "test_connectivity_diagnostics.py",
+    "test_subscription_import.py",
 )
+
+
+def previous_connection_stage(source):
+    """Remove exactly this stage's reviewed additions to construct historical fixtures."""
+    for name in ("test_connectivity_diagnostics.py", "test_subscription_import.py"):
+        command = f"          python ../tools/tests/{name}\n"
+        source = source.replace(command + "          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }\n", "")
+        source = source.replace(command, "")
+    source = source.replace('          export SWIRL_RUST_DIAGNOSTIC="$PWD/target/release/swirl-diagnose"\n', "")
+    source = source.replace("          $env:SWIRL_RUST_DIAGNOSTIC=(Resolve-Path target/release/swirl-diagnose.exe).Path\n", "")
+    for name in ("SWIRL_RUST_HARNESS", "SWIRL_RUST_INSPECTOR", "SWIRL_RUST_DIAGNOSTIC"):
+        source = source.replace(f'          test -x "${name}"\n', "")
+        source = source.replace(
+            f"          if (-not (Test-Path $env:{name} -PathType Leaf)) {{ throw 'Required Rust test binary missing' }}\n", "")
+    source = source.replace("            core/target/release/swirl-diagnose.exe\n", "")
+    return source.replace(
+        "      - run: cargo build --release --locked --workspace --lib --bins\n",
+        "      - run: cargo build --release --locked -p swirl-api\n",
+    )
 
 
 class CoreDevelopmentTests(unittest.TestCase):
@@ -92,6 +127,10 @@ class CoreDevelopmentTests(unittest.TestCase):
         for name in REQUIRED_TESTS:
             (peers / name).write_text("# test fixture\n", encoding="utf-8")
         (root / "tools/Verify-PublicRustCore.py").write_text("# public check fixture\n", encoding="utf-8")
+        (root / "tools/Diagnose-NativeConnectivity.py").write_text("# diagnostic fixture\n", encoding="utf-8")
+        diagnostic = root / "core/crates/swirl-api/src/bin/swirl-diagnose.rs"
+        diagnostic.parent.mkdir(parents=True)
+        diagnostic.write_text("// diagnostic fixture\n", encoding="utf-8")
         return workflow
 
     def test_adds_only_reviewed_tests_and_exact_development_trigger(self):
@@ -123,7 +162,7 @@ class CoreDevelopmentTests(unittest.TestCase):
             self.assertIn(command + "          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }\n", windows)
         self.assertIn('          export SWIRL_RUST_INSPECTOR="$PWD/target/release/swirl-inspect"\n', portable)
         # Reversing only the reviewed additions must recover every original byte.
-        restored = updated.replace(
+        restored = previous_connection_stage(updated).replace(
             "    branches: [test, main, work/core-completion-20261017]\n",
             "    branches: [test, main]\n",
         )
@@ -155,7 +194,7 @@ class CoreDevelopmentTests(unittest.TestCase):
 
     def test_previous_successful_workflow_upgrades_without_duplicate_suites(self):
         final = development.updated_workflow(FIXTURE)
-        previous = final
+        previous = previous_connection_stage(final)
         for name in ("test_dns_negative.py", "test_native_probe.py", "test_connection_stages.py"):
             command = f"          python ../tools/tests/{name}\n"
             previous = previous.replace(command + development.WINDOWS_STATUS_GUARD, "")
@@ -180,7 +219,7 @@ class CoreDevelopmentTests(unittest.TestCase):
 
     def test_previous_dns_stage_upgrades_and_partial_new_menus_are_rejected(self):
         final = development.updated_workflow(FIXTURE)
-        previous = final
+        previous = previous_connection_stage(final)
         for name in ("test_dns_negative.py", "test_native_probe.py", "test_connection_stages.py"):
             command = f"          python ../tools/tests/{name}\n"
             previous = previous.replace(command + development.WINDOWS_STATUS_GUARD, "")
@@ -198,13 +237,88 @@ class CoreDevelopmentTests(unittest.TestCase):
     def test_connection_suite_upgrades_verified_dns_stage_without_partial_acceptance(self):
         final = development.updated_workflow(FIXTURE)
         command = "          python ../tools/tests/test_connection_stages.py\n"
-        previous = final.replace(command + development.WINDOWS_STATUS_GUARD, "").replace(command, "")
+        previous = previous_connection_stage(final).replace(command + development.WINDOWS_STATUS_GUARD, "").replace(command, "")
         self.assertEqual(development.updated_workflow(previous), final)
         for broken in (final.replace(command, "", 1),
                        final.replace(command, command * 2, 1),
                        final.replace(command + development.WINDOWS_STATUS_GUARD, command)):
             with self.subTest(menu=broken[-100:]), self.assertRaises(ValueError):
                 development.updated_workflow(broken)
+
+    def test_connectivity_stage_upgrades_previous_build_menus_and_artifact_together(self):
+        final = development.updated_workflow(FIXTURE)
+        previous = previous_connection_stage(final)
+        self.assertEqual(development.updated_workflow(previous), final)
+        self.assertEqual(final.count("      - run: cargo build --release --locked --workspace --lib --bins\n"), 2)
+        self.assertNotIn("cargo build --release --locked -p swirl-api", final)
+        self.assertEqual(final.count("            core/target/release/swirl-diagnose.exe\n"), 1)
+        portable, windows = final.split("  windows-rust:\n")
+        for name in ("SWIRL_RUST_HARNESS", "SWIRL_RUST_INSPECTOR", "SWIRL_RUST_DIAGNOSTIC"):
+            portable_guard = f'          test -x "${name}"\n'
+            windows_guard = f"          if (-not (Test-Path $env:{name} -PathType Leaf)) {{ throw 'Required Rust test binary missing' }}\n"
+            self.assertEqual(portable.count(portable_guard), 1)
+            self.assertEqual(windows.count(windows_guard), 1)
+            self.assertLess(portable.index(portable_guard), portable.index("          python ../tools/tests/test_rust_core.py\n"))
+            self.assertLess(windows.index(windows_guard), windows.index("          python ../tools/tests/test_rust_core.py\n"))
+
+    def test_connectivity_stage_rejects_partial_menus_guards_environment_and_artifact(self):
+        final = development.updated_workflow(FIXTURE)
+        broken = []
+        for name in ("test_connectivity_diagnostics.py", "test_subscription_import.py"):
+            command = f"          python ../tools/tests/{name}\n"
+            broken.extend((final.replace(command, "", 1), final.replace(command, command * 2, 1),
+                           final.replace(command + development.WINDOWS_STATUS_GUARD, command)))
+        for marker in (
+            '          export SWIRL_RUST_DIAGNOSTIC="$PWD/target/release/swirl-diagnose"\n',
+            "          $env:SWIRL_RUST_DIAGNOSTIC=(Resolve-Path target/release/swirl-diagnose.exe).Path\n",
+            '          test -x "$SWIRL_RUST_DIAGNOSTIC"\n',
+            "          if (-not (Test-Path $env:SWIRL_RUST_INSPECTOR -PathType Leaf)) { throw 'Required Rust test binary missing' }\n",
+            "            core/target/release/swirl-diagnose.exe\n",
+        ):
+            broken.extend((final.replace(marker, "", 1), final + marker))
+        broken.append(final.replace("--workspace --lib --bins", "--workspace --bins", 1))
+        for source in broken:
+            with self.subTest(tail=source[-100:]), self.assertRaises(ValueError):
+                development.updated_workflow(source)
+
+    def test_historical_build_and_artifact_drift_are_not_silently_overwritten(self):
+        for source in (
+            FIXTURE.replace("cargo build --release --locked -p swirl-api", "cargo build --release", 1),
+            FIXTURE.replace("core/target/release/swirl-inspect.exe\n", "core/target/debug/swirl-inspect.exe\n"),
+            FIXTURE.replace("$env:SWIRL_RUST_INSPECTOR=", "$env:OTHER_INSPECTOR="),
+        ):
+            with self.subTest(tail=source[-100:]), self.assertRaises(ValueError):
+                development.updated_workflow(source)
+
+    def test_missing_binary_preflight_stops_before_a_suite_can_skip(self):
+        windows = os.name == "nt"
+        shell = shutil.which("pwsh" if windows else "bash")
+        if shell is None:
+            self.skipTest("The platform's GitHub Actions shell is unavailable")
+        source = development.updated_workflow(FIXTURE).split("  windows-rust:\n")[int(windows)]
+        prefix = "          if (-not (Test-Path" if windows else "          test -x "
+        guards = [line.strip() for line in source.splitlines() if line.startswith(prefix)]
+        self.assertEqual(len(guards), 3)
+        sentinel = "Write-Output 'SUITE_STARTED'" if windows else "printf 'SUITE_STARTED'"
+        script = "\n".join([*guards, sentinel])
+        command = ([shell, "-NoProfile", "-NonInteractive", "-Command", script] if windows
+                   else [shell, "-e", "-c", script])
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            paths = {name: root / name for name in
+                     ("SWIRL_RUST_HARNESS", "SWIRL_RUST_INSPECTOR", "SWIRL_RUST_DIAGNOSTIC")}
+            for name in ("SWIRL_RUST_HARNESS", "SWIRL_RUST_INSPECTOR"):
+                paths[name].write_text("fixture\n", encoding="utf-8")
+                paths[name].chmod(0o700)
+            environment = {**os.environ, **{name: str(path) for name, path in paths.items()}}
+            missing = subprocess.run(command, env=environment, capture_output=True, text=True, timeout=5)
+            self.assertNotEqual(missing.returncode, 0)
+            self.assertNotIn("SUITE_STARTED", missing.stdout)
+            paths["SWIRL_RUST_DIAGNOSTIC"].write_text("fixture\n", encoding="utf-8")
+            paths["SWIRL_RUST_DIAGNOSTIC"].chmod(0o700)
+            present = subprocess.run(command, env=environment, capture_output=True, text=True, timeout=5)
+            self.assertEqual(present.returncode, 0, present.stderr)
+            self.assertEqual(present.stdout.strip(), "SUITE_STARTED")
 
     def test_branch_and_menu_drift_fail_closed(self):
         for source in (
@@ -282,7 +396,11 @@ class CoreDevelopmentTests(unittest.TestCase):
             "tools/tests/test_dns_negative.py",
             "tools/tests/test_native_probe.py",
             "tools/tests/test_connection_stages.py",
+            "tools/tests/test_connectivity_diagnostics.py",
+            "tools/tests/test_subscription_import.py",
             "tools/Verify-PublicRustCore.py",
+            "tools/Diagnose-NativeConnectivity.py",
+            "core/crates/swirl-api/src/bin/swirl-diagnose.rs",
         ):
             with self.subTest(missing=missing), tempfile.TemporaryDirectory() as temporary:
                 root = Path(temporary)

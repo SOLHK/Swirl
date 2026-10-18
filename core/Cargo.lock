@@ -580,7 +580,10 @@ dependencies = [
  "serde",
  "serde_json",
  "swirl-core",
+ "swirl-dns",
+ "swirl-protocol",
  "swirl-subscription",
+ "tokio",
 ]
 
 [[package]]
@@ -615,6 +618,7 @@ dependencies = [
  "httparse",
  "md-5",
  "ring",
+ "serde",
  "sha2",
  "swirl-dns",
  "swirl-subscription",

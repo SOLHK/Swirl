@@ -35,7 +35,33 @@ the built swirl-api executable. No global certificate trust changes occur.
 `tools/Benchmark-RustCore.py` records loopback latency/throughput/CPU/memory and
 optional public HTTPS checks; it does not claim private-node performance.
 
-## Current development branch and evidence
+## Second capture and bounded connectivity diagnostics (2026-10-18)
+
+The current stage continues from `13ea97af5c94198ecba4ed79b16cfc7b1b676f27` on
+`work/core-completion-20261017`. All 16 subscription bodies were independently
+encrypted and persisted before the second fixed cutoff; 14 are newly recovered
+entries and two are refreshes. Initial offline canonical merging was rejected
+by its native parse gate and preserves all old and new ciphertext. See the
+[current stage record](../docs/RUST_CAPTURE_DIAGNOSTICS_VALIDATION_20261018.md)
+for actual merge and later network outcomes; the older two-body evidence below
+is historical.
+
+`swirl-diagnose` accepts an endpoint only through stdin JSON and observes the
+same TCP scheduler used by product connections. It emits address-family counts,
+per-attempt timings and fixed outcomes without endpoint strings or raw OS errors.
+`tools/Diagnose-NativeConnectivity.py` runs an independent system-DNS/socket
+backend and this native binary serially within one ten-second sample budget;
+their DNS budgets are 1500ms each. A successful probe sends no application data
+and establishes only TCP reachability. Product timeouts remain unchanged.
+
+The importer now preserves raw IPv6 hosts, refuses conflicting positional and
+named INI parameters, keeps reserved characters in legacy SS passwords, and
+strictly separates SIP002 percent decoding from legacy credentials. Unknown
+fields remain present and unsupported semantics cannot turn into DIRECT.
+New independent Python SS peers cover actual credentials, forwarding and close.
+No Qt, QML or product settings are changed by this stage.
+
+## Previous connection/policy stage evidence
 
 Continue `work/core-completion-20261017`, not the older main or test head. The
 current connection/policy stage continues from `d27fcc74ed549f2219f97da1f5c56a83bace3ac1`.

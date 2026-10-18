@@ -1,6 +1,7 @@
 //! Bounded TCP address fallback. Resolve once; race only these socket addresses,
 //! and drop every losing connect future before TLS or protocol bytes are sent.
 use super::{Result, Target};
+use crate::diagnostics::{TcpAttempt, TcpDiagnostic, TcpOutcome};
 use std::{
     future::{Future, poll_fn},
     io,
@@ -19,6 +20,159 @@ const ADDRESS_LIMIT: usize = 16;
 // Retire a stalled attempt only when further resolved addresses need a slot.
 // The final candidates retain the remainder of the original shared deadline.
 const SLOT_LIMIT: Duration = Duration::from_secs(2);
+
+fn millis(duration: Duration) -> u64 {
+    duration.as_millis().min(u128::from(u64::MAX)) as u64
+}
+
+// An optional observer, not a second scheduler. It never retains endpoints or
+// OS errors. Dropping the enclosing dial future records still-pending sockets
+// as cancelled; the sockets themselves remain owned by the original scheduler.
+struct Observation<'a> {
+    report: Option<&'a mut TcpDiagnostic>,
+    started: Instant,
+    active: Vec<(usize, Instant)>,
+}
+
+impl<'a> Observation<'a> {
+    fn new(report: Option<&'a mut TcpDiagnostic>, addresses: &[SocketAddr]) -> Self {
+        let mut result = Self {
+            report,
+            started: Instant::now(),
+            active: Vec::new(),
+        };
+        if let Some(report) = result.report.as_deref_mut() {
+            report.address_count = addresses.len();
+            report.ipv4_count = addresses.iter().filter(|a| a.is_ipv4()).count();
+            report.ipv6_count = addresses.len() - report.ipv4_count;
+            report.remaining_count = addresses.len();
+        }
+        result
+    }
+
+    fn start(&mut self, address: SocketAddr) -> usize {
+        let Some(report) = self.report.as_deref_mut() else {
+            return 0;
+        };
+        let index = report.attempts.len();
+        let now = Instant::now();
+        report.attempts.push(TcpAttempt {
+            ordinal: index + 1,
+            family: if address.is_ipv4() { "ipv4" } else { "ipv6" },
+            started_ms: millis(now.duration_since(self.started)),
+            elapsed_ms: 0,
+            outcome: TcpOutcome::Cancelled,
+        });
+        self.active.push((index, now));
+        report.attempted_count += 1;
+        report.remaining_count -= 1;
+        report.peak_pending = report.peak_pending.max(self.active.len());
+        index
+    }
+
+    fn finish(&mut self, index: usize, outcome: TcpOutcome) {
+        let Some(report) = self.report.as_deref_mut() else {
+            return;
+        };
+        if let Some(position) = self.active.iter().position(|(id, _)| *id == index) {
+            let (_, started) = self.active.swap_remove(position);
+            report.attempts[index].elapsed_ms = millis(started.elapsed());
+            report.attempts[index].outcome = outcome;
+        }
+    }
+
+    fn finish_pending(&mut self, outcome: TcpOutcome) {
+        while let Some((index, _)) = self.active.last().copied() {
+            self.finish(index, outcome);
+        }
+    }
+}
+
+impl Drop for Observation<'_> {
+    fn drop(&mut self) {
+        self.finish_pending(TcpOutcome::Cancelled);
+        if let Some(report) = self.report.as_deref_mut() {
+            report.tcp_elapsed_ms = millis(self.started.elapsed());
+        }
+    }
+}
+
+/// Run the product's resolver and TCP address scheduler with a stricter
+/// diagnostic budget. All connected sockets are immediately dropped, without
+/// TLS, proxy authentication or application bytes. This is not a protocol test.
+///
+/// DNS is capped at three seconds, the total at ten seconds and pending TCP at
+/// two. The existing product's timeouts and address-selection policy are not
+/// changed. OS DNS lookups cannot always be cancelled: the resolver retains its
+/// existing semaphore limit and the standalone CLI also bounds runtime shutdown.
+pub async fn diagnose_tcp(
+    resolver: &Resolver,
+    target: &Target,
+    total_budget: Duration,
+    dns_budget: Duration,
+) -> TcpDiagnostic {
+    let (mut report, result) = diagnose_with(
+        total_budget,
+        dns_budget,
+        resolver.resolve(&target.host, target.port),
+        TcpStream::connect,
+    )
+    .await;
+    if let Ok(stream) = result {
+        if stream.set_nodelay(true).is_err() {
+            report.ok = false;
+            report.error_code = Some("SocketOptions");
+            report.failure_stage = Some("socket_options");
+        }
+        drop(stream);
+    }
+    report
+}
+
+async fn diagnose_with<T, F: Future<Output = io::Result<T>>>(
+    total_budget: Duration,
+    dns_budget: Duration,
+    resolve: impl Future<Output = Result<Vec<SocketAddr>>>,
+    connect: impl FnMut(SocketAddr) -> F,
+) -> (TcpDiagnostic, Result<T>) {
+    let started = Instant::now();
+    let mut report = TcpDiagnostic::new(millis(total_budget), millis(dns_budget.min(total_budget)));
+    if total_budget.is_zero()
+        || total_budget > Duration::from_secs(10)
+        || dns_budget.is_zero()
+        || dns_budget > Duration::from_secs(3)
+    {
+        report.error_code = Some("DiagnosticBudget");
+        report.failure_stage = Some("input");
+        return (report, Err("DiagnosticBudget"));
+    }
+    let deadline = started + total_budget;
+    let addresses = within(
+        deadline.min(started + dns_budget),
+        "UpstreamDnsTimeout",
+        resolve,
+    )
+    .await;
+    report.dns_elapsed_ms = millis(started.elapsed());
+    let result = match addresses {
+        Ok(addresses) => {
+            dial_addresses_observed(addresses, deadline, connect, Some(&mut report)).await
+        }
+        Err("UpstreamDnsTimeout" | "DnsTimeout") => Err("UpstreamDnsTimeout"),
+        // DNS has many detailed internal codes. This interface intentionally
+        // emits a small fixed vocabulary, never a supplied error string.
+        Err(_) => Err("DnsLookupFailed"),
+    };
+    report.total_elapsed_ms = millis(started.elapsed());
+    match &result {
+        Ok(_) => report.ok = true,
+        Err(code) => {
+            report.error_code = Some(code);
+            report.failure_stage = Some(crate::failure_stage(code));
+        }
+    }
+    (report, result)
+}
 
 pub(super) async fn within<T>(
     deadline: Instant,
@@ -84,15 +238,27 @@ fn ordered_addresses(addresses: Vec<SocketAddr>) -> Result<Vec<SocketAddr>> {
 async fn dial_addresses<T, F: Future<Output = io::Result<T>>>(
     addresses: Vec<SocketAddr>,
     deadline: Instant,
-    mut connect: impl FnMut(SocketAddr) -> F,
+    connect: impl FnMut(SocketAddr) -> F,
 ) -> Result<T> {
-    let mut addresses = ordered_addresses(addresses)?.into_iter().peekable();
+    dial_addresses_observed(addresses, deadline, connect, None).await
+}
+
+async fn dial_addresses_observed<T, F: Future<Output = io::Result<T>>>(
+    addresses: Vec<SocketAddr>,
+    deadline: Instant,
+    mut connect: impl FnMut(SocketAddr) -> F,
+    report: Option<&mut TcpDiagnostic>,
+) -> Result<T> {
+    let addresses = ordered_addresses(addresses)?;
+    let mut observation = Observation::new(report, &addresses);
+    let mut addresses = addresses.into_iter().peekable();
     let mut attempts = Vec::with_capacity(PENDING_LIMIT);
     let mut next_start = Instant::now();
     let mut timed_out = false;
     loop {
         let now = Instant::now();
         if now >= deadline {
+            observation.finish_pending(TcpOutcome::Timeout);
             return Err("UpstreamTcpTimeout");
         }
         if attempts.len() < PENDING_LIMIT && addresses.peek().is_some() && now >= next_start {
@@ -102,7 +268,8 @@ async fn dial_addresses<T, F: Future<Output = io::Result<T>>>(
             } else {
                 deadline
             };
-            attempts.push(Box::pin(timeout_at(expires, connect(address))));
+            let ordinal = observation.start(address);
+            attempts.push((ordinal, Box::pin(timeout_at(expires, connect(address)))));
             next_start = now + ATTEMPT_DELAY;
         }
         if attempts.is_empty() && addresses.peek().is_none() {
@@ -114,9 +281,12 @@ async fn dial_addresses<T, F: Future<Output = io::Result<T>>>(
         }
         tokio::select! {
             biased;
-            _ = sleep_until(deadline) => return Err("UpstreamTcpTimeout"),
+            _ = sleep_until(deadline) => {
+                observation.finish_pending(TcpOutcome::Timeout);
+                return Err("UpstreamTcpTimeout");
+            },
             (index, result) = poll_fn(|cx| {
-                for (index, attempt) in attempts.iter_mut().enumerate() {
+                for (index, (_, attempt)) in attempts.iter_mut().enumerate() {
                     if let Poll::Ready(result) = attempt.as_mut().poll(cx) {
                         return Poll::Ready((index, result));
                     }
@@ -126,11 +296,18 @@ async fn dial_addresses<T, F: Future<Output = io::Result<T>>>(
                 // Futures are owned here, not spawned. Returning or cancellation
                 // immediately drops all other sockets; no background dial lives
                 // past a successful TCP connection or the total deadline.
-                drop(attempts.swap_remove(index));
+                let (ordinal, attempt) = attempts.swap_remove(index);
+                drop(attempt);
                 match result {
-                    Ok(Ok(stream)) => return Ok(stream),
-                    Ok(Err(_)) => {},
-                    Err(_) => timed_out = true,
+                    Ok(Ok(stream)) => {
+                        observation.finish(ordinal, TcpOutcome::Success);
+                        return Ok(stream);
+                    },
+                    Ok(Err(error)) => observation.finish(ordinal, TcpOutcome::from_io(&error)),
+                    Err(_) => {
+                        observation.finish(ordinal, TcpOutcome::Timeout);
+                        timed_out = true;
+                    },
                 }
                 // A completed failure has already freed its socket slot. Do
                 // not waste a short total budget waiting for a failed attempt;
@@ -407,5 +584,362 @@ mod tests {
         let mut bytes = [0; 6];
         peer.read_exact(&mut bytes).await.unwrap();
         assert_eq!(&bytes, b"native");
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn diagnostic_counts_unique_families_and_records_cancelled_loser() {
+        let started = Instant::now();
+        let endpoints = vec![
+            address("[::1]:32123"),
+            address("[::2]:32123"),
+            address("127.0.0.1:32123"),
+            address("127.0.0.1:32123"),
+        ];
+        let (report, result) = diagnose_with(
+            Duration::from_secs(5),
+            Duration::from_secs(3),
+            async { Ok(endpoints) },
+            |endpoint| async move {
+                if endpoint.is_ipv6() {
+                    pending::<()>().await;
+                }
+                sleep(Duration::from_millis(25)).await;
+                Ok(())
+            },
+        )
+        .await;
+        assert!(result.is_ok());
+        assert!(report.ok);
+        assert_eq!(report.error_code, None);
+        assert_eq!(report.failure_stage, None);
+        assert_eq!(
+            (report.address_count, report.ipv4_count, report.ipv6_count),
+            (3, 1, 2)
+        );
+        assert_eq!(
+            (
+                report.attempted_count,
+                report.remaining_count,
+                report.peak_pending
+            ),
+            (2, 1, 2)
+        );
+        assert_eq!(
+            (
+                report.dns_elapsed_ms,
+                report.tcp_elapsed_ms,
+                report.total_elapsed_ms
+            ),
+            (0, 275, 275)
+        );
+        assert_eq!(report.attempts[0].family, "ipv6");
+        assert_eq!(report.attempts[0].outcome, TcpOutcome::Cancelled);
+        assert_eq!(report.attempts[0].elapsed_ms, 275);
+        assert_eq!(report.attempts[1].family, "ipv4");
+        assert_eq!(report.attempts[1].ordinal, 2);
+        assert_eq!(report.attempts[1].started_ms, 250);
+        assert_eq!(report.attempts[1].elapsed_ms, 25);
+        assert_eq!(report.attempts[1].outcome, TcpOutcome::Success);
+        assert_eq!(started.elapsed(), Duration::from_millis(275));
+        let debug = format!("{report:?}");
+        for private in ["127.0.0.1", "::1", "::2", "32123"] {
+            assert!(!debug.contains(private));
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn diagnostic_dns_cap_prevents_tcp_and_total_cap_can_be_shorter() {
+        for (total_ms, expected_ms) in [(10_000, 3_000), (700, 700)] {
+            let called = Cell::new(false);
+            let (report, result) = diagnose_with(
+                Duration::from_millis(total_ms),
+                Duration::from_secs(3),
+                pending::<Result<Vec<SocketAddr>>>(),
+                |_| {
+                    called.set(true);
+                    async { Ok(()) }
+                },
+            )
+            .await;
+            assert_eq!(result, Err("UpstreamDnsTimeout"));
+            assert_eq!(report.error_code, Some("UpstreamDnsTimeout"));
+            assert_eq!(report.failure_stage, Some("dns"));
+            assert_eq!(report.total_elapsed_ms, expected_ms);
+            assert_eq!(report.dns_elapsed_ms, expected_ms);
+            assert_eq!(report.tcp_elapsed_ms, 0);
+            assert_eq!(report.address_count, 0);
+            assert_eq!(report.attempted_count, 0);
+            assert_eq!(report.remaining_count, 0);
+            assert!(!called.get());
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn diagnostic_dns_time_reduces_tcp_budget_and_counts_unattempted_addresses() {
+        let (report, result) = diagnose_with(
+            Duration::from_millis(100),
+            Duration::from_secs(3),
+            async {
+                sleep(Duration::from_millis(70)).await;
+                Ok(vec![
+                    address("[::1]:80"),
+                    address("[::2]:80"),
+                    address("127.0.0.1:80"),
+                ])
+            },
+            |_| pending::<io::Result<()>>(),
+        )
+        .await;
+        assert_eq!(result, Err("UpstreamTcpTimeout"));
+        assert_eq!(report.failure_stage, Some("tcp_connect"));
+        assert_eq!(
+            (
+                report.dns_elapsed_ms,
+                report.tcp_elapsed_ms,
+                report.total_elapsed_ms
+            ),
+            (70, 30, 100)
+        );
+        assert_eq!(
+            (
+                report.address_count,
+                report.attempted_count,
+                report.remaining_count
+            ),
+            (3, 1, 2)
+        );
+        assert_eq!(report.attempts[0].outcome, TcpOutcome::Timeout);
+        assert_eq!(report.attempts[0].elapsed_ms, 30);
+        assert_eq!(report.peak_pending, 1);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn diagnostic_classifies_os_failures_without_preserving_error_messages() {
+        let endpoints = (1..=6)
+            .map(|port| SocketAddr::from(([127, 0, 0, 1], port)))
+            .collect();
+        let (report, result) = diagnose_with(
+            Duration::from_secs(5),
+            Duration::from_secs(3),
+            async { Ok(endpoints) },
+            |endpoint| async move {
+                let kind = match endpoint.port() {
+                    1 => io::ErrorKind::ConnectionRefused,
+                    2 => io::ErrorKind::NetworkUnreachable,
+                    3 => io::ErrorKind::HostUnreachable,
+                    4 => io::ErrorKind::NetworkDown,
+                    5 => io::ErrorKind::TimedOut,
+                    _ => io::ErrorKind::PermissionDenied,
+                };
+                Err::<(), _>(io::Error::new(
+                    kind,
+                    "secret.invalid:32123 private-password",
+                ))
+            },
+        )
+        .await;
+        // Preserve the product's existing top-level error semantics: only an
+        // actual scheduler deadline changes this into UpstreamTcpTimeout.
+        assert_eq!(result, Err("UpstreamConnectFailed"));
+        assert_eq!(
+            report
+                .attempts
+                .iter()
+                .map(|a| a.outcome)
+                .collect::<Vec<_>>(),
+            vec![
+                TcpOutcome::Refused,
+                TcpOutcome::Unreachable,
+                TcpOutcome::Unreachable,
+                TcpOutcome::Unreachable,
+                TcpOutcome::Timeout,
+                TcpOutcome::Other,
+            ]
+        );
+        assert_eq!(
+            (
+                report.attempted_count,
+                report.remaining_count,
+                report.peak_pending
+            ),
+            (6, 0, 1)
+        );
+        let debug = format!("{report:?}");
+        for private in [
+            "secret.invalid",
+            "32123",
+            "private-password",
+            "PermissionDenied",
+        ] {
+            assert!(!debug.contains(private));
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn diagnostic_slot_timeout_and_winner_cancellation_remain_distinct() {
+        let active = Rc::new(Cell::new(0));
+        let peak = Cell::new(0);
+        let endpoints = (1..=3)
+            .map(|port| SocketAddr::from(([127, 0, 0, 1], port)))
+            .collect();
+        let (report, result) = diagnose_with(
+            Duration::from_secs(5),
+            Duration::from_secs(3),
+            async { Ok(endpoints) },
+            |endpoint| {
+                let guard = AttemptGuard::new(&active, &peak);
+                async move {
+                    let _guard = guard;
+                    if endpoint.port() != 3 {
+                        pending::<()>().await;
+                    }
+                    Ok(())
+                }
+            },
+        )
+        .await;
+        assert!(result.is_ok());
+        assert_eq!(
+            report
+                .attempts
+                .iter()
+                .map(|a| a.outcome)
+                .collect::<Vec<_>>(),
+            vec![
+                TcpOutcome::Timeout,
+                TcpOutcome::Cancelled,
+                TcpOutcome::Success,
+            ]
+        );
+        assert_eq!(report.attempts[0].elapsed_ms, 2000);
+        assert_eq!(report.attempts[1].elapsed_ms, 1750);
+        assert_eq!(report.attempts[2].started_ms, 2000);
+        assert_eq!(report.total_elapsed_ms, 2000);
+        assert_eq!(report.peak_pending, 2);
+        assert_eq!(peak.get(), 2);
+        assert_eq!(active.get(), 0);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn external_cancellation_updates_trace_and_drops_all_connects() {
+        let mut report = TcpDiagnostic::new(5000, 3000);
+        let active = Rc::new(Cell::new(0));
+        let peak = Cell::new(0);
+        let started = Instant::now();
+        let result = timeout(
+            Duration::from_millis(300),
+            dial_addresses_observed(
+                vec![
+                    address("[::1]:80"),
+                    address("127.0.0.1:80"),
+                    address("127.0.0.2:80"),
+                ],
+                started + Duration::from_secs(5),
+                |_| {
+                    let guard = AttemptGuard::new(&active, &peak);
+                    async move {
+                        let _guard = guard;
+                        pending::<io::Result<()>>().await
+                    }
+                },
+                Some(&mut report),
+            ),
+        )
+        .await;
+        assert!(result.is_err());
+        assert_eq!(
+            (
+                report.attempted_count,
+                report.remaining_count,
+                report.peak_pending
+            ),
+            (2, 1, 2)
+        );
+        assert!(
+            report
+                .attempts
+                .iter()
+                .all(|a| a.outcome == TcpOutcome::Cancelled)
+        );
+        assert_eq!(report.attempts[0].elapsed_ms, 300);
+        assert_eq!(report.attempts[1].elapsed_ms, 50);
+        assert_eq!(report.tcp_elapsed_ms, 300);
+        assert_eq!(active.get(), 0);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn diagnostic_invalid_budget_does_not_poll_dns_or_dial() {
+        for (total, dns) in [(10_001, 3000), (10_000, 3001), (0, 3000), (10_000, 0)] {
+            let polled = Cell::new(false);
+            let (report, result) = diagnose_with(
+                Duration::from_millis(total),
+                Duration::from_millis(dns),
+                async {
+                    polled.set(true);
+                    Ok(vec![address("127.0.0.1:80")])
+                },
+                |_| async { Ok(()) },
+            )
+            .await;
+            assert_eq!(result, Err("DiagnosticBudget"));
+            assert_eq!(report.failure_stage, Some("input"));
+            assert!(!polled.get());
+            assert!(report.attempts.is_empty());
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn diagnostic_dns_error_has_a_fixed_redacted_category() {
+        let (report, result) = diagnose_with(
+            Duration::from_secs(5),
+            Duration::from_secs(3),
+            async { Err("private-marker.invalid:32123") },
+            |_| async { Ok(()) },
+        )
+        .await;
+        assert_eq!(result, Err("DnsLookupFailed"));
+        assert_eq!(report.error_code, Some("DnsLookupFailed"));
+        assert_eq!(report.failure_stage, Some("dns"));
+        assert!(!format!("{report:?}").contains("private-marker"));
+        assert!(report.attempts.is_empty());
+    }
+
+    #[tokio::test]
+    async fn diagnostic_real_loopback_connect_closes_without_application_data() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let target = Target {
+            host: "127.0.0.1".into(),
+            port: listener.local_addr().unwrap().port(),
+        };
+        let report = diagnose_tcp(
+            &Resolver::default(),
+            &target,
+            Duration::from_secs(1),
+            Duration::from_millis(300),
+        )
+        .await;
+        assert!(report.ok, "{report:?}");
+        assert_eq!(
+            (
+                report.address_count,
+                report.attempted_count,
+                report.remaining_count
+            ),
+            (1, 1, 0)
+        );
+        assert_eq!(report.attempts[0].outcome, TcpOutcome::Success);
+        assert_eq!(report.attempts[0].family, "ipv4");
+        let (mut peer, _) = timeout(Duration::from_secs(1), listener.accept())
+            .await
+            .unwrap()
+            .unwrap();
+        let mut bytes = [0; 1];
+        assert_eq!(
+            timeout(Duration::from_secs(1), peer.read(&mut bytes))
+                .await
+                .unwrap()
+                .unwrap(),
+            0
+        );
     }
 }
