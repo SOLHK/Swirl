@@ -5,6 +5,7 @@
 #include <QCryptographicHash>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonArray>
 #include <QNetworkReply>
 #include <QNetworkProxy>
 #include <QSettings>
@@ -195,6 +196,15 @@ private slots:
         QCOMPARE(restored.routingRules().first().toMap().value("policy").toString(),QStringLiteral("Local"));
         QCOMPARE(restored.routingRules().first().toMap().value("pattern").toString(),QStringLiteral("edited.fixture.test"));
         QVERIFY(restored.removeRoutingRule(0));QVERIFY(restored.removePolicyGroup("Local"));
+        QVERIFY(restored.saveRoutingRule("PROCESS-NAME","fixture-process.exe","DIRECT"));
+        QCOMPARE(restored.routingRules().first().toMap().value("type").toString(),QStringLiteral("PROCESS-NAME"));
+        // Existing compatibility modifiers are retained by the unchanged editor.
+        NodeStore seed(store);auto snapshot=seed.networkConfiguration();
+        snapshot["rules"]=QJsonArray{"PROCESS-NAME,fixture-process.exe,DIRECT","IP-CIDR,198.51.100.0/24,DIRECT,no-resolve,src"};
+        QVERIFY(seed.saveNetworkConfiguration(snapshot));
+        EngineController compatibility(std::make_unique<MihomoAdapter>(),nullptr,store);
+        QVERIFY(compatibility.saveRoutingRule("IP-CIDR","192.0.2.0/24","DIRECT",1));
+        QCOMPARE(compatibility.networkConfigurationSnapshot().value("rules").toStringList()[1],QStringLiteral("IP-CIDR,192.0.2.0/24,DIRECT,no-resolve,src"));
     }
     void missingAndTampered() {
         MihomoAdapter engine;

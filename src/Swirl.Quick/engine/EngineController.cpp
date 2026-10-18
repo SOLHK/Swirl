@@ -28,6 +28,17 @@
 #endif
 
 namespace {
+QStringList routingRuleFields(const QString &rule) {
+    auto fields=rule.split(',');
+    for(auto &field:fields)field=field.trimmed();
+    return fields;
+}
+int routingRuleTargetIndex(const QStringList &fields) {
+    return fields.value(0)=="MATCH"?1:2;
+}
+bool destinationCidrRule(const QString &type) {
+    return type=="IP-CIDR"||type=="IP-CIDR6";
+}
 QByteArray protectLanPassword(const QByteArray &input,bool decrypt) {
 #ifdef Q_OS_WIN
     DATA_BLOB source{DWORD(input.size()),reinterpret_cast<BYTE *>(const_cast<char *>(input.constData()))},result{};
@@ -426,6 +437,22 @@ bool EngineController::saveNetworkConfiguration() {
     }
     emit optionsChanged();emit statusChanged();return true;
 }
+bool EngineController::commitRoutingConfiguration(const QStringList &rules,const QVariantList &groups) {
+#ifdef SWIRL_USE_RUST_CORE
+    const auto error=RustCoreEngine::validateNetworkConfiguration(m_store.nodes(),m_options.dnsConfig,rules,groups);
+    if(!error.isEmpty()){m_networkError=error;emit optionsChanged();return false;}
+#endif
+    if(rules==m_options.customRules&&groups==m_options.customGroups){emit optionsChanged();return true;}
+    // Validate and durably save the candidate before publishing it to QML.
+    // A failed QSaveFile commit must not expose even a transient edited state.
+    auto snapshot=serializedNetworkConfiguration();
+    if(snapshot.isEmpty()){emit optionsChanged();return false;}
+    snapshot["rules"]=QJsonArray::fromStringList(rules);
+    snapshot["groups"]=QJsonArray::fromVariantList(groups);
+    if(!m_store.saveNetworkConfiguration(snapshot)){m_networkError=m_store.error();emit optionsChanged();return false;}
+    m_options.customRules=rules;m_options.customGroups=groups;
+    emit optionsChanged();emit statusChanged();return true;
+}
 bool EngineController::importNodesAndConfiguration(const QList<ProxyNode> &incoming,const QString &sourceId,const QVariantMap &input,const QJsonObject &original,const QString &sourceFormat) {
 #ifndef SWIRL_USE_RUST_CORE
     Q_UNUSED(incoming);Q_UNUSED(sourceId);Q_UNUSED(input);Q_UNUSED(original);Q_UNUSED(sourceFormat);
@@ -573,15 +600,28 @@ bool EngineController::saveRoutingRule(const QString &type,const QString &patter
     }
     if(type=="DST-PORT"){bool ok=false;const auto port=pattern.toInt(&ok);valid=valid&&ok&&port>0&&port<=65535;}
     if(!valid||index<-1||index>=m_options.customRules.size()||(index<0&&m_options.customRules.size()>=1000)){m_networkError=QStringLiteral("规则类型、匹配值或目标策略无效。");emit optionsChanged();return false;}
-    const auto before=m_options.customRules;
-    const auto rule=type=="MATCH"?"MATCH,"+policy:type+","+pattern.trimmed()+","+policy;
-    if(index<0)m_options.customRules.append(rule);else m_options.customRules[index]=rule;
-    if(saveNetworkConfiguration())return true;m_options.customRules=before;emit optionsChanged();return false;
+    auto rules=m_options.customRules;
+    auto rule=type=="MATCH"?"MATCH,"+policy:type+","+pattern.trimmed()+","+policy;
+    if(index>=0) {
+        const auto previous=routingRuleFields(rules[index]);
+        const auto options=previous.mid(routingRuleTargetIndex(previous)+1);
+        // The current editor has no modifier controls. Preserve hidden options
+        // on the same rule kind (or the equivalent IPv4/IPv6 CIDR kind), and
+        // reject a type change that would otherwise discard their semantics.
+        if(!options.isEmpty()) {
+            if(previous.value(0)!=type&&!(destinationCidrRule(previous.value(0))&&destinationCidrRule(type))) {
+                m_networkError=QStringLiteral("原规则含当前编辑器未显示的附加参数，不能通过更改类型丢弃；原规则保持不变。");emit optionsChanged();return false;
+            }
+            rule+=','+options.join(',');
+        }
+        if(routingRuleFields(rule)!=previous)rules[index]=rule;
+    } else rules.append(rule);
+    return commitRoutingConfiguration(rules,m_options.customGroups);
 }
 bool EngineController::removeRoutingRule(int index) {
     if(!networkEditAllowed()||index<0||index>=m_options.customRules.size())return false;
-    const auto before=m_options.customRules;m_options.customRules.removeAt(index);
-    if(saveNetworkConfiguration())return true;m_options.customRules=before;emit optionsChanged();return false;
+    auto rules=m_options.customRules;rules.removeAt(index);
+    return commitRoutingConfiguration(rules,m_options.customGroups);
 }
 bool EngineController::savePolicyGroup(const QString &name,const QString &type,const QStringList &members) {
     if(!networkEditAllowed())return false;
@@ -601,28 +641,26 @@ bool EngineController::savePolicyGroup(const QString &name,const QString &type,c
     for(const auto &member:members)if(!available.contains(member)){m_networkError=QStringLiteral("策略组包含不存在的节点。");emit optionsChanged();return false;}
 #endif
     if(position>=0)groups[position]=group;else groups.append(group);
-#ifdef SWIRL_USE_RUST_CORE
-    const auto groupError=RustCoreEngine::validatePolicyGroups(m_store.nodes(),groups);
-    if(!groupError.isEmpty()){m_networkError=groupError;emit optionsChanged();return false;}
-#endif
-    const auto before=m_options.customGroups;m_options.customGroups=groups;
-    if(saveNetworkConfiguration())return true;m_options.customGroups=before;emit optionsChanged();return false;
+    return commitRoutingConfiguration(m_options.customRules,groups);
 }
 bool EngineController::removePolicyGroup(const QString &name) {
     if(!networkEditAllowed())return false;
-    for(const auto &rule:m_options.customRules)if(rule.section(',',-1)==name){m_networkError=QStringLiteral("请先删除引用此策略组的规则。");emit optionsChanged();return false;}
+    for(const auto &rule:m_options.customRules) {
+        const auto fields=routingRuleFields(rule);
+        if(fields.value(routingRuleTargetIndex(fields))==name){m_networkError=QStringLiteral("请先删除引用此策略组的规则。");emit optionsChanged();return false;}
+    }
 #ifdef SWIRL_USE_RUST_CORE
     for(const auto &value:m_options.customGroups){const auto group=value.toMap();if(group.value("name")!=name&&group.value("proxies").toStringList().contains(name)){m_networkError=QStringLiteral("请先移除其他策略组对此组的引用。");emit optionsChanged();return false;}}
 #endif
-    const auto before=m_options.customGroups;
-    for(int i=m_options.customGroups.size()-1;i>=0;--i)if(m_options.customGroups[i].toMap().value("name")==name)m_options.customGroups.removeAt(i);
-    if(saveNetworkConfiguration())return true;m_options.customGroups=before;emit optionsChanged();return false;
+    auto groups=m_options.customGroups;
+    for(int i=groups.size()-1;i>=0;--i)if(groups[i].toMap().value("name")==name)groups.removeAt(i);
+    return commitRoutingConfiguration(m_options.customRules,groups);
 }
 QVariantList EngineController::routingRules() const {
     if(processAlive())return m_engine->routingRules();
     QVariantList rows;int order=0;
-    for(const auto &line:m_options.customRules){const auto parts=line.split(',');const bool match=parts[0]=="MATCH";
-        rows.append(QVariantMap{{"id",QString::number(order)},{"order",order},{"customIndex",order},{"type",match?"FINAL":parts[0]},{"pattern",match?"":parts.value(1)},{"policy",parts.last()},{"hits","—"}});++order;}
+    for(const auto &line:m_options.customRules){const auto parts=routingRuleFields(line);const bool match=parts.value(0)=="MATCH";
+        rows.append(QVariantMap{{"id",QString::number(order)},{"order",order},{"customIndex",order},{"type",match?"FINAL":parts.value(0)},{"pattern",match?"":parts.value(1)},{"policy",parts.value(routingRuleTargetIndex(parts))},{"hits","—"}});++order;}
     rows.append(QVariantMap{{"id","final"},{"order",order},{"type","FINAL"},{"pattern",""},{"policy","DIRECT"},{"hits","—"}});
     return rows;
 }

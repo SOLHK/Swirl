@@ -196,6 +196,7 @@ private:
     ProxyEngine::State m_previousEngineState=ProxyEngine::State::Stopped;
     QJsonObject serializedNetworkConfiguration();
     bool saveNetworkConfiguration();
+    bool commitRoutingConfiguration(const QStringList &rules,const QVariantList &groups);
     bool networkEditAllowed();
     void startConfiguredSession();
     QString m_networkError;

@@ -643,6 +643,95 @@ private slots:
   engine.selectNode(o.selectedNodeId);QVERIFY(engine.status().directSession);QCOMPARE(request(net.url()),QByteArray("DIRECT-BYPASS"));QCOMPARE(net.a.forwarded,1);
   engine.stop();
  }
+ void controllerRuleEditsPreserveNoResolve(){
+  ControlledNetwork net;QVERIFY(net.start());QTemporaryDir directory;const auto path=directory.filePath("nodes.dpapi");
+  EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,path);
+  QVERIFY(controller.saveNode({{"name","fixture"},{"protocol","socks5"},{"host","127.0.0.1"},{"port",net.a.serverPort()}}));
+  const auto node=controller.nodeCatalog().first().toMap().value("id").toString();
+  const QVariantList groups{QVariantMap{{"name","route"},{"type","select"},{"proxies",QStringList{"DIRECT"}}}};
+  const QStringList original{" IP-CIDR , 127.0.0.1/32 , route , no-resolve ","IP-CIDR6,::1/128,route,no-resolve"," MATCH , SWIRL "};
+  QVERIFY(controller.replaceNetworkConfiguration({{"groups",groups},{"rules",original}}));
+  QCOMPARE(controller.routingRules()[0].toMap().value("policy").toString(),QString("route"));
+  QCOMPARE(controller.routingRules()[1].toMap().value("policy").toString(),QString("route"));
+  QCOMPARE(controller.routingRules()[2].toMap().value("type").toString(),QString("FINAL"));
+  QCOMPARE(controller.routingRules()[2].toMap().value("policy").toString(),QString("SWIRL"));
+  QFile file(path);QVERIFY(file.open(QIODevice::ReadOnly));const auto unchanged=file.readAll();file.close();
+  QVERIFY(controller.saveRoutingRule("IP-CIDR","127.0.0.1/32","route",0));
+  QCOMPARE(controller.networkConfigurationSnapshot().value("rules").toStringList(),original);
+  QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),unchanged);file.close();
+  QVERIFY(controller.saveRoutingRule("IP-CIDR","127.0.0.0/8","route",0));
+  QVERIFY(controller.saveRoutingRule("IP-CIDR6","::1/128","route",1));
+  const auto saved=controller.networkConfigurationSnapshot();
+  QCOMPARE(saved.value("rules").toStringList()[0],QString("IP-CIDR,127.0.0.0/8,route,no-resolve"));
+  QCOMPARE(saved.value("rules").toStringList()[1],QString("IP-CIDR6,::1/128,route,no-resolve"));
+  QVERIFY(!controller.saveRoutingRule("DOMAIN","localhost","route",0));
+  QCOMPARE(controller.networkConfigurationSnapshot(),saved);
+  EngineController restored(std::make_unique<RustCoreEngine>(),nullptr,path);
+  QCOMPARE(restored.networkConfigurationSnapshot(),saved);
+  auto configuration=options(net);configuration.nodes=NodeStore(path).nodes();configuration.selectedNodeId=node;
+  configuration.routingMode="rule";configuration.customGroups=groups;configuration.customRules=saved.value("rules").toStringList();
+  QJsonObject mapped;QVERIFY(RustCoreEngine::configuration(configuration,&mapped).isEmpty());
+  for(int i=0;i<2;++i)QCOMPARE(mapped["rules"].toArray()[i].toObject()["matcher"].toObject()["resolve"],QJsonValue(false));
+  restored.setProxyPort(configuration.proxyPort);restored.setRoutingMode("rule");restored.connectNode(node);
+  QTRY_VERIFY_WITH_TIMEOUT(restored.apiHealthy(),4000);
+  QCOMPARE(restored.routingRules()[0].toMap().value("policy").toString(),QString("route"));
+  const auto request=[&](const QUrl &url){
+   QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",configuration.proxyPort));
+   QNetworkRequest input(url);input.setTransferTimeout(4000);auto *reply=client.get(input);
+   if(!QTest::qWaitFor([&]{return reply->isFinished();},5000))return QByteArray("timed-out");
+   return reply->error()==QNetworkReply::NoError?reply->readAll():QByteArray("request-failed");
+  };
+  QCOMPARE(request(net.url()),QByteArray("DIRECT-BYPASS"));
+  auto domain=net.url();domain.setHost("localhost");
+  // The unresolved hostname skips both CIDRs and reaches the explicit fallback.
+  // The independent SOCKS peer permits only localhost and this fixture's ports.
+  QCOMPARE(request(domain),QByteArray("exit-A"));QCOMPARE(net.a.forwarded,1);
+  restored.stop();
+ }
+ void controllerRuleReferencesPreventGroupDeletion(){
+  QTemporaryDir directory;const auto path=directory.filePath("nodes.dpapi");
+  EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,path);
+  const QVariantList groups{QVariantMap{{"name","route"},{"type","select"},{"proxies",QStringList{"DIRECT"}}}};
+  for(const auto &rule:QStringList{"IP-CIDR,198.51.100.0/24,route,no-resolve"," IP-CIDR6 , 2001:db8::/32 , route , no-resolve ","DOMAIN,fixture.invalid, route "," MATCH , route "}) {
+   const QVariantMap input{{"dns",QVariantMap{}},{"groups",groups},{"rules",QStringList{rule,"MATCH,REJECT"}}};
+   QVERIFY(controller.replaceNetworkConfiguration(input));
+   QFile file(path);QVERIFY(file.open(QIODevice::ReadOnly));const auto before=file.readAll();file.close();
+   QVERIFY(!controller.removePolicyGroup("route"));QCOMPARE(controller.networkConfigurationSnapshot(),input);
+   QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),before);file.close();
+   NodeStore disk(path);QCOMPARE(disk.networkConfiguration()["groups"].toArray(),QJsonArray::fromVariantList(groups));
+   QVERIFY(controller.removeRoutingRule(0));QVERIFY(controller.removePolicyGroup("route"));QVERIFY(controller.policyGroups().isEmpty());
+  }
+ }
+ void controllerRuleValidationAndPersistenceAreAtomic(){
+  QTemporaryDir directory;const auto path=directory.filePath("nodes.dpapi");
+  EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,path);
+  const QVariantList groups{QVariantMap{{"name","unused"},{"type","select"},{"proxies",QStringList{"DIRECT"}}}};
+  QVERIFY(controller.replaceNetworkConfiguration({{"groups",groups},{"rules",QStringList{"DOMAIN,kept.invalid,DIRECT","MATCH,REJECT"}}}));
+  const auto before=controller.networkConfigurationSnapshot();
+  QFile file(path);QVERIFY(file.open(QIODevice::ReadOnly));const auto ciphertext=file.readAll();file.close();
+  QList<QVariantMap> observed;QObject observer;
+  connect(&controller,&EngineController::optionsChanged,&observer,[&]{observed.append(controller.networkConfigurationSnapshot());});
+  // These fields pass the editor's old checks; native validation must reject
+  // them before writing, including an unsupported rule below terminal MATCH.
+  QVERIFY(!controller.saveRoutingRule("PROCESS-NAME","fixture.exe","DIRECT"));
+  QVERIFY(!controller.saveRoutingRule("DOMAIN","bad..invalid","DIRECT"));
+  QVERIFY(!controller.saveRoutingRule("IP-CIDR","::1/128","DIRECT"));
+  QVERIFY(!controller.saveRoutingRule("IP-CIDR6","127.0.0.1/32","DIRECT"));
+  QCOMPARE(controller.networkConfigurationSnapshot(),before);
+  QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),ciphertext);file.close();
+  const auto backup=directory.filePath("retained.dpapi");QVERIFY(QFile::rename(path,backup));QVERIFY(QDir().mkdir(path));
+  QVERIFY(!controller.saveRoutingRule("DOMAIN","changed.invalid","DIRECT",0));
+  QVERIFY(!controller.removeRoutingRule(0));
+  QVERIFY(!controller.savePolicyGroup("new","select",{"DIRECT"}));
+  QVERIFY(!controller.removePolicyGroup("unused"));
+  QCOMPARE(controller.networkConfigurationSnapshot(),before);
+  QVERIFY(!observed.isEmpty());for(const auto &snapshot:observed)QCOMPARE(snapshot,before);
+  QVERIFY(QDir().rmdir(path));QVERIFY(QFile::rename(backup,path));
+  QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),ciphertext);file.close();
+  EngineController restored(std::make_unique<RustCoreEngine>(),nullptr,path);QCOMPARE(restored.networkConfigurationSnapshot(),before);
+  QVERIFY(controller.saveRoutingRule("DOMAIN","changed.invalid","DIRECT",0));
+  NodeStore persisted(path);QCOMPARE(persisted.networkConfiguration()["rules"].toArray()[0].toString(),QString("DOMAIN,changed.invalid,DIRECT"));
+ }
  void rulesValidateAllFieldsAndPreserveUnsupportedImports(){
   ControlledNetwork net;QVERIFY(net.start());auto o=options(net);o.routingMode="rule";
   auto unsupported=o.nodes.first();unsupported.id="unused";unsupported.protocol="vmess";o.nodes.append(unsupported);
