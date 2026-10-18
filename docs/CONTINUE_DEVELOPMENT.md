@@ -1,3 +1,17 @@
+# 2026-10-18 latest: atomic native subscription profile and fixed acceptance baseline
+
+Continue on `work/core-completion-20261017`; no provider refresh after the closed 06:55:48 window. New capture remains 18 entries/17 encrypted responses. Previous implementation 4e993d6 now has three-platform CI success (39106885139).
+
+Read `RUST_ATOMIC_SUBSCRIPTION_20261018.md`, its verified JSON and `SELF_DEVELOPMENT_PROGRESS.md` first. Current local stage: immutable UUID plans, node+network DPAPI/QSaveFile atomic persistence, read-only legacy migration, self-contained Clash groups/rules with explicit terminal MATCH, native graph validation and fail-closed unsupported globals/DNS. DNS omissions preserve user settings. Production-style profile startup and durable reload forward through independent exit B; unselected profiles do not become DIRECT. Full profiles cannot replace a live session. Node-only refresh validates retained references.
+
+Local checks: 35 native Qt passed, 0 failed, 5 external-peer cases separately covered by four passing Python suites; compatibility imports 11/11 and preferences 3/3; storage paths 21/21. Original appearance timeout is retained; corrected final appearance 5.53 seconds, zero failures, fresh-process restore, unchanged 45-second limit. All application-owned test paths explicitly isolated under D drive; production paths invariant. No user installation/proxy/driver changed.
+
+Fixed 79-item acceptance baseline: 10.83% weighted verified acceptance (6 items), not implementation effort. A02 is partial because INI non-node section bodies are not fully validated; 18/18 means outer format/node parsing only. A06/A07 remain partial, not full A completion. This stage still needs its own precise-commit CI. No new provider-node internet tests or all-corpus product acceptance claimed.
+
+Next: finish precise-commit CI, then strict external DNS mapping and full-document provenance for other client profiles. Do not equate Mihomo respect-rules with Qt force_proxy_hosts; do not silently discard unknown globals or relax certificate/security checks. Keep updating D:/Codex/outputs/SWIRL_ACTIVE_CHECKPOINT.md and this handoff after each bounded stage.
+
+---
+
 Latest development stage: [native INI structure validation](RUST_INI_STRUCTURE_20261018.md). New capture remains encrypted; 18/18 offline replays and 136 Rust tests pass. Full configuration semantics remain incomplete; see the atomic-import next steps and recorded UI-test limitation.
 
 Latest capture checkpoint: [2026-10-18 06:55:48 UTC window](RUST_CAPTURE_065548_20261018.md). 18/18 entries encrypted on Windows and parsed offline; supplier requests stopped at 06:59:26 UTC. Continue from latest development HEAD; no further supplier refresh.

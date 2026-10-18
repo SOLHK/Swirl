@@ -166,6 +166,11 @@ RustCoreEngine::RustCoreEngine(QObject *parent):ProxyEngine(parent){
 // Shutdown during destruction must not signal those partially destroyed owners.
 RustCoreEngine::~RustCoreEngine(){disconnect();stop();}
 QString RustCoreEngine::configurationSummary()const{return "Swirl Core Rust · Mixed HTTP/SOCKS5 · 原生 TCP/有界 UDP · 无外部内核回退";}
+QString RustCoreEngine::validateNetworkConfiguration(const QList<ProxyNode> &nodes,const QVariantMap &dns,const QStringList &rules,const QVariantList &groups){
+ EngineStartOptions options;options.nodes=nodes;options.dnsConfig=dns;options.customRules=rules;options.customGroups=groups;options.routingMode="rule";
+ QJsonObject mappedDns;const auto error=dnsConfiguration(options,&mappedDns);if(!error.isEmpty())return error;
+ QJsonArray mapped,mappedRules,selectors;return routingConfiguration(options,{},&mapped,&mappedRules,&selectors);
+}
 QString RustCoreEngine::validatePolicyGroups(const QList<ProxyNode> &nodes,const QVariantList &groups){
  EngineStartOptions options;options.nodes=nodes;options.customGroups=groups;
  QJsonArray mapped,rules,selectors;return routingConfiguration(options,{},&mapped,&rules,&selectors);

@@ -4,6 +4,8 @@
 #include "engine/EngineController.h"
 #include "ControlledNetwork.h"
 #include <QTest>
+#include <QSettings>
+#include "app/StoragePaths.h"
 #include <QTemporaryDir>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -40,6 +42,20 @@ public:
 class ImportTests:public QObject {
     Q_OBJECT
 private slots:
+    void initTestCase() { QStandardPaths::setTestModeEnabled(true);SwirlPaths::initializeTestStorage();QSettings::setDefaultFormat(QSettings::IniFormat);QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,SwirlPaths::writableLocation(QStandardPaths::AppConfigLocation)); }
+    void completeConfigurationWithoutOwnerDoesNotDiscardGlobals() {
+        QTemporaryDir directory;NodeStore store(directory.filePath("nodes.dpapi"));NodeImportService imports(&store);
+        imports.importText("proxies: [{name: A, type: socks5, server: 127.0.0.1, port: 1080}]\nrules: [MATCH,DIRECT]\n");
+        QTRY_VERIFY_WITH_TIMEOUT(!imports.busy(),4000);QVERIFY(store.nodes().isEmpty());QVERIFY(!QFile::exists(store.filePath()));
+    }
+#ifndef SWIRL_USE_RUST_CORE
+    void compatibilityModeRejectsCompleteDocumentWithoutLosingFields() {
+        QTemporaryDir directory;EngineController controller(std::make_unique<MihomoAdapter>(),nullptr,directory.filePath("nodes.dpapi"));
+        controller.imports()->importText("proxies: [{name: A, type: socks5, server: 127.0.0.1, port: 1080}]\nproxy-groups: [{name: route, type: select, proxies: [A], default-selected: A, future-option: true}]\nrules: ['MATCH,route']\n");
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.imports()->busy(),4000);QVERIFY(controller.nodeCatalog().isEmpty());QVERIFY(controller.policyGroups().isEmpty());
+        QVERIFY(!QFile::exists(directory.filePath("nodes.dpapi")));QVERIFY(controller.imports()->message().contains("Rust"));
+    }
+#endif
     void fullProtocolRegistryCanBeImported() {
         const QStringList expected{"socks5","ss","trojan","http","ssr","vmess","vless","snell","hysteria","hysteria2","wireguard","tuic","shadowquic","gost-relay","ssh","mieru","anytls","sudoku","masque","trusttunnel","openvpn","tailscale","zerotier","easytier"};
         QCOMPARE(ProxyNode::protocols(),expected);

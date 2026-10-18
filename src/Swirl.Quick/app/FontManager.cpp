@@ -10,7 +10,7 @@
 #include <QGuiApplication>
 #include <QSaveFile>
 #include <QSettings>
-#include <QStandardPaths>
+#include "StoragePaths.h"
 
 namespace {
 QString canonicalFamily(const QString &family, const QStringList &available)
@@ -37,7 +37,7 @@ FontManager::FontManager(QObject *parent, const QString &storageDirectory) : QOb
         if(m_defaultFamily.isEmpty()&&!names.isEmpty())m_defaultFamily=names.first();
     }
     m_harmonyFamily=m_defaultFamily;
-    m_directory=storageDirectory.isEmpty()?QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/fonts":storageDirectory;
+    m_directory=storageDirectory.isEmpty()?SwirlPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/fonts":storageDirectory;
     QDir directory(m_directory);
     for(const auto &file:directory.entryList({"*.ttf","*.otf","*.ttc"},QDir::Files)){
         const int id=QFontDatabase::addApplicationFont(directory.filePath(file));

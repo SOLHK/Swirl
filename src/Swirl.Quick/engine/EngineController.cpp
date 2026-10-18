@@ -42,6 +42,46 @@ QByteArray protectLanPassword(const QByteArray &input,bool decrypt) {
 EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject *parent, QString storePath,bool realAcceptance)
     : QObject(parent), m_engine(std::move(engine)), m_store(storePath),m_imports(&m_store,this),m_telemetry(storePath.isEmpty()?QString():storePath+".telemetry",storePath.isEmpty()||realAcceptance) {
     m_options.autoControlPort=true;
+    m_imports.setConfigurationApplier([this](const NodeImporter::Result &result,const QString &sourceId,QString *error) {
+        const auto &configuration=result.configuration;
+        if(configuration.isEmpty()) {
+            NodeStore::ImportPlan plan;
+            if(!m_store.prepareImport(result.nodes,sourceId,&plan)){*error=m_store.error();return false;}
+#ifdef SWIRL_USE_RUST_CORE
+            const auto nodes=plan.nodes();QVariantMap canonical;
+            if(!validateNetworkConfiguration(networkConfigurationSnapshot(),&canonical,&nodes)){*error=m_networkError;return false;}
+#endif
+            if(!m_store.commitImport(plan)){*error=m_store.error();return false;}
+            return true;
+        }
+#ifndef SWIRL_USE_RUST_CORE
+        *error=QStringLiteral("完整订阅事务当前仅在 Rust 模式提供；旧配置保持不变。");return false;
+#else
+        // First executable document profile: self-contained Clash groups/rules.
+        // External DNS dialects and every other root semantic remain explicit
+        // rejection rather than silently becoming Qt defaults or DIRECT.
+        for(auto it=configuration.begin();it!=configuration.end();++it) {
+            if(it.key()!="proxy-groups" && it.key()!="rules" && it.key()!="dns") {
+                *error=QStringLiteral("完整订阅含尚未映射的全局配置；未应用节点或网络配置。");return false;
+            }
+        }
+        if(configuration.contains("dns")) {
+            *error=QStringLiteral("此订阅的 DNS 语义尚未映射到 Rust；未应用节点或网络配置。");return false;
+        }
+        if(configuration.contains("rules")) {
+            if(!configuration["rules"].isArray()){*error=QStringLiteral("规则必须为字符串数组。");return false;}
+            for(const auto &rule:configuration["rules"].toArray())if(!rule.isString()){*error=QStringLiteral("规则必须为字符串。");return false;}
+        }
+        const auto rules=configuration.value("rules").toArray();
+        if(rules.isEmpty() || !rules.last().toString().trimmed().startsWith("MATCH,")) {
+            *error=QStringLiteral("当前完整订阅档案要求显式末尾 MATCH 规则；未猜测默认出站策略。");return false;
+        }
+        const QVariantMap mapped{{"groups",configuration.value("proxy-groups").toVariant()},{"rules",configuration.value("rules").toVariant()}};
+        auto input=mapped;if(!configuration.contains("proxy-groups"))input.remove("groups");if(!configuration.contains("rules"))input.remove("rules");
+        if(!importNodesAndConfiguration(result.nodes,sourceId,input,configuration)){*error=m_networkError;return false;}
+        return true;
+#endif
+    });
     connect(m_engine.get(),&ProxyEngine::statusChanged,this,[this]{m_telemetry.ingest(m_engine->status());});
     connect(&m_telemetry,&TelemetryService::changed,this,&EngineController::statusChanged);
     connect(&m_tests,&NodeTestService::changed,this,&EngineController::nodesChanged);
@@ -53,9 +93,13 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
         m_options.expectedSha256 = object.value(QStringLiteral("executableSha256")).toString().toLatin1();
         m_options.expectedVersion = object.value(QStringLiteral("version")).toString();
     }
+    // The encrypted node snapshot is authoritative after the first migration.
+    // Read legacy settings only when no embedded network snapshot exists.
+    auto configuration=m_store.networkConfiguration();
     QFile networkFile(m_store.filePath()+".network.json");
-    if(networkFile.open(QIODevice::ReadOnly)&&networkFile.size()<=1024*1024) {
-        const auto configuration=QJsonDocument::fromJson(networkFile.readAll()).object();
+    if(configuration.isEmpty() && networkFile.open(QIODevice::ReadOnly)&&networkFile.size()<=1024*1024)
+        configuration=QJsonDocument::fromJson(networkFile.readAll()).object();
+    if(!configuration.isEmpty()) {
         if(configuration.value("schema").toInt()==1) {
             m_options.tunEnabled=configuration.value("tun").toBool(false);
             m_options.meteredNetwork=configuration.value("metered").toBool(false);
@@ -70,7 +114,8 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
             m_options.customGroups=configuration.value("groups").toArray().toVariantList();
         } else m_networkError=QStringLiteral("网络配置文件格式无效，未加载。");
     }
-    m_options.smartRouting=storePath.isEmpty()||realAcceptance;
+    m_nativeDocumentRouting=configuration.value("nativeDocumentRouting").toBool(false);
+    m_options.smartRouting=(storePath.isEmpty()||realAcceptance)&&!m_nativeDocumentRouting;
     connect(&m_systemProxy,&SystemProxySession::changed,this,[this] {
         if(!m_systemProxy.owned()&&!m_systemProxy.error().isEmpty())m_proxyRequested=false;
         const auto state=m_systemProxy.owned()?(m_systemProxy.enabled()?QStringLiteral("Swirl 已接管 Windows 系统代理"):QStringLiteral("接管状态未确认，恢复快照已保留")):QStringLiteral("Swirl 未接管 Windows 系统代理");
@@ -243,7 +288,7 @@ void EngineController::startConfiguredSession() {
     if(m_shuttingDown)return;
     m_connectionRequested=true;
     m_options.nodes=m_store.nodes();m_options.selectedNodeId=m_store.selectedId();
-    m_options.directSession=m_options.selectedNodeId.isEmpty();
+    m_options.directSession=m_options.selectedNodeId.isEmpty()&&!m_nativeDocumentRouting;
     if(processAlive()){m_systemProxy.disable();m_restartPending=true;m_engine->stop();}
     else m_engine->start(m_options);
     emit statusChanged();
@@ -311,12 +356,28 @@ bool EngineController::networkEditAllowed() {
 }
 
 QVariantMap EngineController::networkConfigurationSnapshot() const {return {{"dns",m_options.dnsConfig},{"rules",m_options.customRules},{"groups",m_options.customGroups}};}
-bool EngineController::validateNetworkConfiguration(const QVariantMap &input,QVariantMap *canonical) {
+bool EngineController::validateNetworkConfiguration(const QVariantMap &input,QVariantMap *canonical,const QList<ProxyNode> *candidateNodes) {
     for(const auto &key:input.keys())if(!QStringList{"dns","rules","groups"}.contains(key)){m_networkError=QStringLiteral("不支持的配置覆盖字段：")+key;emit optionsChanged();return false;}
+#ifdef SWIRL_USE_RUST_CORE
+    const auto reject=[&](const QString &message){m_networkError=message;emit optionsChanged();return false;};
+    if(input.contains("dns")&&!QJsonValue::fromVariant(input.value("dns")).isObject())return reject(QStringLiteral("DNS 配置必须为对象。"));
+    if(input.contains("groups")&&!QJsonValue::fromVariant(input.value("groups")).isArray())return reject(QStringLiteral("策略组必须为数组。"));
+    QStringList rules;
+    if(input.contains("rules")) {
+        const auto raw=QJsonValue::fromVariant(input.value("rules"));if(!raw.isArray())return reject(QStringLiteral("规则必须为字符串数组。"));
+        for(const auto &rule:raw.toArray()){if(!rule.isString())return reject(QStringLiteral("规则必须为字符串。"));rules.append(rule.toString());}
+    }
+    const auto dns=input.value("dns").toMap();const auto groups=input.value("groups").toList();
+    const auto error=RustCoreEngine::validateNetworkConfiguration(candidateNodes?*candidateNodes:m_store.nodes(),dns,rules,groups);
+    if(!error.isEmpty())return reject(error);
+    if(canonical)*canonical={{"dns",dns},{"rules",rules},{"groups",groups}};m_networkError.clear();return true;
+#else
     QTemporaryDir temporary;if(!temporary.isValid()){m_networkError=QStringLiteral("无法创建配置校验目录。");emit optionsChanged();return false;}
     const auto store=temporary.filePath("nodes.dpapi");
-    if(QFile::exists(m_store.filePath())&&!QFile::copy(m_store.filePath(),store)){m_networkError=QStringLiteral("无法校验当前节点引用。");emit optionsChanged();return false;}
+    if(candidateNodes){m_networkError=QStringLiteral("完整配置事务当前仅支持 Rust 模式。");return false;}
+    if(QFile::exists(m_store.filePath())&&!QFile::copy(m_store.filePath(),store)){m_networkError=QStringLiteral("无法校验当前节点配置。");return false;}
     EngineController staged(std::make_unique<MihomoAdapter>(),nullptr,store);
+    staged.m_options.dnsConfig.clear();staged.m_options.customRules.clear();staged.m_options.customGroups.clear();
     const auto reject=[&]{m_networkError=staged.networkConfigurationError();emit optionsChanged();return false;};
     const auto dns=input.value("dns").toMap();if(!dns.isEmpty()&&!staged.configureDns(dns))return reject();
     const auto groups=input.value("groups").toList();if(groups.size()>128){m_networkError=QStringLiteral("最多支持 128 个策略组。");emit optionsChanged();return false;}
@@ -335,23 +396,94 @@ bool EngineController::validateNetworkConfiguration(const QVariantMap &input,QVa
         else if(parts.size()==3){if(!staged.saveRoutingRule(parts[0],parts[1],parts[2]))return reject();}
         else {m_networkError=QStringLiteral("规则需要 类型,匹配值,策略 或 MATCH,策略。");emit optionsChanged();return false;}}
     if(canonical)*canonical=staged.networkConfigurationSnapshot();m_networkError.clear();return true;
+#endif
 }
+
 bool EngineController::replaceNetworkConfiguration(const QVariantMap &input) {
     if(!canStart()){m_networkError=QStringLiteral("请先断开引擎，再应用或停用配置覆盖。");emit optionsChanged();return false;}
     QVariantMap canonical;if(!validateNetworkConfiguration(input,&canonical))return false;const auto previous=networkConfigurationSnapshot();
     m_options.dnsConfig=canonical.value("dns").toMap();m_options.customRules=canonical.value("rules").toStringList();m_options.customGroups=canonical.value("groups").toList();
     if(saveNetworkConfiguration())return true;m_options.dnsConfig=previous.value("dns").toMap();m_options.customRules=previous.value("rules").toStringList();m_options.customGroups=previous.value("groups").toList();emit optionsChanged();return false;
 }
-bool EngineController::saveNetworkConfiguration() {
-    QSaveFile file(m_store.filePath()+".network.json");
+QJsonObject EngineController::serializedNetworkConfiguration() {
     const auto protectedPassword=m_options.lanPassword.isEmpty()?QByteArray():protectLanPassword(m_options.lanPassword.toUtf8(),false);
-    if(!m_options.lanPassword.isEmpty()&&protectedPassword.isEmpty()){m_networkError=QStringLiteral("无法加密局域网代理密码。");emit optionsChanged();return false;}
-    const auto bytes=QJsonDocument(QJsonObject{{"schema",1},{"metered",m_options.meteredNetwork},{"meteredAllowlist",QJsonArray::fromStringList(m_options.meteredAllowlist)},{"tunBeforeMetered",m_tunBeforeMetered},{"modeBeforeMetered",m_modeBeforeMetered},{"allowLan",m_options.allowLan},{"lanUsername",m_options.lanUsername},{"lanPasswordProtected",QString::fromLatin1(protectedPassword.toBase64())},{"tun",m_options.tunEnabled},{"dns",QJsonObject::fromVariantMap(m_options.dnsConfig)},
-        {"rules",QJsonArray::fromStringList(m_options.customRules)},{"groups",QJsonArray::fromVariantList(m_options.customGroups)}}).toJson();
-    if(!file.open(QIODevice::WriteOnly)||file.write(bytes)!=bytes.size()||!file.commit()) {
-        m_networkError=QStringLiteral("网络配置保存失败。");emit optionsChanged();return false;
+    if(!m_options.lanPassword.isEmpty()&&protectedPassword.isEmpty()){m_networkError=QStringLiteral("无法加密局域网代理密码。");return {};}
+    auto snapshot=QJsonObject{{"schema",1},{"metered",m_options.meteredNetwork},{"meteredAllowlist",QJsonArray::fromStringList(m_options.meteredAllowlist)},{"tunBeforeMetered",m_tunBeforeMetered},{"modeBeforeMetered",m_modeBeforeMetered},{"allowLan",m_options.allowLan},{"lanUsername",m_options.lanUsername},{"lanPasswordProtected",QString::fromLatin1(protectedPassword.toBase64())},{"tun",m_options.tunEnabled},{"dns",QJsonObject::fromVariantMap(m_options.dnsConfig)},
+        {"rules",QJsonArray::fromStringList(m_options.customRules)},{"groups",QJsonArray::fromVariantList(m_options.customGroups)}};
+    if(m_nativeDocumentRouting)snapshot.insert("nativeDocumentRouting",true);
+    const auto original=m_store.networkConfiguration().value("importedConfiguration");
+    if(!original.isUndefined())snapshot.insert("importedConfiguration",original);
+    return snapshot;
+}
+bool EngineController::saveNetworkConfiguration() {
+    const auto snapshot=serializedNetworkConfiguration();
+    if(snapshot.isEmpty() || !m_store.saveNetworkConfiguration(snapshot)) {
+        if(!snapshot.isEmpty())m_networkError=m_store.error();emit optionsChanged();return false;
     }
     emit optionsChanged();emit statusChanged();return true;
+}
+bool EngineController::importNodesAndConfiguration(const QList<ProxyNode> &incoming,const QString &sourceId,const QVariantMap &input,const QJsonObject &original) {
+#ifndef SWIRL_USE_RUST_CORE
+    Q_UNUSED(incoming);Q_UNUSED(sourceId);Q_UNUSED(input);Q_UNUSED(original);
+    m_networkError=QStringLiteral("完整订阅事务当前仅在 Rust 模式提供。");return false;
+#else
+    // Only this owner may apply while its importer is busy. Existing active
+    // sessions and module overlays must never be reconfigured underneath them.
+    if(m_shuttingDown || busy() || processAlive() || m_moduleOverlayActive) {
+        m_networkError=QStringLiteral("请先断开引擎并停用模块，再导入完整网络配置。");return false;
+    }
+    NodeStore::ImportPlan plan;
+    if(!m_store.prepareImport(incoming,sourceId,&plan)){m_networkError=m_store.error();return false;}
+    auto mapped=input;
+    // A subscription profile without DNS instructions must not erase the
+    // user's secure resolver/hosts configuration and fall back to the system.
+    if(!mapped.contains("dns"))mapped["dns"]=m_options.dnsConfig;
+    QVariantList groups;const auto names=plan.nameToId();
+    QSet<QString> groupNames;for(const auto &entry:input.value("groups").toList())groupNames.insert(entry.toMap().value("name").toString());
+    for(const auto &reserved:QStringList{"DIRECT","REJECT","SWIRL","GLOBAL"})if(names.contains(reserved)) {
+        m_networkError=QStringLiteral("节点名称与保留策略名称冲突；未应用配置。");return false;
+    }
+    for(const auto &entry:input.value("groups").toList()) {
+        auto group=entry.toMap();
+        if(names.contains(group.value("name").toString())){m_networkError=QStringLiteral("节点与策略组名称冲突；未应用配置。");return false;}
+        const auto raw=QJsonValue::fromVariant(group.value("proxies"));
+        if(!raw.isArray()){m_networkError=QStringLiteral("策略组成员必须为字符串数组。");return false;}
+        QStringList members;
+        for(const auto &value:raw.toArray()) {
+            if(!value.isString()){m_networkError=QStringLiteral("策略组成员必须为字符串。");return false;}
+            const auto name=value.toString();
+            if(!names.contains(name)&&!groupNames.contains(name)&&name!="DIRECT"&&name!="REJECT") {
+                m_networkError=QStringLiteral("完整订阅引用了文档外的节点或策略；未应用配置。");return false;
+            }
+            members.append(names.value(name,name));
+        }
+        group["proxies"]=members;
+        if(group.contains("default-selected")) {
+            if(group.value("default-selected").metaType().id()!=QMetaType::QString){m_networkError=QStringLiteral("默认策略必须为字符串。");return false;}
+            const auto name=group.value("default-selected").toString();
+            if(!raw.toArray().contains(QJsonValue(name))){m_networkError=QStringLiteral("默认策略必须使用文档中声明的成员名称。");return false;}
+            group["default-selected"]=names.value(name,name);
+        }
+        groups.append(group);
+    }
+    if(input.contains("groups")) {
+        if(!QJsonValue::fromVariant(input.value("groups")).isArray()){m_networkError=QStringLiteral("策略组必须为数组。");return false;}
+        mapped["groups"]=groups;
+    }
+    QVariantMap canonical;const auto nodes=plan.nodes();
+    if(!validateNetworkConfiguration(mapped,&canonical,&nodes))return false;
+    const auto previous=networkConfigurationSnapshot();const bool previousNative=m_nativeDocumentRouting,previousSmart=m_options.smartRouting;
+    if(!original.isEmpty()){m_nativeDocumentRouting=true;m_options.smartRouting=false;}
+    m_options.dnsConfig=canonical.value("dns").toMap();m_options.customRules=canonical.value("rules").toStringList();m_options.customGroups=canonical.value("groups").toList();
+    auto snapshot=serializedNetworkConfiguration();
+    if(!snapshot.isEmpty() && !original.isEmpty())snapshot.insert("importedConfiguration",QJsonObject{{"format","clash"},{"sourceId",sourceId},{"configuration",original}});
+    if(snapshot.isEmpty() || !m_store.commitImport(plan,snapshot)) {
+        if(!snapshot.isEmpty())m_networkError=m_store.error();
+        m_nativeDocumentRouting=previousNative;m_options.smartRouting=previousSmart;
+        m_options.dnsConfig=previous.value("dns").toMap();m_options.customRules=previous.value("rules").toStringList();m_options.customGroups=previous.value("groups").toList();emit optionsChanged();return false;
+    }
+    m_networkError.clear();emit optionsChanged();emit statusChanged();return true;
+#endif
 }
 bool EngineController::configureDns(const QVariantMap &input) {
     if(!networkEditAllowed())return false;

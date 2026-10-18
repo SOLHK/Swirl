@@ -2,6 +2,7 @@
 #include "app/SingleInstance.h"
 #include "app/ShutdownCoordinator.h"
 #include "app/FontManager.h"
+#include "app/StoragePaths.h"
 #include "app/FontRendering.h"
 #if defined(SWIRL_UI_TESTS) && defined(Q_OS_WIN)
 #include "tests/third_party/renderdoc_app.h"
@@ -162,7 +163,7 @@ int main(int argc, char *argv[])
 #ifdef SWIRL_UI_TESTS
     lifecycleTest=app.arguments().contains("--lifecycle-test");
 #endif
-    const bool isolatedRun=lifecycleTest||realAcceptance||heroTest||navigationTest||radiusTest||nodeTest||motionTest||engineTest||hdrDisplayTest||hdrTest||app.arguments().contains("--interaction-test")||app.arguments().contains("--capture-self-test")||app.arguments().contains("--gateway-self-test")||app.arguments().contains("--smoke-test")||app.arguments().contains("--window-test")||previewMode;
+    const bool isolatedRun=appearanceTest||lifecycleTest||realAcceptance||heroTest||navigationTest||radiusTest||nodeTest||motionTest||engineTest||hdrDisplayTest||hdrTest||app.arguments().contains("--interaction-test")||app.arguments().contains("--capture-self-test")||app.arguments().contains("--gateway-self-test")||app.arguments().contains("--smoke-test")||app.arguments().contains("--window-test")||previewMode;
     SingleInstance instance;
     if(lifecycleTest || (!isolatedRun && !appearanceTest)) {
         const auto ownership=instance.acquire(lifecycleTest?QStringLiteral("isolated-lifecycle-test"):QStringLiteral("production"));
@@ -170,8 +171,9 @@ int main(int argc, char *argv[])
     }
     if(isolatedRun||appearanceTest) {
         QStandardPaths::setTestModeEnabled(true);
+        SwirlPaths::initializeTestStorage();
         QSettings::setDefaultFormat(QSettings::IniFormat);
-        QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation));
+        QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,SwirlPaths::writableLocation(QStandardPaths::AppConfigLocation));
         QSettings isolatedSettings;
         if(!app.arguments().contains("--preview-preserve-settings"))isolatedSettings.clear();
         isolatedSettings.sync();

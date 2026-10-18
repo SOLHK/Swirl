@@ -3,6 +3,7 @@
 #include <QObject>
 #include <QVariantList>
 #include <QUrl>
+#include <QHash>
 
 struct NodeSubscription {
     QString id, name;
@@ -30,17 +31,39 @@ public:
     bool saveSubscription(const QString &id, const QString &name, const QUrl &url, int intervalMinutes, bool enabled,const QString &formatHint={});
     static QStringList subscriptionFormats(){return {"auto","loon","shadowrocket","surge","quantumult-x","sing-box"};}
     bool removeSubscription(const QString &id);
+    // A prepared import is immutable outside this store. Names/parse IDs map to
+    // the final stable UUIDs before any policy configuration is compiled.
+    class ImportPlan {
+    public:
+        QList<ProxyNode> nodes() const { return m_nodes; }
+        QHash<QString,QString> nameToId() const { return m_names; }
+        QHash<QString,QString> importedToStoredIds() const { return m_ids; }
+    private:
+        friend class NodeStore;
+        const NodeStore *m_owner=nullptr;
+        quint64 m_revision=0;
+        QList<ProxyNode> m_nodes;
+        QList<NodeSubscription> m_sources;
+        QString m_selected;
+        QHash<QString,QString> m_names,m_ids;
+    };
+    bool prepareImport(const QList<ProxyNode> &incoming, const QString &sourceId, ImportPlan *plan);
+    bool commitImport(const ImportPlan &plan, const QJsonObject &networkConfiguration = {});
+    QJsonObject networkConfiguration() const { return m_networkConfiguration; }
+    bool saveNetworkConfiguration(const QJsonObject &configuration);
     bool importNodes(QList<ProxyNode> incoming, const QString &sourceId = {});
     static bool allowedSubscriptionUrl(const QUrl &url);
 signals:
     void changed();
     void selectionChanged();
 private:
-    bool write(const QList<ProxyNode> &nodes, const QString &selected, const QList<NodeSubscription> &subscriptions);
+    bool write(const QList<ProxyNode> &nodes, const QString &selected, const QList<NodeSubscription> &subscriptions, const QJsonObject &networkConfiguration);
     void load();
     QString m_path, m_selected, m_error;
     QList<ProxyNode> m_nodes;
     mutable QVariantList m_publicRows;
     QList<NodeSubscription> m_subscriptions;
+    QJsonObject m_networkConfiguration;
     bool m_healthy = true;
+    quint64 m_revision=0;
 };

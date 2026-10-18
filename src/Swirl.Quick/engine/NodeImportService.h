@@ -28,6 +28,8 @@ public:
     Q_INVOKABLE void refreshSubscription(const QString &id);
     Q_INVOKABLE void refreshAll();
     void shutdown();
+    using ApplyConfiguration = std::function<bool(const NodeImporter::Result &,const QString &,QString *)>;
+    void setConfigurationApplier(ApplyConfiguration apply) { m_apply=std::move(apply); }
     void setDownloadProxy(int port) { m_proxyPort=port; }
 signals:
     void changed();
@@ -39,6 +41,7 @@ private:
     void parse(QByteArray bytes);
     void finish(const QString &error={});
     NodeStore *m_store;
+    ApplyConfiguration m_apply;
     QNetworkAccessManager m_network;
     QPointer<QNetworkReply> m_reply;
     QTimer m_timer,m_deadline;

@@ -12,6 +12,8 @@
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QTest>
+#include <QSettings>
+#include "app/StoragePaths.h"
 #include <QTcpSocket>
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -144,7 +146,7 @@ private slots:
         engine.stop();QTRY_VERIFY_WITH_TIMEOUT(!engine.status().processAlive,4000);qunsetenv("SWIRL_FIXTURE_CONTROL");
     }
 
-    void initTestCase() { QStandardPaths::setTestModeEnabled(true); }
+    void initTestCase() { QStandardPaths::setTestModeEnabled(true);SwirlPaths::initializeTestStorage();QSettings::setDefaultFormat(QSettings::IniFormat);QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,SwirlPaths::writableLocation(QStandardPaths::AppConfigLocation)); }
     void cleanup() { qunsetenv("SWIRL_FIXTURE_MODE"); qunsetenv("SWIRL_FIXTURE_CONTROL"); }
     void networkPreferencesValidateAndPersist() {
         QTemporaryDir directory;const auto store=directory.filePath("nodes.dpapi");
@@ -157,7 +159,7 @@ private slots:
         QVERIFY(controller.configureDns(dns));
         QVERIFY(!controller.configureLan("bad:username","long-enough"));QVERIFY(!controller.configureLan("swirl","short"));
         QVERIFY(controller.configureLan("swirl","swirl-test-password"));QVERIFY(controller.lanConfigured());
-        QFile networkStore(store+".network.json");QVERIFY(networkStore.open(QIODevice::ReadOnly));QVERIFY(!networkStore.readAll().contains("swirl-test-password"));networkStore.close();
+        QFile networkStore(store);QVERIFY(networkStore.open(QIODevice::ReadOnly));QVERIFY(!networkStore.readAll().contains("swirl-test-password"));networkStore.close();
         QVERIFY(!controller.saveRoutingRule("DOMAIN-SUFFIX","test\nMATCH,REJECT","DIRECT"));
         QVERIFY(!controller.saveRoutingRule("IP-CIDR","not-a-subnet","DIRECT"));
         QVERIFY(!controller.saveRoutingRule("DOMAIN","fixture.test","missing-group"));

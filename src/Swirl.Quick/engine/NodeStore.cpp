@@ -1,4 +1,5 @@
 #include "NodeStore.h"
+#include "../app/StoragePaths.h"
 #include <QDir>
 #include <QFile>
 #include <QJsonArray>
@@ -54,7 +55,7 @@ static ProxyNode deserialize(const QVariantMap &m) {
     return n;
 }
 NodeStore::NodeStore(QString path, QObject *parent) : QObject(parent), m_path(std::move(path)) {
-    if (m_path.isEmpty()) m_path=QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/nodes.dpapi";
+    if (m_path.isEmpty()) m_path=SwirlPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/nodes.dpapi";
     load();
     // Non-secret selection sidecar. Invalid/stale IDs never override the store.
     QFile selection(m_path+".selected");
@@ -101,14 +102,24 @@ void NodeStore::load() {
         sourceIds.insert(s.id);subscriptions.append(s);
     }
     for(const auto &n:nodes)if(!n.sourceId.isEmpty() && !sourceIds.contains(n.sourceId)){m_error=QStringLiteral("节点订阅归属无效；未覆盖原文件。");return;}
+    const auto network=document.object().value("networkConfiguration");
+    if(!network.isUndefined() && (!network.isObject() || network.toObject().value("schema").toInt()!=1)) {
+        m_error=QStringLiteral("保存的网络配置无效；原文件保持不变。");return;
+    }
+    m_networkConfiguration=network.toObject();
     m_nodes=nodes; m_selected=selected; m_subscriptions=subscriptions;m_healthy=true;
 }
-bool NodeStore::write(const QList<ProxyNode> &nodes, const QString &selected, const QList<NodeSubscription> &subscriptions) {
+bool NodeStore::write(const QList<ProxyNode> &nodes, const QString &selected, const QList<NodeSubscription> &subscriptions,const QJsonObject &networkConfiguration) {
     if (!m_healthy) { m_error=QStringLiteral("节点库损坏或无法解密；未覆盖原文件。"); return false; }
     QJsonArray array; for (const auto &n : nodes) array.append(serialize(n));
     QJsonArray sources;
     for(const auto &s:subscriptions)sources.append(QJsonObject{{"id",s.id},{"name",s.name},{"formatHint",s.formatHint},{"url",s.url.toString(QUrl::FullyEncoded)},{"interval",s.intervalMinutes},{"enabled",s.enabled},{"lastSuccess",s.lastSuccess}});
-    auto plaintext=QJsonDocument(QJsonObject{{"schema",1},{"selected",selected},{"nodes",array},{"subscriptions",sources}}).toJson(QJsonDocument::Compact);
+    QJsonObject snapshot{{"schema",1},{"selected",selected},{"nodes",array},{"subscriptions",sources}};
+    if(!networkConfiguration.isEmpty()) {
+        if(networkConfiguration.value("schema").toInt()!=1){m_error=QStringLiteral("网络配置版本无效。");return false;}
+        snapshot.insert("networkConfiguration",networkConfiguration);
+    }
+    auto plaintext=QJsonDocument(snapshot).toJson(QJsonDocument::Compact);
     const auto encrypted=protect(plaintext, false); plaintext.fill('\0');
     if (encrypted.isEmpty()) { m_error=QStringLiteral("Windows DPAPI 加密失败，未保存任何明文凭据。"); return false; }
     if (!QDir().mkpath(QFileInfo(m_path).absolutePath())) { m_error=QStringLiteral("节点目录无法创建。"); return false; }
@@ -119,7 +130,7 @@ bool NodeStore::write(const QList<ProxyNode> &nodes, const QString &selected, co
     if (!file.open(QIODevice::WriteOnly) || !file.setPermissions(QFile::ReadOwner|QFile::WriteOwner) || file.write(bytes)!=bytes.size() || !file.commit()) {
         m_error=QStringLiteral("节点配置无法安全保存，旧配置保持不变。"); return false;
     }
-    m_nodes=nodes; m_publicRows.clear(); m_selected=selected;m_subscriptions=subscriptions; m_error.clear(); emit changed(); return true;
+    m_nodes=nodes; m_publicRows.clear(); m_selected=selected;m_subscriptions=subscriptions;m_networkConfiguration=networkConfiguration; m_error.clear(); ++m_revision; emit changed(); return true;
 }
 bool NodeStore::saveNode(const QVariantMap &input) {
     auto n=deserialize(input); auto nodes=m_nodes; int index=-1;
@@ -138,12 +149,12 @@ bool NodeStore::saveNode(const QVariantMap &input) {
     m_error=ProxyNode::validate(n); if (!m_error.isEmpty()) return false;
     if (index<0) { if (nodes.size()>=2000) { m_error=QStringLiteral("最多保存 2000 个节点。"); return false; } nodes.append(n); }
     else nodes[index]=n;
-    return write(nodes,m_selected,m_subscriptions);
+    return write(nodes,m_selected,m_subscriptions,m_networkConfiguration);
 }
 bool NodeStore::removeNode(const QString &id) {
     auto nodes=m_nodes; const auto old=nodes.size(); nodes.removeIf([&](const ProxyNode &n){return n.id==id;});
     if (nodes.size()==old) { m_error=QStringLiteral("节点不存在。"); return false; }
-    return write(nodes,m_selected==id ? QString() : m_selected,m_subscriptions);
+    return write(nodes,m_selected==id ? QString() : m_selected,m_subscriptions,m_networkConfiguration);
 }
 bool NodeStore::select(const QString &id) {
     if (!id.isEmpty() && std::none_of(m_nodes.begin(),m_nodes.end(),[&](const ProxyNode &n){return n.id==id;})) {
@@ -157,7 +168,7 @@ bool NodeStore::select(const QString &id) {
        !file.setPermissions(QFile::ReadOwner|QFile::WriteOwner) || file.write(bytes)!=bytes.size() || !file.commit()){
         m_error=QStringLiteral("无法保存节点选择，原选择保持不变。");return false;
     }
-    m_selected=id;m_error.clear();emit selectionChanged();return true;
+    m_selected=id;m_error.clear();++m_revision;emit selectionChanged();return true;
 }
 bool NodeStore::allowedSubscriptionUrl(const QUrl &url) {
     const bool secure=url.scheme()=="https";
@@ -184,32 +195,63 @@ bool NodeStore::saveSubscription(const QString &id,const QString &name,const QUr
     if(!subscriptionFormats().contains(s.formatHint)){m_error=QStringLiteral("订阅格式偏好无效。");return false;}
     if(s.name.isEmpty() || s.name.size()>128 || s.name.contains(QRegularExpression("[\\x00-\\x1f]")) || !allowedSubscriptionUrl(s.url) || interval<15 || interval>10080){m_error=QStringLiteral("需要有效名称、HTTPS 订阅地址及 15–10080 分钟更新间隔（仅本机测试允许 HTTP）。");return false;}
     if(index<0){if(sources.size()>=32){m_error=QStringLiteral("最多保存 32 个订阅。");return false;}sources.append(s);}else sources[index]=s;
-    return write(m_nodes,m_selected,sources);
+    return write(m_nodes,m_selected,sources,m_networkConfiguration);
 }
 bool NodeStore::removeSubscription(const QString &id) {
     auto sources=m_subscriptions;const auto old=sources.size();sources.removeIf([&](const auto &s){return s.id==id;});
     if(old==sources.size()){m_error=QStringLiteral("订阅不存在。");return false;}
     // Removing a source keeps its already imported nodes as manual nodes.
     auto nodes=m_nodes;for(auto &n:nodes)if(n.sourceId==id)n.sourceId.clear();
-    return write(nodes,m_selected,sources);
+    return write(nodes,m_selected,sources,m_networkConfiguration);
+}
+bool NodeStore::prepareImport(const QList<ProxyNode> &incoming,const QString &sourceId,ImportPlan *output) {
+    if(!output || !m_healthy || incoming.isEmpty()) {
+        m_error=QStringLiteral("无法准备空列表或不可读节点库；原配置保持不变。");return false;
+    }
+    ImportPlan plan;plan.m_owner=this;plan.m_revision=m_revision;plan.m_sources=m_subscriptions;
+    if(!sourceId.isEmpty()) {
+        bool found=false;for(auto &source:plan.m_sources)if(source.id==sourceId){found=true;source.lastSuccess=QDateTime::currentSecsSinceEpoch();}
+        if(!found){m_error=QStringLiteral("订阅已移除，已丢弃过期下载响应。");return false;}
+    }
+    plan.m_nodes=m_nodes;
+    if(!sourceId.isEmpty())plan.m_nodes.removeIf([&](const auto &node){return node.sourceId==sourceId;});
+    QSet<QString> assigned;
+    for(auto node:incoming) {
+        m_error=ProxyNode::validate(node);if(!m_error.isEmpty())return false;
+        const auto parsedId=node.id;
+        if(plan.m_names.contains(node.name) || plan.m_ids.contains(parsedId)) {
+            m_error=QStringLiteral("导入含重复节点名称或标识，无法唯一映射策略；原配置保持不变。");return false;
+        }
+        node.sourceId=sourceId;
+        int matches=0;
+        for(const auto &old:m_nodes)if(old.sourceId==sourceId && old.name==node.name && old.protocol==node.protocol){node.id=old.id;++matches;}
+        if(matches>1 || assigned.contains(node.id)) {
+            m_error=QStringLiteral("已有节点身份不唯一；原配置保持不变。");return false;
+        }
+        // Never let a supplied UUID replace an unrelated node/source.
+        for(const auto &old:m_nodes)if(old.id==node.id &&
+            (old.sourceId!=sourceId || old.name!=node.name || old.protocol!=node.protocol)) {
+            m_error=QStringLiteral("导入节点标识与其他节点冲突；原配置保持不变。");return false;
+        }
+        assigned.insert(node.id);plan.m_names.insert(node.name,node.id);plan.m_ids.insert(parsedId,node.id);
+        plan.m_nodes.removeIf([&](const auto &old){return old.id==node.id;});plan.m_nodes.append(node);
+    }
+    if(plan.m_nodes.size()>2000){m_error=QStringLiteral("导入后超过 2000 个节点；原配置保持不变。");return false;}
+    plan.m_selected=m_selected;
+    if(std::none_of(plan.m_nodes.cbegin(),plan.m_nodes.cend(),[&](const auto &node){return node.id==plan.m_selected;}))plan.m_selected.clear();
+    *output=std::move(plan);m_error.clear();return true;
+}
+bool NodeStore::commitImport(const ImportPlan &plan,const QJsonObject &networkConfiguration) {
+    if(plan.m_owner!=this || plan.m_revision!=m_revision) {
+        m_error=QStringLiteral("准备导入后节点库已变更，请重新准备；原配置保持不变。");return false;
+    }
+    return write(plan.m_nodes,plan.m_selected,plan.m_sources,networkConfiguration.isEmpty()?m_networkConfiguration:networkConfiguration);
 }
 bool NodeStore::importNodes(QList<ProxyNode> incoming,const QString &sourceId) {
-    if(incoming.isEmpty()){m_error=QStringLiteral("导入列表为空，原节点保持不变。");return false;}
-    auto sources=m_subscriptions;
-    if(!sourceId.isEmpty()) {
-        bool found=false;for(auto &s:sources)if(s.id==sourceId){found=true;s.lastSuccess=QDateTime::currentSecsSinceEpoch();}
-        if(!found){m_error=QStringLiteral("订阅已移除，已丢弃过期响应。");return false;}
-    }
-    auto nodes=m_nodes;
-    if(!sourceId.isEmpty())nodes.removeIf([&](const auto &n){return n.sourceId==sourceId;});
-    for(auto n:incoming) {
-        m_error=ProxyNode::validate(n);if(!m_error.isEmpty())return false;
-        n.sourceId=sourceId;
-        for(const auto &old:m_nodes)if(old.sourceId==sourceId && old.name==n.name && old.protocol==n.protocol){n.id=old.id;break;}
-        nodes.removeIf([&](const auto &old){return old.id==n.id;});nodes.append(n);
-    }
-    if(nodes.size()>2000){m_error=QStringLiteral("导入后超过 2000 个节点；原节点保持不变。");return false;}
-    QString selected=m_selected;
-    if(std::none_of(nodes.cbegin(),nodes.cend(),[&](const auto &n){return n.id==selected;}))selected.clear();
-    return write(nodes,selected,sources);
+    ImportPlan plan;
+    return prepareImport(incoming,sourceId,&plan) && commitImport(plan);
+}
+bool NodeStore::saveNetworkConfiguration(const QJsonObject &configuration) {
+    if(configuration.isEmpty()){m_error=QStringLiteral("网络配置不能为空。");return false;}
+    return write(m_nodes,m_selected,m_subscriptions,configuration);
 }

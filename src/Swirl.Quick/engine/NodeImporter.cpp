@@ -113,7 +113,10 @@ NodeImporter::Result NodeImporter::parse(const QByteArray &bytes) {
     if(root.isArray())array=root.toArray();
     else if(root.isObject()) {
         const auto obj=root.toObject();
-        if(obj.contains("proxies"))array=obj.value("proxies").toArray();
+        if(obj.contains("proxies")) {
+            array=obj.value("proxies").toArray();
+            result.configuration=obj;result.configuration.remove("proxies");
+        }
         else if(obj.contains("type"))array.append(obj);
     }
     if(array.isEmpty() || array.size()>2000) {
@@ -128,6 +131,9 @@ NodeImporter::Result NodeImporter::parse(const QByteArray &bytes) {
         if(!n.conversionIssues.isEmpty())++result.incompleteNodes;
         n.id=QUuid::createUuid().toString(QUuid::WithoutBraces);
         n.name=params.take("name").toString().trimmed();n.protocol=params.take("type").toString().toLower();
+        if(!result.configuration.isEmpty() && names.contains(n.name)) {
+            result.nodes.clear();result.error=QStringLiteral("完整配置含重复节点名称，策略引用不明确；未应用配置。");return result;
+        }
         if(n.protocol=="socks4"||n.protocol=="socks4a"){
             const auto port=params.value("port");
             if(!port.isDouble()||port.toDouble()!=port.toInt()||port.toInt()<1||port.toInt()>65535){

@@ -128,10 +128,15 @@ void NodeImportService::parse(QByteArray bytes) {
     QThreadPool::globalInstance()->start([guard,bytes=std::move(bytes)]() mutable {
         auto result=NodeImporter::parse(bytes);bytes.fill('\0');
         QMetaObject::invokeMethod(QCoreApplication::instance(),[guard,result=std::move(result)]() mutable {
-            if(!guard)return;
+            if(!guard || guard->m_shuttingDown)return;
             if(!result){guard->finish(result.error);return;}
             const auto count=result.nodes.size();
-            if(!guard->m_store->importNodes(std::move(result.nodes),guard->m_source)){guard->finish(guard->m_store->error());return;}
+            if(guard->m_apply || !result.configuration.isEmpty()) {
+                QString error;
+                if(!guard->m_apply || !guard->m_apply(result,guard->m_source,&error)) {
+                    guard->finish(error.isEmpty()?QStringLiteral("导入包含全局配置，但当前入口不能验证其语义；旧配置保持不变。"):error);return;
+                }
+            } else if(!guard->m_store->importNodes(std::move(result.nodes),guard->m_source)){guard->finish(guard->m_store->error());return;}
             guard->m_message=QStringLiteral("%1 · 已解析并保存 %2 个节点；实际联网需检测。").arg(result.format).arg(count);
             if(result.incompleteNodes)guard->m_message+=QStringLiteral(" %1 个节点含未映射选项，原始差异已加密保留，拒绝静默执行。").arg(result.incompleteNodes);
             emit guard->nodesApplied();guard->finish();

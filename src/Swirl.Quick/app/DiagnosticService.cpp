@@ -4,7 +4,7 @@
 #include <QDir>
 #include <QFile>
 #include <QSaveFile>
-#include <QStandardPaths>
+#include "StoragePaths.h"
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
@@ -46,7 +46,7 @@ QByteArray makeZip(const QList<QPair<QByteArray,QByteArray>> &files){
 }
 }
 DiagnosticService::DiagnosticService(QString directory,QObject *parent):QObject(parent),m_directory(directory){
- if(m_directory.isEmpty())m_directory=QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/diagnostics";QDir().mkpath(m_directory);
+ if(m_directory.isEmpty())m_directory=SwirlPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/diagnostics";QDir().mkpath(m_directory);
  // The last append can take a rotated file slightly beyond 1 MiB.
  QFile recent(m_directory+"/events.jsonl");if(recent.open(QIODevice::ReadOnly)&&recent.size()<=2*1024*1024){for(const auto &line:recent.readAll().split('\n')){auto row=QJsonDocument::fromJson(line).object();if(row.isEmpty())continue;
   if(row.value("source")=="Diagnostics"&&row.value("code")=="EventsCleared"){m_records.clear();m_events=0;continue;}

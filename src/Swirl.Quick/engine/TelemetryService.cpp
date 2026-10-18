@@ -1,5 +1,5 @@
 #include "TelemetryService.h"
-#include <QStandardPaths>
+#include "../app/StoragePaths.h"
 #include <QDir>
 #include <QFile>
 #include <QSaveFile>
@@ -33,7 +33,7 @@ void aggregate(QJsonObject &day,const QString &kind,QString key,double up,double
 }
 }
 TelemetryService::TelemetryService(QString path,bool networkMeasurements,QObject *parent):QObject(parent),m_path(path),m_networkEnabled(networkMeasurements){
- if(m_path.isEmpty())m_path=QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/telemetry.json";
+ if(m_path.isEmpty())m_path=SwirlPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/telemetry.json";
  load();m_save.setInterval(5000);connect(&m_save,&QTimer::timeout,this,&TelemetryService::flush);m_save.start();
  m_measure.setInterval(60000);connect(&m_measure,&QTimer::timeout,this,[this]{if(m_networkEnabled&&m_status.apiHealthy)measureNetwork();});m_measure.start();
  m_stale.setInterval(1000);connect(&m_stale,&QTimer::timeout,this,[this]{if(!sampled()||!connectionsSampled())publish();});m_stale.start();

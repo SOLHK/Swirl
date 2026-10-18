@@ -157,7 +157,8 @@ public:
     Q_INVOKABLE bool setTunEnabled(bool enabled);
     Q_INVOKABLE bool configureDns(const QVariantMap &configuration);
     Q_INVOKABLE QVariantMap networkConfigurationSnapshot() const;
-    bool validateNetworkConfiguration(const QVariantMap &configuration,QVariantMap *canonical=nullptr);
+    bool validateNetworkConfiguration(const QVariantMap &configuration,QVariantMap *canonical=nullptr,const QList<ProxyNode> *candidateNodes=nullptr);
+    bool importNodesAndConfiguration(const QList<ProxyNode> &nodes,const QString &sourceId,const QVariantMap &configuration,const QJsonObject &original = {});
     bool replaceNetworkConfiguration(const QVariantMap &configuration);
     void setModuleOverlayActive(bool active) { m_moduleOverlayActive=active; }
     Q_INVOKABLE bool saveRoutingRule(const QString &type,const QString &pattern,const QString &policy,int index=-1);
@@ -193,6 +194,7 @@ private:
     ConnectionDiagnostics m_diagnostics;
     QString m_previousProxyState;
     ProxyEngine::State m_previousEngineState=ProxyEngine::State::Stopped;
+    QJsonObject serializedNetworkConfiguration();
     bool saveNetworkConfiguration();
     bool networkEditAllowed();
     void startConfiguredSession();
@@ -208,4 +210,5 @@ private:
     bool m_restartPending=false;
     bool m_connectionRequested=false;
     bool m_moduleOverlayActive=false;
+    bool m_nativeDocumentRouting=false;
 };

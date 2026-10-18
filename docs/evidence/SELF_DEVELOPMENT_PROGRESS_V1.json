@@ -1,0 +1,694 @@
+{
+  "baseline": "v1",
+  "frozen_at": "2026-10-18",
+  "metric": "verified acceptance weight, not implementation effort",
+  "stage_weights": {
+    "A": 20,
+    "B": 25,
+    "C": 20,
+    "D": 15,
+    "E": 10,
+    "F": 10
+  },
+  "stage_denominators": {
+    "A": 8,
+    "B": 31,
+    "C": 12,
+    "D": 8,
+    "E": 10,
+    "F": 10
+  },
+  "stage_accepted": {
+    "A": 1,
+    "B": 0,
+    "C": 5,
+    "D": 0,
+    "E": 0,
+    "F": 0
+  },
+  "item_count": 79,
+  "accepted_items": 6,
+  "accepted_weight_percent": 10.833333,
+  "display_percent": "10.83%",
+  "partial_credit": false,
+  "scope_change_requires_new_version": true,
+  "protocol_profiles": {
+    "total": 21,
+    "accepted": 0,
+    "partial": 8
+  },
+  "transport_profiles": {
+    "total": 10,
+    "accepted": 0,
+    "partial": 1
+  },
+  "format_profiles": {
+    "total": 10,
+    "accepted": 0
+  },
+  "new_corpus": {
+    "entries": 18,
+    "capture_success": 18,
+    "response_identities": 17,
+    "outer_format_and_node_parse": 18,
+    "complete_document_grammar_accepted": false,
+    "node_records_including_duplicate_exports": 1558,
+    "records_verified_on_real_network": 0,
+    "complete_entry_chains_verified": 0,
+    "network_success_rate": null
+  },
+  "items": [
+    {
+      "id": "A01",
+      "stage": "A",
+      "criterion": "授权采集、逐份加密、哈希、截止和原始入口映射",
+      "status": "已验收",
+      "evidence": "E02/E03；本轮18入口、17响应全部HTTP200、落盘/解密/哈希匹配",
+      "gap": "仅本轮固定清单；未授权引用不应自动下载"
+    },
+    {
+      "id": "A02",
+      "stage": "A",
+      "criterion": "冻结语料的完整正文结构与节点解析",
+      "status": "部分实现",
+      "evidence": "E01/E02；18/18外层格式及节点解析通过，INI所有节头先校验",
+      "gap": "非节点节正文语法/客户端语义未完成，不能称完整正文通过"
+    },
+    {
+      "id": "A03",
+      "stage": "A",
+      "criterion": "全部10个格式档案的字段语义与错误输入兼容",
+      "status": "部分实现",
+      "evidence": "E01/E05/E07；已有Clash、sing-box、URI/Base64和若干INI适配",
+      "gap": "逐格式版本/未知项/异常输入验收矩阵未完成"
+    },
+    {
+      "id": "A04",
+      "stage": "A",
+      "criterion": "完整原文、来源、未知字段及转换诊断进入可持久化IR",
+      "status": "部分实现",
+      "evidence": "E01/E07；Rust保留原始正文，Qt目前主要保留节点级来源",
+      "gap": "Qt完整文档来源及全局字段尚未统一加密保存"
+    },
+    {
+      "id": "A05",
+      "stage": "A",
+      "criterion": "节点到原生IR的无损转换与稳定身份",
+      "status": "部分实现",
+      "evidence": "E02/E07；450候选记录，NodeStore按来源/名称/协议稳定UUID",
+      "gap": "其余记录的执行阻塞仍在；跨文档完整引用转换未验收"
+    },
+    {
+      "id": "A06",
+      "stage": "A",
+      "criterion": "订阅策略组、DNS、顺序规则到Qt产品配置",
+      "status": "部分实现",
+      "evidence": "当前阶段接入自包含Clash组/规则和原生严格图校验；其余格式与DNS未完成",
+      "gap": "候选节点引用、严格DNS语义、未知全局字段和直接节点规则目标需接入"
+    },
+    {
+      "id": "A07",
+      "stage": "A",
+      "criterion": "完整文档导入、刷新、失败及崩溃的原子持久化与恢复",
+      "status": "部分实现",
+      "evidence": "当前阶段采用稳定UUID准备及单个DPAPI/QSaveFile快照；保留旧sidecar只读迁移",
+      "gap": "所有格式、进程崩溃/掉电和恢复矩阵仍需完成"
+    },
+    {
+      "id": "A08",
+      "stage": "A",
+      "criterion": "18份冻结文档的导入→选组/DNS/路由→Rust→联网整链",
+      "status": "未验证",
+      "evidence": "E01/E02 complete_configuration_execution_supported=false",
+      "gap": "逐文档完成整链；不能由节点解析或少量SS成功替代"
+    },
+    {
+      "id": "B01",
+      "stage": "B",
+      "criterion": "HTTP/HTTPS CONNECT及对应原生入口档案",
+      "status": "部分实现",
+      "evidence": "E05/E06；独立协议/Qt证据",
+      "gap": "当前固定矩阵的全门禁与真实出口覆盖未完成"
+    },
+    {
+      "id": "B02",
+      "stage": "B",
+      "criterion": "SOCKS4 TCP档案",
+      "status": "部分实现",
+      "evidence": "E05/E06；独立对端和Qt映射/转发",
+      "gap": "全部门禁/真实节点覆盖未完成"
+    },
+    {
+      "id": "B03",
+      "stage": "B",
+      "criterion": "SOCKS4a TCP档案",
+      "status": "部分实现",
+      "evidence": "E05/E06；远端域名解析语义已独立测试",
+      "gap": "全部门禁/真实节点覆盖未完成"
+    },
+    {
+      "id": "B04",
+      "stage": "B",
+      "criterion": "SOCKS5 TCP与用户名密码认证档案",
+      "status": "部分实现",
+      "evidence": "E05/E06；原生入口/出口已有实现",
+      "gap": "全部门禁/真实节点覆盖未完成"
+    },
+    {
+      "id": "B05",
+      "stage": "B",
+      "criterion": "SOCKS5出口UDP档案",
+      "status": "未实现",
+      "evidence": "E05仅显式DIRECT/SS出口执行UDP",
+      "gap": "不能把SOCKS5入站UDP ASSOCIATE算成SOCKS5代理出口UDP"
+    },
+    {
+      "id": "B06",
+      "stage": "B",
+      "criterion": "Shadowsocks传统AEAD TCP（三种已列密码套件）",
+      "status": "部分实现",
+      "evidence": "E04/E05；独立认证/边界/Qt和两组历史严格HTTPS样本",
+      "gap": "全目标节点/本轮语料/长期稳定性尚未验收"
+    },
+    {
+      "id": "B07",
+      "stage": "B",
+      "criterion": "Shadowsocks传统AEAD UDP",
+      "status": "部分实现",
+      "evidence": "E05；有界关联及独立Python对端",
+      "gap": "供应商真实UDP未验收"
+    },
+    {
+      "id": "B08",
+      "stage": "B",
+      "criterion": "Shadowsocks 2022档案",
+      "status": "未实现",
+      "evidence": "E05明确拒绝",
+      "gap": "独立状态机、重放/认证、传输和产品验证"
+    },
+    {
+      "id": "B09",
+      "stage": "B",
+      "criterion": "SSR档案",
+      "status": "未实现",
+      "evidence": "E05 Rust Outbound不提供",
+      "gap": "先冻结公开可验证协议/混淆组合；不能将识别当执行"
+    },
+    {
+      "id": "B10",
+      "stage": "B",
+      "criterion": "Trojan TLS档案",
+      "status": "部分实现",
+      "evidence": "E01/E05；严格TLS独立对端",
+      "gap": "不安全源配置被正确阻止；真实严格TLS节点覆盖待补"
+    },
+    {
+      "id": "B11",
+      "stage": "B",
+      "criterion": "VLESS v0 TCP/通用TLS档案",
+      "status": "部分实现",
+      "evidence": "E05/E06；独立协议和Qt转发",
+      "gap": "真实提供商及完整目标范围未验收"
+    },
+    {
+      "id": "B12",
+      "stage": "B",
+      "criterion": "VMess档案",
+      "status": "未实现",
+      "evidence": "E04/E05明确缺项",
+      "gap": "独立状态机、版本、认证、数据流与互操作"
+    },
+    {
+      "id": "B13",
+      "stage": "B",
+      "criterion": "VLESS REALITY扩展",
+      "status": "未实现",
+      "evidence": "E04明确59条历史需求记录但不可执行",
+      "gap": "规格、严格身份验证、互操作、Qt与真实节点"
+    },
+    {
+      "id": "B14",
+      "stage": "B",
+      "criterion": "VLESS Vision扩展",
+      "status": "未实现",
+      "evidence": "E05明确拒绝flow/Vision",
+      "gap": "独立状态机与必要组合互操作"
+    },
+    {
+      "id": "B15",
+      "stage": "B",
+      "criterion": "WebSocket/WSS传输及已承诺VLESS/Trojan组合",
+      "status": "部分实现",
+      "evidence": "E05/E06；分片、背压、关闭预算和Qt已有证据",
+      "gap": "组合矩阵与真实提供商/长连接覆盖未完整"
+    },
+    {
+      "id": "B16",
+      "stage": "B",
+      "criterion": "gRPC传输",
+      "status": "未实现",
+      "evidence": "E04/E05明确缺项",
+      "gap": "HTTP/2基础依赖可用但代理传输状态机需自研"
+    },
+    {
+      "id": "B17",
+      "stage": "B",
+      "criterion": "XHTTP传输",
+      "status": "未实现",
+      "evidence": "E04/E05明确缺项",
+      "gap": "版本/模式矩阵、取消、复用与真实互操作"
+    },
+    {
+      "id": "B18",
+      "stage": "B",
+      "criterion": "Hysteria v1档案",
+      "status": "未实现",
+      "evidence": "E00既定协议范围，E05无原生执行",
+      "gap": "资料/样本/必要范围固定后实现，未验证不得删除"
+    },
+    {
+      "id": "B19",
+      "stage": "B",
+      "criterion": "Hysteria 2档案",
+      "status": "未实现",
+      "evidence": "E04/E05明确缺项",
+      "gap": "QUIC认证、TCP/UDP、拥塞/关闭与产品接入"
+    },
+    {
+      "id": "B20",
+      "stage": "B",
+      "criterion": "TUIC档案",
+      "status": "未实现",
+      "evidence": "E04/E05明确缺项",
+      "gap": "明确版本、QUIC会话、TCP/UDP与互操作"
+    },
+    {
+      "id": "B21",
+      "stage": "B",
+      "criterion": "QUIC/HTTP3必要传输组合",
+      "status": "未实现",
+      "evidence": "E04/E05明确缺项",
+      "gap": "采用审查后的基础库，Swirl拥有代理会话执行逻辑"
+    },
+    {
+      "id": "B22",
+      "stage": "B",
+      "criterion": "AnyTLS档案",
+      "status": "未实现",
+      "evidence": "E00既定协议范围，E05无原生执行",
+      "gap": "协议版本/认证/复用/互操作"
+    },
+    {
+      "id": "B23",
+      "stage": "B",
+      "criterion": "Naive档案",
+      "status": "未实现",
+      "evidence": "E00既定协议范围，E05无原生执行",
+      "gap": "明确HTTP2/3组合与认证/互操作"
+    },
+    {
+      "id": "B24",
+      "stage": "B",
+      "criterion": "Snell档案",
+      "status": "未实现",
+      "evidence": "E00既定协议范围，E05无原生执行",
+      "gap": "专有或未公开语义必须明确阻塞，不虚构实现"
+    },
+    {
+      "id": "B25",
+      "stage": "B",
+      "criterion": "Mieru档案",
+      "status": "未实现",
+      "evidence": "E00既定协议范围，E05无原生执行",
+      "gap": "版本/传输/认证与互操作"
+    },
+    {
+      "id": "B26",
+      "stage": "B",
+      "criterion": "WireGuard档案",
+      "status": "未实现",
+      "evidence": "E00既定协议范围，E05无原生执行",
+      "gap": "协议执行、路由/DNS和Windows产品整链"
+    },
+    {
+      "id": "B27",
+      "stage": "B",
+      "criterion": "SSH代理档案",
+      "status": "未实现",
+      "evidence": "E00既定协议范围，E05无原生执行",
+      "gap": "严格主机身份/认证、转发与产品接入"
+    },
+    {
+      "id": "B28",
+      "stage": "B",
+      "criterion": "代理多路复用及链式代理执行",
+      "status": "未实现",
+      "evidence": "E00范围；E05 VLESS multiplexing明确拒绝；Qt只保留部分detour",
+      "gap": "绑定协议的已冻结组合、背压、取消和防循环"
+    },
+    {
+      "id": "B29",
+      "stage": "B",
+      "criterion": "HTTP/2代理传输扩展",
+      "status": "未实现",
+      "evidence": "E00范围，E05无原生执行",
+      "gap": "不把库依赖或h2配置识别当协议执行"
+    },
+    {
+      "id": "B30",
+      "stage": "B",
+      "criterion": "HTTPUpgrade传输扩展",
+      "status": "未实现",
+      "evidence": "E00范围，E05无原生执行",
+      "gap": "握手校验、边界、Qt和实际对端"
+    },
+    {
+      "id": "B31",
+      "stage": "B",
+      "criterion": "ShadowTLS扩展",
+      "status": "未实现",
+      "evidence": "E00范围，E05无原生执行",
+      "gap": "版本、身份/认证和安全负面测试"
+    },
+    {
+      "id": "C01",
+      "stage": "C",
+      "criterion": "原生UDP/TCP DNS及严格DoT/DoH协议与Qt映射（不含分流/bootstrap）",
+      "status": "已验收",
+      "evidence": "E05/E06；独立DNS对端、严格证书和Qt映射证据",
+      "gap": "历史精准范围可继承；不能代表本机所有公网DoH成功"
+    },
+    {
+      "id": "C02",
+      "stage": "C",
+      "criterion": "A/AAAA/CNAME与TTL正缓存、大小写规范化、有界资源",
+      "status": "已验收",
+      "evidence": "E05/E06已有实现及独立DNS验证",
+      "gap": "保留配置更换和资源上限契约"
+    },
+    {
+      "id": "C03",
+      "stage": "C",
+      "criterion": "SOA证明的NXDOMAIN/NODATA负缓存",
+      "status": "已验收",
+      "evidence": "E05/E06独立负缓存证据",
+      "gap": "不能把未证明空答案当负缓存"
+    },
+    {
+      "id": "C04",
+      "stage": "C",
+      "criterion": "上游失败恢复、备用解析器及有界失败缓存",
+      "status": "已验收",
+      "evidence": "E08；b903b8b完成一秒失败缓存、原错误码与配置换代清理",
+      "gap": "此前README仍称未实现的段落已过时"
+    },
+    {
+      "id": "C05",
+      "stage": "C",
+      "criterion": "DNS分流、Fake-IP、bootstrap与防泄漏完整策略",
+      "status": "未实现",
+      "evidence": "E05明确缺项",
+      "gap": "三者须逐项验收，不得退化成系统/明文解析"
+    },
+    {
+      "id": "C06",
+      "stage": "C",
+      "criterion": "现有基础规则的顺序与优先级",
+      "status": "已验收",
+      "evidence": "E05/E06；domain/suffix/keyword、CIDR、source CIDR、port、MATCH独立路径",
+      "gap": "仅列举的基础匹配；高级规则不在本项冒领"
+    },
+    {
+      "id": "C07",
+      "stage": "C",
+      "criterion": "复杂策略组及配置/健康更新",
+      "status": "部分实现",
+      "evidence": "E05/E06；嵌套手动、url-test/fallback/显式round-robin",
+      "gap": "默认哈希、更多自动嵌套及完整订阅整合待补"
+    },
+    {
+      "id": "C08",
+      "stage": "C",
+      "criterion": "GEOIP/GEOSITE/MRS执行及更新",
+      "status": "未实现",
+      "evidence": "E05/RustCoreEngine明确拒绝智能MRS会话",
+      "gap": "导入、规则执行、数据更新失败与回滚"
+    },
+    {
+      "id": "C09",
+      "stage": "C",
+      "criterion": "进程分流",
+      "status": "未实现",
+      "evidence": "E05明确未迁移",
+      "gap": "Windows进程归属、生命周期和权限边界"
+    },
+    {
+      "id": "C10",
+      "stage": "C",
+      "criterion": "IPv4/IPv6全目标兼容",
+      "status": "部分实现",
+      "evidence": "E05；多地址拨号/部分独立IPv6证据",
+      "gap": "所有协议、DNS、UDP/TUN和实际网络矩阵未覆盖"
+    },
+    {
+      "id": "C11",
+      "stage": "C",
+      "criterion": "网络切换、超时、重试与流量统计",
+      "status": "部分实现",
+      "evidence": "E05；有界TCP竞速、静态错误阶段、快照统计",
+      "gap": "真实网络切换、恢复及统计一致性待验收"
+    },
+    {
+      "id": "C12",
+      "stage": "C",
+      "criterion": "断开清理、失败不降级DIRECT、不重放与隐私保护",
+      "status": "部分实现",
+      "evidence": "E05/E06；不可变会话、失败保留旧计划已有证据",
+      "gap": "整产品/TUN/异常退出的全路径审计与泄漏测试待补"
+    },
+    {
+      "id": "D01",
+      "stage": "D",
+      "criterion": "Windows虚拟接口生命周期",
+      "status": "未实现",
+      "evidence": "E01/E05；Rust TUN尚未接入",
+      "gap": "驱动/API权限、创建/关闭/残留恢复"
+    },
+    {
+      "id": "D02",
+      "stage": "D",
+      "criterion": "TUN TCP数据路径",
+      "status": "未实现",
+      "evidence": "E01/E05",
+      "gap": "独立内核转发、并发、MTU与取消"
+    },
+    {
+      "id": "D03",
+      "stage": "D",
+      "criterion": "TUN UDP数据路径",
+      "status": "未实现",
+      "evidence": "E01/E05",
+      "gap": "映射、DNS、分片/MTU、超时与回收"
+    },
+    {
+      "id": "D04",
+      "stage": "D",
+      "criterion": "TUN DNS接管与防泄漏",
+      "status": "未实现",
+      "evidence": "E01/E05",
+      "gap": "IPv4/IPv6、不同解析协议与绕过探测"
+    },
+    {
+      "id": "D05",
+      "stage": "D",
+      "criterion": "系统路由安装、所有权及恢复",
+      "status": "未实现",
+      "evidence": "E01/E05原生TUN未完成",
+      "gap": "与用户/其他软件修改冲突的恢复契约"
+    },
+    {
+      "id": "D06",
+      "stage": "D",
+      "criterion": "Rust模式系统代理开关及所有权保护",
+      "status": "部分实现",
+      "evidence": "E05；既有C++SystemProxySession保留",
+      "gap": "完整Windows实际接管、他人接管保护和恢复证明"
+    },
+    {
+      "id": "D07",
+      "stage": "D",
+      "criterion": "网络变化和休眠唤醒恢复",
+      "status": "未验证",
+      "evidence": "E01/E05没有当前原生完整证据",
+      "gap": "切网/断网/唤醒真实测试"
+    },
+    {
+      "id": "D08",
+      "stage": "D",
+      "criterion": "崩溃退出、防火墙与系统状态保护",
+      "status": "未验证",
+      "evidence": "E00契约；E01未执行系统修改",
+      "gap": "异常退出恢复，不覆盖用户后续更改；敏感操作需批准"
+    },
+    {
+      "id": "E01",
+      "stage": "E",
+      "criterion": "节点连接耗时及延迟分布",
+      "status": "部分实现",
+      "evidence": "E04有少量固定SS DNS/TCP耗时",
+      "gap": "预定样本规模、P50/P95/P99及同环境可复现"
+    },
+    {
+      "id": "E02",
+      "stage": "E",
+      "criterion": "TCP吞吐",
+      "status": "未验证",
+      "evidence": "E05有Benchmark工具；本次未核验正式报告",
+      "gap": "固定硬件、负载、时间与阈值"
+    },
+    {
+      "id": "E03",
+      "stage": "E",
+      "criterion": "UDP吞吐与丢包",
+      "status": "未验证",
+      "evidence": "E05有独立功能测试，不等于性能",
+      "gap": "固定包长/速率/丢包/抖动/正确性阈值"
+    },
+    {
+      "id": "E04",
+      "stage": "E",
+      "criterion": "高并发与资源上限",
+      "status": "部分实现",
+      "evidence": "E05有并发及有界资源设计/回归",
+      "gap": "长期压力下正确性、耗尽恢复与公平性"
+    },
+    {
+      "id": "E05",
+      "stage": "E",
+      "criterion": "DNS查询/缓存性能",
+      "status": "未验证",
+      "evidence": "E08功能与恢复证据不等于性能",
+      "gap": "缓存命中/未命中/失败P50/P95/P99"
+    },
+    {
+      "id": "E06",
+      "stage": "E",
+      "criterion": "CPU、内存及泄漏",
+      "status": "未验证",
+      "evidence": "E01本阶段未执行完整性能验收",
+      "gap": "空闲、活跃、长期运行的基准与资源回收"
+    },
+    {
+      "id": "E07",
+      "stage": "E",
+      "criterion": "长时间运行",
+      "status": "未验证",
+      "evidence": "E01/E04明确未执行长跑",
+      "gap": "冻结时长、负载、错误率与泄漏阈值"
+    },
+    {
+      "id": "E08",
+      "stage": "E",
+      "criterion": "SSE/WebSocket及Codex登录和持续输出",
+      "status": "部分实现",
+      "evidence": "E05有WS协议/关闭测试；真实Codex CLI仍可选跳过",
+      "gap": "当前Rust模式真实持续输出、登录、恢复与长连接"
+    },
+    {
+      "id": "E09",
+      "stage": "E",
+      "criterion": "弱网、丢包、断线恢复",
+      "status": "未验证",
+      "evidence": "E01/E04未给完整实测",
+      "gap": "冻结损伤参数，不延长产品超时掩盖问题"
+    },
+    {
+      "id": "E10",
+      "stage": "E",
+      "criterion": "启动、停止、退出与资源回收压力",
+      "status": "部分实现",
+      "evidence": "E05/E06有生命周期及取消测试",
+      "gap": "Windows重复启停、负载中退出和异常退出矩阵"
+    },
+    {
+      "id": "F01",
+      "stage": "F",
+      "criterion": "完整Windows Rust Swirl构建",
+      "status": "部分实现",
+      "evidence": "E08历史完整应用构建；E01当前Qt集成构建通过",
+      "gap": "最终候选完整应用/依赖包精准SHA与可重复构建"
+    },
+    {
+      "id": "F02",
+      "stage": "F",
+      "criterion": "完整Qt产品真实运行",
+      "status": "未验证",
+      "evidence": "E01有测试程序但未完成完整GUI产品验收",
+      "gap": "实际启动、导入、操作、退出；不能替代为CTest"
+    },
+    {
+      "id": "F03",
+      "stage": "F",
+      "criterion": "真实订阅、选节点、分流与联网产品链",
+      "status": "未验证",
+      "evidence": "E01/E02 full configuration=false",
+      "gap": "依赖A08与当前真实网络矩阵"
+    },
+    {
+      "id": "F04",
+      "stage": "F",
+      "criterion": "完整产品TUN和系统代理验收",
+      "status": "未验证",
+      "evidence": "E01/E05 TUN未完成",
+      "gap": "依赖D01-D08及用户批准的实际系统操作"
+    },
+    {
+      "id": "F05",
+      "stage": "F",
+      "criterion": "现有UI/动画/设置/用户数据回归",
+      "status": "部分实现",
+      "evidence": "修正进程局部DLL路径和D盘测试隔离后，原45秒上限外观测试5.68秒通过，设置跨进程恢复通过",
+      "gap": "全部UI/动画/用户数据和安装生命周期矩阵仍未完成"
+    },
+    {
+      "id": "F06",
+      "stage": "F",
+      "criterion": "升级、卸载、异常退出及配置恢复",
+      "status": "未验证",
+      "evidence": "E00最终目标；当前未给完整安装生命周期证据",
+      "gap": "版本迁移、用户修改保护、失败恢复"
+    },
+    {
+      "id": "F07",
+      "stage": "F",
+      "criterion": "Rust为默认且无必要Mihomo运行依赖",
+      "status": "部分实现",
+      "evidence": "E05 Rust显式模式无外核回退，但默认仍兼容构建",
+      "gap": "功能验收后才改默认/移除依赖，检查包内容/进程/流量路径"
+    },
+    {
+      "id": "F08",
+      "stage": "F",
+      "criterion": "依赖许可证、必要署名与供应链记录",
+      "status": "部分实现",
+      "evidence": "E05 DEPENDENCIES.json和既有许可证说明",
+      "gap": "对最终依赖及实际安装包逐项核验"
+    },
+    {
+      "id": "F09",
+      "stage": "F",
+      "criterion": "同一候选的三平台CI、Windows Qt及安全门禁",
+      "status": "未验证",
+      "evidence": "E09确认4e993d6三平台已全成功；本阶段新Qt代码CI待完成",
+      "gap": "最新源码完整完成结果需更新；未知状态不视为success"
+    },
+    {
+      "id": "F10",
+      "stage": "F",
+      "criterion": "最终安装包与源码、证据、交接的一致交付",
+      "status": "未实现",
+      "evidence": "E01/E04明确未做完整应用包装",
+      "gap": "安装包构建/哈希/安装卸载验收、开发分支SHA和交接一致"
+    }
+  ]
+}
