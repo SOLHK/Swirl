@@ -1,3 +1,5 @@
+Latest capture checkpoint: [2026-10-18 06:55:48 UTC window](RUST_CAPTURE_065548_20261018.md). 18/18 entries encrypted on Windows and parsed offline; supplier requests stopped at 06:59:26 UTC. Continue from latest development HEAD; no further supplier refresh.
+
 # Swirl 接续开发入口
 
 最新阶段：[旧式 Loon SS 原生转发及跨平台诊断验收](RUST_LOON_SS_NATIVE_20261018.md)。功能源码4ea4139，最终测试源码d7e79df：三平台CI、Qt集成、私有复核均成功；18/18缓存入口可解析，新增入口的前三个SS节点严格HTTPS通过。旧macOS测试失败已定位为唤醒时延假设并修正测试契约，产品超时与校验器不变。订阅窗口仍关闭，继续仅使用D盘加密缓存。
