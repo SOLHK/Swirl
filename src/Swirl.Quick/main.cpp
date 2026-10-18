@@ -54,6 +54,7 @@
 #include "tests/WindowRadiusChecks.h"
 #include "tests/UiQualityChecks.h"
 #include "tests/FontUiChecks.h"
+#include "tests/FontFrameChecks.h"
 #include "tests/HdrChecks.h"
 #include "tests/EngineUiChecks.h"
 #include "tests/NodeUiChecks.h"
@@ -146,7 +147,8 @@ int main(int argc, char *argv[])
     const bool uiQualityTest=app.arguments().contains("--ui-quality-test");
     const bool fontUiTest=app.arguments().contains("--font-ui-test");
     const bool fontReview=app.arguments().contains("--font-review");
-    bool previewMode=uiQualityTest||fontUiTest||fontReview;
+    const bool fontFrameTest=app.arguments().contains("--font-frame-test");
+    bool previewMode=uiQualityTest||fontUiTest||fontReview||fontFrameTest;
     for(const QString &argument:app.arguments())
         if(argument.startsWith(QStringLiteral("--material-test-output="))||argument.startsWith(QStringLiteral("--viewport-test-output="))||argument.startsWith(QStringLiteral("--motion-demo-output="))||argument.startsWith(QStringLiteral("--motion-visual-dir="))||argument.startsWith(QStringLiteral("--capture-preview="))||argument.startsWith(QStringLiteral("--capture-native-frame=")))previewMode=true;
     const bool hdrTest=app.arguments().contains("--hdr-self-test");
@@ -463,6 +465,22 @@ int main(int argc, char *argv[])
         return 4;
 #endif
     }
+    if(fontFrameTest) {
+#ifdef SWIRL_UI_TESTS
+        const auto output=argumentValue(QStringLiteral("--font-frame-output="));
+        QTimer::singleShot(700,&app,[&app,rootWindow,&fontManager,output]{app.exit(runFontFrameChecks(rootWindow,&fontManager,output));});
+#else
+        return 4;
+#endif
+    }
+#ifdef SWIRL_UI_TESTS
+    if(fontReview && rootWindow) {
+        const double points=argumentValue(QStringLiteral("--font-reading-points=")).toDouble();
+        const auto label=argumentValue(QStringLiteral("--font-reading-label="));
+        const auto readingOutput=argumentValue(QStringLiteral("--font-reading-output="));
+        if(points>=9 && points<=16)QTimer::singleShot(700,rootWindow,[rootWindow,points,label,readingOutput]{applyFontReadingReview(rootWindow,points,label,readingOutput);});
+    }
+#endif
     if(fontUiTest) {
 #ifdef SWIRL_UI_TESTS
         const auto output=argumentValue(QStringLiteral("--font-ui-output="));
@@ -528,7 +546,7 @@ int main(int argc, char *argv[])
             });
             auto *captureBackdrop=previewPage=="external"?&panelBackdrop:&backdrop;
             if(!nativeFramePath.isEmpty())QTimer::singleShot(400,&app,[&app,captureBackdrop]{if(!captureBackdrop->prepareNativeCapture()){qCritical()<<"Native capture blocked: cannot activate target window";app.exit(3);}});
-            QTimer::singleShot(900, &app, [window, previewPage, previewPath, nativeFramePath, captureBackdrop, &app, &previewCaptured]() {
+            QTimer::singleShot(fontReview && !argumentValue(QStringLiteral("--font-reading-points=")).isEmpty()?1500:900, &app, [window, previewPage, previewPath, nativeFramePath, captureBackdrop, &app, &previewCaptured]() {
                 QQuickWindow *captureWindow=window;
                 const QString targetName=previewPage=="external"?"dashboardWindow":QString();
                 if(!targetName.isEmpty())for(auto *candidate:QGuiApplication::allWindows())if(candidate->isVisible()&&candidate->objectName()==targetName)if(auto *quick=qobject_cast<QQuickWindow *>(candidate)){captureWindow=quick;break;}

@@ -3,6 +3,9 @@
 #include <QFont>
 #include <QColor>
 #include <QImage>
+#ifdef SWIRL_UI_TESTS
+#include <atomic>
+#endif
 #include <QtQml/qqmlregistration.h>
 
 // Keep a single painted surface per live preview instead of scene-graph glyph
@@ -23,10 +26,17 @@ public:
     void setFont(const QFont &font);
     void setColor(const QColor &color);
     void paint(QPainter *painter) override;
+#ifdef SWIRL_UI_TESTS
+    void setMeasureRaster(bool enabled) { m_measureRaster=enabled; }
+#endif
 signals:
     void textChanged();
     void fontChanged();
     void colorChanged();
+#ifdef SWIRL_UI_TESTS
+    void rasterMeasured(qint64 startedNs,qint64 finishedNs);
+    void paintMeasured(qint64 startedNs,qint64 finishedNs);
+#endif
 protected:
     void geometryChange(const QRectF &next,const QRectF &previous) override;
     void itemChange(ItemChange change,const ItemChangeData &data) override;
@@ -37,4 +47,7 @@ private:
     QFont m_font;
     QColor m_color=Qt::black;
     QImage m_raster;
+#ifdef SWIRL_UI_TESTS
+    std::atomic_bool m_measureRaster{false};
+#endif
 };

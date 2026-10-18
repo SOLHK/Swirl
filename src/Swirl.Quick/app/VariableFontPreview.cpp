@@ -4,6 +4,10 @@
 #include <QTextLayout>
 #include <QTextOption>
 #include <QtMath>
+#ifdef SWIRL_UI_TESTS
+#include <chrono>
+static qint64 rasterClockNs() { return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count(); }
+#endif
 
 VariableFontPreview::VariableFontPreview(QQuickItem *parent) : QQuickPaintedItem(parent)
 {
@@ -29,6 +33,9 @@ void VariableFontPreview::setColor(const QColor &color)
 void VariableFontPreview::updatePolish()
 {
     if(width()<=0)return;
+#ifdef SWIRL_UI_TESTS
+    const auto started=m_measureRaster?rasterClockNs():0;
+#endif
     QTextLayout layout(m_text,m_font);QTextOption option;
     option.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);layout.setTextOption(option);
     layout.beginLayout();qreal y=0;
@@ -41,6 +48,9 @@ void VariableFontPreview::updatePolish()
     QPainter painter(&image);painter.setPen(m_color);painter.setRenderHint(QPainter::TextAntialiasing,true);
     layout.draw(&painter,QPointF());painter.end();m_raster=std::move(image);
     update();
+#ifdef SWIRL_UI_TESTS
+    if(started)emit rasterMeasured(started,rasterClockNs());
+#endif
 }
 void VariableFontPreview::geometryChange(const QRectF &next,const QRectF &previous)
 {
@@ -56,5 +66,11 @@ void VariableFontPreview::paint(QPainter *painter)
 {
     // One native raster at the current DPR, with no resampling or sharpening.
     // Keep only this frame's image; do not cache images or fonts by coordinate.
+#ifdef SWIRL_UI_TESTS
+    const auto started=m_measureRaster?rasterClockNs():0;
+#endif
     painter->drawImage(QPointF(),m_raster);
+#ifdef SWIRL_UI_TESTS
+    if(started)emit paintMeasured(started,rasterClockNs());
+#endif
 }
