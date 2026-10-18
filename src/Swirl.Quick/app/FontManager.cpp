@@ -45,7 +45,7 @@ bool validSfntFile(QFile &file)
             if(offset>length||size>length-offset)return false;
             if(directory.mid(i*16,4)!="fvar")continue;
             const auto variable=read(offset,qMin(size,quint64(16)));
-            if(variable.size()!=16||u32(variable,0)!=0x10000)return false;
+            if(variable.size()!=16||u16(variable,0)!=1)return false;
             const quint64 start=u16(variable,4),axes=u16(variable,8),axisSize=u16(variable,10),instances=u16(variable,12),instanceSize=u16(variable,14);
             if(start<16||!axes||axisSize<20||start>size||axes*axisSize>size-start)return false;
             if(instances&&(instanceSize<4+axes*4||instances*instanceSize>size-start-axes*axisSize))return false;

@@ -100,12 +100,13 @@ ColumnLayout {
             anchors.margins:Theme.dp(16); spacing:Theme.dp(8)
             Repeater {
                 model:["苹方字体显示效果测试","The quick brown fox jumps over the lazy dog.","0123456789","@ # ¥ % &"]
-                delegate:Text {
+                delegate:VariableFontPreview {
                     required property string modelData
                     required property int index
                     objectName:"fontPreviewLine_"+index
-                    text:modelData; Layout.fillWidth:true; wrapMode:Text.Wrap
-                    color:Theme.text; renderType:Text.NativeRendering
+                    text:modelData; Layout.fillWidth:true
+                    Accessible.role:Accessible.StaticText; Accessible.name:text
+                    color:Theme.text
                     font.family:fontManager.previewFamily; font.styleName:""
                     font.pixelSize:Theme.fontSize(index===0?21:15)
                     font.hintingPreference:Font.PreferFullHinting

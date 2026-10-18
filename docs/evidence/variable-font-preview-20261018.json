@@ -1,0 +1,110 @@
+{
+  "qt": "6.10.3",
+  "platform": "Windows 11",
+  "currentDisplayDpr": 1.5,
+  "currentRefreshHz": 120,
+  "captureKind": "raw QQuickWindow render; not physical-screen or remote-compression evidence",
+  "uiChecks": 32,
+  "uiFailures": 0,
+  "distinctCoordinates": 1024,
+  "distinctPrivateMiB": [
+    {
+      "coordinates": 64,
+      "MiB": 253.95,
+      "elapsedMs": 1283
+    },
+    {
+      "coordinates": 128,
+      "MiB": 267.14,
+      "elapsedMs": 2552
+    },
+    {
+      "coordinates": 192,
+      "MiB": 264.47,
+      "elapsedMs": 3785
+    },
+    {
+      "coordinates": 256,
+      "MiB": 255.4,
+      "elapsedMs": 5035
+    },
+    {
+      "coordinates": 320,
+      "MiB": 264.11,
+      "elapsedMs": 6259
+    },
+    {
+      "coordinates": 384,
+      "MiB": 262.6,
+      "elapsedMs": 7472
+    },
+    {
+      "coordinates": 448,
+      "MiB": 261.83,
+      "elapsedMs": 8685
+    },
+    {
+      "coordinates": 512,
+      "MiB": 255.42,
+      "elapsedMs": 9957
+    },
+    {
+      "coordinates": 576,
+      "MiB": 266.98,
+      "elapsedMs": 11189
+    },
+    {
+      "coordinates": 640,
+      "MiB": 261.99,
+      "elapsedMs": 12421
+    },
+    {
+      "coordinates": 704,
+      "MiB": 257.36,
+      "elapsedMs": 13598
+    },
+    {
+      "coordinates": 768,
+      "MiB": 255.17,
+      "elapsedMs": 14812
+    },
+    {
+      "coordinates": 832,
+      "MiB": 268.09,
+      "elapsedMs": 16032
+    },
+    {
+      "coordinates": 896,
+      "MiB": 260.75,
+      "elapsedMs": 17231
+    },
+    {
+      "coordinates": 960,
+      "MiB": 266.73,
+      "elapsedMs": 18399
+    },
+    {
+      "coordinates": 1024,
+      "MiB": 269.27,
+      "elapsedMs": 19692
+    }
+  ],
+  "resetAndIdleMiB": 269.33,
+  "frameMedianMs": 15.681,
+  "frameP95Ms": 31.3301,
+  "fontTests": {
+    "passed": 11,
+    "failed": 0
+  },
+  "focusedCTest": {
+    "passed": 2,
+    "failed": 0
+  },
+  "simulatedScaleTest": "application QT_SCALE_FACTOR creates approximately 200% effective DPR on current 150% display; not Windows scale change",
+  "limits": [
+    "Finite 1024-coordinate test, not an indefinite bound or allocator-level proof",
+    "Frame intervals include test-harness scheduling; not physical 240Hz throughput validation",
+    "Physical clarity and actual scale switching untested",
+    "Private font and raw captures are local only"
+  ]
+}

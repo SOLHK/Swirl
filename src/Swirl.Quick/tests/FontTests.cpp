@@ -1,4 +1,5 @@
 #include "app/FontManager.h"
+#include "app/VariableFontPreview.h"
 #include "app/FontRendering.h"
 #include <QTest>
 #include <QTemporaryDir>
@@ -25,6 +26,7 @@
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <limits>
+#include <QPointer>
 class FontTests : public QObject {
     Q_OBJECT
 private slots:
@@ -118,6 +120,8 @@ private slots:
     void optionalNativePointSizes();
     void optionalMetadataReplacement();
     void malformedImportPreservesState();
+    void optionalPaintedPreviewAxes();
+    void optionalCffImport();
     void nativeGlyphsHaveNoColourFringes(){
         if(QGuiApplication::platformName()!=QStringLiteral("windows"))QSKIP("Requires the native Windows platform");
         QTemporaryDir directory;
@@ -330,7 +334,7 @@ void FontTests::optionalRenderMatrix(){
         }
         report.insert("samples",cases);report.insert("count",count);report.insert("elapsedMs",double(timer.elapsed()));
         QFile file(output+"/matrix.json");QVERIFY(file.open(QIODevice::WriteOnly));file.write(QJsonDocument(report).toJson());
-        qInfo()<<"Render matrix"<<count<<"samples in"<<timer.elapsed()<<"ms; simulated DPI, original font only";
+        qInfo()<<"Render matrix"<<count<<"samples in"<<timer.elapsed()<<"ms; simulated DPI, local font fixture";
     }
 
 void FontTests::optionalNativePointSizes()
@@ -421,6 +425,52 @@ void FontTests::malformedImportPreservesState()
     QVERIFY(!manager.importFont(QUrl::fromLocalFile(oversized.fileName())));
     QCOMPARE(manager.currentFamily(),active);QCOMPARE(manager.previewFamily(),draft);
     QVERIFY(QDir(directory.filePath("fonts")).entryList(QDir::Files).isEmpty());
+}
+
+void FontTests::optionalPaintedPreviewAxes()
+{
+    const auto ttc=qEnvironmentVariable("SWIRL_TEST_TTC");if(ttc.isEmpty())QSKIP("Local font fixture required");
+    QTemporaryDir directory;QSettings::setDefaultFormat(QSettings::IniFormat);QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,directory.path());QSettings().clear();
+    FontManager manager(nullptr,directory.filePath("fonts"));QVERIFY(manager.importFont(QUrl::fromLocalFile(ttc)));
+    qmlRegisterType<VariableFontPreview>("FontTest",1,0,"VariableFontPreview");
+    QQmlEngine engine;engine.rootContext()->setContextProperty("fixture",&manager);QQmlComponent component(&engine);
+    component.setData(R"qml(
+import QtQuick
+import FontTest
+Window { width:850; height:200; color:"white"; visible:true
+ VariableFontPreview { objectName:"preview"; x:16; y:16; width:810; height:implicitHeight
+ text:"苹方字体显示效果测试 The quick brown fox jumps over the lazy dog. 0123456789 @ # ¥ % &";
+ font.family:fixture.previewFamily; font.pixelSize:25; font.styleName:"";
+ font.variableAxes:fixture.previewValues; font.hintingPreference:Font.PreferFullHinting }
+})qml",QUrl());
+    QScopedPointer<QObject> root(component.create());QVERIFY2(root,qPrintable(component.errorString()));
+    auto *window=qobject_cast<QQuickWindow *>(root.data());QVERIFY(window);window->hide();window->show();QVERIFY(QTest::qWaitForWindowExposed(window));
+    auto *preview=root->findChild<VariableFontPreview *>("preview");QVERIFY(preview);
+    QPointer<QObject> instance=preview;
+    for(const auto &entry:manager.previewAxes()){
+        const auto axis=entry.toMap();const auto tag=axis["tag"].toString();manager.resetPreviewAxes();
+        QVERIFY(manager.setPreviewAxis(tag,axis["minimum"].toDouble()));QTest::qWait(40);const auto low=window->grabWindow();
+        QVERIFY(manager.setPreviewAxis(tag,axis["maximum"].toDouble()));
+        QTRY_COMPARE(preview->font().variableAxisValue(*QFont::Tag::fromString(tag.toLatin1())),axis["maximum"].toFloat());
+        QImage high;QTRY_VERIFY(!(high=window->grabWindow()).isNull()&&high!=low);
+        QVERIFY(instance&&instance==preview);QVERIFY(preview->implicitHeight()>0&&preview->implicitHeight()<180);
+    }
+}
+
+void FontTests::optionalCffImport()
+{
+    const auto fixtures=qEnvironmentVariable("SWIRL_FONT_METADATA_FIXTURES");if(fixtures.isEmpty())QSKIP("Synthetic CFF fixture not supplied");
+    QTemporaryDir directory;QSettings::setDefaultFormat(QSettings::IniFormat);QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,directory.path());QSettings().clear();
+    FontManager manager(nullptr,directory.filePath("fonts"));const auto active=manager.currentFamily();
+    QVERIFY2(manager.importFont(QUrl::fromLocalFile(fixtures+"/cff.otf")),qPrintable(manager.error()));
+    QCOMPARE(manager.currentFamily(),active);QCOMPARE(manager.previewFamily(),QStringLiteral("Swirl CFF Probe"));
+    QVERIFY(manager.previewAxes().isEmpty());QVERIFY(manager.applyPreview());
+    QFont font(manager.currentFamily());font.setPixelSize(24);const auto raw=QRawFont::fromFont(font);
+    QVERIFY(raw.isValid());QCOMPARE(raw.familyName(),QStringLiteral("Swirl CFF Probe"));QVERIFY(raw.supportsCharacter(QChar('A')));
+    QImage image(100,60,QImage::Format_ARGB32_Premultiplied);image.fill(Qt::white);
+    QPainter painter(&image);painter.setPen(Qt::black);painter.setFont(font);painter.drawText(QPointF(10,40),"A");painter.end();
+    int ink=0;for(int y=0;y<image.height();++y)for(int x=0;x<image.width();++x)if(qGray(image.pixel(x,y))<240)++ink;
+    QVERIFY(ink>20);
 }
 
 int main(int argc,char **argv){
