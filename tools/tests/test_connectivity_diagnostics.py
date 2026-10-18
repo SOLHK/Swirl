@@ -358,14 +358,32 @@ class ConnectivityDiagnostics(unittest.TestCase):
 
     def test_permanently_stalled_dns_worker_does_not_hold_process_open(self):
         code = f'''
-import importlib.util, json, threading
+import importlib.util, json, threading, time
 spec = importlib.util.spec_from_file_location("diagnostic", {str(SCRIPT)!r})
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 def stalled(*args, **kwargs):
     threading.Event().wait()
+observed = {{}}
+original_start = threading.Thread.start
+original_get = module.queue.Queue.get
+def measured_start(self):
+    start = time.monotonic()
+    try:
+        return original_start(self)
+    finally:
+        observed["worker_start_ms"] = int((time.monotonic() - start) * 1000)
+def measured_get(self, *args, **kwargs):
+    start = time.monotonic()
+    try:
+        return original_get(self, *args, **kwargs)
+    finally:
+        observed["queue_wait_ms"] = int((time.monotonic() - start) * 1000)
+threading.Thread.start = measured_start
+module.queue.Queue.get = measured_get
 report = module.diagnose_python({{"host":"fixture.invalid","port":443,
     "total_budget_ms":100,"dns_budget_ms":30}}, resolver=stalled)
+report.update(observed)
 print(json.dumps(report), flush=True)
 '''
         process = subprocess.run([sys.executable, "-c", code], capture_output=True, timeout=3)
@@ -377,7 +395,8 @@ print(json.dumps(report), flush=True)
         print("STALLED DNS OBSERVATION: " + json.dumps({
             key: raw.get(key) for key in (
                 "total_budget_ms", "dns_budget_ms", "dns_elapsed_ms",
-                "tcp_elapsed_ms", "total_elapsed_ms", "attempted_count")
+                "tcp_elapsed_ms", "total_elapsed_ms", "attempted_count",
+                "worker_start_ms", "queue_wait_ms")
             if type(raw.get(key)) is int
         }), flush=True)
         report = DIAG.safe_report(raw, "python-socket")

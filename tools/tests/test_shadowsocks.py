@@ -183,10 +183,10 @@ class ShadowsocksTests(unittest.TestCase):
         env={**os.environ,'SWIRL_SS_REFERENCE_PORT':str(server.server_address[1])}
         with tempfile.TemporaryDirectory() as folder:
             log=os.path.join(folder,'qt.txt')
-            result=subprocess.run([os.environ['SWIRL_RUST_QT_TESTS'],'shadowsocksThroughIndependentPeer','-o',log+',txt'],env=env,capture_output=True,text=True,timeout=15)
+            result=subprocess.run([os.environ['SWIRL_RUST_QT_TESTS'],'shadowsocksThroughIndependentPeer','loonShadowsocksThroughIndependentPeer','-o',log+',txt'],env=env,capture_output=True,text=True,timeout=15)
             output=Path(log).read_text(encoding='utf-8') if os.path.exists(log) else ''
             self.assertEqual(result.returncode,0,output+result.stdout+result.stderr)
-        self.assertEqual(server.targets,[('origin.example',80)])
+        self.assertEqual(server.targets,[('origin.example',80)] * 3)
     def test_ipv4_and_ipv6_target_encodings(self):
         server=self.setup_peer()
         for authority,host in [('127.0.0.1:8080','127.0.0.1'),('[::1]:8080','::1')]:

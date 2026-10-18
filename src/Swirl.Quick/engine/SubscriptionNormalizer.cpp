@@ -5,6 +5,7 @@
 #include <QUrlQuery>
 #include <QRegularExpression>
 #include <QSet>
+#include <algorithm>
 
 namespace {
 using Result=SubscriptionNormalizer::Result;
@@ -191,6 +192,8 @@ void ini(Result &r,const QString &document){
         const auto equal=line.indexOf('=');if(equal<=0){r.error="订阅代理行缺少赋值符号；未导入任何节点。";return;}
         bool ok;auto fields=csv(line.mid(equal+1),&ok);if(!ok||fields.size()<2){r.error="订阅代理行的引号或字段不完整。";return;}
         const auto left=clean(line.left(equal));const bool qx=section=="[server_local]"||(QStringList{"shadowsocks","trojan","vmess","http","socks5"}.contains(left.toLower())&&fields.first().contains(':'));
+        const bool loonObfs=!qx&&fields.first().compare("shadowsocks",Qt::CaseInsensitive)==0&&fields.size()>=7
+            &&std::all_of(fields.cbegin()+3,fields.cbegin()+7,[](const QString &f){return !f.contains('=');});
         QJsonObject n;QStringList issues;QString host,network,path,wsHost;int port=0;
         if(qx){r.format="Quantumult X";if(!endpoint(fields.takeFirst(),host,port)){r.error="Quantumult X 节点地址无效。";return;}n["type"]=protocol(left);}
         else {n["name"]=left;const auto type=fields.takeFirst();n["type"]=protocol(type);if(type.compare("https",Qt::CaseInsensitive)==0||type.compare("socks5-tls",Qt::CaseInsensitive)==0)n["tls"]=true;if(QStringList{"direct","reject","reject-tinygif"}.contains(n.value("type").toString()))continue;if(fields.size()<2){r.error="INI 节点缺少服务器或端口。";return;}host=clean(fields.takeFirst());port=fields.takeFirst().toInt();}
@@ -199,19 +202,29 @@ void ini(Result &r,const QString &document){
         QSet<QString> seenKeys;
         for(const auto &field:fields){
             const auto at=field.indexOf('=');if(at<0){
-                if(p=="ss"){n[positional++==0?"cipher":"password"]=field;if(positional>2)issue(issues,"INI 节点存在未映射的位置参数。");}
+                if(p=="ss"){
+                    const auto key=positional==0?QStringLiteral("cipher"):positional==1?QStringLiteral("password"):
+                        loonObfs&&positional==2?QStringLiteral("obfs"):loonObfs&&positional==3?QStringLiteral("obfs-host"):QString();
+                    ++positional;
+                    if(key.isEmpty()){issue(issues,"INI 节点存在未映射的位置参数。");continue;}
+                    if(seenKeys.contains(key)||n.contains(key)){r.error="INI 节点含重复参数，无法安全确定配置。";return;}seenKeys.insert(key);
+                    if(key=="obfs"){n["plugin"]="obfs";auto opts=n.value("plugin-opts").toObject();opts["mode"]=field;n["plugin-opts"]=opts;}
+                    else if(key=="obfs-host"){auto opts=n.value("plugin-opts").toObject();opts["host"]=field;n["plugin-opts"]=opts;}
+                    else n[key]=field;
+                }
                 else if(p=="trojan"&&positional++==0)n["password"]=field;
                 else if((p=="vless"||p=="vmess")&&positional++==0)n["uuid"]=field;
                 else if((p=="http"||p=="socks5")&&positional<2)n[positional++==0?"username":"password"]=field;
                 else issue(issues,"INI 节点存在未映射的位置参数。");continue;
             }
             const auto key=field.left(at).trimmed().toLower(),value=clean(field.mid(at+1));
-            if(seenKeys.contains(key)){r.error="INI 节点含重复参数，无法安全确定配置。";return;}seenKeys.insert(key);
+            const auto canonical=p=="ss"?(key=="encrypt-method"||key=="method"?QStringLiteral("cipher"):key=="obfs-name"?QStringLiteral("obfs"):key):key;
+            if(seenKeys.contains(canonical)||(p=="ss"&&n.contains(canonical))){r.error="INI 节点含重复参数，无法安全确定配置。";return;}seenKeys.insert(canonical);
             if(key=="tag")n["name"]=value;
             else if(key=="username")n[p=="vmess"?"uuid":"username"]=value;
             else if(key=="password")n[p=="vmess"&&qx?"uuid":"password"]=value;
             else if(key=="uuid")n["uuid"]=value;
-            else if(key=="encrypt-method"||key=="method")n["cipher"]=value;
+            else if(key=="encrypt-method"||key=="method"||key=="cipher")n["cipher"]=value;
             else if(key=="sni"||key=="tls-host"||key=="tls-name")n["sni"]=value;
             else if(key=="tls"||key=="over-tls")n["tls"]=yes(value);
             else if(key=="skip-cert-verify")n[key]=yes(value);
@@ -228,10 +241,11 @@ void ini(Result &r,const QString &document){
             else if(key=="client-fingerprint")n[key]=value;
             else if(key=="underlying-proxy")n["dialer-proxy"]=value;
             else if(key=="ws")network=yes(value)?"ws":QString();
+            else if(key=="obfs-uri"&&p=="ss"){auto opts=n.value("plugin-opts").toObject();opts[key]=value;n["plugin-opts"]=opts;issue(issues,"INI Shadowsocks 混淆路径尚未支持，原始配置已保留。");}
             else if(key=="ws-path"||key=="obfs-uri")path=value;
             else if(key=="ws-headers"){
                 const auto header=value.section(':',0,0);if(header.compare("Host",Qt::CaseInsensitive)==0)wsHost=value.section(':',1);else issue(issues,"INI WebSocket 头部映射尚未完成。");
-            }else if(key=="obfs"){
+            }else if(key=="obfs"||(key=="obfs-name"&&p=="ss")){
                 if(p=="ss"){n["plugin"]="obfs";auto opts=n.value("plugin-opts").toObject();opts["mode"]=value;n["plugin-opts"]=opts;}
                 else if(value=="ws"||value=="wss"){network="ws";if(value=="wss")n["tls"]=true;}else issue(issues,"INI 节点的伪装传输尚未映射。");
             }else if(key=="obfs-host"){

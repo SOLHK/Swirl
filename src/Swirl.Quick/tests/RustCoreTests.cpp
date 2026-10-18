@@ -438,6 +438,41 @@ private slots:
   QCOMPARE(engine.status().engineKind,QString("rust"));QCOMPARE(engine.status().processId,QCoreApplication::applicationPid());
   engine.stop();
  }
+ void loonShadowsocksImportsKeepCredentialsAndRejectUnsafeOptions(){
+  ControlledNetwork net;QVERIFY(net.start());auto o=options(net);
+  for(const auto &tail:QStringList{"http,obfs.example","obfs-name=http,obfs-host=obfs.example"}){
+   const auto source=QString("[Proxy]\nfixture = Shadowsocks,127.0.0.1,443,aes-128-gcm,\"secret,with:punctuation\",%1").arg(tail).toUtf8();
+   const auto parsed=NodeImporter::parse(source);QVERIFY2(bool(parsed),qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);
+   const auto &node=parsed.nodes.first();QCOMPARE(node.password,QString("secret,with:punctuation"));QVERIFY(node.conversionIssues.isEmpty());QVERIFY(!node.originalConfiguration.isEmpty());
+   o.nodes=parsed.nodes;o.selectedNodeId=node.id;QJsonObject config;QVERIFY(RustCoreEngine::configuration(o,&config).isEmpty());
+   const auto outbound=config["nodes"].toArray().first().toObject()["outbound"].toObject();
+   QCOMPARE(outbound["obfs_http"].toObject()["host"].toString(),QString("obfs.example"));QCOMPARE(outbound["password"].toString(),node.password);
+  }
+  for(const auto &tail:QStringList{"tls,obfs.example","http","http,","http,obfs.example,extra","http,obfs.example,future=retained","obfs-name=http,obfs-host=obfs.example,obfs-uri=/custom"}){
+   const auto parsed=NodeImporter::parse(QString("[Proxy]\nfixture = Shadowsocks,127.0.0.1,443,aes-128-gcm,secret,%1").arg(tail).toUtf8());
+   if(!parsed)continue;
+   QCOMPARE(parsed.nodes.first().password,QString("secret"));QVERIFY(!parsed.nodes.first().originalConfiguration.isEmpty());
+   o.nodes=parsed.nodes;o.selectedNodeId=parsed.nodes.first().id;QJsonObject config;QVERIFY(!RustCoreEngine::configuration(o,&config).isEmpty());
+  }
+  for(const auto &parameters:QStringList{"aes-128-gcm,secret,http,obfs.example,obfs=tls","aes-128-gcm,secret,http,obfs.example,obfs-name=http","aes-128-gcm,secret,http,obfs.example,obfs-host=other.example","aes-128-gcm,password=first,second,http,obfs.example","method=aes-256-gcm,aes-128-gcm,secret","aes-128-gcm,secret,encrypt-method=aes-256-gcm"}){
+   const auto parsed=NodeImporter::parse(QString("[Proxy]\nfixture = Shadowsocks,127.0.0.1,443,%1").arg(parameters).toUtf8());QVERIFY(!parsed);
+  }
+ }
+ void loonShadowsocksThroughIndependentPeer(){
+  bool valid=false;const int port=qEnvironmentVariableIntValue("SWIRL_SS_REFERENCE_PORT",&valid);
+  if(!valid)QSKIP("Independent Python SS peer supplies the isolated port.");
+  ControlledNetwork net;QVERIFY(net.start());
+  for(const auto &tail:QStringList{"http,obfs.example","obfs-name=http,obfs-host=obfs.example"}){
+   auto o=options(net);const auto source=QString("[Proxy]\nfixture = Shadowsocks,127.0.0.1,%1,aes-128-gcm,synthetic-ss-password,%2").arg(port).arg(tail).toUtf8();
+   const auto parsed=NodeImporter::parse(source);QVERIFY2(bool(parsed),qPrintable(parsed.error));o.nodes=parsed.nodes;o.selectedNodeId=parsed.nodes.first().id;
+   RustCoreEngine engine;engine.start(o);QCOMPARE(engine.status().state,ProxyEngine::State::Running);
+   QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",o.proxyPort));
+   QNetworkRequest request(QUrl("http://origin.example/ss"));request.setTransferTimeout(5000);
+   auto reply=client.get(request);QVERIFY(QTest::qWaitFor([&]{return reply->isFinished();},6000));
+   QCOMPARE(reply->error(),QNetworkReply::NoError);QCOMPARE(reply->readAll(),QByteArray("ss-native-ok"));
+   QCOMPARE(engine.status().engineKind,QString("rust"));QCOMPARE(engine.status().processId,QCoreApplication::applicationPid());engine.stop();
+  }
+ }
  void referenceAdapterBlockedAtCompileTime(){
   MihomoAdapter reference;EngineStartOptions o;o.executablePath="must-never-start.exe";reference.start(o);
   QCOMPARE(reference.status().state,ProxyEngine::State::Failed);QCOMPARE(reference.status().error,ProxyEngine::Error::InvalidOptions);QVERIFY(!reference.status().processAlive);

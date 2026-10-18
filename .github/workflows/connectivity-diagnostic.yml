@@ -24,3 +24,5 @@ jobs:
           python-version: '3.14'
       - name: Observe bounded DNS worker with synthetic input
         run: python tools/tests/test_connectivity_diagnostics.py ConnectivityDiagnostics.test_permanently_stalled_dns_worker_does_not_hold_process_open
+      - name: Observe full Python diagnostic suite
+        run: python tools/tests/test_connectivity_diagnostics.py

@@ -167,6 +167,39 @@ class SubscriptionImportTests(unittest.TestCase):
             self.forward(f'[Proxy]\nfixture = {declaration}\n', '127.0.0.1')
         self.assertEqual(server.targets, [('origin.fixture.invalid', 443)] * 2)
 
+    def test_loon_http_obfs_exports_authenticate_forward_and_halfclose(self):
+        for method in ('aes-128-gcm', 'aes-256-gcm', 'chacha20-ietf-poly1305'):
+            server = self.peer(method=method)
+            server.obfs = True
+            endpoint = f'127.0.0.1,{server.server_address[1]}'
+            for options in ('http,obfs.example', 'obfs-name=http,obfs-host=obfs.example'):
+                document = (f'[Proxy]\nfixture = Shadowsocks,{endpoint},'
+                            f'{method},"{PASSWORD}",{options}')
+                self.forward(document, '127.0.0.1')
+            self.assertEqual(server.targets, [('origin.fixture.invalid', 443)] * 2)
+            self.assertEqual(len(server.headers), 2)
+            self.assertTrue(all(f'Host: obfs.example:{server.server_address[1]}\r\n'.encode() in h for h in server.headers))
+
+    def test_loon_http_obfs_corrupt_aead_never_releases_plaintext(self):
+        for mode in ('tampered', 'bad-length-tag', 'truncated', 'bad-http'):
+            server = self.peer()
+            server.obfs, server.mode = True, mode
+            document = (f'[Proxy]\nfixture = Shadowsocks,127.0.0.1,{server.server_address[1]},'
+                        f'aes-128-gcm,"{PASSWORD}",http,obfs.example')
+            outbound = self.inspect(document)['tcpCandidates'][0]
+            self.assertIsNotNone(outbound)
+            started = self.command(op='start', config={'schema': 1, 'listen': '127.0.0.1:0',
+                                   'selected': 'imported', 'nodes': [{'id': 'imported', 'outbound': outbound}]})
+            self.assertTrue(started['ok'])
+            handle = started['handle']
+            try:
+                with socket.create_connection(('127.0.0.1', int(started['status']['address'].rsplit(':', 1)[1])), timeout=5) as stream:
+                    stream.sendall(b'CONNECT origin.fixture.invalid:443 HTTP/1.1\r\nHost: origin.fixture.invalid:443\r\n\r\n')
+                    self.assertIn(b' 200 ', header(stream))
+                    self.assertEqual(stream.recv(100), b'')
+            finally:
+                self.assertTrue(self.command(op='stop', handle=handle)['ok'])
+
     def test_legacy_and_sip002_reserved_passwords_authenticate(self):
         method = 'chacha20-ietf-poly1305'
         for password in ('test/!@#:', 'literal%40/%2f?@#:%GG'):

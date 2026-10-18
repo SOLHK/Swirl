@@ -409,6 +409,13 @@ fn ini(text: &str) -> Result<Vec<Value>, &'static str> {
         }
         let mut n =
             json!({"type":kind,"server":host,"port":port,"name":name.trim(),"raw-ini":line});
+        // Historical Loon Shadowsocks exports append an obfuscation mode and
+        // host to the positional cipher/password. Require the complete pair;
+        // mixed named credentials must never shift these positions.
+        let loon_obfs = !qx
+            && fields[0].eq_ignore_ascii_case("shadowsocks")
+            && fields.len() >= 7
+            && fields[3..7].iter().all(|field| !field.contains('='));
         let mut positional = 0;
         let mut seen = std::collections::HashSet::new();
         for field in &fields[start..] {
@@ -434,6 +441,7 @@ fn ini(text: &str) -> Result<Vec<Value>, &'static str> {
                     "udp-relay" => "udp",
                     "over-tls" => "tls",
                     "fast-open" => "tfo",
+                    "obfs-name" => "obfs",
                     _ => key,
                 };
                 if !seen.insert(canonical) || n.get(canonical).is_some() {
@@ -455,6 +463,8 @@ fn ini(text: &str) -> Result<Vec<Value>, &'static str> {
                 let key = match (kind, positional) {
                     ("ss", 0) => "cipher",
                     ("ss", 1) | ("trojan", 0) => "password",
+                    ("ss", 2) if loon_obfs => "obfs",
+                    ("ss", 3) if loon_obfs => "obfs-host",
                     _ => "unmapped-positional",
                 };
                 if n.get(key).is_some() {
@@ -1651,6 +1661,65 @@ mod tests {
             assert!(!r.report.parsed);
             assert_eq!(r.report.error, Some("DuplicateIniParameter"));
             assert!(r.tcp_candidates.is_empty());
+            assert_eq!(r.original, input.as_bytes());
+        }
+    }
+    #[test]
+    fn loon_http_obfs_positional_and_named_exports_use_native_ss() {
+        for parameters in [
+            "aes-128-gcm,\"fixture,with:punctuation\",http,obfs.example",
+            "aes-128-gcm,\"fixture,with:punctuation\",obfs-name=http,obfs-host=obfs.example",
+        ] {
+            let input = format!("[Proxy]\nfixture = Shadowsocks, example.org, 443, {parameters}");
+            let r = inspect(input.as_bytes());
+            assert!(r.report.parsed);
+            assert_eq!(r.original, input.as_bytes());
+            assert_eq!(r.originals[0]["raw-ini"], input.lines().nth(1).unwrap());
+            assert!(r.report.nodes[0].native_tcp_candidate);
+            match r.tcp_candidates[0].as_ref().unwrap() {
+                Outbound::Shadowsocks {
+                    password,
+                    obfs_http: Some(obfs),
+                    ..
+                } => {
+                    assert_eq!(password, "fixture,with:punctuation");
+                    assert_eq!(obfs.host, "obfs.example");
+                }
+                _ => panic!("expected native SS with HTTP obfuscation"),
+            }
+        }
+    }
+    #[test]
+    fn loon_obfs_unsupported_modes_options_and_incomplete_pairs_never_downgrade() {
+        for tail in [
+            "http",
+            "http,",
+            "tls,obfs.example",
+            "future,obfs.example",
+            "http,obfs.example,future=retained",
+            "http,obfs.example,extra-positional",
+            "http,obfs.example,fast-open=true",
+            "obfs-name=http,obfs-host=obfs.example,obfs-uri=/custom",
+        ] {
+            let input = format!(
+                "[Proxy]\nfixture = Shadowsocks, example.org, 443, aes-128-gcm,fixture,{tail}"
+            );
+            let r = inspect(input.as_bytes());
+            assert_eq!(r.original, input.as_bytes());
+            assert!(r.tcp_candidates.iter().all(Option::is_none));
+        }
+        for tail in [
+            "fixture,http,obfs.example,obfs=tls",
+            "fixture,http,obfs.example,obfs-name=http",
+            "fixture,http,obfs.example,obfs-host=other.example",
+            "fixture,obfs-name=http,obfs=tls,obfs-host=obfs.example",
+            "password=first,second,http,obfs.example",
+        ] {
+            let input =
+                format!("[Proxy]\nfixture = Shadowsocks, example.org, 443, aes-128-gcm,{tail}");
+            let r = inspect(input.as_bytes());
+            assert!(!r.report.parsed);
+            assert_eq!(r.report.error, Some("DuplicateIniParameter"));
             assert_eq!(r.original, input.as_bytes());
         }
     }
