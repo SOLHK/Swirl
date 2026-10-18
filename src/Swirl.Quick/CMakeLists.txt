@@ -256,7 +256,10 @@ if(SWIRL_BUILD_UI_TESTS)
    target_compile_options(SwirlRustCoreTests PRIVATE /utf-8)
   endif()
   add_custom_command(TARGET SwirlRustCoreTests POST_BUILD COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${SWIRL_RUST_TARGET}/release/swirl_api.dll" "$<TARGET_FILE_DIR:SwirlRustCoreTests>/swirl_api.dll")
-  add_test(NAME swirl-rust-qt-integration COMMAND SwirlRustCoreTests)
+  # Qt's Windows text logger may use OutputDebugString when the runner has no
+  # console. Keep an explicit report so CI can show the actual failed assertion.
+  add_test(NAME swirl-rust-qt-integration COMMAND SwirlRustCoreTests
+   -o "${CMAKE_CURRENT_BINARY_DIR}/swirl-rust-qt-integration.xml,xml" -o -,txt)
   set_tests_properties(swirl-rust-qt-integration PROPERTIES TIMEOUT 60)
  endif()
  if(WIN32)

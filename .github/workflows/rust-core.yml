@@ -167,7 +167,11 @@ jobs:
           $env:SWIRL_TEST_ROOT=Join-Path $env:RUNNER_TEMP 'swirl-native-qt-tests'
           New-Item -ItemType Directory -Force -Path $env:SWIRL_TEST_ROOT | Out-Null
           ctest --test-dir build/rust-qt -C Release -R '^swirl-(rust-qt-integration|storage-paths|import-boundaries)$' --output-on-failure
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $nativeQtExit = $LASTEXITCODE
+          $nativeQtReport = 'build/rust-qt/swirl-rust-qt-integration.xml'
+          if (-not (Test-Path $nativeQtReport -PathType Leaf)) { throw 'Required native Qt XML report missing' }
+          Get-Content -LiteralPath $nativeQtReport
+          if ($nativeQtExit -ne 0) { exit $nativeQtExit }
           $env:SWIRL_RUST_HARNESS=(Resolve-Path core/target/release/swirl-api.exe).Path
           $env:SWIRL_RUST_QT_TESTS=(Resolve-Path build/rust-qt/Release/SwirlRustCoreTests.exe).Path
           python tools/tests/test_shadowsocks.py ShadowsocksTests.test_qt_facade_http_obfs_with_udp_declared

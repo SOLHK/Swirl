@@ -667,7 +667,7 @@ private slots:
   QVERIFY(!controller.saveRoutingRule("DOMAIN","localhost","route",0));
   QCOMPARE(controller.networkConfigurationSnapshot(),saved);
   EngineController restored(std::make_unique<RustCoreEngine>(),nullptr,path);
-  QCOMPARE(restored.networkConfigurationSnapshot(),saved);
+  QCOMPARE(QJsonObject::fromVariantMap(restored.networkConfigurationSnapshot()),QJsonObject::fromVariantMap(saved));
   auto configuration=options(net);configuration.nodes=NodeStore(path).nodes();configuration.selectedNodeId=node;
   configuration.routingMode="rule";configuration.customGroups=groups;configuration.customRules=saved.value("rules").toStringList();
   QJsonObject mapped;QVERIFY(RustCoreEngine::configuration(configuration,&mapped).isEmpty());
@@ -728,7 +728,7 @@ private slots:
   QVERIFY(!observed.isEmpty());for(const auto &snapshot:observed)QCOMPARE(snapshot,before);
   QVERIFY(QDir().rmdir(path));QVERIFY(QFile::rename(backup,path));
   QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),ciphertext);file.close();
-  EngineController restored(std::make_unique<RustCoreEngine>(),nullptr,path);QCOMPARE(restored.networkConfigurationSnapshot(),before);
+  EngineController restored(std::make_unique<RustCoreEngine>(),nullptr,path);QCOMPARE(QJsonObject::fromVariantMap(restored.networkConfigurationSnapshot()),QJsonObject::fromVariantMap(before));
   QVERIFY(controller.saveRoutingRule("DOMAIN","changed.invalid","DIRECT",0));
   NodeStore persisted(path);QCOMPARE(persisted.networkConfiguration()["rules"].toArray()[0].toString(),QString("DOMAIN,changed.invalid,DIRECT"));
  }

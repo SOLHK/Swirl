@@ -80,3 +80,28 @@ pushed. Its exact run, commit and result must be recorded after completion;
 the earlier green font/Core baseline cannot stand in for these new tests.
 The fixed whole-goal acceptance score and complete private-profile acceptance
 remain unchanged; no real-node test was performed in this stage.
+
+## First Windows run and follow-up diagnosis
+
+Implementation `72fa72a77d809d6084080dc5630459ed6d336fcf` was pushed to the
+authorized development branch. In [Rust run 39176756150](https://github.com/SOLHK/Swirl/actions/runs/39176756150),
+Linux and macOS passed; Windows compiled the native and compatibility Qt test
+targets, passed storage, import boundaries and the compatibility guard, but
+`swirl-rust-qt-integration` failed after 10.67 seconds. The existing plain Qt
+logger produced no assertion text in the captured CTest output. The independent
+[Core implementation run 39176756152](https://github.com/SOLHK/Swirl/actions/runs/39176756152)
+passed; it does not substitute for the failed Windows test.
+
+A separate Qt 6.10.3 probe reproduced a test expectation defect: a group's
+`QStringList` becomes a `QVariantList` after the real JSON persistence round
+trip. Their values are identical, but nested `QVariantMap` equality is false.
+The two new post-restart comparisons now compare the complete `QJsonObject`
+representations, matching the persisted format and the existing test practice.
+The live-memory, observer, encrypted-byte, validation and forwarding assertions
+are retained. No production data conversion or test tolerance is changed.
+
+The native CTest command also writes an explicit XML report. The workflow prints
+that report and retains CTest's original nonzero exit code, so a Windows runner
+without console text output cannot hide the failing assertion again. This
+diagnosis establishes a concrete test defect, not proof that every Windows
+failure has been explained; the next exact-source CI must confirm the result.
