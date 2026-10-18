@@ -7,6 +7,8 @@ import "../controls"
 Item {
     id:page
     readonly property Item motionTitle:routeTitle
+    // Existing isolated preview hook; normal navigation never invokes this.
+    function scrollToBottom() { options.contentItem.contentY=Math.max(0,options.contentHeight-options.availableHeight) }
 
     property string section:"外观"
     property var sections:["常规","外观","字体","代理","TUN","DNS","端口","系统集成","启动","通知","数据管理","隐私与安全","快捷键","关于 Swirl"]
@@ -314,6 +316,26 @@ Item {
                             SwirlText {Layout.minimumWidth:0; text:"Swirl 使用 HarmonyOS Sans 字体。Copyright 2021 Huawei Device Co., Ltd.\n完整许可可在字体设置中查看。"; Layout.fillWidth:true; wrapMode:Text.Wrap; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
                             SwirlButton { text:"字体与许可"; onClicked:page.section="字体" }
                             SwirlButton { text:"项目主页"; Layout.alignment:Qt.AlignHCenter; onClicked:Qt.openUrlExternally("https://github.com/SOLHK/Swirl") }
+                            GridLayout {
+                                Layout.alignment:Qt.AlignHCenter
+                                columns:parent.width<Theme.dp(430)?1:2
+                                columnSpacing:Theme.compactGap; rowSpacing:Theme.compactGap
+                                SwirlButton {
+                                    objectName:"officialChannelButton"; text:"官方频道"
+                                    Accessible.description:"通过默认浏览器打开 Swirl官方频道（Telegram）"
+                                    ToolTip.visible:hovered||activeFocus; ToolTip.delay:500
+                                    ToolTip.text:"Swirl官方频道 · https://t.me/SwirlUpdates"
+                                    onClicked:Qt.openUrlExternally("https://t.me/SwirlUpdates")
+                                }
+                                SwirlButton {
+                                    objectName:"communityGroupButton"; text:"用户交流群"
+                                    Accessible.description:"通过默认浏览器打开 Swirl交流群（Telegram）"
+                                    ToolTip.visible:hovered||activeFocus; ToolTip.delay:500
+                                    ToolTip.text:"Swirl交流群 · https://t.me/SwirlHQ"
+                                    onClicked:Qt.openUrlExternally("https://t.me/SwirlHQ")
+                                }
+                            }
+                            SwirlText {Layout.minimumWidth:0;wrapMode:Text.Wrap; text:"问题反馈请使用项目主页中的 GitHub Issues。"; Layout.fillWidth:true; horizontalAlignment:Text.AlignHCenter; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
                             SwirlText {Layout.minimumWidth:0;wrapMode:Text.Wrap; text:"第三方组件：Qt、MinGW 运行库、Mihomo（GPL-3.0）、HarmonyOS Sans"; Layout.fillWidth:true; horizontalAlignment:Text.AlignHCenter; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
                         }
                         Item { Layout.preferredHeight:Theme.dp(25) }
