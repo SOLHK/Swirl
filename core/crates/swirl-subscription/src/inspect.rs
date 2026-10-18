@@ -41,6 +41,8 @@ pub struct Report {
     pub nodes: Vec<NodeCapability>,
     pub protocols: BTreeMap<&'static str, usize>,
     pub full_configuration_sections_preserved: usize,
+    /// Preserved non-node sections whose client-specific semantics are not validated.
+    pub configuration_sections_unvalidated: usize,
     pub complete_configuration_execution_supported: bool,
     pub original_preserved: bool,
 }
@@ -362,23 +364,63 @@ fn csv(text: &str) -> Result<Vec<String>, &'static str> {
     out.push(field.trim().to_string());
     Ok(out)
 }
+// Only the section envelope is common across these client formats. Rule,
+// rewrite and script bodies have different grammars: retain them verbatim and
+// report unvalidated semantics instead of pretending to parse them as key=value.
+fn ini_section(line: &str) -> Result<Option<String>, &'static str> {
+    let Some(rest) = line.strip_prefix('[') else {
+        return Ok(None);
+    };
+    let (name, trailing) = rest.split_once(']').ok_or("IniSectionHeader")?;
+    let name = name.trim();
+    let trailing = trailing.trim();
+    if name.is_empty()
+        || name.len() > 128
+        || name.contains(['[', ']'])
+        || name.chars().any(char::is_control)
+        || (!trailing.is_empty() && !trailing.starts_with(['#', ';']))
+    {
+        return Err("IniSectionHeader");
+    }
+    Ok(Some(name.to_ascii_lowercase()))
+}
+
 fn ini(text: &str) -> Result<Vec<Value>, &'static str> {
+    if text
+        .chars()
+        .any(|c| c.is_control() && !matches!(c, '\t' | '\r' | '\n'))
+    {
+        return Err("IniControlCharacter");
+    }
     let mut section = String::new();
+    let mut sections = std::collections::HashSet::new();
     let mut nodes = Vec::new();
     for line in text.lines().map(str::trim) {
-        if line.starts_with('[') {
-            section = line.to_ascii_lowercase();
+        if line.is_empty() || line.starts_with(['#', ';']) {
             continue;
         }
-        if line.is_empty()
-            || line.starts_with(['#', ';'])
-            || !matches!(section.as_str(), "[proxy]" | "[server_local]")
-        {
+        if let Some(name) = ini_section(line)? {
+            if !sections.insert(name.clone()) {
+                return Err("DuplicateIniSection");
+            }
+            if sections.len() > 256 {
+                return Err("IniSectionLimit");
+            }
+            section = name;
+            continue;
+        }
+        if section.is_empty() {
+            return Err("IniMissingSection");
+        }
+        if !matches!(section.as_str(), "proxy" | "server_local") {
             continue;
         }
         let (name, value) = line.split_once('=').ok_or("IniAssignment")?;
+        if name.trim().is_empty() {
+            return Err("IniAssignment");
+        }
         let fields = csv(value)?;
-        let qx = section == "[server_local]";
+        let qx = section == "server_local";
         if !qx && matches!(protocol(&fields[0]), "direct" | "reject") {
             continue;
         }
@@ -482,10 +524,10 @@ fn parse(bytes: &[u8], depth: usize) -> Result<(&'static str, Value, Vec<Value>)
     if depth > 2 {
         return Err("EncodingDepth");
     }
-    let text = std::str::from_utf8(bytes)
+    let original_text = std::str::from_utf8(bytes)
         .map_err(|_| "EncodingNotUtf8")?
-        .trim_start_matches('\u{feff}')
-        .trim();
+        .trim_start_matches('\u{feff}');
+    let text = original_text.trim();
     if text.is_empty() {
         return Err("EmptyDocument");
     }
@@ -494,14 +536,14 @@ fn parse(bytes: &[u8], depth: usize) -> Result<(&'static str, Value, Vec<Value>)
         .map(str::trim)
         .find(|line| !line.is_empty() && !line.starts_with(['#', ';']))
         .is_some_and(|line| line.starts_with('['))
-        && text.lines().any(|l| {
-            matches!(
-                l.trim().to_ascii_lowercase().as_str(),
-                "[proxy]" | "[server_local]"
-            )
+        && text.lines().any(|line| {
+            ini_section(line.trim())
+                .ok()
+                .flatten()
+                .is_some_and(|name| matches!(name.as_str(), "proxy" | "server_local"))
         })
     {
-        return Ok(("ini", Value::String(text.to_string()), ini(text)?));
+        return Ok(("ini", Value::String(text.to_string()), ini(original_text)?));
     }
     if text.lines().filter(|l| !l.trim().is_empty()).all(|l| {
         l.trim().split_once("://").is_some_and(|(scheme, _)| {
@@ -1075,6 +1117,7 @@ pub fn inspect(bytes: &[u8]) -> Inspection {
         nodes: Vec::new(),
         protocols: BTreeMap::new(),
         full_configuration_sections_preserved: 0,
+        configuration_sections_unvalidated: 0,
         complete_configuration_execution_supported: false,
         original_preserved: true,
     };
@@ -1105,11 +1148,21 @@ pub fn inspect(bytes: &[u8]) -> Inspection {
     report.format = format;
     report.recognized = true;
     report.parsed = true;
-    report.full_configuration_sections_preserved = document.as_object().map_or(0, |o| {
-        o.keys()
+    report.full_configuration_sections_preserved = if let Some(object) = document.as_object() {
+        object
+            .keys()
             .filter(|k| !matches!(k.as_str(), "proxies" | "outbounds"))
             .count()
-    });
+    } else {
+        // This also covers Base64-wrapped INI. URI lists have no section headers.
+        document.as_str().map_or(0, |text| {
+            text.lines()
+                .filter_map(|line| ini_section(line.trim()).ok().flatten())
+                .filter(|name| !matches!(name.as_str(), "proxy" | "server_local"))
+                .count()
+        })
+    };
+    report.configuration_sections_unvalidated = report.full_configuration_sections_preserved;
     if nodes.len() > 2000 {
         report.error = Some("NodeCountLimit");
         report.parsed = false;
@@ -1140,6 +1193,92 @@ pub fn inspect(bytes: &[u8]) -> Inspection {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ini_rejects_malformed_structure_after_valid_nodes() {
+        let prefix = "[Proxy]\nfixture = trojan, example.org, 443, SECRET_PASSWORD\n";
+        for suffix in [
+            "[Rule",
+            "[]",
+            "[[Rule]]",
+            "[Rule] SECRET_SUFFIX",
+            "[Rule]\nSECRET\0TAIL",
+            "[Rule]\n[rule]",
+        ] {
+            let input = format!("{prefix}{suffix}");
+            for bytes in [
+                input.as_bytes().to_vec(),
+                STANDARD.encode(input.as_bytes()).into_bytes(),
+            ] {
+                let result = inspect(&bytes);
+                assert!(!result.report.parsed, "accepted malformed INI structure");
+                assert!(result.tcp_candidates.is_empty());
+                assert_eq!(result.original, bytes);
+                assert!(
+                    !serde_json::to_string(&result.report)
+                        .unwrap()
+                        .contains("SECRET")
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn ini_section_spacing_comments_and_unknown_bodies_are_preserved() {
+        let input = "\u{feff}; heading\r\n[ Proxy ] # nodes\r\nfixture = trojan, example.org, 443, secret\r\n[General]\r\ndns-server = system\r\n[Rule]\r\nFINAL,fixture\r\n[Future]\r\nopaque SECRET syntax preserved\r\n";
+        for bytes in [
+            input.as_bytes().to_vec(),
+            STANDARD.encode(input.as_bytes()).into_bytes(),
+        ] {
+            let result = inspect(&bytes);
+            assert!(result.report.parsed);
+            assert_eq!(result.report.nodes.len(), 1);
+            assert!(result.report.nodes[0].native_tcp_candidate);
+            assert_eq!(result.report.full_configuration_sections_preserved, 3);
+            let report = serde_json::to_value(&result.report).unwrap();
+            assert_eq!(report["configuration_sections_unvalidated"], 3);
+            assert!(!result.report.complete_configuration_execution_supported);
+            assert_eq!(result.original, bytes);
+            assert!(
+                result
+                    .document
+                    .as_str()
+                    .unwrap()
+                    .contains("opaque SECRET syntax preserved")
+            );
+            assert!(!report.to_string().contains("SECRET"));
+        }
+    }
+
+    #[test]
+    fn ini_control_validation_precedes_whitespace_normalization() {
+        let node = "[Proxy]\nfixture = trojan, example.org, 443, secret\n";
+        for control in ['\u{000b}', '\u{000c}', '\u{0085}', '\u{007f}'] {
+            for input in [format!("{control}{node}"), format!("{node}{control}")] {
+                for bytes in [
+                    input.as_bytes().to_vec(),
+                    STANDARD.encode(&input).into_bytes(),
+                ] {
+                    let result = inspect(&bytes);
+                    assert!(!result.report.parsed);
+                    assert!(result.tcp_candidates.is_empty());
+                    assert_eq!(result.original, bytes);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn ini_duplicate_proxy_sections_and_empty_node_names_fail_closed() {
+        for text in [
+            "[Proxy]\nfixture = trojan, example.org, 443, secret\n[proxy]\nother = trojan, other.example, 443, secret",
+            "[Proxy]\n = trojan, example.org, 443, secret",
+        ] {
+            let result = inspect(text.as_bytes());
+            assert!(!result.report.parsed);
+            assert!(result.tcp_candidates.is_empty());
+        }
+    }
     #[test]
     fn vless_base_tls_maps_but_flow_and_reality_never_downgrade() {
         let base = "vless://00112233-4455-6677-8899-aabbccddeeff@example.org:443?security=tls&encryption=none";
@@ -1457,7 +1596,7 @@ mod tests {
     }
     #[test]
     fn legacy_ss_passwords_keep_reserved_characters_and_literal_percent_sequences() {
-        for password in ["test/!@#:", "literal%40/%2f?@#:%GG", "space and\t密钥@"] {
+        for password in ["test/!@#:", "literal%40/%2f?@#:%GG", "space and\t瀵嗛挜@"] {
             for authority in ["example.org:8388", "[2001:db8::2]:8388", "::1:8388"] {
                 let decoded = format!("chacha20-ietf-poly1305:{password}@{authority}");
                 let uri = format!(

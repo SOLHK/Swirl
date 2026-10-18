@@ -1,3 +1,5 @@
+Latest development stage: [native INI structure validation](RUST_INI_STRUCTURE_20261018.md). New capture remains encrypted; 18/18 offline replays and 136 Rust tests pass. Full configuration semantics remain incomplete; see the atomic-import next steps and recorded UI-test limitation.
+
 Latest capture checkpoint: [2026-10-18 06:55:48 UTC window](RUST_CAPTURE_065548_20261018.md). 18/18 entries encrypted on Windows and parsed offline; supplier requests stopped at 06:59:26 UTC. Continue from latest development HEAD; no further supplier refresh.
 
 # Swirl 接续开发入口

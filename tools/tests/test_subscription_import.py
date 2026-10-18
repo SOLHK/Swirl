@@ -84,6 +84,33 @@ class SubscriptionImportTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         return json.loads(result.stdout)
 
+    def test_ini_complete_structure_gate_precedes_candidate_conversion(self):
+        node = '[Proxy]\nfixture = trojan, example.org, 443, SECRET_PASSWORD\n'
+        for tail in ('[Rule', '[Rule] SECRET_TRAILING', '[Rule]\n[rule]', '[Rule]\nBAD\x00BODY'):
+            for text in (node + tail, base64.b64encode((node + tail).encode()).decode()):
+                with self.subTest(tail=repr(tail)):
+                    result = self.inspect(text)
+                    self.assertFalse(result['report']['parsed'])
+                    self.assertEqual(result['tcpCandidates'], [])
+                    self.assertEqual(result['nodes'], [])
+                    self.assertNotIn('SECRET', json.dumps(result['report']))
+
+    def test_ini_reports_unvalidated_semantics_without_losing_original_sections(self):
+        text = ('[ Proxy ] # node list\nfixture = trojan, example.org, 443, secret\n'
+                '[General]\ndns-server = system\n[Rule]\nFINAL,fixture\n'
+                '[Future]\nopaque SECRET_VALUE grammar\n')
+        for document in (text, base64.b64encode(text.encode()).decode()):
+            result = self.inspect(document)
+            report = result['report']
+            self.assertTrue(report['parsed'])
+            self.assertEqual(len(result['tcpCandidates']), 1)
+            self.assertIsNotNone(result['tcpCandidates'][0])
+            self.assertEqual(report['full_configuration_sections_preserved'], 3)
+            self.assertEqual(report['configuration_sections_unvalidated'], 3)
+            self.assertFalse(report['complete_configuration_execution_supported'])
+            self.assertIn('opaque SECRET_VALUE grammar', result['document'])
+            self.assertNotIn('SECRET', json.dumps(report))
+
     def peer(self, ipv6=False, password=PASSWORD, method='aes-128-gcm'):
         if ipv6 and not socket.has_ipv6:
             self.skipTest('IPv6 loopback unavailable')
