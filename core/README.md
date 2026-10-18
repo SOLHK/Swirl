@@ -40,8 +40,10 @@ optional public HTTPS checks; it does not claim private-node performance.
 The current stage continues from `13ea97af5c94198ecba4ed79b16cfc7b1b676f27` on
 `work/core-completion-20261017`. All 16 subscription bodies were independently
 encrypted and persisted before the second fixed cutoff; 14 are newly recovered
-entries and two are refreshes. Initial offline canonical merging was rejected
-by its native parse gate and preserves all old and new ciphertext. See the
+entries and two are refreshes. The first offline merge exposed an equal URI-alias
+compatibility bug; after the parser fix, all 16 bodies passed the native parser
+and canonical merging, decryption and body-hash verification succeeded. The old
+window, three new windows and previous canonical version remain preserved. See the
 [current stage record](../docs/RUST_CAPTURE_DIAGNOSTICS_VALIDATION_20261018.md)
 for actual merge and later network outcomes; the older two-body evidence below
 is historical.
@@ -53,18 +55,42 @@ per-attempt timings and fixed outcomes without endpoint strings or raw OS errors
 backend and this native binary serially within one ten-second sample budget;
 their DNS budgets are 1500ms each. A successful probe sends no application data
 and establishes only TCP reachability. Product timeouts remain unchanged.
+The three immutable old SS samples were compared on hosted Linux: both engines
+resolved four IPv4 addresses per sample and exhausted them with TCP timeouts;
+each paired sample finished within 9.55 seconds. No IPv6 addresses were returned
+and no sample reached SS obfuscation, authentication or HTTPS. These outcomes
+are recorded as actual failures and do not identify the provider or network root
+cause. All 16 imported full configurations remain explicitly non-executable as
+complete configurations; their individual supported TCP candidates are separate.
 
 The importer now preserves raw IPv6 hosts, refuses conflicting positional and
 named INI parameters, keeps reserved characters in legacy SS passwords, and
-strictly separates SIP002 percent decoding from legacy credentials. Unknown
+strictly separates SIP002 percent decoding from legacy credentials. Equivalent
+`peer/sni` aliases from the actual cached Trojan URI list now coalesce only when
+decoded typed values agree; conflicting values and duplicate raw keys still fail.
+URI UDP booleans remain declarations and do not imply native UDP support. Unknown
 fields remain present and unsupported semantics cannot turn into DIRECT.
-New independent Python SS peers cover actual credentials, forwarding and close.
+New independent Python SS and strict-TLS Trojan peers cover actual credentials,
+forwarding and close, including expected certificate failures.
 No Qt, QML or product settings are changed by this stage.
+
+Final tested source `056fd56387e15d65259eff5f612b3ad7a1ce7009` passed
+[Rust Core #35](https://github.com/SOLHK/Swirl/actions/runs/39093009560) on all
+three platforms and [App #32](https://github.com/SOLHK/Swirl/actions/runs/39093009558).
+Each platform passed 125 Rust tests, fmt/check/strict Clippy and Release builds.
+Linux/macOS each passed 162 Python cases with four Qt-only skips; Windows passed
+198 distinct Python cases after Qt supplements, with two optional skips. Qt6.10.3
+build and CTest1/1 passed, as did four independent Qt protocol peers. Three strict
+public DIRECT/DoH HTTPS checks passed. Earlier Windows/macOS fixture failures are
+preserved with their source identities; Windows OS refusal actually took about
+two seconds, while native scheduling and product deadlines were not changed.
+Subsequent handoff updates affect only documentation and JSON evidence; the
+compiled source, tests and workflows remain identical to this tested commit.
 
 ## Previous connection/policy stage evidence
 
 Continue `work/core-completion-20261017`, not the older main or test head. The
-current connection/policy stage continues from `d27fcc74ed549f2219f97da1f5c56a83bace3ac1`.
+previous connection/policy stage continued from `d27fcc74ed549f2219f97da1f5c56a83bace3ac1`.
 It adds bounded TCP fallback across an already resolved address set, one deadline
 for outbound DNS/TCP/TLS/protocol establishment, and static failure-stage fields.
 It also connects the existing Qt custom-group settings to nested manual selectors
@@ -80,12 +106,13 @@ builds. Linux/macOS each passed 131 of 135 Python cases, with four explicit Qt
 skips. Windows passed 167 of 169 distinct Python cases after four Qt supplements;
 only optional C++ importer and real CLI cases remain skipped. Windows Qt/MSVC
 build and CTest passed 1/1 in 6.92 seconds. Exact results, skips and source identities belong in the
-[current connection/policy validation](../docs/RUST_CONNECTION_POLICY_VALIDATION_20261017.md).
+[historical connection/policy validation](../docs/RUST_CONNECTION_POLICY_VALIDATION_20261017.md).
 The subsequent evidence update changes only documentation; preserve it when
 continuing from the actual branch HEAD. No private-provider connection passed.
-The current three cached SS samples report `UpstreamTcpTimeout` at `tcp_connect`,
-before HTTP obfuscation or SS authentication. The report does not include DNS
-or per-address timing and does not establish why the endpoints were unreachable.
+The 2026-10-17 report for three cached SS samples recorded `UpstreamTcpTimeout`
+at `tcp_connect`, before HTTP obfuscation or SS authentication. That historical
+report lacks DNS or per-address timing; the 2026-10-18 paired diagnostics above
+now include those measurements, while the underlying cause remains unresolved.
 All 90 cached Trojan entries remain rejected because their configuration disables
 certificate verification. Three strict public native DIRECT/DoH checks passed;
 their success is separate from private-provider validation.
@@ -132,7 +159,7 @@ QML and product UI are preserved. The
 
 The following commits, counts, binary hashes and Actions runs belong to the
 previous WebSocket/public-network stage. They do not validate the later policy,
-SOCKS4 conversion, Qt peer slots, shutdown or current connection-stage changes.
+SOCKS4 conversion, Qt peer slots, shutdown or subsequent connection-stage changes.
 
 That stage's WebSocket implementation was published as
 [`510c62a`](https://github.com/SOLHK/Swirl/commit/510c62ade64418c76241bbe76ae118c5040dad92).
@@ -202,7 +229,7 @@ independent peer suite, `tools/tests/test_dns_https.py`. See the historical
 [DoT semantics](../docs/RUST_DOT.md), the earlier
 [DoH/public-network evidence](../docs/RUST_WS_VALIDATION_20261017.md) and the
 [completed DNS-stage validation](../docs/RUST_DNS_SUBSCRIPTION_VALIDATION_20261017.md)
-and the [current connection/policy validation](../docs/RUST_CONNECTION_POLICY_VALIDATION_20261017.md).
+and the [historical connection/policy validation](../docs/RUST_CONNECTION_POLICY_VALIDATION_20261017.md).
 The old DoT-only document's exclusions do not override the implemented DoH
 behavior described here.
 
@@ -449,7 +476,7 @@ The earlier local public-network attempt failed and remains recorded separately.
 These are earlier-stage binary hashes and results, not current-source evidence.
 Exact historical run identities, the initial and verified reports and scope are recorded in
 [`RUST_WS_VALIDATION_20261017.md`](../docs/RUST_WS_VALIDATION_20261017.md).
-Use [`RUST_CONNECTION_POLICY_VALIDATION_20261017.md`](../docs/RUST_CONNECTION_POLICY_VALIDATION_20261017.md)
+Use [`RUST_CAPTURE_DIAGNOSTICS_VALIDATION_20261018.md`](../docs/RUST_CAPTURE_DIAGNOSTICS_VALIDATION_20261018.md)
 for the current stage's test counts, exact commit and actual CI status.
 Public DIRECT success does not prove a provider's WS endpoint,
 private subscription or all product settings. The user's personal Windows
@@ -461,7 +488,8 @@ network core or Rust workspace was present in the audited `main` baseline
 `87409c0bf9c957ef113f84c176c5a1529c27b9df`. The development branch already
 contained the Rust workspace when the earlier WS stage began at `8bd89f2`.
 The policy stage continued from `0bf2666`, the completed DNS stage followed it,
-and the current connection/Qt-policy stage continues from `d27fcc7`.
+and the previous connection/Qt-policy stage continued from `d27fcc7`. The current
+capture/diagnostic stage continued from `13ea97a`.
 
 ## Primary specifications
 
