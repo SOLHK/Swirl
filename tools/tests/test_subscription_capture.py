@@ -22,6 +22,23 @@ BODY = b'{"proxies":[{"name":"synthetic","type":"socks5","server":"example.org",
 
 
 class EvidenceTests(unittest.TestCase):
+    def test_html_mime_allows_only_complete_uri_subscriptions(self):
+        body = b"ss://c3ludGhldGlj@example.org:443#one\r\ntrojan://synthetic@example.org:443#two\n"
+        for encoded in (body, base64.b64encode(body), base64.urlsafe_b64encode(body).rstrip(b"=")):
+            with self.subTest(encoded=encoded):
+                self.assertEqual(cap.document_status(encoded, "text/html; charset=utf-8"), "CapturedUnvalidated")
+
+    def test_html_mime_rejects_html_mixed_and_invalid_base64(self):
+        for body in (b"<html>ss://synthetic@example.org:443</html>",
+                     b"ss://synthetic@example.org:443\nunauthorized",
+                     b"ss://synthetic@example.org:443#<script>",
+                     b"ss://synthetic@example.org:443\x00",
+                     b"", b"invalid!", b"\xff",
+                     base64.b64encode(b"<html>login</html>"),
+                     base64.b64encode(base64.b64encode(b"ss://synthetic@example.org:443"))):
+            with self.subTest(body=body), self.assertRaises(cap.CaptureError):
+                cap.document_status(body, "text/html")
+
     def test_generated_cases_require_network_evidence(self):
         spec = importlib.util.spec_from_file_location('analysis_cases', Path(__file__).parents[1] / 'Analyze-CapturedSubscriptions.py')
         analysis = importlib.util.module_from_spec(spec)
@@ -77,6 +94,9 @@ class Handler(BaseHTTPRequestHandler):
             body = b"future-client-format\nSECRET_MARKER\n"
         elif path == "/base64":
             body = base64.urlsafe_b64encode(b"socks5://127.0.0.1:1080#synthetic")
+        elif path == "/html-base64":
+            body = base64.b64encode(b"trojan://SECRET_MARKER@example.org:443#synthetic")
+            headers["Content-Type"] = "text/html; charset=utf-8"
         elif path == "/references":
             body = ('proxy-providers:\n  a:\n    url: "' + self.server.base + '/good"\n  b:\n    url: "https://example.org/NOT_AUTHORIZED"\n').encode()
         elif path == "/cycle":
@@ -217,6 +237,18 @@ class CaptureTests(unittest.TestCase):
 
     def test_unknown_and_base64_cached_without_parser(self):
         self.assertEqual(self.run_capture("/unknown", "/base64")["captured"], 2)
+
+    def test_mislabelled_html_subscription_is_preserved_encrypted(self):
+        result = self.run_capture("/html-base64")
+        self.assertEqual(result["captured"], 1)
+        index = cap.read_private(self.cache / "index.dpapi")
+        path = self.cache / next(iter(index["entries"].values()))["file"]
+        record = cap.read_private(path)
+        self.assertEqual(record["headers"]["content-type"], "text/html; charset=utf-8")
+        self.assertEqual(base64.b64decode(record["rawBase64"]),
+                         base64.b64encode(b"trojan://SECRET_MARKER@example.org:443#synthetic"))
+        self.assertNotIn(b"SECRET_MARKER", path.read_bytes())
+        self.assertEqual(cap.replay(path)["code"], "OfflineIntegrityPassed")
 
     def test_closed_window_makes_no_request_and_keeps_cache(self):
         self.run_capture("/good")

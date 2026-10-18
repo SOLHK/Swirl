@@ -412,7 +412,21 @@ fn ini(text: &str) -> Result<Vec<Value>, &'static str> {
         let mut positional = 0;
         let mut seen = std::collections::HashSet::new();
         for field in &fields[start..] {
-            if let Some((key, value)) = field.split_once('=') {
+            // Older Loon Trojan exports use key:value after the password.
+            // Do not interpret a colon inside the positional password as a key.
+            let parameter = field.split_once('=').or_else(|| {
+                if qx || kind != "trojan" || n.get("password").is_none() {
+                    return None;
+                }
+                field.split_once(':').filter(|(key, _)| {
+                    let key = key.trim();
+                    !key.is_empty()
+                        && key
+                            .bytes()
+                            .all(|b| b.is_ascii_alphanumeric() || b"-_".contains(&b))
+                })
+            });
+            if let Some((key, value)) = parameter {
                 let key = key.trim();
                 let canonical = match key {
                     "encrypt-method" | "method" => "cipher",
@@ -1596,6 +1610,49 @@ mod tests {
         let r = inspect(b"[Proxy]\nfixture = trojan, example.org, 443, password=x, tls-host=example.org, sni=other.example");
         assert!(!r.report.parsed);
         assert_eq!(r.report.error, Some("DuplicateIniParameter"));
+    }
+    #[test]
+    fn legacy_loon_trojan_options_preserve_credentials_and_tls_policy() {
+        let input = b"[Proxy]\nfixture = trojan, example.org, 443, \"secret:with:colons\", tls-name:tls.example.org, skip-cert-verify:false";
+        let r = inspect(input);
+        assert!(r.report.parsed);
+        assert!(r.report.nodes[0].native_tcp_candidate);
+        assert_eq!(r.original, input);
+        assert_eq!(r.originals[0]["password"], "secret:with:colons");
+        match r.tcp_candidates[0].as_ref().unwrap() {
+            Outbound::Trojan { password, tls, .. } => {
+                assert_eq!(password, "secret:with:colons");
+                assert_eq!(tls.server_name, "tls.example.org");
+            }
+            _ => panic!("expected native Trojan"),
+        }
+        for suffix in [
+            "skip-cert-verify:true",
+            "skip-cert-verify:invalid",
+            "future:retained",
+        ] {
+            let input = format!("[Proxy]\nfixture = trojan, example.org, 443, secret, {suffix}");
+            let r = inspect(input.as_bytes());
+            assert!(r.report.parsed);
+            assert!(!r.report.nodes[0].native_tcp_candidate);
+            assert_eq!(r.original, input.as_bytes());
+        }
+    }
+    #[test]
+    fn legacy_loon_colon_options_cannot_overwrite_named_parameters() {
+        for suffix in [
+            "tls-name:first.example, sni=second.example",
+            "sni=first.example, tls-name:second.example",
+            "skip-cert-verify:false, skip-cert-verify=true",
+            "password:replacement",
+        ] {
+            let input = format!("[Proxy]\nfixture = trojan, example.org, 443, secret, {suffix}");
+            let r = inspect(input.as_bytes());
+            assert!(!r.report.parsed);
+            assert_eq!(r.report.error, Some("DuplicateIniParameter"));
+            assert!(r.tcp_candidates.is_empty());
+            assert_eq!(r.original, input.as_bytes());
+        }
     }
     #[test]
     fn duplicate_keys_and_remote_tags_fail() {

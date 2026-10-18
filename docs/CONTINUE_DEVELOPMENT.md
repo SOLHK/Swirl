@@ -1,5 +1,7 @@
 # Swirl 接续开发入口
 
+最新采集及导入阶段见 [本机订阅窗口与旧式 Loon Trojan](RUST_SUBSCRIPTION_WINDOW_20261018_LOCAL.md)。新窗口18个入口均已加密保存到D盘，供应商请求已停止；原始缓存保留。CI及双源最终结果待该记录补齐。
+
 **最新补记：原密钥通过已有 GitHub Secret / Windows runner 在内存中复用，无需用户寻找或重发。**
 [本机双源与固定 SS 实测](RUST_WINDOWS_FIXED_SS_20261018.md)已完成：16个远端URL与本地完全一致，
 本地另有两个未对应条目；14份本地缓存正文均与当前远端不同，但三个SS来源对的可执行参数完全一致。

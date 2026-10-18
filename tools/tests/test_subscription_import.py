@@ -186,14 +186,19 @@ class SubscriptionImportTests(unittest.TestCase):
                        'udp=false&sni=localhost&peer=local%68ost&skip-cert-verify=false&allowInsecure=0')
             for query in queries:
                 uri = f'trojan://fixture-password@127.0.0.1:{server.server_address[1]}?{query}'
-                for document in (uri, base64.b64encode(uri.encode()).decode()):
+                loon = (f'[Proxy]\nfixture = trojan,127.0.0.1,{server.server_address[1]},'
+                        'fixture-password,tls-name:localhost,skip-cert-verify:false,udp:false')
+                for document in (uri, base64.b64encode(uri.encode()).decode(), loon):
                     inspected = self.inspect(document)
                     capability = inspected['report']['nodes'][0]
                     self.assertTrue(capability['native_tcp_candidate'])
                     self.assertFalse(capability['real_network_verified'])
                     self.assertFalse(capability['udp_declared'])
                     self.assertFalse(capability['native_udp_supported'])
-                    self.assertEqual(inspected['nodes'][0]['raw-uri'], uri)
+                    if document == loon:
+                        self.assertEqual(inspected['nodes'][0]['raw-ini'], loon.splitlines()[1])
+                    else:
+                        self.assertEqual(inspected['nodes'][0]['raw-uri'], uri)
                     self.assertIs(inspected['nodes'][0]['skip-cert-verify'], False)
                     self.assertIs(inspected['nodes'][0]['udp'], False)
                     outbound = inspected['tcpCandidates'][0]
@@ -217,7 +222,7 @@ class SubscriptionImportTests(unittest.TestCase):
                             self.assertEqual(exact(stream, len(payload)), payload)
                     finally:
                         self.assertTrue(self.command(op='stop', handle=handle)['ok'])
-            self.assertEqual(server.accepted, 4)
+            self.assertEqual(server.accepted, 6)
 
     def test_equal_trojan_aliases_cannot_disable_certificate_validation(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -226,22 +231,25 @@ class SubscriptionImportTests(unittest.TestCase):
             for name, trust_ca in (('localhost', False), ('wrong.fixture.invalid', True)):
                 uri = (f'trojan://fixture-password@127.0.0.1:{server.server_address[1]}'
                        f'?allowInsecure=0&peer={name}&sni={name}&udp=false')
-                outbound = self.inspect(uri)['tcpCandidates'][0]
-                self.assertEqual(outbound['tls']['server_name'], name)
-                if trust_ca:
-                    outbound['tls']['ca_der_base64'] = ca
-                started = self.command(op='start', config={'schema': 1, 'listen': '127.0.0.1:0',
-                                       'selected': 'imported', 'nodes': [{'id': 'imported', 'outbound': outbound}]})
-                self.assertTrue(started['ok'], started)
-                handle = started['handle']
-                port = int(started['status']['address'].rsplit(':', 1)[1])
-                try:
-                    with socket.create_connection(('127.0.0.1', port), timeout=5) as stream:
-                        stream.sendall(b'CONNECT origin.fixture.invalid:443 HTTP/1.1\r\n'
-                                       b'Host: origin.fixture.invalid:443\r\n\r\n')
-                        self.assertIn(b' 502 ', header(stream))
-                finally:
-                    self.assertTrue(self.command(op='stop', handle=handle)['ok'])
+                loon = (f'[Proxy]\nfixture = trojan,127.0.0.1,{server.server_address[1]},'
+                        f'fixture-password,tls-name:{name},skip-cert-verify:false,udp:false')
+                for document in (uri, loon):
+                    outbound = self.inspect(document)['tcpCandidates'][0]
+                    self.assertEqual(outbound['tls']['server_name'], name)
+                    if trust_ca:
+                        outbound['tls']['ca_der_base64'] = ca
+                    started = self.command(op='start', config={'schema': 1, 'listen': '127.0.0.1:0',
+                                           'selected': 'imported', 'nodes': [{'id': 'imported', 'outbound': outbound}]})
+                    self.assertTrue(started['ok'], started)
+                    handle = started['handle']
+                    port = int(started['status']['address'].rsplit(':', 1)[1])
+                    try:
+                        with socket.create_connection(('127.0.0.1', port), timeout=5) as stream:
+                            stream.sendall(b'CONNECT origin.fixture.invalid:443 HTTP/1.1\r\n'
+                                           b'Host: origin.fixture.invalid:443\r\n\r\n')
+                            self.assertIn(b' 502 ', header(stream))
+                    finally:
+                        self.assertTrue(self.command(op='stop', handle=handle)['ok'])
             self.assertEqual(server.accepted, 0)
             for udp in ('1', 'true'):
                 uri = (f'trojan://fixture-password@127.0.0.1:{server.server_address[1]}'
