@@ -5,7 +5,45 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 set(SWIRL_TEST_FONT_DIRECTORY "C:/Windows/Fonts" CACHE PATH "Offscreen test font directory")
 option(SWIRL_BUILD_UI_TESTS "Build the Qt input-driven overview checks" OFF)
+option(SWIRL_FONT_TESTS_ONLY "Configure only the independent Qt font tests, without the application or proxy engine" OFF)
 option(SWIRL_USE_RUST_CORE "Use Swirl Rust Core for production sessions and node probes; reject unsupported capabilities without external fallback" OFF)
+
+# Keep the standalone CI and the existing UI suite on the same font targets.
+# This path deliberately precedes third_party and all application/core targets.
+function(swirl_add_font_tests)
+ add_executable(SwirlFontTests tests/FontTests.cpp app/FontManager.h app/FontManager.cpp app/FontAxisPolicy.h app/FontAxisPolicy.cpp app/FontDisplayContext.h app/FontDisplayContext.cpp app/VariableFontPreview.h app/VariableFontPreview.cpp)
+ target_include_directories(SwirlFontTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+ target_compile_definitions(SwirlFontTests PRIVATE SWIRL_UI_TESTS SWIRL_QML_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/qml")
+ target_link_libraries(SwirlFontTests PRIVATE Qt6::Quick Qt6::QuickControls2 Qt6::Test)
+ add_executable(SwirlFontAxisPolicyTests tests/FontAxisPolicyTests.cpp app/FontAxisPolicy.h app/FontAxisPolicy.cpp)
+ target_include_directories(SwirlFontAxisPolicyTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+ target_link_libraries(SwirlFontAxisPolicyTests PRIVATE Qt6::Gui Qt6::Test)
+ if(MSVC)
+  target_compile_options(SwirlFontTests PRIVATE /utf-8)
+  target_compile_options(SwirlFontAxisPolicyTests PRIVATE /utf-8)
+ endif()
+ qt_add_resources(SwirlFontTests harmony_test_fonts PREFIX "/swirl/fonts" BASE "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts" FILES
+  assets/fonts/HarmonyOS_Sans_SC_Regular.ttf assets/fonts/HarmonyOS_Sans_SC_Medium.ttf assets/fonts/HarmonyOS_Sans_SC_Bold.ttf assets/fonts/LICENSE_HarmonyOS_Sans.txt)
+ add_test(NAME swirl-font-selection COMMAND SwirlFontTests -o "${CMAKE_CURRENT_BINARY_DIR}/font-selection.xml,xml" -o "-,txt")
+ set_tests_properties(swirl-font-selection PROPERTIES LABELS fonts TIMEOUT 30 ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QUICK_BACKEND=software;QT_QPA_FONTDIR=${SWIRL_TEST_FONT_DIRECTORY}")
+ add_test(NAME swirl-font-axis-policy COMMAND SwirlFontAxisPolicyTests -o "${CMAKE_CURRENT_BINARY_DIR}/font-axis-policy.xml,xml" -o "-,txt")
+ set_tests_properties(swirl-font-axis-policy PROPERTIES LABELS fonts TIMEOUT 30)
+ if(WIN32)
+  add_test(NAME swirl-font-native-raster COMMAND SwirlFontTests nativeGlyphsHaveNoColourFringes -o "${CMAKE_CURRENT_BINARY_DIR}/font-native-raster.xml,xml" -o "-,txt")
+  set_tests_properties(swirl-font-native-raster PROPERTIES LABELS fonts TIMEOUT 30 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
+ endif()
+ file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/font-toolchain.txt"
+  "Qt=${Qt6_VERSION}\nCompiler=${CMAKE_CXX_COMPILER_ID}\nCompilerVersion=${CMAKE_CXX_COMPILER_VERSION}\nGenerator=${CMAKE_GENERATOR}\nGeneratorPlatform=${CMAKE_GENERATOR_PLATFORM}\nPointerSize=${CMAKE_SIZEOF_VOID_P}\nCxxStandard=${CMAKE_CXX_STANDARD}\n")
+endfunction()
+
+if(SWIRL_FONT_TESTS_ONLY)
+ find_package(Qt6 6.9 REQUIRED COMPONENTS Quick QuickControls2 Test)
+ qt_standard_project_setup(REQUIRES 6.8)
+ enable_testing()
+ swirl_add_font_tests()
+ return()
+endif()
+
 find_package(Qt6 6.9 REQUIRED COMPONENTS Quick Qml QuickControls2 Network Svg GuiPrivate ShaderTools)
 qt_standard_project_setup(REQUIRES 6.8)
 qt_policy(SET QTP0004 NEW)
@@ -19,7 +57,7 @@ if(NOT SWIRL_BUILD_REVISION)
  set(SWIRL_BUILD_REVISION "source-archive")
 endif()
 target_compile_definitions(Swirl PRIVATE SWIRL_BUILD_REVISION="${SWIRL_BUILD_REVISION}")
-target_sources(Swirl PRIVATE app/FontManager.h app/FontManager.cpp)
+target_sources(Swirl PRIVATE app/FontManager.h app/FontManager.cpp app/FontAxisPolicy.h app/FontAxisPolicy.cpp)
 qt_add_resources(Swirl harmony_fonts PREFIX "/swirl/fonts" BASE "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts" FILES
  assets/fonts/HarmonyOS_Sans_SC_Regular.ttf assets/fonts/HarmonyOS_Sans_SC_Medium.ttf assets/fonts/HarmonyOS_Sans_SC_Bold.ttf assets/fonts/LICENSE_HarmonyOS_Sans.txt)
 add_library(SwirlEngine STATIC
@@ -114,7 +152,8 @@ add_dependencies(Swirl SwirlScriptRunner)
 qt_add_resources(Swirl engine_manifest PREFIX "/engine" BASE "${CMAKE_CURRENT_SOURCE_DIR}/packaging"
  FILES packaging/mihomo-manifest.json)
 set(SWIRL_QML_FILES
- qml/controls/SwirlText.qml
+ qml/controls/SwirlText.qml qml/controls/SwirlFontBinding.qml
+ qml/controls/SwirlTextArea.qml qml/controls/SwirlToolTip.qml
  qml/controls/SwirlLinkedDetail.qml
  qml/controls/SwirlNodeTransfer.qml
  qml/components/SwirlFontSettings.qml
@@ -161,7 +200,7 @@ qt_add_qml_module(Swirl
     RESOURCE_PREFIX /qt/qml
     NO_GENERATE_EXTRA_QMLDIRS
     QML_FILES ${SWIRL_QML_FILES}
-    SOURCES app/JavascriptHighlighter.h app/JavascriptHighlighter.cpp app/WindowEdge.h app/WindowEdge.cpp app/VariableFontPreview.h app/VariableFontPreview.cpp
+    SOURCES app/JavascriptHighlighter.h app/JavascriptHighlighter.cpp app/WindowEdge.h app/WindowEdge.cpp app/VariableFontPreview.h app/VariableFontPreview.cpp app/FontDisplayContext.h app/FontDisplayContext.cpp
 )
 set(SWIRL_ASSET_PATH "${CMAKE_CURRENT_SOURCE_DIR}/assets")
 file(GLOB SWIRL_UI_ICONS CONFIGURE_DEPENDS "${SWIRL_ASSET_PATH}/icons/ui/*.svg")
@@ -193,14 +232,7 @@ if(SWIRL_BUILD_UI_TESTS)
  add_test(NAME swirl-storage-paths COMMAND SwirlStoragePathsTests)
  file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/packaging/rules" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
  find_package(Qt6 REQUIRED COMPONENTS Test)
- add_executable(SwirlFontTests tests/FontTests.cpp app/FontManager.h app/FontManager.cpp app/VariableFontPreview.h app/VariableFontPreview.cpp)
- target_include_directories(SwirlFontTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
- target_link_libraries(SwirlFontTests PRIVATE Qt6::Quick Qt6::Test)
- if(MSVC)
-  target_compile_options(SwirlFontTests PRIVATE /utf-8)
- endif()
- qt_add_resources(SwirlFontTests harmony_test_fonts PREFIX "/swirl/fonts" BASE "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts" FILES
-  assets/fonts/HarmonyOS_Sans_SC_Regular.ttf assets/fonts/HarmonyOS_Sans_SC_Medium.ttf assets/fonts/HarmonyOS_Sans_SC_Bold.ttf assets/fonts/LICENSE_HarmonyOS_Sans.txt)
+ swirl_add_font_tests()
  target_sources(Swirl PRIVATE tests/GatewayChecks.cpp tests/GatewayChecks.h tests/HdrChecks.cpp tests/HdrChecks.h tests/OverviewChecks.cpp tests/OverviewChecks.h tests/CaptureChecks.cpp tests/CaptureChecks.h tests/WindowChecks.cpp tests/WindowChecks.h)
  target_sources(Swirl PRIVATE tests/UiQualityChecks.h tests/UiQualityChecks.cpp)
  target_sources(Swirl PRIVATE tests/RuntimeEvidence.cpp tests/RuntimeEvidence.h)
@@ -238,12 +270,6 @@ if(SWIRL_BUILD_UI_TESTS)
   endif()
   add_test(NAME swirl-codex-proxy-launcher COMMAND SwirlCodexLauncherTests)
   set_tests_properties(swirl-codex-proxy-launcher PROPERTIES TIMEOUT 15)
- endif()
- add_test(NAME swirl-font-selection COMMAND SwirlFontTests)
- set_tests_properties(swirl-font-selection PROPERTIES TIMEOUT 30 ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_QPA_FONTDIR=${SWIRL_TEST_FONT_DIRECTORY}")
- if(WIN32)
-  add_test(NAME swirl-font-native-raster COMMAND SwirlFontTests nativeGlyphsHaveNoColourFringes)
-  set_tests_properties(swirl-font-native-raster PROPERTIES TIMEOUT 30 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
  endif()
  add_executable(SwirlExtensionTests tests/ExtensionTests.cpp)
  if(MSVC)
