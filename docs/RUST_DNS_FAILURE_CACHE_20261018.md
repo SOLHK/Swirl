@@ -1,5 +1,11 @@
 # Windows native DNS failure-cache stage
 
+Later on 2026-10-18, the existing Secret was safely reused through the existing
+Windows runner: exact dual-source matching and the three fixed SS TCP/strict
+HTTPS probes now pass on the user's PC. See [the subsequent evidence](RUST_WINDOWS_FIXED_SS_20261018.md).
+The missing-key and untested-Windows statements below describe this earlier
+stage and are retained as history, not the current blocker state.
+
 **Final verified source: `b903b8b1d9c5e0c40c3dee5033447900665d1835`.**
 [Core 39097773884](https://github.com/SOLHK/Swirl/actions/runs/39097773884) and
 [App 39097773891](https://github.com/SOLHK/Swirl/actions/runs/39097773891) both

@@ -1,5 +1,6 @@
 {
   "schema": 1,
+  "subscription_and_windows_provider_followup": "RUST_WINDOWS_FIXED_SS_20261018_VERIFIED.json",
   "date": "2026-10-18",
   "implementation_commit": "cafdd62a556165bb5796fcac7f9fd8ef95643143",
   "tested_source_commit": "b903b8b1d9c5e0c40c3dee5033447900665d1835",
