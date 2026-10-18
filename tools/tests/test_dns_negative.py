@@ -111,7 +111,7 @@ def respond(peer, data, tcp):
     state = plan.get('families', {}).get(kind, plan.get('state', 'nx'))
     if state == 'silent':
         return None
-    flags = 0x8180 | {'nx': 3, 'fail': 2}.get(state, 0)
+    flags = 0x8180 | {'nx': 3, 'fail': 2, 'refused': 5}.get(state, 0)
     answers, authority, additional = [], [], []
     alias = plan.get('alias')
     if alias and host != alias:
@@ -272,6 +272,59 @@ class DnsNegativeIntegration(unittest.TestCase):
                 self.assertEqual(len(peer.queries), 2)
                 self.stop()
 
+    def test_resolution_failure_cache_expires_and_recovers_real_forwarding(self):
+        port = self.origin()
+        for transport in ('udp', 'dot', 'doh'):
+            for state in ('fail', 'refused'):
+                with self.subTest(transport=transport, state=state):
+                    peer = self.peer(transport, state=state)
+                    self.start(peer)
+                    self.connect(expected='DnsServerError')
+                    before = len(peer.queries)
+                    self.make_positive(peer)
+                    self.connect(8443, 'NEGATIVE.FIXTURE.INVALID', expected='DnsServerError')
+                    self.assertEqual(len(peer.queries), before)
+                    time.sleep(1.1)
+                    self.connect(port)
+                    self.assertEqual(len(peer.queries), before + 2)
+                    self.stop()
+
+    def test_failure_is_cached_only_after_all_configured_servers_fail(self):
+        port = self.origin()
+        for transport in ('udp', 'dot', 'doh'):
+            with self.subTest(transport=transport):
+                failed = self.peer(transport, state='fail')
+                good = self.peer(transport, families={1: 'positive', 28: 'nodata'})
+                self.start([failed, good])
+                self.connect(port)
+                counts = len(failed.queries), len(good.queries)
+                self.assertGreater(counts[0], 0)
+                self.assertEqual(counts[1], 2)
+                self.connect(port)
+                self.assertEqual((len(failed.queries), len(good.queries)), counts)
+                self.stop()
+
+    def test_timeout_failure_cache_starts_after_resolution_finishes(self):
+        peer = self.peer(state='silent')
+        self.start(peer)
+        self.connect(expected='DnsTimeout')
+        self.assertEqual(len(peer.queries), 2)
+        self.make_positive(peer)
+        self.connect(expected='DnsTimeout')
+        self.assertEqual(len(peer.queries), 2)
+        time.sleep(1.1)
+        self.connect(self.origin())
+        self.assertEqual(len(peer.queries), 4)
+
+    def test_configuration_replacement_clears_failure_cache(self):
+        peer = self.peer(state='fail')
+        self.start(peer)
+        self.connect(expected='DnsServerError')
+        self.make_positive(peer)
+        self.assertTrue(self.command(op='configure', handle=self.handle, config=self.config(peer))['ok'])
+        self.connect(self.origin())
+        self.assertEqual(len(peer.queries), 4)
+
     def test_nodata_is_separate_from_name_error_and_requires_both_families(self):
         for transport in ('udp', 'dot', 'doh'):
             with self.subTest(transport=transport):
@@ -383,6 +436,12 @@ class DnsNegativeIntegration(unittest.TestCase):
                 self.start(peer)
                 self.connect(expected=expected)
                 self.make_positive(peer)
+                if expected == 'DnsServerError':
+                    # Resolution failures are cached separately from SOA
+                    # denials; retain the exact failure, then retry on expiry.
+                    self.connect(port, expected='DnsServerError')
+                    self.assertEqual(len(peer.queries), 2)
+                    time.sleep(1.1)
                 self.connect(port)
                 self.assertEqual(len(peer.queries), 4)
                 self.stop()

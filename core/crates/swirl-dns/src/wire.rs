@@ -20,6 +20,8 @@ pub(super) enum Negative {
 pub(super) enum Outcome {
     Addresses(Vec<IpAddr>),
     Negative(Negative),
+    // A local, short-lived resolution failure, never an NXDOMAIN/NODATA fact.
+    Failure(&'static str),
 }
 impl Outcome {
     pub(super) fn for_port(&self, port: u16) -> Result<Vec<SocketAddr>> {
@@ -30,6 +32,7 @@ impl Outcome {
                 .collect()),
             Self::Negative(Negative::NameError) => Err("DnsNameError"),
             Self::Negative(Negative::NoData) => Err("DnsEmpty"),
+            Self::Failure(error) => Err(error),
         }
     }
 }

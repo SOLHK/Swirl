@@ -11,6 +11,8 @@ use swirl_subscription::DnsTlsServer;
 use tokio::{net::lookup_host, sync::Semaphore, time::timeout};
 
 type Cache = HashMap<String, (Instant, wire::Outcome)>;
+type Lookup = Result<Vec<SocketAddr>, &'static str>;
+const FAILURE_TTL: Duration = Duration::from_secs(1);
 pub struct Resolver {
     cache: Mutex<Cache>,
     permits: Arc<Semaphore>,
@@ -32,6 +34,54 @@ impl Default for Resolver {
     }
 }
 impl Resolver {
+    fn cached(&self, key: &str, port: u16) -> Result<Option<Lookup>, &'static str> {
+        let mut cache = self.cache.lock().map_err(|_| "DnsState")?;
+        cache.retain(|_, (expires, _)| *expires > Instant::now());
+        Ok(cache.get(key).map(|(_, outcome)| outcome.for_port(port)))
+    }
+
+    fn remember_failure(&self, key: String, error: &'static str) -> &'static str {
+        // Cache only completed upstream failures, after server failover. Local
+        // admission/cancellation, malformed replies and unproven empty answers
+        // must not become cached denials. Keep the original diagnostic code.
+        if matches!(
+            error,
+            "DnsTimeout"
+                | "DnsLookupFailed"
+                | "DnsServerError"
+                | "DnsAliasLoop"
+                | "DnsAliasDepth"
+                | "DnsConnect"
+                | "DnsSend"
+                | "DnsReceive"
+                | "DnsTcpConnect"
+                | "DnsTcpWrite"
+                | "DnsTcpRead"
+                | "DnsTlsConnect"
+                | "DnsTlsWrite"
+                | "DnsTlsRead"
+                | "DnsTlsTimeout"
+                | "DnsTlsVerificationOrHandshake"
+                | "DnsHttpsConnect"
+                | "DnsHttpsRead"
+                | "DnsHttpsWrite"
+                | "DnsHttpsVerificationOrHandshake"
+        ) && let Ok(mut cache) = self.cache.lock()
+        {
+            let now = Instant::now();
+            cache.retain(|_, (expires, _)| *expires > now);
+            // A racing failed query must not replace a still-valid result or
+            // extend a failure's lifetime on every client request.
+            if !cache.contains_key(&key) {
+                if cache.len() >= 256 {
+                    cache.clear();
+                }
+                cache.insert(key, (now + FAILURE_TTL, wire::Outcome::Failure(error)));
+            }
+        }
+        error
+    }
+
     /// Each immutable configuration owns a separate cache and host table, while
     /// every generation shares the same cap on still-running OS lookups.
     pub fn with_hosts(&self, hosts: &[swirl_subscription::HostMapping]) -> Self {
@@ -74,17 +124,17 @@ impl Resolver {
             return Ok(vec![SocketAddr::new(*ip, port)]);
         }
         let key = host.to_ascii_lowercase();
-        {
-            let mut cache = self.cache.lock().map_err(|_| "DnsState")?;
-            cache.retain(|_, (expires, _)| *expires > Instant::now());
-            if let Some((_, outcome)) = cache.get(&key) {
-                return outcome.for_port(port);
-            }
+        if let Some(result) = self.cached(&key, port)? {
+            return result;
         }
         let permit = timeout(Duration::from_secs(3), self.permits.clone().acquire_owned())
             .await
             .map_err(|_| "DnsBusy")?
             .map_err(|_| "DnsStopped")?;
+        // Another query may have finished while this one waited for capacity.
+        if let Some(result) = self.cached(&key, port)? {
+            return result;
+        }
         if !self.servers.is_empty() || !self.tls_servers.is_empty() {
             let _permit = permit;
             let started = Instant::now();
@@ -97,7 +147,8 @@ impl Resolver {
             };
             let answer = timeout(Duration::from_secs(3), resolution)
                 .await
-                .map_err(|_| "DnsTimeout")??;
+                .unwrap_or(Err("DnsTimeout"))
+                .map_err(|error| self.remember_failure(key.clone(), error))?;
             let expires = started + Duration::from_secs(u64::from(answer.ttl));
             if expires > Instant::now() {
                 let mut cache = self.cache.lock().map_err(|_| "DnsState")?;
@@ -119,9 +170,10 @@ impl Resolver {
         });
         let addresses = timeout(Duration::from_secs(3), lookup)
             .await
-            .map_err(|_| "DnsTimeout")?
-            .map_err(|_| "DnsTask")?
-            .map_err(|_| "DnsLookupFailed")?;
+            .map_err(|_| "DnsTimeout")
+            .and_then(|result| result.map_err(|_| "DnsTask"))
+            .and_then(|result| result.map_err(|_| "DnsLookupFailed"))
+            .map_err(|error| self.remember_failure(key.clone(), error))?;
         if addresses.is_empty() {
             return Err("DnsEmpty");
         }
@@ -191,6 +243,101 @@ fn parse_hosts(data: &[u8]) -> Result<HashMap<String, IpAddr>, &'static str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn failure_cache_preserves_code_deadline_and_successful_answers() {
+        let resolver = Resolver::default();
+        assert_eq!(
+            resolver.remember_failure("failed.invalid".into(), "DnsTimeout"),
+            "DnsTimeout"
+        );
+        let deadline = resolver.cache.lock().unwrap()["failed.invalid"].0;
+        resolver.remember_failure("failed.invalid".into(), "DnsServerError");
+        assert_eq!(resolver.cache.lock().unwrap()["failed.invalid"].0, deadline);
+        assert_eq!(
+            resolver.cached("failed.invalid", 443).unwrap(),
+            Some(Err("DnsTimeout"))
+        );
+        assert!(
+            resolver
+                .with_hosts(&[])
+                .cached("failed.invalid", 443)
+                .unwrap()
+                .is_none()
+        );
+        resolver
+            .cache
+            .lock()
+            .unwrap()
+            .get_mut("failed.invalid")
+            .unwrap()
+            .0 = Instant::now();
+        assert!(resolver.cached("failed.invalid", 443).unwrap().is_none());
+        resolver.cache.lock().unwrap().insert(
+            "good.invalid".into(),
+            (
+                Instant::now() + Duration::from_secs(30),
+                wire::Outcome::Addresses(vec!["127.0.0.1".parse().unwrap()]),
+            ),
+        );
+        resolver.remember_failure("good.invalid".into(), "DnsServerError");
+        assert!(
+            resolver
+                .cached("good.invalid", 443)
+                .unwrap()
+                .unwrap()
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn failure_cache_is_bounded_and_excludes_local_and_invalid_response_errors() {
+        let resolver = Resolver::default();
+        for error in [
+            "DnsBusy",
+            "DnsStopped",
+            "DnsTask",
+            "DnsSocket",
+            "DnsInvalidTarget",
+            "DnsIdentity",
+            "DnsQuestion",
+            "DnsSoaLength",
+            "DnsEmpty",
+            "DnsNameError",
+            "DnsInconsistentAnswer",
+            "DnsHttpsHeader",
+        ] {
+            assert_eq!(
+                resolver.remember_failure("fixture.invalid".into(), error),
+                error
+            );
+            assert!(resolver.cache.lock().unwrap().is_empty());
+        }
+        for index in 0..257 {
+            resolver.remember_failure(format!("{index}.invalid"), "DnsServerError");
+            assert!(resolver.cache.lock().unwrap().len() <= 256);
+        }
+        assert!(resolver.cached("0.invalid", 443).unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn cancelled_upstream_query_does_not_create_failure_cache() {
+        let peer = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        let resolver = Resolver {
+            servers: vec![peer.local_addr().unwrap()],
+            ..Resolver::default()
+        };
+        assert!(
+            timeout(
+                Duration::from_millis(20),
+                resolver.resolve("cancelled.invalid", 443)
+            )
+            .await
+            .is_err()
+        );
+        assert!(resolver.cache.lock().unwrap().is_empty());
+        assert_eq!(resolver.permits.available_permits(), 8);
+    }
+
     #[test]
     fn hosts_file_aliases_comments_and_duplicate_priority() {
         let map=parse_hosts(b"\xef\xbb\xbf127.0.0.1 LocalHost alias.test # legacy comment \xff\r\n::1 ipv6.test\n127.0.0.2 localhost\nnot-an-ip ignored.test\n").unwrap();
