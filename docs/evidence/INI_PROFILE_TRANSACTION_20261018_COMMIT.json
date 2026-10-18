@@ -1,0 +1,87 @@
+{
+  "schema": 1,
+  "recorded_at_utc": "2026-10-18T09:48:10.049177+00:00",
+  "implementation_commit": "050742e7f09d84642bd0c03fa0da4f07453fdf4f",
+  "remote_head_verified": true,
+  "source_hashes_verified_against_commit": true,
+  "local_evidence": "INI_PROFILE_TRANSACTION_20261018.json",
+  "ci_snapshot": [
+    {
+      "id": 39116659213,
+      "name": "Swirl Rust Core",
+      "status": "in_progress",
+      "conclusion": null,
+      "sha": "050742e7f09d84642bd0c03fa0da4f07453fdf4f",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39116659213",
+      "jobs": [
+        {
+          "id": 117643718398,
+          "name": "portable-rust (macos-latest)",
+          "status": "in_progress",
+          "conclusion": null,
+          "active": [
+            "Run cargo test --workspace --locked"
+          ],
+          "failed": []
+        },
+        {
+          "id": 117643718441,
+          "name": "portable-rust (ubuntu-latest)",
+          "status": "in_progress",
+          "conclusion": null,
+          "active": [
+            "Run cargo test --workspace --locked"
+          ],
+          "failed": []
+        },
+        {
+          "id": 117643718480,
+          "name": "windows-rust",
+          "status": "in_progress",
+          "conclusion": null,
+          "active": [
+            "Run cargo check --workspace --locked"
+          ],
+          "failed": []
+        }
+      ]
+    },
+    {
+      "id": 39116659222,
+      "name": "Core implementation validation",
+      "status": "in_progress",
+      "conclusion": null,
+      "sha": "050742e7f09d84642bd0c03fa0da4f07453fdf4f",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39116659222",
+      "jobs": [
+        {
+          "id": 117643718340,
+          "name": "core",
+          "status": "in_progress",
+          "conclusion": null,
+          "active": [
+            "Rust static and unit checks"
+          ],
+          "failed": []
+        }
+      ]
+    }
+  ],
+  "ci_success_not_yet_confirmed": true,
+  "local_execution_state": "paused after safe completion at user request; no local test/build running",
+  "reality_r1": {
+    "path": "D:\\Codex\\work\\reality-r1-kx",
+    "source_snapshot_sha256": "8abfaae97fe86f0aab78e76e899d4ae4c8c8b5bd2b0e008ccdf562fd73faf3a3",
+    "root_verified_manifest_hashes_and_test_logs": true,
+    "results": {
+      "debug_behavior_tests": 8,
+      "debug_ownership_doctests": 1,
+      "release_behavior_tests": 8,
+      "release_ownership_doctests": 1,
+      "clippy_deny_warnings": "passed",
+      "tls_handshakes": 0,
+      "real_node_requests": 0
+    },
+    "warning": "GNU linker: corrupt .drectve at end of def file; cause not established or suppressed"
+  }
+}

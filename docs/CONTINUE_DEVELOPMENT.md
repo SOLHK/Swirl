@@ -1,3 +1,23 @@
+# Current handoff: safely paused after subscription stage (2026-10-18)
+
+User requested conserving local execution quota and deciding font work next. No new protocol module, full build or font work should start automatically from older continuation paragraphs. This section supersedes their scheduling instructions.
+
+Implementation `050742e7f09d84642bd0c03fa0da4f07453fdf4f` is committed and remote-verified on `work/core-completion-20261017`; working tree was clean after push. Its full local gate passed: Qt/Rust43 passed0 failed5 standalone peer-hook skips; native+compatibility import boundaries passed; independent WS/WSS11 and SS/Loon9 passed; full Windows app built. Exact source hashes match the committed tree. See `INI_PROFILE_TRANSACTION_20261018.md` and `evidence/INI_PROFILE_TRANSACTION_20261018_COMMIT.json`.
+
+Exact-implementation CI is running, not yet successful: Rust [39116659213](https://github.com/SOLHK/Swirl/actions/runs/39116659213), implementation [39116659222](https://github.com/SOLHK/Swirl/actions/runs/39116659222). No local rebuild is needed merely to wait for these results. Previous5f1fd13 CI remains independently verified.
+
+All local build/test commands and both subagent tasks have safely finished. The R1 REALITY foundation is preserved at `D:/Codex/work/reality-r1-kx`: Windows GNU Debug and Release each8 behavior tests+1 ownership doctest passed, Clippy passed; root independently checked actual file hashes/logs. Source snapshot `8abfaae97fe86f0aab78e76e899d4ae4c8c8b5bd2b0e008ccdf562fd73faf3a3`. Preserve the unresolved `.drectve` linker warning. This is not a TLS/REALITY handshake or real-node pass; it has not been integrated into Swirl. R0 and R1 files remain intact.
+
+The current subscription stage is sufficient to pause safely. No expiring capture remains and no supplier request is pending. The new source has one encrypted HTTP200 capture,59 VLESS/TCP/REALITY nodes(55 Vision),0 real-node attempts; the closed08:25 window has0 requests/0 new saves. Do not refresh expired sources. Full cached-profile0/18 and weighted acceptance10.83% are unchanged.
+
+Windows-specific remaining work: read this user's DPAPI caches, run authorized real-node tests after required protocols exist, actual Windows Qt/UI/font rendering and DPI checks, and eventual approved TUN/system-proxy/recovery acceptance. Portable unit/property/negative tests, public independent peers and three-platform builds can run in GitHub CI. Raw subscriptions/keys/fonts must never be sent to public CI.
+
+The next subscription engineering dependency is ClientHello finalization/session-ID with the same TLS transcript, certificate authentication and CertificateVerify/Finished, then fingerprint semantics and Vision/independent interoperability before trying the new real nodes. It does not need to block scheduling font work now. The user authorized prioritizing font work at09:47 UTC. The parent will create a dedicated font task after this source writer is released; this subscription task must not start font edits or another protocol module. To resume subscription work later, run `. D:\Codex\work\swirl-env.ps1`, inspect `git -C D:\Codex\work\Swirl status --short` and `git -C D:\Codex\work\Swirl log -3 --oneline`, then read this latest checkpoint and query `python D:\Codex\work\ci-status.py SOLHK/Swirl 050742e7f09d84642bd0c03fa0da4f07453fdf4f`. Coordinate with the font task before modifying this checkout; no rebuild is needed for a status-only check.
+
+The complete queued font constraints and latest no-spacing/no-glyph-design-change clarification are in `D:/Codex/outputs/QUEUED_FONT_TASK.md`.
+
+---
+
 # Latest checkpoint: INI executable subset and transport safety (2026-10-18)
 
 This checkpoint supersedes older next-task/status paragraphs below. Base `5f1fd1347ba4f82854e3f773f90e093c3074ce40` is verified with successful three-platform Rust CI39114652890 and implementation39114652905. The new INI product profile/atomic refresh/transport safety patch is locally validated; read `INI_PROFILE_TRANSACTION_20261018.md` and its evidence. Current patch's exact commit and CI are still pending commit/push and must not borrow the base CI result.
