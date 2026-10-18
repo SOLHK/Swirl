@@ -1,3 +1,19 @@
+# Closed 08:25:51 subscription window: no capture
+
+Hard cutoff 2026-10-18 08:33:30 UTC has passed. Supplier requests 0, new encrypted responses 0. Physical-WLAN destination route preflight passed. Initial automatic approval rejected relayed authorization; the single evidence-backed review retry timed out before CreateProcess, so neither capture script nor capture directory was created. No pending supplier process exists; late approval cannot reopen the window. Existing encrypted cache is preserved. See docs/evidence/CAPTURE_082551_WINDOW_BLOCKED_20261018.json and D:/Codex/outputs/capture-082551-direct-preflight.json. Do not retry supplier refresh.
+
+---
+
+# Verified implementation fbef399 — exact CI and offline corpus binding complete
+
+Implementation `fbef3993e9decc68c8be93a17551536ea9013fd8` is pushed on `work/core-completion-20261017`. Three-platform Rust/Windows Qt CI39110589656 and core validation39110589665 are successful for this exact SHA. Read `RUST_SUBSCRIPTION_BOUNDARIES_20261018.md` and its verified evidence. Later evidence-only commits do not alter this product source.
+
+The18-entry matrix now has a fresh offline replay bound to sourcefbef399, Rusttree8e3b3e57e212affa2c7b391128fe45d58629c89c and inspectorSHA25655a3ad7fab5c9b1fa1eafdf1ae5aaff9a40626629fa1461f868c6e5776988ac5. Counts unchanged18/18parsed,1558records,450candidates; provider network0/0. Original samples map to manifest7 and15, not current9 or cache enumeration8. New real-node sampling remains paused by the separate execution-approval boundary. The 08:25:51 collection request passed a physical-WLAN route preflight, but automatic approval rejected collection because it did not accept the relayed authorization; zero requests started. The direct confirmation did not arrive before the hard cutoff; the single review retry also timed out without process execution. Never refresh after cutoff.
+
+Next authorized coding step: explicit DNS query-family policy with unchanged default dual-query behavior, correct negative caching and independent local UDP/TCP/DoT/DoH qtype tests. Read D:/Codex/outputs/DNS_QUERY_FAMILY_NEXT_TASK.md and CLASH_DNS_MAPPING_PLAN.md. Preserve full-Clash-DNS rejection until hosts/localhost/no-resolve/bootstrap and IPv6 semantics are covered. No UI redesign or system network change. Acceptance remains79items/6accepted,10.83% weighted acceptance (not code progress).
+
+---
+
 # Latest follow-up: subscription dialect boundaries and document targets
 
 Read `RUST_SUBSCRIPTION_BOUNDARIES_20261018.md` and `SUBSCRIPTION_18_ENTRY_MATRIX_20261018.md`. Exact base `ed2f87f` CI has passed all three platforms; a later independent review reproduced imported SWIRL alias acceptance, now covered by a cross-subscription regression and a document-only target restriction. Native user rules keep SWIRL semantics. Non-Clash globals/policies are retained in parsing and explicitly rejected until mapped; wrapped duplicate keys, invalid UTF-8, duplicate BOM and multiple YAML documents fail closed.

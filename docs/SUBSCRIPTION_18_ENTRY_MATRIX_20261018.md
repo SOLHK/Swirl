@@ -56,6 +56,12 @@ Loon历史Windows实测源码：4ea41397386bed2678f8af41ba110965037f421d；证�
 - capture_checkpoint_document: `D:\Codex\work\Swirl\docs\RUST_CAPTURE_065548_20261018.md`；SHA-256 `988c463ed001ec6c522019d46e09f6b7c77d14bca0053a6596527f0d082e522e`
 - historical_fixed_document: `D:\Codex\work\Swirl\docs\RUST_WINDOWS_FIXED_SS_20261018.md`；SHA-256 `ff89b308f5eae0a01a61923b54ea7513374d621368397ca02628f71ceae8b331`
 
-完整机器可读矩阵：`D:\Codex\outputs\SUBSCRIPTION_18_ENTRY_MATRIX.json`。本次仅在内存解密manifest元数据，未解密订阅正文、未刷新供应商、未修改仓库源码。
+矩阵初版仅解密清单元数据。后续版本在内存重放18入口（17个加密响应），检查器仅输出默认脱敏报告，未落盘明文、未刷新供应商、未请求真实节点。
 
 解析不等于 Qt 完整配置导入：INI 非节点正文语法及完整语义仍未全部验证。最新原生产品仅接受有限的自包含 Clash 策略组/规则配置；此矩阵没有将合成夹具验收外推至真实18份文档。
+
+## 精确解析器绑定
+
+2026-10-18 08:21 UTC 离线重放：18/18格式/节点解析通过，1558条记录、450条TCP候选，逐项汇总与初次报告一致。源码提交 `fbef3993e9decc68c8be93a17551536ea9013fd8`，Rust源码树 `8e3b3e57e212affa2c7b391128fe45d58629c89c`。`swirl-inspect.exe` SHA-256：`55a3ad7fab5c9b1fa1eafdf1ae5aaff9a40626629fa1461f868c6e5776988ac5`。Cargo确认既有二进制对当前未变化Rust源码是最新产物；没有把复用产物伪称为新编译版本。
+
+完整绑定及各入口完整性/未验证区段计数见 `docs/evidence/SUBSCRIPTION_18_ENTRY_REPLAY_FBEF399.json`。这是原生离线检查器证据，不是18份完整Qt产品配置执行或真实联网验收。

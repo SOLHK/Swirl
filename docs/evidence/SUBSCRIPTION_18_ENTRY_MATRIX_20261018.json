@@ -3,8 +3,8 @@
   "generated_at": "2026-10-18T08:04:33.261222+00:00",
   "scope": "18 original manifest entries; new 2026-10-18 06:55:48 UTC capture versus separately identified historical samples",
   "supplier_requests_this_audit": 0,
-  "decrypted_response_bodies_this_audit": 0,
-  "manifest_only_in_memory_decryption": true,
+  "decrypted_response_bodies_this_audit": 18,
+  "manifest_only_in_memory_decryption": false,
   "evidence": {
     "new_corpus": {
       "path": "D:\\Codex\\outputs\\capture-065548-corpus.json",
@@ -133,7 +133,10 @@
         "checkpoint_checkout_sha": "d3bf1eb25d0eab3fa0c5227e25b1b7e020bada27",
         "executable_source_sha": null,
         "note": "Checkpoint reused an existing inspector; corpus report does not record binary hash/source SHA. Checkout SHA is not asserted as tested executable source."
-      }
+      },
+      "parser_source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+      "configuration_sections_unvalidated": 18,
+      "body_integrity_verified": true
     },
     {
       "entry": 2,
@@ -190,7 +193,10 @@
         "checkpoint_checkout_sha": "d3bf1eb25d0eab3fa0c5227e25b1b7e020bada27",
         "executable_source_sha": null,
         "note": "Checkpoint reused an existing inspector; corpus report does not record binary hash/source SHA. Checkout SHA is not asserted as tested executable source."
-      }
+      },
+      "parser_source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+      "configuration_sections_unvalidated": 18,
+      "body_integrity_verified": true
     },
     {
       "entry": 3,
@@ -247,7 +253,10 @@
         "checkpoint_checkout_sha": "d3bf1eb25d0eab3fa0c5227e25b1b7e020bada27",
         "executable_source_sha": null,
         "note": "Checkpoint reused an existing inspector; corpus report does not record binary hash/source SHA. Checkout SHA is not asserted as tested executable source."
-      }
+      },
+      "parser_source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+      "configuration_sections_unvalidated": 18,
+      "body_integrity_verified": true
     },
     {
       "entry": 4,
@@ -304,7 +313,10 @@
         "checkpoint_checkout_sha": "d3bf1eb25d0eab3fa0c5227e25b1b7e020bada27",
         "executable_source_sha": null,
         "note": "Checkpoint reused an existing inspector; corpus report does not record binary hash/source SHA. Checkout SHA is not asserted as tested executable source."
-      }
+      },
+      "parser_source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+      "configuration_sections_unvalidated": 18,
+      "body_integrity_verified": true
     },
     {
       "entry": 5,
@@ -361,7 +373,10 @@
         "checkpoint_checkout_sha": "d3bf1eb25d0eab3fa0c5227e25b1b7e020bada27",
         "executable_source_sha": null,
         "note": "Checkpoint reused an existing inspector; corpus report does not record binary hash/source SHA. Checkout SHA is not asserted as tested executable source."
-      }
+      },
+      "parser_source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+      "configuration_sections_unvalidated": 8,
+      "body_integrity_verified": true
     },
     {
       "entry": 6,
@@ -418,7 +433,10 @@
         "checkpoint_checkout_sha": "d3bf1eb25d0eab3fa0c5227e25b1b7e020bada27",
         "executable_source_sha": null,
         "note": "Checkpoint reused an existing inspector; corpus report does not record binary hash/source SHA. Checkout SHA is not asserted as tested executable source."
-      }
+      },
+      "parser_source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+      "configuration_sections_unvalidated": 8,
+      "body_integrity_verified": true
     },
     {
       "entry": 7,
@@ -503,7 +521,10 @@
         "checkpoint_checkout_sha": "d3bf1eb25d0eab3fa0c5227e25b1b7e020bada27",
         "executable_source_sha": null,
         "note": "Checkpoint reused an existing inspector; corpus report does not record binary hash/source SHA. Checkout SHA is not asserted as tested executable source."
-      }
+      },
+      "parser_source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+      "configuration_sections_unvalidated": 4,
+      "body_integrity_verified": true
     },
     {
       "entry": 8,
@@ -560,7 +581,10 @@
         "checkpoint_checkout_sha": "d3bf1eb25d0eab3fa0c5227e25b1b7e020bada27",
         "executable_source_sha": null,
         "note": "Checkpoint reused an existing inspector; corpus report does not record binary hash/source SHA. Checkout SHA is not asserted as tested executable source."
-      }
+      },
+      "parser_source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+      "configuration_sections_unvalidated": 4,
+      "body_integrity_verified": true
     },
     {
       "entry": 9,
@@ -617,7 +641,10 @@
         "checkpoint_checkout_sha": "d3bf1eb25d0eab3fa0c5227e25b1b7e020bada27",
         "executable_source_sha": null,
         "note": "Checkpoint reused an existing inspector; corpus report does not record binary hash/source SHA. Checkout SHA is not asserted as tested executable source."
-      }
+      },
+      "parser_source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+      "configuration_sections_unvalidated": 0,
+      "body_integrity_verified": true
     },
     {
       "entry": 10,
@@ -674,7 +701,10 @@
         "checkpoint_checkout_sha": "d3bf1eb25d0eab3fa0c5227e25b1b7e020bada27",
         "executable_source_sha": null,
         "note": "Checkpoint reused an existing inspector; corpus report does not record binary hash/source SHA. Checkout SHA is not asserted as tested executable source."
-      }
+      },
+      "parser_source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+      "configuration_sections_unvalidated": 0,
+      "body_integrity_verified": true
     },
     {
       "entry": 11,
@@ -731,7 +761,10 @@
         "checkpoint_checkout_sha": "d3bf1eb25d0eab3fa0c5227e25b1b7e020bada27",
         "executable_source_sha": null,
         "note": "Checkpoint reused an existing inspector; corpus report does not record binary hash/source SHA. Checkout SHA is not asserted as tested executable source."
-      }
+      },
+      "parser_source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+      "configuration_sections_unvalidated": 4,
+      "body_integrity_verified": true
     },
     {
       "entry": 12,
@@ -788,7 +821,10 @@
         "checkpoint_checkout_sha": "d3bf1eb25d0eab3fa0c5227e25b1b7e020bada27",
         "executable_source_sha": null,
         "note": "Checkpoint reused an existing inspector; corpus report does not record binary hash/source SHA. Checkout SHA is not asserted as tested executable source."
-      }
+      },
+      "parser_source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+      "configuration_sections_unvalidated": 4,
+      "body_integrity_verified": true
     },
     {
       "entry": 13,
@@ -845,7 +881,10 @@
         "checkpoint_checkout_sha": "d3bf1eb25d0eab3fa0c5227e25b1b7e020bada27",
         "executable_source_sha": null,
         "note": "Checkpoint reused an existing inspector; corpus report does not record binary hash/source SHA. Checkout SHA is not asserted as tested executable source."
-      }
+      },
+      "parser_source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+      "configuration_sections_unvalidated": 9,
+      "body_integrity_verified": true
     },
     {
       "entry": 14,
@@ -902,7 +941,10 @@
         "checkpoint_checkout_sha": "d3bf1eb25d0eab3fa0c5227e25b1b7e020bada27",
         "executable_source_sha": null,
         "note": "Checkpoint reused an existing inspector; corpus report does not record binary hash/source SHA. Checkout SHA is not asserted as tested executable source."
-      }
+      },
+      "parser_source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+      "configuration_sections_unvalidated": 9,
+      "body_integrity_verified": true
     },
     {
       "entry": 15,
@@ -976,7 +1018,10 @@
         "checkpoint_checkout_sha": "d3bf1eb25d0eab3fa0c5227e25b1b7e020bada27",
         "executable_source_sha": null,
         "note": "Checkpoint reused an existing inspector; corpus report does not record binary hash/source SHA. Checkout SHA is not asserted as tested executable source."
-      }
+      },
+      "parser_source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+      "configuration_sections_unvalidated": 12,
+      "body_integrity_verified": true
     },
     {
       "entry": 16,
@@ -1033,7 +1078,10 @@
         "checkpoint_checkout_sha": "d3bf1eb25d0eab3fa0c5227e25b1b7e020bada27",
         "executable_source_sha": null,
         "note": "Checkpoint reused an existing inspector; corpus report does not record binary hash/source SHA. Checkout SHA is not asserted as tested executable source."
-      }
+      },
+      "parser_source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+      "configuration_sections_unvalidated": 12,
+      "body_integrity_verified": true
     },
     {
       "entry": 17,
@@ -1089,7 +1137,10 @@
         "checkpoint_checkout_sha": "d3bf1eb25d0eab3fa0c5227e25b1b7e020bada27",
         "executable_source_sha": null,
         "note": "Checkpoint reused an existing inspector; corpus report does not record binary hash/source SHA. Checkout SHA is not asserted as tested executable source."
-      }
+      },
+      "parser_source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+      "configuration_sections_unvalidated": 0,
+      "body_integrity_verified": true
     },
     {
       "entry": 18,
@@ -1145,7 +1196,10 @@
         "checkpoint_checkout_sha": "d3bf1eb25d0eab3fa0c5227e25b1b7e020bada27",
         "executable_source_sha": null,
         "note": "Checkpoint reused an existing inspector; corpus report does not record binary hash/source SHA. Checkout SHA is not asserted as tested executable source."
-      }
+      },
+      "parser_source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+      "configuration_sections_unvalidated": 0,
+      "body_integrity_verified": true
     }
   ],
   "limitations": [
@@ -1153,6 +1207,24 @@
     "Parsing, protocol candidacy, product-chain acceptance and real network verification are separate measures.",
     "No success percentage is defined for zero attempted new-cache network samples.",
     "Historical Windows success and Linux TCP failure remain separate environments and cache generations.",
-    "No supplier request, credential export, decrypted body read, source edit, build or new network test occurred during this audit."
-  ]
+    "The initial audit read only manifest metadata. The later bound replay decrypted response bodies in memory and verified the existing Cargo artifact; no supplier/node request, credential export or plaintext-file write occurred."
+  ],
+  "parser_binding": {
+    "source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+    "rust_core_tree": "8e3b3e57e212affa2c7b391128fe45d58629c89c",
+    "inspector_sha256": "55a3ad7fab5c9b1fa1eafdf1ae5aaff9a40626629fa1461f868c6e5776988ac5",
+    "inspector_bytes": 2370195,
+    "inspector_mtime_utc": "2026-10-18T07:09:31.911354+00:00",
+    "recorded_utc": "2026-10-18T08:21:39.996195+00:00",
+    "build_result": "success; Cargo verified existing artifact up to date for unchanged Rust source",
+    "private_json_mode": false,
+    "supplier_requests": 0,
+    "real_node_requests": 0,
+    "plaintext_written": false,
+    "previous_corpus_semantics_equal": true,
+    "evidence": "SUBSCRIPTION_18_ENTRY_REPLAY_FBEF399.json",
+    "evidence_sha256": "af006859cc7e0ba6f3768140c6c157777b427b968cf1be8062bbfd7ed7b372fe"
+  },
+  "distinct_ciphertexts_replayed": 17,
+  "plaintext_written": false
 }

@@ -44,3 +44,11 @@ Next: verify this follow-up's exact CI; implement explicit DNS query-family poli
 - All generated artifacts and test settings reside under D:/Codex. No drivers, proxy settings, user installation or provider endpoints were changed. The preceding stage's appearance/storage tests are prior evidence, not rerun claims for this stage.
 
 Exact final logs use `normalizer-acceptance-*` and `normalizer-peer-*` under D:/Codex/work. CI for this implementation must be checked after its push; ed2f87f's green CI is not its result.
+
+## Final implementation and exact CI
+
+Implementation: `fbef3993e9decc68c8be93a17551536ea9013fd8`. [Rust Core 39110589656](https://github.com/SOLHK/Swirl/actions/runs/39110589656) succeeded on Windows, Linux and macOS; [core validation 39110589665](https://github.com/SOLHK/Swirl/actions/runs/39110589665) also succeeded. Windows includes the added native import-boundary CTest plus native Qt/storage and four independent Qt protocol-peer suites. This confirms this implementation's checks, not all-protocol or real-corpus acceptance.
+
+[Verified evidence](evidence/RUST_SUBSCRIPTION_BOUNDARIES_20261018_VERIFIED.json) binds the exact source, local binary/log hashes, original red regression, CI jobs and final offline replay. [Replay evidence](evidence/SUBSCRIPTION_18_ENTRY_REPLAY_FBEF399.json) binds all18 cached entries to the same source's Rust tree and inspector binary; default redacted output only, no provider/node requests, no plaintext files. All18 counts match the prior report.
+
+A transient Windows exec transport disconnect recovered before any further mutation. The interrupted command never started. Source hashes remained correct and no orphan build/test process remained; the user's existing Swirl process was left untouched.
