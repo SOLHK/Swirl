@@ -121,19 +121,65 @@ class ConnectivityDiagnostics(unittest.TestCase):
                 self.assertEqual(peer.recv(1), b"")
 
     def test_refusal_is_distinct_and_does_not_consume_full_budget(self):
+        def unexpected_wait(*_):
+            self.fail("An immediate refusal must not wait for a timer")
+        for code in (errno.ECONNREFUSED, 10061):
+            with self.subTest(error_code=code):
+                network = VirtualNetwork(lambda *_: code, unexpected_wait)
+                immediate = network.diagnose(
+                    {"host": "fixture.invalid", "port": 1, "total_budget_ms": 500},
+                    [row(socket.AF_INET, ("127.0.0.1", 1))])
+                self.assertFalse(immediate["ok"])
+                self.assertEqual(immediate["attempts"][0]["outcome"], "refused")
+                self.assertEqual(immediate["error_code"], "UpstreamConnectFailed")
+                self.assertEqual(immediate["total_elapsed_ms"], 0)
+                self.assertEqual(network.peak, 1)
+                self.assertEqual(network.alive, 0)
+                DIAG.safe_report(immediate, "python-socket")
+
         # A bound, non-listening socket is not a portable refusal fixture:
         # Windows and macOS can leave its incoming connection pending.
         with socket.socket() as closed_listener:
             closed_listener.bind(("127.0.0.1", 0))
             closed_listener.listen()
             endpoint = closed_listener.getsockname()
+        # Observe the OS separately: localhost refusal notification can be
+        # delayed on Windows (https://github.com/python/cpython/issues/85480).
+        # Both probes have a fixed three-second test deadline; neither changes
+        # the production scheduler, and an OS timeout remains a real failure.
+        reference_started = time.monotonic()
+        with socket.socket() as reference:
+            remaining = 3 - (time.monotonic() - reference_started)
+            if remaining <= 0:
+                reference_outcome = "timeout"
+            else:
+                reference.settimeout(remaining)
+                try:
+                    reference.connect(endpoint)
+                    reference_outcome = "success"
+                except ConnectionRefusedError:
+                    reference_outcome = "refused"
+                except TimeoutError:
+                    reference_outcome = "timeout"
+                except OSError:
+                    reference_outcome = "other"
+        reference_elapsed_ms = int((time.monotonic() - reference_started) * 1000)
         report = DIAG.diagnose_python(
-            {"host": "private.invalid", "port": endpoint[1], "total_budget_ms": 500},
+            {"host": "private.invalid", "port": endpoint[1], "total_budget_ms": 3000},
             resolver=lambda *args, **kwargs: [row(socket.AF_INET, endpoint)])
+        print("LOOPBACK REFUSAL OBSERVATION: " + json.dumps({
+            "per_probe_budget_ms": 3000, "os_outcome": reference_outcome,
+            "os_elapsed_ms": reference_elapsed_ms,
+            "diagnostic_outcomes": [entry["outcome"] for entry in report["attempts"]],
+            "diagnostic_elapsed_ms": report["total_elapsed_ms"]}), flush=True)
+        self.assertEqual(reference_outcome, "refused",
+                         "OS refusal was unavailable within the fixed observation deadline")
+        self.assertLess(reference_elapsed_ms, 3000)
         self.assertFalse(report["ok"])
         self.assertEqual(report["attempts"][0]["outcome"], "refused")
         self.assertEqual(report["error_code"], "UpstreamConnectFailed")
-        self.assertLess(report["total_elapsed_ms"], 500)
+        self.assertLess(report["total_elapsed_ms"], 3000)
+        DIAG.safe_report(report, "python-socket")
 
     def test_independent_dns_timeout_prevents_all_tcp_work(self):
         def stalled(*args, **kwargs):
@@ -177,13 +223,27 @@ class ConnectivityDiagnostics(unittest.TestCase):
             rows = [row(socket.AF_INET, refused_endpoint),
                     row(socket.AF_INET, listener.getsockname()),
                     row(socket.AF_INET, listener.getsockname())]
+            # The real OS may report refusal after the existing 250ms stagger;
+            # the live second endpoint must still win and close a pending loser.
             report = DIAG.diagnose_python(
-                {"host": "private.invalid", "port": 1, "total_budget_ms": 200},
+                {"host": "private.invalid", "port": 1, "total_budget_ms": 1000},
                 resolver=lambda *args, **kwargs: rows)
+            print("LOOPBACK FALLBACK OBSERVATION: " + json.dumps({
+                "budget_ms": 1000, "elapsed_ms": report["total_elapsed_ms"],
+                "outcomes": [entry["outcome"] for entry in report["attempts"]],
+                "started_ms": [entry["started_ms"] for entry in report["attempts"]],
+                "peak_pending": report["peak_pending"]}), flush=True)
             self.assertTrue(report["ok"])
             self.assertEqual(report["address_count"], 2)
-            self.assertEqual([entry["outcome"] for entry in report["attempts"]], ["refused", "success"])
+            self.assertEqual(report["attempted_count"], 2)
+            self.assertEqual(report["remaining_count"], 0)
+            self.assertIn(report["attempts"][0]["outcome"], ("refused", "cancelled"))
+            self.assertEqual(report["attempts"][1]["outcome"], "success")
+            if report["attempts"][0]["outcome"] == "cancelled":
+                self.assertGreaterEqual(report["attempts"][1]["started_ms"], 249)
+                self.assertEqual(report["peak_pending"], 2)
             self.assertLessEqual(report["peak_pending"], 2)
+            DIAG.safe_report(report, "python-socket")
             with listener.accept()[0] as peer:
                 peer.settimeout(1)
                 self.assertEqual(peer.recv(1), b"")
