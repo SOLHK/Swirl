@@ -79,9 +79,13 @@ weight or size. Transform-only animation never drives optical-size changes.
 
 ## Retained verification boundaries
 
-The historical physical DPI failures and unpassed stable 240 fps target remain
-recorded in `FONT_ACTUAL_DPI_20261018.md`. This new policy cannot clear them by
-itself. Synthetic font tests establish real axis application, state handling
+The historical physical DPI observations and unpassed stable 240 fps target remain
+recorded in `FONT_ACTUAL_DPI_20261018.md`. Later user-provided evidence identifies
+the old delta-3 case as a reference-image defect and records 160/160 passing
+simulated-DPR cases at `fcc5937`, with tolerance 2 unchanged. Real 125%/200%
+system-scale transitions and the new automatic-font code still require their own
+physical acceptance. See `FONT_AUTOMATION_VALIDATION.md` for the newer evidence
+and 60 Hz limitations. Synthetic font tests establish real axis application, state handling
 and fallback; they do not establish physical-panel clarity. The Windows workflow
 and its exact pass/skip contract are described in `FONT_SYSTEM_CI.md`.
 
