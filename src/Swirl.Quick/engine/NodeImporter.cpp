@@ -42,6 +42,11 @@ QJsonValue convert(const fkyaml::node &value, int depth, int &budget) {
     }
     return out;
 }
+QJsonValue singleDocument(const QByteArray &bytes) {
+    const auto documents=fkyaml::node::deserialize_docs(bytes.constData(),bytes.constData()+bytes.size());
+    if(documents.size()!=1)throw std::runtime_error("document count");
+    int budget=100000;return convert(documents.front(),0,budget);
+}
 bool safeShape(const QByteArray &bytes) {
     // Bound nesting before the YAML parser allocates an AST. A conservative
     // limit is preferable to accepting a document which could exhaust the UI.
@@ -78,7 +83,7 @@ bool safeOptions(const QJsonValue &value) {
 QJsonObject NodeImporter::strictJsonObject(const QByteArray &bytes){
     if(bytes.isEmpty()||bytes.size()>MaximumBytes||!safeShape(bytes))return {};
     QJsonParseError error;const auto json=QJsonDocument::fromJson(bytes,&error);if(error.error!=QJsonParseError::NoError||!json.isObject())return {};
-    try{const auto parsed=fkyaml::node::deserialize(bytes.constData(),bytes.constData()+bytes.size());int budget=100000;return convert(parsed,0,budget).toObject();}catch(...){return {};}
+    try{return singleDocument(bytes).toObject();}catch(...){return {};}
 }
 NodeImporter::Result NodeImporter::parse(const QByteArray &bytes) {
     Result result;
@@ -88,22 +93,23 @@ NodeImporter::Result NodeImporter::parse(const QByteArray &bytes) {
     QJsonValue root;
     const auto normalized=SubscriptionNormalizer::normalize(bytes);
     result.format=normalized.format;
+    result.configuration=normalized.configuration;
+    result.configurationFormat=normalized.configurationFormat;
     if(!normalized.error.isEmpty()){result.error=normalized.error;return result;}
     const auto effective=normalized.decodedDocument.isEmpty()?bytes:normalized.decodedDocument;
     if(!safeShape(effective)){result.error=QStringLiteral("订阅解码后嵌套过深。");return result;}
     if(normalized.handled){
         // QJsonDocument accepts duplicate keys. Validate the original JSON
         // with the existing strict parser before adapting sing-box objects.
-        if(effective.trimmed().startsWith('{')){
-            try{const auto checked=fkyaml::node::deserialize(effective.constData(),effective.constData()+effective.size());int budget=100000;convert(checked,0,budget);}
+        if(normalized.configurationFormat=="sing-box"||effective.trimmed().startsWith('{')){
+            try{singleDocument(effective);}
             catch(...){result.error=QStringLiteral("JSON 含重复键、无效结构或过深嵌套。");return result;}
         }
         root=normalized.nodes;
     }
     else {
     try {
-        auto yaml=fkyaml::node::deserialize(effective.constData(),effective.constData()+effective.size());
-        int budget=100000; root=convert(yaml,0,budget);
+        root=singleDocument(effective);
     } catch(...) {
         // Parser messages can quote password/token-bearing input; never expose them.
         result.error=QStringLiteral("无法解析 Clash YAML/JSON：请检查格式、重复键、锚点循环和嵌套层数。"); return result;
@@ -115,7 +121,7 @@ NodeImporter::Result NodeImporter::parse(const QByteArray &bytes) {
         const auto obj=root.toObject();
         if(obj.contains("proxies")) {
             array=obj.value("proxies").toArray();
-            result.configuration=obj;result.configuration.remove("proxies");
+            result.configuration=obj;result.configuration.remove("proxies");result.configurationFormat="clash";
         }
         else if(obj.contains("type"))array.append(obj);
     }

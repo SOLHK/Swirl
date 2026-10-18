@@ -145,7 +145,7 @@ jobs:
         run: |
           cmake -S src/Swirl.Quick -B build/rust-qt -G "Visual Studio 17 2022" -A x64 -DSWIRL_USE_RUST_CORE=ON -DSWIRL_BUILD_UI_TESTS=ON
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          cmake --build build/rust-qt --config Release --target SwirlRustCoreTests SwirlStoragePathsTests --parallel
+          cmake --build build/rust-qt --config Release --target SwirlRustCoreTests SwirlStoragePathsTests SwirlImportTests --parallel
       - name: Run Qt to Rust integration without Mihomo
         working-directory: .
         run: |
@@ -153,7 +153,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $env:SWIRL_TEST_ROOT=Join-Path $env:RUNNER_TEMP 'swirl-native-qt-tests'
           New-Item -ItemType Directory -Force -Path $env:SWIRL_TEST_ROOT | Out-Null
-          ctest --test-dir build/rust-qt -C Release -R '^swirl-(rust-qt-integration|storage-paths)$' --output-on-failure
+          ctest --test-dir build/rust-qt -C Release -R '^swirl-(rust-qt-integration|storage-paths|import-boundaries)$' --output-on-failure
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $env:SWIRL_RUST_HARNESS=(Resolve-Path core/target/release/swirl-api.exe).Path
           $env:SWIRL_RUST_QT_TESTS=(Resolve-Path build/rust-qt/Release/SwirlRustCoreTests.exe).Path

@@ -43,6 +43,45 @@ class ImportTests:public QObject {
     Q_OBJECT
 private slots:
     void initTestCase() { QStandardPaths::setTestModeEnabled(true);SwirlPaths::initializeTestStorage();QSettings::setDefaultFormat(QSettings::IniFormat);QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,SwirlPaths::writableLocation(QStandardPaths::AppConfigLocation)); }
+    void sourceGlobalsArePreservedAndCannotBecomeNodeOnlyImports() {
+        const QByteArray ini="; fixture\n[ Proxy ] # nodes\nA = socks5, 127.0.0.1, 1080\n[Rule]\nFINAL,A\n[Future]\nopaque fixture-secret\n";
+        const QByteArray json=R"({"outbounds":[{"type":"socks","tag":"A","server":"127.0.0.1","server_port":1080},{"type":"selector","tag":"choice","outbounds":["A"]}],"route":{"final":"choice"},"future":{"fixture-secret":true}})";
+        for(const auto &original:{ini,json})for(const auto &body:{original,original.toBase64()}){
+            const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);QVERIFY(!parsed.configuration.isEmpty());
+            if(original==ini){QCOMPARE(parsed.configurationFormat,QString("ini"));QVERIFY(parsed.configuration["document"].toString().contains("opaque fixture-secret"));}
+            else {QCOMPARE(parsed.configurationFormat,QString("sing-box"));QCOMPARE(parsed.configuration,QJsonDocument::fromJson(json).object());}
+            QTemporaryDir directory;NodeStore store(directory.filePath("nodes.dpapi"));NodeImportService service(&store);
+            const auto seed=NodeImporter::parse("proxies: [{name: retained, type: socks5, server: 127.0.0.1, port: 1081}]");QVERIFY(seed);QVERIFY(store.importNodes(seed.nodes));
+            QFile file(store.filePath());QVERIFY(file.open(QIODevice::ReadOnly));const auto before=file.readAll();file.close();
+            service.importText(QString::fromUtf8(body));QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),4000);QCOMPARE(store.nodes().size(),1);QCOMPARE(store.nodes().first().name,QString("retained"));
+            QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),before);QVERIFY(!service.message().contains("fixture-secret"));
+        }
+        for(const auto &body:{QByteArray("[Proxy]\nA = socks5, 127.0.0.1, 1080\nBypass = direct\n"),QByteArray(R"({"outbounds":[{"type":"socks","tag":"A","server":"127.0.0.1","server_port":1080},{"type":"direct","tag":"bypass"}]})")}){
+            const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));QVERIFY(!parsed.configuration.isEmpty());
+        }
+    }
+    void iniEnvelopeAndWrappedJsonFailClosed() {
+        const QByteArray node="A = socks5, 127.0.0.1, 1080\n";
+        const QList<QByteArray> malformed{
+            "[Proxy]\n"+node+"[Rule\nFINAL,A", "[Proxy]\n"+node+"[Rule] trailing\nFINAL,A",
+            "[Proxy]\n"+node+"[ proxy ]\nB = socks5, 127.0.0.1, 1081", "[Proxy]\n"+node+"[]\n",
+            "[Proxy]\n"+node+"["+QByteArray(129,'a')+"]\n", "preface = ignored\n[Proxy]\n"+node,
+            QByteArray(1,char(0x0b))+"[Proxy]\n"+node, "[Proxy]\n"+node+QByteArray(1,char(0x7f)),
+            "[Proxy]\n"+node+QByteArray(1,char(0xff)), "[Proxy]\n"+node+QByteArray(1,char(0xe4)), "[Proxy]\n"+node+"[Future\tSection]\n",
+            QByteArray(R"({"outbounds":[{"type":"socks","tag":"A","server":"127.0.0.1","server_port":1080,"server_port":1081}]})")
+        };
+        for(const auto &body:malformed)for(const auto &wrapped:{body,body.toBase64(),body.toBase64().toBase64()})QVERIFY(!NodeImporter::parse(wrapped));
+        const QByteArray yaml="proxies: [{name: A, type: socks5, server: 127.0.0.1, port: 1080}]\n";
+        for(const auto &suffix:{QByteArray("---\ndns: {nameserver: [192.0.2.53]}\n"),QByteArray("...\n---\nfuture: true\n"),QByteArray("---\n[invalid"),QByteArray("---\n")}){
+            const auto body=yaml+suffix;for(const auto &wrapped:{body,body.toBase64(),QByteArray("STATUS=fixture\n")+body})QVERIFY(!NodeImporter::parse(wrapped));
+        }
+        const auto json=malformed.last();QVERIFY(!NodeImporter::parse("STATUS=fixture\n"+json));QVERIFY(!NodeImporter::parse(QByteArray("\xef\xbb\xbf")+json));QVERIFY(!NodeImporter::parse(QByteArray("\xef\xbb\xbf\xef\xbb\xbf")+json));
+        QVERIFY(NodeImporter::parse("[{name: flow, type: socks5, server: 127.0.0.1, port: 1080}]"));
+        QVERIFY(NodeImporter::parse("[\n{name: flow, type: socks5, server: 127.0.0.1, port: 1080}\n]"));
+        for(const auto &body:{QByteArray("; comments\n[ Proxy ] # nodes\n")+node,QByteArray("[server_local] ; nodes\nsocks5=127.0.0.1:1080, tag=A\n"),node}){
+            const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));QVERIFY(parsed.configuration.isEmpty());
+        }
+    }
     void completeConfigurationWithoutOwnerDoesNotDiscardGlobals() {
         QTemporaryDir directory;NodeStore store(directory.filePath("nodes.dpapi"));NodeImportService imports(&store);
         imports.importText("proxies: [{name: A, type: socks5, server: 127.0.0.1, port: 1080}]\nrules: [MATCH,DIRECT]\n");

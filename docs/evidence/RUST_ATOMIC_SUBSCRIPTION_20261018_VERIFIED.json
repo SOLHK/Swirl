@@ -1,7 +1,7 @@
 {
   "stage": "stable identities and atomic native subscription profile",
   "base_commit": "064bfa3218758162dd3af89d3bf03b27a6cb3237",
-  "product_commit": null,
+  "product_commit": "ed2f87fb56f704b365a392b691bd138995273867",
   "branch": "work/core-completion-20261017",
   "supplier_refresh_requests": 0,
   "private_urls_or_credentials_in_public_evidence": false,
@@ -214,7 +214,60 @@
     "atomic-development-checks.log": "752dc8b2953687135ce339863ecba12c4e33c03b59f9a7cbc6f8733ea7ac220b"
   },
   "ci": {
-    "current_stage": "not yet submitted",
+    "current_stage": [
+      {
+        "id": 39109242588,
+        "name": "Core implementation validation",
+        "status": "completed",
+        "conclusion": "success",
+        "sha": "ed2f87fb56f704b365a392b691bd138995273867",
+        "url": "https://github.com/SOLHK/Swirl/actions/runs/39109242588",
+        "jobs": [
+          {
+            "id": 117621596930,
+            "name": "core",
+            "status": "completed",
+            "conclusion": "success",
+            "active": [],
+            "failed": []
+          }
+        ]
+      },
+      {
+        "id": 39109242589,
+        "name": "Swirl Rust Core",
+        "status": "completed",
+        "conclusion": "success",
+        "sha": "ed2f87fb56f704b365a392b691bd138995273867",
+        "url": "https://github.com/SOLHK/Swirl/actions/runs/39109242589",
+        "jobs": [
+          {
+            "id": 117621596764,
+            "name": "windows-rust",
+            "status": "completed",
+            "conclusion": "success",
+            "active": [],
+            "failed": []
+          },
+          {
+            "id": 117621596865,
+            "name": "portable-rust (ubuntu-latest)",
+            "status": "completed",
+            "conclusion": "success",
+            "active": [],
+            "failed": []
+          },
+          {
+            "id": 117621596918,
+            "name": "portable-rust (macos-latest)",
+            "status": "completed",
+            "conclusion": "success",
+            "active": [],
+            "failed": []
+          }
+        ]
+      }
+    ],
     "previous_product_commit": "4e993d62884b138d4ee5bbe604e90d85cde6bb33",
     "previous_rust_run": 39106885139,
     "previous_platforms": {
@@ -226,5 +279,12 @@
   "progress_baseline": "v1",
   "verified_acceptance_weight_percent": 10.833333,
   "next": "strict external DNS semantics, full-document provenance and remaining client profiles; preserve legacy settings, then private corpus execution ledger",
-  "development_checks": "passed"
+  "development_checks": "passed",
+  "post_stage_finding": {
+    "code": "ImportedSwirlAliasCanReferenceSelectedNode",
+    "reproduced": true,
+    "evidence": "normalizer-policy-red.log",
+    "follow_up": "RUST_SUBSCRIPTION_BOUNDARIES_20261018.md",
+    "note": "Passing CI did not detect this document-scoping issue. The follow-up adds a failing regression before fixing it."
+  }
 }

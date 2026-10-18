@@ -13,7 +13,8 @@ public:
         QJsonArray nodes;
         QList<QJsonObject> originals;
         QList<QStringList> issues;
-        QString format,error;
+        QString format,error,configurationFormat;
+        QJsonObject configuration; // Unapplied source semantics; never silently discard them.
         QByteArray decodedDocument;
     };
     static Result normalize(const QByteArray &document,int depth=0);

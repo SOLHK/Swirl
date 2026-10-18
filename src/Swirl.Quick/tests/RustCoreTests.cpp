@@ -26,6 +26,32 @@ class RustCoreTests:public QObject {
  }
 private slots:
  void initTestCase(){QStandardPaths::setTestModeEnabled(true);SwirlPaths::initializeTestStorage();QSettings::setDefaultFormat(QSettings::IniFormat);QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,SwirlPaths::writableLocation(QStandardPaths::AppConfigLocation));}
+ void fullDocumentCannotUseExternalSelectedNodeAlias(){
+  QTemporaryDir directory;const auto path=directory.filePath("nodes.dpapi");NodeStore seed(path);
+  QVERIFY(seed.saveSubscription({},"retained source",QUrl("https://fixture.invalid/retained"),360,false));const auto oldSource=seed.subscriptions().first().id;
+  QVERIFY(seed.saveSubscription({},"incoming source",QUrl("https://fixture.invalid/incoming"),360,false));const auto newSource=seed.subscriptions().last().id;QVERIFY(oldSource!=newSource);
+  const auto old=NodeImporter::parse("proxies: [{name: outside, type: socks5, server: 127.0.0.1, port: 1080}]");QVERIFY(old);QVERIFY(seed.importNodes(old.nodes,oldSource));const auto oldId=seed.nodes().first().id;QVERIFY(seed.select(oldId));
+  EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,path);
+  QVERIFY(controller.saveRoutingRule("MATCH",{},"SWIRL")); // Existing native editor meaning remains supported.
+  QFile file(path);QVERIFY(file.open(QIODevice::ReadOnly));const auto before=file.readAll();file.close();const auto network=controller.networkConfigurationSnapshot();
+  const auto incoming=NodeImporter::parse("proxies: [{name: inside, type: socks5, server: 127.0.0.1, port: 1081}]");QVERIFY(incoming);
+  for(const auto &target:QStringList{"SWIRL","GLOBAL","outside",oldId}){
+   const QVariantMap settings{{"rules",QStringList{"MATCH,"+target}}};const QJsonObject original{{"rules",QJsonArray{"MATCH,"+target}}};
+   QVERIFY(!controller.importNodesAndConfiguration(incoming.nodes,newSource,settings,original));
+   QCOMPARE(controller.nodeCatalog().size(),1);QCOMPARE(controller.networkConfigurationSnapshot(),network);
+   QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),before);file.close();NodeStore reopened(path);QCOMPARE(reopened.selectedId(),oldId);QCOMPARE(reopened.nodes().first().sourceId,oldSource);
+  }
+  controller.imports()->importText("proxies: [{name: inside, type: socks5, server: 127.0.0.1, port: 1081}]\nrules: ['MATCH,SWIRL']\n");QTRY_VERIFY_WITH_TIMEOUT(!controller.imports()->busy(),4000);QCOMPARE(controller.nodeCatalog().size(),1);
+ }
+ void nonClashGlobalConfigurationDoesNotAlterNativeState(){
+  QTemporaryDir directory;const auto path=directory.filePath("nodes.dpapi");EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,path);
+  controller.imports()->importText("proxies: [{name: retained, type: socks5, server: 127.0.0.1, port: 1080}]");QTRY_VERIFY_WITH_TIMEOUT(!controller.imports()->busy(),4000);QCOMPARE(controller.nodeCatalog().size(),1);
+  QFile file(path);QVERIFY(file.open(QIODevice::ReadOnly));const auto before=file.readAll();file.close();const auto nodes=controller.nodeCatalog();const auto network=controller.networkConfigurationSnapshot();
+  for(const auto &body:{QByteArray("[Proxy]\nA = socks5, 127.0.0.1, 1081\n[Rule]\nFINAL,A\n[Future]\nfixture-secret\n"),QByteArray(R"({"outbounds":[{"type":"socks","tag":"A","server":"127.0.0.1","server_port":1081},{"type":"selector","tag":"choice","outbounds":["A"]}],"route":{"final":"choice"}})")}){
+   controller.imports()->importText(QString::fromUtf8(body));QTRY_VERIFY_WITH_TIMEOUT(!controller.imports()->busy(),4000);QCOMPARE(controller.nodeCatalog(),nodes);QCOMPARE(controller.networkConfigurationSnapshot(),network);
+   QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),before);file.close();QVERIFY(!controller.imports()->message().contains("fixture-secret"));QVERIFY(!controller.processAlive());
+  }
+ }
  void fullClashSubscriptionReachesNativePolicyAndRejectsPartialUpdates(){
   ControlledNetwork net;QVERIFY(net.start());QTemporaryDir directory;const auto path=directory.filePath("nodes.dpapi");
   EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,path,true);QTcpServer port;QVERIFY(port.listen(QHostAddress::LocalHost));const auto proxyPort=port.serverPort();port.close();controller.setProxyPort(proxyPort);controller.setRoutingMode("rule");

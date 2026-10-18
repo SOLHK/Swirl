@@ -57,6 +57,9 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
 #ifndef SWIRL_USE_RUST_CORE
         *error=QStringLiteral("完整订阅事务当前仅在 Rust 模式提供；旧配置保持不变。");return false;
 #else
+        if(result.configurationFormat!="clash") {
+            *error=QStringLiteral("此格式的完整配置尚未映射；未应用节点或全局配置，原有设置保持不变。");return false;
+        }
         // First executable document profile: self-contained Clash groups/rules.
         // External DNS dialects and every other root semantic remain explicit
         // rejection rather than silently becoming Qt defaults or DIRECT.
@@ -469,6 +472,18 @@ bool EngineController::importNodesAndConfiguration(const QList<ProxyNode> &incom
     if(input.contains("groups")) {
         if(!QJsonValue::fromVariant(input.value("groups")).isArray()){m_networkError=QStringLiteral("策略组必须为数组。");return false;}
         mapped["groups"]=groups;
+    }
+    // Imported documents cannot use the editor's SWIRL selected-node alias:
+    // the global selection may belong to another subscription. The first
+    // document profile only routes to its declared groups or explicit builtins.
+    const auto rawRules=QJsonValue::fromVariant(input.value("rules"));
+    if(rawRules.isArray())for(const auto &value:rawRules.toArray()) {
+        if(!value.isString())continue; // The shared validator reports type errors.
+        auto parts=value.toString().split(',');for(auto &part:parts)part=part.trimmed();
+        const auto target=parts.value(parts.value(0)=="MATCH"?1:2);
+        if(target!="DIRECT"&&target!="REJECT"&&(!groupNames.contains(target)||target=="SWIRL"||target=="GLOBAL")){
+            m_networkError=QStringLiteral("订阅规则只能引用本文件声明的策略组、DIRECT 或 REJECT；未应用配置。");return false;
+        }
     }
     QVariantMap canonical;const auto nodes=plan.nodes();
     if(!validateNetworkConfiguration(mapped,&canonical,&nodes))return false;

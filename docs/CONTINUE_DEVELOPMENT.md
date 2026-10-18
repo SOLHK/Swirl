@@ -1,3 +1,11 @@
+# Latest follow-up: subscription dialect boundaries and document targets
+
+Read `RUST_SUBSCRIPTION_BOUNDARIES_20261018.md` and `SUBSCRIPTION_18_ENTRY_MATRIX_20261018.md`. Exact base `ed2f87f` CI has passed all three platforms; a later independent review reproduced imported SWIRL alias acceptance, now covered by a cross-subscription regression and a document-only target restriction. Native user rules keep SWIRL semantics. Non-Clash globals/policies are retained in parsing and explicitly rejected until mapped; wrapped duplicate keys, invalid UTF-8, duplicate BOM and multiple YAML documents fail closed.
+
+New real-node sampling is paused pending the user's scope confirmation reported by the parent. There have been no new supplier refreshes and no new real-node attempts. Current corpus contains three protocols (SS/Trojan/VLESS), not six. Historical remote #9 maps to manifest entry 7, not entry 9 or cache enumeration 8. Acceptance score is unchanged. See D:/Codex/outputs/SWIRL_ACTIVE_CHECKPOINT.md for exact committed source and running CI.
+
+---
+
 # 2026-10-18 latest: atomic native subscription profile and fixed acceptance baseline
 
 Continue on `work/core-completion-20261017`; no provider refresh after the closed 06:55:48 window. New capture remains 18 entries/17 encrypted responses. Previous implementation 4e993d6 now has three-platform CI success (39106885139).

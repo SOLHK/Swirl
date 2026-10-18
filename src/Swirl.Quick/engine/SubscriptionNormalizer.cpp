@@ -6,6 +6,7 @@
 #include <QRegularExpression>
 #include <QSet>
 #include <algorithm>
+#include <QStringDecoder>
 
 namespace {
 using Result=SubscriptionNormalizer::Result;
@@ -144,7 +145,9 @@ void singBox(Result &r,const QJsonArray &array){
     r.handled=true;r.format="sing-box";
     for(const auto &value:array){
         const auto raw=value.toObject();const auto type=raw.value("type").toString();
-        if(QStringList{"direct","block","dns","selector","urltest"}.contains(type))continue;
+        if(QStringList{"direct","block","dns","selector","urltest"}.contains(type)){
+            auto policies=r.configuration.value("outbounds").toArray();policies.append(raw);r.configuration["outbounds"]=policies;continue;
+        }
         QStringList issues;QJsonObject n{{"name",raw.value("tag")},{"type",protocol(type)},{"server",raw.value("server")},{"port",raw.value("server_port")}};
         // sing-box's SOCKS version is a string. Keep 4 versus 4a explicit so
         // destination DNS never changes silently while normalizing the node.
@@ -184,19 +187,34 @@ void singBox(Result &r,const QJsonArray &array){
     if(r.nodes.isEmpty())r.error="sing-box 配置没有可导入的远端代理节点。";
 }
 void ini(Result &r,const QString &document){
-    r.handled=true;r.format="Surge / Surfboard / Loon";QString section;
+    r.handled=true;r.format="Surge / Surfboard / Loon";r.configurationFormat="ini";QString section;
+    QSet<QString> sections;
+    const bool sectioned=document.contains(QRegularExpression("^\\s*\\[",QRegularExpression::MultilineOption));
+    auto preserve=[&]{r.configuration["document"]=document;};
     for(const auto &rawLine:document.split('\n')){
         const auto line=rawLine.trimmed();if(line.isEmpty()||line.startsWith('#')||line.startsWith(';')||line.startsWith("//"))continue;
-        if(line.startsWith('[')){section=line.toLower();if(section=="[server_local]")r.format="Quantumult X";continue;}
+        if(line.startsWith('[')){
+            const auto close=line.indexOf(']');const auto name=line.mid(1,close-1).trimmed();const auto tail=line.mid(close+1).trimmed();
+            if(close<0||name.isEmpty()||name.toUtf8().size()>128||name.contains('[')||name.contains(']')||name.contains('\t')
+                ||(!tail.isEmpty()&&!tail.startsWith('#')&&!tail.startsWith(';'))){r.error="INI 区段标题无效；未应用配置。";return;}
+            section="["+name.toLower()+"]";
+            if(sections.contains(section)||sections.size()>=256){r.error="INI 区段重复或超过数量限制；未应用配置。";return;}
+            sections.insert(section);
+            if(section=="[server_local]")r.format="Quantumult X";
+            if(section!="[proxy]"&&section!="[server_local]")preserve();
+            continue;
+        }
+        if(sectioned&&section.isEmpty()){r.error="INI 内容缺少所属区段；未应用配置。";return;}
         if(!section.isEmpty()&&section!="[proxy]"&&section!="[server_local]")continue;
         const auto equal=line.indexOf('=');if(equal<=0){r.error="订阅代理行缺少赋值符号；未导入任何节点。";return;}
-        bool ok;auto fields=csv(line.mid(equal+1),&ok);if(!ok||fields.size()<2){r.error="订阅代理行的引号或字段不完整。";return;}
+        bool ok;auto fields=csv(line.mid(equal+1),&ok);if(!ok||fields.isEmpty()){r.error="订阅代理行的引号或字段不完整。";return;}
         const auto left=clean(line.left(equal));const bool qx=section=="[server_local]"||(QStringList{"shadowsocks","trojan","vmess","http","socks5"}.contains(left.toLower())&&fields.first().contains(':'));
+        if(left.isEmpty()){r.error="INI 节点名称或协议为空；未应用配置。";return;}
         const bool loonObfs=!qx&&fields.first().compare("shadowsocks",Qt::CaseInsensitive)==0&&fields.size()>=7
             &&std::all_of(fields.cbegin()+3,fields.cbegin()+7,[](const QString &f){return !f.contains('=');});
         QJsonObject n;QStringList issues;QString host,network,path,wsHost;int port=0;
         if(qx){r.format="Quantumult X";if(!endpoint(fields.takeFirst(),host,port)){r.error="Quantumult X 节点地址无效。";return;}n["type"]=protocol(left);}
-        else {n["name"]=left;const auto type=fields.takeFirst();n["type"]=protocol(type);if(type.compare("https",Qt::CaseInsensitive)==0||type.compare("socks5-tls",Qt::CaseInsensitive)==0)n["tls"]=true;if(QStringList{"direct","reject","reject-tinygif"}.contains(n.value("type").toString()))continue;if(fields.size()<2){r.error="INI 节点缺少服务器或端口。";return;}host=clean(fields.takeFirst());port=fields.takeFirst().toInt();}
+        else {n["name"]=left;const auto type=fields.takeFirst();n["type"]=protocol(type);if(type.compare("https",Qt::CaseInsensitive)==0||type.compare("socks5-tls",Qt::CaseInsensitive)==0)n["tls"]=true;if(QStringList{"direct","reject","reject-tinygif"}.contains(n.value("type").toString())){preserve();continue;}if(fields.size()<2){r.error="INI 节点缺少服务器或端口。";return;}host=clean(fields.takeFirst());port=fields.takeFirst().toInt();}
         n["server"]=host;n["port"]=port;const auto p=n.value("type").toString();
         int positional=0;
         QSet<QString> seenKeys;
@@ -266,17 +284,32 @@ void ini(Result &r,const QString &document){
 
 SubscriptionNormalizer::Result SubscriptionNormalizer::normalize(const QByteArray &document,int depth){
     Result r;if(depth>2){r.error="订阅编码嵌套过深。";return r;}
+    QStringDecoder decoder(QStringDecoder::Utf8,QStringConverter::Flag::Stateless);const QString completeText=decoder(document);
+    if(decoder.hasError()){r.error="订阅不是合法 UTF-8 文本；未应用配置。";return r;}
+    for(const auto c:completeText)if(c.category()==QChar::Other_Control&&c!='\t'&&c!='\r'&&c!='\n'){
+        r.error="订阅含非法控制字符；未应用配置。";return r;
+    }
     auto bytes=document.trimmed();if(bytes.startsWith("\xef\xbb\xbf"))bytes.remove(0,3);
+    if(bytes.startsWith("\xef\xbb\xbf")){r.error="订阅含重复 UTF-8 BOM；未应用配置。";return r;}
+    r.decodedDocument=bytes;
     const auto json=QJsonDocument::fromJson(bytes);
-    if(json.isObject()&&json.object().value("outbounds").isArray()){singBox(r,json.object().value("outbounds").toArray());return r;}
+    if(json.isObject()&&json.object().value("outbounds").isArray()){
+        r.configurationFormat="sing-box";r.configuration=json.object();r.configuration.remove("outbounds");
+        singBox(r,json.object().value("outbounds").toArray());
+        if(!r.configuration.isEmpty())r.configuration=json.object();
+        return r;
+    }
     const auto text=QString::fromUtf8(bytes);
     if(text.startsWith("STATUS=")){
         const auto end=text.indexOf('\n');if(end<0||end>4096){r.error="Shadowrocket 状态头无效。";return r;}
         r=normalize(text.mid(end+1).toUtf8(),depth+1);
+        if(r.decodedDocument.isEmpty())r.decodedDocument=text.mid(end+1).toUtf8();
         if(!r.originals.isEmpty())r.originals[0]["subscription-status-header"]=text.left(end);
         return r;
     }
-    if(text.startsWith('[')&&!json.isArray()&&(text.contains("[Proxy]",Qt::CaseInsensitive)||text.contains("[server_local]",Qt::CaseInsensitive))){ini(r,text);return r;}
+    const auto firstContent=[&]{for(const auto &line:text.split('\n')){const auto value=line.trimmed();if(!value.isEmpty()&&!value.startsWith('#')&&!value.startsWith(';')&&!value.startsWith("//"))return value;}return QString();}();
+    const bool iniHeading=QRegularExpression("^\\[\\s*[A-Za-z][A-Za-z0-9 _-]*(?:\\]|$)").match(firstContent).hasMatch();
+    if(iniHeading&&!json.isArray()){ini(r,text);return r;}
     if(QRegularExpression("^(ss|ssr|trojan|vmess|vless|socks4a|socks4|socks5|socks|http|https)://",QRegularExpression::CaseInsensitiveOption).match(text).hasMatch()){
         r.handled=true;r.format="通用 URI / Shadowrocket";
         for(const auto &line:text.split('\n')){const auto value=line.trimmed();if(value.isEmpty()||value.startsWith('#'))continue;uri(r,value);if(!r.error.isEmpty())break;}return r;
@@ -284,8 +317,8 @@ SubscriptionNormalizer::Result SubscriptionNormalizer::normalize(const QByteArra
     if(QRegularExpression("^(shadowsocks|trojan|vmess|http|socks5)\\s*=",QRegularExpression::CaseInsensitiveOption).match(text).hasMatch()){ini(r,text);return r;}
     if(QRegularExpression("^[^=\\r\\n]{1,128}\\s*=\\s*(Shadowsocks|Trojan|VMess|VLESS|socks5|http|https|ss)\\s*,",QRegularExpression::CaseInsensitiveOption|QRegularExpression::MultilineOption).match(text).hasMatch()){ini(r,text);return r;}
     const auto decoded=base64(bytes);
-    if(!decoded.isEmpty()&&decoded!=bytes&&(decoded.contains("://")||decoded.contains("proxies:")||decoded.contains("[Proxy]")||decoded.contains("outbounds"))){
-        r=normalize(decoded,depth+1);if(!r.handled&&r.error.isEmpty())r.decodedDocument=decoded;r.format="Base64 / "+(r.format.isEmpty()?QString("Clash"):r.format);return r;
+    if(!decoded.isEmpty()&&decoded!=bytes&&(decoded.contains("://")||decoded.contains("proxies:")||decoded.contains("[")||decoded.contains("outbounds"))){
+        r=normalize(decoded,depth+1);if(r.decodedDocument.isEmpty())r.decodedDocument=decoded;r.format="Base64 / "+(r.format.isEmpty()?QString("Clash"):r.format);return r;
     }
     r.format="Clash YAML / JSON";return r;
 }
