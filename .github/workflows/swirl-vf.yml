@@ -74,6 +74,10 @@ jobs:
         if: ${{ always() && steps.coretext.outcome == 'success' }}
         run: |
           python tools/swirl_vf/platform/test_native_reconstruction.py --output build/swirl-vf-evidence/reconstruction --binary "$PWD/build/swirl-vf-evidence/coretext/coretext_extract" --require-native
+      - name: Diagnose unchanged CoreText metrics using independent equivalent tables
+        if: always()
+        run: |
+          python tools/swirl_vf/platform/diagnose_coretext_metrics.py --output build/swirl-vf-evidence/coretext-metric-diagnosis --binary "$PWD/build/swirl-vf-evidence/coretext/coretext_extract" --require-native
       - uses: actions/upload-artifact@v4
         if: always()
         with:
