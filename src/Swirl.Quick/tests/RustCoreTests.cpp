@@ -233,10 +233,26 @@ private slots:
   }
   struct Response {QNetworkReply::NetworkError error;int status;QByteArray body;};
   const auto request=[&](const QString &host,int port,const QString &target,bool encrypted=false){
-   QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",proxyPort));
    QUrl url;url.setScheme(encrypted?"https":"http");url.setHost(host);url.setPort(port);url.setPath(target);
+   if(encrypted){
+    // QNAM can finish HTTP and close its transport before a TLS close_notify
+    // exchange. Own this test client's TLS shutdown so the independent origin
+    // can require both authenticated close alerts, without relaxing its checks.
+    QSslSocket socket;socket.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",proxyPort));
+    auto tls=QSslConfiguration::defaultConfiguration();tls.setCaCertificates(certificates);tls.setPeerVerifyMode(QSslSocket::VerifyPeer);socket.setSslConfiguration(tls);
+    socket.connectToHostEncrypted(host,quint16(port));
+    if(!QTest::qWaitFor([&]{return socket.isEncrypted()||socket.state()==QAbstractSocket::UnconnectedState;},5000))return Response{QNetworkReply::TimeoutError,0,{}};
+    if(!socket.isEncrypted())return Response{socket.error()==QAbstractSocket::SslHandshakeFailedError?QNetworkReply::SslHandshakeFailedError:QNetworkReply::UnknownNetworkError,0,{}};
+    const auto message="GET "+url.path(QUrl::FullyEncoded).toUtf8()+" HTTP/1.1\r\nHost: "+host.toUtf8()+':'+QByteArray::number(port)+"\r\nConnection: close\r\n\r\n";
+    if(socket.write(message)!=message.size())return Response{QNetworkReply::UnknownNetworkError,0,{}};
+    QByteArray response;qsizetype separator=-1;const auto bodyLength=expected.size()+1+target.toUtf8().size();
+    if(!QTest::qWaitFor([&]{response+=socket.readAll();separator=response.indexOf("\r\n\r\n");return response.size()>65536||(separator>=0&&response.size()>=separator+4+bodyLength)||socket.state()==QAbstractSocket::UnconnectedState;},5000))return Response{QNetworkReply::TimeoutError,0,{}};
+    if(separator<0||response.size()>65536||!response.startsWith("HTTP/1.1 200 ")||!response.left(separator+2).contains("\r\nContent-Length: "+QByteArray::number(bodyLength)+"\r\n"))return Response{QNetworkReply::UnknownNetworkError,0,{}};
+    socket.disconnectFromHost();if(!QTest::qWaitFor([&]{return socket.state()==QAbstractSocket::UnconnectedState;},5000))return Response{QNetworkReply::TimeoutError,0,{}};
+    response+=socket.readAll();return Response{QNetworkReply::NoError,200,response.mid(separator+4)};
+   }
+   QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",proxyPort));
    QNetworkRequest message(url);message.setRawHeader("Connection","close");message.setAttribute(QNetworkRequest::Http2AllowedAttribute,false);message.setTransferTimeout(5000);
-   if(encrypted){auto tls=QSslConfiguration::defaultConfiguration();tls.setCaCertificates(certificates);tls.setPeerVerifyMode(QSslSocket::VerifyPeer);message.setSslConfiguration(tls);}
    auto *reply=client.get(message);if(!QTest::qWaitFor([&]{return reply->isFinished();},6000)){reply->abort();return Response{QNetworkReply::TimeoutError,0,{}};}
    return Response{reply->error(),reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt(),reply->readAll()};
   };

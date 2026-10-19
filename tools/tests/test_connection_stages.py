@@ -4,19 +4,23 @@ Resolved-address retries must stop before TLS/authentication/application bytes.
 The deterministic stalled-connect timing/cancellation cases live in Rust tests;
 these peers validate actual DNS, sockets, framed SS traffic and control reports.
 """
+import errno
 import json
 import os
 import socket
 import socketserver
 import struct
 import subprocess
+import sys
 import tempfile
 import threading
 import time
 import types
 import unittest
+from unittest import mock
 
 from dns_peer import DnsPeer
+from loopback_ports import windows_candidates
 from test_rust_core import Reference, Handler, certificates, exact, header
 from test_shadowsocks import Peer as SsPeer, Handler as SsHandler, PASSWORD
 
@@ -41,6 +45,149 @@ class IPv6SsPeer(SsPeer):
     def server_bind(self):
         self.socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
         super().server_bind()
+
+
+def reserve_dual_loopback():
+    """Own both address families before starting either half of a DNS fixture."""
+    held = []
+    try:
+        for attempt in range(8):
+            ipv4 = socket.socket()
+            try:
+                ipv6 = socket.socket(socket.AF_INET6)
+            except BaseException:
+                ipv4.close()
+                raise
+            try:
+                ipv6.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+                # Let the OS allocate and retain a free IPv4 TCP endpoint.
+                ipv4.bind(('127.0.0.1', 0))
+                port = ipv4.getsockname()[1]
+                if sys.platform == 'win32' and any(
+                        port not in windows_candidates(family) for family in (False, True)):
+                    held.append(ipv4)
+                    ipv6.close()
+                    continue
+                ipv6.bind(('::1', port))
+                return ipv4, ipv6
+            except OSError as error:
+                ipv4.close()
+                ipv6.close()
+                # Retry setup collisions only. Access denial, including an
+                # unknown WSAEACCES, remains the original test failure.
+                if (error.errno != errno.EADDRINUSE and
+                        getattr(error, 'winerror', None) != 10048) or attempt == 7:
+                    raise
+            except BaseException:
+                ipv4.close()
+                ipv6.close()
+                raise
+        raise RuntimeError('No eligible dual-family loopback fixture port in eight attempts')
+    finally:
+        for stream in held:
+            stream.close()
+
+
+def adopt_server(server_type, handler, stream):
+    """Transfer a reservation directly; never release and rebind its port."""
+    try:
+        server = server_type(stream.getsockname(), handler, bind_and_activate=False)
+        server.socket.close()
+        server.socket = stream
+        server.server_address = stream.getsockname()
+        server.server_activate()
+        return server
+    except BaseException:
+        stream.close()
+        raise
+
+
+class DualLoopbackAllocationTests(unittest.TestCase):
+    def held_ipv6(self):
+        ipv4, ipv6 = reserve_dual_loopback()
+        port = ipv4.getsockname()[1]
+        ipv4.close()
+        self.addCleanup(ipv6.close)
+        return port
+
+    def allocate_with_collision(self, repeat):
+        port = self.held_ipv6()
+        native, created = socket.socket, []
+        bind = native.bind
+        forced = 0
+
+        def track(*args, **kwargs):
+            stream = native(*args, **kwargs)
+            created.append(stream)
+            return stream
+
+        def collide(stream, address):
+            nonlocal forced
+            if stream.family == socket.AF_INET and (repeat or forced == 0):
+                forced += 1
+                address = ('127.0.0.1', port)
+            return bind(stream, address)
+
+        with mock.patch.object(native, 'bind', new=collide), \
+                mock.patch(__name__ + '.socket.socket', side_effect=track):
+            if repeat:
+                with self.assertRaises(OSError) as caught:
+                    reserve_dual_loopback()
+                self.assertTrue(caught.exception.errno == errno.EADDRINUSE or
+                                getattr(caught.exception, 'winerror', None) == 10048)
+                self.assertEqual(forced, 8)
+                self.assertTrue(all(stream.fileno() == -1 for stream in created))
+            else:
+                ipv4, ipv6 = reserve_dual_loopback()
+                self.addCleanup(ipv4.close)
+                self.addCleanup(ipv6.close)
+                self.assertNotEqual(ipv4.getsockname()[1], port)
+                self.assertEqual(ipv4.getsockname()[1], ipv6.getsockname()[1])
+                self.assertTrue(all(stream.fileno() == -1 for stream in created[:-2]))
+                self.assertGreaterEqual(len(created), 4)
+
+    def test_second_family_collision_releases_both_sockets_before_retry(self):
+        self.allocate_with_collision(False)
+
+    def test_collision_budget_remains_eight_and_releases_every_attempt(self):
+        self.allocate_with_collision(True)
+
+    def test_unknown_access_denial_is_not_retried(self):
+        native, created = socket.socket, []
+        denied = OSError(errno.EACCES, 'synthetic access denial')
+        denied.winerror = 10013
+
+        def track(*args, **kwargs):
+            stream = native(*args, **kwargs)
+            created.append(stream)
+            return stream
+
+        with mock.patch.object(native, 'bind', side_effect=denied) as bind, \
+                mock.patch(__name__ + '.socket.socket', side_effect=track):
+            with self.assertRaises(OSError) as caught:
+                reserve_dual_loopback()
+        self.assertIs(caught.exception, denied)
+        self.assertEqual(bind.call_count, 1)
+        self.assertEqual(len(created), 2)
+        self.assertTrue(all(stream.fileno() == -1 for stream in created))
+
+    def test_second_socket_creation_failure_releases_first(self):
+        native, created = socket.socket, []
+        failure = OSError(errno.EMFILE, 'synthetic descriptor exhaustion')
+
+        def allocate(*args, **kwargs):
+            if created:
+                raise failure
+            stream = native(*args, **kwargs)
+            created.append(stream)
+            return stream
+
+        with mock.patch(__name__ + '.socket.socket', side_effect=allocate) as factory:
+            with self.assertRaises(OSError) as caught:
+                reserve_dual_loopback()
+        self.assertIs(caught.exception, failure)
+        self.assertEqual(factory.call_count, 2)
+        self.assertEqual(created[0].fileno(), -1)
 
 
 class StallHandler(socketserver.BaseRequestHandler):
@@ -133,9 +280,12 @@ class ConnectionStageTests(unittest.TestCase):
         self.peers.append(peer)
         return peer
 
-    def server(self, protocol='echo', host='127.0.0.1', port=0, tls=None, stall=False):
+    def server(self, protocol='echo', host='127.0.0.1', port=0, tls=None, stall=False,
+               reserved=None):
         server_type = IPv6Reference if ':' in host else ObservedReference
-        server = server_type((host, port), StallHandler if stall else Handler)
+        handler = StallHandler if stall else Handler
+        server = (adopt_server(server_type, handler, reserved) if reserved is not None
+                  else server_type((host, port), handler))
         server.protocol, server.tls = protocol, tls
         server.requests, server.errors, server.accepted = [], [], 0
         server.tcp_connections = 0
@@ -143,6 +293,29 @@ class ConnectionStageTests(unittest.TestCase):
         threading.Thread(target=server.serve_forever, daemon=True).start()
         self.servers.append(server)
         return server
+
+    def ipv6_with_refused_ipv4(self):
+        ipv4, ipv6 = reserve_dual_loopback()
+        port = ipv4.getsockname()[1]
+        try:
+            server = self.server(host='::1', reserved=ipv6)
+        finally:
+            # A held non-listening socket can blackhole Windows SYNs. Release
+            # only the refusal endpoint and still require actual OS refusal.
+            ipv4.close()
+        self.assert_refused('127.0.0.1', port)
+        return server
+
+    def dual_servers(self, first_options, second_options):
+        ipv4, ipv6 = reserve_dual_loopback()
+        try:
+            first = self.server(reserved=ipv4, **first_options)
+            second = self.server(host='::1', reserved=ipv6, **second_options)
+            return first, second
+        except BaseException:
+            ipv4.close()
+            ipv6.close()
+            raise
 
     def refuse(self, port=0, host='127.0.0.1'):
         # A bound non-listening socket blackholes SYNs on some platforms.
@@ -202,9 +375,8 @@ class ConnectionStageTests(unittest.TestCase):
         return state
 
     def test_direct_tries_next_resolved_address_and_reuses_host_cache(self):
-        origin = self.server(host='::1')
+        origin = self.ipv6_with_refused_ipv4()
         port = origin.server_address[1]
-        self.refuse(port)
         peer = self.dns()
         self.start({'type': 'direct'}, peer)
         for host in ('target.fixture.invalid', 'TARGET.FIXTURE.INVALID'):
@@ -220,13 +392,17 @@ class ConnectionStageTests(unittest.TestCase):
         self.assertEqual(len(peer.queries), 2)
 
     def test_http_obfs_ss_uses_resolved_proxy_addresses_without_resolving_target(self):
-        server = IPv6SsPeer(('::1', 0), SsHandler)
+        ipv4, ipv6 = reserve_dual_loopback()
+        try:
+            server = adopt_server(IPv6SsPeer, SsHandler, ipv6)
+        finally:
+            ipv4.close()
         server.method, server.obfs, server.mode, server.fixed_salt = 'aes-128-gcm', True, 'echo', None
         server.targets, server.headers, server.errors, server.received = [], [], [], 0
         threading.Thread(target=server.serve_forever, daemon=True).start()
         self.servers.append(server)
         port = server.server_address[1]
-        self.refuse(port)
+        self.assert_refused('127.0.0.1', port)
         peer = self.dns()
         self.start({'type': 'shadowsocks', 'host': 'proxy.fixture.invalid', 'port': port,
                     'password': PASSWORD, 'cipher': 'aes-128-gcm',
@@ -243,9 +419,8 @@ class ConnectionStageTests(unittest.TestCase):
         self.assertEqual({q[0] for q in peer.queries}, {'proxy.fixture.invalid'})
 
     def test_resolving_cidr_rule_pins_failed_address_without_trying_other_answer(self):
-        origin = self.server(host='::1')
+        origin = self.ipv6_with_refused_ipv4()
         port = origin.server_address[1]
-        self.refuse(port)
         peer = self.dns()
         self.start({'type': 'direct'}, peer, rules=[
             {'matcher': {'type': 'cidr', 'value': '127.0.0.1/32', 'resolve': True}, 'outbound': 'node'},
@@ -275,9 +450,8 @@ class ConnectionStageTests(unittest.TestCase):
         self.assert_refused('127.0.0.1', port)
 
     def test_tls_timeout_does_not_restart_on_another_resolved_address(self):
-        first = self.server(stall=True)
+        first, second = self.dual_servers({'stall': True}, {})
         port = first.server_address[1]
-        second = self.server(host='::1', port=port)
         self.start({'type': 'trojan', 'host': 'proxy.fixture.invalid', 'port': port,
                     'password': 'synthetic-trojan',
                     'tls': {'server_name': 'localhost', 'ca_der_base64': self.ca}},
@@ -288,9 +462,8 @@ class ConnectionStageTests(unittest.TestCase):
         self.assertEqual(second.tcp_connections, 0)
 
     def test_protocol_timeout_after_tcp_success_has_its_own_stage(self):
-        first = self.server(stall=True)
+        first, second = self.dual_servers({'stall': True}, {})
         port = first.server_address[1]
-        second = self.server(host='::1', port=port)
         self.start({'type': 'socks5', 'host': 'proxy.fixture.invalid', 'port': port},
                    self.dns(), timeout_ms=400)
         self.tunnel(success=False).close()
@@ -299,9 +472,10 @@ class ConnectionStageTests(unittest.TestCase):
         self.assertEqual(second.tcp_connections, 0)
 
     def test_untrusted_certificate_cannot_select_an_alternate_trusted_peer(self):
-        first = self.server('http_connect', tls=self.other_context)
+        first, second = self.dual_servers(
+            {'protocol': 'http_connect', 'tls': self.other_context},
+            {'protocol': 'http_connect', 'tls': self.context})
         port = first.server_address[1]
-        second = self.server('http_connect', host='::1', port=port, tls=self.context)
         self.start({'type': 'http_connect', 'host': 'proxy.fixture.invalid', 'port': port,
                     'auth': {'username': 'fixture-user', 'password': 'fixture-password'},
                     'tls': {'server_name': 'localhost', 'ca_der_base64': self.ca}},

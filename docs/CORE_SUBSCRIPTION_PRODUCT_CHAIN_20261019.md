@@ -54,7 +54,11 @@ S1 was actually pushed as
 [`292df3ba9763414947ec9b5dffa7886c45a00879`](https://github.com/SOLHK/Swirl/commit/292df3ba9763414947ec9b5dffa7886c45a00879).
 Its exact [Rust run 39280252948](https://github.com/SOLHK/Swirl/actions/runs/39280252948)
 and [App run 39280253098](https://github.com/SOLHK/Swirl/actions/runs/39280253098)
-were queued at the S2 checkpoint. Queued means unexecuted, not passed.
+were reported as queued by REST at the S2 checkpoint. Later logs and artifacts
+showed that Actions state propagation was delayed; the earlier REST observation
+cannot establish whether a runner had actually executed. S1 ultimately failed
+on Linux and Windows, with macOS and App success. The original failures are
+described under S4 below and are not replaced by subsequent results.
 
 ## S2: selected exits, ordered document rules and actual origins
 
@@ -137,7 +141,9 @@ S2 was actually pushed as
 [`593e7cddc360cf7f51d9fdc988e6cf8fd99aea96`](https://github.com/SOLHK/Swirl/commit/593e7cddc360cf7f51d9fdc988e6cf8fd99aea96).
 Its [Rust run 39281808343](https://github.com/SOLHK/Swirl/actions/runs/39281808343)
 and [App run 39281808355](https://github.com/SOLHK/Swirl/actions/runs/39281808355)
-were still queued, with no assigned runners or product artifacts, at 16:03 UTC.
+were still reported as queued, without visible assigned runners or product
+artifacts in those API responses, at 16:03 UTC. Later-retrieved artifacts showed
+execution that had not yet appeared in those responses.
 GitHub's [official status](https://www.githubstatus.com/api/v2/summary.json)
 reported an Actions/workflow-processing incident beginning at 15:49 UTC. The
 incident and individual job states are separate observations; neither supplies
@@ -172,8 +178,70 @@ Equal aliases remain accepted and the original object remains available.
 
 These small Qt changes extend the existing regression slots rather than adding
 a parallel configuration system. Source review and whitespace validation passed;
-the new Qt assertions are **unexecuted until Windows CI actually runs**. The
+the new Qt assertions required the exact-source Windows CI run. The
 official Actions incident is not a reason to waive that gate or claim success.
+
+S3 was actually pushed as
+[`41555465b72fd59d42bc473f0d097c93e210c240`](https://github.com/SOLHK/Swirl/commit/41555465b72fd59d42bc473f0d097c93e210c240),
+with [Rust 39283305158](https://github.com/SOLHK/Swirl/actions/runs/39283305158)
+and [App 39283305193](https://github.com/SOLHK/Swirl/actions/runs/39283305193).
+
+## S4: repair observed fixture failures and require authenticated TLS closure
+
+Three actual failures were retained and investigated before changing tests:
+
+- S1 [Linux job 118152922265](https://github.com/SOLHK/Swirl/actions/runs/39280252948/job/118152922265)
+  failed when an IPv6 fixture allocated a port and its later IPv4 reservation
+  collided with an existing socket (`EADDRINUSE`). Dual-family fixtures now own
+  the IPv4 OS allocation and the same IPv6 port before starting either server.
+  The existing sockets are transferred directly to their servers. A refusal
+  endpoint is still required to return actual connection refusal, not timeout.
+- S1 [Windows job 118152921964](https://github.com/SOLHK/Swirl/actions/runs/39280252948/job/118152921964)
+  failed binding SS fixture TCP port 49666 with WinError 10013. That port was
+  **not** in the recorded excluded ranges; the log does not identify its owner.
+  SS now asks the OS to allocate and retain an available TCP socket, verifies
+  that actual port against the Windows TCP/UDP candidate table, and binds UDP
+  while retaining TCP. Temporarily unsuitable reservations remain held until
+  selection ends. Unknown access denial still fails immediately; only address
+  collisions have the unchanged eight-attempt budget.
+- S2 [Windows job 118157401880](https://github.com/SOLHK/Swirl/actions/runs/39281808343/job/118157401880)
+  reached the separate origins through all four product protocol profiles, but
+  the required wrapper failed with four independent HTTPS-origin teardown
+  errors. The four Qt subprocess successes do not override this failure; the
+  subsequent complete application build was skipped. A narrow Linux Qt client
+  reproduction isolated missing TLS `close_notify` after QNAM HTTP completion.
+  The HTTPS test client now owns a `QSslSocket`, verifies the fixture CA and
+  hostname, and explicitly disconnects after reading the exact response. This
+  changes the test client, not the product's proxy transport or TLS policy.
+
+The independent HTTPS origin still requires successful `unwrap()` and raw EOF.
+After a successful TLS close exchange, a redundant TCP write-shutdown may return
+only the precisely identified `ENOTCONN` / WSAENOTCONN 10057; other errors remain
+failures. Each Windows protocol case additionally requires exactly one completed
+TLS close exchange. Error reports retain the fixture, exception type, errno and
+source boundary without recording request bytes or credentials.
+
+The final local dual-family menu passed **12/12** and the SS policy menu passed
+**20/20**, with no failures or skips. New allocation regressions cover real
+socket ownership, bounded collisions, denied access, rejected candidates and
+descriptor exhaustion. The original forwarding/security assertions remain.
+These are Linux execution and controlled Windows table branches, not native
+Windows proof. The exact local source hashes and raw results are retained under
+`evidence/subscription-product-chain/s4-local/`.
+The final changed portable product class also passed **8/8**, with zero failures
+or skips; that command explicitly selected the portable class and did not run
+the Windows Qt class. The archived Qt client experiment is Linux diagnosis only.
+
+At this source checkpoint, verified S2 and S3 portable product artifacts each
+cover Linux, macOS, Windows and App: eight passes plus one explicit Qt skip in
+each menu. S2 and S3's dedicated Windows product wrappers remain failures; S3's
+[Windows log](https://github.com/SOLHK/Swirl/actions/runs/39283305158/job/118162194645)
+records the same four origin-close errors at 16:31 UTC. S2 now has terminal
+Linux/macOS/App success and Windows failure. New S4
+Windows compilation, the dedicated wrapper, the complete application build and
+all exact-source CI terminal results must still run before acceptance is claimed.
+Concurrent font-only commit `5cb42619785c66317552867d251784df2b0323b9` was checked
+for non-overlap and retained. Formal acceptance stays **79 / 6 / 10.83%**.
 
 ## Actual field boundaries inspected
 

@@ -11,6 +11,7 @@ all positive tunnels MUST reach a separately listening HTTP/HTTPS/echo origin.
 import base64
 import concurrent.futures
 import copy
+import errno
 import hashlib
 import io
 import json
@@ -21,6 +22,7 @@ import socket
 import socketserver
 import ssl
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -43,7 +45,18 @@ class Server(socketserver.ThreadingTCPServer):
     request_queue_size = 64
 
     def handle_error(self, request, address):
-        self.errors.append('IndependentFixtureAssertion')
+        _, error, trace = sys.exc_info()
+        frames = []
+        while trace:
+            frames.append({'file': Path(trace.tb_frame.f_code.co_filename).name,
+                           'function': trace.tb_frame.f_code.co_name, 'line': trace.tb_lineno})
+            trace = trace.tb_next
+        # Keep the exact failing source boundary and system error without
+        # copying request bytes, credentials or exception messages to CI.
+        self.errors.append({'category': 'IndependentFixtureAssertion',
+                            'fixture': self.fixture_kind, 'type': type(error).__name__,
+                            'errno': getattr(error, 'errno', None),
+                            'winerror': getattr(error, 'winerror', None), 'frames': frames[-8:]})
 
 
 class Origin:
@@ -83,10 +96,19 @@ class Origin:
                         stream.sendall(b'HTTP/1.1 200 OK\r\nContent-Length: ' +
                                        str(len(body)).encode() +
                                        b'\r\nConnection: close\r\n\r\n' + body)
-                    if isinstance(stream, ssl.SSLSocket):
+                    tls_closed = isinstance(stream, ssl.SSLSocket)
+                    if tls_closed:
                         stream = stream.unwrap()
                         owner.tls_closed += 1
-                    stream.shutdown(socket.SHUT_WR)
+                    try:
+                        stream.shutdown(socket.SHUT_WR)
+                    except OSError as error:
+                        # unwrap already proved both TLS close_notify alerts.
+                        # Some clients have also completed TCP close by now;
+                        # still require raw EOF below, and accept no other error.
+                        if not tls_closed or (error.errno != errno.ENOTCONN and
+                                              getattr(error, 'winerror', None) != 10057):
+                            raise
                     assert stream.recv(1) == b''
                 except (EOFError, ConnectionError, socket.timeout):
                     # Cancellation is explicitly exercised by the caller.
@@ -96,6 +118,7 @@ class Origin:
 
         self.server = Server(('127.0.0.1', 0), Handler)
         self.server.errors = self.errors
+        self.server.fixture_kind = 'tls-origin' if context else 'echo-origin' if echo else 'http-origin'
         self.port = self.server.server_address[1]
         self.thread = threading.Thread(target=self.server.serve_forever,
                                        kwargs={'poll_interval': 0.02}, daemon=True)
@@ -286,6 +309,7 @@ class Relay:
 
         self.server = Server(('127.0.0.1', 0), Handler)
         self.server.errors = self.errors
+        self.server.fixture_kind = 'relay-' + protocol + '-' + identity
         self.port = self.server.server_address[1]
         self.thread = threading.Thread(target=self.server.serve_forever,
                                        kwargs={'poll_interval': 0.02}, daemon=True)
@@ -672,7 +696,8 @@ class ProductQtIntegration(ChainBase):
                 path.write_text(json.dumps(fixture), encoding='utf-8')
                 log = case / 'qt.log'
                 env = {**os.environ, 'SWIRL_PRODUCT_FIXTURE': str(path)}
-                before = (len(self.http.requests), len(self.https.requests), len(self.https.sni))
+                before = (len(self.http.requests), len(self.https.requests), len(self.https.sni),
+                          self.https.tls_closed)
                 result = subprocess.run([os.environ['SWIRL_RUST_QT_TESTS'],
                                          'subscriptionProductChainAgainstIndependentPeer',
                                          '-o', str(log) + ',txt'], env=env, text=True,
@@ -693,6 +718,10 @@ class ProductQtIntegration(ChainBase):
                 self.assertEqual([request.split(b' ')[1] for request in self.https.requests[before[1]:]],
                                  [b'/selected-a-tls'])
                 self.assertEqual(self.https.sni[before[2]:], ['localhost', 'wrong.fixture.invalid'])
+                deadline = time.monotonic() + 2
+                while self.https.tls_closed == before[3] and not self.https.errors and time.monotonic() < deadline:
+                    time.sleep(0.005)
+                self.assertEqual(self.https.tls_closed - before[3], 1)
                 for peer, paths in [(a, ['/selected-a', '/rule-a', '/rule-choice']),
                                     (b, ['/selected-b', '/restored-b', '/rule-b'])]:
                     observed = [event['prefix'].split(b' ')[1].decode() for event in peer.connections
@@ -706,6 +735,9 @@ class ProductQtIntegration(ChainBase):
                 if evidence:
                     report = {'protocol': protocol, 'origin_http_paths': actual_paths,
                               'origin_https_sni': self.https.sni[before[2]:],
+                              'origin_https_tls_closed': self.https.tls_closed - before[3],
+                              'origin_errors': {'http': self.http.errors, 'https': self.https.errors,
+                                                'echo': self.echo.errors},
                               'peers': [{key: value for key, value in event.items() if key != 'prefix'}
                                         for peer in (a, b) for event in peer.connections]}
                     (Path(evidence) / ('peers-' + protocol + '.json')).write_text(

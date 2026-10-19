@@ -14,6 +14,7 @@ import socket
 import socketserver
 import ssl
 import subprocess
+import sys
 import tempfile
 import threading
 from threading import Thread as PairThread
@@ -21,7 +22,7 @@ import time
 import unittest
 from unittest import mock
 
-from loopback_ports import pair_port
+from loopback_ports import windows_candidates
 from test_rust_core import certificates, exact, header, target
 from test_shadowsocks import PASSWORD, Reader as SsReader, Writer as SsWriter, cipher_key
 
@@ -321,25 +322,39 @@ class SsPolicyPeer:
                 packet = salt + cipher_key(owner.method, salt).encrypt(bytes(12), plain[:7] + response, None)
                 stream.sendto(packet, self.client_address)
 
-        # Use the same two-protocol reservation-aware candidates as DnsPeer.
-        # Hold both sockets before any serving thread starts and release every
-        # failed partial pair. No access-denial error is retried.
-        for attempt in range(8):
-            protocol, address = 'TCP', ('127.0.0.1', pair_port())
-            try:
-                with ExitStack() as cleanup:
-                    tcp = cleanup.enter_context(FixtureServer(address, TcpHandler))
-                    protocol, address = 'UDP', tcp.server_address
-                    udp = cleanup.enter_context(PolicyDatagramServer(address, UdpHandler))
-                    cleanup.pop_all()
-                self.tcp, self.udp = tcp, udp
-                break
-            except OSError as error:
-                collision = error.errno == errno.EADDRINUSE or getattr(error, 'winerror', None) == 10048
-                if not collision or attempt == 7:
-                    error.add_note(f'SS policy fixture {protocol} bind on loopback {address!r}; '
-                                   f'pair attempt {attempt + 1}/8')
-                    raise
+        # Let the OS reserve an available TCP port; an unexcluded random port
+        # can still belong to an exclusive Windows socket and fail with 10013.
+        # CPython likewise binds port zero while retaining the actual socket:
+        # https://github.com/python/cpython/blob/v3.14.0/Lib/test/support/socket_helper.py
+        # TCP and UDP have separate Windows exclusions. Keep rejected TCP
+        # reservations until selection ends so the OS cannot return them again.
+        # Both serving sockets remain held; unknown access denials still fail.
+        candidates = frozenset(windows_candidates(False)) if sys.platform == 'win32' else None
+        with ExitStack() as rejected_reservations:
+            for attempt in range(8):
+                protocol, address = 'TCP', ('127.0.0.1', 0)
+                try:
+                    with ExitStack() as cleanup:
+                        tcp = cleanup.enter_context(FixtureServer(address, TcpHandler))
+                        protocol, address = 'UDP', tcp.server_address
+                        if candidates is not None and address[1] not in candidates:
+                            if attempt == 7:
+                                raise RuntimeError('SS policy fixture found no eligible TCP/UDP '
+                                                   'port after 8 OS allocations; last reservation '
+                                                   f'{address!r} is outside the Windows candidate table')
+                            rejected_reservations.enter_context(tcp)
+                            cleanup.pop_all()
+                            continue
+                        udp = cleanup.enter_context(PolicyDatagramServer(address, UdpHandler))
+                        cleanup.pop_all()
+                    self.tcp, self.udp = tcp, udp
+                    break
+                except OSError as error:
+                    collision = error.errno == errno.EADDRINUSE or getattr(error, 'winerror', None) == 10048
+                    if not collision or attempt == 7:
+                        error.add_note(f'SS policy fixture {protocol} bind on loopback {address!r}; '
+                                       f'pair attempt {attempt + 1}/8')
+                        raise
         self.port = self.tcp.server_address[1]
         self.threads = []
         for server in (self.tcp, self.udp):
@@ -370,9 +385,15 @@ class SsPolicyPeerAllocationTests(unittest.TestCase):
         # CPython uses the same scoped-effect approach for bind-error tests:
         # https://github.com/python/cpython/blob/v3.14.0/Lib/test/test_asyncio/test_unix_events.py
         self.candidate_port = 50789
+
+        def bind(server):
+            if server.socket_type == socket.SOCK_STREAM:
+                self.assertEqual(server.server_address[1], 0)
+                server.server_address = (server.server_address[0], self.candidate_port)
+
         for patcher in (
-                mock.patch(__name__ + '.pair_port', return_value=self.candidate_port),
-                mock.patch.object(socketserver.TCPServer, 'server_bind', autospec=True),
+                mock.patch(__name__ + '.windows_candidates', return_value=(self.candidate_port,)),
+                mock.patch.object(socketserver.TCPServer, 'server_bind', autospec=True, side_effect=bind),
                 mock.patch.object(socketserver.TCPServer, 'server_activate', autospec=True),
                 mock.patch.object(socketserver.BaseServer, 'shutdown', autospec=True),
                 mock.patch(__name__ + '.PairThread')):
@@ -403,7 +424,7 @@ class SsPolicyPeerAllocationTests(unittest.TestCase):
                             peer = SsPolicyPeer('aes-128-gcm', 443, (53,))
                         try:
                             self.assertEqual(len(rejected), fail_count)
-                            self.assertEqual(requested[-2:], [(socket.SOCK_STREAM, self.candidate_port),
+                            self.assertEqual(requested[-2:], [(socket.SOCK_STREAM, 0),
                                                              (socket.SOCK_DGRAM, peer.port)])
                             self.assertEqual(peer.tcp.server_address, peer.udp.server_address)
                             self.assertTrue(all(server.socket.fileno() == -1 for server in created[:-2]))
@@ -471,7 +492,8 @@ class SsPolicyPeerAllocationTests(unittest.TestCase):
                         self.assertIs(caught.exception, failure)
                         self.assertEqual(len(rejected), 1)
                         self.assertEqual(len(created), 1 if failing_kind == socket.SOCK_STREAM else 2)
-                        self.assertEqual(rejected[0][1], self.candidate_port)
+                        self.assertEqual(rejected[0][1],
+                                         0 if failing_kind == socket.SOCK_STREAM else self.candidate_port)
                         if isinstance(failure, OSError):
                             protocol = 'TCP' if failing_kind == socket.SOCK_STREAM else 'UDP'
                             self.assertEqual(failure.__notes__,
@@ -481,6 +503,108 @@ class SsPolicyPeerAllocationTests(unittest.TestCase):
                     finally:
                         for server in created:
                             server.server_close()
+
+    def test_windows_rejected_ports_stay_reserved_until_pair_is_owned(self):
+        original = socketserver.TCPServer.server_bind
+        for rejected_count in (1, 7):
+            with self.subTest(rejected_count=rejected_count):
+                created, requested = [], []
+
+                def bind(server):
+                    self.assertTrue(all(item.socket.fileno() != -1 for item in created))
+                    created.append(server)
+                    requested.append((server.socket_type, server.server_address[1]))
+                    original(server)
+                    if server.socket_type == socket.SOCK_STREAM and len(created) <= rejected_count:
+                        server.server_address = ('127.0.0.1', self.candidate_port - len(created))
+
+                with mock.patch(__name__ + '.sys.platform', 'win32'), \
+                        mock.patch.object(socketserver.TCPServer, 'server_bind', bind):
+                    peer = SsPolicyPeer('aes-128-gcm', 443, (53,))
+                try:
+                    self.assertEqual(requested, [(socket.SOCK_STREAM, 0)] * (rejected_count + 1)
+                                     + [(socket.SOCK_DGRAM, self.candidate_port)])
+                    self.assertTrue(all(server.socket.fileno() == -1 for server in created[:-2]))
+                    self.assertTrue(all(server.socket.fileno() != -1 for server in created[-2:]))
+                    self.assertEqual(peer.tcp.server_address, peer.udp.server_address)
+                finally:
+                    peer.close()
+                self.assertTrue(all(server.socket.fileno() == -1 for server in created))
+
+    def test_windows_rejected_ports_exhaustion_closes_all_eight_reservations(self):
+        original = socketserver.TCPServer.server_bind
+        created = []
+
+        def bind(server):
+            self.assertEqual(server.socket_type, socket.SOCK_STREAM)
+            self.assertTrue(all(item.socket.fileno() != -1 for item in created))
+            created.append(server)
+            original(server)
+            server.server_address = ('127.0.0.1', self.candidate_port - len(created))
+
+        with mock.patch(__name__ + '.sys.platform', 'win32'), \
+                mock.patch.object(socketserver.TCPServer, 'server_bind', bind), \
+                mock.patch(__name__ + '.PairThread') as thread:
+            with self.assertRaisesRegex(RuntimeError, 'after 8 OS allocations'):
+                SsPolicyPeer('aes-128-gcm', 443, (53,))
+            thread.assert_not_called()
+        self.assertEqual(len(created), 8)
+        self.assertTrue(all(server.socket.fileno() == -1 for server in created))
+
+    def test_windows_exclusion_query_failure_starts_no_sockets_or_threads(self):
+        failure = subprocess.CalledProcessError(1, ['netsh', 'controlled-query'])
+        with mock.patch(__name__ + '.sys.platform', 'win32'), \
+                mock.patch(__name__ + '.windows_candidates', side_effect=failure), \
+                mock.patch.object(socketserver.TCPServer, 'server_bind') as bind, \
+                mock.patch(__name__ + '.PairThread') as thread:
+            with self.assertRaises(subprocess.CalledProcessError) as caught:
+                SsPolicyPeer('aes-128-gcm', 443, (53,))
+            self.assertIs(caught.exception, failure)
+            bind.assert_not_called()
+            thread.assert_not_called()
+
+
+class SsPolicyPeerReservationTests(unittest.TestCase):
+    def test_os_allocation_avoids_occupied_tcp_and_holds_the_actual_pair(self):
+        # Only the platform/table branch is controlled on non-Windows hosts.
+        # Every bind/listen/close and the incumbent exclusive socket are real.
+        candidates = windows_candidates(False) if sys.platform == 'win32' else range(1, 65536)
+        original = socketserver.TCPServer.server_bind
+        created, requested = [], []
+
+        def bind(server):
+            created.append(server)
+            requested.append((server.socket_type, server.server_address[1]))
+            if server.socket_type == socket.SOCK_STREAM:
+                self.assertEqual(server.server_address[1], 0)
+            else:
+                tcp = created[-2]
+                self.assertNotEqual(tcp.socket.fileno(), -1)
+                self.assertEqual(tcp.socket.getsockname(), server.server_address)
+            original(server)
+
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as incumbent:
+            if hasattr(socket, 'SO_EXCLUSIVEADDRUSE'):
+                incumbent.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+            incumbent.bind(('127.0.0.1', 0))
+            incumbent.listen(1)
+            with mock.patch(__name__ + '.sys.platform', 'win32'), \
+                    mock.patch(__name__ + '.windows_candidates', return_value=candidates), \
+                    mock.patch.object(socketserver.TCPServer, 'server_bind', bind):
+                peer = SsPolicyPeer('aes-128-gcm', 443, (53,))
+            try:
+                self.assertNotEqual(peer.port, incumbent.getsockname()[1])
+                self.assertEqual(requested[-2:], [(socket.SOCK_STREAM, 0),
+                                                 (socket.SOCK_DGRAM, peer.port)])
+                self.assertEqual(peer.tcp.socket.getsockname(), peer.udp.socket.getsockname())
+                self.assertEqual(peer.tcp.socket.getsockname(), ('127.0.0.1', peer.port))
+                for server in (peer.tcp, peer.udp):
+                    self.assertFalse(server.allow_reuse_address)
+                    self.assertFalse(server.allow_reuse_port)
+                    self.assertNotEqual(server.socket.fileno(), -1)
+            finally:
+                peer.close()
+        self.assertTrue(all(server.socket.fileno() == -1 for server in created))
 
 
 @unittest.skipUnless(os.environ.get('SWIRL_RUST_HARNESS'), 'set SWIRL_RUST_HARNESS')

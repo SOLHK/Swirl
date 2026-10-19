@@ -1,5 +1,28 @@
 # Current handoff: subscription product chain (2026-10-19)
 
+## Latest source checkpoint: S4 observed CI failure repairs
+
+S3 was pushed as [41555465](https://github.com/SOLHK/Swirl/commit/41555465b72fd59d42bc473f0d097c93e210c240).
+S2/S3 native product artifacts now prove eight portable passes and one explicit
+Qt skip on Linux, macOS, Windows and App. The Actions run/jobs API was delayed;
+earlier queued observations below must not be interpreted as proof of no
+execution. S1 actually failed at Linux dual-family allocation and Windows SS
+TCP binding; S2 and S3 actually failed at the independent HTTPS origin's close check,
+after four successful Qt traffic slots. The full Windows application build was
+skipped after that required failure.
+
+S4 repairs actual socket reservation ownership and uses an explicit, verified
+QSslSocket for the HTTPS test client so both TLS close alerts can complete. The
+origin's unwrap/EOF checks remain mandatory, with an additional exact close
+count and safe error diagnostics. Local allocation/forwarding menus passed
+12/12 and 20/20; the changed portable product class passed 8/8 with no skips
+(the command did not select the Windows class). Native Windows execution
+remains the new-source CI gate.
+See [the unified S4 evidence and limits](CORE_SUBSCRIPTION_PRODUCT_CHAIN_20261019.md#s4-repair-observed-fixture-failures-and-require-authenticated-tls-closure).
+Keep 79 / 6 / 10.83% unchanged and preserve concurrent font commit 5cb42619.
+
+## Earlier source checkpoints and their original observations
+
 Read [subscription → persisted selection → native forwarding](CORE_SUBSCRIPTION_PRODUCT_CHAIN_20261019.md)
 first. S1 was actually pushed as
 [`292df3ba9763414947ec9b5dffa7886c45a00879`](https://github.com/SOLHK/Swirl/commit/292df3ba9763414947ec9b5dffa7886c45a00879):
