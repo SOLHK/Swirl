@@ -4,6 +4,7 @@
 // Source fonts and the resulting outlines must remain outside a public repository.
 
 import Foundation
+import CoreFoundation
 import CoreText
 import CoreGraphics
 import CryptoKit
@@ -24,11 +25,81 @@ func stderr(_ message: String) {
     FileHandle.standardError.write(Data((message + "\n").utf8))
 }
 
-func emit(_ value: [String: Any]) throws {
-    guard JSONSerialization.isValidJSONObject(value) else {
-        throw OracleError.invalid("non_finite_or_invalid_output_json")
+// Keep binary64 measurements round-trippable. Foundation JSONSerialization on
+// Darwin can spell a Double through an NSNumber decimal conversion that changes
+// its least significant bits. JSONEncoder directly encodes the typed Double.
+// The paired native transport test retains the legacy output as evidence.
+private enum OracleJSON: Encodable {
+    case null
+    case boolean(Bool)
+    case integer(Int64)
+    case unsignedInteger(UInt64)
+    case number(Double)
+    case string(String)
+    case array([OracleJSON])
+    case object([String: OracleJSON])
+
+    init(_ value: Any) throws {
+        if value is NSNull {
+            self = .null
+        } else if let string = value as? String {
+            self = .string(string)
+        } else if type(of: value) == Double.self {
+            let number = value as! Double
+            guard number.isFinite else { throw OracleError.invalid("non_finite_output_number") }
+            self = .number(number)
+        } else if type(of: value) == Float.self {
+            let number = value as! Float
+            guard number.isFinite else { throw OracleError.invalid("non_finite_output_number") }
+            self = .number(Double(number))
+        } else if let number = value as? NSNumber {
+            if CFGetTypeID(number) == CFBooleanGetTypeID() {
+                self = .boolean(number.boolValue)
+            } else {
+                switch String(cString: number.objCType) {
+                case "f", "d":
+                    guard number.doubleValue.isFinite else {
+                        throw OracleError.invalid("non_finite_output_number")
+                    }
+                    self = .number(number.doubleValue)
+                case "Q":
+                    self = .unsignedInteger(number.uint64Value)
+                default:
+                    self = .integer(number.int64Value)
+                }
+            }
+        } else if let dictionary = value as? [String: Any] {
+            self = .object(try dictionary.mapValues { try OracleJSON($0) })
+        } else if let array = value as? [Any] {
+            self = .array(try array.map { try OracleJSON($0) })
+        } else {
+            throw OracleError.invalid("unsupported_output_json_type")
+        }
     }
-    let data = try JSONSerialization.data(withJSONObject: value, options: [.sortedKeys])
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .null: try container.encodeNil()
+        case .boolean(let value): try container.encode(value)
+        case .integer(let value): try container.encode(value)
+        case .unsignedInteger(let value): try container.encode(value)
+        case .number(let value): try container.encode(value)
+        case .string(let value): try container.encode(value)
+        case .array(let value): try container.encode(value)
+        case .object(let value): try container.encode(value)
+        }
+    }
+}
+
+func encodedJSON(_ value: [String: Any]) throws -> Data {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys]
+    return try encoder.encode(OracleJSON(value))
+}
+
+func emit(_ value: [String: Any]) throws {
+    let data = try encodedJSON(value)
     FileHandle.standardOutput.write(data)
     FileHandle.standardOutput.write(Data([10]))
 }

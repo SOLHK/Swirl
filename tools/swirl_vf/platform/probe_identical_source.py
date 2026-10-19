@@ -53,6 +53,7 @@ def run(source, binary, output):
                                   'training_locations':len(training), 'independent_holdouts':len(heldout),
                                   'native_glyph_records':0, 'metric_rejections':{},
                                   'path_status_counts':{}, 'max_vertical_x_halfwidth_deviation':0.,
+                                  'largest_origin_deviation':None, 'metric_rejection_examples':[],
                                   'reconstruction_pass_glyphs':0, 'reconstruction_failures':[],
                                   'complete_font_acceptance':False}
                         report['faces'].append(record)
@@ -65,12 +66,30 @@ def run(source, binary, output):
                                 record['native_glyph_records'] += 1
                                 statuses[row['path_status']] += 1
                                 deviation = abs(row['vertical_origin_x']-row['horizontal_origin_x']-row['advance_width']/2)
-                                record['max_vertical_x_halfwidth_deviation'] = max(record['max_vertical_x_halfwidth_deviation'],deviation)
+                                if deviation > record['max_vertical_x_halfwidth_deviation']:
+                                    record['max_vertical_x_halfwidth_deviation'] = deviation
+                                    record['largest_origin_deviation'] = {
+                                        'glyph_id':gid, 'location':row['location'],
+                                        'path_status':row['path_status'],
+                                        'advance_width':row['advance_width'],
+                                        'vertical_origin_x':row['vertical_origin_x'],
+                                        'horizontal_origin_x':row['horizontal_origin_x']}
+                                record['path_status_counts'] = dict(statuses)
                                 try:
                                     coords,_,_,_ = compatible_coordinates([row])
                                     with_phantoms(coords[0],row,None,None)
                                 except Exception as error:
                                     metric_errors[str(error)] += 1
+                                    record['metric_rejections'] = dict(metric_errors)
+                                    if len(record['metric_rejection_examples']) < 8:
+                                        record['metric_rejection_examples'].append({
+                                            'glyph_id':gid, 'location':row['location'],
+                                            'path_status':row['path_status'],
+                                            'advance_width':row['advance_width'],
+                                            'advance_height':row['advance_height'],
+                                            'vertical_origin_x':row['vertical_origin_x'],
+                                            'vertical_origin_y':row['vertical_origin_y'],
+                                            'reason':str(error)})
                         record['metric_rejections'] = dict(metric_errors)
                         record['path_status_counts'] = dict(statuses)
                         for gid in gids:
