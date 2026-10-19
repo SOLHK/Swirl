@@ -1,0 +1,87 @@
+{
+  "protocol": "http",
+  "origin_http_paths": [
+    "/selected-a",
+    "/selected-b",
+    "/restored-b",
+    "/rule-a",
+    "/rule-b",
+    "/rule-choice",
+    "/rule-direct"
+  ],
+  "origin_https_sni": [
+    "localhost",
+    "wrong.fixture.invalid"
+  ],
+  "origin_https_tls_closed": 1,
+  "origin_errors": {
+    "http": [],
+    "https": [],
+    "echo": []
+  },
+  "peers": [
+    {
+      "peer": "A",
+      "host": "a.product.invalid",
+      "port": 57813,
+      "upload": 161,
+      "download": 87
+    },
+    {
+      "peer": "A",
+      "host": "localhost",
+      "port": 57814,
+      "upload": 1794,
+      "download": 2561
+    },
+    {
+      "peer": "A",
+      "host": "stream.product.invalid",
+      "port": 57815,
+      "upload": 262180,
+      "download": 262202
+    },
+    {
+      "peer": "A",
+      "host": "a.product.invalid",
+      "port": 57813,
+      "upload": 157,
+      "download": 83
+    },
+    {
+      "peer": "A",
+      "host": "choice.product.invalid",
+      "port": 57813,
+      "upload": 167,
+      "download": 88
+    },
+    {
+      "peer": "B",
+      "host": "b.product.invalid",
+      "port": 57813,
+      "upload": 161,
+      "download": 87
+    },
+    {
+      "peer": "B",
+      "host": "wrong.fixture.invalid",
+      "port": 57814,
+      "upload": 1606,
+      "download": 1906
+    },
+    {
+      "peer": "B",
+      "host": "b.product.invalid",
+      "port": 57813,
+      "upload": 161,
+      "download": 87
+    },
+    {
+      "peer": "B",
+      "host": "b.product.invalid",
+      "port": 57813,
+      "upload": 157,
+      "download": 83
+    }
+  ]
+}

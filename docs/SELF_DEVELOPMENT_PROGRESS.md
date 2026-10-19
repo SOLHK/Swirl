@@ -1,5 +1,24 @@
 # Swirl Core 固定验收与进度基线（baseline-v1，冻结范围）
 
+## S6 精确 CI 与 S7 产品分流证据（2026-10-20）
+
+S6 `598a8a7` 的 [Rust CI](https://github.com/SOLHK/Swirl/actions/runs/39297859906)
+已完成 Linux、macOS、Windows 三平台成功；[App/Core validation](https://github.com/SOLHK/Swirl/actions/runs/39297859893)
+成功。Windows 实际完成 Qt/DPAPI 订阅导入、保存恢复、四协议 Rust 原生出站、
+独立 HTTP/HTTPS 目标与 `Swirl.exe` 编译；[原始产品报告](evidence/subscription-product-chain/s6-ci-windows/)
+保留四协议各 7 条 HTTP 路径、A/B 5/4、每项 1 次 HTTPS 正常关闭及 0 目标错误。
+
+S7 `19afd34` 的 [Rust CI](https://github.com/SOLHK/Swirl/actions/runs/39300230774)
+已通过 Linux/macOS/Windows，Windows Qt/DPAPI 产品测试与完整 `Swirl.exe` 编译均执行成功；
+[App/Core validation](https://github.com/SOLHK/Swirl/actions/runs/39300230656) 成功。
+[S7 原始报告](evidence/subscription-product-chain/s7-ci-windows/)显示四协议各
+10 条 HTTP 路径、A/B 6/6、HTTPS 完整关闭各 1 次、0 目标错误，新增规则覆盖
+DOMAIN-SUFFIX、DOMAIN-KEYWORD、DST-PORT。全部为合成订阅和独立 loopback
+对端。用户重新提供的私人订阅只在仓库外 DPAPI 加密缓存并内存检查：59 条 VLESS/REALITY、
+55 条 Vision，59 条原始 URI 精确保留，可执行候选 0；未发生供应商代理连接或降级。
+因此不满足 A08/F03 与完整协议档案验收。
+正式分子保持 **79 项 / 6 项 / 10.83%**。
+
 ## S7 本地产品分流复核（2026-10-20）
 
 在 S6 `598a8a7` 基线上扩展 Windows Qt 真实产品链测试：新增 DOMAIN-SUFFIX、

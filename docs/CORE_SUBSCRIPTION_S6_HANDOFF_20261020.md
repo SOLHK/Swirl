@@ -1,4 +1,41 @@
-# Swirl Core S6 — Windows SS fixture recovery, exact-source CI pending
+# Swirl Core S6 — Windows SS fixture recovery, exact-source CI success
+
+## Terminal S6 result
+
+Source `598a8a77400236e6f817a1e4782f1c4f0da4bbd0` completed
+[Rust CI 39297859906](https://github.com/SOLHK/Swirl/actions/runs/39297859906)
+on Linux, macOS and Windows, plus
+[App/Core CI 39297859893](https://github.com/SOLHK/Swirl/actions/runs/39297859893),
+all with successful Job conclusions. The Windows independent peer step, Rust
+subscription-to-target step, Qt/DPAPI product integration and complete native
+`Swirl.exe` build each actually executed successfully. The fixture's
+WinError 10013 path was not ignored or retried as a collision. Raw synthetic
+product result, Qt logs and independent A/B relay observations are preserved
+in [`s6-ci-windows`](evidence/subscription-product-chain/s6-ci-windows/).
+The Rust-only menu's separate Qt case was skipped because that executable was
+not present there; the dedicated Windows Qt menu ran one product test with
+zero failures or skips and four protocol subtests.
+
+S7 [`19afd34fca898615d89796cb8d158b4be17ff2e9`](https://github.com/SOLHK/Swirl/commit/19afd34fca898615d89796cb8d158b4be17ff2e9)
+adds ordered DOMAIN-SUFFIX, DOMAIN-KEYWORD and DST-PORT product exit checks.
+Its [Windows Qt evidence](evidence/subscription-product-chain/s7-ci-windows/)
+shows four protocol profiles successful. The complete `Swirl.exe` compiled
+successfully in [Windows job 118223198660](https://github.com/SOLHK/Swirl/actions/runs/39300230774/job/118223198660)
+at `2026-10-19 18:41:27 UTC`;
+[Rust run 39300230774](https://github.com/SOLHK/Swirl/actions/runs/39300230774)
+finished successfully on Linux, macOS and Windows.
+The [App run](https://github.com/SOLHK/Swirl/actions/runs/39300230656)
+is successful. The user-supplied private subscription was DPAPI-cached outside
+Git and inspected only in memory: 59 VLESS/REALITY nodes, 55 with Vision,
+all 59 original URIs retained, zero executable candidates and no provider
+connection. Formal acceptance stays
+**79 / 6 / 10.83%** because the controlled fixture does not complete the
+frozen private-provider or all-format criteria.
+
+Concurrent font/geometry commits through `91dc31e` were fast-forwarded after
+S7 verification without replacing any Core or Qt product file. This handoff
+records exact-source results for `598a8a7` and `19afd34`; later documentation
+and font commits do not inherit those Job conclusions.
 
 ## S7 continuation prepared after S6 peer gate
 

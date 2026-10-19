@@ -1,5 +1,51 @@
 # Current handoff: subscription product chain (2026-10-19)
 
+## Exact-source S6 and S7 success (2026-10-20)
+
+S6 `598a8a77400236e6f817a1e4782f1c4f0da4bbd0` finished
+[Rust CI 39297859906](https://github.com/SOLHK/Swirl/actions/runs/39297859906)
+with Linux, macOS and Windows jobs successful, and
+[App/Core CI 39297859893](https://github.com/SOLHK/Swirl/actions/runs/39297859893)
+successful. Windows executed all required Rust gates, independent peers,
+subscription-to-target, Qt/DPAPI persisted product configuration, and linked
+the complete `Swirl.exe`. The raw
+[Windows product reports](evidence/subscription-product-chain/s6-ci-windows/)
+record four protocol profiles, seven HTTP origin paths per profile, one
+authenticated HTTPS close each, zero origin errors and A/B relay counts 5/4.
+The Rust-only menu explicitly skipped its separate Qt test, which ran and
+passed in the Windows Qt menu; these are not merged into one pass count.
+
+S7 source [`19afd34fca898615d89796cb8d158b4be17ff2e9`](https://github.com/SOLHK/Swirl/commit/19afd34fca898615d89796cb8d158b4be17ff2e9)
+adds actual Qt product-route assertions for DOMAIN-SUFFIX, DOMAIN-KEYWORD and
+DST-PORT. [Rust CI 39300230774](https://github.com/SOLHK/Swirl/actions/runs/39300230774)
+completed successfully on Linux, macOS and Windows. The
+[Windows job 118223198660](https://github.com/SOLHK/Swirl/actions/runs/39300230774/job/118223198660)
+executed the Qt/DPAPI product test and linked `Swirl.exe` at
+`2026-10-19 18:41:27 UTC`.
+[App/Core CI 39300230656](https://github.com/SOLHK/Swirl/actions/runs/39300230656)
+is successful. The raw
+[S7 Windows product reports](evidence/subscription-product-chain/s7-ci-windows/)
+show ten HTTP origin paths, A/B relay counts 6/6, one complete HTTPS close and
+zero origin errors for each of HTTP CONNECT, SOCKS5, SS AEAD and VLESS TCP.
+Local clean-SHA Qt execution and complete application build are recorded in
+[`s7-local`](evidence/subscription-product-chain/s7-local/). The exact-source
+Windows Job and full Rust workflow have final successful conclusions.
+
+These are controlled synthetic subscriptions and independent loopback peers.
+The user supplied the private subscription again. It was fetched into a
+DPAPI-encrypted cache outside Git and inspected in memory: 59 VLESS/REALITY
+URIs, 55 with Vision flow; all 59 original URI values matched exactly after
+parsing, and there were zero executable native candidates. publicKey, shortId,
+fingerprint and flow fields remained present; spiderX was absent from this
+document. No provider connection was attempted or silently downgraded.
+Frozen acceptance remains **79 / 6 / 10.83%**.
+
+After S7, four concurrent font/geometry-only commits through `91dc31e` were
+fetched and preserved. They add workflows, tools and a font handoff document;
+they do not change the tested Core, Qt product or application source. The S7
+four-environment results above belong to `19afd34f`, not the later documentation
+or concurrent font commits.
+
 ## S7 local checkpoint: Qt product routing through independent exits (2026-10-20)
 
 On S6 base `598a8a77400236e6f817a1e4782f1c4f0da4bbd0`, the Windows
