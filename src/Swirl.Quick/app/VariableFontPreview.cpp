@@ -11,7 +11,9 @@
 #include <QScopedPointer>
 #include <QGuiApplication>
 #include <QScreen>
+#include <rhi/qrhi.h>
 #include <cmath>
+#include <memory>
 #ifdef SWIRL_UI_TESTS
 #include <chrono>
 static qint64 rasterClockNs() { return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch()).count(); }
@@ -103,6 +105,7 @@ void VariableFontPreview::alignRaster()
 void VariableFontPreview::scheduleRaster()
 {
     // QQuickItem polish coalesces only rendering work; model axes stay exact and immediate.
+    if(m_rasterDirty)return;
     m_rasterDirty=true;
     polish();update();
 }
@@ -122,8 +125,14 @@ void VariableFontPreview::updatePolish()
 {
     // QQuickWindow also forces polish on unchanged screen notifications. Only
     // raster after one of our actual inputs (including resources) invalidates it.
-    if(!m_rasterDirty||width()<=0)return;
+    if(!m_rasterDirty)return;
     m_rasterDirty=false;
+    if(width()<=0||m_text.isEmpty()){
+        // A collapsed/cleared preview must release its old pixels and scene-graph
+        // texture instead of retaining the last visible sample indefinitely.
+        m_raster={};m_rasterOffset={};setImplicitHeight(0);++m_rasterRevision;update();
+        return;
+    }
     alignRaster();
 #ifdef SWIRL_UI_TESTS
     const auto started=m_measureRaster?rasterClockNs():0;
@@ -148,7 +157,24 @@ void VariableFontPreview::updatePolish()
     const int left=qFloor(qMin(0.,ink.left())*dpr)-2,top=qFloor(qMin(0.,ink.top())*dpr)-2;
     const int right=qCeil(qMax(width(),ink.right())*dpr)+2,bottom=qCeil(qMax(y,ink.bottom())*dpr)+2;
     m_rasterOffset=QPointF(left/dpr,top/dpr);
-    QImage image(QSize(qMax(1,right-left),qMax(1,bottom-top)),QImage::Format_ARGB32_Premultiplied);
+    const QSize pixelSize(qMax(1,right-left),qMax(1,bottom-top));
+    QImage image=std::move(m_raster);
+    if(image.size()!=pixelSize){
+        image=QImage(pixelSize,QImage::Format_ARGB32_Premultiplied);
+#ifdef SWIRL_UI_TESTS
+        if(!image.isNull())++m_rasterAllocations;
+#endif
+    }else{
+        // Uploads may still share the previous frame's data. Detach before paint
+        // if necessary; never mutate a buffer queued on the render thread.
+#ifdef SWIRL_UI_TESTS
+        const auto *previousBits=image.constBits();
+#endif
+        image.detach();
+#ifdef SWIRL_UI_TESTS
+        if(image.constBits()!=previousBits)++m_rasterAllocations;
+#endif
+    }
     image.setDotsPerMeterX(m_metricsDevice.dotsPerMeterX());
     image.setDotsPerMeterY(m_metricsDevice.dotsPerMeterY());
     image.setDevicePixelRatio(dpr);image.fill(Qt::transparent);
@@ -176,10 +202,50 @@ QRectF VariableFontPreview::boundingRect() const
 {
     return QRectF(QPointF(),size()).united(QRectF(m_rasterOffset,m_raster.deviceIndependentSize()));
 }
+class PreviewTexture;
 class PreviewTextureNode : public QSGSimpleTextureNode {
 public:
     quint64 revision=0;
     QScopedPointer<QSGTexture> ownedTexture;
+    PreviewTexture *reusableTexture=nullptr;
+};
+
+// QSGTexture's documented QRhi upload hook keeps the native texture alive while
+// coordinates change. Unlike createTextureFromImage on every frame, same-sized
+// samples do not repeatedly retire GPU resources and their staging allocations.
+// All methods and destruction run on the scene-graph thread. QRhi belongs to the
+// window; this node owns only its texture and one latest pending image.
+class PreviewTexture final : public QSGTexture {
+public:
+    bool setImage(QRhi *rhi,const QImage &image,bool &allocated)
+    {
+        const int limit=rhi->resourceLimit(QRhi::TextureSizeMax);
+        if(image.width()>limit||image.height()>limit)return false;
+        const bool bgra=Q_BYTE_ORDER==Q_LITTLE_ENDIAN&&rhi->isTextureFormatSupported(QRhiTexture::BGRA8);
+        const auto format=bgra?QRhiTexture::BGRA8:QRhiTexture::RGBA8;
+        if(!m_texture||m_rhi!=rhi||m_texture->pixelSize()!=image.size()){
+            std::unique_ptr<QRhiTexture> texture(rhi->newTexture(format,image.size()));
+            if(!texture->create())return false;
+            m_texture=std::move(texture);m_rhi=rhi;allocated=true;
+        }
+        m_pendingImage=bgra?image:image.convertToFormat(QImage::Format_RGBA8888_Premultiplied);
+        return true;
+    }
+    qint64 comparisonKey() const override {return qint64(quintptr(m_texture.get()));}
+    QSize textureSize() const override {return m_texture?m_texture->pixelSize():QSize();}
+    bool hasAlphaChannel() const override {return true;}
+    bool hasMipmaps() const override {return false;}
+    QRhiTexture *rhiTexture() const override {return m_texture.get();}
+    void commitTextureOperations(QRhi *rhi,QRhiResourceUpdateBatch *updates) override
+    {
+        if(rhi!=m_rhi||!m_texture||m_pendingImage.isNull())return;
+        updates->uploadTexture(m_texture.get(),m_pendingImage);
+        m_pendingImage={};
+    }
+private:
+    QRhi *m_rhi=nullptr;
+    std::unique_ptr<QRhiTexture> m_texture;
+    QImage m_pendingImage;
 };
 QSGNode *VariableFontPreview::updatePaintNode(QSGNode *oldNode,UpdatePaintNodeData *)
 {
@@ -190,9 +256,22 @@ QSGNode *VariableFontPreview::updatePaintNode(QSGNode *oldNode,UpdatePaintNodeDa
     const auto started=m_measureRaster?rasterClockNs():0;
 #endif
     if(node->revision!=m_rasterRevision){
-        auto *texture=window()->createTextureFromImage(m_raster);
+        QSGTexture *texture=nullptr;PreviewTexture *reusable=nullptr;bool allocated=false;
+        if(auto *rhi=window()->rhi()){
+            reusable=node->reusableTexture?node->reusableTexture:new PreviewTexture;
+            if(reusable->setImage(rhi,m_raster,allocated))texture=reusable;
+            else{if(reusable!=node->reusableTexture)delete reusable;reusable=nullptr;}
+        }
+        // The software scene graph has no QRhi. Preserve its native image path;
+        // also retain Qt's existing size-limit/allocation handling as a fallback.
+        if(!texture){texture=window()->createTextureFromImage(m_raster);allocated=texture!=nullptr;}
         if(!texture){delete node;return nullptr;}
-        node->setTexture(texture);node->ownedTexture.reset(texture);node->revision=m_rasterRevision;
+        node->setTexture(texture);
+        if(node->ownedTexture.data()!=texture)node->ownedTexture.reset(texture);
+        node->reusableTexture=reusable;node->revision=m_rasterRevision;
+#ifdef SWIRL_UI_TESTS
+        if(allocated)++m_textureAllocations;
+#endif
     }
     // Physical image dimensions determine the quad. Never fit a rounded texture
     // back into the logical line box; that would resample at fractional DPRs.

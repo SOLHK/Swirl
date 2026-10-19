@@ -127,7 +127,7 @@ inline QJsonObject runFontFramePhase(QQuickWindow *window,FontManager *manager,Q
     for(auto *line:lines)line->setMeasureRaster(false);
     if(mode=="font-size")for(int i=0;i<lines.size();++i)lines[i]->setFont(originalFonts[i]);
     std::lock_guard guard(trace->mutex);
-    QJsonArray rawFrames,rawRasters,rawInputs;std::vector<double> intervals,sync,record,submit,whole,raster,paint,handling,driver,latency,rasterLatency;
+    QJsonArray rawFrames,rawRasters,rawInputs,unrepresentedInputs;std::vector<double> intervals,sync,record,submit,whole,raster,paint,handling,driver,latency,rasterLatency,driverOriginLatency;
     QHash<int,qint64> firstQueued,readyAt;QHash<int,double> rasterSums;
     const auto ms=[&](qint64 time){return time?double(time-trace->epoch)/1e6:-1.;};
     qint64 previous=0;
@@ -156,18 +156,23 @@ inline QJsonObject runFontFramePhase(QQuickWindow *window,FontManager *manager,Q
         if(sample.sequence<=warmup)continue;
         handling.push_back(double(sample.end-sample.begin)/1e6);
         if(sample.driverQueued)driver.push_back(double(sample.begin-sample.driverQueued)/1e6);
-        if(firstQueued.contains(sample.sequence)){++represented;latency.push_back(double(firstQueued[sample.sequence]-sample.begin)/1e6);}
+        if(firstQueued.contains(sample.sequence)){
+            ++represented;latency.push_back(double(firstQueued[sample.sequence]-sample.begin)/1e6);
+            if(sample.driverQueued)driverOriginLatency.push_back(double(firstQueued[sample.sequence]-sample.driverQueued)/1e6);
+        }else unrepresentedInputs.append(sample.sequence);
         if(trace->readyMasks.value(sample.sequence)==15)rasterLatency.push_back(double(readyAt[sample.sequence]-sample.begin)/1e6);
     }
     std::vector<double> totalRaster;for(auto it=rasterSums.cbegin();it!=rasterSums.cend();++it)if(it.key()>warmup&&trace->readyMasks.value(it.key())==15)totalRaster.push_back(it.value());
     const bool inputWorked=(mode!="slider"||changes>total/2)&&(mode!="font-size"||sizeChanges>total/2);
-    return {{"mode",mode},{"round",round},{"completed",completed},{"inputWorked",inputWorked},{"windowActiveAtStart",activeAtStart},{"windowActiveAtEnd",window->isActive()},{"warmupFrames",warmup},{"requestedSampleFrames",samples},{"frameCallbacks",callbacks},{"inputCount",issued},{"representedMeasuredInputs",represented},{"elapsedMs",double(finished-started)/1e6},{"privateBytes",double(fontUiPrivateBytes())},{"renderThread",QString::number(trace->renderThread)},{"guiThread",QString::number(reinterpret_cast<quintptr>(QThread::currentThreadId()))},
-        {"queuedPresentIntervalMs",fontFrameStats(intervals)},{"sceneSyncWallMs",fontFrameStats(sync)},{"renderRecordWallMs",fontFrameStats(record)},{"postRecordToSubmitWallMs",fontFrameStats(submit)},{"wholeFrameWallMs",fontFrameStats(whole)},{"rasterLineWallMs",fontFrameStats(raster)},{"rasterFourLinesWallMs",fontFrameStats(totalRaster)},{"textureUpdateCpuWallMs",fontFrameStats(paint)},{"inputHandlerWallMs",fontFrameStats(handling)},{"driverQueueDelayMs",fontFrameStats(driver)},{"inputToAllRastersMs",fontFrameStats(rasterLatency)},{"inputToQueuedPresentMs",fontFrameStats(latency)},{"frames",rawFrames},{"rasters",rawRasters},{"inputs",rawInputs}};
+    return {{"mode",mode},{"round",round},{"completed",completed},{"inputWorked",inputWorked},{"windowActiveAtStart",activeAtStart},{"windowActiveAtEnd",window->isActive()},{"warmupFrames",warmup},{"requestedSampleFrames",samples},{"frameCallbacks",callbacks},{"inputCount",issued},{"representedMeasuredInputs",represented},{"unrepresentedMeasuredInputs",unrepresentedInputs},{"elapsedMs",double(finished-started)/1e6},{"privateBytes",double(fontUiPrivateBytes())},{"renderThread",QString::number(trace->renderThread)},{"guiThread",QString::number(reinterpret_cast<quintptr>(QThread::currentThreadId()))},
+        {"queuedPresentIntervalMs",fontFrameStats(intervals)},{"sceneSyncWallMs",fontFrameStats(sync)},{"renderRecordWallMs",fontFrameStats(record)},{"postRecordToSubmitWallMs",fontFrameStats(submit)},{"wholeFrameWallMs",fontFrameStats(whole)},{"rasterLineWallMs",fontFrameStats(raster)},{"rasterFourLinesWallMs",fontFrameStats(totalRaster)},{"textureUpdateCpuWallMs",fontFrameStats(paint)},{"inputHandlerWallMs",fontFrameStats(handling)},{"driverQueueDelayMs",fontFrameStats(driver)},{"inputToAllRastersMs",fontFrameStats(rasterLatency)},{"inputToQueuedPresentMs",fontFrameStats(latency)},{"driverOriginToQueuedPresentMs",fontFrameStats(driverOriginLatency)},{"frames",rawFrames},{"rasters",rawRasters},{"inputs",rawInputs}};
 }
 
 inline int runFontFrameChecks(QQuickWindow *window,FontManager *manager,const QString &output) {
     if(!window||output.isEmpty()||manager->previewAxes().isEmpty())return 3;
-    QDir().mkpath(output);window->resize(1100,900);window->showNormal();window->raise();window->requestActivate();
+    QDir().mkpath(output);const QSize requestedViewport(1100,900);
+    if(!prepareFontTestViewport(window,requestedViewport,output+"/font-frame-setup-failure.json"))return 3;
+    window->raise();window->requestActivate();
     if(!QTest::qWaitForWindowActive(window,15000)){
         QFile file(output+"/font-frame-setup-failure.json");if(file.open(QIODevice::WriteOnly))file.write(QJsonDocument(QJsonObject{{"active",window->isActive()},{"reason","The native benchmark window could not obtain foreground activation within 15 seconds; no frame phases were measured."}}).toJson());return 3;
     }
@@ -187,8 +192,32 @@ inline int runFontFrameChecks(QQuickWindow *window,FontManager *manager,const QS
     auto *slider=fontFrameFind(window->contentItem(),"fontAxisSlider_HGHT");QList<VariableFontPreview *> lines;
     for(int i=0;i<4;++i)if(auto *line=qobject_cast<VariableFontPreview *>(fontFrameFind(window->contentItem(),"fontPreviewLine_"+QString::number(i))))lines.append(line);
     if(!slider||lines.size()!=4)return 3;
-    const auto center=slider->mapToScene(QPointF(slider->width()/2,slider->height()/2));
-    if(!QRectF(0,0,window->width(),window->height()).contains(center))return 3;
+    // A smaller real work area must still expose the pointer target and all four
+    // preview lines. Scroll their existing shared Flickable during setup only;
+    // being inside the window alone does not establish visibility through clips.
+    QList<QQuickItem *> requiredItems{slider};for(auto *line:lines)requiredItems.append(line);
+    auto *flickable=slider->parentItem();
+    while(flickable&&!flickable->property("contentY").isValid())flickable=flickable->parentItem();
+    if(flickable){
+        QRectF required;
+        for(auto *item:requiredItems)required=required.united(item->mapRectToItem(flickable,item->boundingRect()));
+        const qreal shift=required.top()<0?required.top():qMax(0.,required.bottom()-flickable->height());
+        flickable->setProperty("contentY",qBound(0.,flickable->property("contentY").toDouble()+shift,
+                                                  qMax(0.,flickable->property("contentHeight").toDouble()-flickable->height())));
+    }
+    const auto requiredVisible=[&]{
+        for(auto *item:requiredItems){
+            if(!item->isVisible()||!QRectF(QPointF(),window->size()).contains(item->mapRectToScene(item->boundingRect())))return false;
+            for(auto *parent=item->parentItem();parent;parent=parent->parentItem())
+                if(parent->clip()&&!parent->clipRect().contains(item->mapRectToItem(parent,item->boundingRect())))return false;
+        }
+        return true;
+    };
+    if(!QTest::qWaitFor(requiredVisible,1000)){
+        QFile file(output+"/font-frame-setup-failure.json");
+        if(file.open(QIODevice::WriteOnly))file.write(QJsonDocument(QJsonObject{{"viewport",fontTestViewportReport(window,requestedViewport)},{"reason","The pointer slider and four preview lines cannot all be exposed through the existing scroll viewport; no frame phases were measured."}}).toJson());
+        return 3;
+    }
     QJsonArray phases;bool ok=true;
     for(int round=1;round<=3;++round)for(const auto &mode:QStringList{"static","slider","three-axis","font-size"}){
         manager->resetPreviewAxes();QTest::qWait(200); // Setup only; outside all measured traces.
@@ -199,9 +228,9 @@ inline int runFontFrameChecks(QQuickWindow *window,FontManager *manager,const QS
     }
     const bool samePage=page&&qvariant_cast<QObject *>(loader->property("item"))==page;
     manager->resetPreviewAxes();QTest::qWait(150);window->grabWindow().save(output+"/after-benchmark.png");
-    QJsonObject report{{"completed",ok},{"samePage",samePage},{"dpr",window->devicePixelRatio()},{"qtRefreshRate",window->screen()->refreshRate()},{"screen",window->screen()->name()},{"graphicsApi",int(window->rendererInterface()->graphicsApi())},{"renderLoopOverride",qEnvironmentVariable("QSG_RENDER_LOOP")},{"fontEngine",qEnvironmentVariable("QT_QPA_PLATFORM")},{"phases",phases},
+    QJsonObject report{{"completed",ok},{"samePage",samePage},{"viewport",fontTestViewportReport(window,requestedViewport)},{"dpr",window->devicePixelRatio()},{"qtRefreshRate",window->screen()->refreshRate()},{"screen",window->screen()->name()},{"graphicsApi",int(window->rendererInterface()->graphicsApi())},{"renderLoopOverride",qEnvironmentVariable("QSG_RENDER_LOOP")},{"fontEngine",qEnvironmentVariable("QT_QPA_PLATFORM")},{"phases",phases},
         {"method","std::chrono::steady_clock; direct render-thread signal timestamps; frame-feedback GUI driver, no qWait in measured phases; synthetic pointer events stay in this QQuickWindow"},
-        {"limits","frameSwapped means queued for presentation; afterFrameEnd means submitted. No GPU completion, scanout, photons or hardware pointer latency claimed. Frame wall spans may contain driver/vsync waits; raster and render-record spans are reported separately. No animations or quality settings changed."}};
+        {"limits","frameSwapped means queued for presentation; afterFrameEnd means submitted. No GPU completion, scanout, photons or hardware pointer latency claimed. Frame wall spans may contain driver/vsync waits; raster and render-record spans are reported separately. driverOriginToQueuedPresentMs starts at the preceding frame-feedback callback source, not at physical input. Latency percentiles include only represented inputs; unrepresentedMeasuredInputs lists those absent from an observed queued frame, including a possible final in-flight input. No animations or quality settings changed."}};
     QFile file(output+"/font-frame-report.json");if(!file.open(QIODevice::WriteOnly))return 3;file.write(QJsonDocument(report).toJson());
     return ok&&samePage?0:2;
 }

@@ -6,6 +6,7 @@
 #include <QPointer>
 #include <QScreen>
 #include <QSignalSpy>
+#include <QSGRendererInterface>
 #include <QTextLayout>
 #include <QTextOption>
 #include <QtMath>
@@ -186,4 +187,110 @@ void FontTests::previewWindowMetricsAndIdleStability()
     }
     qInfo("Preview checks used real font registration and same-screen metrics; "
           "the DPR notification was simulated, not a physical display/DPI switch.");
+}
+
+void FontTests::previewRepeatedAxesReuseResources()
+{
+    using namespace FontPreviewInvalidationTest;
+    const auto fixtures = qEnvironmentVariable("SWIRL_FONT_METADATA_FIXTURES");
+    if (fixtures.isEmpty()) QSKIP("Generated original multi-axis fonts not supplied");
+    RegisteredFont registration;
+    registration.id = QFontDatabase::addApplicationFont(fixtures + "/automation.ttf");
+    QVERIFY(registration.id >= 0);
+    const auto request = [](float weight) {
+        QFont font(QStringLiteral("Swirl Automation Probe"));
+        font.setPixelSize(64);
+        font.setWeight(QFont::Normal);
+        font.setHintingPreference(QFont::PreferFullHinting);
+        font.setVariableAxis(QFont::Tag("wght"), weight);
+        return font;
+    };
+
+    // Isolate CPU storage from the scene graph's legitimate in-flight image
+    // references. This original fixture changes real outlines, with fixed metrics.
+    {
+        PreviewProbe cpu;
+        cpu.setWidth(350);
+        cpu.setText(QStringLiteral("AAA"));
+        cpu.setFont(request(200));
+        cpu.ensurePolished();
+        QVERIFY(!cpu.rasterPixelSize().isEmpty());
+        const auto size = cpu.rasterPixelSize();
+        const auto allocations = cpu.rasterAllocationCount();
+        QVERIFY(allocations > 0);
+        for (const float weight : {900.f, 100.f, 650.f, 250.f, 900.f, 200.f}) {
+            cpu.setFont(request(weight));
+            cpu.ensurePolished();
+            QCOMPARE(cpu.rasterPixelSize(), size);
+            QCOMPARE(cpu.rasterAllocationCount(), allocations);
+        }
+    }
+
+    QQuickWindow window;
+    window.resize(400, 180);
+    window.setColor(Qt::white);
+    window.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&window));
+    const QImage empty = window.grabWindow();
+    QVERIFY(!empty.isNull());
+    auto *preview = new PreviewProbe(window.contentItem());
+    preview->setPosition(QPointF(20, 20));
+    preview->setSize(QSizeF(350, 120));
+    preview->setText(QStringLiteral("AAA"));
+    preview->setFont(request(200));
+    preview->setMeasureRaster(true);
+    QSignalSpy rasters(preview, &VariableFontPreview::rasterMeasured);
+    QTRY_VERIFY(rasters.count() > 0);
+    QImage initial;
+    QTRY_VERIFY(!(initial = window.grabWindow()).isNull() && initial != empty);
+    const auto size = preview->rasterPixelSize();
+    const auto textureAllocations = preview->textureAllocationCount();
+    QVERIFY(textureAllocations > 0);
+    const bool rhiBackend = QSGRendererInterface::isApiRhiBased(window.rendererInterface()->graphicsApi());
+    QImage previous = initial;
+    for (const float weight : {900.f, 100.f, 650.f, 250.f, 900.f, 200.f}) {
+        preview->setFont(request(weight));
+        QImage next;
+        QTRY_VERIFY(!(next = window.grabWindow()).isNull() && next != previous);
+        QCOMPARE(preview->rasterPixelSize(), size);
+        if (rhiBackend) QCOMPARE(preview->textureAllocationCount(), textureAllocations);
+        previous = next;
+    }
+    QCOMPARE(previous, initial); // A -> B -> A must restore the exact original pixels.
+
+    QTest::qWait(60);
+    rasters.clear();
+    for (const float weight : {900.f, 100.f, 650.f}) preview->setFont(request(weight));
+    QCOMPARE(preview->font(), request(650)); // the final model value is immediate
+    QTRY_COMPARE(rasters.count(), 1);
+    QTest::qWait(60);
+    QCOMPARE(rasters.count(), 1);
+    preview->setFont(request(200));
+    QTRY_COMPARE(window.grabWindow(), initial);
+    QTest::qWait(60);
+    rasters.clear();
+    const auto idleTextures = preview->textureAllocationCount();
+    for (int i = 0; i < 5; ++i) { window.update(); QTest::qWait(20); }
+    QCOMPARE(rasters.count(), 0);
+    QCOMPARE(preview->textureAllocationCount(), idleTextures);
+
+    // Clear/collapse must remove the old visible texture, and restoring the same
+    // source must recover the exact pixels without retaining a dead scene node.
+    preview->setText(QString());
+    QTRY_VERIFY(preview->rasterPixelSize().isEmpty());
+    QTRY_COMPARE(window.grabWindow(), empty);
+    preview->setText(QStringLiteral("AAA"));
+    QTRY_COMPARE(window.grabWindow(), initial);
+    preview->setWidth(0);
+    QTRY_VERIFY(preview->rasterPixelSize().isEmpty());
+    QTRY_COMPARE(window.grabWindow(), empty);
+    preview->setWidth(350);
+    QTRY_COMPARE(window.grabWindow(), initial);
+    QPointer<PreviewProbe> removed = preview;
+    delete preview;
+    QVERIFY(removed.isNull());
+    QTRY_COMPARE(window.grabWindow(), empty);
+    qInfo() << "Preview resource regression backend" << window.rendererInterface()->graphicsApi()
+            << "RHI texture-reuse assertion executed" << rhiBackend
+            << "; CPU and image checks do not establish Windows private-byte or physical-refresh acceptance.";
 }

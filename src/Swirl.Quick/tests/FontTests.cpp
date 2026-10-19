@@ -140,6 +140,7 @@ private slots:
     void fontDisplayContextLifetime();
     void previewFontResourcesInvalidateRaster();
     void previewWindowMetricsAndIdleStability();
+    void previewRepeatedAxesReuseResources();
     void automaticWidthUsesRealAdvances();
     void optionalPhysicalFontIdentity();
     void nativeGlyphsHaveNoColourFringes(){

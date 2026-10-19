@@ -15,7 +15,9 @@ inline int runFontAcceptanceChecks(QQuickWindow *window,FontManager *manager,
     const auto routes=QJsonDocument::fromJson(eval(currentPageOnly?"JSON.stringify([AppState.currentPage])":"JSON.stringify(AppState.allPageIds)").toString().toUtf8()).array();
     auto ready=[&]{return eval("pageLoader.item && !pageLoader.moving && !pageLoader.pendingGrab && pageLoader.activeLoader.routeId===pageLoader.routeKey").toBool();};
     for(const auto &theme:QStringList{"Light","Dark"})for(const auto &size:QList<QSize>{{1100,900},{900,680}}){
-        eval("Theme.mode='"+theme+"'");window->resize(size);window->showNormal();window->raise();window->requestActivate();
+        eval("Theme.mode='"+theme+"'");
+        if(!prepareFontTestViewport(window,size,output+"/font-acceptance-setup-failure.json"))return 3;
+        window->raise();window->requestActivate();
         for(const auto &entry:routes){
             const auto route=entry.toString();eval("AppState.navigate('"+route+"')");
             const bool settled=QTest::qWaitFor(ready,8000);QTest::qWait(40);
@@ -63,7 +65,7 @@ inline int runFontAcceptanceChecks(QQuickWindow *window,FontManager *manager,
             // symbol is not automatically an application layout failure.
             const bool pass=settled&&captured&&texts>0&&badWeights==0;
             if(!pass)++failures;
-            cases.append(QJsonObject{{"route",route},{"theme",theme},{"width",size.width()},{"height",size.height()},{"settled",settled},{"captured",captured},{"texts",texts},{"foreignSourceRuns",badFaces},{"wrongWeights",badWeights},{"missingGlyphs",missing},{"narrowedLabels",narrowed},{"elidedLabels",elided},{"wrappedTexts",wrapped},{"items",items},{"pass",pass}});
+            cases.append(QJsonObject{{"route",route},{"theme",theme},{"width",size.width()},{"height",size.height()},{"viewport",fontTestViewportReport(window,size)},{"settled",settled},{"captured",captured},{"texts",texts},{"foreignSourceRuns",badFaces},{"wrongWeights",badWeights},{"missingGlyphs",missing},{"narrowedLabels",narrowed},{"elidedLabels",elided},{"wrappedTexts",wrapped},{"items",items},{"pass",pass}});
         }
     }
     QFile report(output+"/font-acceptance.json");if(!report.open(QIODevice::WriteOnly))return 3;

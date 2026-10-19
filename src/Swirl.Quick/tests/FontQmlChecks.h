@@ -234,11 +234,43 @@ ApplicationWindow {
     QVERIFY(QMetaObject::invokeMethod(manualToggle, "toggled"));
     QVERIFY(!manager.previewAutomatic());
     QVERIFY(manager.automatic()); // preview mode does not mutate the active UI
+    const auto axisBinding = [](QObject *target) -> QObject * {
+        for (auto *child : target->children())
+            if (child->property("target").value<QObject *>() == target
+                && child->property("property").toString() == QStringLiteral("font.variableAxes")
+                && child->metaObject()->indexOfMethod("refreshAxes()") >= 0) return child;
+        return nullptr;
+    };
+    auto *previewLine = qobject_cast<VariableFontPreview *>(item("fontPreviewLine_0"));
+    QVERIFY(previewLine);
+    QPointer<VariableFontPreview> retainedPreview = previewLine;
+    auto *previewBinding = axisBinding(previewLine);
+    auto *bodyBinding = axisBinding(item("body"));
+    QVERIFY(previewBinding && bodyBinding);
+    QTRY_VERIFY(!previewBinding->property("refreshQueued").toBool());
+    const auto beforePreviewFont = previewLine->font();
+    auto observedPreviewFonts = std::make_shared<QList<QFont>>();
+    const auto observePreview = QObject::connect(previewLine, &VariableFontPreview::fontChanged,
+        root.data(), [observedPreviewFonts, previewLine] { observedPreviewFonts->append(previewLine->font()); });
     QVERIFY(manager.setPreviewAxis("wght", 575));
     QVERIFY(manager.setPreviewAxis("HGHT", 800));
-    QTRY_COMPARE(font("fontPreviewLine_0").variableAxisValue(weightTag), 575.0f);
+    QVERIFY(manager.setPreviewAxis("wdth", 109.75));
+    QCOMPARE(previewLine->font(), beforePreviewFont); // coalesce the input turn
+    // Execute the production Qt.callLater callback directly to isolate the
+    // hand-off it owns: publishing the complete map must not add a second timer.
+    QVERIFY(QMetaObject::invokeMethod(previewBinding, "refreshAxes"));
+    QCOMPARE(previewLine->font().variableAxisValue(weightTag), 575.0f);
+    QCOMPARE(previewLine->font().variableAxisValue(heightTag), 800.0f);
+    QCOMPARE(previewLine->font().variableAxisValue(QFont::Tag("wdth")), 109.75f);
+    QCOMPARE(observedPreviewFonts->size(), 1);
+    QCOMPARE(observedPreviewFonts->first(), previewLine->font());
+    QCOMPARE(retainedPreview.data(), previewLine);
+    QObject::disconnect(observePreview);
     QCOMPARE(font("body").variableAxisValue(weightTag), 400.0f);
     QVERIFY(manager.applyPreview());
+    // Retain the ordinary text binding's existing delayed commit behavior.
+    QVERIFY(QMetaObject::invokeMethod(bodyBinding, "refreshAxes"));
+    QCOMPARE(font("body").variableAxisValue(weightTag), 400.0f);
     QTRY_COMPARE(font("body").variableAxisValue(weightTag), 575.0f);
     // Manual wght is the user's exact override; automatic mode retains roles.
     QTRY_COMPARE(font("title").variableAxisValue(weightTag), 575.0f);
@@ -310,6 +342,11 @@ ApplicationWindow {
     QVERIFY(manager.importFont(QUrl::fromLocalFile(fixtures+"/automation-width.ttf")));
     QVERIFY(manager.applyPreview());
     QTRY_COMPARE(font("widthText").family(),QStringLiteral("Swirl Width Probe"));
+    // Family selection precedes the queued axis binding. The previous Other
+    // fixture's wdth=95 also satisfies <100, so it cannot prove this face ready.
+    // Await the new fixture's complete two-axis profile before taking a snapshot.
+    QTRY_COMPARE(font("widthText").variableAxisTags().size(),2);
+    QTRY_COMPARE(font("widthText").variableAxisValue(QFont::Tag("wght")),400.f);
     QTRY_VERIFY(font("widthText").variableAxisValue(QFont::Tag("wdth"))<100.f);
     QTest::qWait(100); // let the parent layout publish the natural preferred width
     const auto fittedFont=font("widthText");
@@ -319,7 +356,15 @@ ApplicationWindow {
     QSignalSpy widthChanges(item("widthText"),widthProperty.notifySignal());
     QTest::qWait(100);widthChanges.clear();
     for(int i=0;i<20;++i){item("widthHost")->setProperty("width",96.+(i%2)*.2);QCoreApplication::processEvents();}
-    QTest::qWait(100);QCOMPARE(font("widthText"),fittedFont);QCOMPARE(widthChanges.count(),0);
+    QTest::qWait(100);
+    if(font("widthText")!=fittedFont){
+        const auto describe=[](const QFont &value){
+            QJsonObject axes;for(const auto tag:value.variableAxisTags())axes[QString::fromLatin1(tag.toString())]=value.variableAxisValue(tag);
+            return QJsonObject{{"font",value.toString()},{"axes",axes},{"resolveMask",QString::number(value.resolveMask())}};
+        };
+        qInfo()<<"Width jitter font mismatch"<<QJsonObject{{"before",describe(fittedFont)},{"after",describe(font("widthText"))},{"hostWidth",item("widthHost")->property("width").toDouble()},{"textWidth",item("widthText")->property("width").toDouble()},{"natural",natural},{"fontChanges",widthChanges.count()}};
+    }
+    QCOMPARE(font("widthText"),fittedFont);QCOMPARE(widthChanges.count(),0);
     item("widthHost")->setProperty("width",natural+10);
     QTRY_COMPARE(font("widthText").variableAxisValue(QFont::Tag("wdth")),100.f);
     const auto privateFont=qEnvironmentVariable("SWIRL_TEST_TTC");

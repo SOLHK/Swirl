@@ -32,6 +32,8 @@ public:
     void setMeasureRaster(bool enabled) { m_measureRaster=enabled; }
     qreal rasterDevicePixelRatio() const { return m_raster.devicePixelRatio(); }
     QSize rasterPixelSize() const { return m_raster.size(); }
+    quint64 rasterAllocationCount() const { return m_rasterAllocations.load(); }
+    quint64 textureAllocationCount() const { return m_textureAllocations.load(); }
 #endif
 signals:
     void textChanged();
@@ -63,9 +65,12 @@ private:
     QColor m_color=Qt::black;
     QImage m_raster;
     QPointF m_rasterOffset;
-    bool m_rasterDirty=true;
+    bool m_rasterDirty=false;
     quint64 m_rasterRevision=0;
 #ifdef SWIRL_UI_TESTS
     std::atomic_bool m_measureRaster{false};
+    // Counts actual buffer replacement/detachment and texture resource creation.
+    // Texture allocation is observed on the scene-graph thread.
+    std::atomic<quint64> m_rasterAllocations{0},m_textureAllocations{0};
 #endif
 };

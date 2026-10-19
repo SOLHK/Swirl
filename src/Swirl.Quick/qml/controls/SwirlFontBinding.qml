@@ -16,7 +16,10 @@ Binding {
     property var resolvedAxes: ({})
     property bool refreshQueued: false
     property: "font.variableAxes"
-    delayed: true
+    // Preview inputs already coalesce in Qt.callLater below. Publish that final
+    // snapshot immediately, so polish does not see the previous axis tuple while
+    // a second queued Binding update waits. Preserve normal text/layout timing.
+    delayed: !preview
     value: resolvedAxes
 
     // All QFont subproperties share fontChanged. Reading target.font directly

@@ -1,5 +1,6 @@
 #pragma once
 #include "app/FontManager.h"
+#include "FontTestViewport.h"
 #include <QQuickWindow>
 #include <QQuickItem>
 #include <QQmlExpression>
@@ -39,8 +40,18 @@ inline int runFontUiChecks(QQuickWindow *window,FontManager *manager,const QStri
         if(item->objectName()==name)return item;for(auto *child:item->childItems())if(auto *found=find(child,name))return found;return nullptr;};
     auto get=[&](const QString &name){return find(window->contentItem(),name);};
     auto capture=[&](const QString &name){const auto image=window->grabWindow();check(!image.isNull()&&image.save(output+"/"+name+".png"),"raw Qt render: "+name);};
-    auto memory=[](){return fontUiPrivateBytes();};
-    window->resize(1100,900);window->hide();window->show();QTest::qWait(150);
+    bool memorySamplesValid=true;
+    auto memory=[&](){const auto value=fontUiPrivateBytes();if(value<0)memorySamplesValid=false;return value;};
+#ifdef Q_OS_WIN
+    constexpr bool requirePrivateBytes=true;
+#else
+    constexpr bool requirePrivateBytes=false;
+#endif
+    const QSize requestedViewport(1100,900);
+    window->hide();
+    if(!prepareFontTestViewport(window,requestedViewport,output+"/font-ui-setup-failure.json"))return 3;
+    QTest::qWait(150);
+    const auto viewport=fontTestViewportReport(window,requestedViewport);
     eval("AppState.navigate('settings')");QTest::qWait(350);
     auto *loader=window->findChild<QObject *>("pageLoader");
     // Wait for the existing asynchronous page host to finish its navigation.
@@ -98,12 +109,14 @@ inline int runFontUiChecks(QQuickWindow *window,FontManager *manager,const QStri
     }
     const auto distinctEndMemory=memory();
     manager->resetPreviewAxes();QTest::qWait(3000);const auto distinctIdleMemory=memory();
-    check(!distinctBudgetExceeded,"finite new-coordinate stress stays below 1 GiB private bytes");
+    // On Windows, a failed process-memory query must not silently pass either
+    // memory gate. Unsupported platforms retain an explicit unmeasured status.
+    check((!requirePrivateBytes||memorySamplesValid)&&!distinctBudgetExceeded,"finite new-coordinate stress stays below 1 GiB private bytes");
     // Later assertions deliberately keep the same confirmed fixture as the earlier test.
     manager->setPreviewAxis("wdth",109.75);
 
     const auto lateGrowth=dragMemory.last().toDouble()-dragMemory.at(dragMemory.size()-3).toDouble();
-    check(warmMemory<0||lateGrowth<16LL*1024*1024,"repeated identical coordinate set reaches a memory plateau");
+    check((!requirePrivateBytes||memorySamplesValid)&&(warmMemory<0||lateGrowth<16LL*1024*1024),"repeated identical coordinate set reaches a memory plateau");
     check(page&&qvariant_cast<QObject *>(loader->property("item"))==page,"axis updates retain the settings page instance");
     check(manager->variableAxesFor(manager->currentFamily(),400)==originalApplied,"drag preview leaves active UI unchanged until Apply");
     manager->setPreviewAxis("HGHT",800);manager->setPreviewAxis("wght",575);
@@ -161,6 +174,6 @@ inline int runFontUiChecks(QQuickWindow *window,FontManager *manager,const QStri
     QFile report(output+"/font-ui-report.json");if(report.open(QIODevice::WriteOnly))report.write(QJsonDocument(QJsonObject{
         {"privateBytesBeforeManager",QCoreApplication::instance()->property("fontBeforeManagerBytes").toDouble()},{"privateBytesAfterBundledFonts",QCoreApplication::instance()->property("fontAfterManagerBytes").toDouble()},{"privateBytesAfterPrivateFont",QCoreApplication::instance()->property("fontAfterImportBytes").toDouble()},{"dialogTextItems",popupText},{"dialogCaptures",popupCaptures},{"checks",checks},{"failures",failures},{"dpr",window->devicePixelRatio()},{"updateCount",180},{"updateLoopMs",double(updateMs)},
         {"distinctCoordinates",distinctCount},{"distinctMemoryBytes",distinctMemory},{"distinctBudgetExceeded",distinctBudgetExceeded},{"privateBytesAfterDistinct",double(distinctEndMemory)},{"privateBytesAfterDistinctResetAndIdle",double(distinctIdleMemory)},{"distinctIdleMs",3000},{"dragMemoryBytes",dragMemory},{"privateBytesBefore",double(beforeMemory)},{"privateBytesAfterWarmDrag",double(warmMemory)},{"privateBytesAfterRepeatedDrag",double(repeatedMemory)},{"privateBytesAfter",double(memory())},{"frameIntervalsMs",frameIntervals},{"pages",pageAudits},
-        {"captureKind","raw QQuickWindow render; not physical-screen or remote-compression evidence"}}).toJson());
+        {"privateBytesMeasurementStatus",memorySamplesValid?"measured":"unavailable"},{"privateBytesRequired",requirePrivateBytes},{"viewport",viewport},{"captureKind","raw QQuickWindow render; not physical-screen or remote-compression evidence"}}).toJson());
     return failures?2:0;
 }
