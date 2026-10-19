@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   identify:
-    runs-on: macos-latest
+    runs-on: xcode-27
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
