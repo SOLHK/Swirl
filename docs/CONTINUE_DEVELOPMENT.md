@@ -27,9 +27,13 @@ The concurrent font run exposed a reporter omission for the explicitly local-onl
 `optionalPhysicalFontIdentity` case. Repair `5adcfcf158a4eb99f56e78d0997af5dbc25bd3d0`
 adds that one classification and strict regression tests; the original XML still
 contains 51 passes and 9 skips, with physical verification false. Its own Rust
-run `39205098742`, font run `39205098558` and App run `39205098810` require separate
-final verification. Public width tests, failures and unexpected skips remain
-mandatory gates. No original failed run is rewritten as success.
+run `39205098742`, font run `39205098558` and App run `39205098810` have now all
+completed successfully against that exact full SHA, with new logs and artifacts
+independently checked. Public width tests, failures and unexpected skips remain
+mandatory gates. No original failed run is rewritten as success. The final
+[reporter repair record](FONT_REPORT_CLASSIFICATION_20261019.md) and
+[structured evidence](evidence/FONT_REPORT_CLASSIFICATION_20261019.json) record
+these later runs separately from the four Core stages.
 
 ## Verification checkpoint
 
@@ -37,6 +41,30 @@ The permanent [session evidence](evidence/REALITY_FOUNDATION_AND_IMPORT_20261019
 binds source trees, logs, test counts and actual artifact identities. Never borrow
 an earlier green run for a later commit.
 
+- Latest executable source `5adcfcf158a4eb99f56e78d0997af5dbc25bd3d0` passed
+  [Rust run `39205098742`](https://github.com/SOLHK/Swirl/actions/runs/39205098742)
+  on Linux, macOS and Windows: each passed 188 Rust unit/integration tests plus
+  one doctest and 201 common Python tests, with 5 explicit Qt-hook skips.
+  Windows additionally passed capture 25/1 skip, management 10/1 skip and five
+  independent Qt Python hooks. The entire Windows job records 241 Python passes
+  and 7 skips as test invocations, retaining earlier skips without rewriting or
+  counting repeated hooks as unique tests. Native/compatibility CTest passed
+  3/3 and 2/2. Four new Qt XML reports contain 71 substantive passes, 6 explicit
+  skips and no failures; the subsequent hooks separately execute the six peer
+  slots. The complete native `SWIRL_USE_RUST_CORE=ON` Release `Swirl.exe` build
+  succeeded at `2026-10-19T06:00:52.2358626Z`.
+  [Font run `39205098558`](https://github.com/SOLHK/Swirl/actions/runs/39205098558)
+  passed 51 substantive Qt cases, with 9 explicit skips, 10 reporter tests,
+  the complete compatibility application build and 61/61 ready navigation
+  requests. Physical DPI and 240 Hz verification remain false.
+  [App run `39205098810`](https://github.com/SOLHK/Swirl/actions/runs/39205098810)
+  passed its narrower 189 Rust, 25 guard and 69 network test menu with 5 skips;
+  all 187 regular archived source members match the actual tested commit.
+  That archive includes the reporter test file but its existing export menu
+  does not include `tools/SummarizeFontTests.py`; the implementation is bound by
+  its Git blob and the exact-source Font run. Three public checks cover existing
+  DIRECT HTTPS/native DoH only. Final handoff commits following `5adcfcf` change
+  documentation/evidence only and do not claim separate executable-source CI.
 - `4d73f65` passed Rust run `39198976897`, App run `39198976919` and font run
   `39198976888`. Each platform passed 154 Rust tests; Windows native/compatibility
   CTest, five separate Qt peer hooks and the complete native application passed.
@@ -97,10 +125,12 @@ Protocol profiles remain 0/21 and transport/extensions 0/10 fully accepted.
 The existing 18-profile private corpus remains 0/18 complete chains verified.
 No scope, weight, criterion or passing denominator was removed or narrowed.
 
-The font implementation was not rewritten by this Core task. Its exact-source regression at
-`e0534f4`, run `39201185356`, passed 50 substantive tests with 8 explicit skips,
-61/61 ready navigation requests and the complete compatibility application
-build. Real PingFang TTC, 125%/200% scaling, cross-monitor DPI and 240 Hz remain
+The font implementation was not rewritten by this Core task. The newer
+`5adcfcf` regression above includes the preserved concurrent font changes and
+the reporter classification repair. Earlier exact-source `e0534f4`, run
+`39201185356`, had 50 substantive passes and 8 explicit skips; do not substitute
+those older counts for the new 51/9 report. Real PingFang TTC, 125%/200% scaling,
+cross-monitor DPI and 240 Hz remain
 unverified; follow [the physical Windows checklist](FONT_AUTOMATION_WINDOWS_HANDOFF.md).
 Cloud Linux/GitHub cannot access or save files to the user's `D:/Codex`, and this
 session has not read or overwritten the older unintegrated R0/R1 directory.

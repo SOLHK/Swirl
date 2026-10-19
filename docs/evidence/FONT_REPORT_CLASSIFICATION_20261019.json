@@ -1,0 +1,644 @@
+{
+  "schemaVersion": 1,
+  "document": "Font CI local-fixture skip classification repair",
+  "date": "2026-10-19",
+  "recordedAtUtc": "2026-10-19T06:06:34.127055+00:00",
+  "repository": "https://github.com/SOLHK/Swirl",
+  "branch": "work/core-completion-20261017",
+  "source": {
+    "commit": "5adcfcf158a4eb99f56e78d0997af5dbc25bd3d0",
+    "parent": "927079e93e2a6830b615c030d51379dfa348cd23",
+    "tree": "5f553cf264256b83f10b74d1535b02d9f1dba631",
+    "files": [
+      {"path": "tools/SummarizeFontTests.py","bytes": 5857,"sha256": "558f578672f405138924ac6d72833f2e40e8a7a5dd4fe528231d83b2d5f3c982","parentSha256": "be90cf8ffc4589903014b5c2e15cd55331edc87aaeda1078c4421a1722b820da"},
+      {"path": "tools/tests/test_font_ci_reports.py","bytes": 6415,"sha256": "8b9088a3d375662c3fab2dedad326ab5eb1345a63664ddb845b956fc40c815d8","parentSha256": "1990d330ed53446605b824941c2b3dd79d035a2e27f4d518b88000bcb623724b"}
+    ],
+    "changedPathsVerified": 2,
+    "fontProductSourceModifiedByThisCommit": false,
+    "rustCoreSourceModifiedByThisCommit": false,
+    "otherFontFeatureWork": "8371eb8 and 927079e are separate concurrent font development; preserved, not rewritten by this repair."
+  },
+  "behavior": {
+    "classificationChange": "Recognize optionalPhysicalFontIdentity as a local-resource-dependent case whose absence remains an explicit skip.",
+    "rawCasesRetained": true,
+    "skipConvertedToPass": false,
+    "physicalVerificationClaimAdded": false,
+    "guardsStillRequired": [
+      "An actual optionalPhysicalFontIdentity failure still fails the report gate.",
+      "Required public automaticWidthUsesRealAdvances and optionalMetadataReplacement must pass; skips fail.",
+      "Unrecognized public test skips still fail.",
+      "Missing/malformed XML, absent mandatory cases, failed lifecycle and skipped policy cases still fail.",
+      "The separate Windows native-raster case remains mandatory when Windows verification is requested."
+    ]
+  },
+  "countRules": [
+    "Old failed runs remain failed; replay only exercises reporting against the same immutable downloaded XML.",
+    "Qt totals exclude six init/cleanup lifecycle records. Replays do not create new Qt passes.",
+    "Local and cloud executions of the same 10 reporter tests are separate runs, not 20 unique tests.",
+    "The App workflow has a smaller menu than the platform matrix and cannot replace native Qt or complete native application verification."
+  ],
+  "historicalFontFailures": [
+    {
+      "sourceCommit": "8371eb804b6d3f240090388c4bec90c926904119",
+      "runId": 39204032634,
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39204032634",
+      "jobId": 117902858738,
+      "conclusion": "failure",
+      "archiveEvidence": "prior-8371-archive",
+      "metadataEvidence": ["prior-8371-source.json","prior-8371-stages.json","prior-8371-font-results.json"],
+      "logEvidence": "prior-8371-job-log",
+      "source": {"qtArchitecture": "win64_msvc2022_64","runAttempt": "1","refresh240HzVerified": false,"runner": "windows-2022","physicalDpiVerified": false,"ref": "refs/heads/work/core-completion-20261017","runId": "39204032634","qtRequested": "6.10.3","nativeRendererRequested": "D3D11 WARP","commit": "8371eb804b6d3f240090388c4bec90c926904119"},
+      "stages": {"fontBuild": "success","fontSmoke": "skipped","fontReport": "failure","configure": "success","fontCTest": "success","applicationBuild": "skipped","qt": "success"},
+      "reporterErrors": ["Unexpected public font case skip: optionalPhysicalFontIdentity"],
+      "reports": [
+        {
+          "evidence": "prior-8371-font-selection.xml",
+          "countsExcludingLifecycle": {"passed": 17,"failed": 0,"skipped": 9},
+          "nonPassingCases": [
+            {"function": "importOptionalPingFangUiCollection","status": "skip","description": "Set SWIRL_TEST_TTC to test a local PingFang UI collection"},
+            {"function": "optionalVariableAxesAndLivePreview","status": "skip","description": "Local-only variable font fixture not supplied"},
+            {"function": "optionalRestartRead","status": "skip","description": "Only run as the independent restoration child"},
+            {"function": "optionalRenderMatrix","status": "skip","description": "Local-only matrix requires fixture and evidence directory"},
+            {"function": "optionalNativePointSizes","status": "skip","description": "Local Windows font fixture required"},
+            {"function": "optionalPaintedPreviewAxes","status": "skip","description": "Local font fixture required"},
+            {"function": "optionalRasterQualityMatrix","status": "skip","description": "An authorized local font and local evidence directory are required"},
+            {"function": "optionalPhysicalFontIdentity","status": "skip","description": "Local source font and evidence path required"},
+            {"function": "nativeGlyphsHaveNoColourFringes","status": "skip","description": "Requires the native Windows platform"}
+          ]
+        },
+        {
+          "evidence": "prior-8371-font-axis-policy.xml",
+          "countsExcludingLifecycle": {"passed": 33,"failed": 0,"skipped": 0},
+          "nonPassingCases": []
+        },
+        {
+          "evidence": "prior-8371-font-native-raster.xml",
+          "countsExcludingLifecycle": {"passed": 1,"failed": 0,"skipped": 0},
+          "nonPassingCases": []
+        }
+      ],
+      "countsExcludingLifecycle": {"passed": 51,"failed": 0,"skipped": 9},
+      "physicalDpiVerified": false,
+      "refresh240HzVerified": false,
+      "applicationBuild": "skipped after reporter failure",
+      "navigationSmoke": "skipped after reporter failure"
+    },
+    {
+      "sourceCommit": "927079e93e2a6830b615c030d51379dfa348cd23",
+      "runId": 39204734246,
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39204734246",
+      "jobId": 117904993685,
+      "conclusion": "failure",
+      "archiveEvidence": "prior-927-archive",
+      "metadataEvidence": ["prior-927-source.json","prior-927-stages.json","prior-927-font-results.json"],
+      "logEvidence": "prior-927-job-log",
+      "source": {"nativeRendererRequested": "D3D11 WARP","ref": "refs/heads/work/core-completion-20261017","runner": "windows-2022","qtRequested": "6.10.3","refresh240HzVerified": false,"qtArchitecture": "win64_msvc2022_64","physicalDpiVerified": false,"runAttempt": "1","commit": "927079e93e2a6830b615c030d51379dfa348cd23","runId": "39204734246"},
+      "stages": {"fontCTest": "success","qt": "success","fontReport": "failure","applicationBuild": "skipped","fontBuild": "success","fontSmoke": "skipped","configure": "success"},
+      "reporterErrors": ["Unexpected public font case skip: optionalPhysicalFontIdentity"],
+      "reports": [
+        {
+          "evidence": "prior-927-font-selection.xml",
+          "countsExcludingLifecycle": {"passed": 17,"failed": 0,"skipped": 9},
+          "nonPassingCases": [
+            {"function": "importOptionalPingFangUiCollection","status": "skip","description": "Set SWIRL_TEST_TTC to test a local PingFang UI collection"},
+            {"function": "optionalVariableAxesAndLivePreview","status": "skip","description": "Local-only variable font fixture not supplied"},
+            {"function": "optionalRestartRead","status": "skip","description": "Only run as the independent restoration child"},
+            {"function": "optionalRenderMatrix","status": "skip","description": "Local-only matrix requires fixture and evidence directory"},
+            {"function": "optionalNativePointSizes","status": "skip","description": "Local Windows font fixture required"},
+            {"function": "optionalPaintedPreviewAxes","status": "skip","description": "Local font fixture required"},
+            {"function": "optionalRasterQualityMatrix","status": "skip","description": "An authorized local font and local evidence directory are required"},
+            {"function": "optionalPhysicalFontIdentity","status": "skip","description": "Local source font and evidence path required"},
+            {"function": "nativeGlyphsHaveNoColourFringes","status": "skip","description": "Requires the native Windows platform"}
+          ]
+        },
+        {
+          "evidence": "prior-927-font-axis-policy.xml",
+          "countsExcludingLifecycle": {"passed": 33,"failed": 0,"skipped": 0},
+          "nonPassingCases": []
+        },
+        {
+          "evidence": "prior-927-font-native-raster.xml",
+          "countsExcludingLifecycle": {"passed": 1,"failed": 0,"skipped": 0},
+          "nonPassingCases": []
+        }
+      ],
+      "countsExcludingLifecycle": {"passed": 51,"failed": 0,"skipped": 9},
+      "physicalDpiVerified": false,
+      "refresh240HzVerified": false,
+      "applicationBuild": "skipped after reporter failure",
+      "navigationSmoke": "skipped after reporter failure"
+    }
+  ],
+  "sameXmlReplay": {
+    "sourceCommit": "8371eb804b6d3f240090388c4bec90c926904119",
+    "reporterFixCommit": "5adcfcf158a4eb99f56e78d0997af5dbc25bd3d0",
+    "sourceRunId": 39204032634,
+    "sourceArtifactId": 12165295964,
+    "recordCountIncludingLifecycle": 66,
+    "lifecycleRecords": 6,
+    "sameCaseRecords": true,
+    "allFieldsExceptErrorsIdentical": true,
+    "canonicalCaseRecordsSha256": "520f8de7749dbb3b36d3671bc8b38dc05cd6815d7084d33aa9a7b75f907e54b6",
+    "countsExcludingLifecycle": {"passed": 51,"failed": 0,"skipped": 9},
+    "originalErrors": ["Unexpected public font case skip: optionalPhysicalFontIdentity"],
+    "fixedErrors": [],
+    "physicalDpiVerified": false,
+    "refresh240HzVerified": false,
+    "qtTestsRerun": false,
+    "originalCiConclusionChanged": false,
+    "evidence": ["reporter-replay","old-reporter-result","fixed-reporter-result"]
+  },
+  "localValidation": {
+    "reporterUnitRed": {"run": 10,"passed": 9,"failed": 1,"skipped": 0,"failedFunction": "test_private_physical_identity_skip_is_reported_as_unverified","logEvidence": "reporter-unit-red"},
+    "reporterUnitGreen": {"run": 10,"passed": 10,"failed": 0,"skipped": 0,"logEvidence": "reporter-unit-green"},
+    "rustGates": [
+      {"command": "cargo fmt --all -- --check","status": "passed","exitCode": 0,"exitVerification": "Executing parent reported return code 0; complete log bytes retained.","evidence": "local-rust-fmt"},
+      {"command": "cargo check --workspace --locked --offline","status": "passed","exitCode": 0,"exitVerification": "Executing parent reported return code 0; complete log bytes retained.","evidence": "local-rust-check"},
+      {"command": "cargo clippy --workspace --all-targets --locked --offline -- -D warnings","status": "passed","exitCode": 0,"exitVerification": "Executing parent reported return code 0; complete log bytes retained.","evidence": "local-rust-clippy"},
+      {"command": "cargo test --workspace --locked --offline","status": "passed","exitCode": 0,"exitVerification": "Executing parent reported return code 0; complete log bytes retained.","evidence": "local-rust-test"},
+      {"command": "cargo build --release --locked --offline --workspace --lib --bins","status": "passed","exitCode": 0,"exitVerification": "Executing parent reported return code 0; complete log bytes retained.","evidence": "local-rust-release"}
+    ],
+    "rust": {"unitIntegrationPassed": 188,"doctestPassed": 1,"totalPassed": 189,"failed": 0,"ignored": 0}
+  },
+  "freshCi": {
+    "headSha": "5adcfcf158a4eb99f56e78d0997af5dbc25bd3d0",
+    "tree": "5f553cf264256b83f10b74d1535b02d9f1dba631",
+    "branch": "work/core-completion-20261017",
+    "observedAtUtc": "2026-10-19T06:04:38.613580+00:00",
+    "runs": {"rust": 39205098742,"font": 39205098558,"app": 39205098810},
+    "conclusions": {"rust": "success","font": "success","app": "success"},
+    "jobs": {
+      "app": {
+        "rust": {"unitIntegrationPassed": 188,"failed": 0,"ignored": 0,"doctestPassed": 1},
+        "python": {"run": 99,"passed": 94,"skipped": 5,"failures": 0,"errors": 0},
+        "sourceLogLines": ["2026-10-19T05:32:41.9844320Z 5adcfcf158a4eb99f56e78d0997af5dbc25bd3d0","2026-10-19T05:32:49.8436767Z 5adcfcf158a4eb99f56e78d0997af5dbc25bd3d0"],
+        "realityGenerator": [
+          "2026-10-19T05:34:18.7330499Z REALITY vectors verified: 3 auth cases, genuine ML-KEM decapsulation, 2 TLS transcripts, 22 negative checks. No network or provider test."
+        ],
+        "log": "reporterfix-ci-review/app-job.log",
+        "logSha256": "63065e303b04755428fde10f74c62cb10e2634195bc96e735bee41ebba23726c",
+        "id": 117906096085,
+        "status": "completed",
+        "conclusion": "success",
+        "logEvidence": "fresh-app-job-log"
+      },
+      "ubuntu": {
+        "rust": {"unitIntegrationPassed": 188,"failed": 0,"ignored": 0,"doctestPassed": 1},
+        "python": {"run": 206,"passed": 201,"skipped": 5,"failures": 0,"errors": 0},
+        "sourceLogLines": ["2026-10-19T05:32:39.5750986Z 5adcfcf158a4eb99f56e78d0997af5dbc25bd3d0"],
+        "realityGenerator": [
+          "2026-10-19T05:34:32.3432370Z REALITY vectors verified: 3 auth cases, genuine ML-KEM decapsulation, 2 TLS transcripts, 22 negative checks. No network or provider test."
+        ],
+        "log": "reporterfix-ci-review/ubuntu-job.log",
+        "logSha256": "c7acd8ee672b6e84d06bfaf3d760740275ac62d153e88989421b3e8fb4232366",
+        "id": 117906095649,
+        "status": "completed",
+        "conclusion": "success",
+        "logEvidence": "fresh-ubuntu-job-log"
+      },
+      "macos": {
+        "rust": {"unitIntegrationPassed": 188,"failed": 0,"ignored": 0,"doctestPassed": 1},
+        "python": {"run": 206,"passed": 201,"skipped": 5,"failures": 0,"errors": 0},
+        "sourceLogLines": ["2026-10-19T05:32:46.9597650Z 5adcfcf158a4eb99f56e78d0997af5dbc25bd3d0"],
+        "realityGenerator": [
+          "2026-10-19T05:35:08.5620280Z REALITY vectors verified: 3 auth cases, genuine ML-KEM decapsulation, 2 TLS transcripts, 22 negative checks. No network or provider test."
+        ],
+        "log": "reporterfix-ci-review/macos-job.log",
+        "logSha256": "56e82a21c2c9fdf4a724145d4b88c8b67d1fc025d979194a5bc4a309e1ee3ae2",
+        "id": 117906095831,
+        "status": "completed",
+        "conclusion": "success",
+        "logEvidence": "fresh-macos-job-log"
+      },
+      "windows": {
+        "rust": {"unitIntegrationPassed": 188,"failed": 0,"ignored": 0,"doctestPassed": 1},
+        "python": {
+          "run": 248,
+          "passed": 241,
+          "skipped": 7,
+          "failures": 0,
+          "errors": 0,
+          "breakdown": {
+            "commonPortableSuitesIncludingDevelopmentGuard": {"run": 206,"passed": 201,"skipped": 5,"failures": 0,"errors": 0},
+            "syntheticWindowsCapture": {"run": 26,"passed": 25,"skipped": 1,"failures": 0,"errors": 0},
+            "isolatedManagement": {"run": 11,"passed": 10,"skipped": 1,"failures": 0,"errors": 0},
+            "separateQtHooks": {"run": 5,"passed": 5,"skipped": 0,"failures": 0,"errors": 0}
+          },
+          "countingNote": "Aggregate counts are test invocations. Five Qt hooks were initially skipped without Qt and subsequently invoked successfully; original skips remain recorded.",
+          "skippedTests": [
+            "2026-10-19T05:37:42.6775411Z test_vless_qt_data_path (__main__.RustCoreIntegration.test_vless_qt_data_path) ... skipped 'Qt executable required'",
+            "2026-10-19T05:37:47.0973982Z test_qt_facade_http_obfs_with_udp_declared (__main__.ShadowsocksTests.test_qt_facade_http_obfs_with_udp_declared) ... skipped 'Qt integration executable required'",
+            "2026-10-19T05:38:26.8308680Z test_qt_imported_socks4_and_4a_data_path (__main__.Socks4Integration.test_qt_imported_socks4_and_4a_data_path) ... skipped 'Qt integration executable required'",
+            "2026-10-19T05:38:37.0371507Z test_qt_vless_websocket_data_path (__main__.WebSocketTransportTests.test_qt_vless_websocket_data_path) ... skipped 'Qt integration executable required'",
+            "2026-10-19T05:41:15.2752726Z test_qt_imported_socks5_udp_data_path (__main__.Socks5UdpIntegration.test_qt_imported_socks5_udp_data_path) ... skipped 'Windows Qt integration executable required'",
+            "2026-10-19T05:41:17.6797815Z test_offline_cpp_import_and_existing_store_protection (__main__.CaptureTests.test_offline_cpp_import_and_existing_store_protection) ... skipped 'Set SWIRL_CAPTURE_INSPECTOR to the built C++ importer'",
+            "2026-10-19T05:41:20.0829227Z test_installed_cli_apply_and_rollback_only_in_temporary_home (__main__.InstalledCliTests.test_installed_cli_apply_and_rollback_only_in_temporary_home) ... skipped 'opt-in real CLI with isolated home'"
+          ]
+        },
+        "sourceLogLines": ["2026-10-19T05:32:48.8859555Z 5adcfcf158a4eb99f56e78d0997af5dbc25bd3d0"],
+        "realityGenerator": [
+          "2026-10-19T05:37:14.1228984Z REALITY vectors verified: 3 auth cases, genuine ML-KEM decapsulation, 2 TLS transcripts, 22 negative checks. No network or provider test."
+        ],
+        "log": "reporterfix-ci-review/windows-job.log",
+        "logSha256": "5a0dd676a09722a20329e26467caa73dfcd2a8830e8f50d7954196a9fc10cfcd",
+        "id": 117906096014,
+        "status": "completed",
+        "conclusion": "success",
+        "pythonQtHooks": [
+          {
+            "function": "test_qt_facade_http_obfs_with_udp_declared",
+            "result": "passed",
+            "logEvidence": [
+              "2026-10-19T05:49:48.5913050Z test_qt_facade_http_obfs_with_udp_declared (__main__.ShadowsocksTests.test_qt_facade_http_obfs_with_udp_declared) ... ok"
+            ]
+          },
+          {
+            "function": "test_vless_qt_data_path",
+            "result": "passed",
+            "logEvidence": ["2026-10-19T05:49:49.4352191Z test_vless_qt_data_path (__main__.RustCoreIntegration.test_vless_qt_data_path) ... ok"]
+          },
+          {
+            "function": "test_qt_imported_socks4_and_4a_data_path",
+            "result": "passed",
+            "logEvidence": ["2026-10-19T05:49:52.0889538Z test_qt_imported_socks4_and_4a_data_path (__main__.Socks4Integration.test_qt_imported_socks4_and_4a_data_path) ... ok"]
+          },
+          {
+            "function": "test_qt_vless_websocket_data_path",
+            "result": "passed",
+            "logEvidence": ["2026-10-19T05:49:53.4404509Z test_qt_vless_websocket_data_path (__main__.WebSocketTransportTests.test_qt_vless_websocket_data_path) ... ok"]
+          },
+          {
+            "function": "test_qt_imported_socks5_udp_data_path",
+            "result": "passed",
+            "logEvidence": ["2026-10-19T05:49:54.9182845Z test_qt_imported_socks5_udp_data_path (__main__.Socks5UdpIntegration.test_qt_imported_socks5_udp_data_path) ... ok"]
+          }
+        ],
+        "allocationRegressionLines": [
+          "2026-10-19T05:38:48.6612331Z test_pair_allocation_preserves_denials_and_cleans_up_non_socket_errors (__main__.SsPolicyPeerAllocationTests.test_pair_allocation_preserves_denials_and_cleans_up_non_socket_errors) ... ok",
+          "2026-10-19T05:38:48.6643674Z test_pair_allocation_stops_after_eight_collisions_with_original_error (__main__.SsPolicyPeerAllocationTests.test_pair_allocation_stops_after_eight_collisions_with_original_error) ... ok",
+          "2026-10-19T05:38:49.1585080Z test_pair_retries_only_collisions_and_releases_failed_sockets (__main__.SsPolicyPeerAllocationTests.test_pair_retries_only_collisions_and_releases_failed_sockets) ... ok",
+          "2026-10-19T05:40:15.8558944Z test_pair_allocation_cleans_up_other_errors_without_retry (__main__.DnsPeerAllocationTests.test_pair_allocation_cleans_up_other_errors_without_retry) ... ok",
+          "2026-10-19T05:40:15.8598566Z test_pair_allocation_stops_after_bounded_collisions (__main__.DnsPeerAllocationTests.test_pair_allocation_stops_after_bounded_collisions) ... ok",
+          "2026-10-19T05:40:23.9244351Z test_pair_retries_collision_and_releases_failed_sockets (__main__.DnsPeerAllocationTests.test_pair_retries_collision_and_releases_failed_sockets) ... ok",
+          "2026-10-19T05:40:25.9595574Z test_tcp_selects_port_before_udp_and_forwards_both_families (__main__.DnsPeerAllocationTests.test_tcp_selects_port_before_udp_and_forwards_both_families) ... ok",
+          "2026-10-19T05:40:25.9614528Z test_windows_access_denial_is_not_retried_on_either_endpoint (__main__.DnsPeerAllocationTests.test_windows_access_denial_is_not_retried_on_either_endpoint) ... ok"
+        ],
+        "ctest": {
+          "compatibility": {"passed": 2,"failed": 0},
+          "native": {"passed": 3,"failed": 0},
+          "logEvidence": ["2026-10-19T05:49:27.4568789Z 100% tests passed, 0 tests failed out of 2","2026-10-19T05:49:47.5644685Z 100% tests passed, 0 tests failed out of 3"],
+          "storagePathsLogEvidence": ["2026-10-19T05:49:29.5286454Z 1/3 Test  #1: swirl-storage-paths ..............   Passed    0.21 sec"]
+        },
+        "nativeApplicationBuild": {
+          "result": "success",
+          "coreMode": "SWIRL_USE_RUST_CORE=ON",
+          "configuration": "Release",
+          "configurationEvidence": [
+            "2026-10-19T05:41:44.1287666Z ##[group]Run cmake -S src/Swirl.Quick -B build/rust-qt -G \"Visual Studio 17 2022\" -A x64 -DSWIRL_USE_RUST_CORE=ON -DSWIRL_BUILD_UI_TESTS=ON"
+          ],
+          "logEvidence": ["2026-10-19T06:00:52.2358626Z   Swirl.vcxproj -> D:\\a\\Swirl\\Swirl\\build\\rust-qt\\Release\\Swirl.exe"]
+        },
+        "readOnlyNetshDiagnostics": "skipped: all independent Windows protocol peers succeeded",
+        "qt": {
+          "artifactId": 12166167989,
+          "artifactPath": "reporterfix-ci-review/qt/artifact.zip",
+          "artifactSha256": "6d0fbbed44d36bb825fc48551fd2577b807895e8d9290d4d27e995fcbb5611bf",
+          "headSha": "5adcfcf158a4eb99f56e78d0997af5dbc25bd3d0",
+          "countsExcludingLifecycle": {"pass": 71,"skip": 6,"fail": 0},
+          "reports": [
+            {
+              "path": "reporterfix-ci-review/qt/compat-dns/swirl-import-boundaries.xml",
+              "bytes": 2508,
+              "sha256": "9d29046fe41abcdec1b141b6d667a1651f3884c9aa6a36646dbdb95b9e3d4f7c",
+              "countsExcludingLifecycle": {"pass": 11,"fail": 0,"skip": 0},
+              "evidence": "fresh-qt-compat-import",
+              "nonPassingCases": []
+            },
+            {
+              "path": "reporterfix-ci-review/qt/compat-dns/swirl-native-dns-compatibility-guard.xml",
+              "bytes": 963,
+              "sha256": "3b9a1906deb8cd6de368623f24ec6fccfbe023399d44d65a7790704540e7f7cc",
+              "countsExcludingLifecycle": {"pass": 2,"fail": 0,"skip": 0},
+              "evidence": "fresh-qt-compat-dns",
+              "nonPassingCases": []
+            },
+            {
+              "path": "reporterfix-ci-review/qt/rust-qt/swirl-import-boundaries.xml",
+              "bytes": 2509,
+              "sha256": "6115772c2cd66c6ed448c8d4b88a9bb1c1c2bac3293b370f3e44574536a37777",
+              "countsExcludingLifecycle": {"pass": 11,"fail": 0,"skip": 0},
+              "evidence": "fresh-qt-native-import",
+              "nonPassingCases": []
+            },
+            {
+              "path": "reporterfix-ci-review/qt/rust-qt/swirl-rust-qt-integration.xml",
+              "bytes": 10803,
+              "sha256": "4f60cbe821dea1a2c17879f600d92ff3acd229f8b66d15e21027affd11354495",
+              "countsExcludingLifecycle": {"pass": 47,"skip": 6,"fail": 0},
+              "evidence": "fresh-qt-native",
+              "nonPassingCases": [
+                {"function": "socks5UdpThroughIndependentPeer","status": "skip","description": "Independent Python SOCKS5 UDP peer supplies isolated ports and authentication mode in its integration run."},
+                {"function": "socks4ThroughIndependentPeer","status": "skip","description": "Independent Python SOCKS4/4a peer supplies isolated ports in its integration run."},
+                {"function": "webSocketThroughIndependentPeer","status": "skip","description": "Independent Python VLESS WS peer supplies isolated ports in its integration run."},
+                {"function": "vlessThroughIndependentPeer","status": "skip","description": "Independent VLESS peer supplies the port in its integration run."},
+                {"function": "shadowsocksThroughIndependentPeer","status": "skip","description": "Independent Python SS peer supplies the isolated port in its integration run."},
+                {"function": "loonShadowsocksThroughIndependentPeer","status": "skip","description": "Independent Python SS peer supplies the isolated port."}
+              ]
+            }
+          ],
+          "countingNote": "Four preserved XML reports only, excluding initTestCase and cleanupTestCase; storage-paths CTest is separately evidenced. Six peer-dependent native XML skips remain skips. Five separate Python hook invocations execute six Qt functions because the Shadowsocks hook also tests Loon.",
+          "fullSummary": {"path": "reporterfix-ci-review/qt/summary.json","bytes": 11729,"sha256": "3cb2b314bf94ea71e4316cdac159d539985898726c452c471a369b85f1169d6f","evidence": "fresh-qt-summary"},
+          "archiveEvidence": "fresh-qt-archive"
+        },
+        "logEvidence": "fresh-windows-job-log"
+      }
+    },
+    "appIdentity": {
+      "actualTestedSha": "5adcfcf158a4eb99f56e78d0997af5dbc25bd3d0",
+      "worktreeState": ["?? CORE_TESTED_COMMIT","?? CORE_WORKTREE_STATE","?? core-tested-source.tar"],
+      "artifactId": 12165556755,
+      "artifactSha256": "93b96051a9f3abc97481adef64308ce022a6424e1a0ea00cc7fa10284f261f3f",
+      "sourceTarSha256": "002d58988f931be1db57249a65bae11255d8f35db65efcb5dd72a64011837718",
+      "sourceFilesComparedByteForByte": 187,
+      "sourceMismatches": 0,
+      "files": [
+        {"path": "reporterfix-ci-review/app/artifact.zip","sha256": "93b96051a9f3abc97481adef64308ce022a6424e1a0ea00cc7fa10284f261f3f","evidence": "fresh-app-artifact.zip"},
+        {"path": "reporterfix-ci-review/app/core-tested-source.tar","sha256": "002d58988f931be1db57249a65bae11255d8f35db65efcb5dd72a64011837718","evidence": "fresh-app-core-tested-source.tar"},
+        {"path": "reporterfix-ci-review/app/CORE_TESTED_COMMIT","sha256": "e6773f0a8baf85335178c50de898f671bc35c50fbb7e8f599e4e3231c07ea5f0","evidence": "fresh-app-CORE_TESTED_COMMIT"},
+        {"path": "reporterfix-ci-review/app/CORE_WORKTREE_STATE","sha256": "d1d620b343967ef519019b9ec424181ed3f76a5d382a7821ad59896b4c6d456e","evidence": "fresh-app-CORE_WORKTREE_STATE"}
+      ],
+      "archiveScopeLimit": "The byte-for-byte comparison covers only the 187 regular tar members. tools/SummarizeFontTests.py is outside the App export menu; its verification comes from the exact-SHA Font workflow.",
+      "changedFilesOutsideArchive": ["tools/SummarizeFontTests.py"],
+      "archiveEvidence": "fresh-app-archive",
+      "sourceTarEvidence": "fresh-app-core-tested-source.tar"
+    },
+    "publicNetwork": {
+      "schema": 1,
+      "commit": "5adcfcf158a4eb99f56e78d0997af5dbc25bd3d0",
+      "platform": "Linux",
+      "tracked_worktree_clean": true,
+      "timestamp_utc": "2026-10-19T05:37:45.030690+00:00",
+      "harness_sha256": "f90aa980f37ae1b87fc687897096be05069f88aba992814ca7167bfc5b4a95a4",
+      "scope": "Public HTTPS via native DIRECT and native DoH; no provider, UDP, TUN or performance claim",
+      "checks": [
+        {
+          "host": "example.com",
+          "port": 443,
+          "method": "HEAD",
+          "path": "/",
+          "dns": "system",
+          "route": "explicit-native-direct",
+          "success": true,
+          "engine": "swirl-rust",
+          "native_connect_accepted": true,
+          "certificate_verified": true,
+          "tls_version": "TLSv1.3",
+          "http_status": 200,
+          "orderly_close": true,
+          "core": {"accepted": 1,"active": 0,"failed": 0,"upload": 700,"download": 4789,"last_error": "","last_error_stage": "","recorded_connections": 1},
+          "native_session_settled": true,
+          "elapsed_ms": 78
+        },
+        {
+          "host": "www.rust-lang.org",
+          "port": 443,
+          "method": "HEAD",
+          "path": "/",
+          "dns": "system",
+          "route": "explicit-native-direct",
+          "success": true,
+          "engine": "swirl-rust",
+          "native_connect_accepted": true,
+          "certificate_verified": true,
+          "tls_version": "TLSv1.3",
+          "http_status": 301,
+          "orderly_close": true,
+          "core": {"accepted": 1,"active": 0,"failed": 0,"upload": 690,"download": 5384,"last_error": "","last_error_stage": "","recorded_connections": 1},
+          "native_session_settled": true,
+          "elapsed_ms": 80
+        },
+        {
+          "host": "example.com",
+          "port": 443,
+          "method": "HEAD",
+          "path": "/",
+          "dns": "native-doh",
+          "route": "explicit-native-direct",
+          "success": true,
+          "dns_endpoint": "https://cloudflare-dns.com/dns-query",
+          "dns_bootstrap": "1.1.1.1:443",
+          "engine": "swirl-rust",
+          "native_connect_accepted": true,
+          "certificate_verified": true,
+          "tls_version": "TLSv1.3",
+          "http_status": 200,
+          "orderly_close": true,
+          "core": {"accepted": 1,"active": 0,"failed": 0,"upload": 700,"download": 4789,"last_error": "","last_error_stage": "","recorded_connections": 1},
+          "native_session_settled": true,
+          "elapsed_ms": 181
+        }
+      ],
+      "success": true,
+      "reportEvidence": "fresh-public-report",
+      "archiveEvidence": "fresh-public-archive"
+    },
+    "font": {
+      "sourceCommit": "5adcfcf158a4eb99f56e78d0997af5dbc25bd3d0",
+      "runId": 39205098558,
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39205098558",
+      "jobId": 117906095258,
+      "conclusion": "success",
+      "archiveEvidence": "fresh-font-archive",
+      "metadataEvidence": ["fresh-font-source.json","fresh-font-stages.json","fresh-font-font-results.json"],
+      "logEvidence": "fresh-font-job-log",
+      "source": {"nativeRendererRequested": "D3D11 WARP","runId": "39205098558","refresh240HzVerified": false,"qtRequested": "6.10.3","qtArchitecture": "win64_msvc2022_64","runner": "windows-2022","physicalDpiVerified": false,"runAttempt": "1","commit": "5adcfcf158a4eb99f56e78d0997af5dbc25bd3d0","ref": "refs/heads/work/core-completion-20261017"},
+      "stages": {"configure": "success","fontBuild": "success","qt": "success","fontSmoke": "success","fontCTest": "success","fontReport": "success","applicationBuild": "success"},
+      "reporterErrors": [],
+      "reports": [
+        {
+          "evidence": "fresh-font-font-selection.xml",
+          "countsExcludingLifecycle": {"passed": 17,"failed": 0,"skipped": 9},
+          "nonPassingCases": [
+            {"function": "importOptionalPingFangUiCollection","status": "skip","description": "Set SWIRL_TEST_TTC to test a local PingFang UI collection"},
+            {"function": "optionalVariableAxesAndLivePreview","status": "skip","description": "Local-only variable font fixture not supplied"},
+            {"function": "optionalRestartRead","status": "skip","description": "Only run as the independent restoration child"},
+            {"function": "optionalRenderMatrix","status": "skip","description": "Local-only matrix requires fixture and evidence directory"},
+            {"function": "optionalNativePointSizes","status": "skip","description": "Local Windows font fixture required"},
+            {"function": "optionalPaintedPreviewAxes","status": "skip","description": "Local font fixture required"},
+            {"function": "optionalRasterQualityMatrix","status": "skip","description": "An authorized local font and local evidence directory are required"},
+            {"function": "optionalPhysicalFontIdentity","status": "skip","description": "Local source font and evidence path required"},
+            {"function": "nativeGlyphsHaveNoColourFringes","status": "skip","description": "Requires the native Windows platform"}
+          ]
+        },
+        {
+          "evidence": "fresh-font-font-axis-policy.xml",
+          "countsExcludingLifecycle": {"passed": 33,"failed": 0,"skipped": 0},
+          "nonPassingCases": []
+        },
+        {
+          "evidence": "fresh-font-font-native-raster.xml",
+          "countsExcludingLifecycle": {"passed": 1,"failed": 0,"skipped": 0},
+          "nonPassingCases": []
+        }
+      ],
+      "countsExcludingLifecycle": {"passed": 51,"failed": 0,"skipped": 9},
+      "physicalDpiVerified": false,
+      "refresh240HzVerified": false,
+      "summaryEvidence": "fresh-font-summary",
+      "sourceIsNewCiRun": true,
+      "reporterUnitTests": {
+        "passed": 10,
+        "failed": 0,
+        "skipped": 0,
+        "logLines": ["2026-10-19T05:32:54.1802561Z Ran 10 tests in 0.026s","2026-10-19T05:32:54.1802790Z OK"]
+      },
+      "smoke": {"exitCode": 0,"readyRoutes": 61,"font": "Swirl Automation Probe","navigationRequests": 61},
+      "smokeEvidence": "fresh-font-smoke",
+      "applicationBuild": "success",
+      "applicationCoreMode": "Compatibility; font workflow omits SWIRL_USE_RUST_CORE and exact source CMake default is OFF",
+      "applicationBuildLogLines": ["2026-10-19T05:44:05.4813989Z   Swirl.vcxproj -> D:\\a\\Swirl\\Swirl\\build\\swirl-font-application\\Release\\Swirl.exe"],
+      "requiredWidthCase": "passed",
+      "localPhysicalIdentityCase": "skipped"
+    },
+    "priorFontFailures": [
+      {
+        "sha": "8371eb804b6d3f240090388c4bec90c926904119",
+        "runId": 39204032634,
+        "summaryPath": "concurrent8371-ci-review/summary.json",
+        "summarySha256": "06d477ac82cd7ef962f81525d86deaa8b726b4742974bb8c7b3d3169287d8b02",
+        "conclusion": "failure",
+        "failureStage": "Font result reporter classified the local-only optionalPhysicalFontIdentity skip as an unexpected public skip.",
+        "rawFontCountsExcludingLifecycle": {"pass": 51,"fail": 0,"skip": 9},
+        "applicationBuildAndNavigationSmoke": "skipped after reporter failure; not passed"
+      },
+      {
+        "sha": "927079e93e2a6830b615c030d51379dfa348cd23",
+        "runId": 39204734246,
+        "summaryPath": "concurrent927-ci-review/summary.json",
+        "summarySha256": "f2303cd4162dd4e1cd5113369a51d360d16eb04d677d0731a8600856c6a9ddfe",
+        "conclusion": "failure",
+        "failureStage": "Font result reporter classified the local-only optionalPhysicalFontIdentity skip as an unexpected public skip.",
+        "rawFontCountsExcludingLifecycle": {"pass": 51,"fail": 0,"skip": 9},
+        "applicationBuildAndNavigationSmoke": "skipped after reporter failure; not passed"
+      }
+    ],
+    "acceptanceBaseline": {"items": 79,"acceptedItems": 6,"acceptedWeightPercent": 10.83,"changed": false},
+    "final": true,
+    "runIdentities": {
+      "rust": {"id": 39205098742,"name": "Swirl Rust Core","head_sha": "5adcfcf158a4eb99f56e78d0997af5dbc25bd3d0","head_branch": "work/core-completion-20261017","event": "push","run_attempt": 1,"status": "completed","conclusion": "success","created_at": "2026-10-19T05:32:34Z","updated_at": "2026-10-19T06:00:59Z","html_url": "https://github.com/SOLHK/Swirl/actions/runs/39205098742"},
+      "font": {"id": 39205098558,"name": "Font system Windows Qt 6.10.3","head_sha": "5adcfcf158a4eb99f56e78d0997af5dbc25bd3d0","head_branch": "work/core-completion-20261017","event": "push","run_attempt": 1,"status": "completed","conclusion": "success","created_at": "2026-10-19T05:32:34Z","updated_at": "2026-10-19T05:44:36Z","html_url": "https://github.com/SOLHK/Swirl/actions/runs/39205098558"},
+      "app": {"id": 39205098810,"name": "Core implementation validation","head_sha": "5adcfcf158a4eb99f56e78d0997af5dbc25bd3d0","head_branch": "work/core-completion-20261017","event": "push","run_attempt": 1,"status": "completed","conclusion": "success","created_at": "2026-10-19T05:32:34Z","updated_at": "2026-10-19T05:35:36Z","html_url": "https://github.com/SOLHK/Swirl/actions/runs/39205098810"}
+    },
+    "finalRunState": {"path": "reporterfix-ci-review/final-run-state.json","bytes": 11152,"sha256": "e8c2a395ea4f171cce4ead519a02b9d7f8c73cdca04d7a63bdcd433941071ba3","evidence": "fresh-ci-run-state"},
+    "artifacts": [
+      {"kind": "font","id": 12165388862,"path": "reporterfix-ci-review/font/artifact.zip","bytes": 17945,"sha256": "7e2c78b3df1f83a8608c41f16fa645129000002bfcedfed6b007ac4f883b87da","evidence": "fresh-font-archive"},
+      {"kind": "app-source","id": 12165556755,"path": "reporterfix-ci-review/app/artifact.zip","bytes": 576943,"sha256": "93b96051a9f3abc97481adef64308ce022a6424e1a0ea00cc7fa10284f261f3f","evidence": "fresh-app-archive"},
+      {"kind": "public-direct-doh","id": 12165566160,"path": "reporterfix-ci-review/public/artifact.zip","bytes": 856,"sha256": "e712cb1aeeafcace825535fa2cff47fd66db8fc613ca2c189d4bb63c8ef257cc","evidence": "fresh-public-archive"},
+      {"kind": "windows-qt-tests","id": 12166167989,"path": "reporterfix-ci-review/qt/artifact.zip","bytes": 4592,"sha256": "6d0fbbed44d36bb825fc48551fd2577b807895e8d9290d4d27e995fcbb5611bf","evidence": "fresh-qt-archive"}
+    ],
+    "publicNetworkFile": {"path": "reporterfix-ci-review/public/CORE_PUBLIC_NETWORK.json","bytes": 2551,"sha256": "906012d8200241d0ac6c88970a3e92f4c267eb0cbd8f5dbb6b8fa4ed780867ef","evidence": "fresh-public-report"},
+    "fontComponentSummary": {"path": "reporterfix-ci-review/font-summary.json","bytes": 5227,"sha256": "ed03a24e399e18bd17c172e388716156e5994ab422d47170d72a45430b567cf8","evidence": "fresh-font-summary"},
+    "logFiles": [
+      {"path": "reporterfix-ci-review/ubuntu-job.log","bytes": 123280,"sha256": "c7acd8ee672b6e84d06bfaf3d760740275ac62d153e88989421b3e8fb4232366","evidence": "fresh-ubuntu-job-log"},
+      {"path": "reporterfix-ci-review/macos-job.log","bytes": 114542,"sha256": "56e82a21c2c9fdf4a724145d4b88c8b67d1fc025d979194a5bc4a309e1ee3ae2","evidence": "fresh-macos-job-log"},
+      {"path": "reporterfix-ci-review/windows-job.log","bytes": 289189,"sha256": "5a0dd676a09722a20329e26467caa73dfcd2a8830e8f50d7954196a9fc10cfcd","evidence": "fresh-windows-job-log"},
+      {"path": "reporterfix-ci-review/app-job.log","bytes": 98996,"sha256": "63065e303b04755428fde10f74c62cb10e2634195bc96e735bee41ebba23726c","evidence": "fresh-app-job-log"},
+      {"path": "reporterfix-ci-review/font-job.log","bytes": 134709,"sha256": "e329437273f583d0059aa233862ae490db53fa30251f23c95c20b0c6d46362c3","evidence": "fresh-font-job-log"}
+    ],
+    "logPreservation": "Original decoded job-log bytes preserved, including mixed CRLF/LF in Windows and Font logs.",
+    "scopeLimits": [
+      "No REALITY network handshake, Vision data path or provider node was tested.",
+      "The three public checks cover existing native DIRECT HTTPS and native DoH only.",
+      "No private subscription, private provider credentials or user font files were accessed.",
+      "Font cloud smoke covers software WARP rendering and route navigation; physical DPI, native display refresh and 240 Hz are not verified.",
+      "Font application build is compatibility mode; native Rust application success is separately established by the Windows Rust job.",
+      "App source archive comparison covers 187 regular members only; tools/SummarizeFontTests.py is outside that archive menu.",
+      "Original 8371 and 927 font failures remain failures; the new 5adc reporter does not convert skipped cases into passes.",
+      "All acceptance counts retain the existing 79 items, 6 accepted items and 10.83 percent accepted weight."
+    ],
+    "runUrls": {"rust": "https://github.com/SOLHK/Swirl/actions/runs/39205098742","font": "https://github.com/SOLHK/Swirl/actions/runs/39205098558","app": "https://github.com/SOLHK/Swirl/actions/runs/39205098810"},
+    "runStatusObservedSeparately": [
+      {"id": 39205098742,"name": "Swirl Rust Core","head_sha": "5adcfcf158a4eb99f56e78d0997af5dbc25bd3d0","head_branch": "work/core-completion-20261017","status": "completed","conclusion": "success","updated_at": "2026-10-19T06:00:59Z","html_url": "https://github.com/SOLHK/Swirl/actions/runs/39205098742"},
+      {"id": 39205098558,"name": "Font system Windows Qt 6.10.3","head_sha": "5adcfcf158a4eb99f56e78d0997af5dbc25bd3d0","head_branch": "work/core-completion-20261017","status": "completed","conclusion": "success","updated_at": "2026-10-19T05:44:36Z","html_url": "https://github.com/SOLHK/Swirl/actions/runs/39205098558"},
+      {"id": 39205098810,"name": "Core implementation validation","head_sha": "5adcfcf158a4eb99f56e78d0997af5dbc25bd3d0","head_branch": "work/core-completion-20261017","status": "completed","conclusion": "success","updated_at": "2026-10-19T05:35:36Z","html_url": "https://github.com/SOLHK/Swirl/actions/runs/39205098810"}
+    ],
+    "status": "completed; exact source Rust, Font and App workflows succeeded",
+    "summaryEvidence": "fresh-ci-summary",
+    "fontSummaryEvidence": "fresh-font-summary"
+  },
+  "fixedAcceptance": {"baseline": "v1","itemCount": 79,"acceptedItems": 6,"acceptedWeightPercent": 10.833333,"displayPercent": "10.83%","changed": false,"newlyAcceptedItems": 0,"partialCredit": false},
+  "physicalAcceptance": {"pingFangTtcIdentityVerified": false,"scaling125And200Verified": false,"crossMonitorDpiVerified": false,"refresh240HzVerified": false,"reason": "Hosted synthetic font/Qt/D3D11 checks and report classification do not verify an authorized physical display/font fixture."},
+  "scopeBoundaries": {"privateFontFilesCollected": false,"privateProviderNodesTested": 0,"privateSubscriptionRefreshes": 0,"newProxyProtocolImplemented": false,"realityVisionProductEnabled": false,"coreStageEvidence": "docs/evidence/REALITY_FOUNDATION_AND_IMPORT_20261019.json"},
+  "evidence": {
+    "prior-8371-summary": {"kind": "local-evidence-file","path": "concurrent8371-ci-review/summary.json","bytes": 22145,"sha256": "06d477ac82cd7ef962f81525d86deaa8b726b4742974bb8c7b3d3169287d8b02"},
+    "prior-927-summary": {"kind": "local-evidence-file","path": "concurrent927-ci-review/summary.json","bytes": 3821,"sha256": "f2303cd4162dd4e1cd5113369a51d360d16eb04d677d0731a8600856c6a9ddfe"},
+    "prior-8371-archive": {"kind": "local-evidence-file","path": "concurrent8371-ci-review/font/artifact.zip","bytes": 11665,"sha256": "6b4a3f240febd6f6da3cc9d960846b792bedc544f59af545841ba92e820710c0","githubArtifactId": 12165295964,"githubRunId": 39204032634,"githubName": "Swirl-Font-Evidence-8371eb804b6d3f240090388c4bec90c926904119-1","githubDigestMatches": true,"zipCrcVerified": true,"extractedMembersCompared": 12},
+    "prior-8371-source.json": {"kind": "local-evidence-file","path": "concurrent8371-ci-review/font/font-evidence/source.json","bytes": 375,"sha256": "9785d2d6ab4122cd5f2923e40c444adb9ac90d97536d2ada56441af7fac479b6"},
+    "prior-8371-stages.json": {"kind": "local-evidence-file","path": "concurrent8371-ci-review/font/font-evidence/stages.json","bytes": 195,"sha256": "0532d10e816dc91d1b9342d7f592953fb103458041d46ef19142111f316fae0f"},
+    "prior-8371-font-results.json": {"kind": "local-evidence-file","path": "concurrent8371-ci-review/font/font-evidence/font-results.json","bytes": 14127,"sha256": "c4b9b13888b2b0cd114cd3fc8ca4e2c58b95ec14bf6502428cd90b53f28c8e58"},
+    "prior-8371-font-selection.xml": {"kind": "local-evidence-file","path": "concurrent8371-ci-review/font/swirl-font-tests/font-selection.xml","bytes": 6466,"sha256": "89e6d35bd3f5380a303e7dec8d2b7a92c4c96b037e47e3412ef50d62d2593155"},
+    "prior-8371-font-axis-policy.xml": {"kind": "local-evidence-file","path": "concurrent8371-ci-review/font/swirl-font-tests/font-axis-policy.xml","bytes": 5138,"sha256": "5940aa3a111ebd35e581004b9e10aa7a4a81a9d8079737759217ddcd81f731c0"},
+    "prior-8371-font-native-raster.xml": {"kind": "local-evidence-file","path": "concurrent8371-ci-review/font/swirl-font-tests/font-native-raster.xml","bytes": 3435,"sha256": "e5347de754cc342a321e6a725aaf827680d56b2846ea7f86077a7fc79f55836a"},
+    "prior-8371-job-log": {"kind": "local-evidence-file","path": "concurrent8371-ci-review/font-job.log","bytes": 79969,"sha256": "a9989609c39cef39471bb2805e6cd48566ac19657bd5a68c6589ef583b53f812","githubRunId": 39204032634,"githubJobId": 117902858738},
+    "prior-927-archive": {"kind": "local-evidence-file","path": "concurrent927-ci-review/font/artifact.zip","bytes": 11654,"sha256": "8a70e9532124f6fee76562417732245b7c8738e43d07ee842b07c810fc7249c9","githubArtifactId": 12165327181,"githubRunId": 39204734246,"githubName": "Swirl-Font-Evidence-927079e93e2a6830b615c030d51379dfa348cd23-1","githubDigestMatches": true,"zipCrcVerified": true,"extractedMembersCompared": 12},
+    "prior-927-source.json": {"kind": "local-evidence-file","path": "concurrent927-ci-review/font/font-evidence/source.json","bytes": 375,"sha256": "85bc8582374c000c64705fbb7b034c6c91267b81c81001a24c7ddd0c0050ca90"},
+    "prior-927-stages.json": {"kind": "local-evidence-file","path": "concurrent927-ci-review/font/font-evidence/stages.json","bytes": 195,"sha256": "abe5416185fcd7a7d7694bde4b0c47fb542055cfbac4b9efd44652db2c32783c"},
+    "prior-927-font-results.json": {"kind": "local-evidence-file","path": "concurrent927-ci-review/font/font-evidence/font-results.json","bytes": 14127,"sha256": "c4b9b13888b2b0cd114cd3fc8ca4e2c58b95ec14bf6502428cd90b53f28c8e58"},
+    "prior-927-font-selection.xml": {"kind": "local-evidence-file","path": "concurrent927-ci-review/font/swirl-font-tests/font-selection.xml","bytes": 6468,"sha256": "46c80bd9a377eaeb9579a237930d9ea271b7b36dbe17a0dffbcf807a237c118e"},
+    "prior-927-font-axis-policy.xml": {"kind": "local-evidence-file","path": "concurrent927-ci-review/font/swirl-font-tests/font-axis-policy.xml","bytes": 5138,"sha256": "dbaed641b507d825319592d3c0dec604e9135799b85a2b9b182fb2d40572e7df"},
+    "prior-927-font-native-raster.xml": {"kind": "local-evidence-file","path": "concurrent927-ci-review/font/swirl-font-tests/font-native-raster.xml","bytes": 3434,"sha256": "a26556b21058ce48f148db5dba5b4dfa93fda7a92fc392fd62dca4d8cb4d244e"},
+    "prior-927-job-log": {"kind": "local-evidence-file","path": "concurrent927-ci-review/font-job.log","bytes": 79955,"sha256": "d6b744116625b5b235e7005243920bc3ace7ce482ab4e08ac231e86740842edf","githubRunId": 39204734246,"githubJobId": 117904993685},
+    "reporter-replay": {"kind": "local-evidence-file","path": "font-ci-repair-validation/reporter-replay.json","bytes": 1058,"sha256": "689083f04b67df5e9e2cfeb3d542b365c59bd2682a781b58bbad255f17318cc5"},
+    "old-reporter-result": {"kind": "local-evidence-file","path": "font-ci-repair-validation/old-reporter-result.json","bytes": 13585,"sha256": "63bd790e2c7763d511ff41468b2f8fb835ad6b106e3c3db11ae20122ff41e957"},
+    "fixed-reporter-result": {"kind": "local-evidence-file","path": "font-ci-repair-validation/fixed-reporter-result.json","bytes": 13513,"sha256": "cc66f25df13eeb185baf6e2cc727c19aeaba0feef1b9766084491e5ba3625a56"},
+    "reporter-unit-red": {"kind": "local-evidence-file","path": "font-ci-report-red.log","bytes": 2322,"sha256": "368313a2db19ac22196562ad4211dc36712493161faedbf2ac1b73ec67b96fad"},
+    "reporter-unit-green": {"kind": "local-evidence-file","path": "font-ci-report-green.log","bytes": 1455,"sha256": "2b8fa08b531b96bc5d6b8d736dba59aca2ad3c6af342d8616c038e78e9de681f"},
+    "local-rust-fmt": {"kind": "local-evidence-file","path": "font-ci-repair-validation/fmt.log","bytes": 0,"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+    "local-rust-check": {"kind": "local-evidence-file","path": "font-ci-repair-validation/check.log","bytes": 72,"sha256": "ee1d3fffa2022e962e63e0dbe4d35c9c198450a20c29fc09030f635dbb38bfcd"},
+    "local-rust-clippy": {"kind": "local-evidence-file","path": "font-ci-repair-validation/clippy.log","bytes": 72,"sha256": "8c233a54790c4800d3dd585436af679aa838da259bfdb129412e2d51cdb75cdc"},
+    "local-rust-test": {"kind": "local-evidence-file","path": "font-ci-repair-validation/test.log","bytes": 19648,"sha256": "73b6e79372606d6ae713adb04e1e1429816bee5053fd14f18d428240e9dc88f0"},
+    "local-rust-release": {"kind": "local-evidence-file","path": "font-ci-repair-validation/release.log","bytes": 62,"sha256": "90c8a1a69c0155761cff4bfe0e61bbee007961d2b96729d2127c2e0c291489dd"},
+    "fresh-font-summary": {"kind": "local-evidence-file","path": "reporterfix-ci-review/font-summary.json","bytes": 5227,"sha256": "ed03a24e399e18bd17c172e388716156e5994ab422d47170d72a45430b567cf8"},
+    "fresh-font-archive": {"kind": "local-evidence-file","path": "reporterfix-ci-review/font/artifact.zip","bytes": 17945,"sha256": "7e2c78b3df1f83a8608c41f16fa645129000002bfcedfed6b007ac4f883b87da","githubArtifactId": 12165388862,"githubRunId": 39205098558,"githubName": "Swirl-Font-Evidence-5adcfcf158a4eb99f56e78d0997af5dbc25bd3d0-1","githubDigestMatches": true,"zipCrcVerified": true,"extractedMembersCompared": 18},
+    "fresh-font-source.json": {"kind": "local-evidence-file","path": "reporterfix-ci-review/font/font-evidence/source.json","bytes": 375,"sha256": "a03b9510ad24e11babc0f48e0b636690062452b39616aaaaa81ac9f8f2ead8a4"},
+    "fresh-font-stages.json": {"kind": "local-evidence-file","path": "reporterfix-ci-review/font/font-evidence/stages.json","bytes": 195,"sha256": "c8ea43b4bbb903543b31ce0c8fad7690b57f05eb774a87caeba225405b2958be"},
+    "fresh-font-font-results.json": {"kind": "local-evidence-file","path": "reporterfix-ci-review/font/font-evidence/font-results.json","bytes": 14053,"sha256": "92e32cd86b2ab4c9431abd5bf41ca59d3c5afd159e4845f79381ae872be660ae"},
+    "fresh-font-font-selection.xml": {"kind": "local-evidence-file","path": "reporterfix-ci-review/font/swirl-font-tests/font-selection.xml","bytes": 6464,"sha256": "911a5e728d21d83b894058e88d03f2519197abd38a64c325c7b63c374264b1a9"},
+    "fresh-font-font-axis-policy.xml": {"kind": "local-evidence-file","path": "reporterfix-ci-review/font/swirl-font-tests/font-axis-policy.xml","bytes": 5140,"sha256": "12b511b0e5517210983a8fe4068d989a02b0efa0c56a3433266d4adc46723c0d"},
+    "fresh-font-font-native-raster.xml": {"kind": "local-evidence-file","path": "reporterfix-ci-review/font/swirl-font-tests/font-native-raster.xml","bytes": 3434,"sha256": "9cd8049b8deda715e69d30a4f8ad7fa310ccd24961488e2522979e80ee60098c"},
+    "fresh-font-job-log": {"kind": "local-evidence-file","path": "reporterfix-ci-review/font-job.log","bytes": 134709,"sha256": "e329437273f583d0059aa233862ae490db53fa30251f23c95c20b0c6d46362c3","githubRunId": 39205098558,"githubJobId": 117906095258},
+    "fresh-font-smoke": {"kind": "local-evidence-file","path": "reporterfix-ci-review/font/font-evidence/font-smoke.json","bytes": 111,"sha256": "679202b9475c495672ef8e192d98afecd9cbea69a2dc497e6f014b1af6fc0311"},
+    "fresh-ci-summary": {"kind": "local-evidence-file","path": "reporterfix-ci-review/summary.json","bytes": 64211,"sha256": "7361c6959d8ebe8c5f11d537613d9afe43cc9d07eb331c3cfe7c4c0a6533163b"},
+    "fresh-app-job-log": {"kind": "local-evidence-file","path": "reporterfix-ci-review/app-job.log","bytes": 98996,"sha256": "63065e303b04755428fde10f74c62cb10e2634195bc96e735bee41ebba23726c"},
+    "fresh-ubuntu-job-log": {"kind": "local-evidence-file","path": "reporterfix-ci-review/ubuntu-job.log","bytes": 123280,"sha256": "c7acd8ee672b6e84d06bfaf3d760740275ac62d153e88989421b3e8fb4232366"},
+    "fresh-macos-job-log": {"kind": "local-evidence-file","path": "reporterfix-ci-review/macos-job.log","bytes": 114542,"sha256": "56e82a21c2c9fdf4a724145d4b88c8b67d1fc025d979194a5bc4a309e1ee3ae2"},
+    "fresh-app-archive": {"kind": "local-evidence-file","path": "reporterfix-ci-review/app/artifact.zip","bytes": 576943,"sha256": "93b96051a9f3abc97481adef64308ce022a6424e1a0ea00cc7fa10284f261f3f","githubArtifactId": 12165556755,"githubRunId": 39205098810,"githubName": "Core-development-evidence","githubDigestMatches": true,"zipCrcVerified": true,"extractedMembersCompared": 3},
+    "fresh-app-artifact.zip": {"kind": "local-evidence-file","path": "reporterfix-ci-review/app/artifact.zip","bytes": 576943,"sha256": "93b96051a9f3abc97481adef64308ce022a6424e1a0ea00cc7fa10284f261f3f"},
+    "fresh-app-core-tested-source.tar": {
+      "kind": "local-evidence-file",
+      "path": "reporterfix-ci-review/app/core-tested-source.tar",
+      "bytes": 2549760,
+      "sha256": "002d58988f931be1db57249a65bae11255d8f35db65efcb5dd72a64011837718",
+      "verifiedSourceCommit": "5adcfcf158a4eb99f56e78d0997af5dbc25bd3d0",
+      "regularMembersVerified": 187,
+      "allRegularMembersMatchCommit": true,
+      "memberManifestSha256": "ab50d5f331a1c4bc73c399b08121d9ea9aceac925e06156eaefd20964b35e936",
+      "selectedSourceHashes": [
+        {"path": "tools/tests/test_font_ci_reports.py","sha256": "8b9088a3d375662c3fab2dedad326ab5eb1345a63664ddb845b956fc40c815d8"}
+      ]
+    },
+    "fresh-app-CORE_TESTED_COMMIT": {"kind": "local-evidence-file","path": "reporterfix-ci-review/app/CORE_TESTED_COMMIT","bytes": 41,"sha256": "e6773f0a8baf85335178c50de898f671bc35c50fbb7e8f599e4e3231c07ea5f0"},
+    "fresh-app-CORE_WORKTREE_STATE": {"kind": "local-evidence-file","path": "reporterfix-ci-review/app/CORE_WORKTREE_STATE","bytes": 71,"sha256": "d1d620b343967ef519019b9ec424181ed3f76a5d382a7821ad59896b4c6d456e"},
+    "fresh-ci-run-state": {"kind": "local-evidence-file","path": "reporterfix-ci-review/final-run-state.json","bytes": 11152,"sha256": "e8c2a395ea4f171cce4ead519a02b9d7f8c73cdca04d7a63bdcd433941071ba3"},
+    "fresh-windows-job-log": {"kind": "local-evidence-file","path": "reporterfix-ci-review/windows-job.log","bytes": 289189,"sha256": "5a0dd676a09722a20329e26467caa73dfcd2a8830e8f50d7954196a9fc10cfcd","githubRunId": 39205098742,"githubJobId": 117906096014,"originalLineEndingsPreserved": true},
+    "fresh-qt-summary": {"kind": "local-evidence-file","path": "reporterfix-ci-review/qt/summary.json","bytes": 11729,"sha256": "3cb2b314bf94ea71e4316cdac159d539985898726c452c471a369b85f1169d6f"},
+    "fresh-qt-archive": {"kind": "local-evidence-file","path": "reporterfix-ci-review/qt/artifact.zip","bytes": 4592,"sha256": "6d0fbbed44d36bb825fc48551fd2577b807895e8d9290d4d27e995fcbb5611bf","githubArtifactId": 12166167989,"githubRunId": 39205098742,"githubName": "Swirl-Rust-Qt-Tests-5adcfcf158a4eb99f56e78d0997af5dbc25bd3d0-1","githubDigestMatches": true,"zipCrcVerified": true,"extractedMembersCompared": 4},
+    "fresh-public-archive": {"kind": "local-evidence-file","path": "reporterfix-ci-review/public/artifact.zip","bytes": 856,"sha256": "e712cb1aeeafcace825535fa2cff47fd66db8fc613ca2c189d4bb63c8ef257cc","githubArtifactId": 12165566160,"githubRunId": 39205098742,"githubName": "Swirl-Core-Public-Network","githubDigestMatches": true,"zipCrcVerified": true,"extractedMembersCompared": 1},
+    "fresh-public-report": {"kind": "local-evidence-file","path": "reporterfix-ci-review/public/CORE_PUBLIC_NETWORK.json","bytes": 2551,"sha256": "906012d8200241d0ac6c88970a3e92f4c267eb0cbd8f5dbb6b8fa4ed780867ef"},
+    "fresh-qt-native": {"kind": "local-evidence-file","path": "reporterfix-ci-review/qt/rust-qt/swirl-rust-qt-integration.xml","bytes": 10803,"sha256": "4f60cbe821dea1a2c17879f600d92ff3acd229f8b66d15e21027affd11354495"},
+    "fresh-qt-native-import": {"kind": "local-evidence-file","path": "reporterfix-ci-review/qt/rust-qt/swirl-import-boundaries.xml","bytes": 2509,"sha256": "6115772c2cd66c6ed448c8d4b88a9bb1c1c2bac3293b370f3e44574536a37777"},
+    "fresh-qt-compat-import": {"kind": "local-evidence-file","path": "reporterfix-ci-review/qt/compat-dns/swirl-import-boundaries.xml","bytes": 2508,"sha256": "9d29046fe41abcdec1b141b6d667a1651f3884c9aa6a36646dbdb95b9e3d4f7c"},
+    "fresh-qt-compat-dns": {"kind": "local-evidence-file","path": "reporterfix-ci-review/qt/compat-dns/swirl-native-dns-compatibility-guard.xml","bytes": 963,"sha256": "3b9a1906deb8cd6de368623f24ec6fccfbe023399d44d65a7790704540e7f7cc"}
+  },
+  "priorCoreEvidence": {"commit": "45ed499f335be8ca1216c1023a25ec0e7f6d29f7","path": "docs/evidence/REALITY_FOUNDATION_AND_IMPORT_20261019.json","sha256": "bb762f23a32a16655f181470f569cc87b8e7573dc1717e5d17f7fbf4ecd5a1f1","scope": "Separate four-stage Core evidence; this report does not rewrite it."}
+}
