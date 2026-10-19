@@ -20,6 +20,7 @@ import hashlib
 import itertools
 import json
 import math
+import os
 from pathlib import Path
 import random
 import subprocess
@@ -33,6 +34,8 @@ from fontTools.ttLib import TTFont, TTCollection, newTable
 from fontTools.ttLib.tables._g_l_y_f import Glyph, GlyphCoordinates
 from fontTools.ttLib.tables.TupleVariation import TupleVariation
 from fontTools.varLib.models import VariationModel, normalizeLocation
+from metric_variations import add_metric_variations, verify_metric_variations
+from incremental_pipe import TimedLineReader
 
 
 class ReconstructionError(RuntimeError):
@@ -270,12 +273,15 @@ def verify_serialized_face(reference, serialized):
     """
     expected_order, actual_order = reference.getGlyphOrder(), serialized.getGlyphOrder()
     check(len(expected_order) == len(actual_order), "serialized glyph count changed")
-    for tag in ("glyf", "gvar", "hmtx", "vmtx", "fvar", "avar"):
+    for tag in ("glyf", "gvar", "hmtx", "vmtx", "fvar", "avar", "HVAR", "VVAR"):
         check((tag in reference) == (tag in serialized), f"serialized {tag} presence changed")
-    for tag in ("fvar", "avar"):
+    for tag in ("fvar", "avar", "HVAR", "VVAR"):
         if tag in reference:
             check(reference[tag].compile(reference) == serialized[tag].compile(serialized),
                   f"serialized {tag} axis coordinates changed")
+    if "HVAR" in reference:
+        verify_metric_variations(reference)
+        verify_metric_variations(serialized)
     expected_glyf, actual_glyf = reference["glyf"], serialized["glyf"]
     expected_h, actual_h = reference["hmtx"].metrics, serialized["hmtx"].metrics
     expected_v = reference["vmtx"].metrics if "vmtx" in reference else None
@@ -347,20 +353,24 @@ def verify_collection_tables(reference_paths, collection):
 
 
 class NativeOracle:
-    def __init__(self, executable, source: Path, log: Path):
-        self.stderr = open(log, "w", encoding="utf-8")
+    def __init__(self, executable, source: Path, log: Path, response_timeout=30.0):
+        self.stderr = open(log, "x", encoding="utf-8")
         self.proc = None
+        self.reader = None
+        self.response_timeout = response_timeout
         try:
             self.proc = subprocess.Popen([str(executable), str(source)], stdin=subprocess.PIPE,
                                          stdout=subprocess.PIPE, stderr=self.stderr, text=True,
                                          encoding="utf-8", bufsize=1)
-            line = self.proc.stdout.readline()
+            self.reader = TimedLineReader(self.proc.stdout.fileno())
+            line = self.reader.readline(timeout=120.0)
             check(bool(line), "native oracle did not return metadata; inspect native-oracle.log")
             self.metadata = json.loads(line)
             check(self.metadata.get("type") == "metadata", "native oracle metadata missing")
             check(self.metadata.get("source_sha256") == sha256(source), "native oracle source SHA mismatch")
             check(self.metadata.get("backend") == "CoreText", "need independent CoreText user-coordinate oracle")
-            check(all(face.get("status") == "identity_verified" for face in self.metadata.get("faces", [])),
+            check(bool(self.metadata.get("faces"))
+                  and all(face.get("status") == "identity_verified" for face in self.metadata.get("faces", [])),
                   "native oracle could not verify every requested physical face")
         except Exception:
             self.close()
@@ -376,12 +386,23 @@ class NativeOracle:
         self.proc.stdin.flush()
         results = {}
         for _ in glyph_ids:
-            line = self.proc.stdout.readline()
+            line = self.reader.readline(timeout=self.response_timeout)
             check(bool(line), "native oracle ended before returning every requested glyph")
             record = json.loads(line)
             check(record.get("request_id") == request_id and record.get("face_index") == face,
                   "native oracle response identity mismatch")
-            check(record.get("location") == location, "native oracle axis location mismatch")
+            # Request failures intentionally have no glyph/location payload.
+            # Report the original native error before validating success fields,
+            # otherwise an axis or identity failure is disguised as a JSON echo
+            # mismatch. No failed request is treated as an empty glyph.
+            check(record.get("error") is None,
+                  f"native request {request_id} face {face} failed: {record.get('error')}")
+            check(record.get("type") != "request_error", "native request_error without error detail")
+            check(record.get("location") == location,
+                  "native oracle axis location mismatch: " + json.dumps({
+                      "request_id": request_id, "face_index": face,
+                      "requested": location, "received": record.get("location"),
+                      "reported": record.get("reported_location")}, allow_nan=False))
             gid = record.get("glyph_id")
             check(gid in glyph_ids and gid not in results, "missing, duplicate or unrelated native glyph")
             check(record.get("error") is None, f"native error on glyph {gid}: {record.get('error')}")
@@ -389,6 +410,8 @@ class NativeOracle:
         return results
 
     def close(self):
+        if self.reader is not None:
+            self.reader.close()
         if self.proc is not None and self.proc.poll() is None:
             try:
                 self.proc.stdin.close()
@@ -443,11 +466,28 @@ def rename_face(font, index):
             "source_face_index": index, "target_face_index": index}
 
 
+def validate_io_paths(source, executable, destination, report_path):
+    """Reject report/log aliases before any writable handle is opened."""
+    log = report_path.parent / "native-oracle.log"
+    paths = {"source": source, "oracle": executable, "destination": destination,
+             "report": report_path, "log": log}
+    for (a, pa), (b, pb) in itertools.combinations(paths.items(), 2):
+        aliases = pa.resolve() == pb.resolve()
+        if pa.exists() and pb.exists():
+            aliases = aliases or pa.samefile(pb)
+        check(not aliases, f"unsafe path alias: {a} and {b}; no files written")
+    for name in ("destination", "report", "log"):
+        path = paths[name]
+        check(not path.exists() and not path.is_symlink(),
+              f"{name} already exists; choose a new output/report directory")
+
+
 def run(source, executable, destination, report_path, batch_size=64,
         outline_limit=1.0, metric_limit=1.0, max_extra=24):
     check(destination.name == "Swirl-VF.ttc", "the final font filename must be Swirl-VF.ttc")
     check(source.resolve() != destination.resolve(), "never overwrite the source font")
     check(not destination.exists(), "destination already exists; do not overwrite an unreviewed font")
+    validate_io_paths(source, executable, destination, report_path)
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report = {"source_sha256": sha256(source), "output_generated": False,
               "conversion_kind": "native-instance-reconstruction",
@@ -564,7 +604,8 @@ def run(source, executable, destination, report_path, batch_size=64,
                         out["avar"].segments = {tag: {-1.0:-1.0, 0.0:0.0, 1.0:1.0} for tag in axes}
                         face_report["identity"] = rename_face(out, index)
                         face_report["replaced_tables"] = replaced
-                        face_report["metrics_strategy"] = "gvar phantom points; native advances, bearings and vertical origin"
+                        face_report["metric_variation_verification"] = add_metric_variations(out)
+                        face_report["metrics_strategy"] = "gvar phantom points plus exactly equivalent HVAR/VVAR advances; no native-value correction"
                         face_report["bearing_storage_note"] = "hmtx LSB uses glyf control bounds and preserves the CoreText origin; native geometric LSB is separately observed"
                         face_report["outline_error_policy"] = "training and holdout quadratic point discrepancy plus cubic approximation bound"
                         face_report["retained_tables"] = sorted(set(src.keys()) & set(out.keys()))
@@ -587,7 +628,10 @@ def run(source, executable, destination, report_path, batch_size=64,
                 report["output_sha256"] = sha256(candidate)
                 report["output_size_bytes"] = candidate.stat().st_size
                 report["status"] = "RECONSTRUCTION_SAMPLED_PASS_PLATFORM_UNVERIFIED"
-                candidate.replace(destination)
+                # Same-filesystem hard linking is an atomic no-replace publication.
+                # A destination appearing after preflight cannot be overwritten.
+                os.link(candidate, destination)
+                candidate.unlink()
                 report["output_generated"] = True
     except Exception as error:
         report["status"] = "BLOCKED"
@@ -596,7 +640,8 @@ def run(source, executable, destination, report_path, batch_size=64,
     finally:
         if oracle is not None:
             oracle.close()
-        report_path.write_text(json.dumps(report, indent=2, ensure_ascii=False, allow_nan=False), encoding="utf-8")
+        with report_path.open("x", encoding="utf-8") as stream:
+            stream.write(json.dumps(report, indent=2, ensure_ascii=False, allow_nan=False))
     return report
 
 

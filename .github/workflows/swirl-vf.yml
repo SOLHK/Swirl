@@ -113,6 +113,12 @@ jobs:
         run: |
           ./tools/swirl_vf/platform/run_directwrite_probe.ps1 -Font build/synthetic-three-axis.ttc -OutputDirectory build/swirl-vf-evidence/directwrite -AllGlyphs -Render
           if ($LASTEXITCODE -ne 0) { throw 'Native DirectWrite synthetic probe failed' }
+      - name: Validate production HVAR and VVAR tables through DirectWrite
+        run: |
+          python tools/swirl_vf/platform/make_metric_fixture.py build/synthetic-metric-axes.ttc
+          if ($LASTEXITCODE -ne 0) { throw 'Exact metric fixture generation failed' }
+          ./tools/swirl_vf/platform/run_directwrite_probe.ps1 -Font build/synthetic-metric-axes.ttc -OutputDirectory build/swirl-vf-evidence/directwrite-metrics -AllGlyphs -Render -Binary build/swirl-vf-evidence/directwrite/build/Release/directwrite_probe.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Production metric-table native probe failed' }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -122,4 +128,8 @@ jobs:
             build/swirl-vf-evidence/directwrite/*.jsonl
             build/swirl-vf-evidence/directwrite/*.log
             build/swirl-vf-evidence/directwrite/*.png
+            build/swirl-vf-evidence/directwrite-metrics/*.json
+            build/swirl-vf-evidence/directwrite-metrics/*.jsonl
+            build/swirl-vf-evidence/directwrite-metrics/*.log
+            build/swirl-vf-evidence/directwrite-metrics/*.png
           retention-days: 7
