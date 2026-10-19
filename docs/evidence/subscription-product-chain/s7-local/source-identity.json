@@ -1,0 +1,11 @@
+{
+  "base_sha": "598a8a77400236e6f817a1e4782f1c4f0da4bbd0",
+  "tested_changed_files": {
+    "src/Swirl.Quick/tests/RustCoreTests.cpp": "875447f92a0ed00959643768f0a448c00627510c6ccdf6715a86a077c8911f5f",
+    "tools/tests/test_product_subscription_chain.py": "d7c0af7ab9a3ad93d2e91c198b683075d617049e8a7343c23cca17db0161ff2f"
+  },
+  "source_note": "Local Windows Qt test ran against this base plus exactly these changed tracked files; result.json records the dirty state. CI must validate the committed SHA.",
+  "command": "python tools/tests/test_product_subscription_chain.py ProductQtIntegration -v",
+  "result": "1 Python test with four Qt protocol subtests passed; 0 failures, 0 errors, 0 skips",
+  "rust_gate": "fmt, check, clippy, test, release build passed locally"
+}

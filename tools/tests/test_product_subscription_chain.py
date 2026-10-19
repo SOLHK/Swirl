@@ -263,7 +263,8 @@ class Relay:
                                     'final.fixture.invalid', 'wrong.fixture.invalid',
                                     'a.product.invalid', 'b.product.invalid',
                                     'choice.product.invalid', 'denied.product.invalid',
-                                    'stream.product.invalid')
+                                    'stream.product.invalid', 'nested.suffix.product.invalid',
+                                    'keyword.product.invalid', 'port.product.invalid')
                     assert port in owner.ports
                     upstream = socket.create_connection(('127.0.0.1', port), timeout=8)
                     event = {'peer': identity, 'host': host, 'port': port, 'upload': 0,
@@ -697,7 +698,10 @@ class ProductQtIntegration(ChainBase):
                                       'DOMAIN,b.product.invalid,B',
                                       'DOMAIN,choice.product.invalid,choice',
                                       'DOMAIN,denied.product.invalid,REJECT',
-                                      'IP-CIDR,127.0.0.1/32,DIRECT,no-resolve', 'MATCH,REJECT']}
+                                      'IP-CIDR,127.0.0.1/32,DIRECT,no-resolve',
+                                      'DOMAIN-SUFFIX,suffix.product.invalid,B',
+                                      'DOMAIN-KEYWORD,keyword,A',
+                                      f'DST-PORT,{self.http.port},B', 'MATCH,REJECT']}
                 case = Path(self.folder.name) / protocol
                 case.mkdir()
                 fixture = {'subscription': json.dumps(document), 'http_port': self.http.port,
@@ -723,7 +727,8 @@ class ProductQtIntegration(ChainBase):
                 self.assertEqual(result.returncode, 0, output + result.stdout + result.stderr)
                 self.assertNotIn('SKIP', output)
                 expected_paths = {'/selected-a', '/selected-b', '/restored-b',
-                                  '/rule-a', '/rule-b', '/rule-choice', '/rule-direct'}
+                                  '/rule-a', '/rule-b', '/rule-choice', '/rule-direct',
+                                  '/rule-suffix', '/rule-keyword', '/rule-port'}
                 actual_paths = [request.split(b' ')[1].decode() for request in self.http.requests[before[0]:]]
                 self.assertCountEqual(actual_paths, expected_paths)
                 self.assertEqual([request.split(b' ')[1] for request in self.https.requests[before[1]:]],
@@ -733,16 +738,17 @@ class ProductQtIntegration(ChainBase):
                 while self.https.tls_closed == before[3] and not self.https.errors and time.monotonic() < deadline:
                     time.sleep(0.005)
                 self.assertEqual(self.https.tls_closed - before[3], 1)
-                for peer, paths in [(a, ['/selected-a', '/rule-a', '/rule-choice']),
-                                    (b, ['/selected-b', '/restored-b', '/rule-b'])]:
+                for peer, paths in [(a, ['/selected-a', '/rule-a', '/rule-choice', '/rule-keyword']),
+                                    (b, ['/selected-b', '/restored-b', '/rule-b',
+                                         '/rule-suffix', '/rule-port'])]:
                     observed = [event['prefix'].split(b' ')[1].decode() for event in peer.connections
                                 if event['prefix'].startswith(b'GET ')]
                     self.assertCountEqual(observed, paths)
                     self.assertTrue(all(event['host'] != 'denied.product.invalid' for event in peer.connections))
                 self.assertEqual([event['port'] for event in a.connections].count(self.echo.port), 1)
                 self.assertEqual([event['port'] for event in b.connections].count(self.echo.port), 0)
-                self.assertEqual(len(a.connections), 5)
-                self.assertEqual(len(b.connections), 4)
+                self.assertEqual(len(a.connections), 6)
+                self.assertEqual(len(b.connections), 6)
                 if evidence:
                     report = {'protocol': protocol, 'origin_http_paths': actual_paths,
                               'origin_https_sni': self.https.sni[before[2]:],

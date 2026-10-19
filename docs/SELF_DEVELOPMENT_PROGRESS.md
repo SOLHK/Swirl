@@ -1,5 +1,15 @@
 # Swirl Core 固定验收与进度基线（baseline-v1，冻结范围）
 
+## S7 本地产品分流复核（2026-10-20）
+
+在 S6 `598a8a7` 基线上扩展 Windows Qt 真实产品链测试：新增 DOMAIN-SUFFIX、
+DOMAIN-KEYWORD、DST-PORT 的独立 A/B 出口及实际 HTTP 目标断言，并用另一目标端口
+确认终结 MATCH 拒绝。HTTP CONNECT、SOCKS5、SS AEAD、普通 VLESS TCP 四个子项
+在本机 Qt/DPAPI → Rust → 独立对端 → 目标测试中通过；每项 TLS 验证与正常关闭仍保持。
+原始本地记录见 `docs/evidence/subscription-product-chain/s7-local/`。S6 的 Windows
+完整 CI 尚未终结；本地结果不能代替精确提交的 CI 或私人订阅验收。正式进度保持
+**79 项 / 6 项 / 10.83%**。
+
 ## S6 Windows policy fixture checkpoint (2026-10-20)
 
 S5 source 0416fe09: Linux/macOS/App success; Windows independent SS policy fixture failed before Qt/DPAPI and full Swirl.exe. New scoped S6 patch selects TCP/UDP jointly allowed candidates and preserves immediate access-denial errors; exact-source CI is pending. Read `docs/CORE_SUBSCRIPTION_S6_HANDOFF_20261020.md`. Frozen 79 / 6 / 10.83% unchanged.

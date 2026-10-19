@@ -1,5 +1,25 @@
 # Swirl Core S6 — Windows SS fixture recovery, exact-source CI pending
 
+## S7 continuation prepared after S6 peer gate
+
+At source `598a8a77400236e6f817a1e4782f1c4f0da4bbd0`, Windows Rust
+fmt/check/Clippy/test/Release, independent protocol peers and the native
+subscription-to-target step succeeded in
+[Rust run 39297859906](https://github.com/SOLHK/Swirl/actions/runs/39297859906).
+[App run 39297859893](https://github.com/SOLHK/Swirl/actions/runs/39297859893)
+and portable Linux/macOS Rust jobs completed successfully. The Windows Qt
+product and complete application gates were still in progress at this note;
+their terminal results and raw logs must be fetched separately.
+
+S7 adds real Qt product-route assertions for DOMAIN-SUFFIX, DOMAIN-KEYWORD and
+DST-PORT, preserving the existing A/B switch, NodeStore/DPAPI restoration,
+ordered DIRECT/REJECT/MATCH, verified HTTPS and authenticated close assertions.
+Local Windows Qt/Rust execution passed across four proxy protocols with the
+source-file hashes and raw synthetic evidence saved in
+[`s7-local`](evidence/subscription-product-chain/s7-local/). No private
+subscription or credentials were used. Formal acceptance remains
+**79 / 6 / 10.83%** until the exact committed SHA finishes CI.
+
 Development branch: `work/core-completion-20261017`. This is a bounded
 checkpoint for continuation, **not** a statement that the product's entire
 subscription-to-internet flow has been accepted.

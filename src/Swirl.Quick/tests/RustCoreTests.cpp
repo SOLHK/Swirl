@@ -227,7 +227,7 @@ private slots:
    QCOMPARE(controller.nodeCatalog().size(),2);QVERIFY2(controller.networkConfigurationError().isEmpty(),qPrintable(controller.networkConfigurationError()));
    for(const auto &entry:controller.nodeCatalog()){const auto row=entry.toMap();if(row["name"]=="A")idA=row["id"].toString();if(row["name"]=="B")idB=row["id"].toString();}
    QVERIFY(!idA.isEmpty()&&!idB.isEmpty()&&idA!=idB);QVERIFY(controller.chooseNode(idA));
-   network=controller.networkConfigurationSnapshot();QCOMPARE(network["groups"].toList().size(),1);QCOMPARE(network["rules"].toStringList().size(),6);
+   network=controller.networkConfigurationSnapshot();QCOMPARE(network["groups"].toList().size(),1);QCOMPARE(network["rules"].toStringList().size(),9);
    NodeStore persisted(path);QCOMPARE(persisted.selectedId(),idA);savedNodes=persisted.nodes();original=persisted.networkConfiguration()["importedConfiguration"].toObject();
    QVERIFY(!original.isEmpty());QCOMPARE(original["configuration"].toObject()["rules"].toArray()[0].toString(),QString("DOMAIN,a.product.invalid,A"));
   }
@@ -295,8 +295,13 @@ private slots:
    controller.setRoutingMode("rule");QTRY_COMPARE_WITH_TIMEOUT(controller.routingMode(),QString("rule"),5000);
    QVERIFY(reachesOrigin("a.product.invalid",httpPort,"/rule-a"));QVERIFY(reachesOrigin("b.product.invalid",httpPort,"/rule-b"));
    QVERIFY(reachesOrigin("choice.product.invalid",httpPort,"/rule-choice"));QVERIFY(reachesOrigin("127.0.0.1",httpPort,"/rule-direct"));
+   QVERIFY(reachesOrigin("nested.suffix.product.invalid",httpPort,"/rule-suffix"));
+   QVERIFY(reachesOrigin("keyword.product.invalid",httpPort,"/rule-keyword"));
+   QVERIFY(reachesOrigin("port.product.invalid",httpPort,"/rule-port"));
    const auto rejected=request("denied.product.invalid",httpPort,"/rule-reject");QVERIFY(rejected.error!=QNetworkReply::NoError);QVERIFY(rejected.status!=200);
-   const auto unmatched=request("unmatched.product.invalid",httpPort,"/rule-unmatched");QVERIFY(unmatched.error!=QNetworkReply::NoError);QVERIFY(unmatched.status!=200);
+   // Use another destination port so the terminal MATCH rule, rather than the
+   // preceding DST-PORT rule, is responsible for refusing this request.
+   const auto unmatched=request("unmatched.product.invalid",httpsPort,"/rule-unmatched");QVERIFY(unmatched.error!=QNetworkReply::NoError);QVERIFY(unmatched.status!=200);
    QCOMPARE(controller.engineKind(),QString("rust"));QCOMPARE(controller.activeNodeId(),idB);controller.stop();QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive()&&!controller.busy(),5000);
   }
   QTcpServer released;QVERIFY(released.listen(QHostAddress::LocalHost,proxyPort));

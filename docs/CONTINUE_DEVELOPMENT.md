@@ -1,5 +1,26 @@
 # Current handoff: subscription product chain (2026-10-19)
 
+## S7 local checkpoint: Qt product routing through independent exits (2026-10-20)
+
+On S6 base `598a8a77400236e6f817a1e4782f1c4f0da4bbd0`, the Windows
+independent-peer and Rust subscription-to-target CI steps succeeded; the
+Windows Qt product and full application steps were still running when this
+checkpoint was prepared. S6 App/Core validation completed successfully, as did
+the Linux and macOS Rust jobs. Do not infer a final Windows result here.
+
+The actual Qt product test now imports ordered DOMAIN-SUFFIX, DOMAIN-KEYWORD
+and DST-PORT rules alongside its existing DOMAIN, IPv4 CIDR, DIRECT, REJECT,
+manual group and terminal MATCH cases. Each positive request reaches the
+independent origin through the asserted A/B relay. The terminal MATCH negative
+uses another port so it cannot be satisfied by the preceding DST-PORT rule.
+Local Windows MinGW Qt/Rust product execution passed for HTTP CONNECT, SOCKS5,
+SS AEAD and VLESS TCP: four subtests, one authenticated HTTPS close per protocol,
+zero errors and skips. The local source-file hashes, raw Qt logs, independent
+relay/origin observations and dirty-base identity are in
+[`s7-local`](evidence/subscription-product-chain/s7-local/). This local evidence
+is not final-SHA GitHub CI or a private-provider acceptance. Frozen acceptance
+remains **79 / 6 / 10.83%**.
+
 ## S6 handoff (2026-10-20): Windows SS shared-port fixture repair — exact CI pending
 
 S5 executable source [0416fe09](https://github.com/SOLHK/Swirl/commit/0416fe09fce4f4d5599c5a859842331f7783ebb3) has
