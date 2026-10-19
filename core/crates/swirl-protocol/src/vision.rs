@@ -6,6 +6,7 @@
 //! rejects requests for a raw handoff that transport cannot safely provide.
 //! Inner-TLS inspection describes wire eligibility; it is not authentication.
 
+pub mod record;
 pub mod stream;
 pub mod tls;
 

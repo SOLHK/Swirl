@@ -19,6 +19,7 @@ use swirl_protocol::{
     Target,
     vision::{
         self,
+        record::{PlaintextChunks, TlsRecordIo},
         stream::{ReadMode, Stream},
         tls::Eligibility,
     },
@@ -153,6 +154,33 @@ impl AsyncWrite for Observed {
     }
 }
 
+async fn secure_outer(
+    socket: tokio::net::TcpStream,
+    server_name: String,
+    ca_der_base64: String,
+) -> io::Result<BoxStream> {
+    use base64::Engine;
+    use tokio_rustls::{
+        TlsConnector,
+        rustls::{ClientConfig, RootCertStore, pki_types::ServerName},
+    };
+    // This loopback-only fixture trusts only its temporary CA. All standard
+    // certificate, name, signature, Finished and close checks stay in rustls.
+    let mut roots = RootCertStore::empty();
+    let certificate = base64::engine::general_purpose::STANDARD
+        .decode(ca_der_base64)
+        .map_err(|_| invalid())?;
+    roots.add(certificate.into()).map_err(|_| invalid())?;
+    let config = ClientConfig::builder()
+        .with_root_certificates(roots)
+        .with_no_client_auth();
+    let name = ServerName::try_from(server_name).map_err(|_| invalid())?;
+    let stream = TlsConnector::from(Arc::new(config))
+        .connect(name, TlsRecordIo::new(socket))
+        .await?;
+    Ok(Box::new(PlaintextChunks::new(stream)))
+}
+
 async fn run(input: Input, report: &mut Value, observation: Arc<Observation>) -> io::Result<()> {
     let address = loopback(&input.host, input.port)?;
     loopback(&input.target_host, input.target_port)?;
@@ -171,16 +199,8 @@ async fn run(input: Input, report: &mut Value, observation: Arc<Observation>) ->
         report["stage"] = json!("tcp");
         let socket = tokio::net::TcpStream::connect(address).await?;
         report["stage"] = json!("outer_tls");
-        let outer = swirl_transport::secure(
-            socket,
-            &Tls {
-                server_name: input.outer_server_name,
-                alpn: Vec::new(),
-                ca_der_base64: Some(input.outer_ca_der_base64),
-            },
-        )
-        .await
-        .map_err(io::Error::other)?;
+        let outer =
+            secure_outer(socket, input.outer_server_name, input.outer_ca_der_base64).await?;
         report["stage"] = json!("vision_request");
         let vision = vision::client_over_authenticated(
             outer,

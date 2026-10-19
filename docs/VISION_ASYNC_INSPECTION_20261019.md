@@ -187,9 +187,83 @@ REALITY plus Vision as a complete combined product path, configuration/IR/
 routing/Qt integration, supplier nodes, long-run/weak-network acceptance and
 physical Windows testing. No private subscription was refreshed or read.
 
+The [original failed experiments](evidence/vision-r2/initial-failures.json)
+retain their original summaries, client/target outcomes and reference-server
+logs, with hashes of the original files. The initial four blocked-loopback
+failures and both later 38-byte echo-premise failures remain failures. Complete
+unittest console tracebacks were not separately saved for those experiments;
+the archive records that absence without reconstructing original output.
+
 The frozen baseline remains **79 items, six fully accepted and 10.83% accepted
 weight**. This component substage does not accept the complete Vision item or
 increase that numerator or denominator.
+
+## First committed CI failure: coalesced outer and inner TLS records
+
+The first source commit is
+[`f3ce257f14e59e82977d89ac4be436d08926c6b8`](https://github.com/SOLHK/Swirl/commit/f3ce257f14e59e82977d89ac4be436d08926c6b8).
+Its [Rust run 39243009089](https://github.com/SOLHK/Swirl/actions/runs/39243009089)
+**failed**: Linux completed successfully, while macOS and Windows each passed
+the three TLS 1.2 Vision cases and failed the TLS 1.3 Direct-refusal case.
+The later Windows Qt and full application steps did not run on that failed
+commit. Its separate [App run 39243009132](https://github.com/SOLHK/Swirl/actions/runs/39243009132)
+completed successfully; that result does not replace the two platform failures.
+
+Both failing Xray logs contain the actual `command=2` padding event followed by
+`bad record MAC`. The client returned `InvalidData` in `server_first_probe`
+before observing `DirectRequested`. The target completed its TLS 1.3 handshake
+and sent the 34-byte probe; no application upload started. The assertions
+correctly rejected this outcome: a TLS error without observing the authenticated
+Direct request cannot count as the required `PermissionDenied` refusal.
+
+The locked tokio-rustls/rustls reader can read an outer TLS record carrying the
+terminal Vision frame together with the following raw inner TLS record. It
+processes the whole ciphertext buffer before returning authenticated plaintext,
+so the foreign-key record can cause an error before Vision sees its command.
+Its plaintext `AsyncRead` also attempts further reads after obtaining a chunk.
+The repair therefore needs both ciphertext-record and plaintext-chunk boundaries;
+timing delays, one-byte socket reads and relaxed error assertions are not a fix.
+
+The original results and necessary raw logs are retained in
+[first Linux CI](evidence/vision-r2/first-ci-linux.json),
+[first App CI](evidence/vision-r2/first-ci-app.json),
+[macOS failure](evidence/vision-r2/first-ci-macos-failure.json) and
+[Windows failure](evidence/vision-r2/first-ci-windows-failure.json).
+The failed runs remain failures even after a later source revision passes.
+
+## Record-boundary repair
+
+`vision/record.rs` provides two explicit adapters for an outer TLS transport.
+`TlsRecordIo` sits below TLS and limits each read to the current five-byte header
+or ciphertext body, retaining only that header and counters. It rejects record
+lengths above 18 KiB and truncated headers/bodies; tighter TLS-version bounds
+and authentication remain the TLS engine's responsibility. `PlaintextChunks`
+sits above the engine and returns the current authenticated `AsyncBufRead`
+chunk before polling it again. Neither adapter inserts a delay or artificial
+`Pending`, decodes Vision commands, extracts the socket or grants DirectReady.
+
+The loopback example explicitly combines both adapters with ordinary rustls
+CA/name/signature/Finished verification. The default product `secure()` path
+is unchanged. The example still closes its entire transport owner when Vision
+rejects command 2; it never retries raw forwarding or treats that rejection as
+a successful TLS shutdown.
+
+Five deterministic Rust regressions use an actual TLS 1.3 handshake and enqueue
+an authenticated terminal Vision frame followed by a record encrypted under
+another session's keys in one available read. They compare all four adapter
+combinations: the original ciphertext batching reproduces `InvalidData` and
+`BadRecordMac`; ciphertext limits alone still allow plaintext read-ahead to
+consume the raw suffix. Both boundaries produce the required `PermissionDenied`,
+leave that suffix unread, preserve every application-output sentinel, avoid the
+spurious fatal alert and release the underlying owner exactly once.
+
+The remaining regressions require a tampered authentication tag to fail, valid
+`close_notify` to succeed, boundary TCP EOF and truncated headers/bodies to fail,
+partial-header cancellation and upload half-close to retain read state, and an
+oversized record to be rejected. The mature Xray test assertions are unchanged.
+Local execution and source hashes are retained in
+[the repair evidence](evidence/vision-r2/record-boundary-local.json); exact
+committed CI must be recorded separately from that local snapshot.
 
 ## Primary references and independent implementation
 

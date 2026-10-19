@@ -869,6 +869,7 @@ dependencies = [
  "swirl-subscription",
  "swirl-transport",
  "tokio",
+ "tokio-rustls",
  "zeroize",
 ]
 
