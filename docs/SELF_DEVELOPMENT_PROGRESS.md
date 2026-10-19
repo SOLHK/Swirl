@@ -1,5 +1,9 @@
 # Swirl Core 固定验收与进度基线（baseline-v1，冻结范围）
 
+## S6 Windows policy fixture checkpoint (2026-10-20)
+
+S5 source 0416fe09: Linux/macOS/App success; Windows independent SS policy fixture failed before Qt/DPAPI and full Swirl.exe. New scoped S6 patch selects TCP/UDP jointly allowed candidates and preserves immediate access-denial errors; exact-source CI is pending. Read `docs/CORE_SUBSCRIPTION_S6_HANDOFF_20261020.md`. Frozen 79 / 6 / 10.83% unchanged.
+
 本基线固定 A–F 的 79 项验收范围和权重。**已验收进度 10.83%（6 项），不是代码实现率、可联网节点比例或剩余工期比例。** 大量已有实现仍未满足整项门禁，不能给部分实现随意加分。
 
 基线最初核对来源为 `4e993d62884b138d4ee5bbe604e90d85cde6bb33` 的 Rust 实现及精确提交三平台 CI、已加密保存的 `capture-20261018-065548` 语料和 Qt 事务修改。2026-10-19 新增 E11/E12：规则编辑事务已通过精确提交 Windows/三平台验证；`8d045ab` 已实现 SOCKS5 出口 UDP，B05 从“未实现”更新为“部分实现”。首次新增 UDP CI 的 Windows/macOS 失败继续保留；修复提交 `dc3ed5e` 已独立通过三平台、Windows Qt 和完整原生应用编译。本轮供应商刷新次数仍为 0。

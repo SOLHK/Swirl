@@ -1,5 +1,31 @@
 # Current handoff: subscription product chain (2026-10-19)
 
+## S6 handoff (2026-10-20): Windows SS shared-port fixture repair — exact CI pending
+
+S5 executable source [0416fe09](https://github.com/SOLHK/Swirl/commit/0416fe09fce4f4d5599c5a859842331f7783ebb3) has
+[Rust run 39291365493](https://github.com/SOLHK/Swirl/actions/runs/39291365493):
+Linux/macOS passed, Windows failed before Qt at the independent-policy SS TCP/UDP port fixture, so the Windows Qt/DPAPI product and full app build were **not executed**. Its
+[App run 39291365689](https://github.com/SOLHK/Swirl/actions/runs/39291365689) passed and actually executed the Inspector-based subscription case.
+
+The S6 source change replaces repeated Windows TCP port-zero allocations (which can
+repeatedly land in the UDP exclusion table) with up to eight shuffled candidates
+from the existing *intersection of TCP and UDP exclusions*. It reserves actual
+TCP/UDP sockets on the chosen port, sets SO_EXCLUSIVEADDRUSE before each Windows
+bind, retries only EADDRINUSE/WinError 10048, and preserves WinError 10013 and all
+other permission/resource errors as immediate failures. New tests cover eligible
+candidate selection, eight distinct bounded collisions, socket cleanup and
+pre-bind option ordering. Non-Windows OS-selected ephemeral pairs remain unchanged.
+
+The S6 patch is submitted via GitHub API because this resumed runtime lacks the
+previous local worktree and Cargo installation. **Do not claim it passed local
+Rust/Windows product testing in this resumed runtime**. Wait for exact-source
+GitHub Actions; fix any failures with small non-forced commits. Preserve all
+original failures and source SHA identities. Formal frozen acceptance remains
+**79 items, 6 accepted, 10.83% weighted**, unchanged. No user subscription URL,
+secret, provider node or private font bytes are committed.
+
+Read [S6 detail](CORE_SUBSCRIPTION_S6_HANDOFF_20261020.md) next.
+
 ## Latest source checkpoint: S5 actual proxy-path TLS closure and App Inspector
 
 S4 is pushed as [a066f7d4](https://github.com/SOLHK/Swirl/commit/a066f7d4c8acb96f5d6a46cee5700b2590328b64),
