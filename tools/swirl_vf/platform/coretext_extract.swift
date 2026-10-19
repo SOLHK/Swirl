@@ -7,6 +7,7 @@ import Foundation
 import CoreText
 import CoreGraphics
 import CryptoKit
+import Darwin
 
 enum OracleError: Error, CustomStringConvertible {
     case invalid(String)
@@ -477,9 +478,20 @@ final class JSONLines {
                 if buffer.isEmpty { return nil }
                 let result = buffer; buffer.removeAll(); return result
             }
-            let data = try FileHandle.standardInput.read(upToCount: 65_536) ?? Data()
-            ended = data.isEmpty
-            buffer.append(data)
+            // A request/response pipe must return after one available chunk.
+            // Foundation's read(upToCount:) can wait to fill its requested size,
+            // deadlocking a caller waiting for this request's response before
+            // sending the next request. POSIX read permits short pipe reads.
+            var chunk = [UInt8](repeating: 0, count: 65_536)
+            let count = chunk.withUnsafeMutableBytes { pointer in
+                read(FileHandle.standardInput.fileDescriptor, pointer.baseAddress, pointer.count)
+            }
+            if count < 0 {
+                if errno == EINTR { continue }
+                throw OracleError.invalid("stdin_read_failed_errno:\(errno)")
+            }
+            ended = count == 0
+            if count > 0 { buffer.append(contentsOf: chunk.prefix(count)) }
         }
     }
 }
