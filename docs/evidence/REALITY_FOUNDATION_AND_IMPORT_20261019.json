@@ -1,0 +1,1257 @@
+{
+  "schemaVersion": 1,
+  "document": "REALITY foundation, subscription security and CI fixture evidence",
+  "date": "2026-10-19",
+  "recordedAtUtc": "2026-10-19T05:21:03.219404+00:00",
+  "repository": "https://github.com/SOLHK/Swirl",
+  "branch": "work/core-completion-20261017",
+  "sourceSnapshot": {
+    "baselineCommit": "df7fd069fafaaf7e767946617d22ae7270d3b09c",
+    "baselineTree": "dcc1431252866f62818c991be341bdd5450cba18",
+    "latestSourceCommit": "a429d5bc2efe31f10cfb61d16b16ffbde2a8fc40",
+    "latestSourceTree": "66ea18bfc6daf76b5985ac94742d1e12d0a64ae5",
+    "metadataEvidence": "session-source-metadata",
+    "commits": [
+      {
+        "stage": "import_security",
+        "commit": "4d73f6574bf9884dc4e173b58708ae543b2303bd",
+        "tree": "5830fc0fa64a8444232b4a05b16cd252722aa2e2",
+        "parent": "df7fd069fafaaf7e767946617d22ae7270d3b09c",
+        "files": [
+          {"path": "docs/REALITY_IMPORT_SECURITY_20261019.md","bytes": 4138,"sha256": "7566ec8d1afa13588f3161650182c4ac38f752ea3a58e8e7d1bdf83d7580aa82"},
+          {"path": "src/Swirl.Quick/CMakeLists.txt","bytes": 31274,"sha256": "e8361bac5398ee00fe2c4004b762f8b414611570d3154f467f7348518223ff7d"},
+          {"path": "src/Swirl.Quick/engine/SubscriptionNormalizer.cpp","bytes": 37543,"sha256": "9836023dfb1873cac4848b27aa524f3ba4babb7a72d7a88e1f68655f42eb7523"},
+          {"path": "src/Swirl.Quick/tests/ImportTests.cpp","bytes": 41533,"sha256": "4a3daebe263be7bf5c44f476f23d93d0e322752a7828e1cba92470781c0ba5ab"},
+          {"path": "src/Swirl.Quick/tests/RustCoreTests.cpp","bytes": 107171,"sha256": "446b47236bae012d22129445a7d1076e3cdce6027fdf1cddba1b62d474b3967c"}
+        ]
+      },
+      {
+        "stage": "reality_foundation",
+        "commit": "daad7a057ab2c4b347c3ab142ce88af6528cb8f6",
+        "tree": "70ccc46a5d938ba524e11f35f9e07531e1b0ede8",
+        "parent": "4d73f6574bf9884dc4e173b58708ae543b2303bd",
+        "files": [
+          {"path": ".github/workflows/core-development.yml","bytes": 3719,"sha256": "376f3736b025bdbeb528f23edf1dd845dcd76481e1f58cd6ff0ff71a6537bb53"},
+          {"path": ".github/workflows/rust-core.yml","bytes": 11720,"sha256": "ef3c12f63161a78d95c09cbc9f8de61af7975c1f9c18bc23b93cc93c8518e7fd"},
+          {"path": "core/Cargo.lock","bytes": 31513,"sha256": "929cf5e04b4402da027b1d8670ef1e98e5fd92c7ff374a91ec35334442d21144"},
+          {"path": "core/Cargo.toml","bytes": 1540,"sha256": "d5bca4408b84fe233f9bc38577e8d7d3ba5076208e3d7ddd345dd0a48a3d2d05"},
+          {"path": "core/DEPENDENCIES.json","bytes": 40472,"sha256": "26eee46a202f3864f951f64d4284ffe2b17184fe1c8593b8ab5d52a32c09c963"},
+          {"path": "core/README.md","bytes": 40263,"sha256": "237edabbc598c500705607c45478dceb80a47622653147a760c1c870f84075ab"},
+          {"path": "core/crates/swirl-transport/Cargo.toml","bytes": 514,"sha256": "ad8d17005ad899355b31836ff9a4cce9cb9eeacccd1540e2ac30d4522bf9919c"},
+          {"path": "core/crates/swirl-transport/src/lib.rs","bytes": 4083,"sha256": "1d4384706a19ef66c5e7e681ab4766a62156eea5a4797bc87073714e524a0d55"},
+          {"path": "core/crates/swirl-transport/src/reality/certificate.rs","bytes": 32697,"sha256": "919499a85d47093c2d1d0d35473a6bd7689318402f554daca70711a235213c6b"},
+          {"path": "core/crates/swirl-transport/src/reality/hello.rs","bytes": 8665,"sha256": "cb1d5347f096096d57fecabd788bc01ee4a2ac088fde90f4f8af563136efcd27"},
+          {"path": "core/crates/swirl-transport/src/reality/kx.rs","bytes": 6028,"sha256": "a575d7af318b312ab031d7e97e8d025e075b13f5b345c8d4a373712eac349d3d"},
+          {"path": "core/crates/swirl-transport/src/reality/mod.rs","bytes": 8158,"sha256": "ea23f6c51271b67c3902f5296a6a6fc05eb0a474811fb0a6441654863ff2a67e"},
+          {"path": "core/crates/swirl-transport/src/reality/tests.rs","bytes": 19973,"sha256": "7cb760d3888a46c2fde757abb7dd1be56c2552055f57b1d69daebec1b354c633"},
+          {"path": "core/crates/swirl-transport/tests/fixtures/reality_auth.json","bytes": 65022,"sha256": "b1a87667efe7edec56b97964550f95d56b07ffb5588fb7ac23dfc3718e796856"},
+          {"path": "docs/REALITY_HANDSHAKE_FOUNDATION_20261019.md","bytes": 12833,"sha256": "f799bb570a4883dae3d1eed454a5ebe6fa7c1002350b8bcefbb361bde0573061"},
+          {"path": "src/Swirl.Quick/packaging/licenses/rust-reality-dependencies.txt","bytes": 329606,"sha256": "caa365c8c059f2f02407ac33ccdcb88789eb555b1f572f4363103a2e61db7cc8"},
+          {"path": "tools/tests/generate_reality_vectors.py","bytes": 25330,"sha256": "584a5f6eef5eaad0e99a19b1ceccc79ee5e0f0e7c733ee53a673ca01f12322ac"}
+        ]
+      },
+      {
+        "stage": "singbox_transport",
+        "commit": "e0534f4e9ea23ae38797f95ff7026f00e2f2a1e8",
+        "tree": "00c6d5b2d4d324075e34671ff16f403eae36c3b2",
+        "parent": "daad7a057ab2c4b347c3ab142ce88af6528cb8f6",
+        "files": [
+          {"path": "docs/SINGBOX_TRANSPORT_SECURITY_20261019.md","bytes": 7834,"sha256": "c6eb250b9ec789cef589980a01848fe6062cc55ea5f4ff687012153276d33eac"},
+          {"path": "src/Swirl.Quick/CMakeLists.txt","bytes": 31321,"sha256": "76a5639a225607ad519d11c4376a40058ce54d4f2dbdf3a58384ce839fe6b0d9"},
+          {"path": "src/Swirl.Quick/engine/SubscriptionNormalizer.cpp","bytes": 40288,"sha256": "fe24e6548dc4ee8d0fba1b8b44e5d07e28fd1b3bb13af44514ce05344e921d46"},
+          {"path": "src/Swirl.Quick/tests/ImportTests.cpp","bytes": 48845,"sha256": "f86be6c9bdb08b63c805a02130c0e3621bedf8e30c1611829e6a949f294a58ea"},
+          {"path": "src/Swirl.Quick/tests/RustCoreTests.cpp","bytes": 111052,"sha256": "c055b374b0b590c1c90be87ad52c4de3f251722b218165eaa046a02bd0fc109c"}
+        ]
+      },
+      {
+        "stage": "loopback_pair_fixtures",
+        "commit": "a429d5bc2efe31f10cfb61d16b16ffbde2a8fc40",
+        "tree": "66ea18bfc6daf76b5985ac94742d1e12d0a64ae5",
+        "parent": "e0534f4e9ea23ae38797f95ff7026f00e2f2a1e8",
+        "files": [
+          {"path": ".github/workflows/rust-core.yml","bytes": 12588,"sha256": "e61ab4dccc96a8ca329657e8a5a8f32f00222e231a03b844fedbe5d462bfdf1d"},
+          {"path": "docs/LOOPBACK_PAIR_ALLOCATION_20261019.md","bytes": 6767,"sha256": "48c425d647b9d43f9d73cb0c2fbdb004bbe667fbab8dd5808eedf85a716e505e"},
+          {"path": "tools/tests/dns_peer.py","bytes": 5657,"sha256": "b5d3e8b96c32661ee228f70c6f5c291fa91895ded172587b00b8224eba41e246"},
+          {"path": "tools/tests/test_dns_negative.py","bytes": 35832,"sha256": "31dce8c77d87002e08ea3d3c0012032e0f8263e84ba334d47a7721b30eeeba82"},
+          {"path": "tools/tests/test_policy_groups.py","bytes": 43484,"sha256": "33783549bacfbb3e799963d62e3678e7d782f623c6dd199cc65d0ff2567041c0"}
+        ]
+      }
+    ],
+    "mainModified": false,
+    "forcePushUsed": false
+  },
+  "countRules": [
+    "Counts belong to the named command, platform and exact tested source; different stages/platforms are not added as unique tests.",
+    "Rust foundation total 189 = 188 unit/integration tests + 1 compile-fail doctest. The 34 new REALITY tests and 3 stock-rustls integration cases are subsets.",
+    "Qt/font counts exclude initTestCase and cleanupTestCase. A skipped CTest case remains skipped when a separately invoked peer hook later passes.",
+    "Python unittest run counts are methods; failure/error records may include multiple subtests. Passed methods are null if a distinct count is unsupported.",
+    "The 25 workflow guard tests are included in the 202-method portable baseline and 99-method App menu.",
+    "The port allocator 8-case targeted run overlaps final DNS 31 and policy 16 suites; only 47 final suite methods are counted.",
+    "App validation has a narrower menu and does not replace native Qt, complete native application or physical display tests."
+  ],
+  "fixedAcceptance": {
+    "baseline": "v1",
+    "itemCount": 79,
+    "acceptedItems": 6,
+    "acceptedWeightPercent": 10.833333,
+    "displayPercent": "10.83%",
+    "partialCredit": false,
+    "criteriaIdsDenominatorsAndWeightsChanged": false,
+    "newlyAcceptedItems": 0,
+    "B13": {"criterion": "VLESS REALITY扩展","status": "部分实现","accepted": false,"basis": "Verified library foundations; product REALITY execution is unavailable."},
+    "B14": {"criterion": "VLESS Vision扩展","status": "未实现","accepted": false},
+    "protocolProfiles": {"total": 21,"accepted": 0,"partial": 9},
+    "transportProfiles": {"total": 10,"accepted": 0,"partial": 2}
+  },
+  "capabilityBoundary": {"realityFoundationCodeImplemented": true,"realityFoundationUnitTestsPassed": true,"independentSyntheticCryptoVectorsPassed": true,"stockRustlsComponentIntegrationPassed": true,"completeIndependentRealityProtocolPeerPassed": false,"realityProductOutboundEnabled": false,"visionProductOutboundEnabled": false,"qtRealityVisionForwardingPassed": false,"publicRealityVisionNodePassed": false,"privateProviderNodeAttempts": 0,"privateSubscriptionRefreshes": 0,"completePrivateSubscriptionAcceptancePassed": false,"physicalWindowsDisplayAcceptancePassed": false,"privateDataInNewFixtures": false,"syntheticKeyMaterialOnly": true},
+  "stages": [
+    {
+      "id": "import_security",
+      "sourceCommit": "4d73f6574bf9884dc4e173b58708ae543b2303bd",
+      "implemented": [
+        "Require explicit REALITY security layer and credential; preserve VLESS REALITY intent.",
+        "Preserve typed sing-box TLS/uTLS options and reject malformed or unsupported combinations before native start.",
+        "Exercise Qt import and Rust-adapter rejection without ordinary-TLS or DIRECT downgrade."
+      ],
+      "localQtRegression": {
+        "environment": "Linux Qt 6.10.3 isolated normalizer/adapter harness; not a complete application build",
+        "baselineSource": "df7fd069fafaaf7e767946617d22ae7270d3b09c",
+        "fixedSource": "4d73f6574bf9884dc4e173b58708ae543b2303bd",
+        "before": {
+          "evidence": "import-local-red-xml",
+          "countsExcludingLifecycle": {"passed": 0,"failed": 3,"skipped": 0},
+          "nonPassingCases": [
+            {"function": "uriRealityRequiresAnExplicitSecurityLayerAndCredential","status": "fail","reason": "'!parsed' returned FALSE. (security=reality)"},
+            {"function": "singBoxTlsTypesAndFingerprintIntentArePreserved","status": "fail","reason": "'!parsed' returned FALSE. (Malformed TLS options became an ordinary connection)"},
+            {"function": "importedRealityVisionAndDefaultUtlsCannotStartAsOrdinaryTls","status": "fail","reason": "'!reason.isEmpty()' returned FALSE. (Declared security profile became ordinary TLS)"}
+          ]
+        },
+        "after": {
+          "evidence": "import-local-green-xml",
+          "countsExcludingLifecycle": {"passed": 3,"failed": 0,"skipped": 0},
+          "nonPassingCases": []
+        }
+      },
+      "rustMatrix": {
+        "runId": 39198976897,
+        "url": "https://github.com/SOLHK/Swirl/actions/runs/39198976897",
+        "eventHeadSha": "4d73f6574bf9884dc4e173b58708ae543b2303bd",
+        "status": "completed",
+        "conclusion": "success",
+        "jobs": [
+          {
+            "platform": "Linux",
+            "jobId": 117887764822,
+            "conclusion": "success",
+            "logEvidence": "stage1-linux-log",
+            "sourceLogLines": ["2026-10-19T04:20:33.8157078Z 4d73f6574bf9884dc4e173b58708ae543b2303bd"],
+            "rust": {"unitIntegrationPassed": 154,"doctestPassed": 0,"totalPassed": 154,"failed": 0,"ignored": 0},
+            "python": {"run": 202,"passed": 197,"skipped": 5},
+            "realityFixtureCheck": "not-present-at-this-stage",
+            "steps": [
+              {"name": "Independent portable protocol peers","conclusion": "success"},
+              {"name": "Native public HTTPS and DoH verification","conclusion": "success"},
+              {"name": "Preserve public network evidence","conclusion": "success"}
+            ],
+            "cargoGates": {"cargo fmt --all -- --check": "success","cargo check --workspace --locked": "success","cargo clippy --workspace --all-targets --locked -- -D warnings": "success","cargo test --workspace --locked": "success","cargo build --release --locked --workspace --lib --bins": "success"}
+          },
+          {
+            "platform": "macOS",
+            "jobId": 117887764609,
+            "conclusion": "success",
+            "logEvidence": "stage1-macos-log",
+            "sourceLogLines": ["2026-10-19T04:20:41.4733730Z 4d73f6574bf9884dc4e173b58708ae543b2303bd"],
+            "rust": {"unitIntegrationPassed": 154,"doctestPassed": 0,"totalPassed": 154,"failed": 0,"ignored": 0},
+            "python": {"run": 202,"passed": 197,"skipped": 5},
+            "realityFixtureCheck": "not-present-at-this-stage",
+            "steps": [
+              {"name": "Independent portable protocol peers","conclusion": "success"},
+              {"name": "Native public HTTPS and DoH verification","conclusion": "skipped"},
+              {"name": "Preserve public network evidence","conclusion": "skipped"}
+            ],
+            "cargoGates": {"cargo fmt --all -- --check": "success","cargo check --workspace --locked": "success","cargo clippy --workspace --all-targets --locked -- -D warnings": "success","cargo test --workspace --locked": "success","cargo build --release --locked --workspace --lib --bins": "success"}
+          },
+          {
+            "platform": "Windows",
+            "jobId": 117887764945,
+            "conclusion": "success",
+            "logEvidence": "stage1-windows-log",
+            "rust": {"unitIntegrationPassed": 154,"doctestPassed": 0,"totalPassed": 154,"failed": 0,"ignored": 0},
+            "python": {
+              "portableSuiteSet": {"run": 202,"passed": 197,"skipped": 5,"includesGuardPassed": 25},
+              "extraSubscriptionCaptureAndManagement": {"run": 37,"passed": 35,"skipped": 2},
+              "laterIndependentQtHooks": {"run": 5,"passed": 5,"skipped": 0}
+            },
+            "steps": [
+              {"name": "Independent TLS and protocol peers","conclusion": "success"},
+              {"name": "Install Qt for Rust control adapter","conclusion": "success"},
+              {"name": "Build Qt to Rust integration test","conclusion": "success"},
+              {"name": "Reject native DNS policy in compatibility builds without starting a core","conclusion": "success"},
+              {"name": "Run Qt to Rust integration without Mihomo","conclusion": "success"},
+              {"name": "Build complete native Rust application","conclusion": "success"},
+              {"name": "Preserve isolated Qt test reports","conclusion": "success"}
+            ],
+            "cargoGates": {"cargo fmt --all -- --check": "success","cargo check --workspace --locked": "success","cargo clippy --workspace --all-targets --locked -- -D warnings": "success","cargo test --workspace --locked": "success","cargo build --release --locked --workspace --lib --bins": "success"}
+          }
+        ]
+      },
+      "windowsQt": {
+        "runId": 39198976897,
+        "jobId": 117887764945,
+        "sourceCommit": "4d73f6574bf9884dc4e173b58708ae543b2303bd",
+        "archiveEvidence": "stage1-qt-archive",
+        "summaryEvidence": "stage1-qt-summary",
+        "reports": [
+          {
+            "evidence": "stage1-qt-report-1",
+            "countsExcludingLifecycle": {"passed": 10,"failed": 0,"skipped": 0},
+            "nonPassingCases": []
+          },
+          {
+            "evidence": "stage1-qt-report-2",
+            "countsExcludingLifecycle": {"passed": 46,"failed": 0,"skipped": 6},
+            "nonPassingCases": [
+              {"function": "socks5UdpThroughIndependentPeer","status": "skip","reason": "Independent Python SOCKS5 UDP peer supplies isolated ports and authentication mode in its integration run."},
+              {"function": "socks4ThroughIndependentPeer","status": "skip","reason": "Independent Python SOCKS4/4a peer supplies isolated ports in its integration run."},
+              {"function": "webSocketThroughIndependentPeer","status": "skip","reason": "Independent Python VLESS WS peer supplies isolated ports in its integration run."},
+              {"function": "vlessThroughIndependentPeer","status": "skip","reason": "Independent VLESS peer supplies the port in its integration run."},
+              {"function": "shadowsocksThroughIndependentPeer","status": "skip","reason": "Independent Python SS peer supplies the isolated port in its integration run."},
+              {"function": "loonShadowsocksThroughIndependentPeer","status": "skip","reason": "Independent Python SS peer supplies the isolated port."}
+            ]
+          },
+          {
+            "evidence": "stage1-qt-report-3",
+            "countsExcludingLifecycle": {"passed": 2,"failed": 0,"skipped": 0},
+            "nonPassingCases": []
+          },
+          {
+            "evidence": "stage1-qt-report-4",
+            "countsExcludingLifecycle": {"passed": 10,"failed": 0,"skipped": 0},
+            "nonPassingCases": []
+          }
+        ],
+        "independentPythonQtHooks": {
+          "passed": 5,
+          "failed": 0,
+          "skipped": 0,
+          "cases": [
+            "test_vless_qt_data_path",
+            "test_qt_facade_http_obfs_with_udp_declared",
+            "test_qt_imported_socks4_and_4a_data_path",
+            "test_qt_vless_websocket_data_path",
+            "test_qt_imported_socks5_udp_data_path"
+          ],
+          "note": "Shadowsocks hook covers two Qt slots; the six CTest skips remain recorded."
+        },
+        "completeNativeApplicationBuild": "passed",
+        "completeNativeApplicationBuildEvidence": "stage1-windows-log"
+      },
+      "appValidation": {"runId": 39198976919,"url": "https://github.com/SOLHK/Swirl/actions/runs/39198976919","eventHeadSha": "4d73f6574bf9884dc4e173b58708ae543b2303bd","status": "completed","conclusion": "success","actualTestedSha": null,"actualSourceArchiveVerification": "Not independently inspected in this record; event head is not substituted for actual tested source."},
+      "fontRegression": {
+        "runId": 39198976888,
+        "url": "https://github.com/SOLHK/Swirl/actions/runs/39198976888",
+        "eventHeadSha": "4d73f6574bf9884dc4e173b58708ae543b2303bd",
+        "status": "completed",
+        "conclusion": "success",
+        "actualTestedSha": "4d73f6574bf9884dc4e173b58708ae543b2303bd",
+        "archiveEvidence": "stage1-font-archive",
+        "reportEvidence": ["stage1-font-source.json","stage1-font-stages.json","stage1-font-font-results.json","stage1-font-font-smoke.json"],
+        "source": {"runId": "39198976888","ref": "refs/heads/work/core-completion-20261017","nativeRendererRequested": "D3D11 WARP","commit": "4d73f6574bf9884dc4e173b58708ae543b2303bd","qtArchitecture": "win64_msvc2022_64","runner": "windows-2022","physicalDpiVerified": false,"qtRequested": "6.10.3","refresh240HzVerified": false,"runAttempt": "1"},
+        "countsExcludingLifecycle": {"passed": 50,"failed": 0,"skipped": 8},
+        "reports": [
+          {
+            "evidence": "stage1-font-selection.xml",
+            "countsExcludingLifecycle": {"passed": 16,"failed": 0,"skipped": 8},
+            "nonPassingCases": [
+              {"function": "importOptionalPingFangUiCollection","status": "skip","reason": "Set SWIRL_TEST_TTC to test a local PingFang UI collection"},
+              {"function": "optionalVariableAxesAndLivePreview","status": "skip","reason": "Local-only variable font fixture not supplied"},
+              {"function": "optionalRestartRead","status": "skip","reason": "Only run as the independent restoration child"},
+              {"function": "optionalRenderMatrix","status": "skip","reason": "Local-only matrix requires fixture and evidence directory"},
+              {"function": "optionalNativePointSizes","status": "skip","reason": "Local Windows font fixture required"},
+              {"function": "optionalPaintedPreviewAxes","status": "skip","reason": "Local font fixture required"},
+              {"function": "optionalRasterQualityMatrix","status": "skip","reason": "An authorized local font and local evidence directory are required"},
+              {"function": "nativeGlyphsHaveNoColourFringes","status": "skip","reason": "Requires the native Windows platform"}
+            ]
+          },
+          {
+            "evidence": "stage1-font-axis-policy.xml",
+            "countsExcludingLifecycle": {"passed": 33,"failed": 0,"skipped": 0},
+            "nonPassingCases": []
+          },
+          {
+            "evidence": "stage1-font-native-raster.xml",
+            "countsExcludingLifecycle": {"passed": 1,"failed": 0,"skipped": 0},
+            "nonPassingCases": []
+          }
+        ],
+        "smoke": {"exitCode": 0,"navigationRequests": 61,"readyRoutes": 61,"font": "Swirl Automation Probe"},
+        "stages": {"fontSmoke": "success","configure": "success","applicationBuild": "success","fontReport": "success","fontBuild": "success","fontCTest": "success","qt": "success"},
+        "applicationCoreMode": "compatibility (font workflow omits SWIRL_USE_RUST_CORE; CMake default OFF)",
+        "physicalWindowsDisplayVerified": false,
+        "physical240HzVerified": false,
+        "scope": "Synthetic font automation and compatibility application build; does not substitute for native Rust application/Qt gates."
+      }
+    },
+    {
+      "id": "reality_foundation",
+      "sourceCommit": "daad7a057ab2c4b347c3ab142ce88af6528cb8f6",
+      "implemented": [
+        "Own fresh X25519 and ML-KEM-768 material; modern X25519MLKEM768 with optional classical share from the same X25519 owner.",
+        "Authenticate zero-session-ID ClientHello AAD with REALITY X25519/HKDF-SHA256/AES-256-GCM and bounded structural parsing.",
+        "Validate ServerHello, perform real hybrid decapsulation or explicit offered classical fallback, and retain SHA-256/SHA-384 transcript checkpoints.",
+        "Authenticate extension-free Ed25519 REALITY certificate HMAC, including upstream year-1 encoding, and standard TLS 1.3 CertificateVerify.",
+        "Reject wrong keys, malformed handshake input, unsupported certificate forms/extensions, TLS 1.2 authentication and ML-DSA certificate extension."
+      ],
+      "local": {
+        "environment": {"platform": "Linux","rust": "1.99.1","minimumRustActuallyChecked": "1.89.0","python": "3.12.14","cryptography": "50.0.2"},
+        "gates": [
+          {"command": "cargo fmt --all -- --check","status": "passed","evidence": "foundation-local-fmt","exitCode": null,"exitVerification": "Executing parent observed successful completion; log archived."},
+          {"command": "cargo check --workspace --locked --offline","status": "passed","evidence": "foundation-local-check","exitCode": null,"exitVerification": "Executing parent observed successful completion; log archived."},
+          {"command": "cargo clippy --workspace --all-targets --locked --offline -- -D warnings","status": "passed","evidence": "foundation-local-clippy","exitCode": null,"exitVerification": "Executing parent observed successful completion; log archived."},
+          {"command": "cargo test --workspace --locked --offline","status": "passed","evidence": "foundation-local-test","exitCode": null,"exitVerification": "Executing parent observed successful completion; log archived."},
+          {"command": "cargo build --release --locked --offline --workspace --lib --bins","status": "passed","evidence": "foundation-local-release","exitCode": null,"exitVerification": "Executing parent observed successful completion; log archived."},
+          {"command": "cargo +1.89.0 check --workspace --all-targets --locked --offline","status": "passed","evidence": "foundation-local-msrv-check","exitCode": null,"exitVerification": "Executing parent observed successful completion; log archived."}
+        ],
+        "rust": {"unitIntegrationPassed": 188,"doctestPassed": 1,"totalPassed": 189,"failed": 0,"ignored": 0,"newRealityTests": 34},
+        "independentPython": {
+          "run": 202,
+          "passed": 197,
+          "skipped": 5,
+          "guardIncluded": 25,
+          "summaryEvidence": "foundation-local-peer-summary",
+          "suites": [
+            {"suite": "rust_core","run": 24,"passed": 23,"skipped": 1,"exitCode": 0,"logEvidence": "foundation-peer-rust_core"},
+            {"suite": "shadowsocks","run": 9,"passed": 8,"skipped": 1,"exitCode": 0,"logEvidence": "foundation-peer-shadowsocks"},
+            {"suite": "dns_tls","run": 11,"passed": 11,"skipped": 0,"exitCode": 0,"logEvidence": "foundation-peer-dns_tls"},
+            {"suite": "dns_https","run": 9,"passed": 9,"skipped": 0,"exitCode": 0,"logEvidence": "foundation-peer-dns_https"},
+            {"suite": "socks4","run": 10,"passed": 9,"skipped": 1,"exitCode": 0,"logEvidence": "foundation-peer-socks4"},
+            {"suite": "websocket_transport","run": 11,"passed": 10,"skipped": 1,"exitCode": 0,"logEvidence": "foundation-peer-websocket_transport"},
+            {"suite": "core_development","run": 25,"passed": 25,"skipped": 0,"exitCode": 0,"logEvidence": "foundation-peer-core_development"},
+            {"suite": "policy_groups","run": 13,"passed": 13,"skipped": 0,"exitCode": 0,"logEvidence": "foundation-peer-policy_groups"},
+            {"suite": "dns_negative","run": 30,"passed": 30,"skipped": 0,"exitCode": 0,"logEvidence": "foundation-peer-dns_negative"},
+            {"suite": "native_probe","run": 7,"passed": 7,"skipped": 0,"exitCode": 0,"logEvidence": "foundation-peer-native_probe"},
+            {"suite": "connection_stages","run": 8,"passed": 8,"skipped": 0,"exitCode": 0,"logEvidence": "foundation-peer-connection_stages"},
+            {"suite": "connectivity_diagnostics","run": 21,"passed": 21,"skipped": 0,"exitCode": 0,"logEvidence": "foundation-peer-connectivity_diagnostics"},
+            {"suite": "subscription_import","run": 11,"passed": 11,"skipped": 0,"exitCode": 0,"logEvidence": "foundation-peer-subscription_import"},
+            {"suite": "socks5_udp","run": 13,"passed": 12,"skipped": 1,"exitCode": 0,"logEvidence": "foundation-peer-socks5_udp"}
+          ]
+        },
+        "earlierFailuresRetained": [
+          {"evidence": "reality-first-tests","scope": "Early focused transport run","passed": 30,"failed": 2,"reason": "Existing UDP tests received sandbox EPERM for socket access; final authorized socket-capable full run passed.","finalEvidence": "foundation-local-test"},
+          {"evidence": "reality-first-clippy","reason": "Strict chunks_exact lint corrected in implementation, without suppressing lint.","finalEvidence": "foundation-local-clippy"},
+          {"evidence": "reality-release-cache-failure","reason": "Generated release cache lacked swirl_dns rlib; cache removed, identical source release build passed.","cleanupEvidence": "reality-release-clean","finalEvidence": "foundation-local-release"}
+        ]
+      },
+      "independentFixtures": {"generator": "tools/tests/generate_reality_vectors.py","fixture": "core/crates/swirl-transport/tests/fixtures/reality_auth.json","checkMode": "--check; exact regeneration without mutation","authCases": 3,"genuineMlKemDecapsulation": true,"tlsTranscriptCheckpoints": 2,"negativeChecks": 22,"networkAccess": false,"providerNodeTest": false},
+      "stockRustlsIntegration": {
+        "cases": 3,
+        "passed": 3,
+        "subsetOfNewRealityTests": true,
+        "peer": "In-memory ordinary rustls server with synthetic public Ed25519/HMAC certificate",
+        "verified": [
+          "CertificateVerify and Finished in stock rustls integration",
+          "Bidirectional application bytes and close_notify",
+          "Wrong authentication key and tampered server flight reject before application data"
+        ],
+        "unauthenticatedClientHello": true,
+        "fullRealityProtocolPeer": false
+      },
+      "rustMatrix": {
+        "runId": 39200717679,
+        "url": "https://github.com/SOLHK/Swirl/actions/runs/39200717679",
+        "eventHeadSha": "daad7a057ab2c4b347c3ab142ce88af6528cb8f6",
+        "status": "completed",
+        "conclusion": "failure",
+        "jobs": [
+          {
+            "platform": "Linux",
+            "jobId": 117892932122,
+            "conclusion": "success",
+            "logEvidence": "foundation-linux-log",
+            "sourceLogLines": ["2026-10-19T04:41:21.9824167Z daad7a057ab2c4b347c3ab142ce88af6528cb8f6"],
+            "rust": {"unitIntegrationPassed": 188,"doctestPassed": 1,"totalPassed": 189,"failed": 0,"ignored": 0},
+            "python": {"run": 202,"passed": 197,"skipped": 5},
+            "realityFixtureCheck": "passed",
+            "steps": [
+              {"name": "Independent portable protocol peers","conclusion": "success"},
+              {"name": "Native public HTTPS and DoH verification","conclusion": "success"},
+              {"name": "Preserve public network evidence","conclusion": "success"}
+            ],
+            "cargoGates": {"cargo fmt --all -- --check": "success","cargo check --workspace --locked": "success","cargo clippy --workspace --all-targets --locked -- -D warnings": "success","cargo test --workspace --locked": "success","cargo build --release --locked --workspace --lib --bins": "success"}
+          },
+          {
+            "platform": "macOS",
+            "jobId": 117892932147,
+            "conclusion": "success",
+            "logEvidence": "foundation-macos-log",
+            "sourceLogLines": ["2026-10-19T04:41:27.6455590Z daad7a057ab2c4b347c3ab142ce88af6528cb8f6"],
+            "rust": {"unitIntegrationPassed": 188,"doctestPassed": 1,"totalPassed": 189,"failed": 0,"ignored": 0},
+            "python": {"run": 202,"passed": 197,"skipped": 5},
+            "realityFixtureCheck": "passed",
+            "steps": [
+              {"name": "Independent portable protocol peers","conclusion": "success"},
+              {"name": "Native public HTTPS and DoH verification","conclusion": "skipped"},
+              {"name": "Preserve public network evidence","conclusion": "skipped"}
+            ],
+            "cargoGates": {"cargo fmt --all -- --check": "success","cargo check --workspace --locked": "success","cargo clippy --workspace --all-targets --locked -- -D warnings": "success","cargo test --workspace --locked": "success","cargo build --release --locked --workspace --lib --bins": "success"}
+          },
+          {
+            "platform": "Windows",
+            "jobId": 117892931813,
+            "conclusion": "failure",
+            "logEvidence": "foundation-windows-log",
+            "rust": {"unitIntegrationPassed": 188,"doctestPassed": 1,"totalPassed": 189,"failed": 0,"ignored": 0},
+            "realityFixtureCheck": "passed",
+            "python": {
+              "completedSuitesBeforeDnsFailure": {"run": 112,"passed": 108,"skipped": 4},
+              "dnsNegative": {"run": 30,"failureRecords": 1,"errorRecords": 20,"passed": null,"skipped": 0,"countCaveat": "Subtest failure/error records do not determine the distinct passed method count."}
+            },
+            "failure": {"suite": "test_dns_negative.py","fixture": "dns_peer.DnsPeer","operation": "TCP bind after UDP-first port selection","sourceLine": 73,"windowsSocketError": 10013,"exhaustedAttempts": 8,"recordedFailedMethod": "test_positive_addresses_share_hostname_but_use_each_real_destination_port","qtBuildCtestAndFullNativeApplication": "skipped","qtArtifact": "absent; upload found no files"},
+            "steps": [
+              {"name": "Independent TLS and protocol peers","conclusion": "failure"},
+              {"name": "Install Qt for Rust control adapter","conclusion": "skipped"},
+              {"name": "Build Qt to Rust integration test","conclusion": "skipped"},
+              {"name": "Reject native DNS policy in compatibility builds without starting a core","conclusion": "skipped"},
+              {"name": "Run Qt to Rust integration without Mihomo","conclusion": "skipped"},
+              {"name": "Build complete native Rust application","conclusion": "skipped"},
+              {"name": "Preserve isolated Qt test reports","conclusion": "success"}
+            ],
+            "cargoGates": {"cargo fmt --all -- --check": "success","cargo check --workspace --locked": "success","cargo clippy --workspace --all-targets --locked -- -D warnings": "success","cargo test --workspace --locked": "success","cargo build --release --locked --workspace --lib --bins": "success"}
+          }
+        ]
+      },
+      "appValidation": {
+        "runId": 39200717693,
+        "url": "https://github.com/SOLHK/Swirl/actions/runs/39200717693",
+        "eventHeadSha": "daad7a057ab2c4b347c3ab142ce88af6528cb8f6",
+        "status": "completed",
+        "conclusion": "success",
+        "jobId": 117892932108,
+        "actualTestedSha": "daad7a057ab2c4b347c3ab142ce88af6528cb8f6",
+        "logEvidence": "foundation-app-log",
+        "sourceLogLines": ["2026-10-19T04:41:23.5474087Z daad7a057ab2c4b347c3ab142ce88af6528cb8f6","2026-10-19T04:41:33.7611713Z daad7a057ab2c4b347c3ab142ce88af6528cb8f6"],
+        "rust": {"unitIntegrationPassed": 188,"doctestPassed": 1,"totalPassed": 189,"failed": 0,"ignored": 0},
+        "python": {
+          "run": 99,
+          "passed": 94,
+          "skipped": 5,
+          "breakdown": {"guardPassed": 25,"networkPassed": 69,"networkSkipped": 5}
+        },
+        "realityFixtureCheck": "passed",
+        "artifactEvidence": "foundation-app-artifact",
+        "menuScope": "25 guard tests plus six network suites; five skips include four Qt hooks and missing SOCKS4 inspector. Native Qt/full application are outside this menu."
+      },
+      "productRuntimeEnabled": false
+    },
+    {
+      "id": "singbox_transport",
+      "sourceCommit": "e0534f4e9ea23ae38797f95ff7026f00e2f2a1e8",
+      "implemented": [
+        "Map supported TCP/TLS/WS/WSS options exactly and respect documented optional null semantics.",
+        "Retain unmapped transport fields and reject malformed or unsupported transport shapes/options before native start.",
+        "Add Qt import/adapter regressions preventing silent fallback to plain TCP or loss of WebSocket parameters."
+      ],
+      "newExecutableHttpQuicGrpcHttpUpgradeTransport": false,
+      "localQtRegression": {
+        "environment": "Linux Qt 6.10.3 isolated normalizer/adapter harness; not a complete application build",
+        "baselineSource": "4d73f6574bf9884dc4e173b58708ae543b2303bd",
+        "fixedSource": "e0534f4e9ea23ae38797f95ff7026f00e2f2a1e8",
+        "before": {
+          "evidence": "transport-local-red-xml",
+          "countsExcludingLifecycle": {"passed": 3,"failed": 2,"skipped": 0},
+          "nonPassingCases": [
+            {"function": "singBoxTransportShapesAndFieldsCannotDowngrade","status": "fail","reason": "'!parsed' returned FALSE. (Invalid transport silently became TCP or a default WS path)"},
+            {"function": "singBoxTransportMapsExactlyAndRejectsUnmappedFieldsBeforeStart","status": "fail","reason": "'!RustCoreEngine::configuration(options,&unchanged).isEmpty()' returned FALSE. ()"}
+          ]
+        },
+        "after": {
+          "evidence": "transport-local-green-xml",
+          "countsExcludingLifecycle": {"passed": 5,"failed": 0,"skipped": 0},
+          "nonPassingCases": []
+        }
+      },
+      "summaryEvidence": "stage3-ci-summary",
+      "rustMatrix": {
+        "runId": 39201185263,
+        "url": "https://github.com/SOLHK/Swirl/actions/runs/39201185263",
+        "eventHeadSha": "e0534f4e9ea23ae38797f95ff7026f00e2f2a1e8",
+        "status": "completed",
+        "conclusion": "failure",
+        "jobs": [
+          {
+            "platform": "Linux",
+            "jobId": 117894297096,
+            "conclusion": "success",
+            "logEvidence": "stage3-ubuntu-log",
+            "sourceLogLines": ["2026-10-19T04:46:52.8219706Z e0534f4e9ea23ae38797f95ff7026f00e2f2a1e8"],
+            "rust": {"unitIntegrationPassed": 188,"failed": 0,"ignored": 0,"doctestPassed": 1,"totalPassed": 189},
+            "python": {"run": 202,"passed": 197,"skipped": 5,"errors": 0},
+            "realityFixtureCheck": "passed"
+          },
+          {
+            "platform": "macOS",
+            "jobId": 117894297097,
+            "conclusion": "success",
+            "logEvidence": "stage3-macos-log",
+            "sourceLogLines": ["2026-10-19T04:46:58.2544080Z e0534f4e9ea23ae38797f95ff7026f00e2f2a1e8"],
+            "rust": {"unitIntegrationPassed": 188,"failed": 0,"ignored": 0,"doctestPassed": 1,"totalPassed": 189},
+            "python": {"run": 202,"passed": 197,"skipped": 5,"errors": 0},
+            "realityFixtureCheck": "passed"
+          },
+          {
+            "platform": "Windows",
+            "jobId": 117894296898,
+            "conclusion": "failure",
+            "logEvidence": "stage3-windows-log",
+            "sourceLogLines": ["2026-10-19T04:46:58.8355035Z e0534f4e9ea23ae38797f95ff7026f00e2f2a1e8"],
+            "rust": {"unitIntegrationPassed": 188,"failed": 0,"ignored": 0,"doctestPassed": 1,"totalPassed": 189},
+            "python": {"run": 112,"passed": 107,"skipped": 4,"errors": 1},
+            "realityFixtureCheck": "passed",
+            "failure": {"suite": "test_policy_groups.py","test": "test_udp_association_pins_distinct_ss_exit_across_health_and_configure","constructor": "SsPolicyPeer","sourceLine": 331,"message": "cannot allocate a local TCP/UDP fixture pair","underlyingSocketError": null,"qtBuildCtestAndFullNativeApplication": "skipped","qtArtifact": "absent; upload logged no files found","underlyingSocketErrorNote": "Old allocator discarded original socket error; no WinError 10013 diagnosis is claimed."}
+          }
+        ]
+      },
+      "appValidation": {
+        "runId": 39201185296,
+        "url": "https://github.com/SOLHK/Swirl/actions/runs/39201185296",
+        "eventHeadSha": "e0534f4e9ea23ae38797f95ff7026f00e2f2a1e8",
+        "status": "completed",
+        "conclusion": "success",
+        "platform": "Linux App workflow",
+        "jobId": 117894297106,
+        "logEvidence": "stage3-app-log",
+        "sourceLogLines": ["2026-10-19T04:46:54.0876286Z e0534f4e9ea23ae38797f95ff7026f00e2f2a1e8","2026-10-19T04:47:02.3732831Z e0534f4e9ea23ae38797f95ff7026f00e2f2a1e8"],
+        "rust": {"unitIntegrationPassed": 188,"failed": 0,"ignored": 0,"doctestPassed": 1,"totalPassed": 189},
+        "python": {
+          "run": 99,
+          "passed": 94,
+          "skipped": 5,
+          "errors": 0,
+          "breakdown": {"guardPassed": 25,"networkPassed": 69,"networkSkipped": 5}
+        },
+        "realityFixtureCheck": "passed",
+        "actualTestedSha": "e0534f4e9ea23ae38797f95ff7026f00e2f2a1e8",
+        "trackedSourceClean": true,
+        "untrackedEvidenceFiles": ["?? CORE_TESTED_COMMIT","?? CORE_WORKTREE_STATE","?? core-tested-source.tar"],
+        "artifactEvidence": "stage3-app-archive",
+        "sourceArchiveEvidence": "stage3-app-source-tar",
+        "menuScope": "25 guard passes + 69 network passes, 5 skips; no native Qt or full native application."
+      },
+      "publicNetwork": {
+        "runId": 39201185263,
+        "jobId": 117894297096,
+        "artifactEvidence": "stage3-public-archive",
+        "reportEvidence": "stage3-public-report",
+        "schema": 1,
+        "commit": "e0534f4e9ea23ae38797f95ff7026f00e2f2a1e8",
+        "platform": "Linux",
+        "tracked_worktree_clean": true,
+        "timestamp_utc": "2026-10-19T04:52:13.089428+00:00",
+        "harness_sha256": "f90aa980f37ae1b87fc687897096be05069f88aba992814ca7167bfc5b4a95a4",
+        "scope": "Public HTTPS via native DIRECT and native DoH; no provider, UDP, TUN or performance claim",
+        "checks": [
+          {
+            "host": "example.com",
+            "port": 443,
+            "method": "HEAD",
+            "path": "/",
+            "dns": "system",
+            "route": "explicit-native-direct",
+            "success": true,
+            "engine": "swirl-rust",
+            "native_connect_accepted": true,
+            "certificate_verified": true,
+            "tls_version": "TLSv1.3",
+            "http_status": 200,
+            "orderly_close": true,
+            "core": {"accepted": 1,"active": 0,"failed": 0,"upload": 700,"download": 4788,"last_error": "","last_error_stage": "","recorded_connections": 1},
+            "native_session_settled": true,
+            "elapsed_ms": 106
+          },
+          {
+            "host": "www.rust-lang.org",
+            "port": 443,
+            "method": "HEAD",
+            "path": "/",
+            "dns": "system",
+            "route": "explicit-native-direct",
+            "success": true,
+            "engine": "swirl-rust",
+            "native_connect_accepted": true,
+            "certificate_verified": true,
+            "tls_version": "TLSv1.3",
+            "http_status": 301,
+            "orderly_close": true,
+            "core": {"accepted": 1,"active": 0,"failed": 0,"upload": 690,"download": 5388,"last_error": "","last_error_stage": "","recorded_connections": 1},
+            "native_session_settled": true,
+            "elapsed_ms": 137
+          },
+          {
+            "host": "example.com",
+            "port": 443,
+            "method": "HEAD",
+            "path": "/",
+            "dns": "native-doh",
+            "route": "explicit-native-direct",
+            "success": true,
+            "dns_endpoint": "https://cloudflare-dns.com/dns-query",
+            "dns_bootstrap": "1.1.1.1:443",
+            "engine": "swirl-rust",
+            "native_connect_accepted": true,
+            "certificate_verified": true,
+            "tls_version": "TLSv1.3",
+            "http_status": 200,
+            "orderly_close": true,
+            "core": {"accepted": 1,"active": 0,"failed": 0,"upload": 700,"download": 4789,"last_error": "","last_error_stage": "","recorded_connections": 1},
+            "native_session_settled": true,
+            "elapsed_ms": 266
+          }
+        ],
+        "success": true,
+        "performanceComparison": false
+      },
+      "fontRegression": {
+        "runId": 39201185356,
+        "url": "https://github.com/SOLHK/Swirl/actions/runs/39201185356",
+        "eventHeadSha": "e0534f4e9ea23ae38797f95ff7026f00e2f2a1e8",
+        "status": "completed",
+        "conclusion": "success",
+        "actualTestedSha": "e0534f4e9ea23ae38797f95ff7026f00e2f2a1e8",
+        "archiveEvidence": "stage3-font-archive",
+        "reportEvidence": ["stage3-font-source.json","stage3-font-stages.json","stage3-font-font-results.json","stage3-font-font-smoke.json"],
+        "source": {"nativeRendererRequested": "D3D11 WARP","refresh240HzVerified": false,"runAttempt": "1","runner": "windows-2022","runId": "39201185356","qtRequested": "6.10.3","qtArchitecture": "win64_msvc2022_64","physicalDpiVerified": false,"commit": "e0534f4e9ea23ae38797f95ff7026f00e2f2a1e8","ref": "refs/heads/work/core-completion-20261017"},
+        "countsExcludingLifecycle": {"passed": 50,"failed": 0,"skipped": 8},
+        "reports": [
+          {
+            "evidence": "stage3-font-selection.xml",
+            "countsExcludingLifecycle": {"passed": 16,"failed": 0,"skipped": 8},
+            "nonPassingCases": [
+              {"function": "importOptionalPingFangUiCollection","status": "skip","reason": "Set SWIRL_TEST_TTC to test a local PingFang UI collection"},
+              {"function": "optionalVariableAxesAndLivePreview","status": "skip","reason": "Local-only variable font fixture not supplied"},
+              {"function": "optionalRestartRead","status": "skip","reason": "Only run as the independent restoration child"},
+              {"function": "optionalRenderMatrix","status": "skip","reason": "Local-only matrix requires fixture and evidence directory"},
+              {"function": "optionalNativePointSizes","status": "skip","reason": "Local Windows font fixture required"},
+              {"function": "optionalPaintedPreviewAxes","status": "skip","reason": "Local font fixture required"},
+              {"function": "optionalRasterQualityMatrix","status": "skip","reason": "An authorized local font and local evidence directory are required"},
+              {"function": "nativeGlyphsHaveNoColourFringes","status": "skip","reason": "Requires the native Windows platform"}
+            ]
+          },
+          {
+            "evidence": "stage3-font-axis-policy.xml",
+            "countsExcludingLifecycle": {"passed": 33,"failed": 0,"skipped": 0},
+            "nonPassingCases": []
+          },
+          {
+            "evidence": "stage3-font-native-raster.xml",
+            "countsExcludingLifecycle": {"passed": 1,"failed": 0,"skipped": 0},
+            "nonPassingCases": []
+          }
+        ],
+        "smoke": {"navigationRequests": 61,"font": "Swirl Automation Probe","exitCode": 0,"readyRoutes": 61},
+        "stages": {"configure": "success","fontSmoke": "success","fontReport": "success","fontCTest": "success","applicationBuild": "success","qt": "success","fontBuild": "success"},
+        "applicationCoreMode": "compatibility (font workflow omits SWIRL_USE_RUST_CORE; CMake default OFF)",
+        "physicalWindowsDisplayVerified": false,
+        "physical240HzVerified": false,
+        "scope": "Synthetic font automation and compatibility application build; does not substitute for native Rust application/Qt gates.",
+        "logEvidence": "stage3-font-log"
+      },
+      "nativeQtAndCompleteNativeApplication": "Skipped after Windows fixture failure; compatibility font build does not replace these gates."
+    },
+    {
+      "id": "loopback_pair_fixtures",
+      "sourceCommit": "a429d5bc2efe31f10cfb61d16b16ffbde2a8fc40",
+      "implemented": [
+        "DNS binds and holds TCP port zero first, then UDP to the same port.",
+        "DNS and Shadowsocks policy fixtures retry only address-in-use collisions, at most eight attempts.",
+        "Permission and other non-collision failures propagate immediately with endpoint/attempt notes; partial resources close.",
+        "Windows peer-step failure emits eight read-only TCP/UDP IPv4/IPv6 dynamic/excluded-range diagnostics."
+      ],
+      "productionSocketLogicChanged": false,
+      "soReuseAddrAdded": false,
+      "ciStatus": "completed success",
+      "local": {
+        "gates": [
+          {"gate": "fmt","status": "passed","evidence": "portfix-local-fmt","exitCode": null,"exitVerification": "Executing parent observed successful completion; log archived."},
+          {"gate": "check","status": "passed","evidence": "portfix-local-check","exitCode": null,"exitVerification": "Executing parent observed successful completion; log archived."},
+          {"gate": "clippy","status": "passed","evidence": "portfix-local-clippy","exitCode": null,"exitVerification": "Executing parent observed successful completion; log archived."},
+          {"gate": "test","status": "passed","evidence": "portfix-local-test","exitCode": null,"exitVerification": "Executing parent observed successful completion; log archived."},
+          {"gate": "release","status": "passed","evidence": "portfix-local-release","exitCode": null,"exitVerification": "Executing parent observed successful completion; log archived."},
+          {"gate": "workflow-guard","status": "passed","evidence": "portfix-local-workflow-guard","exitCode": null,"exitVerification": "Executing parent observed successful completion; log archived."}
+        ],
+        "rust": {"unitIntegrationPassed": 188,"doctestPassed": 1,"totalPassed": 189,"failed": 0,"ignored": 0},
+        "dnsNegative": {"run": 31,"passed": 31,"failed": 0,"skipped": 0,"seconds": 80.064,"sourceFileSha256": "31dce8c77d87002e08ea3d3c0012032e0f8263e84ba334d47a7721b30eeeba82","logEvidence": "portfix-dns-negative-green"},
+        "policyGroups": {"run": 16,"passed": 16,"failed": 0,"skipped": 0,"seconds": 5.387,"sourceFileSha256": "33783549bacfbb3e799963d62e3678e7d782f623c6dd199cc65d0ff2567041c0","logEvidence": "portfix-policy-groups-green"},
+        "uniqueFinalMethodCount": 47,
+        "earlierTargetedSubset": {"run": 8,"passed": 8,"failed": 0,"skipped": 0,"seconds": 6.257,"logEvidence": "portfix-pair-allocation-green","countedAgain": false,"policySourceSha256": "96cbff53e5a91a7297bb96af1021c51a1c71052872dc643cb0dadc05dee56f60","sourceDifference": "Two error-note assertions were added after this subset began. Final full DNS/policy suites include all eight final allocator methods and passed."},
+        "redRegression": [
+          {"suite": "DNS allocator","run": 5,"failureRecords": 9,"errorRecords": 6,"passed": null,"logEvidence": "portfix-dns-allocation-red"},
+          {"suite": "policy allocator","run": 3,"failureRecords": 3,"errorRecords": 9,"passed": null,"logEvidence": "portfix-policy-allocation-red"}
+        ],
+        "workflowGuard": {"run": 25,"passed": 25,"skipped": 0,"updaterCheck": "Passed; workflow bytes unchanged.","logEvidence": "portfix-local-workflow-guard"}
+      },
+      "ciSnapshotEvidence": "portfix-ci-summary",
+      "ciSnapshot": {
+        "expectedSha": "a429d5bc2efe31f10cfb61d16b16ffbde2a8fc40",
+        "expectedTree": "66ea18bfc6daf76b5985ac94742d1e12d0a64ae5",
+        "observedAtUtc": "2026-10-19T05:32:00.073678+00:00",
+        "runs": {"rust": 39202767158,"app": 39202767154},
+        "conclusions": {"rust": "success","app": "success"},
+        "jobs": {
+          "ubuntu": {
+            "id": 117899065457,
+            "conclusion": "success",
+            "rust": {"unitIntegrationPassed": 188,"failed": 0,"ignored": 0,"doctestPassed": 1},
+            "python": {
+              "run": 206,
+              "passed": 201,
+              "skipped": 5,
+              "skippedTests": [
+                "2026-10-19T05:08:46.6146802Z test_vless_qt_data_path (__main__.RustCoreIntegration.test_vless_qt_data_path) ... skipped 'Qt executable required'",
+                "2026-10-19T05:08:51.1295898Z test_qt_facade_http_obfs_with_udp_declared (__main__.ShadowsocksTests.test_qt_facade_http_obfs_with_udp_declared) ... skipped 'Qt integration executable required'",
+                "2026-10-19T05:09:23.1025858Z test_qt_imported_socks4_and_4a_data_path (__main__.Socks4Integration.test_qt_imported_socks4_and_4a_data_path) ... skipped 'Qt integration executable required'",
+                "2026-10-19T05:09:30.8458666Z test_qt_vless_websocket_data_path (__main__.WebSocketTransportTests.test_qt_vless_websocket_data_path) ... skipped 'Qt integration executable required'",
+                "2026-10-19T05:11:33.3559508Z test_qt_imported_socks5_udp_data_path (__main__.Socks5UdpIntegration.test_qt_imported_socks5_udp_data_path) ... skipped 'Windows Qt integration executable required'"
+              ]
+            },
+            "sourceLogLines": ["2026-10-19T05:05:56.5506494Z a429d5bc2efe31f10cfb61d16b16ffbde2a8fc40"],
+            "log": "portfix-ci-review/ubuntu-job.log",
+            "logSha256": "7e8afbdff17ea4d1ba57c9bc34055b9b6b17b51f97fe79af0ad5e0b12b9b74c4",
+            "independentRealityGenerator": [
+              "2026-10-19T05:08:19.8031566Z REALITY vectors verified: 3 auth cases, genuine ML-KEM decapsulation, 2 TLS transcripts, 22 negative checks. No network or provider test."
+            ],
+            "allocatorCasesPassed": 8,
+            "allocatorCasesAreSubset": true,
+            "logEvidence": "portfix-file-ubuntu-job-log"
+          },
+          "macos": {
+            "id": 117899065548,
+            "conclusion": "success",
+            "rust": {"unitIntegrationPassed": 188,"failed": 0,"ignored": 0,"doctestPassed": 1},
+            "python": {
+              "run": 206,
+              "passed": 201,
+              "skipped": 5,
+              "skippedTests": [
+                "2026-10-19T05:08:30.3766700Z test_vless_qt_data_path (__main__.RustCoreIntegration.test_vless_qt_data_path) ... skipped 'Qt executable required'",
+                "2026-10-19T05:08:34.6219870Z test_qt_facade_http_obfs_with_udp_declared (__main__.ShadowsocksTests.test_qt_facade_http_obfs_with_udp_declared) ... skipped 'Qt integration executable required'",
+                "2026-10-19T05:09:08.1329230Z test_qt_imported_socks4_and_4a_data_path (__main__.Socks4Integration.test_qt_imported_socks4_and_4a_data_path) ... skipped 'Qt integration executable required'",
+                "2026-10-19T05:09:17.5272420Z test_qt_vless_websocket_data_path (__main__.WebSocketTransportTests.test_qt_vless_websocket_data_path) ... skipped 'Qt integration executable required'",
+                "2026-10-19T05:11:35.2138110Z test_qt_imported_socks5_udp_data_path (__main__.Socks5UdpIntegration.test_qt_imported_socks5_udp_data_path) ... skipped 'Windows Qt integration executable required'"
+              ]
+            },
+            "sourceLogLines": ["2026-10-19T05:05:59.7478410Z a429d5bc2efe31f10cfb61d16b16ffbde2a8fc40"],
+            "log": "portfix-ci-review/macos-job.log",
+            "logSha256": "83c917d4590e31068f1aa2a543371085aa788865d590187b7121639a7935ae65",
+            "independentRealityGenerator": [
+              "2026-10-19T05:08:00.8422320Z REALITY vectors verified: 3 auth cases, genuine ML-KEM decapsulation, 2 TLS transcripts, 22 negative checks. No network or provider test."
+            ],
+            "allocatorCasesPassed": 8,
+            "allocatorCasesAreSubset": true,
+            "logEvidence": "portfix-file-macos-job-log"
+          },
+          "app": {
+            "id": 117899065106,
+            "conclusion": "success",
+            "rust": {"unitIntegrationPassed": 188,"failed": 0,"ignored": 0,"doctestPassed": 1},
+            "python": {
+              "run": 99,
+              "passed": 94,
+              "skipped": 5,
+              "guard": {"run": 25,"passed": 25,"skipped": 0},
+              "networkSuites": [
+                {"run": 24,"passed": 23,"skipped": 1},
+                {"run": 9,"passed": 8,"skipped": 1},
+                {"run": 11,"passed": 11,"skipped": 0},
+                {"run": 9,"passed": 9,"skipped": 0},
+                {"run": 10,"passed": 8,"skipped": 2},
+                {"run": 11,"passed": 10,"skipped": 1}
+              ]
+            },
+            "sourceLogLines": ["2026-10-19T05:05:56.9351320Z a429d5bc2efe31f10cfb61d16b16ffbde2a8fc40","2026-10-19T05:06:04.9202768Z a429d5bc2efe31f10cfb61d16b16ffbde2a8fc40"],
+            "actualTestedSha": "a429d5bc2efe31f10cfb61d16b16ffbde2a8fc40",
+            "worktree": ["?? CORE_TESTED_COMMIT","?? CORE_WORKTREE_STATE","?? core-tested-source.tar"],
+            "log": "portfix-ci-review/app-job.log",
+            "logSha256": "1c3612dc409cd43df7ab1bb07cc4fd775319e6f87fbca7db73563ecb5b5778e9",
+            "files": [
+              {"path": "portfix-ci-review/app/artifact.zip","sha256": "5b357a1319b3c275aab061a9144ceeb0c37eb83fa4659ac42b6c17912acc8519"},
+              {"path": "portfix-ci-review/app/core-tested-source.tar","sha256": "c08c10dab165cf6e5b09730bdc41c4700cb4df5069db42e9a62da79876bb7e7e"},
+              {"path": "portfix-ci-review/app/CORE_TESTED_COMMIT","sha256": "a191d277842dd47289afdf9e5fda66619ed6309cc482fcaca88d913ca70d1bf9"},
+              {"path": "portfix-ci-review/app/CORE_WORKTREE_STATE","sha256": "d1d620b343967ef519019b9ec424181ed3f76a5d382a7821ad59896b4c6d456e"}
+            ],
+            "testedSourceFileHashes": {"src/Swirl.Quick/engine/SubscriptionNormalizer.cpp": "fe24e6548dc4ee8d0fba1b8b44e5d07e28fd1b3bb13af44514ce05344e921d46","src/Swirl.Quick/tests/ImportTests.cpp": "f86be6c9bdb08b63c805a02130c0e3621bedf8e30c1611829e6a949f294a58ea","src/Swirl.Quick/tests/RustCoreTests.cpp": "c055b374b0b590c1c90be87ad52c4de3f251722b218165eaa046a02bd0fc109c","tools/tests/test_policy_groups.py": "33783549bacfbb3e799963d62e3678e7d782f623c6dd199cc65d0ff2567041c0"},
+            "realityGenerator": [
+              "2026-10-19T05:07:39.1037274Z REALITY vectors verified: 3 auth cases, genuine ML-KEM decapsulation, 2 TLS transcripts, 22 negative checks. No network or provider test."
+            ],
+            "testedSourceArchiveComparison": {
+              "method": "Each regular tar member compared byte-for-byte with git show exactSHA:path",
+              "filesCompared": 182,
+              "mismatches": [],
+              "gitTree": "66ea18bfc6daf76b5985ac94742d1e12d0a64ae5"
+            },
+            "logEvidence": "portfix-file-app-job-log"
+          },
+          "windows": {
+            "rust": {"unitIntegrationPassed": 188,"failed": 0,"ignored": 0,"doctestPassed": 1},
+            "python": {
+              "run": 248,
+              "passed": 241,
+              "skipped": 7,
+              "failures": 0,
+              "errors": 0,
+              "breakdown": {
+                "commonPortableSuitesIncludingDevelopmentGuard": {"run": 206,"passed": 201,"skipped": 5,"failures": 0,"errors": 0},
+                "syntheticWindowsCapture": {"run": 26,"passed": 25,"skipped": 1,"failures": 0,"errors": 0},
+                "isolatedManagement": {"run": 11,"passed": 10,"skipped": 1,"failures": 0,"errors": 0},
+                "separateQtHooks": {"run": 5,"passed": 5,"skipped": 0,"failures": 0,"errors": 0}
+              },
+              "countingNote": "Aggregate counts are test invocations. The five Qt hooks were first skipped without Qt and subsequently invoked successfully; those skips remain recorded.",
+              "skippedTests": [
+                "2026-10-19T05:10:15.1753185Z test_vless_qt_data_path (__main__.RustCoreIntegration.test_vless_qt_data_path) ... skipped 'Qt executable required'",
+                "2026-10-19T05:10:19.0785428Z test_qt_facade_http_obfs_with_udp_declared (__main__.ShadowsocksTests.test_qt_facade_http_obfs_with_udp_declared) ... skipped 'Qt integration executable required'",
+                "2026-10-19T05:10:55.5116097Z test_qt_imported_socks4_and_4a_data_path (__main__.Socks4Integration.test_qt_imported_socks4_and_4a_data_path) ... skipped 'Qt integration executable required'",
+                "2026-10-19T05:11:05.3934475Z test_qt_vless_websocket_data_path (__main__.WebSocketTransportTests.test_qt_vless_websocket_data_path) ... skipped 'Qt integration executable required'",
+                "2026-10-19T05:13:40.6902191Z test_qt_imported_socks5_udp_data_path (__main__.Socks5UdpIntegration.test_qt_imported_socks5_udp_data_path) ... skipped 'Windows Qt integration executable required'",
+                "2026-10-19T05:13:43.3082226Z test_offline_cpp_import_and_existing_store_protection (__main__.CaptureTests.test_offline_cpp_import_and_existing_store_protection) ... skipped 'Set SWIRL_CAPTURE_INSPECTOR to the built C++ importer'",
+                "2026-10-19T05:13:45.6545982Z test_installed_cli_apply_and_rollback_only_in_temporary_home (__main__.InstalledCliTests.test_installed_cli_apply_and_rollback_only_in_temporary_home) ... skipped 'opt-in real CLI with isolated home'"
+              ]
+            },
+            "sourceLogLines": ["2026-10-19T05:06:02.7495213Z a429d5bc2efe31f10cfb61d16b16ffbde2a8fc40"],
+            "realityGenerator": [
+              "2026-10-19T05:09:47.0611427Z REALITY vectors verified: 3 auth cases, genuine ML-KEM decapsulation, 2 TLS transcripts, 22 negative checks. No network or provider test."
+            ],
+            "log": "portfix-ci-review/windows-job.log",
+            "logSha256": "6a76d65a49a26b7853ee77e107f0ae1e9c969ad0b469fa03d497fecfce532f88",
+            "id": 117899065248,
+            "conclusion": "success",
+            "pythonQtHooks": [
+              {
+                "function": "test_qt_facade_http_obfs_with_udp_declared",
+                "result": "passed",
+                "logLines": [
+                  "2026-10-19T05:20:09.2560394Z test_qt_facade_http_obfs_with_udp_declared (__main__.ShadowsocksTests.test_qt_facade_http_obfs_with_udp_declared) ... ok"
+                ]
+              },
+              {
+                "function": "test_vless_qt_data_path",
+                "result": "passed",
+                "logLines": ["2026-10-19T05:20:10.0387704Z test_vless_qt_data_path (__main__.RustCoreIntegration.test_vless_qt_data_path) ... ok"]
+              },
+              {
+                "function": "test_qt_imported_socks4_and_4a_data_path",
+                "result": "passed",
+                "logLines": ["2026-10-19T05:20:12.6489285Z test_qt_imported_socks4_and_4a_data_path (__main__.Socks4Integration.test_qt_imported_socks4_and_4a_data_path) ... ok"]
+              },
+              {
+                "function": "test_qt_vless_websocket_data_path",
+                "result": "passed",
+                "logLines": ["2026-10-19T05:20:13.9464292Z test_qt_vless_websocket_data_path (__main__.WebSocketTransportTests.test_qt_vless_websocket_data_path) ... ok"]
+              },
+              {
+                "function": "test_qt_imported_socks5_udp_data_path",
+                "result": "passed",
+                "logLines": ["2026-10-19T05:20:15.4017033Z test_qt_imported_socks5_udp_data_path (__main__.Socks5UdpIntegration.test_qt_imported_socks5_udp_data_path) ... ok"]
+              }
+            ],
+            "ctest": {
+              "compatibility": {"passed": 2,"failed": 0},
+              "native": {"passed": 3,"failed": 0},
+              "storagePathsLogEvidence": ["2026-10-19T05:19:50.1914149Z 1/3 Test  #1: swirl-storage-paths ..............   Passed    0.26 sec"],
+              "logLines": ["2026-10-19T05:19:48.4700203Z 100% tests passed, 0 tests failed out of 2","2026-10-19T05:20:08.3055021Z 100% tests passed, 0 tests failed out of 3"],
+              "logEvidence": "portfix-file-windows-job-log"
+            },
+            "nativeApplicationBuild": {
+              "result": "success",
+              "coreMode": "SWIRL_USE_RUST_CORE=ON",
+              "configuration": "Release",
+              "logLines": ["2026-10-19T05:27:47.6859570Z   Swirl.vcxproj -> D:\\a\\Swirl\\Swirl\\build\\rust-qt\\Release\\Swirl.exe"],
+              "logEvidence": "portfix-file-windows-job-log"
+            },
+            "readOnlyNetshDiagnostics": "skipped: all independent Windows protocol peers succeeded",
+            "steps": [
+              {"name": "Independent TLS and protocol peers","status": "completed","conclusion": "success","number": 10},
+              {"name": "Diagnose hosted Windows port allocation after a peer failure","status": "completed","conclusion": "skipped","number": 11},
+              {"name": "Install Qt for Rust control adapter","status": "completed","conclusion": "success","number": 13},
+              {"name": "Build Qt to Rust integration test","status": "completed","conclusion": "success","number": 14},
+              {"name": "Reject native DNS policy in compatibility builds without starting a core","status": "completed","conclusion": "success","number": 15},
+              {"name": "Run Qt to Rust integration without Mihomo","status": "completed","conclusion": "success","number": 16},
+              {"name": "Build complete native Rust application","status": "completed","conclusion": "success","number": 17},
+              {"name": "Preserve isolated Qt test reports","status": "completed","conclusion": "success","number": 18}
+            ],
+            "qt": {
+              "runId": 39202767158,
+              "jobId": 117899065248,
+              "headSha": "a429d5bc2efe31f10cfb61d16b16ffbde2a8fc40",
+              "artifactId": 12164194762,
+              "archiveSha256": "ae2a40bba772956bca25eccf06cee76353971f574bd00fd1f083447c2a257e26",
+              "countsExcludingLifecycle": {"pass": 71,"skip": 6,"fail": 0},
+              "reports": [
+                {
+                  "path": "portfix-ci-review/qt/compat-dns/swirl-import-boundaries.xml",
+                  "sha256": "de9426b61798483376eb9a78e4bda47b6fd7fd4724a3bdd3d57f59a2533feabb",
+                  "countsExcludingLifecycle": {"pass": 11,"fail": 0,"skip": 0},
+                  "selectedCases": [
+                    {"function": "typedOptionsAndAliasesCannotOverwriteImportedState","data": "","status": "pass","description": ""},
+                    {"function": "uriRealityRequiresAnExplicitSecurityLayerAndCredential","data": "","status": "pass","description": ""},
+                    {"function": "singBoxTlsTypesAndFingerprintIntentArePreserved","data": "","status": "pass","description": ""},
+                    {"function": "singBoxTransportShapesAndFieldsCannotDowngrade","data": "","status": "pass","description": ""}
+                  ],
+                  "evidence": "portfix-file-qt-compat-dns-swirl-import-boundaries-xml",
+                  "skippedCases": []
+                },
+                {
+                  "path": "portfix-ci-review/qt/compat-dns/swirl-native-dns-compatibility-guard.xml",
+                  "sha256": "2d3a2af5723d0b8511f66f3d5c4d7a2cb9ed1f5f35ed660f9a8ddf3763e3f8aa",
+                  "countsExcludingLifecycle": {"pass": 2,"fail": 0,"skip": 0},
+                  "selectedCases": [],
+                  "evidence": "portfix-file-qt-compat-dns-swirl-native-dns-compatibility-guard-xml",
+                  "skippedCases": []
+                },
+                {
+                  "path": "portfix-ci-review/qt/rust-qt/swirl-import-boundaries.xml",
+                  "sha256": "8c1207907923bcd9652e4f8e493a4602ca627d7b9dd614f9beeacf167fb2b266",
+                  "countsExcludingLifecycle": {"pass": 11,"fail": 0,"skip": 0},
+                  "selectedCases": [
+                    {"function": "typedOptionsAndAliasesCannotOverwriteImportedState","data": "","status": "pass","description": ""},
+                    {"function": "uriRealityRequiresAnExplicitSecurityLayerAndCredential","data": "","status": "pass","description": ""},
+                    {"function": "singBoxTlsTypesAndFingerprintIntentArePreserved","data": "","status": "pass","description": ""},
+                    {"function": "singBoxTransportShapesAndFieldsCannotDowngrade","data": "","status": "pass","description": ""}
+                  ],
+                  "evidence": "portfix-file-qt-rust-qt-swirl-import-boundaries-xml",
+                  "skippedCases": []
+                },
+                {
+                  "path": "portfix-ci-review/qt/rust-qt/swirl-rust-qt-integration.xml",
+                  "sha256": "eba1a38fbad3e406929a7771cdd1295695cbb41deb13dd92e73a0996641de281",
+                  "countsExcludingLifecycle": {"pass": 47,"skip": 6,"fail": 0},
+                  "selectedCases": [
+                    {"function": "iniRealityCannotStartAsOrdinaryTls","data": "","status": "pass","description": ""},
+                    {"function": "importedRealityVisionAndDefaultUtlsCannotStartAsOrdinaryTls","data": "","status": "pass","description": ""},
+                    {"function": "singBoxTransportMapsExactlyAndRejectsUnmappedFieldsBeforeStart","data": "","status": "pass","description": ""},
+                    {"function": "socks5UdpThroughIndependentPeer","data": "","status": "skip","description": "Independent Python SOCKS5 UDP peer supplies isolated ports and authentication mode in its integration run."},
+                    {"function": "socks4ThroughIndependentPeer","data": "","status": "skip","description": "Independent Python SOCKS4/4a peer supplies isolated ports in its integration run."},
+                    {"function": "webSocketThroughIndependentPeer","data": "","status": "skip","description": "Independent Python VLESS WS peer supplies isolated ports in its integration run."},
+                    {"function": "vlessThroughIndependentPeer","data": "","status": "skip","description": "Independent VLESS peer supplies the port in its integration run."},
+                    {"function": "shadowsocksThroughIndependentPeer","data": "","status": "skip","description": "Independent Python SS peer supplies the isolated port in its integration run."},
+                    {"function": "loonShadowsocksThroughIndependentPeer","data": "","status": "skip","description": "Independent Python SS peer supplies the isolated port."}
+                  ],
+                  "evidence": "portfix-file-qt-rust-qt-swirl-rust-qt-integration-xml",
+                  "skippedCases": [
+                    {"function": "socks5UdpThroughIndependentPeer","reason": "Independent Python SOCKS5 UDP peer supplies isolated ports and authentication mode in its integration run."},
+                    {"function": "socks4ThroughIndependentPeer","reason": "Independent Python SOCKS4/4a peer supplies isolated ports in its integration run."},
+                    {"function": "webSocketThroughIndependentPeer","reason": "Independent Python VLESS WS peer supplies isolated ports in its integration run."},
+                    {"function": "vlessThroughIndependentPeer","reason": "Independent VLESS peer supplies the port in its integration run."},
+                    {"function": "shadowsocksThroughIndependentPeer","reason": "Independent Python SS peer supplies the isolated port in its integration run."},
+                    {"function": "loonShadowsocksThroughIndependentPeer","reason": "Independent Python SS peer supplies the isolated port."}
+                  ]
+                }
+              ],
+              "countingNote": "Four preserved XML reports only, excluding initTestCase and cleanupTestCase; storage-paths CTest is separately evidenced. Six peer-dependent native XML skips remain skips.",
+              "transportPersistenceRegression": {
+                "function": "typedOptionsAndAliasesCannotOverwriteImportedState",
+                "modes": ["native","compatibility"],
+                "newInvalidSourceShapes": 4,
+                "rawAndBase64PerMode": 8,
+                "assertions": ["old node retained","durable file bytes unchanged","fixture secret absent from error"],
+                "caseCounting": "Loop assertions inside one existing test function per mode, not additional XML test cases"
+              },
+              "fullSummaryPath": "portfix-ci-review/qt/summary.json",
+              "fullSummarySha256": "f5fbaa5c7f22e2f168eb35f93ab2184c748f1debfbab09126fca45db2781a18a",
+              "archiveEvidence": "portfix-file-qt-artifact-zip",
+              "summaryEvidence": "portfix-qt-summary"
+            },
+            "allocatorCasesPassed": 8,
+            "allocatorCasesAreSubset": true,
+            "logEvidence": "portfix-file-windows-job-log",
+            "cargoGates": {"cargo fmt --all -- --check": "success","cargo check --workspace --locked": "success","cargo clippy --workspace --all-targets --locked -- -D warnings": "success","cargo test --workspace --locked": "success","cargo build --release --locked --workspace --lib --bins": "success"}
+          }
+        },
+        "publicNetwork": {
+          "schema": 1,
+          "commit": "a429d5bc2efe31f10cfb61d16b16ffbde2a8fc40",
+          "platform": "Linux",
+          "tracked_worktree_clean": true,
+          "timestamp_utc": "2026-10-19T05:11:34.973044+00:00",
+          "harness_sha256": "f90aa980f37ae1b87fc687897096be05069f88aba992814ca7167bfc5b4a95a4",
+          "scope": "Public HTTPS via native DIRECT and native DoH; no provider, UDP, TUN or performance claim",
+          "checks": [
+            {
+              "host": "example.com",
+              "port": 443,
+              "method": "HEAD",
+              "path": "/",
+              "dns": "system",
+              "route": "explicit-native-direct",
+              "success": true,
+              "engine": "swirl-rust",
+              "native_connect_accepted": true,
+              "certificate_verified": true,
+              "tls_version": "TLSv1.3",
+              "http_status": 200,
+              "orderly_close": true,
+              "core": {"accepted": 1,"active": 0,"failed": 0,"upload": 700,"download": 4789,"last_error": "","last_error_stage": "","recorded_connections": 1},
+              "native_session_settled": true,
+              "elapsed_ms": 90
+            },
+            {
+              "host": "www.rust-lang.org",
+              "port": 443,
+              "method": "HEAD",
+              "path": "/",
+              "dns": "system",
+              "route": "explicit-native-direct",
+              "success": true,
+              "engine": "swirl-rust",
+              "native_connect_accepted": true,
+              "certificate_verified": true,
+              "tls_version": "TLSv1.3",
+              "http_status": 301,
+              "orderly_close": true,
+              "core": {"accepted": 1,"active": 0,"failed": 0,"upload": 690,"download": 5409,"last_error": "","last_error_stage": "","recorded_connections": 1},
+              "native_session_settled": true,
+              "elapsed_ms": 80
+            },
+            {
+              "host": "example.com",
+              "port": 443,
+              "method": "HEAD",
+              "path": "/",
+              "dns": "native-doh",
+              "route": "explicit-native-direct",
+              "success": true,
+              "dns_endpoint": "https://cloudflare-dns.com/dns-query",
+              "dns_bootstrap": "1.1.1.1:443",
+              "engine": "swirl-rust",
+              "native_connect_accepted": true,
+              "certificate_verified": true,
+              "tls_version": "TLSv1.3",
+              "http_status": 200,
+              "orderly_close": true,
+              "core": {"accepted": 1,"active": 0,"failed": 0,"upload": 700,"download": 4790,"last_error": "","last_error_stage": "","recorded_connections": 1},
+              "native_session_settled": true,
+              "elapsed_ms": 186
+            }
+          ],
+          "success": true
+        },
+        "artifacts": [
+          {"id": 12164044669,"kind": "app-source","path": "portfix-ci-review/app/artifact.zip","sha256": "5b357a1319b3c275aab061a9144ceeb0c37eb83fa4659ac42b6c17912acc8519","evidence": "portfix-file-app-artifact-zip"},
+          {"id": 12164129740,"kind": "public-network","path": "portfix-ci-review/public/artifact.zip","sha256": "c3c0c800075c1fa953fbe15b0143b8b689fd9db612e16dd523f04b710225e1a4","evidence": "portfix-file-public-artifact-zip"},
+          {"id": 12164194762,"kind": "windows-qt-tests","path": "portfix-ci-review/qt/artifact.zip","sha256": "ae2a40bba772956bca25eccf06cee76353971f574bd00fd1f083447c2a257e26","evidence": "portfix-file-qt-artifact-zip"}
+        ],
+        "font": {"status": "not_triggered_for_this_commit","priorVerifiedSha": "e0534f4e9ea23ae38797f95ff7026f00e2f2a1e8","priorRunId": 39201185356,"sourceTreeIdAtBothCommits": "7df08ca20b04cf1a2d1f51a24603911746e3722d","freshArtifactForCurrentCommit": false,"workflowBlobAtBothCommits": "9b9fbd3af1f82e6bcbacd3cb03a963ba0acfb99e"},
+        "acceptanceBaseline": {"totalItems": 79,"acceptedItems": 6,"acceptedWeightPercent": 10.83,"changed": false},
+        "rustRunIdentity": {"observedAtUtc": "2026-10-19 05:31:58 UTC","actualHeadSha": "a429d5bc2efe31f10cfb61d16b16ffbde2a8fc40","status": "completed","conclusion": "success","updatedAt": "2026-10-19T05:27:53Z","htmlUrl": "https://github.com/SOLHK/Swirl/actions/runs/39202767158","runAttempt": 1},
+        "publicNetworkFile": {"path": "portfix-ci-review/public/CORE_PUBLIC_NETWORK.json","sha256": "cb04cc7064e332cb60c18ae0f1eb0bbe1f8ef14c69167764810ccdfdd4eb1ac6"},
+        "scopeLimits": [
+          "No REALITY network handshake or provider node was tested.",
+          "The three public checks cover existing DIRECT HTTPS and native DoH only.",
+          "No current font run was triggered for a429; e053 font evidence is retained separately.",
+          "This exact a429 result is not a claim that the concurrent 8371 commit passed."
+        ],
+        "boundedPolling": {"performed": 18,"maximumAuthorized": 30,"completed": true},
+        "runUrls": {"rust": "https://github.com/SOLHK/Swirl/actions/runs/39202767158","app": "https://github.com/SOLHK/Swirl/actions/runs/39202767154"},
+        "verifiedRunStatus": [
+          {"id": 39202767154,"head_sha": "a429d5bc2efe31f10cfb61d16b16ffbde2a8fc40","status": "completed","conclusion": "success","updated_at": "2026-10-19T05:08:55Z"},
+          {"id": 39202767158,"head_sha": "a429d5bc2efe31f10cfb61d16b16ffbde2a8fc40","status": "completed","conclusion": "success","updated_at": "2026-10-19T05:27:53Z"}
+        ]
+      },
+      "appSourceArchiveEvidence": "portfix-app-source-tar",
+      "fontRerun": {"newRunAtThisSource": false,"retainedEvidenceSource": "e0534f4e9ea23ae38797f95ff7026f00e2f2a1e8","srcTreeUnchangedFromPreviousStage": true,"srcTree": "7df08ca20b04cf1a2d1f51a24603911746e3722d"},
+      "limitations": [
+        "Linux injected socket failures validate allocator behavior; they do not reproduce a Windows kernel reservation.",
+        "Old Shadowsocks CI discarded its socket error; its cause cannot be classified as WinError 10013 from that log."
+      ],
+      "ciVerifiedAtUtc": "2026-10-19T05:32:00.073678+00:00",
+      "artifactEvidence": ["portfix-file-app-artifact-zip","portfix-file-public-artifact-zip","portfix-file-qt-artifact-zip"],
+      "windowsQtSummaryEvidence": "portfix-qt-summary",
+      "windowsLogEvidence": "portfix-file-windows-job-log",
+      "fullNativeApplicationBuild": "success at a429d5bc2efe31f10cfb61d16b16ffbde2a8fc40"
+    }
+  ],
+  "remainingAcceptanceGaps": [
+    "Integrate REALITY authentication before the TLS backend hashes ClientHello; do not rewrite wire bytes after transcript hashing.",
+    "Complete authenticated record I/O, Finished enforcement, supported fingerprint/ALPN semantics, cancellation, timeout and orderly close against an independent complete REALITY server.",
+    "Implement and independently verify Vision and permitted VLESS/REALITY/Vision combinations.",
+    "Enable Qt-to-Rust REALITY only after complete peer and forwarding evidence; unsupported combinations continue to fail explicitly.",
+    "Private provider nodes and whole subscriptions require separate current authorization and network conditions.",
+    "Real PingFang TTC, 125%/200% scaling, cross-monitor DPI and physical 240 Hz checks remain unverified."
+  ],
+  "evidence": {
+    "session-source-metadata": {"kind": "local-evidence-file","path": "session-source-metadata.json","bytes": 4874,"sha256": "fcc97f9e55867d1a63987ecd233b85ad6939234798ad62be5c4d8ca9bbe6b7cb"},
+    "stage1-qt-summary": {"kind": "local-evidence-file","path": "stage1-ci-review/qt/summary.json","bytes": 16340,"sha256": "15d3d189dda11af9fb9c4823d3236df1607e92b5c4c44cf0d10d503307025839"},
+    "stage3-ci-summary": {"kind": "local-evidence-file","path": "stage3-ci-review/summary.json","bytes": 13668,"sha256": "2e5fba5ad21e2a2f06f0c2d88e0fa7defd0b3f062badce79f632b08011f3823f"},
+    "portfix-ci-summary": {"kind": "local-evidence-file","path": "portfix-ci-review/summary.json","bytes": 43798,"sha256": "71a9f2ac34085f7d6e1b1f86f85f1b733a1ab7c82d9a00697148663981e9b34f"},
+    "stage1-windows-log": {"kind": "local-evidence-file","path": "stage1-ci-review/windows-job.log","bytes": 271404,"sha256": "ada5cc859225eaca5705db5872df0dab50b1f7b2ef8faec09934d1c54a5d6ba6","githubRunId": 39198976897,"githubJobId": 117887764945},
+    "stage1-linux-log": {"kind": "github-workflow-job-log","githubRunId": 39198976897,"githubJobId": 117887764822,"url": "https://github.com/SOLHK/Swirl/actions/runs/39198976897/job/117887764822","hashBasis": "UTF-8 bytes of decoded GitHub tool log, retaining BOM","bytes": 111880,"sha256": "e97143f30d60765b8d1c55c4909ec2212f6a7c87ed2452a6d60fcb8e0ba0115f"},
+    "stage1-macos-log": {"kind": "github-workflow-job-log","githubRunId": 39198976897,"githubJobId": 117887764609,"url": "https://github.com/SOLHK/Swirl/actions/runs/39198976897/job/117887764609","hashBasis": "UTF-8 bytes of decoded GitHub tool log, retaining BOM","bytes": 103353,"sha256": "31bc66f648b06f89a32a11f66781bfefdf3c8a8e8b380ac4885aae31b80883ad"},
+    "stage1-qt-archive": {"kind": "local-evidence-file","path": "stage1-ci-review/qt/artifact.zip","bytes": 4507,"sha256": "e79caec9559b4db1600cba20e9ec8037096f20fec5c7c5b24e78d8ae4798d8a7","githubArtifactId": 12163931998,"githubRunId": 39198976897,"githubDigestMatches": true,"zipCrcVerified": true,"extractedMembersCompared": 4},
+    "stage1-qt-report-1": {"kind": "local-evidence-file","path": "stage1-ci-review/qt/rust-qt/swirl-import-boundaries.xml","bytes": 2337,"sha256": "f695c4332c1e14e4febb750d07d92aee28d3fc917a3832d2dbfd21323768df97"},
+    "stage1-qt-report-2": {"kind": "local-evidence-file","path": "stage1-ci-review/qt/rust-qt/swirl-rust-qt-integration.xml","bytes": 10614,"sha256": "420a4c8264abf42e70c442f282288f65fa234cb12e226754c7e4d19626d03c04"},
+    "stage1-qt-report-3": {"kind": "local-evidence-file","path": "stage1-ci-review/qt/compat-dns/swirl-native-dns-compatibility-guard.xml","bytes": 964,"sha256": "72399397a81ad2ef52ce58abf16782fb93383c12ce9070955664b09d2ce2066a"},
+    "stage1-qt-report-4": {"kind": "local-evidence-file","path": "stage1-ci-review/qt/compat-dns/swirl-import-boundaries.xml","bytes": 2337,"sha256": "683256e2133cf63963a3f7db1cc83f6f2c0962fea04d5cf009111d46b9d617ab"},
+    "import-local-red-xml": {"kind": "local-evidence-file","path": "qt-gap-harness/baseline.xml","bytes": 1775,"sha256": "039eae83ae273e5d3d79d0932bc25718d5f96e8bdd26cce660f8ac7bf4e26eaf"},
+    "import-local-green-xml": {"kind": "local-evidence-file","path": "qt-gap-harness/fixed.xml","bytes": 1164,"sha256": "cebd7a455406457c20dd1575a26968613e8c07cd116fa2796ac641c8be3e9420"},
+    "transport-local-red-xml": {"kind": "local-evidence-file","path": "qt-gap-harness/transport-baseline.xml","bytes": 1953,"sha256": "3d13538a3c92cf015afdb083c54f75d1959c88d61caa8c77d057bedda3b611ab"},
+    "transport-local-green-xml": {"kind": "local-evidence-file","path": "qt-gap-harness/transport-fixed.xml","bytes": 1514,"sha256": "a2c1b84e4cd9a5fafac01558d5885d6d16c6550288859b1beb4ebde702c42dbb"},
+    "foundation-windows-log": {"kind": "local-evidence-file","path": "foundation-ci-review/windows-job.log","bytes": 153471,"sha256": "950e2db31fdc1a5443c0e9da24dd3e094371656e01e45af9bac29fd447242edf","githubRunId": 39200717679,"githubJobId": 117892931813},
+    "foundation-linux-log": {"kind": "github-workflow-job-log","githubRunId": 39200717679,"githubJobId": 117892932122,"url": "https://github.com/SOLHK/Swirl/actions/runs/39200717679/job/117892932122","hashBasis": "UTF-8 bytes of decoded GitHub tool log, retaining BOM","bytes": 122500,"sha256": "96afd3bff5ce5b4d47f5ae3e72533062916e70f058596aa4f1e56eaabac62b4b"},
+    "foundation-macos-log": {"kind": "github-workflow-job-log","githubRunId": 39200717679,"githubJobId": 117892932147,"url": "https://github.com/SOLHK/Swirl/actions/runs/39200717679/job/117892932147","hashBasis": "UTF-8 bytes of decoded GitHub tool log, retaining BOM","bytes": 113748,"sha256": "11943cb723c5d57d7c7ab2feef5190aae3d093dbde3a2978cf2c60406027a975"},
+    "foundation-app-log": {"kind": "github-workflow-job-log","githubRunId": 39200717693,"githubJobId": 117892932108,"url": "https://github.com/SOLHK/Swirl/actions/runs/39200717693/job/117892932108","hashBasis": "UTF-8 bytes of decoded GitHub tool log, retaining BOM","bytes": 98994,"sha256": "d515a645ca298eec7cf9d0f695dcc580290bc608961efa216bbc75cd4d025c3b"},
+    "foundation-app-artifact": {"kind": "github-artifact","githubRunId": 39200717693,"githubArtifactId": 12163507701,"name": "Core-development-evidence","sha256": "7c47b98bf9f4ac183a83409e5149b9e484c09dc6affd8c3528f03a7b4803a370","hashBasis": "GitHub artifact digest","localArchiveHashVerified": false,"actualSourceVerification": "Parent independently verified archive; same source SHA appears twice in retrieved job log."},
+    "foundation-local-fmt": {"kind": "local-evidence-file","path": "reality-fmt.log","bytes": 0,"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+    "foundation-local-check": {"kind": "local-evidence-file","path": "reality-check.log","bytes": 556,"sha256": "b9f5e5576338b697eabecf8526e7297d646702a89e79fd1e67e21a9b07681d5a"},
+    "foundation-local-clippy": {"kind": "local-evidence-file","path": "reality-clippy.log","bytes": 556,"sha256": "b74f333a7fb78261de2e368d82f3e3fe50566c8d3b03ec61ee15c86340f7e3b8"},
+    "foundation-local-test": {"kind": "local-evidence-file","path": "reality-test.log","bytes": 20132,"sha256": "8771799d7fb5223a5a542d2c0423ad9faf4ba78db9875099f970052da423560b"},
+    "foundation-local-release": {"kind": "local-evidence-file","path": "reality-release.log","bytes": 4296,"sha256": "427dafdb8ff79c9a6259ad401935c6d27ac1ca0b4ed468432b0582b4b198cc7a"},
+    "foundation-local-msrv-check": {"kind": "local-evidence-file","path": "reality-msrv-check.log","bytes": 556,"sha256": "5ac276d50833d8064be7d7d8faa87bd8adb462382fab4941b403a5758d6315e7"},
+    "reality-first-tests": {"kind": "local-evidence-file","path": "reality-first-tests.log","bytes": 4306,"sha256": "db9d63eaec7d49c06fbb7ef96690b44823189be182fadccce99ea7bca2844388"},
+    "reality-first-clippy": {"kind": "local-evidence-file","path": "reality-first-clippy.log","bytes": 892,"sha256": "19616a3af77726aed2cd6dcc69dcb683c2ebc993a2a4aa02c36831584ca7a9ec"},
+    "reality-clippy-fixed": {"kind": "local-evidence-file","path": "reality-clippy-fixed.log","bytes": 556,"sha256": "4a243c2a1bfa4fe94e2bec2fefc4b592a6cb10c90fb1f1b90bc94fb6489c32cc"},
+    "reality-release-cache-failure": {"kind": "local-evidence-file","path": "reality-release-cache-failure.log","bytes": 649,"sha256": "9351a83a90900cee3eb28994cfdb6fa7db63f82cb97967a474f5ee77dbb08064"},
+    "reality-release-clean": {"kind": "local-evidence-file","path": "reality-release-clean.log","bytes": 40,"sha256": "31476ba547a2756c284ba69b990930cf07d8800113dec415f43f62eb1d7617ef"},
+    "reality-msrv-install": {"kind": "local-evidence-file","path": "reality-msrv-install.log","bytes": 314,"sha256": "5fa998037d4b499366e906c3a79ccacff76f2a702bb6bfd08cfaf6ce59ddead9"},
+    "foundation-local-peer-summary": {"kind": "local-evidence-file","path": "reality-final-peer-logs/summary.json","bytes": 2409,"sha256": "d218a39bf72f6a34a8651ad8882568b6f79e4979f0d2520e28a3e87a6def2353"},
+    "foundation-peer-rust_core": {"kind": "local-evidence-file","path": "reality-final-peer-logs/rust_core.log","bytes": 3546,"sha256": "4b427dfab9ee7ff526dfa53cc50c1a4d89baee1915c484bd6f85566f2719be8b"},
+    "foundation-peer-shadowsocks": {"kind": "local-evidence-file","path": "reality-final-peer-logs/shadowsocks.log","bytes": 1464,"sha256": "ae57251856114877cfdad9fd47d6dbeb486ac6d5d2aa15f13393a090d6526ac6"},
+    "foundation-peer-dns_tls": {"kind": "local-evidence-file","path": "reality-final-peer-logs/dns_tls.log","bytes": 111,"sha256": "180f940a8fe39e72b2980e7f766ec69713551a4a7106d4e8e46b9f7e58286b01"},
+    "foundation-peer-dns_https": {"kind": "local-evidence-file","path": "reality-final-peer-logs/dns_https.log","bytes": 1306,"sha256": "91629165568884131dfe4967dff7d06ec30e08647ad2c34e085234122ce6b4c2"},
+    "foundation-peer-socks4": {"kind": "local-evidence-file","path": "reality-final-peer-logs/socks4.log","bytes": 1583,"sha256": "ef0cfec72f08a0f8343957788aa5a0131f50785442fbfb785a157bb1cfe3bd97"},
+    "foundation-peer-websocket_transport": {"kind": "local-evidence-file","path": "reality-final-peer-logs/websocket_transport.log","bytes": 1912,"sha256": "b9500efe8107a8cf271e6faae33f4cf47a8936aedbb97c6aa9dfa4d369a7ce2c"},
+    "foundation-peer-core_development": {"kind": "local-evidence-file","path": "reality-final-peer-logs/core_development.log","bytes": 4218,"sha256": "df203bdcca24776d5663feaa08004718a61767bb3c3119fdb131473e690b1b94"},
+    "foundation-peer-policy_groups": {"kind": "local-evidence-file","path": "reality-final-peer-logs/policy_groups.log","bytes": 2071,"sha256": "f6751c2e2bafb591724a8ac4ddf73fd917baec891715060aa4c7532c4970e381"},
+    "foundation-peer-dns_negative": {"kind": "local-evidence-file","path": "reality-final-peer-logs/dns_negative.log","bytes": 5060,"sha256": "bcf3eab2193ad7f0f7305f84adc8b1461d11769028bd95a01e6bac9802494c21"},
+    "foundation-peer-native_probe": {"kind": "local-evidence-file","path": "reality-final-peer-logs/native_probe.log","bytes": 1261,"sha256": "9a255c84ebde1e002a4b3fb63597a1f9e184887d99e0ce47dfbb37e7db0f26c4"},
+    "foundation-peer-connection_stages": {"kind": "local-evidence-file","path": "reality-final-peer-logs/connection_stages.log","bytes": 1458,"sha256": "05979278dce98c8993b6ca6f41c0306761f5ec55b12248b19a905490e64534a1"},
+    "foundation-peer-connectivity_diagnostics": {"kind": "local-evidence-file","path": "reality-final-peer-logs/connectivity_diagnostics.log","bytes": 4044,"sha256": "ef097523583b71a5b0612ba3987e683b38926255c114d3ae1afb6368f0d83c6f"},
+    "foundation-peer-subscription_import": {"kind": "local-evidence-file","path": "reality-final-peer-logs/subscription_import.log","bytes": 110,"sha256": "f75376c2145b90461550581bd80f2fa414707375a9f9229be6c936a6f2a37cd9"},
+    "foundation-peer-socks5_udp": {"kind": "local-evidence-file","path": "reality-final-peer-logs/socks5_udp.log","bytes": 2180,"sha256": "4379abedea56ecdbc318da673eb6f76b4ad14f5e8c06eadef791ec64edb7f163"},
+    "stage3-ubuntu-log": {"kind": "local-evidence-file","path": "stage3-ci-review/ubuntu-job.log","bytes": 122495,"sha256": "cc328860d6fb19895f14ae3da5e80abd62c5b4e436823655ec904b4599b9e93b","githubJobId": 117894297096,"githubRunId": 39201185263},
+    "stage3-macos-log": {"kind": "local-evidence-file","path": "stage3-ci-review/macos-job.log","bytes": 113750,"sha256": "be05cbb8481d397a9e67fefe1859ab9a9e6be2fb9fb6df05bc2a56e34e18ca3d","githubJobId": 117894297097,"githubRunId": 39201185263},
+    "stage3-windows-log": {"kind": "local-evidence-file","path": "stage3-ci-review/windows-job.log","bytes": 105699,"sha256": "eb067b3168498a16c0ebfc50ce50c2893ce8934fa5ef508253900ed1008af750","githubJobId": 117894296898,"githubRunId": 39201185263},
+    "stage3-app-log": {"kind": "local-evidence-file","path": "stage3-ci-review/app-job.log","bytes": 98995,"sha256": "24d816aa68cf031753d08a75e75cf9b03948f358ad677306f33ab5a0ef57ea7d","githubJobId": 117894297106,"githubRunId": 39201185296},
+    "stage3-app-archive": {"kind": "local-evidence-file","path": "stage3-ci-review/app/artifact.zip","bytes": 568020,"sha256": "6894e8158df444dbcd1271fd5bdef8cdb21228c2927943b04fdee05b6a041702","githubArtifactId": 12164330434,"githubRunId": 39201185296,"githubDigestMatches": true,"zipCrcVerified": true,"extractedMembersCompared": 3},
+    "stage3-public-archive": {"kind": "local-evidence-file","path": "stage3-ci-review/public/artifact.zip","bytes": 856,"sha256": "5c6ed8f6ecc02674e734416bbe7aa3e720f6fe70c1634eef9d2206dfc602f234","githubArtifactId": 12164505284,"githubRunId": 39201185263,"githubDigestMatches": true,"zipCrcVerified": true,"extractedMembersCompared": 1},
+    "stage3-font-archive": {"kind": "local-evidence-file","path": "stage3-ci-review/font/artifact.zip","bytes": 17769,"sha256": "613e23c6abedf2e07b82389a5567bfc2879288abb184cde09c72d14f2b938acf","githubArtifactId": 12164462028,"githubRunId": 39201185356,"githubDigestMatches": true,"zipCrcVerified": true,"extractedMembersCompared": 0},
+    "stage3-app-source-tar": {
+      "kind": "local-evidence-file",
+      "path": "stage3-ci-review/app/core-tested-source.tar",
+      "bytes": 2508800,
+      "sha256": "92b3f166fb21d4110c3febc09ae1299deb7cb6e3b755a91db9796811c50994a6",
+      "verifiedSourceCommit": "e0534f4e9ea23ae38797f95ff7026f00e2f2a1e8",
+      "regularMembersVerified": 182,
+      "allRegularMembersMatchCommit": true,
+      "memberManifestSha256": "36d9be42a034cbbc77d25de99f92cf7d6bed02eaeaac3aaf04a99d052e4a6edf",
+      "selectedSourceHashes": [
+        {"path": "core/Cargo.lock","sha256": "929cf5e04b4402da027b1d8670ef1e98e5fd92c7ff374a91ec35334442d21144"},
+        {"path": "core/Cargo.toml","sha256": "d5bca4408b84fe233f9bc38577e8d7d3ba5076208e3d7ddd345dd0a48a3d2d05"},
+        {"path": "core/DEPENDENCIES.json","sha256": "26eee46a202f3864f951f64d4284ffe2b17184fe1c8593b8ab5d52a32c09c963"},
+        {"path": "core/README.md","sha256": "237edabbc598c500705607c45478dceb80a47622653147a760c1c870f84075ab"},
+        {"path": "core/crates/swirl-transport/Cargo.toml","sha256": "ad8d17005ad899355b31836ff9a4cce9cb9eeacccd1540e2ac30d4522bf9919c"},
+        {"path": "core/crates/swirl-transport/src/lib.rs","sha256": "1d4384706a19ef66c5e7e681ab4766a62156eea5a4797bc87073714e524a0d55"},
+        {"path": "core/crates/swirl-transport/src/reality/certificate.rs","sha256": "919499a85d47093c2d1d0d35473a6bd7689318402f554daca70711a235213c6b"},
+        {"path": "core/crates/swirl-transport/src/reality/hello.rs","sha256": "cb1d5347f096096d57fecabd788bc01ee4a2ac088fde90f4f8af563136efcd27"},
+        {"path": "core/crates/swirl-transport/src/reality/kx.rs","sha256": "a575d7af318b312ab031d7e97e8d025e075b13f5b345c8d4a373712eac349d3d"},
+        {"path": "core/crates/swirl-transport/src/reality/mod.rs","sha256": "ea23f6c51271b67c3902f5296a6a6fc05eb0a474811fb0a6441654863ff2a67e"},
+        {"path": "core/crates/swirl-transport/src/reality/tests.rs","sha256": "7cb760d3888a46c2fde757abb7dd1be56c2552055f57b1d69daebec1b354c633"},
+        {"path": "core/crates/swirl-transport/tests/fixtures/reality_auth.json","sha256": "b1a87667efe7edec56b97964550f95d56b07ffb5588fb7ac23dfc3718e796856"},
+        {"path": "src/Swirl.Quick/engine/SubscriptionNormalizer.cpp","sha256": "fe24e6548dc4ee8d0fba1b8b44e5d07e28fd1b3bb13af44514ce05344e921d46"},
+        {"path": "src/Swirl.Quick/tests/ImportTests.cpp","sha256": "f86be6c9bdb08b63c805a02130c0e3621bedf8e30c1611829e6a949f294a58ea"},
+        {"path": "src/Swirl.Quick/tests/RustCoreTests.cpp","sha256": "c055b374b0b590c1c90be87ad52c4de3f251722b218165eaa046a02bd0fc109c"},
+        {"path": "tools/tests/dns_peer.py","sha256": "64461dbd9aea2de6a1add883655dad42525f06f66314343b51648dd5926a9cc9"},
+        {"path": "tools/tests/generate_reality_vectors.py","sha256": "584a5f6eef5eaad0e99a19b1ceccc79ee5e0f0e7c733ee53a673ca01f12322ac"},
+        {"path": "tools/tests/test_dns_negative.py","sha256": "8af2354210c7557b38b87d3370906c2b4b846ec84043f77ca2e1dad4eba62217"},
+        {"path": "tools/tests/test_policy_groups.py","sha256": "0757353599d75d9c1178071db42b3d73f73e5f335bead90fefd888a873da414c"}
+      ],
+      "scope": "Only archived paths are claimed; the archive is not the entire repository."
+    },
+    "stage3-app-core_tested_commit": {"kind": "local-evidence-file","path": "stage3-ci-review/app/CORE_TESTED_COMMIT","bytes": 41,"sha256": "03104a479c63d1168986289f56f6d7a9847d050eac8f0d318037130e8b88e409"},
+    "stage3-app-core_worktree_state": {"kind": "local-evidence-file","path": "stage3-ci-review/app/CORE_WORKTREE_STATE","bytes": 71,"sha256": "d1d620b343967ef519019b9ec424181ed3f76a5d382a7821ad59896b4c6d456e"},
+    "stage3-public-report": {"kind": "local-evidence-file","path": "stage3-ci-review/public/CORE_PUBLIC_NETWORK.json","bytes": 2553,"sha256": "79edf02a2817ff22307cc2986bfc50bb2ae1f619a5e76ac2568e47425641f3f4"},
+    "stage1-font-archive": {"kind": "local-evidence-file","path": "stage1-ci-review/font/artifact.zip","bytes": 17787,"sha256": "a6bbb0bb222129771a45e043a06386ac012c052a427409a8c49121cd334ae370","githubArtifactId": 12163377916,"githubRunId": 39198976888,"githubDigestMatches": true,"zipCrcVerified": true,"extractedMembersCompared": 0},
+    "stage1-font-source.json": {"kind": "local-evidence-file","path": "stage1-ci-review/font/source.json","bytes": 375,"sha256": "99b505b03cbb1c9c454f6a4a6d402ddc1ac86446a41c60a63c60c7beac926f65"},
+    "stage1-font-stages.json": {"kind": "local-evidence-file","path": "stage1-ci-review/font/stages.json","bytes": 195,"sha256": "774e46cca2220c451d52b350eeefb5d5726c0bca0f328fdda31b544d78344d11"},
+    "stage1-font-font-results.json": {"kind": "local-evidence-file","path": "stage1-ci-review/font/font-results.json","bytes": 13605,"sha256": "35ef8f37122897de25134835254f0e7efcf78aa0babd8ca1bb944e4c232a4148"},
+    "stage1-font-font-smoke.json": {"kind": "local-evidence-file","path": "stage1-ci-review/font/font-smoke.json","bytes": 111,"sha256": "a2d2560dcee2b57e6f9d751923fc5f6f271f3e0f4eab060caf6a79b3308df5b2"},
+    "stage1-font-selection.xml": {"kind": "local-evidence-file","path": "stage1-ci-review/font/font-selection.xml","bytes": 6000,"sha256": "8ddb125e463a2ef3ce70cd0161095a1d3e1475a5fdfe125eb079069baa4051da"},
+    "stage1-font-axis-policy.xml": {"kind": "local-evidence-file","path": "stage1-ci-review/font/font-axis-policy.xml","bytes": 5136,"sha256": "1c7afa79c5b1fea70e3e22feb9d99aa136d87138982cf28a0a2e2ef6cd425577"},
+    "stage1-font-native-raster.xml": {"kind": "local-evidence-file","path": "stage1-ci-review/font/font-native-raster.xml","bytes": 3433,"sha256": "084dcc6bef8a172e838bc2ae8307c948cb719611cea7a2e6573603244088e1e8"},
+    "stage3-font-source.json": {"kind": "local-evidence-file","path": "stage3-ci-review/font/source.json","bytes": 375,"sha256": "0072ea0ede43c2a93a98af863fa5098aa3ed5a6e83c22cae5e5f405f60d28b3b"},
+    "stage3-font-stages.json": {"kind": "local-evidence-file","path": "stage3-ci-review/font/stages.json","bytes": 195,"sha256": "330216f1761fe23c0802b7caddcfe03b45cbb8789b52214dcbb07cffc9b1f264"},
+    "stage3-font-font-results.json": {"kind": "local-evidence-file","path": "stage3-ci-review/font/font-results.json","bytes": 13605,"sha256": "35ef8f37122897de25134835254f0e7efcf78aa0babd8ca1bb944e4c232a4148"},
+    "stage3-font-font-smoke.json": {"kind": "local-evidence-file","path": "stage3-ci-review/font/font-smoke.json","bytes": 111,"sha256": "bc311c95482ca02edae237beae1ca414543def015848a52fa8357323af655581"},
+    "stage3-font-selection.xml": {"kind": "local-evidence-file","path": "stage3-ci-review/font/font-selection.xml","bytes": 5998,"sha256": "3ba984905519f3dce18c6c10456c1b8483f17f93a90a864a4f059b59d6377854"},
+    "stage3-font-axis-policy.xml": {"kind": "local-evidence-file","path": "stage3-ci-review/font/font-axis-policy.xml","bytes": 5140,"sha256": "37be41f6ecba3b98f08a1dfac52e163abb73fd6ad6bee3b70babc5346c7736c3"},
+    "stage3-font-native-raster.xml": {"kind": "local-evidence-file","path": "stage3-ci-review/font/font-native-raster.xml","bytes": 3434,"sha256": "a4d293db45fb78e5aa29136858eb7a15572e416cd52666bb332adb23495ad899"},
+    "stage3-font-log": {"kind": "local-evidence-file","path": "stage3-ci-review/font-job.log","bytes": 133047,"sha256": "faac562b203b8e770e0b3c3269d66699addffb67399bae4703caa495d9072702","githubJobId": 117894297673,"githubRunId": 39201185356},
+    "portfix-local-fmt": {"kind": "local-evidence-file","path": "port-fixture-validation/fmt.log","bytes": 0,"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"},
+    "portfix-local-check": {"kind": "local-evidence-file","path": "port-fixture-validation/check.log","bytes": 72,"sha256": "ee1d3fffa2022e962e63e0dbe4d35c9c198450a20c29fc09030f635dbb38bfcd"},
+    "portfix-local-clippy": {"kind": "local-evidence-file","path": "port-fixture-validation/clippy.log","bytes": 72,"sha256": "8c233a54790c4800d3dd585436af679aa838da259bfdb129412e2d51cdb75cdc"},
+    "portfix-local-test": {"kind": "local-evidence-file","path": "port-fixture-validation/test.log","bytes": 19648,"sha256": "aa38d0c01f3e6bf858ff08ea873eb996096bfd71b760a45705295d9f7d996b22"},
+    "portfix-local-release": {"kind": "local-evidence-file","path": "port-fixture-validation/release.log","bytes": 62,"sha256": "90c8a1a69c0155761cff4bfe0e61bbee007961d2b96729d2127c2e0c291489dd"},
+    "portfix-local-workflow-guard": {"kind": "local-evidence-file","path": "port-fixture-validation/workflow-guard.log","bytes": 4431,"sha256": "e33f2630d6fc994586356bd9313c61a69896f193081dcdbf88eaefbe2f84b4b1"},
+    "portfix-dns-allocation-red": {"kind": "local-evidence-file","path": "tmp/swirl-dns-allocation-red.log","bytes": 16934,"sha256": "ffb23aa8bcdd078f1c51bfeac1eda23e92bd659dd03eaa3b04ce3938aabf1233"},
+    "portfix-policy-allocation-red": {"kind": "local-evidence-file","path": "tmp/swirl-policy-allocation-red.log","bytes": 15114,"sha256": "18de5e6cb7c2f24bcf935724fee5d91679be2d7a5f931bd53fa38f0f0d1b9cb3"},
+    "portfix-pair-allocation-green": {"kind": "local-evidence-file","path": "tmp/swirl-pair-allocation-green.log","bytes": 1496,"sha256": "cfa8d6335942b23b88b6522c2622a13f896579cc582e1756f9f944602554ead1"},
+    "portfix-dns-negative-green": {"kind": "local-evidence-file","path": "tmp/swirl-dns-negative-green.log","bytes": 5189,"sha256": "663c68dfa06c72c66e2157db54f56746e1119623c18aac65767611818fbda907"},
+    "portfix-policy-groups-green": {"kind": "local-evidence-file","path": "tmp/swirl-policy-groups-green.log","bytes": 2615,"sha256": "a1a73714fce4d1e7a3b7b78c24c61aad84c3feb3b1490136750db5c9797cff6b"},
+    "portfix-file-ubuntu-job-log": {"kind": "local-evidence-file","path": "portfix-ci-review/ubuntu-job.log","bytes": 123283,"sha256": "7e8afbdff17ea4d1ba57c9bc34055b9b6b17b51f97fe79af0ad5e0b12b9b74c4","githubRunId": 39202767158,"githubJobId": 117899065457},
+    "portfix-file-macos-job-log": {"kind": "local-evidence-file","path": "portfix-ci-review/macos-job.log","bytes": 114538,"sha256": "83c917d4590e31068f1aa2a543371085aa788865d590187b7121639a7935ae65","githubRunId": 39202767158,"githubJobId": 117899065548},
+    "portfix-file-app-job-log": {"kind": "local-evidence-file","path": "portfix-ci-review/app-job.log","bytes": 99001,"sha256": "1c3612dc409cd43df7ab1bb07cc4fd775319e6f87fbca7db73563ecb5b5778e9","githubRunId": 39202767154,"githubJobId": 117899065106},
+    "portfix-file-app-artifact-zip": {"kind": "local-evidence-file","path": "portfix-ci-review/app/artifact.zip","bytes": 570140,"sha256": "5b357a1319b3c275aab061a9144ceeb0c37eb83fa4659ac42b6c17912acc8519","githubArtifactId": 12164044669,"githubRunId": 39202767154,"githubName": "Core-development-evidence","githubDigestMatches": true,"zipCrcVerified": true,"extractedMembersCompared": 3},
+    "portfix-file-app-core-tested-source-tar": {"kind": "local-evidence-file","path": "portfix-ci-review/app/core-tested-source.tar","bytes": 2519040,"sha256": "c08c10dab165cf6e5b09730bdc41c4700cb4df5069db42e9a62da79876bb7e7e"},
+    "portfix-file-app-CORE-TESTED-COMMIT": {"kind": "local-evidence-file","path": "portfix-ci-review/app/CORE_TESTED_COMMIT","bytes": 41,"sha256": "a191d277842dd47289afdf9e5fda66619ed6309cc482fcaca88d913ca70d1bf9"},
+    "portfix-file-app-CORE-WORKTREE-STATE": {"kind": "local-evidence-file","path": "portfix-ci-review/app/CORE_WORKTREE_STATE","bytes": 71,"sha256": "d1d620b343967ef519019b9ec424181ed3f76a5d382a7821ad59896b4c6d456e"},
+    "portfix-file-public-artifact-zip": {"kind": "local-evidence-file","path": "portfix-ci-review/public/artifact.zip","bytes": 858,"sha256": "c3c0c800075c1fa953fbe15b0143b8b689fd9db612e16dd523f04b710225e1a4","githubArtifactId": 12164129740,"githubRunId": 39202767158,"githubName": "Swirl-Core-Public-Network","githubDigestMatches": true,"zipCrcVerified": true,"extractedMembersCompared": 1},
+    "portfix-app-summary": {"kind": "local-evidence-file","path": "portfix-ci-review/app-summary.json","bytes": 3018,"sha256": "2d0f800cf16b1a9303495bde5821ad4d714c87c7c449b29e9e402739df6e5927"},
+    "portfix-app-source-tar": {
+      "kind": "local-evidence-file",
+      "path": "portfix-ci-review/app/core-tested-source.tar",
+      "bytes": 2519040,
+      "sha256": "c08c10dab165cf6e5b09730bdc41c4700cb4df5069db42e9a62da79876bb7e7e",
+      "verifiedSourceCommit": "a429d5bc2efe31f10cfb61d16b16ffbde2a8fc40",
+      "regularMembersVerified": 182,
+      "allRegularMembersMatchCommit": true,
+      "memberManifestSha256": "3444ca510f23a932f4964fbf5fc5fd560df4fb5347b671a0b02157097ba1a48c",
+      "selectedSourceHashes": [
+        {"path": "core/Cargo.lock","sha256": "929cf5e04b4402da027b1d8670ef1e98e5fd92c7ff374a91ec35334442d21144"},
+        {"path": "core/Cargo.toml","sha256": "d5bca4408b84fe233f9bc38577e8d7d3ba5076208e3d7ddd345dd0a48a3d2d05"},
+        {"path": "core/DEPENDENCIES.json","sha256": "26eee46a202f3864f951f64d4284ffe2b17184fe1c8593b8ab5d52a32c09c963"},
+        {"path": "core/README.md","sha256": "237edabbc598c500705607c45478dceb80a47622653147a760c1c870f84075ab"},
+        {"path": "core/crates/swirl-transport/Cargo.toml","sha256": "ad8d17005ad899355b31836ff9a4cce9cb9eeacccd1540e2ac30d4522bf9919c"},
+        {"path": "core/crates/swirl-transport/src/lib.rs","sha256": "1d4384706a19ef66c5e7e681ab4766a62156eea5a4797bc87073714e524a0d55"},
+        {"path": "core/crates/swirl-transport/src/reality/certificate.rs","sha256": "919499a85d47093c2d1d0d35473a6bd7689318402f554daca70711a235213c6b"},
+        {"path": "core/crates/swirl-transport/src/reality/hello.rs","sha256": "cb1d5347f096096d57fecabd788bc01ee4a2ac088fde90f4f8af563136efcd27"},
+        {"path": "core/crates/swirl-transport/src/reality/kx.rs","sha256": "a575d7af318b312ab031d7e97e8d025e075b13f5b345c8d4a373712eac349d3d"},
+        {"path": "core/crates/swirl-transport/src/reality/mod.rs","sha256": "ea23f6c51271b67c3902f5296a6a6fc05eb0a474811fb0a6441654863ff2a67e"},
+        {"path": "core/crates/swirl-transport/src/reality/tests.rs","sha256": "7cb760d3888a46c2fde757abb7dd1be56c2552055f57b1d69daebec1b354c633"},
+        {"path": "core/crates/swirl-transport/tests/fixtures/reality_auth.json","sha256": "b1a87667efe7edec56b97964550f95d56b07ffb5588fb7ac23dfc3718e796856"},
+        {"path": "src/Swirl.Quick/engine/SubscriptionNormalizer.cpp","sha256": "fe24e6548dc4ee8d0fba1b8b44e5d07e28fd1b3bb13af44514ce05344e921d46"},
+        {"path": "src/Swirl.Quick/tests/ImportTests.cpp","sha256": "f86be6c9bdb08b63c805a02130c0e3621bedf8e30c1611829e6a949f294a58ea"},
+        {"path": "src/Swirl.Quick/tests/RustCoreTests.cpp","sha256": "c055b374b0b590c1c90be87ad52c4de3f251722b218165eaa046a02bd0fc109c"},
+        {"path": "tools/tests/dns_peer.py","sha256": "b5d3e8b96c32661ee228f70c6f5c291fa91895ded172587b00b8224eba41e246"},
+        {"path": "tools/tests/generate_reality_vectors.py","sha256": "584a5f6eef5eaad0e99a19b1ceccc79ee5e0f0e7c733ee53a673ca01f12322ac"},
+        {"path": "tools/tests/test_dns_negative.py","sha256": "31dce8c77d87002e08ea3d3c0012032e0f8263e84ba334d47a7721b30eeeba82"},
+        {"path": "tools/tests/test_policy_groups.py","sha256": "33783549bacfbb3e799963d62e3678e7d782f623c6dd199cc65d0ff2567041c0"}
+      ],
+      "scope": "Only archived paths are claimed; the archive is not the entire repository."
+    },
+    "portfix-file-windows-job-log": {"kind": "local-evidence-file","path": "portfix-ci-review/windows-job.log","bytes": 289196,"sha256": "6a76d65a49a26b7853ee77e107f0ae1e9c969ad0b469fa03d497fecfce532f88","githubRunId": 39202767158,"githubJobId": 117899065248},
+    "portfix-file-qt-compat-dns-swirl-import-boundaries-xml": {"kind": "local-evidence-file","path": "portfix-ci-review/qt/compat-dns/swirl-import-boundaries.xml","bytes": 2509,"sha256": "de9426b61798483376eb9a78e4bda47b6fd7fd4724a3bdd3d57f59a2533feabb","githubArtifactId": 12164194762,"githubRunId": 39202767158,"githubJobId": 117899065248},
+    "portfix-file-qt-compat-dns-swirl-native-dns-compatibility-guard-xml": {"kind": "local-evidence-file","path": "portfix-ci-review/qt/compat-dns/swirl-native-dns-compatibility-guard.xml","bytes": 962,"sha256": "2d3a2af5723d0b8511f66f3d5c4d7a2cb9ed1f5f35ed660f9a8ddf3763e3f8aa","githubArtifactId": 12164194762,"githubRunId": 39202767158,"githubJobId": 117899065248},
+    "portfix-file-qt-rust-qt-swirl-import-boundaries-xml": {"kind": "local-evidence-file","path": "portfix-ci-review/qt/rust-qt/swirl-import-boundaries.xml","bytes": 2509,"sha256": "8c1207907923bcd9652e4f8e493a4602ca627d7b9dd614f9beeacf167fb2b266","githubArtifactId": 12164194762,"githubRunId": 39202767158,"githubJobId": 117899065248},
+    "portfix-file-qt-rust-qt-swirl-rust-qt-integration-xml": {"kind": "local-evidence-file","path": "portfix-ci-review/qt/rust-qt/swirl-rust-qt-integration.xml","bytes": 10798,"sha256": "eba1a38fbad3e406929a7771cdd1295695cbb41deb13dd92e73a0996641de281","githubArtifactId": 12164194762,"githubRunId": 39202767158,"githubJobId": 117899065248},
+    "portfix-file-qt-artifact-zip": {"kind": "local-evidence-file","path": "portfix-ci-review/qt/artifact.zip","bytes": 4572,"sha256": "ae2a40bba772956bca25eccf06cee76353971f574bd00fd1f083447c2a257e26","githubArtifactId": 12164194762,"githubRunId": 39202767158,"githubName": "Swirl-Rust-Qt-Tests-a429d5bc2efe31f10cfb61d16b16ffbde2a8fc40-1","githubDigestMatches": true,"zipCrcVerified": true,"extractedMembersCompared": 4},
+    "portfix-file-public-CORE-PUBLIC-NETWORK-json": {"kind": "local-evidence-file","path": "portfix-ci-review/public/CORE_PUBLIC_NETWORK.json","bytes": 2551,"sha256": "cb04cc7064e332cb60c18ae0f1eb0bbe1f8ef14c69167764810ccdfdd4eb1ac6"},
+    "portfix-qt-summary": {"kind": "local-evidence-file","path": "portfix-ci-review/qt/summary.json","bytes": 15192,"sha256": "f5fbaa5c7f22e2f168eb35f93ab2184c748f1debfbab09126fca45db2781a18a"}
+  },
+  "concurrentDevelopment": {
+    "observedHead": "927079e93e2a6830b615c030d51379dfa348cd23",
+    "commits": [
+      {"commit": "8371eb804b6d3f240090388c4bec90c926904119","parent": "a429d5bc2efe31f10cfb61d16b16ffbde2a8fc40","tree": "f92fe03cf646744f9096f53ff692082029050bbb","subject": "feat(fonts): fit constrained labels with real width axes and verify Windows faces","preservedByFastForward": true,"ciEvaluatedInThisCoreEvidence": false},
+      {"commit": "927079e93e2a6830b615c030d51379dfa348cd23","parent": "8371eb804b6d3f240090388c4bec90c926904119","tree": "5de7ff425512175fd0189093399b1bc80d874cb1","subject": "test(fonts): observe retained raster DPI in the same Windows window","preservedByFastForward": true,"ciEvaluatedInThisCoreEvidence": false}
+    ],
+    "coreEvidenceSourceLimit": "a429d5bc2efe31f10cfb61d16b16ffbde2a8fc40",
+    "sourceSnapshotMeaning": "latestSourceCommit is the latest source commit in this four-stage Core evidence series, not the later concurrent repository HEAD.",
+    "testBoundary": "The later font commits are preserved. Results at a429 are not claimed for their changed source; their CI is not evaluated in this Core evidence record."
+  }
+}

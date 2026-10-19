@@ -1,3 +1,112 @@
+# Current handoff: REALITY foundation and strict subscription import (2026-10-19)
+
+Development continues only on `work/core-completion-20261017`. The active user
+instruction authorizes implementation, testing, linear commits/pushes and CI
+repair; it does not authorize private subscription refreshes or new private-node
+requests. Never modify `main`, force-push, reconfigure the App/Secrets, or replace
+unsupported native requirements with DIRECT/ordinary TLS. The older pause and
+local-font scheduling paragraphs below are historical.
+
+The remote branch, recent commits and Actions were reread before this session's
+work. `df7fd069fafaaf7e767946617d22ae7270d3b09c` was then the actual remote HEAD;
+there was no newer commit to assume or overwrite. Four source stages have since
+been pushed with an expected-head lease and `force=false`:
+
+| Source commit | Implemented scope | Detailed evidence |
+| --- | --- | --- |
+| `4d73f6574bf9884dc4e173b58708ae543b2303bd` | Preserve REALITY security selection and uTLS fingerprint intent through URI/Base64/sing-box import; reject invalid types and native unsupported options before connecting | [Import security](REALITY_IMPORT_SECURITY_20261019.md) |
+| `daad7a057ab2c4b347c3ab142ce88af6528cb8f6` | Owned X25519/ML-KEM, authenticated ClientHello/ServerHello transcript checkpoint, REALITY certificate HMAC and genuine Ed25519 CertificateVerify, independent vectors and rustls verifier/provider tests | [Handshake foundation](REALITY_HANDSHAKE_FOUNDATION_20261019.md) |
+| `e0534f4e9ea23ae38797f95ff7026f00e2f2a1e8` | Strict sing-box transport types/fields, actual optional-null semantics, exact TCP/TLS/WS/WSS mapping and refusal of unmapped options | [Transport import](SINGBOX_TRANSPORT_SECURITY_20261019.md) |
+| `a429d5bc2efe31f10cfb61d16b16ffbde2a8fc40` | Correct DNS port-selection premise; preserve SS pair errors and clean failed sockets; bounded collision tests and read-only Windows port diagnostics | [Fixture failures and repair](LOOPBACK_PAIR_ALLOCATION_20261019.md) |
+
+Subsequent remote rereads found concurrent font commits `8371eb804b6d3f240090388c4bec90c926904119`
+and `927079e93e2a6830b615c030d51379dfa348cd23`, both direct descendants of these
+Core stages. They were fast-forwarded and preserved without editing their font
+implementation. Their separate CI is not covered by the `a429d5b` evidence below.
+The concurrent font run exposed a reporter omission for the explicitly local-only
+`optionalPhysicalFontIdentity` case. Repair `5adcfcf158a4eb99f56e78d0997af5dbc25bd3d0`
+adds that one classification and strict regression tests; the original XML still
+contains 51 passes and 9 skips, with physical verification false. Its own Rust
+run `39205098742`, font run `39205098558` and App run `39205098810` require separate
+final verification. Public width tests, failures and unexpected skips remain
+mandatory gates. No original failed run is rewritten as success.
+
+## Verification checkpoint
+
+The permanent [session evidence](evidence/REALITY_FOUNDATION_AND_IMPORT_20261019.json)
+binds source trees, logs, test counts and actual artifact identities. Never borrow
+an earlier green run for a later commit.
+
+- `4d73f65` passed Rust run `39198976897`, App run `39198976919` and font run
+  `39198976888`. Each platform passed 154 Rust tests; Windows native/compatibility
+  CTest, five separate Qt peer hooks and the complete native application passed.
+  Native integration XML has 46 actual passes and 6 explicit skips; the hooks
+  separately exercise those six peer slots, without rewriting the XML counts.
+- `daad7a0` and `e0534f4` passed 188 Rust unit/integration tests plus one doctest
+  on each platform, Release builds and independent REALITY vectors. Their
+  Linux/macOS full portable suites each passed 197 tests with 5 Qt-hook skips.
+  Their original Windows jobs failed before Qt: DNS pair TCP bind `10013` at
+  `daad7a0`; an SS pair wrapper error whose underlying errno was lost at
+  `e0534f4`. These remain failed runs. App validation passed its narrower menu
+  against the actual matching source SHA in each case.
+- The `a429d5b` repair has local fmt/check/Clippy/189 Rust tests/Release success,
+  31 DNS and 16 policy passes with no skips, and 25 workflow guard passes.
+  Its exact-source [Rust run `39202767158`](https://github.com/SOLHK/Swirl/actions/runs/39202767158)
+  completed successfully on all three platforms: each passed 189 Rust tests and
+  201 tests in the common Python menu, with 5 explicit skips. Windows additionally
+  passed 25 synthetic capture tests (1 skip), 10 isolated management tests
+  (1 skip), and five separate Qt hooks. Native/compatibility CTest passed 3/3
+  and 2/2; the four original XML reports contain 71 substantive passes and
+  6 explicit skips. The complete native `Swirl.exe` build succeeded at
+  `2026-10-19T05:27:47.685957Z`.
+  [App run `39202767154`](https://github.com/SOLHK/Swirl/actions/runs/39202767154)
+  also succeeded, with its actual tested commit and all 182 regular archived
+  source files matching `a429d5b`. Its narrower menu passed 189 Rust,
+  25 guard and 69 network tests, with 5 skips. The Linux public artifact has
+  three successful existing DIRECT HTTPS/native DoH checks; none tests REALITY.
+
+## What REALITY currently does and still cannot do
+
+The new module is a tested handshake foundation, **not an enabled REALITY
+outbound**. It owns genuine hybrid key material and authenticated transcript
+bytes, rejects malformed/unsupported first flights and verifies the server's
+HMAC-authenticated Ed25519 key plus CertificateVerify. It explicitly rejects
+unimplemented certificate profiles, including ML-DSA/extensions/chains/OCSP.
+The three actual stock-rustls integrations prove verifier/provider behavior,
+Finished, bidirectional data and closure only in that bounded test setup; their
+ClientHello is not a REALITY-authenticated wire flight. They are not complete
+REALITY interoperability, public-node or provider evidence. Vision remains
+unimplemented and native startup continues to reject both requirements.
+
+The next blocking implementation is a TLS backend adapter that finalizes the
+authenticated ClientHello **before its encoded bytes enter the transcript buffer
+and send queue**, with the same live key owner used for the negotiated exchange.
+Pinned rustls 0.23.46 has no direct single-construction public hook for this.
+Socket-output byte replacement would leave the internal transcript inconsistent.
+A strictly bounded two-pass construction using public APIs remains an untested
+candidate; no fork requirement or working adapter is established by that idea.
+Then verify the actual server CertificateVerify and Finished over those exact
+bytes, implement supported fingerprint/SNI/ALPN semantics, bounded record IO,
+cancellation and shutdown; implement Vision framing and eligible VLESS
+combinations; finish independent REALITY peer and Qt product interoperability.
+Do not enable an outbound merely because the cryptographic module compiles.
+
+The frozen acceptance baseline remains **79 items, six accepted, 10.83% accepted
+weight**. B13 now has a partially implemented foundation; B14 is unimplemented.
+Protocol profiles remain 0/21 and transport/extensions 0/10 fully accepted.
+The existing 18-profile private corpus remains 0/18 complete chains verified.
+No scope, weight, criterion or passing denominator was removed or narrowed.
+
+The font implementation was not rewritten by this Core task. Its exact-source regression at
+`e0534f4`, run `39201185356`, passed 50 substantive tests with 8 explicit skips,
+61/61 ready navigation requests and the complete compatibility application
+build. Real PingFang TTC, 125%/200% scaling, cross-monitor DPI and 240 Hz remain
+unverified; follow [the physical Windows checklist](FONT_AUTOMATION_WINDOWS_HANDOFF.md).
+Cloud Linux/GitHub cannot access or save files to the user's `D:/Codex`, and this
+session has not read or overwritten the older unintegrated R0/R1 directory.
+
+---
+
 # Current handoff: cloud font gates and native SOCKS5 UDP verified (2026-10-19)
 
 The current user instruction is to complete the font work and then continue the

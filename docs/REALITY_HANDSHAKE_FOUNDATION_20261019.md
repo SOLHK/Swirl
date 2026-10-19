@@ -161,7 +161,7 @@ No source was copied from another proxy core. Public protocol behavior was
 reviewed against the following pinned sources:
 
 - [Xray-core REALITY client](https://github.com/XTLS/Xray-core/blob/92ccc939aaf4f8965f369cf0b142e005aeaa11d5/transport/internet/reality/reality.go), MPL-2.0, read only.
-- [REALITY server](https://github.com/XTLS/REALITY/tree/83f621788ca88b83179810b12baa7ae518aacb83), BSD-3-Clause, read only; its `tls.go` and `handshake_server_tls13.go` define the current share/authentication behavior.
+- [REALITY server](https://github.com/XTLS/REALITY/tree/83f621788ca88b83179810b12baa7ae518aacb83), MPL-2.0 under that revision's [repository LICENSE](https://github.com/XTLS/REALITY/blob/83f621788ca88b83179810b12baa7ae518aacb83/LICENSE), read only; its `tls.go` and `handshake_server_tls13.go` define the current share/authentication behavior. Go-derived files retain their separate original notices; the repository is not generally BSD-3-Clause. No source from this project was copied into Swirl.
 - [RFC 10024](https://www.rfc-editor.org/rfc/rfc10024.html), hybrid TLS key layout, and [RFC 9954](https://www.rfc-editor.org/rfc/rfc9954.html), component reuse within one ClientHello.
 - [TLS 1.3 RFC 9846](https://www.rfc-editor.org/rfc/rfc9846.html), transcript, certificate proof and Finished semantics.
 - [rustls 0.23.46](https://github.com/rustls/rustls/tree/f04804fa13341a9b1dc02b5d1dd8a746f2c4b7fb), existing TLS dependency and public key-exchange/verifier contracts.
@@ -178,9 +178,10 @@ The inventory contains 130 packages; 29 newly resolved package versions have
 58 complete license/notice texts in the new artifact. One upstream license
 line's trailing space is preserved verbatim rather than rewriting its contents.
 
-The next blocking step is a TLS backend interface that installs the finalized
-authenticated ClientHello before hashing it, using the same live key owner.
-The currently pinned rustls public API has no such hook. Rewriting bytes at the
+The next blocking step is a TLS backend adapter that installs the finalized
+authenticated ClientHello before its encoded bytes enter the transcript buffer
+and send queue, using the same live key owner. The currently pinned rustls
+public API has no direct single-construction hook for this. Rewriting bytes at the
 socket boundary would desynchronize the transcript and is not a valid solution.
 The subsequent integration must verify the actual server CertificateVerify and
 Finished over that transcript, implement configured fingerprint/ALPN semantics,
@@ -194,3 +195,46 @@ implemented after exact-source verification; B14 is still unimplemented.
 No complete protocol profile, private provider, complete subscription, TUN or
 Windows physical display acceptance is established. Supplier refreshes and
 private-node attempts in this session remain zero.
+
+
+## Exact-source CI and follow-up verification
+
+The foundation was pushed as `daad7a057ab2c4b347c3ab142ce88af6528cb8f6`,
+tree `70ccc46a5d938ba524e11f35f9e07531e1b0ede8`.
+[Rust CI 39200717679](https://github.com/SOLHK/Swirl/actions/runs/39200717679)
+passed fmt/check/Clippy, 188 unit/integration tests plus one doctest, Release and
+the independent REALITY generator on **all three platforms**. Linux/macOS jobs
+completed successfully with 197 Python passes and 5 explicit Qt-hook skips each.
+The Windows job failed later in the existing DNS peer's same-port TCP allocation;
+its 30-function suite reported 20 error incidents and one consequent failure.
+Windows Qt, separate Qt peers and the complete native application were not run.
+The successful cryptographic checks do not turn that job into a successful job.
+
+[App validation 39200717693](https://github.com/SOLHK/Swirl/actions/runs/39200717693)
+passed against the actual `daad7a0` source: 189 Rust, 69 independent-network and
+25 workflow-guard passes, with 5 explicit skips in its narrower menu. It is not
+a substitute for the skipped Windows gates.
+
+The subsequent sing-box import commit `e0534f4` did not change Rust source and
+again passed the three-platform Rust/REALITY gates; its original Windows peer
+job instead failed inside an SS fixture which had swallowed the original socket
+error. Both failure histories are preserved in
+[the bounded allocation repair](LOOPBACK_PAIR_ALLOCATION_20261019.md).
+Repair source `a429d5bc2efe31f10cfb61d16b16ffbde2a8fc40` has passed local
+Rust/Release and the complete affected DNS/policy suites. Its exact-source
+[Rust run 39202767158](https://github.com/SOLHK/Swirl/actions/runs/39202767158)
+and [App run 39202767154](https://github.com/SOLHK/Swirl/actions/runs/39202767154)
+both completed successfully and are bound in
+[the permanent session evidence](evidence/REALITY_FOUNDATION_AND_IMPORT_20261019.json).
+Each platform passed 189 Rust tests and 201 common Python tests with 5 explicit
+skips. Windows native/compatibility CTest passed 3/3 and 2/2; four original XMLs
+contain 71 substantive passes, no failures and 6 skips. Five separate Python Qt
+hooks passed, and the complete native `Swirl.exe` compiled successfully.
+The App's narrower menu passed 189 Rust, 25 guard and 69 network tests, with
+5 skips; its actual tested SHA and archived source match `a429d5b`. This final
+follow-up does not erase either original failed Windows run.
+
+B13 is now recorded as partially implemented solely for this tested foundation.
+B14, executable REALITY/Vision, complete independent REALITY interoperability,
+provider nodes and whole private profiles remain unverified or unimplemented as
+specified above; the 79-item scope and 10.83% accepted weight do not change.

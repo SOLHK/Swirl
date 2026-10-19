@@ -69,12 +69,49 @@ Release CLI；Windows CI 使用 Python 3.14.8。结果如下：
 | `ApplyCoreDevelopment.py --check` | 25 个既有守卫测试通过，更新前后工作流字节一致 |
 
 Rust 生产源码及 Release CLI 未因本次 Python 修复改变。新增测试函数共 4 个，
-既有产品转发断言保持原样。新提交的三平台完整菜单与 Windows Qt/完整原生
-应用结果仍等待精确源码 CI，不能从本地受影响套件或旧绿色运行外推。
+既有产品转发断言保持原样。以上为提交前的本地检查点；以下新增的三平台
+完整菜单与 Windows Qt/完整原生应用结果来自修复提交自己的 CI，不能从
+本地受影响套件或旧绿色运行外推。
 
 修复提交的 CI 结果在本阶段完成后追加，并汇总到
 [本轮结构化证据](evidence/REALITY_FOUNDATION_AND_IMPORT_20261019.json)。
 原始失败记录不会被成功的后续提交覆盖。
+
+## 修复提交的精确 CI 结果
+
+源码 `a429d5bc2efe31f10cfb61d16b16ffbde2a8fc40`、tree
+`66ea18bfc6daf76b5985ac94742d1e12d0a64ae5` 的
+[Rust 运行 39202767158](https://github.com/SOLHK/Swirl/actions/runs/39202767158)
+于 `2026-10-19T05:27:53Z` 全部成功。三个平台的 checkout、日志和本次
+产物身份分别核对，没有从旧提交继承测试结果。
+
+| 门禁 | 此次实际结果 |
+| --- | --- |
+| Linux / macOS / Windows Rust | 各 188 单元/集成 + 1 doctest；fmt、check、Clippy、Release 和独立 REALITY 向量全部通过 |
+| 三平台共有 Python 菜单 | 各 201 通过、5 个 Qt 钩子跳过，0 失败/错误；8 个分配器函数是该菜单子集 |
+| Windows 额外合成 capture / 独立 management | 分别 25 通过/1 跳过、10 通过/1 跳过；不访问私有订阅 |
+| Windows CTest | 原生 3/3、兼容 2/2；原生包含独立 storage-paths 测试 |
+| 原生 Qt integration XML | 47 通过、0 失败、6 个依赖独立对端的跳过，排除初始化/清理 |
+| 原生 import / 兼容 import / 兼容 DNS guard XML | 分别 11、11、2 通过，无失败/跳过；导入坏输入持久化函数在两种模式均实际执行 |
+| 独立 Python Qt 对端 | 5 次分别通过，实际覆盖 6 个 Qt peer 槽位；此前的跳过不冲抵 |
+| 完整原生应用 | `SWIRL_USE_RUST_CORE=ON`、Release `Swirl.exe` 于 `05:27:47.685957Z` 编译成功 |
+
+Windows 共记录 248 次 Python 调用：241 通过、7 跳过。这个累计包含先跳过、
+后单独运行的钩子调用，不能当成 248 个互不重复的测试。四份 Qt XML 合计
+71 个实际通过、6 个跳过；storage-paths 和五个 Python 钩子另外记录。
+新增只读 netsh 诊断因实际 peer 步骤成功而没有运行，没有修改 Windows 端口配置。
+
+[App 运行 39202767154](https://github.com/SOLHK/Swirl/actions/runs/39202767154)
+也成功：189 Rust、25 guard、69 network 通过，5 跳过。下载的实际测试 SHA
+及源码 tar 的 182 个 regular 文件逐字节匹配该提交。这个较小菜单不能替代
+上面的完整 Rust 工作流。Linux 公网产物的三个既有 DIRECT HTTPS/原生 DoH
+检查成功，包括严格证书验证与会话关闭；它们不验证 REALITY/Vision 或提供商。
+
+本次 Windows Qt artifact `12164194762` 的 ZIP SHA-256 为
+`ae2a40bba772956bca25eccf06cee76353971f574bd00fd1f083447c2a257e26`。
+Windows 原始作业日志 SHA-256 为
+`6a76d65a49a26b7853ee77e107f0ae1e9c969ad0b469fa03d497fecfce532f88`。
+逐份 XML、其他平台、App 与公网产物的身份和计数见统一证据。
 
 ## 依据与未扩大范围
 

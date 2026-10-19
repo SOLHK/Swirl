@@ -40,7 +40,7 @@
   "transport_profiles": {
     "total": 10,
     "accepted": 0,
-    "partial": 1
+    "partial": 2
   },
   "format_profiles": {
     "total": 10,
@@ -222,9 +222,9 @@
       "id": "B13",
       "stage": "B",
       "criterion": "VLESS REALITY扩展",
-      "status": "未实现",
-      "evidence": "E04明确59条历史需求记录但不可执行",
-      "gap": "规格、严格身份验证、互操作、Qt与真实节点"
+      "status": "部分实现",
+      "evidence": "E14；daad7a0 拥有真实 X25519/ML-KEM、ClientHello/ServerHello transcript、证书 HMAC 与 CertificateVerify 的独立测试基础",
+      "gap": "仍不能执行 REALITY 出口；缺少 TLS 后端 transcript 集成、实际 Finished/指纹语义、独立完整对端、Qt 与真实节点"
     },
     {
       "id": "B14",
@@ -671,7 +671,7 @@
       "stage": "F",
       "criterion": "依赖许可证、必要署名与供应链记录",
       "status": "部分实现",
-      "evidence": "E05 DEPENDENCIES.json和既有许可证说明",
+      "evidence": "E05/E14；130 包库存、29 个新增依赖版本与 58 份完整许可证/notice；ML-KEM 上游未声称独立安全审计",
       "gap": "对最终依赖及实际安装包逐项核验"
     },
     {
@@ -679,8 +679,8 @@
       "stage": "F",
       "criterion": "同一候选的三平台CI、Windows Qt及安全门禁",
       "status": "未验证",
-      "evidence": "E09确认4e993d6三平台已全成功；本阶段新Qt代码CI待完成",
-      "gap": "最新源码完整完成结果需更新；未知状态不视为success"
+      "evidence": "E13–E16 分别记录开发提交的精确三平台/Qt结果，保留失败与未执行步骤",
+      "gap": "最终全协议候选及完整安全门禁仍未验证；开发阶段 CI 不代表全目标验收"
     },
     {
       "id": "F10",
@@ -805,6 +805,98 @@
         "app_tested_commit": "dc3ed5ef8ba9d3ec3d8d05e9ae0c7e810f19cfbb",
         "app_does_not_run_new_udp_suite": true
       }
+    },
+    {
+      "date": "2026-10-19",
+      "item": "B13",
+      "old_status": "未实现",
+      "new_status": "部分实现",
+      "source_sha": "daad7a057ab2c4b347c3ab142ce88af6528cb8f6",
+      "source_tree_sha": "70ccc46a5d938ba524e11f35f9e07531e1b0ede8",
+      "evidence": [
+        "docs/REALITY_HANDSHAKE_FOUNDATION_20261019.md",
+        "docs/evidence/REALITY_FOUNDATION_AND_IMPORT_20261019.json"
+      ],
+      "environment": [
+        "isolated Linux Rust 1.99.1 / actual Rust 1.89.0 MSRV check",
+        "GitHub Actions ubuntu-latest / macos-latest / windows-2022"
+      ],
+      "local_result": {
+        "rust_unit_integration_passed": 188,
+        "rust_doctest_passed": 1,
+        "rust_failed": 0,
+        "rust_ignored": 0,
+        "new_reality_module_tests_passed": 34,
+        "independent_auth_vectors": 3,
+        "independent_tls_transcripts": 2,
+        "independent_negative_checks": 22,
+        "complete_reality_peer_verified": false,
+        "native_reality_outbound_executable": false,
+        "vision_implemented": false
+      },
+      "initial_ci": {
+        "rust_run_id": 39200717679,
+        "linux": "success",
+        "macos": "success",
+        "windows": "failure in DNS peer TCP port allocation; Rust 189, Release and REALITY fixture passed; Qt/native application not run",
+        "app_run_id": 39200717693,
+        "app_actual_tested_sha": "daad7a057ab2c4b347c3ab142ce88af6528cb8f6",
+        "app_conclusion": "success"
+      },
+      "followup_source_sha": "a429d5bc2efe31f10cfb61d16b16ffbde2a8fc40",
+      "followup_source_tree_sha": "66ea18bfc6daf76b5985ac94742d1e12d0a64ae5",
+      "followup_ci": {
+        "rust_run_id": 39202767158,
+        "rust_conclusion": "success",
+        "linux": {
+          "rust_passed": 189,
+          "python_passed": 201,
+          "python_skipped": 5
+        },
+        "macos": {
+          "rust_passed": 189,
+          "python_passed": 201,
+          "python_skipped": 5
+        },
+        "windows": {
+          "job_id": 117899065248,
+          "rust_passed": 189,
+          "common_python_passed": 201,
+          "common_python_skipped": 5,
+          "additional_capture_passed": 25,
+          "additional_capture_skipped": 1,
+          "additional_management_passed": 10,
+          "additional_management_skipped": 1,
+          "separate_python_qt_hooks_passed": 5,
+          "all_python_invocations_passed": 241,
+          "all_python_invocations_skipped": 7,
+          "native_ctest_passed": 3,
+          "compatibility_ctest_passed": 2,
+          "native_integration_qt_passed": 47,
+          "native_integration_qt_skipped": 6,
+          "native_import_qt_passed": 11,
+          "compatibility_import_qt_passed": 11,
+          "compatibility_dns_guard_qt_passed": 2,
+          "qt_counts_exclude_lifecycle": true,
+          "complete_native_application_compiled": true,
+          "physical_display_verified": false
+        },
+        "app_run_id": 39202767154,
+        "app_conclusion": "success",
+        "app_actual_tested_sha": "a429d5bc2efe31f10cfb61d16b16ffbde2a8fc40",
+        "app_rust_passed": 189,
+        "app_guard_passed": 25,
+        "app_network_passed": 69,
+        "app_skipped": 5,
+        "app_archived_regular_source_files_byte_matched": 182,
+        "public_direct_https_native_doh_passed": 3,
+        "public_reality_vision_verified": false,
+        "verification": "verified exact source, original logs and artifacts"
+      },
+      "inheritance": "Only tested handshake foundations justify partial implementation. Stock-rustls verifier/provider tests are not a complete REALITY peer. Older green CI, ordinary TLS, parsing and build success do not establish REALITY/Vision execution or provider compatibility.",
+      "accepted_score_changed": false,
+      "private_records_tested": 0,
+      "complete_private_profiles_verified": 0
     }
   ]
 }

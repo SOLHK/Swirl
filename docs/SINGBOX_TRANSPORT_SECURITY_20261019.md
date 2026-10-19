@@ -79,3 +79,35 @@ a2c1b84e4cd9a5fafac01558d5885d6d16c6550288859b1beb4ebde702c42dbb
 - 已核对 [sing-box 许可证](https://github.com/SagerNet/sing-box/blob/dfb80349bf5779ec0a3f834c9ec2794345bff8f0/LICENSE)和 [sing 许可证](https://github.com/SagerNet/sing/blob/6f21f2425a95/LICENSE)，均为 GPL-3.0-or-later；这里只参考行为，没有复制实现或引入其依赖。
 
 固定验收仍为 **79 项、6 项已验收、权重 10.83%**。本次修复不删除、拆分或缩小验收项，不改变 REALITY/Vision 的可执行验收状态；没有更新验收 JSON 来提高比例。
+
+
+## 精确提交与原始 CI 失败
+
+本阶段已推送为 `e0534f4e9ea23ae38797f95ff7026f00e2f2a1e8`，tree
+`00c6d5b2d4d324075e34671ff16f403eae36c3b2`。
+[Rust 运行 39201185263](https://github.com/SOLHK/Swirl/actions/runs/39201185263)
+三平台各通过 188 个 Rust 单元/集成测试、1 个 doctest、Release 和 REALITY
+独立向量检查；Linux/macOS 各通过 197 个 Python 测试，5 个 Qt 钩子跳过。
+Windows 实际在策略组独立 SS 对端分配 TCP/UDP 同端口时失败，留下一个
+被包装而丢失底层错误码的 `RuntimeError`。此作业有 107 个 Python 通过、
+4 个跳过、1 个 error，后续菜单及 Qt/完整原生应用未执行；空报告上传步骤
+的 success 不等于有 Qt 产物。
+
+[App 运行 39201185296](https://github.com/SOLHK/Swirl/actions/runs/39201185296)
+已成功，下载的 `CORE_TESTED_COMMIT`、源码归档中实际 Qt 文件哈希均匹配
+`e0534f4`；189 Rust、25 guard 和 69 network 通过，5 个跳过。
+[字体运行 39201185356](https://github.com/SOLHK/Swirl/actions/runs/39201185356)
+另行成功：本次原始 XML 为 50 通过、8 跳过、0 失败，导航 61/61，完整
+兼容模式应用构建成功。它不替代此前跳过的原生 Rust 应用构建。
+Linux 公网产物中的 3 个既有 DIRECT HTTPS/原生 DoH 检查成功，实际来源
+SHA 相同；没有借此宣称新传输或 REALITY 联网。
+
+后续 `a429d5b` 对端修复保留本阶段全部 Qt 源码，其精确
+[Rust 运行 39202767158](https://github.com/SOLHK/Swirl/actions/runs/39202767158)
+已全部成功。Windows native/compat CTest 分别 3/3、2/2；原始 XML 中原生
+集成 47 通过/6 跳过、原生导入 11 通过、兼容导入 11 通过、兼容 DNS guard
+2 通过，均无失败且排除生命周期。新增传输映射/拒绝函数和现有坏输入
+原子持久化函数确实通过；五个独立 Qt 转发钩子另行通过，完整原生
+`Swirl.exe` 编译成功。本地最小 harness 的历史范围仍保持原记录。
+详见 [端口配对记录](LOOPBACK_PAIR_ALLOCATION_20261019.md)
+及 [统一结构化证据](evidence/REALITY_FOUNDATION_AND_IMPORT_20261019.json)。
