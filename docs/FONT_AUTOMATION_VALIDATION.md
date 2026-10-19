@@ -12,6 +12,7 @@
 | `587934dddadc24042e515bc6e5e4467e42f561ad` | 同样 3 个 CTest 通过；39 个实际用例通过，8 跳过，报告错误 0。 | 修复文件登记后配置成功；编译在 Qt 自动 QML 注册处失败：`QQmlElement<FontDisplayContext>` 不能继承 `final` 类，MSVC C3246。 | [39150738774](https://github.com/SOLHK/Swirl/actions/runs/39150738774) |
 | `f014feefeb618c43602d9f9fa3df6f459c0ae02e` | 编译成功；策略和原生 D3D11 两组通过，selection 组失败。49 个实际用例通过、1 个失败、8 个跳过；严格报告的 2 个错误均指向同一个重启用例。 | 启用 `SWIRL_BUILD_UI_TESTS=ON` 后完整 Swirl 目标配置、编译及 EXE 存在检查成功。该成功不抵消字体测试失败。 | [39152371090](https://github.com/SOLHK/Swirl/actions/runs/39152371090) |
 | `dfae05d07f84694d12223c9fcd4eddd199373dc1` | Qt 6.10.3/MSVC 编译成功；CTest 3/3，5.98 秒；50 个实际用例通过、8 个跳过、0 个报告错误。真实跨进程重启通过。 | 完整 Swirl 编译成功；导入公开可变字体后的导航测试退出 0，61 次请求均等待到路由和过渡就绪，无 Qt 警告。 | [39175245906](https://github.com/SOLHK/Swirl/actions/runs/39175245906) |
+| `8d045ab888e6ed0af6dea87adfb752793c455b5b` | Qt 6.10.3/MSVC 重新编译成功；CTest 3/3，8.06 秒；原始 XML 复核为 50 个实际用例通过、8 个跳过、0 个报告错误。 | 完整 Swirl 重新编译成功；公开字体导航测试退出 0，61 次请求、61 条 ready、60 个实际 routeKey，无 Qt 测试或导航警告。 | [39180142727](https://github.com/SOLHK/Swirl/actions/runs/39180142727) |
 
 上述 Windows 编译均实际使用 MSVC **19.44.35229.0**、Qt **6.10.3**、
 `win64_msvc2022_64`、Visual Studio 17 2022 x64。独立测试成功不代表
@@ -64,6 +65,38 @@ GitHub 证据产物的保留期为 7 天；已将不含私有字体或用户状�
 和 [Core implementation validation](https://github.com/SOLHK/Swirl/actions/runs/39175245881)
 也已成功；后者日志的实际 `CORE_TESTED_COMMIT` 为该 SHA。字体专用完整
 应用构建仍使用默认兼容内核，不能代替 Rust 专用产品验收。
+
+## 8d045ab 的 Windows 字体回归复验
+
+`8d045ab888e6ed0af6dea87adfb752793c455b5b` 的
+[字体专项运行 39180142727](https://github.com/SOLHK/Swirl/actions/runs/39180142727)
+于 2026-10-19 00:31 UTC 完成。已下载该运行的原始产物，核对运行 API、
+产物来源与源码 SHA 一致，并使用该提交中的报告脚本重新解析三份完整 XML。
+本节是新一次实际执行记录；前面的 `dfae05d` 结果及历史失败继续保留。
+
+| 检查项 | 本次实际结果 |
+| --- | --- |
+| 工具链 | Qt 6.10.3、MSVC 19.44.35229.0、Visual Studio 17 2022 x64、C++23。 |
+| 字体构建与 CTest | 独立目标编译成功；3/3 CTest 通过，总耗时 8.06 秒。 |
+| QTest 原始 XML | selection 为 16 通过、8 跳过；纯策略为 33 通过；原生字形为 1 通过。总计 50 通过、8 跳过、0 个报告错误，init/cleanup 不计入通过数。 |
+| 原生渲染后端 | 日志实际创建 D3D11 QRhi，选择 Microsoft Basic Render Driver，`Prefer software device: 1`，即 WARP 软件设备。 |
+| 完整应用 | 配置及编译步骤耗时 577 秒，Swirl EXE 存在检查成功；仍是默认兼容内核构建。 |
+| 应用导航 | 实际选中 `Swirl Automation Probe`，离屏软件后端；退出码 0，61 次导航请求、61 条就绪记录，61 个不同请求 ID 对应 60 个实际 routeKey。 |
+| 警告 | QTest 与导航诊断中没有 Qt warning/critical/fatal。完整应用构建仍有 `ScriptRunner.cpp` 两处、`GatewayChecks.cpp` 一处 C4834，以及 Qt GuiPrivate 配置提醒。 |
+
+Qt 安装、独立配置、字体构建、CTest、严格汇总、完整应用构建和导航步骤
+均为 success。8 个跳过项保持独立列示；原生字形项在 selection 离屏进程
+中跳过，在独立 Windows D3D11 进程中实际通过。导航就绪检查覆盖路由
+构造和转场状态，不代表 61 个独立页面、所有弹窗或最终视觉像素验收。
+
+原始产物 ID 为 `12156730169`，ZIP SHA-256 为
+`edcd6023e6ae2c892db2a1bc9cabf5b68ea928c45c6f50eb053989f9b375c1ef`，
+本地计算值与 GitHub 产物摘要一致。产物保留至 2026-10-26 00:31:13 UTC；
+已将来源、工具链、阶段、逐项结果和导航摘要按白名单保存到
+[FONT_AUTOMATION_WINDOWS_8D045AB_20261019.json](evidence/FONT_AUTOMATION_WINDOWS_8D045AB_20261019.json)。
+该摘录不包含私有字体、用户状态或安装包，也没有把物理 DPI 或 240 Hz
+标为通过。同一 SHA 的 Rust Core 回归有独立失败，字体结果不抵消该失败；
+对应问题与后续修复见 [SOCKS5 UDP 实际验证记录](RUST_SOCKS5_UDP_20261019.md)。
 
 ## 云端本地真实测试
 

@@ -1,4 +1,4 @@
-# Current handoff: automatic fonts verified; native Core development resumed (2026-10-19)
+# Current handoff: cloud font gates and native SOCKS5 UDP verified (2026-10-19)
 
 The current user instruction is to complete the font work and then continue the
 self-developed Swirl Core. This supersedes the older pause and delegation
@@ -6,10 +6,14 @@ instructions below. All changes stay on `work/core-completion-20261017`; never
 force-push or change `main`, App configuration, Secrets or supplier subscriptions.
 
 - Automatic variable-font implementation `dfae05d07f84694d12223c9fcd4eddd199373dc1`
-  passed Windows Qt 6.10.3 font tests (50 actual passes, 8 explicit skips), the
-  complete compatibility application build and 61/61 ready navigation requests.
+  passed its Windows font/application gates. The later exact-source regression
+  at `8d045ab888e6ed0af6dea87adfb752793c455b5b`, run `39180142727`, also passed:
+  Windows Qt 6.10.3/MSVC, 50 actual font passes, 8 explicit skips, complete
+  compatibility application build and 61/61 ready navigation requests (60 actual
+  route keys). The following Core buffer fix did not change font/QML/main source.
   See `FONT_AUTOMATION_SYSTEM.md`, `FONT_AUTOMATION_QML_COVERAGE.md` and
-  `FONT_AUTOMATION_VALIDATION.md`. Physical scaling/240 Hz are still separate;
+  `FONT_AUTOMATION_VALIDATION.md`. `FONT_AUTOMATION_WINDOWS_HANDOFF.md` gives
+  the remaining local procedure. Physical scaling/240 Hz are still separate;
   hosted D3D11 WARP/offscreen results do not establish physical display quality.
 - Rule-editor integrity implementation `72fa72a77d809d6084080dc5630459ed6d336fcf`
   and its test/report fix `6dcc212df1f58ce96d555dfa14db29e53b2e4bf2` now passed
@@ -17,19 +21,27 @@ force-push or change `main`, App configuration, Secrets or supplier subscription
   passes, 5 independent-peer skips and no failures. All three new rule tests
   passed, including encrypted atomic persistence and native forwarding. Preserve
   the first failed run and follow-up evidence in `RULE_EDIT_TRANSACTION_20261019.md`.
-- This source stage implements standard SOCKS5 outbound UDP, strict implicit TLS
-  alias preservation and existing Qt import/control integration. Local Rust
-  workspace: 152 passes. Independent new UDP: 12 passes, 1 full-Qt hook skip;
-  separately executed Qt production-code subsets and real Rust shared library
-  pass the new mapping and independent peer hooks. Existing TCP/TLS/SS peers:
-  31 passes, 2 explicit full-Qt hook skips. No private provider is involved.
-  See `RUST_SOCKS5_UDP_20261019.md` for exact bounds and retained failure history.
+- Standard SOCKS5 outbound UDP, strict implicit TLS alias preservation and
+  existing Qt import/control integration were implemented at `8d045ab`. Its
+  initial Windows preflight failure and macOS maximum-datagram failure are
+  preserved. The fixes are `dc3ed5ef8ba9d3ec3d8d05e9ae0c7e810f19cfbb`, tree
+  `9078aeb88f993a62a3d380a1bfc840c516d51d99`. Exact-source run `39181705419`
+  succeeded on Linux, macOS and Windows, with 154 Rust passes on each platform.
+  Linux/macOS each have 197 Python passes and 5 explicit Qt-hook skips; the
+  new UDP suite has 12 passes and 1 skip on each, including the previously
+  failing full response boundary. Windows separately passed native CTest 3/3,
+  compatibility CTest 2/2, five independent Qt peer hooks and the complete
+  native `Swirl.exe` build. Qt 6.10.3 and Rust use matching MSVC x64 ABIs.
+  App run `39181705430` succeeded and its actual tested-commit/archive identity
+  is `dc3ed5e`; it still runs only the older six peer scripts, not the new UDP
+  suite. See `RUST_SOCKS5_UDP_20261019.md` and its two permanent CI evidence JSONs.
 
-Next gate for this UDP source commit: actual Linux/macOS/Windows CI, both native
-and compatibility Qt imports, independent Windows Qt UDP forwarding, and a full
-native `Swirl` build. Record the exact SHA and result after those jobs finish;
-local portable Qt subsets are not the complete Windows test targets. Preserve
-all test assertions, explicit skips, fixed XML report paths and original exit codes.
+The cloud gates for this bounded Core stage are complete. Preserve exact-source
+logs, explicit skips, fixed XML report paths and original exit codes. Follow-up
+work includes real-provider UDP/NAT and long-run acceptance, full profile/DNS
+semantics and independently verified REALITY/Vision implementation. None is
+established by hosted loopback peers or the successful full application build.
+No background task continues after this handoff; the build is not an installer.
 
 The 79-item acceptance baseline and 10.83% verified whole-goal score are unchanged.
 SOCKS5 UDP is a partial protocol implementation, not complete-profile acceptance.

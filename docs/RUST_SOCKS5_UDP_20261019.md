@@ -210,8 +210,60 @@ Linux 的 Rust 为 152 通过；14 个 Python 套件共 202 项，197 通过、5
 [App 验证 39180142599](https://github.com/SOLHK/Swirl/actions/runs/39180142599)
 成功，实际 `CORE_TESTED_COMMIT` 与归档身份均为 `8d045ab`；但该 App 步骤
 只运行已有的六个独立 peer 文件，不包含新 UDP 整套，不能补算其验收。
-Windows 自检和跨平台缓冲修复仍须通过自己的精确提交 CI，最终结果在完成
-后追加，不能借用字体或先前 Core 的绿色记录。
+Windows 自检和跨平台缓冲修复随后执行了自己的精确提交 CI，结果见下文；
+没有借用字体或先前 Core 的绿色记录。
+
+### 修复后的精确提交验证
+
+修复已原子提交为 `dc3ed5ef8ba9d3ec3d8d05e9ae0c7e810f19cfbb`，相关树为
+`9078aeb88f993a62a3d380a1bfc840c516d51d99`。新
+[Rust CI 39181705419](https://github.com/SOLHK/Swirl/actions/runs/39181705419)
+与 [App 验证 39181705430](https://github.com/SOLHK/Swirl/actions/runs/39181705430)
+独立于首次失败运行。
+
+| 环境 | 实际结果 |
+| --- | --- |
+| Linux | Rust 154 通过、0 失败、0 ignored；14 个 Python 套件 197 通过、5 个完整 Qt 钩子跳过；新 UDP 为 12 通过、1 跳过，8.650 秒。 |
+| macOS | Rust 154 通过、0 失败、0 ignored，两个新传输用例均实际通过；14 个 Python 套件 197 通过、5 跳过；新 UDP 为 12 通过、1 跳过，9.377 秒。首次失败的两种认证最大报文往返所在用例实际通过。 |
+| Windows | Rust 154 通过、0 失败、0 ignored；fmt/check/clippy/Release 均成功。前置 16 个 Python 套件 232 通过、7 跳过；其中新 UDP 为 12 通过、1 Qt 钩子跳过，8.179 秒。随后兼容 CTest 2/2、原生 CTest 3/3、五个独立 Qt peer 钩子均实际通过。完整原生 `Swirl.exe` 编译和存在检查成功，实际编译约 551.20 秒。 |
+| App 验证 | Rust 154、更新器自检 25 实际通过；既有六个 Python peer 套件 69 通过、5 跳过。`CORE_TESTED_COMMIT` 和源码归档身份均为 `dc3ed5e`，修复的九个非文档文件与归档逐字节一致，无已跟踪文件差异。此 App 仍不包含新 UDP Python 整套。 |
+
+GitHub App 证据 ZIP 的 SHA-256 为
+`9bc65dd4275ea96726beeb5ca0947c02841c7afb73ea38416845d31d9ded4b6d`，
+与下载字节和 GitHub 摘要一致。所有跳过均独立列示；没有把三平台执行同一
+Rust 测试的次数相加为独立新用例数量。
+
+### Windows 原始 Qt 报告复核
+
+已下载运行 `39181705419` 的四份完整 XML，排除 `initTestCase` 和
+`cleanupTestCase` 后逐项解析：
+
+| 报告 | 实际通过 | 跳过 | 失败 |
+| --- | ---: | ---: | ---: |
+| 原生 `SwirlRustCoreTests` | 45 | 6 | 0 |
+| 原生导入边界 | 8 | 0 | 0 |
+| 兼容导入边界 | 8 | 0 | 0 |
+| 兼容 DNS 保护 | 2 | 0 | 0 |
+
+两种构建的 `socks5TlsUriAliasesPreserveSecurity`、原生
+`socks5UdpMappingPreservesTypedOptionsAndTls` 和规则事务的三个新增 slot
+均有实际 PASS。六个 standalone peer 跳过保留原始原因；随后五个独立
+Python Qt 钩子分别执行，其中 SS 钩子包含普通 SS 和 Loon SS 两个 Qt slot，
+合计覆盖这六个入口，不能把它们填回已跳过的 XML 记录。新 UDP 钩子
+为 1 通过、0 跳过、1.319 秒，含两种认证各自经过 Clash/INI 导入的四次
+真实 UDP 转发。所有 Python 步骤合计 237 通过、7 跳过；这包含支持脚本
+自检，并不是 237 个提供商联网用例。
+
+四份 XML 无 Qt warning/critical/fatal。完整原生应用仍有原有的三条
+C4834（`ScriptRunner.cpp` 两处、`GatewayChecks.cpp` 一处）和
+GuiPrivate 配置提醒，未宣称构建零警告。原生 `Swirl.exe` 确实生成，但
+该作业没有发布它的安装包，也没有运行完整原生 GUI 的实机验收。
+
+Qt XML 产物 ID `12157296715` 的下载 ZIP SHA-256 为
+`b49c0ed9d7fbe6049a19f0257bb4485034adac89bbe15606b2d2e6b3b09e71ee`，
+与 GitHub API 摘要一致，保留至 2026-10-26 01:03:05 UTC。白名单永久摘录为
+[跨平台及 App 证据](evidence/RUST_SOCKS5_UDP_PORTABLE_20261019.json) 和
+[Windows 原生 Qt／完整应用证据](evidence/RUST_SOCKS5_UDP_WINDOWS_20261019.json)。
 
 提供商 UDP、完整私有档案 0/18、真实目标记录 0/1558、REALITY/Vision、TUN、
 长期性能和物理网络变化仍未验收。没有把 Windows 云端构建称为用户 D 盘

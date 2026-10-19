@@ -1,0 +1,1248 @@
+{
+  "schema_version": 1,
+  "recorded_at_utc": "2026-10-19T00:55:18+00:00",
+  "repository": "SOLHK/Swirl",
+  "branch": "work/core-completion-20261017",
+  "title": "SOCKS5 UDP portable CI: first macOS failure and verified bounded-buffer correction",
+  "scope": "Complete Linux/macOS job logs and actual GitHub App source artifacts were inspected. Windows evidence is maintained separately.",
+  "count_semantics": {
+    "python": "pass/fail/skip count test methods reported by unittest Ran. A failed test method containing two erroneous subtests counts once in fail; error_incidents preserves unittest errors=2. Skips never count as passes.",
+    "rust": "Sum of actual passed/failed/ignored Rust test-result records, including any zero-case doctest records without adding passes.",
+    "registered_python_scripts": "The fourteen portable Python scripts include independent protocol peers and supporting CI/configuration checks; this is not a claim of 197 external-network tests."
+  },
+  "initial": {
+    "source_commit": "8d045ab888e6ed0af6dea87adfb752793c455b5b",
+    "source_tree": "125f439f7b929114caa1336bb01f42ba38353da4",
+    "rust_workflow_run_id": 39180142737,
+    "rust_workflow_run_url": "https://github.com/SOLHK/Swirl/actions/runs/39180142737",
+    "platforms": [
+      {
+        "platform": "linux",
+        "runner_label": "portable-rust (ubuntu-latest)",
+        "operating_system": [
+          "Ubuntu",
+          "24.04.5",
+          "LTS"
+        ],
+        "job_id": 117830957687,
+        "job_url": "https://github.com/SOLHK/Swirl/actions/runs/39180142737/job/117830957687",
+        "conclusion": "success",
+        "rustc_version_observed": "1.99.1 (58cf8f9c3 2026-10-13)",
+        "steps": [
+          {
+            "name": "Run cargo fmt --all -- --check",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run cargo check --workspace --locked",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run cargo clippy --workspace --all-targets --locked -- -D warnings",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run cargo test --workspace --locked",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run cargo build --release --locked --workspace --lib --bins",
+            "conclusion": "success"
+          },
+          {
+            "name": "Independent portable protocol peers",
+            "conclusion": "success"
+          },
+          {
+            "name": "Native public HTTPS and DoH verification",
+            "conclusion": "success"
+          }
+        ],
+        "rust": {
+          "pass": 152,
+          "fail": 0,
+          "ignored": 0
+        },
+        "new_transport_tests": [],
+        "python_totals": {
+          "tests_run": 202,
+          "pass": 197,
+          "fail": 0,
+          "skip": 5
+        },
+        "python_suites": [
+          {
+            "file": "tools/tests/test_rust_core.py",
+            "tests_run": 24,
+            "pass": 23,
+            "fail": 0,
+            "skip": 1,
+            "seconds": 27.114,
+            "unittest_result": "OK (skipped=1)"
+          },
+          {
+            "file": "tools/tests/test_shadowsocks.py",
+            "tests_run": 9,
+            "pass": 8,
+            "fail": 0,
+            "skip": 1,
+            "seconds": 11.187,
+            "unittest_result": "OK (skipped=1)"
+          },
+          {
+            "file": "tools/tests/test_dns_tls.py",
+            "tests_run": 11,
+            "pass": 11,
+            "fail": 0,
+            "skip": 0,
+            "seconds": 10.244,
+            "unittest_result": "OK"
+          },
+          {
+            "file": "tools/tests/test_dns_https.py",
+            "tests_run": 9,
+            "pass": 9,
+            "fail": 0,
+            "skip": 0,
+            "seconds": 8.626,
+            "unittest_result": "OK"
+          },
+          {
+            "file": "tools/tests/test_socks4.py",
+            "tests_run": 10,
+            "pass": 9,
+            "fail": 0,
+            "skip": 1,
+            "seconds": 5.063,
+            "unittest_result": "OK (skipped=1)"
+          },
+          {
+            "file": "tools/tests/test_websocket_transport.py",
+            "tests_run": 11,
+            "pass": 10,
+            "fail": 0,
+            "skip": 1,
+            "seconds": 9.629,
+            "unittest_result": "OK (skipped=1)"
+          },
+          {
+            "file": "tools/tests/test_core_development.py",
+            "tests_run": 25,
+            "pass": 25,
+            "fail": 0,
+            "skip": 0,
+            "seconds": 0.058,
+            "unittest_result": "OK"
+          },
+          {
+            "file": "tools/tests/test_policy_groups.py",
+            "tests_run": 13,
+            "pass": 13,
+            "fail": 0,
+            "skip": 0,
+            "seconds": 5.236,
+            "unittest_result": "OK"
+          },
+          {
+            "file": "tools/tests/test_dns_negative.py",
+            "tests_run": 30,
+            "pass": 30,
+            "fail": 0,
+            "skip": 0,
+            "seconds": 79.292,
+            "unittest_result": "OK"
+          },
+          {
+            "file": "tools/tests/test_native_probe.py",
+            "tests_run": 7,
+            "pass": 7,
+            "fail": 0,
+            "skip": 0,
+            "seconds": 0.027,
+            "unittest_result": "OK"
+          },
+          {
+            "file": "tools/tests/test_connection_stages.py",
+            "tests_run": 8,
+            "pass": 8,
+            "fail": 0,
+            "skip": 0,
+            "seconds": 9.038,
+            "unittest_result": "OK"
+          },
+          {
+            "file": "tools/tests/test_connectivity_diagnostics.py",
+            "tests_run": 21,
+            "pass": 21,
+            "fail": 0,
+            "skip": 0,
+            "seconds": 5.189,
+            "unittest_result": "OK"
+          },
+          {
+            "file": "tools/tests/test_subscription_import.py",
+            "tests_run": 11,
+            "pass": 11,
+            "fail": 0,
+            "skip": 0,
+            "seconds": 4.174,
+            "unittest_result": "OK"
+          },
+          {
+            "file": "tools/tests/test_socks5_udp.py",
+            "tests_run": 13,
+            "pass": 12,
+            "fail": 0,
+            "skip": 1,
+            "seconds": 8.547,
+            "unittest_result": "OK (skipped=1)"
+          }
+        ],
+        "new_socks5_udp": {
+          "file": "tools/tests/test_socks5_udp.py",
+          "tests_run": 13,
+          "pass": 12,
+          "fail": 0,
+          "skip": 1,
+          "seconds": 8.547,
+          "unittest_result": "OK (skipped=1)"
+        },
+        "large_socks5_response_boundary": {
+          "test_method": "test_wire_addresses_authentication_and_datagram_boundaries",
+          "authentication_variants": [
+            false,
+            true
+          ],
+          "response_header_bytes": 10,
+          "origin_response_prefix_bytes": 18,
+          "explicit_response_length_assertion": false,
+          "source_sha256": "1d4eda240b9664373047870ee75460cf4e94962d26cda73a36ec2c0c0bbcf57a",
+          "result": "pass",
+          "expected_application_request_payload_bytes": 65479,
+          "expected_client_socks_udp_request_bytes": 65489,
+          "expected_client_socks_udp_response_bytes": 65507,
+          "request_and_response_completed_and_verified": true
+        },
+        "public_https_and_doh": {
+          "executed": true,
+          "passed_probes": 3,
+          "scope": "Public HTTPS via native DIRECT and native DoH only; no provider, UDP, TUN or performance claim."
+        },
+        "log": {
+          "file_name": "linux-rust.log",
+          "utf8_bytes": 111670,
+          "sha256": "71b997c138321abba13b3c466949d22ffaf31179eb64a26ae592b55ade8453c0",
+          "representation": "Exact UTF-8 text returned by github_fetch_workflow_job_logs, including BOM and final newline."
+        }
+      },
+      {
+        "platform": "macos",
+        "runner_label": "portable-rust (macos-latest)",
+        "operating_system": [
+          "macOS",
+          "26.6.2",
+          "25G83"
+        ],
+        "job_id": 117830957648,
+        "job_url": "https://github.com/SOLHK/Swirl/actions/runs/39180142737/job/117830957648",
+        "conclusion": "failure",
+        "rustc_version_observed": "1.99.1 (58cf8f9c3 2026-10-13)",
+        "steps": [
+          {
+            "name": "Run cargo fmt --all -- --check",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run cargo check --workspace --locked",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run cargo clippy --workspace --all-targets --locked -- -D warnings",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run cargo test --workspace --locked",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run cargo build --release --locked --workspace --lib --bins",
+            "conclusion": "success"
+          },
+          {
+            "name": "Independent portable protocol peers",
+            "conclusion": "failure"
+          },
+          {
+            "name": "Native public HTTPS and DoH verification",
+            "conclusion": "skipped"
+          }
+        ],
+        "rust": {
+          "pass": 152,
+          "fail": 0,
+          "ignored": 0
+        },
+        "new_transport_tests": [],
+        "python_totals": {
+          "tests_run": 202,
+          "pass": 196,
+          "fail": 1,
+          "skip": 5
+        },
+        "python_suites": [
+          {
+            "file": "tools/tests/test_rust_core.py",
+            "tests_run": 24,
+            "pass": 23,
+            "fail": 0,
+            "skip": 1,
+            "seconds": 27.198,
+            "unittest_result": "OK (skipped=1)"
+          },
+          {
+            "file": "tools/tests/test_shadowsocks.py",
+            "tests_run": 9,
+            "pass": 8,
+            "fail": 0,
+            "skip": 1,
+            "seconds": 8.776,
+            "unittest_result": "OK (skipped=1)"
+          },
+          {
+            "file": "tools/tests/test_dns_tls.py",
+            "tests_run": 11,
+            "pass": 11,
+            "fail": 0,
+            "skip": 0,
+            "seconds": 10.745,
+            "unittest_result": "OK"
+          },
+          {
+            "file": "tools/tests/test_dns_https.py",
+            "tests_run": 9,
+            "pass": 9,
+            "fail": 0,
+            "skip": 0,
+            "seconds": 8.822,
+            "unittest_result": "OK"
+          },
+          {
+            "file": "tools/tests/test_socks4.py",
+            "tests_run": 10,
+            "pass": 9,
+            "fail": 0,
+            "skip": 1,
+            "seconds": 6.903,
+            "unittest_result": "OK (skipped=1)"
+          },
+          {
+            "file": "tools/tests/test_websocket_transport.py",
+            "tests_run": 11,
+            "pass": 10,
+            "fail": 0,
+            "skip": 1,
+            "seconds": 11.064,
+            "unittest_result": "OK (skipped=1)"
+          },
+          {
+            "file": "tools/tests/test_core_development.py",
+            "tests_run": 25,
+            "pass": 25,
+            "fail": 0,
+            "skip": 0,
+            "seconds": 0.133,
+            "unittest_result": "OK"
+          },
+          {
+            "file": "tools/tests/test_policy_groups.py",
+            "tests_run": 13,
+            "pass": 13,
+            "fail": 0,
+            "skip": 0,
+            "seconds": 7.214,
+            "unittest_result": "OK"
+          },
+          {
+            "file": "tools/tests/test_dns_negative.py",
+            "tests_run": 30,
+            "pass": 30,
+            "fail": 0,
+            "skip": 0,
+            "seconds": 85.781,
+            "unittest_result": "OK"
+          },
+          {
+            "file": "tools/tests/test_native_probe.py",
+            "tests_run": 7,
+            "pass": 7,
+            "fail": 0,
+            "skip": 0,
+            "seconds": 0.036,
+            "unittest_result": "OK"
+          },
+          {
+            "file": "tools/tests/test_connection_stages.py",
+            "tests_run": 8,
+            "pass": 8,
+            "fail": 0,
+            "skip": 0,
+            "seconds": 9.667,
+            "unittest_result": "OK"
+          },
+          {
+            "file": "tools/tests/test_connectivity_diagnostics.py",
+            "tests_run": 21,
+            "pass": 21,
+            "fail": 0,
+            "skip": 0,
+            "seconds": 5.514,
+            "unittest_result": "OK"
+          },
+          {
+            "file": "tools/tests/test_subscription_import.py",
+            "tests_run": 11,
+            "pass": 11,
+            "fail": 0,
+            "skip": 0,
+            "seconds": 3.991,
+            "unittest_result": "OK"
+          },
+          {
+            "file": "tools/tests/test_socks5_udp.py",
+            "tests_run": 13,
+            "pass": 11,
+            "fail": 1,
+            "skip": 1,
+            "seconds": 9.433,
+            "unittest_result": "FAILED (errors=2, skipped=1)",
+            "failed_test_methods": [
+              "test_wire_addresses_authentication_and_datagram_boundaries (__main__.Socks5UdpIntegration.test_wire_addresses_authentication_and_datagram_boundaries)"
+            ],
+            "error_incidents": 2,
+            "assertion_failure_incidents": 0
+          }
+        ],
+        "new_socks5_udp": {
+          "file": "tools/tests/test_socks5_udp.py",
+          "tests_run": 13,
+          "pass": 11,
+          "fail": 1,
+          "skip": 1,
+          "seconds": 9.433,
+          "unittest_result": "FAILED (errors=2, skipped=1)",
+          "failed_test_methods": [
+            "test_wire_addresses_authentication_and_datagram_boundaries (__main__.Socks5UdpIntegration.test_wire_addresses_authentication_and_datagram_boundaries)"
+          ],
+          "error_incidents": 2,
+          "assertion_failure_incidents": 0
+        },
+        "large_socks5_response_boundary": {
+          "test_method": "test_wire_addresses_authentication_and_datagram_boundaries",
+          "authentication_variants": [
+            false,
+            true
+          ],
+          "response_header_bytes": 10,
+          "origin_response_prefix_bytes": 18,
+          "explicit_response_length_assertion": false,
+          "source_sha256": "1d4eda240b9664373047870ee75460cf4e94962d26cda73a36ec2c0c0bbcf57a",
+          "result": "failure_before_client_send_completed",
+          "expected_application_request_payload_bytes": 65479,
+          "expected_client_socks_udp_request_bytes": 65489,
+          "expected_client_socks_udp_response_bytes": 65507,
+          "request_and_response_completed_and_verified": false
+        },
+        "public_https_and_doh": {
+          "executed": false,
+          "passed_probes": 0,
+          "scope": "Public HTTPS via native DIRECT and native DoH only; no provider, UDP, TUN or performance claim."
+        },
+        "log": {
+          "file_name": "macos-rust.log",
+          "utf8_bytes": 105914,
+          "sha256": "db50e42b62257150348ff9e64b0c0a9cf8b0c80be7363d9f67bcbbfc04cc2812",
+          "representation": "Exact UTF-8 text returned by github_fetch_workflow_job_logs, including BOM and final newline."
+        },
+        "failure": {
+          "step": "Independent portable protocol peers",
+          "file": "tools/tests/test_socks5_udp.py",
+          "test_method": "test_wire_addresses_authentication_and_datagram_boundaries",
+          "subtests": [
+            "auth=False",
+            "auth=True"
+          ],
+          "error_incidents": 2,
+          "failed_test_methods": 1,
+          "error": "OSError: [Errno 40] Message too long",
+          "site": "Client Python UDP sendto, original source lines 511 -> 487, before that datagram reached Core.",
+          "retained": true
+        }
+      }
+    ],
+    "app_validation": {
+      "workflow_run_id": 39180142599,
+      "workflow_run_url": "https://github.com/SOLHK/Swirl/actions/runs/39180142599",
+      "job_id": 117830957179,
+      "job_url": "https://github.com/SOLHK/Swirl/actions/runs/39180142599/job/117830957179",
+      "conclusion": "success",
+      "rust": {
+        "pass": 152,
+        "fail": 0,
+        "ignored": 0
+      },
+      "new_transport_tests": [],
+      "ci_script_selftests": {
+        "file": "tools/tests/test_core_development.py",
+        "tests_run": 25,
+        "pass": 25,
+        "fail": 0,
+        "skip": 0,
+        "seconds": 0.093,
+        "unittest_result": "OK"
+      },
+      "network_peer_totals": {
+        "tests_run": 74,
+        "pass": 69,
+        "fail": 0,
+        "skip": 5
+      },
+      "network_peer_suites": [
+        {
+          "file": "tools/tests/test_rust_core.py",
+          "tests_run": 24,
+          "pass": 23,
+          "fail": 0,
+          "skip": 1,
+          "seconds": 28.112,
+          "unittest_result": "OK (skipped=1)"
+        },
+        {
+          "file": "tools/tests/test_shadowsocks.py",
+          "tests_run": 9,
+          "pass": 8,
+          "fail": 0,
+          "skip": 1,
+          "seconds": 12.18,
+          "unittest_result": "OK (skipped=1)"
+        },
+        {
+          "file": "tools/tests/test_dns_tls.py",
+          "tests_run": 11,
+          "pass": 11,
+          "fail": 0,
+          "skip": 0,
+          "seconds": 10.229,
+          "unittest_result": "OK"
+        },
+        {
+          "file": "tools/tests/test_dns_https.py",
+          "tests_run": 9,
+          "pass": 9,
+          "fail": 0,
+          "skip": 0,
+          "seconds": 8.588,
+          "unittest_result": "OK"
+        },
+        {
+          "file": "tools/tests/test_socks4.py",
+          "tests_run": 10,
+          "pass": 8,
+          "fail": 0,
+          "skip": 2,
+          "seconds": 4.105,
+          "unittest_result": "OK (skipped=2)"
+        },
+        {
+          "file": "tools/tests/test_websocket_transport.py",
+          "tests_run": 11,
+          "pass": 10,
+          "fail": 0,
+          "skip": 1,
+          "seconds": 9.587,
+          "unittest_result": "OK (skipped=1)"
+        }
+      ],
+      "runs_new_socks5_udp_python_suite": false,
+      "limitation": "This workflow runs six older peer scripts. Its success does not replace the new SOCKS5 UDP Python suite in the portable Rust workflow.",
+      "artifact": {
+        "id": 12155623951,
+        "name": "Core-development-evidence",
+        "zip_bytes": 522923,
+        "zip_sha256": "fa375c983df226a500fca42eb227a8046cac9d60411a9ca3ff98eb43369770d2",
+        "api_digest_matched": true,
+        "core_tested_commit": "8d045ab888e6ed0af6dea87adfb752793c455b5b",
+        "git_archive_commit": "8d045ab888e6ed0af6dea87adfb752793c455b5b",
+        "source_tar_sha256": "9de66d842861806cdac8f9a38ed0e12108d41e1c0ea89d2e12525db129097fb7",
+        "tracked_worktree_clean": true,
+        "worktree_state": [
+          "?? CORE_TESTED_COMMIT",
+          "?? CORE_WORKTREE_STATE",
+          "?? core-tested-source.tar"
+        ],
+        "archived_source_files_verified_against_commit": {
+          "core/Cargo.lock": "fdd119e25b615e2d60b151528095a59ae8f62642b2bc94eb1d4e6b316e593b49",
+          "core/crates/swirl-core/src/lib.rs": "d63d0425efab27b1d3314fa14f34c60ee915b3bc45df27d4503547a0c4fc453c",
+          "core/crates/swirl-protocol/src/socks5.rs": "42764f7780a7cdf3dbb44ef2a29e284ad6e953ccf12acdf09a27e260d1da57d0",
+          "tools/tests/test_socks5_udp.py": "1d4eda240b9664373047870ee75460cf4e94962d26cda73a36ec2c0c0bbcf57a"
+        },
+        "source_tar_copied_into_repository": false
+      },
+      "log": {
+        "file_name": "app-validation.log",
+        "utf8_bytes": 88175,
+        "sha256": "26581301ded5229eed629da5a1e2b759d15704a92d3300b61d8236cf8f87d72e",
+        "representation": "Exact UTF-8 text returned by github_fetch_workflow_job_logs, including BOM and final newline."
+      }
+    }
+  },
+  "followup": {
+    "source_commit": "dc3ed5ef8ba9d3ec3d8d05e9ae0c7e810f19cfbb",
+    "source_tree": "9078aeb88f993a62a3d380a1bfc840c516d51d99",
+    "rust_workflow_run_id": 39181705419,
+    "rust_workflow_run_url": "https://github.com/SOLHK/Swirl/actions/runs/39181705419",
+    "platforms": [
+      {
+        "platform": "linux",
+        "runner_label": "portable-rust (ubuntu-latest)",
+        "operating_system": [
+          "Ubuntu",
+          "24.04.5",
+          "LTS"
+        ],
+        "job_id": 117835644603,
+        "job_url": "https://github.com/SOLHK/Swirl/actions/runs/39181705419/job/117835644603",
+        "conclusion": "success",
+        "rustc_version_observed": "1.99.1 (58cf8f9c3 2026-10-13)",
+        "steps": [
+          {
+            "name": "Run cargo fmt --all -- --check",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run cargo check --workspace --locked",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run cargo clippy --workspace --all-targets --locked -- -D warnings",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run cargo test --workspace --locked",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run cargo build --release --locked --workspace --lib --bins",
+            "conclusion": "success"
+          },
+          {
+            "name": "Independent portable protocol peers",
+            "conclusion": "success"
+          },
+          {
+            "name": "Native public HTTPS and DoH verification",
+            "conclusion": "success"
+          }
+        ],
+        "rust": {
+          "pass": 154,
+          "fail": 0,
+          "ignored": 0
+        },
+        "new_transport_tests": [
+          {
+            "name": "udp::tests::full_datagrams_survive_small_buffers_and_address_families",
+            "result": "pass"
+          },
+          {
+            "name": "udp::tests::buffer_setup_retains_larger_existing_values",
+            "result": "pass"
+          }
+        ],
+        "python_totals": {
+          "tests_run": 202,
+          "pass": 197,
+          "fail": 0,
+          "skip": 5
+        },
+        "python_suites": [
+          {
+            "file": "tools/tests/test_rust_core.py",
+            "tests_run": 24,
+            "pass": 23,
+            "fail": 0,
+            "skip": 1,
+            "seconds": 26.689,
+            "unittest_result": "OK (skipped=1)"
+          },
+          {
+            "file": "tools/tests/test_shadowsocks.py",
+            "tests_run": 9,
+            "pass": 8,
+            "fail": 0,
+            "skip": 1,
+            "seconds": 11.19,
+            "unittest_result": "OK (skipped=1)"
+          },
+          {
+            "file": "tools/tests/test_dns_tls.py",
+            "tests_run": 11,
+            "pass": 11,
+            "fail": 0,
+            "skip": 0,
+            "seconds": 10.243,
+            "unittest_result": "OK"
+          },
+          {
+            "file": "tools/tests/test_dns_https.py",
+            "tests_run": 9,
+            "pass": 9,
+            "fail": 0,
+            "skip": 0,
+            "seconds": 8.634,
+            "unittest_result": "OK"
+          },
+          {
+            "file": "tools/tests/test_socks4.py",
+            "tests_run": 10,
+            "pass": 9,
+            "fail": 0,
+            "skip": 1,
+            "seconds": 5.106,
+            "unittest_result": "OK (skipped=1)"
+          },
+          {
+            "file": "tools/tests/test_websocket_transport.py",
+            "tests_run": 11,
+            "pass": 10,
+            "fail": 0,
+            "skip": 1,
+            "seconds": 9.673,
+            "unittest_result": "OK (skipped=1)"
+          },
+          {
+            "file": "tools/tests/test_core_development.py",
+            "tests_run": 25,
+            "pass": 25,
+            "fail": 0,
+            "skip": 0,
+            "seconds": 0.063,
+            "unittest_result": "OK"
+          },
+          {
+            "file": "tools/tests/test_policy_groups.py",
+            "tests_run": 13,
+            "pass": 13,
+            "fail": 0,
+            "skip": 0,
+            "seconds": 5.226,
+            "unittest_result": "OK"
+          },
+          {
+            "file": "tools/tests/test_dns_negative.py",
+            "tests_run": 30,
+            "pass": 30,
+            "fail": 0,
+            "skip": 0,
+            "seconds": 78.307,
+            "unittest_result": "OK"
+          },
+          {
+            "file": "tools/tests/test_native_probe.py",
+            "tests_run": 7,
+            "pass": 7,
+            "fail": 0,
+            "skip": 0,
+            "seconds": 0.028,
+            "unittest_result": "OK"
+          },
+          {
+            "file": "tools/tests/test_connection_stages.py",
+            "tests_run": 8,
+            "pass": 8,
+            "fail": 0,
+            "skip": 0,
+            "seconds": 9.039,
+            "unittest_result": "OK"
+          },
+          {
+            "file": "tools/tests/test_connectivity_diagnostics.py",
+            "tests_run": 21,
+            "pass": 21,
+            "fail": 0,
+            "skip": 0,
+            "seconds": 5.192,
+            "unittest_result": "OK"
+          },
+          {
+            "file": "tools/tests/test_subscription_import.py",
+            "tests_run": 11,
+            "pass": 11,
+            "fail": 0,
+            "skip": 0,
+            "seconds": 4.184,
+            "unittest_result": "OK"
+          },
+          {
+            "file": "tools/tests/test_socks5_udp.py",
+            "tests_run": 13,
+            "pass": 12,
+            "fail": 0,
+            "skip": 1,
+            "seconds": 8.65,
+            "unittest_result": "OK (skipped=1)"
+          }
+        ],
+        "new_socks5_udp": {
+          "file": "tools/tests/test_socks5_udp.py",
+          "tests_run": 13,
+          "pass": 12,
+          "fail": 0,
+          "skip": 1,
+          "seconds": 8.65,
+          "unittest_result": "OK (skipped=1)"
+        },
+        "large_socks5_response_boundary": {
+          "test_method": "test_wire_addresses_authentication_and_datagram_boundaries",
+          "authentication_variants": [
+            false,
+            true
+          ],
+          "response_header_bytes": 10,
+          "origin_response_prefix_bytes": 18,
+          "explicit_response_length_assertion": true,
+          "source_sha256": "b06bdde43f85d9eff887237c73fac70ba6d7405df815dcccdcfb0710cd9abd61",
+          "result": "pass",
+          "expected_application_request_payload_bytes": 65479,
+          "expected_client_socks_udp_request_bytes": 65489,
+          "expected_client_socks_udp_response_bytes": 65507,
+          "request_and_response_completed_and_verified": true
+        },
+        "public_https_and_doh": {
+          "executed": true,
+          "passed_probes": 3,
+          "scope": "Public HTTPS via native DIRECT and native DoH only; no provider, UDP, TUN or performance claim."
+        },
+        "log": {
+          "file_name": "linux-rust.log",
+          "utf8_bytes": 111886,
+          "sha256": "71df9c09ce22697a4b5cc8c9275422a2ac6f4fd474649edf98618f9d2da86852",
+          "representation": "Exact UTF-8 text returned by github_fetch_workflow_job_logs, including BOM and final newline."
+        }
+      },
+      {
+        "platform": "macos",
+        "runner_label": "portable-rust (macos-latest)",
+        "operating_system": [
+          "macOS",
+          "26.6.2",
+          "25G83"
+        ],
+        "job_id": 117835644727,
+        "job_url": "https://github.com/SOLHK/Swirl/actions/runs/39181705419/job/117835644727",
+        "conclusion": "success",
+        "rustc_version_observed": "1.99.1 (58cf8f9c3 2026-10-13)",
+        "steps": [
+          {
+            "name": "Run cargo fmt --all -- --check",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run cargo check --workspace --locked",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run cargo clippy --workspace --all-targets --locked -- -D warnings",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run cargo test --workspace --locked",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run cargo build --release --locked --workspace --lib --bins",
+            "conclusion": "success"
+          },
+          {
+            "name": "Independent portable protocol peers",
+            "conclusion": "success"
+          },
+          {
+            "name": "Native public HTTPS and DoH verification",
+            "conclusion": "skipped"
+          }
+        ],
+        "rust": {
+          "pass": 154,
+          "fail": 0,
+          "ignored": 0
+        },
+        "new_transport_tests": [
+          {
+            "name": "udp::tests::full_datagrams_survive_small_buffers_and_address_families",
+            "result": "pass"
+          },
+          {
+            "name": "udp::tests::buffer_setup_retains_larger_existing_values",
+            "result": "pass"
+          }
+        ],
+        "python_totals": {
+          "tests_run": 202,
+          "pass": 197,
+          "fail": 0,
+          "skip": 5
+        },
+        "python_suites": [
+          {
+            "file": "tools/tests/test_rust_core.py",
+            "tests_run": 24,
+            "pass": 23,
+            "fail": 0,
+            "skip": 1,
+            "seconds": 28.752,
+            "unittest_result": "OK (skipped=1)"
+          },
+          {
+            "file": "tools/tests/test_shadowsocks.py",
+            "tests_run": 9,
+            "pass": 8,
+            "fail": 0,
+            "skip": 1,
+            "seconds": 10.785,
+            "unittest_result": "OK (skipped=1)"
+          },
+          {
+            "file": "tools/tests/test_dns_tls.py",
+            "tests_run": 11,
+            "pass": 11,
+            "fail": 0,
+            "skip": 0,
+            "seconds": 10.165,
+            "unittest_result": "OK"
+          },
+          {
+            "file": "tools/tests/test_dns_https.py",
+            "tests_run": 9,
+            "pass": 9,
+            "fail": 0,
+            "skip": 0,
+            "seconds": 10.828,
+            "unittest_result": "OK"
+          },
+          {
+            "file": "tools/tests/test_socks4.py",
+            "tests_run": 10,
+            "pass": 9,
+            "fail": 0,
+            "skip": 1,
+            "seconds": 6.194,
+            "unittest_result": "OK (skipped=1)"
+          },
+          {
+            "file": "tools/tests/test_websocket_transport.py",
+            "tests_run": 11,
+            "pass": 10,
+            "fail": 0,
+            "skip": 1,
+            "seconds": 10.747,
+            "unittest_result": "OK (skipped=1)"
+          },
+          {
+            "file": "tools/tests/test_core_development.py",
+            "tests_run": 25,
+            "pass": 25,
+            "fail": 0,
+            "skip": 0,
+            "seconds": 0.105,
+            "unittest_result": "OK"
+          },
+          {
+            "file": "tools/tests/test_policy_groups.py",
+            "tests_run": 13,
+            "pass": 13,
+            "fail": 0,
+            "skip": 0,
+            "seconds": 7.211,
+            "unittest_result": "OK"
+          },
+          {
+            "file": "tools/tests/test_dns_negative.py",
+            "tests_run": 30,
+            "pass": 30,
+            "fail": 0,
+            "skip": 0,
+            "seconds": 96.427,
+            "unittest_result": "OK"
+          },
+          {
+            "file": "tools/tests/test_native_probe.py",
+            "tests_run": 7,
+            "pass": 7,
+            "fail": 0,
+            "skip": 0,
+            "seconds": 0.028,
+            "unittest_result": "OK"
+          },
+          {
+            "file": "tools/tests/test_connection_stages.py",
+            "tests_run": 8,
+            "pass": 8,
+            "fail": 0,
+            "skip": 0,
+            "seconds": 10.708,
+            "unittest_result": "OK"
+          },
+          {
+            "file": "tools/tests/test_connectivity_diagnostics.py",
+            "tests_run": 21,
+            "pass": 21,
+            "fail": 0,
+            "skip": 0,
+            "seconds": 5.571,
+            "unittest_result": "OK"
+          },
+          {
+            "file": "tools/tests/test_subscription_import.py",
+            "tests_run": 11,
+            "pass": 11,
+            "fail": 0,
+            "skip": 0,
+            "seconds": 3.983,
+            "unittest_result": "OK"
+          },
+          {
+            "file": "tools/tests/test_socks5_udp.py",
+            "tests_run": 13,
+            "pass": 12,
+            "fail": 0,
+            "skip": 1,
+            "seconds": 9.377,
+            "unittest_result": "OK (skipped=1)"
+          }
+        ],
+        "new_socks5_udp": {
+          "file": "tools/tests/test_socks5_udp.py",
+          "tests_run": 13,
+          "pass": 12,
+          "fail": 0,
+          "skip": 1,
+          "seconds": 9.377,
+          "unittest_result": "OK (skipped=1)"
+        },
+        "large_socks5_response_boundary": {
+          "test_method": "test_wire_addresses_authentication_and_datagram_boundaries",
+          "authentication_variants": [
+            false,
+            true
+          ],
+          "response_header_bytes": 10,
+          "origin_response_prefix_bytes": 18,
+          "explicit_response_length_assertion": true,
+          "source_sha256": "b06bdde43f85d9eff887237c73fac70ba6d7405df815dcccdcfb0710cd9abd61",
+          "result": "pass",
+          "expected_application_request_payload_bytes": 65479,
+          "expected_client_socks_udp_request_bytes": 65489,
+          "expected_client_socks_udp_response_bytes": 65507,
+          "request_and_response_completed_and_verified": true
+        },
+        "public_https_and_doh": {
+          "executed": false,
+          "passed_probes": 0,
+          "scope": "Public HTTPS via native DIRECT and native DoH only; no provider, UDP, TUN or performance claim."
+        },
+        "log": {
+          "file_name": "macos-rust.log",
+          "utf8_bytes": 103355,
+          "sha256": "0d9126007a5cc7e1d1196eea3e7e3e6e41c2a4934fd37c5daeb48be42c9ecba7",
+          "representation": "Exact UTF-8 text returned by github_fetch_workflow_job_logs, including BOM and final newline."
+        }
+      }
+    ],
+    "app_validation": {
+      "workflow_run_id": 39181705430,
+      "workflow_run_url": "https://github.com/SOLHK/Swirl/actions/runs/39181705430",
+      "job_id": 117835644738,
+      "job_url": "https://github.com/SOLHK/Swirl/actions/runs/39181705430/job/117835644738",
+      "conclusion": "success",
+      "rust": {
+        "pass": 154,
+        "fail": 0,
+        "ignored": 0
+      },
+      "new_transport_tests": [
+        {
+          "name": "udp::tests::full_datagrams_survive_small_buffers_and_address_families",
+          "result": "pass"
+        },
+        {
+          "name": "udp::tests::buffer_setup_retains_larger_existing_values",
+          "result": "pass"
+        }
+      ],
+      "ci_script_selftests": {
+        "file": "tools/tests/test_core_development.py",
+        "tests_run": 25,
+        "pass": 25,
+        "fail": 0,
+        "skip": 0,
+        "seconds": 0.057,
+        "unittest_result": "OK"
+      },
+      "network_peer_totals": {
+        "tests_run": 74,
+        "pass": 69,
+        "fail": 0,
+        "skip": 5
+      },
+      "network_peer_suites": [
+        {
+          "file": "tools/tests/test_rust_core.py",
+          "tests_run": 24,
+          "pass": 23,
+          "fail": 0,
+          "skip": 1,
+          "seconds": 28.115,
+          "unittest_result": "OK (skipped=1)"
+        },
+        {
+          "file": "tools/tests/test_shadowsocks.py",
+          "tests_run": 9,
+          "pass": 8,
+          "fail": 0,
+          "skip": 1,
+          "seconds": 11.192,
+          "unittest_result": "OK (skipped=1)"
+        },
+        {
+          "file": "tools/tests/test_dns_tls.py",
+          "tests_run": 11,
+          "pass": 11,
+          "fail": 0,
+          "skip": 0,
+          "seconds": 10.244,
+          "unittest_result": "OK"
+        },
+        {
+          "file": "tools/tests/test_dns_https.py",
+          "tests_run": 9,
+          "pass": 9,
+          "fail": 0,
+          "skip": 0,
+          "seconds": 8.629,
+          "unittest_result": "OK"
+        },
+        {
+          "file": "tools/tests/test_socks4.py",
+          "tests_run": 10,
+          "pass": 8,
+          "fail": 0,
+          "skip": 2,
+          "seconds": 4.074,
+          "unittest_result": "OK (skipped=2)"
+        },
+        {
+          "file": "tools/tests/test_websocket_transport.py",
+          "tests_run": 11,
+          "pass": 10,
+          "fail": 0,
+          "skip": 1,
+          "seconds": 9.63,
+          "unittest_result": "OK (skipped=1)"
+        }
+      ],
+      "runs_new_socks5_udp_python_suite": false,
+      "limitation": "This workflow runs six older peer scripts. Its success does not replace the new SOCKS5 UDP Python suite in the portable Rust workflow.",
+      "artifact": {
+        "id": 12156826289,
+        "name": "Core-development-evidence",
+        "zip_bytes": 524438,
+        "zip_sha256": "9bc65dd4275ea96726beeb5ca0947c02841c7afb73ea38416845d31d9ded4b6d",
+        "api_digest_matched": true,
+        "core_tested_commit": "dc3ed5ef8ba9d3ec3d8d05e9ae0c7e810f19cfbb",
+        "git_archive_commit": "dc3ed5ef8ba9d3ec3d8d05e9ae0c7e810f19cfbb",
+        "source_tar_sha256": "86f5a92f34854ef918cd43d4533eb96cd04d8d012a73126bc4b62fb02413e83b",
+        "tracked_worktree_clean": true,
+        "worktree_state": [
+          "?? CORE_TESTED_COMMIT",
+          "?? CORE_WORKTREE_STATE",
+          "?? core-tested-source.tar"
+        ],
+        "archived_source_files_verified_against_commit": {
+          "core/Cargo.lock": "aa08c5b402b9592e56e79b739527efa742e3dbcadda5960c6a6b58074a9bbfcd",
+          "core/Cargo.toml": "e178bbe58df7cc632a88c099b45d2da58980c984d2d4da9a170b28f167778303",
+          "core/crates/swirl-core/src/lib.rs": "9a22e16f7df0a2c1227a90d7114acb8fc0ccd4b6da536860de24dea3647137b9",
+          "core/crates/swirl-protocol/src/socks5.rs": "8ea696f1df8b498cb3ae1b3f71a3712753fcbc14af0d9659c3d9f18b16773b9f",
+          "core/crates/swirl-transport/Cargo.toml": "d380cad26d9b64c28b33abd9a464b2fda4a5e176b21fdc3bd6d3378178d978e8",
+          "core/crates/swirl-transport/src/lib.rs": "15557bc300a06eb105e5c28a7e9577e5537bb4051eb5f824af8aead2593306c0",
+          "core/crates/swirl-transport/src/udp.rs": "e5f6a2d0d056aabbe941e98c1a3885ea2473f7a9882b6a88653c79f1682ab966",
+          "tools/tests/test_socks5_udp.py": "b06bdde43f85d9eff887237c73fac70ba6d7405df815dcccdcfb0710cd9abd61"
+        },
+        "source_tar_copied_into_repository": false
+      },
+      "log": {
+        "file_name": "app-validation.log",
+        "utf8_bytes": 88384,
+        "sha256": "7cc9c82b35fc3e1a6d642c8f72c90c102d5b042a1ee85356bd91364b83749d7e",
+        "representation": "Exact UTF-8 text returned by github_fetch_workflow_job_logs, including BOM and final newline."
+      }
+    }
+  },
+  "correction": {
+    "production_entry": "swirl_transport::bind_udp",
+    "production_file": "core/crates/swirl-transport/src/udp.rs",
+    "per_socket_buffer_minimum_bytes": 65536,
+    "options": [
+      "SO_SNDBUF",
+      "SO_RCVBUF"
+    ],
+    "preserves_larger_existing_values": true,
+    "reads_back_and_rejects_insufficient_values": true,
+    "changes_system_network_limits": false,
+    "changes_application_queue_or_datagram_limits": false,
+    "production_sockets_covered": [
+      "inbound SOCKS UDP relay",
+      "shared IPv4 UDP outbound",
+      "shared IPv6 UDP outbound",
+      "upstream SOCKS5 UDP association"
+    ],
+    "independent_fixture_sockets_covered": [
+      "client",
+      "SOCKS relay",
+      "relay-to-origin forwarding socket",
+      "origin"
+    ],
+    "inbound_success_reply_follows_socket_initialization": true,
+    "dependency": {
+      "name": "socket2",
+      "version": "0.6.5",
+      "already_present_in_lockfile": true,
+      "package_versions_changed": false,
+      "lockfile_change": "One direct dependency edge from swirl-transport."
+    },
+    "darwin_source": {
+      "repository": "apple-oss-distributions/xnu",
+      "commit": "f6217f891ac0bb64f3d375211650a4c1ff8ca1ea",
+      "release": "xnu-12377.1.9",
+      "references": [
+        "https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/netinet/udp_usrreq.c",
+        "https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/kern/uipc_socket.c",
+        "https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/kern/uipc_socket2.c"
+      ],
+      "observed_source_default_udp_sendspace_bytes": 9216,
+      "basis": "udp_attach reserves the default send space; atomic sends above so_snd.sb_hiwat return EMSGSIZE. SO_SNDBUF changes that high-water mark. Receive accounting also includes source address bytes.",
+      "runner_default_buffer_value_directly_measured": false,
+      "receive_default_not_reduced": "The reviewed XNU source has approximately 192 KiB default UDP receive space; the correction preserves larger defaults. 65536 is a minimum, not a claim that an OS queue holds exactly one packet."
+    }
+  },
+  "coverage_limits": [
+    "The independent SOCKS5 peer forwards to a separate IPv4 loopback UDP origin. IPv6 destination ATYP preservation does not establish a complete IPv6 final-destination proxy path.",
+    "An explicit IPv6 BND relay and a domain BND mapped to IPv6 use actual IPv6 loopback transport while the control peer remains IPv4.",
+    "The new transport unit test sends exact 65507-byte datagrams in both directions over IPv4 and IPv6 loopback, including recovery from deliberately small per-socket buffers.",
+    "The independent protocol boundary has a 65507-byte SOCKS response; the request is shorter by the synthetic origin response prefix. Exact request/response sizes are recorded per platform.",
+    "Hosted loopback interoperability and the Linux public DIRECT/DoH checks do not establish private-provider UDP, TUN, throughput, long-duration stability, or complete-profile acceptance.",
+    "The Qt peer hooks skipped on portable jobs require their separate Windows evidence. No skipped hook is counted as passed here."
+  ],
+  "private_provider_requests": 0,
+  "protocol_acceptance": "B05 remains partially implemented; complete-profile and whole-goal acceptance are unchanged.",
+  "sensitive_material_committed": false
+}

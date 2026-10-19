@@ -6,6 +6,31 @@ using `SWIRL_USE_RUST_CORE=ON`; it does not wrap the C++ forwarder or Mihomo.
 The default build preserves historical capabilities until their Rust replacements
 are implemented and tested. This is **not the completed all-protocol product**.
 
+## Current development scope (2026-10-19)
+
+After the automatic-font implementation passed its Windows application/font
+gates, native Core development resumed on `work/core-completion-20261017`.
+Rule editing now preserves trailing modifiers, validates the complete candidate
+configuration and commits persistent state before publishing it; see the
+[rule transaction evidence](../docs/RULE_EDIT_TRANSACTION_20261019.md).
+
+The new standard SOCKS5 UDP outbound supports configured no-authentication or
+username/password authentication, actual advertised relay addresses, bounded
+associations and queues, control-stream shutdown and existing Qt import paths.
+`udp` defaults to false; TLS plus UDP is explicitly rejected. A fixed socket
+buffer minimum preserves the full datagram boundary across platforms without
+reducing larger OS defaults. It does not change system network settings.
+See the [implementation and exact CI results](../docs/RUST_SOCKS5_UDP_20261019.md)
+for `8d045ab` and its `dc3ed5e` portability/test fix, including the first failures
+and explicit skips. The Qt adapter and complete native application have their
+own Windows gates; portable tests cannot substitute for those results.
+
+The [fixed acceptance baseline](../docs/SELF_DEVELOPMENT_PROGRESS.md) remains
+79 items and 10.83% accepted weight. SOCKS5 outbound UDP is now a partial
+implementation; protocol profiles remain 0/21 fully accepted. No new private
+provider, full subscription chain, REALITY/Vision or TUN acceptance is claimed.
+The older dated sections below retain their original source and scope.
+
 ## Build and verification
 
 Use stable Rust and a native C toolchain (ring builds C/assembly cryptography).
