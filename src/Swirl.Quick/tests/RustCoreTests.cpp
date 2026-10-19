@@ -145,6 +145,38 @@ private slots:
   }
   QCoreApplication::processEvents();QCOMPARE(requests,0);
  }
+ void importedRealityVisionAndDefaultUtlsCannotStartAsOrdinaryTls(){
+  QTcpServer endpoint;QVERIFY(endpoint.listen(QHostAddress::LocalHost));int connections=0;
+  connect(&endpoint,&QTcpServer::newConnection,this,[&]{++connections;});
+  QTcpServer localPort;QVERIFY(localPort.listen(QHostAddress::LocalHost));const auto proxyPort=localPort.serverPort();localPort.close();
+  const QByteArray prefix="vless://11111111-1111-4111-8111-111111111111@127.0.0.1:"+QByteArray::number(endpoint.serverPort())+"?";
+  const auto ordinary=NodeImporter::parse(prefix+"security=tls");QVERIFY(ordinary);
+  EngineStartOptions options;options.nodes=ordinary.nodes;options.selectedNodeId=ordinary.nodes.first().id;options.proxyPort=proxyPort;options.routingMode="global";
+  QJsonObject configuration;QVERIFY(RustCoreEngine::configuration(options,&configuration).isEmpty());
+  const auto outbound=configuration.value("nodes").toArray().first().toObject().value("outbound").toObject();
+  QCOMPARE(outbound.value("type"),QJsonValue("vless"));QVERIFY(outbound.value("tls").isObject());
+  QList<QByteArray> sources{
+   prefix+"security=reality&pbk=synthetic-key",
+   prefix+"security=reality&pbk=synthetic-key&flow=xtls-rprx-vision",
+   prefix+"security=tls&flow=xtls-rprx-vision",
+   prefix+"security=tls&flow=xtls-rprx-vision-udp443"
+  };
+  for(const auto &extension:QList<QJsonObject>{QJsonObject{{"enabled",true}},QJsonObject{{"enabled",true},{"fingerprint",""}}}){
+   QJsonObject node{{"tag","fixture"},{"type","vless"},{"server","127.0.0.1"},{"server_port",endpoint.serverPort()},{"uuid","11111111-1111-4111-8111-111111111111"},
+    {"tls",QJsonObject{{"enabled",true},{"utls",extension}}}};
+   sources.append(QJsonDocument(QJsonObject{{"outbounds",QJsonArray{node}}}).toJson());
+   auto tls=node.value("tls").toObject();tls["reality"]=QJsonObject{{"enabled",true},{"public_key","synthetic-key"},{"short_id","abcd"}};node["tls"]=tls;node["flow"]="xtls-rprx-vision";
+   sources.append(QJsonDocument(QJsonObject{{"outbounds",QJsonArray{node}}}).toJson());
+  }
+  for(const auto &source:sources)for(const auto &body:{source,source.toBase64()}){
+   const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));options.nodes=parsed.nodes;options.selectedNodeId=parsed.nodes.first().id;
+   const auto reason=RustCoreEngine::configuration(options,&configuration);QVERIFY2(!reason.isEmpty(),"Declared security profile became ordinary TLS");
+   QVERIFY(!SwirlProtocolRegistry::nativeNodeReason(parsed.nodes.first()).isEmpty());
+   RustCoreEngine engine;engine.start(options);QCOMPARE(engine.status().state,ProxyEngine::State::Failed);QCOMPARE(engine.status().error,ProxyEngine::Error::InvalidOptions);
+   QVERIFY(!engine.status().processAlive);QVERIFY(!engine.status().apiHealthy);
+  }
+  QCoreApplication::processEvents();QCOMPARE(connections,0);
+ }
  void profileRefreshKeepsOnlyItsOwnValidSelection(){
   QTemporaryDir directory;const auto path=directory.filePath("nodes.dpapi");NodeStore seed(path);
   QVERIFY(seed.saveSubscription({},"first",QUrl("https://fixture.invalid/first"),360,false));const auto first=seed.subscriptions().last().id;

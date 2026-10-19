@@ -104,6 +104,81 @@ private slots:
             for(const auto &options:{"transport=ws,ws=true", "ws=true,transport=ws", "obfs=wss,transport=ws", "transport=ws,obfs=wss"}){const auto parsed=NodeImporter::parse(prefix+options);QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.first().parameters.value("network"),QJsonValue("ws"));}
         }
     }
+    void uriRealityRequiresAnExplicitSecurityLayerAndCredential() {
+        const QByteArray plain="socks5://127.0.0.1:1081#retained";
+        for(const auto &protocol:{"vless","trojan"}){
+            const QByteArray prefix=QByteArray(protocol)+"://"+(QByteArray(protocol)=="vless"?"11111111-1111-4111-8111-111111111111":"synthetic-secret")+"@edge.example.org:443?";
+            for(const auto &query:{"security=reality", "security=reality&sid=abcd", "security=reality&pbk=", "pbk=&security=reality", "security=reality&pbk=%20", "security=tls&pbk=synthetic-key", "pbk=synthetic-key&security=tls", "security=none&pbk=synthetic-key", "pbk=synthetic-key&security=none", "pbk=synthetic-key", "sid=abcd", "security=tls&sid="}){
+                const auto invalid=prefix+query;
+                for(const auto &original:{invalid,plain+"\n"+invalid})for(const auto &body:{original,original.toBase64()}){
+                    const auto parsed=NodeImporter::parse(body);QVERIFY2(!parsed,query);QVERIFY(parsed.nodes.isEmpty());
+                    QVERIFY(!parsed.error.contains("synthetic-secret"));QVERIFY(!parsed.error.contains("synthetic-key"));
+                }
+            }
+            for(const auto &query:{"security=reality&pbk=synthetic-key&sid=abcd", "sid=abcd&pbk=synthetic-key&security=reality", "security=reality&pbk=synthetic-key&sid="}){
+                const auto original=prefix+query;
+                for(const auto &body:{original,original.toBase64()}){
+                    const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));const auto &node=parsed.nodes.first();
+                    QCOMPARE(node.parameters.value("tls"),QJsonValue(true));QCOMPARE(node.parameters.value("reality-opts").toObject().value("public-key"),QJsonValue("synthetic-key"));
+                    QCOMPARE(node.originalConfiguration.value("uri"),QJsonValue(QString::fromUtf8(original)));
+                    QVERIFY(!SwirlProtocolRegistry::nativeNodeReason(node).isEmpty());
+                }
+            }
+            const auto ordinary=NodeImporter::parse(prefix+"security=tls");QVERIFY(ordinary);QVERIFY(ordinary.nodes.first().conversionIssues.isEmpty());
+            QCOMPARE(ordinary.nodes.first().parameters.value("tls"),QJsonValue(true));QVERIFY(!ordinary.nodes.first().parameters.contains("reality-opts"));
+        }
+    }
+    void singBoxTlsTypesAndFingerprintIntentArePreserved() {
+        const QByteArray prefix=R"({"outbounds":[{"tag":"fixture","type":"vless","server":"edge.example.org","server_port":443,"uuid":"11111111-1111-4111-8111-111111111111","tls":)";
+        const QList<QByteArray> invalidTls{
+            "null", "false", "true", "1", "\"synthetic-secret\"", "[]",
+            R"({"enabled":"true"})", R"({"enabled":1})", R"({"enabled":true,"insecure":"false"})",
+            R"({"enabled":true,"reality":"synthetic-secret"})", R"({"enabled":true,"reality":[]})", R"({"enabled":true,"reality":null})",
+            R"({"enabled":true,"reality":{"enabled":"true","public_key":"synthetic-secret"}})",
+            R"({"enabled":true,"reality":{"enabled":1,"public_key":"synthetic-secret"}})",
+            R"({"enabled":true,"utls":"chrome"})", R"({"enabled":true,"utls":[]})", R"({"enabled":true,"utls":null})",
+            R"({"enabled":true,"utls":{"enabled":"true"}})", R"({"enabled":true,"utls":{"enabled":1}})",
+            R"({"enabled":true,"utls":{"enabled":true,"fingerprint":null}})", R"({"enabled":true,"utls":{"enabled":true,"fingerprint":[]}})",
+            R"({"enabled":true,"utls":{"enabled":true},"reality":{"enabled":true}})",
+            R"({"enabled":true,"utls":{"enabled":true},"reality":{"enabled":true,"public_key":""}})",
+            R"({"enabled":true,"utls":{"enabled":true},"reality":{"enabled":true,"public_key":42}})",
+            R"({"enabled":true,"utls":{"enabled":true},"reality":{"enabled":true,"public_key":"synthetic-key","short_id":7}})",
+            R"({"enabled":true,"reality":{"enabled":true,"public_key":"synthetic-key"}})",
+            R"({"enabled":true,"utls":{"enabled":false},"reality":{"enabled":true,"public_key":"synthetic-key"}})",
+            R"({"enabled":false,"utls":{"enabled":true}})", R"({"utls":{"enabled":true}})",
+            R"({"enabled":false,"reality":{"enabled":true,"public_key":"synthetic-key"}})"
+        };
+        for(const auto &tls:invalidTls){
+            const auto original=prefix+tls+"}]}";
+            for(const auto &body:{original,original.toBase64()}){
+                const auto parsed=NodeImporter::parse(body);QVERIFY2(!parsed,"Malformed TLS options became an ordinary connection");QVERIFY(parsed.nodes.isEmpty());
+                QVERIFY(!parsed.error.contains("synthetic-secret"));QVERIFY(!parsed.error.contains("synthetic-key"));
+            }
+        }
+        for(const auto &tls:QList<QByteArray>{"{}",R"({"enabled":false})",R"({"enabled":true})",R"({"enabled":true,"utls":{"enabled":false},"reality":{"enabled":false}})"}){
+            const auto parsed=NodeImporter::parse(prefix+tls+"}]}");QVERIFY2(parsed,qPrintable(parsed.error));const auto &node=parsed.nodes.first();
+            QVERIFY(node.conversionIssues.isEmpty());QVERIFY(!node.parameters.contains("client-fingerprint"));QVERIFY(!node.parameters.contains("reality-opts"));
+        }
+        for(const auto &fields:QList<QByteArray>{R"("enabled":true)",R"("enabled":true,"fingerprint":"")",R"("enabled":true,"fingerprint":"firefox")"}){
+            const auto original=prefix+R"({"enabled":true,"utls":{)"+fields+"}}}]}";
+            for(const auto &body:{original,original.toBase64()}){
+                const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));const auto &node=parsed.nodes.first();
+                QCOMPARE(node.parameters.value("client-fingerprint"),QJsonValue(fields.contains("firefox")?"firefox":"chrome"));
+                QCOMPARE(node.originalConfiguration,QJsonDocument::fromJson(original).object().value("outbounds").toArray().first().toObject());
+                QVERIFY(!SwirlProtocolRegistry::nativeNodeReason(node).isEmpty());
+            }
+        }
+        const auto original=prefix+R"({"enabled":true,"utls":{"enabled":true},"reality":{"enabled":true,"public_key":"synthetic-key","short_id":"abcd"}},"flow":"xtls-rprx-vision"}]})";
+        const auto parsed=NodeImporter::parse(original);QVERIFY2(parsed,qPrintable(parsed.error));const auto &node=parsed.nodes.first();
+        QCOMPARE(node.parameters.value("reality-opts").toObject().value("public-key"),QJsonValue("synthetic-key"));
+        QCOMPARE(node.parameters.value("reality-opts").toObject().value("short-id"),QJsonValue("abcd"));
+        QCOMPARE(node.parameters.value("client-fingerprint"),QJsonValue("chrome"));QCOMPARE(node.parameters.value("flow"),QJsonValue("xtls-rprx-vision"));
+        QCOMPARE(node.originalConfiguration,QJsonDocument::fromJson(original).object().value("outbounds").toArray().first().toObject());
+        QVERIFY(!SwirlProtocolRegistry::nativeNodeReason(node).isEmpty());
+        const auto unknown=NodeImporter::parse(prefix+R"({"enabled":true,"utls":{"enabled":true,"future":"synthetic-secret"}}}]})");
+        QVERIFY(unknown);QVERIFY(!unknown.nodes.first().conversionIssues.isEmpty());QVERIFY(!SwirlProtocolRegistry::nativeNodeReason(unknown.nodes.first()).isEmpty());
+        QVERIFY(!QJsonDocument::fromVariant(unknown.nodes.first().publicInfo()).toJson().contains("synthetic-secret"));
+    }
     void iniCompleteProfileHasClosedExecutionSemantics() {
         const QByteArray original="[Proxy]\nA = socks5,127.0.0.1,1080\nDIRECT = direct\nREJECT = reject\n[Proxy Group]\nroute = select,A,DIRECT\nnested = select,route,REJECT\n[Rule]\nDOMAIN,exact.invalid,REJECT\nDOMAIN-SUFFIX,suffix.invalid,route\nDOMAIN-KEYWORD,keyword,nested\nFINAL,route\n";
         for(const auto &body:{original,original.toBase64()}) {
@@ -152,6 +227,10 @@ private slots:
         rejected.append("[Proxy]\nfixture = socks5,example.org,1080,fixture,fixture-secret,password=second");
         for(const auto &declaration:{"https,example.org,443,tls=false", "socks5-tls,example.org,443,over-tls=false", "http,example.org,443,tls=false,transport=tls", "http,example.org,443,transport=tls,tls=false"})rejected.append(QByteArray("[Proxy]\nfixture = ")+declaration);
         rejected.append(uri+"security=none");
+        rejected.append("vless://11111111-1111-4111-8111-111111111111@example.org:443?security=reality");
+        rejected.append("vless://11111111-1111-4111-8111-111111111111@example.org:443?security=tls&pbk=fixture-secret");
+        rejected.append(R"({"outbounds":[{"type":"vless","tag":"invalid","server":"example.org","server_port":443,"uuid":"11111111-1111-4111-8111-111111111111","tls":{"enabled":true,"reality":"fixture-secret"}}]})");
+        rejected.append(R"({"outbounds":[{"type":"vless","tag":"invalid","server":"example.org","server_port":443,"uuid":"11111111-1111-4111-8111-111111111111","tls":{"enabled":true,"utls":{"enabled":"true","fingerprint":"fixture-secret"}}}]})");
         for(const auto &protocol:{"https","socks5-tls"})rejected.append(QByteArray("[server_local]\n")+protocol+"=example.org:443,tag=fixture,over-tls=false");
         for(const auto &body:rejected)for(const auto &wrapped:{body,body.toBase64()}){
             const auto parsed=NodeImporter::parse(wrapped);QVERIFY2(!parsed,"Malformed or conflicting typed option was accepted");

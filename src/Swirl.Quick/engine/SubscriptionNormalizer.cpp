@@ -163,6 +163,16 @@ void uri(Result &r,const QString &line){
             node["plugin"]=plugin;node["plugin-opts"]=opts;
         }
     }
+    // A REALITY declaration must survive normalization even before a native
+    // implementation exists. Missing credentials cannot turn it into TLS.
+    const auto security=queryValues.value("security").toString();
+    if(security=="reality"){
+        if(node.value("reality-opts").toObject().value("public-key").toString().trimmed().isEmpty()){
+            r.error="节点 URI REALITY 缺少公钥；未降级为普通 TLS。";return;
+        }
+    }else if(node.contains("reality-opts")){
+        r.error="节点 URI REALITY 参数与安全层冲突；未应用配置。";return;
+    }
     transport(node,network,path,host,issues);append(r,node,QJsonObject{{"uri",line}},issues);
 }
 void singBox(Result &r,const QJsonArray &array){
@@ -185,13 +195,47 @@ void singBox(Result &r,const QJsonArray &array){
         }
         const QMap<QString,QString> mappings{{"username","username"},{"password","password"},{"uuid","uuid"},{"method","cipher"},{"alter_id","alterId"},{"security","cipher"},{"flow","flow"},{"detour","dialer-proxy"},{"up_mbps","up"},{"down_mbps","down"}};
         for(auto it=mappings.begin();it!=mappings.end();++it)if(raw.contains(it.key()))n[it.value()]=raw.value(it.key());
+        if(raw.contains("tls")&&!raw.value("tls").isObject()){
+            r.error="sing-box TLS 必须为对象；未应用配置。";return;
+        }
         const auto tls=raw.value("tls").toObject();
+        for(const auto &key:QStringList{"enabled","insecure"})if(tls.contains(key)&&!tls.value(key).isBool()){
+            r.error="sing-box TLS 布尔参数类型无效；未应用配置。";return;
+        }
+        for(const auto &key:QStringList{"utls","reality"})if(tls.contains(key)){
+            if(!tls.value(key).isObject()){
+                r.error="sing-box TLS 扩展必须为对象；未应用配置。";return;
+            }
+            const auto extension=tls.value(key).toObject();
+            if(extension.contains("enabled")&&!extension.value("enabled").isBool()){
+                r.error="sing-box TLS 扩展开关类型无效；未应用配置。";return;
+            }
+            if(extension.value("enabled").toBool()&&!tls.value("enabled").toBool()){
+                r.error="sing-box TLS 未启用却启用了 TLS 扩展；未应用配置。";return;
+            }
+            const auto strings=key=="utls"?QStringList{"fingerprint"}:QStringList{"public_key","short_id"};
+            for(const auto &field:strings)if(extension.contains(field)&&!extension.value(field).isString()){
+                r.error="sing-box TLS 扩展字符串类型无效；未应用配置。";return;
+            }
+        }
         if(type=="trojan"&&tls.isEmpty())issue(issues,"sing-box Trojan 未明确配置 TLS，不能静默改变传输语义。");
         if(!tls.isEmpty()){
             n["tls"]=tls.value("enabled");n["sni"]=tls.value("server_name");n["skip-cert-verify"]=tls.value("insecure");
             if(tls.contains("alpn"))n["alpn"]=tls.value("alpn");
-            const auto utls=tls.value("utls").toObject();if(utls.value("enabled").toBool())n["client-fingerprint"]=utls.value("fingerprint");
-            const auto reality=tls.value("reality").toObject();if(reality.value("enabled").toBool())n["reality-opts"]=QJsonObject{{"public-key",reality.value("public_key")},{"short-id",reality.value("short_id")}};
+            const auto utls=tls.value("utls").toObject();
+            if(utls.value("enabled").toBool()){
+                const auto fingerprint=utls.value("fingerprint").toString();
+                // sing-box defaults an enabled uTLS profile to chrome. Keep
+                // that profile explicit so native TLS cannot silently replace it.
+                n["client-fingerprint"]=fingerprint.isEmpty()?QString("chrome"):fingerprint;
+            }
+            const auto reality=tls.value("reality").toObject();
+            if(reality.value("enabled").toBool()){
+                if(!utls.value("enabled").toBool()||reality.value("public_key").toString().trimmed().isEmpty()){
+                    r.error="sing-box REALITY 需要已启用的 uTLS 和公钥；未降级为普通 TLS。";return;
+                }
+                n["reality-opts"]=QJsonObject{{"public-key",reality.value("public_key")},{"short-id",reality.value("short_id")}};
+            }
             for(auto it=tls.begin();it!=tls.end();++it)if(!QStringList{"enabled","server_name","insecure","alpn","utls","reality"}.contains(it.key()))issue(issues,"sing-box TLS 含未映射选项，原始配置已保留。");
             for(auto it=utls.begin();it!=utls.end();++it)if(!QStringList{"enabled","fingerprint"}.contains(it.key()))issue(issues,"sing-box uTLS 含未映射选项。");
             for(auto it=reality.begin();it!=reality.end();++it)if(!QStringList{"enabled","public_key","short_id"}.contains(it.key()))issue(issues,"sing-box Reality 含未映射选项。");
