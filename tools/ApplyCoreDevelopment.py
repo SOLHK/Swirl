@@ -16,6 +16,8 @@ The REALITY TLS stage builds its actual Release protocol client and runs both
 independent peer suites only after all four required test binaries are present.
 The Vision component stage requires both independent fixture checks, in order,
 with immediate Windows exit propagation, before any protocol peer can run.
+The Vision stream stage then builds its Release client and runs full Xray
+interoperability after the complete REALITY R3 gate, preserving both raw logs.
 It does not change permissions, secrets,
 existing actions, pull-request triggers or any product source.
 
@@ -71,6 +73,18 @@ XRAY_SOURCES = (
     Path("tools/tests/xray_peer/lock.json"),
 )
 XRAY_GO_ACTION = "actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16"
+VISION_XRAY_SOURCES = (
+    Path("core/crates/swirl-protocol/examples/vision-client.rs"),
+    Path("core/crates/swirl-protocol/src/vision/stream.rs"),
+    Path("core/crates/swirl-protocol/src/vision/tls.rs"),
+    Path("core/crates/swirl-protocol/tests/vision_stream.rs"),
+    Path("core/crates/swirl-protocol/tests/vision_tls.rs"),
+    Path("tools/tests/test_vision_xray.py"),
+)
+VISION_BUILD_COMMAND = (
+    "cargo build --manifest-path core/Cargo.toml --release --locked "
+    "-p swirl-protocol --example vision-client"
+)
 
 
 def xray_steps(windows: bool = False, artifact_prefix: str = "Swirl-REALITY-Xray") -> str:
@@ -143,6 +157,85 @@ def _add_xray_steps(source: str) -> str:
         if source.count(anchor) != 1:
             raise ValueError("Rust CI Xray insertion boundary drifted; review required")
         source = source.replace(anchor, block + anchor, 1)
+    return source
+
+
+def vision_xray_steps(windows: bool = False, artifact_prefix: str = "Swirl-Vision-Xray") -> str:
+    """Release build, full Xray peer and evidence are one mandatory gate."""
+    suffix = ".exe" if windows else ""
+    shell = "pwsh" if windows else "bash"
+    status = WINDOWS_STATUS_GUARD if windows else ""
+    if windows:
+        start = (
+            "          $ErrorActionPreference = 'Stop'\n"
+            "          New-Item -ItemType Directory -Force -Path $env:SWIRL_VISION_EVIDENCE | Out-Null\n"
+        )
+        log = '2>&1 | Tee-Object -FilePath "$env:SWIRL_VISION_EVIDENCE/{}"\n'
+        preflight = (
+            "          if (-not (Test-Path $env:SWIRL_VISION_CLIENT -PathType Leaf)) "
+            "{ throw 'Required Vision Release client missing' }\n"
+        )
+    else:
+        start = '          set -euo pipefail\n          mkdir -p "$SWIRL_VISION_EVIDENCE"\n'
+        log = '2>&1 | tee "$SWIRL_VISION_EVIDENCE/{}"\n'
+        preflight = '          test -x "$SWIRL_VISION_CLIENT"\n'
+    return (
+        "      - name: Build native Vision client and verify Xray interoperability\n"
+        "        working-directory: .\n"
+        f"        shell: {shell}\n"
+        "        env:\n"
+        "          SWIRL_XRAY_PEER_DIR: ${{ runner.temp }}/swirl-xray-peer\n"
+        "          SWIRL_VISION_EVIDENCE: ${{ runner.temp }}/swirl-vision-results\n"
+        f"          SWIRL_VISION_CLIENT: ${{{{ github.workspace }}}}/core/target/release/examples/vision-client{suffix}\n"
+        "        run: |\n"
+        + start + f"          {VISION_BUILD_COMMAND} " + log.format("client-build.log") + status
+        + preflight
+        + "          python tools/tests/test_vision_xray.py " + log.format("peer-test.log") + status
+        + "      - name: Preserve Vision client and full Xray interoperability evidence\n"
+        "        if: always()\n"
+        "        uses: actions/upload-artifact@v4\n"
+        "        with:\n"
+        f"          name: {artifact_prefix}-${{{{ runner.os }}}}-${{{{ github.sha }}}}-${{{{ github.run_attempt }}}}\n"
+        "          path: |\n"
+        "            ${{ runner.temp }}/swirl-xray-peer/build.log\n"
+        "            ${{ runner.temp }}/swirl-xray-peer/build-manifest.json\n"
+        "            ${{ runner.temp }}/swirl-vision-results\n"
+        "          if-no-files-found: error\n"
+        "          retention-days: 14\n"
+    )
+
+
+def without_vision_xray_steps(source: str) -> str:
+    """Accept the prior R3 stage or both exact, correctly placed Vision gates."""
+    blocks = (vision_xray_steps(), vision_xray_steps(windows=True))
+    markers = ("vision-client", "test_vision_xray.py", "SWIRL_VISION_", "swirl-vision-",
+               "Build native Vision client", "Preserve Vision client", "Swirl-Vision-Xray")
+    if not any(marker in source for marker in markers):
+        return source
+    if any(source.count(block) != 1 for block in blocks):
+        raise ValueError("Rust CI Vision build, test or evidence gate drifted; review required")
+    separator = "  windows-rust:\n"
+    if source.count(separator) != 1:
+        raise ValueError("Rust CI Vision job boundaries drifted; review required")
+    parts = source.split(separator)
+    for index, block in enumerate(blocks):
+        # This stage consumes the independently verified R3 peer. It cannot
+        # move before the build, enter another platform, or bypass a R3 failure.
+        if parts[index].count(xray_steps(windows=index == 1) + block) != 1:
+            raise ValueError("Rust CI Vision gate must follow the complete platform R3 gate")
+        parts[index] = parts[index].replace(block, "", 1)
+    stripped = separator.join(parts)
+    if any(marker in stripped for marker in markers):
+        raise ValueError("Rust CI has duplicated or unreviewed Vision commands")
+    return stripped
+
+
+def _add_vision_xray_steps(source: str) -> str:
+    for windows in (False, True):
+        anchor = xray_steps(windows=windows)
+        if source.count(anchor) != 1:
+            raise ValueError("Rust CI Vision insertion boundary drifted; review required")
+        source = source.replace(anchor, anchor + vision_xray_steps(windows=windows), 1)
     return source
 
 
@@ -565,6 +658,7 @@ def _vector_blocks(windows: bool) -> tuple[str, str, str]:
 
 def updated_workflow(source: str) -> str:
     """Validate the whole fixture stage before preserving every prior CI guard."""
+    source = without_vision_xray_steps(source)
     source = without_xray_steps(source)
     separator = "  windows-rust:\n"
     if source.count(separator) != 1:
@@ -586,7 +680,7 @@ def updated_workflow(source: str) -> str:
     for index, part in enumerate(parts):
         historical, _, complete = _vector_blocks(windows=index == 1)
         parts[index] = _replace_checked(part, historical, complete, "Vision fixture checks")
-    return _add_xray_steps(separator.join(parts))
+    return _add_vision_xray_steps(_add_xray_steps(separator.join(parts)))
 
 
 def validate_context(environment: Mapping[str, str]) -> None:
@@ -632,6 +726,9 @@ def prepare_update(repository: Path) -> tuple[Path, str, str]:
     for relative in XRAY_SOURCES:
         if not (repository / relative).is_file():
             raise ValueError(f"Required mature Xray peer source is missing: {relative.as_posix()}")
+    for relative in VISION_XRAY_SOURCES:
+        if not (repository / relative).is_file():
+            raise ValueError(f"Required Vision stream peer source is missing: {relative.as_posix()}")
     return path, before, after
 
 

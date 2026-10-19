@@ -863,6 +863,7 @@ dependencies = [
  "md-5",
  "ring",
  "serde",
+ "serde_json",
  "sha2",
  "swirl-dns",
  "swirl-subscription",

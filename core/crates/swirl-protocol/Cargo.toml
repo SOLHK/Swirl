@@ -17,5 +17,6 @@ md-5.workspace = true
 zeroize.workspace = true
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }
+serde_json.workspace = true
 [lints]
 workspace = true

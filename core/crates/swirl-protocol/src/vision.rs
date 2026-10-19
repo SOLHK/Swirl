@@ -1,12 +1,45 @@
-//! Incremental Vision framing only, independently implemented from wire behavior.
+//! Incremental Vision framing, bounded stream I/O and inner-TLS inspection.
 //!
 //! `DirectRequested` is a decoded handoff request. Decoding does not authenticate
 //! the request or grant permission to bypass TLS. This module has no TLS-version
-//! input, inner-TLS classifier or raw stream access. The caller must authenticate
-//! its outer transport, establish eligibility and own the transition.
-//! Padding bytes/length policy is supplied by the caller, not synthesized here.
+//! input or raw stream access. The stream adapter keeps its outer transport and
+//! rejects requests for a raw handoff that transport cannot safely provide.
+//! Inner-TLS inspection describes wire eligibility; it is not authentication.
+
+pub mod stream;
+pub mod tls;
 
 use std::{fmt, ops::Range};
+
+/// Component client for an already authenticated outer transport. It writes the
+/// existing VLESS request with the exact Vision Addons, and retains the existing
+/// lazy, strict response-prefix decoder beneath Vision framing. The caller owns
+/// the authentication/connect deadline; native configuration/runtime startup
+/// still rejects unsupported REALITY/Vision product requirements.
+///
+/// No authentication is inferred from a successful TCP connection. This API
+/// cannot extract its supplied transport or perform a raw/direct handoff.
+pub async fn client_over_authenticated(
+    mut transport: swirl_transport::BoxStream,
+    uuid: &str,
+    target: &crate::Target,
+    prefix_limit: std::time::Duration,
+) -> crate::Result<stream::Stream<swirl_transport::BoxStream>> {
+    use tokio::io::AsyncWriteExt;
+
+    let request = crate::vless::request_with_flow(uuid, target, Some("xtls-rprx-vision"))?;
+    let id = swirl_subscription::uuid_bytes(uuid).ok_or("VlessUuid")?;
+    tokio::time::timeout(prefix_limit, async {
+        transport.write_all(&request).await?;
+        transport.flush().await
+    })
+    .await
+    .map_err(|_| "VisionRequestTimeout")?
+    .map_err(|_| "VisionRequestWrite")?;
+    let response: swirl_transport::BoxStream =
+        Box::new(crate::vless::Stream::new(transport, prefix_limit));
+    Ok(stream::Stream::new(response, id, stream::Role::Client))
+}
 
 pub const UUID_LEN: usize = 16;
 pub const HEADER_LEN: usize = 5;
@@ -177,6 +210,22 @@ impl Decoder {
     fn fail<T>(&mut self, error: Error) -> Result<T, Error> {
         self.state = State::Failed(error);
         Err(error)
+    }
+
+    // A transport with no direct owner may refuse this unsupported request as
+    // soon as its header is known, before returning any partial terminal body.
+    // This is not a completed-boundary event or a handoff permission.
+    fn pending_direct_request(&self) -> bool {
+        matches!(
+            self.state,
+            State::Content {
+                command: Command::DirectRequested,
+                ..
+            } | State::Padding {
+                command: Command::DirectRequested,
+                ..
+            }
+        )
     }
 
     pub fn decode<'a>(&mut self, input: &'a [u8]) -> Result<Step<'a>, Error> {

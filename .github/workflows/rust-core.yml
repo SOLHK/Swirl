@@ -87,6 +87,30 @@ jobs:
             ${{ runner.temp }}/swirl-xray-results
           if-no-files-found: error
           retention-days: 14
+      - name: Build native Vision client and verify Xray interoperability
+        working-directory: .
+        shell: bash
+        env:
+          SWIRL_XRAY_PEER_DIR: ${{ runner.temp }}/swirl-xray-peer
+          SWIRL_VISION_EVIDENCE: ${{ runner.temp }}/swirl-vision-results
+          SWIRL_VISION_CLIENT: ${{ github.workspace }}/core/target/release/examples/vision-client
+        run: |
+          set -euo pipefail
+          mkdir -p "$SWIRL_VISION_EVIDENCE"
+          cargo build --manifest-path core/Cargo.toml --release --locked -p swirl-protocol --example vision-client 2>&1 | tee "$SWIRL_VISION_EVIDENCE/client-build.log"
+          test -x "$SWIRL_VISION_CLIENT"
+          python tools/tests/test_vision_xray.py 2>&1 | tee "$SWIRL_VISION_EVIDENCE/peer-test.log"
+      - name: Preserve Vision client and full Xray interoperability evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-Vision-Xray-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/swirl-xray-peer/build.log
+            ${{ runner.temp }}/swirl-xray-peer/build-manifest.json
+            ${{ runner.temp }}/swirl-vision-results
+          if-no-files-found: error
+          retention-days: 14
       - name: Native public HTTPS and DoH verification
         if: runner.os == 'Linux'
         run: python ../tools/Verify-PublicRustCore.py --harness target/release/swirl-api --output ../CORE_PUBLIC_NETWORK.json
@@ -214,6 +238,32 @@ jobs:
             ${{ runner.temp }}/swirl-xray-peer/build.log
             ${{ runner.temp }}/swirl-xray-peer/build-manifest.json
             ${{ runner.temp }}/swirl-xray-results
+          if-no-files-found: error
+          retention-days: 14
+      - name: Build native Vision client and verify Xray interoperability
+        working-directory: .
+        shell: pwsh
+        env:
+          SWIRL_XRAY_PEER_DIR: ${{ runner.temp }}/swirl-xray-peer
+          SWIRL_VISION_EVIDENCE: ${{ runner.temp }}/swirl-vision-results
+          SWIRL_VISION_CLIENT: ${{ github.workspace }}/core/target/release/examples/vision-client.exe
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path $env:SWIRL_VISION_EVIDENCE | Out-Null
+          cargo build --manifest-path core/Cargo.toml --release --locked -p swirl-protocol --example vision-client 2>&1 | Tee-Object -FilePath "$env:SWIRL_VISION_EVIDENCE/client-build.log"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not (Test-Path $env:SWIRL_VISION_CLIENT -PathType Leaf)) { throw 'Required Vision Release client missing' }
+          python tools/tests/test_vision_xray.py 2>&1 | Tee-Object -FilePath "$env:SWIRL_VISION_EVIDENCE/peer-test.log"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Preserve Vision client and full Xray interoperability evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-Vision-Xray-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/swirl-xray-peer/build.log
+            ${{ runner.temp }}/swirl-xray-peer/build-manifest.json
+            ${{ runner.temp }}/swirl-vision-results
           if-no-files-found: error
           retention-days: 14
       - uses: actions/upload-artifact@v4

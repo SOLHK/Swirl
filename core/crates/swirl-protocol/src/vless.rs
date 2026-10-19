@@ -15,7 +15,11 @@ pub fn request(uuid: &str, target: &Target) -> Result<Vec<u8>> {
     request_with_flow(uuid, target, None)
 }
 
-fn request_with_flow(uuid: &str, target: &Target, flow: Option<&str>) -> Result<Vec<u8>> {
+pub(crate) fn request_with_flow(
+    uuid: &str,
+    target: &Target,
+    flow: Option<&str>,
+) -> Result<Vec<u8>> {
     let addons = crate::vision::request_addons(flow).map_err(|_| "VlessFlow")?;
     let id = swirl_subscription::uuid_bytes(uuid).ok_or("VlessUuid")?;
     let mut bytes = vec![0];

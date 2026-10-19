@@ -101,6 +101,30 @@ jobs:
             ${{ runner.temp }}/swirl-xray-results
           if-no-files-found: error
           retention-days: 14
+      - name: Build native Vision client and verify Xray interoperability
+        working-directory: .
+        shell: bash
+        env:
+          SWIRL_XRAY_PEER_DIR: ${{ runner.temp }}/swirl-xray-peer
+          SWIRL_VISION_EVIDENCE: ${{ runner.temp }}/swirl-vision-results
+          SWIRL_VISION_CLIENT: ${{ github.workspace }}/core/target/release/examples/vision-client
+        run: |
+          set -euo pipefail
+          mkdir -p "$SWIRL_VISION_EVIDENCE"
+          cargo build --manifest-path core/Cargo.toml --release --locked -p swirl-protocol --example vision-client 2>&1 | tee "$SWIRL_VISION_EVIDENCE/client-build.log"
+          test -x "$SWIRL_VISION_CLIENT"
+          python tools/tests/test_vision_xray.py 2>&1 | tee "$SWIRL_VISION_EVIDENCE/peer-test.log"
+      - name: Preserve Vision client and full Xray interoperability evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: App-Vision-Xray-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/swirl-xray-peer/build.log
+            ${{ runner.temp }}/swirl-xray-peer/build-manifest.json
+            ${{ runner.temp }}/swirl-vision-results
+          if-no-files-found: error
+          retention-days: 14
       - name: Export exact source and result identity
         if: always()
         run: |

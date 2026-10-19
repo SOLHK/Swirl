@@ -147,6 +147,7 @@ def vector_fixture(source, stage):
 
 def previous_reality_stage(source):
     """Strip the entire later TLS-peer stage before making historical fixtures."""
+    source = development.without_vision_xray_steps(source)
     source = development.without_xray_steps(source)
     source = vector_fixture(source, 0)
     separator = "  windows-rust:\n"
@@ -216,6 +217,10 @@ class CoreDevelopmentTests(unittest.TestCase):
             path = root / relative
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text("# public synthetic Xray fixture\n", encoding="utf-8")
+        for relative in development.VISION_XRAY_SOURCES:
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("# public synthetic Vision stream fixture\n", encoding="utf-8")
         return workflow
 
     def test_vision_stage_upgrades_both_reviewed_histories_and_is_idempotent(self):
@@ -845,7 +850,7 @@ class CoreDevelopmentTests(unittest.TestCase):
     def test_xray_stage_is_complete_pinned_and_after_the_existing_peers(self):
         root = Path(__file__).resolve().parents[2]
         final = development.updated_workflow(FIXTURE)
-        previous = development.without_xray_steps(final)
+        previous = development.without_xray_steps(development.without_vision_xray_steps(final))
         self.assertNotIn("test_reality_xray.py", previous)
         self.assertEqual(development.updated_workflow(previous), final)
         self.assertEqual(development.updated_workflow(final), final)
@@ -930,6 +935,179 @@ class CoreDevelopmentTests(unittest.TestCase):
             result = subprocess.run(args, cwd=work, env=environment, capture_output=True, timeout=15)
             self.assertEqual(result.returncode, 23, result.stderr.decode(errors="replace"))
             self.assertFalse((work / "PEER_WAS_RUN").exists())
+
+    def test_vision_xray_stage_preserves_r3_and_is_idempotent_on_all_jobs(self):
+        root = Path(__file__).resolve().parents[2]
+        final = development.updated_workflow(FIXTURE)
+        previous = development.without_vision_xray_steps(final)
+        self.assertNotIn("test_vision_xray.py", previous)
+        self.assertNotIn("vision-client", previous)
+        self.assertEqual(development.updated_workflow(previous), final)
+        self.assertEqual(development.updated_workflow(final), final)
+        for windows, part in enumerate(final.split("  windows-rust:\n")):
+            self.assertEqual(part.count(development.xray_steps(windows=bool(windows))), 1)
+            self.assertEqual(part.count(development.vision_xray_steps(windows=bool(windows))), 1)
+            self.assertIn(development.xray_steps(windows=bool(windows))
+                          + development.vision_xray_steps(windows=bool(windows)), part)
+        checked_in = (root / ".github/workflows/rust-core.yml").read_text(encoding="utf-8")
+        self.assertIn("os: [ubuntu-latest, macos-latest]", checked_in)
+        self.assertIn("runs-on: windows-2022", checked_in)
+        self.assertEqual(development.updated_workflow(checked_in), checked_in)
+        app = (root / ".github/workflows/core-development.yml").read_text(encoding="utf-8")
+        self.assertIn("          ref: ${{ github.sha }}\n", app)
+        self.assertIn(development.xray_steps(artifact_prefix="App-REALITY-Xray")
+                      + development.vision_xray_steps(artifact_prefix="App-Vision-Xray"), app)
+        for label, part in (
+            ("portable", checked_in.split("  windows-rust:\n")[0]),
+            ("windows", checked_in.split("  windows-rust:\n")[1]),
+            ("app", app),
+        ):
+            with self.subTest(job=label):
+                build = ("cargo build --manifest-path core/Cargo.toml --release --locked "
+                         "-p swirl-protocol --example vision-client")
+                self.assertEqual(part.count(build), 1)
+                self.assertEqual(part.count("python tools/tests/test_vision_xray.py"), 1)
+                self.assertLess(part.index("python tools/tests/test_reality_xray.py"), part.index(build))
+                self.assertLess(part.index(build), part.index("python tools/tests/test_vision_xray.py"))
+                step = part.split("      - name: Build native Vision client and verify Xray interoperability\n", 1)[1]
+                step = step.split("      - ", 1)[0]
+                self.assertIn("        working-directory: .\n", step)
+                self.assertNotIn("continue-on-error:", step)
+                self.assertNotIn("        if:", step)
+                self.assertIn("SWIRL_XRAY_PEER_DIR: ${{ runner.temp }}/swirl-xray-peer\n", step)
+                self.assertIn("SWIRL_VISION_EVIDENCE: ${{ runner.temp }}/swirl-vision-results\n", step)
+                self.assertIn("client-build.log", step)
+                self.assertIn("peer-test.log", step)
+                if label == "windows":
+                    self.assertIn("        shell: pwsh\n", step)
+                    self.assertIn("vision-client.exe\n", step)
+                    self.assertIn("if (-not (Test-Path $env:SWIRL_VISION_CLIENT -PathType Leaf))", step)
+                    for log in ("client-build.log", "peer-test.log"):
+                        self.assertIn(f'/{log}"\n' + development.WINDOWS_STATUS_GUARD, step)
+                else:
+                    self.assertIn("        shell: bash\n", step)
+                    self.assertIn("          set -euo pipefail\n", step)
+                    self.assertIn('          test -x "$SWIRL_VISION_CLIENT"\n', step)
+                evidence = part.split("      - name: Preserve Vision client and full Xray interoperability evidence\n", 1)[1]
+                evidence = evidence.split("      - ", 1)[0]
+                self.assertIn("        if: always()\n", evidence)
+                self.assertIn("          if-no-files-found: error\n", evidence)
+                self.assertIn("${{ github.sha }}-${{ github.run_attempt }}", evidence)
+                self.assertIn("swirl-xray-peer/build-manifest.json\n", evidence)
+                self.assertIn("swirl-xray-peer/build.log\n", evidence)
+                self.assertIn("swirl-vision-results\n", evidence)
+
+    def test_vision_xray_partial_drift_duplicates_and_bypass_fail_atomically(self):
+        final = development.updated_workflow(FIXTURE)
+        broken = []
+        for windows in (False, True):
+            block = development.vision_xray_steps(windows=windows)
+            log = ('2>&1 | Tee-Object -FilePath "$env:SWIRL_VISION_EVIDENCE/peer-test.log"\n'
+                   if windows else '2>&1 | tee "$SWIRL_VISION_EVIDENCE/peer-test.log"\n')
+            command = "          python tools/tests/test_vision_xray.py " + log
+            edits = (
+                "", block * 2,
+                block.replace(development.VISION_BUILD_COMMAND, development.VISION_BUILD_COMMAND.replace("--release ", ""), 1),
+                block.replace(development.VISION_BUILD_COMMAND, development.VISION_BUILD_COMMAND.replace("--locked ", ""), 1),
+                block.replace(command, "", 1),
+                block.replace(command, command * 2, 1),
+                block.replace("working-directory: .", "working-directory: core", 1),
+                block.replace("vision-client.exe" if windows else "examples/vision-client", "examples/unrelated-client", 1),
+                block.replace("SWIRL_XRAY_PEER_DIR:", "UNREVIEWED_PEER_DIR:", 1),
+                block.replace("SWIRL_VISION_EVIDENCE:", "UNREVIEWED_VISION_EVIDENCE:", 1),
+                block.replace("        run: |\n", "        continue-on-error: true\n        run: |\n", 1),
+                block.replace("        run: |\n", "        if: always()\n        run: |\n", 1),
+                block.replace("        if: always()\n", "        if: success()\n", 1),
+                block.replace("if-no-files-found: error", "if-no-files-found: ignore", 1),
+                block.replace("swirl-xray-peer/build-manifest.json", "swirl-xray-peer/unrelated.json", 1),
+                block.replace("${{ github.sha }}", "unverified-source", 1),
+            )
+            broken.extend(final.replace(block, edit, 1) for edit in edits)
+            if windows:
+                broken.append(final.replace(block, block.replace(development.WINDOWS_STATUS_GUARD, "", 1), 1))
+                broken.append(final.replace(block, block.replace(command + development.WINDOWS_STATUS_GUARD, command, 1), 1))
+                preflight = ("          if (-not (Test-Path $env:SWIRL_VISION_CLIENT -PathType Leaf)) "
+                             "{ throw 'Required Vision Release client missing' }\n")
+            else:
+                broken.append(final.replace(block, block.replace("set -euo pipefail", "set -eu", 1), 1))
+                broken.append(final.replace(block, block.replace(command, command.rstrip() + " || true\n", 1), 1))
+                preflight = '          test -x "$SWIRL_VISION_CLIENT"\n'
+            broken.append(final.replace(block, block.replace(preflight, "", 1), 1))
+            r3 = development.xray_steps(windows=windows)
+            broken.append(final.replace(r3 + block, block + r3, 1))
+        broken.append(final + "          python tools/tests/test_vision_xray.py\n")
+        for index, source in enumerate(broken):
+            with self.subTest(drift=index), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                workflow = self.make_repository(root, source)
+                before = workflow.read_bytes()
+                with self.assertRaises(ValueError):
+                    development.apply_update(root, ENVIRONMENT)
+                self.assertEqual(workflow.read_bytes(), before)
+
+    def test_vision_xray_missing_material_prevents_any_workflow_write(self):
+        for missing in development.VISION_XRAY_SOURCES:
+            with self.subTest(missing=missing), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                workflow = self.make_repository(root)
+                before = workflow.read_bytes()
+                (root / missing).unlink()
+                with self.assertRaises(ValueError):
+                    development.apply_update(root, ENVIRONMENT)
+                self.assertEqual(workflow.read_bytes(), before)
+
+    def test_vision_xray_shell_propagates_build_missing_binary_and_peer_failure(self):
+        # Execute checked-in shell bodies, including their log pipelines, rather
+        # than treating textual exit guards as evidence that failures propagate.
+        root = Path(__file__).resolve().parents[2]
+        source = (root / ".github/workflows/rust-core.yml").read_text(encoding="utf-8")
+        windows = os.name == "nt"
+        jobs = [("rust", source.split("  windows-rust:\n")[int(windows)])]
+        if not windows:
+            jobs.append(("app", (root / ".github/workflows/core-development.yml").read_text(encoding="utf-8")))
+        for job, part in jobs:
+            body = part.split("      - name: Build native Vision client and verify Xray interoperability\n", 1)[1]
+            body = body.split("        run: |\n", 1)[1].split("      - ", 1)[0]
+            body = "\n".join(line[10:] for line in body.splitlines() if line.strip()) + "\n"
+            for build_exit, client_present, peer_exit in ((23, True, 0), (0, False, 0), (0, True, 29), (0, True, 0)):
+                with self.subTest(job=job, build=build_exit, client=client_present, peer=peer_exit), tempfile.TemporaryDirectory() as temporary:
+                    work = Path(temporary)
+                    (work / "tools/tests").mkdir(parents=True)
+                    shim = work / "bin"
+                    shim.mkdir()
+                    stub = shim / ("cargo.cmd" if windows else "cargo")
+                    stub.write_text(
+                        (f"@echo off\necho synthetic-build\nexit /b {build_exit}\n" if windows
+                         else f"#!/bin/sh\necho synthetic-build\nexit {build_exit}\n"), encoding="utf-8")
+                    stub.chmod(0o755)
+                    client = work / ("vision-client.exe" if windows else "vision-client")
+                    if client_present:
+                        client.write_text("synthetic preflight fixture\n", encoding="utf-8")
+                        client.chmod(0o755)
+                    (work / "tools/tests/test_vision_xray.py").write_text(
+                        "from pathlib import Path\nPath('PEER_WAS_RUN').write_text('yes')\n"
+                        f"print('synthetic-peer', flush=True)\nraise SystemExit({peer_exit})\n", encoding="utf-8")
+                    evidence = work / "evidence"
+                    environment = dict(os.environ, SWIRL_VISION_CLIENT=str(client),
+                                       SWIRL_VISION_EVIDENCE=str(evidence), SWIRL_XRAY_PEER_DIR=str(work / "peer"))
+                    environment["PATH"] = str(shim) + os.pathsep + environment.get("PATH", "")
+                    if windows:
+                        script = work / "failure.ps1"
+                        script.write_text(body, encoding="utf-8")
+                        args = ["pwsh", "-NoProfile", "-File", str(script)]
+                    else:
+                        args = ["bash", "-c", body]
+                    result = subprocess.run(args, cwd=work, env=environment, capture_output=True, timeout=15)
+                    if client_present:
+                        self.assertEqual(result.returncode, build_exit or peer_exit, result.stderr.decode(errors="replace"))
+                    else:
+                        self.assertNotEqual(result.returncode, 0)
+                    ran = build_exit == 0 and client_present
+                    self.assertEqual((work / "PEER_WAS_RUN").exists(), ran)
+                    self.assertIn("synthetic-build", (evidence / "client-build.log").read_text(encoding="utf-8"))
+                    self.assertEqual((evidence / "peer-test.log").exists(), ran)
+                    if ran:
+                        self.assertIn("synthetic-peer", (evidence / "peer-test.log").read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
