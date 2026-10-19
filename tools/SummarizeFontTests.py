@@ -47,11 +47,14 @@ def summarize(build: Path, require_windows: bool) -> dict:
         "fontCachesAreBoundedAndStable", "displayContextHasBoundedLifecycle",
         "qmlLiveAutomaticFonts", "fontDisplayContextLifetime",
         "previewFontResourcesInvalidateRaster", "previewWindowMetricsAndIdleStability",
+        "previewRepeatedAxesReuseResources",
         "automaticWidthUsesRealAdvances",
     )]
     if require_windows:
         reports.append("font-native-raster.xml")
-        required.append(("font-native-raster.xml", "nativeGlyphsHaveNoColourFringes"))
+        required.extend(("font-native-raster.xml", name) for name in (
+            "nativeGlyphsHaveNoColourFringes", "previewRepeatedAxesReuseResources",
+        ))
     cases, errors = [], []
     for report in reports:
         try:

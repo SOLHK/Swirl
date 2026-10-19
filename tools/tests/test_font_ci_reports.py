@@ -25,6 +25,7 @@ class FontCiReportTests(unittest.TestCase):
             "displayContextHasBoundedLifecycle": "pass", "qmlLiveAutomaticFonts": "pass",
             "fontDisplayContextLifetime": "pass", "previewFontResourcesInvalidateRaster": "pass",
             "previewWindowMetricsAndIdleStability": "pass",
+            "previewRepeatedAxesReuseResources": "pass",
             "automaticWidthUsesRealAdvances": "pass",
             "importOptionalPingFangUiCollection": "skip", "cleanupTestCase": "pass",
         }
@@ -42,13 +43,13 @@ class FontCiReportTests(unittest.TestCase):
 
     def test_skipped_private_fixture_is_separate_from_passes(self):
         result = font_report.summarize(self.root, False)
-        self.assertEqual(result["countsExcludingLifecycle"], {"pass": 18, "skip": 1})
+        self.assertEqual(result["countsExcludingLifecycle"], {"pass": 19, "skip": 1})
         self.assertEqual(result["errors"], [])
         self.assertFalse(result["physicalDpiVerified"])
         self.assertFalse(result["refresh240HzVerified"])
 
     def test_required_synthetic_fixture_skip_fails_gate(self):
-        for name in ("optionalMetadataReplacement", "automaticWidthUsesRealAdvances"):
+        for name in ("optionalMetadataReplacement", "automaticWidthUsesRealAdvances", "previewRepeatedAxesReuseResources"):
             with self.subTest(name=name):
                 skipped = dict(self.selection)
                 skipped[name] = "skip"
@@ -60,7 +61,7 @@ class FontCiReportTests(unittest.TestCase):
         self.selection["optionalPhysicalFontIdentity"] = "skip"
         self.write("font-selection.xml", self.selection)
         result = font_report.summarize(self.root, False)
-        self.assertEqual(result["countsExcludingLifecycle"], {"pass": 18, "skip": 2})
+        self.assertEqual(result["countsExcludingLifecycle"], {"pass": 19, "skip": 2})
         self.assertEqual(result["errors"], [])
         self.assertFalse(result["physicalDpiVerified"])
         self.assertFalse(result["refresh240HzVerified"])
@@ -73,7 +74,7 @@ class FontCiReportTests(unittest.TestCase):
         self.write("font-selection.xml", self.selection)
         result = font_report.summarize(self.root, False)
         self.assertTrue(any("optionalPhysicalFontIdentity: fail" in error for error in result["errors"]))
-        self.assertEqual(result["countsExcludingLifecycle"], {"pass": 18, "skip": 1})
+        self.assertEqual(result["countsExcludingLifecycle"], {"pass": 19, "skip": 1})
 
     def test_missing_or_truncated_report_fails_gate(self):
         for contents in (None, "<TestCase><TestFunction>"):
@@ -86,9 +87,18 @@ class FontCiReportTests(unittest.TestCase):
 
     def test_windows_native_gate_cannot_be_absent_or_skipped(self):
         self.assertTrue(font_report.summarize(self.root, True)["errors"])
-        self.write("font-native-raster.xml", {"nativeGlyphsHaveNoColourFringes": "skip"})
-        self.assertTrue(font_report.summarize(self.root, True)["errors"])
-        self.write("font-native-raster.xml", {"nativeGlyphsHaveNoColourFringes": "pass"})
+        complete = {"nativeGlyphsHaveNoColourFringes": "pass", "previewRepeatedAxesReuseResources": "pass"}
+        for name in complete:
+            for status in (None, "skip"):
+                with self.subTest(name=name, status=status):
+                    cases = dict(complete)
+                    if status is None:
+                        del cases[name]
+                    else:
+                        cases[name] = status
+                    self.write("font-native-raster.xml", cases)
+                    self.assertTrue(any(name in error for error in font_report.summarize(self.root, True)["errors"]))
+        self.write("font-native-raster.xml", complete)
         self.assertEqual(font_report.summarize(self.root, True)["errors"], [])
 
     def test_failed_lifecycle_is_retained_as_failure(self):
@@ -106,7 +116,7 @@ class FontCiReportTests(unittest.TestCase):
         self.assertTrue(any("Unexpected public font case skip" in error for error in font_report.summarize(self.root, False)["errors"]))
 
     def test_missing_registered_qml_or_restart_case_fails_gate(self):
-        for name in ("qmlLiveAutomaticFonts", "automaticProfilesRestartAcrossProcess"):
+        for name in ("qmlLiveAutomaticFonts", "automaticProfilesRestartAcrossProcess", "previewRepeatedAxesReuseResources"):
             with self.subTest(name=name):
                 missing = dict(self.selection)
                 del missing[name]

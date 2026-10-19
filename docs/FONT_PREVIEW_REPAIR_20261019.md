@@ -107,6 +107,9 @@ Qt **6.10.3**, GCC **13.3**, Linux Release, offscreen/software:
 
 The Windows workflow on this development branch compiles the exact triggering
 source, exercises D3D11 WARP and the standalone tests, then builds the full app.
+The native-raster invocation now also runs `previewRepeatedAxesReuseResources`;
+when Windows/D3D11 is requested the test requires that actual graphics API, so
+the texture-reuse branch cannot silently be replaced by software-only checks.
 Its result must be read from the actual run; the Linux results above do not
 predeclare its outcome.
 

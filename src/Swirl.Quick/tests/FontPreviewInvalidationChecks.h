@@ -247,6 +247,11 @@ void FontTests::previewRepeatedAxesReuseResources()
     const auto textureAllocations = preview->textureAllocationCount();
     QVERIFY(textureAllocations > 0);
     const bool rhiBackend = QSGRendererInterface::isApiRhiBased(window.rendererInterface()->graphicsApi());
+    // The native CI invocation must execute the RHI branch, not silently retain
+    // only the software assertions if the requested graphics backend is absent.
+    if (QGuiApplication::platformName() == QStringLiteral("windows")
+        && qEnvironmentVariable("QSG_RHI_BACKEND") == QStringLiteral("d3d11"))
+        QCOMPARE(window.rendererInterface()->graphicsApi(), QSGRendererInterface::Direct3D11);
     QImage previous = initial;
     for (const float weight : {900.f, 100.f, 650.f, 250.f, 900.f, 200.f}) {
         preview->setFont(request(weight));
