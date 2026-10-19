@@ -1,0 +1,93 @@
+name: Swirl VF native source identity
+
+on:
+  push:
+    branches: [work/core-completion-20261017]
+    paths:
+      - '.github/workflows/swirl-vf-source-identity.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  identify:
+    runs-on: macos-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check system font hashes only
+        shell: bash
+        run: |
+          mkdir -p build/source-identity
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, platform, subprocess, tempfile
+          expected = '39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890'
+          paths = [
+            '/System/Library/PrivateFrameworks/FontServices.framework/Versions/A/Resources/Reserved/PingFangUI.ttc',
+            '/System/Library/PrivateFrameworks/FontServices.framework/Resources/Reserved/PingFangUI.ttc',
+            '/System/Library/Fonts/PingFang.ttc',
+          ]
+          report = {'status':'NO_IDENTICAL_SOURCE_FOUND', 'expected_sha256':expected,
+                    'platform':platform.platform(), 'source_font_transferred':False,
+                    'original_outline_data_published':False, 'windows_acceptance':'NOT_RUN',
+                    'candidate_font_generated':False, 'candidates':[]}
+          same = None
+          seen = set()
+          for name in paths:
+            path = pathlib.Path(name)
+            if not path.is_file():
+              report['candidates'].append({'path':name,'status':'NOT_PRESENT'})
+              continue
+            resolved = str(path.resolve())
+            if resolved in seen:
+              continue
+            seen.add(resolved)
+            h = hashlib.sha256()
+            with path.open('rb') as stream:
+              for data in iter(lambda:stream.read(1048576),b''):
+                h.update(data)
+            digest = h.hexdigest()
+            report['candidates'].append({'path':name,'bytes':path.stat().st_size,'sha256':digest,
+                                         'identical_to_user_source':digest == expected})
+            if digest == expected:
+              same = path
+          if same is not None:
+            report['status'] = 'IDENTICAL_SOURCE_FOUND'
+            with tempfile.TemporaryDirectory(prefix='swirl-private-identity-') as tmp:
+              binary = pathlib.Path(tmp) / 'coretext_extract'
+              try:
+                built = subprocess.run(['xcrun','swiftc','-O','tools/swirl_vf/platform/coretext_extract.swift',
+                                        '-o',str(binary)],capture_output=True,text=True,timeout=180)
+                report['native_compile_exit_code'] = built.returncode
+                if built.returncode == 0:
+                  # No glyph requests: read only native metadata, never emit outlines.
+                  run = subprocess.run([str(binary),str(same)],input='',capture_output=True,
+                                       text=True,timeout=180)
+                  report['native_exit_code'] = run.returncode
+                  rows = [json.loads(line) for line in run.stdout.splitlines() if line]
+                  header = next((row for row in rows if row.get('type') == 'metadata'),{})
+                  faces = header.get('faces',[])
+                  report['native_source_sha256'] = header.get('source_sha256')
+                  report['native_face_count'] = len(faces)
+                  report['identity_verified_faces'] = sum(f.get('status') == 'identity_verified' for f in faces)
+                  report['all_source_faces_verified'] = (run.returncode == 0 and bool(faces)
+                    and header.get('source_sha256') == expected
+                    and all(f.get('status') == 'identity_verified' for f in faces))
+                else:
+                  report['native_compile_failed'] = True
+                  report['compile_diagnostics'] = built.stderr[-8000:]
+              except Exception as error:
+                report['native_probe_error_type'] = type(error).__name__
+          dest = pathlib.Path('build/source-identity/source-identity.json')
+          dest.write_text(json.dumps(report,indent=2)+'\n')
+          print(dest.read_text())
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: swirl-vf-source-identity-${{ github.sha }}
+          path: build/source-identity/source-identity.json
+          retention-days: 7
