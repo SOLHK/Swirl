@@ -68,7 +68,7 @@ def inspect(source: Path, output: Path):
         report["source_unchanged"] = original_hash == hashlib.file_digest(stream, "sha256").hexdigest()
     report["blockers"] = [
         "Native Apple outline/metric oracle has not been run against this exact source hash.",
-        "Portable experimental rendering explicitly refuses undocumented tangent blend reconstruction.",
+        "Portable experimental rendering refuses tangent blend reconstruction not yet independently validated.",
         "Raw Apple avar duplicates/order must be evaluated by CoreText; dictionary collapse is not equivalent proof.",
         "Nonlinear hierarchy/rotation and float-to-integer conversion require independent unsampled-point error bounds.",
         "Actual private-source Windows DirectWrite, Qt and physical DPI tests have not run."]

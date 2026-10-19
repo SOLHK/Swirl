@@ -21,7 +21,7 @@
 
 [hvgl](https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6hvgl.html) 说明了 little-endian、自然对齐、shape/composite 层级、稀疏增量及旋转/平移数据；[hvpm](https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6hvpm.html) 说明 TTC 字体面可通过内部 part 映射共享轮廓。映射不能只作用于顶层 glyph；替代 part 必须具有相容的树结构和轴语义。
 
-公开格式足以做边界检查和结构解码，但对 tangent blend 类型的全部求值细节没有给出可直接照抄的算法。工程判断：不应把一个依据不完整说明推导出的渲染器作为证明自身正确的唯一基准。含旋转的层级参数可能产生非线性几何，不能先验断言有限个线性 gvar 支持区间能够精确表示全部行为。
+公开格式为边界检查、结构解码和 tangent blend 的实现提供了依据。原件的 Type 2 并非标准不支持或原则上无法实现；准确的工程状态是：当前研究渲染器尚未完成经过原件独立原生对照的 Type 2 求值，所以明确拒绝该路径。不能把“本轮未实现、未验证”写成“格式没有定义”。含旋转的层级参数可能产生非线性几何，不能先验断言有限个线性 gvar 支持区间能够精确表示全部行为。
 
 Apple 还公开了 [hvf C/Swift 接口](https://developer.apple.com/documentation/hvf)。本工程实现 `platform/hvf_oracle.c`，从用户指定 TTC 字体面读取表，然后直接调用 Apple renderer；以未缩放、17 位有效数字 JSON 记录真实回调，作为将来的独立几何基准。`HVF_set_axis_value` 接受设计空间归一化坐标，不能把用户 wght/WDTH/HGHT 原值直接传入。参见 [轴值 API](https://developer.apple.com/documentation/hvf/hvf_set_axis_value) 和 [renderer 初始化](https://developer.apple.com/documentation/hvf/hvf_open_part_renderer)。
 
