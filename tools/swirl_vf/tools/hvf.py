@@ -2,8 +2,9 @@
 
 The binary reader implements the published storage format.  The experimental
 renderer is deliberately a separate class: parsing success is not evidence of
-CoreText-equivalent rendering.  In particular it refuses tangent blend types
-whose reconstruction is not specified by the public table documentation.
+CoreText-equivalent rendering. Isolated Type-2 tangent projection is an
+explicitly enabled experimental path with separate native evidence; unsupported
+tangent types remain errors rather than being treated as ordinary corners.
 
 References (retrieved 2026-10-19):
 https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6hvgl.html
@@ -319,15 +320,17 @@ def extrema(values):
 class ExperimentalRenderer:
     """Research evaluator; NEVER a release/Apple-equivalence oracle.
 
-    Uses additive structure-tree deltas as suggested by the published format.
-    This interpretation and internal-axis extrapolation require Apple-oracle
-    comparison.  Tangent blend types 2/3/4 fail explicitly rather than being
-    treated as corners or silently dropping the affected glyphs.
+    Axis deltas are additive. Descendant transforms compose in traversal order:
+    a deeper composite rotates an inherited translation before adding its own.
+    This was checked against independent native synthetic fixtures. The complete
+    source still requires native comparison. Type 2 is an explicit opt-in to the
+    separately tested projection rule; Types 3/4 remain unsupported.
     """
     backend = "portable-experimental-unverified"
 
-    def __init__(self, table: HVGL):
+    def __init__(self, table: HVGL, *, isolated_tangents: bool = False):
         self.table = table
+        self.isolated_tangents = isolated_tangents
 
     def render(self, glyph_id: int, design_location) -> list[np.ndarray]:
         root = self.table.part(glyph_id)
@@ -341,10 +344,25 @@ class ExperimentalRenderer:
         paths = []
         active = set()
 
-        def add_transform(t, out, part_base, weights):
-            np.add.at(out, part_base + 1 + t.master_rows, t.master_values)
-            for (row, col), v in zip(t.extreme_indices, t.extreme_values):
-                out[part_base + 1 + int(row)] += weights[int(col)] * v
+        def compose_transforms(part, part_base, weights):
+            # Each composite defines a complete local R-then-T contribution.
+            # Compose it AFTER contributions inherited from shallower nodes;
+            # simply adding translations loses the deeper rotation of them.
+            # Collect sparse rows only, avoiding an allocation of the full tree.
+            changes = {}
+            for record, section in ((part.translations, slice(0, 2)),
+                                    (part.rotations, slice(2, 3))):
+                for row, vector in zip(record.master_rows, record.master_values):
+                    changes.setdefault(int(row), np.zeros(3))[section] += vector
+                for (row, col), vector in zip(record.extreme_indices, record.extreme_values):
+                    changes.setdefault(int(row), np.zeros(3))[section] += weights[int(col)] * vector
+            for row, delta in changes.items():
+                target = part_base + 1 + row
+                co, si = math.cos(delta[2]), math.sin(delta[2])
+                x, y = translations[target]
+                translations[target] = (co*x - si*y + delta[0],
+                                        si*x + co*y + delta[1])
+                rotations[target] += delta[2]
 
         def visit(index, part_base, axis_base, parent_matrix):
             if index in active:
@@ -364,12 +382,12 @@ class ExperimentalRenderer:
                     a, b = int(p.column_starts[col]), int(p.column_starts[col + 1])
                     if weights[col] and a != b:
                         np.add.at(values, desc + p.extreme_rows[a:b], p.extreme_values[a:b] * weights[col])
-                add_transform(p.translations, translations, part_base, weights)
-                add_transform(p.rotations, rotations.reshape(-1, 1), part_base, weights)
+                compose_transforms(p, part_base, weights)
                 for child, part_row, axis_row in p.subparts:
                     visit(child, part_base + 1 + part_row, desc + axis_row, matrix)
             else:
-                unsupported = sorted(set(p.blends) - {0, 1})
+                supported = {0, 1, 2} if self.isolated_tangents else {0, 1}
+                unsupported = sorted(set(p.blends) - supported)
                 if unsupported:
                     raise UnsupportedRendering(f"part {p.index}: tangent blend types {unsupported} need Apple oracle")
                 if p.axis_count:
@@ -383,12 +401,19 @@ class ExperimentalRenderer:
                     pos += size
                     if size < 3:  # specified by Apple, not a heuristic simplification
                         continue
-                    off = segment[:, 2:4].copy()
-                    for k, kind in enumerate(types):
-                        if kind == 0:
-                            parallel = segment[k, 0]
-                            segment[k, :2] = (1 - parallel) * off[k - 1] + parallel * off[k]
-                    points = segment.reshape(-1, 2)
+                    if self.isolated_tangents:
+                        from tangent_geometry import resolve_path, TangentGeometryError
+                        try:
+                            points = resolve_path(segment, types)
+                        except TangentGeometryError as error:
+                            raise UnsupportedRendering(f"part {p.index}: {error}") from error
+                    else:
+                        off = segment[:, 2:4].copy()
+                        for k, kind in enumerate(types):
+                            if kind == 0:
+                                parallel = segment[k, 0]
+                                segment[k, :2] = (1 - parallel) * off[k - 1] + parallel * off[k]
+                        points = segment.reshape(-1, 2)
                     homogeneous = np.column_stack((points, np.ones(len(points))))
                     transformed = (homogeneous @ matrix.T)[:, :2]
                     require(bool(np.isfinite(transformed).all()), "non-finite rendered coordinate")

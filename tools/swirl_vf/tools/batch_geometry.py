@@ -32,8 +32,9 @@ class GeometryBatch:
 class BatchGeometry:
     backend = "portable-batched-experimental-unverified"
 
-    def __init__(self, table: HVGL):
+    def __init__(self, table: HVGL, *, isolated_tangents: bool = False):
         self.table = table
+        self.isolated_tangents = isolated_tangents
 
     def render(self, glyph_id: int, design_locations) -> GeometryBatch:
         root = self.table.part(glyph_id)
@@ -55,11 +56,23 @@ class BatchGeometry:
         active = set()
         point_count = 0
 
-        def transforms(record, target, base, weights):
-            if len(record.master_rows):
-                target[:, base + 1 + record.master_rows] += record.master_values
-            for (row, col), vector in zip(record.extreme_indices, record.extreme_values):
-                target[:, base + 1 + int(row)] += weights[:, int(col), None] * vector
+        def compose_transforms(part, base, weights):
+            # Match the scalar renderer's native-checked composition order.
+            # A deeper rotation acts on inherited descendant translations.
+            changes = {}
+            for record, section in ((part.translations, slice(0, 2)),
+                                    (part.rotations, slice(2, 3))):
+                for row, vector in zip(record.master_rows, record.master_values):
+                    changes.setdefault(int(row), np.zeros((count, 3)))[:, section] += vector
+                for (row, col), vector in zip(record.extreme_indices, record.extreme_values):
+                    changes.setdefault(int(row), np.zeros((count, 3)))[:, section] += weights[:, int(col), None] * vector
+            for row, delta in changes.items():
+                target = base + 1 + row
+                cosine, sine = np.cos(delta[:, 2]), np.sin(delta[:, 2])
+                old = translations[:, target].copy()
+                translations[:, target, 0] = cosine * old[:, 0] - sine * old[:, 1] + delta[:, 0]
+                translations[:, target, 1] = sine * old[:, 0] + cosine * old[:, 1] + delta[:, 1]
+                rotations[:, target] += delta[:, 2]
 
         def visit(index, part_base, axis_base, parent_matrix, parent_offset, depth):
             nonlocal point_count
@@ -89,13 +102,13 @@ class BatchGeometry:
                     if start != end:
                         values[:, descendants + part.extreme_rows[start:end]] += (
                             weights[:, column, None] * part.extreme_values[start:end])
-                transforms(part.translations, translations, part_base, weights)
-                transforms(part.rotations, rotations[..., None], part_base, weights)
+                compose_transforms(part, part_base, weights)
                 for child, part_row, axis_row in part.subparts:
                     visit(child, part_base + 1 + part_row, descendants + axis_row,
                           matrix, offset, depth + 1)
             else:
-                unsupported = sorted(set(part.blends) - {0, 1})
+                supported = {0, 1, 2} if self.isolated_tangents else {0, 1}
+                unsupported = sorted(set(part.blends) - supported)
                 if unsupported:
                     raise UnsupportedRendering(f"part {part.index}: tangent blend types {unsupported} lack validated evaluation")
                 require(count * part.master.size <= 8_000_000,
@@ -113,12 +126,19 @@ class BatchGeometry:
                         continue  # Explicit rule in Apple's HVGL specification.
                     point_count += count * size * 2
                     require(point_count <= 8_000_000, "path batch exceeds output resource limit")
-                    off = segment[:, :, 2:4].copy()
-                    for k, kind in enumerate(kinds):
-                        if kind == 0:
-                            factor = segment[:, k, 0, None]
-                            segment[:, k, :2] = (1 - factor) * off[:, k - 1] + factor * off[:, k]
-                    points = segment.reshape(count, -1, 2)
+                    if self.isolated_tangents:
+                        from tangent_geometry import resolve_path, TangentGeometryError
+                        try:
+                            points = resolve_path(segment, kinds)
+                        except TangentGeometryError as error:
+                            raise UnsupportedRendering(f"part {part.index}: {error}") from error
+                    else:
+                        off = segment[:, :, 2:4].copy()
+                        for k, kind in enumerate(kinds):
+                            if kind == 0:
+                                factor = segment[:, k, 0, None]
+                                segment[:, k, :2] = (1 - factor) * off[:, k - 1] + factor * off[:, k]
+                        points = segment.reshape(count, -1, 2)
                     points = np.einsum("nij,npj->npi", matrix, points) + offset[:, None, :]
                     require(bool(np.isfinite(points).all()), "non-finite evaluated outline")
                     result.paths.append(points)

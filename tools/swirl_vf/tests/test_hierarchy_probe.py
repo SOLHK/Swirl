@@ -73,12 +73,13 @@ class HierarchyProbeTests(unittest.TestCase):
         child_axis = 0.125 + 0.5*0.375
         leaf_axis = 0.125 + 0.5*child_axis
         leaf = analytic_leaf(leaf_axis)
-        # The current model combines translations targeting the same leaf in
-        # its parent coordinate system, after that leaf's own rotation.
-        expected = rigid(rigid(leaf, -0.23, [-12, 10]), 0.371, [30, 40])
+        # Independent native artifact 12205148657 proves the deeper local
+        # rotation also rotates an inherited descendant translation. Only the
+        # newly contributed (-25,17) translation is applied after that rotation.
+        expected = rigid(rigid(leaf + [13, -7], -0.23, [-25, 17]), 0.371, [30, 40])
         actual = ExperimentalRenderer(parsed).render(0, [0.375])[0]
         np.testing.assert_allclose(actual, expected, rtol=0, atol=1e-10)
-        wrong = rigid(rigid(analytic_leaf(leaf_axis), -0.23, [-25, 17]), 0.371, [30, 40]) + [13, -7]
+        wrong = rigid(rigid(leaf, -0.23, [-12, 10]), 0.371, [30, 40])
         self.assertGreater(np.max(np.abs(wrong-actual)), LIMIT)
 
     def test_internal_axis_cases_expose_current_extrapolation_hypothesis(self):
