@@ -99,7 +99,10 @@ try {
             $report.native_exit_code = $returnCode
             $report.native_runtime = 'RAN'
             $nativeLog = Join-Path $resultDirectory 'directwrite.jsonl'
-            $rows = @(Get-Content -LiteralPath $nativeLog -Encoding UTF8 | ForEach-Object { $_ | ConvertFrom-Json })
+            # Font axis tags are case-sensitive. DirectWrite may expose both
+            # the physical custom WDTH and a synthesized registered wdth axis.
+            # PSCustomObject cannot retain these distinct JSON keys.
+            $rows = @(Get-Content -LiteralPath $nativeLog -Encoding UTF8 | ForEach-Object { $_ | ConvertFrom-Json -AsHashtable })
             $headers = @($rows | Where-Object { $_.record -eq 'header' })
             $summaries = @($rows | Where-Object { $_.record -eq 'summary' })
             $failures = @($rows | Where-Object { $_.record -eq 'face_result' -and $_.status -eq 'FAILED' })

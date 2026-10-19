@@ -80,7 +80,7 @@ static int find_table(Span file, size_t sfnt, const char tag[4], Span *out) {
 static void separator(Output *out) {
     if (out->events++) fputc(',', out->out);
 }
-static void xy(Output *out, HVFPoint p) {
+static void xy(Output *out, struct HVFPoint p) {
     if (!isfinite(p.x) || !isfinite(p.y)) {
         fputs("null,null", out->out);
         out->failed = 1;

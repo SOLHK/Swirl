@@ -172,7 +172,10 @@ func tagString(_ value: UInt32) -> String {
 }
 
 func copiedTable(_ font: CTFont, _ tag: String) -> Data? {
-    CTFontCopyTable(font, CTFontTableTag(tagIdentifier(tag)), .excludeSynthetic) as Data?
+    // The current macOS SDK explicitly marks excludeSynthetic unavailable
+    // ("Unsupported"). Use supported default options; verifyIdentity still
+    // requires exact byte length and SHA-256 equality with every source table.
+    CTFontCopyTable(font, CTFontTableTag(tagIdentifier(tag)), CTFontTableOptions(rawValue: 0)) as Data?
 }
 
 func verifyIdentity(_ font: CTFont, _ face: RawFace, allTables: Bool) throws -> [String: String] {

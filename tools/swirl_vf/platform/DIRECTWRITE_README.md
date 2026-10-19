@@ -2,17 +2,19 @@
 
 `directwrite_probe.cpp` 直接使用 Windows 的 `IDWriteFactory6`、`IDWriteFontResource`、`IDWriteFontFace5` 和 Direct2D/WIC。它不依赖 Qt，也不经过系统字体名称匹配来猜测输入文件。
 
-**当前工作区为 Linux；没有 Windows SDK、DirectWrite 运行时、Wine 或 PowerShell。Windows 原生编译、字体加载和 DPI 图像生成均尚未运行。** 非 Windows 编译出来的占位入口只返回 77 / `NOT_RUN`，不能用于字体兼容性证明。
+Linux 的占位入口只返回 77 / `NOT_RUN`，不能用于字体兼容性证明。原生结果以记录了操作系统、输入 SHA-256 和源码提交的 Windows 日志为准；公开 CI 仅使用原创几何字体。Windows Server CI、Windows 11 桌面和用户原字体的验收分别记录。
 
 ## 运行方法
 
-在有 Visual Studio 2022 C++ 桌面工具、Windows SDK 和 CMake 的 Windows 11 电脑上运行：
+在有 Visual Studio 2022 C++ 桌面工具、Windows SDK、CMake 和 PowerShell 7 的 Windows 11 电脑上运行：
 
 ```powershell
 .\run_directwrite_probe.ps1 -Font "D:\Codex\Swirl-VF\Swirl-VF.ttc" -OutputDirectory "D:\Codex\Swirl-VF\evidence\windows-first" -Render
 ```
 
 每次选择新的输出目录。没有 `Swirl-VF.ttc` 就记录尚未运行，不会把原版重命名成 Windows 字体。`-Binary` 可以指定已编译的程序；`-AllGlyphs` 会把每个字体面、每个测试坐标位置的检查扩展到所有 glyph ID，可能明显增加运行时间。
+
+轴标签区分大小写。实际 DirectWrite 实例可同时报告自定义 `WDTH` 与内建 `wdth`，脚本使用 `ConvertFrom-Json -AsHashtable` 完整保留二者。首轮原生 CI 在 C++ 检查成功后暴露了默认 PowerShell JSON 对象不能容纳这两个键的问题；修复处理方式，没有删除或改名任何轴。
 
 ## 实际检查
 
