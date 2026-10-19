@@ -363,6 +363,22 @@ class SsPolicyPeer:
 
 
 class SsPolicyPeerAllocationTests(unittest.TestCase):
+    def setUp(self):
+        # These cases exercise allocation error handling, not network traffic.
+        # Keep real socket descriptors for the cleanup assertions, but isolate
+        # bind/listen/thread effects from Windows reservations and other peers.
+        # CPython uses the same scoped-effect approach for bind-error tests:
+        # https://github.com/python/cpython/blob/v3.14.0/Lib/test/test_asyncio/test_unix_events.py
+        self.candidate_port = 50789
+        for patcher in (
+                mock.patch(__name__ + '.pair_port', return_value=self.candidate_port),
+                mock.patch.object(socketserver.TCPServer, 'server_bind', autospec=True),
+                mock.patch.object(socketserver.TCPServer, 'server_activate', autospec=True),
+                mock.patch.object(socketserver.BaseServer, 'shutdown', autospec=True),
+                mock.patch(__name__ + '.PairThread')):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
     def test_pair_retries_only_collisions_and_releases_failed_sockets(self):
         original = socketserver.TCPServer.server_bind
         for failing_kind in (socket.SOCK_STREAM, socket.SOCK_DGRAM):
@@ -387,12 +403,12 @@ class SsPolicyPeerAllocationTests(unittest.TestCase):
                             peer = SsPolicyPeer('aes-128-gcm', 443, (53,))
                         try:
                             self.assertEqual(len(rejected), fail_count)
-                            selected = peer.port if os.name == 'nt' else 0
-                            self.assertEqual(requested[-2:], [(socket.SOCK_STREAM, selected),
+                            self.assertEqual(requested[-2:], [(socket.SOCK_STREAM, self.candidate_port),
                                                              (socket.SOCK_DGRAM, peer.port)])
                             self.assertEqual(peer.tcp.server_address, peer.udp.server_address)
                             self.assertTrue(all(server.socket.fileno() == -1 for server in created[:-2]))
                             for server in (peer.tcp, peer.udp):
+                                self.assertNotEqual(server.socket.fileno(), -1)
                                 self.assertFalse(server.allow_reuse_address)
                                 self.assertFalse(server.allow_reuse_port)
                         finally:
@@ -455,8 +471,7 @@ class SsPolicyPeerAllocationTests(unittest.TestCase):
                         self.assertIs(caught.exception, failure)
                         self.assertEqual(len(rejected), 1)
                         self.assertEqual(len(created), 1 if failing_kind == socket.SOCK_STREAM else 2)
-                        self.assertEqual(rejected[0][1] == 0,
-                                         os.name != 'nt' and failing_kind == socket.SOCK_STREAM)
+                        self.assertEqual(rejected[0][1], self.candidate_port)
                         if isinstance(failure, OSError):
                             protocol = 'TCP' if failing_kind == socket.SOCK_STREAM else 'UDP'
                             self.assertEqual(failure.__notes__,

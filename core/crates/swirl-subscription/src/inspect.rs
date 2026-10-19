@@ -2,6 +2,9 @@
 //! the public report. Only explicitly supported and fully mapped TCP nodes can
 //! yield an executable isolated-test outbound; all original fields are retained.
 use crate::{Config, Credentials, Limits, Node, ObfsHttp, Outbound, Tls};
+#[cfg(test)]
+#[path = "inspect_boundaries.rs"]
+mod inspect_boundaries;
 #[path = "inspect_socks4.rs"]
 mod inspect_socks4;
 #[path = "inspect_websocket.rs"]
@@ -328,6 +331,20 @@ fn uri(line: &str) -> Result<Value, &'static str> {
                 "0" | "false" => Value::Bool(false),
                 _ => return Err("InvalidUriBoolean"),
             }
+        } else if key == "alpn" {
+            // The sharing-link format encodes an ordered comma-separated list.
+            // Keep raw-uri unchanged; never drop empty entries or trim a token.
+            let protocols: Vec<_> = value.split(',').collect();
+            if protocols.len() > 16
+                || protocols.iter().any(|protocol| {
+                    protocol.is_empty()
+                        || protocol.len() > 255
+                        || !protocol.bytes().all(|byte| byte.is_ascii_graphic())
+                })
+            {
+                return Err("InvalidUriAlpn");
+            }
+            json!(protocols)
         } else {
             Value::String(value.into_owned())
         };
@@ -666,6 +683,25 @@ const SS_FIELDS: &[&str] = &[
     "raw-uri",
     "raw-ini",
 ];
+fn endpoint_port(raw: &Value) -> Result<u16, &'static str> {
+    let parse = |value: &Value| {
+        value
+            .as_u64()
+            .or_else(|| value.as_str().and_then(|text| text.parse().ok()))
+            .and_then(|port| u16::try_from(port).ok())
+            .filter(|port| *port != 0)
+            .ok_or("NodeParameters")
+    };
+    // Validate both supplied aliases, including explicit null, before choosing.
+    // Source types remain in Inspection; numeric strings retain prior support.
+    let port = raw.get("port").map(parse).transpose()?;
+    let server_port = raw.get("server_port").map(parse).transpose()?;
+    match (port, server_port) {
+        (Some(a), Some(b)) if a != b => Err("ConflictingServerPort"),
+        (Some(port), _) | (_, Some(port)) => Ok(port),
+        (None, None) => Err("NodeParameters"),
+    }
+}
 fn ss_outbound(raw: &Value, family: &str) -> Result<Outbound, &'static str> {
     if family == "xray-v2ray-json" {
         return Err("UnmappedFields");
@@ -745,15 +781,7 @@ fn ss_outbound(raw: &Value, family: &str) -> Result<Outbound, &'static str> {
         .and_then(Value::as_str)
         .ok_or("NodeParameters")?
         .to_string();
-    let port = raw
-        .get("port")
-        .or_else(|| raw.get("server_port"))
-        .and_then(|p| {
-            p.as_u64()
-                .or_else(|| p.as_str().and_then(|s| s.parse().ok()))
-        })
-        .and_then(|p| u16::try_from(p).ok())
-        .ok_or("NodeParameters")?;
+    let port = endpoint_port(raw)?;
     let password = raw
         .get("password")
         .and_then(Value::as_str)
@@ -790,8 +818,10 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
         .or_else(|| raw.get("protocol"))
         .and_then(Value::as_str)
         .unwrap_or("");
-    let implicit_socks_tls = source_protocol.eq_ignore_ascii_case("socks5-tls");
     let kind = protocol(source_protocol);
+    let implicit_tls = kind == "trojan"
+        || source_protocol.eq_ignore_ascii_case("socks5-tls")
+        || source_protocol.eq_ignore_ascii_case("https");
     if matches!(kind, "socks4" | "socks4a")
         || (raw.get("type").and_then(Value::as_str) == Some("socks")
             && matches!(raw.get("version").and_then(Value::as_str), Some("4" | "4a")))
@@ -800,9 +830,8 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
     }
     let transport_raw = raw
         .get("network")
-        .and_then(Value::as_str)
-        .or_else(|| raw.pointer("/transport/type").and_then(Value::as_str))
-        .unwrap_or("tcp");
+        .or_else(|| raw.pointer("/transport/type"))
+        .map_or("tcp", |value| value.as_str().unwrap_or("unknown"));
     let transport = allowed(
         transport_raw,
         &[
@@ -844,8 +873,7 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
     let reality = raw.get("reality-opts").is_some()
         || raw.pointer("/tls/reality").is_some()
         || raw.get("security").and_then(Value::as_str) == Some("reality");
-    let tls_enabled = kind == "trojan"
-        || implicit_socks_tls
+    let tls_enabled = implicit_tls
         || tls_obj.and_then(Value::as_bool) == Some(true)
         || raw.pointer("/tls/enabled").and_then(Value::as_bool) == Some(true)
         || raw.get("security").and_then(Value::as_str) == Some("tls");
@@ -943,14 +971,7 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
             .and_then(Value::as_str)
             .unwrap_or("")
             .to_string();
-        let port = raw
-            .get("port")
-            .or_else(|| raw.get("server_port"))
-            .and_then(|p| {
-                p.as_u64()
-                    .or_else(|| p.as_str().and_then(|s| s.parse().ok()))
-            })
-            .unwrap_or(0);
+        let port = endpoint_port(raw);
         let skip = raw.get("skip-cert-verify").and_then(Value::as_bool) == Some(true)
             || raw.pointer("/tls/insecure").and_then(Value::as_bool) == Some(true)
             || raw.get("tls-verification").and_then(Value::as_bool) == Some(false);
@@ -971,9 +992,19 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
             raw.pointer("/tls/server_name"),
         ];
         let first_name = names.iter().flatten().next().copied();
+        let conflicting_alpn = raw
+            .get("alpn")
+            .zip(raw.pointer("/tls/alpn"))
+            .is_some_and(|(outer, inner)| outer != inner);
+        // Trojan authenticates with its password hash, not a username. An
+        // explicit empty string has no authentication meaning; preserve its
+        // source spelling but reject every other value instead of dropping it.
+        let unsupported_trojan_username = kind == "trojan"
+            && raw
+                .get("username")
+                .is_some_and(|value| value.as_str() != Some(""));
         let tls_invalid = tls_obj.is_some_and(|v| !v.is_boolean() && !v.is_object())
-            || (kind == "trojan" && declared_tls == Some(false))
-            || (implicit_socks_tls && (declared_tls == Some(false) || security == Some("none")))
+            || (implicit_tls && (declared_tls == Some(false) || security == Some("none")))
             || matches!(
                 (declared_tls, security),
                 (Some(false), Some("tls")) | (Some(true), Some("none"))
@@ -999,6 +1030,12 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
             "TransportNotImplemented"
         } else if unrecognized > 0 || tls_unknown {
             "UnmappedFields"
+        } else if let Err(error) = port {
+            error
+        } else if conflicting_alpn {
+            "ConflictingAlpn"
+        } else if unsupported_trojan_username {
+            "TrojanUsernameUnsupported"
         } else if kind == "socks5" && udp && tls_enabled {
             "Socks5UdpTlsUnsupported"
         } else {
@@ -1029,12 +1066,13 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
             && !unsafe_booleans
             && !tls_unknown
             && !tls_invalid
+            && !conflicting_alpn
+            && !unsupported_trojan_username
             && !skip
             && !reality
             && transport == "tcp"
-            && port > 0
-            && port <= 65535
             && family != "xray-v2ray-json"
+            && let Ok(port) = port
         {
             let password = raw
                 .get("password")
@@ -1101,27 +1139,27 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
             let outbound = match kind {
                 "vless" => Some(Outbound::Vless {
                     host,
-                    port: port as u16,
+                    port,
                     uuid: raw.get("uuid").and_then(Value::as_str).unwrap_or("").into(),
                     tls,
                     websocket: None,
                 }),
                 "trojan" => tls.map(|tls| Outbound::Trojan {
                     host,
-                    port: port as u16,
+                    port,
                     password,
                     tls,
                     websocket: None,
                 }),
                 "http" => Some(Outbound::HttpConnect {
                     host,
-                    port: port as u16,
+                    port,
                     auth,
                     tls,
                 }),
                 _ => Some(Outbound::Socks5 {
                     host,
-                    port: port as u16,
+                    port,
                     auth,
                     tls,
                     udp,

@@ -199,6 +199,8 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
   const auto &n=*it;
   if(!n.conversionIssues.isEmpty()||!ProxyNode::validate(n).isEmpty())return "节点含无效或未映射参数，Rust 拒绝执行。";
   if(!QStringList{"http","socks4","socks4a","socks5","trojan","ss","vless"}.contains(n.protocol))return "此节点协议尚未迁移到 Rust；未使用外部内核。";
+  if(n.protocol!="ss"&&!n.cipher.isEmpty())return "Rust 尚未映射此协议声明的 cipher；未丢弃加密参数。";
+  if(n.protocol=="trojan"&&!n.username.isEmpty())return "Trojan 只支持密码认证；未丢弃 username。";
   const bool socks4=n.protocol=="socks4"||n.protocol=="socks4a";
   QSet<QString> allowed=socks4?QSet<QString>{"tls","udp","network","tfo","skip-cert-verify"}:n.protocol=="ss"?QSet<QString>{"udp","plugin","plugin-opts"}:QSet<QString>{"tls","udp","sni","servername","alpn","skip-cert-verify"};
   allowed.insert("tfo");

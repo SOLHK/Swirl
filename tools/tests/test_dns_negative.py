@@ -110,6 +110,17 @@ class LoopbackPortSelectionTests(unittest.TestCase):
 
 
 class DnsPeerAllocationTests(unittest.TestCase):
+    def isolate_bind_effects(self):
+        # Error-only unit cases must not bind arbitrary host ports. Retain real
+        # unbound descriptors so constructor/ExitStack cleanup is still checked.
+        # The forwarding cases below continue to reserve and use actual sockets.
+        for patcher in (
+                mock.patch('dns_peer.pair_port', return_value=50789),
+                mock.patch.object(socketserver.TCPServer, 'server_bind', autospec=True),
+                mock.patch.object(socketserver.TCPServer, 'server_activate', autospec=True)):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
     def assert_pair_forwards(self, peer):
         # A maximum-length DNS name still crosses both actual socket types.
         host = '.'.join(('a' * 63, 'b' * 63, 'c' * 63, 'd' * 61))
@@ -164,6 +175,7 @@ class DnsPeerAllocationTests(unittest.TestCase):
                 self.assertTrue(all(server.socket.fileno() == -1 for server in created))
 
     def test_windows_access_denial_is_not_retried_on_either_endpoint(self):
+        self.isolate_bind_effects()
         original = socketserver.TCPServer.server_bind
         for failing_kind in (socket.SOCK_STREAM, socket.SOCK_DGRAM):
             with self.subTest(failing_kind=failing_kind):
@@ -186,8 +198,7 @@ class DnsPeerAllocationTests(unittest.TestCase):
                 self.assertIs(caught.exception, failure)
                 self.assertEqual(len(rejected), 1)
                 self.assertEqual(len(created), 1 if failing_kind == socket.SOCK_STREAM else 2)
-                self.assertEqual(rejected[0][1] == 0,
-                                 os.name != 'nt' and failing_kind == socket.SOCK_STREAM)
+                self.assertEqual(rejected[0][1], 50789)
                 protocol = 'TCP' if failing_kind == socket.SOCK_STREAM else 'UDP'
                 self.assertEqual(failure.__notes__,
                                  [f'DNS fixture {protocol} bind on loopback {rejected[0]!r}; pair attempt 1/8'])
@@ -227,6 +238,7 @@ class DnsPeerAllocationTests(unittest.TestCase):
                         self.assertTrue(all(server.socket.fileno() == -1 for server in created))
 
     def test_pair_allocation_stops_after_bounded_collisions(self):
+        self.isolate_bind_effects()
         original = socketserver.TCPServer.server_bind
         for failing_kind in (socket.SOCK_STREAM, socket.SOCK_DGRAM):
             for windows in (False, True):
@@ -256,6 +268,7 @@ class DnsPeerAllocationTests(unittest.TestCase):
                     self.assertTrue(all(server.socket.fileno() == -1 for server in created))
 
     def test_pair_allocation_cleans_up_other_errors_without_retry(self):
+        self.isolate_bind_effects()
         original = socketserver.TCPServer.server_bind
         for failing_kind in (socket.SOCK_DGRAM, socket.SOCK_STREAM):
             for failure in (PermissionError(errno.EACCES, 'controlled bind denial'),

@@ -1,4 +1,15 @@
-# Current handoff: REALITY R3 and Vision record-boundary correction (2026-10-19)
+# Current handoff: subscription product chain (2026-10-19)
+
+Read [subscription → persisted selection → native forwarding](CORE_SUBSCRIPTION_PRODUCT_CHAIN_20261019.md)
+first. The S1 changes fix actual Rust/Qt parameter-loss boundaries and unreliable
+Windows allocation unit fixtures. Fixed acceptance remains 79 / 6 / 10.83%.
+The expressly authorized new subscription was fetched once privately; its 59
+REALITY nodes (55 Vision) are retained and blocked, not counted as connected.
+No provider credentials or font/UI changes are part of this delivery. Exact
+new-source CI must be checked after push; the historical results below do not
+prove the new changes passed.
+
+## Previous handoff: REALITY R3 and Vision record-boundary correction
 
 Read [the current Core handoff](CORE_REALITY_VISION_HANDOFF_20261019.md),
 [REALITY R3](REALITY_XRAY_INTEROP_20261019.md) and

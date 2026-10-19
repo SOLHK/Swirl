@@ -137,6 +137,13 @@ NodeImporter::Result NodeImporter::parse(const QByteArray &bytes) {
         else n.originalConfiguration=params;
         if(!n.conversionIssues.isEmpty())++result.incompleteNodes;
         n.id=QUuid::createUuid().toString(QUuid::WithoutBraces);
+        // Validate before extracting the scalar fields. QVariant::toString()
+        // would turn numbers/bools into credentials, and QJsonValue::toString()
+        // would turn null/objects into an absent SNI or cipher. The encrypted
+        // original remains the provenance; invalid values never become defaults.
+        for(const auto &key:QStringList{"username","password","cipher","sni","servername"})if(params.contains(key)&&!params.value(key).isString()){
+            result.nodes.clear();result.error=QStringLiteral("第 %1 个节点：凭据、加密方式和 TLS 名称必须为字符串，不能为 null 或其它类型。").arg(i+1);return result;
+        }
         n.name=params.take("name").toString().trimmed();n.protocol=params.take("type").toString().toLower();
         if(!result.configuration.isEmpty() && names.contains(n.name)) {
             result.nodes.clear();result.error=QStringLiteral("完整配置含重复节点名称，策略引用不明确；未应用配置。");return result;
@@ -146,16 +153,13 @@ NodeImporter::Result NodeImporter::parse(const QByteArray &bytes) {
             if(!port.isDouble()||port.toDouble()!=port.toInt()||port.toInt()<1||port.toInt()>65535){
                 result.nodes.clear();result.error=QStringLiteral("第 %1 个节点：SOCKS4/4a 端口须为 1–65535 的整数。").arg(i+1);return result;
             }
-            for(const auto &key:QStringList{"username","password","cipher","sni"})if(params.contains(key)&&!params.value(key).isString()){
-                result.nodes.clear();result.error=QStringLiteral("第 %1 个节点：SOCKS4/4a 凭据或安全参数类型无效。").arg(i+1);return result;
-            }
         }
         n.host=params.take("server").toString().trimmed();
         const auto portValue=params.take("port");bool portOk=false;
         const auto port=portValue.toVariant().toString().toInt(&portOk);
         if(!portOk && n.protocol=="ssh" && portValue.isUndefined()){n.port=22;portOk=true;}
         else if(portOk && port>=1 && port<=65535)n.port=quint16(port);
-        n.username=params.take("username").toVariant().toString();n.password=params.take("password").toVariant().toString();
+        n.username=params.take("username").toString();n.password=params.take("password").toString();
         n.cipher=params.take("cipher").toString();n.serverName=params.take("sni").toString();
         if(n.serverName.isEmpty())n.serverName=params.value("servername").toString();
         n.parameters=params;

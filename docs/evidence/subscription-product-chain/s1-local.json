@@ -1,0 +1,81 @@
+{
+  "scope": "S1 final staged source blobs; local Linux, not Windows Qt or new-source CI",
+  "base_sha": "8e0f07eed972b814a00bc3581960b423ecf699be",
+  "source_git_blobs": {
+    "core/crates/swirl-subscription/src/inspect.rs": "c6d36d23c9eda3f3a4e989eddb3a867f72ec373b",
+    "core/crates/swirl-subscription/src/inspect_boundaries.rs": "1502d51cfa2dc99b7eaf7095b16ee7119439f695",
+    "src/Swirl.Quick/engine/NodeImporter.cpp": "de307ecfcf97bb827018854b2758ae1c50cf798c",
+    "src/Swirl.Quick/engine/RustCoreEngine.cpp": "9e53a0a8d6d4fb72919799ed39c66b2073dbf892",
+    "src/Swirl.Quick/tests/RustCoreTests.cpp": "4c177eb0092c381f0fad3896d54e62a8db821692",
+    "tools/tests/test_dns_negative.py": "d3b8666427c0a4f3dcfbe53bf91f31f3ed9bec3d",
+    "tools/tests/test_policy_groups.py": "c95682123ae6536aafc03295ffc4d85e15b8747c"
+  },
+  "commands": [
+    {
+      "command": "cargo fmt --all -- --check",
+      "exit_code": 0,
+      "seconds": 0.287,
+      "raw_log": "s1-gate-1.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "cargo check --workspace --locked",
+      "exit_code": 0,
+      "seconds": 1.381,
+      "raw_log": "s1-gate-2.log",
+      "log_sha256": "d8fe7ffd721a08eb85db0d5f8ba343412c4b8dd7f88dac52431e7376dfcb371c"
+    },
+    {
+      "command": "cargo clippy --workspace --all-targets --locked -- -D warnings",
+      "exit_code": 0,
+      "seconds": 1.757,
+      "raw_log": "s1-gate-3.log",
+      "log_sha256": "7979cd785ffcd4f5cc7b2a9c88d214ac3a6fc22b11c54df218db611f7d458389"
+    },
+    {
+      "command": "cargo test --workspace --locked",
+      "exit_code": 0,
+      "seconds": 8.004,
+      "raw_log": "s1-gate-4.log",
+      "log_sha256": "45359f0e89c35e97fdeefe85a2fb036076499c712dc0ce3b5f100f20d332a1b9"
+    },
+    {
+      "command": "cargo build --workspace --release --locked",
+      "exit_code": 0,
+      "seconds": 27.78,
+      "raw_log": "s1-gate-5.log",
+      "log_sha256": "cd443d09bcd128185e69b918b662f2f6434ea1f7ae88cb0cf2ac29c1d249ecb3"
+    },
+    {
+      "command": "python3 tools/tests/test_subscription_import.py -v",
+      "exit_code": 0,
+      "seconds": 4.393,
+      "raw_log": "s1-gate-6.log",
+      "log_sha256": "a4190cb2e31616ebdb45f80b6da6b4a9ed5b054c8c0d7cbaf0e7901b1f8f3c3f"
+    },
+    {
+      "command": "python3 tools/tests/test_policy_groups.py SsPolicyPeerAllocationTests -v",
+      "exit_code": 0,
+      "seconds": 0.122,
+      "raw_log": "s1-gate-7.log",
+      "log_sha256": "3fb22b6683705c7677ea9033b28d1f004228bd0e712d24eba21acc3093faddf2"
+    },
+    {
+      "command": "python3 tools/tests/test_dns_negative.py LoopbackPortSelectionTests DnsPeerAllocationTests -v",
+      "exit_code": 0,
+      "seconds": 6.157,
+      "raw_log": "s1-gate-8.log",
+      "log_sha256": "fbcd951b327df76570db97c0dcc74906ae89a8ee419930f1919402fe1e97e485"
+    }
+  ],
+  "rust_tests_including_doctests": 279,
+  "private_subscription": {
+    "fetched": true,
+    "nodes": 59,
+    "reality_nodes": 59,
+    "vision_nodes": 55,
+    "native_candidates": 0,
+    "provider_requests": 0
+  },
+  "windows_qt_status": "pending exact-source CI"
+}

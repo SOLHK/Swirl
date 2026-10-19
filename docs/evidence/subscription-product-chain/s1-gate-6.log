@@ -1,0 +1,16 @@
+test_equal_trojan_aliases_and_udp_false_forward_with_strict_tls (__main__.SubscriptionImportTests.test_equal_trojan_aliases_and_udp_false_forward_with_strict_tls) ... ok
+test_equal_trojan_aliases_cannot_disable_certificate_validation (__main__.SubscriptionImportTests.test_equal_trojan_aliases_cannot_disable_certificate_validation) ... ok
+test_ini_complete_structure_gate_precedes_candidate_conversion (__main__.SubscriptionImportTests.test_ini_complete_structure_gate_precedes_candidate_conversion) ... ok
+test_ini_reports_unvalidated_semantics_without_losing_original_sections (__main__.SubscriptionImportTests.test_ini_reports_unvalidated_semantics_without_losing_original_sections) ... ok
+test_ipv6_sip002_and_base64_forward_with_authenticated_close (__main__.SubscriptionImportTests.test_ipv6_sip002_and_base64_forward_with_authenticated_close) ... ok
+test_legacy_and_sip002_reserved_passwords_authenticate (__main__.SubscriptionImportTests.test_legacy_and_sip002_reserved_passwords_authenticate) ... ok
+test_loon_http_obfs_corrupt_aead_never_releases_plaintext (__main__.SubscriptionImportTests.test_loon_http_obfs_corrupt_aead_never_releases_plaintext) ... ok
+test_loon_http_obfs_exports_authenticate_forward_and_halfclose (__main__.SubscriptionImportTests.test_loon_http_obfs_exports_authenticate_forward_and_halfclose) ... ok
+test_mixed_positional_and_named_credentials_are_rejected (__main__.SubscriptionImportTests.test_mixed_positional_and_named_credentials_are_rejected) ... ok
+test_unknown_options_remain_preserved_and_unexecutable (__main__.SubscriptionImportTests.test_unknown_options_remain_preserved_and_unexecutable) ... ok
+test_valid_surge_and_loon_credentials_forward (__main__.SubscriptionImportTests.test_valid_surge_and_loon_credentials_forward) ... ok
+
+----------------------------------------------------------------------
+Ran 11 tests in 4.271s
+
+OK

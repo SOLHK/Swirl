@@ -39,6 +39,61 @@ class RustCoreTests:public QObject {
  }
 private slots:
  void initTestCase(){QStandardPaths::setTestModeEnabled(true);SwirlPaths::initializeTestStorage();QSettings::setDefaultFormat(QSettings::IniFormat);QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,SwirlPaths::writableLocation(QStandardPaths::AppConfigLocation));}
+ void importedScalarTypesCannotBecomeCredentialsOrTlsDefaults(){
+  const QJsonObject base{{"name","typed-fixture"},{"type","http"},{"server","127.0.0.1"},{"port",443},{"tls",true}};
+  for(const auto &key:QStringList{"username","password","cipher","sni","servername"})for(const auto &value:QJsonArray{QJsonValue(),false,123,QJsonArray{},QJsonObject{{"secret","synthetic-private"}}}){
+   auto node=base;node[key]=value;
+   const auto parsed=NodeImporter::parse(QJsonDocument(QJsonObject{{"proxies",QJsonArray{node}}}).toJson());
+   QVERIFY2(!parsed,qPrintable(key));QVERIFY(parsed.nodes.isEmpty());QVERIFY(!parsed.error.contains("synthetic-private"));
+  }
+  auto node=base;node["username"]="123";node["password"]="false";node["sni"]="tls.fixture.invalid";
+  const auto parsed=NodeImporter::parse(QJsonDocument(QJsonObject{{"proxies",QJsonArray{node}}}).toJson());QVERIFY2(parsed,qPrintable(parsed.error));
+  QCOMPARE(parsed.nodes.first().username,QString("123"));QCOMPARE(parsed.nodes.first().password,QString("false"));QCOMPARE(parsed.nodes.first().serverName,QString("tls.fixture.invalid"));
+  const QJsonObject singbox{{"type","http"},{"tag","typed-fixture"},{"server","127.0.0.1"},{"server_port",443},{"tls",QJsonObject{{"enabled",true},{"server_name",QJsonValue()}}}};
+  QVERIFY(!NodeImporter::parse(QJsonDocument(QJsonObject{{"outbounds",QJsonArray{singbox}}}).toJson()));
+ }
+ void extractedUnsupportedFieldsNeverDisappearBeforeNativeValidation(){
+  ControlledNetwork net;QVERIFY(net.start());auto baseline=options(net);const QJsonObject sentinel{{"sentinel",true}};
+  for(const auto &protocol:QStringList{"http","socks5","trojan","vless"}){
+   QJsonObject node{{"name","unsupported-field"},{"type",protocol},{"server","127.0.0.1"},{"port",net.a.serverPort()},{"cipher","synthetic-cipher"}};
+   if(protocol=="trojan")node["password"]="synthetic-password";
+   if(protocol=="vless")node["uuid"]="00112233-4455-6677-8899-aabbccddeeff";
+   auto parsed=NodeImporter::parse(QJsonDocument(QJsonObject{{"proxies",QJsonArray{node}}}).toJson());QVERIFY2(parsed,qPrintable(parsed.error));
+   baseline.nodes=parsed.nodes;baseline.selectedNodeId=parsed.nodes.first().id;QJsonObject output=sentinel;
+   QVERIFY(!RustCoreEngine::configuration(baseline,&output).isEmpty());QCOMPARE(output,sentinel);
+   QCOMPARE(parsed.nodes.first().originalConfiguration.value("cipher"),node.value("cipher"));
+  }
+  auto node=QJsonObject{{"name","trojan-user"},{"type","trojan"},{"server","127.0.0.1"},{"port",net.a.serverPort()},{"password","synthetic-password"},{"username","synthetic-user"}};
+  const auto parsed=NodeImporter::parse(QJsonDocument(QJsonObject{{"proxies",QJsonArray{node}}}).toJson());QVERIFY(parsed);
+  baseline.nodes=parsed.nodes;baseline.selectedNodeId=parsed.nodes.first().id;QJsonObject output=sentinel;
+  QVERIFY(!RustCoreEngine::configuration(baseline,&output).isEmpty());QCOMPARE(output,sentinel);
+ }
+ void importedParametersSurviveStoreDestructionAndNativeRoundTrip(){
+  QTemporaryDir directory;const auto path=directory.filePath("parameters.dpapi");
+  const QJsonObject node{{"name","round-trip"},{"type","vless"},{"server","2001:db8::1"},{"port",8443},{"uuid","00112233-4455-6677-8899-aabbccddeeff"},
+   {"tls",true},{"sni","tls.fixture.invalid"},{"alpn",QJsonArray{"http/1.1"}},{"skip-cert-verify",false},{"udp",false},{"tfo",false},{"encryption","none"},{"flow",""},
+   {"network","ws"},{"ws-opts",QJsonObject{{"path","/proxy%20path?roundtrip=1"},{"headers",QJsonObject{{"hOsT","ws.fixture.invalid:8443"}}}}}};
+  const auto body=QJsonDocument(QJsonObject{{"proxies",QJsonArray{node}}}).toJson();const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));
+  EngineStartOptions options;options.nodes=parsed.nodes;options.selectedNodeId=parsed.nodes.first().id;options.routingMode="global";options.proxyPort=12345;
+  QJsonObject before;const auto error=RustCoreEngine::configuration(options,&before);QVERIFY2(error.isEmpty(),qPrintable(error));QString source,id;
+  {
+   NodeStore store(path);QVERIFY(store.saveSubscription({},"round-trip source",QUrl("https://fixture.invalid/subscription"),360,false));source=store.subscriptions().first().id;
+   QVERIFY(store.importNodes(parsed.nodes,source));id=store.nodes().first().id;QVERIFY(store.select(id));
+   QFile file(path);QVERIFY(file.open(QIODevice::ReadOnly));const auto ciphertext=file.readAll();QVERIFY(!ciphertext.contains("00112233-4455"));QVERIFY(!ciphertext.contains("ws.fixture.invalid"));
+  }
+  {
+   NodeStore restored(path);QVERIFY2(restored.error().isEmpty(),qPrintable(restored.error()));QCOMPARE(restored.selectedId(),id);QCOMPARE(restored.nodes().size(),1);
+   const auto saved=restored.nodes().first();QCOMPARE(saved.sourceId,source);QCOMPARE(saved.parameters,parsed.nodes.first().parameters);QCOMPARE(saved.originalConfiguration,node);
+   options.nodes=restored.nodes();options.selectedNodeId=restored.selectedId();QJsonObject after;QVERIFY(RustCoreEngine::configuration(options,&after).isEmpty());QCOMPARE(after,before);
+   // Unknown extensions keep their original JSON null/false values, survive
+   // encryption and remain ineligible for native execution after recreation.
+   auto extension=node;extension["future-security"]=QJsonObject{{"enabled",false},{"key",QJsonValue()}};
+   const auto unsupported=NodeImporter::parse(QJsonDocument(QJsonObject{{"proxies",QJsonArray{extension}}}).toJson());QVERIFY(unsupported);QVERIFY(restored.importNodes(unsupported.nodes,source));
+  }
+  NodeStore unsupported(path);QCOMPARE(unsupported.nodes().first().originalConfiguration["future-security"],QJsonValue(QJsonObject{{"enabled",false},{"key",QJsonValue()}}));
+  options.nodes=unsupported.nodes();options.selectedNodeId=unsupported.selectedId();QJsonObject output{{"sentinel",true}};
+  QVERIFY(!RustCoreEngine::configuration(options,&output).isEmpty());QCOMPARE(output,QJsonObject({{"sentinel",true}}));
+ }
  void fullDocumentCannotUseExternalSelectedNodeAlias(){
   QTemporaryDir directory;const auto path=directory.filePath("nodes.dpapi");NodeStore seed(path);
   QVERIFY(seed.saveSubscription({},"retained source",QUrl("https://fixture.invalid/retained"),360,false));const auto oldSource=seed.subscriptions().first().id;
