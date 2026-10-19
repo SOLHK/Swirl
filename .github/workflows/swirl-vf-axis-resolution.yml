@@ -6,6 +6,7 @@ on:
     paths:
       - '.github/workflows/swirl-vf-axis-resolution.yml'
       - 'tools/swirl_vf/platform/compare_axis_construction.py'
+      - 'tools/swirl_vf/platform/calibrate_hvf_geometry.py'
   workflow_dispatch:
 
 permissions:
@@ -39,4 +40,29 @@ jobs:
         with:
           name: swirl-vf-native-construction-${{ github.sha }}
           path: build/native-construction-summary/*.json
+          retention-days: 7
+
+  native-design-geometry:
+    runs-on: xcode-27
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Calibrate design-space hierarchy and all Type-2 shape occurrences
+        shell: bash
+        run: |
+          python -m pip install fonttools==4.61.1 numpy==2.2.6
+          python tools/swirl_vf/platform/calibrate_hvf_geometry.py \
+            /System/Library/PrivateFrameworks/FontServices.framework/Versions/A/Resources/Reserved/PingFangUI.ttc \
+            --output build/hvf-calibration-summary/geometry.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: swirl-vf-hvf-calibration-${{ github.sha }}
+          path: build/hvf-calibration-summary/*.json
           retention-days: 7
