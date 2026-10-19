@@ -22,6 +22,15 @@ Code availability does not confer a license to use or redistribute Apple fonts.
   user's original PingFang or an Apple-derived candidate.
 * No accepted Apple-derived `Swirl-VF.ttc` is included or claimed by this stage.
 
+Native synthetic evidence at commits `501099d` and `7dfbdda` includes the Apple
+HVF oracle (29/29 geometric locations) and DirectWrite (3 faces, 186 instances,
+10 software-rendered DPI images). The CoreText extractor compiles and returns
+all 174 requested synthetic glyph records, but its unchanged 1/32 FUnit
+analytical regression fails (for example, vertical advance 849 versus 850).
+`platform/diagnose_coretext_metrics.py` independently compares gvar-only,
+equivalent HVAR/VVAR and static fonts without replacing that failing gate.
+The original private PingFang has not been measured by either native oracle.
+
 ## Reproducible tools
 
 Python 3.12+, `fonttools==4.61.1`, `numpy==2.2.6` (the source audit also records
@@ -94,6 +103,11 @@ true sidebearings/vertical origins, shaping, AAT tracking equivalence where
 needed, Windows 11 system installation and application loading, real Swirl UI
 screenshots at 100/125/150/175/200%, and measured startup/layout/scroll baselines.
 None is replaced by a Linux unit test or by a synthetic Windows pass.
+
+Swirl currently retains its existing 128 MiB (134,217,728 byte) font-file limit.
+The size of a complete reconstructed Apple font is unknown. A larger result
+would be rejected by the application until the limit is reviewed against the
+actual file and memory measurements; dropping glyphs or faces is not a remedy.
 
 ## Primary references
 

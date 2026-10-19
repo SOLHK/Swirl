@@ -459,134 +459,136 @@ def run(source, executable, destination, report_path, batch_size=64,
     try:
         oracle = NativeOracle(executable, source, report_path.parent / "native-oracle.log")
         report["oracle"] = oracle.metadata
-        original = TTCollection(source, lazy=True)
-        check(len(oracle.metadata.get("faces", [])) == len(original.fonts), "native/source face count mismatch")
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        with tempfile.TemporaryDirectory(prefix="swirl-vf-", dir=destination.parent) as tmp:
-            face_paths = []
-            for index, src in enumerate(original.fonts):
-                check("MVAR" not in src and "VVAR" not in src,
-                      "this reconstruction path has no native font-wide/VVAR metric oracle")
-                for tag in ("GSUB", "GPOS", "BASE"):
-                    if tag in src:
-                        layout = src[tag].table
-                        check(not getattr(layout, "FeatureVariations", None)
-                              and not getattr(layout, "VarStore", None)
-                              and not getattr(layout, "ItemVarStore", None),
-                              f"{tag} variable layout requires independent remapping before replacing avar")
-                axes = {a.axisTag: (a.minValue, a.defaultValue, a.maxValue) for a in src["fvar"].axes}
-                training = normalized_grid(list(axes))
-                check_locations = heldout_locations(list(axes), seed=20261019 + index)
-                # Every named instance is checked if it is not already a master.
-                known = {tuple(p.items()) for p in training + check_locations}
-                for instance in src["fvar"].instances:
-                    location = normalizeLocation(instance.coordinates, axes)
-                    if tuple(location.items()) not in known:
-                        check_locations.append(location)
-                        known.add(tuple(location.items()))
-                # Sample immediately either side of all raw avar source knots.
-                # Raw records retain duplicate/out-of-order knots; only the input
-                # request positions are deduplicated, never the output semantics.
-                if "avar" in src:
-                    from audit_font import raw_avar
-                    raw = raw_avar(src.reader["avar"], list(axes))
-                    for axis in raw["axes"]:
-                        for record in axis["records"]:
-                            x = record["from_f2dot14"] / 16384
-                            for eps in (-1/16384, 0, 1/16384):
-                                if -1 <= x + eps <= 1:
-                                    p = {a: 0.0 for a in axes}; p[axis["tag"]] = x + eps
-                                    if tuple(p.items()) not in known:
-                                        check_locations.append(p); known.add(tuple(p.items()))
-                out = TTFont(source, fontNumber=index, lazy=False, recalcBBoxes=True, recalcTimestamp=False)
-                glyph_order = src.getGlyphOrder()
-                out.setGlyphOrder(glyph_order)
-                out["glyf"] = newTable("glyf"); out["glyf"].glyphs = {}; out["glyf"].glyphOrder = glyph_order
-                out["loca"] = newTable("loca")
-                out["gvar"] = newTable("gvar"); out["gvar"].version = 1; out["gvar"].reserved = 0; out["gvar"].variations = {}
-                face_report = {"face_index": index, "glyph_count": len(glyph_order),
-                               "axes": axes, "training_points": len(training),
-                               "initial_holdout_points": len(check_locations),
-                               "max_outline_error": 0.0, "max_metric_error": 0.0,
-                               "glyphs_with_adaptive_training": 0, "retained_aat_behavior_windows": "NOT_VERIFIED"}
-                report["faces"].append(face_report)
-                for start in range(0, len(glyph_order), batch_size):
-                    gids = list(range(start, min(start + batch_size, len(glyph_order))))
-                    initial = [oracle.samples(index, gids, user_location(p, axes)) for p in training + check_locations]
-                    for gid in gids:
-                        name = glyph_order[gid]
-                        train = [point[gid] for point in initial[:len(training)]]
-                        held = [point[gid] for point in initial[len(training):]]
-                        tl, hl = list(training), list(check_locations)
-                        attempts = 0
-                        while True:
-                            glyph, tuples, hm, vm, evidence = reconstruct_glyph(
-                                train, held, tl, hl, axes, src["hmtx"].metrics[name],
-                                src["vmtx"].metrics.get(name) if "vmtx" in src else None,
-                                outline_limit, metric_limit)
-                            if not evidence["failures"]:
-                                break
-                            check(not any(f["sample_kind"] == "training" for f in evidence["failures"]),
-                                  f"face {index} gid {gid}: training/default quantization exceeds error budget")
-                            check(attempts < max_extra,
-                                  f"face {index} gid {gid}: holdout error persists after {attempts} adaptive points")
-                            worst = max(evidence["failures"], key=lambda f: max(f["max_outline_error_bound_units"], f["max_metric_error_units"]))
-                            k = hl.index(worst["location"])
-                            peak = {tag: otRound(value * 16384) / 16384 for tag, value in hl[k].items()}
-                            check(peak not in tl, "gvar F2DOT14 support precision cannot resolve the remaining native error")
-                            tl.append(peak)
-                            if peak == hl[k]:
-                                hl.pop(k); train.append(held.pop(k))
-                            else:
-                                train.append(oracle.samples(index, [gid], user_location(peak, axes))[gid])
-                            attempts += 1
-                            # New independent points after every refinement, never
-                            # report the promoted training point as a passing test.
-                            additions = heldout_locations(list(axes), seed=index*100000+gid*31+attempts,
-                                                          random_count=4)[-4:]
-                            for p in additions:
-                                if p not in tl and p not in hl:
-                                    hl.append(p); held.append(oracle.samples(index, [gid], user_location(p, axes))[gid])
-                        out["glyf"].glyphs[name] = glyph
-                        out["gvar"].variations[name] = tuples
-                        out["hmtx"].metrics[name] = hm
-                        if "vmtx" in out:
-                            out["vmtx"].metrics[name] = vm
-                        face_report["max_outline_error"] = max(face_report["max_outline_error"], evidence["max_outline_error_bound_units"])
-                        face_report["max_metric_error"] = max(face_report["max_metric_error"], evidence["max_metric_error_units"])
-                        face_report["glyphs_with_adaptive_training"] += bool(attempts)
-                    print(f"face={index} glyphs={start+len(gids)}/{len(glyph_order)}", file=sys.stderr, flush=True)
-                replaced = [tag for tag in ("hvgl", "hvpm", "HVAR", "VVAR", "VORG") if tag in out]
-                for tag in replaced:
-                    del out[tag]
-                out["avar"] = newTable("avar"); out["avar"].majorVersion = 1; out["avar"].minorVersion = 0
-                out["avar"].segments = {tag: {-1.0:-1.0, 0.0:0.0, 1.0:1.0} for tag in axes}
-                face_report["identity"] = rename_face(out, index)
-                face_report["replaced_tables"] = replaced
-                face_report["metrics_strategy"] = "gvar phantom points; native advances, bearings and vertical origin"
-                face_report["bearing_storage_note"] = "hmtx LSB uses glyf control bounds and preserves the CoreText origin; native geometric LSB is separately observed"
-                face_report["outline_error_policy"] = "training and holdout quadratic point discrepancy plus cubic approximation bound"
-                face_report["retained_tables"] = sorted(set(src.keys()) & set(out.keys()))
-                path = Path(tmp) / f"face-{index}.ttf"
-                out.save(path)
-                with TTFont(path) as verified:
-                    face_report["serialized_model_verification"] = verify_serialized_face(out, verified)
-                    check(verified["cmap"].compile(verified) == src["cmap"].compile(src), "serialized cmap changed")
-                out.close()
-                face_paths.append(path)
-            candidate = Path(tmp) / "candidate.ttc"
-            collection = TTCollection(); collection.fonts = [TTFont(p, lazy=True) for p in face_paths]
-            collection.save(candidate, shareTables=True)
-            reopened = TTCollection(candidate, lazy=True)
-            report["collection_verification"] = verify_collection_tables(face_paths, reopened)
-            reopened.close()
-            collection.close()
-            check(sha256(source) == report["source_sha256"], "source changed during conversion")
-            report["output_sha256"] = sha256(candidate)
-            report["output_size_bytes"] = candidate.stat().st_size
-            report["status"] = "RECONSTRUCTION_SAMPLED_PASS_PLATFORM_UNVERIFIED"
-            candidate.replace(destination)
-            report["output_generated"] = True
+        with TTCollection(source, lazy=True) as original:
+            check(len(oracle.metadata.get("faces", [])) == len(original.fonts), "native/source face count mismatch")
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            with tempfile.TemporaryDirectory(prefix="swirl-vf-", dir=destination.parent) as tmp:
+                face_paths = []
+                for index, src in enumerate(original.fonts):
+                    check("MVAR" not in src and "VVAR" not in src,
+                          "this reconstruction path has no native font-wide/VVAR metric oracle")
+                    for tag in ("GSUB", "GPOS", "BASE"):
+                        if tag in src:
+                            layout = src[tag].table
+                            check(not getattr(layout, "FeatureVariations", None)
+                                  and not getattr(layout, "VarStore", None)
+                                  and not getattr(layout, "ItemVarStore", None),
+                                  f"{tag} variable layout requires independent remapping before replacing avar")
+                    axes = {a.axisTag: (a.minValue, a.defaultValue, a.maxValue) for a in src["fvar"].axes}
+                    training = normalized_grid(list(axes))
+                    check_locations = heldout_locations(list(axes), seed=20261019 + index)
+                    # Every named instance is checked if it is not already a master.
+                    known = {tuple(p.items()) for p in training + check_locations}
+                    for instance in src["fvar"].instances:
+                        location = normalizeLocation(instance.coordinates, axes)
+                        if tuple(location.items()) not in known:
+                            check_locations.append(location)
+                            known.add(tuple(location.items()))
+                    # Sample immediately either side of all raw avar source knots.
+                    # Raw records retain duplicate/out-of-order knots; only the input
+                    # request positions are deduplicated, never the output semantics.
+                    if "avar" in src:
+                        from audit_font import raw_avar
+                        raw = raw_avar(src.reader["avar"], list(axes))
+                        for axis in raw["axes"]:
+                            for record in axis["records"]:
+                                x = record["from_f2dot14"] / 16384
+                                for eps in (-1/16384, 0, 1/16384):
+                                    if -1 <= x + eps <= 1:
+                                        p = {a: 0.0 for a in axes}; p[axis["tag"]] = x + eps
+                                        if tuple(p.items()) not in known:
+                                            check_locations.append(p); known.add(tuple(p.items()))
+                    with TTFont(source, fontNumber=index, lazy=False, recalcBBoxes=True,
+                                recalcTimestamp=False) as out:
+                        glyph_order = src.getGlyphOrder()
+                        out.setGlyphOrder(glyph_order)
+                        out["glyf"] = newTable("glyf"); out["glyf"].glyphs = {}; out["glyf"].glyphOrder = glyph_order
+                        out["loca"] = newTable("loca")
+                        out["gvar"] = newTable("gvar"); out["gvar"].version = 1; out["gvar"].reserved = 0; out["gvar"].variations = {}
+                        face_report = {"face_index": index, "glyph_count": len(glyph_order),
+                                       "axes": axes, "training_points": len(training),
+                                       "initial_holdout_points": len(check_locations),
+                                       "max_outline_error": 0.0, "max_metric_error": 0.0,
+                                       "glyphs_with_adaptive_training": 0, "retained_aat_behavior_windows": "NOT_VERIFIED"}
+                        report["faces"].append(face_report)
+                        for start in range(0, len(glyph_order), batch_size):
+                            gids = list(range(start, min(start + batch_size, len(glyph_order))))
+                            initial = [oracle.samples(index, gids, user_location(p, axes)) for p in training + check_locations]
+                            for gid in gids:
+                                name = glyph_order[gid]
+                                train = [point[gid] for point in initial[:len(training)]]
+                                held = [point[gid] for point in initial[len(training):]]
+                                tl, hl = list(training), list(check_locations)
+                                attempts = 0
+                                while True:
+                                    glyph, tuples, hm, vm, evidence = reconstruct_glyph(
+                                        train, held, tl, hl, axes, src["hmtx"].metrics[name],
+                                        src["vmtx"].metrics.get(name) if "vmtx" in src else None,
+                                        outline_limit, metric_limit)
+                                    if not evidence["failures"]:
+                                        break
+                                    check(not any(f["sample_kind"] == "training" for f in evidence["failures"]),
+                                          f"face {index} gid {gid}: training/default quantization exceeds error budget")
+                                    check(attempts < max_extra,
+                                          f"face {index} gid {gid}: holdout error persists after {attempts} adaptive points")
+                                    worst = max(evidence["failures"], key=lambda f: max(f["max_outline_error_bound_units"], f["max_metric_error_units"]))
+                                    k = hl.index(worst["location"])
+                                    peak = {tag: otRound(value * 16384) / 16384 for tag, value in hl[k].items()}
+                                    check(peak not in tl, "gvar F2DOT14 support precision cannot resolve the remaining native error")
+                                    tl.append(peak)
+                                    if peak == hl[k]:
+                                        hl.pop(k); train.append(held.pop(k))
+                                    else:
+                                        train.append(oracle.samples(index, [gid], user_location(peak, axes))[gid])
+                                    attempts += 1
+                                    # New independent points after every refinement, never
+                                    # report the promoted training point as a passing test.
+                                    additions = heldout_locations(list(axes), seed=index*100000+gid*31+attempts,
+                                                                  random_count=4)[-4:]
+                                    for p in additions:
+                                        if p not in tl and p not in hl:
+                                            hl.append(p); held.append(oracle.samples(index, [gid], user_location(p, axes))[gid])
+                                out["glyf"].glyphs[name] = glyph
+                                out["gvar"].variations[name] = tuples
+                                out["hmtx"].metrics[name] = hm
+                                if "vmtx" in out:
+                                    out["vmtx"].metrics[name] = vm
+                                face_report["max_outline_error"] = max(face_report["max_outline_error"], evidence["max_outline_error_bound_units"])
+                                face_report["max_metric_error"] = max(face_report["max_metric_error"], evidence["max_metric_error_units"])
+                                face_report["glyphs_with_adaptive_training"] += bool(attempts)
+                            print(f"face={index} glyphs={start+len(gids)}/{len(glyph_order)}", file=sys.stderr, flush=True)
+                        replaced = [tag for tag in ("hvgl", "hvpm", "HVAR", "VVAR", "VORG") if tag in out]
+                        for tag in replaced:
+                            del out[tag]
+                        out["avar"] = newTable("avar"); out["avar"].majorVersion = 1; out["avar"].minorVersion = 0
+                        out["avar"].segments = {tag: {-1.0:-1.0, 0.0:0.0, 1.0:1.0} for tag in axes}
+                        face_report["identity"] = rename_face(out, index)
+                        face_report["replaced_tables"] = replaced
+                        face_report["metrics_strategy"] = "gvar phantom points; native advances, bearings and vertical origin"
+                        face_report["bearing_storage_note"] = "hmtx LSB uses glyf control bounds and preserves the CoreText origin; native geometric LSB is separately observed"
+                        face_report["outline_error_policy"] = "training and holdout quadratic point discrepancy plus cubic approximation bound"
+                        face_report["retained_tables"] = sorted(set(src.keys()) & set(out.keys()))
+                        path = Path(tmp) / f"face-{index}.ttf"
+                        out.save(path)
+                        with TTFont(path) as verified:
+                            face_report["serialized_model_verification"] = verify_serialized_face(out, verified)
+                            check(verified["cmap"].compile(verified) == src["cmap"].compile(src), "serialized cmap changed")
+                    face_paths.append(path)
+                candidate = Path(tmp) / "candidate.ttc"
+                with TTCollection() as collection:
+                    # Packaging must not rewrite timestamps after each face's
+                    # complete serialized model has already been verified.
+                    for path in face_paths:
+                        collection.fonts.append(TTFont(path, lazy=True, recalcTimestamp=False))
+                    collection.save(candidate, shareTables=True)
+                    with TTCollection(candidate, lazy=True) as reopened:
+                        report["collection_verification"] = verify_collection_tables(face_paths, reopened)
+                check(sha256(source) == report["source_sha256"], "source changed during conversion")
+                report["output_sha256"] = sha256(candidate)
+                report["output_size_bytes"] = candidate.stat().st_size
+                report["status"] = "RECONSTRUCTION_SAMPLED_PASS_PLATFORM_UNVERIFIED"
+                candidate.replace(destination)
+                report["output_generated"] = True
     except Exception as error:
         report["status"] = "BLOCKED"
         report["failures"].append({"type": type(error).__name__, "message": str(error)})

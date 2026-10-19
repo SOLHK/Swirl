@@ -66,9 +66,11 @@ TC、HK、MO、JA、Display、Watch 等面不合并成 SC，也不按字体文�
 
 ## Windows 渲染路径
 
-Swirl 的既有默认 Windows 路径是 Qt 6.10.3 的 FreeType 字体后端与现有
-Qt Quick NativeRendering。先前交接记录了采用该路径的分数 DPI 彩边依据，
-本阶段保留它。Qt 官方指出可选 GDI 后端不支持变量轴；代码没有切换到 GDI。
+Swirl 的既有 Windows 默认配置请求 Qt 6.10.3 的 FreeType 字体后端，并使用
+现有 Qt Quick NativeRendering。先前交接记录了该配置的分数 DPI 彩边依据，
+本阶段保留它。本次实际测得 D3D11 QRhi、Microsoft Basic Render Driver 和
+可变轴字形行为；没有额外独立识别底层字体后端，不能将环境请求当作后端证明。
+Qt 官方指出可选 GDI 后端不支持变量轴；代码没有切换到 GDI。
 明确的诊断环境覆盖继续可用，不会被强行覆盖成声称已验证的后端。
 即使后端能读取原始 fvar 表，只要 `QFontInfo` 未报告完整轴及一致的范围，
 Swirl VF 自动选择和预览确认仍会被阻止；这可避免把 GDI 的表读取当成轴支持。
@@ -114,9 +116,18 @@ FreeType 路径，这个测试前提不成立，合成字体的小位移会量�
 结果，并要求子进程完整测试报告。旧日志保留；没有把该次失败的底层缓存原因
 宣称为已查明，也没有把一次偶然重跑通过视为修复依据。
 
-现有 Windows 字体 CI 将继续运行以上公开测试；原生 Windows CTest 也增加
-物理来源和自定义轴路径检查。是否通过必须查看这次实际提交对应的 Actions。
-此处 Linux 结果不预先替代 Windows 结果。
+提交 `aab06bfef1ceb41fb0e2173b19a9a6efa0b88efb` 的
+[Windows Qt 工作流 39244199561](https://github.com/SOLHK/Swirl/actions/runs/39244199561)
+已实际完成并通过：Windows Server 2022、Qt 6.10.3、MSVC x64；CTest 3/3，
+62 个实际用例通过、9 个明确跳过、0 个报告门禁错误。原生窗口路径明确通过
+彩边、纹理资源复用、物理面选择、自定义轴真实轮廓变化及被篡改字体表拒绝五项。
+原生 XML 记录 D3D11 QRhi 与 Microsoft Basic Render Driver，资源复用断言实际执行。
+
+同一提交的完整 Swirl 应用编译通过；另外一条 offscreen 自动化导航路径以
+原创 `Swirl Automation Probe` 字体运行，退出码 0，61/61 页面就绪。它与前述
+原生窗口渲染测试分别记录，不能把 offscreen 导航当作 61 个页面的实际视觉验收。
+这些都是原创夹具的 Windows CI 证据；本次 Apple 原件、最终转换字体、Windows 11
+物理显示器、系统安装以及真实文件性能验收仍为未执行。
 
 ## 重复运行
 
