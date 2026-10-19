@@ -1,40 +1,40 @@
-# Swirl-VF font engineering tools — 2026-10-19
+# Swirl-VF font engineering tools — 2026-10-20
 
-This directory contains independent code, synthetic tests and native probes. It
-contains **no Apple font, converted Apple font or extracted Apple outlines**.
-The font itself must be supplied locally by a user with the necessary rights.
-Code availability does not confer a license to use or redistribute Apple fonts.
+Independent code, original geometric fixtures, native probes and reconstruction
+tools. This directory contains no Apple font, converted Apple font or extracted
+Apple outlines. A locally supplied font requires appropriate use/modification
+rights; availability of this code does not grant rights to redistribute fonts.
 
-## Current, deliberately separate statuses
+## Current status
 
-* The HVGL 3.1 / HVPM 1 binary reader implements bounds, layout, sparse matrices,
-  depth-first structure and remapping validation. The uploaded source's entire
-  70,047-part structure has been decoded and checked locally.
-* `ExperimentalRenderer` is a research evaluator, **not an Apple oracle**. It
-  refuses tangent blend types 2/3/4 rather than substituting another algorithm.
-* `rebuild.py` implements native-instance reconstruction with standard
-  `glyf/gvar`, complete original face/GID coverage, original axis tags/ranges,
-  identity target `avar`, native metric phantom points, and independent
-  holdouts plus adaptive refinement. This is explicitly an approximation, not
-  a lossless format translation. It requires the CoreText extractor to run.
-* Platform probes compile/run in their respective native environments. Public CI
-  supplies only original geometric test fonts. Those tests do not certify the
-  user's original PingFang or an Apple-derived candidate.
-* No accepted Apple-derived `Swirl-VF.ttc` is included or claimed by this stage.
+The exact-source normalized-design geometry gate now passes: **1088/1088**, zero
+failures, at the unchanged **1/32 FUnit** threshold. Native run 39306798698 used
+source commit `5cbf5715d99c1046e80c1c3e45a4ec2ab8946f1f` on xcode-27. The previous
+178 failures were repaired by ordered rigid-transform powers, rotation-centre
+interpolation and native Type-0 factor evaluation. Scalar and batch evaluators
+share that implementation. All 124 tangent, 28 hierarchy and 120 new transform
+experiments also passed. Type-2 remains explicitly enabled; Types 3/4 fail.
 
-Native synthetic evidence at commits `501099d` and `7dfbdda` includes the Apple
-HVF oracle (29/29 geometric locations) and DirectWrite (3 faces, 186 instances,
-10 software-rendered DPI images). The CoreText extractor compiles and returns
-all 174 requested synthetic glyph records, but its unchanged 1/32 FUnit
-analytical regression fails (for example, vertical advance 849 versus 850).
-`platform/diagnose_coretext_metrics.py` independently compares gvar-only,
-equivalent HVAR/VVAR and static fonts without replacing that failing gate.
-The original private PingFang has not been measured by either native oracle.
+This is a fixed sample, **not** all-GID, all-face user-coordinate, continuous-space
+or Windows acceptance. CoreText actually verified all 32 physical source faces,
+but the original `rebuild.py` run stopped at the WDTH fractional-axis readback
+check before completing its first face. No accepted `Swirl-VF.ttc` exists.
 
-## Reproducible tools
+The new HVAR diagnosis measured 3048 user locations / 12192 advances across 32
+faces. Raw-order avar evaluation with zero-normalized coordinates preserved
+matches these metric observations within the original 1/32 FUnit budget; its
+rounding semantics and user-coordinate outline equivalence remain unaccepted.
+The separate CoreText strict metric test still fails. Windows DirectWrite passes
+only the original synthetic fixtures, not an Apple-derived candidate.
 
-Python 3.12+, `fonttools==4.61.1`, `numpy==2.2.6` (the source audit also records
-the exact local runtime). Install in an isolated environment.
+Read the current [detailed handoff](../../docs/SWIRL_VF_USER_AXIS_HANDOFF_20261020.md),
+[geometry evidence](../../docs/SWIRL_VF_GEOMETRY_PASS_20261020.md), and
+[algorithm repair](../../docs/SWIRL_VF_TRANSFORM_REPAIR_20261020.md) before continuing.
+
+## Local tests and read-only audit
+
+Use an isolated environment with Python 3.12+, `fonttools==4.61.1` and
+`numpy==2.2.6` (CI pins these versions). From this directory:
 
 ```sh
 python -m unittest discover -s tests -v
@@ -43,13 +43,20 @@ python tools/audit_font.py /private/PingFangUI.ttc --output /private/audit
 python tools/inspect_hvf.py /private/PingFangUI.ttc --output /private/hvf-preflight.json
 ```
 
-On macOS, compile and validate the official HVF C oracle and the CoreText
-user-coordinate oracle as documented in `platform/HVF_ORACLE_README.md` and
-`platform/CORETEXT_ORACLE.md`. A current Apple SDK with `<hvf/Scaler.h>` and
-`libhvf` is required for the first probe. The CoreText extractor verifies physical
-font-table identity; it refuses to treat a system fallback as the supplied file.
+Parsing/finite-coordinate success is not native outline equality. Original raw
+avar record order and duplicates must not be collapsed through a dictionary.
 
-After a private source run establishes the native oracle:
+## Native source and reconstruction
+
+The [Apple HVF probe](platform/HVF_ORACLE_README.md) uses the actual system
+libhvf with normalized design coordinates. The [CoreText extractor](platform/CORETEXT_ORACLE.md)
+requests original user coordinates, verifies physical face/table identity and
+retains real outlines, origins and advances. Current exact-source runners use
+`xcode-27` and require SHA-256
+`39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890`.
+Do not substitute a different installed PingFang release.
+
+After resolving the source-oracle gates, run privately:
 
 ```sh
 python tools/rebuild.py /private/PingFangUI.ttc \
@@ -58,71 +65,40 @@ python tools/rebuild.py /private/PingFangUI.ttc \
   --report /private/output/reconstruction.json
 ```
 
-The final filename is fixed. An existing output is never overwritten. Missing
-native data, differing topology, unrepresentable metrics, unresolved holdout
-error or source mutation aborts the build and records `BLOCKED`. A successful
-reconstruction still needs independent Apple comparison, Windows, Qt, visual
-and performance acceptance; `lossless_conversion` stays false. Every saved
-face is reopened and its decoded outline, topology, metric phantom points and
-complete gvar coefficients must exactly match the native-checked model. TTC
-packing must preserve every verified face's tables. Float-to-integer
-quantization and cubic conversion are not hidden.
+The current builder is **native-instance approximation**, not lossless format
+translation. It retains original GIDs, face coverage, axis tags/ranges, and uses
+standard glyf/gvar with explicit metric phantoms and equivalent HVAR/VVAR.
+Its original total outline and metric budgets are 1 FUnit each, including
+training/default rounding, independent holdouts and the 0.05-unit cubic allowance
+when needed. Those are distinct from the source decoder's 1/32 FUnit gate;
+neither budget was loosened in the geometry repair.
 
-The default check thresholds are 1 source font unit for the total outline
-error bound and for metrics. The cubic conversion allowance of 0.05 units,
-when needed, is included in that outline budget. Training/default rounding
-errors and independent holdouts are both checked. These are engineering
-bounds, not a promise of pixel equality.
-Every source glyph must be represented; there is no automatic dropping, outline
-boolean merge, alternative-font fallback, pseudo-bold or stretch operation.
+The builder does not overwrite input or previous output. Missing data, topology
+changes, unrepresentable metrics or remaining holdout error block publication.
+Every serialized face's contours, phantoms and full variation coefficients and
+all TTC-packed table bytes are checked. Even a sampled build pass still needs
+independent source, Windows and application acceptance; `lossless_conversion`
+stays false. No alternative-font fill, faux bold, dropped height axis or glyph
+cropping is permitted.
 
-## Native Windows validation
+## Windows and Swirl acceptance
 
-`platform/run_directwrite_probe.ps1` builds and runs the DirectWrite probe on a
-local supplied font. It enumerates physical TTC faces, compares source `fvar`
-with DirectWrite, creates continuous arbitrary-axis instances and measures real
-outlines/advances. It can render five DPI scales on light/dark backgrounds.
-See `platform/DIRECTWRITE_README.md` for what this does and does not verify.
-No system font is installed by these tests.
+See [DirectWrite](platform/DIRECTWRITE_README.md) for the C++/PowerShell probe.
+It loads an explicitly supplied file, checks physical TTC faces and all three
+axes, samples actual outlines/advances, and captures five software DPI scales.
+It does not install a font or prove Apple equivalence, shaping, ClearType quality
+or real Swirl UI performance. Windows Server synthetic CI and Windows 11 desktop
+acceptance must remain separately identified.
 
-## Evidence boundaries and remaining work
+Original source/candidate data, private glyph comparisons and Apple-font images
+stay in an authorized private workspace, not this public repository or public
+Actions artifacts. Swirl's existing 128 MiB font-file limit remains; if a complete
+candidate exceeds it, evaluate size/memory and the application limit rather than
+dropping glyphs or faces. Regions, cmap/UVS/GSUB, original horizontal/vertical
+metrics, real shaping, five DPI levels and startup/layout/scroll performance all
+remain part of final acceptance.
 
-Raw source `avar` data can contain duplicate input coordinates and records out
-of order. A `fontTools` dictionary cannot represent those records faithfully.
-The audit preserves the raw records, and the reconstruction asks CoreText at
-original user coordinates rather than guessing which duplicate wins.
-
-Native output, complete private per-glyph differences, Apple-font screenshots
-and resulting font binaries belong in the user's private workspace. Do not
-place them in this public source directory or public Actions artifacts.
-Synthetic fixtures in CI are generated from original geometric formulas.
-
-The remaining private acceptance includes original native extraction, all-face
-reconstruction with its post-serialization gate, source-vs-target glyph bounds,
-true sidebearings/vertical origins, shaping, AAT tracking equivalence where
-needed, Windows 11 system installation and application loading, real Swirl UI
-screenshots at 100/125/150/175/200%, and measured startup/layout/scroll baselines.
-None is replaced by a Linux unit test or by a synthetic Windows pass.
-
-Swirl currently retains its existing 128 MiB (134,217,728 byte) font-file limit.
-The size of a complete reconstructed Apple font is unknown. A larger result
-would be rejected by the application until the limit is reviewed against the
-actual file and memory measurements; dropping glyphs or faces is not a remedy.
-
-## Primary references
-
-* [Apple HVGL 3.1](https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6hvgl.html)
-* [Apple HVPM 1](https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6hvpm.html)
-* [Apple HVF rendering API](https://developer.apple.com/documentation/hvf)
-* [ACT-02/PingFangUI-VF](https://github.com/ACT-02/PingFangUI-VF): README and animation,
-  not a published turnkey converter. Its removed height axis and altered
-  outlines are not adopted here.
-* [fontTools](https://github.com/fonttools/fonttools),
-  [VariationModel](https://fonttools.readthedocs.io/en/latest/varLib/models.html),
-  [cu2qu](https://fonttools.readthedocs.io/en/latest/cu2qu/index.html)
-* [OpenType avar](https://learn.microsoft.com/en-us/typography/opentype/spec/avar)
-* [DirectWrite arbitrary axis instances](https://learn.microsoft.com/en-us/windows/win32/api/dwrite_3/nf-dwrite_3-idwritefontresource-createfontface)
-* [Qt QFont variable axes](https://doc.qt.io/qt-6/qfont.html#setVariableAxis)
-* [Qt application font loading](https://doc.qt.io/qt-6/qfontdatabase.html#addApplicationFont)
-* [Current published macOS 27 license](https://www.apple.com/legal/sla/docs/macOS27.pdf)
-
+Primary references and licensing boundaries are recorded in
+[technical comparison](research/TECHNICAL_COMPARISON.md) and
+[licensing review](research/LICENSING_REVIEW.md). Those dated documents retain
+historical observations; current tested state is in the detailed handoff above.
