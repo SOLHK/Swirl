@@ -243,6 +243,66 @@ all exact-source CI terminal results must still run before acceptance is claimed
 Concurrent font-only commit `5cb42619785c66317552867d251784df2b0323b9` was checked
 for non-overlap and retained. Formal acceptance stays **79 / 6 / 10.83%**.
 
+S4 was actually pushed as
+[`a066f7d4c8acb96f5d6a46cee5700b2590328b64`](https://github.com/SOLHK/Swirl/commit/a066f7d4c8acb96f5d6a46cee5700b2590328b64).
+Its exact runs are [Rust 39287922752](https://github.com/SOLHK/Swirl/actions/runs/39287922752)
+and [App 39287923155](https://github.com/SOLHK/Swirl/actions/runs/39287923155).
+The [S1–S3 final matrix, raw failures and product artifacts](evidence/subscription-product-chain/ci-s1-s3/README.md)
+retain all earlier exact-source outcomes; they do not prove S4 passed.
+
+## S5: verify the Qt client's close exchange through the real proxy path
+
+The S4 local direct-to-origin Qt diagnostic was not sufficient to predict the
+proxied Qt close sequence. An additional Qt HttpProxy → Rust → independent
+relay experiment received the correct origin body but still failed strict TLS
+closure. An explicit CONNECT on the same Qt socket reproduced that result too.
+Both failed diagnostic variants remain evidence; neither is a product pass.
+The exact S4 [Windows job 118180557286](https://github.com/SOLHK/Swirl/actions/runs/39287922752/job/118180557286)
+then confirmed that failure: all four profiles recorded zero completed TLS
+closes, and origin cleanup reported four `SSLEOFError` exceptions at `unwrap()`.
+The wrapper ran one test with five failure records and zero skips; the complete
+application build was skipped. S4 Linux, macOS and App completed successfully.
+
+The Qt product fixture now gives the test client ownership of the positive
+close sequence: after sending its complete response, the origin first requires
+the client's authenticated TLS EOF, then sends its own close alert with
+`unwrap()`, and finally requires raw TCP EOF. `suppress_ragged_eofs=False`
+prevents bare TCP EOF from satisfying that first check. The close counter is
+incremented only after both TLS and raw EOF complete, so a caught cancellation
+cannot be counted as normal closure. The portable menu retains server-initiated
+TLS closure. Both directions therefore keep independent authenticated-close
+coverage. The S4 C++ client's HttpProxy and VerifyPeer configuration remain the
+actual Qt product test client.
+
+With the final fixture source, a Linux Qt/PySide client using the actual
+subscription inspector and Rust harness passed all four HTTP CONNECT/SOCKS5/
+SS AEAD/VLESS TCP profiles. Independent relays observed the expected positive
+and wrong-name connections, correct SNI, one origin HTTP request, one complete
+TLS/raw close and zero positive origin/relay errors per profile. Wrong-name
+verification produced no additional HTTP request. A real bare-TCP-FIN negative
+through the HTTP relay produced `SSLEOFError`, zero completed closes and a
+failed origin cleanup, as required. This is a Qt-client/Rust diagnostic, not
+Windows C++/DPAPI product-object acceptance. The changed portable class also
+passed eight tests with no failures or skips; the Windows class was not selected.
+
+S4 App validation also exposed an actual menu omission: its older independent
+SOCKS4 subscription case skipped because that shell step did not export the
+already-built Inspector. App now exports and preflights the Release Inspector
+before the existing peers. The new guard failed on the previous workflow, then
+all 45 guards passed with the correction. The updater remains idempotent and
+keeps its existing single-workflow scope. The local SOCKS4 menu passed nine
+tests, including the two protocol variants across five input representations;
+its separate Windows Qt hook was explicitly skipped.
+
+These local results and failed diagnostic controls are archived under
+`evidence/subscription-product-chain/s5-local/`. Exact new-source Linux/macOS/
+Windows/App CI, the mandatory Windows product wrapper and the complete native
+application build must execute before this source is reported as passed.
+Formal acceptance remains **79 / 6 / 10.83%**.
+
+The concurrent font-only `b98850c3caaec7874f7e8c5a95866bbc4741df36` was fetched,
+checked for non-overlap and retained before S5 publication.
+
 ## Actual field boundaries inspected
 
 The audit used `swirl-subscription/src/{lib,inspect,inspect_boundaries}.rs`, the

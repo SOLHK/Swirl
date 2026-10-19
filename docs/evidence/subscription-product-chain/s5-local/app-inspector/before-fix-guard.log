@@ -1,0 +1,14 @@
+test_app_existing_peer_menu_requires_built_subscription_inspector (__main__.CoreDevelopmentTests.test_app_existing_peer_menu_requires_built_subscription_inspector) ... FAIL
+
+======================================================================
+FAIL: test_app_existing_peer_menu_requires_built_subscription_inspector (__main__.CoreDevelopmentTests.test_app_existing_peer_menu_requires_built_subscription_inspector)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/ca6cd1f88f6f/Swirl/tools/tests/test_core_development.py", line 215, in test_app_existing_peer_menu_requires_built_subscription_inspector
+    self.assertEqual(menu.count(export), 1)
+AssertionError: 0 != 1
+
+----------------------------------------------------------------------
+Ran 1 test in 0.001s
+
+FAILED (failures=1)

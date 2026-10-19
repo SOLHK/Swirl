@@ -1,0 +1,11 @@
+{"protocol": "http", "status": "passed", "parsed_subscription": true, "positive": {"tls_verified": true, "http_sent": true, "http_status": 200, "body": "product-origin-ok:/through-qt-proxy", "socket_state": "UnconnectedState"}, "negative": {"tls_verified": false, "error": "SslHandshakeFailedError", "verification_error": "HostNameMismatch", "http_sent": false}, "origin_http_count": 1, "origin_sni": ["localhost", "wrong.fixture.invalid"], "origin_tls_closed": 1, "origin_errors": [], "relay_errors": [], "relay_connections": [{"peer": "A", "host": "localhost", "port": 38935, "upload": 713, "download": 1496}, {"peer": "A", "host": "wrong.fixture.invalid", "port": 38935, "upload": 517, "download": 840}]}
+Traceback (most recent call last):
+  File "/workspace/scratch/ca6cd1f88f6f/swirl-chain-evidence/s4-qt-proxy/qt-proxy-diagnostic.py", line 185, in <module>
+    result = run_protocol(protocol)
+             ^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/ca6cd1f88f6f/swirl-chain-evidence/s4-qt-proxy/qt-proxy-diagnostic.py", line 166, in run_protocol
+    relay.close()
+  File "/workspace/scratch/ca6cd1f88f6f/Swirl/tools/tests/test_product_subscription_chain.py", line 345, in close
+    assert not self.errors, self.errors
+           ^^^^^^^^^^^^^^^
+AssertionError: [{'category': 'IndependentFixtureAssertion', 'fixture': 'relay-socks5-A', 'type': 'OSError', 'errno': 107, 'winerror': None, 'frames': [{'file': 'socketserver.py', 'function': 'process_request_thread', 'line': 697}, {'file': 'socketserver.py', 'function': 'finish_request', 'line': 362}, {'file': 'socketserver.py', 'function': '__init__', 'line': 766}, {'file': 'test_product_subscription_chain.py', 'function': 'handle', 'line': 300}]}]

@@ -60,7 +60,7 @@ class Server(socketserver.ThreadingTCPServer):
 
 
 class Origin:
-    def __init__(self, context=None, echo=False):
+    def __init__(self, context=None, echo=False, client_closes_tls=False):
         self.requests, self.errors, self.payloads, self.sni = [], [], [], []
         self.context, self.echo = context, echo
         self.tls_closed = 0
@@ -76,7 +76,7 @@ class Origin:
                 try:
                     if context:
                         try:
-                            stream = context.wrap_socket(stream, server_side=True)
+                            stream = context.wrap_socket(stream, server_side=True, suppress_ragged_eofs=False)
                         except ssl.SSLError:
                             return  # The explicit wrong-name client is a negative test.
                     if echo:
@@ -98,8 +98,12 @@ class Origin:
                                        b'\r\nConnection: close\r\n\r\n' + body)
                     tls_closed = isinstance(stream, ssl.SSLSocket)
                     if tls_closed:
+                        if client_closes_tls:
+                            # The Qt test client explicitly owns shutdown after
+                            # its full response. Require its authenticated TLS
+                            # EOF first; a bare TCP EOF raises SSLEOFError.
+                            assert stream.recv(1) == b''
                         stream = stream.unwrap()
-                        owner.tls_closed += 1
                     try:
                         stream.shutdown(socket.SHUT_WR)
                     except OSError as error:
@@ -110,6 +114,10 @@ class Origin:
                                               getattr(error, 'winerror', None) != 10057):
                             raise
                     assert stream.recv(1) == b''
+                    if tls_closed:
+                        # Count normal completion only after authenticated TLS
+                        # closure AND raw EOF; cancellation cannot count as it.
+                        owner.tls_closed += 1
                 except (EOFError, ConnectionError, socket.timeout):
                     # Cancellation is explicitly exercised by the caller.
                     pass
@@ -377,7 +385,8 @@ class ChainBase(unittest.TestCase):
         self.addCleanup(self.folder.cleanup)
         self.context, self.ca_der, self.ca_pem = certificates(self.folder.name)
         self.http = self.keep(Origin())
-        self.https = self.keep(Origin(context=self.context))
+        self.https = self.keep(Origin(context=self.context,
+                                      client_closes_tls=getattr(self, 'client_closes_tls', False)))
         self.echo = self.keep(Origin(echo=True))
 
     def keep(self, resource):
@@ -676,6 +685,8 @@ class ProductChainIntegration(ChainBase):
 @unittest.skipUnless(os.environ.get('SWIRL_RUST_QT_TESTS'),
                      'Windows Qt/DPAPI integration executable required')
 class ProductQtIntegration(ChainBase):
+    client_closes_tls = True
+
     def test_actual_product_import_persist_select_route_and_recreate(self):
         for protocol in ('http', 'socks5', 'ss', 'vless'):
             with self.subTest(protocol=protocol):

@@ -39,7 +39,20 @@ S2 [完整本地菜单与原始日志](evidence/subscription-product-chain/s2-ex
 
 ## 1. 固定范围、状态和计算规则
 
-E20 最新 S4 接续：S3 已推送 `41555465b72fd59d42bc473f0d097c93e210c240`；S2/S3 的 Linux、macOS、
+E20 最新 S5：S4 已推送 `a066f7d4c8acb96f5d6a46cee5700b2590328b64`。后续真实 Qt HttpProxy → Rust
+对照发现直连 Qt 诊断未覆盖的 TLS 关闭失败，因此 S5 为 Qt 产品菜单明确由测试客户端发起关闭；
+独立目标禁用 ragged EOF 隐藏，依次要求认证 TLS EOF、unwrap 和原始 TCP EOF，完成后才计数。
+便携菜单保留服务端主动关闭，裸 TCP FIN 对照仍产生 SSLEOFError 并失败。最终本地四协议 Qt 客户端/
+Rust 代理诊断、8 项便携菜单通过，但不冒充 Windows C++/DPAPI 产品验收。
+S4 Windows 精确 CI 已证实四次 unwrap SSLEOFError、完整关闭计数为零，完整应用构建跳过；
+该失败保留，S4 Linux/macOS/App 为成功，不能用来替代 S5 结果。
+
+App 旧协议菜单此前缺 Inspector 环境而跳过一个订阅用例，现增加已有 Release Inspector 的导出与
+可执行文件检查；新增 guard 先复现失败，修复后 45 guards、生成器一致性及 SOCKS4 9 通过 / 1 Qt
+明确跳过均通过。新版精确 CI 与 Windows 完整应用仍须实际执行；详见[统一 S5 交接](CORE_SUBSCRIPTION_PRODUCT_CHAIN_20261019.md#s5-verify-the-qt-clients-close-exchange-through-the-real-proxy-path)。
+**79 项 / 6 项已验收 / 10.83% 完全不变。**
+
+E20 此前 S4 接续：S3 已推送 `41555465b72fd59d42bc473f0d097c93e210c240`；S2/S3 的 Linux、macOS、
 Windows 与 App 新整链原始附件均已核实各 8 通过 / 1 Qt 明确跳过。此前 Actions API 排队状态存在
 传播延迟，不能据其推断实际未执行。S1 的 Linux 双地址族端口竞争及 Windows SS TCP 10013 失败保留；
 49666 不在日志排除范围内，未推测具体占用者。S2/S3 Windows 四种协议 Qt 槽实际转发成功，但独立 HTTPS

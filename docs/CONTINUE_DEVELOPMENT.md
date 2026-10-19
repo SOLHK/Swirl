@@ -1,6 +1,29 @@
 # Current handoff: subscription product chain (2026-10-19)
 
-## Latest source checkpoint: S4 observed CI failure repairs
+## Latest source checkpoint: S5 actual proxy-path TLS closure and App Inspector
+
+S4 is pushed as [a066f7d4](https://github.com/SOLHK/Swirl/commit/a066f7d4c8acb96f5d6a46cee5700b2590328b64),
+with [Rust 39287922752](https://github.com/SOLHK/Swirl/actions/runs/39287922752)
+and [App 39287923155](https://github.com/SOLHK/Swirl/actions/runs/39287923155).
+An additional actual Qt HttpProxy → Rust → independent proxy test caught a TLS
+close failure that the direct Qt diagnostic did not cover. S5 makes the Qt test
+client initiate the close, requires authenticated TLS EOF with ragged EOF
+suppression disabled, then requires unwrap and raw EOF before counting success.
+The portable suite retains the server-initiated close direction. A bare TCP FIN
+still produces an explicit failing SSL error.
+S4's exact Windows CI subsequently confirmed four `SSLEOFError` origin failures
+and zero complete closes; its full application build was skipped. Linux,
+macOS and App succeeded. Those are historical S4 outcomes, not S5 results.
+
+Local final-source evidence includes four Qt-client/Rust proxy profiles passing,
+eight portable passes, 45 guards and nine SOCKS4 passes with one explicit Qt
+hook skip. The latter corrects an App shell-step omission: the old peer menu now
+exports and preflights the built Inspector, so its subscription case actually
+runs. Windows C++/DPAPI and complete application acceptance remain exact-source
+CI gates; local PySide is not that evidence. See [the S5 scope and raw evidence](CORE_SUBSCRIPTION_PRODUCT_CHAIN_20261019.md#s5-verify-the-qt-clients-close-exchange-through-the-real-proxy-path).
+Keep 79 / 6 / 10.83% unchanged.
+
+## Previous source checkpoint: S4 observed CI failure repairs
 
 S3 was pushed as [41555465](https://github.com/SOLHK/Swirl/commit/41555465b72fd59d42bc473f0d097c93e210c240).
 S2/S3 native product artifacts now prove eight portable passes and one explicit

@@ -63,8 +63,10 @@ jobs:
           python tools/tests/generate_reality_vectors.py --check
           python tools/tests/generate_vision_vectors.py --check
           export SWIRL_RUST_HARNESS="$PWD/core/target/release/swirl-api"
+          export SWIRL_RUST_INSPECTOR="$PWD/core/target/release/swirl-inspect"
           export SWIRL_REALITY_CLIENT="$PWD/core/target/release/examples/reality-client"
           test -x "$SWIRL_RUST_HARNESS"
+          test -x "$SWIRL_RUST_INSPECTOR"
           test -x "$SWIRL_REALITY_CLIENT"
           python tools/tests/test_reality_peer.py
           python tools/tests/test_reality_tls.py

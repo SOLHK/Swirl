@@ -194,6 +194,30 @@ def previous_connection_stage(source):
 
 
 class CoreDevelopmentTests(unittest.TestCase):
+    def test_app_existing_peer_menu_requires_built_subscription_inspector(self):
+        root = Path(__file__).resolve().parents[2]
+        source = (root / ".github/workflows/core-development.yml").read_text(encoding="utf-8")
+        build_title = "      - name: Rust static and unit checks\n"
+        peer_title = "      - name: Independent network peers\n"
+        self.assertEqual(source.count(build_title), 1)
+        self.assertEqual(source.count(peer_title), 1)
+        self.assertLess(source.index(build_title), source.index(peer_title))
+        build = source.split(build_title, 1)[1].split("      - ", 1)[0]
+        self.assertIn("        working-directory: core\n", build)
+        self.assertIn("          cargo build --release --locked -p swirl-api --bins\n", build)
+        menu = source.split(peer_title, 1)[1].split("      - ", 1)[0]
+        for step in (build, menu):
+            self.assertNotIn("        if:", step)
+            self.assertNotIn("continue-on-error:", step)
+        self.assertIn("          set -euo pipefail\n", menu)
+        export = '          export SWIRL_RUST_INSPECTOR="$PWD/core/target/release/swirl-inspect"\n'
+        preflight = '          test -x "$SWIRL_RUST_INSPECTOR"\n'
+        self.assertEqual(menu.count(export), 1)
+        self.assertEqual(menu.count(preflight), 1)
+        self.assertLess(menu.index(export), menu.index(preflight))
+        self.assertLess(menu.index(preflight), menu.index("          python tools/tests/test_reality_peer.py\n"))
+        self.assertIn("          if test -f tools/tests/test_socks4.py; then python tools/tests/test_socks4.py; fi\n", menu)
+
     def test_product_chain_gates_use_release_binaries_and_preserve_exact_evidence(self):
         root = Path(__file__).resolve().parents[2]
         source = (root / ".github/workflows/rust-core.yml").read_text(encoding="utf-8")
@@ -566,6 +590,7 @@ class CoreDevelopmentTests(unittest.TestCase):
         expected = (
             '          export SWIRL_REALITY_CLIENT="$PWD/core/target/release/examples/reality-client"\n'
             '          test -x "$SWIRL_RUST_HARNESS"\n'
+            '          test -x "$SWIRL_RUST_INSPECTOR"\n'
             '          test -x "$SWIRL_REALITY_CLIENT"\n'
             '          python tools/tests/test_reality_peer.py\n'
             '          python tools/tests/test_reality_tls.py\n'
