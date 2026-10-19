@@ -111,10 +111,27 @@ REQUIRED_TESTS = (
     "test_connectivity_diagnostics.py",
     "test_subscription_import.py",
     "test_socks5_udp.py",
+    "test_reality_peer.py",
+    "test_reality_tls.py",
 )
+REALITY_BUILD = "cargo build --release --locked -p swirl-transport --example reality-client"
+BINARY_NAMES = ("SWIRL_RUST_HARNESS", "SWIRL_RUST_INSPECTOR", "SWIRL_RUST_DIAGNOSTIC",
+                "SWIRL_REALITY_CLIENT")
+
+
+def previous_reality_stage(source):
+    """Strip the entire later TLS-peer stage before making historical fixtures."""
+    separator = "  windows-rust:\n"
+    parts = source.split(separator)
+    for index, part in enumerate(parts):
+        for before, after, _ in development._reality_blocks(windows=index == 1):
+            part = part.replace(after, before, 1)
+        parts[index] = part
+    return separator.join(parts)
 
 
 def previous_socks5_udp_stage(source):
+    source = previous_reality_stage(source)
     command = "          python ../tools/tests/test_socks5_udp.py\n"
     qt = "          python tools/tests/test_socks5_udp.py Socks5UdpIntegration.test_qt_imported_socks5_udp_data_path\n"
     return source.replace(development.QT_TEST_ARTIFACT, "").replace(
@@ -159,6 +176,10 @@ class CoreDevelopmentTests(unittest.TestCase):
         diagnostic = root / "core/crates/swirl-api/src/bin/swirl-diagnose.rs"
         diagnostic.parent.mkdir(parents=True)
         diagnostic.write_text("// diagnostic fixture\n", encoding="utf-8")
+        for relative in development.REALITY_SOURCES:
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("# synthetic REALITY source fixture\n", encoding="utf-8")
         return workflow
 
     def test_adds_only_reviewed_tests_and_exact_development_trigger(self):
@@ -219,6 +240,80 @@ class CoreDevelopmentTests(unittest.TestCase):
     def test_idempotence_prevents_repeated_app_commits(self):
         first = development.updated_workflow(FIXTURE)
         self.assertEqual(development.updated_workflow(first), first)
+
+    def test_reality_stage_builds_release_preflights_and_runs_peers_first(self):
+        final = development.updated_workflow(FIXTURE)
+        self.assertEqual(final.count(REALITY_BUILD), 2)
+        previous = previous_reality_stage(final)
+        self.assertNotIn("SWIRL_REALITY_CLIENT", previous)
+        self.assertNotIn("test_reality_", previous)
+        self.assertEqual(development.updated_workflow(previous), final)
+        self.assertEqual(development.updated_workflow(final), final)
+        for windows, part in enumerate(final.split("  windows-rust:\n")):
+            first_peer = part.index("          python ../tools/tests/test_reality_peer.py\n")
+            tls_peer = part.index("          python ../tools/tests/test_reality_tls.py\n")
+            self.assertLess(part.index(REALITY_BUILD), first_peer)
+            self.assertLess(part.index("python -m pip install cryptography==50.0.2"), first_peer)
+            self.assertLess(first_peer, tls_peer)
+            self.assertLess(tls_peer, part.index("          python ../tools/tests/test_rust_core.py\n"))
+            for name in BINARY_NAMES:
+                guard = (f"          if (-not (Test-Path $env:{name} -PathType Leaf)) {{ throw 'Required Rust test binary missing' }}\n"
+                         if windows else f'          test -x "${name}"\n')
+                self.assertEqual(part.count(guard), 1)
+                self.assertLess(part.index(guard), first_peer)
+            if windows:
+                self.assertIn(REALITY_BUILD + "\n" + development.WINDOWS_STATUS_GUARD, part)
+                self.assertIn("$env:SWIRL_REALITY_CLIENT=(Resolve-Path target/release/examples/reality-client.exe).Path\n", part)
+                for name in ("test_reality_peer.py", "test_reality_tls.py"):
+                    self.assertIn(f"          python ../tools/tests/{name}\n" + development.WINDOWS_STATUS_GUARD, part)
+            else:
+                self.assertIn('export SWIRL_REALITY_CLIENT="$PWD/target/release/examples/reality-client"\n', part)
+
+    def test_reality_partial_build_environment_preflight_or_suites_fail_closed(self):
+        final = development.updated_workflow(FIXTURE)
+        commands = [f"          python ../tools/tests/{name}\n"
+                    for name in ("test_reality_peer.py", "test_reality_tls.py")]
+        markers = [
+            '          export SWIRL_REALITY_CLIENT="$PWD/target/release/examples/reality-client"\n',
+            "          $env:SWIRL_REALITY_CLIENT=(Resolve-Path target/release/examples/reality-client.exe).Path\n",
+            '          test -x "$SWIRL_REALITY_CLIENT"\n',
+            "          if (-not (Test-Path $env:SWIRL_REALITY_CLIENT -PathType Leaf)) { throw 'Required Rust test binary missing' }\n",
+            *commands,
+        ]
+        broken = []
+        for marker in markers:
+            broken.extend((final.replace(marker, "", 1), final.replace(marker, marker * 2, 1)))
+        for command in commands:
+            broken.append(final.replace(command + development.WINDOWS_STATUS_GUARD, command, 1))
+        broken.extend((
+            final.replace(REALITY_BUILD, REALITY_BUILD.replace("--release ", ""), 1),
+            final.replace(REALITY_BUILD, REALITY_BUILD.replace("--example reality-client", "--lib"), 1),
+            final.replace(REALITY_BUILD + "\n" + development.WINDOWS_STATUS_GUARD, REALITY_BUILD + "\n", 1),
+            final.replace("target/release/examples/reality-client", "target/debug/examples/reality-client", 1),
+        ))
+        for index, source in enumerate(broken):
+            with self.subTest(drift=index), self.assertRaises(ValueError):
+                development.updated_workflow(source)
+
+    def test_app_workflow_builds_and_requires_the_same_real_peer_client(self):
+        source = (Path(__file__).resolve().parents[2] / ".github/workflows/core-development.yml").read_text(encoding="utf-8")
+        self.assertEqual(source.count(REALITY_BUILD + "\n"), 1)
+        marker = "      - name: Independent network peers\n"
+        menu = source.split(marker, 1)[1].split("      - ", 1)[0]
+        expected = (
+            '          export SWIRL_REALITY_CLIENT="$PWD/core/target/release/examples/reality-client"\n'
+            '          test -x "$SWIRL_RUST_HARNESS"\n'
+            '          test -x "$SWIRL_REALITY_CLIENT"\n'
+            '          python tools/tests/test_reality_peer.py\n'
+            '          python tools/tests/test_reality_tls.py\n'
+            '          python tools/tests/test_rust_core.py\n'
+        )
+        self.assertEqual(menu.count(expected), 1)
+        self.assertLess(menu.index("python -m pip install cryptography==50.0.2"), menu.index(expected))
+        self.assertIn("          set -euo pipefail\n", menu)
+        self.assertLess(source.index(REALITY_BUILD), source.index(marker))
+        # This stage adds execution only; the original source archive scope stays fixed.
+        self.assertIn("git archive HEAD core tools/tests src/Swirl.Quick/engine src/Swirl.Quick/tests > core-tested-source.tar\n", source)
 
     def test_socks5_udp_adds_portable_qt_and_native_build_as_one_stage(self):
         final = development.updated_workflow(FIXTURE)
@@ -442,7 +537,7 @@ class CoreDevelopmentTests(unittest.TestCase):
                 source = updated.split(marker, 1)[1].split("      - ", 1)[0]
                 guards = [line.strip() for line in source.splitlines()
                           if line.startswith(prefix)]
-                self.assertEqual(len(guards), 3)
+                self.assertEqual(len(guards), 4)
                 scripts[windows] = "\n".join([*guards, sentinel])
         windows = os.name == "nt"
         shell = shutil.which("pwsh" if windows else "bash")
@@ -453,17 +548,19 @@ class CoreDevelopmentTests(unittest.TestCase):
                    else [shell, "-e", "-c", script])
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            paths = {name: root / name for name in
-                     ("SWIRL_RUST_HARNESS", "SWIRL_RUST_INSPECTOR", "SWIRL_RUST_DIAGNOSTIC")}
-            for name in ("SWIRL_RUST_HARNESS", "SWIRL_RUST_INSPECTOR"):
-                paths[name].write_text("fixture\n", encoding="utf-8")
-                paths[name].chmod(0o700)
+            paths = {name: root / name for name in BINARY_NAMES}
+            for path in paths.values():
+                path.write_text("fixture\n", encoding="utf-8")
+                path.chmod(0o700)
             environment = {**os.environ, **{name: str(path) for name, path in paths.items()}}
-            missing = subprocess.run(command, env=environment, capture_output=True, text=True, timeout=5)
-            self.assertNotEqual(missing.returncode, 0)
-            self.assertNotIn("SUITE_STARTED", missing.stdout)
-            paths["SWIRL_RUST_DIAGNOSTIC"].write_text("fixture\n", encoding="utf-8")
-            paths["SWIRL_RUST_DIAGNOSTIC"].chmod(0o700)
+            for name, path in paths.items():
+                with self.subTest(missing_binary=name):
+                    path.unlink()
+                    missing = subprocess.run(command, env=environment, capture_output=True, text=True, timeout=5)
+                    self.assertNotEqual(missing.returncode, 0)
+                    self.assertNotIn("SUITE_STARTED", missing.stdout)
+                    path.write_text("fixture\n", encoding="utf-8")
+                    path.chmod(0o700)
             present = subprocess.run(command, env=environment, capture_output=True, text=True, timeout=5)
             self.assertEqual(present.returncode, 0, present.stderr)
             self.assertEqual(present.stdout.strip(), "SUITE_STARTED")
@@ -546,6 +643,10 @@ class CoreDevelopmentTests(unittest.TestCase):
             "tools/tests/test_connection_stages.py",
             "tools/tests/test_connectivity_diagnostics.py",
             "tools/tests/test_subscription_import.py",
+            "tools/tests/test_reality_peer.py",
+            "tools/tests/test_reality_tls.py",
+            "tools/tests/reality_peer.py",
+            "core/crates/swirl-transport/examples/reality-client.rs",
             "tools/Verify-PublicRustCore.py",
             "tools/Diagnose-NativeConnectivity.py",
             "core/crates/swirl-api/src/bin/swirl-diagnose.rs",

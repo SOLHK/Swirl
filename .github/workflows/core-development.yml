@@ -52,6 +52,7 @@ jobs:
           cargo clippy --workspace --all-targets --locked -- -D warnings
           cargo test --workspace --locked
           cargo build --release --locked -p swirl-api
+          cargo build --release --locked -p swirl-transport --example reality-client
       - uses: actions/setup-python@v5
         with:
           python-version: '3.14'
@@ -61,6 +62,11 @@ jobs:
           python -m pip install cryptography==50.0.2
           python tools/tests/generate_reality_vectors.py --check
           export SWIRL_RUST_HARNESS="$PWD/core/target/release/swirl-api"
+          export SWIRL_REALITY_CLIENT="$PWD/core/target/release/examples/reality-client"
+          test -x "$SWIRL_RUST_HARNESS"
+          test -x "$SWIRL_REALITY_CLIENT"
+          python tools/tests/test_reality_peer.py
+          python tools/tests/test_reality_tls.py
           python tools/tests/test_rust_core.py
           python tools/tests/test_shadowsocks.py
           python tools/tests/test_dns_tls.py

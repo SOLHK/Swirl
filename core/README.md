@@ -8,17 +8,16 @@ are implemented and tested. This is **not the completed all-protocol product**.
 
 ## Current development scope (2026-10-19)
 
-The new [REALITY handshake foundation](../docs/REALITY_HANDSHAKE_FOUNDATION_20261019.md)
-owns real X25519/ML-KEM-768 key material, authenticates the exact first
-ClientHello, validates ServerHello/transcript checkpoints, and verifies REALITY
-certificate HMAC plus Ed25519 CertificateVerify. Independent Python/OpenSSL
-vectors and real stock-rustls verifier/provider integration cover authentication,
-data and close behavior within that test scope. This module is not connected to
-an outbound: the TLS backend still needs a pre-transcript ClientHello interface,
-fingerprint/negotiation integration and a complete REALITY peer. Vision remains
-unimplemented. Native import/startup preserves and explicitly rejects these
-requirements instead of substituting ordinary TLS or DIRECT; see the
-[Qt import security repair](../docs/REALITY_IMPORT_SECURITY_20261019.md).
+The [REALITY R2 TLS engine](../docs/REALITY_TLS_ENGINE_20261019.md) extends the
+[owned-key/authentication foundation](../docs/REALITY_HANDSHAKE_FOUNDATION_20261019.md)
+with a real TLS 1.3 record channel. Two offline constructors bind the authenticated
+ClientHello to the same sole key owner and final rustls transcript. Actual
+CertificateVerify, Finished, bidirectional data and closure now pass an independent
+Python/OpenSSL peer in all six combinations of three TLS suites and hybrid/X25519
+selection. The engine uses an explicitly native ClientHello profile; browser
+fingerprints, Vision and the product outbound are still pending. Native import
+and startup continue to preserve and explicitly reject those unsupported
+requirements; see the [Qt import security repair](../docs/REALITY_IMPORT_SECURITY_20261019.md).
 
 After the automatic-font implementation passed its Windows application/font
 gates, native Core development resumed on `work/core-completion-20261017`.
@@ -55,6 +54,7 @@ cargo check --workspace --locked
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked
 cargo build --release --locked --workspace --lib --bins
+cargo build --release --locked -p swirl-transport --example reality-client
 ```
 
 Configure the real desktop with CMake options `SWIRL_USE_RUST_CORE=ON` and

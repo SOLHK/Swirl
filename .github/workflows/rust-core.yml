@@ -27,6 +27,7 @@ jobs:
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo test --workspace --locked
       - run: cargo build --release --locked --workspace --lib --bins
+      - run: cargo build --release --locked -p swirl-transport --example reality-client
       - uses: actions/setup-python@v5
         with:
           python-version: '3.14'
@@ -37,9 +38,13 @@ jobs:
           export SWIRL_RUST_HARNESS="$PWD/target/release/swirl-api"
           export SWIRL_RUST_INSPECTOR="$PWD/target/release/swirl-inspect"
           export SWIRL_RUST_DIAGNOSTIC="$PWD/target/release/swirl-diagnose"
+          export SWIRL_REALITY_CLIENT="$PWD/target/release/examples/reality-client"
           test -x "$SWIRL_RUST_HARNESS"
           test -x "$SWIRL_RUST_INSPECTOR"
           test -x "$SWIRL_RUST_DIAGNOSTIC"
+          test -x "$SWIRL_REALITY_CLIENT"
+          python ../tools/tests/test_reality_peer.py
+          python ../tools/tests/test_reality_tls.py
           python ../tools/tests/test_rust_core.py
           python ../tools/tests/test_shadowsocks.py
           python ../tools/tests/test_dns_tls.py
@@ -80,6 +85,11 @@ jobs:
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo test --workspace --locked
       - run: cargo build --release --locked --workspace --lib --bins
+      - name: Build native REALITY TLS peer client
+        shell: pwsh
+        run: |
+          cargo build --release --locked -p swirl-transport --example reality-client
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/setup-python@v5
         with:
           python-version: '3.14'
@@ -94,9 +104,15 @@ jobs:
           $env:SWIRL_RUST_HARNESS=(Resolve-Path target/release/swirl-api.exe).Path
           $env:SWIRL_RUST_INSPECTOR=(Resolve-Path target/release/swirl-inspect.exe).Path
           $env:SWIRL_RUST_DIAGNOSTIC=(Resolve-Path target/release/swirl-diagnose.exe).Path
+          $env:SWIRL_REALITY_CLIENT=(Resolve-Path target/release/examples/reality-client.exe).Path
           if (-not (Test-Path $env:SWIRL_RUST_HARNESS -PathType Leaf)) { throw 'Required Rust test binary missing' }
           if (-not (Test-Path $env:SWIRL_RUST_INSPECTOR -PathType Leaf)) { throw 'Required Rust test binary missing' }
           if (-not (Test-Path $env:SWIRL_RUST_DIAGNOSTIC -PathType Leaf)) { throw 'Required Rust test binary missing' }
+          if (-not (Test-Path $env:SWIRL_REALITY_CLIENT -PathType Leaf)) { throw 'Required Rust test binary missing' }
+          python ../tools/tests/test_reality_peer.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python ../tools/tests/test_reality_tls.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python ../tools/tests/test_rust_core.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python ../tools/tests/test_shadowsocks.py

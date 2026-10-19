@@ -1,17 +1,22 @@
-//! REALITY handshake foundations, deliberately not connected to an outbound.
+//! REALITY authentication and a bounded native TLS 1.3 client.
 //!
 //! Swirl owns fresh hybrid key material, authenticated ClientHello finalization
 //! and the first ServerHello transition. The exact finalized handshake bytes
 //! enter the transcript. Neither a key exchange nor certificate authentication
-//! establishes a data channel: the TLS backend must still verify CertificateVerify
-//! and Finished, negotiate the configured fingerprint and implement close rules.
-//! The stock rustls client currently has no pre-transcript ClientHello hook, so
-//! rewriting its socket output is forbidden and REALITY/Vision remain rejected.
+//! establishes a data channel: the opt-in [`TlsClient`] also verifies the actual
+//! CertificateVerify and Finished. Its two offline constructions bind the final
+//! authenticated ClientHello to rustls's own transcript, without socket rewriting.
+//! This is a native rustls profile, not a browser fingerprint or a VLESS/Vision
+//! outbound. Subscription/runtime gates remain unchanged until those semantics
+//! and the complete product path are implemented and independently verified.
+mod backend;
 mod certificate;
+mod client;
 mod hello;
 mod kx;
 
 pub use certificate::ServerAuthenticator;
+pub use client::TlsClient;
 pub use kx::X25519_MLKEM768;
 
 use ring::{

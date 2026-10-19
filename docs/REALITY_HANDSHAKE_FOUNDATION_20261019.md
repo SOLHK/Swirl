@@ -1,5 +1,10 @@
 # REALITY handshake foundation: owned keys, transcript and server authentication
 
+This document retains the evidence and limits of source stage `daad7a0`.
+The later [R2 TLS engine](REALITY_TLS_ENGINE_20261019.md) adds the actual
+authenticated record channel and independent socket peer; its results must be
+read separately from this historical foundation checkpoint.
+
 ## Scope and product boundary
 
 This is a bounded native Rust foundation, developed after the import-security
@@ -18,7 +23,7 @@ The implementation lives in `core/crates/swirl-transport/src/reality/`:
 | `certificate.rs` | Strict DER profile, HMAC-SHA512 authentication of the Ed25519 public key, genuine TLS 1.3 CertificateVerify verification; no cover-certificate fallback |
 | `tests.rs` and certificate tests | Independent known answers, malformed-message and authentication failures, key ownership, actual stock-rustls integration |
 
-Generic TLS in `secure.rs`, DNS, routing, runtime outbounds, and existing
+Generic TLS in `swirl-transport/src/lib.rs::secure()`, DNS, routing, runtime outbounds, and existing
 supported VLESS TCP/TLS/WS execution are unchanged. No QML or font code is
 modified by this foundation. The earlier unintegrated Windows R0/R1 directory
 has not been accessed from this cloud workspace.

@@ -12,6 +12,8 @@ portable/Windows peers, its Qt forwarding hook and the complete native applicati
 build using the existing Qt build tree. Shared subscription import tests also
 run in the existing compatibility build, alongside its native-DNS rejection gate.
 Four fixed Qt XML reports preserve diagnostics even after a failed test or build.
+The REALITY TLS stage builds its actual Release protocol client and runs both
+independent peer suites only after all four required test binaries are present.
 It does not change permissions, secrets,
 existing actions, pull-request triggers or any product source.
 
@@ -50,6 +52,24 @@ DNS_PROBE_TESTS = ("test_dns_negative.py", "test_native_probe.py", "test_connect
 CONNECTIVITY_IMPORT_TESTS = ("test_connectivity_diagnostics.py", "test_subscription_import.py")
 SOCKS5_UDP_TEST = "test_socks5_udp.py"
 SOCKS5_UDP_QT_TEST = "test_socks5_udp.py Socks5UdpIntegration.test_qt_imported_socks5_udp_data_path"
+REALITY_TESTS = ("test_reality_peer.py", "test_reality_tls.py")
+REALITY_SOURCES = (
+    Path("core/crates/swirl-transport/examples/reality-client.rs"),
+    Path("tools/tests/reality_peer.py"),
+)
+REALITY_BUILD_COMMAND = "cargo build --release --locked -p swirl-transport --example reality-client"
+PORTABLE_REALITY_BUILD = f"      - run: {REALITY_BUILD_COMMAND}\n"
+WINDOWS_REALITY_BUILD = (
+    "      - name: Build native REALITY TLS peer client\n"
+    "        shell: pwsh\n"
+    "        run: |\n"
+    f"          {REALITY_BUILD_COMMAND}\n"
+    + WINDOWS_STATUS_GUARD
+)
+PORTABLE_REALITY_ENV = '          export SWIRL_REALITY_CLIENT="$PWD/target/release/examples/reality-client"\n'
+WINDOWS_REALITY_ENV = "          $env:SWIRL_REALITY_CLIENT=(Resolve-Path target/release/examples/reality-client.exe).Path\n"
+PORTABLE_REALITY_CHECK = '          test -x "$SWIRL_REALITY_CLIENT"\n'
+WINDOWS_REALITY_CHECK = "          if (-not (Test-Path $env:SWIRL_REALITY_CLIENT -PathType Leaf)) { throw 'Required Rust test binary missing' }\n"
 PREVIOUS_RELEASE_BUILD = "      - run: cargo build --release --locked -p swirl-api\n"
 RELEASE_BUILD = "      - run: cargo build --release --locked --workspace --lib --bins\n"
 PORTABLE_DIAGNOSTIC = '          export SWIRL_RUST_DIAGNOSTIC="$PWD/target/release/swirl-diagnose"\n'
@@ -330,7 +350,7 @@ def _connectivity_workflow(source: str) -> str:
     return separator.join(parts)
 
 
-def updated_workflow(source: str) -> str:
+def _udp_workflow(source: str) -> str:
     """Add the complete UDP stage without weakening prior workflow guards."""
     command = f"          python ../tools/tests/{SOCKS5_UDP_TEST}\n"
     qt_command = f"          python tools/tests/{SOCKS5_UDP_QT_TEST}\n"
@@ -374,6 +394,71 @@ def updated_workflow(source: str) -> str:
     return source[:-len(qt_before)] + qt_after
 
 
+def _reality_blocks(windows: bool) -> tuple[tuple[str, str, str], ...]:
+    first_test = "          python ../tools/tests/test_rust_core.py\n"
+    names = ("SWIRL_RUST_HARNESS", "SWIRL_RUST_INSPECTOR", "SWIRL_RUST_DIAGNOSTIC")
+    if windows:
+        build = WINDOWS_REALITY_BUILD
+        diagnostic = WINDOWS_DIAGNOSTIC
+        environment = WINDOWS_REALITY_ENV
+        extra_check = WINDOWS_REALITY_CHECK
+        checks = "".join(
+            f"          if (-not (Test-Path $env:{name} -PathType Leaf)) {{ throw 'Required Rust test binary missing' }}\n"
+            for name in names
+        )
+        status = WINDOWS_STATUS_GUARD
+    else:
+        build = PORTABLE_REALITY_BUILD
+        diagnostic = PORTABLE_DIAGNOSTIC
+        environment = PORTABLE_REALITY_ENV
+        extra_check = PORTABLE_REALITY_CHECK
+        checks = "".join(f'          test -x "${name}"\n' for name in names)
+        status = ""
+    suites = "".join(f"          python ../tools/tests/{name}\n" + status for name in REALITY_TESTS)
+    return (
+        (RELEASE_BUILD, RELEASE_BUILD + build, "REALITY Release example build"),
+        (diagnostic + checks + first_test,
+         diagnostic + environment + checks + extra_check + suites + first_test,
+         "REALITY environment, required binaries and peer menus"),
+    )
+
+
+def updated_workflow(source: str) -> str:
+    """Treat build, binary identity, preflight and both peers as one atomic stage."""
+    separator = "  windows-rust:\n"
+    if source.count(separator) != 1:
+        raise ValueError("Rust CI job boundaries have drifted; review required")
+    markers = (
+        PORTABLE_REALITY_BUILD, WINDOWS_REALITY_BUILD,
+        PORTABLE_REALITY_ENV, WINDOWS_REALITY_ENV,
+        PORTABLE_REALITY_CHECK, WINDOWS_REALITY_CHECK,
+        *(f"          python ../tools/tests/{name}\n" for name in REALITY_TESTS),
+    )
+    counts = tuple(source.count(marker) for marker in markers)
+    identities = tuple(source.count(marker) for marker in
+                       ("reality-client", "SWIRL_REALITY_CLIENT", "test_reality_"))
+    present = any(counts) or any(identities)
+    if present and (counts != (1, 1, 1, 1, 1, 1, 2, 2) or identities != (4, 4, 4)):
+        raise ValueError("Rust CI REALITY stage is partial or duplicated; review required")
+    parts = source.split(separator)
+    if present:
+        for index, part in enumerate(parts):
+            for before, after, label in _reality_blocks(windows=index == 1):
+                if part.count(after) != 1:
+                    raise ValueError(f"Rust CI {label} has drifted; review required")
+                part = part.replace(after, before, 1)
+            parts[index] = part
+    # Preserve every historical guard. Only exact complete new blocks were
+    # removed; deleting a guard or changing a command is never auto-repaired.
+    source = _udp_workflow(separator.join(parts))
+    parts = source.split(separator)
+    for index, part in enumerate(parts):
+        for before, after, label in _reality_blocks(windows=index == 1):
+            part = _replace_checked(part, before, after, label)
+        parts[index] = part
+    return separator.join(parts)
+
+
 def validate_context(environment: Mapping[str, str]) -> None:
     expected = {
         "GITHUB_ACTIONS": "true",
@@ -399,7 +484,8 @@ def prepare_update(repository: Path) -> tuple[Path, str, str]:
     # workflow; writes still occur only in the existing Linux App job.
     before = path.read_text(encoding="utf-8")
     after = updated_workflow(before)
-    for name in (*ADDITIONAL_TESTS, POLICY_TEST, *DNS_PROBE_TESTS, *CONNECTIVITY_IMPORT_TESTS, SOCKS5_UDP_TEST):
+    for name in (*ADDITIONAL_TESTS, POLICY_TEST, *DNS_PROBE_TESTS, *CONNECTIVITY_IMPORT_TESTS,
+                 SOCKS5_UDP_TEST, *REALITY_TESTS):
         if not (repository / "tools/tests" / name).is_file():
             raise ValueError(f"Required CI suite is missing: {name}")
     if not (repository / PUBLIC_PROBE).is_file():
@@ -407,6 +493,9 @@ def prepare_update(repository: Path) -> tuple[Path, str, str]:
     for relative in (DIAGNOSTIC_TOOL, DIAGNOSTIC_SOURCE):
         if not (repository / relative).is_file():
             raise ValueError(f"Required native diagnostic source is missing: {relative.as_posix()}")
+    for relative in REALITY_SOURCES:
+        if not (repository / relative).is_file():
+            raise ValueError(f"Required REALITY peer source is missing: {relative.as_posix()}")
     return path, before, after
 
 
