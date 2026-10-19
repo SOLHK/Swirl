@@ -16,7 +16,10 @@ BND 地址/端口、UDP 封装、来源限制、分片以及 TCP 控制连接的
 参考 MIT 项目 [fast-socks5](https://github.com/dizda/fast-socks5/blob/master/src/client.rs)
 同时持有控制流与 connected UDP 的架构，也参考
 [PySocks](https://github.com/Anorov/PySocks/blob/master/socks.py) 的控制连接生命周期。
-未复制这两个项目的代码，没有新增代理内核、依赖包或修改 `Cargo.lock`。
+未复制这两个项目的代码，没有新增代理内核。首次实现未增加依赖；随后为
+修复 macOS 实际发现的大报文缓冲问题，`swirl-transport` 直接使用已由 Tokio
+锁定的 `socket2` 0.6.5。`Cargo.lock` 仅增加该直接引用，无新包或版本升级，
+也没有增加裸 `unsafe` 操作。
 
 RFC 1928 并不规定所有 `TLS + SOCKS5 UDP` 客户端扩展的安全语义；本阶段明确
 拒绝该组合，不能保留 TLS 标签却发送未经相应保护的 UDP。支持范围是标准
@@ -83,6 +86,7 @@ SOCKS5 的无认证和 RFC 1929 用户名/密码认证。
 | Direct/SS 最近目标 | 保留原来的最多 64 个目标及 30 秒回包窗口。 |
 | SOCKS5 最近活动 | 每个可信 relay 最近发送后 30 秒；这是关联窗口，不是逐目标验证。 |
 | 配置更新 | 已建立关联持有原不可变会话计划；新关联使用新配置。 |
+| 原生 UDP socket 缓冲 | 固定最低 65,536 字节，发送/接收均读回验证；保留已有更大系统值，不随流量增长。它不代表内核队列恰好只有一个报文。 |
 
 关闭墓碑避免同一入站关联在上游 EOF 后隐式重连。应用可以建立新的入站
 关联，新的关联会独立握手。这一限制明确有界，不是无限自动重试。
@@ -139,8 +143,45 @@ origin 的响应。断言同时检查客户端回包、peer `forwarded` 和 orig
 5. 前置规则阶段的 Windows CTest 失败及两处 JSON 往返测试类型问题，完整
    保留在 [规则事务报告](RULE_EDIT_TRANSACTION_20261019.md)。新增固定 XML
    报告输出保持原 CTest 退出码，不以日志工具掩盖失败。
+6. `8d045ab888e6ed0af6dea87adfb752793c455b5b` 的首次
+   [三平台 CI](https://github.com/SOLHK/Swirl/actions/runs/39180142737)
+   中，Windows 在工作流自检失败：只应收集三个 Rust 程序预检的测试误收了
+   后续完整应用的 EXE 存在检查，得到 `4 != 3`。修复将提取范围限定为各自
+   具名 peer step，并在每个平台先检查 Windows 和 Unix 两种脚本。三个预检、
+   缺失文件必须阻止套件开始、齐全文件允许开始的实际执行断言，以及后续
+   完整应用检查全部保留。修复后本地 25/25 通过；首次 Windows 的 Qt、
+   新 UDP peer 和完整应用步骤未执行，没有四份 Qt XML 产物。
+7. 同一次 macOS 运行的最大数据报用例，在无认证和密码认证两个子例里由
+   Python 客户端 `sendto` 抛出 `EMSGSIZE`，尚未把包发送到 Core。
+   该套件结果为 13 项、2 个子例错误、1 个 Qt 钩子跳过，不能记为通过。
+   后续修复必须核对测试对端与实际转发 socket 的容量，保留 65,507 字节
+   边界；不能通过缩小报文或跳过 macOS 消除失败。
 
-Release `swirl-api` 的本地 SHA-256 为
+针对第 7 项，已按精确版本读取 Apple 的
+[XNU UDP 默认缓冲](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/netinet/udp_usrreq.c)、
+[原子发送与 socket 选项处理](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/kern/uipc_socket.c)
+以及 [接收队列的报文/地址空间计算](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/kern/uipc_socket2.c)。
+这份公开源码的默认发送容量为 9,216 字节，原子报文超过发送高水位会返回
+`EMSGSIZE`；同一机制约束 Python 和 Core。该源码的默认接收容量已经较大，
+修复不会将它降低。公开源码机制与本次错误一致，不把它当作已经读取了
+托管运行器的全部内核参数。
+
+共享 `swirl-transport::bind_udp` 仅提高不足 65,536 的发送/接收缓冲，随后
+读取实际值；若设置失败或被限制在下限以下，显式返回错误。Core 的入站
+relay、Direct/SS 的 IPv4/IPv6 socket，以及 SOCKS5 的 connected relay
+共用它。入站成功回复移到这些 socket 初始化之后，避免初始化失败却先回复
+成功。独立 Python client、proxy relay、origin 转发和 origin 四跳自行设置
+相同固定下限，没有使用 Rust 的函数或缩减大包。
+
+本地新增的两个传输测试实际执行了小缓冲恢复后的 IPv4/IPv6 双向完整
+65,507 字节传输，以及保留较大原值；Rust 整集为 154 通过、0 失败、0 ignored，
+fmt/check/clippy 通过。独立 peer 的原边界仍要求最终完整响应恰好为 65,507
+字节；Linux 本地结果不能替代 macOS/Windows 精确提交复测。
+修复后的 Release 实际构建成功，独立 UDP 全套为 12 通过、1 个完整 Qt
+钩子跳过、0 失败，8.814 秒；当前 CLI SHA-256 为
+`e7135782c474bfc1d18118283c69632a086bef59a9e9f5a2d1511665dcb28bea`。
+
+首次实现的 Release `swirl-api` 本地 SHA-256 为
 `13d70f3debaf077673f690c6b557cde73af3bc87daa2c3a2ff5007e85a23eaa0`。
 旧 SOCKS5 TCP 认证/TLS、Direct DNS/UDP、三个 SS AEAD 算法、重放保护、
 HTTP 混淆、大传输和半关闭通过以上现有独立回归；未修改旧测试。
@@ -159,9 +200,18 @@ Windows 作业总上限从 25 分钟调整为 35 分钟，用于新增的完整�
 
 Windows 增加 Qt UDP peer，兼容构建同时执行原 DNS 保护与共享导入边界，
 然后实际编译启用原生 Rust 的完整 `Swirl` 目标。固定路径 XML 报告按白名单
-保存；用户缓存、配置和私有字体不进入产物。本文件随实现提交时，该精确
-源码的新阶段 CI 尚待执行；最终提交与运行结果须在完成后追加，不能借用
-字体或先前 Core 的绿色记录。
+保存；用户缓存、配置和私有字体不进入产物。
+
+首次实现 `8d045ab888e6ed0af6dea87adfb752793c455b5b` 的
+[Rust 运行 39180142737](https://github.com/SOLHK/Swirl/actions/runs/39180142737)
+中，Linux 成功，macOS 和 Windows 失败，原因及未执行步骤见上文。
+Linux 的 Rust 为 152 通过；14 个 Python 套件共 202 项，197 通过、5 个
+完整 Qt 钩子跳过，其中新 UDP 套件为 12 通过、1 跳过。
+[App 验证 39180142599](https://github.com/SOLHK/Swirl/actions/runs/39180142599)
+成功，实际 `CORE_TESTED_COMMIT` 与归档身份均为 `8d045ab`；但该 App 步骤
+只运行已有的六个独立 peer 文件，不包含新 UDP 整套，不能补算其验收。
+Windows 自检和跨平台缓冲修复仍须通过自己的精确提交 CI，最终结果在完成
+后追加，不能借用字体或先前 Core 的绿色记录。
 
 提供商 UDP、完整私有档案 0/18、真实目标记录 0/1558、REALITY/Vision、TUN、
 长期性能和物理网络变化仍未验收。没有把 Windows 云端构建称为用户 D 盘

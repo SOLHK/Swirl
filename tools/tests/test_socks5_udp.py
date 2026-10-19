@@ -37,6 +37,25 @@ USER = 'synthetic-socks5-user'
 PASSWORD = 'synthetic-socks5-password'
 PREFIX = b'socks5-udp-native:'
 QT_PAYLOAD = b'qt-socks5-udp'
+UDP_BUFFER_MINIMUM = 65_536
+
+
+def udp_socket(family=socket.AF_INET):
+    # Darwin's default UDP SO_SNDBUF is smaller than a legal 65,507-byte
+    # datagram. Configure every real forwarding hop independently of the Core,
+    # keeping larger OS defaults and the original wire-size acceptance limit.
+    result = socket.socket(family, socket.SOCK_DGRAM)
+    try:
+        for option in (socket.SO_SNDBUF, socket.SO_RCVBUF):
+            if result.getsockopt(socket.SOL_SOCKET, option) < UDP_BUFFER_MINIMUM:
+                result.setsockopt(socket.SOL_SOCKET, option, UDP_BUFFER_MINIMUM)
+            actual = result.getsockopt(socket.SOL_SOCKET, option)
+            if actual < UDP_BUFFER_MINIMUM:
+                raise RuntimeError(f'UDP buffer option {option} was clamped to {actual}')
+        return result
+    except BaseException:
+        result.close()
+        raise
 
 
 def exact(stream, length):
@@ -104,7 +123,7 @@ class UdpOrigin:
     """An actual UDP application, with no knowledge of SOCKS framing."""
 
     def __init__(self):
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.socket = udp_socket()
         self.socket.bind(('127.0.0.1', 0))
         self.socket.settimeout(0.05)
         self.address = self.socket.getsockname()
@@ -192,7 +211,7 @@ class Socks5Peer:
 
     def relay_socket(self, family):
         for _ in range(8):
-            relay = socket.socket(family, socket.SOCK_DGRAM)
+            relay = udp_socket(family)
             relay.bind(('::1' if family == socket.AF_INET6 else '127.0.0.1', 0))
             if relay.getsockname()[1] != self.port:
                 return relay
@@ -278,7 +297,7 @@ class Socks5Peer:
                 raise AssertionError('Expected UDP ASSOCIATE with unknown, zero source endpoint')
             self.requests.append(source)
             family = socket.AF_INET6 if self.bound in ('ipv6', 'domain') else socket.AF_INET
-            with self.relay_socket(family) as relay, socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as forwarding:
+            with self.relay_socket(family) as relay, udp_socket() as forwarding:
                 session.relay = relay
                 forwarding.connect(self.origin.address)
                 forwarding.settimeout(2)
@@ -447,7 +466,7 @@ class Socks5UdpIntegration(unittest.TestCase):
         self.assertTrue(self.command(op='stop', handle=self.handle)['ok'])
 
     def associate(self, known_source=False):
-        client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        client = udp_socket()
         client.bind(('127.0.0.1', 0))
         client.settimeout(3)
         control = socket.create_connection(('127.0.0.1', self.port), timeout=3)
@@ -508,7 +527,8 @@ class Socks5UdpIntegration(unittest.TestCase):
                         self.assertEqual(peer.datagrams[-1][1:], (host, origin.address[1], payload))
                 # IPv4's legal outer UDP limit minus SOCKS overhead and the
                 # independent application's response prefix, without truncation.
-                self.exchange(association, origin, b'x' * (65507 - 10 - len(PREFIX)))
+                boundary = self.exchange(association, origin, b'x' * (65507 - 10 - len(PREFIX)))
+                self.assertEqual(len(boundary), 65507)
                 self.assertEqual(peer.accepted, 1)
                 self.assertNotEqual(peer.sessions[0].relay.getsockname()[1], peer.port)
                 self.assertEqual(peer.forwarded, 10)

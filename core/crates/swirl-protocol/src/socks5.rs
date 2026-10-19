@@ -5,6 +5,7 @@ use crate::dial::{connect_tcp, within};
 use std::{io, net::SocketAddr, time::Duration};
 use swirl_dns::Resolver;
 use swirl_subscription::{Credentials, Outbound};
+use swirl_transport::bind_udp;
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
     net::{TcpStream, UdpSocket},
@@ -160,10 +161,10 @@ impl UdpAssociation {
             return Err("Socks5UdpRelayAddress");
         }
         let socket = within(deadline, "UpstreamProtocolTimeout", async {
-            let socket = UdpSocket::bind(if address.is_ipv4() {
-                "0.0.0.0:0"
+            let socket = bind_udp(if address.is_ipv4() {
+                SocketAddr::from(([0, 0, 0, 0], 0))
             } else {
-                "[::]:0"
+                SocketAddr::from(([0u16; 8], 0))
             })
             .await
             .map_err(|_| "Socks5UdpBind")?;

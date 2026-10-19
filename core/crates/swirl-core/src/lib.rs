@@ -16,7 +16,7 @@ use std::{
 use swirl_dns::Resolver;
 use swirl_protocol::{Inbound, Result, Target};
 use swirl_subscription::{Config, Outbound, PolicyStrategy};
-use swirl_transport::Counters;
+use swirl_transport::{Counters, bind_udp};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream, UdpSocket},
@@ -593,9 +593,15 @@ async fn udp_associate(
     if !requested_ip.is_unspecified() && requested_ip != peer.ip() {
         return Err("UdpClientAddress");
     }
-    let relay = UdpSocket::bind(SocketAddr::new(peer.ip(), 0))
+    let relay = bind_udp(SocketAddr::new(peer.ip(), 0))
         .await
         .map_err(|_| "UdpBind")?;
+    let v4 = bind_udp(SocketAddr::from(([0, 0, 0, 0], 0)))
+        .await
+        .map_err(|_| "UdpBind")?;
+    let v6 = bind_udp(SocketAddr::from(([0u16; 8], 0)))
+        .await
+        .map_err(|_| "UdpBindV6")?;
     let local = relay.local_addr().map_err(|_| "UdpBind")?;
     let mut response = vec![5, 0, 0];
     Target {
@@ -604,8 +610,6 @@ async fn udp_associate(
     }
     .encode(&mut response)?;
     control.write_all(&response).await.map_err(|_| "UdpReply")?;
-    let v4 = UdpSocket::bind("0.0.0.0:0").await.map_err(|_| "UdpBind")?;
-    let v6 = UdpSocket::bind("[::]:0").await.map_err(|_| "UdpBindV6")?;
     let mut client = if request.target.port == 0 {
         None
     } else {

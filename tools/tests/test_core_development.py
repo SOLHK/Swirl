@@ -426,16 +426,29 @@ class CoreDevelopmentTests(unittest.TestCase):
                 development.updated_workflow(source)
 
     def test_missing_binary_preflight_stops_before_a_suite_can_skip(self):
+        updated = development.updated_workflow(FIXTURE)
+        scripts = {}
+        for windows, step_name, prefix, sentinel in (
+            (False, "Independent portable protocol peers", "          test -x ",
+             "printf 'SUITE_STARTED'"),
+            (True, "Independent TLS and protocol peers", "          if (-not (Test-Path",
+             "Write-Output 'SUITE_STARTED'"),
+        ):
+            with self.subTest(preflight=step_name):
+                # Check both menus on every platform. Later build steps also
+                # check artifacts, but those files do not exist at preflight.
+                marker = f"      - name: {step_name}\n"
+                self.assertEqual(updated.count(marker), 1)
+                source = updated.split(marker, 1)[1].split("      - ", 1)[0]
+                guards = [line.strip() for line in source.splitlines()
+                          if line.startswith(prefix)]
+                self.assertEqual(len(guards), 3)
+                scripts[windows] = "\n".join([*guards, sentinel])
         windows = os.name == "nt"
         shell = shutil.which("pwsh" if windows else "bash")
         if shell is None:
             self.skipTest("The platform's GitHub Actions shell is unavailable")
-        source = development.updated_workflow(FIXTURE).split("  windows-rust:\n")[int(windows)]
-        prefix = "          if (-not (Test-Path" if windows else "          test -x "
-        guards = [line.strip() for line in source.splitlines() if line.startswith(prefix)]
-        self.assertEqual(len(guards), 3)
-        sentinel = "Write-Output 'SUITE_STARTED'" if windows else "printf 'SUITE_STARTED'"
-        script = "\n".join([*guards, sentinel])
+        script = scripts[windows]
         command = ([shell, "-NoProfile", "-NonInteractive", "-Command", script] if windows
                    else [shell, "-e", "-c", script])
         with tempfile.TemporaryDirectory() as temporary:

@@ -5,6 +5,7 @@ edition.workspace = true
 publish.workspace = true
 [dependencies]
 tokio.workspace = true
+socket2.workspace = true
 tokio-rustls.workspace = true
 webpki-roots.workspace = true
 swirl-subscription.workspace = true
