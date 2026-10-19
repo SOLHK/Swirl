@@ -84,6 +84,7 @@ jobs:
         with:
           python-version: '3.14'
       - name: Independent TLS and protocol peers
+        id: independent_windows_peers
         shell: pwsh
         run: |
           python -m pip install cryptography==50.0.2
@@ -127,6 +128,20 @@ jobs:
           python ../tools/tests/test_subscription_capture.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python ../tools/tests/test_codex_management.py
+      - name: Diagnose hosted Windows port allocation after a peer failure
+        if: failure() && steps.independent_windows_peers.conclusion == 'failure'
+        shell: pwsh
+        run: |
+          # Read only: retain the failed test's outcome and host reservation facts.
+          # TCP and UDP have separate dynamic/excluded port ranges on Windows.
+          netsh interface ipv4 show dynamicport tcp
+          netsh interface ipv4 show dynamicport udp
+          netsh interface ipv4 show excludedportrange protocol=tcp
+          netsh interface ipv4 show excludedportrange protocol=udp
+          netsh interface ipv6 show dynamicport tcp
+          netsh interface ipv6 show dynamicport udp
+          netsh interface ipv6 show excludedportrange protocol=tcp
+          netsh interface ipv6 show excludedportrange protocol=udp
       - uses: actions/upload-artifact@v4
         with:
           name: Swirl-Rust-Core-Windows

@@ -61,25 +61,28 @@ class DnsPeer:
                     pass
 
         host='::1' if ipv6 else '127.0.0.1'
-        # A free UDP port can already be occupied by TCP. Hold both sockets
-        # before starting either server, and release a failed partial pair.
+        # Windows selects ephemeral ports independently for each protocol.
+        # Choose through TCP first so a UDP-only allocation cannot choose a
+        # TCP-excluded port. UDP may still collide; hold both sockets before
+        # starting either server and release every failed partial pair.
         for attempt in range(8):
-            selected_udp_port = False
+            protocol, address = 'TCP', (host, 0)
             try:
                 with ExitStack() as cleanup:
-                    self.udp = cleanup.enter_context(UDP((host, 0), UDPHandler))
-                    self.port = self.udp.server_address[1]
-                    selected_udp_port = True
-                    self.tcp = cleanup.enter_context(TCP((host, self.port), TCPHandler))
+                    tcp = cleanup.enter_context(TCP(address, TCPHandler))
+                    protocol, address = 'UDP', (host, tcp.server_address[1])
+                    udp = cleanup.enter_context(UDP(address, UDPHandler))
                     cleanup.pop_all()
+                self.tcp, self.udp, self.port = tcp, udp, address[1]
                 break
             except OSError as error:
-                # On Windows, a UDP-assigned port may be TCP-excluded or held
-                # exclusively: binding the TCP half then returns WSAEACCES.
-                # Retry only this selected-port case, never generic EACCES or
-                # denial of the initial ephemeral UDP allocation.
-                reserved_tcp_port = selected_udp_port and getattr(error, 'winerror', None) == 10013
-                if (error.errno != errno.EADDRINUSE and not reserved_tcp_port) or attempt == 7:
+                # WSAEACCES (10013) can mean a genuine access denial, not just
+                # a reservation. Preserve it on either endpoint, together
+                # with all other non-collision errors and the final collision.
+                collision = error.errno == errno.EADDRINUSE or getattr(error, 'winerror', None) == 10048
+                if not collision or attempt == 7:
+                    error.add_note(f'DNS fixture {protocol} bind on loopback {address!r}; '
+                                   f'pair attempt {attempt + 1}/8')
                     raise
         for server in (self.udp, self.tcp):
             threading.Thread(target=server.serve_forever, daemon=True).start()

@@ -3,8 +3,10 @@
 Every tunnel terminates at a fixture port. No provider, public resolver, system
 proxy, private configuration or complete third-party proxy core is involved.
 """
+from contextlib import ExitStack
 import base64
 import copy
+import errno
 import json
 import os
 import select
@@ -16,6 +18,7 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest import mock
 
 from test_rust_core import certificates, exact, header, target
 from test_shadowsocks import PASSWORD, Reader as SsReader, Writer as SsWriter, cipher_key
@@ -316,19 +319,25 @@ class SsPolicyPeer:
                 packet = salt + cipher_key(owner.method, salt).encrypt(bytes(12), plain[:7] + response, None)
                 stream.sendto(packet, self.client_address)
 
-        # TCP and UDP intentionally share the advertised SS port. Retry only a
-        # fixture allocation collision before any server starts accepting work.
-        for _ in range(8):
-            tcp = FixtureServer(('127.0.0.1', 0), TcpHandler)
+        # Select through TCP first, as in DnsPeer: the two protocol allocators
+        # need not have the same available ports. Hold both sockets before any
+        # serving thread starts and release every failed partial pair.
+        for attempt in range(8):
+            protocol, address = 'TCP', ('127.0.0.1', 0)
             try:
-                udp = PolicyDatagramServer(tcp.server_address, UdpHandler)
-            except OSError:
-                tcp.server_close()
-                continue
-            self.tcp, self.udp = tcp, udp
-            break
-        else:
-            raise RuntimeError('cannot allocate a local TCP/UDP fixture pair')
+                with ExitStack() as cleanup:
+                    tcp = cleanup.enter_context(FixtureServer(address, TcpHandler))
+                    protocol, address = 'UDP', tcp.server_address
+                    udp = cleanup.enter_context(PolicyDatagramServer(address, UdpHandler))
+                    cleanup.pop_all()
+                self.tcp, self.udp = tcp, udp
+                break
+            except OSError as error:
+                collision = error.errno == errno.EADDRINUSE or getattr(error, 'winerror', None) == 10048
+                if not collision or attempt == 7:
+                    error.add_note(f'SS policy fixture {protocol} bind on loopback {address!r}; '
+                                   f'pair attempt {attempt + 1}/8')
+                    raise
         self.port = self.tcp.server_address[1]
         self.threads = []
         for server in (self.tcp, self.udp):
@@ -349,6 +358,110 @@ class SsPolicyPeer:
         for thread in self.threads:
             thread.join(2)
         assert not self.errors, self.errors
+
+
+class SsPolicyPeerAllocationTests(unittest.TestCase):
+    def test_pair_retries_only_collisions_and_releases_failed_sockets(self):
+        original = socketserver.TCPServer.server_bind
+        for failing_kind in (socket.SOCK_STREAM, socket.SOCK_DGRAM):
+            for windows in (False, True):
+                for fail_count in (1, 7):
+                    with self.subTest(failing_kind=failing_kind, windows=windows, fail_count=fail_count):
+                        created, requested, rejected = [], [], []
+                        failure = OSError(errno.EINVAL if windows else errno.EADDRINUSE,
+                                          'controlled bind collision')
+                        if windows:
+                            failure.winerror = 10048
+
+                        def bind(server):
+                            created.append(server)
+                            requested.append((server.socket_type, server.server_address[1]))
+                            if server.socket_type == failing_kind and len(rejected) < fail_count:
+                                rejected.append(server)
+                                raise failure
+                            original(server)
+
+                        with mock.patch.object(socketserver.TCPServer, 'server_bind', bind):
+                            peer = SsPolicyPeer('aes-128-gcm', 443, (53,))
+                        try:
+                            self.assertEqual(len(rejected), fail_count)
+                            self.assertEqual(requested[-2:], [(socket.SOCK_STREAM, 0),
+                                                             (socket.SOCK_DGRAM, peer.port)])
+                            self.assertEqual(peer.tcp.server_address, peer.udp.server_address)
+                            self.assertTrue(all(server.socket.fileno() == -1 for server in created[:-2]))
+                            for server in (peer.tcp, peer.udp):
+                                self.assertFalse(server.allow_reuse_address)
+                                self.assertFalse(server.allow_reuse_port)
+                        finally:
+                            peer.close()
+                        self.assertTrue(all(server.socket.fileno() == -1 for server in created))
+
+    def test_pair_allocation_stops_after_eight_collisions_with_original_error(self):
+        original = socketserver.TCPServer.server_bind
+        for failing_kind in (socket.SOCK_STREAM, socket.SOCK_DGRAM):
+            for windows in (False, True):
+                with self.subTest(failing_kind=failing_kind, windows=windows):
+                    created, rejected = [], []
+
+                    def bind(server):
+                        created.append(server)
+                        if server.socket_type == failing_kind:
+                            failure = OSError(errno.EINVAL if windows else errno.EADDRINUSE,
+                                              f'controlled collision {len(rejected) + 1}')
+                            if windows:
+                                failure.winerror = 10048
+                            rejected.append(failure)
+                            raise failure
+                        original(server)
+
+                    with mock.patch.object(socketserver.TCPServer, 'server_bind', bind), \
+                            mock.patch('threading.Thread') as thread:
+                        with self.assertRaises(OSError) as caught:
+                            SsPolicyPeer('aes-128-gcm', 443, (53,))
+                        thread.assert_not_called()
+                    self.assertIs(caught.exception, rejected[-1])
+                    self.assertEqual(len(rejected), 8)
+                    self.assertIn('pair attempt 8/8', caught.exception.__notes__[-1])
+                    self.assertEqual(sum(server.socket_type == socket.SOCK_STREAM for server in created), 8)
+                    self.assertTrue(all(server.socket.fileno() == -1 for server in created))
+
+    def test_pair_allocation_preserves_denials_and_cleans_up_non_socket_errors(self):
+        original = socketserver.TCPServer.server_bind
+        for failing_kind in (socket.SOCK_STREAM, socket.SOCK_DGRAM):
+            access_denial = PermissionError(errno.EACCES, 'synthetic socket access denial')
+            access_denial.winerror = 10013
+            for failure in (access_denial, PermissionError(errno.EACCES, 'controlled bind denial'),
+                            OSError(errno.ENOBUFS, 'controlled resource failure'),
+                            RuntimeError('controlled non-socket failure')):
+                with self.subTest(failing_kind=failing_kind, failure=type(failure).__name__):
+                    created, rejected = [], []
+
+                    def bind(server):
+                        created.append(server)
+                        if server.socket_type == failing_kind:
+                            rejected.append(server.server_address)
+                            raise failure
+                        original(server)
+
+                    try:
+                        with mock.patch.object(socketserver.TCPServer, 'server_bind', bind), \
+                                mock.patch('threading.Thread') as thread:
+                            with self.assertRaises(type(failure)) as caught:
+                                SsPolicyPeer('aes-128-gcm', 443, (53,))
+                            thread.assert_not_called()
+                        self.assertIs(caught.exception, failure)
+                        self.assertEqual(len(rejected), 1)
+                        self.assertEqual(len(created), 1 if failing_kind == socket.SOCK_STREAM else 2)
+                        self.assertEqual(rejected[0][1] == 0, failing_kind == socket.SOCK_STREAM)
+                        if isinstance(failure, OSError):
+                            protocol = 'TCP' if failing_kind == socket.SOCK_STREAM else 'UDP'
+                            self.assertEqual(failure.__notes__,
+                                             [f'SS policy fixture {protocol} bind on loopback {rejected[0]!r}; '
+                                              'pair attempt 1/8'])
+                        self.assertTrue(all(server.socket.fileno() == -1 for server in created))
+                    finally:
+                        for server in created:
+                            server.server_close()
 
 
 @unittest.skipUnless(os.environ.get('SWIRL_RUST_HARNESS'), 'set SWIRL_RUST_HARNESS')

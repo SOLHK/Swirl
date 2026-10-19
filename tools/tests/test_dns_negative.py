@@ -25,82 +25,143 @@ from test_rust_core import Reference, Handler, certificates, exact, header
 
 
 class DnsPeerAllocationTests(unittest.TestCase):
-    def test_windows_reserved_tcp_port_retry_is_bounded_and_does_not_mask_udp_denial(self):
+    def assert_pair_forwards(self, peer):
+        # A maximum-length DNS name still crosses both actual socket types.
+        host = '.'.join(('a' * 63, 'b' * 63, 'c' * 63, 'd' * 61))
+        question = name(host) + struct.pack('!HH', 1, 1)
+        query = b'\x12\x34\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00' + question
+        answer = (b'\x12\x34\x81\x80\x00\x01\x00\x01\x00\x00\x00\x00' + question
+                  + b'\xc0\x0c' + struct.pack('!HHIH', 1, 1, 30, 4) + b'\x7f\x00\x00\x01')
+        with socket.socket(peer.udp.address_family, socket.SOCK_DGRAM) as stream:
+            stream.settimeout(3)
+            stream.connect(peer.udp.server_address)
+            stream.send(query)
+            self.assertEqual(stream.recv(4096), answer)
+        with socket.create_connection((peer.tcp.server_address[0], peer.port), timeout=3) as stream:
+            frame = struct.pack('!H', len(query)) + query
+            for at in range(0, len(frame), 3):
+                stream.sendall(frame[at:at + 3])
+            size = struct.unpack('!H', exact(stream, 2))[0]
+            self.assertEqual(exact(stream, size), answer)
+        self.assertEqual(peer.queries, [(host, 1, False), (host, 1, True)])
+
+    def test_tcp_selects_port_before_udp_and_forwards_both_families(self):
         original = socketserver.TCPServer.server_bind
-        for failing_kind, fail_count in ((socket.SOCK_STREAM, 1),
-                                         (socket.SOCK_STREAM, 8),
-                                         (socket.SOCK_DGRAM, 1)):
-            with self.subTest(failing_kind=failing_kind, fail_count=fail_count):
-                created, rejected = [], []
-                failure = PermissionError(errno.EACCES, 'synthetic reserved port')
-                failure.winerror = 10013
+        for ipv6 in (False, True):
+            with self.subTest(ipv6=ipv6):
+                created, requested = [], []
 
                 def bind(server):
                     created.append(server)
-                    if server.socket_type == failing_kind and len(rejected) < fail_count:
-                        rejected.append(server)
+                    requested.append((server.socket_type, server.server_address[1]))
+                    # Model a UDP allocator consistently choosing a port which
+                    # TCP cannot use; increasing retry count cannot fix this.
+                    if server.socket_type == socket.SOCK_STREAM and server.server_address[1] != 0:
+                        failure = PermissionError(errno.EACCES, 'synthetic TCP reservation')
+                        failure.winerror = 10013
                         raise failure
                     original(server)
 
                 with mock.patch.object(socketserver.TCPServer, 'server_bind', bind):
-                    if failing_kind == socket.SOCK_STREAM and fail_count == 1:
-                        peer = DnsPeer()
-                        try:
-                            self.assertEqual(peer.udp.server_address[1], peer.tcp.server_address[1])
-                            self.assertFalse(peer.tcp.allow_reuse_address)
-                            self.assertTrue(all(server.socket.fileno() == -1 for server in created[:-2]))
-                        finally:
-                            peer.close()
-                    else:
-                        with self.assertRaises(PermissionError) as caught:
-                            DnsPeer()
-                        self.assertIs(caught.exception, failure)
-                self.assertEqual(len(rejected), fail_count)
+                    peer = DnsPeer(ipv6=ipv6)
+                try:
+                    self.assertEqual(requested, [(socket.SOCK_STREAM, 0), (socket.SOCK_DGRAM, peer.port)])
+                    self.assertEqual(peer.udp.server_address[1], peer.tcp.server_address[1])
+                    self.assert_pair_forwards(peer)
+                finally:
+                    peer.close()
+                self.assertTrue(all(server.socket.fileno() == -1 for server in created))
+
+    def test_windows_access_denial_is_not_retried_on_either_endpoint(self):
+        original = socketserver.TCPServer.server_bind
+        for failing_kind in (socket.SOCK_STREAM, socket.SOCK_DGRAM):
+            with self.subTest(failing_kind=failing_kind):
+                created, rejected = [], []
+                failure = PermissionError(errno.EACCES, 'synthetic socket access denial')
+                failure.winerror = 10013
+
+                def bind(server):
+                    created.append(server)
+                    if server.socket_type == failing_kind:
+                        rejected.append(server.server_address)
+                        raise failure
+                    original(server)
+
+                with mock.patch.object(socketserver.TCPServer, 'server_bind', bind), \
+                        mock.patch('dns_peer.threading.Thread') as thread:
+                    with self.assertRaises(PermissionError) as caught:
+                        DnsPeer()
+                    thread.assert_not_called()
+                self.assertIs(caught.exception, failure)
+                self.assertEqual(len(rejected), 1)
+                self.assertEqual(len(created), 1 if failing_kind == socket.SOCK_STREAM else 2)
+                self.assertEqual(rejected[0][1] == 0, failing_kind == socket.SOCK_STREAM)
+                protocol = 'TCP' if failing_kind == socket.SOCK_STREAM else 'UDP'
+                self.assertEqual(failure.__notes__,
+                                 [f'DNS fixture {protocol} bind on loopback {rejected[0]!r}; pair attempt 1/8'])
                 self.assertTrue(all(server.socket.fileno() == -1 for server in created))
 
     def test_pair_retries_collision_and_releases_failed_sockets(self):
         original = socketserver.TCPServer.server_bind
         for collision_kind in (socket.SOCK_DGRAM, socket.SOCK_STREAM):
-            with self.subTest(collision_kind=collision_kind):
-                created, rejected = [], []
+            for windows in (False, True):
+                for fail_count in (1, 7):
+                    with self.subTest(collision_kind=collision_kind, windows=windows, fail_count=fail_count):
+                        created, rejected = [], []
+                        failure = OSError(errno.EINVAL if windows else errno.EADDRINUSE,
+                                          'controlled bind collision')
+                        if windows:
+                            failure.winerror = 10048
 
-                def collide_once(server):
-                    created.append(server)
-                    if server.socket_type == collision_kind and not rejected:
-                        rejected.append(server)
-                        raise OSError(errno.EADDRINUSE, 'controlled bind collision')
-                    original(server)
+                        def collide(server):
+                            created.append(server)
+                            if server.socket_type == collision_kind and len(rejected) < fail_count:
+                                rejected.append(server)
+                                raise failure
+                            original(server)
 
-                with mock.patch.object(socketserver.TCPServer, 'server_bind', collide_once):
-                    peer = DnsPeer()
-                try:
-                    self.assertEqual(len(rejected), 1)
-                    self.assertEqual(peer.udp.server_address[1], peer.tcp.server_address[1])
-                    self.assertTrue(all(server.socket.fileno() == -1 for server in created[:-2]))
-                    for server in (peer.udp, peer.tcp):
-                        self.assertFalse(server.allow_reuse_address)
-                        self.assertFalse(server.allow_reuse_port)
-                    self.assertEqual(peer.queries, [])
-                finally:
-                    peer.close()
-                self.assertTrue(all(server.socket.fileno() == -1 for server in created))
+                        with mock.patch.object(socketserver.TCPServer, 'server_bind', collide):
+                            peer = DnsPeer()
+                        try:
+                            self.assertEqual(len(rejected), fail_count)
+                            self.assertEqual(peer.udp.server_address[1], peer.tcp.server_address[1])
+                            self.assertTrue(all(server.socket.fileno() == -1 for server in created[:-2]))
+                            for server in (peer.udp, peer.tcp):
+                                self.assertFalse(server.allow_reuse_address)
+                                self.assertFalse(server.allow_reuse_port)
+                            self.assert_pair_forwards(peer)
+                        finally:
+                            peer.close()
+                        self.assertTrue(all(server.socket.fileno() == -1 for server in created))
 
     def test_pair_allocation_stops_after_bounded_collisions(self):
         original = socketserver.TCPServer.server_bind
-        created = []
+        for failing_kind in (socket.SOCK_STREAM, socket.SOCK_DGRAM):
+            for windows in (False, True):
+                with self.subTest(failing_kind=failing_kind, windows=windows):
+                    created, rejected = [], []
 
-        def always_collide(server):
-            created.append(server)
-            if server.socket_type == socket.SOCK_STREAM:
-                raise OSError(errno.EADDRINUSE, 'controlled bind collision')
-            original(server)
+                    def always_collide(server):
+                        created.append(server)
+                        if server.socket_type == failing_kind:
+                            failure = OSError(errno.EINVAL if windows else errno.EADDRINUSE,
+                                              f'controlled collision {len(rejected) + 1}')
+                            if windows:
+                                failure.winerror = 10048
+                            rejected.append(failure)
+                            raise failure
+                        original(server)
 
-        with mock.patch.object(socketserver.TCPServer, 'server_bind', always_collide):
-            with self.assertRaises(OSError) as caught:
-                DnsPeer()
-        self.assertEqual(caught.exception.errno, errno.EADDRINUSE)
-        self.assertEqual(sum(server.socket_type == socket.SOCK_STREAM for server in created), 8)
-        self.assertTrue(all(server.socket.fileno() == -1 for server in created))
+                    with mock.patch.object(socketserver.TCPServer, 'server_bind', always_collide), \
+                            mock.patch('dns_peer.threading.Thread') as thread:
+                        with self.assertRaises(OSError) as caught:
+                            DnsPeer()
+                        thread.assert_not_called()
+                    self.assertIs(caught.exception, rejected[-1])
+                    self.assertEqual(len(rejected), 8)
+                    self.assertIn('pair attempt 8/8', caught.exception.__notes__[-1])
+                    self.assertEqual(sum(server.socket_type == socket.SOCK_STREAM for server in created), 8)
+                    self.assertTrue(all(server.socket.fileno() == -1 for server in created))
 
     def test_pair_allocation_cleans_up_other_errors_without_retry(self):
         original = socketserver.TCPServer.server_bind
@@ -120,7 +181,7 @@ class DnsPeerAllocationTests(unittest.TestCase):
                         with self.assertRaises(type(failure)) as caught:
                             DnsPeer()
                     self.assertIs(caught.exception, failure)
-                    self.assertEqual(len(created), 1 if failing_kind == socket.SOCK_DGRAM else 2)
+                    self.assertEqual(len(created), 1 if failing_kind == socket.SOCK_STREAM else 2)
                     self.assertTrue(all(server.socket.fileno() == -1 for server in created))
 
 
