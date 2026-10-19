@@ -167,6 +167,35 @@ private slots:
         QVERIFY(!result.contains("FAKE"));
     }
 
+    void customWidthAndHiddenHeightPreserveSourceCoordinates()
+    {
+        // Raw custom WDTH coordinates are not OpenType wdth percentages.
+        // Face-specific wght defaults/ranges may differ inside one TTC.
+        for(double defaultWeight:{499.0,500.0,501.0})for(double maximumWeight:{600.0,900.0}){
+            const QVariantList metadata{axis("WDTH",1,500,1000),
+                axis("wght",100,defaultWeight,maximumWeight),axis("HGHT",1,500,1000)};
+            FontAxisPolicy::Request request;request.weight=900;
+            const auto automatic=FontAxisPolicy::resolve(metadata,request);
+            QCOMPARE(automatic.value("WDTH").toDouble(),500.0);
+            QCOMPARE(automatic.value("HGHT").toDouble(),500.0);
+            QCOMPARE(automatic.value("wght").toDouble(),maximumWeight);
+            QVERIFY(!automatic.contains("wdth"));
+            request.manual=true;
+            const auto fractional=FontAxisPolicy::resolve(metadata,request,
+                {{"WDTH",746.5},{"wght",523.25},{"HGHT",333.75}});
+            QCOMPARE(fractional.value("WDTH").toDouble(),746.5);
+            QCOMPARE(fractional.value("wght").toDouble(),523.25);
+            QCOMPARE(fractional.value("HGHT").toDouble(),333.75);
+            for(double endpoint:{1.0,1000.0}){
+                const auto exact=FontAxisPolicy::resolve(metadata,request,
+                    {{"WDTH",endpoint},{"HGHT",endpoint}});
+                QCOMPARE(exact.value("WDTH").toDouble(),endpoint);
+                QCOMPARE(exact.value("HGHT").toDouble(),endpoint);
+                QCOMPARE(exact.value("wght").toDouble(),defaultWeight);
+            }
+        }
+    }
+
     void invalidManualValuesKeepDesignerDefaults()
     {
         FontAxisPolicy::Request request;

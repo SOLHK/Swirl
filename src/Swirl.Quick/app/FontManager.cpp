@@ -1,5 +1,6 @@
 #include "FontManager.h"
 #include "FontAxisPolicy.h"
+#include "FontFileInspection.h"
 #include <QCryptographicHash>
 #include <QDir>
 #include <QFile>
@@ -16,7 +17,6 @@
 #include <QImage>
 #include <QTextDocument>
 #include <cmath>
-#include <QtEndian>
 #include "StoragePaths.h"
 
 namespace {
@@ -26,45 +26,6 @@ QString profileKey(const QString &family)
         + QString::fromLatin1(QCryptographicHash::hash(family.toUtf8(), QCryptographicHash::Sha256).toHex())
         + QLatin1Char('/');
 }
-// Validate container and fvar bounds before passing untrusted bytes to a font engine.
-// This is a structural guard, not a replacement for the engine's complete sanitizer.
-bool validSfntFile(QFile &file)
-{
-    const quint64 length=file.size();
-    auto read=[&](quint64 offset,quint64 size){
-        if(offset>length||size>length-offset||!file.seek(qint64(offset)))return QByteArray();
-        return file.read(qint64(size));
-    };
-    auto u16=[](const QByteArray &data,int at){return qFromBigEndian<quint16>(data.constData()+at);};
-    auto u32=[](const QByteArray &data,int at){return qFromBigEndian<quint32>(data.constData()+at);};
-    const auto header=read(0,12);if(header.size()!=12)return false;
-    QList<quint32> faces;
-    if(header.first(4)=="ttcf"){
-        const auto version=u32(header,4),count=u32(header,8);
-        if((version!=0x10000&&version!=0x20000)||!count||quint64(count)>((length-12)/4))return false;
-        const auto offsets=read(12,quint64(count)*4);if(quint64(offsets.size())!=quint64(count)*4)return false;
-        for(quint32 i=0;i<count;++i)faces.append(u32(offsets,int(i*4)));
-    }else faces.append(0);
-    for(const auto face:faces){
-        const auto sfnt=read(face,12);if(sfnt.size()!=12)return false;
-        const auto signature=u32(sfnt,0);
-        if(signature!=0x10000&&signature!=0x4f54544f&&signature!=0x74727565&&signature!=0x74797031)return false;
-        const auto count=u16(sfnt,4);if(!count)return false;
-        const auto directory=read(quint64(face)+12,quint64(count)*16);if(directory.size()!=count*16)return false;
-        for(int i=0;i<count;++i){
-            const quint64 offset=u32(directory,i*16+8),size=u32(directory,i*16+12);
-            if(offset>length||size>length-offset)return false;
-            if(directory.mid(i*16,4)!="fvar")continue;
-            const auto variable=read(offset,qMin(size,quint64(16)));
-            if(variable.size()!=16||u16(variable,0)!=1)return false;
-            const quint64 start=u16(variable,4),axes=u16(variable,8),axisSize=u16(variable,10),instances=u16(variable,12),instanceSize=u16(variable,14);
-            if(start<16||!axes||axisSize<20||start>size||axes*axisSize>size-start)return false;
-            if(instances&&(instanceSize<4+axes*4||instances*instanceSize>size-start-axes*axisSize))return false;
-        }
-    }
-    return file.seek(0);
-}
-
 QString canonicalFamily(const QString &family, const QStringList &available)
 {
     const QStringList regions{"SC","TC","HK","MO","JA"};
@@ -92,16 +53,26 @@ FontManager::FontManager(QObject *parent, const QString &storageDirectory) : QOb
     m_harmonyFamily=m_defaultFamily;
     m_directory=storageDirectory.isEmpty()?SwirlPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/fonts":storageDirectory;
     QDir directory(m_directory);
-    for(const auto &file:directory.entryList({"*.ttf","*.otf","*.ttc","*.otc"},QDir::Files)){
-        const int id=QFontDatabase::addApplicationFont(directory.filePath(file));
-        if(id>=0){
-            m_fontIds.append(id);
-            m_loadedPaths.insert(QFileInfo(directory.filePath(file)).absoluteFilePath(),id);
-            m_importedFamilies.append(QFontDatabase::applicationFontFamilies(id));
-        }
+    QString localSwirlFamily;
+    auto discover=[&](const QString &path){
+        const int id=loadFontFile(path);
+        if(id<0||QFileInfo(path).fileName()!=QStringLiteral("Swirl-VF.ttc"))return;
+        const auto names=QFontDatabase::applicationFontFamilies(id);
+        // Swirl's UI is Simplified Chinese. Other regional faces remain
+        // individually selectable; never collapse them to the SC family.
+        const QString preferred=QStringLiteral("Swirl VF UI Text SC");
+        if(names.contains(preferred))localSwirlFamily=preferred;
+    };
+    for(const auto &file:directory.entryList({"*.ttf","*.otf","*.ttc","*.otc"},QDir::Files))
+        discover(directory.filePath(file));
+    // Local user-supplied asset only. The repository/release does not bundle it.
+    for(const auto &relative:{"fonts/Swirl-VF.ttc","Swirl-VF.ttc"}){
+        const auto path=QDir(QCoreApplication::applicationDirPath()).filePath(relative);
+        if(QFileInfo::exists(path))discover(path);
     }
     const auto available=QFontDatabase::families();
-    // Bundled HarmonyOS is the stable UI default; manual choices are retained.
+    // A verified local Swirl VF is opt-in by file placement. Existing saved
+    // selections are retained, with bundled HarmonyOS as the normal fallback.
     QStringList preferred;
 #ifdef Q_OS_WIN
     preferred={m_harmonyFamily,QStringLiteral("Microsoft YaHei UI"),
@@ -112,6 +83,8 @@ FontManager::FontManager(QObject *parent, const QString &storageDirectory) : QOb
     preferred={m_harmonyFamily};
 #endif
     preferred.append(QFontDatabase::systemFont(QFontDatabase::GeneralFont).family());
+    if(!localSwirlFamily.isEmpty()&&verifyImportedFamily(localSwirlFamily))
+        preferred.prepend(localSwirlFamily);
     for(const auto &candidate : preferred) {
         if(!candidate.isEmpty() && available.contains(candidate,Qt::CaseInsensitive)) {
             for(const auto &name:available)
@@ -126,7 +99,8 @@ FontManager::FontManager(QObject *parent, const QString &storageDirectory) : QOb
     connect(&m_saveTimer,&QTimer::timeout,this,&FontManager::savePreview);
     migrateSettings();
     const auto requested=canonicalFamily(QSettings().value("Fonts/family",m_defaultFamily).toString(),available);
-    m_family=families().contains(requested)?requested:m_defaultFamily;
+    m_family=families().contains(requested)
+        &&(requested==m_defaultFamily||verifyImportedFamily(requested))?requested:m_defaultFamily;
     const auto profile=profileFor(m_family);
     m_automatic=profile.automatic;
     m_values=normalizedAxes(m_family,profile.values);
@@ -154,6 +128,111 @@ FontManager::~FontManager()
     disconnect(qGuiApp,nullptr,this,nullptr);
     m_databaseTimer.stop();
     for(const int id:m_fontIds)QFontDatabase::removeApplicationFont(id);
+}
+
+int FontManager::loadFontFile(const QString &path)
+{
+    const auto canonical=QFileInfo(path).canonicalFilePath();
+    if(canonical.isEmpty())return -1;
+    QFile file(canonical);
+    if(!file.open(QIODevice::ReadOnly))return -1;
+    const auto inspection=SwirlFontFile::inspect(file);
+    if(!inspection.valid()){
+        fail(inspection.hvfOnly
+            ?QStringLiteral("此文件仍使用 Apple HVGL 字形，需要完成并验证标准 OpenType 转换后才能加载。仅重命名文件无效。")
+            :QStringLiteral("字体文件校验失败：%1").arg(inspection.error));
+        return -1;
+    }
+    // Our persistent copies are named by their SHA-256. Verify that identity
+    // on restart too; do not trust a filename if a cached file was replaced.
+    const auto stem=QFileInfo(canonical).completeBaseName().toLatin1().toLower();
+    if(stem.size()==64&&QByteArray::fromHex(stem).toHex()==stem){
+        QCryptographicHash hash(QCryptographicHash::Sha256);
+        if(!hash.addData(&file)||hash.result().toHex()!=stem){
+            fail(QStringLiteral("已保存字体的 SHA-256 与文件名不符，请重新导入原始文件。"));
+            return -1;
+        }
+    }
+    if(m_loadedPaths.contains(canonical)){
+        const auto id=m_loadedPaths.value(canonical);
+        if(!QFontDatabase::applicationFontFamilies(id).isEmpty())return id;
+    }
+    const int id=QFontDatabase::addApplicationFont(canonical);
+    const auto names=QFontDatabase::applicationFontFamilies(id);
+    if(id<0||names.isEmpty()){
+        if(id>=0)QFontDatabase::removeApplicationFont(id);
+        fail(QStringLiteral("当前字体引擎无法加载此字体。"));
+        return -1;
+    }
+    m_fontIds.append(id);
+    m_loadedPaths.insert(canonical,id);
+    m_importedFamilies.append(names);
+    const auto available=QFontDatabase::families();
+    for(const auto &name:names)m_familySources.insert(canonicalFamily(name,available),canonical);
+    return id;
+}
+
+QVariantMap FontManager::sourceIdentityForFont(const QFont &font) const
+{
+    const auto available=QFontDatabase::families();
+    const auto requested=canonicalFamily(font.family(),available);
+    const QFontInfo info(font);
+    const auto matched=canonicalFamily(info.family(),available);
+    QVariantList engineAxes;
+    QHash<QString,QVariantMap> engineAxesByTag;
+    for(const auto &axis:info.variableAxes()){
+        const auto tag=QString::fromLatin1(axis.tag().toString());
+        const QVariantMap metadata{{"tag",tag},{"minimum",axis.minimumValue()},
+            {"defaultValue",axis.defaultValue()},{"maximum",axis.maximumValue()}};
+        engineAxes.append(metadata);engineAxesByTag.insert(tag,metadata);
+    }
+    QVariantMap result{{"requestedFamily",requested},{"matchedFamily",matched},
+        {"familyMatched",requested==matched},{"matchesSource",false},{"faceIndex",-1},
+        {"engineAxes",engineAxes},{"axisMetadataMatchesSource",false},
+        {"qtVersion",QString::fromLatin1(qVersion())},{"platform",QGuiApplication::platformName()},
+        {"fontEngineRequest",QString::fromUtf8(qgetenv("QT_QPA_PLATFORM"))}};
+    const auto path=m_familySources.value(requested);
+    result["registeredSource"]=!path.isEmpty();
+    if(path.isEmpty())return result;
+    QFile file(path);
+    if(!file.open(QIODevice::ReadOnly))return result;
+    const auto inspection=SwirlFontFile::inspect(file);
+    if(!inspection.valid())return result;
+    const int index=SwirlFontFile::matchingFace(QRawFont::fromFont(font),file,inspection);
+    result["faceIndex"]=index;
+    result["matchesSource"]=index>=0&&requested==matched;
+    result["sourceFaceCount"]=inspection.faces.size();
+    if(index>=0){
+        const auto &sourceAxes=inspection.faces[index].axes;
+        result["sourceAxes"]=sourceAxes;
+        bool axesMatch=!sourceAxes.isEmpty()&&sourceAxes.size()==engineAxes.size()
+            &&engineAxesByTag.size()==engineAxes.size();
+        for(const auto &entry:sourceAxes){
+            const auto source=entry.toMap();
+            const auto engine=engineAxesByTag.value(source.value("tag").toString());
+            axesMatch&=!engine.isEmpty();
+            for(const auto *key:{"minimum","defaultValue","maximum"})
+                axesMatch&=source.value(key).toFloat()==engine.value(key).toFloat();
+        }
+        // Axis discovery proves metadata acceptance only. Glyph-path tests
+        // separately check that custom axes actually affect rendered outlines.
+        result["axisMetadataMatchesSource"]=axesMatch;
+    }
+    QCryptographicHash hash(QCryptographicHash::Sha256);
+    if(file.seek(0)&&hash.addData(&file))result["sourceSha256"]=QString::fromLatin1(hash.result().toHex());
+    return result;
+}
+
+bool FontManager::verifyImportedFamily(const QString &family)
+{
+    if(!family.startsWith(QStringLiteral("Swirl VF "))||!m_familySources.contains(family))return true;
+    QFont font(family);font.setStyleName(QString());font.clearVariableAxes();
+    const auto identity=sourceIdentityForFont(font);
+    if(!identity.value("matchesSource").toBool())
+        return fail(QStringLiteral("Swirl VF 的实际字体与本地文件不一致，可能存在同名字体冲突。请选择内部名称唯一的已验证版本。"));
+    if(!identity.value("axisMetadataMatchesSource").toBool())
+        return fail(QStringLiteral("当前字体引擎未正确识别 Swirl VF 的全部可变轴及范围，尚不能启用该字体。"));
+    return true;
 }
 
 void FontManager::migrateSettings()
@@ -461,6 +540,7 @@ void FontManager::savePreview()
 
 bool FontManager::applyPreview()
 {
+    if(!verifyImportedFamily(m_previewFamily))return false;
     QSettings settings;
     settings.setValue("Fonts/family",m_previewFamily);
     settings.setValue("Fonts/axes",m_previewValues);
@@ -493,32 +573,31 @@ bool FontManager::importFont(const QUrl &url)
     if(!url.isLocalFile())return fail(QStringLiteral("请选择本地 TTF、OTF、TTC 或 OTC 字体文件。"));
     QFile input(url.toLocalFile());
     const auto suffix=QFileInfo(input).suffix().toLower();
-    constexpr qint64 maxFontBytes=128LL*1024*1024;
-    if(!QStringList{"ttf","otf","ttc","otc"}.contains(suffix)||!input.open(QIODevice::ReadOnly)||input.size()<=0||input.size()>maxFontBytes)
+    if(!QStringList{"ttf","otf","ttc","otc"}.contains(suffix)||!input.open(QIODevice::ReadOnly)||input.size()<=0||input.size()>SwirlFontFile::maximumBytes)
         return fail(QStringLiteral("无法读取字体，请选择不超过 128 MiB 的 TTF、OTF、TTC 或 OTC 文件。"));
-    if(!validSfntFile(input))return fail(tr("The font container or variation table is truncated or invalid. The active font was preserved."));
+    const auto inspection=SwirlFontFile::inspect(input);
+    if(!inspection.valid())return fail(inspection.hvfOnly
+        ?QStringLiteral("此文件仍使用 Apple HVGL 字形，需要完成并验证标准 OpenType 转换后才能加载。仅重命名文件无效。")
+        :QStringLiteral("字体文件校验失败：%1").arg(inspection.error));
     const auto stageCollection=[this](const QStringList &names){
         QStringList collection;
         const auto available=QFontDatabase::families();
         for(const auto &name:names)collection.append(canonicalFamily(name,available));
         collection.removeDuplicates();collection.sort(Qt::CaseInsensitive);
         if(collection.contains(m_previewFamily))return true; // preserve this collection's unsaved draft
-        const auto preferred=collection.contains("PingFang UI SC")?QStringLiteral("PingFang UI SC"):collection.value(0);
+        const auto preferred=collection.contains("Swirl VF UI Text SC")?QStringLiteral("Swirl VF UI Text SC")
+            :collection.contains("PingFang UI SC")?QStringLiteral("PingFang UI SC"):collection.value(0);
         return choosePreviewFamily(preferred);
     };
     QCryptographicHash hash(QCryptographicHash::Sha256);
     if(!hash.addData(&input))return fail(tr("Could not read the font file."));
     const auto path=m_directory+"/"+QString::fromLatin1(hash.result().toHex())+"."+suffix;
-    const auto absolutePath=QFileInfo(path).absoluteFilePath();
-    if(m_loadedPaths.contains(absolutePath)) {
-        const auto names=QFontDatabase::applicationFontFamilies(m_loadedPaths.value(absolutePath));
+    const auto canonicalPath=QFileInfo(path).canonicalFilePath();
+    if(m_loadedPaths.contains(canonicalPath)) {
+        const auto id=loadFontFile(path);
+        if(id<0)return false;
+        const auto names=QFontDatabase::applicationFontFamilies(id);
         if(!names.isEmpty())return stageCollection(names);
-    }
-    const int sourceId=QFontDatabase::addApplicationFont(input.fileName());
-    const auto names=QFontDatabase::applicationFontFamilies(sourceId);
-    if(sourceId<0||names.isEmpty()){
-        if(sourceId>=0)QFontDatabase::removeApplicationFont(sourceId);
-        return fail(tr("The file is not a usable font. The active font was preserved."));
     }
     const bool alreadySaved=QFile::exists(path);
     bool saved=alreadySaved;
@@ -534,18 +613,17 @@ bool FontManager::importFont(const QUrl &url)
         }
     }
     if(!saved){
-        QFontDatabase::removeApplicationFont(sourceId);
         return fail(QStringLiteral("无法保存导入的字体，当前字体未更改。"));
     }
-    const int savedId=QFontDatabase::addApplicationFont(path);
-    QFontDatabase::removeApplicationFont(sourceId);
+    // Register only the final verified copy. The previous path loaded a large
+    // TTC twice and invalidated every font cache when unloading the source ID.
+    const int savedId=loadFontFile(path);
     if(savedId<0){
         if(!alreadySaved)QFile::remove(path);
-        return fail(QStringLiteral("无法加载已保存的字体，当前字体未更改。"));
+        return false;
     }
-    m_fontIds.append(savedId);
-    m_loadedPaths.insert(absolutePath,savedId);
-    m_importedFamilies.append(names);m_axisMetadata.clear();m_resolvedAxes.clear();refreshFamilies();
+    const auto names=QFontDatabase::applicationFontFamilies(savedId);
+    m_axisMetadata.clear();m_resolvedAxes.clear();refreshFamilies();
     // Registration can change metadata without changing the selected family name.
     m_previewValues=normalizedAxes(m_previewFamily,m_previewValues);
     emit familiesChanged();emit previewAxesChanged();emit previewValuesChanged();m_saveTimer.start();

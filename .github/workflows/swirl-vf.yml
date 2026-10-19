@@ -1,0 +1,120 @@
+name: Swirl VF source and native synthetic probes
+
+on:
+  push:
+    branches: [work/core-completion-20261017]
+    paths:
+      - '.github/workflows/swirl-vf.yml'
+      - 'tools/swirl_vf/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: swirl-vf-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Dependencies and independent synthetic tests
+        run: |
+          python -m pip install fonttools==4.61.1 numpy==2.2.6
+          python -m unittest discover -s tools/swirl_vf/tests -v
+          python -m unittest discover -s tools/swirl_vf/audit -p 'test_*.py' -v
+      - name: No private font data is tracked
+        run: |
+          python - <<'PY'
+          import subprocess
+          paths=subprocess.check_output(['git','ls-files','tools/swirl_vf'],text=True).splitlines()
+          forbidden=[p for p in paths if p.lower().endswith(('.ttc','.ttf','.otf','.woff','.woff2','.jsonl'))]
+          if forbidden: raise SystemExit('Private-font publication guard: '+str(forbidden))
+          print('Only source/docs and original fixture generators are tracked.')
+          PY
+
+  apple-oracles:
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Record exact source and native SDK
+        run: |
+          mkdir -p build/swirl-vf-evidence
+          git rev-parse HEAD > build/swirl-vf-evidence/commit.txt
+          sw_vers > build/swirl-vf-evidence/macos.txt
+          xcodebuild -version > build/swirl-vf-evidence/xcode.txt
+          python -m pip install fonttools==4.61.1 numpy==2.2.6
+      - name: Compile official HVF oracle and test original synthetic geometry
+        run: |
+          xcrun clang -std=c11 -O2 -Wall -Wextra -Werror -mmacosx-version-min=15.4 tools/swirl_vf/platform/hvf_oracle.c -lhvf -o build/hvf_oracle
+          python tools/swirl_vf/platform/make_synthetic_hvf.py build/synthetic-hvf.ttf
+          python tools/swirl_vf/platform/verify_synthetic_hvf.py --binary build/hvf_oracle --fixture build/synthetic-hvf.ttf --out build/swirl-vf-evidence/hvf
+      - name: Compile CoreText extractor and verify original two-face tracking fixture
+        id: coretext
+        if: always()
+        run: |
+          python tools/swirl_vf/platform/test_coretext_extract.py --output build/swirl-vf-evidence/coretext --require-native
+      - name: Reconstruct and remeasure all synthetic faces through CoreText
+        if: ${{ always() && steps.coretext.outcome == 'success' }}
+        run: |
+          python tools/swirl_vf/platform/test_native_reconstruction.py --output build/swirl-vf-evidence/reconstruction --binary "$PWD/build/swirl-vf-evidence/coretext/coretext_extract" --require-native
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: swirl-vf-apple-synthetic-${{ github.sha }}
+          path: |
+            build/swirl-vf-evidence/**/*.json
+            build/swirl-vf-evidence/**/*.log
+            build/swirl-vf-evidence/**/*.txt
+          retention-days: 7
+
+  directwrite:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Generate original three-face three-axis variable fixture
+        run: |
+          python -m pip install fonttools==4.61.1 numpy==2.2.6
+          if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed' }
+          python tools/swirl_vf/platform/make_standard_fixture.py build/synthetic-three-axis.ttc
+          if ($LASTEXITCODE -ne 0) { throw 'Original fixture generation failed' }
+      - name: Compile and run actual DirectWrite with all synthetic glyphs
+        run: |
+          ./tools/swirl_vf/platform/run_directwrite_probe.ps1 -Font build/synthetic-three-axis.ttc -OutputDirectory build/swirl-vf-evidence/directwrite -AllGlyphs -Render
+          if ($LASTEXITCODE -ne 0) { throw 'Native DirectWrite synthetic probe failed' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: swirl-vf-windows-synthetic-${{ github.sha }}
+          path: |
+            build/swirl-vf-evidence/directwrite/*.json
+            build/swirl-vf-evidence/directwrite/*.jsonl
+            build/swirl-vf-evidence/directwrite/*.log
+            build/swirl-vf-evidence/directwrite/*.png
+          retention-days: 7

@@ -48,6 +48,8 @@ public:
     Q_INVOKABLE void discardPreview();
     Q_INVOKABLE bool selectFamily(const QString &family);
     Q_INVOKABLE bool importFont(const QUrl &file);
+    // On-demand evidence; never called by a text layout or animation binding.
+    Q_INVOKABLE QVariantMap sourceIdentityForFont(const QFont &font) const;
     Q_INVOKABLE QVariantMap variableAxesFor(const QString &family, int weight) const;
     Q_INVOKABLE QVariantMap resolvedAxes(const QString &family, int weight,
         double pixelSize, double pointSize, double logicalDpi, double dpr,
@@ -83,6 +85,8 @@ private:
     void savePreview();
     void refreshFamilies();
     void refreshFontDatabase();
+    int loadFontFile(const QString &path);
+    bool verifyImportedFamily(const QString &family);
     void migrateSettings();
     struct Profile { bool automatic = true; QVariantMap values; };
     Profile profileFor(const QString &family) const;
@@ -96,6 +100,7 @@ private:
     mutable QCache<QByteArray,QVariantMap> m_resolvedAxes{256};
     mutable QCache<QByteArray,qreal> m_textWidths{256};
     QHash<QString,int> m_loadedPaths;
+    QHash<QString,QString> m_familySources;
     QTimer m_saveTimer;
     QTimer m_databaseTimer;
     bool m_automatic = true, m_previewAutomatic = true;

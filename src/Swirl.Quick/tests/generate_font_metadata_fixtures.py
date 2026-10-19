@@ -37,7 +37,7 @@ b.save(out/'cff.otf')
 from fontTools.ttLib.tables.TupleVariation import TupleVariation
 
 
-def automation_font(filename, family, axes, width_metrics=False):
+def automation_font(filename, family, axes, width_metrics=False, hidden_axes=()):
     builder = FontBuilder(1000, isTTF=True)
     builder.setupGlyphOrder(['.notdef', 'A'])
     builder.setupCharacterMap({65: 'A'})
@@ -64,10 +64,13 @@ def automation_font(filename, family, axes, width_metrics=False):
         'copyright': 'Original Swirl test geometry; distributed under the repository license.'})
     builder.setupOS2(sTypoAscender=900, sTypoDescender=-200,
                      usWinAscent=1000, usWinDescent=200,
-                     usWeightClass=int(axes[0][2]))
+                     usWeightClass=int(next(axis[2] for axis in axes if axis[0] == 'wght')))
     builder.setupPost()
     builder.setupMaxp()
     builder.setupFvar(axes, [])
+    for axis in builder.font['fvar'].axes:
+        if axis.axisTag in hidden_axes:
+            axis.flags |= 1
 
     weight = [(-30, 0), (-20, 0), (20, 0), (30, 0), (-30, 0),
               (-25, 0), (25, 0), (30, 0), (15, 25), (-15, 25), (0, -40)]
@@ -78,6 +81,7 @@ def automation_font(filename, family, axes, width_metrics=False):
         'opsz': optical,
         'HGHT': [(0, round(y * .18)) for x, y in points],
         'wdth': [(round((x - 330) * .15), 0) for x, y in points],
+        'WDTH': [(round((x - 330) * .15), 0) for x, y in points],
         'TEST': [(round(y * .10), 0) for x, y in points],
     }
     variations = []
@@ -87,7 +91,7 @@ def automation_font(filename, family, axes, width_metrics=False):
             # Four zero deltas are the TrueType phantom points: this fixture
             # intentionally keeps advance/vertical metrics stable for every axis.
             coordinates = [(sign * dx, sign * dy) for dx, dy in deltas[tag]] + [(0, 0)] * 4
-            if width_metrics and tag == 'wdth':
+            if width_metrics and tag in ('wdth', 'WDTH'):
                 coordinates[-3] = (sign * 200, 0)  # actual horizontal advance variation
             variations.append(TupleVariation({tag: region}, coordinates))
     gvar = newTable('gvar')
@@ -118,3 +122,52 @@ from fontTools.ttLib import TTFont, TTCollection
 collection = TTCollection()
 collection.fonts = [TTFont(out / 'automation-width.ttf')]
 collection.save(out / 'automation-width.otc')
+
+# Original test geometry in raw custom-axis coordinates. This is not PingFang
+# and does not establish the accuracy or readiness of a converted Apple font.
+for filename, family, default, maximum in [
+    ('custom-width-sc.ttf', 'Swirl VF UI Text SC', 501, 900),
+    ('custom-width-tc.ttf', 'Swirl VF UI Text TC', 499, 900),
+    ('custom-width-watch.ttf', 'Swirl VF Watch UI Text SC', 500, 600),
+]:
+    automation_font(filename, family, [
+        ('WDTH', 1, 500, 1000, 'Original test width'),
+        ('wght', 100, default, maximum, 'Weight'),
+        ('HGHT', 1, 500, 1000, 'Original test height'),
+    ], width_metrics=True, hidden_axes=('WDTH', 'HGHT'))
+collection = TTCollection()
+collection.fonts = [TTFont(out / filename) for filename in (
+    'custom-width-sc.ttf', 'custom-width-tc.ttf', 'custom-width-watch.ttf')]
+collection.save(out / 'swirl-vf-probe.ttc')
+
+# Reject unsupported outlines and malformed variation metadata before loading.
+# These tables contain only synthetic data generated above, never Apple bytes.
+from fontTools.ttLib.tables.DefaultTable import DefaultTable
+import struct
+font = TTFont(out / 'custom-width-sc.ttf')
+for tag in ('glyf', 'loca', 'gvar'):
+    del font[tag]
+font['HVGL'] = DefaultTable('HVGL')
+font['HVGL'].data = bytes(16)
+font.save(out / 'hvgl-only.ttf')
+
+for filename, entries in [
+    ('avar-empty.ttf', []),
+    ('avar-duplicate.ttf', [(-16384, -16384), (0, 0), (0, 0), (16384, 16384)]),
+    ('avar-unanchored.ttf', [(-16384, -16384), (0, 1), (16384, 16384)]),
+    ('avar-nonmonotonic.ttf', [(-16384, -16384), (-8192, 8192), (0, 0), (16384, 16384)]),
+]:
+    font = TTFont(out / 'custom-width-sc.ttf')
+    font['avar'] = DefaultTable('avar')
+    segment = struct.pack('>H', len(entries)) + b''.join(struct.pack('>hh', *entry) for entry in entries)
+    font['avar'].data = struct.pack('>IHH', 0x10000, 0, 3) + segment * 3
+    font.save(out / filename)
+
+font = TTFont(out / 'custom-width-sc.ttf')
+del font['fvar']
+del font['gvar']
+font.save(out / 'custom-width-static-impostor.ttf')
+font = TTFont(out / 'custom-width-sc.ttf')
+font['glyf']['A'].coordinates[0] = (140, 0)
+font.save(out / 'custom-width-outline-impostor.ttf')
+print('Generated original custom-axis TTC, HVGL guard and malformed avar fixtures')

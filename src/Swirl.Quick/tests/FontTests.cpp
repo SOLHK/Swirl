@@ -143,6 +143,11 @@ private slots:
     void previewRepeatedAxesReuseResources();
     void automaticWidthUsesRealAdvances();
     void optionalPhysicalFontIdentity();
+    void fontInspectionRejectsUnsupportedAndInvalidVariations();
+    void startupRejectsUnsupportedFontAndCorruptCache();
+    void localSwirlCollectionUsesPhysicalFaces();
+    void customAxesChangeRealGlyphsAtMixedCoordinates();
+    void physicalIdentityRejectsMissingAndChangedOutlineTables();
     void nativeGlyphsHaveNoColourFringes(){
         if(QGuiApplication::platformName()!=QStringLiteral("windows"))QSKIP("Requires the native Windows platform");
         QTemporaryDir directory;
@@ -500,6 +505,7 @@ void FontTests::optionalCffImport()
 #include "FontPreviewInvalidationChecks.h"
 #include "FontWidthChecks.h"
 #include "FontSourceChecks.h"
+#include "FontSwirlVfChecks.h"
 
 int main(int argc,char **argv){
     configureSwirlFontRendering();

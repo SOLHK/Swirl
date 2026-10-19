@@ -42,6 +42,10 @@ inline QJsonObject identity(const QRawFont &font,const QJsonArray &expected,bool
     }
     int index=-1;
     for(const auto &entry:expected){const auto face=entry.toObject();const auto wanted=face["tables"].toObject();bool same=true;
+        for(auto it=wanted.begin();it!=wanted.end();++it){
+            if(!full&&it.key()==QStringLiteral("gvar"))continue;
+            if(tables[it.key()]!=it.value())same=false;
+        }
         for(auto it=tables.begin();it!=tables.end();++it)if(wanted[it.key()]!=it.value())same=false;
         if(same&&tables.contains("name")&&tables.contains("cmap")){index=face["index"].toInt();break;}}
     return {{"family",font.familyName()},{"faceIndex",index},{"matchesSource",index>=0},{"tables",tables}};
