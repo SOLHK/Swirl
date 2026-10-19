@@ -16,10 +16,12 @@ import ssl
 import subprocess
 import tempfile
 import threading
+from threading import Thread as PairThread
 import time
 import unittest
 from unittest import mock
 
+from loopback_ports import pair_port
 from test_rust_core import certificates, exact, header, target
 from test_shadowsocks import PASSWORD, Reader as SsReader, Writer as SsWriter, cipher_key
 
@@ -319,11 +321,11 @@ class SsPolicyPeer:
                 packet = salt + cipher_key(owner.method, salt).encrypt(bytes(12), plain[:7] + response, None)
                 stream.sendto(packet, self.client_address)
 
-        # Select through TCP first, as in DnsPeer: the two protocol allocators
-        # need not have the same available ports. Hold both sockets before any
-        # serving thread starts and release every failed partial pair.
+        # Use the same two-protocol reservation-aware candidates as DnsPeer.
+        # Hold both sockets before any serving thread starts and release every
+        # failed partial pair. No access-denial error is retried.
         for attempt in range(8):
-            protocol, address = 'TCP', ('127.0.0.1', 0)
+            protocol, address = 'TCP', ('127.0.0.1', pair_port())
             try:
                 with ExitStack() as cleanup:
                     tcp = cleanup.enter_context(FixtureServer(address, TcpHandler))
@@ -342,7 +344,7 @@ class SsPolicyPeer:
         self.threads = []
         for server in (self.tcp, self.udp):
             server.errors = self.errors
-            thread = threading.Thread(target=server.serve_forever,
+            thread = PairThread(target=server.serve_forever,
                                       kwargs={'poll_interval': 0.02}, daemon=True)
             thread.start()
             self.threads.append(thread)
@@ -385,7 +387,8 @@ class SsPolicyPeerAllocationTests(unittest.TestCase):
                             peer = SsPolicyPeer('aes-128-gcm', 443, (53,))
                         try:
                             self.assertEqual(len(rejected), fail_count)
-                            self.assertEqual(requested[-2:], [(socket.SOCK_STREAM, 0),
+                            selected = peer.port if os.name == 'nt' else 0
+                            self.assertEqual(requested[-2:], [(socket.SOCK_STREAM, selected),
                                                              (socket.SOCK_DGRAM, peer.port)])
                             self.assertEqual(peer.tcp.server_address, peer.udp.server_address)
                             self.assertTrue(all(server.socket.fileno() == -1 for server in created[:-2]))
@@ -415,7 +418,7 @@ class SsPolicyPeerAllocationTests(unittest.TestCase):
                         original(server)
 
                     with mock.patch.object(socketserver.TCPServer, 'server_bind', bind), \
-                            mock.patch('threading.Thread') as thread:
+                            mock.patch(__name__ + '.PairThread') as thread:
                         with self.assertRaises(OSError) as caught:
                             SsPolicyPeer('aes-128-gcm', 443, (53,))
                         thread.assert_not_called()
@@ -445,14 +448,15 @@ class SsPolicyPeerAllocationTests(unittest.TestCase):
 
                     try:
                         with mock.patch.object(socketserver.TCPServer, 'server_bind', bind), \
-                                mock.patch('threading.Thread') as thread:
+                                mock.patch(__name__ + '.PairThread') as thread:
                             with self.assertRaises(type(failure)) as caught:
                                 SsPolicyPeer('aes-128-gcm', 443, (53,))
                             thread.assert_not_called()
                         self.assertIs(caught.exception, failure)
                         self.assertEqual(len(rejected), 1)
                         self.assertEqual(len(created), 1 if failing_kind == socket.SOCK_STREAM else 2)
-                        self.assertEqual(rejected[0][1] == 0, failing_kind == socket.SOCK_STREAM)
+                        self.assertEqual(rejected[0][1] == 0,
+                                         os.name != 'nt' and failing_kind == socket.SOCK_STREAM)
                         if isinstance(failure, OSError):
                             protocol = 'TCP' if failing_kind == socket.SOCK_STREAM else 'UDP'
                             self.assertEqual(failure.__notes__,

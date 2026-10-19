@@ -1,4 +1,84 @@
-# Current handoff: REALITY foundation and strict subscription import (2026-10-19)
+# Current handoff: REALITY R3 and Vision record-boundary correction (2026-10-19)
+
+Read [the current Core handoff](CORE_REALITY_VISION_HANDOFF_20261019.md),
+[REALITY R3](REALITY_XRAY_INTEROP_20261019.md) and
+[Vision async inspection](VISION_ASYNC_INSPECTION_20261019.md) first. Older
+checkpoints retain their original source, failures and limits.
+
+Only `work/core-completion-20261017` is writable. Reread remote HEAD before
+non-forced pushes and preserve concurrent UI/font/test work. The correction
+retains font commits `aab06bf`, `501099da`, `7dfbdda` and
+`b3ac46414ed3921d18b1cf8e9a143c545c8085fb` and
+`6cba41ff43b989a240191a3731d9d8a5e29908b1` (font diagnostics and TTC
+timestamp/tests/docs). Private subscription
+updates remain disabled; no private provider requests were made.
+
+| Stage | Actual source | Exact Actions results |
+| --- | --- | --- |
+| REALITY R3 | [`5ad68bcb22a23573d462cbfd972c7120093f504a`](https://github.com/SOLHK/Swirl/commit/5ad68bcb22a23573d462cbfd972c7120093f504a) | [Rust 39239280852](https://github.com/SOLHK/Swirl/actions/runs/39239280852): Linux/macOS/Windows success, including Windows Qt/native application. [App 39239280949](https://github.com/SOLHK/Swirl/actions/runs/39239280949): success |
+| Initial Vision substage | [`f3ce257f14e59e82977d89ac4be436d08926c6b8`](https://github.com/SOLHK/Swirl/commit/f3ce257f14e59e82977d89ac4be436d08926c6b8) | [Rust 39243009089](https://github.com/SOLHK/Swirl/actions/runs/39243009089): Linux success, macOS/Windows failure; subsequent Windows Qt/native application gates did not run. [App 39243009132](https://github.com/SOLHK/Swirl/actions/runs/39243009132): success |
+| Outer-TLS record-boundary correction | [`0be68231b15c1e4f69b138cda7bae0a3930d956b`](https://github.com/SOLHK/Swirl/commit/0be68231b15c1e4f69b138cda7bae0a3930d956b) | [Rust 39246770262](https://github.com/SOLHK/Swirl/actions/runs/39246770262): Linux/macOS success; Windows failed at an older DNS UDP fixture bind before R3/Vision/Qt ran. [App 39246770049](https://github.com/SOLHK/Swirl/actions/runs/39246770049): success |
+| Windows TCP/UDP fixture port selection | `included with this commit` | Final local 94 tests passed; exact new-source CI **not yet executed** |
+
+R3 pins official Xray/REALITY, module checksums and Go 1.27.2, repeats both
+executable builds and verifies matching same-platform digests. Twelve tests
+create thirteen fresh loopback sessions for X25519/hybrid authentication, both
+Finished messages, bidirectional data, 1 MiB/short I/O, strict TLS closure,
+bad-credential isolation, timeout/cancellation and cleanup. Its controlled
+camouflage target is not arbitrary cover-site or provider acceptance. Generic
+Windows Qt has six explicit peer-hook skips; five later wrappers exercise those
+six slots separately. App is the Core validation workflow, not a full GUI test.
+
+Vision adds incremental inner-TLS inspection, bounded async framing,
+partial writes/backpressure, cancellation and upload half-close. Its unchanged
+four mature-Xray cases are three inner-TLS-1.2 positives and one TLS-1.3 Direct
+refusal. The initial macOS/Windows negative returned InvalidData before the
+required DirectRequested observation. Original [macOS](evidence/vision-r2/first-ci-macos-failure.json)
+and [Windows](evidence/vision-r2/first-ci-windows-failure.json) failures remain
+separate from [Linux](evidence/vision-r2/first-ci-linux.json) and
+[App](evidence/vision-r2/first-ci-app.json) success.
+
+The correction bounds ciphertext record reads and authenticated plaintext
+delivery before Vision handles command 2. Five deterministic real-TLS
+regressions prove the raw suffix remains unread, corrupted authentication still
+fails and bare TCP EOF remains an error. Final [local evidence](evidence/vision-r2/record-boundary-local.json)
+records 272 Rust tests plus one doctest, five Rust gates, Release example and
+four mature cases passing with unchanged assertions. The existing workflow
+guard suite has 41 cases. The correction now has exact-source
+[Linux](evidence/vision-r2/record-ci-linux.json),
+[macOS](evidence/vision-r2/record-ci-macos.json) and
+[App](evidence/vision-r2/record-ci-app.json) success. Its original
+[Windows DNS failure](evidence/vision-r2/record-ci-windows-failure.json) remains
+a failure; R3/Vision/Qt were not executed in that Windows job. The negative still requires PermissionDenied at
+server_first_probe, zero user-application upload/receipt and DirectReady=false;
+the target's 34-byte probe is counted separately.
+
+The next fixture correction, `included with this commit`, reads each Windows
+address family's TCP/UDP excluded-port tables with netsh, explicitly selects
+outside their union and retains both sockets. Other platforms keep OS-selected
+ports. Query/parse failures, exhaustion and unknown 10013 errors are not hidden;
+the existing eight-attempt collision limit remains. Six selector regressions
+were added. Final [local validation](evidence/vision-r2/port-pair-local.json)
+passed DNS 37, Shadowsocks fixture 16 and guard 41: 94 tests, no failures/skips,
+with the same four source-file hashes. Exact CI is `not yet executed`.
+
+DirectReady, raw-socket/residual-buffer handoff, eligible HRR processing,
+production async REALITY, combined VLESS/REALITY/Vision and the subscription
+IR/routing/runtime/Qt product chain remain unfinished. Unsupported requirements
+fail explicitly, without ordinary-TLS or DIRECT fallback. Providers, physical
+Windows and installers remain unaccepted. Original failed experiments and the
+absence of their full console tracebacks remain in the
+[failure archive](evidence/vision-r2/initial-failures.json).
+
+The frozen baseline stays **79 items, six accepted, 10.83%**. B13/B14 are partial,
+without acceptance credit. E17 retains R2/R1 history, E18 records R3 and E19
+separates original Vision and Windows-fixture failures from later corrections.
+Replace included with this commit / not yet executed only with the actual
+port-fixture source identity and its verified run/artifact results.
+
+---
+
+# Historical handoff: REALITY foundation and strict subscription import (2026-10-19)
 
 Development continues only on `work/core-completion-20261017`. The active user
 instruction authorizes implementation, testing, linear commits/pushes and CI

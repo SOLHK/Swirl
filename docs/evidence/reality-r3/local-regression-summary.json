@@ -1,0 +1,114 @@
+[
+  {
+    "suite": "test_reality_peer.py",
+    "tests_run": 16,
+    "skipped": 0,
+    "exit_code": 0,
+    "seconds": 0.112
+  },
+  {
+    "suite": "test_reality_tls.py",
+    "tests_run": 19,
+    "skipped": 0,
+    "exit_code": 0,
+    "seconds": 0.174
+  },
+  {
+    "suite": "test_rust_core.py",
+    "tests_run": 24,
+    "skipped": 1,
+    "exit_code": 0,
+    "seconds": 27.018
+  },
+  {
+    "suite": "test_shadowsocks.py",
+    "tests_run": 9,
+    "skipped": 1,
+    "exit_code": 0,
+    "seconds": 12.962
+  },
+  {
+    "suite": "test_dns_tls.py",
+    "tests_run": 11,
+    "skipped": 0,
+    "exit_code": 0,
+    "seconds": 10.435
+  },
+  {
+    "suite": "test_dns_https.py",
+    "tests_run": 9,
+    "skipped": 0,
+    "exit_code": 0,
+    "seconds": 8.826
+  },
+  {
+    "suite": "test_socks4.py",
+    "tests_run": 10,
+    "skipped": 1,
+    "exit_code": 0,
+    "seconds": 5.192
+  },
+  {
+    "suite": "test_websocket_transport.py",
+    "tests_run": 11,
+    "skipped": 1,
+    "exit_code": 0,
+    "seconds": 9.837
+  },
+  {
+    "suite": "test_core_development.py",
+    "tests_run": 37,
+    "skipped": 0,
+    "exit_code": 0,
+    "seconds": 0.212
+  },
+  {
+    "suite": "test_policy_groups.py",
+    "tests_run": 16,
+    "skipped": 0,
+    "exit_code": 0,
+    "seconds": 5.643
+  },
+  {
+    "suite": "test_dns_negative.py",
+    "tests_run": 31,
+    "skipped": 0,
+    "exit_code": 0,
+    "seconds": 81.703
+  },
+  {
+    "suite": "test_native_probe.py",
+    "tests_run": 7,
+    "skipped": 0,
+    "exit_code": 0,
+    "seconds": 0.081
+  },
+  {
+    "suite": "test_connection_stages.py",
+    "tests_run": 8,
+    "skipped": 0,
+    "exit_code": 0,
+    "seconds": 9.137
+  },
+  {
+    "suite": "test_connectivity_diagnostics.py",
+    "tests_run": 21,
+    "skipped": 0,
+    "exit_code": 0,
+    "seconds": 5.24
+  },
+  {
+    "suite": "test_subscription_import.py",
+    "tests_run": 11,
+    "skipped": 0,
+    "exit_code": 0,
+    "seconds": 4.26
+  },
+  {
+    "suite": "test_socks5_udp.py",
+    "tests_run": 13,
+    "skipped": 1,
+    "exit_code": 0,
+    "seconds": 8.87
+  }
+]

@@ -4,7 +4,9 @@ import errno
 import socketserver
 import socket
 import struct
-import threading
+from threading import Thread
+
+from loopback_ports import pair_port
 
 
 def exact(sock, size):
@@ -61,12 +63,12 @@ class DnsPeer:
                     pass
 
         host='::1' if ipv6 else '127.0.0.1'
-        # Windows selects ephemeral ports independently for each protocol.
-        # Choose through TCP first so a UDP-only allocation cannot choose a
-        # TCP-excluded port. UDP may still collide; hold both sockets before
-        # starting either server and release every failed partial pair.
+        # Reserve TCP first and keep it while binding UDP to the same port.
+        # Windows candidates exclude both protocol reservation tables; neither
+        # protocol's ephemeral allocator alone can establish pair availability.
+        # Actual collisions remain bounded and all access denials still fail.
         for attempt in range(8):
-            protocol, address = 'TCP', (host, 0)
+            protocol, address = 'TCP', (host, pair_port(ipv6))
             try:
                 with ExitStack() as cleanup:
                     tcp = cleanup.enter_context(TCP(address, TCPHandler))
@@ -85,7 +87,7 @@ class DnsPeer:
                                    f'pair attempt {attempt + 1}/8')
                     raise
         for server in (self.udp, self.tcp):
-            threading.Thread(target=server.serve_forever, daemon=True).start()
+            Thread(target=server.serve_forever, daemon=True).start()
 
     @property
     def address(self):

@@ -3,8 +3,8 @@
 This stage adds a reproducible, mandatory upstream-peer gate after the native
 REALITY R2 implementation. Development and pushes use only
 `work/core-completion-20261017`, starting from `271ed3f5d2abe185a7b3308dd77f00b904bc58be`.
-The final source SHA and exact Actions results are recorded in the follow-up
-handoff; a local result or a triggered workflow is not a completed CI result.
+The source SHA and completed Actions results are recorded below and in the
+current handoff; local results and triggered workflows are recorded separately.
 
 ## Delivered code
 
@@ -85,7 +85,7 @@ Cloud Linux, Rust 1.99.1, Python 3.12 and cryptography 50.0.2 were used.
 | CI anti-regression suite | 37 passed, no skips |
 | New pinned Xray TLS interoperability suite | 12 passed, 13 sessions, no errors/failures/skips |
 | Repeated upstream builds | Both actual executable SHA-256 comparisons matched |
-| GitHub Actions | Pending the exact first source commit; only later completed runs can establish CI success |
+| GitHub Actions | Pending at that local checkpoint; the subsequently completed exact-source runs are recorded below |
 
 The first workspace test compilation exhausted the shared disk before tests
 could execute. Its raw failure is preserved. After removing inactive,
@@ -95,6 +95,35 @@ The first real upstream run also failed at the missing CurveID observation;
 that failure is preserved separately from the corrected wire-observed result.
 Earlier source/binary mismatch refusals were provenance-gate failures and are
 not counted as executed interoperability tests.
+
+## Exact committed CI
+
+Source [`5ad68bcb22a23573d462cbfd972c7120093f504a`](https://github.com/SOLHK/Swirl/commit/5ad68bcb22a23573d462cbfd972c7120093f504a),
+tree `b82dc554aadd144f8745b9ec7763915cfbae4933`, passed
+[Rust run 39239280852](https://github.com/SOLHK/Swirl/actions/runs/39239280852)
+on Linux, macOS and Windows, and
+[App run 39239280949](https://github.com/SOLHK/Swirl/actions/runs/39239280949).
+Both workflows completed with `success`; each peer invocation passed all 12
+tests / 13 sessions, with no failures, errors or skips. Downloaded evidence ZIPs
+matched their GitHub artifact digests, and their test/source/build identities
+matched this exact SHA. Both upstream executable rebuild comparisons matched.
+
+Permanent result and lifecycle records:
+[Linux](evidence/reality-r3/ci-linux.json),
+[macOS](evidence/reality-r3/ci-macos.json),
+[Windows](evidence/reality-r3/ci-windows.json), and
+[App](evidence/reality-r3/ci-app.json).
+Each Rust platform passed 239 unit/integration tests and one doctest. Windows
+also completed its compatibility/native Qt tests, dedicated injected-peer
+wrappers and the full native `Swirl.exe` build. Its generic Qt entry retained
+six explicitly separate peer-injection skips; the subsequent five wrappers
+exercised those six slots. This is not physical GUI or provider acceptance.
+The App source archive's 226 files matched the exact commit's Git blobs and modes.
+
+The complete local portable Python menu separately recorded 248 passes and
+five explicit Qt-hook skips, before adding the 12 new Xray cases; its original
+[suite results](evidence/reality-r3/local-regression-summary.json) are retained.
+The local skips were not relabeled as passes.
 
 ## Deliberate remaining boundaries
 
@@ -111,5 +140,5 @@ unaccepted. Existing explicit product refusal is preserved; there is no DIRECT
 fallback, ordinary-TLS downgrade or private subscription request.
 
 The fixed baseline remains **79 items, six fully accepted, weighted 10.83%**.
-Neither local peer coverage nor a future green CI alone completes B13/B14.
+These component checks do not complete the full B13/B14 acceptance criteria.
 

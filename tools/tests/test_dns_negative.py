@@ -18,10 +18,95 @@ import types
 import unittest
 from unittest import mock
 
+from loopback_ports import pair_port, parse_exclusions, windows_candidates
 from dns_peer import DnsPeer, name
 from test_dns_tls import DotPeer
 from test_dns_https import DohPeer
 from test_rust_core import Reference, Handler, certificates, exact, header
+
+
+class LoopbackPortSelectionTests(unittest.TestCase):
+    def setUp(self):
+        windows_candidates.cache_clear()
+        self.addCleanup(windows_candidates.cache_clear)
+
+    @staticmethod
+    def table(rows=b''):
+        return b'Localized column labels\n----------    --------\n' + rows + b'\n* - Exclusions.\n'
+
+    def test_netsh_numeric_rows_and_empty_table(self):
+        # Actual ranges from the failed Windows job, with a localized heading
+        # and an administered reservation. No English labels are required.
+        data = b'\xe7\xab\xaf\xe5\x8f\xa3\n----------    --------\n'
+        data += b'60437 60536\n60537 60636\n63203 63302\n63303 63402 *\n'
+        self.assertEqual(parse_exclusions(data),
+                         [(60437, 60536), (60537, 60636), (63203, 63302), (63303, 63402)])
+        self.assertEqual(parse_exclusions(self.table()), [])
+
+    def test_missing_or_malformed_exclusion_table_fails(self):
+        for output in (b'', b'netsh failed', b'49152 65535\n',
+                       self.table(b'65536 65537'), self.table(b'0 5'),
+                       self.table(b'60000 59999'), self.table(b'49152 broken'),
+                       self.table(b'49152 65535 unexpected'), self.table(b'* 49152 65535')):
+            with self.subTest(output=output):
+                with self.assertRaises(ValueError):
+                    parse_exclusions(output)
+
+    def test_windows_candidate_excludes_both_protocols_on_each_family(self):
+        commands = []
+
+        def query(command, **options):
+            commands.append(command)
+            self.assertEqual(options, {'check': True, 'stdout': subprocess.PIPE,
+                                       'stderr': subprocess.PIPE, 'timeout': 10})
+            # Exactly one private-range candidate survives the union.
+            rows = b'49152 50788' if command[-1] == 'protocol=tcp' else b'50790 65535'
+            return types.SimpleNamespace(stdout=self.table(rows))
+
+        with mock.patch('loopback_ports.sys.platform', 'win32'), \
+                mock.patch('loopback_ports.subprocess.run', side_effect=query):
+            for ipv6 in (False, True):
+                self.assertEqual(pair_port(ipv6), 50789)
+                self.assertEqual(pair_port(ipv6), 50789)
+        self.assertEqual(commands, [
+            ['netsh', 'interface', family, 'show', 'excludedportrange', f'protocol={protocol}']
+            for family in ('ipv4', 'ipv6') for protocol in ('tcp', 'udp')])
+
+    def test_query_failures_never_bind_or_start_servers(self):
+        for failure in (FileNotFoundError('netsh unavailable'),
+                        subprocess.CalledProcessError(1, ['netsh']),
+                        subprocess.TimeoutExpired(['netsh'], 10)):
+            with self.subTest(failure=type(failure).__name__):
+                windows_candidates.cache_clear()
+                with mock.patch('loopback_ports.sys.platform', 'win32'), \
+                        mock.patch('loopback_ports.subprocess.run', side_effect=failure), \
+                        mock.patch.object(socketserver.TCPServer, 'server_bind') as bind, \
+                        mock.patch('dns_peer.Thread') as thread:
+                    with self.assertRaises(type(failure)) as caught:
+                        DnsPeer()
+                    self.assertIs(caught.exception, failure)
+                    bind.assert_not_called()
+                    thread.assert_not_called()
+
+    def test_all_ports_excluded_is_a_failure_not_an_ephemeral_fallback(self):
+        result = types.SimpleNamespace(stdout=self.table(b'49152 65535'))
+        with mock.patch('loopback_ports.sys.platform', 'win32'), \
+                mock.patch('loopback_ports.subprocess.run', return_value=result), \
+                mock.patch.object(socketserver.TCPServer, 'server_bind') as bind, \
+                mock.patch('dns_peer.Thread') as thread:
+            with self.assertRaisesRegex(RuntimeError, 'No unexcluded private TCP/UDP fixture port'):
+                DnsPeer()
+            bind.assert_not_called()
+            thread.assert_not_called()
+
+    def test_portable_candidate_remains_os_selected_without_netsh(self):
+        for platform in ('linux', 'darwin'):
+            with self.subTest(platform=platform), \
+                    mock.patch('loopback_ports.sys.platform', platform), \
+                    mock.patch('loopback_ports.subprocess.run') as query:
+                self.assertEqual(pair_port(False), 0)
+                self.assertEqual(pair_port(True), 0)
+                query.assert_not_called()
 
 
 class DnsPeerAllocationTests(unittest.TestCase):
@@ -45,27 +130,33 @@ class DnsPeerAllocationTests(unittest.TestCase):
             self.assertEqual(exact(stream, size), answer)
         self.assertEqual(peer.queries, [(host, 1, False), (host, 1, True)])
 
-    def test_tcp_selects_port_before_udp_and_forwards_both_families(self):
+    def test_tcp_reserves_port_before_udp_and_forwards_both_families(self):
         original = socketserver.TCPServer.server_bind
-        for ipv6 in (False, True):
-            with self.subTest(ipv6=ipv6):
+        for ipv6, first_collision in ((False, False), (False, True), (True, False), (True, True)):
+            with self.subTest(ipv6=ipv6, first_collision=first_collision):
                 created, requested = [], []
 
                 def bind(server):
                     created.append(server)
                     requested.append((server.socket_type, server.server_address[1]))
-                    # Model a UDP allocator consistently choosing a port which
-                    # TCP cannot use; increasing retry count cannot fix this.
-                    if server.socket_type == socket.SOCK_STREAM and server.server_address[1] != 0:
-                        failure = PermissionError(errno.EACCES, 'synthetic TCP reservation')
-                        failure.winerror = 10013
-                        raise failure
+                    if first_collision and len(created) == 1:
+                        raise OSError(errno.EADDRINUSE, 'controlled first TCP collision')
+                    # UDP must use the already-held TCP port, never select a
+                    # port and close a probe socket before the real TCP bind.
+                    if server.socket_type == socket.SOCK_DGRAM:
+                        self.assertEqual(created[-2].socket_type, socket.SOCK_STREAM)
+                        self.assertNotEqual(created[-2].socket.fileno(), -1)
+                        self.assertEqual(server.server_address[1], created[-2].server_address[1])
                     original(server)
 
                 with mock.patch.object(socketserver.TCPServer, 'server_bind', bind):
                     peer = DnsPeer(ipv6=ipv6)
                 try:
-                    self.assertEqual(requested, [(socket.SOCK_STREAM, 0), (socket.SOCK_DGRAM, peer.port)])
+                    selected = peer.port if os.name == 'nt' else 0
+                    self.assertEqual(requested[-2:], [(socket.SOCK_STREAM, selected),
+                                                      (socket.SOCK_DGRAM, peer.port)])
+                    self.assertGreaterEqual(len(requested), 2 + int(first_collision))
+                    self.assertTrue(all(server.socket.fileno() == -1 for server in created[:-2]))
                     self.assertEqual(peer.udp.server_address[1], peer.tcp.server_address[1])
                     self.assert_pair_forwards(peer)
                 finally:
@@ -88,14 +179,15 @@ class DnsPeerAllocationTests(unittest.TestCase):
                     original(server)
 
                 with mock.patch.object(socketserver.TCPServer, 'server_bind', bind), \
-                        mock.patch('dns_peer.threading.Thread') as thread:
+                        mock.patch('dns_peer.Thread') as thread:
                     with self.assertRaises(PermissionError) as caught:
                         DnsPeer()
                     thread.assert_not_called()
                 self.assertIs(caught.exception, failure)
                 self.assertEqual(len(rejected), 1)
                 self.assertEqual(len(created), 1 if failing_kind == socket.SOCK_STREAM else 2)
-                self.assertEqual(rejected[0][1] == 0, failing_kind == socket.SOCK_STREAM)
+                self.assertEqual(rejected[0][1] == 0,
+                                 os.name != 'nt' and failing_kind == socket.SOCK_STREAM)
                 protocol = 'TCP' if failing_kind == socket.SOCK_STREAM else 'UDP'
                 self.assertEqual(failure.__notes__,
                                  [f'DNS fixture {protocol} bind on loopback {rejected[0]!r}; pair attempt 1/8'])
@@ -153,7 +245,7 @@ class DnsPeerAllocationTests(unittest.TestCase):
                         original(server)
 
                     with mock.patch.object(socketserver.TCPServer, 'server_bind', always_collide), \
-                            mock.patch('dns_peer.threading.Thread') as thread:
+                            mock.patch('dns_peer.Thread') as thread:
                         with self.assertRaises(OSError) as caught:
                             DnsPeer()
                         thread.assert_not_called()

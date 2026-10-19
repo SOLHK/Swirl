@@ -4,7 +4,15 @@
 
 基线最初核对来源为 `4e993d62884b138d4ee5bbe604e90d85cde6bb33` 的 Rust 实现及精确提交三平台 CI、已加密保存的 `capture-20261018-065548` 语料和 Qt 事务修改。2026-10-19 新增 E11/E12：规则编辑事务已通过精确提交 Windows/三平台验证；`8d045ab` 已实现 SOCKS5 出口 UDP，B05 从“未实现”更新为“部分实现”。首次新增 UDP CI 的 Windows/macOS 失败继续保留；修复提交 `dc3ed5e` 已独立通过三平台、Windows Qt 和完整原生应用编译。本轮供应商刷新次数仍为 0。
 
-同日接续研发新增 E13–E16：Qt REALITY/uTLS 与 sing-box 传输导入保护、REALITY 密钥/握手认证基础，以及真实 Windows 测试对端失败修复。B13 从“未实现”更新为“部分实现”，只表示已有独立测试的握手基础；REALITY/Vision 出口仍不可执行。新提交的完整 CI 必须看专项证据，不能借用旧绿色运行。79 项、6 项已验收和 10.83% 权重均不变。
+同日较早阶段的 E13–E16 保留 Qt REALITY/uTLS 与 sing-box 导入保护、REALITY 握手基础和 Windows 对端修复证据；B13 当时从“未实现”变为“部分实现”。本次新增 E17–E19：已有 R2/R1 精确证据、正式 REALITY R3 成熟对端 CI、Vision R2 异步 framing/内层 TLS 识别子阶段。B13 继续部分实现，B14 从“未实现”变为“部分实现”；两项均未满足完整产品/供应商门禁，79 项、6 项已验收和 10.83% 权重完全不变。
+
+R3 源码 `5ad68bcb22a23573d462cbfd972c7120093f504a` 的 [Rust 39239280852](https://github.com/SOLHK/Swirl/actions/runs/39239280852) 已在 Linux/macOS/Windows 完整成功，Windows Qt/原生应用编译亦成功；[App 39239280949](https://github.com/SOLHK/Swirl/actions/runs/39239280949) 成功，成熟对端 12 项/13 会话、0 失败/跳过与精确归档源码已核对。常规 Qt 的 6 个 peer hook 跳过保留，随后 5 个独立 wrapper 分别执行六槽，不把跳过改写为通过。
+
+Vision 初次源码 `f3ce257f14e59e82977d89ac4be436d08926c6b8` 在 [Rust 39243009089](https://github.com/SOLHK/Swirl/actions/runs/39243009089) 的 Linux 成功、macOS/Windows 失败，Windows 后续 Qt/原生应用门禁未运行；[App 39243009132](https://github.com/SOLHK/Swirl/actions/runs/39243009132) 成功。第 4 项 Direct 拒绝先返回 InvalidData 的原失败没有改写。
+
+record 修复 `0be68231b15c1e4f69b138cda7bae0a3930d956b` 的 [Rust 39246770262](https://github.com/SOLHK/Swirl/actions/runs/39246770262) 已在 Linux/macOS 成功，[App 39246770049](https://github.com/SOLHK/Swirl/actions/runs/39246770049) 成功；这些环境实际通过 272 Rust + 1 doctest、5 项新 record 回归、41 guard 与成熟 R3/Vision 测试。Windows 则在旧 DNS fixture 的 UDP 保留段绑定处失败，R3/Vision/Qt 未执行；[原失败](evidence/vision-r2/record-ci-windows-failure.json) 单独保留，不按其他环境结果补算通过。
+
+下一项 Windows 端口 fixture 修复 `随本提交入库`：只读 netsh 查询 TCP/UDP 保留段并集之外的候选，显式选择且同时持有两种 socket；未知 10013/查询失败不吞、8 次冲突预算不变，新增 6 项选择器回归。最终本地 DNS 37 / Shadowsocks fixture 16 / guard 41 共 94 项通过、无失败/跳过；[本地证据](evidence/vision-r2/port-pair-local.json) 保留四文件哈希，精确 CI 为 **尚未执行**。并发字体提交 aab06bf/501099da/7dfbdda/b3ac464/6cba41ff 均保留，固定验收不因此加分。
 
 独立核对将 A02 降为部分实现：18/18 parsed 仅证明外层格式与节点解析，INI 非节点节正文未全部语法/语义验证。没有为提高百分比缩窄该项范围。详细可重复核对依据见证据索引和 `evidence/SELF_DEVELOPMENT_PROGRESS_V1.json`。
 
@@ -52,6 +60,9 @@
 | E14 | [REALITY 握手认证基础](REALITY_HANDSHAKE_FOUNDATION_20261019.md) | `daad7a0`；34 项新 REALITY 测试、独立 Python/OpenSSL 向量、实际 rustls verifier/provider 集成；TLS 后端 transcript 接口和完整 REALITY 对端仍缺失；原 Windows DNS 对端失败保留 |
 | E15 | [sing-box 传输语义](SINGBOX_TRANSPORT_SECURITY_20261019.md) | `e0534f4`；本地同组 Qt 旧实现 2 项失败、修复 5 项通过；包含相同 Qt 源码的 `a429d5b` 已通过原生/兼容 CTest、导入持久化、独立钩子和完整原生应用；旧 SS fixture 失败保留 |
 | E16 | [Windows 测试对端修复](LOOPBACK_PAIR_ALLOCATION_20261019.md) | `a429d5b`；DNS 先选 TCP，SS 保留原错误/清理；本地 31 DNS、16 policy 通过；精确 CI 三平台各 189 Rust、201 Python/5 跳过，Windows Qt 四 XML 71 实际通过/6 跳过，完整原生应用成功 |
+| E17 | [REALITY R2](REALITY_TLS_ENGINE_20261019.md)、[Vision R1](VISION_FRAMING_FOUNDATION_20261019.md)及[历史精确 CI](CORE_REALITY_VISION_HANDOFF_20261019.md#保留的上一阶段证据) | `611edcff` / `5b55ab33` 各自三平台与 App 已成功；是已入库 TLS/R1 framing 证据，本次未重做，不能替代新提交 CI |
+| E18 | [REALITY R3 专项](REALITY_XRAY_INTEROP_20261019.md)、[本地结果](evidence/reality-r3/local-xray-final-summary.json)及[精确 CI](CORE_REALITY_VISION_HANDOFF_20261019.md#本次源码与精确-ci) | `5ad68bcb`；固定官方 Xray/REALITY/Go、重复构建身份；12 项/13 会话，严格 EOF/凭据隔离/回收。Linux/macOS/Windows 与 App 全部 success，含 Windows Qt/原生应用；仅受控 TLS 组件互通 |
+| E19 | [Vision 专项](VISION_ASYNC_INSPECTION_20261019.md)、[record 本地](evidence/vision-r2/record-boundary-local.json)、[Linux](evidence/vision-r2/record-ci-linux.json)/[macOS](evidence/vision-r2/record-ci-macos.json)/[App](evidence/vision-r2/record-ci-app.json)、[Windows DNS 失败](evidence/vision-r2/record-ci-windows-failure.json)、[端口本地](evidence/vision-r2/port-pair-local.json) | 初始 f3ce257f macOS/Windows 失败保留；0be68231 Linux/macOS/App 成功、Windows DNS 失败且协议/Qt 未运行。下一端口源码 随本提交入库，本地 94 项通过，CI 尚未执行。DirectReady/所有权/HRR/组合/产品链未完成 |
 
 ## 3. A–F固定验收清单
 
@@ -84,8 +95,8 @@
 | B10 | Trojan TLS档案 | 部分实现 | E01/E05；严格TLS独立对端 | 不安全源配置被正确阻止；真实严格TLS节点覆盖待补 |
 | B11 | VLESS v0 TCP/通用TLS档案 | 部分实现 | E05/E06；独立协议和Qt转发 | 真实提供商及完整目标范围未验收 |
 | B12 | VMess档案 | 未实现 | E04/E05明确缺项 | 独立状态机、版本、认证、数据流与互操作 |
-| B13 | VLESS REALITY扩展 | 部分实现 | E14；拥有真实 X25519/ML-KEM、ClientHello/ServerHello transcript、证书 HMAC 与 CertificateVerify 的独立测试基础 | 仍不能执行 REALITY 出口；缺少 TLS 后端 transcript 集成、实际 Finished/指纹语义、独立完整对端、Qt 与真实节点 |
-| B14 | VLESS Vision扩展 | 未实现 | E05明确拒绝flow/Vision | 独立状态机与必要组合互操作 |
+| B13 | VLESS REALITY扩展 | 部分实现 | E17/E18；原生 REALITY TLS 1.3、双方 Finished 与官方 Xray/REALITY 的 12 项/13 会话独立互通，保留 EOF、凭据隔离与回收证据 | 生产异步 REALITY、浏览器指纹/任意伪装站点、完整 VLESS/REALITY/Vision 组合、订阅 IR/路由/Qt 与真实提供商仍未验收 |
+| B14 | VLESS Vision扩展 | 部分实现 | E17/E19；R1 framing、增量内层 TLS、有界异步 framing；0be68231 的 Linux/macOS/App 实际通过 272 Rust + 1 doctest、成熟 4 项，Windows DNS fixture 失败导致协议/Qt 未执行；下一端口修复 随本提交入库 本地 94 项通过，CI 尚未执行；此前原失败均保留 | DirectReady、原始 socket/缓冲所有权交接、HRR、真实 REALITY+Vision 组合及订阅 IR/路由/Qt/供应商整链仍未完成 |
 | B15 | WebSocket/WSS传输及已承诺VLESS/Trojan组合 | 部分实现 | E05/E06；分片、背压、关闭预算和Qt已有证据 | 组合矩阵与真实提供商/长连接覆盖未完整 |
 | B16 | gRPC传输 | 未实现 | E04/E05明确缺项 | HTTP/2基础依赖可用但代理传输状态机需自研 |
 | B17 | XHTTP传输 | 未实现 | E04/E05明确缺项 | 版本/模式矩阵、取消、复用与真实互操作 |
@@ -170,7 +181,7 @@
 
 每个档案冻结以下七道门禁：①源参数/版本/支持组合与未知项处理；②独立对端的认证/握手；③双向数据及对应TCP/UDP语义；④分片/背压/取消/正常与异常关闭；⑤错误/超时/重放等适用安全负面测试；⑥Qt产品转换和实际转发；⑦已授权真实目标验证及其覆盖边界。所有适用项通过才将该档案标已验收；不适用项必须在测试前有可复核的协议理由，不能因为缺样本而写N/A。真实节点无可用样本时该门禁为未验证。
 
-公式：协议档案验收率=`通过全部门禁档案/21`；传输扩展验收率=`通过全部门禁扩展/10`。当前源码证明若干协议已有原生实现与独立证据，但未建立完整逐档案七门禁表，**两个整档案验收率均为0%（协议0/21，传输0/10），不是没有原生代码。协议9项已有部分实现，传输2项已有部分实现；未满足全部门禁不计完成**。不能从支持HTTP/SS/Trojan等名单推算“协议已完成X%”。
+公式：协议档案验收率=`通过全部门禁档案/21`；传输扩展验收率=`通过全部门禁扩展/10`。当前源码证明若干协议已有原生实现与独立证据，但未建立完整逐档案七门禁表，**两个整档案验收率均为0%（协议0/21，传输0/10），不是没有原生代码。协议9项已有部分实现，传输3项已有部分实现；未满足全部门禁不计完成**。不能从支持HTTP/SS/Trojan等名单推算“协议已完成X%”。
 
 ## 5. 订阅的两个固定分母
 
@@ -230,10 +241,10 @@
 ## 8. 本阶段报告口径
 
 - 已验收进度：**10.83%**。首次冻结基线，没有可比的上一正式百分比；当前Qt事务改进仍是A06/A07的部分实现，不把局部profile完成冒领为整项完成。
-- 协议档案：**0/21完成全门禁，9/21部分实现**；传输扩展：**0/10完成全门禁，1/10部分实现**。已有HTTP、SOCKS、SS、Trojan、VLESS等原生执行能力，具体范围见B表。
+- 协议档案：**0/21完成全门禁，9/21部分实现**；传输扩展：**0/10完成全门禁，3/10部分实现**。已有HTTP、SOCKS、SS、Trojan、VLESS等原生执行能力，具体范围见B表。
 - 格式档案：**0/10完成完整语义及产品整链**；本轮采集18/18、响应完整性17/17、外层格式/节点解析18/18。三个口径不可互换。
 - 新语料实际联网验收覆盖：记录0/1558、完整来源链0/18；成功率N/A（0/0）。历史固定SS样本只按其各自窗口、源码和环境引用。
-- 本轮新增：规则编辑保留隐藏修饰符及事务失败原子性；标准SOCKS5出口UDP和TLS别名保护。它们分别加强A06/A07及B05的部分实现，未冒领完整配置或真实提供商验收。TUN、全量真实语料、长跑/弱网和安装包仍未完成。
-- 下一步：在已通过的UDP云端门禁之后，补真实提供商UDP/NAT/长跑验收、严格外部DNS及完整档案语义，继续独立验证的REALITY/Vision实现，并建立保护隐私的逐记录真实联网账本。安装包、物理网络与退出恢复仍须独立验收。任何新增范围必须版本化并保留v1趋势。
+- 本轮新增：REALITY R3 正式固定成熟对端、严格 EOF/身份及回收 CI；Vision R2 子阶段新增内层 TLS 检查、有界异步 framing 与完整 Xray 正例/Direct 拒绝测试。B13/B14 都保持未整项验收，不增加完成数和权重；新源码/CI 绑定状态见 E18/E19。
+- 下一步：先完成本次精确 CI 取证，再实现 DirectReady/原始所有权与剩余字节交接、HRR、生产异步 REALITY 和真实组合对端；随后贯通订阅→IR→路由→Rust→通道→Qt。既有 UDP/真实提供商、全量语料、TUN、长跑/弱网、物理网络和安装包缺口全部保留；订阅更新继续关闭。任何新增范围必须版本化并保留 v1 趋势。
 
 检查点需要同时保存源码SHA、相关树/产物哈希、命令、通过/失败/跳过、联网来源、当前阻塞和下一具体任务。实际日期/CI/阶段结果更新不能改变上述固定分母。

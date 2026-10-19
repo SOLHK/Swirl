@@ -265,6 +265,64 @@ Local execution and source hashes are retained in
 [the repair evidence](evidence/vision-r2/record-boundary-local.json); exact
 committed CI must be recorded separately from that local snapshot.
 
+## Exact record-repair CI and Windows fixture failure
+
+The record-boundary source is
+[`0be68231b15c1e4f69b138cda7bae0a3930d956b`](https://github.com/SOLHK/Swirl/commit/0be68231b15c1e4f69b138cda7bae0a3930d956b),
+tree `72cf2ebcb652baeefeb415be66ebe59184725697`.
+The [Rust run 39246770262](https://github.com/SOLHK/Swirl/actions/runs/39246770262)
+completed with Linux/macOS **success** and Windows **failure**. The separate
+[App run 39246770049](https://github.com/SOLHK/Swirl/actions/runs/39246770049)
+completed successfully. Linux, macOS and App each actually passed 272 Rust tests
+plus one doctest, all five new record regressions, 41 CI guards, all 12 REALITY
+cases/13 sessions and all four Vision cases. Their strict TLS 1.3 rejection is
+`PermissionDenied` after an observed Direct request, with zero application bytes
+and `DirectReady=false`. The App source archive contains 262 files, all matched
+to the exact tree's Git blobs and modes.
+
+Windows passed the Rust gates, including the five record regressions, but its
+older DNS allocation guards failed before the mature REALITY/Vision and Qt/App
+steps. Ten UDP binds returned `WinError 10013` for ports within `63203..63402`.
+The same job's read-only `netsh` diagnostics reported those UDP exclusion ranges,
+which differ from its TCP exclusions. A TCP-selected ephemeral port was not a
+valid shared UDP/TCP candidate. Missing later peer artifacts are a consequence
+of that first failure, not successful or skipped interoperability tests.
+
+Exact records are preserved separately as
+[Linux](evidence/vision-r2/record-ci-linux.json),
+[macOS](evidence/vision-r2/record-ci-macos.json),
+[App](evidence/vision-r2/record-ci-app.json) and
+[Windows failure](evidence/vision-r2/record-ci-windows-failure.json).
+The failed Windows job was not rerun to obtain a different host.
+
+## Shared Windows UDP/TCP fixture port correction
+
+`tools/tests/loopback_ports.py` reads the Windows TCP and UDP exclusion tables
+once per address family/process. It validates the numeric table independently
+of localized headings, then selects a private-range candidate outside their
+union. The DNS and SS policy fixtures hold the actual TCP socket continuously
+while binding UDP on the same port; both must exist before a server thread starts.
+Other platforms continue to request an OS-selected port. No reservation, firewall
+or host setting is changed.
+
+The existing eight-attempt collision bound and original exception identity remain
+intact. Unknown permission errors, query failures/timeouts, malformed tables and
+an exhausted candidate range still fail; none becomes an ephemeral fallback or
+a skipped test. A reservation added after the snapshot also remains a bind
+failure. Fixture thread mocks now target their local imports so that they cannot
+intercept Windows subprocess pipe-reader threads.
+
+Six new selector tests cover the actual failed host's table shape, both protocol
+exclusions and address families, valid empty tables, malformed output, query
+errors/timeouts, all ports excluded and the portable path. Existing pair tests
+retain real maximum-length DNS forwarding over UDP and fragmented TCP, both
+address families, collision recovery, held-socket ownership, all failed-socket
+cleanup, immediate permission rejection and the final eighth collision error.
+The final local results and exact four-file hashes are recorded in
+[port-pair local evidence](evidence/vision-r2/port-pair-local.json).
+This fixture correction accompanies this source revision; its new exact CI
+results must be recorded separately before claiming Windows interoperability.
+
 ## Primary references and independent implementation
 
 - [Reviewed Xray Vision traffic/framing/TLS behavior at the fixed commit](https://github.com/XTLS/Xray-core/blob/92ccc939aaf4f8965f369cf0b142e005aeaa11d5/proxy/proxy.go).

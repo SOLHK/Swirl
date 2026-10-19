@@ -40,7 +40,7 @@
   "transport_profiles": {
     "total": 10,
     "accepted": 0,
-    "partial": 2
+    "partial": 3
   },
   "format_profiles": {
     "total": 10,
@@ -223,16 +223,16 @@
       "stage": "B",
       "criterion": "VLESS REALITY扩展",
       "status": "部分实现",
-      "evidence": "E14；daad7a0 拥有真实 X25519/ML-KEM、ClientHello/ServerHello transcript、证书 HMAC 与 CertificateVerify 的独立测试基础",
-      "gap": "仍不能执行 REALITY 出口；缺少 TLS 后端 transcript 集成、实际 Finished/指纹语义、独立完整对端、Qt 与真实节点"
+      "evidence": "E17/E18；原生 REALITY TLS 1.3、双方 Finished 与官方 Xray/REALITY 的 12 项/13 会话独立互通，保留 EOF、凭据隔离与回收证据",
+      "gap": "生产异步 REALITY、浏览器指纹/任意伪装站点、完整 VLESS/REALITY/Vision 组合、订阅 IR/路由/Qt 与真实提供商仍未验收"
     },
     {
       "id": "B14",
       "stage": "B",
       "criterion": "VLESS Vision扩展",
-      "status": "未实现",
-      "evidence": "E05明确拒绝flow/Vision",
-      "gap": "独立状态机与必要组合互操作"
+      "status": "部分实现",
+      "evidence": "E17/E19；R1 framing、增量内层 TLS、有界异步 framing；0be68231 的 Linux/macOS/App 实际通过 272 Rust + 1 doctest、成熟 4 项，Windows DNS fixture 失败导致协议/Qt 未执行；下一端口修复 随本提交入库 本地 94 项通过，CI 尚未执行；此前原失败均保留",
+      "gap": "DirectReady、原始 socket/缓冲所有权交接、HRR、真实 REALITY+Vision 组合及订阅 IR/路由/Qt/供应商整链仍未完成"
     },
     {
       "id": "B15",
@@ -897,6 +897,315 @@
       "accepted_score_changed": false,
       "private_records_tested": 0,
       "complete_private_profiles_verified": 0
+    },
+    {
+      "date": "2026-10-19",
+      "item": "B14",
+      "old_status": "未实现",
+      "new_status": "部分实现",
+      "source_sha": "f3ce257f14e59e82977d89ac4be436d08926c6b8",
+      "source_tree_sha": "342dd35abae1d2932b0f860a1ce09d30fa4e9640",
+      "evidence": [
+        "E17",
+        "E19",
+        "docs/VISION_FRAMING_FOUNDATION_20261019.md",
+        "docs/VISION_ASYNC_INSPECTION_20261019.md",
+        "docs/evidence/vision-r2/local-validation.json",
+        "docs/evidence/vision-r2/first-ci-linux.json",
+        "docs/evidence/vision-r2/first-ci-macos-failure.json",
+        "docs/evidence/vision-r2/first-ci-windows-failure.json",
+        "docs/evidence/vision-r2/first-ci-app.json",
+        "docs/evidence/vision-r2/initial-failures.json",
+        "docs/evidence/vision-r2/record-boundary-local.json",
+        "docs/evidence/vision-r2/record-ci-linux.json",
+        "docs/evidence/vision-r2/record-ci-macos.json",
+        "docs/evidence/vision-r2/record-ci-app.json",
+        "docs/evidence/vision-r2/record-ci-windows-failure.json",
+        "docs/evidence/vision-r2/port-pair-local.json"
+      ],
+      "environment": [
+        "isolated cloud Linux / Rust 1.99.1 / pinned official full Xray v26.10.17",
+        "Initial exact f3ce257f CI: Linux/App success, macOS/Windows failure; downstream Windows Qt/native application not run.",
+        "Record correction 0be68231: Linux/macOS/App success; Windows DNS UDP fixture bind failed before R3/Vision/Qt.",
+        "Next fixture correction included with this commit: final local 94 tests passed; exact CI not_yet_executed."
+      ],
+      "local_result": {
+        "rust_unit_integration_passed": 267,
+        "rust_doctest_passed": 1,
+        "new_rust_tests_passed": 28,
+        "rust_failed": 0,
+        "rust_ignored": 0,
+        "workflow_guards_passed": 41,
+        "full_xray_tests_passed": 4,
+        "full_xray_positive_tests": 3,
+        "full_xray_direct_refusal_tests": 1,
+        "full_xray_failed": 0,
+        "full_xray_skipped": 0
+      },
+      "ci": {
+        "rust_run_id": 39243009089,
+        "rust_run_url": "https://github.com/SOLHK/Swirl/actions/runs/39243009089",
+        "linux": "success",
+        "macos": "failure",
+        "windows": "failure",
+        "windows_qt_full_application": "not_run_after_vision_failure",
+        "app_run_id": 39243009132,
+        "app_run_url": "https://github.com/SOLHK/Swirl/actions/runs/39243009132",
+        "app": "success",
+        "failed_case": "test_tls13_direct_request_is_rejected_without_application_data",
+        "observed_failure": "InvalidData at server_first_probe before DirectRequested was observed; strict expected PermissionDenied was not satisfied.",
+        "original_results_preserved": true
+      },
+      "inheritance": "R1 retains its own exact-source success. Original f3ce257f macOS/Windows failures and 0be68231 Windows DNS fixture failure remain preserved. Record correction success on Linux/macOS/App does not fill the unexecuted Windows peer/Qt gates. The next fixture correction has separate local and pending exact-CI evidence. Direct refusal is not successful Direct interoperability.",
+      "remaining": [
+        "DirectReady and raw socket/residual-buffer ownership",
+        "HRR eligibility",
+        "production async REALITY and actual combined VLESS/REALITY/Vision",
+        "subscription IR, routing, runtime, Qt and real-provider chain"
+      ],
+      "accepted_score_changed": false,
+      "private_records_tested": 0,
+      "complete_private_profiles_verified": 0,
+      "current_source_sha": "0be68231b15c1e4f69b138cda7bae0a3930d956b",
+      "current_source_tree_sha": "72cf2ebcb652baeefeb415be66ebe59184725697",
+      "current_ci": {
+        "rust_run_id": 39246770262,
+        "rust_run_url": "https://github.com/SOLHK/Swirl/actions/runs/39246770262",
+        "linux": "success",
+        "macos": "success",
+        "windows": "failure",
+        "windows_r3_vision_qt": "not_executed_after_dns_fixture_failure",
+        "windows_failure": "WinError 10013 while binding UDP on a TCP-selected port inside the observed Windows UDP exclusion ranges.",
+        "app_run_id": 39246770049,
+        "app_run_url": "https://github.com/SOLHK/Swirl/actions/runs/39246770049",
+        "app": "success",
+        "app_archived_source_files_matched": 262,
+        "status": "completed_with_windows_dns_fixture_failure",
+        "original_failure_preserved": true
+      },
+      "record_boundary_local_result": {
+        "evidence": "docs/evidence/vision-r2/record-boundary-local.json",
+        "rust_unit_integration_passed": 272,
+        "rust_doctest_passed": 1,
+        "new_record_boundary_regressions_passed": 5,
+        "rust_failed_final_authorized_run": 0,
+        "rust_ignored": 0,
+        "full_xray_tests_passed": 4,
+        "full_xray_positive_tests": 3,
+        "full_xray_direct_refusal_tests": 1,
+        "full_xray_failed": 0,
+        "full_xray_skipped": 0,
+        "mature_peer_assertions_unchanged": true,
+        "initial_local_loopback_permission_failure_preserved": true,
+        "local_snapshot_does_not_imply_exact_commit_ci": true
+      },
+      "port_pair_followup": {
+        "source_sha": null,
+        "ci_status": "not_yet_executed",
+        "scope": "Windows independent-test TCP/UDP shared-port allocation; no product transport or protocol acceptance change.",
+        "implementation": [
+          "Read-only netsh excluded-port queries for TCP and UDP on the relevant IPv4/IPv6 address family; explicitly select outside their union.",
+          "Hold both TCP and UDP sockets together; retain OS-selected ports on non-Windows platforms.",
+          "Query/parse failures, candidate exhaustion and unknown WinError 10013 remain errors; keep the eight-attempt collision budget."
+        ],
+        "local": {
+          "dns_tests_passed": 37,
+          "dns_seconds": 81.647,
+          "shadowsocks_fixture_tests_passed": 16,
+          "shadowsocks_seconds": 5.408,
+          "workflow_guards_passed": 41,
+          "guard_seconds": 0.471,
+          "total_tests_passed": 94,
+          "new_selector_regressions": 6,
+          "failures": 0,
+          "skipped": 0,
+          "source_hashes_match_final_four_files": true,
+          "evidence": "docs/evidence/vision-r2/port-pair-local.json"
+        },
+        "preserved_font_parent": "6cba41ff43b989a240191a3731d9d8a5e29908b1",
+        "exact_new_source_ci_not_yet_verified": true
+      }
     }
-  ]
+  ],
+  "evidence_index": {
+    "E17": {
+      "scope": "Previously committed REALITY R2 TLS and Vision R1 framing; historical exact-source evidence, not rerun in this stage",
+      "paths": [
+        "docs/REALITY_TLS_ENGINE_20261019.md",
+        "docs/VISION_FRAMING_FOUNDATION_20261019.md",
+        "docs/CORE_REALITY_VISION_HANDOFF_20261019.md"
+      ],
+      "stages": [
+        {
+          "source_sha": "611edcff6c90d5f6e22637de1a24b4dfde494095",
+          "rust_run_id": 39217803242,
+          "app_run_id": 39217803202,
+          "historical_linux_macos_windows_app_conclusion": "success"
+        },
+        {
+          "source_sha": "5b55ab33dde4c1789547e523b25dcad5abb1cf48",
+          "rust_run_id": 39220250082,
+          "app_run_id": 39220250444,
+          "historical_linux_macos_windows_app_conclusion": "success"
+        }
+      ]
+    },
+    "E18": {
+      "scope": "Pinned mature REALITY TLS-component peer; controlled camouflage target, no arbitrary cover sites, product combination or provider acceptance",
+      "source_sha": "5ad68bcb22a23573d462cbfd972c7120093f504a",
+      "source_tree_sha": "b82dc554aadd144f8745b9ec7763915cfbae4933",
+      "paths": [
+        "docs/REALITY_XRAY_INTEROP_20261019.md",
+        "docs/evidence/reality-r3/local-xray-final-summary.json",
+        "docs/evidence/reality-r3/local-xray-initial-failures.json",
+        "docs/evidence/reality-r3/ci-linux.json",
+        "docs/evidence/reality-r3/ci-macos.json",
+        "docs/evidence/reality-r3/ci-windows.json",
+        "docs/evidence/reality-r3/ci-app.json"
+      ],
+      "upstream": {
+        "xray_commit": "92ccc939aaf4f8965f369cf0b142e005aeaa11d5",
+        "reality_commit": "83f621788ca88b83179810b12baa7ae518aacb83",
+        "reality_version": "v0.0.0-20261014101318-83f621788ca8",
+        "go_version": "go1.27.2"
+      },
+      "ci": {
+        "rust_run_id": 39239280852,
+        "linux": "success",
+        "macos": "success",
+        "windows_reality_peer_step": "success",
+        "windows_job_qt_full_application": "success",
+        "app_run_id": 39239280949,
+        "app_conclusion": "success",
+        "app_job_id": 118015881436,
+        "app_artifact_ids": [
+          12180996474,
+          12180951591
+        ],
+        "app_tests_passed": 12,
+        "app_sessions": 13,
+        "app_failed": 0,
+        "app_skipped": 0,
+        "app_archived_source_files_matched": 226,
+        "app_actual_tested_sha": "5ad68bcb22a23573d462cbfd972c7120093f504a",
+        "app_repeated_build_hashes_match": true,
+        "rust_conclusion": "success",
+        "windows": "success",
+        "windows_generic_qt_peer_hook_skips": 6,
+        "subsequent_independent_qt_wrappers": 5,
+        "qt_skips_not_relabelled_as_passes": true
+      }
+    },
+    "E19": {
+      "scope": "Vision R2 bounded async framing and incremental inner-TLS inspection substage; no DirectReady or native product enablement",
+      "source_sha": "f3ce257f14e59e82977d89ac4be436d08926c6b8",
+      "paths": [
+        "docs/VISION_ASYNC_INSPECTION_20261019.md",
+        "docs/evidence/vision-r2/local-validation.json",
+        "docs/evidence/vision-r2/first-ci-linux.json",
+        "docs/evidence/vision-r2/first-ci-macos-failure.json",
+        "docs/evidence/vision-r2/first-ci-windows-failure.json",
+        "docs/evidence/vision-r2/first-ci-app.json",
+        "docs/evidence/vision-r2/initial-failures.json",
+        "docs/evidence/vision-r2/record-boundary-local.json",
+        "docs/evidence/vision-r2/record-ci-linux.json",
+        "docs/evidence/vision-r2/record-ci-macos.json",
+        "docs/evidence/vision-r2/record-ci-app.json",
+        "docs/evidence/vision-r2/record-ci-windows-failure.json",
+        "docs/evidence/vision-r2/port-pair-local.json"
+      ],
+      "local_result": {
+        "rust_unit_integration_passed": 267,
+        "rust_doctest_passed": 1,
+        "new_rust_tests_passed": 28,
+        "workflow_guards_passed": 41,
+        "full_xray_tests_passed": 4,
+        "full_xray_positive_tests": 3,
+        "full_xray_direct_refusal_tests": 1,
+        "full_xray_failed": 0,
+        "full_xray_skipped": 0
+      },
+      "ci": {
+        "rust_run_id": 39243009089,
+        "rust_run_url": "https://github.com/SOLHK/Swirl/actions/runs/39243009089",
+        "linux": "success",
+        "macos": "failure",
+        "windows": "failure",
+        "windows_qt_full_application": "not_run_after_vision_failure",
+        "app_run_id": 39243009132,
+        "app_run_url": "https://github.com/SOLHK/Swirl/actions/runs/39243009132",
+        "app": "success",
+        "failed_case": "test_tls13_direct_request_is_rejected_without_application_data",
+        "observed_failure": "InvalidData at server_first_probe before DirectRequested was observed; strict expected PermissionDenied was not satisfied.",
+        "original_results_preserved": true
+      },
+      "source_tree_sha": "342dd35abae1d2932b0f860a1ce09d30fa4e9640",
+      "current_source_sha": "0be68231b15c1e4f69b138cda7bae0a3930d956b",
+      "current_source_tree_sha": "72cf2ebcb652baeefeb415be66ebe59184725697",
+      "current_ci": {
+        "rust_run_id": 39246770262,
+        "rust_run_url": "https://github.com/SOLHK/Swirl/actions/runs/39246770262",
+        "linux": "success",
+        "macos": "success",
+        "windows": "failure",
+        "windows_r3_vision_qt": "not_executed_after_dns_fixture_failure",
+        "windows_failure": "WinError 10013 while binding UDP on a TCP-selected port inside the observed Windows UDP exclusion ranges.",
+        "app_run_id": 39246770049,
+        "app_run_url": "https://github.com/SOLHK/Swirl/actions/runs/39246770049",
+        "app": "success",
+        "app_archived_source_files_matched": 262,
+        "status": "completed_with_windows_dns_fixture_failure",
+        "original_failure_preserved": true
+      },
+      "record_boundary_local_result": {
+        "evidence": "docs/evidence/vision-r2/record-boundary-local.json",
+        "rust_unit_integration_passed": 272,
+        "rust_doctest_passed": 1,
+        "new_record_boundary_regressions_passed": 5,
+        "rust_failed_final_authorized_run": 0,
+        "rust_ignored": 0,
+        "full_xray_tests_passed": 4,
+        "full_xray_positive_tests": 3,
+        "full_xray_direct_refusal_tests": 1,
+        "full_xray_failed": 0,
+        "full_xray_skipped": 0,
+        "mature_peer_assertions_unchanged": true,
+        "initial_local_loopback_permission_failure_preserved": true,
+        "local_snapshot_does_not_imply_exact_commit_ci": true
+      },
+      "concurrent_font_commits_preserved": [
+        "aab06bf",
+        "501099da",
+        "7dfbdda",
+        "b3ac46414ed3921d18b1cf8e9a143c545c8085fb",
+        "6cba41ff43b989a240191a3731d9d8a5e29908b1"
+      ],
+      "port_pair_followup": {
+        "source_sha": null,
+        "ci_status": "not_yet_executed",
+        "scope": "Windows independent-test TCP/UDP shared-port allocation; no product transport or protocol acceptance change.",
+        "implementation": [
+          "Read-only netsh excluded-port queries for TCP and UDP on the relevant IPv4/IPv6 address family; explicitly select outside their union.",
+          "Hold both TCP and UDP sockets together; retain OS-selected ports on non-Windows platforms.",
+          "Query/parse failures, candidate exhaustion and unknown WinError 10013 remain errors; keep the eight-attempt collision budget."
+        ],
+        "local": {
+          "dns_tests_passed": 37,
+          "dns_seconds": 81.647,
+          "shadowsocks_fixture_tests_passed": 16,
+          "shadowsocks_seconds": 5.408,
+          "workflow_guards_passed": 41,
+          "guard_seconds": 0.471,
+          "total_tests_passed": 94,
+          "new_selector_regressions": 6,
+          "failures": 0,
+          "skipped": 0,
+          "source_hashes_match_final_four_files": true,
+          "evidence": "docs/evidence/vision-r2/port-pair-local.json"
+        },
+        "preserved_font_parent": "6cba41ff43b989a240191a3731d9d8a5e29908b1",
+        "exact_new_source_ci_not_yet_verified": true
+      }
+    }
+  }
 }

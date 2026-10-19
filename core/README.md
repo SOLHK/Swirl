@@ -8,23 +8,72 @@ are implemented and tested. This is **not the completed all-protocol product**.
 
 ## Current development scope (2026-10-19)
 
-The [REALITY R2 TLS engine](../docs/REALITY_TLS_ENGINE_20261019.md) extends the
-[owned-key/authentication foundation](../docs/REALITY_HANDSHAKE_FOUNDATION_20261019.md)
-with a real TLS 1.3 record channel. Two offline constructors bind the authenticated
-ClientHello to the same sole key owner and final rustls transcript. Actual
-CertificateVerify, Finished, bidirectional data and closure now pass an independent
-Python/OpenSSL peer in all six combinations of three TLS suites and hybrid/X25519
-selection. The engine uses an explicitly native ClientHello profile; browser
-fingerprints and the product outbound are still pending. Native import
-and startup continue to preserve and explicitly reject those unsupported
-requirements; see the [Qt import security repair](../docs/REALITY_IMPORT_SECURITY_20261019.md).
+The [REALITY R3 gate](../docs/REALITY_XRAY_INTEROP_20261019.md) exercises the
+native R2 TLS engine against pinned, unmodified official Xray/REALITY source.
+It verifies source/module identity, repeats both executable builds and runs
+12 tests / 13 synthetic loopback sessions: native X25519/hybrid authentication,
+both Finished messages, bidirectional data, large/short I/O, authenticated
+closure, credential rejection and timeout/cancellation/cleanup. Bare TCP EOF
+remains an error without close_notify. The controlled local camouflage target
+does not cover arbitrary public sites, browser fingerprints, real providers or
+the full VLESS configuration path.
 
-The [Vision R1 framing component](../docs/VISION_FRAMING_FOUNDATION_20261019.md)
-adds fixed-memory incremental decoding, bounded frame encoding, exact terminal
-boundaries and strict VLESS request Addons. It is independently checked against
-Python-generated wire fixtures. A decoded direct request does not authorize raw
-copy. Inner-TLS eligibility, async stream ownership and complete Vision forwarding
-remain pending, so the product continues to reject Vision requirements.
+R3 source [`5ad68bcb22a23573d462cbfd972c7120093f504a`](https://github.com/SOLHK/Swirl/commit/5ad68bcb22a23573d462cbfd972c7120093f504a)
+passed [Rust 39239280852](https://github.com/SOLHK/Swirl/actions/runs/39239280852)
+on Linux/macOS/Windows, including Windows Qt and native application compilation,
+and [App 39239280949](https://github.com/SOLHK/Swirl/actions/runs/39239280949).
+The App archive's exact source was verified. Generic Windows Qt retained six
+peer-hook skips, followed by five dedicated wrappers exercising those six slots;
+neither the generic skips nor physical GUI coverage are relabeled as passes.
+
+The [Vision R2 substage](../docs/VISION_ASYNC_INSPECTION_20261019.md) extends R1
+with bounded incremental inner-TLS inspection and async framing/padding,
+partial writes, backpressure, terminal-frame tails, cancellation and upload
+half-close while retaining downlink reads. Its four full-Xray cases are three
+inner-TLS-1.2 positive cases and one inner-TLS-1.3 Direct-request refusal.
+The initial source [`f3ce257f14e59e82977d89ac4be436d08926c6b8`](https://github.com/SOLHK/Swirl/commit/f3ce257f14e59e82977d89ac4be436d08926c6b8)
+passed Linux in [Rust 39243009089](https://github.com/SOLHK/Swirl/actions/runs/39243009089)
+and [App 39243009132](https://github.com/SOLHK/Swirl/actions/runs/39243009132),
+but its macOS/Windows Direct-refusal case failed; subsequent Windows Qt/native
+application gates did not run. Those original failures remain archived.
+
+Correction [`0be68231b15c1e4f69b138cda7bae0a3930d956b`](https://github.com/SOLHK/Swirl/commit/0be68231b15c1e4f69b138cda7bae0a3930d956b)
+(tree `72cf2ebcb652baeefeb415be66ebe59184725697`) explicitly bounds both
+ciphertext records and authenticated plaintext delivery. This lets Vision reject
+command 2 before outer TLS consumes subsequent raw inner ciphertext. Five new
+real-TLS regressions retain authentication, strict EOF, partial-read and
+half-close guarantees; no DirectReady or raw-socket extraction was added.
+Final [local evidence](../docs/evidence/vision-r2/record-boundary-local.json)
+records 272 Rust tests plus one doctest and four mature-Xray cases passing
+without relaxed assertions; the workflow guard suite has 41 cases.
+[Rust 39246770262](https://github.com/SOLHK/Swirl/actions/runs/39246770262) passed
+on Linux/macOS, and [App 39246770049](https://github.com/SOLHK/Swirl/actions/runs/39246770049)
+passed with all 262 archived source files verified. Windows failed at an older
+DNS fixture's UDP bind because the chosen TCP port was in that host's UDP
+excluded range; its R3/Vision/Qt stages did not execute. The original
+[Windows failure](../docs/evidence/vision-r2/record-ci-windows-failure.json) and
+[Linux](../docs/evidence/vision-r2/record-ci-linux.json),
+[macOS](../docs/evidence/vision-r2/record-ci-macos.json),
+[App](../docs/evidence/vision-r2/record-ci-app.json) successes remain distinct.
+
+The next test-fixture correction, `included with this commit`, queries Windows
+TCP/UDP exclusions read-only, chooses a port outside their union and keeps both
+sockets allocated. Query/parse failures and unknown 10013 errors remain fatal;
+the existing eight collision attempts and non-Windows OS allocation remain.
+Six selector regressions were added; final [local tests](../docs/evidence/vision-r2/port-pair-local.json)
+passed DNS 37, Shadowsocks fixture 16 and guards 41 (94 total, no failures/skips).
+New-source CI is **not yet executed**. Development preserves font commits
+aab06bf/501099da/7dfbdda/b3ac464 and
+6cba41ff43b989a240191a3731d9d8a5e29908b1.
+
+DirectReady, raw-socket/residual-buffer handoff, eligible HRR processing,
+production async REALITY and combined VLESS/REALITY/Vision remain unfinished.
+The subscription-to-IR-to-route-to-runtime-to-Qt path is not enabled for these
+requirements. Native import/startup preserve and explicitly reject unsupported
+requirements; no failure falls back to DIRECT or ordinary TLS. Private
+subscription updates remain disabled. See the [current handoff](../docs/CORE_REALITY_VISION_HANDOFF_20261019.md)
+for original failure evidence and pending gates. The fixed acceptance baseline
+remains **79 items, six accepted, weighted 10.83%**; B13/B14 remain partial.
 
 After the automatic-font implementation passed its Windows application/font
 gates, native Core development resumed on `work/core-completion-20261017`.
