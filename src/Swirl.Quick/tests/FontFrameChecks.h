@@ -32,12 +32,13 @@ struct FontFrameSample {
     int index=0,readySequence=0;
     qint64 begin=0,syncBegin=0,syncEnd=0,renderBegin=0,renderEnd=0,queued=0,end=0;
 };
-struct FontRasterSample { int sequence=0,line=0;bool paint=false,axesMatch=false;qint64 begin=0,end=0; };
-struct FontInputSample {int sequence=0;qint64 begin=0,end=0,driverQueued=0;double wght=0,wdth=0,hght=0;};
+struct FontRasterSample { int sequence=0,line=0;bool paint=false,axesMatch=false;qint64 begin=0,end=0;double points=-1; };
+struct FontInputSample {int sequence=0;qint64 begin=0,end=0,driverQueued=0;double wght=0,wdth=0,hght=0,points=-1;};
 struct FontFrameTrace {
     std::mutex mutex;
     std::atomic_bool enabled{true};
     std::atomic_int sequence{0},readySequence{0};
+    std::atomic<double> expectedPoints{-1};
     qint64 epoch=fontFrameNowNs();int begun=0;
     quintptr renderThread=0;
     FontFrameSample current;
@@ -56,7 +57,9 @@ inline QJsonObject runFontFramePhase(QQuickWindow *window,FontManager *manager,Q
                                     const QList<VariableFontPreview *> &lines,const QString &mode,int round)
 {
     constexpr int warmup=30,samples=240,total=warmup+samples;
+    const bool activeAtStart=window->isActive();
     auto trace=std::make_shared<FontFrameTrace>();QObject receiver;QEventLoop loop;
+    QList<QFont> originalFonts;for(auto *line:lines)originalFonts.append(line->font());
     QList<QMetaObject::Connection> connections;
     auto direct=[&](auto signal,auto callback){connections.append(QObject::connect(window,signal,&receiver,callback,Qt::DirectConnection));};
     direct(&QQuickWindow::beforeFrameBegin,[trace]{
@@ -75,8 +78,9 @@ inline QJsonObject runFontFramePhase(QQuickWindow *window,FontManager *manager,Q
         connections.append(QObject::connect(line,&VariableFontPreview::rasterMeasured,&receiver,[trace,line,index](qint64 begin,qint64 end){
             if(!trace->enabled.load())return;const auto seq=trace->sequence.load();const auto font=line->font();
             std::lock_guard guard(trace->mutex);
-            const bool matches=std::abs(font.variableAxisValue(QFont::Tag("wght"))-trace->expected[0])<.001 && std::abs(font.variableAxisValue(QFont::Tag("wdth"))-trace->expected[1])<.001 && std::abs(font.variableAxisValue(QFont::Tag("HGHT"))-trace->expected[2])<.001;
-            if(trace->rasters.size()<8192)trace->rasters.push_back({seq,index,false,matches,begin,end});
+            const bool matches=std::abs(font.variableAxisValue(QFont::Tag("wght"))-trace->expected[0])<.001 && std::abs(font.variableAxisValue(QFont::Tag("wdth"))-trace->expected[1])<.001 && std::abs(font.variableAxisValue(QFont::Tag("HGHT"))-trace->expected[2])<.001
+                && (trace->expectedPoints.load()<0||std::abs(font.pointSizeF()-trace->expectedPoints.load())<.0001);
+            if(trace->rasters.size()<8192)trace->rasters.push_back({seq,index,false,matches,begin,end,font.pointSizeF()});
             if(matches&&seq>0){trace->readyMasks[seq]|=1<<index;if(trace->readyMasks[seq]==15)trace->readySequence.store(seq);}
         },Qt::DirectConnection));
         connections.append(QObject::connect(line,&VariableFontPreview::textureMeasured,&receiver,[trace,index](qint64 begin,qint64 end){
@@ -100,13 +104,16 @@ inline QJsonObject runFontFramePhase(QQuickWindow *window,FontManager *manager,Q
             const double left=slider->property("leftPadding").toDouble(),right=slider->property("rightPadding").toDouble();
             lastPoint=slider->mapToScene(QPointF(left+fraction*(slider->width()-left-right),slider->height()/2));
             pointer(sequence==1?QEvent::MouseButtonPress:QEvent::MouseMove,lastPoint);
+        }else if(mode=="font-size"){
+            const double points=9.+(sequence%120)*7./119.;trace->expectedPoints.store(points);
+            for(auto *line:lines){auto font=line->font();font.setPointSizeF(points);line->setFont(font);}
         }else{
             manager->setPreviewAxis("HGHT",1.125+((sequence*37)%1024)*998.5/1024.0);
             manager->setPreviewAxis("wght",100.125+((sequence*617)%1024)*799.5/1024.0);
             manager->setPreviewAxis("wdth",80.0125+((sequence*389)%1024)*39.95/1024.0);
         }
         const auto axes=manager->previewValues();const auto end=fontFrameNowNs();
-        {std::lock_guard guard(trace->mutex);trace->expected={axes.value("wght").toDouble(),axes.value("wdth").toDouble(),axes.value("HGHT").toDouble()};trace->inputs.push_back({sequence,begin,end,driverQueued,trace->expected[0],trace->expected[1],trace->expected[2]});}
+        {std::lock_guard guard(trace->mutex);trace->expected={axes.value("wght").toDouble(),axes.value("wdth").toDouble(),axes.value("HGHT").toDouble()};trace->inputs.push_back({sequence,begin,end,driverQueued,trace->expected[0],trace->expected[1],trace->expected[2],trace->expectedPoints.load()});}
         window->update();
     };
     connections.append(QObject::connect(window,&QQuickWindow::frameSwapped,&receiver,[&]{
@@ -118,6 +125,7 @@ inline QJsonObject runFontFramePhase(QQuickWindow *window,FontManager *manager,Q
     trace->enabled.store(false);for(const auto &connection:connections)QObject::disconnect(connection);
     if(mode=="slider")pointer(QEvent::MouseButtonRelease,lastPoint);
     for(auto *line:lines)line->setMeasureRaster(false);
+    if(mode=="font-size")for(int i=0;i<lines.size();++i)lines[i]->setFont(originalFonts[i]);
     std::lock_guard guard(trace->mutex);
     QJsonArray rawFrames,rawRasters,rawInputs;std::vector<double> intervals,sync,record,submit,whole,raster,paint,handling,driver,latency,rasterLatency;
     QHash<int,qint64> firstQueued,readyAt;QHash<int,double> rasterSums;
@@ -136,14 +144,15 @@ inline QJsonObject runFontFramePhase(QQuickWindow *window,FontManager *manager,Q
         if(frame.queued)previous=frame.queued;
     }
     for(const auto &sample:trace->rasters){
-        rawRasters.append(QJsonObject{{"sequence",sample.sequence},{"line",sample.line},{"textureUpdate",sample.paint},{"axesMatch",sample.axesMatch},{"beginMs",ms(sample.begin)},{"endMs",ms(sample.end)}});
+        rawRasters.append(QJsonObject{{"sequence",sample.sequence},{"line",sample.line},{"textureUpdate",sample.paint},{"axesAndSizeMatch",sample.axesMatch},{"axesMatch",sample.axesMatch},{"pointSize",sample.points},{"beginMs",ms(sample.begin)},{"endMs",ms(sample.end)}});
         if(!sample.paint&&sample.axesMatch){readyAt[sample.sequence]=qMax(readyAt.value(sample.sequence),sample.end);rasterSums[sample.sequence]+=double(sample.end-sample.begin)/1e6;}
         if(sample.sequence>warmup)(sample.paint?paint:raster).push_back(double(sample.end-sample.begin)/1e6);
     }
-    int represented=0,changes=0;double previousHght=-1;
+    int represented=0,changes=0,sizeChanges=0;double previousHght=-1,previousPoints=-1;
     for(const auto &sample:trace->inputs){
-        rawInputs.append(QJsonObject{{"sequence",sample.sequence},{"beginMs",ms(sample.begin)},{"handledMs",ms(sample.end)},{"driverQueuedPresentMs",ms(sample.driverQueued)},{"wght",sample.wght},{"wdth",sample.wdth},{"HGHT",sample.hght}});
+        rawInputs.append(QJsonObject{{"sequence",sample.sequence},{"beginMs",ms(sample.begin)},{"handledMs",ms(sample.end)},{"driverQueuedPresentMs",ms(sample.driverQueued)},{"wght",sample.wght},{"wdth",sample.wdth},{"HGHT",sample.hght},{"pointSize",sample.points}});
         if(sample.hght!=previousHght)++changes;previousHght=sample.hght;
+        if(sample.points!=previousPoints)++sizeChanges;previousPoints=sample.points;
         if(sample.sequence<=warmup)continue;
         handling.push_back(double(sample.end-sample.begin)/1e6);
         if(sample.driverQueued)driver.push_back(double(sample.begin-sample.driverQueued)/1e6);
@@ -151,14 +160,17 @@ inline QJsonObject runFontFramePhase(QQuickWindow *window,FontManager *manager,Q
         if(trace->readyMasks.value(sample.sequence)==15)rasterLatency.push_back(double(readyAt[sample.sequence]-sample.begin)/1e6);
     }
     std::vector<double> totalRaster;for(auto it=rasterSums.cbegin();it!=rasterSums.cend();++it)if(it.key()>warmup&&trace->readyMasks.value(it.key())==15)totalRaster.push_back(it.value());
-    const bool inputWorked=mode!="slider"||changes>total/2;
-    return {{"mode",mode},{"round",round},{"completed",completed},{"inputWorked",inputWorked},{"warmupFrames",warmup},{"requestedSampleFrames",samples},{"frameCallbacks",callbacks},{"inputCount",issued},{"representedMeasuredInputs",represented},{"elapsedMs",double(finished-started)/1e6},{"privateBytes",double(fontUiPrivateBytes())},{"renderThread",QString::number(trace->renderThread)},{"guiThread",QString::number(reinterpret_cast<quintptr>(QThread::currentThreadId()))},
+    const bool inputWorked=(mode!="slider"||changes>total/2)&&(mode!="font-size"||sizeChanges>total/2);
+    return {{"mode",mode},{"round",round},{"completed",completed},{"inputWorked",inputWorked},{"windowActiveAtStart",activeAtStart},{"windowActiveAtEnd",window->isActive()},{"warmupFrames",warmup},{"requestedSampleFrames",samples},{"frameCallbacks",callbacks},{"inputCount",issued},{"representedMeasuredInputs",represented},{"elapsedMs",double(finished-started)/1e6},{"privateBytes",double(fontUiPrivateBytes())},{"renderThread",QString::number(trace->renderThread)},{"guiThread",QString::number(reinterpret_cast<quintptr>(QThread::currentThreadId()))},
         {"queuedPresentIntervalMs",fontFrameStats(intervals)},{"sceneSyncWallMs",fontFrameStats(sync)},{"renderRecordWallMs",fontFrameStats(record)},{"postRecordToSubmitWallMs",fontFrameStats(submit)},{"wholeFrameWallMs",fontFrameStats(whole)},{"rasterLineWallMs",fontFrameStats(raster)},{"rasterFourLinesWallMs",fontFrameStats(totalRaster)},{"textureUpdateCpuWallMs",fontFrameStats(paint)},{"inputHandlerWallMs",fontFrameStats(handling)},{"driverQueueDelayMs",fontFrameStats(driver)},{"inputToAllRastersMs",fontFrameStats(rasterLatency)},{"inputToQueuedPresentMs",fontFrameStats(latency)},{"frames",rawFrames},{"rasters",rawRasters},{"inputs",rawInputs}};
 }
 
 inline int runFontFrameChecks(QQuickWindow *window,FontManager *manager,const QString &output) {
     if(!window||output.isEmpty()||manager->previewAxes().isEmpty())return 3;
-    QDir().mkpath(output);window->resize(1100,900);window->show();
+    QDir().mkpath(output);window->resize(1100,900);window->showNormal();window->raise();window->requestActivate();
+    if(!QTest::qWaitForWindowActive(window,15000)){
+        QFile file(output+"/font-frame-setup-failure.json");if(file.open(QIODevice::WriteOnly))file.write(QJsonDocument(QJsonObject{{"active",window->isActive()},{"reason","The native benchmark window could not obtain foreground activation within 15 seconds; no frame phases were measured."}}).toJson());return 3;
+    }
     QQmlExpression navigate(qmlContext(window),window,"AppState.navigate('settings')");navigate.evaluate();QTest::qWait(500);
     auto *loader=window->findChild<QObject *>("pageLoader");QPointer<QObject> page;
     QElapsedTimer ready;ready.start();while(ready.elapsed()<8000){
@@ -178,10 +190,12 @@ inline int runFontFrameChecks(QQuickWindow *window,FontManager *manager,const QS
     const auto center=slider->mapToScene(QPointF(slider->width()/2,slider->height()/2));
     if(!QRectF(0,0,window->width(),window->height()).contains(center))return 3;
     QJsonArray phases;bool ok=true;
-    for(int round=1;round<=3&&ok;++round)for(const auto &mode:QStringList{"static","slider","three-axis"}){
+    for(int round=1;round<=3;++round)for(const auto &mode:QStringList{"static","slider","three-axis","font-size"}){
         manager->resetPreviewAxes();QTest::qWait(200); // Setup only; outside all measured traces.
         const auto result=runFontFramePhase(window,manager,slider,lines,mode,round);phases.append(result);
-        if(!result.value("completed").toBool()||!result.value("inputWorked").toBool()){ok=false;break;}
+        // Preserve a failed phase and continue the remaining independent modes;
+        // the overall exit code still fails. Do not lengthen its 6 s deadline.
+        if(!result.value("completed").toBool()||!result.value("inputWorked").toBool())ok=false;
     }
     const bool samePage=page&&qvariant_cast<QObject *>(loader->property("item"))==page;
     manager->resetPreviewAxes();QTest::qWait(150);window->grabWindow().save(output+"/after-benchmark.png");

@@ -96,12 +96,16 @@ void FontTests::previewFontResourcesInvalidateRaster()
     rasters.clear();
     QVERIFY(QFontDatabase::removeApplicationFont(registration.id));
     registration.id = -1;
+    QVERIFY(!QFontDatabase::families().contains(family));
     QTRY_VERIFY(rasters.count() > 0);
     QCOMPARE(preview->font(), request);
     QCOMPARE(fontChanges.count(), 0);
-    const QImage removed = window.grabWindow();
-    QVERIFY(!removed.isNull());
-    QVERIFY(removed != registered);
+    QVERIFY(QRawFont::fromFont(preview->font()).familyName()!=family);
+    QImage removed;
+    // rasterMeasured is emitted on the GUI thread before the updated texture
+    // has necessarily reached the render thread. Await the actual new render,
+    // retaining the exact image inequality and the existing test timeout.
+    QTRY_VERIFY(!(removed=window.grabWindow()).isNull()&&removed!=registered);
 
     QTest::qWait(60);
     rasters.clear();

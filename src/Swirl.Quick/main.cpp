@@ -55,6 +55,7 @@
 #include "tests/UiQualityChecks.h"
 #include "tests/FontUiChecks.h"
 #include "tests/FontFrameChecks.h"
+#include "tests/FontAcceptanceChecks.h"
 #include "tests/HdrChecks.h"
 #include "tests/EngineUiChecks.h"
 #include "tests/NodeUiChecks.h"
@@ -148,7 +149,8 @@ int main(int argc, char *argv[])
     const bool fontUiTest=app.arguments().contains("--font-ui-test");
     const bool fontReview=app.arguments().contains("--font-review");
     const bool fontFrameTest=app.arguments().contains("--font-frame-test");
-    bool previewMode=uiQualityTest||fontUiTest||fontReview||fontFrameTest;
+    const bool fontAcceptanceTest=app.arguments().contains("--font-acceptance-test");
+    bool previewMode=uiQualityTest||fontUiTest||fontReview||fontFrameTest||fontAcceptanceTest;
     for(const QString &argument:app.arguments())
         if(argument.startsWith(QStringLiteral("--material-test-output="))||argument.startsWith(QStringLiteral("--viewport-test-output="))||argument.startsWith(QStringLiteral("--motion-demo-output="))||argument.startsWith(QStringLiteral("--motion-visual-dir="))||argument.startsWith(QStringLiteral("--capture-preview="))||argument.startsWith(QStringLiteral("--capture-native-frame=")))previewMode=true;
     const bool hdrTest=app.arguments().contains("--hdr-self-test");
@@ -463,6 +465,16 @@ int main(int argc, char *argv[])
         });
 #else
         qWarning() << "Rebuild with -DSWIRL_BUILD_UI_TESTS=ON to run input checks.";
+        return 4;
+#endif
+    }
+    if(fontAcceptanceTest) {
+#ifdef SWIRL_UI_TESTS
+        const auto output=argumentValue(QStringLiteral("--font-acceptance-output="));
+        const auto source=argumentValue(QStringLiteral("--font-source-file="));
+        const bool currentPageOnly=app.arguments().contains("--font-acceptance-current-page");
+        QTimer::singleShot(700,&app,[&app,rootWindow,&fontManager,output,source,currentPageOnly]{app.exit(runFontAcceptanceChecks(rootWindow,&fontManager,source,output,currentPageOnly));});
+#else
         return 4;
 #endif
     }

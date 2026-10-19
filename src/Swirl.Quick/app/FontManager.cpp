@@ -12,6 +12,9 @@
 #include <QSaveFile>
 #include <QSettings>
 #include <QDataStream>
+#include <QFontMetricsF>
+#include <QImage>
+#include <QTextDocument>
 #include <cmath>
 #include <QtEndian>
 #include "StoragePaths.h"
@@ -89,7 +92,7 @@ FontManager::FontManager(QObject *parent, const QString &storageDirectory) : QOb
     m_harmonyFamily=m_defaultFamily;
     m_directory=storageDirectory.isEmpty()?SwirlPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/fonts":storageDirectory;
     QDir directory(m_directory);
-    for(const auto &file:directory.entryList({"*.ttf","*.otf","*.ttc"},QDir::Files)){
+    for(const auto &file:directory.entryList({"*.ttf","*.otf","*.ttc","*.otc"},QDir::Files)){
         const int id=QFontDatabase::addApplicationFont(directory.filePath(file));
         if(id>=0){
             m_fontIds.append(id);
@@ -141,7 +144,7 @@ FontManager::FontManager(QObject *parent, const QString &storageDirectory) : QOb
     connect(qGuiApp,&QGuiApplication::fontDatabaseChanged,this,[this]{
         // Invalidate immediately, then coalesce multiple add/remove events from
         // an import into one notification after the final registration settles.
-        m_axisMetadata.clear();m_resolvedAxes.clear();m_databaseTimer.start();
+        m_axisMetadata.clear();m_resolvedAxes.clear();m_textWidths.clear();m_databaseTimer.start();
     });
 }
 
@@ -202,7 +205,7 @@ void FontManager::writePreview(QSettings &settings) const
 void FontManager::refreshFontDatabase()
 {
     const auto previousFamilies=m_availableFamilies;
-    m_axisMetadata.clear();m_resolvedAxes.clear();refreshFamilies();
+    m_axisMetadata.clear();m_resolvedAxes.clear();m_textWidths.clear();refreshFamilies();
     // Preserve the selected family and its saved profile when a resource goes
     // away: QFont's existing fallback chain renders it until it is available.
     if(m_availableFamilies.contains(m_previewFamily))
@@ -348,6 +351,63 @@ QVariantMap FontManager::previewResolvedAxesForFont(const QFont &font,
                                logicalDpi,dpr,role);
 }
 
+QVariantMap FontManager::fittedText(const QFont &font, const QString &text,
+    double logicalDpi, double dpr, const QString &role, double availableWidth,
+    double previousWidth) const
+{
+    auto axes=resolvedAxesForFont(font,logicalDpi,dpr,role);
+    // The caller opts in only single-line plain labels whose allocated width
+    // is independent of their compressed metrics. Never resize or transform text.
+    QFont measured=font;measured.clearVariableAxes();
+    for(auto it=axes.cbegin();it!=axes.cend();++it)
+        if(auto tag=QFont::Tag::fromString(it.key().toLatin1()))measured.setVariableAxis(*tag,it.value().toFloat());
+    QImage device(1,1,QImage::Format_ARGB32_Premultiplied);
+    const auto dpi=std::isfinite(logicalDpi)&&logicalDpi>0?logicalDpi:96.;
+    device.setDotsPerMeterX(qRound(dpi/.0254));device.setDotsPerMeterY(qRound(dpi/.0254));
+    auto advance=[&](const QFont &f){
+        QByteArray key;QDataStream stream(&key,QIODevice::WriteOnly);stream<<f<<text<<dpi;
+        if(const auto *cached=m_textWidths.object(key))return *cached;
+        const qreal value=QFontMetricsF(f,&device).horizontalAdvance(text);
+        m_textWidths.insert(key,new qreal(value));return value;
+    };
+    const bool plain=!text.contains('\n')&&!text.contains('\r')&&!Qt::mightBeRichText(text);
+    const double natural=plain?advance(measured):0;
+    QVariantMap result{{"axes",axes},{"naturalWidth",natural},{"fitted",false}};
+    if(!plain||text.isEmpty()||!std::isfinite(availableWidth)||availableWidth<=0
+        ||(font.family()==m_family&&!m_automatic)
+        ||!QStringList{"button","navigation","pageTitle"}.contains(role))return result;
+    QVariantMap widthAxis;
+    for(const auto &record:axesFor(font.family()))if(record.toMap().value("tag")=="wdth")widthAxis=record.toMap();
+    if(widthAxis.isEmpty())return result;
+    const double normal=widthAxis.value("defaultValue").toDouble();
+    // At most 10% of the designer's width coordinate; legal ranges can narrow
+    // this further. A non-percent or nonpositive custom default is not guessed.
+    if(normal<=0)return result;
+    const double minimum=qMax(widthAxis.value("minimum").toDouble(),normal*.90);
+    if(minimum>=normal)return result;
+    const bool wasNarrow=std::isfinite(previousWidth)&&previousWidth>=minimum&&previousWidth<normal;
+    // Four logical pixels to enter/leave fitting, two pixels inside each band.
+    // Small layout jitter therefore keeps the previous coordinate.
+    if((!wasNarrow&&natural<=availableWidth+4)||(wasNarrow&&natural<=availableWidth-4))return result;
+    auto widthAt=[&](double coordinate){auto f=measured;f.setVariableAxis(QFont::Tag("wdth"),float(coordinate));return advance(f);};
+    if(wasNarrow){
+        const auto current=widthAt(previousWidth);
+        const auto wider=qMin(normal,previousWidth+normal*.02);
+        if(current<=availableWidth+2&&widthAt(wider)>availableWidth-2){axes["wdth"]=previousWidth;result["axes"]=axes;result["fitted"]=true;return result;}
+    }
+    double chosen=normal;
+    for(int step=1;step<=5;++step){
+        const double candidate=qMax(minimum,normal*(1.-step*.02));
+        const double width=widthAt(candidate);
+        // Some fonts expose wdth but keep advances invariant. Do not claim a
+        // layout fit or distort their outlines when they offer no useful space.
+        if(width<natural-.5)chosen=candidate;
+        if(width<=availableWidth-2||candidate==minimum)break;
+    }
+    if(chosen<normal){axes["wdth"]=chosen;result["axes"]=axes;result["fitted"]=true;}
+    return result;
+}
+
 bool FontManager::choosePreviewFamily(const QString &family)
 {
     if(!families().contains(family))return fail(tr("Font family is unavailable."));
@@ -430,12 +490,12 @@ bool FontManager::selectFamily(const QString &requestedFamily)
 
 bool FontManager::importFont(const QUrl &url)
 {
-    if(!url.isLocalFile())return fail(QStringLiteral("请选择本地 TTF、OTF 或 TTC 字体文件。"));
+    if(!url.isLocalFile())return fail(QStringLiteral("请选择本地 TTF、OTF、TTC 或 OTC 字体文件。"));
     QFile input(url.toLocalFile());
     const auto suffix=QFileInfo(input).suffix().toLower();
     constexpr qint64 maxFontBytes=128LL*1024*1024;
-    if(!QStringList{"ttf","otf","ttc"}.contains(suffix)||!input.open(QIODevice::ReadOnly)||input.size()<=0||input.size()>maxFontBytes)
-        return fail(QStringLiteral("无法读取字体，请选择不超过 128 MiB 的 TTF、OTF 或 TTC 文件。"));
+    if(!QStringList{"ttf","otf","ttc","otc"}.contains(suffix)||!input.open(QIODevice::ReadOnly)||input.size()<=0||input.size()>maxFontBytes)
+        return fail(QStringLiteral("无法读取字体，请选择不超过 128 MiB 的 TTF、OTF、TTC 或 OTC 文件。"));
     if(!validSfntFile(input))return fail(tr("The font container or variation table is truncated or invalid. The active font was preserved."));
     const auto stageCollection=[this](const QStringList &names){
         QStringList collection;

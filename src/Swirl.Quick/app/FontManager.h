@@ -58,6 +58,9 @@ public:
         double logicalDpi, double dpr, const QString &role) const;
     Q_INVOKABLE QVariantMap previewResolvedAxesForFont(const QFont &font,
         double logicalDpi, double dpr, const QString &role) const;
+    Q_INVOKABLE QVariantMap fittedText(const QFont &font, const QString &text,
+        double logicalDpi, double dpr, const QString &role, double availableWidth,
+        double previousWidth) const;
     Q_INVOKABLE void reset();
 #ifdef SWIRL_UI_TESTS
     int metadataCacheSize() const { return m_axisMetadata.size(); }
@@ -91,6 +94,7 @@ private:
     QVariantMap m_previewValues, m_values;
     mutable QHash<QString,QVariantList> m_axisMetadata;
     mutable QCache<QByteArray,QVariantMap> m_resolvedAxes{256};
+    mutable QCache<QByteArray,qreal> m_textWidths{256};
     QHash<QString,int> m_loadedPaths;
     QTimer m_saveTimer;
     QTimer m_databaseTimer;

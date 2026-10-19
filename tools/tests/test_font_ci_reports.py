@@ -25,6 +25,7 @@ class FontCiReportTests(unittest.TestCase):
             "displayContextHasBoundedLifecycle": "pass", "qmlLiveAutomaticFonts": "pass",
             "fontDisplayContextLifetime": "pass", "previewFontResourcesInvalidateRaster": "pass",
             "previewWindowMetricsAndIdleStability": "pass",
+            "automaticWidthUsesRealAdvances": "pass",
             "importOptionalPingFangUiCollection": "skip", "cleanupTestCase": "pass",
         }
         self.write("font-selection.xml", self.selection)
@@ -41,7 +42,7 @@ class FontCiReportTests(unittest.TestCase):
 
     def test_skipped_private_fixture_is_separate_from_passes(self):
         result = font_report.summarize(self.root, False)
-        self.assertEqual(result["countsExcludingLifecycle"], {"pass": 17, "skip": 1})
+        self.assertEqual(result["countsExcludingLifecycle"], {"pass": 18, "skip": 1})
         self.assertEqual(result["errors"], [])
         self.assertFalse(result["physicalDpiVerified"])
         self.assertFalse(result["refresh240HzVerified"])

@@ -37,7 +37,7 @@ b.save(out/'cff.otf')
 from fontTools.ttLib.tables.TupleVariation import TupleVariation
 
 
-def automation_font(filename, family, axes):
+def automation_font(filename, family, axes, width_metrics=False):
     builder = FontBuilder(1000, isTTF=True)
     builder.setupGlyphOrder(['.notdef', 'A'])
     builder.setupCharacterMap({65: 'A'})
@@ -87,6 +87,8 @@ def automation_font(filename, family, axes):
             # Four zero deltas are the TrueType phantom points: this fixture
             # intentionally keeps advance/vertical metrics stable for every axis.
             coordinates = [(sign * dx, sign * dy) for dx, dy in deltas[tag]] + [(0, 0)] * 4
+            if width_metrics and tag == 'wdth':
+                coordinates[-3] = (sign * 200, 0)  # actual horizontal advance variation
             variations.append(TupleVariation({tag: region}, coordinates))
     gvar = newTable('gvar')
     gvar.version = 1
@@ -109,3 +111,10 @@ automation_font('automation-other.ttf', 'Swirl Other Probe', [
     ('TEST', 10, 20, 30, 'Original test shear'),
 ])
 print('Generated original multi-axis outline fixtures for public automation tests')
+automation_font('automation-width.ttf', 'Swirl Width Probe', [
+    ('wght', 100, 400, 900, 'Weight'), ('wdth', 75, 100, 125, 'Width'),
+], width_metrics=True)
+from fontTools.ttLib import TTFont, TTCollection
+collection = TTCollection()
+collection.fonts = [TTFont(out / 'automation-width.ttf')]
+collection.save(out / 'automation-width.otc')

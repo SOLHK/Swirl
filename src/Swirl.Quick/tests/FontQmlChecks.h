@@ -65,6 +65,12 @@ void FontTests::qmlLiveAutomaticFonts()
     // Context services must outlive the engine's Theme singleton.
     QScopedPointer<QObject> serviceObject;
     QQmlEngine engine;
+    // The full application build creates a SwirlQuick/qmldir beside this test
+    // executable which prefers resources linked only into Swirl.exe. Keep this
+    // source-based fixture independent of that unrelated application module.
+    auto importPaths=engine.importPathList();
+    importPaths.removeAll(QCoreApplication::applicationDirPath());
+    engine.setImportPathList(importPaths);
     QObject::connect(&engine, &QQmlEngine::warnings, &engine, [&](const QList<QQmlError> &errors) {
         for (const auto &error : errors) warnings.append(error.toString());
     });
@@ -115,6 +121,7 @@ QtObject {
     component.setData(R"(
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Layouts
 import SwirlQuick
 import "controls" as Controls
 import "components" as Components
@@ -127,6 +134,9 @@ ApplicationWindow {
             readonly property var monitorAxes: Theme.variableAxesFor(font, 144, 1.5, "body")
         }
         Controls.SwirlText { objectName: "title"; text: "A"; textRole: "pageTitle"; font.pixelSize: 32; font.weight: Font.DemiBold }
+        RowLayout { objectName: "widthHost"; width: 96
+            Controls.SwirlText { objectName: "widthText"; text: "AAAAAAAA"; textRole: "button"; font.pixelSize: 20; Layout.fillWidth: true; elide: Text.ElideRight }
+        }
         // The editor accepts point sizes. SwirlText deliberately keeps its
         // existing pixel-size default; Qt forbids setting both units at once.
         Controls.SwirlTextArea { objectName: "pointText"; text: "A"; font.pointSize: 18
@@ -297,6 +307,42 @@ ApplicationWindow {
     QCoreApplication::processEvents();
     QCOMPARE(font("body"), before);
     QCOMPARE(fontChanges.count(), 0);
+    QVERIFY(manager.importFont(QUrl::fromLocalFile(fixtures+"/automation-width.ttf")));
+    QVERIFY(manager.applyPreview());
+    QTRY_COMPARE(font("widthText").family(),QStringLiteral("Swirl Width Probe"));
+    QTRY_VERIFY(font("widthText").variableAxisValue(QFont::Tag("wdth"))<100.f);
+    QTest::qWait(100); // let the parent layout publish the natural preferred width
+    const auto fittedFont=font("widthText");
+    const auto natural=manager.fittedText(fittedFont,"AAAAAAAA",96,1.5,"button",1000,100).value("naturalWidth").toDouble();
+    QTRY_VERIFY(qAbs(QQmlProperty(item("widthText"),"Layout.preferredWidth",qmlContext(item("widthText"))).read().toDouble()-natural)<.001);
+    const auto widthProperty=item("widthText")->metaObject()->property(item("widthText")->metaObject()->indexOfProperty("font"));
+    QSignalSpy widthChanges(item("widthText"),widthProperty.notifySignal());
+    QTest::qWait(100);widthChanges.clear();
+    for(int i=0;i<20;++i){item("widthHost")->setProperty("width",96.+(i%2)*.2);QCoreApplication::processEvents();}
+    QTest::qWait(100);QCOMPARE(font("widthText"),fittedFont);QCOMPARE(widthChanges.count(),0);
+    item("widthHost")->setProperty("width",natural+10);
+    QTRY_COMPARE(font("widthText").variableAxisValue(QFont::Tag("wdth")),100.f);
+    const auto privateFont=qEnvironmentVariable("SWIRL_TEST_TTC");
+    const auto evidence=qEnvironmentVariable("SWIRL_FONT_EVIDENCE");
+    if(!privateFont.isEmpty()&&!evidence.isEmpty()){
+        const QPointer<QObject> retainedWidth=item("widthText");
+        QVERIFY(manager.importFont(QUrl::fromLocalFile(privateFont)));QVERIFY(manager.applyPreview());
+        item("widthText")->setProperty("text",QStringLiteral("应用到整个界面 Swirl 0123456789"));
+        item("widthHost")->setProperty("width",600);
+        QTRY_COMPARE(font("widthText").family(),QStringLiteral("PingFang UI SC"));
+        QTRY_COMPARE(font("widthText").variableAxisValue(QFont::Tag("wdth")),100.f);
+        const auto privateNatural=manager.fittedText(font("widthText"),item("widthText")->property("text").toString(),96,window->devicePixelRatio(),"button",600,100).value("naturalWidth").toDouble();
+        QTest::qWait(100);QVERIFY(window->grabWindow().save(evidence+"/width-layout-natural.png"));
+        item("widthHost")->setProperty("width",privateNatural*.95);
+        QTRY_VERIFY(font("widthText").variableAxisValue(QFont::Tag("wdth"))<100.f);
+        QTest::qWait(100);QVERIFY(window->grabWindow().save(evidence+"/width-layout-fitted.png"));
+        const auto actual=font("widthText");QFont uncompressed=actual;uncompressed.setVariableAxis(QFont::Tag("wdth"),100.f);
+        QVERIFY(retainedWidth&&retainedWidth.data()==item("widthText"));
+        const auto text=item("widthText")->property("text").toString();
+        QVERIFY(QFontMetricsF(actual).horizontalAdvance(text)<QFontMetricsF(uncompressed).horizontalAdvance(text));
+        QFile report(evidence+"/private-width-layout.json");QVERIFY(report.open(QIODevice::WriteOnly));
+        report.write(QJsonDocument(QJsonObject{{"dpr",window->devicePixelRatio()},{"naturalAdvance",privateNatural},{"availableWidth",item("widthText")->property("width").toDouble()},{"actualWdth",actual.variableAxisValue(QFont::Tag("wdth"))},{"pixelSize",actual.pixelSize()},{"sameObject",retainedWidth.data()==item("widthText")}}).toJson());
+    }
     QVERIFY2(warnings.isEmpty(), qPrintable(warnings.join('\n')));
 }
 

@@ -37,7 +37,18 @@ VariableFontPreview::VariableFontPreview(QQuickItem *parent) : QQuickItem(parent
     auto transforms=transform();transforms.append(&transforms,m_pixelAlignment);
     // A newly registered or removed face can change an unchanged QFont's
     // result. Qt clears its engine cache; invalidate our retained texture too.
-    connect(qGuiApp,&QGuiApplication::fontDatabaseChanged,this,&VariableFontPreview::scheduleRaster);
+    connect(qGuiApp,&QGuiApplication::fontDatabaseChanged,this,[this]{
+        // A retained QFont can still own a removed Windows/FreeType engine
+        // after the database invalidates its public caches. Detach that engine
+        // through public setters, preserving every requested font value and its
+        // resolve mask. No fontChanged signal or layout-property churn is needed.
+        QFont refreshed=m_font;
+        refreshed.setFamilies({});
+        refreshed.setFamilies(m_font.families());
+        refreshed.setResolveMask(m_font.resolveMask());
+        m_font=refreshed;
+        scheduleRaster();
+    });
     connectAlignmentWindow();
 }
 void VariableFontPreview::connectAlignmentWindow()

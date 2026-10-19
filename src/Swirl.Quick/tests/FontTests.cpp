@@ -140,6 +140,8 @@ private slots:
     void fontDisplayContextLifetime();
     void previewFontResourcesInvalidateRaster();
     void previewWindowMetricsAndIdleStability();
+    void automaticWidthUsesRealAdvances();
+    void optionalPhysicalFontIdentity();
     void nativeGlyphsHaveNoColourFringes(){
         if(QGuiApplication::platformName()!=QStringLiteral("windows"))QSKIP("Requires the native Windows platform");
         QTemporaryDir directory;
@@ -495,6 +497,8 @@ void FontTests::optionalCffImport()
 #include "FontAutomationChecks.h"
 #include "FontQmlChecks.h"
 #include "FontPreviewInvalidationChecks.h"
+#include "FontWidthChecks.h"
+#include "FontSourceChecks.h"
 
 int main(int argc,char **argv){
     configureSwirlFontRendering();

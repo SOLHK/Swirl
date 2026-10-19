@@ -46,7 +46,7 @@ which does not impose a pixel-size default, and verifies the native point unit.
 | Body copy, status and helper text | `SwirlText` / native Qt Quick Text | Shared binding follows live family, design weight, original size and display context. |
 | Page titles and large titles | Existing `SwirlText`, including the shared animated hero title | Existing point/pixel sizes and weights stay in their components. Role annotations identify titles without new size tiers. |
 | Navigation and sidebar | `SwirlNavigationItem` and `SwirlText` | Selected and unselected weights remain distinct; navigation role carries their existing semantics. |
-| Buttons and segments | `SwirlButton`, `SwirlSegmentedControl`, `SwirlText` | Buttons retain Medium by default. An explicit button weight now reaches the actual label instead of being overridden by an unconditional Medium. |
+| Buttons and segments | `SwirlButton`, `SwirlSegmentedControl`, `SwirlText` | Buttons retain Medium by default and propagate explicit design weights. Constrained eliding single-line button labels in Layouts can use measured, bounded wdth fitting while publishing their natural preferred width. |
 | Table headers, cells and list rows | `SwirlDataTable`, `SwirlListRow`, `SwirlText` | Existing header/cell sizes, clipping, elision and number animations remain unchanged. |
 | Card data and counters | `SwirlMetricCard`, Activity values and existing counter text | Data role preserves the existing larger size/weight choices; no width-axis compression is introduced. |
 | Search and single-line input | `SwirlSearchField`, `SwirlTextField` / native TextInput | Shared binding on the control font; Qt's placeholder/selection machinery remains intact. |

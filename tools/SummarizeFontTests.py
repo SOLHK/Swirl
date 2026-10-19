@@ -47,6 +47,7 @@ def summarize(build: Path, require_windows: bool) -> dict:
         "fontCachesAreBoundedAndStable", "displayContextHasBoundedLifecycle",
         "qmlLiveAutomaticFonts", "fontDisplayContextLifetime",
         "previewFontResourcesInvalidateRaster", "previewWindowMetricsAndIdleStability",
+        "automaticWidthUsesRealAdvances",
     )]
     if require_windows:
         reports.append("font-native-raster.xml")

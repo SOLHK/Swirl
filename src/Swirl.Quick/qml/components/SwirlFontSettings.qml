@@ -154,12 +154,12 @@ ColumnLayout {
     RowLayout {
         Layout.fillWidth:true
         SwirlButton { objectName:"fontImport"; text:"导入字体文件…"; onClicked:fontFile.open() }
-        SwirlText { text:"支持 TTF、OTF、TTC，最大 128 MiB，仅供 Swirl 使用"; color:Theme.muted; font.pixelSize:Theme.fontSize(11); Layout.fillWidth:true; wrapMode:Text.Wrap }
+        SwirlText { text:"支持 TTF、OTF、TTC、OTC，最大 128 MiB，仅供 Swirl 使用"; color:Theme.muted; font.pixelSize:Theme.fontSize(11); Layout.fillWidth:true; wrapMode:Text.Wrap }
     }
     SwirlText { text:fontManager.error; visible:text.length>0; color:Theme.red; Layout.fillWidth:true; wrapMode:Text.Wrap; font.pixelSize:Theme.fontSize(12) }
     SwirlText { text:"Swirl 使用 HarmonyOS Sans 字体。Copyright 2021 Huawei Device Co., Ltd.\n字体按 HarmonyOS Sans Fonts License Agreement 分发，随软件提供的字体文件保持官方原样。"; color:Theme.muted; Layout.fillWidth:true; wrapMode:Text.Wrap; font.pixelSize:Theme.fontSize(11) }
     SwirlButton { objectName:"fontLicense"; text:"查看鸿蒙字体许可"; onClicked:licenseDialog.open() }
-    FileDialog { id:fontFile;parentWindow:root.Window.window;objectName:"settingsFontFileDialog"; title:"选择字体文件"; nameFilters:["字体文件 (*.ttf *.otf *.ttc)"]; onAccepted:fontManager.importFont(selectedFile) }
+    FileDialog { id:fontFile;parentWindow:root.Window.window;objectName:"settingsFontFileDialog"; title:"选择字体文件"; nameFilters:["字体文件 (*.ttf *.otf *.ttc *.otc)"]; onAccepted:fontManager.importFont(selectedFile) }
     SwirlDialog {
         ownerItem:root
         id:licenseDialog; objectName:"fontLicenseDialog"; title:"HarmonyOS Sans 字体许可"; guardChanges:false; implicitWidth:Math.min(Theme.dp(720),parent?parent.width-Theme.dp(40):Theme.dp(720)); implicitHeight:Math.min(Theme.dp(540),parent?parent.height-Theme.dp(40):Theme.dp(540))

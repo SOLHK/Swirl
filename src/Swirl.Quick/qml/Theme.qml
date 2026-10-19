@@ -137,6 +137,9 @@ QtObject {
         const values = fontManager.previewValues
         return fontManager.previewResolvedAxesForFont(font, logicalDpi, dpr, role)
     }
+    function fittedText(font, text, logicalDpi, dpr, role, width, previousWidth) {
+        return fontManager.fittedText(font, text, logicalDpi, dpr, role, width, previousWidth)
+    }
     function dp(value) { return value === 0 ? 0 : Math.round(value * uiScale) }
     function fontSize(value) { return Math.max(12, Math.round(dp(value))) }
     function setScalePercent(percent) {
