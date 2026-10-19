@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "go_version": "go1.27.2",
+  "xray": {
+    "repository": "https://github.com/XTLS/Xray-core.git",
+    "commit": "92ccc939aaf4f8965f369cf0b142e005aeaa11d5",
+    "tree": "55fc871fdf3e63149066956e7c60670f3a44fbf2",
+    "release": "v26.10.17",
+    "go_mod_sha256": "31fe6bd6c04eb2738e157b850236b1376cbbac3f33e974256bb7325c8c764250",
+    "go_sum_sha256": "a72c2f2b5dd38fcf42ef55034bd55038703448b55a878eafddd60d4af1f63145"
+  },
+  "reality": {
+    "module": "github.com/xtls/reality",
+    "version": "v0.0.0-20261014101318-83f621788ca8",
+    "commit": "83f621788ca88b83179810b12baa7ae518aacb83",
+    "sum": "h1:RjLnVvlzK4q6zWaSBPNRGsrgx2fbJDeUWffjw574uzs=",
+    "go_mod_sum": "h1:ptlSkJ8k/7IDauNH0SA96JPOo+nYGLTv2Y3UMpwvAsY="
+  }
+}

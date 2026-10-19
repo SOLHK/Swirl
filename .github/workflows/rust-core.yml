@@ -60,6 +60,33 @@ jobs:
           python ../tools/tests/test_connectivity_diagnostics.py
           python ../tools/tests/test_subscription_import.py
           python ../tools/tests/test_socks5_udp.py
+      - name: Install pinned Go for the independent Xray peer
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        with:
+          go-version: '1.27.2'
+          cache: false
+      - name: Build pinned Xray and verify REALITY interoperability
+        working-directory: .
+        shell: bash
+        env:
+          SWIRL_XRAY_PEER_DIR: ${{ runner.temp }}/swirl-xray-peer
+          SWIRL_XRAY_EVIDENCE: ${{ runner.temp }}/swirl-xray-results
+          SWIRL_REALITY_CLIENT: ${{ github.workspace }}/core/target/release/examples/reality-client
+        run: |
+          set -euo pipefail
+          python tools/Build-XrayPeer.py --output "$SWIRL_XRAY_PEER_DIR"
+          python tools/tests/test_reality_xray.py
+      - name: Preserve Xray build identity and raw interoperability evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-REALITY-Xray-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/swirl-xray-peer/build.log
+            ${{ runner.temp }}/swirl-xray-peer/build-manifest.json
+            ${{ runner.temp }}/swirl-xray-results
+          if-no-files-found: error
+          retention-days: 14
       - name: Native public HTTPS and DoH verification
         if: runner.os == 'Linux'
         run: python ../tools/Verify-PublicRustCore.py --harness target/release/swirl-api --output ../CORE_PUBLIC_NETWORK.json
@@ -161,6 +188,34 @@ jobs:
           netsh interface ipv6 show dynamicport udp
           netsh interface ipv6 show excludedportrange protocol=tcp
           netsh interface ipv6 show excludedportrange protocol=udp
+      - name: Install pinned Go for the independent Xray peer
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        with:
+          go-version: '1.27.2'
+          cache: false
+      - name: Build pinned Xray and verify REALITY interoperability
+        working-directory: .
+        shell: pwsh
+        env:
+          SWIRL_XRAY_PEER_DIR: ${{ runner.temp }}/swirl-xray-peer
+          SWIRL_XRAY_EVIDENCE: ${{ runner.temp }}/swirl-xray-results
+          SWIRL_REALITY_CLIENT: ${{ github.workspace }}/core/target/release/examples/reality-client.exe
+        run: |
+          python tools/Build-XrayPeer.py --output "$env:SWIRL_XRAY_PEER_DIR"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/tests/test_reality_xray.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Preserve Xray build identity and raw interoperability evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-REALITY-Xray-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/swirl-xray-peer/build.log
+            ${{ runner.temp }}/swirl-xray-peer/build-manifest.json
+            ${{ runner.temp }}/swirl-xray-results
+          if-no-files-found: error
+          retention-days: 14
       - uses: actions/upload-artifact@v4
         with:
           name: Swirl-Rust-Core-Windows

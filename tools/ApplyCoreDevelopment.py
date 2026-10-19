@@ -64,6 +64,88 @@ VISION_SOURCES = (
     Path("core/crates/swirl-protocol/tests/fixtures/vision-v1.txt"),
     Path("core/crates/swirl-protocol/tests/fixtures/flow-v1.txt"),
 )
+XRAY_SOURCES = (
+    Path("tools/Build-XrayPeer.py"),
+    Path("tools/tests/test_reality_xray.py"),
+    Path("tools/tests/xray_peer/main.go"),
+    Path("tools/tests/xray_peer/lock.json"),
+)
+XRAY_GO_ACTION = "actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16"
+
+
+def xray_steps(windows: bool = False, artifact_prefix: str = "Swirl-REALITY-Xray") -> str:
+    """One reviewed build/test/evidence unit; the Go peer is test-only."""
+    suffix = ".exe" if windows else ""
+    shell = "pwsh" if windows else "bash"
+    build = ('          python tools/Build-XrayPeer.py --output "$env:SWIRL_XRAY_PEER_DIR"\n'
+             if windows else '          python tools/Build-XrayPeer.py --output "$SWIRL_XRAY_PEER_DIR"\n')
+    status = WINDOWS_STATUS_GUARD if windows else ""
+    start = "" if windows else "          set -euo pipefail\n"
+    return (
+        "      - name: Install pinned Go for the independent Xray peer\n"
+        f"        uses: {XRAY_GO_ACTION}\n"
+        "        with:\n"
+        "          go-version: '1.27.2'\n"
+        "          cache: false\n"
+        "      - name: Build pinned Xray and verify REALITY interoperability\n"
+        "        working-directory: .\n"
+        f"        shell: {shell}\n"
+        "        env:\n"
+        "          SWIRL_XRAY_PEER_DIR: ${{ runner.temp }}/swirl-xray-peer\n"
+        "          SWIRL_XRAY_EVIDENCE: ${{ runner.temp }}/swirl-xray-results\n"
+        f"          SWIRL_REALITY_CLIENT: ${{{{ github.workspace }}}}/core/target/release/examples/reality-client{suffix}\n"
+        "        run: |\n"
+        + start + build + status
+        + "          python tools/tests/test_reality_xray.py\n" + status
+        + "      - name: Preserve Xray build identity and raw interoperability evidence\n"
+        "        if: always()\n"
+        "        uses: actions/upload-artifact@v4\n"
+        "        with:\n"
+        f"          name: {artifact_prefix}-${{{{ runner.os }}}}-${{{{ github.sha }}}}-${{{{ github.run_attempt }}}}\n"
+        "          path: |\n"
+        "            ${{ runner.temp }}/swirl-xray-peer/build.log\n"
+        "            ${{ runner.temp }}/swirl-xray-peer/build-manifest.json\n"
+        "            ${{ runner.temp }}/swirl-xray-results\n"
+        "          if-no-files-found: error\n"
+        "          retention-days: 14\n"
+    )
+
+
+def without_xray_steps(source: str) -> str:
+    """Accept a complete prior stage or both exact R3 blocks, never a partial gate."""
+    blocks = (xray_steps(), xray_steps(windows=True))
+    markers = ("Build-XrayPeer.py", "test_reality_xray.py", "swirl-xray-",
+               "Install pinned Go", "Preserve Xray build", "Swirl-REALITY-Xray")
+    if not any(marker in source for marker in markers):
+        return source
+    if any(source.count(block) != 1 for block in blocks):
+        raise ValueError("Rust CI Xray build, test or evidence gate drifted; review required")
+    separator = "  windows-rust:\n"
+    if source.count(separator) != 1:
+        raise ValueError("Rust CI Xray job boundaries drifted; review required")
+    parts = source.split(separator)
+    for index, block in enumerate(blocks):
+        if parts[index].count(block) != 1:
+            raise ValueError("Rust CI Xray gate is in the wrong platform job")
+        parts[index] = parts[index].replace(block, "", 1)
+    stripped = separator.join(parts)
+    if any(marker in stripped for marker in markers):
+        raise ValueError("Rust CI has duplicated or unreviewed Xray commands")
+    return stripped
+
+
+def _add_xray_steps(source: str) -> str:
+    portable = "      - name: Native public HTTPS and DoH verification\n"
+    windows = ("      - uses: actions/upload-artifact@v4\n"
+               "        with:\n"
+               "          name: Swirl-Rust-Core-Windows\n")
+    for anchor, block in ((portable, xray_steps()), (windows, xray_steps(windows=True))):
+        if source.count(anchor) != 1:
+            raise ValueError("Rust CI Xray insertion boundary drifted; review required")
+        source = source.replace(anchor, block + anchor, 1)
+    return source
+
+
 REALITY_BUILD_COMMAND = "cargo build --release --locked -p swirl-transport --example reality-client"
 PORTABLE_REALITY_BUILD = f"      - run: {REALITY_BUILD_COMMAND}\n"
 WINDOWS_REALITY_BUILD = (
@@ -483,6 +565,7 @@ def _vector_blocks(windows: bool) -> tuple[str, str, str]:
 
 def updated_workflow(source: str) -> str:
     """Validate the whole fixture stage before preserving every prior CI guard."""
+    source = without_xray_steps(source)
     separator = "  windows-rust:\n"
     if source.count(separator) != 1:
         raise ValueError("Rust CI job boundaries have drifted; review required")
@@ -503,7 +586,7 @@ def updated_workflow(source: str) -> str:
     for index, part in enumerate(parts):
         historical, _, complete = _vector_blocks(windows=index == 1)
         parts[index] = _replace_checked(part, historical, complete, "Vision fixture checks")
-    return separator.join(parts)
+    return _add_xray_steps(separator.join(parts))
 
 
 def validate_context(environment: Mapping[str, str]) -> None:
@@ -546,6 +629,9 @@ def prepare_update(repository: Path) -> tuple[Path, str, str]:
     for relative in VISION_SOURCES:
         if not (repository / relative).is_file():
             raise ValueError(f"Required Vision fixture source is missing: {relative.as_posix()}")
+    for relative in XRAY_SOURCES:
+        if not (repository / relative).is_file():
+            raise ValueError(f"Required mature Xray peer source is missing: {relative.as_posix()}")
     return path, before, after
 
 

@@ -51,9 +51,23 @@ fn chunk(input: &Value, key: &str) -> io::Result<usize> {
     }
 }
 
+fn duration(input: &Value, key: &str) -> io::Result<Option<Duration>> {
+    input
+        .get(key)
+        .map(|value| {
+            value
+                .as_u64()
+                .filter(|n| (1..=15_000).contains(n))
+                .map(Duration::from_millis)
+                .ok_or_else(|| invalid("InvalidSyntheticPeerDuration"))
+        })
+        .transpose()
+}
+
 struct Wire {
     socket: TcpStream,
     deadline: Instant,
+    cancel_at: Option<Instant>,
     calls: usize,
     read_chunk: usize,
     write_chunk: usize,
@@ -70,34 +84,78 @@ impl Wire {
         {
             return Err(invalid("SyntheticPeerIoBudget"));
         }
-        self.deadline
-            .checked_duration_since(Instant::now())
-            .map(|left| left.min(Duration::from_secs(3)))
-            .filter(|left| !left.is_zero())
-            .ok_or_else(|| io::ErrorKind::TimedOut.into())
+        let now = Instant::now();
+        if self
+            .cancel_at
+            .is_some_and(|at| at <= self.deadline && now >= at)
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::Interrupted,
+                "SyntheticPeerCancelled",
+            ));
+        }
+        if now >= self.deadline {
+            return Err(io::Error::new(
+                io::ErrorKind::TimedOut,
+                "SyntheticPeerDeadline",
+            ));
+        }
+        let until = self
+            .cancel_at
+            .map_or(self.deadline, |at| at.min(self.deadline));
+        Ok((until - now).min(Duration::from_secs(3)))
     }
 }
 
 impl Read for Wire {
     fn read(&mut self, bytes: &mut [u8]) -> io::Result<usize> {
-        let timeout = self.tick()?;
-        self.socket.set_read_timeout(Some(timeout))?;
-        let end = bytes.len().min(self.read_chunk);
-        let read = self.socket.read(&mut bytes[..end])?;
-        self.read_bytes += read;
-        Ok(read)
+        loop {
+            let timeout = self.tick()?;
+            self.socket.set_read_timeout(Some(timeout))?;
+            let end = bytes.len().min(self.read_chunk);
+            match self.socket.read(&mut bytes[..end]) {
+                Ok(read) => {
+                    self.read_bytes += read;
+                    return Ok(read);
+                }
+                // Windows and Unix use different error kinds for socket timeouts.
+                // Recheck our absolute deadline/cancellation owner before retrying.
+                Err(error)
+                    if matches!(
+                        error.kind(),
+                        io::ErrorKind::WouldBlock
+                            | io::ErrorKind::TimedOut
+                            | io::ErrorKind::Interrupted
+                    ) => {}
+                Err(error) => return Err(error),
+            }
+        }
     }
 }
 
 impl Write for Wire {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        let timeout = self.tick()?;
-        self.socket.set_write_timeout(Some(timeout))?;
-        let written = self
-            .socket
-            .write(&bytes[..bytes.len().min(self.write_chunk)])?;
-        self.written_bytes += written;
-        Ok(written)
+        loop {
+            let timeout = self.tick()?;
+            self.socket.set_write_timeout(Some(timeout))?;
+            match self
+                .socket
+                .write(&bytes[..bytes.len().min(self.write_chunk)])
+            {
+                Ok(written) => {
+                    self.written_bytes += written;
+                    return Ok(written);
+                }
+                Err(error)
+                    if matches!(
+                        error.kind(),
+                        io::ErrorKind::WouldBlock
+                            | io::ErrorKind::TimedOut
+                            | io::ErrorKind::Interrupted
+                    ) => {}
+                Err(error) => return Err(error),
+            }
+        }
     }
     fn flush(&mut self) -> io::Result<()> {
         self.socket.flush()
@@ -128,6 +186,8 @@ fn run(input: Value, report: &mut Value) -> io::Result<()> {
         "payload_hex",
         "read_chunk",
         "write_chunk",
+        "timeout_ms",
+        "cancel_after_ms",
     ];
     if object.keys().any(|key| !KEYS.contains(&key.as_str())) {
         return Err(invalid("UnknownSyntheticPeerInput"));
@@ -180,6 +240,8 @@ fn run(input: Value, report: &mut Value) -> io::Result<()> {
     };
     let read_chunk = chunk(&input, "read_chunk")?;
     let write_chunk = chunk(&input, "write_chunk")?;
+    let timeout = duration(&input, "timeout_ms")?.unwrap_or(Duration::from_secs(15));
+    let cancellation = duration(&input, "cancel_after_ms")?;
     let parameters =
         ClientParameters::new(text(&input, "server_name")?, public_key, &short_id, version)
             .map_err(invalid)?;
@@ -192,11 +254,16 @@ fn run(input: Value, report: &mut Value) -> io::Result<()> {
     .map_err(|_| invalid("SyntheticPeerClock"))?;
     let mut client = TlsClient::new(&parameters, unix_time, &alpn).map_err(invalid)?;
     report["stage"] = "connect".into();
-    let socket = TcpStream::connect_timeout(&SocketAddr::new(host, port), Duration::from_secs(3))?;
+    let start = Instant::now();
+    let socket = TcpStream::connect_timeout(
+        &SocketAddr::new(host, port),
+        timeout.min(Duration::from_secs(3)),
+    )?;
     socket.set_nodelay(true)?;
     let mut wire = Wire {
         socket,
-        deadline: Instant::now() + Duration::from_secs(15),
+        deadline: start + timeout,
+        cancel_at: cancellation.map(|after| start + after),
         calls: 0,
         read_chunk,
         write_chunk,

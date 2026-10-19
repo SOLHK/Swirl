@@ -27,7 +27,7 @@ jobs:
           permission-workflows: write
       - uses: actions/checkout@v4
         with:
-          ref: work/core-completion-20261017
+          ref: ${{ github.sha }}
           token: ${{ steps.swirl-app-token.outputs.token }}
       - name: Install Rust tools
         run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy
@@ -74,10 +74,37 @@ jobs:
           python tools/tests/test_dns_https.py
           if test -f tools/tests/test_socks4.py; then python tools/tests/test_socks4.py; fi
           if test -f tools/tests/test_websocket_transport.py; then python tools/tests/test_websocket_transport.py; fi
+      - name: Install pinned Go for the independent Xray peer
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        with:
+          go-version: '1.27.2'
+          cache: false
+      - name: Build pinned Xray and verify REALITY interoperability
+        working-directory: .
+        shell: bash
+        env:
+          SWIRL_XRAY_PEER_DIR: ${{ runner.temp }}/swirl-xray-peer
+          SWIRL_XRAY_EVIDENCE: ${{ runner.temp }}/swirl-xray-results
+          SWIRL_REALITY_CLIENT: ${{ github.workspace }}/core/target/release/examples/reality-client
+        run: |
+          set -euo pipefail
+          python tools/Build-XrayPeer.py --output "$SWIRL_XRAY_PEER_DIR"
+          python tools/tests/test_reality_xray.py
+      - name: Preserve Xray build identity and raw interoperability evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: App-REALITY-Xray-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/swirl-xray-peer/build.log
+            ${{ runner.temp }}/swirl-xray-peer/build-manifest.json
+            ${{ runner.temp }}/swirl-xray-results
+          if-no-files-found: error
+          retention-days: 14
       - name: Export exact source and result identity
         if: always()
         run: |
-          git archive HEAD core tools/tests src/Swirl.Quick/engine src/Swirl.Quick/tests > core-tested-source.tar
+          git archive HEAD core tools .github/workflows src/Swirl.Quick/engine src/Swirl.Quick/tests > core-tested-source.tar
           git status --porcelain > CORE_WORKTREE_STATE
       - uses: actions/upload-artifact@v4
         if: always()

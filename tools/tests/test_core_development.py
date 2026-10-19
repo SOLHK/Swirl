@@ -147,6 +147,7 @@ def vector_fixture(source, stage):
 
 def previous_reality_stage(source):
     """Strip the entire later TLS-peer stage before making historical fixtures."""
+    source = development.without_xray_steps(source)
     source = vector_fixture(source, 0)
     separator = "  windows-rust:\n"
     parts = source.split(separator)
@@ -211,6 +212,10 @@ class CoreDevelopmentTests(unittest.TestCase):
             path = root / relative
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text("# public synthetic Vision fixture\n", encoding="utf-8")
+        for relative in development.XRAY_SOURCES:
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("# public synthetic Xray fixture\n", encoding="utf-8")
         return workflow
 
     def test_vision_stage_upgrades_both_reviewed_histories_and_is_idempotent(self):
@@ -439,8 +444,8 @@ class CoreDevelopmentTests(unittest.TestCase):
         self.assertLess(menu.index("python -m pip install cryptography==50.0.2"), menu.index(expected))
         self.assertIn("          set -euo pipefail\n", menu)
         self.assertLess(source.index(REALITY_BUILD), source.index(marker))
-        # This stage adds execution only; the original source archive scope stays fixed.
-        self.assertIn("git archive HEAD core tools/tests src/Swirl.Quick/engine src/Swirl.Quick/tests > core-tested-source.tar\n", source)
+        # Include the peer builder and CI source as well as the actual test code.
+        self.assertIn("git archive HEAD core tools .github/workflows src/Swirl.Quick/engine src/Swirl.Quick/tests > core-tested-source.tar\n", source)
 
     def test_socks5_udp_adds_portable_qt_and_native_build_as_one_stage(self):
         final = development.updated_workflow(FIXTURE)
@@ -836,6 +841,95 @@ class CoreDevelopmentTests(unittest.TestCase):
         # Preparation alone is read-only, including when this test runs before
         # the App has made its first workflow-file commit.
         self.assertEqual((root / ".github/workflows/rust-core.yml").read_text(encoding="utf-8"), before)
+
+    def test_xray_stage_is_complete_pinned_and_after_the_existing_peers(self):
+        root = Path(__file__).resolve().parents[2]
+        final = development.updated_workflow(FIXTURE)
+        previous = development.without_xray_steps(final)
+        self.assertNotIn("test_reality_xray.py", previous)
+        self.assertEqual(development.updated_workflow(previous), final)
+        self.assertEqual(development.updated_workflow(final), final)
+        parts = final.split("  windows-rust:\n")
+        for index, part in enumerate(parts):
+            self.assertEqual(part.count("go-version: '1.27.2'"), 1)
+            self.assertIn("actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16", part)
+            self.assertIn("          cache: false\n", part)
+            self.assertEqual(part.count("python tools/tests/test_reality_xray.py\n"), 1)
+            self.assertLess(part.index("python ../tools/tests/test_reality_tls.py"),
+                            part.index("python tools/Build-XrayPeer.py"))
+            self.assertLess(part.index("python tools/Build-XrayPeer.py"),
+                            part.index("python tools/tests/test_reality_xray.py"))
+            evidence = part.split("      - name: Preserve Xray build", 1)[1].split("      - ", 1)[0]
+            self.assertIn("        if: always()\n", evidence)
+            self.assertIn("          if-no-files-found: error\n", evidence)
+            self.assertIn("build-manifest.json", evidence)
+            self.assertIn("build.log", evidence)
+            self.assertIn("${{ github.sha }}", evidence)
+            if index:
+                self.assertIn("reality-client.exe\n", part)
+                self.assertIn("python tools/tests/test_reality_xray.py\n" + development.WINDOWS_STATUS_GUARD, part)
+        app = (root / ".github/workflows/core-development.yml").read_text(encoding="utf-8")
+        self.assertIn("          ref: ${{ github.sha }}\n", app)
+        self.assertEqual(app.count("python tools/tests/test_reality_xray.py\n"), 1)
+        self.assertIn(development.xray_steps(artifact_prefix="App-REALITY-Xray"), app)
+
+    def test_xray_partial_missing_duplicate_and_ignored_failure_are_rejected(self):
+        final = development.updated_workflow(FIXTURE)
+        command = "          python tools/tests/test_reality_xray.py\n"
+        bad = (
+            final.replace(command, "", 1),
+            final.replace(command, command * 2, 1),
+            final.replace(command, command.rstrip() + " || true\n", 1),
+            final.replace(command + development.WINDOWS_STATUS_GUARD, command, 1),
+            final.replace("go-version: '1.27.2'", "go-version: 'stable'", 1),
+            final.replace("setup-go@924ae3a1cded613372ab5595356fb5720e22ba16", "setup-go@v6", 1),
+            final.replace("build-manifest.json", "unrelated.json", 1),
+            final.replace("          if-no-files-found: error\n", "          if-no-files-found: ignore\n", 1),
+            final.replace(development.xray_steps(), "", 1),
+            final.replace(development.xray_steps(windows=True), "", 1),
+            final + command,
+        )
+        for source in bad:
+            with self.subTest(source=source[-100:]), self.assertRaises(ValueError):
+                development.updated_workflow(source)
+
+    def test_xray_missing_material_prevents_any_workflow_write(self):
+        for missing in development.XRAY_SOURCES:
+            with self.subTest(missing=missing), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                workflow = self.make_repository(root)
+                before = workflow.read_bytes()
+                (root / missing).unlink()
+                with self.assertRaises(ValueError):
+                    development.apply_update(root, ENVIRONMENT)
+                self.assertEqual(workflow.read_bytes(), before)
+
+    def test_xray_build_failure_cannot_run_the_peer_or_become_success(self):
+        # Execute the checked-in shell body with a failing builder. This tests
+        # real exit propagation, independently of the textual migration guard.
+        root = Path(__file__).resolve().parents[2]
+        source = (root / ".github/workflows/rust-core.yml").read_text(encoding="utf-8")
+        windows = os.name == "nt"
+        part = source.split("  windows-rust:\n")[int(windows)]
+        body = part.split("      - name: Build pinned Xray and verify REALITY interoperability\n", 1)[1]
+        body = body.split("        run: |\n", 1)[1].split("      - ", 1)[0]
+        body = "\n".join(line[10:] for line in body.splitlines() if line.strip()) + "\n"
+        with tempfile.TemporaryDirectory() as temporary:
+            work = Path(temporary)
+            (work / "tools/tests").mkdir(parents=True)
+            (work / "tools/Build-XrayPeer.py").write_text("raise SystemExit(23)\n", encoding="utf-8")
+            (work / "tools/tests/test_reality_xray.py").write_text(
+                "from pathlib import Path\nPath('PEER_WAS_RUN').write_text('bad')\n", encoding="utf-8")
+            environment = dict(os.environ, SWIRL_XRAY_PEER_DIR=str(work / "peer"))
+            if windows:
+                script = work / "failure.ps1"
+                script.write_text(body, encoding="utf-8")
+                args = ["pwsh", "-NoProfile", "-File", str(script)]
+            else:
+                args = ["bash", "-c", body]
+            result = subprocess.run(args, cwd=work, env=environment, capture_output=True, timeout=15)
+            self.assertEqual(result.returncode, 23, result.stderr.decode(errors="replace"))
+            self.assertFalse((work / "PEER_WAS_RUN").exists())
 
 
 if __name__ == "__main__":
