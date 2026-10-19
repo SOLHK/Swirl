@@ -59,6 +59,7 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install cryptography==50.0.2
+          python tools/tests/generate_reality_vectors.py --check
           export SWIRL_RUST_HARNESS="$PWD/core/target/release/swirl-api"
           python tools/tests/test_rust_core.py
           python tools/tests/test_shadowsocks.py

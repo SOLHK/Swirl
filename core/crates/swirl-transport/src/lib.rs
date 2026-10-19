@@ -1,4 +1,5 @@
 //! Fixed-buffer full-duplex transfer with independent half-close and live counters.
+pub mod reality;
 mod udp;
 pub use udp::bind_udp;
 

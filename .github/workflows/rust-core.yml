@@ -33,6 +33,7 @@ jobs:
       - name: Independent portable protocol peers
         run: |
           python -m pip install cryptography==50.0.2
+          python ../tools/tests/generate_reality_vectors.py --check
           export SWIRL_RUST_HARNESS="$PWD/target/release/swirl-api"
           export SWIRL_RUST_INSPECTOR="$PWD/target/release/swirl-inspect"
           export SWIRL_RUST_DIAGNOSTIC="$PWD/target/release/swirl-diagnose"
@@ -86,6 +87,9 @@ jobs:
         shell: pwsh
         run: |
           python -m pip install cryptography==50.0.2
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python ../tools/tests/generate_reality_vectors.py --check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $env:SWIRL_RUST_HARNESS=(Resolve-Path target/release/swirl-api.exe).Path
           $env:SWIRL_RUST_INSPECTOR=(Resolve-Path target/release/swirl-inspect.exe).Path
           $env:SWIRL_RUST_DIAGNOSTIC=(Resolve-Path target/release/swirl-diagnose.exe).Path

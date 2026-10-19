@@ -8,6 +8,18 @@ are implemented and tested. This is **not the completed all-protocol product**.
 
 ## Current development scope (2026-10-19)
 
+The new [REALITY handshake foundation](../docs/REALITY_HANDSHAKE_FOUNDATION_20261019.md)
+owns real X25519/ML-KEM-768 key material, authenticates the exact first
+ClientHello, validates ServerHello/transcript checkpoints, and verifies REALITY
+certificate HMAC plus Ed25519 CertificateVerify. Independent Python/OpenSSL
+vectors and real stock-rustls verifier/provider integration cover authentication,
+data and close behavior within that test scope. This module is not connected to
+an outbound: the TLS backend still needs a pre-transcript ClientHello interface,
+fingerprint/negotiation integration and a complete REALITY peer. Vision remains
+unimplemented. Native import/startup preserves and explicitly rejects these
+requirements instead of substituting ordinary TLS or DIRECT; see the
+[Qt import security repair](../docs/REALITY_IMPORT_SECURITY_20261019.md).
+
 After the automatic-font implementation passed its Windows application/font
 gates, native Core development resumed on `work/core-completion-20261017`.
 Rule editing now preserves trailing modifiers, validates the complete candidate
@@ -42,7 +54,7 @@ cargo fmt --all -- --check
 cargo check --workspace --locked
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked
-cargo build --release --locked -p swirl-api
+cargo build --release --locked --workspace --lib --bins
 ```
 
 Configure the real desktop with CMake options `SWIRL_USE_RUST_CORE=ON` and

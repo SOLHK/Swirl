@@ -22,6 +22,10 @@ sha2 = "0.10"
 ring = "0.17"
 md-5 = "0.10"
 zeroize = "1"
+x25519-dalek = { version = "=3.0.0", features = ["static_secrets"] }
+ml-kem = { version = "=0.3.3", features = ["zeroize"] }
+x509-cert = { version = "=0.3.0", default-features = false }
+der = { version = "=0.8.2", default-features = false, features = ["derive"] }
 serde-saphyr = { version = "2.0", default-features = false, features = ["deserialize"] }
 url = "2"
 percent-encoding = "2"
