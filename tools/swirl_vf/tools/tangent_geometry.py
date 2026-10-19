@@ -34,7 +34,7 @@ def resolve_path(segments, blends) -> np.ndarray:
     controls = data[..., 2:4]
     for index, tag in enumerate(tags):
         if tag == 0:
-            factor = data[..., index, 0, None]
+            factor = np.clip(data[..., index, 0, None], 0.0, 1.0)
             result[..., index, :2] = ((1-factor) * controls[..., index-1, :]
                                       + factor * controls[..., index, :])
         elif tag == 2:

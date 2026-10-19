@@ -6,6 +6,10 @@ on:
     paths:
       - '.github/workflows/swirl-vf-transform-stages.yml'
       - 'tools/swirl_vf/platform/probe_transform_stages.py'
+      - 'tools/swirl_vf/platform/verify_transform_stages.py'
+      - 'tools/swirl_vf/tools/transform_geometry.py'
+      - 'tools/swirl_vf/tests/test_transform_geometry.py'
+      - 'tools/swirl_vf/tools/tangent_geometry.py'
       - 'tools/swirl_vf/tools/hvf.py'
       - 'tools/swirl_vf/tools/batch_geometry.py'
   workflow_dispatch:
@@ -53,7 +57,7 @@ jobs:
           xcrun clang -std=c11 -O2 -Wall -Wextra -Werror -mmacosx-version-min=15.4 tools/swirl_vf/platform/hvf_oracle.c -lhvf -o build/hvf_oracle
       - name: Observe independently authored master and extremum transform stages
         run: |
-          python tools/swirl_vf/platform/probe_transform_stages.py --binary build/hvf_oracle --output build/transform-evidence/transform-stages.json
+          python tools/swirl_vf/platform/verify_transform_stages.py --binary build/hvf_oracle --output build/transform-evidence/transform-stages.json
       - name: Preserve all 124 original tangent and 28 hierarchy regressions
         if: ${{ always() && steps.native.outcome == 'success' }}
         run: |

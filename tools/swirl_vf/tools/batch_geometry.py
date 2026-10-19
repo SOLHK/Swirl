@@ -57,16 +57,8 @@ class BatchGeometry:
         point_count = 0
 
         def compose_transforms(part, base, weights):
-            # Match the scalar renderer's native-checked composition order.
-            # A deeper rotation acts on inherited descendant translations.
-            changes = {}
-            for record, section in ((part.translations, slice(0, 2)),
-                                    (part.rotations, slice(2, 3))):
-                for row, vector in zip(record.master_rows, record.master_values):
-                    changes.setdefault(int(row), np.zeros((count, 3)))[:, section] += vector
-                for (row, col), vector in zip(record.extreme_indices, record.extreme_values):
-                    changes.setdefault(int(row), np.zeros((count, 3)))[:, section] += weights[:, int(col), None] * vector
-            for row, delta in changes.items():
+            from transform_geometry import blend_transform_rows
+            for row, delta in blend_transform_rows(part, weights).items():
                 target = base + 1 + row
                 cosine, sine = np.cos(delta[:, 2]), np.sin(delta[:, 2])
                 old = translations[:, target].copy()
@@ -136,7 +128,7 @@ class BatchGeometry:
                         off = segment[:, :, 2:4].copy()
                         for k, kind in enumerate(kinds):
                             if kind == 0:
-                                factor = segment[:, k, 0, None]
+                                factor = np.clip(segment[:, k, 0, None], 0.0, 1.0)
                                 segment[:, k, :2] = (1 - factor) * off[:, k - 1] + factor * off[:, k]
                         points = segment.reshape(count, -1, 2)
                     points = np.einsum("nij,npj->npi", matrix, points) + offset[:, None, :]

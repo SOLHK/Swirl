@@ -345,18 +345,10 @@ class ExperimentalRenderer:
         active = set()
 
         def compose_transforms(part, part_base, weights):
-            # Each composite defines a complete local R-then-T contribution.
-            # Compose it AFTER contributions inherited from shallower nodes;
-            # simply adding translations loses the deeper rotation of them.
-            # Collect sparse rows only, avoiding an allocation of the full tree.
-            changes = {}
-            for record, section in ((part.translations, slice(0, 2)),
-                                    (part.rotations, slice(2, 3))):
-                for row, vector in zip(record.master_rows, record.master_values):
-                    changes.setdefault(int(row), np.zeros(3))[section] += vector
-                for (row, col), vector in zip(record.extreme_indices, record.extreme_values):
-                    changes.setdefault(int(row), np.zeros(3))[section] += weights[int(col)] * vector
-            for row, delta in changes.items():
+            # Native experiments distinguish master/extremum composition and
+            # rotation-centre interpolation from additive R/T parameters.
+            from transform_geometry import blend_transform_rows
+            for row, delta in blend_transform_rows(part, weights).items():
                 target = part_base + 1 + row
                 co, si = math.cos(delta[2]), math.sin(delta[2])
                 x, y = translations[target]
@@ -411,7 +403,7 @@ class ExperimentalRenderer:
                         off = segment[:, 2:4].copy()
                         for k, kind in enumerate(types):
                             if kind == 0:
-                                parallel = segment[k, 0]
+                                parallel = np.clip(segment[k, 0], 0.0, 1.0)
                                 segment[k, :2] = (1 - parallel) * off[k - 1] + parallel * off[k]
                         points = segment.reshape(-1, 2)
                     homogeneous = np.column_stack((points, np.ones(len(points))))
