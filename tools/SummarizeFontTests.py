@@ -70,6 +70,7 @@ def summarize(build: Path, require_windows: bool) -> dict:
     local_only = {"importOptionalPingFangUiCollection", "optionalVariableAxesAndLivePreview",
                   "optionalRestartRead", "optionalRenderMatrix", "optionalNativePointSizes",
                   "optionalPaintedPreviewAxes", "optionalRasterQualityMatrix",
+                  "optionalPhysicalFontIdentity",
                   "nativeGlyphsHaveNoColourFringes"}
     for case in cases:
         if case["status"] not in {"pass", "skip"}:

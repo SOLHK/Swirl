@@ -48,10 +48,32 @@ class FontCiReportTests(unittest.TestCase):
         self.assertFalse(result["refresh240HzVerified"])
 
     def test_required_synthetic_fixture_skip_fails_gate(self):
-        self.selection["optionalMetadataReplacement"] = "skip"
+        for name in ("optionalMetadataReplacement", "automaticWidthUsesRealAdvances"):
+            with self.subTest(name=name):
+                skipped = dict(self.selection)
+                skipped[name] = "skip"
+                self.write("font-selection.xml", skipped)
+                result = font_report.summarize(self.root, False)
+                self.assertTrue(any(name in error for error in result["errors"]))
+
+    def test_private_physical_identity_skip_is_reported_as_unverified(self):
+        self.selection["optionalPhysicalFontIdentity"] = "skip"
         self.write("font-selection.xml", self.selection)
         result = font_report.summarize(self.root, False)
-        self.assertTrue(any("optionalMetadataReplacement" in error for error in result["errors"]))
+        self.assertEqual(result["countsExcludingLifecycle"], {"pass": 18, "skip": 2})
+        self.assertEqual(result["errors"], [])
+        self.assertFalse(result["physicalDpiVerified"])
+        self.assertFalse(result["refresh240HzVerified"])
+        actual = [case for case in result["cases"] if case["function"] == "optionalPhysicalFontIdentity"]
+        self.assertEqual(len(actual), 1)
+        self.assertEqual(actual[0]["status"], "skip")
+
+    def test_failed_private_physical_identity_still_fails_gate(self):
+        self.selection["optionalPhysicalFontIdentity"] = "fail"
+        self.write("font-selection.xml", self.selection)
+        result = font_report.summarize(self.root, False)
+        self.assertTrue(any("optionalPhysicalFontIdentity: fail" in error for error in result["errors"]))
+        self.assertEqual(result["countsExcludingLifecycle"], {"pass": 18, "skip": 1})
 
     def test_missing_or_truncated_report_fails_gate(self):
         for contents in (None, "<TestCase><TestFunction>"):
