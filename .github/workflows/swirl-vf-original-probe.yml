@@ -1,0 +1,50 @@
+name: Swirl VF exact-source native diagnostics
+
+on:
+  push:
+    branches: [work/core-completion-20261017]
+    paths:
+      - '.github/workflows/swirl-vf-original-probe.yml'
+      - 'tools/swirl_vf/platform/probe_identical_source.py'
+      - 'tools/swirl_vf/platform/coretext_extract.swift'
+      - 'tools/swirl_vf/tools/rebuild.py'
+      - 'tools/swirl_vf/tools/metric_variations.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: swirl-vf-original-probe-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  original-probe:
+    runs-on: xcode-27
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile native extractor
+        shell: bash
+        run: |
+          python -m pip install fonttools==4.61.1 numpy==2.2.6
+          mkdir -p build/original-probe-summary
+          xcrun swiftc -O tools/swirl_vf/platform/coretext_extract.swift -o "$RUNNER_TEMP/coretext_extract"
+      - name: Probe only the exact resident source without publishing font data
+        shell: bash
+        run: |
+          python tools/swirl_vf/platform/probe_identical_source.py \
+            /System/Library/PrivateFrameworks/FontServices.framework/Versions/A/Resources/Reserved/PingFangUI.ttc \
+            --binary "$RUNNER_TEMP/coretext_extract" \
+            --output build/original-probe-summary/original-probe-summary.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: swirl-vf-original-summary-${{ github.sha }}
+          path: build/original-probe-summary/original-probe-summary.json
+          retention-days: 7
