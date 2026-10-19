@@ -241,11 +241,56 @@ void singBox(Result &r,const QJsonArray &array){
             for(auto it=reality.begin();it!=reality.end();++it)if(!QStringList{"enabled","public_key","short_id"}.contains(it.key()))issue(issues,"sing-box Reality 含未映射选项。");
             if(type=="trojan"&&!tls.value("enabled").toBool())issue(issues,"未加密的 Trojan 出站尚未支持。");
         }
-        const auto t=raw.value("transport").toObject();if(!t.isEmpty()){
-            const auto net=t.value("type").toString();const auto path=t.value(net=="grpc"?"service_name":"path").toString();
+        if(raw.contains("transport")&&!raw.value("transport").isNull()){
+            // The optional sing-box transport pointer treats null as absent.
+            // Wrong JSON types must not become an empty object or default path.
+            if(!raw.value("transport").isObject()){
+                r.error="sing-box 传输必须为对象；未应用配置。";return;
+            }
+            auto t=raw.value("transport").toObject();const auto net=t.value("type").toString();
+            if(!t.value("type").isString()||!QStringList{"http","ws","quic","grpc","httpupgrade"}.contains(net)){
+                r.error="sing-box 传输类型缺失、无效或未识别；未降级为 TCP。";return;
+            }
+            QSet<QString> mapped{"type"};
+            if(net=="ws")mapped.unite(QSet<QString>{"path","headers","max_early_data","early_data_header_name"});
+            else if(net=="grpc")mapped.insert("service_name");
+            // Go decoding leaves these optional null fields at their zero value;
+            // normalize only mapped fields and retain the untouched original.
+            for(const auto &key:mapped)if(key!="type"&&t.value(key).isNull())t.remove(key);
+            for(const auto &key:QStringList{"path","service_name","early_data_header_name"})if(t.contains(key)&&!t.value(key).isString()){
+                r.error="sing-box 传输字符串类型无效；未应用配置。";return;
+            }
+            if(t.contains("headers")){
+                if(!t.value("headers").isObject()){
+                    r.error="sing-box 传输请求头必须为对象；未应用配置。";return;
+                }
+                auto headers=t.value("headers").toObject();
+                for(auto h=headers.begin();h!=headers.end();){
+                    // A null Listable has no entries. Null string-array entries
+                    // are empty strings, not an instruction to omit the header.
+                    if(h.value().isNull()){h=headers.erase(h);continue;}
+                    const auto value=h.value();auto values=value.isArray()?value.toArray():QJsonArray{value};
+                    for(qsizetype i=0;i<values.size();++i){
+                        if(values.at(i).isNull())values[i]="";
+                        else if(!values.at(i).isString()){
+                            r.error="sing-box 传输请求头值类型无效；未应用配置。";return;
+                        }
+                    }
+                    if(value.isArray())h.value()=values;
+                    ++h;
+                }
+                t["headers"]=headers;
+            }
+            if(t.contains("max_early_data")){
+                const auto value=t.value("max_early_data");const auto count=value.toInteger(-1);
+                if(!value.isDouble()||count<0||count>0xffffffffLL){
+                    r.error="sing-box 传输早期数据上限必须为 uint32；未应用配置。";return;
+                }
+            }
+            const auto path=t.value(net=="grpc"?"service_name":"path").toString();
             transport(n,net,path,{},issues);
             if(net=="ws"){auto opts=n.value("ws-opts").toObject();if(t.contains("headers"))opts["headers"]=t.value("headers");if(t.contains("max_early_data"))opts["max-early-data"]=t.value("max_early_data");if(t.contains("early_data_header_name"))opts["early-data-header-name"]=t.value("early_data_header_name");n["ws-opts"]=opts;}
-            for(auto it=t.begin();it!=t.end();++it)if(!QStringList{"type","path","service_name","headers","max_early_data","early_data_header_name"}.contains(it.key()))issue(issues,"sing-box 传输含未映射选项，原始配置已保留。");
+            for(auto it=t.begin();it!=t.end();++it)if(!mapped.contains(it.key()))issue(issues,"sing-box 传输含未映射选项，原始配置已保留。");
         }
         const QSet<QString> known{"tag","type","server","server_port","tls","transport","username","password","uuid","method","alter_id","security","flow","detour","up_mbps","down_mbps"};
         for(auto it=raw.begin();it!=raw.end();++it)if(!known.contains(it.key()))issue(issues,"sing-box 出站包含未映射扩展，原始配置已保留。");

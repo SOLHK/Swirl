@@ -177,6 +177,40 @@ private slots:
   }
   QCoreApplication::processEvents();QCOMPARE(connections,0);
  }
+ void singBoxTransportMapsExactlyAndRejectsUnmappedFieldsBeforeStart(){
+  QTcpServer endpoint;QVERIFY(endpoint.listen(QHostAddress::LocalHost));int connections=0;
+  connect(&endpoint,&QTcpServer::newConnection,this,[&]{++connections;});
+  QTcpServer localPort;QVERIFY(localPort.listen(QHostAddress::LocalHost));const auto proxyPort=localPort.serverPort();localPort.close();
+  const QJsonObject source{{"tag","fixture"},{"type","vless"},{"server","127.0.0.1"},{"server_port",endpoint.serverPort()},{"uuid","11111111-1111-4111-8111-111111111111"}};
+  EngineStartOptions options;options.proxyPort=proxyPort;options.routingMode="global";
+  for(const auto &field:QStringList{"service_name","future_required_field"}){
+   auto node=source;node["transport"]=QJsonObject{{"type","ws"},{"path","/ws"},{field,"synthetic-secret"}};
+   const auto parsed=NodeImporter::parse(QJsonDocument(QJsonObject{{"outbounds",QJsonArray{node}}}).toJson());QVERIFY2(parsed,qPrintable(parsed.error));
+   options.nodes=parsed.nodes;options.selectedNodeId=parsed.nodes.first().id;QJsonObject unchanged{{"sentinel",true}};
+   QVERIFY(!RustCoreEngine::configuration(options,&unchanged).isEmpty());QCOMPARE(unchanged,QJsonObject({{"sentinel",true}}));
+   RustCoreEngine engine;engine.start(options);QCOMPARE(engine.status().state,ProxyEngine::State::Failed);QCOMPARE(engine.status().error,ProxyEngine::Error::InvalidOptions);
+   QVERIFY(!engine.status().processAlive);QVERIFY(!engine.status().apiHealthy);QVERIFY(!engine.status().message.contains("synthetic-secret"));
+  }
+  for(bool tls:{false,true})for(bool websocket:{false,true})for(bool explicitNulls:{false,true}){
+   auto node=source;
+   if(tls)node["tls"]=QJsonObject{{"enabled",true},{"server_name","tls.fixture.invalid"},{"alpn",QJsonArray{"http/1.1"}}};
+   if(websocket)node["transport"]=QJsonObject{{"type","ws"},{"path","/ws%20path?fixture=1"},{"headers",QJsonObject{{"hOsT","ws.fixture.invalid:8443"}}}};
+   if(explicitNulls)node["transport"]=websocket?QJsonValue(QJsonObject{{"type","ws"},{"path",QJsonValue()},{"headers",QJsonObject{{"Host",QJsonValue()}}},{"max_early_data",QJsonValue()},{"early_data_header_name",QJsonValue()}}):QJsonValue();
+   const auto original=QJsonDocument(QJsonObject{{"outbounds",QJsonArray{node}}}).toJson();
+   for(const auto &body:{original,original.toBase64()}){
+    const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));QVERIFY(parsed.nodes.first().conversionIssues.isEmpty());
+    QCOMPARE(parsed.nodes.first().originalConfiguration,node);
+    options.nodes=parsed.nodes;options.selectedNodeId=parsed.nodes.first().id;QJsonObject configuration;const auto error=RustCoreEngine::configuration(options,&configuration);QVERIFY2(error.isEmpty(),qPrintable(error));
+    const auto outbound=configuration.value("nodes").toArray().first().toObject().value("outbound").toObject();
+    QCOMPARE(outbound.value("type"),QJsonValue("vless"));QCOMPARE(outbound.value("host"),source.value("server"));QCOMPARE(outbound.value("port"),source.value("server_port"));QCOMPARE(outbound.value("uuid"),source.value("uuid"));
+    QCOMPARE(outbound.contains("tls"),tls);QCOMPARE(outbound.contains("websocket"),websocket);
+    if(tls){QCOMPARE(outbound.value("tls").toObject().value("server_name"),QJsonValue("tls.fixture.invalid"));QCOMPARE(outbound.value("tls").toObject().value("alpn"),QJsonValue(QJsonArray{"http/1.1"}));}
+    if(websocket){QCOMPARE(outbound.value("websocket").toObject().value("host"),explicitNulls?source.value("server"):QJsonValue("ws.fixture.invalid:8443"));QCOMPARE(outbound.value("websocket").toObject().value("path"),QJsonValue(explicitNulls?"/":"/ws%20path?fixture=1"));}
+    else {QVERIFY(!parsed.nodes.first().parameters.contains("network"));QVERIFY(!parsed.nodes.first().parameters.contains("ws-opts"));}
+   }
+  }
+  QCoreApplication::processEvents();QCOMPARE(connections,0);
+ }
  void profileRefreshKeepsOnlyItsOwnValidSelection(){
   QTemporaryDir directory;const auto path=directory.filePath("nodes.dpapi");NodeStore seed(path);
   QVERIFY(seed.saveSubscription({},"first",QUrl("https://fixture.invalid/first"),360,false));const auto first=seed.subscriptions().last().id;

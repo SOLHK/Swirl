@@ -179,6 +179,80 @@ private slots:
         QVERIFY(unknown);QVERIFY(!unknown.nodes.first().conversionIssues.isEmpty());QVERIFY(!SwirlProtocolRegistry::nativeNodeReason(unknown.nodes.first()).isEmpty());
         QVERIFY(!QJsonDocument::fromVariant(unknown.nodes.first().publicInfo()).toJson().contains("synthetic-secret"));
     }
+    void singBoxTransportShapesAndFieldsCannotDowngrade() {
+        const QByteArray prefix=R"({"outbounds":[{"tag":"fixture","type":"vless","server":"edge.example.org","server_port":443,"uuid":"11111111-1111-4111-8111-111111111111","transport":)";
+        const QList<QByteArray> invalidTransport{
+            "false", "true", "1", "\"ws\"", "[]", "{}",
+            R"({"type":null})",R"({"type":1})",R"({"type":[]})",R"({"type":""})",R"({"type":"tcp"})",R"({"type":"h2"})",R"({"type":"synthetic-secret"})",
+            R"({"type":"ws","path":42})",R"({"type":"ws","path":[]})",
+            R"({"type":"grpc","service_name":42})",R"({"type":"ws","early_data_header_name":false})",
+            R"({"type":"ws","headers":[]})",R"({"type":"ws","headers":"synthetic-secret"})",
+            R"({"type":"ws","headers":{"Host":42}})",R"({"type":"ws","headers":{"Host":["ws.example.org",42]}})",
+            R"({"type":"ws","max_early_data":true})",R"({"type":"ws","max_early_data":"0"})",
+            R"({"type":"ws","max_early_data":-1})",R"({"type":"ws","max_early_data":1.5})",R"({"type":"ws","max_early_data":4294967296})"
+        };
+        for(const auto &transport:invalidTransport){
+            const auto original=prefix+transport+"}]}";
+            for(const auto &body:{original,original.toBase64()}){
+                const auto parsed=NodeImporter::parse(body);QVERIFY2(!parsed,"Invalid transport silently became TCP or a default WS path");QVERIFY(parsed.nodes.isEmpty());
+                QVERIFY(!parsed.error.contains("synthetic-secret"));
+            }
+        }
+        const auto absent=prefix+"null}]}";
+        for(const auto &body:{absent,absent.toBase64()}){
+            const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));const auto &node=parsed.nodes.first();
+            QVERIFY(node.conversionIssues.isEmpty());QVERIFY(!node.parameters.contains("network"));QVERIFY(!node.parameters.contains("ws-opts"));
+            QCOMPARE(node.originalConfiguration,QJsonDocument::fromJson(absent).object().value("outbounds").toArray().first().toObject());
+        }
+        const QList<QJsonObject> websocketOptions{
+            QJsonObject{{"type","ws"}},QJsonObject{{"type","ws"},{"path",""}},
+            QJsonObject{{"type","ws"},{"path","/socket%20path?fixture=1"},{"headers",QJsonObject{{"hOsT","ws.fixture.invalid:8443"}}}},
+            QJsonObject{{"type","ws"},{"path","/ws"},{"headers",QJsonObject{{"X-Fixture",QJsonArray{"first","second"}}}},{"max_early_data",qint64(0)},{"early_data_header_name",""}},
+            QJsonObject{{"type","ws"},{"max_early_data",qint64(4294967295)},{"early_data_header_name","Sec-WebSocket-Protocol"}}
+        };
+        for(const auto &transport:websocketOptions){
+            const auto original=prefix+QJsonDocument(transport).toJson(QJsonDocument::Compact)+"}]}";
+            for(const auto &body:{original,original.toBase64()}){
+                const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));const auto &node=parsed.nodes.first();QVERIFY(node.conversionIssues.isEmpty());
+                QCOMPARE(node.parameters.value("network"),QJsonValue("ws"));const auto ws=node.parameters.value("ws-opts").toObject();
+                QCOMPARE(ws.value("path"),QJsonValue(transport.value("path").toString().isEmpty()?"/":transport.value("path").toString()));
+                QCOMPARE(ws.value("headers"),transport.contains("headers")?transport.value("headers"):QJsonValue(QJsonObject{}));
+                QCOMPARE(ws.value("max-early-data"),transport.value("max_early_data"));QCOMPARE(ws.value("early-data-header-name"),transport.value("early_data_header_name"));
+                QCOMPARE(node.originalConfiguration,QJsonDocument::fromJson(original).object().value("outbounds").toArray().first().toObject());
+            }
+        }
+        const QJsonObject defaultWs{{"path","/"},{"headers",QJsonObject{}}};
+        const QList<QPair<QByteArray,QJsonObject>> nullableWs{
+            {R"({"type":"ws","path":null})",defaultWs},
+            {R"({"type":"ws","headers":null})",defaultWs},
+            {R"({"type":"ws","headers":{"Host":null,"X-Fixture":null}})",defaultWs},
+            {R"({"type":"ws","max_early_data":null,"early_data_header_name":null})",defaultWs},
+            {R"({"type":"ws","path":null,"headers":null,"max_early_data":null,"early_data_header_name":null})",defaultWs},
+            {R"({"type":"ws","headers":{"Host":null,"X-Fixture":["first",null,"second"]}})",
+             QJsonObject{{"path","/"},{"headers",QJsonObject{{"X-Fixture",QJsonArray{"first","","second"}}}}}}
+        };
+        for(const auto &[transport,expected]:nullableWs){
+            const auto original=prefix+transport+"}]}";
+            for(const auto &body:{original,original.toBase64()}){
+                const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));const auto &node=parsed.nodes.first();
+                QVERIFY(node.conversionIssues.isEmpty());QCOMPARE(node.parameters.value("ws-opts"),QJsonValue(expected));
+                QCOMPARE(node.originalConfiguration,QJsonDocument::fromJson(original).object().value("outbounds").toArray().first().toObject());
+            }
+        }
+        for(const auto &transport:QList<QByteArray>{R"({"type":"ws","service_name":"synthetic-secret"})",R"({"type":"ws","future":"synthetic-secret"})",R"({"type":"grpc","path":"/synthetic-secret"})",R"({"type":"grpc","headers":{"Host":"synthetic-secret"}})"}){
+            const auto original=prefix+transport+"}]}";const auto parsed=NodeImporter::parse(original);QVERIFY2(parsed,qPrintable(parsed.error));const auto &node=parsed.nodes.first();
+            QVERIFY(!node.conversionIssues.isEmpty());QVERIFY(!SwirlProtocolRegistry::nativeNodeReason(node).isEmpty());
+            QCOMPARE(node.originalConfiguration.value("transport"),QJsonValue(QJsonDocument::fromJson(transport).object()));
+            QVERIFY(!QJsonDocument::fromVariant(node.publicInfo()).toJson().contains("synthetic-secret"));
+        }
+        const auto grpc=NodeImporter::parse(prefix+R"({"type":"grpc","service_name":"fixture-service"}}]})");QVERIFY(grpc);
+        QCOMPARE(grpc.nodes.first().parameters.value("network"),QJsonValue("grpc"));QCOMPARE(grpc.nodes.first().parameters.value("grpc-opts").toObject().value("grpc-service-name"),QJsonValue("fixture-service"));
+        QVERIFY(!SwirlProtocolRegistry::nativeNodeReason(grpc.nodes.first()).isEmpty());
+        const auto nullGrpc=NodeImporter::parse(prefix+R"({"type":"grpc","service_name":null}}]})");QVERIFY(nullGrpc);
+        QCOMPARE(nullGrpc.nodes.first().parameters.value("grpc-opts").toObject().value("grpc-service-name"),QJsonValue(""));
+        QVERIFY(nullGrpc.nodes.first().originalConfiguration.value("transport").toObject().value("service_name").isNull());
+        QVERIFY(!SwirlProtocolRegistry::nativeNodeReason(nullGrpc.nodes.first()).isEmpty());
+    }
     void iniCompleteProfileHasClosedExecutionSemantics() {
         const QByteArray original="[Proxy]\nA = socks5,127.0.0.1,1080\nDIRECT = direct\nREJECT = reject\n[Proxy Group]\nroute = select,A,DIRECT\nnested = select,route,REJECT\n[Rule]\nDOMAIN,exact.invalid,REJECT\nDOMAIN-SUFFIX,suffix.invalid,route\nDOMAIN-KEYWORD,keyword,nested\nFINAL,route\n";
         for(const auto &body:{original,original.toBase64()}) {
@@ -231,6 +305,8 @@ private slots:
         rejected.append("vless://11111111-1111-4111-8111-111111111111@example.org:443?security=tls&pbk=fixture-secret");
         rejected.append(R"({"outbounds":[{"type":"vless","tag":"invalid","server":"example.org","server_port":443,"uuid":"11111111-1111-4111-8111-111111111111","tls":{"enabled":true,"reality":"fixture-secret"}}]})");
         rejected.append(R"({"outbounds":[{"type":"vless","tag":"invalid","server":"example.org","server_port":443,"uuid":"11111111-1111-4111-8111-111111111111","tls":{"enabled":true,"utls":{"enabled":"true","fingerprint":"fixture-secret"}}}]})");
+        for(const auto &transport:QList<QByteArray>{R"("fixture-secret")",R"({"type":42})",R"({"type":"ws","path":42})",R"({"type":"ws","headers":["fixture-secret"]})"})
+            rejected.append(QByteArray(R"({"outbounds":[{"type":"vless","tag":"invalid","server":"example.org","server_port":443,"uuid":"11111111-1111-4111-8111-111111111111","transport":)")+transport+"}]}");
         for(const auto &protocol:{"https","socks5-tls"})rejected.append(QByteArray("[server_local]\n")+protocol+"=example.org:443,tag=fixture,over-tls=false");
         for(const auto &body:rejected)for(const auto &wrapped:{body,body.toBase64()}){
             const auto parsed=NodeImporter::parse(wrapped);QVERIFY2(!parsed,"Malformed or conflicting typed option was accepted");
