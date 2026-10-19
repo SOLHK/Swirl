@@ -1,3 +1,48 @@
+# Current handoff: automatic fonts verified; native Core development resumed (2026-10-19)
+
+The current user instruction is to complete the font work and then continue the
+self-developed Swirl Core. This supersedes the older pause and delegation
+instructions below. All changes stay on `work/core-completion-20261017`; never
+force-push or change `main`, App configuration, Secrets or supplier subscriptions.
+
+- Automatic variable-font implementation `dfae05d07f84694d12223c9fcd4eddd199373dc1`
+  passed Windows Qt 6.10.3 font tests (50 actual passes, 8 explicit skips), the
+  complete compatibility application build and 61/61 ready navigation requests.
+  See `FONT_AUTOMATION_SYSTEM.md`, `FONT_AUTOMATION_QML_COVERAGE.md` and
+  `FONT_AUTOMATION_VALIDATION.md`. Physical scaling/240 Hz are still separate;
+  hosted D3D11 WARP/offscreen results do not establish physical display quality.
+- Rule-editor integrity implementation `72fa72a77d809d6084080dc5630459ed6d336fcf`
+  and its test/report fix `6dcc212df1f58ce96d555dfa14db29e53b2e4bf2` now passed
+  exact-source three-platform CI `39178283551`. Windows native Qt has 44 actual
+  passes, 5 independent-peer skips and no failures. All three new rule tests
+  passed, including encrypted atomic persistence and native forwarding. Preserve
+  the first failed run and follow-up evidence in `RULE_EDIT_TRANSACTION_20261019.md`.
+- This source stage implements standard SOCKS5 outbound UDP, strict implicit TLS
+  alias preservation and existing Qt import/control integration. Local Rust
+  workspace: 152 passes. Independent new UDP: 12 passes, 1 full-Qt hook skip;
+  separately executed Qt production-code subsets and real Rust shared library
+  pass the new mapping and independent peer hooks. Existing TCP/TLS/SS peers:
+  31 passes, 2 explicit full-Qt hook skips. No private provider is involved.
+  See `RUST_SOCKS5_UDP_20261019.md` for exact bounds and retained failure history.
+
+Next gate for this UDP source commit: actual Linux/macOS/Windows CI, both native
+and compatibility Qt imports, independent Windows Qt UDP forwarding, and a full
+native `Swirl` build. Record the exact SHA and result after those jobs finish;
+local portable Qt subsets are not the complete Windows test targets. Preserve
+all test assertions, explicit skips, fixed XML report paths and original exit codes.
+
+The 79-item acceptance baseline and 10.83% verified whole-goal score are unchanged.
+SOCKS5 UDP is a partial protocol implementation, not complete-profile acceptance.
+Private-profile chains remain 0/18 verified; there is no new supplier refresh or
+private-node attempt. REALITY/Vision remain unsupported in the repository. The
+prior unintegrated R0/R1 work under `D:/Codex/work/reality-r1-kx` has not been read
+from this cloud session or overwritten; do not claim its TLS handshake is done.
+Cloud/GitHub changes do not save files on the user's D drive.
+
+---
+
+# Historical handoffs (the current section above takes scheduling precedence)
+
 # Current handoff: safely paused after subscription stage (2026-10-18)
 
 User requested conserving local execution quota and deciding font work next. No new protocol module, full build or font work should start automatically from older continuation paragraphs. This section supersedes their scheduling instructions.

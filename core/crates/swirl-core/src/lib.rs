@@ -1,5 +1,6 @@
 //! Rust-owned runtime, sockets, scheduling, statistics and immutable session plans.
 mod policy;
+mod socks5_udp;
 pub use policy::{MemberHealth, PolicyReport};
 use policy::{PolicyRuntime, PolicyView};
 use serde::Serialize;
@@ -20,7 +21,7 @@ use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream, UdpSocket},
     runtime::{Builder, Runtime},
-    sync::{Semaphore, watch},
+    sync::{OwnedSemaphorePermit, Semaphore, watch},
     task::{JoinHandle, JoinSet},
     time::timeout,
 };
@@ -492,10 +493,20 @@ async fn route<'a>(
 }
 
 struct UdpDispatch {
-    address: SocketAddr,
-    packet: Vec<u8>,
+    transport: UdpTransport,
     payload_len: usize,
     node_id: String,
+    permit: OwnedSemaphorePermit,
+}
+enum UdpTransport {
+    Datagram {
+        address: SocketAddr,
+        packet: Vec<u8>,
+    },
+    Socks5 {
+        target: Target,
+        payload: Vec<u8>,
+    },
 }
 fn udp_drop(local: &Counters, total: &Counters) {
     local.udp_dropped.fetch_add(1, Ordering::Relaxed);
@@ -516,10 +527,24 @@ async fn prepare_udp(
     target: Target,
     payload: Vec<u8>,
     source: std::net::IpAddr,
+    permit: OwnedSemaphorePermit,
 ) -> Result<UdpDispatch> {
     let (node, target) = route(&plan, &target, source).await?;
+    let payload_len = payload.len();
     let (host, port, packet) = match &node.outbound {
-        Outbound::Direct {} => (target.host.clone(), target.port, payload.clone()),
+        Outbound::Direct {} => (target.host.clone(), target.port, payload),
+        Outbound::Socks5 {
+            udp: true,
+            tls: None,
+            ..
+        } => {
+            return Ok(UdpDispatch {
+                transport: UdpTransport::Socks5 { target, payload },
+                payload_len,
+                node_id: node.id.clone(),
+                permit,
+            });
+        }
         Outbound::Shadowsocks {
             host,
             port,
@@ -545,10 +570,10 @@ async fn prepare_udp(
         .next()
         .ok_or("DnsEmpty")?;
     Ok(UdpDispatch {
-        address,
-        packet,
-        payload_len: payload.len(),
+        transport: UdpTransport::Datagram { address, packet },
+        payload_len,
         node_id: node.id.clone(),
+        permit,
     })
 }
 async fn udp_associate(
@@ -592,17 +617,34 @@ async fn udp_associate(
     // A bounded per-association preparation queue lets DNS wait independently
     // from received replies. Dropping the JoinSet cancels all queued work.
     let mut pending: JoinSet<Result<UdpDispatch>> = JoinSet::new();
+    let slots = Arc::new(Semaphore::new(4));
+    let mut socks = socks5_udp::Pool::new(plan.clone(), counters.clone(), total.clone());
     loop {
         tokio::select! {
             _=control.read(&mut closed)=>return Ok(()),
             Some(prepared)=pending.join_next(), if !pending.is_empty()=>{
-                let dispatch=match prepared {Ok(Ok(d))=>d,_=>{udp_drop(&counters,&total);continue;}};
+                let UdpDispatch {transport,payload_len,node_id,permit}=match prepared {Ok(Ok(d))=>d,_=>{udp_drop(&counters,&total);continue;}};
+                let (address,packet)=match transport {
+                    UdpTransport::Datagram {address,packet}=>(address,packet),
+                    UdpTransport::Socks5 {target,payload}=>{socks.send(node_id,target,payload,permit);continue;}
+                };
                 destinations.retain(|_,(at,_)|at.elapsed()<Duration::from_secs(30));
-                if (destinations.len()>=64 && !destinations.contains_key(&dispatch.address)) || destinations.get(&dispatch.address).is_some_and(|(_,id)|id!=&dispatch.node_id){udp_drop(&counters,&total);continue;}
-                let socket=if dispatch.address.is_ipv4(){&v4}else{&v6};
-                if socket.send_to(&dispatch.packet,dispatch.address).await.is_err(){udp_drop(&counters,&total);continue;}
-                destinations.insert(dispatch.address,(Instant::now(),dispatch.node_id));
-                counters.upload.fetch_add(dispatch.payload_len as u64,Ordering::Relaxed);total.upload.fetch_add(dispatch.payload_len as u64,Ordering::Relaxed);
+                if (destinations.len()>=64 && !destinations.contains_key(&address)) || destinations.get(&address).is_some_and(|(_,id)|id!=&node_id){udp_drop(&counters,&total);continue;}
+                let socket=if address.is_ipv4(){&v4}else{&v6};
+                if socket.send_to(&packet,address).await.is_err(){udp_drop(&counters,&total);continue;}
+                destinations.insert(address,(Instant::now(),node_id));
+                counters.upload.fetch_add(payload_len as u64,Ordering::Relaxed);total.upload.fetch_add(payload_len as u64,Ordering::Relaxed);
+                drop(permit);
+            }
+            Some(response)=socks.next_reply()=>{
+                let Some(client)=client else {continue;};
+                let forwarded=tokio::select! {
+                    biased;
+                    _=control.read(&mut closed)=>return Ok(()),
+                    sent=response.send_to(&relay,client)=>sent,
+                };
+                let Ok(payload_len)=forwarded else {udp_drop(&counters,&total);continue;};
+                counters.download.fetch_add(payload_len as u64,Ordering::Relaxed);total.download.fetch_add(payload_len as u64,Ordering::Relaxed);
             }
             packet=relay.recv_from(&mut from_client)=>{
                 let (n,source)=match packet {Ok(v)=>v,Err(e) if transient_udp(&e)=>{udp_drop(&counters,&total);continue;},Err(_)=>return Err("UdpReceive")};
@@ -611,8 +653,8 @@ async fn udp_associate(
                 let Ok(target)=swirl_protocol::read_target(&mut cursor,false).await else {continue;};
                 client=Some(source);
                 if cursor.len()>65507 {continue;}
-                if pending.len()>=4{udp_drop(&counters,&total);continue;}
-                pending.spawn(prepare_udp(plan.clone(),target,cursor.to_vec(),source.ip()));
+                let Ok(permit)=slots.clone().try_acquire_owned() else {udp_drop(&counters,&total);continue;};
+                pending.spawn(prepare_udp(plan.clone(),target,cursor.to_vec(),source.ip(),permit));
             }
             packet=v4.recv_from(&mut from_v4)=>{
                 let (n,source)=match packet {Ok(v)=>v,Err(e) if transient_udp(&e)=>{udp_drop(&counters,&total);continue;},Err(_)=>return Err("UdpReceive")};

@@ -9,6 +9,8 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkProxy>
+#include <QNetworkDatagram>
+#include <QUdpSocket>
 #include <QUuid>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -23,6 +25,17 @@ class RustCoreTests:public QObject {
   EngineStartOptions o;QTcpServer port;port.listen(QHostAddress::LocalHost);o.proxyPort=port.serverPort();o.routingMode="global";
   ProxyNode n;n.id=QUuid::createUuid().toString(QUuid::WithoutBraces);n.name="synthetic";n.protocol="socks5";n.host="127.0.0.1";n.port=net.a.serverPort();
   o.nodes={n};o.selectedNodeId=n.id;return o;
+ }
+ QList<QByteArray> socks5Sources(quint16 port,bool authenticated,int udp=-1,bool tls=false){
+  QJsonObject proxy{{"name","fixture"},{"type","socks5"},{"server","127.0.0.1"},{"port",port}};
+  QByteArray ini="[Proxy]\nfixture = socks5,127.0.0.1,"+QByteArray::number(port);
+  if(authenticated){
+   proxy["username"]="synthetic-socks5-user";proxy["password"]="synthetic-socks5-password";
+   ini+=",username=synthetic-socks5-user,password=synthetic-socks5-password";
+  }
+  if(udp>=0){proxy["udp"]=udp==1;ini+=udp==1?",udp-relay=true":",udp-relay=false";}
+  if(tls){proxy["tls"]=true;ini+=",over-tls=true";}
+  return {QJsonDocument(QJsonObject{{"proxies",QJsonArray{proxy}}}).toJson(),ini+"\n"};
  }
 private slots:
  void initTestCase(){QStandardPaths::setTestModeEnabled(true);SwirlPaths::initializeTestStorage();QSettings::setDefaultFormat(QSettings::IniFormat);QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,SwirlPaths::writableLocation(QStandardPaths::AppConfigLocation));}
@@ -251,6 +264,140 @@ private slots:
   QVERIFY(!store.commitImport(plan));QCOMPARE(store.nodes().first().port,quint16(1080));QCOMPARE(store.nodes().first().id,id);
   QVERIFY(QDir().rmdir(store.filePath()));QVERIFY(QFile::rename(backup,store.filePath()));
   NodeStore reopened(store.filePath());QCOMPARE(reopened.nodes().first().port,quint16(1080));QCOMPARE(reopened.nodes().first().id,id);
+ }
+ void socks5UdpMappingPreservesTypedOptionsAndTls(){
+  EngineStartOptions o;o.routingMode="global";
+  const QJsonObject sentinel{{"unchanged",true}};
+  for(const bool authenticated:{false,true})for(const int udp:{-1,0,1}){
+   for(const auto &source:socks5Sources(1080,authenticated,udp)){
+    const auto parsed=NodeImporter::parse(source);QVERIFY2(bool(parsed),qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);
+    const auto &node=parsed.nodes.first();QCOMPARE(node.protocol,QString("socks5"));
+    QVERIFY(node.conversionIssues.isEmpty());QVERIFY(!node.originalConfiguration.isEmpty());
+    QCOMPARE(node.parameters.contains("udp"),udp>=0);
+    if(udp>=0)QCOMPARE(node.parameters.value("udp"),QJsonValue(udp==1));
+    QCOMPARE(node.username,authenticated?QString("synthetic-socks5-user"):QString());
+    QCOMPARE(node.password,authenticated?QString("synthetic-socks5-password"):QString());
+    o.nodes=parsed.nodes;o.selectedNodeId=node.id;QJsonObject config;
+    const auto error=RustCoreEngine::configuration(o,&config);QVERIFY2(error.isEmpty(),qPrintable(error));
+    QJsonObject expected{{"type","socks5"},{"host","127.0.0.1"},{"port",1080},{"udp",udp==1}};
+    if(authenticated)expected["auth"]=QJsonObject{{"username","synthetic-socks5-user"},{"password","synthetic-socks5-password"}};
+    QCOMPARE(config["nodes"].toArray().first().toObject()["outbound"].toObject(),expected);
+    QVERIFY(SwirlProtocolRegistry::nativeNodeReason(node).isEmpty());
+   }
+  }
+  // TLS remains explicit. Enabling UDP may not silently erase it, while the
+  // existing TCP-only TLS configuration still crosses the real native ABI.
+  for(const auto &source:socks5Sources(1080,true,1,true)){
+   const auto parsed=NodeImporter::parse(source);QVERIFY2(bool(parsed),qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);
+   const auto &node=parsed.nodes.first();QCOMPARE(node.parameters.value("tls"),QJsonValue(true));QCOMPARE(node.parameters.value("udp"),QJsonValue(true));
+   o.nodes=parsed.nodes;o.selectedNodeId=node.id;QJsonObject config=sentinel;
+   QVERIFY(!RustCoreEngine::configuration(o,&config).isEmpty());QCOMPARE(config,sentinel);
+   RustCoreEngine engine;engine.start(o);QCOMPARE(engine.status().state,ProxyEngine::State::Failed);
+   QCOMPARE(engine.status().error,ProxyEngine::Error::InvalidOptions);QVERIFY(!engine.status().processAlive);QVERIFY(!engine.status().apiHealthy);
+  }
+  auto tcpTlsSources=socks5Sources(1080,true,0,true);
+  tcpTlsSources.append("socks5-tls://synthetic-socks5-user:synthetic-socks5-password@127.0.0.1:1080#fixture");
+  for(const auto &source:tcpTlsSources){
+   const auto parsed=NodeImporter::parse(source);QVERIFY2(bool(parsed),qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);
+   const auto &node=parsed.nodes.first();QCOMPARE(node.parameters.value("tls"),QJsonValue(true));QVERIFY(node.conversionIssues.isEmpty());
+   o.nodes=parsed.nodes;o.selectedNodeId=node.id;QJsonObject config;
+   const auto error=RustCoreEngine::configuration(o,&config);QVERIFY2(error.isEmpty(),qPrintable(error));
+   const auto outbound=config["nodes"].toArray().first().toObject()["outbound"].toObject();
+   QCOMPARE(outbound["udp"],QJsonValue(false));
+   const QJsonObject tls{{"server_name","127.0.0.1"},{"alpn",QJsonArray{}}};QCOMPARE(outbound["tls"].toObject(),tls);
+   QTcpServer port;QVERIFY(port.listen(QHostAddress::LocalHost));o.proxyPort=port.serverPort();port.close();
+   RustCoreEngine engine;engine.start(o);QVERIFY2(engine.status().state==ProxyEngine::State::Running,qPrintable(engine.status().message));
+   QCOMPARE(engine.status().engineKind,QString("rust"));engine.stop();QCOMPARE(engine.status().state,ProxyEngine::State::Stopped);
+  }
+  for(const auto &source:QList<QByteArray>{
+      "socks5-tls://127.0.0.1:1080?udp=true#fixture",
+      "socks5-tls://127.0.0.1:1080?tls=false#fixture"}){
+   const auto parsed=NodeImporter::parse(source);QVERIFY2(bool(parsed),qPrintable(parsed.error));
+   QCOMPARE(parsed.nodes.first().parameters.value("tls"),QJsonValue(true));
+   o.nodes=parsed.nodes;o.selectedNodeId=parsed.nodes.first().id;QJsonObject config=sentinel;
+   QVERIFY(!RustCoreEngine::configuration(o,&config).isEmpty());QCOMPARE(config,sentinel);
+  }
+  const QJsonObject base{{"name","fixture"},{"type","socks5"},{"server","127.0.0.1"},{"port",1080}};
+  for(const auto &value:QList<QJsonValue>{"true","false",0,1,QJsonValue(QJsonValue::Null),QJsonObject{},QJsonArray{}}){
+   auto proxy=base;proxy["udp"]=value;
+   const auto parsed=NodeImporter::parse(QJsonDocument(QJsonObject{{"proxies",QJsonArray{proxy}}}).toJson());
+   QVERIFY2(bool(parsed),qPrintable(parsed.error));QCOMPARE(parsed.nodes.first().originalConfiguration,proxy);
+   QCOMPARE(parsed.nodes.first().parameters.value("udp"),value);
+   o.nodes=parsed.nodes;o.selectedNodeId=parsed.nodes.first().id;QJsonObject config=sentinel;
+   QVERIFY(!RustCoreEngine::configuration(o,&config).isEmpty());QCOMPARE(config,sentinel);
+  }
+  auto unknown=base;unknown["udp"]=true;unknown["future-udp-mode"]="preserved";
+  const QList<QByteArray> unknownSources{QJsonDocument(QJsonObject{{"proxies",QJsonArray{unknown}}}).toJson(),
+    "[Proxy]\nfixture = socks5,127.0.0.1,1080,udp-relay=true,future-udp-mode=preserved\n"};
+  for(const auto &source:unknownSources){
+   const auto parsed=NodeImporter::parse(source);QVERIFY2(bool(parsed),qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);
+   const auto &node=parsed.nodes.first();QVERIFY(!node.originalConfiguration.isEmpty());
+   QVERIFY(node.parameters.contains("future-udp-mode")||!node.conversionIssues.isEmpty());
+   o.nodes=parsed.nodes;o.selectedNodeId=node.id;QJsonObject config=sentinel;
+   QVERIFY(!RustCoreEngine::configuration(o,&config).isEmpty());QCOMPARE(config,sentinel);
+  }
+  auto insecure=base;insecure["tls"]=true;insecure["skip-cert-verify"]=true;
+  QVERIFY(!NodeImporter::parse(QJsonDocument(QJsonObject{{"proxies",QJsonArray{insecure}}}).toJson()));
+  QVERIFY(!NodeImporter::parse("[Proxy]\nfixture = socks5,127.0.0.1,1080,over-tls=true,tls-verification=false\n"));
+  QVERIFY(!NodeImporter::parse("[Proxy]\nfixture = socks5,127.0.0.1,1080,udp-relay=maybe\n"));
+  QVERIFY(!NodeImporter::parse("[Proxy]\nfixture = socks5,127.0.0.1,1080,udp-relay=true,udp=false\n"));
+  const auto valid=NodeImporter::parse(socks5Sources(1080,false,0,true).first());QVERIFY(bool(valid));
+  o.nodes=valid.nodes;o.selectedNodeId=o.nodes.first().id;o.nodes.first().parameters["skip-cert-verify"]=true;
+  QJsonObject config=sentinel;QVERIFY(!RustCoreEngine::configuration(o,&config).isEmpty());QCOMPARE(config,sentinel);
+ }
+ void socks5UdpThroughIndependentPeer(){
+  const bool hasPeer=qEnvironmentVariableIsSet("SWIRL_SOCKS5_UDP_REFERENCE_PORT");
+  const bool hasOrigin=qEnvironmentVariableIsSet("SWIRL_SOCKS5_UDP_ORIGIN_PORT");
+  const bool hasAuth=qEnvironmentVariableIsSet("SWIRL_SOCKS5_UDP_EXPECT_AUTH");
+  if(!hasPeer&&!hasOrigin&&!hasAuth)QSKIP("Independent Python SOCKS5 UDP peer supplies isolated ports and authentication mode in its integration run.");
+  QVERIFY2(hasPeer&&hasOrigin&&hasAuth,"All SOCKS5 UDP reference environment variables must be supplied together.");
+  bool validPeer=false,validOrigin=false;
+  const int peer=qEnvironmentVariableIntValue("SWIRL_SOCKS5_UDP_REFERENCE_PORT",&validPeer);
+  const int origin=qEnvironmentVariableIntValue("SWIRL_SOCKS5_UDP_ORIGIN_PORT",&validOrigin);
+  const auto auth=qgetenv("SWIRL_SOCKS5_UDP_EXPECT_AUTH");
+  QVERIFY(validPeer&&validOrigin&&peer>0&&peer<=65535&&origin>0&&origin<=65535);
+  QVERIFY2(auth=="0"||auth=="1","SOCKS5 UDP authentication mode must be exactly 0 or 1.");
+  const auto sources=socks5Sources(quint16(peer),auth=="1",1);
+  for(qsizetype index=0;index<sources.size();++index){
+   const auto parsed=NodeImporter::parse(sources[index]);QVERIFY2(bool(parsed),qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);
+   const auto &node=parsed.nodes.first();QVERIFY(node.conversionIssues.isEmpty());QCOMPARE(node.parameters.value("udp"),QJsonValue(true));
+   EngineStartOptions o;o.routingMode="global";o.nodes=parsed.nodes;o.selectedNodeId=node.id;o.executablePath="must-not-start-mihomo.exe";
+   QTcpServer port;QVERIFY(port.listen(QHostAddress::LocalHost));o.proxyPort=port.serverPort();port.close();
+   ThreadedEngine engine;engine.start(o);
+   QVERIFY2(QTest::qWaitFor([&]{return engine.status().apiHealthy;},5000),qPrintable(engine.status().message));
+   QCOMPARE(engine.status().engineKind,QString("rust"));QCOMPARE(engine.status().processId,QCoreApplication::applicationPid());
+   QUdpSocket client;client.setProxy(QNetworkProxy::NoProxy);QVERIFY(client.bind(QHostAddress::LocalHost,0,QUdpSocket::DontShareAddress));
+   QTcpSocket control;control.setProxy(QNetworkProxy::NoProxy);control.connectToHost(QHostAddress::LocalHost,o.proxyPort);
+   QVERIFY(QTest::qWaitFor([&]{return control.state()==QAbstractSocket::ConnectedState;},4000));
+   QCOMPARE(control.write(QByteArray::fromHex("050100")),qint64(3));
+   QVERIFY(QTest::qWaitFor([&]{return control.bytesAvailable()>=2;},4000));QCOMPARE(control.read(2),QByteArray::fromHex("0500"));
+   auto associate=QByteArray::fromHex("050300017f000001");associate.append(char(client.localPort()>>8));associate.append(char(client.localPort()&0xff));
+   QCOMPARE(control.write(associate),qint64(associate.size()));
+   QVERIFY(QTest::qWaitFor([&]{return control.bytesAvailable()>=10;},4000));const auto bound=control.read(10);
+   QCOMPARE(bound.left(8),QByteArray::fromHex("050000017f000001"));
+   const quint16 relayPort=(quint16(quint8(bound[8]))<<8)|quint8(bound[9]);QVERIFY(relayPort>0);
+   // Hand-encoded RFC 1928 bytes, independent of the production Rust codec.
+   // Send to the returned UDP bind port; it is not the mixed TCP listener.
+   auto header=QByteArray::fromHex("000000017f000001");header.append(char(origin>>8));header.append(char(origin&0xff));
+   const QByteArray payload="qt-socks5-udp",responsePayload="socks5-udp-native:qt-socks5-udp";
+   const auto packet=header+payload;
+   QCOMPARE(client.writeDatagram(packet,QHostAddress::LocalHost,relayPort),qint64(packet.size()));
+   QVERIFY(QTest::qWaitFor([&]{return client.hasPendingDatagrams();},6000));const auto reply=client.receiveDatagram();
+   QCOMPARE(reply.senderAddress(),QHostAddress(QHostAddress::LocalHost));QCOMPARE(reply.senderPort(),int(relayPort));
+   QCOMPARE(reply.data(),header+responsePayload);
+   QVERIFY(QTest::qWaitFor([&]{return engine.status().uploadTotal>=payload.size()&&engine.status().downloadTotal>=responsePayload.size();},2000));
+   const auto udpReleased=[&]{QUdpSocket reclaimed;reclaimed.setProxy(QNetworkProxy::NoProxy);return reclaimed.bind(QHostAddress::LocalHost,relayPort,QUdpSocket::DontShareAddress);};
+   if(index==0){
+    control.disconnectFromHost();QVERIFY(QTest::qWaitFor([&]{return control.state()==QAbstractSocket::UnconnectedState;},3000));
+    QVERIFY2(QTest::qWaitFor(udpReleased,3000),"Closing the SOCKS TCP control connection must release its UDP association.");
+   }
+   // The INI pass instead keeps control connected until engine shutdown.
+   engine.stop();QVERIFY(QTest::qWaitFor([&]{return engine.status().state==ProxyEngine::State::Stopped;},5000));
+   QVERIFY(!engine.status().processAlive);QVERIFY(!engine.status().apiHealthy);
+   QVERIFY(QTest::qWaitFor([&]{return control.state()==QAbstractSocket::UnconnectedState;},3000));
+   QVERIFY2(QTest::qWaitFor(udpReleased,3000),"Engine shutdown must release its UDP relay port.");
+   QTcpServer reclaimed;QVERIFY(reclaimed.listen(QHostAddress::LocalHost,o.proxyPort));
+  }
  }
  void socks4ImportsMapAndAcceptAcrossNativeAbi(){
   ControlledNetwork net;QVERIFY(net.start());auto o=options(net);

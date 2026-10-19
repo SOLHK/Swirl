@@ -5,6 +5,7 @@ mod dial;
 mod probe;
 mod shadowsocks;
 mod socks4;
+mod socks5;
 mod vless;
 mod websocket;
 pub use diagnostics::{TcpAttempt, TcpDiagnostic, TcpOutcome, failure_stage};
@@ -14,6 +15,7 @@ pub use probe::health_probe;
 pub use shadowsocks::{
     decrypt_datagram as ss_decrypt_datagram, encrypt_datagram as ss_encrypt_datagram,
 };
+pub use socks5::UdpAssociation as Socks5UdpAssociation;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use swirl_dns::Resolver;
 use swirl_subscription::{Credentials, Outbound, valid_host};
@@ -447,6 +449,7 @@ pub async fn connect(
             port,
             auth,
             tls,
+            ..
         }
         | Outbound::HttpConnect {
             host,
@@ -574,54 +577,8 @@ async fn handshake(
         return Ok(Box::new(vless::Stream::new(stream, handshake_limit)));
     }
     if matches!(outbound, Outbound::Socks5 { .. }) {
-        let method = if auth.is_some() { 2 } else { 0 };
-        stream
-            .write_all(&[5, 1, method])
-            .await
-            .map_err(|_| "SocksUpstreamWrite")?;
-        stream.flush().await.map_err(|_| "SocksUpstreamWrite")?;
-        let mut response = [0; 2];
-        stream
-            .read_exact(&mut response)
-            .await
-            .map_err(|_| "SocksUpstreamRead")?;
-        if response != [5, method] {
-            return Err("UpstreamAuthentication");
-        }
-        if let Some(auth) = auth {
-            let mut request = vec![1, auth.username.len() as u8];
-            request.extend(auth.username.as_bytes());
-            request.push(auth.password.len() as u8);
-            request.extend(auth.password.as_bytes());
-            stream
-                .write_all(&request)
-                .await
-                .map_err(|_| "SocksUpstreamWrite")?;
-            stream.flush().await.map_err(|_| "SocksUpstreamWrite")?;
-            stream
-                .read_exact(&mut response)
-                .await
-                .map_err(|_| "SocksUpstreamRead")?;
-            if response != [1, 0] {
-                return Err("UpstreamAuthentication");
-            }
-        }
-        let mut request = vec![5, 1, 0];
-        target.encode(&mut request)?;
-        stream
-            .write_all(&request)
-            .await
-            .map_err(|_| "SocksUpstreamWrite")?;
-        stream.flush().await.map_err(|_| "SocksUpstreamWrite")?;
-        let mut header = [0; 3];
-        stream
-            .read_exact(&mut header)
-            .await
-            .map_err(|_| "SocksUpstreamRead")?;
-        if header != [5, 0, 0] {
-            return Err("UpstreamRejected");
-        }
-        read_target(&mut stream, true).await?;
+        socks5::authenticate(&mut stream, auth).await?;
+        socks5::request(&mut stream, 1, target, true).await?;
     } else {
         let mut request = format!(
             "CONNECT {} HTTP/1.1\r\nHost: {}\r\n",

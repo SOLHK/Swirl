@@ -52,6 +52,7 @@ jobs:
           python ../tools/tests/test_connection_stages.py
           python ../tools/tests/test_connectivity_diagnostics.py
           python ../tools/tests/test_subscription_import.py
+          python ../tools/tests/test_socks5_udp.py
       - name: Native public HTTPS and DoH verification
         if: runner.os == 'Linux'
         run: python ../tools/Verify-PublicRustCore.py --harness target/release/swirl-api --output ../CORE_PUBLIC_NETWORK.json
@@ -64,7 +65,8 @@ jobs:
           retention-days: 7
   windows-rust:
     runs-on: windows-2022
-    timeout-minutes: 25
+    # Includes the complete native application after the existing Qt/Core gates.
+    timeout-minutes: 35
     defaults:
       run:
         working-directory: core
@@ -116,6 +118,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python ../tools/tests/test_subscription_import.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python ../tools/tests/test_socks5_udp.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python ../tools/tests/test_subscription_capture.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python ../tools/tests/test_codex_management.py
@@ -148,29 +152,45 @@ jobs:
           cmake --build build/rust-qt --config Release --target SwirlRustCoreTests SwirlStoragePathsTests SwirlImportTests --parallel
       - name: Reject native DNS policy in compatibility builds without starting a core
         working-directory: .
+        env:
+          QT_FORCE_STDERR_LOGGING: '1'
         run: |
           cmake -S src/Swirl.Quick -B build/compat-dns -G "Visual Studio 17 2022" -A x64 -DSWIRL_USE_RUST_CORE=OFF -DSWIRL_BUILD_UI_TESTS=ON
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          cmake --build build/compat-dns --config Release --target SwirlEngineTests --parallel
+          cmake --build build/compat-dns --config Release --target SwirlEngineTests SwirlImportTests --parallel
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           windeployqt --release build/compat-dns/Release/SwirlEngineTests.exe
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $env:SWIRL_TEST_ROOT=Join-Path $env:RUNNER_TEMP 'swirl-compat-dns-tests'
           New-Item -ItemType Directory -Force -Path $env:SWIRL_TEST_ROOT | Out-Null
-          ctest --test-dir build/compat-dns -C Release -R '^swirl-native-dns-compatibility-guard$' --output-on-failure
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ctest --test-dir build/compat-dns -C Release -R '^swirl-(native-dns-compatibility-guard|import-boundaries)$' --output-on-failure -V
+          $compatQtExit = $LASTEXITCODE
+          foreach ($compatQtReport in @(
+            'build/compat-dns/swirl-native-dns-compatibility-guard.xml',
+            'build/compat-dns/swirl-import-boundaries.xml'
+          )) {
+            if (-not (Test-Path $compatQtReport -PathType Leaf)) { throw 'Required compatibility Qt XML report missing' }
+            Get-Content -LiteralPath $compatQtReport
+          }
+          if ($compatQtExit -ne 0) { exit $compatQtExit }
       - name: Run Qt to Rust integration without Mihomo
         working-directory: .
+        env:
+          QT_FORCE_STDERR_LOGGING: '1'
         run: |
           windeployqt --release build/rust-qt/Release/SwirlRustCoreTests.exe
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $env:SWIRL_TEST_ROOT=Join-Path $env:RUNNER_TEMP 'swirl-native-qt-tests'
           New-Item -ItemType Directory -Force -Path $env:SWIRL_TEST_ROOT | Out-Null
-          ctest --test-dir build/rust-qt -C Release -R '^swirl-(rust-qt-integration|storage-paths|import-boundaries)$' --output-on-failure
+          ctest --test-dir build/rust-qt -C Release -R '^swirl-(rust-qt-integration|storage-paths|import-boundaries)$' --output-on-failure -V
           $nativeQtExit = $LASTEXITCODE
-          $nativeQtReport = 'build/rust-qt/swirl-rust-qt-integration.xml'
-          if (-not (Test-Path $nativeQtReport -PathType Leaf)) { throw 'Required native Qt XML report missing' }
-          Get-Content -LiteralPath $nativeQtReport
+          foreach ($nativeQtReport in @(
+            'build/rust-qt/swirl-rust-qt-integration.xml',
+            'build/rust-qt/swirl-import-boundaries.xml'
+          )) {
+            if (-not (Test-Path $nativeQtReport -PathType Leaf)) { throw 'Required native Qt XML report missing' }
+            Get-Content -LiteralPath $nativeQtReport
+          }
           if ($nativeQtExit -ne 0) { exit $nativeQtExit }
           $env:SWIRL_RUST_HARNESS=(Resolve-Path core/target/release/swirl-api.exe).Path
           $env:SWIRL_RUST_QT_TESTS=(Resolve-Path build/rust-qt/Release/SwirlRustCoreTests.exe).Path
@@ -182,3 +202,23 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python tools/tests/test_websocket_transport.py WebSocketTransportTests.test_qt_vless_websocket_data_path
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/tests/test_socks5_udp.py Socks5UdpIntegration.test_qt_imported_socks5_udp_data_path
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build complete native Rust application
+        working-directory: .
+        run: |
+          cmake --build build/rust-qt --config Release --target Swirl --parallel 2
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not (Test-Path build/rust-qt/Release/Swirl.exe -PathType Leaf)) { throw 'Native Swirl executable missing after build' }
+      - name: Preserve isolated Qt test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-Rust-Qt-Tests-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            build/rust-qt/swirl-rust-qt-integration.xml
+            build/rust-qt/swirl-import-boundaries.xml
+            build/compat-dns/swirl-native-dns-compatibility-guard.xml
+            build/compat-dns/swirl-import-boundaries.xml
+          if-no-files-found: warn
+          retention-days: 7

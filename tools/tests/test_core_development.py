@@ -67,9 +67,24 @@ jobs:
             core/target/release/swirl-api.exe
             core/target/release/swirl-inspect.exe
             core/Cargo.lock
+      - name: Reject native DNS policy in compatibility builds without starting a core
+        working-directory: .
+        run: |
+          cmake -S src/Swirl.Quick -B build/compat-dns -G "Visual Studio 17 2022" -A x64 -DSWIRL_USE_RUST_CORE=OFF -DSWIRL_BUILD_UI_TESTS=ON
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --build build/compat-dns --config Release --target SwirlEngineTests --parallel
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          windeployqt --release build/compat-dns/Release/SwirlEngineTests.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:SWIRL_TEST_ROOT=Join-Path $env:RUNNER_TEMP 'swirl-compat-dns-tests'
+          New-Item -ItemType Directory -Force -Path $env:SWIRL_TEST_ROOT | Out-Null
+          ctest --test-dir build/compat-dns -C Release -R '^swirl-native-dns-compatibility-guard$' --output-on-failure
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Run Qt to Rust integration without Mihomo
         working-directory: .
         run: |
+          ctest --test-dir build/rust-qt -C Release -R '^swirl-(rust-qt-integration|storage-paths|import-boundaries)$' --output-on-failure
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python tools/tests/test_rust_core.py RustCoreIntegration.test_vless_qt_data_path
 """
 
@@ -95,11 +110,24 @@ REQUIRED_TESTS = (
     "test_connection_stages.py",
     "test_connectivity_diagnostics.py",
     "test_subscription_import.py",
+    "test_socks5_udp.py",
 )
+
+
+def previous_socks5_udp_stage(source):
+    command = "          python ../tools/tests/test_socks5_udp.py\n"
+    qt = "          python tools/tests/test_socks5_udp.py Socks5UdpIntegration.test_qt_imported_socks5_udp_data_path\n"
+    return source.replace(development.QT_TEST_ARTIFACT, "").replace(
+        development.NATIVE_QT_REPORT, development.PREVIOUS_NATIVE_QT_REPORT).replace(
+        development.COMPATIBILITY_GATE, development.PREVIOUS_COMPATIBILITY_GATE).replace(
+        development.NATIVE_APPLICATION_BUILD, "").replace(
+        qt + development.WINDOWS_STATUS_GUARD, "").replace(
+        command + development.WINDOWS_STATUS_GUARD, "").replace(command, "")
 
 
 def previous_connection_stage(source):
     """Remove exactly this stage's reviewed additions to construct historical fixtures."""
+    source = previous_socks5_udp_stage(source)
     for name in ("test_connectivity_diagnostics.py", "test_subscription_import.py"):
         command = f"          python ../tools/tests/{name}\n"
         source = source.replace(command + "          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }\n", "")
@@ -191,6 +219,113 @@ class CoreDevelopmentTests(unittest.TestCase):
     def test_idempotence_prevents_repeated_app_commits(self):
         first = development.updated_workflow(FIXTURE)
         self.assertEqual(development.updated_workflow(first), first)
+
+    def test_socks5_udp_adds_portable_qt_and_native_build_as_one_stage(self):
+        final = development.updated_workflow(FIXTURE)
+        previous = previous_socks5_udp_stage(final)
+        self.assertEqual(development.updated_workflow(previous), final)
+        self.assertEqual(final.count("          python ../tools/tests/test_socks5_udp.py\n"), 2)
+        qt = "          python tools/tests/test_socks5_udp.py Socks5UdpIntegration.test_qt_imported_socks5_udp_data_path\n"
+        self.assertEqual(final.count(qt), 1)
+        self.assertIn(qt + development.WINDOWS_STATUS_GUARD, final)
+        self.assertTrue(final.endswith(development.NATIVE_APPLICATION_BUILD + development.QT_TEST_ARTIFACT))
+        self.assertEqual(final.count("cmake --build build/rust-qt --config Release --target Swirl --parallel 2"), 1)
+
+    def test_socks5_udp_partial_commands_and_native_build_drift_are_rejected(self):
+        final = development.updated_workflow(FIXTURE)
+        command = "          python ../tools/tests/test_socks5_udp.py\n"
+        qt = "          python tools/tests/test_socks5_udp.py Socks5UdpIntegration.test_qt_imported_socks5_udp_data_path\n"
+        for broken in (
+            final.replace(command, "", 1),
+            final.replace(command, command * 2, 1),
+            final.replace(command + development.WINDOWS_STATUS_GUARD, command),
+            final.replace(qt, ""),
+            final.replace(qt + development.WINDOWS_STATUS_GUARD, qt),
+            final.replace(development.NATIVE_APPLICATION_BUILD, ""),
+            final + development.NATIVE_APPLICATION_BUILD,
+            final.replace("--target Swirl --parallel 2", "--target SwirlEngineTests --parallel 2"),
+        ):
+            with self.subTest(tail=broken[-180:]), self.assertRaises(ValueError):
+                development.updated_workflow(broken)
+
+    def test_compatibility_import_runs_alongside_the_existing_native_dns_guard(self):
+        final = development.updated_workflow(FIXTURE)
+        self.assertEqual(final.count(development.COMPATIBILITY_GATE), 1)
+        self.assertNotIn(development.PREVIOUS_COMPATIBILITY_GATE, final)
+        gate = development.COMPATIBILITY_GATE
+        self.assertIn("-DSWIRL_USE_RUST_CORE=OFF -DSWIRL_BUILD_UI_TESTS=ON\n", gate)
+        self.assertIn("--target SwirlEngineTests SwirlImportTests --parallel\n" + development.WINDOWS_STATUS_GUARD, gate)
+        self.assertIn("'^swirl-(native-dns-compatibility-guard|import-boundaries)$' --output-on-failure -V\n"
+                      + "          $compatQtExit = $LASTEXITCODE\n", gate)
+        self.assertIn("          if ($compatQtExit -ne 0) { exit $compatQtExit }\n", gate)
+        self.assertIn("$env:SWIRL_TEST_ROOT=Join-Path $env:RUNNER_TEMP 'swirl-compat-dns-tests'", gate)
+        self.assertEqual(development.updated_workflow(previous_socks5_udp_stage(final)), final)
+
+    def test_compatibility_import_partial_or_weakened_gates_are_rejected(self):
+        final = development.updated_workflow(FIXTURE)
+        gate = development.COMPATIBILITY_GATE
+        for broken_gate in (
+            "",
+            gate + gate,
+            development.PREVIOUS_COMPATIBILITY_GATE,
+            gate.replace("-DSWIRL_USE_RUST_CORE=OFF", "-DSWIRL_USE_RUST_CORE=ON"),
+            gate.replace("SwirlEngineTests SwirlImportTests", "SwirlEngineTests"),
+            gate.replace("SwirlEngineTests SwirlImportTests", "SwirlImportTests"),
+            gate.replace("native-dns-compatibility-guard|import-boundaries", "native-dns-compatibility-guard"),
+            gate.replace("native-dns-compatibility-guard|import-boundaries", "import-boundaries"),
+            gate.replace(development.WINDOWS_STATUS_GUARD, "", 1),
+            gate.replace("          if ($compatQtExit -ne 0) { exit $compatQtExit }\n", ""),
+        ):
+            with self.subTest(gate=broken_gate), self.assertRaises(ValueError):
+                development.updated_workflow(final.replace(gate, broken_gate, 1))
+
+    def test_qt_reports_upgrade_diagnostic_stage_and_preserve_exact_artifact_paths(self):
+        final = development.updated_workflow(FIXTURE)
+        diagnostic = previous_socks5_udp_stage(final).replace(
+            development.PREVIOUS_NATIVE_QT_REPORT, development.DIAGNOSTIC_NATIVE_QT_REPORT)
+        self.assertEqual(development.updated_workflow(diagnostic), final)
+        self.assertEqual(final.count(development.NATIVE_QT_REPORT), 1)
+        self.assertEqual(final.count(development.QT_TEST_ARTIFACT), 1)
+        self.assertTrue(final.endswith(development.QT_TEST_ARTIFACT))
+        artifact = development.QT_TEST_ARTIFACT
+        paths = [line.strip() for line in artifact.splitlines() if line.startswith("            ")]
+        self.assertEqual(paths, [
+            "build/rust-qt/swirl-rust-qt-integration.xml",
+            "build/rust-qt/swirl-import-boundaries.xml",
+            "build/compat-dns/swirl-native-dns-compatibility-guard.xml",
+            "build/compat-dns/swirl-import-boundaries.xml",
+        ])
+        self.assertIn("        if: always()\n", artifact)
+        self.assertIn("          retention-days: 7\n", artifact)
+        self.assertIn("github.sha", artifact)
+
+    def test_qt_reports_reject_missing_paths_expanded_artifacts_and_weakened_exits(self):
+        final = development.updated_workflow(FIXTURE)
+        native, compat, artifact = (development.NATIVE_QT_REPORT, development.COMPATIBILITY_GATE,
+                                    development.QT_TEST_ARTIFACT)
+        broken_blocks = [
+            (artifact, ""),
+            (artifact, artifact * 2),
+            (artifact, artifact.replace("if: always()", "if: success()")),
+            (artifact, artifact.replace("retention-days: 7", "retention-days: 30")),
+            (artifact, artifact.replace("build/rust-qt/swirl-import-boundaries.xml", "build/**")),
+            (artifact, artifact.replace("            build/compat-dns/swirl-import-boundaries.xml\n", "")),
+            (artifact, artifact.replace("          if-no-files-found:",
+                                        "            ${{ env.SWIRL_TEST_ROOT }}\n          if-no-files-found:")),
+        ]
+        for block, prefix in ((native, "native"), (compat, "compat")):
+            exit_guard = f"          if (${prefix}QtExit -ne 0) {{ exit ${prefix}QtExit }}\n"
+            capture = f"          ${prefix}QtExit = $LASTEXITCODE\n"
+            broken_blocks.extend((
+                (block, block.replace(capture, "")),
+                (block, block.replace(exit_guard, "")),
+                (block, block.replace(exit_guard, "          exit 0\n")),
+                (block, block.replace("swirl-import-boundaries.xml", "../private-state.xml")),
+                (block, block.replace("Get-Content -LiteralPath", "Write-Output")),
+            ))
+        for before, after in broken_blocks:
+            with self.subTest(block=after), self.assertRaises(ValueError):
+                development.updated_workflow(final.replace(before, after, 1))
 
     def test_previous_successful_workflow_upgrades_without_duplicate_suites(self):
         final = development.updated_workflow(FIXTURE)

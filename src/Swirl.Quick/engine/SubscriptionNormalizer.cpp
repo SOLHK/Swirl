@@ -116,7 +116,7 @@ void uri(Result &r,const QString &line){
         if(!q.isEmpty())issue(issues,"SOCKS4/4a URI 的查询扩展尚未映射，原始配置已保留。");
         append(r,node,QJsonObject{{"uri",line}},issues);return;
     }
-    if(scheme=="https"||p=="trojan")node["tls"]=true;
+    if(scheme=="https"||scheme=="socks5-tls"||p=="trojan")node["tls"]=true;
     QString network,path,host;
     const QSet<QString> known{"sni","peer","security","type","path","host","serviceName","flow","fp","pbk","sid","alpn","allowInsecure","insecure","skip-cert-verify","network","udp","plugin","encryption","headerType","quicSecurity"};
     QSet<QString> queryKeys;QJsonObject queryValues;
@@ -407,7 +407,7 @@ SubscriptionNormalizer::Result SubscriptionNormalizer::normalize(const QByteArra
     const auto firstContent=[&]{for(const auto &line:text.split('\n')){const auto value=line.trimmed();if(!value.isEmpty()&&!value.startsWith('#')&&!value.startsWith(';')&&!value.startsWith("//"))return value;}return QString();}();
     const bool iniHeading=QRegularExpression("^\\[\\s*[A-Za-z][A-Za-z0-9 _-]*(?:\\]|$)").match(firstContent).hasMatch();
     if(iniHeading&&!json.isArray()){ini(r,text);return r;}
-    if(QRegularExpression("^(ss|ssr|trojan|vmess|vless|socks4a|socks4|socks5|socks|http|https)://",QRegularExpression::CaseInsensitiveOption).match(text).hasMatch()){
+    if(QRegularExpression("^(ss|ssr|trojan|vmess|vless|socks4a|socks4|socks5|socks5-tls|socks|http|https)://",QRegularExpression::CaseInsensitiveOption).match(text).hasMatch()){
         r.handled=true;r.format="通用 URI / Shadowrocket";
         for(const auto &line:text.split('\n')){const auto value=line.trimmed();if(value.isEmpty()||value.startsWith('#'))continue;uri(r,value);if(!r.error.isEmpty())break;}return r;
     }

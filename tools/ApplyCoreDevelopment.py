@@ -7,7 +7,12 @@ checks with an evidence artifact on Linux. The current stage adds negative DNS
 and isolated native-outbound probe and connection-stage regressions alongside the existing SOCKS4
 and WS Qt forwarding peers. The current update includes independent connectivity
 and subscription-import gates, required-binary checks, all native release bins,
-and the Windows diagnostic artifact. It does not change permissions, secrets,
+and the Windows diagnostic artifact. The SOCKS5 UDP stage adds independent
+portable/Windows peers, its Qt forwarding hook and the complete native application
+build using the existing Qt build tree. Shared subscription import tests also
+run in the existing compatibility build, alongside its native-DNS rejection gate.
+Four fixed Qt XML reports preserve diagnostics even after a failed test or build.
+It does not change permissions, secrets,
 existing actions, pull-request triggers or any product source.
 
 Run ``python tools/ApplyCoreDevelopment.py --check`` to run the safety tests and
@@ -43,6 +48,8 @@ ADDITIONAL_TESTS = (
 POLICY_TEST = "test_policy_groups.py"
 DNS_PROBE_TESTS = ("test_dns_negative.py", "test_native_probe.py", "test_connection_stages.py")
 CONNECTIVITY_IMPORT_TESTS = ("test_connectivity_diagnostics.py", "test_subscription_import.py")
+SOCKS5_UDP_TEST = "test_socks5_udp.py"
+SOCKS5_UDP_QT_TEST = "test_socks5_udp.py Socks5UdpIntegration.test_qt_imported_socks5_udp_data_path"
 PREVIOUS_RELEASE_BUILD = "      - run: cargo build --release --locked -p swirl-api\n"
 RELEASE_BUILD = "      - run: cargo build --release --locked --workspace --lib --bins\n"
 PORTABLE_DIAGNOSTIC = '          export SWIRL_RUST_DIAGNOSTIC="$PWD/target/release/swirl-diagnose"\n'
@@ -66,6 +73,83 @@ PUBLIC_VALIDATION_STEPS = """      - name: Native public HTTPS and DoH verificat
           path: CORE_PUBLIC_NETWORK.json
           retention-days: 7
 """
+NATIVE_APPLICATION_BUILD = """      - name: Build complete native Rust application
+        working-directory: .
+        run: |
+          cmake --build build/rust-qt --config Release --target Swirl --parallel 2
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not (Test-Path build/rust-qt/Release/Swirl.exe -PathType Leaf)) { throw 'Native Swirl executable missing after build' }
+"""
+QT_TEST_ARTIFACT = """      - name: Preserve isolated Qt test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-Rust-Qt-Tests-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            build/rust-qt/swirl-rust-qt-integration.xml
+            build/rust-qt/swirl-import-boundaries.xml
+            build/compat-dns/swirl-native-dns-compatibility-guard.xml
+            build/compat-dns/swirl-import-boundaries.xml
+          if-no-files-found: warn
+          retention-days: 7
+"""
+PREVIOUS_NATIVE_QT_REPORT = """          ctest --test-dir build/rust-qt -C Release -R '^swirl-(rust-qt-integration|storage-paths|import-boundaries)$' --output-on-failure
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+"""
+DIAGNOSTIC_NATIVE_QT_REPORT = """          ctest --test-dir build/rust-qt -C Release -R '^swirl-(rust-qt-integration|storage-paths|import-boundaries)$' --output-on-failure
+          $nativeQtExit = $LASTEXITCODE
+          $nativeQtReport = 'build/rust-qt/swirl-rust-qt-integration.xml'
+          if (-not (Test-Path $nativeQtReport -PathType Leaf)) { throw 'Required native Qt XML report missing' }
+          Get-Content -LiteralPath $nativeQtReport
+          if ($nativeQtExit -ne 0) { exit $nativeQtExit }
+"""
+NATIVE_QT_REPORT = """          ctest --test-dir build/rust-qt -C Release -R '^swirl-(rust-qt-integration|storage-paths|import-boundaries)$' --output-on-failure -V
+          $nativeQtExit = $LASTEXITCODE
+          foreach ($nativeQtReport in @(
+            'build/rust-qt/swirl-rust-qt-integration.xml',
+            'build/rust-qt/swirl-import-boundaries.xml'
+          )) {
+            if (-not (Test-Path $nativeQtReport -PathType Leaf)) { throw 'Required native Qt XML report missing' }
+            Get-Content -LiteralPath $nativeQtReport
+          }
+          if ($nativeQtExit -ne 0) { exit $nativeQtExit }
+"""
+COMPATIBILITY_TEST_REPORT = """          ctest --test-dir build/compat-dns -C Release -R '^swirl-(native-dns-compatibility-guard|import-boundaries)$' --output-on-failure -V
+          $compatQtExit = $LASTEXITCODE
+          foreach ($compatQtReport in @(
+            'build/compat-dns/swirl-native-dns-compatibility-guard.xml',
+            'build/compat-dns/swirl-import-boundaries.xml'
+          )) {
+            if (-not (Test-Path $compatQtReport -PathType Leaf)) { throw 'Required compatibility Qt XML report missing' }
+            Get-Content -LiteralPath $compatQtReport
+          }
+          if ($compatQtExit -ne 0) { exit $compatQtExit }
+"""
+PREVIOUS_COMPATIBILITY_GATE = """      - name: Reject native DNS policy in compatibility builds without starting a core
+        working-directory: .
+        run: |
+          cmake -S src/Swirl.Quick -B build/compat-dns -G "Visual Studio 17 2022" -A x64 -DSWIRL_USE_RUST_CORE=OFF -DSWIRL_BUILD_UI_TESTS=ON
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --build build/compat-dns --config Release --target SwirlEngineTests --parallel
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          windeployqt --release build/compat-dns/Release/SwirlEngineTests.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:SWIRL_TEST_ROOT=Join-Path $env:RUNNER_TEMP 'swirl-compat-dns-tests'
+          New-Item -ItemType Directory -Force -Path $env:SWIRL_TEST_ROOT | Out-Null
+          ctest --test-dir build/compat-dns -C Release -R '^swirl-native-dns-compatibility-guard$' --output-on-failure
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+"""
+COMPATIBILITY_GATE = PREVIOUS_COMPATIBILITY_GATE.replace(
+    "        working-directory: .\n",
+    "        working-directory: .\n        env:\n          QT_FORCE_STDERR_LOGGING: '1'\n",
+).replace(
+    "--target SwirlEngineTests --parallel\n",
+    "--target SwirlEngineTests SwirlImportTests --parallel\n",
+).replace(
+    "          ctest --test-dir build/compat-dns -C Release -R '^swirl-native-dns-compatibility-guard$' --output-on-failure\n"
+    + WINDOWS_STATUS_GUARD,
+    COMPATIBILITY_TEST_REPORT,
+)
 
 
 def _replace_checked(source: str, before: str, after: str, label: str,
@@ -214,7 +298,7 @@ def _connectivity_blocks(windows: bool) -> tuple[tuple[str, str, str], ...]:
     return blocks
 
 
-def updated_workflow(source: str) -> str:
+def _connectivity_workflow(source: str) -> str:
     """Upgrade a reviewed historical stage atomically, or validate the complete new stage."""
     separator = "  windows-rust:\n"
     if source.count(separator) != 1:
@@ -246,6 +330,50 @@ def updated_workflow(source: str) -> str:
     return separator.join(parts)
 
 
+def updated_workflow(source: str) -> str:
+    """Add the complete UDP stage without weakening prior workflow guards."""
+    command = f"          python ../tools/tests/{SOCKS5_UDP_TEST}\n"
+    qt_command = f"          python tools/tests/{SOCKS5_UDP_QT_TEST}\n"
+    counts = (source.count(command), source.count(qt_command),
+              source.count(NATIVE_APPLICATION_BUILD), source.count(COMPATIBILITY_GATE),
+              source.count(NATIVE_QT_REPORT), source.count(QT_TEST_ARTIFACT))
+    if counts not in ((0, 0, 0, 0, 0, 0), (2, 1, 1, 1, 1, 1)):
+        raise ValueError("Rust CI SOCKS5 UDP stage is partial or duplicated; review required")
+    anchor = "          python ../tools/tests/test_subscription_import.py\n"
+    windows_tail = "          python ../tools/tests/test_subscription_capture.py\n"
+    menus = (
+        (anchor + PUBLIC_VALIDATION_STEPS, anchor + command + PUBLIC_VALIDATION_STEPS),
+        (anchor + WINDOWS_STATUS_GUARD + windows_tail,
+         anchor + WINDOWS_STATUS_GUARD + command + WINDOWS_STATUS_GUARD + windows_tail),
+    )
+    qt_before = f"          python tools/tests/{QT_PEER_TESTS[-1]}\n" + WINDOWS_STATUS_GUARD
+    qt_after = qt_before + qt_command + WINDOWS_STATUS_GUARD + NATIVE_APPLICATION_BUILD + QT_TEST_ARTIFACT
+    if counts == (2, 1, 1, 1, 1, 1):
+        for before, after in menus:
+            if source.count(after) != 1 or source.count(before) != 0:
+                raise ValueError("Rust CI SOCKS5 UDP peer menu drifted; review required")
+            source = source.replace(after, before, 1)
+        if not source.endswith(qt_after):
+            raise ValueError("Rust CI SOCKS5 UDP Qt/native build tail drifted; review required")
+        source = source[:-len(qt_after)] + qt_before
+        if source.count(PREVIOUS_COMPATIBILITY_GATE) != 0:
+            raise ValueError("Rust CI compatibility import gate duplicated; review required")
+        source = source.replace(COMPATIBILITY_GATE, PREVIOUS_COMPATIBILITY_GATE, 1)
+        if source.count(PREVIOUS_NATIVE_QT_REPORT) != 0 or source.count(DIAGNOSTIC_NATIVE_QT_REPORT) != 0:
+            raise ValueError("Rust CI native Qt report gate duplicated; review required")
+        source = source.replace(NATIVE_QT_REPORT, PREVIOUS_NATIVE_QT_REPORT, 1)
+    source = _connectivity_workflow(source)
+    source = _replace_checked(source, PREVIOUS_COMPATIBILITY_GATE, COMPATIBILITY_GATE,
+                              "compatibility import and native-DNS gates")
+    source = _replace_checked(source, PREVIOUS_NATIVE_QT_REPORT, NATIVE_QT_REPORT,
+                              "native Qt report and exit-code gates", intermediate=DIAGNOSTIC_NATIVE_QT_REPORT)
+    for before, after in menus:
+        source = _replace_checked(source, before, after, "SOCKS5 UDP peer menu")
+    if not source.endswith(qt_before):
+        raise ValueError("Rust CI pre-UDP Qt peer tail drifted; review required")
+    return source[:-len(qt_before)] + qt_after
+
+
 def validate_context(environment: Mapping[str, str]) -> None:
     expected = {
         "GITHUB_ACTIONS": "true",
@@ -271,7 +399,7 @@ def prepare_update(repository: Path) -> tuple[Path, str, str]:
     # workflow; writes still occur only in the existing Linux App job.
     before = path.read_text(encoding="utf-8")
     after = updated_workflow(before)
-    for name in (*ADDITIONAL_TESTS, POLICY_TEST, *DNS_PROBE_TESTS, *CONNECTIVITY_IMPORT_TESTS):
+    for name in (*ADDITIONAL_TESTS, POLICY_TEST, *DNS_PROBE_TESTS, *CONNECTIVITY_IMPORT_TESTS, SOCKS5_UDP_TEST):
         if not (repository / "tools/tests" / name).is_file():
             raise ValueError(f"Required CI suite is missing: {name}")
     if not (repository / PUBLIC_PROBE).is_file():

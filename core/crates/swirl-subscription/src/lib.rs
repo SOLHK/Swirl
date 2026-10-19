@@ -74,6 +74,8 @@ pub enum Outbound {
         auth: Option<Credentials>,
         #[serde(default)]
         tls: Option<Tls>,
+        #[serde(default)]
+        udp: bool,
     },
     HttpConnect {
         host: String,
@@ -419,6 +421,11 @@ impl Config {
                 } if !valid_host(host) || *port == 0 || !valid_auth(auth) => {
                     return Err("NodeParameters");
                 }
+                Outbound::Socks5 {
+                    udp: true,
+                    tls: Some(_),
+                    ..
+                } => return Err("Socks5UdpTlsUnsupported"),
                 Outbound::Trojan {
                     host,
                     port,
@@ -546,6 +553,32 @@ impl ImportedDocument {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn socks5_udp_is_explicit_and_never_weakens_tls() {
+        for (extra, udp) in [
+            ("", false),
+            (",\"udp\":false", false),
+            (",\"udp\":true", true),
+        ] {
+            let document = format!(
+                r#"{{"schema":1,"listen":"127.0.0.1:0","selected":"s","nodes":[{{"id":"s","outbound":{{"type":"socks5","host":"proxy.fixture.test","port":1080{extra}}}}}]}}"#
+            );
+            let config = Config::parse(document.as_bytes()).unwrap();
+            assert!(
+                matches!(&config.nodes[0].outbound, Outbound::Socks5 { udp: actual, .. } if *actual == udp)
+            );
+            let tls =
+                document.replace("1080", r#"1080,"tls":{"server_name":"proxy.fixture.test"}"#);
+            if udp {
+                assert!(matches!(
+                    Config::parse(tls.as_bytes()),
+                    Err("Socks5UdpTlsUnsupported")
+                ));
+            } else {
+                assert!(Config::parse(tls.as_bytes()).is_ok());
+            }
+        }
+    }
     #[test]
     fn unknown_fields_preserved_but_not_executed() {
         let data = br#"{"schema":1,"unknown_tls_secret":"fixture"}"#;

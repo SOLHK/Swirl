@@ -105,3 +105,22 @@ that report and retains CTest's original nonzero exit code, so a Windows runner
 without console text output cannot hide the failing assertion again. This
 diagnosis establishes a concrete test defect, not proof that every Windows
 failure has been explained; the next exact-source CI must confirm the result.
+
+## Verified follow-up
+
+Fix `6dcc212df1f58ce96d555dfa14db29e53b2e4bf2` passed
+[Rust run 39178283551](https://github.com/SOLHK/Swirl/actions/runs/39178283551)
+on Linux, macOS and Windows. Windows job `117825412254` used Qt 6.10.3 and
+MSVC 19.44.35229.0. The native CTest group passed 3/3, and the separate
+compatibility guard passed 1/1. The complete native Qt XML contains **44 actual
+passed cases, 5 external-peer skips and no failures**, excluding init/cleanup.
+All three new rule slots passed, including the literal-IP/hostname forwarding
+checks, group-reference preservation and real DPAPI/QSaveFile failure/reload.
+The independent Qt peer suites ran after this CTest group and passed; their
+standalone skipped hooks are not counted as CTest passes.
+
+The permanent, whitelisted per-case extraction is
+[`RULE_EDIT_TRANSACTION_WINDOWS_20261019.json`](evidence/RULE_EDIT_TRANSACTION_WINDOWS_20261019.json).
+It preserves both the earlier failed run and the verified source identity.
+This closes the reported Windows rule-stage test failure; physical user-machine
+and private-provider acceptance remain separate.

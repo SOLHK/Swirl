@@ -294,7 +294,7 @@ fn uri(line: &str) -> Result<Value, &'static str> {
         }
         return Ok(n);
     }
-    if u.scheme() == "https" {
+    if matches!(u.scheme(), "https" | "socks5-tls") {
         n["tls"] = true.into();
     }
     let mut seen = std::collections::HashSet::new();
@@ -785,12 +785,13 @@ fn ss_outbound(raw: &Value, family: &str) -> Result<Outbound, &'static str> {
     Ok(outbound)
 }
 fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Option<Outbound>) {
-    let kind = protocol(
-        raw.get("type")
-            .or_else(|| raw.get("protocol"))
-            .and_then(Value::as_str)
-            .unwrap_or(""),
-    );
+    let source_protocol = raw
+        .get("type")
+        .or_else(|| raw.get("protocol"))
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let implicit_socks_tls = source_protocol.eq_ignore_ascii_case("socks5-tls");
+    let kind = protocol(source_protocol);
     if matches!(kind, "socks4" | "socks4a")
         || (raw.get("type").and_then(Value::as_str) == Some("socks")
             && matches!(raw.get("version").and_then(Value::as_str), Some("4" | "4a")))
@@ -844,6 +845,7 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
         || raw.pointer("/tls/reality").is_some()
         || raw.get("security").and_then(Value::as_str) == Some("reality");
     let tls_enabled = kind == "trojan"
+        || implicit_socks_tls
         || tls_obj.and_then(Value::as_bool) == Some(true)
         || raw.pointer("/tls/enabled").and_then(Value::as_bool) == Some(true)
         || raw.get("security").and_then(Value::as_str) == Some("tls");
@@ -971,6 +973,7 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
         let first_name = names.iter().flatten().next().copied();
         let tls_invalid = tls_obj.is_some_and(|v| !v.is_boolean() && !v.is_object())
             || (kind == "trojan" && declared_tls == Some(false))
+            || (implicit_socks_tls && (declared_tls == Some(false) || security == Some("none")))
             || matches!(
                 (declared_tls, security),
                 (Some(false), Some("tls")) | (Some(true), Some("none"))
@@ -996,6 +999,8 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
             "TransportNotImplemented"
         } else if unrecognized > 0 || tls_unknown {
             "UnmappedFields"
+        } else if kind == "socks5" && udp && tls_enabled {
+            "Socks5UdpTlsUnsupported"
         } else {
             diagnostic
         };
@@ -1119,6 +1124,7 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
                     port: port as u16,
                     auth,
                     tls,
+                    udp,
                 }),
             };
             if let Some(outbound) = outbound {
@@ -1155,7 +1161,7 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
             udp_declared: udp,
             unrecognized_fields: unrecognized,
             native_tcp_candidate: candidate.is_some(),
-            native_udp_supported: kind == "ss" && udp && candidate.is_some(),
+            native_udp_supported: ["ss", "socks5"].contains(&kind) && udp && candidate.is_some(),
             real_network_verified: false,
             diagnostic,
         },
@@ -1661,6 +1667,91 @@ mod tests {
                 );
                 assert_eq!(rejected.original, unsafe_input.as_bytes());
             }
+        }
+    }
+    #[test]
+    fn socks5_udp_capability_requires_plain_standard_transport() {
+        for (parameter, enabled) in [("", false), ("?udp=false", false), ("?udp=1", true)] {
+            let input = format!("socks5://user:secret@proxy.fixture.test:1080{parameter}");
+            let result = inspect(input.as_bytes());
+            assert!(result.report.parsed);
+            let node = &result.report.nodes[0];
+            assert!(node.native_tcp_candidate);
+            assert_eq!(node.native_udp_supported, enabled);
+            assert!(!node.real_network_verified);
+            assert_eq!(result.original, input.as_bytes());
+            assert!(
+                matches!(result.tcp_candidates[0].as_ref(), Some(Outbound::Socks5 { udp, .. }) if *udp == enabled)
+            );
+        }
+        for input in [
+            "socks5-tls://user:secret@proxy.fixture.test:1080?udp=1",
+            "socks5://user:secret@proxy.fixture.test:1080?udp=1&security=tls",
+        ] {
+            let result = inspect(input.as_bytes());
+            assert!(result.report.parsed);
+            let node = &result.report.nodes[0];
+            assert_eq!(node.diagnostic, "Socks5UdpTlsUnsupported");
+            assert!(!node.native_tcp_candidate);
+            assert!(!node.native_udp_supported);
+            assert!(!node.real_network_verified);
+            assert!(result.tcp_candidates[0].is_none());
+        }
+        let tls_uri = "socks5-tls://user:secret@proxy.fixture.test:1080";
+        for input in [tls_uri.to_owned(), format!("{tls_uri}?udp=false")] {
+            let result = inspect(input.as_bytes());
+            assert!(matches!(
+                result.tcp_candidates[0].as_ref(),
+                Some(Outbound::Socks5 {
+                    tls: Some(_),
+                    udp: false,
+                    ..
+                })
+            ));
+        }
+        for input in [
+            format!("{tls_uri}?tls=false"),
+            format!("{tls_uri}?security=none"),
+            "socks5://user:secret@proxy.fixture.test:1080?udp=1&tls=true".into(),
+        ] {
+            assert!(
+                !inspect(input.as_bytes())
+                    .report
+                    .nodes
+                    .first()
+                    .is_some_and(|n| n.native_tcp_candidate)
+            );
+        }
+        for extra in [
+            "",
+            ",\"udp\":false",
+            ",\"udp\":true",
+            ",\"tls\":false",
+            ",\"security\":\"none\"",
+        ] {
+            let input = format!(
+                r#"{{"proxies":[{{"type":"socks5-tls","server":"proxy.fixture.test","port":1080{extra}}}]}}"#
+            );
+            let result = inspect(input.as_bytes());
+            if matches!(extra, "" | ",\"udp\":false") {
+                assert!(matches!(
+                    result.tcp_candidates[0].as_ref(),
+                    Some(Outbound::Socks5 {
+                        tls: Some(_),
+                        udp: false,
+                        ..
+                    })
+                ));
+            } else {
+                assert!(!result.report.nodes[0].native_tcp_candidate);
+                assert!(!result.report.nodes[0].native_udp_supported);
+            }
+        }
+        for value in ["1", "null", "\"true\""] {
+            let document = format!(
+                r#"{{"proxies":[{{"type":"socks5","server":"proxy.fixture.test","port":1080,"udp":{value}}}]}}"#
+            );
+            assert!(!inspect(document.as_bytes()).report.nodes[0].native_tcp_candidate);
         }
     }
     #[test]

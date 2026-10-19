@@ -2,6 +2,7 @@
 #include "engine/NodeImportService.h"
 #include "engine/MihomoAdapter.h"
 #include "engine/EngineController.h"
+#include "engine/SwirlProtocolRegistry.h"
 #include "ControlledNetwork.h"
 #include <QTest>
 #include <QSettings>
@@ -60,6 +61,38 @@ private slots:
         for(const auto &body:{QByteArray("[Proxy]\nA = socks5, 127.0.0.1, 1080\nBypass = direct\n"),QByteArray(R"({"outbounds":[{"type":"socks","tag":"A","server":"127.0.0.1","server_port":1080},{"type":"direct","tag":"bypass"}]})")}){
             const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));QVERIFY(!parsed.configuration.isEmpty());
         }
+    }
+    void socks5TlsUriAliasesPreserveSecurity() {
+        const QByteArray prefix="socks5-tls://synthetic-socks5-user:synthetic-socks5-password@127.0.0.1:1080";
+        const auto secure=prefix+"#secure";
+        const QByteArray plain="socks5://127.0.0.1:1081#plain";
+        // A TLS alias is equally binding when it is the first URI, a later
+        // item, or inside a Base64 subscription envelope.
+        for(const auto &original:QList<QByteArray>{secure,plain+"\n"+secure})for(const auto &body:{original,original.toBase64()}){
+            const auto parsed=NodeImporter::parse(body);QVERIFY2(bool(parsed),qPrintable(parsed.error));
+            QCOMPARE(parsed.nodes.size(),original==secure?1:2);QVERIFY(parsed.configuration.isEmpty());
+            const auto &node=parsed.nodes.last();QCOMPARE(node.protocol,QString("socks5"));
+            QCOMPARE(node.parameters.value("tls"),QJsonValue(true));QVERIFY(node.conversionIssues.isEmpty());
+            QCOMPARE(node.username,QString("synthetic-socks5-user"));QCOMPARE(node.password,QString("synthetic-socks5-password"));
+            QCOMPARE(node.originalConfiguration.value("uri"),QJsonValue(QString::fromUtf8(secure)));
+            if(parsed.nodes.size()==2){QVERIFY(!parsed.nodes.first().parameters.contains("tls"));QCOMPARE(parsed.nodes.first().originalConfiguration.value("uri"),QJsonValue(QString::fromUtf8(plain)));}
+        }
+        const auto conflict=prefix+"?security=none#conflict";
+        for(const auto &original:QList<QByteArray>{conflict,plain+"\n"+conflict})for(const auto &body:{original,original.toBase64()})
+            QVERIFY2(!NodeImporter::parse(body),"An explicit security=none cannot downgrade the implicit TLS URI scheme.");
+        const auto unknown=prefix+"?tls=false#unknown";
+        for(const auto &original:QList<QByteArray>{unknown,plain+"\n"+unknown})for(const auto &body:{original,original.toBase64()}){
+            const auto parsed=NodeImporter::parse(body);QVERIFY2(bool(parsed),qPrintable(parsed.error));const auto &node=parsed.nodes.last();
+            QCOMPARE(node.parameters.value("tls"),QJsonValue(true));QVERIFY(!node.conversionIssues.isEmpty());
+            QCOMPARE(node.originalConfiguration.value("uri"),QJsonValue(QString::fromUtf8(unknown)));
+            QVERIFY(!SwirlProtocolRegistry::nativeNodeReason(node).isEmpty());
+        }
+        for(const auto &source:QList<QByteArray>{
+                "[Proxy]\nfixture = socks5-tls,127.0.0.1,1080,over-tls=false\n",
+                "[server_local]\nsocks5-tls=127.0.0.1:1080,tag=fixture,tls=false\n"})
+            for(const auto &body:{source,source.toBase64()})QVERIFY(!NodeImporter::parse(body));
+        // This URI fix does not extend the raw Clash protocol vocabulary.
+        QVERIFY(!NodeImporter::parse("proxies: [{name: fixture, type: socks5-tls, server: 127.0.0.1, port: 1080}]"));
     }
     void iniTransportAliasesCannotDowngradeSecurity() {
         for(const auto &protocol:{"vless","trojan"}) {

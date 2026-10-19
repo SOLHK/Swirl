@@ -310,11 +310,11 @@ in [connection/policy validation](../docs/RUST_CONNECTION_POLICY_VALIDATION_2026
 | Crate | Actual implementation | Not yet implemented |
 |---|---|---|
 | swirl-subscription | Versioned typed Swirl IR; bounded content detection for Clash YAML/JSON, sing-box JSON, URI/Base64 and INI; raw/unknown field preservation; redacted capability matrix; mapped TCP/WS and SOCKS4/4a candidates; validated DoT/DoH settings, explicit probes and bounded policy membership graphs | Complete client-specific config execution and integrated subscription updating; existing C++ adapters and Python capture retained; arbitrary imported full configurations and unsupported group semantics are not automatically executable |
-| swirl-protocol | Mixed HTTP/CONNECT/SOCKS4/4a/5 input, input auth, HTTP CONNECT/SOCKS4/4a/5 upstream, Trojan TLS, SS AEAD TCP/UDP, simple-obfs HTTP TCP, VLESS v0 TCP/TLS; native VLESS WS/WSS and Trojan WSS framing; native HTTP/HTTPS health requests; bounded multi-address TCP, one establishment deadline and static failure stages | SS2022/SSR/VMess/REALITY/QUIC families, VLESS Vision/mux/encryption extensions, other protocol UDP and obfs TLS; full RFC 8305 asynchronous DNS behavior |
+| swirl-protocol | Mixed HTTP/CONNECT/SOCKS4/4a/5 input, input auth, HTTP CONNECT/SOCKS4/4a/5 upstream, explicit standard SOCKS5 UDP with control lifetime and strict authentication, Trojan TLS, SS AEAD TCP/UDP, simple-obfs HTTP TCP, VLESS v0 TCP/TLS; native VLESS WS/WSS and Trojan WSS framing; native HTTP/HTTPS health requests; bounded multi-address TCP, one establishment deadline and static failure stages | SS2022/SSR/VMess/REALITY/QUIC families, VLESS Vision/mux/encryption extensions, other protocol UDP, SOCKS5 TLS+UDP and obfs TLS; full RFC 8305 asynchronous DNS behavior |
 | swirl-transport | rustls TLS with verification/SNI/ALPN, including origin TLS over an existing native proxy stream; bounded duplex copying, independent TCP half-close and live byte counters; the bounded WS driver currently resides in swirl-protocol | gRPC/XHTTP, mux and QUIC; WS close is full duplex and does not promise TCP half-close semantics |
 | swirl-routing | Ordered domain/suffix/keyword, source/destination CIDR, destination port and final rules; lazy configured DNS and pinned IP decisions; bounded nested manual groups and session-bound automatic choices; Qt mappings for nested manual and supported automatic groups | Process rules, GEOIP/GEOSITE/MRS, reevaluation/retry of alternative destination IPs after CIDR-based selection; automatic-group members that are themselves groups |
 | swirl-dns | Rust custom UDP/TCP DNS, strict DoT and HTTP/1.1 DoH with explicit IP bootstrap; validated A/AAAA/CNAME, hostname-shared positive TTL cache and strict SOA negative cache; system resolver, exact hosts through Qt, immutable caches, shared 8-query budget, max 16 addresses | Combined system/custom mode, proxy-routed encrypted DNS, domain bootstrap, EDNS/DNSSEC, RFC 9520 failure cache, DNS split/Fake-IP |
-| swirl-core | Two Tokio workers, max 256 sessions, immutable per-session configuration and policy view; bounded health scheduling, `url_test`/`fallback`/round-robin groups, atomic updates, stop/cancel and stats; SOCKS5 UDP ASSOCIATE with explicit DIRECT or SS AEAD routes | Other protocol UDP, TUN, platform network takeover and long-duration performance validation |
+| swirl-core | Two Tokio workers, max 256 sessions, immutable per-session configuration and policy view; bounded health scheduling, `url_test`/`fallback`/round-robin groups, atomic updates, stop/cancel and stats; SOCKS5 UDP ASSOCIATE with explicit DIRECT, SS AEAD or standard SOCKS5 routes | Other protocol UDP, TUN, platform network takeover and long-duration performance validation |
 | swirl-api | ABI v1 caller-buffer JSON, lifecycle handles, start/configure/select/select_group/snapshot/stop; explicit policy input and redacted health reports; per-connection static errors/stages and snapshot last-error stage; local stdin harness | Complete product configuration migration and persisted IR migration |
 
 The Qt adapter contains mappings for supported HTTP/SOCKS4/4a/5/Trojan/SS AEAD/VLESS
@@ -447,8 +447,16 @@ https://github.com/XTLS/Xray-core/blob/main/proxy/vless/encoding/encoding.go .
   deadline. At most two TCP candidates wait concurrently; no post-TCP-success
   address retry, authentication downgrade or application replay is permitted.
 - UDP control connection owns one association; exact client IP/port pinning,
-  fragments dropped, <=64 recent destinations with 30-second response allowance,
-  <=65507-byte datagrams. Only explicit DIRECT or SS AEAD (`udp: true`) routes execute UDP in this phase.
+  fragments dropped, <=65507-byte datagrams. Explicit DIRECT, SS AEAD and
+  standard SOCKS5 (`udp: true`, without TLS) routes execute UDP. DIRECT/SS keep
+  <=64 recent destinations with a 30-second response allowance. SOCKS5 keeps
+  <=16 upstream associations including closed-node tombstones, with no implicit
+  reconnect in the same inbound association. All UDP preparation/queued sends
+  share four in-flight permits; SOCKS5 replies share a four-entry queue. Its
+  connected UDP socket checks the relay source, with a 30-second recent-send
+  window per relay, not a per-destination verification claim. Control EOF
+  cancels pending sends and invalidates queued replies. See the exact scope and
+  independent evidence in [SOCKS5 UDP validation](../docs/RUST_SOCKS5_UDP_20261019.md).
 - Resolver permits remain owned by pending OS lookup tasks after caller timeout,
   limiting detached work. Runtime shutdown waits at most 500ms for OS resolver
   work; Qt uses PreventUnloadHint so late OS completion cannot call unloaded code.

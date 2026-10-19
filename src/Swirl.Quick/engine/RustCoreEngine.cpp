@@ -207,10 +207,13 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
   if(n.protocol=="vless"||n.protocol=="trojan")allowed.unite(QSet<QString>{"network","ws-opts"});
   for(auto p=n.parameters.begin();p!=n.parameters.end();++p)if(!allowed.contains(p.key()))return "Rust 尚未实现此传输或扩展参数。";
   for(const auto &key:QStringList{"tls","udp","skip-cert-verify"})if(n.parameters.contains(key)&&!n.parameters.value(key).isBool())return "Rust 布尔参数类型无效。";
-  if((n.protocol!="ss"&&n.parameters.value("udp").toBool())||n.parameters.value("skip-cert-verify").toBool())return "Rust 尚不支持该出口的代理 UDP，且不允许关闭证书验证。";
+  if(n.parameters.value("skip-cert-verify").toBool())return "Rust 不允许关闭证书验证。";
+  const bool udp=n.parameters.value("udp").toBool();
+  if(udp&&n.protocol!="ss"&&n.protocol!="socks5")return "Rust 尚不支持该出口的代理 UDP。";
   for(const auto &key:QStringList{"sni","servername"})if(n.parameters.contains(key)&&(!n.parameters.value(key).isString()||n.parameters.value(key).toString()!=n.serverName))return "TLS 名称字段不一致。";
   if(n.protocol=="trojan"&&n.parameters.contains("tls")&&!n.parameters.value("tls").toBool())return "Trojan 必须使用 TLS。";
   const bool tls=n.protocol=="trojan"||n.parameters.value("tls").toBool();
+  if(n.protocol=="socks5"&&udp&&tls)return "Rust 尚未验证 SOCKS5 TLS 与 UDP 的组合；未丢弃 TLS 或 UDP 参数。";
   if(!tls&&(!n.serverName.isEmpty()||n.parameters.contains("alpn")))return "未启用 TLS 却含 TLS 参数。";
   QJsonObject outbound{{"type",socks4?"socks4":n.protocol=="http"?"http_connect":n.protocol=="ss"?"shadowsocks":n.protocol},{"host",n.host},{"port",n.port}};
   if(socks4){
@@ -237,6 +240,7 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
   }
   else if(n.protocol=="trojan")outbound["password"]=n.password;
   else if(!n.username.isEmpty()||!n.password.isEmpty())outbound["auth"]=QJsonObject{{"username",n.username},{"password",n.password}};
+  if(n.protocol=="socks5")outbound["udp"]=udp;
   if(tls){
    auto alpn=n.parameters.value("alpn");if(!alpn.isUndefined()&&!alpn.isArray())return "ALPN 格式无效。";
    outbound["tls"]=QJsonObject{{"server_name",n.serverName.isEmpty()?n.host:n.serverName},{"alpn",alpn.isUndefined()?QJsonArray{}:alpn.toArray()}};
