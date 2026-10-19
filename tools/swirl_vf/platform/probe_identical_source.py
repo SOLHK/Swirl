@@ -117,6 +117,15 @@ def run(source, binary, output):
     except Exception as error:
         report['status'] = 'DIAGNOSTIC_ERROR'
         report['errors'].append({'type':type(error).__name__,'message':str(error)})
+        if 'coretext_did_not_report_requested_axis_value:' in str(error):
+            # A separate observation-only run keeps the strict production failure.
+            # It emits axis numbers, never glyph paths or an accepted instance.
+            from diagnose_axis_readback import diagnose
+            try:
+                diagnosis = diagnose(source, output.with_name('axis-readback.json'))
+                report['supplemental_axis_diagnosis'] = diagnosis['status']
+            except Exception as diagnostic_error:
+                report['supplemental_axis_diagnosis_error'] = str(diagnostic_error)
     finally:
         report['source_unchanged'] = sha256(source) == EXPECTED
         report['elapsed_seconds'] = time.monotonic()-started
