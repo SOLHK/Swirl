@@ -6,6 +6,8 @@ on:
     paths:
       - '.github/workflows/swirl-vf-tangents.yml'
       - 'tools/swirl_vf/platform/probe_tangent_rules.py'
+      - 'tools/swirl_vf/platform/probe_hierarchy_rules.py'
+      - 'tools/swirl_vf/tests/test_hierarchy_probe.py'
       - 'tools/swirl_vf/tools/tangent_geometry.py'
       - 'tools/swirl_vf/tests/test_tangent_geometry.py'
   workflow_dispatch:
@@ -37,8 +39,13 @@ jobs:
           sw_vers
           xcodebuild -version
           python -m pip install fonttools==4.61.1 numpy==2.2.6
+          python -m unittest discover -s tools/swirl_vf/tests -p test_hierarchy_probe.py -v
           xcrun clang -std=c11 -O2 -Wall -Wextra -Werror -mmacosx-version-min=15.4 tools/swirl_vf/platform/hvf_oracle.c -lhvf -o build/hvf_oracle
           python tools/swirl_vf/platform/probe_tangent_rules.py --binary build/hvf_oracle --output build/tangent-evidence/synthetic.json
+      - name: Compare native rotations and nested translations without relaxing the budget
+        run: |
+          set -euo pipefail
+          python tools/swirl_vf/platform/probe_hierarchy_rules.py --binary build/hvf_oracle --output build/tangent-evidence/hierarchy.json --require-pass
       - uses: actions/upload-artifact@v4
         if: always()
         with:
