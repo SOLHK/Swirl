@@ -10,7 +10,8 @@ non-forced pushes and preserve concurrent UI/font/test work. The correction
 retains font commits `aab06bf`, `501099da`, `7dfbdda` and
 `b3ac46414ed3921d18b1cf8e9a143c545c8085fb` and
 `6cba41ff43b989a240191a3731d9d8a5e29908b1` (font diagnostics and TTC
-timestamp/tests/docs). Private subscription
+timestamp/tests/docs), followed by parent `d175d81774aef984265ca440d1b88a406394ccf5`.
+Private subscription
 updates remain disabled; no private provider requests were made.
 
 | Stage | Actual source | Exact Actions results |
@@ -18,7 +19,7 @@ updates remain disabled; no private provider requests were made.
 | REALITY R3 | [`5ad68bcb22a23573d462cbfd972c7120093f504a`](https://github.com/SOLHK/Swirl/commit/5ad68bcb22a23573d462cbfd972c7120093f504a) | [Rust 39239280852](https://github.com/SOLHK/Swirl/actions/runs/39239280852): Linux/macOS/Windows success, including Windows Qt/native application. [App 39239280949](https://github.com/SOLHK/Swirl/actions/runs/39239280949): success |
 | Initial Vision substage | [`f3ce257f14e59e82977d89ac4be436d08926c6b8`](https://github.com/SOLHK/Swirl/commit/f3ce257f14e59e82977d89ac4be436d08926c6b8) | [Rust 39243009089](https://github.com/SOLHK/Swirl/actions/runs/39243009089): Linux success, macOS/Windows failure; subsequent Windows Qt/native application gates did not run. [App 39243009132](https://github.com/SOLHK/Swirl/actions/runs/39243009132): success |
 | Outer-TLS record-boundary correction | [`0be68231b15c1e4f69b138cda7bae0a3930d956b`](https://github.com/SOLHK/Swirl/commit/0be68231b15c1e4f69b138cda7bae0a3930d956b) | [Rust 39246770262](https://github.com/SOLHK/Swirl/actions/runs/39246770262): Linux/macOS success; Windows failed at an older DNS UDP fixture bind before R3/Vision/Qt ran. [App 39246770049](https://github.com/SOLHK/Swirl/actions/runs/39246770049): success |
-| Windows TCP/UDP fixture port selection | `included with this commit` | Final local 94 tests passed; exact new-source CI **not yet executed** |
+| Windows TCP/UDP fixture port selection | [`7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167`](https://github.com/SOLHK/Swirl/commit/7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167) | Final local 94 tests passed; [Rust 39250098899](https://github.com/SOLHK/Swirl/actions/runs/39250098899) / [App 39250098637](https://github.com/SOLHK/Swirl/actions/runs/39250098637): **Linux/macOS/Windows and App success** |
 
 R3 pins official Xray/REALITY, module checksums and Go 1.27.2, repeats both
 executable builds and verifies matching same-platform digests. Twelve tests
@@ -53,14 +54,27 @@ a failure; R3/Vision/Qt were not executed in that Windows job. The negative stil
 server_first_probe, zero user-application upload/receipt and DirectReady=false;
 the target's 34-byte probe is counted separately.
 
-The next fixture correction, `included with this commit`, reads each Windows
+The committed fixture correction, `7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167`, reads each Windows
 address family's TCP/UDP excluded-port tables with netsh, explicitly selects
 outside their union and retains both sockets. Other platforms keep OS-selected
 ports. Query/parse failures, exhaustion and unknown 10013 errors are not hidden;
 the existing eight-attempt collision limit remains. Six selector regressions
 were added. Final [local validation](evidence/vision-r2/port-pair-local.json)
-passed DNS 37, Shadowsocks fixture 16 and guard 41: 94 tests, no failures/skips,
-with the same four source-file hashes. Exact CI is `not yet executed`.
+passed DNS 37, `test_policy_groups.py` 16 and guard 41: 94 tests, no failures/skips,
+with the same four source-file hashes. Exact-source Linux/macOS/Windows jobs and
+App now all completed successfully, including Windows Qt integration, independent
+Qt peer wrappers and the complete Swirl.exe build. Final evidence is separate:
+[Linux](evidence/vision-r2/ci-linux.json),
+[macOS](evidence/vision-r2/ci-macos.json),
+[Windows](evidence/vision-r2/ci-windows.json) and
+[App](evidence/vision-r2/ci-app.json).
+All four environments passed 272 Rust tests plus one doctest, the five record
+regressions, 41 guards, REALITY 12 tests/13 sessions and four Vision cases with
+unchanged strict assertions. The App archive's 265 files match the exact Git tree.
+DNS 37 and `test_policy_groups.py` 16 passed in the three-platform Rust workflow; the existing
+App menu does not run them. App Python has 161 passes and five documented skips
+(four Qt wrappers and one absent SWIRL_RUST_INSPECTOR); portable Linux/macOS each
+retain five Qt-wrapper skips. macOS public checks retain their Linux-only scope.
 
 DirectReady, raw-socket/residual-buffer handoff, eligible HRR processing,
 production async REALITY, combined VLESS/REALITY/Vision and the subscription
@@ -73,8 +87,10 @@ absence of their full console tracebacks remain in the
 The frozen baseline stays **79 items, six accepted, 10.83%**. B13/B14 are partial,
 without acceptance credit. E17 retains R2/R1 history, E18 records R3 and E19
 separates original Vision and Windows-fixture failures from later corrections.
-Replace included with this commit / not yet executed only with the actual
-port-fixture source identity and its verified run/artifact results.
+All exact-source jobs and their artifacts have completed verification. This
+final handoff is documentation/evidence only; its commit does not claim a new
+executable CI run. Original failures remain independently traceable. Continue
+with safe transport/residual-buffer ownership and the remaining Direct gates.
 
 ---
 

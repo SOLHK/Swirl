@@ -56,15 +56,28 @@ excluded range; its R3/Vision/Qt stages did not execute. The original
 [macOS](../docs/evidence/vision-r2/record-ci-macos.json),
 [App](../docs/evidence/vision-r2/record-ci-app.json) successes remain distinct.
 
-The next test-fixture correction, `included with this commit`, queries Windows
+The committed test-fixture correction, `7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167`, queries Windows
 TCP/UDP exclusions read-only, chooses a port outside their union and keeps both
 sockets allocated. Query/parse failures and unknown 10013 errors remain fatal;
 the existing eight collision attempts and non-Windows OS allocation remain.
 Six selector regressions were added; final [local tests](../docs/evidence/vision-r2/port-pair-local.json)
-passed DNS 37, Shadowsocks fixture 16 and guards 41 (94 total, no failures/skips).
-New-source CI is **not yet executed**. Development preserves font commits
+passed DNS 37, `test_policy_groups.py` 16 and guards 41 (94 total, no failures/skips).
+New-source [Rust CI](https://github.com/SOLHK/Swirl/actions/runs/39250098899) and [App CI](https://github.com/SOLHK/Swirl/actions/runs/39250098637) both completed successfully, with all three Rust platform jobs green, including
+Windows Qt integration, independent Qt peer wrappers and full Swirl.exe build.
+Final [Linux](../docs/evidence/vision-r2/ci-linux.json),
+[macOS](../docs/evidence/vision-r2/ci-macos.json),
+[Windows](../docs/evidence/vision-r2/ci-windows.json) and
+[App](../docs/evidence/vision-r2/ci-app.json) evidence is bound to this source.
+All four environments passed 272 Rust tests plus one doctest, the five record
+regressions, 41 guards, REALITY 12 tests/13 sessions and four Vision cases.
+The App archive's 265 files match the exact tree. DNS 37 and `test_policy_groups.py` 16 ran
+in the three-platform Rust workflow, not the existing App menu. App Python
+retains 161 passes and five explicit skips (four Qt and one inspector prerequisite);
+portable Linux/macOS retain five Qt-wrapper skips each. macOS public checks
+remain Linux-only. These limits do not change the zero-failure/zero-skip mature
+REALITY and Vision results. Development preserves font commits
 aab06bf/501099da/7dfbdda/b3ac464 and
-6cba41ff43b989a240191a3731d9d8a5e29908b1.
+6cba41ff43b989a240191a3731d9d8a5e29908b1/d175d81774aef984265ca440d1b88a406394ccf5.
 
 DirectReady, raw-socket/residual-buffer handoff, eligible HRR processing,
 production async REALITY and combined VLESS/REALITY/Vision remain unfinished.

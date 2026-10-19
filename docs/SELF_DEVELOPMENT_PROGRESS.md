@@ -12,7 +12,7 @@ Vision 初次源码 `f3ce257f14e59e82977d89ac4be436d08926c6b8` 在 [Rust 3924300
 
 record 修复 `0be68231b15c1e4f69b138cda7bae0a3930d956b` 的 [Rust 39246770262](https://github.com/SOLHK/Swirl/actions/runs/39246770262) 已在 Linux/macOS 成功，[App 39246770049](https://github.com/SOLHK/Swirl/actions/runs/39246770049) 成功；这些环境实际通过 272 Rust + 1 doctest、5 项新 record 回归、41 guard 与成熟 R3/Vision 测试。Windows 则在旧 DNS fixture 的 UDP 保留段绑定处失败，R3/Vision/Qt 未执行；[原失败](evidence/vision-r2/record-ci-windows-failure.json) 单独保留，不按其他环境结果补算通过。
 
-下一项 Windows 端口 fixture 修复 `随本提交入库`：只读 netsh 查询 TCP/UDP 保留段并集之外的候选，显式选择且同时持有两种 socket；未知 10013/查询失败不吞、8 次冲突预算不变，新增 6 项选择器回归。最终本地 DNS 37 / Shadowsocks fixture 16 / guard 41 共 94 项通过、无失败/跳过；[本地证据](evidence/vision-r2/port-pair-local.json) 保留四文件哈希，精确 CI 为 **尚未执行**。并发字体提交 aab06bf/501099da/7dfbdda/b3ac464/6cba41ff 均保留，固定验收不因此加分。
+已推送 Windows 端口 fixture 修复 `7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167`：只读 netsh 查询 TCP/UDP 保留段并集之外的候选，显式选择且同时持有两种 socket；未知 10013/查询失败不吞、8 次冲突预算不变，新增 6 项选择器回归。最终本地 DNS 37 / `test_policy_groups.py` 16 / guard 41 共 94 项通过、无失败/跳过；[本地证据](evidence/vision-r2/port-pair-local.json) 保留四文件哈希，精确 [Rust 39250098899](https://github.com/SOLHK/Swirl/actions/runs/39250098899) 的 Linux/macOS/Windows 完整作业与 [App 39250098637](https://github.com/SOLHK/Swirl/actions/runs/39250098637) 均成功，包括 Windows Qt、独立 wrapper 与完整应用编译。最终 [Linux](evidence/vision-r2/ci-linux.json)/[macOS](evidence/vision-r2/ci-macos.json)/[Windows](evidence/vision-r2/ci-windows.json)/[App](evidence/vision-r2/ci-app.json) 保存精确源码、原始结果和跳过原因；App 265 个归档文件均匹配该 tree。并发字体提交 aab06bf/501099da/7dfbdda/b3ac464/6cba41ff/d175d817 均保留，固定验收不因此加分。
 
 独立核对将 A02 降为部分实现：18/18 parsed 仅证明外层格式与节点解析，INI 非节点节正文未全部语法/语义验证。没有为提高百分比缩窄该项范围。详细可重复核对依据见证据索引和 `evidence/SELF_DEVELOPMENT_PROGRESS_V1.json`。
 
@@ -62,7 +62,7 @@ record 修复 `0be68231b15c1e4f69b138cda7bae0a3930d956b` 的 [Rust 39246770262](
 | E16 | [Windows 测试对端修复](LOOPBACK_PAIR_ALLOCATION_20261019.md) | `a429d5b`；DNS 先选 TCP，SS 保留原错误/清理；本地 31 DNS、16 policy 通过；精确 CI 三平台各 189 Rust、201 Python/5 跳过，Windows Qt 四 XML 71 实际通过/6 跳过，完整原生应用成功 |
 | E17 | [REALITY R2](REALITY_TLS_ENGINE_20261019.md)、[Vision R1](VISION_FRAMING_FOUNDATION_20261019.md)及[历史精确 CI](CORE_REALITY_VISION_HANDOFF_20261019.md#保留的上一阶段证据) | `611edcff` / `5b55ab33` 各自三平台与 App 已成功；是已入库 TLS/R1 framing 证据，本次未重做，不能替代新提交 CI |
 | E18 | [REALITY R3 专项](REALITY_XRAY_INTEROP_20261019.md)、[本地结果](evidence/reality-r3/local-xray-final-summary.json)及[精确 CI](CORE_REALITY_VISION_HANDOFF_20261019.md#本次源码与精确-ci) | `5ad68bcb`；固定官方 Xray/REALITY/Go、重复构建身份；12 项/13 会话，严格 EOF/凭据隔离/回收。Linux/macOS/Windows 与 App 全部 success，含 Windows Qt/原生应用；仅受控 TLS 组件互通 |
-| E19 | [Vision 专项](VISION_ASYNC_INSPECTION_20261019.md)、[record 本地](evidence/vision-r2/record-boundary-local.json)、[Linux](evidence/vision-r2/record-ci-linux.json)/[macOS](evidence/vision-r2/record-ci-macos.json)/[App](evidence/vision-r2/record-ci-app.json)、[Windows DNS 失败](evidence/vision-r2/record-ci-windows-failure.json)、[端口本地](evidence/vision-r2/port-pair-local.json) | 初始 f3ce257f macOS/Windows 失败保留；0be68231 Linux/macOS/App 成功、Windows DNS 失败且协议/Qt 未运行。下一端口源码 随本提交入库，本地 94 项通过，CI 尚未执行。DirectReady/所有权/HRR/组合/产品链未完成 |
+| E19 | [Vision 专项](VISION_ASYNC_INSPECTION_20261019.md)、[record 本地](evidence/vision-r2/record-boundary-local.json)、[Linux](evidence/vision-r2/record-ci-linux.json)/[macOS](evidence/vision-r2/record-ci-macos.json)/[App](evidence/vision-r2/record-ci-app.json)、[Windows DNS 失败](evidence/vision-r2/record-ci-windows-failure.json)、[端口本地](evidence/vision-r2/port-pair-local.json) | 初始 f3ce257f macOS/Windows 失败保留；0be68231 Linux/macOS/App 成功、Windows DNS 失败且协议/Qt 未运行。当前端口源码 7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167，本地 94 项通过；该精确 SHA 三平台 Rust 与 App 完整成功，272 Rust + 1 doctest、R3 12 项/13 会话与 Vision 4 项通过。DirectReady/所有权/HRR/组合/产品链未完成 |
 
 ## 3. A–F固定验收清单
 
@@ -96,7 +96,7 @@ record 修复 `0be68231b15c1e4f69b138cda7bae0a3930d956b` 的 [Rust 39246770262](
 | B11 | VLESS v0 TCP/通用TLS档案 | 部分实现 | E05/E06；独立协议和Qt转发 | 真实提供商及完整目标范围未验收 |
 | B12 | VMess档案 | 未实现 | E04/E05明确缺项 | 独立状态机、版本、认证、数据流与互操作 |
 | B13 | VLESS REALITY扩展 | 部分实现 | E17/E18；原生 REALITY TLS 1.3、双方 Finished 与官方 Xray/REALITY 的 12 项/13 会话独立互通，保留 EOF、凭据隔离与回收证据 | 生产异步 REALITY、浏览器指纹/任意伪装站点、完整 VLESS/REALITY/Vision 组合、订阅 IR/路由/Qt 与真实提供商仍未验收 |
-| B14 | VLESS Vision扩展 | 部分实现 | E17/E19；R1 framing、增量内层 TLS、有界异步 framing；0be68231 的 Linux/macOS/App 实际通过 272 Rust + 1 doctest、成熟 4 项，Windows DNS fixture 失败导致协议/Qt 未执行；下一端口修复 随本提交入库 本地 94 项通过，CI 尚未执行；此前原失败均保留 | DirectReady、原始 socket/缓冲所有权交接、HRR、真实 REALITY+Vision 组合及订阅 IR/路由/Qt/供应商整链仍未完成 |
+| B14 | VLESS Vision扩展 | 部分实现 | E17/E19；R1 framing、增量内层 TLS、有界异步 framing；0be68231 的 Linux/macOS/App 实际通过 272 Rust + 1 doctest、成熟 4 项，Windows DNS fixture 失败导致协议/Qt 未执行；当前端口修复 7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167 本地 94 项通过，精确三平台 Rust 与 App 完整成功；此前原失败均保留 | DirectReady、原始 socket/缓冲所有权交接、HRR、真实 REALITY+Vision 组合及订阅 IR/路由/Qt/供应商整链仍未完成 |
 | B15 | WebSocket/WSS传输及已承诺VLESS/Trojan组合 | 部分实现 | E05/E06；分片、背压、关闭预算和Qt已有证据 | 组合矩阵与真实提供商/长连接覆盖未完整 |
 | B16 | gRPC传输 | 未实现 | E04/E05明确缺项 | HTTP/2基础依赖可用但代理传输状态机需自研 |
 | B17 | XHTTP传输 | 未实现 | E04/E05明确缺项 | 版本/模式矩阵、取消、复用与真实互操作 |

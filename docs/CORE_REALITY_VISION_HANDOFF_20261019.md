@@ -2,8 +2,8 @@
 
 ## 代码与执行边界
 
-- 唯一开发分支：`work/core-completion-20261017`。提交前读取最新远端 HEAD，只做非强制快进，不写入 `main` 或 `test`。开发保留并发字体提交 `aab06bf`、`501099da`、`7dfbdda`、`b3ac464` 和 `6cba41ff43b989a240191a3731d9d8a5e29908b1`；后两项分别涉及字体 workflow 诊断及 TTC timestamp/字体测试文档，端口修复基于最新字体提交继续。
-- 当前已推送修复源码：[`0be68231b15c1e4f69b138cda7bae0a3930d956b`](https://github.com/SOLHK/Swirl/commit/0be68231b15c1e4f69b138cda7bae0a3930d956b)，tree `72cf2ebcb652baeefeb415be66ebe59184725697`。首次 Vision 提交的失败与修复后的结果分别保存。
+- 唯一开发分支：`work/core-completion-20261017`。提交前读取最新远端 HEAD，只做非强制快进，不写入 `main` 或 `test`。开发保留并发字体提交 `aab06bf`、`501099da`、`7dfbdda`、`b3ac464` 和 `6cba41ff43b989a240191a3731d9d8a5e29908b1`；后两项分别涉及字体 workflow 诊断及 TTC timestamp/字体测试文档，并保留随后新增的字体交接/诊断提交 `d175d81774aef984265ca440d1b88a406394ccf5`；端口修复以该最新提交为父节点。
+- 当前已推送源码：[`7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167`](https://github.com/SOLHK/Swirl/commit/7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167)，tree `79d2eba424535d42ba95c9e97ca6d0b44bdb7420`，父提交 `d175d81774aef984265ca440d1b88a406394ccf5`。首次 Vision 提交的失败与后续修复结果分别保存。
 - 固定验收仍为 **79 项、6 项整项已验收、加权 10.83%**。B13/B14 均为部分实现，独立组件和开发阶段 CI 不等于完整协议档案或产品验收。
 - 私有订阅更新开关保持关闭；本阶段没有新的私有订阅或供应商节点请求，没有提交私人凭据/缓存或受限字体二进制。失败代理明确报错，不降级普通 TLS 或 DIRECT。
 - 先读本交接、[开发契约](SWIRL_CORE_DEVELOPMENT_CONTRACT.md)、[固定进度](SELF_DEVELOPMENT_PROGRESS.md)、[R3 专项](REALITY_XRAY_INTEROP_20261019.md)和[Vision 专项](VISION_ASYNC_INSPECTION_20261019.md)。后续纯交接提交不能冒领为新的可执行源码 CI。
@@ -15,7 +15,7 @@
 | REALITY R3 | [`5ad68bcb22a23573d462cbfd972c7120093f504a`](https://github.com/SOLHK/Swirl/commit/5ad68bcb22a23573d462cbfd972c7120093f504a) | [Rust 39239280852](https://github.com/SOLHK/Swirl/actions/runs/39239280852)：Linux/macOS/Windows 完整 job 均 **success**，包括 Windows Qt 和原生应用编译；[App 39239280949](https://github.com/SOLHK/Swirl/actions/runs/39239280949) **success** |
 | Vision R2 首次子阶段 | [`f3ce257f14e59e82977d89ac4be436d08926c6b8`](https://github.com/SOLHK/Swirl/commit/f3ce257f14e59e82977d89ac4be436d08926c6b8) | [Rust 39243009089](https://github.com/SOLHK/Swirl/actions/runs/39243009089)：Linux **success**，macOS/Windows **failure**；Windows 后续 Qt/原生应用门禁未运行。[App 39243009132](https://github.com/SOLHK/Swirl/actions/runs/39243009132) **success**。不能称此 SHA 三平台通过 |
 | Vision 外层 TLS record 边界修复 | [`0be68231b15c1e4f69b138cda7bae0a3930d956b`](https://github.com/SOLHK/Swirl/commit/0be68231b15c1e4f69b138cda7bae0a3930d956b) | [Rust 39246770262](https://github.com/SOLHK/Swirl/actions/runs/39246770262)：Linux/macOS **success**，Windows 在旧 DNS fixture 的 UDP 绑定处 **failure**，R3/Vision/Qt 均未执行；[App 39246770049](https://github.com/SOLHK/Swirl/actions/runs/39246770049) **success** |
-| Windows TCP/UDP 端口对 fixture 修复 | `随本提交入库` | 最终本地 94 项通过；源码身份待本次提交绑定，精确 CI **尚未执行** |
+| Windows TCP/UDP 端口对 fixture 修复 | [`7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167`](https://github.com/SOLHK/Swirl/commit/7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167) | 最终本地 94 项通过；[Rust 39250098899](https://github.com/SOLHK/Swirl/actions/runs/39250098899) / [App 39250098637](https://github.com/SOLHK/Swirl/actions/runs/39250098637)：**Linux/macOS/Windows 完整 job 与 App 均 success** |
 
 R3 各平台的 12 项成熟对端测试创建 13 个会话，均无失败/错误/跳过；[Linux](evidence/reality-r3/ci-linux.json)、[macOS](evidence/reality-r3/ci-macos.json)、[Windows](evidence/reality-r3/ci-windows.json)、[App](evidence/reality-r3/ci-app.json) 保留源码、构建、结果和生命周期身份。R3 App 的 226 个归档文件逐项匹配精确 tree 的 Git blob 和执行位。常规 Windows Qt 入口原有 6 个独立 peer hook 跳过，随后 5 个 wrapper 分别执行这 6 个槽位；这些跳过没有改写为通过。App 指现有 Core implementation validation 工作流，不是完整 Qt GUI 验收。
 
@@ -47,18 +47,36 @@ record 修复的 [Linux](evidence/vision-r2/record-ci-linux.json)、[macOS](evid
 
 原始失败没有改写。R3 首次磁盘耗尽与 `CurveID` 缺失断言保留在 [R3 证据](evidence/reality-r3/)；[Vision 早期实验](evidence/vision-r2/initial-failures.json) 保留最初 4 个 loopback 阻断失败与两次 38 字节回显负例失败，明确原完整 unittest console 未保存。修复阶段首次本地 workspace 测试因沙箱拒绝 loopback 绑定而失败，同一源码/命令取得已授权网络权限后通过；两次原日志均留存，没有删除或弱化断言。
 
-## Windows 对端端口修复候选
+## Windows 对端端口修复
 
-源码 `随本提交入库` 在 Windows 只读查询当前地址族的 `netsh` TCP/UDP excluded-port 表，从两个协议保留段的并集之外显式选择端口，随后同时持有 TCP/UDP socket。Linux/macOS 保持 OS 分配。没有修改系统保留段或吞掉未知 `10013`；查询失败、解析失败或候选耗尽立即失败，实际端口冲突仍最多尝试 8 次。
+源码 `7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167` 在 Windows 只读查询当前地址族的 `netsh` TCP/UDP excluded-port 表，从两个协议保留段的并集之外显式选择端口，随后同时持有 TCP/UDP socket。Linux/macOS 保持 OS 分配。没有修改系统保留段或吞掉未知 `10013`；查询失败、解析失败或候选耗尽立即失败，实际端口冲突仍最多尝试 8 次。
 
-新增 6 项选择器回归；最终同一文件哈希的本地 DNS 37 项（81.647s）、Shadowsocks fixture 16 项（5.408s）、CI guard 41 项（0.471s），共 **94 项通过、0 失败/跳过**。[本地证据](evidence/vision-r2/port-pair-local.json) 将本轮命令、四个源码文件哈希及原始结果绑定；这不改变成熟对端断言，也不代表 Windows 或新提交 CI 已通过。新精确 CI 状态为 `尚未执行`。
+新增 6 项选择器回归；最终同一文件哈希的本地 DNS 37 项（81.647s）、`test_policy_groups.py` 16 项（5.408s）、CI guard 41 项（0.471s），共 **94 项通过、0 失败/跳过**。[本地证据](evidence/vision-r2/port-pair-local.json) 将本轮命令、四个源码文件哈希及原始结果绑定；成熟对端断言保持不变；以下为该新 SHA 实际执行成功后的独立 CI 证据，本地结果没有代替平台结果。
+
+## 最终源码的精确 CI 证据
+
+以下四项均绑定源码 `7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167` 和 tree `79d2eba424535d42ba95c9e97ca6d0b44bdb7420`，已核对完整作业终态、原始日志、构建身份和产物摘要：
+
+| 环境 | 完整作业 | 原始证据 |
+|---|---|---|
+| Linux | [118051505320 — success](https://github.com/SOLHK/Swirl/actions/runs/39250098899/job/118051505320) | [ci-linux.json](evidence/vision-r2/ci-linux.json) |
+| macOS | [118051505781 — success](https://github.com/SOLHK/Swirl/actions/runs/39250098899/job/118051505781) | [ci-macos.json](evidence/vision-r2/ci-macos.json) |
+| Windows | [118051505764 — success](https://github.com/SOLHK/Swirl/actions/runs/39250098899/job/118051505764) | [ci-windows.json](evidence/vision-r2/ci-windows.json) |
+| App/Core validation | [118053482123 — success](https://github.com/SOLHK/Swirl/actions/runs/39250098637/job/118053482123) | [ci-app.json](evidence/vision-r2/ci-app.json) |
+
+三平台 Rust 门禁及 App 实际通过 272 项 Rust 测试 + 1 doctest，包含 5 项真实 TLS record 回归；CI guard 为 41 项。各环境成熟 REALITY 为 12 项/13 会话，Vision 为 4 项（3 项内层 TLS 1.2 正例 + 1 项 TLS 1.3 Direct 安全拒绝），这些成熟对端测试均 0 失败/错误/跳过。TLS 1.3 负例严格观察 DirectRequested 后返回 PermissionDenied，上传/接收应用字节为 0，DirectReady 为 false。
+
+三平台 Rust CI 还分别通过 DNS 37 项（含新增选择器 6 项）和 `test_policy_groups.py` 16 项。Windows 完成 Qt 到 Rust 集成、独立 Qt peer wrappers 及完整 `Swirl.exe` 编译。App 的 265 个归档源码文件全部匹配精确 tree 的 Git blob 与执行位，未把自动格式化后的不同源码冒认为同一 SHA。
+
+原有跳过范围如实保留：Linux/macOS 各有 5 项需要 Qt 测试可执行文件的 Python wrapper 跳过；macOS 的公网检查按既有 Linux-only 条件未运行。App Python 菜单实际为 166 项、161 通过、5 跳过（4 项 Qt wrapper 与 1 项缺少 SWIRL_RUST_INSPECTOR）；该菜单没有 DNS 37/`test_policy_groups.py` 16，不能补算执行。Windows 常规 Qt 的 peer hook 跳过与随后注入独立对端的 wrapper 实际执行分开记录。App 工作流成功和原生应用编译不等于物理 GUI、供应商或完整产品验收。
+
+本次最终交接提交只更新文档与 JSON 证据；以上结果属于实际执行的源码提交，不冒领为交接提交的新一轮源码 CI。此前 f3ce257f 与 0be68231 的失败仍保留原结论。
 
 ## 下一步实际阻塞
 
-1. 绑定并推送端口 fixture 修复，再核验该精确 SHA 的 Linux/macOS/Windows/App；回填 `随本提交入库` / `尚未执行`，保留此前两个 Windows 失败，不用触发成功代替执行成功。
-2. `DirectReady`、原始 socket/缓冲所有权、TLS 状态与剩余字节安全交接仍未实现。HRR 尚不能进入 Direct 候选；收到 command=2 保持明确拒绝。
-3. 完成生产异步 REALITY，以及真实 VLESS + REALITY + Vision 组合互通；两个组件各自成功不能拼成组合成功。
-4. 再逐阶段接订阅语义 → 归一化 IR → 路由 → Rust runtime → REALITY/Vision → Qt。保留现有 UI/动画/字体和未知参数拒绝；提供商、TUN、长跑/弱网、物理 Windows 与安装包仍独立待验收。
+1. `DirectReady`、原始 socket/缓冲所有权、TLS 状态与剩余字节安全交接仍未实现。HRR 尚不能进入 Direct 候选；收到 command=2 保持明确拒绝。
+2. 完成生产异步 REALITY，以及真实 VLESS + REALITY + Vision 组合互通；两个组件各自成功不能拼成组合成功。
+3. 再逐阶段接订阅语义 → 归一化 IR → 路由 → Rust runtime → REALITY/Vision → Qt。保留现有 UI/动画/字体和未知参数拒绝；提供商、TUN、长跑/弱网、物理 Windows 与安装包仍独立待验收。
 
 ## 保留的上一阶段证据
 

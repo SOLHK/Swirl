@@ -320,8 +320,55 @@ address families, collision recovery, held-socket ownership, all failed-socket
 cleanup, immediate permission rejection and the final eighth collision error.
 The final local results and exact four-file hashes are recorded in
 [port-pair local evidence](evidence/vision-r2/port-pair-local.json).
-This fixture correction accompanies this source revision; its new exact CI
-results must be recorded separately before claiming Windows interoperability.
+The fixture correction was pushed as
+[`7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167`](https://github.com/SOLHK/Swirl/commit/7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167).
+Its completed exact-source CI is recorded below, separately from both prior
+failed revisions and the local fixture snapshot.
+
+## Final exact-source verification
+
+Source `7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167`, tree
+`79d2eba424535d42ba95c9e97ca6d0b44bdb7420`, passed
+[Rust run 39250098899](https://github.com/SOLHK/Swirl/actions/runs/39250098899)
+on Linux, macOS and Windows and
+[App run 39250098637](https://github.com/SOLHK/Swirl/actions/runs/39250098637).
+Every complete job finished with `success`; this is execution evidence, not a
+workflow trigger or a result inherited from another source commit.
+
+Each environment passed 272 Rust unit/integration tests plus one doctest,
+including the five real-TLS record regressions, 41 workflow guards, all 12
+REALITY tests/13 sessions and all four Vision tests, with no mature-peer failures,
+errors or skips. The four Vision cases remain three inner-TLS-1.2 positives and
+one inner-TLS-1.3 Direct refusal. The negative requires the actual authenticated
+Direct request, `PermissionDenied` at `server_first_probe`, zero user-application
+upload/receipt and `DirectReady=false`. The target's 34-byte probe is separately
+counted; no failed assertion was relaxed.
+
+The three-platform Rust workflow passed DNS 37 tests (including six new port
+selector tests) and `test_policy_groups.py` 16 tests. Windows also completed Qt/Rust
+integration, all independent Qt peer wrappers and full native `Swirl.exe`
+compilation. The App source artifact contains 265 files; each Git blob and mode
+matches the exact source tree. Build/source identities, both repeated peer binary
+hashes, artifact digests, raw test results and resource cleanup are retained in
+[Linux](evidence/vision-r2/ci-linux.json),
+[macOS](evidence/vision-r2/ci-macos.json),
+[Windows](evidence/vision-r2/ci-windows.json) and
+[App](evidence/vision-r2/ci-app.json).
+
+Existing scope differences are preserved. Portable Linux/macOS each skipped five
+Qt-dependent Python wrappers; macOS public HTTPS/DoH steps were not run under the
+existing Linux-only condition. The App Python menu ran 166 tests: 161 passed,
+five skipped (four Qt wrappers and one missing SWIRL_RUST_INSPECTOR prerequisite).
+That menu does not include DNS 37 or `test_policy_groups.py` 16. Windows generic Qt peer-hook
+skips are recorded separately from subsequent peer-injected wrapper execution.
+App workflow success and native compilation do not establish physical GUI,
+provider or complete-product acceptance.
+
+The final follow-up only commits documentation and JSON evidence. These results
+belong to the executable source SHA above. The original `f3ce257f` and `0be68231`
+failures remain unchanged. DirectReady, raw ownership/residual-byte handoff, HRR,
+production async REALITY, combined REALITY/Vision and the product chain remain
+incomplete; acceptance stays 79 items, six fully accepted, weighted 10.83%.
 
 ## Primary references and independent implementation
 
