@@ -117,10 +117,37 @@ REQUIRED_TESTS = (
 REALITY_BUILD = "cargo build --release --locked -p swirl-transport --example reality-client"
 BINARY_NAMES = ("SWIRL_RUST_HARNESS", "SWIRL_RUST_INSPECTOR", "SWIRL_RUST_DIAGNOSTIC",
                 "SWIRL_REALITY_CLIENT")
+PIP_COMMAND = "          python -m pip install cryptography==50.0.2\n"
+REALITY_VECTOR_COMMAND = "          python ../tools/tests/generate_reality_vectors.py --check\n"
+VISION_VECTOR_COMMAND = "          python ../tools/tests/generate_vision_vectors.py --check\n"
+VISION_FILES = (
+    "tools/tests/generate_vision_vectors.py",
+    "core/crates/swirl-protocol/tests/fixtures/vision-v1.txt",
+    "core/crates/swirl-protocol/tests/fixtures/flow-v1.txt",
+)
+
+
+def vector_fixture(source, stage):
+    """Independent fixture construction; never uses the updater's block definitions."""
+    separator = "  windows-rust:\n"
+    parts = source.split(separator)
+    for index, part in enumerate(parts):
+        status = "          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }\n" if index else ""
+        harness = ("          $env:SWIRL_RUST_HARNESS=(Resolve-Path target/release/swirl-api.exe).Path\n"
+                   if index else '          export SWIRL_RUST_HARNESS="$PWD/target/release/swirl-api"\n')
+        historical = PIP_COMMAND + harness
+        reality = PIP_COMMAND + status + REALITY_VECTOR_COMMAND + status + harness
+        final = PIP_COMMAND + status + REALITY_VECTOR_COMMAND + status + VISION_VECTOR_COMMAND + status + harness
+        original = next((block for block in (final, reality, historical) if part.count(block) == 1), None)
+        if original is None:
+            raise AssertionError("Fixture's Python vector prefix drifted")
+        parts[index] = part.replace(original, (historical, reality, final)[stage], 1)
+    return separator.join(parts)
 
 
 def previous_reality_stage(source):
     """Strip the entire later TLS-peer stage before making historical fixtures."""
+    source = vector_fixture(source, 0)
     separator = "  windows-rust:\n"
     parts = source.split(separator)
     for index, part in enumerate(parts):
@@ -180,7 +207,107 @@ class CoreDevelopmentTests(unittest.TestCase):
             path = root / relative
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text("# synthetic REALITY source fixture\n", encoding="utf-8")
+        for relative in VISION_FILES:
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("# public synthetic Vision fixture\n", encoding="utf-8")
         return workflow
+
+    def test_vision_stage_upgrades_both_reviewed_histories_and_is_idempotent(self):
+        final = development.updated_workflow(FIXTURE)
+        self.assertEqual(final.count(REALITY_VECTOR_COMMAND), 2)
+        self.assertEqual(final.count(VISION_VECTOR_COMMAND), 2)
+        for stage in (0, 1, 2):
+            with self.subTest(stage=stage):
+                self.assertEqual(development.updated_workflow(vector_fixture(final, stage)), final)
+        for index, part in enumerate(final.split("  windows-rust:\n")):
+            status = development.WINDOWS_STATUS_GUARD if index else ""
+            prefix = PIP_COMMAND + status + REALITY_VECTOR_COMMAND + status + VISION_VECTOR_COMMAND + status
+            self.assertEqual(part.count(prefix), 1)
+            self.assertLess(part.index(prefix), part.index("SWIRL_RUST_HARNESS"))
+
+    def test_vision_partial_duplicate_modes_order_and_windows_exits_fail_closed(self):
+        final = vector_fixture(development.updated_workflow(FIXTURE), 2)
+        status = development.WINDOWS_STATUS_GUARD
+        broken = [
+            final.replace(VISION_VECTOR_COMMAND, "", 1),
+            final.replace(VISION_VECTOR_COMMAND, VISION_VECTOR_COMMAND * 2, 1),
+            final.replace(VISION_VECTOR_COMMAND, VISION_VECTOR_COMMAND.replace("--check", "--write"), 1),
+            final.replace(VISION_VECTOR_COMMAND, VISION_VECTOR_COMMAND.replace(" --check", ""), 1),
+            final.replace(VISION_VECTOR_COMMAND, VISION_VECTOR_COMMAND.rstrip() + " || true\n", 1),
+            final.replace(VISION_VECTOR_COMMAND + status, VISION_VECTOR_COMMAND, 1),
+            final.replace(VISION_VECTOR_COMMAND + status, VISION_VECTOR_COMMAND + "          exit 0\n", 1),
+            final.replace(REALITY_VECTOR_COMMAND, "", 1),
+            final.replace(REALITY_VECTOR_COMMAND, REALITY_VECTOR_COMMAND * 2, 1),
+            final.replace(REALITY_VECTOR_COMMAND + status, REALITY_VECTOR_COMMAND, 1),
+            final.replace(PIP_COMMAND + status, PIP_COMMAND, 1),
+            final.replace(REALITY_VECTOR_COMMAND + VISION_VECTOR_COMMAND,
+                          VISION_VECTOR_COMMAND + REALITY_VECTOR_COMMAND, 1),
+            final.replace(VISION_VECTOR_COMMAND, VISION_VECTOR_COMMAND.replace("../tools", "tools"), 1),
+        ]
+        portable, windows = final.split("  windows-rust:\n")
+        broken.append(portable.replace(VISION_VECTOR_COMMAND, "", 1)
+                      + "  windows-rust:\n" + windows.replace(VISION_VECTOR_COMMAND, VISION_VECTOR_COMMAND * 2, 1))
+        for index, source in enumerate(broken):
+            with self.subTest(drift=index), self.assertRaises(ValueError):
+                development.updated_workflow(source)
+
+    def test_vision_material_is_required_before_an_atomic_workflow_write(self):
+        for missing in VISION_FILES:
+            with self.subTest(missing=missing), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                workflow = self.make_repository(root)
+                (root / missing).unlink()
+                initial = workflow.read_bytes()
+                with self.assertRaises(ValueError):
+                    development.apply_update(root, ENVIRONMENT)
+                self.assertEqual(workflow.read_bytes(), initial)
+
+    def test_checked_in_rust_and_app_vector_menus_are_mandatory(self):
+        root = Path(__file__).resolve().parents[2]
+        source = (root / ".github/workflows/rust-core.yml").read_text(encoding="utf-8")
+        self.assertEqual(source.count(VISION_VECTOR_COMMAND), 2)
+        self.assertEqual(development.updated_workflow(source), source)
+        for index, part in enumerate(source.split("  windows-rust:\n")):
+            status = development.WINDOWS_STATUS_GUARD if index else ""
+            self.assertEqual(part.count(REALITY_VECTOR_COMMAND + status + VISION_VECTOR_COMMAND + status), 1)
+        app = (root / ".github/workflows/core-development.yml").read_text(encoding="utf-8")
+        prefix = ("          python tools/tests/generate_reality_vectors.py --check\n"
+                  "          python tools/tests/generate_vision_vectors.py --check\n")
+        self.assertEqual(app.count("generate_vision_vectors.py"), 1)
+        marker = "      - name: Independent network peers\n"
+        menu = app.split(marker, 1)[1].split("      - ", 1)[0]
+        self.assertEqual(menu.count(prefix), 1)
+        self.assertLess(menu.index("          set -euo pipefail\n"), menu.index(prefix))
+        self.assertLess(menu.index(prefix), menu.index("          python tools/tests/test_reality_peer.py\n"))
+
+    def test_vision_fixture_failure_stops_before_later_peer_execution(self):
+        final = development.updated_workflow(FIXTURE)
+        windows = os.name == "nt"
+        part = final.split("  windows-rust:\n")[int(windows)]
+        status = development.WINDOWS_STATUS_GUARD if windows else ""
+        command = VISION_VECTOR_COMMAND + status
+        self.assertEqual(part.count(command), 1)
+        shell = shutil.which("pwsh" if windows else "bash")
+        if shell is None:
+            self.skipTest("The platform's GitHub Actions shell is unavailable")
+        sentinel = "Write-Output 'PEERS_STARTED'" if windows else "printf 'PEERS_STARTED'"
+        script = command + sentinel
+        invocation = ([shell, "-NoProfile", "-NonInteractive", "-Command", script] if windows
+                      else [shell, "-e", "-c", script])
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "core").mkdir()
+            generator = root / "tools/tests/generate_vision_vectors.py"
+            generator.parent.mkdir(parents=True)
+            generator.write_text("raise SystemExit(7)\n", encoding="utf-8")
+            failed = subprocess.run(invocation, cwd=root / "core", capture_output=True, text=True, timeout=5)
+            self.assertEqual(failed.returncode, 7)
+            self.assertNotIn("PEERS_STARTED", failed.stdout)
+            generator.write_text("raise SystemExit(0)\n", encoding="utf-8")
+            passed = subprocess.run(invocation, cwd=root / "core", capture_output=True, text=True, timeout=5)
+            self.assertEqual(passed.returncode, 0, passed.stderr)
+            self.assertEqual(passed.stdout.strip(), "PEERS_STARTED")
 
     def test_adds_only_reviewed_tests_and_exact_development_trigger(self):
         updated = development.updated_workflow(FIXTURE)

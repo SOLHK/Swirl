@@ -14,6 +14,8 @@ run in the existing compatibility build, alongside its native-DNS rejection gate
 Four fixed Qt XML reports preserve diagnostics even after a failed test or build.
 The REALITY TLS stage builds its actual Release protocol client and runs both
 independent peer suites only after all four required test binaries are present.
+The Vision component stage requires both independent fixture checks, in order,
+with immediate Windows exit propagation, before any protocol peer can run.
 It does not change permissions, secrets,
 existing actions, pull-request triggers or any product source.
 
@@ -56,6 +58,11 @@ REALITY_TESTS = ("test_reality_peer.py", "test_reality_tls.py")
 REALITY_SOURCES = (
     Path("core/crates/swirl-transport/examples/reality-client.rs"),
     Path("tools/tests/reality_peer.py"),
+)
+VISION_SOURCES = (
+    Path("tools/tests/generate_vision_vectors.py"),
+    Path("core/crates/swirl-protocol/tests/fixtures/vision-v1.txt"),
+    Path("core/crates/swirl-protocol/tests/fixtures/flow-v1.txt"),
 )
 REALITY_BUILD_COMMAND = "cargo build --release --locked -p swirl-transport --example reality-client"
 PORTABLE_REALITY_BUILD = f"      - run: {REALITY_BUILD_COMMAND}\n"
@@ -423,7 +430,7 @@ def _reality_blocks(windows: bool) -> tuple[tuple[str, str, str], ...]:
     )
 
 
-def updated_workflow(source: str) -> str:
+def _reality_workflow(source: str) -> str:
     """Treat build, binary identity, preflight and both peers as one atomic stage."""
     separator = "  windows-rust:\n"
     if source.count(separator) != 1:
@@ -456,6 +463,46 @@ def updated_workflow(source: str) -> str:
         for before, after, label in _reality_blocks(windows=index == 1):
             part = _replace_checked(part, before, after, label)
         parts[index] = part
+    return separator.join(parts)
+
+
+def _vector_blocks(windows: bool) -> tuple[str, str, str]:
+    """Exact pre-fixture, REALITY-only and complete fixture prefixes for one job."""
+    install = "          python -m pip install cryptography==50.0.2\n"
+    reality = "          python ../tools/tests/generate_reality_vectors.py --check\n"
+    vision = "          python ../tools/tests/generate_vision_vectors.py --check\n"
+    status = WINDOWS_STATUS_GUARD if windows else ""
+    harness = ("          $env:SWIRL_RUST_HARNESS=(Resolve-Path target/release/swirl-api.exe).Path\n"
+               if windows else '          export SWIRL_RUST_HARNESS="$PWD/target/release/swirl-api"\n')
+    return (
+        install + harness,
+        install + status + reality + status + harness,
+        install + status + reality + status + vision + status + harness,
+    )
+
+
+def updated_workflow(source: str) -> str:
+    """Validate the whole fixture stage before preserving every prior CI guard."""
+    separator = "  windows-rust:\n"
+    if source.count(separator) != 1:
+        raise ValueError("Rust CI job boundaries have drifted; review required")
+    counts = tuple(source.count(name) for name in
+                   ("generate_reality_vectors.py", "generate_vision_vectors.py"))
+    reviewed = ((0, 0), (2, 0), (2, 2))
+    if counts not in reviewed:
+        raise ValueError("Rust CI fixture stage is partial or duplicated; review required")
+    stage = reviewed.index(counts)
+    parts = source.split(separator)
+    for index, part in enumerate(parts):
+        blocks = _vector_blocks(windows=index == 1)
+        if part.count(blocks[stage]) != 1:
+            raise ValueError("Rust CI fixture commands or exit guards drifted; review required")
+        parts[index] = part.replace(blocks[stage], blocks[0], 1)
+    source = _reality_workflow(separator.join(parts))
+    parts = source.split(separator)
+    for index, part in enumerate(parts):
+        historical, _, complete = _vector_blocks(windows=index == 1)
+        parts[index] = _replace_checked(part, historical, complete, "Vision fixture checks")
     return separator.join(parts)
 
 
@@ -496,6 +543,9 @@ def prepare_update(repository: Path) -> tuple[Path, str, str]:
     for relative in REALITY_SOURCES:
         if not (repository / relative).is_file():
             raise ValueError(f"Required REALITY peer source is missing: {relative.as_posix()}")
+    for relative in VISION_SOURCES:
+        if not (repository / relative).is_file():
+            raise ValueError(f"Required Vision fixture source is missing: {relative.as_posix()}")
     return path, before, after
 
 

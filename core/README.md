@@ -15,9 +15,16 @@ ClientHello to the same sole key owner and final rustls transcript. Actual
 CertificateVerify, Finished, bidirectional data and closure now pass an independent
 Python/OpenSSL peer in all six combinations of three TLS suites and hybrid/X25519
 selection. The engine uses an explicitly native ClientHello profile; browser
-fingerprints, Vision and the product outbound are still pending. Native import
+fingerprints and the product outbound are still pending. Native import
 and startup continue to preserve and explicitly reject those unsupported
 requirements; see the [Qt import security repair](../docs/REALITY_IMPORT_SECURITY_20261019.md).
+
+The [Vision R1 framing component](../docs/VISION_FRAMING_FOUNDATION_20261019.md)
+adds fixed-memory incremental decoding, bounded frame encoding, exact terminal
+boundaries and strict VLESS request Addons. It is independently checked against
+Python-generated wire fixtures. A decoded direct request does not authorize raw
+copy. Inner-TLS eligibility, async stream ownership and complete Vision forwarding
+remain pending, so the product continues to reject Vision requirements.
 
 After the automatic-font implementation passed its Windows application/font
 gates, native Core development resumed on `work/core-completion-20261017`.

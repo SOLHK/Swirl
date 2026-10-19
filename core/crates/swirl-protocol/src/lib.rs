@@ -6,6 +6,7 @@ mod probe;
 mod shadowsocks;
 mod socks4;
 mod socks5;
+pub mod vision;
 mod vless;
 mod websocket;
 pub use diagnostics::{TcpAttempt, TcpDiagnostic, TcpOutcome, failure_stage};

@@ -61,6 +61,7 @@ jobs:
           set -euo pipefail
           python -m pip install cryptography==50.0.2
           python tools/tests/generate_reality_vectors.py --check
+          python tools/tests/generate_vision_vectors.py --check
           export SWIRL_RUST_HARNESS="$PWD/core/target/release/swirl-api"
           export SWIRL_REALITY_CLIENT="$PWD/core/target/release/examples/reality-client"
           test -x "$SWIRL_RUST_HARNESS"
