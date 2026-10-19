@@ -1,0 +1,42 @@
+name: Swirl VF native construction comparison
+
+on:
+  push:
+    branches: [work/core-completion-20261017]
+    paths:
+      - '.github/workflows/swirl-vf-axis-resolution.yml'
+      - 'tools/swirl_vf/platform/compare_axis_construction.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: swirl-vf-axis-resolution-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-construction:
+    runs-on: xcode-27
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compare exact resident font through public native construction APIs
+        shell: bash
+        run: |
+          mkdir -p build/native-construction-summary
+          python tools/swirl_vf/platform/compare_axis_construction.py \
+            /System/Library/PrivateFrameworks/FontServices.framework/Versions/A/Resources/Reserved/PingFangUI.ttc \
+            --output build/native-construction-summary/comparison.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: swirl-vf-native-construction-${{ github.sha }}
+          path: build/native-construction-summary/*.json
+          retention-days: 7
