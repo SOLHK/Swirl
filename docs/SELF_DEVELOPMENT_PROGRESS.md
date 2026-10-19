@@ -28,6 +28,15 @@ S2 补齐同一订阅内规则节点引用、原生选择失败回滚、等待�
 Rust 测试宿主持久化菜单和 Windows 真实 Qt/DPAPI/控制器菜单，并加入三平台与 App 适用 CI。
 新增测试的数量不改变冻结验收；Windows 实际执行和精确源码 CI 终态须另行记录。
 
+S2 已推送 `593e7cddc360cf7f51d9fdc988e6cf8fd99aea96`，本地新版整链 8 通过 / Windows Qt 1 明确跳过，
+44 项 CI 防退化通过；[Rust 39281808343](https://github.com/SOLHK/Swirl/actions/runs/39281808343) /
+[App 39281808355](https://github.com/SOLHK/Swirl/actions/runs/39281808355) 于 16:03 UTC 仍排队。
+S3 继续修复显式 DIRECT 绕过候选节点能力检查及空值 SNI 别名覆盖，Qt 回归尚待实际 Windows 执行；
+GitHub 官方 Actions 事故不能当作测试通过，也不修改任何冻结验收状态。
+S2 [完整本地菜单与原始日志](evidence/subscription-product-chain/s2-existing/summary.json) 24/24 命令成功，
+包含五项 Rust 门禁、278 个测试加 1 doctest、两组独立向量与现有 Python 261 通过 / 5 Qt 跳过；
+新增整链 8 通过 / 1 Qt 跳过另行保留。与并发字体 83efbaac 的变更无重叠，后者已保留。
+
 ## 1. 固定范围、状态和计算规则
 
 状态只能是：**已验收 / 部分实现 / 未验证 / 未实现**。已验收必须满足该行明确范围的全部契约，并有可定位源码、环境、命令或独立对端、结果和未解决问题；部分实现、跳过、未验证和未实现都不计入通过分子。未知不是通过，也不等于已经证明失败。

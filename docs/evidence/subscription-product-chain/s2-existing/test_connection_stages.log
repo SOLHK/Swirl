@@ -1,0 +1,16 @@
+SOURCE 593e7cddc360cf7f51d9fdc988e6cf8fd99aea96
+COMMAND ["/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3", "/workspace/scratch/ca6cd1f88f6f/Swirl/tools/tests/test_connection_stages.py", "-v"]
+
+test_direct_tries_next_resolved_address_and_reuses_host_cache (__main__.ConnectionStageTests.test_direct_tries_next_resolved_address_and_reuses_host_cache) ... ok
+test_dns_timeout_is_not_misreported_as_tcp_or_protocol_timeout (__main__.ConnectionStageTests.test_dns_timeout_is_not_misreported_as_tcp_or_protocol_timeout) ... ok
+test_http_obfs_ss_uses_resolved_proxy_addresses_without_resolving_target (__main__.ConnectionStageTests.test_http_obfs_ss_uses_resolved_proxy_addresses_without_resolving_target) ... ok
+test_protocol_timeout_after_tcp_success_has_its_own_stage (__main__.ConnectionStageTests.test_protocol_timeout_after_tcp_success_has_its_own_stage) ... ok
+test_refused_tcp_is_distinct_from_dns_and_has_no_protocol_traffic (__main__.ConnectionStageTests.test_refused_tcp_is_distinct_from_dns_and_has_no_protocol_traffic) ... ok
+test_resolving_cidr_rule_pins_failed_address_without_trying_other_answer (__main__.ConnectionStageTests.test_resolving_cidr_rule_pins_failed_address_without_trying_other_answer) ... ok
+test_tls_timeout_does_not_restart_on_another_resolved_address (__main__.ConnectionStageTests.test_tls_timeout_does_not_restart_on_another_resolved_address) ... ok
+test_untrusted_certificate_cannot_select_an_alternate_trusted_peer (__main__.ConnectionStageTests.test_untrusted_certificate_cannot_select_an_alternate_trusted_peer) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 9.040s
+
+OK

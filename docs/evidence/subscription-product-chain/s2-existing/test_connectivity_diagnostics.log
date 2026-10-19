@@ -1,0 +1,32 @@
+SOURCE 593e7cddc360cf7f51d9fdc988e6cf8fd99aea96
+COMMAND ["/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3", "/workspace/scratch/ca6cd1f88f6f/Swirl/tools/tests/test_connectivity_diagnostics.py", "-v"]
+
+test_address_family_interleaving_and_limit (__main__.ConnectivityDiagnostics.test_address_family_interleaving_and_limit) ... ok
+test_dns_worker_startup_consumes_absolute_dns_deadline (__main__.ConnectivityDiagnostics.test_dns_worker_startup_consumes_absolute_dns_deadline) ... ok
+test_duplicate_fields_are_rejected_before_private_input_can_dial (__main__.ConnectivityDiagnostics.test_duplicate_fields_are_rejected_before_private_input_can_dial) ... ok
+test_error_classification_and_whitelist_never_echo_private_fields (__main__.ConnectivityDiagnostics.test_error_classification_and_whitelist_never_echo_private_fields) ... ok
+test_expired_slot_readiness_is_ignored_and_third_address_gets_a_slot (__main__.ConnectivityDiagnostics.test_expired_slot_readiness_is_ignored_and_third_address_gets_a_slot) ... ok
+test_hung_first_child_is_reaped_before_second_and_sample_stays_within_ten_seconds (__main__.ConnectivityDiagnostics.test_hung_first_child_is_reaped_before_second_and_sample_stays_within_ten_seconds) ... ok
+test_immediate_connects_record_elapsed_time_and_live_socket_peak (__main__.ConnectivityDiagnostics.test_immediate_connects_record_elapsed_time_and_live_socket_peak) ... ok
+test_independent_dns_timeout_prevents_all_tcp_work (__main__.ConnectivityDiagnostics.test_independent_dns_timeout_prevents_all_tcp_work) ... ok
+test_invalid_input_never_dials (__main__.ConnectivityDiagnostics.test_invalid_input_never_dials) ... ok
+test_late_dns_wait_never_dials_or_becomes_valid_budget_evidence (__main__.ConnectivityDiagnostics.test_late_dns_wait_never_dials_or_becomes_valid_budget_evidence) ... ok
+test_nonzero_exit_after_valid_success_json_is_not_connectivity_success (__main__.ConnectivityDiagnostics.test_nonzero_exit_after_valid_success_json_is_not_connectivity_success) ... ok
+test_permanently_stalled_dns_worker_does_not_hold_process_open (__main__.ConnectivityDiagnostics.test_permanently_stalled_dns_worker_does_not_hold_process_open) ... STALLED DNS OBSERVATION: {"total_budget_ms": 100, "dns_budget_ms": 30, "dns_elapsed_ms": 30, "tcp_elapsed_ms": 0, "total_elapsed_ms": 30, "attempted_count": 0, "worker_start_ms": 0, "queue_wait_ms": 29}
+ok
+test_python_cli_actual_tcp_without_application_data (__main__.ConnectivityDiagnostics.test_python_cli_actual_tcp_without_application_data) ... ok
+test_refusal_is_distinct_and_does_not_consume_full_budget (__main__.ConnectivityDiagnostics.test_refusal_is_distinct_and_does_not_consume_full_budget) ... LOOPBACK REFUSAL OBSERVATION: {"per_probe_budget_ms": 3000, "os_outcome": "refused", "os_elapsed_ms": 0, "diagnostic_outcomes": ["refused"], "diagnostic_elapsed_ms": 0}
+ok
+test_refused_first_address_immediately_falls_back (__main__.ConnectivityDiagnostics.test_refused_first_address_immediately_falls_back) ... LOOPBACK FALLBACK OBSERVATION: {"budget_ms": 1000, "elapsed_ms": 0, "outcomes": ["refused", "success"], "started_ms": [0, 0], "peak_pending": 1}
+ok
+test_report_validator_rejects_inconsistent_budgets_and_trace (__main__.ConnectivityDiagnostics.test_report_validator_rejects_inconsistent_budgets_and_trace) ... ok
+test_report_validator_rejects_reordered_or_duplicate_attempt_ordinals (__main__.ConnectivityDiagnostics.test_report_validator_rejects_reordered_or_duplicate_attempt_ordinals) ... ok
+test_report_validator_rejects_three_overlapping_attempts (__main__.ConnectivityDiagnostics.test_report_validator_rejects_three_overlapping_attempts) ... ok
+test_selector_readiness_after_total_deadline_cannot_succeed (__main__.ConnectivityDiagnostics.test_selector_readiness_after_total_deadline_cannot_succeed) ... ok
+test_socket_options_error_keeps_tcp_success_but_not_diagnostic_success (__main__.ConnectivityDiagnostics.test_socket_options_error_keeps_tcp_success_but_not_diagnostic_success) ... ok
+test_two_real_implementations_share_budget_and_close_without_payload (__main__.ConnectivityDiagnostics.test_two_real_implementations_share_budget_and_close_without_payload) ... ok
+
+----------------------------------------------------------------------
+Ran 21 tests in 5.143s
+
+OK

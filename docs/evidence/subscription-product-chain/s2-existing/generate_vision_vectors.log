@@ -1,0 +1,4 @@
+SOURCE 593e7cddc360cf7f51d9fdc988e6cf8fd99aea96
+COMMAND ["/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3", "/workspace/scratch/ca6cd1f88f6f/Swirl/tools/tests/generate_vision_vectors.py", "--check"]
+
+Vision vectors: 10 frame and 3 flow cases match

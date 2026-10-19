@@ -336,6 +336,12 @@ void RustCoreEngine::refresh(){
 }
 void RustCoreEngine::selectNode(const QString &id){
  if(!m_handle)return;auto options=m_options;options.selectedNodeId=id;options.directSession=false;
+ if(options.routingMode=="direct"){
+  // Validate the selected node independently of the current DIRECT route.
+  // The installed route and its explicit DIRECT status remain unchanged.
+  auto candidate=options;candidate.routingMode="global";QJsonObject node;
+  const auto reason=configuration(candidate,&node);if(!reason.isEmpty()){emit diagnostic("SwirlRust","SelectionUnsupported",reason);return;}
+ }
  QJsonObject config;const auto reason=configuration(options,&config);if(!reason.isEmpty()){emit diagnostic("SwirlRust","SelectionUnsupported",reason);return;}
  const auto result=call({{"op","configure"},{"handle",qint64(m_handle)},{"config",config}});
  if(!result["ok"].toBool()){emit diagnostic("SwirlRust","SelectionFailed",result["error"].toString());return;}

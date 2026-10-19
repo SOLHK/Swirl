@@ -1,0 +1,81 @@
+SOURCE 593e7cddc360cf7f51d9fdc988e6cf8fd99aea96
+COMMAND ["/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3", "/workspace/scratch/ca6cd1f88f6f/Swirl/tools/tests/test_dns_negative.py", "-v"]
+
+test_cname_followup_denial_never_outlives_earliest_alias (__main__.DnsNegativeIntegration.test_cname_followup_denial_never_outlives_earliest_alias) ... ok
+test_config_generation_drops_old_negative_cache (__main__.DnsNegativeIntegration.test_config_generation_drops_old_negative_cache) ... ok
+test_configuration_replacement_clears_failure_cache (__main__.DnsNegativeIntegration.test_configuration_replacement_clears_failure_cache) ... ok
+test_doh_age_and_cache_control_also_limit_negative_ttl (__main__.DnsNegativeIntegration.test_doh_age_and_cache_control_also_limit_negative_ttl) ... ok
+test_failure_is_cached_only_after_all_configured_servers_fail (__main__.DnsNegativeIntegration.test_failure_is_cached_only_after_all_configured_servers_fail) ... ok
+test_inconsistent_families_and_failed_families_never_create_negative_cache (__main__.DnsNegativeIntegration.test_inconsistent_families_and_failed_families_never_create_negative_cache) ... ok
+test_inline_cname_uses_terminal_soa_and_preserves_mailbox_label_bytes (__main__.DnsNegativeIntegration.test_inline_cname_uses_terminal_soa_and_preserves_mailbox_label_bytes) ... ok
+test_invalid_negative_packets_are_rejected_and_never_cached (__main__.DnsNegativeIntegration.test_invalid_negative_packets_are_rejected_and_never_cached) ... ok
+test_ipv4_only_can_query_an_ipv6_upstream_on_all_transports (__main__.DnsNegativeIntegration.test_ipv4_only_can_query_an_ipv6_upstream_on_all_transports) ... ok
+test_ipv4_only_doh_age_and_no_store_bound_single_family_cache (__main__.DnsNegativeIntegration.test_ipv4_only_doh_age_and_no_store_bound_single_family_cache) ... ok
+test_ipv4_only_negative_soa_cache_expires_without_querying_aaaa (__main__.DnsNegativeIntegration.test_ipv4_only_negative_soa_cache_expires_without_querying_aaaa) ... ok
+test_ipv4_only_nxdomain_without_soa_is_terminal_but_never_cached (__main__.DnsNegativeIntegration.test_ipv4_only_nxdomain_without_soa_is_terminal_but_never_cached) ... ok
+test_ipv4_only_omits_aaaa_and_preserves_tcp_retry_and_cname (__main__.DnsNegativeIntegration.test_ipv4_only_omits_aaaa_and_preserves_tcp_retry_and_cname) ... ok
+test_ipv4_only_unproven_empty_failover_and_zero_ttl_denial (__main__.DnsNegativeIntegration.test_ipv4_only_unproven_empty_failover_and_zero_ttl_denial) ... ok
+test_missing_foreign_additional_or_wrong_class_soa_is_never_cached (__main__.DnsNegativeIntegration.test_missing_foreign_additional_or_wrong_class_soa_is_never_cached) ... ok
+test_negative_cache_capacity_does_not_grow_beyond_existing_bound (__main__.DnsNegativeIntegration.test_negative_cache_capacity_does_not_grow_beyond_existing_bound) ... ok
+test_nodata_is_separate_from_name_error_and_requires_both_families (__main__.DnsNegativeIntegration.test_nodata_is_separate_from_name_error_and_requires_both_families) ... ok
+test_nxdomain_cache_shares_ports_and_case_on_every_transport (__main__.DnsNegativeIntegration.test_nxdomain_cache_shares_ports_and_case_on_every_transport) ... ok
+test_positive_addresses_share_hostname_but_use_each_real_destination_port (__main__.DnsNegativeIntegration.test_positive_addresses_share_hostname_but_use_each_real_destination_port) ... ok
+test_query_family_reconfiguration_discards_the_previous_cache (__main__.DnsNegativeIntegration.test_query_family_reconfiguration_discards_the_previous_cache) ... ok
+test_resolution_failure_cache_expires_and_recovers_real_forwarding (__main__.DnsNegativeIntegration.test_resolution_failure_cache_expires_and_recovers_real_forwarding) ... ok
+test_soa_record_ttl_and_minimum_both_expire_denials (__main__.DnsNegativeIntegration.test_soa_record_ttl_and_minimum_both_expire_denials) ... ok
+test_timeout_failure_cache_starts_after_resolution_finishes (__main__.DnsNegativeIntegration.test_timeout_failure_cache_starts_after_resolution_finishes) ... ok
+test_unproven_empty_answers_fail_over_but_valid_zero_ttl_denials_are_terminal (__main__.DnsNegativeIntegration.test_unproven_empty_answers_fail_over_but_valid_zero_ttl_denials_are_terminal) ... ok
+test_validated_tcp_retry_can_cache_the_complete_negative_answer (__main__.DnsNegativeIntegration.test_validated_tcp_retry_can_cache_the_complete_negative_answer) ... ok
+test_zero_negative_ttls_are_not_cached_on_any_transport (__main__.DnsNegativeIntegration.test_zero_negative_ttls_are_not_cached_on_any_transport) ... ok
+test_pair_allocation_cleans_up_other_errors_without_retry (__main__.DnsPeerAllocationTests.test_pair_allocation_cleans_up_other_errors_without_retry) ... ok
+test_pair_allocation_stops_after_bounded_collisions (__main__.DnsPeerAllocationTests.test_pair_allocation_stops_after_bounded_collisions) ... ok
+test_pair_retries_collision_and_releases_failed_sockets (__main__.DnsPeerAllocationTests.test_pair_retries_collision_and_releases_failed_sockets) ... ok
+test_tcp_reserves_port_before_udp_and_forwards_both_families (__main__.DnsPeerAllocationTests.test_tcp_reserves_port_before_udp_and_forwards_both_families) ... ok
+test_windows_access_denial_is_not_retried_on_either_endpoint (__main__.DnsPeerAllocationTests.test_windows_access_denial_is_not_retried_on_either_endpoint) ... ok
+test_all_ports_excluded_is_a_failure_not_an_ephemeral_fallback (__main__.LoopbackPortSelectionTests.test_all_ports_excluded_is_a_failure_not_an_ephemeral_fallback) ... Loopback pair reservation snapshot: ipv4 tcp
+Localized column labels
+----------    --------
+49152 65535
+* - Exclusions.
+
+Loopback pair reservation snapshot: ipv4 udp
+Localized column labels
+----------    --------
+49152 65535
+* - Exclusions.
+
+ok
+test_missing_or_malformed_exclusion_table_fails (__main__.LoopbackPortSelectionTests.test_missing_or_malformed_exclusion_table_fails) ... ok
+test_netsh_numeric_rows_and_empty_table (__main__.LoopbackPortSelectionTests.test_netsh_numeric_rows_and_empty_table) ... ok
+test_portable_candidate_remains_os_selected_without_netsh (__main__.LoopbackPortSelectionTests.test_portable_candidate_remains_os_selected_without_netsh) ... ok
+test_query_failures_never_bind_or_start_servers (__main__.LoopbackPortSelectionTests.test_query_failures_never_bind_or_start_servers) ... ok
+test_windows_candidate_excludes_both_protocols_on_each_family (__main__.LoopbackPortSelectionTests.test_windows_candidate_excludes_both_protocols_on_each_family) ... Loopback pair reservation snapshot: ipv4 tcp
+Localized column labels
+----------    --------
+49152 50788
+* - Exclusions.
+
+Loopback pair reservation snapshot: ipv4 udp
+Localized column labels
+----------    --------
+50790 65535
+* - Exclusions.
+
+Loopback pair reservation snapshot: ipv6 tcp
+Localized column labels
+----------    --------
+49152 50788
+* - Exclusions.
+
+Loopback pair reservation snapshot: ipv6 udp
+Localized column labels
+----------    --------
+50790 65535
+* - Exclusions.
+
+ok
+
+----------------------------------------------------------------------
+Ran 37 tests in 81.519s
+
+OK

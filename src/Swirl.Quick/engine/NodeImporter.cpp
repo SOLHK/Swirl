@@ -144,6 +144,9 @@ NodeImporter::Result NodeImporter::parse(const QByteArray &bytes) {
         for(const auto &key:QStringList{"username","password","cipher","sni","servername"})if(params.contains(key)&&!params.value(key).isString()){
             result.nodes.clear();result.error=QStringLiteral("第 %1 个节点：凭据、加密方式和 TLS 名称必须为字符串，不能为 null 或其它类型。").arg(i+1);return result;
         }
+        if(params.contains("sni")&&params.contains("servername")&&params.value("sni")!=params.value("servername")){
+            result.nodes.clear();result.error=QStringLiteral("第 %1 个节点：sni 与 servername 冲突，不能以别名覆盖 TLS 名称。").arg(i+1);return result;
+        }
         n.name=params.take("name").toString().trimmed();n.protocol=params.take("type").toString().toLower();
         if(!result.configuration.isEmpty() && names.contains(n.name)) {
             result.nodes.clear();result.error=QStringLiteral("完整配置含重复节点名称，策略引用不明确；未应用配置。");return result;

@@ -306,6 +306,9 @@ bool EngineController::chooseNode(const QString &id) {
         auto candidate=active?m_options:EngineStartOptions{};
         if(!active){candidate.nodes=m_store.nodes();candidate.routingMode="global";}
         candidate.selectedNodeId=id;candidate.directSession=false;
+        // DIRECT bypasses node translation for traffic, but a saved selection
+        // must still be eligible when the user later leaves explicit DIRECT.
+        if(candidate.routingMode=="direct")candidate.routingMode="global";
         QJsonObject configuration;const auto reason=RustCoreEngine::configuration(candidate,&configuration);
         if(!reason.isEmpty()){m_nodeError=reason;emit selectionChanged();return false;}
     }

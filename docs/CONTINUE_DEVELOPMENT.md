@@ -18,6 +18,21 @@ reported as product DPAPI persistence; the dedicated Windows wrapper supplies
 that evidence only when actually executed. The historical results below do not
 prove the new changes passed.
 
+S2 is now pushed as
+[`593e7cddc360cf7f51d9fdc988e6cf8fd99aea96`](https://github.com/SOLHK/Swirl/commit/593e7cddc360cf7f51d9fdc988e6cf8fd99aea96):
+local Release 8 portable product-chain tests passed, 1 Windows-only Qt skip;
+44 CI guards passed. [Rust 39281808343](https://github.com/SOLHK/Swirl/actions/runs/39281808343)
+and [App 39281808355](https://github.com/SOLHK/Swirl/actions/runs/39281808355)
+were still queued at 16:03 UTC during the officially reported GitHub Actions
+incident. S3 closes the reviewed DIRECT-mode selection-validation bypass and
+empty/nonempty SNI-alias conflict. Its Qt execution still requires Windows CI;
+the exact-source job state and raw evidence must be updated after execution.
+The [complete local S2 menu](evidence/subscription-product-chain/s2-existing/summary.json)
+passed all 24 commands: the five Rust gates, 279 Rust tests including one doctest,
+both vector checks and 261 existing Python passes / 5 Windows Qt skips. These
+are additional local evidence, not GitHub CI results. Font-only concurrent
+`83efbaacac15fad711bdfa2107f7845bba0c8d3a` is retained.
+
 ## Previous handoff: REALITY R3 and Vision record-boundary correction
 
 Read [the current Core handoff](CORE_REALITY_VISION_HANDOFF_20261019.md),

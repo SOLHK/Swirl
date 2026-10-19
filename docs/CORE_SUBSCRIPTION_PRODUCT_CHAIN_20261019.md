@@ -133,6 +133,70 @@ in [the S2 checkpoint](evidence/subscription-product-chain/s2-local.json).
 Core source is unchanged from S1, whose five required Rust gates passed with
 278 tests plus one doctest. These local results do not supply Windows Qt evidence.
 
+S2 was actually pushed as
+[`593e7cddc360cf7f51d9fdc988e6cf8fd99aea96`](https://github.com/SOLHK/Swirl/commit/593e7cddc360cf7f51d9fdc988e6cf8fd99aea96).
+Its [Rust run 39281808343](https://github.com/SOLHK/Swirl/actions/runs/39281808343)
+and [App run 39281808355](https://github.com/SOLHK/Swirl/actions/runs/39281808355)
+were still queued, with no assigned runners or product artifacts, at 16:03 UTC.
+GitHub's [official status](https://www.githubstatus.com/api/v2/summary.json)
+reported an Actions/workflow-processing incident beginning at 15:49 UTC. The
+incident and individual job states are separate observations; neither supplies
+an executed test result.
+
+The full existing local menu was then rerun at exact S2 source: **24/24 commands
+succeeded**, including the five Rust gates (**278 unit/integration tests plus
+one doctest**), the Release REALITY example, both generated-vector checks and
+all 16 existing Python suites (**261 passed / 5 explicit Windows Qt skips**).
+[Its source-bound summary and 24 raw logs](evidence/subscription-product-chain/s2-existing/summary.json)
+record every command, input/binary hash and skip reason. Mature Xray R3/Vision
+and Windows Qt/full application remain CI gates; they were not replaced by this
+local menu. Concurrent font-only commit `83efbaacac15fad711bdfa2107f7845bba0c8d3a`
+was checked for non-overlap and retained before S3.
+
+## S3: close the remaining explicit-DIRECT and SNI alias bypasses
+
+Review of the connected product path found two further real conversion gaps.
+An active explicit DIRECT mode legitimately bypasses proxy traffic, but must not
+also bypass validation of the saved node selection. Both controller preflight
+and native adapter selection now validate a temporary global candidate, then
+retain the user's actual DIRECT mode. Unsupported extensions and Vision cannot
+be confirmed as eligible selections. A supported B selection still leaves traffic
+DIRECT until the user explicitly changes mode; subsequent global/rule traffic
+must use B.
+
+Qt previously extracted `sni`, then used `servername` whenever that extracted
+string was empty. Conflicting `sni: ""` and nonempty `servername` could therefore
+lose their conflict before native validation. The importer now rejects different
+simultaneous aliases before either is extracted, without echoing their values.
+Equal aliases remain accepted and the original object remains available.
+
+These small Qt changes extend the existing regression slots rather than adding
+a parallel configuration system. Source review and whitespace validation passed;
+the new Qt assertions are **unexecuted until Windows CI actually runs**. The
+official Actions incident is not a reason to waive that gate or claim success.
+
+## Actual field boundaries inspected
+
+The audit used `swirl-subscription/src/{lib,inspect,inspect_boundaries}.rs`, the
+existing normalizers, `NodeImporter`, `NodeStore`, `RustCoreEngine::configuration`
+and `EngineController` import/selection/rule transactions. The following are
+current code boundaries, not claims that every field has completed networking.
+
+| Field family | Existing preservation / execution boundary |
+| --- | --- |
+| Protocol and version | Original node/document remains distinct from the typed `Outbound` enum. Supported aliases use existing normalizers; unrecognized version/extension fields cannot become another protocol silently. |
+| Host, IPv4/IPv6 and port | Typed host and bounded native port; Rust checks both supplied port aliases. Qt keeps the server and final source-owned node ID. IPv6 round-trip and literal IPv6 reject routing have separate tests. |
+| Username, password and UUID | Qt rejects non-string source/editor values; NodeStore encrypts original and extracted credentials. Runtime authentication uses the typed fields; wrong credentials in four proxy families produce no target request or alternate exit. |
+| TLS enable and verification | Implicit TLS protocols retain TLS. Contradictory disable requests and insecure verification are rejected; supported runtime TLS has no insecure switch. |
+| SNI, ALPN and certificates | SNI aliases cannot conflict; ordered ALPN is retained. Native `Tls` has explicit extra DER trust-anchor support, but an unmapped subscription certificate option is rejected instead of guessed. The new HTTPS origin fixture uses a private test CA only in its client. |
+| REALITY public key, short ID, fingerprint and spiderX | Original options/URI retained; no normal-TLS substitution. Production async REALITY and combined Vision remain capability errors. |
+| VLESS flow and transport | Nonempty Vision flow remains blocked. Missing supported default, explicit null and unrecognized transport are distinguished before conversion. |
+| WS/WSS | Existing converter preserves supported host/path/Host header and TLS/HTTP-1.1 ALPN. Other headers/options or a TCP/WS conflict reject; S1 persistence test is not WS target-traffic evidence. |
+| Shadowsocks | Three traditional AEAD ciphers, explicit UDP declaration and existing HTTP-obfs options retain their typed meanings. Other ciphers/plugins/options reject; the new full-origin matrix proves TCP, not UDP or obfs product completion. |
+| gRPC/XHTTP and unknown extensions | Original values, including false/null, remain inspectable; no executable TCP candidate is synthesized. |
+| DNS, ordered rules and groups | Existing native DNS configuration remains in use. This raw-document product profile rejects unmapped subscription DNS dialects; ordered basic rules resolve only source-owned nodes/groups. Advanced rule families remain explicit errors. |
+| TFO, timeouts, IPv6 and network controls | TFO false retains the existing disabled meaning; true/null or unmapped network options cannot silently take effect. Native `Limits`, DNS family policy and socket targets keep their own typed validation. Complete external network-option dialect mapping remains unfinished. |
+
 ## Baseline CI is not new-source evidence
 
 At source `292bcb29cbcd9a1b35d33380c0fd4e0fe07b499b`,

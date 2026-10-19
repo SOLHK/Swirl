@@ -55,6 +55,14 @@ private slots:
   auto node=base;node["username"]="123";node["password"]="false";node["sni"]="tls.fixture.invalid";
   const auto parsed=NodeImporter::parse(QJsonDocument(QJsonObject{{"proxies",QJsonArray{node}}}).toJson());QVERIFY2(parsed,qPrintable(parsed.error));
   QCOMPARE(parsed.nodes.first().username,QString("123"));QCOMPARE(parsed.nodes.first().password,QString("false"));QCOMPARE(parsed.nodes.first().serverName,QString("tls.fixture.invalid"));
+  for(const auto &names:QList<QStringList>{{"","other.fixture.invalid"},{"other.fixture.invalid",""},{"a.fixture.invalid","b.fixture.invalid"}}){
+   auto aliasNode=base;aliasNode["sni"]=names[0];aliasNode["servername"]=names[1];const auto aliasResult=NodeImporter::parse(QJsonDocument(QJsonObject{{"proxies",QJsonArray{aliasNode}}}).toJson());QVERIFY(!aliasResult);QVERIFY(aliasResult.nodes.isEmpty());
+  }
+  for(const auto &name:QStringList{"","same.fixture.invalid"}){
+   auto aliasNode=base;aliasNode["sni"]=name;aliasNode["servername"]=name;const auto aliasResult=NodeImporter::parse(QJsonDocument(QJsonObject{{"proxies",QJsonArray{aliasNode}}}).toJson());QVERIFY2(aliasResult,qPrintable(aliasResult.error));
+   QCOMPARE(aliasResult.nodes.first().serverName,name);QCOMPARE(aliasResult.nodes.first().originalConfiguration,aliasNode);
+   EngineStartOptions options;options.nodes=aliasResult.nodes;options.selectedNodeId=aliasResult.nodes.first().id;options.routingMode="global";QJsonObject config;QVERIFY(RustCoreEngine::configuration(options,&config).isEmpty());
+  }
   const QJsonObject singbox{{"type","http"},{"tag","typed-fixture"},{"server","127.0.0.1"},{"server_port",443},{"tls",QJsonObject{{"enabled",true},{"server_name",QJsonValue()}}}};
   QVERIFY(!NodeImporter::parse(QJsonDocument(QJsonObject{{"outbounds",QJsonArray{singbox}}}).toJson()));
  }
@@ -153,21 +161,33 @@ private slots:
  }
  void leavingExplicitDirectUsesTheSavedNodeForGlobalAndRuleModes(){
   ControlledNetwork net;QVERIFY(net.start());QTemporaryDir directory;const auto path=directory.filePath("direct-mode.dpapi");
-  auto engine=std::make_unique<ThreadedEngine>();const auto *runtime=engine.get();EngineController controller(std::move(engine),nullptr,path);const auto o=options(net);controller.setProxyPort(o.proxyPort);controller.setRoutingMode("global");
-  controller.imports()->importText(QString("proxies: [{name: A, type: socks5, server: 127.0.0.1, port: %1}]").arg(net.a.serverPort()));QTRY_VERIFY_WITH_TIMEOUT(!controller.imports()->busy(),5000);QCOMPARE(controller.nodeCatalog().size(),1);
-  const auto idA=controller.nodeCatalog().first().toMap()["id"].toString();QVERIFY(controller.chooseNode(idA));QVERIFY(controller.saveRoutingRule("MATCH",{},"SWIRL"));
+  auto engine=std::make_unique<ThreadedEngine>();auto *runtime=engine.get();EngineController controller(std::move(engine),nullptr,path);const auto o=options(net);controller.setProxyPort(o.proxyPort);controller.setRoutingMode("global");
+  QJsonObject a{{"name","A"},{"type","socks5"},{"server","127.0.0.1"},{"port",net.a.serverPort()}},b=a;b["name"]="B";b["port"]=net.b.serverPort();b["username"]=QString::fromUtf8(net.b.username);b["password"]=QString::fromUtf8(net.b.password);
+  auto unknown=a;unknown["name"]="unknown";unknown["future-security"]=QJsonObject{{"enabled",false},{"key",QJsonValue()}};
+  auto vision=a;vision["name"]="vision";vision["type"]="vless";vision["uuid"]="00112233-4455-6677-8899-aabbccddeeff";vision["tls"]=true;vision["flow"]="xtls-rprx-vision";
+  controller.imports()->importText(QString::fromUtf8(QJsonDocument(QJsonObject{{"proxies",QJsonArray{a,b,unknown,vision}}}).toJson()));QTRY_VERIFY_WITH_TIMEOUT(!controller.imports()->busy(),5000);QCOMPARE(controller.nodeCatalog().size(),4);
+  const auto idA=controller.nodeCatalog()[0].toMap()["id"].toString(),idB=controller.nodeCatalog()[1].toMap()["id"].toString();QVERIFY(controller.chooseNode(idA));QVERIFY(controller.saveRoutingRule("MATCH",{},"SWIRL"));
   controller.setRoutingMode("direct");controller.connectNode({});QTRY_VERIFY_WITH_TIMEOUT(controller.apiHealthy(),5000);QVERIFY(runtime->status().directSession);const auto session=runtime->status().sessionId;
   const auto request=[&]{QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",o.proxyPort));QNetworkRequest input(net.url());input.setTransferTimeout(4000);input.setRawHeader("Connection","close");auto *reply=client.get(input);if(!QTest::qWaitFor([&]{return reply->isFinished();},5000)||reply->error()!=QNetworkReply::NoError)return QByteArray("request-failed");return reply->readAll();};
   QCOMPARE(request(),QByteArray("DIRECT-BYPASS"));QCOMPARE(net.a.forwarded,0);
+  for(qsizetype index=2;index<4;++index){
+   const auto unsupported=controller.nodeCatalog()[index].toMap()["id"].toString();QVERIFY(!controller.chooseNode(unsupported));QVERIFY(!controller.nodeError().isEmpty());QCOMPARE(NodeStore(path).selectedId(),idA);
+   // The worker adapter enforces the same boundary independently of the
+   // controller, while an explicit DIRECT route remains operational.
+   QSignalSpy diagnostics(runtime,&ProxyEngine::diagnostic);runtime->selectNode(unsupported);QTRY_COMPARE_WITH_TIMEOUT(diagnostics.size(),qsizetype(1),5000);QCOMPARE(diagnostics.first()[1].toString(),QString("SelectionUnsupported"));
+   QCOMPARE(controller.selectedNodeId(),idA);QCOMPARE(controller.activeNodeId(),idA);QVERIFY(controller.apiHealthy());QVERIFY(runtime->status().directSession);QCOMPARE(runtime->status().sessionId,session);
+  }
+  QVERIFY(controller.chooseNode(idB));QTRY_COMPARE_WITH_TIMEOUT(controller.activeNodeId(),idB,5000);QCOMPARE(NodeStore(path).selectedId(),idB);QVERIFY(runtime->status().directSession);QCOMPARE(controller.routingMode(),QString("direct"));
+  QCOMPARE(request(),QByteArray("DIRECT-BYPASS"));QCOMPARE(net.a.forwarded,0);QCOMPARE(net.b.forwarded,0);
   for(const auto &mode:QStringList{"global","rule"}){
    controller.setRoutingMode(mode);QTRY_COMPARE_WITH_TIMEOUT(controller.routingMode(),mode,5000);QVERIFY(!runtime->status().directSession);
-   QCOMPARE(controller.selectedNodeId(),idA);QCOMPARE(controller.activeNodeId(),idA);QCOMPARE(NodeStore(path).selectedId(),idA);QCOMPARE(runtime->status().sessionId,session);
-   QCOMPARE(request(),QByteArray("exit-A"));
+   QCOMPARE(controller.selectedNodeId(),idB);QCOMPARE(controller.activeNodeId(),idB);QCOMPARE(NodeStore(path).selectedId(),idB);QCOMPARE(runtime->status().sessionId,session);
+   QCOMPARE(request(),QByteArray("exit-B"));
    if(mode=="global"){
     controller.setRoutingMode("direct");QTRY_COMPARE_WITH_TIMEOUT(controller.routingMode(),QString("direct"),5000);QVERIFY(runtime->status().directSession);QCOMPARE(request(),QByteArray("DIRECT-BYPASS"));
    }
   }
-  QCOMPARE(net.a.forwarded,2);QCOMPARE(net.b.forwarded,0);QCOMPARE(net.httpRequestsByExit.value("DIRECT-BYPASS"),2);controller.stop();QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive()&&!controller.busy(),5000);
+  QCOMPARE(net.a.forwarded,0);QCOMPARE(net.b.forwarded,2);QCOMPARE(net.httpRequestsByExit.value("DIRECT-BYPASS"),3);controller.stop();QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive()&&!controller.busy(),5000);
  }
  void importedRulesResolveNodeNamesToStableSourceOwnedIds(){
   ControlledNetwork net;QVERIFY(net.start());QTemporaryDir directory;const auto path=directory.filePath("rule-leaves.dpapi");
