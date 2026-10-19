@@ -30,6 +30,8 @@ public:
     QRectF boundingRect() const override;
 #ifdef SWIRL_UI_TESTS
     void setMeasureRaster(bool enabled) { m_measureRaster=enabled; }
+    qreal rasterDevicePixelRatio() const { return m_raster.devicePixelRatio(); }
+    QSize rasterPixelSize() const { return m_raster.size(); }
 #endif
 signals:
     void textChanged();

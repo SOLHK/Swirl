@@ -56,6 +56,7 @@
 #include "tests/FontUiChecks.h"
 #include "tests/FontFrameChecks.h"
 #include "tests/FontAcceptanceChecks.h"
+#include "tests/FontDpiWatch.h"
 #include "tests/HdrChecks.h"
 #include "tests/EngineUiChecks.h"
 #include "tests/NodeUiChecks.h"
@@ -150,7 +151,8 @@ int main(int argc, char *argv[])
     const bool fontReview=app.arguments().contains("--font-review");
     const bool fontFrameTest=app.arguments().contains("--font-frame-test");
     const bool fontAcceptanceTest=app.arguments().contains("--font-acceptance-test");
-    bool previewMode=uiQualityTest||fontUiTest||fontReview||fontFrameTest||fontAcceptanceTest;
+    const bool fontDpiWatch=app.arguments().contains("--font-dpi-watch");
+    bool previewMode=uiQualityTest||fontUiTest||fontReview||fontFrameTest||fontAcceptanceTest||fontDpiWatch;
     for(const QString &argument:app.arguments())
         if(argument.startsWith(QStringLiteral("--material-test-output="))||argument.startsWith(QStringLiteral("--viewport-test-output="))||argument.startsWith(QStringLiteral("--motion-demo-output="))||argument.startsWith(QStringLiteral("--motion-visual-dir="))||argument.startsWith(QStringLiteral("--capture-preview="))||argument.startsWith(QStringLiteral("--capture-native-frame=")))previewMode=true;
     const bool hdrTest=app.arguments().contains("--hdr-self-test");
@@ -465,6 +467,13 @@ int main(int argc, char *argv[])
         });
 #else
         qWarning() << "Rebuild with -DSWIRL_BUILD_UI_TESTS=ON to run input checks.";
+        return 4;
+#endif
+    }
+    if(fontDpiWatch) {
+#ifdef SWIRL_UI_TESTS
+        startFontDpiWatch(rootWindow,&fontManager,argumentValue(QStringLiteral("--font-source-file=")),argumentValue(QStringLiteral("--font-dpi-output=")));
+#else
         return 4;
 #endif
     }

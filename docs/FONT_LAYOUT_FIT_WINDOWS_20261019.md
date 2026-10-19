@@ -89,6 +89,14 @@ nonzero. The six-second phase deadline is not increased to obtain a pass.
 `--font-acceptance-current-page` is a shorter restart/DPI probe of the current
 page in the same two themes and sizes; it does not substitute for the full walk.
 
+`--font-dpi-watch --font-dpi-output=<local-folder>` with the same local source
+argument observes an existing isolated review window while Windows changes its
+real scale. It records the unchanged QWindow/page object, actual display context,
+physical source identity and retained preview raster DPR/pixel size, then saves
+the raw render. It changes no system setting and simulates no DPR. Initial setup
+scrolls the existing settings page to its font preview. Human flicker/clarity and
+panel scanout are still separate acceptance items.
+
 ## Primary implementation references
 
 - [Qt 6.10.3 QFont implementation](https://github.com/qt/qtbase/blob/v6.10.3/src/gui/text/qfont.cpp): copied font private data does not retain engineData; public value changes detach it.
