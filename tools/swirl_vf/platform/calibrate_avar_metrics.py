@@ -19,6 +19,8 @@ import subprocess
 import sys
 import tempfile
 
+import numpy as np
+
 from fontTools.ttLib import TTCollection
 from fontTools.varLib.varStore import VarStoreInstancer
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'tools'))
@@ -103,6 +105,70 @@ def candidate_map(records, value, policy, special_zero):
     ordered=sorted(pairs.items())
     if value<=ordered[0][0]: return ordered[0][1]
     return ordered_intervals(ordered,value)
+
+
+def infer_weight_from_metrics(measured, negative, neutral, positive):
+    """Invert two affine metric branches, independently of any avar hypothesis.
+
+    Values are four-dimensional advance vectors at a fixed width location.
+    A returned coordinate is diagnostic, not geometry or continuous-space proof.
+    Flat/uninformative branches remain intervals instead of invented coordinates.
+    """
+    arrays = [np.asarray(v, dtype=np.float64) for v in (measured, negative, neutral, positive)]
+    if any(a.shape != (4,) or not np.isfinite(a).all() for a in arrays):
+        raise ValueError('four_finite_metric_observations_required')
+    actual, low, base, high = arrays
+    candidates = []
+    for sign, endpoint in ((-1, low), (1, high)):
+        slope = endpoint - base
+        norm = float(np.dot(slope, slope))
+        if norm == 0:
+            value = None; interval = [-1., 0.] if sign < 0 else [0., 1.]
+            predicted = base
+        else:
+            factor = float(np.clip(np.dot(actual - base, slope) / norm, 0., 1.))
+            value = sign * factor; interval = [value, value]
+            predicted = base + factor * slope
+        error = float(np.max(np.abs(actual - predicted)))
+        candidates.append({'normalized_weight': value, 'possible_interval': interval,
+                           'max_metric_residual': error})
+    candidates.sort(key=lambda c: c['max_metric_residual'])
+    accepted = [c for c in candidates if c['max_metric_residual'] <= LIMIT]
+    return {'best_fit': candidates[0], 'consistent_branches': accepted,
+            'within_unchanged_metric_budget': bool(accepted),
+            'geometry_mapping_accepted': False}
+
+
+def infer_source_weight_locations(font, selected):
+    """No outline/advance data is published, only inferred axis coordinates."""
+    axes = {a.axisTag: a for a in font['fvar'].axes}
+    order = font.getGlyphOrder(); table = font['HVAR'].table
+    weight_index = list(axes).index('wght')
+    for region in table.VarStore.VarRegionList.Region:
+        a = region.VarRegionAxis[weight_index]
+        triple = (a.StartCoord, a.PeakCoord, a.EndCoord)
+        if triple not in ((-1., -1., 0.), (0., 0., 0.), (0., 1., 1.)):
+            raise ValueError('HVAR_weight_is_not_two_affine_branches')
+    cache = {}; result = []
+    for request, observed in selected:
+        loc = request['location']; width = axes['WDTH']
+        x = normalize(loc['WDTH'], width.minValue, width.defaultValue, width.maxValue)
+        key = (x, tuple(request['glyph_ids']))
+        if key not in cache:
+            vectors = []
+            for w in (-1., 0., 1.):
+                inst = VarStoreInstancer(table.VarStore, font['fvar'].axes,
+                                        {'WDTH': x, 'wght': w, 'HGHT': 0.})
+                vector = []
+                for gid in request['glyph_ids']:
+                    name = order[gid]
+                    index = table.AdvWidthMap.mapping[name] if table.AdvWidthMap else gid
+                    vector.append(font['hmtx'].metrics[name][0] + inst[index])
+                vectors.append(vector)
+            cache[key] = vectors
+        inference = infer_weight_from_metrics(observed['advances'], *cache[key])
+        result.append({'user_location': loc, **inference})
+    return result
 
 
 def requests_for(fonts):
@@ -193,7 +259,8 @@ def run(source, output):
             reports.append({'face_index':face,'native_positions':len(selected),
                             'matching_interpretations':[x for x in alternatives if x['failures']==0],
                             'best_failing_interpretations':[x for x in alternatives if x['failures']][:3],
-                            'total_hypotheses':len(alternatives)})
+                            'total_hypotheses':len(alternatives),
+                            'metric_inferred_locations':infer_source_weight_locations(font, selected)})
             print(json.dumps({'face_index':face,'best':alternatives[0],'matching_hypotheses':sum(x['failures']==0 for x in alternatives)}),flush=True)
         report={'status':'NATIVE_HVAR_MAPPING_DIAGNOSIS_NOT_FONT_ACCEPTANCE',
                 'source_sha256':EXPECTED,'source_unchanged':hashlib.sha256(source.read_bytes()).hexdigest()==EXPECTED,
