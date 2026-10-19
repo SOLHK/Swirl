@@ -111,6 +111,20 @@ def assert_close(actual, expected, label, epsilon=1 / 32):
         raise AssertionError(f"{label}: actual={actual}, expected={expected}, tolerance={epsilon}")
 
 
+class NativeResultValidationError(AssertionError):
+    """Keep the exact failed synthetic measurement; never adjust its threshold."""
+    def __init__(self, error, result, request):
+        self.details = {"validation_error": str(error),
+                        "request_id": result.get("request_id"),
+                        "face_index": result.get("face_index"),
+                        "glyph_id": result.get("glyph_id"),
+                        "location": result.get("location"),
+                        "requested_input": request,
+                        "native_result": result}
+        super().__init__(f"request={result.get('request_id')} face={result.get('face_index')} "
+                         f"gid={result.get('glyph_id')}: {error}")
+
+
 def validate_results(records, requests, source_sha):
     if not records or records[0].get("type") != "metadata":
         raise AssertionError("metadata must be first")
@@ -130,40 +144,44 @@ def validate_results(records, requests, source_sha):
         raise AssertionError(f"wrong result count: {len(results)} vs {len(expected)}")
     seen = set()
     for result in results:
-        key = (result["request_id"], result["glyph_id"])
-        if key in seen or key not in expected:
-            raise AssertionError("duplicate or unrelated glyph result")
-        seen.add(key)
-        request = expected[key]
-        if result.get("error") is not None:
-            raise AssertionError(f"native glyph failed: {result}")
-        if result["face_index"] != request["face_index"]:
-            raise AssertionError("wrong source face returned")
-        assert_close(result["horizontal_origin_x"], 0, "horizontal origin")
-        if result["glyph_id"] == 0:
-            assert_close(result["advance_width"], 550, "notdef advance without trak")
-            continue
-        if result["glyph_id"] == 1:
-            if result["commands"]:
-                raise AssertionError("blank glyph must be preserved as empty")
-            assert_close(result["advance_width"], 400, "space advance without trak")
-            continue
-        location = request["location"]
-        width = normalized(location["WDTH"], 1, 500, 1000)
-        weight = normalized(location["wght"], 100, 400, 900)
-        height = normalized(location["HGHT"], 1, 500, 1000)
-        cross = max(0, width) * max(0, height)
-        advance = 700 + width * 100 + weight * 30 + cross * 10
-        assert_close(result["advance_width"], advance, "varied advance without trak")
-        assert_close(result["advance_height"], 1000 + height * 150, "vertical advance is raw CGSize.width")
-        assert_close(result["vertical_origin_y"], 820 + height * 60, "vertical origin sign")
-        assert_close(result["vertical_origin_x"], advance / 2, "vertical origin half advance")
-        assert_close(result["lsb"], 100 + width * 20, "effective geometric left bearing")
-        assert_close(result["bounds"][0] + result["bounds"][2], 450 + width * 90 + weight * 60 + cross * 20,
-                     "true curve extremum differs from control-point bound")
-        assert_close(result["bounds"][1] + result["bounds"][3], 600 + height * 180, "height-dependent outline")
-        if not any(command[0] in {"qCurveTo", "curveTo"} for command in result["commands"]):
-            raise AssertionError("native curve path was flattened or lost")
+        try:
+            key = (result["request_id"], result["glyph_id"])
+            if key in seen or key not in expected:
+                raise AssertionError("duplicate or unrelated glyph result")
+            seen.add(key)
+            request = expected[key]
+            if result.get("error") is not None:
+                raise AssertionError(f"native glyph failed: {result}")
+            if result["face_index"] != request["face_index"]:
+                raise AssertionError("wrong source face returned")
+            assert_close(result["horizontal_origin_x"], 0, "horizontal origin")
+            if result["glyph_id"] == 0:
+                assert_close(result["advance_width"], 550, "notdef advance without trak")
+                continue
+            if result["glyph_id"] == 1:
+                if result["commands"]:
+                    raise AssertionError("blank glyph must be preserved as empty")
+                assert_close(result["advance_width"], 400, "space advance without trak")
+                continue
+            location = request["location"]
+            width = normalized(location["WDTH"], 1, 500, 1000)
+            weight = normalized(location["wght"], 100, 400, 900)
+            height = normalized(location["HGHT"], 1, 500, 1000)
+            cross = max(0, width) * max(0, height)
+            advance = 700 + width * 100 + weight * 30 + cross * 10
+            assert_close(result["advance_width"], advance, "varied advance without trak")
+            assert_close(result["advance_height"], 1000 + height * 150, "vertical advance is raw CGSize.width")
+            assert_close(result["vertical_origin_y"], 820 + height * 60, "vertical origin sign")
+            assert_close(result["vertical_origin_x"], advance / 2, "vertical origin half advance")
+            assert_close(result["lsb"], 100 + width * 20, "effective geometric left bearing")
+            assert_close(result["bounds"][0] + result["bounds"][2], 450 + width * 90 + weight * 60 + cross * 20,
+                         "true curve extremum differs from control-point bound")
+            assert_close(result["bounds"][1] + result["bounds"][3], 600 + height * 180, "height-dependent outline")
+            if not any(command[0] in {"qCurveTo", "curveTo"} for command in result["commands"]):
+                raise AssertionError("native curve path was flattened or lost")
+        except Exception as error:
+            request = expected.get((result.get("request_id"), result.get("glyph_id")))
+            raise NativeResultValidationError(error, result, request) from error
     return {"passed": True, "source_sha256": source_sha, "face_count": 2,
             "request_count": len(requests), "glyph_result_count": len(results),
             "metric_and_geometric_tolerance_font_units": 1 / 32,
@@ -213,6 +231,8 @@ def main():
         status["status"] = "PASS_SYNTHETIC_NATIVE_ONLY"
     except Exception as error:
         status.update({"status": "FAIL", "error": str(error)})
+        if isinstance(error, NativeResultValidationError):
+            status["failure_context"] = error.details
     (out / "coretext_test_result.json").write_text(json.dumps(status, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(status, indent=2))
     return 0 if status["status"] == "PASS_SYNTHETIC_NATIVE_ONLY" else 1

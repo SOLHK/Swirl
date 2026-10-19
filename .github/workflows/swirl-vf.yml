@@ -80,6 +80,7 @@ jobs:
           name: swirl-vf-apple-synthetic-${{ github.sha }}
           path: |
             build/swirl-vf-evidence/**/*.json
+            build/swirl-vf-evidence/**/*.jsonl
             build/swirl-vf-evidence/**/*.log
             build/swirl-vf-evidence/**/*.txt
           retention-days: 7
