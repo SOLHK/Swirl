@@ -107,7 +107,7 @@ public:
     QString nodeStateText() const;
     QString requestStateText() const;
     QString nodeError() const { return !m_nodeError.isEmpty()?m_nodeError:m_store.error(); }
-    bool nodeBusy() const { return m_engine->status().nodeBusy || busy() || m_restartPending || m_imports.busy(); }
+    bool nodeBusy() const { return m_engine->status().nodeBusy || busy() || m_restartPending || m_imports.busy() || !m_pendingSelection.isEmpty(); }
     NodeImportService *imports() { return &m_imports; }
     QStringList supportedProtocols() const { return ProxyNode::protocols(); }
     bool requestSucceeded() const { return m_engine->status().requestState==ProxyEngine::RequestState::Succeeded; }
@@ -205,6 +205,8 @@ private:
     bool m_proxyRequested=false;
     bool m_proxyChecking=false;
     QString m_nodeError;
+    QString m_pendingSelection,m_previousSelection;
+    void rollbackPendingSelection(const QString &reason);
     bool m_tunBeforeGateway=false;
     bool m_tunBeforeMetered=false;
     QString m_modeBeforeMetered="rule";

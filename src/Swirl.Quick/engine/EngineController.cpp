@@ -101,6 +101,11 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
     connect(&m_telemetry,&TelemetryService::changed,this,&EngineController::statusChanged);
     connect(&m_tests,&NodeTestService::changed,this,&EngineController::nodesChanged);
     connect(m_engine.get(),&ProxyEngine::diagnostic,this,&EngineController::diagnostic);
+#ifdef SWIRL_USE_RUST_CORE
+    connect(m_engine.get(),&ProxyEngine::diagnostic,this,[this](const QString &module,const QString &code,const QString &message){
+        if(module=="SwirlRust"&&(code=="SelectionUnsupported"||code=="SelectionFailed"))rollbackPendingSelection(message);
+    });
+#endif
     connect(this,&EngineController::diagnostic,&m_diagnostics,[this](const QString &module,const QString &code,const QString &message){m_diagnostics.noteEvent(module+" / "+code,message);});
     QFile manifest(QStringLiteral(":/engine/mihomo-manifest.json"));
     if (manifest.open(QIODevice::ReadOnly)) {
@@ -148,6 +153,12 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
             m_options.controlPort=quint16(runtimePort);emit optionsChanged();
         }
         const auto s=m_engine->status();
+        if(!m_pendingSelection.isEmpty()) {
+            if(s.processAlive&&s.apiHealthy&&s.selectedNodeId==m_pendingSelection) {
+                m_options.selectedNodeId=m_pendingSelection;m_options.directSession=false;
+                m_pendingSelection.clear();m_previousSelection.clear();emit selectionChanged();
+            }else if(s.state==ProxyEngine::State::Failed)rollbackPendingSelection(QStringLiteral("节点切换未完成，保留原选择。"));
+        }
         if(m_meteredPending && s.state==ProxyEngine::State::Running && s.tunEnabled)m_meteredPending=false;
         if(m_meteredPending && s.state==ProxyEngine::State::Failed){
             m_meteredPending=false;m_options.meteredNetwork=false;
@@ -225,9 +236,10 @@ bool EngineController::busy() const {
     return state == ProxyEngine::State::Validating || state == ProxyEngine::State::Starting || state == ProxyEngine::State::Stopping;
 }
 void EngineController::start() { if (canStart()) { m_connectionRequested=false;m_options.nodes=m_store.nodes(); m_options.selectedNodeId.clear();m_options.directSession=false; m_engine->start(m_options); } }
-void EngineController::stop() { m_diagnostics.noteEvent(QStringLiteral("Swirl 操作"),QStringLiteral("用户停止引擎，现有本机代理连接将关闭。"));m_proxyRequested=false;m_systemProxy.disable(); m_connectionRequested=false;m_restartPending=false; m_options.selectedNodeId.clear();m_options.directSession=false; m_engine->stop(); }
+void EngineController::stop() { rollbackPendingSelection(QStringLiteral("节点切换已取消，保留原选择。"));m_diagnostics.noteEvent(QStringLiteral("Swirl 操作"),QStringLiteral("用户停止引擎，现有本机代理连接将关闭。"));m_proxyRequested=false;m_systemProxy.disable(); m_connectionRequested=false;m_restartPending=false; m_options.selectedNodeId.clear();m_options.directSession=false; m_engine->stop(); }
 void EngineController::shutdown() {
     if(m_shuttingDown)return;
+    rollbackPendingSelection(QStringLiteral("节点切换已取消，保留原选择。"));
     m_shuttingDown=true;m_connectionRequested=false;m_restartPending=false;m_proxyRequested=false;
     m_imports.shutdown();m_tests.cancel();m_systemProxy.disable();m_engine->stop();
 }
@@ -285,13 +297,40 @@ bool EngineController::chooseNode(const QString &id) {
     if(m_shuttingDown)return false;
     if(nodeBusy())return false;
     if(processAlive()&&!activeNodeId().isEmpty()&&!apiHealthy()){m_nodeError=QStringLiteral("控制接口未就绪，不能切换节点。");emit selectionChanged();return false;}
+    const bool active=processAlive()&&!activeNodeId().isEmpty();
+#ifdef SWIRL_USE_RUST_CORE
+    if(active&&id.isEmpty()){m_nodeError=QStringLiteral("连接期间不能清空节点选择；请先断开连接。");emit selectionChanged();return false;}
+    if(!id.isEmpty()) {
+        // A running session owns its original node snapshot. A refreshed or
+        // newly imported node only becomes eligible after an explicit reconnect.
+        auto candidate=active?m_options:EngineStartOptions{};
+        if(!active){candidate.nodes=m_store.nodes();candidate.routingMode="global";}
+        candidate.selectedNodeId=id;candidate.directSession=false;
+        QJsonObject configuration;const auto reason=RustCoreEngine::configuration(candidate,&configuration);
+        if(!reason.isEmpty()){m_nodeError=reason;emit selectionChanged();return false;}
+    }
+#endif
+#ifdef SWIRL_USE_RUST_CORE
+    if(active&&activeNodeId()!=id){
+        m_previousSelection=activeNodeId();m_pendingSelection=id;
+    }
+#endif
     m_nodeError.clear();const bool ok=m_store.select(id);
-    if(ok&&processAlive()&&!activeNodeId().isEmpty())m_engine->selectNode(id);
-    emit selectionChanged();return ok;
+    if(!ok){m_pendingSelection.clear();m_previousSelection.clear();}
+    if(ok&&active&&activeNodeId()!=id){
+        m_engine->selectNode(id);
+    }
+    emit selectionChanged();emit statusChanged();return ok&&m_store.selectedId()==id;
+}
+void EngineController::rollbackPendingSelection(const QString &reason) {
+    if(m_pendingSelection.isEmpty())return;
+    const auto previous=m_previousSelection;m_pendingSelection.clear();m_previousSelection.clear();
+    m_nodeError=m_store.select(previous)?reason:QStringLiteral("节点切换失败，原出口保持运行；无法恢复保存的选择：")+m_store.error();
+    emit selectionChanged();emit statusChanged();
 }
 void EngineController::connectNode(const QString &id) {
     if(m_shuttingDown)return;
-    if(id.isEmpty()){if(!busy()&&!m_imports.busy())startConfiguredSession();return;}
+    if(id.isEmpty()){if(!nodeBusy())startConfiguredSession();return;}
     if(nodeBusy() || !chooseNode(id))return;
     if(processAlive() && !activeNodeId().isEmpty())return;
     m_connectionRequested=true;
@@ -301,9 +340,21 @@ void EngineController::connectNode(const QString &id) {
 }
 void EngineController::startConfiguredSession() {
     if(m_shuttingDown)return;
+#ifdef SWIRL_USE_RUST_CORE
+    // An absent/deleted subscription selection is not authorization to bypass
+    // proxies. DIRECT is an explicit routing mode, never the empty-ID default.
+    if(m_store.selectedId().isEmpty()&&m_options.routingMode!="direct") {
+        m_nodeError=QStringLiteral("未选择可用节点；请选择节点或明确启用直接连接模式。未自动切换 DIRECT。");emit selectionChanged();emit statusChanged();return;
+    }
+#endif
+    m_nodeError.clear();
     m_connectionRequested=true;
     m_options.nodes=m_store.nodes();m_options.selectedNodeId=m_store.selectedId();
+#ifdef SWIRL_USE_RUST_CORE
+    m_options.directSession=m_options.routingMode=="direct";
+#else
     m_options.directSession=m_options.selectedNodeId.isEmpty()&&!m_nativeDocumentRouting;
+#endif
     if(processAlive()){m_systemProxy.disable();m_restartPending=true;m_engine->stop();}
     else m_engine->start(m_options);
     emit statusChanged();
@@ -320,6 +371,9 @@ void EngineController::setRoutingMode(const QString &mode) {
         m_routingError=QStringLiteral("请等待当前操作完成，并连接节点后再切换运行模式。");emit statusChanged();return;
     }
     m_routingError.clear();m_options.routingMode=mode;
+#ifdef SWIRL_USE_RUST_CORE
+    m_options.directSession=mode=="direct";
+#endif
     QSettings().setValue("Proxy/routingMode",mode);
     if(processAlive())m_engine->setRoutingMode(mode);
     emit statusChanged();
@@ -514,17 +568,24 @@ bool EngineController::importNodesAndConfiguration(const QList<ProxyNode> &incom
         if(!QJsonValue::fromVariant(input.value("groups")).isArray()){m_networkError=QStringLiteral("策略组必须为数组。");return false;}
         mapped["groups"]=groups;
     }
-    // Imported documents cannot use the editor's SWIRL selected-node alias:
-    // the global selection may belong to another subscription. The first
-    // document profile only routes to its declared groups or explicit builtins.
+    // Resolve only this document's node names to final persisted UUIDs. Never
+    // accept arbitrary stored UUIDs/names or the editor's SWIRL alias from a
+    // document: those could select a node belonging to a different provider.
     const auto rawRules=QJsonValue::fromVariant(input.value("rules"));
-    if(rawRules.isArray())for(const auto &value:rawRules.toArray()) {
-        if(!value.isString())continue; // The shared validator reports type errors.
-        auto parts=value.toString().split(',');for(auto &part:parts)part=part.trimmed();
-        const auto target=parts.value(parts.value(0)=="MATCH"?1:2);
-        if(target!="DIRECT"&&target!="REJECT"&&(!groupNames.contains(target)||target=="SWIRL"||target=="GLOBAL")){
-            m_networkError=QStringLiteral("订阅规则只能引用本文件声明的策略组、DIRECT 或 REJECT；未应用配置。");return false;
+    if(rawRules.isArray()) {
+        QJsonArray rules;
+        for(const auto &value:rawRules.toArray()) {
+            if(!value.isString()){rules.append(value);continue;} // Shared validator reports the type error.
+            auto parts=routingRuleFields(value.toString());const auto targetIndex=routingRuleTargetIndex(parts);
+            const auto target=parts.value(targetIndex);
+            if(names.contains(target)) {
+                parts[targetIndex]=names.value(target);rules.append(parts.join(','));
+            }else if(target=="DIRECT"||target=="REJECT"||(groupNames.contains(target)&&target!="SWIRL"&&target!="GLOBAL"))rules.append(value);
+            else {
+                m_networkError=QStringLiteral("订阅规则只能引用本文件声明的节点、策略组、DIRECT 或 REJECT；未应用配置。");return false;
+            }
         }
+        mapped["rules"]=rules.toVariantList();
     }
     QVariantMap canonical;const auto nodes=plan.nodes();
     if(!validateNetworkConfiguration(mapped,&canonical,&nodes))return false;
@@ -594,6 +655,9 @@ bool EngineController::saveRoutingRule(const QString &type,const QString &patter
     const QStringList types={"DOMAIN","DOMAIN-SUFFIX","DOMAIN-KEYWORD","IP-CIDR","IP-CIDR6","PROCESS-NAME","DST-PORT","SRC-IP-CIDR","MATCH"};
     bool valid=types.contains(type)&&pattern.size()<=2048&&!pattern.contains(QRegularExpression("[,\\r\\n]"));
     QStringList policies={"DIRECT","REJECT","SWIRL"};for(const auto &g:m_options.customGroups)policies.append(g.toMap().value("name").toString());
+#ifdef SWIRL_USE_RUST_CORE
+    for(const auto &node:m_store.nodes())policies.append(node.id);
+#endif
     valid=valid&&policies.contains(policy)&&(type=="MATCH"||!pattern.trimmed().isEmpty());
     if(type=="IP-CIDR"||type=="IP-CIDR6"||type=="SRC-IP-CIDR") {
         const auto cidr=QHostAddress::parseSubnet(pattern);valid=valid&&!cidr.first.isNull()&&cidr.second>=0;

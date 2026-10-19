@@ -51,7 +51,7 @@ jobs:
           cargo check --workspace --locked
           cargo clippy --workspace --all-targets --locked -- -D warnings
           cargo test --workspace --locked
-          cargo build --release --locked -p swirl-api
+          cargo build --release --locked -p swirl-api --bins
           cargo build --release --locked -p swirl-transport --example reality-client
       - uses: actions/setup-python@v5
         with:
@@ -74,6 +74,26 @@ jobs:
           python tools/tests/test_dns_https.py
           if test -f tools/tests/test_socks4.py; then python tools/tests/test_socks4.py; fi
           if test -f tools/tests/test_websocket_transport.py; then python tools/tests/test_websocket_transport.py; fi
+      - name: Subscription to native proxy and target
+        working-directory: .
+        shell: bash
+        env:
+          SWIRL_RUST_HARNESS: ${{ github.workspace }}/core/target/release/swirl-api
+          SWIRL_RUST_INSPECTOR: ${{ github.workspace }}/core/target/release/swirl-inspect
+          SWIRL_PRODUCT_EVIDENCE: ${{ runner.temp }}/swirl-product-chain-rust
+        run: |
+          set -euo pipefail
+          test -x "$SWIRL_RUST_HARNESS"
+          test -x "$SWIRL_RUST_INSPECTOR"
+          python tools/tests/test_product_subscription_chain.py -v
+      - name: Preserve subscription product rust evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: App-Product-Chain-${{ runner.os }}-rust-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swirl-product-chain-rust
+          if-no-files-found: error
+          retention-days: 14
       - name: Install pinned Go for the independent Xray peer
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
         with:

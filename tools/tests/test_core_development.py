@@ -113,6 +113,7 @@ REQUIRED_TESTS = (
     "test_socks5_udp.py",
     "test_reality_peer.py",
     "test_reality_tls.py",
+    "test_product_subscription_chain.py",
 )
 REALITY_BUILD = "cargo build --release --locked -p swirl-transport --example reality-client"
 BINARY_NAMES = ("SWIRL_RUST_HARNESS", "SWIRL_RUST_INSPECTOR", "SWIRL_RUST_DIAGNOSTIC",
@@ -147,6 +148,7 @@ def vector_fixture(source, stage):
 
 def previous_reality_stage(source):
     """Strip the entire later TLS-peer stage before making historical fixtures."""
+    source = development.without_product_chain_steps(source)
     source = development.without_vision_xray_steps(source)
     source = development.without_xray_steps(source)
     source = vector_fixture(source, 0)
@@ -192,6 +194,127 @@ def previous_connection_stage(source):
 
 
 class CoreDevelopmentTests(unittest.TestCase):
+    def test_product_chain_gates_use_release_binaries_and_preserve_exact_evidence(self):
+        root = Path(__file__).resolve().parents[2]
+        source = (root / ".github/workflows/rust-core.yml").read_text(encoding="utf-8")
+        self.assertEqual(development.updated_workflow(source), source)
+        final = development.updated_workflow(FIXTURE)
+        previous = development.without_product_chain_steps(final)
+        self.assertNotIn("test_product_subscription_chain.py", previous)
+        self.assertEqual(development.updated_workflow(previous), final)
+        app = (root / ".github/workflows/core-development.yml").read_text(encoding="utf-8")
+        self.assertIn("cargo build --release --locked -p swirl-api --bins\n", app)
+        jobs = [("linux/macos", source.split("  windows-rust:\n")[0], False, False),
+                ("windows", source.split("  windows-rust:\n")[1], True, False),
+                ("windows Qt", source.split("  windows-rust:\n")[1], True, True),
+                ("app", app, False, False)]
+        for label, part, windows, qt in jobs:
+            with self.subTest(job=label):
+                title = ("Subscription through persisted Qt product configuration" if qt
+                         else "Subscription to native proxy and target")
+                step = part.split(f"      - name: {title}\n", 1)[1].split("      - ", 1)[0]
+                self.assertIn("        working-directory: .\n", step)
+                self.assertNotIn("        if:", step)
+                self.assertNotIn("continue-on-error:", step)
+                suffix = ".exe" if windows else ""
+                for variable, binary in (("SWIRL_RUST_HARNESS", "swirl-api"),
+                                         ("SWIRL_RUST_INSPECTOR", "swirl-inspect")):
+                    self.assertIn(f"{variable}: ${{{{ github.workspace }}}}/core/target/release/{binary}{suffix}\n", step)
+                    check = (f"if (-not (Test-Path $env:{variable} -PathType Leaf))"
+                             if windows else f'test -x "${variable}"')
+                    self.assertIn(check, step)
+                stage = "qt" if qt else "rust"
+                self.assertIn(f"SWIRL_PRODUCT_EVIDENCE: ${{{{ runner.temp }}}}/swirl-product-chain-{stage}\n", step)
+                selection = " ProductQtIntegration" if qt else ""
+                command = f"          python tools/tests/test_product_subscription_chain.py{selection} -v\n"
+                self.assertEqual(step.count(command), 1)
+                if windows:
+                    self.assertIn(command + "          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }\n", step)
+                else:
+                    self.assertIn("          set -euo pipefail\n", step)
+                if qt:
+                    self.assertIn("SWIRL_RUST_QT_TESTS: ${{ github.workspace }}/build/rust-qt/Release/SwirlRustCoreTests.exe\n", step)
+                    self.assertIn("if (-not (Test-Path $env:SWIRL_RUST_QT_TESTS -PathType Leaf))", step)
+                    self.assertLess(part.index("Run Qt to Rust integration without Mihomo"), part.index(title))
+                    self.assertLess(part.index(title), part.index("Build complete native Rust application"))
+                artifact = part.split(f"      - name: Preserve subscription product {stage} evidence\n", 1)[1].split("      - ", 1)[0]
+                self.assertIn("        if: always()\n", artifact)
+                self.assertIn("          if-no-files-found: error\n", artifact)
+                self.assertIn("${{ github.sha }}-${{ github.run_attempt }}", artifact)
+                self.assertIn(f"path: ${{{{ runner.temp }}}}/swirl-product-chain-{stage}\n", artifact)
+
+    def test_product_chain_partial_blocks_wrong_binaries_and_failure_bypasses_are_rejected(self):
+        final = development.updated_workflow(FIXTURE)
+        for windows, qt in ((False, False), (True, False), (True, True)):
+            block = development.product_chain_steps(windows=windows, qt=qt)
+            edits = ["", block * 2,
+                     block.replace("working-directory: .", "working-directory: core", 1),
+                     block.replace("release/swirl-inspect", "debug/swirl-inspect", 1),
+                     block.replace("release/swirl-api", "release/wrong-api", 1),
+                     block.replace("SWIRL_PRODUCT_EVIDENCE:", "UNREVIEWED_EVIDENCE:", 1),
+                     block.replace("        run: |\n", "        continue-on-error: true\n        run: |\n", 1),
+                     block.replace("        run: |\n", "        if: false\n        run: |\n", 1),
+                     block.replace("        if: always()\n", "        if: success()\n", 1),
+                     block.replace("if-no-files-found: error", "if-no-files-found: ignore", 1),
+                     block.replace("${{ github.sha }}", "unverified-source", 1)]
+            if windows:
+                edits.append(block.replace(development.WINDOWS_STATUS_GUARD, "", 1))
+                edits.append(block.replace("Test-Path $env:SWIRL_RUST_INSPECTOR", "Test-Path $env:SWIRL_RUST_HARNESS", 1))
+            else:
+                edits.append(block.replace('          test -x "$SWIRL_RUST_INSPECTOR"\n', "", 1))
+                edits.append(block.replace("set -euo pipefail", "set -u", 1))
+            if qt:
+                edits.append(block.replace(" ProductQtIntegration -v", " ProductChainIntegration -v", 1))
+                edits.append(block.replace("Release/SwirlRustCoreTests.exe", "Debug/SwirlRustCoreTests.exe", 1))
+            for index, edit in enumerate(edits):
+                with self.subTest(windows=windows, qt=qt, drift=index), tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    workflow = self.make_repository(root, final.replace(block, edit, 1))
+                    before = workflow.read_bytes()
+                    with self.assertRaises(ValueError):
+                        development.apply_update(root, ENVIRONMENT)
+                    self.assertEqual(workflow.read_bytes(), before)
+
+    def test_product_chain_shell_propagates_missing_binary_and_peer_failure(self):
+        root = Path(__file__).resolve().parents[2]
+        source = (root / ".github/workflows/rust-core.yml").read_text(encoding="utf-8")
+        windows = os.name == "nt"
+        part = source.split("  windows-rust:\n")[int(windows)]
+        for qt in ((False, True) if windows else (False,)):
+            title = ("Subscription through persisted Qt product configuration" if qt
+                     else "Subscription to native proxy and target")
+            body = part.split(f"      - name: {title}\n", 1)[1].split("        run: |\n", 1)[1].split("      - ", 1)[0]
+            body = "\n".join(line[10:] for line in body.splitlines() if line.strip()) + "\n"
+            body += "Write-Output 'AFTER_PRODUCT_PEER'\n" if windows else "echo AFTER_PRODUCT_PEER\n"
+            for missing, peer_exit in ((None, 0), (None, 29), ("SWIRL_RUST_INSPECTOR", 0)):
+                with self.subTest(qt=qt, missing=missing, peer_exit=peer_exit), tempfile.TemporaryDirectory() as temporary:
+                    work = Path(temporary)
+                    script = work / "tools/tests/test_product_subscription_chain.py"
+                    script.parent.mkdir(parents=True)
+                    script.write_text("from pathlib import Path\nPath('PEER_WAS_RUN').touch()\n"
+                                      f"raise SystemExit({peer_exit})\n", encoding="utf-8")
+                    environment = dict(os.environ, SWIRL_TEST_ROOT=str(work / "qt-root"))
+                    for name in ("SWIRL_RUST_HARNESS", "SWIRL_RUST_INSPECTOR", "SWIRL_RUST_QT_TESTS"):
+                        path = work / name
+                        if name != missing:
+                            path.write_text("synthetic executable identity\n", encoding="utf-8")
+                            path.chmod(0o755)
+                        environment[name] = str(path)
+                    if windows:
+                        shell = work / "gate.ps1"
+                        shell.write_text(body, encoding="utf-8")
+                        args = ["pwsh", "-NoProfile", "-File", str(shell)]
+                    else:
+                        args = ["bash", "-c", body]
+                    result = subprocess.run(args, cwd=work, env=environment,
+                                            capture_output=True, text=True, timeout=15)
+                    if missing:
+                        self.assertNotEqual(result.returncode, 0)
+                    else:
+                        self.assertEqual(result.returncode, peer_exit, result.stderr)
+                    self.assertEqual((work / "PEER_WAS_RUN").exists(), missing is None)
+                    self.assertEqual("AFTER_PRODUCT_PEER" in result.stdout, missing is None and peer_exit == 0)
+
     def make_repository(self, root, source=FIXTURE):
         workflow = root / ".github/workflows/rust-core.yml"
         workflow.parent.mkdir(parents=True)
@@ -323,7 +446,8 @@ class CoreDevelopmentTests(unittest.TestCase):
         updated = development.updated_workflow(FIXTURE)
         portable, windows = updated.split("  windows-rust:\n")
         for name in REQUIRED_TESTS:
-            command = f"          python ../tools/tests/{name}\n"
+            command = (f"          python tools/tests/{name} -v\n" if name == "test_product_subscription_chain.py"
+                       else f"          python ../tools/tests/{name}\n")
             self.assertEqual(portable.count(command), 1)
             self.assertEqual(windows.count(command), 1)
             self.assertIn(command + "          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }\n", windows)
@@ -386,7 +510,9 @@ class CoreDevelopmentTests(unittest.TestCase):
         self.assertNotIn("test_reality_", previous)
         self.assertEqual(development.updated_workflow(previous), final)
         self.assertEqual(development.updated_workflow(final), final)
-        for windows, part in enumerate(final.split("  windows-rust:\n")):
+        # The separately guarded product steps repeat their own preflight.
+        historical_menu = development.without_product_chain_steps(final)
+        for windows, part in enumerate(historical_menu.split("  windows-rust:\n")):
             first_peer = part.index("          python ../tools/tests/test_reality_peer.py\n")
             tls_peer = part.index("          python ../tools/tests/test_reality_tls.py\n")
             self.assertLess(part.index(REALITY_BUILD), first_peer)
@@ -619,7 +745,7 @@ class CoreDevelopmentTests(unittest.TestCase):
         self.assertEqual(final.count("      - run: cargo build --release --locked --workspace --lib --bins\n"), 2)
         self.assertNotIn("cargo build --release --locked -p swirl-api", final)
         self.assertEqual(final.count("            core/target/release/swirl-diagnose.exe\n"), 1)
-        portable, windows = final.split("  windows-rust:\n")
+        portable, windows = development.without_product_chain_steps(final).split("  windows-rust:\n")
         for name in ("SWIRL_RUST_HARNESS", "SWIRL_RUST_INSPECTOR", "SWIRL_RUST_DIAGNOSTIC"):
             portable_guard = f'          test -x "${name}"\n'
             windows_guard = f"          if (-not (Test-Path $env:{name} -PathType Leaf)) {{ throw 'Required Rust test binary missing' }}\n"
@@ -841,7 +967,9 @@ class CoreDevelopmentTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[2]
         _, before, after = development.prepare_update(root)
         for name in REQUIRED_TESTS:
-            self.assertEqual(after.count(f"          python ../tools/tests/{name}\n"), 2)
+            command = (f"          python tools/tests/{name} -v\n" if name == "test_product_subscription_chain.py"
+                       else f"          python ../tools/tests/{name}\n")
+            self.assertEqual(after.count(command), 2)
         self.assertEqual(development.updated_workflow(after), after)
         # Preparation alone is read-only, including when this test runs before
         # the App has made its first workflow-file commit.

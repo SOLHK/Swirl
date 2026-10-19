@@ -22,6 +22,12 @@ record 修复 `0be68231b15c1e4f69b138cda7bae0a3930d956b` 的 [Rust 39246770262](
 Windows CI 验证。用户另行授权的新订阅为 59 个 REALITY 节点，其中 55 个含 Vision；仅保留并
 明确拒绝当前不支持的执行，没有将其计为联网成功。**79 项 / 6 项已验收 / 10.83% 不变。**
 
+S1 实际源码为 [`292df3ba9763414947ec9b5dffa7886c45a00879`](https://github.com/SOLHK/Swirl/commit/292df3ba9763414947ec9b5dffa7886c45a00879)。
+S2 补齐同一订阅内规则节点引用、原生选择失败回滚、等待确认期间重连隔离、选择丢失不得默认直连及
+退出显式 DIRECT 的模式一致性。新增独立 Python 代理 A/B 与单独 HTTP/HTTPS/echo 目标，分别设置
+Rust 测试宿主持久化菜单和 Windows 真实 Qt/DPAPI/控制器菜单，并加入三平台与 App 适用 CI。
+新增测试的数量不改变冻结验收；Windows 实际执行和精确源码 CI 终态须另行记录。
+
 ## 1. 固定范围、状态和计算规则
 
 状态只能是：**已验收 / 部分实现 / 未验证 / 未实现**。已验收必须满足该行明确范围的全部契约，并有可定位源码、环境、命令或独立对端、结果和未解决问题；部分实现、跳过、未验证和未实现都不计入通过分子。未知不是通过，也不等于已经证明失败。
@@ -69,6 +75,7 @@ Windows CI 验证。用户另行授权的新订阅为 59 个 REALITY 节点，�
 | E17 | [REALITY R2](REALITY_TLS_ENGINE_20261019.md)、[Vision R1](VISION_FRAMING_FOUNDATION_20261019.md)及[历史精确 CI](CORE_REALITY_VISION_HANDOFF_20261019.md#保留的上一阶段证据) | `611edcff` / `5b55ab33` 各自三平台与 App 已成功；是已入库 TLS/R1 framing 证据，本次未重做，不能替代新提交 CI |
 | E18 | [REALITY R3 专项](REALITY_XRAY_INTEROP_20261019.md)、[本地结果](evidence/reality-r3/local-xray-final-summary.json)及[精确 CI](CORE_REALITY_VISION_HANDOFF_20261019.md#本次源码与精确-ci) | `5ad68bcb`；固定官方 Xray/REALITY/Go、重复构建身份；12 项/13 会话，严格 EOF/凭据隔离/回收。Linux/macOS/Windows 与 App 全部 success，含 Windows Qt/原生应用；仅受控 TLS 组件互通 |
 | E19 | [Vision 专项](VISION_ASYNC_INSPECTION_20261019.md)、[record 本地](evidence/vision-r2/record-boundary-local.json)、[Linux](evidence/vision-r2/record-ci-linux.json)/[macOS](evidence/vision-r2/record-ci-macos.json)/[App](evidence/vision-r2/record-ci-app.json)、[Windows DNS 失败](evidence/vision-r2/record-ci-windows-failure.json)、[端口本地](evidence/vision-r2/port-pair-local.json) | 初始 f3ce257f macOS/Windows 失败保留；0be68231 Linux/macOS/App 成功、Windows DNS 失败且协议/Qt 未运行。当前端口源码 7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167，本地 94 项通过；该精确 SHA 三平台 Rust 与 App 完整成功，272 Rust + 1 doctest、R3 12 项/13 会话与 Vision 4 项通过。DirectReady/所有权/HRR/组合/产品链未完成 |
+| E20 | [订阅产品整链](CORE_SUBSCRIPTION_PRODUCT_CHAIN_20261019.md)、[S1 本地原始证据](evidence/subscription-product-chain/s1-local.json) | S1 参数转换修复已推送 292df3ba；S2 节点切换/规则叶子与独立目标菜单区分便携测试宿主和 Windows 产品对象范围。REALITY/Vision 供应商节点仍无联网验收；新源码 CI 不得引用旧结果替代 |
 
 ## 3. A–F固定验收清单
 

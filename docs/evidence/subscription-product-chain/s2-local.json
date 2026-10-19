@@ -1,0 +1,66 @@
+{
+  "scope": "S2 actual local Linux source blobs. Product Windows Qt/DPAPI has NOT run locally.",
+  "base_sha": "292df3ba9763414947ec9b5dffa7886c45a00879",
+  "source_git_blobs": {
+    ".github/workflows/core-development.yml": "a79eacda4cf6991b6e5e259b8ccd346067d6597a",
+    ".github/workflows/rust-core.yml": "77df5295c2def1b49460b7053f78be87c6bc7083",
+    "src/Swirl.Quick/engine/EngineController.cpp": "4206626429bde8dc412ce9bafc69fb26df91c8ff",
+    "src/Swirl.Quick/engine/EngineController.h": "b6528009cb58b20f326017ced14bd1258ade1598",
+    "src/Swirl.Quick/engine/NodeStore.cpp": "68b1630da20dfeddaaaacd8ad30fd34965bf13f4",
+    "src/Swirl.Quick/engine/RustCoreEngine.cpp": "95f38594790603b82447fcb0fcf0781bc84a4583",
+    "src/Swirl.Quick/tests/RustCoreTests.cpp": "fb514f5552c49ed21bcb9253d1d0c57faa743cb7",
+    "tools/ApplyCoreDevelopment.py": "68b05d84959ca2a42b8539a07ebb28d3a901d492",
+    "tools/tests/test_core_development.py": "2f8ef1a037c2a7e0cfad6d64ad4f1e204a536ce9",
+    "tools/tests/test_product_subscription_chain.py": "57a2307f20fd950d9de5d2d9a0539014618d1d5d"
+  },
+  "core_source": "unchanged from S1 292df3ba9763414947ec9b5dffa7886c45a00879; rebuilt with official Rust 1.99.1",
+  "commands": [
+    {
+      "command": "cargo build --workspace --release --locked",
+      "exit_code": 0,
+      "raw_log": "s2-release-build.log"
+    },
+    {
+      "command": "python3 tools/tests/test_product_subscription_chain.py -v",
+      "exit_code": 0,
+      "passed": 8,
+      "skipped": 1,
+      "raw_log": "s2-portable.log",
+      "result": "s2-portable-result.json"
+    },
+    {
+      "command": "python3 tools/tests/test_core_development.py -v",
+      "exit_code": 0,
+      "passed": 44,
+      "skipped": 0,
+      "raw_log": "s2-guards.log"
+    },
+    {
+      "command": "python3 tools/ApplyCoreDevelopment.py --check",
+      "exit_code": 0,
+      "idempotent": true,
+      "raw_log": "s2-workflow-check.log"
+    }
+  ],
+  "artifact_sha256": {
+    "s2-portable.log": "e845089c821f6d3800c9ee3844101b71f7699e8d5aaccc80e6e06b6b89ccfa7e",
+    "s2-portable-result.json": "ea879ca22d0021b92a00fe0b6021ee5874ef83b7fefdb802c9ec83bd04773050",
+    "s2-guards.log": "3b30db5006d6be335d86ddd2f63e1f719b2341e9a630d6e9e6067acb9bc930e6",
+    "s2-workflow-check.log": "c805608aac6cdb36a5b92500e0032b09908f9c1615bf9c6fe9689ecfad4c6daf",
+    "s2-release-build.log": "c27b869d250ac8d52ada0e091c0603ebbdefcfabf04f7abfa7efe1b96c1a27d6",
+    "s2-release-result.json": "a6458df2ad068893a9a72e123c180026a5c01ddaa4b0f522932cdbdaf923bbb8"
+  },
+  "earlier_environment_failure": {
+    "error": "FileNotFoundError: previous /tmp release binaries and toolchain absent",
+    "portable_setup_errors": 8,
+    "network_executed": false,
+    "original_full_traceback_archived": false,
+    "resolution": "Restored official toolchain in excluded workspace runtime; rebuilt unchanged Core source and reran suite."
+  },
+  "product_qt": "pending exact-source Windows CI, not replaced by portable tests",
+  "acceptance": {
+    "total": 79,
+    "accepted": 6,
+    "weighted_percent": 10.83
+  }
+}

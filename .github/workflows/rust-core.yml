@@ -60,6 +60,26 @@ jobs:
           python ../tools/tests/test_connectivity_diagnostics.py
           python ../tools/tests/test_subscription_import.py
           python ../tools/tests/test_socks5_udp.py
+      - name: Subscription to native proxy and target
+        working-directory: .
+        shell: bash
+        env:
+          SWIRL_RUST_HARNESS: ${{ github.workspace }}/core/target/release/swirl-api
+          SWIRL_RUST_INSPECTOR: ${{ github.workspace }}/core/target/release/swirl-inspect
+          SWIRL_PRODUCT_EVIDENCE: ${{ runner.temp }}/swirl-product-chain-rust
+        run: |
+          set -euo pipefail
+          test -x "$SWIRL_RUST_HARNESS"
+          test -x "$SWIRL_RUST_INSPECTOR"
+          python tools/tests/test_product_subscription_chain.py -v
+      - name: Preserve subscription product rust evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-Product-Chain-${{ runner.os }}-rust-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swirl-product-chain-rust
+          if-no-files-found: error
+          retention-days: 14
       - name: Install pinned Go for the independent Xray peer
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
         with:
@@ -212,6 +232,27 @@ jobs:
           netsh interface ipv6 show dynamicport udp
           netsh interface ipv6 show excludedportrange protocol=tcp
           netsh interface ipv6 show excludedportrange protocol=udp
+      - name: Subscription to native proxy and target
+        working-directory: .
+        shell: pwsh
+        env:
+          SWIRL_RUST_HARNESS: ${{ github.workspace }}/core/target/release/swirl-api.exe
+          SWIRL_RUST_INSPECTOR: ${{ github.workspace }}/core/target/release/swirl-inspect.exe
+          SWIRL_PRODUCT_EVIDENCE: ${{ runner.temp }}/swirl-product-chain-rust
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not (Test-Path $env:SWIRL_RUST_HARNESS -PathType Leaf)) { throw 'Required product chain binary missing' }
+          if (-not (Test-Path $env:SWIRL_RUST_INSPECTOR -PathType Leaf)) { throw 'Required product chain binary missing' }
+          python tools/tests/test_product_subscription_chain.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Preserve subscription product rust evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-Product-Chain-${{ runner.os }}-rust-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swirl-product-chain-rust
+          if-no-files-found: error
+          retention-days: 14
       - name: Install pinned Go for the independent Xray peer
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
         with:
@@ -347,6 +388,32 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python tools/tests/test_socks5_udp.py Socks5UdpIntegration.test_qt_imported_socks5_udp_data_path
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Subscription through persisted Qt product configuration
+        working-directory: .
+        shell: pwsh
+        env:
+          SWIRL_RUST_HARNESS: ${{ github.workspace }}/core/target/release/swirl-api.exe
+          SWIRL_RUST_INSPECTOR: ${{ github.workspace }}/core/target/release/swirl-inspect.exe
+          SWIRL_PRODUCT_EVIDENCE: ${{ runner.temp }}/swirl-product-chain-qt
+          SWIRL_RUST_QT_TESTS: ${{ github.workspace }}/build/rust-qt/Release/SwirlRustCoreTests.exe
+          SWIRL_TEST_ROOT: ${{ runner.temp }}/swirl-product-qt-tests
+          QT_FORCE_STDERR_LOGGING: '1'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not (Test-Path $env:SWIRL_RUST_HARNESS -PathType Leaf)) { throw 'Required product chain binary missing' }
+          if (-not (Test-Path $env:SWIRL_RUST_INSPECTOR -PathType Leaf)) { throw 'Required product chain binary missing' }
+          if (-not (Test-Path $env:SWIRL_RUST_QT_TESTS -PathType Leaf)) { throw 'Required product chain binary missing' }
+          New-Item -ItemType Directory -Force -Path $env:SWIRL_TEST_ROOT | Out-Null
+          python tools/tests/test_product_subscription_chain.py ProductQtIntegration -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Preserve subscription product qt evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-Product-Chain-${{ runner.os }}-qt-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swirl-product-chain-qt
+          if-no-files-found: error
+          retention-days: 14
       - name: Build complete native Rust application
         working-directory: .
         run: |

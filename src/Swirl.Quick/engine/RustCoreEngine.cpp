@@ -27,6 +27,14 @@ QString routingConfiguration(const EngineStartOptions &o,const QString &selected
  bool needsDirect=false,needsReject=false;int index=0;
  QHash<QString,QString> groups;QSet<QString> included{selected};
  const auto invalidGroup=[] {return QString("Rust 策略组参数无效或尚未支持；配置保持原值，未忽略该组。");};
+ const auto includeNode=[&](const QString &id){
+  if(id.isEmpty())return false;if(included.contains(id))return true;
+  // Both a rule leaf and a group member use the selected-node converter, so
+  // neither boundary can discard protocol, transport or authentication fields.
+  auto leaf=o;leaf.customGroups.clear();leaf.customRules.clear();leaf.routingMode="global";leaf.smartRouting=false;leaf.selectedNodeId=id;
+  QJsonObject config;if(!RustCoreEngine::configuration(leaf,&config).isEmpty())return false;
+  nodes->append(config.value("nodes").toArray().first());included.insert(id);return nodes->size()<=512;
+ };
  if(o.customGroups.size()>128)return "Rust 策略组数量超过限制。";
  // Allocate every name before resolving members so forward references have
  // the same meaning as backward references. Node IDs and group names may not
@@ -89,11 +97,7 @@ QString routingConfiguration(const EngineStartOptions &o,const QString &selected
     id=groups.value(member);edges[name].append(member);
    }
    else if(!included.contains(member)){
-    // Reuse precisely the same protocol validation as the top-level selection.
-    // Clearing groups/rules makes this a single bounded leaf conversion.
-    auto leaf=o;leaf.customGroups.clear();leaf.customRules.clear();leaf.routingMode="global";leaf.smartRouting=false;leaf.selectedNodeId=member;
-    QJsonObject config;if(!RustCoreEngine::configuration(leaf,&config).isEmpty())return invalidGroup();
-    nodes->append(config.value("nodes").toArray().first());included.insert(member);if(nodes->size()>512)return invalidGroup();
+    if(!includeNode(member))return invalidGroup();
    }
    memberIds.insert(member,id);mapped.append(id);
   }
@@ -147,6 +151,7 @@ QString routingConfiguration(const EngineStartOptions &o,const QString &selected
   else if(policy=="DIRECT"){outbound=direct;needsDirect=true;}
   else if(policy=="REJECT"){outbound=reject;needsReject=true;}
   else if(groups.contains(policy))outbound=groups.value(policy);
+  else if(includeNode(policy))outbound=policy;
   else return invalid();
   rules->append(QJsonObject{{"matcher",matcher},{"outbound",outbound}});
  }
@@ -337,7 +342,7 @@ void RustCoreEngine::selectNode(const QString &id){
  m_options=options;m_status.selectedNodeId=id;m_status.directSession=options.directSession||options.routingMode=="direct";m_status.requestState=RequestState::NotTested;refresh();
 }
 void RustCoreEngine::setRoutingMode(const QString &mode){
- if(!m_handle)return;auto options=m_options;options.routingMode=mode;QJsonObject config;const auto reason=configuration(options,&config);
+ if(!m_handle)return;auto options=m_options;options.routingMode=mode;options.directSession=mode=="direct";QJsonObject config;const auto reason=configuration(options,&config);
  if(!reason.isEmpty()){emit diagnostic("SwirlRust","RoutingUnsupported",reason);return;}
  const auto result=call({{"op","configure"},{"handle",qint64(m_handle)},{"config",config}});
  if(!result["ok"].toBool()){emit diagnostic("SwirlRust","RoutingFailed",result["error"].toString());return;}

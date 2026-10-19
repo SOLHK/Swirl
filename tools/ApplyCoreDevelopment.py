@@ -18,6 +18,9 @@ The Vision component stage requires both independent fixture checks, in order,
 with immediate Windows exit propagation, before any protocol peer can run.
 The Vision stream stage then builds its Release client and runs full Xray
 interoperability after the complete REALITY R3 gate, preserving both raw logs.
+The product stage runs subscription-to-target peers on every Rust platform and
+the persisted Qt wrapper on Windows, with Release preflights and exact-source
+evidence. Its separate steps preserve every existing protocol and build gate.
 It does not change permissions, secrets,
 existing actions, pull-request triggers or any product source.
 
@@ -85,6 +88,102 @@ VISION_BUILD_COMMAND = (
     "cargo build --manifest-path core/Cargo.toml --release --locked "
     "-p swirl-protocol --example vision-client"
 )
+PRODUCT_CHAIN_TEST = "test_product_subscription_chain.py"
+
+
+def product_chain_steps(windows: bool = False, qt: bool = False,
+                        artifact_prefix: str = "Swirl") -> str:
+    """Run the same committed subscription suite with exact Release identities."""
+    if qt and not windows:
+        raise ValueError("The product Qt wrapper is a Windows-only gate")
+    stage = "qt" if qt else "rust"
+    suffix = ".exe" if windows else ""
+    title = ("Subscription through persisted Qt product configuration" if qt
+             else "Subscription to native proxy and target")
+    names = ("SWIRL_RUST_HARNESS", "SWIRL_RUST_INSPECTOR")
+    environment = (
+        f"          SWIRL_RUST_HARNESS: ${{{{ github.workspace }}}}/core/target/release/swirl-api{suffix}\n"
+        f"          SWIRL_RUST_INSPECTOR: ${{{{ github.workspace }}}}/core/target/release/swirl-inspect{suffix}\n"
+        f"          SWIRL_PRODUCT_EVIDENCE: ${{{{ runner.temp }}}}/swirl-product-chain-{stage}\n"
+    )
+    if qt:
+        names += ("SWIRL_RUST_QT_TESTS",)
+        environment += (
+            "          SWIRL_RUST_QT_TESTS: ${{ github.workspace }}/build/rust-qt/Release/SwirlRustCoreTests.exe\n"
+            "          SWIRL_TEST_ROOT: ${{ runner.temp }}/swirl-product-qt-tests\n"
+            "          QT_FORCE_STDERR_LOGGING: '1'\n"
+        )
+    if windows:
+        body = "          $ErrorActionPreference = 'Stop'\n"
+        body += "".join(
+            f"          if (-not (Test-Path $env:{name} -PathType Leaf)) "
+            "{ throw 'Required product chain binary missing' }\n" for name in names)
+        if qt:
+            body += ("          New-Item -ItemType Directory -Force "
+                     "-Path $env:SWIRL_TEST_ROOT | Out-Null\n")
+    else:
+        body = "          set -euo pipefail\n"
+        body += "".join(f'          test -x "${name}"\n' for name in names)
+    selection = " ProductQtIntegration" if qt else ""
+    body += f"          python tools/tests/{PRODUCT_CHAIN_TEST}{selection} -v\n"
+    if windows:
+        body += WINDOWS_STATUS_GUARD
+    return (
+        f"      - name: {title}\n"
+        "        working-directory: .\n"
+        f"        shell: {'pwsh' if windows else 'bash'}\n"
+        "        env:\n" + environment + "        run: |\n" + body
+        + f"      - name: Preserve subscription product {stage} evidence\n"
+        "        if: always()\n"
+        "        uses: actions/upload-artifact@v4\n"
+        "        with:\n"
+        f"          name: {artifact_prefix}-Product-Chain-${{{{ runner.os }}}}-{stage}-"
+        "${{ github.sha }}-${{ github.run_attempt }}\n"
+        f"          path: ${{{{ runner.temp }}}}/swirl-product-chain-{stage}\n"
+        "          if-no-files-found: error\n"
+        "          retention-days: 14\n"
+    )
+
+
+def without_product_chain_steps(source: str) -> str:
+    """Accept a complete prior stage or all three exact product gates."""
+    markers = (PRODUCT_CHAIN_TEST, "SWIRL_PRODUCT_EVIDENCE", "Product-Chain-",
+               "Subscription to native proxy", "Subscription through persisted Qt")
+    if not any(marker in source for marker in markers):
+        return source
+    separator = "  windows-rust:\n"
+    if source.count(separator) != 1:
+        raise ValueError("Rust CI product job boundaries drifted; review required")
+    parts = source.split(separator)
+    for index, part in enumerate(parts):
+        blocks = [product_chain_steps(windows=bool(index))]
+        if index:
+            blocks.append(product_chain_steps(windows=True, qt=True))
+        for block in blocks:
+            if part.count(block) != 1:
+                raise ValueError("Rust CI product test/binary/evidence gate drifted; review required")
+            part = part.replace(block, "", 1)
+        if any(marker in part for marker in markers):
+            raise ValueError("Rust CI product stage is partial or duplicated; review required")
+        parts[index] = part
+    return separator.join(parts)
+
+
+def _add_product_chain_steps(source: str) -> str:
+    separator = "  windows-rust:\n"
+    parts = source.split(separator)
+    for index, part in enumerate(parts):
+        anchor = xray_steps(windows=bool(index))
+        if part.count(anchor) != 1:
+            raise ValueError("Rust CI product peer boundary drifted; review required")
+        part = part.replace(anchor, product_chain_steps(windows=bool(index)) + anchor, 1)
+        if index:
+            if part.count(NATIVE_APPLICATION_BUILD) != 1:
+                raise ValueError("Rust CI product Qt boundary drifted; review required")
+            part = part.replace(NATIVE_APPLICATION_BUILD,
+                                product_chain_steps(windows=True, qt=True) + NATIVE_APPLICATION_BUILD, 1)
+        parts[index] = part
+    return separator.join(parts)
 
 
 def xray_steps(windows: bool = False, artifact_prefix: str = "Swirl-REALITY-Xray") -> str:
@@ -658,6 +757,7 @@ def _vector_blocks(windows: bool) -> tuple[str, str, str]:
 
 def updated_workflow(source: str) -> str:
     """Validate the whole fixture stage before preserving every prior CI guard."""
+    source = without_product_chain_steps(source)
     source = without_vision_xray_steps(source)
     source = without_xray_steps(source)
     separator = "  windows-rust:\n"
@@ -680,7 +780,7 @@ def updated_workflow(source: str) -> str:
     for index, part in enumerate(parts):
         historical, _, complete = _vector_blocks(windows=index == 1)
         parts[index] = _replace_checked(part, historical, complete, "Vision fixture checks")
-    return _add_vision_xray_steps(_add_xray_steps(separator.join(parts)))
+    return _add_product_chain_steps(_add_vision_xray_steps(_add_xray_steps(separator.join(parts))))
 
 
 def validate_context(environment: Mapping[str, str]) -> None:
@@ -709,7 +809,7 @@ def prepare_update(repository: Path) -> tuple[Path, str, str]:
     before = path.read_text(encoding="utf-8")
     after = updated_workflow(before)
     for name in (*ADDITIONAL_TESTS, POLICY_TEST, *DNS_PROBE_TESTS, *CONNECTIVITY_IMPORT_TESTS,
-                 SOCKS5_UDP_TEST, *REALITY_TESTS):
+                 SOCKS5_UDP_TEST, *REALITY_TESTS, PRODUCT_CHAIN_TEST):
         if not (repository / "tools/tests" / name).is_file():
             raise ValueError(f"Required CI suite is missing: {name}")
     if not (repository / PUBLIC_PROBE).is_file():

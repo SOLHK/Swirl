@@ -1,12 +1,21 @@
 # Current handoff: subscription product chain (2026-10-19)
 
 Read [subscription → persisted selection → native forwarding](CORE_SUBSCRIPTION_PRODUCT_CHAIN_20261019.md)
-first. The S1 changes fix actual Rust/Qt parameter-loss boundaries and unreliable
-Windows allocation unit fixtures. Fixed acceptance remains 79 / 6 / 10.83%.
+first. S1 was actually pushed as
+[`292df3ba9763414947ec9b5dffa7886c45a00879`](https://github.com/SOLHK/Swirl/commit/292df3ba9763414947ec9b5dffa7886c45a00879):
+Rust/Qt parameter-loss boundaries and unreliable Windows allocation unit fixtures.
+S2 connects source-owned rule leaves, transactional node switching and explicit
+direct-mode semantics, with independent proxy-to-origin and Windows Qt/DPAPI
+product-object suites in CI. Fixed acceptance remains 79 / 6 / 10.83%.
 The expressly authorized new subscription was fetched once privately; its 59
 REALITY nodes (55 Vision) are retained and blocked, not counted as connected.
 No provider credentials or font/UI changes are part of this delivery. Exact
-new-source CI must be checked after push; the historical results below do not
+new-source CI must be checked after push. S1
+[Rust 39280252948](https://github.com/SOLHK/Swirl/actions/runs/39280252948) and
+[App 39280253098](https://github.com/SOLHK/Swirl/actions/runs/39280253098) were
+queued at the S2 checkpoint. Portable JSON test-host persistence must not be
+reported as product DPAPI persistence; the dedicated Windows wrapper supplies
+that evidence only when actually executed. The historical results below do not
 prove the new changes passed.
 
 ## Previous handoff: REALITY R3 and Vision record-boundary correction

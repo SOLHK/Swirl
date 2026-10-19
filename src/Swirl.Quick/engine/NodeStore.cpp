@@ -133,6 +133,14 @@ bool NodeStore::write(const QList<ProxyNode> &nodes, const QString &selected, co
     m_nodes=nodes; m_publicRows.clear(); m_selected=selected;m_subscriptions=subscriptions;m_networkConfiguration=networkConfiguration; m_error.clear(); ++m_revision; emit changed(); return true;
 }
 bool NodeStore::saveNode(const QVariantMap &input) {
+    // The editor/API boundary must obey the same scalar types as import. A
+    // QVariant conversion must not synthesize credentials or an SNI default.
+    for(const auto &key:QStringList{"username","password","cipher","serverName"})if(input.contains(key)&&input.value(key).metaType().id()!=QMetaType::QString){
+        m_error=QStringLiteral("凭据、加密方式和 TLS 名称必须为字符串；原节点保持不变。");return false;
+    }
+    if(input.contains("replaceCredentials")&&input.value("replaceCredentials").metaType().id()!=QMetaType::Bool){
+        m_error=QStringLiteral("替换凭据开关必须为布尔值；原节点保持不变。");return false;
+    }
     auto n=deserialize(input); auto nodes=m_nodes; int index=-1;
     if(input.contains("options") && input.value("options").metaType().id()!=QMetaType::QVariantMap){m_error=QStringLiteral("扩展选项须为 JSON 对象。");return false;}
     if (n.id.isEmpty()) n.id=QUuid::createUuid().toString(QUuid::WithoutBraces);
