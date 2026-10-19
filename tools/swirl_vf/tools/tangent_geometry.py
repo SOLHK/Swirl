@@ -1,9 +1,11 @@
 """Bounded HVF curve/corner/isolated-tangent evaluation after interpolation.
 
-Type 2 uses orthogonal projection onto the line through the two neighbouring
+Type 2 uses orthogonal projection onto the segment between the two neighbouring
 quadratic control points. This rule was inferred from 22 independently executed
 Apple libhvf experiments using ONLY self-authored geometry. Agreement on those
-experiments does not prove every Apple glyph or degenerate case is supported.
+experiments alone missed outside-segment cases. A later independent 48-case
+check exposed that limitation; the closest-segment bound is now explicit.
+These experiments do not prove every Apple glyph or degenerate case is supported.
 Types 3/4 and a collapsed Type-2 control line remain explicit errors.
 
 Input is one path (segments, 4), or batches (..., segments, 4), in the original
@@ -47,6 +49,11 @@ def resolve_path(segments, blends) -> np.ndarray:
             displacement = data[..., index, :2] - origin
             parameter = (np.sum(displacement * unit, axis=-1, keepdims=True)
                          / np.sum(unit * unit, axis=-1, keepdims=True))
+            # The initial infinite-line hypothesis failed 35 of 48 unseen native
+            # inputs, exactly the cases projecting outside the control segment.
+            # Keep the projection between its endpoints. Do not clamp original
+            # axis coordinates or replace the source outline with a scaled one.
+            parameter = np.clip(parameter, 0.0, scale)
             result[..., index, :2] = origin + parameter * unit
     if not np.isfinite(result).all():
         raise TangentGeometryError('nonfinite resolved geometry')

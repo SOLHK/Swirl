@@ -24,7 +24,7 @@ concurrency:
 
 jobs:
   native-tangent-diagnosis:
-    runs-on: macos-latest
+    runs-on: xcode-27
     timeout-minutes: 18
     steps:
       - uses: actions/checkout@v4
@@ -53,7 +53,7 @@ jobs:
         run: |
           set -euo pipefail
           python tools/swirl_vf/platform/probe_hierarchy_rules.py --binary build/hvf_oracle --output build/tangent-evidence/hierarchy.json --require-pass
-      - name: Verify projection with 48 independent new synthetic cases
+      - name: Verify all previous cases plus 54 unseen boundary cases
         if: ${{ always() && steps.native.outcome == 'success' }}
         run: |
           set -euo pipefail

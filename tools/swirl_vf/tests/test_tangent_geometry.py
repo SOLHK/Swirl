@@ -31,22 +31,29 @@ class TangentGeometryTests(unittest.TestCase):
                 index = blends.index(2)
                 np.testing.assert_allclose(result[index, 0], observed[name], rtol=0, atol=1e-12)
 
-    def test_projection_orthogonality_and_control_collinearity(self):
+    def test_projection_optimality_and_control_collinearity(self):
         rng = np.random.default_rng(873201)
         for _ in range(200):
             data = rng.normal(0, 500, (6, 4))
             result = resolve_path(data, [1,1,1,2,1,1]).reshape(-1,2,2)
             p, a, b = data[3,:2], data[2,2:], data[3,2:]
             actual = result[3,0]
-            self.assertAlmostEqual(float(np.dot(p-actual,b-a)), 0, delta=1e-8)
+            # Nearest-point optimality on a closed segment: residual has a
+            # nonpositive dot product with any feasible displacement. For an
+            # interior solution the usual orthogonality additionally holds.
+            self.assertLessEqual(float(np.dot(p-actual,a-actual)), 1e-8)
+            self.assertLessEqual(float(np.dot(p-actual,b-actual)), 1e-8)
+            t=float(np.dot(p-a,b-a)/np.dot(b-a,b-a))
+            if 0 < t < 1:
+                self.assertAlmostEqual(float(np.dot(p-actual,b-a)), 0, delta=1e-8)
             self.assertAlmostEqual(float(np.linalg.det(np.stack([actual-a,b-a]))), 0, delta=1e-8)
             np.testing.assert_array_equal(result[:,1], data[:,2:])
             np.testing.assert_array_equal(result[[0,1,2,4,5],0], data[[0,1,2,4,5],:2])
 
-    def test_projection_is_on_infinite_line_not_clamped_segment(self):
+    def test_outside_projection_stops_at_control_segment_endpoint(self):
         data = np.zeros((3,4));data[0,2:]=[0,0];data[1,2:]=[10,0];data[1,:2]=[30,17]
         result = resolve_path(data, [1,2,1])
-        np.testing.assert_allclose(result[2], [30,0], rtol=0, atol=1e-12)
+        np.testing.assert_allclose(result[2], [10,0], rtol=0, atol=1e-12)
 
     def test_batch_matches_scalar_and_does_not_mutate_input(self):
         _, blends, base = cases()[2]
@@ -68,7 +75,7 @@ class TangentGeometryTests(unittest.TestCase):
 
     def test_short_nonzero_lines_are_not_discarded(self):
         data = np.zeros((3,4));data[1,2:]=[1e-150,0];data[1,:2]=[3e-150,2e-150]
-        result=resolve_path(data,[1,2,1]);np.testing.assert_allclose(result[2],[3e-150,0],rtol=1e-12,atol=0)
+        result=resolve_path(data,[1,2,1]);np.testing.assert_allclose(result[2],[1e-150,0],rtol=1e-12,atol=0)
 
     def test_degenerate_unsupported_and_malformed_paths_fail_explicitly(self):
         for tags in ([1,3,4], [1,2,1], [1,True,1]):

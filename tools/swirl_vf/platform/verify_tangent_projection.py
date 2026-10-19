@@ -2,7 +2,8 @@
 """Verify implemented isolated tangents against native data, never release a font.
 
 Recorded input is restricted to the 22 self-authored experiments from the first
-native run. Fresh native verification adds 48 new transformed/perturbed cases.
+native run. Fresh verification retains the 48 previously independent cases and adds
+54 unseen explicit boundary cases; none of the failing inputs is removed.
 An optional original-source mode writes AGGREGATES ONLY, never Apple outlines.
 """
 from __future__ import annotations
@@ -53,6 +54,28 @@ def extra_cases():
         yield f'independent_{n}', tags, data
 
 
+def boundary_cases():
+    """New exact boundary/near-boundary points, not used to infer clamping."""
+    _, tags, base = cases()[0]
+    parameters = (-4., -1e-6, 0., 1e-6, .5, 1.-1e-6, 1., 1.+1e-6, 4.)
+    for angle in (0., .371, -1.2):
+        c, s = np.cos(angle), np.sin(angle)
+        rotation = np.array([[c,-s],[s,c]])
+        a, b = np.array([120.,-40.]), np.array([160.,180.])
+        direction = b-a
+        normal = np.array([-direction[1], direction[0]])
+        normal /= np.linalg.norm(normal)
+        for t in parameters:
+            for displacement in (-173., 229.):
+                data = base.copy()
+                data[2,2:] = a; data[3,2:] = b
+                data[3,:2] = a+t*direction+displacement*normal
+                for index, tag in enumerate(tags):
+                    if tag != 0: data[index,:2] = data[index,:2] @ rotation.T
+                data[:,2:] = data[:,2:] @ rotation.T
+                yield f'boundary_{angle}_{t}_{displacement}', tags, data
+
+
 def native_events(binary, font, coordinate, gid=0):
     result = subprocess.run([str(binary.resolve()), str(font.resolve()), '0',
                              ','.join(map(str, coordinate)), str(gid), '1'],
@@ -94,16 +117,18 @@ def verify_synthetic(binary):
     errors = []
     with tempfile.TemporaryDirectory(prefix='swirl-type2-independent-') as directory:
         font = Path(directory) / 'synthetic.ttf'; create(font)
-        for name, tags, data in cases() + list(extra_cases()):
+        for name, tags, data in cases() + list(extra_cases()) + list(boundary_cases()):
             with TTFont(font, recalcBBoxes=False, recalcTimestamp=False) as f:
                 table = newTable('hvgl'); table.data = encode_shape(tags, data); f['hvgl'] = table
                 pending = Path(directory) / 'next.ttf'; f.save(pending)
             pending.replace(font)
             events = native_events(binary, font, [0, 0, 0])
             error = point_error([resolve_path(data, tags)], native_quadratics(events))
-            errors.append({'case': name, 'max_point_error': error, 'passed': error <= LIMIT})
+            errors.append({'case': name, 'max_point_error': error, 'passed': error <= LIMIT,
+                           'synthetic_input_blends': tags, 'synthetic_input_master': data.tolist(),
+                           'synthetic_native_events': events})
     return {'status': 'NATIVE_SYNTHETIC_PASS' if all(x['passed'] for x in errors) else 'NATIVE_SYNTHETIC_FAILED',
-            'cases': len(errors), 'independent_cases': 48, 'failures': sum(not x['passed'] for x in errors),
+            'cases': len(errors), 'prior_independent_cases_retained': 48, 'new_boundary_cases': 54, 'failures': sum(not x['passed'] for x in errors),
             'max_point_error': max(x['max_point_error'] for x in errors), 'results': errors,
             'original_font_acceptance': 'NOT_RUN', 'tolerance_font_units': LIMIT}
 
@@ -150,7 +175,7 @@ def verify_source(binary, source):
             'coverage': coverage, 'positions': len(positions), 'glyph_instances': count,
             'passed': count-len(failures), 'failures': len(failures), 'by_glyph': by_gid,
             'max_point_error': maximum, 'failure_reasons': reasons, 'failure_examples': failures[:16],
-            'type2_interpretation': 'implemented_orthogonal_control_line_projection',
+            'type2_interpretation': 'implemented_closest_control_segment_projection',
             'tolerance_font_units': LIMIT, 'source_outlines_published': False,
             'scope': 'sampled_design_geometry_only_no_avar_metrics_or_Windows', 'final_font_generated': False}
 
