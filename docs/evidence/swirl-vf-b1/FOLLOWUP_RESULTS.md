@@ -26,7 +26,8 @@ CoreText changes the coordinate or that outline interpolation used 0.8281.
 
 Only the synthetic fvar HGHT user range was reparameterized by 16384; all
 normalized coordinates and frozen predictions stayed unchanged. The successful
-run contains 16 fixtures, **550 unique coordinates, 1,100 raw records and 550
+run contains 16 fixtures, **550 fixture-coordinate observations (52 distinct
+normalized coordinate pairs), 1,100 raw records and 550
 exact forward/reverse pairs**. All font/table, requested user-axis, size and
 matrix identity guards remain strict.
 
@@ -35,6 +36,8 @@ the corresponding new-unit rows: **204/204 channel comparisons**, including
 binary64 bits, across direct advances, vertical translation, witness path and
 vertical layout. The earlier failed 52nd row remains unmeasured and unpaired;
 the old partial report is never promoted to native acceptance.
+Font-identity objects are excluded from the cross-unit channel comparison and
+are independently verified against each variant's own source table bytes.
 
 All 550 witness WDTH inferences match exactly. The 448 geometrically observable
 HGHT inferences match exactly. The other 102 records are explicitly
@@ -72,7 +75,7 @@ universal nondefault minus-one rule:
 | 1000 | 1125 | 1124 | 1124.21875 |
 | 1024 | 1125 | 1124 | 1124.21875 |
 
-The original endpoint phenomenon is explained by the same candidate: the
+The first-stage synthetic endpoint observation is explained by the same candidate: the
 stored/interpolated phantom difference 850 yields native 849 at UPEM 1000 but
 850 at UPEM 1024. VVAR changes the height computation path; it gives 850 at that
 endpoint but truncates fractional heights elsewhere. Neither observation is a
