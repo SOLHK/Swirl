@@ -855,6 +855,150 @@ magnitudes must be measured first; a nonzero split alone is not a proof that
 both sides cannot fit the1/32 budget. `standard_format_impossibility_proved`
 remains false.
 
+## A2 completed bounded closure: actual all-face and historical-141 evidence
+
+Exact source **`b549ccdf0c28ec4d38ecc3893f2d149049882970`**, native
+[39391013239](https://github.com/SOLHK/Swirl/actions/runs/39391013239), job
+118522247190, is now **completed/success**. The actual checkout/log, final
+termination and downloaded artifact12250517308 were checked independently.
+ZIP: 5,127,487 bytes, SHA-256
+`e29c2b663330845e16135ec35e760f7a4cf70a99814db0e4ff9e2ac30404f018`;
+safe JSON SHA-256
+`9440365ac6f57461fc2cbeeb802ebf849b1b7e4953d0f16a9561f101c51c4bb9`.
+The exact-commit production extractor and regenerated diagnostic harness hashes
+match the artifact: respectively
+`8e5aaa0a921f24a656766c1e24a0d388397cdaddbdfebae1ab415c0d7c3f3bbf` and
+`d7cd31edb8d3579d8b251c221a09da65ff4f6a96330d251c3f44f6136d43a0fd`.
+
+Six processes each verified all32 source faces and finished with 10,712
+requests, 53,560 records, zero errors, valid summary/EOF, exit0 and unchanged
+source. Total: **64,272 requests / 321,360 actual records**;
+**160,680/160,680 opposite-order payload pairs exact**, **32,136 replay batches,
+zero failures**. Identical face/GID/design references use 1,098 unique actual
+HVF calls; comparison counts below must not be described as unique native calls.
+
+The archive audit independently rebuilt every row's face/index/global ID,
+binary64 location hash, historical location/q hash, original fixture hashes
+and historical141 membership. All recomputed fields equal the embedded audit.
+Production exactly reproduces **3048/3048 historical inferred q values**.
+Each anchor changes exactly36 historical q values, faces20-31 at wght400.01,
+from -4915 to -4914; these actual changes are retained, not substituted into
+the immutable archive. Each anchor's fixed candidate matches its actual q and
+HVAR exactly on **3048/3048** historical rows. Historical portable comparisons:
+**15,240/15,240** within1/32, maximum5.684341886080801e-13; the two legacy type
+failures remain separately visible. The historical direct subset contains
+185 positions /370 zero-error checks per anchor.
+
+For the specific old141 disagreements, **each anchor** has candidate/archive/
+current q agreement141/141, exact HVAR141/141, portable705/705 with maximum
+3.410605131648481e-13, and **282/282 direct Apple HVF comparisons exactly zero**
+(all141 positions, GIDs5 and19177). No old case is absent and
+`historical_unresolved_rows=[]`. This closes that finite historical discrepancy
+set using both metrics and direct native outlines. Production control has no
+candidate direct-HVF checks for this subset; do not assign the anchors'282
+checks to production. No raw avar records, duplicates or production algorithms
+were altered. The model is the already predeclared C=T(T(x)), double
+normalization, float32 only on the normalized result, truncation to16-bit
+normalized grid, original ordered avar evaluation and final F2DOT14 rounding.
+This remains an empirical bounded explanation, not proof of Apple's internal
+implementation or continuous-space equivalence.
+
+Across all5356 positions, each anchor has **5355/5356 exact HVAR**, zero HVAR
+errors above1/32, portable **26,780/26,780** within1/32 (maximum
+0.011959285366742733), and **1050/1050 direct HVF checks exactly zero** on the
+525 positions selected before execution. Sixteen legacy type rejections remain;
+the preserved original Q/Q comparisons pass without deleting those fields.
+Both anchors'26,780 raw payload/readback pairs are identical. They differ from
+production at880 glyph payloads /176 positions despite identical readbacks.
+
+The sole new nonexact HVAR case is **face18, fresh_triple_7**:
+WDTH395.1762070327519, wght493.5928547043863, HGHT579.3731774437933.
+Raw readback is395.1762/493.5928/579.3731; the declared design coordinate is
+(-0.21002197265625,-0.0084228515625,0.15875244140625).
+Maximum metric error **0.01220703125**, largest portable point error
+**0.011959285366742733**. It has no conditional HVAR inferred q and is **not**
+in the predeclared direct-HVF subset. Do not claim direct native equality or
+fit a special-case rule. All production/continuous-space acceptance flags stay
+false. The same closure repeat39392843365 at9f is still running at this
+evidence checkpoint and is not counted as a pass.
+
+## A3 actual input-resolution obstruction: conditional, measured scalar bound
+
+Exact source **`53ca5ff74e17bfc65e338b460fa2fc4df3801c1d`** was non-forced pushed
+and independently confirmed at remote HEAD before native launch.
+[39394042127](https://github.com/SOLHK/Swirl/actions/runs/39394042127), job
+118532235960, finished **success** as a diagnostic, not font acceptance.
+Actual log and artifact12250677333 were read; ZIP29,479 bytes, SHA-256
+`3ca3783288dc72aecc69a5c4ba15d7f24d5ed4b592e29bf9be9af2e3ad728541`.
+Six processes verify all32 source identities, zero errors/exit0, valid
+summary/EOF and unchanged source. They complete **72 requests /2520 records**,
+**1260/1260 opposite-order pairs exact**, **36 replay batches, zero failures**.
+
+All six cases, both candidates, the three constructors and controls were fixed
+before launch. On face15 with WDTH=HGHT500, the two distinct binary64 requests
+499.006199 and499.006201 both convert to standard16.16 integer **32702870**
+(exact value499.006195068359375). All three actual constructors return respective
+echoes499.0061 and499.0062 and conditional HVAR design-grid integers **0 and65**.
+The default499, canonical_low499.0061 and shared_fixed_input controls produce
+q0; canonical_high499.0062 produces q65. Both predeclared models match all six
+native metric observations exactly. No model was fitted after this measurement.
+
+For each constructor and each model, portable/native **210/210** comparisons
+pass, maximum5.684341886080801e-13; the selected **12/12 direct Apple HVF checks
+are exactly zero** (six locations times GIDs5 and19177). Conditional references
+also match. Only **four unique HVF calls** are needed because identical
+face/GID/design observations are reused; do not claim108 distinct native calls.
+Structural coverage remains35 GIDs,13/13 Type2 shapes, depth12 and four rotation
+roots; this is not all47,102 GIDs.
+
+The pair produces genuinely different raw payloads for **31/35 glyphs**, in all
+three constructors. Most decisively, **GID5's measured horizontal advance differs
+by0.5474853515625 FUnit**. Its vector and total advance differences agree.
+The largest reported preserved-Q control difference is0.5025888150435662 atGID82;
+that control difference is not used as a Hausdorff lower-bound proof. Vertical
+advance/origins and horizontal origins have zero differences for this pair.
+
+Let the two measured source widths be a and b. Any deterministic target which
+first maps both requests to the same standard16.16 input must return one common
+width t. By the scalar triangle inequality,
+`max(abs(t-a), abs(t-b)) >= abs(a-b)/2 = 0.27374267578125 FUnit`.
+This is **8.759765625 times the unchanged1/32 budget**. The premise is explicit:
+the target discards the distinguishing input precision before normalization.
+The [official input-normalization rule](https://learn.microsoft.com/en-us/typography/opentype/spec/otvaroverview#coordinate-scales-and-normalization)
+specifies16.16 input and nearest/ties-higher conversion. The observed source
+split is independent of the descriptor-base plateau, since all three
+constructors reproduce it.
+
+This is a concrete **conditional input-boundary obstruction**, not a claim that
+every OpenType renderer follows this exact internal path or that all conceivable
+standard representations are impossible. No actual Windows/Qt target input
+path has been tested here. Keep `standard_format_impossibility_proved=false`,
+`mapping_accepted=false`, `continuous_space_accepted=false`, and
+`font_generated=false`. Do not silently smooth the discontinuity, change the
+three original axes, reinterpret user values or promote the candidate to a
+full-space production mapper. The actual scalar lower bound, rather than API
+echo strings alone, is the reason full reconstruction remains gated.
+
+Changed source files for53ca: `platform/probe_axis_input_resolution.py`,
+`tests/test_axis_input_resolution.py`, `.github/workflows/swirl-vf-axis-input-resolution.yml`,
+and both handoffs. Local frozen regressions448/448, zero skips,6/6 audits passed.
+Same-source [39394041915](https://github.com/SOLHK/Swirl/actions/runs/39394041915)
+is final: Python job118532235602 succeeds (448 tests, seven optional HarfBuzz
+skips; actual log read), Windows118532235923 succeeds, Apple118532235918 fails.
+The actual Apple log preserves22/22 Swift guards and raw face0/GID2 minimum
+height **849 versus850** at0.03125. No new B-stage repair is claimed.
+
+Two9f diagnostic repeats also finalized and were downloaded/hash-checked:
+counterexamples[39392843315](https://github.com/SOLHK/Swirl/actions/runs/39392843315),
+artifact12249944101, ZIP SHA
+`c7cb4b7bbd4120150a018794dff5bac6446604188c96241eb14d76d40917d94f`;
+plateau[39392843375](https://github.com/SOLHK/Swirl/actions/runs/39392843375),
+artifact12250795873, ZIP SHA
+`e5425070887df66fb7a8cfbf2d1e1d02c4cf281f663c32a384e1b801b7eacff5`.
+Each safe JSON is byte-identical to its prior native result after replacing
+only source_commit: no measured shared-transport regression from the rebuild
+admission guard. Historical type refusals and diagnostic limitations remain.
+
 ## Newly retrieved prior evidence (not new execution in this continuation)
 
 - At exact source `056f7ea6dc7cf3a703da63e8522b89d33d1166f4`,
@@ -879,10 +1023,15 @@ remains false.
 
 ## Next smallest task and unchanged blockers
 
-With the bounded A1 result recorded, continue A2 with the existing raw-order
-avar diagnostics and independent native outlines/HVAR. Do not replace the 141
-questions with a formula fitted only to archived advances. Preserve all raw
-records and duplicates and the 1/32 geometry threshold.
+The old141 sample set now has independent direct-native closure as recorded
+above; do not repeat that completed work. A3 retains the measured conditional
+input-resolution obstruction and the one new mixed-axis nonexact point. A
+small original standard-font target probe can check actual platform input
+precision. B1's smallest unrun discriminator is UPEM1000 versus1024 with identical
+phantom coordinates, default height1000 and minimum850, measured at each font's
+own UPEM size. Keep both model predictions and raw actual values; do not repeat
+the already completed size/CTRun/VVAR/static trials or compensate by a constant.
+Obtain the still-running9f closure repeat's final status before claiming it.
 
 The 849/850 raw metric failure, independent vertical X-origin representation,
 all-face/all-GID reconstruction, Windows 11 and Qt/Swirl acceptance remain
