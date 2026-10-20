@@ -44,17 +44,18 @@ jobs:
           python-version: '3.12'
       - name: Dependencies and independent synthetic tests
         run: |
-          python -m pip install fonttools==4.61.1 numpy==2.2.6
+          python -m pip install fonttools==4.61.1 numpy==2.2.6 uharfbuzz==0.56.3
+          python -c "import importlib.metadata; import uharfbuzz; print('uharfbuzz=' + importlib.metadata.version('uharfbuzz'))"
           python -m unittest discover -s tools/swirl_vf/tests -v
           python -m unittest discover -s tools/swirl_vf/audit -p 'test_*.py' -v
-      - name: No private font data is tracked
+      - name: Check prohibited font-data extensions
         run: |
           python - <<'PY'
           import subprocess
           paths=subprocess.check_output(['git','ls-files','tools/swirl_vf'],text=True).splitlines()
           forbidden=[p for p in paths if p.lower().endswith(('.ttc','.ttf','.otf','.woff','.woff2','.jsonl'))]
           if forbidden: raise SystemExit('Private-font publication guard: '+str(forbidden))
-          print('Only source/docs and original fixture generators are tracked.')
+          print('Extension guard passed for tools/swirl_vf; JSON/ZIP contents require separate privacy review.')
           PY
 
   apple-oracles:
