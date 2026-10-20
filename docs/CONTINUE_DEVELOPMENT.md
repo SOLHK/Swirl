@@ -1,3 +1,12 @@
+## Resumed subscription source checkpoint (2026-10-20)
+
+Recovered the interrupted source and corrected two additional reproduced URI
+boundaries. Final local Rust: 324 tests plus one doctest; focused production Qt
+parser: 58/58 malformed cases blocked with originals preserved. Windows DPAPI
+and new exact-source CI are pending; private suppliers remain untested. Read
+[the current subscription checkpoint](CORE_RESUMED_SUBSCRIPTION_20261020.md).
+Concurrent font commits through 72f1c20 are preserved. **79 / 6 / 10.83%** unchanged.
+
 # Current handoff: subscription product chain (2026-10-19)
 
 ## Combined native REALITY + Vision continuation (2026-10-20)

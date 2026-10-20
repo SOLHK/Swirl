@@ -1,4 +1,5 @@
 #include "NodeStore.h"
+#include "NodeImporter.h"
 #include "../app/StoragePaths.h"
 #include <QDir>
 #include <QFile>
@@ -51,6 +52,18 @@ static ProxyNode deserialize(const QVariantMap &m) {
     n.parameters=QJsonObject::fromVariantMap(m.value("options").toMap());n.sourceId=m.value("sourceId").toString();
     n.originalConfiguration=QJsonObject::fromVariantMap(m.value("originalConfiguration").toMap());
     n.sourceFormat=m.value("sourceFormat").toString();n.conversionIssues=m.value("conversionIssues").toStringList();
+    // A previous importer may have accepted a URI while losing an unsupported
+    // source field from its normalized options. Recheck the preserved source
+    // with today's parser; capability changes must not authorize that loss.
+    // This only adds bounded diagnostics in memory. Keep the stored parameters,
+    // identity, selection and original document, and never rewrite on load.
+    if(n.originalConfiguration.contains("uri")){
+        const auto source=n.originalConfiguration.value("uri");
+        const auto parsed=source.isString()?NodeImporter::parse(source.toString().toUtf8()):NodeImporter::Result{};
+        const auto issues=parsed&&parsed.nodes.size()==1?parsed.nodes.first().conversionIssues:
+            QStringList{QStringLiteral("保存的原始 URI 无法通过当前导入校验；原始字段已保留，拒绝执行。")};
+        for(const auto &issue:issues)if(!n.conversionIssues.contains(issue)&&n.conversionIssues.size()<32)n.conversionIssues.append(issue);
+    }
     if(n.cipher.isEmpty())n.cipher=n.parameters.value("cipher").toString();
     return n;
 }

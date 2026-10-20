@@ -260,6 +260,25 @@ fn uri(line: &str) -> Result<Value, &'static str> {
     if matches!(u.scheme(), "socks4" | "socks4a") && !matches!(u.path(), "" | "/") {
         return Err("Socks4UriPath");
     }
+    if u.scheme() == "vless" {
+        // The official sharing syntax has a UUID authority and query-based
+        // transport paths: https://github.com/XTLS/Xray-core/discussions/716
+        // Do not discard an extra password or URL path before native mapping.
+        if u.password().is_some_and(|password| !password.is_empty()) {
+            return Err("VlessUriPassword");
+        }
+        // url::Url shortens dot segments before exposing path(). Inspect the
+        // original path so /private/.. and encoded dots cannot become a neutral
+        // slash and erase a source requirement before candidate validation.
+        let authority_and_path = line.split_once("://").ok_or("UriSyntax")?.1;
+        let before_query = authority_and_path.split(['?', '#']).next().unwrap_or("");
+        let original_path = before_query
+            .find('/')
+            .map_or("", |start| &before_query[start..]);
+        if !matches!(original_path, "" | "/") {
+            return Err("VlessUriPath");
+        }
+    }
     // URL serialization brackets IPv6 addresses; the typed IR expects an IP
     // literal, not an authority. Keep the exact URI in raw-uri for preservation.
     let host = match u.host().ok_or("UriHost")? {
@@ -366,6 +385,19 @@ fn uri(line: &str) -> Result<Value, &'static str> {
             return Err("ConflictingUriParameter");
         }
         n[key] = value;
+    }
+    // v2rayN explicitly exports headerType=none for RAW/TCP sharing URIs:
+    // https://github.com/2dust/v2rayN/blob/66dd7da6e69b3bcad51115d1c7d5e017b7ef0dd0/v2rayN/ServiceLib/Handler/Fmt/BaseFmt.cs
+    // Independently map that declared neutral option only at this URI boundary.
+    // raw-uri keeps its exact spelling; other headers and their extra fields
+    // stay present for strict capability rejection, including on non-TCP nodes.
+    if n["type"] == "vless"
+        && n["security"] == "reality"
+        && n.get("network")
+            .is_none_or(|value| value.as_str() == Some("tcp"))
+        && n.get("headerType").and_then(Value::as_str) == Some("none")
+    {
+        n.as_object_mut().expect("URI node").remove("headerType");
     }
     Ok(n)
 }

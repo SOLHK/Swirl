@@ -210,3 +210,129 @@ fn browser_profile_alpn_is_fixed_while_native_rustls_keeps_custom_alpn() {
         json!(["custom"])
     );
 }
+
+#[test]
+fn reality_uri_explicit_no_header_preserves_profile_and_original() {
+    let key = URL_SAFE_NO_PAD.encode([9; 32]);
+    for fingerprint in ["chrome", "chrome_133", "rustls"] {
+        let plain = format!(
+            "vless://00112233-4455-6677-8899-aabbccddeeff@proxy.invalid:443?security=reality&sni=camouflage.invalid&fp={fingerprint}&pbk={key}&sid=a1B2&type=tcp&flow=xtls-rprx-vision"
+        );
+        let expected = candidate(&plain);
+        let explicit = format!("{plain}&headerType=none");
+        for input in [explicit.clone(), STANDARD.encode(&explicit)] {
+            assert_eq!(candidate(&input), expected);
+            let parsed = inspect(input.as_bytes());
+            assert_eq!(parsed.originals[0]["raw-uri"], explicit);
+            assert_eq!(parsed.report.nodes[0].unrecognized_fields, 0);
+        }
+    }
+}
+
+#[test]
+fn reality_uri_header_mapping_does_not_discard_transport_requirements() {
+    let key = URL_SAFE_NO_PAD.encode([9; 32]);
+    let plain = format!(
+        "vless://00112233-4455-6677-8899-aabbccddeeff@proxy.invalid:443?security=reality&sni=camouflage.invalid&fp=chrome&pbk={key}&sid=a1B2&type=tcp&flow=xtls-rprx-vision"
+    );
+    for suffix in [
+        "&headerType=http",
+        "&headerType=",
+        "&headerType=None",
+        "&headerType=none&path=%2Fprivate-path",
+        "&headerType=none&host=private-host.invalid",
+        "&headerType=none&spx=%2Fprivate-path",
+        "&headerType=none&headerType=none",
+        "&headerType=none&headerType=http",
+        "&headerType=none&network=ws",
+    ] {
+        let uri = format!("{plain}{suffix}");
+        for input in [uri.clone(), STANDARD.encode(&uri)] {
+            let parsed = inspect(input.as_bytes());
+            assert_eq!(parsed.original, input.as_bytes());
+            assert!(parsed.tcp_candidates.iter().all(Option::is_none));
+            assert!(
+                parsed
+                    .report
+                    .nodes
+                    .iter()
+                    .all(|node| !node.native_tcp_candidate && !node.real_network_verified),
+                "accepted {suffix}"
+            );
+            let report = serde_json::to_string(&parsed.report).unwrap();
+            assert!(!report.contains("private-path") && !report.contains("private-host"));
+        }
+    }
+    // headerType is a sharing-URI field, not a sing-box or Clash option.
+    // Even an explicit neutral value must not expand those source formats.
+    for value in [
+        json!("none"),
+        json!(false),
+        Value::Null,
+        json!([]),
+        json!({}),
+    ] {
+        let mut source = sing_box("chrome");
+        source["headerType"] = value;
+        rejected(&source, "RealityUnmappedFields");
+        // A source-supplied provenance-looking field cannot bypass the actual
+        // URI parser when the outer document is JSON, including Base64 JSON.
+        source["raw-uri"] = json!(format!("{plain}&headerType=none"));
+        rejected(&source, "RealityUnmappedFields");
+    }
+}
+
+#[test]
+fn vless_uri_unmapped_authority_and_path_fail_before_candidate_mapping() {
+    let key = URL_SAFE_NO_PAD.encode([9; 32]);
+    let plain = "vless://00112233-4455-6677-8899-aabbccddeeff@proxy.invalid:443";
+    let security = format!(
+        "?security=reality&sni=camouflage.invalid&fp=chrome&pbk={key}&sid=a1B2&type=tcp&flow=xtls-rprx-vision"
+    );
+    for options in ["", security.as_str()] {
+        for (source, expected) in [
+            (plain.replace('@', ":private-password@"), "VlessUriPassword"),
+            (
+                plain.replace('@', ":%70rivate-password@"),
+                "VlessUriPassword",
+            ),
+            (format!("{plain}/private-path"), "VlessUriPath"),
+            (format!("{plain}/%70rivate-path"), "VlessUriPath"),
+            (format!("{plain}/private-path/.."), "VlessUriPath"),
+            (format!("{plain}/private-path/%2e%2e"), "VlessUriPath"),
+            (format!("{plain}/."), "VlessUriPath"),
+            (format!("{plain}/%2e"), "VlessUriPath"),
+            (format!("{plain}//"), "VlessUriPath"),
+        ] {
+            let uri = source + options;
+            for input in [uri.clone(), STANDARD.encode(&uri)] {
+                let parsed = inspect(input.as_bytes());
+                assert_eq!(parsed.original, input.as_bytes());
+                assert!(!parsed.report.parsed);
+                assert_eq!(parsed.report.error, Some(expected));
+                assert!(parsed.tcp_candidates.is_empty());
+                let report = serde_json::to_string(&parsed.report).unwrap();
+                for private in ["private", "proxy.invalid", "00112233", key.as_str()] {
+                    assert!(!report.contains(private));
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn vless_uri_neutral_root_path_keeps_the_same_authenticated_outbound() {
+    let key = URL_SAFE_NO_PAD.encode([9; 32]);
+    let authority = "vless://00112233-4455-6677-8899-aabbccddeeff@proxy.invalid:443";
+    let security = format!(
+        "?security=reality&sni=camouflage.invalid&fp=chrome&pbk={key}&sid=a1B2&type=tcp&flow=xtls-rprx-vision"
+    );
+    let expected = candidate(&format!("{authority}{security}"));
+    for source in [authority.to_owned(), authority.replace('@', ":@")] {
+        let uri = format!("{source}/{security}");
+        for input in [uri.clone(), STANDARD.encode(&uri)] {
+            assert_eq!(candidate(&input), expected);
+            assert_eq!(inspect(input.as_bytes()).originals[0]["raw-uri"], uri);
+        }
+    }
+}

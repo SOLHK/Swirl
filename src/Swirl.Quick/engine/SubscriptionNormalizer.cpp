@@ -103,7 +103,15 @@ void uri(Result &r,const QString &line){
         const auto at=auth.indexOf(':');if(at<=0){r.error="SIP002 节点缺少加密方式或密码。";return;}
         node["cipher"]=auth.left(at);node["password"]=auth.mid(at+1);
     }else if(p=="trojan"){node["password"]=userInfo(url);}
-    else if(p=="vless"){node["uuid"]=url.userName(QUrl::FullyDecoded);}
+    else if(p=="vless"){
+        node["uuid"]=url.userName(QUrl::FullyDecoded);
+        // The VLESS sharing format authenticates with the UUID alone. Neither
+        // an extra URI password nor a URI path has a mapped meaning.
+        if(!url.password(QUrl::FullyDecoded).isEmpty())
+            issue(issues,"VLESS URI 含未映射的额外密码；原始参数已保留，不能忽略后连接。");
+        if(!url.path().isEmpty()&&url.path()!="/")
+            issue(issues,"VLESS URI 含未映射的地址路径；原始参数已保留，不能忽略后连接。");
+    }
     else {
         node["username"]=url.userName(QUrl::FullyDecoded);node["password"]=url.password(QUrl::FullyDecoded);
         if(p!="socks4"&&p!="socks4a"&&url.password().isEmpty()&&!url.userName().isEmpty()){
@@ -149,7 +157,8 @@ void uri(Result &r,const QString &line){
         else if(key=="udp")node["udp"]=typed;
         else if(key=="pbk"||key=="sid"){auto reality=node.value("reality-opts").toObject();reality[key=="pbk"?"public-key":"short-id"]=value;node["reality-opts"]=reality;}
         else if(key=="encryption"&&value!="none")issue(issues,"VLESS URI 的加密扩展尚未映射。");
-        else if((key=="headerType"||key=="quicSecurity")&&!value.isEmpty()&&value!="none")issue(issues,"URI 的附加伪装或 QUIC 加密选项尚未映射。");
+        else if(key=="headerType"&&value!="none")issue(issues,"URI 的 headerType 仅支持 TCP 的 none；原始参数已保留，不能忽略后连接。");
+        else if(key=="quicSecurity"&&!value.isEmpty()&&value!="none")issue(issues,"URI 的附加伪装或 QUIC 加密选项尚未映射。");
         else if(key=="plugin"){
             auto fields=value.split(';');auto plugin=fields.takeFirst();QJsonObject opts;
             const bool obfs=plugin=="obfs-local"||plugin=="simple-obfs"||plugin=="obfs";
@@ -173,6 +182,17 @@ void uri(Result &r,const QString &line){
     }else if(node.contains("reality-opts")){
         r.error="节点 URI REALITY 参数与安全层冲突；未应用配置。";return;
     }
+    if(network.isEmpty()&&(queryKeys.contains("type")||queryKeys.contains("network")))
+        issue(issues,"URI 显式传输类型为空；原始参数已保留，不能当作省略后连接。");
+    if(queryKeys.contains("headerType")&&!network.isEmpty()&&network!="tcp")
+        issue(issues,"此传输不支持 URI 的 headerType；原始参数已保留，不能忽略后连接。");
+    // These are transport requirements, not decorative URI metadata. The
+    // ordinary TCP mapper cannot implement an HTTP path/Host or gRPC service.
+    // Even an explicitly empty value must not disappear into a TCP default;
+    // retain the complete original and prevent this node from being executed.
+    if((network.isEmpty()||network=="tcp")&&
+       (queryKeys.contains("path")||queryKeys.contains("host")||queryKeys.contains("serviceName")))
+        issue(issues,"TCP URI 的 path、host 或 serviceName 尚未映射；原始参数已保留，不能忽略后连接。");
     transport(node,network,path,host,issues);append(r,node,QJsonObject{{"uri",line}},issues);
 }
 // Match the closed Xray subset in swirl-subscription/inspect_reality_xray.rs.

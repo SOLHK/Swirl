@@ -53,6 +53,121 @@ class ImportTests:public QObject {
     Q_OBJECT
 private slots:
     void initTestCase() { QStandardPaths::setTestModeEnabled(true);SwirlPaths::initializeTestStorage();QSettings::setDefaultFormat(QSettings::IniFormat);QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,SwirlPaths::writableLocation(QStandardPaths::AppConfigLocation)); }
+    void tcpUriTransportRequirementsRemainBlockedAfterPersistence() {
+        const auto key=QByteArray(32,'\x09').toBase64(QByteArray::Base64UrlEncoding|QByteArray::OmitTrailingEquals);
+        const QByteArray prefix="vless://00112233-4455-6677-8899-aabbccddeeff@proxy.invalid:443?security=reality&sni=camouflage.invalid&fp=chrome&pbk="+key+"&sid=abcd&flow=xtls-rprx-vision";
+        for(const auto &network:QList<QByteArray>{"","&type=tcp","&network=tcp"}){
+            const auto baseline=NodeImporter::parse(prefix+network);QVERIFY2(baseline,qPrintable(baseline.error));QVERIFY(baseline.nodes.first().conversionIssues.isEmpty());
+#ifdef SWIRL_USE_RUST_CORE
+            QVERIFY(SwirlProtocolRegistry::nativeNodeReason(baseline.nodes.first()).isEmpty());
+#endif
+        }
+        QList<QByteArray> uris{prefix+"&type=",prefix+"&network="};
+        for(const auto &network:QList<QByteArray>{"","&type=tcp","&network=tcp"})
+        for(const auto &parameter:QList<QByteArray>{"&path=%2Ffixture-secret","&host=fixture-secret.invalid","&serviceName=fixture-secret","&path=","&host=","&serviceName="})uris.append(prefix+network+parameter);
+        for(const auto &uri:uris){
+            for(const auto &body:{uri,uri.toBase64()}){
+                const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);QCOMPARE(parsed.incompleteNodes,1);
+                const auto node=parsed.nodes.first();QVERIFY(!node.conversionIssues.isEmpty());QCOMPARE(node.originalConfiguration.value("uri"),QJsonValue(QString::fromUtf8(uri)));
+                QVERIFY(!node.conversionIssues.join(' ').contains("fixture-secret"));QVERIFY(!SwirlProtocolRegistry::nativeNodeReason(node).isEmpty());
+                QTemporaryDir directory;QVERIFY(directory.isValid());const auto path=directory.filePath("transport.dpapi");
+                {NodeStore store(path);QVERIFY(store.importNodes(parsed.nodes));}
+                NodeStore restored(path);QCOMPARE(restored.nodes().size(),1);const auto saved=restored.nodes().first();
+                QCOMPARE(saved.originalConfiguration,node.originalConfiguration);QCOMPARE(saved.conversionIssues,node.conversionIssues);
+                QVERIFY(!SwirlProtocolRegistry::nativeNodeReason(saved).isEmpty());
+                QFile file(path);QVERIFY(file.open(QIODevice::ReadOnly));QVERIFY(!file.readAll().contains("fixture-secret"));
+            }
+        }
+        // Valid WebSocket path/Host mapping remains intact; this change does
+        // not treat every transport-specific URI field as an unsupported one.
+        const QByteArray websocket="vless://00112233-4455-6677-8899-aabbccddeeff@proxy.invalid:443?type=ws&path=%2Fsocket&host=websocket.invalid";
+        const auto parsed=NodeImporter::parse(websocket);QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.incompleteNodes,0);
+        const auto options=parsed.nodes.first().parameters.value("ws-opts").toObject();QCOMPARE(options.value("path"),QJsonValue("/socket"));QCOMPARE(options.value("headers").toObject().value("Host"),QJsonValue("websocket.invalid"));
+    }
+    void vlessUriAuthorityAndPathRequirementsRemainBlocked() {
+        const auto key=QByteArray(32,'\x09').toBase64(QByteArray::Base64UrlEncoding|QByteArray::OmitTrailingEquals);
+        const QByteArray user="vless://00112233-4455-6677-8899-aabbccddeeff";
+        const QByteArray endpoint="@proxy.invalid:443";
+        const QByteArray query="?security=reality&type=tcp&sni=camouflage.invalid&fp=chrome&pbk="+key+"&sid=abcd&flow=xtls-rprx-vision";
+        for(const auto &uri:QList<QByteArray>{user+":fixture-secret"+endpoint+query,user+endpoint+"/fixture-secret"+query,user+endpoint+"/fixture-secret/.."+query,user+endpoint+"/fixture-secret/%2e%2e"+query,user+endpoint+"/."+query,user+endpoint+"/%2e"+query,user+":fixture-secret"+endpoint+"/fixture-secret"+query})
+        for(const auto &body:{uri,uri.toBase64()}){
+            const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);QCOMPARE(parsed.incompleteNodes,1);
+            const auto node=parsed.nodes.first();QCOMPARE(node.originalConfiguration.value("uri"),QJsonValue(QString::fromUtf8(uri)));
+            QVERIFY(!node.conversionIssues.isEmpty());QVERIFY(!node.conversionIssues.join(' ').contains("fixture-secret"));QVERIFY(!SwirlProtocolRegistry::nativeNodeReason(node).isEmpty());
+        }
+        // An empty userinfo password or a single neutral slash does not carry
+        // an additional requirement. Keep both equivalent spellings usable.
+        for(const auto &password:QList<QByteArray>{"",":"})for(const auto &path:QList<QByteArray>{"","/"}){
+            const auto uri=user+password+endpoint+path+query;
+            for(const auto &body:{uri,uri.toBase64()}){
+                const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);QCOMPARE(parsed.incompleteNodes,0);
+                QCOMPARE(parsed.nodes.first().originalConfiguration.value("uri"),QJsonValue(QString::fromUtf8(uri)));QVERIFY(parsed.nodes.first().conversionIssues.isEmpty());
+#ifdef SWIRL_USE_RUST_CORE
+                QVERIFY(SwirlProtocolRegistry::nativeNodeReason(parsed.nodes.first()).isEmpty());
+#endif
+            }
+        }
+        for(const auto &extra:QList<QByteArray>{"&type=tcp","&network=ws"}){
+            const auto uri=user+":fixture-secret"+endpoint+"/fixture-secret"+query+extra;
+            for(const auto &body:{uri,uri.toBase64()}){
+                const auto parsed=NodeImporter::parse(body);QVERIFY(!parsed);QVERIFY(parsed.nodes.isEmpty());QVERIFY(!parsed.error.contains("fixture-secret"));
+            }
+        }
+    }
+    void uriHeaderTypeHasClosedTransportSemantics() {
+        const auto key=QByteArray(32,'\x09').toBase64(QByteArray::Base64UrlEncoding|QByteArray::OmitTrailingEquals);
+        const QByteArray prefix="vless://00112233-4455-6677-8899-aabbccddeeff@proxy.invalid:443?security=reality&sni=camouflage.invalid&fp=chrome&pbk="+key+"&sid=abcd&flow=xtls-rprx-vision";
+        for(const auto &network:QList<QByteArray>{"","&type=tcp","&network=tcp"}){
+            const auto baseline=NodeImporter::parse(prefix+network);QVERIFY(baseline);
+            const auto uri=prefix+network+"&headerType=none";
+            for(const auto &body:{uri,uri.toBase64()}){
+                const auto parsed=NodeImporter::parse(body);QVERIFY(parsed);QCOMPARE(parsed.incompleteNodes,0);QCOMPARE(parsed.nodes.size(),1);
+                QCOMPARE(parsed.nodes.first().parameters,baseline.nodes.first().parameters);
+                QCOMPARE(parsed.nodes.first().originalConfiguration.value("uri"),QJsonValue(QString::fromUtf8(uri)));
+#ifdef SWIRL_USE_RUST_CORE
+                QVERIFY(SwirlProtocolRegistry::nativeNodeReason(parsed.nodes.first()).isEmpty());
+#endif
+            }
+        }
+        for(const auto &uri:QList<QByteArray>{prefix+"&type=tcp&headerType=",prefix+"&type=tcp&headerType=None",prefix+"&type=tcp&headerType=http",QByteArray("vless://00112233-4455-6677-8899-aabbccddeeff@proxy.invalid:443?type=ws&headerType=none")})
+        for(const auto &body:{uri,uri.toBase64()}){
+            const auto parsed=NodeImporter::parse(body);QVERIFY(parsed);QCOMPARE(parsed.incompleteNodes,1);QCOMPARE(parsed.nodes.size(),1);
+            QCOMPARE(parsed.nodes.first().originalConfiguration.value("uri"),QJsonValue(QString::fromUtf8(uri)));
+            QVERIFY(!SwirlProtocolRegistry::nativeNodeReason(parsed.nodes.first()).isEmpty());
+        }
+        for(const auto &extra:QList<QByteArray>{"&headerType=none&headerType=none","&headerType=none&headerType=http"})
+        for(const auto &body:{prefix+extra,(prefix+extra).toBase64()}){
+            const auto parsed=NodeImporter::parse(body);QVERIFY(!parsed);QVERIFY(parsed.nodes.isEmpty());
+        }
+    }
+    void preUpgradeUriStoreRechecksSourceWithoutRewriting() {
+        const auto key=QByteArray(32,'\x09').toBase64(QByteArray::Base64UrlEncoding|QByteArray::OmitTrailingEquals);
+        const QByteArray user="vless://00112233-4455-6677-8899-aabbccddeeff";
+        const QByteArray endpoint="@proxy.invalid:443";
+        const QByteArray query="?security=reality&type=tcp&sni=camouflage.invalid&fp=chrome&pbk="+key+"&sid=abcd&flow=xtls-rprx-vision";
+        const auto prefix=user+endpoint+query;
+        auto emptyType=prefix,emptyNetwork=prefix;emptyType.replace("&type=tcp","&type=");emptyNetwork.replace("&type=tcp","&network=");
+        const QList<QByteArray> sources{prefix,prefix+"&headerType=none",prefix+"&headerType=",prefix+"&path=%2Ffixture-secret",prefix+"&host=fixture-secret.invalid",prefix+"&serviceName=fixture-secret",user+":fixture-secret"+endpoint+query,user+endpoint+"/fixture-secret"+query,emptyType,emptyNetwork};
+        for(const auto &uri:sources)for(const auto &existing:QStringList{"","已有的未映射配置诊断。"}){
+            const bool supported=uri==prefix||uri==prefix+"&headerType=none";
+            const auto imported=NodeImporter::parse(uri);QVERIFY(imported);QCOMPARE(imported.nodes.size(),1);
+            auto old=imported.nodes.first();old.conversionIssues.clear(); // Actual pre-fix persisted shape.
+            if(!existing.isEmpty())old.conversionIssues.append(existing);
+            QTemporaryDir directory;QVERIFY(directory.isValid());const auto path=directory.filePath("old.dpapi");
+            {NodeStore saved(path);QVERIFY(saved.importNodes({old}));QVERIFY(saved.select(old.id));}
+            QFile file(path);QVERIFY(file.open(QIODevice::ReadOnly));const auto encrypted=file.readAll();file.close();
+            NodeStore restored(path);QCOMPARE(restored.nodes().size(),1);QCOMPARE(restored.selectedId(),old.id);const auto node=restored.nodes().first();
+            QCOMPARE(node.id,old.id);QCOMPARE(node.parameters,old.parameters);QCOMPARE(node.originalConfiguration,old.originalConfiguration);
+            QCOMPARE(node.conversionIssues.isEmpty(),supported&&existing.isEmpty());
+            if(!existing.isEmpty())QVERIFY(node.conversionIssues.contains(existing));
+            if(!supported){QVERIFY(node.conversionIssues.size()>old.conversionIssues.size());QVERIFY(!node.conversionIssues.join(' ').contains("fixture-secret"));}
+            if(!supported||!existing.isEmpty())QVERIFY(!SwirlProtocolRegistry::nativeNodeReason(node).isEmpty());
+#ifdef SWIRL_USE_RUST_CORE
+            else {QVERIFY(SwirlProtocolRegistry::nativeNodeReason(node).isEmpty());QCOMPARE(SwirlProtocolRegistry::describe(node).value("tested"),QVariant(false));}
+#endif
+            QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),encrypted);
+        }
+    }
     void sourceGlobalsArePreservedAndCannotBecomeNodeOnlyImports() {
         const QByteArray ini="; fixture\n[ Proxy ] # nodes\nA = socks5, 127.0.0.1, 1080\n[Rule]\nFINAL,A\n[Future]\nopaque fixture-secret\n";
         const QByteArray json=R"({"outbounds":[{"type":"socks","tag":"A","server":"127.0.0.1","server_port":1080},{"type":"selector","tag":"choice","outbounds":["A"]}],"route":{"final":"choice"},"future":{"fixture-secret":true}})";
