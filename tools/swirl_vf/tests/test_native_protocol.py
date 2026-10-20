@@ -1,16 +1,23 @@
-"""Native protocol regression with explicit original message doubles, no fonts."""
+"""Protocol regressions with original message doubles and temporary original fonts.
+
+No Apple source, native CoreText or production font data is used.
+"""
 import io
 import hashlib
 import json
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock
 
+from fontTools.ttLib import TTCollection
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 from rebuild import NativeOracle, ReconstructionError, native_failure_details
+from test_rebuild import write_fixture
 
 
 class NativeProtocolTests(unittest.TestCase):
@@ -124,6 +131,90 @@ class NativeProtocolTests(unittest.TestCase):
             executable.chmod(0o700)
             with self.assertRaisesRegex(ReconstructionError, 'unverified native axis observations'):
                 NativeOracle(executable, source, root / 'native.log')
+
+    def production_cli_fixture(self, root, marker):
+        """A real CLI/process boundary with an original, temporary two-face TTC."""
+        source = root / 'original-protocol-fixture.ttc'
+        write_fixture(source, faces=2)
+        metadata = {'type': 'metadata', 'backend': 'CoreText',
+                    'source_sha256': hashlib.sha256(source.read_bytes()).hexdigest(),
+                    'source_byte_size': source.stat().st_size,
+                    'axis_observations_only': False,
+                    'synthetic_protocol_fixture_only': True,
+                    'apple_or_coretext_executed': False}
+        with TTCollection(source, lazy=True) as collection:
+            metadata['faces'] = [
+                {'face_index': i, 'status': 'identity_verified',
+                 'upm': font['head'].unitsPerEm, 'glyph_count': font['maxp'].numGlyphs,
+                 'verified_table_sha256': {tag: hashlib.sha256(font.reader[tag]).hexdigest()
+                                           for tag in font.reader.tables}}
+                for i, font in enumerate(collection.fonts)]
+        if marker != 'absent':
+            metadata['diagnostic_readback_observation_only'] = marker
+        received = root / 'received-requests.jsonl'
+        executable = root / 'original-protocol'
+        lines = ['#!' + sys.executable, 'import json, pathlib, sys',
+                 'print(' + repr(json.dumps(metadata)) + ', flush=True)',
+                 'for line in sys.stdin:',
+                 '    pathlib.Path(' + repr(str(received)) + ').write_text(line)',
+                 '    request = json.loads(line)',
+                 "    print(json.dumps({'type': 'request_error', 'request_id': request['request_id'],",
+                 "                      'face_index': request['face_index'],",
+                 "                      'error': 'original_protocol_reached_sampling'}), flush=True)"]
+        executable.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+        executable.chmod(0o700)
+        output, report = root / 'Swirl-VF.ttc', root / 'report.json'
+        command = [sys.executable, str(Path(__file__).resolve().parents[1] / 'tools' / 'rebuild.py'),
+                   str(source), '--oracle', str(executable), '--output', str(output), '--report', str(report)]
+        return source, executable, received, output, report, command
+
+    def test_production_cli_rejects_diagnostic_and_malformed_markers_before_sampling(self):
+        for marker in (True, 1, 0, None, 'false'):
+            for checkpointed in (False, True):
+                with self.subTest(marker=marker, checkpointed=checkpointed), tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    source, _, received, output, report, command = self.production_cli_fixture(root, marker)
+                    before = source.read_bytes()
+                    checkpoint = root / 'private-checkpoints'
+                    if checkpointed:
+                        command += ['--checkpoint-dir', str(checkpoint)]
+                    result = subprocess.run(command, text=True, capture_output=True, timeout=20)
+                    self.assertEqual(result.returncode, 2, result.stderr)
+                    self.assertIn('diagnostic-only native observations cannot be used for reconstruction', result.stderr)
+                    saved = json.loads(report.read_text(encoding='utf-8'))
+                    self.assertEqual(saved['status'], 'BLOCKED')
+                    self.assertEqual(saved['failures'][0]['context']['stage'], 'native_metadata')
+                    self.assertEqual(saved['native_observation_progress']['attempted_batches_this_run'], 0)
+                    self.assertEqual(saved['faces'], [])
+                    self.assertFalse(saved['output_generated'])
+                    self.assertFalse(output.exists())
+                    self.assertFalse(received.exists())
+                    self.assertFalse(checkpoint.exists())
+                    self.assertEqual(source.read_bytes(), before)
+
+    def test_production_cli_preserves_legacy_and_explicit_nondiagnostic_metadata(self):
+        for marker in ('absent', False):
+            with self.subTest(marker=marker), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                _, _, received, output, report, command = self.production_cli_fixture(root, marker)
+                result = subprocess.run(command, text=True, capture_output=True, timeout=20)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn('original_protocol_reached_sampling', result.stderr)
+                saved = json.loads(report.read_text(encoding='utf-8'))
+                self.assertEqual(saved['native_observation_progress']['attempted_batches_this_run'], 1)
+                self.assertTrue(received.exists())
+                self.assertFalse(output.exists())
+
+    def test_diagnostic_transport_remains_available_outside_production_run(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source, executable, received, _, _, _ = self.production_cli_fixture(root, True)
+            oracle = NativeOracle(executable, source, root / 'diagnostic.log')
+            try:
+                self.assertIs(oracle.metadata['diagnostic_readback_observation_only'], True)
+            finally:
+                oracle.close()
+            self.assertFalse(received.exists())
 
     def test_complete_transcript_requires_summary_eof_and_successful_process_exit(self):
         # Separate real child processes exercise errors arriving after all glyph

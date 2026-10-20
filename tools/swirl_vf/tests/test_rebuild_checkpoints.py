@@ -77,6 +77,31 @@ class RebuildCheckpointTests(unittest.TestCase):
         self.assertEqual([session.finish_count for session in oracle.sessions], [1, 0])
         return json.loads((self.root / "attempt-1" / "report.json").read_text())
 
+    def test_later_diagnostic_session_preserves_verified_face_and_blocks_new_sampling(self):
+        before = self.source.read_bytes()
+        def configure(oracle, index):
+            if index == 1:
+                oracle.metadata['diagnostic_readback_observation_only'] = True
+        sessions = OracleSessions(self.source, configure=configure)
+        with self.assertRaisesRegex(rebuild.ReconstructionError,
+                                   'diagnostic-only native observations cannot be used for reconstruction'):
+            self.invoke('diagnostic-session', sessions)
+        self.assertEqual(self.source.read_bytes(), before)
+        self.assertFalse(self.output.exists())
+        self.assertEqual(len(sessions.sessions), 2)
+        self.assertTrue(all(session.close_count == 1 for session in sessions.sessions))
+        self.assertEqual([session.finish_count for session in sessions.sessions], [1, 0])
+        self.assertEqual(sessions.sessions[1].requests, [])
+        self.assertTrue(all(face == 0 for face, _, _ in sessions.requests))
+        manifest = json.loads((self.checkpoints / 'verified-faces.json').read_text())
+        self.assertEqual(set(manifest['faces']), {'0'})
+        saved = json.loads((self.root / 'attempt-diagnostic-session' / 'report.json').read_text())
+        self.assertEqual(saved['status'], 'BLOCKED')
+        self.assertFalse(saved['output_generated'])
+        self.assertEqual(saved['failures'][0]['context'],
+                         {'stage': 'native_session_metadata', 'face_index': 1})
+        self.assertEqual(saved['faces'][0]['native_face_transcript']['status'], 'PASS')
+
     def test_verified_face_survives_and_resume_rechecks_complete_ttc(self):
         before = self.source.read_bytes()
         partial = self.interrupted()

@@ -728,6 +728,63 @@ native result**. Enlarged native execution is pending at this source checkpoint.
 Next task: retrieve its actual final results, verify source/termination and
 every unresolved row, then save evidence before any production promotion.
 
+## Production admission: reject diagnostic observations at every rebuild session
+
+The all-face diagnostic source is pushed and independently remote-confirmed as
+`b549ccdf0c28ec4d38ecc3893f2d149049882970`.
+[39391013239](https://github.com/SOLHK/Swirl/actions/runs/39391013239), job
+118522247190, is still **in progress**, not PASS. Its bounded old 736-position
+profile repeat [39391012999](https://github.com/SOLHK/Swirl/actions/runs/39391012999),
+job 118522246091, finished **success**. The actual log and downloaded artifact
+12249194164 were checked; ZIP SHA-256:
+`f478b8c1e299c372844104974de0beef503264bbe8427f6ecc80325652b9b51e`.
+Every old summary field exactly equals the aea native result except source SHA;
+the only added fields are `diagnostic_profile=anchors_736` and
+`direct_native_reference_positions=36`. This verifies no measured regression
+in the shared driver after adding the all-face profile.
+
+The same-source companion run
+[39391013019](https://github.com/SOLHK/Swirl/actions/runs/39391013019)
+finished Python/Windows **success**, Apple **failure**. Actual Apple job
+118522247042 logs retain 22/22 Swift guard checks and the strict raw vertical
+advance failure, face 0 / GID 2 at all minima: **849 versus 850**, tolerance
+0.03125. The SourceTables reconstruction result cannot override that failure.
+
+A separate actual CLI counterexample, using only an original two-face/three-GID
+temporary fixture and a real authored protocol child process, exposed that
+`rebuild.run` accepted `axis_observations_only=false` together with
+`diagnostic_readback_observation_only=true`. It issued the first sampling
+request; only the fixture's deliberate error stopped reconstruction. This is
+not evidence that an Apple font was reconstructed or that any diagnostic
+instance was production-accepted in a native build.
+
+`tools/rebuild.py` now checks the diagnostic marker in **every production
+`open_session`**, immediately after metadata transport, before sampling or
+checkpoint creation. Missing preserves the legacy strict protocol; an explicit
+value must be the JSON boolean false. True, 0, 1, null and strings are rejected.
+The shared `NativeOracle` remains available to diagnostic drivers. No numeric
+tolerance, source mapping, Swift construction, v2 payload/replay policy or
+metric field changes. In particular, the upstream `NOT_ACCEPTED` explanatory
+string is not used as a false rejection of already verified v2 metadata.
+
+Changed files: `tools/rebuild.py`, `tests/test_native_protocol.py`,
+`tests/test_rebuild_checkpoints.py`, and both continuation handoffs.
+The original CLI regression first failed on all ten diagnostic/malformed-marker
+subcases before the fix. It now verifies ordinary and checkpointed entry,
+exact rejection stage, zero requests, no output/checkpoint, and unchanged
+source bytes; real original SFNT table identities are provided so unrelated
+identity gates cannot substitute for this check. Legacy missing/false metadata
+still reaches sampling, and direct diagnostic transport still works. A second
+session test proves a verified first-face checkpoint is retained when the next
+session's diagnostic metadata is rejected before any new sampling.
+
+Frozen local regression: **436/436 tests, zero skips, 6/6 audits**, 37.462
+seconds; `git diff --check` clean. Actual native CI for this new admission fix
+is not yet run at this commit checkpoint. Next: obtain and save the all-face
+closure's final source-bound native results, then consider the smallest
+explicit production-construction bridge. Do not promote the diagnostic binary
+or enter full reconstruction. Original completed faces remain **0/32**.
+
 ## Newly retrieved prior evidence (not new execution in this continuation)
 
 - At exact source `056f7ea6dc7cf3a703da63e8522b89d33d1166f4`,

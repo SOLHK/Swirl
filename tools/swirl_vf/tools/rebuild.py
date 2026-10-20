@@ -805,6 +805,13 @@ def run(source, executable, destination, report_path, batch_size=64,
         session_number += 1
         name = "native-oracle.log" if session_number == 1 else f"native-oracle-session-{session_number}.log"
         oracle = NativeOracle(executable, source, report_path.parent / name)
+        # NativeOracle also transports observations for diagnostic drivers.
+        # Every production session, including checkpoint resumptions, must
+        # reject those observations before sampling or creating checkpoints.
+        # Missing is the legacy strict protocol; an explicit marker must be
+        # the JSON boolean false, never a truthy or malformed diagnostic flag.
+        check(oracle.metadata.get("diagnostic_readback_observation_only", False) is False,
+              "diagnostic-only native observations cannot be used for reconstruction")
         if source_faces is not None:
             verify_checkpoint_session_metadata(oracle.metadata, report["source_sha256"],
                                                source.stat().st_size, source_faces)
