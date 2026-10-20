@@ -3,10 +3,10 @@
 ## Scope and source identity
 
 `font-system-windows.yml` responds to font/QML changes on
-`work/core-completion-20261017` and checks out the triggering **commit SHA**, not a
-moving branch tip. It never writes a branch, edits an App, uses private
+`work/core-completion-20261017` and `work/vf-smart-width-w1`, and checks out the
+triggering **commit SHA**, not a moving branch tip. It never writes a branch, edits an App, uses private
 subscription archives, or reads a private font. It also declares a manual trigger
-on that same branch; `build_full_application=false` omits the extra full
+on those permitted branches; `build_full_application=false` omits the extra full
 application compilation and application navigation smoke, not the font test
 targets. The initial execution uses
 the development-branch push. GitHub's manual-run UI depends on default-branch
@@ -118,11 +118,30 @@ checks to actually pass:
 | Public font integration | Automatic/manual profiles, independent-process restart, legacy migration, real multi-axis glyph/fallback rendering, and bounded caches |
 | Actual QML and preview integration | Existing controls and live mode/family updates, display-context lifetime, font-resource invalidation, and idle raster stability |
 | Windows native raster | `nativeGlyphsHaveNoColourFringes`; a skip fails this gate |
+| W1 bounded width solver | Invalid inputs/history, actual-axis interval sampling, nonmonotonic counterexamples, safety floor and finite execution; all public width slots must pass |
+| Windows native width | Real advance fitting, original nonmonotonic/asymmetric fonts, shaped text, cache/resize and actual shared QML controls; all five width slots must pass |
+| Application-scale simulations | The same five width slots in separate Windows processes with `QT_SCALE_FACTOR=1.25` and `2`; both reports are mandatory |
 
 The offscreen selection/QML suite explicitly uses Qt Quick's software backend,
 as an offscreen integration check. The separate Windows native raster target
 unsets that override and runs the Windows/D3D11 path; software offscreen results
 are not evidence of D3D11 glyph quality.
+
+W1-B registers five Windows CTest processes: selection, axis policy, native
+raster/width, simulated-125 and simulated-200. All have 30-second timeouts;
+the existing deadlines are unchanged. Native/simulated targets use `RUN_SERIAL`.
+The native processes use Swirl's
+`windows:fontengine=freetype` setup with the requested D3D11 WARP backend.
+`qmlWidthControls` reports its observed window DPR and logical DPI; an
+environment-variable value alone is not evidence of the observed context.
+The simulated processes do not change Windows system scaling and do not test a
+physical display or same-window monitor migration.
+
+The asymmetric-font case separately verifies hinted equal-advance plateaus
+and an actually distinguishable minimum-axis endpoint. A Windows hinted
+coordinate need not equal a Linux fractional-metrics coordinate when both
+produce the same minimum advance. Neither safety assertions nor the strict
+endpoint assertion are removed to accommodate this difference.
 
 Only the test step sets `QT_FORCE_STDERR_LOGGING=1`. In Qt 6.10.3, the Windows
 [plain test logger](https://github.com/qt/qtbase/blob/v6.10.3/src/testlib/qplaintestlogger.cpp)
@@ -143,6 +162,9 @@ The existing private/child/native-only cases are explicitly listed: any new
 public test that unexpectedly skips also fails the report gate. The current
 automatic-font integration cases are required by name, so an accidentally
 unregistered QML or restart slot cannot disappear from an otherwise green report.
+The reporter also rejects a required slot with any failing or skipped data row,
+even if another row of that slot passed. Its 13 regression cases check missing
+native/simulated reports and required width slots as well as the existing gates.
 
 ## Evidence and limits
 
