@@ -63,22 +63,36 @@ function Stop-ExactOwnedSwirl([int]$ParentPid,[string]$ExpectedHash) {
     return $survivors
 }
 function Show-Result {
-    Write-Host ''
-    Write-Host '====== Swirl Rust 联网测试 ======' -ForegroundColor Cyan
     $daily=$summary.systemProxyControl.status
     $rust=$summary.swirlRustExplicit.status
-    Write-Host "电脑当前代理控制请求：$daily"
-    Write-Host "Swirl Rust 显式代理：$rust（$($summary.swirlRustExplicit.passed)/6）"
+    $dailyLabel=if($daily -eq 'PASS'){'可用'}elseif($daily -eq 'FAIL'){'未通过'}else{'未测试'}
+    $rustLabel=if($rust -eq 'PASS'){'可用'}elseif($rust -eq 'FAIL' -and $summary.swirlRustExplicit.passed -gt 0){'部分可用'}elseif($rust -eq 'FAIL'){'未通过'}else{'未完成'}
+    $lines=[Collections.Generic.List[string]]::new()
+    $lines.Add('====== Swirl Rust 联网测试 ======')
+    $lines.Add("电脑当前代理控制请求：$dailyLabel（$daily）")
+    $lines.Add("Swirl Rust 显式代理：$rustLabel（$($summary.swirlRustExplicit.passed)/6，判定 $rust）")
     if($rust -eq 'PASS') {
-        Write-Host '本次请求确实进入测试版 Swirl Rust，并有出站收发。' -ForegroundColor Green
+        $lines.Add('六项请求均进入测试版 Swirl Rust，并有出站收发。')
     } elseif($rust -eq 'FAIL') {
-        Write-Host 'Swirl 请求有失败；结果已保存，可稍后交给 Codex 分析。' -ForegroundColor Red
+        $rows=@($summary.swirlRustExplicit.requests)
+        $plain=@($rows | Where-Object { $_.name -match '_http$' })
+        $https=@($rows | Where-Object { $_.name -match '_https$' })
+        $lines.Add("明文 HTTP：$(@($plain | Where-Object status -eq 'PASS').Count)/3；HTTPS：$(@($https | Where-Object status -eq 'PASS').Count)/3。")
+        $names=@{http_http='HTTP 代理到明文网页';http_https='HTTP 代理到 HTTPS';connect_http='CONNECT 到明文网页';connect_https='CONNECT 到 HTTPS';socks5_http='SOCKS5 到明文网页';socks5_https='SOCKS5 到 HTTPS'}
+        foreach($row in @($rows | Where-Object status -ne 'PASS')) {
+            $label=if($names.ContainsKey([string]$row.name)){$names[[string]$row.name]}else{'未知请求'}
+            $lines.Add("失败：$label；curl 退出码 $($row.curlExitCode)。")
+        }
+        $lines.Add('有些请求已成功，但本轮不稳定；失败记录已经保存。')
     } else {
-        Write-Host "尚不能判断 Swirl 联网：$($summary.reasonCode)" -ForegroundColor Yellow
+        $lines.Add("尚不能判断 Swirl 联网：$($summary.reasonCode)")
     }
-    Write-Host '完整摆脱 Mihomo 依赖：未证明。普通应用仍按 Windows 系统代理走。'
-    if($runDir) { Write-Host "本机结果：$runDir" }
-    Write-Host '脚本没有暂停或关闭 Mihomo，也没有修改系统代理、TUN、路由或 DNS。'
+    $lines.Add('完整摆脱 Mihomo 依赖：未证明。普通应用仍按 Windows 系统代理走。')
+    if($runDir) { $lines.Add("本机结果：$runDir") }
+    $lines.Add('脚本没有暂停或关闭 Mihomo，也没有修改系统代理、TUN、路由或 DNS。')
+    if($runDir) { $lines | Set-Content -LiteralPath (Join-Path $runDir '结果-直接看.txt') -Encoding utf8 }
+    Write-Host ''
+    foreach($line in $lines) { Write-Host $line }
 }
 
 try {

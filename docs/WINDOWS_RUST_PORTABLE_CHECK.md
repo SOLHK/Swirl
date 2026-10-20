@@ -2,7 +2,7 @@
 
 此包是 `SWIRL_USE_RUST_CORE=ON`、`SWIRL_BUILD_UI_TESTS=ON` 的开发验收预览，供同一台 Windows 11 电脑断开 Codex 时双击运行。它不是普通用户正式发行版。包内有 `Swirl.exe`、进程内的 `swirl_api.dll`、Qt/QML 和 MinGW 运行库、辅助 EXE、许可证、固定哈希清单和一键脚本；不含 `mihomo.exe`、私有订阅、NodeStore 或原始运行时状态。
 
-双击 `TEST-SWIRL-NETWORK.cmd`。脚本默认读取 Git 外的 `D:\Codex\Swirl-acceptance-private-20261020\nodes.dpapi` 和 `.selected`，每次只在 D 盘私有目录生成隔离副本，并把 `SWIRL_TEST_ROOT` 仅设置给测试子进程。报告位于 `D:\Codex\Swirl-acceptance-private-20261020\portable-runs\run-*\summary.json`。包可移动，但这台电脑上的 DPAPI 副本和 PowerShell 7、Windows curl 是运行条件；缺失时报告 BLOCKED。
+双击 `TEST-SWIRL-NETWORK.cmd`。脚本默认读取 Git 外的 `D:\Codex\Swirl-acceptance-private-20261020\nodes.dpapi` 和 `.selected`，每次只在 D 盘私有目录生成隔离副本，并把 `SWIRL_TEST_ROOT` 仅设置给测试子进程。可直接看的中文结果在 `D:\Codex\Swirl-acceptance-private-20261020\portable-runs\run-*\结果-直接看.txt`，同目录还有脱敏 `summary.json`。包可移动，但这台电脑上的 DPAPI 副本和 PowerShell 7、Windows curl 是运行条件；缺失时报告 BLOCKED。
 
 黑色窗口分开显示：
 

@@ -132,7 +132,7 @@ Swirl Rust 便携联网测试包（开发验收版）
 1. 保持 Mihomo 正常运行，先双击 TEST-SWIRL-NETWORK.cmd。
 2. 黑色窗口会分别显示“电脑当前代理控制请求”和“Swirl Rust 显式代理”。等它写出结果后按任意键关闭。
 3. 如果 Codex 或浏览器断网，仍可在同一窗口看 Swirl 的结果；普通应用是否能联网与 Swirl 显式请求是两件事。
-4. 结果只保存在 D:\Codex\Swirl-acceptance-private-20261020\portable-runs；包内没有私有 NodeStore。
+4. 结果只保存在 D:\Codex\Swirl-acceptance-private-20261020\portable-runs；打开最新 run-* 目录里的“结果-直接看.txt”即可，包内没有私有 NodeStore。
 5. 不要直接双击 Swirl.exe 来做这个隔离测试；那会使用普通应用的单实例和用户配置。
 
 脚本不会关闭/暂停 Mihomo，不会修改 Windows 系统代理、TUN、路由或 DNS。
