@@ -364,6 +364,18 @@ void EngineController::connectNode(const QString &id) {
     if(id.isEmpty()){if(!nodeBusy())startConfiguredSession();return;}
     if(nodeBusy() || !chooseNode(id))return;
     if(processAlive() && !activeNodeId().isEmpty())return;
+#ifdef SWIRL_USE_RUST_CORE
+    // Selection checks node eligibility in isolation. Starting a session must
+    // also check the user's actual routing and network options before changing
+    // engine state. Do not silently replace saved rule mode with global mode.
+    auto candidate=m_options;
+    candidate.nodes=m_store.nodes();candidate.selectedNodeId=id;candidate.directSession=false;
+    QJsonObject configuration;
+    m_nodeError=RustCoreEngine::configuration(candidate,&configuration);
+    if(!m_nodeError.isEmpty()){
+        m_connectionRequested=false;emit selectionChanged();emit statusChanged();return;
+    }
+#endif
     m_connectionRequested=true;
     m_options.nodes=m_store.nodes();m_options.selectedNodeId=id;m_options.directSession=false;
     if(processAlive()){m_restartPending=true;m_engine->stop();}
@@ -376,6 +388,14 @@ void EngineController::startConfiguredSession() {
     // proxies. DIRECT is an explicit routing mode, never the empty-ID default.
     if(m_store.selectedId().isEmpty()&&m_options.routingMode!="direct") {
         m_nodeError=QStringLiteral("未选择可用节点；请选择节点或明确启用直接连接模式。未自动切换 DIRECT。");emit selectionChanged();emit statusChanged();return;
+    }
+    auto candidate=m_options;
+    candidate.nodes=m_store.nodes();candidate.selectedNodeId=m_store.selectedId();
+    candidate.directSession=candidate.routingMode=="direct";
+    QJsonObject configuration;
+    const auto reason=RustCoreEngine::configuration(candidate,&configuration);
+    if(!reason.isEmpty()){
+        m_nodeError=reason;emit selectionChanged();emit statusChanged();return;
     }
 #endif
     m_nodeError.clear();

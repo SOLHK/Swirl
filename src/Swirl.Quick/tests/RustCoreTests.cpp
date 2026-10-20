@@ -76,6 +76,50 @@ private slots:
   controller.stop();QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive(),5000);
   QCOMPARE(controller.engineIdentityLabel(),QString::fromUtf8("Swirl Rust Core · 构建类型"));
  }
+ void savedRuleModePreflightsBeforeStartingRustSession(){
+  ControlledNetwork net;QVERIFY(net.start());QTemporaryDir directory;QVERIFY(directory.isValid());
+  QSettings settings;const auto previous=settings.value("Proxy/routingMode");
+  const auto restore=qScopeGuard([&]{if(previous.isValid())settings.setValue("Proxy/routingMode",previous);else settings.remove("Proxy/routingMode");settings.sync();});
+  settings.setValue("Proxy/routingMode","rule");settings.sync();
+  const auto o=options(net);
+  EngineController controller(std::make_unique<ThreadedEngine>(),nullptr,directory.filePath("product-rule.dpapi"),true);
+  controller.setProxyPort(o.proxyPort);
+  QCOMPARE(controller.routingMode(),QString("rule"));
+  const QJsonObject node{{"name","synthetic"},{"type","socks5"},{"server","127.0.0.1"},{"port",net.a.serverPort()}};
+  controller.imports()->importText(QString::fromUtf8(QJsonDocument(QJsonObject{{"proxies",QJsonArray{node}}}).toJson()));
+  QTRY_VERIFY_WITH_TIMEOUT(!controller.imports()->busy(),5000);
+  QCOMPARE(controller.nodeCatalog().size(),1);
+  const auto id=controller.nodeCatalog().first().toMap().value("id").toString();
+  QVERIFY(controller.chooseNode(id));
+  controller.connectNode(id);
+  QVERIFY(controller.nodeError().contains(QString::fromUtf8("策略")));
+  QVERIFY(controller.nodeError().contains(QString::fromUtf8("全局代理")));
+  QVERIFY(!controller.processAlive());QVERIFY(!controller.apiHealthy());
+  QCOMPARE(QSettings().value("Proxy/routingMode").toString(),QString("rule"));
+  QTcpServer available;QVERIFY(available.listen(QHostAddress::LocalHost,o.proxyPort));available.close();
+  controller.setRoutingMode("global");
+  controller.connectNode(id);QTRY_VERIFY_WITH_TIMEOUT(controller.apiHealthy(),5000);
+  QCOMPARE(controller.engineKind(),QString("rust"));
+  QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",o.proxyPort));
+  QNetworkRequest request(net.url());request.setTransferTimeout(4000);
+  auto *reply=client.get(request);QTRY_VERIFY_WITH_TIMEOUT(reply->isFinished(),5000);
+  QCOMPARE(reply->error(),QNetworkReply::NoError);QCOMPARE(reply->readAll(),QByteArray("exit-A"));
+  QCOMPARE(net.a.forwarded,1);
+  controller.stop();QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive(),5000);
+ }
+ void unsupportedSessionMessagesIdentifyActualBlocker(){
+  ControlledNetwork net;QVERIFY(net.start());const auto o=options(net);QJsonObject configuration;
+  auto blocked=o;blocked.smartRouting=true;blocked.routingMode="rule";
+  QVERIFY(RustCoreEngine::configuration(blocked,&configuration).contains(QString::fromUtf8("全局代理")));
+  blocked=o;blocked.preferCompatibility=true;
+  QVERIFY(RustCoreEngine::configuration(blocked,&configuration).contains(QString::fromUtf8("兼容内核")));
+  blocked=o;blocked.tunEnabled=true;
+  QVERIFY(RustCoreEngine::configuration(blocked,&configuration).contains(QString::fromUtf8("增强模式")));
+  blocked=o;blocked.allowLan=true;
+  QVERIFY(RustCoreEngine::configuration(blocked,&configuration).contains(QString::fromUtf8("局域网代理")));
+  blocked=o;blocked.meteredNetwork=true;
+  QVERIFY(RustCoreEngine::configuration(blocked,&configuration).contains(QString::fromUtf8("计费网络")));
+ }
  void nativeRealityParametersSurviveEncryptedStoreAndConfiguration(){
   const QByteArray key=QByteArray(32,'\x09').toBase64(QByteArray::Base64UrlEncoding|QByteArray::OmitTrailingEquals);
   const QByteArray source="vless://00112233-4455-6677-8899-aabbccddeeff@proxy.invalid:443?security=reality&type=tcp&sni=camouflage.invalid&pbk="+key+"&sid=a1B2&fp=rustls&encryption=none&alpn=h2,http%2F1.1";

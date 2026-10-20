@@ -190,8 +190,12 @@ QVariantList RustCoreEngine::routingRules()const{
  return rows;
 }
 QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *output){
- if(o.preferCompatibility||o.tunEnabled||o.gatewayForwarding||o.allowLan||o.meteredNetwork||(o.smartRouting&&o.routingMode=="rule"&&!o.directSession))
-  return "当前 Rust 阶段尚未迁移此会话的 TUN、LAN、智能规则库或兼容模式；已拒绝启动，不回退外部内核。";
+ if(o.preferCompatibility)return "已选择优先使用兼容内核。此 Rust 版本不会启动 Mihomo；请在“设置”关闭兼容模式后重试。";
+ if(o.tunEnabled||o.gatewayForwarding)return "当前会话要求增强模式或网关转发，但 Rust 版尚未支持。请在“概览”关闭增强模式后重试。";
+ if(o.allowLan)return "当前会话要求局域网代理，但 Rust 版尚未支持。请在“概览”关闭局域网代理后重试。";
+ if(o.meteredNetwork)return "当前会话要求计费网络模式，但 Rust 版尚未支持。请在“设置”关闭计费网络模式后重试。";
+ if(o.smartRouting&&o.routingMode=="rule"&&!o.directSession)
+  return "当前“规则判定”依赖尚未迁移的智能规则库。请在左侧“策略”选择“全局代理”，再返回节点页连接；不会自动更改系统代理。";
  if(o.routingMode!="global"&&o.routingMode!="rule"&&o.routingMode!="direct")return "Rust 路由模式无效。";
  QJsonObject dns;const auto dnsError=dnsConfiguration(o,&dns);if(!dnsError.isEmpty())return dnsError;
  QJsonArray nodes;QString selected=o.selectedNodeId;
