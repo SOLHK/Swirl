@@ -1,8 +1,9 @@
 # Intelligent variable fonts: QML integration and coverage
 
 This document covers the application integration, not a physical-screen clarity or
-240 Hz acceptance report. The policy itself is implemented in `FontAxisPolicy`;
-there are no width, height, weight or optical-size formulas in page QML.
+240 Hz acceptance report. General axis policy is implemented in `FontAxisPolicy`;
+the bounded width solver is `FontWidthFit.h`, called through `FontManager`.
+There are no width, height, weight or optical-size formulas in page QML.
 
 ## One application binding path
 
@@ -97,7 +98,7 @@ No page implements a separate axis algorithm.
 | Gateway menu labels | Explicit fixed-content opt-in within the existing fixed menu width | Original menu sizing, padding and ellipsis remain; the page/parser audit does not substitute for opening that menu on a physical Windows screen. |
 | Other page/large titles | Existing eligible labels can inherit the bridge | Source titles without an existing ellipsis, with wrapping, or without an external width constraint keep their original layout. No blanket elide rule was added. |
 | General context menus and segmented controls | Natural width retained | Their existing content has no ellipsis contract. W1-B does not change their overflow rules or claim these labels were fitted. |
-| Body copy, numbers, inputs, multi-line/rich text, code views | Excluded | Automatic general axes/manual overrides remain; width compression is not applied. |
+| Body copy, data-role numbers, inputs, multi-line/rich text, code views | Excluded | Automatic general axes/manual overrides remain; width compression is not applied. Ordinary labels containing numbers still follow their label role. |
 | Shared animated hero title | Explicit `fitWidth: false` retained | Existing transform/size/opacity animation is unchanged. |
 
 The shared width guard also excludes hard line breaks and Qt multi-length strings.

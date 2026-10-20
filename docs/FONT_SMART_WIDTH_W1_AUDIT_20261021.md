@@ -1,5 +1,10 @@
 # W1 width fitting audit — 2026-10-21
 
+This is the preserved initial W1 audit. Its unverified/SDK-unavailable status
+describes that checkpoint, not the subsequent W1-B work. See
+[W1-B validation](FONT_SMART_WIDTH_W1B_VALIDATION.md) for executed Qt tests,
+actual Windows failures and fixes, QML coverage, costs and physical-test limits.
+
 Base: `work/core-completion-20261017` at `50d2a8e8bac702abb2cdc0212f43953b8b78ffef`. W1 branch is isolated. This is a source audit, **not** a claim of native test success.
 
 ## Existing behavior
