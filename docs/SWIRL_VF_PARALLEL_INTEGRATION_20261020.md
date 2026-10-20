@@ -22,16 +22,17 @@
 
 | 研发分支 | 远端 HEAD / PR | 本次可审核提交 | 当前状态 | 主责 |
 | --- | --- | --- | --- | --- |
-| `work/vf-axis-a3` | `6dd81c0cfd6cf2794584210bee7def55aef20e90` | 1 | 输入数值 contract 新增 3 文件；专项 CI success，实际代码审查中；A3 生产阻塞开放 | 输入精度、用户坐标映射 |
-| `work/vf-metrics-b1` | `e505326486202ad4c8e98bb8b66a17b4547c559f` | 0 | 分支已创建，尚无领先提交；B1 原始度量失败保留 | CoreText、HVAR/VVAR、垂直度量与原点 |
-| `work/vf-rebuild-c1` | `b0c3500afd58a5ecc55bc09dec259ba4b21bb7a6` | 1 | staging store 新增 4 文件；专项 CI failure（macOS），不具备合并条件 | HVF/OpenType/TTC 重建与完整性 |
-| `work/vf-windows-d1` | `e505326486202ad4c8e98bb8b66a17b4547c559f` | 0 | 分支已创建，尚无领先提交；目标输入及成品验收待做 | DirectWrite、Qt、Swirl 字体适配 |
+| `work/vf-axis-a3` | `9dd26766f949ded4e5fa8253fc44ae4639a95ea9` | 首阶段固定为 `6dd81c0`；后续逐提交审查 | 本次只集成输入数值 contract；`22a89a1` 原生诊断已审查，更新 tip 尚未接受；A3 阻塞开放 | 输入精度、用户坐标映射 |
+| `work/vf-metrics-b1` | `9836e89130694fdc336c4f4d7de22259c51741f6` | 首个提交审查中 | 新成果已出现；不能沿用“无提交”；B1 原始度量失败保留 | CoreText、HVAR/VVAR、垂直度量与原点 |
+| `work/vf-rebuild-c1` | `110d903ac95a0e793911610a0c99c061d199df8a` | 2 | macOS 路径问题已修；Windows packing 失败及 silent-return 未修；暂不合并 | HVF/OpenType/TTC 重建与完整性 |
+| `work/vf-windows-d1` | `562cbc998d03ad36c7e8b25fa7c614a3b17168ae` | 1 | Server 2022/2025 CI failure；Qt 反序未实际执行，暂不合并 | DirectWrite、Qt、Swirl 字体适配 |
 
 首次及 09:03:55 UTC 查询时四分支未出现；09:11:14 UTC 已全部出现。
 这只描述远端查询结果，不表示其他聊天之前没有在工作或没有本地成果。
-A3 和 C1 的实际 compare 均以 e505 为 merge-base，各领先 1 提交、落后 0；
-仅新增互不重名的文件，与本窗口三份修改无文件交集。
-B1/D1 尚无可审核 diff；当前没有进行专项合并。
+上表更新至 09:24 UTC 远端快照，集成 HEAD 为
+`50dae9c56ae4f4a64ec18295a92466d4bd141df2`。分支持续推进，审核和集成对象
+必须固定到下文完整 SHA；不能因 tip 前进就自动包含新提交。09:11 的 A3/C1
+第一提交都以 e505 为 merge-base，新增文件互不重名；当时 B1/D1 无 diff 是历史状态。
 
 ### 必须保留的技术事实
 
@@ -122,7 +123,8 @@ python -m unittest discover -s tools/swirl_vf/audit -p 'test_*.py' -v
 git diff --check
 ```
 
-目前发现 448 项回归及 6 项 audit。必须分别记录 discovered/executed/passed/failed/skipped；
+建档基线有 448 项回归及 6 项 audit；新增阶段的实际数量见执行记录。
+必须分别记录 discovered/executed/passed/failed/skipped；
 当前历史公共 CI 的 `Ran 448, OK (skipped=7)` 是 **441 个执行通过 + 7 个跳过**。
 HarfBuzz 涉及的改动必须安装并记录实际 `uharfbuzz` 版本后执行对应七项，不能记作通过。
 `NOT_RUN` 的原生诊断是未运行，不能用 Linux 单测覆盖来声称 macOS/Windows 实测。
@@ -321,3 +323,106 @@ Run 39392843365 于 08:38:56 UTC 更新为最终 success，artifact **1225140171
 - 本地与独立只读复核均确认不扩大原件工作流，不吞 B1 失败，不把跳过算作通过。
 
 后续实际提交、远端核验和终态在此追加；未结束/未审查项目不能作为通过证据。
+
+### 8.1 管理基线已推送并回读
+
+实际提交 [50dae9c56ae4f4a64ec18295a92466d4bd141df2](https://github.com/SOLHK/Swirl/commit/50dae9c56ae4f4a64ec18295a92466d4bd141df2)，
+父提交为 e505；GitHub ref 更新采用 `expected_sha=e505...`、`force=false`，返回 success。
+随后重新读取远端 HEAD、提交 compare 和本文件内容，均匹配。只有本文件、
+`SWIRL_VF_NEXT_HANDOFF_20261020.md` 和 `.github/workflows/swirl-vf.yml` 三个文件变化。
+
+该精确提交的 [39399304891](https://github.com/SOLHK/Swirl/actions/runs/39399304891)
+已为 **completed/failure**：Python 448 discovered、441 passed、7 skipped，audit 6/6；
+DirectWrite synthetic success；Apple job **118549729338** 仍实际报
+`actual=849, expected=850.0, tolerance=0.03125`。原严格门槛未被绕过，后续严格
+reconstruction smoke 没有因诊断步骤成功而被记成执行成功。
+
+Apple 工件 **12253467177** 已实际下载，278,104 字节，ZIP SHA-256：
+`c6ed99a9b062a2958f6a73bb0572288c1ab2f55dce0ac42730392f0992392c42`，
+保留至 2026-10-27 09:15:55 UTC。Windows 工件 **12253711881** 的 GitHub digest 为
+`74b0a9f2fed68608384181d9cd25042e46043f0bd898ec6d9c0c3731bd20f3c2`；
+此处仅登记服务返回的 digest，不能混写为已下载核验。
+
+Core implementation validation **39399304869** 已 completed/success；
+Rust Core **39399304790** 在 09:24 UTC 仍 in_progress，不记通过。
+最初交接中的两个未完成 Core run 39394872349 / 39394041948 已取得终态，见第 6 节。
+
+### 8.2 第一阶段：固定 A3 数值输入合同
+
+本次精确集成源提交：
+`6dd81c0cfd6cf2794584210bee7def55aef20e90`，源父提交为 e505；
+目标父提交为 `50dae9c56ae4f4a64ec18295a92466d4bd141df2`。
+在独立 worktree 上执行正常双亲 merge candidate，只有以下三个新增文件，无冲突：
+
+- `.github/workflows/swirl-vf-a3-input.yml`
+- `tools/swirl_vf/platform/axis_a3_input_cases.py`
+- `tools/swirl_vf/tests/test_axis_a3_input_cases.py`
+
+已读完整源码与测试；保留 binary64 请求、float32 与 Fixed16.16 碰撞的区分、
+独立对照、原始轴标签、raw avar 顺序与固定 holdout。没有改生产映射、旧测试、容差、
+共享文件或字体内容。该阶段只完成数值合同，native/production 接受仍为 false。
+
+实际验证：
+
+- 源 SHA CI [39398618327](https://github.com/SOLHK/Swirl/actions/runs/39398618327)，
+  job **118547460910**：completed/success，17/17，0 skip；该工作流没有工件。
+- 独立专项本地复核 17/17，0 skip。
+- 目标 50dae9c + 源 6dd81c0 的完整候选回归：**465/465 passed、0 failure、
+  0 error、0 skip，33.408 秒，exit 0**。依赖版本与第 8 节一致，包含真实 HarfBuzz 执行。
+- 合并候选 audit **6/6**、0 skip，`git diff --check` 通过。
+- 数值合同集成不关闭 A3 条件障碍；B1 849 vs 850、0/32 面、无正式 TTC 均保留。
+
+源分支在审核期间已继续推进。`22a89a154217c5a4ea65788d2994e99e816ffabf`
+已获得独立原生诊断审查，但不属于本次固定 6dd81c0 合并；更新 tip 9dd2676
+同样不能因分支名相同而自动进入候选。每个后续阶段另做 diff、测试和记录。
+
+### 8.3 C1 当前阻断审查
+
+精确提交 `110d903ac95a0e793911610a0c99c061d199df8a` 是新增 pack/validate/preflight
+基础设施阶段，不能只描述为上轮 macOS 修补。新增 C1 staging、fixture、preflight、
+contract/pack/validate 测试及专项审查文档归 C1 主责；未改共享 rebuild/hvf/extractor。
+
+[39399445734](https://github.com/SOLHK/Swirl/actions/runs/39399445734) 最终 **failure**：
+Linux job 118550192611 与 macOS 118550192970 的 C1 专项均 110/110、0 skip；
+Linux 全套 558 discovered、551 passed、7 skipped，audit 6/6。
+macOS 测试将自有临时根 `resolve()`，保留任意 staging 路径的 symlink 拒绝，修复已核实。
+
+Windows job **118550193381** 实际 110 discovered、100 passed、3 failures、7 errors。
+七个 error 均在 packer 读取 SFNT 前的 `source_changed_before_open`：路径 `lstat`
+与 handle `fstat` 的 `(st_dev, st_ino, st_size, st_mtime_ns, st_ctime_ns)` 比较不等。
+日志未记录具体哪个字段不同，不能假称根因已定位。三个负例因同一提前错误失去目标覆盖。
+必须先取得 Windows 实际字段对照，保留身份、SHA、table checksum 与复制前后完整性检查。
+
+旧 `test_ttc_staging_store.py` 的 symlink 创建失败后 Windows `return` 仍存在；
+独立故障注入已复现 testsRun=1、success=True、skipped=0 而关键断言未执行。
+必须改为明确的覆盖结果并取得实际保护测试，不能用 silent-return 计通过。
+
+另核实两项原创重现：当前共享 rebuild 的 GDEF VarStore referenced delta **25→50**，
+以及旧 whole-face manifest 的 stale writer 丢掉已确认 face entry。重现测试通过代表
+缺陷存在，不是修复完成；C1 没有擅自改共享实现，两项均列为开放生产阻塞。
+preflight 继续 BLOCKED/exit 2、0 面、font_generated=false、production=false。
+**本阶段不合并，等待 C1 owner 的修复提交及三个系统终态。**
+
+### 8.4 D1 当前阻断审查
+
+精确提交 `562cbc998d03ad36c7e8b25fa7c614a3b17168ae` 新增九个文件：原创精度夹具、
+DirectWrite/Qt 探针、PowerShell/CMake、专项 tests/workflow/说明，均归 D1 主责；
+没有修改 Core、应用 UI 或共享源文件。
+
+[39399001699](https://github.com/SOLHK/Swirl/actions/runs/39399001699) 两个系统最终 **failure**。
+Server 2025 在 CMake configure 阶段失败：强制使用的 Visual Studio 17 2022 generator
+未安装，因此不能说已运行此系统的 native probe。Server 2022 编译并执行了部分真实
+DirectWrite/Qt 实验；四个 Qt FreeType private/installed、forward/reverse 探针各输出
+12 条观察后报 `Identical API inputs produced different actual pair outputs`。
+
+另有必须修复的独立反序验证漏洞：Qt 探针在构造 `QGuiApplication` 后才读取
+`app.arguments()` 中的 `--reverse`；Qt 把它作为内建 RTL 选项消费。工件中四个
+名为 reverse 的 Qt run 实际 header 都是 `reverse:false`，case 顺序与 forward 相同。
+DirectWrite 反序正常，不能替 Qt 抵消这项缺口。应改用独有参数或先解析，并由 harness
+核对请求的顺序与实际 header/完整 case 顺序；现有 `PASS_QT_SYNTHETIC` 不能证明反序。
+
+已下载 ZIP SHA-256：Server 2022
+`9c84239a7b50044730b311c49a8a589880214e8b905754baa7aeaff8bfdfcdeb`；
+Server 2025 `f39146d519a544c642d99b9fa6dc9cd731e21388300196192371ba246e2d191c`。
+**本阶段不合并，等待 D1 owner 修复真实失败、反序覆盖与 runner 构建选择。**
+Windows 11、实际 Swirl、DPI/安装/成品语义验收继续未完成。

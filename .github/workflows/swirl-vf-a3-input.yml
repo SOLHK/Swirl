@@ -1,0 +1,28 @@
+name: Swirl VF A3 input representation controls
+
+on:
+  push:
+    branches: [work/vf-axis-a3]
+    paths:
+      - '.github/workflows/swirl-vf-a3-input.yml'
+      - 'tools/swirl_vf/platform/axis_a3_input_cases.py'
+      - 'tools/swirl_vf/tests/test_axis_a3_input_cases.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  representation-controls:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test exact representation controls without claiming native validation
+        run: python -m unittest discover -s tools/swirl_vf/tests -p 'test_axis_a3_input_cases.py' -v
