@@ -1,4 +1,5 @@
 #include "FontManager.h"
+#include "FontWidthFit.h"
 #include "FontAxisPolicy.h"
 #include "FontFileInspection.h"
 #include <QCryptographicHash>
@@ -446,6 +447,9 @@ QVariantMap FontManager::fittedText(const QFont &font, const QString &text,
     auto advance=[&](const QFont &f){
         QByteArray key;QDataStream stream(&key,QIODevice::WriteOnly);stream<<f<<text<<dpi;
         if(const auto *cached=m_textWidths.object(key))return *cached;
+#ifdef SWIRL_UI_TESTS
+        ++m_textWidthMeasurements;
+#endif
         const qreal value=QFontMetricsF(f,&device).horizontalAdvance(text);
         m_textWidths.insert(key,new qreal(value));return value;
     };
@@ -454,46 +458,15 @@ QVariantMap FontManager::fittedText(const QFont &font, const QString &text,
     QVariantMap result{{"axes",axes},{"naturalWidth",natural},{"fitted",false}};
     if(!plain||text.isEmpty()||!std::isfinite(availableWidth)||availableWidth<=0
         ||(font.family()==m_family&&!m_automatic)
-        ||!QStringList{"button","navigation","pageTitle"}.contains(role))return result;
+        ||!QStringList{"button","navigation","pageTitle","largeTitle","label"}.contains(role)
+        ||!axes.contains("wdth"))return result;
     QVariantMap widthAxis;
     for(const auto &record:axesFor(font.family()))if(record.toMap().value("tag")=="wdth")widthAxis=record.toMap();
     if(widthAxis.isEmpty())return result;
     const double normal=widthAxis.value("defaultValue").toDouble();
-    // At most 10% of the designer's width coordinate; legal ranges can narrow
-    // this further. A non-percent or nonpositive custom default is not guessed.
-    if(normal<=0)return result;
-    const double minimum=qMax(widthAxis.value("minimum").toDouble(),normal*.90);
-    if(minimum>=normal)return result;
-    const bool wasNarrow=std::isfinite(previousWidth)&&previousWidth>=minimum&&previousWidth<normal;
-    // Four logical pixels to enter/leave fitting, two pixels inside each band.
-    // Small layout jitter therefore keeps the previous coordinate.
-    if((!wasNarrow&&natural<=availableWidth+4)||(wasNarrow&&natural<=availableWidth-4))return result;
     auto widthAt=[&](double coordinate){auto f=measured;f.setVariableAxis(QFont::Tag("wdth"),float(coordinate));return advance(f);};
-    if(wasNarrow){
-        const auto current=widthAt(previousWidth);
-        const auto wider=qMin(normal,previousWidth+normal*.02);
-        if(current<=availableWidth+2&&widthAt(wider)>availableWidth-2){axes["wdth"]=previousWidth;result["axes"]=axes;result["fitted"]=true;return result;}
-    }
-    // Sample the bounded domain without assuming advance is monotonic. Prefer
-    // the least compressed coordinate that actually fits; if none fits, use
-    // the smallest *measured* advance rather than the last sampled coordinate.
-    // A 10% axis movement can cause a much larger advance change, so impose
-    // an independent 85% measured-advance readability floor.
-    double chosen=normal;
-    double bestAdvance=natural;
-    bool foundFit=false;
-    for(int step=1;step<=10;++step){
-        const double candidate=qMax(minimum,normal*(1.-step*.01));
-        const double width=widthAt(candidate);
-        if(!std::isfinite(width)||width<natural*.85||width>=natural-.5)
-            continue;
-        if(width<=availableWidth-2){
-            if(!foundFit||candidate>chosen){chosen=candidate;bestAdvance=width;}
-            foundFit=true;
-        }else if(!foundFit&&width<bestAdvance-.5){
-            chosen=candidate;bestAdvance=width;
-        }
-    }
+    const double chosen=FontWidthFit::solve(widthAxis.value("minimum").toDouble(),normal,
+        widthAxis.value("maximum").toDouble(),natural,availableWidth,previousWidth,widthAt);
     if(chosen<normal){axes["wdth"]=chosen;result["axes"]=axes;result["fitted"]=true;}
     return result;
 }

@@ -123,6 +123,32 @@ collection = TTCollection()
 collection.fonts = [TTFont(out / 'automation-width.ttf')]
 collection.save(out / 'automation-width.otc')
 
+# Valid nonmonotonic advance variation comes from gvar regions, not from an
+# illegal backwards avar map. All geometry and metrics originate above.
+def width_region_font(filename, family, minimum, default, maximum, regions):
+    automation_font(filename, family, [
+        ('wght', 100, 400, 900, 'Weight'),
+        ('wdth', minimum, default, maximum, 'Width'),
+    ])
+    font = TTFont(out / filename)
+    variations = [v for v in font['gvar'].variations['A'] if 'wdth' not in v.axes]
+    points = font['glyf']['A'].coordinates
+    for support, advance_delta in regions:
+        coordinates = [(round((x - 330) * advance_delta / 660), 0) for x, y in points]
+        coordinates += [(0, 0), (advance_delta, 0), (0, 0), (0, 0)]
+        variations.append(TupleVariation({'wdth': support}, coordinates))
+    font['gvar'].variations['A'] = variations
+    font.save(out / filename)
+
+
+width_region_font('automation-width-nonmonotonic.ttf', 'Swirl Nonmonotonic Width',
+                  98.5, 100, 140, [((-.65, -.6, -.55), -75)])
+width_region_font('automation-width-steep.ttf', 'Swirl Steep Width',
+                  75, 100, 125, [((-1, -1, 0), -500)])
+width_region_font('automation-width-asymmetric.ttf', 'Swirl Asymmetric Width',
+                  96, 100, 100, [((-1, -1, 0), -80)])
+print('Generated original nonmonotonic, steep and asymmetric width fixtures')
+
 # Original test geometry in raw custom-axis coordinates. This is not PingFang
 # and does not establish the accuracy or readiness of a converted Apple font.
 for filename, family, default, maximum in [

@@ -38,6 +38,8 @@ def read_cases(path: Path) -> list[dict]:
 
 def summarize(build: Path, require_windows: bool) -> dict:
     reports = ["font-selection.xml", "font-axis-policy.xml"]
+    width_cases = ("automaticWidthUsesRealAdvances", "automaticWidthNonmonotonicFonts",
+                   "automaticWidthShaping", "automaticWidthCacheAndResize", "qmlWidthControls")
     required = [("font-selection.xml", name) for name in (
         "defaultSelectionAndPersistence", "importKeepsOriginalFile",
         "malformedImportPreservesState", "optionalMetadataReplacement",
@@ -48,14 +50,19 @@ def summarize(build: Path, require_windows: bool) -> dict:
         "qmlLiveAutomaticFonts", "fontDisplayContextLifetime",
         "previewFontResourcesInvalidateRaster", "previewWindowMetricsAndIdleStability",
         "previewRepeatedAxesReuseResources",
-        "automaticWidthUsesRealAdvances",
+        "widthSolverRejectsUnsafeHistory", "widthSolverBoundsAndNonmonotonic",
     )]
+    required.extend(("font-selection.xml", name) for name in width_cases)
     if require_windows:
         reports.append("font-native-raster.xml")
         required.extend(("font-native-raster.xml", name) for name in (
             "nativeGlyphsHaveNoColourFringes", "previewRepeatedAxesReuseResources",
-            "automaticWidthUsesRealAdvances",
         ))
+        required.extend(("font-native-raster.xml", name) for name in width_cases)
+        for scale in (125, 200):
+            report = f"font-width-simulated-{scale}.xml"
+            reports.append(report)
+            required.extend((report, name) for name in width_cases)
     cases, errors = [], []
     for report in reports:
         try:
@@ -82,7 +89,7 @@ def summarize(build: Path, require_windows: bool) -> dict:
         if case["status"] == "skip" and case["report"] == "font-selection.xml" and case["function"] not in local_only:
             errors.append(f"Unexpected public font case skip: {case['function']}")
     counts = {status: sum(case["status"] == status and not case["lifecycle"] for case in cases)
-              for status in ("pass", "skip")}
+              for status in ("pass", "fail", "skip")}
     return {"schema": 1, "countsExcludingLifecycle": counts, "errors": errors,
             "cases": cases, "physicalDpiVerified": False, "refresh240HzVerified": False}
 
@@ -98,13 +105,15 @@ def main() -> int:
     args.output.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     counts = result["countsExcludingLifecycle"]
     lines = ["## Font test cases", "",
-             f"Passed: {counts['pass']}; skipped: {counts['skip']}; report/gate errors: {len(result['errors'])}.",
+             f"Passed: {counts['pass']}; failed: {counts['fail']}; skipped: {counts['skip']}; report/gate errors: {len(result['errors'])}.",
              "Lifecycle callbacks are excluded. Skipped cases are not passes.", "",
              "### Skipped cases", ""]
     skipped = [case for case in result["cases"] if case["status"] == "skip"]
     lines += [f"- {case['report']}/{case['function']}: {case['description']}" for case in skipped] or ["None."]
     if result["errors"]:
         lines += ["", "### Errors", ""] + [f"- {error}" for error in result["errors"]]
+    if args.require_windows:
+        lines += ["", "Width reports named simulated-125/200 use QT_SCALE_FACTOR=1.25/2 in separate processes; these are application-scale simulations, not physical Windows system scaling."]
     lines += ["", "Hosted Qt/D3D11 checks do not verify a physical Windows 11 display, cross-monitor DPI transitions, or 240 Hz performance.", ""]
     summary = "\n".join(lines)
     print(summary)

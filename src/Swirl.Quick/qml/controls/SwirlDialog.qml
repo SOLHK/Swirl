@@ -91,6 +91,7 @@ Dialog {
         opacity:dialog.heroSource?Math.max(0,Math.min(1,(dialog.heroProgress-0.18)/0.65)):1
         SwirlText {
             textRole: "pageTitle"
+            fitInFixedWidth: true
             text: dialog.title
             color: Theme.text; font.pixelSize:Theme.fontSize(18); font.weight: Font.DemiBold
             anchors.left: parent.left; anchors.leftMargin:dialog.leftPadding

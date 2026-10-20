@@ -34,6 +34,8 @@ inline void registerFontQmlTypes()
         qmlRegisterType<VariableFontPreview>("SwirlQuick", 1, 0, "VariableFontPreview");
         qmlRegisterType(QUrl::fromLocalFile(QStringLiteral(SWIRL_QML_SOURCE_DIR "/components/SwirlContinuousSurface.qml")),
                         "SwirlQuick", 1, 0, "SwirlContinuousSurface");
+        qmlRegisterType(QUrl::fromLocalFile(QStringLiteral(SWIRL_QML_SOURCE_DIR "/controls/SwirlText.qml")),
+                        "SwirlQuick", 1, 0, "SwirlText");
         qmlRegisterSingletonType(QUrl::fromLocalFile(QStringLiteral(SWIRL_QML_SOURCE_DIR "/Theme.qml")),
                                  "SwirlQuick", 1, 0, "Theme");
         qmlRegisterSingletonType(QUrl::fromLocalFile(QStringLiteral(SWIRL_QML_SOURCE_DIR "/SwirlMotion.qml")),
@@ -387,6 +389,216 @@ ApplicationWindow {
         QVERIFY(QFontMetricsF(actual).horizontalAdvance(text)<QFontMetricsF(uncompressed).horizontalAdvance(text));
         QFile report(evidence+"/private-width-layout.json");QVERIFY(report.open(QIODevice::WriteOnly));
         report.write(QJsonDocument(QJsonObject{{"dpr",window->devicePixelRatio()},{"naturalAdvance",privateNatural},{"availableWidth",item("widthText")->property("width").toDouble()},{"actualWdth",actual.variableAxisValue(QFont::Tag("wdth"))},{"pixelSize",actual.pixelSize()},{"sameObject",retainedWidth.data()==item("widthText")}}).toJson());
+    }
+    QVERIFY2(warnings.isEmpty(), qPrintable(warnings.join('\n')));
+}
+
+void FontTests::qmlWidthControls()
+{
+    const auto fixtures = qEnvironmentVariable("SWIRL_FONT_METADATA_FIXTURES");
+    if (fixtures.isEmpty()) QSKIP("Original public width fixtures required");
+    QTemporaryDir directory;
+    QVERIFY(directory.isValid());
+    QSettings::setDefaultFormat(QSettings::IniFormat);
+    QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, directory.path());
+    QSettings().clear();
+    FontManager manager(nullptr, directory.filePath("fonts"));
+    QVERIFY(manager.importFont(QUrl::fromLocalFile(fixtures + "/automation-width.ttf")));
+    QVERIFY(manager.applyPreview());
+
+    registerFontQmlTypes();
+    QStringList warnings;
+    QScopedPointer<QObject> serviceObject;
+    QQmlEngine engine;
+    auto importPaths = engine.importPathList();
+    importPaths.removeAll(QCoreApplication::applicationDirPath());
+    engine.setImportPathList(importPaths);
+    QObject::connect(&engine, &QQmlEngine::warnings, &engine, [&](const QList<QQmlError> &errors) {
+        for (const auto &error : errors) warnings.append(error.toString());
+    });
+    engine.addImageProvider(QStringLiteral("swirl"), new FontQmlIconProvider);
+    engine.rootContext()->setContextProperty("fontManager", &manager);
+    engine.rootContext()->setContextProperty("gpuEffectsSupported", false);
+    engine.rootContext()->setContextProperty("previewCaptureMode", false);
+    QQmlComponent services(&engine);
+    services.setData(R"(
+import QtQuick
+QtObject {
+    property string sidebarPage: "overview"
+    property bool proxyOn: false
+    property int measurementTick: 0
+    property bool alwaysShowScrollbars: false
+    property bool complexMotion: false
+    property bool systemReducedMotion: false
+    function zh(value) { return value }
+    function fingerprint(item) { return "" }
+    function push(item, window) {}
+    function pop(item) {}
+    function setTransitioning(active) {}
+}
+)", QUrl("file:width-test-services.qml"));
+    serviceObject.reset(services.create());
+    QVERIFY2(serviceObject, qPrintable(services.errorString()));
+    for (const char *name : {"AppState", "dismissals", "motionPolicy"})
+        engine.rootContext()->setContextProperty(QString::fromLatin1(name), serviceObject.data());
+    QQmlComponent component(&engine);
+    component.setData(R"(
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+import SwirlQuick
+import "controls" as Controls
+import "components" as Components
+ApplicationWindow {
+    id: window
+    visible: true; width: 800; height: 800; title: "AAAAAAAA"
+    Column {
+        Controls.SwirlComboBox { objectName: "widthCombo"; width: 300; model: ["AAAAAAAA", "AAAA"]; font.pixelSize: 20 }
+        Components.SwirlNavigationItem { objectName: "widthNavigation"; width: 300; title: "AAAAAAAA" }
+        Components.SwirlListRow { objectName: "widthList"; width: 300; title: "AAAAAAAA" }
+        Components.SwirlMetricCard { objectName: "widthCard"; width: 300; label: "AAAAAAAA"; value: "AAAA" }
+        Controls.SwirlDataTable { objectName: "widthTable"; width: 300; height: 50; columns: [{key:"name",label:"AAAAAAAA",w:100}]; rows: [] }
+        Components.SwirlWindowTitleBar { objectName: "widthWindowTitle"; width: 300; targetWindow: window }
+        RowLayout { objectName: "paddedHost"; width: 300
+            Controls.SwirlText { objectName: "paddedLabel"; textRole: "label"; text: "AAAAAAAA"; font.pixelSize: 20
+                leftPadding: 12; rightPadding: 8; Layout.fillWidth: true; elide: Text.ElideRight }
+        }
+        RowLayout { width: 50
+            Controls.SwirlText { objectName: "bodyExcluded"; text: "AAAAAAAA"; Layout.fillWidth: true; elide: Text.ElideRight }
+            Controls.SwirlText { objectName: "dataExcluded"; textRole: "data"; text: "AAAAAAAA"; Layout.fillWidth: true; elide: Text.ElideRight }
+        }
+        RowLayout { width: 50
+            Controls.SwirlText { objectName: "richExcluded"; textRole: "label"; text: "<b>AAAAAAAA</b>"; Layout.fillWidth: true; elide: Text.ElideRight }
+            Controls.SwirlText { objectName: "multilineExcluded"; textRole: "label"; text: "AAAA\nAAAA"; Layout.fillWidth: true; elide: Text.ElideRight }
+            Controls.SwirlText { objectName: "designMetricsExcluded"; textRole: "label"; text: "AAAAAAAA"; renderType: Text.QtRendering; Layout.fillWidth: true; elide: Text.ElideRight }
+        }
+        Controls.SwirlText { objectName: "unconstrainedExcluded"; textRole: "label"; text: "AAAAAAAA"; elide: Text.ElideRight }
+        Controls.SwirlTextField { objectName: "inputExcluded"; width: 40; text: "AAAAAAAA" }
+    }
+    Controls.SwirlDialog { objectName: "widthDialog"; title: "AAAAAAAA"; guardChanges: false
+        contentItem: Controls.SwirlText { text: "A"; wrapMode: Text.Wrap }
+    }
+}
+)", QUrl::fromLocalFile(QStringLiteral(SWIRL_QML_SOURCE_DIR "/width-controls-fixture.qml")));
+    QScopedPointer<QObject> root(component.create());
+    QVERIFY2(root, qPrintable(component.errorString()));
+    auto *window = qobject_cast<QQuickWindow *>(root.data());
+    QVERIFY(window && window->screen());
+    qInfo().noquote() << "W1 width QML environment" << QJsonDocument(QJsonObject{
+        {"platform", QGuiApplication::platformName()},
+        {"windowDpr", window->devicePixelRatio()},
+        {"logicalDpi", window->screen()->logicalDotsPerInchY()},
+        {"QT_SCALE_FACTOR", qEnvironmentVariable("QT_SCALE_FACTOR")},
+        {"physicalScreenVerified", false}}).toJson(QJsonDocument::Compact);
+    auto object = [&](const char *name) { return root->findChild<QObject *>(QString::fromLatin1(name)); };
+    std::function<QQuickItem *(QQuickItem *)> firstText = [&](QQuickItem *item) -> QQuickItem * {
+        if (!item) return nullptr;
+        if (item->inherits("QQuickText") && item->property("text").toString() == QStringLiteral("AAAAAAAA")) return item;
+        for (auto *child : item->childItems()) if (auto *found = firstText(child)) return found;
+        return nullptr;
+    };
+    const auto widthTag = QFont::Tag("wdth");
+    const auto font = [](QObject *item) { return item->property("font").value<QFont>(); };
+    const auto natural = [&](QObject *item) {
+        return manager.fittedText(font(item), item->property("text").toString(), 96, 1,
+            item->property("textRole").toString(), 10000, 100).value("naturalWidth").toDouble();
+    };
+    // Exercise the real shared content items. The owner width changes while its
+    // icon/padding/layout contract stays intact; no test-only width solver exists.
+    for (const char *name : {"widthCombo", "widthNavigation", "widthList", "widthCard", "widthTable", "widthWindowTitle"}) {
+        auto *owner = object(name);
+        QVERIFY2(owner, name);
+        auto *text = firstText(qobject_cast<QQuickItem *>(owner));
+        QVERIFY2(text, name);
+        QTRY_VERIFY(text->property("widthFitting").toBool());
+        QTRY_COMPARE(font(text).variableAxisValue(widthTag), 100.f);
+        const auto defaultFont = font(text);
+        const double ownerImplicitWidth = owner->property("implicitWidth").toDouble();
+        const double preferred = natural(text);
+        QVERIFY(preferred > 30);
+        const double extra = owner->property("width").toDouble() - text->width()
+            + text->property("leftPadding").toDouble() + text->property("rightPadding").toDouble();
+        QVERIFY(owner->setProperty("width", preferred + extra - 8));
+        QTRY_VERIFY(font(text).variableAxisValue(widthTag) < 100.f);
+        QCOMPARE(font(text).pixelSize(), defaultFont.pixelSize());
+        QCOMPARE(font(text).weight(), defaultFont.weight());
+        QCOMPARE(font(text).hintingPreference(), defaultFont.hintingPreference());
+        QTRY_VERIFY(qAbs(owner->property("implicitWidth").toDouble() - ownerImplicitWidth) < .001);
+        QVERIFY(owner->setProperty("width", preferred + extra + 10));
+        QTRY_COMPARE(font(text).variableAxisValue(widthTag), 100.f);
+    }
+    auto *padded = object("paddedLabel");
+    auto *paddedHost = object("paddedHost");
+    QVERIFY(padded && paddedHost);
+    const double paddedNatural = natural(padded);
+    // Total width fits, but the actual text area does not: ignoring padding
+    // would incorrectly retain the default coordinate in this regression.
+    QVERIFY(paddedHost->setProperty("width", paddedNatural + 12));
+    QTRY_VERIFY(font(padded).variableAxisValue(widthTag) < 100.f);
+    QTRY_VERIFY(qAbs(QQmlProperty(padded, "Layout.preferredWidth", qmlContext(padded)).read().toDouble()
+        - paddedNatural - 20) < .001);
+    QVERIFY(padded->setProperty("leftPadding", 0));
+    QVERIFY(padded->setProperty("rightPadding", 0));
+    QTRY_COMPARE(font(padded).variableAxisValue(widthTag), 100.f);
+    for (const char *name : {"bodyExcluded", "dataExcluded", "richExcluded", "multilineExcluded", "designMetricsExcluded", "unconstrainedExcluded"}) {
+        QVERIFY2(object(name), name);
+        QVERIFY(!object(name)->property("widthFitting").toBool());
+        QTRY_COMPARE(font(object(name)).variableAxisValue(widthTag), 100.f);
+    }
+    QTRY_COMPARE(font(object("inputExcluded")).variableAxisValue(widthTag), 100.f);
+
+    auto *combo = object("widthCombo");
+    auto *comboText = firstText(qobject_cast<QQuickItem *>(combo));
+    QVERIFY(combo && comboText);
+    QVERIFY(combo->setProperty("width", natural(comboText) + combo->property("leftPadding").toDouble()
+        + combo->property("rightPadding").toDouble() - 8));
+    QTRY_VERIFY(font(comboText).variableAxisValue(widthTag) < 100.f);
+    const auto heldFont = font(comboText);
+    const double heldWidth = combo->property("width").toDouble();
+    const auto fontProperty = comboText->metaObject()->property(comboText->metaObject()->indexOfProperty("font"));
+    QTest::qWait(100);
+    QSignalSpy changes(comboText, fontProperty.notifySignal());
+    for (int i = 0; i < 24; ++i) {
+        QVERIFY(combo->setProperty("width", heldWidth + (i % 2) * .2));
+        QCoreApplication::processEvents();
+    }
+    QTest::qWait(100);
+    QCOMPARE(font(comboText), heldFont);
+    QCOMPARE(changes.count(), 0);
+    QVERIFY(manager.setPreviewAxis("wdth", 107.25));
+    QVERIFY(manager.applyPreview());
+    QTRY_COMPARE(font(comboText).variableAxisValue(widthTag), 107.25f);
+    QVERIFY(combo->setProperty("width", 30));
+    QTRY_COMPARE(font(comboText).variableAxisValue(widthTag), 107.25f);
+    manager.setPreviewAutomatic(true);
+    QVERIFY(manager.applyPreview());
+    QTRY_VERIFY(font(comboText).variableAxisValue(widthTag) <= 100.f);
+
+    auto *dialog = object("widthDialog");
+    QVERIFY(dialog);
+    auto *header = firstText(qobject_cast<QQuickItem *>(dialog->property("header").value<QObject *>()));
+    QVERIFY(header);
+    QTRY_VERIFY(header->property("widthFitting").toBool());
+    const double dialogNatural = natural(header);
+    QVERIFY(dialog->setProperty("width", dialogNatural + dialog->property("leftPadding").toDouble()
+        + dialog->property("rightPadding").toDouble() - 8));
+    QPointer<QQuickItem> retainedHeader(header);
+    for (int i = 0; i < 6; ++i) {
+        QVERIFY(QMetaObject::invokeMethod(dialog, "open"));
+        QTRY_VERIFY(dialog->property("opened").toBool());
+        QTRY_VERIFY(font(header).variableAxisValue(widthTag) < 100.f);
+        QVERIFY(QMetaObject::invokeMethod(dialog, "close"));
+        QTRY_VERIFY(!dialog->property("visible").toBool());
+        QCOMPARE(retainedHeader.data(), header);
+    }
+    // Reuse these same live objects through static fallback and re-selection.
+    const auto widthFamily = manager.currentFamily();
+    for (int i = 0; i < 4; ++i) {
+        QVERIFY(manager.selectFamily(manager.defaultFamily()));
+        QTRY_VERIFY(!font(comboText).isVariableAxisSet(widthTag));
+        QVERIFY(manager.selectFamily(widthFamily));
+        QTRY_VERIFY(font(comboText).isVariableAxisSet(widthTag));
+        QVERIFY(manager.automatic());
     }
     QVERIFY2(warnings.isEmpty(), qPrintable(warnings.join('\n')));
 }

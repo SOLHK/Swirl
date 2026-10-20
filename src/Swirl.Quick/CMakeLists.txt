@@ -31,8 +31,25 @@ function(swirl_add_font_tests)
  add_test(NAME swirl-font-axis-policy COMMAND SwirlFontAxisPolicyTests -o "${CMAKE_CURRENT_BINARY_DIR}/font-axis-policy.xml,xml" -o "-,txt")
  set_tests_properties(swirl-font-axis-policy PROPERTIES LABELS fonts TIMEOUT 30)
  if(WIN32)
-  add_test(NAME swirl-font-native-raster COMMAND SwirlFontTests nativeGlyphsHaveNoColourFringes previewRepeatedAxesReuseResources automaticWidthUsesRealAdvances localSwirlCollectionUsesPhysicalFaces customAxesChangeRealGlyphsAtMixedCoordinates physicalIdentityRejectsMissingAndChangedOutlineTables -o "${CMAKE_CURRENT_BINARY_DIR}/font-native-raster.xml,xml" -o "-,txt")
+  set(swirl_width_tests automaticWidthUsesRealAdvances automaticWidthNonmonotonicFonts
+      automaticWidthShaping automaticWidthCacheAndResize qmlWidthControls)
+  add_test(NAME swirl-font-native-raster COMMAND SwirlFontTests nativeGlyphsHaveNoColourFringes previewRepeatedAxesReuseResources ${swirl_width_tests} localSwirlCollectionUsesPhysicalFaces customAxesChangeRealGlyphsAtMixedCoordinates physicalIdentityRejectsMissingAndChangedOutlineTables -o "${CMAKE_CURRENT_BINARY_DIR}/font-native-raster.xml,xml" -o "-,txt")
   set_tests_properties(swirl-font-native-raster PROPERTIES LABELS fonts TIMEOUT 30 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
+  # Qt documents QT_SCALE_FACTOR as a hardware-independent application-scale
+  # simulation. Its multiplier is not a physical Windows system DPI setting.
+  # Run separate processes so each QGuiApplication sees its scale at startup.
+  foreach(swirl_width_scale IN ITEMS 125 200)
+   if(swirl_width_scale EQUAL 125)
+    set(swirl_width_factor 1.25)
+   else()
+    set(swirl_width_factor 2)
+   endif()
+   add_test(NAME swirl-font-width-simulated-${swirl_width_scale} COMMAND SwirlFontTests ${swirl_width_tests}
+       -o "${CMAKE_CURRENT_BINARY_DIR}/font-width-simulated-${swirl_width_scale}.xml,xml" -o "-,txt")
+   set_tests_properties(swirl-font-width-simulated-${swirl_width_scale} PROPERTIES LABELS fonts TIMEOUT 30 RUN_SERIAL TRUE
+       ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11;QT_SCALE_FACTOR=${swirl_width_factor}"
+       ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
+  endforeach()
  endif()
  file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/font-toolchain.txt"
   "Qt=${Qt6_VERSION}\nCompiler=${CMAKE_CXX_COMPILER_ID}\nCompilerVersion=${CMAKE_CXX_COMPILER_VERSION}\nGenerator=${CMAKE_GENERATOR}\nGeneratorPlatform=${CMAKE_GENERATOR_PLATFORM}\nPointerSize=${CMAKE_SIZEOF_VOID_P}\nCxxStandard=${CMAKE_CXX_STANDARD}\n")

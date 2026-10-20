@@ -10,7 +10,7 @@ Item {
  component GatewayMenuItem:MenuItem{
   implicitHeight:visible?Theme.dp(26):0;height:implicitHeight;font.family:Theme.fontFamily;font.pixelSize:Theme.fontSize(12)
   background:Rectangle{radius:Theme.dp(6);color:parent.highlighted?Theme.accent:"transparent"}
-  contentItem:SwirlText {text:parent.text;leftPadding:Theme.dp(8);rightPadding:Theme.dp(8);font.family:parent.font.family;font.pixelSize:parent.font.pixelSize;font.weight:parent.font.weight;color:parent.highlighted?"white":parent.enabled?Theme.text:Theme.muted;verticalAlignment:Text.AlignVCenter;elide:Text.ElideRight}
+  contentItem:SwirlText {textRole:"label";fitInFixedWidth:true;text:parent.text;leftPadding:Theme.dp(8);rightPadding:Theme.dp(8);font.family:parent.font.family;font.pixelSize:parent.font.pixelSize;font.weight:parent.font.weight;color:parent.highlighted?"white":parent.enabled?Theme.text:Theme.muted;verticalAlignment:Text.AlignVCenter;elide:Text.ElideRight}
  }
  id:page;property string selectedId:"";property int sortIndex:3
  readonly property var records:{if(!visible)return [];let rows=gatewayProvider.devices.map(r=>Object.assign({},r));if(sortIndex===0)rows.sort((a,b)=>b.total-a.total);else if(sortIndex===1)rows.sort((a,b)=>b.speed-a.speed);else if(sortIndex===2)rows.sort((a,b)=>a.name.localeCompare(b.name));else if(sortIndex===3)rows.sort((a,b)=>ipNumber(a.ip)-ipNumber(b.ip));else if(sortIndex===4)rows.sort((a,b)=>b.lastSeen-a.lastSeen);return rows}

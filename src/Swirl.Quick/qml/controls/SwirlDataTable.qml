@@ -80,7 +80,8 @@ Item {
                             SwirlText {renderType:Text.NativeRendering;
                                 text:AppState.zh(modelData.label)
                                 color:table.minimal?Theme.muted:Theme.text
-                                textRole:"smallLabel"
+                                textRole:"label"
+                                fitInFixedWidth: true
                                 font.pixelSize:Theme.fontSize(table.headerPixelSize)
                                 font.family:Theme.fontFamily
                                 font.weight:Theme.bodyFontWeight
