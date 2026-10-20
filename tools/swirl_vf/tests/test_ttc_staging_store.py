@@ -37,7 +37,7 @@ def records(start=0, stop=2):
 class BatchStoreTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory(prefix="c1-original-staging-")
-        self.root = Path(self.tmp.name)
+        self.root = Path(self.tmp.name).resolve()
         self.store = BatchStore(self.root / "private", BINDING, [5, 3], batch_size=2)
 
     def tearDown(self):
@@ -315,6 +315,22 @@ with store.writer():
                                      ([1], 2, 10), ([1], 2, 2**40)):
             with self.subTest(counts=counts, batch=batch, limit=limit), self.assertRaises(StagingError):
                 BatchStore(self.root / "invalid", BINDING, counts, batch_size=batch, max_payload_bytes=limit)
+
+    def test_valid_numeric_corruption_of_finished_session_is_detected(self):
+        with self.store.writer():
+            self.store.commit(0, 0, 2, records(), evidence(self.store))
+            path = next((self.store.directory / "receipts").iterdir())
+            changed = json.loads(path.read_bytes())
+            changed["evidence"]["request_count"] += 1
+            path.write_bytes(canonical_bytes(changed))
+            with self.assertRaisesRegex(StagingError, "receipt_hash_mismatch"):
+                self.store.restore(0, 0, 2)
+
+    def test_oversized_recipe_rejected_before_creating_any_directory(self):
+        path = self.root / "large-recipe"
+        with self.assertRaisesRegex(StagingError, "recipe_size_limit"):
+            BatchStore(path, {**BINDING, "data": "x" * (4 * 1024**2)}, [1])
+        self.assertFalse(path.exists())
 
 
 if __name__ == "__main__":

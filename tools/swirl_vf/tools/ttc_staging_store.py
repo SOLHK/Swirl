@@ -19,7 +19,7 @@ import tempfile
 from ttc_staging_contract import StagingError
 
 
-FORMAT = "swirl-vf-c1-batches-v1"
+FORMAT = "swirl-vf-c1-batches-v2"
 
 
 def canonical_bytes(value):
@@ -197,6 +197,8 @@ class BatchStore:
                        "batch_size": batch_size, "max_payload_bytes": max_payload_bytes,
                        "commit_policy": "immutable_receipt_after_payload_and_finished_session"}
         self.recipe_bytes = canonical_bytes(self.recipe)
+        if len(self.recipe_bytes) > 4 * 1024 * 1024:
+            raise StagingError("serialization", "checkpoint_recipe_size_limit")
         self.recipe_sha256 = digest_bytes(self.recipe_bytes)
         self._locked = False
 
@@ -284,7 +286,7 @@ class BatchStore:
             return None
         receipt, _ = _json_file(path, 16384)
         keys = {"schema", "recipe_sha256", "face_index", "gid_start", "gid_stop", "payload_sha256",
-                "payload_bytes", "record_count", "evidence"}
+                "payload_bytes", "record_count", "evidence", "receipt_sha256"}
         if (type(receipt) is not dict or set(receipt) != keys
                 or type(receipt["schema"]) is not int or receipt["schema"] != 1
                 or receipt["recipe_sha256"] != self.recipe_sha256
@@ -292,9 +294,13 @@ class BatchStore:
                 or type(receipt["gid_start"]) is not int or receipt["gid_start"] != start
                 or type(receipt["gid_stop"]) is not int or receipt["gid_stop"] != stop
                 or not _sha(receipt["payload_sha256"])
+                or not _sha(receipt["receipt_sha256"])
                 or not _integer(receipt["payload_bytes"], 1, self.max_payload_bytes)
                 or type(receipt["record_count"]) is not int or receipt["record_count"] != stop - start):
             raise StagingError("serialization", "invalid_batch_receipt", face_index=face)
+        checked = {key: value for key, value in receipt.items() if key != "receipt_sha256"}
+        if digest_bytes(canonical_bytes(checked)) != receipt["receipt_sha256"]:
+            raise StagingError("serialization", "checkpoint_receipt_hash_mismatch", face_index=face)
         self._validate_evidence(receipt["evidence"], face, start, stop)
         payload_path = _safe_path(self.directory / "payloads" / (receipt["payload_sha256"] + ".json"))
         payload, data = _json_file(payload_path, self.max_payload_bytes)
@@ -328,6 +334,7 @@ class BatchStore:
                    "face_index": face, "gid_start": start, "gid_stop": stop,
                    "payload_sha256": digest, "payload_bytes": len(data),
                    "record_count": stop - start, "evidence": evidence}
+        receipt["receipt_sha256"] = digest_bytes(canonical_bytes(receipt))
         # Validate any old receipt before an idempotent replay. A corrupted
         # confirmed record cannot be replaced with newly computed data.
         if receipt_path.exists() or receipt_path.is_symlink():
