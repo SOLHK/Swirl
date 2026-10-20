@@ -444,8 +444,10 @@ class CoreDevelopmentTests(unittest.TestCase):
         for name in REQUIRED_TESTS:
             (peers / name).write_text("# test fixture\n", encoding="utf-8")
         (peers / development.REALITY_RUNTIME_TEST).write_text("# runtime peer fixture\n", encoding="utf-8")
+        (peers / development.PUBLIC_QT_TEST).write_text("# Qt public evidence fixture\n", encoding="utf-8")
         (root / "tools/Verify-PublicRustCore.py").write_text("# public check fixture\n", encoding="utf-8")
         (root / development.PUBLIC_REALITY_PROBE).write_text("# public REALITY check fixture\n", encoding="utf-8")
+        (root / development.PUBLIC_QT_PROBE).write_text("# public Qt check fixture\n", encoding="utf-8")
         (root / "tools/Diagnose-NativeConnectivity.py").write_text("# diagnostic fixture\n", encoding="utf-8")
         diagnostic = root / "core/crates/swirl-api/src/bin/swirl-diagnose.rs"
         diagnostic.parent.mkdir(parents=True)
@@ -486,6 +488,7 @@ class CoreDevelopmentTests(unittest.TestCase):
                 self.assertIn(development.reality_runtime_steps(windows=True, qt=True)
                               + development.reality_runtime_steps(windows=True, qt=True, vision=True)
                               + development.reality_runtime_steps(windows=True, qt=True, vision=True, fingerprint="chrome")
+                              + development.public_qt_steps()
                               + development.NATIVE_APPLICATION_BUILD, part)
         for source in (
             final.replace("python tools/tests/test_reality_runtime.py\n", "python tools/tests/test_reality_runtime.py || true\n", 1),
@@ -1495,7 +1498,38 @@ class CoreDevelopmentTests(unittest.TestCase):
         qt = development.reality_runtime_steps(windows=True, qt=True, vision=True, fingerprint="chrome")
         self.assertEqual(windows.count(qt), 1)
         self.assertLess(windows.index("Run Qt to Rust integration without Mihomo"), windows.index(qt))
-        self.assertIn(qt + development.NATIVE_APPLICATION_BUILD, windows)
+        self.assertIn(qt + development.public_qt_steps() + development.NATIVE_APPLICATION_BUILD, windows)
+
+    def test_windows_qt_public_gate_rejects_weakened_moved_or_partial_evidence(self):
+        final = development.updated_workflow(FIXTURE)
+        block = development.public_qt_steps()
+        previous = development.without_public_qt_steps(final)
+        self.assertEqual(development.updated_workflow(previous), final)
+        self.assertEqual(development.updated_workflow(final), final)
+        portable, windows = final.split("  windows-rust:\n")
+        self.assertNotIn(development.PUBLIC_QT_PROBE.name, portable)
+        self.assertEqual(windows.count(block), 1)
+        self.assertIn(' --qt-tests "$env:SWIRL_RUST_QT_TESTS" ', block)
+        self.assertNotIn("--harness", block)
+        for replacement in (block * 2,
+                            block.replace(development.WINDOWS_STATUS_GUARD, "", 1),
+                            block.replace("if: always()", "if: success()", 1),
+                            block.replace("if-no-files-found: error", "if-no-files-found: warn", 1),
+                            block.replace("        run: |", "        continue-on-error: true\n        run: |", 1),
+                            block.replace("${{ github.sha }}", "unverified", 1),
+                            block.replace("Verify-PublicQtReality.py", "Verify-PublicRealityRuntime.py", 1)):
+            with self.subTest(replacement=replacement), self.assertRaises(ValueError):
+                development.updated_workflow(final.replace(block, replacement, 1))
+        moved = final.replace(block, "", 1) + block
+        with self.assertRaises(ValueError):
+            development.updated_workflow(moved)
+        for relative in (development.PUBLIC_QT_PROBE, Path("tools/tests") / development.PUBLIC_QT_TEST):
+            with tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                self.make_repository(root)
+                (root / relative).unlink()
+                with self.assertRaises(ValueError):
+                    development.prepare_update(root)
 
     def test_fingerprint_partial_mutated_moved_and_weakened_gates_fail_closed(self):
         final = development.updated_workflow(FIXTURE)

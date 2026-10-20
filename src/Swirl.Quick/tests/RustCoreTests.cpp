@@ -23,6 +23,10 @@
 #include <QSettings>
 #include <QThreadPool>
 #include <QSignalSpy>
+#include <QElapsedTimer>
+#include <QFileInfo>
+#include <QSaveFile>
+#include <QScopeGuard>
 #include "app/StoragePaths.h"
 
 class RustCoreTests:public QObject {
@@ -417,6 +421,174 @@ private slots:
    QCOMPARE(controller.engineKind(),QString("rust"));QCOMPARE(controller.activeNodeId(),idB);controller.stop();QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive()&&!controller.busy(),5000);
   }
   QTcpServer released;QVERIFY(released.listen(QHostAddress::LocalHost,proxyPort));
+ }
+ void publicRealityProductChainAgainstIndependentPeer(){
+  if(!qEnvironmentVariableIsSet("SWIRL_PUBLIC_QT_FIXTURE"))QSKIP("The explicit public Windows Qt fixture supplies synthetic peers and fixed public targets.");
+#ifndef Q_OS_WIN
+  QSKIP("The public product gate requires real Windows NodeStore/DPAPI.");
+#endif
+  const auto fixturePath=qEnvironmentVariable("SWIRL_PUBLIC_QT_FIXTURE"),reportPath=qEnvironmentVariable("SWIRL_PUBLIC_QT_REPORT");
+  QVERIFY(!reportPath.isEmpty()&&QFileInfo(reportPath).isAbsolute());
+  QVERIFY(QFileInfo(fixturePath).absoluteFilePath()!=QFileInfo(reportPath).absoluteFilePath());
+  QJsonObject report{{"schema",1},{"scope","Windows Qt/DPAPI public targets: global node selection plus imported MATCH rejection"},
+   {"provider_connection",false},{"imported",false},{"encrypted_store_reloaded",false},{"parameters_preserved",false},
+   {"in_process_rust",false},{"node_switch_verified",false},{"selected_node_restored",false},{"match_reject_verified",false},
+   {"stopped",false},{"listener_released",false},{"checks",QJsonArray{}}};
+  const auto saveReport=[&]{QSaveFile file(reportPath);const auto bytes=QJsonDocument(report).toJson();return file.open(QIODevice::WriteOnly)&&file.write(bytes)==bytes.size()&&file.commit();};
+  const auto reportGuard=qScopeGuard([&]{saveReport();});QVERIFY(saveReport());
+  QFile input(fixturePath);QVERIFY(input.open(QIODevice::ReadOnly));QVERIFY(input.size()>0&&input.size()<=NodeImporter::MaximumBytes);
+  const auto fixture=NodeImporter::strictJsonObject(input.readAll());QVERIFY(!fixture.isEmpty());input.close();
+  for(const auto &key:fixture.keys())QVERIFY((QStringList{"subscription","targets","vision"}.contains(key)));
+  QVERIFY(fixture["subscription"].isString()&&!fixture["subscription"].toString().isEmpty());QCOMPARE(fixture["vision"],QJsonValue(true));
+  const auto document=NodeImporter::strictJsonObject(fixture["subscription"].toString().toUtf8());QVERIFY(!document.isEmpty());
+  for(const auto &key:document.keys())QVERIFY((QStringList{"proxies","rules"}.contains(key)));
+  const QJsonArray expectedRules{"DOMAIN,www.msftconnecttest.com,A","DOMAIN,www.rust-lang.org,A","MATCH,REJECT"};
+  QVERIFY(document["rules"]==QJsonValue(expectedRules));QVERIFY(document["proxies"].isArray()&&document["proxies"].toArray().size()==2);
+  QStringList fixtureNames;
+  for(const auto &entry:document["proxies"].toArray()){
+   QVERIFY(entry.isObject());const auto node=entry.toObject();const auto name=node["name"].toString();
+   QVERIFY((name=="A"||name=="B")&&!fixtureNames.contains(name));fixtureNames.append(name);
+   QVERIFY(node["server"]==QJsonValue("127.0.0.1")&&node["type"]==QJsonValue("vless"));
+   QVERIFY(node["tls"]==QJsonValue(true)&&node["flow"]==QJsonValue("xtls-rprx-vision"));
+   QVERIFY(node["client-fingerprint"]==QJsonValue("chrome")&&node["reality-opts"].isObject());
+  }
+  const QJsonArray targets{
+   QJsonObject{{"host","www.msftconnecttest.com"},{"port",80},{"method","GET"},{"path","/connecttest.txt"},{"expected_body","Microsoft Connect Test"}},
+   QJsonObject{{"host","www.rust-lang.org"},{"port",443},{"method","HEAD"},{"path","/"}}};
+  QVERIFY(fixture["targets"].isArray()&&fixture["targets"].toArray().size()==targets.size());
+  const auto suppliedTargets=fixture["targets"].toArray();
+  for(qsizetype i=0;i<targets.size();++i){
+   QVERIFY(suppliedTargets[i].isObject());const auto supplied=suppliedTargets[i].toObject(),expected=targets[i].toObject();
+   for(const auto &key:supplied.keys())QVERIFY((QStringList{"host","port","method","path","expected_body"}.contains(key)));
+   for(const auto &key:QStringList{"host","port","method","path"})QVERIFY(supplied[key]==expected[key]);
+   if(supplied.contains("expected_body"))QVERIFY(expected.contains("expected_body")&&supplied["expected_body"]==expected["expected_body"]);
+  }
+  QVERIFY(QSslSocket::supportsSsl());QTemporaryDir directory;QVERIFY(directory.isValid());const auto path=directory.filePath("public-product.dpapi");
+  QTcpServer reservation;reservation.setProxy(QNetworkProxy::NoProxy);QVERIFY(reservation.listen(QHostAddress::LocalHost));const auto proxyPort=reservation.serverPort();reservation.close();
+  QString idA,idB;QList<ProxyNode> savedNodes;QVariantMap savedNetwork;
+  {
+   EngineController controller(std::make_unique<ThreadedEngine>(),nullptr,path,true);controller.setProxyPort(proxyPort);controller.setRoutingMode("global");
+   controller.imports()->importText(fixture["subscription"].toString());QTRY_VERIFY_WITH_TIMEOUT(!controller.imports()->busy(),5000);
+   QVERIFY(controller.networkConfigurationError().isEmpty());QCOMPARE(controller.nodeCatalog().size(),2);
+   for(const auto &entry:controller.nodeCatalog()){const auto row=entry.toMap();if(row["name"]=="A")idA=row["id"].toString();if(row["name"]=="B")idB=row["id"].toString();}
+   QVERIFY(!idA.isEmpty()&&!idB.isEmpty()&&idA!=idB);QVERIFY(controller.chooseNode(idA));
+   savedNetwork=controller.networkConfigurationSnapshot();QCOMPARE(savedNetwork["rules"].toStringList().size(),3);
+   NodeStore persisted(path);QVERIFY(persisted.error().isEmpty()&&persisted.selectedId()==idA);savedNodes=persisted.nodes();QCOMPARE(savedNodes.size(),2);
+   QFile encrypted(path);QVERIFY(encrypted.open(QIODevice::ReadOnly));auto stored=encrypted.readAll();
+   QVERIFY(stored.startsWith("SWIRLNODE1\n")&&stored.size()>11);QVERIFY(!stored.contains(fixture["subscription"].toString().toUtf8()));
+   for(const auto &node:savedNodes){
+    const auto reality=node.parameters.value("reality-opts").toObject();
+    // VLESS stores its credential in uuid, not ProxyNode::password. Check the
+    // actual security fields so an empty unrelated member cannot fake a pass.
+    for(const auto &credential:QStringList{node.parameters.value("uuid").toString(),reality.value("public-key").toString(),reality.value("short-id").toString()}){
+     QVERIFY(!credential.isEmpty());QVERIFY(!stored.contains(credential.toUtf8()));
+    }
+   }
+   stored.fill('\0');report["imported"]=true;
+  }
+  // Qt's socket-level HttpProxy is CONNECT and Socks5Proxy resolves host names
+  // at the proxy. QSslSocket VerifyPeer retains system roots and host checks.
+  // Primary references: doc.qt.io/qt-6.10/qnetworkproxy.html and qsslsocket.html;
+  // Qt Network is the existing LGPL/GPL dependency. No upstream code is copied.
+  const auto request=[&](const QString &nodeName,QNetworkProxy::ProxyType proxyType,const QJsonObject &target){
+   const auto host=target["host"].toString(),method=target["method"].toString();const int port=target["port"].toInt();const bool tls=port==443;
+   QJsonObject check{{"node",nodeName},{"frontend",proxyType==QNetworkProxy::HttpProxy?"http-connect":"socks5"},
+    {"host",host},{"port",port},{"method",method},{"proxy_host","127.0.0.1"},{"proxy_port",int(proxyPort)},{"stage","connect"},{"http_status",0},{"certificate_verified",false},{"tls_version",""},{"expected_body_verified",false},{"success",false}};
+   QSslSocket socket;socket.setReadBufferSize(65537);socket.setProxy(QNetworkProxy(proxyType,"127.0.0.1",proxyPort));
+   bool verificationError=false,transportError=false;int socketError=-1,tlsErrors=0;
+   QObject::connect(&socket,&QSslSocket::sslErrors,&socket,[&](const QList<QSslError>& errors){verificationError=true;tlsErrors=int(errors.size());});
+   QObject::connect(&socket,&QAbstractSocket::errorOccurred,&socket,[&](QAbstractSocket::SocketError error){socketError=int(error);if(error!=QAbstractSocket::RemoteHostClosedError)transportError=true;});
+   QElapsedTimer timer;timer.start();constexpr int totalBudgetMs=15000;
+   const auto finish=[&]{check["socket_error"]=socketError;check["tls_error_count"]=tlsErrors;check["elapsed_ms"]=int(timer.elapsed());check["closed"]=socket.state()==QAbstractSocket::UnconnectedState;return check;};
+   const auto wait=[&](const auto &predicate){const auto remaining=totalBudgetMs-int(timer.elapsed());return remaining>0&&QTest::qWaitFor(predicate,remaining);};
+   if(tls){
+    check["stage"]="tls-handshake";auto configuration=QSslConfiguration::defaultConfiguration();configuration.setPeerVerifyMode(QSslSocket::VerifyPeer);configuration.setProtocol(QSsl::TlsV1_3);
+    configuration.setAllowedNextProtocols({QByteArray("http/1.1")});socket.setSslConfiguration(configuration);socket.connectToHostEncrypted(host,quint16(port));
+   }else socket.connectToHost(host,quint16(port));
+   if(!wait([&]{return (tls?socket.isEncrypted():socket.state()==QAbstractSocket::ConnectedState)||socket.state()==QAbstractSocket::UnconnectedState;}))return finish();
+   if(socket.state()!=QAbstractSocket::ConnectedState||verificationError||transportError)return finish();
+   if(tls){
+    const bool verified=socket.isEncrypted()&&!socket.peerCertificate().isNull()&&socket.sslHandshakeErrors().isEmpty()&&socket.sessionProtocol()==QSsl::TlsV1_3&&socket.sslConfiguration().nextNegotiatedProtocol()==QByteArray("http/1.1");
+    check["certificate_verified"]=verified;check["tls_version"]=socket.sessionProtocol()==QSsl::TlsV1_3?"TLSv1.3":"unsupported";if(!verified)return finish();
+   }
+   check["stage"]="http-write";const auto message=method.toUtf8()+" "+target["path"].toString().toUtf8()+" HTTP/1.1\r\nHost: "+host.toUtf8()+"\r\nConnection: close\r\nAccept-Encoding: identity\r\n\r\n";
+   if(socket.write(message)!=message.size())return finish();
+   check["stage"]="http-headers";QByteArray response;qsizetype separator=-1;bool oversized=false;
+   if(!wait([&]{response+=socket.readAll();oversized=response.size()>65536;separator=response.indexOf("\r\n\r\n");return oversized||separator>=0||socket.state()==QAbstractSocket::UnconnectedState;}))return finish();
+   if(oversized||separator<0||verificationError||transportError)return finish();
+   const auto lines=response.left(separator).split('\n');if(lines.isEmpty())return finish();
+   const auto statusLine=lines.first().trimmed().split(' ');bool validStatus=false;
+   const int status=statusLine.size()>=2?statusLine[1].toInt(&validStatus):0;check["http_status"]=status;
+   if(!validStatus||statusLine[1].size()!=3||(statusLine[0]!="HTTP/1.1"&&statusLine[0]!="HTTP/1.0")||status<200||status>=400)return finish();
+   check["stage"]="http-body";if(method=="GET"){
+    if(status!=200)return finish();const auto expected=target["expected_body"].toString().toUtf8();bool contentLengthSeen=false;
+    for(qsizetype i=1;i<lines.size();++i){
+     const auto line=lines[i].trimmed();const auto colon=line.indexOf(':');if(colon<=0)return finish();const auto header=line.left(colon).toLower(),value=line.mid(colon+1).trimmed();
+     if(header=="transfer-encoding")return finish();
+     if(header=="content-encoding"&&value.toLower()!="identity")return finish();
+     if(header=="content-length"){bool ok=false;const auto length=value.toLongLong(&ok);if(contentLengthSeen||!ok||length!=expected.size())return finish();contentLengthSeen=true;}
+    }
+    if(!contentLengthSeen)return finish();
+    if(!wait([&]{response+=socket.readAll();return response.size()>65536||response.size()>=separator+4+expected.size()||socket.state()==QAbstractSocket::UnconnectedState;}))return finish();
+    if(response.mid(separator+4)!=expected||response.size()>65536)return finish();check["expected_body_verified"]=true;
+   }else if(method!="HEAD"||!response.mid(separator+4).isEmpty())return finish();
+   check["stage"]="close";if(socket.state()!=QAbstractSocket::UnconnectedState){socket.disconnectFromHost();if(!wait([&]{return socket.state()==QAbstractSocket::UnconnectedState;}))return finish();}
+   response+=socket.readAll();if(response.size()>65536||verificationError||transportError)return finish();
+   if(method=="GET"&&response.mid(separator+4)!=target["expected_body"].toString().toUtf8())return finish();
+   if(method=="HEAD"&&!response.mid(separator+4).isEmpty())return finish();
+   check["stage"]="complete";check["success"]=true;return finish();
+  };
+  {
+   EngineController controller(std::make_unique<ThreadedEngine>(),nullptr,path,true);controller.setProxyPort(proxyPort);controller.setRoutingMode("global");controller.setExecutablePath("must-not-start-an-external-core.exe");
+   QVERIFY(controller.selectedNodeId()==idA);QVERIFY(controller.networkConfigurationSnapshot()==savedNetwork);
+   NodeStore restored(path);const auto restoredNodes=restored.nodes();QVERIFY(restored.error().isEmpty()&&restoredNodes.size()==savedNodes.size());report["encrypted_store_reloaded"]=true;
+   for(qsizetype i=0;i<savedNodes.size();++i){const auto &node=restoredNodes[i],&before=savedNodes[i];QVERIFY(node.parameters==before.parameters&&node.password==before.password&&node.originalConfiguration==before.originalConfiguration);}
+   report["parameters_preserved"]=true;controller.connectNode({});QTRY_VERIFY_WITH_TIMEOUT(controller.apiHealthy(),5000);
+   const auto nativeIdentity=[&]{return controller.engineKind()=="rust"&&controller.processId()==QString::number(QCoreApplication::applicationPid())&&controller.controlEndpoint().startsWith("in-process://SwirlRust/")&&controller.activeProxyPort()==proxyPort;};
+   QVERIFY(nativeIdentity());report["in_process_rust"]=true;
+   for(const auto &name:QStringList{"A","B"}){
+    const auto id=name=="A"?idA:idB;
+    if(name=="B"){QVERIFY(controller.chooseNode(id));QTRY_VERIFY_WITH_TIMEOUT(controller.activeNodeId()==id&&!controller.nodeBusy(),5000);QVERIFY(NodeStore(path).selectedId()==id);report["node_switch_verified"]=true;}
+    QVERIFY(controller.selectedNodeId()==id&&controller.activeNodeId()==id&&nativeIdentity());
+    for(const auto frontend:{QNetworkProxy::HttpProxy,QNetworkProxy::Socks5Proxy})for(const auto &target:targets){
+     const auto check=request(name,frontend,target.toObject());auto checks=report["checks"].toArray();checks.append(check);report["checks"]=checks;QVERIFY(saveReport());QVERIFY(check["success"].toBool());
+     QVERIFY(controller.selectedNodeId()==id&&controller.activeNodeId()==id&&nativeIdentity());
+    }
+   }
+   controller.setRoutingMode("rule");QTRY_COMPARE_WITH_TIMEOUT(controller.routingMode(),QString("rule"),5000);
+   // A real reachable listener makes a mistaken DIRECT route observable. A
+   // deliberately unresolvable domain could fail DNS and falsely prove REJECT.
+   QTcpServer rejectOrigin;rejectOrigin.setProxy(QNetworkProxy::NoProxy);QVERIFY(rejectOrigin.listen(QHostAddress::LocalHost));
+   QTcpSocket control;control.setProxy(QNetworkProxy::NoProxy);control.connectToHost(QHostAddress::LocalHost,rejectOrigin.serverPort());
+   QVERIFY(QTest::qWaitFor([&]{return control.state()==QAbstractSocket::ConnectedState&&rejectOrigin.hasPendingConnections();},5000));
+   const auto accepted=rejectOrigin.nextPendingConnection();QVERIFY(accepted);accepted->abort();delete accepted;control.abort();
+   int leakedConnections=0;QObject::connect(&rejectOrigin,&QTcpServer::newConnection,&rejectOrigin,[&]{++leakedConnections;});
+   for(const auto frontend:{QNetworkProxy::HttpProxy,QNetworkProxy::Socks5Proxy}){
+    // Qt intentionally bypasses its proxy for localhost destinations. Speak
+    // each frontend to Rust explicitly so the local target tests its routing.
+    QTcpSocket denied;denied.setProxy(QNetworkProxy::NoProxy);denied.connectToHost(QHostAddress::LocalHost,proxyPort);
+    QVERIFY(QTest::qWaitFor([&]{return denied.state()==QAbstractSocket::ConnectedState;},5000));QByteArray response;
+    if(frontend==QNetworkProxy::HttpProxy){
+     const auto authority=QByteArray("127.0.0.1:")+QByteArray::number(rejectOrigin.serverPort());
+     const auto message="CONNECT "+authority+" HTTP/1.1\r\nHost: "+authority+"\r\n\r\n";QCOMPARE(denied.write(message),message.size());
+     QVERIFY(QTest::qWaitFor([&]{response+=denied.readAll();return response.contains("\r\n\r\n")||denied.state()==QAbstractSocket::UnconnectedState;},5000));
+     QCOMPARE(response,QByteArray("HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"));
+    }else{
+     const auto greeting=QByteArray::fromHex("050100");QCOMPARE(denied.write(greeting),greeting.size());
+     QVERIFY(QTest::qWaitFor([&]{response+=denied.readAll();return response.size()>=2||denied.state()==QAbstractSocket::UnconnectedState;},5000));QCOMPARE(response,QByteArray::fromHex("0500"));response.clear();
+     auto message=QByteArray::fromHex("050100017f000001");message.append(char(rejectOrigin.serverPort()>>8));message.append(char(rejectOrigin.serverPort()&255));QCOMPARE(denied.write(message),message.size());
+     QVERIFY(QTest::qWaitFor([&]{response+=denied.readAll();return response.size()>=10||denied.state()==QAbstractSocket::UnconnectedState;},5000));QCOMPARE(response,QByteArray::fromHex("05050001000000000000"));
+    }
+    denied.abort();QCOMPARE(leakedConnections,0);QVERIFY(!rejectOrigin.hasPendingConnections());
+   }
+   controller.stop();QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive()&&!controller.busy(),5000);report["stopped"]=true;
+   QCOMPARE(leakedConnections,0);QVERIFY(!rejectOrigin.hasPendingConnections());report["match_reject_verified"]=true;
+  }
+  {
+   EngineController restored(std::make_unique<ThreadedEngine>(),nullptr,path,true);QVERIFY(restored.selectedNodeId()==idB);QVERIFY(restored.networkConfigurationSnapshot()==savedNetwork);report["selected_node_restored"]=true;
+  }
+  QTcpServer released;released.setProxy(QNetworkProxy::NoProxy);QVERIFY(released.listen(QHostAddress::LocalHost,proxyPort));report["listener_released"]=true;
+  QCOMPARE(report["checks"].toArray().size(),8);QVERIFY(saveReport());
  }
  void fullDocumentCannotUseExternalSelectedNodeAlias(){
   QTemporaryDir directory;const auto path=directory.filePath("nodes.dpapi");NodeStore seed(path);

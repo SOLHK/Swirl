@@ -93,6 +93,8 @@ VISION_BUILD_COMMAND = (
 PRODUCT_CHAIN_TEST = "test_product_subscription_chain.py"
 REALITY_RUNTIME_TEST = "test_reality_runtime.py"
 PUBLIC_REALITY_PROBE = Path("tools/Verify-PublicRealityRuntime.py")
+PUBLIC_QT_PROBE = Path("tools/Verify-PublicQtReality.py")
+PUBLIC_QT_TEST = "test_public_qt_reality.py"
 FINGERPRINT_SOURCES = (
     Path("core/crates/swirl-transport/examples/reality-hello.rs"),
     Path("tools/tests/test_reality_fingerprint.py"),
@@ -320,8 +322,66 @@ def _fingerprint_insertions(windows: bool) -> tuple[tuple[str, str], ...]:
     return oracle, (runtime_anchor, runtime)
 
 
+def public_qt_steps() -> str:
+    """The Windows product, not an isolated Runtime, owns every public request."""
+    return """      - name: Windows Qt Chrome133 Vision product to public HTTP and HTTPS
+        working-directory: .
+        shell: pwsh
+        env:
+          SWIRL_XRAY_PEER_DIR: ${{ runner.temp }}/swirl-xray-peer
+          SWIRL_RUST_HARNESS: ${{ github.workspace }}/core/target/release/swirl-api.exe
+          SWIRL_RUST_INSPECTOR: ${{ github.workspace }}/core/target/release/swirl-inspect.exe
+          SWIRL_RUST_QT_TESTS: ${{ github.workspace }}/build/rust-qt/Release/SwirlRustCoreTests.exe
+          SWIRL_QT_PRIVATE_INSPECTOR: ${{ github.workspace }}/build/rust-qt/Release/SwirlPrivateSubscriptionInspect.exe
+          SWIRL_TEST_ROOT: ${{ runner.temp }}/swirl-public-qt-tests
+          QT_FORCE_STDERR_LOGGING: '1'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path $env:SWIRL_TEST_ROOT | Out-Null
+          windeployqt --release "$env:SWIRL_QT_PRIVATE_INSPECTOR"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/tests/test_public_qt_reality.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/Verify-PublicQtReality.py --qt-tests "$env:SWIRL_RUST_QT_TESTS" --xray-peer-dir "$env:SWIRL_XRAY_PEER_DIR" --output "$env:RUNNER_TEMP/swirl-public-qt/report.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Preserve Windows Qt authenticated public exit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-Public-Qt-Chrome133-Vision-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swirl-public-qt
+          if-no-files-found: error
+          retention-days: 14
+"""
+
+
+def without_public_qt_steps(source: str) -> str:
+    markers = (PUBLIC_QT_PROBE.name, PUBLIC_QT_TEST, "swirl-public-qt", "Swirl-Public-Qt-")
+    if not any(marker in source for marker in markers):
+        return source
+    parts = source.split("  windows-rust:\n")
+    block = public_qt_steps()
+    anchor = reality_runtime_steps(windows=True, qt=True, vision=True, fingerprint="chrome")
+    if (len(parts) != 2 or any(marker in parts[0] for marker in markers)
+            or parts[1].count(anchor + block + NATIVE_APPLICATION_BUILD) != 1):
+        raise ValueError("Windows Qt public gate is incomplete, moved or weakened; review required")
+    parts[1] = parts[1].replace(block, "", 1)
+    if any(marker in parts[1] for marker in markers):
+        raise ValueError("Windows Qt public gate contains duplicated or unreviewed commands")
+    return "  windows-rust:\n".join(parts)
+
+
+def _add_public_qt_steps(source: str) -> str:
+    anchor = reality_runtime_steps(windows=True, qt=True, vision=True, fingerprint="chrome")
+    if source.count(anchor + NATIVE_APPLICATION_BUILD) != 1:
+        raise ValueError("Windows Qt public gate requires complete controlled Qt and application gates")
+    return source.replace(anchor + NATIVE_APPLICATION_BUILD,
+                          anchor + public_qt_steps() + NATIVE_APPLICATION_BUILD, 1)
+
+
 def without_fingerprint_steps(source: str) -> str:
     """Allow an intact prior stage or the complete native/browser evidence stage."""
+    source = without_public_qt_steps(source)
     markers = ("reality-hello", "utls-hello", "test_reality_fingerprint.py", "SWIRL_FINGERPRINT_",
                "swirl-fingerprint-results", "--fingerprint", "Chrome133")
     if not any(marker in source for marker in markers):
@@ -1022,6 +1082,7 @@ def _vector_blocks(windows: bool) -> tuple[str, str, str]:
 
 def updated_workflow(source: str) -> str:
     """Validate the whole fixture stage before preserving every prior CI guard."""
+    source = without_public_qt_steps(source)
     source = without_product_chain_steps(source)
     source = without_vision_xray_steps(source)
     source = without_xray_steps(source)
@@ -1045,8 +1106,8 @@ def updated_workflow(source: str) -> str:
     for index, part in enumerate(parts):
         historical, _, complete = _vector_blocks(windows=index == 1)
         parts[index] = _replace_checked(part, historical, complete, "Vision fixture checks")
-    return _add_fingerprint_steps(_add_reality_runtime_steps(
-        _add_product_chain_steps(_add_vision_xray_steps(_add_xray_steps(separator.join(parts))))))
+    return _add_public_qt_steps(_add_fingerprint_steps(_add_reality_runtime_steps(
+        _add_product_chain_steps(_add_vision_xray_steps(_add_xray_steps(separator.join(parts)))))))
 
 
 def validate_context(environment: Mapping[str, str]) -> None:
@@ -1075,13 +1136,15 @@ def prepare_update(repository: Path) -> tuple[Path, str, str]:
     before = path.read_text(encoding="utf-8")
     after = updated_workflow(before)
     for name in (*ADDITIONAL_TESTS, POLICY_TEST, *DNS_PROBE_TESTS, *CONNECTIVITY_IMPORT_TESTS,
-                 SOCKS5_UDP_TEST, *REALITY_TESTS, PRODUCT_CHAIN_TEST, REALITY_RUNTIME_TEST):
+                 SOCKS5_UDP_TEST, *REALITY_TESTS, PRODUCT_CHAIN_TEST, REALITY_RUNTIME_TEST, PUBLIC_QT_TEST):
         if not (repository / "tools/tests" / name).is_file():
             raise ValueError(f"Required CI suite is missing: {name}")
     if not (repository / PUBLIC_PROBE).is_file():
         raise ValueError("The required native public-network verification script is missing")
     if not (repository / PUBLIC_REALITY_PROBE).is_file():
         raise ValueError("The required public REALITY/Vision Runtime verification script is missing")
+    if not (repository / PUBLIC_QT_PROBE).is_file():
+        raise ValueError("The required Windows Qt public product verification script is missing")
     for relative in (DIAGNOSTIC_TOOL, DIAGNOSTIC_SOURCE):
         if not (repository / relative).is_file():
             raise ValueError(f"Required native diagnostic source is missing: {relative.as_posix()}")

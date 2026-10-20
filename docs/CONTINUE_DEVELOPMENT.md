@@ -1,3 +1,11 @@
+## Windows Qt public gate source checkpoint (2026-10-20)
+
+Recovered the eight-request A/B public Qt/DPAPI gate and made failure evidence
+persistent and strictly redacted. Local 9 evidence tests and 55 workflow guards
+passed. Exact-SHA Windows execution is pending; three broader Qt negative and
+TLS1.2/cancellation cases remain. Read [the public gate checkpoint](CORE_WINDOWS_QT_PUBLIC_GATE_20261020.md).
+The preceding subscription fix is pushed as b096ffac75eec057a901a792a4e81718263943bc.
+
 ## Resumed subscription source checkpoint (2026-10-20)
 
 Recovered the interrupted source and corrected two additional reproduced URI

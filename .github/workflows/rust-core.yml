@@ -617,7 +617,7 @@ jobs:
         run: |
           cmake -S src/Swirl.Quick -B build/rust-qt -G "Visual Studio 17 2022" -A x64 -DSWIRL_USE_RUST_CORE=ON -DSWIRL_BUILD_UI_TESTS=ON
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          cmake --build build/rust-qt --config Release --target SwirlRustCoreTests SwirlStoragePathsTests SwirlImportTests --parallel
+          cmake --build build/rust-qt --config Release --target SwirlRustCoreTests SwirlStoragePathsTests SwirlImportTests SwirlPrivateSubscriptionInspect --parallel
       - name: Reject native DNS policy in compatibility builds without starting a core
         working-directory: .
         env:
@@ -768,6 +768,34 @@ jobs:
         with:
           name: Swirl-REALITY-Vision-Runtime-Chrome133-${{ runner.os }}-qt-${{ github.sha }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/swirl-reality-vision-runtime-chrome133-qt
+          if-no-files-found: error
+          retention-days: 14
+      - name: Windows Qt Chrome133 Vision product to public HTTP and HTTPS
+        working-directory: .
+        shell: pwsh
+        env:
+          SWIRL_XRAY_PEER_DIR: ${{ runner.temp }}/swirl-xray-peer
+          SWIRL_RUST_HARNESS: ${{ github.workspace }}/core/target/release/swirl-api.exe
+          SWIRL_RUST_INSPECTOR: ${{ github.workspace }}/core/target/release/swirl-inspect.exe
+          SWIRL_RUST_QT_TESTS: ${{ github.workspace }}/build/rust-qt/Release/SwirlRustCoreTests.exe
+          SWIRL_QT_PRIVATE_INSPECTOR: ${{ github.workspace }}/build/rust-qt/Release/SwirlPrivateSubscriptionInspect.exe
+          SWIRL_TEST_ROOT: ${{ runner.temp }}/swirl-public-qt-tests
+          QT_FORCE_STDERR_LOGGING: '1'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path $env:SWIRL_TEST_ROOT | Out-Null
+          windeployqt --release "$env:SWIRL_QT_PRIVATE_INSPECTOR"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/tests/test_public_qt_reality.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python tools/Verify-PublicQtReality.py --qt-tests "$env:SWIRL_RUST_QT_TESTS" --xray-peer-dir "$env:SWIRL_XRAY_PEER_DIR" --output "$env:RUNNER_TEMP/swirl-public-qt/report.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Preserve Windows Qt authenticated public exit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-Public-Qt-Chrome133-Vision-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swirl-public-qt
           if-no-files-found: error
           retention-days: 14
       - name: Build complete native Rust application
