@@ -147,6 +147,87 @@ case-sensitive WDTH/HGHT settings. They are not yet a real Swirl UI or original
 TTC acceptance result. The local fixture/evidence regression suite is 31/31
 at this checkpoint; new native outcomes must be appended after CI completes.
 
+## Stage 2: both Windows runtimes executed; FreeType state isolated
+
+Source commit: [`47d6dfc06fa2fddddd1532c1d8370028a6b9da17`](https://github.com/SOLHK/Swirl/commit/47d6dfc06fa2fddddd1532c1d8370028a6b9da17).
+Actions run: [`39400461390`](https://github.com/SOLHK/Swirl/actions/runs/39400461390),
+final conclusion **failure** because the strict FreeType path checks remain
+failed. Both operating systems now configured, compiled and executed the full
+16-process harness. No equality threshold or original acceptance gate changed.
+
+| Runtime / job | Actual compiler | DirectWrite | Qt native | Qt FreeType |
+| --- | --- | --- | --- | --- |
+| Server 2022 build 20348 / [118553585274](https://github.com/SOLHK/Swirl/actions/runs/39400461390/job/118553585274) | VS 17 2022, instance 17.14.37710.0 | 8/8 processes, 448 observations | 4/4 processes, 3120 observations | 4 strict failures, each after 13 observations |
+| Server 2025 build 26100 / [118553585584](https://github.com/SOLHK/Swirl/actions/runs/39400461390/job/118553585584) | VS 18 2026, MSVC 19.51.36260.0, v145, SDK 10.0.26100.0 | 8/8 processes, 448 observations | 4/4 processes, 3120 observations | 4 strict failures, each after 13 observations |
+
+Both runtimes used Qt 6.10.3 and passed 31/31 Python checks. DirectWrite DLL
+versions were respectively 10.0.20348.1 and 10.0.26100.1. Qt reverse headers now
+actually report `reverse=true`. Every successful Qt process executed the 36
+production-policy combinations; private processes also executed remove/reload
+and missing-file fallback controls. Both fonts' installation cleanup passed
+on both VMs. Windows 11 client and actual Swirl UI remain unexecuted.
+
+Downloaded ZIP identities:
+
+| Runtime | Artifact | SHA-256 |
+| --- | --- | --- |
+| Server 2022 | [12254492969](https://github.com/SOLHK/Swirl/actions/runs/39400461390/artifacts/12254492969) | `e01ba6a4b6a26fa88c9da81a87c9a4bb105b6e41da5c2c2ada7293694dbbcab4` |
+| Server 2025 | [12254657939](https://github.com/SOLHK/Swirl/actions/runs/39400461390/artifacts/12254657939) | `365110cfb1a998aa1eb534454f5a527ac94cd1bf9ab8e16d227ee5029c6961e5` |
+
+Independent cross-OS comparison found zero differences in all 448 DirectWrite
+and 3120 Qt native corresponding observation payloads, including their raster
+hashes. These counts compare the two OS datasets; they are not extra executions.
+The saved native binary rasters and derived PGM images were independently
+checked against the JSONL: 32 of each per OS. All 1300 primary Qt PNGs and 12
+path-state diagnostic PNGs per OS were decoded back to BGRA bytes and matched
+their recorded pixel hashes exactly.
+
+### Fixed input changes its path after rasterization
+
+All eight fresh FreeType diagnostic children (two OS versions, private and
+installed loading, both parent orders) measured the same sequence. With one
+existing QRawFont and unchanged `499.006199` request:
+
+| Observation checkpoint | A rightmost x, pixels |
+| --- | ---: |
+| Before and after raw advance query | 6.421875 |
+| After raw path, metrics and text-layout extraction | 6.421875 |
+| Immediately after painting the text layout | 6.4375 |
+| After reacquiring QRawFont | 6.4375 |
+| Repeating the identical decimal 499.006199 | 6.4375 |
+| Then requesting 499.006201, the same binary32 value | 6.4375 |
+
+All three diagnostic requests retain A advance `7.625` pixels and identical
+pixel SHA-256 `2e9e40bf767345167f349239150f93b16867d4201e6bd39526617f52f76378e1`.
+The primary forward and reverse tests also swap which decimal receives the
+first path value. This establishes render-history dependence without changing
+the decimal or axis input. It cannot be used as evidence for extra precision.
+
+The Qt 6.10.3 source supplies a plausible mechanism: FreeType raster loading
+sets a subpixel translation with `FT_Set_Transform`; the subsequent unscaled
+path extraction resets that transform only when its matrix differs, leaving
+a same-matrix translation potentially active. This remains a source-backed
+mechanism hypothesis until the focused offset diagnostic is executed; the
+observed before/after path change itself is already established.
+
+At the integration baseline, `FontRendering.h` explicitly requests
+`windows:fontengine=freetype` before QGuiApplication. This makes the finding
+relevant to Swirl's backend foundation, but the probe does not establish a
+visible UI regression: its measured raster and advances did not change. It
+also does not authorize silently switching the production backend, whose
+existing comment documents a fractional-DPI rendering reason for FreeType.
+
+Stage 3 adds a separate fixed-QRawFont/single-glyph fractional-offset
+diagnostic, with no primary warm-up or relaxed equality. It also retains
+individually source-bound valid subprocess evidence when the overall strict
+analysis fails. Partial evidence must keep failed global status and exit 1.
+The stage-3 local suite passed 37/37 tests. Against the actual stage-2 artifacts,
+the partial collector retained exactly 12 complete processes / 3568 observations
+per OS, rejected the four FreeType failures, and verified six opposite-order
+and three private/installed comparisons. It also corrected its representation
+check for an empty Qt path: a single MoveTo at the origin is empty according
+to QPainterPath::isEmpty. No real path equality comparison was weakened.
+
 ## A3 target-input finding
 
 For the current public DirectWrite FLOAT axis API and Qt float setter, the

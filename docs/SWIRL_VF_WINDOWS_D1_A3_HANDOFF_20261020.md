@@ -68,6 +68,28 @@ normalized14-before-avar 模型残差 6000。普通夹具仍有 0.3603515625 FUn
 VS2026 不匹配；第二阶段改为发现并记录实际工具链。原生新结果以对应源码 SHA
 的后续 run 和 `d1-analysis.json` 为准，不继承首轮的预期。
 
+### 第二阶段更新：两个 Windows 环境均已实测
+
+源码 [`47d6dfc06fa2fddddd1532c1d8370028a6b9da17`](https://github.com/SOLHK/Swirl/commit/47d6dfc06fa2fddddd1532c1d8370028a6b9da17)，
+run [`39400461390`](https://github.com/SOLHK/Swirl/actions/runs/39400461390)。
+Server 2022 / 2025 均完成编译与原生运行；每个系统 8 个 DirectWrite 进程
+通过，共 448 条观测；4 个 Qt native 进程通过，共 3120 条观测；
+4 个 Qt FreeType 进程仍严格失败。两个系统之间对应的 DirectWrite 和 Qt native
+完整 payload 均一致。独立反序参数已生效，安装与清理均通过。
+
+FreeType 原因已缩小为**绘制历史影响路径读取**：保持同一个 `QRawFont` 和
+完全相同的 `499.006199` 输入不变，A 最右坐标在绘制前为 `6.421875 px`，
+绘制后立即变为 `6.4375 px`。重复相同十进制以及改为另一小数请求都保持后者；
+反序请求还会交换哪个小数首先得到前者。8 个隔离诊断子进程结果完全相同。
+A advance 始终 `7.625 px`，三次绘制的像素 hash 完全相同。
+因此不能把首轮不等的 QRawFont 路径解释为保留了原请求精度。
+
+Qt 6.10.3 的 raster 路径设置 FreeType 子像素平移，path 路径仅在矩阵不同
+时重置变换，这与观测一致。第三阶段继续用固定单字形与不同绘制偏移验证该机制，
+不放宽主检查、不清除失败。Swirl 基线 `FontRendering.h` 默认请求 FreeType，
+所以此项必须进入后续适配交接；当前数据也不足以宣称 Swirl UI 已出现可见回归。
+第二阶段 run 的最终状态仍为 **failure**。
+
 ## 自动适配基础与最终验收入口
 
 独立 Qt 可执行程序读取夹具真实家族/轴元数据、验证实际字体表身份，并直接编译

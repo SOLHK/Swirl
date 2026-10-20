@@ -415,6 +415,90 @@ QJsonArray advancesOnly(const QJsonObject &payload)
     for (const auto &v : payload["glyphs"].toArray()) result.append(v.toObject()["advance_px"]);
     return result;
 }
+QJsonObject diagnoseSubpixelState(const Source &source, const QString &output, QFile &log)
+{
+    // One object and one axis request for the entire experiment. Only the
+    // preceding draw's horizontal position changes; no new font is requested.
+    const Position position{"one_fixed_raw_object", 499.006199,
+                            source.axes["WDTH"].defaultValue, source.axes["HGHT"].defaultValue};
+    QImage device(8, 8, QImage::Format_ARGB32_Premultiplied);
+    device.setDotsPerMeterX(qRound(96 / 0.0254)); device.setDotsPerMeterY(qRound(96 / 0.0254));
+    device.setDevicePixelRatio(1);
+    QFont query(source.family);
+    query.setStyleName(QString()); query.setWeight(QFont::Normal); query.setPointSizeF(9);
+    query.setHintingPreference(QFont::PreferNoHinting);
+    query.setStyleStrategy(QFont::StyleStrategy(QFont::NoFontMerging | QFont::PreferAntialias | QFont::NoSubpixelAntialias));
+    query.setVariableAxis(QFont::Tag("wght"), float(position.wght));
+    query.setVariableAxis(QFont::Tag("WDTH"), float(position.wdth));
+    query.setVariableAxis(QFont::Tag("HGHT"), float(position.hght));
+    const QFont font(query, &device);
+    const QRawFont raw = QRawFont::fromFont(font);
+    verifyIdentity(raw, source);
+    const auto glyphs = raw.glyphIndexesForString(QStringLiteral("A"));
+    require(glyphs.size() == 1 && glyphs[0] != 0, "Subpixel diagnostic requires the original A glyph");
+    const auto initialAdvances = raw.advancesForGlyphIndexes(glyphs);
+    require(initialAdvances.size() == 1, "Subpixel diagnostic advance is incomplete");
+    const auto initialPath = pathElements(raw.pathForGlyph(glyphs[0]));
+    require(!initialPath.isEmpty(), "Subpixel diagnostic outline is empty");
+    const auto pathHash = [](const QJsonArray &path) { return hash(QJsonDocument(path).toJson(QJsonDocument::Compact)); };
+    QMap<QString, bool> shapes;
+    shapes.insert(pathHash(initialPath), true);
+    writeRecord(log, {{"record", "subpixel_state_baseline"}, {"case_id", position.id},
+                      {"requested_decimal", requested(position)}, {"api_float32", floatRequested(position)},
+                      {"point_size", 9}, {"logical_dpi", 96}, {"dpr", 1}, {"raw_pixel_size", raw.pixelSize()},
+                      {"gid", int(glyphs[0])}, {"family", raw.familyName()}, {"table_identity_exact", true},
+                      {"advance_px", point(initialAdvances[0])}, {"path_px", initialPath},
+                      {"path_sha256", pathHash(initialPath)}});
+    QGlyphRun run;
+    run.setRawFont(raw); run.setGlyphIndexes(glyphs); run.setPositions({QPointF(0, 0)});
+    const QList<double> offsets{0.0, 0.25, 0.5, 0.75, 0.0, 0.75, 0.5, 0.25, 0.0};
+    int rasterChanges = 0, advanceChanges = 0;
+    bool allAdvancesEqual = true;
+    for (qsizetype i = 0; i < offsets.size(); ++i) {
+        const auto before = pathElements(raw.pathForGlyph(glyphs[0]));
+        QImage image(96, 96, QImage::Format_ARGB32_Premultiplied);
+        require(!image.isNull(), "Cannot allocate subpixel diagnostic raster");
+        image.setDotsPerMeterX(device.dotsPerMeterX()); image.setDotsPerMeterY(device.dotsPerMeterY());
+        image.setDevicePixelRatio(1); image.fill(Qt::white);
+        {
+            QPainter painter(&image);
+            require(painter.isActive(), "Cannot start subpixel diagnostic painter");
+            painter.setPen(Qt::black); painter.setRenderHint(QPainter::TextAntialiasing, true);
+            painter.drawGlyphRun(QPointF(24 + offsets[i], 32), run);
+        }
+        // Observe the same raw object immediately, before any metric call.
+        const auto afterRaster = pathElements(raw.pathForGlyph(glyphs[0]));
+        const auto advances = raw.advancesForGlyphIndexes(glyphs);
+        require(advances.size() == 1, "Subpixel diagnostic advance disappeared");
+        const auto afterAdvance = pathElements(raw.pathForGlyph(glyphs[0]));
+        const bool rasterChanged = before != afterRaster, advanceChanged = afterRaster != afterAdvance;
+        rasterChanges += rasterChanged; advanceChanges += advanceChanged;
+        allAdvancesEqual = allAdvancesEqual && point(advances[0]) == point(initialAdvances[0]);
+        shapes.insert(pathHash(before), true); shapes.insert(pathHash(afterRaster), true); shapes.insert(pathHash(afterAdvance), true);
+        qsizetype inkPixels = 0;
+        for (int y = 0; y < image.height(); ++y) {
+            const auto *row = reinterpret_cast<const QRgb *>(image.constScanLine(y));
+            for (int x = 0; x < image.width(); ++x) inkPixels += row[x] != qRgb(255, 255, 255);
+        }
+        require(inkPixels > 0, "Subpixel diagnostic raster is empty");
+        const QString png = QDir(output).filePath(QStringLiteral("draw-%1.png").arg(i, 2, 10, QLatin1Char('0')));
+        require(image.save(png, "PNG"), "Cannot save subpixel diagnostic raster");
+        const QByteArray pixels(reinterpret_cast<const char *>(image.constBits()), image.sizeInBytes());
+        writeRecord(log, {{"record", "subpixel_state_observation"}, {"draw_index", int(i)}, {"raster_x_offset", offsets[i]},
+                          {"raster_origin_px", point(QPointF(24 + offsets[i], 32))}, {"same_raw_object", true},
+                          {"requested_decimal", requested(position)}, {"api_float32", floatRequested(position)},
+                          {"before_path_px", before}, {"after_raster_path_px", afterRaster}, {"after_advance_path_px", afterAdvance},
+                          {"path_changed_by_raster", rasterChanged}, {"path_changed_by_advance", advanceChanged},
+                          {"after_raster_path_sha256", pathHash(afterRaster)}, {"advance_px", point(advances[0])},
+                          {"raster_pixel_sha256", hash(pixels)}, {"raster_ink_pixels", double(inkPixels)}, {"png", png}});
+    }
+    verifyIdentity(raw, source);
+    return {{"record", "diagnostic_summary"}, {"status", "DIAGNOSTIC_COMPLETED_NOT_ACCEPTANCE"},
+            {"observations", int(offsets.size())}, {"fixed_raw_object", true}, {"fixed_axis_request", true},
+            {"path_changed_after_raster_count", rasterChanges}, {"path_changed_after_advance_count", advanceChanges},
+            {"distinct_path_shapes", int(shapes.size())}, {"all_advances_equal", allAdvancesEqual},
+            {"interpretation", "Only the preceding raster x-offset is explicitly varied; cached draws may retain prior engine state"}};
+}
 } // namespace
 
 int main(int argc, char **argv)
@@ -428,15 +512,18 @@ int main(int argc, char **argv)
     if (arguments.size() < 3) {
         std::fputs("Usage: win_axis_precision_qt FONT OUTPUT_DIR [--installed] [--reverse-order]\n", stderr); return 2;
     }
-    bool installed = false, reverse = false, diagnosePathState = false;
+    bool installed = false, reverse = false, diagnosePathState = false, diagnoseSubpixel = false;
     for (int i = 3; i < arguments.size(); ++i) {
         if (arguments[i] == "--installed") installed = true;
         else if (arguments[i] == "--reverse-order") reverse = true;
         else if (arguments[i] == "--diagnose-path-state") diagnosePathState = true;
+        else if (arguments[i] == "--diagnose-subpixel-state") diagnoseSubpixel = true;
         else { std::fputs("Unknown argument\n", stderr); return 2; }
     }
+    if (diagnosePathState && diagnoseSubpixel) { std::fputs("Choose one diagnostic mode\n", stderr); return 2; }
     const QString output = QDir(arguments[2]).absolutePath();
-    QFile log(QDir(output).filePath(diagnosePathState ? "qt-path-state-diagnostic.jsonl" : "qt-axis-precision.jsonl"));
+    QFile log(QDir(output).filePath(diagnosePathState ? "qt-path-state-diagnostic.jsonl"
+                                  : diagnoseSubpixel ? "qt-subpixel-state-diagnostic.jsonl" : "qt-axis-precision.jsonl"));
     int fontId = -1, observations = 0, pairs = 0, repeated = 0;
     QList<double> durations;
     try {
@@ -444,11 +531,12 @@ int main(int argc, char **argv)
         require(QDir().mkpath(output), "Cannot create evidence directory");
         require(!QFileInfo::exists(log.fileName()) && log.open(QIODevice::WriteOnly | QIODevice::NewOnly), "Use a new evidence directory");
         const Source source = sourceFont(arguments[1]);
-        if (diagnosePathState) {
+        if (diagnosePathState || diagnoseSubpixel) {
             writeRecord(log, {{"record", "diagnostic_header"}, {"schema", 1}, {"input_sha256", source.sha256},
                               {"qt_version", QString::fromLatin1(qVersion())}, {"requested_qpa", qEnvironmentVariable("QT_QPA_PLATFORM")},
                               {"load_mode", installed ? "system_installed" : "application_private"},
-                              {"experiment", "fresh_process_path_state_with_extra_measurement_calls"},
+                              {"experiment", diagnoseSubpixel ? "fresh_process_fixed_raw_object_varying_raster_subpixel_offset"
+                                                               : "fresh_process_path_state_with_extra_measurement_calls"},
                               {"acceptance", "DIAGNOSTIC_ONLY_PRIMARY_FAILURE_RETAINED"}});
             if (installed) {
                 require(QFontDatabase::families().contains(source.family), "Diagnostic fixture is not installed");
@@ -457,17 +545,23 @@ int main(int argc, char **argv)
                 fontId = QFontDatabase::addApplicationFont(arguments[1]);
                 require(fontId >= 0 && QFontDatabase::applicationFontFamilies(fontId).contains(source.family), "Diagnostic registration failed");
             }
-            QList<Position> probes{{"same_input_first", 499.006199, source.axes["WDTH"].defaultValue, source.axes["HGHT"].defaultValue},
-                                   {"same_input_repeated", 499.006199, source.axes["WDTH"].defaultValue, source.axes["HGHT"].defaultValue},
-                                   {"other_decimal_same_float", 499.006201, source.axes["WDTH"].defaultValue, source.axes["HGHT"].defaultValue}};
-            for (const auto &probe : probes) {
-                QJsonArray checkpoints;
-                const auto result = observe(source, probe, 9, 96, 1, QDir(output).filePath(probe.id + ".png"), &checkpoints);
-                writeRecord(log, {{"record", "path_state_diagnostic"}, {"case_id", probe.id}, {"requested_decimal", requested(probe)},
-                                  {"api_float32", floatRequested(probe)}, {"checkpoints", checkpoints}, {"payload", result.payload}});
+            QJsonObject summary;
+            if (diagnoseSubpixel) {
+                summary = diagnoseSubpixelState(source, output, log);
+            } else {
+                QList<Position> probes{{"same_input_first", 499.006199, source.axes["WDTH"].defaultValue, source.axes["HGHT"].defaultValue},
+                                       {"same_input_repeated", 499.006199, source.axes["WDTH"].defaultValue, source.axes["HGHT"].defaultValue},
+                                       {"other_decimal_same_float", 499.006201, source.axes["WDTH"].defaultValue, source.axes["HGHT"].defaultValue}};
+                for (const auto &probe : probes) {
+                    QJsonArray checkpoints;
+                    const auto result = observe(source, probe, 9, 96, 1, QDir(output).filePath(probe.id + ".png"), &checkpoints);
+                    writeRecord(log, {{"record", "path_state_diagnostic"}, {"case_id", probe.id}, {"requested_decimal", requested(probe)},
+                                      {"api_float32", floatRequested(probe)}, {"checkpoints", checkpoints}, {"payload", result.payload}});
+                }
+                summary = {{"record", "diagnostic_summary"}, {"status", "DIAGNOSTIC_COMPLETED_NOT_ACCEPTANCE"}, {"observations", 3}};
             }
             if (fontId >= 0) { require(QFontDatabase::removeApplicationFont(fontId), "Diagnostic removal failed"); fontId = -1; }
-            writeRecord(log, {{"record", "diagnostic_summary"}, {"status", "DIAGNOSTIC_COMPLETED_NOT_ACCEPTANCE"}, {"observations", 3}});
+            writeRecord(log, summary);
             return 0;
         }
         const auto cases = positions(source);
@@ -578,16 +672,20 @@ int main(int argc, char **argv)
                                   {"original_font_acceptance", "NOT_RUN"}};
         if (log.isOpen()) { try { writeRecord(log, failure); } catch (...) {} }
         const QString error = QString::fromUtf8(e.what());
-        if (!diagnosePathState && (error.contains("actual pair outputs") || error.contains("reverse/reload replay"))) {
+        if (!diagnosePathState && !diagnoseSubpixel && (error.contains("actual pair outputs") || error.contains("reverse/reload replay"))) {
             // Isolate additional observations in a fresh process; never warm or
             // retry the primary observation to turn its failure into a pass.
-            QProcess child;
-            QStringList childArguments{arguments[1], QDir(output).filePath("path-state-diagnostic"), "--diagnose-path-state"};
-            if (installed) childArguments.append("--installed");
-            child.setStandardOutputFile(QDir(output).filePath("path-state-child.stdout.log"));
-            child.setStandardErrorFile(QDir(output).filePath("path-state-child.stderr.log"));
-            child.start(QCoreApplication::applicationFilePath(), childArguments);
-            if (!child.waitForStarted(5000) || !child.waitForFinished(15000)) { child.kill(); child.waitForFinished(1000); }
+            for (const auto &mode : {std::pair<const char *, const char *>{"path-state", "--diagnose-path-state"},
+                                    {"subpixel-state", "--diagnose-subpixel-state"}}) {
+                QProcess child;
+                const QString label = QString::fromLatin1(mode.first);
+                QStringList childArguments{arguments[1], QDir(output).filePath(label + "-diagnostic"), QString::fromLatin1(mode.second)};
+                if (installed) childArguments.append("--installed");
+                child.setStandardOutputFile(QDir(output).filePath(label + "-child.stdout.log"));
+                child.setStandardErrorFile(QDir(output).filePath(label + "-child.stderr.log"));
+                child.start(QCoreApplication::applicationFilePath(), childArguments);
+                if (!child.waitForStarted(5000) || !child.waitForFinished(15000)) { child.kill(); child.waitForFinished(1000); }
+            }
         }
         std::fputs(QJsonDocument(failure).toJson(QJsonDocument::Compact).constData(), stderr);
         std::fputc('\n', stderr);

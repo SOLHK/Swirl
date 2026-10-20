@@ -12,6 +12,7 @@ import json
 import math
 from pathlib import Path
 import struct
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -410,6 +411,102 @@ class WindowsAxisPrecisionEvidenceTests(unittest.TestCase):
                      [[0, 0, 0], [1, float("nan"), 1]], [[0, 0, 0], [9, 1, 1]]):
             with self.subTest(path=path), self.assertRaises(evidence.EvidenceError):
                 evidence.validate_qt_path(path)
+
+    def test_qt_empty_path_accepts_single_moveto_but_no_drawing_segment(self):
+        # The real Windows Qt native backend emits [[0,0,0]] for the space;
+        # QPainterPath::isEmpty documents this as empty despite elementCount=1.
+        for path in ([], [[0, 0, 0]], [[0, 12.5, -7]]):
+            with self.subTest(path=path):
+                evidence.validate_qt_path(path, empty_allowed=True)
+                self.assertTrue(evidence.qt_path_is_empty(path))
+                with self.assertRaises(evidence.EvidenceError):
+                    evidence.validate_qt_path(path)
+        drawing = [[0, 0, 0], [1, 1, 1]]
+        evidence.validate_qt_path(drawing)
+        self.assertFalse(evidence.qt_path_is_empty(drawing))
+
+    def _partial_context(self):
+        manifest = fixture.write_fixture(self.directory / "fixtures")
+        (self.directory / "fixture-manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+        (self.directory / "requests.tsv").write_bytes((self.directory / "fixtures" / "requests.tsv").read_bytes())
+        run = {"status": "FAILED", "source_commit": "a" * 40, "system_installation_requested": True,
+               "fixtures": {font["kind"]: {key: font[key] for key in ("file", "bytes", "sha256")}
+                            for font in manifest["fonts"]}, "runs": [], "installations": [],
+               "windows_product": "UNIT_TEST_METADATA_ONLY"}
+        self._save_partial_run(run)
+        return run, manifest
+
+    def _save_partial_run(self, run):
+        (self.directory / "windows-axis-precision-run.json").write_text(json.dumps(run), encoding="utf-8")
+
+    def _rejected_partial_log(self, run, content, digest=None):
+        label = "ordinary-dwrite-private-forward"
+        directory = self.directory / label
+        directory.mkdir(exist_ok=True)
+        path = directory / "directwrite-axis-precision.jsonl"
+        path.write_bytes(content)
+        run["runs"] = [{"label": label, "status": "PASS", "exit_code": 0, "timeout": False,
+                        "native_log": {"file": path.name, "bytes": len(content),
+                                       "sha256": digest or hashlib.sha256(content).hexdigest()},
+                        "header": {}}]
+        self._save_partial_run(run)
+        return label
+
+    def test_partial_mode_requires_independently_bound_source_sha(self):
+        self._partial_context()
+        for expected in (None, "b" * 40):
+            with self.subTest(expected=expected):
+                partial = evidence.collect_partial_evidence(self.directory, expected)
+                self.assertEqual(partial["status"], "PARTIAL_EVIDENCE_REJECTED")
+                self.assertEqual(partial["validated_processes"], 0)
+                self.assertEqual(partial["validated_experiments"], {})
+                self.assertTrue(partial["binding_errors"])
+                self.assertFalse(partial["full_acceptance"])
+
+    def test_partial_mode_excludes_hash_mismatched_process(self):
+        run, _ = self._partial_context()
+        label = self._rejected_partial_log(run, b"not a native report\n", digest="0" * 64)
+        partial = evidence.collect_partial_evidence(self.directory, "a" * 40)
+        self.assertEqual(partial["validated_processes"], 0)
+        self.assertIn("hash changed", partial["rejected_processes"][label]["error"])
+        self.assertNotIn(label, partial["validated_experiments"])
+        self.assertEqual(partial["opposite_process_replays"], {})
+        self.assertEqual(partial["private_vs_installed"], {})
+
+    def test_partial_mode_excludes_incomplete_native_evidence_even_if_hash_matches(self):
+        run, manifest = self._partial_context()
+        content = (json.dumps({"record": "header", "input_sha256": manifest["fonts"][0]["sha256"]})
+                   + '\n{"record":"observation"}\n').encode("utf-8")
+        label = self._rejected_partial_log(run, content)
+        partial = evidence.collect_partial_evidence(self.directory, "a" * 40)
+        self.assertEqual(partial["validated_processes"], 0)
+        self.assertIn(label, partial["rejected_processes"])
+        self.assertFalse(partial["full_acceptance"])
+        self.assertEqual(partial["opposite_process_replays"], {})
+
+    def test_partial_mode_rejects_changed_case_stream_before_collecting_processes(self):
+        self._partial_context()
+        (self.directory / "requests.tsv").write_text("id\twght\tWDTH\tHGHT\ndefault\t500\t100\t100\n", encoding="ascii")
+        partial = evidence.collect_partial_evidence(self.directory, "a" * 40)
+        self.assertEqual(partial["validated_processes"], 0)
+        self.assertTrue(any("case-stream hash changed" in error for error in partial["binding_errors"]))
+
+    def test_failed_run_stays_failed_and_cli_exits_one_with_partial_section(self):
+        self._partial_context()
+        with self.assertRaisesRegex(evidence.EvidenceError, "Windows execution has not passed"):
+            evidence.analyze(self.directory, "a" * 40)
+        completed = subprocess.run([sys.executable, str(Path(evidence.__file__).resolve()), str(self.directory),
+                                    "--expected-source-sha", "a" * 40], capture_output=True, text=True, check=False)
+        self.assertEqual(completed.returncode, 1, completed.stderr)
+        result = evidence.read_json((self.directory / "d1-analysis.json").read_text())
+        self.assertEqual(result["status"], "FAILED_EVIDENCE_ANALYSIS")
+        self.assertIn("partial_validated_evidence", result)
+        partial = result["partial_validated_evidence"]
+        self.assertFalse(partial["full_acceptance"])
+        self.assertEqual(partial["validated_processes"], 0)
+        self.assertEqual(len(partial["missing_processes"]), 16)
+        self.assertNotIn("actual_pair_collapsed_all_experiments", partial)
+        self.assertNotIn("actual_pair_collapsed_all_experiments", result)
 
 
 if __name__ == "__main__":

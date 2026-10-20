@@ -106,6 +106,82 @@ before primary acceptance and are not warm-ups that can replace failed data.
 The child ends with `DIAGNOSTIC_COMPLETED_NOT_ACCEPTANCE` rather than a pass
 verdict for the font or original matrix.
 
+The separate `--diagnose-subpixel-state` child holds one `const QRawFont`, one
+authored `A` glyph, and exactly the same axis request for its entire lifetime.
+It renders a `QGlyphRun` at horizontal offsets 0, 0.25, 0.5 and 0.75 pixels,
+then replays those offsets without clearing caches. Its
+`subpixel-state-diagnostic/qt-subpixel-state-diagnostic.jsonl` records the same
+raw object's path immediately before and after each raster operation, then
+after an advance query; every raster has a PNG and pixel hash. It reports
+observed path changes and unchanged or changed advances without turning them
+into an acceptance result. The replay deliberately retains any existing cache
+state. No changes in this diagnostic are applied to primary measurements or
+production font rendering.
+
+## Measured stage 2 result: raster history changes FreeType path queries
+
+[Windows CI run 39400461390](https://github.com/SOLHK/Swirl/actions/runs/39400461390)
+tested source commit `47d6dfc06fa2fddddd1532c1d8370028a6b9da17` with Qt 6.10.3
+on Windows Server 2022 build 20348 and Windows Server 2025 build 26100. These
+are actual Windows measurements, but neither runner is Windows 11. On each OS,
+all four Qt native invocations completed their full synthetic matrices; all
+four Qt FreeType invocations failed the strict pair comparison after the first
+13 observations. Private and installed loading reproduced the same behavior.
+The primary FreeType failure remains a blocker; it is not reclassified as a
+successful matrix by the following diagnostic.
+
+The fixed `--reverse-order` option now changes the actual first observation
+order. Its effect is directly visible in the original failed observations:
+
+| First observation order | `pair_lo` A rightmost x | `pair_hi` A rightmost x |
+| --- | ---: | ---: |
+| Forward (`pair_lo` precedes `pair_hi`) | 6.421875 px | 6.4375 px |
+| Reverse (`pair_hi` precedes `pair_lo`) | 6.4375 px | 6.421875 px |
+
+Thus the smaller path coordinate follows which request is observed first,
+rather than following the decimal value. Both API requests have binary32 bits
+`0x43f980cb` (exact value `499.006195068359375`).
+
+Each failed invocation started the separately instrumented path-state child.
+All eight children (two OS versions, two load modes and two parent orders)
+produced identical diagnostic observation records. With `wght=499.006199`,
+`WDTH=HGHT=100`, 9 pt, logical DPI 96 and DPR 1, the same existing `QRawFont`
+object produced the following A path coordinate:
+
+| Checkpoint within one unchanged decimal request | A rightmost x |
+| --- | ---: |
+| Before and after raw advances | 6.421875 px |
+| After raw paths, font metrics, layout creation and actual-run path extraction | 6.421875 px |
+| Immediately after rasterization | 6.4375 px |
+| After reacquiring a raw font | 6.4375 px |
+| All checkpoints when repeating exactly `499.006199` | 6.4375 px |
+| All checkpoints when subsequently requesting `499.006201` | 6.4375 px |
+
+The change is exactly `1/64 px`. The A advance remains `7.625 px`; text metrics
+and pixel output remain equal across the first request, identical-decimal
+repeat and other-decimal request. The shared pixel SHA-256 is
+`2e9e40bf767345167f349239150f93b16867d4201e6bd39526617f52f76378e1`.
+This demonstrates render-history dependence of the path query without any
+change in requested decimal or API axis value. It cannot establish additional
+input precision or a successful preservation of Apple's source-side result.
+
+Within each downloaded artifact, the independently reviewable evidence is
+`d1-evidence/ordinary-qt-freetype-{private|installed}-{forward|reverse}/`
+`path-state-diagnostic/qt-path-state-diagnostic.jsonl`. All four private files
+have SHA-256 `d96cd5b8d3ec81bfc00fa0741c6c6e9e351149a88aaeadc4174c5d2213a5bd83`;
+all four installed files have SHA-256
+`fcfea5990d18997d7dc3d6f16c138f668224f912f4148c4b7383a0930f2678bf`.
+The files differ only in the header's load mode; their three observation
+records match exactly across all eight children.
+
+The inspected Qt source below suggests a preceding raster's FreeType subpixel
+translation as the mechanism: raster loading sets it, while the path loader's
+face lock refreshes a changed matrix but does not independently clear the
+translation. Stage 2 proves the after-raster state effect. The separately
+implemented fixed-object subpixel-offset experiment is a further causal test;
+its result must be read from its own future Windows evidence rather than
+inferred from this stage 2 record.
+
 ## Inspected primary references
 
 References were inspected before implementation. This probe is independently
@@ -134,6 +210,19 @@ written and does not copy Qt implementation code.
    units-per-em size, loads glyphs with `FT_LOAD_NO_BITMAP` and manually scales
    their outlines. That implementation is separate from raster loading and
    should not be assumed to have identical state or precision.
+7. [Qt 6.10.3 QRawFont path delegation](https://github.com/qt/qtbase/blob/7ddbc87d8e14ce51d2957ea72d0a6077593d5ff4/src/gui/text/qrawfont.cpp#L254-L270):
+   `pathForGlyph` delegates to the current engine's `addGlyphsToPath`.
+   The FreeType engine's [raster loading](https://github.com/qt/qtbase/blob/7ddbc87d8e14ce51d2957ea72d0a6077593d5ff4/src/gui/text/freetype/qfontengine_ft.cpp#L1779-L1824)
+   sets a face transform including a subpixel translation. Its
+   [path loading](https://github.com/qt/qtbase/blob/7ddbc87d8e14ce51d2957ea72d0a6077593d5ff4/src/gui/text/freetype/qfontengine_ft.cpp#L2349-L2368)
+   uses `lockFace(Unscaled)`, and
+   [that lock](https://github.com/qt/qtbase/blob/7ddbc87d8e14ce51d2957ea72d0a6077593d5ff4/src/gui/text/freetype/qfontengine_ft.cpp#L2917-L2937)
+   refreshes the transform when its matrix changes. The subpixel experiment
+   tests the possibility that a preceding raster translation remains visible
+   to later paths; source inspection alone is not a measured result.
+8. [FreeType transform documentation](https://freetype.org/freetype2/docs/reference/ft2-sizing_and_scaling.html#ft_set_transform):
+   the face's matrix and translation are applied during subsequent glyph
+   loads. A null translation pointer explicitly resets the translation.
 
 Tag `v6.10.3` was resolved through the GitHub API to source commit
 `7ddbc87d8e14ce51d2957ea72d0a6077593d5ff4`.

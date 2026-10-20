@@ -319,6 +319,12 @@ def validate_qt_policy(rows, header, summary):
     require(seen == expected, "Incomplete Qt production-policy positions")
 
 
+def qt_path_is_empty(path):
+    # QPainterPath::isEmpty explicitly includes a single MoveToElement.
+    # https://doc.qt.io/qt-6/qpainterpath.html#isEmpty
+    return not path or (len(path) == 1 and path[0][0] == 0)
+
+
 def validate_qt_path(path, empty_allowed=False):
     require(isinstance(path, list) and (empty_allowed or path), "Empty or invalid Qt outline")
     begun = False
@@ -340,6 +346,7 @@ def validate_qt_path(path, empty_allowed=False):
             else:
                 require(element[0] != 3, "Orphan Qt cubic data")
         cursor += 1
+    require(empty_allowed or not qt_path_is_empty(path), "Qt glyph contains no drawing elements")
 
 
 def validate_qt_glyphs(payload):
@@ -352,7 +359,7 @@ def validate_qt_glyphs(payload):
         require(isinstance(advance, list) and len(advance) == 2 and all(finite_number(v) for v in advance), "Invalid Qt glyph advance")
         validate_qt_path(glyph.get("path_px"), empty_allowed=gid == 1)
         if gid == 1:
-            require(glyph["path_px"] == [], "Qt space unexpectedly contains an outline")
+            require(qt_path_is_empty(glyph["path_px"]), "Qt space unexpectedly contains drawing elements")
     raster = payload.get("raster")
     require(isinstance(raster, dict) and type(raster.get("width")) is int and type(raster.get("height")) is int
             and raster["width"] > 0 and raster["height"] > 0, "Invalid Qt raster dimensions")
@@ -484,6 +491,135 @@ def analyze(directory, expected_source_sha=None):
             "scope": "Frozen authored fixtures on these runtime versions; model matches do not reveal proprietary Windows internal implementation."}
 
 
+EVIDENCE_FAILURES = (EvidenceError, KeyError, TypeError, ValueError, OSError,
+                     OverflowError, AttributeError, struct.error)
+
+
+def collect_partial_evidence(directory, expected_source_sha=None):
+    """Retain independently complete processes without relaxing full acceptance.
+
+    A failed or incomplete process never enters the measurements/comparison
+    maps. Source, case-stream, font identity, native log hash, header and full
+    per-process validators must all agree before one process is retained.
+    An explicit independently supplied source SHA is mandatory in this mode.
+    """
+    directory = Path(directory)
+    expected = {f"{font}-dwrite-{mode}-{order}" for font in ("ordinary", "gain")
+                for mode in ("private", "installed") for order in ("forward", "reverse")}
+    expected |= {f"ordinary-qt-{backend}-{mode}-{order}" for backend in ("native", "freetype")
+                 for mode in ("private", "installed") for order in ("forward", "reverse")}
+    partial = {
+        "schema": 1, "status": "PARTIAL_EVIDENCE_REJECTED", "full_acceptance": False,
+        "expected_source_sha": expected_source_sha, "source_commit": None,
+        "reported_windows_run_status": None, "expected_processes": len(expected),
+        "validated_processes": 0, "validated_observations": 0,
+        "validated_experiments": {}, "rejected_processes": {}, "missing_processes": [],
+        "unexpected_process_labels": [], "binding_errors": [],
+        "opposite_process_replays": {}, "private_vs_installed": {}, "comparison_failures": [],
+        "original_ttc_acceptance": "NOT_RUN_NO_QUALIFIED_CANDIDATE",
+        "windows11_desktop_acceptance": "NOT_RUN", "real_swirl_ui_acceptance": "NOT_RUN",
+        "scope": "Individually validated complete processes only. Missing, failed or mismatched processes are excluded. Comparisons require both operands to have validated. This section never changes the global FAILED verdict or certifies all experiments.",
+    }
+    try:
+        require(isinstance(expected_source_sha, str) and len(expected_source_sha) == 40
+                and all(c in "0123456789abcdef" for c in expected_source_sha),
+                "Partial evidence requires an explicit expected source SHA")
+        run = load_json(directory / "windows-axis-precision-run.json")
+        require(isinstance(run, dict), "Run metadata is not an object")
+        partial["source_commit"] = run.get("source_commit")
+        partial["reported_windows_run_status"] = run.get("status")
+        require(run.get("source_commit") == expected_source_sha, "Partial evidence belongs to another source commit")
+        require(run.get("status") in ("FAILED", "PASS_SYNTHETIC_WINDOWS_EXPERIMENT"), "Windows execution never reached a completed run record")
+        require(run.get("system_installation_requested") is True, "Partial D1 evidence is not from the declared installed/private experiment")
+        manifest = load_json(directory / "fixture-manifest.json")
+        require(manifest.get("original_synthetic") is True, "Not the authored D1 fixture")
+        require(valid_sha256(manifest.get("requests_sha256"))
+                and sha256(directory / "requests.tsv") == manifest["requests_sha256"], "Partial case-stream hash changed")
+        fonts = {font["kind"]: font for font in manifest["fonts"]}
+        require(set(fonts) == {"ordinary", "gain"} and len(manifest["fonts"]) == 2, "Missing/duplicate original fixture")
+        for kind, font in fonts.items():
+            registered = run["fixtures"][kind]
+            require(valid_sha256(font.get("sha256")) and registered.get("sha256") == font["sha256"]
+                    and registered.get("bytes") == font["bytes"], "Harness/manifest fixture identity differs: " + kind)
+        entries = run.get("runs")
+        require(isinstance(entries, list), "Native process entries are not an array")
+        indexed = {}
+        for entry in entries:
+            require(isinstance(entry, dict) and isinstance(entry.get("label"), str), "Malformed native process entry")
+            indexed.setdefault(entry["label"], []).append(entry)
+        partial["unexpected_process_labels"] = sorted(set(indexed) - expected)
+        partial["environment"] = {key: run.get(key) for key in
+                                  ("windows_product", "windows_build", "dwrite_version", "qt_sdk")}
+        partial["recorded_build_sources"] = run.get("sources", {})
+        partial["installation_lifecycle"] = run.get("installations", [])
+    except EVIDENCE_FAILURES as error:
+        partial["binding_errors"].append(str(error))
+        return partial
+
+    measurements = {}
+    for label in sorted(expected):
+        group = indexed.get(label, [])
+        if not group:
+            partial["missing_processes"].append(label)
+            continue
+        if len(group) != 1:
+            partial["rejected_processes"][label] = {"error": "Duplicate native process label", "entries": len(group)}
+            continue
+        entry = group[0]
+        try:
+            require(entry.get("status") == "PASS" and type(entry.get("exit_code")) is int
+                    and entry["exit_code"] == 0 and entry.get("timeout") is False, "Native subprocess failed or did not complete")
+            font = fonts[label.split("-", 1)[0]]
+            native = "-dwrite-" in label
+            filename = "directwrite-axis-precision.jsonl" if native else "qt-axis-precision.jsonl"
+            path = directory / label / filename
+            recorded = entry["native_log"]
+            require(recorded.get("file") == filename and recorded.get("bytes") == path.stat().st_size,
+                    "Native log filename/byte count differs from harness")
+            digest = sha256(path)
+            require(valid_sha256(recorded.get("sha256")) and digest == recorded["sha256"], "Native evidence hash changed")
+            result = validate_native(path, font, manifest) if native else validate_qt(path, font, "-installed-" in label)
+            validate_process_header(label, result["header"], entry)
+            measurements[label] = result.pop("payloads")
+            result["validation_scope"] = "INDIVIDUAL_COMPLETE_PROCESS_ONLY"
+            result["evidence_binding"] = {"source_commit": expected_source_sha, "font_sha256": font["sha256"],
+                                          "native_log_sha256": digest, "native_log_bytes": path.stat().st_size,
+                                          "header_bound_to_process_label": True}
+            partial["validated_experiments"][label] = result
+            partial["validated_observations"] += result["summary"]["observation_count" if native else "observations"]
+        except EVIDENCE_FAILURES as error:
+            partial["rejected_processes"][label] = {
+                "error": str(error), "reported_status": entry.get("status"),
+                "reported_exit_code": entry.get("exit_code"), "reported_timeout": entry.get("timeout"),
+                "reported_error": entry.get("error"),
+            }
+    for label in sorted(measurements):
+        if not label.endswith("-forward"):
+            continue
+        other = label.removesuffix("forward") + "reverse"
+        if other in measurements:
+            equal = measurements[label] == measurements[other]
+            partial["opposite_process_replays"][label] = {"first": label, "second": other, "equal": equal}
+            if not equal:
+                partial["comparison_failures"].append("Independent process mismatch: " + label)
+        if "-private-" in label:
+            installed = label.replace("-private-", "-installed-")
+            if installed in measurements:
+                first, second = measurements[label], measurements[installed]
+                differences = [str(key) for key in first if first[key] != second.get(key)]
+                equal = not differences and set(first) == set(second)
+                partial["private_vs_installed"][label] = {
+                    "first": label, "second": installed, "equal": equal,
+                    "differing_positions": len(differences), "first_differences": differences[:5],
+                }
+                if not equal:
+                    partial["comparison_failures"].append("Private/installed mismatch: " + label)
+    partial["validated_processes"] = len(measurements)
+    if measurements:
+        partial["status"] = "PARTIAL_EVIDENCE_ONLY"
+    return partial
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("evidence_directory", type=Path)
@@ -492,11 +628,12 @@ def main():
     output = args.evidence_directory / "d1-analysis.json"
     try:
         result = analyze(args.evidence_directory, args.expected_source_sha)
-    except (EvidenceError, KeyError, TypeError, ValueError, OSError) as error:
+    except EVIDENCE_FAILURES as error:
         result = {"schema": 1, "status": "FAILED_EVIDENCE_ANALYSIS", "error": str(error),
-                  "original_ttc_acceptance": "NOT_RUN"}
-        output.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
-        print(json.dumps(result))
+                  "original_ttc_acceptance": "NOT_RUN",
+                  "partial_validated_evidence": collect_partial_evidence(args.evidence_directory, args.expected_source_sha)}
+        output.write_text(json.dumps(result, indent=2, allow_nan=False) + "\n", encoding="utf-8")
+        print(json.dumps(result, allow_nan=False))
         raise SystemExit(1)
     output.write_text(json.dumps(result, indent=2, allow_nan=False) + "\n", encoding="utf-8")
     print("D1_ANALYSIS " + json.dumps(result, separators=(",", ":"), allow_nan=False))
