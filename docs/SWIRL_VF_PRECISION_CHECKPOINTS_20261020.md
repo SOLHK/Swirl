@@ -76,8 +76,21 @@ Local validation: **332/332 Python tests, zero skips, 6/6 audits**; full suite
 11.346 seconds; `git diff --check` passed. Eight new independent analytical
 cases cover positive/negative/mixed slopes, nonzero residual, clipped domains,
 flat branches, contradictory constraints and a feasible singleton whose old
-least-squares point still fails. Native execution of this checkpoint is pending;
-the exact commit and final Actions result will be recorded after the push.
+least-squares point still fails. Exact source commit
+`a7efe8b983a6d1a7ad8e4ce33532d40326444d64` was pushed non-forcibly and the remote
+HEAD matched. Native run [39380682143](https://github.com/SOLHK/Swirl/actions/runs/39380682143),
+job 118488866332, completed **success** on xcode-27. The verified downloaded
+artifact 12244799401 has ZIP SHA-256
+`5bc02d3f638b983ff3f7df2c30a42351a9d8e1593388f8aa822c03f7a3267b65`.
+All 32 faces / 3,048 native observations completed, exact source SHA matched,
+and every pre-existing inference field is identical to the earlier archive.
+The new best-branch intervals contain 7–23 F2DOT14 grid points.
+This is diagnostic validation, not acceptance of a new mapping formula.
+
+Same-source [39380682203](https://github.com/SOLHK/Swirl/actions/runs/39380682203)
+also finished: Python and Windows synthetic DirectWrite **success**; Apple
+**failure**, retaining the same raw 849/850 vertical-advance assertion at
+0.03125. The actual failure log was read (job 118488867261).
 
 The original archive's best fits are identifiable in the zero-residual sense,
 but the 1/32 metric budget generally admits 7–23 neighboring F2DOT14 grid points
