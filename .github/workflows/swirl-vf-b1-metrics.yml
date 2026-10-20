@@ -4,9 +4,15 @@ on:
   push:
     branches: [work/vf-metrics-b1]
     paths:
-      - '.github/workflows/swirl-vf-b1-*.yml'
-      - 'tools/swirl_vf/platform/b1_*'
-      - 'tools/swirl_vf/tests/test_metric_b1_*'
+      # The frozen first-stage experiment does not rerun for new follow-up
+      # modules or workflows. Its strict failure log is retained as evidence.
+      - 'tools/swirl_vf/platform/b1_metric_discriminator.py'
+      - 'tools/swirl_vf/platform/b1_metric_fixture.py'
+      - 'tools/swirl_vf/platform/b1_metric_probe.swift'
+      - 'tools/swirl_vf/platform/b1_original_metric_check.py'
+      - 'tools/swirl_vf/tests/test_metric_b1_discriminator.py'
+      - 'tools/swirl_vf/tests/test_metric_b1_fixture.py'
+      - 'tools/swirl_vf/tests/test_metric_b1_original_check.py'
   workflow_dispatch:
 
 permissions:

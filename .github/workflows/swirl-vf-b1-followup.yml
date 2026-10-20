@@ -1,0 +1,107 @@
+name: Swirl VF B1 independent hypotheses and original VORG ablation
+
+on:
+  push:
+    branches: [work/vf-metrics-b1]
+    paths:
+      - '.github/workflows/swirl-vf-b1-followup.yml'
+      - 'tools/swirl_vf/platform/b1_metric_followup*.py'
+      - 'tools/swirl_vf/platform/b1_original_vorg_ablation.py'
+      - 'tools/swirl_vf/tests/test_metric_b1_followup*.py'
+      - 'tools/swirl_vf/tests/test_metric_b1_vorg_ablation.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: swirl-vf-b1-followup-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  python:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate frozen predictions, raw-directory ablation and regressions
+        run: |
+          python -m pip install fonttools==4.61.1 numpy==2.2.6
+          python -m unittest discover -s tools/swirl_vf/tests -v
+          python -m unittest discover -s tools/swirl_vf/audit -p 'test_*.py' -v
+
+  apple-followup:
+    needs: python
+    runs-on: xcode-27
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Record native environment and dependencies
+        run: |
+          mkdir -p build/b1-followup-environment
+          git rev-parse HEAD > build/b1-followup-environment/commit.txt
+          sw_vers > build/b1-followup-environment/macos.txt
+          xcodebuild -version > build/b1-followup-environment/xcode.txt
+          python -m pip install fonttools==4.61.1 numpy==2.2.6
+      - name: Measure unseen coordinates with frozen hypotheses and exact reverse replay
+        run: |
+          python tools/swirl_vf/platform/b1_metric_followup.py --output build/b1-followup --require-native
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: swirl-vf-b1-followup-${{ github.sha }}
+          path: |
+            build/b1-followup-environment/*.txt
+            build/b1-followup/*.json
+            build/b1-followup/*.log
+            build/b1-followup/raw/*.json
+            build/b1-followup/raw/*.log
+            build/b1-followup/fixtures/manifest.json
+          retention-days: 90
+
+  apple-original-ablation:
+    needs: [python, apple-followup]
+    runs-on: xcode-27
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile the unchanged production native oracle
+        run: |
+          mkdir -p build/b1-ablation-environment
+          git rev-parse HEAD > build/b1-ablation-environment/commit.txt
+          sw_vers > build/b1-ablation-environment/macos.txt
+          xcodebuild -version > build/b1-ablation-environment/xcode.txt
+          python -m pip install fonttools==4.61.1 numpy==2.2.6
+          xcrun swiftc -O tools/swirl_vf/platform/coretext_extract.swift -o build/b1-ablation-coretext
+      - name: Original / VORG-directory-only ablation / original repeat and unchanged strict representation gate
+        run: |
+          python tools/swirl_vf/platform/b1_original_vorg_ablation.py \
+            --source /System/Library/PrivateFrameworks/FontServices.framework/Versions/A/Resources/Reserved/PingFangUI.ttc \
+            --binary "$PWD/build/b1-ablation-coretext" \
+            --output build/b1-original-vorg-ablation.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: swirl-vf-b1-original-vorg-ablation-${{ github.sha }}
+          path: |
+            build/b1-ablation-environment/*.txt
+            build/b1-original-vorg-ablation.json
+          retention-days: 90
