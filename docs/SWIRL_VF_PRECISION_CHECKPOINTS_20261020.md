@@ -785,6 +785,76 @@ closure's final source-bound native results, then consider the smallest
 explicit production-construction bridge. Do not promote the diagnostic binary
 or enter full reconstruction. Original completed faces remain **0/32**.
 
+## A2/A3 boundary: freeze six input-resolution observations before promotion
+
+Production admission source **`9f4d9882255bd36f804d0bd639966ad65677fc31`** was
+non-forced pushed and independently confirmed as remote HEAD. Its
+[39392843327](https://github.com/SOLHK/Swirl/actions/runs/39392843327) finished:
+Python job 118528286230 **success** (436 tests, seven optional HarfBuzz skips;
+the local frozen run had zero skips), Windows job 118528285590 **success**,
+Apple job 118528285313 **failure**. Actual logs were read: the existing 22 Swift
+guards pass, but raw face0/GID2 all-minimum vertical advance remains **849/850**
+at 0.03125. This is not a new metric fix or a whole-job PASS.
+
+The same-source real reconstruction
+[39392843364](https://github.com/SOLHK/Swirl/actions/runs/39392843364) passed
+its original construction preflight, then job 118529050437 actually ran the
+builder and **failed**. Its safe final log confirms all32 identities, unchanged
+source, 91 completed batches / 5,824 glyph observations, zero completed glyph
+models and zero completed faces. The unchanged blocker is face0/GID0, WDTH=1,
+wght=501, HGHT=500: vertical-origin X differs from the standard vmtx model by
+**100 FUnit**. No TTC was generated; no new native transcript finalization is
+claimed after this failure. The default strict probe 39392843518 also remains
+failed at the known fractional WDTH readback; it is a separate unchanged path.
+
+The 32-face b549 diagnostic
+[39391013239](https://github.com/SOLHK/Swirl/actions/runs/39391013239) now has
+actual final **success**, and all three mode logs report 5,356 positions with
+zero failed replay batches. Artifact 12250517308 has GitHub ZIP SHA-256
+`e29c2b663330845e16135ec35e760f7a4cf70a99814db0e4ff9e2ac30404f018`.
+The complete native/archived-141 audit is not yet interpreted at this source
+checkpoint. A workflow's diagnostic success is not production acceptance.
+
+Before changing production construction, the independent numerical review
+identified a deliberately small new falsification case on face15, with original
+WDTH=HGHT=500. Requests **wght=499.006199 and 499.006201** are different binary64
+values but both round to Fixed integer **32702870**, exactly
+499.006195068359375. The already fixed source candidate instead predicts
+C=499.0061/499.0062 and design q=0/65 in F2DOT14 integers. This is a **prediction,
+not an observed native split**. Four controls are default499, each C, and the
+common exact Fixed input. No new model is fitted to these six positions.
+
+`platform/probe_axis_input_resolution.py` reuses the existing production-prefix
+bound diagnostic constructors, both predeclared models, exact original/replay
+policy, complete opposite-order payload checks and original strict raw-Q
+comparator. It selects the existing structural set plus HVAR glyphs: **35 GIDs**,
+13/13 Type2 shapes, maximum tested hierarchy depth12, four rotation-bearing roots.
+All selected GIDs undergo portable/native comparison; **direct Apple HVF is
+limited to GIDs5 and19177 at every point**, with explicitly separate conditional
+HVAR references. Three constructs / two orders / original+replay plan **2,520
+records**, six fully identity-checked native processes. The original source,
+all payloads and native logs stay private. Only coordinates, counts, differences
+and explicit failure verdicts are emitted.
+
+New workflow `swirl-vf-axis-input-resolution.yml` runs xcode-27 and publishes
+only the safe summary. Twelve independent original tests cover Fixed ties for
+both signs, the six-point contract, independent rational cell bounds, distinct
+locations with identical payloads, unknown-field differences without disclosure,
+blank fractional origins, identity mismatch, and a true 0.5 control error which
+remains failed in both legacy and raw-Q results. Frozen full regression:
+**448/448, zero skips; 6/6 audits**, 50.261 seconds. No native execution of this
+new probe is claimed at this checkpoint. Changed files are the new probe,
+workflow/test and these two handoffs; existing mapping/constructors are unchanged.
+
+The official [OpenType normalization specification](https://learn.microsoft.com/en-us/typography/opentype/spec/otvaroverview#coordinate-scales-and-normalization)
+requires user input in16.16 with nearest conversion and ties to the higher
+integer. This diagnostic tests that processing boundary. It does **not** assert
+that every platform follows one precision path or that every standard-font
+representation is impossible. Actual source behavior, exact replay and error
+magnitudes must be measured first; a nonzero split alone is not a proof that
+both sides cannot fit the1/32 budget. `standard_format_impossibility_proved`
+remains false.
+
 ## Newly retrieved prior evidence (not new execution in this continuation)
 
 - At exact source `056f7ea6dc7cf3a703da63e8522b89d33d1166f4`,
