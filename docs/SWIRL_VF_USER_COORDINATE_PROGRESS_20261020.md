@@ -4,6 +4,19 @@ This phase starts at `b5a84bfacc48e6b2a8be8f0797f34639530766c9` on
 `work/core-completion-20261017`; every push is non-forced and based on a fresh
 remote head. UI, animations and Rust Core are outside the changes.
 
+## Eleventh implementation checkpoint: unwrap optional CoreText frame diagnostics
+
+The diagnostic checkpoint `babc38b12373a6c744a03f727bee230d8341f615` preserved
+concurrent Core commit `5d3ec74d`. Its native run
+[39373488729](https://github.com/SOLHK/Swirl/actions/runs/39373488729), job
+118466325711, stopped during Swift compilation: `CTFrameGetFrameAttributes`
+returns an optional CFDictionary. The probe now maps that optional before
+bridging to NSDictionary and records unavailable attributes explicitly as
+`reported_frame_attributes_available=false` with a null progression. It does
+not assume or substitute a frame progression. All original layout and identity
+guards remain unchanged; all **9/9 existing local probe tests pass**. This run
+did not produce new vertical identities or GPOS effectiveness measurements.
+
 ## Tenth implementation checkpoint: retain the actual CoreText vertical-layout failure
 
 Commit `121d58c3579241305d5a653939f1200573f3a7d2` (parent `af8df45a`) repaired

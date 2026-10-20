@@ -195,7 +195,7 @@ func fixtureSnapshot(_ font: CTFont, _ request: [String: Any],
     let frameLines = CTFrameGetLines(frame)
     guard visible.location == 0, visible.length == text.utf16.count,
           let lines = frameLines as? [CTLine], !lines.isEmpty else {
-        let reportedFrameAttributes = CTFrameGetFrameAttributes(frame) as NSDictionary
+        let reportedFrameAttributes = CTFrameGetFrameAttributes(frame).map { $0 as NSDictionary }
         throw OracleError.diagnostic("original_fixture_layout_incomplete", [
             "visible_range": [visible.location, visible.length],
             "requested_range": [0, 0], "utf16_count": text.utf16.count,
@@ -203,7 +203,8 @@ func fixtureSnapshot(_ font: CTFont, _ request: [String: Any],
             "frame_rect": [Double(rectangle.minX), Double(rectangle.minY),
                            Double(rectangle.width), Double(rectangle.height)],
             "requested_frame_progression": frameAttributes[kCTFrameProgressionAttributeName as String] ?? NSNull(),
-            "reported_frame_progression": reportedFrameAttributes[kCTFrameProgressionAttributeName] ?? NSNull(),
+            "reported_frame_attributes_available": reportedFrameAttributes != nil,
+            "reported_frame_progression": reportedFrameAttributes?[kCTFrameProgressionAttributeName] ?? NSNull(),
             "vertical_forms": direction == "ttb", "construction": fixtureConstruction,
             "requested_font": fixtureIdentity(font, expected, absent)])
     }
