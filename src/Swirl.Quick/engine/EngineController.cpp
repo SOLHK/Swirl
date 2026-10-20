@@ -216,8 +216,13 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
     QTimer::singleShot(0,this,&EngineController::refreshLanAddresses);
 }
 void EngineController::updateRoutingFlags() {
+#ifdef SWIRL_USE_RUST_CORE
     m_options.smartRouting=m_smartRoutingEligible&&!m_nativeDocumentRouting&&m_options.customRules.isEmpty();
     m_options.nativePrivateRouting=m_smartRoutingEligible&&!m_nativeDocumentRouting&&!m_options.customRules.isEmpty();
+#else
+    m_options.smartRouting=m_smartRoutingEligible&&!m_nativeDocumentRouting;
+    m_options.nativePrivateRouting=false;
+#endif
 }
 QString EngineController::engineIdentityLabel() const {
     const auto status=m_engine->status();

@@ -35,3 +35,5 @@ Windows Qt 测试通过真实导入、选择、`ThreadedEngine`、Rust DLL、HTT
 - Rust `cargo fmt --all -- --check`、`cargo check --workspace --locked`、`cargo clippy --workspace --all-targets --locked -- -D warnings`、`cargo test --workspace --locked` 与 `cargo build --release --locked -p swirl-api` 均退出 0。
 - Windows Release 构建的 `Swirl.exe`、`SwirlRustCoreTests.exe` 成功；另以 `SWIRL_USE_RUST_CORE=ON`、`SWIRL_BUILD_UI_TESTS=OFF` 完成正常产品 `Swirl.exe` 构建。`ctest -R ^swirl-rust-qt-integration$` 最终 1/1 通过。XML 中新增手工规则产品案例和“私有规则优先于终结 MATCH”案例均为 PASS，9 个需其他对端的既有可选案例为 SKIP，不算通过。
 - 独立 Windows 回环测试：`test_policy_groups.py` 21/21、`test_connection_stages.py` 19/19、`test_dns_negative.py` 43/43 通过；`test_shadowsocks.py` 9 项中 1 项明确跳过，`test_rust_core.py` 24 项中 1 项明确跳过，其余通过。包含 TCP、DNS、IPv4/IPv6、HTTP/HTTPS 与合成 Shadowsocks 出站，均不替代真实服务商或物理系统代理验收。
+
+追加复核将手工规则开关严格限定在 `SWIRL_USE_RUST_CORE` 构建；兼容构建继续沿用原 `smartRouting` 条件。Windows 兼容 `SwirlNativeTests.exe` 编译通过，定向 `explicitCompatibilityPreferenceKeepsNetworkOptions` 通过。完整 `swirl-native-engine` 运行结果为 **13 PASS、3 FAIL、1 SKIP**：两个 FAIL 明确缺少本构建目录的 `core/mihomo.exe`，另一个独立 Trojan 对端未能启动，原因尚未确认。该完整兼容套件不能记为通过；这不改变上述 Rust 模式本地结果。
