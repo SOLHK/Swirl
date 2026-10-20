@@ -5,6 +5,8 @@ use crate::{Config, Credentials, Limits, Node, ObfsHttp, Outbound, Tls};
 #[cfg(test)]
 #[path = "inspect_boundaries.rs"]
 mod inspect_boundaries;
+#[path = "inspect_reality.rs"]
+mod inspect_reality;
 #[path = "inspect_socks4.rs"]
 mod inspect_socks4;
 #[path = "inspect_websocket.rs"]
@@ -846,6 +848,9 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
         ],
         "unknown",
     );
+    if kind == "vless" && inspect_reality::declared(raw) {
+        return inspect_reality::inspect(raw, index, family);
+    }
     if transport == "ws" && matches!(kind, "vless" | "trojan") {
         return inspect_websocket::inspect(raw, index, family);
     }
@@ -1143,6 +1148,8 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
                     uuid: raw.get("uuid").and_then(Value::as_str).unwrap_or("").into(),
                     tls,
                     websocket: None,
+                    reality: None,
+                    flow: None,
                 }),
                 "trojan" => tls.map(|tls| Outbound::Trojan {
                     host,

@@ -422,6 +422,74 @@ pub async fn connect(
     // DNS, all address attempts, TLS and protocol negotiation share this one
     // budget. A successful TCP connection ends address fallback permanently.
     let deadline = Instant::now() + handshake_limit;
+    if let Outbound::Vless {
+        host,
+        port,
+        reality: Some(reality),
+        tls,
+        websocket,
+        flow,
+        ..
+    } = outbound
+    {
+        // Validate before any socket or DNS operation even for direct callers
+        // of this API. There is no ordinary TLS/TCP or DIRECT failure branch.
+        reality.validate()?;
+        if tls.is_some() || websocket.is_some() {
+            return Err("RealityTransportConflict");
+        }
+        if flow.as_deref().is_some_and(|value| !value.is_empty()) {
+            return Err("VlessFlowUnsupported");
+        }
+        let (key, short_id) = reality.key_material()?;
+        let parameters = swirl_transport::reality::ClientParameters::new(
+            &reality.server_name,
+            key,
+            &short_id,
+            [0, 1, 0],
+        )?;
+        let tcp = connect_tcp(
+            resolver,
+            &Target {
+                host: host.clone(),
+                port: *port,
+            },
+            deadline,
+        )
+        .await?;
+        let unix_time = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .ok()
+            .and_then(|value| u32::try_from(value.as_secs()).ok())
+            .ok_or("RealityClock")?;
+        let alpn: Vec<Vec<u8>> = reality
+            .alpn
+            .iter()
+            .map(|value| value.as_bytes().to_vec())
+            .collect();
+        let stream = within(deadline, "RealityHandshakeTimeout", async {
+            swirl_transport::reality::connect(tcp, &parameters, unix_time, &alpn)
+                .await
+                .map_err(|_| "RealityAuthenticationOrHandshake")
+        })
+        .await?;
+        return within(
+            deadline,
+            "UpstreamProtocolTimeout",
+            handshake(
+                outbound,
+                target,
+                Box::new(stream),
+                None,
+                *port,
+                handshake_limit,
+            ),
+        )
+        .await;
+    }
+    if matches!(outbound, Outbound::Vless { flow: Some(flow), .. } if !flow.is_empty()) {
+        return Err("VlessFlowUnsupported");
+    }
     let (host, port, auth, tls) = match outbound {
         Outbound::Direct {} => {
             return Ok(Box::new(connect_tcp(resolver, target, deadline).await?));

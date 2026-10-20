@@ -1,5 +1,5 @@
-//! VLESS wire version 0 and TCP command. The executable path keeps empty Addons;
-//! strict flow request encoding is an internal component, without Vision I/O.
+//! VLESS wire version 0, TCP command and a lazy response prefix. The wrapper
+//! retains its concrete transport owner when a subsequent Vision handoff needs it.
 use crate::{Result, Target};
 use std::{
     future::Future,
@@ -50,16 +50,16 @@ fn invalid() -> io::Error {
         "VLESS response version or addons unsupported",
     )
 }
-pub struct Stream {
-    inner: BoxStream,
+pub struct Stream<S = BoxStream> {
+    inner: S,
     header: [u8; 2],
     received: usize,
     failed: bool,
     limit: std::time::Duration,
     partial_deadline: Option<Pin<Box<tokio::time::Sleep>>>,
 }
-impl Stream {
-    pub fn new(inner: BoxStream, limit: std::time::Duration) -> Self {
+impl<S> Stream<S> {
+    pub fn new(inner: S, limit: std::time::Duration) -> Self {
         Self {
             inner,
             header: [0; 2],
@@ -69,8 +69,22 @@ impl Stream {
             partial_deadline: None,
         }
     }
+
+    pub(crate) fn transport_mut(&mut self) -> io::Result<&mut S> {
+        if self.failed {
+            return Err(invalid());
+        }
+        Ok(&mut self.inner)
+    }
+
+    pub(crate) fn response_transport_mut(&mut self) -> io::Result<&mut S> {
+        if self.received != 2 || self.header != [0, 0] {
+            return Err(invalid());
+        }
+        self.transport_mut()
+    }
 }
-impl AsyncRead for Stream {
+impl<S: AsyncRead + Unpin> AsyncRead for Stream<S> {
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -117,7 +131,7 @@ impl AsyncRead for Stream {
     }
 }
 
-impl AsyncWrite for Stream {
+impl<S: AsyncWrite + Unpin> AsyncWrite for Stream<S> {
     fn poll_write(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,

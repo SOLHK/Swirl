@@ -1,9 +1,9 @@
 //! Incremental Vision framing, bounded stream I/O and inner-TLS inspection.
 //!
 //! `DirectRequested` is a decoded handoff request. Decoding does not authenticate
-//! the request or grant permission to bypass TLS. This module has no TLS-version
-//! input or raw stream access. The stream adapter keeps its outer transport and
-//! rejects requests for a raw handoff that transport cannot safely provide.
+//! the request or grant permission to bypass TLS. The generic stream adapter
+//! rejects raw handoff requests. The concrete REALITY client additionally owns
+//! authenticated, record-bounded transport transitions in each direction.
 //! Inner-TLS inspection describes wire eligibility; it is not authentication.
 
 pub mod record;
@@ -11,6 +11,46 @@ pub mod stream;
 pub mod tls;
 
 use std::{fmt, ops::Range};
+
+/// Vision over the retained VLESS response decoder and native REALITY owner.
+/// Raw transitions never extract, clone or independently split its socket.
+pub type RealityStream<S> =
+    stream::Stream<crate::vless::Stream<swirl_transport::reality::Stream<S>>>;
+
+/// Write the exact Vision flow after native REALITY authentication, then decode
+/// the VLESS response lazily. Only this concrete owner can grant direct mode;
+/// unknown transports continue to use `client_over_authenticated` and refuse it.
+pub async fn client_over_reality<S>(
+    mut transport: swirl_transport::reality::Stream<S>,
+    uuid: &str,
+    target: &crate::Target,
+    prefix_limit: std::time::Duration,
+) -> crate::Result<RealityStream<S>>
+where
+    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
+{
+    use tokio::io::AsyncWriteExt;
+
+    if !transport.is_authenticated() {
+        return Err("VisionOuterAuthenticationRequired");
+    }
+    if transport.raw_read_enabled() || transport.raw_write_enabled() {
+        return Err("VisionOuterTransportAlreadyDirect");
+    }
+    let request = crate::vless::request_with_flow(uuid, target, Some("xtls-rprx-vision"))?;
+    let id = swirl_subscription::uuid_bytes(uuid).ok_or("VlessUuid")?;
+    tokio::time::timeout(prefix_limit, async {
+        transport.write_all(&request).await?;
+        transport.flush().await
+    })
+    .await
+    .map_err(|_| "VisionRequestTimeout")?
+    .map_err(|_| "VisionRequestWrite")?;
+    Ok(stream::Stream::over_reality(
+        crate::vless::Stream::new(transport, prefix_limit),
+        id,
+    ))
+}
 
 /// Component client for an already authenticated outer transport. It writes the
 /// existing VLESS request with the exact Vision Addons, and retains the existing

@@ -113,6 +113,7 @@ pub fn failure_stage(code: &str) -> &'static str {
         }
         code if code.starts_with("Dns") || code.starts_with("RouteDns") => "dns",
         code if code.starts_with("Tls") => "tls_handshake",
+        code if code.starts_with("Reality") => "reality_handshake",
         code if code.starts_with("WebSocketUpgrade") => "websocket_upgrade",
         code if code.starts_with("SocksUpstream") || code.starts_with("HttpUpstream") => {
             "protocol_handshake"

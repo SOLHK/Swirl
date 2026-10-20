@@ -3,8 +3,10 @@
 use serde::{Deserialize, Serialize};
 mod dns_tls;
 mod policy;
+mod reality;
 mod websocket;
 pub use policy::{HealthProbe, PolicyStrategy, ProbeTarget};
+pub use reality::Reality;
 pub use websocket::WebSocket;
 pub mod inspect;
 pub use dns_tls::DnsTlsServer;
@@ -49,6 +51,10 @@ pub enum Outbound {
         tls: Option<Tls>,
         #[serde(default)]
         websocket: Option<WebSocket>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        reality: Option<Reality>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        flow: Option<String>,
     },
     Shadowsocks {
         host: String,
@@ -442,10 +448,25 @@ impl Config {
             }
             match &node.outbound {
                 Outbound::Vless {
-                    websocket: Some(ws),
+                    reality,
+                    flow,
                     tls,
+                    websocket,
                     ..
-                } => ws.validate_tls(tls.as_ref())?,
+                } => {
+                    if flow.as_deref().is_some_and(|value| !value.is_empty()) {
+                        return Err("VlessFlowUnsupported");
+                    }
+                    if let Some(reality) = reality {
+                        if tls.is_some() || websocket.is_some() {
+                            return Err("RealityTransportConflict");
+                        }
+                        reality.validate()?;
+                    }
+                    if let Some(ws) = websocket {
+                        ws.validate_tls(tls.as_ref())?;
+                    }
+                }
                 Outbound::Trojan {
                     websocket: Some(ws),
                     tls,

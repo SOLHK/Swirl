@@ -6,18 +6,20 @@
 //! establishes a data channel: the opt-in [`TlsClient`] also verifies the actual
 //! CertificateVerify and Finished. Its two offline constructions bind the final
 //! authenticated ClientHello to rustls's own transcript, without socket rewriting.
-//! This is a native rustls profile, not a browser fingerprint or a VLESS/Vision
-//! outbound. Subscription/runtime gates remain unchanged until those semantics
-//! and the complete product path are implemented and independently verified.
+//! The async [`Stream`] owns the transport and preserves exact record boundaries.
+//! This is a native rustls profile; a requested browser fingerprint must still be
+//! rejected by the caller instead of being silently changed to this profile.
 mod backend;
 mod certificate;
 mod client;
 mod hello;
 mod kx;
+mod stream;
 
 pub use certificate::ServerAuthenticator;
 pub use client::TlsClient;
 pub use kx::X25519_MLKEM768;
+pub use stream::{Stream, connect};
 
 use ring::{
     aead, digest, hkdf,

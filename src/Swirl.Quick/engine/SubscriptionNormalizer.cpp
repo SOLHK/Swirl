@@ -144,7 +144,7 @@ void uri(Result &r,const QString &line){
         else if(key=="host")host=value;
         else if(key=="flow")node["flow"]=value;
         else if(key=="fp")node["client-fingerprint"]=value;
-        else if(key=="alpn")node["alpn"]=QJsonArray::fromStringList(value.split(',',Qt::SkipEmptyParts));
+        else if(key=="alpn")node["alpn"]=QJsonArray::fromStringList(value.split(',',Qt::KeepEmptyParts));
         else if(canonical=="skip-cert-verify")node["skip-cert-verify"]=typed;
         else if(key=="udp")node["udp"]=typed;
         else if(key=="pbk"||key=="sid"){auto reality=node.value("reality-opts").toObject();reality[key=="pbk"?"public-key":"short-id"]=value;node["reality-opts"]=reality;}

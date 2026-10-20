@@ -3,12 +3,12 @@
 //! Construct only after outer authentication and VLESS request/response handling.
 //! The outer stream must itself distinguish authenticated TLS closure from bare
 //! TCP EOF. This adapter neither authenticates that stream nor reinterprets its
-//! EOF as close_notify. It has no raw-stream extraction or direct-copy fallback.
+//! EOF as close_notify. No raw socket is extracted or cloned.
 //!
-//! EndPadding keeps using the same outer stream. DirectRequested aborts with
-//! `PermissionDenied`: the current backend has no safe, owned raw handoff. Inner
-//! TLS eligibility, a frame boundary or a peer command cannot grant that missing
-//! ownership. No DirectReady state is manufactured from caller-provided booleans.
+//! EndPadding keeps using the same outer stream. Generic transports still reject
+//! DirectRequested. Only the concrete authenticated REALITY constructor installs
+//! the private operations that switch its retained socket owner in each direction.
+//! Inner TLS eligibility and a completed boundary must precede those operations.
 
 use super::{Command, Decoder, Encoder, UUID_LEN, tls};
 use ring::rand::{SecureRandom, SystemRandom};
@@ -50,7 +50,13 @@ pub enum ReadMode {
     Framed,
     OuterStream,
     DirectRequested,
+    Direct,
     Closed,
+}
+
+struct Handoff<S> {
+    read: fn(&mut S) -> io::Result<Vec<u8>>,
+    write: fn(&mut S, &mut Context<'_>) -> Poll<io::Result<()>>,
 }
 
 #[derive(Clone, Copy)]
@@ -86,6 +92,10 @@ pub struct Stream<S> {
     write_frame: Vec<u8>,
     write_position: usize,
     write_framed: bool,
+    handoff: Option<Handoff<S>>,
+    write_direct_pending: bool,
+    write_direct: bool,
+    read_direct: bool,
     shutdown_started: bool,
     write_closed: bool,
     failure: Option<Failure>,
@@ -108,6 +118,10 @@ impl<S> Stream<S> {
             write_frame: Vec::new(),
             write_position: 0,
             write_framed: true,
+            handoff: None,
+            write_direct_pending: false,
+            write_direct: false,
+            read_direct: false,
             shutdown_started: false,
             write_closed: false,
             failure: None,
@@ -126,6 +140,14 @@ impl<S> Stream<S> {
         self.write_framed
     }
 
+    pub fn direct_read_active(&self) -> bool {
+        self.read_direct
+    }
+
+    pub fn direct_write_active(&self) -> bool {
+        self.write_direct
+    }
+
     pub fn buffered_bytes(&self) -> usize {
         self.wire_used - self.wire_position + self.payload.len() - self.payload_position
             + self.write_frame.len()
@@ -142,6 +164,7 @@ impl<S> Stream<S> {
         self.payload_position = 0;
         self.write_frame = Vec::new();
         self.write_position = 0;
+        self.write_direct_pending = false;
         self.wire_used = 0;
         self.wire_position = 0;
         self.inspection = tls::Inspection::new();
@@ -152,6 +175,25 @@ impl<S> Stream<S> {
     /// AsyncWrite::shutdown and leaves the downlink readable.
     pub fn abort(&mut self) {
         let _ = self.fail(io::ErrorKind::Interrupted, "VisionCancelled");
+    }
+}
+
+impl<S: AsyncRead + AsyncWrite + Unpin>
+    Stream<crate::vless::Stream<swirl_transport::reality::Stream<S>>>
+{
+    pub(super) fn over_reality(
+        inner: crate::vless::Stream<swirl_transport::reality::Stream<S>>,
+        uuid: [u8; UUID_LEN],
+    ) -> Self {
+        let mut stream = Self::new(inner, uuid, Role::Client);
+        stream.handoff = Some(Handoff {
+            read: |owner| owner.response_transport_mut()?.enable_raw_read(),
+            write: |owner, cx| match owner.transport_mut() {
+                Ok(owner) => owner.poll_enable_raw_write(cx),
+                Err(error) => Poll::Ready(Err(error)),
+            },
+        });
+        stream
     }
 }
 
@@ -192,6 +234,25 @@ impl<S: AsyncWrite + Unpin> Stream<S> {
             if self.write_position == self.write_frame.len() {
                 self.write_frame.clear();
                 self.write_position = 0;
+                if self.write_direct_pending {
+                    let switch = self.handoff.as_ref().expect("owned direct request").write;
+                    match ready!(switch(
+                        self.inner
+                            .as_mut()
+                            .expect("live stream after failure check"),
+                        cx,
+                    )) {
+                        Ok(()) => {
+                            self.write_direct_pending = false;
+                            self.write_direct = true;
+                        }
+                        Err(error) => {
+                            return Poll::Ready(Err(
+                                self.fail(error.kind(), "VisionDirectWriteHandoff")
+                            ));
+                        }
+                    }
+                }
                 return Poll::Ready(Ok(()));
             }
             let result = ready!(
@@ -259,9 +320,8 @@ impl<S: AsyncRead + Unpin> AsyncRead for Stream<S> {
                             ));
                         }
                     };
-                    if step.boundary == Some(Command::DirectRequested)
-                        || this.decoder.pending_direct_request()
-                    {
+                    let direct = step.boundary == Some(Command::DirectRequested);
+                    if (direct || this.decoder.pending_direct_request()) && this.handoff.is_none() {
                         this.read_mode = ReadMode::DirectRequested;
                         return Poll::Ready(Err(this.fail(
                             io::ErrorKind::PermissionDenied,
@@ -270,18 +330,62 @@ impl<S: AsyncRead + Unpin> AsyncRead for Stream<S> {
                     }
                     this.wire_position += step.consumed;
                     this.payload.extend_from_slice(step.payload);
+                    this.inspection
+                        .observe(this.role.read_direction(), &this.payload);
+                    if direct {
+                        this.read_mode = ReadMode::DirectRequested;
+                        if !matches!(
+                            this.inspection.eligibility(),
+                            tls::Eligibility::Candidate { .. }
+                        ) || !this
+                            .inspection
+                            .application_record_seen(this.role.read_direction())
+                            || !this
+                                .inspection
+                                .at_record_boundary(this.role.read_direction())
+                        {
+                            return Poll::Ready(Err(this.fail(
+                                io::ErrorKind::PermissionDenied,
+                                "VisionDirectInnerTlsIneligible",
+                            )));
+                        }
+                        let switch = this.handoff.as_ref().expect("checked direct owner").read;
+                        let residual = match switch(
+                            this.inner
+                                .as_mut()
+                                .expect("live stream after failure check"),
+                        ) {
+                            Ok(residual) => residual,
+                            Err(error) => {
+                                return Poll::Ready(Err(
+                                    this.fail(error.kind(), "VisionDirectReadHandoff")
+                                ));
+                            }
+                        };
+                        // All these bytes precede the first raw socket read:
+                        // terminal payload, already-delivered TLS plaintext tail,
+                        // then plaintext still buffered in the TLS engine.
+                        this.payload
+                            .extend_from_slice(&this.wire[this.wire_position..this.wire_used]);
+                        this.payload.extend_from_slice(&residual);
+                        this.wire_position = this.wire_used;
+                        this.read_mode = ReadMode::Direct;
+                        this.read_direct = true;
+                    }
                     if step.boundary == Some(Command::EndPadding) {
                         this.read_mode = ReadMode::OuterStream;
                     }
                 } else {
-                    // Only command=1 can arrive here. This tail was already
-                    // read through the same outer stream; preserve its order.
+                    // Post-padding bytes preserve their order in the active
+                    // direction; the transport owns whether they use outer TLS.
                     this.payload
                         .extend_from_slice(&this.wire[this.wire_position..this.wire_used]);
                     this.wire_position = this.wire_used;
+                    if !this.read_direct {
+                        this.inspection
+                            .observe(this.role.read_direction(), &this.payload);
+                    }
                 }
-                this.inspection
-                    .observe(this.role.read_direction(), &this.payload);
                 continue;
             }
             this.wire_position = 0;
@@ -357,19 +461,21 @@ impl<S: AsyncWrite + Unpin> AsyncWrite for Stream<S> {
         let count = bytes.len().min(WRITE_CONTENT_LIMIT);
         this.inspection
             .observe(this.role.write_direction(), &bytes[..count]);
-        // We can safely end padding over the authenticated outer transport, but
-        // cannot request direct without an owned backend transition. The read
-        // side independently refuses a peer's unsupported direct request.
-        let ending = matches!(
-            this.inspection.eligibility(),
-            tls::Eligibility::Ineligible(_)
-        ) || (this
-            .inspection
-            .application_record_seen(this.role.write_direction())
-            && this
+        let eligibility = this.inspection.eligibility();
+        let ending = matches!(eligibility, tls::Eligibility::Ineligible(_))
+            || (this
                 .inspection
-                .at_record_boundary(this.role.write_direction()));
-        let command = if ending {
+                .application_record_seen(this.role.write_direction())
+                && this
+                    .inspection
+                    .at_record_boundary(this.role.write_direction())
+                && (this.handoff.is_none() || eligibility != tls::Eligibility::Pending));
+        let direct = ending
+            && this.handoff.is_some()
+            && matches!(eligibility, tls::Eligibility::Candidate { .. });
+        let command = if direct {
+            Command::DirectRequested
+        } else if ending {
             Command::EndPadding
         } else {
             Command::Continue
@@ -389,6 +495,7 @@ impl<S: AsyncWrite + Unpin> AsyncWrite for Stream<S> {
             }
         };
         this.write_framed = !ending;
+        this.write_direct_pending = direct;
         // Return the accepted application count before attempting transport I/O.
         // A later pending/error poll must never replay or double-ack this frame.
         Poll::Ready(Ok(count))
@@ -439,3 +546,7 @@ impl<S: AsyncWrite + Unpin> AsyncWrite for Stream<S> {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "direct_tests.rs"]
+mod direct_tests;

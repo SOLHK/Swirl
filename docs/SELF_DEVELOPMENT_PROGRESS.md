@@ -1,5 +1,17 @@
 # Swirl Core 固定验收与进度基线（baseline-v1，冻结范围）
 
+## REALITY 正式 Runtime 本地互通（2026-10-20）
+
+本轮将已有 REALITY 握手接入正式 Rust 异步出站、VLESS 与 Runtime 转发，
+补齐原生 IR/订阅及 Qt 配置的严格映射。固定完整官方 Xray 的本地 P0 菜单
+**7/7 通过，0 失败/错误/跳过**，实际访问独立 HTTP 与验证证书的 HTTPS 目标，
+覆盖认证拒绝、路由、并发分段、A/B 切换、半关闭、取消和超时。
+此处是带源码/二进制身份的本地受控测试；精确提交 CI 与 Windows Qt 尚待执行。
+Vision 所有权组件准备已测试，但正式非空 flow 仍被拒绝，未计组合联网通过。
+仅显式 `fingerprint=rustls` 可用，未更改既有私人节点指纹、未访问私人订阅或供应商。
+详情及失败原因见[当前 Runtime 交接](CORE_REALITY_RUNTIME_20261020.md)。
+**冻结验收仍为 79 项 / 6 项完全通过 / 加权 10.83%。**
+
 ## S6 精确 CI 与 S7 产品分流证据（2026-10-20）
 
 S6 `598a8a7` 的 [Rust CI](https://github.com/SOLHK/Swirl/actions/runs/39297859906)

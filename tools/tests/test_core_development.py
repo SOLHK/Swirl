@@ -347,6 +347,7 @@ class CoreDevelopmentTests(unittest.TestCase):
         peers.mkdir(parents=True)
         for name in REQUIRED_TESTS:
             (peers / name).write_text("# test fixture\n", encoding="utf-8")
+        (peers / development.REALITY_RUNTIME_TEST).write_text("# runtime peer fixture\n", encoding="utf-8")
         (root / "tools/Verify-PublicRustCore.py").write_text("# public check fixture\n", encoding="utf-8")
         (root / "tools/Diagnose-NativeConnectivity.py").write_text("# diagnostic fixture\n", encoding="utf-8")
         diagnostic = root / "core/crates/swirl-api/src/bin/swirl-diagnose.rs"
@@ -369,6 +370,28 @@ class CoreDevelopmentTests(unittest.TestCase):
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text("# public synthetic Vision stream fixture\n", encoding="utf-8")
         return workflow
+
+    def test_reality_runtime_gates_require_actual_binary_and_preserve_every_prior_gate(self):
+        final = development.updated_workflow(FIXTURE)
+        previous = development.without_reality_runtime_steps(final)
+        self.assertNotIn("test_reality_runtime.py", previous)
+        self.assertEqual(development.updated_workflow(previous), final)
+        self.assertEqual(development.updated_workflow(final), final)
+        for windows, part in enumerate(final.split("  windows-rust:\n")):
+            block = development.reality_runtime_steps(windows=bool(windows))
+            self.assertEqual(part.count(block), 1)
+            self.assertLess(part.index("python tools/Build-XrayPeer.py"), part.index(block))
+            if windows:
+                self.assertIn(development.reality_runtime_steps(windows=True, qt=True)
+                              + development.NATIVE_APPLICATION_BUILD, part)
+        for source in (
+            final.replace("python tools/tests/test_reality_runtime.py\n", "python tools/tests/test_reality_runtime.py || true\n", 1),
+            final.replace(development.reality_runtime_steps(windows=True, qt=True), "", 1),
+            final.replace("python tools/tests/test_reality_runtime.py --qt\n" + development.WINDOWS_STATUS_GUARD,
+                          "python tools/tests/test_reality_runtime.py --qt\n", 1),
+        ):
+            with self.assertRaises(ValueError):
+                development.updated_workflow(source)
 
     def test_vision_stage_upgrades_both_reviewed_histories_and_is_idempotent(self):
         final = development.updated_workflow(FIXTURE)

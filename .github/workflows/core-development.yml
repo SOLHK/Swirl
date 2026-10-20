@@ -147,6 +147,25 @@ jobs:
             ${{ runner.temp }}/swirl-vision-results
           if-no-files-found: error
           retention-days: 14
+      - name: Production REALITY Runtime through full Xray to HTTP and HTTPS
+        working-directory: .
+        shell: bash
+        env:
+          SWIRL_XRAY_PEER_DIR: ${{ runner.temp }}/swirl-xray-peer
+          SWIRL_RUST_HARNESS: ${{ github.workspace }}/core/target/release/swirl-api
+          SWIRL_RUST_INSPECTOR: ${{ github.workspace }}/core/target/release/swirl-inspect
+          SWIRL_REALITY_RUNTIME_EVIDENCE: ${{ runner.temp }}/swirl-reality-runtime-rust
+        run: |
+          set -euo pipefail
+          python tools/tests/test_reality_runtime.py
+      - name: Preserve production REALITY Runtime rust evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: App-REALITY-Runtime-${{ runner.os }}-rust-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swirl-reality-runtime-rust
+          if-no-files-found: error
+          retention-days: 14
       - name: Export exact source and result identity
         if: always()
         run: |

@@ -207,10 +207,12 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
   if(n.protocol!="ss"&&!n.cipher.isEmpty())return "Rust 尚未映射此协议声明的 cipher；未丢弃加密参数。";
   if(n.protocol=="trojan"&&!n.username.isEmpty())return "Trojan 只支持密码认证；未丢弃 username。";
   const bool socks4=n.protocol=="socks4"||n.protocol=="socks4a";
+  const bool reality=n.protocol=="vless"&&n.parameters.contains("reality-opts");
   QSet<QString> allowed=socks4?QSet<QString>{"tls","udp","network","tfo","skip-cert-verify"}:n.protocol=="ss"?QSet<QString>{"udp","plugin","plugin-opts"}:QSet<QString>{"tls","udp","sni","servername","alpn","skip-cert-verify"};
   allowed.insert("tfo");
   if(n.parameters.contains("tfo")&&n.parameters.value("tfo")!=QJsonValue(false))return "Rust 尚未实现 TCP Fast Open；必须明确为 false。";
   if(n.protocol=="vless")allowed.unite(QSet<QString>{"uuid","flow","encryption"});
+  if(reality)allowed.unite(QSet<QString>{"reality-opts","client-fingerprint"});
   if(n.protocol=="vless"||n.protocol=="trojan")allowed.unite(QSet<QString>{"network","ws-opts"});
   for(auto p=n.parameters.begin();p!=n.parameters.end();++p)if(!allowed.contains(p.key()))return "Rust 尚未实现此传输或扩展参数。";
   for(const auto &key:QStringList{"tls","udp","skip-cert-verify"})if(n.parameters.contains(key)&&!n.parameters.value(key).isBool())return "Rust 布尔参数类型无效。";
@@ -220,6 +222,7 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
   for(const auto &key:QStringList{"sni","servername"})if(n.parameters.contains(key)&&(!n.parameters.value(key).isString()||n.parameters.value(key).toString()!=n.serverName))return "TLS 名称字段不一致。";
   if(n.protocol=="trojan"&&n.parameters.contains("tls")&&!n.parameters.value("tls").toBool())return "Trojan 必须使用 TLS。";
   const bool tls=n.protocol=="trojan"||n.parameters.value("tls").toBool();
+  if(reality&&!tls)return "REALITY 必须明确启用安全连接；未降级为 TCP。";
   if(n.protocol=="socks5"&&udp&&tls)return "Rust 尚未验证 SOCKS5 TLS 与 UDP 的组合；未丢弃 TLS 或 UDP 参数。";
   if(!tls&&(!n.serverName.isEmpty()||n.parameters.contains("alpn")))return "未启用 TLS 却含 TLS 参数。";
   QJsonObject outbound{{"type",socks4?"socks4":n.protocol=="http"?"http_connect":n.protocol=="ss"?"shadowsocks":n.protocol},{"host",n.host},{"port",n.port}};
@@ -244,11 +247,33 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
    if(n.parameters.contains("flow")&&(!n.parameters.value("flow").isString()||!n.parameters.value("flow").toString().isEmpty()))return "Rust 尚未实现 VLESS flow/Vision。";
    if(n.parameters.contains("encryption")&&n.parameters.value("encryption").toString()!="none")return "Rust 尚未实现该 VLESS encryption 扩展。";
    outbound["uuid"]=QUuid(n.parameters.value("uuid").toString()).toString(QUuid::WithoutBraces);
+   if(n.parameters.contains("flow"))outbound["flow"]=n.parameters.value("flow");
   }
   else if(n.protocol=="trojan")outbound["password"]=n.password;
   else if(!n.username.isEmpty()||!n.password.isEmpty())outbound["auth"]=QJsonObject{{"username",n.username},{"password",n.password}};
   if(n.protocol=="socks5")outbound["udp"]=udp;
-  if(tls){
+  if(reality){
+   if(n.parameters.value("client-fingerprint")!=QJsonValue(QStringLiteral("rustls")))return "REALITY 当前只支持显式 rustls 原生指纹；尚未实现浏览器指纹，未替换源配置。";
+   if(!n.parameters.value("reality-opts").isObject())return "REALITY 参数必须是对象。";
+   if(n.parameters.contains("network")&&n.parameters.value("network")!=QJsonValue(QStringLiteral("tcp")))return "REALITY 当前仅支持 TCP 传输。";
+   if(n.parameters.contains("ws-opts"))return "REALITY 不能附带 WebSocket 参数。";
+   const auto settings=n.parameters.value("reality-opts").toObject();
+   for(auto p=settings.begin();p!=settings.end();++p)if(p.key()!="public-key"&&p.key()!="short-id")return "REALITY 含尚未映射的参数；未丢弃原值。";
+   if(!settings.value("public-key").isString()||!settings.value("short-id").isString())return "REALITY 公钥或 shortId 类型无效。";
+   const auto key=settings.value("public-key").toString(),shortId=settings.value("short-id").toString();
+   if(!QRegularExpression("^[A-Za-z0-9_-]{43}=?$").match(key).hasMatch())return "REALITY 公钥编码无效。";
+   const auto decoded=QByteArray::fromBase64Encoding(key.toLatin1(),QByteArray::Base64UrlEncoding|QByteArray::AbortOnBase64DecodingErrors);
+   if(!decoded||decoded.decoded.size()!=32||decoded.decoded==QByteArray(32,'\0'))return "REALITY 公钥无效。";
+   const auto canonical=decoded.decoded.toBase64(QByteArray::Base64UrlEncoding|QByteArray::OmitTrailingEquals);if(key.toLatin1()!=canonical&&key.toLatin1()!=canonical+'=')return "REALITY 公钥必须使用规范的 Base64URL 编码。";
+   if(!QRegularExpression("^(?:[0-9A-Fa-f]{2}){0,8}$").match(shortId).hasMatch())return "REALITY shortId 必须是最长 8 字节的十六进制。";
+   if(n.serverName.isEmpty()||n.serverName.size()>253||!QHostAddress(n.serverName).isNull()||!QRegularExpression("^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$").match(n.serverName).hasMatch())return "REALITY 需要明确的有效 SNI 域名。";
+   const auto alpn=n.parameters.value("alpn");if(!alpn.isUndefined()&&!alpn.isArray())return "REALITY ALPN 格式无效。";
+   if(alpn.toArray().size()>16)return "REALITY ALPN 数量超过限制。";
+   QSet<QString> seenAlpn;int totalAlpn=0;for(const auto &value:alpn.toArray()){const auto text=value.toString();if(seenAlpn.contains(text)||(totalAlpn+=text.size())>1024)return "REALITY ALPN 重复或总长度超过限制。";seenAlpn.insert(text);}
+   for(const auto &value:alpn.toArray())if(!value.isString()||value.toString().isEmpty()||value.toString().size()>255||!QRegularExpression("^[\\x20-\\x7e]+$").match(value.toString()).hasMatch())return "REALITY ALPN 值无效。";
+   outbound["reality"]=QJsonObject{{"server_name",n.serverName},{"public_key",key},{"short_id",shortId},{"fingerprint","rustls"},{"alpn",alpn.isUndefined()?QJsonArray{}:alpn.toArray()}};
+  }
+  else if(tls){
    auto alpn=n.parameters.value("alpn");if(!alpn.isUndefined()&&!alpn.isArray())return "ALPN 格式无效。";
    outbound["tls"]=QJsonObject{{"server_name",n.serverName.isEmpty()?n.host:n.serverName},{"alpn",alpn.isUndefined()?QJsonArray{}:alpn.toArray()}};
   }

@@ -1,5 +1,17 @@
 # Current handoff: subscription product chain (2026-10-19)
 
+## Production REALITY Runtime checkpoint (2026-10-20)
+
+Read [the current native Runtime handoff](CORE_REALITY_RUNTIME_20261020.md) first.
+The official production connection path now owns async REALITY through VLESS,
+and strict subscription/Qt mapping retains its security parameters. The full
+pinned Xray local P0 menu passed 7/7 with actual independent HTTP/verified HTTPS
+targets; exact-source CI and Windows Qt execution are still pending at this
+source checkpoint. Vision ownership preparation is component-tested but flow is
+still blocked pending the deliberate combined Runtime gate. Private-provider,
+browser-fingerprint and physical Windows acceptance are not claimed. Concurrent
+font work is preserved; **79 / 6 / 10.83%** remains frozen.
+
 ## Exact-source S6 and S7 success (2026-10-20)
 
 S6 `598a8a77400236e6f817a1e4782f1c4f0da4bbd0` finished

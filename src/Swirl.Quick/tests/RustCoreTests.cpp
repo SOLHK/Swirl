@@ -45,6 +45,24 @@ class RustCoreTests:public QObject {
  }
 private slots:
  void initTestCase(){QStandardPaths::setTestModeEnabled(true);SwirlPaths::initializeTestStorage();QSettings::setDefaultFormat(QSettings::IniFormat);QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,SwirlPaths::writableLocation(QStandardPaths::AppConfigLocation));}
+ void nativeRealityParametersSurviveEncryptedStoreAndConfiguration(){
+  const QByteArray key=QByteArray(32,'\x09').toBase64(QByteArray::Base64UrlEncoding|QByteArray::OmitTrailingEquals);
+  const QByteArray source="vless://00112233-4455-6677-8899-aabbccddeeff@proxy.invalid:443?security=reality&type=tcp&sni=camouflage.invalid&pbk="+key+"&sid=a1B2&fp=rustls&encryption=none&alpn=h2,http%2F1.1";
+  const auto imported=NodeImporter::parse(source);QVERIFY2(imported,qPrintable(imported.error));QCOMPARE(imported.nodes.size(),1);
+  QTemporaryDir directory;QVERIFY(directory.isValid());const auto path=directory.filePath("reality.dat");QString id;
+  {NodeStore saved(path);QVERIFY(saved.importNodes(imported.nodes));QCOMPARE(saved.nodes().size(),1);id=saved.nodes().first().id;QVERIFY(saved.select(id));}
+  NodeStore restored(path);QCOMPARE(restored.nodes().size(),1);QCOMPARE(restored.selectedId(),id);
+  const auto original=imported.nodes.first();const auto node=restored.nodes().first();QCOMPARE(node.parameters,original.parameters);QCOMPARE(node.originalConfiguration,original.originalConfiguration);
+  EngineStartOptions options;options.nodes=restored.nodes();options.selectedNodeId=id;options.routingMode="global";options.proxyPort=12345;
+  QJsonObject configuration;const auto error=RustCoreEngine::configuration(options,&configuration);QVERIFY2(error.isEmpty(),qPrintable(error));
+  const auto outbound=configuration.value("nodes").toArray().first().toObject().value("outbound").toObject();
+  QVERIFY(!outbound.contains("tls"));QVERIFY(!outbound.contains("websocket"));QCOMPARE(outbound.value("type"),QJsonValue("vless"));
+  const auto reality=outbound.value("reality").toObject();QCOMPARE(reality.value("public_key"),QJsonValue(QString::fromLatin1(key)));QCOMPARE(reality.value("short_id"),QJsonValue("a1B2"));QCOMPARE(reality.value("fingerprint"),QJsonValue("rustls"));QCOMPARE(reality.value("server_name"),QJsonValue("camouflage.invalid"));QCOMPARE(reality.value("alpn"),QJsonValue(QJsonArray{"h2","http/1.1"}));
+  for(const auto &profile:QStringList{"chrome","firefox","","random"}){auto invalid=options;invalid.nodes.first().parameters["client-fingerprint"]=profile;QVERIFY(!RustCoreEngine::configuration(invalid,&configuration).isEmpty());}
+  for(const auto &shortId:QStringList{"a","zz","001122334455667788"}){auto invalid=options;auto settings=invalid.nodes.first().parameters.value("reality-opts").toObject();settings["short-id"]=shortId;invalid.nodes.first().parameters["reality-opts"]=settings;QVERIFY(!RustCoreEngine::configuration(invalid,&configuration).isEmpty());}
+  auto invalid=options;auto settings=invalid.nodes.first().parameters.value("reality-opts").toObject();settings["spider-x"]="/private";invalid.nodes.first().parameters["reality-opts"]=settings;QVERIFY(!RustCoreEngine::configuration(invalid,&configuration).isEmpty());
+  auto invalidAlpn=source;invalidAlpn.replace("alpn=h2,http%2F1.1","alpn=h2,,http%2F1.1");const auto retained=NodeImporter::parse(invalidAlpn);QVERIFY(retained);QCOMPARE(retained.nodes.first().parameters.value("alpn"),QJsonValue(QJsonArray{"h2","","http/1.1"}));invalid=options;invalid.nodes=retained.nodes;invalid.selectedNodeId=retained.nodes.first().id;QVERIFY(!RustCoreEngine::configuration(invalid,&configuration).isEmpty());
+ }
  void importedScalarTypesCannotBecomeCredentialsOrTlsDefaults(){
   const QJsonObject base{{"name","typed-fixture"},{"type","http"},{"server","127.0.0.1"},{"port",443},{"tls",true}};
   for(const auto &key:QStringList{"username","password","cipher","sni","servername"})for(const auto &value:QJsonArray{QJsonValue(),false,123,QJsonArray{},QJsonObject{{"secret","synthetic-private"}}}){
@@ -214,6 +232,11 @@ private slots:
    const auto value=fixture.value(key);QVERIFY(value.isDouble());QVERIFY(value.toDouble()==value.toInt());QVERIFY(value.toInt()>0&&value.toInt()<=65535);
   }
   for(const auto &key:QStringList{"subscription","ca_pem","expected_body"})QVERIFY(fixture.value(key).isString()&&!fixture.value(key).toString().isEmpty());
+  const auto lengthHeader=fixture.value("stream_length_header");QVERIFY(lengthHeader.isUndefined()||lengthHeader.isBool());
+  const bool framedStream=lengthHeader.toBool();QString halfcloseSignal;
+  if(fixture.contains("stream_halfclose_signal")){
+   const auto signal=fixture.value("stream_halfclose_signal");QVERIFY(framedStream&&signal.isString()&&!signal.toString().isEmpty());halfcloseSignal=signal.toString();
+  }
   const int httpPort=fixture["http_port"].toInt(),httpsPort=fixture["https_port"].toInt(),streamPort=fixture["stream_port"].toInt();
   const auto certificates=QSslCertificate::fromData(fixture["ca_pem"].toString().toUtf8());QVERIFY(!certificates.isEmpty());QVERIFY(QSslSocket::supportsSsl());
   const auto expected=fixture["expected_body"].toString().toUtf8();QTemporaryDir directory;QVERIFY(directory.isValid());const auto path=directory.filePath("product.dpapi");
@@ -271,13 +294,21 @@ private slots:
    const auto authority=QByteArray("stream.product.invalid:")+QByteArray::number(streamPort);const auto connectRequest="CONNECT "+authority+" HTTP/1.1\r\nHost: "+authority+"\r\n\r\n";
    QCOMPARE(stream.write(connectRequest),qint64(connectRequest.size()));QByteArray response;
    QVERIFY(QTest::qWaitFor([&]{response+=stream.readAll();return response.contains("\r\n\r\n");},5000));QVERIFY(response.startsWith("HTTP/1.1 200 "));QVERIFY(response.endsWith("\r\n\r\n"));
-   const QByteArray first="before-node-switch\n";QCOMPARE(stream.write(first),qint64(first.size()));QTRY_VERIFY_WITH_TIMEOUT(stream.bytesAvailable()>=first.size(),5000);QCOMPARE(stream.read(first.size()),first);
+   const QByteArray first="before-node-switch\n";constexpr qsizetype payloadSize=256*1024+17;
+   if(framedStream){
+    // The independent origin can frame a complete upload without requiring
+    // an intermediate proxy to propagate TCP CloseWrite to its target socket.
+    const auto length=quint32(first.size()+payloadSize);QByteArray prefix(4,'\0');
+    for(int index=0;index<4;++index)prefix[index]=char((length>>(8*(3-index)))&0xffu);
+    QCOMPARE(stream.write(prefix),qint64(prefix.size()));
+   }
+   QCOMPARE(stream.write(first),qint64(first.size()));QTRY_VERIFY_WITH_TIMEOUT(stream.bytesAvailable()>=first.size(),5000);QCOMPARE(stream.read(first.size()),first);
    QVERIFY(controller.chooseNode(idB));QTRY_COMPARE_WITH_TIMEOUT(controller.activeNodeId(),idB,5000);QCOMPARE(controller.selectedNodeId(),idB);QCOMPARE(NodeStore(path).selectedId(),idB);
    QVERIFY(reachesOrigin("b.product.invalid",httpPort,"/selected-b"));
    const auto deniedTls=request("wrong.fixture.invalid",httpsPort,"/wrong-certificate",true);QCOMPARE(deniedTls.error,QNetworkReply::SslHandshakeFailedError);QVERIFY(deniedTls.body.isEmpty());
    // The already-established A tunnel survives the B selection. Both sides
    // carry exact bytes in irregular chunks, including reads after upload EOF.
-   QByteArray payload(256*1024+17,Qt::Uninitialized);for(qsizetype i=0;i<payload.size();++i)payload[i]=char((i*31+17)%256);
+   QByteArray payload(payloadSize,Qt::Uninitialized);for(qsizetype i=0;i<payload.size();++i)payload[i]=char((i*31+17)%256);
    for(qsizetype position=0;position<payload.size();){const auto count=qMin(qsizetype(1+(position*73)%8191),payload.size()-position);QCOMPARE(stream.write(payload.constData()+position,count),qint64(count));position+=count;}
    QByteArray echoed;QVERIFY(QTest::qWaitFor([&]{echoed+=stream.readAll();return echoed.size()>=payload.size();},8000));QCOMPARE(echoed,payload);QTRY_COMPARE_WITH_TIMEOUT(stream.bytesToWrite(),qint64(0),3000);
 #ifdef Q_OS_WIN
@@ -285,6 +316,12 @@ private slots:
 #else
    QCOMPARE(::shutdown(int(stream.socketDescriptor()),SHUT_WR),0);
 #endif
+   if(!halfcloseSignal.isEmpty()){
+    // Release the delayed origin response only after the real local upload
+    // half-close succeeded. This does not claim the origin observed that FIN.
+    QFile signal(halfcloseSignal);QVERIFY(signal.open(QIODevice::WriteOnly|QIODevice::NewOnly));
+    const QByteArray marker="half-closed";QCOMPARE(signal.write(marker),qint64(marker.size()));QVERIFY(signal.flush());signal.close();
+   }
    const QByteArray tail="origin-after-halfclose";QByteArray receivedTail;QVERIFY(QTest::qWaitFor([&]{receivedTail+=stream.readAll();return receivedTail.size()>=tail.size();},5000));QCOMPARE(receivedTail,tail);
    QTRY_COMPARE_WITH_TIMEOUT(stream.state(),QAbstractSocket::UnconnectedState,5000);controller.stop();QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive()&&!controller.busy(),5000);
   }

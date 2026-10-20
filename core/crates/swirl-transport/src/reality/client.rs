@@ -15,8 +15,8 @@ const MAX_HANDSHAKE_BYTES: usize = 256 * 1024;
 /// ordinary TLS on failure. The caller owns the transport, timeout and cancellation.
 ///
 /// This profile uses rustls's native ClientHello with real hybrid/X25519 shares;
-/// it does not implement Chrome/uTLS fingerprinting, VLESS or Vision. The public
-/// subscription and runtime capability gates deliberately do not enable it yet.
+/// it does not implement Chrome/uTLS fingerprinting, VLESS or Vision. The async
+/// [`super::Stream`] drives this exact engine in the production transport path.
 /// Application writes are refused until CertificateVerify and Finished succeed.
 pub struct TlsClient {
     connection: ClientConnection,
@@ -229,6 +229,34 @@ impl TlsClient {
             self.sent_close = true;
         }
         Ok(())
+    }
+
+    /// Used only by the owning async adapter after an authenticated higher-layer
+    /// Direct command. No socket read is performed and no ciphertext is skipped.
+    /// Exact-record input means there is no raw read-ahead outside this boundary.
+    pub(super) fn take_plaintext_for_raw(&mut self) -> io::Result<Vec<u8>> {
+        self.check_live()?;
+        if !self.ready() || self.filled != 0 || self.peer_closed || self.transport_eof {
+            return Err(invalid("RealityRawReadBoundary"));
+        }
+        let mut plaintext = Vec::new();
+        let mut part = [0; MAX_PLAINTEXT_RECORD];
+        loop {
+            match self.read_plaintext(&mut part) {
+                Ok(0) => return Err(invalid("RealityRawReadClosed")),
+                Ok(count) => {
+                    if plaintext.len() + count > 64 * 1024 {
+                        self.failed = true;
+                        return Err(invalid("RealityRawReadBufferLimit"));
+                    }
+                    plaintext.extend_from_slice(&part[..count]);
+                }
+                Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                    return Ok(plaintext);
+                }
+                Err(error) => return Err(error),
+            }
+        }
     }
 
     fn ready(&self) -> bool {
