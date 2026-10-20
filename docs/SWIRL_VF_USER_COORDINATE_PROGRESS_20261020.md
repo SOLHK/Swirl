@@ -82,3 +82,30 @@ fontTools VarStoreInstancer/VariationModel; Skia TypefaceMacTest at
 709209322f9597b6712079a4386f4d1c7e9b5d44; HarfBuzz and Fontations raw avar
 compatibility handling. These sources inform falsifiable hypotheses, not an
 assumption that Apple's entire implementation matches one candidate.
+# Third implementation checkpoint: transparent metric provenance
+
+The xcode-27 run at `0531127a0babcd8242b9d7f81db9f5c9c0202d3c`
+(`39359357221`) observed macOS 27.0.1. Increasing measurement size from
+0.25 to 64 UPEM and using CTRun did not remove the retained raw CoreText
+metric discrepancies. A new adapter uses explicit source-table coordinates
+for exact metrics while retaining every raw API field and discrepancy.
+Its CLI currently accepts only standard glyf fonts with verified identity
+avar; it explicitly rejects an Apple/HVGL mapping guess or a diagnostic
+axis-guard bypass. The old strict CoreText API gate remains unchanged.
+
+The independent table-metric gate checks the original analytical fixture,
+blank glyphs, fractional and static instances, then actually invokes the
+complete reconstruction and independent serialized/native reread. It fails
+if the existing production axis guard rejects a request. This is a separate
+converter-data gate, not a claim that Apple's API metrics have passed.
+
+The new quantization analysis retains all 141 original F2DOT14 discrepancies.
+A normalized-16.16 truncation candidate explains those cases but introduces
+36 different mismatches; no globally valid replacement is accepted. Native
+construction diagnostics now read the same CFNumber through the C API and
+inspect descriptor attributes to distinguish transport from stored values.
+
+Local verification before this checkpoint: **180/180 Python tests and 6/6
+audit tests pass**. Original 32-face reconstruction is still blocked before
+the first completed face; no final font and no Windows 11/Qt acceptance.
+

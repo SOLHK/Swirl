@@ -82,6 +82,10 @@ jobs:
         if: always()
         run: |
           python tools/swirl_vf/platform/diagnose_coretext_precision.py --output build/swirl-vf-evidence/coretext-precision --require-native
+      - name: Reconstruct native synthetic paths with explicitly sourced table metrics
+        if: always()
+        run: |
+          python tools/swirl_vf/platform/test_native_table_metrics.py --output build/swirl-vf-evidence/native-table-metrics --binary "$PWD/build/swirl-vf-evidence/coretext/coretext_extract" --require-native
       - uses: actions/upload-artifact@v4
         if: always()
         with:

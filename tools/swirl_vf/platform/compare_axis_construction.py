@@ -109,23 +109,57 @@ func geometryDifference(_ a: CTFont, _ b: CTFont, _ gid: Int) throws -> (Double,
     }
     return (maximum, true)
 }
+func inspectNumber(_ value: NSNumber) -> [String: Any] {
+    let scalar = value.doubleValue
+    var result: [String: Any] = ["value": scalar,
+        "binary64_hex": String(scalar.bitPattern, radix:16),
+        "objc_type": String(cString: value.objCType)]
+    // NSNumber and CFNumber are toll-free bridged. Read the same object through
+    // the C API without passing its Double value back into a new CFNumber.
+    // The conversion Boolean concerns this stored number, not axis acceptance.
+    let isNumber = CFGetTypeID(value) == CFNumberGetTypeID()
+    result["is_cf_number"] = isNumber
+    if isNumber {
+        let number = unsafeBitCast(value, to: CFNumber.self)
+        var direct = Double.nan
+        let exact = CFNumberGetValue(number, .float64Type, &direct)
+        result["cf_number_type"] = CFNumberGetType(number).rawValue
+        result["cf_number_byte_size"] = CFNumberGetByteSize(number)
+        result["cf_number_is_float"] = CFNumberIsFloatType(number)
+        result["cf_number_float64_conversion_exact"] = exact
+        result["cf_number_float64_is_finite"] = direct.isFinite
+        result["cf_number_float64_binary64_hex"] = String(direct.bitPattern, radix:16)
+        result["cf_number_and_nsnumber_bits_equal"] = direct.bitPattern == scalar.bitPattern
+        if direct.isFinite { result["cf_number_float64_value"] = direct }
+    }
+    return result
+}
 func inspectNumbers(_ font: CTFont) -> [[String: Any]] {
     var values: [[String: Any]] = []
-    if let axes = CTFontCopyVariation(font) as? [NSNumber: NSNumber] {
-        for (key, value) in axes {
-            let scalar = value.doubleValue
-            values.append(["api": "CTFontCopyVariation", "axis": tagString(key.uint32Value),
-                "value": scalar, "binary64_hex": String(scalar.bitPattern, radix:16),
-                "objc_type": String(cString: value.objCType)])
+    let descriptor = CTFontCopyFontDescriptor(font)
+    let dictionaries: [(String, Any?)] = [
+        ("CTFontCopyVariation", CTFontCopyVariation(font)),
+        ("CTFontCopyAttribute(kCTFontVariationAttribute)",
+            CTFontCopyAttribute(font, kCTFontVariationAttribute)),
+        ("CTFontDescriptorCopyAttribute(kCTFontVariationAttribute)",
+            CTFontDescriptorCopyAttribute(descriptor, kCTFontVariationAttribute))]
+    for (api, dictionary) in dictionaries {
+        if let axes = dictionary as? [NSNumber: NSNumber] {
+            for (key, value) in axes {
+                var row = inspectNumber(value)
+                row["api"] = api
+                row["axis"] = tagString(key.uint32Value)
+                values.append(row)
+            }
         }
     }
     let graphics = CTFontCopyGraphicsFont(font, nil)
     if let axes = graphics.variations as? [String: NSNumber] {
         for (key, value) in axes {
-            let scalar = value.doubleValue
-            values.append(["api": "CGFont.variations", "axis_name": key, "value": scalar,
-                "binary64_hex": String(scalar.bitPattern, radix:16),
-                "objc_type": String(cString: value.objCType)])
+            var row = inspectNumber(value)
+            row["api"] = "CGFont.variations"
+            row["axis_name"] = key
+            values.append(row)
         }
     }
     return values
@@ -190,6 +224,8 @@ func compareConstructionMain() throws {
     try emit(["status": "NATIVE_CONSTRUCTION_COMPARISON_NOT_FONT_ACCEPTANCE",
         "source_sha256": sha256(data), "physical_faces_verified": states.count,
         "production_oracle_changed": false, "axis_tolerance": 1e-6,
+        "number_metadata_schema": 2,
+        "cf_number_conversion_exact_is_not_axis_acceptance": true,
         "outlines_published": false, "font_generated": false, "reports": reports])
 }
 try compareConstructionMain()

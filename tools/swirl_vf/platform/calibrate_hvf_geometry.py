@@ -91,22 +91,84 @@ def native_paths(events):
     return paths
 
 
+def _scalar_cycle_minimum(left, right):
+    """Retain legacy behavior outside the canonical float64 fast path."""
+    candidates=[]
+    for shift in range(len(left)):
+        errors=[]
+        for i,(kind,values) in enumerate(left):
+            other,points=right[(i+shift)%len(right)]
+            if kind!=other: break
+            errors.append(float(np.abs(values-points).max()))
+        else: candidates.append(max(errors,default=0.))
+    if not candidates: raise ValueError('segment_types_differ')
+    return min(candidates)
+
+
+def _small_cycle_minimum(left, right):
+    """Avoid array setup for short contours, with the same proven bound."""
+    best=math.inf; matched=False
+    for shift in range(len(left)):
+        error=0.
+        for i,(kind,values) in enumerate(left):
+            other,points=right[(i+shift)%len(right)]
+            if kind!=other: break
+            point_error=float(np.abs(values-points).max())
+            if not math.isfinite(point_error):
+                return _scalar_cycle_minimum(left,right)
+            error=max(error,point_error)
+            if matched and error>=best: break
+        else:
+            best=min(best,error); matched=True
+            if best==0.: return best
+    if not matched: raise ValueError('segment_types_differ')
+    return best
+
+
 def discrepancy(wanted, actual):
     if len(wanted)!=len(actual): raise ValueError('path_count_differs')
     max_error=0.; tested=0
     for left,right in zip(wanted,actual):
         if len(left)!=len(right): raise ValueError('segment_count_differs')
         if not left: continue
-        candidates=[]
-        for shift in range(len(left)):
-            errors=[]
-            for i,(kind,values) in enumerate(left):
-                other,points=right[(i+shift)%len(right)]
-                if kind!=other: break
-                errors.append(float(np.abs(values-points).max()))
-            else: candidates.append(max(errors,default=0.))
-        if not candidates: raise ValueError('segment_types_differ')
-        max_error=max(max_error,min(candidates));tested+=len(left)
+        count=len(left)
+        if not all(kind in ('L','Q') and isinstance(values,np.ndarray)
+                   and values.dtype==np.dtype('float64')
+                   and values.shape==(4 if kind=='L' else 6,)
+                   for kind,values in left+right):
+            max_error=max(max_error,_scalar_cycle_minimum(left,right)); tested+=count
+            continue
+        if count<=16:
+            max_error=max(max_error,_small_cycle_minimum(left,right)); tested+=count
+            continue
+        left_kinds=np.asarray([kind for kind,_ in left])
+        right_kinds=np.asarray([kind for kind,_ in right])
+        # Canonical segments are lines (four values) or quadratics (six).
+        # Zero padding has no effect on a same-kind absolute-error maximum.
+        # Reject mismatched kinds exactly as before; no resampling, segment
+        # merging or change to the control-point error metric is introduced.
+        lhs=np.zeros((count,6)); rhs=np.zeros((count,6))
+        for i,((kind,values),(other,points)) in enumerate(zip(left,right)):
+            lhs[i,:len(values)]=values; rhs[i,:len(points)]=points
+        if not np.isfinite(lhs).all() or not np.isfinite(rhs).all():
+            max_error=max(max_error,_scalar_cycle_minimum(left,right)); tested+=count
+            continue
+        shifts=np.flatnonzero(right_kinds==left_kinds[0])
+        lower_bounds=np.max(np.abs(rhs[shifts]-lhs[0]),axis=1)
+        # The first segment's error is a lower bound on that shift's full
+        # maximum. Visit the most promising shifts first, then discard only
+        # candidates that mathematically cannot improve the current minimum.
+        indices=np.arange(count); best=math.inf; matched=False
+        for candidate in np.argsort(lower_bounds,kind='stable'):
+            lower=float(lower_bounds[candidate])
+            if matched and lower>=best: continue
+            shifted=(indices+int(shifts[candidate]))%count
+            if not np.array_equal(left_kinds,right_kinds[shifted]): continue
+            error=float(np.abs(lhs-rhs[shifted]).max())
+            best=min(best,error); matched=True
+            if best==0.: break
+        if not matched: raise ValueError('segment_types_differ')
+        max_error=max(max_error,best);tested+=count
     return max_error,tested
 
 

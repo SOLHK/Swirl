@@ -7,6 +7,8 @@ on:
       - '.github/workflows/swirl-vf-source-rebuild.yml'
       - 'tools/swirl_vf/tools/rebuild.py'
       - 'tools/swirl_vf/platform/coretext_extract.swift'
+      - 'tools/swirl_vf/platform/compare_axis_construction.py'
+      - 'tools/swirl_vf/platform/probe_axis_cache.py'
   workflow_dispatch:
 
 permissions:
@@ -54,7 +56,8 @@ jobs:
                       try:
                           run = subprocess.run([sys.executable, 'tools/swirl_vf/tools/rebuild.py', str(source),
                               '--oracle', os.environ['NATIVE_BINARY'], '--output', str(candidate),
-                              '--report', str(report), '--batch-size', '64'], stdout=stdout, stderr=stderr, timeout=300)
+                              '--report', str(report), '--batch-size', '64',
+                              '--checkpoint-dir', str(private/'verified-faces')], stdout=stdout, stderr=stderr, timeout=300)
                           summary['process_exit_code'] = run.returncode
                       except subprocess.TimeoutExpired:
                           summary['status'] = 'REBUILD_TIME_LIMIT_NOT_ACCEPTED'
@@ -64,6 +67,9 @@ jobs:
                           native_faces_verified=len(raw.get('oracle', {}).get('faces', [])),
                           faces_completed=sum('serialized_model_verification' in f for f in raw.get('faces', [])),
                           faces_started=len(raw.get('faces', [])), output_generated=raw['output_generated'])
+                      summary['face_progress']=[{key: face[key] for key in ('face_index', 'glyph_count',
+                          'glyphs_completed', 'max_outline_error', 'max_metric_error') if key in face}
+                          for face in raw.get('faces', [])]
                       failures=[]
                       for item in raw.get('failures', []):
                           message=item.get('message', '')
@@ -75,8 +81,17 @@ jobs:
                               'native outline command topology differs between instances',
                               'training/default quantization exceeds error budget',
                               'holdout error persists', 'native oracle could not verify every requested physical face')
+                          context=item.get('context', {})
+                          safe={key: context[key] for key in ('stage', 'face_index', 'glyph_id', 'gid_first',
+                              'gid_last', 'sample_number', 'adaptive_points', 'max_outline_error', 'max_metric_error')
+                              if key in context and isinstance(context[key], (int, float, str))}
+                          location=context.get('user_location', {})
+                          if isinstance(location, dict):
+                              safe['user_location']={tag: value for tag, value in location.items()
+                                  if tag in ('WDTH', 'wght', 'HGHT') and isinstance(value, (int, float))}
                           failures.append({'type':item.get('type'), 'reason':next((r for r in reasons if r in message),
-                              'OTHER_PRIVATE_FAILURE'), 'face_gid':re.findall(r'face (\d+) gid (\d+)', message)})
+                              'OTHER_PRIVATE_FAILURE'), 'face_gid':re.findall(r'face (\d+) gid (\d+)', message),
+                              'context':safe})
                       summary['failures']=failures
                       if candidate.exists():
                           summary.update(output_bytes=candidate.stat().st_size, output_sha256=digest(candidate))
