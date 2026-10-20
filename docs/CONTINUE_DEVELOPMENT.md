@@ -1,3 +1,13 @@
+# 2026-10-20: real Windows public evidence and retained CI fixture failure
+
+The exact `ac0069ec645b552835d15534b93d6d2ae0c69620` Windows Qt public gate has now run successfully: all eight A/B × HTTP CONNECT/SOCKS5 × HTTP/HTTPS requests passed. Independent Xray A and B each recorded four REALITY authentications, verified ClientFinished and accepted VLESS sessions, two upload and two download Vision Direct commands, and two real sockets to each public destination. DPAPI reload, parameter preservation, in-process Runtime identity, selection switching/restoration, reachable MATCH REJECT and listener cleanup were true. This is controlled Xray to public targets, not private-provider or physical Windows acceptance.
+
+The additional Qt lifecycle source is saved at `1e45e4af4d490dbfc49c20a590258ab55587c6eb`; its exact new-SHA Windows execution is still required. The offline stage `5f16245a...` hit a real Windows fixture failure: the mock compared the TEMP short alias with the analyzer's resolved long path. This checkpoint resolves the fixture root once and preserves all strict isolation, redaction and encrypted-reload assertions. Production code and timeout limits are unchanged. Seven local tests pass; the actual alias reproduction fails before the fix and passes afterward. The original Windows failure remains recorded.
+
+See [verified C public evidence](evidence/CORE_WINDOWS_QT_PUBLIC_CI_ac0069ec.json) and [original failure and tested fix](evidence/CORE_WINDOWS_PATH_ALIAS_FAILURE_20261020.json). All-platform Rust/App CI, the added Windows lifecycle/DPAPI gates and complete Swirl.exe must be checked on the newest fixed SHA; older success is not substituted. Keep the private 59-node current count unknown until the authorized offline Windows tool runs. Frozen full-project acceptance remains 79/6/10.83%; unresolved historical DNS/DoH/health timeouts remain open.
+
+---
+
 # 2026-10-20: complete Qt lifecycle gate checkpoint
 
 The public Qt gate is saved at `ac0069ec645b552835d15534b93d6d2ae0c69620`; readonly private-cache requalification is saved at `5f16245a238411c8e57d097995fded50edc65522`. This checkpoint adds four explicit Chrome133 + Vision Qt product cases: verified inner TLS 1.2 with zero Direct commands, four incorrect REALITY/VLESS credential variants, cancellation after a verified echo, and DOMAIN/MATCH REJECT with the exact same targets proven reachable through DIRECT controls. Both proxy entrances are mandatory. Original controlled and public Qt slots remain byte-for-byte unchanged.

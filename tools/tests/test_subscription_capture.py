@@ -110,7 +110,10 @@ class EvidenceTests(unittest.TestCase):
              'diagnostic': 'TcpCandidateNotYetVerified', 'secret': 'PRIVATE_TOKEN'}]},
              'nodes': [{'raw-uri': 'PRIVATE_URI'}], 'tcpCandidates': [{'password': 'PRIVATE_PASSWORD'}]}
         with tempfile.TemporaryDirectory() as directory:
-            cache = Path(directory)/'cache';private = Path(directory)/'analysis.dpapi'
+            # Windows TEMP may use an 8.3 alias; the analyzer resolves paths
+            # before enforcing output isolation. Compare the same real paths.
+            root = Path(directory).resolve()
+            cache = root/'cache';private = root/'analysis.dpapi'
             saved = {}
             def read(path):
                 if Path(path) == private:return saved['value']
@@ -123,7 +126,7 @@ class EvidenceTests(unittest.TestCase):
                     mock.patch.object(analysis.capture, 'save_private', side_effect=save), \
                     mock.patch.object(analysis.subprocess, 'run', return_value=process), \
                     mock.patch.object(analysis, 'test_node', side_effect=AssertionError('offline network attempted')):
-                report = analysis.analyze(cache, Path(directory)/'inspector', private)
+                report = analysis.analyze(cache, root/'inspector', private)
         self.assertNotIn('PRIVATE_', json.dumps(report))
         self.assertTrue(report['offlineOnly'])
         self.assertTrue(report['privateAnalysisReloadVerified'])
