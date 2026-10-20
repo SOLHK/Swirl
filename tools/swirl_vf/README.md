@@ -18,8 +18,9 @@ experiments also passed. Type-2 remains explicitly enabled; Types 3/4 fail.
 This is a fixed sample, **not** all-GID, all-face user-coordinate, continuous-space
 or Windows acceptance. CoreText actually verified all 32 physical source faces,
 but the original `rebuild.py` run is still blocked before its first completed
-glyph model or face. The latest run at `24119489` passed the old sample-41 WDTH
-location and found a new exact numeric-candidate counterexample at sample 44. No accepted `Swirl-VF.ttc` exists.
+glyph model or face. The latest rebuild at `ef564245` passed the old sample-41
+WDTH location and retained the actual sample-44 wght counterexample: requested
+323.3597412109375, reported 323.3596. No accepted `Swirl-VF.ttc` exists.
 
 The new HVAR diagnosis measured 3048 user locations / 12192 advances across 32
 faces. Raw-order avar evaluation with zero-normalized coordinates preserved
@@ -37,12 +38,18 @@ current-width/2 as a universal interpretation of Apple's API values. See the
 
 The new `tools/verified_axis_oracle.py` accepts explicitly unverified native
 observations only after checking original source/table identity and replaying
-every requested GID at the reported coordinates. Exact finite equality is
+every requested GID at coordinates computed before any native observation.
+With `T(x)=trunc(binary64(x*10000))/10000`, v2 admits only exact original/T/T(T)
+first echoes and requires the actual independent replay at fixed `T(T(x))` to
+echo that coordinate exactly. Exact finite equality is
 required for typed path commands, bounds and all raw metrics; no tolerance is
 increased and no coordinate/path/metric is replaced. The unchanged strict
-extractor remains the default. The new native integration needs its own passing
-run; `39366215864` failed the original sample-44 candidate and `39366215910`
-failed the synthetic replay-stability check. Failure reports now retain safe
+extractor remains the default. Native boundary run `39368769062` completed
+12,800 original selected-GID records and 600 original synthetic records with
+zero path/raw-metric differences across all predeclared candidates and both
+process orders. All 120 fixed second-step instances echoed exactly. This
+supports the fixed v2 policy but does not replace its every-batch native checks
+or a fresh original rebuild. Failure reports retain safe
 axis values, binary64 hex, original/replay phase and completed-observation
 counts. The separate boundary probe compares every predeclared numeric
 candidate and cannot grant production acceptance. Neither this adapter nor a

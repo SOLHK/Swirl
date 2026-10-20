@@ -4,6 +4,81 @@ This phase starts at `b5a84bfacc48e6b2a8be8f0797f34639530766c9` on
 `work/core-completion-20261017`; every push is non-forced and based on a fresh
 remote head. UI, animations and Rust Core are outside the changes.
 
+## Seventh implementation checkpoint: predeclare a stable replay before native observations
+
+Local verification: **280/280 Python regressions and 6/6 audit tests pass**.
+The Linux suite exercises protocol/serialization and explicit unavailable-native
+behavior; it is not a replacement for the new macOS integration run.
+
+The preceding source checkpoint is
+`ef564245f5de600757b7283437c7daf31a1e90e9`, based on concurrent Core parent
+`a3b89050e141557444519c8c17f2a263e6a013fc`. Its actual native boundary run
+[39368769062](https://github.com/SOLHK/Swirl/actions/runs/39368769062) passed on
+xcode-27 with the exact original source hash. The private records were compared
+in memory; the public artifact contains only safe counts and axis observations.
+
+Define `T(x) = trunc(binary64(x * 10000)) / 10000`. The probe declared requested,
+divide1, multiply1, divide2 and multiply2 before starting either native process.
+It completed 12,800 original records (four faces, ten cases, 32 selected GIDs,
+five variants and two opposite-order processes) and 600 original synthetic
+records (two faces, ten cases, three GIDs, five variants and two processes).
+All eight within-process comparison chains and five cross-process chains had
+zero typed-command, topology, raw metric or provenance differences. Each chain
+had 1,280 original pairs and 60 synthetic pairs. These repeated comparisons
+must not be counted as additional unique GIDs.
+
+Recomputing each expression from each variant's own input gives:
+
+| Source observations | Effective axis values | Exact T matches | Exact T(T) matches |
+| --- | ---: | ---: | ---: |
+| Original selected faces | 1,200 | 1,128 | 1,200 |
+| Original synthetic fixtures | 600 | 600 | 564 |
+
+There was no missing nondefault axis. Omitted defaults account for 400 original
+and 200 synthetic values. All 600 native instances retained their actual echo
+through every requested glyph read. The original sample-44 request
+`wght=323.3597412109375` really reported `323.3596`, while its single-T candidate
+was `323.3597`. The synthetic request `267.10205078125` reported `267.102`, but
+replaying that first value reported `267.1019`. This is an observed API numeric
+representation issue; it is not evidence for a universal design-coordinate
+mapping. In particular, the two weights were not cross-requested in both font
+formats, so the difference cannot be causally attributed to HVGL versus glyf.
+
+For all 60 cases in both processes, the independently predeclared value
+`C=T(T(original_request))` actually echoed C exactly, and its selected-GID
+payloads exactly matched the original request. Adapter v2 therefore computes
+the finite plan **before its first native request**. The original echo must
+exactly equal the original value, T or T(T); one independent instance is then
+created at the fixed C, whose actual echo must equal C exactly. Every GID's
+complete typed path and every raw metric must match with zero tolerance before
+any record from the batch is released. The emitted data and location remain
+those of the original request. Negative/zero values stay exact-only; out-of-range
+candidates fail without clamping. There is no third construction, recursive
+truncation, epsilon increase, response-selected replay or per-point model choice.
+
+The native source/table/axis identity, final transcript, source SHA, EOF, process
+exit and per-face checkpoint bindings remain mandatory. Three new independent
+regressions cover both first-echo expressions with the same predeclared replay,
+a still-unstable replay and 1e-10 payload differences, and range-boundary
+rejection before any native call. The adapter-specific suite passes **25/25**.
+The new production policy needs a fresh original reconstruction run; the boundary
+diagnostic alone cannot accept untested GIDs or continuous coordinates.
+
+The preceding actual original rebuild
+[39368768983](https://github.com/SOLHK/Swirl/actions/runs/39368768983) verified
+32/32 source faces and stopped at face 0, GIDs 0-63, sample 44 / request 45.
+It retained 44 completed batches / 2,816 accepted glyph observations, separately
+from **zero completed glyph models, zero completed faces and no TTC**. Its exact
+numeric failure is the original sample-44 observation above. The same commit's
+[39368768995](https://github.com/SOLHK/Swirl/actions/runs/39368768995) passed
+277 Python tests, six audit tests and Windows Server's original DirectWrite
+fixtures. The unchanged strict raw CoreText 849/850 metric test still failed.
+
+The 141 original HVAR quantization questions, all rejected global user/design
+mapping models, real vertical-origin-X expression and all-GID reconstruction
+remain unresolved. This change cannot establish Windows 11, Qt/Swirl or DPI
+acceptance, and no original-derived output font is published.
+
 ## Sixth implementation checkpoint: preserve actual failure evidence and quantize residuals once
 
 Local verification for this checkpoint: **277/277 Python tests and 6/6 audit

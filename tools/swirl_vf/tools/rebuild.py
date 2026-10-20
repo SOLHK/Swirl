@@ -64,7 +64,8 @@ def native_failure_details(record):
         result["glyph_id"] = record["glyph_id"]
     if type(record.get("reported_axis_present")) is bool:
         result["reported_axis_present"] = record["reported_axis_present"]
-    for key in ("requested_value", "reported_value", "expected_candidate_value", "source_requested_value"):
+    for key in ("requested_value", "reported_value", "expected_candidate_value",
+                "expected_secondary_candidate_value", "source_requested_value"):
         value = record.get(key)
         if type(value) in (int, float):
             try:

@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'platform'))
 from test_coretext_extract import make_fixture
 from verified_axis_oracle import (BACKEND, SCALARS, VECTORS, VerificationError,
-    effective_readback, make_launcher, serve, source_hash, source_identities,
+    declare_readback, effective_readback, make_launcher, serve, source_hash, source_identities,
     validate_request, verified_metadata, verify_batch)
 from rebuild import NativeOracle
 
@@ -316,6 +316,59 @@ class VerifiedAxisOracleTests(unittest.TestCase):
             self.assertEqual(len(calls), 2)
             self.assertEqual(result[0]['location']['WDTH'], requested)
             self.assertEqual(result[0]['axis_verification']['native_replay_count'], 1)
+
+    def test_fixed_second_step_is_predeclared_and_not_selected_from_the_first_echo(self):
+        # An authored arithmetic grid, independent of either native artifact.
+        value = next(n / 10000 + .000037 for n in range(6_000_000, 6_020_000)
+                     if math.trunc((n / 10000) * 10000) / 10000 != n / 10000)
+        location = {'WDTH': value, 'wght': 400., 'HGHT': 500.}
+        declaration = declare_readback(location)
+        once, twice = declaration['WDTH']['once'], declaration['WDTH']['twice']
+        self.assertNotEqual(once, twice)
+        request = self.request(location=location)
+        for first_echo in (once, twice):
+            calls, exchange = self.exchange(reported={'WDTH': first_echo})
+            result = verify_batch(request, self.identities, self.digest, exchange, 1)
+            self.assertEqual(len(calls), 2)
+            self.assertEqual(calls[0]['location'], location)
+            self.assertEqual(calls[1]['location']['WDTH'], twice)
+            for row in result:
+                self.assertEqual(row['location'], location)
+                self.assertEqual(row['reported_location'], {'WDTH': first_echo})
+                proof = row['axis_verification']
+                self.assertEqual(proof['predeclared_replay_location']['WDTH'], twice)
+                self.assertTrue(proof['replay_declared_before_native_observations'])
+                self.assertTrue(proof['replay_echo_exactly_stable'])
+
+    def test_a_second_step_candidate_still_requires_actual_stable_echo_and_every_payload_field(self):
+        location = {'WDTH': 600.000437, 'wght': 400., 'HGHT': 500.}
+        # Pick a reproducible independently generated non-idempotent boundary.
+        for n in range(6_000_000, 6_020_000):
+            value = n / 10000 + .000037
+            plan = declare_readback({'WDTH': value})['WDTH']
+            if plan['once'] != plan['twice']:
+                location['WDTH'] = value
+                break
+        request = self.request(location=location)
+        for field in ('reported_location', 'commands', 'vertical_advance_sum'):
+            def mutate(native_request, rows):
+                if native_request['request_id'].endswith('-reported'):
+                    if field == 'reported_location': rows[-1][field]['WDTH'] -= .0001
+                    elif field == 'commands': rows[-1][field][0][1] += 1e-10
+                    else: rows[-1][field] += 1e-10
+            calls, exchange = self.exchange(reported={'WDTH': plan['twice']}, mutate=mutate)
+            with self.subTest(field=field), self.assertRaises(VerificationError):
+                verify_batch(request, self.identities, self.digest, exchange, 1)
+            self.assertEqual(len(calls), 2, 'a failed fixed replay cannot trigger another construction')
+
+    def test_predeclared_candidate_cannot_be_clamped_into_the_source_range(self):
+        identities = copy.deepcopy(self.identities)
+        identities[0]['axes'][0]['minimum'] = 600.000037
+        request = self.request(location={'WDTH': 600.000037, 'wght': 400., 'HGHT': 500.})
+        calls, exchange = self.exchange()
+        with self.assertRaisesRegex(VerificationError, 'predeclared_axis_candidate_outside_source_range'):
+            verify_batch(request, identities, self.digest, exchange, 1)
+        self.assertEqual(calls, [])
 
     def test_one_changed_scalar_vector_sum_status_or_future_field_rejects_batch(self):
         mutations = []

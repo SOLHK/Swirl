@@ -3,9 +3,11 @@
 
 The upstream CoreText process explicitly observes axis readbacks without granting
 acceptance. This adapter binds every source table, validates complete requests,
-and checks one independently constructed readback instance for every request.
-The named positive-decimal candidate only explains a reported number; acceptance
-also requires every requested GID's original native payload to match exactly.
+and checks one independently constructed, predeclared instance per request.
+Two finite positive-decimal expressions explain observed API numbers. Neither
+selects the native design coordinate. A fixed twice-evaluated candidate is
+declared before the first native request, must actually echo exactly, and must
+match every requested GID's original native payload exactly.
 
 No glyph, metric, requested coordinate or reported coordinate is corrected.
 There is no avar/HVGL inference, tolerance increase, recursive canonicalization,
@@ -31,8 +33,8 @@ from fontTools.ttLib import TTCollection
 from incremental_pipe import TimedLineReader
 
 
-BACKEND = 'CoreTextExactAxisReadbackBatchV1'
-CANDIDATE = 'positive_binary64_product_truncate_decimal4_v1'
+BACKEND = 'CoreTextExactAxisReadbackBatchV2'
+CANDIDATE = 'positive_binary64_decimal4_once_or_twice_with_predeclared_stable_replay_v2'
 MAX_REQUEST_BYTES = 1_048_576
 MAX_BATCH_BYTES = 128 * 1024 * 1024
 SCALARS = ('advance_width', 'advance_height', 'lsb', 'horizontal_origin_x',
@@ -191,6 +193,10 @@ def verified_metadata(native, digest, byte_size, identities):
     result.update(upstream_axis_observations_only=True, axis_observations_only=False,
                   axis_verification_backend=BACKEND,
                   axis_verification_policy={'readback_candidate': CANDIDATE,
+                      'readback_expressions': ['x', 'T(x)', 'T(T(x))'],
+                      'T_definition': 'binary64_trunc(x*10000)/10000_for_positive_finite_x',
+                      'replay_location': 'T(T(x))_declared_before_first_native_request',
+                      'replay_acceptance': 'actual_echo_exactly_equals_predeclared_location',
                       'batch_release': 'all_requested_GIDs_require_exact_native_payload_replay',
                       'numeric_equality': 'finite_binary64_values_no_tolerance_signed_zeros_equal',
                       'source_user_mapping_inferred': False, 'raw_metrics_modified': False,
@@ -221,7 +227,26 @@ def validate_request(request, identities):
     return identity
 
 
-def effective_readback(record, identity, requested, *, replay=False):
+def declare_readback(location):
+    """A fixed finite plan, independent of any native response or glyph data.
+
+    Negative/zero coordinates retain the existing exact-only behavior. There
+    is no search for a convenient decimal or loop until a native echo stops
+    changing. If the fixed candidate fails its actual echo or payload check,
+    the batch fails; no third native construction is attempted.
+    """
+    result = {}
+    for tag, value in location.items():
+        plan = {'requested': value, 'canonical': value}
+        if finite_number(value) and value > 0 and math.isfinite(value * 10000):
+            once = math.trunc(value * 10000) / 10000
+            twice = math.trunc(once * 10000) / 10000
+            plan.update(once=once, twice=twice, canonical=twice)
+        result[tag] = plan
+    return result
+
+
+def effective_readback(record, identity, requested, *, replay=False, declaration=None):
     reported = record.get('reported_location')
     axes = identity['axes']
     require(type(reported) is dict and set(reported) <= {a['tag'] for a in axes},
@@ -244,16 +269,20 @@ def effective_readback(record, identity, requested, *, replay=False):
         require(finite_number(value) and axis['minimum'] <= value <= axis['maximum'],
                 'native_axis_readback_nonfinite_or_out_of_range', **context)
         if replay:
-            # Do not run the decimal candidate again: multiplication/truncation
-            # is not idempotent for some binary64 encodings of four decimals.
+            # The fixed, predeclared second instance must really be stable.
+            # Never feed another observed value back into a retry loop.
             require(value == expected, 'native_readback_replay_not_exactly_stable', **context)
         elif value != expected:
             require(expected > 0 and value > 0 and math.isfinite(expected * 10000),
                     'positive_decimal4_candidate_unavailable', **context)
-            candidate = math.trunc(expected * 10000) / 10000
+            plan = (declaration or declare_readback(requested))[tag]
+            candidate, second = plan['once'], plan['twice']
             context.update(expected_candidate_value=candidate,
-                           expected_candidate_value_hex=float(candidate).hex())
-            require(value == candidate, 'native_readback_not_named_decimal4_candidate', **context)
+                           expected_candidate_value_hex=float(candidate).hex(),
+                           expected_secondary_candidate_value=second,
+                           expected_secondary_candidate_value_hex=float(second).hex())
+            require(value == candidate or value == second,
+                    'native_readback_not_named_decimal4_candidate', **context)
         result[tag] = value
     return result
 
@@ -301,12 +330,17 @@ def validate_native_record(record, request, seen):
 def verify_batch(request, identities, digest, exchange, sequence):
     """Return only a complete verified batch; exchange supplies native records."""
     identity = validate_request(request, identities)
+    declaration = declare_readback(request['location'])
+    canonical = {tag: value['canonical'] for tag, value in declaration.items()}
+    for axis in identity['axes']:
+        require(axis['minimum'] <= canonical[axis['tag']] <= axis['maximum'],
+                'predeclared_axis_candidate_outside_source_range', axis=axis['tag'])
     original_request = {**request, 'request_id': f'axis-{sequence}-original'}
     original, seen, reported = {}, set(), None
     for record in exchange(original_request):
         gid = validate_native_record(record, original_request, seen)
         try:
-            effective = effective_readback(record, identity, request['location'])
+            effective = effective_readback(record, identity, request['location'], declaration=declaration)
         except VerificationError as error:
             error.context.setdefault('glyph_id', gid)
             tag = error.context.get('axis')
@@ -320,7 +354,9 @@ def verify_batch(request, identities, digest, exchange, sequence):
         require(same_json(record['reported_location'], reported[0]), 'native_inconsistent_batch_readback', glyph_id=gid)
         original[gid] = record
     require(seen == set(request['glyph_ids']), 'native_original_batch_incomplete')
-    replay_request = {**request, 'request_id': f'axis-{sequence}-reported', 'location': reported[1]}
+    # Keep the opaque legacy request-ID suffix for protocol compatibility. The
+    # coordinate was computed before exchange(), not selected from reported[1].
+    replay_request = {**request, 'request_id': f'axis-{sequence}-reported', 'location': canonical}
     seen, replay_reported = set(), None
     for record in exchange(replay_request):
         gid = validate_native_record(record, replay_request, seen)
@@ -345,6 +381,9 @@ def verify_batch(request, identities, digest, exchange, sequence):
     require(seen == set(request['glyph_ids']), 'native_replay_batch_incomplete')
     evidence = {'backend': BACKEND, 'candidate': CANDIDATE, 'source_sha256': digest,
                 'effective_reported_location': reported[1], 'replay_reported_location': replay_reported,
+                'predeclared_replay_location': canonical,
+                'replay_declared_before_native_observations': True,
+                'replay_echo_exactly_stable': True,
                 'changed_axes': [a['tag'] for a in identity['axes']
                                  if request['location'][a['tag']] != reported[1][a['tag']]],
                 'verified_GIDs_in_batch': len(seen), 'native_replay_count': 1,

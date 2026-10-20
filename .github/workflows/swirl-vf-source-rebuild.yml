@@ -105,6 +105,7 @@ jobs:
                               'training/default quantization exceeds error budget',
                               'holdout error persists', 'native oracle could not verify every requested physical face')
                           reasons += ('native_nondefault_axis_not_reported',
+                              'predeclared_axis_candidate_outside_source_range',
                               'native_readback_replay_not_exactly_stable', 'native_readback_not_named_decimal4_candidate',
                               'native_replay_payload_not_exact', 'native_final_summary_mismatch',
                               'source_changed_during_axis_verification', 'native final summary is incomplete',
