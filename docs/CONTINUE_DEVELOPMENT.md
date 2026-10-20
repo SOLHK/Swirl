@@ -1,3 +1,15 @@
+# 2026-10-20: retained Windows Qt reload failure and tested JSON comparison fix
+
+Exact source `f19b0ad51058580a8a0ed73008b22754e6f45ea0` passed Linux, macOS and App CI, plus Windows Rust 324 tests and one doctest. Its Windows Qt build and two earlier REALITY profiles passed. The new Chrome133/Vision group actually ran five methods: the existing product chain, TLS 1.2, incorrect credentials and active cancellation passed; the reachable REJECT case failed before its DIRECT positive control. The ordinary capture suite passed 29 with two explicit optional skips; the required standalone Qt offline inspector, public eight-request gate and complete Swirl.exe step were not executed on that SHA. Do not substitute the earlier `ac0069ec...` public success for them.
+
+The failure was a test comparison bug: optional DNS host `server`/`comment` values move from invalid QVariant to JSON null on the existing save/reload boundary. A real Qt JSON roundtrip reproduced raw-map inequality while preserving the entire JSON document. Changing one host IP or one REJECT policy was correctly detected by the complete JSON comparison. This checkpoint compares all persisted dns/rules/groups as QJsonObject and retains the selected-node assertion separately, matching the existing controlled slot. It does not change production DNS, remove fields, alter request/CI timeouts, or relax the four DIRECT controls, exact 502/0505 replies or zero-origin/zero-Xray REJECT checks.
+
+Local validation after the fix: Rust 324 + 1, fmt/check/clippy, 24 portable evidence tests, 56 workflow guards with unchanged generation, and exact-slot Qt moc/C++23 syntax passed. Linux syntax/type checks are not Windows DPAPI execution. Original controlled/public slots are byte-identical to F. The exact corrected SHA must now run Rust/App CI and all Windows gates through the complete Swirl.exe build.
+
+See [retained failure, artifact identity and local validation](evidence/CORE_QT_JSON_RELOAD_FAILURE_20261020.json). Private supplier authentication/Direct and physical Windows remain unexecuted; the 59-node current qualification count is unknown. Historical DNS/DoH/health timeouts remain open and the frozen 79/6/10.83% baseline is unchanged.
+
+---
+
 # 2026-10-20: real Windows public evidence and retained CI fixture failure
 
 The exact `ac0069ec645b552835d15534b93d6d2ae0c69620` Windows Qt public gate has now run successfully: all eight A/B × HTTP CONNECT/SOCKS5 × HTTP/HTTPS requests passed. Independent Xray A and B each recorded four REALITY authentications, verified ClientFinished and accepted VLESS sessions, two upload and two download Vision Direct commands, and two real sockets to each public destination. DPAPI reload, parameter preservation, in-process Runtime identity, selection switching/restoration, reachable MATCH REJECT and listener cleanup were true. This is controlled Xray to public targets, not private-provider or physical Windows acceptance.

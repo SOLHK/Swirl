@@ -610,7 +610,7 @@ private slots:
   const auto certificates=QSslCertificate::fromData(fixture["ca_pem"].toString().toUtf8());QVERIFY(!certificates.isEmpty());QVERIFY(QSslSocket::supportsSsl());
   QTemporaryDir directory;QVERIFY(directory.isValid());const auto path=directory.filePath("lifecycle.dpapi");
   QTcpServer reservation;reservation.setProxy(QNetworkProxy::NoProxy);QVERIFY(reservation.listen(QHostAddress::LocalHost));const auto proxyPort=reservation.serverPort();reservation.close();
-  QString idA,idB;QList<ProxyNode> savedNodes;QVariantMap savedNetwork;
+  QString idA,idB;QList<ProxyNode> savedNodes;QJsonObject savedNetwork;
   {
    EngineController controller(std::make_unique<ThreadedEngine>(),nullptr,path,true);controller.setProxyPort(proxyPort);controller.setRoutingMode("global");
    controller.imports()->importText(fixture["subscription"].toString());QTRY_VERIFY_WITH_TIMEOUT(!controller.imports()->busy(),5000);
@@ -623,7 +623,10 @@ private slots:
     const QVariantList hosts{QVariantMap{{"name","denied.product.invalid"},{"value","127.0.0.1"}},QVariantMap{{"name","unmatched.product.invalid"},{"value","127.0.0.1"}}};
     QVERIFY(controller.configureDns(QVariantMap{{"mode",0},{"hosts",hosts},{"useHosts",true}}));
    }
-   savedNetwork=controller.networkConfigurationSnapshot();NodeStore persisted(path);QVERIFY(persisted.error().isEmpty()&&persisted.selectedId()==idA);savedNodes=persisted.nodes();QCOMPARE(savedNodes.size(),2);
+   // NodeStore persists JSON. Optional host metadata changes from an invalid
+   // QVariant to JSON null on reload; compare every persisted field in that
+   // same representation, as the existing controlled product slot does.
+   savedNetwork=QJsonObject::fromVariantMap(controller.networkConfigurationSnapshot());NodeStore persisted(path);QVERIFY(persisted.error().isEmpty()&&persisted.selectedId()==idA);savedNodes=persisted.nodes();QCOMPARE(savedNodes.size(),2);
    QFile encrypted(path);QVERIFY(encrypted.open(QIODevice::ReadOnly));auto bytes=encrypted.readAll();QVERIFY(bytes.startsWith("SWIRLNODE1\n")&&bytes.size()>11);
    QVERIFY(!bytes.contains(fixture["subscription"].toString().toUtf8()));
    for(const auto &node:savedNodes){const auto reality=node.parameters["reality-opts"].toObject();for(const auto &credential:QStringList{node.parameters["uuid"].toString(),reality["public-key"].toString(),reality["short-id"].toString()}){QVERIFY(!credential.isEmpty()&&!bytes.contains(credential.toUtf8()));}}
@@ -665,7 +668,8 @@ private slots:
   for(const auto frontend:{QNetworkProxy::HttpProxy,QNetworkProxy::Socks5Proxy}){
    const auto frontendName=frontend==QNetworkProxy::HttpProxy?QString("http-connect"):QString("socks5");
    EngineController controller(std::make_unique<ThreadedEngine>(),nullptr,path,true);controller.setProxyPort(proxyPort);controller.setRoutingMode(mode=="reject"?"direct":"global");controller.setExecutablePath("must-not-start-an-external-core.exe");
-   QVERIFY(controller.selectedNodeId()==idA&&controller.networkConfigurationSnapshot()==savedNetwork);
+   QVERIFY(controller.selectedNodeId()==idA);
+   QVERIFY(QJsonObject::fromVariantMap(controller.networkConfigurationSnapshot())==savedNetwork);
    NodeStore restored(path);QVERIFY(restored.error().isEmpty()&&restored.nodes().size()==savedNodes.size());report["encrypted_store_reloaded"]=true;
    for(qsizetype i=0;i<savedNodes.size();++i){const auto node=restored.nodes()[i];QVERIFY(node.parameters==savedNodes[i].parameters&&node.originalConfiguration==savedNodes[i].originalConfiguration);}
    report["parameters_preserved"]=true;controller.connectNode({});QTRY_VERIFY_WITH_TIMEOUT(controller.apiHealthy(),5000);
