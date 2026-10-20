@@ -1,0 +1,112 @@
+{
+  "schema": "swirl.vf.a3.normalized_native_evidence.v1",
+  "source_commit": "73a5bc831c46b25c3480c9d28eae4216b5add2b3",
+  "workflow_run_id": 39406852651,
+  "workflow_url": "https://github.com/SOLHK/Swirl/actions/runs/39406852651",
+  "workflow_status": "completed",
+  "workflow_conclusion": "success",
+  "scope": "Authored HVAR/gvar font and external normalized q only. Not Apple mapping, DirectWrite, Qt, Windows 11, Swirl or full original TTC acceptance.",
+  "mapping_accepted": false,
+  "continuous_space_accepted": false,
+  "font_conversion_accepted": false,
+  "fixture_sha256": "5454124dfdcf87ed4f3bd82d6021b1b6f2056853b509908b554214a7b314daf3",
+  "windows_library_sha256": {
+    "harfbuzz": "cfbe14d84474dae2b379a746a5325dcc10b7ebfa077bf5a8e9ec0d761f673b22",
+    "freetype": "9f62ad75bdc24573940f2e0b0db1848464ce02928926808885e3744fc5272add"
+  },
+  "artifacts": [
+    {
+      "runner": "linux",
+      "artifact_id": 12256872753,
+      "job_id": 118574758864,
+      "archive_file": "axis_a3_native_runtime_linux_73a5bc8.zip",
+      "archive_sha256": "f2066dad3df176c1e823d600b4feb97d4838137c857fb7df10bc710bd240e3d2",
+      "archive_size_bytes": 2129,
+      "members": {
+        "linux.json": {
+          "sha256": "1f9c65767546bcfa980c198e5539899a6556796886ade74fc955ff6bc523f42e",
+          "size_bytes": 48528
+        }
+      },
+      "platform": "Linux-6.17.0-1022-azure-x86_64-with-glibc2.39",
+      "python": "3.12.15",
+      "versions": {
+        "harfbuzz": "8.3.0",
+        "freetype": "2.13.2"
+      },
+      "c_long_bytes": 8
+    },
+    {
+      "runner": "windows-2022",
+      "artifact_id": 12257861744,
+      "job_id": 118574908949,
+      "archive_file": "axis_a3_native_runtime_windows2022_73a5bc8.zip",
+      "archive_sha256": "d3fe9129de206c9a74a5a1999de25b952e0ef6649510c4bc39abbbe531ae33b7",
+      "archive_size_bytes": 3371,
+      "members": {
+        "native-packages.txt": {
+          "sha256": "118b5b071caa2c5e4238c3bacb756fc509c83d2fff41689284aeff9cabda790c",
+          "size_bytes": 2483
+        },
+        "windows-2022.json": {
+          "sha256": "e58aabc2a0bcd5d9e1515d0cf4534679981a9631408f801ba7809f955df4b791",
+          "size_bytes": 51435
+        }
+      },
+      "platform": "Windows-2022Server-10.0.20348-SP0",
+      "python": "3.12.10",
+      "versions": {
+        "harfbuzz": "14.6.0",
+        "freetype": "2.15.0"
+      },
+      "c_long_bytes": 4
+    },
+    {
+      "runner": "windows-2025",
+      "artifact_id": 12257711903,
+      "job_id": 118574909027,
+      "archive_file": "axis_a3_native_runtime_windows2025_73a5bc8.zip",
+      "archive_sha256": "b63ada4c3164f96d8e4eab162e4187a707977ea717a93ed15a94311aa6306ee5",
+      "archive_size_bytes": 3369,
+      "members": {
+        "native-packages.txt": {
+          "sha256": "118b5b071caa2c5e4238c3bacb756fc509c83d2fff41689284aeff9cabda790c",
+          "size_bytes": 2483
+        },
+        "windows-2025.json": {
+          "sha256": "d14b379ad07ceac84b5f99978a0945a6d706f98fbc3b69c86337898c82fe0542",
+          "size_bytes": 51435
+        }
+      },
+      "platform": "Windows-2025Server-10.0.26100-SP0",
+      "python": "3.12.10",
+      "versions": {
+        "harfbuzz": "14.6.0",
+        "freetype": "2.15.0"
+      },
+      "c_long_bytes": 4
+    }
+  ],
+  "per_platform_checks": {
+    "native_observations": 72,
+    "opposite_order_pairs": 36,
+    "normalized_glyph_checks": 64,
+    "all_exact": true
+  },
+  "windows_totals": {
+    "processes": 4,
+    "native_observations": 144,
+    "opposite_order_pairs": 72,
+    "normalized_glyph_checks": 128,
+    "cross_windows_comparison_pairs": 72
+  },
+  "linux_control_is_additional_not_counted_as_windows": true,
+  "known_limitations": [
+    "q is supplied externally; no Apple binary64 -> q algorithm is derived here",
+    "HarfBuzz extents and FreeType authored full points are checked; not original Apple contours",
+    "Windows Server builds 20348/26100; not Windows 11 or Qt integration",
+    "Library package versions and Windows DLL hashes are captured, but the installer uses current packages on rerun",
+    "MINGW64 deprecation warning and one concurrent package cache warning do not replace native measurements",
+    "No cold-system-cache claim; reverse observations use independent processes"
+  ]
+}
