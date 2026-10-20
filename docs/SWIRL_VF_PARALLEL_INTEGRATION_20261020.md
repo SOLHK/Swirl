@@ -22,15 +22,17 @@
 
 | 研发分支 | 远端 HEAD / PR | 本次可审核提交 | 当前状态 | 主责 |
 | --- | --- | --- | --- | --- |
-| `work/vf-axis-a3` | `6f36bdd47d0b52622c697974989b8b481657d2ea` | 前两阶段已入 7bbca55；本次固定 `9dd2676` | 构造/identity-avar 诊断通过执行审查，失败仍保留；normalized/evidence 后续阶段另审 | 输入精度、用户坐标映射 |
-| `work/vf-metrics-b1` | `03c34a68a6ad52035097d123a9e5ecd2948e310f` | 三提交已审查，禁止集成 | 原件逐 GID 数据已进入公开日志/工件/Git；新 follow-up HGHT 回读失败，ablation skipped | CoreText、HVAR/VVAR、垂直度量与原点 |
-| `work/vf-rebuild-c1` | `88c4474b7faea263d6e1b21ba846915269f398c6` | 96e99cd 代码已审；88 新证据阶段复审中 | Windows packing 已修、三平台 success；store symlink silent-return 未修，禁止集成 | HVF/OpenType/TTC 重建与完整性 |
-| `work/vf-windows-d1` | `4c0fcaf4a66fd34d3487754dd2f849a278da3a3e` | 415 代码及后续文档已审 | 空路径修复已核实；两系统仍有四个 FreeType 严格失败进程，禁止集成 | DirectWrite、Qt、Swirl 字体适配 |
+| `work/vf-axis-a3` | `6f36bdd47d0b52622c697974989b8b481657d2ea` | 前三阶段已入 525975f；本阶段固定 d22be86 / 6f36bdd | normalized/evidence 已审，540/540 候选回归通过；两处 CI 归属元数据已修正；A3 生产阻塞仍开放 | 输入精度、用户坐标映射 |
+| `work/vf-metrics-b1` | `aeb2574879ca76290f9e22c2e319f27f422e7ae6` | 五提交已审查，禁止集成 | 原件逐 GID 数据已进入公开日志/工件/Git；最新原版 ablation 实际失败并再次公开原始度量 | CoreText、HVAR/VVAR、垂直度量与原点 |
+| `work/vf-rebuild-c1` | `88c4474b7faea263d6e1b21ba846915269f398c6` | 96e99cd 代码及 88 证据阶段均已复审 | Windows packing 已修、三平台 success；store symlink silent-return 未修，禁止集成 | HVF/OpenType/TTC 重建与完整性 |
+| `work/vf-windows-d1` | `4c0fcaf4a66fd34d3487754dd2f849a278da3a3e` | 415 代码及后续文档已审 | 空路径修复已核实；每系统四个、两系统合计八个 FreeType 严格失败进程，禁止集成 | DirectWrite、Qt、Swirl 字体适配 |
 
 首次及 09:03:55 UTC 查询时四分支未出现；09:11:14 UTC 已全部出现。
 这只描述远端查询结果，不表示其他聊天之前没有在工作或没有本地成果。
-上表依据 09:40 UTC 远端快照及 09:46 UTC D1 复查；并发 Core 提交后的集成 HEAD 为
-`5c170be7feef2c9ed98c1fd0ca3c25cb19790aaa`。分支持续推进，审核和集成对象
+上表依据 09:54 UTC 四分支快照及固定提交复审；09:59 UTC 回读的集成 HEAD 为
+`525975f059d6bdf2e6f3c94d75500eecf417a1ef`，已保留并发 Core 提交 5c170be。
+本阶段的源提交和候选验证见 8.15；推送后的实际 SHA 必须由远端回读确定。
+分支持续推进，审核和集成对象
 必须固定到下文完整 SHA；不能因 tip 前进就自动包含新提交。09:11 的 A3/C1
 第一提交都以 e505 为 merge-base，新增文件互不重名；当时 B1/D1 无 diff 是历史状态。
 
@@ -39,7 +41,8 @@
 1. 历史 141 项差异已在固定原生样本内闭合，只保留回归，不重新研发。
 2. 两个 anchor 的每个候选各有 26,780 次 portable 轮廓比较在 1/32 FUnit 内，
    属于 5,356 个位置和所选 GID 的有限测试，不是全字库或连续空间验收。
-3. A3 有明确前提的输入分辨率障碍，目标 Windows/Qt 实际输入路径尚未验证。
+3. A3 有明确前提的输入分辨率障碍。Windows Server 的 DirectWrite/Qt 输入路径已用
+   原创夹具实测，Qt FreeType 严格失败仍开放；Windows 11、实际 Swirl 与原件候选未验收。
 4. **B1 的 849/850 是实测垂直 advance 849 FUnit 对预期 850 FUnit，
    不是 850 项测试中通过 849 项。** 原差值 1 FUnit、门槛 0.03125 均保留。
 5. 原件已完成 GID 模型为 0、完成面为 **0/32**，无合格 `Swirl-VF.ttc`。
@@ -211,7 +214,8 @@ python tools/swirl_vf/platform/diagnose_coretext_precision.py --output /private/
   `.github/workflows/font-system-windows.yml` 执行；`SWIRL_FONT_TESTS_ONLY=ON` 构建、
   `ctest -R '^swirl-font-' --no-tests=error`、`SummarizeFontTests.py --require-windows`
   都要有实际结果。微小轴输入用例必须显式必跑，顶层绿色不能代替用例执行。
-- Windows Server 合成测试不算 Windows 11 实机、安装、ClearType 或 Swirl 成品通过。
+- Windows Server 原创夹具的加载/安装/清理结果单列；它们不构成 Windows 11 原件候选的
+  实机安装、ClearType 或 Swirl 成品验收。
   现有自动 PNG 是 face 0 默认实例的灰度渲染，不能外推到全部面/字重/实际屏幕。
 
 ## 5. 本轮实际 CI 配置变更与边界
@@ -309,8 +313,9 @@ Run 39392843365 于 08:38:56 UTC 更新为最终 success，artifact **1225140171
 
 ## 8. 本窗口执行记录
 
-本轮只修改协调文档、交接入口和公共合成 CI 触发/PR 来源检查，
-未修改任何字体算法、测试断言、容差、原始字体、Rust Core、UI 或动画。
+初始管理阶段的直接修改仅为协调文档、交接入口和公共合成 CI 触发/PR 来源检查。
+后续独立 A3 阶段按下文记录合并，并修正两处测试归属元数据；既有字体算法、严格断言、
+容差和原始字体未修改。并发 Core 提交原样保留，本窗口未编辑 Rust Core、UI 或动画。
 
 - 独立 checkout 基线为 `e505326486202ad4c8e98bb8b66a17b4547c559f`，初始工作区干净。
 - Python 3.12.14、fonttools 4.61.1、numpy 2.2.6、uharfbuzz 0.56.3。
@@ -686,3 +691,126 @@ full_acceptance=false；光栅化后的路径状态差异仍存在。
 09:47 UTC 追加核验：bbb79c1 的 Core implementation 39400875148 与 7bbca55 的
 39401951617 均已 completed/success；50dae9c 的 Rust Core 39399304790、bbb79c1 的
 39400874981 仍在运行。待结束项继续按运行中记录，不以其他 SHA 的通过替代。
+
+### 8.14 第三阶段已推送及实际终态
+
+实际 merge [525975f059d6bdf2e6f3c94d75500eecf417a1ef](https://github.com/SOLHK/Swirl/commit/525975f059d6bdf2e6f3c94d75500eecf417a1ef)
+双亲为 `5c170be7feef2c9ed98c1fd0ca3c25cb19790aaa` 和
+`9dd26766f949ded4e5fa8253fc44ae4639a95ea9`；GitHub tree
+`f574b00e442d082269f6ac30521c08124d970842` 与已验证本地 tree 一致。
+预期旧 HEAD / force=false 更新成功，随后回读 ref、父链与 compare；
+仅七个 A3 新文件及本记录发生变化，并发 Core 的 11 个文件逐字节保留。
+
+[39403489454](https://github.com/SOLHK/Swirl/actions/runs/39403489454) 于 09:50:44 UTC
+completed/failure：Python **118563695408** 515 discovered、508 passed、7 skipped，
+audit 6/6；DirectWrite **118563695693** success；Apple **118563695766** failure，
+仍为 vertical advance 849 对 850.0、容差 0.03125。诊断输出
+`DIAGNOSTIC_COMPLETE_NOT_ACCEPTANCE` 没有替代严格失败。
+这里的 CI 7 skip 与本地 515/515、0 skip 分别记账，不能混成同一次执行。
+
+两份工件均已实际下载、验证 GitHub digest 并读取 JSON：Windows **12256227454**，
+ZIP SHA-256 `7bab0213439df4d81391858aa92ba817c4907556af3603ea6369e98f4651dd0e`；
+Apple **12255322350**，`b304eba95d650e7a4f609657bc98cf5ff69af5fda60980057926bbe632f5a6fc`。
+有限原创 HVF 夹具 29/29 位置及两份 DirectWrite 夹具成功，不含原件重建或 Win11/Swirl 验收。
+
+### 8.15 第四阶段：Linux normalized API 控制与证据归档
+
+固定目标父提交 `525975f059d6bdf2e6f3c94d75500eecf417a1ef`，固定源
+`6f36bdd47d0b52622c697974989b8b481657d2ea`，包括前序
+`d22be86b56cd20a257505be569a21fcea3ef2bbf`。
+相对已集成 9dd2676 新增 15 个 A3 专属文件：两个 workflow、normalized API probe、
+三个 tests、handoff、manifest、Windows 输入契约 JSON 和六份已审查的诊断 ZIP。
+没有 C1/B1/D1 文件、共享原生提取器或 Core 文件变更。六个 ZIP 是实际证据文件，
+这不是“仅文档”阶段，也不是新的 Apple 原件观测。
+
+| 精确 source SHA | 实际 CI 终态 | 已执行范围 |
+| --- | --- | --- |
+| `d22be86b56cd20a257505be569a21fcea3ef2bbf` | [39400961369](https://github.com/SOLHK/Swirl/actions/runs/39400961369) / success，job 118555262358 | 6/6 normalized API 测试，0 skip；Linux HarfBuzz/FreeType 原创夹具 |
+| `6f36bdd47d0b52622c697974989b8b481657d2ea` | [39402011732](https://github.com/SOLHK/Swirl/actions/runs/39402011732) / success，job 118558751185 | 92 项 A3 + 12 项既有输入分辨率测试，0 skip；归档和契约核验 |
+
+合并候选实际全套 **540 discovered / 540 executed / 540 passed / 0 failure / 0 error /
+0 skip，42.254 秒，exit 0**；audit **6/6、0 skip、exit 0**；`git diff --check` 通过。
+Python 3.12.14、fonttools 4.61.1、numpy 2.2.6、uharfbuzz 0.56.3；
+本地实际 HarfBuzz 8.3.0、FreeType 2.13.2 控制均执行，未借平台 skip 通过。
+Linux 日志中的 macOS 原生 `NOT_RUN` 仍表示该入口未在 Linux 实测。
+
+normalized 实验只在内存生成 .notdef 与原创方形两个字形，夹具 SHA-256
+`6c786cd801a13332f101e35d4d583126a0965e598b0fc90842bebac2ab83837c`。
+HarfBuzz design-float 路径将历史输入对接收为相同位模式 `43f980cb`，
+两个 normalized 输出均为 [0,0,0]、原创 advance 均为 500。
+外部显式提供 normalized [0,0,0] / [0,65,0] 后，回读精确，原创 advance 为 500/565。
+FreeType 只测 [0,0,0] / [0,260,0] 的 set/get 精确回读，没有测 glyph metrics。
+这些 q 是外部给定，不是恢复出的原件映射；不能据此关闭 A3，或推断 Windows API 能力。
+
+normalized 工件 **12253998687** 已下载；ZIP SHA-256
+`cb7ece5d9b82ea4992201071a3b8662ec271971c8994d0b694d78ffd5869ebcb`，
+单成员 normalized-api.json 的 SHA-256
+`35c10f6327b9ec5aace54e2a628ee61d22c29a4cb5f6e40fb8932cde14613a32`；
+保留至 2026-10-27 09:29:02 UTC。Linux authored-only 与 Windows/Apple 未测标记保留。
+
+六份归档的实际 Git blob 字节与各自源 CI ZIP 一致，全部成员及报告 hash 已校验；
+合计压缩 677,410 bytes、JSON 解包 41,239,564 bytes，每 ZIP 仅一个 JSON。
+前五份的来源及范围见既有输入诊断和 8.6/8.12，第六份为上述 normalized 实验。
+manifest 保留各 source SHA、run/artifact、ZIP 与报告 hash；job ID 在本记录中另列，
+不以当前 tip 重写历史来源。
+原轴/范围/avar 元数据和标量误差确实存在；人工逐字段审查未发现字体字节、二进制表、
+轮廓命令/点或原件绝对逐 GID 度量。新负例递归拒绝 raw metric 字段冒充安全汇总；
+原创 normalized 500/565 不冒充原件数据。未接纳 B1 的公开原始度量文件。
+
+归档还细分了 8.12 的 874 replay failures：五个 binary64 copy/anchor/descriptor 模式
+各 56 个是 `native_nondefault_axis_not_reported`，涉及 28 个标签、18 个不同位置，
+这些模式没有 raw payload replay changed；但回读 guard 的失败不能删除。
+显式 binary32 与 CFNumber float32 各有 2 个 payload-changed batch，Fixed 有 4 个。
+Windows 输入契约保留九模式×三对控制；32 面原轴 metadata 保存在 identity 归档中。
+Windows observations 为 null，
+所有未测/未接受标记保留；HVAR 局部精确也不能替代 HGHT 几何精确。
+
+**集成审查修正两处 CI 归属元数据**：6dd81c0 的 39398618327 实际只跑 17 个新测试，
+原 handoff 把另外 12 个既有测试误归给它。现从该行移除 12，增加 6f 的 92+12 行；
+manifest 增加 `retained_input_resolution_evidence`，将 12 项明确绑定 6f / 39402011732。
+归档原始字节、所有原生结果、测试断言与源分支均未改写；本次 540 项候选验证已包含修正。
+
+专项 workflow 保留 A3-only push/manual 范围；共享集成 CI 的全套 discover 会执行新增测试，
+但不等于这些源原生 workflow 在集成 SHA 重跑。生产 mapping/continuous-space/
+font-generated 仍 false，原件 **0/32**。本阶段只接受可重复的控制与证据基础设施。
+
+### 8.16 B1 新提交：实际消融失败与第二次公开输出
+
+固定新增提交 `3b8f113d811413464fe38136ca1dd43feedf5397` 和
+`aeb2574879ca76290f9e22c2e319f27f422e7ae6` 已审查。它们归档此前失败证据、
+新增合成 HGHT 用户单位控制及独立 probe，没有修正或删除 8.7 的原始度量公开出口和 Git 文件。
+合成单位实验不构成更改原件轴语义的许可。
+
+[39403338270](https://github.com/SOLHK/Swirl/actions/runs/39403338270) 已 completed/failure：
+Python **118563182640** 572 discovered、565 passed、7 skipped，audit 6/6；
+follow-up **118563371013** 为 success / `NATIVE_FOLLOWUP_COMPLETE_NOT_ACCEPTANCE`，
+16 个原创夹具、1,100 条记录、550 对 replay，仍有 **550 strict metric failures**。
+Original ablation **118563371147** 实际 failure；`private_without_vorg` 在原生启动时被拒绝，
+该变体没有原生观测。这不是有效的原版 VORG 消融修复结论。
+
+workflow 将 ablation 依赖改为 python，使原先 skipped 的阶段实际执行；09:49:20.065811 UTC
+stdout 的 `B1_VORG_ABLATION_SUMMARY_JSON` 又公开了原版逐 GID 原始度量：
+original_with_vorg 60 条 + original_repeat 60 条，是同一 60 样本两次测量，
+不是 120 个独立样本。这里仅记字段类别、计数和来源，没有复制原始值。
+API 登记工件 **12255752467**、digest
+`61d2b4f33c68873eb41e3c75aac488ed489419d98b4ed25b25e141d7be7106b4`；
+本条确认 metadata 和实际 stdout，未将这个 ZIP 记为已下载复验。
+
+维持 **CHANGES_REQUIRED / DO_NOT_MERGE**。后续需要关闭公开 stdout/工件/提交出口，
+私有保存原始观测，公开只留经审查的误差和计数。即便未来 tip 文件已净化，
+正常合并仍会引入 d283e2e5 的私有数据祖先；必须另行提供不含这些对象的干净交付历史。
+本窗口没有删除已公开日志/工件、改写历史或 force push；已有公开副本的处置尚未完成。
+原版完整接受/production fix 为 false、完成 GID 模型和面均为 0。
+
+### 8.17 Core CI 时点记录
+
+截至 10:00:21 UTC，初始管理提交 50dae9c 的 Rust Core
+[39399304790](https://github.com/SOLHK/Swirl/actions/runs/39399304790) 已于 09:49:57 UTC
+completed/success，三个 job 全部成功；此结论取代 8.13 中更早的 running 快照。
+5c170be 的 Core implementation 39402875815 已 success。进一步复查取得：
+bbb79c1 的 Rust 39400874981 success（09:57:03 UTC）；5c170be 的 font-system Windows
+39402875777 success（09:54:39 UTC）；525975f 的 Core implementation 39403489553 success。
+7bbca55 的 Rust 39401951743、5c170be 的 Rust 39402875811，以及 525975f 的
+Rust 39403489509 当时仍运行。这三项是明确待取终态的运行，不计为通过，
+也不影响 8.14 已确定的字体 failure 事实。
+后续读取结果按精确 run/head SHA 追加；不以其他提交的绿色替代。
