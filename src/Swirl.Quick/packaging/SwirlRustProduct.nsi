@@ -120,6 +120,7 @@ Section "Uninstall"
     DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\SwirlRustCorePreview"
     isolated_uninstall:
     !include "${UNINSTALL_LIST}"
+    Delete "$INSTDIR\Swirl-diagnostics.txt"
     Delete "$INSTDIR\Uninstall-SwirlRust.exe"
     Delete "$INSTDIR\.swirl-rust-app-isolated"
     Delete "$INSTDIR\.swirl-rust-app-owned"
