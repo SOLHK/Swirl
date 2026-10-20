@@ -1,5 +1,14 @@
 # D1 macOS source baseline and cross-platform delivery — 2026-10-21
 
+Latest evidence: exact original loads on macOS 27.0.1 CI (32/32 identities), but
+has 96/384 strict axis-readback failures. Local macOS 26.3 refuses that source in
+CoreText while Apple HVF works. Full-GID default-design comparison completes
+47,102 GIDs using existing comparison rules; 38 legacy type rejections are
+retained and their existing raw-Q companion checks pass. Original production
+faces remain 0/32. Windows Server synthetic DirectWrite passes; Windows 11 and
+actual Qt/Swirl acceptance are NOT_RUN. There is no accepted Apple-derived TTC.
+Machine-readable counts: [D1 evidence](evidence/SWIRL_VF_D1_MACOS_WINDOWS_20261021.json).
+
 ## Isolation and ownership
 
 This window uses only `work/vf-macos-windows-d1-20261021` in
@@ -264,3 +273,75 @@ observations are requested. Existing synthetic jobs and the strict failing gate
 remain intact. YAML parsing/branch checks pass; this added native job has not
 executed at this checkpoint. Source mismatch/missing font/identity failure remains
 nonzero, not a fallback to a different installed font.
+
+## D2 terminal all-GID result and D5 delivery boundary
+
+The local default-design comparison completed **47,102/47,102 GIDs** at face 0 /
+normalized `[0,0,0]`, 395.200 s, unchanged source, complete native header/summary,
+source/output/code bindings checked. The **unmodified legacy comparator** passed
+**47,064**, retaining **38 `segment_types_differ` rejections**. Only these 38
+were sent to the existing preserved-raw-Q companion; all **38/38** passed. Thus
+47,102 pass the existing combined comparison policy, with zero numeric failures
+and maximum point discrepancy **9.890754881780595e-12 FUnit**, unchanged limit
+**0.03125**. This is not 47,102 separate companion calls. No old rejection was
+removed, comparator changed, glyph model built or user-axis mapping accepted.
+One face/default design is not 32-face user-space or continuous-space equivalence.
+
+Private result/checkpoints: `build/vf-d1-private/original-hvf-all-default/`.
+The independent driver `build/vf-d1-private/compare_all_default.py` binds its own
+SHA-256 `b65f3079e5f41e120bdeb04a308d70481d39a322a4ad92807772bc3e2d81e32f`.
+Its checkpoints every 512 GIDs allow an interrupted run to resume without
+accepting changed source/native output/renderer/comparator code. Native callback
+JSONL (~505 MiB), all font data and full private logs remain ignored/local only.
+
+The exact-source matching-host follow-up is saved at source
+**`d10354fa02495d63e141b301ffb14be3c1941ac1`**. [Run 39476027356](https://github.com/SOLHK/Swirl/actions/runs/39476027356)
+completed **failure** at 2026-10-20 18:36:11 UTC; all three terminal job states
+and all three actual logs have been read:
+
+| Actual job | Result and scope |
+| --- | --- |
+| Original baseline 118812091949 | **success**, actual macOS **27.0.1 build 26A434**, exact original SHA/size, **32/32 physical identities**, **384 strict axis requests / 288 passed / 96 retained failures**, input unchanged |
+| Windows 118812092483 | **success**, Server 2022 / 20348, both actual DirectWrite controls `PASS_NATIVE_PROBE` |
+| macOS synthetic 118812092557 | **failure**, eight new tests pass, strict **849/850** failure retained; independent native/table reconstruction step succeeds |
+
+Native extractor SHA `8e5aaa0a921f24a656766c1e24a0d388397cdaddbdfebae1ab415c0d7c3f3bbf`
+and generated baseline harness SHA
+`7c8d6c01b30d19d5a106d4840c299d513f6c072ffe5117625c0614b3fc8367ad`
+were independently recalculated locally and match the original CI summary.
+Original CI success specifically means source identity, not all requested axes
+or production acceptance. This establishes different source-loading outcomes on
+the two measured hosts; it does not isolate the internal OS cause.
+
+Existing Swirl source was reviewed read-only: `FontFileInspection.h` retains the
+128 MiB limit, physical TTC directory/axis guards and explicit rejection of
+HVGL-only fonts; `FontManager.cpp` uses `QFontDatabase::addApplicationFont` only
+after that gate. Width adaptation and Qt implementation remain owned by W1/D1
+Windows work. No UI or font-loader file was changed, and no real Qt/Swirl result
+is inferred from these source checks.
+
+**Delivery is blocked, with evidence preserved:** original production models
+and faces **0/32**, no accepted Apple-derived `Swirl-VF.ttc`; A3 user-coordinate
+mapping, B1 strict metrics/vertical origin and C1 full rebuild gates remain
+open. Original Windows 11 installation/DirectWrite/Qt/Swirl, complex mixed-text
+layout, visual/DPI quality and performance remain unvalidated. The 3,424-byte
+local file above is only an original synthetic control. Integration owner must
+review/merge this isolated branch; no merge was performed and no source-file
+conflict was encountered. W1 advanced concurrently to `82541d4` and was preserved.
+
+For a new local native extraction (fresh directory):
+
+```sh
+build/vf-d1-private/venv/bin/python tools/swirl_vf/platform/run_hvf_oracle.py \
+  --font ~/Downloads/PingFangUI.ttc \
+  --binary build/vf-d1-private/original-hvf/hvf_oracle \
+  --out build/vf-d1-private/original-hvf-next --face 0 --coords=0,0,0 --count 0
+# After interruption, resume the existing bound comparison checkpoint:
+build/vf-d1-private/venv/bin/python build/vf-d1-private/compare_all_default.py
+```
+
+A completed comparison intentionally refuses overwrite. The primary next code
+work belongs to the existing A3/B1/C1 owners, using the matching-host and new
+all-GID/fresh-design evidence; do not bypass their acceptance gates to manufacture
+a final font. The next Windows 11 check requires an actual original candidate
+and Windows 11 desktop, not another Server synthetic result.
