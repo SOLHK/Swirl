@@ -25,15 +25,15 @@ SetCompressor /SOLID zlib
 Var IsolatedInstall
 Var Parameters
 !define MUI_ABORTWARNING
-Name "Swirl Rust Core（预览版）"
+Name "Swirl Core（预览版）"
 OutFile "${OUT_DIR}\Swirl-Rust-Core-Setup-${SOURCE_SHORT}.exe"
 InstallDir "D:\Codex\SwirlRust"
 RequestExecutionLevel user
 ShowInstDetails show
 ShowUnInstDetails show
 VIProductVersion "0.1.0.0"
-VIAddVersionKey /LANG=2052 "ProductName" "Swirl Rust Core 预览版"
-VIAddVersionKey /LANG=2052 "FileDescription" "Swirl Rust Core 应用安装程序"
+VIAddVersionKey /LANG=2052 "ProductName" "Swirl Core 预览版"
+VIAddVersionKey /LANG=2052 "FileDescription" "Swirl Core 应用安装程序"
 VIAddVersionKey /LANG=2052 "ProductVersion" "0.1.0.0"
 VIAddVersionKey /LANG=2052 "Comments" "Source ${SOURCE_SHA}"
 
@@ -54,7 +54,7 @@ Function .onInit
     init_done:
 FunctionEnd
 
-Section "安装 Swirl Rust Core"
+Section "安装 Swirl Core"
     SetShellVarContext current
     ; Keep the app separate from the user's working Mihomo-backed Swirl.
     StrCmp $INSTDIR "D:\Codex\SwirlRust" install_path_ok
@@ -83,10 +83,13 @@ Section "安装 Swirl Rust Core"
     Goto install_done
     regular_install:
     Delete "$INSTDIR\.swirl-rust-app-isolated"
-    CreateDirectory "$SMPROGRAMS\Swirl Rust Core"
-    CreateShortCut "$SMPROGRAMS\Swirl Rust Core\Swirl Rust Core.lnk" "$INSTDIR\Swirl.exe" "" "$INSTDIR\Swirl.exe" 0
-    CreateShortCut "$DESKTOP\Swirl Rust Core.lnk" "$INSTDIR\Swirl.exe" "" "$INSTDIR\Swirl.exe" 0
-    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\SwirlRustCorePreview" "DisplayName" "Swirl Rust Core（预览版）"
+    Delete "$DESKTOP\Swirl Rust Core.lnk"
+    Delete "$SMPROGRAMS\Swirl Rust Core\Swirl Rust Core.lnk"
+    RMDir "$SMPROGRAMS\Swirl Rust Core"
+    CreateDirectory "$SMPROGRAMS\Swirl Core"
+    CreateShortCut "$SMPROGRAMS\Swirl Core\Swirl Core.lnk" "$INSTDIR\Swirl.exe" "" "$INSTDIR\Swirl.exe" 0
+    CreateShortCut "$DESKTOP\Swirl Core.lnk" "$INSTDIR\Swirl.exe" "" "$INSTDIR\Swirl.exe" 0
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\SwirlRustCorePreview" "DisplayName" "Swirl Core（预览版）"
     WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\SwirlRustCorePreview" "DisplayVersion" "0.1.0.0"
     WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\SwirlRustCorePreview" "InstallLocation" "$INSTDIR"
     WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\SwirlRustCorePreview" "DisplayIcon" "$INSTDIR\Swirl.exe"
@@ -114,6 +117,9 @@ Section "Uninstall"
     SetShellVarContext current
     IfFileExists "$INSTDIR\.swirl-rust-app-isolated" isolated_uninstall regular_uninstall
     regular_uninstall:
+    Delete "$DESKTOP\Swirl Core.lnk"
+    Delete "$SMPROGRAMS\Swirl Core\Swirl Core.lnk"
+    RMDir "$SMPROGRAMS\Swirl Core"
     Delete "$DESKTOP\Swirl Rust Core.lnk"
     Delete "$SMPROGRAMS\Swirl Rust Core\Swirl Rust Core.lnk"
     RMDir "$SMPROGRAMS\Swirl Rust Core"

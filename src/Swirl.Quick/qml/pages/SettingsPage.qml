@@ -267,7 +267,7 @@ Item {
                                 }
                             }
                             SwirlText {
-                                text:"当前引擎："+engineController.engineName+(engineController.engineReason?"\n"+engineController.engineReason:"")
+                                text:"当前引擎："+(engineController.engineKind==="rust"?"Swirl Core":engineController.engineName)+(engineController.engineReason?"\n"+engineController.engineReason:"")
                                 color:Theme.muted;font.pixelSize:Theme.fontSize(12);wrapMode:Text.Wrap;Layout.fillWidth:true
                             }
                             SwirlText {
@@ -276,7 +276,7 @@ Item {
                                 color:Theme.muted; font.pixelSize:Theme.fontSize(12); wrapMode:Text.Wrap; Layout.fillWidth:true
                             }
                             SwirlText {
-                                text:"已校验版本："+engineController.expectedVersion+"　运行版本："+(engineController.version||"未读取")+"　运行时间："+engineController.uptimeSeconds+" 秒"
+                                text:"已校验版本："+engineController.expectedVersion+"　运行版本："+(engineController.engineKind==="rust"?(engineController.version||"未读取").replace("Swirl Core Rust","Swirl Core"):(engineController.version||"未读取"))+"　运行时间："+engineController.uptimeSeconds+" 秒"
                                 color:Theme.muted; font.pixelSize:Theme.fontSize(12); wrapMode:Text.Wrap; Layout.fillWidth:true
                             }
                             SwirlText {
@@ -293,7 +293,7 @@ Item {
                                 color:Theme.muted; font.pixelSize:Theme.fontSize(11); wrapMode:Text.WrapAnywhere; Layout.fillWidth:true
                             }
                             SwirlText {
-                                text:engineController.configurationSummary; visible:text.length>0
+                                text:engineController.engineKind==="rust"?engineController.configurationSummary.replace("Swirl Core Rust","Swirl Core"):engineController.configurationSummary; visible:text.length>0
                                 color:Theme.muted; font.pixelSize:Theme.fontSize(11); wrapMode:Text.WrapAnywhere; Layout.fillWidth:true
                             }
                         }

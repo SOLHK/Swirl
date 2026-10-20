@@ -95,7 +95,7 @@ foreach($license in @('fkYAML-MIT.txt','FreeType-FTL.txt','GCC-exception-3.1.txt
 }
 Copy-Item -LiteralPath (Join-Path $repo 'src\Swirl.Quick\packaging\README-RustProductPreview.txt') -Destination (Join-Path $stage 'README-先看.txt') -ErrorAction Stop
 @'
-Swirl Rust Core Windows preview
+Swirl Core Windows preview
 
 This normal Swirl Qt interface uses an in-process Rust proxy core. No Mihomo
 executable is included or used as a fallback. Rust sessions reject unsupported
@@ -136,7 +136,7 @@ $product=[ordered]@{
 }
 $product | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath (Join-Path $stage 'PRODUCT.json') -Encoding utf8
 @"
-Swirl Rust Core Windows product preview
+Swirl Core Windows product preview
 Source SHA: $sourceSha
 Swirl.exe SHA-256: $exeHash
 swirl_api.dll SHA-256: $dllHash
