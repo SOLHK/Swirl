@@ -4,6 +4,86 @@ This phase starts at `b5a84bfacc48e6b2a8be8f0797f34639530766c9` on
 `work/core-completion-20261017`; every push is non-forced and based on a fresh
 remote head. UI, animations and Rust Core are outside the changes.
 
+## Ninth implementation checkpoint: actual Windows placement and supported CoreText table access
+
+Local verification: **319/319 Python tests, zero skips, in 14.102 seconds;
+6/6 audit tests**. Existing acceptance thresholds and timeout values are unchanged.
+
+The preceding source is `af8df45a9ca3f2ed0d2e623856cb3c8ef85f3974` (parent
+`4927316c74f935099a5648cefacc13ae0d1f2772`). Its actual native results are now
+available; a successful job is not a complete-font acceptance decision.
+
+### Original first failing sample is now identified
+
+Run [39371704891](https://github.com/SOLHK/Swirl/actions/runs/39371704891),
+job 118461413491, verified the exact original SHA before and after extraction.
+All **32 face identities and 91 initial batches / 5,824 observations** passed.
+At face 0 / GID 0, training sample 1, user coordinates
+`WDTH=1, wght=501, HGHT=500`, the native vertical X origin differs from
+`horizontal_origin_x + advance_width/2` by **100 FUnits**. The original
+`1e-5` representation guard is unchanged. This is a width-extreme representation
+failure, not the fractional default-width rounding case. The public report
+contains only the absolute error; its sign is not inferred. **Zero original
+glyph models or faces completed, no final accepted transcript, no TTC.**
+Safe artifact 12240689906 contains only `rebuild.json`; its verified ZIP SHA is
+`f03e9564b29deda8fd78fb5943ab050e9329e6195a0dbc9ea62344f794b5c449`.
+
+### Real DirectWrite layout results
+
+Run [39371704981](https://github.com/SOLHK/Swirl/actions/runs/39371704981),
+job 118460805932, actually compiled with MSVC 19.44.35229.0 / SDK 10.0.26100.0
+and executed **4,608 layouts / 11,520 glyph observations** on Windows Server
+2022 build 20348 (product type 3). Four independent processes completed all
+identity, axis, summary and EOF checks. This is not a Windows 11 machine.
+
+| Default vertical route | Fixed-origin error, 64 single-Han observations | Above 1/32 | Above 1 FUnit |
+| --- | ---: | ---: | ---: |
+| `vert` | 0.5 FUnit maximum | 1 | 0 |
+| `vkrn` | 0.5 FUnit maximum | 1 | 0 |
+| `vrt2` | 98 FUnits maximum; no default correction | 58 | 58 |
+
+For each route, default horizontal records match **128/128**, disabled records
+match **256/256**, GSUB/clusters and regional mapping checks each pass **768/768**,
+and design metrics and layout advances each match **1,920/1,920**. These counts
+refer only to the independently authored eight-glyph fixture.
+
+DirectWrite's actual offset differs from the continuous GPOS value by up to
+0.25 FUnit. The worst final case has continuous width 906.5, native width 907,
+continuous placement 13.25 and actual placement 13, leaving -0.5 FUnit. The
+actual callback geometry confirms this quantization; it is not JSON formatting.
+Separately examining all 64 default mixed layouts per route gives the same
+0.5 maximum Han residual for `vert` and `vkrn`. All 128 rotated space/Latin runs
+(192 glyphs) and all baselines remain exactly unchanged. Explicit activation
+can move rotated Latin along world Y, so unconditional application-level feature
+activation is not accepted. Artifact 12241327627 ZIP SHA:
+`94ac58f2dece1244fd590e15a008a59db1461b1afae818082820ba3ff9402e85`.
+
+The same run's HarfBuzz job 118460806224 passed all 12 original tests, no skips,
+using HarfBuzz 12.3.2 / uharfbuzz 0.53.3. Its **3,840 shapes / 15,360 glyph
+observations** reproduce the earlier local limits: only `vert` is active by
+default; final fixed-origin error is at most 0.25 FUnit, while individually
+rounded odd deltas still reach 2 FUnits. Default `vkrn` therefore differs across
+the two measured engines. No universal feature-routing contract is inferred.
+
+### Fix the actual macOS compilation failure, then rerun the native experiment
+
+CoreText job 118460806251 in the same run failed during Swift compilation:
+the current macOS SDK marks `CTFontTableOptions.excludeSynthetic` unavailable.
+It executed **zero GPOS layouts**. The probe now uses supported
+`CTFontTableOptions(rawValue: 0)` at both table reads, retaining exact table
+hashes and absent-table checks for the actual run font. All existing nine
+CoreText analyzer/protocol tests remain. Linux source checks cannot establish
+Swift SDK compatibility; the new xcode-27 job must compile and execute it.
+The experiment's raster resolution remains 2.667 FUnits/pixel and can diagnose
+large placement/direction errors, not certify a 1/32 or 1-FUnit limit.
+
+Production reconstruction and its vertical-origin guard are unchanged in this
+small compile repair. An encoded positional model must include the independent
+native X origin in its existing metric error budget before the original
+reconstruction can proceed. The 141 original quantization questions, old strict
+849/850 API failure, complete original reconstruction and Windows 11/Qt
+acceptance remain unresolved.
+
 ## Eighth implementation checkpoint: actual reconstruction progress and variable vertical layout
 
 Local verification: **319/319 Python tests, zero skips, plus 6/6 audit tests**.

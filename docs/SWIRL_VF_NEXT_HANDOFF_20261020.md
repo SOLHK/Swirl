@@ -15,7 +15,8 @@
 `c31edaf04f3a6369e90da026b94aa6cf8176f356`、
 `24119489f7b85fe58dea53acf3a4a6f467a6e8fa`、
 `ef564245f5de600757b7283437c7daf31a1e90e9`、
-`4927316c74f935099a5648cefacc13ae0d1f2772`。并发 Core 提交
+`4927316c74f935099a5648cefacc13ae0d1f2772`、
+`af8df45a9ca3f2ed0d2e623856cb3c8ef85f3974`。并发 Core 提交
 `169e0cad51fc18a2d6fa4f194fafd90128bf2f7b`、
 `85f4cb916221fb64b9c07f0cd6fd85bbc7e94883`、
 `54908e2902c28ae20e2588fa5347df9b2b3d76e9`、
@@ -23,10 +24,11 @@
 完整数值、执行范围和历史失败见
 [本轮进展](SWIRL_VF_USER_COORDINATE_PROGRESS_20261020.md)。
 
-- 最新已核实字体提交 `4927316c74f935099a5648cefacc13ae0d1f2772`。
-  run [39370313776](https://github.com/SOLHK/Swirl/actions/runs/39370313776)
+- 最新已核实字体提交 `af8df45a9ca3f2ed0d2e623856cb3c8ef85f3974`。
+  run [39371704891](https://github.com/SOLHK/Swirl/actions/runs/39371704891)
   的实际原件重建已通过全部 91 批 / 5,824 条原件采样观测，32/32 面身份通过，
-  停在 face 0 / GID 0 的标准 vmtx 垂直 X 原点表示检查。
+  停在 face 0 / GID 0 的标准 vmtx 垂直 X 原点表示检查：training sample 1，
+  `WDTH=1, wght=501, HGHT=500`，实际绝对偏差 **100 FUnit**，原 1e-5 门槛不变。
   没有新轴回读失败；尚未到达完整 oracle summary。已接受观测与完成模型分开记录；
   **0 个 GID 模型完成、0/32 面完成，无 TTC**。
 - run [39370313682](https://github.com/SOLHK/Swirl/actions/runs/39370313682)
@@ -49,12 +51,16 @@
   整批每个 GID 的全部原始轮廓与度量必须零误差匹配。原请求数据不替换、
   原 `1e-6` 不放宽、无递归重试或第三次构造。25/25 适配专项回归已通过；
   原件首批 91 个位置和完整原创合成重建已验证该规则，后续所有 GID 仍须逐批验证。
-- 原点失败现在附实际 sample/location 与有限误差摘要，表示门槛不放宽。独立可变
-  GPOS 实验及真正的 DirectWrite TextLayout/Renderer 验证已实现；必须先读取其
-  Windows 原生默认/显式/关闭结果，不能根据 HarfBuzz 一项行为就用于生产。
+- run [39371704981](https://github.com/SOLHK/Swirl/actions/runs/39371704981)
+  的 Windows Server 原生任务实际完成 **4,608 布局 / 11,520 字形观察**。
+  默认竖排 `vert` / `vkrn` 将原创夹具最大 X 漂移从 98 降至 **0.5 FUnit**；
+  `vrt2` 默认无补偿。默认横排、GSUB/地区映射、度量与字宽均保持；默认混排
+  128 个旋转空格/Latin run 完整相等。实际 GPOS 仍有量化，不能称 1/32 通过。
+  HB 实测默认只启用 `vert`，不能把单一引擎行为当跨平台契约。
+  Mac 同轮因 `.excludeSynthetic` 被 SDK 禁用而编译失败，尚无 GPOS 布局结果。
+  本检查点改为受支持的取表选项，保留实际字体表哈希与缺席表检查，立即原生重跑。
 - 本检查点 Python **319/319**（包含实际 HarfBuzz、无 skip）、audit **6/6**。
-  新增 DirectWrite 4,608 次及 CoreText 2,016 次真实布局请求的原生任务；这些是
-  将执行的数量，未读新工件前不声明 Windows/CoreText 布局通过。
+  Windows 数量已经实际完成；CoreText 的 2,016 次仍是待执行请求数。
 - 另修复 gvar 残差双重舍入：原创可表达反例的误差从 1.400071 降至 0.014142
   FUnit，保存重开后也通过。原有 1 FUnit 重建预算与 1/32 原算法门槛均未放宽。
 - `c31edaf` 的四个全局用户轴映射模型仍均未全部通过，最好的候选仍有 150 项失败。

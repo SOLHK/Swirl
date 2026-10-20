@@ -74,13 +74,16 @@ func verifyFixture(_ font: CTFont, _ expected: [String: String], _ absent: [Stri
     guard CTFontGetGlyphCount(font) == 8, CTFontGetUnitsPerEm(font) == 1000,
           CTFontGetSize(font) == 1000 else { throw OracleError.invalid("wrong_original_fixture_identity") }
     for (tag, hash) in expected {
-        guard let table = CTFontCopyTable(font, tagValue(tag), .excludeSynthetic),
+        // The current macOS SDK marks excludeSynthetic unavailable. Default
+        // options are supported; exact data hashes still reject a different
+        // font or any synthesized table that differs from the fixture bytes.
+        guard let table = CTFontCopyTable(font, tagValue(tag), CTFontTableOptions(rawValue: 0)),
               sha256(table as Data) == hash else {
             throw OracleError.invalid("actual_run_changed_fixture_table:\(tag)")
         }
     }
     for tag in absent {
-        guard CTFontCopyTable(font, tagValue(tag), .excludeSynthetic) == nil else {
+        guard CTFontCopyTable(font, tagValue(tag), CTFontTableOptions(rawValue: 0)) == nil else {
             throw OracleError.invalid("actual_run_added_unrequested_table:\(tag)")
         }
     }

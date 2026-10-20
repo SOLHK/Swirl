@@ -18,9 +18,11 @@ experiments also passed. Type-2 remains explicitly enabled; Types 3/4 fail.
 This is a fixed sample, **not** all-GID, all-face user-coordinate, continuous-space
 or Windows acceptance. CoreText actually verified all 32 physical source faces,
 but the original `rebuild.py` run is still blocked before its first completed
-glyph model or face. The latest rebuild at `4927316c` accepted all 91 initial
+glyph model or face. The latest rebuild at `af8df45a` accepted all 91 initial
 batches / 5,824 glyph observations with exact replay, then stopped at face 0 /
 GID 0 because the observed vertical X origin cannot be represented by vmtx alone.
+Training sample 1 at `WDTH=1, wght=501, HGHT=500` has a 100-FUnit absolute
+representation error, retained against the unchanged 1e-5 condition.
 Zero original glyph models/faces are complete. No accepted `Swirl-VF.ttc` exists.
 
 The new HVAR diagnosis measured 3048 user locations / 12192 advances across 32
@@ -63,8 +65,15 @@ rebuilding, serialization and native reread. All three axes and exact metric
 models were retained. The 3,424-byte original synthetic TTC was removed after
 measurement. The old raw API 849/850 failure remains separately visible; this
 does not grant original Apple-font or Windows acceptance. Independent variable
-GPOS/actual TextLayout experiments now address the confirmed fixed-origin
-representation blocker; their results must precede any production use.
+GPOS/actual TextLayout experiments address the confirmed fixed-origin blocker.
+Run `39371704981` actually completed 4,608 Windows Server layouts / 11,520 glyph
+observations: default `vert` and `vkrn` reduced the original synthetic maximum
+drift from 98 to 0.5 FUnit, retaining default horizontal/mixed Latin runs and
+mapping/metrics. HarfBuzz defaults differ (`vert` only); neither result proves
+universal feature behavior or a 1/32 final-layout bound. The macOS job failed
+before any layout because its SDK disallows `.excludeSynthetic`; the supported
+table-option repair retains all identity checks and awaits native rerun.
+No production origin is bypassed on the strength of a diagnostic result.
 
 Read the current [detailed handoff](../../docs/SWIRL_VF_USER_AXIS_HANDOFF_20261020.md),
 [geometry evidence](../../docs/SWIRL_VF_GEOMETRY_PASS_20261020.md), and
