@@ -64,3 +64,14 @@ jobs:
           if bad:
               raise SystemExit('Private font data is not allowed in tracked C1 files')
           print('Source and original fixture generators only; production acceptance remains blocked.')
+      - name: Preserve exact committed source without font or checkpoint data
+        if: always() && runner.os == 'Linux'
+        run: python tools/swirl_vf/platform/rebuild_c1_evidence.py --output c1-source-evidence/public-source.zip
+      - name: Upload source provenance only
+        if: always() && runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: c1-public-source-${{ github.sha }}
+          path: c1-source-evidence/public-source.zip
+          if-no-files-found: error
+          retention-days: 14
