@@ -118,6 +118,52 @@ the discontinuous default, with original geometry plus HVAR, independent
 process order, and fresh held-out coordinates. Do not repeat the already-run
 cache experiment or choose per-point mapping exceptions.
 
+## A2 next experiment: fresh thresholds with native geometry and HVAR
+
+New files: `platform/axis_threshold_cases.py`, `platform/probe_axis_thresholds.py`,
+`tests/test_axis_threshold_cases.py`, `tests/test_axis_threshold_probe.py` under
+`tools/swirl_vf`, and `.github/workflows/swirl-vf-axis-thresholds.yml`. This is a
+diagnostic executable, **not a production mapping repair**. Native results are
+pending at this source checkpoint; no formula, font or continuous-space pass is
+declared. The source and final run evidence will be recorded separately.
+
+The original fvar-only preflight creates **1,724 user positions**, 35 selected
+GIDs (the established structural set plus the four HVAR controls), and plans
+120,680 actual CoreText glyph records across opposite-order processes. All 32
+faces, original tags/ranges/defaults, all 27 corners per face, default-side
+16.16/F2DOT14 thresholds, binary64 nextafter neighbors, decimal readback bins
+and the equal-slope 300/400 counterexample are retained. The 192 deterministic
+random holdouts are absent from the old 3,048-position HVAR sample.
+
+Each face uses two independent CoreText processes. Every process binds all 32
+physical faces and all original table hashes and must finish with exact count,
+zero-error summary, EOF and zero exit status. Opposite orders compare the whole
+typed path/raw metric payload exactly; readback bits are recorded independently.
+These processes do not claim to reset macOS's system-wide font-service cache.
+
+Six global mapping hypotheses are precomputed before native observation, then
+compared with the unchanged batched HVGL renderer and strict 1/32 comparator.
+Two new candidates test normalized-16 truncation before avar from either the
+original request or predeclared T(T(x)); neither is chosen per point. HVAR
+inversion applies only at exact width/height nodes after checking raw identity
+avar and neutral HVAR height regions. Rejected fits cannot create conditioned
+design references. Best-fit residuals, full branch tolerance intervals and
+neighbor-grid metric residuals are retained; these inferred per-observation
+references are explicitly **not** a global mapping or unique tolerance solution.
+Selected threshold cases also execute the existing Apple libhvf C oracle and
+compare it independently with both CoreText and the portable implementation.
+
+Local focused verification: **16/16 authored tests** pass, covering distinct
+binary neighbors, source range preservation, complete face/table identities,
+raw payload differences, rejected/clipped HVAR inversions and malformed/truncated
+native HVF transcripts. Full regression: **348/348 Python tests, zero skips,
+6/6 audits**, with `git diff --check` clean. This does not substitute for the
+pending actual CoreText/libhvf run.
+Private original paths and raw advances remain in memory/temporary storage;
+only coordinates, GIDs, aggregate discrepancies and identity evidence enter the
+safe JSON checkpoint or public artifact. A failed run retains stage/face/request
+context and remains FAILED. The existing 141 questions and 849/850 gate remain.
+
 ## Newly retrieved prior evidence (not new execution in this continuation)
 
 - At exact source `056f7ea6dc7cf3a703da63e8522b89d33d1166f4`,

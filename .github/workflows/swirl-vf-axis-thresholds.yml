@@ -1,0 +1,46 @@
+name: Swirl VF original axis threshold diagnosis
+
+on:
+  push:
+    branches: [work/core-completion-20261017]
+    paths:
+      - '.github/workflows/swirl-vf-axis-thresholds.yml'
+      - 'tools/swirl_vf/platform/probe_axis_thresholds.py'
+      - 'tools/swirl_vf/platform/axis_threshold_cases.py'
+      - 'tools/swirl_vf/platform/coretext_extract.swift'
+      - 'tools/swirl_vf/platform/calibrate_avar_metrics.py'
+      - 'tools/swirl_vf/platform/axis_geometry_candidates.py'
+      - 'tools/swirl_vf/platform/analyze_axis_quantization.py'
+      - 'tools/swirl_vf/platform/probe_user_axis_geometry.py'
+      - 'tools/swirl_vf/platform/hvf_oracle.c'
+      - 'tools/swirl_vf/tools/batch_geometry.py'
+      - 'tools/swirl_vf/tools/verified_axis_oracle.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-axis-thresholds:
+    runs-on: xcode-27
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Observe fresh native thresholds and independent HVAR and HVF references
+        run: |
+          python -m pip install fonttools==4.61.1 numpy==2.2.6
+          python tools/swirl_vf/platform/probe_axis_thresholds.py \
+            /System/Library/PrivateFrameworks/FontServices.framework/Versions/A/Resources/Reserved/PingFangUI.ttc \
+            --output build/axis-threshold-summary/thresholds.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: swirl-vf-axis-thresholds-${{ github.sha }}
+          path: build/axis-threshold-summary/*.json
+          retention-days: 7
