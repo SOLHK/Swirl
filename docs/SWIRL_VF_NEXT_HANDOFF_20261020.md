@@ -17,7 +17,9 @@
 `ef564245f5de600757b7283437c7daf31a1e90e9`、
 `4927316c74f935099a5648cefacc13ae0d1f2772`、
 `af8df45a9ca3f2ed0d2e623856cb3c8ef85f3974`、
-`121d58c3579241305d5a653939f1200573f3a7d2`。并发 Core 提交
+`121d58c3579241305d5a653939f1200573f3a7d2`、
+`babc38b12373a6c744a03f727bee230d8341f615`、
+`24ae62158ce147602bd1a4a5b6f41a1335325c8f`。并发 Core 提交
 `169e0cad51fc18a2d6fa4f194fafd90128bf2f7b`、
 `85f4cb916221fb64b9c07f0cd6fd85bbc7e94883`、
 `54908e2902c28ae20e2588fa5347df9b2b3d76e9`、
@@ -62,8 +64,11 @@
   Mac 同轮因 `.excludeSynthetic` 被 SDK 禁用而编译失败，后由 `121d58c` 修复。
   新 run [39372726963](https://github.com/SOLHK/Swirl/actions/runs/39372726963)
   已编译通过，第一 source 进程横排 168 项完成，但竖排 168 项全部被实际字体身份
-  或完整文本布局检查拒绝，尚未执行 candidate。当前补充 actual/requested font 表
-  哈希与可见范围/框尺寸的结构化诊断，原检查全部保留，不能推断 GPOS 功效。
+  或完整文本布局检查拒绝，尚未执行 candidate。后续实际诊断 run
+  [39373773102](https://github.com/SOLHK/Swirl/actions/runs/39373773102) 已确认：
+  请求 8-GID 原创字体，竖排实际却选为 47,102-GID 系统苹方，表哈希守卫正确拦截。
+  当前将唯一当前原创 fixture URL 注册到隔离进程的 `.process`，并核验退出前注销。
+  所有 actual-run 身份及完整文本检查保留，须再跑原生证明回退解决，不能推断 GPOS 功效。
 - 本检查点 Python **319/319**（包含实际 HarfBuzz、无 skip）、audit **6/6**。
   Windows 数量已经实际完成；CoreText 的 2,016 次仍是待执行请求数。
 - 另修复 gvar 残差双重舍入：原创可表达反例的误差从 1.400071 降至 0.014142

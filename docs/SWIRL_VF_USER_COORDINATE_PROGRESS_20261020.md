@@ -4,6 +4,34 @@ This phase starts at `b5a84bfacc48e6b2a8be8f0797f34639530766c9` on
 `work/core-completion-20261017`; every push is non-forced and based on a fresh
 remote head. UI, animations and Rust Core are outside the changes.
 
+## Twelfth implementation checkpoint: prevent confirmed vertical fixture font fallback
+
+The actual diagnostic at `24ae62158ce147602bd1a4a5b6f41a1335325c8f`, run
+[39373773102](https://github.com/SOLHK/Swirl/actions/runs/39373773102), job
+118467209436, now identifies the failure. Requested font
+`SwirlOriginalGPOSLaboratory-even` has 8 GIDs, UPM 1000, size 1000 and exact
+expected table hashes. The actual vertical Han/mixed run instead selected
+`PingFangSC-Regular` with 47,102 GIDs and different mapping, variation and metric
+tables. The identity guard rejected it before extracting actual paths/metrics.
+No fallback glyph observations are counted as fixture results. Latin/space
+requests separately have zero visible characters and zero lines; their cause
+is not assumed from frame dimensions alone.
+
+The probe now registers **only the current SHA-verified original fixture URL
+at process scope** in its existing isolated process, allowing internal font
+descriptor matching to find that same file. It retains the CGFont-backed
+requested construction and every actual run's identity/axis/full-text check.
+Deferred unregister runs on successful and failed request paths; Python requires
+one actual successful cleanup record bound to the same SHA and process scope.
+Registration success alone is not proof that CoreText used the correct font.
+The next native run must confirm all actual run identities and layout results.
+
+All **10/10 CoreText probe tests pass**, including an independent protocol
+counterexample for missing, duplicate, failed, wrong-scope, wrong-font or
+non-Boolean cleanup. This source change does not publish the separate unfinished
+production origin model/encoder integration and does not change its default
+strict vmtx-only behavior. Original reconstruction remains 0 faces / no TTC.
+
 ## Eleventh implementation checkpoint: unwrap optional CoreText frame diagnostics
 
 The diagnostic checkpoint `babc38b12373a6c744a03f727bee230d8341f615` preserved

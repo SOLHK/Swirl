@@ -123,9 +123,23 @@ class CoreTextGPOSProbeTests(unittest.TestCase):
         self.assertIn('CTRunDraw(run, context', source)
         self.assertIn('CTRunGetBaseAdvancesAndOrigins', source)
         self.assertNotIn('CGImageDestination', source)
-        self.assertNotIn('CTFontManagerRegister', source)
+        self.assertNotIn('.session', source)
+        self.assertNotIn('.persistent', source)
         self.assertNotIn('PingFang', source)
         self.assertNotIn('kCTKernAttributeName as String:', source)
+
+    def test_registration_cleanup_requires_same_fixture_process_scope_and_actual_success(self):
+        success = {'type': 'fixture_registration_cleanup', 'scope': 'process',
+                   'font_sha256': 'original-fixture', 'unregistered': True}
+        self.assertEqual(probe.require_registration_cleanup([success], 'original-fixture'), success)
+        invalid_records = [[], [success, success],
+            [{**success, 'unregistered': False, 'error': 'native_in_use'}],
+            [{**success, 'unregistered': 'true'}],
+            [{**success, 'scope': 'session'}],
+            [{**success, 'font_sha256': 'another-candidate'}]]
+        for records in invalid_records:
+            with self.subTest(records=records), self.assertRaisesRegex(ValueError, 'registration_cleanup'):
+                probe.require_registration_cleanup(records, 'original-fixture')
 
     def test_linux_run_is_explicitly_not_native_and_never_overwrites_existing_evidence(self):
         with tempfile.TemporaryDirectory() as folder, mock.patch.object(probe.sys, 'platform', 'linux'):

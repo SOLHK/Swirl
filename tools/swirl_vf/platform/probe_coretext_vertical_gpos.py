@@ -73,7 +73,7 @@ func tagName(_ value: UInt32) -> String {
     String(bytes: [UInt8((value >> 24) & 255), UInt8((value >> 16) & 255),
         UInt8((value >> 8) & 255), UInt8(value & 255)], encoding: .ascii)!
 }
-let fixtureConstruction = "SHA256-verified original fixture bytes -> CGDataProvider -> CGFont -> CTFontCreateWithGraphicsFont; identity matrix; explicit variation and feature descriptor; unregistered font in an isolated process"
+let fixtureConstruction = "SHA256-verified original fixture bytes -> CGDataProvider -> CGFont -> CTFontCreateWithGraphicsFont; identity matrix; explicit variation and feature descriptor; only the current fixture URL registered with process scope in an isolated process"
 func nativeErrorRecord(_ error: Error, _ type: String) -> [String: Any] {
     var record: [String: Any] = ["type": type, "error": String(describing: error)]
     if let failure = error as? OracleError {
@@ -300,7 +300,7 @@ func fixtureSnapshot(_ font: CTFont, _ request: [String: Any],
     return result
 }
 
-func originalGPOSMain() throws {
+func originalGPOSMain() throws -> Int32 {
     guard CommandLine.arguments.count == 2 else { throw OracleError.invalid("fixture_manifest_required") }
     let configData = try Data(contentsOf: URL(fileURLWithPath: CommandLine.arguments[1]))
     guard let config = try JSONSerialization.jsonObject(with: configData) as? [String: Any],
@@ -312,16 +312,37 @@ func originalGPOSMain() throws {
           let requests = config["requests"] as? [[String: Any]] else {
         throw OracleError.invalid("invalid_original_fixture_manifest")
     }
-    let bytes = try Data(contentsOf: URL(fileURLWithPath: source))
+    let fixtureURL = URL(fileURLWithPath: source)
+    let bytes = try Data(contentsOf: fixtureURL)
     guard sha256(bytes) == wantedHash,
           let provider = CGDataProvider(data: bytes as CFData), let graphics = CGFont(provider) else {
         throw OracleError.invalid("original_fixture_bytes_or_CGFont_failed")
+    }
+    // A CTFont backed by an unregistered CGFont was retained in horizontal
+    // runs but replaced by a system font during vertical layout on macOS 27.
+    // Make exactly this file discoverable by descriptor matching, only for
+    // this already isolated process. Every actual run still verifies its data.
+    var registrationError: Unmanaged<CFError>?
+    guard CTFontManagerRegisterFontsForURL(fixtureURL as CFURL, .process, &registrationError) else {
+        let detail = registrationError.map { String(describing: $0.takeRetainedValue()) } ?? "no_CoreText_error_detail"
+        throw OracleError.diagnostic("original_fixture_process_registration_failed", [
+            "scope": "process", "font_sha256": wantedHash, "detail": detail])
+    }
+    defer {
+        var cleanupError: Unmanaged<CFError>?
+        let removed = CTFontManagerUnregisterFontsForURL(fixtureURL as CFURL, .process, &cleanupError)
+        var cleanup: [String: Any] = ["type": "fixture_registration_cleanup", "scope": "process",
+            "font_sha256": wantedHash, "unregistered": removed]
+        if let failure = cleanupError { cleanup["error"] = String(describing: failure.takeRetainedValue()) }
+        try? emit(cleanup)
+        if !removed { exit(4) }
     }
     let calibration0 = try layoutInk { $0.fill(CGRect(x: 1200, y: 1300, width: 117, height: 91)) }
     let calibration1 = try layoutInk { $0.fill(CGRect(x: 1337.25, y: 1226.5, width: 117, height: 91)) }
     try emit(["type": "metadata", "scope": "independent_original_GPOS_fixture_only",
         "font_sha256": wantedHash, "os_version": ProcessInfo.processInfo.operatingSystemVersionString,
         "actual_font_table_identity_checked": true, "Apple_font_input": false,
+        "font_registration_scope": "process", "registered_only_current_fixture": true,
         "paths_or_bitmaps_emitted": false, "raster_font_units_per_pixel": 1/Double(layoutScale),
         "raster_calibration": ["before": calibration0, "after": calibration1,
                                "requested_translation": [137.25, -73.5]]])
@@ -341,9 +362,10 @@ func originalGPOSMain() throws {
         }
     }
     try emit(["type": "summary", "requests": requests.count, "observations": success, "errors": errors])
-    if errors != 0 { exit(3) }
+    // Return before exiting so the registration cleanup also runs on failures.
+    return errors == 0 ? 0 : 3
 }
-do { try originalGPOSMain() }
+do { let status = try originalGPOSMain(); if status != 0 { exit(status) } }
 catch { try? emit(nativeErrorRecord(error, "fatal")); exit(2) }
 '''
 
@@ -399,6 +421,14 @@ def raster_sign(metadata):
     residual = subtract([s*x for s, x in zip(sign, delta)], wanted)
     fixture.require(max(map(abs, residual)) <= 1/RASTER_SCALE, 'CoreText_GPOS_raster_instrument_mismatch')
     return sign, residual
+
+
+def require_registration_cleanup(records, expected_sha):
+    fixture.require(len(records) == 1, 'CoreText_GPOS_missing_or_duplicate_registration_cleanup')
+    cleanup = records[0]
+    fixture.require(cleanup.get('scope') == 'process' and cleanup.get('font_sha256') == expected_sha
+                    and cleanup.get('unregistered') is True, 'CoreText_GPOS_registration_cleanup_failed')
+    return cleanup
 
 
 def drawing_comparisons(source_default, source, candidate, encoded, sign):
@@ -534,8 +564,8 @@ def run(output):
             compiled = subprocess.run(['xcrun', 'swiftc', '-O', str(swift), '-o', str(binary)],
                                       capture_output=True, text=True, timeout=180)
             fixture.require(compiled.returncode == 0, 'CoreText_GPOS_compile_failed:' + compiled.stderr[-6000:])
-            # Do not register the same family globally. Every baseline/route uses
-            # a fresh native process, and every shaped run checks raw table hashes.
+            # Each baseline/route registers only its current fixture URL with
+            # process scope in a fresh process. Every run checks raw table hashes.
             for route in fixture.ROUTES:
                 for variant, data in (('source', source), (route, candidates[route])):
                     font_path = temp/(variant+'-'+route+'.ttf')
@@ -556,13 +586,18 @@ def run(output):
                     report['native_errors'].extend({'variant': variant, 'route': route, **row} for row in errors)
                     meta = next((row for row in rows if row.get('type') == 'metadata'), None)
                     summary = next((row for row in rows if row.get('type') == 'summary'), None)
+                    cleanup = [row for row in rows if row.get('type') == 'fixture_registration_cleanup']
                     report['native_processes'].append({'variant': variant, 'route': route,
                         'returncode': observed.returncode, 'metadata': meta, 'summary': summary,
-                        'stderr': observed.stderr[-3000:]})
+                        'registration_cleanup': cleanup, 'stderr': observed.stderr[-3000:]})
                     observations[variant].extend(row for row in rows if row.get('type') == 'observation')
                     fixture.require(meta and meta.get('font_sha256') == configuration['font_sha256']
                         and meta.get('Apple_font_input') is False and meta.get('paths_or_bitmaps_emitted') is False,
                         'CoreText_GPOS_metadata_mismatch')
+                    fixture.require(meta.get('font_registration_scope') == 'process'
+                        and meta.get('registered_only_current_fixture') is True,
+                        'CoreText_GPOS_wrong_registration_scope')
+                    require_registration_cleanup(cleanup, configuration['font_sha256'])
                     sign, calibration = raster_sign(meta)
                     report['native_processes'][-1]['raster_calibration_residual'] = calibration
                     if route in signs:
