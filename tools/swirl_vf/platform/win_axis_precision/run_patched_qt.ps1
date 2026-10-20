@@ -17,8 +17,10 @@ $platform = Split-Path $PSScriptRoot -Parent
 
 function Invoke-Logged([string]$Name, [string]$Executable, [string[]]$Arguments) {
     $path = Join-Path $out ($Name + '.log')
+    Write-Output ('D2_STAGE_START ' + $Name + ' ' + [DateTime]::UtcNow.ToString('o'))
     & $Executable @Arguments *> $path
     if ($LASTEXITCODE -ne 0) { Get-Content $path -Tail 100; throw "$Name failed: $LASTEXITCODE" }
+    Write-Output ('D2_STAGE_PASS ' + $Name + ' ' + [DateTime]::UtcNow.ToString('o'))
 }
 
 # Discover the installed toolchain, not one inferred from the runner label.
@@ -42,13 +44,15 @@ Invoke-Logged 'prepare' 'python' @((Join-Path $PSScriptRoot 'd2_state.py'), 'pre
 Invoke-Logged 'fixtures' 'python' @((Join-Path $platform 'make_win_axis_precision_fixture.py'), $fixture)
 # This private source-built Core/Gui installation never replaces a production SDK.
 # Both sides use exactly these flags, the same build tree, compiler and prefix.
+# Keep OpenGL enabled: this pinned Windows plugin has dynamicgl references
+# that fail to compile in the first no-OpenGL experiment. No upstream workaround.
 $options = @('-S', $qt, '-B', $build, '-G', 'Ninja', '-DCMAKE_BUILD_TYPE=Release',
     "-DCMAKE_INSTALL_PREFIX=$prefix", '-DQT_BUILD_EXAMPLES=OFF', '-DQT_BUILD_TESTS=OFF',
     '-DFEATURE_system_freetype=OFF', '-DFEATURE_system_harfbuzz=OFF',
     '-DFEATURE_system_png=OFF', '-DFEATURE_system_zlib=OFF', '-DFEATURE_system_pcre2=OFF',
     '-DFEATURE_network=OFF', '-DFEATURE_sql=OFF', '-DFEATURE_xml=OFF', '-DFEATURE_concurrent=OFF',
     '-DFEATURE_dbus=OFF', '-DFEATURE_widgets=OFF', '-DFEATURE_printsupport=OFF', '-DFEATURE_testlib=OFF',
-    '-DFEATURE_opengl=OFF')
+    '-DFEATURE_opengl=ON')
 $options | ConvertTo-Json | Set-Content (Join-Path $out 'configure-arguments.json') -Encoding utf8
 Invoke-Logged 'configure-qt' 'cmake' $options
 Invoke-Logged 'build-baseline-qt' 'cmake' @('--build', $build, '--parallel', '4')

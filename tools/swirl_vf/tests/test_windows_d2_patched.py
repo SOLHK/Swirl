@@ -22,6 +22,13 @@ def control(clean=False):
 
 
 class PatchedQtTests(unittest.TestCase):
+    def test_windows_build_keeps_opengl_and_bundled_freetype(self):
+        script = (Path(patched.__file__).parent / 'run_patched_qt.ps1').read_text()
+        self.assertIn("'-DFEATURE_opengl=ON'", script)
+        self.assertNotIn("'-DFEATURE_opengl=OFF'", script)
+        self.assertIn("'-DFEATURE_system_freetype=OFF'", script)
+        self.assertIn("foreach ($kind in @('baseline', 'patched'))", script)
+
     def test_frozen_48_control_scenarios(self):
         self.assertEqual(len(patched.SPECS), 48)
         self.assertEqual(len({patched.label(s) for s in patched.SPECS}), 48)
