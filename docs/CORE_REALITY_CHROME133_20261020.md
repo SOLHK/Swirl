@@ -8,13 +8,22 @@ overlap and retained by fast-forward before this implementation. No force push,
 main/test changes, private subscription retrieval or provider credentials are
 part of this work. Frozen acceptance stays **79 items / 6 accepted / 10.83%**.
 
+Chrome133 source was pushed as `a3b89050e141557444519c8c17f2a263e6a013fc`.
+Subsequent font-only commits `ef564245f5de600757b7283437c7daf31a1e90e9` and
+`4927316c74f935099a5648cefacc13ae0d1f2772` were independently fetched, inspected
+for overlap and retained by fast-forward. A later Windows run exposed a real
+fixture allocation failure even though a3b8905 passed; that failure and the
+source repair are recorded below rather than being hidden by the earlier pass.
+
 ## Original CI failure and source identity
 
 | Source | Rust workflow | App workflow | Observed conclusion |
 |---|---|---|---|
 | `169e0cad51fc18a2d6fa4f194fafd90128bf2f7b` | [39362403837](https://github.com/SOLHK/Swirl/actions/runs/39362403837) | [39362403822](https://github.com/SOLHK/Swirl/actions/runs/39362403822) | Both successful, including the Windows full application build. |
 | `85f4cb916221fb64b9c07f0cd6fd85bbc7e94883` | [39363969382](https://github.com/SOLHK/Swirl/actions/runs/39363969382) | [39363969436](https://github.com/SOLHK/Swirl/actions/runs/39363969436) | Failed: TLS 1.3 origin certificate fixture lacked Authority Key Identifier under strict Python/OpenSSL validation. The affected 9-case menu had 8 successes and 1 error. |
-| `54908e2902c28ae20e2588fa5347df9b2b3d76e9` | [39366092611](https://github.com/SOLHK/Swirl/actions/runs/39366092611) | [39366092691](https://github.com/SOLHK/Swirl/actions/runs/39366092691) | App/Linux/macOS successful at this checkpoint. Windows Rust and actual Qt/DPAPI/network menus passed; full application build was still running. |
+| `54908e2902c28ae20e2588fa5347df9b2b3d76e9` | [39366092611](https://github.com/SOLHK/Swirl/actions/runs/39366092611) | [39366092691](https://github.com/SOLHK/Swirl/actions/runs/39366092691) | All successful, including the actual Qt/DPAPI/network menus and complete Windows application build. |
+| `a3b89050e141557444519c8c17f2a263e6a013fc` | [39368450317](https://github.com/SOLHK/Swirl/actions/runs/39368450317) | [39368450338](https://github.com/SOLHK/Swirl/actions/runs/39368450338) | All successful: native and Chrome133 menus on all platforms, Linux public origins, Windows Qt/DPAPI and complete Swirl.exe build. |
+| `ef564245f5de600757b7283437c7daf31a1e90e9` | [39368769057](https://github.com/SOLHK/Swirl/actions/runs/39368769057) | [39368768977](https://github.com/SOLHK/Swirl/actions/runs/39368768977) | App/Linux/macOS successful; Windows failed while creating a DNS fixture with WinError 10013. Later Windows protocol/Qt/application gates did not run. |
 
 The repair gives the temporary CA proper key usage and SKI, and leaf certificates
 AKI, SKI, digital-signature usage and serverAuth. The local TLS 1.3 verifier also
@@ -49,6 +58,82 @@ not have a successful HTTPS request and correctly recorded zero Direct commands.
 The evidence includes ten HTTP paths, one verified HTTPS close, a 262180-byte
 echo/half-close transfer and no origin errors. The updated Qt gate explicitly
 requires those A-node Direct observations rather than only framing activity.
+
+## Completed Chrome133 CI and a subsequent Windows allocation repair
+
+The [a3b8905 exact-SHA audit](evidence/CORE_REALITY_CHROME133_CI_20261020.json)
+records downloaded artifacts, their hashes, actual test results and source
+identity. Every Rust platform and App passed 320 ordinary Rust tests and one
+doctest; each passed 14 REALITY component tests, 4 Vision component tests,
+4 independent uTLS oracle tests, native Runtime menus of 8/8 and 10/10, and
+Chrome133 Runtime menus of 8/8 and 10/10. These protocol menus had zero failures,
+errors or skips. General Python suites still report their explicit unavailable-Qt
+skips; Windows later executes the applicable Qt menus with actual binaries.
+
+The three Windows Qt Runtime artifacts (native REALITY, native Vision and
+Chrome133 Vision) each passed 1/1 with no skips. Each retains ten HTTP paths,
+strict verified HTTPS, a 262180-byte echo/half-close transfer, persisted DPAPI
+configuration and A/B observations. Both Vision A nodes recorded upload and
+download Direct commands. B's deliberately unsuccessful HTTPS request correctly
+records no Direct transition. The final build log contains the actual
+`build/rust-qt/Release/Swirl.exe` link output and the required file-existence
+check passed. This is hosted Windows product-chain evidence, not physical GUI
+or private-provider acceptance.
+
+All four Linux public-origin artifacts also passed: native/Chrome133, with and
+without Vision. HTTP returned the expected 22-byte body with status 200;
+strict verified TLS 1.3 HTTPS returned status 301 with authenticated close.
+Each request records an authenticated REALITY/VLESS session and an actual public
+TCP connection through the official controlled Xray server. Both Vision HTTPS
+paths recorded Direct in both directions. There was no DIRECT fallback.
+The App source archive contains 468 files whose blobs all match a3b8905, with
+equal trigger/tested/archive commit IDs and empty source diff/untracked-source
+records. Its generated identity marker files are not source modifications.
+
+The ef56424 Windows failure occurred before the certificate-negative test could
+run: the DNS fixture's first TCP bind requested `127.0.0.1:52786` and returned
+10013. Neither the before nor after excluded-port table included 52786. There
+was no contemporaneous endpoint/PID snapshot, so the historical owner or exact
+OS denial cause remains unknown. An unexcluded randomly chosen number is not
+an owned free port; that source defect is directly observable and repaired.
+
+DNS and paired Shadowsocks fixtures now request TCP port zero and retain the
+actual server socket while checking known TCP/UDP exclusions and binding UDP
+to the same port. Windows sockets request `SO_EXCLUSIVEADDRUSE` before bind;
+`SO_REUSEADDR` is not used. Known excluded TCP candidates remain held until
+selection exits, so a sequential allocator can pass an entire exclusion block
+without selecting the same still-owned endpoint. These finite-set prechecks
+are separate from the unchanged budget of eight actual EADDRINUSE/10048
+collisions. Unknown 10013 and other failures still propagate as the original
+exception, with cleanup and the protocol/address/attempt context. The related
+dual-family fixture uses the same ownership and separate-budget rules.
+
+New regression cases cover the 200-port exclusion sequence, retained descriptor
+ownership, no UDP bind to excluded candidates, cleanup on all exits, port-zero
+requests, real exclusive/wildcard incumbents and actual TCP/UDP data. Simulated
+OS allocation sequences are distinguished from actual socket forwarding tests.
+Failure-only CI diagnostics retain local TCP/UDP endpoint/state/PID snapshots;
+these later snapshots do not retrospectively prove the failed port's owner.
+The repair needs its own exact-SHA CI and cannot inherit a3b8905's success.
+
+The [local repair checkpoint](evidence/CORE_LOOPBACK_PORT_OWNERSHIP_LOCAL_20261020.json)
+retains source hashes, all earlier failure logs and the passed allocation,
+Rust, Xray, oracle and Runtime results. Additional local complete policy/DNS
+runs exposed intermittent deadlines: one CONNECT probe timeout, two DoH
+timeouts, a later UDP `DnsTimeout` and a DoT recovery request returning 502.
+The latter observations are not claimed fixed by the allocation change.
+`DnsTimeout` alone does not distinguish the 900ms UDP endpoint deadline from
+the 3s total budget, and the 502 log did not record its internal error.
+Bounded unchanged diagnostic runs passed without establishing the historical
+cause. The sequential policy menu passed 21/21; the final complete instrumented
+DNS menu passed 43/43 with zero failures, errors or skips in 124.511 seconds.
+That passing trace measured long heartbeat gaps and cgroup CPU throttling;
+Python CPU and some other events advanced during the gaps. This does not prove
+a whole-process freeze or explain the earlier failures, which lack complete
+timing traces. All four complete DNS outcomes, source and binary hashes, and
+the trace limits are preserved in the checkpoint. New exact-SHA CI remains an
+independent gate. No timeout, certificate check or test assertion was relaxed.
+These failures remain an open local investigation, not overwritten by a later pass.
 
 ## Implemented profile and ownership
 
@@ -91,6 +176,13 @@ negotiation. ClientHello compatibility is not proof of browser-identical record
 timing or resistance to every fingerprinting method. Inner HTTPS TLS 1.2 remains
 supported through authenticated non-Direct Vision; inner TLS 1.3 can enter Direct.
 
+In the exact locked official REALITY server, authenticated TLS 1.3
+[EncryptedExtensions](https://github.com/XTLS/REALITY/blob/83f621788ca88b83179810b12baa7ae518aacb83/handshake_messages.go)
+are generated locally and have no ALPS negotiation field. Therefore this ALPS
+limitation does not block that server's authenticated path, even when the
+camouflage target supports ALPS. This source-level finding does not extend to
+provider modifications, future versions or unauthenticated transparent traffic.
+
 ## Strict subscription and Qt adaptation
 
 Rust Inspector and the actual Qt normalizer preserve the critical values through
@@ -122,7 +214,8 @@ RustCoreEngine configuration path across these formats. The dedicated Windows
 Runtime test still enters through NodeImportService and EngineController, uses
 DPAPI and recreates the product objects before requesting the origins. Its new
 Chrome/Vision menu must pass in the exact-SHA Windows job before claiming that
-product integration is verified; the local environment has no Qt SDK.
+product integration is verified. It passed in the a3b8905 job and downloaded
+artifact described above; the local environment has no Qt SDK.
 
 ## Independent references and licenses
 
@@ -170,12 +263,13 @@ Ed25519 through standard TLS certificate selection; the Python target selects
 the compatible fixture certificate for the declared profile. Production profile
 constants and all authentication/Finished/data assertions remain unchanged.
 
-The local Chrome public probe stopped at `PublicDnsFailed` before public TCP,
-and correctly recorded an uncommitted working tree. It is not public acceptance.
+The initial local Chrome public probe stopped at `PublicDnsFailed` before public
+TCP, and correctly recorded an uncommitted working tree. It is not public acceptance.
 Linux CI adds separate Chrome REALITY and Chrome Vision public gates alongside
 both native gates. Linux/macOS/Windows/App keep all earlier native menus and add
 the oracle and Chrome menus. Windows adds actual Qt/DPAPI Chrome Vision before
-the full application build. CI gate/shell-failure tests pass 54/54 locally.
+the full application build. These a3b8905 gates subsequently passed as recorded
+above. CI gate/shell-failure tests pass 54/54 locally.
 
 Do not convert historical private subscription counts (59 REALITY, 55 Vision,
 59 retained URIs, previously zero native candidates) into current connectivity

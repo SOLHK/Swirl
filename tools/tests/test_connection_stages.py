@@ -4,6 +4,7 @@ Resolved-address retries must stop before TLS/authentication/application bytes.
 The deterministic stalled-connect timing/cancellation cases live in Rust tests;
 these peers validate actual DNS, sockets, framed SS traffic and control reports.
 """
+from contextlib import contextmanager
 import errno
 import json
 import os
@@ -20,7 +21,7 @@ import unittest
 from unittest import mock
 
 from dns_peer import DnsPeer
-from loopback_ports import windows_candidates
+from loopback_ports import windows_exclusions
 from test_rust_core import Reference, Handler, certificates, exact, header
 from test_shadowsocks import Peer as SsPeer, Handler as SsHandler, PASSWORD
 
@@ -49,9 +50,13 @@ class IPv6SsPeer(SsPeer):
 
 def reserve_dual_loopback():
     """Own both address families before starting either half of a DNS fixture."""
-    held = []
+    excluded = (windows_exclusions(False) | windows_exclusions(True)
+                if sys.platform == 'win32' else frozenset())
+    if len(excluded) == 65535:
+        raise RuntimeError('No unexcluded dual-family loopback fixture port')
+    held, filtered, attempt = [], set(), 0
     try:
-        for attempt in range(8):
+        while attempt < 8:
             ipv4 = socket.socket()
             try:
                 ipv6 = socket.socket(socket.AF_INET6)
@@ -60,13 +65,21 @@ def reserve_dual_loopback():
                 raise
             try:
                 ipv6.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+                if sys.platform == 'win32' and hasattr(socket, 'SO_EXCLUSIVEADDRUSE'):
+                    for stream in (ipv4, ipv6):
+                        stream.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
                 # Let the OS allocate and retain a free IPv4 TCP endpoint.
                 ipv4.bind(('127.0.0.1', 0))
                 port = ipv4.getsockname()[1]
-                if sys.platform == 'win32' and any(
-                        port not in windows_candidates(family) for family in (False, True)):
+                if port in excluded:
+                    if port in filtered:
+                        raise RuntimeError('OS reused a still-held excluded dual-family fixture port')
+                    filtered.add(port)
                     held.append(ipv4)
                     ipv6.close()
+                    # A configured reservation is not a live bind collision.
+                    # Keep each rejected endpoint until the whole selection
+                    # finishes; the finite exclusion set bounds these probes.
                     continue
                 ipv6.bind(('::1', port))
                 return ipv4, ipv6
@@ -78,11 +91,11 @@ def reserve_dual_loopback():
                 if (error.errno != errno.EADDRINUSE and
                         getattr(error, 'winerror', None) != 10048) or attempt == 7:
                     raise
+                attempt += 1
             except BaseException:
                 ipv4.close()
                 ipv6.close()
                 raise
-        raise RuntimeError('No eligible dual-family loopback fixture port in eight attempts')
     finally:
         for stream in held:
             stream.close()
@@ -103,18 +116,52 @@ def adopt_server(server_type, handler, stream):
 
 
 class DualLoopbackAllocationTests(unittest.TestCase):
-    def held_ipv6(self):
-        ipv4, ipv6 = reserve_dual_loopback()
-        port = ipv4.getsockname()[1]
-        ipv4.close()
-        self.addCleanup(ipv6.close)
-        return port
+    def assert_socket_roundtrip(self, stream, marker):
+        stream.listen(1)
+        stream.settimeout(2)
+        with socket.create_connection(stream.getsockname()[:2], timeout=2) as client:
+            accepted, _ = stream.accept()
+            with accepted:
+                accepted.settimeout(2)
+                client.sendall(marker)
+                self.assertEqual(exact(accepted, len(marker)), marker)
+                accepted.sendall(marker[::-1])
+                self.assertEqual(exact(client, len(marker)), marker[::-1])
+
+    @contextmanager
+    def controlled_ports(self, ports, exclusions, before_bind=None):
+        # Retain real descriptors for ownership assertions, but control bind
+        # results to exercise long reservation blocks on every CI platform.
+        native, created, requested, addresses = socket.socket, [], [], {}
+        ports = iter(ports)
+
+        def allocate(*args, **kwargs):
+            stream = native(*args, **kwargs)
+            created.append(stream)
+            return stream
+
+        def bind(stream, address):
+            requested.append((stream.family, address))
+            if before_bind is not None:
+                before_bind(stream, address, created)
+            if stream.family == socket.AF_INET:
+                self.assertEqual(address, ('127.0.0.1', 0))
+                addresses[stream] = ('127.0.0.1', next(ports))
+            else:
+                addresses[stream] = (*address, 0, 0)
+
+        with mock.patch(__name__ + '.sys.platform', 'win32'), \
+                mock.patch(__name__ + '.windows_exclusions',
+                           side_effect=lambda ipv6: exclusions[ipv6]), \
+                mock.patch.object(native, 'bind', new=bind), \
+                mock.patch.object(native, 'getsockname', new=lambda stream: addresses[stream]), \
+                mock.patch(__name__ + '.socket.socket', side_effect=allocate):
+            yield created, requested
 
     def allocate_with_collision(self, repeat):
-        port = self.held_ipv6()
         native, created = socket.socket, []
         bind = native.bind
-        forced = 0
+        rejected = []
 
         def track(*args, **kwargs):
             stream = native(*args, **kwargs)
@@ -122,10 +169,14 @@ class DualLoopbackAllocationTests(unittest.TestCase):
             return stream
 
         def collide(stream, address):
-            nonlocal forced
-            if stream.family == socket.AF_INET and (repeat or forced == 0):
-                forced += 1
-                address = ('127.0.0.1', port)
+            if stream.family == socket.AF_INET6 and (repeat or not rejected):
+                # A real exclusive incumbent may correctly produce Windows
+                # 10013. Inject only a known retryable collision here; access
+                # denial is covered separately and must never be reclassified.
+                failure = OSError(errno.EADDRINUSE, 'controlled second-family collision')
+                failure.winerror = 10048
+                rejected.append(failure)
+                raise failure
             return bind(stream, address)
 
         with mock.patch.object(native, 'bind', new=collide), \
@@ -133,15 +184,13 @@ class DualLoopbackAllocationTests(unittest.TestCase):
             if repeat:
                 with self.assertRaises(OSError) as caught:
                     reserve_dual_loopback()
-                self.assertTrue(caught.exception.errno == errno.EADDRINUSE or
-                                getattr(caught.exception, 'winerror', None) == 10048)
-                self.assertEqual(forced, 8)
+                self.assertIs(caught.exception, rejected[-1])
+                self.assertEqual(len(rejected), 8)
                 self.assertTrue(all(stream.fileno() == -1 for stream in created))
             else:
                 ipv4, ipv6 = reserve_dual_loopback()
                 self.addCleanup(ipv4.close)
                 self.addCleanup(ipv6.close)
-                self.assertNotEqual(ipv4.getsockname()[1], port)
                 self.assertEqual(ipv4.getsockname()[1], ipv6.getsockname()[1])
                 self.assertTrue(all(stream.fileno() == -1 for stream in created[:-2]))
                 self.assertGreaterEqual(len(created), 4)
@@ -151,6 +200,171 @@ class DualLoopbackAllocationTests(unittest.TestCase):
 
     def test_collision_budget_remains_eight_and_releases_every_attempt(self):
         self.allocate_with_collision(True)
+
+    def test_two_hundred_reservations_keep_ownership_and_leave_eight_collision_attempts(self):
+        blocked = list(range(32000, 32200))
+        ports = blocked + list(range(40000, 40008))
+        rejected = []
+
+        def collide(stream, address, created):
+            # Each prior rejected IPv4 owner must remain live while the OS
+            # allocates later ports, including all seven collision retries.
+            for owner in created[:min(400, len(created) - 2):2]:
+                self.assertNotEqual(owner.fileno(), -1)
+            if stream.family == socket.AF_INET6 and len(rejected) < 7:
+                failure = OSError(errno.EINVAL, 'controlled Windows collision')
+                failure.winerror = 10048
+                rejected.append(failure)
+                raise failure
+
+        excluded = (frozenset(blocked[:100]), frozenset(blocked[100:]))
+        with self.controlled_ports(ports, excluded, collide) as (created, requested):
+            ipv4, ipv6 = reserve_dual_loopback()
+            self.addCleanup(ipv4.close)
+            self.addCleanup(ipv6.close)
+            self.assertEqual(ipv4.getsockname()[1], 40007)
+            self.assertEqual(ipv6.getsockname()[1], 40007)
+            # The configured OS dynamic range may lie outside 49152..65535.
+            self.assertLess(ipv4.getsockname()[1], 49152)
+        self.assertEqual(len(rejected), 7)
+        self.assertEqual(sum(family == socket.AF_INET for family, _ in requested), 208)
+        self.assertEqual(sum(family == socket.AF_INET6 for family, _ in requested), 8)
+        self.assertTrue(all(stream.fileno() == -1 for stream in created[:-2]))
+        self.assertTrue(all(stream.fileno() != -1 for stream in created[-2:]))
+
+    def test_failure_after_reservations_closes_held_and_current_sockets(self):
+        for failing_family in (socket.AF_INET, socket.AF_INET6):
+            denied = PermissionError(errno.EACCES, 'controlled access denial')
+            denied.winerror = 10013
+            for failure in (denied, OSError(errno.ENOBUFS, 'controlled resource exhaustion'),
+                            RuntimeError('controlled non-socket failure')):
+                with self.subTest(family=failing_family, failure=type(failure).__name__):
+                    rejected = []
+
+                    def fail(stream, address, created):
+                        if len(created) == 8 and stream.family == failing_family:
+                            self.assertTrue(all(owner.fileno() != -1 for owner in created[:6:2]))
+                            rejected.append(address)
+                            raise failure
+
+                    excluded = (frozenset(range(32000, 32003)), frozenset())
+                    with self.controlled_ports([32000, 32001, 32002, 40000], excluded, fail) as (created, _):
+                        with self.assertRaises(type(failure)) as caught:
+                            reserve_dual_loopback()
+                    self.assertIs(caught.exception, failure)
+                    self.assertEqual(len(rejected), 1)
+                    self.assertEqual(len(created), 8)
+                    self.assertTrue(all(stream.fileno() == -1 for stream in created))
+
+    def test_repeated_held_excluded_port_fails_and_closes_every_socket(self):
+        excluded = (frozenset({32000}), frozenset())
+        with self.controlled_ports([32000, 32000], excluded) as (created, requested):
+            with self.assertRaisesRegex(RuntimeError, 'still-held excluded'):
+                reserve_dual_loopback()
+        self.assertEqual(len(created), 4)
+        self.assertEqual(len(requested), 2)
+        self.assertTrue(all(stream.fileno() == -1 for stream in created))
+
+    def test_windows_exclusive_and_ipv6_only_options_precede_binds(self):
+        ipv4, ipv6, calls = mock.Mock(), mock.Mock(), []
+        ipv4.getsockname.return_value = ('127.0.0.1', 40000)
+        for label, stream in (('ipv4', ipv4), ('ipv6', ipv6)):
+            stream.setsockopt.side_effect = lambda level, name, value, label=label: calls.append(
+                (label, level, name, value))
+            stream.bind.side_effect = lambda address, label=label: calls.append((label, address))
+        with mock.patch(__name__ + '.sys.platform', 'win32'), \
+                mock.patch.object(socket, 'SO_EXCLUSIVEADDRUSE', 12345, create=True), \
+                mock.patch(__name__ + '.windows_exclusions', return_value=frozenset()), \
+                mock.patch(__name__ + '.socket.socket', side_effect=(ipv4, ipv6)):
+            self.assertEqual(reserve_dual_loopback(), (ipv4, ipv6))
+        self.assertEqual(calls, [
+            ('ipv6', socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1),
+            ('ipv4', socket.SOL_SOCKET, 12345, 1),
+            ('ipv6', socket.SOL_SOCKET, 12345, 1),
+            ('ipv4', ('127.0.0.1', 0)),
+            ('ipv6', ('::1', 40000)),
+        ])
+        ipv4.close.assert_not_called()
+        ipv6.close.assert_not_called()
+
+    def test_windows_exclusion_query_failure_allocates_no_sockets(self):
+        failure = subprocess.CalledProcessError(1, ['netsh', 'controlled-query'])
+        with mock.patch(__name__ + '.sys.platform', 'win32'), \
+                mock.patch(__name__ + '.windows_exclusions', side_effect=failure), \
+                mock.patch(__name__ + '.socket.socket') as factory:
+            with self.assertRaises(subprocess.CalledProcessError) as caught:
+                reserve_dual_loopback()
+        self.assertIs(caught.exception, failure)
+        factory.assert_not_called()
+
+    def test_real_allocations_keep_both_families_and_avoid_existing_owner(self):
+        pairs = []
+        for _ in range(2):
+            pair = reserve_dual_loopback()
+            for stream in pair:
+                self.addCleanup(stream.close)
+            pairs.append(pair)
+            self.assertEqual(pair[0].getsockname()[0], '127.0.0.1')
+            self.assertEqual(pair[1].getsockname()[0], '::1')
+            self.assertEqual(pair[0].getsockname()[1], pair[1].getsockname()[1])
+            self.assertEqual(pair[1].getsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY), 1)
+            self.assert_socket_roundtrip(pair[0], b'owned-ipv4')
+            self.assert_socket_roundtrip(pair[1], b'owned-ipv6')
+        self.assertNotEqual(pairs[0][0].getsockname()[1], pairs[1][0].getsockname()[1])
+
+    def test_real_ipv6_incumbent_preserves_access_denial_or_retries_only_collision(self):
+        released, incumbent = reserve_dual_loopback()
+        port = released.getsockname()[1]
+        released.close()
+        self.addCleanup(incumbent.close)
+        incumbent.listen(1)
+        native, created, observed = socket.socket, [], []
+        bind, forced = native.bind, False
+
+        def allocate(*args, **kwargs):
+            stream = native(*args, **kwargs)
+            created.append(stream)
+            return stream
+
+        def force_second_family_collision(stream, address):
+            nonlocal forced
+            if stream.family == socket.AF_INET and not forced:
+                self.assertEqual(address, ('127.0.0.1', 0))
+                address, forced = ('127.0.0.1', port), True
+            try:
+                return bind(stream, address)
+            except OSError as error:
+                # Record the actual kernel result; never translate an exclusive
+                # owner's access denial into the retryable address-in-use code.
+                self.assertEqual(stream.family, socket.AF_INET6)
+                self.assertEqual(address, ('::1', port))
+                observed.append(error)
+                raise
+
+        with mock.patch.object(native, 'bind', new=force_second_family_collision), \
+                mock.patch(__name__ + '.socket.socket', side_effect=allocate):
+            try:
+                pair = reserve_dual_loopback()
+            except OSError as error:
+                self.assertEqual(observed, [error])
+                self.assertEqual(getattr(error, 'winerror', None), 10013)
+                self.assertEqual(len(created), 2)
+                self.assertTrue(all(stream.fileno() == -1 for stream in created))
+                outcome = 'access-denied-failed-closed'
+            else:
+                for stream in pair:
+                    self.addCleanup(stream.close)
+                self.assertEqual(len(observed), 1)
+                error = observed[0]
+                self.assertTrue(error.errno == errno.EADDRINUSE or
+                                getattr(error, 'winerror', None) == 10048)
+                self.assertNotEqual(pair[0].getsockname()[1], port)
+                self.assertEqual(pair[0].getsockname()[1], pair[1].getsockname()[1])
+                self.assertTrue(all(stream.fileno() == -1 for stream in created[:-2]))
+                outcome = 'address-in-use-retried'
+        print(f'Dual-family incumbent: errno={observed[0].errno} '
+              f'winerror={getattr(observed[0], "winerror", None)} outcome={outcome}')
+        self.assert_socket_roundtrip(incumbent, b'original-ipv6-owner')
 
     def test_unknown_access_denial_is_not_retried(self):
         native, created = socket.socket, []

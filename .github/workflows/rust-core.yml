@@ -405,6 +405,10 @@ jobs:
           netsh interface ipv6 show dynamicport udp
           netsh interface ipv6 show excludedportrange protocol=tcp
           netsh interface ipv6 show excludedportrange protocol=udp
+          # This is a later snapshot, not proof of the failed port's earlier owner.
+          # Keep local endpoint/state/PID evidence without process command lines.
+          Get-NetTCPConnection -ErrorAction Continue | Sort-Object LocalPort,LocalAddress | Select-Object LocalAddress,LocalPort,State,OwningProcess | Format-Table -AutoSize
+          Get-NetUDPEndpoint -ErrorAction Continue | Sort-Object LocalPort,LocalAddress | Select-Object LocalAddress,LocalPort,OwningProcess | Format-Table -AutoSize
       - name: Subscription to native proxy and target
         working-directory: .
         shell: pwsh

@@ -1,13 +1,14 @@
-"""Port candidates for fixtures which must hold TCP and UDP on the same port.
+"""Own OS-allocated loopback TCP/UDP pairs without treating access denial as reuse.
 
-Windows has separate protocol exclusion tables. A TCP ephemeral allocation does
-not establish that UDP may bind that port. Read the tables without changing the
-host, then let the caller reserve both real sockets. This is candidate selection,
-not permission-error recovery: callers must still propagate every access denial.
+Windows exclusion tables describe reservations, not live endpoint ownership.
+Only a successful bind owns a port. Keep the actual TCP server bound while
+checking the other protocol and creating UDP; never probe, close and rebind.
 """
+from contextlib import ExitStack
+import errno
 from functools import lru_cache
-import random
 import re
+import socket
 import subprocess
 import sys
 
@@ -35,7 +36,7 @@ def parse_exclusions(output):
 
 
 @lru_cache(maxsize=2)
-def windows_candidates(ipv6):
+def windows_exclusions(ipv6):
     # One read-only snapshot per family/process. If reservations change later,
     # the actual bind error still fails the fixture; it is never swallowed.
     family = 'ipv6' if ipv6 else 'ipv4'
@@ -49,13 +50,56 @@ def windows_candidates(ipv6):
               + result.stdout.decode('utf-8', errors='replace'), file=sys.stderr)
         for first, last in parse_exclusions(result.stdout):
             excluded.update(range(first, last + 1))
-    candidates = tuple(port for port in range(49152, 65536) if port not in excluded)
-    if not candidates:
-        raise RuntimeError(f'No unexcluded private TCP/UDP fixture port for {family}')
-    return candidates
+    return frozenset(excluded)
 
 
-def pair_port(ipv6=False):
-    if sys.platform != 'win32':
-        return 0
-    return random.SystemRandom().choice(windows_candidates(ipv6))
+class ExclusiveLoopbackBind:
+    """SocketServer mixin: own Windows endpoints before bind, without REUSEADDR."""
+
+    def server_bind(self):
+        if sys.platform == 'win32' and hasattr(socket, 'SO_EXCLUSIVEADDRUSE'):
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        super().server_bind()
+
+
+def reserve_tcp_udp(tcp_factory, udp_factory, *, ipv6=False, label='Loopback fixture'):
+    """Return two bound SocketServers; neither factory may start a thread.
+
+    TCP always requests port zero, so the OS avoids live TCP incumbents. Windows
+    TCP/UDP reservations differ: hold rejected TCP owners until selection ends,
+    so a sequential allocator can pass a whole UDP exclusion block without
+    selecting the same endpoint again. The finite exclusion set bounds those
+    prechecks separately from eight actual EADDRINUSE/10048 retries. Unknown
+    access denials (including 10013), resource and construction errors propagate.
+
+    https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-bind
+    """
+    excluded = windows_exclusions(ipv6) if sys.platform == 'win32' else frozenset()
+    if len(excluded) == 65535:
+        raise RuntimeError('No unexcluded TCP/UDP fixture port')
+    host = '::1' if ipv6 else '127.0.0.1'
+    filtered, attempt = set(), 0
+    with ExitStack() as held:
+        while attempt < 8:
+            protocol, address = 'TCP', (host, 0)
+            try:
+                with ExitStack() as cleanup:
+                    tcp = cleanup.enter_context(tcp_factory(address))
+                    port = tcp.server_address[1]
+                    if port in excluded:
+                        if port in filtered:
+                            raise RuntimeError('OS reused a still-held excluded TCP fixture port')
+                        filtered.add(port)
+                        held.callback(cleanup.pop_all().close)
+                        continue
+                    protocol, address = 'UDP', (host, port)
+                    udp = cleanup.enter_context(udp_factory(address))
+                    cleanup.pop_all()
+                return tcp, udp
+            except OSError as error:
+                collision = error.errno == errno.EADDRINUSE or getattr(error, 'winerror', None) == 10048
+                if not collision or attempt == 7:
+                    error.add_note(f'{label} {protocol} bind on loopback {address!r}; '
+                                   f'pair attempt {attempt + 1}/8')
+                    raise
+                attempt += 1

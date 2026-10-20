@@ -18,7 +18,7 @@ import types
 import unittest
 from unittest import mock
 
-from loopback_ports import pair_port, parse_exclusions, windows_candidates
+from loopback_ports import parse_exclusions, reserve_tcp_udp, windows_exclusions
 from dns_peer import DnsPeer, name
 from test_dns_tls import DotPeer
 from test_dns_https import DohPeer
@@ -27,8 +27,8 @@ from test_rust_core import Reference, Handler, certificates, exact, header
 
 class LoopbackPortSelectionTests(unittest.TestCase):
     def setUp(self):
-        windows_candidates.cache_clear()
-        self.addCleanup(windows_candidates.cache_clear)
+        windows_exclusions.cache_clear()
+        self.addCleanup(windows_exclusions.cache_clear)
 
     @staticmethod
     def table(rows=b''):
@@ -52,22 +52,23 @@ class LoopbackPortSelectionTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     parse_exclusions(output)
 
-    def test_windows_candidate_excludes_both_protocols_on_each_family(self):
+    def test_windows_exclusions_preserve_both_protocols_and_cache_each_family(self):
         commands = []
 
         def query(command, **options):
             commands.append(command)
             self.assertEqual(options, {'check': True, 'stdout': subprocess.PIPE,
                                        'stderr': subprocess.PIPE, 'timeout': 10})
-            # Exactly one private-range candidate survives the union.
-            rows = b'49152 50788' if command[-1] == 'protocol=tcp' else b'50790 65535'
+            # Preserve all numeric reservations, not only a default dynamic range.
+            rows = b'80 80\n49152 50788' if command[-1] == 'protocol=tcp' else b'50790 65535'
             return types.SimpleNamespace(stdout=self.table(rows))
 
         with mock.patch('loopback_ports.sys.platform', 'win32'), \
                 mock.patch('loopback_ports.subprocess.run', side_effect=query):
             for ipv6 in (False, True):
-                self.assertEqual(pair_port(ipv6), 50789)
-                self.assertEqual(pair_port(ipv6), 50789)
+                expected = (frozenset(range(49152, 65536)) - {50789}) | {80}
+                self.assertEqual(windows_exclusions(ipv6), expected)
+                self.assertEqual(windows_exclusions(ipv6), expected)
         self.assertEqual(commands, [
             ['netsh', 'interface', family, 'show', 'excludedportrange', f'protocol={protocol}']
             for family in ('ipv4', 'ipv6') for protocol in ('tcp', 'udp')])
@@ -77,7 +78,7 @@ class LoopbackPortSelectionTests(unittest.TestCase):
                         subprocess.CalledProcessError(1, ['netsh']),
                         subprocess.TimeoutExpired(['netsh'], 10)):
             with self.subTest(failure=type(failure).__name__):
-                windows_candidates.cache_clear()
+                windows_exclusions.cache_clear()
                 with mock.patch('loopback_ports.sys.platform', 'win32'), \
                         mock.patch('loopback_ports.subprocess.run', side_effect=failure), \
                         mock.patch.object(socketserver.TCPServer, 'server_bind') as bind, \
@@ -88,25 +89,176 @@ class LoopbackPortSelectionTests(unittest.TestCase):
                     bind.assert_not_called()
                     thread.assert_not_called()
 
-    def test_all_ports_excluded_is_a_failure_not_an_ephemeral_fallback(self):
-        result = types.SimpleNamespace(stdout=self.table(b'49152 65535'))
+    def test_all_ports_excluded_fails_before_allocating_an_endpoint(self):
+        result = types.SimpleNamespace(stdout=self.table(b'1 65535'))
         with mock.patch('loopback_ports.sys.platform', 'win32'), \
                 mock.patch('loopback_ports.subprocess.run', return_value=result), \
                 mock.patch.object(socketserver.TCPServer, 'server_bind') as bind, \
                 mock.patch('dns_peer.Thread') as thread:
-            with self.assertRaisesRegex(RuntimeError, 'No unexcluded private TCP/UDP fixture port'):
+            with self.assertRaisesRegex(RuntimeError, 'No unexcluded TCP/UDP fixture port'):
                 DnsPeer()
             bind.assert_not_called()
             thread.assert_not_called()
 
-    def test_portable_candidate_remains_os_selected_without_netsh(self):
+    def test_portable_pairs_use_os_allocation_without_querying_netsh(self):
         for platform in ('linux', 'darwin'):
-            with self.subTest(platform=platform), \
-                    mock.patch('loopback_ports.sys.platform', platform), \
-                    mock.patch('loopback_ports.subprocess.run') as query:
-                self.assertEqual(pair_port(False), 0)
-                self.assertEqual(pair_port(True), 0)
-                query.assert_not_called()
+            for ipv6 in (False, True):
+                with self.subTest(platform=platform, ipv6=ipv6):
+                    family = socket.AF_INET6 if ipv6 else socket.AF_INET
+                    requested = []
+
+                    class TCP(socketserver.TCPServer):
+                        address_family = family
+
+                    class UDP(socketserver.UDPServer):
+                        address_family = family
+
+                    def tcp_factory(address):
+                        requested.append(address)
+                        return TCP(address, socketserver.BaseRequestHandler)
+
+                    with mock.patch('loopback_ports.sys.platform', platform), \
+                            mock.patch('loopback_ports.subprocess.run') as query:
+                        tcp, udp = reserve_tcp_udp(
+                            tcp_factory, lambda address: UDP(address, socketserver.BaseRequestHandler),
+                            ipv6=ipv6)
+                    try:
+                        self.assertEqual(requested, [('::1' if ipv6 else '127.0.0.1', 0)])
+                        self.assertGreater(tcp.server_address[1], 0)
+                        self.assertEqual(tcp.socket.getsockname(), udp.socket.getsockname())
+                        query.assert_not_called()
+                    finally:
+                        tcp.server_close()
+                        udp.server_close()
+
+
+class LoopbackPairOwnershipTests(unittest.TestCase):
+    def factories(self, excluded, *, collisions=0, tcp_error=None, udp_error=None,
+                  repeated=False, selected=58000):
+        # Model a deterministic OS allocation sequence without binding chosen
+        # host ports. Every returned SocketServer owns a real descriptor; the
+        # actual bind/forwarding contract is tested separately below.
+        sequence = iter(([55000, 55000] if repeated else sorted(excluded)) + [selected] * 8)
+        trace = {'created': [], 'held': [], 'tcp': [], 'udp': [], 'collisions': []}
+
+        def held_are_open():
+            self.assertTrue(all(server.socket.fileno() != -1 for server in trace['held']))
+
+        def tcp_factory(address):
+            trace['tcp'].append(address)
+            self.assertEqual(address, ('127.0.0.1', 0))
+            held_are_open()
+            if tcp_error is not None and len(trace['tcp']) > len(excluded):
+                raise tcp_error
+            server = socketserver.TCPServer(address, socketserver.BaseRequestHandler,
+                                            bind_and_activate=False)
+            server.server_address = (address[0], next(sequence))
+            trace['created'].append(server)
+            if server.server_address[1] in excluded:
+                trace['held'].append(server)
+            return server
+
+        def udp_factory(address):
+            trace['udp'].append(address)
+            self.assertNotIn(address[1], excluded)
+            self.assertEqual(len(trace['held']), len(excluded))
+            held_are_open()
+            tcp = trace['created'][-1]
+            self.assertEqual(tcp.server_address, address)
+            self.assertNotEqual(tcp.socket.fileno(), -1)
+            if udp_error is not None:
+                raise udp_error
+            if len(trace['collisions']) < collisions:
+                error = OSError(errno.EINVAL, 'controlled UDP address collision')
+                error.winerror = 10048
+                trace['collisions'].append(error)
+                raise error
+            server = socketserver.UDPServer(address, socketserver.BaseRequestHandler,
+                                            bind_and_activate=False)
+            trace['created'].append(server)
+            return server
+
+        return tcp_factory, udp_factory, trace
+
+    def test_two_hundred_excluded_owners_are_held_without_using_collision_budget(self):
+        excluded = frozenset(range(55000, 55200))
+        tcp_factory, udp_factory, trace = self.factories(excluded, collisions=7)
+        with mock.patch('loopback_ports.sys.platform', 'win32'), \
+                mock.patch('loopback_ports.windows_exclusions', return_value=excluded):
+            tcp, udp = reserve_tcp_udp(tcp_factory, udp_factory)
+        try:
+            self.assertEqual(len(trace['held']), 200)
+            self.assertEqual(len(trace['tcp']), 208)
+            self.assertEqual(len(trace['udp']), 8)
+            self.assertEqual(len(trace['collisions']), 7)
+            self.assertEqual((tcp, udp), tuple(trace['created'][-2:]))
+            self.assertTrue(all(server.socket.fileno() == -1 for server in trace['created'][:-2]))
+            self.assertNotEqual(tcp.socket.fileno(), -1)
+            self.assertNotEqual(udp.socket.fileno(), -1)
+        finally:
+            tcp.server_close()
+            udp.server_close()
+        self.assertTrue(all(server.socket.fileno() == -1 for server in trace['created']))
+
+    def test_held_exclusions_release_when_eight_real_collisions_are_exhausted(self):
+        excluded = frozenset(range(55000, 55200))
+        tcp_factory, udp_factory, trace = self.factories(excluded, collisions=8)
+        with mock.patch('loopback_ports.sys.platform', 'win32'), \
+                mock.patch('loopback_ports.windows_exclusions', return_value=excluded):
+            with self.assertRaises(OSError) as caught:
+                reserve_tcp_udp(tcp_factory, udp_factory)
+        self.assertEqual(len(trace['tcp']), 208)
+        self.assertEqual(len(trace['udp']), 8)
+        self.assertIs(caught.exception, trace['collisions'][-1])
+        self.assertIn('pair attempt 8/8', caught.exception.__notes__[-1])
+        self.assertTrue(all(server.socket.fileno() == -1 for server in trace['created']))
+
+    def test_held_exclusions_release_on_tcp_or_udp_errors_without_retry(self):
+        excluded = frozenset(range(55000, 55200))
+        for protocol in ('tcp', 'udp'):
+            denied = PermissionError(errno.EACCES, 'controlled unknown access denial')
+            denied.winerror = 10013
+            for error in (denied, OSError(errno.ENOBUFS, 'controlled resource failure'),
+                          RuntimeError('controlled constructor failure')):
+                with self.subTest(protocol=protocol, error=type(error).__name__):
+                    tcp_factory, udp_factory, trace = self.factories(
+                        excluded, **{protocol + '_error': error})
+                    with mock.patch('loopback_ports.sys.platform', 'win32'), \
+                            mock.patch('loopback_ports.windows_exclusions', return_value=excluded):
+                        with self.assertRaises(type(error)) as caught:
+                            reserve_tcp_udp(tcp_factory, udp_factory)
+                    self.assertIs(caught.exception, error)
+                    self.assertEqual(len(trace['tcp']), 201)
+                    self.assertEqual(len(trace['udp']), int(protocol == 'udp'))
+                    self.assertEqual(len(trace['held']), 200)
+                    self.assertTrue(all(server.socket.fileno() == -1 for server in trace['created']))
+                    if isinstance(error, OSError):
+                        self.assertIn('pair attempt 1/8', error.__notes__[-1])
+
+    def test_repeated_os_result_cannot_reuse_a_still_held_excluded_owner(self):
+        excluded = frozenset({55000})
+        tcp_factory, udp_factory, trace = self.factories(excluded, repeated=True)
+        with mock.patch('loopback_ports.sys.platform', 'win32'), \
+                mock.patch('loopback_ports.windows_exclusions', return_value=excluded):
+            with self.assertRaisesRegex(RuntimeError, 'still-held excluded TCP fixture port'):
+                reserve_tcp_udp(tcp_factory, udp_factory)
+        self.assertEqual(len(trace['tcp']), 2)
+        self.assertEqual(trace['udp'], [])
+        self.assertTrue(all(server.socket.fileno() == -1 for server in trace['created']))
+
+    def test_os_dynamic_port_range_is_not_assumed_to_start_at_49152(self):
+        tcp_factory, udp_factory, trace = self.factories(frozenset(), selected=32000)
+        with mock.patch('loopback_ports.sys.platform', 'win32'), \
+                mock.patch('loopback_ports.windows_exclusions', return_value=frozenset()):
+            tcp, udp = reserve_tcp_udp(tcp_factory, udp_factory)
+        try:
+            self.assertEqual(trace['tcp'], [('127.0.0.1', 0)])
+            self.assertEqual(trace['udp'], [('127.0.0.1', 32000)])
+            self.assertEqual(tcp.server_address, udp.server_address)
+        finally:
+            tcp.server_close()
+            udp.server_close()
+        self.assertTrue(all(server.socket.fileno() == -1 for server in trace['created']))
 
 
 class DnsPeerAllocationTests(unittest.TestCase):
@@ -114,9 +266,14 @@ class DnsPeerAllocationTests(unittest.TestCase):
         # Error-only unit cases must not bind arbitrary host ports. Retain real
         # unbound descriptors so constructor/ExitStack cleanup is still checked.
         # The forwarding cases below continue to reserve and use actual sockets.
+        def bind(server):
+            if server.socket_type == socket.SOCK_STREAM:
+                self.assertEqual(server.server_address[1], 0)
+                server.server_address = (server.server_address[0], 50789)
+
         for patcher in (
-                mock.patch('dns_peer.pair_port', return_value=50789),
-                mock.patch.object(socketserver.TCPServer, 'server_bind', autospec=True),
+                mock.patch('loopback_ports.windows_exclusions', return_value=frozenset()),
+                mock.patch.object(socketserver.TCPServer, 'server_bind', autospec=True, side_effect=bind),
                 mock.patch.object(socketserver.TCPServer, 'server_activate', autospec=True)):
             patcher.start()
             self.addCleanup(patcher.stop)
@@ -150,6 +307,8 @@ class DnsPeerAllocationTests(unittest.TestCase):
                 def bind(server):
                     created.append(server)
                     requested.append((server.socket_type, server.server_address[1]))
+                    if server.socket_type == socket.SOCK_STREAM:
+                        self.assertEqual(server.server_address[1], 0)
                     if first_collision and len(created) == 1:
                         raise OSError(errno.EADDRINUSE, 'controlled first TCP collision')
                     # UDP must use the already-held TCP port, never select a
@@ -158,13 +317,13 @@ class DnsPeerAllocationTests(unittest.TestCase):
                         self.assertEqual(created[-2].socket_type, socket.SOCK_STREAM)
                         self.assertNotEqual(created[-2].socket.fileno(), -1)
                         self.assertEqual(server.server_address[1], created[-2].server_address[1])
+                        self.assertEqual(created[-2].socket.getsockname()[:2], server.server_address[:2])
                     original(server)
 
                 with mock.patch.object(socketserver.TCPServer, 'server_bind', bind):
                     peer = DnsPeer(ipv6=ipv6)
                 try:
-                    selected = peer.port if os.name == 'nt' else 0
-                    self.assertEqual(requested[-2:], [(socket.SOCK_STREAM, selected),
+                    self.assertEqual(requested[-2:], [(socket.SOCK_STREAM, 0),
                                                       (socket.SOCK_DGRAM, peer.port)])
                     self.assertGreaterEqual(len(requested), 2 + int(first_collision))
                     self.assertTrue(all(server.socket.fileno() == -1 for server in created[:-2]))
@@ -198,10 +357,59 @@ class DnsPeerAllocationTests(unittest.TestCase):
                 self.assertIs(caught.exception, failure)
                 self.assertEqual(len(rejected), 1)
                 self.assertEqual(len(created), 1 if failing_kind == socket.SOCK_STREAM else 2)
-                self.assertEqual(rejected[0][1], 50789)
+                self.assertEqual(rejected[0][1], 0 if failing_kind == socket.SOCK_STREAM else 50789)
                 protocol = 'TCP' if failing_kind == socket.SOCK_STREAM else 'UDP'
                 self.assertEqual(failure.__notes__,
                                  [f'DNS fixture {protocol} bind on loopback {rejected[0]!r}; pair attempt 1/8'])
+                self.assertTrue(all(server.socket.fileno() == -1 for server in created))
+
+    def test_os_allocation_avoids_wildcard_and_dual_stack_incumbents(self):
+        original = socketserver.TCPServer.server_bind
+        for family, host in ((socket.AF_INET, '0.0.0.0'), (socket.AF_INET6, '::')):
+            with self.subTest(family=family), socket.socket(family, socket.SOCK_STREAM) as incumbent:
+                if hasattr(socket, 'SO_EXCLUSIVEADDRUSE'):
+                    incumbent.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+                if family == socket.AF_INET6:
+                    incumbent.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+                incumbent.bind((host, 0))
+                incumbent.listen(1)
+                incumbent_port = incumbent.getsockname()[1]
+                # This is a known, still-held owner, not a reason to recover
+                # from an unknown 10013 in the allocator. Capture the actual
+                # platform protection before requesting a fresh OS endpoint.
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+                    with self.assertRaises(OSError) as caught:
+                        probe.bind(('127.0.0.1', incumbent_port))
+                protected = caught.exception
+                self.assertTrue(protected.errno == errno.EADDRINUSE or
+                                getattr(protected, 'winerror', None) in (10013, 10048))
+                print(f'Known held wildcard owner family={family.name}: '
+                      f'errno={protected.errno}, winerror={getattr(protected, "winerror", None)}')
+                created, requested = [], []
+
+                def bind(server):
+                    created.append(server)
+                    requested.append((server.socket_type, server.server_address[1]))
+                    self.assertNotEqual(incumbent.fileno(), -1)
+                    if server.socket_type == socket.SOCK_STREAM:
+                        self.assertEqual(server.server_address[1], 0)
+                    else:
+                        tcp = created[-2]
+                        self.assertNotEqual(tcp.socket.fileno(), -1)
+                        self.assertEqual(tcp.socket.getsockname(), server.server_address)
+                    original(server)
+
+                with mock.patch.object(socketserver.TCPServer, 'server_bind', bind):
+                    peer = DnsPeer()
+                try:
+                    self.assertNotEqual(peer.port, incumbent_port)
+                    self.assertEqual(requested[-2:], [(socket.SOCK_STREAM, 0),
+                                                      (socket.SOCK_DGRAM, peer.port)])
+                    self.assertIs(peer.tcp, created[-2])
+                    self.assertIs(peer.udp, created[-1])
+                    self.assert_pair_forwards(peer)
+                finally:
+                    peer.close()
                 self.assertTrue(all(server.socket.fileno() == -1 for server in created))
 
     def test_pair_retries_collision_and_releases_failed_sockets(self):
