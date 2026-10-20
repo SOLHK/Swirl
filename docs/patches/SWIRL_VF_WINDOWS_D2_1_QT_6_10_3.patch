@@ -1,0 +1,25 @@
+--- a/src/gui/text/freetype/qfontengine_ft.cpp
++++ b/src/gui/text/freetype/qfontengine_ft.cpp
+@@ -2350,6 +2350,14 @@
+                                     QPainterPath *path, QTextItem::RenderFlags)
+ {
+     FT_Face face = lockFace(Unscaled);
++    const auto unlock = qScopeGuard([this] { unlockFace(); });
++    FT_Matrix outlineMatrix;
++    FT_Vector savedDelta;
++    FT_Get_Transform(face, &outlineMatrix, &savedDelta);
++    const auto restore = qScopeGuard([&] {
++        FT_Set_Transform(face, &outlineMatrix, &savedDelta);
++    });
++    FT_Set_Transform(face, &outlineMatrix, nullptr);
+ 
+     for (int gl = 0; gl < numGlyphs; gl++) {
+         FT_UInt glyph = glyphs[gl];
+@@ -2365,7 +2373,6 @@
+             FT_GlyphSlot_Oblique(g);
+         QFreetypeFace::addGlyphToPath(face, g, positions[gl], path, xsize, ysize);
+     }
+-    unlockFace();
+ }
+ 
+ glyph_t QFontEngineFT::glyphIndex(uint ucs4) const
