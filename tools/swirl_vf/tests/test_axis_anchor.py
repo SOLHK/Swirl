@@ -10,7 +10,8 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "platform"))
 from probe_axis_anchor import (MODES, MODE_ENV, MODEL_NAMES, TAGS, add_control,
-    control_stats, declare_readback, declared_mappings, diagnostic_failure, replay_audit, selected_mode)
+    control_stats, declare_readback, declared_mappings, diagnostic_failure, direct_case,
+    profile_modes, replay_audit, selected_mode)
 from diagnose_path_types import RawSegment
 from test_verified_axis_oracle import native_record
 
@@ -116,6 +117,38 @@ class AxisAnchorTests(unittest.TestCase):
                 self.assertEqual(result, {"failure_type": "RuntimeError"})
         self.assertEqual(diagnostic_failure(ValueError("authored_public_code")),
                          {"failure_type": "ValueError", "failure_code": "authored_public_code"})
+
+    def test_fixed_profiles_keep_old_modes_and_reject_unknown_profile(self):
+        self.assertEqual(profile_modes("anchors_736"), MODES)
+        self.assertEqual(profile_modes("closure_all_faces"),
+                         ("production", "anchor_endpoint_original", "anchor_quarter_original"))
+        with self.assertRaisesRegex(ValueError, "unknown_anchor_diagnostic_profile"):
+            profile_modes("use_best_fitting_observation")
+
+    def test_closure_native_subset_is_predeclared_for_all_faces_and_actual_ranges(self):
+        axes = {tag: SimpleNamespace(minValue=lo, defaultValue=default, maxValue=hi)
+                for tag, (lo, default, hi) in zip(TAGS, ((10., 520., 1030.), (110., 510., 910.), (20., 420., 820.)))}
+        def case(point, labels=("authored",)):
+            return {"location": point, "label": labels[0], "labels": list(labels)}
+        default = {tag: a.defaultValue for tag, a in axes.items()}
+        minimum = {tag: a.minValue for tag, a in axes.items()}
+        maximum = {tag: a.maxValue for tag, a in axes.items()}
+        arbitrary = dict(WDTH=640.25, wght=470.75, HGHT=320.5)
+        planned = [case(default), case(minimum), case(maximum),
+                   case({**minimum, "HGHT": axes["HGHT"].maxValue}),
+                   case({**default, "wght": 299.9817}), case({**default, "wght": 400.01}),
+                   case(arbitrary, ("archive_123", "fresh_triple_0")),
+                   {**case(arbitrary), "historical_baseline_disagreement": True}]
+        for face in range(32):
+            for row in planned:
+                self.assertTrue(direct_case(face, row, profile="closure_all_faces", axes=axes))
+            for row in (case(arbitrary), case(arbitrary, ("fresh_triple_1",)),
+                        case({**default, "wght": 400.01, "HGHT": 421.})):
+                self.assertFalse(direct_case(face, row, profile="closure_all_faces", axes=axes))
+        with self.assertRaisesRegex(ValueError, "closure_direct_reference_axes_required"):
+            direct_case(0, case(default), profile="closure_all_faces")
+        self.assertTrue(direct_case(0, case(dict(WDTH=500., wght=400.04, HGHT=500.))))
+        self.assertFalse(direct_case(1, case(dict(WDTH=500., wght=400.04, HGHT=500.))))
 
 
 if __name__ == "__main__":

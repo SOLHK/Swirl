@@ -665,6 +665,69 @@ two six-record static groups are not raw API acceptance. The existing local
 GID-2 samples, but no independent UPEM-1024 or translated-phantom experiment
 has yet isolated its mechanism. Do not repeat the old size/CTRun experiments.
 
+## A2 next checkpoint: all 32 faces and the historical 141 as direct-native cases
+
+The preceding verified native evidence was committed as
+`0f03f7ff1e4b9ac9afe1907103b5cc13a824cc1c`, pushed non-forcibly, and independently
+confirmed at remote HEAD before this next implementation began.
+
+The fixed `closure_all_faces` profile reuses the same diagnostic transport,
+constructor, predeclared models, strict replay and independent comparisons.
+The default `anchors_736` profile retains its existing five modes and sampling.
+No production Swift, mapping, HVGL algorithm or rebuild implementation changes.
+New files are `axis_mapping_closure_cases.py`, `axis_mapping_closure_archive.py`,
+their independent test modules, the compact safe
+`tests/data/axis_mapping_archive_20261020.json`, and workflow
+`swirl-vf-axis-mapping-closure.yml`; the shared driver/test and both handoffs
+are updated.
+
+The new profile contains **5,356 positions on all 32 faces**. It invokes the
+existing `calibrate_avar_metrics.requests_for(fonts)` unchanged, retaining all
+**3,048 old requests**, their order, IDs, binary64 coordinates and duplicates.
+The 2,308 additional rows include 27 min/default/max combinations per face,
+near-default values, anchor midpoints, 300/400 boundaries, mixed axes, the
+original fractional WDTH blockage and **256 fresh three-axis holdouts** using
+seed 20961020+face. New duplicate coordinates add provenance labels to the first
+old occurrence; they never delete an archived observation.
+
+Before any native launch, `prepare_archive` binds the complete old coordinates
+to the downloaded actual native archive using per-face binary64-hex location
+and location/q hashes. The 26,285-byte fixture stores only the actual 3,048
+conditional HVAR grid integers, hashes, 141 historical failing indices and
+provenance, with no advances or paths. Fixture SHA-256 is
+`3eca463b6eb42df74565b6f25047a93f4dc9e6219d872a4ac070815f1c9b2bc1`;
+the bound original safe JSON SHA-256 is
+`1905e7a6beb77cd67424a14c567961698cda948889428090f9a0452396d4a91f`.
+That JSON comes from source `a7efe8b983a6d1a7ad8e4ce33532d40326444d64`, run
+39380682143, artifact 12244799401, whose ZIP hash is already recorded above.
+Candidate predictions never substitute for historical measurements.
+
+The direct Apple HVF subset is fixed before native execution: **all 141 old
+disagreements**, plus each face's default, eight min/max corners, first fresh
+triple, 299.9817 and 400.01 weight controls. This gives **525 positions**, each
+with GIDs 5 and 19177. All 5,356 positions also retain the four HVAR glyphs and
+GID 19177's portable/native-path comparison. The unchanged production control,
+endpoint anchor and independent quarter-point anchor each run in both orders,
+with original plus predeclared replay: **321,360 planned glyph records**.
+Native HVF observations may be reused only for an identical verified
+face/GID/design tuple; CoreText instances are never cached across requests.
+
+Final audit separates original-production archive reproduction, actual changed
+anchor q values, candidate/HVAR exactness, legacy and preserved-Q geometry,
+actual direct-native coverage, replay and request-order results. Missing direct
+native coverage for any historical-141 anchor case remains explicitly
+unresolved. Every summary retains `mapping_accepted=false` and
+`continuous_space_accepted=false`; valid numeric failures remain visible.
+
+Local frozen regression: **432/432 Python tests, zero skips, 6/6 audits**,
+15.464 seconds, `git diff --check` clean. Real private-source read-only planning
+also verified 32 faces, all 3,048 archived rows/hashes, 141 fixed old indices,
+5,356 total positions and 525 direct-reference positions. The candidate matches
+the old inferred q on those 141 archived rows locally; this is **not a new
+native result**. Enlarged native execution is pending at this source checkpoint.
+Next task: retrieve its actual final results, verify source/termination and
+every unresolved row, then save evidence before any production promotion.
+
 ## Newly retrieved prior evidence (not new execution in this continuation)
 
 - At exact source `056f7ea6dc7cf3a703da63e8522b89d33d1166f4`,

@@ -38,6 +38,8 @@ from verified_axis_oracle import ENVELOPE, VerificationError, effective_readback
 
 
 MODEL_NAMES = ("canonical_normalized16_truncate", "canonical_float32_normalized16_truncate")
+PROFILES = ("anchors_736", "closure_all_faces")
+CLOSURE_MODES = ("production", "anchor_endpoint_original", "anchor_quarter_original")
 NATIVE_ERROR_CODES = frozenset((
     "invalid_anchor_axis_range_or_target", "anchor_not_inside_source_range_or_not_distant",
     "anchor_nonfinite_optical_attribute", "anchor_expected_optical_attribute_invalid",
@@ -144,9 +146,24 @@ def add_control(stats, left, right, face, gid, location):
             "restored_segment_count": result["restored_segment_count"]}
 
 
-def direct_case(face, case):
+def profile_modes(profile):
+    require(profile in PROFILES, "unknown_anchor_diagnostic_profile")
+    return MODES if profile == "anchors_736" else CLOSURE_MODES
+
+
+def direct_case(face, case, *, profile="anchors_736", axes=None):
     """Predeclare a small direct-HVF subset, independently of observed errors."""
+    require(profile in PROFILES, "unknown_anchor_diagnostic_profile")
     point = case["location"]
+    if profile == "closure_all_faces":
+        require(axes is not None and set(axes) == set(TAGS), "closure_direct_reference_axes_required")
+        labels = case.get("labels", [case["label"]])
+        return (case.get("historical_baseline_disagreement") is True
+                or "fresh_triple_0" in labels
+                or all(point[tag] == axes[tag].defaultValue for tag in TAGS)
+                or all(point[tag] in (axes[tag].minValue, axes[tag].maxValue) for tag in TAGS)
+                or (point["wght"] in (299.9817, 400.01)
+                    and all(point[tag] == axes[tag].defaultValue for tag in ("WDTH", "HGHT"))))
     if face not in (0, 20, 24, 31):
         return False
     return (point["wght"] in (299.9817, 300.01, 400.04, 400.0401)
@@ -155,8 +172,9 @@ def direct_case(face, case):
 
 
 def evaluate_face(font, face, cases, observations, renderer, gids, mode_report, mappings,
-                  hvf_get, is_anchor):
+                  hvf_get, is_anchor, *, profile="anchors_736"):
     metrics = SourceMetrics(font)
+    axes = {a.axisTag: a for a in font["fvar"].axes}
     inference = infer_at_axis_nodes(font, axis_records(font), cases, observations)
     raw_native = [{gid: raw_coretext_paths(records[gid]["commands"]) for gid in gids}
                   for records in observations]
@@ -177,8 +195,7 @@ def evaluate_face(font, face, cases, observations, renderer, gids, mode_report, 
             row["HVAR_inference"] = inference[index]
             q = conditioned_grid(inference[index])
             row["HVAR_inferred_f2dot14"] = q
-            if q is not None and direct_case(face, case):
-                axes = {a.axisTag: a for a in font["fvar"].axes}
+            if q is not None and direct_case(face, case, profile=profile, axes=axes):
                 design = {tag: normalize(case["location"][tag], axes[tag].minValue,
                     axes[tag].defaultValue, axes[tag].maxValue) for tag in TAGS}
                 design["wght"] = q / 16384
@@ -199,7 +216,7 @@ def evaluate_face(font, face, cases, observations, renderer, gids, mode_report, 
                     raw_portable_paths([path[offset] for path in batch.paths]), raw_native[index][gid],
                     face, gid, cases[index]["location"])
                 rows[index]["model_checks"][name]["geometry"].append({"glyph_id": gid, **comparison})
-                if is_anchor and gid in (5, 19177) and direct_case(face, cases[index]):
+                if is_anchor and gid in (5, 19177) and direct_case(face, cases[index], profile=profile, axes=axes):
                     native = hvf_get(face, gid, design)
                     comparison = add_control(mode_report["models"][name]["native_HVF_geometry"],
                         native, raw_native[index][gid], face, gid, cases[index]["location"])
@@ -208,11 +225,13 @@ def evaluate_face(font, face, cases, observations, renderer, gids, mode_report, 
     return rows
 
 
-def run(source, output):
+def run(source, output, *, profile="anchors_736"):
+    modes = profile_modes(profile)
     require(not output.exists() and source.resolve() != output.resolve(), "new_report_path_required")
     require(source.stat().st_size == 61473880 and hashlib.sha256(source.read_bytes()).hexdigest() == EXPECTED,
             "exact_original_source_required")
-    report = {"status": "NOT_RUN", "source_sha256": EXPECTED, "source_commit": os.environ.get("GITHUB_SHA"),
+    report = {"status": "NOT_RUN", "diagnostic_profile": profile,
+        "source_sha256": EXPECTED, "source_commit": os.environ.get("GITHUB_SHA"),
         "platform": platform.platform(), "production_constructor_changed": False, "production_mapping_changed": False,
         "raw_avar_records_modified": False, "source_outlines_or_raw_metrics_published": False,
         "mapping_accepted": False, "font_generated": False, "outline_limit_font_units": LIMIT,
@@ -231,15 +250,42 @@ def run(source, output):
             identities = source_identities(fonts)
             ranges = {face: {a.axisTag: (a.minValue, a.defaultValue, a.maxValue) for a in font["fvar"].axes}
                       for face, font in enumerate(fonts)}
-            cases = anchor_cases(ranges)
+            if profile == "anchors_736":
+                cases = anchor_cases(ranges)
+            else:
+                from axis_mapping_closure_cases import closure_cases
+                cases = closure_cases(fonts)
+                require(tuple(cases) == tuple(range(32)), "closure_all_original_faces_required")
+                require(sum("archive_global_request_id" in case for rows in cases.values() for case in rows) == 3048,
+                        "closure_all_3048_archived_positions_required")
             requests = [(face, index) for face, rows in cases.items() for index in range(len(rows))]
             mappings = {face: [declared_mappings(fonts[face], axis_records(fonts[face]), case["location"])
                               for case in rows] for face, rows in cases.items()}
             declarations = {face: [declare_readback(case["location"]) for case in rows] for face, rows in cases.items()}
+            history = None
+            if profile == "closure_all_faces":
+                from axis_mapping_closure_archive import prepare_archive
+                history = prepare_archive(cases)
+                old_disagreements = history["baseline_disagreement_global_request_ids"]
+                require(len(old_disagreements) == 141 and len(set(old_disagreements)) == 141,
+                        "closure_all_141_historical_disagreements_required")
+                selected = set(old_disagreements)
+                for rows in cases.values():
+                    for case in rows:
+                        if case.get("archive_global_request_id") in selected:
+                            case["historical_baseline_disagreement"] = True
+                require(sum(case.get("historical_baseline_disagreement") is True
+                            for rows in cases.values() for case in rows) == 141,
+                        "closure_historical_direct_subset_missing")
             gids = sorted(set(METRIC_GIDS) | {19177})
             report.update(selected_faces=list(cases), selected_glyphs=gids, user_positions=len(requests),
-                planned_constructor_modes=list(MODES), planned_native_records=4 * len(MODES) * len(requests) * len(gids),
+                planned_constructor_modes=list(modes), planned_native_records=4 * len(modes) * len(requests) * len(gids),
                 replay_plan_declared_before_native_launch=True, model_names=list(MODEL_NAMES))
+            report["direct_native_reference_positions"] = sum(
+                direct_case(face, case, profile=profile, axes={a.axisTag:a for a in fonts[face]["fvar"].axes})
+                for face, rows in cases.items() for case in rows)
+            if history is not None:
+                report["historical_archive_declared_before_native_launch"] = True
             table_bytes = fonts[0].reader["hvgl"]
             digest = hashlib.sha256(table_bytes).hexdigest()
             require(all(hashlib.sha256(fonts[face].reader["hvgl"]).hexdigest() == digest for face in cases),
@@ -270,8 +316,8 @@ def run(source, output):
                 return cache[key]
 
             production = anchor_reference = None
-            require(MODES[0] == "production", "production_control_must_be_first")
-            for mode in MODES:
+            require(modes[0] == "production", "production_control_must_be_first")
+            for mode in modes:
                 original = {face: [None] * len(rows) for face, rows in cases.items()}
                 replayed = {face: [None] * len(rows) for face, rows in cases.items()}
                 mode_report = {"mode": mode, "status": "IN_PROGRESS", "opposite_order_pairs": 0,
@@ -333,7 +379,7 @@ def run(source, output):
                 for face, rows in cases.items():
                     report["active_context"] = {"stage": "independent_reference_comparison", "mode": mode, "face_index": face}
                     safe_rows = evaluate_face(fonts[face], face, rows, original[face], renderer, gids,
-                                              mode_report, mappings[face], hvf_get, mode != "production")
+                                              mode_report, mappings[face], hvf_get, mode != "production", profile=profile)
                     for index, row in enumerate(safe_rows):
                         row["against_production"] = [{"glyph_id": gid,
                             **compare_payloads(production[face][index][gid], original[face][index][gid])} for gid in gids]
@@ -348,6 +394,9 @@ def run(source, output):
                                   mode_report["replay_failed_batches"], "status": mode_report["status"]}), flush=True)
             require(hashlib.sha256(source.read_bytes()).hexdigest() == EXPECTED, "original_source_changed")
             report.update(source_unchanged=True, status="COMPLETED_NATIVE_ANCHOR_DIAGNOSIS_NOT_ACCEPTANCE")
+            if history is not None:
+                from axis_mapping_closure_archive import audit_archive_modes
+                report["historical_archive_comparison"] = audit_archive_modes(report, history)
             report.pop("active_context", None)
     except Exception as error:
         report.update(status="FAILED_ANCHOR_DIAGNOSIS_NOT_ACCEPTANCE", **diagnostic_failure(error))
@@ -361,5 +410,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source", type=Path)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--profile", choices=PROFILES, default="anchors_736")
     args = parser.parse_args()
-    run(args.source, args.output)
+    run(args.source, args.output, profile=args.profile)
