@@ -6,10 +6,16 @@ on:
     paths:
       - '.github/workflows/swirl-vf-a3-evidence.yml'
       - 'tools/swirl_vf/platform/axis_a3_evidence_manifest_20261020.json'
+      - 'tools/swirl_vf/platform/axis_a3_arithmetic_evidence_20261020.json'
+      - 'tools/swirl_vf/platform/axis_a3_arithmetic_native_*.zip'
+      - 'tools/swirl_vf/platform/axis_a3_windows_evidence_20261020.json'
+      - 'tools/swirl_vf/platform/axis_a3_arithmetic_handoff_20261020.md'
       - 'tools/swirl_vf/platform/axis_a3_native_*.zip'
       - 'tools/swirl_vf/platform/axis_a3_windows_contract.json'
       - 'tools/swirl_vf/platform/axis_a3_handoff_20261020.md'
       - 'tools/swirl_vf/tests/test_axis_a3_evidence.py'
+      - 'tools/swirl_vf/tests/test_axis_a3_frozen_arithmetic_evidence.py'
+      - 'tools/swirl_vf/tests/test_axis_a3_windows_evidence.py'
       - 'tools/swirl_vf/tests/test_axis_a3_windows_contract.py'
   workflow_dispatch:
 
