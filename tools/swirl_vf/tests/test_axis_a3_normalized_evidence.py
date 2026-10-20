@@ -90,6 +90,12 @@ class NativeNormalizedEvidence(unittest.TestCase):
         reports['windows-2022']['checks']['all_exact'] = 1
         with self.assertRaises(ValueError): evidence.audit_reports(reports, self.manifest)
 
+    def test_synthetic_archive_namespace_does_not_pollute_apple_evidence(self):
+        names = {item['archive_file'] for item in self.manifest['artifacts']}
+        self.assertEqual(names, {p.name for p in evidence.ROOT.glob('axis_a3_normalized_runtime_*.zip')})
+        self.assertTrue(all(name.startswith('axis_a3_normalized_runtime_') for name in names))
+        self.assertTrue(names.isdisjoint({p.name for p in evidence.ROOT.glob('axis_a3_native_*.zip')}))
+
     def test_original_archive_bytes_are_mandatory(self):
         with tempfile.TemporaryDirectory() as directory:
             for item in self.manifest['artifacts']:

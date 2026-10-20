@@ -19,7 +19,7 @@
       "runner": "linux",
       "artifact_id": 12256872753,
       "job_id": 118574758864,
-      "archive_file": "axis_a3_native_runtime_linux_73a5bc8.zip",
+      "archive_file": "axis_a3_normalized_runtime_linux_73a5bc8.zip",
       "archive_sha256": "f2066dad3df176c1e823d600b4feb97d4838137c857fb7df10bc710bd240e3d2",
       "archive_size_bytes": 2129,
       "members": {
@@ -40,7 +40,7 @@
       "runner": "windows-2022",
       "artifact_id": 12257861744,
       "job_id": 118574908949,
-      "archive_file": "axis_a3_native_runtime_windows2022_73a5bc8.zip",
+      "archive_file": "axis_a3_normalized_runtime_windows2022_73a5bc8.zip",
       "archive_sha256": "d3fe9129de206c9a74a5a1999de25b952e0ef6649510c4bc39abbbe531ae33b7",
       "archive_size_bytes": 3371,
       "members": {
@@ -65,7 +65,7 @@
       "runner": "windows-2025",
       "artifact_id": 12257711903,
       "job_id": 118574909027,
-      "archive_file": "axis_a3_native_runtime_windows2025_73a5bc8.zip",
+      "archive_file": "axis_a3_normalized_runtime_windows2025_73a5bc8.zip",
       "archive_sha256": "b63ada4c3164f96d8e4eab162e4187a707977ea717a93ed15a94311aa6306ee5",
       "archive_size_bytes": 3369,
       "members": {

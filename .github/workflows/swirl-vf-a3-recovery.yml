@@ -7,7 +7,7 @@ on:
       - '.github/workflows/swirl-vf-a3-recovery.yml'
       - 'tools/swirl_vf/platform/axis_a3_normalized_evidence.py'
       - 'tools/swirl_vf/platform/axis_a3_normalized_runtime_evidence_20261020.json'
-      - 'tools/swirl_vf/platform/axis_a3_native_runtime_*.zip'
+      - 'tools/swirl_vf/platform/axis_a3_normalized_runtime_*.zip'
       - 'tools/swirl_vf/tests/test_axis_a3_normalized_evidence.py'
   workflow_dispatch:
 
