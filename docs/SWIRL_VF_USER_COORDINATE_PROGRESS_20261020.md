@@ -4,6 +4,113 @@ This phase starts at `b5a84bfacc48e6b2a8be8f0797f34639530766c9` on
 `work/core-completion-20261017`; every push is non-forced and based on a fresh
 remote head. UI, animations and Rust Core are outside the changes.
 
+## Eighth implementation checkpoint: actual reconstruction progress and variable vertical layout
+
+Local verification: **319/319 Python tests, zero skips, plus 6/6 audit tests**.
+This includes actual optional HarfBuzz tests, not Windows/CoreText execution.
+An earlier 310-test run had one launcher subprocess hit its unchanged 20-second
+deadline. Its log is retained locally; the unchanged launcher then passed its
+isolated test in 1.521 seconds and the full 319-test suite in 13.098 seconds.
+No deadline, numerical budget or failure assertion was loosened.
+
+The latest completed native checkpoint is
+`4927316c74f935099a5648cefacc13ae0d1f2772`, parent
+`ef564245f5de600757b7283437c7daf31a1e90e9`. Its new policy passed all 91 initial
+original batches and reached the actual metric representation gate.
+
+### Original reconstruction: the axis blocker was passed, the first glyph model is still blocked
+
+Run [39370313776](https://github.com/SOLHK/Swirl/actions/runs/39370313776),
+job 118456892468, used the exact original SHA on macOS 27.0.1 / xcode-27.
+It verified **32/32 physical faces**, accepted **91/91 batches / 5,824 glyph
+observations**, and then stopped in `with_phantoms` at **face 0 / GID 0**:
+`native horizontal coordinate of vertical origin is not representable by standard vmtx`.
+No axis mismatch or replay payload failure occurred. There are still **zero
+completed original glyph models, zero completed faces and no original TTC**.
+The final native transcript was not reached; completed batch counts do not
+constitute a completed source session or resumable face checkpoint.
+
+This run did not preserve the particular training/holdout record that failed.
+The new source retains its actual user location, sample index/kind and finite
+absolute X-origin representation error, without exposing raw metric values or
+paths. The unchanged 1e-5 representation condition still rejects the discrepancy.
+Three independent tests include a late GID failure after a prior completed GID,
+a holdout failure despite a larger general metric budget, and the public-field
+allowlist. The helper does not guess the missing value in the preceding run.
+
+### Complete original synthetic TTC: actual native extraction, rebuilding and reread passed
+
+Run [39370313682](https://github.com/SOLHK/Swirl/actions/runs/39370313682),
+job 118456463254, completed the full CoreText -> v2 verifier -> explicit source
+table metrics -> builder -> saved TTC -> independent CoreText reread chain:
+
+- **2/2 faces, 3/3 GIDs per face**, all three original axis labels/ranges/flags.
+- Each face: **27 training + 38 holdout positions**, zero adaptive additions,
+  maximum sampled outline error **0.010986328125 FUnit**, metric error **zero**.
+- Accepted terminal transcript: **260 batches / 390 glyph observations**;
+  internally **520 native requests / 780 records**, zero errors, source unchanged.
+- Each face's **3 glyphs, 21 default points including phantoms and 7 gvar
+  tuples** checked after serialization; HVAR/VVAR exact coefficients checked;
+  both TTC faces retained every verified standalone table byte except the
+  permitted `head.checkSumAdjustment` field.
+- A real **3,424-byte TTC** was generated, SHA-256
+  `74168ffac87764d52b388d37b1868efb044bd119dd0757c0b6df4a0e21327485`.
+  It contains only original authored test symbols and was removed privately;
+  it is not the Apple-derived deliverable.
+- Another **58-request / 174-record** native extraction of source and candidate
+  found zero control-point, bounds and source-table-metric differences. These
+  reread coordinates are not all claimed to be previously unsampled.
+
+The separate 174-record analytic source gate and 6+6 static checks also passed.
+Their counts are separate from reconstruction. The unchanged old raw API test
+still fails at 849 versus 850 under 1/32, so the Apple job remains failure.
+The candidate's retained raw CoreText height discrepancy is at most 0.3375 in
+this sample; the source gvar-only fixture's is 1.3375. Table-derived metrics
+are labelled and never relabelled as raw API observations. This full synthetic
+success does not admit the unverified Apple avar/HVGL SourceTables policy.
+
+### Independent GPOS mechanism and actual-layout gates
+
+`experiment_vertical_gpos.py` creates eight independent geometric symbols with
+three axes, coherent HVAR/gvar phantom advances, blank and region/vertical GSUB
+cases. Adding GPOS leaves the original outline, metric, mapping and GSUB tables
+byte-identical. A GDEF ItemVariationStore and SinglePos XPlacement express
+current-width/2 minus the desired fixed X origin. Exact encoding rejects
+fractional bases/deltas; explicitly labelled rounded counterexamples retain
+their failures. No production origin is altered by this experiment.
+
+Actual local HarfBuzz 12.3.2 / uharfbuzz 0.53.3 measurement completed **3,840
+shaping calls / 15,360 glyph observations**. Of the three tested routes, `vert`
+is active in default vertical shaping; `vrt2` and `vkrn` require explicit
+activation in this harness. Default horizontal layout is unchanged, but explicit
+activation can also move horizontal text. The native GPOS shift differs from
+serialized values by at most **0.005798816681 FUnit**. HVAR width rounding leaves
+up to **0.25 FUnit** final X residual in the even fixture: within the existing
+1-FUnit rebuild budget, not a universal 1/32 exact-layout pass. A rounded
+multi-region odd-delta counterexample reaches **2 FUnits**, rejecting that
+particular independent-rounding scheme, not all possible standard encodings.
+
+The new `directwrite_vertical_layout.cpp` and Python driver exercise actual
+TextLayout4::Draw / TextRenderer1 callbacks in four independent custom font
+collections. Actual file/table identity, no simulations/fallback, Float32 axis
+inputs and real Face5 echoes, text coverage and terminal summaries are required.
+The matrix requests **4,608 layouts / 11,520 glyph observations**, including
+both writing directions, both regions, mixed text and single-character ink
+bounds at 32 coordinates. Default/explicit/disabled routes remain separate.
+The single-character fixed-origin result is not a mixed-text acceptance claim.
+Fifteen local protocol/stub tests pass; Windows native execution is pending.
+`probe_coretext_vertical_gpos.py` adds **2,016 actual layout requests** over six
+isolated source/candidate processes at seven axis points. It retains raw API,
+CTRun positions/base origins, actual CTFrameDraw/CTRunDraw and memory-raster
+comparisons separately. Candidate-minus-current-source and
+candidate-minus-source-default can distinguish a working correction from a
+source that is already fixed and would be moved twice. Nine original local
+analyzer/protocol tests pass; Swift compilation and native results are pending.
+The new workflow runs actual HarfBuzz, xcode-27 CoreText and Windows Server
+layout and publishes
+only original synthetic observations and safe metadata. It cannot certify
+Windows 11 installation, Qt/Swirl, DPI quality or an original converted font.
+
 ## Seventh implementation checkpoint: predeclare a stable replay before native observations
 
 Local verification: **280/280 Python regressions and 6/6 audit tests pass**.

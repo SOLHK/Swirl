@@ -42,7 +42,7 @@ jobs:
           import hashlib, json, os, pathlib, platform, re, subprocess, sys, tempfile
           sys.path.insert(0, str(pathlib.Path('tools/swirl_vf/tools').resolve()))
           from verified_axis_oracle import make_launcher
-          from rebuild import native_failure_details
+          from rebuild import native_failure_details, metric_failure_details
           source = pathlib.Path('/System/Library/PrivateFrameworks/FontServices.framework/Versions/A/Resources/Reserved/PingFangUI.ttc')
           expected = '39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890'
           def digest(path):
@@ -120,6 +120,8 @@ jobs:
                                   if tag in ('WDTH', 'wght', 'HGHT') and isinstance(value, (int, float))}
                           if 'native_observation' in context:
                               safe['native_observation']=native_failure_details(context['native_observation'])
+                          if 'metric_representation' in context:
+                              safe['metric_representation']=metric_failure_details(context['metric_representation'])
                           failures.append({'type':item.get('type'), 'reason':next((r for r in reasons if r in message),
                               'OTHER_PRIVATE_FAILURE'), 'face_gid':re.findall(r'face (\d+) gid (\d+)', message),
                               'context':safe})

@@ -18,9 +18,10 @@ experiments also passed. Type-2 remains explicitly enabled; Types 3/4 fail.
 This is a fixed sample, **not** all-GID, all-face user-coordinate, continuous-space
 or Windows acceptance. CoreText actually verified all 32 physical source faces,
 but the original `rebuild.py` run is still blocked before its first completed
-glyph model or face. The latest rebuild at `ef564245` passed the old sample-41
-WDTH location and retained the actual sample-44 wght counterexample: requested
-323.3597412109375, reported 323.3596. No accepted `Swirl-VF.ttc` exists.
+glyph model or face. The latest rebuild at `4927316c` accepted all 91 initial
+batches / 5,824 glyph observations with exact replay, then stopped at face 0 /
+GID 0 because the observed vertical X origin cannot be represented by vmtx alone.
+Zero original glyph models/faces are complete. No accepted `Swirl-VF.ttc` exists.
 
 The new HVAR diagnosis measured 3048 user locations / 12192 advances across 32
 faces. Raw-order avar evaluation with zero-normalized coordinates preserved
@@ -49,11 +50,21 @@ extractor remains the default. Native boundary run `39368769062` completed
 zero path/raw-metric differences across all predeclared candidates and both
 process orders. All 120 fixed second-step instances echoed exactly. This
 supports the fixed v2 policy but does not replace its every-batch native checks
-or a fresh original rebuild. Failure reports retain safe
+or every later original batch. Run `39370313776` now passed those first 91
+batches before the separate origin gate. Failure reports retain safe
 axis values, binary64 hex, original/replay phase and completed-observation
 counts. The separate boundary probe compares every predeclared numeric
 candidate and cannot grant production acceptance. Neither this adapter nor a
 successful diagnostic proves complete-font or continuous-space equivalence.
+
+Run `39370313682` did complete an original synthetic two-face, three-GID-per-face
+TTC through real CoreText paths, v2 verification, explicit source-table metrics,
+rebuilding, serialization and native reread. All three axes and exact metric
+models were retained. The 3,424-byte original synthetic TTC was removed after
+measurement. The old raw API 849/850 failure remains separately visible; this
+does not grant original Apple-font or Windows acceptance. Independent variable
+GPOS/actual TextLayout experiments now address the confirmed fixed-origin
+representation blocker; their results must precede any production use.
 
 Read the current [detailed handoff](../../docs/SWIRL_VF_USER_AXIS_HANDOFF_20261020.md),
 [geometry evidence](../../docs/SWIRL_VF_GEOMETRY_PASS_20261020.md), and

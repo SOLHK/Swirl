@@ -90,6 +90,34 @@ def check(condition, message):
         raise ReconstructionError(message)
 
 
+def metric_failure_details(record):
+    """A safe sampled metric failure, without raw origins, advances or paths."""
+    if type(record) is not dict:
+        return {}
+    result = {}
+    if record.get("field") == "vertical_origin_x":
+        result["field"] = "vertical_origin_x"
+    if type(record.get("sample_number")) is int and record["sample_number"] >= 0:
+        result["sample_number"] = record["sample_number"]
+    if record.get("sample_kind") in ("training", "holdout"):
+        result["sample_kind"] = record["sample_kind"]
+    for key in ("absolute_error_font_units", "representation_tolerance_font_units"):
+        value = record.get(key)
+        if type(value) in (int, float):
+            try:
+                finite = math.isfinite(value)
+            except OverflowError:
+                finite = False
+            if finite and value >= 0:
+                result[key] = value
+    location = record.get("user_location")
+    if type(location) is dict:
+        result["user_location"] = {tag: value for tag, value in location.items()
+            if tag in ("WDTH", "wght", "HGHT") and type(value) in (int, float)
+            and -65536 <= value <= 65536 and math.isfinite(value)}
+    return result
+
+
 def sha256(path):
     h = hashlib.sha256()
     with open(path, "rb") as stream:
@@ -205,8 +233,13 @@ def with_phantoms(points, record, source_metrics, source_vertical):
     lsb, top = float(record["lsb"]), float(record["vertical_origin_y"])
     left, vertical_x = float(record["horizontal_origin_x"]), float(record["vertical_origin_x"])
     check(all(math.isfinite(v) for v in (lsb, top, left, vertical_x)), "invalid native bearing/origin")
-    check(abs(vertical_x - (left + aw / 2)) <= 1e-5,
-          "native horizontal coordinate of vertical origin is not representable by standard vmtx")
+    origin_error = abs(vertical_x - (left + aw / 2))
+    if origin_error > 1e-5:
+        raise ReconstructionError(
+            "native horizontal coordinate of vertical origin is not representable by standard vmtx",
+            metric_representation={"field": "vertical_origin_x",
+                "absolute_error_font_units": origin_error,
+                "representation_tolerance_font_units": 1e-5})
     check(-32768 <= left <= 32767 and aw <= 65535 and ah <= 65535, "unrepresentable TrueType metrics")
     return np.vstack((points, [(left, 0), (left + aw, 0), (0, top), (0, top - ah)]))
 
@@ -222,7 +255,16 @@ def reconstruct_glyph(training, heldout, training_locations, heldout_locations_,
           "invalid reconstruction error budget")
     records = training + heldout
     coords, flags, ends, cubic_count = compatible_coordinates(records, cubic_error)
-    vectors = [with_phantoms(p, r, source_metrics, source_vertical) for p, r in zip(coords, records)]
+    vectors = []
+    for number, (points, record) in enumerate(zip(coords, records)):
+        try:
+            vectors.append(with_phantoms(points, record, source_metrics, source_vertical))
+        except ReconstructionError as error:
+            if "metric_representation" in error.context:
+                error.context["metric_representation"].update(
+                    sample_number=number, sample_kind="training" if number < len(training) else "holdout",
+                    user_location=record.get("location", {}))
+            raise
     model = VariationModel(training_locations, axisOrder=list(axes))
     default = next(i for i, location in enumerate(training_locations) if not any(location.values()))
     default_points = np.asarray([[otRound(x), otRound(y)] for x, y in coords[default]], dtype=float).reshape(-1, 2)
@@ -1016,6 +1058,8 @@ def run(source, executable, destination, report_path, batch_size=64,
         report["status"] = "BLOCKED"
         if isinstance(error, ReconstructionError) and "native_observation" in error.context:
             context = {**context, "native_observation": native_failure_details(error.context["native_observation"])}
+        if isinstance(error, ReconstructionError) and "metric_representation" in error.context:
+            context = {**context, "metric_representation": metric_failure_details(error.context["metric_representation"])}
         report["failures"].append({"type": type(error).__name__, "message": str(error),
                                    "context": context})
         raise

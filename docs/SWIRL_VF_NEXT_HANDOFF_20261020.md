@@ -14,7 +14,8 @@
 `4461798c9989d7230affc1d46560f6147b859e8c`、
 `c31edaf04f3a6369e90da026b94aa6cf8176f356`、
 `24119489f7b85fe58dea53acf3a4a6f467a6e8fa`、
-`ef564245f5de600757b7283437c7daf31a1e90e9`。并发 Core 提交
+`ef564245f5de600757b7283437c7daf31a1e90e9`、
+`4927316c74f935099a5648cefacc13ae0d1f2772`。并发 Core 提交
 `169e0cad51fc18a2d6fa4f194fafd90128bf2f7b`、
 `85f4cb916221fb64b9c07f0cd6fd85bbc7e94883`、
 `54908e2902c28ae20e2588fa5347df9b2b3d76e9`、
@@ -22,17 +23,19 @@
 完整数值、执行范围和历史失败见
 [本轮进展](SWIRL_VF_USER_COORDINATE_PROGRESS_20261020.md)。
 
-- 最新已核实字体提交 `ef564245f5de600757b7283437c7daf31a1e90e9`。
-  run [39368768983](https://github.com/SOLHK/Swirl/actions/runs/39368768983)
-  的实际原件重建越过旧 WDTH 阻塞，停在第 45 个请求
-  （face 0 / GID 0–63 / sample 44）的新小数候选反例：wght 请求
-  323.3597412109375，真实回读 323.3596，前版单次候选为 323.3597。
-  44 批 / 2,816 条已接受采样观测与完成模型分开记录；
+- 最新已核实字体提交 `4927316c74f935099a5648cefacc13ae0d1f2772`。
+  run [39370313776](https://github.com/SOLHK/Swirl/actions/runs/39370313776)
+  的实际原件重建已通过全部 91 批 / 5,824 条原件采样观测，32/32 面身份通过，
+  停在 face 0 / GID 0 的标准 vmtx 垂直 X 原点表示检查。
+  没有新轴回读失败；尚未到达完整 oracle summary。已接受观测与完成模型分开记录；
   **0 个 GID 模型完成、0/32 面完成，无 TTC**。
-- run [39368768995](https://github.com/SOLHK/Swirl/actions/runs/39368768995)
-  的 Python 277+6、Windows Server 原创 DirectWrite 夹具通过。严格原生度量仍为
+- run [39370313682](https://github.com/SOLHK/Swirl/actions/runs/39370313682)
+  实际完成原创合成 2/2 面、各 3/3 GID TTC，三轴完整；每面 27 training+38 holdout，
+  最大轮廓误差 0.010986328125 FUnit、表度量误差零。完整原生终结通过（260 批、
+  390 接受记录，内部 520 请求/780 记录），保存重开、打包及 174 条原生复测通过。
+  3,424 字节测试 TTC 实际生成后已清理，**不是苹果原件成品**。严格原生度量仍为
   849/850 失败；SourceTables 与原生路径 174 项及两组各 6 项静态检查通过。
-  实际合成完整重建也停在 sample 44，原因是 replay 的 API 回读不精确稳定。
+  API 原始误差保留，Apple job 仍为 failure；SourceTables 值不冒称原生 API 值。
 - run [39366216066](https://github.com/SOLHK/Swirl/actions/runs/39366216066)
   的 378 单字、42 混排真实绘制已完成。245 非空变化对支持固定默认 X 原点；
   当前字宽/2 解释最大错位约 100 FUnit。不是简单 API 小数显示问题，不能覆盖原点。
@@ -45,8 +48,13 @@
 - 本检查点据此实现固定 v2：原生调用前声明 C；实际 C 回读必须精确等于 C；
   整批每个 GID 的全部原始轮廓与度量必须零误差匹配。原请求数据不替换、
   原 `1e-6` 不放宽、无递归重试或第三次构造。25/25 适配专项回归已通过；
-  仍需新原件重建逐批接受所有实际使用的样本。
-- 本检查点完整 Python 回归 **280/280**、audit **6/6** 通过。
+  原件首批 91 个位置和完整原创合成重建已验证该规则，后续所有 GID 仍须逐批验证。
+- 原点失败现在附实际 sample/location 与有限误差摘要，表示门槛不放宽。独立可变
+  GPOS 实验及真正的 DirectWrite TextLayout/Renderer 验证已实现；必须先读取其
+  Windows 原生默认/显式/关闭结果，不能根据 HarfBuzz 一项行为就用于生产。
+- 本检查点 Python **319/319**（包含实际 HarfBuzz、无 skip）、audit **6/6**。
+  新增 DirectWrite 4,608 次及 CoreText 2,016 次真实布局请求的原生任务；这些是
+  将执行的数量，未读新工件前不声明 Windows/CoreText 布局通过。
 - 另修复 gvar 残差双重舍入：原创可表达反例的误差从 1.400071 降至 0.014142
   FUnit，保存重开后也通过。原有 1 FUnit 重建预算与 1/32 原算法门槛均未放宽。
 - `c31edaf` 的四个全局用户轴映射模型仍均未全部通过，最好的候选仍有 150 项失败。
