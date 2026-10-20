@@ -51,3 +51,15 @@ D2 runs with `always()` and cannot turn those failures green.
 
 Original TTC, Windows 11, Qt Quick production UI and performance: **NOT_RUN**.
 This checkpoint does not claim a shipped Qt repair or a visible UI defect.
+
+## Native configuration correction
+
+First executable checkpoint: `f7e841816888aecdba19e51457b246a2b55f569f`.
+CI: https://github.com/SOLHK/Swirl/actions/runs/39407995733 . Both Windows
+SDKs reported bundled FreeType (`QT_FEATURE_system_freetype=OFF`), but the
+external CMake consumer had not explicitly imported `Qt6GuiPrivate`. Qt 6.10
+loads private module counterparts conditionally; their absence as an imported
+target does not establish absent SDK headers. D2 now explicitly requires the
+exact private package inside its opt-in block. The original D1 configuration
+is unchanged. Source binding and unapplied patch generation succeeded; native
+D2 compilation/execution was NOT_RUN in that attempt.

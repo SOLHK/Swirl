@@ -26,6 +26,8 @@ file(WRITE "${CMAKE_BINARY_DIR}/d1-toolchain.txt"
 # Opt-in only AFTER the unchanged D1 harness has completed. Never link the
 # private ABI intervention into the primary probe or a production executable.
 if(DEFINED ENV{D2_QTBASE_SOURCE} AND DEFINED ENV{D2_PREPARED})
+  # Qt 6.10 does not implicitly import private modules for external consumers.
+  find_package(Qt6GuiPrivate 6.10.3 EXACT REQUIRED CONFIG)
   if(QT_FEATURE_system_freetype OR NOT TARGET Qt6::GuiPrivate)
     message(FATAL_ERROR "D2 requires the pinned SDK's bundled FreeType and private headers")
   endif()
