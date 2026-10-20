@@ -14,6 +14,10 @@
 #include <functional>
 
 namespace {
+const QStringList &privateSubnets(){
+ static const QStringList values{"127.0.0.0/8","10.0.0.0/8","172.16.0.0/12","192.168.0.0/16","169.254.0.0/16","100.64.0.0/10","::1/128","fc00::/7","fe80::/10"};
+ return values;
+}
 QString dnsConfiguration(const EngineStartOptions &o,QJsonObject *output){
  return SwirlRustDns::configuration(o.dnsConfig,output);
 }
@@ -118,11 +122,13 @@ QString routingConfiguration(const EngineStartOptions &o,const QString &selected
   visiting.remove(name);depths.insert(name,longest);return longest;
  };
  for(auto it=groups.cbegin();it!=groups.cend();++it)if(depth(it.key())>16)return "Rust 策略组存在循环或超过 16 层嵌套；未应用配置。";
+ QJsonObject finalRule;QHash<QByteArray,QPair<int,QString>> seenRules;
  for(const auto &line:o.customRules){
   ++index;const auto invalid=[index]{return QString("第 %1 条规则无效或 Rust 尚未支持；未忽略该规则。").arg(index);};
   if(line.size()>2300||line.contains('\n')||line.contains('\r')||line.contains(QChar(0)))return invalid();
   auto parts=line.split(',');for(auto &part:parts)part=part.trimmed();
   const auto type=parts.value(0);const bool final=type=="MATCH";
+  if(final&&o.nativePrivateRouting&&index!=o.customRules.size())return QString("MATCH 必须是最后一条用户规则；第 %1 条之后的规则不会被执行。").arg(index);
   const bool cidr=type=="IP-CIDR"||type=="IP-CIDR6";
   const bool noResolve=cidr&&parts.size()==4&&parts[3]=="no-resolve";
   if(parts.size()!=(final?2:3)&&!noResolve)return invalid();
@@ -153,8 +159,23 @@ QString routingConfiguration(const EngineStartOptions &o,const QString &selected
   else if(groups.contains(policy))outbound=groups.value(policy);
   else if(includeNode(policy))outbound=policy;
   else return invalid();
-  rules->append(QJsonObject{{"matcher",matcher},{"outbound",outbound}});
+  if(o.nativePrivateRouting){
+   const auto key=QJsonDocument(matcher).toJson(QJsonDocument::Compact);
+   if(seenRules.contains(key)&&seenRules.value(key).second!=outbound)
+    return QString("第 %1 条规则与第 %2 条规则的匹配条件相同但出站不同；前者会遮蔽后者，未应用配置。").arg(seenRules.value(key).first).arg(index);
+   if(!seenRules.contains(key))seenRules.insert(key,{index,outbound});
+  }
+  const QJsonObject mapped{{"matcher",matcher},{"outbound",outbound}};
+  if(final&&o.nativePrivateRouting)finalRule=mapped;else rules->append(mapped);
  }
+ if(o.nativePrivateRouting){
+  needsDirect=true;
+  for(const auto &subnet:privateSubnets())
+   rules->append(QJsonObject{{"matcher",QJsonObject{{"type","cidr"},{"value",subnet},{"resolve",false}}},{"outbound",direct}});
+  rules->append(QJsonObject{{"matcher",QJsonObject{{"type","domain"},{"value","localhost"}}},{"outbound",direct}});
+  rules->append(QJsonObject{{"matcher",QJsonObject{{"type","domain_suffix"},{"value","local"}}},{"outbound",direct}});
+ }
+ if(!finalRule.isEmpty())rules->append(finalRule);
  if(needsDirect)nodes->append(QJsonObject{{"id",direct},{"outbound",QJsonObject{{"type","direct"}}}});
  if(needsReject)nodes->append(QJsonObject{{"id",reject},{"outbound",QJsonObject{{"type","reject"}}}});
  if(nodes->size()>512)return invalidGroup();
@@ -171,8 +192,8 @@ RustCoreEngine::RustCoreEngine(QObject *parent):ProxyEngine(parent){
 // Shutdown during destruction must not signal those partially destroyed owners.
 RustCoreEngine::~RustCoreEngine(){disconnect();stop();}
 QString RustCoreEngine::configurationSummary()const{return "Swirl Core Rust · Mixed HTTP/SOCKS5 · 原生 TCP/有界 UDP · 无外部内核回退";}
-QString RustCoreEngine::validateNetworkConfiguration(const QList<ProxyNode> &nodes,const QVariantMap &dns,const QStringList &rules,const QVariantList &groups){
- EngineStartOptions options;options.nodes=nodes;options.dnsConfig=dns;options.customRules=rules;options.customGroups=groups;options.routingMode="rule";
+QString RustCoreEngine::validateNetworkConfiguration(const QList<ProxyNode> &nodes,const QVariantMap &dns,const QStringList &rules,const QVariantList &groups,bool nativePrivateRouting){
+ EngineStartOptions options;options.nodes=nodes;options.dnsConfig=dns;options.customRules=rules;options.customGroups=groups;options.routingMode="rule";options.nativePrivateRouting=nativePrivateRouting;
  QJsonObject mappedDns;const auto error=dnsConfiguration(options,&mappedDns);if(!error.isEmpty())return error;
  QJsonArray mapped,mappedRules,selectors;return routingConfiguration(options,{},&mapped,&mappedRules,&selectors);
 }
@@ -180,13 +201,21 @@ QString RustCoreEngine::validatePolicyGroups(const QList<ProxyNode> &nodes,const
  EngineStartOptions options;options.nodes=nodes;options.customGroups=groups;
  QJsonArray mapped,rules,selectors;return routingConfiguration(options,{},&mapped,&rules,&selectors);
 }
-QVariantList RustCoreEngine::routingRules()const{
- QVariantList rows;int order=0;const bool direct=m_options.directSession||m_options.routingMode=="direct";
- if(!direct&&m_options.routingMode=="rule")for(const auto &line:m_options.customRules){
-  const auto parts=line.split(',');const bool final=parts.value(0).trimmed()=="MATCH";
-  rows.append(QVariantMap{{"id",QString::number(order)},{"order",order},{"customIndex",order},{"type",final?"FINAL":parts.value(0).trimmed()},{"pattern",final?QString():parts.value(1).trimmed()},{"policy",parts.value(final?1:2).trimmed()},{"hits","—"}});++order;
+QVariantList RustCoreEngine::routingRules()const{return routingRulesForOptions(m_options);}
+QVariantList RustCoreEngine::routingRulesForOptions(const EngineStartOptions &options){
+ QVariantList rows;int order=0;const bool direct=options.directSession||options.routingMode=="direct";
+ QVariantMap terminal;
+ if(!direct&&options.routingMode=="rule")for(int index=0;index<options.customRules.size();++index){
+  const auto parts=options.customRules[index].split(',');const bool final=parts.value(0).trimmed()=="MATCH";
+  QVariantMap row{{"id",QString::number(index)},{"order",order},{"customIndex",index},{"type",final?"FINAL":parts.value(0).trimmed()},{"pattern",final?QString():parts.value(1).trimmed()},{"policy",parts.value(final?1:2).trimmed()},{"hits","—"}};
+  if(final&&options.nativePrivateRouting)terminal=row;else {rows.append(row);++order;}
  }
- rows.append(QVariantMap{{"id","final"},{"order",order},{"type","FINAL"},{"pattern",""},{"policy",direct?"DIRECT":"SWIRL"},{"hits","—"}});
+ if(!direct&&options.routingMode=="rule"&&options.nativePrivateRouting){
+  for(const auto &subnet:privateSubnets())rows.append(QVariantMap{{"id","private-"+QString::number(order)},{"order",order++},{"type",subnet.contains(':')?"IP-CIDR6":"IP-CIDR"},{"pattern",subnet},{"policy","DIRECT"},{"hits","—"}});
+  for(const auto &pattern:QStringList{"localhost","local"})rows.append(QVariantMap{{"id","private-"+QString::number(order)},{"order",order++},{"type",pattern=="localhost"?"DOMAIN":"DOMAIN-SUFFIX"},{"pattern",pattern},{"policy","DIRECT"},{"hits","—"}});
+  if(!terminal.isEmpty()){terminal["order"]=order++;rows.append(terminal);}
+ }
+ if(terminal.isEmpty())rows.append(QVariantMap{{"id","final"},{"order",order},{"type","FINAL"},{"pattern",""},{"policy",direct?"DIRECT":"SWIRL"},{"hits","—"}});
  return rows;
 }
 QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *output){
@@ -375,9 +404,15 @@ void RustCoreEngine::refresh(){
  m_status.state=m_status.processAlive?State::Running:State::Failed;m_status.uptimeSeconds=m_uptime.elapsed()/1000;
  m_status.connectionsAt=m_status.trafficAt=qMax(QDateTime::currentMSecsSinceEpoch(),m_status.connectionsAt+1);m_status.connections.clear();
  for(const auto &value:state["connections"].toArray()){
-  const auto row=value.toObject();const auto node=row["node"].toString();
+  const auto row=value.toObject();const auto node=row["node"].toString(),category=row["category"].toString();
+  QString proxyNode;
+  if(category=="proxy"){
+   const auto named=std::find_if(m_options.nodes.cbegin(),m_options.nodes.cend(),[&](const auto &item){return item.id==node;});
+   proxyNode=named==m_options.nodes.cend()?node:named->name;
+  }
   m_status.connections.append(QVariantMap{{"id",QString::number(row["id"].toInteger())},{"host",row["host"].toString()},{"port",row["port"].toInt()},
-   {"sourceIp",row["source_ip"].toString()},{"sourcePort",row["source_port"].toInt()},{"policy",node},{"nodeChain",QStringList{node}},{"category",row["category"].toString()},
+   {"sourceIp",row["source_ip"].toString()},{"sourcePort",row["source_port"].toInt()},{"policy",node},{"nodeChain",QStringList{node}},{"category",category},
+   {"rule",row["matched_rule"].toString()},{"outbound",category.toUpper()},{"proxyNode",proxyNode},{"transportState",row["transport_state"].toString()},
    {"closed",row["ended"].toBool()},{"uploadBytes",row["upload"].toInteger()},{"downloadBytes",row["download"].toInteger()},
    {"time",QDateTime::fromMSecsSinceEpoch(m_status.connectionsAt-row["elapsed_ms"].toInteger()).toString(Qt::ISODateWithMs)},{"process","未知进程"}});
  }

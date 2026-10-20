@@ -1606,11 +1606,119 @@ private slots:
   QCOMPARE(request(net.url()),QByteArray("DIRECT-BYPASS"));QCOMPARE(net.a.forwarded,0);
   const auto before=net.httpRequests;request(QUrl(QString("http://blocked.invalid:%1/").arg(net.http.serverPort())));
   QCOMPARE(net.httpRequests,before);QCOMPARE(net.a.forwarded,0);
-  engine.refresh();bool rejected=false;for(const auto &record:engine.status().connections){const auto row=record.toMap();if(row["host"]=="blocked.invalid"&&row["category"]=="reject")rejected=true;}QVERIFY(rejected);
+  engine.refresh();bool rejected=false,direct=false;for(const auto &record:engine.status().connections){const auto row=record.toMap();
+   if(row["host"]=="blocked.invalid"&&row["category"]=="reject"){
+    rejected=row["rule"].toString().contains("DOMAIN,blocked.invalid")&&row["outbound"]=="REJECT"&&row["transportState"]=="failed";
+   }
+   if(row["host"]=="127.0.0.1"&&row["category"]=="direct"){
+    direct=row["rule"].toString().contains("DST-PORT")&&row["outbound"]=="DIRECT"&&row["downloadBytes"].toLongLong()>0;
+   }
+  }QVERIFY(rejected);QVERIFY(direct);
   engine.setRoutingMode("global");QCOMPARE(request(net.url()),QByteArray("exit-A"));QCOMPARE(net.a.forwarded,1);
+  engine.refresh();bool proxied=false;for(const auto &record:engine.status().connections){const auto row=record.toMap();
+   if(row["category"]=="proxy"&&row["host"]=="127.0.0.1")proxied=row["rule"]=="DEFAULT"&&row["outbound"]=="PROXY"&&row["proxyNode"]=="synthetic"&&row["downloadBytes"].toLongLong()>0;
+  }QVERIFY(proxied);
   engine.setRoutingMode("rule");QCOMPARE(request(net.url()),QByteArray("DIRECT-BYPASS"));QCOMPARE(net.a.forwarded,1);
   engine.setRoutingMode("direct");QCOMPARE(request(net.url()),QByteArray("DIRECT-BYPASS"));QCOMPARE(engine.routingRules().size(),1);
   engine.selectNode(o.selectedNodeId);QVERIFY(engine.status().directSession);QCOMPARE(request(net.url()),QByteArray("DIRECT-BYPASS"));QCOMPARE(net.a.forwarded,1);
+  engine.stop();
+ }
+ void manualWindowsRulesUseTwoIndependentTargetsAndPersist(){
+  ControlledNetwork net;QVERIFY(net.start());net.a.aliases={"fallback.proxy.invalid","overseas.proxy.invalid"};
+  QTcpServer directTarget;QVERIFY(directTarget.listen(QHostAddress::LocalHost,0));int directRequests=0;
+  connect(&directTarget,&QTcpServer::newConnection,&directTarget,[&]{
+   while(directTarget.hasPendingConnections()){
+    auto *socket=directTarget.nextPendingConnection();
+    connect(socket,&QTcpSocket::disconnected,socket,&QObject::deleteLater);
+    connect(socket,&QTcpSocket::readyRead,socket,[socket,&directRequests]{
+     const auto bytes=socket->property("request").toByteArray()+socket->readAll();socket->setProperty("request",bytes);
+     if(!bytes.contains("\r\n\r\n"))return;
+     ++directRequests;socket->write("HTTP/1.1 200 OK\r\nContent-Length: 14\r\nConnection: close\r\n\r\nprivate-direct");socket->disconnectFromHost();
+    });
+   }
+  });
+  QTemporaryDir directory;QVERIFY(directory.isValid());const auto path=directory.filePath("manual-rules.dpapi");const auto o=options(net);
+  QSettings settings;const auto previous=settings.value("Proxy/routingMode");
+  const auto restore=qScopeGuard([&]{if(previous.isValid())settings.setValue("Proxy/routingMode",previous);else settings.remove("Proxy/routingMode");settings.sync();});
+  const QJsonObject imported{{"name","synthetic"},{"type","socks5"},{"server","127.0.0.1"},{"port",net.a.serverPort()}};
+  const auto directUrl=QUrl(QString("http://127.0.0.1:%1/direct").arg(directTarget.serverPort()));
+  const auto proxyUrl=QUrl(QString("http://fallback.proxy.invalid:%1/proxy").arg(net.http.serverPort()));
+  const auto overseasUrl=QUrl(QString("http://overseas.proxy.invalid:%1/overseas").arg(net.http.serverPort()));
+  const auto rejectUrl=QUrl(QString("http://ad.ads.invalid:%1/blocked").arg(net.http.serverPort()));
+  const auto request=[&](quint16 port,const QUrl &url){
+   QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",port));
+   QNetworkRequest req(url);req.setTransferTimeout(4000);auto *reply=client.get(req);
+   if(!QTest::qWaitFor([&]{return reply->isFinished();},5000))return QByteArray("timeout");
+   return reply->error()==QNetworkReply::NoError?reply->readAll():QByteArray("rejected");
+  };
+  QString id;
+  {
+   EngineController controller(std::make_unique<ThreadedEngine>(),nullptr,path,true);controller.setProxyPort(o.proxyPort);
+   controller.imports()->importText(QString::fromUtf8(QJsonDocument(QJsonObject{{"proxies",QJsonArray{imported}}}).toJson()));
+   QTRY_VERIFY_WITH_TIMEOUT(!controller.imports()->busy(),5000);QCOMPARE(controller.nodeCatalog().size(),1);
+   id=controller.nodeCatalog().first().toMap().value("id").toString();QVERIFY(controller.chooseNode(id));
+   controller.setRoutingMode("rule");controller.connectNode(id);
+   QVERIFY(controller.nodeError().contains(QString::fromUtf8("智能规则库")));QVERIFY(!controller.processAlive());
+   controller.setRoutingMode("global");controller.connectNode(id);QTRY_VERIFY_WITH_TIMEOUT(controller.apiHealthy(),5000);
+   controller.setRoutingMode("rule");QCOMPARE(controller.routingMode(),QString("global"));
+   QVERIFY(controller.routingError().contains(QString::fromUtf8("智能规则库")));QVERIFY(controller.connected());
+   QCOMPARE(QSettings().value("Proxy/routingMode").toString(),QString("global"));
+   controller.stop();QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive(),5000);controller.setRoutingMode("rule");
+   QVERIFY(controller.saveRoutingRule("DOMAIN-SUFFIX","ads.invalid","REJECT"));
+   QVERIFY(!controller.saveRoutingRule("DOMAIN-SUFFIX","ads.invalid","DIRECT"));
+   QVERIFY(controller.networkConfigurationError().contains(QString::fromUtf8("遮蔽")));
+   QVERIFY(controller.saveRoutingRule("DOMAIN","overseas.proxy.invalid","SWIRL"));
+   QVERIFY(controller.saveRoutingRule("DST-PORT",QString::number(directTarget.serverPort()),"DIRECT"));
+   const auto saved=controller.networkConfigurationSnapshot();
+   QVERIFY(!controller.saveRoutingRule("MATCH","","SWIRL",0));
+   QVERIFY(controller.networkConfigurationError().contains(QString::fromUtf8("最后一条")));
+   QCOMPARE(controller.networkConfigurationSnapshot(),saved);
+   controller.connectNode(id);QTRY_VERIFY_WITH_TIMEOUT(controller.apiHealthy(),5000);
+   QCOMPARE(request(o.proxyPort,directUrl),QByteArray("private-direct"));QCOMPARE(directRequests,1);QCOMPARE(net.a.forwarded,0);
+   QCOMPARE(request(o.proxyPort,overseasUrl),QByteArray("exit-A"));QCOMPARE(net.a.forwarded,1);
+   QCOMPARE(request(o.proxyPort,proxyUrl),QByteArray("exit-A"));QCOMPARE(net.a.forwarded,2);
+   QCOMPARE(request(o.proxyPort,net.url()),QByteArray("DIRECT-BYPASS"));QCOMPARE(net.a.forwarded,2);
+   const auto before=net.httpRequests,beforeDirect=directRequests,beforeProxy=net.a.forwarded;
+   QCOMPARE(request(o.proxyPort,rejectUrl),QByteArray("rejected"));QCOMPARE(net.httpRequests,before);
+   QCOMPARE(directRequests,beforeDirect);QCOMPARE(net.a.forwarded,beforeProxy);
+   QTRY_VERIFY_WITH_TIMEOUT([&]{for(const auto &entry:controller.telemetry()->connections())if(entry.toMap().value("host")=="ad.ads.invalid")return true;return false;}(),3000);
+   bool direct=false,proxy=false,overseas=false,reject=false;
+   for(const auto &entry:controller.telemetry()->connections()){
+    const auto row=entry.toMap();const auto host=row.value("host").toString();
+    if(host=="127.0.0.1"&&row.value("port").toInt()==directTarget.serverPort())direct=row.value("rule").toString().contains("DST-PORT")&&row.value("outbound")=="DIRECT"&&row.value("downloadBytes").toLongLong()>0;
+    if(host=="fallback.proxy.invalid")proxy=row.value("rule")=="DEFAULT"&&row.value("outbound")=="PROXY"&&row.value("proxyNode")=="synthetic"&&row.value("downloadBytes").toLongLong()>0;
+    if(host=="overseas.proxy.invalid")overseas=row.value("rule").toString().contains("DOMAIN,overseas.proxy.invalid")&&row.value("outbound")=="PROXY"&&row.value("proxyNode")=="synthetic";
+    if(host=="ad.ads.invalid")reject=row.value("rule").toString().contains("DOMAIN-SUFFIX,ads.invalid")&&row.value("outbound")=="REJECT";
+   }
+   QVERIFY(direct);QVERIFY(proxy);QVERIFY(overseas);
+   QVERIFY2(reject,qPrintable(QString::fromUtf8(QJsonDocument::fromVariant(controller.telemetry()->connections()).toJson(QJsonDocument::Compact))));
+   QVERIFY(!controller.saveRoutingRule("MATCH","","DIRECT"));QVERIFY(controller.connected());
+   QCOMPARE(request(o.proxyPort,proxyUrl),QByteArray("exit-A"));
+   controller.stop();QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive(),5000);
+  }
+  QCOMPARE(NodeStore(path).networkConfiguration()["rules"].toArray().size(),3);
+  {
+   EngineController restored(std::make_unique<ThreadedEngine>(),nullptr,path,true);restored.setProxyPort(o.proxyPort);
+   QCOMPARE(restored.selectedNodeId(),id);QCOMPARE(restored.routingMode(),QString("rule"));
+   restored.connectNode({});QTRY_VERIFY_WITH_TIMEOUT(restored.apiHealthy(),5000);
+   QCOMPARE(request(o.proxyPort,directUrl),QByteArray("private-direct"));
+   QCOMPARE(request(o.proxyPort,proxyUrl),QByteArray("exit-A"));
+   restored.stop();QTRY_VERIFY_WITH_TIMEOUT(!restored.processAlive(),5000);
+  }
+  QCOMPARE(directRequests,2);QCOMPARE(net.a.forwarded,4);
+ }
+ void nativePrivateRulesPrecedeTerminalMatch(){
+  ControlledNetwork net;QVERIFY(net.start());auto o=options(net);o.routingMode="rule";
+  o.nativePrivateRouting=true;o.customRules={"MATCH,REJECT"};
+  QJsonObject config;const auto error=RustCoreEngine::configuration(o,&config);QVERIFY2(error.isEmpty(),qPrintable(error));
+  const auto rules=config.value("rules").toArray();QVERIFY(rules.size()>2);
+  QCOMPARE(rules.first().toObject().value("matcher").toObject().value("value"),QJsonValue("127.0.0.0/8"));
+  QCOMPARE(rules.last().toObject().value("matcher").toObject().value("type"),QJsonValue("match"));
+  const auto rows=RustCoreEngine::routingRulesForOptions(o);QCOMPARE(rows.last().toMap().value("policy").toString(),QString("REJECT"));
+  RustCoreEngine engine;engine.start(o);QVERIFY2(engine.status().apiHealthy,qPrintable(engine.status().message));
+  QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",o.proxyPort));
+  auto *reply=client.get(QNetworkRequest(net.url()));QVERIFY(QTest::qWaitFor([&]{return reply->isFinished();},5000));
+  QCOMPARE(reply->error(),QNetworkReply::NoError);QCOMPARE(reply->readAll(),QByteArray("DIRECT-BYPASS"));QCOMPARE(net.a.forwarded,0);
   engine.stop();
  }
  void controllerRuleEditsPreserveNoResolve(){

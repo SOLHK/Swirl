@@ -9,6 +9,15 @@ Concurrent font commits through 72f1c20 are preserved. **79 / 6 / 10.83%** uncha
 
 # Swirl Core 固定验收与进度基线（baseline-v1，冻结范围）
 
+## 2026-10-21 Windows Rust 手工规则与测速口径检查
+
+Windows 系统代理受控公网请求、节点 HTTP 测速口径及原生手工规则阶段分别记录在
+[`CORE_WINDOWS_LIVE_PATH_20261021.md`](CORE_WINDOWS_LIVE_PATH_20261021.md)、
+[`CORE_SPEED_ACCURACY_20261021.md`](CORE_SPEED_ACCURACY_20261021.md) 与
+[`CORE_NATIVE_RULES_20261021.md`](CORE_NATIVE_RULES_20261021.md)。规则 A/B 为两个独立
+loopback 目标，尚非私人 Shadowsocks 供应商或可信 Geo 数据验收；固定 79 项、6 项、
+10.83% 基线不因此增加。
+
 ## Vision 正式组合联网本地通过（2026-10-20）
 
 REALITY P0 源码 `169e0cad` 已推送，其精确 Linux 与 App CI 已成功并核对原始工件。

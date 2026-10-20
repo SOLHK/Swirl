@@ -31,6 +31,7 @@ struct Record {
     category: &'static str,
     target: Target,
     node: String,
+    matched_rule: String,
     started: Instant,
     ended: bool,
     error: &'static str,
@@ -56,6 +57,8 @@ pub struct Connection {
     pub host: String,
     pub port: u16,
     pub node: String,
+    pub matched_rule: String,
+    pub transport_state: &'static str,
     pub ended: bool,
     pub error: &'static str,
     pub failure_stage: &'static str,
@@ -293,6 +296,12 @@ impl Core {
                     host: r.target.host.clone(),
                     port: r.target.port,
                     node: r.node.clone(),
+                    matched_rule: r.matched_rule.clone(),
+                    transport_state: if r.error.is_empty() {
+                        if r.ended { "closed" } else { "active" }
+                    } else {
+                        "failed"
+                    },
                     ended: r.ended,
                     error: r.error,
                     failure_stage: swirl_protocol::failure_stage(r.error),
@@ -371,9 +380,10 @@ async fn session(
             id,
             Record {
                 peer,
-                category: "direct",
+                category: "udp",
                 target: request.target.clone(),
                 node: "udp-routed".into(),
+                matched_rule: "PER_DATAGRAM".into(),
                 started: Instant::now(),
                 ended: false,
                 error: "",
@@ -382,9 +392,23 @@ async fn session(
         );
         return udp_associate(inbound, peer, request, plan, counters, state.totals.clone()).await;
     }
-    let (node, routed_target) = match route(&plan, &request.target, peer.ip()).await {
+    let (node, routed_target, rule_index) = match route(&plan, &request.target, peer.ip()).await {
         Ok(route) => route,
         Err(error) => {
+            state.records.lock().map_err(|_| "StatsState")?.insert(
+                id,
+                Record {
+                    peer,
+                    category: "route-error",
+                    target: request.target.clone(),
+                    node: String::new(),
+                    matched_rule: "ROUTE_ERROR".into(),
+                    started: Instant::now(),
+                    ended: false,
+                    error,
+                    counters: counters.clone(),
+                },
+            );
             let _ = swirl_protocol::reply(&mut inbound, request.kind, false).await;
             return Err(error);
         }
@@ -402,6 +426,7 @@ async fn session(
             },
             target: request.target.clone(),
             node: node.id.clone(),
+            matched_rule: swirl_routing::rule_label(config, rule_index),
             started: Instant::now(),
             ended: false,
             error: "",
@@ -445,12 +470,14 @@ async fn route<'a>(
     plan: &'a SessionPlan,
     target: &Target,
     source: std::net::IpAddr,
-) -> Result<(&'a swirl_subscription::Node, Target)> {
+) -> Result<(&'a swirl_subscription::Node, Target, Option<usize>)> {
     let config = &plan.config;
     let resolver = &plan.resolver;
     use swirl_routing::Decision;
     let choose = |id: &str| plan.policies.choose(id);
-    match swirl_routing::select_with(config, &target.host, target.port, source, None, &choose)? {
+    let selected =
+        swirl_routing::select_with_trace(config, &target.host, target.port, source, None, &choose)?;
+    match selected.decision {
         Decision::Node(node) => {
             let mut routed = target.clone();
             if config.dns.force_proxy_hosts
@@ -459,7 +486,7 @@ async fn route<'a>(
             {
                 routed.host = ip.to_string();
             }
-            Ok((node, routed))
+            Ok((node, routed, selected.matched_rule))
         }
         Decision::Resolve => {
             let addresses = timeout(
@@ -471,20 +498,22 @@ async fn route<'a>(
             // Match and dial the same address. Do not retry another DNS answer
             // under the first address's policy or let an upstream resolve again.
             let address = addresses.first().ok_or("RouteDnsEmpty")?;
-            match swirl_routing::select_with(
+            let selected = swirl_routing::select_with_trace(
                 config,
                 &target.host,
                 target.port,
                 source,
                 Some(&addresses),
                 &choose,
-            )? {
+            )?;
+            match selected.decision {
                 Decision::Node(node) => Ok((
                     node,
                     Target {
                         host: address.ip().to_string(),
                         port: target.port,
                     },
+                    selected.matched_rule,
                 )),
                 Decision::Resolve => Err("RouteDnsUnresolved"),
             }
@@ -529,7 +558,7 @@ async fn prepare_udp(
     source: std::net::IpAddr,
     permit: OwnedSemaphorePermit,
 ) -> Result<UdpDispatch> {
-    let (node, target) = route(&plan, &target, source).await?;
+    let (node, target, _) = route(&plan, &target, source).await?;
     let payload_len = payload.len();
     let (host, port, packet) = match &node.outbound {
         Outbound::Direct {} => (target.host.clone(), target.port, payload),

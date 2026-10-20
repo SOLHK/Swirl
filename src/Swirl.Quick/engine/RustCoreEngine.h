@@ -22,8 +22,9 @@ public:
  Status status() const override {return m_status;}
  QString configurationSummary() const override;
  QVariantList routingRules() const override;
+ static QVariantList routingRulesForOptions(const EngineStartOptions &);
  static QString configuration(const EngineStartOptions &,QJsonObject *);
- static QString validateNetworkConfiguration(const QList<ProxyNode> &,const QVariantMap &,const QStringList &,const QVariantList &);
+ static QString validateNetworkConfiguration(const QList<ProxyNode> &,const QVariantMap &,const QStringList &,const QVariantList &,bool nativePrivateRouting=false);
  static QString validatePolicyGroups(const QList<ProxyNode> &,const QVariantList &);
 private:
  using Command=qintptr(*)(const unsigned char *,size_t,unsigned char *,size_t);

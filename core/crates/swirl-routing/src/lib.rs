@@ -7,6 +7,11 @@ pub enum Decision<'a> {
     Resolve,
 }
 
+pub struct TracedDecision<'a> {
+    pub decision: Decision<'a>,
+    pub matched_rule: Option<usize>,
+}
+
 /// Ask for DNS only when an unresolved destination reaches a resolving CIDR.
 /// The caller retries with bounded resolver results. Earlier rules still win.
 pub fn select<'a>(
@@ -31,13 +36,25 @@ pub fn select_with<'a>(
     resolved: Option<&[SocketAddr]>,
     choose: &impl Fn(&str) -> Result<String, &'static str>,
 ) -> Result<Decision<'a>, &'static str> {
+    Ok(select_with_trace(config, host, port, source, resolved, choose)?.decision)
+}
+
+pub fn select_with_trace<'a>(
+    config: &'a Config,
+    host: &str,
+    port: u16,
+    source: IpAddr,
+    resolved: Option<&[SocketAddr]>,
+    choose: &impl Fn(&str) -> Result<String, &'static str>,
+) -> Result<TracedDecision<'a>, &'static str> {
     let host = host.to_ascii_lowercase();
     let ip = host.parse::<std::net::IpAddr>().ok();
     // Do not expose results to earlier no-resolve rules on the second pass:
     // those rules were already skipped before resolution was requested.
     let mut dns_reached = false;
     let mut id = config.selected.as_str();
-    for rule in &config.rules {
+    let mut matched_rule = None;
+    for (index, rule) in config.rules.iter().enumerate() {
         let matched = match &rule.matcher {
             Matcher::Domain { value } => host.eq_ignore_ascii_case(value),
             Matcher::DomainSuffix { value } => {
@@ -55,7 +72,10 @@ pub fn select_with<'a>(
                     if *resolve {
                         dns_reached = true;
                         if resolved.is_none() {
-                            return Ok(Decision::Resolve);
+                            return Ok(TracedDecision {
+                                decision: Decision::Resolve,
+                                matched_rule: Some(index),
+                            });
                         }
                     }
                     dns_reached
@@ -70,6 +90,7 @@ pub fn select_with<'a>(
         };
         if matched {
             id = &rule.outbound;
+            matched_rule = Some(index);
             break;
         }
     }
@@ -78,7 +99,10 @@ pub fn select_with<'a>(
     // runtime bound too, so callers cannot accidentally route unvalidated IR.
     for _ in 0..=16 {
         if let Some(node) = config.nodes.iter().find(|n| n.id == id) {
-            return Ok(Decision::Node(node));
+            return Ok(TracedDecision {
+                decision: Decision::Node(node),
+                matched_rule,
+            });
         }
         let group = config
             .selectors
@@ -95,6 +119,33 @@ pub fn select_with<'a>(
         }
     }
     Err("PolicyDepth")
+}
+
+pub fn rule_label(config: &Config, index: Option<usize>) -> String {
+    let Some((index, rule)) = index.and_then(|i| config.rules.get(i).map(|rule| (i, rule))) else {
+        return "DEFAULT".to_owned();
+    };
+    let matcher = match &rule.matcher {
+        Matcher::Domain { value } => format!("DOMAIN,{value}"),
+        Matcher::DomainSuffix { value } => format!("DOMAIN-SUFFIX,{value}"),
+        Matcher::DomainKeyword { value } => format!("DOMAIN-KEYWORD,{value}"),
+        Matcher::Cidr { value, resolve } => {
+            let kind = if value.addr().is_ipv4() {
+                "IP-CIDR"
+            } else {
+                "IP-CIDR6"
+            };
+            if *resolve {
+                format!("{kind},{value}")
+            } else {
+                format!("{kind},{value},no-resolve")
+            }
+        }
+        Matcher::SourceCidr { value } => format!("SRC-IP-CIDR,{value}"),
+        Matcher::DestinationPort { value } => format!("DST-PORT,{value}"),
+        Matcher::Match {} => "MATCH".to_owned(),
+    };
+    format!("#{} {matcher} => {}", index + 1, rule.outbound)
 }
 
 #[cfg(test)]
@@ -115,6 +166,21 @@ mod tests {
         assert_eq!(route(&c, "A.Example.org", 80, None), "allow");
         assert_eq!(route(&c, "example.org", 80, None), "allow");
         assert_eq!(route(&c, "notexample.org", 80, None), "deny");
+        let traced = select_with_trace(
+            &c,
+            "a.example.org",
+            80,
+            "127.0.0.1".parse().unwrap(),
+            None,
+            &|_| Err("NoPolicy"),
+        )
+        .unwrap();
+        assert_eq!(traced.matched_rule, Some(0));
+        assert_eq!(
+            rule_label(&c, traced.matched_rule),
+            "#1 DOMAIN-SUFFIX,example.org => allow"
+        );
+        assert_eq!(rule_label(&c, None), "DEFAULT");
     }
     #[test]
     fn dns_is_lazy_and_no_resolve_does_not_reorder_rules() {

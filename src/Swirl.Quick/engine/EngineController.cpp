@@ -106,6 +106,11 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
 #ifdef SWIRL_USE_RUST_CORE
     connect(m_engine.get(),&ProxyEngine::diagnostic,this,[this](const QString &module,const QString &code,const QString &message){
         if(module=="SwirlRust"&&(code=="SelectionUnsupported"||code=="SelectionFailed"))rollbackPendingSelection(message);
+        if(module=="SwirlRust"&&(code=="RoutingUnsupported"||code=="RoutingFailed")){
+            m_routingError=message;const auto actual=m_engine->status().mode;
+            if(!actual.isEmpty()&&actual!=m_options.routingMode){m_options.routingMode=actual;m_options.directSession=actual=="direct";QSettings().setValue("Proxy/routingMode",actual);}
+            emit statusChanged();
+        }
     });
 #endif
     connect(this,&EngineController::diagnostic,&m_diagnostics,[this](const QString &module,const QString &code,const QString &message){m_diagnostics.noteEvent(module+" / "+code,message);});
@@ -137,7 +142,8 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
         } else m_networkError=QStringLiteral("网络配置文件格式无效，未加载。");
     }
     m_nativeDocumentRouting=configuration.value("nativeDocumentRouting").toBool(false);
-    m_options.smartRouting=(storePath.isEmpty()||realAcceptance)&&!m_nativeDocumentRouting;
+    m_smartRoutingEligible=storePath.isEmpty()||realAcceptance;
+    updateRoutingFlags();
     connect(&m_systemProxy,&SystemProxySession::changed,this,[this] {
         if(!m_systemProxy.owned()&&!m_systemProxy.error().isEmpty())m_proxyRequested=false;
         const auto state=m_systemProxy.owned()?(m_systemProxy.enabled()?QStringLiteral("Swirl 已接管 Windows 系统代理"):QStringLiteral("接管状态未确认，恢复快照已保留")):QStringLiteral("Swirl 未接管 Windows 系统代理");
@@ -209,6 +215,10 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
     connect(interfaces,&QTimer::timeout,this,&EngineController::refreshLanAddresses);interfaces->start();
     QTimer::singleShot(0,this,&EngineController::refreshLanAddresses);
 }
+void EngineController::updateRoutingFlags() {
+    m_options.smartRouting=m_smartRoutingEligible&&!m_nativeDocumentRouting&&m_options.customRules.isEmpty();
+    m_options.nativePrivateRouting=m_smartRoutingEligible&&!m_nativeDocumentRouting&&!m_options.customRules.isEmpty();
+}
 QString EngineController::engineIdentityLabel() const {
     const auto status=m_engine->status();
     if(status.processAlive) {
@@ -229,6 +239,7 @@ bool EngineController::prepareRealAcceptance() {
     // Do not write QSettings, touch the system proxy, or inherit a saved TUN.
     m_options.routingMode="global";
     m_options.smartRouting=false;
+    m_options.nativePrivateRouting=false;
     m_options.tunEnabled=false;
     m_options.meteredNetwork=false;
     m_options.allowLan=false;
@@ -421,6 +432,14 @@ void EngineController::setRoutingMode(const QString &mode) {
     if(busy()||routingBusy()||nodeBusy()||(processAlive()&&!connected())) {
         m_routingError=QStringLiteral("请等待当前操作完成，并连接节点后再切换运行模式。");emit statusChanged();return;
     }
+#ifdef SWIRL_USE_RUST_CORE
+    if(processAlive()){
+        auto candidate=m_options;candidate.routingMode=mode;candidate.directSession=mode=="direct";
+        candidate.nodes=m_store.nodes();candidate.selectedNodeId=m_store.selectedId();
+        QJsonObject configuration;const auto reason=RustCoreEngine::configuration(candidate,&configuration);
+        if(!reason.isEmpty()){m_routingError=reason;emit statusChanged();return;}
+    }
+#endif
     m_routingError.clear();m_options.routingMode=mode;
 #ifdef SWIRL_USE_RUST_CORE
     m_options.directSession=mode=="direct";
@@ -523,7 +542,7 @@ bool EngineController::replaceNetworkConfiguration(const QVariantMap &input) {
     if(!canStart()){m_networkError=QStringLiteral("请先断开引擎，再应用或停用配置覆盖。");emit optionsChanged();return false;}
     QVariantMap canonical;if(!validateNetworkConfiguration(input,&canonical))return false;const auto previous=networkConfigurationSnapshot();
     m_options.dnsConfig=canonical.value("dns").toMap();m_options.customRules=canonical.value("rules").toStringList();m_options.customGroups=canonical.value("groups").toList();
-    if(saveNetworkConfiguration())return true;m_options.dnsConfig=previous.value("dns").toMap();m_options.customRules=previous.value("rules").toStringList();m_options.customGroups=previous.value("groups").toList();emit optionsChanged();return false;
+    if(saveNetworkConfiguration()){updateRoutingFlags();return true;}m_options.dnsConfig=previous.value("dns").toMap();m_options.customRules=previous.value("rules").toStringList();m_options.customGroups=previous.value("groups").toList();emit optionsChanged();return false;
 }
 QJsonObject EngineController::serializedNetworkConfiguration() {
     const auto protectedPassword=m_options.lanPassword.isEmpty()?QByteArray():protectLanPassword(m_options.lanPassword.toUtf8(),false);
@@ -544,7 +563,7 @@ bool EngineController::saveNetworkConfiguration() {
 }
 bool EngineController::commitRoutingConfiguration(const QStringList &rules,const QVariantList &groups) {
 #ifdef SWIRL_USE_RUST_CORE
-    const auto error=RustCoreEngine::validateNetworkConfiguration(m_store.nodes(),m_options.dnsConfig,rules,groups);
+    const auto error=RustCoreEngine::validateNetworkConfiguration(m_store.nodes(),m_options.dnsConfig,rules,groups,m_smartRoutingEligible&&!m_nativeDocumentRouting&&!rules.isEmpty());
     if(!error.isEmpty()){m_networkError=error;emit optionsChanged();return false;}
 #endif
     if(rules==m_options.customRules&&groups==m_options.customGroups){emit optionsChanged();return true;}
@@ -555,7 +574,7 @@ bool EngineController::commitRoutingConfiguration(const QStringList &rules,const
     snapshot["rules"]=QJsonArray::fromStringList(rules);
     snapshot["groups"]=QJsonArray::fromVariantList(groups);
     if(!m_store.saveNetworkConfiguration(snapshot)){m_networkError=m_store.error();emit optionsChanged();return false;}
-    m_options.customRules=rules;m_options.customGroups=groups;
+    m_options.customRules=rules;m_options.customGroups=groups;updateRoutingFlags();
     emit optionsChanged();emit statusChanged();return true;
 }
 bool EngineController::importNodesAndConfiguration(const QList<ProxyNode> &incoming,const QString &sourceId,const QVariantMap &input,const QJsonObject &original,const QString &sourceFormat) {
@@ -640,14 +659,14 @@ bool EngineController::importNodesAndConfiguration(const QList<ProxyNode> &incom
     }
     QVariantMap canonical;const auto nodes=plan.nodes();
     if(!validateNetworkConfiguration(mapped,&canonical,&nodes))return false;
-    const auto previous=networkConfigurationSnapshot();const bool previousNative=m_nativeDocumentRouting,previousSmart=m_options.smartRouting;
-    if(!original.isEmpty()){m_nativeDocumentRouting=true;m_options.smartRouting=false;}
+    const auto previous=networkConfigurationSnapshot();const bool previousNative=m_nativeDocumentRouting,previousSmart=m_options.smartRouting,previousPrivate=m_options.nativePrivateRouting;
+    if(!original.isEmpty()){m_nativeDocumentRouting=true;m_options.smartRouting=false;m_options.nativePrivateRouting=false;}
     m_options.dnsConfig=canonical.value("dns").toMap();m_options.customRules=canonical.value("rules").toStringList();m_options.customGroups=canonical.value("groups").toList();
     auto snapshot=serializedNetworkConfiguration();
     if(!snapshot.isEmpty() && !original.isEmpty())snapshot.insert("importedConfiguration",QJsonObject{{"format",sourceFormat},{"sourceId",sourceId},{"configuration",original}});
     if(snapshot.isEmpty() || !m_store.commitImport(plan,snapshot)) {
         if(!snapshot.isEmpty())m_networkError=m_store.error();
-        m_nativeDocumentRouting=previousNative;m_options.smartRouting=previousSmart;
+        m_nativeDocumentRouting=previousNative;m_options.smartRouting=previousSmart;m_options.nativePrivateRouting=previousPrivate;
         m_options.dnsConfig=previous.value("dns").toMap();m_options.customRules=previous.value("rules").toStringList();m_options.customGroups=previous.value("groups").toList();emit optionsChanged();return false;
     }
     m_networkError.clear();emit optionsChanged();emit statusChanged();return true;
@@ -773,6 +792,10 @@ bool EngineController::removePolicyGroup(const QString &name) {
 }
 QVariantList EngineController::routingRules() const {
     if(processAlive())return m_engine->routingRules();
+#ifdef SWIRL_USE_RUST_CORE
+    auto preview=m_options;preview.routingMode="rule";preview.directSession=false;
+    return RustCoreEngine::routingRulesForOptions(preview);
+#endif
     QVariantList rows;int order=0;
     for(const auto &line:m_options.customRules){const auto parts=routingRuleFields(line);const bool match=parts.value(0)=="MATCH";
         rows.append(QVariantMap{{"id",QString::number(order)},{"order",order},{"customIndex",order},{"type",match?"FINAL":parts.value(0)},{"pattern",match?"":parts.value(1)},{"policy",parts.value(routingRuleTargetIndex(parts))},{"hits","—"}});++order;}

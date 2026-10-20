@@ -227,4 +227,6 @@ private:
     bool m_connectionRequested=false;
     bool m_moduleOverlayActive=false;
     bool m_nativeDocumentRouting=false;
+    bool m_smartRoutingEligible=false;
+    void updateRoutingFlags();
 };
