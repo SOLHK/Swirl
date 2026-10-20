@@ -8,6 +8,7 @@
 #include <QtGui/private/qfontengine_ft_p.h>
 #include <QLibraryInfo>
 #include <QScopeGuard>
+#include <QtCore/qt_windows.h>
 #include "d2_ft_access.h"
 
 namespace {
@@ -60,6 +61,22 @@ QJsonArray d2Cache(QFontEngineFT *engine, quint32 gid, double dpr)
                                         {"data_present", g->data != nullptr}});
     }
     return entries;
+}
+QString d2LoadedGuiPath()
+{
+    HMODULE module = nullptr;
+    require(GetModuleHandleExW(0, L"Qt6Gui.dll", &module) != 0, "Qt GUI module is not loaded");
+    const auto releaseModule = qScopeGuard([&] { FreeLibrary(module); });
+    wchar_t buffer[32768];
+    const DWORD length = GetModuleFileNameW(module, buffer, 32768);
+    require(length > 0 && length < 32768, "Cannot identify loaded Qt GUI module path");
+    const QString actual = QFileInfo(QString::fromWCharArray(buffer, int(length))).canonicalFilePath();
+    const QString expected = QFileInfo(QDir(QLibraryInfo::path(QLibraryInfo::BinariesPath))
+                                      .filePath("Qt6Gui.dll")).canonicalFilePath();
+    require(!actual.isEmpty() && !expected.isEmpty()
+            && actual.compare(expected, Qt::CaseInsensitive) == 0,
+            "Loaded Qt GUI module does not match the selected SDK");
+    return actual;
 }
 QString d2FileHash(const QString &name)
 {
@@ -124,10 +141,15 @@ int main(int argc, char **argv)
         const auto baseline = pathElements(raw.pathForGlyph(ids[0]));
         require(!baseline.isEmpty(), "Empty baseline path");
         QGlyphRun run; run.setRawFont(raw); run.setGlyphIndexes(ids); run.setPositions({QPointF(0, 0)});
-        const auto runtime = QLibraryInfo::path(QLibraryInfo::BinariesPath);
-        writeRecord(log, {{"record", "header"}, {"schema", 1}, {"source_commit", qEnvironmentVariable("GITHUB_SHA")},
+        const auto runtime = d2LoadedGuiPath();
+        require(QStringLiteral(D2_BUILD_SOURCE_COMMIT) == qEnvironmentVariable("GITHUB_SHA"),
+                "Executable was compiled for another source commit");
+        writeRecord(log, {{"record", "header"}, {"schema", 2}, {"source_commit", qEnvironmentVariable("GITHUB_SHA")},
+                          {"build_source_commit", D2_BUILD_SOURCE_COMMIT}, {"qt_source_commit", D2_QT_SOURCE_COMMIT},
+                          {"freetype_header_git_blob", D2_FT_HEADER_BLOB},
+                          {"freetype_header_version", QString("%1.%2.%3").arg(FREETYPE_MAJOR).arg(FREETYPE_MINOR).arg(FREETYPE_PATCH)},
                           {"input_sha256", source.sha256}, {"qt_version", qVersion()},
-                          {"qt_gui_sha256", d2FileHash(QDir(runtime).filePath("Qt6Gui.dll"))},
+                          {"qt_gui_sha256", d2FileHash(runtime)}, {"qt_gui_path", runtime}, {"qt_gui_loaded_from_sdk", true},
                           {"freetype_version", QString("%1.%2.%3").arg(major).arg(minor).arg(patch)},
                           {"actual_backend", "QFontEngineFT"}, {"logical_dpi", dpi}, {"dpr", dpr},
                           {"hint", args[5]}, {"mode", args[6]}, {"cache_disabled", qEnvironmentVariableIntValue("QT_NO_FT_CACHE") != 0},
