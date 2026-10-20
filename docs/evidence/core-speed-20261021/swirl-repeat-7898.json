@@ -1,0 +1,166 @@
+{
+  "scope": "fixed IPv4 HTTPS 204; local HTTP proxy; TLS verified",
+  "proxyPort": 7898,
+  "targetHost": "www.gstatic.com",
+  "targetIpv4": "120.232.234.98",
+  "samplesRequested": 10,
+  "cold": [
+    {
+      "sample": 1,
+      "loopbackTcpMs": 2.985,
+      "proxyConnectMs": 43.523,
+      "verifiedTlsMs": 617.629,
+      "httpFirstByteMs": 317.712,
+      "http204Ms": 317.722,
+      "totalMs": 981.859
+    },
+    {
+      "sample": 2,
+      "loopbackTcpMs": 22.302,
+      "proxyConnectMs": 47.065,
+      "verifiedTlsMs": 601.88,
+      "httpFirstByteMs": 311.233,
+      "http204Ms": 311.242,
+      "totalMs": 982.489
+    },
+    {
+      "sample": 3,
+      "loopbackTcpMs": 23.191,
+      "proxyConnectMs": 46.51,
+      "verifiedTlsMs": 591.853,
+      "httpFirstByteMs": 315.955,
+      "http204Ms": 315.964,
+      "totalMs": 977.518
+    },
+    {
+      "sample": 4,
+      "loopbackTcpMs": 10.817,
+      "proxyConnectMs": 63.308,
+      "verifiedTlsMs": 611.851,
+      "httpFirstByteMs": 321.414,
+      "http204Ms": 321.425,
+      "totalMs": 1007.401
+    },
+    {
+      "sample": 5,
+      "loopbackTcpMs": 0.359,
+      "proxyConnectMs": 41.899,
+      "verifiedTlsMs": 589.88,
+      "httpFirstByteMs": 308.489,
+      "http204Ms": 308.499,
+      "totalMs": 940.637
+    },
+    {
+      "sample": 6,
+      "loopbackTcpMs": 17.928,
+      "proxyConnectMs": 42.672,
+      "verifiedTlsMs": 592.688,
+      "httpFirstByteMs": 303.89,
+      "http204Ms": 303.901,
+      "totalMs": 957.189
+    },
+    {
+      "sample": 7,
+      "loopbackTcpMs": 24.359,
+      "proxyConnectMs": 42.49,
+      "verifiedTlsMs": 603.503,
+      "httpFirstByteMs": 312.336,
+      "http204Ms": 312.345,
+      "totalMs": 982.697
+    },
+    {
+      "sample": 8,
+      "loopbackTcpMs": 24.137,
+      "proxyConnectMs": 45.945,
+      "verifiedTlsMs": 580.779,
+      "httpFirstByteMs": 303.458,
+      "http204Ms": 303.466,
+      "totalMs": 954.327
+    },
+    {
+      "sample": 9,
+      "loopbackTcpMs": 19.284,
+      "proxyConnectMs": 46.906,
+      "verifiedTlsMs": 606.958,
+      "httpFirstByteMs": 313.984,
+      "http204Ms": 313.993,
+      "totalMs": 987.141
+    },
+    {
+      "sample": 10,
+      "loopbackTcpMs": 0.21,
+      "proxyConnectMs": 43.736,
+      "verifiedTlsMs": 610.773,
+      "httpFirstByteMs": 318.796,
+      "http204Ms": 318.804,
+      "totalMs": 973.523
+    }
+  ],
+  "reusedConnection": [
+    {
+      "sample": 1,
+      "httpFirstByteMs": 321.386,
+      "http204Ms": 321.395
+    },
+    {
+      "sample": 2,
+      "httpFirstByteMs": 326.418,
+      "http204Ms": 326.426
+    },
+    {
+      "sample": 3,
+      "httpFirstByteMs": 326.065,
+      "http204Ms": 326.075
+    },
+    {
+      "sample": 4,
+      "httpFirstByteMs": 321.254,
+      "http204Ms": 321.263
+    },
+    {
+      "sample": 5,
+      "httpFirstByteMs": 319.646,
+      "http204Ms": 319.655
+    },
+    {
+      "sample": 6,
+      "httpFirstByteMs": 324.423,
+      "http204Ms": 324.432
+    },
+    {
+      "sample": 7,
+      "httpFirstByteMs": 330.752,
+      "http204Ms": 330.761
+    },
+    {
+      "sample": 8,
+      "httpFirstByteMs": 318.941,
+      "http204Ms": 318.95
+    },
+    {
+      "sample": 9,
+      "httpFirstByteMs": 320.439,
+      "http204Ms": 320.447
+    },
+    {
+      "sample": 10,
+      "httpFirstByteMs": 321.17,
+      "http204Ms": 321.18
+    }
+  ],
+  "errors": [],
+  "reusedConnectionSetup": {
+    "loopbackTcpMs": 22.531,
+    "proxyConnectMs": 44.964,
+    "verifiedTlsMs": 613.108
+  },
+  "coldSummary": {
+    "medianMs": 979.688,
+    "p95NearestRankMs": 1007.401
+  },
+  "reusedSummary": {
+    "medianMs": 321.329,
+    "p95NearestRankMs": 330.761
+  },
+  "pass": true
+}

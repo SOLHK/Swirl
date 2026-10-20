@@ -394,7 +394,9 @@ void RustCoreEngine::selectNode(const QString &id){
  QJsonObject config;const auto reason=configuration(options,&config);if(!reason.isEmpty()){emit diagnostic("SwirlRust","SelectionUnsupported",reason);return;}
  const auto result=call({{"op","configure"},{"handle",qint64(m_handle)},{"config",config}});
  if(!result["ok"].toBool()){emit diagnostic("SwirlRust","SelectionFailed",result["error"].toString());return;}
- m_options=options;m_status.selectedNodeId=id;m_status.directSession=options.directSession||options.routingMode=="direct";m_status.requestState=RequestState::NotTested;refresh();
+ m_options=options;m_status.selectedNodeId=id;m_status.directSession=options.directSession||options.routingMode=="direct";
+ m_status.requestState=RequestState::NotTested;m_status.nodeHealth=NodeHealth::Unknown;
+ m_status.latencyMs=-1;m_status.responseCode=0;m_status.nodeMessage.clear();refresh();
 }
 void RustCoreEngine::setRoutingMode(const QString &mode){
  if(!m_handle)return;auto options=m_options;options.routingMode=mode;options.directSession=mode=="direct";QJsonObject config;const auto reason=configuration(options,&config);
@@ -410,7 +412,8 @@ void RustCoreEngine::probeNode(const QUrl &url){
  QNetworkRequest request(url);request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,QNetworkRequest::ManualRedirectPolicy);request.setTransferTimeout(8000);request.setRawHeader("Connection","close");
  auto reply=m_network.get(request);m_reply=reply;reply->setReadBufferSize(65536);auto clock=std::make_shared<QElapsedTimer>();clock->start();
  auto deadline=new QTimer(reply);deadline->setSingleShot(true);connect(deadline,&QTimer::timeout,reply,&QNetworkReply::abort);deadline->start(9000);
- m_status.nodeBusy=true;m_status.requestState=RequestState::InProgress;emit statusChanged();
+ m_status.nodeBusy=true;m_status.requestState=RequestState::InProgress;
+ m_status.nodeHealth=NodeHealth::Checking;m_status.latencyMs=-1;m_status.responseCode=0;m_status.nodeMessage.clear();emit statusChanged();
  connect(reply,&QNetworkReply::readyRead,this,[reply]{const auto count=reply->property("count").toLongLong()+reply->readAll().size();reply->setProperty("count",count);if(count>256*1024)reply->abort();});
  connect(reply,&QNetworkReply::finished,this,[this,reply,clock]{
   m_reply=nullptr;const auto code=reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();const bool ok=reply->error()==QNetworkReply::NoError&&code>=200&&code<300;

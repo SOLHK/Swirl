@@ -38,6 +38,7 @@ void NodeTestService::start(const EngineStartOptions &options,const QStringList 
  if(!url.isValid()||(url.scheme()!="https"&&url.scheme()!="http")||url.host().isEmpty()||!url.userInfo().isEmpty()||url.hasFragment()||url.toString().size()>2048){m_message="测试地址必须为有效且不含凭据的 HTTP/HTTPS URL";emit changed();return;}
  m_options=options;m_url=url;m_completed=0;m_succeeded=0;m_failed=0;m_queue.clear();
  for(const auto &id:ids)if(!m_queue.contains(id)){bool found=false;for(const auto &n:options.nodes)if(n.id==id)found=true;if(found)m_queue.enqueue(id);}
+ for(const auto &id:m_queue)m_results.remove(id);
  m_total=m_queue.size();m_message=m_total?"正在独立测试节点":"没有可测试的节点";emit changed();next();
 }
 void NodeTestService::next(){
@@ -70,7 +71,9 @@ void NodeTestService::next(){
 }
 void NodeTestService::finish(const QString &id,ProxyEngine *runner,const QVariantMap &result){
  if(m_running.value(id)!=runner)return;m_running.remove(id);retire(runner);
- auto row=result;row["engineKind"]=runner->property("probeEngineKind");row["time"]=QDateTime::currentDateTime().toString(Qt::ISODate);m_results[id]=row;++m_completed;if(row.value("success").toBool())++m_succeeded;else{++m_failed;emit diagnostic("NodeTestFailed",row.value("error").toString());}
+ auto row=result;row["engineKind"]=runner->property("probeEngineKind");
+ if(row.value("engineKind")==QStringLiteral("rust"))row["metricType"]=QStringLiteral("http_total");
+ row["time"]=QDateTime::currentDateTime().toString(Qt::ISODate);m_results[id]=row;++m_completed;if(row.value("success").toBool())++m_succeeded;else{++m_failed;emit diagnostic("NodeTestFailed",row.value("error").toString());}
  m_message=QString("%1/%2 · 成功 %3 · 失败 %4").arg(m_completed).arg(m_total).arg(m_succeeded).arg(m_failed);emit changed();QTimer::singleShot(0,this,&NodeTestService::next);
 }
 void NodeTestService::retire(ProxyEngine *runner){

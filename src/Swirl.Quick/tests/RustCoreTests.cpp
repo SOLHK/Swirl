@@ -1824,9 +1824,26 @@ private slots:
   ControlledNetwork net;QVERIFY(net.start());auto o=options(net);o.executablePath="must-not-start-mihomo.exe";
   NodeTestService probes;probes.start(o,{o.selectedNodeId},net.url());QVERIFY(QTest::qWaitFor([&]{return !probes.busy();},6000));
   QCOMPARE(probes.succeeded(),1);QCOMPARE(probes.result(o.selectedNodeId).value("engineKind").toString(),QString("rust"));
+  QCOMPARE(probes.result(o.selectedNodeId).value("metricType").toString(),QString("http_total"));
   o.nodes.first().protocol="ss";o.nodes.first().password="synthetic";o.nodes.first().cipher="2022-blake3-aes-128-gcm";
-  probes.start(o,{o.selectedNodeId},net.url());QVERIFY(QTest::qWaitFor([&]{return !probes.busy();},3000));QCOMPARE(probes.failed(),1);
+  probes.start(o,{o.selectedNodeId},net.url());QVERIFY(!probes.result(o.selectedNodeId).value("success").toBool());
+  QVERIFY(QTest::qWaitFor([&]{return !probes.busy();},3000));QCOMPARE(probes.failed(),1);
   QCOMPARE(probes.result(o.selectedNodeId).value("engineKind").toString(),QString("rust"));
+ }
+ void switchingNodesClearsOldHttpTiming(){
+  ControlledNetwork net;QVERIFY(net.start());auto o=options(net);
+  auto second=o.nodes.first();second.id=QUuid::createUuid().toString(QUuid::WithoutBraces);second.port=net.b.serverPort();o.nodes.append(second);
+  RustCoreEngine engine;engine.start(o);QVERIFY2(engine.status().apiHealthy,qPrintable(engine.status().message));
+  engine.probeNode(net.url());
+  QVERIFY(QTest::qWaitFor([&]{return engine.status().requestState==ProxyEngine::RequestState::Succeeded;},5000));
+  QVERIFY(engine.status().latencyMs>=0);QCOMPARE(engine.status().responseCode,200);
+  engine.probeNode(net.url());QCOMPARE(engine.status().latencyMs,-1);QCOMPARE(engine.status().responseCode,0);
+  QVERIFY(QTest::qWaitFor([&]{return engine.status().requestState==ProxyEngine::RequestState::Succeeded;},5000));
+  engine.selectNode(second.id);QCOMPARE(engine.status().selectedNodeId,second.id);
+  QCOMPARE(engine.status().requestState,ProxyEngine::RequestState::NotTested);
+  QCOMPARE(engine.status().nodeHealth,ProxyEngine::NodeHealth::Unknown);
+  QCOMPARE(engine.status().latencyMs,-1);QCOMPARE(engine.status().responseCode,0);
+  engine.stop();
  }
  void unsupportedSessionRejectedAndOldStreamSurvivesBadSelection(){
   ControlledNetwork net;QVERIFY(net.start());auto o=options(net);RustCoreEngine engine;
