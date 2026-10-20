@@ -1,5 +1,11 @@
 # Swirl-VF 最新接续入口：严格用户轴验收与原件重建
 
+最新精度接续检查点见
+[SWIRL_VF_PRECISION_CHECKPOINTS_20261020.md](SWIRL_VF_PRECISION_CHECKPOINTS_20261020.md)。
+本次从真实远端 `056f7ea6dc7cf3a703da63e8522b89d33d1166f4` 继续，
+复用已有 A1 v2 逐批严格重放。默认 Swift 校验新增“非默认轴不得缺失”的独立防护；
+原生结果待读取后记录，不将 Linux harness 检查写成 CoreText 通过。
+
 **本文件已更新，旧版“剩余 178 组轮廓错误”不再是当前状态。**
 首先阅读 `docs/SWIRL_VF_USER_AXIS_HANDOFF_20261020.md`，再阅读
 `docs/SWIRL_VF_GEOMETRY_PASS_20261020.md` 与 `docs/SWIRL_VF_TRANSFORM_REPAIR_20261020.md`。

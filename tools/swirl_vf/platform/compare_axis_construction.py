@@ -17,7 +17,9 @@ import subprocess
 import tempfile
 
 EXPECTED = '39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890'
-GUARD = r'''        guard let expected = location[axis.tag], abs(effective - expected) <= 1e-6 else {
+GUARD = r'''        guard let expected = location[axis.tag],
+              (reported[axis.tag] != nil || expected == axis.defaultValue),
+              abs(effective - expected) <= 1e-6 else {
             throw OracleError.invalid("coretext_did_not_report_requested_axis_value:\(axis.tag)")
         }'''
 

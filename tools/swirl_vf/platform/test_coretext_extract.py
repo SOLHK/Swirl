@@ -25,6 +25,8 @@ from fontTools.ttLib import TTCollection, newTable
 from fontTools.ttLib.tables.TupleVariation import TupleVariation
 from fontTools.ttLib.tables._t_r_a_k import TrackData, TrackTableEntry
 
+from check_coretext_axis_guard import run_axis_guard_tests
+
 
 def make_fixture(path: Path) -> None:
     """Two TTC faces, one quadratic glyph, one blank; nonzero trak is intentional."""
@@ -219,6 +221,7 @@ def main():
         (out / "swift_compile.log").write_text(compile_result.stdout + compile_result.stderr, encoding="utf-8")
         if compile_result.returncode:
             raise RuntimeError(f"Swift compilation failed; see {out / 'swift_compile.log'}")
+    status["axis_readback_guard"] = run_axis_guard_tests(out)
     result = subprocess.run([str(binary), str(fixture)], input=request_text, capture_output=True, text=True, timeout=120)
     (out / "native_oracle_results.jsonl").write_text(result.stdout, encoding="utf-8")
     (out / "native_oracle_stderr.log").write_text(result.stderr, encoding="utf-8")

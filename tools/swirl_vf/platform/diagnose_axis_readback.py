@@ -14,6 +14,8 @@ from pathlib import Path
 import subprocess
 import tempfile
 
+from compare_axis_construction import GUARD
+
 EXPECTED = '39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890'
 
 MAIN = r'''
@@ -54,12 +56,9 @@ try diagnosticMain()
 def harness(source):
     text = source.read_text()
     prefix = text[:text.index('\nfunc run() throws {')]
-    guard = r'''        guard let expected = location[axis.tag], abs(effective - expected) <= 1e-6 else {
-            throw OracleError.invalid("coretext_did_not_report_requested_axis_value:\(axis.tag)")
-        }'''
-    if prefix.count(guard) != 1:
+    if prefix.count(GUARD) != 1:
         raise ValueError('production guard changed: review diagnosis instead of blind patching')
-    prefix = prefix.replace(guard, '        _ = effective // Observation only; no acceptance verdict.')
+    prefix = prefix.replace(GUARD, '        _ = effective // Observation only; no acceptance verdict.')
     prefix = prefix.replace('func makeInstance(', 'func diagnosticInstance(', 1)
     return prefix + MAIN.replace('SOURCE_HASH', EXPECTED)
 

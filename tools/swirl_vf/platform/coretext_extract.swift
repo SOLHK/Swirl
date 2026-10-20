@@ -387,16 +387,21 @@ func constructInstance(_ state: FaceState, _ requested: [String: Double]) throws
     return (font, location, reported)
 }
 
-func makeInstance(_ state: FaceState, _ requested: [String: Double]) throws -> (CTFont, [String: Double], [String: Double]) {
-    let (font, location, reported) = try constructInstance(state, requested)
-    let raw = state.raw
-    for axis in raw.axes {
+func validateReportedAxes(_ axes: [Axis], _ location: [String: Double], _ reported: [String: Double]) throws {
+    for axis in axes {
         // A default omitted by CoreText is allowed; a nondefault that is not reported fails.
         let effective = reported[axis.tag] ?? axis.defaultValue
-        guard let expected = location[axis.tag], abs(effective - expected) <= 1e-6 else {
+        guard let expected = location[axis.tag],
+              (reported[axis.tag] != nil || expected == axis.defaultValue),
+              abs(effective - expected) <= 1e-6 else {
             throw OracleError.invalid("coretext_did_not_report_requested_axis_value:\(axis.tag)")
         }
     }
+}
+
+func makeInstance(_ state: FaceState, _ requested: [String: Double]) throws -> (CTFont, [String: Double], [String: Double]) {
+    let (font, location, reported) = try constructInstance(state, requested)
+    try validateReportedAxes(state.raw.axes, location, reported)
     return (font, location, reported)
 }
 
