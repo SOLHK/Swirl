@@ -257,7 +257,7 @@ class VorgEvidenceTests(unittest.TestCase):
         with self.assertRaisesRegex(b1.AblationError, "ablation_source_not_changed"):
             b1.compare_variants(values)
 
-    def test_public_log_rewhitelists_native_metrics_and_recomputes_ieee_bits(self):
+    def test_public_log_excludes_original_and_variant_metric_records(self):
         values = variants()
         row = values[0]["observations"][0]
         row.update(commands=["PRIVATE_OUTLINE"], bounds=[0, 1, 2, 3], native_binary64_bits={"x": "PRIVATE_BITS"})
@@ -267,9 +267,9 @@ class VorgEvidenceTests(unittest.TestCase):
                   "source_path": "/PRIVATE_PATH", "native_metadata": {"PRIVATE": "PRIVATE"}}
         result = b1.public_log_summary(report)
         self.assertNotIn("PRIVATE", json.dumps(result))
-        bits = result["variants"][0]["observations"][0]["native_binary64_bits"]
-        self.assertEqual(bits["advance_width"], "4089000000000000")
-        self.assertEqual(bits["vertical_origin_translation"][0], "c07f400000000000")
+        self.assertNotIn("variants", result)
+        self.assertNotIn("observations", result)
+        self.assertEqual(result["public_output_scope"], "aggregate_only")
         self.assertFalse(result["production_fix_established"])
 
     def test_arbitrary_error_payload_is_never_public(self):
@@ -369,6 +369,9 @@ class PrivateNativeSessionTests(unittest.TestCase):
             line = stdout.getvalue().strip()
             self.assertTrue(line.startswith("B1_VORG_ABLATION_SUMMARY_JSON="))
             compact = json.loads(line.split("=", 1)[1])
+            self.assertEqual(compact, report)
+            self.assertNotIn("variants", report)
+            self.assertNotIn("directory_patch_verification", report)
             self.assertTrue(compact["comparison"]["original_repeat_binary64_exact"])
             self.assertNotIn("differences", compact["comparison"])
             self.assertNotIn(str(directory), json.dumps(compact))
@@ -407,3 +410,4 @@ class PrivateNativeSessionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

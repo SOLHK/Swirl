@@ -59,7 +59,7 @@ def finite(value):
 
 
 def metric_whitelist(record):
-    """Only finite numeric metric fields may cross the public report boundary."""
+    """Validate finite numeric metrics for private in-memory analysis only."""
     require(type(record) is dict and record.get("error") is None, "invalid_native_metric_record")
     result = {}
     for name in SCALARS:
@@ -226,38 +226,73 @@ def finish_observations(report, oracle, expected_requests, expected_records):
     return 0 if passed else 1
 
 
-def public_log_summary(report):
-    """Publish the already-filtered report's numeric evidence, never raw records.
+# Public reports are a separate aggregate schema, not a filtered native record.
+# Do not add free-form strings, face/GID keys, locations, hashes, table details,
+# observations, metric values, differences, or binary64 payloads here.
+PUBLIC_STATUSES = frozenset((
+    "NOT_RUN", "FINITE_SAMPLE_CHECKS_PASS_NOT_ORIGINAL_ACCEPTANCE",
+    "STRICT_ORIGINAL_METRIC_CHECK_FAILED", "ORIGINAL_METRIC_CHECK_EXECUTION_ERROR",
+    "SOURCE_IDENTITY_FAILED", "VORG_ABLATION_REJECTION_OR_REPEAT_FAILURE",
+    "DIAGNOSTICS_COMPLETE_ORIGINAL_PRODUCTION_REPRESENTATION_FAILED",
+    "BOUNDED_VORG_ABLATION_COMPLETE_NOT_FIX", "VORG_ABLATION_EXECUTION_ERROR",
+    "ORIGINAL_SOURCE_IDENTITY_FAILED"))
+PUBLIC_BOOLEAN_FIELDS = (
+    "diagnostics_complete", "experiment_complete", "source_unchanged",
+    "original_font_accepted", "font_output_generated", "original_outlines_published",
+    "original_font_published", "variant_font_published", "continuous_space_acceptance",
+    "production_extract_or_rebuild_modified", "production_entrypoints_modified",
+    "production_fix_established", "source_table_metrics_replace_native",
+    "private_temporary_protocol_files_removed", "private_temporary_font_and_protocol_files_removed",
+    "diagnostics_complete_and_original_repeat_stable", "strict_original_representation_pass")
+PUBLIC_COUNT_FIELDS = (
+    "strict_metric_failures", "reference_unavailable_count", "representation_failures",
+    "physical_faces_verified", "original_faces_reconstructed", "original_glyph_models_completed",
+    "strict_original_representation_failed_count")
+PUBLIC_FINALIZATION_COUNTS = (
+    "request_count", "successful_glyph_count", "error_count", "verified_batch_count",
+    "internal_native_request_count", "internal_native_glyph_count")
+PUBLIC_COMPARISON_BOOLEANS = (
+    "original_repeat_numeric_exact", "original_repeat_binary64_exact",
+    "all_native_fields_unchanged", "measured_differences_invented")
+PUBLIC_GATE_BOOLEANS = (
+    "strict_original_representation_pass", "strict_original_representation_complete",
+    "source_table_equivalence_rechecked")
+PUBLIC_GATE_COUNTS = (
+    "strict_original_representation_failed_count", "strict_original_representation_checked_count",
+    "additional_native_requests")
 
-    This makes the bounded evidence independently recoverable from CI logs when
-    artifacts cannot be downloaded. Complete physical table identities and
-    timestamps remain in the report file; no native payload is serialized here.
-    Counts are null before finalization, rather than a misleading zero.
+
+def _public_fields(values, booleans=(), counts=()):
+    """Copy only exact primitive types; malformed/missing fields stay unknown."""
+    values = values if type(values) is dict else {}
+    result = {key: values.get(key) if type(values.get(key)) is bool else None
+              for key in booleans}
+    for key in counts:
+        value = values.get(key)
+        result[key] = value if type(value) is int and 0 <= value <= 2**53 - 1 else None
+    return result
+
+
+def public_log_summary(report):
+    """Aggregate-only allowlist shared by stdout and the public JSON artifact.
+
+    Full observations remain in process memory for strict checks only. Unknown
+    fields and arbitrary failure messages are never serialized. Counts are null
+    before finalization, rather than a misleading zero. Gate semantics and exit
+    codes are unchanged; diagnostic completion is not original-font acceptance.
     """
-    keys = ("schema_version", "status", "diagnostics_complete", "native_finalization",
-            "strict_metric_failures", "reference_unavailable_count", "representation_failures",
-            "physical_faces_verified", "source_sha256", "observed_source_sha256", "source_commit",
-            "native_binary_sha256", "verified_axis_launcher_sha256", "source_unchanged", "platform",
-            "sampled_faces", "sampled_glyphs", "plan", "original_font_accepted",
-            "original_faces_reconstructed", "original_glyph_models_completed", "font_output_generated",
-            "original_outlines_published", "original_font_published", "continuous_space_acceptance",
-            "windows_acceptance", "production_extract_or_rebuild_modified",
-            "source_table_metrics_replace_native", "strict_metric_tolerance_font_units",
-            "production_representation_tolerance_font_units", "private_temporary_protocol_files_removed",
-            "failure")
-    result = {key: report.get(key) for key in keys}
-    row_keys = ("face_index", "glyph_id", "case", "user_location", "stored_metrics",
-                "source_table_reference_basis", "source_table_reference", "vertical_x_candidates",
-                "strict_source_table_comparison", "production_representation")
-    result["observations"] = []
-    for row in report["observations"]:
-        item = {key: row[key] for key in row_keys if key in row}
-        # Reapply the native metric whitelist and regenerate bit patterns rather
-        # than forwarding any additional field or untrusted stored hex string.
-        item["native_metrics"] = native = metric_whitelist(row["native_metrics"])
-        item["native_scalar_binary64_hex"] = {
-            key: struct.pack(">d", float(native[key])).hex() for key in SCALARS}
-        result["observations"].append(item)
+    report = report if type(report) is dict else {}
+    status = report.get("status")
+    result = {"schema_version": 2, "public_output_scope": "aggregate_only",
+              "status": status if type(status) is str and status in PUBLIC_STATUSES
+              else "UNRECOGNIZED_STATUS_NOT_ACCEPTED"}
+    result.update(_public_fields(report, PUBLIC_BOOLEAN_FIELDS, PUBLIC_COUNT_FIELDS))
+    result["native_finalization"] = _public_fields(
+        report.get("native_finalization"), ("source_unchanged",), PUBLIC_FINALIZATION_COUNTS)
+    result["comparison"] = _public_fields(report.get("comparison"),
+        PUBLIC_COMPARISON_BOOLEANS, ("samples", "original_repeat_samples"))
+    result["original_representation_gate"] = _public_fields(
+        report.get("original_representation_gate"), PUBLIC_GATE_BOOLEANS, PUBLIC_GATE_COUNTS)
     return result
 
 
@@ -359,7 +394,7 @@ def run(source, binary, output):
             code = 1
         report["ended_utc"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
         with output.open("x", encoding="utf-8") as stream:
-            json.dump(report, stream, indent=2, allow_nan=False)
+            json.dump(public_log_summary(report), stream, indent=2, allow_nan=False)
             stream.write("\n")
     print("B1_ORIGINAL_SUMMARY_JSON=" + json.dumps(public_log_summary(report),
           separators=(",", ":"), allow_nan=False), flush=True)
@@ -370,10 +405,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--binary", type=Path, required=True)
-    parser.add_argument("--output", type=Path, required=True, help="New JSON report file")
+    parser.add_argument("--output", type=Path, required=True, help="New aggregate-only public JSON report file")
     args = parser.parse_args()
     return run(args.source, args.binary, args.output)
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

@@ -29,7 +29,8 @@ import tempfile
 from fontTools.ttLib import TTCollection
 
 from b1_original_metric_check import (EXPECTED_SOURCE, FACES, GLYPHS, SCALARS, VECTORS,
-                                    fixed_cases, metric_whitelist, representation_check, stored_metrics)
+                                    fixed_cases, metric_whitelist, representation_check, stored_metrics,
+                                    public_log_summary)
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 import rebuild
@@ -347,37 +348,6 @@ def check_original_representations(results, stored):
             "source_table_equivalence_rechecked": False, "sessions": sessions}
 
 
-def public_log_summary(report):
-    """Export only the closed report schema; native payloads never cross it."""
-    scalar_fields = ("schema_version", "status", "experiment_complete", "source_sha256", "source_commit",
-        "native_binary_sha256", "sampled_faces", "sampled_glyphs", "source_unchanged",
-        "original_font_accepted", "production_fix_established", "original_faces_reconstructed",
-        "original_glyph_models_completed", "variant_font_published", "original_font_published",
-        "original_outlines_published", "production_entrypoints_modified", "source_table_metrics_replace_native",
-        "continuous_space_acceptance", "windows_acceptance", "private_temporary_font_and_protocol_files_removed",
-        "interpretation", "failure", "directory_patch_verification", "comparison",
-        "diagnostics_complete_and_original_repeat_stable", "strict_original_representation_pass",
-        "strict_original_representation_failed_count", "original_representation_gate")
-    result = {key: report[key] for key in scalar_fields if key in report}
-    result["variants"] = []
-    variant_fields = ("variant", "status", "diagnostics_complete", "source_sha256", "source_byte_size",
-        "fresh_oracle_process_requested", "original_font_accepted", "font_or_outline_published",
-        "physical_faces_verified", "physical_face_identity_digest", "verified_axis_launcher_sha256",
-        "native_metadata_verification", "native_finalization", "failure", "cleanup_failure",
-        "observed_record_count", "source_unchanged", "strict_original_representation_pass",
-        "strict_original_representation_failed_count")
-    for variant in report["variants"]:
-        saved = {key: variant[key] for key in variant_fields if key in variant}
-        saved["observations"] = []
-        for row in variant["observations"]:
-            native = metric_whitelist(row["native_metrics"])
-            kept = {key: row[key] for key in ("face_index", "glyph_id", "case", "user_location",
-                                            "stored_original_metrics", "production_representation") if key in row}
-            saved["observations"].append(kept | {"native_metrics": native, "native_binary64_bits": metric_bits(native)})
-        result["variants"].append(saved)
-    return result
-
-
 def run(source, binary, output):
     source, binary, output = Path(source).resolve(), Path(binary).resolve(), Path(output)
     require(not output.exists() and not output.is_symlink(), "new_report_path_required")
@@ -449,7 +419,7 @@ def run(source, binary, output):
             code = 1
         report["ended_utc"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
         with output.open("x", encoding="utf-8") as stream:
-            json.dump(report, stream, indent=2, allow_nan=False)
+            json.dump(public_log_summary(report), stream, indent=2, allow_nan=False)
             stream.write("\n")
     print("B1_VORG_ABLATION_SUMMARY_JSON=" + json.dumps(public_log_summary(report),
           separators=(",", ":"), allow_nan=False), flush=True)
@@ -460,10 +430,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--binary", type=Path, required=True)
-    parser.add_argument("--output", type=Path, required=True, help="New safe JSON report file")
+    parser.add_argument("--output", type=Path, required=True, help="New aggregate-only public JSON report file")
     args = parser.parse_args()
     return run(args.source, args.binary, args.output)
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

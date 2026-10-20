@@ -4,6 +4,8 @@ on:
   push:
     branches: [work/vf-metrics-b1]
     paths:
+      - 'tools/swirl_vf/platform/b1_original_metric_check.py'
+      - 'tools/swirl_vf/tests/test_metric_b1_public_output.py'
       - '.github/workflows/swirl-vf-b1-followup.yml'
       - 'tools/swirl_vf/platform/b1_metric_followup*.py'
       - 'tools/swirl_vf/platform/b1_metric_followup_probe.swift'
@@ -102,15 +104,24 @@ jobs:
           xcrun swiftc -O tools/swirl_vf/platform/coretext_extract.swift -o build/b1-ablation-coretext
       - name: Original / VORG-directory-only ablation / original repeat and unchanged strict representation gate
         run: |
+          # Only the aggregate allowlist reaches logs/artifacts, including failures.
+          set +e
           python tools/swirl_vf/platform/b1_original_vorg_ablation.py \
             --source /System/Library/PrivateFrameworks/FontServices.framework/Versions/A/Resources/Reserved/PingFangUI.ttc \
             --binary "$PWD/build/b1-ablation-coretext" \
-            --output build/b1-original-vorg-ablation.json
+            --output build/b1-original-vorg-ablation-public.json > "$RUNNER_TEMP/b1-original-private-process.log" 2>&1
+          gate_status=$?
+          set -e
+          if [ -f build/b1-original-vorg-ablation-public.json ]; then
+            cat build/b1-original-vorg-ablation-public.json
+          fi
+          exit "$gate_status"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: swirl-vf-b1-original-vorg-ablation-${{ github.sha }}
           path: |
             build/b1-ablation-environment/*.txt
-            build/b1-original-vorg-ablation.json
+            build/b1-original-vorg-ablation-public.json
           retention-days: 90
+

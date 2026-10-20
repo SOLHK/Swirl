@@ -104,7 +104,7 @@ class B1OriginalMetricCheckTests(unittest.TestCase):
         self.assertTrue(all(len(value) == 16 for value in bits.values()))
         self.assertEqual(struct.unpack(">d", bytes.fromhex(bits["advance_width"]))[0], 800.0)
 
-    def test_public_ci_summary_retains_all_safe_row_evidence_and_omits_private_payloads(self):
+    def test_public_ci_summary_excludes_all_original_row_evidence(self):
         row = b1.observation(native_record(), stored_reference(), native_record(), None,
                              {"available": False, "reason": "nonidentity_anchor"})
         row.update(face_index=15, glyph_id=5, case="default", user_location={"WDTH": 501, "wght": 501, "HGHT": 500},
@@ -123,10 +123,10 @@ class B1OriginalMetricCheckTests(unittest.TestCase):
         self.assertNotIn("physical_face_identities", saved)
         self.assertEqual(saved["physical_faces_verified"], 32)
         self.assertEqual(saved["reference_unavailable_count"], 60)
-        actual = saved["observations"][0]
-        for key in ("stored_metrics", "vertical_x_candidates", "strict_source_table_comparison", "production_representation"):
-            self.assertEqual(actual[key], row[key])
-        self.assertEqual(actual["native_scalar_binary64_hex"]["advance_width"], "4089000000000000")
+        self.assertNotIn("observations", saved)
+        self.assertNotIn("sampled_faces", saved)
+        self.assertNotIn("source_sha256", saved)
+        self.assertEqual(saved["public_output_scope"], "aggregate_only")
         self.assertFalse(saved["original_font_accepted"])
         self.assertEqual(saved["original_faces_reconstructed"], 0)
 
@@ -241,3 +241,4 @@ class B1OriginalMetricCheckTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
