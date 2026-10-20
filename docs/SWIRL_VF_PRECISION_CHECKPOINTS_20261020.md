@@ -484,8 +484,11 @@ differences. Graphics-copy-with-tracking has 150/1,435 payload differences and
 700/1,435 readback differences; rebase_300 has 475 payload differences and
 rebase_500 has 360, with zero readback differences for either rebase mode.
 Maximum canonical point difference is 0.01110839843784106 FUnit; maximum
-metric difference is 0.00686192512512207. These remain real differences despite
-being below 1/32 for this finite glyph set. Graphics-copy also produces a
+metric difference is 0.00686192512512207. These are maxima of numerical
+comparisons; **each rebase mode also retains one canonical type rejection** at
+face 10 / GID 19177 / WDTH=600.5859375, wght=400.04, HGHT=250. The safe report
+records `segment_types_differ`; a small numeric maximum must not imply that
+these rejected comparisons passed. Graphics-copy also produces a
 300 platform and shifts the upper 400 boundary; it is not an equivalent fix.
 
 The observation supports base-dependent near-coordinate reuse; it does not
@@ -501,6 +504,61 @@ finished: Python and Windows synthetic DirectWrite **success**, Apple
 **failure**. Actual job 118508223730 log was read: raw vertical 849 versus 850
 at 0.03125 remains; the 22-case production Swift guard still passes. There is
 still no accepted original GID model, completed original face or output TTC.
+
+## A2 next diagnostic: predeclared far-axis anchors and independent references
+
+The next source checkpoint adds `platform/anchor_construction_harness.py`,
+`platform/axis_anchor_cases.py`, `platform/probe_axis_anchor.py`, their three
+test modules and `.github/workflows/swirl-vf-axis-anchor.yml`. Production
+Swift, production mapping and rebuild code remain unchanged. The generated
+harness binds the reviewed production prefix and keeps it byte-for-byte.
+
+Four experimental modes are separate from the unchanged production control:
+far endpoints from original / wght-300 / wght-500 bases, and far quarter-points
+from the original base. Each request independently plans all three anchor
+coordinates using original ranges and the requested target, then makes exactly
+two production-helper copies. Every axis is separated from its target by at
+least half (endpoint) or a quarter (quarter-point) of its full raw range.
+No prior request, observed coordinate, fitted HVAR result or retry chooses the
+anchor or target. Anchor echoes must be exactly predeclared, and both copies
+must preserve the production optical selection. All original and seeded bases
+retain full table identity; the ordinary helper retains its own instance
+identity, output UPEM, matrix and tracking checks.
+
+The experiment has **736 fixed user positions**, seven representative faces,
+five GIDs, five modes, both request orders, and original plus predeclared
+T(T(x)) replay per request: **73,600 planned native glyph records**. Cases
+include original defaults/extrema, endpoint neighbors, 300/400 boundaries,
+anchor-choice midpoints, mixed axes and 84 new random holdouts with seed
+20861020+face. All positions, replay declarations and both global model
+predictions are fixed before the first native process starts. Readback and
+complete-payload replay use the existing strict policy, with all failures
+retained; diagnostic observations are never released to a builder.
+
+The original double-normalize/16-bit-truncate candidate is compared separately
+with a predeclared double-normalize, float32-result cast, then 16-bit-truncate
+candidate. Both preserve original ordered avar records and duplicates. Every
+model has its own legacy and preserved-Q geometry verdict, HVAR metric error,
+and selected direct native HVF checks. HVAR-inferred coordinates remain
+explicit conditional references, not global model outputs. Cross-base and
+cross-anchor equality retains all payload fields, including origins and bounds.
+
+Local final regression: **413/413 Python tests, zero skips, 6/6 audits**,
+15.676 seconds; `git diff --check` clean. An earlier in-progress full-suite
+snapshot caught an optical helper variable-name contract mismatch and duplicate
+generator helpers appended after `run`; both are corrected without dropping
+assertions, and the complete final frozen source passed. The new 27 independent
+tests include failure preservation, exact replay, hidden payload changes,
+raw-record ordering, anchor/range logic and generated-source rejection. Exact
+native transport wrappers retain only a whitelist of public failure codes;
+arbitrary native error text and private payload remain excluded.
+Native compilation and execution are still pending at this source checkpoint.
+Next smallest task is to read the actual native run and all failed cases before
+considering any production constructor change.
+
+Concurrent Core commit `8841244f17cfae92f0f025ad8ac00c5796a01fb0` was inspected
+and preserved by fast-forward. Its Qt JSON-reload test and evidence changes
+have no font-path overlap. No force push or overwrite was used.
 
 ## Newly retrieved prior evidence (not new execution in this continuation)
 
