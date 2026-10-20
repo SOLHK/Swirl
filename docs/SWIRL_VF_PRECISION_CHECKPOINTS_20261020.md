@@ -123,13 +123,16 @@ cache experiment or choose per-point mapping exceptions.
 New files: `platform/axis_threshold_cases.py`, `platform/probe_axis_thresholds.py`,
 `tests/test_axis_threshold_cases.py`, `tests/test_axis_threshold_probe.py` under
 `tools/swirl_vf`, and `.github/workflows/swirl-vf-axis-thresholds.yml`. This is a
-diagnostic executable, **not a production mapping repair**. Native results are
-pending at this source checkpoint; no formula, font or continuous-space pass is
-declared. Exact source `f51d262352a638d2256f5757171d6e3823a387a7` was pushed
+diagnostic executable, **not a production mapping repair**. Native execution has
+completed; no formula, font or continuous-space pass is declared. Exact source `f51d262352a638d2256f5757171d6e3823a387a7` was pushed
 non-forcibly and the independently queried remote HEAD matched. Native
 [39381634460](https://github.com/SOLHK/Swirl/actions/runs/39381634460), job
-118491837396, is **IN_PROGRESS**, not PASS, at this documentation checkpoint.
-On continuation, read its actual final status/artifact before changing a mapper.
+118491837396, finished **success**: diagnostic completion only. The final job
+log and safe artifact 12245849108 were read. Its verified ZIP SHA-256 is
+`da3b7925a252b08023352ce22f8d059ddf576251e3af4b739762115c556f58a9`.
+All 32 faces, 1,724 positions, 64 independent processes and 120,680 glyph
+records completed with exact source identity, zero native errors, valid
+summary/EOF and zero exit status. Source hash remained unchanged.
 
 Same-source synthetic run
 [39381634228](https://github.com/SOLHK/Swirl/actions/runs/39381634228) has finished:
@@ -177,12 +180,81 @@ Local focused verification: **16/16 authored tests** pass, covering distinct
 binary neighbors, source range preservation, complete face/table identities,
 raw payload differences, rejected/clipped HVAR inversions and malformed/truncated
 native HVF transcripts. Full regression: **348/348 Python tests, zero skips,
-6/6 audits**, with `git diff --check` clean. This does not substitute for the
-pending actual CoreText/libhvf run.
+6/6 audits**, with `git diff --check` clean. The separate actual CoreText/libhvf results follow below.
 Private original paths and raw advances remain in memory/temporary storage;
 only coordinates, GIDs, aggregate discrepancies and identity evidence enter the
 safe JSON checkpoint or public artifact. A failed run retains stage/face/request
 context and remains FAILED. The existing 141 questions and 849/850 gate remain.
+
+## A2 fresh native result: improved candidate, remaining counterexamples
+
+Every opposite-order pair matches its complete raw typed path/metric payload:
+**60,340/60,340**, zero readback differences. Direct Apple libhvf versus CoreText
+passes **372/372**, maximum point difference **0**. The portable implementation
+versus the same native libhvf cases also passes **372/372**, maximum
+`3.410605131648481e-13` FUnit. These direct cases do not include the eight
+remaining type failures below; they cannot be used to dismiss those failures.
+
+All six global models remain unaccepted. Each made 60,340 strict geometry
+comparisons and 1,724 four-GID horizontal-metric vector comparisons:
+
+| Predeclared model | Geometry failures | Numeric / type failures | Exact metric vectors | Metric vectors over 1/32 |
+|---|---:|---:|---:|---:|
+| Raw-order float | 1396 | 390 / 1006 | 1026 | 30 |
+| Raw-order final F2DOT14 | 938 | 390 / 548 | 1613 | 30 |
+| Raw-order two F2DOT14 stages | 940 | 270 / 670 | 1609 | 30 |
+| Signed-zero variant | 940 | 390 / 550 | 1609 | 30 |
+| Request normalized-16 truncation | 628 | 240 / 388 | 1666 | 20 |
+| Predeclared T(T(x)), normalized-16 truncation | 8 | 0 / 8 | 1694 | 0 |
+
+The last candidate's largest comparable point error is
+`0.006132067549600606` FUnit; maximum metric error is `0.0032958984375`.
+It is a finite diagnostic candidate, not a production fix. Type-failure rows
+have null point error and are not counted as zero-error results.
+The 30 nonexact metric vectors comprise the existing 400.01 example on all
+12 faces 20–31 and six fresh 400-threshold samples on each of faces 20, 24, 31.
+All have inferred native weight grid -4915 versus candidate -4914.
+The 192 unseen random positions are included in the overall comparison.
+
+All eight remaining type failures are GID 19177:
+
+| Face | WDTH | wght | HGHT |
+|---:|---:|---:|---:|
+| 0 | 500 | 837.5754436931355 | 500 |
+| 1 | 422.3943344488167 | 810.2631054512518 | 344.1305449918785 |
+| 8 | 500 | 831.1462518294346 | 500 |
+| 15, 16, 17, 18, 19 | 1 | 100 | 1 |
+
+At 1,596 eligible exact width/height nodes, the zero-residual HVAR best-fit grid
+reference makes 55,860 geometry comparisons: 7 type failures, zero numeric
+failures, maximum comparable error `2.3305801732931286e-12` FUnit. The mixed-axis
+face-1 case is not eligible for that inversion. This reference is conditioned
+on each observation and is **not** a user-to-design formula or proof of unique
+coordinates within the metric budget. Neighbor grid references retain their
+own failures in the safe artifact.
+
+Offline falsification after the new run: a generic raw-interval rule using
+pre-avar F2DOT14 rounding only when the chosen interval ends at (0, 0) fits all
+3,048 old observations and removes these 30 fresh 400-threshold discrepancies.
+It nevertheless fails two unseen weight holdouts: face 25 at
+`482.20654224674365` (native -874, predicted -875) and face 30 at
+`462.34568323838` (native -1851, predicted -1850). Their zero-residual HVAR and
+recorded geometry independently distinguish the grids. This rejected rule is
+not installed in production. Original avar order and duplicates remain intact.
+
+Next smallest task: execute the existing native libhvf oracle on the eight
+remaining GID-19177 cases and retain raw L/Q controls privately to distinguish
+true curve changes from canonicalization sensitivity; keep the strict result
+visible. In parallel, collect only discriminating 300/400 threshold neighbors
+and the two fresh falsifiers. Do not smooth discontinuities, drop type failures,
+or alter the original 1/32 threshold.
+
+Concurrent commits `ac0069ec645b552835d15534b93d6d2ae0c69620` and
+`5f16245a238411c8e57d097995fded50edc65522` were also inspected and fast-forwarded
+before saving this evidence. Their Core / Qt / subscription files do not
+overlap the font changes and remain preserved. No font production model,
+original GID completion count, original TTC output, raw 849/850 status or
+Windows 11 / Qt acceptance status changes at this diagnostic checkpoint.
 
 ## Newly retrieved prior evidence (not new execution in this continuation)
 
