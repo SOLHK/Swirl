@@ -126,3 +126,46 @@ and actual Windows Server DirectWrite CI, preserving the synthetic/original and
 Server/Windows-11 distinctions. Exact-original native testing requires the
 matching supported host; keep the existing macOS-27 evidence, do not relabel this
 Mac as macOS 27.
+
+## D1 saved checkpoint and D2/D3 controls
+
+D1 is saved remotely as **`ab4394b836cce7934c28e4e9493bda6e1e3c3842`**,
+parent `6b9628e6a9a5a864e5a7e210cd916868804564c8`, exact tree
+`de9ed45868af871436cd66ac695ba0185f3497b5`.
+The local HTTPS push failed because no terminal credentials were configured.
+The existing connected GitHub tools created the same reviewed tree and commit
+without changing any App/Secret. The local-only commit `986b4be` is preserved on
+`work/vf-macos-windows-d1-20261021-local-snapshot`; the task branch follows the
+remote commit with the identical tree. No local history was reset or rebased.
+A concurrent W1 advance to `127e9fc` was fetched and left untouched.
+
+The new baseline also ran natively on the self-authored two-face fixture:
+2/2 physical faces verified, 24 fixed axis requests, 18 strict passes / 6 retained
+strict failures. Thus the blocked original result is distinguished from both a
+working installed system source and a working portable fixture on this host.
+
+With all eight added tests, the full local suite is now **598 discovered = 591
+passed + 7 platform-specific skips**, 23.141 s; no failure/error. This includes
+the actual HarfBuzz GPOS tests. The separate unmodified strict native
+reconstruction test actually ran and failed at the retained 849/850 assertion.
+The independent existing `test_native_table_metrics.py` actually completed:
+
+- Self-authored 2-face / 3-GID reconstruction, 3 original axes, distinct UPEM
+  1000/1128, serialized TTC **3,424 bytes** generated and re-opened.
+- Original native paths plus explicit source-table metrics: 174 records pass.
+- Candidate native remeasurement: 58 requests / 174 records, maximum control
+  point, table metric and bounds differences all **0** against the fixture.
+- The old raw CoreText gate remains **FAIL** in the same report. Source-table
+  metric success does not represent native API metric success.
+- The existing integration test removes its temporary fonts by design; full
+  reports are under `build/vf-d1-private/native-table-metrics/`. This generated
+  fixture is not an Apple conversion and is never the original deliverable.
+
+`.github/workflows/swirl-vf-macos-windows-d1.yml` is limited to this dedicated
+branch. It reuses existing fixture generators, strict native tests, table-metric
+reconstruction and DirectWrite C++/PowerShell probes. It runs macOS-15 and
+Windows Server 2022 controls, preserves native failures without continue-on-error,
+and uploads only self-authored synthetic reports/images. It never opens an
+Apple font or uploads any font binary. YAML parsing and whitespace checks pass;
+actual remote CI is pending at this source checkpoint. Windows 11 remains
+NOT_RUN even if Windows Server DirectWrite succeeds.

@@ -1,0 +1,104 @@
+name: Swirl VF D1 isolated native controls
+
+on:
+  push:
+    branches: [work/vf-macos-windows-d1-20261021]
+    paths:
+      - '.github/workflows/swirl-vf-macos-windows-d1.yml'
+      - 'tools/swirl_vf/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  macos-synthetic:
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned dependencies
+        run: python -m pip install fonttools==4.61.1 numpy==2.2.6 uharfbuzz==0.56.3
+      - name: Test original source-substitution and preservation controls
+        run: python -m unittest discover -s tools/swirl_vf/tests -p test_macos_source_baseline.py -v
+      - name: Generate only the self-authored two-face fixture
+        run: |
+          mkdir -p build/d1
+          python - <<'PY'
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, 'tools/swirl_vf/platform')
+          from test_coretext_extract import make_fixture
+          make_fixture(Path('build/d1/self-authored.ttc'))
+          PY
+      - name: Run exact native source baseline on generated fixture
+        run: |
+          python tools/swirl_vf/platform/macos_source_baseline.py build/d1/self-authored.ttc --output build/d1/baseline
+      - name: Preserve the unchanged strict native metric gate
+        id: strict
+        run: |
+          python tools/swirl_vf/platform/test_coretext_extract.py --output build/d1/strict --require-native
+      - name: Independently reconstruct native paths with explicit table metrics
+        if: always()
+        run: |
+          python tools/swirl_vf/platform/test_native_table_metrics.py --output build/d1/table-metrics --require-native
+      - name: Retain only self-authored synthetic reports, never source fonts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: d1-macos-synthetic-${{ github.sha }}
+          path: |
+            build/d1/baseline/baseline.json
+            build/d1/strict/*.json
+            build/d1/table-metrics/*.json
+          retention-days: 7
+
+  windows-directwrite-synthetic:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned dependencies and generate original controls
+        run: |
+          python -m pip install fonttools==4.61.1 numpy==2.2.6
+          if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed' }
+          python tools/swirl_vf/platform/make_standard_fixture.py build/d1/self-authored-standard.ttc
+          if ($LASTEXITCODE -ne 0) { throw 'Standard fixture generation failed' }
+          python tools/swirl_vf/platform/make_metric_fixture.py build/d1/self-authored-metrics.ttc
+          if ($LASTEXITCODE -ne 0) { throw 'Metric fixture generation failed' }
+      - name: Run actual DirectWrite all-glyph and five-DPI controls
+        run: |
+          ./tools/swirl_vf/platform/run_directwrite_probe.ps1 -Font build/d1/self-authored-standard.ttc -OutputDirectory build/d1/standard -AllGlyphs -Render
+          if ($LASTEXITCODE -ne 0) { throw 'DirectWrite standard fixture failed' }
+          ./tools/swirl_vf/platform/run_directwrite_probe.ps1 -Font build/d1/self-authored-metrics.ttc -OutputDirectory build/d1/metrics -AllGlyphs -Render -Binary build/d1/standard/build/Release/directwrite_probe.exe
+          if ($LASTEXITCODE -ne 0) { throw 'DirectWrite production HVAR/VVAR fixture failed' }
+      - name: Retain only self-authored DirectWrite evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: d1-windows-server-synthetic-${{ github.sha }}
+          path: |
+            build/d1/standard/*.json
+            build/d1/standard/*.jsonl
+            build/d1/standard/*.log
+            build/d1/standard/*.png
+            build/d1/metrics/*.json
+            build/d1/metrics/*.jsonl
+            build/d1/metrics/*.log
+            build/d1/metrics/*.png
+          retention-days: 7
