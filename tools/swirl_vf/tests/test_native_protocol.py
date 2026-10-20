@@ -1,8 +1,10 @@
 """Native protocol regression with explicit original message doubles, no fonts."""
 import io
+import hashlib
 import json
 from pathlib import Path
 import sys
+import tempfile
 from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock
@@ -18,6 +20,8 @@ class NativeProtocolTests(unittest.TestCase):
         oracle = object.__new__(NativeOracle)
         oracle.proc = SimpleNamespace(stdin=io.StringIO())
         oracle.sequence = 0
+        oracle.successful_glyph_count = 0
+        oracle.summary = None
         oracle.response_timeout = 2.0
         oracle.reader = Mock()
         oracle.reader.readline.side_effect = [json.dumps(row) + '\n' for row in rows]
@@ -72,6 +76,65 @@ class NativeProtocolTests(unittest.TestCase):
         self.assertTrue(all(row['location'] == self.location for row in rows.values()))
         self.assertEqual(oracle.reader.readline.call_count,2)
         oracle.reader.readline.assert_called_with(timeout=2.0)
+
+    def test_real_protocol_cannot_admit_unverified_axis_observation_mode(self):
+        # Execute an original protocol fixture, not a fake native font or path.
+        # A valid source digest and face status cannot override this marker.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'protocol-source'
+            source.write_bytes(b'original observation-only protocol fixture')
+            metadata = {'type': 'metadata', 'backend': 'CoreText',
+                        'source_sha256': hashlib.sha256(source.read_bytes()).hexdigest(),
+                        'faces': [{'face_index': 0, 'status': 'identity_verified'}],
+                        'axis_observations_only': True}
+            executable = root / 'observation-protocol'
+            executable.write_text('#!' + sys.executable + '\n'
+                                  + 'print(' + repr(json.dumps(metadata)) + ', flush=True)\n',
+                                  encoding='utf-8')
+            executable.chmod(0o700)
+            with self.assertRaisesRegex(ReconstructionError, 'unverified native axis observations'):
+                NativeOracle(executable, source, root / 'native.log')
+
+    def test_complete_transcript_requires_summary_eof_and_successful_process_exit(self):
+        # Separate real child processes exercise errors arriving after all glyph
+        # records. These are protocol messages, never claimed native font data.
+        cases = [('complete', {}, 0, None, None),
+                 ('missing', None, 0, None, 'without a final summary'),
+                 ('wrong_count', {'request_count': 1}, 0, None, 'final summary is incomplete'),
+                 ('boolean_count', {'successful_glyph_count': False}, 0, None, 'final summary is incomplete'),
+                 ('late_failure', {}, 3, None, 'failed after its final glyph'),
+                 ('extra_data', {}, 0, {'type': 'unexpected'}, 'after its final summary')]
+        for name, changes, code, trailer, message in cases:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                source = root / 'protocol-source'
+                source.write_bytes(b'original final-transcript protocol fixture')
+                digest = hashlib.sha256(source.read_bytes()).hexdigest()
+                metadata = {'type': 'metadata', 'backend': 'CoreText', 'source_sha256': digest,
+                            'faces': [{'face_index': 0, 'status': 'identity_verified'}]}
+                summary = {'type': 'summary', 'source_sha256': digest, 'request_count': 0,
+                           'successful_glyph_count': 0, 'error_count': 0}
+                lines = ['#!' + sys.executable, 'import sys',
+                         'print(' + repr(json.dumps(metadata)) + ', flush=True)', 'sys.stdin.read()']
+                if changes is not None:
+                    lines.append('print(' + repr(json.dumps({**summary, **changes})) + ', flush=True)')
+                if trailer is not None:
+                    lines.append('print(' + repr(json.dumps(trailer)) + ', flush=True)')
+                lines.append('raise SystemExit(' + str(code) + ')')
+                executable = root / 'finish-protocol'
+                executable.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+                executable.chmod(0o700)
+                oracle = NativeOracle(executable, source, root / 'native.log')
+                try:
+                    if message:
+                        with self.assertRaisesRegex(ReconstructionError, message):
+                            oracle.finish()
+                    else:
+                        self.assertEqual(oracle.finish(), summary)
+                        self.assertEqual(oracle.finish(), summary)
+                finally:
+                    oracle.close()
 
 
 if __name__ == '__main__':

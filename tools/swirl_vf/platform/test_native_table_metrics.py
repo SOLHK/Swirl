@@ -31,6 +31,7 @@ sys.path.insert(0, str(ROOT / 'tools'))
 from source_metrics import SourceMetrics
 from table_metric_oracle import (FIELDS, RAW_FIELDS, adapt_record, adapted_metadata,
                                  identity_design_coordinates, source_hash)
+from verified_axis_oracle import make_launcher as make_verified_axis_launcher
 
 
 def require(condition, message):
@@ -137,6 +138,7 @@ def make_launcher(path, binary):
     """Bind all adapter dependencies so a face-checkpoint cannot reuse old code."""
     files = [ROOT / 'tools' / name for name in
              ('table_metric_oracle.py', 'source_metrics.py', 'audit_font.py', 'incremental_pipe.py')]
+    files.append(Path(binary).resolve())
     bindings = {str(p): source_hash(p) for p in files}
     command = [sys.executable, str(files[0]), '--native', str(binary), '--standard-identity']
     code = ('#!/usr/bin/env python3\nimport hashlib, os, pathlib, sys\n'
@@ -212,7 +214,10 @@ def run(output, binary=None, require_native=False):
                     report['static_instances'].append({'case': label, 'source_sha256': source_hash(static), **checked})
 
                 launcher = temp / 'table-metric-oracle'
-                report['adapter_dependency_sha256'] = make_launcher(launcher, binary)
+                axis_launcher = make_verified_axis_launcher(temp / 'verified-axis-oracle', binary)
+                report['verified_axis_launcher_sha256'] = source_hash(axis_launcher)
+                report['axis_acceptance'] = 'every_requested_GID_exact_native_replay_before_batch_release'
+                report['adapter_dependency_sha256'] = make_launcher(launcher, axis_launcher)
                 build_report = output / 'table-reconstruction-report.json'
                 result = recorded_run([sys.executable, str(ROOT / 'tools/rebuild.py'), str(source),
                                        '--oracle', str(launcher), '--output', str(candidate),

@@ -140,7 +140,8 @@ def adapt_record(provider, native_record, normalized_design_coordinates, coordin
 def adapted_metadata(native, digest, faces):
     require(native.get('type') == 'metadata' and native.get('backend') == 'CoreText'
             and native.get('source_sha256') == digest, 'native source/backend metadata mismatch')
-    require(not native.get('diagnostic_readback_observation_only'),
+    require(not native.get('diagnostic_readback_observation_only')
+            and native.get('axis_observations_only') is not True,
             'diagnostic-only axis observation is not an accepted conversion oracle')
     require(len(native.get('faces', [])) == len(faces)
             and all(f.get('status') == 'identity_verified' and f.get('face_index') == i
@@ -225,9 +226,10 @@ def serve(source, native_binary, input_stream=sys.stdin, output_stream=sys.stdou
                     and summary.get('successful_glyph_count') == adapted,
                     'native summary incomplete or mismatched')
             summary.update({'table_metric_records': adapted, 'raw_coretext_metrics_retained': True})
-            emit(summary)
+            require(reader.readline(timeout=10.) == '', 'native output follows its final summary')
             require(process.wait(timeout=10) == 0, 'native process failed')
             require(source_hash(source) == digest, 'source bytes changed during conversion')
+            emit(summary)
         return 0
     finally:
         if reader is not None:

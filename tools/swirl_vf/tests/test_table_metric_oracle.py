@@ -130,7 +130,8 @@ class TableMetricAdapterTests(unittest.TestCase):
         self.assertEqual(actual['metric_backend'], 'SourceTables')
         self.assertEqual(actual['native_metrics_policy'], 'original_raw_API_policy')
         self.assertEqual(actual['strict_native_API_metric_acceptance'], 'NOT_ESTABLISHED_BY_THIS_ADAPTER')
-        for change in [{'source_sha256': 'b' * 64}, {'diagnostic_readback_observation_only': True}]:
+        for change in [{'source_sha256': 'b' * 64}, {'diagnostic_readback_observation_only': True},
+                       {'axis_observations_only': True}]:
             with self.assertRaises(ValueError):
                 adapted_metadata({**native, **change}, 'a' * 64, self.collection.fonts)
 

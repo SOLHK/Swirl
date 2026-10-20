@@ -34,13 +34,25 @@ class OriginalAnalyticOracle:
             "original_geometric_fixture": True,
             "apple_or_coretext_executed": False,
             "source_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
-            "faces": [{"face_index": i, "glyph_count": 3,
-                       "status": "synthetic_fixture_only"} for i in range(3)],
+            "source_byte_size": source.stat().st_size,
         }
+        # The original fixture has real independent SFNT identities. Supplying
+        # these hashes does not claim that CoreText or an Apple font was used.
+        with TTCollection(source, lazy=True) as collection:
+            self.metadata["faces"] = [
+                {"face_index": index, "glyph_count": font["maxp"].numGlyphs,
+                 "upm": font["head"].unitsPerEm, "status": "synthetic_fixture_only",
+                 "verified_table_sha256": {tag: hashlib.sha256(font.reader[tag]).hexdigest()
+                                           for tag in font.reader.tables}}
+                for index, font in enumerate(collection.fonts)]
         self.requests = []
         self.close_count = 0
+        self.finish_count = 0
+        self.closed = self.finished = False
 
     def samples(self, face, glyph_ids, location):
+        if self.closed or self.finished:
+            raise AssertionError("cannot reuse a finished original oracle session")
         if face not in range(3) or not set(glyph_ids) <= {0, 1, 2}:
             raise AssertionError("unexpected synthetic face/GID request")
         if set(location) != set(AXES):
@@ -55,6 +67,17 @@ class OriginalAnalyticOracle:
 
     def close(self):
         self.close_count += 1
+        self.closed = True
+
+    def finish(self):
+        if self.closed or self.finished:
+            raise AssertionError("original oracle session already finished or closed")
+        self.finish_count += 1
+        self.finished = True
+        return {'type': 'summary', 'source_sha256': self.metadata['source_sha256'],
+                'error_count': 0, 'request_count': len(self.requests),
+                'successful_glyph_count': sum(len(gids) for _, gids, _ in self.requests),
+                'synthetic_test_double_only': True}
 
 
 class RebuildPipelineTests(unittest.TestCase):
@@ -85,6 +108,20 @@ class RebuildPipelineTests(unittest.TestCase):
         self.assertEqual(saved["oracle"]["backend"], "SyntheticAnalyticOracle")
         self.assertTrue(saved["failures"])
         return saved
+
+    def test_final_native_failure_blocks_already_serialized_collection(self):
+        with tempfile.TemporaryDirectory(prefix='analytic-finalization-') as tmp:
+            root = Path(tmp)
+            source, output, report = self.fixture(root)
+            before = source.read_bytes()
+            oracle = OriginalAnalyticOracle(source)
+            oracle.finish = mock.Mock(side_effect=rebuild.ReconstructionError('native final summary rejected'))
+            with self.assertRaisesRegex(rebuild.ReconstructionError, 'native final summary rejected'):
+                self.invoke(source, output, report, oracle)
+            saved = self.assert_blocked(root, source, before, output, report, oracle)
+            self.assertEqual(saved['collection_verification']['status'], 'PASS')
+            self.assertEqual(saved['failures'][0]['context']['stage'], 'native_finalization')
+            oracle.finish.assert_called_once()
 
     def test_complete_three_face_pipeline_and_unseen_mixed_coordinates(self):
         with tempfile.TemporaryDirectory(prefix="analytic-pipeline-") as tmp:

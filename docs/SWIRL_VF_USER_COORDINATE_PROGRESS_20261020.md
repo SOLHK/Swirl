@@ -4,6 +4,93 @@ This phase starts at `b5a84bfacc48e6b2a8be8f0797f34639530766c9` on
 `work/core-completion-20261017`; every push is non-forced and based on a fresh
 remote head. UI, animations and Rust Core are outside the changes.
 
+## Fifth implementation checkpoint: exact batch replay and accepted transcripts
+
+Local full regression now passes **254/254 tests plus 6/6 audit tests**. New
+native jobs have been wired but are not declared passing in this source
+checkpoint. The remote advanced during publication to concurrent Core commit
+`54908e2902c28ae20e2588fa5347df9b2b3d76e9`, following
+`85f4cb916221fb64b9c07f0cd6fd85bbc7e94883` and our font checkpoint
+`c31edaf04f3a6369e90da026b94aa6cf8176f356`. The five newly changed Core/CI
+paths do not overlap this font work; publication was rebased without force.
+
+`coretext_extract.swift` separates instance construction from acceptance. The
+ordinary `makeInstance` path retains the exact original 1e-6 guard. Explicit
+`--axis-observations` marks raw observations as unaccepted; neither the builder
+nor SourceTables adapter can consume them directly. `verified_axis_oracle.py`
+binds every original source table and every physical face/axis, including raw
+fvar flags/hidden. It accepts a batch only after all its requested GIDs pass an
+exact, finite, typed-command and raw-metric comparison against one separately
+constructed reported-coordinate instance. Missing nondefault axes, an unknown
+readback rule, a changing replay echo, any payload difference or late GID error
+blocks the entire batch. Original requested/reported values and native payloads
+are retained. There is no avar inference or replacement metric in this adapter.
+
+The named positive decimal-four truncation candidate describes a falsifiable
+readback hypothesis, not Apple's public contract. Binary64 multiplication and
+truncation is not always idempotent; replay must actually echo the first value,
+and is never recursively truncated until it matches. Twenty new adapter tests
+include real subprocess/pipe consumption, independent source-metadata fixtures,
+109 synthetic non-idempotent boundaries, malformed/missing records, late failure,
+source mutation and hash-bound launcher dependencies.
+
+The separate first-writer native gate compares two new processes with opposite
+creation order. All 32 selected GIDs are forced through the first-created font
+before creating the other font. Planned coverage is faces 20/31, 11 positions
+per face, four comparison chains of 704 GID pairs each. Canonical values are
+computed before either process starts. This does not claim that a system font
+service cache was cleared. Fourteen original tests pass; native results remain
+to be checked. The exact-source reconstruction job now depends on this gate and
+uses the per-request verifier, with the unchanged outline/metric budgets.
+
+The builder now verifies a complete final native summary, external request/GID
+counts, source identity, EOF and successful process exit before TTC publication.
+A reproduced recovery bug was also fixed: a face serialized before a failing
+final summary could previously survive in a checkpoint and bypass that failure
+on restart. Checkpoint recipe v2 requires a complete, independently finished
+native session for each face before saving it. Restores require the accepted
+transcript bound to the source, all-table identity, physical face and launcher.
+A fresh zero-request session on a fully restored build cannot replace those
+earlier face proofs. Twelve checkpoint regressions include this exact failure,
+changed source/bytes/code/identity and valid partial recovery.
+
+The synthetic native/table-metric reconstruction gate chains the verified axis
+launcher with the existing standard-identity SourceTables adapter. Its original
+raw 849/850 CoreText gate remains unchanged and separately reported. No source
+table policy for Apple HVGL has been admitted. An independent actual CTFrameDraw
+and CTRunDraw diagnosis is added for 378 single-character observations and 42
+mixed-text frames over seven representative faces. All glyph paths and bitmaps
+stay in memory; the 2.667-FUnit/pixel raster instrument distinguishes the large
+placement signal and does not replace the unchanged 1/32 FUnit acceptance.
+
+### Newly completed native evidence from the previous checkpoint
+
+Run [39362516018](https://github.com/SOLHK/Swirl/actions/runs/39362516018),
+source `c31edaf04f3a6369e90da026b94aa6cf8176f356`, actually completed all 32
+faces and 2,692 user positions, 86,144 selected-GID comparisons per model:
+
+| Mapping hypothesis | Failed comparisons | Measured point failures | Maximum measured point error |
+| --- | ---: | ---: | ---: |
+| raw-order float | 491 | 100 | 2.942359 FUnit |
+| raw-order final F2DOT14 | 290 | 100 | 2.942506 FUnit |
+| raw-order two F2DOT14 | 430 | 135 | 6.490196 FUnit |
+| signed-zero raw-order two F2DOT14 | 150 | 65 | 0.453230 FUnit |
+
+The other failures are strict segment-type correspondence failures; no model
+passes the full sample. The best candidate's 65 measured failures occur on
+faces 15-19 near the positive side of the weight default. All earlier models and
+the 141 HVAR quantization questions remain. Requested/readback path comparison
+had zero error, but only 44,928 comparisons constructed a distinct sibling;
+the other 41,216 reused unchanged requests. These counts must not be conflated.
+
+The same run's independent vertical-origin probe measured 6,912 values. All
+retained the default native X exactly. Source default hmtx/2 differs on odd
+widths by 0.5; current native width/2 differs in 3,956 observations, by up to
+100 FUnits. Height=1000 and vertical Y=860 held for all measured values. Those
+API findings motivate the actual drawing probe; they do not authorize changing
+the source origins. No original-derived final font or Windows 11/Qt acceptance
+has been produced by this checkpoint.
+
 ## Actual source and first native result
 
 The uploaded 61,473,880-byte file matches SHA-256
@@ -89,9 +176,11 @@ The exact-source user-coordinate run `39359956472` completed at
 and 74,496 glyph checks per model. The raw/final-F2/two-F2 models retained
 454/290/290 failures respectively; none passes the entire sample. Some are
 strict L/Q correspondence failures rather than a measured large path error.
-Requested versus readback-created native paths had zero discrepancy in all
-74,496 comparisons. This did not compare every raw metric or prove a universal
-coordinate mapping, and is not complete-font acceptance.
+Requested versus readback-created native paths had zero discrepancy in the
+40,704 comparisons that actually constructed a different readback instance;
+the remaining 33,792 comparisons reused the unchanged request record. This did
+not compare every raw metric or prove a universal coordinate mapping, and is
+not complete-font acceptance.
 
 At `4461798c9989d7230affc1d46560f6147b859e8c`, run `39361349404`
 reproduced the original blocker at face 0, GIDs 0–63, sample 41, location

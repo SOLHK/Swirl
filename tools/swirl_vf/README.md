@@ -27,6 +27,22 @@ rounding semantics and user-coordinate outline equivalence remain unaccepted.
 The separate CoreText strict metric test still fails. Windows DirectWrite passes
 only the original synthetic fixtures, not an Apple-derived candidate.
 
+Continuation at `c31edaf04f3a6369e90da026b94aa6cf8176f356` measured 2,692
+user-coordinate positions across all 32 faces, with 32 selected GIDs per point.
+None of the four global avar/quantization models passes all 86,144 comparisons.
+The independent 6,912-observation vertical-origin diagnosis also rejects
+current-width/2 as a universal interpretation of Apple's API values. See the
+[current continuation](../../docs/SWIRL_VF_USER_COORDINATE_PROGRESS_20261020.md).
+
+The new `tools/verified_axis_oracle.py` accepts explicitly unverified native
+observations only after checking original source/table identity and replaying
+every requested GID at the reported coordinates. Exact finite equality is
+required for typed path commands, bounds and all raw metrics; no tolerance is
+increased and no coordinate/path/metric is replaced. The unchanged strict
+extractor remains the default. The new native integration needs its own passing
+run; neither this adapter nor a successful diagnostic proves complete-font or
+continuous-space mapping equivalence.
+
 Read the current [detailed handoff](../../docs/SWIRL_VF_USER_AXIS_HANDOFF_20261020.md),
 [geometry evidence](../../docs/SWIRL_VF_GEOMETRY_PASS_20261020.md), and
 [algorithm repair](../../docs/SWIRL_VF_TRANSFORM_REPAIR_20261020.md) before continuing.
@@ -80,6 +96,11 @@ all TTC-packed table bytes are checked. Even a sampled build pass still needs
 independent source, Windows and application acceptance; `lossless_conversion`
 stays false. No alternative-font fill, faux bold, dropped height axis or glyph
 cropping is permitted.
+
+Before publishing a candidate, the builder also requires the oracle's complete
+final transcript: exact source identity, accepted request/GID counts, no native
+errors, no trailing records, and exit code zero. Private face checkpoints must
+have their own accepted native transcript before they can be restored.
 
 ## Windows and Swirl acceptance
 

@@ -338,7 +338,10 @@ struct Request: Decodable {
     let glyph_ids: [Int]
 }
 
-func makeInstance(_ state: FaceState, _ requested: [String: Double]) throws -> (CTFont, [String: Double], [String: Double]) {
+// Construction and acceptance are distinct. The explicit observation protocol
+// below may expose this result only to an independent per-request verifier.
+// The ordinary extraction path continues through makeInstance's strict guard.
+func constructInstance(_ state: FaceState, _ requested: [String: Double]) throws -> (CTFont, [String: Double], [String: Double]) {
     guard let baseFont = state.baseFont else {
         throw OracleError.invalid("requested_face_has_no_verified_coretext_descriptor")
     }
@@ -381,6 +384,12 @@ func makeInstance(_ state: FaceState, _ requested: [String: Double]) throws -> (
     if let dictionary = CTFontCopyVariation(font) as? [NSNumber: NSNumber] {
         for (key, value) in dictionary { reported[tagString(key.uint32Value)] = value.doubleValue }
     }
+    return (font, location, reported)
+}
+
+func makeInstance(_ state: FaceState, _ requested: [String: Double]) throws -> (CTFont, [String: Double], [String: Double]) {
+    let (font, location, reported) = try constructInstance(state, requested)
+    let raw = state.raw
     for axis in raw.axes {
         // A default omitted by CoreText is allowed; a nondefault that is not reported fails.
         let effective = reported[axis.tag] ?? axis.defaultValue
@@ -568,8 +577,9 @@ final class JSONLines {
 }
 
 func run() throws {
-    guard CommandLine.arguments.count == 2 else {
-        throw OracleError.invalid("usage: coretext_extract /path/font.ttc < requests.jsonl > private_oracle.jsonl")
+    let observationsOnly = CommandLine.arguments.count == 3 && CommandLine.arguments[2] == "--axis-observations"
+    guard CommandLine.arguments.count == 2 || observationsOnly else {
+        throw OracleError.invalid("usage: coretext_extract /path/font.ttc [--axis-observations] < requests.jsonl > private_oracle.jsonl")
     }
     let url = URL(fileURLWithPath: CommandLine.arguments[1]).standardizedFileURL.resolvingSymlinksInPath()
     let data = try Data(contentsOf: url, options: [.mappedIfSafe])
@@ -577,6 +587,8 @@ func run() throws {
     let rawFaces = try parseFaces(bytes)
     let states = try locateDescriptors(rawFaces, url: url)
     try emit(["type": "metadata", "schema_version": 1, "backend": "CoreText",
+              "axis_observations_only": observationsOnly,
+              "axis_observation_acceptance": observationsOnly ? "NOT_ACCEPTED_requires_independent_per_request_verification" : "strict_reported_coordinate_check",
               "source_sha256": sha256(data), "source_byte_size": data.count,
               "os_version": ProcessInfo.processInfo.operatingSystemVersionString,
               "source_path": url.path, "face_index_basis": "raw_TTC_directory_order_verified_by_original_table_hashes",
@@ -606,7 +618,8 @@ func run() throws {
             }
             requestCount += 1
             let state = states[request.face_index]
-            let (font, location, reported) = try makeInstance(state, request.location)
+            let (font, location, reported) = try (observationsOnly
+                ? constructInstance(state, request.location) : makeInstance(state, request.location))
             for glyph in request.glyph_ids {
                 do {
                     let result = try autoreleasepool { try extractGlyph(request, glyph, state, font, location, reported, bytes) }

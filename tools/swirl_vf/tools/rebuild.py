@@ -370,6 +370,8 @@ class NativeOracle:
             check(self.metadata.get("type") == "metadata", "native oracle metadata missing")
             check(self.metadata.get("source_sha256") == sha256(source), "native oracle source SHA mismatch")
             check(self.metadata.get("backend") == "CoreText", "need independent CoreText user-coordinate oracle")
+            check(self.metadata.get("axis_observations_only") is not True,
+                  "unverified native axis observations cannot be used for reconstruction")
             check(bool(self.metadata.get("faces"))
                   and all(face.get("status") == "identity_verified" for face in self.metadata.get("faces", [])),
                   "native oracle could not verify every requested physical face")
@@ -377,8 +379,11 @@ class NativeOracle:
             self.close()
             raise
         self.sequence = 0
+        self.successful_glyph_count = 0
+        self.summary = None
 
     def samples(self, face, glyph_ids, location):
+        check(self.summary is None, "native oracle was already finalized")
         self.sequence += 1
         request_id = str(self.sequence)
         request = {"request_id": request_id, "face_index": face,
@@ -408,7 +413,28 @@ class NativeOracle:
             check(gid in glyph_ids and gid not in results, "missing, duplicate or unrelated native glyph")
             check(record.get("error") is None, f"native error on glyph {gid}: {record.get('error')}")
             results[gid] = record
+        self.successful_glyph_count += len(results)
         return results
+
+    def finish(self):
+        """Require the complete native transcript before publishing any TTC."""
+        if self.summary is not None:
+            return self.summary
+        self.proc.stdin.close()
+        line = self.reader.readline(timeout=120.0)
+        check(bool(line), "native oracle ended without a final summary")
+        summary = json.loads(line)
+        check(summary.get("type") == "summary"
+              and summary.get("source_sha256") == self.metadata["source_sha256"]
+              and type(summary.get("error_count")) is int and summary["error_count"] == 0
+              and type(summary.get("request_count")) is int and summary["request_count"] == self.sequence
+              and type(summary.get("successful_glyph_count")) is int
+              and summary["successful_glyph_count"] == self.successful_glyph_count,
+              "native final summary is incomplete or disagrees with accepted requests/glyphs")
+        check(self.reader.readline(timeout=10.0) == "", "native oracle emitted data after its final summary")
+        check(self.proc.wait(timeout=10) == 0, "native oracle failed after its final glyph")
+        self.summary = summary
+        return summary
 
     def close(self):
         if self.reader is not None:
@@ -483,16 +509,68 @@ def validate_io_paths(source, executable, destination, report_path):
               f"{name} already exists; choose a new output/report directory")
 
 
+def checkpoint_source_faces(fonts):
+    """Read every original table once to bind each fresh native session."""
+    faces, hashes = [], {}
+    for index, font in enumerate(fonts):
+        tables = {}
+        for tag, entry in font.reader.tables.items():
+            key = (entry.offset, entry.length)
+            if key not in hashes:
+                hashes[key] = hashlib.sha256(font.reader[tag]).hexdigest()
+            tables[tag] = hashes[key]
+        faces.append({"face_index": index, "upm": font["head"].unitsPerEm,
+                      "glyph_count": font["maxp"].numGlyphs,
+                      "verified_table_sha256": tables})
+    check(bool(faces), "checkpoint source has no physical faces")
+    return faces
+
+
+def identity_digest(value):
+    return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"),
+                                     allow_nan=False).encode("utf-8")).hexdigest()
+
+
+def verify_checkpoint_session_metadata(metadata, source_digest, byte_size, faces):
+    """A new process must independently identify the complete original TTC."""
+    check(metadata.get("source_sha256") == source_digest
+          and type(metadata.get("source_byte_size")) is int
+          and metadata["source_byte_size"] == byte_size,
+          "checkpoint native session source identity differs")
+    actual = metadata.get("faces")
+    check(type(actual) is list and len(actual) == len(faces),
+          "checkpoint native session physical face count differs")
+    for expected, observed in zip(faces, actual):
+        check(type(observed) is dict
+              and all(type(observed.get(key)) is int and observed[key] == expected[key]
+                      for key in ("face_index", "upm", "glyph_count"))
+              and observed.get("verified_table_sha256") == expected["verified_table_sha256"],
+              f"checkpoint native session original table identity differs on face {expected['face_index']}")
+
+
+def verify_session_summary(summary, digest, requests, glyphs):
+    # Keep these checks even for caller-supplied test doubles. NativeOracle also
+    # requires its actual transcript, EOF and successful child-process exit.
+    check(type(summary) is dict and summary.get("type") == "summary"
+          and summary.get("source_sha256") == digest
+          and type(summary.get("error_count")) is int and summary["error_count"] == 0
+          and type(summary.get("request_count")) is int and summary["request_count"] == requests
+          and type(summary.get("successful_glyph_count")) is int
+          and summary["successful_glyph_count"] == glyphs,
+          "native session summary disagrees with this session's accepted requests/glyphs")
+
+
 class FaceCheckpoints:
     """Private, verified whole-face checkpoints; never accept a partial face.
 
-    A file hash binds the exact bytes that passed native sample and serialized
-    coefficient checks. The recipe binds source, oracle, code and dependencies,
+    A file hash binds the exact bytes that passed native sample, serialized
+    coefficient and complete per-face native transcript checks. The recipe
+    binds source, oracle, code and dependencies,
     so changing any of them requires a fresh checkpoint directory. Font bytes
     in this directory are private build inputs, not public CI artifacts.
     """
 
-    def __init__(self, directory, source, executable, protected, settings):
+    def __init__(self, directory, source, executable, protected, settings, source_faces):
         self.directory = Path(directory)
         check(not self.directory.is_symlink(), "checkpoint directory must not be a symlink")
         resolved = self.directory.resolve()
@@ -500,8 +578,11 @@ class FaceCheckpoints:
             check(not path.resolve().is_relative_to(resolved),
                   "checkpoint directory must be separate from source, oracle and final report/output paths")
         code_root = Path(__file__).resolve().parent
-        recipe = {"format": 1, "source_sha256": sha256(source),
+        recipe = {"format": 2, "source_sha256": sha256(source),
                   "oracle_sha256": sha256(executable) if executable.is_file() else None,
+                  "source_identity_sha256": identity_digest(source_faces),
+                  "source_face_identity_sha256": [identity_digest(face) for face in source_faces],
+                  "native_transcript_policy": "independent_complete_native_session_before_each_face_checkpoint",
                   "code_sha256": {name: sha256(code_root / name) for name in
                                   ("rebuild.py", "metric_variations.py", "audit_font.py", "incremental_pipe.py")},
                   "python_version": list(sys.version_info[:3]),
@@ -544,6 +625,7 @@ class FaceCheckpoints:
               f"checkpoint face {index}: verified font bytes changed or missing")
         report = copy.deepcopy(entry["report"])
         count = len(source_font.getGlyphOrder())
+        self.verify_transcript(index, report, count)
         check(report.get("face_index") == index and report.get("glyphs_completed") == count
               and report.get("serialized_model_verification", {}).get("status") == "PASS"
               and report["serialized_model_verification"].get("glyphs_checked") == count,
@@ -557,7 +639,29 @@ class FaceCheckpoints:
         report["restored_from_verified_checkpoint"] = True
         return path, report
 
+    def verify_transcript(self, index, report, glyph_count):
+        recipe = self.state["recipe"]
+        evidence = report.get("native_face_transcript")
+        check(type(glyph_count) is int and glyph_count > 0
+              and type(evidence) is dict and evidence.get("status") == "PASS"
+              and type(evidence.get("session_index")) is int and evidence["session_index"] > 0
+              and type(evidence.get("face_index")) is int and evidence["face_index"] == index
+              and evidence.get("source_sha256") == recipe["source_sha256"]
+              and evidence.get("source_identity_sha256") == recipe["source_identity_sha256"]
+              and evidence.get("source_face_identity_sha256") == recipe["source_face_identity_sha256"][index]
+              and evidence.get("oracle_sha256") == recipe["oracle_sha256"]
+              and evidence.get("source_unchanged") is True
+              and evidence.get("native_metadata_verified_against_all_source_tables") is True
+              and evidence.get("native_summary_eof_exit_accepted") is True
+              and type(evidence.get("request_count")) is int and evidence["request_count"] > 0
+              and type(evidence.get("successful_glyph_count")) is int
+              and evidence["successful_glyph_count"] >= glyph_count,
+              f"checkpoint face {index}: missing or unbound accepted native transcript")
+        verify_session_summary(evidence.get("summary"), recipe["source_sha256"],
+                               evidence["request_count"], evidence["successful_glyph_count"])
+
     def save(self, index, path, report):
+        self.verify_transcript(index, report, report.get("glyph_count", 0))
         digest = sha256(path)
         target = self.directory / f"face-{index}-{digest}.ttf"
         handle, temporary = tempfile.mkstemp(prefix=f"face-{index}-", suffix=".tmp", dir=self.directory)
@@ -593,18 +697,72 @@ def run(source, executable, destination, report_path, batch_size=64,
               "fonttools_version": __import__('fontTools').__version__,
               "outline_limit_font_units": outline_limit, "metric_limit_font_units": metric_limit,
               "faces": [], "failures": [], "status": "RUNNING"}
-    oracle = None
+    oracle = checkpoints = None
+    source_faces = None
+    session_number = session_requests = session_glyphs = 0
     context = {"stage": "native_metadata"}
+
+    def open_session():
+        nonlocal oracle, session_number, session_requests, session_glyphs
+        check(oracle is None, "cannot replace an unfinished native session")
+        check(sha256(source) == report["source_sha256"], "source changed before native session")
+        session_number += 1
+        name = "native-oracle.log" if session_number == 1 else f"native-oracle-session-{session_number}.log"
+        oracle = NativeOracle(executable, source, report_path.parent / name)
+        if source_faces is not None:
+            verify_checkpoint_session_metadata(oracle.metadata, report["source_sha256"],
+                                               source.stat().st_size, source_faces)
+        session_requests = session_glyphs = 0
+        if "oracle" not in report:
+            report["oracle"] = copy.deepcopy(oracle.metadata)
+
+    def native_samples(face, gids, location):
+        nonlocal session_requests, session_glyphs
+        check(oracle is not None, "native session must be opened before sampling")
+        rows = oracle.samples(face, gids, location)
+        check(type(rows) is dict and set(rows) == set(gids), "native batch did not return the exact requested GIDs")
+        session_requests += 1
+        session_glyphs += len(gids)
+        return rows
+
+    def finish_session(face_index=None):
+        nonlocal oracle
+        check(oracle is not None, "native session must exist before finalization")
+        current = oracle
+        try:
+            summary = current.finish()
+            verify_session_summary(summary, report["source_sha256"], session_requests, session_glyphs)
+            check(sha256(source) == report["source_sha256"], "source changed during native session")
+        finally:
+            oracle = None
+            current.close()
+        evidence = {"status": "PASS", "session_index": session_number,
+                    "source_sha256": report["source_sha256"], "source_unchanged": True,
+                    "request_count": session_requests, "successful_glyph_count": session_glyphs,
+                    "native_summary_eof_exit_accepted": True, "summary": copy.deepcopy(summary)}
+        if checkpoints is not None:
+            recipe = checkpoints.state["recipe"]
+            evidence.update(source_identity_sha256=recipe["source_identity_sha256"],
+                            oracle_sha256=recipe["oracle_sha256"],
+                            native_metadata_verified_against_all_source_tables=True)
+            if face_index is not None:
+                evidence.update(face_index=face_index,
+                                source_face_identity_sha256=recipe["source_face_identity_sha256"][face_index])
+            report.setdefault("native_session_summaries", []).append(copy.deepcopy(evidence))
+        return evidence
+
     try:
-        oracle = NativeOracle(executable, source, report_path.parent / "native-oracle.log")
-        report["oracle"] = oracle.metadata
-        checkpoints = None
+        if checkpoint_dir is not None:
+            with TTCollection(source, lazy=True) as checkpoint_source:
+                source_faces = checkpoint_source_faces(checkpoint_source.fonts)
+        open_session()
         if checkpoint_dir is not None:
             checkpoints = FaceCheckpoints(checkpoint_dir, source, executable,
                                           (destination, report_path, report_path.parent / "native-oracle.log"),
                                           {"outline_limit": outline_limit, "metric_limit": metric_limit,
-                                           "max_extra": max_extra})
+                                           "max_extra": max_extra}, source_faces)
             report["private_face_checkpoints"] = True
+            report["checkpoint_transcript_policy"] = "complete_independent_session_before_each_face_checkpoint"
         with TTCollection(source, lazy=True) as original:
             check(len(oracle.metadata.get("faces", [])) == len(original.fonts), "native/source face count mismatch")
             destination.parent.mkdir(parents=True, exist_ok=True)
@@ -621,6 +779,9 @@ def run(source, executable, destination, report_path, batch_size=64,
                             print(f"face={index} restored_verified_glyphs={face_report['glyphs_completed']}",
                                   file=sys.stderr, flush=True)
                             continue
+                        if oracle is None:
+                            context = {"stage": "native_session_metadata", "face_index": index}
+                            open_session()
                     check("MVAR" not in src and "VVAR" not in src,
                           "this reconstruction path has no native font-wide/VVAR metric oracle")
                     for tag in ("GSUB", "GPOS", "BASE"):
@@ -676,7 +837,7 @@ def run(source, executable, destination, report_path, batch_size=64,
                                 context = {"stage": "native_batch", "face_index": index,
                                            "gid_first": gids[0], "gid_last": gids[-1],
                                            "sample_number": sample_number, "user_location": location}
-                                initial.append(oracle.samples(index, gids, location))
+                                initial.append(native_samples(index, gids, location))
                             for gid in gids:
                                 context = {"stage": "glyph_reconstruction", "face_index": index,
                                            "glyph_id": gid}
@@ -711,7 +872,7 @@ def run(source, executable, destination, report_path, batch_size=64,
                                     else:
                                         location = user_location(peak, axes)
                                         context.update(stage="native_adaptive", user_location=location)
-                                        train.append(oracle.samples(index, [gid], location)[gid])
+                                        train.append(native_samples(index, [gid], location)[gid])
                                     attempts += 1
                                     # New independent points after every refinement, never
                                     # report the promoted training point as a passing test.
@@ -721,7 +882,7 @@ def run(source, executable, destination, report_path, batch_size=64,
                                         if p not in tl and p not in hl:
                                             location = user_location(p, axes)
                                             context.update(stage="native_adaptive_holdout", user_location=location)
-                                            hl.append(p); held.append(oracle.samples(index, [gid], location)[gid])
+                                            hl.append(p); held.append(native_samples(index, [gid], location)[gid])
                                 out["glyf"].glyphs[name] = glyph
                                 out["gvar"].variations[name] = tuples
                                 out["hmtx"].metrics[name] = hm
@@ -752,6 +913,8 @@ def run(source, executable, destination, report_path, batch_size=64,
                             face_report["serialized_model_verification"] = verify_serialized_face(out, verified)
                             check(verified["cmap"].compile(verified) == src["cmap"].compile(src), "serialized cmap changed")
                         if checkpoints is not None:
+                            context = {"stage": "native_face_finalization", "face_index": index}
+                            face_report["native_face_transcript"] = finish_session(index)
                             checkpoints.save(index, path, face_report)
                     face_paths.append(path)
                 context = {"stage": "collection_serialization"}
@@ -764,6 +927,25 @@ def run(source, executable, destination, report_path, batch_size=64,
                     collection.save(candidate, shareTables=True)
                     with TTCollection(candidate, lazy=True) as reopened:
                         report["collection_verification"] = verify_collection_tables(face_paths, reopened)
+                context = {"stage": "native_finalization"}
+                if checkpoints is None:
+                    report["oracle_summary"] = finish_session()["summary"]
+                else:
+                    # A build that restores every face still starts one new
+                    # identity-checked session. Its empty transcript must finish
+                    # successfully, and cannot replace the prior face proofs.
+                    if oracle is not None:
+                        finish_session()
+                    summaries = report["native_session_summaries"]
+                    report["oracle_summary"] = {
+                        "type": "summary", "source_sha256": report["source_sha256"], "error_count": 0,
+                        "request_count": sum(s["request_count"] for s in summaries),
+                        "successful_glyph_count": sum(s["successful_glyph_count"] for s in summaries),
+                        "native_session_count": len(summaries), "source_unchanged": True,
+                        "face_transcripts_checked": len(face_paths),
+                        "restored_face_transcripts": sum(bool(f.get("restored_from_verified_checkpoint"))
+                                                         for f in report["faces"]),
+                        "count_scope": "sessions_started_this_run; restored_faces_retain_bound_prior_transcripts"}
                 check(sha256(source) == report["source_sha256"], "source changed during conversion")
                 report["output_sha256"] = sha256(candidate)
                 report["output_size_bytes"] = candidate.stat().st_size

@@ -1,4 +1,4 @@
-# Swirl-VF 最新接续入口：原件 1088 组轮廓已全部通过
+# Swirl-VF 最新接续入口：严格用户轴验收与原件重建
 
 **本文件已更新，旧版“剩余 178 组轮廓错误”不再是当前状态。**
 首先阅读 `docs/SWIRL_VF_USER_AXIS_HANDOFF_20261020.md`，再阅读
@@ -6,6 +6,36 @@
 
 唯一仓库/分支：`SOLHK/Swirl` / `work/core-completion-20261017`。
 接续前必须读取真实远端 HEAD，保留并发 Rust Core / UI 修改，不得强推。
+
+## 2026-10-20 本轮后续进展
+
+已推送字体源码阶段 `0531127a0babcd8242b9d7f81db9f5c9c0202d3c`、
+`ff3b59190ed1a6c6a628aba9e915aaf9eed18247`、
+`4461798c9989d7230affc1d46560f6147b859e8c`、
+`c31edaf04f3a6369e90da026b94aa6cf8176f356`。并发 Core 提交
+`169e0cad51fc18a2d6fa4f194fafd90128bf2f7b`、
+`85f4cb916221fb64b9c07f0cd6fd85bbc7e94883`、
+`54908e2902c28ae20e2588fa5347df9b2b3d76e9` 均保留。
+完整数值、执行范围和历史失败见
+[本轮进展](SWIRL_VF_USER_COORDINATE_PROGRESS_20261020.md)。
+
+- 原生 run [39362516018](https://github.com/SOLHK/Swirl/actions/runs/39362516018)
+  在 c31edaf 检查 32 面、2,692 用户坐标、32 个选择 GID，共 86,144 项/model。
+  四个全局用户轴映射模型均未全部通过；最好的 signed-zero 候选仍有 150 项失败。
+  其中 65 项有可测点误差、最大约 0.45323 FUnit；不能写成全字库通过。
+- 同一运行中 6,912 项垂直原点观测保持默认的 native X 坐标，改变 WDTH 后也不变。
+  当前字宽的一半并不复现这些 API 观测；奇数字宽还出现半单位差。
+  必须继续看实际 CTFrame/CTRun 绘制，不能擅自覆盖原始度量。
+- 原生 run [39362516053](https://github.com/SOLHK/Swirl/actions/runs/39362516053)
+  仍在原始 WDTH guard 阻断重建，0 面完成、无输出。缓存顺序诊断通过不等于字体完成。
+- 本次代码加入独立逐请求验证适配器：原始 `1e-6` guard 默认不变；显式未接受的
+  observation 协议必须经过源表身份、非默认轴回读及所有请求 GID 的 typed commands、
+  bounds、原始度量精确对照。只有整批通过才输出给重建器。新原生运行尚待核实。
+- 严格 849/850 CoreText API 测试继续保留。SourceTables 度量适配仅支持已验证 identity
+  avar 的原创标准字体，拒绝 Apple HVGL。尚无原版字体 Windows 11 或 Qt/Swirl 验收。
+
+不要把新的 observation 参数直接交给重建器，也不要把候选坐标规则当作 Apple 官方契约。
+原有 141 项 HVAR 量化疑点仍保留。
 
 ## 已实际完成
 
