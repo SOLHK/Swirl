@@ -474,14 +474,25 @@ QVariantMap FontManager::fittedText(const QFont &font, const QString &text,
         const auto wider=qMin(normal,previousWidth+normal*.02);
         if(current<=availableWidth+2&&widthAt(wider)>availableWidth-2){axes["wdth"]=previousWidth;result["axes"]=axes;result["fitted"]=true;return result;}
     }
+    // Sample the bounded domain without assuming advance is monotonic. Prefer
+    // the least compressed coordinate that actually fits; if none fits, use
+    // the smallest *measured* advance rather than the last sampled coordinate.
+    // A 10% axis movement can cause a much larger advance change, so impose
+    // an independent 85% measured-advance readability floor.
     double chosen=normal;
-    for(int step=1;step<=5;++step){
-        const double candidate=qMax(minimum,normal*(1.-step*.02));
+    double bestAdvance=natural;
+    bool foundFit=false;
+    for(int step=1;step<=10;++step){
+        const double candidate=qMax(minimum,normal*(1.-step*.01));
         const double width=widthAt(candidate);
-        // Some fonts expose wdth but keep advances invariant. Do not claim a
-        // layout fit or distort their outlines when they offer no useful space.
-        if(width<natural-.5)chosen=candidate;
-        if(width<=availableWidth-2||candidate==minimum)break;
+        if(!std::isfinite(width)||width<natural*.85||width>=natural-.5)
+            continue;
+        if(width<=availableWidth-2){
+            if(!foundFit||candidate>chosen){chosen=candidate;bestAdvance=width;}
+            foundFit=true;
+        }else if(!foundFit&&width<bestAdvance-.5){
+            chosen=candidate;bestAdvance=width;
+        }
     }
     if(chosen<normal){axes["wdth"]=chosen;result["axes"]=axes;result["fitted"]=true;}
     return result;
