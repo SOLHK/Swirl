@@ -93,6 +93,10 @@ class SourceMetricsTests(unittest.TestCase):
             self.assertEqual(actual['vertical_origin_y'], top)
             self.assertEqual(actual['advance_height'], 1000)
             self.assertEqual(actual['vertical_origin_basis'], 'source_VORG')
+            self.assertEqual(actual['vertical_origin_x_basis'],
+                             'DirectWrite_horizontal_origin_plus_half_current_advance_not_stored_in_VORG')
+            self.assertFalse(actual['vertical_origin_x_is_native_observation'])
+            self.assertEqual(actual['native_HVGL_vertical_origin_x_acceptance'], 'NOT_ESTABLISHED')
         self.assertAlmostEqual(provider.at(2, {'WDTH': .5, 'wght': -.5, 'HGHT': .75})[
             'advance_width'], 738.75)
 

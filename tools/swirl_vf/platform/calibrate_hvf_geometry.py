@@ -132,14 +132,16 @@ def discrepancy(wanted, actual):
         if len(left)!=len(right): raise ValueError('segment_count_differs')
         if not left: continue
         count=len(left)
+        # This branch keeps each array's original subtraction and dtype. Only
+        # the padded vector branch below needs a canonical shape/type guard.
+        if count<=16:
+            max_error=max(max_error,_small_cycle_minimum(left,right)); tested+=count
+            continue
         if not all(kind in ('L','Q') and isinstance(values,np.ndarray)
                    and values.dtype==np.dtype('float64')
                    and values.shape==(4 if kind=='L' else 6,)
                    for kind,values in left+right):
             max_error=max(max_error,_scalar_cycle_minimum(left,right)); tested+=count
-            continue
-        if count<=16:
-            max_error=max(max_error,_small_cycle_minimum(left,right)); tested+=count
             continue
         left_kinds=np.asarray([kind for kind,_ in left])
         right_kinds=np.asarray([kind for kind,_ in right])

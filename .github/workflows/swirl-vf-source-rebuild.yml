@@ -132,6 +132,12 @@ jobs:
           python tools/swirl_vf/platform/compare_axis_construction.py \
             /System/Library/PrivateFrameworks/FontServices.framework/Versions/A/Resources/Reserved/PingFangUI.ttc \
             --output build/axis-summary/construction.json
+      - name: Compare independent request orders and readback-created instances
+        if: always()
+        run: |
+          python tools/swirl_vf/platform/probe_axis_cache.py \
+            /System/Library/PrivateFrameworks/FontServices.framework/Versions/A/Resources/Reserved/PingFangUI.ttc \
+            --output build/axis-summary/cache.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:

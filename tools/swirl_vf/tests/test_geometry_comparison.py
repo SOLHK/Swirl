@@ -107,7 +107,11 @@ class GeometryComparisonTests(unittest.TestCase):
         for wanted, actual in (([], [line]), ([line], [[]]),
                                ([contour(rng, 4, ['L', 'L', 'Q', 'Q'])],
                                 [contour(rng, 4, ['L', 'Q', 'L', 'Q'])]),
-                               ([line], [contour(rng, 1, ['Q'])])):
+                               ([line], [contour(rng, 1, ['Q'])]),
+                               ([contour(rng, 19, ['L'] * 19)],
+                                [contour(rng, 19, ['Q'] * 19)]),
+                               ([contour(rng, 20, ['L'] * 10 + ['Q'] * 10)],
+                                [contour(rng, 20, ['L', 'Q'] * 10)])):
             self.equal_result(wanted, actual)
 
     def test_empty_contours_zero_length_segments_and_reverse_order_are_preserved(self):
@@ -121,11 +125,13 @@ class GeometryComparisonTests(unittest.TestCase):
 
     def test_noncanonical_numeric_inputs_retain_scalar_behavior(self):
         for dtype in (np.float32, np.int64):
-            original = [('L', np.asarray([10, 20, 30, 40], dtype=dtype))]
-            actual = [('L', np.asarray([11, 21, 31, 41], dtype=dtype))]
-            self.equal_result([original], [actual])
-        self.equal_result([[('legacy', np.asarray([1., 2., 3.]))]],
-                          [[('legacy', np.asarray([2., 3., 4.]))]])
+            for count in (1, 19):
+                original = [('L', np.asarray([10 + i, 20, 30, 40], dtype=dtype)) for i in range(count)]
+                actual = [('L', np.asarray([11 + i, 21, 31, 41], dtype=dtype)) for i in range(count)]
+                self.equal_result([original], [actual[7:] + actual[:7]])
+        for count in (1, 21):
+            self.equal_result([[('legacy', np.asarray([1. + i, 2., 3.])) for i in range(count)]],
+                              [[('legacy', np.asarray([2. + i, 3., 4.])) for i in range(count)]])
 
 
 if __name__ == '__main__':

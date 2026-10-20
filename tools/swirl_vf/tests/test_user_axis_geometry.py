@@ -9,7 +9,7 @@ from fontTools.ttLib import TTCollection
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "platform"))
 from probe_user_axis_geometry import (MODELS, axis_records, coretext_paths, discrepancy,
-    make_harness, map_location, new_stats, record_check, requests_for_face)
+    make_harness, map_location, new_stats, record_check, requests_for_face, render_face_references)
 from compare_axis_construction import GUARD
 from test_coretext_extract import make_fixture
 
@@ -69,6 +69,25 @@ class UserAxisGeometryTests(unittest.TestCase):
         self.assertEqual((a["failures"], b["failures"]), (1, 1))
         self.assertEqual(a["maximum_point_error"], .04)
         self.assertEqual(a["examples"][0]["glyph_id"], 2)
+
+    def test_batched_reference_keeps_each_original_analytic_position_and_model(self):
+        from batch_geometry import BatchGeometry
+        from hvf import HVGL
+        from test_hvf import table, shape
+        renderer = BatchGeometry(HVGL(table([shape()])))
+        values = np.linspace(-1., 1., 7 * len(MODELS)).reshape(7, len(MODELS))
+        mapped = [{m: {"WDTH": float(values[p, i]), "wght": 0., "HGHT": 0.}
+                   for i, m in enumerate(MODELS)} for p in range(7)]
+        batch = render_face_references(renderer, [0], mapped)[0]
+        self.assertEqual(batch.sample_count, values.size)
+        self.assertEqual(batch.sources[0].part_index, 0)
+        for p in range(7):
+            for i in range(len(MODELS)):
+                v = values[p, i]
+                # Independent original affine fixture: negative/positive sides
+                # translate by 10/20 respectively, with no y displacement.
+                np.testing.assert_array_equal(batch.paths[0][p*len(MODELS)+i, 0],
+                                              [v*(10 if v < 0 else 20), 0.])
 
 
 if __name__ == "__main__":

@@ -6,6 +6,8 @@ on:
     paths:
       - '.github/workflows/swirl-vf-user-geometry.yml'
       - 'tools/swirl_vf/platform/probe_user_axis_geometry.py'
+      - 'tools/swirl_vf/platform/axis_geometry_candidates.py'
+      - 'tools/swirl_vf/platform/probe_vertical_origins.py'
       - 'tools/swirl_vf/tools/user_axis_mapping.py'
   workflow_dispatch:
 
@@ -35,4 +37,28 @@ jobs:
         with:
           name: swirl-vf-user-geometry-${{ github.sha }}
           path: build/user-geometry-summary/*.json
+          retention-days: 7
+
+  original-vertical-origins:
+    runs-on: xcode-27
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compare actual original vertical origins with independent metric hypotheses
+        run: |
+          python -m pip install fonttools==4.61.1 numpy==2.2.6
+          python tools/swirl_vf/platform/probe_vertical_origins.py \
+            /System/Library/PrivateFrameworks/FontServices.framework/Versions/A/Resources/Reserved/PingFangUI.ttc \
+            --output build/vertical-origin-summary/origins.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: swirl-vf-vertical-origins-${{ github.sha }}
+          path: build/vertical-origin-summary/*.json
           retention-days: 7

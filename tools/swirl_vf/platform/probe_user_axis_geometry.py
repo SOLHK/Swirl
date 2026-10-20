@@ -27,6 +27,7 @@ from fontTools.ttLib import TTCollection
 from calibrate_hvf_geometry import EXPECTED, LIMIT, discrepancy, native_paths, portable_paths, select_glyphs
 from calibrate_avar_metrics import normalize, ordered_intervals
 from compare_axis_construction import GUARD
+from axis_geometry_candidates import map_signed_zero_raw_order, targeted_user_locations
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 from audit_font import raw_avar
@@ -35,7 +36,8 @@ from hvf import HVGL
 from rebuild import NativeOracle, user_location
 from source_metrics import SourceMetrics
 
-MODELS = ("raw_order_float", "raw_order_final_f2dot14", "raw_order_two_f2dot14")
+MODELS = ("raw_order_float", "raw_order_final_f2dot14", "raw_order_two_f2dot14",
+          "signed_zero_raw_order_two_f2dot14")
 
 
 def require(value, message):
@@ -91,6 +93,9 @@ def map_location(font, records, location, model):
     result = {}
     for axis in font["fvar"].axes:
         value = normalize(location[axis.axisTag], axis.minValue, axis.defaultValue, axis.maxValue)
+        if model == "signed_zero_raw_order_two_f2dot14":
+            result[axis.axisTag] = map_signed_zero_raw_order(value, records[axis.axisTag])
+            continue
         if model == "raw_order_two_f2dot14":
             value = math.floor(value * 16384 + .5) / 16384
         mapped = 0. if value == 0. else ordered_intervals(records[axis.axisTag], value)
@@ -123,6 +128,11 @@ def requests_for_face(font, face):
         key = tuple(location[tag] for tag in tags)
         if key not in seen:
             result.append(location); seen.add(key)
+    for item in targeted_user_locations(axes):
+        location = item["location"]
+        key = tuple(location[tag] for tag in tags)
+        if key not in seen:
+            result.append(location); seen.add(key)
     return result
 
 
@@ -132,6 +142,7 @@ def new_stats():
 
 def record_check(stats, face, gid, location, comparison):
     stats["checks"] += 1
+    error = None
     try:
         error = comparison()
         require(math.isfinite(error), "nonfinite_comparison")
@@ -141,9 +152,18 @@ def record_check(stats, face, gid, location, comparison):
         reason = str(failure)
         stats["failures"] += 1
         stats["failure_types"][reason] = stats["failure_types"].get(reason, 0) + 1
-        if len(stats["examples"]) < 12:
+        if len(stats["examples"]) < 2048:
             stats["examples"].append({"face_index": face, "glyph_id": gid,
-                                      "user_location": location, "reason": reason})
+                                      "user_location": location, "reason": reason,
+                                      "maximum_point_error": error})
+
+
+def render_face_references(renderer, selected, mapped_locations):
+    """Batch only deterministic portable calculations; native requests stay separate."""
+    designs = np.asarray([list(mapped[model].values())
+                          for mapped in mapped_locations for model in MODELS])
+    return {gid: renderer.render(gid, designs[:, :renderer.table.part(gid).axis_count])
+            for gid in selected}
 
 
 def run(source, output):
@@ -156,6 +176,8 @@ def run(source, output):
               "production_readback_guard_unchanged": True, "models": {m: new_stats() for m in MODELS},
               "request_vs_reported_instance": new_stats(), "readback_differences": 0,
               "raw_metric_differences": {}, "faces": []}
+    report["new_candidate_scope"] = "signed_zero_geometry_hypothesis_not_HVAR_mapping_acceptance"
+    report["retained_prior_HVAR_quantization_disagreements"] = 141
     output.parent.mkdir(parents=True, exist_ok=True)
     def save():
         output.write_text(json.dumps(report, indent=2, allow_nan=False) + "\n")
@@ -181,8 +203,13 @@ def run(source, output):
                 require(hashlib.sha256(font.reader["hvgl"]).hexdigest() == hvgl_hash, "unshared_source_geometry")
                 records = axis_records(font); positions = requests_for_face(font, face)
                 metrics = SourceMetrics(font)
+                mapped_locations = [{m: map_location(font, records, location, m) for m in MODELS}
+                                    for location in positions]
+                # Evaluation has no cross-sample state. Keep every native face,
+                # request and metric observation; batch only this pure reference.
+                reference_batches = render_face_references(renderer, selected, mapped_locations)
                 start = report["models"][MODELS[0]]["checks"]
-                for location in positions:
+                for position_number, location in enumerate(positions):
                     original = oracle.samples(face, selected, location)
                     reported = {a.axisTag: original[selected[0]]["reported_location"].get(a.axisTag, a.defaultValue)
                                 for a in font["fvar"].axes}
@@ -191,23 +218,30 @@ def run(source, output):
                     changed = any(reported[k] != location[k] for k in location)
                     report["readback_differences"] += changed
                     echoed = oracle.samples(face, selected, reported) if changed else original
-                    mapped = {m: map_location(font, records, location, m) for m in MODELS}
-                    design = [list(mapped[m].values()) for m in MODELS]
+                    mapped = mapped_locations[position_number]
                     for gid in selected:
                         actual = coretext_paths(original[gid]["commands"])
                         record_check(report["request_vs_reported_instance"], face, gid, location,
                                      lambda: discrepancy(actual, coretext_paths(echoed[gid]["commands"]))[0])
-                        batch = renderer.render(gid, np.asarray(design)[:, :table.part(gid).axis_count])
+                        batch = reference_batches[gid]
                         for i, model in enumerate(MODELS):
+                            sample_index = position_number * len(MODELS) + i
                             record_check(report["models"][model], face, gid, location,
-                                lambda i=i: discrepancy(portable_paths([p[i] for p in batch.paths]), actual)[0])
+                                lambda i=sample_index: discrepancy(portable_paths([p[i] for p in batch.paths]), actual)[0])
                         ideal = metrics.at(gid, mapped["raw_order_final_f2dot14"])
                         for field in ("advance_width", "advance_height", "vertical_origin_x", "vertical_origin_y"):
                             difference = abs(original[gid][field] - ideal[field])
                             item = report["raw_metric_differences"].setdefault(field, {"checks": 0, "over_budget": 0, "maximum_error": 0.})
                             item["checks"] += 1; item["over_budget"] += difference > LIMIT
+                            if difference > item["maximum_error"]:
+                                item["maximum_error_context"] = {"face_index": face, "glyph_id": gid,
+                                    "user_location": location, "reported_location": reported,
+                                    "raw_native_value": original[gid][field], "source_table_value": ideal[field],
+                                    "source_design_coordinates": mapped["raw_order_final_f2dot14"]}
                             item["maximum_error"] = max(item["maximum_error"], difference)
                     report["user_positions"] += 1
+                    if position_number % 16 == 15:
+                        save()
                 report["faces_completed"] += 1
                 report["faces"].append({"face_index": face, "positions": len(positions),
                     "glyph_instances": report["models"][MODELS[0]]["checks"] - start})
@@ -220,6 +254,7 @@ def run(source, output):
         finally:
             oracle.close()
     report["source_unchanged"] = hashlib.sha256(source.read_bytes()).hexdigest() == EXPECTED
+    require(report["source_unchanged"], "source_changed_during_native_comparison")
     report["models_passing_entire_sample"] = [m for m in MODELS if not report["models"][m]["failures"]]
     report["status"] = "SAMPLED_USER_GEOMETRY_PASS" if report["models_passing_entire_sample"] else "USER_GEOMETRY_MODELS_REJECTED"
     save()

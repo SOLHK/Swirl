@@ -5,8 +5,17 @@ does not normalize user axes, interpret avar, round coordinates, modify the font
 or claim that CoreText returned its values. In particular, native integer
 vertical advances and missing blank-glyph origins remain separate evidence.
 
+The returned vertical_origin_x is the standard DirectWrite convention, the
+horizontal origin plus half the current advance width. Neither vmtx nor VORG
+stores this x coordinate; VORG supplies y only. Native measurements of the
+original HVGL font have rejected the assumption that CoreText always returns
+this x value. For HVGL it remains a standard-platform reference, never an
+accepted native-origin model or authorization for conversion.
+
 References: OpenType hmtx, vmtx, HVAR, VVAR, VORG, and gvar specifications;
 fontTools' VarStoreInstancer and supportScalar are used through their public APIs.
+https://learn.microsoft.com/en-us/typography/opentype/spec/vmtx
+https://learn.microsoft.com/en-us/windows/win32/api/dwrite/ns-dwrite-dwrite_glyph_metrics
 """
 from __future__ import annotations
 
@@ -182,5 +191,10 @@ class SourceMetrics:
                 'horizontal_origin_x': origin_x, 'horizontal_origin_y': 0.,
                 'vertical_origin_x': origin_x + width / 2, 'vertical_origin_y': origin_y,
                 'metric_source': 'unhinted_standard_source_tables_not_CoreText_API',
+                'vertical_origin_x_basis': 'DirectWrite_horizontal_origin_plus_half_current_advance_not_stored_in_VORG',
+                'vertical_origin_x_is_native_observation': False,
+                'native_HVGL_vertical_origin_x_acceptance': 'NOT_ESTABLISHED',
+                # This basis describes the y component only; x uses the
+                # separately labelled standard-platform reference above.
                 'vertical_origin_basis': basis,
                 'normalized_design_location': dict(normalized_coordinates)}

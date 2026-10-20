@@ -82,6 +82,47 @@ fontTools VarStoreInstancer/VariationModel; Skia TypefaceMacTest at
 709209322f9597b6712079a4386f4d1c7e9b5d44; HarfBuzz and Fontations raw avar
 compatibility handling. These sources inform falsifiable hypotheses, not an
 assumption that Apple's entire implementation matches one candidate.
+# Fourth implementation checkpoint: native counterexamples and batched references
+
+The exact-source user-coordinate run `39359956472` completed at
+`ff3b59190ed1a6c6a628aba9e915aaf9eed18247`: 32 faces, 2,328 user positions
+and 74,496 glyph checks per model. The raw/final-F2/two-F2 models retained
+454/290/290 failures respectively; none passes the entire sample. Some are
+strict L/Q correspondence failures rather than a measured large path error.
+Requested versus readback-created native paths had zero discrepancy in all
+74,496 comparisons. This did not compare every raw metric or prove a universal
+coordinate mapping, and is not complete-font acceptance.
+
+At `4461798c9989d7230affc1d46560f6147b859e8c`, run `39361349404`
+reproduced the original blocker at face 0, GIDs 0–63, sample 41, location
+WDTH=600.5859375, wght=368.22259521484375, HGHT=975.7080078125.
+All 32 source faces verified; zero glyphs/faces completed and no output font.
+CFNumber direct reads, NSNumber and descriptor metadata agree on the stored
+limited readback, so this is not merely a JSON display or NSNumber read issue.
+
+Run `39361349387` actually passed the 174-record analytical native-path and
+source-table-metric gate (native control-point error <=0.00660285213 FUnit),
+plus two six-record static gates. Its full synthetic reconstruction remains
+blocked by the same WDTH assertion; the raw API gate still fails at 849/850.
+Python and Windows Server DirectWrite jobs passed, not Windows 11 acceptance.
+
+The original native data also rejects current-width/2 as a universal Apple
+vertical-origin-X interpretation (38,775/74,496 outside 1/32; max126.398987).
+The standard SourceMetrics X convention is now explicitly labelled; the
+HVGL adapter remains refused. A separate native origin probe tests predeclared
+current/default/static-width hypotheses. No original metric was overwritten.
+
+The portable reference computation is now batched across a whole face. Private
+face-0 equivalence testing checked all 7,200 glyph/model positions: identical
+source topology and maximum raw coordinate difference 0.0. Pure rendering CPU
+was 96.3299s versus 2.3830s; parsing/native work is excluded from this ratio.
+All per-face native observations remain independent. The revised diagnostic
+preserves the old models, adds a separately falsifiable signed-zero hypothesis,
+adds targeted counterexample coordinates and retains more failure context.
+
+Local checkpoint regression: **202/202 Python tests pass**. Original 141 HVAR
+quantization disagreements are retained, not relabelled as fixed.
+
 # Third implementation checkpoint: transparent metric provenance
 
 The xcode-27 run at `0531127a0babcd8242b9d7f81db9f5c9c0202d3c`
