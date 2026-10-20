@@ -1,0 +1,61 @@
+name: Swirl VF C1 private staging infrastructure
+
+on:
+  push:
+    branches: [work/vf-rebuild-c1]
+    paths:
+      - '.github/workflows/swirl-vf-rebuild-c1.yml'
+      - 'tools/swirl_vf/**'
+      - 'docs/SWIRL_VF_REBUILD_C1_*.md'
+  pull_request:
+    branches: [work/core-completion-20261017]
+    paths:
+      - '.github/workflows/swirl-vf-rebuild-c1.yml'
+      - 'tools/swirl_vf/tools/ttc_staging_*.py'
+      - 'tools/swirl_vf/tests/test_ttc_staging_*.py'
+      - 'tools/swirl_vf/platform/rebuild_c1_*.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: swirl-vf-rebuild-c1-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  staging:
+    name: C1 synthetic staging (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022, macos-14]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install the frozen reconstruction dependencies
+        run: python -m pip install fonttools==4.61.1 numpy==2.2.6
+      - name: Original synthetic TTC, checkpoint and fail-closed tests
+        run: python -m unittest discover -s tools/swirl_vf/tests -p "test_ttc_staging_*.py" -v
+      - name: Existing portable algorithm regressions
+        if: runner.os == 'Linux'
+        run: python -m unittest discover -s tools/swirl_vf/tests -v
+      - name: Original source audit tests
+        if: runner.os == 'Linux'
+        run: python -m unittest discover -s tools/swirl_vf/audit -p "test_*.py" -v
+      - name: No private font or staging data in tracked files
+        shell: python
+        run: |
+          import subprocess
+          paths = subprocess.check_output(['git', 'ls-files', 'tools/swirl_vf'], text=True).splitlines()
+          bad = [p for p in paths if p.lower().endswith(('.ttc', '.ttf', '.otf', '.woff', '.woff2', '.jsonl'))]
+          if bad:
+              raise SystemExit('Private font data is not allowed in tracked C1 files')
+          print('Source and original fixture generators only; production acceptance remains blocked.')
