@@ -125,7 +125,27 @@ New files: `platform/axis_threshold_cases.py`, `platform/probe_axis_thresholds.p
 `tools/swirl_vf`, and `.github/workflows/swirl-vf-axis-thresholds.yml`. This is a
 diagnostic executable, **not a production mapping repair**. Native results are
 pending at this source checkpoint; no formula, font or continuous-space pass is
-declared. The source and final run evidence will be recorded separately.
+declared. Exact source `f51d262352a638d2256f5757171d6e3823a387a7` was pushed
+non-forcibly and the independently queried remote HEAD matched. Native
+[39381634460](https://github.com/SOLHK/Swirl/actions/runs/39381634460), job
+118491837396, is **IN_PROGRESS**, not PASS, at this documentation checkpoint.
+On continuation, read its actual final status/artifact before changing a mapper.
+
+Same-source synthetic run
+[39381634228](https://github.com/SOLHK/Swirl/actions/runs/39381634228) has finished:
+Python and Windows DirectWrite **success**; Apple **failure** at the unchanged
+849/850 assertion, tolerance 0.03125 (actual log job 118491836755 read).
+The production Swift guard still passes its 22 cases. No new native metric pass
+or accepted original font is implied. Compared with the starting remote HEAD,
+the existing HVGL, batch geometry, transform, tangent and rebuild source files
+are unchanged; all 15 changed paths remain within font tooling/documentation.
+
+Concurrent work preserved: while the native threshold job was running, remote
+HEAD advanced from `f51d262352a638d2256f5757171d6e3823a387a7` to
+`b096ffac75eec057a901a792a4e81718263943bc` (subscription boundary/URI intent
+repair and its independent Core handoff). The complete changed-path list was
+inspected: no font-file overlap. Local synchronization is a fast-forward, and
+this font handoff is based on that newer commit; no force push or Core rewrite.
 
 The original fvar-only preflight creates **1,724 user positions**, 35 selected
 GIDs (the established structural set plus the four HVAR controls), and plans
