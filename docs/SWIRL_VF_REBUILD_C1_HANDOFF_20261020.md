@@ -242,9 +242,80 @@ not that the shared defects were repaired or production acceptance was granted.
    comparison. Actual logs were read; the following stage repairs that native
    stat distinction while retaining per-path/per-handle snapshots and SHA checks.
 
-The exact final source SHA, test counts and final run results are appended after
-the final execution completes. A queued or running check is never recorded as
-passing. Documentation-only final evidence updates do not rerun unchanged code.
+3. [`96e99cd72db72b89b7f6d89ef56591a6674db01d`](https://github.com/SOLHK/Swirl/commit/96e99cd72db72b89b7f6d89ef56591a6674db01d):
+   complete synthetic reconstruction/recovery, preserved source contracts,
+   bounded encoding, Windows identity repair, eager/lazy layout parity and
+   explicit physical-face object release. Final local execution passed
+   **150 C1 tests in 32.450 s, all 598 tests in 62.220 s, and 6 audit tests**.
+   There were **zero skipped tests**. Local Python was 3.12.14 on Linux;
+   FontTools 4.61.1, NumPy 2.2.6 and uharfbuzz 0.52.0 matched the CI pins.
+
+### Final cross-platform evidence
+
+[Run 39401050976](https://github.com/SOLHK/Swirl/actions/runs/39401050976)
+executed source `96e99cd72db72b89b7f6d89ef56591a6674db01d`, attempt 1,
+from 2026-10-20 09:29:33 to 09:31:30 UTC, with overall **SUCCESS**.
+All three completed job logs were fetched and read; these are execution
+results, not inferred from workflow configuration.
+
+| Host and actual Python | C1 execution | Additional execution | Final job |
+| --- | --- | --- | --- |
+| Ubuntu 24.04, Python 3.12.15 | 150/150, 8.694 s | 47,102-GID stress; full 598/598, 19.247 s; audit 6/6 | [SUCCESS](https://github.com/SOLHK/Swirl/actions/runs/39401050976/job/118555573278) |
+| macOS 14 arm64, Python 3.12.10 | 150/150, 6.287 s | 127-GID stress and temporary-font cleanup | [SUCCESS](https://github.com/SOLHK/Swirl/actions/runs/39401050976/job/118555573026) |
+| Windows Server 2022, Python 3.12.10 | 150/150, 23.857 s | 127-GID stress and temporary-font cleanup | [SUCCESS](https://github.com/SOLHK/Swirl/actions/runs/39401050976/job/118555573242) |
+
+All executed test suites reported plain `OK`, with no skipped test cases.
+The full-size stress, complete portable suite and audit suite are deliberately
+Linux-only workflow steps; conditional non-Linux step skips are not executions
+of those suites. The tracked-private-font-data gate passed on all three hosts.
+
+### Final full-size stress at the validated source SHA
+
+This is the new Linux execution with the corrected lazy layout checker and
+final packer. The separate earlier local measurement above remains historical.
+
+| Measurement | Final CI result |
+| --- | ---: |
+| Original synthetic physical faces | 1 |
+| GIDs / outline points | 47,102 / 197,820 |
+| gvar tuples / horizontal and vertical metric models | 471,020 / 94,204 |
+| Checked layout glyph references / tables | 12 / 21 |
+| Standalone / TTC bytes | 9,083,480 / 9,083,496 |
+| Fixture generation | 29.816684497 s |
+| Complete source validation | 40.775070548 s |
+| Streaming TTC packing | 2.292885215 s |
+| Reopening and GID-boundary check | 0.039834645 s |
+| Total including temporary-file cleanup | 74.082251084 s |
+| Copy block | 65,536 bytes |
+| Packing-only tracemalloc peak | 191,961 bytes (187.46 KiB) |
+| Whole-process peak RSS | 664,858,624 bytes (634.06 MiB) |
+
+Original synthetic standalone SHA-256:
+`1db6d53911071a378c2c44c8e0773639d63b55c13f2fc48c399bdb5ef1740b3b`.
+Temporary synthetic TTC SHA-256:
+`3ecbba1f14bc31af0180c8b063b2e9974ec44f58497b7b8d9b213ec403cbe473`.
+The script confirmed cleanup; neither generated font was committed or uploaded.
+
+The Windows stress reports unavailable process RSS as `null`; it does not
+invent a measurement. Its 127-GID synthetic TTC and the macOS equivalent had
+the same SHA-256, `d22cf9b795edd79de6aeb25c938042ebf6efaaa434c2a3c2248c01c0a92d3691`.
+That observation is limited to those original fixtures and executions.
+
+The final read-only preflight without a private source returned exit **2** and
+`BLOCKED`, with A3/B1 `NOT_INTEGRATED`, `source_identity_verified=false`,
+`production_rebuild_permitted=false`, `production_acceptance=false`,
+`font_generated=false`, `reconstructed_faces=0` and Windows acceptance `NOT_RUN`.
+No original source identity or original table inventory is claimed as checked.
+
+There are no failing C1 tests at the validated source SHA. Earlier macOS and
+Windows CI failures, lazy-reference underchecking and previous-face retention
+were repaired and covered by regressions. Remaining blockers are the A3/B1
+production interfaces, the two shared-entry defects documented above, original
+all-GID reconstruction and independent target-platform acceptance.
+
+This final evidence update changes only this document. Its parent is the exact
+validated source SHA above; no code or workflow was changed after that CI run.
+Documentation-only evidence commits do not rerun unchanged code.
 
 ## Next production integration boundary
 
