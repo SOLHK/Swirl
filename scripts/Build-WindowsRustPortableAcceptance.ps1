@@ -171,7 +171,8 @@ Swirl Rust 便携联网测试包（开发验收版）
 包内自带 PowerShell 7；你不需要单独安装，也不需要先打开 CMD 再双击 Swirl.exe。
 
 脚本不会关闭/暂停 Mihomo，不会修改 Windows 系统代理、TUN、路由或 DNS。
-每个 curl 请求最多 20 秒，整轮子进程最多 270 秒；如果某项失败，会显示 FAIL 并保留脱敏结果。
+原六项每个 curl 请求最多 20 秒，整轮子进程最多 600 秒；如果某项失败，会显示 FAIL 并保留脱敏结果。
+若原明文 HTTP 请求失败，脚本会用另一公开地址做最多 8 秒的单独对照；对照成功也不覆盖原六项 FAIL。
 “Swirl Rust 显式代理 PASS”只证明本次请求通过测试版 Swirl Rust；完整 Mihomo 独立性仍需另外证明。
 如果 D 盘加密 NodeStore 副本不存在，脚本会报告 BLOCKED，不会尝试下载订阅。
 '@ | Set-Content -LiteralPath (Join-Path $stage 'README-先看.txt') -Encoding utf8

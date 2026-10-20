@@ -10,7 +10,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $proxyPort = 17988
-$result = [ordered]@{ status='BLOCKED'; identity=$null; requests=@(); independence='独立性未证实'; pre=$null; post=$null; reason='' }
+$result = [ordered]@{ status='BLOCKED'; identity=$null; requests=@(); diagnostics=@(); independence='独立性未证实'; pre=$null; post=$null; reason='' }
 $started = $null
 
 function Save-AcceptanceProgress {
@@ -198,13 +198,13 @@ function Wait-RustTrafficCounters($before) {
     return $latest
 }
 
-function Invoke-Probe([string]$name,[string]$url,[string]$scheme,[bool]$tunnel,[int]$testPid) {
+function Invoke-Probe([string]$name,[string]$url,[string]$scheme,[bool]$tunnel,[int]$testPid,[int]$expectedHttp,[string]$expectedBody,[int]$timeoutSeconds=20) {
     if ((Get-ListenerPid) -ne $testPid) { throw '17988 listener ownership changed during request.' }
     $bodyPath = Join-Path $WorkDirectory ($name + '.body')
     $proxy = if ($scheme -eq 'socks5h') { 'socks5h://127.0.0.1:17988' } else { 'http://127.0.0.1:17988' }
     # curl --write-out fields are cumulative seconds and body byte counts;
     # see https://curl.se/docs/manpage.html#-w for the primary definitions.
-    $args = @('--disable','--silent','--max-time','20','--proxy',$proxy,
+    $args = @('--disable','--silent','--max-time',"$timeoutSeconds",'--proxy',$proxy,
         '--noproxy=','--output',$bodyPath,'--write-out',
         '{"http_code":%{http_code},"http_connect":%{http_connect},"time_connect":%{time_connect},"time_appconnect":%{time_appconnect},"time_pretransfer":%{time_pretransfer},"time_starttransfer":%{time_starttransfer},"time_total":%{time_total},"size_request":%{size_request},"size_upload":%{size_upload},"size_download":%{size_download},"proxy_used":%{proxy_used},"ssl_verify_result":%{ssl_verify_result}}')
     if ($tunnel) { $args += '--proxytunnel' }
@@ -235,11 +235,10 @@ function Invoke-Probe([string]$name,[string]$url,[string]$scheme,[bool]$tunnel,[
     $bodyValid = $false
     if ($null -ne $data -and (Test-Path -LiteralPath $bodyPath)) {
         $bytes = [IO.File]::ReadAllBytes($bodyPath)
-        if ($url.StartsWith('http://')) { $bodyValid = [Text.Encoding]::UTF8.GetString($bytes).Trim() -ceq 'Microsoft Connect Test' }
-        else { $bodyValid = $bytes.Length -eq 0 }
+        if ($expectedBody.Length -eq 0) { $bodyValid = $bytes.Length -eq 0 }
+        else { $bodyValid = [Text.Encoding]::UTF8.GetString($bytes).Trim() -ceq $expectedBody }
     }
     Remove-Item -LiteralPath $bodyPath -ErrorAction SilentlyContinue
-    $expectedHttp = if ($url.StartsWith('http://')) { 200 } else { 204 }
     $uploadDelta = if ($trafficBefore -and $trafficAfter -and $trafficAfter.upload -ge $trafficBefore.upload) { $trafficAfter.upload-$trafficBefore.upload } else { $null }
     $downloadDelta = if ($trafficBefore -and $trafficAfter -and $trafficAfter.download -ge $trafficBefore.download) { $trafficAfter.download-$trafficBefore.download } else { $null }
     $acceptedDelta = if ($trafficBefore -and $trafficAfter -and $trafficAfter.accepted -ge $trafficBefore.accepted) { $trafficAfter.accepted-$trafficBefore.accepted } else { $null }
@@ -309,18 +308,26 @@ try {
     }
     Save-AcceptanceProgress
     $probes = @(
-        @('http_http','http://www.msftconnecttest.com/connecttest.txt','http',$false),
-        @('http_https','https://www.gstatic.com/generate_204','http',$false),
-        @('connect_http','http://www.msftconnecttest.com/connecttest.txt','http',$true),
-        @('connect_https','https://www.gstatic.com/generate_204','http',$true),
-        @('socks5_http','http://www.msftconnecttest.com/connecttest.txt','socks5h',$false),
-        @('socks5_https','https://www.gstatic.com/generate_204','socks5h',$false)
+        @('http_http','http://www.msftconnecttest.com/connecttest.txt','http',$false,200,'Microsoft Connect Test'),
+        @('http_https','https://www.gstatic.com/generate_204','http',$false,204,''),
+        @('connect_http','http://www.msftconnecttest.com/connecttest.txt','http',$true,200,'Microsoft Connect Test'),
+        @('connect_https','https://www.gstatic.com/generate_204','http',$true,204,''),
+        @('socks5_http','http://www.msftconnecttest.com/connecttest.txt','socks5h',$false,200,'Microsoft Connect Test'),
+        @('socks5_https','https://www.gstatic.com/generate_204','socks5h',$false,204,'')
     )
     foreach ($probe in $probes) {
-        $result.requests += Invoke-Probe $probe[0] $probe[1] $probe[2] $probe[3] $started.Id
+        $result.requests += Invoke-Probe $probe[0] $probe[1] $probe[2] $probe[3] $started.Id $probe[4] $probe[5]
         Save-AcceptanceProgress
     }
     $result.status = if (@($result.requests | Where-Object status -ne 'PASS').Count -eq 0) { 'PASS' } else { 'FAIL' }
+    # A second public HTTP destination helps identify target-dependent failures.
+    # These rows are diagnostics; they never change the original six-request result.
+    foreach ($failed in @($result.requests | Where-Object { $_.status -ne 'PASS' -and $_.name -match '_http$' })) {
+        $scheme = if ($failed.name -eq 'socks5_http') { 'socks5h' } else { 'http' }
+        $tunnel = $failed.name -eq 'connect_http'
+        $result.diagnostics += Invoke-Probe ('alternate_'+$failed.name) 'http://www.gstatic.com/generate_204' $scheme $tunnel $started.Id 204 '' 8
+        Save-AcceptanceProgress
+    }
     if ($result.pre.mihomoPids.Count -gt 0 -or $result.pre.tunAdapterCount -gt 0 -or $result.pre.tunDefaultRouteCount -gt 0 -or $result.pre.transparentDriverCount -gt 0) {
         $result.independence = '独立性未证实'
     } else { $result.independence = '未发现已知转发迹象；仍需独立出口证据' }

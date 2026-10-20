@@ -16,6 +16,8 @@
 
 六项请求 PASS 只证明本轮 Shadowsocks 节点经过 Swirl Rust 前端成功请求。若 Mihomo 仍运行，或有 TUN／透明路由迹象，独立性固定为“未证实”。系统代理由另一应用接管本身不说明显式 curl 请求经过 Mihomo。要验证彻底独立，需另行在用户许可且 Mihomo 停用、路由迹象排除时重复对照。59 条 VLESS/REALITY 节点的原生资格仍为 0/59；此工具不把 Shadowsocks 结果归给它们。
 
+若原六项里的明文 HTTP 请求失败，脚本会用相同代理入口另测 `http://www.gstatic.com/generate_204`，要求 204 且正文为空。此对照每项最多 8 秒，单独记在 `diagnostics`，绝不改变原六项的 PASS/FAIL。`rustAcceptedDelta=1` 且上传增加只能证明请求进入 Rust 并发出数据；下载为 0 表示没有收到可转发的响应，不能由此判定是目标、节点、80 端口线路还是内核导致。CONNECT 的本地 200 也不代表目标站点已连通。
+
 实现参考了 [Clash Verge Service 对内核 PID 的显式跟踪](https://github.com/clash-verge-rev/clash-verge-service/blob/main/src/service/core.rs) 和 [curl 对 `--noproxy` 的定义](https://github.com/curl/curl/blob/master/docs/cmdline-opts/noproxy.md)。仅参考其可观察行为，代码独立实现。
 
 Mihomo 必须由用户手动挂起/恢复、且 Codex 可能断线的独立对照，使用 [离线 Windows Rust 验收流程](WINDOWS_RUST_INDEPENDENT_ACCEPTANCE.md)；它单列受控请求和完整独立性结论。

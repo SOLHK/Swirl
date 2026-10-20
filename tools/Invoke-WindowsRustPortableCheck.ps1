@@ -1,7 +1,7 @@
 # User-facing, offline-capable check for the Windows Rust acceptance preview.
 # The package never changes Mihomo or Windows proxy, DNS, TUN, or routes.
 param(
-    [ValidateRange(60,600)][int]$WallSeconds = 270
+    [ValidateRange(60,600)][int]$WallSeconds = 600
 )
 $ErrorActionPreference='Stop'
 $ProgressPreference='SilentlyContinue'
@@ -24,7 +24,7 @@ $summary=[ordered]@{
     startedUtc=[DateTime]::UtcNow.ToString('o'); completedUtc=$null
     sourceSha=$null; exeSha256=$null; rustDllSha256=$null
     systemProxyControl=[ordered]@{status='NOT TESTED';winInetPointsToMihomo=$false;mihomoListenerPid=0;httpStatus=0;curlExitCode=$null}
-    swirlRustExplicit=[ordered]@{status='NOT TESTED';passed=0;total=6;enginePid=0;requests=@()}
+    swirlRustExplicit=[ordered]@{status='NOT TESTED';passed=0;total=6;enginePid=0;requests=@();diagnostics=@()}
     fullMihomoIndependence='BLOCKED'; userSettingsChangedByScript=$false
     resultDirectory=$null; privateRuntimeStateMayPersist=$false
 }
@@ -83,6 +83,22 @@ function Show-Result {
         foreach($row in @($rows | Where-Object status -ne 'PASS')) {
             $label=if($names.ContainsKey([string]$row.name)){$names[[string]$row.name]}else{'未知请求'}
             $lines.Add("失败：$label；curl 退出码 $($row.curlExitCode)。")
+        }
+        $failedRows=@($rows | Where-Object status -ne 'PASS')
+        if($failedRows.Count -gt 0 -and @($failedRows | Where-Object {
+            $_.rustAcceptedDelta -ne 1 -or $_.rustUploadDelta -le 0 -or $_.rustDownloadDelta -ne 0
+        }).Count -eq 0) {
+            $lines.Add('失败请求进入了 Rust，发出了数据，但没有收到可转发的响应；原因还不能确定。')
+        }
+        $alternate=@($summary.swirlRustExplicit.diagnostics)
+        if($alternate.Count -gt 0) {
+            $alternatePassed=@($alternate | Where-Object status -eq 'PASS').Count
+            $lines.Add("另一公开明文 HTTP 地址对照：$alternatePassed/$($alternate.Count)；原六项判定不变。")
+            if($alternatePassed -gt 0) {
+                $lines.Add('对照中有成功请求，提示目标或线路可能有关；仍不能确定根因。')
+            } else {
+                $lines.Add('对照也未通过；仍不能确定根因。')
+            }
         }
         $lines.Add('有些请求已成功，但本轮不稳定；失败记录已经保存。')
     } else {
@@ -166,7 +182,7 @@ try {
     } finally {
         [Environment]::SetEnvironmentVariable('SWIRL_TEST_ROOT',$previousRoot,'Process')
     }
-    Write-Host '正在测试 Swirl Rust，请等候；每项请求有超时，整轮最多约 5 分钟。'
+    Write-Host '正在测试 Swirl Rust，请等候；每项请求有超时，整轮最多约 10 分钟。'
     if(-not $child.WaitForExit($WallSeconds*1000)) {
         $childTimedOut=$true
         Stop-Process -InputObject $child -Force -ErrorAction SilentlyContinue
@@ -185,7 +201,18 @@ try {
             httpStatus=$_.httpStatus;httpConnectStatus=$_.httpConnectStatus
             tlsCertificateVerified=$_.tlsCertificateVerified
             rustTransferObserved=$_.rustTransferObserved
-            rustOutboundPidObserved=$_.rustOutboundObservation.observed}
+            rustOutboundPidObserved=$_.rustOutboundObservation.observed
+            rustAcceptedDelta=$_.rustAcceptedDelta;rustUploadDelta=$_.rustUploadDelta
+            rustDownloadDelta=$_.rustDownloadDelta;rustFailedDelta=$_.rustFailedDelta
+            rustLastErrorStage=$_.rustLastErrorStage}
+    })
+    $summary.swirlRustExplicit.diagnostics=@(@($report.diagnostics) | ForEach-Object {
+        [ordered]@{name=$_.name;status=$_.status;curlExitCode=$_.exitCode
+            httpStatus=$_.httpStatus;rustTransferObserved=$_.rustTransferObserved
+            rustOutboundPidObserved=$_.rustOutboundObservation.observed
+            rustAcceptedDelta=$_.rustAcceptedDelta;rustUploadDelta=$_.rustUploadDelta
+            rustDownloadDelta=$_.rustDownloadDelta;rustFailedDelta=$_.rustFailedDelta
+            rustLastErrorStage=$_.rustLastErrorStage}
     })
     $allObserved=($rows.Count -eq 6 -and @($rows | Where-Object {
         $_.status -ne 'PASS' -or -not $_.rustTransferObserved -or
