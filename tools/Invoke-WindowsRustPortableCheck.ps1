@@ -13,6 +13,7 @@ $exe=Join-Path $packageDir 'Swirl.exe'
 $dll=Join-Path $packageDir 'swirl_api.dll'
 $accept=Join-Path $PSScriptRoot 'Invoke-WindowsRustAcceptance.ps1'
 $launcher=Join-Path $packageDir 'TEST-SWIRL-NETWORK.cmd'
+$bundledPwsh=Join-Path $packageDir 'runtime\powershell\pwsh.exe'
 $runDir=$null
 $child=$null
 $childTimedOut=$false
@@ -100,6 +101,7 @@ try {
         -not (Test-Path -LiteralPath $exe -PathType Leaf) -or
         -not (Test-Path -LiteralPath $dll -PathType Leaf) -or
         -not (Test-Path -LiteralPath $accept -PathType Leaf) -or
+        -not (Test-Path -LiteralPath $bundledPwsh -PathType Leaf) -or
         -not (Test-Path -LiteralPath $launcher -PathType Leaf)) { throw 'PACKAGE_INCOMPLETE' }
     $manifest=Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
     if($manifest.kind -ne 'windows-rust-acceptance-preview' -or
@@ -111,11 +113,11 @@ try {
         $summary.rustDllSha256 -ne $manifest.rustDllSha256 -or
         (Get-FileHash -LiteralPath $accept -Algorithm SHA256).Hash -ne $manifest.acceptanceScriptSha256 -or
         (Get-FileHash -LiteralPath $PSCommandPath -Algorithm SHA256).Hash -ne $manifest.portableRunnerSha256 -or
+        (Get-FileHash -LiteralPath $bundledPwsh -Algorithm SHA256).Hash -ne $manifest.bundledPowerShellSha256 -or
         (Get-FileHash -LiteralPath $launcher -Algorithm SHA256).Hash -ne $manifest.launcherCmdSha256) {
         throw 'PACKAGE_HASH_MISMATCH'
     }
-    if(-not (Get-Command pwsh -ErrorAction SilentlyContinue) -or
-        -not (Get-Command curl.exe -ErrorAction SilentlyContinue)) { throw 'PWSH_OR_CURL_MISSING' }
+    if(-not (Get-Command curl.exe -ErrorAction SilentlyContinue)) { throw 'WINDOWS_CURL_MISSING' }
     if(-not (Test-DPathOutsidePackage $EncryptedStore) -or
         -not (Test-DPathOutsidePackage $ResultsRoot)) { throw 'PRIVATE_PATH_MUST_BE_D_CODEX_OUTSIDE_PACKAGE' }
     if(-not (Test-Path -LiteralPath $EncryptedStore -PathType Leaf) -or
@@ -160,7 +162,7 @@ try {
     $previousRoot=[Environment]::GetEnvironmentVariable('SWIRL_TEST_ROOT','Process')
     try {
         [Environment]::SetEnvironmentVariable('SWIRL_TEST_ROOT',$storage,'Process')
-        $child=Start-Process -FilePath (Get-Command pwsh -ErrorAction Stop).Source -ArgumentList $args -PassThru -WindowStyle Hidden -RedirectStandardOutput $out -RedirectStandardError $err
+        $child=Start-Process -FilePath $bundledPwsh -ArgumentList $args -PassThru -WindowStyle Hidden -RedirectStandardOutput $out -RedirectStandardError $err
     } finally {
         [Environment]::SetEnvironmentVariable('SWIRL_TEST_ROOT',$previousRoot,'Process')
     }
