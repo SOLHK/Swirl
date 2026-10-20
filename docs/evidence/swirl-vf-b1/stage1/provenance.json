@@ -1,0 +1,53 @@
+{
+  "source_commit": "9836e89130694fdc336c4f4d7de22259c51741f6",
+  "workflow_run": 39399674995,
+  "workflow_terminal_conclusion": "failure",
+  "jobs": {
+    "118550962741": "success",
+    "118551140161": "success",
+    "118551394339": "failure"
+  },
+  "files": [
+    {
+      "path": "native-job-118551140161.log",
+      "bytes": 106285,
+      "sha256": "ad2550838b66a0725dee7778f0b99aed3502f2d52ababae0ef572d43d8b8b350",
+      "kind": "decoded_job_log_exact"
+    },
+    {
+      "path": "native-summary.json",
+      "bytes": 122105,
+      "sha256": "a31646c3bed740c8c404db5b49b9c9820e5bf172cd21d0e7d01d5c0f635d5928",
+      "kind": "pretty_printed_derivative_of_named_log_json"
+    },
+    {
+      "path": "original-summary.json",
+      "bytes": 226316,
+      "sha256": "ec56c0eed8cff52834ffd66e950c9d583d316bae0b60a902268fa415bc6e1041",
+      "kind": "pretty_printed_derivative_of_named_log_json"
+    },
+    {
+      "path": "python-job-118550962741.log",
+      "bytes": 123619,
+      "sha256": "6b1f1f2246c582a862895d957b13428ff54f310bf188588d8629e89871ad57fd",
+      "kind": "decoded_job_log_exact"
+    },
+    {
+      "path": "strict-job-118551394339.log",
+      "bytes": 178555,
+      "sha256": "1a11d8ecd34eda43a96867579b6d7de07de7db75782b434472fae97964273ff2",
+      "kind": "decoded_job_log_exact"
+    }
+  ],
+  "artifact_digest_basis": "GitHub server metadata only; not a locally downloaded archive verification",
+  "artifacts": [
+    {
+      "id": 12254476529,
+      "sha256": "5914f830d48c145db4e164305efc83604d60b7213401b2c09b5670d1063c6c54"
+    },
+    {
+      "id": 12255036417,
+      "sha256": "51de82e316455488e89380c3f19333c4a6c6647768862a4998814cfbc6f9e88f"
+    }
+  ]
+}
