@@ -4,7 +4,10 @@
 [SWIRL_VF_PRECISION_CHECKPOINTS_20261020.md](SWIRL_VF_PRECISION_CHECKPOINTS_20261020.md)。
 本次从真实远端 `056f7ea6dc7cf3a703da63e8522b89d33d1166f4` 继续，
 复用已有 A1 v2 逐批严格重放。默认 Swift 校验新增“非默认轴不得缺失”的独立防护；
-原生结果待读取后记录，不将 Linux harness 检查写成 CoreText 通过。
+源码 `f72187f70d0af20fb197fb3e49389b53e8ce31a0` 已推送并核验远端。
+[39379538186](https://github.com/SOLHK/Swirl/actions/runs/39379538186) 的 xcode-27
+实际 Swift 校验 **22/22 通过**，Python / Windows 原创夹具通过；Apple 整体仍因
+原有严格 `849/850` 度量失败而为 failure。A1 防护修复通过不代表内部轴映射或度量通过。
 
 **本文件已更新，旧版“剩余 178 组轮廓错误”不再是当前状态。**
 首先阅读 `docs/SWIRL_VF_USER_AXIS_HANDOFF_20261020.md`，再阅读

@@ -9,6 +9,20 @@ The input and all Apple-derived private data remain outside this repository.
 
 ## A1: preserve the existing replay solution; close a strict-path omission hole
 
+**Native verification complete for this bounded A1 fix.** Exact source:
+`f72187f70d0af20fb197fb3e49389b53e8ce31a0`. Non-forced branch update was
+followed by an independent remote HEAD read matching that full SHA.
+[Actions 39379538186](https://github.com/SOLHK/Swirl/actions/runs/39379538186)
+finished: Python **success**, Windows synthetic DirectWrite **success**, Apple
+**failure** because the old strict 849/850 metric check still fails. Apple job
+118485220527 compiled the actual production Swift helper and **22/22 validator
+cases passed**, with `numeric_tolerance=1e-6`, `actual_font_test=false`, and
+`PASS_PRODUCTION_SWIFT_VALIDATOR`. The real extractor exited zero before the
+unchanged separate metric assertion rejected face 0 / GID 2 at 0.03125.
+No queued/running job is counted as PASS. Artifact 12244867446 records the
+native evidence; GitHub reports archive digest
+`f47a0a483ad3c235102d59f48ed17a8b4e60c67292a5040333f9004a389ee636`.
+
 The existing v2 verifier remains the production replay implementation. It
 predeclares T/T(T) before native requests, checks an exactly stable replay echo,
 compares every requested GID's complete raw paths and metrics with zero
@@ -42,10 +56,9 @@ Baseline local regression: **320/320 Python tests, zero skips, 6/6 audits**,
 using Python 3.12.14, fontTools 4.61.1, NumPy 2.2.6 and uharfbuzz 0.53.3.
 After this fix: **324/324 Python tests, zero skips, 6/6 audits**; the full suite
 completed in 12.780 seconds and `git diff --check` passed.
-The new Swift cases need the exact pushed source on xcode-27; Linux has no
-CoreText/Swift runtime. **Native verification is pending in this implementation
-checkpoint.** The next evidence entry must record its exact commit and final
-Actions result before calling this fix natively verified.
+Linux has no CoreText/Swift runtime. The exact pushed source has now executed
+the new Swift cases on xcode-27, as recorded above; local harness tests alone
+were never counted as native success.
 
 ## Newly retrieved prior evidence (not new execution in this continuation)
 
@@ -71,7 +84,7 @@ Actions result before calling this fix natively verified.
 
 ## Next smallest task and unchanged blockers
 
-Read the actual A1 native result, then continue A2 with the existing raw-order
+With the bounded A1 result recorded, continue A2 with the existing raw-order
 avar diagnostics and independent native outlines/HVAR. Do not replace the 141
 questions with a formula fitted only to archived advances. Preserve all raw
 records and duplicates and the 1/32 geometry threshold.
