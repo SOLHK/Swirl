@@ -256,6 +256,52 @@ overlap the font changes and remain preserved. No font production model,
 original GID completion count, original TTC output, raw 849/850 status or
 Windows 11 / Qt acceptance status changes at this diagnostic checkpoint.
 
+## A2 narrow follow-up: preserve strict failures and inspect raw segments
+
+New diagnostic files: `platform/probe_axis_counterexamples.py`,
+`platform/diagnose_path_types.py`, `tests/test_axis_counterexamples.py`,
+`tests/test_path_type_diagnostic.py`, and workflow
+`.github/workflows/swirl-vf-axis-counterexamples.yml`. The existing
+`probe_axis_thresholds.hvf_paths` delegates to a factored `hvf_events`; every
+native header/event/counter/summary check remains in force before raw events
+are exposed privately. No production renderer, mapping or strict comparator
+is changed.
+
+Preflight against original fvar ranges creates **324 user positions on 13
+selected faces**, five GIDs and **3,240 planned actual CoreText records** in
+two independent opposite-order processes. Both processes must verify all 32
+physical source identities/table hashes. The eight GID-19177 cases, decimal
+neighbors of six normalized-16 steps on both sides of 300/400, different-slope
+300-left half-grid neighbors, two rejected-rule controls and **40 new random
+holdouts** are predeclared before any observations. Direct Apple HVF checks
+cover the type failures and selected narrow thresholds; per-observation HVAR
+references remain separate from every global candidate.
+
+Three stable platform controls also distinguish a concrete arithmetic hypothesis
+before native execution: at weights 300.025, 400.025, 399.968 on faces 20/24/31,
+canonical normalized-16 plus exact binary64 interpolation predicts grid
+(-9829, -4914, -4916). Float32 interpolation with half ties toward positive
+infinity predicts (-9828, -4913, -4916); half ties away from zero predicts
+(-9829, -4914, -4917). The equal-slope .0062/.01 counterexample alone cannot
+distinguish these arithmetic stages. No prediction is counted as observation.
+
+The separate raw-path diagnostic preserves each original L/Q control privately
+and reports the unchanged strict comparison beside analytical evidence. Only a
+unique forward cyclic endpoint correspondence permits a continuous parametric
+curve-difference bound. Exact rational arithmetic evaluates endpoints and
+quadratic derivative roots, with outward rounding of the reported upper bound.
+No sampled curve fit, reversed contour, merged segment or accepted mapping is
+introduced. Public evidence contains only indices, types and scalar differences.
+
+Local validation: **362/362 Python tests, zero skips, 6/6 audits**, full suite
+13.744 seconds, clean `git diff --check`. Fourteen new tests include true
+curvature, short chords, control-point overshoot, non-midpoint collinear
+quadratics, ambiguous/reversed correspondence, exact between-sample extrema,
+safe output and a three-way fixture whose strict type failure must remain
+rejected even when the independent curve bound is tiny. This checkpoint is a
+validated diagnostic implementation; its native run is still pending and no
+original-font pass is claimed.
+
 ## Newly retrieved prior evidence (not new execution in this continuation)
 
 - At exact source `056f7ea6dc7cf3a703da63e8522b89d33d1166f4`,

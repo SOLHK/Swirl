@@ -238,7 +238,8 @@ def compare_face(font, face, cases, observations, renderer, gids, report, mappin
     return safe_rows, native_geometry
 
 
-def hvf_paths(binary, source, face, gid, design):
+def hvf_events(binary, source, face, gid, design):
+    """Return private native events only after the full transcript is checked."""
     values = [design[tag] for tag in TAGS]
     native = subprocess.run([str(binary), str(source), str(face), ",".join(map(str, values)), str(gid), "1"],
                             capture_output=True, text=True, timeout=30)
@@ -284,7 +285,11 @@ def hvf_paths(binary, source, face, gid, design):
             require(bool(stack) and stack.pop() == event[1], "unbalanced_native_HVF_parts")
     require(not stack and all(type(counters.get(key)) is int and counters[key] == value
                              for key, value in counted.items()), "native_HVF_counter_mismatch")
-    return native_paths(events)
+    return events
+
+
+def hvf_paths(binary, source, face, gid, design):
+    return native_paths(hvf_events(binary, source, face, gid, design))
 
 
 def direct_hvf_checks(binary, source, face, rows, native_geometry, renderer, report):
