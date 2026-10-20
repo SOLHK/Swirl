@@ -6,6 +6,8 @@ import sys
 import struct
 import tempfile
 import unittest
+from unittest import mock
+import weakref
 
 from fontTools.fontBuilder import FontBuilder
 from fontTools.feaLib.builder import addOpenTypeFeaturesFromString
@@ -21,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 from metric_variations import add_metric_variations
 from ttc_staging_contract import StagingError
 from ttc_staging_validate import face_contract, validate_face, validate_collection
+import ttc_staging_validate as validation
 
 
 def make_font(index=0):
@@ -313,6 +316,43 @@ class TtcStagingValidateTests(unittest.TestCase):
         self.rejects("font_tables", "feature_lookup_index",
                      lambda f: f["GSUB"].table.FeatureList.FeatureRecord[0].Feature.LookupListIndex.__setitem__(0, 99))
 
+    def test_serialized_lazy_layout_cannot_hide_out_of_range_glyphs(self):
+        # fontTools accepts the synthetic glyph65534 spelling as a numeric
+        # ushort when compiling. It is still outside this five-GID font. This
+        # therefore corrupts actual serialized layout bytes without relying on
+        # a mock or an ordinary unknown string that the compiler would reject.
+        for tag in ("GSUB", "GPOS", "GDEF"):
+            with self.subTest(table=tag):
+                font = make_font()
+                if tag == "GSUB":
+                    font[tag].table.LookupList.Lookup[0].SubTable[0].mapping["A"] = "glyph65534"
+                elif tag == "GPOS":
+                    font[tag].table.LookupList.Lookup[0].SubTable[0].PairSet[0].PairValueRecord[0].SecondGlyph = "glyph65534"
+                else:
+                    font[tag].table.GlyphClassDef.classDefs["glyph65534"] = 1
+                data = io.BytesIO()
+                font.save(data)
+                font.close()
+                data.seek(0)
+                with TTFont(data, lazy=True, recalcTimestamp=False) as corrupted:
+                    self.assertEqual(len(corrupted.getGlyphOrder()), 5)
+                    with self.assertRaises(StagingError) as caught:
+                        validate_face(corrupted)
+                    self.assertEqual(caught.exception.category, "font_tables")
+                    self.assertEqual(caught.exception.code, "layout_glyph_reference")
+
+    def test_layout_reference_coverage_is_equal_for_lazy_and_eager_reads(self):
+        data = io.BytesIO()
+        self.font.save(data)
+        original = data.getvalue()
+        reports = []
+        for lazy in (False, True):
+            with TTFont(io.BytesIO(original), lazy=lazy, recalcTimestamp=False) as actual:
+                reports.append(validate_face(actual))
+        self.assertEqual(reports[0]["layout_glyph_references_checked"],
+                         reports[1]["layout_glyph_references_checked"])
+        self.assertGreater(reports[1]["layout_glyph_references_checked"], 2)
+
     def test_unmapped_gdef_variation_store_is_rejected(self):
         self.rejects("font_tables", "unmapped_layout_variation_store",
                      lambda f: setattr(f["GDEF"].table, "VarStore", copy.deepcopy(f["HVAR"].table.VarStore)))
@@ -364,6 +404,31 @@ class TtcStagingValidateTests(unittest.TestCase):
                 validate_collection(path, [expected[0], expected[0]])
             self.assertEqual(caught.exception.code, "duplicate_face_identity")
             collection.close()
+
+    def test_collection_releases_decoded_face_before_opening_next_face(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "original-only.ttc"
+            collection = TTCollection()
+            collection.fonts = [make_font(index) for index in range(3)]
+            expected = [face_contract(font) for font in collection.fonts]
+            collection.save(path)
+            collection.close()
+            opened, previous_alive = [], []
+            original = validation.TTFont
+
+            def observe(*args, **kwargs):
+                # No collection here: bounded face lifetime is the checker's
+                # responsibility, including cycles in lazy variation readers.
+                previous_alive.append(sum(reference() is not None for reference in opened))
+                font = original(*args, **kwargs)
+                opened.append(weakref.ref(font))
+                return font
+
+            with mock.patch.object(validation, "TTFont", side_effect=observe):
+                report = validate_collection(path, expected)
+            self.assertEqual(report["faces_checked"], 3)
+            self.assertEqual(previous_alive, [0, 0, 0])
+            self.assertTrue(all(reference() is None for reference in opened))
 
 
 if __name__ == "__main__":

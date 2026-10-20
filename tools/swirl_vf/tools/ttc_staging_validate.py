@@ -15,6 +15,7 @@ https://learn.microsoft.com/en-us/typography/opentype/spec/otvarcommonformats
 """
 from __future__ import annotations
 
+import gc
 import hashlib
 import json
 import math
@@ -22,6 +23,7 @@ from pathlib import Path
 import struct
 
 from fontTools.ttLib import TTFont
+from fontTools.ttLib.tables.otBase import BaseTable
 from fontTools.ttLib.tables.otConverters import GlyphID
 
 from metric_variations import MetricVariationError, verify_metric_variations
@@ -417,6 +419,12 @@ def _layout(font, order):
             for item in value:
                 walk(item, depth + 1)
             return
+        if isinstance(value, BaseTable):
+            # With TTFont(lazy=True), custom GSUB mappings and GDEF classDefs
+            # are absent from __dict__ until this explicit decode. Walking a
+            # deferred reader before compilation otherwise misses real GID
+            # references that fontTools can round-trip as glyph65534 names.
+            value.ensureDecompiled()
         attributes = vars(value)
         for field in ("glyphs", "Component"):
             if field in attributes:
@@ -587,6 +595,10 @@ def validate_collection(path, expected_contracts):
             with TTFont(path, fontNumber=index, lazy=True, recalcTimestamp=False) as font:
                 report = validate_face(font, expected)
                 reports.append({"face_index": index, **report})
+            # close() releases the file, not decoded tables or lazy-reader
+            # cycles. Release this physical face before opening the next one.
+            del font
+            gc.collect()
         return {"status": "PASS_C1_TTC_STRUCTURE", "faces_checked": count,
                 "glyphs_checked": sum(r["glyphs_checked"] for r in reports),
                 "faces": reports, "native_source_equivalence": False,

@@ -14,7 +14,7 @@ from unittest import mock
 TOOLS = Path(__file__).resolve().parents[1] / "tools"
 sys.path.insert(0, str(TOOLS))
 from ttc_staging_contract import StagingError
-from ttc_staging_store import BatchStore, atomic_immutable, canonical_bytes
+from ttc_staging_store import BatchStore, atomic_immutable, canonical_bytes, bounded_canonical_bytes
 import ttc_staging_store as storage
 
 
@@ -331,6 +331,13 @@ with store.writer():
         with self.assertRaisesRegex(StagingError, "recipe_size_limit"):
             BatchStore(path, {**BINDING, "data": "x" * (4 * 1024**2)}, [1])
         self.assertFalse(path.exists())
+
+    def test_bounded_encoding_matches_canonical_bytes_at_exact_limit(self):
+        value = {"original": "\u4e2d\U0001f600", "points": [[i, -i] for i in range(100)], "value": 1.25}
+        actual = canonical_bytes(value)
+        self.assertEqual(bounded_canonical_bytes(value, len(actual)), actual)
+        with self.assertRaisesRegex(StagingError, "size_limit"):
+            bounded_canonical_bytes(value, len(actual) - 1)
 
 
 if __name__ == "__main__":

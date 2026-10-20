@@ -5,6 +5,7 @@ import struct
 import sys
 import tempfile
 import tracemalloc
+from types import SimpleNamespace
 import unittest
 from unittest import mock
 
@@ -22,6 +23,12 @@ import ttc_staging_pack as pack
 
 def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def stat_copy(value, **overrides):
+    fields = {name: getattr(value, name) for name in dir(value) if name.startswith("st_")}
+    fields.update(overrides)
+    return SimpleNamespace(**fields)
 
 
 class PackingTests(unittest.TestCase):
@@ -300,6 +307,124 @@ class PackingTests(unittest.TestCase):
                 stream.write(b"source changed")
         with self.assertRaisesRegex(StagingError, "source_changed_during_pack"):
             pack.pack_collection(paths, output, validate=mutate)
+        self.assert_no_candidate(root, output)
+
+    def test_windows_path_and_fd_change_times_can_differ_without_changing_identity(self):
+        # Reproduce CPython's Windows lstat creation-time / fstat change-time
+        # split on every CI platform; do not require a Windows runner to guard
+        # against reintroducing a cross-API ctime comparison.
+        root, paths, output = self.fixture(2)
+        real_fstat = pack.os.fstat
+        def descriptor_stat(fd):
+            value = real_fstat(fd)
+            return stat_copy(value, st_ctime_ns=value.st_ctime_ns + 123456789)
+        hashes = [sha(path) for path in paths]
+        with mock.patch.object(pack.os, "fstat", side_effect=descriptor_stat):
+            result = pack.pack_collection(paths, output, expected_sha256=hashes)
+        self.assertEqual(result["source_sha256"], hashes)
+        with TTCollection(output, lazy=True) as collection:
+            self.assertEqual(len(collection.fonts), 2)
+            self.assertEqual(collection.fonts[0].getGlyphOrder(), list(BASE_ORDER))
+        self.assertFalse(list(root.glob(".ttc-staging-*")))
+
+    def test_path_and_descriptor_still_bind_device_inode_size_and_mtime(self):
+        root, paths, output = self.fixture(1)
+        real_fstat = pack.os.fstat
+        for field in ("st_dev", "st_ino", "st_size", "st_mtime_ns"):
+            def descriptor_stat(fd):
+                value = real_fstat(fd)
+                return stat_copy(value, **{field: getattr(value, field) + 1})
+            with self.subTest(field=field), mock.patch.object(pack.os, "fstat", side_effect=descriptor_stat):
+                with self.assertRaisesRegex(StagingError, "source_changed_before_open"):
+                    pack.pack_collection(paths, output)
+            self.assert_no_candidate(root, output)
+
+    def test_same_bytes_path_replacement_between_stat_and_open_is_rejected(self):
+        root, paths, output = self.fixture(1)
+        real_regular = pack._regular
+        replaced = False
+        original = sha(paths[0])
+        def replace_before_open(path):
+            nonlocal replaced
+            value = real_regular(path)
+            if path == paths[0] and not replaced:
+                replacement = root / "replacement.ttf"
+                replacement.write_bytes(path.read_bytes())
+                pack.os.utime(replacement, ns=(value.st_atime_ns, value.st_mtime_ns))
+                replacement.replace(path)
+                replaced = True
+            return value
+        with mock.patch.object(pack, "_regular", side_effect=replace_before_open):
+            with self.assertRaisesRegex(StagingError, "source_changed_before_open"):
+                pack.pack_collection(paths, output)
+        self.assertEqual(sha(paths[0]), original)
+        self.assert_no_candidate(root, output)
+
+    def test_change_time_is_still_checked_separately_for_each_api_and_phase(self):
+        root, paths, output = self.fixture(1)
+        real_regular, real_fstat = pack._regular, pack.os.fstat
+        for api in ("path", "fd"):
+            for phase in ("scan", "pack"):
+                calls = {"path": 0, "fd": 0}
+                after_callback = False
+                def change(value, current):
+                    calls[current] += 1
+                    during_scan = phase == "scan" and calls[current] >= {"path": 3, "fd": 2}[current]
+                    if api == current and (during_scan or after_callback):
+                        return stat_copy(value, st_ctime_ns=value.st_ctime_ns + 1)
+                    return value
+                def path_stat(path):
+                    return change(real_regular(path), "path")
+                def descriptor_stat(fd):
+                    return change(real_fstat(fd), "fd")
+                def mutate_metadata(_candidate):
+                    nonlocal after_callback
+                    after_callback = True
+                code = "source_changed_during_scan" if phase == "scan" else "source_changed_during_pack"
+                with self.subTest(api=api, phase=phase), \
+                        mock.patch.object(pack, "_regular", side_effect=path_stat), \
+                        mock.patch.object(pack.os, "fstat", side_effect=descriptor_stat):
+                    with self.assertRaisesRegex(StagingError, code):
+                        pack.pack_collection(paths, output, validate=mutate_metadata)
+                self.assert_no_candidate(root, output)
+
+    def test_full_file_hash_detects_changes_even_when_all_metadata_is_unchanged(self):
+        root, paths, output = self.fixture(1)
+        # Bytes outside table ranges must also remain immutable. Freeze both
+        # metadata APIs so only the whole-source content guard can detect this.
+        with paths[0].open("ab") as stream:
+            stream.write(b"original synthetic trailing metadata")
+        real_regular, real_fstat = pack._regular, pack.os.fstat
+        path_snapshot = real_regular(paths[0])
+        with paths[0].open("rb") as stream:
+            fd_snapshot = real_fstat(stream.fileno())
+        def path_stat(path):
+            return path_snapshot if path == paths[0] else real_regular(path)
+        def descriptor_stat(fd):
+            value = real_fstat(fd)
+            return fd_snapshot if (value.st_dev, value.st_ino) == (fd_snapshot.st_dev, fd_snapshot.st_ino) else value
+        def mutate(_candidate):
+            with paths[0].open("r+b") as stream:
+                stream.seek(-1, 2)
+                stream.write(b"!")
+        with mock.patch.object(pack, "_regular", side_effect=path_stat), \
+                mock.patch.object(pack.os, "fstat", side_effect=descriptor_stat):
+            with self.assertRaisesRegex(StagingError, "source_changed_during_pack"):
+                pack.pack_collection(paths, output, validate=mutate)
+        self.assert_no_candidate(root, output)
+
+    def test_source_identity_is_rechecked_after_hash_read_completes(self):
+        root, paths, output = self.fixture(1)
+        face = pack._describe_face(paths[0], 4096, None)
+        real_hash = pack._file_hash
+        def change_after_read(stream, size, chunk_size):
+            digest = real_hash(stream, size, chunk_size)
+            with paths[0].open("ab") as writer:
+                writer.write(b"changed after final read")
+            return digest
+        with paths[0].open("rb") as stream, mock.patch.object(pack, "_file_hash", side_effect=change_after_read):
+            with self.assertRaisesRegex(StagingError, "source_changed_during_pack"):
+                pack._source_unchanged(face, stream, 4096)
         self.assert_no_candidate(root, output)
 
     def test_concurrent_publisher_is_never_overwritten(self):

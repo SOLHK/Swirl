@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
@@ -26,6 +27,27 @@ def canonical_bytes(value):
     try:
         return json.dumps(value, sort_keys=True, separators=(",", ":"),
                           ensure_ascii=True, allow_nan=False).encode("ascii")
+    except (ValueError, TypeError, OverflowError, RecursionError) as error:
+        raise StagingError("serialization", "noncanonical_json") from error
+
+
+def bounded_canonical_bytes(value, limit):
+    """Incrementally encode model arrays, stopping before accumulating >limit.
+
+    The caller's input objects and JSONEncoder's current string chunk are
+    outside this byte-buffer budget. This is not a hard process memory limit.
+    """
+    encoder = json.JSONEncoder(sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False)
+    buffer = io.BytesIO()
+    size = 0
+    try:
+        for piece in encoder.iterencode(value):
+            size += len(piece)  # ensure_ascii guarantees one byte per character
+            if size > limit:
+                raise StagingError("serialization", "checkpoint_size_limit",
+                                   limit_bytes=limit, observed_bytes=size)
+            buffer.write(piece.encode("ascii"))
+        return buffer.getvalue()
     except (ValueError, TypeError, OverflowError, RecursionError) as error:
         raise StagingError("serialization", "noncanonical_json") from error
 
@@ -325,10 +347,8 @@ class BatchStore:
         receipt_path = self._receipt(face, start, stop)
         self._validate_records(records, start, stop)
         self._validate_evidence(evidence, face, start, stop)
-        data = canonical_bytes({"recipe_sha256": self.recipe_sha256, "face_index": face, "records": records})
-        if len(data) > self.max_payload_bytes:
-            raise StagingError("serialization", "checkpoint_size_limit",
-                               observed_bytes=len(data), limit_bytes=self.max_payload_bytes)
+        data = bounded_canonical_bytes(
+            {"recipe_sha256": self.recipe_sha256, "face_index": face, "records": records}, self.max_payload_bytes)
         digest = digest_bytes(data)
         receipt = {"schema": 1, "recipe_sha256": self.recipe_sha256,
                    "face_index": face, "gid_start": start, "gid_stop": stop,

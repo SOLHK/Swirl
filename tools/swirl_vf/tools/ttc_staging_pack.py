@@ -45,6 +45,21 @@ def _stat_id(value):
             value.st_ctime_ns)
 
 
+def _path_fd_binding(value):
+    """Fields with the same meaning for path and descriptor stat results.
+
+    Windows CPython 3.12+ can return creation time as lstat.st_ctime_ns but
+    metadata change time as fstat.st_ctime_ns for the very same file. Bind the
+    path to its descriptor with file ID, size and modification time, then retain
+    both complete snapshots and compare each only with the same API later.
+    This preserves change-time checks without assuming cross-API equality.
+    https://github.com/python/cpython/issues/157671
+    https://github.com/python/cpython/blob/3.12/Modules/posixmodule.c
+    https://github.com/python/cpython/blob/3.12/Python/fileutils.c
+    """
+    return (value.st_dev, value.st_ino, value.st_size, value.st_mtime_ns)
+
+
 def _regular(path):
     try:
         value = path.lstat()
@@ -101,7 +116,8 @@ class _Table:
 @dataclass(frozen=True)
 class _Face:
     path: Path
-    identity: tuple
+    path_identity: tuple
+    fd_identity: tuple
     digest: str
     header: bytes
     tables: tuple
@@ -109,9 +125,14 @@ class _Face:
 
 def _describe_face(path, chunk_size, expected):
     before = _regular(path)
+    path_identity = _stat_id(before)
     _checked_end(0, before.st_size)
     with path.open("rb") as stream:
-        _require(_stat_id(os.fstat(stream.fileno())) == _stat_id(before),
+        fd_before = os.fstat(stream.fileno())
+        fd_identity = _stat_id(fd_before)
+        _require(stat.S_ISREG(fd_before.st_mode)
+                 and _path_fd_binding(fd_before) == _path_fd_binding(before)
+                 and _stat_id(_regular(path)) == path_identity,
                  "source_changed_before_open")
         header = stream.read(_SFNT.size)
         _require(len(header) == _SFNT.size, "truncated_sfnt_header")
@@ -151,9 +172,9 @@ def _describe_face(path, chunk_size, expected):
             tables.append(_Table(tag, checksum, offset, length, digest))
         digest = _file_hash(stream, before.st_size, chunk_size)
         _require(expected is None or digest == expected, "source_sha256_mismatch")
-        _require(_stat_id(os.fstat(stream.fileno())) == _stat_id(before)
-                 and _stat_id(_regular(path)) == _stat_id(before), "source_changed_during_scan")
-    return _Face(path, _stat_id(before), digest, header, tuple(tables))
+        _require(_stat_id(os.fstat(stream.fileno())) == fd_identity
+                 and _stat_id(_regular(path)) == path_identity, "source_changed_during_scan")
+    return _Face(path, path_identity, fd_identity, digest, header, tuple(tables))
 
 
 def _same_bytes(source, table, target, offset, chunk_size):
@@ -164,12 +185,17 @@ def _same_bytes(source, table, target, offset, chunk_size):
     return True
 
 
+def _source_identity_unchanged(face, stream):
+    _require(_stat_id(os.fstat(stream.fileno())) == face.fd_identity
+             and _stat_id(_regular(face.path)) == face.path_identity,
+             "source_changed_during_pack")
+
+
 def _source_unchanged(face, stream, chunk_size):
-    _require(_stat_id(os.fstat(stream.fileno())) == face.identity
-             and _stat_id(_regular(face.path)) == face.identity,
+    _source_identity_unchanged(face, stream)
+    _require(_file_hash(stream, face.path_identity[2], chunk_size) == face.digest,
              "source_changed_during_pack")
-    _require(_file_hash(stream, face.identity[2], chunk_size) == face.digest,
-             "source_changed_during_pack")
+    _source_identity_unchanged(face, stream)
 
 
 def _fsync_directory(directory):
