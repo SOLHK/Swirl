@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "run_id": 39405669524,
+  "run_conclusion": "success",
+  "tested_commit": "ac8e750bbcd174b5d1ba38214c646e5c55203ded",
+  "python": {
+    "run": 592,
+    "passed": 585,
+    "skipped": 7,
+    "audit_passed": 6,
+    "B1_test_methods": 144
+  },
+  "files": [
+    {
+      "path": "docs/evidence/swirl-vf-b1/startup/native-job-118571033968.log",
+      "byte_size": 118148,
+      "sha256": "7c106ee56cc997ae5c075ebcc02eba1670b47c7e1b0ce8b85e8b2f04807f4552"
+    },
+    {
+      "path": "docs/evidence/swirl-vf-b1/startup/python-job-118570866640.log",
+      "byte_size": 144962,
+      "sha256": "3d1aa24da175c6d220b87e6a914c9d4dce3942a334e3bbf355da5813b278d0e6"
+    },
+    {
+      "path": "docs/evidence/swirl-vf-b1/startup/summary.json",
+      "byte_size": 150959,
+      "sha256": "6e631efa382262b4efa3262a1127409e33f7684531cd8b7cc8d8aaa8bb1c7fc3"
+    },
+    {
+      "path": "docs/evidence/swirl-vf-b1/STARTUP_RESULTS.md",
+      "byte_size": 5312,
+      "sha256": "5155d904544ff6f90734d9d6629be700293a35ab811de97fa3791b987bd1bdb3"
+    },
+    {
+      "path": "docs/evidence/swirl-vf-b1/archives/original-startup-12256826076.zip",
+      "byte_size": 4962862,
+      "sha256": "f145e3dab64c738e39bb0f33e489f8d8cd0514def296607fe8aa66e27780da6e",
+      "zip_entries": 8,
+      "all_member_crc_verified": true,
+      "actual_download_digest_verified": true
+    }
+  ],
+  "glyph_requests": 0,
+  "metric_records": 0,
+  "original_faces_reconstructed": 0,
+  "production_fix_established": false
+}
