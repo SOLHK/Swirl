@@ -169,3 +169,75 @@ and uploads only self-authored synthetic reports/images. It never opens an
 Apple font or uploads any font binary. YAML parsing and whitespace checks pass;
 actual remote CI is pending at this source checkpoint. Windows 11 remains
 NOT_RUN even if Windows Server DirectWrite succeeds.
+
+## D3 actual CI terminal result and retained synthetic build
+
+Source checkpoint **`ce33013b4841beff21ca6e4de2b85547d6bab163`** was saved with
+parent ab4394b and exact tree `3259676faa479327ea40a626a6ab302f084a42de`, then
+synchronized locally by a normal fast-forward. No other branch was updated.
+[Run 39474695780](https://github.com/SOLHK/Swirl/actions/runs/39474695780)
+completed **failure** at 2026-10-20 18:27:05 UTC. Actual job steps and both
+complete job logs were read; no running job is counted as passed.
+
+- Windows job **118807512454**: **success**, Windows **Server 2022 / 10.0.20348**.
+  Both actual DirectWrite invocations returned `PASS_NATIVE_PROBE`; the original
+  three-face control and two-face production HVAR/VVAR control were requested
+  with `-AllGlyphs -Render` (five DPI scales). This is a synthetic Server result,
+  not an original-derived TTC, system install, Windows 11, Qt or Swirl result.
+- macOS job **118807513515**: **failure**. All eight new tests passed, baseline
+  verified 2/2 faces and recorded 18/24 strict axis passes. The unchanged native
+  metric gate failed at **849 versus 850.0**, tolerance **0.03125**. The independent
+  table-metric native reconstruction subsequently completed successfully. Its
+  success does not hide the failed step or make the overall run green.
+- Artifact metadata was read: Windows **12287859189**, 39,840 bytes, GitHub digest
+  `92652651d527bdd78ad49deb21c792bb4d1b891e7ddc65f4f06ff21f6b8a8494`;
+  macOS **12289470936**, 15,243 bytes, GitHub digest
+  `0bc2279e61bde84773538f8ecc3d0c46d94e0e9a0b2ab278d0fea6dfdf04535d`.
+  **ZIPs were not downloaded/rehash-verified**: the connected download tool
+  failed connecting to its blob-storage host. These digests are API metadata,
+  not locally verified bytes. Detailed native face/raster counts inside ZIPs
+  remain unaudited; the claims above are bounded to actual executed job logs.
+
+A separate local run of the existing builder plus existing verified-axis and
+explicit-table-metric adapters retained a **self-authored synthetic** candidate:
+`build/vf-d1-private/retained-synthetic-control/Swirl-VF.ttc`, 3,424 bytes,
+SHA-256 `74168ffac87764d52b388d37b1868efb044bd119dd0757c0b6df4a0e21327485`.
+It has two faces / three GIDs per face; it is **not the Apple deliverable**.
+All source/candidate/checkpoint material stays local and ignored.
+
+Existing independent validators checked GIDs/cmap/three axes/defaults/hidden flags,
+fvar bytes, tracking, horizontal and vertical metrics, native transcript,
+serialized model and TTC table preservation. Native reread compared 58 requests /
+174 records with zero observed contour, table-metric and bounds difference.
+HarfBuzz **14.6.0** completed **16** source/candidate comparisons (2 faces × 4
+locations × horizontal/vertical) with exact glyph/advance/offset equality.
+fontTools generated/saved/reopened **8** static instances, all fully instantiated.
+The read-only audit found **0 issues / 0 parser errors** on this synthetic TTC.
+None of these static/finite checks proves continuous-space or Apple equivalence.
+
+## D2 original HVF control: distinguish the API layers
+
+The existing `run_hvf_oracle.py` and unmodified C oracle compiled and actually
+ran on macOS 26.3. Apple **libhvf 1.0.2** accepted the exact user original's
+HVGL 3.1 and extracted face 0 / GIDs 0..19 at normalized design `[0,0,0]`,
+20/20 with native exit 0, valid summary and unchanged source. A subsequent run
+extracted **all 47,102 GIDs**, zero native failures, matching header/summary counts,
+unchanged source. These private callback outlines are never uploaded.
+This is extraction, not yet comparison, user-coordinate mapping or metrics.
+
+An isolated process-scoped registration probe also ran on the original and
+returned false, domain `com.apple.CoreText.CTFontManagerErrorDomain`, code **103**,
+with zero identity-verified faces. The local SDK names 103
+`kCTFontManagerErrorUnrecognizedFormat` (104 is InvalidFontData).
+No successful registration or system font installation occurred. The observation
+therefore narrows the issue to CoreText's source-loading path; it does not prove
+the HVGL decoder is generally unavailable or identify the exact causal table.
+Do not infer that changing the font header would be a valid repair.
+
+The full-GID **comparison** is separate from extraction and runs with the existing
+renderer, unchanged 1/32 comparator and existing preserved-Q companion. It has
+private checkpoints every 512 GIDs, bound to source, native-output and relevant
+code hashes. It does not perform a production rebuild or change A3/B1/C1.
+Its terminal result will be recorded separately; no incomplete comparison is
+counted as full-GID PASS here. Private commands/scripts remain under
+`build/vf-d1-private/`; original source data and native logs are not public CI input.
