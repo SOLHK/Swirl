@@ -453,7 +453,11 @@ QVariantMap FontManager::fittedText(const QFont &font, const QString &text,
         const qreal value=QFontMetricsF(f,&device).horizontalAdvance(text);
         m_textWidths.insert(key,new qreal(value));return value;
     };
-    const bool plain=!text.contains('\n')&&!text.contains('\r')&&!Qt::mightBeRichText(text);
+    // Match Qt Quick's hard-line and multi-length-string exclusions even for
+    // direct C++/Q_INVOKABLE callers that do not use SwirlText's QML guard.
+    const bool plain=!text.contains('\n')&&!text.contains('\r')
+        &&!text.contains(QChar(0x2028))&&!text.contains(QChar(0x2029))
+        &&!text.contains(QChar(0x009c))&&!Qt::mightBeRichText(text);
     const double natural=plain?advance(measured):0;
     QVariantMap result{{"axes",axes},{"naturalWidth",natural},{"fitted",false}};
     if(!plain||text.isEmpty()||!std::isfinite(availableWidth)||availableWidth<=0

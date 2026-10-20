@@ -177,6 +177,15 @@ void FontTests::automaticWidthShaping()
             -widthLayoutAdvance(widthResultFont(points,result),"AAAAAAAA",dpi))<.05);
         QCOMPARE(points.pixelSize(),-1);QCOMPARE(points.pointSizeF(),13.5);
     }
+    for(const auto separator:{QChar('\n'),QChar('\r'),QChar(0x2028),QChar(0x2029),QChar(0x009c)}) {
+        const auto count=manager.textWidthMeasurementCount();
+        const auto result=manager.fittedText(points,QStringLiteral("AAAA")+separator+"AAAA",
+            96,1,"label",1,90);
+        QVERIFY(!result.value("fitted").toBool());
+        QCOMPARE(result.value("naturalWidth").toDouble(),0.);
+        QCOMPARE(result.value("axes").toMap().value("wdth").toDouble(),100.);
+        QCOMPARE(manager.textWidthMeasurementCount(),count);
+    }
     qInfo().noquote()<<"Width shaping: real QTextLayout comparisons="<<combinations
         <<"plus 3 point-size/DPI cases; mixed CJK/Latin, combining marks, Arabic, Hebrew and long labels.";
 }
