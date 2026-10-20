@@ -31,7 +31,7 @@ function(swirl_add_font_tests)
  add_test(NAME swirl-font-axis-policy COMMAND SwirlFontAxisPolicyTests -o "${CMAKE_CURRENT_BINARY_DIR}/font-axis-policy.xml,xml" -o "-,txt")
  set_tests_properties(swirl-font-axis-policy PROPERTIES LABELS fonts TIMEOUT 30)
  if(WIN32)
-  add_test(NAME swirl-font-native-raster COMMAND SwirlFontTests nativeGlyphsHaveNoColourFringes previewRepeatedAxesReuseResources localSwirlCollectionUsesPhysicalFaces customAxesChangeRealGlyphsAtMixedCoordinates physicalIdentityRejectsMissingAndChangedOutlineTables -o "${CMAKE_CURRENT_BINARY_DIR}/font-native-raster.xml,xml" -o "-,txt")
+  add_test(NAME swirl-font-native-raster COMMAND SwirlFontTests nativeGlyphsHaveNoColourFringes previewRepeatedAxesReuseResources automaticWidthUsesRealAdvances localSwirlCollectionUsesPhysicalFaces customAxesChangeRealGlyphsAtMixedCoordinates physicalIdentityRejectsMissingAndChangedOutlineTables -o "${CMAKE_CURRENT_BINARY_DIR}/font-native-raster.xml,xml" -o "-,txt")
   set_tests_properties(swirl-font-native-raster PROPERTIES LABELS fonts TIMEOUT 30 RUN_SERIAL TRUE ENVIRONMENT "QT_QPA_PLATFORM=windows;QSG_RHI_BACKEND=d3d11" ENVIRONMENT_MODIFICATION "QT_QUICK_BACKEND=unset:")
  endif()
  file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/font-toolchain.txt"

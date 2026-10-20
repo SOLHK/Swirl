@@ -54,6 +54,7 @@ def summarize(build: Path, require_windows: bool) -> dict:
         reports.append("font-native-raster.xml")
         required.extend(("font-native-raster.xml", name) for name in (
             "nativeGlyphsHaveNoColourFringes", "previewRepeatedAxesReuseResources",
+            "automaticWidthUsesRealAdvances",
         ))
     cases, errors = [], []
     for report in reports:

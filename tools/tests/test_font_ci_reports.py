@@ -87,7 +87,8 @@ class FontCiReportTests(unittest.TestCase):
 
     def test_windows_native_gate_cannot_be_absent_or_skipped(self):
         self.assertTrue(font_report.summarize(self.root, True)["errors"])
-        complete = {"nativeGlyphsHaveNoColourFringes": "pass", "previewRepeatedAxesReuseResources": "pass"}
+        complete = {"nativeGlyphsHaveNoColourFringes": "pass", "previewRepeatedAxesReuseResources": "pass",
+                    "automaticWidthUsesRealAdvances": "pass"}
         for name in complete:
             for status in (None, "skip"):
                 with self.subTest(name=name, status=status):
