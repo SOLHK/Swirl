@@ -1,5 +1,6 @@
 #pragma once
 #include <QNetworkInterface>
+#include <QPair>
 #include "ProxyEngine.h"
 #include "NodeStore.h"
 #include "NodeImportService.h"
@@ -93,6 +94,15 @@ public:
     bool prepareRealAcceptance(); // Called only by the isolated runtime harness.
     QString engineReason() const { return m_engine->status().engineReason; }
     QString processId() const { return QString::number(m_engine->status().processId); }
+    QPair<qint64,qint64> rustTrafficTotals() const {
+        const auto status=m_engine->status();
+        return status.engineKind==QStringLiteral("rust")
+            ? QPair<qint64,qint64>{status.uploadTotal,status.downloadTotal}
+            : QPair<qint64,qint64>{0,0};
+    }
+    qint64 rustAccepted() const { return m_engine->status().rustAccepted; }
+    qint64 rustFailed() const { return m_engine->status().rustFailed; }
+    QString rustLastErrorStage() const { return m_engine->status().rustLastErrorStage; }
     qint64 uptimeSeconds() const { return m_engine->status().uptimeSeconds; }
     QString configPath() const { return m_engine->status().configPath; }
     QString configurationSummary() const { return m_engine->configurationSummary(); }

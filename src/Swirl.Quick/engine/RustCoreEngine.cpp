@@ -364,7 +364,10 @@ void RustCoreEngine::refresh(){
  const auto state=response["status"].toObject();const auto elapsed=m_rateClock.restart();
  const auto up=state["upload"].toInteger(),down=state["download"].toInteger();
  m_status.uploadRate=elapsed>0?double(up-m_status.uploadTotal)*1000/elapsed:0;m_status.downloadRate=elapsed>0?double(down-m_status.downloadTotal)*1000/elapsed:0;
- m_status.uploadTotal=up;m_status.downloadTotal=down;m_status.processAlive=state["running"].toBool();m_status.apiHealthy=m_status.processAlive;
+ m_status.uploadTotal=up;m_status.downloadTotal=down;
+ m_status.rustAccepted=state["accepted"].toInteger();m_status.rustFailed=state["failed"].toInteger();
+ m_status.rustLastErrorStage=state["last_error_stage"].toString();
+ m_status.processAlive=state["running"].toBool();m_status.apiHealthy=m_status.processAlive;
  m_status.state=m_status.processAlive?State::Running:State::Failed;m_status.uptimeSeconds=m_uptime.elapsed()/1000;
  m_status.connectionsAt=m_status.trafficAt=qMax(QDateTime::currentMSecsSinceEpoch(),m_status.connectionsAt+1);m_status.connections.clear();
  for(const auto &value:state["connections"].toArray()){

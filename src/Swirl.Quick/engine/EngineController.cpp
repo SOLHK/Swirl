@@ -52,7 +52,9 @@ QByteArray protectLanPassword(const QByteArray &input,bool decrypt) {
 }
 }
 EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject *parent, QString storePath,bool realAcceptance)
-    : QObject(parent), m_engine(std::move(engine)), m_store(storePath),m_imports(&m_store,this),m_telemetry(storePath.isEmpty()?QString():storePath+".telemetry",storePath.isEmpty()||realAcceptance) {
+    // Runtime acceptance counts explicit requests. Its own periodic probes
+    // would add unrelated Rust connections and corrupt per-request deltas.
+    : QObject(parent), m_engine(std::move(engine)), m_store(storePath),m_imports(&m_store,this),m_telemetry(storePath.isEmpty()?QString():storePath+".telemetry",storePath.isEmpty()&&!realAcceptance) {
     m_options.autoControlPort=true;
     m_imports.setConfigurationApplier([this](const NodeImporter::Result &result,const QString &sourceId,QString *error) {
         const auto &configuration=result.configurationFormat=="ini"?result.executionConfiguration:result.configuration;

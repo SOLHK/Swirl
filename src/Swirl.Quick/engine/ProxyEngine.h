@@ -78,6 +78,9 @@ public:
         qint64 trafficAt = 0;
         qint64 uploadTotal = 0;
         qint64 downloadTotal = 0;
+        qint64 rustAccepted = 0;
+        qint64 rustFailed = 0;
+        QString rustLastErrorStage;
         double uploadRate = 0;
         double downloadRate = 0;
         QString telemetryError;
