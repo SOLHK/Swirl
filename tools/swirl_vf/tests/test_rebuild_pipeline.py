@@ -123,6 +123,39 @@ class RebuildPipelineTests(unittest.TestCase):
             self.assertEqual(saved['failures'][0]['context']['stage'], 'native_finalization')
             oracle.finish.assert_called_once()
 
+    def test_failed_batch_preserves_safe_numeric_evidence_and_completed_observation_counts(self):
+        with tempfile.TemporaryDirectory(prefix='analytic-axis-failure-') as tmp:
+            root = Path(tmp)
+            source, output, report = self.fixture(root)
+            before = source.read_bytes()
+            oracle = OriginalAnalyticOracle(source)
+            original_samples = oracle.samples
+            def samples(face, gids, location):
+                if oracle.requests:
+                    raise rebuild.ReconstructionError('native_readback_replay_not_exactly_stable',
+                        native_observation={'axis': 'WDTH', 'phase': 'replay', 'glyph_id': 1,
+                            'requested_value': 612.3456, 'reported_value': 612.3455,
+                            'source_requested_value': 612.3456789,
+                            'commands': ['PRIVATE_PAYLOAD_MUST_NOT_PROPAGATE']})
+                return original_samples(face, gids, location)
+            oracle.samples = samples
+            with self.assertRaisesRegex(rebuild.ReconstructionError, 'replay_not_exactly_stable'):
+                self.invoke(source, output, report, oracle)
+            saved = self.assert_blocked(root, source, before, output, report, oracle)
+            self.assertEqual(saved['faces'][0]['glyphs_completed'], 0)
+            progress = saved['native_observation_progress']
+            self.assertEqual(progress['attempted_batches_this_run'], 2)
+            self.assertEqual(progress['completed_batches_this_run'], 1)
+            self.assertEqual(progress['glyph_observations_in_completed_batches_this_run'], 2)
+            failure = saved['failures'][0]['context']
+            self.assertEqual(failure['face_index'], 0)
+            self.assertEqual((failure['gid_first'], failure['gid_last']), (0, 1))
+            self.assertEqual(failure['sample_number'], 1)
+            self.assertEqual(failure['native_observation']['phase'], 'replay')
+            self.assertEqual(failure['native_observation']['reported_value_hex'], float(612.3455).hex())
+            self.assertNotIn('PRIVATE_PAYLOAD_MUST_NOT_PROPAGATE', json.dumps(saved))
+            self.assertEqual(oracle.finish_count, 0)
+
     def test_complete_three_face_pipeline_and_unseen_mixed_coordinates(self):
         with tempfile.TemporaryDirectory(prefix="analytic-pipeline-") as tmp:
             root = Path(tmp)

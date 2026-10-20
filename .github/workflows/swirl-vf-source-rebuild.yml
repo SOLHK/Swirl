@@ -42,6 +42,7 @@ jobs:
           import hashlib, json, os, pathlib, platform, re, subprocess, sys, tempfile
           sys.path.insert(0, str(pathlib.Path('tools/swirl_vf/tools').resolve()))
           from verified_axis_oracle import make_launcher
+          from rebuild import native_failure_details
           source = pathlib.Path('/System/Library/PrivateFrameworks/FontServices.framework/Versions/A/Resources/Reserved/PingFangUI.ttc')
           expected = '39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890'
           def digest(path):
@@ -81,6 +82,13 @@ jobs:
                       summary['face_progress']=[{key: face[key] for key in ('face_index', 'glyph_count',
                           'glyphs_completed', 'max_outline_error', 'max_metric_error') if key in face}
                           for face in raw.get('faces', [])]
+                      progress=raw.get('native_observation_progress', {})
+                      summary['native_observation_progress']={key: progress[key] for key in
+                          ('attempted_batches_this_run', 'completed_batches_this_run',
+                           'glyph_observations_in_completed_batches_this_run')
+                          if type(progress.get(key)) is int and progress[key] >= 0}
+                      summary['native_observation_progress']['count_scope']=(
+                          'completed native batches; no completed glyph model or finalized transcript implied')
                       final = raw.get('oracle_summary', {})
                       summary['oracle_finalization']={key: final[key] for key in ('request_count',
                           'successful_glyph_count', 'error_count', 'verified_batch_count', 'source_unchanged')
@@ -109,6 +117,8 @@ jobs:
                           if isinstance(location, dict):
                               safe['user_location']={tag: value for tag, value in location.items()
                                   if tag in ('WDTH', 'wght', 'HGHT') and isinstance(value, (int, float))}
+                          if 'native_observation' in context:
+                              safe['native_observation']=native_failure_details(context['native_observation'])
                           failures.append({'type':item.get('type'), 'reason':next((r for r in reasons if r in message),
                               'OTHER_PRIVATE_FAILURE'), 'face_gid':re.findall(r'face (\d+) gid (\d+)', message),
                               'context':safe})

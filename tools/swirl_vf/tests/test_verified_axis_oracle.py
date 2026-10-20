@@ -260,6 +260,44 @@ class VerifiedAxisOracleTests(unittest.TestCase):
             verify_batch(request, self.identities, self.digest, exchange, 1)
         self.assertEqual(len(calls), 2)
 
+    def test_candidate_failure_preserves_exact_binary64_values_and_stage(self):
+        # Original analytic input: the alternative is one binary64 ULP away,
+        # not an approved native candidate and not accepted through tolerance.
+        request = self.request(location={'WDTH': 612.3456789, 'wght': 400., 'HGHT': 500.})
+        candidate = 612.3456
+        observed = math.nextafter(candidate, math.inf)
+        calls, exchange = self.exchange(reported={'WDTH': observed})
+        with self.assertRaisesRegex(VerificationError, 'not_named_decimal4_candidate') as raised:
+            verify_batch(request, self.identities, self.digest, exchange, 1)
+        context = raised.exception.context
+        self.assertEqual(context['phase'], 'original')
+        self.assertEqual(context['axis'], 'WDTH')
+        self.assertEqual(context['glyph_id'], 0)
+        self.assertEqual(context['requested_value'], request['location']['WDTH'])
+        self.assertEqual(context['reported_value'], observed)
+        self.assertEqual(context['reported_value_hex'], observed.hex())
+        self.assertEqual(context['expected_candidate_value'], candidate)
+        self.assertEqual(context['expected_candidate_value_hex'], candidate.hex())
+        self.assertNotEqual(context['reported_value_hex'], context['expected_candidate_value_hex'])
+        self.assertEqual(len(calls), 1)
+
+    def test_replay_failure_retains_original_request_and_actual_second_readback(self):
+        request = self.request(location={'WDTH': 612.3456789, 'wght': 400., 'HGHT': 500.})
+        def mutate(request, records):
+            if request['request_id'].endswith('-reported'):
+                for record in records: record['reported_location']['WDTH'] = 612.3455
+        calls, exchange = self.exchange(reported={'WDTH': 612.3456}, mutate=mutate)
+        with self.assertRaisesRegex(VerificationError, 'replay_not_exactly_stable') as raised:
+            verify_batch(request, self.identities, self.digest, exchange, 1)
+        context = raised.exception.context
+        self.assertEqual(context['phase'], 'replay')
+        self.assertEqual(context['source_requested_value'], 612.3456789)
+        self.assertEqual(context['requested_value'], 612.3456)
+        self.assertEqual(context['reported_value'], 612.3455)
+        self.assertEqual(context['reported_value_hex'], float(612.3455).hex())
+        self.assertNotIn('expected_candidate_value', context)
+        self.assertEqual(len(calls), 2)
+
     def test_109_independent_binary64_boundary_values_need_no_repeated_truncation(self):
         # These grid values are generated analytically, not read from Apple data.
         cases = []

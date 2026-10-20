@@ -10,7 +10,7 @@ import unittest
 from unittest.mock import Mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
-from rebuild import NativeOracle, ReconstructionError
+from rebuild import NativeOracle, ReconstructionError, native_failure_details
 
 
 class NativeProtocolTests(unittest.TestCase):
@@ -44,6 +44,35 @@ class NativeProtocolTests(unittest.TestCase):
         oracle = self.oracle([self.success(error='native_path_unavailable', location=None)])
         with self.assertRaisesRegex(ReconstructionError, 'native_path_unavailable'):
             oracle.samples(0,[0],self.location)
+
+    def test_failure_context_keeps_axis_evidence_and_excludes_private_payloads(self):
+        row = {'type': 'request_error', 'request_id': '1', 'face_index': 0,
+               'error': 'native_readback_replay_not_exactly_stable', 'phase': 'replay', 'axis': 'wght',
+               'glyph_id': 1, 'requested_value': 612.3456, 'reported_value': 612.3455,
+               'source_requested_value': 612.3456789, 'reported_value_hex': 'untrusted free text',
+               'reported_axis_present': True, 'commands': ['PRIVATE_OUTLINE_SENTINEL'],
+               'native_error': '/private/native/diagnostics', 'field': 'commands'}
+        oracle = self.oracle([row])
+        with self.assertRaises(ReconstructionError) as raised:
+            oracle.samples(0, [0, 1], self.location)
+        details = raised.exception.context['native_observation']
+        self.assertEqual(details['axis'], 'wght')
+        self.assertEqual(details['phase'], 'replay')
+        self.assertEqual(details['glyph_id'], 1)
+        self.assertEqual(details['reported_value'], 612.3455)
+        self.assertEqual(details['reported_value_hex'], float(612.3455).hex())
+        self.assertTrue(details['reported_axis_present'])
+        self.assertNotIn('PRIVATE_OUTLINE_SENTINEL', json.dumps(details))
+        self.assertNotIn('private', json.dumps(details))
+        self.assertEqual(oracle.successful_glyph_count, 0)
+
+    def test_failure_context_filter_rejects_invalid_types_and_nonfinite_values(self):
+        for value in (None, [], 'untrusted'):
+            self.assertEqual(native_failure_details(value), {})
+        self.assertEqual(native_failure_details({'axis': '/private', 'phase': 'arbitrary',
+            'glyph_id': True, 'requested_value': True, 'reported_value': float('nan'),
+            'expected_candidate_value': float('inf'), 'source_requested_value': 10 ** 10000,
+            'reported_axis_present': 1, 'field': ['commands']}), {})
 
     def test_successful_location_mismatch_remains_strict(self):
         wrong = dict(self.location); wrong['wght'] += 1e-10

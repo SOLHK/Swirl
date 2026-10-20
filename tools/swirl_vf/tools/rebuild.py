@@ -40,7 +40,48 @@ from incremental_pipe import TimedLineReader
 
 
 class ReconstructionError(RuntimeError):
-    pass
+    def __init__(self, message, **context):
+        super().__init__(message)
+        self.context = context
+
+
+def native_failure_details(record):
+    """Keep safe, typed axis evidence; never forward arbitrary native payloads.
+
+    The same filter is used at the private protocol boundary and when producing
+    a public CI summary. Hex strings are recomputed from the retained finite
+    values rather than trusted as free-form upstream strings.
+    """
+    if type(record) is not dict:
+        return {}
+    result = {}
+    axis = record.get("axis")
+    if type(axis) is str and len(axis) == 4 and axis.isascii() and axis.isalnum():
+        result["axis"] = axis
+    if record.get("phase") in ("original", "replay"):
+        result["phase"] = record["phase"]
+    if type(record.get("glyph_id")) is int and 0 <= record["glyph_id"] <= 65535:
+        result["glyph_id"] = record["glyph_id"]
+    if type(record.get("reported_axis_present")) is bool:
+        result["reported_axis_present"] = record["reported_axis_present"]
+    for key in ("requested_value", "reported_value", "expected_candidate_value", "source_requested_value"):
+        value = record.get(key)
+        if type(value) in (int, float):
+            try:
+                number = float(value)
+            except OverflowError:
+                continue
+            if math.isfinite(number):
+                result[key] = value
+                result[key + "_hex"] = number.hex()
+    field = record.get("field")
+    if field in ("commands", "bounds", "path_status", "advance_width", "advance_height", "lsb",
+                 "horizontal_origin_x", "horizontal_origin_y", "vertical_origin_x", "vertical_origin_y",
+                 "horizontal_advance_sum", "vertical_advance_sum", "horizontal_advance_vector",
+                 "vertical_advance_vector", "vertical_origin_translation", "lsb_derivation",
+                 "vertical_origin_derivation"):
+        result["field"] = field
+    return result
 
 
 def check(condition, message):
@@ -197,7 +238,11 @@ def reconstruct_glyph(training, heldout, training_locations, heldout_locations_,
     glyph.program.fromBytecode([])
     glyph.recalcBounds(None)
     rounded = [np.asarray([[otRound(x), otRound(y)] for x, y in v], dtype=float) for v in vectors[:len(training)]]
-    deltas = model.getDeltas(rounded, round=lambda a: np.floor(a + 0.5))
+    # Quantize each residual against the already encoded integer coefficients.
+    # Rounding masters first adds another independent error at adaptive peaks.
+    # getDeltas mutates its input arrays; retain the original native references.
+    deltas = model.getDeltas([v.copy() for v in vectors[:len(training)]],
+                            round=lambda a: np.floor(a + 0.5))
     tuples = []
     for support, delta in zip(model.supports[1:], deltas[1:]):
         if np.any(delta):
@@ -367,6 +412,9 @@ class NativeOracle:
             line = self.reader.readline(timeout=120.0)
             check(bool(line), "native oracle did not return metadata; inspect native-oracle.log")
             self.metadata = json.loads(line)
+            if self.metadata.get("error") is not None:
+                raise ReconstructionError(f"native oracle startup failed: {self.metadata['error']}",
+                                          native_observation=native_failure_details(self.metadata))
             check(self.metadata.get("type") == "metadata", "native oracle metadata missing")
             check(self.metadata.get("source_sha256") == sha256(source), "native oracle source SHA mismatch")
             check(self.metadata.get("backend") == "CoreText", "need independent CoreText user-coordinate oracle")
@@ -401,8 +449,9 @@ class NativeOracle:
             # Report the original native error before validating success fields,
             # otherwise an axis or identity failure is disguised as a JSON echo
             # mismatch. No failed request is treated as an empty glyph.
-            check(record.get("error") is None,
-                  f"native request {request_id} face {face} failed: {record.get('error')}")
+            if record.get("error") is not None:
+                raise ReconstructionError(f"native request {request_id} face {face} failed: {record['error']}",
+                                          native_observation=native_failure_details(record))
             check(record.get("type") != "request_error", "native request_error without error detail")
             check(record.get("location") == location,
                   "native oracle axis location mismatch: " + json.dumps({
@@ -424,6 +473,9 @@ class NativeOracle:
         line = self.reader.readline(timeout=120.0)
         check(bool(line), "native oracle ended without a final summary")
         summary = json.loads(line)
+        if summary.get("error") is not None:
+            raise ReconstructionError(f"native oracle finalization failed: {summary['error']}",
+                                      native_observation=native_failure_details(summary))
         check(summary.get("type") == "summary"
               and summary.get("source_sha256") == self.metadata["source_sha256"]
               and type(summary.get("error_count")) is int and summary["error_count"] == 0
@@ -700,6 +752,7 @@ def run(source, executable, destination, report_path, batch_size=64,
     oracle = checkpoints = None
     source_faces = None
     session_number = session_requests = session_glyphs = 0
+    attempted_batches = completed_batches = observed_glyphs = 0
     context = {"stage": "native_metadata"}
 
     def open_session():
@@ -717,12 +770,15 @@ def run(source, executable, destination, report_path, batch_size=64,
             report["oracle"] = copy.deepcopy(oracle.metadata)
 
     def native_samples(face, gids, location):
-        nonlocal session_requests, session_glyphs
+        nonlocal session_requests, session_glyphs, attempted_batches, completed_batches, observed_glyphs
         check(oracle is not None, "native session must be opened before sampling")
+        attempted_batches += 1
         rows = oracle.samples(face, gids, location)
         check(type(rows) is dict and set(rows) == set(gids), "native batch did not return the exact requested GIDs")
         session_requests += 1
         session_glyphs += len(gids)
+        completed_batches += 1
+        observed_glyphs += len(gids)
         return rows
 
     def finish_session(face_index=None):
@@ -957,12 +1013,19 @@ def run(source, executable, destination, report_path, batch_size=64,
                 report["output_generated"] = True
     except Exception as error:
         report["status"] = "BLOCKED"
+        if isinstance(error, ReconstructionError) and "native_observation" in error.context:
+            context = {**context, "native_observation": native_failure_details(error.context["native_observation"])}
         report["failures"].append({"type": type(error).__name__, "message": str(error),
                                    "context": context})
         raise
     finally:
         if oracle is not None:
             oracle.close()
+        report["native_observation_progress"] = {
+            "attempted_batches_this_run": attempted_batches,
+            "completed_batches_this_run": completed_batches,
+            "glyph_observations_in_completed_batches_this_run": observed_glyphs,
+            "count_scope": "completed native batches; no completed glyph model or finalized transcript implied"}
         with report_path.open("x", encoding="utf-8") as stream:
             stream.write(json.dumps(report, indent=2, ensure_ascii=False, allow_nan=False))
     return report

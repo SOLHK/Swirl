@@ -17,8 +17,9 @@ experiments also passed. Type-2 remains explicitly enabled; Types 3/4 fail.
 
 This is a fixed sample, **not** all-GID, all-face user-coordinate, continuous-space
 or Windows acceptance. CoreText actually verified all 32 physical source faces,
-but the original `rebuild.py` run stopped at the WDTH fractional-axis readback
-check before completing its first face. No accepted `Swirl-VF.ttc` exists.
+but the original `rebuild.py` run is still blocked before its first completed
+glyph model or face. The latest run at `24119489` passed the old sample-41 WDTH
+location and found a new exact numeric-candidate counterexample at sample 44. No accepted `Swirl-VF.ttc` exists.
 
 The new HVAR diagnosis measured 3048 user locations / 12192 advances across 32
 faces. Raw-order avar evaluation with zero-normalized coordinates preserved
@@ -40,8 +41,12 @@ every requested GID at the reported coordinates. Exact finite equality is
 required for typed path commands, bounds and all raw metrics; no tolerance is
 increased and no coordinate/path/metric is replaced. The unchanged strict
 extractor remains the default. The new native integration needs its own passing
-run; neither this adapter nor a successful diagnostic proves complete-font or
-continuous-space mapping equivalence.
+run; `39366215864` failed the original sample-44 candidate and `39366215910`
+failed the synthetic replay-stability check. Failure reports now retain safe
+axis values, binary64 hex, original/replay phase and completed-observation
+counts. The separate boundary probe compares every predeclared numeric
+candidate and cannot grant production acceptance. Neither this adapter nor a
+successful diagnostic proves complete-font or continuous-space equivalence.
 
 Read the current [detailed handoff](../../docs/SWIRL_VF_USER_AXIS_HANDOFF_20261020.md),
 [geometry evidence](../../docs/SWIRL_VF_GEOMETRY_PASS_20261020.md), and

@@ -4,6 +4,85 @@ This phase starts at `b5a84bfacc48e6b2a8be8f0797f34639530766c9` on
 `work/core-completion-20261017`; every push is non-forced and based on a fresh
 remote head. UI, animations and Rust Core are outside the changes.
 
+## Sixth implementation checkpoint: preserve actual failure evidence and quantize residuals once
+
+Local verification for this checkpoint: **277/277 Python tests and 6/6 audit
+tests passed**. The final pre-publication HEAD advanced again to concurrent Core
+commit `a3b89050e141557444519c8c17f2a263e6a013fc`; its changes are preserved.
+
+The preceding font checkpoint is `24119489f7b85fe58dea53acf3a4a6f467a6e8fa`,
+based on the preserved concurrent Core parent
+`54908e2902c28ae20e2588fa5347df9b2b3d76e9`. Its real native outcomes are now
+known; the adapter has not yet obtained a complete original-font pass.
+
+- [39366215864](https://github.com/SOLHK/Swirl/actions/runs/39366215864): the
+  opposite-first-writer gate completed all four chains at **704/704 exact
+  payload matches**, 2,816 native glyph records total. The actual original
+  reconstruction verified all 32 physical source identities and passed the
+  former sample-41 WDTH guard location. It stopped at **face 0, GIDs 0-63,
+  sample 44 / request 45**, with `native_readback_not_named_decimal4_candidate`.
+  The requested location was WDTH=304.712646484375, wght=323.3597412109375,
+  HGHT=728.240966796875. No glyph model or face was completed; no TTC exists.
+- [39366215910](https://github.com/SOLHK/Swirl/actions/runs/39366215910):
+  Python passed 254 tests plus 6 audit tests; Windows Server DirectWrite passed
+  the original synthetic fixtures. The real two-face synthetic reconstruction
+  used CoreText -> exact-axis adapter -> SourceTables -> builder, and stopped
+  at the corresponding sample 44 with `native_readback_replay_not_exactly_stable`.
+  Its requested wght was 267.10205078125. The unchanged raw CoreText test still
+  reports 849 versus 850. The separate 174-record table/native-path comparison
+  and two six-record static-instance comparisons passed.
+- [39366216066](https://github.com/SOLHK/Swirl/actions/runs/39366216066):
+  actual CTFrameDraw/CTRunDraw completed 378 single-character and 42 mixed-text
+  observations over seven faces. Among 245 nonempty default/variation pairs,
+  the fixed native X-origin model had maximum raster residual **0.186695 FUnit**;
+  current-width/2 had maximum residual **100.008297 FUnits**. No fallback,
+  missing/clipped ink or incomparable pair was detected. The instrument has
+  2.667 FUnits per pixel and does not establish a 1/32 outline bound. It confirms
+  that the fixed-X behavior affects actual drawing, not just the metric API.
+
+The original and synthetic sample-44 failures did not preserve their inner
+axis, reported number or original/replay phase. The numeric difference between
+`trunc(x*10000)/10000` and `trunc(x*10000)*0.0001` is a concrete hypothesis, not
+an observed native conclusion: at both requested weights those expressions
+are one binary64 ULP apart, and the divided value can drift on a second
+application. Production acceptance is **unchanged** in this checkpoint.
+
+`verified_axis_oracle.py` now attaches safe finite requested/reported/candidate
+numbers, binary64 hexadecimal forms, the exact axis and original/replay phase
+to failures. `NativeOracle` and the builder retain these fields through the
+private error protocol and a typed public-summary allowlist; outline data and
+unreviewed strings cannot pass through that allowlist. Completed native batch
+and glyph-observation counts are now reported separately from reconstructed
+GIDs, faces and accepted final transcripts.
+
+The new independent `probe_axis_readback_boundaries.py` declares all five
+candidate instances before native processes start: requested, divide1,
+multiply1, divide2 and multiply2. It compares every candidate's complete typed
+path and raw metrics, and repeats construction in the opposite order. Both
+sample-44 failures, the previous WDTH control, binary64 neighbors and decimal
+neighbors are included: 12,800 original selected-GID records across faces
+0/15/20/31 and 600 records from private original synthetic fixtures are planned.
+The new native result must be read before selecting any production policy.
+There is no recursive search, numeric tolerance or per-point best-model choice.
+
+A separate original analytic counterexample proved that the builder rounded
+masters and then residuals, causing an avoidable **1.40007142675 FUnit** training
+error. It now fits the unrounded native master vectors and rounds each residual
+against already encoded integer coefficients exactly once. The same authored
+27-corner-plus-adaptive-peak model has maximum error **0.014142135624 FUnit**,
+also after real TTF serialization and independent fontTools glyph-set rendering.
+The default glyf coordinates and all gvar deltas remain integers. Four original
+regressions include negative half-coordinate rounding and prove that fontTools'
+in-place arithmetic cannot modify the original reference vectors. This is a
+converter arithmetic repair, not evidence that Apple source GIDs have passed.
+
+The original 141 HVAR quantization questions, unsupported global user/design
+mapping, real vertical-origin-X expression and strict raw CoreText metric
+failures remain explicit. No original-derived font, Windows 11 installation,
+Qt/Swirl rendering or DPI acceptance is available. The five-minute public CI
+attempt is still an early-failure experiment with private temporary data; it
+must not be described as a full-build runtime or durable private checkpoint.
+
 ## Fifth implementation checkpoint: exact batch replay and accepted transcripts
 
 Local full regression now passes **254/254 tests plus 6/6 audit tests**. New

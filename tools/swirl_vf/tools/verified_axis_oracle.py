@@ -229,20 +229,31 @@ def effective_readback(record, identity, requested, *, replay=False):
     result = {}
     for axis in axes:
         tag = axis['tag']; expected = requested[tag]
+        # Preserve the actual binary64 observations on a failure. A decimal
+        # label alone cannot distinguish division from reciprocal multiplication
+        # or diagnose a second application's one-ULP / one-decimal-step drift.
+        # These are axis coordinates only, never native outline/metric payloads.
+        context = {'axis': tag, 'phase': 'replay' if replay else 'original',
+                   'requested_value': expected, 'requested_value_hex': float(expected).hex(),
+                   'reported_axis_present': tag in reported}
         require(expected == axis['default'] or tag in reported,
-                'native_nondefault_axis_not_reported', axis=tag)
+                'native_nondefault_axis_not_reported', **context)
         value = reported.get(tag, axis['default'])
+        if finite_number(value):
+            context.update(reported_value=value, reported_value_hex=float(value).hex())
         require(finite_number(value) and axis['minimum'] <= value <= axis['maximum'],
-                'native_axis_readback_nonfinite_or_out_of_range', axis=tag)
+                'native_axis_readback_nonfinite_or_out_of_range', **context)
         if replay:
             # Do not run the decimal candidate again: multiplication/truncation
             # is not idempotent for some binary64 encodings of four decimals.
-            require(value == expected, 'native_readback_replay_not_exactly_stable', axis=tag)
+            require(value == expected, 'native_readback_replay_not_exactly_stable', **context)
         elif value != expected:
             require(expected > 0 and value > 0 and math.isfinite(expected * 10000),
-                    'positive_decimal4_candidate_unavailable', axis=tag)
-            require(value == math.trunc(expected * 10000) / 10000,
-                    'native_readback_not_named_decimal4_candidate', axis=tag)
+                    'positive_decimal4_candidate_unavailable', **context)
+            candidate = math.trunc(expected * 10000) / 10000
+            context.update(expected_candidate_value=candidate,
+                           expected_candidate_value_hex=float(candidate).hex())
+            require(value == candidate, 'native_readback_not_named_decimal4_candidate', **context)
         result[tag] = value
     return result
 
@@ -298,6 +309,11 @@ def verify_batch(request, identities, digest, exchange, sequence):
             effective = effective_readback(record, identity, request['location'])
         except VerificationError as error:
             error.context.setdefault('glyph_id', gid)
+            tag = error.context.get('axis')
+            if tag in request['location']:
+                value = request['location'][tag]
+                error.context.update(source_requested_value=value,
+                                     source_requested_value_hex=float(value).hex())
             raise
         if reported is None:
             reported = (copy.deepcopy(record['reported_location']), effective)
@@ -312,6 +328,11 @@ def verify_batch(request, identities, digest, exchange, sequence):
             effective_readback(record, identity, replay_request['location'], replay=True)
         except VerificationError as error:
             error.context.setdefault('glyph_id', gid)
+            tag = error.context.get('axis')
+            if tag in request['location']:
+                value = request['location'][tag]
+                error.context.update(source_requested_value=value,
+                                     source_requested_value_hex=float(value).hex())
             raise
         if replay_reported is None:
             replay_reported = copy.deepcopy(record['reported_location'])

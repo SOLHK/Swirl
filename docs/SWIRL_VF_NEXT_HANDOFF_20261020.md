@@ -15,24 +15,31 @@
 `c31edaf04f3a6369e90da026b94aa6cf8176f356`。并发 Core 提交
 `169e0cad51fc18a2d6fa4f194fafd90128bf2f7b`、
 `85f4cb916221fb64b9c07f0cd6fd85bbc7e94883`、
-`54908e2902c28ae20e2588fa5347df9b2b3d76e9` 均保留。
+`54908e2902c28ae20e2588fa5347df9b2b3d76e9`、
+`a3b89050e141557444519c8c17f2a263e6a013fc` 均保留。
 完整数值、执行范围和历史失败见
 [本轮进展](SWIRL_VF_USER_COORDINATE_PROGRESS_20261020.md)。
 
-- 原生 run [39362516018](https://github.com/SOLHK/Swirl/actions/runs/39362516018)
-  在 c31edaf 检查 32 面、2,692 用户坐标、32 个选择 GID，共 86,144 项/model。
-  四个全局用户轴映射模型均未全部通过；最好的 signed-zero 候选仍有 150 项失败。
-  其中 65 项有可测点误差、最大约 0.45323 FUnit；不能写成全字库通过。
-- 同一运行中 6,912 项垂直原点观测保持默认的 native X 坐标，改变 WDTH 后也不变。
-  当前字宽的一半并不复现这些 API 观测；奇数字宽还出现半单位差。
-  必须继续看实际 CTFrame/CTRun 绘制，不能擅自覆盖原始度量。
-- 原生 run [39362516053](https://github.com/SOLHK/Swirl/actions/runs/39362516053)
-  仍在原始 WDTH guard 阻断重建，0 面完成、无输出。缓存顺序诊断通过不等于字体完成。
-- 本次代码加入独立逐请求验证适配器：原始 `1e-6` guard 默认不变；显式未接受的
-  observation 协议必须经过源表身份、非默认轴回读及所有请求 GID 的 typed commands、
-  bounds、原始度量精确对照。只有整批通过才输出给重建器。新原生运行尚待核实。
-- 严格 849/850 CoreText API 测试继续保留。SourceTables 度量适配仅支持已验证 identity
-  avar 的原创标准字体，拒绝 Apple HVGL。尚无原版字体 Windows 11 或 Qt/Swirl 验收。
+- 最新已核实字体提交 `24119489f7b85fe58dea53acf3a4a6f467a6e8fa`。
+  run [39366215864](https://github.com/SOLHK/Swirl/actions/runs/39366215864)
+  的四组反向创建顺序验证各 704/704 精确通过，随后实际原件重建越过旧 WDTH
+  阻塞，停在第 45 个请求（face 0 / GID 0–63 / sample 44）的新小数候选反例。
+  **0 个 GID 模型完成、0/32 面完成，无 TTC**。
+- run [39366215910](https://github.com/SOLHK/Swirl/actions/runs/39366215910)
+  的 Python 254+6、Windows Server 原创 DirectWrite 夹具通过。严格原生度量仍为
+  849/850 失败；SourceTables 与原生路径 174 项及两组各 6 项静态检查通过。
+  实际合成完整重建也停在 sample 44，原因是 replay 的 API 回读不精确稳定。
+- run [39366216066](https://github.com/SOLHK/Swirl/actions/runs/39366216066)
+  的 378 单字、42 混排真实绘制已完成。245 非空变化对支持固定默认 X 原点；
+  当前字宽/2 解释最大错位约 100 FUnit。不是简单 API 小数显示问题，不能覆盖原点。
+- 本检查点修复失败 evidence 的逐层丢失，保存安全轴值/hex/phase 和采样进度；
+  新边界探针同时保留除法、乘倒数及固定第二层候选，生产接受规则暂不改变。
+  必须先读取其新原生结果，不能只根据本地浮点算术推断实际 CoreText 返回值。
+- 本检查点完整 Python 回归 **277/277**、audit **6/6** 通过。
+- 另修复 gvar 残差双重舍入：原创可表达反例的误差从 1.400071 降至 0.014142
+  FUnit，保存重开后也通过。原有 1 FUnit 重建预算与 1/32 原算法门槛均未放宽。
+- `c31edaf` 的四个全局用户轴映射模型仍均未全部通过，最好的候选仍有 150 项失败。
+  SourceTables 适配仍拒绝未验证的 Apple HVGL 映射。无 Windows 11 或 Qt/Swirl 验收。
 
 不要把新的 observation 参数直接交给重建器，也不要把候选坐标规则当作 Apple 官方契约。
 原有 141 项 HVAR 量化疑点仍保留。
