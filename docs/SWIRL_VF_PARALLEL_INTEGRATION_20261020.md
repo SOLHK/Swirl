@@ -22,15 +22,15 @@
 
 | 研发分支 | 远端 HEAD / PR | 本次可审核提交 | 当前状态 | 主责 |
 | --- | --- | --- | --- | --- |
-| `work/vf-axis-a3` | `9dd26766f949ded4e5fa8253fc44ae4639a95ea9` | 首阶段固定为 `6dd81c0`；后续逐提交审查 | 本次只集成输入数值 contract；`22a89a1` 原生诊断已审查，更新 tip 尚未接受；A3 阻塞开放 | 输入精度、用户坐标映射 |
-| `work/vf-metrics-b1` | `9836e89130694fdc336c4f4d7de22259c51741f6` | 首个提交审查中 | 新成果已出现；不能沿用“无提交”；B1 原始度量失败保留 | CoreText、HVAR/VVAR、垂直度量与原点 |
-| `work/vf-rebuild-c1` | `110d903ac95a0e793911610a0c99c061d199df8a` | 2 | macOS 路径问题已修；Windows packing 失败及 silent-return 未修；暂不合并 | HVF/OpenType/TTC 重建与完整性 |
-| `work/vf-windows-d1` | `562cbc998d03ad36c7e8b25fa7c614a3b17168ae` | 1 | Server 2022/2025 CI failure；Qt 反序未实际执行，暂不合并 | DirectWrite、Qt、Swirl 字体适配 |
+| `work/vf-axis-a3` | `d22be86b56cd20a257505be569a21fcea3ef2bbf` | 数值阶段已入 bbb79c1；本次固定 `22a89a1` | 本次仅追加已审查的原生 HVAR 诊断；更新 tip 另审；A3 阻塞开放 | 输入精度、用户坐标映射 |
+| `work/vf-metrics-b1` | `d283e2e5ad8d43aa3808e66ac6093c3252c5d9e0` | 首阶段及新 delta 审查中 | 原始度量失败保留；首阶段发现原件逐 GID 数据公开输出，阻断集成；新提交待核验 | CoreText、HVAR/VVAR、垂直度量与原点 |
+| `work/vf-rebuild-c1` | `96e99cd72db72b89b7f6d89ef56591a6674db01d` | 新修复 delta 复审中 | 110d903 的 Windows packing/silent-return 阻塞见历史记录；新 SHA 未接受 | HVF/OpenType/TTC 重建与完整性 |
+| `work/vf-windows-d1` | `47d6dfc06fa2fddddd1532c1d8370028a6b9da17` | 2 | 构建及真实反序已修并核实；两系统 FreeType 状态相关路径差异、空路径分析器问题仍阻断合并 | DirectWrite、Qt、Swirl 字体适配 |
 
 首次及 09:03:55 UTC 查询时四分支未出现；09:11:14 UTC 已全部出现。
 这只描述远端查询结果，不表示其他聊天之前没有在工作或没有本地成果。
-上表更新至 09:24 UTC 远端快照，集成 HEAD 为
-`50dae9c56ae4f4a64ec18295a92466d4bd141df2`。分支持续推进，审核和集成对象
+上表更新至 09:32 UTC 远端快照，集成 HEAD 为
+`bbb79c1e5038d9cfe6b88954094833bae6f7cd4e`。分支持续推进，审核和集成对象
 必须固定到下文完整 SHA；不能因 tip 前进就自动包含新提交。09:11 的 A3/C1
 第一提交都以 e505 为 merge-base，新增文件互不重名；当时 B1/D1 无 diff 是历史状态。
 
@@ -155,7 +155,9 @@ HarfBuzz 涉及的改动必须安装并记录实际 `uharfbuzz` 版本后执行�
   相同回读字符串不是输出等价证据。
 - 生产关闭必须处理已测字宽分裂 `0.5474853515625` FUnit 与有前提的
   `0.27374267578125` 下界；保留 `face18 / fresh_triple_7` 的非精确 HVAR
-  `0.01220703125`，该点没有旧直接 HVF 检查。不能用逐点例外或平滑改变原语义。
+  `0.01220703125`。旧 32 面诊断没有直接检查该点，现由 22a89a1 的固定原生子集
+  补齐：截断误差仍在；nearest 仅修好该点，在新 holdout 仍不精确。不能用逐点例外
+  或平滑改变原语义，不能把该点定位写成全局映射接受。
 - 原 `1/32`、严格回读 `1e-6`、原始 avar 顺序/重复项、完整 summary/EOF/exit 均不改变。
 
 ### B1：度量与原点
@@ -376,7 +378,7 @@ Rust Core **39399304790** 在 09:24 UTC 仍 in_progress，不记通过。
 已获得独立原生诊断审查，但不属于本次固定 6dd81c0 合并；更新 tip 9dd2676
 同样不能因分支名相同而自动进入候选。每个后续阶段另做 diff、测试和记录。
 
-### 8.3 C1 当前阻断审查
+### 8.3 C1 在 110d903 的阻断审查
 
 精确提交 `110d903ac95a0e793911610a0c99c061d199df8a` 是新增 pack/validate/preflight
 基础设施阶段，不能只描述为上轮 macOS 修补。新增 C1 staging、fixture、preflight、
@@ -403,7 +405,7 @@ Windows job **118550193381** 实际 110 discovered、100 passed、3 failures、7
 preflight 继续 BLOCKED/exit 2、0 面、font_generated=false、production=false。
 **本阶段不合并，等待 C1 owner 的修复提交及三个系统终态。**
 
-### 8.4 D1 当前阻断审查
+### 8.4 D1 首次提交的阻断审查（后续修复见 8.8）
 
 精确提交 `562cbc998d03ad36c7e8b25fa7c614a3b17168ae` 新增九个文件：原创精度夹具、
 DirectWrite/Qt 探针、PowerShell/CMake、专项 tests/workflow/说明，均归 D1 主责；
@@ -426,3 +428,118 @@ DirectWrite 反序正常，不能替 Qt 抵消这项缺口。应改用独有参�
 Server 2025 `f39146d519a544c642d99b9fa6dc9cd731e21388300196192371ba246e2d191c`。
 **本阶段不合并，等待 D1 owner 修复真实失败、反序覆盖与 runner 构建选择。**
 Windows 11、实际 Swirl、DPI/安装/成品语义验收继续未完成。
+
+### 8.5 A3 第一阶段已推送及实际集成 CI
+
+实际 merge [bbb79c1e5038d9cfe6b88954094833bae6f7cd4e](https://github.com/SOLHK/Swirl/commit/bbb79c1e5038d9cfe6b88954094833bae6f7cd4e)
+的双亲为 50dae9c 与完整源 6dd81c0；完整 SHA 分别见上节。GitHub tree 与本地候选
+`git write-tree` 完全相同；`force=false`、预期旧 HEAD 更新返回 success。
+远端 HEAD、双亲和 compare 已回读：只有三个 A3 新文件与本文件变化，未覆盖并发代码。
+
+[39400874977](https://github.com/SOLHK/Swirl/actions/runs/39400874977) 已 completed/failure。
+Python job **118554973331**：465 discovered、458 passed、7 skipped，audit 6/6；
+DirectWrite **118554973309** success；Apple **118554973496** 仍为同一
+`actual=849, expected=850.0, tolerance=0.03125` 失败。
+本地 465/465、零跳过与 CI 的七项可选跳过分别登记，不互相偷换。
+
+两份工件均已下载并核对 SHA-256：
+
+| Artifact | ZIP SHA-256 | 保留至 UTC |
+| --- | --- | --- |
+| Windows 12254923261 | `4ceb7d02dfd61738288fcdf97e5e6e18f17e695fb36c4496825d55c6d7405e2f` | 2026-10-27 09:29:16 |
+| Apple 12254718190 | `199bdfb0e71a128e15a4f3c7c986e56fc91f7447882262ee874ea8a661f90169` | 2026-10-27 09:29:01 |
+
+另已实际下载并核验 50dae9c 的 Windows 12253711881，哈希与 8.1 的 API digest 相同。
+09:30 UTC，bbb79c1 的 Rust Core 39400874981 与 Core implementation 39400875148
+尚在运行；此前 50dae9c 的 Rust Core 39399304790 也尚在运行，均不记通过。
+
+### 8.6 第二阶段：固定 A3 三轴 HVAR 原生诊断
+
+本次精确源提交 `22a89a154217c5a4ea65788d2994e99e816ffabf`，源父提交 6dd81c0；
+目标父提交 `bbb79c1e5038d9cfe6b88954094833bae6f7cd4e`。
+仅新增以下三个 A3 专属文件及更新本记录，无共享源码修改、无冲突：
+
+- `.github/workflows/swirl-vf-a3-hvar.yml`
+- `tools/swirl_vf/platform/probe_axis_a3_hvar.py`
+- `tools/swirl_vf/tests/test_axis_a3_hvar.py`
+
+已逐文件审查完整代码、测试、阈值和公开字段。所有候选公式、34 个位置、27 格邻域
+在原生启动前声明，不拟合逐点修正。源 SHA 的导入依赖与合并候选相同。
+目标候选完整回归 **479/479 passed、0 failure/error/skip、53.640 秒、exit 0**。
+候选 audit **6/6、0 skip**，`git diff --check` 通过。
+
+源 CI [39398883017](https://github.com/SOLHK/Swirl/actions/runs/39398883017)
+已 completed/success；unit job **118548334102** 14/14、0 skip；
+原生 job **118548435545** 在 xcode-27 实际执行；日志 checkout 均为完整源 SHA。
+工件 **12254500323** 已下载：ZIP 55,318 字节，SHA-256
+`63f4f3c36a37a9690efcf2bdc754fad9d3659d6fb83c0ed9f8a6a91d1db542b1`；
+`hvar.json` 2,900,094 字节，SHA-256
+`cfcab697ff93d6756e1fb2840d4836428f2bf8a37f85752a4d70f4be1a0ae84a`。
+保留至 2026-10-27 09:13:11 UTC；源字体、生产 Swift 和生成 harness 的身份均已核对。
+
+实际范围为面 18、34 个位置、5 个 GID（5/12/56/169/19177）、三种构造的正反序
+共六个独立进程。每进程核验 32 面身份；总计 408 次请求、2,040 条 glyph 记录，
+**1,020/1,020 反序 payload 精确相同、204 批 replay 零失败**；
+只有 **60 次唯一直接 HVF 调用**，缓存复用比较数不冒充独立调用。
+
+原 `fresh_triple_7` 的六种截断候选仍保留 HVAR 最大误差 0.01220703125，
+该点现已直接比较 HVF/CoreText。nearest 在该点的有限 metric/直接轮廓对照为零，
+但每构造 34 个位置仅 **32/34** HVAR 精确；两个新 holdout 仍有
+0.003303971141576767 与 0.01220703125 误差。因此不是通过的全局映射。
+其每构造 170 项 portable 比较均在原 1/32 内，最大约 0.014040801358532917，
+属于有限预算内比较，不能改称精确或连续空间等价。
+
+工件只含坐标、原轴/avar 顺序元数据、GID、误差、计数和 hash；不含字体、二进制表、
+轮廓命令/点或原始绝对 advance/bounds/API metrics。原始 avar 元数据确实存在，
+因此不描述为“无任何原件派生元数据”。不重复公开上传该工件。
+`mapping_accepted=false`、`continuous_space_accepted=false`、`font_generated=false`、
+原件不变和 **0/32** 均保留。更新 tip 的其余阶段没有自动纳入本次合并。
+
+### 8.7 B1 公开数据边界阻断（首阶段）
+
+审查源 `9836e89130694fdc336c4f4d7de22259c51741f6` 发现
+`b1_original_metric_check.py` 将原件逐 face/GID 的 raw native metrics、存储度量及
+逐字形比较写入详细报告，并进入公开 CI stdout/artifact。这超出聚合误差/计数汇总范围，
+与用户的衍生私有数据禁公开要求及工具 README 的公开边界不符。
+不在本记录重述原始数值，不复制或重新上传这些报告，**该阶段不合并**。
+
+B1 须把原件详细观察保留在授权私有环境，公开产物采用明确的聚合安全字段白名单，
+测试必须证明原始度量/逐 GID 记录不会进入 stdout/artifact，同时保留真实失败结论。
+技术上已有的严格 849 vs 850 仍失败；诊断执行成功不能关闭 B1。
+09:32 UTC 的后续 HEAD `d283e2e5ad8d43aa3808e66ac6093c3252c5d9e0` 另行复审，
+不能先假定后续提交已解决数据边界。复审已确认该提交没有修复公开输出，反而将原件
+60 个逐 GID 记录写入 `docs/evidence/swirl-vf-b1/stage1/original-summary.json`，
+并由同目录 `strict-job-118551394339.log` 重复公开；相关内容已进入源分支 Git 历史。
+
+首个已核实公开入口为 run **39399674995** / job **118551394339** 的
+`B1_ORIGINAL_SUMMARY_JSON` stdout，以及 artifact **12255036417** 中的
+`b1-original-metrics.json`。记录真实不等于适合公开。该文件包括 60 行原件观察，
+本记录只登记文件身份与数量，不复述其原始数值。B1 必须先修公开 schema 和输出路径；
+仓库维护者还需处理已经公开的 CI 工件/日志和 Git 历史，追加删除文件不能抹除旧历史。
+本窗口不擅自删除其他窗口证据、不重写源分支历史，不把含该数据的祖先合并入集成分支。
+
+### 8.8 D1 第二次提交的真实修复与剩余失败
+
+精确源 `47d6dfc06fa2fddddd1532c1d8370028a6b9da17` 的
+[39400461390](https://github.com/SOLHK/Swirl/actions/runs/39400461390) 已 completed/failure。
+Server 2022 job **118553585274**、Server 2025 **118553585584** 均实际编译和执行。
+31/31 Python tests 本地及 CI 通过；新 `--reverse-order` 的 header 和实际首轮顺序
+已从工件验证，Server 2025 工具链发现也已验证。8.4 的这两个问题已修，不再作为当前失败。
+
+每个 Server 的 16 个 native 进程中，12 个通过，4 个 Qt FreeType 失败。
+同一 API 位模式的 pair 在 forward/reverse 下产生相反的 **1/64 px** 路径差异；
+独立诊断在相同请求的 raster 前后观察到路径变化。原始 advance/metrics/raster 相同，
+raw path/含路径的布局字段不同。这是所测路径的状态相关差异，不是恢复被量化的小数精度。
+不得通过预热、扩大容差或删比较制造通过。
+
+新增分析器另将合法的单一 MoveTo 空格路径错误要求为 `[]`；独立调用分析器核验
+真实成功 JSONL 已复现误拒绝。需要按空路径语义增加回归，不得放宽可见轮廓断言。
+这项被总报告 FAILED 的提前退出遮住，修主失败时仍须同时处理。
+
+已下载工件：2022 **12254492969**，ZIP SHA-256
+`e01ba6a4b6a26fa88c9da81a87c9a4bb105b6e41da5c2c2ada7293694dbbcab4`；
+2025 **12254657939**，
+`365110cfb1a998aa1eb534454f5a527ac94cd1bf9ab8e16d227ee5029c6961e5`。
+两者来自原创六字形夹具，不含 Apple 字体或私有衍生数据。
+仍暂不合并。专项 workflow 的 D1-only branch/job 条件和未覆盖的实际编译依赖
+也须在后续集成时修正；不能把 Windows Server 的有限成功外推为 Windows 11/Swirl 验收。
