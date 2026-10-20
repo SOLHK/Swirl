@@ -1,0 +1,2257 @@
+{
+  "schema": 1,
+  "status": "FAILED_EVIDENCE_ANALYSIS",
+  "error": "Windows execution has not passed",
+  "original_ttc_acceptance": "NOT_RUN",
+  "partial_validated_evidence": {
+    "schema": 1,
+    "status": "PARTIAL_EVIDENCE_ONLY",
+    "full_acceptance": false,
+    "expected_source_sha": "41504fed7ec7ca6d4768389106a03aa9bc5cd36e",
+    "source_commit": "41504fed7ec7ca6d4768389106a03aa9bc5cd36e",
+    "reported_windows_run_status": "FAILED",
+    "expected_processes": 16,
+    "validated_processes": 12,
+    "validated_observations": 3568,
+    "validated_experiments": {
+      "gain-dwrite-installed-forward": {
+        "header": {
+          "record": "header",
+          "schema": 1,
+          "input_sha256": "1d05d64130cd12a14d8de40e25302b6468cfd4168923ec3319c02edf69cabb47",
+          "input_bytes": 3384,
+          "family": "Swirl D1 Precision Gain",
+          "load_mode": "system_collection",
+          "first_order": "forward",
+          "case_count": 28,
+          "api_axis_type": "IEEE754_binary32",
+          "units_per_em": 1000,
+          "glyph_count": 6,
+          "physical_table_sha256": {
+            "head": "126525de8c6ca6a1a7d1d4bc611c284b1439aea225f372a9c508e07324d34ac1",
+            "maxp": "e7e09c9c65165becd17c0321aa1d8538312b17c76a704d9431c9b966f73c5981",
+            "name": "1ecb83fc7698f8133e6919d383fac89921f49d5c66cc348bb5ff4855daa90637",
+            "cmap": "81863f0b1267606a1c5c869e3290d95ea88746dae019b64928aef53669ef43e0",
+            "fvar": "771abe07521487efe48e0d01ce0a4625a46ba886973239df19629acbeef9384e",
+            "avar": "fa15a45125407557ed20cf5d87f8b344a27b725e2cd16eca4a43f86bd33e8ae0",
+            "glyf": "f2d5340d1e39b50fde2439651e71b8602b3346da9549bacade1a69604040c9f3",
+            "gvar": "620872f19d359827abce5a94b6004819cd37c9b08979543699f361fdc4cdf691",
+            "hmtx": "ce4b94f7a14b922d1e88975f4700cceed9a51e6356da33899a72cb76ca68282a",
+            "HVAR": "1130dc113461bfbd4898bd951412b115ccb6cfe118ff0a05ff1ae9ff2c5bd55b",
+            "STAT": "e3c805efd44ace1f97d8364627b10568e7c594ad52aa12129279e2e5a794babb"
+          },
+          "original_ttc_acceptance": "NOT_RUN",
+          "windows11_desktop_acceptance": "NOT_RUN"
+        },
+        "summary": {
+          "record": "summary",
+          "status": "PASS_DWRITE_SYNTHETIC",
+          "observation_count": 56,
+          "pair_input_bits_equal": true,
+          "pair_outline_equal": true,
+          "pair_design_metrics_equal": true,
+          "pair_placement_equal": true,
+          "pair_raster_equal": true,
+          "reverse_replay_equal": true,
+          "axis_positive_controls_passed": 3,
+          "elapsed_ms": 151.6326,
+          "internal_normalization_algorithm": "NOT_INFERRED_FROM_READBACK",
+          "original_ttc_acceptance": "NOT_RUN"
+        },
+        "selected": {
+          "pair_lo": {
+            "requested": "499.006199",
+            "api_float32": 499.0061950683594,
+            "api_float32_bits": "0x43f980cb",
+            "api_readback_wght": 499.0061950683594,
+            "api_readback_wght_bits": "0x43f980cb",
+            "A_design_advance": 19000,
+            "A_natural_advance": 19000,
+            "A_outline_right": 18060.0
+          },
+          "pair_hi": {
+            "requested": "499.006201",
+            "api_float32": 499.0061950683594,
+            "api_float32_bits": "0x43f980cb",
+            "api_readback_wght": 499.0061950683594,
+            "api_readback_wght_bits": "0x43f980cb",
+            "A_design_advance": 19000,
+            "A_natural_advance": 19000,
+            "A_outline_right": 18060.0
+          },
+          "f32_m1": {
+            "requested": "499.00616455078125",
+            "api_float32": 499.00616455078125,
+            "api_float32_bits": "0x43f980ca",
+            "api_readback_wght": 499.00616455078125,
+            "api_readback_wght_bits": "0x43f980ca",
+            "A_design_advance": 19000,
+            "A_natural_advance": 19000,
+            "A_outline_right": 18060.0
+          },
+          "f32_p1": {
+            "requested": "499.0062255859375",
+            "api_float32": 499.0062255859375,
+            "api_float32_bits": "0x43f980cc",
+            "api_readback_wght": 499.0062255859375,
+            "api_readback_wght_bits": "0x43f980cc",
+            "A_design_advance": 19000,
+            "A_natural_advance": 19000,
+            "A_outline_right": 18060.0
+          },
+          "low_f32_0": {
+            "requested": "100",
+            "api_float32": 100.0,
+            "api_float32_bits": "0x42c80000",
+            "api_readback_wght": 100,
+            "api_readback_wght_bits": "0x42c80000",
+            "A_design_advance": 4000,
+            "A_natural_advance": 4000,
+            "A_outline_right": 3060.0
+          },
+          "low_f32_1": {
+            "requested": "100.00000762939453125",
+            "api_float32": 100.00000762939453,
+            "api_float32_bits": "0x42c80001",
+            "api_readback_wght": 100.00001525878906,
+            "api_readback_wght_bits": "0x42c80002",
+            "A_design_advance": 4000,
+            "A_natural_advance": 4000,
+            "A_outline_right": 3060.0
+          },
+          "low_f32_2": {
+            "requested": "100.0000152587890625",
+            "api_float32": 100.00001525878906,
+            "api_float32_bits": "0x42c80002",
+            "api_readback_wght": 100.00001525878906,
+            "api_readback_wght_bits": "0x42c80002",
+            "A_design_advance": 4000,
+            "A_natural_advance": 4000,
+            "A_outline_right": 3060.0
+          },
+          "low_f32_3": {
+            "requested": "100.00002288818359375",
+            "api_float32": 100.0000228881836,
+            "api_float32_bits": "0x42c80003",
+            "api_readback_wght": 100.00003051757812,
+            "api_readback_wght_bits": "0x42c80004",
+            "A_design_advance": 4000,
+            "A_natural_advance": 4000,
+            "A_outline_right": 3060.0
+          },
+          "low_f32_4": {
+            "requested": "100.000030517578125",
+            "api_float32": 100.00003051757812,
+            "api_float32_bits": "0x42c80004",
+            "api_readback_wght": 100.00003051757812,
+            "api_readback_wght_bits": "0x42c80004",
+            "A_design_advance": 4000,
+            "A_natural_advance": 4000,
+            "A_outline_right": 3060.0
+          },
+          "ramp_lo": {
+            "requested": "498.9990234375",
+            "api_float32": 498.9990234375,
+            "api_float32_bits": "0x43f97fe0",
+            "api_readback_wght": 498.9990234375,
+            "api_readback_wght_bits": "0x43f97fe0",
+            "A_design_advance": 16000,
+            "A_natural_advance": 16000,
+            "A_outline_right": 15060.0
+          },
+          "ramp_mid": {
+            "requested": "499.0142822265625",
+            "api_float32": 499.0142822265625,
+            "api_float32_bits": "0x43f981d4",
+            "api_readback_wght": 499.0142822265625,
+            "api_readback_wght_bits": "0x43f981d4",
+            "A_design_advance": 22000,
+            "A_natural_advance": 22000,
+            "A_outline_right": 21060.0
+          },
+          "ramp_hi": {
+            "requested": "499.029541015625",
+            "api_float32": 499.029541015625,
+            "api_float32_bits": "0x43f983c8",
+            "api_readback_wght": 499.029541015625,
+            "api_readback_wght_bits": "0x43f983c8",
+            "A_design_advance": 28000,
+            "A_natural_advance": 28000,
+            "A_outline_right": 27060.0
+          }
+        },
+        "model_residuals": {
+          "binary32_continuous": {
+            "maximum_advance_error": 203.99999999790452,
+            "maximum_outline_right_error": 203.99999999790452,
+            "both_within_1_32_on_frozen_cases": false
+          },
+          "binary32_user16_continuous": {
+            "maximum_advance_error": 203.99999999790452,
+            "maximum_outline_right_error": 203.99999999790452,
+            "both_within_1_32_on_frozen_cases": false
+          },
+          "binary32_normalize16_before_avar": {
+            "maximum_advance_error": 0.0,
+            "maximum_outline_right_error": 0.0,
+            "both_within_1_32_on_frozen_cases": true
+          },
+          "binary32_normalize14_before_avar": {
+            "maximum_advance_error": 6000.0,
+            "maximum_outline_right_error": 6000.0,
+            "both_within_1_32_on_frozen_cases": false
+          }
+        },
+        "model_scope": "Four predeclared finite hypotheses; a normalized16-before-avar match does not exclude user16 rounding followed by normalized16 rounding, and does not identify proprietary Windows internals.",
+        "low_float_pair_observables_equal": true,
+        "low_float_pair_api_readback_equal": true,
+        "validation_scope": "INDIVIDUAL_COMPLETE_PROCESS_ONLY",
+        "evidence_binding": {
+          "source_commit": "41504fed7ec7ca6d4768389106a03aa9bc5cd36e",
+          "font_sha256": "1d05d64130cd12a14d8de40e25302b6468cfd4168923ec3319c02edf69cabb47",
+          "native_log_sha256": "eecd0e048b2f864689adef9f97b08fc1ce2806f7d7cc4d596d0d2124f25ecb0b",
+          "native_log_bytes": 181817,
+          "header_bound_to_process_label": true
+        }
+      },
+      "gain-dwrite-installed-reverse": {
+        "header": {
+          "record": "header",
+          "schema": 1,
+          "input_sha256": "1d05d64130cd12a14d8de40e25302b6468cfd4168923ec3319c02edf69cabb47",
+          "input_bytes": 3384,
+          "family": "Swirl D1 Precision Gain",
+          "load_mode": "system_collection",
+          "first_order": "reverse",
+          "case_count": 28,
+          "api_axis_type": "IEEE754_binary32",
+          "units_per_em": 1000,
+          "glyph_count": 6,
+          "physical_table_sha256": {
+            "head": "126525de8c6ca6a1a7d1d4bc611c284b1439aea225f372a9c508e07324d34ac1",
+            "maxp": "e7e09c9c65165becd17c0321aa1d8538312b17c76a704d9431c9b966f73c5981",
+            "name": "1ecb83fc7698f8133e6919d383fac89921f49d5c66cc348bb5ff4855daa90637",
+            "cmap": "81863f0b1267606a1c5c869e3290d95ea88746dae019b64928aef53669ef43e0",
+            "fvar": "771abe07521487efe48e0d01ce0a4625a46ba886973239df19629acbeef9384e",
+            "avar": "fa15a45125407557ed20cf5d87f8b344a27b725e2cd16eca4a43f86bd33e8ae0",
+            "glyf": "f2d5340d1e39b50fde2439651e71b8602b3346da9549bacade1a69604040c9f3",
+            "gvar": "620872f19d359827abce5a94b6004819cd37c9b08979543699f361fdc4cdf691",
+            "hmtx": "ce4b94f7a14b922d1e88975f4700cceed9a51e6356da33899a72cb76ca68282a",
+            "HVAR": "1130dc113461bfbd4898bd951412b115ccb6cfe118ff0a05ff1ae9ff2c5bd55b",
+            "STAT": "e3c805efd44ace1f97d8364627b10568e7c594ad52aa12129279e2e5a794babb"
+          },
+          "original_ttc_acceptance": "NOT_RUN",
+          "windows11_desktop_acceptance": "NOT_RUN"
+        },
+        "summary": {
+          "record": "summary",
+          "status": "PASS_DWRITE_SYNTHETIC",
+          "observation_count": 56,
+          "pair_input_bits_equal": true,
+          "pair_outline_equal": true,
+          "pair_design_metrics_equal": true,
+          "pair_placement_equal": true,
+          "pair_raster_equal": true,
+          "reverse_replay_equal": true,
+          "axis_positive_controls_passed": 3,
+          "elapsed_ms": 154.9175,
+          "internal_normalization_algorithm": "NOT_INFERRED_FROM_READBACK",
+          "original_ttc_acceptance": "NOT_RUN"
+        },
+        "selected": {
+          "pair_lo": {
+            "requested": "499.006199",
+            "api_float32": 499.0061950683594,
+            "api_float32_bits": "0x43f980cb",
+            "api_readback_wght": 499.0061950683594,
+            "api_readback_wght_bits": "0x43f980cb",
+            "A_design_advance": 19000,
+            "A_natural_advance": 19000,
+            "A_outline_right": 18060.0
+          },
+          "pair_hi": {
+            "requested": "499.006201",
+            "api_float32": 499.0061950683594,
+            "api_float32_bits": "0x43f980cb",
+            "api_readback_wght": 499.0061950683594,
+            "api_readback_wght_bits": "0x43f980cb",
+            "A_design_advance": 19000,
+            "A_natural_advance": 19000,
+            "A_outline_right": 18060.0
+          },
+          "f32_m1": {
+            "requested": "499.00616455078125",
+            "api_float32": 499.00616455078125,
+            "api_float32_bits": "0x43f980ca",
+            "api_readback_wght": 499.00616455078125,
+            "api_readback_wght_bits": "0x43f980ca",
+            "A_design_advance": 19000,
+            "A_natural_advance": 19000,
+            "A_outline_right": 18060.0
+          },
+          "f32_p1": {
+            "requested": "499.0062255859375",
+            "api_float32": 499.0062255859375,
+            "api_float32_bits": "0x43f980cc",
+            "api_readback_wght": 499.0062255859375,
+            "api_readback_wght_bits": "0x43f980cc",
+            "A_design_advance": 19000,
+            "A_natural_advance": 19000,
+            "A_outline_right": 18060.0
+          },
+          "low_f32_0": {
+            "requested": "100",
+            "api_float32": 100.0,
+            "api_float32_bits": "0x42c80000",
+            "api_readback_wght": 100,
+            "api_readback_wght_bits": "0x42c80000",
+            "A_design_advance": 4000,
+            "A_natural_advance": 4000,
+            "A_outline_right": 3060.0
+          },
+          "low_f32_1": {
+            "requested": "100.00000762939453125",
+            "api_float32": 100.00000762939453,
+            "api_float32_bits": "0x42c80001",
+            "api_readback_wght": 100.00001525878906,
+            "api_readback_wght_bits": "0x42c80002",
+            "A_design_advance": 4000,
+            "A_natural_advance": 4000,
+            "A_outline_right": 3060.0
+          },
+          "low_f32_2": {
+            "requested": "100.0000152587890625",
+            "api_float32": 100.00001525878906,
+            "api_float32_bits": "0x42c80002",
+            "api_readback_wght": 100.00001525878906,
+            "api_readback_wght_bits": "0x42c80002",
+            "A_design_advance": 4000,
+            "A_natural_advance": 4000,
+            "A_outline_right": 3060.0
+          },
+          "low_f32_3": {
+            "requested": "100.00002288818359375",
+            "api_float32": 100.0000228881836,
+            "api_float32_bits": "0x42c80003",
+            "api_readback_wght": 100.00003051757812,
+            "api_readback_wght_bits": "0x42c80004",
+            "A_design_advance": 4000,
+            "A_natural_advance": 4000,
+            "A_outline_right": 3060.0
+          },
+          "low_f32_4": {
+            "requested": "100.000030517578125",
+            "api_float32": 100.00003051757812,
+            "api_float32_bits": "0x42c80004",
+            "api_readback_wght": 100.00003051757812,
+            "api_readback_wght_bits": "0x42c80004",
+            "A_design_advance": 4000,
+            "A_natural_advance": 4000,
+            "A_outline_right": 3060.0
+          },
+          "ramp_lo": {
+            "requested": "498.9990234375",
+            "api_float32": 498.9990234375,
+            "api_float32_bits": "0x43f97fe0",
+            "api_readback_wght": 498.9990234375,
+            "api_readback_wght_bits": "0x43f97fe0",
+            "A_design_advance": 16000,
+            "A_natural_advance": 16000,
+            "A_outline_right": 15060.0
+          },
+          "ramp_mid": {
+            "requested": "499.0142822265625",
+            "api_float32": 499.0142822265625,
+            "api_float32_bits": "0x43f981d4",
+            "api_readback_wght": 499.0142822265625,
+            "api_readback_wght_bits": "0x43f981d4",
+            "A_design_advance": 22000,
+            "A_natural_advance": 22000,
+            "A_outline_right": 21060.0
+          },
+          "ramp_hi": {
+            "requested": "499.029541015625",
+            "api_float32": 499.029541015625,
+            "api_float32_bits": "0x43f983c8",
+            "api_readback_wght": 499.029541015625,
+            "api_readback_wght_bits": "0x43f983c8",
+            "A_design_advance": 28000,
+            "A_natural_advance": 28000,
+            "A_outline_right": 27060.0
+          }
+        },
+        "model_residuals": {
+          "binary32_continuous": {
+            "maximum_advance_error": 203.99999999790452,
+            "maximum_outline_right_error": 203.99999999790452,
+            "both_within_1_32_on_frozen_cases": false
+          },
+          "binary32_user16_continuous": {
+            "maximum_advance_error": 203.99999999790452,
+            "maximum_outline_right_error": 203.99999999790452,
+            "both_within_1_32_on_frozen_cases": false
+          },
+          "binary32_normalize16_before_avar": {
+            "maximum_advance_error": 0.0,
+            "maximum_outline_right_error": 0.0,
+            "both_within_1_32_on_frozen_cases": true
+          },
+          "binary32_normalize14_before_avar": {
+            "maximum_advance_error": 6000.0,
+            "maximum_outline_right_error": 6000.0,
+            "both_within_1_32_on_frozen_cases": false
+          }
+        },
+        "model_scope": "Four predeclared finite hypotheses; a normalized16-before-avar match does not exclude user16 rounding followed by normalized16 rounding, and does not identify proprietary Windows internals.",
+        "low_float_pair_observables_equal": true,
+        "low_float_pair_api_readback_equal": true,
+        "validation_scope": "INDIVIDUAL_COMPLETE_PROCESS_ONLY",
+        "evidence_binding": {
+          "source_commit": "41504fed7ec7ca6d4768389106a03aa9bc5cd36e",
+          "font_sha256": "1d05d64130cd12a14d8de40e25302b6468cfd4168923ec3319c02edf69cabb47",
+          "native_log_sha256": "d47dbea017da94b953a8333ea9b43d28555656a84332f379b6c2e69c8ebe9192",
+          "native_log_bytes": 181827,
+          "header_bound_to_process_label": true
+        }
+      },
+      "gain-dwrite-private-forward": {
+        "header": {
+          "record": "header",
+          "schema": 1,
+          "input_sha256": "1d05d64130cd12a14d8de40e25302b6468cfd4168923ec3319c02edf69cabb47",
+          "input_bytes": 3384,
+          "family": "Swirl D1 Precision Gain",
+          "load_mode": "direct_file",
+          "first_order": "forward",
+          "case_count": 28,
+          "api_axis_type": "IEEE754_binary32",
+          "units_per_em": 1000,
+          "glyph_count": 6,
+          "physical_table_sha256": {
+            "head": "126525de8c6ca6a1a7d1d4bc611c284b1439aea225f372a9c508e07324d34ac1",
+            "maxp": "e7e09c9c65165becd17c0321aa1d8538312b17c76a704d9431c9b966f73c5981",
+            "name": "1ecb83fc7698f8133e6919d383fac89921f49d5c66cc348bb5ff4855daa90637",
+            "cmap": "81863f0b1267606a1c5c869e3290d95ea88746dae019b64928aef53669ef43e0",
+            "fvar": "771abe07521487efe48e0d01ce0a4625a46ba886973239df19629acbeef9384e",
+            "avar": "fa15a45125407557ed20cf5d87f8b344a27b725e2cd16eca4a43f86bd33e8ae0",
+            "glyf": "f2d5340d1e39b50fde2439651e71b8602b3346da9549bacade1a69604040c9f3",
+            "gvar": "620872f19d359827abce5a94b6004819cd37c9b08979543699f361fdc4cdf691",
+            "hmtx": "ce4b94f7a14b922d1e88975f4700cceed9a51e6356da33899a72cb76ca68282a",
+            "HVAR": "1130dc113461bfbd4898bd951412b115ccb6cfe118ff0a05ff1ae9ff2c5bd55b",
+            "STAT": "e3c805efd44ace1f97d8364627b10568e7c594ad52aa12129279e2e5a794babb"
+          },
+          "original_ttc_acceptance": "NOT_RUN",
+          "windows11_desktop_acceptance": "NOT_RUN"
+        },
+        "summary": {
+          "record": "summary",
+          "status": "PASS_DWRITE_SYNTHETIC",
+          "observation_count": 56,
+          "pair_input_bits_equal": true,
+          "pair_outline_equal": true,
+          "pair_design_metrics_equal": true,
+          "pair_placement_equal": true,
+          "pair_raster_equal": true,
+          "reverse_replay_equal": true,
+          "axis_positive_controls_passed": 3,
+          "elapsed_ms": 115.9096,
+          "internal_normalization_algorithm": "NOT_INFERRED_FROM_READBACK",
+          "original_ttc_acceptance": "NOT_RUN"
+        },
+        "selected": {
+          "pair_lo": {
+            "requested": "499.006199",
+            "api_float32": 499.0061950683594,
+            "api_float32_bits": "0x43f980cb",
+            "api_readback_wght": 499.0061950683594,
+            "api_readback_wght_bits": "0x43f980cb",
+            "A_design_advance": 19000,
+            "A_natural_advance": 19000,
+            "A_outline_right": 18060.0
+          },
+          "pair_hi": {
+            "requested": "499.006201",
+            "api_float32": 499.0061950683594,
+            "api_float32_bits": "0x43f980cb",
+            "api_readback_wght": 499.0061950683594,
+            "api_readback_wght_bits": "0x43f980cb",
+            "A_design_advance": 19000,
+            "A_natural_advance": 19000,
+            "A_outline_right": 18060.0
+          },
+          "f32_m1": {
+            "requested": "499.00616455078125",
+            "api_float32": 499.00616455078125,
+            "api_float32_bits": "0x43f980ca",
+            "api_readback_wght": 499.00616455078125,
+            "api_readback_wght_bits": "0x43f980ca",
+            "A_design_advance": 19000,
+            "A_natural_advance": 19000,
+            "A_outline_right": 18060.0
+          },
+          "f32_p1": {
+            "requested": "499.0062255859375",
+            "api_float32": 499.0062255859375,
+            "api_float32_bits": "0x43f980cc",
+            "api_readback_wght": 499.0062255859375,
+            "api_readback_wght_bits": "0x43f980cc",
+            "A_design_advance": 19000,
+            "A_natural_advance": 19000,
+            "A_outline_right": 18060.0
+          },
+          "low_f32_0": {
+            "requested": "100",
+            "api_float32": 100.0,
+            "api_float32_bits": "0x42c80000",
+            "api_readback_wght": 100,
+            "api_readback_wght_bits": "0x42c80000",
+            "A_design_advance": 4000,
+            "A_natural_advance": 4000,
+            "A_outline_right": 3060.0
+          },
+          "low_f32_1": {
+            "requested": "100.00000762939453125",
+            "api_float32": 100.00000762939453,
+            "api_float32_bits": "0x42c80001",
+            "api_readback_wght": 100.00001525878906,
+            "api_readback_wght_bits": "0x42c80002",
+            "A_design_advance": 4000,
+            "A_natural_advance": 4000,
+            "A_outline_right": 3060.0
+          },
+          "low_f32_2": {
+            "requested": "100.0000152587890625",
+            "api_float32": 100.00001525878906,
+            "api_float32_bits": "0x42c80002",
+            "api_readback_wght": 100.00001525878906,
+            "api_readback_wght_bits": "0x42c80002",
+            "A_design_advance": 4000,
+            "A_natural_advance": 4000,
+            "A_outline_right": 3060.0
+          },
+          "low_f32_3": {
+            "requested": "100.00002288818359375",
+            "api_float32": 100.0000228881836,
+            "api_float32_bits": "0x42c80003",
+            "api_readback_wght": 100.00003051757812,
+            "api_readback_wght_bits": "0x42c80004",
+            "A_design_advance": 4000,
+            "A_natural_advance": 4000,
+            "A_outline_right": 3060.0
+          },
+          "low_f32_4": {
+            "requested": "100.000030517578125",
+            "api_float32": 100.00003051757812,
+            "api_float32_bits": "0x42c80004",
+            "api_readback_wght": 100.00003051757812,
+            "api_readback_wght_bits": "0x42c80004",
+            "A_design_advance": 4000,
+            "A_natural_advance": 4000,
+            "A_outline_right": 3060.0
+          },
+          "ramp_lo": {
+            "requested": "498.9990234375",
+            "api_float32": 498.9990234375,
+            "api_float32_bits": "0x43f97fe0",
+            "api_readback_wght": 498.9990234375,
+            "api_readback_wght_bits": "0x43f97fe0",
+            "A_design_advance": 16000,
+            "A_natural_advance": 16000,
+            "A_outline_right": 15060.0
+          },
+          "ramp_mid": {
+            "requested": "499.0142822265625",
+            "api_float32": 499.0142822265625,
+            "api_float32_bits": "0x43f981d4",
+            "api_readback_wght": 499.0142822265625,
+            "api_readback_wght_bits": "0x43f981d4",
+            "A_design_advance": 22000,
+            "A_natural_advance": 22000,
+            "A_outline_right": 21060.0
+          },
+          "ramp_hi": {
+            "requested": "499.029541015625",
+            "api_float32": 499.029541015625,
+            "api_float32_bits": "0x43f983c8",
+            "api_readback_wght": 499.029541015625,
+            "api_readback_wght_bits": "0x43f983c8",
+            "A_design_advance": 28000,
+            "A_natural_advance": 28000,
+            "A_outline_right": 27060.0
+          }
+        },
+        "model_residuals": {
+          "binary32_continuous": {
+            "maximum_advance_error": 203.99999999790452,
+            "maximum_outline_right_error": 203.99999999790452,
+            "both_within_1_32_on_frozen_cases": false
+          },
+          "binary32_user16_continuous": {
+            "maximum_advance_error": 203.99999999790452,
+            "maximum_outline_right_error": 203.99999999790452,
+            "both_within_1_32_on_frozen_cases": false
+          },
+          "binary32_normalize16_before_avar": {
+            "maximum_advance_error": 0.0,
+            "maximum_outline_right_error": 0.0,
+            "both_within_1_32_on_frozen_cases": true
+          },
+          "binary32_normalize14_before_avar": {
+            "maximum_advance_error": 6000.0,
+            "maximum_outline_right_error": 6000.0,
+            "both_within_1_32_on_frozen_cases": false
+          }
+        },
+        "model_scope": "Four predeclared finite hypotheses; a normalized16-before-avar match does not exclude user16 rounding followed by normalized16 rounding, and does not identify proprietary Windows internals.",
+        "low_float_pair_observables_equal": true,
+        "low_float_pair_api_readback_equal": true,
+        "validation_scope": "INDIVIDUAL_COMPLETE_PROCESS_ONLY",
+        "evidence_binding": {
+          "source_commit": "41504fed7ec7ca6d4768389106a03aa9bc5cd36e",
+          "font_sha256": "1d05d64130cd12a14d8de40e25302b6468cfd4168923ec3319c02edf69cabb47",
+          "native_log_sha256": "98dc324a4fbbf719ec42e9512cea7739f70a1a65ab5f297dbde6c3372fcc3371",
+          "native_log_bytes": 181811,
+          "header_bound_to_process_label": true
+        }
+      },
+      "gain-dwrite-private-reverse": {
+        "header": {
+          "record": "header",
+          "schema": 1,
+          "input_sha256": "1d05d64130cd12a14d8de40e25302b6468cfd4168923ec3319c02edf69cabb47",
+          "input_bytes": 3384,
+          "family": "Swirl D1 Precision Gain",
+          "load_mode": "direct_file",
+          "first_order": "reverse",
+          "case_count": 28,
+          "api_axis_type": "IEEE754_binary32",
+          "units_per_em": 1000,
+          "glyph_count": 6,
+          "physical_table_sha256": {
+            "head": "126525de8c6ca6a1a7d1d4bc611c284b1439aea225f372a9c508e07324d34ac1",
+            "maxp": "e7e09c9c65165becd17c0321aa1d8538312b17c76a704d9431c9b966f73c5981",
+            "name": "1ecb83fc7698f8133e6919d383fac89921f49d5c66cc348bb5ff4855daa90637",
+            "cmap": "81863f0b1267606a1c5c869e3290d95ea88746dae019b64928aef53669ef43e0",
+            "fvar": "771abe07521487efe48e0d01ce0a4625a46ba886973239df19629acbeef9384e",
+            "avar": "fa15a45125407557ed20cf5d87f8b344a27b725e2cd16eca4a43f86bd33e8ae0",
+            "glyf": "f2d5340d1e39b50fde2439651e71b8602b3346da9549bacade1a69604040c9f3",
+            "gvar": "620872f19d359827abce5a94b6004819cd37c9b08979543699f361fdc4cdf691",
+            "hmtx": "ce4b94f7a14b922d1e88975f4700cceed9a51e6356da33899a72cb76ca68282a",
+            "HVAR": "1130dc113461bfbd4898bd951412b115ccb6cfe118ff0a05ff1ae9ff2c5bd55b",
+            "STAT": "e3c805efd44ace1f97d8364627b10568e7c594ad52aa12129279e2e5a794babb"
+          },
+          "original_ttc_acceptance": "NOT_RUN",
+          "windows11_desktop_acceptance": "NOT_RUN"
+        },
+        "summary": {
+          "record": "summary",
+          "status": "PASS_DWRITE_SYNTHETIC",
+          "observation_count": 56,
+          "pair_input_bits_equal": true,
+          "pair_outline_equal": true,
+          "pair_design_metrics_equal": true,
+          "pair_placement_equal": true,
+          "pair_raster_equal": true,
+          "reverse_replay_equal": true,
+          "axis_positive_controls_passed": 3,
+          "elapsed_ms": 116.2202,
+          "internal_normalization_algorithm": "NOT_INFERRED_FROM_READBACK",
+          "original_ttc_acceptance": "NOT_RUN"
+        },
+        "selected": {
+          "pair_lo": {
+            "requested": "499.006199",
+            "api_float32": 499.0061950683594,
+            "api_float32_bits": "0x43f980cb",
+            "api_readback_wght": 499.0061950683594,
+            "api_readback_wght_bits": "0x43f980cb",
+            "A_design_advance": 19000,
+            "A_natural_advance": 19000,
+            "A_outline_right": 18060.0
+          },
+          "pair_hi": {
+            "requested": "499.006201",
+            "api_float32": 499.0061950683594,
+            "api_float32_bits": "0x43f980cb",
+            "api_readback_wght": 499.0061950683594,
+            "api_readback_wght_bits": "0x43f980cb",
+            "A_design_advance": 19000,
+            "A_natural_advance": 19000,
+            "A_outline_right": 18060.0
+          },
+          "f32_m1": {
+            "requested": "499.00616455078125",
+            "api_float32": 499.00616455078125,
+            "api_float32_bits": "0x43f980ca",
+            "api_readback_wght": 499.00616455078125,
+            "api_readback_wght_bits": "0x43f980ca",
+            "A_design_advance": 19000,
+            "A_natural_advance": 19000,
+            "A_outline_right": 18060.0
+          },
+          "f32_p1": {
+            "requested": "499.0062255859375",
+            "api_float32": 499.0062255859375,
+            "api_float32_bits": "0x43f980cc",
+            "api_readback_wght": 499.0062255859375,
+            "api_readback_wght_bits": "0x43f980cc",
+            "A_design_advance": 19000,
+            "A_natural_advance": 19000,
+            "A_outline_right": 18060.0
+          },
+          "low_f32_0": {
+            "requested": "100",
+            "api_float32": 100.0,
+            "api_float32_bits": "0x42c80000",
+            "api_readback_wght": 100,
+            "api_readback_wght_bits": "0x42c80000",
+            "A_design_advance": 4000,
+            "A_natural_advance": 4000,
+            "A_outline_right": 3060.0
+          },
+          "low_f32_1": {
+            "requested": "100.00000762939453125",
+            "api_float32": 100.00000762939453,
+            "api_float32_bits": "0x42c80001",
+            "api_readback_wght": 100.00001525878906,
+            "api_readback_wght_bits": "0x42c80002",
+            "A_design_advance": 4000,
+            "A_natural_advance": 4000,
+            "A_outline_right": 3060.0
+          },
+          "low_f32_2": {
+            "requested": "100.0000152587890625",
+            "api_float32": 100.00001525878906,
+            "api_float32_bits": "0x42c80002",
+            "api_readback_wght": 100.00001525878906,
+            "api_readback_wght_bits": "0x42c80002",
+            "A_design_advance": 4000,
+            "A_natural_advance": 4000,
+            "A_outline_right": 3060.0
+          },
+          "low_f32_3": {
+            "requested": "100.00002288818359375",
+            "api_float32": 100.0000228881836,
+            "api_float32_bits": "0x42c80003",
+            "api_readback_wght": 100.00003051757812,
+            "api_readback_wght_bits": "0x42c80004",
+            "A_design_advance": 4000,
+            "A_natural_advance": 4000,
+            "A_outline_right": 3060.0
+          },
+          "low_f32_4": {
+            "requested": "100.000030517578125",
+            "api_float32": 100.00003051757812,
+            "api_float32_bits": "0x42c80004",
+            "api_readback_wght": 100.00003051757812,
+            "api_readback_wght_bits": "0x42c80004",
+            "A_design_advance": 4000,
+            "A_natural_advance": 4000,
+            "A_outline_right": 3060.0
+          },
+          "ramp_lo": {
+            "requested": "498.9990234375",
+            "api_float32": 498.9990234375,
+            "api_float32_bits": "0x43f97fe0",
+            "api_readback_wght": 498.9990234375,
+            "api_readback_wght_bits": "0x43f97fe0",
+            "A_design_advance": 16000,
+            "A_natural_advance": 16000,
+            "A_outline_right": 15060.0
+          },
+          "ramp_mid": {
+            "requested": "499.0142822265625",
+            "api_float32": 499.0142822265625,
+            "api_float32_bits": "0x43f981d4",
+            "api_readback_wght": 499.0142822265625,
+            "api_readback_wght_bits": "0x43f981d4",
+            "A_design_advance": 22000,
+            "A_natural_advance": 22000,
+            "A_outline_right": 21060.0
+          },
+          "ramp_hi": {
+            "requested": "499.029541015625",
+            "api_float32": 499.029541015625,
+            "api_float32_bits": "0x43f983c8",
+            "api_readback_wght": 499.029541015625,
+            "api_readback_wght_bits": "0x43f983c8",
+            "A_design_advance": 28000,
+            "A_natural_advance": 28000,
+            "A_outline_right": 27060.0
+          }
+        },
+        "model_residuals": {
+          "binary32_continuous": {
+            "maximum_advance_error": 203.99999999790452,
+            "maximum_outline_right_error": 203.99999999790452,
+            "both_within_1_32_on_frozen_cases": false
+          },
+          "binary32_user16_continuous": {
+            "maximum_advance_error": 203.99999999790452,
+            "maximum_outline_right_error": 203.99999999790452,
+            "both_within_1_32_on_frozen_cases": false
+          },
+          "binary32_normalize16_before_avar": {
+            "maximum_advance_error": 0.0,
+            "maximum_outline_right_error": 0.0,
+            "both_within_1_32_on_frozen_cases": true
+          },
+          "binary32_normalize14_before_avar": {
+            "maximum_advance_error": 6000.0,
+            "maximum_outline_right_error": 6000.0,
+            "both_within_1_32_on_frozen_cases": false
+          }
+        },
+        "model_scope": "Four predeclared finite hypotheses; a normalized16-before-avar match does not exclude user16 rounding followed by normalized16 rounding, and does not identify proprietary Windows internals.",
+        "low_float_pair_observables_equal": true,
+        "low_float_pair_api_readback_equal": true,
+        "validation_scope": "INDIVIDUAL_COMPLETE_PROCESS_ONLY",
+        "evidence_binding": {
+          "source_commit": "41504fed7ec7ca6d4768389106a03aa9bc5cd36e",
+          "font_sha256": "1d05d64130cd12a14d8de40e25302b6468cfd4168923ec3319c02edf69cabb47",
+          "native_log_sha256": "bdd9e133b70b191c0bbf2021f3d1820bed768702279da887ed0efc2af23f8255",
+          "native_log_bytes": 181821,
+          "header_bound_to_process_label": true
+        }
+      },
+      "ordinary-dwrite-installed-forward": {
+        "header": {
+          "record": "header",
+          "schema": 1,
+          "input_sha256": "1011e838786f1516db99d783bb9b85d962de1783e5cfc20c22fa552db22ed211",
+          "input_bytes": 3300,
+          "family": "Swirl D1 Precision",
+          "load_mode": "system_collection",
+          "first_order": "forward",
+          "case_count": 28,
+          "api_axis_type": "IEEE754_binary32",
+          "units_per_em": 1000,
+          "glyph_count": 6,
+          "physical_table_sha256": {
+            "head": "bcd12416b63224301565bd985ae077b568fc497112d44bc6866496cc6c401eee",
+            "maxp": "e7e09c9c65165becd17c0321aa1d8538312b17c76a704d9431c9b966f73c5981",
+            "name": "bb224efc0e8be1e71a3a23c7f32ea34770e0dfa86a5a44bb5a41be3a03f77393",
+            "cmap": "81863f0b1267606a1c5c869e3290d95ea88746dae019b64928aef53669ef43e0",
+            "fvar": "771abe07521487efe48e0d01ce0a4625a46ba886973239df19629acbeef9384e",
+            "avar": "eea771fd186f239a548e30eeb159e502a065cce68b0d21729ba0968ed2985e74",
+            "glyf": "4bf686bb8baafc178c29cfbe89af8be55718a4eddd3571191072ded75c37cc73",
+            "gvar": "a27ad158ac971671bb65cc28b4e67d6961784442e67a0cdf39d13119dc730f3d",
+            "hmtx": "951d64d88ccb1342ad7ecea2e1f908ae66d46da2fd0f912b530bb3adf463016a",
+            "HVAR": "fa0f314beb9d4098134ad9f74c74dd5ea689c49d15dbf12d59e96b261c011228",
+            "STAT": "e3c805efd44ace1f97d8364627b10568e7c594ad52aa12129279e2e5a794babb"
+          },
+          "original_ttc_acceptance": "NOT_RUN",
+          "windows11_desktop_acceptance": "NOT_RUN"
+        },
+        "summary": {
+          "record": "summary",
+          "status": "PASS_DWRITE_SYNTHETIC",
+          "observation_count": 56,
+          "pair_input_bits_equal": true,
+          "pair_outline_equal": true,
+          "pair_design_metrics_equal": true,
+          "pair_placement_equal": true,
+          "pair_raster_equal": true,
+          "reverse_replay_equal": true,
+          "axis_positive_controls_passed": 3,
+          "elapsed_ms": 114.6381,
+          "internal_normalization_algorithm": "NOT_INFERRED_FROM_READBACK",
+          "original_ttc_acceptance": "NOT_RUN"
+        },
+        "selected": {
+          "pair_lo": {
+            "requested": "499.006199",
+            "api_float32": 499.0061950683594,
+            "api_float32_bits": "0x43f980cb",
+            "api_readback_wght": 499.0061950683594,
+            "api_readback_wght_bits": "0x43f980cb",
+            "A_design_advance": 636,
+            "A_natural_advance": 636,
+            "A_outline_right": 536.0
+          },
+          "pair_hi": {
+            "requested": "499.006201",
+            "api_float32": 499.0061950683594,
+            "api_float32_bits": "0x43f980cb",
+            "api_readback_wght": 499.0061950683594,
+            "api_readback_wght_bits": "0x43f980cb",
+            "A_design_advance": 636,
+            "A_natural_advance": 636,
+            "A_outline_right": 536.0
+          },
+          "f32_m1": {
+            "requested": "499.00616455078125",
+            "api_float32": 499.00616455078125,
+            "api_float32_bits": "0x43f980ca",
+            "api_readback_wght": 499.00616455078125,
+            "api_readback_wght_bits": "0x43f980ca",
+            "A_design_advance": 636,
+            "A_natural_advance": 636,
+            "A_outline_right": 536.0
+          },
+          "f32_p1": {
+            "requested": "499.0062255859375",
+            "api_float32": 499.0062255859375,
+            "api_float32_bits": "0x43f980cc",
+            "api_readback_wght": 499.0062255859375,
+            "api_readback_wght_bits": "0x43f980cc",
+            "A_design_advance": 636,
+            "A_natural_advance": 636,
+            "A_outline_right": 536.0
+          },
+          "low_f32_0": {
+            "requested": "100",
+            "api_float32": 100.0,
+            "api_float32_bits": "0x42c80000",
+            "api_readback_wght": 100,
+            "api_readback_wght_bits": "0x42c80000",
+            "A_design_advance": 420,
+            "A_natural_advance": 420,
+            "A_outline_right": 320.0
+          },
+          "low_f32_1": {
+            "requested": "100.00000762939453125",
+            "api_float32": 100.00000762939453,
+            "api_float32_bits": "0x42c80001",
+            "api_readback_wght": 100.00001525878906,
+            "api_readback_wght_bits": "0x42c80002",
+            "A_design_advance": 420,
+            "A_natural_advance": 420,
+            "A_outline_right": 320.0
+          },
+          "low_f32_2": {
+            "requested": "100.0000152587890625",
+            "api_float32": 100.00001525878906,
+            "api_float32_bits": "0x42c80002",
+            "api_readback_wght": 100.00001525878906,
+            "api_readback_wght_bits": "0x42c80002",
+            "A_design_advance": 420,
+            "A_natural_advance": 420,
+            "A_outline_right": 320.0
+          },
+          "low_f32_3": {
+            "requested": "100.00002288818359375",
+            "api_float32": 100.0000228881836,
+            "api_float32_bits": "0x42c80003",
+            "api_readback_wght": 100.00003051757812,
+            "api_readback_wght_bits": "0x42c80004",
+            "A_design_advance": 420,
+            "A_natural_advance": 420,
+            "A_outline_right": 320.0
+          },
+          "low_f32_4": {
+            "requested": "100.000030517578125",
+            "api_float32": 100.00003051757812,
+            "api_float32_bits": "0x42c80004",
+            "api_readback_wght": 100.00003051757812,
+            "api_readback_wght_bits": "0x42c80004",
+            "A_design_advance": 420,
+            "A_natural_advance": 420,
+            "A_outline_right": 320.0
+          },
+          "ramp_lo": {
+            "requested": "498.9990234375",
+            "api_float32": 498.9990234375,
+            "api_float32_bits": "0x43f97fe0",
+            "api_readback_wght": 498.9990234375,
+            "api_readback_wght_bits": "0x43f97fe0",
+            "A_design_advance": 636,
+            "A_natural_advance": 636,
+            "A_outline_right": 536.0
+          },
+          "ramp_mid": {
+            "requested": "499.0142822265625",
+            "api_float32": 499.0142822265625,
+            "api_float32_bits": "0x43f981d4",
+            "api_readback_wght": 499.0142822265625,
+            "api_readback_wght_bits": "0x43f981d4",
+            "A_design_advance": 636,
+            "A_natural_advance": 636,
+            "A_outline_right": 536.0
+          },
+          "ramp_hi": {
+            "requested": "499.029541015625",
+            "api_float32": 499.029541015625,
+            "api_float32_bits": "0x43f983c8",
+            "api_readback_wght": 499.029541015625,
+            "api_readback_wght_bits": "0x43f983c8",
+            "A_design_advance": 636,
+            "A_natural_advance": 636,
+            "A_outline_right": 536.0
+          }
+        },
+        "model_residuals": {
+          "binary32_continuous": {
+            "maximum_advance_error": 0.3603515625,
+            "maximum_outline_right_error": 0.3603515625,
+            "both_within_1_32_on_frozen_cases": false
+          },
+          "binary32_user16_continuous": {
+            "maximum_advance_error": 0.3603515625,
+            "maximum_outline_right_error": 0.3603515625,
+            "both_within_1_32_on_frozen_cases": false
+          },
+          "binary32_normalize16_before_avar": {
+            "maximum_advance_error": 0.3603515625,
+            "maximum_outline_right_error": 0.3603515625,
+            "both_within_1_32_on_frozen_cases": false
+          },
+          "binary32_normalize14_before_avar": {
+            "maximum_advance_error": 0.3603515625,
+            "maximum_outline_right_error": 0.3603515625,
+            "both_within_1_32_on_frozen_cases": false
+          }
+        },
+        "model_scope": "Four predeclared finite hypotheses; a normalized16-before-avar match does not exclude user16 rounding followed by normalized16 rounding, and does not identify proprietary Windows internals.",
+        "low_float_pair_observables_equal": true,
+        "low_float_pair_api_readback_equal": true,
+        "validation_scope": "INDIVIDUAL_COMPLETE_PROCESS_ONLY",
+        "evidence_binding": {
+          "source_commit": "41504fed7ec7ca6d4768389106a03aa9bc5cd36e",
+          "font_sha256": "1011e838786f1516db99d783bb9b85d962de1783e5cfc20c22fa552db22ed211",
+          "native_log_sha256": "55318f8b0f8a6bfb383dff622cf36f9fa877f372833e95dec78ba6d2445957ce",
+          "native_log_bytes": 179888,
+          "header_bound_to_process_label": true
+        }
+      },
+      "ordinary-dwrite-installed-reverse": {
+        "header": {
+          "record": "header",
+          "schema": 1,
+          "input_sha256": "1011e838786f1516db99d783bb9b85d962de1783e5cfc20c22fa552db22ed211",
+          "input_bytes": 3300,
+          "family": "Swirl D1 Precision",
+          "load_mode": "system_collection",
+          "first_order": "reverse",
+          "case_count": 28,
+          "api_axis_type": "IEEE754_binary32",
+          "units_per_em": 1000,
+          "glyph_count": 6,
+          "physical_table_sha256": {
+            "head": "bcd12416b63224301565bd985ae077b568fc497112d44bc6866496cc6c401eee",
+            "maxp": "e7e09c9c65165becd17c0321aa1d8538312b17c76a704d9431c9b966f73c5981",
+            "name": "bb224efc0e8be1e71a3a23c7f32ea34770e0dfa86a5a44bb5a41be3a03f77393",
+            "cmap": "81863f0b1267606a1c5c869e3290d95ea88746dae019b64928aef53669ef43e0",
+            "fvar": "771abe07521487efe48e0d01ce0a4625a46ba886973239df19629acbeef9384e",
+            "avar": "eea771fd186f239a548e30eeb159e502a065cce68b0d21729ba0968ed2985e74",
+            "glyf": "4bf686bb8baafc178c29cfbe89af8be55718a4eddd3571191072ded75c37cc73",
+            "gvar": "a27ad158ac971671bb65cc28b4e67d6961784442e67a0cdf39d13119dc730f3d",
+            "hmtx": "951d64d88ccb1342ad7ecea2e1f908ae66d46da2fd0f912b530bb3adf463016a",
+            "HVAR": "fa0f314beb9d4098134ad9f74c74dd5ea689c49d15dbf12d59e96b261c011228",
+            "STAT": "e3c805efd44ace1f97d8364627b10568e7c594ad52aa12129279e2e5a794babb"
+          },
+          "original_ttc_acceptance": "NOT_RUN",
+          "windows11_desktop_acceptance": "NOT_RUN"
+        },
+        "summary": {
+          "record": "summary",
+          "status": "PASS_DWRITE_SYNTHETIC",
+          "observation_count": 56,
+          "pair_input_bits_equal": true,
+          "pair_outline_equal": true,
+          "pair_design_metrics_equal": true,
+          "pair_placement_equal": true,
+          "pair_raster_equal": true,
+          "reverse_replay_equal": true,
+          "axis_positive_controls_passed": 3,
+          "elapsed_ms": 63.1202,
+          "internal_normalization_algorithm": "NOT_INFERRED_FROM_READBACK",
+          "original_ttc_acceptance": "NOT_RUN"
+        },
+        "selected": {
+          "pair_lo": {
+            "requested": "499.006199",
+            "api_float32": 499.0061950683594,
+            "api_float32_bits": "0x43f980cb",
+            "api_readback_wght": 499.0061950683594,
+            "api_readback_wght_bits": "0x43f980cb",
+            "A_design_advance": 636,
+            "A_natural_advance": 636,
+            "A_outline_right": 536.0
+          },
+          "pair_hi": {
+            "requested": "499.006201",
+            "api_float32": 499.0061950683594,
+            "api_float32_bits": "0x43f980cb",
+            "api_readback_wght": 499.0061950683594,
+            "api_readback_wght_bits": "0x43f980cb",
+            "A_design_advance": 636,
+            "A_natural_advance": 636,
+            "A_outline_right": 536.0
+          },
+          "f32_m1": {
+            "requested": "499.00616455078125",
+            "api_float32": 499.00616455078125,
+            "api_float32_bits": "0x43f980ca",
+            "api_readback_wght": 499.00616455078125,
+            "api_readback_wght_bits": "0x43f980ca",
+            "A_design_advance": 636,
+            "A_natural_advance": 636,
+            "A_outline_right": 536.0
+          },
+          "f32_p1": {
+            "requested": "499.0062255859375",
+            "api_float32": 499.0062255859375,
+            "api_float32_bits": "0x43f980cc",
+            "api_readback_wght": 499.0062255859375,
+            "api_readback_wght_bits": "0x43f980cc",
+            "A_design_advance": 636,
+            "A_natural_advance": 636,
+            "A_outline_right": 536.0
+          },
+          "low_f32_0": {
+            "requested": "100",
+            "api_float32": 100.0,
+            "api_float32_bits": "0x42c80000",
+            "api_readback_wght": 100,
+            "api_readback_wght_bits": "0x42c80000",
+            "A_design_advance": 420,
+            "A_natural_advance": 420,
+            "A_outline_right": 320.0
+          },
+          "low_f32_1": {
+            "requested": "100.00000762939453125",
+            "api_float32": 100.00000762939453,
+            "api_float32_bits": "0x42c80001",
+            "api_readback_wght": 100.00001525878906,
+            "api_readback_wght_bits": "0x42c80002",
+            "A_design_advance": 420,
+            "A_natural_advance": 420,
+            "A_outline_right": 320.0
+          },
+          "low_f32_2": {
+            "requested": "100.0000152587890625",
+            "api_float32": 100.00001525878906,
+            "api_float32_bits": "0x42c80002",
+            "api_readback_wght": 100.00001525878906,
+            "api_readback_wght_bits": "0x42c80002",
+            "A_design_advance": 420,
+            "A_natural_advance": 420,
+            "A_outline_right": 320.0
+          },
+          "low_f32_3": {
+            "requested": "100.00002288818359375",
+            "api_float32": 100.0000228881836,
+            "api_float32_bits": "0x42c80003",
+            "api_readback_wght": 100.00003051757812,
+            "api_readback_wght_bits": "0x42c80004",
+            "A_design_advance": 420,
+            "A_natural_advance": 420,
+            "A_outline_right": 320.0
+          },
+          "low_f32_4": {
+            "requested": "100.000030517578125",
+            "api_float32": 100.00003051757812,
+            "api_float32_bits": "0x42c80004",
+            "api_readback_wght": 100.00003051757812,
+            "api_readback_wght_bits": "0x42c80004",
+            "A_design_advance": 420,
+            "A_natural_advance": 420,
+            "A_outline_right": 320.0
+          },
+          "ramp_lo": {
+            "requested": "498.9990234375",
+            "api_float32": 498.9990234375,
+            "api_float32_bits": "0x43f97fe0",
+            "api_readback_wght": 498.9990234375,
+            "api_readback_wght_bits": "0x43f97fe0",
+            "A_design_advance": 636,
+            "A_natural_advance": 636,
+            "A_outline_right": 536.0
+          },
+          "ramp_mid": {
+            "requested": "499.0142822265625",
+            "api_float32": 499.0142822265625,
+            "api_float32_bits": "0x43f981d4",
+            "api_readback_wght": 499.0142822265625,
+            "api_readback_wght_bits": "0x43f981d4",
+            "A_design_advance": 636,
+            "A_natural_advance": 636,
+            "A_outline_right": 536.0
+          },
+          "ramp_hi": {
+            "requested": "499.029541015625",
+            "api_float32": 499.029541015625,
+            "api_float32_bits": "0x43f983c8",
+            "api_readback_wght": 499.029541015625,
+            "api_readback_wght_bits": "0x43f983c8",
+            "A_design_advance": 636,
+            "A_natural_advance": 636,
+            "A_outline_right": 536.0
+          }
+        },
+        "model_residuals": {
+          "binary32_continuous": {
+            "maximum_advance_error": 0.3603515625,
+            "maximum_outline_right_error": 0.3603515625,
+            "both_within_1_32_on_frozen_cases": false
+          },
+          "binary32_user16_continuous": {
+            "maximum_advance_error": 0.3603515625,
+            "maximum_outline_right_error": 0.3603515625,
+            "both_within_1_32_on_frozen_cases": false
+          },
+          "binary32_normalize16_before_avar": {
+            "maximum_advance_error": 0.3603515625,
+            "maximum_outline_right_error": 0.3603515625,
+            "both_within_1_32_on_frozen_cases": false
+          },
+          "binary32_normalize14_before_avar": {
+            "maximum_advance_error": 0.3603515625,
+            "maximum_outline_right_error": 0.3603515625,
+            "both_within_1_32_on_frozen_cases": false
+          }
+        },
+        "model_scope": "Four predeclared finite hypotheses; a normalized16-before-avar match does not exclude user16 rounding followed by normalized16 rounding, and does not identify proprietary Windows internals.",
+        "low_float_pair_observables_equal": true,
+        "low_float_pair_api_readback_equal": true,
+        "validation_scope": "INDIVIDUAL_COMPLETE_PROCESS_ONLY",
+        "evidence_binding": {
+          "source_commit": "41504fed7ec7ca6d4768389106a03aa9bc5cd36e",
+          "font_sha256": "1011e838786f1516db99d783bb9b85d962de1783e5cfc20c22fa552db22ed211",
+          "native_log_sha256": "08d54e8df001b867551198ec8e40ff326c86c12e80b2628f31e9120020802b71",
+          "native_log_bytes": 179888,
+          "header_bound_to_process_label": true
+        }
+      },
+      "ordinary-dwrite-private-forward": {
+        "header": {
+          "record": "header",
+          "schema": 1,
+          "input_sha256": "1011e838786f1516db99d783bb9b85d962de1783e5cfc20c22fa552db22ed211",
+          "input_bytes": 3300,
+          "family": "Swirl D1 Precision",
+          "load_mode": "direct_file",
+          "first_order": "forward",
+          "case_count": 28,
+          "api_axis_type": "IEEE754_binary32",
+          "units_per_em": 1000,
+          "glyph_count": 6,
+          "physical_table_sha256": {
+            "head": "bcd12416b63224301565bd985ae077b568fc497112d44bc6866496cc6c401eee",
+            "maxp": "e7e09c9c65165becd17c0321aa1d8538312b17c76a704d9431c9b966f73c5981",
+            "name": "bb224efc0e8be1e71a3a23c7f32ea34770e0dfa86a5a44bb5a41be3a03f77393",
+            "cmap": "81863f0b1267606a1c5c869e3290d95ea88746dae019b64928aef53669ef43e0",
+            "fvar": "771abe07521487efe48e0d01ce0a4625a46ba886973239df19629acbeef9384e",
+            "avar": "eea771fd186f239a548e30eeb159e502a065cce68b0d21729ba0968ed2985e74",
+            "glyf": "4bf686bb8baafc178c29cfbe89af8be55718a4eddd3571191072ded75c37cc73",
+            "gvar": "a27ad158ac971671bb65cc28b4e67d6961784442e67a0cdf39d13119dc730f3d",
+            "hmtx": "951d64d88ccb1342ad7ecea2e1f908ae66d46da2fd0f912b530bb3adf463016a",
+            "HVAR": "fa0f314beb9d4098134ad9f74c74dd5ea689c49d15dbf12d59e96b261c011228",
+            "STAT": "e3c805efd44ace1f97d8364627b10568e7c594ad52aa12129279e2e5a794babb"
+          },
+          "original_ttc_acceptance": "NOT_RUN",
+          "windows11_desktop_acceptance": "NOT_RUN"
+        },
+        "summary": {
+          "record": "summary",
+          "status": "PASS_DWRITE_SYNTHETIC",
+          "observation_count": 56,
+          "pair_input_bits_equal": true,
+          "pair_outline_equal": true,
+          "pair_design_metrics_equal": true,
+          "pair_placement_equal": true,
+          "pair_raster_equal": true,
+          "reverse_replay_equal": true,
+          "axis_positive_controls_passed": 3,
+          "elapsed_ms": 31.259,
+          "internal_normalization_algorithm": "NOT_INFERRED_FROM_READBACK",
+          "original_ttc_acceptance": "NOT_RUN"
+        },
+        "selected": {
+          "pair_lo": {
+            "requested": "499.006199",
+            "api_float32": 499.0061950683594,
+            "api_float32_bits": "0x43f980cb",
+            "api_readback_wght": 499.0061950683594,
+            "api_readback_wght_bits": "0x43f980cb",
+            "A_design_advance": 636,
+            "A_natural_advance": 636,
+            "A_outline_right": 536.0
+          },
+          "pair_hi": {
+            "requested": "499.006201",
+            "api_float32": 499.0061950683594,
+            "api_float32_bits": "0x43f980cb",
+            "api_readback_wght": 499.0061950683594,
+            "api_readback_wght_bits": "0x43f980cb",
+            "A_design_advance": 636,
+            "A_natural_advance": 636,
+            "A_outline_right": 536.0
+          },
+          "f32_m1": {
+            "requested": "499.00616455078125",
+            "api_float32": 499.00616455078125,
+            "api_float32_bits": "0x43f980ca",
+            "api_readback_wght": 499.00616455078125,
+            "api_readback_wght_bits": "0x43f980ca",
+            "A_design_advance": 636,
+            "A_natural_advance": 636,
+            "A_outline_right": 536.0
+          },
+          "f32_p1": {
+            "requested": "499.0062255859375",
+            "api_float32": 499.0062255859375,
+            "api_float32_bits": "0x43f980cc",
+            "api_readback_wght": 499.0062255859375,
+            "api_readback_wght_bits": "0x43f980cc",
+            "A_design_advance": 636,
+            "A_natural_advance": 636,
+            "A_outline_right": 536.0
+          },
+          "low_f32_0": {
+            "requested": "100",
+            "api_float32": 100.0,
+            "api_float32_bits": "0x42c80000",
+            "api_readback_wght": 100,
+            "api_readback_wght_bits": "0x42c80000",
+            "A_design_advance": 420,
+            "A_natural_advance": 420,
+            "A_outline_right": 320.0
+          },
+          "low_f32_1": {
+            "requested": "100.00000762939453125",
+            "api_float32": 100.00000762939453,
+            "api_float32_bits": "0x42c80001",
+            "api_readback_wght": 100.00001525878906,
+            "api_readback_wght_bits": "0x42c80002",
+            "A_design_advance": 420,
+            "A_natural_advance": 420,
+            "A_outline_right": 320.0
+          },
+          "low_f32_2": {
+            "requested": "100.0000152587890625",
+            "api_float32": 100.00001525878906,
+            "api_float32_bits": "0x42c80002",
+            "api_readback_wght": 100.00001525878906,
+            "api_readback_wght_bits": "0x42c80002",
+            "A_design_advance": 420,
+            "A_natural_advance": 420,
+            "A_outline_right": 320.0
+          },
+          "low_f32_3": {
+            "requested": "100.00002288818359375",
+            "api_float32": 100.0000228881836,
+            "api_float32_bits": "0x42c80003",
+            "api_readback_wght": 100.00003051757812,
+            "api_readback_wght_bits": "0x42c80004",
+            "A_design_advance": 420,
+            "A_natural_advance": 420,
+            "A_outline_right": 320.0
+          },
+          "low_f32_4": {
+            "requested": "100.000030517578125",
+            "api_float32": 100.00003051757812,
+            "api_float32_bits": "0x42c80004",
+            "api_readback_wght": 100.00003051757812,
+            "api_readback_wght_bits": "0x42c80004",
+            "A_design_advance": 420,
+            "A_natural_advance": 420,
+            "A_outline_right": 320.0
+          },
+          "ramp_lo": {
+            "requested": "498.9990234375",
+            "api_float32": 498.9990234375,
+            "api_float32_bits": "0x43f97fe0",
+            "api_readback_wght": 498.9990234375,
+            "api_readback_wght_bits": "0x43f97fe0",
+            "A_design_advance": 636,
+            "A_natural_advance": 636,
+            "A_outline_right": 536.0
+          },
+          "ramp_mid": {
+            "requested": "499.0142822265625",
+            "api_float32": 499.0142822265625,
+            "api_float32_bits": "0x43f981d4",
+            "api_readback_wght": 499.0142822265625,
+            "api_readback_wght_bits": "0x43f981d4",
+            "A_design_advance": 636,
+            "A_natural_advance": 636,
+            "A_outline_right": 536.0
+          },
+          "ramp_hi": {
+            "requested": "499.029541015625",
+            "api_float32": 499.029541015625,
+            "api_float32_bits": "0x43f983c8",
+            "api_readback_wght": 499.029541015625,
+            "api_readback_wght_bits": "0x43f983c8",
+            "A_design_advance": 636,
+            "A_natural_advance": 636,
+            "A_outline_right": 536.0
+          }
+        },
+        "model_residuals": {
+          "binary32_continuous": {
+            "maximum_advance_error": 0.3603515625,
+            "maximum_outline_right_error": 0.3603515625,
+            "both_within_1_32_on_frozen_cases": false
+          },
+          "binary32_user16_continuous": {
+            "maximum_advance_error": 0.3603515625,
+            "maximum_outline_right_error": 0.3603515625,
+            "both_within_1_32_on_frozen_cases": false
+          },
+          "binary32_normalize16_before_avar": {
+            "maximum_advance_error": 0.3603515625,
+            "maximum_outline_right_error": 0.3603515625,
+            "both_within_1_32_on_frozen_cases": false
+          },
+          "binary32_normalize14_before_avar": {
+            "maximum_advance_error": 0.3603515625,
+            "maximum_outline_right_error": 0.3603515625,
+            "both_within_1_32_on_frozen_cases": false
+          }
+        },
+        "model_scope": "Four predeclared finite hypotheses; a normalized16-before-avar match does not exclude user16 rounding followed by normalized16 rounding, and does not identify proprietary Windows internals.",
+        "low_float_pair_observables_equal": true,
+        "low_float_pair_api_readback_equal": true,
+        "validation_scope": "INDIVIDUAL_COMPLETE_PROCESS_ONLY",
+        "evidence_binding": {
+          "source_commit": "41504fed7ec7ca6d4768389106a03aa9bc5cd36e",
+          "font_sha256": "1011e838786f1516db99d783bb9b85d962de1783e5cfc20c22fa552db22ed211",
+          "native_log_sha256": "050cd9993ee06b85cc61d936f70542234c8e84f6c523e1cc6f47528a22398df7",
+          "native_log_bytes": 179870,
+          "header_bound_to_process_label": true
+        }
+      },
+      "ordinary-dwrite-private-reverse": {
+        "header": {
+          "record": "header",
+          "schema": 1,
+          "input_sha256": "1011e838786f1516db99d783bb9b85d962de1783e5cfc20c22fa552db22ed211",
+          "input_bytes": 3300,
+          "family": "Swirl D1 Precision",
+          "load_mode": "direct_file",
+          "first_order": "reverse",
+          "case_count": 28,
+          "api_axis_type": "IEEE754_binary32",
+          "units_per_em": 1000,
+          "glyph_count": 6,
+          "physical_table_sha256": {
+            "head": "bcd12416b63224301565bd985ae077b568fc497112d44bc6866496cc6c401eee",
+            "maxp": "e7e09c9c65165becd17c0321aa1d8538312b17c76a704d9431c9b966f73c5981",
+            "name": "bb224efc0e8be1e71a3a23c7f32ea34770e0dfa86a5a44bb5a41be3a03f77393",
+            "cmap": "81863f0b1267606a1c5c869e3290d95ea88746dae019b64928aef53669ef43e0",
+            "fvar": "771abe07521487efe48e0d01ce0a4625a46ba886973239df19629acbeef9384e",
+            "avar": "eea771fd186f239a548e30eeb159e502a065cce68b0d21729ba0968ed2985e74",
+            "glyf": "4bf686bb8baafc178c29cfbe89af8be55718a4eddd3571191072ded75c37cc73",
+            "gvar": "a27ad158ac971671bb65cc28b4e67d6961784442e67a0cdf39d13119dc730f3d",
+            "hmtx": "951d64d88ccb1342ad7ecea2e1f908ae66d46da2fd0f912b530bb3adf463016a",
+            "HVAR": "fa0f314beb9d4098134ad9f74c74dd5ea689c49d15dbf12d59e96b261c011228",
+            "STAT": "e3c805efd44ace1f97d8364627b10568e7c594ad52aa12129279e2e5a794babb"
+          },
+          "original_ttc_acceptance": "NOT_RUN",
+          "windows11_desktop_acceptance": "NOT_RUN"
+        },
+        "summary": {
+          "record": "summary",
+          "status": "PASS_DWRITE_SYNTHETIC",
+          "observation_count": 56,
+          "pair_input_bits_equal": true,
+          "pair_outline_equal": true,
+          "pair_design_metrics_equal": true,
+          "pair_placement_equal": true,
+          "pair_raster_equal": true,
+          "reverse_replay_equal": true,
+          "axis_positive_controls_passed": 3,
+          "elapsed_ms": 31.7267,
+          "internal_normalization_algorithm": "NOT_INFERRED_FROM_READBACK",
+          "original_ttc_acceptance": "NOT_RUN"
+        },
+        "selected": {
+          "pair_lo": {
+            "requested": "499.006199",
+            "api_float32": 499.0061950683594,
+            "api_float32_bits": "0x43f980cb",
+            "api_readback_wght": 499.0061950683594,
+            "api_readback_wght_bits": "0x43f980cb",
+            "A_design_advance": 636,
+            "A_natural_advance": 636,
+            "A_outline_right": 536.0
+          },
+          "pair_hi": {
+            "requested": "499.006201",
+            "api_float32": 499.0061950683594,
+            "api_float32_bits": "0x43f980cb",
+            "api_readback_wght": 499.0061950683594,
+            "api_readback_wght_bits": "0x43f980cb",
+            "A_design_advance": 636,
+            "A_natural_advance": 636,
+            "A_outline_right": 536.0
+          },
+          "f32_m1": {
+            "requested": "499.00616455078125",
+            "api_float32": 499.00616455078125,
+            "api_float32_bits": "0x43f980ca",
+            "api_readback_wght": 499.00616455078125,
+            "api_readback_wght_bits": "0x43f980ca",
+            "A_design_advance": 636,
+            "A_natural_advance": 636,
+            "A_outline_right": 536.0
+          },
+          "f32_p1": {
+            "requested": "499.0062255859375",
+            "api_float32": 499.0062255859375,
+            "api_float32_bits": "0x43f980cc",
+            "api_readback_wght": 499.0062255859375,
+            "api_readback_wght_bits": "0x43f980cc",
+            "A_design_advance": 636,
+            "A_natural_advance": 636,
+            "A_outline_right": 536.0
+          },
+          "low_f32_0": {
+            "requested": "100",
+            "api_float32": 100.0,
+            "api_float32_bits": "0x42c80000",
+            "api_readback_wght": 100,
+            "api_readback_wght_bits": "0x42c80000",
+            "A_design_advance": 420,
+            "A_natural_advance": 420,
+            "A_outline_right": 320.0
+          },
+          "low_f32_1": {
+            "requested": "100.00000762939453125",
+            "api_float32": 100.00000762939453,
+            "api_float32_bits": "0x42c80001",
+            "api_readback_wght": 100.00001525878906,
+            "api_readback_wght_bits": "0x42c80002",
+            "A_design_advance": 420,
+            "A_natural_advance": 420,
+            "A_outline_right": 320.0
+          },
+          "low_f32_2": {
+            "requested": "100.0000152587890625",
+            "api_float32": 100.00001525878906,
+            "api_float32_bits": "0x42c80002",
+            "api_readback_wght": 100.00001525878906,
+            "api_readback_wght_bits": "0x42c80002",
+            "A_design_advance": 420,
+            "A_natural_advance": 420,
+            "A_outline_right": 320.0
+          },
+          "low_f32_3": {
+            "requested": "100.00002288818359375",
+            "api_float32": 100.0000228881836,
+            "api_float32_bits": "0x42c80003",
+            "api_readback_wght": 100.00003051757812,
+            "api_readback_wght_bits": "0x42c80004",
+            "A_design_advance": 420,
+            "A_natural_advance": 420,
+            "A_outline_right": 320.0
+          },
+          "low_f32_4": {
+            "requested": "100.000030517578125",
+            "api_float32": 100.00003051757812,
+            "api_float32_bits": "0x42c80004",
+            "api_readback_wght": 100.00003051757812,
+            "api_readback_wght_bits": "0x42c80004",
+            "A_design_advance": 420,
+            "A_natural_advance": 420,
+            "A_outline_right": 320.0
+          },
+          "ramp_lo": {
+            "requested": "498.9990234375",
+            "api_float32": 498.9990234375,
+            "api_float32_bits": "0x43f97fe0",
+            "api_readback_wght": 498.9990234375,
+            "api_readback_wght_bits": "0x43f97fe0",
+            "A_design_advance": 636,
+            "A_natural_advance": 636,
+            "A_outline_right": 536.0
+          },
+          "ramp_mid": {
+            "requested": "499.0142822265625",
+            "api_float32": 499.0142822265625,
+            "api_float32_bits": "0x43f981d4",
+            "api_readback_wght": 499.0142822265625,
+            "api_readback_wght_bits": "0x43f981d4",
+            "A_design_advance": 636,
+            "A_natural_advance": 636,
+            "A_outline_right": 536.0
+          },
+          "ramp_hi": {
+            "requested": "499.029541015625",
+            "api_float32": 499.029541015625,
+            "api_float32_bits": "0x43f983c8",
+            "api_readback_wght": 499.029541015625,
+            "api_readback_wght_bits": "0x43f983c8",
+            "A_design_advance": 636,
+            "A_natural_advance": 636,
+            "A_outline_right": 536.0
+          }
+        },
+        "model_residuals": {
+          "binary32_continuous": {
+            "maximum_advance_error": 0.3603515625,
+            "maximum_outline_right_error": 0.3603515625,
+            "both_within_1_32_on_frozen_cases": false
+          },
+          "binary32_user16_continuous": {
+            "maximum_advance_error": 0.3603515625,
+            "maximum_outline_right_error": 0.3603515625,
+            "both_within_1_32_on_frozen_cases": false
+          },
+          "binary32_normalize16_before_avar": {
+            "maximum_advance_error": 0.3603515625,
+            "maximum_outline_right_error": 0.3603515625,
+            "both_within_1_32_on_frozen_cases": false
+          },
+          "binary32_normalize14_before_avar": {
+            "maximum_advance_error": 0.3603515625,
+            "maximum_outline_right_error": 0.3603515625,
+            "both_within_1_32_on_frozen_cases": false
+          }
+        },
+        "model_scope": "Four predeclared finite hypotheses; a normalized16-before-avar match does not exclude user16 rounding followed by normalized16 rounding, and does not identify proprietary Windows internals.",
+        "low_float_pair_observables_equal": true,
+        "low_float_pair_api_readback_equal": true,
+        "validation_scope": "INDIVIDUAL_COMPLETE_PROCESS_ONLY",
+        "evidence_binding": {
+          "source_commit": "41504fed7ec7ca6d4768389106a03aa9bc5cd36e",
+          "font_sha256": "1011e838786f1516db99d783bb9b85d962de1783e5cfc20c22fa552db22ed211",
+          "native_log_sha256": "fca582e2744874297914830a8a5653ec37bc8243e83622a91d6c0609254d8088",
+          "native_log_bytes": 179882,
+          "header_bound_to_process_label": true
+        }
+      },
+      "ordinary-qt-native-installed-forward": {
+        "header": {
+          "backend_identity": "requested_platform_and_public_axis_behavior; private_engine_class_not_queried",
+          "case_ids": [
+            "default",
+            "automatic_600",
+            "pair_lo",
+            "pair_hi",
+            "float_prev",
+            "float_next",
+            "wght_min",
+            "wght_max",
+            "WDTH_min",
+            "WDTH_max",
+            "HGHT_min",
+            "HGHT_max",
+            "mixed"
+          ],
+          "dprs": [
+            1,
+            1.25,
+            1.5,
+            2
+          ],
+          "expected_exact_replays": 312,
+          "expected_observations": 624,
+          "expected_pair_comparisons": 48,
+          "expected_policy_checks": 36,
+          "family": "Swirl D1 Precision",
+          "float_bytes": 4,
+          "input_bytes": 3300,
+          "input_sha256": "1011e838786f1516db99d783bb9b85d962de1783e5cfc20c22fa552db22ed211",
+          "kernel_version": "10.0.26100",
+          "load_mode": "system_installed",
+          "logical_dpis": [
+            96,
+            144
+          ],
+          "original_font_acceptance": "NOT_RUN",
+          "os_product": "Windows Server 2025 Version 24H2",
+          "pass_count": 2,
+          "point_sizes": [
+            9,
+            12,
+            18
+          ],
+          "qpa_platform": "windows",
+          "qreal_bytes": 8,
+          "qt_build_version": "6.10.3",
+          "qt_version": "6.10.3",
+          "record": "header",
+          "requested_qpa": "windows:fontengine=native",
+          "reverse": false,
+          "schema": 1,
+          "source_axes": [
+            {
+              "default": 100,
+              "maximum": 200,
+              "minimum": 50,
+              "tag": "HGHT"
+            },
+            {
+              "default": 100,
+              "maximum": 200,
+              "minimum": 50,
+              "tag": "WDTH"
+            },
+            {
+              "default": 400,
+              "maximum": 900,
+              "minimum": 100,
+              "tag": "wght"
+            }
+          ],
+          "source_table_sha256": {
+            "HVAR": "fa0f314beb9d4098134ad9f74c74dd5ea689c49d15dbf12d59e96b261c011228",
+            "OS/2": "8ba73c9e5e2b0d5d989238ea7b94315be91dc1d43d139957414845923dd0b329",
+            "STAT": "e3c805efd44ace1f97d8364627b10568e7c594ad52aa12129279e2e5a794babb",
+            "avar": "eea771fd186f239a548e30eeb159e502a065cce68b0d21729ba0968ed2985e74",
+            "cmap": "81863f0b1267606a1c5c869e3290d95ea88746dae019b64928aef53669ef43e0",
+            "fvar": "771abe07521487efe48e0d01ce0a4625a46ba886973239df19629acbeef9384e",
+            "glyf": "4bf686bb8baafc178c29cfbe89af8be55718a4eddd3571191072ded75c37cc73",
+            "gvar": "a27ad158ac971671bb65cc28b4e67d6961784442e67a0cdf39d13119dc730f3d",
+            "head": "bcd12416b63224301565bd985ae077b568fc497112d44bc6866496cc6c401eee",
+            "hhea": "09762e06c38afa3ac4b1eb7bce11977db511a8acddb9115a21b0f6f5046bd5c2",
+            "hmtx": "951d64d88ccb1342ad7ecea2e1f908ae66d46da2fd0f912b530bb3adf463016a",
+            "loca": "f51386b6ca5ce7deebefd92999802940862492037bdeb5a1ceb886710a8649f8",
+            "maxp": "e7e09c9c65165becd17c0321aa1d8538312b17c76a704d9431c9b966f73c5981",
+            "name": "bb224efc0e8be1e71a3a23c7f32ea34770e0dfa86a5a44bb5a41be3a03f77393",
+            "post": "e88ad9b2dd67d9fa02294d87fb2dcca9be4e223fd90f846b31ea106b2d436125"
+          },
+          "units_per_em": 1000
+        },
+        "summary": {
+          "application_reload": "NOT_APPLICABLE",
+          "elapsed_median_ms_including_evidence": 2.1022,
+          "elapsed_p95_ms_including_evidence": 4.9012,
+          "exact_replays": 312,
+          "font_cache_memory_benchmark": "NOT_RUN",
+          "interpretation": "Observed binary32 pair collapse in this exact synthetic Qt run; API storage is not a native-face readback",
+          "observations": 624,
+          "original_font_acceptance": "NOT_RUN",
+          "pair_comparisons": 48,
+          "physical_axis_effects_verified": 3,
+          "production_policy_checks": 36,
+          "real_swirl_ui_acceptance": "NOT_RUN",
+          "record": "summary",
+          "regional_glyph_acceptance": "NOT_RUN",
+          "status": "PASS_QT_SYNTHETIC"
+        },
+        "validation_scope": "INDIVIDUAL_COMPLETE_PROCESS_ONLY",
+        "evidence_binding": {
+          "source_commit": "41504fed7ec7ca6d4768389106a03aa9bc5cd36e",
+          "font_sha256": "1011e838786f1516db99d783bb9b85d962de1783e5cfc20c22fa552db22ed211",
+          "native_log_sha256": "a31d46282c522e8b048aa4ee83e7848527ec94c825d6d654a46a88a70212d5fc",
+          "native_log_bytes": 2538671,
+          "header_bound_to_process_label": true
+        }
+      },
+      "ordinary-qt-native-installed-reverse": {
+        "header": {
+          "backend_identity": "requested_platform_and_public_axis_behavior; private_engine_class_not_queried",
+          "case_ids": [
+            "default",
+            "automatic_600",
+            "pair_lo",
+            "pair_hi",
+            "float_prev",
+            "float_next",
+            "wght_min",
+            "wght_max",
+            "WDTH_min",
+            "WDTH_max",
+            "HGHT_min",
+            "HGHT_max",
+            "mixed"
+          ],
+          "dprs": [
+            1,
+            1.25,
+            1.5,
+            2
+          ],
+          "expected_exact_replays": 312,
+          "expected_observations": 624,
+          "expected_pair_comparisons": 48,
+          "expected_policy_checks": 36,
+          "family": "Swirl D1 Precision",
+          "float_bytes": 4,
+          "input_bytes": 3300,
+          "input_sha256": "1011e838786f1516db99d783bb9b85d962de1783e5cfc20c22fa552db22ed211",
+          "kernel_version": "10.0.26100",
+          "load_mode": "system_installed",
+          "logical_dpis": [
+            96,
+            144
+          ],
+          "original_font_acceptance": "NOT_RUN",
+          "os_product": "Windows Server 2025 Version 24H2",
+          "pass_count": 2,
+          "point_sizes": [
+            9,
+            12,
+            18
+          ],
+          "qpa_platform": "windows",
+          "qreal_bytes": 8,
+          "qt_build_version": "6.10.3",
+          "qt_version": "6.10.3",
+          "record": "header",
+          "requested_qpa": "windows:fontengine=native",
+          "reverse": true,
+          "schema": 1,
+          "source_axes": [
+            {
+              "default": 100,
+              "maximum": 200,
+              "minimum": 50,
+              "tag": "HGHT"
+            },
+            {
+              "default": 100,
+              "maximum": 200,
+              "minimum": 50,
+              "tag": "WDTH"
+            },
+            {
+              "default": 400,
+              "maximum": 900,
+              "minimum": 100,
+              "tag": "wght"
+            }
+          ],
+          "source_table_sha256": {
+            "HVAR": "fa0f314beb9d4098134ad9f74c74dd5ea689c49d15dbf12d59e96b261c011228",
+            "OS/2": "8ba73c9e5e2b0d5d989238ea7b94315be91dc1d43d139957414845923dd0b329",
+            "STAT": "e3c805efd44ace1f97d8364627b10568e7c594ad52aa12129279e2e5a794babb",
+            "avar": "eea771fd186f239a548e30eeb159e502a065cce68b0d21729ba0968ed2985e74",
+            "cmap": "81863f0b1267606a1c5c869e3290d95ea88746dae019b64928aef53669ef43e0",
+            "fvar": "771abe07521487efe48e0d01ce0a4625a46ba886973239df19629acbeef9384e",
+            "glyf": "4bf686bb8baafc178c29cfbe89af8be55718a4eddd3571191072ded75c37cc73",
+            "gvar": "a27ad158ac971671bb65cc28b4e67d6961784442e67a0cdf39d13119dc730f3d",
+            "head": "bcd12416b63224301565bd985ae077b568fc497112d44bc6866496cc6c401eee",
+            "hhea": "09762e06c38afa3ac4b1eb7bce11977db511a8acddb9115a21b0f6f5046bd5c2",
+            "hmtx": "951d64d88ccb1342ad7ecea2e1f908ae66d46da2fd0f912b530bb3adf463016a",
+            "loca": "f51386b6ca5ce7deebefd92999802940862492037bdeb5a1ceb886710a8649f8",
+            "maxp": "e7e09c9c65165becd17c0321aa1d8538312b17c76a704d9431c9b966f73c5981",
+            "name": "bb224efc0e8be1e71a3a23c7f32ea34770e0dfa86a5a44bb5a41be3a03f77393",
+            "post": "e88ad9b2dd67d9fa02294d87fb2dcca9be4e223fd90f846b31ea106b2d436125"
+          },
+          "units_per_em": 1000
+        },
+        "summary": {
+          "application_reload": "NOT_APPLICABLE",
+          "elapsed_median_ms_including_evidence": 2.0368,
+          "elapsed_p95_ms_including_evidence": 4.8229,
+          "exact_replays": 312,
+          "font_cache_memory_benchmark": "NOT_RUN",
+          "interpretation": "Observed binary32 pair collapse in this exact synthetic Qt run; API storage is not a native-face readback",
+          "observations": 624,
+          "original_font_acceptance": "NOT_RUN",
+          "pair_comparisons": 48,
+          "physical_axis_effects_verified": 3,
+          "production_policy_checks": 36,
+          "real_swirl_ui_acceptance": "NOT_RUN",
+          "record": "summary",
+          "regional_glyph_acceptance": "NOT_RUN",
+          "status": "PASS_QT_SYNTHETIC"
+        },
+        "validation_scope": "INDIVIDUAL_COMPLETE_PROCESS_ONLY",
+        "evidence_binding": {
+          "source_commit": "41504fed7ec7ca6d4768389106a03aa9bc5cd36e",
+          "font_sha256": "1011e838786f1516db99d783bb9b85d962de1783e5cfc20c22fa552db22ed211",
+          "native_log_sha256": "36ffd14b00851c8aad645c8b42f953f39fb8a7a1d862e13836518854da9268be",
+          "native_log_bytes": 2538658,
+          "header_bound_to_process_label": true
+        }
+      },
+      "ordinary-qt-native-private-forward": {
+        "header": {
+          "backend_identity": "requested_platform_and_public_axis_behavior; private_engine_class_not_queried",
+          "case_ids": [
+            "default",
+            "automatic_600",
+            "pair_lo",
+            "pair_hi",
+            "float_prev",
+            "float_next",
+            "wght_min",
+            "wght_max",
+            "WDTH_min",
+            "WDTH_max",
+            "HGHT_min",
+            "HGHT_max",
+            "mixed"
+          ],
+          "dprs": [
+            1,
+            1.25,
+            1.5,
+            2
+          ],
+          "expected_exact_replays": 624,
+          "expected_observations": 936,
+          "expected_pair_comparisons": 72,
+          "expected_policy_checks": 36,
+          "family": "Swirl D1 Precision",
+          "float_bytes": 4,
+          "input_bytes": 3300,
+          "input_sha256": "1011e838786f1516db99d783bb9b85d962de1783e5cfc20c22fa552db22ed211",
+          "kernel_version": "10.0.26100",
+          "load_mode": "application_private",
+          "logical_dpis": [
+            96,
+            144
+          ],
+          "original_font_acceptance": "NOT_RUN",
+          "os_product": "Windows Server 2025 Version 24H2",
+          "pass_count": 3,
+          "point_sizes": [
+            9,
+            12,
+            18
+          ],
+          "qpa_platform": "windows",
+          "qreal_bytes": 8,
+          "qt_build_version": "6.10.3",
+          "qt_version": "6.10.3",
+          "record": "header",
+          "requested_qpa": "windows:fontengine=native",
+          "reverse": false,
+          "schema": 1,
+          "source_axes": [
+            {
+              "default": 100,
+              "maximum": 200,
+              "minimum": 50,
+              "tag": "HGHT"
+            },
+            {
+              "default": 100,
+              "maximum": 200,
+              "minimum": 50,
+              "tag": "WDTH"
+            },
+            {
+              "default": 400,
+              "maximum": 900,
+              "minimum": 100,
+              "tag": "wght"
+            }
+          ],
+          "source_table_sha256": {
+            "HVAR": "fa0f314beb9d4098134ad9f74c74dd5ea689c49d15dbf12d59e96b261c011228",
+            "OS/2": "8ba73c9e5e2b0d5d989238ea7b94315be91dc1d43d139957414845923dd0b329",
+            "STAT": "e3c805efd44ace1f97d8364627b10568e7c594ad52aa12129279e2e5a794babb",
+            "avar": "eea771fd186f239a548e30eeb159e502a065cce68b0d21729ba0968ed2985e74",
+            "cmap": "81863f0b1267606a1c5c869e3290d95ea88746dae019b64928aef53669ef43e0",
+            "fvar": "771abe07521487efe48e0d01ce0a4625a46ba886973239df19629acbeef9384e",
+            "glyf": "4bf686bb8baafc178c29cfbe89af8be55718a4eddd3571191072ded75c37cc73",
+            "gvar": "a27ad158ac971671bb65cc28b4e67d6961784442e67a0cdf39d13119dc730f3d",
+            "head": "bcd12416b63224301565bd985ae077b568fc497112d44bc6866496cc6c401eee",
+            "hhea": "09762e06c38afa3ac4b1eb7bce11977db511a8acddb9115a21b0f6f5046bd5c2",
+            "hmtx": "951d64d88ccb1342ad7ecea2e1f908ae66d46da2fd0f912b530bb3adf463016a",
+            "loca": "f51386b6ca5ce7deebefd92999802940862492037bdeb5a1ceb886710a8649f8",
+            "maxp": "e7e09c9c65165becd17c0321aa1d8538312b17c76a704d9431c9b966f73c5981",
+            "name": "bb224efc0e8be1e71a3a23c7f32ea34770e0dfa86a5a44bb5a41be3a03f77393",
+            "post": "e88ad9b2dd67d9fa02294d87fb2dcca9be4e223fd90f846b31ea106b2d436125"
+          },
+          "units_per_em": 1000
+        },
+        "summary": {
+          "application_reload": "PASS",
+          "elapsed_median_ms_including_evidence": 1.7176,
+          "elapsed_p95_ms_including_evidence": 4.5344,
+          "exact_replays": 624,
+          "font_cache_memory_benchmark": "NOT_RUN",
+          "interpretation": "Observed binary32 pair collapse in this exact synthetic Qt run; API storage is not a native-face readback",
+          "observations": 936,
+          "original_font_acceptance": "NOT_RUN",
+          "pair_comparisons": 72,
+          "physical_axis_effects_verified": 3,
+          "production_policy_checks": 36,
+          "real_swirl_ui_acceptance": "NOT_RUN",
+          "record": "summary",
+          "regional_glyph_acceptance": "NOT_RUN",
+          "status": "PASS_QT_SYNTHETIC"
+        },
+        "validation_scope": "INDIVIDUAL_COMPLETE_PROCESS_ONLY",
+        "evidence_binding": {
+          "source_commit": "41504fed7ec7ca6d4768389106a03aa9bc5cd36e",
+          "font_sha256": "1011e838786f1516db99d783bb9b85d962de1783e5cfc20c22fa552db22ed211",
+          "native_log_sha256": "46488a68e904edc6b372c9d5b99c3a9c0db5bb73555c3890bd0208b43743e3d8",
+          "native_log_bytes": 3798485,
+          "header_bound_to_process_label": true
+        }
+      },
+      "ordinary-qt-native-private-reverse": {
+        "header": {
+          "backend_identity": "requested_platform_and_public_axis_behavior; private_engine_class_not_queried",
+          "case_ids": [
+            "default",
+            "automatic_600",
+            "pair_lo",
+            "pair_hi",
+            "float_prev",
+            "float_next",
+            "wght_min",
+            "wght_max",
+            "WDTH_min",
+            "WDTH_max",
+            "HGHT_min",
+            "HGHT_max",
+            "mixed"
+          ],
+          "dprs": [
+            1,
+            1.25,
+            1.5,
+            2
+          ],
+          "expected_exact_replays": 624,
+          "expected_observations": 936,
+          "expected_pair_comparisons": 72,
+          "expected_policy_checks": 36,
+          "family": "Swirl D1 Precision",
+          "float_bytes": 4,
+          "input_bytes": 3300,
+          "input_sha256": "1011e838786f1516db99d783bb9b85d962de1783e5cfc20c22fa552db22ed211",
+          "kernel_version": "10.0.26100",
+          "load_mode": "application_private",
+          "logical_dpis": [
+            96,
+            144
+          ],
+          "original_font_acceptance": "NOT_RUN",
+          "os_product": "Windows Server 2025 Version 24H2",
+          "pass_count": 3,
+          "point_sizes": [
+            9,
+            12,
+            18
+          ],
+          "qpa_platform": "windows",
+          "qreal_bytes": 8,
+          "qt_build_version": "6.10.3",
+          "qt_version": "6.10.3",
+          "record": "header",
+          "requested_qpa": "windows:fontengine=native",
+          "reverse": true,
+          "schema": 1,
+          "source_axes": [
+            {
+              "default": 100,
+              "maximum": 200,
+              "minimum": 50,
+              "tag": "HGHT"
+            },
+            {
+              "default": 100,
+              "maximum": 200,
+              "minimum": 50,
+              "tag": "WDTH"
+            },
+            {
+              "default": 400,
+              "maximum": 900,
+              "minimum": 100,
+              "tag": "wght"
+            }
+          ],
+          "source_table_sha256": {
+            "HVAR": "fa0f314beb9d4098134ad9f74c74dd5ea689c49d15dbf12d59e96b261c011228",
+            "OS/2": "8ba73c9e5e2b0d5d989238ea7b94315be91dc1d43d139957414845923dd0b329",
+            "STAT": "e3c805efd44ace1f97d8364627b10568e7c594ad52aa12129279e2e5a794babb",
+            "avar": "eea771fd186f239a548e30eeb159e502a065cce68b0d21729ba0968ed2985e74",
+            "cmap": "81863f0b1267606a1c5c869e3290d95ea88746dae019b64928aef53669ef43e0",
+            "fvar": "771abe07521487efe48e0d01ce0a4625a46ba886973239df19629acbeef9384e",
+            "glyf": "4bf686bb8baafc178c29cfbe89af8be55718a4eddd3571191072ded75c37cc73",
+            "gvar": "a27ad158ac971671bb65cc28b4e67d6961784442e67a0cdf39d13119dc730f3d",
+            "head": "bcd12416b63224301565bd985ae077b568fc497112d44bc6866496cc6c401eee",
+            "hhea": "09762e06c38afa3ac4b1eb7bce11977db511a8acddb9115a21b0f6f5046bd5c2",
+            "hmtx": "951d64d88ccb1342ad7ecea2e1f908ae66d46da2fd0f912b530bb3adf463016a",
+            "loca": "f51386b6ca5ce7deebefd92999802940862492037bdeb5a1ceb886710a8649f8",
+            "maxp": "e7e09c9c65165becd17c0321aa1d8538312b17c76a704d9431c9b966f73c5981",
+            "name": "bb224efc0e8be1e71a3a23c7f32ea34770e0dfa86a5a44bb5a41be3a03f77393",
+            "post": "e88ad9b2dd67d9fa02294d87fb2dcca9be4e223fd90f846b31ea106b2d436125"
+          },
+          "units_per_em": 1000
+        },
+        "summary": {
+          "application_reload": "PASS",
+          "elapsed_median_ms_including_evidence": 1.7171,
+          "elapsed_p95_ms_including_evidence": 4.4018,
+          "exact_replays": 624,
+          "font_cache_memory_benchmark": "NOT_RUN",
+          "interpretation": "Observed binary32 pair collapse in this exact synthetic Qt run; API storage is not a native-face readback",
+          "observations": 936,
+          "original_font_acceptance": "NOT_RUN",
+          "pair_comparisons": 72,
+          "physical_axis_effects_verified": 3,
+          "production_policy_checks": 36,
+          "real_swirl_ui_acceptance": "NOT_RUN",
+          "record": "summary",
+          "regional_glyph_acceptance": "NOT_RUN",
+          "status": "PASS_QT_SYNTHETIC"
+        },
+        "validation_scope": "INDIVIDUAL_COMPLETE_PROCESS_ONLY",
+        "evidence_binding": {
+          "source_commit": "41504fed7ec7ca6d4768389106a03aa9bc5cd36e",
+          "font_sha256": "1011e838786f1516db99d783bb9b85d962de1783e5cfc20c22fa552db22ed211",
+          "native_log_sha256": "49d7664d969da39b08b9e7eb395fe1dd45c29e8a5a994194fb65418a3585bac5",
+          "native_log_bytes": 3798507,
+          "header_bound_to_process_label": true
+        }
+      }
+    },
+    "rejected_processes": {
+      "ordinary-qt-freetype-installed-forward": {
+        "error": "Native subprocess failed or did not complete",
+        "reported_status": "FAILED",
+        "reported_exit_code": 1,
+        "reported_timeout": false,
+        "reported_error": "Native probe did not complete its exact required successful summary."
+      },
+      "ordinary-qt-freetype-installed-reverse": {
+        "error": "Native subprocess failed or did not complete",
+        "reported_status": "FAILED",
+        "reported_exit_code": 1,
+        "reported_timeout": false,
+        "reported_error": "Native probe did not complete its exact required successful summary."
+      },
+      "ordinary-qt-freetype-private-forward": {
+        "error": "Native subprocess failed or did not complete",
+        "reported_status": "FAILED",
+        "reported_exit_code": 1,
+        "reported_timeout": false,
+        "reported_error": "Native probe did not complete its exact required successful summary."
+      },
+      "ordinary-qt-freetype-private-reverse": {
+        "error": "Native subprocess failed or did not complete",
+        "reported_status": "FAILED",
+        "reported_exit_code": 1,
+        "reported_timeout": false,
+        "reported_error": "Native probe did not complete its exact required successful summary."
+      }
+    },
+    "missing_processes": [],
+    "unexpected_process_labels": [],
+    "binding_errors": [],
+    "opposite_process_replays": {
+      "gain-dwrite-installed-forward": {
+        "first": "gain-dwrite-installed-forward",
+        "second": "gain-dwrite-installed-reverse",
+        "equal": true
+      },
+      "gain-dwrite-private-forward": {
+        "first": "gain-dwrite-private-forward",
+        "second": "gain-dwrite-private-reverse",
+        "equal": true
+      },
+      "ordinary-dwrite-installed-forward": {
+        "first": "ordinary-dwrite-installed-forward",
+        "second": "ordinary-dwrite-installed-reverse",
+        "equal": true
+      },
+      "ordinary-dwrite-private-forward": {
+        "first": "ordinary-dwrite-private-forward",
+        "second": "ordinary-dwrite-private-reverse",
+        "equal": true
+      },
+      "ordinary-qt-native-installed-forward": {
+        "first": "ordinary-qt-native-installed-forward",
+        "second": "ordinary-qt-native-installed-reverse",
+        "equal": true
+      },
+      "ordinary-qt-native-private-forward": {
+        "first": "ordinary-qt-native-private-forward",
+        "second": "ordinary-qt-native-private-reverse",
+        "equal": true
+      }
+    },
+    "private_vs_installed": {
+      "gain-dwrite-private-forward": {
+        "first": "gain-dwrite-private-forward",
+        "second": "gain-dwrite-installed-forward",
+        "equal": true,
+        "differing_positions": 0,
+        "first_differences": []
+      },
+      "ordinary-dwrite-private-forward": {
+        "first": "ordinary-dwrite-private-forward",
+        "second": "ordinary-dwrite-installed-forward",
+        "equal": true,
+        "differing_positions": 0,
+        "first_differences": []
+      },
+      "ordinary-qt-native-private-forward": {
+        "first": "ordinary-qt-native-private-forward",
+        "second": "ordinary-qt-native-installed-forward",
+        "equal": true,
+        "differing_positions": 0,
+        "first_differences": []
+      }
+    },
+    "comparison_failures": [],
+    "original_ttc_acceptance": "NOT_RUN_NO_QUALIFIED_CANDIDATE",
+    "windows11_desktop_acceptance": "NOT_RUN",
+    "real_swirl_ui_acceptance": "NOT_RUN",
+    "scope": "Individually validated complete processes only. Missing, failed or mismatched processes are excluded. Comparisons require both operands to have validated. This section never changes the global FAILED verdict or certifies all experiments.",
+    "environment": {
+      "windows_product": "Microsoft Windows Server 2025 Datacenter",
+      "windows_build": "26100",
+      "dwrite_version": "10.0.26100.1 (WinBuild.160101.0800)",
+      "qt_sdk": "6.10.3"
+    },
+    "recorded_build_sources": {
+      "win_axis_precision_directwrite.cpp": {
+        "sha256": "65e1656b32322cf11458a008843a24d2f2f27c04b42a1a89fe5ac7c3dbd7e093",
+        "file": "win_axis_precision_directwrite.cpp",
+        "bytes": 24352
+      },
+      "run_win_axis_precision.ps1": {
+        "sha256": "00b4e7389807154ba48696c82206e9c973ec58a8e24e6e02c83f23aff2a95b40",
+        "file": "run_win_axis_precision.ps1",
+        "bytes": 23381
+      },
+      "win_axis_precision_qt.cpp": {
+        "sha256": "79cad751da027ec95122a6a4581d9bcea993b72518912f973ebe20d761b334fe",
+        "file": "win_axis_precision_qt.cpp",
+        "bytes": 44279
+      },
+      "make_win_axis_precision_fixture.py": {
+        "sha256": "03e175660fbf538d4a3eb0c4269390c1881e45e9e0ce3af3dc690a482dd30336",
+        "file": "make_win_axis_precision_fixture.py",
+        "bytes": 15975
+      },
+      "CMakeLists.txt": {
+        "sha256": "9f8ac2403a29b3ee1aa2decb3ef6564f3bcba4ae911b9ea80f0c43925f53136d",
+        "file": "CMakeLists.txt",
+        "bytes": 1446
+      }
+    },
+    "installation_lifecycle": [
+      {
+        "fixture": "ordinary",
+        "family": "Swirl D1 Precision",
+        "registry_hive": "HKCU",
+        "registry_value": "Swirl D1 Precision (TrueType)",
+        "installed_copy": "C:\\Users\\runneradmin\\AppData\\Local\\Microsoft\\Windows\\Fonts\\SwirlD1-c8ece97a921f4deab6b70b37af27730d.ttf",
+        "status": "REGISTERED",
+        "cleanup": "PASS",
+        "resource_added": true,
+        "registry_added": true,
+        "file_copied": true,
+        "registered_faces": 3,
+        "broadcast_after_add": true,
+        "resource_removed": true,
+        "broadcast_after_remove": true,
+        "cleanup_errors": []
+      },
+      {
+        "fixture": "gain",
+        "family": "Swirl D1 Precision Gain",
+        "registry_hive": "HKCU",
+        "registry_value": "Swirl D1 Precision Gain (TrueType)",
+        "installed_copy": "C:\\Users\\runneradmin\\AppData\\Local\\Microsoft\\Windows\\Fonts\\SwirlD1-f037cacc73324d13893e84dddf5e506f.ttf",
+        "status": "REGISTERED",
+        "cleanup": "PASS",
+        "resource_added": true,
+        "registry_added": true,
+        "file_copied": true,
+        "registered_faces": 3,
+        "broadcast_after_add": true,
+        "resource_removed": true,
+        "broadcast_after_remove": true,
+        "cleanup_errors": []
+      }
+    ]
+  }
+}

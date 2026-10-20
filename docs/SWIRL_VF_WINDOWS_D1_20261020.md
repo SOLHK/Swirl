@@ -228,6 +228,77 @@ and three private/installed comparisons. It also corrected its representation
 check for an empty Qt path: a single MoveTo at the origin is empty according
 to QPainterPath::isEmpty. No real path equality comparison was weakened.
 
+## Stage 3: final executable checkpoint and durable evidence
+
+Final executable source:
+[`41504fed7ec7ca6d4768389106a03aa9bc5cd36e`](https://github.com/SOLHK/Swirl/commit/41504fed7ec7ca6d4768389106a03aa9bc5cd36e).
+Final native run:
+[`39401509155`](https://github.com/SOLHK/Swirl/actions/runs/39401509155), completed
+with **failure** on both jobs. Server 2022 job is
+[`118557079537`](https://github.com/SOLHK/Swirl/actions/runs/39401509155/job/118557079537);
+Server 2025 job is
+[`118557079179`](https://github.com/SOLHK/Swirl/actions/runs/39401509155/job/118557079179).
+
+Both jobs passed 37/37 Python tests, selected and compiled with their installed
+MSVC toolchains, and repeated the same 8 passing DirectWrite / 4 passing Qt
+native / 4 failing Qt FreeType processes. Each OS has 3568 independently
+validated observations. All six opposite-process and three private/installed
+comparisons are exact. The final report says `FAILED_EVIDENCE_ANALYSIS`, with
+`PARTIAL_EVIDENCE_ONLY` and `full_acceptance: false`; it does not grant full D1
+acceptance. Both fixture installation cleanups passed.
+
+| Runtime | Final artifact | ZIP SHA-256 |
+| --- | --- | --- |
+| Server 2022 | [12254259788](https://github.com/SOLHK/Swirl/actions/runs/39401509155/artifacts/12254259788) | `7825518135349628ab0d0f3a83a54ebab8f57225e281d04daef270b2988343bd` |
+| Server 2025 | [12255265257](https://github.com/SOLHK/Swirl/actions/runs/39401509155/artifacts/12255265257) | `ca1dc2d7720c81228ba28035efcd6ebe75d2c95c3788617b58b2595229e41c6e` |
+
+The final analysis reports are preserved byte-for-byte in this repository:
+
+- [Server 2022 native analysis](evidence/SWIRL_VF_WINDOWS_D1_SERVER2022_20261020.json)
+- [Server 2025 native analysis](evidence/SWIRL_VF_WINDOWS_D1_SERVER2025_20261020.json)
+- [Derived cross-OS and fixed-object diagnostic evidence](evidence/SWIRL_VF_WINDOWS_D1_FINAL_20261020.json)
+
+### Fixed-object subpixel experiment
+
+The same QRawFont, A glyph and `499.006199` axis request remain fixed throughout
+each fresh diagnostic process. Only the preceding draw's horizontal pixel
+offset changes. All eight children on the two OS versions reproduce this:
+
+| Draw index | Raster x-offset | A leftmost x after drawing | A rightmost x after drawing |
+| --- | ---: | ---: | ---: |
+| Initial path, before drawing | — | 0.71875 | 6.421875 |
+| 0 | 0 | 0.71875 | 6.421875 |
+| 1 | 0.25 | 0.71875 | 6.4375 |
+| 2 | 0.5 | 0.71875 | 6.4375 |
+| 3 | 0.75 | 0.734375 | 6.4375 |
+| 4–8, replaying cached offsets | 0, 0.75, 0.5, 0.25, 0 | 0.734375 | 6.4375 |
+
+Every child has three distinct path shapes, two immediate after-raster changes,
+zero after-advance changes, and constant advance `7.625` pixels. Each offset's
+replayed bitmap is exactly equal to its original bitmap. Actual draw positions
+change the raster as expected; the subsequent outline query retains history
+despite the fixed axis input and raw-font object.
+
+This experiment supports the mechanism identified in the pinned Qt source:
+cached glyph loads return before updating the FreeType transformation, raster
+loads set a subpixel delta, and the unscaled outline path only clears the delta
+when the matrix changes. We did not modify Qt or inspect a private engine's
+internal transformation at runtime, so that implementation explanation is an
+inference from the controlled observations plus source. The public path-query
+history dependence is directly measured.
+
+All 72 final offset-diagnostic PNGs were independently decoded and their BGRA
+pixel hashes and ink counts matched the JSONL. The same mode's complete
+diagnostic JSONL is byte-identical across the two OS versions. Both downloaded
+analysis reports were reproduced exactly with the committed analyzer, and all
+recorded build-source file hashes matched this executable checkpoint.
+
+All diagnostic completion statuses remain `DIAGNOSTIC_COMPLETED_NOT_ACCEPTANCE`.
+The primary strict failures are not retried, warmed away or reclassified as
+passes. This test uses `PreferNoHinting` and QImage; production FontManager
+requests `PreferFullHinting`, and Qt Quick scene-graph/UI behavior is still
+NOT_RUN. No visible production UI defect or performance regression is claimed.
+
 ## A3 target-input finding
 
 For the current public DirectWrite FLOAT axis API and Qt float setter, the
@@ -257,6 +328,9 @@ and any changed-coordinate contract remain separate work.
 - [Qt 6.10.3 DirectWrite font database](https://github.com/qt/qtbase/blob/v6.10.3/src/gui/text/windows/qwindowsdirectwritefontdatabase.cpp)
 - [Qt 6.10.3 QFont implementation](https://github.com/qt/qtbase/blob/v6.10.3/src/gui/text/qfont.cpp)
 - [Qt 6.10.3 Windows platform parameter parsing](https://github.com/qt/qtbase/blob/v6.10.3/src/plugins/platforms/windows/qwindowsintegration.cpp)
+- [Pinned Qt FreeType engine source](https://github.com/qt/qtbase/blob/7ddbc87d8e14ce51d2957ea72d0a6077593d5ff4/src/gui/text/freetype/qfontengine_ft.cpp)
+- [FreeType transformation API](https://freetype.org/freetype2/docs/reference/ft2-sizing_and_scaling.html#ft_set_transform)
+- [Swirl baseline backend selection](https://github.com/SOLHK/Swirl/blob/e505326486202ad4c8e98bb8b66a17b4547c559f/src/Swirl.Quick/app/FontRendering.h)
 
 These references informed API use; the D1 experiment code and font geometry
 are original. No proprietary font payload is committed or uploaded.
