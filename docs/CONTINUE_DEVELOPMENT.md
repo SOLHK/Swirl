@@ -1,3 +1,13 @@
+# 2026-10-20: private offline qualification checkpoint
+
+The interrupted subscription repair is saved in `b096ffac75eec057a901a792a4e81718263943bc`; the real Windows Qt public gate is saved in `ac0069ec645b552835d15534b93d6d2ae0c69620`. This checkpoint adds the readonly Qt NodeStore inspector, preserves separate parsing/reload/native/network evidence stages, and allowlists all public private-cache reports. The old physical Windows cache has not been read: the current 59-node candidate count remains unknown.
+
+Local checks: 7 portable Python tests; 8 synthetic configurations through the final Rust inspector; C++23 syntax with the real Qt declarations; 55 workflow guards and idempotent generator check. Windows DPAPI execution is required by the workflow after building/deploying the actual inspector; absent Windows/environment/executable fails before the selected unittest. That native result, supplier authentication and physical Swirl.exe acceptance remain pending.
+
+See [offline qualification and conditional Windows handoff](CORE_PRIVATE_OFFLINE_ACCEPTANCE_20261020.md) and [content-bound local evidence](evidence/CORE_PRIVATE_OFFLINE_LOCAL_20261020.json). Existing cache and selection files are never overwritten by offline inspection. The full-project baseline remains 79 items / 6 complete / 10.83%; historical DNS, DoH and health-probe timeouts remain unresolved.
+
+---
+
 ## Windows Qt public gate source checkpoint (2026-10-20)
 
 Recovered the eight-request A/B public Qt/DPAPI gate and made failure evidence

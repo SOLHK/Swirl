@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import socket
+import subprocess
 import tempfile
 import threading
 import time
@@ -43,16 +44,107 @@ class EvidenceTests(unittest.TestCase):
         spec = importlib.util.spec_from_file_location('analysis_cases', Path(__file__).parents[1] / 'Analyze-CapturedSubscriptions.py')
         analysis = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(analysis)
-        report = {'nodes': [
+        report = {'parsed': True, 'recognized': True, 'nodes': [
             {'index': i, 'native_tcp_candidate': i != 1, 'native_udp_supported': False,
              'diagnostic': 'ProtocolNotImplemented' if i == 1 else 'TcpCandidateNotYetVerified'}
             for i in range(1, 6)]}
         cases = analysis.test_cases(report, [
             {'node': 2, 'success': False, 'code': 'NotTested'},
             {'node': 3, 'success': False, 'code': 'TlsFailed'},
-            {'node': 4, 'success': True, 'phase': 'http'}])
+            {'node': 4, 'success': True, 'phase': 'http', 'runtimeStarted': True,
+             'proxyConnectAccepted': True, 'certificateVerified': True, 'httpStatus': 200}])
         self.assertEqual([c['tcp'] for c in cases], ['blocked', 'not-tested', 'failed', 'passed', 'not-tested'])
         self.assertTrue(all(c['udp'] == 'blocked' and c['fullConfiguration'] == 'not-tested' for c in cases))
+        for case in cases:
+            for stage in ('realityConnection', 'realityAuthentication', 'vision', 'visionDirect', 'http', 'qtNodeStoreReload'):
+                self.assertEqual(case[stage], 'not-tested')
+        self.assertEqual(cases[3]['https'], 'passed')
+
+    def test_analysis_allowlist_rejects_private_fields_and_unproven_success(self):
+        spec = importlib.util.spec_from_file_location('analysis_redaction', Path(__file__).parents[1] / 'Analyze-CapturedSubscriptions.py')
+        analysis = importlib.util.module_from_spec(spec);spec.loader.exec_module(analysis)
+        report = {'parsed': True, 'recognized': True, 'format': 'PRIVATE_FORMAT',
+                  'error': 'PRIVATE_ERROR', 'password': 'PRIVATE_PASSWORD',
+                  'protocols': {'PRIVATE_PROTOCOL': 1}, 'nodes': [{
+                      'index': 'PRIVATE_ID', 'protocol': 'PRIVATE_PROTOCOL',
+                      'diagnostic': 'PRIVATE_DIAGNOSTIC', 'native_tcp_candidate': True,
+                      'native_udp_supported': False, 'real_network_verified': True,
+                      'host': 'PRIVATE_HOST', 'nested': {'uuid': 'PRIVATE_UUID'}}]}
+        public = analysis.public_report(report)
+        probes = [{'node': 1, 'success': True, 'phase': 'PRIVATE_PHASE',
+                   'code': 'PRIVATE_CODE', 'password': 'PRIVATE_PASSWORD'}]
+        cases = analysis.test_cases(report, probes)
+        serialized = json.dumps({'report': public, 'probes': list(map(analysis.public_probe, probes)), 'cases': cases})
+        self.assertNotIn('PRIVATE_', serialized)
+        self.assertEqual(public['nodes'][0]['index'], 1)
+        self.assertFalse(public['nodes'][0]['real_network_verified'])
+        self.assertNotEqual(cases[0]['tcp'], 'passed')
+        self.assertNotEqual(cases[0]['https'], 'passed')
+
+    def test_analysis_does_not_mark_failed_parse_or_cache_as_passed(self):
+        spec = importlib.util.spec_from_file_location('analysis_stages', Path(__file__).parents[1] / 'Analyze-CapturedSubscriptions.py')
+        analysis = importlib.util.module_from_spec(spec);spec.loader.exec_module(analysis)
+        report = {'parsed': False, 'recognized': True, 'nodes': [{
+            'index': 1, 'protocol': 'vless', 'native_tcp_candidate': True,
+            'diagnostic': 'TcpCandidateNotYetVerified'}]}
+        case = analysis.test_cases(report, [])[0]
+        self.assertEqual(case['parse'], 'failed')
+        self.assertEqual(case['nativeEligibility'], 'blocked')
+        self.assertEqual(case['capturedResponseDpapiReload'], 'not-tested')
+        report['parsed'] = True
+        case = analysis.test_cases(report, [], capture_reloaded=True)[0]
+        self.assertEqual(case['capturedResponseDpapiReload'], 'passed')
+        self.assertEqual(case['qtNodeStoreReload'], 'not-tested')
+        self.assertEqual(case['nativeEligibility'], 'passed')
+        self.assertEqual(case['runtimeStart'], 'not-tested')
+        self.assertEqual(case['realityAuthentication'], 'not-tested')
+
+    def test_analysis_offline_pipeline_sanitizes_reports_and_verifies_output_reload(self):
+        spec = importlib.util.spec_from_file_location('analysis_pipeline', Path(__file__).parents[1] / 'Analyze-CapturedSubscriptions.py')
+        analysis = importlib.util.module_from_spec(spec);spec.loader.exec_module(analysis)
+        raw = b'PRIVATE_SYNTHETIC_DOCUMENT'
+        record = {'rawBase64': base64.b64encode(raw).decode(), 'rawSha256': cap.digest(raw),
+                  'decodedSha256': cap.digest(raw), 'headers': {}}
+        inspection = {'report': {'parsed': True, 'recognized': True, 'nodes': [
+            {'index': 1, 'protocol': 'vless', 'native_tcp_candidate': True,
+             'diagnostic': 'TcpCandidateNotYetVerified', 'secret': 'PRIVATE_TOKEN'}]},
+             'nodes': [{'raw-uri': 'PRIVATE_URI'}], 'tcpCandidates': [{'password': 'PRIVATE_PASSWORD'}]}
+        with tempfile.TemporaryDirectory() as directory:
+            cache = Path(directory)/'cache';private = Path(directory)/'analysis.dpapi'
+            saved = {}
+            def read(path):
+                if Path(path) == private:return saved['value']
+                if Path(path).name == 'index.dpapi':return {'entries': {'PRIVATE_SOURCE': {'file': 'entry.dpapi', 'sources': ['PRIVATE_URL']}}}
+                return record
+            def save(path, value):
+                self.assertEqual(Path(path), private);saved['value'] = value
+            process = subprocess.CompletedProcess([], 0, json.dumps(inspection).encode(), b'')
+            with mock.patch.object(analysis.capture, 'read_private', side_effect=read), \
+                    mock.patch.object(analysis.capture, 'save_private', side_effect=save), \
+                    mock.patch.object(analysis.subprocess, 'run', return_value=process), \
+                    mock.patch.object(analysis, 'test_node', side_effect=AssertionError('offline network attempted')):
+                report = analysis.analyze(cache, Path(directory)/'inspector', private)
+        self.assertNotIn('PRIVATE_', json.dumps(report))
+        self.assertTrue(report['offlineOnly'])
+        self.assertTrue(report['privateAnalysisReloadVerified'])
+        self.assertEqual(report['realTcpProbes'], 0)
+        self.assertEqual(saved['value']['documents'][0]['analysis']['nodes'][0]['raw-uri'], 'PRIVATE_URI')
+
+    def test_analysis_outputs_cannot_overwrite_existing_or_input_cache(self):
+        spec = importlib.util.spec_from_file_location('analysis_outputs', Path(__file__).parents[1] / 'Analyze-CapturedSubscriptions.py')
+        analysis = importlib.util.module_from_spec(spec);spec.loader.exec_module(analysis)
+        with tempfile.TemporaryDirectory() as directory:
+            cache = Path(directory)/'cache';cache.mkdir()
+            existing = Path(directory)/'existing.dpapi';existing.write_bytes(b'UNCHANGED_SYNTHETIC_CIPHERTEXT')
+            for destination in (existing, cache/'index.dpapi', cache/'nested'/'new.dpapi'):
+                with self.subTest(destination=destination.name), \
+                        mock.patch.object(analysis.capture, 'read_private', side_effect=AssertionError('input was read')):
+                    with self.assertRaisesRegex(analysis.capture.CaptureError, 'NewIsolatedAnalysisRequired'):
+                        analysis.analyze(cache, Path(directory)/'inspector', destination)
+            self.assertEqual(existing.read_bytes(), b'UNCHANGED_SYNTHETIC_CIPHERTEXT')
+            self.assertEqual(list(cache.iterdir()), [])
+            fresh = Path(directory)/'new'/'analysis.dpapi'
+            self.assertEqual(analysis.new_output_path(fresh, cache), fresh.resolve())
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -210,6 +302,69 @@ class CaptureTests(unittest.TestCase):
         self.assertNotIn(b'PRIVATE_SECRET',private.read_bytes())
         saved=cap.read_private(private)
         self.assertEqual(saved['documents'][0]['analysis']['nodes'][0]['future-field'],'PRIVATE_VALUE')
+
+    @unittest.skipUnless(os.environ.get('SWIRL_QT_PRIVATE_INSPECTOR'), 'Qt offline inspector is built after the ordinary capture tests')
+    def test_qt_offline_inspector_reloads_and_redacts_actual_dpapi(self):
+        executable = Path(os.environ['SWIRL_QT_PRIVATE_INSPECTOR']).resolve()
+        self.assertTrue(executable.is_file(), 'Required Qt inspector executable is missing')
+        key = base64.urlsafe_b64encode(bytes(range(32))).decode().rstrip('=')
+        credential = '00112233-4455-6677-8899-aabbccddeeff'
+        uri = (f'vless://{credential}@private-origin.invalid:443?security=reality&type=tcp'
+               f'&headerType=none&sni=private-sni.invalid&pbk={key}&sid=abcd'
+               '&fp=chrome&flow=xtls-rprx-vision')
+        raw = ('\n'.join([uri+'#PRIVATE_VALID', uri+'&path=%2FPRIVATE_PATH#PRIVATE_PATH_NODE',
+                           uri.replace('fp=chrome', 'fp=firefox')+'#PRIVATE_FINGERPRINT'])).encode()
+        input_path = Path(self.temp.name)/'synthetic-response.dpapi'
+        input_path.write_bytes(cap.protect(raw))
+        store_path = Path(self.temp.name)/'isolated-nodes.dpapi'
+        def run(*arguments):
+            result = subprocess.run([str(executable), *map(str, arguments)], capture_output=True, timeout=30)
+            all_output = result.stdout + result.stderr
+            for secret in [b'PRIVATE_', credential.encode(), key.encode(), b'private-origin.invalid', b'private-sni.invalid', b'vless://']:
+                self.assertNotIn(secret, all_output)
+            return result, json.loads(result.stdout.decode('utf-8-sig'))
+        before_network = sum(self.server.hits.values())
+        result, report = run(input_path, store_path)
+        self.assertEqual(result.returncode, 0, report)
+        self.assertEqual(report['nodes'], 3)
+        self.assertEqual(report['nativeTcpCandidates'], 1)
+        self.assertEqual(report['encryptedSaveReload'], 'passed')
+        self.assertTrue(report['inputUnchanged'])
+        self.assertEqual(report['cases'][1]['conversionIssueCodes'], ['TcpUriTransportOptionsUnsupported'])
+        self.assertEqual(report['cases'][2]['reasonCode'], 'RealityFingerprintUnsupported')
+        encrypted_before = store_path.read_bytes()
+        for secret in [credential.encode(), key.encode(), b'PRIVATE_', b'private-origin.invalid']:
+            self.assertNotIn(secret, encrypted_before)
+        result, reloaded = run('--node-store', store_path)
+        self.assertEqual(result.returncode, 0, reloaded)
+        self.assertEqual(reloaded['nativeTcpCandidates'], 1)
+        self.assertEqual(reloaded['encryptedSaveReload'], 'reload-only')
+        self.assertEqual(store_path.read_bytes(), encrypted_before)
+        self.assertFalse(Path(str(store_path)+'.selected').exists())
+        for case in reloaded['cases']:
+            self.assertEqual(case['stages']['qtNodeStoreReload'], 'passed')
+            self.assertEqual(case['stages']['sourceRemapping'], 'passed')
+            for stage in ('runtimeStart', 'proxyConnect', 'realityConnection', 'realityAuthentication', 'vision', 'visionDirect', 'http', 'https'):
+                self.assertEqual(case['stages'][stage], 'not-tested')
+        sidecar = Path(str(store_path)+'.selected')
+        sidecar.write_bytes(b'{"selected":""}\n')
+        selection_before = sidecar.read_bytes()
+        result, with_selection = run('--node-store', store_path)
+        self.assertEqual(result.returncode, 0, with_selection)
+        self.assertTrue(with_selection['inputUnchanged'])
+        self.assertEqual(sidecar.read_bytes(), selection_before)
+        self.assertEqual(store_path.read_bytes(), encrypted_before)
+        result, refused = run(input_path, store_path)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(refused['errorCode'], 'OutputAlreadyExists')
+        self.assertEqual(store_path.read_bytes(), encrypted_before)
+        damaged = Path(self.temp.name)/'damaged-nodes.dpapi'
+        changed = bytearray(encrypted_before);changed[-12] ^= 1;damaged.write_bytes(changed)
+        result, rejected = run('--node-store', damaged)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(rejected['errorCode'], 'NodeStoreReloadFailed')
+        self.assertEqual(damaged.read_bytes(), bytes(changed))
+        self.assertEqual(sum(self.server.hits.values()), before_network)
 
     def test_gzip_raw_preserved_and_offline_replay(self):
         report = self.run_capture("/gzip")

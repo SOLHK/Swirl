@@ -1517,7 +1517,10 @@ class CoreDevelopmentTests(unittest.TestCase):
                             block.replace("if-no-files-found: error", "if-no-files-found: warn", 1),
                             block.replace("        run: |", "        continue-on-error: true\n        run: |", 1),
                             block.replace("${{ github.sha }}", "unverified", 1),
-                            block.replace("Verify-PublicQtReality.py", "Verify-PublicRealityRuntime.py", 1)):
+                            block.replace("Verify-PublicQtReality.py", "Verify-PublicRealityRuntime.py", 1),
+                            block.replace('if (-not $IsWindows -or ', 'if (', 1),
+                            block.replace('[string]::IsNullOrWhiteSpace($env:SWIRL_QT_PRIVATE_INSPECTOR) -or ', '', 1),
+                            block.replace('test_qt_offline_inspector_reloads_and_redacts_actual_dpapi', 'test_omitted_inspector', 1)):
             with self.subTest(replacement=replacement), self.assertRaises(ValueError):
                 development.updated_workflow(final.replace(block, replacement, 1))
         moved = final.replace(block, "", 1) + block
