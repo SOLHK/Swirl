@@ -122,7 +122,27 @@ void FontTests::automaticWidthNonmonotonicFonts()
     QVERIFY(safeWidth>unsafe);QCOMPARE(font.pixelSize(),50);
 
     QVERIFY(import("automation-width-asymmetric.ttf"));font.setFamily(manager.currentFamily());
+    // Native hinted advances can form plateaus: at 50 px FreeType full
+    // hinting measures both 96 and 96.4 as 232 px. The nearest-default equal
+    // advance is correct; an axis endpoint is not a unique metric minimum.
+    for(const auto hint:{QFont::PreferDefaultHinting,QFont::PreferFullHinting}) {
+        font.setHintingPreference(hint);
+        const double endpoint=at(96),neighbour=at(96.4);
+        QVERIFY(at(96.8)>neighbour);
+        QVERIFY(neighbour==endpoint||neighbour>endpoint+.5);
+        const auto plateau=manager.fittedText(font,text,96,2,"label",1,100);
+        const double expected=neighbour==endpoint?double(float(96.4)):96.;
+        QCOMPARE(plateau.value("axes").toMap().value("wdth").toDouble(),expected);
+        QCOMPARE(widthLayoutAdvance(widthResultFont(font,plateau),text,96),endpoint);
+        QVERIFY(endpoint>=at(100)*.85);
+        qInfo()<<"Asymmetric width: pixels=50 hint="<<hint<<"at96="<<endpoint
+            <<"at96.4="<<neighbour<<"selected="<<expected;
+    }
+    // At 125 px every adjacent grid step has distinct hinted advances. Retain
+    // the strict real-font endpoint assertion as well as the plateau check.
+    font.setPixelSize(125);
     const double asymmetricNatural=at(100);
+    QVERIFY(at(96.4)>at(96)+.5);
     const auto minimum=manager.fittedText(font,text,96,2,"label",1,100);
     QCOMPARE(minimum.value("axes").toMap().value("wdth").toDouble(),96.);
     QVERIFY(widthLayoutAdvance(widthResultFont(font,minimum),text,96)>=asymmetricNatural*.85);
