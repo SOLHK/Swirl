@@ -4,14 +4,12 @@ on:
     branches: [work/core-completion-20261017]
 concurrency:
   group: core-implementation-validation
-  # App-token pushes start a new run; keep the original run alive to finish validation.
+  # Preserve each pushed commit's validation and evidence.
   cancel-in-progress: false
 permissions:
   contents: read
 jobs:
   core:
-    # Skip the follow-up run created by this job's own App-token push.
-    if: ${{ !contains(github.event.head_commit.message, '[swirl-core-autofix]') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -31,18 +29,15 @@ jobs:
           token: ${{ steps.swirl-app-token.outputs.token }}
       - name: Install Rust tools
         run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy
-      - name: Apply checked core refactoring and format the development branch
+      - name: Verify exact pushed source and reviewed CI gates
         run: |
           set -euo pipefail
           test "$GITHUB_REF" = refs/heads/work/core-completion-20261017
-          if test -f tools/ApplyCoreDevelopment.py; then python tools/ApplyCoreDevelopment.py; fi
-          cargo fmt --manifest-path core/Cargo.toml --all
-          # Only this development branch is writable, never test or main.
-          git add core src/Swirl.Quick/engine src/Swirl.Quick/tests .github/workflows/rust-core.yml
-          if ! git diff --cached --quiet; then
-            git -c user.name='Swirl core development' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Apply native core integration and canonical Rust formatting [swirl-core-autofix]'
-            git push origin HEAD:refs/heads/work/core-completion-20261017
-          fi
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          python tools/ApplyCoreDevelopment.py --check
+          cargo fmt --manifest-path core/Cargo.toml --all -- --check
+          git diff --exit-code HEAD --
           git rev-parse HEAD | tee CORE_TESTED_COMMIT
       - name: Rust static and unit checks
         working-directory: core
@@ -188,14 +183,25 @@ jobs:
       - name: Export exact source and result identity
         if: always()
         run: |
-          git archive HEAD core tools .github/workflows src/Swirl.Quick/engine src/Swirl.Quick/tests > core-tested-source.tar
+          set -euo pipefail
+          printf '%s\n' "$GITHUB_SHA" > CORE_TRIGGER_COMMIT
           git status --porcelain > CORE_WORKTREE_STATE
+          git diff --binary "$GITHUB_SHA" -- > CORE_SOURCE_DIFF.patch
+          git ls-files --others --exclude-standard -- core tools .github/workflows src/Swirl.Quick/engine src/Swirl.Quick/tests > CORE_UNTRACKED_SOURCE
+          git archive "$GITHUB_SHA" core tools .github/workflows src/Swirl.Quick/engine src/Swirl.Quick/tests > core-tested-source.tar
+          test "$(cat CORE_TESTED_COMMIT)" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test ! -s CORE_SOURCE_DIFF.patch
+          test ! -s CORE_UNTRACKED_SOURCE
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: Core-development-evidence
           path: |
+            CORE_TRIGGER_COMMIT
             CORE_TESTED_COMMIT
             CORE_WORKTREE_STATE
+            CORE_SOURCE_DIFF.patch
+            CORE_UNTRACKED_SOURCE
             core-tested-source.tar
           retention-days: 7

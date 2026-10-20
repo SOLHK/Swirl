@@ -32,7 +32,7 @@ import uuid
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.x509.oid import NameOID
+from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 
 from test_reality_xray import executable, sha256
 
@@ -49,6 +49,14 @@ def certificates(directory: Path):
           .public_key(ca_key.public_key()).serial_number(x509.random_serial_number())
           .not_valid_before(now - timedelta(hours=1)).not_valid_after(now + timedelta(hours=1))
           .add_extension(x509.BasicConstraints(ca=True, path_length=0), critical=True)
+          # Python >=3.13 enables OpenSSL X509_STRICT by default. The test
+          # chain must satisfy RFC 5280, including CA usage and key identifiers.
+          # https://docs.openssl.org/3.0/man1/openssl-verification-options/#verification-options
+          .add_extension(x509.KeyUsage(digital_signature=False, content_commitment=False,
+                                       key_encipherment=False, data_encipherment=False,
+                                       key_agreement=False, key_cert_sign=True, crl_sign=True,
+                                       encipher_only=False, decipher_only=False), critical=True)
+          .add_extension(x509.SubjectKeyIdentifier.from_public_key(ca_key.public_key()), critical=False)
           .sign(ca_key, hashes.SHA256()))
     result = {"ca_der_base64": base64.b64encode(ca.public_bytes(serialization.Encoding.DER)).decode("ascii")}
     for role in ("outer", "inner"):
@@ -61,6 +69,14 @@ def certificates(directory: Path):
                 .not_valid_before(now - timedelta(hours=1)).not_valid_after(now + timedelta(hours=1))
                 .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
                 .add_extension(x509.SubjectAlternativeName([x509.DNSName(name)]), critical=False)
+                .add_extension(x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_key.public_key()),
+                               critical=False)
+                .add_extension(x509.SubjectKeyIdentifier.from_public_key(key.public_key()), critical=False)
+                .add_extension(x509.KeyUsage(digital_signature=True, content_commitment=False,
+                                             key_encipherment=False, data_encipherment=False,
+                                             key_agreement=False, key_cert_sign=False, crl_sign=False,
+                                             encipher_only=False, decipher_only=False), critical=True)
+                .add_extension(x509.ExtendedKeyUsage([ExtendedKeyUsageOID.SERVER_AUTH]), critical=False)
                 .sign(ca_key, hashes.SHA256()))
         cert_path, key_path = directory / f"{role}.pem", directory / f"{role}.key"
         cert_path.write_bytes(cert.public_bytes(serialization.Encoding.PEM) + ca.public_bytes(serialization.Encoding.PEM))

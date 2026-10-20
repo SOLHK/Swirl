@@ -812,6 +812,7 @@ class VisionRuntimeInterop(RealityRuntimeInterop):
         self.start(self.imported([peer], "uri"))
         context = ssl.create_default_context(cadata=ssl.DER_cert_to_PEM_cert(
             base64.b64decode(certs["ca_der_base64"])))
+        context.verify_flags |= ssl.VERIFY_X509_STRICT
         context.minimum_version = ssl.TLSVersion.TLSv1_3
         context.maximum_version = ssl.TLSVersion.TLSv1_3
         payload = bytes(range(256)) * 2048

@@ -25,7 +25,9 @@ It does not change permissions, secrets,
 existing actions, pull-request triggers or any product source.
 
 Run ``python tools/ApplyCoreDevelopment.py --check`` to run the safety tests and
-review the exact diff without writing. With no arguments, writes are restricted
+review the exact diff without writing; it fails if a reviewed update is missing.
+The App validation workflow uses this read-only mode to test the pushed commit
+without automatic source changes. With no arguments, writes are restricted
 to this repository's existing development workflow and push ref. The caller
 already owns committing and pushing the change through its GitHub App token.
 """
@@ -1001,7 +1003,7 @@ def apply_update(repository: Path, environment: Mapping[str, str]) -> bool:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--check", action="store_true", help="Run safety tests and show the diff without writes"
+        "--check", action="store_true", help="Run safety tests and fail on workflow drift without writes"
     )
     options = parser.parse_args()
     repository = Path(__file__).resolve().parent.parent
@@ -1025,6 +1027,7 @@ def main() -> int:
                 fromfile=WORKFLOW.as_posix(), tofile=WORKFLOW.as_posix(),
             )
         )
+        return int(before != after)
     else:
         changed = apply_update(repository, os.environ)
         print("Applied reviewed Rust CI update" if changed else "Rust CI gates already current")

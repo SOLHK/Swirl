@@ -194,6 +194,100 @@ def previous_connection_stage(source):
 
 
 class CoreDevelopmentTests(unittest.TestCase):
+    def test_check_command_rejects_pending_update_without_writing(self):
+        script = Path(development.__file__).read_bytes()
+        for current in (False, True):
+            with self.subTest(current=current), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                workflow = self.make_repository(
+                    root, development.updated_workflow(FIXTURE) if current else FIXTURE)
+                (root / "tools/ApplyCoreDevelopment.py").write_bytes(script)
+                before = workflow.read_bytes()
+                result = subprocess.run(
+                    [sys.executable, "tools/ApplyCoreDevelopment.py", "--check"],
+                    cwd=root, capture_output=True, text=True, timeout=15)
+                self.assertEqual(result.returncode, 0 if current else 1, result.stderr)
+                self.assertEqual(workflow.read_bytes(), before)
+                self.assertEqual("@@" in result.stdout, not current)
+
+    @unittest.skipIf(os.name == "nt", "The App source-identity job executes on Linux")
+    def test_app_source_identity_shell_rejects_real_git_drift(self):
+        # Execute the actual App shell with a real local Git repository. No
+        # network, token, source formatting or branch write is needed.
+        repository = Path(__file__).resolve().parents[2]
+        source = (repository / ".github/workflows/core-development.yml").read_text(encoding="utf-8")
+        self.assertNotIn("git push", source)
+        self.assertNotIn("git add", source)
+        self.assertNotIn("[swirl-core-autofix]", source)
+        self.assertIn("          ref: ${{ github.sha }}\n", source)
+
+        def body(title):
+            step = source.split(f"      - name: {title}\n", 1)[1].split("      - ", 1)[0]
+            return "\n".join(line[10:] for line in step.split("        run: |\n", 1)[1].splitlines()) + "\n"
+
+        preflight = body("Verify exact pushed source and reviewed CI gates")
+        export = body("Export exact source and result identity")
+        cases = ("clean", "wrong-trigger", "formatter-write", "missing-gate",
+                 "unstaged", "staged", "untracked", "moved-head", "wrong-tested")
+        for case in cases:
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as temporary:
+                parent = Path(temporary)
+                root, shim = parent / "repo", parent / "bin"
+                root.mkdir()
+                shim.mkdir()
+                for relative in ("core/source.rs", "tools/tests/fixture.py", ".github/workflows/fixture.yml",
+                                 "src/Swirl.Quick/engine/fixture.cpp", "src/Swirl.Quick/tests/fixture.cpp"):
+                    path = root / relative
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_text("synthetic source\n", encoding="utf-8")
+                (root / "tools/ApplyCoreDevelopment.py").write_text(
+                    "import sys\nassert sys.argv[1:] == ['--check']\n"
+                    f"raise SystemExit({1 if case == 'missing-gate' else 0})\n", encoding="utf-8")
+                cargo = shim / "cargo"
+                cargo.write_bytes(
+                    b"#!/bin/sh\ntest \"$*\" = 'fmt --manifest-path core/Cargo.toml --all -- --check' || exit 23\n"
+                    + (b"printf 'unexpected format write\\n' >> core/source.rs\n" if case == "formatter-write" else b""))
+                cargo.chmod(0o755)
+
+                def git(*args):
+                    return subprocess.check_output(["git", *args], cwd=root, stderr=subprocess.STDOUT).decode().strip()
+
+                git("init", "-q")
+                git("config", "user.name", "Source identity test")
+                git("config", "user.email", "source-identity@example.invalid")
+                git("add", ".")
+                git("commit", "-qm", "Original source")
+                original = git("rev-parse", "HEAD")
+                environment = dict(os.environ, GITHUB_REF=development.DEVELOPMENT_REF,
+                                   GITHUB_SHA="0" * 40 if case == "wrong-trigger" else original)
+                environment["PATH"] = str(shim) + os.pathsep + environment.get("PATH", "")
+                checked = subprocess.run(["bash", "-c", preflight], cwd=root, env=environment,
+                                         capture_output=True, text=True, timeout=15)
+                if case in ("wrong-trigger", "formatter-write", "missing-gate"):
+                    self.assertNotEqual(checked.returncode, 0)
+                    self.assertFalse((root / "CORE_TESTED_COMMIT").exists())
+                    continue
+                self.assertEqual(checked.returncode, 0, checked.stderr)
+                if case in ("unstaged", "staged", "moved-head"):
+                    (root / "core/source.rs").write_text("changed during tests\n", encoding="utf-8")
+                    if case != "unstaged":
+                        git("add", "core/source.rs")
+                    if case == "moved-head":
+                        git("commit", "-qm", "Unexpected changed source")
+                elif case == "untracked":
+                    (root / "core/injected.rs").write_text("unexpected source\n", encoding="utf-8")
+                elif case == "wrong-tested":
+                    (root / "CORE_TESTED_COMMIT").write_text("0" * 40 + "\n", encoding="utf-8")
+                exported = subprocess.run(["bash", "-c", export], cwd=root, env=environment,
+                                          capture_output=True, text=True, timeout=15)
+                self.assertEqual(exported.returncode == 0, case == "clean", exported.stderr)
+                self.assertEqual((root / "CORE_TRIGGER_COMMIT").read_text().strip(), original)
+                self.assertTrue((root / "core-tested-source.tar").is_file())
+                if case in ("unstaged", "staged", "moved-head"):
+                    self.assertIn("changed during tests", (root / "CORE_SOURCE_DIFF.patch").read_text())
+                if case == "untracked":
+                    self.assertIn("core/injected.rs", (root / "CORE_UNTRACKED_SOURCE").read_text())
+
     def test_app_existing_peer_menu_requires_built_subscription_inspector(self):
         root = Path(__file__).resolve().parents[2]
         source = (root / ".github/workflows/core-development.yml").read_text(encoding="utf-8")
@@ -686,7 +780,7 @@ class CoreDevelopmentTests(unittest.TestCase):
         self.assertIn("          set -euo pipefail\n", menu)
         self.assertLess(source.index(REALITY_BUILD), source.index(marker))
         # Include the peer builder and CI source as well as the actual test code.
-        self.assertIn("git archive HEAD core tools .github/workflows src/Swirl.Quick/engine src/Swirl.Quick/tests > core-tested-source.tar\n", source)
+        self.assertIn('git archive "$GITHUB_SHA" core tools .github/workflows src/Swirl.Quick/engine src/Swirl.Quick/tests > core-tested-source.tar\n', source)
 
     def test_socks5_udp_adds_portable_qt_and_native_build_as_one_stage(self):
         final = development.updated_workflow(FIXTURE)
