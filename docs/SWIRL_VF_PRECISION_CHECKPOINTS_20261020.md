@@ -387,12 +387,72 @@ cover exact/nextafter limits, true curvature, raw L/Q rejection, orientation,
 cross-contour and same-contour numeric failures, and a binary64 subtraction
 that would otherwise round a true over-budget difference down to exactly 1/32.
 The diagnostic integration preserves the old failure even when the new raw-Q
-control comparison passes. Native execution of this added comparison remains
-pending; prior parametric evidence is not substituted for that execution.
+control comparison passes. Exact source
+`2518e7e4d87623b118c37a72f1cffb2538e82db9` was pushed non-forcibly and the
+remote HEAD independently matched. Native
+[39385586825](https://github.com/SOLHK/Swirl/actions/runs/39385586825), job
+118504523929, completed **success**. All eight original type-only failures pass
+the new original-Q control-point comparison, maximum
+`3.410605131648481e-13` FUnit, without changing the 1/32 budget. Each has one
+restored segment. Native HVF / CoreText needs no restored segment and is exact.
+The old global-model, HVAR-conditioned, direct-strict and opposite-order fields
+are identical to the prior 619ec701 artifact; all old failures remain visible.
+Both processes completed 324 requests / 1,620 records, zero errors and valid
+summary/EOF/exit, with full 32-face identity and unchanged source. Downloaded
+artifact 12247188502 has verified ZIP SHA-256
+`fb640bc42bbaf2acef879b1b22b7b0f204231d08611902c961046055f5227fe6`.
+This validates the conservative comparison on these eight cases; it does not
+accept a production mapper or a reconstructed font.
+
+Same-source [39385586778](https://github.com/SOLHK/Swirl/actions/runs/39385586778)
+finished: Python and Windows synthetic DirectWrite **success**, Apple
+**failure**. Actual log 118504524101 was read: raw vertical advance 849 versus
+850 at unchanged 0.03125; the 22-case production Swift guard still passes.
+
+The full threshold rerun at source
+`619ec70181858815a23ba8c80adc63ab206dd2f3`,
+[39384574416](https://github.com/SOLHK/Swirl/actions/runs/39384574416), job
+118501232869, has now completed **success**, superseding the running status
+above. Downloaded artifact 12247761673 has verified ZIP SHA-256
+`c2c9435be3460739b7c7e8c08e92a6bcf130db8c845bb85842f0e04905013044`.
+Every top-level field equals the prior f51d262 report except `source_commit`,
+including all 32 face reports, 1,724 positions, 120,680 records, all model
+failures, native comparisons and process summaries. This proves repeatability
+of the recorded finite diagnostic, not that its failed model is accepted.
 
 Concurrent Core evidence/test commit
 `f19b0ad51058580a8a0ed73008b22754e6f45ea0` was inspected and preserved by
 fast-forward; none of its four files overlaps this font change.
+
+## A2 next diagnostic: constructor and base-instance plateau boundaries
+
+New files: `platform/plateau_construction_harness.py`,
+`platform/probe_axis_plateau.py`, `tests/test_plateau_construction_harness.py`,
+`tests/test_axis_plateau.py` under `tools/swirl_vf`, and
+`.github/workflows/swirl-vf-axis-plateau.yml`. Local validation is
+**386/386 Python tests, zero skips, 6/6 audits**, full suite 20.262 seconds;
+`git diff --check` is clean. The 12 additional tests cover generated-source
+contracts, refusal conditions, complete-payload comparison, mode restoration
+and predefined source-range samples. They are not native Swift execution.
+
+The new experiment selects seven representative faces, 287 fixed locations,
+five GIDs and five constructor modes, each in separate forward/reverse
+processes: **14,350 planned native records**. Modes are the unchanged production
+constructor, existing descriptor and graphics alternatives, and production
+copies from fully identity-verified bases seeded at wght 300 or 500. Alternative
+paths do not preconstruct the production baseline. The full production Swift
+prefix, strict guard, source SHA, 32-face table identity, extraction and native
+termination contracts are retained. The harness is explicitly diagnostic and
+must never be supplied to `rebuild.py` as an accepted oracle.
+
+The report retains original and seeded base axis observations, full-payload
+and raw-command equality, every scalar/vector metric difference, readback
+differences, and conditional independent HVF checks. Only safe differences and
+identity summaries are published. Samples cover the 400 plateau boundaries,
+300 controls, original defaults and mixed WDTH/wght/HGHT. No font-specific
+mapping rule or constructor is promoted. Native execution is pending at this
+source checkpoint; next smallest task is to read its actual final result and
+distinguish base/constructor dependence before further arithmetic hypotheses.
 
 ## Newly retrieved prior evidence (not new execution in this continuation)
 
