@@ -16,11 +16,13 @@
 `24119489f7b85fe58dea53acf3a4a6f467a6e8fa`、
 `ef564245f5de600757b7283437c7daf31a1e90e9`、
 `4927316c74f935099a5648cefacc13ae0d1f2772`、
-`af8df45a9ca3f2ed0d2e623856cb3c8ef85f3974`。并发 Core 提交
+`af8df45a9ca3f2ed0d2e623856cb3c8ef85f3974`、
+`121d58c3579241305d5a653939f1200573f3a7d2`。并发 Core 提交
 `169e0cad51fc18a2d6fa4f194fafd90128bf2f7b`、
 `85f4cb916221fb64b9c07f0cd6fd85bbc7e94883`、
 `54908e2902c28ae20e2588fa5347df9b2b3d76e9`、
-`a3b89050e141557444519c8c17f2a263e6a013fc` 均保留。
+`a3b89050e141557444519c8c17f2a263e6a013fc`、
+`5d3ec74d212276726e96be8ecbd4c2f92adc4e53` 均保留。
 完整数值、执行范围和历史失败见
 [本轮进展](SWIRL_VF_USER_COORDINATE_PROGRESS_20261020.md)。
 
@@ -57,8 +59,11 @@
   `vrt2` 默认无补偿。默认横排、GSUB/地区映射、度量与字宽均保持；默认混排
   128 个旋转空格/Latin run 完整相等。实际 GPOS 仍有量化，不能称 1/32 通过。
   HB 实测默认只启用 `vert`，不能把单一引擎行为当跨平台契约。
-  Mac 同轮因 `.excludeSynthetic` 被 SDK 禁用而编译失败，尚无 GPOS 布局结果。
-  本检查点改为受支持的取表选项，保留实际字体表哈希与缺席表检查，立即原生重跑。
+  Mac 同轮因 `.excludeSynthetic` 被 SDK 禁用而编译失败，后由 `121d58c` 修复。
+  新 run [39372726963](https://github.com/SOLHK/Swirl/actions/runs/39372726963)
+  已编译通过，第一 source 进程横排 168 项完成，但竖排 168 项全部被实际字体身份
+  或完整文本布局检查拒绝，尚未执行 candidate。当前补充 actual/requested font 表
+  哈希与可见范围/框尺寸的结构化诊断，原检查全部保留，不能推断 GPOS 功效。
 - 本检查点 Python **319/319**（包含实际 HarfBuzz、无 skip）、audit **6/6**。
   Windows 数量已经实际完成；CoreText 的 2,016 次仍是待执行请求数。
 - 另修复 gvar 残差双重舍入：原创可表达反例的误差从 1.400071 降至 0.014142

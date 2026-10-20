@@ -4,6 +4,35 @@ This phase starts at `b5a84bfacc48e6b2a8be8f0797f34639530766c9` on
 `work/core-completion-20261017`; every push is non-forced and based on a fresh
 remote head. UI, animations and Rust Core are outside the changes.
 
+## Tenth implementation checkpoint: retain the actual CoreText vertical-layout failure
+
+Commit `121d58c3579241305d5a653939f1200573f3a7d2` (parent `af8df45a`) repaired
+the SDK compilation issue. Run
+[39372726963](https://github.com/SOLHK/Swirl/actions/runs/39372726963), CoreText
+job 118463975746, verified the original system-font SHA and **compiled Swift
+successfully** on macOS 27.0.1 / Xcode 27.0. The first fixture process then
+completed **168 horizontal layouts** and rejected all **168 vertical layouts**:
+84 Han/mixed requests failed actual-run font identity; 84 Latin/space requests
+failed visible-range/layout completeness. No candidate GPOS process was reached.
+These are retained diagnostic failures, not a negative GPOS efficacy result.
+Artifact 12241697562 ZIP SHA is
+`d112c3983f49bd477e6f8052e16e9b22295cbfff5934a87233727300e51a914e`.
+
+The probe now preserves structured requested/actual font identities, each table
+hash/match, font size/UPM/GID count, visible/requested text range, frame rectangle
+and progression. It identifies the unregistered CGDataProvider -> CGFont ->
+CTFont construction separately from the font actually selected by CTRun. All
+original identity, missing-table and full-text checks remain unchanged. The
+next native run must establish the cause before a construction change can be
+accepted. The existing **9/9 CoreText analyzer/protocol tests pass**; Linux does
+not execute or certify this new Swift diagnostic. This small checkpoint does
+not publish the separate work-in-progress positioning fitter/encoder.
+
+The remote advanced to concurrent Core test commit
+`5d3ec74d212276726e96be8ecbd4c2f92adc4e53`, whose nine paths do not overlap
+font tools or handoffs. This checkpoint retains it as its direct parent and
+updates only the native font probe and handoff documents.
+
 ## Ninth implementation checkpoint: actual Windows placement and supported CoreText table access
 
 Local verification: **319/319 Python tests, zero skips, in 14.102 seconds;

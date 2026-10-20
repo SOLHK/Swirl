@@ -59,7 +59,10 @@ import CoreText
 import CoreGraphics
 import CryptoKit
 
-enum OracleError: Error { case invalid(String) }
+enum OracleError: Error {
+    case invalid(String)
+    case diagnostic(String, [String: Any])
+}
 func emit(_ object: [String: Any]) throws {
     let data = try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
     FileHandle.standardOutput.write(data); FileHandle.standardOutput.write(Data([10]))
@@ -69,6 +72,42 @@ func tagValue(_ tag: String) -> UInt32 { tag.utf8.reduce(UInt32(0)) { ($0 << 8) 
 func tagName(_ value: UInt32) -> String {
     String(bytes: [UInt8((value >> 24) & 255), UInt8((value >> 16) & 255),
         UInt8((value >> 8) & 255), UInt8(value & 255)], encoding: .ascii)!
+}
+let fixtureConstruction = "SHA256-verified original fixture bytes -> CGDataProvider -> CGFont -> CTFontCreateWithGraphicsFont; identity matrix; explicit variation and feature descriptor; unregistered font in an isolated process"
+func nativeErrorRecord(_ error: Error, _ type: String) -> [String: Any] {
+    var record: [String: Any] = ["type": type, "error": String(describing: error)]
+    if let failure = error as? OracleError {
+        switch failure {
+        case .invalid: break
+        case let .diagnostic(reason, context):
+            record["error"] = reason; record["diagnostic"] = context
+        }
+    }
+    return record
+}
+func fixtureIdentity(_ font: CTFont, _ expected: [String: String], _ absent: [String]) -> [String: Any] {
+    var tables: [String: Any] = [:]
+    for tag in Set(Array(expected.keys) + absent).sorted() {
+        var observation: [String: Any] = ["available": false]
+        if let data = CTFontCopyTable(font, tagValue(tag), CTFontTableOptions(rawValue: 0)) {
+            let actualHash = sha256(data as Data)
+            observation = ["available": true, "sha256": actualHash]
+            if let expectedHash = expected[tag] {
+                observation["matches_requested_fixture"] = actualHash == expectedHash
+            }
+        }
+        if let expectedHash = expected[tag] { observation["expected_sha256"] = expectedHash }
+        observation["expected_absent"] = absent.contains(tag)
+        tables[tag] = observation
+    }
+    let matrix = CTFontGetMatrix(font)
+    return ["postscript_name": CTFontCopyPostScriptName(font) as String,
+        "family_name": CTFontCopyFamilyName(font) as String,
+        "glyph_count": CTFontGetGlyphCount(font), "units_per_em": CTFontGetUnitsPerEm(font),
+        "size": Double(CTFontGetSize(font)),
+        "font_matrix": [Double(matrix.a), Double(matrix.b), Double(matrix.c), Double(matrix.d),
+                        Double(matrix.tx), Double(matrix.ty)],
+        "observed_axes": observedAxes(font), "tables": tables]
 }
 func verifyFixture(_ font: CTFont, _ expected: [String: String], _ absent: [String]) throws {
     guard CTFontGetGlyphCount(font) == 8, CTFontGetUnitsPerEm(font) == 1000,
@@ -117,7 +156,12 @@ func makeFixtureFont(_ graphics: CGFont, _ request: [String: Any],
     let descriptor = CTFontDescriptorCreateWithAttributes(attributes as CFDictionary)
     var matrix = CGAffineTransform.identity
     let font = CTFontCreateWithGraphicsFont(graphics, 1000, &matrix, descriptor)
-    try verifyFixture(font, expected, absent)
+    do { try verifyFixture(font, expected, absent) }
+    catch {
+        throw OracleError.diagnostic("constructed_fixture_identity_failed", [
+            "cause": String(describing: error), "construction": fixtureConstruction,
+            "requested_font": fixtureIdentity(font, expected, absent)])
+    }
     return font
 }
 
@@ -148,9 +192,20 @@ func fixtureSnapshot(_ font: CTFont, _ request: [String: Any],
     let frame = CTFramesetterCreateFrame(setter, CFRange(location: 0, length: 0), path,
                                         frameAttributes as CFDictionary)
     let visible = CTFrameGetVisibleStringRange(frame)
+    let frameLines = CTFrameGetLines(frame)
     guard visible.location == 0, visible.length == text.utf16.count,
-          let lines = CTFrameGetLines(frame) as? [CTLine], !lines.isEmpty else {
-        throw OracleError.invalid("original_fixture_layout_incomplete")
+          let lines = frameLines as? [CTLine], !lines.isEmpty else {
+        let reportedFrameAttributes = CTFrameGetFrameAttributes(frame) as NSDictionary
+        throw OracleError.diagnostic("original_fixture_layout_incomplete", [
+            "visible_range": [visible.location, visible.length],
+            "requested_range": [0, 0], "utf16_count": text.utf16.count,
+            "line_count": CFArrayGetCount(frameLines),
+            "frame_rect": [Double(rectangle.minX), Double(rectangle.minY),
+                           Double(rectangle.width), Double(rectangle.height)],
+            "requested_frame_progression": frameAttributes[kCTFrameProgressionAttributeName as String] ?? NSNull(),
+            "reported_frame_progression": reportedFrameAttributes[kCTFrameProgressionAttributeName] ?? NSNull(),
+            "vertical_forms": direction == "ttb", "construction": fixtureConstruction,
+            "requested_font": fixtureIdentity(font, expected, absent)])
     }
     var lineOrigins = [CGPoint](repeating: .zero, count: lines.count)
     CTFrameGetLineOrigins(frame, CFRange(location: 0, length: 0), &lineOrigins)
@@ -169,7 +224,14 @@ func fixtureSnapshot(_ font: CTFont, _ request: [String: Any],
                 throw OracleError.invalid("original_fixture_run_font_missing")
             }
             let runFont = value as! CTFont
-            try verifyFixture(runFont, expected, absent)
+            do { try verifyFixture(runFont, expected, absent) }
+            catch {
+                throw OracleError.diagnostic("actual_run_fixture_identity_failed", [
+                    "cause": String(describing: error), "construction": fixtureConstruction,
+                    "line": lineIndex, "run": runNumber,
+                    "requested_font": fixtureIdentity(font, expected, absent),
+                    "actual_run_font": fixtureIdentity(runFont, expected, absent)])
+            }
             guard observedAxes(runFont) == observedAxes(font) else {
                 throw OracleError.invalid("original_fixture_run_changed_observed_axes")
             }
@@ -271,7 +333,9 @@ func originalGPOSMain() throws {
                 success += 1
             }
         } catch {
-            try emit(["type": "request_error", "request": request, "error": String(describing: error)])
+            var record = nativeErrorRecord(error, "request_error")
+            record["request"] = request
+            try emit(record)
             errors += 1
         }
     }
@@ -279,7 +343,7 @@ func originalGPOSMain() throws {
     if errors != 0 { exit(3) }
 }
 do { try originalGPOSMain() }
-catch { try? emit(["type": "fatal", "error": String(describing: error)]); exit(2) }
+catch { try? emit(nativeErrorRecord(error, "fatal")); exit(2) }
 '''
 
 
