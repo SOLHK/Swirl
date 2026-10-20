@@ -15,6 +15,7 @@ import math
 import os
 from pathlib import Path
 import platform
+import re
 import subprocess
 import tempfile
 
@@ -25,7 +26,7 @@ from axis_a3_input_cases import (SELECTED_FACES, conditional_lower_bound,
                                  input_cases, representations)
 from probe_axis_anchor import (EXPECTED, LIMIT, METRIC_GIDS, TAGS, NativeOracle,
     add_control, axis_records, check_metadata, checked_batch, conditioned_grid,
-    control_stats, declare_readback, declared_mappings, diagnostic_failure,
+    control_stats, declare_readback, declared_mappings, diagnostic_failure as upstream_diagnostic_failure,
     infer_at_axis_nodes, raw_coretext_paths, replay_audit, require, same_json,
     same_private_payload, source_identities)
 from verified_axis_oracle import ENVELOPE, SCALARS, VECTORS, finite_number
@@ -33,6 +34,21 @@ from verified_axis_oracle import ENVELOPE, SCALARS, VECTORS, finite_number
 
 LOSSY_MODES = ("anchor_binary32", "anchor_fixed16", "copy_cfnumber_float32")
 PAIR_GROUPS = ("existing_collision", "fixed_only_collision", "float32_only_collision")
+A3_NATIVE_ERROR_CODES = frozenset((
+    "a3_value_outside_fixed16_range", "a3_nonfinite_input", "a3_nonfinite_float32_input",
+    "a3_constructor_mode_missing_or_unknown", "a3_unverified_base", "a3_axis_missing",
+    "a3_size_or_matrix_changed", "a3_scalar_count_invalid"))
+
+
+def diagnostic_failure(error):
+    """Retain only known A3 codes from the native transport's error wrapper."""
+    result = upstream_diagnostic_failure(error)
+    match = re.fullmatch(
+        r"(?:native request [0-9]+ face [0-9]+ failed|native oracle startup failed): ([A-Za-z0-9_]{1,160})",
+        str(error))
+    if match and match.group(1) in A3_NATIVE_ERROR_CODES:
+        result["native_failure_code"] = match.group(1)
+    return result
 
 
 def submitted_location(location, mode):

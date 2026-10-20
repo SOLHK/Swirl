@@ -22,7 +22,9 @@ import axis_a3_constructor_harness as a3
 import anchor_construction_harness as anchor
 from compare_axis_construction import EXPECTED, GUARD
 from axis_a3_input_cases import fixed16_input
-from probe_axis_a3_construction import check_scalar_report, compare_records, submitted_location
+from probe_axis_a3_construction import (check_scalar_report, compare_records,
+                                       diagnostic_failure, submitted_location)
+from rebuild import ReconstructionError
 from test_verified_axis_oracle import native_record
 
 
@@ -253,6 +255,47 @@ class AxisA3DriverComparisons(unittest.TestCase):
             submitted_location(location, "typo_unknown_mode")
         with self.assertRaisesRegex(ValueError, "a3_complete_three_axes_required"):
             submitted_location({"wght": 499.006199}, "copy_binary64")
+
+
+class AxisA3FailureEvidence(unittest.TestCase):
+    def test_new_native_guard_codes_survive_request_and_startup_wrappers(self):
+        # Use real transport exception objects and independently name the
+        # guards. The expected result must not depend on the allowlist itself.
+        codes = ("a3_value_outside_fixed16_range", "a3_nonfinite_input",
+                 "a3_nonfinite_float32_input", "a3_constructor_mode_missing_or_unknown",
+                 "a3_unverified_base", "a3_axis_missing", "a3_size_or_matrix_changed",
+                 "a3_scalar_count_invalid")
+        for prefix in ("native request 31 face 15 failed: ", "native oracle startup failed: "):
+            for code in codes:
+                with self.subTest(prefix=prefix, code=code):
+                    error = ReconstructionError(prefix + code, native_observation={
+                        "commands": [["moveTo", 1234.56789, 8765.4321]],
+                        "advance_width": 432.5, "source": "PRIVATE_A3_SOURCE_SENTINEL"})
+                    self.assertEqual(diagnostic_failure(error), {
+                        "failure_type": "ReconstructionError", "native_failure_code": code})
+
+    def test_upstream_named_native_and_local_failures_remain_classified(self):
+        error = ReconstructionError("native request 1 face 15 failed: anchor_optical_inheritance_mismatch")
+        self.assertEqual(diagnostic_failure(error), {
+            "failure_type": "ReconstructionError", "native_failure_code": "anchor_optical_inheritance_mismatch"})
+        self.assertEqual(diagnostic_failure(ValueError("a3_native_scalar_count_mismatch")), {
+            "failure_type": "ValueError", "failure_code": "a3_native_scalar_count_mismatch"})
+
+    def test_unknown_wrapped_codes_and_raw_payloads_are_not_published(self):
+        messages = (
+            "native request 1 face 15 failed: a3_future_unknown_code",
+            "native oracle startup failed: a3_future_unknown_code",
+            "native request 1 face 15 failed: a3_size_or_matrix_changed_extra",
+            "native request 1 face 15 failed: a3_size_or_matrix_changed: 432.5",
+            'native request 1 face 15 failed: {"advance_width":432.5,"commands":[["moveTo",1234.56789,8765.4321]]}',
+            "native request 1 face 15 failed: a3_size_or_matrix_changed\nPRIVATE_A3_SOURCE_SENTINEL",
+            "PRIVATE_A3_SOURCE_SENTINEL a3_size_or_matrix_changed",
+            "native oracle startup failed: /private/PRIVATE_A3_SOURCE_SENTINEL.ttf",
+        )
+        for message in messages:
+            with self.subTest(message=message):
+                error = ReconstructionError(message, native_observation={"source": "PRIVATE_A3_SOURCE_SENTINEL"})
+                self.assertEqual(diagnostic_failure(error), {"failure_type": "ReconstructionError"})
 
 
 class AxisA3ScalarReportControls(unittest.TestCase):
