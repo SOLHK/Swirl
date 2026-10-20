@@ -102,3 +102,55 @@ jobs:
             build/d1/metrics/*.log
             build/d1/metrics/*.png
           retention-days: 7
+
+  original-source-baseline:
+    # Reuse the repository's existing native host. Never upload its source font
+    # or the private report containing font-level metrics/table identities.
+    runs-on: xcode-27
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned read-only baseline dependency
+        run: python -m pip install fonttools==4.61.1
+      - name: Measure exact original source identity and strict axis readback
+        run: |
+          python tools/swirl_vf/platform/macos_source_baseline.py \
+            /System/Library/PrivateFrameworks/FontServices.framework/Versions/A/Resources/Reserved/PingFangUI.ttc \
+            --expected-sha256 39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890 \
+            --output build/d1-private-original-baseline
+      - name: Export only fixed aggregate fields
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          private = Path('build/d1-private-original-baseline/baseline.json')
+          if not private.is_file():
+              raise SystemExit('Original baseline did not produce a report; not accepted')
+          report = json.loads(private.read_text())
+          summary = report['summary']
+          safe = {key: summary[key] for key in (
+              'status', 'face_count', 'physical_faces_verified', 'axis_requests',
+              'axis_strict_passes', 'font_generated', 'windows11_acceptance')}
+          safe.update({key: report[key] for key in (
+              'source_sha256', 'source_bytes', 'extractor_sha256', 'harness_sha256', 'source_unchanged')})
+          safe['scope'] = 'source_identity_and_finite_strict_readback_only'
+          safe['os_version'] = report['native']['os_version']
+          output = Path('build/d1-public-original-summary')
+          output.mkdir(parents=True, exist_ok=True)
+          (output / 'summary.json').write_text(json.dumps(safe, indent=2, allow_nan=False))
+          print(json.dumps(safe, allow_nan=False))
+          PY
+      - name: Preserve aggregate original baseline only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: d1-original-baseline-aggregate-${{ github.sha }}
+          path: build/d1-public-original-summary/summary.json
+          retention-days: 7

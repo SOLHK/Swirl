@@ -241,3 +241,26 @@ code hashes. It does not perform a production rebuild or change A3/B1/C1.
 Its terminal result will be recorded separately; no incomplete comparison is
 counted as full-GID PASS here. Private commands/scripts remain under
 `build/vf-d1-private/`; original source data and native logs are not public CI input.
+
+## D2 fresh design coordinates and matching-host CoreText follow-up
+
+A predeclared `random.Random(20261021)` sample of 64 GIDs at three new mixed
+normalized design locations completed **192/192** comparisons with Apple HVF.
+Locations: `[-.9375,.8125,-.6875]`, `[.123456789,-.7654321,.3456789]`,
+`[.9999,-.9999,.0001]`. Legacy comparator failures: **0**; unchanged 1/32 budget;
+maximum point error **4.547473508864641e-13 FUnit**; input unchanged.
+This extends finite design-space coverage; it is not user-coordinate mapping,
+metrics, all-axis continuity or Windows acceptance. Private reproducible driver
+and safe result: `build/vf-d1-private/compare_fresh_design.py` and
+`fresh-design-comparison.json`. No algorithms were altered for this result.
+
+The dedicated workflow now additionally reuses the repository's existing
+`xcode-27` host to run the **same** baseline on the exact-hash original, using its
+existing system file. This does not replace or upgrade this local macOS 26.3.
+Only explicit aggregate keys (counts/status/source and code hashes/OS version)
+can reach stdout and the original-summary artifact. Full original baseline,
+font-level metrics, table identities and fonts are excluded. No private per-GID
+observations are requested. Existing synthetic jobs and the strict failing gate
+remain intact. YAML parsing/branch checks pass; this added native job has not
+executed at this checkpoint. Source mismatch/missing font/identity failure remains
+nonzero, not a fallback to a different installed font.
