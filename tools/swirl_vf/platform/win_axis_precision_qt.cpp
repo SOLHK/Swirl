@@ -1,6 +1,7 @@
 // Original Swirl D1 synthetic-font experiment. No Apple outlines or font data.
 // Build with Qt 6.9+ Core/Gui; run on Windows with the windows QPA plugin.
-// Usage: win_axis_precision_qt FONT OUTPUT_DIR [--installed] [--reverse]
+// Usage: win_axis_precision_qt FONT OUTPUT_DIR [--installed] [--reverse-order]
+#include "../../../src/Swirl.Quick/app/FontAxisPolicy.h"
 #include <QByteArray>
 #include <QCoreApplication>
 #include <QCryptographicHash>
@@ -22,6 +23,7 @@
 #include <QMap>
 #include <QPainter>
 #include <QPainterPath>
+#include <QProcess>
 #include <QRawFont>
 #include <QSysInfo>
 #include <QTextLayout>
@@ -158,12 +160,76 @@ struct Position {
     QString id;
     double wght, wdth, hght;
 };
+QVariantList policyMetadata(const Source &source)
+{
+    QVariantList metadata;
+    for (const auto &a : source.axes)
+        metadata.append(QVariantMap{{"tag", a.tag}, {"minimum", a.minimum},
+                                    {"defaultValue", a.defaultValue}, {"maximum", a.maximum}});
+    return metadata;
+}
+Position resolvedPosition(const QString &id, const QVariantMap &axes)
+{
+    for (const auto *tag : {"wght", "WDTH", "HGHT"})
+        require(axes.contains(tag) && std::isfinite(axes.value(tag).toDouble()), "Production policy omitted a physical coordinate");
+    return {id, axes.value("wght").toDouble(), axes.value("WDTH").toDouble(), axes.value("HGHT").toDouble()};
+}
+Position automaticPosition(const Source &source, int weight, const QString &id)
+{
+    FontAxisPolicy::Request request;
+    request.family = source.family; request.weight = weight; request.pixelSize = 24;
+    request.role = "body";
+    return resolvedPosition(id, FontAxisPolicy::resolve(policyMetadata(source), request));
+}
+Position manualPosition(const Source &source)
+{
+    FontAxisPolicy::Request request;
+    request.family = source.family; request.manual = true; request.pixelSize = 24;
+    const QVariantMap values{{"wght", 623.25}, {"WDTH", 137.5}, {"HGHT", 172.5}};
+    return resolvedPosition("mixed", FontAxisPolicy::resolve(policyMetadata(source), request, values));
+}
+int checkProductionPolicy(const Source &source, QFile &log)
+{
+    const auto metadata = policyMetadata(source);
+    int count = 0;
+    for (const int dpi : {96, 144, 192})
+        for (const double dpr : {1.0, 1.25, 1.5, 2.0}) {
+            for (const int weight : {400, 600}) {
+                FontAxisPolicy::Request request;
+                request.family = source.family; request.role = "body"; request.weight = weight;
+                request.pixelSize = 24; request.logicalDpi = dpi; request.devicePixelRatio = dpr;
+                const auto result = FontAxisPolicy::resolve(metadata, request);
+                require(result.size() == 3 && result.value("wght").toDouble() == weight
+                        && result.value("WDTH").toDouble() == source.axes["WDTH"].defaultValue
+                        && result.value("HGHT").toDouble() == source.axes["HGHT"].defaultValue,
+                        "Automatic production policy changed weight or unprofiled custom-axis defaults");
+                writeRecord(log, {{"record", "policy_observation"}, {"mode", "automatic"}, {"weight", weight},
+                                  {"logical_dpi", dpi}, {"dpr", dpr}, {"resolved_axes", QJsonObject::fromVariantMap(result)},
+                                  {"implementation", "existing_FontAxisPolicy_resolve"}});
+                ++count;
+            }
+            FontAxisPolicy::Request request;
+            request.family = source.family; request.manual = true; request.pixelSize = 24;
+            request.logicalDpi = dpi; request.devicePixelRatio = dpr;
+            const QVariantMap manual{{"wght", 623.25}, {"WDTH", 137.5}, {"HGHT", 172.5}, {"wdth", 88.0}};
+            const auto result = FontAxisPolicy::resolve(metadata, request, manual);
+            require(result.size() == 3 && !result.contains("wdth") && result.value("wght").toDouble() == 623.25
+                    && result.value("WDTH").toDouble() == 137.5 && result.value("HGHT").toDouble() == 172.5,
+                    "Manual production policy changed custom units or accepted wrong-case axis");
+            writeRecord(log, {{"record", "policy_observation"}, {"mode", "manual"}, {"logical_dpi", dpi}, {"dpr", dpr},
+                              {"resolved_axes", QJsonObject::fromVariantMap(result)}, {"wrong_case_wdth_rejected", true},
+                              {"implementation", "existing_FontAxisPolicy_resolve"}});
+            ++count;
+        }
+    return count;
+}
 QList<Position> positions(const Source &source)
 {
     const auto w = source.axes["wght"], d = source.axes["WDTH"], h = source.axes["HGHT"];
     const float center = float(499.006199);
     return {
-        {"default", w.defaultValue, d.defaultValue, h.defaultValue},
+        automaticPosition(source, 400, "default"),
+        automaticPosition(source, 600, "automatic_600"),
         {"pair_lo", 499.006199, d.defaultValue, h.defaultValue},
         {"pair_hi", 499.006201, d.defaultValue, h.defaultValue},
         {"float_prev", double(std::nextafter(center, -std::numeric_limits<float>::infinity())), d.defaultValue, h.defaultValue},
@@ -174,8 +240,7 @@ QList<Position> positions(const Source &source)
         {"WDTH_max", w.defaultValue, d.maximum, h.defaultValue},
         {"HGHT_min", w.defaultValue, d.defaultValue, h.minimum},
         {"HGHT_max", w.defaultValue, d.defaultValue, h.maximum},
-        {"mixed", 623.25, d.minimum + (d.maximum - d.minimum) * 0.5833333333333333,
-                            h.minimum + (h.maximum - h.minimum) * 0.8166666666666667}
+        manualPosition(source)
     };
 }
 QJsonObject requested(const Position &p)
@@ -191,7 +256,7 @@ QJsonObject floatRequested(const Position &p)
 }
 struct Observation { QJsonObject payload; QString rasterSha; QString png; double elapsedMs = 0; };
 Observation observe(const Source &source, const Position &position, double points, int logicalDpi,
-                    double dpr, const QString &png)
+                    double dpr, const QString &png, QJsonArray *diagnostic = nullptr)
 {
     QElapsedTimer timer; timer.start();
     QImage device(8, 8, QImage::Format_ARGB32_Premultiplied);
@@ -229,7 +294,17 @@ Observation observe(const Source &source, const Position &position, double point
     }
     const QString glyphText = QStringLiteral("A B\u4e2d\u6587");
     const auto glyphs = raw.glyphIndexesForString(glyphText);
+    // Extra calls are restricted to a fresh, explicitly diagnostic process.
+    // Main acceptance keeps its original observation order and no warm-up.
+    const auto checkpoint = [&](const char *stage) {
+        if (!diagnostic) return;
+        QJsonArray paths;
+        for (const auto gid : glyphs) paths.append(QJsonObject{{"gid", int(gid)}, {"path_px", pathElements(raw.pathForGlyph(gid))}});
+        diagnostic->append(QJsonObject{{"stage", stage}, {"raw_pixel_size", raw.pixelSize()}, {"paths", paths}});
+    };
+    checkpoint("before_raw_advances");
     const auto advances = raw.advancesForGlyphIndexes(glyphs);
+    checkpoint("after_raw_advances");
     require(glyphs.size() == glyphText.size() && advances.size() == glyphs.size(), "Incomplete original glyph sample");
     QJsonArray glyphPayload;
     int nonEmpty = 0;
@@ -242,9 +317,11 @@ Observation observe(const Source &source, const Position &position, double point
                                        {"advance_px", point(advances[i])}, {"path_px", pathElements(path)}});
     }
     require(nonEmpty == 4, "Unexpected empty original synthetic outlines");
+    checkpoint("after_raw_paths");
     const QString text = QStringLiteral("AB \u4e2d\u6587 AB");
     QFontMetricsF metrics(font, &device);
     const double width = metrics.horizontalAdvance(text), lineHeight = metrics.height();
+    checkpoint("after_qfontmetrics");
     require(std::isfinite(width) && width > 0 && width < 10000 && std::isfinite(lineHeight) && lineHeight > 0 && lineHeight < 1000,
             "Invalid or excessive synthetic text metrics");
     QTextLayout layout(text, font, &device);
@@ -255,6 +332,7 @@ Observation observe(const Source &source, const Position &position, double point
     require(line.isValid(), "Text layout produced no line");
     line.setLineWidth(100000);
     layout.endLayout();
+    checkpoint("after_textlayout_creation");
     require(line.textLength() == text.size() && layout.lineCount() == 1, "Incomplete mixed text layout");
     QJsonArray runPayload;
     QRectF actualInk;
@@ -278,6 +356,7 @@ Observation observe(const Source &source, const Position &position, double point
                                       {"paths_px", runPaths}, {"advances_px", runAdvances}});
     }
     require(glyphCount == text.size(), "Mixed text did not yield every expected authored glyph");
+    checkpoint("after_actual_run_paths");
     const QPointF origin(24 - std::min(0.0, actualInk.left()), 24 - std::min(0.0, actualInk.top()));
     const int imageWidth = qCeil((std::max({width, line.naturalTextWidth(), actualInk.right()}) + origin.x() + 24) * dpr);
     const int imageHeight = qCeil((std::max({lineHeight, line.height(), actualInk.bottom()}) + origin.y() + 24) * dpr);
@@ -291,6 +370,14 @@ Observation observe(const Source &source, const Position &position, double point
         painter.setPen(Qt::black);
         painter.setRenderHint(QPainter::TextAntialiasing, true);
         layout.draw(&painter, origin);
+    }
+    checkpoint("after_raster");
+    if (diagnostic) {
+        const auto reacquired = QRawFont::fromFont(font);
+        verifyIdentity(reacquired, source);
+        QJsonArray paths;
+        for (const auto gid : glyphs) paths.append(QJsonObject{{"gid", int(gid)}, {"path_px", pathElements(reacquired.pathForGlyph(gid))}});
+        diagnostic->append(QJsonObject{{"stage", "after_rawfont_reacquisition"}, {"raw_pixel_size", reacquired.pixelSize()}, {"paths", paths}});
     }
     qsizetype inkPixels = 0;
     for (int y = 0; y < image.height(); ++y) {
@@ -339,16 +426,17 @@ int main(int argc, char **argv)
     QGuiApplication app(argc, argv);
     const auto arguments = app.arguments();
     if (arguments.size() < 3) {
-        std::fputs("Usage: win_axis_precision_qt FONT OUTPUT_DIR [--installed] [--reverse]\n", stderr); return 2;
+        std::fputs("Usage: win_axis_precision_qt FONT OUTPUT_DIR [--installed] [--reverse-order]\n", stderr); return 2;
     }
-    bool installed = false, reverse = false;
+    bool installed = false, reverse = false, diagnosePathState = false;
     for (int i = 3; i < arguments.size(); ++i) {
         if (arguments[i] == "--installed") installed = true;
-        else if (arguments[i] == "--reverse") reverse = true;
+        else if (arguments[i] == "--reverse-order") reverse = true;
+        else if (arguments[i] == "--diagnose-path-state") diagnosePathState = true;
         else { std::fputs("Unknown argument\n", stderr); return 2; }
     }
     const QString output = QDir(arguments[2]).absolutePath();
-    QFile log(QDir(output).filePath("qt-axis-precision.jsonl"));
+    QFile log(QDir(output).filePath(diagnosePathState ? "qt-path-state-diagnostic.jsonl" : "qt-axis-precision.jsonl"));
     int fontId = -1, observations = 0, pairs = 0, repeated = 0;
     QList<double> durations;
     try {
@@ -356,6 +444,36 @@ int main(int argc, char **argv)
         require(QDir().mkpath(output), "Cannot create evidence directory");
         require(!QFileInfo::exists(log.fileName()) && log.open(QIODevice::WriteOnly | QIODevice::NewOnly), "Use a new evidence directory");
         const Source source = sourceFont(arguments[1]);
+        if (diagnosePathState) {
+            writeRecord(log, {{"record", "diagnostic_header"}, {"schema", 1}, {"input_sha256", source.sha256},
+                              {"qt_version", QString::fromLatin1(qVersion())}, {"requested_qpa", qEnvironmentVariable("QT_QPA_PLATFORM")},
+                              {"load_mode", installed ? "system_installed" : "application_private"},
+                              {"experiment", "fresh_process_path_state_with_extra_measurement_calls"},
+                              {"acceptance", "DIAGNOSTIC_ONLY_PRIMARY_FAILURE_RETAINED"}});
+            if (installed) {
+                require(QFontDatabase::families().contains(source.family), "Diagnostic fixture is not installed");
+            } else {
+                require(!QFontDatabase::families().contains(source.family), "Diagnostic private font was already installed");
+                fontId = QFontDatabase::addApplicationFont(arguments[1]);
+                require(fontId >= 0 && QFontDatabase::applicationFontFamilies(fontId).contains(source.family), "Diagnostic registration failed");
+            }
+            QList<Position> probes{{"same_input_first", 499.006199, source.axes["WDTH"].defaultValue, source.axes["HGHT"].defaultValue},
+                                   {"same_input_repeated", 499.006199, source.axes["WDTH"].defaultValue, source.axes["HGHT"].defaultValue},
+                                   {"other_decimal_same_float", 499.006201, source.axes["WDTH"].defaultValue, source.axes["HGHT"].defaultValue}};
+            for (const auto &probe : probes) {
+                QJsonArray checkpoints;
+                const auto result = observe(source, probe, 9, 96, 1, QDir(output).filePath(probe.id + ".png"), &checkpoints);
+                writeRecord(log, {{"record", "path_state_diagnostic"}, {"case_id", probe.id}, {"requested_decimal", requested(probe)},
+                                  {"api_float32", floatRequested(probe)}, {"checkpoints", checkpoints}, {"payload", result.payload}});
+            }
+            if (fontId >= 0) { require(QFontDatabase::removeApplicationFont(fontId), "Diagnostic removal failed"); fontId = -1; }
+            writeRecord(log, {{"record", "diagnostic_summary"}, {"status", "DIAGNOSTIC_COMPLETED_NOT_ACCEPTANCE"}, {"observations", 3}});
+            return 0;
+        }
+        const auto cases = positions(source);
+        const int passes = installed ? 2 : 3;
+        QJsonArray caseIds;
+        for (const auto &p : cases) caseIds.append(p.id);
         QJsonArray axes;
         for (const auto &a : source.axes) axes.append(QJsonObject{{"tag", a.tag}, {"minimum", a.minimum}, {"default", a.defaultValue}, {"maximum", a.maximum}});
         QJsonObject tableHashes;
@@ -367,7 +485,13 @@ int main(int argc, char **argv)
                           {"backend_identity", "requested_platform_and_public_axis_behavior; private_engine_class_not_queried"},
                           {"os_product", QSysInfo::prettyProductName()}, {"kernel_version", QSysInfo::kernelVersion()},
                           {"load_mode", installed ? "system_installed" : "application_private"}, {"reverse", reverse},
-                          {"float_bytes", int(sizeof(float))}, {"qreal_bytes", int(sizeof(qreal))}, {"original_font_acceptance", "NOT_RUN"}});
+                          {"float_bytes", int(sizeof(float))}, {"qreal_bytes", int(sizeof(qreal))},
+                          {"case_ids", caseIds}, {"point_sizes", QJsonArray{9, 12, 18}}, {"logical_dpis", QJsonArray{96, 144}},
+                          {"dprs", QJsonArray{1, 1.25, 1.5, 2}}, {"pass_count", passes},
+                          {"expected_observations", int(cases.size()) * 24 * passes}, {"expected_pair_comparisons", 24 * passes},
+                          {"expected_exact_replays", int(cases.size()) * 24 * (passes - 1)}, {"expected_policy_checks", 36},
+                          {"original_font_acceptance", "NOT_RUN"}});
+        const int policyChecks = checkProductionPolicy(source, log);
         if (installed) {
             require(QFontDatabase::families().contains(source.family), "Fixture family is not system-installed before any app font registration");
         } else {
@@ -381,10 +505,8 @@ int main(int argc, char **argv)
             fontId = QFontDatabase::addApplicationFont(arguments[1]);
             require(fontId >= 0 && QFontDatabase::applicationFontFamilies(fontId).contains(source.family), "Cannot privately register authored fixture family");
         }
-        const auto cases = positions(source);
         require(floatBits(float(499.006199)) == floatBits(float(499.006201)), "Unexpected binary32 pair conversion");
         QMap<QString, QJsonObject> first;
-        const int passes = installed ? 2 : 3;
         for (int pass = 0; pass < passes; ++pass) {
             if (pass == 2) {
                 require(QFontDatabase::removeApplicationFont(fontId), "Application font removal failed"); fontId = -1;
@@ -438,7 +560,8 @@ int main(int argc, char **argv)
         QFile input(arguments[1]); require(input.open(QIODevice::ReadOnly) && hash(input.readAll()) == source.sha256, "Input font changed during the run");
         std::sort(durations.begin(), durations.end());
         const QJsonObject summary{{"record", "summary"}, {"status", "PASS_QT_SYNTHETIC"}, {"observations", observations},
-                                  {"pair_comparisons", pairs}, {"exact_replays", repeated}, {"physical_axis_effects_verified", 3},
+                                  {"pair_comparisons", pairs}, {"exact_replays", repeated}, {"production_policy_checks", policyChecks},
+                                  {"physical_axis_effects_verified", 3},
                                   {"application_reload", installed ? "NOT_APPLICABLE" : "PASS"},
                                   {"elapsed_median_ms_including_evidence", durations[durations.size() / 2]},
                                   {"elapsed_p95_ms_including_evidence", durations[(durations.size() - 1) * 95 / 100]},
@@ -454,6 +577,18 @@ int main(int argc, char **argv)
                                   {"observations", observations}, {"pair_comparisons", pairs}, {"exact_replays", repeated},
                                   {"original_font_acceptance", "NOT_RUN"}};
         if (log.isOpen()) { try { writeRecord(log, failure); } catch (...) {} }
+        const QString error = QString::fromUtf8(e.what());
+        if (!diagnosePathState && (error.contains("actual pair outputs") || error.contains("reverse/reload replay"))) {
+            // Isolate additional observations in a fresh process; never warm or
+            // retry the primary observation to turn its failure into a pass.
+            QProcess child;
+            QStringList childArguments{arguments[1], QDir(output).filePath("path-state-diagnostic"), "--diagnose-path-state"};
+            if (installed) childArguments.append("--installed");
+            child.setStandardOutputFile(QDir(output).filePath("path-state-child.stdout.log"));
+            child.setStandardErrorFile(QDir(output).filePath("path-state-child.stderr.log"));
+            child.start(QCoreApplication::applicationFilePath(), childArguments);
+            if (!child.waitForStarted(5000) || !child.waitForFinished(15000)) { child.kill(); child.waitForFinished(1000); }
+        }
         std::fputs(QJsonDocument(failure).toJson(QJsonDocument::Compact).constData(), stderr);
         std::fputc('\n', stderr);
         return 1;

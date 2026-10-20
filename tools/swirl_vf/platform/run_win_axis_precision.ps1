@@ -151,7 +151,9 @@ function Invoke-FixtureModes([string]$Font, [string]$FixtureName, [bool]$Install
             foreach ($backend in @('native', 'freetype')) {
                 $qtArguments = @()
                 if ($Installed) { $qtArguments += '--installed' }
-                if ($order -eq 'reverse') { $qtArguments += '--reverse' }
+                # --reverse belongs to QGuiApplication (layout direction), so
+                # use the probe-owned flag that survives Qt argument parsing.
+                if ($order -eq 'reverse') { $qtArguments += '--reverse-order' }
                 # Qt 6.10.3 accepts native/freetype/gdi. "directwrite" is not
                 # a recognized fontengine value and would silently use default.
                 Invoke-D1Probe -Executable $qtExe -Font $Font -Label "$FixtureName-qt-$backend-$mode-$order" -ReportName 'qt-axis-precision.jsonl' -ExpectedStatus 'PASS_QT_SYNTHETIC' -ExtraArguments $qtArguments -Platform "windows:fontengine=$backend"
@@ -207,13 +209,54 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Qt plugin directory is unavailable.' }
     $env:QT_QPA_PLATFORM_PLUGIN_PATH = Join-Path $qtPlugins 'platforms'
     $buildDirectory = Join-Path $resultDirectory 'build'
-    & cmake -S (Join-Path $PSScriptRoot 'win_axis_precision') -B $buildDirectory -G 'Visual Studio 17 2022' -A x64 *> (Join-Path $resultDirectory 'cmake-configure.log')
+    # windows-2025 currently carries VS 2026 while windows-2022 carries VS
+    # 2022. Select an installed C++ instance supported by this actual CMake;
+    # the runner label alone is not a compiler identity.
+    # https://cmake.org/cmake/help/latest/generator/Visual%20Studio%2018%202026.html
+    # https://cmake.org/cmake/help/latest/variable/CMAKE_GENERATOR_INSTANCE.html
+    $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
+    if (-not (Test-Path -LiteralPath $vswhere)) { throw 'Visual Studio Installer vswhere is unavailable.' }
+    $vsJson = & $vswhere -all -prerelease -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -format json -utf8
+    if ($LASTEXITCODE -ne 0) { throw 'Visual Studio C++ instance discovery failed.' }
+    $instances = @($vsJson | ConvertFrom-Json -AsHashtable)
+    $capabilitiesJson = & cmake -E capabilities
+    if ($LASTEXITCODE -ne 0) { throw 'Could not read actual CMake generator capabilities.' }
+    $capabilities = $capabilitiesJson | ConvertFrom-Json -AsHashtable
+    $generatorNames = @($capabilities.generators | ForEach-Object { $_.name })
+    $generator = ''
+    $selectedInstance = $null
+    foreach ($candidate in ($instances | Sort-Object { [version]$_.installationVersion } -Descending)) {
+        $major = ([version]$candidate.installationVersion).Major
+        $candidateGenerator = switch ($major) {
+            17 { 'Visual Studio 17 2022' }
+            18 { 'Visual Studio 18 2026' }
+            default { '' }
+        }
+        if ($candidateGenerator -and $generatorNames -contains $candidateGenerator) {
+            $generator = $candidateGenerator
+            $selectedInstance = $candidate
+            break
+        }
+    }
+    if (-not $generator -or $null -eq $selectedInstance) { throw 'No installed VS 2022/2026 C++ instance is supported by this CMake.' }
+    $report.cmake_version = $capabilities.version.string
+    $report.cmake_generator = $generator
+    $report.visual_studio_instance = @{
+        version = $selectedInstance.installationVersion
+        path = $selectedInstance.installationPath
+        display_name = $selectedInstance.displayName
+    }
+    $configureArguments = @('-S', (Join-Path $PSScriptRoot 'win_axis_precision'), '-B', $buildDirectory,
+        '-G', $generator, '-A', 'x64', ('-DCMAKE_GENERATOR_INSTANCE=' + $selectedInstance.installationPath))
+    Write-Output ('D1_TOOLCHAIN_REQUEST ' + (@{ cmake = $report.cmake_version; generator = $generator; instance = $report.visual_studio_instance } | ConvertTo-Json -Compress))
+    & cmake @configureArguments *> (Join-Path $resultDirectory 'cmake-configure.log')
     if ($LASTEXITCODE -ne 0) {
         Get-Content -LiteralPath (Join-Path $resultDirectory 'cmake-configure.log')
         throw 'Windows CMake configure failed.'
     }
     Copy-Item -LiteralPath (Join-Path $buildDirectory 'd1-toolchain.txt') -Destination $resultDirectory
     $toolchain = Get-Content -LiteralPath (Join-Path $buildDirectory 'd1-toolchain.txt') -Raw
+    $report.toolchain = $toolchain
     if ($toolchain -notmatch '(?m)^Qt=6\.10\.3\r?$' -or $toolchain -notmatch '(?m)^Compiler=MSVC\r?$' -or $toolchain -notmatch '(?m)^PointerSize=8\r?$') {
         throw 'Qt/compiler ABI toolchain evidence mismatch.'
     }

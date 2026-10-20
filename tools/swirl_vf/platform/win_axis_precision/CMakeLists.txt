@@ -11,6 +11,7 @@ target_compile_features(win_axis_precision_directwrite PRIVATE cxx_std_17)
 target_link_libraries(win_axis_precision_directwrite PRIVATE dwrite d2d1 windowscodecs ole32 bcrypt)
 
 add_executable(win_axis_precision_qt ../win_axis_precision_qt.cpp)
+target_sources(win_axis_precision_qt PRIVATE ../../../../src/Swirl.Quick/app/FontAxisPolicy.cpp)
 target_compile_features(win_axis_precision_qt PRIVATE cxx_std_17)
 target_link_libraries(win_axis_precision_qt PRIVATE Qt6::Core Qt6::Gui)
 
@@ -20,4 +21,4 @@ if(MSVC)
 endif()
 
 file(WRITE "${CMAKE_BINARY_DIR}/d1-toolchain.txt"
-  "Qt=${Qt6Core_VERSION}\nCompiler=${CMAKE_CXX_COMPILER_ID}\nCompilerVersion=${CMAKE_CXX_COMPILER_VERSION}\nPointerSize=${CMAKE_SIZEOF_VOID_P}\nWindowsSDK=${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}\n")
+  "Qt=${Qt6Core_VERSION}\nCompiler=${CMAKE_CXX_COMPILER_ID}\nCompilerVersion=${CMAKE_CXX_COMPILER_VERSION}\nCompilerPath=${CMAKE_CXX_COMPILER}\nPointerSize=${CMAKE_SIZEOF_VOID_P}\nWindowsSDK=${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}\nCMakeVersion=${CMAKE_VERSION}\nGenerator=${CMAKE_GENERATOR}\nGeneratorInstance=${CMAKE_GENERATOR_INSTANCE}\nPlatformToolset=${CMAKE_VS_PLATFORM_TOOLSET}\n")

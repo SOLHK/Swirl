@@ -6,6 +6,7 @@ tests cannot certify DirectWrite, Qt, system installation or the Apple font.
 from __future__ import annotations
 
 from decimal import Decimal
+import copy
 import hashlib
 import json
 import math
@@ -21,6 +22,7 @@ from fontTools.varLib.instancer import instantiateVariableFont
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "platform"))
 import make_win_axis_precision_fixture as fixture
+import analyze_win_axis_precision as evidence
 
 
 class WindowsAxisPrecisionFixtureTests(unittest.TestCase):
@@ -183,6 +185,231 @@ class WindowsAxisPrecisionFixtureTests(unittest.TestCase):
         self.assertEqual(saved["original_apple_acceptance"], "NOT_RUN")
         self.assertIn("not native outputs", saved["numeric_model_scope"])
         self.assertTrue(any("abstract fixture marks" in item for item in saved["limits"]))
+
+
+class WindowsAxisPrecisionEvidenceTests(unittest.TestCase):
+    """Reject broken evidence before any native-result claim is constructed.
+
+    Small parser envelopes exercise rejection paths. They are intentionally
+    incomplete observations and are never advertised as fake passing native
+    reports or used to establish a Windows numerical result.
+    """
+
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.directory = Path(self.temporary.name)
+
+    def tearDown(self):
+        self.temporary.cleanup()
+
+    def _write_log(self, rows, terminated=True):
+        path = self.directory / "native.jsonl"
+        path.write_text("\n".join(json.dumps(row, allow_nan=False) for row in rows)
+                        + ("\n" if terminated else ""), encoding="utf-8")
+        return path
+
+    def _envelope(self):
+        return [{"record": "header", "input_sha256": "a" * 64},
+                {"record": "observation"},
+                {"record": "summary", "status": "TEST_ENVELOPE_ONLY"}]
+
+    def test_json_rejects_duplicate_keys_at_any_depth(self):
+        for text in ('{"record":"header","record":"summary"}',
+                     '{"a":{"sha256":"x","sha256":"y"}}'):
+            with self.subTest(text=text), self.assertRaises(evidence.EvidenceError):
+                evidence.read_json(text)
+
+    def test_json_rejects_nonfinite_literals_and_numeric_overflow(self):
+        for token in ("NaN", "Infinity", "-Infinity", "1e999", "-1e999"):
+            with self.subTest(token=token), self.assertRaises(evidence.EvidenceError):
+                evidence.read_json('{"nested":[{"advance":' + token + '}]}')
+
+    def test_json_keeps_distinct_original_pair_and_case_sensitive_axes(self):
+        parsed = evidence.read_json('{"lo":499.006199,"hi":499.006201,"WDTH":100,"wdth":88}')
+        self.assertNotEqual(parsed["lo"], parsed["hi"])
+        self.assertEqual(parsed["WDTH"], 100)
+        self.assertEqual(parsed["wdth"], 88)
+
+    def test_read_log_rejects_truncated_eof_even_with_complete_last_json(self):
+        path = self._write_log(self._envelope(), terminated=False)
+        with self.assertRaisesRegex(evidence.EvidenceError, "terminator"):
+            evidence.read_log(path, "a" * 64, "TEST_ENVELOPE_ONLY")
+
+    def test_read_log_rejects_missing_duplicated_or_misplaced_boundaries(self):
+        header, observation, summary = self._envelope()
+        for label, rows in (
+                ("missing_footer", [header, observation, observation]),
+                ("duplicate_header", [header, header, observation, summary]),
+                ("duplicate_footer", [header, observation, summary, summary]),
+                ("misplaced_header", [observation, header, summary]),
+                ("misplaced_footer", [header, summary, observation])):
+            with self.subTest(label=label), self.assertRaises(evidence.EvidenceError):
+                evidence.read_log(self._write_log(rows), "a" * 64, "TEST_ENVELOPE_ONLY")
+
+    def test_read_log_rejects_wrong_identity_failed_footer_and_error_rows(self):
+        header, observation, summary = self._envelope()
+        for label, rows, expected_hash in (
+                ("wrong_font", [header, observation, summary], "b" * 64),
+                ("failure", [header, observation, {"record": "summary", "status": "FAILED"}], "a" * 64),
+                ("native_error", [header, {"record": "error", "error": "probe failed"}, summary], "a" * 64)):
+            with self.subTest(label=label), self.assertRaises(evidence.EvidenceError):
+                evidence.read_log(self._write_log(rows), expected_hash, "TEST_ENVELOPE_ONLY")
+
+    def test_read_log_rejects_non_object_records_without_uncaught_attribute_error(self):
+        header, _, summary = self._envelope()
+        for row in ([], None, "observation", 0, True):
+            with self.subTest(row=row), self.assertRaises(evidence.EvidenceError):
+                evidence.read_log(self._write_log([header, row, summary]), "a" * 64, "TEST_ENVELOPE_ONLY")
+
+    @staticmethod
+    def _triangle_stream():
+        z = fixture.float32_bits(0)
+        o = fixture.float32_bits(1)
+        return [1, 1, 2, 0, 3, 0, z, z, 4, 2, o, z, z, o, 6, 1]
+
+    def test_outline_decoder_reads_exact_float_coordinates(self):
+        self.assertEqual(evidence.outline_points(self._triangle_stream()), [(0, 0), (1, 0), (0, 1)])
+
+    def test_outline_decoder_rejects_incomplete_or_nonfinite_native_operations(self):
+        z = fixture.float32_bits(0)
+        cases = [[], [3], [7, 0], [6, 1], [4, 1, z, z],
+                 [3, 0, z, z], [3, 0, z, z, 3, 0, z, z, 6, 1],
+                 [3, 0, z, z, 5, 1, z, z, 6, 1],
+                 [3, 0, 0x7FC00000, z, 6, 1], [3, 0, z, 0x7F800000, 6, 1],
+                 [3, 0, True, z, 6, 1], [3, 0, -1, z, 6, 1],
+                 [3, 0, 2**32, z, 6, 1], [3, 0, 0.0, z, 6, 1]]
+        for operations in cases:
+            with self.subTest(operations=operations), self.assertRaises(evidence.EvidenceError):
+                evidence.outline_points(operations)
+
+    def test_outline_decoder_rejects_invalid_directwrite_enum_values(self):
+        for index in (1, 3, 5, 15):
+            operations = self._triangle_stream()
+            operations[index] = 99
+            with self.subTest(argument_index=index), self.assertRaises(evidence.EvidenceError):
+                evidence.outline_points(operations)
+
+    def test_empty_native_observation_set_and_qt_matrix_are_rejected(self):
+        font = {"sha256": "a" * 64}
+        empty = [{"record": "header", "input_sha256": font["sha256"]},
+                 {"record": "summary", "status": "PASS_DWRITE_SYNTHETIC"}]
+        with self.assertRaises(evidence.EvidenceError):
+            evidence.validate_native(self._write_log(empty), font, {"cases": []})
+        partial = [{"record": "header", "input_sha256": font["sha256"],
+                    "qt_version": "6.10.3", "qpa_platform": "windows"},
+                   {"record": "observation", "case_id": "default"},
+                   {"record": "summary", "status": "PASS_QT_SYNTHETIC"}]
+        with self.assertRaises(evidence.EvidenceError):
+            evidence.validate_qt(self._write_log(partial), font, installed=True)
+
+    def test_analyzer_rejects_empty_missing_and_duplicate_process_matrix(self):
+        manifest = fixture.write_fixture(self.directory / "fixtures")
+        (self.directory / "fixture-manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+        (self.directory / "requests.tsv").write_bytes((self.directory / "fixtures" / "requests.tsv").read_bytes())
+        # Labels alone are sufficient for this rejection gate; no fabricated
+        # font measurement or PASS payload is constructed.
+        labels = [f"{font}-dwrite-{mode}-{order}"
+                  for font in ("ordinary", "gain")
+                  for mode in ("private", "installed") for order in ("forward", "reverse")]
+        labels += [f"ordinary-qt-{backend}-{mode}-{order}"
+                   for backend in ("native", "freetype")
+                   for mode in ("private", "installed") for order in ("forward", "reverse")]
+        for label, chosen in (("empty", []), ("missing", labels[:-1]),
+                              ("duplicate", labels[:-1] + [labels[0]])):
+            report = {"status": "PASS_SYNTHETIC_WINDOWS_EXPERIMENT", "system_installation_requested": True,
+                      "source_commit": "a" * 40, "runs": [{"label": name} for name in chosen]}
+            (self.directory / "windows-axis-precision-run.json").write_text(json.dumps(report), encoding="utf-8")
+            with self.subTest(label=label), self.assertRaisesRegex(evidence.EvidenceError, "process matrix"):
+                evidence.analyze(self.directory, "a" * 40)
+
+    def test_process_header_cannot_substitute_load_order_or_qt_backend(self):
+        native = {"load_mode": "direct_file", "first_order": "forward"}
+        evidence.validate_process_header("ordinary-dwrite-private-forward", native)
+        for label in ("ordinary-dwrite-installed-forward", "ordinary-dwrite-private-reverse"):
+            with self.subTest(label=label), self.assertRaises(evidence.EvidenceError):
+                evidence.validate_process_header(label, native)
+        qt = {"load_mode": "application_private", "reverse": False, "requested_qpa": "windows:fontengine=native"}
+        evidence.validate_process_header("ordinary-qt-native-private-forward", qt)
+        for label in ("ordinary-qt-native-installed-forward", "ordinary-qt-native-private-reverse",
+                      "ordinary-qt-freetype-private-forward"):
+            with self.subTest(label=label), self.assertRaises(evidence.EvidenceError):
+                evidence.validate_process_header(label, qt)
+        with self.assertRaisesRegex(evidence.EvidenceError, "Harness header snapshot"):
+            evidence.validate_process_header("ordinary-dwrite-private-forward", native, {"header": {}})
+        with self.assertRaisesRegex(evidence.EvidenceError, "Harness Qt backend"):
+            evidence.validate_process_header("ordinary-qt-native-private-forward", qt,
+                                             {"header": qt, "platform_requested": "windows:fontengine=freetype"})
+
+    def test_native_metric_and_placement_gids_cannot_be_reordered(self):
+        for field in ("outline", "design_metrics", "natural_placement"):
+            row = {key: [{"gid": gid} for gid in (2, 3, 4, 5)]
+                   for key in ("outline", "design_metrics", "natural_placement")}
+            row[field][0]["gid"] = 5
+            with self.subTest(field=field), self.assertRaisesRegex(evidence.EvidenceError, "glyph identities: " + field):
+                evidence.validate_native_glyphs(row)
+
+    def test_native_raster_matrix_rejects_duplicate_dpr_wrong_size_or_digest(self):
+        rasters = [{"em": em, "dpr": dpr, "bounds": [0, 0, 1, 1], "bytes": 3, "sha256": "a" * 64}
+                   for em in (16, 32) for dpr in (1, 1.25, 1.5, 2)]
+        evidence.validate_native_rasters(rasters)
+        variants = []
+        duplicate = copy.deepcopy(rasters); duplicate[-1] = duplicate[0]; variants.append(duplicate)
+        wrong_bytes = copy.deepcopy(rasters); wrong_bytes[0]["bytes"] = 4; variants.append(wrong_bytes)
+        bad_hash = copy.deepcopy(rasters); bad_hash[0]["sha256"] = "z" * 64; variants.append(bad_hash)
+        empty_bounds = copy.deepcopy(rasters); empty_bounds[0]["bounds"] = [0, 0, 0, 1]; variants.append(empty_bounds)
+        variants.append(rasters[:-1])
+        for index, value in enumerate(variants):
+            with self.subTest(variant=index), self.assertRaises(evidence.EvidenceError):
+                evidence.validate_native_rasters(value)
+
+    def test_native_readback_cannot_hide_duplicate_tags_or_inconsistent_bits(self):
+        values = [{"tag": tag, "value": value, "bits": fixture.float32_bits(value)}
+                  for tag, value in (("wght", 400), ("WDTH", 100), ("HGHT", 100))]
+        evidence.validate_native_readback(values)
+        duplicate = copy.deepcopy(values); duplicate[-1] = duplicate[0]
+        inconsistent = copy.deepcopy(values); inconsistent[0]["bits"] += 1
+        for variant in ([], values[:-1], duplicate, inconsistent, [None]):
+            with self.subTest(variant=variant), self.assertRaises(evidence.EvidenceError):
+                evidence.validate_native_readback(variant)
+
+    def test_low_pair_rendering_comparison_does_not_include_api_readback(self):
+        first = {key: [] for key in evidence.NATIVE_FIELDS}
+        second = copy.deepcopy(first)
+        first["api_readback"] = [{"tag": "wght", "value": 100}]
+        second["api_readback"] = [{"tag": "wght", "value": 100.0000152587890625}]
+        self.assertNotEqual(first, second)
+        self.assertEqual(evidence.native_observables(first), evidence.native_observables(second))
+        second["natural_placement"] = [{"advance": 1}]
+        self.assertNotEqual(evidence.native_observables(first), evidence.native_observables(second))
+
+    def test_qt_policy_rejects_missing_duplicate_alias_and_changed_values(self):
+        rows = []
+        for dpi in (96, 144, 192):
+            for dpr in (1, 1.25, 1.5, 2):
+                for weight in (400, 600):
+                    rows.append({"record": "policy_observation", "mode": "automatic", "weight": weight,
+                                 "logical_dpi": dpi, "dpr": dpr, "resolved_axes": {"wght": weight, "WDTH": 100, "HGHT": 100},
+                                 "implementation": "existing_FontAxisPolicy_resolve"})
+                rows.append({"record": "policy_observation", "mode": "manual", "logical_dpi": dpi, "dpr": dpr,
+                             "resolved_axes": {"wght": 623.25, "WDTH": 137.5, "HGHT": 172.5},
+                             "wrong_case_wdth_rejected": True, "implementation": "existing_FontAxisPolicy_resolve"})
+        header, summary = {"expected_policy_checks": 36}, {"production_policy_checks": 36}
+        evidence.validate_qt_policy(rows, header, summary)
+        duplicate = copy.deepcopy(rows); duplicate[-1] = duplicate[0]
+        alias = copy.deepcopy(rows); alias[2]["resolved_axes"]["wdth"] = 88
+        wrong_weight = copy.deepcopy(rows); wrong_weight[1]["resolved_axes"]["wght"] = 400
+        for variant in ([], rows[:-1], duplicate, alias, wrong_weight):
+            with self.subTest(length=len(variant)), self.assertRaises(evidence.EvidenceError):
+                evidence.validate_qt_policy(variant, header, summary)
+
+    def test_qt_path_rejects_orphan_curve_data_and_nonfinite_coordinates(self):
+        evidence.validate_qt_path([[0, 0, 0], [1, 1, 0], [1, 0, 1], [1, 0, 0]])
+        evidence.validate_qt_path([], empty_allowed=True)
+        for path in ([], [[1, 0, 0]], [[0, 0, 0], [3, 1, 1]],
+                     [[0, 0, 0], [2, 1, 1], [3, 2, 2]],
+                     [[0, 0, 0], [1, float("nan"), 1]], [[0, 0, 0], [9, 1, 1]]):
+            with self.subTest(path=path), self.assertRaises(evidence.EvidenceError):
+                evidence.validate_qt_path(path)
 
 
 if __name__ == "__main__":

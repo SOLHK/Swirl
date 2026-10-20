@@ -9,6 +9,7 @@ on:
       - 'tools/swirl_vf/platform/win_axis_precision/**'
       - 'tools/swirl_vf/platform/make_win_axis_precision_fixture.py'
       - 'tools/swirl_vf/platform/run_win_axis_precision.ps1'
+      - 'tools/swirl_vf/platform/analyze_win_axis_precision.py'
       - 'tools/swirl_vf/tests/test_windows_axis_precision.py'
   workflow_dispatch:
 
@@ -60,10 +61,20 @@ jobs:
           target: desktop
           arch: win64_msvc2022_64
           cache: false
+          setup-python: false
       - name: Compile and run Windows precision, installation and Qt probes
         run: |
           ./tools/swirl_vf/platform/run_win_axis_precision.ps1 -FixtureDirectory build/d1-fixtures -OutputDirectory build/d1-evidence -InstallPerUserFont
           if ($LASTEXITCODE -ne 0) { throw 'Native D1 precision experiment failed; inspect preserved evidence' }
+      - name: Compare complete source-bound native observations
+        if: always()
+        run: |
+          if ((Test-Path -LiteralPath build/d1-evidence/windows-axis-precision-run.json) -and (Test-Path -LiteralPath build/d1-evidence/fixture-manifest.json)) {
+            python tools/swirl_vf/platform/analyze_win_axis_precision.py build/d1-evidence --expected-source-sha $env:GITHUB_SHA
+            if ($LASTEXITCODE -ne 0) { throw 'D1 cross-process analysis failed; incomplete or unequal evidence is not accepted' }
+          } else {
+            Write-Output 'D1 analysis NOT_RUN: native harness failed before creating the source-bound manifests.'
+          }
       - name: Publish source-bound evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -75,6 +86,9 @@ jobs:
             build/d1-evidence/**/*.log
             build/d1-evidence/**/*.txt
             build/d1-evidence/**/*.png
+            build/d1-evidence/**/*.tsv
+            build/d1-evidence/**/*.pgm
+            build/d1-evidence/**/*.bin
             build/d1-fixtures/manifest.json
             build/d1-fixtures/requests.tsv
           if-no-files-found: error
