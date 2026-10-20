@@ -1,0 +1,82 @@
+name: Swirl VF D1 Windows axis precision
+
+on:
+  push:
+    branches: [work/vf-windows-d1]
+    paths:
+      - '.github/workflows/swirl-vf-windows-d1.yml'
+      - 'tools/swirl_vf/platform/win_axis_precision*'
+      - 'tools/swirl_vf/platform/win_axis_precision/**'
+      - 'tools/swirl_vf/platform/make_win_axis_precision_fixture.py'
+      - 'tools/swirl_vf/platform/run_win_axis_precision.ps1'
+      - 'tools/swirl_vf/tests/test_windows_axis_precision.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: swirl-vf-windows-d1-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows-precision:
+    # Hosted Server VMs are actual Windows evidence, never Windows 11 evidence.
+    if: github.ref == 'refs/heads/work/vf-windows-d1' && !github.event.repository.private
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      QT_FORCE_STDERR_LOGGING: '1'
+      D1_RUNNER_LABEL: ${{ matrix.os }}
+    steps:
+      - name: Check out the exact D1 source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate and generate authored fixtures
+        run: |
+          python -m pip install fonttools==4.61.1
+          if ($LASTEXITCODE -ne 0) { throw 'Fixture dependency installation failed' }
+          python -m unittest discover -s tools/swirl_vf/tests -p test_windows_axis_precision.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'D1 fixture regression failed' }
+          python tools/swirl_vf/platform/make_win_axis_precision_fixture.py build/d1-fixtures
+          if ($LASTEXITCODE -ne 0) { throw 'Authored fixture generation failed' }
+      - name: Install the same Qt SDK as the Swirl font workflow
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.10.3'
+          host: windows
+          target: desktop
+          arch: win64_msvc2022_64
+          cache: false
+      - name: Compile and run Windows precision, installation and Qt probes
+        run: |
+          ./tools/swirl_vf/platform/run_win_axis_precision.ps1 -FixtureDirectory build/d1-fixtures -OutputDirectory build/d1-evidence -InstallPerUserFont
+          if ($LASTEXITCODE -ne 0) { throw 'Native D1 precision experiment failed; inspect preserved evidence' }
+      - name: Publish source-bound evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-VF-D1-${{ matrix.os }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            build/d1-evidence/**/*.json
+            build/d1-evidence/**/*.jsonl
+            build/d1-evidence/**/*.log
+            build/d1-evidence/**/*.txt
+            build/d1-evidence/**/*.png
+            build/d1-fixtures/manifest.json
+            build/d1-fixtures/requests.tsv
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 9
