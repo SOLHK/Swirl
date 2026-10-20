@@ -552,13 +552,118 @@ tests include failure preservation, exact replay, hidden payload changes,
 raw-record ordering, anchor/range logic and generated-source rejection. Exact
 native transport wrappers retain only a whitelist of public failure codes;
 arbitrary native error text and private payload remain excluded.
-Native compilation and execution are still pending at this source checkpoint.
-Next smallest task is to read the actual native run and all failed cases before
-considering any production constructor change.
+Native compilation and execution were pending when this source checkpoint was
+pushed; their subsequently retrieved final result follows below. No production
+constructor change is accepted by the diagnostic alone.
 
 Concurrent Core commit `8841244f17cfae92f0f025ad8ac00c5796a01fb0` was inspected
 and preserved by fast-forward. Its Qt JSON-reload test and evidence changes
 have no font-path overlap. No force push or overwrite was used.
+
+## A2 far-axis anchor native result: finite construction independence
+
+Exact source `aea46364186e0098cf432d0a3a7a1c0aa3c0d761` was pushed non-forcibly
+and independently confirmed at remote HEAD. Native
+[39388682680](https://github.com/SOLHK/Swirl/actions/runs/39388682680), job
+118514656189, completed **success** on macOS 27.0.1 / xcode-27. Its final log
+and artifact 12249245192 were retrieved; ZIP SHA-256 is
+`32f90fd81218bfc6c09be23a4d08c27f04b7db1589e9f564bfcf61eaf8bd7a71`.
+The report itself correctly says `COMPLETED_NATIVE_ANCHOR_DIAGNOSIS_NOT_ACCEPTANCE`.
+
+All ten independent native processes completed 1,472 requests / 7,360 glyph
+records, zero native errors, complete summary/EOF/exit and all 32 physical
+identities. The source hash remained unchanged. The actual total is **73,600
+records**. All **36,800 opposite-order pairs** match complete payload and
+readback exactly. All **7,360 original/replay batch checks** pass the unchanged
+production readback policy and exact complete-payload equality.
+
+The four anchor modes give identical full payloads and readbacks at every one
+of the 736 positions / 3,680 glyphs. This includes independent original/300/500
+initial bases, endpoint versus quarter-point anchors and mixed/random cases.
+Against the original one-copy production construction, each anchor changes
+31 positions / 155 glyph payloads and raw paths, while all 3,680 user-coordinate
+readbacks remain exactly equal. This independently confirms that matching an
+API echo cannot establish matching geometry. It also bounds the new result:
+the chosen construction removes the observed base-dependent behavior; it does
+not prove that every possible public CoreText construction is equivalent.
+
+The two predeclared global models distinguish the remaining arithmetic issue:
+
+| Construction / candidate | Exact HVAR positions | Preserved-Q geometry | Maximum point error | Direct native HVF/CoreText |
+| --- | ---: | ---: | ---: | ---: |
+| Original production / double-normalized16 | 699/736 | 3680/3680 | 0.01110839843784106 | Not requested for global model |
+| Original production / float32-normalized16 | 705/736 | 3680/3680 | 0.01110839843784106 | Not requested for global model |
+| Each far-anchor / double-normalized16 | 730/736 | 3680/3680 | 0.005554199218977374 | 72/72 within budget; max 0.005370084551472587 |
+| Each far-anchor / float32-normalized16 | **736/736** | **3680/3680** | **5.684341886080801e-13** | **72/72 exactly zero** |
+
+Both models apply the predeclared C=T(T(x)) user coordinate. The second casts
+only the result of double-precision normalization to float32, then truncates
+to 16 normalized fractional bits, evaluates untouched raw ordered avar records
+(including repeats and zero behavior), and finally rounds to F2DOT14. It does
+not cast the input user coordinate or every arithmetic operation to float32.
+The six remaining double-model HVAR disagreements are faces 20/24/31 at
+wght=299.9817, with either default WDTH/HGHT or WDTH=600.5859375, HGHT=250.
+The float32-result candidate removes all six and matches independent native
+geometry, rather than merely fitting the previously archived HVAR observations.
+
+Each anchor retains **two legacy `segment_types_differ` results**, face 10 /
+GID 19177 at (WDTH=600.5859375,wght=400.01,HGHT=250), and face 15 / GID 19177
+at (1,100,1). The already-native-validated preserved-Q comparison passes these
+without relaxing 1/32, altering paths or concealing the old failures. The
+original production control retains three legacy type rejections. Each mode
+also has 435 eligible conditional HVAR grid inferences and 40 selected
+conditional native HVF comparisons, all with zero geometry error. Conditional
+results remain distinct from the global model; the native HVF cache contains
+84 actual unique invocations and is never a CoreText instance cache.
+
+**Production mapping and construction remain unchanged.** The next smallest
+task is the same predeclared model/construction on all 32 faces, the old 3,048
+locations, the existing structural GIDs and fresh held-out points, with exact
+replay and independent native geometry. Do not call the finite 736-position
+result continuous-space losslessness, or declare the historical 141 cases
+fully resolved before the expanded real-source comparison.
+
+## Same-source strict metric evidence rechecked, without rerunning old hypotheses
+
+Same-source [39388682346](https://github.com/SOLHK/Swirl/actions/runs/39388682346)
+finished with Python and Windows synthetic DirectWrite **success**, Apple
+**failure**. Job 118514654842's actual log and final artifact 12248497276 were
+read. ZIP SHA-256:
+`418efaf1b82b0141fc8064d498c89f3bfa463f19a345161da9d142b24725b1bb`.
+The artifact records macOS 27.0.1 build 26A434 / Xcode 27.0 build 27A266a;
+commit.txt and all three bound extractor/metric-test/diagnostic source hashes
+match this source. The 22 production Swift axis guards pass. Native extraction
+exit 0 still accompanies **strict FAIL**: face 0 / GID 2 at all-min axes,
+raw vertical CGSize.width **849 vs 850**, tolerance **0.03125**.
+
+The current 144-observation three-path diagnostic has gvar-only **30/48** and
+equivalent HVAR/VVAR with explicit bearing maps **4/48** outside budget; older
+29/48 and 6/48 counts must not be reused for this run. The 1,044 equivalent
+standard coefficients still have zero error. At integer height endpoints,
+gvar-only 849/1149 becomes 850/1150 with the equivalent tables. At the internal
+fractional positions, the ideal 1063.3375 becomes 1062 in gvar-only and 1063
+with the equivalent tables: **0.3375 FUnit remains**. Face 1 / UPEM 1128 also
+has gvar-only default height 999 versus 1000, so this is not solely nondefault
+variation behavior. No OS or code cause is inferred merely from changed counts.
+
+The four-size precision report has 2,088 observations and 2,784 measured CTRun
+advances. Every normalized direct metric dictionary is exactly the same at
+0.25/1/16/64 times UPEM, and every measured CTRun advance exactly matches its
+direct counterpart. Per-size outside-budget counts remain 107/174 for
+gvar-only and 4/174 for either table variant. Production HVAR/VVAR's origin Y
+still differs by 0.335; explicit bearing maps reduce that to
+0.00394531250003638, but neither removes the fractional height loss.
+
+Static instances match all their own serialized advance widths/heights
+exactly. Their **20/48** raw-origin failures consist of 16 blank glyphs and
+four odd-width half origins (width 735, raw X 367 vs table half-width 367.5).
+Static 1063 vs ideal 1063.3375 is a serialization loss, distinct from raw API
+loss against a continuous variable-table model. SourceTables reconstruction
+still explicitly retains the old strict FAIL; its 174 path/table checks and
+two six-record static groups are not raw API acceptance. The existing local
+16.16/phantom hypothesis has 42/42 matching predictions on 14 nondefault
+GID-2 samples, but no independent UPEM-1024 or translated-phantom experiment
+has yet isolated its mechanism. Do not repeat the old size/CTRun experiments.
 
 ## Newly retrieved prior evidence (not new execution in this continuation)
 
