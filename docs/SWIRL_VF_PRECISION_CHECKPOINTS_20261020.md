@@ -60,6 +60,51 @@ Linux has no CoreText/Swift runtime. The exact pushed source has now executed
 the new Swift cases on xcode-27, as recorded above; local harness tests alone
 were never counted as native success.
 
+## A2 diagnostic checkpoint: retain the full metric-consistent interval
+
+This checkpoint changes only diagnostic `calibrate_avar_metrics.py` and adds
+`tests/test_axis_inference_intervals.py`; it does not change the production
+mapper, any raw avar record, or any tolerance. The existing least-squares
+best fit and `possible_interval` are retained for compatibility. A separate
+`tolerance_consistent_interval` intersects the four affine inequalities with
+the original branch domain. Rational arithmetic uses the exact supplied
+binary64 values; only the displayed interval endpoints convert back to float.
+Flat contradictions and empty intersections return null. A feasible interval
+does not reclassify a failure under the old least-squares acceptance decision.
+
+Local validation: **332/332 Python tests, zero skips, 6/6 audits**; full suite
+11.346 seconds; `git diff --check` passed. Eight new independent analytical
+cases cover positive/negative/mixed slopes, nonzero residual, clipped domains,
+flat branches, contradictory constraints and a feasible singleton whose old
+least-squares point still fails. Native execution of this checkpoint is pending;
+the exact commit and final Actions result will be recorded after the push.
+
+The original archive's best fits are identifiable in the zero-residual sense,
+but the 1/32 metric budget generally admits 7–23 neighboring F2DOT14 grid points
+for these four GIDs. The previous point interval must not be read as proof of a
+unique coordinate at that budget. The **141 simple-model disagreements remain
+unresolved**; HVAR agreement still does not establish geometry equivalence.
+
+The latest A1 cache experiment at `f72187f70d0af20fb197fb3e49389b53e8ce31a0`,
+[39379538202](https://github.com/SOLHK/Swirl/actions/runs/39379538202),
+again completed both independent construction orders, with 36 requests per
+order and no request/readback or repeated-request geometry/metric difference.
+For face 20 at default width/height, 300 to 300.01 changes native geometry and
+horizontal metrics, while 400 to 400.01 changes neither, in both orders.
+This is a concrete counterexample for the next threshold experiment, not a
+font-specific exception to add to production. Safe cache artifact 12244931341
+was downloaded and its ZIP SHA-256 checked:
+`d2aee64e54ec4627aba32372a87d0d3cbb0c312fb71717817cfbf4173e62143f`.
+
+The same run's rebuild job failed at the unchanged face 0 / GID 0 vertical
+origin X guard (100 FUnit versus 1e-5), after 91 completed batches and 5,824
+native observations. Zero GID models/faces completed; no original TTC exists.
+
+Next: fresh native threshold samples around the two equal-slope intervals and
+the discontinuous default, with original geometry plus HVAR, independent
+process order, and fresh held-out coordinates. Do not repeat the already-run
+cache experiment or choose per-point mapping exceptions.
+
 ## Newly retrieved prior evidence (not new execution in this continuation)
 
 - At exact source `056f7ea6dc7cf3a703da63e8522b89d33d1166f4`,

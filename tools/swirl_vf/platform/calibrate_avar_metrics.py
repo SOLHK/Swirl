@@ -10,6 +10,7 @@ A matching HVAR interpretation alone does not certify HVF geometry or a font.
 from __future__ import annotations
 import argparse
 import bisect
+from fractions import Fraction
 import hashlib
 import json
 import math
@@ -107,12 +108,40 @@ def candidate_map(records, value, policy, special_zero):
     return ordered_intervals(ordered,value)
 
 
+def _tolerance_consistent_interval(actual, base, endpoint, sign):
+    """Intersect all four affine metric constraints without a grid or sampling.
+
+    Rational arithmetic preserves the exact real inequalities defined by the
+    input binary64 values and the unchanged LIMIT. Only the final endpoints
+    are rounded to binary64 for JSON; None denotes an exactly empty intersection.
+    This diagnostic does not replace the existing least-squares acceptance.
+    """
+    lower, upper, epsilon = Fraction(0), Fraction(1), Fraction(LIMIT)
+    for measured, neutral, extreme in zip(actual, base, endpoint):
+        difference = Fraction(float(measured)) - Fraction(float(neutral))
+        slope = Fraction(float(extreme)) - Fraction(float(neutral))
+        if slope == 0:
+            if abs(difference) > epsilon:
+                return None
+            continue
+        a, b = (difference - epsilon) / slope, (difference + epsilon) / slope
+        lower, upper = max(lower, min(a, b)), min(upper, max(a, b))
+        if lower > upper:
+            return None
+    if sign < 0:
+        lower, upper = -upper, -lower
+    return [float(lower), float(upper)]
+
+
 def infer_weight_from_metrics(measured, negative, neutral, positive):
     """Invert two affine metric branches, independently of any avar hypothesis.
 
     Values are four-dimensional advance vectors at a fixed width location.
     A returned coordinate is diagnostic, not geometry or continuous-space proof.
     Flat/uninformative branches remain intervals instead of invented coordinates.
+    possible_interval retains its existing best-fit/flat-branch meaning. The
+    separate tolerance_consistent_interval reports all coordinates consistent
+    with the four affine inequalities, without changing accepted branches.
     """
     arrays = [np.asarray(v, dtype=np.float64) for v in (measured, negative, neutral, positive)]
     if any(a.shape != (4,) or not np.isfinite(a).all() for a in arrays):
@@ -131,7 +160,9 @@ def infer_weight_from_metrics(measured, negative, neutral, positive):
             predicted = base + factor * slope
         error = float(np.max(np.abs(actual - predicted)))
         candidates.append({'normalized_weight': value, 'possible_interval': interval,
-                           'max_metric_residual': error})
+                           'max_metric_residual': error,
+                           'tolerance_consistent_interval':
+                               _tolerance_consistent_interval(actual, base, endpoint, sign)})
     candidates.sort(key=lambda c: c['max_metric_residual'])
     accepted = [c for c in candidates if c['max_metric_residual'] <= LIMIT]
     return {'best_fit': candidates[0], 'consistent_branches': accepted,

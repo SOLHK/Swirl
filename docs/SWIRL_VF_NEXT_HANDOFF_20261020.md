@@ -9,6 +9,10 @@
 实际 Swift 校验 **22/22 通过**，Python / Windows 原创夹具通过；Apple 整体仍因
 原有严格 `849/850` 度量失败而为 failure。A1 防护修复通过不代表内部轴映射或度量通过。
 
+A2 新增 HVAR 四维约束的真实容差一致区间，与旧最佳拟合点分别报告；
+332/332 Python 回归及 6/6 audit 通过。该变更仅修正诊断含义，
+141 项量化差异未解决，原生新运行待推送后核实；后续阈值实验见上述检查点文档。
+
 **本文件已更新，旧版“剩余 178 组轮廓错误”不再是当前状态。**
 首先阅读 `docs/SWIRL_VF_USER_AXIS_HANDOFF_20261020.md`，再阅读
 `docs/SWIRL_VF_GEOMETRY_PASS_20261020.md` 与 `docs/SWIRL_VF_TRANSFORM_REPAIR_20261020.md`。
