@@ -974,8 +974,105 @@ class VisionRuntimeInterop(RealityRuntimeInterop):
         self.idle()
 
 
+QT_PRODUCT_TEST = "test_actual_qt_import_dpapi_select_route_and_recreate"
+QT_LIFECYCLE_TESTS = (
+    "test_actual_qt_tls12_never_enters_vision_direct",
+    "test_actual_qt_bad_credentials_never_reach_origin_or_spare",
+    "test_actual_qt_cancels_authenticated_stream_and_releases_listener",
+    "test_actual_qt_domain_and_match_reject_a_proven_reachable_origin",
+)
+QT_LIFECYCLE_STATES = ("imported", "encrypted_store_reloaded", "parameters_preserved",
+                       "in_process_rust", "stopped", "listener_released")
+QT_LIFECYCLE_MODES = ("tls12", "http-control", "authentication-failure", "cancel", "reject")
+QT_CANCEL_PAYLOAD = b"qt-authenticated-stream-before-cancellation"
+
+
+def qt_test_names(fingerprint, vision):
+    # The three existing Qt profiles keep their original full product test.
+    # The added risk matrix runs once in the fixed Chrome133 + Vision gate;
+    # explicit selection is recorded, never represented as skipped passes.
+    return (QT_PRODUCT_TEST, *QT_LIFECYCLE_TESTS) if fingerprint == "chrome" and vision else (QT_PRODUCT_TEST,)
+
+
+def qt_lifecycle_progress(value):
+    """Keep typed, authored partial evidence even if the Qt process failed."""
+    if not isinstance(value, dict) or type(value.get("schema")) is not int or value["schema"] != 1:
+        raise AssertionError("Qt lifecycle report schema")
+    result = {"schema": 1, "provider_connection": False, "checks": []}
+    for field in QT_LIFECYCLE_STATES:
+        if type(value.get(field)) is bool:
+            result[field] = value[field]
+    if value.get("mode") in QT_LIFECYCLE_MODES:
+        result["mode"] = value["mode"]
+    allowed = {"frontend": ("http-connect", "socks5"), "node": ("A",),
+               "phase": (*QT_LIFECYCLE_MODES, "direct-control"),
+               "target": ("tls.product.invalid", "stream.product.invalid", "a.product.invalid",
+                          "denied.product.invalid", "unmatched.product.invalid"),
+               "proxy_host": ("127.0.0.1",), "tls_version": ("TLSv1.2", "unsupported"),
+               "stage": ("start", "proxy-connect", "proxy-reply", "http-write", "http-response", "close",
+                         "authentication-failure", "authenticated-echo", "runtime-cancel", "tls-handshake", "complete")}
+    booleans = ("frontend_response_valid", "tunnel_accepted", "expected_result_observed", "closed",
+                "expected_body_verified", "certificate_verified", "echo_verified", "cancelled_after_echo")
+    numbers = {"target_port": (1, 65535), "proxy_port": (1, 65535), "proxy_status": (-1, 599),
+               "http_status": (0, 599), "socket_error": (-1, 99), "tls_error_count": (0, 100),
+               "elapsed_ms": (0, 100000), "echo_bytes": (0, 65536)}
+    checks = value.get("checks", [])
+    if not isinstance(checks, list) or len(checks) > 8:
+        raise AssertionError("Qt lifecycle check budget")
+    for row in checks:
+        if not isinstance(row, dict):
+            raise AssertionError("Qt lifecycle check object")
+        safe = {field: row[field] for field, choices in allowed.items() if row.get(field) in choices}
+        safe.update({field: row[field] for field in booleans if type(row.get(field)) is bool})
+        safe.update({field: row[field] for field, (low, high) in numbers.items()
+                     if type(row.get(field)) is int and low <= row[field] <= high})
+        result["checks"].append(safe)
+    return result
+
+
+def validate_qt_lifecycle_report(value, mode, port):
+    result = qt_lifecycle_progress(value)
+    assert result.get("mode") == mode and mode in QT_LIFECYCLE_MODES, "Qt lifecycle mode"
+    assert all(result.get(field) is True for field in QT_LIFECYCLE_STATES), "Qt lifecycle product state"
+    phases = ("direct-control", "reject") if mode == "reject" else (mode,)
+    hosts = (("denied.product.invalid", "unmatched.product.invalid") if mode == "reject" else
+             ("tls.product.invalid" if mode == "tls12" else
+              "stream.product.invalid" if mode == "cancel" else "a.product.invalid",))
+    expected = {(frontend, phase, host) for frontend in ("http-connect", "socks5")
+                for phase in phases for host in hosts}
+    actual = [(row.get("frontend"), row.get("phase"), row.get("target")) for row in result["checks"]]
+    assert len(actual) == len(expected) and set(actual) == expected, "Qt lifecycle complete entrance/target matrix"
+    assert len({row.get("proxy_port") for row in result["checks"]}) == 1, "Qt lifecycle same product listener"
+    for row in result["checks"]:
+        assert row.get("node") == "A" and row.get("target_port") == port, "Qt lifecycle target identity"
+        assert row.get("proxy_host") == "127.0.0.1" and type(row.get("proxy_port")) is int, "Qt lifecycle proxy identity"
+        assert row.get("stage") == "complete" and row.get("closed") is True, "Qt lifecycle completion"
+        assert row.get("expected_result_observed") is True and row.get("frontend_response_valid") is True, "Qt lifecycle result"
+        assert type(row.get("elapsed_ms")) is int and type(row.get("socket_error")) is int, "Qt lifecycle request evidence"
+        assert row.get("tls_error_count") == 0, "Qt lifecycle unexpected TLS error"
+        if row["phase"] == "reject":
+            assert row.get("tunnel_accepted") is False, "Qt policy rejection"
+            assert row.get("proxy_status") == (502 if row["frontend"] == "http-connect" else 5), "Qt policy reply"
+        elif mode == "authentication-failure":
+            assert row.get("http_status", 0) == 0, "Qt authentication failure cannot count HTTP success"
+            accepted = row.get("tunnel_accepted")
+            assert type(accepted) is bool, "Qt authentication frontend outcome"
+            assert row.get("proxy_status") == ((200 if accepted else 502) if row["frontend"] == "http-connect" else (0 if accepted else 5)), "Qt authentication reply"
+        else:
+            assert row.get("tunnel_accepted") is True, "Qt selected tunnel"
+            assert row.get("proxy_status") == (200 if row["frontend"] == "http-connect" else 0), "Qt accepted proxy reply"
+            if mode == "cancel":
+                assert row.get("echo_verified") is True and row.get("cancelled_after_echo") is True, "Qt authenticated cancellation"
+                assert row.get("echo_bytes") == len(QT_CANCEL_PAYLOAD), "Qt cancellation payload"
+            else:
+                assert row.get("http_status") == 200 and row.get("expected_body_verified") is True, "Qt HTTP response"
+                if mode == "tls12":
+                    assert row.get("certificate_verified") is True and row.get("tls_version") == "TLSv1.2", "Qt verified TLS1.2"
+    return result
+
+
 class RealityQtInterop(RealityRuntimeInterop):
-    """Only the existing real Qt product slot runs in this explicit mode."""
+    """Explicit real Windows Qt/DPAPI product and lifecycle suites."""
     client_closes_tls = True
 
     @classmethod
@@ -1025,6 +1122,118 @@ class RealityQtInterop(RealityRuntimeInterop):
                     self.assertGreater(observed["vision_direct_upload_commands"], 0, observed)
                     self.assertGreater(observed["vision_direct_download_commands"], 0, observed)
 
+    def lifecycle(self, a, b, mode, *, node=None, label=None):
+        label = label or mode
+        port = self.https.port if mode == "tls12" else self.echo.port if mode == "cancel" else self.http.port
+        document = {"proxies": [node or a.node(), b.node()],
+                    "rules": ["DOMAIN,denied.product.invalid,REJECT", "MATCH,REJECT"]}
+        fixture = {"mode": mode, "subscription": remember_secret(json.dumps(document)),
+                   "target_port": port, "ca_pem": self.ca_pem, "expected_body": BODY.decode()}
+        folder = Path(self.folder.name)
+        path, log, report = (folder / (label + suffix) for suffix in ("-fixture.json", "-private.log", "-report.json"))
+        write_json(path, fixture)
+        summary = {"mode": mode, "provider_connection": False, "qt_exit_code": None, "timed_out": False}
+        result, progress = None, None
+        try:
+            result = subprocess.run([os.environ["SWIRL_RUST_QT_TESTS"],
+                                     "realityLifecycleProductChainAgainstIndependentPeer", "-o", str(log) + ",txt"],
+                                    env={**os.environ, "SWIRL_QT_LIFECYCLE_FIXTURE": str(path),
+                                         "SWIRL_QT_LIFECYCLE_REPORT": str(report)},
+                                    text=True, capture_output=True, timeout=100)
+            summary["qt_exit_code"] = result.returncode
+        except subprocess.TimeoutExpired:
+            summary["timed_out"] = True
+            raise
+        finally:
+            output = redacted(log.read_text(encoding="utf-8", errors="replace")) if log.exists() else ""
+            if result is not None:
+                output += redacted(result.stdout + result.stderr)
+            (self.case / (label + "-qt.log")).write_text(output, encoding="utf-8")
+            if report.exists():
+                try:
+                    self.assertLessEqual(report.stat().st_size, 65536)
+                    progress = qt_lifecycle_progress(json.loads(report.read_text(encoding="utf-8")))
+                    write_json(self.case / (label + "-qt.json"), progress)
+                except (AssertionError, ValueError, OSError) as error:
+                    summary["report_error"] = type(error).__name__
+            write_json(self.case / (label + "-execution.json"), summary)
+        self.assertEqual(result.returncode, 0, output)
+        self.assertNotIn("SKIP", output)
+        self.assertIsNotNone(progress, "Qt lifecycle evidence absent")
+        return validate_qt_lifecycle_report(progress, mode, port)
+
+    def test_actual_qt_tls12_never_enters_vision_direct(self):
+        self.context.minimum_version = ssl.TLSVersion.TLSv1_2
+        self.context.maximum_version = ssl.TLSVersion.TLSv1_2
+        a, b = self.peer(), self.peer("B")
+        self.lifecycle(a, b, "tls12")
+        observed = self.observed(a, 2)
+        self.assertGreater(observed["vision_padding_events"], 0)
+        self.assertGreater(observed["vision_unpadding_events"], 0)
+        self.assertEqual(observed["vision_direct_upload_commands"], 0)
+        self.assertEqual(observed["vision_direct_download_commands"], 0)
+        self.assertEqual(self.https.sni, ["localhost", "localhost"])
+        self.assertCountEqual([r.split(b" ")[1] for r in self.https.requests],
+                              [b"/qt-tls12-http-connect", b"/qt-tls12-socks5"])
+        self.assertEqual(self.https.tls_closed, 2)
+        self.assertEqual(self.http.requests, [])
+        self.observed(b, 0)
+
+    def test_actual_qt_bad_credentials_never_reach_origin_or_spare(self):
+        a, b = self.peer(), self.peer("B")
+        self.lifecycle(a, b, "http-control")
+        paths = [b"/qt-http-control-http-connect", b"/qt-http-control-socks5"]
+        self.assertCountEqual([r.split(b" ")[1] for r in self.http.requests], paths)
+        self.observed(a, 2)
+        for kind in ("short-id", "public-key", "servername", "uuid"):
+            with self.subTest(invalid=kind):
+                node = copy.deepcopy(a.node())
+                if kind == "short-id":
+                    node["reality-opts"][kind] = remember_secret(os.urandom(8).hex())
+                elif kind == "public-key":
+                    node["reality-opts"][kind] = remember_secret(b64url(x25519.X25519PrivateKey.generate().public_key().public_bytes(
+                        serialization.Encoding.Raw, serialization.PublicFormat.Raw)))
+                elif kind == "uuid":
+                    node[kind] = remember_secret(str(uuid.uuid4()))
+                else:
+                    node[kind] = "incorrect.reality.invalid"
+                self.lifecycle(a, b, "authentication-failure", node=node, label="bad-" + kind)
+                self.assertCountEqual([r.split(b" ")[1] for r in self.http.requests], paths)
+                self.assertEqual(self.https.requests, [])
+                self.assertEqual(self.echo.payloads, [])
+                write_json(self.case / ("bad-" + kind + "-peer.json"), {"A": self.observed(a, 2), "B": self.observed(b, 0)})
+
+    def test_actual_qt_cancels_authenticated_stream_and_releases_listener(self):
+        self.echo.cancel_expected = True
+        a, b = self.peer(), self.peer("B")
+        self.lifecycle(a, b, "cancel")
+        deadline = time.monotonic() + 3
+        while len(self.echo.sessions) < 2 and time.monotonic() < deadline:
+            time.sleep(0.01)
+        self.assertEqual(len(self.echo.sessions), 2)
+        self.assertEqual(b"".join(self.echo.payloads), QT_CANCEL_PAYLOAD * 2)
+        for session in self.echo.sessions:
+            self.assertEqual(session["received_bytes"], len(QT_CANCEL_PAYLOAD))
+            self.assertEqual(session["expected_bytes"], len(QT_CANCEL_PAYLOAD) + 1)
+            self.assertTrue(session["cancelled"] and session["target_closed"])
+            self.assertFalse(session["tail_after_client_halfclose"])
+        self.observed(a, 2)
+        self.observed(b, 0)
+        self.assertEqual(self.http.requests, [])
+        self.assertEqual(self.https.requests, [])
+
+    def test_actual_qt_domain_and_match_reject_a_proven_reachable_origin(self):
+        a, b = self.peer(), self.peer("B")
+        self.lifecycle(a, b, "reject")
+        expected = [f"/qt-direct-control-{frontend}-{rule}".encode()
+                    for frontend in ("http-connect", "socks5") for rule in ("domain", "match")]
+        self.assertCountEqual([r.split(b" ")[1] for r in self.http.requests], expected)
+        self.assertEqual(self.https.requests, [])
+        self.assertEqual(self.echo.payloads, [])
+        self.observed(a, 0)
+        self.observed(b, 0)
+
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
@@ -1035,7 +1244,8 @@ if __name__ == "__main__":
     RealityRuntimeInterop.fingerprint = args.fingerprint
     if args.vision:
         RealityQtInterop.flow = VisionRuntimeInterop.flow
-    suite = (unittest.TestSuite([RealityQtInterop("test_actual_qt_import_dpapi_select_route_and_recreate")])
+    selected_qt_tests = qt_test_names(args.fingerprint, args.vision)
+    suite = (unittest.TestSuite(RealityQtInterop(name) for name in selected_qt_tests)
              if args.qt else unittest.defaultTestLoader.loadTestsFromTestCase(
                  VisionRuntimeInterop if args.vision else RealityRuntimeInterop))
     evidence = Path(os.environ.get("SWIRL_REALITY_RUNTIME_EVIDENCE", ROOT / "build/reality-runtime-evidence")).resolve()
@@ -1043,10 +1253,12 @@ if __name__ == "__main__":
     captured = io.StringIO()
     result = unittest.TextTestRunner(stream=EvidenceStream(sys.stderr, captured), verbosity=2).run(suite)
     (evidence / "tests.log").write_text(captured.getvalue(), encoding="utf-8")
+    successful = result.wasSuccessful() and not result.skipped and (not args.qt or result.testsRun == len(selected_qt_tests))
     write_json(evidence / "test-summary.json", {"tests_run": result.testsRun, "failures": len(result.failures),
-               "errors": len(result.errors), "skipped": len(result.skipped), "successful": result.wasSuccessful(),
+               "errors": len(result.errors), "skipped": len(result.skipped), "successful": successful,
                "product_mode": "qt-dpapi" if args.qt else "rust-runtime", "provider_connection": False,
                "protocol": "vless+reality+vision" if args.vision else "vless+reality",
                "fingerprint": args.fingerprint,
+               "selected_qt_tests": list(selected_qt_tests) if args.qt else [],
                "client_hello_profile": "chrome_133" if args.fingerprint in ("chrome", "chrome_133") else "rustls"})
-    raise SystemExit(0 if result.wasSuccessful() else 1)
+    raise SystemExit(0 if successful else 1)

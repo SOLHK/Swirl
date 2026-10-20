@@ -444,6 +444,7 @@ class CoreDevelopmentTests(unittest.TestCase):
         for name in REQUIRED_TESTS:
             (peers / name).write_text("# test fixture\n", encoding="utf-8")
         (peers / development.REALITY_RUNTIME_TEST).write_text("# runtime peer fixture\n", encoding="utf-8")
+        (peers / development.QT_LIFECYCLE_TEST).write_text("# Qt lifecycle evidence fixture\n", encoding="utf-8")
         (peers / development.PUBLIC_QT_TEST).write_text("# Qt public evidence fixture\n", encoding="utf-8")
         (root / "tools/Verify-PublicRustCore.py").write_text("# public check fixture\n", encoding="utf-8")
         (root / development.PUBLIC_REALITY_PROBE).write_text("# public REALITY check fixture\n", encoding="utf-8")
@@ -1533,6 +1534,24 @@ class CoreDevelopmentTests(unittest.TestCase):
                 (root / relative).unlink()
                 with self.assertRaises(ValueError):
                     development.prepare_update(root)
+
+    def test_qt_lifecycle_guard_is_required_only_in_explicit_chrome_vision_product_group(self):
+        final = development.updated_workflow(FIXTURE)
+        command = "python tools/tests/" + development.QT_LIFECYCLE_TEST
+        block = development.reality_runtime_steps(windows=True, qt=True, vision=True, fingerprint="chrome")
+        self.assertEqual(final.count(command), 1)
+        self.assertIn(command + "\n" + development.WINDOWS_STATUS_GUARD, block)
+        self.assertLess(block.index(command), block.index("test_reality_runtime.py --qt --vision --fingerprint chrome"))
+        for replacement in (block.replace(command, "python missing_lifecycle_guard.py", 1),
+                            block.replace(command + "\n" + development.WINDOWS_STATUS_GUARD, "", 1)):
+            with self.subTest(replacement=replacement), self.assertRaises(ValueError):
+                development.updated_workflow(final.replace(block, replacement, 1))
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            self.make_repository(root)
+            (root / "tools/tests" / development.QT_LIFECYCLE_TEST).unlink()
+            with self.assertRaises(ValueError):
+                development.prepare_update(root)
 
     def test_fingerprint_partial_mutated_moved_and_weakened_gates_fail_closed(self):
         final = development.updated_workflow(FIXTURE)

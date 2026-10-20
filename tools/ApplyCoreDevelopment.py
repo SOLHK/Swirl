@@ -92,6 +92,7 @@ VISION_BUILD_COMMAND = (
 )
 PRODUCT_CHAIN_TEST = "test_product_subscription_chain.py"
 REALITY_RUNTIME_TEST = "test_reality_runtime.py"
+QT_LIFECYCLE_TEST = "test_qt_reality_lifecycle.py"
 PUBLIC_REALITY_PROBE = Path("tools/Verify-PublicRealityRuntime.py")
 PUBLIC_QT_PROBE = Path("tools/Verify-PublicQtReality.py")
 PUBLIC_QT_TEST = "test_public_qt_reality.py"
@@ -138,6 +139,8 @@ def reality_runtime_steps(windows: bool = False, qt: bool = False,
     body = "          $ErrorActionPreference = 'Stop'\n" if windows else "          set -euo pipefail\n"
     if qt:
         body += "          New-Item -ItemType Directory -Force -Path $env:SWIRL_TEST_ROOT | Out-Null\n"
+    if qt and vision and fingerprint == "chrome":
+        body += f"          python tools/tests/{QT_LIFECYCLE_TEST}\n" + WINDOWS_STATUS_GUARD
     selection = ((" --qt" if qt else "") + (" --vision" if vision else "")
                  + (" --fingerprint chrome" if fingerprint else ""))
     body += f"          python tools/tests/{REALITY_RUNTIME_TEST}{selection}\n"
@@ -1139,7 +1142,7 @@ def prepare_update(repository: Path) -> tuple[Path, str, str]:
     before = path.read_text(encoding="utf-8")
     after = updated_workflow(before)
     for name in (*ADDITIONAL_TESTS, POLICY_TEST, *DNS_PROBE_TESTS, *CONNECTIVITY_IMPORT_TESTS,
-                 SOCKS5_UDP_TEST, *REALITY_TESTS, PRODUCT_CHAIN_TEST, REALITY_RUNTIME_TEST, PUBLIC_QT_TEST):
+                 SOCKS5_UDP_TEST, *REALITY_TESTS, PRODUCT_CHAIN_TEST, REALITY_RUNTIME_TEST, PUBLIC_QT_TEST, QT_LIFECYCLE_TEST):
         if not (repository / "tools/tests" / name).is_file():
             raise ValueError(f"Required CI suite is missing: {name}")
     if not (repository / PUBLIC_PROBE).is_file():

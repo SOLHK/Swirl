@@ -1,3 +1,13 @@
+# 2026-10-20: complete Qt lifecycle gate checkpoint
+
+The public Qt gate is saved at `ac0069ec645b552835d15534b93d6d2ae0c69620`; readonly private-cache requalification is saved at `5f16245a238411c8e57d097995fded50edc65522`. This checkpoint adds four explicit Chrome133 + Vision Qt product cases: verified inner TLS 1.2 with zero Direct commands, four incorrect REALITY/VLESS credential variants, cancellation after a verified echo, and DOMAIN/MATCH REJECT with the exact same targets proven reachable through DIRECT controls. Both proxy entrances are mandatory. Original controlled and public Qt slots remain byte-for-byte unchanged.
+
+The real Windows fixture uses normal import, DPAPI save, object destruction/reload and the in-process Rust controller. Its five selected Qt cases cannot skip or report a reduced count. Local evidence: 24 combined portable tests, 56 workflow guards and idempotent generation, exact-slot moc/C++23 syntax, plus existing independent Linux component diagnostics. Those component diagnostics are not Windows acceptance.
+
+See [Qt lifecycle coverage](CORE_WINDOWS_QT_LIFECYCLE_GATE_20261020.md) and [content-bound local evidence](evidence/CORE_WINDOWS_QT_LIFECYCLE_LOCAL_20261020.json). Exact new-SHA Windows execution, public Xray artifacts and complete Swirl.exe build must still finish before native success is claimed. Private provider/physical Windows checks and the current private 59-node qualification count remain unexecuted. Preserve all concurrent font commits, all real failures and the unchanged 79/6/10.83% formal baseline.
+
+---
+
 # 2026-10-20: private offline qualification checkpoint
 
 The interrupted subscription repair is saved in `b096ffac75eec057a901a792a4e81718263943bc`; the real Windows Qt public gate is saved in `ac0069ec645b552835d15534b93d6d2ae0c69620`. This checkpoint adds the readonly Qt NodeStore inspector, preserves separate parsing/reload/native/network evidence stages, and allowlists all public private-cache reports. The old physical Windows cache has not been read: the current 59-node candidate count remains unknown.

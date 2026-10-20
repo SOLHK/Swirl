@@ -760,6 +760,8 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force -Path $env:SWIRL_TEST_ROOT | Out-Null
+          python tools/tests/test_qt_reality_lifecycle.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python tools/tests/test_reality_runtime.py --qt --vision --fingerprint chrome
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Preserve production REALITY + Vision + Chrome133 Runtime qt evidence
