@@ -299,8 +299,68 @@ curvature, short chords, control-point overshoot, non-midpoint collinear
 quadratics, ambiguous/reversed correspondence, exact between-sample extrema,
 safe output and a three-way fixture whose strict type failure must remain
 rejected even when the independent curve bound is tiny. This checkpoint is a
-validated diagnostic implementation; its native run is still pending and no
-original-font pass is claimed.
+validated diagnostic implementation. Exact source
+`619ec70181858815a23ba8c80adc63ab206dd2f3` was pushed and remote HEAD verified.
+[39384574612](https://github.com/SOLHK/Swirl/actions/runs/39384574612), job
+118501233885, completed **success** on xcode-27. Artifact 12247320036 was
+read and its ZIP SHA-256 verified:
+`cc5c37b0bed6e010ed41f66d8b190f9a568f95000d91c97338a7c2ac0c085426`.
+This is diagnostic completion; no production mapping/font is accepted.
+
+Both independent processes completed 324 requests / 1,620 records each, all
+32 physical source identities and final summary/EOF/exit checks. All 1,620
+opposite-order complete raw payload pairs are exactly equal, with no readback
+differences. Source hash is unchanged. The six global candidates still retain
+all eight strict type failures. The canonical normalized-16 candidate has
+225/324 exactly matching metric vectors, none over 1/32; maximum metric error
+is 0.006591796875 and maximum finite point error is 0.01110839843784106.
+
+The new direct native comparison proves the scope of the eight type failures:
+Apple HVF and CoreText are exactly equal at **all eight original failed cases**.
+Both original commands of each mismatched segment are quadratic, but the old
+canonicalizer classifies the portable one as L and the native one as Q. The
+very short nonzero chord amplifies tiny control-point rounding into a projection
+outside its dimensionless interval. This is not the short-chord branch. The
+actual differing segment is path 7 / segment 3 on faces 0, 8 and 15–19; on
+face 1 it is path 11 / segment 3. Exact rational continuous parametric bounds
+for the entire corresponding glyph are at most `2.652692880171041e-13` FUnit.
+The original eight strict failures are still reported; no tolerance or line
+classification threshold has been changed to hide them.
+
+Across all direct hypotheses there are 260 native HVF / CoreText comparisons,
+zero strict failures and maximum point error 0.010740169102945174. That aggregate
+includes intentionally wrong inferred/global coordinates and is not an exact
+mapping claim. The eight type cases themselves are exactly equal. Portable /
+HVF retains eight canonical type failures; its other comparable point errors
+are at most `4.547473508864641e-13`.
+
+The quantization investigation has a distinct new counterexample: on faces
+20, 24 and 31, every tested weight from 399.9633 through 400.04 gives native
+HVAR grid -4915, while 399.96 gives -4917. This is a finite set spanning several
+ordinary quantization steps, **not proof of all values in a continuous interval**.
+The predeclared three platform points give (-9829, -4915, -4915), contradicting
+each full arithmetic prediction above. Real native HVF / CoreText geometry
+at the accepted HVAR reference corroborates these observed grid values.
+Do not turn this platform into a per-coordinate production exception. At
+299.9817 another discrepancy remains (-9831 native versus -9830 canonical);
+float32 normalization is a separate unverified mechanism worth distinguishing.
+
+Same-source [39384574478](https://github.com/SOLHK/Swirl/actions/runs/39384574478)
+finished with Python and Windows synthetic DirectWrite **success**, Apple
+**failure**. Actual Apple job 118501233362 still reports raw 849 versus 850 at
+0.03125, and the production Swift validator passes 22 cases. The separate
+full 1,724-position rerun
+[39384574416](https://github.com/SOLHK/Swirl/actions/runs/39384574416) is still
+IN_PROGRESS at this evidence checkpoint; its final result must be retrieved.
+
+Next minimal work: preserve the old canonical report and add a conservative
+raw-Q/Q control-point comparison only where that report rejects segment types;
+all six original quadratic coordinates must meet the unchanged 1/32 budget,
+without rescuing existing numeric or topology failures. Separately locate the
+400-platform boundaries and test constructor/base-instance dependence before
+assigning any internal Apple mechanism. Concurrent Core commit
+`1e45e4af4d490dbfc49c20a590258ab55587c6eb` was inspected and preserved by
+fast-forward; it has no font-path overlap.
 
 ## Newly retrieved prior evidence (not new execution in this continuation)
 
