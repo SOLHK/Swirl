@@ -20,6 +20,21 @@ void FontTests::automaticWidthUsesRealAdvances()
     QCOMPARE(tight.value("naturalWidth").toDouble(),natural);QCOMPARE(font.pixelSize(),20);
     QFont compressed=font;compressed.setVariableAxis(QFont::Tag("wdth"),float(width));
     QVERIFY(QFontMetricsF(compressed).horizontalAdvance("AAAAAAAA")<natural-1);
+    // More samples must never select an illegal axis coordinate or allow
+    // disproportionate advance compression.
+    for(const double space:{natural-4,natural-12,natural-24,natural*.5}){
+        const auto outcome=fit(space);
+        const double coordinate=outcome.value("axes").toMap().value("wdth").toDouble();
+        QVERIFY(coordinate>=90.&&coordinate<=100.);
+        if(outcome.value("fitted").toBool()){
+            QFont candidate=font;
+            candidate.setVariableAxis(QFont::Tag("wght"),600.f);
+            candidate.setVariableAxis(QFont::Tag("wdth"),float(coordinate));
+            const double actual=QFontMetricsF(candidate).horizontalAdvance("AAAAAAAA");
+            QVERIFY(actual>=natural*.85-1.);
+            QVERIFY(actual<natural);
+        }
+    }
     const auto stable=fit(natural-12+.2,width);QCOMPARE(stable.value("axes").toMap(),axes);
     QCOMPARE(fit(natural+10,width).value("axes").toMap().value("wdth").toDouble(),100.);
     QCOMPARE(fit(natural-12,100,"body").value("axes").toMap().value("wdth").toDouble(),100.);
