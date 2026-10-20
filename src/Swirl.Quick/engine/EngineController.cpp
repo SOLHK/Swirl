@@ -207,6 +207,32 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
     connect(interfaces,&QTimer::timeout,this,&EngineController::refreshLanAddresses);interfaces->start();
     QTimer::singleShot(0,this,&EngineController::refreshLanAddresses);
 }
+QString EngineController::engineIdentityLabel() const {
+    const auto status=m_engine->status();
+    if(status.processAlive) {
+        if(status.engineKind==QStringLiteral("rust"))return QStringLiteral("Swirl Rust Core · 运行中");
+        if(status.engineKind==QStringLiteral("compatibility"))return QStringLiteral("Mihomo · 运行中");
+        if(status.engineKind==QStringLiteral("native"))return QStringLiteral("Swirl C++ Native · 运行中");
+        return QStringLiteral("未知内核 · 运行中");
+    }
+#ifdef SWIRL_USE_RUST_CORE
+    return QStringLiteral("Swirl Rust Core · 构建类型");
+#else
+    return QStringLiteral("Mihomo · 构建类型");
+#endif
+}
+bool EngineController::prepareRealAcceptance() {
+    if(processAlive()||busy())return false;
+    // Test-only caller: select a supported route before starting the engine.
+    // Do not write QSettings, touch the system proxy, or inherit a saved TUN.
+    m_options.routingMode="global";
+    m_options.smartRouting=false;
+    m_options.tunEnabled=false;
+    m_options.meteredNetwork=false;
+    m_options.allowLan=false;
+    emit statusChanged();
+    return true;
+}
 void EngineController::setExecutablePath(const QString &path) {
     if (!canStart() || m_options.executablePath == path) return;
     m_options.executablePath = path; emit optionsChanged();

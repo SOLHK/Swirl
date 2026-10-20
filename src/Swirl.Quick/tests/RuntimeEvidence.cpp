@@ -51,7 +51,13 @@ static void captureRenderedFrame(QQuickWindow *window,const QString &path){
 // Test-build-only harness. It drives THIS Swirl window with the real encrypted
 // node store copy and real engine. It has no fixtures or access to other apps.
 void startRuntimeEvidence(QQuickWindow *window,EngineController *controller,SystemDataProvider *system,DiagnosticService *diagnostics,const QString &commandPath,const QString &statePath){
- controller->setControlPort(19097);controller->setProxyPort(17988);controller->connectNode(controller->selectedNodeId());
+ controller->setControlPort(19097);controller->setProxyPort(17988);
+ // Set an isolated global route before the first engine start.
+ // A saved production rule or DIRECT mode must never leak into this run.
+ if(!controller->prepareRealAcceptance()||controller->routingMode()!=QStringLiteral("global")){
+  qWarning()<<"Runtime acceptance refused non-global routing";QTimer::singleShot(0,qApp,&QCoreApplication::quit);return;
+ }
+ controller->connectNode(controller->selectedNodeId());
  auto timer=new QTimer(window);timer->setInterval(500);
  QObject::connect(timer,&QTimer::timeout,window,[=]{
   auto status=system->diagnosticSnapshot();status["testsBusy"]=controller->tests()->busy();status["testsCompleted"]=controller->tests()->completed();status["testsTotal"]=controller->tests()->total();status["testsSucceeded"]=controller->tests()->succeeded();status["testsFailed"]=controller->tests()->failed();status["hasExternalIp"]=!controller->telemetry()->externalIp().isEmpty();

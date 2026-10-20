@@ -26,6 +26,7 @@ class EngineController final : public QObject {
     Q_PROPERTY(QString version READ version NOTIFY statusChanged)
     Q_PROPERTY(QString engineName READ engineName NOTIFY statusChanged)
     Q_PROPERTY(QString engineKind READ engineKind NOTIFY statusChanged)
+    Q_PROPERTY(QString engineIdentityLabel READ engineIdentityLabel NOTIFY statusChanged)
     Q_PROPERTY(QString engineReason READ engineReason NOTIFY statusChanged)
     Q_PROPERTY(QString processId READ processId NOTIFY statusChanged)
     Q_PROPERTY(qint64 uptimeSeconds READ uptimeSeconds NOTIFY statusChanged)
@@ -88,6 +89,8 @@ public:
     QString version() const { return m_engine->status().version; }
     QString engineName() const { return m_engine->status().engineName; }
     QString engineKind() const { return m_engine->status().engineKind; }
+    QString engineIdentityLabel() const;
+    bool prepareRealAcceptance(); // Called only by the isolated runtime harness.
     QString engineReason() const { return m_engine->status().engineReason; }
     QString processId() const { return QString::number(m_engine->status().processId); }
     qint64 uptimeSeconds() const { return m_engine->status().uptimeSeconds; }

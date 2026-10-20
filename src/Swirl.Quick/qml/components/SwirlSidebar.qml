@@ -29,6 +29,14 @@ Item {
  property alias searchField:pageSearch
  function openSearch(){ searchPopup.open();pageSearch.forceActiveFocus() }
  SwirlTrafficLights{x:Theme.dp(8);y:Theme.dp(4);targetWindow:sidebar.Window.window}
+ SwirlText {
+  objectName:"engineIdentityLabel"
+  x:Theme.dp(16);y:Theme.dp(31);width:sidebar.width-Theme.dp(32)
+  text:engineController.engineIdentityLabel
+  color:Theme.muted;font.pixelSize:Theme.fontSize(11)
+  elide:Text.ElideRight
+  Accessible.name:text
+ }
  Column {
   onPositioningComplete:++sidebar.geometryRevision
   x:Theme.dp(10);y:Theme.dp(55);width:parent.width-Theme.dp(20);spacing:0

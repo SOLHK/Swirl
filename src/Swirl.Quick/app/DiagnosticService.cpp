@@ -91,10 +91,18 @@ bool DiagnosticService::exportReport(const QUrl &file,const QVariantMap &snapsho
  QList<QPair<QByteArray,QByteArray>> entries;QByteArray logs;
  for(const auto &row:records()){auto safe=row.toMap();safe["message"]=redact(safe.value("message").toString());logs+=QJsonDocument(QJsonObject::fromVariantMap(safe)).toJson(QJsonDocument::Compact)+"\n";}
  entries.append({"logs.jsonl",logs});
- // Snapshot is constructed from an allowlist; URLs, connections, node options,
- // process paths, environment variables and credentials are never included.
+ // Snapshot is constructed from an allowlist; it includes the Swirl.exe path,
+ // hash, build SHA, actual engine and PID, but no node or credential fields.
  auto environment=QJsonObject{{"version",QCoreApplication::applicationVersion()},{"qt",qVersion()},{"os",QSysInfo::prettyProductName()},{"architecture",QSysInfo::currentCpuArchitecture()},{"created",QDateTime::currentDateTime().toString(Qt::ISODate)}};
  entries.append({"environment.json",QJsonDocument(environment).toJson()});
+ const auto sourceSha=snapshot.value("sourceSha").toString(),binarySha=snapshot.value("executableSha256").toString();
+ const auto engine=snapshot.value("actualEngineType").toString();
+ const auto isHex=[](const QString &value,int length){return value.size()==length&&QRegularExpression(QStringLiteral("^[0-9a-fA-F]+$")).match(value).hasMatch();};
+ const auto actualEngine=QStringList{"rust","compatibility","native","not-running"}.contains(engine)?engine:QStringLiteral("unknown");
+ const QJsonObject identity{{"sourceSha",isHex(sourceSha,40)?sourceSha:QStringLiteral("source-archive")},
+  {"executablePath",QCoreApplication::applicationFilePath()},{"executableSha256",isHex(binarySha,64)?binarySha:QString()},
+  {"actualEngineType",actualEngine},{"engineProcessId",snapshot.value("engineProcessId").toString().toLongLong()}};
+ entries.append({"identity.json",QJsonDocument(identity).toJson()});
  std::function<QVariant(const QVariant &)> sanitize=[&](const QVariant &value)->QVariant {
   if(value.metaType().id()==QMetaType::QString)return redact(value.toString());
   if(value.metaType().id()==QMetaType::QVariantMap){auto map=value.toMap();for(auto it=map.begin();it!=map.end();++it)it.value()=sanitize(it.value());return map;}

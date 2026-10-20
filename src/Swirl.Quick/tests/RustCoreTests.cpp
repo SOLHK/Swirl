@@ -49,6 +49,33 @@ class RustCoreTests:public QObject {
  }
 private slots:
  void initTestCase(){QStandardPaths::setTestModeEnabled(true);SwirlPaths::initializeTestStorage();QSettings::setDefaultFormat(QSettings::IniFormat);QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,SwirlPaths::writableLocation(QStandardPaths::AppConfigLocation));}
+ void realAcceptanceStartsGlobalWithoutChangingSavedRouting(){
+  ControlledNetwork net;QVERIFY(net.start());QTemporaryDir directory;QVERIFY(directory.isValid());
+  QSettings settings;settings.setValue("Proxy/routingMode","rule");settings.sync();
+  const auto path=directory.filePath("acceptance.dpapi");const auto o=options(net);
+  EngineController controller(std::make_unique<ThreadedEngine>(),nullptr,path,true);controller.setProxyPort(o.proxyPort);
+  QCOMPARE(controller.routingMode(),QString("rule"));QVERIFY(controller.prepareRealAcceptance());
+  QCOMPARE(controller.routingMode(),QString("global"));
+  QCOMPARE(controller.engineIdentityLabel(),QString::fromUtf8("Swirl Rust Core · 构建类型"));
+  QCOMPARE(QSettings().value("Proxy/routingMode").toString(),QString("rule"));
+  const QJsonObject node{{"name","synthetic"},{"type","socks5"},{"server","127.0.0.1"},{"port",net.a.serverPort()}};
+  controller.imports()->importText(QString::fromUtf8(QJsonDocument(QJsonObject{{"proxies",QJsonArray{node}}}).toJson()));
+  QTRY_VERIFY_WITH_TIMEOUT(!controller.imports()->busy(),5000);
+  QCOMPARE(controller.nodeCatalog().size(),1);
+  const auto id=controller.nodeCatalog().first().toMap().value("id").toString();
+  QVERIFY(controller.chooseNode(id));controller.connectNode(id);
+  QTRY_VERIFY_WITH_TIMEOUT(controller.apiHealthy(),5000);
+  QCOMPARE(controller.routingMode(),QString("global"));QCOMPARE(controller.engineKind(),QString("rust"));
+  QCOMPARE(controller.engineIdentityLabel(),QString::fromUtf8("Swirl Rust Core · 运行中"));
+  QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",o.proxyPort));
+  QNetworkRequest request(net.url());request.setTransferTimeout(4000);
+  auto *reply=client.get(request);QTRY_VERIFY_WITH_TIMEOUT(reply->isFinished(),5000);
+  QCOMPARE(reply->error(),QNetworkReply::NoError);QCOMPARE(reply->readAll(),QByteArray("exit-A"));
+  QCOMPARE(net.a.forwarded,1);
+  QCOMPARE(QSettings().value("Proxy/routingMode").toString(),QString("rule"));
+  controller.stop();QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive(),5000);
+  QCOMPARE(controller.engineIdentityLabel(),QString::fromUtf8("Swirl Rust Core · 构建类型"));
+ }
  void nativeRealityParametersSurviveEncryptedStoreAndConfiguration(){
   const QByteArray key=QByteArray(32,'\x09').toBase64(QByteArray::Base64UrlEncoding|QByteArray::OmitTrailingEquals);
   const QByteArray source="vless://00112233-4455-6677-8899-aabbccddeeff@proxy.invalid:443?security=reality&type=tcp&sni=camouflage.invalid&pbk="+key+"&sid=a1B2&fp=rustls&encryption=none&alpn=h2,http%2F1.1";
