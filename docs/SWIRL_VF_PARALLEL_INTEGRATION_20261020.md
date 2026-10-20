@@ -22,17 +22,18 @@
 
 | 研发分支 | 远端 HEAD / PR | 本次可审核提交 | 当前状态 | 主责 |
 | --- | --- | --- | --- | --- |
-| `work/vf-axis-a3` | `9c2fd0092284edc7d346b0c9e1d1208095429b39` | 前四阶段已入 89751f9；本阶段固定 9c2fd00 | 算术/默认轴省略诊断已审，590/590 候选回归通过；原严格失败及 A3 生产阻塞保留 | 输入精度、用户坐标映射 |
-| `work/vf-metrics-b1` | `bdbd6a04bfb23d340e495ab5bb3933f572d96cbe` | 六提交已审查，禁止集成 | 原件逐 GID 数据进入公开日志/工件/Git；最新归档再次将 ablation 原始度量纳入 Git；代码父 CI failure | CoreText、HVAR/VVAR、垂直度量与原点 |
+| `work/vf-axis-a3` | `6d6a7b5eec6e2c7a630dfd4f692e29a7ecc52115` | 已审并合入至 9c2fd00 / 集成 4ec6a9b；随后四提交待审 | 已合入代码的本地及 CI 均 590/590、0 skip；后续阶段未验收，原严格失败及 A3 生产阻塞保留 | 输入精度、用户坐标映射 |
+| `work/vf-metrics-b1` | `7902cdb7b449a56939346263df54a692c22d8337` | 已审至 bdbd6a0，禁止集成；随后两提交未验收 | 7902cdb 仍包含 bdbd6a0 及 d283 私有数据祖先；旧原版数据与严格度量阻断未解除 | CoreText、HVAR/VVAR、垂直度量与原点 |
 | `work/vf-rebuild-c1` | `c0fe6c47f1a4a0854fcbbde7c9f08b791b44123e` | 75628e3 代码及 c0fe6c4 文档均已复审 | 二进制校验新增 33 项、代码父三平台 success；store symlink silent-return 未修，禁止集成 | HVF/OpenType/TTC 重建与完整性 |
 | `work/vf-windows-d1` | `4c0fcaf4a66fd34d3487754dd2f849a278da3a3e` | 415 代码及后续文档已审 | 空路径修复已核实；每系统四个、两系统合计八个 FreeType 严格失败进程，禁止集成 | DirectWrite、Qt、Swirl 字体适配 |
 
 首次及 09:03:55 UTC 查询时四分支未出现；09:11:14 UTC 已全部出现。
 这只描述远端查询结果，不表示其他聊天之前没有在工作或没有本地成果。
-上表依据 10:06 UTC 四分支快照及固定提交复审；10:15 UTC 前回读的集成 HEAD 为
-`89751f96d10d5cd68467ec7dcdd2c84ce558bf87`，已保留并发 Core 提交 5c170be。
-本阶段固定 9c2fd00；后续更晚的分支 tip 不自动纳入。本阶段源提交和候选验证见 8.20；
-推送后的实际 SHA 必须由远端回读确定。
+上表依据 10:24 UTC 最新远端快照，分别列明实际 tip 与已审核范围；集成 HEAD 回读为
+`4ec6a9b5f7e5a1c11bdf3cba1b9d6cd4d1456abd`，已保留并发 Core 提交 5c170be。
+最近代码阶段固定 9c2fd00，候选及真实合并/CI 见 8.20–8.21。本次末尾追加只修改本记录，
+字体与工作流代码不变；该记录提交的实际 SHA 由推送后的远端回读确定。
+更晚的分支 tip 不自动纳入本轮已验收的独立阶段，待审队列见 8.22。
 分支持续推进，审核和集成对象
 必须固定到下文完整 SHA；不能因 tip 前进就自动包含新提交。09:11 的 A3/C1
 第一提交都以 e505 为 merge-base，新增文件互不重名；当时 B1/D1 无 diff 是历史状态。
@@ -957,3 +958,66 @@ guard 现在明确只检查扩展名，JSON/ZIP 仍须另做实际内容保密�
 本阶段只接受新增可重复诊断和 CI 执行覆盖；A3 条件性输入障碍、B1 849/850、C1 必要
 安全测试与 D1 实际路径失败仍阻断生产。原件重建 **0 模型、0/32 面**，无合格 TTC，
 生产 32 面完整重建未启动。本轮审核固定至上述源 SHA，不自动接纳更晚的并发提交。
+
+### 8.21 第五阶段实际推送与最终字体 CI
+
+实际 merge [4ec6a9b5f7e5a1c11bdf3cba1b9d6cd4d1456abd](https://github.com/SOLHK/Swirl/commit/4ec6a9b5f7e5a1c11bdf3cba1b9d6cd4d1456abd)
+双亲为 `89751f96d10d5cd68467ec7dcdd2c84ce558bf87` 和
+`9c2fd0092284edc7d346b0c9e1d1208095429b39`；GitHub tree
+`7ac68fd000560308ad924230d154384708cfd4bf` 与本地测试候选完全一致。
+expected_sha=89751f9 / force=false 更新成功；随后独立回读 ref、双亲、tree、compare、
+管理文档及公共 workflow 全文，均与预期相符。仅十三个已审路径改变。
+本地对齐远端后 index/worktree 干净；已接受 A3 祖先存在，B1 私有数据目录、
+C1 staging store 与 D1 新 Qt probe 等拒绝的新增文件均未进入集成 tree。
+
+[39407140139](https://github.com/SOLHK/Swirl/actions/runs/39407140139) 的 head_sha
+精确为 4ec6a9b，于 **10:20:45 UTC completed/failure**；终态已实际读取。
+
+| Job | 真实终态 | 实际日志与范围 |
+| --- | --- | --- |
+| Python 118575707788 | success | **590 discovered / 590 passed / 0 skipped，12.769 秒**；audit **6/6** |
+| DirectWrite 118575708195 | success | 两个原创合成 fixture 分别 3/3、2/2 faces，均 PASS_NATIVE_PROBE、native exit 0、input_unchanged=true |
+| Apple 118575708373 | failure | 原创合成 face0-point0 / gid2 的垂直 advance **849 对 850.0，tolerance 0.03125**；extractor exit 0，严格验证步骤 exit 1 |
+
+Python 实际安装并 import `uharfbuzz=0.56.3`；以前跳过的七个
+VerticalGPOSHarfBuzzTests 逐项显示 ok，日志无 skipped。本次确实恢复了这七项 CI 执行，
+不是仅修改依赖声明后推测通过；验证既有反例的测试通过不表示相应精度障碍消失。
+Apple 数值轴 validator 22/22、HVF 29/29 仍只是原创夹具/校验器。
+Windows 实际环境为 Server 2022 build 20348，原件轮廓/系统安装/真实 Swirl/清晰度未验；
+原件完整字体测试仍 NOT_RUN，整体 failure 与 0/32 不改变。
+
+已实际下载并读必要报告，两个 ZIP 的 SHA-256 与 GitHub digest 一致，均绑定 4ec6a9b：
+
+| Artifact | ZIP bytes / members | 实际 ZIP SHA-256 |
+| --- | --- | --- |
+| Windows 12256908364 | 40,305 / 30 | `33351991ce0bcb1d4cd58c07fc6debbc4194c805207fff3a4cf33319d35ff5d8` |
+| Apple 12257043346 | 278,090 / 123 | `727315acfab5baf4bbd2c3690c212bb8e59e09c70e9016e326cbf7330c53b13a` |
+
+10:24 UTC 再读时，525975f Rust 39403489509、89751f9 Rust 39405299170、4ec6a9b 的
+Rust 39407140155 / Core implementation 39407140181 仍 in_progress / conclusion=null，
+未计通过。7bbca55 Rust 39401951743 已于 10:10:39 UTC success，89751f9 的
+Core implementation 39405299281 已于 10:12:53 UTC success。
+这次收尾记录只改本文档，字体/工作流与已测试 4ec6a9b 逐字节一致；没有为纯文档追加
+重复运行原生实验，也不把 4ec6a9b 的 CI 冒充新记录 SHA 的独立 CI。
+
+### 8.22 后续待审队列与继续工作的固定入口
+
+10:24 UTC 远端 A3 已到 `6d6a7b5eec6e2c7a630dfd4f692e29a7ecc52115`，
+相对已审核 9c2fd00 为四个提交，涉及十六个路径（新增实验/测试/workflow/归档和已有
+arithmetic probe/handoff 的修改）。本轮已读实际 compare 文件列表及 exact HEAD run 状态：
+39407084146 与 39407084001 均 completed/success，但**未完成这批完整 diff、日志、工件及
+集成候选回归审查**，不得自动继承本轮 590 项验收。下一轮要重新固定完整 SHA，
+特别保留已集成 handoff 的 CI 归属修正，并重新审查 probe 的生产隔离与私有数据出口。
+
+B1 已到 `7902cdb7b449a56939346263df54a692c22d8337`，相对已审核 bdbd6a0 为
+两个提交、十五个路径，新增 original startup 探针、测试及证据。目录级预审已记录，
+本轮未验收该新阶段，exact HEAD 无 workflow run。compare 确认 merge-base 为 bdbd6a0、
+ahead=2 / behind=0，故已证实的私有数据祖先仍在。不能直接合并整条分支；
+首先修复公开出口并提供不含这些祖先的干净交付，再逐阶段验证代码与真实 CI。
+
+C1 仍固定 c0fe6c47：先使必要 symlink 安全断言真实执行、并验证不能执行时门槛失败，
+然后复审已通过的打包/二进制校验阶段。D1 仍固定 4c0fcaf：先解决反序及光栅化前后
+Qt FreeType 路径不稳定，在两个既有系统保留严格失败样本复验，并补齐集成 CI 触发。
+A3 的源/目标精度映射与 B1 原生垂直度量、vertical X origin 仍须各自关闭。
+只有这些必要阻塞和 C1 完整性门槛真正通过后，才启动生产 32 面重建及 Windows 11/
+DirectWrite/Qt 6/实际 Swirl/DPI/字重/三轴最终实测；当前不存在可交付 TTC。
