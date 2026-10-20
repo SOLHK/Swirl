@@ -2,6 +2,24 @@
   "scope": "Cargo.lock resolved dependencies, including target-specific and build dependencies",
   "packages": [
     {
+      "name": "alloc-no-stdlib",
+      "version": "2.0.4",
+      "license": "BSD-3-Clause",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "repository": "https://github.com/dropbox/rust-alloc-no-stdlib",
+      "notices": [
+        "LICENSE"
+      ]
+    },
+    {
+      "name": "alloc-stdlib",
+      "version": "0.2.4",
+      "license": "BSD-3-Clause",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "repository": "https://github.com/dropbox/rust-alloc-no-stdlib",
+      "notices": []
+    },
+    {
       "name": "annotate-snippets",
       "version": "0.12.16",
       "license": "MIT OR Apache-2.0",
@@ -75,6 +93,27 @@
       "notices": [
         "LICENSE-APACHE",
         "LICENSE-MIT"
+      ]
+    },
+    {
+      "name": "brotli",
+      "version": "8.0.4",
+      "license": "BSD-3-Clause AND MIT",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "repository": "https://github.com/dropbox/rust-brotli",
+      "notices": [
+        "LICENSE.BSD-3-Clause",
+        "LICENSE.MIT"
+      ]
+    },
+    {
+      "name": "brotli-decompressor",
+      "version": "5.0.3",
+      "license": "BSD-3-Clause/MIT",
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "repository": "https://github.com/dropbox/rust-brotli-decompressor",
+      "notices": [
+        "LICENSE"
       ]
     },
     {
@@ -748,7 +787,7 @@
       "name": "rustls",
       "version": "0.23.46",
       "license": "Apache-2.0 OR ISC OR MIT",
-      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "source": "vendored+vendor/rustls",
       "repository": "https://github.com/rustls/rustls",
       "notices": [
         "LICENSE-APACHE",

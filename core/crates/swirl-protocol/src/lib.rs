@@ -449,7 +449,8 @@ pub async fn connect(
             key,
             &short_id,
             [0, 1, 0],
-        )?;
+        )?
+        .with_fingerprint(&reality.fingerprint)?;
         let tcp = connect_tcp(
             resolver,
             &Target {

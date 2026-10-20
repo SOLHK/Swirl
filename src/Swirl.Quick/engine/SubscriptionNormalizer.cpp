@@ -175,6 +175,80 @@ void uri(Result &r,const QString &line){
     }
     transport(node,network,path,host,issues);append(r,node,QJsonObject{{"uri",line}},issues);
 }
+// Match the closed Xray subset in swirl-subscription/inspect_reality_xray.rs.
+// Keep each complete source object; never pick one endpoint/user from a list.
+bool xrayKeys(Result &r,const QJsonValue &value,const QStringList &allowed){
+    if(!value.isObject()){r.error="Xray 参数必须为对象；未应用配置。";return false;}
+    const auto object=value.toObject();
+    for(auto it=object.begin();it!=object.end();++it)if(!allowed.contains(it.key())){r.error="Xray 节点含未映射字段；未丢弃字段或应用配置。";return false;}
+    return true;
+}
+void xrayReality(Result &r,const QJsonArray &array){
+    r.handled=true;r.format="Xray / V2Ray JSON";
+    for(const auto &value:array){
+        if(!value.isObject()){r.error="Xray 出站必须为对象；未应用配置。";return;}
+        const auto raw=value.toObject();const auto kind=raw.value("protocol").toString();
+        if(QStringList{"freedom","blackhole","dns"}.contains(kind)){
+            // These are source policy objects, not native executable nodes.
+            auto policies=r.configuration.value("outbounds").toArray();policies.append(raw);r.configuration["outbounds"]=policies;continue;
+        }
+        if(!xrayKeys(r,raw,{"protocol","tag","settings","streamSettings","mux"}))return;
+        if(kind!="vless"||(raw.contains("tag")&&!raw.value("tag").isString())){r.error="Xray 当前仅映射明确的 VLESS REALITY 节点；未应用配置。";return;}
+        if(raw.contains("mux")){
+            if(!xrayKeys(r,raw.value("mux"),{"enabled"}))return;
+            if(raw.value("mux").toObject().value("enabled")!=QJsonValue(false)){r.error="Xray mux 尚未支持；必须明确禁用。";return;}
+        }
+        if(!raw.value("settings").isObject()){r.error="Xray VLESS settings 必须为对象。";return;}
+        const auto settings=raw.value("settings").toObject();QJsonObject endpoint,user;
+        if(settings.contains("vnext")){
+            if(!xrayKeys(r,settings,{"vnext"}))return;
+            const auto endpoints=settings.value("vnext");
+            if(!endpoints.isArray()||endpoints.toArray().size()!=1){r.error="Xray VLESS 必须明确包含一个端点；未选择或合并多个端点。";return;}
+            if(!xrayKeys(r,endpoints.toArray().first(),{"address","port","users"}))return;
+            endpoint=endpoints.toArray().first().toObject();const auto users=endpoint.value("users");
+            if(!users.isArray()||users.toArray().size()!=1){r.error="Xray VLESS 必须明确包含一个用户；未选择或合并多个用户。";return;}
+            if(!xrayKeys(r,users.toArray().first(),{"id","encryption","flow"}))return;
+            user=users.toArray().first().toObject();
+        }else{
+            if(!xrayKeys(r,settings,{"address","port","id","encryption","flow"}))return;
+            endpoint=settings;user=settings;
+        }
+        const auto port=endpoint.value("port");
+        if(!endpoint.value("address").isString()||endpoint.value("address").toString()!=endpoint.value("address").toString().trimmed()||!port.isDouble()||port.toDouble()!=port.toInt(-1)||port.toInt()<1||port.toInt()>65535||!user.value("id").isString()){
+            r.error="Xray VLESS 服务器、端口或 UUID 类型无效。";return;
+        }
+        if(user.value("encryption")!=QJsonValue(QStringLiteral("none"))){r.error="Xray VLESS encryption 必须明确为 none；未丢弃加密要求。";return;}
+        if(user.contains("flow")&&!user.value("flow").isString()){r.error="Xray VLESS flow 必须为字符串。";return;}
+        if(!xrayKeys(r,raw.value("streamSettings"),{"network","security","realitySettings","tcpSettings","rawSettings"}))return;
+        const auto stream=raw.value("streamSettings").toObject();
+        if(!QStringList{"tcp","raw"}.contains(stream.value("network").toString())){r.error="Xray REALITY 当前仅映射明确的 tcp 或 raw 传输。";return;}
+        if(stream.value("security")!=QJsonValue(QStringLiteral("reality"))){r.error="Xray REALITY 安全层缺失或冲突；未降级为普通 TLS。";return;}
+        if(stream.contains("tcpSettings")&&stream.contains("rawSettings")&&stream.value("tcpSettings")!=stream.value("rawSettings")){r.error="Xray tcpSettings 与 rawSettings 冲突；未覆盖原值。";return;}
+        if(stream.contains("tcpSettings")||stream.contains("rawSettings")){
+            const auto tcp=stream.contains("tcpSettings")?stream.value("tcpSettings"):stream.value("rawSettings");
+            if(!xrayKeys(r,tcp,{"header"}))return;
+            if(tcp.toObject().contains("header")){
+                const auto header=tcp.toObject().value("header");if(!xrayKeys(r,header,{"type"}))return;
+                if(header.toObject().value("type")!=QJsonValue(QStringLiteral("none"))){r.error="Xray TCP 头部伪装尚未支持；未丢弃原值。";return;}
+            }
+        }
+        if(!xrayKeys(r,stream.value("realitySettings"),{"serverName","fingerprint","publicKey","password","shortId","spiderX","show"}))return;
+        const auto reality=stream.value("realitySettings").toObject();
+        if(reality.contains("spiderX")){r.error="Xray REALITY spiderX 行为尚未支持；未丢弃原值。";return;}
+        if(reality.contains("show")&&reality.value("show")!=QJsonValue(false)){r.error="Xray REALITY 诊断扩展尚未支持；未应用配置。";return;}
+        if(reality.contains("publicKey")&&reality.contains("password")&&reality.value("publicKey")!=reality.value("password")){r.error="Xray REALITY publicKey 与 password 冲突；未覆盖原值。";return;}
+        const auto key=reality.contains("publicKey")?reality.value("publicKey"):reality.value("password");
+        if(!key.isString()||!reality.value("serverName").isString()||!reality.value("fingerprint").isString()||!reality.value("shortId").isString()){
+            r.error="Xray REALITY 公钥、SNI、指纹及 shortId 必须明确提供字符串。";return;
+        }
+        QJsonObject node{{"type","vless"},{"name",raw.value("tag")},{"server",endpoint.value("address")},{"port",port},{"uuid",user.value("id")},
+            {"encryption","none"},{"tls",true},{"network","tcp"},{"sni",reality.value("serverName")},{"client-fingerprint",reality.value("fingerprint")},
+            {"reality-opts",QJsonObject{{"public-key",key},{"short-id",reality.value("shortId")}}}};
+        if(user.contains("flow"))node["flow"]=user.value("flow");
+        append(r,node,raw);if(!r.error.isEmpty())return;
+    }
+    if(r.nodes.isEmpty())r.error="Xray 配置没有可导入的 VLESS REALITY 节点。";
+}
 void singBox(Result &r,const QJsonArray &array){
     r.handled=true;r.format="sing-box";
     for(const auto &value:array){
@@ -226,9 +300,11 @@ void singBox(Result &r,const QJsonArray &array){
             if(utls.value("enabled").toBool()){
                 const auto fingerprint=utls.value("fingerprint").toString();
                 // sing-box defaults an enabled uTLS profile to chrome. Keep
-                // that profile explicit so native TLS cannot silently replace it.
+                // that import metadata; the native gate still requires an
+                // explicit supported profile in the untouched source object.
                 n["client-fingerprint"]=fingerprint.isEmpty()?QString("chrome"):fingerprint;
-            }
+            }else if(utls.contains("fingerprint"))issue(issues,"sing-box uTLS 未启用却含指纹要求，原始配置已保留。");
+            for(const auto &key:QStringList{"fp","client-fingerprint"})if(raw.contains(key)&&utls.contains("fingerprint")&&raw.value(key)!=utls.value("fingerprint"))issue(issues,"sing-box 顶层指纹别名与 uTLS 指纹冲突，原始配置已保留。");
             const auto reality=tls.value("reality").toObject();
             if(reality.value("enabled").toBool()){
                 if(!utls.value("enabled").toBool()||reality.value("public_key").toString().trimmed().isEmpty()){
@@ -480,8 +556,10 @@ SubscriptionNormalizer::Result SubscriptionNormalizer::normalize(const QByteArra
     r.decodedDocument=bytes;
     const auto json=QJsonDocument::fromJson(bytes);
     if(json.isObject()&&json.object().value("outbounds").isArray()){
-        r.configurationFormat="sing-box";r.configuration=json.object();r.configuration.remove("outbounds");
-        singBox(r,json.object().value("outbounds").toArray());
+        const auto outbounds=json.object().value("outbounds").toArray();
+        const bool xray=std::any_of(outbounds.cbegin(),outbounds.cend(),[](const QJsonValue &node){return node.toObject().contains("protocol");});
+        r.configurationFormat=xray?"xray-v2ray-json":"sing-box";r.configuration=json.object();r.configuration.remove("outbounds");
+        if(xray)xrayReality(r,outbounds);else singBox(r,outbounds);
         if(!r.configuration.isEmpty())r.configuration=json.object();
         return r;
     }

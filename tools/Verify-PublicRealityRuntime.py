@@ -118,9 +118,9 @@ class DeadlineControl(Control):
 
 
 class PublicPeer(XrayRuntimePeer):
-    def __init__(self, binary, folder, evidence, destinations, flow):
+    def __init__(self, binary, folder, evidence, destinations, flow, fingerprint="rustls"):
         self.destinations = destinations
-        super().__init__(binary, folder, evidence, "public", (), flow)
+        super().__init__(binary, folder, evidence, "public", (), flow, fingerprint)
 
     def outbound_routes(self):
         outbounds, rules = [], []
@@ -155,7 +155,7 @@ def imported_configuration(peer):
     expected = {"type": "vless", "host": "127.0.0.1", "port": peer.port, "uuid": peer.uuid,
                 "tls": None, "websocket": None, "reality": {
                     "server_name": SNI, "public_key": peer.public_key,
-                    "short_id": peer.short_id, "fingerprint": "rustls", "alpn": []}}
+                    "short_id": peer.short_id, "fingerprint": peer.fingerprint, "alpn": []}}
     if peer.flow:
         expected["flow"] = peer.flow
     require(value["tcpCandidates"] == [expected], "NativeCandidateParametersChanged")
@@ -322,6 +322,7 @@ def main():
     for name in ("harness", "inspector", "xray-peer-dir", "output"):
         parser.add_argument("--" + name, type=Path, required=True)
     parser.add_argument("--vision", action="store_true")
+    parser.add_argument("--fingerprint", choices=("rustls", "chrome", "chrome_133"), default="rustls")
     args = parser.parse_args()
     output = args.output.resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -331,6 +332,8 @@ def main():
               "timestamp_utc": datetime.now(timezone.utc).isoformat(), "checks": [],
               "protocol": "vless+reality" + ("+vision" if args.vision else ""),
               "flow": FLOW if args.vision else "", "verifier_sha256": sha256(Path(__file__)),
+              "fingerprint": args.fingerprint,
+              "client_hello_profile": "chrome_133" if args.fingerprint in ("chrome", "chrome_133") else "rustls",
               "public_target_dns": "Explicit test-launcher system lookup; one public IPv4 pinned at Xray per origin",
               "scope": "Native Rust subscription import and Runtime through official Xray to explicit public origins; not Qt, provider or TUN acceptance"}
     phase, peer = "identity", None
@@ -339,7 +342,7 @@ def main():
         os.environ["SWIRL_RUST_HARNESS"] = str(args.harness.resolve(strict=True))
         os.environ["SWIRL_RUST_INSPECTOR"] = str(args.inspector.resolve(strict=True))
         os.environ["SWIRL_XRAY_PEER_DIR"] = str(args.xray_peer_dir.resolve(strict=True))
-        binary = verified_build(evidence)
+        binary = verified_build(evidence, fingerprint=args.fingerprint)
         identity = json.loads((evidence / "source-identity.json").read_text(encoding="utf-8"))
         report.update(commit=identity["git_sha"], tracked_worktree_clean=source_is_clean())
         if not report["tracked_worktree_clean"]:
@@ -349,7 +352,8 @@ def main():
         with tempfile.TemporaryDirectory(prefix="swirl-public-reality-") as folder:
             try:
                 phase = "official-peer-start"
-                peer = PublicPeer(binary, Path(folder) / "peer", evidence, destinations, report["flow"])
+                peer = PublicPeer(binary, Path(folder) / "peer", evidence, destinations,
+                                  report["flow"], args.fingerprint)
                 peer.start()
                 report["checks"] = [probe(peer, target, address, args.vision) for target, address in destinations]
             finally:

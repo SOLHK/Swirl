@@ -5,6 +5,11 @@ Branch: `work/core-completion-20261017`. The source baseline was
 This file describes the production integration, not private-provider acceptance.
 Frozen acceptance remains **79 items / 6 accepted / 10.83% weighted**.
 
+The subsequent [Chrome133 continuation](CORE_REALITY_CHROME133_20261020.md)
+supersedes the fingerprint and CI status boundaries below. This document retains
+the original P0/P1 checkpoint; its historical `rustls`-only restrictions are not
+the current supported-profile list.
+
 ## Current continuation: combined Vision Runtime
 
 P0 was pushed as [`169e0cad51fc18a2d6fa4f194fafd90128bf2f7b`](https://github.com/SOLHK/Swirl/commit/169e0cad51fc18a2d6fa4f194fafd90128bf2f7b),

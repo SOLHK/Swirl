@@ -3,7 +3,8 @@
 
 This build-only fixture never fetches subscriptions and is not a product
 dependency. All protocol code comes from the unmodified, verified upstream
-checkout. The small Go entry point is Swirl's loopback test instrumentation.
+checkout. The small Go entry points are Swirl's loopback test instrumentation
+and an offline ClientHello oracle from Xray's original locked uTLS dependency.
 """
 
 from __future__ import annotations
@@ -20,6 +21,8 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "tools" / "tests" / "xray_peer"
+UTLS_MODULE = "github.com/refraction-networking/utls"
+UTLS_VERSION = "v1.8.3-0.20260301010127-aa6edf4b11af"
 
 
 def sha256(path: Path) -> str:
@@ -39,6 +42,7 @@ def build(args: argparse.Namespace) -> None:
         "platform": platform.platform(),
         "lock_sha256": sha256(lock_path),
         "helper_source_sha256": sha256(FIXTURE / "main.go"),
+        "utls_helper_source_sha256": sha256(FIXTURE / "utls_hello/main.go"),
         "xray": lock["xray"],
         "reality": lock["reality"],
     }
@@ -113,11 +117,29 @@ def build(args: argparse.Namespace) -> None:
                                     ("Sum", "sum"), ("GoModSum", "go_mod_sum")):
                 if reality.get(field) != lock["reality"][expected]:
                     raise RuntimeError(f"REALITY {field} identity mismatch")
+            utls = json.loads(run([args.go, "mod", "download", "-json", UTLS_MODULE], source))
+            if utls.get("Path") != UTLS_MODULE or utls.get("Version") != UTLS_VERSION:
+                raise RuntimeError("uTLS oracle is not the reviewed module pinned by Xray")
+            upstream_sums = {tuple(parts[:2]): parts[2] for line in
+                             (source / "go.sum").read_text(encoding="utf-8").splitlines()
+                             if len(parts := line.split()) == 3}
+            for field, suffix in (("Sum", ""), ("GoModSum", "/go.mod")):
+                if not utls.get(field) or utls[field] != upstream_sums.get((UTLS_MODULE, UTLS_VERSION + suffix)):
+                    raise RuntimeError(f"uTLS {field} differs from the original verified Xray lock")
+            utls_source = Path(utls["Dir"])
+            manifest["utls"] = {
+                "module": UTLS_MODULE, "version": UTLS_VERSION,
+                "sum": utls["Sum"], "go_mod_sum": utls["GoModSum"],
+                "profile": "HelloChrome_133", "license": "BSD-3-Clause",
+                "license_sha256": sha256(utls_source / "LICENSE"),
+                "profile_source_sha256": sha256(utls_source / "u_parrots.go"),
+            }
             run([args.go, "mod", "verify"], source)
             run([args.go, "list", "-m", "-json", "all"], source)
             extension = ".exe" if os.name == "nt" else ""
             xray = output / ("xray" + extension)
             peer = output / ("reality-peer" + extension)
+            hello = output / ("utls-hello" + extension)
             xray_command = [args.go, "build", "-mod=readonly", "-trimpath", "-buildvcs=true"]
             run([*xray_command, "-o", str(xray), "./main"], source)
             ldflags = (f"-X main.xrayCommit={lock['xray']['commit']} "
@@ -125,14 +147,20 @@ def build(args: argparse.Namespace) -> None:
             manifest["helper_source_sha256"] = sha256(FIXTURE / "main.go")
             peer_command = [args.go, "build", "-mod=readonly", "-trimpath", "-buildvcs=false", "-ldflags", ldflags]
             run([*peer_command, "-o", str(peer), str(FIXTURE / "main.go")], source)
-            if sha256(FIXTURE / "main.go") != manifest["helper_source_sha256"] or sha256(lock_path) != manifest["lock_sha256"]:
+            hello_command = [args.go, "build", "-mod=readonly", "-trimpath", "-buildvcs=false", "-ldflags",
+                             f"-X main.xrayCommit={lock['xray']['commit']}"]
+            run([*hello_command, "-o", str(hello), str(FIXTURE / "utls_hello/main.go")], source)
+            if (sha256(FIXTURE / "main.go") != manifest["helper_source_sha256"]
+                    or sha256(FIXTURE / "utls_hello/main.go") != manifest["utls_helper_source_sha256"]
+                    or sha256(lock_path) != manifest["lock_sha256"]):
                 raise RuntimeError("peer source or lock changed during its build")
             manifest["binaries"] = {}
-            for name, path in (("xray", xray), ("reality_peer", peer)):
+            for name, path in (("xray", xray), ("reality_peer", peer), ("utls_hello", hello)):
                 version_info = run([args.go, "version", "-m", str(path)])
                 (output / f"{name}-go-version.txt").write_text(version_info + "\n", encoding="utf-8")
-                if lock["reality"]["version"] not in version_info or lock["reality"]["sum"] not in version_info:
-                    raise RuntimeError(f"{name} binary omitted the locked REALITY build identity")
+                identity = manifest["utls"] if name == "utls_hello" else lock["reality"]
+                if identity["version"] not in version_info or identity["sum"] not in version_info:
+                    raise RuntimeError(f"{name} binary omitted its locked dependency identity")
                 if name == "xray" and (f"vcs.revision={lock['xray']['commit']}" not in version_info or "vcs.modified=false" not in version_info):
                     raise RuntimeError("Xray executable VCS build identity mismatch")
                 manifest["binaries"][name] = {"file": path.name, "sha256": sha256(path)}
@@ -142,12 +170,21 @@ def build(args: argparse.Namespace) -> None:
                 manifest["peer_version_output"].get("reality_version") != lock["reality"]["version"] or
                 manifest["peer_version_output"].get("go_version") != actual_go):
                 raise RuntimeError("helper executable Xray identity mismatch")
-            # Re-run both builds to distinct output paths with identical fixed
+            manifest["utls_hello_version_output"] = json.loads(run([str(hello), "--version"]))
+            hello_version = manifest["utls_hello_version_output"]
+            if (hello_version.get("xray_commit") != lock["xray"]["commit"]
+                    or hello_version.get("go_version") != actual_go
+                    or hello_version.get("profile") != "HelloChrome_133"
+                    or any(hello_version.get("utls", {}).get(field) != manifest["utls"][field]
+                           for field in ("module", "version", "sum"))):
+                raise RuntimeError("uTLS ClientHello oracle runtime identity mismatch")
+            # Re-run all builds to distinct output paths with identical fixed
             # inputs/flags. Cache reuse is allowed; equality is actually checked
             # rather than inferred from the flags. The duplicate is temporary.
             manifest["reproducible_rebuild"] = {}
             for name, command, entry in (("xray", xray_command, "./main"),
-                                         ("reality_peer", peer_command, str(FIXTURE / "main.go"))):
+                                         ("reality_peer", peer_command, str(FIXTURE / "main.go")),
+                                         ("utls_hello", hello_command, str(FIXTURE / "utls_hello/main.go"))):
                 repeated = output / ("repeated-" + manifest["binaries"][name]["file"])
                 try:
                     run([*command, "-o", str(repeated), entry], source)
@@ -158,7 +195,8 @@ def build(args: argparse.Namespace) -> None:
                         raise RuntimeError(f"{name} repeated build differs from original")
                 finally:
                     repeated.unlink(missing_ok=True)
-            if sha256(FIXTURE / "main.go") != manifest["helper_source_sha256"]:
+            if (sha256(FIXTURE / "main.go") != manifest["helper_source_sha256"]
+                    or sha256(FIXTURE / "utls_hello/main.go") != manifest["utls_helper_source_sha256"]):
                 raise RuntimeError("helper source changed during repeated builds")
             # Builds cannot rewrite the imported source or the original module
             # lock. A cache corruption check also runs after both compilations.

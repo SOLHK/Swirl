@@ -6,8 +6,10 @@ SWIRL_REALITY_CLIENT, then run this file. Missing builds, mismatched executable
 hashes, missing outcomes and peer failures are errors, never skipped tests.
 Every connection uses fresh synthetic credentials and loopback listeners. The
 test helper is an isolated upstream oracle; Swirl never links or launches it
-as a production outbound. VLESS, Vision, browser fingerprints, real providers
-and the complete product path are outside this TLS component's evidence.
+as a production outbound. Chrome133 and the native profile both exercise the
+actual hybrid and classical key exchanges. Browser wire compatibility has its
+own independent uTLS gate; VLESS, Vision, real providers and the complete
+product path are outside this TLS component's evidence.
 """
 
 from __future__ import annotations
@@ -298,9 +300,10 @@ class RealityXrayInterop(unittest.TestCase):
         self.assertEqual(server["camouflage_application_bytes"], 0, server)
 
     def positive(self, payload, *, group="hybrid", read_chunk=16384, write_chunk=16384,
-                 peer_read_chunk=4093, peer_write_chunk=997):
+                 peer_read_chunk=4093, peer_write_chunk=997, fingerprint="rustls"):
         with self.peer_session(group=group, read_chunk=peer_read_chunk, write_chunk=peer_write_chunk) as peer:
-            code, client, _ = self.invoke(peer, payload, read_chunk=read_chunk, write_chunk=write_chunk)
+            code, client, _ = self.invoke(peer, payload, read_chunk=read_chunk,
+                                         write_chunk=write_chunk, fingerprint=fingerprint)
             server = peer.finish()
             self.assertEqual(code, 0, client)
             self.assertEqual(client["status"], "ok", client)
@@ -325,6 +328,13 @@ class RealityXrayInterop(unittest.TestCase):
 
     def test_native_x25519_authentication_finished_bidirectional_data_and_close(self):
         self.positive((bytes(range(255, -1, -1)) * 129)[:32769], group="x25519")
+
+    def test_chrome_hybrid_authentication_finished_bidirectional_data_and_close(self):
+        self.positive((bytes(range(256)) * 129)[:32769], fingerprint="chrome")
+
+    def test_chrome_independent_x25519_authentication_finished_bidirectional_data_and_close(self):
+        self.positive((bytes(range(255, -1, -1)) * 129)[:32769], group="x25519",
+                      fingerprint="chrome_133")
 
     def test_one_mebibyte_binary_transfer_with_short_reads_and_writes(self):
         self.positive(bytes(range(256)) * (MAX_PAYLOAD // 256), read_chunk=257, write_chunk=131,

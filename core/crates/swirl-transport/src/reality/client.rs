@@ -14,9 +14,11 @@ const MAX_HANDSHAKE_BYTES: usize = 256 * 1024;
 /// certificate. It performs no DNS or socket I/O by itself and never substitutes
 /// ordinary TLS on failure. The caller owns the transport, timeout and cancellation.
 ///
-/// This profile uses rustls's native ClientHello with real hybrid/X25519 shares;
-/// it does not implement Chrome/uTLS fingerprinting, VLESS or Vision. The async
-/// [`super::Stream`] drives this exact engine in the production transport path.
+/// The selected profile uses a native rustls or pinned Chrome133 ClientHello
+/// with real hybrid/X25519 shares. Chrome133 is checked against an independent
+/// uTLS wire oracle; it does not claim full browser behavior. The async
+/// [`super::Stream`] drives this exact engine in the production transport path;
+/// VLESS and Vision framing belong to the protocol layer above it.
 /// Application writes are refused until CertificateVerify and Finished succeed.
 pub struct TlsClient {
     connection: ClientConnection,

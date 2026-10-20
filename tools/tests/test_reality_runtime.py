@@ -14,8 +14,9 @@ https://github.com/XTLS/REALITY/blob/83f621788ca88b83179810b12baa7ae518aacb83/re
 https://github.com/XTLS/Xray-core/blob/92ccc939aaf4f8965f369cf0b142e005aeaa11d5/proxy/vless/inbound/inbound.go
 https://github.com/XTLS/Xray-core/blob/92ccc939aaf4f8965f369cf0b142e005aeaa11d5/infra/conf/freedom.go
 
-Private provider, browser-fingerprint and physical Windows GUI acceptance remain
-separate. --qt requires the actual Windows Qt/DPAPI test executable; absence is
+Private provider, complete browser-behavior and physical Windows GUI acceptance
+remain separate. Chrome ClientHello compatibility has an independent uTLS oracle.
+--qt requires the actual Windows Qt/DPAPI test executable; absence is
 an error, not a skipped or simulated product test.
 """
 
@@ -48,8 +49,8 @@ import uuid
 from urllib.parse import urlencode
 
 from cryptography import x509
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import ed25519, x25519
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec, ed25519, x25519
 from cryptography.x509.oid import NameOID
 
 from test_product_subscription_chain import BODY, TAIL, ChainBase, ProductChainIntegration, Server
@@ -248,18 +249,23 @@ class LengthEchoOrigin:
 
 
 class Camouflage:
-    """Ticket-free TLS 1.3 Ed25519 target; accepted sockets have single owners."""
+    """Ticket-free TLS 1.3 target; accepted sockets have single owners."""
 
-    def __init__(self, folder):
+    def __init__(self, folder, fingerprint="rustls"):
         now = datetime.now(timezone.utc)
-        key = ed25519.Ed25519PrivateKey.generate()
+        # Chrome133 does not offer Ed25519. The observed camouflage target must
+        # have a genuinely compatible TLS certificate; never change the real
+        # browser signature list to accommodate an incompatible test server.
+        browser = fingerprint in ("chrome", "chrome_133")
+        key = (ec.generate_private_key(ec.SECP256R1()) if browser
+               else ed25519.Ed25519PrivateKey.generate())
         subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, SNI)])
         cert = (x509.CertificateBuilder().subject_name(subject).issuer_name(subject)
                 .public_key(key.public_key()).serial_number(x509.random_serial_number())
                 .not_valid_before(now - timedelta(hours=1)).not_valid_after(now + timedelta(hours=1))
                 .add_extension(x509.BasicConstraints(ca=True, path_length=0), critical=True)
                 .add_extension(x509.SubjectAlternativeName([x509.DNSName(SNI)]), critical=False)
-                .sign(key, None))
+                .sign(key, hashes.SHA256() if browser else None))
         cert_path, key_path = folder / "camouflage.pem", folder / "camouflage.key"
         cert_path.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
         key_path.write_bytes(key.private_bytes(serialization.Encoding.PEM,
@@ -358,11 +364,12 @@ class Camouflage:
 class XrayRuntimePeer:
     """Complete official executable, no seeded cache or alternate VLESS handler."""
 
-    def __init__(self, binary, folder, evidence, identity, ports, flow=""):
+    def __init__(self, binary, folder, evidence, identity, ports, flow="", fingerprint="rustls"):
         self.binary, self.folder, self.evidence, self.identity = binary, folder, evidence, identity
         self.folder.mkdir()
         self.flow, self.ports = flow, list(ports)
-        self.camouflage = Camouflage(self.folder)
+        self.fingerprint = fingerprint
+        self.camouflage = Camouflage(self.folder, fingerprint)
         self.uuid = str(uuid.uuid4())
         key = x25519.X25519PrivateKey.generate()
         self.private_key = b64url(key.private_bytes(serialization.Encoding.Raw,
@@ -432,7 +439,7 @@ class XrayRuntimePeer:
     def node(self):
         node = {"name": self.identity, "type": "vless", "server": "127.0.0.1", "port": self.port,
                 "uuid": self.uuid, "network": "tcp", "tls": True, "servername": SNI,
-                "client-fingerprint": "rustls", "reality-opts": {
+                "client-fingerprint": self.fingerprint, "reality-opts": {
                     "public-key": self.public_key, "short-id": self.short_id}}
         if self.flow:
             node["flow"] = self.flow
@@ -441,6 +448,31 @@ class XrayRuntimePeer:
     def document(self, fmt="json"):
         if fmt == "json":
             return remember_secret(json.dumps({"proxies": [self.node()]}))
+        if fmt == "singbox":
+            assert self.fingerprint in ("chrome", "chrome_133")
+            node = {"tag": self.identity, "type": "vless", "server": "127.0.0.1",
+                    "server_port": self.port, "uuid": self.uuid,
+                    "tls": {"enabled": True, "server_name": SNI,
+                            "utls": {"enabled": True, "fingerprint": self.fingerprint},
+                            "reality": {"enabled": True, "public_key": self.public_key,
+                                        "short_id": self.short_id}}}
+            if self.flow:
+                node["flow"] = self.flow
+            return remember_secret(json.dumps({"outbounds": [node]}))
+        if fmt == "xray":
+            assert self.fingerprint in ("chrome", "chrome_133")
+            user = {"id": self.uuid, "encryption": "none"}
+            if self.flow:
+                user["flow"] = self.flow
+            node = {"tag": self.identity, "protocol": "vless",
+                    "settings": {"vnext": [{"address": "127.0.0.1", "port": self.port,
+                                             "users": [user]}]},
+                    "streamSettings": {"network": "raw", "security": "reality",
+                                       "realitySettings": {"serverName": SNI,
+                                                           "fingerprint": self.fingerprint,
+                                                           "publicKey": self.public_key,
+                                                           "shortId": self.short_id}}}
+            return remember_secret(json.dumps({"outbounds": [node]}))
         if fmt == "yaml":
             node = self.node()
             rows = ["proxies:", "  - name: " + json.dumps(node.pop("name"))]
@@ -448,7 +480,7 @@ class XrayRuntimePeer:
                 rows.append("    " + key + ": " + json.dumps(value))
             return remember_secret("\n".join(rows) + "\n")
         query = {"security": "reality", "type": "tcp", "encryption": "none", "sni": SNI,
-                 "pbk": self.public_key, "sid": self.short_id, "fp": "rustls"}
+                 "pbk": self.public_key, "sid": self.short_id, "fp": self.fingerprint}
         if self.flow:
             query["flow"] = self.flow
         uri = f"vless://{self.uuid}@127.0.0.1:{self.port}?{urlencode(query)}#{self.identity}"
@@ -462,6 +494,8 @@ class XrayRuntimePeer:
         access = self.access_path.read_text(encoding="utf-8", errors="replace") if self.access_path.exists() else ""
         accepted = [line for line in access.splitlines() if " accepted tcp:" in line]
         return {"identity": self.identity, "protocol": "vless+reality" + ("+vision" if self.flow else ""),
+                "fingerprint": self.fingerprint,
+                "client_hello_profile": "chrome_133" if self.fingerprint in ("chrome", "chrome_133") else "rustls",
                 "tcp_listener_established": self.process is not None,
                 "reality_authenticated_sessions": len(re.findall(r"isHandshakeComplete\.Load\(\): true", log)),
                 "client_finished_verified_sessions": len(re.findall(r"readClientFinished\(\) err: <nil>", log)),
@@ -504,7 +538,7 @@ class XrayRuntimePeer:
         assert not forced and report["process_reaped"] and listener_closed
 
 
-def verified_build(evidence, qt=False):
+def verified_build(evidence, qt=False, fingerprint="rustls"):
     for name in ("SWIRL_XRAY_PEER_DIR", "SWIRL_RUST_HARNESS", "SWIRL_RUST_INSPECTOR"):
         if not os.environ.get(name):
             raise RuntimeError("Required Runtime/Xray executable not configured: " + name)
@@ -544,7 +578,8 @@ def verified_build(evidence, qt=False):
         "platform": sys.platform, "github_run_id": os.environ.get("GITHUB_RUN_ID"),
         "build_manifest": manifest,
         "scope": "actual Windows Qt/DPAPI" if qt else "production Rust control ABI with portable JSON test host",
-        "provider_connection": False, "fingerprint": "rustls"})
+        "provider_connection": False, "fingerprint": fingerprint,
+        "client_hello_profile": "chrome_133" if fingerprint in ("chrome", "chrome_133") else "rustls"})
     return binary
 
 
@@ -558,13 +593,14 @@ class RealityRuntimeInterop(ChainBase):
     idle = ProductChainIntegration.idle
     imported = ProductChainIntegration.imported
     flow = ""
+    fingerprint = "rustls"
 
     @classmethod
     def setUpClass(cls):
         cls.evidence_root = Path(os.environ.get("SWIRL_REALITY_RUNTIME_EVIDENCE",
                                                 ROOT / "build/reality-runtime-evidence")).resolve()
         cls.evidence_root.mkdir(parents=True, exist_ok=True)
-        cls.xray = verified_build(cls.evidence_root)
+        cls.xray = verified_build(cls.evidence_root, fingerprint=cls.fingerprint)
 
     def setUp(self):
         self.addCleanup(self.record)
@@ -596,7 +632,8 @@ class RealityRuntimeInterop(ChainBase):
 
     def peer(self, identity="A", extra_ports=()):
         peer = XrayRuntimePeer(self.xray, Path(self.folder.name) / identity, self.case, identity,
-                               [self.http.port, self.https.port, self.echo.port, *extra_ports], self.flow)
+                               [self.http.port, self.https.port, self.echo.port, *extra_ports],
+                               self.flow, self.fingerprint)
         self.addCleanup(peer.close)
         peer.start()
         self.peers.append(peer)
@@ -617,22 +654,93 @@ class RealityRuntimeInterop(ChainBase):
 
     def test_import_uri_yaml_json_base64_to_http_and_verified_https(self):
         peer = self.peer()
-        for fmt in ("uri", "json", "yaml", "base64"):
+        formats = ["uri", "json", "yaml", "base64"]
+        if self.fingerprint in ("chrome", "chrome_133"):
+            formats += ["singbox", "xray"]
+        for fmt in formats:
             with self.subTest(format=fmt):
                 config = self.imported([peer], fmt)
                 reality = config["nodes"][0]["outbound"]["reality"]
                 self.assertEqual(reality["server_name"], SNI)
                 self.assertEqual(reality["public_key"], peer.public_key)
                 self.assertEqual(reality["short_id"], peer.short_id)
-                self.assertEqual(reality["fingerprint"], "rustls")
+                self.assertEqual(reality["fingerprint"], self.fingerprint)
                 self.assertEqual(config["nodes"][0]["outbound"].get("flow") or "", self.flow)
                 self.start(config)
                 self.fetch(path="/" + fmt)
                 self.fetch(path="/" + fmt + "-tls", tls=True)
                 self.idle()
                 self.assertTrue(self.core.command(op="stop", handle=self.handle)["ok"])
-        self.observed(peer, 8)
-        self.assertEqual(self.https.tls_closed, 4)
+        self.observed(peer, 2 * len(formats))
+        self.assertEqual(self.https.tls_closed, len(formats))
+
+    def test_socks5_domain_connect_to_http_and_verified_https(self):
+        peer = self.peer()
+        self.start(self.imported([peer], "uri"))
+        exchanges = []
+        for tls in (False, True):
+            with self.subTest(tls=tls):
+                host = b"localhost"
+                port = self.https.port if tls else self.http.port
+                path = "/socks-domain-https" if tls else "/socks-domain-http"
+                raw = socket.create_connection(("127.0.0.1", self.port), timeout=8)
+                stream = raw
+                exchange = {"inbound": "socks5", "method": "no-auth", "address_type": "domain",
+                            "host": host.decode(), "port": port, "path": path,
+                            "tls": tls, "certificate_verified": False,
+                            "authenticated_tls_close": False}
+                try:
+                    raw.sendall(b"\x05\x01\x00")
+                    self.assertEqual(exact(raw, 2), b"\x05\x00")
+                    raw.sendall(b"\x05\x01\x00\x03" + bytes([len(host)]) + host + port.to_bytes(2, "big"))
+                    response = exact(raw, 4)
+                    self.assertEqual(response[:3], b"\x05\x00\x00")
+                    if response[3] == 1:
+                        exact(raw, 4)
+                    elif response[3] == 4:
+                        exact(raw, 16)
+                    else:
+                        self.assertEqual(response[3], 3, "Unknown SOCKS5 bound address type")
+                        exact(raw, exact(raw, 1)[0])
+                    exact(raw, 2)
+                    if tls:
+                        context = ssl.create_default_context(cadata=self.ca_pem)
+                        context.set_alpn_protocols(["http/1.1"])
+                        stream = context.wrap_socket(raw, server_hostname=host.decode(),
+                                                     suppress_ragged_eofs=False)
+                        self.assertEqual(stream.selected_alpn_protocol(), "http/1.1")
+                        exchange.update(certificate_verified=True, tls_version=stream.version())
+                    stream.sendall(f"GET {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n".encode())
+                    response = header(stream)
+                    self.assertTrue(response.startswith(b"HTTP/1.1 200 OK\r\n"))
+                    length = next(int(line.split(b":", 1)[1]) for line in response.split(b"\r\n")
+                                  if line.lower().startswith(b"content-length:"))
+                    self.assertEqual(exact(stream, length), BODY + b":" + path.encode())
+                    if tls:
+                        stream = stream.unwrap()
+                        exchange["authenticated_tls_close"] = True
+                    stream.shutdown(socket.SHUT_WR)
+                    self.assertEqual(stream.recv(1), b"")
+                    exchanges.append(exchange)
+                finally:
+                    stream.close()
+                    raw.close()
+        observed = self.observed(peer, 2)
+        self.assertEqual(observed["reality_authenticated_sessions"], 2, observed)
+        self.assertEqual(observed["client_finished_verified_sessions"], 2, observed)
+        self.assertCountEqual(observed["vless_target_ports"], [self.http.port, self.https.port])
+        if self.flow:
+            self.assertGreater(observed["vision_padding_events"], 0, observed)
+            self.assertGreater(observed["vision_unpadding_events"], 0, observed)
+        status = self.idle()
+        self.assertEqual(status["accepted"], 2, status)
+        self.assertGreater(status["upload"], 0, status)
+        self.assertGreater(status["download"], 0, status)
+        self.assertEqual([r.split(b" ")[1] for r in self.http.requests], [b"/socks-domain-http"])
+        self.assertEqual([r.split(b" ")[1] for r in self.https.requests], [b"/socks-domain-https"])
+        self.assertEqual(self.https.sni, ["localhost"])
+        self.assertEqual(self.https.tls_closed, 1)
+        write_json(self.case / "socks5-client.json", {"exchanges": exchanges})
 
     def test_wrong_reality_authentication_and_vless_uuid_never_reach_target(self):
         peer, spare = self.peer(), self.peer("B")
@@ -874,7 +982,7 @@ class RealityQtInterop(RealityRuntimeInterop):
     def setUpClass(cls):
         cls.evidence_root = Path(os.environ["SWIRL_REALITY_RUNTIME_EVIDENCE"]).resolve()
         cls.evidence_root.mkdir(parents=True, exist_ok=True)
-        cls.xray = verified_build(cls.evidence_root, qt=True)
+        cls.xray = verified_build(cls.evidence_root, qt=True, fingerprint=cls.fingerprint)
 
     def test_actual_qt_import_dpapi_select_route_and_recreate(self):
         a, b = self.peer(), self.peer("B")
@@ -912,13 +1020,19 @@ class RealityQtInterop(RealityRuntimeInterop):
             if self.flow:
                 self.assertGreater(observed["vision_padding_events"], 0, observed)
                 self.assertGreater(observed["vision_unpadding_events"], 0, observed)
+                if peer is a:
+                    # Only A carries the successfully verified TLS 1.3 origin.
+                    self.assertGreater(observed["vision_direct_upload_commands"], 0, observed)
+                    self.assertGreater(observed["vision_direct_download_commands"], 0, observed)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--qt", action="store_true")
     parser.add_argument("--vision", action="store_true")
+    parser.add_argument("--fingerprint", choices=("rustls", "chrome", "chrome_133"), default="rustls")
     args = parser.parse_args()
+    RealityRuntimeInterop.fingerprint = args.fingerprint
     if args.vision:
         RealityQtInterop.flow = VisionRuntimeInterop.flow
     suite = (unittest.TestSuite([RealityQtInterop("test_actual_qt_import_dpapi_select_route_and_recreate")])
@@ -932,5 +1046,7 @@ if __name__ == "__main__":
     write_json(evidence / "test-summary.json", {"tests_run": result.testsRun, "failures": len(result.failures),
                "errors": len(result.errors), "skipped": len(result.skipped), "successful": result.wasSuccessful(),
                "product_mode": "qt-dpapi" if args.qt else "rust-runtime", "provider_connection": False,
-               "protocol": "vless+reality+vision" if args.vision else "vless+reality"})
+               "protocol": "vless+reality+vision" if args.vision else "vless+reality",
+               "fingerprint": args.fingerprint,
+               "client_hello_profile": "chrome_133" if args.fingerprint in ("chrome", "chrome_133") else "rustls"})
     raise SystemExit(0 if result.wasSuccessful() else 1)

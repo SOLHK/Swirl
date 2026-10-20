@@ -93,16 +93,32 @@ VISION_BUILD_COMMAND = (
 PRODUCT_CHAIN_TEST = "test_product_subscription_chain.py"
 REALITY_RUNTIME_TEST = "test_reality_runtime.py"
 PUBLIC_REALITY_PROBE = Path("tools/Verify-PublicRealityRuntime.py")
+FINGERPRINT_SOURCES = (
+    Path("core/crates/swirl-transport/examples/reality-hello.rs"),
+    Path("tools/tests/test_reality_fingerprint.py"),
+    Path("tools/tests/xray_peer/utls_hello/main.go"),
+)
+FINGERPRINT_BUILD_COMMAND = (
+    "cargo build --manifest-path core/Cargo.toml --release --locked "
+    "-p swirl-transport --example reality-hello"
+)
 
 
 def reality_runtime_steps(windows: bool = False, qt: bool = False,
-                          artifact_prefix: str = "Swirl", vision: bool = False) -> str:
+                          artifact_prefix: str = "Swirl", vision: bool = False,
+                          fingerprint: str | None = None) -> str:
     if qt and not windows:
         raise ValueError("The actual Qt/DPAPI runtime gate is Windows-only")
+    if fingerprint not in (None, "chrome"):
+        raise ValueError("Only the independently verified Chrome profile is a reviewed CI gate")
     stage, suffix = ("qt" if qt else "rust"), (".exe" if windows else "")
     protocol = "REALITY + Vision" if vision else "REALITY"
     directory = "swirl-reality-vision-runtime" if vision else "swirl-reality-runtime"
     artifact = "REALITY-Vision-Runtime" if vision else "REALITY-Runtime"
+    if fingerprint:
+        protocol += " + Chrome133"
+        directory += "-chrome133"
+        artifact += "-Chrome133"
     title = (f"Qt persisted {protocol} through full Xray to HTTP and HTTPS" if qt
              else f"Production {protocol} Runtime through full Xray to HTTP and HTTPS")
     environment = (
@@ -120,7 +136,8 @@ def reality_runtime_steps(windows: bool = False, qt: bool = False,
     body = "          $ErrorActionPreference = 'Stop'\n" if windows else "          set -euo pipefail\n"
     if qt:
         body += "          New-Item -ItemType Directory -Force -Path $env:SWIRL_TEST_ROOT | Out-Null\n"
-    selection = (" --qt" if qt else "") + (" --vision" if vision else "")
+    selection = ((" --qt" if qt else "") + (" --vision" if vision else "")
+                 + (" --fingerprint chrome" if fingerprint else ""))
     body += f"          python tools/tests/{REALITY_RUNTIME_TEST}{selection}\n"
     if windows:
         body += WINDOWS_STATUS_GUARD
@@ -140,11 +157,17 @@ def reality_runtime_steps(windows: bool = False, qt: bool = False,
     )
 
 
-def public_reality_runtime_steps(vision: bool = False) -> str:
+def public_reality_runtime_steps(vision: bool = False, fingerprint: str | None = None) -> str:
     """Separate required Linux public-origin evidence, never provider evidence."""
+    if fingerprint not in (None, "chrome"):
+        raise ValueError("Only the independently verified Chrome profile is a reviewed public gate")
     protocol = "REALITY + Vision" if vision else "REALITY"
     directory = "swirl-public-reality-vision" if vision else "swirl-public-reality"
     artifact = "Swirl-Public-REALITY-Vision" if vision else "Swirl-Public-REALITY"
+    if fingerprint:
+        protocol += " + Chrome133"
+        directory += "-chrome133"
+        artifact += "-Chrome133"
     return (
         f"      - name: Native {protocol} to independent public HTTP and HTTPS\n"
         "        if: runner.os == 'Linux'\n"
@@ -158,7 +181,8 @@ def public_reality_runtime_steps(vision: bool = False) -> str:
         f"          python {PUBLIC_REALITY_PROBE.as_posix()} --harness core/target/release/swirl-api "
         "--inspector core/target/release/swirl-inspect "
         '--xray-peer-dir "$SWIRL_XRAY_PEER_DIR" --output "$SWIRL_PUBLIC_REALITY_OUTPUT"'
-        + (" --vision\n" if vision else "\n")
+        + (" --vision" if vision else "")
+        + (" --fingerprint chrome" if fingerprint else "") + "\n"
         + f"      - name: Preserve public {protocol} Runtime evidence\n"
         "        if: always() && runner.os == 'Linux'\n"
         "        uses: actions/upload-artifact@v4\n"
@@ -171,6 +195,7 @@ def public_reality_runtime_steps(vision: bool = False) -> str:
 
 
 def without_public_reality_runtime_steps(source: str) -> str:
+    source = without_fingerprint_steps(source)
     markers = (PUBLIC_REALITY_PROBE.as_posix(), "SWIRL_PUBLIC_REALITY_", "swirl-public-reality",
                "Swirl-Public-REALITY", "Preserve public REALITY")
     if not any(marker in source for marker in markers):
@@ -231,6 +256,101 @@ def _add_reality_runtime_steps(source: str) -> str:
                           reality_runtime_steps(windows=True, qt=True)
                           + reality_runtime_steps(windows=True, qt=True, vision=True)
                           + NATIVE_APPLICATION_BUILD, 1)
+
+
+def fingerprint_steps(windows: bool = False, artifact_prefix: str = "Swirl") -> str:
+    """Compare actual native wire bytes against the unchanged pinned uTLS build."""
+    suffix = ".exe" if windows else ""
+    status = WINDOWS_STATUS_GUARD if windows else ""
+    if windows:
+        start = (
+            "          $ErrorActionPreference = 'Stop'\n"
+            "          New-Item -ItemType Directory -Force -Path $env:SWIRL_FINGERPRINT_EVIDENCE | Out-Null\n"
+        )
+        log = '2>&1 | Tee-Object -FilePath "$env:SWIRL_FINGERPRINT_EVIDENCE/{}"\n'
+        preflight = (
+            "          if (-not (Test-Path $env:SWIRL_REALITY_HELLO -PathType Leaf)) "
+            "{ throw 'Required native ClientHello Release binary missing' }\n"
+            "          if (-not (Test-Path (Join-Path $env:SWIRL_XRAY_PEER_DIR 'utls-hello.exe') -PathType Leaf)) "
+            "{ throw 'Required pinned uTLS oracle missing' }\n"
+        )
+    else:
+        start = '          set -euo pipefail\n          mkdir -p "$SWIRL_FINGERPRINT_EVIDENCE"\n'
+        log = '2>&1 | tee "$SWIRL_FINGERPRINT_EVIDENCE/{}"\n'
+        preflight = ('          test -x "$SWIRL_REALITY_HELLO"\n'
+                     '          test -x "$SWIRL_XRAY_PEER_DIR/utls-hello"\n')
+    return (
+        "      - name: Build native ClientHello and verify independent Chrome133 fingerprint\n"
+        "        working-directory: .\n"
+        f"        shell: {'pwsh' if windows else 'bash'}\n"
+        "        env:\n"
+        "          SWIRL_XRAY_PEER_DIR: ${{ runner.temp }}/swirl-xray-peer\n"
+        "          SWIRL_FINGERPRINT_EVIDENCE: ${{ runner.temp }}/swirl-fingerprint-results\n"
+        f"          SWIRL_REALITY_HELLO: ${{{{ github.workspace }}}}/core/target/release/examples/reality-hello{suffix}\n"
+        "        run: |\n"
+        + start + f"          {FINGERPRINT_BUILD_COMMAND} " + log.format("client-build.log") + status
+        + preflight
+        + "          python tools/tests/test_reality_fingerprint.py " + log.format("oracle-test.log") + status
+        + "      - name: Preserve raw ClientHello and independent uTLS fingerprint evidence\n"
+        "        if: always()\n"
+        "        uses: actions/upload-artifact@v4\n"
+        "        with:\n"
+        f"          name: {artifact_prefix}-Chrome133-Fingerprint-${{{{ runner.os }}}}-${{{{ github.sha }}}}-${{{{ github.run_attempt }}}}\n"
+        "          path: |\n"
+        "            ${{ runner.temp }}/swirl-xray-peer/build.log\n"
+        "            ${{ runner.temp }}/swirl-xray-peer/build-manifest.json\n"
+        "            ${{ runner.temp }}/swirl-fingerprint-results\n"
+        "          if-no-files-found: error\n"
+        "          retention-days: 14\n"
+    )
+
+
+def _fingerprint_insertions(windows: bool) -> tuple[tuple[str, str], ...]:
+    oracle = (vision_xray_steps(windows=windows), fingerprint_steps(windows=windows))
+    runtime_anchor = reality_runtime_steps(windows=windows, vision=True)
+    runtime = (reality_runtime_steps(windows=windows, fingerprint="chrome")
+               + reality_runtime_steps(windows=windows, vision=True, fingerprint="chrome"))
+    if windows:
+        qt = (reality_runtime_steps(windows=True, qt=True, vision=True),
+              reality_runtime_steps(windows=True, qt=True, vision=True, fingerprint="chrome"))
+        return oracle, (runtime_anchor, runtime), qt
+    runtime_anchor += public_reality_runtime_steps() + public_reality_runtime_steps(vision=True)
+    runtime += (public_reality_runtime_steps(fingerprint="chrome")
+                + public_reality_runtime_steps(vision=True, fingerprint="chrome"))
+    return oracle, (runtime_anchor, runtime)
+
+
+def without_fingerprint_steps(source: str) -> str:
+    """Allow an intact prior stage or the complete native/browser evidence stage."""
+    markers = ("reality-hello", "utls-hello", "test_reality_fingerprint.py", "SWIRL_FINGERPRINT_",
+               "swirl-fingerprint-results", "--fingerprint", "Chrome133")
+    if not any(marker in source for marker in markers):
+        return source
+    parts = source.split("  windows-rust:\n")
+    if len(parts) != 2:
+        raise ValueError("Fingerprint gate job boundaries changed")
+    for index, part in enumerate(parts):
+        for anchor, block in _fingerprint_insertions(windows=bool(index)):
+            if part.count(block) != 1 or part.count(anchor + block) != 1:
+                raise ValueError("Native fingerprint oracle, runtime or public gate drifted; review required")
+            part = part.replace(block, "", 1)
+        if any(marker in part for marker in markers):
+            raise ValueError("Native fingerprint stage is partial, duplicated or contains an unreviewed command")
+        parts[index] = part
+    return "  windows-rust:\n".join(parts)
+
+
+def _add_fingerprint_steps(source: str) -> str:
+    parts = source.split("  windows-rust:\n")
+    if len(parts) != 2:
+        raise ValueError("Fingerprint gate job boundaries changed")
+    for index, part in enumerate(parts):
+        for anchor, block in _fingerprint_insertions(windows=bool(index)):
+            if part.count(anchor) != 1:
+                raise ValueError("Fingerprint gates require the intact existing Xray and Runtime stages")
+            part = part.replace(anchor, anchor + block, 1)
+        parts[index] = part
+    return "  windows-rust:\n".join(parts)
 
 
 def product_chain_steps(windows: bool = False, qt: bool = False,
@@ -925,8 +1045,8 @@ def updated_workflow(source: str) -> str:
     for index, part in enumerate(parts):
         historical, _, complete = _vector_blocks(windows=index == 1)
         parts[index] = _replace_checked(part, historical, complete, "Vision fixture checks")
-    return _add_reality_runtime_steps(
-        _add_product_chain_steps(_add_vision_xray_steps(_add_xray_steps(separator.join(parts)))))
+    return _add_fingerprint_steps(_add_reality_runtime_steps(
+        _add_product_chain_steps(_add_vision_xray_steps(_add_xray_steps(separator.join(parts))))))
 
 
 def validate_context(environment: Mapping[str, str]) -> None:
@@ -977,6 +1097,9 @@ def prepare_update(repository: Path) -> tuple[Path, str, str]:
     for relative in VISION_XRAY_SOURCES:
         if not (repository / relative).is_file():
             raise ValueError(f"Required Vision stream peer source is missing: {relative.as_posix()}")
+    for relative in FINGERPRINT_SOURCES:
+        if not (repository / relative).is_file():
+            raise ValueError(f"Required independent fingerprint source is missing: {relative.as_posix()}")
     return path, before, after
 
 

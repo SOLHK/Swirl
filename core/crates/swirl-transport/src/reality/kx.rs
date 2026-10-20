@@ -55,6 +55,7 @@ pub(crate) struct HybridKeyExchange {
     x25519: StaticSecret,
     mlkem: DecapsulationKey<MlKem768>,
     public: [u8; CLIENT_SHARE_LEN],
+    classical: Option<(StaticSecret, [u8; 32])>,
 }
 
 impl HybridKeyExchange {
@@ -81,7 +82,19 @@ impl HybridKeyExchange {
             x25519,
             mlkem,
             public,
+            classical: None,
         }
+    }
+
+    pub(super) fn independent_classical_share(&mut self) -> Result<(), &'static str> {
+        let mut seed = Zeroizing::new([0; 32]);
+        SystemRandom::new()
+            .fill(seed.as_mut())
+            .map_err(|_| "RealityRandom")?;
+        let secret = StaticSecret::from(*seed);
+        let public = *PublicKey::from(&secret).as_bytes();
+        self.classical = Some((secret, public));
+        Ok(())
     }
 
     pub(crate) fn public_share(&self) -> &[u8] {
@@ -89,15 +102,30 @@ impl HybridKeyExchange {
     }
 
     pub(crate) fn classical_share(&self) -> &[u8] {
-        &self.public[MLKEM_PUBLIC_LEN..]
+        self.classical
+            .as_ref()
+            .map_or(&self.public[MLKEM_PUBLIC_LEN..], |(_, public)| public)
     }
 
     pub(crate) fn classical_secret(
         &self,
         peer: &[u8],
     ) -> Result<Zeroizing<[u8; 32]>, &'static str> {
+        Self::dh(
+            self.classical
+                .as_ref()
+                .map_or(&self.x25519, |(secret, _)| secret),
+            peer,
+        )
+    }
+
+    pub(crate) fn hybrid_secret(&self, peer: &[u8]) -> Result<Zeroizing<[u8; 32]>, &'static str> {
+        Self::dh(&self.x25519, peer)
+    }
+
+    fn dh(owner: &StaticSecret, peer: &[u8]) -> Result<Zeroizing<[u8; 32]>, &'static str> {
         let peer: [u8; 32] = peer.try_into().map_err(|_| "RealityKeyShareLength")?;
-        let secret = self.x25519.diffie_hellman(&PublicKey::from(peer));
+        let secret = owner.diffie_hellman(&PublicKey::from(peer));
         if !secret.was_contributory() {
             return Err("RealityNonContributoryKey");
         }
@@ -118,7 +146,7 @@ impl HybridKeyExchange {
         if peer.len() != SERVER_SHARE_LEN {
             return Err("RealityKeyShareLength");
         }
-        let x25519 = self.classical_secret(&peer[MLKEM_CIPHERTEXT_LEN..])?;
+        let x25519 = self.hybrid_secret(&peer[MLKEM_CIPHERTEXT_LEN..])?;
         let ciphertext = Ciphertext::<MlKem768>::try_from(&peer[..MLKEM_CIPHERTEXT_LEN])
             .map_err(|_| "RealityKeyShareLength")?;
         // FIPS 203 implicit rejection returns a pseudorandom secret for a

@@ -7,13 +7,14 @@
 //! CertificateVerify and Finished. Its two offline constructions bind the final
 //! authenticated ClientHello to rustls's own transcript, without socket rewriting.
 //! The async [`Stream`] owns the transport and preserves exact record boundaries.
-//! This is a native rustls profile; a requested browser fingerprint must still be
-//! rejected by the caller instead of being silently changed to this profile.
+//! The default is an explicit native rustls profile. Chrome requests opt into
+//! the fixed Chrome 133 wire profile; unimplemented fingerprints fail closed.
 mod backend;
 mod certificate;
 mod client;
 mod hello;
 mod kx;
+mod profile;
 mod stream;
 
 pub use certificate::ServerAuthenticator;
@@ -35,6 +36,7 @@ pub struct ClientParameters {
     public_key: [u8; 32],
     short_id: [u8; 8],
     version: [u8; 3],
+    fingerprint: profile::Fingerprint,
 }
 
 impl ClientParameters {
@@ -64,7 +66,15 @@ impl ClientParameters {
             public_key,
             short_id: padded_id,
             version,
+            fingerprint: profile::Fingerprint::Rustls,
         })
+    }
+
+    /// Select a supported wire profile without changing the source requirement.
+    /// `chrome` is versioned to Chrome 133, matching the locked uTLS oracle.
+    pub fn with_fingerprint(mut self, fingerprint: &str) -> Result<Self, &'static str> {
+        self.fingerprint = profile::Fingerprint::parse(fingerprint)?;
+        Ok(self)
     }
 }
 
@@ -87,6 +97,14 @@ impl ClientKeys {
         })
     }
 
+    fn generate_for(fingerprint: profile::Fingerprint) -> Result<Self, &'static str> {
+        let mut keys = Self::generate()?;
+        if fingerprint == profile::Fingerprint::Chrome133 {
+            keys.key_exchange.independent_classical_share()?;
+        }
+        Ok(keys)
+    }
+
     pub fn client_random(&self) -> &[u8; 32] {
         &self.random
     }
@@ -96,7 +114,8 @@ impl ClientKeys {
         self.key_exchange.public_share()
     }
 
-    /// Optional second share, backed by the SAME ephemeral X25519 owner.
+    /// Optional standalone X25519 share. Chrome uses a separate fresh owner;
+    /// the original native profile uses the hybrid component.
     pub fn x25519_public_key(&self) -> &[u8] {
         self.key_exchange.classical_share()
     }
@@ -119,7 +138,13 @@ impl ClientKeys {
         unix_time: u32,
     ) -> Result<AuthenticatedClientHello, &'static str> {
         let offer = hello::client(&client_hello, &self.random, &self.key_exchange, parameters)?;
-        let shared = self.key_exchange.classical_secret(&parameters.public_key)?;
+        // Official REALITY authenticates with the standalone X25519 share if
+        // present, otherwise with the hybrid's X25519 component.
+        let shared = if offer.classical {
+            self.key_exchange.classical_secret(&parameters.public_key)?
+        } else {
+            self.key_exchange.hybrid_secret(&parameters.public_key)?
+        };
         let authentication_key = derive_authentication_key(&shared, &self.random)?;
         let session_id = seal_session_id(
             &authentication_key,

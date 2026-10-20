@@ -14,7 +14,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: core
@@ -131,6 +131,31 @@ jobs:
             ${{ runner.temp }}/swirl-vision-results
           if-no-files-found: error
           retention-days: 14
+      - name: Build native ClientHello and verify independent Chrome133 fingerprint
+        working-directory: .
+        shell: bash
+        env:
+          SWIRL_XRAY_PEER_DIR: ${{ runner.temp }}/swirl-xray-peer
+          SWIRL_FINGERPRINT_EVIDENCE: ${{ runner.temp }}/swirl-fingerprint-results
+          SWIRL_REALITY_HELLO: ${{ github.workspace }}/core/target/release/examples/reality-hello
+        run: |
+          set -euo pipefail
+          mkdir -p "$SWIRL_FINGERPRINT_EVIDENCE"
+          cargo build --manifest-path core/Cargo.toml --release --locked -p swirl-transport --example reality-hello 2>&1 | tee "$SWIRL_FINGERPRINT_EVIDENCE/client-build.log"
+          test -x "$SWIRL_REALITY_HELLO"
+          test -x "$SWIRL_XRAY_PEER_DIR/utls-hello"
+          python tools/tests/test_reality_fingerprint.py 2>&1 | tee "$SWIRL_FINGERPRINT_EVIDENCE/oracle-test.log"
+      - name: Preserve raw ClientHello and independent uTLS fingerprint evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-Chrome133-Fingerprint-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/swirl-xray-peer/build.log
+            ${{ runner.temp }}/swirl-xray-peer/build-manifest.json
+            ${{ runner.temp }}/swirl-fingerprint-results
+          if-no-files-found: error
+          retention-days: 14
       - name: Production REALITY Runtime through full Xray to HTTP and HTTPS
         working-directory: .
         shell: bash
@@ -205,6 +230,80 @@ jobs:
           path: ${{ runner.temp }}/swirl-public-reality-vision
           if-no-files-found: error
           retention-days: 14
+      - name: Production REALITY + Chrome133 Runtime through full Xray to HTTP and HTTPS
+        working-directory: .
+        shell: bash
+        env:
+          SWIRL_XRAY_PEER_DIR: ${{ runner.temp }}/swirl-xray-peer
+          SWIRL_RUST_HARNESS: ${{ github.workspace }}/core/target/release/swirl-api
+          SWIRL_RUST_INSPECTOR: ${{ github.workspace }}/core/target/release/swirl-inspect
+          SWIRL_REALITY_RUNTIME_EVIDENCE: ${{ runner.temp }}/swirl-reality-runtime-chrome133-rust
+        run: |
+          set -euo pipefail
+          python tools/tests/test_reality_runtime.py --fingerprint chrome
+      - name: Preserve production REALITY + Chrome133 Runtime rust evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-REALITY-Runtime-Chrome133-${{ runner.os }}-rust-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swirl-reality-runtime-chrome133-rust
+          if-no-files-found: error
+          retention-days: 14
+      - name: Production REALITY + Vision + Chrome133 Runtime through full Xray to HTTP and HTTPS
+        working-directory: .
+        shell: bash
+        env:
+          SWIRL_XRAY_PEER_DIR: ${{ runner.temp }}/swirl-xray-peer
+          SWIRL_RUST_HARNESS: ${{ github.workspace }}/core/target/release/swirl-api
+          SWIRL_RUST_INSPECTOR: ${{ github.workspace }}/core/target/release/swirl-inspect
+          SWIRL_REALITY_RUNTIME_EVIDENCE: ${{ runner.temp }}/swirl-reality-vision-runtime-chrome133-rust
+        run: |
+          set -euo pipefail
+          python tools/tests/test_reality_runtime.py --vision --fingerprint chrome
+      - name: Preserve production REALITY + Vision + Chrome133 Runtime rust evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-REALITY-Vision-Runtime-Chrome133-${{ runner.os }}-rust-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swirl-reality-vision-runtime-chrome133-rust
+          if-no-files-found: error
+          retention-days: 14
+      - name: Native REALITY + Chrome133 to independent public HTTP and HTTPS
+        if: runner.os == 'Linux'
+        working-directory: .
+        shell: bash
+        env:
+          SWIRL_XRAY_PEER_DIR: ${{ runner.temp }}/swirl-xray-peer
+          SWIRL_PUBLIC_REALITY_OUTPUT: ${{ runner.temp }}/swirl-public-reality-chrome133/report.json
+        run: |
+          set -euo pipefail
+          python tools/Verify-PublicRealityRuntime.py --harness core/target/release/swirl-api --inspector core/target/release/swirl-inspect --xray-peer-dir "$SWIRL_XRAY_PEER_DIR" --output "$SWIRL_PUBLIC_REALITY_OUTPUT" --fingerprint chrome
+      - name: Preserve public REALITY + Chrome133 Runtime evidence
+        if: always() && runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-Public-REALITY-Chrome133-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swirl-public-reality-chrome133
+          if-no-files-found: error
+          retention-days: 14
+      - name: Native REALITY + Vision + Chrome133 to independent public HTTP and HTTPS
+        if: runner.os == 'Linux'
+        working-directory: .
+        shell: bash
+        env:
+          SWIRL_XRAY_PEER_DIR: ${{ runner.temp }}/swirl-xray-peer
+          SWIRL_PUBLIC_REALITY_OUTPUT: ${{ runner.temp }}/swirl-public-reality-vision-chrome133/report.json
+        run: |
+          set -euo pipefail
+          python tools/Verify-PublicRealityRuntime.py --harness core/target/release/swirl-api --inspector core/target/release/swirl-inspect --xray-peer-dir "$SWIRL_XRAY_PEER_DIR" --output "$SWIRL_PUBLIC_REALITY_OUTPUT" --vision --fingerprint chrome
+      - name: Preserve public REALITY + Vision + Chrome133 Runtime evidence
+        if: always() && runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-Public-REALITY-Vision-Chrome133-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swirl-public-reality-vision-chrome133
+          if-no-files-found: error
+          retention-days: 14
       - name: Native public HTTPS and DoH verification
         if: runner.os == 'Linux'
         run: python ../tools/Verify-PublicRustCore.py --harness target/release/swirl-api --output ../CORE_PUBLIC_NETWORK.json
@@ -218,7 +317,7 @@ jobs:
   windows-rust:
     runs-on: windows-2022
     # Includes the complete native application after the existing Qt/Core gates.
-    timeout-minutes: 35
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: core
@@ -381,6 +480,33 @@ jobs:
             ${{ runner.temp }}/swirl-vision-results
           if-no-files-found: error
           retention-days: 14
+      - name: Build native ClientHello and verify independent Chrome133 fingerprint
+        working-directory: .
+        shell: pwsh
+        env:
+          SWIRL_XRAY_PEER_DIR: ${{ runner.temp }}/swirl-xray-peer
+          SWIRL_FINGERPRINT_EVIDENCE: ${{ runner.temp }}/swirl-fingerprint-results
+          SWIRL_REALITY_HELLO: ${{ github.workspace }}/core/target/release/examples/reality-hello.exe
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path $env:SWIRL_FINGERPRINT_EVIDENCE | Out-Null
+          cargo build --manifest-path core/Cargo.toml --release --locked -p swirl-transport --example reality-hello 2>&1 | Tee-Object -FilePath "$env:SWIRL_FINGERPRINT_EVIDENCE/client-build.log"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not (Test-Path $env:SWIRL_REALITY_HELLO -PathType Leaf)) { throw 'Required native ClientHello Release binary missing' }
+          if (-not (Test-Path (Join-Path $env:SWIRL_XRAY_PEER_DIR 'utls-hello.exe') -PathType Leaf)) { throw 'Required pinned uTLS oracle missing' }
+          python tools/tests/test_reality_fingerprint.py 2>&1 | Tee-Object -FilePath "$env:SWIRL_FINGERPRINT_EVIDENCE/oracle-test.log"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Preserve raw ClientHello and independent uTLS fingerprint evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-Chrome133-Fingerprint-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/swirl-xray-peer/build.log
+            ${{ runner.temp }}/swirl-xray-peer/build-manifest.json
+            ${{ runner.temp }}/swirl-fingerprint-results
+          if-no-files-found: error
+          retention-days: 14
       - name: Production REALITY Runtime through full Xray to HTTP and HTTPS
         working-directory: .
         shell: pwsh
@@ -419,6 +545,46 @@ jobs:
         with:
           name: Swirl-REALITY-Vision-Runtime-${{ runner.os }}-rust-${{ github.sha }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/swirl-reality-vision-runtime-rust
+          if-no-files-found: error
+          retention-days: 14
+      - name: Production REALITY + Chrome133 Runtime through full Xray to HTTP and HTTPS
+        working-directory: .
+        shell: pwsh
+        env:
+          SWIRL_XRAY_PEER_DIR: ${{ runner.temp }}/swirl-xray-peer
+          SWIRL_RUST_HARNESS: ${{ github.workspace }}/core/target/release/swirl-api.exe
+          SWIRL_RUST_INSPECTOR: ${{ github.workspace }}/core/target/release/swirl-inspect.exe
+          SWIRL_REALITY_RUNTIME_EVIDENCE: ${{ runner.temp }}/swirl-reality-runtime-chrome133-rust
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python tools/tests/test_reality_runtime.py --fingerprint chrome
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Preserve production REALITY + Chrome133 Runtime rust evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-REALITY-Runtime-Chrome133-${{ runner.os }}-rust-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swirl-reality-runtime-chrome133-rust
+          if-no-files-found: error
+          retention-days: 14
+      - name: Production REALITY + Vision + Chrome133 Runtime through full Xray to HTTP and HTTPS
+        working-directory: .
+        shell: pwsh
+        env:
+          SWIRL_XRAY_PEER_DIR: ${{ runner.temp }}/swirl-xray-peer
+          SWIRL_RUST_HARNESS: ${{ github.workspace }}/core/target/release/swirl-api.exe
+          SWIRL_RUST_INSPECTOR: ${{ github.workspace }}/core/target/release/swirl-inspect.exe
+          SWIRL_REALITY_RUNTIME_EVIDENCE: ${{ runner.temp }}/swirl-reality-vision-runtime-chrome133-rust
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python tools/tests/test_reality_runtime.py --vision --fingerprint chrome
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Preserve production REALITY + Vision + Chrome133 Runtime rust evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-REALITY-Vision-Runtime-Chrome133-${{ runner.os }}-rust-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swirl-reality-vision-runtime-chrome133-rust
           if-no-files-found: error
           retention-days: 14
       - uses: actions/upload-artifact@v4
@@ -574,6 +740,30 @@ jobs:
         with:
           name: Swirl-REALITY-Vision-Runtime-${{ runner.os }}-qt-${{ github.sha }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/swirl-reality-vision-runtime-qt
+          if-no-files-found: error
+          retention-days: 14
+      - name: Qt persisted REALITY + Vision + Chrome133 through full Xray to HTTP and HTTPS
+        working-directory: .
+        shell: pwsh
+        env:
+          SWIRL_XRAY_PEER_DIR: ${{ runner.temp }}/swirl-xray-peer
+          SWIRL_RUST_HARNESS: ${{ github.workspace }}/core/target/release/swirl-api.exe
+          SWIRL_RUST_INSPECTOR: ${{ github.workspace }}/core/target/release/swirl-inspect.exe
+          SWIRL_REALITY_RUNTIME_EVIDENCE: ${{ runner.temp }}/swirl-reality-vision-runtime-chrome133-qt
+          SWIRL_RUST_QT_TESTS: ${{ github.workspace }}/build/rust-qt/Release/SwirlRustCoreTests.exe
+          SWIRL_TEST_ROOT: ${{ runner.temp }}/swirl-reality-vision-runtime-chrome133-qt-tests
+          QT_FORCE_STDERR_LOGGING: '1'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path $env:SWIRL_TEST_ROOT | Out-Null
+          python tools/tests/test_reality_runtime.py --qt --vision --fingerprint chrome
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Preserve production REALITY + Vision + Chrome133 Runtime qt evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swirl-REALITY-Vision-Runtime-Chrome133-${{ runner.os }}-qt-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swirl-reality-vision-runtime-chrome133-qt
           if-no-files-found: error
           retention-days: 14
       - name: Build complete native Rust application

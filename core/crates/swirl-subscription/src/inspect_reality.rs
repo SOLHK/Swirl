@@ -1,7 +1,12 @@
-//! Strict VLESS/REALITY mapping for sharing URIs, Clash YAML/JSON and sing-box
+//! Strict VLESS/REALITY mapping for sharing URIs, Clash, sing-box and Xray
 //! JSON. Original documents stay with Inspection; diagnostics contain no values.
 use super::{Config, Limits, Node, NodeCapability, Outbound, Value, endpoint_port};
 use crate::Reality;
+#[cfg(test)]
+#[path = "inspect_reality_fingerprints.rs"]
+mod fingerprints;
+#[path = "inspect_reality_xray.rs"]
+mod xray;
 
 const FIELDS: &[&str] = &[
     "type",
@@ -39,6 +44,7 @@ pub(super) fn declared(raw: &Value) -> bool {
             .pointer("/streamSettings/security")
             .and_then(Value::as_str)
             == Some("reality")
+        || raw.pointer("/streamSettings/realitySettings").is_some()
 }
 
 fn aliases<'a>(
@@ -70,8 +76,10 @@ fn object_keys(value: &Value, allowed: &[&str]) -> Result<(), &'static str> {
 }
 
 fn outbound(raw: &Value, family: &str) -> Result<Outbound, &'static str> {
-    if family == "xray-v2ray-json" {
-        return Err("RealityFormatUnsupported");
+    if family == "xray-v2ray-json" || raw.get("protocol").is_some() {
+        // Validate every source object before flattening, including for a
+        // base64-wrapped Xray document. Inspection retains the untouched input.
+        return outbound(&xray::normalized(raw)?, "normalized-reality");
     }
     object_keys(raw, FIELDS)?;
     if raw
@@ -141,16 +149,19 @@ fn outbound(raw: &Value, family: &str) -> Result<Outbound, &'static str> {
             return Err("RealitySecurityConflict");
         }
     }
-    if let Some(utls) = raw.pointer("/tls/utls") {
+    let utls_fingerprint = if let Some(utls) = raw.pointer("/tls/utls") {
         object_keys(utls, &["enabled", "fingerprint"])?;
-        // This path denotes a uTLS browser profile. Claiming native rustls is
-        // uTLS would change an explicit source requirement.
-        if utls.get("enabled").and_then(Value::as_bool) != Some(false)
-            || utls.get("fingerprint").is_some()
-        {
-            return Err("RealityFingerprintUnsupported");
+        match utls.get("enabled").and_then(Value::as_bool) {
+            Some(true) => Some(
+                utls.get("fingerprint")
+                    .ok_or("RealityFingerprintRequired")?,
+            ),
+            Some(false) if utls.get("fingerprint").is_none() => None,
+            _ => return Err("RealityFingerprintUnsupported"),
         }
-    }
+    } else {
+        None
+    };
     let public_key = string(
         aliases(
             &[
@@ -175,11 +186,20 @@ fn outbound(raw: &Value, family: &str) -> Result<Outbound, &'static str> {
     )?;
     let fingerprint = string(
         aliases(
-            &[raw.get("fp"), raw.get("client-fingerprint")],
+            &[
+                raw.get("fp"),
+                raw.get("client-fingerprint"),
+                utls_fingerprint,
+            ],
             "RealityConflictingFingerprint",
         )?,
         "RealityFingerprintRequired",
     )?;
+    // A source that explicitly enables uTLS requires a browser profile, even
+    // if its profile happens to be named "rustls". Never erase that request.
+    if utls_fingerprint.is_some() && !matches!(fingerprint.as_str(), "chrome" | "chrome_133") {
+        return Err("RealityFingerprintUnsupported");
+    }
     let server_name = string(
         aliases(
             &[
@@ -250,9 +270,15 @@ pub(super) fn inspect(
         Ok(value) => (Some(value), "TcpCandidateNotYetVerified"),
         Err(error) => (None, error),
     };
-    let transport = match raw.get("network") {
+    let is_xray = family == "xray-v2ray-json" || raw.get("protocol").is_some();
+    let transport = match raw
+        .get("network")
+        .or_else(|| raw.pointer("/streamSettings/network"))
+    {
+        None if is_xray => "unsupported",
         None => "tcp",
         Some(value) if value.as_str() == Some("tcp") => "tcp",
+        Some(value) if is_xray && value.as_str() == Some("raw") => "tcp",
         _ => "unsupported",
     };
     (
@@ -266,9 +292,10 @@ pub(super) fn inspect(
             cipher: "none",
             udp_declared: raw.get("udp").and_then(Value::as_bool) == Some(true),
             unrecognized_fields: raw.as_object().map_or(1, |object| {
+                let known = if is_xray { xray::FIELDS } else { FIELDS };
                 object
                     .keys()
-                    .filter(|key| !FIELDS.contains(&key.as_str()))
+                    .filter(|key| !known.contains(&key.as_str()))
                     .count()
             }),
             native_tcp_candidate: candidate.is_some(),
@@ -371,7 +398,7 @@ mod tests {
     #[test]
     fn unsupported_profiles_conflicts_and_unknown_fields_never_downgrade() {
         let cases = [
-            json!({"client-fingerprint":"chrome"}),
+            json!({"client-fingerprint":"firefox"}),
             json!({"client-fingerprint":null}),
             json!({"flow":"xtls-rprx-vision-udp443"}),
             json!({"flow":"xtls-rprx-direct"}),

@@ -1,0 +1,262 @@
+{
+  "source_base_commit": "24119489f7b85fe58dea53acf3a4a6f467a6e8fa",
+  "validation_source": "local uncommitted working tree before source commit; exact-SHA CI remains required",
+  "provider_connection": false,
+  "frozen_acceptance": {
+    "items": 79,
+    "accepted": 6,
+    "weighted_percent": 10.83
+  },
+  "rust": {
+    "passed": 321,
+    "failed": 0,
+    "ignored": 0,
+    "includes_one_doctest": true,
+    "fmt_check_strict_clippy_test_release": true,
+    "log_sha256": "c13f60a6fa2d032982f154c98533d0a739abe89af928fe1ead2315d4cebdc871"
+  },
+  "runtime": [
+    {
+      "profile": "rustls",
+      "mode": "reality",
+      "summary": {
+        "tests_run": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "successful": true,
+        "product_mode": "rust-runtime",
+        "provider_connection": false,
+        "protocol": "vless+reality",
+        "fingerprint": "rustls",
+        "client_hello_profile": "rustls"
+      },
+      "summary_sha256": "f291e705a0138421ae08c4f6850d9f2ef42f4c314d728193c85d2418a8447afd",
+      "tests_log_sha256": "d876a921030aa26d0ed9dbf33de89341db58b37cb9bcf2a957b4d48e792b889d",
+      "binaries": {
+        "SWIRL_RUST_HARNESS": {
+          "file": "swirl-api",
+          "sha256": "431ab49b81b78d1c247dd603b6ab25cce1296f0a5b46d337ba1b54e6154d3895"
+        },
+        "SWIRL_RUST_INSPECTOR": {
+          "file": "swirl-inspect",
+          "sha256": "98f95004c34f95e65b2b2d187a20a8a33345b4fc25d0fd0cb3122e3382ecf92a"
+        }
+      }
+    },
+    {
+      "profile": "rustls",
+      "mode": "vision",
+      "summary": {
+        "tests_run": 10,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "successful": true,
+        "product_mode": "rust-runtime",
+        "provider_connection": false,
+        "protocol": "vless+reality+vision",
+        "fingerprint": "rustls",
+        "client_hello_profile": "rustls"
+      },
+      "summary_sha256": "d324395b229bb98b3387f1d43d1622a6f0c083f76af070e0687ad99c5d1b41ce",
+      "tests_log_sha256": "1479b224c231c332b435ee619c442b22cd970c16e9cc98875dd68673e2401697",
+      "binaries": {
+        "SWIRL_RUST_HARNESS": {
+          "file": "swirl-api",
+          "sha256": "431ab49b81b78d1c247dd603b6ab25cce1296f0a5b46d337ba1b54e6154d3895"
+        },
+        "SWIRL_RUST_INSPECTOR": {
+          "file": "swirl-inspect",
+          "sha256": "98f95004c34f95e65b2b2d187a20a8a33345b4fc25d0fd0cb3122e3382ecf92a"
+        }
+      }
+    },
+    {
+      "profile": "chrome",
+      "mode": "reality",
+      "summary": {
+        "tests_run": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "successful": true,
+        "product_mode": "rust-runtime",
+        "provider_connection": false,
+        "protocol": "vless+reality",
+        "fingerprint": "chrome",
+        "client_hello_profile": "chrome_133"
+      },
+      "summary_sha256": "c483b3d8c5ea8ded295dfb65f24f12391d19dc82e5acf809cb80180f5ec0e11b",
+      "tests_log_sha256": "4af037b702479d913a6383be87368c9a3388b396c6d4761221870f3bd27c5f15",
+      "binaries": {
+        "SWIRL_RUST_HARNESS": {
+          "file": "swirl-api",
+          "sha256": "431ab49b81b78d1c247dd603b6ab25cce1296f0a5b46d337ba1b54e6154d3895"
+        },
+        "SWIRL_RUST_INSPECTOR": {
+          "file": "swirl-inspect",
+          "sha256": "98f95004c34f95e65b2b2d187a20a8a33345b4fc25d0fd0cb3122e3382ecf92a"
+        }
+      }
+    },
+    {
+      "profile": "chrome",
+      "mode": "vision",
+      "summary": {
+        "tests_run": 10,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "successful": true,
+        "product_mode": "rust-runtime",
+        "provider_connection": false,
+        "protocol": "vless+reality+vision",
+        "fingerprint": "chrome",
+        "client_hello_profile": "chrome_133"
+      },
+      "summary_sha256": "f7ea4182d8d5a6fa55b53d321bc4b557076b95c894854f316bc111ec1f7a0164",
+      "tests_log_sha256": "1c7f1558a68966323067c94a4c17a072a7697de2af689c4cb884456a53fb85a6",
+      "binaries": {
+        "SWIRL_RUST_HARNESS": {
+          "file": "swirl-api",
+          "sha256": "431ab49b81b78d1c247dd603b6ab25cce1296f0a5b46d337ba1b54e6154d3895"
+        },
+        "SWIRL_RUST_INSPECTOR": {
+          "file": "swirl-inspect",
+          "sha256": "98f95004c34f95e65b2b2d187a20a8a33345b4fc25d0fd0cb3122e3382ecf92a"
+        }
+      }
+    }
+  ],
+  "fingerprint_oracle": {
+    "tests": 4,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "successful": true,
+    "log_sha256": "c2c740b8a6724054163b6303a301bd434cfc2a12edd20800a769bf46512ddcaf"
+  },
+  "official_component": {
+    "tests": 14,
+    "failures": 0,
+    "errors": 0,
+    "skips": 0,
+    "log_sha256": "3afe68c29035260a72f77b601a65f2b439a06ce6e8460539aba1ecdd2c227879",
+    "build_manifest": {
+      "binaries": {
+        "reality_peer": {
+          "file": "reality-peer",
+          "sha256": "1002842d64f546e60e5deb45bcabbdfd8ee76d204b68c5a533a3a3f38835ecd4"
+        },
+        "utls_hello": {
+          "file": "utls-hello",
+          "sha256": "8d276b73e3de822ab01b93b4c93fc77c0418a219f5f5b32f6d79957ff3247cbd"
+        },
+        "xray": {
+          "file": "xray",
+          "sha256": "a5a3bf1c921d8a19224a26abc5b251cd9f38c3608ba74c319307b72184e44c9a"
+        }
+      },
+      "finished_unix": 1792469066,
+      "go_version": "go1.27.2",
+      "helper_source_sha256": "3ac7754fd95cc5a05a8b75f77324700991d9980d9303f3a6d5a6e7fcfb376445",
+      "lock_sha256": "b32dd9af801c8ed97c489f1120209b74224e595353b19fbfc13bce981eaaa925",
+      "peer_version_output": {
+        "event": "version",
+        "go_version": "go1.27.2",
+        "reality_version": "v0.0.0-20261014101318-83f621788ca8",
+        "xray_commit": "92ccc939aaf4f8965f369cf0b142e005aeaa11d5"
+      },
+      "platform": "Linux-6.18.55-x86_64-with-glibc2.39",
+      "reality": {
+        "commit": "83f621788ca88b83179810b12baa7ae518aacb83",
+        "go_mod_sum": "h1:ptlSkJ8k/7IDauNH0SA96JPOo+nYGLTv2Y3UMpwvAsY=",
+        "module": "github.com/xtls/reality",
+        "sum": "h1:RjLnVvlzK4q6zWaSBPNRGsrgx2fbJDeUWffjw574uzs=",
+        "version": "v0.0.0-20261014101318-83f621788ca8"
+      },
+      "reproducible_rebuild": {
+        "reality_peer": {
+          "first_sha256": "1002842d64f546e60e5deb45bcabbdfd8ee76d204b68c5a533a3a3f38835ecd4",
+          "matches": true,
+          "repeated_sha256": "1002842d64f546e60e5deb45bcabbdfd8ee76d204b68c5a533a3a3f38835ecd4"
+        },
+        "utls_hello": {
+          "first_sha256": "8d276b73e3de822ab01b93b4c93fc77c0418a219f5f5b32f6d79957ff3247cbd",
+          "matches": true,
+          "repeated_sha256": "8d276b73e3de822ab01b93b4c93fc77c0418a219f5f5b32f6d79957ff3247cbd"
+        },
+        "xray": {
+          "first_sha256": "a5a3bf1c921d8a19224a26abc5b251cd9f38c3608ba74c319307b72184e44c9a",
+          "matches": true,
+          "repeated_sha256": "a5a3bf1c921d8a19224a26abc5b251cd9f38c3608ba74c319307b72184e44c9a"
+        }
+      },
+      "schema_version": 1,
+      "started_unix": 1792468995,
+      "status": "success",
+      "swirl_source_commit": "24119489f7b85fe58dea53acf3a4a6f467a6e8fa",
+      "swirl_worktree_status": "M .github/workflows/core-development.yml\n M .github/workflows/rust-core.yml\n M core/Cargo.lock\n M core/Cargo.toml\n M core/DEPENDENCIES.json\n M core/crates/swirl-protocol/src/lib.rs\n M core/crates/swirl-subscription/src/inspect_reality.rs\n M core/crates/swirl-subscription/src/reality.rs\n M core/crates/swirl-transport/examples/reality-client.rs\n M core/crates/swirl-transport/src/reality/backend.rs\n M core/crates/swirl-transport/src/reality/backend_tests.rs\n M core/crates/swirl-transport/src/reality/hello.rs\n M core/crates/swirl-transport/src/reality/kx.rs\n M core/crates/swirl-transport/src/reality/mod.rs\n M src/Swirl.Quick/engine/RustCoreEngine.cpp\n M src/Swirl.Quick/engine/SubscriptionNormalizer.cpp\n M src/Swirl.Quick/tests/ImportTests.cpp\n M src/Swirl.Quick/tests/RustCoreTests.cpp\n M tools/ApplyCoreDevelopment.py\n M tools/Build-XrayPeer.py\n M tools/Collect-RustDependencies.py\n M tools/Verify-PublicRealityRuntime.py\n M tools/tests/test_core_development.py\n M tools/tests/test_reality_runtime.py\n M tools/tests/test_reality_xray.py\n M tools/tests/xray_peer/main.go\n?? core/crates/swirl-subscription/src/inspect_reality_fingerprints.rs\n?? core/crates/swirl-subscription/src/inspect_reality_xray.rs\n?? core/crates/swirl-transport/examples/reality-hello.rs\n?? core/crates/swirl-transport/src/reality/profile.rs\n?? core/crates/swirl-transport/tests/client_hello_customizer.rs\n?? core/vendor/rustls/.clippy.toml\n?? core/vendor/rustls/.rustfmt.toml\n?? core/vendor/rustls/Cargo.lock\n?? core/vendor/rustls/Cargo.toml\n?? core/vendor/rustls/Cargo.toml.orig\n?? core/vendor/rustls/LICENSE-APACHE\n?? core/vendor/rustls/LICENSE-ISC\n?? core/vendor/rustls/LICENSE-MIT\n?? core/vendor/rustls/README.md\n?? core/vendor/rustls/SWIRL-PATCH.md\n?? core/vendor/rustls/benches/benchmarks.rs\n?? core/vendor/rustls/build.rs\n?? core/vendor/rustls/examples/internal/test_ca.rs\n?? core/vendor/rustls/src/bs_debug.rs\n?? core/vendor/rustls/src/builder.rs\n?? core/vendor/rustls/src/check.rs\n?? core/vendor/rustls/src/client/builder.rs\n?? core/vendor/rustls/src/client/client_conn.rs\n?? core/vendor/rustls/src/client/common.rs\n?? core/vendor/rustls/src/client/customize.rs\n?? core/vendor/rustls/src/client/ech.rs\n?? core/vendor/rustls/src/client/handy.rs\n?? core/vendor/rustls/src/client/hs.rs\n?? core/vendor/rustls/src/client/test.rs\n?? core/vendor/rustls/src/client/tls12.rs\n?? core/vendor/rustls/src/client/tls13.rs\n?? core/vendor/rustls/src/common_state.rs\n?? core/vendor/rustls/src/compress.rs\n?? core/vendor/rustls/src/conn.rs\n?? core/vendor/rustls/src/conn/kernel.rs\n?? core/vendor/rustls/src/conn/unbuffered.rs\n?? core/vendor/rustls/src/crypto/aws_lc_rs/hpke.rs\n?? core/vendor/rustls/src/crypto/aws_lc_rs/mod.rs\n?? core/vendor/rustls/src/crypto/aws_lc_rs/pq/hybrid.rs\n?? core/vendor/rustls/src/crypto/aws_lc_rs/pq/mlkem.rs\n?? core/vendor/rustls/src/crypto/aws_lc_rs/pq/mod.rs\n?? core/vendor/rustls/src/crypto/aws_lc_rs/sign.rs\n?? core/vendor/rustls/src/crypto/aws_lc_rs/ticketer.rs\n?? core/vendor/rustls/src/crypto/aws_lc_rs/tls12.rs\n?? core/vendor/rustls/src/crypto/aws_lc_rs/tls13.rs\n?? core/vendor/rustls/src/crypto/cipher.rs\n?? core/vendor/rustls/src/crypto/hash.rs\n?? core/vendor/rustls/src/crypto/hmac.rs\n?? core/vendor/rustls/src/crypto/hpke.rs\n?? core/vendor/rustls/src/crypto/mod.rs\n?? core/vendor/rustls/src/crypto/ring/hash.rs\n?? core/vendor/rustls/src/crypto/ring/hmac.rs\n?? core/vendor/rustls/src/crypto/ring/kx.rs\n?? core/vendor/rustls/src/crypto/ring/mod.rs\n?? core/vendor/rustls/src/crypto/ring/quic.rs\n?? core/vendor/rustls/src/crypto/ring/sign.rs\n?? core/vendor/rustls/src/crypto/ring/ticketer.rs\n?? core/vendor/rustls/src/crypto/ring/tls12.rs\n?? core/vendor/rustls/src/crypto/ring/tls13.rs\n?? core/vendor/rustls/src/crypto/signer.rs\n?? core/vendor/rustls/src/crypto/tls12.rs\n?? core/vendor/rustls/src/crypto/tls13.rs\n?? core/vendor/rustls/src/enums.rs\n?? core/vendor/rustls/src/error.rs\n?? core/vendor/rustls/src/hash_hs.rs\n?? core/vendor/rustls/src/key_log.rs\n?? core/vendor/rustls/src/key_log_file.rs\n?? core/vendor/rustls/src/lib.rs\n?? core/vendor/rustls/src/limited_cache.rs\n?? core/vendor/rustls/src/lock.rs\n?? core/vendor/rustls/src/manual/defaults.rs\n?? core/vendor/rustls/src/manual/features.rs\n?? core/vendor/rustls/src/manual/fips.rs\n?? core/vendor/rustls/src/manual/howto.rs\n?? core/vendor/rustls/src/manual/implvulns.rs\n?? core/vendor/rustls/src/manual/mod.rs\n?? core/vendor/rustls/src/manual/tlsvulns.rs\n?? core/vendor/rustls/src/msgs/alert.rs\n?? core/vendor/rustls/src/msgs/base.rs\n?? core/vendor/rustls/src/msgs/ccs.rs\n?? core/vendor/rustls/src/msgs/codec.rs\n?? core/vendor/rustls/src/msgs/deframer/buffers.rs\n?? core/vendor/rustls/src/msgs/deframer/handshake.rs\n?? core/vendor/rustls/src/msgs/deframer/mod.rs\n?? core/vendor/rustls/src/msgs/enums.rs\n?? core/vendor/rustls/src/msgs/ffdhe_groups.rs\n?? core/vendor/rustls/src/msgs/fragmenter.rs\n?? core/vendor/rustls/src/msgs/handshake.rs\n?? core/vendor/rustls/src/msgs/handshake_test.rs\n?? core/vendor/rustls/src/msgs/macros.rs\n?? core/vendor/rustls/src/msgs/message/inbound.rs\n?? core/vendor/rustls/src/msgs/message/mod.rs\n?? core/vendor/rustls/src/msgs/message/outbound.rs\n?? core/vendor/rustls/src/msgs/message_test.rs\n?? core/vendor/rustls/src/msgs/mod.rs\n?? core/vendor/rustls/src/msgs/persist.rs\n?? core/vendor/rustls/src/polyfill.rs\n?? core/vendor/rustls/src/quic.rs\n?? core/vendor/rustls/src/rand.rs\n?? core/vendor/rustls/src/record_layer.rs\n?? core/vendor/rustls/src/server/builder.rs\n?? core/vendor/rustls/src/server/common.rs\n?? core/vendor/rustls/src/server/handy.rs\n?? core/vendor/rustls/src/server/hs.rs\n?? core/vendor/rustls/src/server/server_conn.rs\n?? core/vendor/rustls/src/server/test.rs\n?? core/vendor/rustls/src/server/tls12.rs\n?? core/vendor/rustls/src/server/tls13.rs\n?? core/vendor/rustls/src/stream.rs\n?? core/vendor/rustls/src/suites.rs\n?? core/vendor/rustls/src/test_macros.rs\n?? core/vendor/rustls/src/ticketer.rs\n?? core/vendor/rustls/src/time_provider.rs\n?? core/vendor/rustls/src/tls12/mod.rs\n?? core/vendor/rustls/src/tls13/key_schedule.rs\n?? core/vendor/rustls/src/tls13/mod.rs\n?? core/vendor/rustls/src/vecbuf.rs\n?? core/vendor/rustls/src/verify.rs\n?? core/vendor/rustls/src/verifybench.rs\n?? core/vendor/rustls/src/versions.rs\n?? core/vendor/rustls/src/webpki/anchors.rs\n?? core/vendor/rustls/src/webpki/client_verifier.rs\n?? core/vendor/rustls/src/webpki/mod.rs\n?? core/vendor/rustls/src/webpki/server_verifier.rs\n?? core/vendor/rustls/src/webpki/verify.rs\n?? core/vendor/rustls/src/x509.rs\n?? src/Swirl.Quick/packaging/licenses/rust-browser-tls-dependencies.txt\n?? tools/tests/test_reality_fingerprint.py\n?? tools/tests/xray_peer/utls_hello/main.go",
+      "utls": {
+        "go_mod_sum": "h1:jkSOEkLqn+S/jtpEHPOsVv/4V4EVnelwbMQl4vCWXAM=",
+        "license": "BSD-3-Clause",
+        "license_sha256": "2d36597f7117c38b006835ae7f537487207d8ec407aa9d9980794b2030cbc067",
+        "module": "github.com/refraction-networking/utls",
+        "profile": "HelloChrome_133",
+        "profile_source_sha256": "539e821a53eda1ab6acbfd1661d2ba0a9f8c87a27938709a85b7b69788971648",
+        "sum": "h1:er2acxbi3N1nvEq6HXHUAR1nTWEJmQfqiGR8EVT9rfs=",
+        "version": "v1.8.3-0.20260301010127-aa6edf4b11af"
+      },
+      "utls_hello_version_output": {
+        "ech_encoded_inner_lengths": [
+          128,
+          160,
+          192,
+          224
+        ],
+        "event": "version",
+        "go_version": "go1.27.2",
+        "profile": "HelloChrome_133",
+        "utls": {
+          "module": "github.com/refraction-networking/utls",
+          "sum": "h1:er2acxbi3N1nvEq6HXHUAR1nTWEJmQfqiGR8EVT9rfs=",
+          "version": "v1.8.3-0.20260301010127-aa6edf4b11af"
+        },
+        "xray_commit": "92ccc939aaf4f8965f369cf0b142e005aeaa11d5"
+      },
+      "utls_helper_source_sha256": "7585bd25ade061a67aaa2b195e298e9e8fbd7805c20bda5fdd702ebcbfee2eed",
+      "xray": {
+        "commit": "92ccc939aaf4f8965f369cf0b142e005aeaa11d5",
+        "go_mod_sha256": "31fe6bd6c04eb2738e157b850236b1376cbbac3f33e974256bb7325c8c764250",
+        "go_sum_sha256": "a72c2f2b5dd38fcf42ef55034bd55038703448b55a878eafddd60d4af1f63145",
+        "release": "v26.10.17",
+        "repository": "https://github.com/XTLS/Xray-core.git",
+        "tree": "55fc871fdf3e63149066956e7c60670f3a44fbf2"
+      },
+      "xray_version_output": "Xray 26.10.17 (Xray, Penetrates Everything.) 92ccc93 (go1.27.2 linux/amd64)\nA unified platform for anti-censorship."
+    }
+  },
+  "local_public_probe": {
+    "schema": 1,
+    "success": false,
+    "platform": "Linux",
+    "timestamp_utc": "2026-10-20T04:05:11.141857+00:00",
+    "checks": [],
+    "protocol": "vless+reality+vision",
+    "flow": "xtls-rprx-vision",
+    "verifier_sha256": "05e6d2938e376f70f935c25fff90616a9b38a158c1a041bae90b9433ef2872e8",
+    "fingerprint": "chrome",
+    "client_hello_profile": "chrome_133",
+    "public_target_dns": "Explicit test-launcher system lookup; one public IPv4 pinned at Xray per origin",
+    "scope": "Native Rust subscription import and Runtime through official Xray to explicit public origins; not Qt, provider or TUN acceptance",
+    "commit": "24119489f7b85fe58dea53acf3a4a6f467a6e8fa",
+    "tracked_worktree_clean": false,
+    "source_identity_pending": "Verifier and relevant source must be committed without changes",
+    "failure": {
+      "phase": "explicit-public-dns",
+      "type": "ProbeFailure",
+      "code": "PublicDnsFailed"
+    }
+  }
+}

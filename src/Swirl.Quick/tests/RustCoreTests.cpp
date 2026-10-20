@@ -58,7 +58,7 @@ private slots:
   const auto outbound=configuration.value("nodes").toArray().first().toObject().value("outbound").toObject();
   QVERIFY(!outbound.contains("tls"));QVERIFY(!outbound.contains("websocket"));QCOMPARE(outbound.value("type"),QJsonValue("vless"));
   const auto reality=outbound.value("reality").toObject();QCOMPARE(reality.value("public_key"),QJsonValue(QString::fromLatin1(key)));QCOMPARE(reality.value("short_id"),QJsonValue("a1B2"));QCOMPARE(reality.value("fingerprint"),QJsonValue("rustls"));QCOMPARE(reality.value("server_name"),QJsonValue("camouflage.invalid"));QCOMPARE(reality.value("alpn"),QJsonValue(QJsonArray{"h2","http/1.1"}));
-  for(const auto &profile:QStringList{"chrome","firefox","","random"}){auto invalid=options;invalid.nodes.first().parameters["client-fingerprint"]=profile;QVERIFY(!RustCoreEngine::configuration(invalid,&configuration).isEmpty());}
+  for(const auto &profile:QStringList{"safari","firefox","","random","Chrome","chrome_120"}){auto invalid=options;invalid.nodes.first().parameters["client-fingerprint"]=profile;QVERIFY(!RustCoreEngine::configuration(invalid,&configuration).isEmpty());}
   for(const auto &shortId:QStringList{"a","zz","001122334455667788"}){auto invalid=options;auto settings=invalid.nodes.first().parameters.value("reality-opts").toObject();settings["short-id"]=shortId;invalid.nodes.first().parameters["reality-opts"]=settings;QVERIFY(!RustCoreEngine::configuration(invalid,&configuration).isEmpty());}
   auto invalid=options;auto settings=invalid.nodes.first().parameters.value("reality-opts").toObject();settings["spider-x"]="/private";invalid.nodes.first().parameters["reality-opts"]=settings;QVERIFY(!RustCoreEngine::configuration(invalid,&configuration).isEmpty());
   auto invalidAlpn=source;invalidAlpn.replace("alpn=h2,http%2F1.1","alpn=h2,,http%2F1.1");const auto retained=NodeImporter::parse(invalidAlpn);QVERIFY(retained);QCOMPARE(retained.nodes.first().parameters.value("alpn"),QJsonValue(QJsonArray{"h2","","http/1.1"}));invalid=options;invalid.nodes=retained.nodes;invalid.selectedNodeId=retained.nodes.first().id;QVERIFY(!RustCoreEngine::configuration(invalid,&configuration).isEmpty());
@@ -67,6 +67,76 @@ private slots:
   NodeStore visionRestored(visionPath);QCOMPARE(visionRestored.nodes().size(),1);QCOMPARE(visionRestored.nodes().first().originalConfiguration,visionImported.nodes.first().originalConfiguration);
   auto visionOptions=options;visionOptions.nodes=visionRestored.nodes();visionOptions.selectedNodeId=visionRestored.selectedId();QVERIFY(RustCoreEngine::configuration(visionOptions,&configuration).isEmpty());QCOMPARE(configuration.value("nodes").toArray().first().toObject().value("outbound").toObject().value("flow"),QJsonValue("xtls-rprx-vision"));
   for(const auto &flow:QStringList{"xtls-rprx-direct","xtls-rprx-vision-udp443","XTLS-RPRX-VISION"}){auto unsupported=visionOptions;unsupported.nodes.first().parameters["flow"]=flow;QVERIFY(!RustCoreEngine::configuration(unsupported,&configuration).isEmpty());}
+ }
+ void browserRealityParametersSurviveImportStoreAndConfiguration(){
+  const auto key=QByteArray(32,'\x09').toBase64(QByteArray::Base64UrlEncoding|QByteArray::OmitTrailingEquals);
+  QTemporaryDir directory;QVERIFY(directory.isValid());int index=0;
+  for(const auto &profile:QStringList{"chrome","chrome_133"})for(const bool explicitAlpn:{false,true}){
+   const QByteArray uri="vless://00112233-4455-6677-8899-aabbccddeeff@proxy.invalid:443?security=reality&type=tcp&sni=camouflage.invalid&pbk="+key+"&sid=a1B2&fp="+profile.toUtf8()+"&flow=xtls-rprx-vision"+(explicitAlpn?"&alpn=h2,http%2F1.1":"");
+   const QByteArray yaml="proxies:\n  - name: fixture\n    type: vless\n    server: proxy.invalid\n    port: 443\n    uuid: 00112233-4455-6677-8899-aabbccddeeff\n    tls: true\n    servername: camouflage.invalid\n    client-fingerprint: "+profile.toUtf8()+"\n    reality-opts: {public-key: "+key+", short-id: a1B2}\n    flow: xtls-rprx-vision\n"+(explicitAlpn?"    alpn: [h2, http/1.1]\n":"");
+   QJsonObject tls{{"enabled",true},{"server_name","camouflage.invalid"},{"insecure",false},{"utls",QJsonObject{{"enabled",true},{"fingerprint",profile}}},{"reality",QJsonObject{{"enabled",true},{"public_key",QString::fromLatin1(key)},{"short_id","a1B2"}}}};
+   if(explicitAlpn)tls["alpn"]=QJsonArray{"h2","http/1.1"};
+   const QJsonObject source{{"tag","fixture"},{"type","vless"},{"server","proxy.invalid"},{"server_port",443},{"uuid","00112233-4455-6677-8899-aabbccddeeff"},{"flow","xtls-rprx-vision"},{"tls",tls}};
+   const auto json=QJsonDocument(QJsonObject{{"outbounds",QJsonArray{source}}}).toJson();
+   QList<QByteArray> bodies{uri,uri.toBase64(),yaml,json,json.toBase64()};
+   if(!explicitAlpn){
+    const QJsonObject user{{"id","00112233-4455-6677-8899-aabbccddeeff"},{"encryption","none"},{"flow","xtls-rprx-vision"}};
+    const QJsonObject endpoint{{"address","proxy.invalid"},{"port",443},{"users",QJsonArray{user}}};
+    const QJsonObject reality{{"serverName","camouflage.invalid"},{"fingerprint",profile},{"publicKey",QString::fromLatin1(key)},{"shortId","a1B2"}};
+    const QJsonObject stream{{"network","raw"},{"security","reality"},{"realitySettings",reality}};
+    const QJsonObject legacy{{"protocol","vless"},{"tag","fixture"},{"settings",QJsonObject{{"vnext",QJsonArray{endpoint}}}},{"streamSettings",stream}};
+    auto tcp=legacy;auto tcpStream=stream;tcpStream["network"]="tcp";tcpStream["tcpSettings"]=QJsonObject{{"header",QJsonObject{{"type","none"}}}};tcp["streamSettings"]=tcpStream;
+    auto simplified=legacy;auto settings=user;settings["address"]="proxy.invalid";settings["port"]=443;simplified["settings"]=settings;
+    auto renamed=reality;renamed["password"]=renamed.take("publicKey");auto renamedStream=stream;renamedStream["realitySettings"]=renamed;simplified["streamSettings"]=renamedStream;
+    auto aliases=simplified;renamed["publicKey"]=renamed.value("password");renamed["show"]=false;renamedStream["realitySettings"]=renamed;renamedStream["tcpSettings"]=tcpStream.value("tcpSettings");renamedStream["rawSettings"]=tcpStream.value("tcpSettings");aliases["streamSettings"]=renamedStream;aliases["mux"]=QJsonObject{{"enabled",false}};
+    for(const auto &xray:QList<QJsonObject>{legacy,tcp,simplified,aliases}){const auto body=QJsonDocument(QJsonObject{{"outbounds",QJsonArray{xray}}}).toJson();bodies.append(body);bodies.append(body.toBase64());}
+   }
+   QJsonObject expected;
+   for(const auto &body:bodies){
+    const auto imported=NodeImporter::parse(body);QVERIFY2(imported,qPrintable(imported.error));QCOMPARE(imported.nodes.size(),1);
+    const auto original=imported.nodes.first();QVERIFY(original.conversionIssues.isEmpty());QCOMPARE(original.parameters.value("client-fingerprint"),QJsonValue(profile));
+    if(body==json||body==json.toBase64())QCOMPARE(original.originalConfiguration,source);
+    if(original.sourceFormat.contains("Xray")){const auto decoded=body.startsWith('{')?body:QByteArray::fromBase64(body);QCOMPARE(original.originalConfiguration,QJsonDocument::fromJson(decoded).object().value("outbounds").toArray().first().toObject());QCOMPARE(imported.configurationFormat,QString("xray-v2ray-json"));QVERIFY(imported.configuration.isEmpty());QVERIFY(imported.executionConfiguration.isEmpty());}
+    const auto path=directory.filePath(QString("browser-reality-%1.dat").arg(index++));QString id;
+    {NodeStore saved(path);QVERIFY(saved.importNodes(imported.nodes));id=saved.nodes().first().id;QVERIFY(saved.select(id));}
+    NodeStore restored(path);QCOMPARE(restored.nodes().size(),1);QCOMPARE(restored.selectedId(),id);
+    const auto node=restored.nodes().first();QCOMPARE(node.parameters,original.parameters);QCOMPARE(node.originalConfiguration,original.originalConfiguration);
+    QVERIFY(SwirlProtocolRegistry::nativeNodeReason(node).isEmpty());QCOMPARE(SwirlProtocolRegistry::describe(node).value("tested"),QVariant(false));
+    EngineStartOptions options;options.nodes=restored.nodes();options.selectedNodeId=id;options.routingMode="global";options.proxyPort=12345;
+    QJsonObject configuration;const auto reason=RustCoreEngine::configuration(options,&configuration);QVERIFY2(reason.isEmpty(),qPrintable(reason));
+    const auto outbound=configuration.value("nodes").toArray().first().toObject().value("outbound").toObject();
+    if(expected.isEmpty())expected=outbound;else QCOMPARE(outbound,expected);
+    QVERIFY(!outbound.contains("tls"));QVERIFY(!outbound.contains("websocket"));QCOMPARE(outbound.value("flow"),QJsonValue("xtls-rprx-vision"));
+    const auto reality=outbound.value("reality").toObject();QCOMPARE(reality.value("fingerprint"),QJsonValue(profile));QCOMPARE(reality.value("public_key"),QJsonValue(QString::fromLatin1(key)));QCOMPARE(reality.value("short_id"),QJsonValue("a1B2"));QCOMPARE(reality.value("server_name"),QJsonValue("camouflage.invalid"));
+    const QJsonArray expectedAlpn=explicitAlpn?QJsonArray{"h2","http/1.1"}:QJsonArray{};QCOMPARE(reality.value("alpn"),QJsonValue(expectedAlpn));
+   }
+  }
+ }
+ void browserRealityAlpnAndSourceFingerprintCannotBeOverwritten(){
+  const auto key=QString::fromLatin1(QByteArray(32,'\x09').toBase64(QByteArray::Base64UrlEncoding|QByteArray::OmitTrailingEquals));
+  const QJsonObject tls{{"enabled",true},{"server_name","camouflage.invalid"},{"utls",QJsonObject{{"enabled",true},{"fingerprint","chrome"}}},{"reality",QJsonObject{{"enabled",true},{"public_key",key},{"short_id","abcd"}}}};
+  const QJsonObject source{{"tag","fixture"},{"type","vless"},{"server","proxy.invalid"},{"server_port",443},{"uuid","00112233-4455-6677-8899-aabbccddeeff"},{"flow","xtls-rprx-vision"},{"tls",tls}};
+  const auto document=QJsonDocument(QJsonObject{{"outbounds",QJsonArray{source}}}).toJson();const auto imported=NodeImporter::parse(document);QVERIFY(imported);
+  EngineStartOptions options;options.nodes=imported.nodes;options.selectedNodeId=imported.nodes.first().id;options.routingMode="global";options.proxyPort=12345;
+  QJsonObject configuration;QVERIFY(RustCoreEngine::configuration(options,&configuration).isEmpty());
+  // Neither a later edit nor an old normalized cache may silently rename an
+  // explicit source profile. The native IR preserves chrome versus chrome_133.
+  auto changed=options;changed.nodes.first().parameters["client-fingerprint"]="chrome_133";QVERIFY(!RustCoreEngine::configuration(changed,&configuration).isEmpty());
+  for(const auto &alpn:QList<QJsonArray>{QJsonArray{"h2"},QJsonArray{"http/1.1"},QJsonArray{"http/1.1","h2"},QJsonArray{"h2","h2"},QJsonArray{""},QJsonArray{"custom"}}){
+   auto changedSource=source;auto changedTls=tls;changedTls["alpn"]=alpn;changedSource["tls"]=changedTls;
+   const auto body=QJsonDocument(QJsonObject{{"outbounds",QJsonArray{changedSource}}}).toJson();
+   const auto parsed=NodeImporter::parse(body);QVERIFY(parsed);QCOMPARE(parsed.nodes.first().originalConfiguration,changedSource);QCOMPARE(parsed.nodes.first().parameters.value("alpn"),QJsonValue(alpn));
+   changed=options;changed.nodes=parsed.nodes;changed.selectedNodeId=parsed.nodes.first().id;const auto reason=RustCoreEngine::configuration(changed,&configuration);QVERIFY(reason.contains("ALPN"));
+  }
+  for(const auto &profile:QStringList{"firefox","rustls","","random","Chrome"}){
+   auto changedSource=source;auto changedTls=tls;changedTls["utls"]=QJsonObject{{"enabled",true},{"fingerprint",profile}};changedSource["tls"]=changedTls;
+   const auto parsed=NodeImporter::parse(QJsonDocument(QJsonObject{{"outbounds",QJsonArray{changedSource}}}).toJson());QVERIFY(parsed);QCOMPARE(parsed.nodes.first().originalConfiguration,changedSource);
+   changed=options;changed.nodes=parsed.nodes;changed.selectedNodeId=parsed.nodes.first().id;QVERIFY(!RustCoreEngine::configuration(changed,&configuration).isEmpty());
+  }
+  for(const auto &alias:QStringList{"fp","client-fingerprint"}){
+   auto collision=source;collision[alias]="chrome_133";const auto parsed=NodeImporter::parse(QJsonDocument(QJsonObject{{"outbounds",QJsonArray{collision}}}).toJson());QVERIFY(parsed);QCOMPARE(parsed.nodes.first().originalConfiguration,collision);QVERIFY(parsed.nodes.first().conversionIssues.join(' ').contains("冲突"));
+   changed=options;changed.nodes=parsed.nodes;changed.selectedNodeId=parsed.nodes.first().id;QVERIFY(!RustCoreEngine::configuration(changed,&configuration).isEmpty());
+  }
  }
  void importedScalarTypesCannotBecomeCredentialsOrTlsDefaults(){
   const QJsonObject base{{"name","typed-fixture"},{"type","http"},{"server","127.0.0.1"},{"port",443},{"tls",true}};
@@ -471,13 +541,14 @@ private slots:
    prefix+"security=tls&flow=xtls-rprx-vision-udp443"
   };
   const auto nativeKey=QString::fromLatin1(QByteArray(32,'\x09').toBase64(QByteArray::Base64UrlEncoding|QByteArray::OmitTrailingEquals));
+  sources.append(prefix+"security=reality&pbk="+nativeKey.toUtf8()+"&sid=abcd&sni=camouflage.invalid&flow=xtls-rprx-vision");
   const QJsonObject utlsNamedRustls{{"tag","declared-utls"},{"type","vless"},{"server","127.0.0.1"},{"server_port",endpoint.serverPort()},{"uuid","11111111-1111-4111-8111-111111111111"},{"tls",QJsonObject{{"enabled",true},{"server_name","camouflage.invalid"},{"insecure",false},{"utls",QJsonObject{{"enabled",true},{"fingerprint","rustls"}}},{"reality",QJsonObject{{"enabled",true},{"public_key",nativeKey},{"short_id","abcd"}}}}}};
   sources.append(QJsonDocument(QJsonObject{{"outbounds",QJsonArray{utlsNamedRustls}}}).toJson());
   for(const auto &extension:QList<QJsonObject>{QJsonObject{{"enabled",true}},QJsonObject{{"enabled",true},{"fingerprint",""}}}){
    QJsonObject node{{"tag","fixture"},{"type","vless"},{"server","127.0.0.1"},{"server_port",endpoint.serverPort()},{"uuid","11111111-1111-4111-8111-111111111111"},
     {"tls",QJsonObject{{"enabled",true},{"utls",extension}}}};
    sources.append(QJsonDocument(QJsonObject{{"outbounds",QJsonArray{node}}}).toJson());
-   auto tls=node.value("tls").toObject();tls["reality"]=QJsonObject{{"enabled",true},{"public_key","synthetic-key"},{"short_id","abcd"}};node["tls"]=tls;node["flow"]="xtls-rprx-vision";
+   auto tls=node.value("tls").toObject();tls["server_name"]="camouflage.invalid";tls["reality"]=QJsonObject{{"enabled",true},{"public_key",nativeKey},{"short_id","abcd"}};node["tls"]=tls;node["flow"]="xtls-rprx-vision";
    sources.append(QJsonDocument(QJsonObject{{"outbounds",QJsonArray{node}}}).toJson());
   }
   for(const auto &source:sources)for(const auto &body:{source,source.toBase64()}){

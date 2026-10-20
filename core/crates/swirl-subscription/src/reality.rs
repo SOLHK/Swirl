@@ -1,5 +1,5 @@
-//! Typed REALITY parameters. An explicitly selected native rustls profile is
-//! distinct from a browser fingerprint; unsupported profiles never downgrade.
+//! Typed REALITY parameters. Native rustls and the fixed Chrome 133 profile
+//! retain their source names; unsupported profiles never downgrade.
 use base64::{
     Engine,
     engine::general_purpose::{URL_SAFE, URL_SAFE_NO_PAD},
@@ -25,8 +25,16 @@ impl Reality {
         {
             return Err("RealityServerName");
         }
-        if self.fingerprint != "rustls" {
-            return Err("RealityFingerprintUnsupported");
+        match self.fingerprint.as_str() {
+            "rustls" => {}
+            "chrome" | "chrome_133" => {
+                // This browser profile has a fixed ALPN offer. Empty selects
+                // that offer in the transport without changing the source IR.
+                if !self.alpn.is_empty() && self.alpn != ["h2", "http/1.1"] {
+                    return Err("RealityFingerprintAlpnUnsupported");
+                }
+            }
+            _ => return Err("RealityFingerprintUnsupported"),
         }
         let mut seen = std::collections::HashSet::new();
         if self.alpn.len() > 16

@@ -1,7 +1,11 @@
 //! Bounded handshake-message validation. These are handshake bytes (including
 //! type/uint24 length), never TLS record headers or an independently re-encoded
 //! approximation of the bytes that will enter the transcript.
-use super::{ClientParameters, kx::HybridKeyExchange};
+use super::{
+    ClientParameters,
+    kx::HybridKeyExchange,
+    profile::{self, Fingerprint},
+};
 use std::collections::BTreeSet;
 
 pub(super) const SESSION_ID: std::ops::Range<usize> = 39..71;
@@ -126,9 +130,14 @@ pub(super) fn client(
     body.finish()?;
     // This first-flight foundation does not authenticate resumption binders,
     // 0-RTT, ECH inner/outer transcripts, or a second ClientHello after HRR.
-    if entries
-        .iter()
-        .any(|(kind, _)| matches!(kind, 41 | 42 | 44 | 0xfd00 | 0xfe0d))
+    if entries.iter().any(|(kind, _)| {
+        matches!(kind, 41 | 42 | 44 | 0xfd00)
+            || (*kind == 0xfe0d && parameters.fingerprint != Fingerprint::Chrome133)
+    }) {
+        return Err("RealityHelloExtensionUnsupported");
+    }
+    if parameters.fingerprint == Fingerprint::Chrome133
+        && !profile::valid_grease_ech(extension(&entries, 0xfe0d)?)
     {
         return Err("RealityHelloExtensionUnsupported");
     }
@@ -149,8 +158,13 @@ pub(super) fn client(
     }
     name.finish()?;
     let mut signatures = Cursor(extension(&entries, 13)?);
-    if !words(signatures.vector16()?)?.contains(&0x0807) {
-        return Err("RealityEd25519Required");
+    let schemes = words(signatures.vector16()?)?;
+    match parameters.fingerprint {
+        Fingerprint::Rustls if !schemes.contains(&0x0807) => return Err("RealityEd25519Required"),
+        Fingerprint::Chrome133 if schemes != profile::CHROME_SIGNATURES => {
+            return Err("RealityBrowserSignatureProfile");
+        }
+        _ => {}
     }
     signatures.finish()?;
     let mut groups = Cursor(extension(&entries, 10)?);

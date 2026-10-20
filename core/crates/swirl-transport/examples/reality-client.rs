@@ -183,6 +183,7 @@ fn run(input: Value, report: &mut Value) -> io::Result<()> {
         "short_id_hex",
         "version",
         "alpn",
+        "fingerprint",
         "payload_hex",
         "read_chunk",
         "write_chunk",
@@ -242,8 +243,15 @@ fn run(input: Value, report: &mut Value) -> io::Result<()> {
     let write_chunk = chunk(&input, "write_chunk")?;
     let timeout = duration(&input, "timeout_ms")?.unwrap_or(Duration::from_secs(15));
     let cancellation = duration(&input, "cancel_after_ms")?;
+    let fingerprint = match input.get("fingerprint") {
+        None => "rustls",
+        Some(Value::String(value)) => value,
+        _ => return Err(invalid("InvalidSyntheticPeerFingerprint")),
+    };
     let parameters =
         ClientParameters::new(text(&input, "server_name")?, public_key, &short_id, version)
+            .map_err(invalid)?
+            .with_fingerprint(fingerprint)
             .map_err(invalid)?;
     let unix_time = u32::try_from(
         SystemTime::now()

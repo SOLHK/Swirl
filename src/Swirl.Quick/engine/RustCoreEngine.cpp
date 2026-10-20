@@ -203,14 +203,26 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
   if(it==o.nodes.cend())return "未选择节点。";
   const auto &n=*it;
   if(!n.conversionIssues.isEmpty()||!ProxyNode::validate(n).isEmpty())return "节点含无效或未映射参数，Rust 拒绝执行。";
-  // sing-box's explicit uTLS requirement survives normalization in the
-  // preserved source. A profile named rustls cannot authorize dropping it.
-  if(n.originalConfiguration.value("tls").toObject().value("utls").toObject().value("enabled").toBool())return "源配置明确要求 uTLS；Rust 原生 rustls 指纹不能替代该扩展，未丢弃原始要求。";
   if(!QStringList{"http","socks4","socks4a","socks5","trojan","ss","vless"}.contains(n.protocol))return "此节点协议尚未迁移到 Rust；未使用外部内核。";
   if(n.protocol!="ss"&&!n.cipher.isEmpty())return "Rust 尚未映射此协议声明的 cipher；未丢弃加密参数。";
   if(n.protocol=="trojan"&&!n.username.isEmpty())return "Trojan 只支持密码认证；未丢弃 username。";
   const bool socks4=n.protocol=="socks4"||n.protocol=="socks4a";
   const bool reality=n.protocol=="vless"&&n.parameters.contains("reality-opts");
+  // Check the preserved sing-box requirement before accepting its normalized
+  // profile. A default inferred by the importer cannot authorize a browser
+  // handshake, and a source profile named rustls does not implement uTLS.
+  const auto sourceTls=n.originalConfiguration.value("tls").toObject();
+  if(sourceTls.contains("utls")){
+   if(!sourceTls.value("utls").isObject())return "源配置 uTLS 参数类型无效。";
+   const auto utls=sourceTls.value("utls").toObject();
+   for(auto p=utls.begin();p!=utls.end();++p)if(p.key()!="enabled"&&p.key()!="fingerprint")return "源配置 uTLS 含未映射参数；未丢弃原值。";
+   if(utls.value("enabled")==QJsonValue(true)){
+    const auto fingerprint=utls.value("fingerprint");
+    if(!reality||sourceTls.value("enabled")!=QJsonValue(true)||sourceTls.value("reality").toObject().value("enabled")!=QJsonValue(true)||!fingerprint.isString()||!QStringList{"chrome","chrome_133"}.contains(fingerprint.toString()))return "源配置 uTLS 仅支持 REALITY 的显式 chrome 或 chrome_133 指纹；未替换原值。";
+    if(fingerprint!=n.parameters.value("client-fingerprint"))return "源配置 uTLS 指纹与节点指纹冲突；未覆盖原值。";
+   }else if((!utls.value("enabled").isUndefined()&&utls.value("enabled")!=QJsonValue(false))||utls.contains("fingerprint"))return "源配置 uTLS 未明确启用却含指纹要求；未丢弃原值。";
+  }
+  if(reality&&n.originalConfiguration.value("_swirl-default-client-fingerprint").toBool())return "REALITY 需要源配置明确声明受支持的指纹；未执行导入时推断的默认值。";
   QSet<QString> allowed=socks4?QSet<QString>{"tls","udp","network","tfo","skip-cert-verify"}:n.protocol=="ss"?QSet<QString>{"udp","plugin","plugin-opts"}:QSet<QString>{"tls","udp","sni","servername","alpn","skip-cert-verify"};
   allowed.insert("tfo");
   if(n.parameters.contains("tfo")&&n.parameters.value("tfo")!=QJsonValue(false))return "Rust 尚未实现 TCP Fast Open；必须明确为 false。";
@@ -256,7 +268,8 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
   else if(!n.username.isEmpty()||!n.password.isEmpty())outbound["auth"]=QJsonObject{{"username",n.username},{"password",n.password}};
   if(n.protocol=="socks5")outbound["udp"]=udp;
   if(reality){
-   if(n.parameters.value("client-fingerprint")!=QJsonValue(QStringLiteral("rustls")))return "REALITY 当前只支持显式 rustls 原生指纹；尚未实现浏览器指纹，未替换源配置。";
+   const auto fingerprint=n.parameters.value("client-fingerprint");
+   if(!fingerprint.isString()||!QStringList{"rustls","chrome","chrome_133"}.contains(fingerprint.toString()))return "REALITY 指纹尚未支持；当前支持显式 rustls、chrome 或 chrome_133，未替换源配置。";
    if(!n.parameters.value("reality-opts").isObject())return "REALITY 参数必须是对象。";
    if(n.parameters.contains("network")&&n.parameters.value("network")!=QJsonValue(QStringLiteral("tcp")))return "REALITY 当前仅支持 TCP 传输。";
    if(n.parameters.contains("ws-opts"))return "REALITY 不能附带 WebSocket 参数。";
@@ -271,10 +284,11 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
    if(!QRegularExpression("^(?:[0-9A-Fa-f]{2}){0,8}$").match(shortId).hasMatch())return "REALITY shortId 必须是最长 8 字节的十六进制。";
    if(n.serverName.isEmpty()||n.serverName.size()>253||!QHostAddress(n.serverName).isNull()||!QRegularExpression("^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$").match(n.serverName).hasMatch())return "REALITY 需要明确的有效 SNI 域名。";
    const auto alpn=n.parameters.value("alpn");if(!alpn.isUndefined()&&!alpn.isArray())return "REALITY ALPN 格式无效。";
+   if(fingerprint!=QJsonValue(QStringLiteral("rustls"))&&!alpn.toArray().isEmpty()&&alpn.toArray()!=QJsonArray{"h2","http/1.1"})return "REALITY Chrome 指纹仅支持默认 ALPN 或按顺序声明 h2、http/1.1；未替换源配置。";
    if(alpn.toArray().size()>16)return "REALITY ALPN 数量超过限制。";
    QSet<QString> seenAlpn;int totalAlpn=0;for(const auto &value:alpn.toArray()){const auto text=value.toString();if(seenAlpn.contains(text)||(totalAlpn+=text.size())>1024)return "REALITY ALPN 重复或总长度超过限制。";seenAlpn.insert(text);}
    for(const auto &value:alpn.toArray())if(!value.isString()||value.toString().isEmpty()||value.toString().size()>255||!QRegularExpression("^[\\x20-\\x7e]+$").match(value.toString()).hasMatch())return "REALITY ALPN 值无效。";
-   outbound["reality"]=QJsonObject{{"server_name",n.serverName},{"public_key",key},{"short_id",shortId},{"fingerprint","rustls"},{"alpn",alpn.isUndefined()?QJsonArray{}:alpn.toArray()}};
+   outbound["reality"]=QJsonObject{{"server_name",n.serverName},{"public_key",key},{"short_id",shortId},{"fingerprint",fingerprint},{"alpn",alpn.isUndefined()?QJsonArray{}:alpn.toArray()}};
   }
   else if(tls){
    auto alpn=n.parameters.value("alpn");if(!alpn.isUndefined()&&!alpn.isArray())return "ALPN 格式无效。";

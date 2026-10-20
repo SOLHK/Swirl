@@ -219,6 +219,8 @@ class CoreDevelopmentTests(unittest.TestCase):
         self.assertNotIn("git push", source)
         self.assertNotIn("git add", source)
         self.assertNotIn("[swirl-core-autofix]", source)
+        self.assertIn("          permission-contents: read\n", source)
+        self.assertNotIn("permission-workflows:", source)
         self.assertIn("          ref: ${{ github.sha }}\n", source)
 
         def body(title):
@@ -464,6 +466,10 @@ class CoreDevelopmentTests(unittest.TestCase):
             path = root / relative
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text("# public synthetic Vision stream fixture\n", encoding="utf-8")
+        for relative in development.FINGERPRINT_SOURCES:
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("# public synthetic fingerprint fixture\n", encoding="utf-8")
         return workflow
 
     def test_reality_runtime_gates_require_actual_binary_and_preserve_every_prior_gate(self):
@@ -479,6 +485,7 @@ class CoreDevelopmentTests(unittest.TestCase):
             if windows:
                 self.assertIn(development.reality_runtime_steps(windows=True, qt=True)
                               + development.reality_runtime_steps(windows=True, qt=True, vision=True)
+                              + development.reality_runtime_steps(windows=True, qt=True, vision=True, fingerprint="chrome")
                               + development.NATIVE_APPLICATION_BUILD, part)
         for source in (
             final.replace("python tools/tests/test_reality_runtime.py\n", "python tools/tests/test_reality_runtime.py || true\n", 1),
@@ -1440,6 +1447,150 @@ class CoreDevelopmentTests(unittest.TestCase):
                     self.assertEqual((evidence / "peer-test.log").exists(), ran)
                     if ran:
                         self.assertIn("synthetic-peer", (evidence / "peer-test.log").read_text(encoding="utf-8"))
+
+    def test_fingerprint_stage_preserves_prior_gates_and_runs_on_all_platforms_and_app(self):
+        root = Path(__file__).resolve().parents[2]
+        final = development.updated_workflow(FIXTURE)
+        previous = development.without_fingerprint_steps(final)
+        self.assertNotIn("--fingerprint", previous)
+        self.assertNotIn("test_reality_fingerprint.py", previous)
+        self.assertEqual(development.updated_workflow(previous), final)
+        self.assertEqual(development.updated_workflow(final), final)
+        checked_in = (root / ".github/workflows/rust-core.yml").read_text(encoding="utf-8")
+        self.assertEqual(development.updated_workflow(checked_in), checked_in)
+        portable, windows = checked_in.split("  windows-rust:\n")
+        app = (root / ".github/workflows/core-development.yml").read_text(encoding="utf-8")
+        for label, part, is_windows, prefix in (("portable", portable, False, "Swirl"),
+                                                ("windows", windows, True, "Swirl"),
+                                                ("app", app, False, "App")):
+            with self.subTest(job=label):
+                oracle = development.fingerprint_steps(windows=is_windows, artifact_prefix=prefix)
+                self.assertEqual(part.count(oracle), 1)
+                self.assertEqual(part.count(development.FINGERPRINT_BUILD_COMMAND), 1)
+                self.assertEqual(part.count("python tools/tests/test_reality_fingerprint.py"), 1)
+                self.assertLess(part.index("python tools/Build-XrayPeer.py"), part.index(oracle))
+                for vision in (False, True):
+                    # Both prior rustls menus remain mandatory and byte-identical.
+                    original = development.reality_runtime_steps(windows=is_windows, vision=vision,
+                                                                 artifact_prefix=prefix)
+                    native = development.reality_runtime_steps(windows=is_windows, vision=vision,
+                                                               fingerprint="chrome", artifact_prefix=prefix)
+                    self.assertEqual(part.count(original), 1)
+                    self.assertEqual(part.count(native), 1)
+                    self.assertLess(part.index(oracle), part.index(native))
+                if is_windows:
+                    self.assertIn("examples/reality-hello.exe\n", oracle)
+                    self.assertIn("'utls-hello.exe'", oracle)
+                    self.assertIn('oracle-test.log"\n' + development.WINDOWS_STATUS_GUARD, oracle)
+                else:
+                    self.assertIn('          test -x "$SWIRL_REALITY_HELLO"\n', oracle)
+                    self.assertIn('          test -x "$SWIRL_XRAY_PEER_DIR/utls-hello"\n', oracle)
+        for vision in (False, True):
+            public = development.public_reality_runtime_steps(vision=vision, fingerprint="chrome")
+            self.assertEqual(portable.count(public), 1)
+            self.assertNotIn(public, windows)
+            self.assertIn("if: runner.os == 'Linux'", public)
+            self.assertIn("if: always() && runner.os == 'Linux'", public)
+            self.assertIn(development.reality_runtime_steps(windows=True, qt=True, vision=vision), windows)
+        qt = development.reality_runtime_steps(windows=True, qt=True, vision=True, fingerprint="chrome")
+        self.assertEqual(windows.count(qt), 1)
+        self.assertLess(windows.index("Run Qt to Rust integration without Mihomo"), windows.index(qt))
+        self.assertIn(qt + development.NATIVE_APPLICATION_BUILD, windows)
+
+    def test_fingerprint_partial_mutated_moved_and_weakened_gates_fail_closed(self):
+        final = development.updated_workflow(FIXTURE)
+        broken = []
+        for windows in (False, True):
+            for anchor, block in development._fingerprint_insertions(windows):
+                for edit in ("", block * 2,
+                             block.replace("working-directory: .", "working-directory: core", 1),
+                             block.replace("        run: |\n", "        continue-on-error: true\n        run: |\n", 1),
+                             block.replace("if: always()", "if: success()", 1),
+                             block.replace("if-no-files-found: error", "if-no-files-found: ignore", 1),
+                             block.replace("${{ github.sha }}", "unverified-source", 1)):
+                    broken.append(final.replace(block, edit, 1))
+                broken.append(final.replace(anchor + block, block + anchor, 1))
+                if windows:
+                    broken.append(final.replace(block, block.replace(development.WINDOWS_STATUS_GUARD, "", 1), 1))
+                else:
+                    broken.append(final.replace(block, block.replace("set -euo pipefail", "set -eu", 1), 1))
+            oracle = development.fingerprint_steps(windows=windows)
+            for edit in (oracle.replace("--release ", "", 1), oracle.replace("--locked ", "", 1),
+                         oracle.replace("test_reality_fingerprint.py", "test_reality_peer.py", 1),
+                         oracle.replace("SWIRL_REALITY_HELLO:", "UNREVIEWED_CLIENT:", 1),
+                         oracle.replace("build-manifest.json", "unrelated.json", 1)):
+                broken.append(final.replace(oracle, edit, 1))
+        broken.extend((final.replace("--fingerprint chrome", "--fingerprint rustls", 1),
+                       final.replace(" --fingerprint chrome", "", 1),
+                       final + "          python tools/tests/test_reality_fingerprint.py\n"))
+        for index, source in enumerate(broken):
+            with self.subTest(drift=index), self.assertRaises(ValueError):
+                development.updated_workflow(source)
+
+    def test_fingerprint_missing_material_prevents_any_workflow_write(self):
+        for missing in development.FINGERPRINT_SOURCES:
+            with self.subTest(missing=missing), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                workflow = self.make_repository(root)
+                before = workflow.read_bytes()
+                (root / missing).unlink()
+                with self.assertRaises(ValueError):
+                    development.apply_update(root, ENVIRONMENT)
+                self.assertEqual(workflow.read_bytes(), before)
+
+    def test_fingerprint_shell_propagates_build_missing_tools_and_oracle_failure(self):
+        root = Path(__file__).resolve().parents[2]
+        source = (root / ".github/workflows/rust-core.yml").read_text(encoding="utf-8")
+        windows = os.name == "nt"
+        jobs = [("rust", source.split("  windows-rust:\n")[int(windows)])]
+        if not windows:
+            jobs.append(("app", (root / ".github/workflows/core-development.yml").read_text(encoding="utf-8")))
+        for job, part in jobs:
+            body = part.split("      - name: Build native ClientHello and verify independent Chrome133 fingerprint\n", 1)[1]
+            body = body.split("        run: |\n", 1)[1].split("      - ", 1)[0]
+            body = "\n".join(line[10:] for line in body.splitlines() if line.strip()) + "\n"
+            cases = ((23, True, True, 0), (0, False, True, 0), (0, True, False, 0),
+                     (0, True, True, 29), (0, True, True, 0))
+            for build_exit, client_present, oracle_present, test_exit in cases:
+                with self.subTest(job=job, case=(build_exit, client_present, oracle_present, test_exit)), tempfile.TemporaryDirectory() as temporary:
+                    work = Path(temporary)
+                    (work / "tools/tests").mkdir(parents=True)
+                    shim, peer = work / "bin", work / "peer"
+                    shim.mkdir()
+                    peer.mkdir()
+                    cargo = shim / ("cargo.cmd" if windows else "cargo")
+                    cargo.write_text(
+                        (f"@echo off\necho synthetic-build\nexit /b {build_exit}\n" if windows
+                         else f"#!/bin/sh\necho synthetic-build\nexit {build_exit}\n"), encoding="utf-8")
+                    cargo.chmod(0o755)
+                    suffix = ".exe" if windows else ""
+                    client = work / ("reality-hello" + suffix)
+                    for path, present in ((client, client_present), (peer / ("utls-hello" + suffix), oracle_present)):
+                        if present:
+                            path.write_text("synthetic required binary\n", encoding="utf-8")
+                            path.chmod(0o755)
+                    (work / "tools/tests/test_reality_fingerprint.py").write_text(
+                        "from pathlib import Path\nPath('ORACLE_WAS_RUN').write_text('yes')\n"
+                        f"print('synthetic-oracle', flush=True)\nraise SystemExit({test_exit})\n", encoding="utf-8")
+                    evidence = work / "evidence"
+                    environment = dict(os.environ, SWIRL_REALITY_HELLO=str(client),
+                                       SWIRL_FINGERPRINT_EVIDENCE=str(evidence), SWIRL_XRAY_PEER_DIR=str(peer))
+                    environment["PATH"] = str(shim) + os.pathsep + environment.get("PATH", "")
+                    if windows:
+                        script = work / "failure.ps1"
+                        script.write_text(body, encoding="utf-8")
+                        args = ["pwsh", "-NoProfile", "-File", str(script)]
+                    else:
+                        args = ["bash", "-c", body]
+                    result = subprocess.run(args, cwd=work, env=environment, capture_output=True, timeout=15)
+                    if client_present and oracle_present:
+                        self.assertEqual(result.returncode, build_exit or test_exit, result.stderr.decode(errors="replace"))
+                    else:
+                        self.assertNotEqual(result.returncode, 0)
+                    ran = build_exit == 0 and client_present and oracle_present
+                    self.assertEqual((work / "ORACLE_WAS_RUN").exists(), ran)
+                    self.assertIn("synthetic-build", (evidence / "client-build.log").read_text(encoding="utf-8"))
+                    self.assertEqual((evidence / "oracle-test.log").exists(), ran)
 
 
 if __name__ == "__main__":

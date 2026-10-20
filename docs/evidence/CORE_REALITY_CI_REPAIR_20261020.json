@@ -1,0 +1,1242 @@
+{
+  "sha": "54908e2902c28ae20e2588fa5347df9b2b3d76e9",
+  "artifacts": [
+    {
+      "artifact_id": 12239249884,
+      "name": "App-REALITY-Xray-Linux-54908e2902c28ae20e2588fa5347df9b2b3d76e9-1",
+      "zip_sha256": "682e859bca4dfe50c0709143d76add8c4a2c9a8c13fed9fefba960c5ed29bb91",
+      "run_id": 39366092691,
+      "summaries": [
+        {
+          "file": "swirl-xray-results/test-summary.json",
+          "tests_run": 12,
+          "successful": true,
+          "failures": [],
+          "errors": [],
+          "skipped": []
+        }
+      ],
+      "identities": [
+        {
+          "file": "swirl-xray-results/source-identity.json",
+          "git_sha": "54908e2902c28ae20e2588fa5347df9b2b3d76e9",
+          "tracked_clean": true,
+          "test_hash_matches_commit": true,
+          "source": "tools/tests/test_reality_xray.py",
+          "platform": "linux",
+          "binaries": {}
+        }
+      ]
+    },
+    {
+      "artifact_id": 12239269926,
+      "name": "Swirl-REALITY-Runtime-Windows-qt-54908e2902c28ae20e2588fa5347df9b2b3d76e9-1",
+      "zip_sha256": "21c054fe76a98e348bab3f0d2c720ab3a7ebaa07845ffe0a66f22f3a26c5dc10",
+      "run_id": 39366092611,
+      "summaries": [
+        {
+          "file": "test-summary.json",
+          "tests_run": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "successful": true,
+          "product_mode": "qt-dpapi",
+          "provider_connection": false,
+          "protocol": "vless+reality"
+        }
+      ],
+      "identities": [
+        {
+          "file": "source-identity.json",
+          "git_sha": "54908e2902c28ae20e2588fa5347df9b2b3d76e9",
+          "tracked_clean": true,
+          "test_hash_matches_commit": true,
+          "source": "tools/tests/test_reality_runtime.py",
+          "platform": "win32",
+          "binaries": {
+            "SWIRL_RUST_HARNESS": {
+              "file": "swirl-api.exe",
+              "sha256": "7b708d8ba5264975aac65d3a3e0450057c73fcea14a6cc361344776cb8d523b2"
+            },
+            "SWIRL_RUST_INSPECTOR": {
+              "file": "swirl-inspect.exe",
+              "sha256": "5b8fd7bb964abf43d299ec833a5d97ccf491faac9a337d2ddfbeea46c5bbe72e"
+            },
+            "SWIRL_RUST_QT_TESTS": {
+              "file": "SwirlRustCoreTests.exe",
+              "sha256": "68bc6e36f8909dea6f333f0ca6c5374c106a5f175d37a6ae7939720ef8d98674"
+            }
+          },
+          "rust_binary_hashes_match_downloaded_bundle": true
+        }
+      ],
+      "qt_observations": [
+        {
+          "file": "test_actual_qt_import_dpapi_select_route_and_recreate-1792469302838821800/A-xray.json",
+          "data": {
+            "identity": "A",
+            "protocol": "vless+reality",
+            "tcp_listener_established": true,
+            "reality_authenticated_sessions": 6,
+            "client_finished_verified_sessions": 6,
+            "camouflage_record_size_failures": 0,
+            "vless_accepted_sessions": 6,
+            "vless_target_ports": [
+              49260,
+              49261,
+              49263,
+              49260,
+              49260,
+              49260
+            ],
+            "vision_padding_events": 0,
+            "vision_unpadding_events": 0,
+            "vision_direct_upload_commands": 0,
+            "vision_direct_download_commands": 0,
+            "camouflage_connections": 13,
+            "camouflage_application_bytes": 0,
+            "process_reaped": true,
+            "forced_kill": false,
+            "listener_closed": true,
+            "active_camouflage_connections": 0
+          }
+        },
+        {
+          "file": "test_actual_qt_import_dpapi_select_route_and_recreate-1792469302838821800/B-xray.json",
+          "data": {
+            "identity": "B",
+            "protocol": "vless+reality",
+            "tcp_listener_established": true,
+            "reality_authenticated_sessions": 6,
+            "client_finished_verified_sessions": 6,
+            "camouflage_record_size_failures": 0,
+            "vless_accepted_sessions": 6,
+            "vless_target_ports": [
+              49260,
+              49261,
+              49260,
+              49260,
+              49260,
+              49260
+            ],
+            "vision_padding_events": 0,
+            "vision_unpadding_events": 0,
+            "vision_direct_upload_commands": 0,
+            "vision_direct_download_commands": 0,
+            "camouflage_connections": 13,
+            "camouflage_application_bytes": 0,
+            "process_reaped": true,
+            "forced_kill": false,
+            "listener_closed": true,
+            "active_camouflage_connections": 0
+          }
+        },
+        {
+          "file": "test_actual_qt_import_dpapi_select_route_and_recreate-1792469302838821800/origins.json",
+          "data": {
+            "http_paths": [
+              "/selected-a",
+              "/selected-b",
+              "/restored-b",
+              "/rule-a",
+              "/rule-b",
+              "/rule-choice",
+              "/rule-direct",
+              "/rule-suffix",
+              "/rule-keyword",
+              "/rule-port"
+            ],
+            "https_paths": [
+              "/selected-a-tls"
+            ],
+            "https_sni": [
+              "localhost",
+              "wrong.fixture.invalid"
+            ],
+            "https_authenticated_closes": 1,
+            "echo_bytes": 262180,
+            "echo_sessions": [
+              {
+                "expected_bytes": 262180,
+                "received_bytes": 262180,
+                "cancelled": false,
+                "tail_after_client_halfclose": true,
+                "target_closed": true,
+                "sha256": "4dbd1f5710a191e3b2872347b48eabcbd3adb5c8009266d780667afdcb8b06ee"
+              }
+            ],
+            "origin_errors": {
+              "http": [],
+              "https": [],
+              "echo": []
+            }
+          }
+        }
+      ]
+    },
+    {
+      "artifact_id": 12239319701,
+      "name": "Swirl-REALITY-Vision-Runtime-Windows-rust-54908e2902c28ae20e2588fa5347df9b2b3d76e9-1",
+      "zip_sha256": "c38cd3a1f38c9de556b6e2326379d0e0a178796c27ea42746f44fbe3e4ba3699",
+      "run_id": 39366092611,
+      "summaries": [
+        {
+          "file": "test-summary.json",
+          "tests_run": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "successful": true,
+          "product_mode": "rust-runtime",
+          "provider_connection": false,
+          "protocol": "vless+reality+vision"
+        }
+      ],
+      "identities": [
+        {
+          "file": "source-identity.json",
+          "git_sha": "54908e2902c28ae20e2588fa5347df9b2b3d76e9",
+          "tracked_clean": true,
+          "test_hash_matches_commit": true,
+          "source": "tools/tests/test_reality_runtime.py",
+          "platform": "win32",
+          "binaries": {
+            "SWIRL_RUST_HARNESS": {
+              "file": "swirl-api.exe",
+              "sha256": "7b708d8ba5264975aac65d3a3e0450057c73fcea14a6cc361344776cb8d523b2"
+            },
+            "SWIRL_RUST_INSPECTOR": {
+              "file": "swirl-inspect.exe",
+              "sha256": "5b8fd7bb964abf43d299ec833a5d97ccf491faac9a337d2ddfbeea46c5bbe72e"
+            }
+          },
+          "rust_binary_hashes_match_downloaded_bundle": true
+        }
+      ]
+    },
+    {
+      "artifact_id": 12239329197,
+      "name": "Swirl-REALITY-Vision-Runtime-macOS-rust-54908e2902c28ae20e2588fa5347df9b2b3d76e9-1",
+      "zip_sha256": "a3121301311c221092480c62af95542029c8de83f3ea362860be0fd0d4d0d438",
+      "run_id": 39366092611,
+      "summaries": [
+        {
+          "file": "test-summary.json",
+          "tests_run": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "successful": true,
+          "product_mode": "rust-runtime",
+          "provider_connection": false,
+          "protocol": "vless+reality+vision"
+        }
+      ],
+      "identities": [
+        {
+          "file": "source-identity.json",
+          "git_sha": "54908e2902c28ae20e2588fa5347df9b2b3d76e9",
+          "tracked_clean": true,
+          "test_hash_matches_commit": true,
+          "source": "tools/tests/test_reality_runtime.py",
+          "platform": "darwin",
+          "binaries": {
+            "SWIRL_RUST_HARNESS": {
+              "file": "swirl-api",
+              "sha256": "97716873d38c9705dcc3750b00f2772bc9340a3dbf23fe329227994e04fc5702"
+            },
+            "SWIRL_RUST_INSPECTOR": {
+              "file": "swirl-inspect",
+              "sha256": "26921ddada76d610dd3cbbedf8100f335a8c5d8762d45fa214685450880afa06"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "artifact_id": 12239354241,
+      "name": "Swirl-REALITY-Xray-Windows-54908e2902c28ae20e2588fa5347df9b2b3d76e9-1",
+      "zip_sha256": "457deb9c5950ec3674b9d8a07bd8b405f364eb5c2808c3ad80efa76f5e5ee320",
+      "run_id": 39366092611,
+      "summaries": [
+        {
+          "file": "swirl-xray-results/test-summary.json",
+          "tests_run": 12,
+          "successful": true,
+          "failures": [],
+          "errors": [],
+          "skipped": []
+        }
+      ],
+      "identities": [
+        {
+          "file": "swirl-xray-results/source-identity.json",
+          "git_sha": "54908e2902c28ae20e2588fa5347df9b2b3d76e9",
+          "tracked_clean": true,
+          "test_hash_matches_commit": true,
+          "source": "tools/tests/test_reality_xray.py",
+          "platform": "win32",
+          "binaries": {}
+        }
+      ]
+    },
+    {
+      "artifact_id": 12239363952,
+      "name": "Swirl-REALITY-Xray-macOS-54908e2902c28ae20e2588fa5347df9b2b3d76e9-1",
+      "zip_sha256": "5a9a357ed96e3b559fca2b3297d4c1c484ec434e1885a93ef7ff35b8abd95dbd",
+      "run_id": 39366092611,
+      "summaries": [
+        {
+          "file": "swirl-xray-results/test-summary.json",
+          "tests_run": 12,
+          "successful": true,
+          "failures": [],
+          "errors": [],
+          "skipped": []
+        }
+      ],
+      "identities": [
+        {
+          "file": "swirl-xray-results/source-identity.json",
+          "git_sha": "54908e2902c28ae20e2588fa5347df9b2b3d76e9",
+          "tracked_clean": true,
+          "test_hash_matches_commit": true,
+          "source": "tools/tests/test_reality_xray.py",
+          "platform": "darwin",
+          "binaries": {}
+        }
+      ]
+    },
+    {
+      "artifact_id": 12239404037,
+      "name": "Swirl-Vision-Xray-Windows-54908e2902c28ae20e2588fa5347df9b2b3d76e9-1",
+      "zip_sha256": "3172062040a1d3fe9e871e967c2f08ec97b77b93b5a7e3df870bcc35b2b49b40",
+      "run_id": 39366092611,
+      "summaries": [
+        {
+          "file": "swirl-vision-results/test-summary.json",
+          "tests_run": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "successful": true
+        }
+      ],
+      "identities": [
+        {
+          "file": "swirl-vision-results/source-identity.json",
+          "git_sha": "54908e2902c28ae20e2588fa5347df9b2b3d76e9",
+          "tracked_clean": true,
+          "test_hash_matches_commit": true,
+          "source": "tools/tests/test_vision_xray.py",
+          "platform": "win32",
+          "binaries": {}
+        }
+      ]
+    },
+    {
+      "artifact_id": 12239413927,
+      "name": "Swirl-REALITY-Runtime-macOS-rust-54908e2902c28ae20e2588fa5347df9b2b3d76e9-1",
+      "zip_sha256": "ec1e3234f003f042705495435363953910228639bafa4ba3a52230e23e61ae1e",
+      "run_id": 39366092611,
+      "summaries": [
+        {
+          "file": "test-summary.json",
+          "tests_run": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "successful": true,
+          "product_mode": "rust-runtime",
+          "provider_connection": false,
+          "protocol": "vless+reality"
+        }
+      ],
+      "identities": [
+        {
+          "file": "source-identity.json",
+          "git_sha": "54908e2902c28ae20e2588fa5347df9b2b3d76e9",
+          "tracked_clean": true,
+          "test_hash_matches_commit": true,
+          "source": "tools/tests/test_reality_runtime.py",
+          "platform": "darwin",
+          "binaries": {
+            "SWIRL_RUST_HARNESS": {
+              "file": "swirl-api",
+              "sha256": "97716873d38c9705dcc3750b00f2772bc9340a3dbf23fe329227994e04fc5702"
+            },
+            "SWIRL_RUST_INSPECTOR": {
+              "file": "swirl-inspect",
+              "sha256": "26921ddada76d610dd3cbbedf8100f335a8c5d8762d45fa214685450880afa06"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "artifact_id": 12239423761,
+      "name": "Swirl-Vision-Xray-macOS-54908e2902c28ae20e2588fa5347df9b2b3d76e9-1",
+      "zip_sha256": "98d572d26b0d1decf30fdc1a012bef07546318c538e1c81d9da411a64a4e4af9",
+      "run_id": 39366092611,
+      "summaries": [
+        {
+          "file": "swirl-vision-results/test-summary.json",
+          "tests_run": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "successful": true
+        }
+      ],
+      "identities": [
+        {
+          "file": "swirl-vision-results/source-identity.json",
+          "git_sha": "54908e2902c28ae20e2588fa5347df9b2b3d76e9",
+          "tracked_clean": true,
+          "test_hash_matches_commit": true,
+          "source": "tools/tests/test_vision_xray.py",
+          "platform": "darwin",
+          "binaries": {}
+        }
+      ]
+    },
+    {
+      "artifact_id": 12239424109,
+      "name": "Swirl-REALITY-Runtime-Windows-rust-54908e2902c28ae20e2588fa5347df9b2b3d76e9-1",
+      "zip_sha256": "f829c4a9109d5d198b4e4f4bf7c2f2d686d7bf772283546fe9f16c99d6c5988c",
+      "run_id": 39366092611,
+      "summaries": [
+        {
+          "file": "test-summary.json",
+          "tests_run": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "successful": true,
+          "product_mode": "rust-runtime",
+          "provider_connection": false,
+          "protocol": "vless+reality"
+        }
+      ],
+      "identities": [
+        {
+          "file": "source-identity.json",
+          "git_sha": "54908e2902c28ae20e2588fa5347df9b2b3d76e9",
+          "tracked_clean": true,
+          "test_hash_matches_commit": true,
+          "source": "tools/tests/test_reality_runtime.py",
+          "platform": "win32",
+          "binaries": {
+            "SWIRL_RUST_HARNESS": {
+              "file": "swirl-api.exe",
+              "sha256": "7b708d8ba5264975aac65d3a3e0450057c73fcea14a6cc361344776cb8d523b2"
+            },
+            "SWIRL_RUST_INSPECTOR": {
+              "file": "swirl-inspect.exe",
+              "sha256": "5b8fd7bb964abf43d299ec833a5d97ccf491faac9a337d2ddfbeea46c5bbe72e"
+            }
+          },
+          "rust_binary_hashes_match_downloaded_bundle": true
+        }
+      ]
+    },
+    {
+      "artifact_id": 12239547889,
+      "name": "Swirl-Product-Chain-Windows-qt-54908e2902c28ae20e2588fa5347df9b2b3d76e9-1",
+      "zip_sha256": "50159fa2bb62b6f7caff1423a9dc2c37a5c2d98d2a4a2a90e40d960336ce7c58",
+      "run_id": 39366092611,
+      "summaries": [],
+      "identities": [],
+      "product_result": {
+        "source_sha": "54908e2902c28ae20e2588fa5347df9b2b3d76e9",
+        "platform": "win32",
+        "binaries": {
+          "SWIRL_RUST_HARNESS": {
+            "filename": "swirl-api.exe",
+            "available": true,
+            "sha256": "7b708d8ba5264975aac65d3a3e0450057c73fcea14a6cc361344776cb8d523b2"
+          },
+          "SWIRL_RUST_INSPECTOR": {
+            "filename": "swirl-inspect.exe",
+            "available": true,
+            "sha256": "5b8fd7bb964abf43d299ec833a5d97ccf491faac9a337d2ddfbeea46c5bbe72e"
+          },
+          "SWIRL_RUST_QT_TESTS": {
+            "filename": "SwirlRustCoreTests.exe",
+            "available": true,
+            "sha256": "68bc6e36f8909dea6f333f0ca6c5374c106a5f175d37a6ae7939720ef8d98674"
+          }
+        },
+        "tracked_worktree_changes": [],
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": [],
+        "success": true,
+        "scope": "Rust test-host JSON persistence; only ProductQtIntegration uses product Qt/DPAPI"
+      }
+    },
+    {
+      "artifact_id": 12239556924,
+      "name": "App-REALITY-Vision-Runtime-Linux-rust-54908e2902c28ae20e2588fa5347df9b2b3d76e9-1",
+      "zip_sha256": "d9c194de229bdd3f7ca7f5d92e606329d7d1c39d47a2a86c0ad8b615c5f88a9f",
+      "run_id": 39366092691,
+      "summaries": [
+        {
+          "file": "test-summary.json",
+          "tests_run": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "successful": true,
+          "product_mode": "rust-runtime",
+          "provider_connection": false,
+          "protocol": "vless+reality+vision"
+        }
+      ],
+      "identities": [
+        {
+          "file": "source-identity.json",
+          "git_sha": "54908e2902c28ae20e2588fa5347df9b2b3d76e9",
+          "tracked_clean": true,
+          "test_hash_matches_commit": true,
+          "source": "tools/tests/test_reality_runtime.py",
+          "platform": "linux",
+          "binaries": {
+            "SWIRL_RUST_HARNESS": {
+              "file": "swirl-api",
+              "sha256": "dea1f772b4aaf38ba401781fe12501974b9762ea22a09be46fd4eb08feabd5a3"
+            },
+            "SWIRL_RUST_INSPECTOR": {
+              "file": "swirl-inspect",
+              "sha256": "445248775c30bedf75bd6e850a5786ca77a51f4d618f9f841d06954422a6842b"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "artifact_id": 12239596940,
+      "name": "Swirl-Public-REALITY-54908e2902c28ae20e2588fa5347df9b2b3d76e9-1",
+      "zip_sha256": "ada2231bad7df8a53bc6717c4b96d83a9e5b7ad5b07439f9a29cec79fc5678be",
+      "run_id": 39366092611,
+      "summaries": [],
+      "identities": [
+        {
+          "file": "report-evidence/source-identity.json",
+          "git_sha": "54908e2902c28ae20e2588fa5347df9b2b3d76e9",
+          "tracked_clean": true,
+          "test_hash_matches_commit": true,
+          "source": "tools/tests/test_reality_runtime.py",
+          "platform": "linux",
+          "binaries": {
+            "SWIRL_RUST_HARNESS": {
+              "file": "swirl-api",
+              "sha256": "dea1f772b4aaf38ba401781fe12501974b9762ea22a09be46fd4eb08feabd5a3"
+            },
+            "SWIRL_RUST_INSPECTOR": {
+              "file": "swirl-inspect",
+              "sha256": "445248775c30bedf75bd6e850a5786ca77a51f4d618f9f841d06954422a6842b"
+            }
+          }
+        }
+      ],
+      "public_report": {
+        "schema": 1,
+        "success": true,
+        "platform": "Linux",
+        "timestamp_utc": "2026-10-20T03:53:52.834596+00:00",
+        "checks": [
+          {
+            "host": "www.msftconnecttest.com",
+            "port": 80,
+            "method": "GET",
+            "path": "/connecttest.txt",
+            "success": true,
+            "public_ipv4_only": true,
+            "provider_connection": false,
+            "direct_fallback": false,
+            "subscription_original_preserved": true,
+            "native_candidate_parameters_preserved": true,
+            "native_connect_accepted": true,
+            "http_status": 200,
+            "body_bytes": 22,
+            "expected_body_verified": true,
+            "orderly_origin_close": true,
+            "official_xray": {
+              "vless_accepted_sessions": 1,
+              "reality_authenticated_sessions": 1,
+              "client_finished_verified_sessions": 1,
+              "vision_padding_events": 0,
+              "vision_unpadding_events": 0,
+              "vision_direct_upload_commands": 0,
+              "vision_direct_download_commands": 0,
+              "public_tcp_connections": 1,
+              "camouflage_application_bytes": 0
+            },
+            "native": {
+              "accepted": 1,
+              "active": 0,
+              "failed": 0,
+              "upload": 83,
+              "download": 187,
+              "recorded_connections": 1,
+              "error_present": false
+            },
+            "native_process_reaped": true,
+            "elapsed_ms": 56
+          },
+          {
+            "host": "www.rust-lang.org",
+            "port": 443,
+            "method": "HEAD",
+            "path": "/",
+            "success": true,
+            "public_ipv4_only": true,
+            "provider_connection": false,
+            "direct_fallback": false,
+            "subscription_original_preserved": true,
+            "native_candidate_parameters_preserved": true,
+            "native_connect_accepted": true,
+            "certificate_verified": true,
+            "tls_version": "TLSv1.3",
+            "http_status": 301,
+            "authenticated_tls_close": true,
+            "orderly_origin_close": true,
+            "official_xray": {
+              "vless_accepted_sessions": 1,
+              "reality_authenticated_sessions": 1,
+              "client_finished_verified_sessions": 1,
+              "vision_padding_events": 0,
+              "vision_unpadding_events": 0,
+              "vision_direct_upload_commands": 0,
+              "vision_direct_download_commands": 0,
+              "public_tcp_connections": 1,
+              "camouflage_application_bytes": 0
+            },
+            "native": {
+              "accepted": 1,
+              "active": 0,
+              "failed": 0,
+              "upload": 690,
+              "download": 5414,
+              "recorded_connections": 1,
+              "error_present": false
+            },
+            "native_process_reaped": true,
+            "elapsed_ms": 120
+          }
+        ],
+        "protocol": "vless+reality",
+        "flow": "",
+        "verifier_sha256": "9f90fc863a4124b729e573fd60a7f9944ae77e6369329e36a659ba8b4275b357",
+        "public_target_dns": "Explicit test-launcher system lookup; one public IPv4 pinned at Xray per origin",
+        "scope": "Native Rust subscription import and Runtime through official Xray to explicit public origins; not Qt, provider or TUN acceptance",
+        "commit": "54908e2902c28ae20e2588fa5347df9b2b3d76e9",
+        "tracked_worktree_clean": true,
+        "official_peer_cleanup_passed": true
+      }
+    },
+    {
+      "artifact_id": 12239601859,
+      "name": "Swirl-REALITY-Runtime-Linux-rust-54908e2902c28ae20e2588fa5347df9b2b3d76e9-1",
+      "zip_sha256": "6a3d1ee2db1bc40968fe697300b5c579acdc391868295b8d4bf65dd63853cea7",
+      "run_id": 39366092611,
+      "summaries": [
+        {
+          "file": "test-summary.json",
+          "tests_run": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "successful": true,
+          "product_mode": "rust-runtime",
+          "provider_connection": false,
+          "protocol": "vless+reality"
+        }
+      ],
+      "identities": [
+        {
+          "file": "source-identity.json",
+          "git_sha": "54908e2902c28ae20e2588fa5347df9b2b3d76e9",
+          "tracked_clean": true,
+          "test_hash_matches_commit": true,
+          "source": "tools/tests/test_reality_runtime.py",
+          "platform": "linux",
+          "binaries": {
+            "SWIRL_RUST_HARNESS": {
+              "file": "swirl-api",
+              "sha256": "dea1f772b4aaf38ba401781fe12501974b9762ea22a09be46fd4eb08feabd5a3"
+            },
+            "SWIRL_RUST_INSPECTOR": {
+              "file": "swirl-inspect",
+              "sha256": "445248775c30bedf75bd6e850a5786ca77a51f4d618f9f841d06954422a6842b"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "artifact_id": 12239636728,
+      "name": "Swirl-Public-REALITY-Vision-54908e2902c28ae20e2588fa5347df9b2b3d76e9-1",
+      "zip_sha256": "be07b9eb88506164f60f0c393f1f30c3d7f4a2800bd29552cfc4cfb3bdb71239",
+      "run_id": 39366092611,
+      "summaries": [],
+      "identities": [
+        {
+          "file": "report-evidence/source-identity.json",
+          "git_sha": "54908e2902c28ae20e2588fa5347df9b2b3d76e9",
+          "tracked_clean": true,
+          "test_hash_matches_commit": true,
+          "source": "tools/tests/test_reality_runtime.py",
+          "platform": "linux",
+          "binaries": {
+            "SWIRL_RUST_HARNESS": {
+              "file": "swirl-api",
+              "sha256": "dea1f772b4aaf38ba401781fe12501974b9762ea22a09be46fd4eb08feabd5a3"
+            },
+            "SWIRL_RUST_INSPECTOR": {
+              "file": "swirl-inspect",
+              "sha256": "445248775c30bedf75bd6e850a5786ca77a51f4d618f9f841d06954422a6842b"
+            }
+          }
+        }
+      ],
+      "public_report": {
+        "schema": 1,
+        "success": true,
+        "platform": "Linux",
+        "timestamp_utc": "2026-10-20T03:53:54.286472+00:00",
+        "checks": [
+          {
+            "host": "www.msftconnecttest.com",
+            "port": 80,
+            "method": "GET",
+            "path": "/connecttest.txt",
+            "success": true,
+            "public_ipv4_only": true,
+            "provider_connection": false,
+            "direct_fallback": false,
+            "subscription_original_preserved": true,
+            "native_candidate_parameters_preserved": true,
+            "native_connect_accepted": true,
+            "http_status": 200,
+            "body_bytes": 22,
+            "expected_body_verified": true,
+            "orderly_origin_close": true,
+            "official_xray": {
+              "vless_accepted_sessions": 1,
+              "reality_authenticated_sessions": 1,
+              "client_finished_verified_sessions": 1,
+              "vision_padding_events": 1,
+              "vision_unpadding_events": 1,
+              "vision_direct_upload_commands": 0,
+              "vision_direct_download_commands": 0,
+              "public_tcp_connections": 1,
+              "camouflage_application_bytes": 0
+            },
+            "native": {
+              "accepted": 1,
+              "active": 0,
+              "failed": 0,
+              "upload": 83,
+              "download": 187,
+              "recorded_connections": 1,
+              "error_present": false
+            },
+            "native_process_reaped": true,
+            "elapsed_ms": 32
+          },
+          {
+            "host": "www.rust-lang.org",
+            "port": 443,
+            "method": "HEAD",
+            "path": "/",
+            "success": true,
+            "public_ipv4_only": true,
+            "provider_connection": false,
+            "direct_fallback": false,
+            "subscription_original_preserved": true,
+            "native_candidate_parameters_preserved": true,
+            "native_connect_accepted": true,
+            "certificate_verified": true,
+            "tls_version": "TLSv1.3",
+            "http_status": 301,
+            "authenticated_tls_close": true,
+            "orderly_origin_close": true,
+            "official_xray": {
+              "vless_accepted_sessions": 1,
+              "reality_authenticated_sessions": 1,
+              "client_finished_verified_sessions": 1,
+              "vision_padding_events": 2,
+              "vision_unpadding_events": 2,
+              "vision_direct_upload_commands": 1,
+              "vision_direct_download_commands": 1,
+              "public_tcp_connections": 1,
+              "camouflage_application_bytes": 0
+            },
+            "native": {
+              "accepted": 1,
+              "active": 0,
+              "failed": 0,
+              "upload": 690,
+              "download": 5412,
+              "recorded_connections": 1,
+              "error_present": false
+            },
+            "native_process_reaped": true,
+            "elapsed_ms": 91
+          }
+        ],
+        "protocol": "vless+reality+vision",
+        "flow": "xtls-rprx-vision",
+        "verifier_sha256": "9f90fc863a4124b729e573fd60a7f9944ae77e6369329e36a659ba8b4275b357",
+        "public_target_dns": "Explicit test-launcher system lookup; one public IPv4 pinned at Xray per origin",
+        "scope": "Native Rust subscription import and Runtime through official Xray to explicit public origins; not Qt, provider or TUN acceptance",
+        "commit": "54908e2902c28ae20e2588fa5347df9b2b3d76e9",
+        "tracked_worktree_clean": true,
+        "official_peer_cleanup_passed": true
+      }
+    },
+    {
+      "artifact_id": 12239836389,
+      "name": "Swirl-REALITY-Xray-Linux-54908e2902c28ae20e2588fa5347df9b2b3d76e9-1",
+      "zip_sha256": "4b005dad4c21d7ed4891582389ae1cfa3e4adda42ac369a4e0cbaa4cdecfe76b",
+      "run_id": 39366092611,
+      "summaries": [
+        {
+          "file": "swirl-xray-results/test-summary.json",
+          "tests_run": 12,
+          "successful": true,
+          "failures": [],
+          "errors": [],
+          "skipped": []
+        }
+      ],
+      "identities": [
+        {
+          "file": "swirl-xray-results/source-identity.json",
+          "git_sha": "54908e2902c28ae20e2588fa5347df9b2b3d76e9",
+          "tracked_clean": true,
+          "test_hash_matches_commit": true,
+          "source": "tools/tests/test_reality_xray.py",
+          "platform": "linux",
+          "binaries": {}
+        }
+      ]
+    },
+    {
+      "artifact_id": 12239846350,
+      "name": "App-REALITY-Runtime-Linux-rust-54908e2902c28ae20e2588fa5347df9b2b3d76e9-1",
+      "zip_sha256": "5760e1b63c824b7dd808e119b7315364406c6c7bac926576179361e195757edf",
+      "run_id": 39366092691,
+      "summaries": [
+        {
+          "file": "test-summary.json",
+          "tests_run": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "successful": true,
+          "product_mode": "rust-runtime",
+          "provider_connection": false,
+          "protocol": "vless+reality"
+        }
+      ],
+      "identities": [
+        {
+          "file": "source-identity.json",
+          "git_sha": "54908e2902c28ae20e2588fa5347df9b2b3d76e9",
+          "tracked_clean": true,
+          "test_hash_matches_commit": true,
+          "source": "tools/tests/test_reality_runtime.py",
+          "platform": "linux",
+          "binaries": {
+            "SWIRL_RUST_HARNESS": {
+              "file": "swirl-api",
+              "sha256": "dea1f772b4aaf38ba401781fe12501974b9762ea22a09be46fd4eb08feabd5a3"
+            },
+            "SWIRL_RUST_INSPECTOR": {
+              "file": "swirl-inspect",
+              "sha256": "445248775c30bedf75bd6e850a5786ca77a51f4d618f9f841d06954422a6842b"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "artifact_id": 12239901252,
+      "name": "Swirl-Vision-Xray-Linux-54908e2902c28ae20e2588fa5347df9b2b3d76e9-1",
+      "zip_sha256": "faac637fd352ce7bd1f74fa6b27a4431050ddfe9fe27277670447495efb6a6c7",
+      "run_id": 39366092611,
+      "summaries": [
+        {
+          "file": "swirl-vision-results/test-summary.json",
+          "tests_run": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "successful": true
+        }
+      ],
+      "identities": [
+        {
+          "file": "swirl-vision-results/source-identity.json",
+          "git_sha": "54908e2902c28ae20e2588fa5347df9b2b3d76e9",
+          "tracked_clean": true,
+          "test_hash_matches_commit": true,
+          "source": "tools/tests/test_vision_xray.py",
+          "platform": "linux",
+          "binaries": {}
+        }
+      ]
+    },
+    {
+      "artifact_id": 12239901277,
+      "name": "Swirl-REALITY-Vision-Runtime-Linux-rust-54908e2902c28ae20e2588fa5347df9b2b3d76e9-1",
+      "zip_sha256": "bf48e2b5419fefd777dfcd4ddba6013073a1dde969c69a3e9bb74be2e830cd12",
+      "run_id": 39366092611,
+      "summaries": [
+        {
+          "file": "test-summary.json",
+          "tests_run": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "successful": true,
+          "product_mode": "rust-runtime",
+          "provider_connection": false,
+          "protocol": "vless+reality+vision"
+        }
+      ],
+      "identities": [
+        {
+          "file": "source-identity.json",
+          "git_sha": "54908e2902c28ae20e2588fa5347df9b2b3d76e9",
+          "tracked_clean": true,
+          "test_hash_matches_commit": true,
+          "source": "tools/tests/test_reality_runtime.py",
+          "platform": "linux",
+          "binaries": {
+            "SWIRL_RUST_HARNESS": {
+              "file": "swirl-api",
+              "sha256": "dea1f772b4aaf38ba401781fe12501974b9762ea22a09be46fd4eb08feabd5a3"
+            },
+            "SWIRL_RUST_INSPECTOR": {
+              "file": "swirl-inspect",
+              "sha256": "445248775c30bedf75bd6e850a5786ca77a51f4d618f9f841d06954422a6842b"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "artifact_id": 12240040932,
+      "name": "Core-development-evidence",
+      "zip_sha256": "145327f863ab238e5d662b0f95afce314be5e3e82b687f71936f6b8cf0b81d07",
+      "run_id": 39366092691,
+      "summaries": [],
+      "identities": [],
+      "source_archive": {
+        "trigger_sha": "54908e2902c28ae20e2588fa5347df9b2b3d76e9",
+        "tested_sha": "54908e2902c28ae20e2588fa5347df9b2b3d76e9",
+        "archive_sha": "54908e2902c28ae20e2588fa5347df9b2b3d76e9",
+        "files_all_match_commit": 333,
+        "source_diff_bytes": 0,
+        "untracked_source_bytes": 0,
+        "worktree_state": "?? CORE_TESTED_COMMIT\n?? CORE_TRIGGER_COMMIT\n?? CORE_WORKTREE_STATE\n"
+      }
+    },
+    {
+      "artifact_id": 12240186672,
+      "name": "Swirl-Rust-Core-Windows",
+      "zip_sha256": "c587fda6a1042c3bb2763ce41bf636ae2f67a147129ce9f6121dc8d11490d6ee",
+      "run_id": 39366092611,
+      "summaries": [],
+      "identities": [],
+      "archived_binaries": {
+        "swirl_api.dll": "42a890b4b90fd5b7657cd9655756e0bc5e15bc9c93c48e08441a90e239443c2d",
+        "swirl-api.exe": "7b708d8ba5264975aac65d3a3e0450057c73fcea14a6cc361344776cb8d523b2",
+        "swirl-inspect.exe": "5b8fd7bb964abf43d299ec833a5d97ccf491faac9a337d2ddfbeea46c5bbe72e",
+        "swirl-diagnose.exe": "100b2d36b2c99e70f31471e1233e9142c2baef6dfd436c22d546dfab693a033b"
+      }
+    },
+    {
+      "artifact_id": 12240205466,
+      "name": "App-Vision-Xray-Linux-54908e2902c28ae20e2588fa5347df9b2b3d76e9-1",
+      "zip_sha256": "c2f24d1fcae2c488590a3a029e9f2e91c5c23d9fdbe7273fbb35fe0e7b072220",
+      "run_id": 39366092691,
+      "summaries": [
+        {
+          "file": "swirl-vision-results/test-summary.json",
+          "tests_run": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "successful": true
+        }
+      ],
+      "identities": [
+        {
+          "file": "swirl-vision-results/source-identity.json",
+          "git_sha": "54908e2902c28ae20e2588fa5347df9b2b3d76e9",
+          "tracked_clean": true,
+          "test_hash_matches_commit": true,
+          "source": "tools/tests/test_vision_xray.py",
+          "platform": "linux",
+          "binaries": {}
+        }
+      ]
+    },
+    {
+      "artifact_id": 12240460467,
+      "name": "Swirl-REALITY-Vision-Runtime-Windows-qt-54908e2902c28ae20e2588fa5347df9b2b3d76e9-1",
+      "zip_sha256": "b4d40b4a2659e1a8c441faf336c5905fa72255a3d102e5088b1ca52c89563ae3",
+      "run_id": 39366092611,
+      "summaries": [
+        {
+          "file": "test-summary.json",
+          "tests_run": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "successful": true,
+          "product_mode": "qt-dpapi",
+          "provider_connection": false,
+          "protocol": "vless+reality+vision"
+        }
+      ],
+      "identities": [
+        {
+          "file": "source-identity.json",
+          "git_sha": "54908e2902c28ae20e2588fa5347df9b2b3d76e9",
+          "tracked_clean": true,
+          "test_hash_matches_commit": true,
+          "source": "tools/tests/test_reality_runtime.py",
+          "platform": "win32",
+          "binaries": {
+            "SWIRL_RUST_HARNESS": {
+              "file": "swirl-api.exe",
+              "sha256": "7b708d8ba5264975aac65d3a3e0450057c73fcea14a6cc361344776cb8d523b2"
+            },
+            "SWIRL_RUST_INSPECTOR": {
+              "file": "swirl-inspect.exe",
+              "sha256": "5b8fd7bb964abf43d299ec833a5d97ccf491faac9a337d2ddfbeea46c5bbe72e"
+            },
+            "SWIRL_RUST_QT_TESTS": {
+              "file": "SwirlRustCoreTests.exe",
+              "sha256": "68bc6e36f8909dea6f333f0ca6c5374c106a5f175d37a6ae7939720ef8d98674"
+            }
+          },
+          "rust_binary_hashes_match_downloaded_bundle": true
+        }
+      ],
+      "qt_observations": [
+        {
+          "file": "test_actual_qt_import_dpapi_select_route_and_recreate-1792469307712784600/A-xray.json",
+          "data": {
+            "identity": "A",
+            "protocol": "vless+reality+vision",
+            "tcp_listener_established": true,
+            "reality_authenticated_sessions": 6,
+            "client_finished_verified_sessions": 6,
+            "camouflage_record_size_failures": 0,
+            "vless_accepted_sessions": 6,
+            "vless_target_ports": [
+              49348,
+              49349,
+              49351,
+              49348,
+              49348,
+              49348
+            ],
+            "vision_padding_events": 8,
+            "vision_unpadding_events": 7,
+            "vision_direct_upload_commands": 1,
+            "vision_direct_download_commands": 1,
+            "camouflage_connections": 13,
+            "camouflage_application_bytes": 0,
+            "process_reaped": true,
+            "forced_kill": false,
+            "listener_closed": true,
+            "active_camouflage_connections": 0
+          }
+        },
+        {
+          "file": "test_actual_qt_import_dpapi_select_route_and_recreate-1792469307712784600/B-xray.json",
+          "data": {
+            "identity": "B",
+            "protocol": "vless+reality+vision",
+            "tcp_listener_established": true,
+            "reality_authenticated_sessions": 6,
+            "client_finished_verified_sessions": 6,
+            "camouflage_record_size_failures": 0,
+            "vless_accepted_sessions": 6,
+            "vless_target_ports": [
+              49348,
+              49349,
+              49348,
+              49348,
+              49348,
+              49348
+            ],
+            "vision_padding_events": 6,
+            "vision_unpadding_events": 6,
+            "vision_direct_upload_commands": 0,
+            "vision_direct_download_commands": 0,
+            "camouflage_connections": 13,
+            "camouflage_application_bytes": 0,
+            "process_reaped": true,
+            "forced_kill": false,
+            "listener_closed": true,
+            "active_camouflage_connections": 0
+          }
+        },
+        {
+          "file": "test_actual_qt_import_dpapi_select_route_and_recreate-1792469307712784600/origins.json",
+          "data": {
+            "http_paths": [
+              "/selected-a",
+              "/selected-b",
+              "/restored-b",
+              "/rule-a",
+              "/rule-b",
+              "/rule-choice",
+              "/rule-direct",
+              "/rule-suffix",
+              "/rule-keyword",
+              "/rule-port"
+            ],
+            "https_paths": [
+              "/selected-a-tls"
+            ],
+            "https_sni": [
+              "localhost",
+              "wrong.fixture.invalid"
+            ],
+            "https_authenticated_closes": 1,
+            "echo_bytes": 262180,
+            "echo_sessions": [
+              {
+                "expected_bytes": 262180,
+                "received_bytes": 262180,
+                "cancelled": false,
+                "tail_after_client_halfclose": true,
+                "target_closed": true,
+                "sha256": "4dbd1f5710a191e3b2872347b48eabcbd3adb5c8009266d780667afdcb8b06ee"
+              }
+            ],
+            "origin_errors": {
+              "http": [],
+              "https": [],
+              "echo": []
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "jobs": [
+    {
+      "job_id": 118443163346,
+      "rust_passed_including_doctests": 297,
+      "python_summaries": [
+        "Ran 16 tests in 0.013s",
+        "Ran 19 tests in 0.107s",
+        "Ran 24 tests in 28.622s",
+        "Ran 9 tests in 12.191s",
+        "Ran 11 tests in 10.238s",
+        "Ran 9 tests in 8.597s",
+        "Ran 10 tests in 5.053s",
+        "Ran 11 tests in 9.594s",
+        "Ran 50 tests in 1.166s",
+        "Ran 21 tests in 5.324s",
+        "Ran 37 tests in 87.192s",
+        "Ran 7 tests in 0.018s",
+        "Ran 12 tests in 9.031s",
+        "Ran 21 tests in 5.113s",
+        "Ran 11 tests in 4.091s",
+        "Ran 13 tests in 8.508s",
+        "Ran 9 tests in 4.304s",
+        "Ran 12 tests in 4.657s",
+        "Ran 4 tests in 0.689s",
+        "Ran 7 tests in 2.937s",
+        "Ran 9 tests in 5.940s"
+      ],
+      "python_skipped_cases": [
+        "test_vless_qt_data_path (__main__.RustCoreIntegration.test_vless_qt_data_path) ... skipped 'Qt executable required'",
+        "test_qt_facade_http_obfs_with_udp_declared (__main__.ShadowsocksTests.test_qt_facade_http_obfs_with_udp_declared) ... skipped 'Qt integration executable required'",
+        "test_qt_imported_socks4_and_4a_data_path (__main__.Socks4Integration.test_qt_imported_socks4_and_4a_data_path) ... skipped 'Qt integration executable required'",
+        "test_qt_vless_websocket_data_path (__main__.WebSocketTransportTests.test_qt_vless_websocket_data_path) ... skipped 'Qt integration executable required'",
+        "test_qt_imported_socks5_udp_data_path (__main__.Socks5UdpIntegration.test_qt_imported_socks5_udp_data_path) ... skipped 'Windows Qt integration executable required'",
+        "test_actual_product_import_persist_select_route_and_recreate (__main__.ProductQtIntegration.test_actual_product_import_persist_select_route_and_recreate) ... skipped 'Windows Qt/DPAPI integration executable required'"
+      ],
+      "raw_log": "/tmp/swirl-phase1-job-118443163346.log"
+    },
+    {
+      "job_id": 118443163710,
+      "rust_passed_including_doctests": 297,
+      "python_summaries": [
+        "Ran 16 tests in 0.029s",
+        "Ran 19 tests in 0.258s",
+        "Ran 24 tests in 30.320s",
+        "Ran 9 tests in 9.782s",
+        "Ran 11 tests in 11.219s",
+        "Ran 9 tests in 12.839s",
+        "Ran 10 tests in 5.724s",
+        "Ran 11 tests in 12.798s",
+        "Ran 50 tests in 4.268s",
+        "Ran 21 tests in 7.538s",
+        "Ran 37 tests in 95.085s",
+        "Ran 7 tests in 0.033s",
+        "Ran 12 tests in 9.164s",
+        "Ran 21 tests in 5.567s",
+        "Ran 11 tests in 3.964s",
+        "Ran 13 tests in 9.168s",
+        "Ran 9 tests in 1.308s",
+        "Ran 12 tests in 4.771s",
+        "Ran 4 tests in 1.100s",
+        "Ran 7 tests in 4.877s",
+        "Ran 9 tests in 6.806s"
+      ],
+      "python_skipped_cases": [
+        "test_vless_qt_data_path (__main__.RustCoreIntegration.test_vless_qt_data_path) ... skipped 'Qt executable required'",
+        "test_qt_facade_http_obfs_with_udp_declared (__main__.ShadowsocksTests.test_qt_facade_http_obfs_with_udp_declared) ... skipped 'Qt integration executable required'",
+        "test_qt_imported_socks4_and_4a_data_path (__main__.Socks4Integration.test_qt_imported_socks4_and_4a_data_path) ... skipped 'Qt integration executable required'",
+        "test_qt_vless_websocket_data_path (__main__.WebSocketTransportTests.test_qt_vless_websocket_data_path) ... skipped 'Qt integration executable required'",
+        "test_qt_imported_socks5_udp_data_path (__main__.Socks5UdpIntegration.test_qt_imported_socks5_udp_data_path) ... skipped 'Windows Qt integration executable required'",
+        "test_actual_product_import_persist_select_route_and_recreate (__main__.ProductQtIntegration.test_actual_product_import_persist_select_route_and_recreate) ... skipped 'Windows Qt/DPAPI integration executable required'"
+      ],
+      "raw_log": "/tmp/swirl-phase1-job-118443163710.log"
+    },
+    {
+      "job_id": 118443164046,
+      "rust_passed_including_doctests": 297,
+      "python_summaries": [
+        "Ran 50 tests in 1.612s",
+        "Ran 16 tests in 0.017s",
+        "Ran 19 tests in 0.094s",
+        "Ran 24 tests in 27.189s",
+        "Ran 9 tests in 11.182s",
+        "Ran 11 tests in 10.244s",
+        "Ran 9 tests in 8.634s",
+        "Ran 10 tests in 5.105s",
+        "Ran 11 tests in 9.630s",
+        "Ran 9 tests in 4.332s",
+        "Ran 12 tests in 4.671s",
+        "Ran 4 tests in 0.742s",
+        "Ran 7 tests in 18.104s",
+        "Ran 9 tests in 31.110s"
+      ],
+      "python_skipped_cases": [
+        "test_vless_qt_data_path (__main__.RustCoreIntegration.test_vless_qt_data_path) ... skipped 'Qt executable required'",
+        "test_qt_facade_http_obfs_with_udp_declared (__main__.ShadowsocksTests.test_qt_facade_http_obfs_with_udp_declared) ... skipped 'Qt integration executable required'",
+        "test_qt_imported_socks4_and_4a_data_path (__main__.Socks4Integration.test_qt_imported_socks4_and_4a_data_path) ... skipped 'Qt integration executable required'",
+        "test_qt_vless_websocket_data_path (__main__.WebSocketTransportTests.test_qt_vless_websocket_data_path) ... skipped 'Qt integration executable required'",
+        "test_actual_product_import_persist_select_route_and_recreate (__main__.ProductQtIntegration.test_actual_product_import_persist_select_route_and_recreate) ... skipped 'Windows Qt/DPAPI integration executable required'"
+      ],
+      "raw_log": "/tmp/swirl-phase1-job-118443164046.log"
+    }
+  ]
+}

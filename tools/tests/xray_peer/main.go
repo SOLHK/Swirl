@@ -7,8 +7,11 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto"
 	"crypto/ecdh"
+	"crypto/ecdsa"
 	"crypto/ed25519"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/tls"
@@ -289,12 +292,21 @@ func (c *countedConn) Close() error {
 
 func (c *countedConn) CloseWrite() error { return c.Conn.(*net.TCPConn).CloseWrite() }
 
-func certificate() (tls.Certificate, error) {
-	caPublic, caKey, err := ed25519.GenerateKey(rand.Reader)
+func certificate(browser bool) (tls.Certificate, error) {
+	// Offer both certificates through the standard TLS selection path. Chrome
+	// does not advertise Ed25519; the existing native profile still uses it.
+	generate := func() (crypto.Signer, error) {
+		if browser {
+			return ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		}
+		_, key, err := ed25519.GenerateKey(rand.Reader)
+		return key, err
+	}
+	caKey, err := generate()
 	if err != nil {
 		return tls.Certificate{}, err
 	}
-	public, key, err := ed25519.GenerateKey(rand.Reader)
+	key, err := generate()
 	if err != nil {
 		return tls.Certificate{}, err
 	}
@@ -308,7 +320,7 @@ func certificate() (tls.Certificate, error) {
 		KeyUsage: x509.KeyUsageCertSign, BasicConstraintsValid: true, IsCA: true,
 		MaxPathLenZero: true,
 	}
-	caDER, err := x509.CreateCertificate(rand.Reader, ca, ca, caPublic, caKey)
+	caDER, err := x509.CreateCertificate(rand.Reader, ca, ca, caKey.Public(), caKey)
 	if err != nil {
 		return tls.Certificate{}, err
 	}
@@ -325,7 +337,7 @@ func certificate() (tls.Certificate, error) {
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		BasicConstraintsValid: true,
 	}
-	der, err := x509.CreateCertificate(rand.Reader, template, ca, public, caKey)
+	der, err := x509.CreateCertificate(rand.Reader, template, ca, key.Public(), caKey)
 	if err != nil {
 		return tls.Certificate{}, err
 	}
@@ -383,7 +395,11 @@ func run(input request, result *report) error {
 		result.ActiveConnections = all.active.Load()
 		result.CamouflageApplicationBytes = camouflageBytes.Load()
 	}()
-	cert, err := certificate()
+	cert, err := certificate(false)
+	if err != nil {
+		return err
+	}
+	browserCert, err := certificate(true)
 	if err != nil {
 		return err
 	}
@@ -392,7 +408,7 @@ func run(input request, result *report) error {
 		group = tls.X25519
 	}
 	targetTLS := &tls.Config{
-		Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS13,
+		Certificates: []tls.Certificate{cert, browserCert}, MinVersion: tls.VersionTLS13,
 		MaxVersion: tls.VersionTLS13, CurvePreferences: []tls.CurveID{group},
 		SessionTicketsDisabled: true,
 	}

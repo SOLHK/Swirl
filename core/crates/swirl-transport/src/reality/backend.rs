@@ -1,4 +1,4 @@
-//! A bounded, native-rustls first-flight adapter; never a browser fingerprint.
+//! A bounded rustls first-flight adapter with an opt-in, versioned wire profile.
 //!
 //! rustls 0.23.46 constructs and buffers its ClientHello inside `new()`. Its
 //! public API has no SessionID setter before that transcript input. Two entirely
@@ -13,6 +13,7 @@
 //! caller must validate ServerHello (including echo and HRR) before giving it to
 //! rustls; this module does not establish an authenticated application channel.
 
+use super::profile::{Chrome133, Fingerprint};
 use super::{AuthenticatedClientHello, ClientKeys, ClientParameters, ServerAuthenticator, hello};
 use ring::rand::{SecureRandom as _, SystemRandom};
 use std::{cell::RefCell, collections::BTreeSet, marker::PhantomData, rc::Rc, sync::Arc};
@@ -44,7 +45,22 @@ pub(super) fn prepare(
     alpn: &[Vec<u8>],
 ) -> Result<Prepared, &'static str> {
     validate_alpn(alpn)?;
-    let keys = ClientKeys::generate()?;
+    let browser: Option<Arc<dyn rustls::client::ClientHelloCustomizer>> =
+        if parameters.fingerprint == Fingerprint::Chrome133 {
+            Some(Arc::new(Chrome133::generate()?))
+        } else {
+            None
+        };
+    let default_alpn = [b"h2".to_vec(), b"http/1.1".to_vec()];
+    let alpn = if browser.is_some() {
+        if !alpn.is_empty() && alpn != default_alpn {
+            return Err("RealityFingerprintAlpnUnsupported");
+        }
+        default_alpn.as_slice()
+    } else {
+        alpn
+    };
+    let keys = ClientKeys::generate_for(parameters.fingerprint)?;
     let random = *keys.client_random();
     let mut preview_id = [0; 32];
     let mut order = [0; 2];
@@ -55,9 +71,12 @@ pub(super) fn prepare(
 
     // Public bytes may be copied. The actual private keys stay in `keys` until
     // authenticate consumes them; the preview cannot complete a key exchange.
-    let public = PreviewKey(keys.hybrid_public_key().to_vec());
+    let public = PreviewKey(
+        keys.hybrid_public_key().to_vec(),
+        keys.x25519_public_key().to_vec(),
+    );
     let (preview, mut expected_records) = construct(
-        configuration(Arc::new(DenyPreviewCertificate), alpn)?,
+        profiled_configuration(Arc::new(DenyPreviewCertificate), alpn, browser.clone())?,
         parameters,
         Construction::new(preview_id, order, random, Box::new(public)),
     )?;
@@ -87,7 +106,11 @@ pub(super) fn prepare(
     // No shared owner, seed replay or leaked per-connection provider is needed.
     // Only the final rustls connection takes the real key, by value, once.
     let (connection, first_flight) = construct(
-        configuration(Arc::new(ServerAuthenticator::new(authentication_key)), alpn)?,
+        profiled_configuration(
+            Arc::new(ServerAuthenticator::new(authentication_key)),
+            alpn,
+            browser,
+        )?,
         parameters,
         Construction::new(session_id, order, random, Box::new(key_exchange)),
     )?;
@@ -120,9 +143,18 @@ fn validate_alpn(alpn: &[Vec<u8>]) -> Result<(), &'static str> {
     Ok(())
 }
 
+#[cfg(test)]
 fn configuration(
     verifier: Arc<dyn ServerCertVerifier>,
     alpn: &[Vec<u8>],
+) -> Result<Arc<ClientConfig>, &'static str> {
+    profiled_configuration(verifier, alpn, None)
+}
+
+fn profiled_configuration(
+    verifier: Arc<dyn ServerCertVerifier>,
+    alpn: &[Vec<u8>],
+    browser: Option<Arc<dyn rustls::client::ClientHelloCustomizer>>,
 ) -> Result<Arc<ClientConfig>, &'static str> {
     use rustls::crypto::ring::cipher_suite::{
         TLS13_AES_128_GCM_SHA256, TLS13_AES_256_GCM_SHA384, TLS13_CHACHA20_POLY1305_SHA256,
@@ -146,8 +178,14 @@ fn configuration(
     config.resumption = Resumption::disabled();
     config.enable_early_data = false;
     config.cert_decompressors.clear();
+    if browser.is_some() {
+        config
+            .cert_decompressors
+            .push(rustls::compress::BROTLI_DECOMPRESSOR);
+    }
     config.cert_compressors.clear();
     config.send_ticket_request = None;
+    config.client_hello_customizer = browser;
     Ok(Arc::new(config))
 }
 
@@ -312,7 +350,7 @@ impl SupportedKxGroup for AdvertiseClassicalOnly {
     }
 }
 
-struct PreviewKey(Vec<u8>);
+struct PreviewKey(Vec<u8>, Vec<u8>);
 
 impl ActiveKeyExchange for PreviewKey {
     fn pub_key(&self) -> &[u8] {
@@ -328,7 +366,7 @@ impl ActiveKeyExchange for PreviewKey {
     }
 
     fn hybrid_component(&self) -> Option<(NamedGroup, &[u8])> {
-        Some((NamedGroup::X25519, &self.0[super::kx::MLKEM_PUBLIC_LEN..]))
+        Some((NamedGroup::X25519, &self.1))
     }
 
     fn complete_hybrid_component(self: Box<Self>, _peer: &[u8]) -> Result<SharedSecret, Error> {
