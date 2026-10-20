@@ -62,6 +62,11 @@ private slots:
   for(const auto &shortId:QStringList{"a","zz","001122334455667788"}){auto invalid=options;auto settings=invalid.nodes.first().parameters.value("reality-opts").toObject();settings["short-id"]=shortId;invalid.nodes.first().parameters["reality-opts"]=settings;QVERIFY(!RustCoreEngine::configuration(invalid,&configuration).isEmpty());}
   auto invalid=options;auto settings=invalid.nodes.first().parameters.value("reality-opts").toObject();settings["spider-x"]="/private";invalid.nodes.first().parameters["reality-opts"]=settings;QVERIFY(!RustCoreEngine::configuration(invalid,&configuration).isEmpty());
   auto invalidAlpn=source;invalidAlpn.replace("alpn=h2,http%2F1.1","alpn=h2,,http%2F1.1");const auto retained=NodeImporter::parse(invalidAlpn);QVERIFY(retained);QCOMPARE(retained.nodes.first().parameters.value("alpn"),QJsonValue(QJsonArray{"h2","","http/1.1"}));invalid=options;invalid.nodes=retained.nodes;invalid.selectedNodeId=retained.nodes.first().id;QVERIFY(!RustCoreEngine::configuration(invalid,&configuration).isEmpty());
+  const auto visionSource=source+"&flow=xtls-rprx-vision";const auto visionImported=NodeImporter::parse(visionSource);QVERIFY(visionImported);const auto visionPath=directory.filePath("vision.dat");
+  {NodeStore saved(visionPath);QVERIFY(saved.importNodes(visionImported.nodes));QVERIFY(saved.select(saved.nodes().first().id));}
+  NodeStore visionRestored(visionPath);QCOMPARE(visionRestored.nodes().size(),1);QCOMPARE(visionRestored.nodes().first().originalConfiguration,visionImported.nodes.first().originalConfiguration);
+  auto visionOptions=options;visionOptions.nodes=visionRestored.nodes();visionOptions.selectedNodeId=visionRestored.selectedId();QVERIFY(RustCoreEngine::configuration(visionOptions,&configuration).isEmpty());QCOMPARE(configuration.value("nodes").toArray().first().toObject().value("outbound").toObject().value("flow"),QJsonValue("xtls-rprx-vision"));
+  for(const auto &flow:QStringList{"xtls-rprx-direct","xtls-rprx-vision-udp443","XTLS-RPRX-VISION"}){auto unsupported=visionOptions;unsupported.nodes.first().parameters["flow"]=flow;QVERIFY(!RustCoreEngine::configuration(unsupported,&configuration).isEmpty());}
  }
  void importedScalarTypesCannotBecomeCredentialsOrTlsDefaults(){
   const QJsonObject base{{"name","typed-fixture"},{"type","http"},{"server","127.0.0.1"},{"port",443},{"tls",true}};
@@ -465,6 +470,9 @@ private slots:
    prefix+"security=tls&flow=xtls-rprx-vision",
    prefix+"security=tls&flow=xtls-rprx-vision-udp443"
   };
+  const auto nativeKey=QString::fromLatin1(QByteArray(32,'\x09').toBase64(QByteArray::Base64UrlEncoding|QByteArray::OmitTrailingEquals));
+  const QJsonObject utlsNamedRustls{{"tag","declared-utls"},{"type","vless"},{"server","127.0.0.1"},{"server_port",endpoint.serverPort()},{"uuid","11111111-1111-4111-8111-111111111111"},{"tls",QJsonObject{{"enabled",true},{"server_name","camouflage.invalid"},{"insecure",false},{"utls",QJsonObject{{"enabled",true},{"fingerprint","rustls"}}},{"reality",QJsonObject{{"enabled",true},{"public_key",nativeKey},{"short_id","abcd"}}}}}};
+  sources.append(QJsonDocument(QJsonObject{{"outbounds",QJsonArray{utlsNamedRustls}}}).toJson());
   for(const auto &extension:QList<QJsonObject>{QJsonObject{{"enabled",true}},QJsonObject{{"enabled",true},{"fingerprint",""}}}){
    QJsonObject node{{"tag","fixture"},{"type","vless"},{"server","127.0.0.1"},{"server_port",endpoint.serverPort()},{"uuid","11111111-1111-4111-8111-111111111111"},
     {"tls",QJsonObject{{"enabled",true},{"utls",extension}}}};

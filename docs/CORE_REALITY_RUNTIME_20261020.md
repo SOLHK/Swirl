@@ -5,6 +5,55 @@ Branch: `work/core-completion-20261017`. The source baseline was
 This file describes the production integration, not private-provider acceptance.
 Frozen acceptance remains **79 items / 6 accepted / 10.83% weighted**.
 
+## Current continuation: combined Vision Runtime
+
+P0 was pushed as [`169e0cad51fc18a2d6fa4f194fafd90128bf2f7b`](https://github.com/SOLHK/Swirl/commit/169e0cad51fc18a2d6fa4f194fafd90128bf2f7b),
+preserving concurrent font commits through `4461798`. Its exact
+[Linux job](https://github.com/SOLHK/Swirl/actions/runs/39362403837/job/118431346772)
+and [App/Core validation](https://github.com/SOLHK/Swirl/actions/runs/39362403822)
+completed successfully. The Linux artifact was downloaded, its ZIP digest
+verified, and its [raw source/peer evidence](evidence/reality-runtime/p0-ci-linux/)
+checked: clean exact SHA, 7/7, 20 REALITY authentications, 19 VLESS accepts and
+four verified HTTPS closes. Other platform conclusions are recorded only after
+their final results are observed.
+
+The next source stage enables only exact `xtls-rprx-vision` with REALITY. Its
+concrete authenticated socket/TLS owner enters the existing Vision adapter before
+boxing, and a single VLESS request includes the actual flow. Ordinary VLESS does
+not run first. Unsupported/non-REALITY flows still fail closed. The original
+connection deadline covers both handshake and request setup. Safe directional
+Direct handoff flushes the terminal frame before raw writes and drains decoded
+payload/outer plaintext before raw reads, with no second socket owner.
+
+The complete official Xray combined menu passed **9/9**, zero errors/failures/
+skips, in 18.236 seconds against the actual new Release. It includes all seven
+P0 cases, TLS 1.3 server-first Direct with 512 KiB bidirectional payload hashes
+and inner authenticated close, plus TLS 1.2 staying in the authenticated outer
+Vision stream. Official observations counted 22 REALITY authentications,
+21 VLESS accepts and five Direct commands in each direction. As in P0, one
+authenticated session intentionally fails VLESS UUID and one HTTP request uses
+an explicitly requested DIRECT routing rule; these are not proxy successes.
+The [P1 local evidence](evidence/REALITY_VISION_RUNTIME_P1_LOCAL_20261020.json)
+retains these distinctions. fmt/check/strict Clippy and **296 unit/integration
+tests + one doctest** passed on one identical Core tree. Windows Qt and the
+new exact-source CI remain separate required gates.
+
+Qt now preserves Vision through actual encrypted NodeStore reload and configuration.
+The converter additionally rejects explicit source `tls.utls.enabled=true`,
+even if its fingerprint text says `rustls`: that unsupported source requirement
+must not disappear during sing-box normalization. The full Qt/Xray Vision menu
+also requires padding/unpadding observations at both exits.
+
+`tools/Verify-PublicRealityRuntime.py` adds a separate fixed public HTTP/verified
+HTTPS gate through this same Runtime and complete official Xray. It has no
+DIRECT outbound or alternate destination retry; `--vision` requires real
+bidirectional Direct. Local attempts failed at system DNS (`EAI_AGAIN`), including
+outside the execution sandbox, before any public TCP connection. No public
+success is claimed from those attempts; exact Linux CI must establish it. Test
+launcher DNS is explicit and is not a proxy DNS privacy acceptance.
+
+The remaining sections retain the P0 checkpoint and its original boundaries.
+
 ## Executable changes
 
 The existing `swirl_protocol::connect` now carries an explicitly validated

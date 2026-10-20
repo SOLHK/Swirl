@@ -339,11 +339,42 @@ mod tests {
     }
 
     #[test]
+    fn vision_flow_is_retained_only_with_supported_reality() {
+        let mut source = node();
+        source["flow"] = json!("xtls-rprx-vision");
+        let key = source["reality-opts"]["public-key"].as_str().unwrap();
+        let documents = [
+            json!({"proxies":[source.clone()]}).to_string(),
+            format!(
+                "vless://00112233-4455-6677-8899-aabbccddeeff@proxy.invalid:443?security=reality&sni=camouflage.invalid&fp=rustls&pbk={key}&sid=a1B2&type=tcp&flow=xtls-rprx-vision"
+            ),
+        ];
+        for document in documents {
+            let parsed = inspect(document.as_bytes());
+            assert_eq!(parsed.original, document.as_bytes());
+            assert!(parsed.report.nodes[0].native_tcp_candidate);
+            assert!(!parsed.report.nodes[0].real_network_verified);
+            let outbound = parsed.tcp_candidates[0].as_ref().unwrap();
+            let restored: Outbound =
+                serde_json::from_slice(&serde_json::to_vec(outbound).unwrap()).unwrap();
+            assert!(
+                matches!(restored, Outbound::Vless { reality: Some(_), flow: Some(flow), .. }
+                if flow == "xtls-rprx-vision")
+            );
+        }
+        source.as_object_mut().unwrap().remove("reality-opts");
+        source.as_object_mut().unwrap().remove("client-fingerprint");
+        let without_reality = inspect(json!({"proxies":[source]}).to_string().as_bytes());
+        assert!(without_reality.tcp_candidates[0].is_none());
+    }
+
+    #[test]
     fn unsupported_profiles_conflicts_and_unknown_fields_never_downgrade() {
         let cases = [
             json!({"client-fingerprint":"chrome"}),
             json!({"client-fingerprint":null}),
-            json!({"flow":"xtls-rprx-vision"}),
+            json!({"flow":"xtls-rprx-vision-udp443"}),
+            json!({"flow":"xtls-rprx-direct"}),
             json!({"flow":false}),
             json!({"network":"ws"}),
             json!({"security":"tls"}),

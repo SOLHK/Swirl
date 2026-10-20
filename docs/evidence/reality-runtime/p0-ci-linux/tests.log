@@ -1,0 +1,12 @@
+test_handshake_timeout_drops_socket_and_never_tries_spare_or_direct (__main__.RealityRuntimeInterop.test_handshake_timeout_drops_socket_and_never_tries_spare_or_direct) ... ok
+test_import_uri_yaml_json_base64_to_http_and_verified_https (__main__.RealityRuntimeInterop.test_import_uri_yaml_json_base64_to_http_and_verified_https) ... ok
+test_large_fragmented_concurrent_bidirectional_halfclose (__main__.RealityRuntimeInterop.test_large_fragmented_concurrent_bidirectional_halfclose) ... ok
+test_ordered_routes_reject_direct_domain_and_selected_exit (__main__.RealityRuntimeInterop.test_ordered_routes_reject_direct_domain_and_selected_exit) ... ok
+test_runtime_cancellation_releases_authenticated_stream (__main__.RealityRuntimeInterop.test_runtime_cancellation_releases_authenticated_stream) ... ok
+test_switch_preserves_old_session_and_routes_new_session_to_b (__main__.RealityRuntimeInterop.test_switch_preserves_old_session_and_routes_new_session_to_b) ... ok
+test_wrong_reality_authentication_and_vless_uuid_never_reach_target (__main__.RealityRuntimeInterop.test_wrong_reality_authentication_and_vless_uuid_never_reach_target) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 3.053s
+
+OK

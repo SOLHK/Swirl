@@ -203,6 +203,9 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
   if(it==o.nodes.cend())return "未选择节点。";
   const auto &n=*it;
   if(!n.conversionIssues.isEmpty()||!ProxyNode::validate(n).isEmpty())return "节点含无效或未映射参数，Rust 拒绝执行。";
+  // sing-box's explicit uTLS requirement survives normalization in the
+  // preserved source. A profile named rustls cannot authorize dropping it.
+  if(n.originalConfiguration.value("tls").toObject().value("utls").toObject().value("enabled").toBool())return "源配置明确要求 uTLS；Rust 原生 rustls 指纹不能替代该扩展，未丢弃原始要求。";
   if(!QStringList{"http","socks4","socks4a","socks5","trojan","ss","vless"}.contains(n.protocol))return "此节点协议尚未迁移到 Rust；未使用外部内核。";
   if(n.protocol!="ss"&&!n.cipher.isEmpty())return "Rust 尚未映射此协议声明的 cipher；未丢弃加密参数。";
   if(n.protocol=="trojan"&&!n.username.isEmpty())return "Trojan 只支持密码认证；未丢弃 username。";
@@ -244,7 +247,7 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
   }
   else if(n.protocol=="vless"){
    if(!n.username.isEmpty()||!n.password.isEmpty())return "VLESS 只支持 UUID 认证。";
-   if(n.parameters.contains("flow")&&(!n.parameters.value("flow").isString()||!n.parameters.value("flow").toString().isEmpty()))return "Rust 尚未实现 VLESS flow/Vision。";
+   if(n.parameters.contains("flow")){const auto flow=n.parameters.value("flow");if(!flow.isString()||(!flow.toString().isEmpty()&&(!reality||flow.toString()!="xtls-rprx-vision")))return "Rust 仅支持 REALITY 的 xtls-rprx-vision flow；未删除或更换原值。";}
    if(n.parameters.contains("encryption")&&n.parameters.value("encryption").toString()!="none")return "Rust 尚未实现该 VLESS encryption 扩展。";
    outbound["uuid"]=QUuid(n.parameters.value("uuid").toString()).toString(QUuid::WithoutBraces);
    if(n.parameters.contains("flow"))outbound["flow"]=n.parameters.value("flow");

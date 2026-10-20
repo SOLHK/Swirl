@@ -1,5 +1,17 @@
 # Current handoff: subscription product chain (2026-10-19)
 
+## Combined native REALITY + Vision continuation (2026-10-20)
+
+P0 source `169e0cad` is pushed with exact Linux/App CI success. The following
+native Runtime stage retains `xtls-rprx-vision`, safely switches each raw socket
+direction after authenticated framing, and passed 9/9 full official Xray local
+cases including real bidirectional Direct and 512 KiB TLS 1.3 transfer. All 297
+Rust tests (including one doctest) passed. Read the current stage and exact
+evidence in [the Runtime handoff](CORE_REALITY_RUNTIME_20261020.md). Windows Qt,
+remaining exact-source CI, and public proxy-path checks require their actual
+results; local public DNS failed before TCP and is not a pass. Private-provider
+nodes and physical GUI/TUN remain untested. **79 / 6 / 10.83%** is unchanged.
+
 ## Production REALITY Runtime checkpoint (2026-10-20)
 
 Read [the current native Runtime handoff](CORE_REALITY_RUNTIME_20261020.md) first.

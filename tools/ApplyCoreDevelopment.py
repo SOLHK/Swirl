@@ -90,31 +90,36 @@ VISION_BUILD_COMMAND = (
 )
 PRODUCT_CHAIN_TEST = "test_product_subscription_chain.py"
 REALITY_RUNTIME_TEST = "test_reality_runtime.py"
+PUBLIC_REALITY_PROBE = Path("tools/Verify-PublicRealityRuntime.py")
 
 
 def reality_runtime_steps(windows: bool = False, qt: bool = False,
-                          artifact_prefix: str = "Swirl") -> str:
+                          artifact_prefix: str = "Swirl", vision: bool = False) -> str:
     if qt and not windows:
         raise ValueError("The actual Qt/DPAPI runtime gate is Windows-only")
     stage, suffix = ("qt" if qt else "rust"), (".exe" if windows else "")
-    title = ("Qt persisted REALITY through full Xray to HTTP and HTTPS" if qt
-             else "Production REALITY Runtime through full Xray to HTTP and HTTPS")
+    protocol = "REALITY + Vision" if vision else "REALITY"
+    directory = "swirl-reality-vision-runtime" if vision else "swirl-reality-runtime"
+    artifact = "REALITY-Vision-Runtime" if vision else "REALITY-Runtime"
+    title = (f"Qt persisted {protocol} through full Xray to HTTP and HTTPS" if qt
+             else f"Production {protocol} Runtime through full Xray to HTTP and HTTPS")
     environment = (
         "          SWIRL_XRAY_PEER_DIR: ${{ runner.temp }}/swirl-xray-peer\n"
         f"          SWIRL_RUST_HARNESS: ${{{{ github.workspace }}}}/core/target/release/swirl-api{suffix}\n"
         f"          SWIRL_RUST_INSPECTOR: ${{{{ github.workspace }}}}/core/target/release/swirl-inspect{suffix}\n"
-        f"          SWIRL_REALITY_RUNTIME_EVIDENCE: ${{{{ runner.temp }}}}/swirl-reality-runtime-{stage}\n"
+        f"          SWIRL_REALITY_RUNTIME_EVIDENCE: ${{{{ runner.temp }}}}/{directory}-{stage}\n"
     )
     if qt:
         environment += (
             "          SWIRL_RUST_QT_TESTS: ${{ github.workspace }}/build/rust-qt/Release/SwirlRustCoreTests.exe\n"
-            "          SWIRL_TEST_ROOT: ${{ runner.temp }}/swirl-reality-runtime-qt-tests\n"
+            f"          SWIRL_TEST_ROOT: ${{{{ runner.temp }}}}/{directory}-qt-tests\n"
             "          QT_FORCE_STDERR_LOGGING: '1'\n"
         )
     body = "          $ErrorActionPreference = 'Stop'\n" if windows else "          set -euo pipefail\n"
     if qt:
         body += "          New-Item -ItemType Directory -Force -Path $env:SWIRL_TEST_ROOT | Out-Null\n"
-    body += f"          python tools/tests/{REALITY_RUNTIME_TEST}{' --qt' if qt else ''}\n"
+    selection = (" --qt" if qt else "") + (" --vision" if vision else "")
+    body += f"          python tools/tests/{REALITY_RUNTIME_TEST}{selection}\n"
     if windows:
         body += WINDOWS_STATUS_GUARD
     return (
@@ -122,33 +127,89 @@ def reality_runtime_steps(windows: bool = False, qt: bool = False,
         "        working-directory: .\n"
         f"        shell: {'pwsh' if windows else 'bash'}\n"
         "        env:\n" + environment + "        run: |\n" + body
-        + f"      - name: Preserve production REALITY Runtime {stage} evidence\n"
+        + f"      - name: Preserve production {protocol} Runtime {stage} evidence\n"
         "        if: always()\n"
         "        uses: actions/upload-artifact@v4\n"
         "        with:\n"
-        f"          name: {artifact_prefix}-REALITY-Runtime-${{{{ runner.os }}}}-{stage}-${{{{ github.sha }}}}-${{{{ github.run_attempt }}}}\n"
-        f"          path: ${{{{ runner.temp }}}}/swirl-reality-runtime-{stage}\n"
+        f"          name: {artifact_prefix}-{artifact}-${{{{ runner.os }}}}-{stage}-${{{{ github.sha }}}}-${{{{ github.run_attempt }}}}\n"
+        f"          path: ${{{{ runner.temp }}}}/{directory}-{stage}\n"
         "          if-no-files-found: error\n"
         "          retention-days: 14\n"
     )
 
 
+def public_reality_runtime_steps(vision: bool = False) -> str:
+    """Separate required Linux public-origin evidence, never provider evidence."""
+    protocol = "REALITY + Vision" if vision else "REALITY"
+    directory = "swirl-public-reality-vision" if vision else "swirl-public-reality"
+    artifact = "Swirl-Public-REALITY-Vision" if vision else "Swirl-Public-REALITY"
+    return (
+        f"      - name: Native {protocol} to independent public HTTP and HTTPS\n"
+        "        if: runner.os == 'Linux'\n"
+        "        working-directory: .\n"
+        "        shell: bash\n"
+        "        env:\n"
+        "          SWIRL_XRAY_PEER_DIR: ${{ runner.temp }}/swirl-xray-peer\n"
+        f"          SWIRL_PUBLIC_REALITY_OUTPUT: ${{{{ runner.temp }}}}/{directory}/report.json\n"
+        "        run: |\n"
+        "          set -euo pipefail\n"
+        f"          python {PUBLIC_REALITY_PROBE.as_posix()} --harness core/target/release/swirl-api "
+        "--inspector core/target/release/swirl-inspect "
+        '--xray-peer-dir "$SWIRL_XRAY_PEER_DIR" --output "$SWIRL_PUBLIC_REALITY_OUTPUT"'
+        + (" --vision\n" if vision else "\n")
+        + f"      - name: Preserve public {protocol} Runtime evidence\n"
+        "        if: always() && runner.os == 'Linux'\n"
+        "        uses: actions/upload-artifact@v4\n"
+        "        with:\n"
+        f"          name: {artifact}-${{{{ github.sha }}}}-${{{{ github.run_attempt }}}}\n"
+        f"          path: ${{{{ runner.temp }}}}/{directory}\n"
+        "          if-no-files-found: error\n"
+        "          retention-days: 14\n"
+    )
+
+
+def without_public_reality_runtime_steps(source: str) -> str:
+    markers = (PUBLIC_REALITY_PROBE.as_posix(), "SWIRL_PUBLIC_REALITY_", "swirl-public-reality",
+               "Swirl-Public-REALITY", "Preserve public REALITY")
+    if not any(marker in source for marker in markers):
+        return source
+    complete = public_reality_runtime_steps() + public_reality_runtime_steps(vision=True)
+    parts = source.split("  windows-rust:\n")
+    if (len(parts) != 2 or parts[0].count(reality_runtime_steps(vision=True) + complete) != 1
+            or any(marker in parts[1] for marker in markers)):
+        raise ValueError("Public REALITY/Vision gates must both follow Linux controlled Runtime verification")
+    source = source.replace(complete, "", 1)
+    if any(marker in source for marker in markers):
+        raise ValueError("Public REALITY/Vision gates are partial, duplicated or changed")
+    return source
+
+
 def without_reality_runtime_steps(source: str) -> str:
+    source = without_public_reality_runtime_steps(source)
     blocks = (reality_runtime_steps(), reality_runtime_steps(windows=True),
               reality_runtime_steps(windows=True, qt=True))
+    vision_blocks = (reality_runtime_steps(vision=True), reality_runtime_steps(windows=True, vision=True),
+                     reality_runtime_steps(windows=True, qt=True, vision=True))
+    vision_markers = ("swirl-reality-vision-runtime-", "REALITY-Vision-Runtime-",
+                      "Preserve production REALITY + Vision Runtime",
+                      "Production REALITY + Vision Runtime", "Qt persisted REALITY + Vision",
+                      REALITY_RUNTIME_TEST + " --vision", REALITY_RUNTIME_TEST + " --qt --vision")
     markers = (REALITY_RUNTIME_TEST, "SWIRL_REALITY_RUNTIME_", "swirl-reality-runtime-",
-               "Preserve production REALITY Runtime", "REALITY-Runtime-")
+               "Preserve production REALITY Runtime", "REALITY-Runtime-", *vision_markers)
     if not any(marker in source for marker in markers):
         return source
     if any(source.count(block) != 1 for block in blocks):
         raise ValueError("Production REALITY Runtime gate is partial, duplicated or changed")
+    with_vision = any(marker in source for marker in vision_markers)
+    if with_vision and any(source.count(base + vision) != 1 for base, vision in zip(blocks, vision_blocks)):
+        raise ValueError("Production REALITY + Vision Runtime must follow every intact REALITY gate")
     parts = source.split("  windows-rust:\n")
     if len(parts) != 2 or parts[0].count(blocks[0]) != 1:
         raise ValueError("Production REALITY Runtime job boundary changed")
     if any(parts[1].count(block) != 1 for block in blocks[1:]):
         raise ValueError("Production REALITY Runtime Windows/Qt gate moved")
-    for block in blocks:
-        source = source.replace(block, "", 1)
+    for index, block in enumerate(blocks):
+        source = source.replace(block + (vision_blocks[index] if with_vision else ""), "", 1)
     if any(marker in source for marker in markers):
         raise ValueError("Production REALITY Runtime has an unreviewed extra command")
     return source
@@ -159,11 +220,15 @@ def _add_reality_runtime_steps(source: str) -> str:
         anchor = vision_xray_steps(windows=windows)
         if source.count(anchor) != 1:
             raise ValueError("Production REALITY Runtime requires the fixed upstream peer stages")
-        source = source.replace(anchor, anchor + reality_runtime_steps(windows=windows), 1)
+        public = "" if windows else public_reality_runtime_steps() + public_reality_runtime_steps(vision=True)
+        source = source.replace(anchor, anchor + reality_runtime_steps(windows=windows)
+                                + reality_runtime_steps(windows=windows, vision=True) + public, 1)
     if source.count(NATIVE_APPLICATION_BUILD) != 1:
         raise ValueError("Production REALITY Qt gate requires the full native application build")
     return source.replace(NATIVE_APPLICATION_BUILD,
-                          reality_runtime_steps(windows=True, qt=True) + NATIVE_APPLICATION_BUILD, 1)
+                          reality_runtime_steps(windows=True, qt=True)
+                          + reality_runtime_steps(windows=True, qt=True, vision=True)
+                          + NATIVE_APPLICATION_BUILD, 1)
 
 
 def product_chain_steps(windows: bool = False, qt: bool = False,
@@ -893,6 +958,8 @@ def prepare_update(repository: Path) -> tuple[Path, str, str]:
             raise ValueError(f"Required CI suite is missing: {name}")
     if not (repository / PUBLIC_PROBE).is_file():
         raise ValueError("The required native public-network verification script is missing")
+    if not (repository / PUBLIC_REALITY_PROBE).is_file():
+        raise ValueError("The required public REALITY/Vision Runtime verification script is missing")
     for relative in (DIAGNOSTIC_TOOL, DIAGNOSTIC_SOURCE):
         if not (repository / relative).is_file():
             raise ValueError(f"Required native diagnostic source is missing: {relative.as_posix()}")

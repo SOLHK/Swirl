@@ -349,6 +349,7 @@ class CoreDevelopmentTests(unittest.TestCase):
             (peers / name).write_text("# test fixture\n", encoding="utf-8")
         (peers / development.REALITY_RUNTIME_TEST).write_text("# runtime peer fixture\n", encoding="utf-8")
         (root / "tools/Verify-PublicRustCore.py").write_text("# public check fixture\n", encoding="utf-8")
+        (root / development.PUBLIC_REALITY_PROBE).write_text("# public REALITY check fixture\n", encoding="utf-8")
         (root / "tools/Diagnose-NativeConnectivity.py").write_text("# diagnostic fixture\n", encoding="utf-8")
         diagnostic = root / "core/crates/swirl-api/src/bin/swirl-diagnose.rs"
         diagnostic.parent.mkdir(parents=True)
@@ -383,6 +384,7 @@ class CoreDevelopmentTests(unittest.TestCase):
             self.assertLess(part.index("python tools/Build-XrayPeer.py"), part.index(block))
             if windows:
                 self.assertIn(development.reality_runtime_steps(windows=True, qt=True)
+                              + development.reality_runtime_steps(windows=True, qt=True, vision=True)
                               + development.NATIVE_APPLICATION_BUILD, part)
         for source in (
             final.replace("python tools/tests/test_reality_runtime.py\n", "python tools/tests/test_reality_runtime.py || true\n", 1),
@@ -392,6 +394,66 @@ class CoreDevelopmentTests(unittest.TestCase):
         ):
             with self.assertRaises(ValueError):
                 development.updated_workflow(source)
+
+    def test_combined_vision_runtime_upgrades_intact_p0_and_rejects_changed_gates(self):
+        final = development.updated_workflow(FIXTURE)
+        combinations = ({}, {"windows": True}, {"windows": True, "qt": True})
+        previous = development.without_public_reality_runtime_steps(final)
+        for flags in combinations:
+            base = development.reality_runtime_steps(**flags)
+            combined = development.reality_runtime_steps(**flags, vision=True)
+            self.assertEqual(final.count(base + combined), 1)
+            previous = previous.replace(combined, "", 1)
+            self.assertIn("swirl-reality-vision-runtime-", combined)
+            self.assertIn("if-no-files-found: error", combined)
+            self.assertIn("if: always()", combined)
+            self.assertIn("--vision\n", combined)
+            broken = [combined.replace(" --vision\n", "\n"),
+                      combined.replace("if: always()", "if: success()"),
+                      combined.replace("swirl-reality-vision-runtime-", "swirl-reality-runtime-"),
+                      ""]
+            if flags.get("windows"):
+                broken.append(combined.replace(development.WINDOWS_STATUS_GUARD, ""))
+            for replacement in broken:
+                with self.subTest(flags=flags, replacement=replacement), self.assertRaises(ValueError):
+                    development.updated_workflow(final.replace(combined, replacement, 1))
+            with self.assertRaises(ValueError):
+                development.updated_workflow(final.replace(base + combined, combined + base, 1))
+        self.assertEqual(development.updated_workflow(previous), final)
+        self.assertEqual(development.updated_workflow(final), final)
+        app = (Path(__file__).resolve().parents[2] / ".github/workflows/core-development.yml").read_text(encoding="utf-8")
+        self.assertIn(development.reality_runtime_steps(artifact_prefix="App")
+                      + development.reality_runtime_steps(artifact_prefix="App", vision=True), app)
+
+    def test_public_reality_and_vision_gates_are_required_linux_only_and_fail_closed(self):
+        final = development.updated_workflow(FIXTURE)
+        previous = development.without_public_reality_runtime_steps(final)
+        self.assertNotIn(development.PUBLIC_REALITY_PROBE.as_posix(), previous)
+        self.assertEqual(development.updated_workflow(previous), final)
+        portable, windows = final.split("  windows-rust:\n")
+        for vision in (False, True):
+            block = development.public_reality_runtime_steps(vision=vision)
+            self.assertEqual(portable.count(block), 1)
+            self.assertNotIn(block, windows)
+            self.assertIn("if: runner.os == 'Linux'", block)
+            self.assertIn("if: always() && runner.os == 'Linux'", block)
+            self.assertIn("if-no-files-found: error", block)
+            for broken in ("", block + block,
+                           block.replace("if: runner.os == 'Linux'", "if: false"),
+                           block.replace("set -euo pipefail", "set +e"),
+                           block.replace("if: always() && runner.os == 'Linux'", "if: success()"),
+                           block.replace("--output", "--disabled-output"),
+                           block.replace("report.json", "../private.json")):
+                with self.subTest(vision=vision, broken=broken), self.assertRaises(ValueError):
+                    development.updated_workflow(final.replace(block, broken, 1))
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = self.make_repository(root)
+            original = target.read_bytes()
+            (root / development.PUBLIC_REALITY_PROBE).unlink()
+            with self.assertRaises(ValueError):
+                development.prepare_update(root)
+            self.assertEqual(target.read_bytes(), original)
 
     def test_vision_stage_upgrades_both_reviewed_histories_and_is_idempotent(self):
         final = development.updated_workflow(FIXTURE)

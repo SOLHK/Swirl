@@ -1,5 +1,16 @@
 # Swirl Core 固定验收与进度基线（baseline-v1，冻结范围）
 
+## Vision 正式组合联网本地通过（2026-10-20）
+
+REALITY P0 源码 `169e0cad` 已推送，其精确 Linux 与 App CI 已成功并核对原始工件。
+后续源码保留原始 `xtls-rprx-vision`，完成具体认证流到 Vision 的方向所有权交接，
+完整官方 Xray 组合菜单 **9/9 通过、0 失败/错误/跳过**，实际证明双向 Direct、
+512 KiB TLS 1.3 数据与认证关闭、TLS 1.2 不进入 Direct。297 项 Rust 测试含 1 项
+doctest 全通过。Qt 参数/加密恢复及组合门禁已接线，需精确 Windows CI 实际验证；
+新增公网代理路径本地被 DNS EAI_AGAIN 阻塞，未宣称公网或供应商成功。
+详见[当前 Runtime 交接](CORE_REALITY_RUNTIME_20261020.md)。
+**冻结验收仍为 79 项 / 6 项完全通过 / 加权 10.83%。**
+
 ## REALITY 正式 Runtime 本地互通（2026-10-20）
 
 本轮将已有 REALITY 握手接入正式 Rust 异步出站、VLESS 与 Runtime 转发，

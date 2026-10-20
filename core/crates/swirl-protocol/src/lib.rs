@@ -425,6 +425,7 @@ pub async fn connect(
     if let Outbound::Vless {
         host,
         port,
+        uuid,
         reality: Some(reality),
         tls,
         websocket,
@@ -438,7 +439,8 @@ pub async fn connect(
         if tls.is_some() || websocket.is_some() {
             return Err("RealityTransportConflict");
         }
-        if flow.as_deref().is_some_and(|value| !value.is_empty()) {
+        let flow = flow.as_deref().unwrap_or("");
+        if !flow.is_empty() && flow != "xtls-rprx-vision" {
             return Err("VlessFlowUnsupported");
         }
         let (key, short_id) = reality.key_material()?;
@@ -473,6 +475,18 @@ pub async fn connect(
                 .map_err(|_| "RealityAuthenticationOrHandshake")
         })
         .await?;
+        if flow == "xtls-rprx-vision" {
+            // Keep the concrete authenticated owner until the Vision adapter
+            // installs its directional raw handoff. The wire request retains
+            // the declared flow; no ordinary VLESS request is sent first.
+            let stream = within(
+                deadline,
+                "UpstreamProtocolTimeout",
+                vision::client_over_reality(stream, uuid, target, handshake_limit),
+            )
+            .await?;
+            return Ok(Box::new(stream));
+        }
         return within(
             deadline,
             "UpstreamProtocolTimeout",

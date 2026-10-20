@@ -454,7 +454,9 @@ impl Config {
                     websocket,
                     ..
                 } => {
-                    if flow.as_deref().is_some_and(|value| !value.is_empty()) {
+                    if flow.as_deref().is_some_and(|value| {
+                        !value.is_empty() && (reality.is_none() || value != "xtls-rprx-vision")
+                    }) {
                         return Err("VlessFlowUnsupported");
                     }
                     if let Some(reality) = reality {

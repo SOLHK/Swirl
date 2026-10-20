@@ -575,6 +575,14 @@ class RealityRuntimeInterop(ChainBase):
         self.peers = []
         self.core = self.keep(Control())
 
+    def tearDown(self):
+        # Capture the production error stage before cleanup releases the ABI
+        # owner. Snapshot contains counters and route identities, not passwords
+        # or TLS keys, including when the first CONNECT was rejected.
+        if hasattr(self, "handle") and self.core.process.poll() is None:
+            snapshot = self.core.command(op="snapshot", handle=self.handle)
+            write_json(self.case / "runtime.json", snapshot)
+
     def record(self):
         if not hasattr(self, "case"):
             return
@@ -898,8 +906,11 @@ class RealityQtInterop(RealityRuntimeInterop):
         self.assertEqual([r.split(b" ")[1] for r in self.https.requests], [b"/selected-a-tls"])
         self.assertEqual(self.https.sni, ["localhost", "wrong.fixture.invalid"])
         self.assertEqual(self.https.tls_closed, 1)
-        self.observed(a, 6)
-        self.observed(b, 6)
+        for peer in (a, b):
+            observed = self.observed(peer, 6)
+            if self.flow:
+                self.assertGreater(observed["vision_padding_events"], 0, observed)
+                self.assertGreater(observed["vision_unpadding_events"], 0, observed)
 
 
 if __name__ == "__main__":

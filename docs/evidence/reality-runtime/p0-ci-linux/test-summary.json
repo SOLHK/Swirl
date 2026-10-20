@@ -1,0 +1,10 @@
+{
+  "tests_run": 7,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "successful": true,
+  "product_mode": "rust-runtime",
+  "provider_connection": false,
+  "protocol": "vless+reality"
+}
