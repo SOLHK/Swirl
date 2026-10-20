@@ -24,7 +24,7 @@ import numpy as np
 from fontTools.ttLib import TTCollection
 
 from probe_user_axis_geometry import coretext_paths
-from diagnose_path_types import (diagnose_paths, raw_coretext_paths,
+from diagnose_path_types import (compare_preserved_quadratics, diagnose_paths, raw_coretext_paths,
                                  raw_native_paths, raw_portable_paths)
 from probe_axis_thresholds import (ALL_MODELS, INFERRED_REFERENCES, METRIC_GIDS, TAGS,
     BatchGeometry, EXPECTED, HVGL, LIMIT, NativeOracle, axis_records, check_metadata,
@@ -145,6 +145,10 @@ def direct_checks(binary, source, face, rows, observations, renderer, report):
                         "native_HVF_vs_CoreText": diagnose_paths(raw_native, raw_coretext),
                         "portable_vs_native_HVF": diagnose_paths(raw_portable, raw_native),
                         "portable_vs_CoreText": diagnose_paths(raw_portable, raw_coretext)}
+                    checks["preserved_quadratic_control_comparison"] = {
+                        "native_HVF_vs_CoreText": compare_preserved_quadratics(raw_native, raw_coretext),
+                        "portable_vs_native_HVF": compare_preserved_quadratics(raw_portable, raw_native),
+                        "portable_vs_CoreText": compare_preserved_quadratics(raw_portable, raw_coretext)}
                 row["direct_native_checks"].append(checks)
 
 

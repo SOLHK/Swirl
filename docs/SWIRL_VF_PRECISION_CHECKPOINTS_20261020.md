@@ -362,6 +362,38 @@ assigning any internal Apple mechanism. Concurrent Core commit
 `1e45e4af4d490dbfc49c20a590258ab55587c6eb` was inspected and preserved by
 fast-forward; it has no font-path overlap.
 
+## Preserve quadratic controls at a canonical type-only rejection
+
+`platform/diagnose_path_types.py` adds `compare_preserved_quadratics` without
+editing any existing comparison function. `probe_axis_counterexamples.py`
+reports its result alongside the unchanged canonical and parametric results
+for the eight known cases. The two corresponding authored test modules are
+updated. The source mapper, renderer, reconstruction code and original avar
+records remain unchanged.
+
+Each contour first executes the old comparator. Only its exact
+`segment_types_differ` rejection can enter the new branch. Canonical same-type
+segments keep the old fields/error calculation. A canonical L/Q mismatch must
+have **original Q/Q commands on both sides**; all six original coordinates are
+then compared under the unchanged 1/32 L-infinity control-point budget.
+Restored differences use exact rational subtraction of input binary64 values
+and round outward. Raw L/Q mismatches are never degree-elevated for acceptance.
+Numeric failures, topology failures and the old forward-cycle policy remain.
+The original rejected result and every restored segment index stay in the report.
+
+Local regression: **374/374 Python tests, zero skips, 6/6 audits**, full suite
+12.557 seconds, `git diff --check` clean. Twelve additional independent cases
+cover exact/nextafter limits, true curvature, raw L/Q rejection, orientation,
+cross-contour and same-contour numeric failures, and a binary64 subtraction
+that would otherwise round a true over-budget difference down to exactly 1/32.
+The diagnostic integration preserves the old failure even when the new raw-Q
+control comparison passes. Native execution of this added comparison remains
+pending; prior parametric evidence is not substituted for that execution.
+
+Concurrent Core evidence/test commit
+`f19b0ad51058580a8a0ed73008b22754e6f45ea0` was inspected and preserved by
+fast-forward; none of its four files overlaps this font change.
+
 ## Newly retrieved prior evidence (not new execution in this continuation)
 
 - At exact source `056f7ea6dc7cf3a703da63e8522b89d33d1166f4`,

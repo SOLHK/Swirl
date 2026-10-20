@@ -10,7 +10,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "platform"))
 from calibrate_hvf_geometry import discrepancy, native_paths, portable_paths
-from diagnose_path_types import (RawSegment, canonical_paths, diagnose_paths,
+from diagnose_path_types import (RawSegment, canonical_paths, compare_preserved_quadratics, diagnose_paths,
                                  raw_coretext_paths, raw_native_paths, raw_portable_paths)
 from probe_user_axis_geometry import coretext_paths
 
@@ -159,6 +159,159 @@ class RawPathDiagnosticTests(unittest.TestCase):
             raw_portable_paths([[(0., 0.)]])
         with self.assertRaisesRegex(ValueError, "endpoint_limit"):
             diagnose_paths([], [], endpoint_limit=math.inf)
+
+
+class PreservedQuadraticComparisonTests(unittest.TestCase):
+    @staticmethod
+    def projection_boundary_pair():
+        # Both commands are genuinely Q. The second control is displaced only
+        # 1e-13, but its projection on the 1e-6 chord crosses the old -1e-10 gate.
+        return (quad((0., 0.), (0., 0.), (1e-6, 0.)),
+                quad((0., 0.), (-1e-13, 0.), (1e-6, 0.)))
+
+    def test_original_quadratic_controls_restore_a_type_only_failure(self):
+        left, right = self.projection_boundary_pair()
+        report = compare_preserved_quadratics([[left]], [[right]])
+        self.assertEqual(report["legacy"]["status"], "rejected")
+        self.assertEqual(report["legacy"]["reason"], "segment_types_differ")
+        self.assertEqual(report["status"], "within_budget")
+        self.assertEqual(report["maximum_point_error"], 1e-13)
+        self.assertEqual(report["restored_segment_count"], 1)
+        self.assertEqual(report["tested_segments"], 1)
+        entry = report["restored_segments"][0]
+        self.assertEqual((entry["path_index"], entry["left_segment_index"], entry["right_segment_index"]), (0, 0, 0))
+        self.assertEqual((entry["left_raw_kind"], entry["right_raw_kind"]), ("Q", "Q"))
+        self.assertEqual((entry["left_canonical_kind"], entry["right_canonical_kind"]), ("L", "Q"))
+        self.assertFalse(report["mapping_accepted"])
+
+    def test_full_control_point_gate_includes_exact_boundary_and_rejects_next_value(self):
+        baseline = [[quad((0., 0.), (1., 0.), (2., 0.))]]
+        for delta, status in ((1 / 32, "within_budget"),
+                              (math.nextafter(1 / 32, math.inf), "outside_budget")):
+            with self.subTest(delta=delta):
+                report = compare_preserved_quadratics(baseline, [[quad((0., 0.), (1., delta), (2., 0.))]])
+                self.assertEqual(report["status"], status)
+                self.assertEqual(report["limit"], 1 / 32)
+                self.assertEqual(report["maximum_point_error"], delta)
+                self.assertEqual(report["legacy"]["reason"], "segment_types_differ")
+
+    def test_curve_bound_below_budget_cannot_hide_a_control_point_failure(self):
+        lhs = [[quad((0., 0.), (1., 0.), (2., 0.))]]
+        rhs = [[quad((0., 0.), (1., .04), (2., 0.))]]
+        self.assertEqual(diagnose_paths(lhs, rhs)["maximum_parametric_difference_upper_bound"], .02)
+        report = compare_preserved_quadratics(lhs, rhs)
+        self.assertEqual(report["status"], "outside_budget")
+        self.assertEqual(report["maximum_point_error"], .04)
+
+    def test_new_control_branch_cannot_round_an_exact_excess_down_onto_the_gate(self):
+        gate, tiny = 1 / 32, 2. ** -60
+        # Ordinary binary64 subtraction rounds this positive excess onto gate.
+        self.assertEqual(gate - (-tiny), gate)
+        lhs = [[quad((0., gate), (1., gate), (2., gate))]]
+        rhs = [[quad((0., gate), (1., -tiny), (2., gate))]]
+        report = compare_preserved_quadratics(lhs, rhs)
+        self.assertEqual(report["status"], "outside_budget")
+        self.assertEqual(report["maximum_point_error"], math.nextafter(gate, math.inf))
+        self.assertEqual(report["restored_segment_count"], 1)
+
+    def test_explicit_line_quadratic_type_mismatch_is_never_degree_elevated(self):
+        lhs = [[line((0., 0.), (2., 0.))]]
+        rhs = [[quad((0., 0.), (1., 2e-8), (2., 0.))]]
+        for left, right in ((lhs, rhs), (rhs, lhs)):
+            report = compare_preserved_quadratics(left, right)
+            self.assertEqual(report["status"], "rejected")
+            self.assertEqual(report["reason"], "raw_segment_types_differ")
+            self.assertIsNone(report["maximum_point_error"])
+            self.assertEqual(report["restored_segments"], [])
+
+    def test_existing_canonical_line_match_keeps_its_original_result(self):
+        # Canonical L/L was already accepted even with nonmidpoint raw Q.
+        # This patch does not change that pre-existing comparison rule.
+        lhs = [[line((0., 0.), (2., 0.))]]
+        rhs = [[quad((0., 0.), (.25, 0.), (2., 0.))]]
+        report = compare_preserved_quadratics(lhs, rhs)
+        self.assertEqual(report["status"], "within_budget")
+        self.assertEqual(report["maximum_point_error"], 0.)
+        self.assertEqual(report["restored_segment_count"], 0)
+        self.assertEqual(report["paths"][0]["raw_control"]["method"], "legacy_unchanged")
+
+    def test_forward_cycle_can_restore_but_reverse_order_gets_no_new_permission(self):
+        original, perturbed = self.projection_boundary_pair()
+        tail = [quad((1e-6, 0.), (2., 3.), (4., 0.)), quad((4., 0.), (2., -4.), (0., 0.))]
+        lhs = [original, *tail]
+        rhs = [perturbed, *tail]
+        report = compare_preserved_quadratics([lhs], [rhs[1:] + rhs[:1]])
+        self.assertEqual(report["status"], "within_budget")
+        self.assertEqual(report["paths"][0]["raw_control"]["right_cyclic_shift"], 2)
+        self.assertEqual(report["restored_segment_count"], 1)
+        reversed_path = [quad(item.points[2], item.points[1], item.points[0]) for item in reversed(rhs)]
+        reverse = compare_preserved_quadratics([lhs], [reversed_path])
+        self.assertEqual(reverse["status"], "outside_budget")
+        self.assertGreater(reverse["maximum_point_error"], 1 / 32)
+        self.assertFalse(reverse["orientation_reversal_allowed"])
+
+    def test_another_contours_numeric_failure_cannot_be_hidden_by_recovery(self):
+        first, second = self.projection_boundary_pair()
+        lhs = [[first], [line((10., 0.), (11., 0.))]]
+        rhs = [[second], [line((10., .125), (11., .125))]]
+        report = compare_preserved_quadratics(lhs, rhs)
+        self.assertEqual(report["legacy"]["reason"], "segment_types_differ")
+        self.assertEqual(report["restored_segment_count"], 1)
+        self.assertEqual(report["paths"][1]["legacy"]["status"], "outside_budget")
+        self.assertEqual(report["paths"][1]["raw_control"]["method"], "legacy_unchanged")
+        self.assertEqual(report["status"], "outside_budget")
+        self.assertEqual(report["maximum_point_error"], .125)
+
+    def test_existing_matching_cycle_with_numeric_failure_is_not_reconsidered(self):
+        # Shift 1 matches canonical L/Q types but has a large endpoint error.
+        # Shift 0 has small raw-Q differences and *would* pass a generalized
+        # recovery, which is intentionally forbidden for an old numeric fail.
+        lhs = [[quad((0., 0.), (0., 0.), (1., 0.)),
+                quad((1., 0.), (.5, 2e-8), (0., 0.))]]
+        rhs = [[quad((0., 0.), (0., 2e-8), (1., 0.)),
+                quad((1., 0.), (.5, 0.), (0., 0.))]]
+        report = compare_preserved_quadratics(lhs, rhs)
+        self.assertEqual(report["legacy"]["status"], "outside_budget")
+        self.assertEqual(report["status"], "outside_budget")
+        self.assertEqual(report["maximum_point_error"], report["legacy"]["maximum_point_error"])
+        self.assertEqual(report["maximum_point_error"], 1.)
+        self.assertEqual(report["restored_segment_count"], 0)
+        self.assertEqual(report["paths"][0]["raw_control"]["method"], "legacy_unchanged")
+
+    def test_count_mismatch_and_empty_paths_keep_the_original_policy(self):
+        item = line((0., 0.), (0., 0.))
+        for lhs, rhs, reason in (([], [[item]], "path_count_differs"),
+                                  ([[item]], [[item, item]], "segment_count_differs")):
+            report = compare_preserved_quadratics(lhs, rhs)
+            self.assertEqual(report["status"], "rejected")
+            self.assertEqual(report["legacy"]["reason"], reason)
+            self.assertEqual(report["reason"], reason)
+            self.assertIsNone(report["maximum_point_error"])
+            self.assertEqual(report["restored_segment_count"], 0)
+        for empty in ([], [[]], [[], []]):
+            report = compare_preserved_quadratics(empty, empty)
+            self.assertEqual(report["status"], "within_budget")
+            self.assertEqual(report["maximum_point_error"], 0.)
+            self.assertEqual(report["tested_segments"], 0)
+
+    def test_numeric_failure_in_matching_segment_survives_same_contour_recovery(self):
+        original, perturbed = self.projection_boundary_pair()
+        lhs = [[original, quad((1e-6, 0.), (2., 3.), (4., 0.))]]
+        rhs = [[perturbed, quad((1e-6, 0.), (2., 3.125), (4., 0.))]]
+        report = compare_preserved_quadratics(lhs, rhs)
+        self.assertEqual(report["legacy"]["reason"], "segment_types_differ")
+        self.assertEqual(report["status"], "outside_budget")
+        self.assertEqual(report["maximum_point_error"], .125)
+        self.assertEqual(report["restored_segment_count"], 1)
+
+    def test_recovery_report_contains_no_raw_geometry(self):
+        lhs = [[quad((123456.789, 234567.891), (123457.789, 234567.891), (123458.789, 234567.891))]]
+        rhs = [[quad((123456.789, 234567.891), (123457.789, 234567.901), (123458.789, 234567.891))]]
+        report = compare_preserved_quadratics(lhs, rhs)
+        self.assertEqual(report["restored_segment_count"], 1)
+        encoded = json.dumps(report, allow_nan=False)
+        for private in ("123456.789", "234567.891", '"points"', '"commands"', '"events"'):
+            self.assertNotIn(private, encoded)
 
 
 if __name__ == "__main__":

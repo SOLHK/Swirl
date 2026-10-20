@@ -274,3 +274,111 @@ def diagnose_paths(left, right, endpoint_limit=LIMIT):
     if complete:
         result["maximum_parametric_difference_upper_bound"] = _upper(maximum)
     return result
+
+
+def _preserved_legacy_result(left, right):
+    """Capture the unmodified canonical comparator, without hiding a failure."""
+    result = {"limit": LIMIT, "maximum_point_error": None, "tested_segments": None}
+    try:
+        error, count = discrepancy(left, right)
+        if not math.isfinite(error) or error < 0:
+            result.update(status="rejected", reason="nonfinite_legacy_difference")
+        else:
+            result.update(status="within_budget" if error <= LIMIT else "outside_budget",
+                          maximum_point_error=error, tested_segments=count)
+    except ValueError as error:
+        result.update(status="rejected", reason=str(error))
+    return result
+
+
+def _preserved_quadratic_cycle(left, right, left_canonical, right_canonical):
+    """Recover only original Q/Q controls at a canonical type mismatch."""
+    best = None
+    valid_candidates = 0
+    for shift in range(len(left)):
+        maximum, restored = 0., []
+        for index, (kind, values) in enumerate(left_canonical):
+            other_index = (index + shift) % len(right)
+            other_kind, other_values = right_canonical[other_index]
+            if kind == other_kind:
+                error = float(np.abs(values - other_values).max())
+            else:
+                lhs, rhs = left[index], right[other_index]
+                if lhs.kind != "Q" or rhs.kind != "Q":
+                    break
+                # Compare all six original coordinates, not the curve's sampled
+                # positions, its parametric bound, or degree-elevated lines.
+                # Exact binary64 differences round outward, so this new branch
+                # cannot round a value just above the fixed gate down onto it.
+                error = _upper(max(abs(Fraction(a) - Fraction(b))
+                    for p, q in zip(lhs.points, rhs.points) for a, b in zip(p, q)))
+                restored.append({"left_segment_index": index, "right_segment_index": other_index,
+                    "left_raw_kind": "Q", "right_raw_kind": "Q",
+                    "left_canonical_kind": kind, "right_canonical_kind": other_kind,
+                    "maximum_control_point_error": error})
+            if not math.isfinite(error) or error < 0:
+                break
+            maximum = max(maximum, error)
+        else:
+            valid_candidates += 1
+            if best is None or maximum < best[0]:
+                best = maximum, shift, restored
+    if best is None:
+        return {"status": "rejected", "reason": "raw_segment_types_differ",
+                "maximum_point_error": None, "tested_segments": None,
+                "valid_forward_candidates": 0, "restored_segments": []}
+    error, shift, restored = best
+    return {"status": "within_budget" if error <= LIMIT else "outside_budget",
+            "maximum_point_error": error, "tested_segments": len(left),
+            "right_cyclic_shift": shift, "valid_forward_candidates": valid_candidates,
+            "restored_segments": restored}
+
+
+def compare_preserved_quadratics(left, right):
+    """Compare contours while retaining raw-Q evidence for type-only failures.
+
+    The old comparison remains in ``legacy`` and in every path's ``legacy``.
+    An old numeric failure never enters the recovery branch. Only a contour
+    rejected for ``segment_types_differ`` can recover original Q/Q controls;
+    canonical-matching segments keep the old fields and error calculation.
+    Original L/Q mismatches are never degree-elevated or reparameterized.
+
+    This is a finite outline/control-point result. It does not accept a user-axis
+    mapping, metrics, an entire font, or continuous-space reconstruction.
+    """
+    left_canonical, right_canonical = canonical_paths(left), canonical_paths(right)
+    legacy = _preserved_legacy_result(left_canonical, right_canonical)
+    result = {"status": "rejected", "maximum_point_error": None, "limit": LIMIT,
+              "legacy": legacy, "paths": [], "restored_segments": [],
+              "restored_segment_count": 0, "tested_segments": None,
+              "mapping_accepted": False, "raw_geometry_published": False,
+              "orientation_reversal_allowed": False,
+              "restored_control_error_arithmetic": "exact_binary64_difference_rounded_up"}
+    if len(left) != len(right):
+        result["reason"] = "path_count_differs"
+        return result
+    errors, rejected, tested = [], [], 0
+    for path_index, (lhs, rhs, lc, rc) in enumerate(zip(left, right, left_canonical, right_canonical)):
+        prior = _preserved_legacy_result([lc], [rc])
+        if prior["status"] == "rejected" and prior.get("reason") == "segment_types_differ":
+            current = _preserved_quadratic_cycle(lhs, rhs, lc, rc)
+            current["method"] = "preserved_raw_quadratic_controls"
+        else:
+            current = {**prior, "method": "legacy_unchanged", "restored_segments": []}
+        current["limit"] = LIMIT
+        result["paths"].append({"path_index": path_index, "legacy": prior, "raw_control": current})
+        result["restored_segments"].extend({"path_index": path_index, **entry}
+                                             for entry in current["restored_segments"])
+        if current["status"] == "rejected":
+            rejected.append(current["reason"])
+        else:
+            errors.append(current["maximum_point_error"])
+            tested += current["tested_segments"]
+    result["restored_segment_count"] = len(result["restored_segments"])
+    if rejected:
+        result["reason"] = rejected[0]
+    else:
+        error = max(errors, default=0.)
+        result.update(status="within_budget" if error <= LIMIT else "outside_budget",
+                      maximum_point_error=error, tested_segments=tested)
+    return result

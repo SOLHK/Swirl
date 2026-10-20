@@ -82,6 +82,12 @@ class CounterexampleProbeTests(unittest.TestCase):
         self.assertLess(detail["maximum_parametric_difference_upper_bound"], 2e-12)
         self.assertEqual(detail["unchanged_strict_comparison"]["status"], "rejected")
         self.assertFalse(detail["mapping_accepted"])
+        control = rows[0]["direct_native_checks"][1]["preserved_quadratic_control_comparison"]["portable_vs_native_HVF"]
+        self.assertEqual(control["legacy"]["status"], "rejected")
+        self.assertEqual(control["status"], "within_budget")
+        self.assertEqual(control["restored_segment_count"], 1)
+        self.assertLess(control["maximum_point_error"], 3e-12)
+        self.assertEqual(control["limit"], 1 / 32)
         encoded = json.dumps(rows, allow_nan=False)
         self.assertNotIn('"commands"', encoded)
         self.assertNotIn('"events"', encoded)
