@@ -21,6 +21,7 @@ import struct
 import tempfile
 
 from ttc_staging_contract import StagingError
+from ttc_staging_binary import validate_ttc_binary
 
 
 MAX_OFFSET = 0xFFFFFFFF
@@ -308,8 +309,10 @@ def pack_collection(face_paths, destination, *, expected_sha256=None, chunk_size
             validate(candidate)
         _verify_packed(candidate, faces, directories, placements, chunk_size)
         _require(_regular(candidate).st_size == cursor, "ttc_size_changed")
-        with candidate.open("rb") as stream:
-            digest = _file_hash(stream, cursor, chunk_size)
+        # Reparse the actual TTC independently of the writer's metadata.
+        # Table-byte equality does not cover padding, gaps or directory aliases.
+        binary_validation = validate_ttc_binary(candidate, chunk_size=chunk_size)
+        digest = binary_validation["sha256"]
         # Same-directory hard-link publication is atomic and never replaces an
         # existing target (including one created concurrently or a symlink).
         try:
@@ -324,7 +327,7 @@ def pack_collection(face_paths, destination, *, expected_sha256=None, chunk_size
                 "source_sha256": [face.digest for face in faces],
                 "sha256": digest, "byte_size": cursor,
                 "tables_written": written, "table_references_shared": shared,
-                "copy_chunk_bytes": chunk_size,
+                "copy_chunk_bytes": chunk_size, "binary_validation": binary_validation,
                 "memory_policy": "bounded_byte_buffers_plus_face_table_metadata",
                 "all_table_bytes_preserved_except_head_checksum_adjustment": True}
     except StagingError:

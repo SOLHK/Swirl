@@ -121,7 +121,8 @@ def decode_model(record):
 def builder_identity():
     root = Path(__file__).parent
     names = ("rebuild.py", "metric_variations.py", "ttc_staging_engine.py", "ttc_staging_store.py",
-             "ttc_staging_validate.py", "ttc_staging_pack.py", "ttc_staging_contract.py")
+             "ttc_staging_validate.py", "ttc_staging_pack.py", "ttc_staging_contract.py",
+             "ttc_staging_binary.py")
     return digest_bytes(canonical_bytes({name: file_digest(root / name) for name in names}))
 
 
