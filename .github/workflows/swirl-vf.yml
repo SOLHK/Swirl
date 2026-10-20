@@ -43,7 +43,7 @@ jobs:
           PY
 
   apple-oracles:
-    runs-on: macos-latest
+    runs-on: xcode-27
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -78,6 +78,10 @@ jobs:
         if: always()
         run: |
           python tools/swirl_vf/platform/diagnose_coretext_metrics.py --output build/swirl-vf-evidence/coretext-metric-diagnosis --binary "$PWD/build/swirl-vf-evidence/coretext/coretext_extract" --require-native
+      - name: Locate metric quantization across native sizes and layout APIs
+        if: always()
+        run: |
+          python tools/swirl_vf/platform/diagnose_coretext_precision.py --output build/swirl-vf-evidence/coretext-precision --require-native
       - uses: actions/upload-artifact@v4
         if: always()
         with:
