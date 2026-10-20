@@ -450,9 +450,57 @@ and raw-command equality, every scalar/vector metric difference, readback
 differences, and conditional independent HVF checks. Only safe differences and
 identity summaries are published. Samples cover the 400 plateau boundaries,
 300 controls, original defaults and mixed WDTH/wght/HGHT. No font-specific
-mapping rule or constructor is promoted. Native execution is pending at this
-source checkpoint; next smallest task is to read its actual final result and
-distinguish base/constructor dependence before further arithmetic hypotheses.
+mapping rule or constructor is promoted. Exact source
+`c6c5dd8c5eef829614cfce1950c616e501357537` was pushed non-forcibly and the remote
+HEAD independently matched. Native
+[39386727297](https://github.com/SOLHK/Swirl/actions/runs/39386727297), job
+118508223685, completed **success**. Artifact 12248385248 was downloaded and
+verified: ZIP SHA-256
+`86986038391cc0dc62acccd2abaf036307678ef0fd720f9e8d99695d86934b78`.
+All ten processes completed 287 requests / 1,435 records each, zero errors,
+valid summary/EOF/exit, all 32 physical identities and unchanged source. All
+7,175 forward/reverse pairs are exactly equal, including readback. The 70
+selected conditional native HVF / CoreText geometry comparisons have **zero
+error**, confirming the selected HVAR grid references independently.
+
+All 32 original descriptor bases actually report `wght=400`, at 12 points.
+Production and descriptor-copy observations are completely identical. The
+finite 400-neighborhood platform now brackets as follows: 399.96 is outside,
+399.9601 through 400.04 sampled points share the 400 output, and 400.0401 is
+outside. On faces 20/24/31, q at these outside/inside/outside examples is
+(-4917, -4915, -4913). This is not a claim about every point between samples.
+
+**The platform depends on the construction base.** With a base explicitly
+seeded at 300, the 400 platform disappears and the sampled 300.0062, 300.01 and
+300.03 observations give q(300)=-9830 on faces 20/24/31; 300.04 gives -9828.
+With the base seeded at 500, the ordinary 300.0062/300.01/300.03 value -9829
+returns. Both seeded bases have the same UPEM size, so this difference cannot
+be explained solely by changing the base size. At 400.04 both rebased modes
+give -4913 instead of production's -4915. All these requests still report the
+same user coordinates; API readback equality is not instance equality.
+
+Relative to the production run, descriptor copy has zero payload or readback
+differences. Graphics-copy-with-tracking has 150/1,435 payload differences and
+700/1,435 readback differences; rebase_300 has 475 payload differences and
+rebase_500 has 360, with zero readback differences for either rebase mode.
+Maximum canonical point difference is 0.01110839843784106 FUnit; maximum
+metric difference is 0.00686192512512207. These remain real differences despite
+being below 1/32 for this finite glyph set. Graphics-copy also produces a
+300 platform and shifts the upper 400 boundary; it is not an equivalent fix.
+
+The observation supports base-dependent near-coordinate reuse; it does not
+prove an undocumented internal relative-tolerance constant or a global mapping
+formula. No production construction change has been made. Next smallest task:
+predeclare a far-axis anchor construction that avoids proximity to the target,
+then compare actual native geometry/HVAR and complete readback replay across
+independent initial bases, original defaults/extrema, mixed axes and fresh
+held-out coordinates. Keep all raw avar records and all old strict failures.
+
+Same-source [39386727229](https://github.com/SOLHK/Swirl/actions/runs/39386727229)
+finished: Python and Windows synthetic DirectWrite **success**, Apple
+**failure**. Actual job 118508223730 log was read: raw vertical 849 versus 850
+at 0.03125 remains; the 22-case production Swift guard still passes. There is
+still no accepted original GID model, completed original face or output TTC.
 
 ## Newly retrieved prior evidence (not new execution in this continuation)
 
