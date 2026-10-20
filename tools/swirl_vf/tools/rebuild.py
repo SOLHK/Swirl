@@ -23,6 +23,7 @@ import math
 import os
 from pathlib import Path
 import random
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -482,8 +483,105 @@ def validate_io_paths(source, executable, destination, report_path):
               f"{name} already exists; choose a new output/report directory")
 
 
+class FaceCheckpoints:
+    """Private, verified whole-face checkpoints; never accept a partial face.
+
+    A file hash binds the exact bytes that passed native sample and serialized
+    coefficient checks. The recipe binds source, oracle, code and dependencies,
+    so changing any of them requires a fresh checkpoint directory. Font bytes
+    in this directory are private build inputs, not public CI artifacts.
+    """
+
+    def __init__(self, directory, source, executable, protected, settings):
+        self.directory = Path(directory)
+        check(not self.directory.is_symlink(), "checkpoint directory must not be a symlink")
+        resolved = self.directory.resolve()
+        for path in (source, executable, *protected):
+            check(not path.resolve().is_relative_to(resolved),
+                  "checkpoint directory must be separate from source, oracle and final report/output paths")
+        code_root = Path(__file__).resolve().parent
+        recipe = {"format": 1, "source_sha256": sha256(source),
+                  "oracle_sha256": sha256(executable) if executable.is_file() else None,
+                  "code_sha256": {name: sha256(code_root / name) for name in
+                                  ("rebuild.py", "metric_variations.py", "audit_font.py", "incremental_pipe.py")},
+                  "python_version": list(sys.version_info[:3]),
+                  "fonttools_version": __import__('fontTools').__version__,
+                  "numpy_version": np.__version__, "settings": settings}
+        self.manifest = self.directory / "verified-faces.json"
+        if self.directory.exists():
+            check(self.directory.is_dir() and self.manifest.is_file()
+                  and not self.manifest.is_symlink(), "existing checkpoint directory has no regular manifest")
+            self.state = json.loads(self.manifest.read_text(encoding="utf-8"))
+            check(self.state.get("recipe") == recipe, "checkpoint recipe differs from this build")
+            check(isinstance(self.state.get("faces"), dict), "invalid checkpoint face index")
+        else:
+            self.directory.mkdir(parents=True, mode=0o700)
+            self.state = {"recipe": recipe, "faces": {}}
+            self._save_manifest()
+
+    def _save_manifest(self):
+        check(not self.manifest.is_symlink(), "checkpoint manifest became a symlink")
+        handle, temporary = tempfile.mkstemp(prefix="manifest-", suffix=".tmp", dir=self.directory)
+        try:
+            with os.fdopen(handle, "w", encoding="utf-8") as stream:
+                json.dump(self.state, stream, indent=2, allow_nan=False)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary, self.manifest)
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
+
+    def restore(self, index, source_font):
+        entry = self.state["faces"].get(str(index))
+        if entry is None:
+            return None
+        digest = entry.get("sha256", "")
+        check(len(digest) == 64 and all(c in "0123456789abcdef" for c in digest),
+              f"checkpoint face {index}: invalid SHA-256")
+        path = self.directory / f"face-{index}-{digest}.ttf"
+        check(path.is_file() and not path.is_symlink() and sha256(path) == digest,
+              f"checkpoint face {index}: verified font bytes changed or missing")
+        report = copy.deepcopy(entry["report"])
+        count = len(source_font.getGlyphOrder())
+        check(report.get("face_index") == index and report.get("glyphs_completed") == count
+              and report.get("serialized_model_verification", {}).get("status") == "PASS"
+              and report["serialized_model_verification"].get("glyphs_checked") == count,
+              f"checkpoint face {index}: incomplete original verification")
+        with TTFont(path, lazy=True) as restored:
+            check(len(restored.getGlyphOrder()) == count,
+                  f"checkpoint face {index}: glyph count differs from source")
+            for tag in ("cmap", "fvar"):
+                check(restored[tag].compile(restored) == source_font[tag].compile(source_font),
+                      f"checkpoint face {index}: source {tag} differs")
+        report["restored_from_verified_checkpoint"] = True
+        return path, report
+
+    def save(self, index, path, report):
+        digest = sha256(path)
+        target = self.directory / f"face-{index}-{digest}.ttf"
+        handle, temporary = tempfile.mkstemp(prefix=f"face-{index}-", suffix=".tmp", dir=self.directory)
+        try:
+            with os.fdopen(handle, "wb") as output, path.open("rb") as source:
+                shutil.copyfileobj(source, output, length=1024 * 1024)
+                output.flush()
+                os.fsync(output.fileno())
+            # No-replace publication of verified bytes, even when another file
+            # appears after the directory check. An interrupted manifest update
+            # can leave an identical unindexed face, which is safe to reuse.
+            try:
+                os.link(temporary, target)
+            except FileExistsError:
+                check(target.is_file() and not target.is_symlink() and sha256(target) == digest,
+                      f"checkpoint face {index}: existing file is not the verified face")
+            self.state["faces"][str(index)] = {"sha256": digest, "report": copy.deepcopy(report)}
+            self._save_manifest()
+        finally:
+            os.unlink(temporary)
+
+
 def run(source, executable, destination, report_path, batch_size=64,
-        outline_limit=1.0, metric_limit=1.0, max_extra=24):
+        outline_limit=1.0, metric_limit=1.0, max_extra=24, checkpoint_dir=None):
     check(destination.name == "Swirl-VF.ttc", "the final font filename must be Swirl-VF.ttc")
     check(source.resolve() != destination.resolve(), "never overwrite the source font")
     check(not destination.exists(), "destination already exists; do not overwrite an unreviewed font")
@@ -496,15 +594,33 @@ def run(source, executable, destination, report_path, batch_size=64,
               "outline_limit_font_units": outline_limit, "metric_limit_font_units": metric_limit,
               "faces": [], "failures": [], "status": "RUNNING"}
     oracle = None
+    context = {"stage": "native_metadata"}
     try:
         oracle = NativeOracle(executable, source, report_path.parent / "native-oracle.log")
         report["oracle"] = oracle.metadata
+        checkpoints = None
+        if checkpoint_dir is not None:
+            checkpoints = FaceCheckpoints(checkpoint_dir, source, executable,
+                                          (destination, report_path, report_path.parent / "native-oracle.log"),
+                                          {"outline_limit": outline_limit, "metric_limit": metric_limit,
+                                           "max_extra": max_extra})
+            report["private_face_checkpoints"] = True
         with TTCollection(source, lazy=True) as original:
             check(len(oracle.metadata.get("faces", [])) == len(original.fonts), "native/source face count mismatch")
             destination.parent.mkdir(parents=True, exist_ok=True)
             with tempfile.TemporaryDirectory(prefix="swirl-vf-", dir=destination.parent) as tmp:
                 face_paths = []
                 for index, src in enumerate(original.fonts):
+                    context = {"stage": "face_preflight", "face_index": index}
+                    if checkpoints is not None:
+                        restored = checkpoints.restore(index, src)
+                        if restored is not None:
+                            path, face_report = restored
+                            face_paths.append(path)
+                            report["faces"].append(face_report)
+                            print(f"face={index} restored_verified_glyphs={face_report['glyphs_completed']}",
+                                  file=sys.stderr, flush=True)
+                            continue
                     check("MVAR" not in src and "VVAR" not in src,
                           "this reconstruction path has no native font-wide/VVAR metric oracle")
                     for tag in ("GSUB", "GPOS", "BASE"):
@@ -549,22 +665,36 @@ def run(source, executable, destination, report_path, batch_size=64,
                                        "axes": axes, "training_points": len(training),
                                        "initial_holdout_points": len(check_locations),
                                        "max_outline_error": 0.0, "max_metric_error": 0.0,
-                                       "glyphs_with_adaptive_training": 0, "retained_aat_behavior_windows": "NOT_VERIFIED"}
+                                       "glyphs_with_adaptive_training": 0, "glyphs_completed": 0,
+                                       "retained_aat_behavior_windows": "NOT_VERIFIED"}
                         report["faces"].append(face_report)
                         for start in range(0, len(glyph_order), batch_size):
                             gids = list(range(start, min(start + batch_size, len(glyph_order))))
-                            initial = [oracle.samples(index, gids, user_location(p, axes)) for p in training + check_locations]
+                            initial = []
+                            for sample_number, p in enumerate(training + check_locations):
+                                location = user_location(p, axes)
+                                context = {"stage": "native_batch", "face_index": index,
+                                           "gid_first": gids[0], "gid_last": gids[-1],
+                                           "sample_number": sample_number, "user_location": location}
+                                initial.append(oracle.samples(index, gids, location))
                             for gid in gids:
+                                context = {"stage": "glyph_reconstruction", "face_index": index,
+                                           "glyph_id": gid}
                                 name = glyph_order[gid]
                                 train = [point[gid] for point in initial[:len(training)]]
                                 held = [point[gid] for point in initial[len(training):]]
                                 tl, hl = list(training), list(check_locations)
                                 attempts = 0
                                 while True:
+                                    context = {"stage": "glyph_reconstruction", "face_index": index,
+                                               "glyph_id": gid, "adaptive_points": attempts}
                                     glyph, tuples, hm, vm, evidence = reconstruct_glyph(
                                         train, held, tl, hl, axes, src["hmtx"].metrics[name],
                                         src["vmtx"].metrics.get(name) if "vmtx" in src else None,
                                         outline_limit, metric_limit)
+                                    context["adaptive_points"] = attempts
+                                    context["max_outline_error"] = evidence["max_outline_error_bound_units"]
+                                    context["max_metric_error"] = evidence["max_metric_error_units"]
                                     if not evidence["failures"]:
                                         break
                                     check(not any(f["sample_kind"] == "training" for f in evidence["failures"]),
@@ -579,7 +709,9 @@ def run(source, executable, destination, report_path, batch_size=64,
                                     if peak == hl[k]:
                                         hl.pop(k); train.append(held.pop(k))
                                     else:
-                                        train.append(oracle.samples(index, [gid], user_location(peak, axes))[gid])
+                                        location = user_location(peak, axes)
+                                        context.update(stage="native_adaptive", user_location=location)
+                                        train.append(oracle.samples(index, [gid], location)[gid])
                                     attempts += 1
                                     # New independent points after every refinement, never
                                     # report the promoted training point as a passing test.
@@ -587,7 +719,9 @@ def run(source, executable, destination, report_path, batch_size=64,
                                                                   random_count=4)[-4:]
                                     for p in additions:
                                         if p not in tl and p not in hl:
-                                            hl.append(p); held.append(oracle.samples(index, [gid], user_location(p, axes))[gid])
+                                            location = user_location(p, axes)
+                                            context.update(stage="native_adaptive_holdout", user_location=location)
+                                            hl.append(p); held.append(oracle.samples(index, [gid], location)[gid])
                                 out["glyf"].glyphs[name] = glyph
                                 out["gvar"].variations[name] = tuples
                                 out["hmtx"].metrics[name] = hm
@@ -596,7 +730,9 @@ def run(source, executable, destination, report_path, batch_size=64,
                                 face_report["max_outline_error"] = max(face_report["max_outline_error"], evidence["max_outline_error_bound_units"])
                                 face_report["max_metric_error"] = max(face_report["max_metric_error"], evidence["max_metric_error_units"])
                                 face_report["glyphs_with_adaptive_training"] += bool(attempts)
+                                face_report["glyphs_completed"] += 1
                             print(f"face={index} glyphs={start+len(gids)}/{len(glyph_order)}", file=sys.stderr, flush=True)
+                        context = {"stage": "face_tables", "face_index": index}
                         replaced = [tag for tag in ("hvgl", "hvpm", "HVAR", "VVAR", "VORG") if tag in out]
                         for tag in replaced:
                             del out[tag]
@@ -610,11 +746,15 @@ def run(source, executable, destination, report_path, batch_size=64,
                         face_report["outline_error_policy"] = "training and holdout quadratic point discrepancy plus cubic approximation bound"
                         face_report["retained_tables"] = sorted(set(src.keys()) & set(out.keys()))
                         path = Path(tmp) / f"face-{index}.ttf"
+                        context = {"stage": "face_serialization", "face_index": index}
                         out.save(path)
                         with TTFont(path) as verified:
                             face_report["serialized_model_verification"] = verify_serialized_face(out, verified)
                             check(verified["cmap"].compile(verified) == src["cmap"].compile(src), "serialized cmap changed")
+                        if checkpoints is not None:
+                            checkpoints.save(index, path, face_report)
                     face_paths.append(path)
+                context = {"stage": "collection_serialization"}
                 candidate = Path(tmp) / "candidate.ttc"
                 with TTCollection() as collection:
                     # Packaging must not rewrite timestamps after each face's
@@ -635,7 +775,8 @@ def run(source, executable, destination, report_path, batch_size=64,
                 report["output_generated"] = True
     except Exception as error:
         report["status"] = "BLOCKED"
-        report["failures"].append({"type": type(error).__name__, "message": str(error)})
+        report["failures"].append({"type": type(error).__name__, "message": str(error),
+                                   "context": context})
         raise
     finally:
         if oracle is not None:
@@ -652,10 +793,13 @@ def main():
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--report", required=True, type=Path)
     parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument("--checkpoint-dir", type=Path,
+                        help="private directory for verified whole-face checkpoints; never upload as a public artifact")
     args = parser.parse_args()
     check(1 <= args.batch_size <= 1024, "batch size outside 1..1024")
     try:
-        run(args.source, args.oracle, args.output, args.report, args.batch_size)
+        run(args.source, args.oracle, args.output, args.report, args.batch_size,
+            checkpoint_dir=args.checkpoint_dir)
     except (ReconstructionError, OSError, ValueError) as error:
         print(f"BLOCKED: {error}", file=sys.stderr)
         return 2
