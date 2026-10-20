@@ -2,6 +2,16 @@ name: Swirl VF source and native synthetic probes
 
 on:
   push:
+    branches:
+      - work/core-completion-20261017
+      - work/vf-axis-a3
+      - work/vf-metrics-b1
+      - work/vf-rebuild-c1
+      - work/vf-windows-d1
+    paths:
+      - '.github/workflows/swirl-vf.yml'
+      - 'tools/swirl_vf/**'
+  pull_request:
     branches: [work/core-completion-20261017]
     paths:
       - '.github/workflows/swirl-vf.yml'
@@ -17,6 +27,11 @@ concurrency:
 
 jobs:
   python:
+    # PR checks execute the merge candidate, only for the four delegated branches.
+    if: >-
+      github.event_name != 'pull_request' ||
+      (github.event.pull_request.head.repo.full_name == github.repository &&
+       contains(fromJSON('["work/vf-axis-a3","work/vf-metrics-b1","work/vf-rebuild-c1","work/vf-windows-d1"]'), github.head_ref))
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -43,6 +58,10 @@ jobs:
           PY
 
   apple-oracles:
+    if: >-
+      github.event_name != 'pull_request' ||
+      (github.event.pull_request.head.repo.full_name == github.repository &&
+       contains(fromJSON('["work/vf-axis-a3","work/vf-metrics-b1","work/vf-rebuild-c1","work/vf-windows-d1"]'), github.head_ref))
     runs-on: xcode-27
     timeout-minutes: 15
     steps:
@@ -98,6 +117,10 @@ jobs:
           retention-days: 7
 
   directwrite:
+    if: >-
+      github.event_name != 'pull_request' ||
+      (github.event.pull_request.head.repo.full_name == github.repository &&
+       contains(fromJSON('["work/vf-axis-a3","work/vf-metrics-b1","work/vf-rebuild-c1","work/vf-windows-d1"]'), github.head_ref))
     runs-on: windows-2022
     timeout-minutes: 15
     defaults:
