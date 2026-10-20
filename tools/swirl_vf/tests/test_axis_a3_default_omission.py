@@ -4,6 +4,7 @@ These small invented raw records exercise the diagnostic gate. No Apple source
 font, extracted contour or measured source metric is included in this fixture.
 """
 import copy
+import io
 import json
 import math
 from pathlib import Path
@@ -11,9 +12,14 @@ import struct
 import sys
 import unittest
 
+from fontTools.fontBuilder import FontBuilder
+from fontTools.misc.textTools import Tag
+from fontTools.pens.ttGlyphPen import TTGlyphPen
+from fontTools.ttLib import TTFont, newTable
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "platform"))
 from axis_a3_default_omission import classify_default_omission
-from verified_axis_oracle import declare_readback
+from verified_axis_oracle import declare_readback, source_identities
 
 
 def bits(location):
@@ -60,6 +66,52 @@ def evidence(location=None):
             "replay": {gid: authored_record(identity, canonical, reported, gid, "replay-2") for gid in gids},
             "declaration": declaration, "submitted_original_bits": bits(location),
             "submitted_replay_bits": bits(canonical)}
+
+
+def reader_identity_evidence(location=None):
+    """Exercise the real SFNTReader -> source_identities schema, entirely in memory.
+
+    Glyphs are empty and all font data is authored here. Loading the serialized
+    font is essential: SFNTReader table keys are fontTools Tag objects, whereas
+    JSON-native metadata table keys are built-in strings.
+    """
+    builder = FontBuilder(1000, isTTF=True)
+    names = [".notdef", "a", "b"]
+    builder.setupGlyphOrder(names)
+    builder.setupCharacterMap({65: "a", 66: "b"})
+    builder.setupGlyf({name: TTGlyphPen(None).glyph() for name in names})
+    builder.setupHorizontalMetrics({name: (500, 0) for name in names})
+    builder.setupHorizontalHeader(ascent=800, descent=-200)
+    builder.setupNameTable({"familyName": "Authored A3 identity regression",
+                            "styleName": "Regular", "psName": "AuthoredA3IdentityRegression"})
+    builder.setupOS2(sTypoAscender=800, sTypoDescender=-200, usWinAscent=800, usWinDescent=200)
+    builder.setupPost()
+    builder.setupFvar([(axis["tag"], axis["minimum"], axis["default"], axis["maximum"], axis["tag"])
+                      for axis in authored_identity()["axes"]], [])
+    for axis, expected in zip(builder.font["fvar"].axes, authored_identity()["axes"]):
+        axis.flags = expected["flags"]
+    avar = newTable("avar")
+    avar.segments = {tag: {-1.: -1., 0.: 0., 1.: 1.} for tag in ("WDTH", "wght", "HGHT")}
+    builder.font["avar"] = avar
+    extra = newTable("test")
+    extra.data = b"authored additional table identity regression"
+    builder.font["test"] = extra
+    buffer = io.BytesIO()
+    builder.save(buffer)
+    buffer.seek(0)
+    with TTFont(buffer, lazy=True) as font:
+        identity = source_identities([font])[0]
+    item = evidence(location)
+    item["identity"] = identity
+    # Swift emits JSON, so native metadata has ordinary string keys. Do not
+    # convert the independently produced source identity or its Tag keys.
+    item["native_identity"] = {**json.loads(json.dumps(identity)), "status": "identity_verified"}
+    item["requested_gids"] = [0, 1, 2]
+    for phase in ("original", "replay"):
+        old = item[phase][0]
+        item[phase] = {gid: authored_record(identity, old["location"], old["reported_location"],
+                                            gid, old["request_id"]) for gid in item["requested_gids"]}
+    return item
 
 
 class DefaultOmissionTests(unittest.TestCase):
@@ -250,6 +302,61 @@ class DefaultOmissionTests(unittest.TestCase):
         self.assertTrue(self.classify(item)["strict_replay_passed"])
         item["original"][0]["location"]["WDTH"] = 0.
         self.reject(item, "native_raw_location_binary64_changed")
+
+    def test_real_reader_source_identity_reaches_both_complete_classifications(self):
+        for location, expected in (({"WDTH": 500., "wght": 499.25, "HGHT": 500.},
+                                    "STRICT_REPLAY_ALREADY_PASSED"),
+                                   ({"WDTH": 500.00005, "wght": 499.25, "HGHT": 500.},
+                                    "DEFAULT_OMISSION_EQUIVALENT_FOR_THIS_BATCH")):
+            with self.subTest(expected=expected):
+                item = reader_identity_evidence(location)
+                before = copy.deepcopy(item)
+                self.assertTrue(all(type(tag) is Tag for tag in item["identity"]["verified_table_sha256"]))
+                self.assertTrue(all(type(tag) is str for tag in item["native_identity"]["verified_table_sha256"]))
+                self.assertTrue(all(type(axis["tag"]) is str for axis in item["identity"]["axes"]))
+                result = self.classify(item)
+                self.assertEqual(result["classification"], expected)
+                self.assertTrue(result["constructor_entry_binary64_unchanged"])
+                self.assertEqual(result["requested_GID_count"], 3)
+                self.assertTrue(result["legacy_strict_replay"]["all_payloads_exactly_equal"])
+                self.assertEqual(item, before)
+
+    def test_real_reader_Tag_keys_do_not_relax_any_table_binding(self):
+        base = reader_identity_evidence()
+        for mutation in ("hash", "missing", "extra"):
+            item = copy.deepcopy(base)
+            tables = item["native_identity"]["verified_table_sha256"]
+            if mutation == "hash": tables["test"] = "f" * 64
+            if mutation == "missing": del tables["test"]
+            if mutation == "extra": tables["new!"] = "f" * 64
+            self.reject(item, "native_face_or_original_table_identity_mismatch")
+        for key in (b"test", Tag("bad"), Tag("\u00e9abc"), 1234):
+            item = copy.deepcopy(base)
+            tables = item["identity"]["verified_table_sha256"]
+            digest = tables.pop("test")
+            tables[key] = digest
+            self.reject(item, "original_table_binding_incomplete")
+        for digest in ("f" * 63, "g" * 64, True):
+            item = copy.deepcopy(base)
+            item["identity"]["verified_table_sha256"][Tag("test")] = digest
+            self.reject(item, "original_table_binding_incomplete")
+
+    def test_real_reader_payload_change_rejects_even_when_all_readbacks_pass(self):
+        # Public input coordinates of the new fresh_30_0 control, with entirely
+        # authored glyph payloads. This is a gate regression, not a substitute
+        # for that control's archived CoreText measurements.
+        item = reader_identity_evidence({"WDTH": 729.2925740388073,
+                                         "wght": 660.9898707384746,
+                                         "HGHT": 303.5934274824121})
+        for record in item["replay"].values():
+            record["commands"][0][1] += 2 ** -20
+            record["bounds"][0] += 2 ** -20
+        result = self.reject(item, "native_replay_payload_not_exact")
+        self.assertEqual(result["predeclared_replay_location"],
+                         {"WDTH": 729.2925, "wght": 660.9897, "HGHT": 303.5933})
+        self.assertEqual(result["legacy_strict_replay"]["readback_failures"], [])
+        self.assertEqual(len(result["legacy_strict_replay"]["payload_differences"]), 3)
+        self.assertEqual(result["explained_omitted_axes"], [])
 
 
 if __name__ == "__main__":

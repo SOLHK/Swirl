@@ -100,8 +100,11 @@ def _identity(identity, native_identity):
                 and type(axis.get("hidden")) is bool and axis["hidden"] == bool(axis["flags"] & 1),
                 "original_axis_identity_invalid", axis=tag)
     tables = identity["verified_table_sha256"]
+    # source_identities preserves SFNTReader's Tag(str) table-directory keys.
+    # Validate their text without coercing/dropping keys; the complete table map
+    # and every digest must still match the independently read native identity.
     require(type(tables) is dict and {"head", "name", "maxp", "cmap", "fvar", "avar"} <= set(tables)
-            and all(type(tag) is str and len(tag) == 4 and tag.isascii()
+            and all(isinstance(tag, str) and len(tag) == 4 and tag.isascii()
                     and type(digest) is str and re.fullmatch(r"[0-9a-f]{64}", digest)
                     for tag, digest in tables.items()), "original_table_binding_incomplete")
     # Extra native metadata (including the anchor identity) is deliberately
