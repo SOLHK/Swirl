@@ -1,0 +1,63 @@
+name: Swirl VF A3 source recovery and baseline
+
+on:
+  push:
+    branches: [work/vf-axis-a3]
+    paths: ['.github/workflows/swirl-vf-a3-recovery.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  recover-and-verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Export tracked public font tooling, not runtime font data
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/work/vf-axis-a3
+          mkdir -p build/a3-recovery
+          git rev-parse HEAD > build/a3-recovery/a3-head.txt
+          git archive --format=tar.gz --output=build/a3-recovery/a3-source.tar.gz HEAD tools/swirl_vf docs .github/workflows
+          git log -12 --format=fuller HEAD -- tools/swirl_vf .github/workflows > build/a3-recovery/a3-history.txt
+          git show --format=fuller 37ca8f8d9cca15e6bee6dd3a8761fc71dab48156 > build/a3-recovery/previous-head.diff
+          git show --format=fuller eda37d1c733cb1ced283583434e4123824a2147c > build/a3-recovery/arithmetic-source.diff
+          git show --format=fuller 6f36bdd47d0b52622c697974989b8b481657d2ea > build/a3-recovery/evidence-source.diff
+          for branch in work/core-completion-20261017 work/vf-windows-d1; do
+            sha=$(git rev-parse "refs/remotes/origin/$branch")
+            name=${branch##*/}
+            printf '%s\n' "$sha" > "build/a3-recovery/$name-head.txt"
+            git diff --name-status "HEAD...$sha" > "build/a3-recovery/$name-other-changes.txt"
+            git diff --name-status "$sha...HEAD" > "build/a3-recovery/$name-a3-changes.txt"
+            git log -8 --format=fuller "$sha" -- tools/swirl_vf docs .github/workflows > "build/a3-recovery/$name-history.txt"
+          done
+          d1=$(cat build/a3-recovery/vf-windows-d1-head.txt)
+          git archive --format=tar.gz --output=build/a3-recovery/d1-source-readonly.tar.gz "$d1" tools/swirl_vf docs .github/workflows
+          sha256sum build/a3-recovery/* > build/a3-recovery/SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: swirl-vf-a3-public-source-${{ github.sha }}
+          path: build/a3-recovery/
+          retention-days: 7
+          if-no-files-found: error
+      - name: Install independent controls
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libharfbuzz0b libfreetype6
+          python -m pip install fonttools==4.61.1 numpy==2.2.6
+      - name: Preserve A3 regressions and original input counterexample
+        run: |
+          python -c 'import ctypes.util; assert ctypes.util.find_library("harfbuzz") and ctypes.util.find_library("freetype")'
+          python -m unittest discover -s tools/swirl_vf/tests -p 'test_axis_a3*.py' -v
+          python -m unittest discover -s tools/swirl_vf/tests -p 'test_axis_input_resolution.py' -v
