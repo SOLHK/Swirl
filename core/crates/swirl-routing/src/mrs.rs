@@ -518,7 +518,9 @@ mod tests {
             Some(&ips),
         )
         .unwrap();
-        assert!(matches!(foreign_without_dns.decision, crate::Decision::Node(n) if n.id == "proxy"));
+        assert!(
+            matches!(foreign_without_dns.decision, crate::Decision::Node(n) if n.id == "proxy")
+        );
         let foreign = select_with_trace_and_china(
             &config,
             "www.example.com",
