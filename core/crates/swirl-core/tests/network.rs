@@ -737,9 +737,13 @@ fn smart_routing_executes_direct_proxy_and_reject_with_real_loopback_sockets() {
     let mut direct_reply = [0; 6];
     direct.read_exact(&mut direct_reply).unwrap();
     assert_eq!(&direct_reply, b"direct");
-    assert!(core.snapshot().unwrap().connections.iter().any(|row| {
-        row.node == "direct" && row.host == "www.baidu.com"
-    }));
+    assert!(
+        core.snapshot()
+            .unwrap()
+            .connections
+            .iter()
+            .any(|row| { row.node == "direct" && row.host == "www.baidu.com" })
+    );
     drop(direct);
     direct_peer.join().unwrap();
 
@@ -750,16 +754,24 @@ fn smart_routing_executes_direct_proxy_and_reject_with_real_loopback_sockets() {
     let mut proxy_reply = [0; 7];
     proxied.read_exact(&mut proxy_reply).unwrap();
     assert_eq!(&proxy_reply, b"proxied");
-    assert!(core.snapshot().unwrap().connections.iter().any(|row| {
-        row.node == "proxy" && row.host == "www.example.com"
-    }));
+    assert!(
+        core.snapshot()
+            .unwrap()
+            .connections
+            .iter()
+            .any(|row| { row.node == "proxy" && row.host == "www.example.com" })
+    );
     drop(proxied);
     assert_eq!(proxy_worker.join().unwrap(), "www.example.com");
     proxy_target.join().unwrap();
 
     // Explicit REJECT takes precedence over the MRS direct rule.
     let _rejected = connect_host(&core, "blocked.example.cn", 443, 502);
-    assert!(core.snapshot().unwrap().connections.iter().any(|row| {
-        row.category == "route-error" && row.host == "blocked.example.cn"
-    }));
+    assert!(
+        core.snapshot()
+            .unwrap()
+            .connections
+            .iter()
+            .any(|row| { row.category == "route-error" && row.host == "blocked.example.cn" })
+    );
 }
