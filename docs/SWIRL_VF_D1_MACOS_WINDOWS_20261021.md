@@ -620,3 +620,16 @@ Original 480-request diagnosis on a matching host uses
 It intentionally requires exact source identity and cannot replace the Mac-26
 source with a different system font under that hash. All result/raw/native
 checkpoints remain available locally under `build/vf-d2-private/`.
+
+### D2 review artifact saved
+
+Final CI evidence/handoff commit:
+**`e5f0eb14476b90a5fc36c5295ed61ce31b24f10c`**, following the two validated
+source checkpoints 30ff0ad and a5bfb22. Draft review:
+[PR #23](https://github.com/SOLHK/Swirl/pull/23), dedicated head →
+`work/core-completion-20261017`. At review creation GitHub reported `mergeable=true`,
+`mergeable_state=clean` against integration `70a18d5`; this is a timestamped
+conflict check, not merge approval. The PR remains draft/unmerged, with no
+reviewer assignment or automatic merge. Later integration changes must be
+reviewed independently. This final review-link update changes documentation
+only; source/native test evidence remains bound to a5bfb22.
