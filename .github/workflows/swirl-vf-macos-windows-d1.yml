@@ -1,4 +1,4 @@
-name: Swirl VF D1 isolated native controls
+name: Swirl VF D1-D2 isolated native controls
 
 on:
   push:
@@ -26,7 +26,9 @@ jobs:
       - name: Install pinned dependencies
         run: python -m pip install fonttools==4.61.1 numpy==2.2.6 uharfbuzz==0.56.3
       - name: Test original source-substitution and preservation controls
-        run: python -m unittest discover -s tools/swirl_vf/tests -p test_macos_source_baseline.py -v
+        run: |
+          python -m unittest discover -s tools/swirl_vf/tests -p test_macos_source_baseline.py -v
+          python -m unittest discover -s tools/swirl_vf/tests -p 'test_d2*.py' -v
       - name: Generate only the self-authored two-face fixture
         run: |
           mkdir -p build/d1
@@ -48,6 +50,10 @@ jobs:
         if: always()
         run: |
           python tools/swirl_vf/platform/test_native_table_metrics.py --output build/d1/table-metrics --require-native
+      - name: Independently test frozen metric predictions at fresh UPEMs
+        if: always()
+        run: |
+          python tools/swirl_vf/platform/d2_metric_upem.py --binary "$PWD/build/d1/table-metrics/coretext_extract" --output build/d2-synthetic-upem
       - name: Retain only self-authored synthetic reports, never source fonts
         if: always()
         uses: actions/upload-artifact@v4
@@ -57,6 +63,7 @@ jobs:
             build/d1/baseline/baseline.json
             build/d1/strict/*.json
             build/d1/table-metrics/*.json
+            build/d2-synthetic-upem/summary.json
           retention-days: 7
 
   windows-directwrite-synthetic:
@@ -81,18 +88,45 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Standard fixture generation failed' }
           python tools/swirl_vf/platform/make_metric_fixture.py build/d1/self-authored-metrics.ttc
           if ($LASTEXITCODE -ne 0) { throw 'Metric fixture generation failed' }
+      - name: Test D2 diagnostic preservation controls
+        run: |
+          python -m unittest discover -s tools/swirl_vf/tests -p 'test_d2*.py' -v
+          if ($LASTEXITCODE -ne 0) { throw 'D2 diagnostic tests failed' }
       - name: Run actual DirectWrite all-glyph and five-DPI controls
         run: |
           ./tools/swirl_vf/platform/run_directwrite_probe.ps1 -Font build/d1/self-authored-standard.ttc -OutputDirectory build/d1/standard -AllGlyphs -Render
           if ($LASTEXITCODE -ne 0) { throw 'DirectWrite standard fixture failed' }
           ./tools/swirl_vf/platform/run_directwrite_probe.ps1 -Font build/d1/self-authored-metrics.ttc -OutputDirectory build/d1/metrics -AllGlyphs -Render -Binary build/d1/standard/build/Release/directwrite_probe.exe
           if ($LASTEXITCODE -ne 0) { throw 'DirectWrite production HVAR/VVAR fixture failed' }
+      - name: Record actual Windows scope without granting original or desktop acceptance
+        shell: bash
+        run: |
+          python - <<'PYCODE'
+          import json
+          from pathlib import Path
+          controls = []
+          for label, faces in [('standard', 3), ('metrics', 2)]:
+              report = json.loads(Path(f'build/d1/{label}/directwrite-run.json').read_text(encoding='utf-8-sig'))
+              assert report['status'] == 'PASS_NATIVE_PROBE' and report['native_exit_code'] == 0
+              assert report['native_runtime'] == 'RAN' and report['input_unchanged'] is True
+              assert report['native_summary'][0]['faces_passed'] == faces
+              assert report['system_installation'] == report['real_swirl_ui'] == 'NOT_TESTED'
+              controls.append({'fixture': label, 'faces_passed': faces,
+                  'windows_product': report['windows_product'], 'windows_build': report['windows_build'],
+                  'raster_count': len(report['rasters']), 'input_sha256': report['input_sha256']})
+          result = {'scope': 'self_authored_synthetic_controls_only', 'controls': controls,
+              'original_font_acceptance': 'NOT_RUN', 'windows11_desktop_acceptance': 'NOT_RUN',
+              'system_installation': 'NOT_TESTED', 'actual_qt_swirl_acceptance': 'NOT_RUN'}
+          Path('build/d1/acceptance-scope.json').write_text(json.dumps(result, indent=2))
+          print(json.dumps(result))
+          PYCODE
       - name: Retain only self-authored DirectWrite evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: d1-windows-server-synthetic-${{ github.sha }}
           path: |
+            build/d1/acceptance-scope.json
             build/d1/standard/*.json
             build/d1/standard/*.jsonl
             build/d1/standard/*.log
@@ -103,11 +137,11 @@ jobs:
             build/d1/metrics/*.png
           retention-days: 7
 
-  original-source-baseline:
-    # Reuse the repository's existing native host. Never upload its source font
-    # or the private report containing font-level metrics/table identities.
+  original-source-d2:
+    # Exact original only. Native callbacks remain in memory; artifacts are
+    # fixed aggregate summaries, never font tables, glyph payloads or logs.
     runs-on: xcode-27
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
@@ -116,41 +150,27 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install pinned read-only baseline dependency
-        run: python -m pip install fonttools==4.61.1
-      - name: Measure exact original source identity and strict axis readback
+      - name: Install pinned native diagnostic dependencies
+        run: python -m pip install fonttools==4.61.1 numpy==2.2.6
+      - name: Classify all original strict axis failures and predeclared readback controls
         run: |
-          python tools/swirl_vf/platform/macos_source_baseline.py \
+          python tools/swirl_vf/platform/d2_axis_readback.py \
             /System/Library/PrivateFrameworks/FontServices.framework/Versions/A/Resources/Reserved/PingFangUI.ttc \
             --expected-sha256 39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890 \
-            --output build/d1-private-original-baseline
-      - name: Export only fixed aggregate fields
-        if: always()
+            --output build/d2-private-axis
+      - name: Compile unchanged Apple HVF oracle and compare bounded samples in all 32 faces
         run: |
-          python - <<'PY'
-          import json
-          from pathlib import Path
-          private = Path('build/d1-private-original-baseline/baseline.json')
-          if not private.is_file():
-              raise SystemExit('Original baseline did not produce a report; not accepted')
-          report = json.loads(private.read_text())
-          summary = report['summary']
-          safe = {key: summary[key] for key in (
-              'status', 'face_count', 'physical_faces_verified', 'axis_requests',
-              'axis_strict_passes', 'font_generated', 'windows11_acceptance')}
-          safe.update({key: report[key] for key in (
-              'source_sha256', 'source_bytes', 'extractor_sha256', 'harness_sha256', 'source_unchanged')})
-          safe['scope'] = 'source_identity_and_finite_strict_readback_only'
-          safe['os_version'] = report['native']['os_version']
-          output = Path('build/d1-public-original-summary')
-          output.mkdir(parents=True, exist_ok=True)
-          (output / 'summary.json').write_text(json.dumps(safe, indent=2, allow_nan=False))
-          print(json.dumps(safe, allow_nan=False))
-          PY
-      - name: Preserve aggregate original baseline only
+          mkdir -p build/d2
+          xcrun clang -std=c11 -O2 -Wall -Wextra -Werror -mmacosx-version-min=15.4 tools/swirl_vf/platform/hvf_oracle.c -lhvf -o build/d2/hvf_oracle
+          python tools/swirl_vf/platform/d2_hvf_faces.py \
+            /System/Library/PrivateFrameworks/FontServices.framework/Versions/A/Resources/Reserved/PingFangUI.ttc \
+            --binary "$PWD/build/d2/hvf_oracle" --output build/d2-private-faces
+      - name: Retain aggregate original diagnostics only
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: d1-original-baseline-aggregate-${{ github.sha }}
-          path: build/d1-public-original-summary/summary.json
+          name: d2-original-aggregate-${{ github.sha }}
+          path: |
+            build/d2-private-axis/summary.json
+            build/d2-private-faces/summary.json
           retention-days: 7

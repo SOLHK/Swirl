@@ -404,3 +404,100 @@ build/vf-d1-private/venv/bin/python tools/swirl_vf/platform/d2_hvf_faces.py \
 A completed output refuses overwrite; an unchanged incomplete recipe can resume.
 The next D2 stage diagnoses the 96 readback rejections and independently tests
 B1's frozen metric hypothesis on fresh UPEMs, preserving all strict failures.
+
+## D2 saved 32-face checkpoint and independent failure diagnosis
+
+The first D2 stage is saved remotely as
+**`30ff0adc9ef358713a269b40a7f4be8dbdb754f1`**, preserving ff2ed17 as parent.
+Its tree contains only this window's new sampling driver/tests/aggregate evidence
+and this handoff. The integration branch independently advanced to `2c2992e`;
+that change was fetched but not merged, modified or pushed by this window.
+
+### A3-facing 96-request diagnosis
+
+`d2_axis_readback.py` freezes the original D1 384 requests plus 96 additional
+predeclared `T(T(x))` readback controls **before** native observation. It reuses
+the production Swift prefix, `constructInstance` and strict
+`validateReportedAxes` verbatim. It never calls a glyph metric/path API, and
+never makes its observations an accepted reconstruction oracle.
+
+A real local control on the installed macOS-26 font (SHA `7ea43219...`, **not**
+the user's `39d42acd...` original) completed **480 native axis requests**:
+
+- Original 384: **288 strict passes / 96 strict failures**.
+- Exactly **32 failures per axis**, all at the fraction-index-1 request
+  `minimum + .123456789 * (maximum - minimum)`; endpoints/midpoint pass.
+- Maximum absolute user readback errors: WDTH/HGHT
+  **0.000032211000004167545**, wght **0.00009450000001720582**; all rejected
+  errors exceed the unchanged **1e-6** guard.
+- All **96** failed original echoes match the **predeclared** T(T(x)) values;
+  all **96/96** additional controls echo their requested values exactly and pass
+  the unchanged guard. Original 96 failures remain failures.
+
+This isolates finite readback quantization as the numerical reason for these
+strict refusals. It does not prove where/when Apple quantizes interpolation,
+original/replay outline equality or a universal user-axis mapping. The same
+probe still requires macOS-27 execution against the exact original before these
+control-font numbers can be assigned to that source. Existing A3 payload/replay
+and input-resolution blockers are retained; no source axis, tolerance, constructor
+or admission policy was changed. Public [control evidence](evidence/SWIRL_VF_D2_SYSTEM_AXIS_20261021.json)
+contains only counts/errors/hashes; full native axis records remain private.
+
+### B1-facing minimal reproduction and fresh UPEM holdouts
+
+B1's existing UPEM1000/1024, phantom, VVAR, size and four-channel experiments
+were read from its fixed `7902cdb` handoff; they were not reimplemented as a
+production repair. The new `d2_metric_upem.py` is an independent small extension:
+it uses the existing self-authored fixture, retains every source table byte,
+and changes **only head.unitsPerEm plus the serialization checksum**. Protected
+head bytes and all other tables are actually checked after save/reopen.
+
+Two known controls (1000,1024) plus **six fresh UPEMs**
+`1001,1023,2047,4093,8191,16383` are sampled at five HGHT values, with WDTH500 /
+wght100. Every request is strictly identity/readback checked. Separate forward
+and reverse native processes complete **80 records / 40 unique coordinate
+observations / 40 exact complete-payload replay pairs**. Actual raw CoreText
+values are never corrected. This is generated geometry, not original PingFang.
+
+B1's already-frozen candidate is evaluated using exact rational arithmetic:
+`H=1000+R(60*y)-R(-90*y)` (R: nearest, halves away from zero), followed by
+`trunc(floor(H*65536/UPEM)*UPEM/65536)`. It matches **40/40** observed heights,
+including **30/30 fresh-UPEM** observations, while **36/40** still fail the
+unchanged strict continuous-height comparison. At minimum HGHT the known
+1000/1024 pair still measures **849/850**, and every fresh odd UPEM measures 849.
+At the 53/64 normalized-height control the observed height can exceed the
+continuous ideal, so a universal minus-one correction remains false.
+
+Five preregistered horizontal normalization candidates (6,14,16,20,24 fractional
+bits) are also retained. Across 40 observations their exact-match counts are
+**0,15,40,5,5** respectively. Among the **30 fresh** observations these become
+**0,10,30,0,0**. This discriminates these finite candidates and gives independent
+support to a 16-bit normalization explanation; it does not uniquely prove
+Apple's internal representation or validate a production fix. UPEM4093's raw
+horizontal width is 669.9464569091797 against continuous 670, demonstrating an
+additional over-1/32 horizontal error in that control.
+
+Public [UPEM evidence](evidence/SWIRL_VF_D2_UPEM_20261021.json) contains only
+self-authored fixture measurements. Full synthetic native rows/fixtures stay
+under `build/vf-d2-private/upem-final/`; no Apple font was opened by this test.
+The source/core algorithms and the old strict 849/850 test remain unchanged.
+
+### D2 regression and CI checkpoint
+
+Thirteen D2 regression tests pass (five sampling/checkpoint tests plus eight
+readback/metric tests). They include source/table substitution, duplicate and
+missing rows, falsified strict passes, default/unavailable handling, frozen
+replay not rescuing original failures, the known 849/850 distinction, a true
+positive metric error, all-table/head invariance and complete-payload replay.
+Full local suite: **611 discovered = 604 passed + 7 platform skips**, no failure;
+audit **6/6**. These counts include the thirteen D2 tests, not an additional suite.
+
+The dedicated workflow now runs these tests on Mac and Windows, the bounded
+32-face HVF and exact-original 480-request diagnosis on `xcode-27`, and the
+synthetic UPEM reproduction on the Mac control host. Windows records actual
+product/build, face/raster counts and explicit synthetic-only scope after both
+real DirectWrite probes; original, Windows-11-desktop, installation and Qt/Swirl
+acceptance remain NOT_RUN/NOT_TESTED. The old strict native metric step and its
+failure propagation remain intact. Only original aggregate `summary.json`
+files are uploaded; private rows/logs/fonts are excluded. YAML parsing/branch
+checks pass. New remote native CI has not executed at this source checkpoint.
