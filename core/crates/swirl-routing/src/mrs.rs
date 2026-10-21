@@ -37,7 +37,7 @@ impl ChinaRules {
         c.take(extra_len as usize)?;
         let (domains, networks) = match expected {
             Behavior::Domain => (decode_domains(&mut c, count as usize)?, Vec::new()),
-            Behavior::IpCidr => (Vec::new(), decode_ip_ranges(&mut c, count as usize)?),
+            Behavior::IpCidr => (Vec::new(), decode_ip_ranges(&mut c)?),
         };
         if !c.is_empty() { return Err("MrsTrailingData"); }
         Ok(Self { domains, networks })
@@ -119,7 +119,7 @@ fn walk_domain(node: usize, node_count: usize, path: &mut Vec<u8>, leaves: &[u64
     Ok(())
 }
 
-fn decode_ip_ranges(c: &mut Cursor<'_>, count: usize) -> Result<Vec<(IpAddr, IpAddr)>, &'static str> {
+fn decode_ip_ranges(c: &mut Cursor<'_>) -> Result<Vec<(IpAddr, IpAddr)>, &'static str> {
     let version = c.byte()?; if version != 1 { return Err("MrsIpVersion"); }
     let n = c.i64()?; if n < 1 || n as usize > MAX_ITEMS { return Err("MrsIpCount"); }
     let mut ranges = Vec::with_capacity(n as usize);
@@ -221,6 +221,37 @@ mod tests {
         assert!(networks.matches_ip("114.114.114.114".parse().unwrap()));
         assert!(networks.matches_ip("240e:3a1:1000::1".parse().unwrap()));
         assert!(!networks.matches_ip("8.8.8.8".parse().unwrap()));
+    }
+
+    #[test]
+    fn ordered_routing_applies_cn_fallback_but_preserves_user_reject() {
+        use std::net::SocketAddr;
+        use swirl_subscription::Config;
+        use crate::select_with_trace_and_china;
+        let config = Config::parse(br#"{
+          "schema":1,"listen":"127.0.0.1:0","selected":"proxy",
+          "nodes":[
+            {"id":"proxy","outbound":{"type":"socks5","host":"127.0.0.1","port":1080,"auth":null}},
+            {"id":"direct","outbound":{"type":"direct"}},
+            {"id":"reject","outbound":{"type":"reject"}}
+          ],
+          "rules":[
+            {"matcher":{"type":"domain","value":"blocked.example.cn"},"outbound":"reject"},
+            {"matcher":{"type":"match"},"outbound":"proxy"}
+          ]
+        }"#).unwrap();
+        let domains = ChinaRules { domains: vec!["+.example.cn".into()], networks: vec![] };
+        let ips = ChinaRules { domains: vec![], networks: vec![("10.0.0.0".parse().unwrap(), "10.255.255.255".parse().unwrap())] };
+        let choose = |_| Err("NoAutomaticGroup");
+        let source = "127.0.0.1".parse().unwrap();
+        let cn = select_with_trace_and_china(&config, "www.example.cn", 443, source, None, &choose, Some(&domains), Some(&ips)).unwrap();
+        assert!(matches!(cn.decision, crate::Decision::Node(n) if n.id == "direct"));
+        let reject = select_with_trace_and_china(&config, "blocked.example.cn", 443, source, None, &choose, Some(&domains), Some(&ips)).unwrap();
+        assert!(matches!(reject.decision, crate::Decision::Node(n) if n.id == "reject"));
+        let foreign = select_with_trace_and_china(&config, "www.example.com", 443, source, Some(&["8.8.8.8:443".parse::<SocketAddr>().unwrap()]), &choose, Some(&domains), Some(&ips)).unwrap();
+        assert!(matches!(foreign.decision, crate::Decision::Node(n) if n.id == "proxy"));
+        let china_ip = select_with_trace_and_china(&config, "www.example.com", 443, source, Some(&["10.2.3.4:443".parse::<SocketAddr>().unwrap()]), &choose, Some(&domains), Some(&ips)).unwrap();
+        assert!(matches!(china_ip.decision, crate::Decision::Node(n) if n.id == "direct"));
     }
 
     #[test]
