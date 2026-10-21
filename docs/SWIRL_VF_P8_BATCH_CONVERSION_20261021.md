@@ -246,6 +246,75 @@ The immutable batch snapshot SHA is
 Full private evidence is under `p8-independent-228-stage1/`; only aggregate
 counts/hashes enter this repository. The batch is stopped safely for review.
 
+## Actual nominal228 native checkpoint and remaining limits
+
+The repaired existing P7 frontend also produces:
+`build/vf-takeover-private/p8-nominal-228-stage1/P7-Original-face0-NOMINAL-EXPERIMENTAL.ttc`,
+35,972,428bytes, SHA256
+`ed9a90eca316b76717c96a8e73ce52d9c85f63593cdbebc58a0d20d36e415100`;
+TTF SHA256 `e1208aea096ed2ef4277c6c1922e7dac6adea9a8e8a74cb1e7a6c94e2fbc82e8`.
+The final font restores original WDTH/wght/HGHT tags, ranges/defaults and flags.
+All34,555 cmap codepoint-to-original-GID pairs and47,102 GID slots are checked.
+There are21,730 encoded gvar tuples after nominal range restriction,17,514
+quantized support coordinates, and maximum support change
+0.000028316827352048435 NORMALIZED_AXIS_COORDINATE. This is not a source-FUnit
+outline bound. Exact serialization and94,204 HVAR/VVAR model checks PASS;
+nominal mapping/original native equivalence remain UNACCEPTED.
+
+Actual bounded CoreText extraction on20 GIDs (16 new beyond representative100
+and4 historical anchors) completes120 records,40 exact reverse pairs,18 strict
+effective-axis checks and22 table-identity checks. There are114 nonempty paths
+and6 source-proven empty records,0 terminal errors. Nineteen samples change
+outlines and20 change raw metrics. An additional actual TTC/default invocation
+loads2 GIDs through CoreText, verifies all22 tables and matches the corresponding
+TTF records exactly. This is native candidate loading, not original parity.
+Private evidence/harness and source hashes are in `p8-nominal-228-coretext/`.
+
+Latest tested source checkpoint `b0d26bf68c91d1f6cb7d692954c0950c37d0e09f`:
+[CI39598736413](https://github.com/SOLHK/Swirl/actions/runs/39598736413) PASS on
+889 portable tests plus6 audits, original-source macOS27 replay and authored
+Windows Server32-face controls. The historical96/384 strict source-axis failures
+are explicitly retained by that diagnostic job; success does not accept them.
+
+No full remaining sweep is launched. Measured128-new-GID extraction/model/cache
+time250.412s and representative90 time207.458s extrapolate to roughly25–30hours
+for46,874 remaining GIDs, with6,046,746 new native invocations under this
+per-GID129-case strategy. This is an estimate, not a performance guarantee.
+Naive full caching may occupy52–82GiB and6.2million files. More importantly,
+`p8_batch_original.face` currently materializes all selected models together;
+straight extrapolation of actual tuple-point counts suggests37–71GiB just for
+decoded Python pair containers, exceeding this Mac's16GiB. This is not a measured
+peak-RSS bound and the full-face memory path is NOT validated. The existing
+oracle already supports contiguous GID ranges: a future versioned batch cache
+can amortize process/source parsing, and assembly needs bounded model streaming.
+Existing228 code-bound checkpoints must be preserved when that implementation
+changes; do not silently reinterpret them under a new recipe.
+
+Precision remains the earlier blocker: no nonempty model passes all129 sampled
+outline bounds, the independent seven-position maximum is8.521084573934047,
+and metric errors remain above1/32. No continuous-domain proof exists. Source
+user-mapping, native metric/origin, flattened component, named-instance and
+retained trak/cidg/meta semantics remain unaccepted. The q-models are finite
+C1 sample reconstructions, not direct exact translation of all HVF coefficients.
+None of the full default-only population is counted as variable conversion.
+No application-specific compensation was added. Original-derived DirectWrite,
+Windows11, Qt/Swirl and third-party Windows validation remain NOT_RUN.
+
+P8 pushed source checkpoints, in order:
+
+| Commit | Reviewed scope |
+| --- | --- |
+| `d75b1b7` | Representative selection, tensor sampling, per-GID checkpoints |
+| `3a4ec7a` | Private local Windows gate and actual authored Windows CI |
+| `0896c39` | Independent100 validation and verified full-plan seeding |
+| `76e3d8f` | Actual nominal gvar-support serialization/metric repair |
+| `b0d26bf` | Independent incomplete-plan diagnostics and228 evidence |
+
+The documentation successor adds only these final verified aggregates. PR24
+stays draft, stacked on unchanged PR23; integration-owner review is required.
+Fresh remote inspection leaves A3/B1/C1/D1/W1/Core and the parallel P8 branch
+unchanged. No overlapping P8 source files or branch-write conflicts were found.
+
 ## Resume current batch
 
 ```sh

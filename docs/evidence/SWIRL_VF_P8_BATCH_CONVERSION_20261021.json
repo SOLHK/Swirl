@@ -153,6 +153,69 @@
     "requested_q_quantization_observations": 684,
     "partial_batch_diagnostic": true,
     "source_batch_complete": false,
-    "production_accepted": false
-  }
+    "production_accepted": false,
+    "strict_129_position_nonempty_model_outline_pass_GIDs": 0
+  },
+  "nominal_228": {
+    "TTF_sha256": "e1208aea096ed2ef4277c6c1922e7dac6adea9a8e8a74cb1e7a6c94e2fbc82e8",
+    "TTC_sha256": "ed9a90eca316b76717c96a8e73ce52d9c85f63593cdbebc58a0d20d36e415100",
+    "TTC_bytes": 35972428,
+    "total_GIDs": 47102,
+    "selected_model_GIDs": 228,
+    "default_only_GIDs": 46874,
+    "cmap_pairs_verified": 34555,
+    "encoded_gvar_tuples": 21730,
+    "changed_normalized_support_coordinates": 17514,
+    "maximum_normalized_support_encoding_error": 2.8316827352048435e-05,
+    "support_error_unit": "NORMALIZED_AXIS_COORDINATE_NOT_SOURCE_FUNIT",
+    "HVAR_VVAR_metric_models_verified": 94204,
+    "CoreText_sampled_GIDs": 20,
+    "CoreText_new_GIDs_beyond_representative100": 16,
+    "CoreText_records": 120,
+    "CoreText_exact_reverse_pairs": 40,
+    "CoreText_strict_effective_axis_checks": 18,
+    "CoreText_table_identity_checks": 22,
+    "CoreText_nonempty_path_records": 114,
+    "CoreText_proven_empty_records": 6,
+    "CoreText_actual_outline_movement_GIDs": 19,
+    "CoreText_actual_raw_metric_movement_GIDs": 20,
+    "additional_TTC_default_records": 2,
+    "additional_TTC_TTF_exact_record_matches": 2,
+    "production_accepted": false,
+    "continuous_equivalence_proven": false
+  },
+  "latest_tested_source": {
+    "commit": "b0d26bf68c91d1f6cb7d692954c0950c37d0e09f",
+    "CI_run_id": 39598736413,
+    "CI_conclusion": "success",
+    "portable_tests_passed": 889,
+    "audits_passed": 6,
+    "original_macOS_source_replay": "PASS_FINITE_REPLAY_NOT_MAPPING_ACCEPTANCE",
+    "D2_strict_axis_passed_retained": 288,
+    "D2_strict_axis_failed_retained": 96,
+    "Windows_Server_32_face_authored_controls": "PASS_NOT_ORIGINAL_CANDIDATE"
+  },
+  "remaining_full_face_resource_risks": {
+    "remaining_GIDs": 46874,
+    "new_native_calls_under_current_per_GID_strategy": 6046746,
+    "estimated_remaining_serial_hours": [
+      25,
+      30
+    ],
+    "measured_full_native_peak_RSS": "NOT_RUN",
+    "estimated_full_decoded_pair_container_GiB": [
+      37,
+      71
+    ],
+    "host_RAM_GiB": 16,
+    "full_model_assembly_memory_validated": false,
+    "unbounded_remaining_sweep_started": false
+  },
+  "pushed_source_commits": [
+    "d75b1b72951baaef17d4d66af3c8920ce4a8b4a1",
+    "3a4ec7ab57481c09ffc0646347d9142b109e0bab",
+    "0896c3975e7c22767f255f35c48148e1f84c1532",
+    "76e3d8f88585bffca16cff2c223089ec9aab8072",
+    "b0d26bf68c91d1f6cb7d692954c0950c37d0e09f"
+  ]
 }
