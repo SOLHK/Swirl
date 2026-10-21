@@ -117,14 +117,15 @@ Item {
        SwirlIconButton {id:networkDiagnosticButton;objectName:"networkDiagnosticButton";iconName:"refresh";quiet:true;enabled:page.telemetry.measurementState!=="正在测量";onClicked:page.telemetry.measureNetwork();Accessible.name:"网络诊断";SwirlToolTip {parent:networkDiagnosticButton;visible:networkDiagnosticButton.hovered;text:"发起网络诊断";delay:650}}
        SwirlIconButton {objectName:"networkDiagnosticDetails";iconName:page.diagnosticOpen?"chevron-left":"chevron-right";quiet:true;onClicked:page.diagnosticOpen=!page.diagnosticOpen;Accessible.name:page.diagnosticOpen?"收起检测详情":"查看检测详情"}
       }
-      Label {text:"互联网延迟";Layout.fillWidth:true}
+      Label {text:"HTTPS 请求耗时";Layout.fillWidth:true}
       Value {text:page.telemetry.latencies.internet||"尚未检测";Layout.fillWidth:true}
-      Label {text:page.telemetry.measurementState||"尚未检测";Layout.fillWidth:true}
+      Label {text:page.telemetry.internetDiagnostic.success?(page.telemetry.internetDiagnostic.route==="直连"?"直连":"当前策略")+" · 含连接/TLS/响应":page.telemetry.measurementState||"尚未检测";Layout.fillWidth:true}
       RowLayout {Layout.fillWidth:true;spacing:Theme.dp(8)
        Repeater {model:[{label:"路由",value:page.telemetry.latencies.router||"—"},{label:"DNS",value:page.telemetry.latencies.dns||"—"},{label:"代理",value:page.nodeConnected?(page.telemetry.latencies.proxy||"—"):"未连接"}]
         ColumnLayout {required property var modelData;Layout.fillWidth:true;Layout.minimumWidth:0;Label{text:modelData.label}SwirlText {text:modelData.value;color:Theme.text;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;elide:Text.ElideRight}}
        }
       }
+      Label {text:"各项分别采样，不能相加";Layout.fillWidth:true}
      }
      ColumnLayout {id:diagnosticDetails;x:Theme.cardPadding;y:diagnostic.collapsedHeight;width:parent.width-2*Theme.cardPadding;spacing:Theme.dp(10);visible:diagnostic.reveal>0;enabled:diagnostic.expanded
       SwirlText {text:page.telemetry.internetDiagnostic.advice||"点击刷新，发起真实的 HTTPS 请求。";color:Theme.text;Layout.fillWidth:true;wrapMode:Text.Wrap;font.pixelSize:Theme.fontSize(12)}

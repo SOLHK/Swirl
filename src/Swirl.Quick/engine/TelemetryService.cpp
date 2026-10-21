@@ -140,7 +140,7 @@ void TelemetryService::reportMeasurement(const QString &key,bool ok,const QStrin
 void TelemetryService::recordInternetResult(int error,int http,bool proxy,qint64 elapsed) {
  QString code,state,advice;
  const bool success=error==int(QNetworkReply::NoError)&&http>=200&&http<300;
- if(success){code="ok";state=QStringLiteral("请求成功");advice=proxy?QStringLiteral("HTTPS 已通过 Swirl 当前代理策略；此结果仅代表本次检测请求。"):QStringLiteral("直连 HTTPS 请求成功；未验证代理节点。");}
+ if(success){code="ok";state=QStringLiteral("请求成功");advice=proxy?QStringLiteral("HTTPS 请求经 Swirl 当前策略完成；耗时包含连接、TLS 与目标响应，仅代表本次检测。"):QStringLiteral("直连 HTTPS 请求成功；耗时包含连接、TLS 与目标响应，未验证代理节点。");}
  else if(m_status.error==ProxyEngine::Error::SelectionFailed){code="policy";state=QStringLiteral("策略选择失败");advice=QStringLiteral("检查所选节点和代理策略。");}
  else if(proxy && m_status.nodeHealth==ProxyEngine::NodeHealth::Unavailable){code="node";state=QStringLiteral("节点不可用");advice=QStringLiteral("尝试测速或切换节点，再检测实际请求。");}
  else if(error==int(QNetworkReply::SslHandshakeFailedError)){code="tls";state=QStringLiteral("TLS 握手失败");advice=QStringLiteral("检查证书信任与系统时间；不要关闭证书校验。");}

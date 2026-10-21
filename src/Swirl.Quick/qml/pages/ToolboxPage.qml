@@ -20,9 +20,9 @@ Item {
         }
         SwirlGlassPanel { Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(155)
             ColumnLayout {anchors.fill:parent;anchors.margins:Theme.cardPadding;spacing:Theme.dp(10)
-                SwirlText {text:"互联网 TCP："+(engineController.telemetry.latencies.internet||"未采集")+"  ·  默认网关 ICMP："+(engineController.telemetry.latencies.router||"未采集")+"  ·  DNS 查询："+(engineController.telemetry.latencies.dns||"未采集");color:Theme.text;Layout.fillWidth:true;wrapMode:Text.Wrap}
+                SwirlText {text:"HTTPS 请求耗时："+(engineController.telemetry.latencies.internet||"未采集")+"  ·  默认网关 ICMP："+(engineController.telemetry.latencies.router||"未采集")+"  ·  DNS 查询："+(engineController.telemetry.latencies.dns||"未采集");color:Theme.text;Layout.fillWidth:true;wrapMode:Text.Wrap}
                 SwirlText {text:"外部 IP："+(engineController.telemetry.externalIp||"未检测")+"  ·  "+systemProvider.currentNetwork().type;color:Theme.text;Layout.fillWidth:true;wrapMode:Text.Wrap}
-                SwirlText {text:"互联网测量为直连 TCP 握手；网关来自当前活动网卡；出口检测经实际 Swirl 分流。节点检测使用独立引擎。";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
+                SwirlText {text:"HTTPS 数值包含连接、TLS 与目标响应；各项分别采样，不能相加。出口检测经当前 Swirl 策略，节点检测使用独立引擎。";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
             }
         }
         SwirlText { text:"其他自定义工具（研发中）"; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
