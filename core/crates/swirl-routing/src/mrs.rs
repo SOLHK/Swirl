@@ -161,16 +161,16 @@ fn decode_domains(c: &mut Cursor<'_>, count: usize) -> Result<Vec<String>, &'sta
     let leaves = c.u64_vec()?;
     let bitmap = c.u64_vec()?;
     let labels = c.bytes_vec()?;
-    if leaves.len() > MAX_ITEMS
-        || bitmap.len() > MAX_ITEMS * 4
-        || labels.len() > MAX_ITEMS * 64
-    {
+    if leaves.len() > MAX_ITEMS || bitmap.len() > MAX_ITEMS * 4 || labels.len() > MAX_ITEMS * 64 {
         return Err("MrsDomainBounds");
     }
     if leaves.is_empty() || bitmap.is_empty() || labels.is_empty() {
         return Err("MrsDomainEmpty");
     }
-    let nodes = bitmap.iter().map(|word| word.count_ones() as usize).sum::<usize>();
+    let nodes = bitmap
+        .iter()
+        .map(|word| word.count_ones() as usize)
+        .sum::<usize>();
     let logical_bits = nodes.checked_add(labels.len()).ok_or("MrsDomainBounds")?;
     if nodes == 0
         || nodes > MAX_ITEMS
@@ -231,8 +231,7 @@ fn zero_rank_before(bitmap: &[u64], zero_prefix_words: &[usize], position: usize
     let word_index = position / 64;
     let offset = position % 64;
     let mask = if offset == 0 { 0 } else { (1u64 << offset) - 1 };
-    zero_prefix_words[word_index] + offset
-        - (bitmap[word_index] & mask).count_ones() as usize
+    zero_prefix_words[word_index] + offset - (bitmap[word_index] & mask).count_ones() as usize
 }
 
 fn walk_domain(
