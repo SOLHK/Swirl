@@ -257,6 +257,9 @@ pub struct Config {
     pub nodes: Vec<Node>,
     #[serde(default)]
     pub rules: Vec<Rule>,
+    /// Enable bundled, checksum-pinned China MRS fallback before MATCH.
+    #[serde(default)]
+    pub smart_routing: bool,
     #[serde(default)]
     pub selectors: Vec<Selector>,
     #[serde(default)]
