@@ -19,10 +19,10 @@ pub struct ChinaRules {
 }
 
 impl ChinaRules {
-    pub fn parse(bytes: &[u8], expected: Behavior, expected_sha256: &[u8; 32]) -> Result<Self, &'static str> {
+    pub fn parse(bytes: &[u8], expected: Behavior, expected_sha256_hex: &str) -> Result<Self, &'static str> {
         if bytes.is_empty() || bytes.len() > MAX_COMPRESSED { return Err("MrsCompressedSize"); }
-        let digest = sha2::Sha256::digest(bytes);
-        if digest.as_slice() != expected_sha256 { return Err("MrsChecksum"); }
+        let digest = format!("{:x}", sha2::Sha256::digest(bytes));
+        if digest != expected_sha256_hex { return Err("MrsChecksum"); }
         let decoder = zstd::stream::read::Decoder::new(bytes).map_err(|_| "MrsZstdHeader")?;
         let mut decoded = Vec::new();
         decoder.take((MAX_DECOMPRESSED + 1) as u64).read_to_end(&mut decoded).map_err(|_| "MrsZstdDecode")?;
@@ -92,8 +92,8 @@ fn select_one(bits: &[u64], nth: usize) -> Option<usize> {
     }
     None
 }
-fn walk_domain(node: usize, path: &mut Vec<u8>, leaves: &[u64], bitmap: &[u64], labels: &[u8], out: &mut Vec<String>) -> Result<(), &'static str> {
-    if node >= leaves.len() * 64 || out.len() > MAX_ITEMS { return Err("MrsDomainBounds"); }
+fn walk_domain(node: usize, node_count: usize, path: &mut Vec<u8>, leaves: &[u64], bitmap: &[u64], labels: &[u8], out: &mut Vec<String>) -> Result<(), &'static str> {
+    if node >= node_count || path.len() > 253 || out.len() > MAX_ITEMS { return Err("MrsDomainBounds"); }
     if bit(leaves, node) {
         let mut key = path.clone();
         key.reverse();
@@ -112,7 +112,7 @@ fn walk_domain(node: usize, path: &mut Vec<u8>, leaves: &[u64], bitmap: &[u64], 
                 + (0..(pos % 64)).filter(|b| !bit(bitmap, *b)).count();
             let ch = *labels.get(zero_rank).ok_or("MrsDomainLabels")?;
             path.push(ch);
-            walk_domain(zero_rank + 1, path, leaves, bitmap, labels, out)?;
+            walk_domain(zero_rank + 1, node_count, path, leaves, bitmap, labels, out)?;
             path.pop();
         }
     }
@@ -171,7 +171,7 @@ mod tests {
     use super::*;
     #[test]
     fn rejects_truncated_and_wrong_checksum_before_parsing() {
-        assert_eq!(ChinaRules::parse(b"bad", Behavior::Domain, &[0;32]).unwrap_err(), "MrsCompressedSize");
+        assert_eq!(ChinaRules::parse(b"bad", Behavior::Domain, "00").unwrap_err(), "MrsCompressedSize");
         let bytes = [0u8; 32];
         assert_eq!(ChinaRules::parse(&bytes, Behavior::Domain, &[0;32]).unwrap_err(), "MrsChecksum");
     }
