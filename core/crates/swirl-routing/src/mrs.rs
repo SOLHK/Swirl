@@ -507,6 +507,18 @@ mod tests {
         )
         .unwrap();
         assert!(matches!(reject.decision, crate::Decision::Node(n) if n.id == "reject"));
+        let foreign_without_dns = select_with_trace_and_china(
+            &config,
+            "www.example.com",
+            443,
+            source,
+            None,
+            &choose,
+            Some(&domains),
+            Some(&ips),
+        )
+        .unwrap();
+        assert!(matches!(foreign_without_dns.decision, crate::Decision::Node(n) if n.id == "proxy"));
         let foreign = select_with_trace_and_china(
             &config,
             "www.example.com",
