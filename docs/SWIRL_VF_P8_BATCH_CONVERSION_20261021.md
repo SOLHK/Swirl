@@ -152,6 +152,49 @@ A new parallel branch `work/vf-p8-gvar-pro` was observed at
 helper has no file overlap or validated gvar mesh fix to reuse here. It is not
 merged or modified; all parallel history remains intact.
 
+## Actual nominal support-encoding repair
+
+The minimal frontend fix is in `p7_nominal_candidate.serialized_metric_candidate`.
+After range restriction, an interior support may be2/3, which is not F2DOT14.
+The strict metric writer correctly refuses that transient value. The frontend
+now serializes/reopens gvar FIRST using the existing packed-delta/overflow
+validator, then derives HVAR/VVAR from the actual encoded supports and phantoms.
+The writer's exact-F2 check is unchanged; no tolerance is enlarged. The normalized
+support encoding difference is explicitly recorded in normalized-axis units,
+not relabelled as a glyph-FUnit accuracy result.
+
+The first repaired attempt exposed an additional wrapper assumption: fontTools
+instancer removes empty gvar dictionary entries, whereas reopening the binary
+table restores empty slots for every GID. The audit now captures all original
+GID slots with explicit empty lists. This was not a glyph-name/post-format
+change; that early hypothesis was ruled out by the actual instancer source.
+Default-only GIDs are still not counted as variable. Both failed private build
+logs at nominal100 stage1 and stage2 are preserved.
+
+Actual successful output:
+`build/vf-takeover-private/p8-nominal-100-stage3/P7-Original-face0-NOMINAL-EXPERIMENTAL.ttc`,
+35,315,848bytes, SHA256
+`ac721ddf2522db374ba2b873c4fc1c79e2d3b6a49798825f99bdb00c97051ead`;
+TTF SHA256 `48e49a8369b06bc6f98ce6776b836719965e5282c0022e0bda1892ecb3b49a44`.
+There are8,352 quantized support coordinates, maximum change
+0.000028316827352048435 normalized-axis units (< half an F2 cell). All94,204
+HVAR/VVAR metric models exactly match final gvar phantoms; C1 decoded-byte and
+22-table packing gates pass. All inherited source-model/native precision
+failures and every production acceptance flag remain unchanged/false.
+
+Actual CoreText nominal100 probe uses16 GIDs from the exact100 plan (all5 empty
+plus11 spread nonempty), four nominal positions and two reverse requests:
+96 records,32 exact reverse pairs,18 strict effective-axis checks,22 table
+identities,66 paths and30 source-proven empty records,0 terminal errors.
+All11 nonempty samples change outlines; all16 change raw metrics. Original and
+candidate hashes remain unchanged. No nominal raster, original CoreText parity,
+DirectWrite original or Windows11 acceptance is implied.
+
+Five focused nominal regressions pass, including the authored2/3 support failure
+before repair, actual encoded10923/16384 support after repair, exact metric
+consistency, packed-delta overflow rejection and default-only-slot handling.
+The original P7 identity/integrity tests remain intact.
+
 ## Resume current batch
 
 ```sh

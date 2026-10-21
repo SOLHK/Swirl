@@ -27,6 +27,42 @@ def require(condition, message):
         raise ValueError(message)
 
 
+def serialized_metric_candidate(candidate):
+    """Derive metrics from the encoded support grid, never transient supports.
+
+    Range restriction can map an interior support to, for example, 2/3. The
+    OpenType serializer encodes that support in F2DOT14. Keep the metric writer's
+    exact-F2 guard and derive its regions from those actual reopened gvar bytes.
+    This records coordinate quantization; it does not certify font fidelity.
+    """
+    # The instancer removes empty gvar dictionary entries; the binary table
+    # still has a slot for every GID and reopening restores those empty lists.
+    before = {name: [dict(item.axes) for item in candidate['gvar'].variations.get(name, [])]
+              for name in candidate.getGlyphOrder()}
+    for tag in ('HVAR', 'VVAR'):
+        if tag in candidate:
+            del candidate[tag]
+    encoded = _serialized_precision_font(candidate)
+    require(encoded.getGlyphOrder() == list(before), 'support_encoding_changed_GID_order')
+    changed, maximum = 0, 0.
+    for name, variations in encoded['gvar'].variations.items():
+        require(len(variations) == len(before[name]), 'support_encoding_changed_tuple_count')
+        for item, wanted in zip(variations, before[name]):
+            require(set(item.axes) == set(wanted), 'support_encoding_changed_axes')
+            for tag, triple in item.axes.items():
+                for old, new in zip(wanted[tag], triple):
+                    error = abs(old-new)
+                    require(error <= .5/16384, 'unexpected_F2_support_encoding_error')
+                    changed += old != new
+                    maximum = max(maximum, error)
+    verification = add_metric_variations(encoded)
+    return encoded, dict(stage='SERIALIZE_GVAR_BEFORE_DERIVING_METRIC_REGIONS',
+        changed_support_coordinates=changed, maximum_normalized_support_encoding_error=maximum,
+        error_unit='NORMALIZED_AXIS_COORDINATE_NOT_SOURCE_FUNIT',
+        metric_encoding=verification, continuous_equivalence_proven=False,
+        strict_font_acceptance=False, production_accepted=False)
+
+
 def run(source, parent_directory, output):
     source, parent = Path(source).resolve(strict=True), Path(parent_directory).resolve(strict=True)
     require(sha256(source)==EXPECTED, 'exact_original_source_required')
@@ -43,9 +79,7 @@ def run(source, parent_directory, output):
         axes = axes_from_font(src)
         candidate, mapped = rebase_design_font(qfont, axes)
         # Keep a single exactly consistent metric encoding of the final phantoms.
-        for tag in ('HVAR', 'VVAR'):
-            if tag in candidate: del candidate[tag]
-        add_metric_variations(candidate)
+        candidate, support_encoding = serialized_metric_candidate(candidate)
         for axis, source_axis in zip(candidate['fvar'].axes, src['fvar'].axes):
             axis.flags = source_axis.flags
             axis.axisNameID = candidate['name'].addName('Experimental '+axis.axisTag)
@@ -85,7 +119,7 @@ def run(source, parent_directory, output):
             'target_units_per_em':candidate['head'].unitsPerEm,
             'original_named_instances':'NOT_RESTORED_PENDING_METADATA_ACCEPTANCE',
             'inherited_model_failures':True, 'retained_unverified_tables':receipt['retained_unscaled_unverified_tables'],
-            'mapping':mapped, 'serialization':serialized, 'packing':packed,
+            'mapping':mapped, 'support_encoding':support_encoding, 'serialization':serialized, 'packing':packed,
             'original_composite_relations_preserved':False, 'source_user_mapping_accepted':False,
             'strict_font_acceptance':False, 'font_only_equivalence_accepted':False,
             'production_accepted':False, 'DirectWrite':'NOT_RUN', 'Windows11':'NOT_RUN', 'Qt_Swirl':'NOT_RUN'}
