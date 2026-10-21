@@ -6,7 +6,7 @@ conversion. All original production guards, tolerances and failures remain.
 Branch/worktree stay `work/vf-takeover-abc-20261021` / `vf-takeover-abc`.
 Starting remote HEAD is6567f4aca310c7bd7d37cb828b6d12b9624ccb04.
 
-PR23 remains draft/unmerged at54e579f; PR24 contains four takeover commits and
+At the starting snapshot PR23 was draft/unmerged at54e579f; PR24 contained four takeover commits and
 26 changed files relative to that unchanged base. Their actual differences
 were read. The A3/B1/C1 source tips remain66594e9/7902cdb/c0fe6c4; their latest
 original handoffs and implementation were re-read. A concurrently newer
@@ -76,10 +76,10 @@ and5376metric/extents comparisons exactly. The twins use custom normalized
 tags rather than an invalid negative registered wght user scale. All files
 remain in ignored private build directories and are not delivery fonts.
 
-The new DirectWrite C++ control checks actual submitted FLOAT/readback bits,
+The DirectWrite C++ control checks actual submitted FLOAT/readback bits,
 physical face/table identity, all glyph metrics and horizontal/sideways outline
-points. Its Mac stub compiles and reports NOT_RUN; actual Windows Server CI is
-pending at this checkpoint. It cannot grant Windows11/original-font acceptance.
+points. Its Mac stub compiles and reports NOT_RUN; actual Windows Server results
+are recorded below. It cannot grant Windows11/original-font acceptance.
 
 ## Fresh native evidence to collect
 
@@ -185,8 +185,7 @@ The extended DirectWrite probe has a separate `--font-level` control mode:
 it verifies legal target avar and default tables, then compares actual metrics
 and full outline points at unchanged nominal inputs. The existing optional
 q-transport control retains its stricter identical variation-table requirement.
-Neither mode grants original/Windows11 acceptance. Actual Windows execution
-of the new font-level mode is pending at this source checkpoint.
+Neither mode grants original/Windows11 acceptance.
 
 The original165-position experiment is extended for a new reason: compare the
 fractional q reconstructed from the quantized r against original CoreText/HVF.
@@ -195,11 +194,73 @@ re-encoding; it does not pretend to be an original target-font build. Existing
 comparators and all original96readback failures remain. No expensive full-GID
 baseline is repeated. Formal original reconstruction remains NOT_RUN.
 
+Checkpoint9f39f24acd0060e54e38302190bb72fe7300f245 passed all three jobs in
+[run39556281421](https://github.com/SOLHK/Swirl/actions/runs/39556281421).
+The Linux job passed38 targeted mapping/model regressions and both authored
+HarfBuzz controls. The separately automatic existing takeover workflow also
+passed at the same source commit; it was not manually dispatched again.
+
+On the exact original/macOS27.0.1, baseline165HVAR positions and330HVF glyph
+comparisons still have zero error. The new fractional-r composition has maximum
+HVAR error0.0036952052687411197 and maximum HVF point error0.0025511955074080106
+source FUnit; all165metric positions/330glyph comparisons remain inside1/32,
+under both unchanged comparators.432unique native HVF calls suffice through
+caching;825opposite-order pairs/3300internal CoreText records remain exact.
+All96strict fractional readback failures remain. This experiment isolates
+coordinate composition: it does not encode original glyph coefficients, run
+the generated original avar on Windows, or establish a global input map.
+Aggregate: [original rebased coordinates](evidence/SWIRL_VF_P4_REBASED_NATIVE_20261021.json).
+
+The actual new font-only mode passed on Windows Server2022/build20348:
+32authored faces,512requests,3584glyph pairs,25088metric fields,7168outline
+pairs,22528bit-exact point pairs,6144FLOAT/readback checks. All maximum errors
+are zero. The target receives unchanged nominal inputs; it contains the actual
+reparameterized models, rather than relying on the optional q adapter.
+Aggregate: [font-only DirectWrite](evidence/SWIRL_VF_P4_REBASED_WINDOWS_20261021.json).
+Windows11/original font/third-party applications remain NOT_RUN.
+
 P4 saved source checkpoints so far:
 - d3a766f03e2b70033a775702d87ecb5ddab7fb42: separated mapping/legal compiler;
   actual original/native and Windows representation CI passed.
 - b9823c481eefef8a980d1d6671460fdbf1c0f406: font-only physical scaling/GPOS
   control and input-bound UPEM postcondition; existing CI passed.
+- 9f39f24acd0060e54e38302190bb72fe7300f245: legal endpoint-r basis and actual
+  variation-model transformation; original finite coordinate and authored
+  Windows Server font-file controls passed.
+
+## Guarded fine-grid coefficient candidate
+
+`rebase_design_font_precision8` scales the complete supported standard q font
+before restriction, then serializes/reopens both scaled and rebased models.
+It changes UPEM with geometry/metrics, not user inputs or application placement.
+All16 targeted model/precision regressions pass locally (2.628s). The serialized odd-delta1/half-domain witness now reproduces the original
+continuous gvar/HVAR/VVAR model exactly at seven mixed positions, rather than
+rounding0.5 to an integer. All six source UPEM families fit the legal target
+range. Input data and the default unscaled function remain unchanged.
+
+This is not a universal fix: an authored3/16 endpoint needs coefficient1.5 on
+the eightfold grid, rounds to2, and still differs by1/16 source FUnit. Also,
+actual HarfBuzz raw advances on the unscaled reference round on its original
+grid;42/49 authored advance comparisons differ by more than1/32 (maximum3/8)
+despite the fine-grid target reproducing the continuous metric model at the
+same output scale. Those native-equality failures are retained separately.
+The earlier failed universal-equality assertion is preserved privately as
+`build/vf-takeover-private/p4-precision8-regression.log`; no original data is
+in that authored-only log. No original/native/production acceptance is added.
+
+The candidate rejects overflow, hint bytecode, unknown/AAT/Graphite tables,
+unreviewed VORG and MVAR. MVAR includes dimensionless caret-slope tags, so
+blindly scaling every VarData delta changes an authored hcrn slope ratio from1
+to0.125 while leaving the base unchanged. The independent regression proves
+that wrong result and the candidate's refusal, with source bytes unchanged.
+A tag-aware MVAR transformation is still required.
+Successful FontTools roundtrip alone is insufficient: its packed-delta encoder
+can emit0xC0 long runs, whereas the published standard gvar packed format uses
+signed8/16-bit runs. This candidate explicitly refuses out-of-range gvar
+coefficients instead of emitting that extension. Reference:
+[OpenType packed deltas](https://learn.microsoft.com/en-us/typography/opentype/spec/otvarcommonformats#packed-deltas).
+No output or production gate is changed when a candidate is refused.
+Aggregate: [fine-grid model and retained failures](evidence/SWIRL_VF_P4_PRECISION8_MODEL_20261021.json).
 
 The original Swirl-VF production guard remains closed. Actual source-HVF to
 standard glyph construction, full original metrics, font-level global input

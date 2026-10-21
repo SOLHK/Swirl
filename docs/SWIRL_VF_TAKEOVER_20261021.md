@@ -115,9 +115,10 @@ HarfBuzz's CoreText backend. Original fixedX500 at width800/1200 differs from
 DirectWrite's current-width-half convention400/600; VORG supplies Y only.
 The849/850 case is a separate synthetic native behavior, not the measured
 original height. No valid API correction or font-only X representation was
-found; all strict failures remain. A delivery-contract question is pending
-about explicit Qt/Swirl layout compensation versus low-level native API
-equality. No dependent relaxation or compensating source edit is made.
+found at that checkpoint; all strict failures remain. The formerly pending
+delivery-contract question is now resolved by the later user instruction:
+portable font-file behavior takes priority; Qt/Swirl compensation cannot count
+as conversion. P4's font-level experiments and native evidence are linked above.
 
 C1's reviewed packer/binary checker is integrated as a separate selected patch;
 its synthetic-only reconstruction engine is not imported or enabled for Apple
@@ -270,13 +271,13 @@ It must never be described as a converted PingFang/Swirl-VF delivery font.
 Native authored reconstruction fonts were temporary and removed. Original user
 font remains untouched in Downloads, never registered/patched/uploaded.
 
-Next actionable work is a separately evidenced target representation contract,
-not another large original sweep. A3's ONCE_ALL finite design cohort is useful
-prior evidence, not a global map. The pending delivery decision is whether
-Qt/Swirl may compensate fixed verticalX500 versus DirectWrite's width-half
-placement while raw native API differences stay separately failing. No answer
-or permission is inferred from elapsed time. Even such a decision would not
-by itself resolve axis precision or authorize marking raw API equality passed.
+P4 now implements a separate, explicitly unaccepted font-level target basis and
+actual standard-table reparameterization; see its linked handoff for tested
+commits and quantitative results. A3's ONCE_ALL finite design cohort remains
+finite evidence, not a global map. The user has resolved the delivery decision:
+app-only Qt/Swirl compensation cannot qualify as font conversion. Fixed
+verticalX500 versus DirectWrite's width-half behavior and the original strict
+raw native API failures remain separate acceptance items.
 Do not remove the source-only production guard or change original tolerances
 without replacing them with independently verified target acceptance.
 

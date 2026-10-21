@@ -13,6 +13,9 @@ from __future__ import annotations
 
 import fontTools
 import copy
+import io
+from fontTools.ttLib import TTFont
+from fontTools.ttLib.scaleUpem import scale_upem
 from fontTools.varLib.instancer import instantiateVariableFont
 
 from audit_font import raw_avar
@@ -68,8 +71,7 @@ def _restore_metadata(font, axes, bases):
         record.AxisTag = by_custom[record.AxisTag][0].tag
 
 
-def rebase_design_font(font, source_axes):
-    """Return a distinct TTFont candidate and a non-acceptance report."""
+def _validate_standard_q(font, source_axes):
     require(type(source_axes) in (tuple, list) and len(source_axes) == 3
             and all(isinstance(axis, SourceAxis) for axis in source_axes)
             and {axis.tag for axis in source_axes} == set(CUSTOM_TAGS), 'three_raw_source_axes_required')
@@ -92,6 +94,12 @@ def rebase_design_font(font, source_axes):
             and set(font['avar'].segments) == set(custom_order)
             and all(segment == IDENTITY for segment in font['avar'].segments.values()),
             'input_q_avar_not_identity')
+    return custom_order
+
+
+def rebase_design_font(font, source_axes):
+    """Return a distinct TTFont candidate and a non-acceptance report."""
+    custom_order = _validate_standard_q(font, source_axes)
     bases = tuple(basis_from_axis(axis) for axis in source_axes)
     # The instancer filters out named instances outside the restricted range.
     # Validate their original coordinates before that filtering can hide an
@@ -137,4 +145,85 @@ def rebase_design_font(font, source_axes):
         'source_user_mapping_accepted': False, 'target_mapping_accepted': False,
         'font_conversion_accepted': False, 'font_only_equivalence_accepted': False,
     }
+    return rebased, report
+
+
+# Deliberately narrow: the public scaler does not rewrite TrueType hint
+# programs, AAT/Graphite or every legacy vertical-origin record. Silently
+# keeping such design-unit data would change physical behavior. Unknown
+# tables must be investigated before using this candidate path with them.
+PRECISION8_TABLES = frozenset(('GlyphOrder', 'head', 'hhea', 'maxp', 'OS/2',
+    'hmtx', 'cmap', 'loca', 'glyf', 'name', 'post', 'vhea', 'vmtx', 'fvar',
+    'avar', 'gvar', 'HVAR', 'VVAR', 'GDEF', 'GPOS', 'GSUB', 'STAT'))
+
+
+def _serialized_precision_font(font):
+    # OpenType's published packed gvar deltas are signed bytes/words. The
+    # upstream serializer can emit its 0xC0 long-delta extension, so a
+    # successful fontTools save/reopen alone does not prove this constraint.
+    # https://learn.microsoft.com/en-us/typography/opentype/spec/otvarcommonformats#packed-deltas
+    for variations in font['gvar'].variations.values():
+        for variation in variations:
+            require(all(point is None or all(type(v) in (int, float)
+                        and int(v) == v and -32768 <= v <= 32767 for v in point)
+                        for point in variation.coordinates), 'precision8_gvar_packed_delta_out_of_range')
+    try:
+        stream = io.BytesIO()
+        font.save(stream)
+        reopened = TTFont(io.BytesIO(stream.getvalue()), recalcTimestamp=False)
+        # Force parsing of every supported table; a lazy reader is not a
+        # serialization check. Overflow must fail before a candidate escapes.
+        for tag in reopened.keys():
+            reopened[tag]
+        return reopened
+    except Exception as error:
+        raise ValueError('precision8_serialized_field_or_table_invalid') from error
+
+
+def rebase_design_font_precision8(font, source_axes):
+    """Rebase on an eightfold design grid; physical scaling is font-internal.
+
+    This fixes integral-half coefficient witnesses by scaling BEFORE range
+    restriction, instead of magnifying an already rounded delta. Eightfold
+    scaling is legal for all six known source UPEM families, but is neither a
+    universal 1/32 bound nor a lossless-conversion claim. The unscaled path and
+    all its failed witnesses remain available unchanged. No file is written.
+    """
+    _validate_standard_q(font, source_axes)
+    # MVAR also contains dimensionless caretSlopeRise/Run variation tags.
+    # The upstream generic VarData visitor scales their deltas while leaving
+    # the base ratio untouched. A tag-aware treatment is required first.
+    require(set(font.keys()) <= PRECISION8_TABLES, 'precision8_unsupported_table')
+    source_upem = font['head'].unitsPerEm
+    require(type(source_upem) is int and 16 <= source_upem and source_upem * 8 <= 16384,
+            'precision8_target_UPEM_outside_OpenType_range')
+    for name in font.getGlyphOrder():
+        glyph = font['glyf'][name]  # expand lazy glyphs before checking programs
+        program = getattr(glyph, 'program', None)
+        require(program is None or not program.getBytecode(), 'precision8_hint_program_not_supported')
+        if glyph.isComposite():
+            require(all(hasattr(component, 'x') and hasattr(component, 'y')
+                        for component in glyph.components), 'precision8_point_attached_composite_not_supported')
+    # Canonicalize the detached model first. A freshly authored avar v1 can
+    # have segments without the generated otTables object expected by the
+    # upstream visitor; serialization creates it without mutating the input.
+    scaled = _serialized_precision_font(copy.deepcopy(font))
+    try:
+        scale_upem(scaled, source_upem * 8)
+    except Exception as error:
+        raise ValueError('precision8_scaling_failed') from error
+    scaled = _serialized_precision_font(scaled)
+    rebased, report = rebase_design_font(scaled, source_axes)
+    rebased = _serialized_precision_font(rebased)
+    require(rebased['head'].unitsPerEm == source_upem * 8
+            and rebased.getGlyphOrder() == font.getGlyphOrder()
+            and rebased['cmap'].compile(rebased) == font['cmap'].compile(font),
+            'precision8_serialized_identity_changed')
+    report.update(status='PRECISION8_STANDARD_Q_REBASED_CANDIDATE_ONLY',
+        precision_grid_multiplier=8, source_units_per_em=source_upem,
+        target_units_per_em=rebased['head'].unitsPerEm,
+        scale_before_restriction=True, serialized_candidate_reopened=True,
+        error_reporting_units='source_font_units', application_compensation=False,
+        default_table_byte_identity=False, physical_error_bound='NOT_ESTABLISHED',
+        coefficient_rounding_possible=True, lossless_conversion=False)
     return rebased, report

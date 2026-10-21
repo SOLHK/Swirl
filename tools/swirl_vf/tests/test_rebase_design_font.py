@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'platform'))
 from metric_variations import add_metric_variations
 from rebuild_c1_fixture import make_face
-from rebase_design_font import CUSTOM_TAGS, rebase_design_font
+from rebase_design_font import CUSTOM_TAGS, rebase_design_font, rebase_design_font_precision8
 from target_axis_mapping import SourceAxis
 
 
@@ -57,6 +57,125 @@ def static_at(font, location):
 
 
 class RebaseDesignFontTests(unittest.TestCase):
+    def test_precision8_fixes_serialized_odd_half_coefficients_in_physical_units(self):
+        from fontTools.varLib.models import supportScalar
+        from fontTools.varLib.varStore import VarStoreInstancer
+        original = q_font(weight_delta=1)
+        original.recalcTimestamp = False
+        before = serialize(original)
+        candidate, report = rebase_design_font_precision8(original, source_axes())
+        self.assertEqual(serialize(original), before)
+        self.assertEqual(candidate['head'].unitsPerEm, original['head'].unitsPerEm * 8)
+        for weight in (-.5, -.25, -.125, 0., .125, .25, .5):
+            source_location = {'XWDT': .375, 'XWGT': weight, 'XHGT': -.25}
+            target_location = {'WDTH': .375, 'wght': weight * 2, 'HGHT': -.25}
+            for table, field in (('HVAR', 'AdvWidthMap'), ('VVAR', 'AdvHeightMap')):
+                a, b = original[table].table, candidate[table].table
+                src = VarStoreInstancer(a.VarStore, original['fvar'].axes, source_location)
+                dst = VarStoreInstancer(b.VarStore, candidate['fvar'].axes, target_location)
+                for name in original.getGlyphOrder():
+                    self.assertEqual(src[getattr(a, field).mapping[name]],
+                                     dst[getattr(b, field).mapping[name]] / 8)
+            # Compare actual serialized gvar coefficients at independent mixed
+            # positions. A static instance would round the source .5 first.
+            def deltas(font, location, scale):
+                count = len(font['gvar'].variations['A'][0].coordinates)
+                total = [[0., 0.] for _ in range(count)]
+                for variation in font['gvar'].variations['A']:
+                    scalar = supportScalar(location, variation.axes) / scale
+                    for point, coordinate in zip(total, variation.coordinates):
+                        self.assertIsNotNone(coordinate)
+                        for axis in (0, 1): point[axis] += scalar * coordinate[axis]
+                return total
+            self.assertEqual(deltas(original, source_location, 1),
+                             deltas(candidate, target_location, 8))
+        self.assertTrue(report['scale_before_restriction'])
+        self.assertTrue(report['serialized_candidate_reopened'])
+        self.assertFalse(report['application_compensation'])
+        self.assertFalse(report['font_conversion_accepted'])
+        self.assertEqual(report['physical_error_bound'], 'NOT_ESTABLISHED')
+
+    def test_precision8_HarfBuzz_model_accuracy_and_raw_grid_difference_are_separate(self):
+        import uharfbuzz as hb
+        from fontTools.varLib.varStore import VarStoreInstancer
+        original = q_font(weight_delta=1)
+        candidate, _ = rebase_design_font_precision8(original, source_axes())
+        retained_metric_failures, maximum_raw_difference = 0, 0.
+        for weight in (-.5, -.25, -.125, 0., .125, .25, .5):
+            reference = hb.Font(hb.Face(serialize(original)))
+            target = hb.Font(hb.Face(serialize(candidate)))
+            for font in (reference, target):
+                hb.ot_font_set_funcs(font)
+                font.scale = (64000, 64000)  # same physical output scale
+            reference.set_variations({'XWDT': .375, 'XWGT': weight, 'XHGT': -.25})
+            target.set_variations({'WDTH': 687.5, 'wght': 500 + 800*weight, 'HGHT': 375.25})
+            hvar = original['HVAR'].table
+            model = VarStoreInstancer(hvar.VarStore, original['fvar'].axes,
+                        {'XWDT': .375, 'XWGT': weight, 'XHGT': -.25})
+            for gid, name in enumerate(original.getGlyphOrder()):
+                expected = original['hmtx'].metrics[name][0] + model[hvar.AdvWidthMap.mapping[name]]
+                self.assertEqual(target.get_glyph_h_advance(gid), expected * 64)
+                difference = abs(target.get_glyph_h_advance(gid) - reference.get_glyph_h_advance(gid)) / 64
+                retained_metric_failures += difference > 1/32
+                maximum_raw_difference = max(maximum_raw_difference, difference)
+        # The same physical output scale exposes native source-grid rounding;
+        # improving the data model must not relabel raw API parity as passed.
+        self.assertEqual(retained_metric_failures, 42)
+        self.assertEqual(maximum_raw_difference, 3/8)
+
+    def test_precision8_three_sixteenths_is_still_not_a_universal_error_bound(self):
+        from fontTools.varLib.varStore import VarStoreInstancer
+        original = q_font(weight_delta=1)
+        three_sixteenths = ((-16384, -16384), (-16384, -3072), (0, 0),
+                            (16384, 3072), (16384, 16384))
+        axes = tuple(SourceAxis(axis.tag, axis.minimum, axis.default, axis.maximum,
+                      three_sixteenths if axis.tag == 'wght' else axis.records) for axis in source_axes())
+        candidate, report = rebase_design_font_precision8(original, axes)
+        a, b = original['HVAR'].table, candidate['HVAR'].table
+        src = VarStoreInstancer(a.VarStore, original['fvar'].axes, {'XWGT': 3/16})
+        dst = VarStoreInstancer(b.VarStore, candidate['fvar'].axes, {'wght': 1.})
+        expected = src[a.AdvWidthMap.mapping['A']]
+        actual = dst[b.AdvWidthMap.mapping['A']] / 8
+        self.assertEqual(expected, 3/16)
+        self.assertEqual(actual, 1/4)
+        self.assertEqual(abs(expected - actual), 1/16)
+        self.assertGreater(abs(expected - actual), 1/32)
+        self.assertFalse(report['font_only_equivalence_accepted'])
+        self.assertFalse(report['lossless_conversion'])
+
+    def test_precision8_all_six_source_UPM_families_remain_legal(self):
+        for upem in (1000, 1028, 1064, 1100, 1128, 1144):
+            with self.subTest(upem=upem):
+                original = q_font(weight_delta=1)
+                original['head'].unitsPerEm = upem
+                candidate, report = rebase_design_font_precision8(original, source_axes())
+                self.assertEqual(candidate['head'].unitsPerEm, upem * 8)
+                self.assertEqual(report['source_units_per_em'], upem)
+                self.assertEqual(candidate['hmtx'].metrics['A'],
+                                 tuple(v*8 for v in original['hmtx'].metrics['A']))
+
+    def test_precision8_rejects_UPM_geometry_and_variation_field_overflow(self):
+        for case in ('UPM', 'glyf', 'gvar'):
+            original = q_font(weight_delta=5000 if case == 'gvar' else 1)
+            if case == 'UPM': original['head'].unitsPerEm = 3000
+            if case == 'glyf': original['glyf']['A'].coordinates[1] = (10000, 600)
+            with self.subTest(case=case), self.assertRaisesRegex(ValueError, 'precision8_'):
+                rebase_design_font_precision8(original, source_axes())
+
+    def test_precision8_rejects_unscaled_unsupported_tables_and_lazy_hint_programs(self):
+        for tag in ('VORG', 'cvt ', 'morx'):
+            original = q_font(weight_delta=1)
+            original[tag] = newTable(tag)
+            with self.subTest(table=tag), self.assertRaisesRegex(ValueError, 'precision8_unsupported_table'):
+                rebase_design_font_precision8(original, source_axes())
+        from fontTools.ttLib.tables.ttProgram import Program
+        original = q_font(weight_delta=1)
+        original['glyf']['A'].program = Program()
+        original['glyf']['A'].program.fromBytecode([0x00])
+        lazy = TTFont(io.BytesIO(serialize(original)), lazy=True, recalcTimestamp=False)
+        with self.assertRaisesRegex(ValueError, 'precision8_hint_program_not_supported'):
+            rebase_design_font_precision8(lazy, source_axes())
+
     def test_all_three_clipped_axes_preserve_mixed_gvar_and_VVAR_endpoints(self):
         import itertools
         original = q_font()
@@ -233,6 +352,53 @@ class RebaseDesignFontTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'nonanchor_metadata'):
             rebase_design_font(font, source_axes())
         self.assertEqual(font['fvar'].instances[0].coordinates['XWGT'], 1.)
+
+
+    def test_precision8_rejects_dimensionless_MVAR_caret_scaling(self):
+        from fontTools.ttLib.tables import otTables
+        from fontTools.ttLib.scaleUpem import scale_upem
+        from fontTools.varLib.varStore import OnlineVarStoreBuilder, VarStoreInstancer
+        original = q_font()
+        original.recalcTimestamp = False
+        original['hhea'].caretSlopeRise = 1
+        original['hhea'].caretSlopeRun = 0
+        builder = OnlineVarStoreBuilder([axis.axisTag for axis in original['fvar'].axes])
+        builder.setSupports([{'XWGT': (0, 1, 1)}])
+        index = builder.storeDeltas([2])
+        table = newTable('MVAR')
+        table.table = otTables.MVAR()
+        table.table.Version = 0x10000
+        table.table.Reserved = 0
+        table.table.ValueRecordSize = 8
+        table.table.ValueRecordCount = 1
+        table.table.VarStore = builder.finish()
+        record = otTables.MetricsValueRecord()
+        record.ValueTag = 'hcrn'
+        record.VarIdx = index
+        record.MoreBytes = []
+        table.table.ValueRecord = [record]
+        original['MVAR'] = table
+        before = serialize(original)
+
+        def caret_ratio(font):
+            store = font['MVAR'].table
+            delta = VarStoreInstancer(store.VarStore, font['fvar'].axes,
+                                     {'XWGT': .5})[store.ValueRecord[0].VarIdx]
+            return font['hhea'].caretSlopeRise / (font['hhea'].caretSlopeRun + delta)
+
+        # Independently demonstrate why a generic design-unit VarData scaler
+        # cannot be admitted here: caret rise/run define a dimensionless ratio.
+        # The base remains1/0 but the variation delta is incorrectly scaled8x.
+        upstream = TTFont(io.BytesIO(before), recalcTimestamp=False)
+        try:
+            scale_upem(upstream, original['head'].unitsPerEm * 8)
+            self.assertEqual(caret_ratio(original), 1.)
+            self.assertEqual(caret_ratio(upstream), .125)
+        finally:
+            upstream.close()
+        with self.assertRaisesRegex(ValueError, 'precision8_unsupported_table'):
+            rebase_design_font_precision8(original, source_axes())
+        self.assertEqual(serialize(original), before)
 
 
 if __name__ == '__main__':
