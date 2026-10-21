@@ -1,5 +1,14 @@
 # D1 macOS source baseline and cross-platform delivery — 2026-10-21
 
+D3 source is now saved as **fddb0f81c76a21113b26fd37a35c3f38f0709ddd**:
+three production admission/recovery defects repaired (GDEF variation-store
+omission, stale checkpoint writer data loss, and native identity type aliasing).
+Local 616 passed + 7 skips; Windows Server targeted/native controls pass;
+Mac strict 849/850 remains failed. **A3/B1 original build gates remain blocked;
+no original-derived TTC is generated.** Final D3 CI evidence is
+[SWIRL_VF_D3_CI_20261021.json](evidence/SWIRL_VF_D3_CI_20261021.json).
+See the D3 sections at the end for exact source scope and recovery commands.
+
 D2 continuation is now complete for its bounded scope: 32 × 34 × 15 native
 samples passed the existing combined comparison on both Mac hosts; all original
 96 strict axis failures are diagnosed and retained; fresh-UPEM synthetic metric
@@ -844,3 +853,79 @@ on its owner's branch, unmerged. Its completed staging work should be reused
 after coordinator review defines an achievable source/target axis and vertical
 layout contract. Actual Qt/Swirl acceptance is NOT_RUN; this Mac has no detected
 Qt6 development CLI/toolchain and no accepted original conversion to load.
+
+## D3 final CI, reviewed changes and recovery
+
+Final tested production source:
+**`fddb0f81c76a21113b26fd37a35c3f38f0709ddd`**.
+[Run 39541637771](https://github.com/SOLHK/Swirl/actions/runs/39541637771)
+completed **failure**, with the actual final job states and complete Mac/Windows
+job logs independently read.
+
+| Actual job | Result | Evidence boundary |
+| --- | --- | --- |
+| Mac 119030483024 | **failure** | macOS15.7.9: D1 8, D2 13, D3 12 and existing checkpoint13 tests all pass; real native/table reconstruction and new GDEF identity/HarfBuzz checks pass; unchanged strict849/850 gate fails |
+| Windows 119030483284 | **success** | Server2022 Datacenter build20348: D2 13 + D3 12 + checkpoint13 pass, including real separate-process lock contention/death; DirectWrite synthetic3/3 and2/2 faces, 10 rasters each |
+| Original D2 119030484506 | **skipped** | No new original sample claimed in this final source run; unchanged costly matrix remains manually callable |
+
+The earlier same-branch first-source push also automatically executed original
+job **119026568458**, [39540402958](https://github.com/SOLHK/Swirl/actions/runs/39540402958),
+at `1c90c4d`. Its complete actual log was read: exact source, macOS27.0.1 /
+26A434, 32/32 identities, **288/384 strict axis passes, 96 retained failures**,
+96/96 separate controls. The bounded HVF set executes **16,320/16,320 combined
+passes**, with all64 old rejections retained and companion64/64; max point error
+1.3073986337985843e-12, unchanged1/32, 310.444s, source unchanged. This repeats
+the established D2 result; it is not an additional mapping or font acceptance.
+No expensive all47,102-GID/all-axis/all-face sweep was launched.
+
+Machine-readable evidence contains extracted safe summaries only:
+[evidence/SWIRL_VF_D3_CI_20261021.json](evidence/SWIRL_VF_D3_CI_20261021.json).
+CI artifact ZIPs were not downloaded or independently rehashed; no unseen ZIP
+content is claimed verified. No Apple font, derivative, raw source outline or
+private log is committed or exported. The final local original SHA is still
+39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890.
+
+Production checkpoints saved to this branch, in order:
+
+- `1c90c4d93527b20c0430e59973ad80885b55b889`: GDEF preflight repair.
+- `e45d63bdc6a7110d43d1df8d66e2ce3a1969fa75`: confirmed-face recovery/writer repair.
+- `216df0f60e910eae5a80c0518f68747785512015`: Windows readiness byte transport repair.
+- `fddb0f81c76a21113b26fd37a35c3f38f0709ddd`: typed native face/GID/axis observation repair.
+
+The preserved local971c1d7, one-shot a070ea4 and own-branch343460c history are
+explained above; the temporary workflow is removed in e45d63b. No other window's
+branch was merged or changed. The integration branch independently advanced
+00b9f50→f87b6f9 during this work and was only fetched, never overwritten or merged.
+PR23 remains draft/open/unmerged; raw GitHub reports mergeable=true but
+mergeable_state=unstable due to checks, not clean CI. Final integration order
+and overlapping rebuild.py review belong to the integration owner. A local
+read-only `git merge-tree --write-tree` check against integration
+`f87b6f98eb7018c4a5e86f281fe707764565ce58` returned exit0 (no textual conflicts),
+virtual tree5606b511985b3180b70aea57e5c09f5c7ebe979f. This only wrote an
+unreferenced Git tree object; no branch/ref or working file was merged.
+
+### Direct next commands
+
+In this same isolated worktree, after fetching and inspecting the current branch:
+
+```sh
+build/vf-d1-private/venv/bin/python -m unittest discover -s tools/swirl_vf/tests -p 'test_d3*.py' -v
+build/vf-d1-private/venv/bin/python -m unittest discover -s tools/swirl_vf/tests -q
+build/vf-d1-private/venv/bin/python tools/swirl_vf/platform/test_d3_rebuild_guards.py \
+  --binary build/vf-d3-private/table-metrics-stage3/coretext_extract \
+  --output build/vf-d3-private/native-guards-next
+```
+
+The output directory must be fresh. Native regeneration, if production code
+changes again, uses the existing `platform/test_native_table_metrics.py --output
+FRESH_PRIVATE_DIRECTORY --require-native`. It preserves the raw strict failure;
+it is not permission to promote SourceTables to CoreText API values.
+
+**Outstanding:** no accepted universal Apple user-to-design mapping, no portable
+representation satisfying the original independent vertical X contract, no
+original completed GID model or face. C1 original engine admission is still
+blocked. No accepted original `Swirl-VF.ttc` exists locally or remotely. The old
+3424-byte retained synthetic control remains only at
+`build/vf-d1-private/retained-synthetic-control/Swirl-VF.ttc`; it is not a new
+D3 original deliverable. Windows11 desktop, original DirectWrite/installation,
+actual Qt/Swirl and application rendering remain **NOT_RUN**.
