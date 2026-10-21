@@ -14,14 +14,16 @@ import uharfbuzz as hb
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 from bounded_rebase import bounded_rebase, exact_rebase
-from continuous_model import evaluate_model
-from font_model_certificate import advance_models
+from continuous_model import EndpointTransform, evaluate_model
+from font_model_certificate import advance_models, certify_font_models
 from metric_variations import add_metric_variations
 from precision_metrics import scale_with_precision_metrics
 from make_target_axis_controls import authored_control_face, ORDER, IDENTITY
 from target_axis_mapping import SourceAxis
 from rebuild import sha256, verify_collection_tables
 from ttc_staging_pack import pack_collection
+from rebase_design_font import _serialized_precision_font
+from avar2_rounding_control import make_avar2_control
 
 LIMIT = F(1, 32)
 CLIP = ((-16384, -16384), (-16384, -3072), (0, 0),
@@ -65,7 +67,7 @@ def _path(font):
     return commands
 
 
-def trace(reference, target, multiplier, q=Q, r=R, user=USER):
+def trace(reference, target, multiplier, q=Q, r=R, user=USER, *, target_in_q=False):
     """Actual HB callbacks at several explicit scales; none is a pixel raster."""
     models = [advance_models(f) for f in (reference, target)]
     native = [hb.Font(hb.Face(_blob(f))) for f in (reference, target)]
@@ -76,7 +78,7 @@ def trace(reference, target, multiplier, q=Q, r=R, user=USER):
     actual = [tuple(F(round(v*16384), 16384) for v in f.get_var_coords_normalized())
               for f in native]
     values = [evaluate_model(m['HVAR', 'A'], c)[0] for m, c in zip(models, actual)]
-    ideal_q = (actual[1][0], actual[1][1]*F(3, 16), actual[1][2])
+    ideal_q = actual[1] if target_in_q else (actual[1][0], actual[1][1]*F(3, 16), actual[1][2])
     composed = evaluate_model(models[0]['HVAR', 'A'], ideal_q)[0]
     rows = []
     for scale in (1000, 64000, 128000, reference['head'].unitsPerEm):
@@ -98,6 +100,7 @@ def trace(reference, target, multiplier, q=Q, r=R, user=USER):
     return {'GID': 2, 'requested_q': list(map(str, q)), 'requested_pre_avar_r': list(map(str, r)),
         'ideal_unquantized_q': list(map(str, ideal_q)),
         'target_user': user, 'source_UPM': 1000, 'native_font_UPM': reference['head'].unitsPerEm,
+        'target_post_avar_space': 'source_q' if target_in_q else 'rebased_r',
         'multiplier': multiplier, 'decoded_HVAR_ideal_native_units': list(map(str, values)),
         'decoded_HVAR_ideal_source_units': [str(v/multiplier) for v in values],
         'coefficient_error_source_units': str(abs(composed-values[1])/multiplier),
@@ -116,9 +119,16 @@ def generate(output):
     source = authored_source()
     axes = tuple(SourceAxis(tag, *PROFILES[tag], CLIP if tag == 'wght' else IDENTITY) for tag in ORDER)
     records = {}
-    for name, rebase in (('bounded5', bounded_rebase), ('exact16', exact_rebase)):
-        target, report = rebase(source, axes)
-        n = report['selected_multiplier']
+    for name, rebase in (('bounded5', bounded_rebase), ('exact16', exact_rebase), ('avar2q', None)):
+        target_in_q = rebase is None
+        if target_in_q:
+            target = _serialized_precision_font(make_avar2_control(source, axes))
+            n = 1
+            report = {'continuous_model_certificate': certify_font_models(
+                source, target, EndpointTransform(), target_upem_multiplier=1)}
+        else:
+            target, report = rebase(source, axes)
+            n = report['selected_multiplier']
         reference = scale_with_precision_metrics(source, 1000*n)
         paths = {}
         for kind, font in (('reference', reference), ('target', target)):
@@ -133,13 +143,26 @@ def generate(output):
             pack_collection([path], output/f'{name}-{kind}.ttc',
                             expected_sha256=[sha256(path)], validate=verify)
         records[name] = {'continuous_certificate': report['continuous_model_certificate'],
-                         'coefficient_witness': trace(reference, target, n),
-                         'F2_input_witness': trace(reference, target, n, F2_Q, F2_R, F2_USER),
+                         'coefficient_witness': trace(reference, target, n, target_in_q=target_in_q),
+                         'F2_input_witness': trace(reference, target, n, F2_Q, F2_R, F2_USER,
+                                                   target_in_q=target_in_q),
+                         'avar2_platform_compatibility': 'NOT_ESTABLISHED' if target_in_q else 'NOT_APPLICABLE',
                          'font_SHA256': {kind: sha256(path) for kind, path in paths.items()}}
         reference.close(); target.close()
+    source_native = hb.Font(hb.Face(_blob(source)))
+    source_native.scale = (64000, 64000)
+    unscaled = {}
+    for case, q in (('coefficient_witness', Q), ('F2_input_witness', F2_Q)):
+        source_native.set_variations(dict(zip(('XWDT', 'XWGT', 'XHGT'), map(float, q))))
+        raw = source_native.get_glyph_h_advance(2)
+        unscaled[case] = {'UPM': 1000, 'HB_scale': 64000, 'GID2_h_advance_raw': raw,
+            'candidate_differences_source_units': {
+                name: str(F(abs(next(s for s in data[case]['scales'] if s['font_scale']==64000)
+                                 ['h_advance_raw'][1]-raw), 64)) for name, data in records.items()},
+            'scope': 'self_authored_unscaled_source_API_contract_not_Apple_acceptance'}
     source.close()
     summary = {'status': 'AUTHORED_ROUNDING_DIAGNOSTIC_NOT_ACCEPTANCE',
-        'HarfBuzz': hb.version_string(), 'controls': records,
+        'HarfBuzz': hb.version_string(), 'controls': records, 'unscaled_reference': unscaled,
         'strict_limit_source_units': LIMIT, 'original_font': 'NOT_RUN', 'Windows11': 'NOT_RUN',
         'production_accepted': False, 'font_only_equivalence_accepted': False}
     with (output/'summary.json').open('x') as stream:

@@ -143,3 +143,76 @@ unaccepted. General original HVF extraction/model certification, unsupported
 hinting/table semantics, MVAR reparameterization and full VORG/native behavior
 still need their existing gates. Original first face is NOT_BUILT; original
 32-face TTC, Windows11, real Qt/Swirl and third-party software are NOT_RUN.
+
+## Actual native checkpoint e003a16
+
+Saved/pushed `e003a164135dd8eb5a12b7e1f2b20a02a7f137ad`.
+[P6 CI39578993915](https://github.com/SOLHK/Swirl/actions/runs/39578993915):
+exact-reference PASS, CoreText PASS, Windows-native FAIL specifically at the
+unchanged strict nominal-witness gate after successful compilation, all four
+native diagnostics and the narrow coefficient-fix assertion.
+[Existing CI39578993738](https://github.com/SOLHK/Swirl/actions/runs/39578993738)
+also passed all three jobs; it was automatically triggered by source changes.
+
+Actual Server2022/10.0.20348 results (self-authored GID2 only):
+
+| Case | Integer advanceWidth pair | Single upright point difference at em=UPM | Strict |
+| --- | --- | ---: | --- |
+|5x old witness|1462/1463|0.2 source FUnit|FAIL|
+|16x old witness|4680/4680|0|PASS|
+|5x new nominal witness|1491/1491|0|PASS|
+|16x new nominal witness|4772/4771|1/16 source FUnit|FAIL|
+
+Every diagnostic checked14 integer metric fields,36 outline runs and240 point
+pairs with zero topology failures. Six em sizes were used: fontUPM,1000,
+1000.5,12,12.5,16.25 DIP, each with upright/sideways single-glyph, repeated
+implicit-advance and repeated explicit-integer-advance runs. Old5x has2 metric
+field failures and204 point-pair failures; new16x nominal has2 and124.
+Repeated glyphs accumulate both outline and advance differences: maxima are
+0.40006852042728636 and0.12500469501201922 respectively after physical
+normalization. These are floating geometry results, not raster pixel errors.
+At em=UPM the new nominal repeated horizontal translation is4772/4771 target
+units; vertical translations agree. DWrite native post-avar coordinates and
+its proprietary internal operation order remain NOT_OBSERVED. Actual integer
+design results match the independent threshold calculation; that does not
+prove DWrite implements HarfBuzz's source code or every tie rule.
+
+P6 CoreText CI actually ran macOS15.7.9/build24G830, distinct from the local
+macOS26.3 and the existing macOS27 original-source workflow. All four authored
+cases completed; the important exact16 nominal advance error remains1/262144,
+outline error0. Windows11 and original converted-font acceptance remain NOT_RUN.
+
+## Alternative representation experiment: unchanged source grid
+
+The new source-contract regression explicitly compares the unscaled authored
+UPM1000 reference to the16x target: HB18688/18720, difference1/2 source FUnit.
+Thus changing BOTH reference and target UPEM for coefficient isolation does
+not establish preservation of the original reference's native API contract.
+That failure is now executable and retained, as are all earlier failures.
+
+`avar2_rounding_control.py` is a tightly restricted seven-glyph authored
+compatibility fixture, not a converter or production option. It keeps UPEM1000
+and raw glyf/gvar/HVAR/VVAR/hmtx/vmtx/cmap bytes unchanged. Existing compiled
+staircase segment maps embed source integer q into r, then a post-segment
+avar2 VarStore contracts weight by3/16 and rounds back to integer q. Because
+the decode error bound is3/32 of ONE F2 integer (<1/2), this recovers every
+integer q in[-3072,3072]. It avoids rounding fractional rebased coefficients.
+
+Actual HB14.6 tests: all6,145 integer q recoveries, all32,769 nominal F2 weight
+inputs and three mixed nominal cases pass. All seven GIDs' H/V advances and
+extents agree at those three cases, and the native UPEM remains unchanged.
+Local CoreText actually completes both principal cases with zero advance,
+outline and baseline differences at all four sizes (16 records/8 exact reverse
+pairs per case). Post-avar coordinates remain opaque there.
+
+This does not prove between-grid binary64 input equivalence, full original
+axes, original glyphs or Windows compatibility. The Microsoft published
+[OpenType1.9.1 avar page](https://learn.microsoft.com/en-us/typography/opentype/spec/avar)
+documents v1. The [HarfBuzz avar2 design](https://github.com/harfbuzz/boring-expansion-spec/blob/main/avar2.md)
+and fontTools public builders inform this independent experiment. ISO OFF
+[edition5 was published July2026](https://www.iso.org/standard/14496-22), but
+its final avar2 text has not been inspected; no unsupported claim of universal
+standard compliance is made. The dated [Google Fonts support matrix](https://googlefonts.github.io/how2avar2/docs/support/)
+is a reason to test current native engines, not evidence of this candidate's
+DirectWrite behavior. Windows/CI results for this new alternative are pending
+at this checkpoint. COMPATIBILITY remains NOT_VERIFIED and production false.

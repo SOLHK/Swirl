@@ -48,6 +48,23 @@ class ExactRebaseTests(unittest.TestCase):
         self.assertTrue(all(row['endpoint_metric_lower_bound'] > 0
                             for row in error.exception.attempts))
 
+    def test_equal_scaled_reference_is_not_unscaled_source_native_acceptance(self):
+        import uharfbuzz as hb
+        source = q_font(1)
+        target, report = exact_rebase(source, clipped_axes())
+        values = []
+        for font, coords in (
+            (source, {'XWDT': 63/16384, 'XWGT': 3/16, 'XHGT': 0}),
+            (target, {'WDTH': 501.922607421875, 'wght': 900, 'HGHT': 500})):
+            native = hb.Font(hb.Face(serialize(font)))
+            native.scale = (64000, 64000)
+            native.set_variations(coords)
+            values.append(native.get_glyph_h_advance(2))
+        self.assertEqual(values, [18688, 18720])
+        self.assertEqual(F(abs(values[0]-values[1]), 64), F(1, 2))
+        self.assertGreater(F(abs(values[0]-values[1]), 64), F(1, 32))
+        self.assertFalse(report['production_accepted'])
+
 
 if __name__ == '__main__':
     unittest.main()

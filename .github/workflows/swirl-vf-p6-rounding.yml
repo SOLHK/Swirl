@@ -9,6 +9,8 @@ on:
       - 'tools/swirl_vf/tests/test_native_rounding.py'
       - 'tools/swirl_vf/tests/test_exact_rebase.py'
       - 'tools/swirl_vf/tests/test_precision_coretext.py'
+      - 'tools/swirl_vf/tests/test_avar2_rounding_control.py'
+      - 'tools/swirl_vf/platform/avar2_rounding_control.py'
       - 'tools/swirl_vf/platform/make_rounding_controls.py'
       - 'tools/swirl_vf/platform/precision_rounding_trace.cpp'
       - 'tools/swirl_vf/platform/precision_rounding_trace/**'
@@ -37,6 +39,7 @@ jobs:
           python -m unittest discover -s tools/swirl_vf/tests -p test_native_rounding.py -v
           python -m unittest discover -s tools/swirl_vf/tests -p test_exact_rebase.py -v
           python -m unittest discover -s tools/swirl_vf/tests -p test_precision_coretext.py -v
+          python -m unittest discover -s tools/swirl_vf/tests -p test_avar2_rounding_control.py -v
       - name: Serialize authored one-face controls and observe HarfBuzz
         run: python tools/swirl_vf/platform/make_rounding_controls.py --output build/p6-private/controls
       - uses: actions/upload-artifact@v4
@@ -67,12 +70,12 @@ jobs:
           from probe_precision_coretext import run_pair, AXES, Q, R
           from make_rounding_controls import F2_Q, F2_R, F2_USER
           root=Path('build/p6-private')
-          for grid,n in [('bounded5',5),('exact16',16)]:
+          for grid,n in [('bounded5',5),('exact16',16),('avar2q',1)]:
               for case,q,r,axes in [('coefficient',Q,R,AXES),('F2',F2_Q,F2_R,{
                   'reference':dict(zip(('XWDT','XWGT','XHGT'),map(float,F2_Q))), 'target':F2_USER})]:
                   result=run_pair(root/'controls'/f'{grid}-reference.ttf',
                       root/'controls'/f'{grid}-target.ttf', root/f'{grid}-{case}',
-                      grid_multiplier=n,axes=axes,q=q,r=r,case_name=f'{grid}-{case}')
+                      grid_multiplier=n,axes=axes,q=q,r=q if grid=='avar2q' else r,case_name=f'{grid}-{case}')
                   assert all(result['source_hashes_unchanged'].values())
                   print(json.dumps({k:result[k] for k in ('case_name','os_version',
                       'maximum_native_advance_error','maximum_native_outline_error')}))
@@ -128,6 +131,19 @@ jobs:
           $new = Get-Content build/p6-private/controls/exact16-coefficient-directwrite.json -Raw | ConvertFrom-Json
           if ($old.strict_result -ne 'FAIL') { throw 'Original strict failure unexpectedly changed' }
           if ($new.strict_result -ne 'PASS') { throw 'Exact-grid coefficient witness still fails' }
+      - name: Observe alternative avar2 source-grid representation without accepting it
+        run: |
+          foreach ($case in @('coefficient','F2')) {
+            $extra = @()
+            if ($case -eq 'F2') { $extra = @('--f2-witness') }
+            & build/p6-private/probe/Release/precision_rounding_trace.exe build/p6-private/controls/avar2q-reference.ttf build/p6-private/controls/avar2q-target.ttf "build/p6-private/controls/avar2q-${case}-directwrite.json" @extra
+            $code = $LASTEXITCODE
+            if (-not (Test-Path "build/p6-private/controls/avar2q-${case}-directwrite.json")) { throw 'Alternative probe produced no evidence' }
+            Write-Output "Authored avar2 diagnostic exit=$code; compatibility is determined by saved native observations."
+          }
+          # Probe failure is retained as an unsupported/incomplete experiment;
+          # it cannot authorize this representation or bypass the gate below.
+          exit 0
       - name: Retain the unchanged strict gate on the new nominal-coordinate witness
         run: |
           $r = Get-Content build/p6-private/controls/exact16-F2-directwrite.json -Raw | ConvertFrom-Json
