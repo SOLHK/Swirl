@@ -686,6 +686,7 @@ fn connect_host(core: &Core, host: &str, port: u16, expected_status: u16) -> Tcp
         "CONNECT {host}:{port} HTTP/1.1\\r\\nHost: {host}:{port}\\r\\n\\r\\n"
     )
     .unwrap();
+    eprintln!("awaiting CONNECT response for {host}:{port}, expected {expected_status}");
     let response = header(&mut stream);
     assert!(
         response.starts_with(format!("HTTP/1.1 {expected_status}").as_bytes()),
