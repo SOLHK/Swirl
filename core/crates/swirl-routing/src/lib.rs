@@ -146,7 +146,8 @@ pub fn select_with_trace_and_china<'a>(
     choose: &impl Fn(&str) -> Result<String, &'static str>,
     china: Option<(&ChinaRules, &ChinaRules)>,
 ) -> Result<TracedDecision<'a>, &'static str> {
-    let (cn_domains, cn_ips) = china.map_or((None, None), |(domains, ips)| (Some(domains), Some(ips)));
+    let (cn_domains, cn_ips) =
+        china.map_or((None, None), |(domains, ips)| (Some(domains), Some(ips)));
     let host = host.to_ascii_lowercase();
     let ip = host.parse::<std::net::IpAddr>().ok();
     // Do not expose results to earlier no-resolve rules on the second pass:
