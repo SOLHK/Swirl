@@ -420,7 +420,8 @@ mod tests {
                 &domain,
                 Behavior::IpCidr,
                 "e92bda4f0b9f05623663a882331a320ab4e266cada2046d3828a94572cdded46"
-            ).unwrap_err(),
+            )
+            .unwrap_err(),
             "MrsBehavior"
         );
     }
