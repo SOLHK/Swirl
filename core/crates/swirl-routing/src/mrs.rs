@@ -12,6 +12,35 @@ const MRS_MAGIC: &[u8; 4] = b"MRS\x01";
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Behavior { Domain, IpCidr }
 
+static BUNDLED_RULES: std::sync::OnceLock<Result<(ChinaRules, ChinaRules), &'static str>> = std::sync::OnceLock::new();
+
+pub fn bundled_rules() -> Result<(&'static ChinaRules, &'static ChinaRules), &'static str> {
+    match BUNDLED_RULES.get_or_init(load_bundled_rules) {
+        Ok((domains, ips)) => Ok((domains, ips)),
+        Err(error) => Err(*error),
+    }
+}
+
+pub fn validate_bundled_rules() -> Result<(), &'static str> {
+    bundled_rules().map(|_| ())
+}
+
+fn load_bundled_rules() -> Result<(ChinaRules, ChinaRules), &'static str> {
+    let executable_dir = std::env::current_exe().ok().and_then(|p| p.parent().map(|p| p.to_path_buf()));
+    let packaged = executable_dir.as_ref().map(|p| p.join("rules"));
+    let source = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../src/Swirl.Quick/packaging/rules");
+    let directory = packaged.filter(|p| p.join("cn-domain.mrs").is_file() && p.join("cn-ip.mrs").is_file())
+        .unwrap_or(source);
+    let domain_bytes = std::fs::read(directory.join("cn-domain.mrs")).map_err(|_| "ChinaDomainRulesRead")?;
+    let ip_bytes = std::fs::read(directory.join("cn-ip.mrs")).map_err(|_| "ChinaIpRulesRead")?;
+    let domains = ChinaRules::parse(&domain_bytes, Behavior::Domain, "e92bda4f0b9f05623663a882331a320ab4e266cada2046d3828a94572cdded46")
+        .map_err(|_| "ChinaDomainRulesInvalid")?;
+    let ips = ChinaRules::parse(&ip_bytes, Behavior::IpCidr, "d95b3d125f6c74ce3c15e19ef794f142de91e21c3b8fb7767e76aebfabff5149")
+        .map_err(|_| "ChinaIpRulesInvalid")?;
+    Ok((domains, ips))
+}
+
 #[derive(Debug, Clone)]
 pub struct ChinaRules {
     domains: Vec<String>,
