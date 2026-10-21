@@ -1,5 +1,6 @@
 fn load_china_rules(config: &Config) -> Result<(Option<Arc<ChinaRules>>, Option<Arc<ChinaRules>>)> {
-    let Some(directory) = config.china_rules_directory.as_ref() else { return Ok((None, None)); };
+    if !config.smart_routing { return Ok((None, None)); }
+    let directory = config.china_rules_directory.as_ref().ok_or("ChinaRulesDirectoryMissing")?;
     let directory = std::path::Path::new(directory);
     let domain_path = directory.join("cn-domain.mrs");
     let ip_path = directory.join("cn-ip.mrs");
