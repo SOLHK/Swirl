@@ -267,8 +267,10 @@ jobs:
           $nsis = "C:/Program Files (x86)/NSIS/makensis.exe"
           $appDist = (Resolve-Path "installer-bin").Path
           $outDir = (Resolve-Path "out").Path
+          $appVersion = (Get-Content -LiteralPath 'src/Swirl.Quick/PRODUCT_VERSION.txt' -Raw).Trim()
+          if ($appVersion -notmatch '^\d+\.\d+\.\d+$') { throw "Invalid product version: $appVersion" }
           $icon = (Resolve-Path "build/swirl-quick/brand/Swirl.ico").Path
-          & $nsis /INPUTCHARSET UTF8 "/DAPP_DIST=$appDist" "/DOUT_DIR=$outDir" "/DAPP_ICON=$icon" "src/Swirl.Quick/packaging/Swirl.nsi"
+          & $nsis /INPUTCHARSET UTF8 "/DAPP_DIST=$appDist" "/DOUT_DIR=$outDir" "/DAPP_ICON=$icon" "/DAPP_VERSION=$appVersion" "src/Swirl.Quick/packaging/Swirl.nsi"
           if ($LASTEXITCODE -ne 0) { throw "NSIS packaging failed ($LASTEXITCODE)" }
           if (!(Test-Path "out/Swirl-Setup.exe")) { throw "Installer missing" }
           if ((Get-Item "out/Swirl-Setup.exe").Length -lt 10000000) { throw "Installer suspiciously small" }

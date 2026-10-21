@@ -13,6 +13,9 @@ Var Parameters
 !ifndef APP_ICON
 !error "APP_ICON required (generated from Swirl SVG)"
 !endif
+!ifndef APP_VERSION
+!error "APP_VERSION is required"
+!endif
 !define MUI_ABORTWARNING
 !define MUI_ICON "${APP_ICON}"
 !define MUI_UNICON "${APP_ICON}"
@@ -25,11 +28,11 @@ InstallDirRegKey HKCU "Software\\Swirl" "InstallDir"
 RequestExecutionLevel user
 ShowInstDetails show
 ShowUnInstDetails show
-VIProductVersion "1.0.0.0"
+VIProductVersion "${APP_VERSION}.0"
 VIAddVersionKey /LANG=2052 "ProductName" "Swirl"
 VIAddVersionKey /LANG=2052 "FileDescription" "Swirl 安装程序"
-VIAddVersionKey /LANG=2052 "FileVersion" "1.0.0.0"
-VIAddVersionKey /LANG=2052 "ProductVersion" "1.0.0.0"
+VIAddVersionKey /LANG=2052 "FileVersion" "${APP_VERSION}.0"
+VIAddVersionKey /LANG=2052 "ProductVersion" "${APP_VERSION}"
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
@@ -93,7 +96,7 @@ Section "安装 Swirl"
     StrCmp $0 0 +2
     DetailPrint "Swirl 任务栏图标刷新未完成，错误 $0。"
     WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "DisplayName" "Swirl"
-    WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "DisplayVersion" "1.0.0.0"
+    WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "DisplayVersion" "${APP_VERSION}"
     WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "UninstallString" '"$INSTDIR\\卸载 Swirl.exe"'
     WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "DisplayIcon" "$INSTDIR\\Swirl-brand-phase3-v2.ico"
     WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "Publisher" "Swirl"
