@@ -2,6 +2,8 @@
 
 Branch: `work/vf-takeover-abc-20261021`; parent checkpoint
 `9fff65027d6642f78f793150254c20e13e7ada2c`. PR #24 remains draft.
+Latest tested source: `72b8e289dd99782b3b3e35d3aa60005b1d5d3a09`.
+The final successor changes this handoff and whitelisted aggregate evidence only.
 
 ## First executable fix
 
@@ -216,3 +218,85 @@ standard compliance is made. The dated [Google Fonts support matrix](https://goo
 is a reason to test current native engines, not evidence of this candidate's
 DirectWrite behavior. Windows/CI results for this new alternative are pending
 at this checkpoint. COMPATIBILITY remains NOT_VERIFIED and production false.
+
+## Final actual results at 72b8e28
+
+[P6 run39580436408](https://github.com/SOLHK/Swirl/actions/runs/39580436408)
+completed: exact-reference PASS (22 targeted regressions), CoreText PASS,
+Windows-native FAIL only at the retained1/32 native acceptance gate. All six
+Windows authored traces completed, including avar2q; the experimental-format
+step records measured failures and does not accept the representation.
+[Existing run39580436278](https://github.com/SOLHK/Swirl/actions/runs/39580436278)
+completed all three jobs successfully:818 portable tests plus6 audits,
+macOS27 original source-only replay, and existing C1 synthetic DirectWrite.
+Original D2 remains288 pass/96 fail, not target-mapping acceptance.
+
+The unchanged-grid alternative is NOT a Windows delivery fix on the tested
+Server2022/build20348:
+
+| avar2q case, UPEM1000 unchanged | CoreText advance/path pair error | HB pair error | DWrite advance pair | DWrite single upright point error |
+| --- | ---: | ---: | --- | ---: |
+|old coefficient witness|0|0|292/293|1 source FUnit|
+|new nominal witness|0|0|298/299|1 source FUnit|
+
+CoreText CI actually tested macOS15.7.9 and reproduced the zero pair errors
+seen locally on macOS26.3. DWrite loads the font and matches its raw tables,
+but fails the required mapping behavior; no claim about its internal handling
+of avar2 or all versions of Windows follows. Repeated-run geometry maxima are
+2.0000457763671875 and2.0000985835207397 source FUnits. The UPEM1000 protocol
+retains both fontUPM and1000 em entries (five unique em sizes, six entries),
+so these are bounded diagnostics, not independent sampling counts.
+
+There is **no accepted cross-software font-level fix yet**. The exact16 route
+removes the old coefficient-induced mismatch in the same-scaled-reference
+control, while a real nominal-coordinate1/16 failure and the unscaled-source
+1/2 failure remain. The avar2q route preserves the original authored grid and
+works in HB/CoreText's tested domain but fails actual DWrite here. This is
+stronger evidence than assuming either all native engines round identically
+or every smaller ideal-model error must improve native output.
+
+All scalar errors are in ORIGINAL source FUnits after explicit UPEM/em-size
+normalization. Design-model1/32, source/target native-API1/32 and geometry/run
+1/32 checks are independent. No device-pixel or antialiasing equivalence is
+claimed; none of these criteria replaces an existing strict production gate.
+Conditional threshold bounds do not prove a universal OpenType impossibility.
+MVAR/VORG full native support is still NOT_ESTABLISHED, unchanged by P6.
+
+Machine-readable evidence, containing only fixed self-authored aggregates:
+[`docs/evidence/SWIRL_VF_P6_NATIVE_ROUNDING_20261021.json`](evidence/SWIRL_VF_P6_NATIVE_ROUNDING_20261021.json).
+No font, raw Apple glyph data, private log or credential is committed/exported.
+Latest local authored controls are under
+`build/vf-takeover-private/p6/controls-stage5/` (three reference/target pairs,
+TTF and C1-verified single-face TTC); these are NOT `Swirl-VF.ttc`.
+
+### Resume without repeating earlier sweeps
+
+Current worktree is `~/Swirl-worktrees/vf-takeover-abc`, PR #24 stacked on
+PR #23's unchanged D1 head54e579f. Source commits in this round:
+
+- `5dce5e0d0df357961ae28325348341d788f0d308`: exact coefficient-grid path.
+- `e003a164135dd8eb5a12b7e1f2b20a02a7f137ad`: rounding reference, real nominal
+  counterexample and actual CoreText/DirectWrite diagnostics.
+- `72b8e289dd99782b3b3e35d3aa60005b1d5d3a09`: unscaled-native contract failure,
+  avar2q authored control and platform experiment.
+
+For a relevant source change only, targeted commands are:
+
+```sh
+PY=../vf-macos-windows-d1/build/vf-d1-private/venv/bin/python
+"$PY" -m unittest discover -s tools/swirl_vf/tests -p test_native_rounding.py -v
+"$PY" -m unittest discover -s tools/swirl_vf/tests -p test_exact_rebase.py -v
+"$PY" -m unittest discover -s tools/swirl_vf/tests -p test_avar2_rounding_control.py -v
+"$PY" tools/swirl_vf/platform/make_rounding_controls.py --output build/vf-takeover-private/p6/NEW_FRESH_DIRECTORY
+```
+
+Use the checked-in P6 workflow for the native build/measurement commands.
+Next useful independent work is actual Windows11 testing of these same small
+controls and verification of a supported source-q representation, including
+between-grid inputs. Do not substitute Windows HB support for DirectWrite
+support, or enable original reconstruction on the strength of these controls.
+Original first-face/32-face build, installation, third-party Windows software
+and real Qt/Swirl remain NOT_RUN/NOT_BUILT. Integration-owner review is needed;
+PR #23/#24 are not merged. No A3/B1/C1/W1/Core branch is modified or merged.
+Other windows' remote updates were observed and preserved; no concurrent
+update or conflict was detected on this dedicated branch.
