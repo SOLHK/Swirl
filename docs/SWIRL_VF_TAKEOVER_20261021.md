@@ -1,5 +1,10 @@
 # A3/B1/C1 takeover — isolated source-input repair
 
+P4 continuation: [font mapping work](SWIRL_VF_P4_FONT_MAPPING_20261021.md).
+The user's later contract resolves the previous pending question: portable
+font-file behavior takes priority; Swirl/Qt compensation cannot qualify as
+conversion. Historical checkpoint results below remain unchanged.
+
 ## Branch and preserved histories
 
 The user authorized a new isolated integration experiment because D1 contains
