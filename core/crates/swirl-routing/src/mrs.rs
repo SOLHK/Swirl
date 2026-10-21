@@ -223,16 +223,14 @@ fn decode_domains(c: &mut Cursor<'_>, count: usize) -> Result<Vec<String>, &'sta
 
     let mut out = Vec::with_capacity(count.min(65536));
     let mut path = Vec::new();
-    walk_domain(
-        0,
-        &mut path,
-        &leaves,
-        &bitmap,
-        &labels,
-        &one_positions,
-        &zero_prefix_words,
-        &mut out,
-    )?;
+    let index = DomainTrieIndex {
+        leaves: &leaves,
+        bitmap: &bitmap,
+        labels: &labels,
+        one_positions: &one_positions,
+        zero_prefix_words: &zero_prefix_words,
+    };
+    walk_domain(0, &mut path, &index, &mut out)?;
     if out.is_empty() {
         return Err("MrsDomainEmpty");
     }
@@ -251,20 +249,24 @@ fn zero_rank_before(bitmap: &[u64], zero_prefix_words: &[usize], position: usize
     zero_prefix_words[word_index] + offset - (bitmap[word_index] & mask).count_ones() as usize
 }
 
+struct DomainTrieIndex<'a> {
+    leaves: &'a [u64],
+    bitmap: &'a [u64],
+    labels: &'a [u8],
+    one_positions: &'a [usize],
+    zero_prefix_words: &'a [usize],
+}
+
 fn walk_domain(
     node: usize,
     path: &mut Vec<u8>,
-    leaves: &[u64],
-    bitmap: &[u64],
-    labels: &[u8],
-    one_positions: &[usize],
-    zero_prefix_words: &[usize],
+    index: &DomainTrieIndex<'_>,
     out: &mut Vec<String>,
 ) -> Result<(), &'static str> {
-    if node >= one_positions.len() || out.len() > MAX_ITEMS {
+    if node >= index.one_positions.len() || out.len() > MAX_ITEMS {
         return Err("MrsDomainBounds");
     }
-    if bit(leaves, node) {
+    if bit(index.leaves, node) {
         let mut key = path.clone();
         key.reverse();
         let value = String::from_utf8(key).map_err(|_| "MrsDomainUtf8")?;
@@ -273,27 +275,18 @@ fn walk_domain(
         }
         out.push(value);
     }
-    let end = *one_positions.get(node).ok_or("MrsDomainBitmap")?;
+    let end = *index.one_positions.get(node).ok_or("MrsDomainBitmap")?;
     let start = if node == 0 {
         0
     } else {
-        one_positions[node - 1] + 1
+        index.one_positions[node - 1] + 1
     };
     for position in start..end {
-        if !bit(bitmap, position) {
-            let rank = zero_rank_before(bitmap, zero_prefix_words, position);
-            let character = *labels.get(rank).ok_or("MrsDomainLabels")?;
+        if !bit(index.bitmap, position) {
+            let rank = zero_rank_before(index.bitmap, index.zero_prefix_words, position);
+            let character = *index.labels.get(rank).ok_or("MrsDomainLabels")?;
             path.push(character);
-            walk_domain(
-                rank + 1,
-                path,
-                leaves,
-                bitmap,
-                labels,
-                one_positions,
-                zero_prefix_words,
-                out,
-            )?;
+            walk_domain(rank + 1, path, index, out)?;
             path.pop();
         }
     }
