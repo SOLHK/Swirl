@@ -283,6 +283,8 @@ impl Core {
             config: Arc::new(next),
             resolver: plan.resolver.clone(),
             policies: plan.policies.clone(),
+            cn_domains: plan.cn_domains.clone(),
+            cn_ips: plan.cn_ips.clone(),
         });
         self.state.generation.fetch_add(1, Ordering::Relaxed);
         Ok(())
