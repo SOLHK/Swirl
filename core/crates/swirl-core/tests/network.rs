@@ -619,3 +619,134 @@ fn automatic_udp_association_retains_choices_after_policy_replacement() {
     assert!(core.snapshot().unwrap().udp_dropped > dropped);
     worker.join().unwrap();
 }
+
+
+fn socks5_proxy() -> (u16, thread::JoinHandle<String>) {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let worker = thread::spawn(move || {
+        let (mut client, _) = listener.accept().unwrap();
+        client.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+        let mut greeting = [0; 2];
+        client.read_exact(&mut greeting).unwrap();
+        assert_eq!(greeting[0], 5);
+        let mut methods = vec![0; greeting[1] as usize];
+        client.read_exact(&mut methods).unwrap();
+        assert!(methods.contains(&0));
+        client.write_all(&[5, 0]).unwrap();
+
+        let mut request = [0; 4];
+        client.read_exact(&mut request).unwrap();
+        assert_eq!(request[0], 5);
+        assert_eq!(request[1], 1);
+        let host = match request[3] {
+            1 => {
+                let mut bytes = [0; 4];
+                client.read_exact(&mut bytes).unwrap();
+                std::net::Ipv4Addr::from(bytes).to_string()
+            }
+            3 => {
+                let mut length = [0; 1];
+                client.read_exact(&mut length).unwrap();
+                let mut bytes = vec![0; length[0] as usize];
+                client.read_exact(&mut bytes).unwrap();
+                String::from_utf8(bytes).unwrap()
+            }
+            4 => {
+                let mut bytes = [0; 16];
+                client.read_exact(&mut bytes).unwrap();
+                std::net::Ipv6Addr::from(bytes).to_string()
+            }
+            other => panic!("unsupported SOCKS address type {other}"),
+        };
+        let mut port_bytes = [0; 2];
+        client.read_exact(&mut port_bytes).unwrap();
+        let target_port = u16::from_be_bytes(port_bytes);
+        let mut upstream = TcpStream::connect(("127.0.0.1", target_port)).unwrap();
+        client.write_all(&[5, 0, 0, 1, 127, 0, 0, 1, 0, 0]).unwrap();
+
+        let mut client_read = client.try_clone().unwrap();
+        let mut upstream_write = upstream.try_clone().unwrap();
+        let upload = thread::spawn(move || std::io::copy(&mut client_read, &mut upstream_write));
+        let _ = std::io::copy(&mut upstream, &mut client);
+        let _ = upload.join();
+        host
+    });
+    (port, worker)
+}
+
+fn connect_host(core: &Core, host: &str, port: u16, expected_status: u16) -> TcpStream {
+    let mut stream = TcpStream::connect(core.address()).unwrap();
+    stream.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+    write!(
+        stream,
+        "CONNECT {host}:{port} HTTP/1.1\\r\\nHost: {host}:{port}\\r\\n\\r\\n"
+    )
+    .unwrap();
+    let response = header(&mut stream);
+    assert!(response.starts_with(format!("HTTP/1.1 {expected_status}").as_bytes()), "{response:?}");
+    stream
+}
+
+#[test]
+fn smart_routing_executes_direct_proxy_and_reject_with_real_loopback_sockets() {
+    let rules_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../src/Swirl.Quick/packaging/rules");
+    let (proxy_port, proxy_worker) = socks5_proxy();
+    let config = Config::parse(
+        &serde_json::to_vec(&json!({
+            "schema": 1,
+            "listen": "127.0.0.1:0",
+            "selected": "proxy",
+            "smart_routing": true,
+            "china_rules_directory": rules_dir.to_string_lossy(),
+            "nodes": [
+                {"id":"direct","outbound":{"type":"direct"}},
+                {"id":"reject","outbound":{"type":"reject"}},
+                {"id":"proxy","outbound":{"type":"socks5","host":"127.0.0.1","port":proxy_port,"auth":null,"udp":false}}
+            ],
+            "rules": [
+                {"matcher":{"type":"domain","value":"blocked.example.cn"},"outbound":"reject"},
+                {"matcher":{"type":"match"},"outbound":"proxy"}
+            ],
+            "dns": {
+                "hosts": [
+                    {"name":"www.baidu.com","address":"127.0.0.1"},
+                    {"name":"www.example.com","address":"127.0.0.1"}
+                ],
+                "servers": [],
+                "tls_servers": [],
+                "use_system_hosts": true
+            }
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let core = Core::start(config).unwrap();
+
+    // A real MRS domain hit must connect directly to the local fixture.
+    let (direct_port, direct_peer) = echo();
+    let mut direct = connect_host(&core, "www.baidu.com", direct_port, 200);
+    direct.write_all(b"direct").unwrap();
+    let mut direct_reply = [0; 6];
+    direct.read_exact(&mut direct_reply).unwrap();
+    assert_eq!(&direct_reply, b"direct");
+    drop(direct);
+    direct_peer.join().unwrap();
+
+    // An unclassified hostname must use the selected SOCKS5 proxy, not DIRECT.
+    let (proxy_target_port, proxy_target) = echo();
+    let mut proxied = connect_host(&core, "www.example.com", proxy_target_port, 200);
+    proxied.write_all(b"proxied").unwrap();
+    let mut proxy_reply = [0; 7];
+    proxied.read_exact(&mut proxy_reply).unwrap();
+    assert_eq!(&proxy_reply, b"proxied");
+    drop(proxied);
+    assert_eq!(proxy_worker.join().unwrap(), "www.example.com");
+    proxy_target.join().unwrap();
+
+    // Explicit REJECT takes precedence over the MRS direct rule.
+    let mut rejected = connect_host(&core, "blocked.example.cn", 443, 502);
+    let mut unexpected = [0; 1];
+    assert!(rejected.read(&mut unexpected).is_err());
+}
