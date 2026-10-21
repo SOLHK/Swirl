@@ -172,8 +172,9 @@ mod tests {
     #[test]
     fn rejects_truncated_and_wrong_checksum_before_parsing() {
         assert_eq!(ChinaRules::parse(b"bad", Behavior::Domain, "00").unwrap_err(), "MrsCompressedSize");
+        assert_eq!(ChinaRules::parse(b"not a zstd stream but long enough", Behavior::Domain, "00").unwrap_err(), "MrsChecksum");
         let bytes = [0u8; 32];
-        assert_eq!(ChinaRules::parse(&bytes, Behavior::Domain, &[0;32]).unwrap_err(), "MrsChecksum");
+        assert_eq!(ChinaRules::parse(&bytes, Behavior::Domain, "00").unwrap_err(), "MrsChecksum");
     }
 
     fn bundled(name: &str) -> Vec<u8> {
@@ -185,25 +186,19 @@ mod tests {
     #[test]
     fn parses_bundled_mrs_assets_and_matches_domains_and_ips() {
         let domain = bundled("cn-domain.mrs");
-        let domain_hash: [u8;32] = hex_literal_domain_hash();
+        let domain_hash = "e92bda4f0b9f05623663a882331a320ab4e266cada2046d3828a94572cdded46";
         let domains = ChinaRules::parse(&domain, Behavior::Domain, &domain_hash).expect("valid domain MRS");
         assert!(domains.matches_domain("www.baidu.com"));
         assert!(domains.matches_domain("www.qq.com"));
 
         let ips = bundled("cn-ip.mrs");
-        let ip_hash: [u8;32] = hex_literal_ip_hash();
+        let ip_hash = "d95b3d125f6c74ce3c15e19ef794f142de91e21c3b8fb7767e76aebfabff5149";
         let networks = ChinaRules::parse(&ips, Behavior::IpCidr, &ip_hash).expect("valid IP MRS");
         assert!(networks.matches_ip("114.114.114.114".parse().unwrap()));
         assert!(networks.matches_ip("240e:3a1:1000::1".parse().unwrap()));
         assert!(!networks.matches_ip("8.8.8.8".parse().unwrap()));
     }
 
-    fn hex_literal_domain_hash() -> [u8;32] {
-        [0xe9,0x2b,0xda,0x4f,0x0b,0x9f,0x05,0x62,0x36,0x63,0xa8,0x82,0x33,0x1a,0x32,0x0a,0xb4,0xe2,0x66,0xca,0xda,0x20,0x46,0xd3,0x82,0x8a,0x94,0x57,0x2c,0xdd,0xed,0x46]
-    }
-    fn hex_literal_ip_hash() -> [u8;32] {
-        [0xd9,0x5b,0x3d,0x12,0x5f,0x6c,0x74,0xce,0x3c,0x15,0xe1,0x9e,0xf7,0x94,0xf1,0x42,0xde,0x91,0xe2,0x1c,0x3b,0x8f,0xb7,0x76,0x7e,0x76,0xae,0xbf,0xab,0xff,0x51,0x49]
-    }
     #[test]
     fn suffix_matching_is_label_bounded() {
         let r = ChinaRules { domains: vec!["+.example.cn".into()], networks: vec![] };
