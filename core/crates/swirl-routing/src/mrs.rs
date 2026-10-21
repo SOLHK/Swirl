@@ -548,7 +548,10 @@ mod tests {
         )
         .unwrap();
         assert!(matches!(china_ip.decision, crate::Decision::Node(n) if n.id == "direct"));
-        assert_eq!(crate::rule_label(&config, china_ip.matched_rule), "MRS:CN-IP");
+        assert_eq!(
+            crate::rule_label(&config, china_ip.matched_rule),
+            "MRS:CN-IP"
+        );
     }
 
     #[test]
