@@ -5,181 +5,28 @@ fn china_direct<'a>(
     resolved: Option<&[SocketAddr]>,
     cn_domains: Option<&ChinaRules>,
     cn_ips: Option<&ChinaRules>,
-) -> Result<Option<&'a Node>, &'static str> {
+) -> Result<Option<Decision<'a>>, &'static str> {
     if cn_domains.is_none() && cn_ips.is_none() { return Ok(None); }
     if cn_domains.is_some_and(|rules| rules.matches_domain(host)) {
         return config.nodes.iter().find(|n| matches!(n.outbound, swirl_subscription::Outbound::Direct {}))
-            .map(Some).ok_or("ChinaDirectOutboundMissing");
+            .map(|node| Some(Decision::Node(node))).ok_or("ChinaDirectOutboundMissing");
     }
     if let Some(ip) = ip {
         if cn_ips.is_some_and(|rules| rules.matches_ip(ip)) {
             return config.nodes.iter().find(|n| matches!(n.outbound, swirl_subscription::Outbound::Direct {}))
-                .map(Some).ok_or("ChinaDirectOutboundMissing");
+                .map(|node| Some(Decision::Node(node))).ok_or("ChinaDirectOutboundMissing");
         }
         return Ok(None);
     }
     if let Some(addresses) = resolved {
         if addresses.iter().any(|address| cn_ips.is_some_and(|rules| rules.matches_ip(address.ip()))) {
             return config.nodes.iter().find(|n| matches!(n.outbound, swirl_subscription::Outbound::Direct {}))
-                .map(Some).ok_or("ChinaDirectOutboundMissing");
+                .map(|node| Some(Decision::Node(node))).ok_or("ChinaDirectOutboundMissing");
         }
         return Ok(None);
     }
-    if cn_ips.is_some() { return Err("ChinaIpResolutionRequired"); }
+    if cn_ips.is_some() { return Ok(Some(Decision::Resolve)); }
     Ok(None)
-}
-
-//! Ordered routing over immutable, validated IR. No implicit DIRECT fallback.
-use std::net::{IpAddr, SocketAddr};
-mod mrs;
-pub use mrs::{Behavior as MrsBehavior, ChinaRules};
-use swirl_subscription::{Config, Matcher, Node, PolicyStrategy};
-
-pub enum Decision<'a> {
-    Node(&'a Node),
-    Resolve,
-}
-
-pub struct TracedDecision<'a> {
-    pub decision: Decision<'a>,
-    pub matched_rule: Option<usize>,
-}
-
-/// Ask for DNS only when an unresolved destination reaches a resolving CIDR.
-/// The caller retries with bounded resolver results. Earlier rules still win.
-pub fn select<'a>(
-    config: &'a Config,
-    host: &str,
-    port: u16,
-    source: IpAddr,
-    resolved: Option<&[SocketAddr]>,
-) -> Result<Decision<'a>, &'static str> {
-    select_with(config, host, port, source, resolved, &|_| {
-        Err("AutomaticPolicyRequiresRuntime")
-    })
-}
-
-/// Apply the same ordered rules with an immutable session's automatic choices.
-/// The callback must return a concrete member; it cannot replace a failed exit.
-pub fn select_with<'a>(
-    config: &'a Config,
-    host: &str,
-    port: u16,
-    source: IpAddr,
-    resolved: Option<&[SocketAddr]>,
-    choose: &impl Fn(&str) -> Result<String, &'static str>,
-) -> Result<Decision<'a>, &'static str> {
-    Ok(select_with_trace(config, host, port, source, resolved, choose)?.decision)
-}
-
-pub fn select_with_trace<'a>(
-    config: &'a Config,
-    host: &str,
-    port: u16,
-    source: IpAddr,
-    resolved: Option<&[SocketAddr]>,
-    choose: &impl Fn(&str) -> Result<String, &'static str>,
-) -> Result<TracedDecision<'a>, &'static str> {
-    select_with_trace_and_china(config, host, port, source, resolved, choose, None, None)
-}
-
-/// Apply the built-in China domain/IP providers before the terminal user MATCH
-/// rule, preserving the order of all explicit user rules.
-pub fn select_with_trace_and_china<'a>(
-    config: &'a Config,
-    host: &str,
-    port: u16,
-    source: IpAddr,
-    resolved: Option<&[SocketAddr]>,
-    choose: &impl Fn(&str) -> Result<String, &'static str>,
-    cn_domains: Option<&ChinaRules>,
-    cn_ips: Option<&ChinaRules>,
-) -> Result<TracedDecision<'a>, &'static str> {
-    let host = host.to_ascii_lowercase();
-    let ip = host.parse::<std::net::IpAddr>().ok();
-    // Do not expose results to earlier no-resolve rules on the second pass:
-    // those rules were already skipped before resolution was requested.
-    let mut dns_reached = false;
-    let mut id = config.selected.as_str();
-    let mut matched_rule = None;
-    for (index, rule) in config.rules.iter().enumerate() {
-        if matches!(rule.matcher, Matcher::Match {}) {
-            if let Some(direct) = china_direct(config, &host, ip, resolved, cn_domains, cn_ips)? {
-                return Ok(TracedDecision { decision: Decision::Node(direct), matched_rule: Some(index) });
-            }
-        }
-        let matched = match &rule.matcher {
-            Matcher::Domain { value } => host.eq_ignore_ascii_case(value),
-            Matcher::DomainSuffix { value } => {
-                let suffix = value.to_ascii_lowercase();
-                host == suffix
-                    || host
-                        .strip_suffix(&suffix)
-                        .is_some_and(|prefix| prefix.ends_with('.'))
-            }
-            Matcher::DomainKeyword { value } => host.contains(&value.to_ascii_lowercase()),
-            Matcher::Cidr { value, resolve } => {
-                if let Some(ip) = ip {
-                    value.contains(&ip)
-                } else {
-                    if *resolve {
-                        dns_reached = true;
-                        if resolved.is_none() {
-                            return Ok(TracedDecision {
-                                decision: Decision::Resolve,
-                                matched_rule: Some(index),
-                            });
-                        }
-                    }
-                    dns_reached
-                        && resolved
-                            .and_then(|a| a.first())
-                            .is_some_and(|a| value.contains(&a.ip()))
-                }
-            }
-            Matcher::SourceCidr { value } => value.contains(&source),
-            Matcher::DestinationPort { value } => port == *value,
-            Matcher::Match {} => true,
-        };
-        if matched {
-            id = &rule.outbound;
-            matched_rule = Some(index);
-            break;
-        }
-    }
-    // If there is no explicit MATCH rule, built-in providers still run
-    // before the selected-node fallback. A domain lookup is requested only
-    // after explicit rules have had their chance to match.
-    if matched_rule.is_none() {
-        if let Some(direct) = china_direct(config, &host, ip, resolved, cn_domains, cn_ips)? {
-            return Ok(TracedDecision { decision: Decision::Node(direct), matched_rule: None });
-        }
-    }
-    let mut id = id.to_owned();
-    // The validated graph has at most sixteen groups on any path. Keep this
-    // runtime bound too, so callers cannot accidentally route unvalidated IR.
-    for _ in 0..=16 {
-        if let Some(node) = config.nodes.iter().find(|n| n.id == id) {
-            return Ok(TracedDecision {
-                decision: Decision::Node(node),
-                matched_rule,
-            });
-        }
-        let group = config
-            .selectors
-            .iter()
-            .find(|s| s.id == id)
-            .ok_or("RouteNotFound")?;
-        id = if group.strategy == PolicyStrategy::Manual {
-            group.selected.clone()
-        } else {
-            choose(&group.id)?
-        };
-        if !group.members.contains(&id) {
-            return Err("PolicySelectionNotMember");
-        }
-    }
-    Err("PolicyDepth")
 }
 
 pub fn rule_label(config: &Config, index: Option<usize>) -> String {
