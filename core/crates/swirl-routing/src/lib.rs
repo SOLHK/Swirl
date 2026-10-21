@@ -133,7 +133,7 @@ pub fn select_with_trace<'a>(
             Some(ips),
         )
     } else {
-        select_with_trace_and_china(config, host, port, source, resolved, choose, None, None)
+        select_with_trace_and_china(config, host, port, source, resolved, choose, None)
     }
 }
 
@@ -146,9 +146,9 @@ pub fn select_with_trace_and_china<'a>(
     source: IpAddr,
     resolved: Option<&[SocketAddr]>,
     choose: &impl Fn(&str) -> Result<String, &'static str>,
-    cn_domains: Option<&ChinaRules>,
-    cn_ips: Option<&ChinaRules>,
+    china: Option<(&ChinaRules, &ChinaRules)>,
 ) -> Result<TracedDecision<'a>, &'static str> {
+    let (cn_domains, cn_ips) = china.map_or((None, None), |(domains, ips)| (Some(domains), Some(ips)));
     let host = host.to_ascii_lowercase();
     let ip = host.parse::<std::net::IpAddr>().ok();
     // Do not expose results to earlier no-resolve rules on the second pass:
