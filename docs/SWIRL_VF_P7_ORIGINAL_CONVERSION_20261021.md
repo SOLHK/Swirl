@@ -110,6 +110,73 @@ component semantics need further acceptance. Neither file is a released
 `Swirl-VF.ttc`. A32-face expansion is not justified while one-face variable
 completeness, precision, metrics and mapping gates remain unresolved.
 
+## Actual closure-point encoding fix and current candidates
+
+Independent comparison exposed a target-only terminal zero-length line: C1's
+explicit final on-curve point duplicates each contour's first point. New
+`hvf_glyf_closure.py` and the separate private `p7_compact_candidate.py` remove
+only that redundant final point, with an exact proof: the base endpoint and
+every complete gvar tuple endpoint delta must equal the first point. Therefore
+their weighted sums are identical at every position in that encoded model.
+Sparse/None tuples and differing endpoint deltas are skipped; instructions and
+composites are refused. Internal zero-length segments remain. Point indices and
+the final four phantom entries are remapped together. Production C1 and the
+native comparator are unchanged.
+
+The actual full face removes739,241 redundant terminal points in47,097 nonempty
+GIDs, retaining all47,102 GIDs and93 tuples. hmtx/vmtx/HVAR/VVAR bytes are exactly
+unchanged. Reopening verifies9,598,940 default/phantom points; C1 packing again
+verifies22 tables. Current private candidates are:
+
+- q TTF: `build/vf-takeover-private/p7-face-compact-stage1/P7-Original-face0-EXPERIMENTAL.ttf`,
+  SHA256 `bcc46ae10835a9567684489d70428434c692f8b1a304506fbb3b307843bc4b78`.
+  Single-face TTC32,452,320bytes, SHA256
+  `5e0d59069c3ff782a01aef76877c109b00a9d6c791b6b31ae314266da56e5c6e`.
+- nominal TTF: `build/vf-takeover-private/p7-nominal-compact-stage1/P7-Original-face0-NOMINAL-EXPERIMENTAL.ttf`,
+  SHA256 `329ba65ca37085d4c5de0e689dade650ea4628169d0ece48bedb82c6f0c6a46a`.
+  Single-face TTC32,532,300bytes, SHA256
+  `e9db53ed7ff33c3f4a293cb6624e4021f2e898960b3a525a0bd19084230d020c`.
+
+The q candidate's actual CoreText regression has32 records,16 exact reverse
+pairs,12 strict axis comparisons and12 glyph draws into two private PNGs.
+All16 matched prior native command/bounds/advance/vertical-translation records
+and both PNG files are exactly equal before/after compaction. This is a bounded
+candidate encoding regression, not original equivalence or cross-platform
+pixel parity. The unchanged raw original-HVF/HB comparator now obtains numeric
+comparisons for all32 requests:8 pass,24 fail `outside_budget`, with no remaining
+segment-count failures or terminal zero lines. Selected nondefault maximum
+control error is6.956634475799774; DEFAULT_ONLY nondefault samples reach
+116.30857628945148. Earlier failure records remain saved, and strict numerical
+failures are exposed rather than suppressed.
+
+The compact nominal candidate also passed32 native CoreText records,16 exact
+reverse pairs and12 strict effective-axis checks; its16 matched prior nominal
+records have identical commands, bounds, advances, vertical translations and
+axis readback. The separate unchanged HVF/HB comparator returns6/32 numeric
+passes and26 `outside_budget` failures, zero segment-count failures. Selected
+nondefault maximum control error is9.125873988903379; table/HB advance failures
+are unchanged. All8 shaping GID/cluster sequences match, but119/640 position
+fields remain above1/32. No nominal compact drawing was run.
+
+A final bounded default check confirms real nonempty GID12 reaches the existing
+preserved-quadratic1/32 check after standard encoding and actual HarfBuzz decode:
+maximum control error0.022461404806222163. Its old legacy segment-type rejection
+is still recorded, while the already-existing raw-quadratic companion compares
+the original controls. GIDs0/1166/19177 at default still fail numerically. This
+one-position result does not accept GID12's full variable model or the face.
+
+Four authored closure regressions pass, including multi-contour remapping,
+unchanged internal duplicates, phantom/delta preservation, sparse/differing
+delta refusal and actual serialized HarfBuzz geometry/extents/advance before/
+after comparisons. Existing fontTools
+[TTGlyphPen](https://github.com/fonttools/fonttools/blob/4.61.1/Lib/fontTools/pens/ttGlyphPen.py)
+and [point pen](https://github.com/fonttools/fonttools/blob/4.61.1/Lib/fontTools/pens/pointPen.py)
+provide the mature duplicate-closure precedent; the gvar proof/remapping here
+is independently implemented according to
+[OpenType point/phantom numbering](https://learn.microsoft.com/en-us/typography/opentype/spec/otvarcommonformats).
+No upstream code is copied. All prior model/quantization/native failures remain
+inherited; removing redundant encoded points does not re-judge their budgets.
+
 ## Actual native and independent checks
 
 Both q and nominal candidates loaded through the existing generic CoreText
@@ -193,6 +260,10 @@ python tools/swirl_vf/platform/p7_nominal_candidate.py \
   --source ~/Downloads/PingFangUI.ttc \
   --parent build/vf-takeover-private/p7-face-next \
   --output build/vf-takeover-private/p7-nominal-next
+python tools/swirl_vf/platform/p7_compact_candidate.py \
+  --source ~/Downloads/PingFangUI.ttc \
+  --parent build/vf-takeover-private/p7-face-stage1 \
+  --output build/vf-takeover-private/p7-face-compact-next
 python tools/swirl_vf/platform/p7_validate_candidate.py \
   --source ~/Downloads/PingFangUI.ttc \
   --candidate build/vf-takeover-private/p7-nominal-stage1/P7-Original-face0-NOMINAL-EXPERIMENTAL.ttc \
