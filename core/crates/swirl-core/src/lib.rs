@@ -27,7 +27,9 @@ use tokio::{
     time::timeout,
 };
 
-fn load_china_rules(config: &Config) -> Result<(Option<Arc<ChinaRules>>, Option<Arc<ChinaRules>>)> {
+type ChinaRulePair = (Option<Arc<ChinaRules>>, Option<Arc<ChinaRules>>);
+
+fn load_china_rules(config: &Config) -> Result<ChinaRulePair> {
     if !config.smart_routing {
         return Ok((None, None));
     }
@@ -517,10 +519,7 @@ async fn route<'a>(
         source,
         None,
         &choose,
-        match (plan.cn_domains.as_deref(), plan.cn_ips.as_deref()) {
-            (Some(domains), Some(ips)) => Some((domains, ips)),
-            _ => None,
-        },
+        china,
     )?;
     match selected.decision {
         Decision::Node(node) => {
@@ -550,10 +549,7 @@ async fn route<'a>(
                 source,
                 Some(&addresses),
                 &choose,
-                match (plan.cn_domains.as_deref(), plan.cn_ips.as_deref()) {
-                    (Some(domains), Some(ips)) => Some((domains, ips)),
-                    _ => None,
-                },
+                china,
             )?;
             match selected.decision {
                 Decision::Node(node) => Ok((
