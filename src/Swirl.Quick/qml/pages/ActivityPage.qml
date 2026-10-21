@@ -136,7 +136,7 @@ Item {
       Label {text:"代理："+(page.telemetry.latencies.proxy||"尚未测量")+" · "+(page.telemetry.proxyDiagnostic.detail||"通过当前代理入口单独测量 HTTPS 往返。")+(page.telemetry.proxyDiagnostic.networkError!==undefined?" · HTTP "+page.telemetry.proxyDiagnostic.http+" · 错误码 "+page.telemetry.proxyDiagnostic.networkError:"");Layout.fillWidth:true;wrapMode:Text.Wrap;elide:Text.ElideNone}
      }
     }
-    SwirlGlassPanel {Layout.fillWidth:true;Layout.minimumWidth:0;Layout.preferredWidth:7;Layout.preferredHeight:Math.max(Theme.dp(240),rankingContent.implicitHeight+2*Theme.cardPadding);Layout.alignment:Qt.AlignTop
+    SwirlGlassPanel {Layout.fillWidth:true;Layout.fillHeight:false;Layout.minimumWidth:0;Layout.preferredWidth:7;Layout.preferredHeight:page.ranks.length===0?rankingContent.implicitHeight+2*Theme.cardPadding:Math.max(Theme.dp(240),rankingContent.implicitHeight+2*Theme.cardPadding);Layout.alignment:Qt.AlignTop
     ColumnLayout {id:rankingContent;anchors.left:parent.left;anchors.right:parent.right;anchors.top:parent.top;anchors.margins:Theme.cardPadding;spacing:Theme.dp(12)
      RowLayout {Layout.fillWidth:true;SwirlText {text:"流量来源";color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold;Layout.fillWidth:true}SwirlButton {text:"查看全部";quiet:true;onClicked:{AppState.trafficPeriod=page.period===0?0:3;AppState.navigate(page.rankingKind===0?"processes":page.rankingKind===1?"gateway":"traffic")}}}
      SwirlSegmentedControl {Layout.preferredWidth:Math.min(parent.width,Theme.dp(360));options:["进程","设备","域名","策略"];currentIndex:page.rankingKind;onActivated:index=>page.rankingKind=index}
@@ -147,7 +147,7 @@ Item {
        onClicked:{AppState.trafficPeriod=page.period===0?0:3;if(page.rankingKind===0){AppState.trafficSelectedProcess=modelData.name;SwirlMotion.navigateFrom(rank,"processes","processName")}else if(page.rankingKind===1){AppState.trafficSelectedDevice=modelData.name;SwirlMotion.navigateFrom(rank,"gateway","deviceName")}else AppState.navigate("traffic")}
       }
      }
-     Label {visible:page.ranks.length===0;text:"尚未采集排行数据";Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(56)}
+     Label {visible:page.ranks.length===0;text:"尚未采集排行数据";Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(24)}
      Label {text:"仅统计经过 Swirl 的流量 · "+(page.period===0?"今日":"本月")+" · DHCP 租用设备 "+gatewayProvider.devices.filter(r=>r.status==="租用中").length;Layout.fillWidth:true}
      Label {text:"直连 "+(page.distribution[1]?page.distribution[1].value:"—")+" · 代理 "+(page.distribution[0]?page.distribution[0].value:"—")+(page.totals.sampled&&!page.telemetry.sampled?" · 历史累计":"");Layout.fillWidth:true}
     }
