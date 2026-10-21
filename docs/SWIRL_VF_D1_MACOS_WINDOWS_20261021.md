@@ -345,3 +345,62 @@ work belongs to the existing A3/B1/C1 owners, using the matching-host and new
 all-GID/fresh-design evidence; do not bypass their acceptance gates to manufacture
 a final font. The next Windows 11 check requires an actual original candidate
 and Windows 11 desktop, not another Server synthetic result.
+
+## D2 continuation — 32-face bounded native verification (2026-10-21)
+
+Resumed from freshly fetched dedicated HEAD `ff2ed179fbbe5bc55a634a19ac597ad0604aa08c`;
+worktree was clean, original source/hash and D1 environment/checkpoints retained.
+No D1 full-GID run was repeated. A3 `66594e9`, B1 `7902cdb` and clean-output
+containment `ba8039a` were reviewed read-only; none was merged. Their existing
+UPEM1000/1024/phantom/size/layout conclusions are retained. W1 advanced to
+`2be6c78` independently and was not changed.
+
+The 32 faces share one exact HVGL blob, have no HVPM, and retain independent
+native face-index selection. An 8-call native pilot took 0.12956 s and projected
+about 249 s for 32 × 15 × 32 observations. The selected bounded plan instead uses
+**34 GIDs**: the existing 32 representative GIDs plus two prior type-rejection
+witnesses. Existing selection covers **13/13 Type-2 shapes**, tree depth **12**
+and **4** rotation roots. The 15 normalized-design locations include all eight
+three-axis corners, five weight-axis values at neutral width/height, and two
+fractional mixed-axis locations. These are design coordinates supplied directly
+to HVF; no user-coordinate/avar mapping is invented or accepted.
+
+Actual native run on this macOS 26.3: **32/32 faces × 34 GIDs × 15 locations =
+16,320 accepted native transcripts/comparisons**, **241.855 s**. Every observation
+executes the existing Apple C oracle and its existing complete transcript/event/
+counter checks. Only portable calculations may share an identical-HVGL cache;
+no native face observation is replaced by a different face's result.
+
+- Unchanged legacy comparator: **16,256 passes + 64 retained type rejections**.
+- Existing preserved-Q companion: invoked only for those **64**, **64/64 pass**.
+- Combined existing policy: **16,320 pass / 0 fail**; maximum point discrepancy
+  **1.3073986337985843e-12 FUnit**, unchanged **1/32** threshold.
+- Original input unchanged; no metrics, user mapping, TTC construction, Windows
+  or UI acceptance inferred. No A3/B1/C1/W1 production file was modified.
+
+New independent driver `platform/d2_hvf_faces.py` has face checkpoints bound to
+source/binary/code/plan hashes. Five focused regression tests pass, including
+JSON roundtrip/resumption, rejecting incomplete/substituted/falsified checkpoints,
+and retaining a true numeric failure. A local interrupted pilot exposed a tuple
+versus JSON-list resume-recipe mismatch; it was corrected and tested before the
+complete run above, which uses a new output directory. The pilot's private log
+and partial results were preserved; they are not added to the 16,320 count.
+
+Private checkpoint/result directory: `build/vf-d2-private/faces-validated/`.
+Public output is only aggregate counts/errors/hashes:
+[evidence](evidence/SWIRL_VF_D2_FACES_20261021.json). Native outline callbacks stay
+in memory and are never written to public logs or Git. Primary references read
+before this continuation: [Apple HVGL](https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6hvgl.html),
+[fontTools gvar reader](https://github.com/fonttools/fonttools/blob/main/Lib/fontTools/ttLib/tables/_g_v_a_r.py),
+and [HarfBuzz CoreText integration](https://github.com/harfbuzz/harfbuzz/blob/main/src/hb-coretext-font.cc).
+Existing algorithms are reused unchanged; no upstream implementation was copied.
+
+```sh
+build/vf-d1-private/venv/bin/python tools/swirl_vf/platform/d2_hvf_faces.py \
+  ~/Downloads/PingFangUI.ttc --binary build/vf-d1-private/original-hvf/hvf_oracle \
+  --output build/vf-d2-private/faces-next
+```
+
+A completed output refuses overwrite; an unchanged incomplete recipe can resume.
+The next D2 stage diagnoses the 96 readback rejections and independently tests
+B1's frozen metric hypothesis on fresh UPEMs, preserving all strict failures.
