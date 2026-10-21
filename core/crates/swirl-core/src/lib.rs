@@ -140,6 +140,7 @@ pub struct Core {
 impl Core {
     pub fn start(config: Config) -> Result<Self> {
         config.validate()?;
+        swirl_routing::validate_smart_routing(&config)?;
         let runtime = Builder::new_multi_thread()
             .worker_threads(2)
             .max_blocking_threads(4)
