@@ -3,6 +3,30 @@
   "scope": "LOCAL_ORIGINAL_DERIVED_PARTIAL_VARIABLE_EXPERIMENT_NOT_ACCEPTANCE",
   "branch": "work/vf-takeover-abc-20261021",
   "first_source_commit": "b2f057e3420e192478c25862cbd9dc6eba78810a",
+  "final_tested_source_commit": "67a6196d3075821ffe5a3235bf1d1a393c41fe8b",
+  "P7_source_checkpoints": [
+    "b2f057e3420e192478c25862cbd9dc6eba78810a",
+    "c13a57372ecb27145612094fe4704c5e0b8c3c69",
+    "3b3a4c3a7f7a8ec9455411639d26571a4b98a2c4",
+    "67a6196d3075821ffe5a3235bf1d1a393c41fe8b"
+  ],
+  "final_public_CI": {
+    "run_id": 39589107507,
+    "conclusion": "success",
+    "portable_passed": 846,
+    "audits_passed": 6,
+    "original_source_macOS": "PASS_EXISTING_SEPARATE_JOB_STRICT_FAILURES_RETAINED",
+    "Windows_Server_authored_C1_control": "PASS",
+    "original_derived_candidate_tested_in_public_CI": false
+  },
+  "protected_remote_tips_checked_unchanged": {
+    "A3": "66594e9d32a33c1d216319e2dccd2f35c7e47a4a",
+    "B1": "7902cdb7b449a56939346263df54a692c22d8337",
+    "C1": "c0fe6c47f1a4a0854fcbbde7c9f08b791b44123e",
+    "D1_PR23": "54e579f1b46ee75187069d40b9ec626b3cc980d5"
+  },
+  "local_or_concurrent_own_branch_conflict_detected": false,
+  "PR24": "DRAFT_OPEN_UNMERGED_INTEGRATION_OWNER_REVIEW_REQUIRED",
   "macOS": "26.3_25D125_arm64",
   "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
   "source_unchanged": true,

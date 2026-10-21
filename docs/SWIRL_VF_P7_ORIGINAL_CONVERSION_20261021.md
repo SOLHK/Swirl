@@ -238,6 +238,28 @@ The nominal-axis/source-guard checkpoint
 [CI39587343174](https://github.com/SOLHK/Swirl/actions/runs/39587343174)
 passes840 portable tests and6 audits with the same separate native-job scopes.
 
+Final tested source is `67a6196d3075821ffe5a3235bf1d1a393c41fe8b`.
+[CI39589107507](https://github.com/SOLHK/Swirl/actions/runs/39589107507)
+completed successfully:846 portable tests,6 audits, the existing original-source
+macOS job and the Windows Server authored C1 job. Original strict failures
+(including the historical96 axis readbacks) are retained by the existing tests;
+successful CI does not grant original target equivalence or Windows acceptance.
+
+P7 checkpoints pushed normally, in order:
+
+| Commit | Validated change |
+| --- | --- |
+| `b2f057e3420e192478c25862cbd9dc6eba78810a` | Real HVF glyph models and complete default-face experimental assembler |
+| `c13a57372ecb27145612094fe4704c5e0b8c3c69` | Actual nominal-axis candidate and private-output/source integrity guards |
+| `3b3a4c3a7f7a8ec9455411639d26571a4b98a2c4` | Repeatable bounded original-candidate native/HB validator |
+| `67a6196d3075821ffe5a3235bf1d1a393c41fe8b` | Exact closure/gvar compaction, full real-face rebuild and native regressions |
+
+The final documentation/evidence successor changes no tested source. The
+worktree is isolated; A3/B1/C1 and D1 remote tips were checked unchanged after
+these pushes. No concurrent update to this branch or local conflict occurred.
+PR24 stays draft/open/unmerged on unchanged PR23/D1 base54e579f; integration
+and cross-branch conflict decisions belong to the integration owner.
+
 ## Resume commands (private outputs only)
 
 Use the existing Python environment:
@@ -247,26 +269,27 @@ only under their exact recipe; use a fresh directory for changed code. Completed
 face/nominal files are never overwritten.
 
 ```sh
-python tools/swirl_vf/platform/p7_original_glyf.py sample \
+SWIRL_VF_PY="$HOME/Swirl-worktrees/vf-macos-windows-d1/build/vf-d1-private/venv/bin/python"
+"$SWIRL_VF_PY" tools/swirl_vf/platform/p7_original_glyf.py sample \
   --source ~/Downloads/PingFangUI.ttc \
   --binary build/vf-takeover-private/p7-original-hvf-native/gid-00000-default/hvf_oracle \
   --output build/vf-takeover-private/p7-models-next
-python tools/swirl_vf/platform/p7_original_glyf.py face \
+"$SWIRL_VF_PY" tools/swirl_vf/platform/p7_original_glyf.py face \
   --source ~/Downloads/PingFangUI.ttc \
   --models build/vf-takeover-private/p7-models-next \
   --native-cache ~/Swirl-worktrees/vf-macos-windows-d1/build/vf-d1-private/original-hvf-all-default/hvf-run.json \
   --output build/vf-takeover-private/p7-face-next
-python tools/swirl_vf/platform/p7_nominal_candidate.py \
+"$SWIRL_VF_PY" tools/swirl_vf/platform/p7_compact_candidate.py \
   --source ~/Downloads/PingFangUI.ttc \
   --parent build/vf-takeover-private/p7-face-next \
-  --output build/vf-takeover-private/p7-nominal-next
-python tools/swirl_vf/platform/p7_compact_candidate.py \
-  --source ~/Downloads/PingFangUI.ttc \
-  --parent build/vf-takeover-private/p7-face-stage1 \
   --output build/vf-takeover-private/p7-face-compact-next
-python tools/swirl_vf/platform/p7_validate_candidate.py \
+"$SWIRL_VF_PY" tools/swirl_vf/platform/p7_nominal_candidate.py \
   --source ~/Downloads/PingFangUI.ttc \
-  --candidate build/vf-takeover-private/p7-nominal-stage1/P7-Original-face0-NOMINAL-EXPERIMENTAL.ttc \
+  --parent build/vf-takeover-private/p7-face-compact-next \
+  --output build/vf-takeover-private/p7-nominal-next
+"$SWIRL_VF_PY" tools/swirl_vf/platform/p7_validate_candidate.py \
+  --source ~/Downloads/PingFangUI.ttc \
+  --candidate build/vf-takeover-private/p7-nominal-compact-stage1/P7-Original-face0-NOMINAL-EXPERIMENTAL.ttc \
   --binary build/vf-takeover-private/p7-original-hvf-native/gid-00000-default/hvf_oracle \
   --mode nominal \
   --expected-sha256 39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890 \
