@@ -2,7 +2,7 @@
 //! The container is Zstandard-compressed; the decoded payload is validated
 //! independently of routing so malformed assets can never become permissive.
 use sha2::Digest;
-use std::{io::Read, net::IpAddr};
+use std::{collections::HashSet, io::Read, net::IpAddr};
 
 const MAX_COMPRESSED: usize = 16 * 1024 * 1024;
 const MAX_DECOMPRESSED: usize = 64 * 1024 * 1024;
@@ -66,7 +66,9 @@ pub fn load_rules_from_directory(
 
 #[derive(Debug, Clone)]
 pub struct ChinaRules {
-    domains: Vec<String>,
+    exact_domains: HashSet<String>,
+    suffix_domains: HashSet<String>,
+    wildcard_domains: Vec<String>,
     networks: Vec<(IpAddr, IpAddr)>,
 }
 
@@ -121,29 +123,44 @@ impl ChinaRules {
         if !c.is_empty() {
             return Err("MrsTrailingData");
         }
-        Ok(Self { domains, networks })
+        Ok(Self::from_parts(domains, networks))
+    }
+
+    fn from_parts(domains: Vec<String>, mut networks: Vec<(IpAddr, IpAddr)>) -> Self {
+        let mut exact_domains = HashSet::new();
+        let mut suffix_domains = HashSet::new();
+        let mut wildcard_domains = Vec::new();
+        for rule in domains {
+            if let Some(suffix) = rule.strip_prefix("+.").or_else(|| rule.strip_prefix('.')) {
+                suffix_domains.insert(suffix.to_owned());
+            } else if rule.contains('*') {
+                wildcard_domains.push(rule);
+            } else {
+                exact_domains.insert(rule);
+            }
+        }
+        networks.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+        Self { exact_domains, suffix_domains, wildcard_domains, networks }
     }
 
     pub fn matches_domain(&self, host: &str) -> bool {
         let host = host.trim_end_matches('.').to_ascii_lowercase();
-        self.domains.iter().any(|rule| {
-            if let Some(suffix) = rule.strip_prefix("+.") {
-                (host == suffix && self.domains.iter().any(|candidate| candidate == suffix))
-                    || host.strip_suffix(suffix).is_some_and(|p| p.ends_with('.'))
-            } else if let Some(suffix) = rule.strip_prefix('.') {
-                host != suffix && host.strip_suffix(suffix).is_some_and(|p| p.ends_with('.'))
-            } else if rule.contains('*') {
-                wildcard_domain(rule, &host)
-            } else {
-                host == *rule
+        if self.exact_domains.contains(&host) {
+            return true;
+        }
+        let mut offset = 0;
+        while let Some(dot) = host[offset..].find('.') {
+            offset += dot + 1;
+            if self.suffix_domains.contains(&host[offset..]) {
+                return true;
             }
-        })
+        }
+        self.wildcard_domains.iter().any(|pattern| wildcard_domain(pattern, &host))
     }
 
     pub fn matches_ip(&self, ip: IpAddr) -> bool {
-        self.networks.iter().any(|(start, end)| {
-            ip_cmp(ip, *start).is_some_and(|a| a >= 0) && ip_cmp(ip, *end).is_some_and(|b| b <= 0)
-        })
+        let index = self.networks.partition_point(|(start, _)| *start <= ip);
+        index > 0 && ip_cmp(ip, self.networks[index - 1].1).is_some_and(|order| order <= 0)
     }
 }
 
@@ -579,34 +596,25 @@ mod tests {
 
     #[test]
     fn suffix_matching_is_label_bounded() {
-        let r = ChinaRules {
-            domains: vec!["+.example.cn".into()],
-            networks: vec![],
-        };
+        let r = ChinaRules::from_parts(vec!["+.example.cn".into()], vec![]);
         assert!(!r.matches_domain("example.cn"));
         assert!(r.matches_domain("www.example.cn"));
         assert!(!r.matches_domain("notexample.cn"));
-        let apex_and_suffix = ChinaRules {
-            domains: vec!["example.cn".into(), "+.example.cn".into()],
-            networks: vec![],
-        };
+        let apex_and_suffix = ChinaRules::from_parts(
+            vec!["example.cn".into(), "+.example.cn".into()],
+            vec![],
+        );
         assert!(apex_and_suffix.matches_domain("example.cn"));
     }
     #[test]
     fn ipv4_and_ipv6_cidr_matching() {
-        let r = ChinaRules {
-            domains: vec![],
-            networks: vec![
-                (
-                    "10.0.0.0".parse().unwrap(),
-                    "10.255.255.255".parse().unwrap(),
-                ),
-                (
-                    "2001:db8::".parse().unwrap(),
-                    "2001:db8:ffff:ffff:ffff:ffff:ffff:ffff".parse().unwrap(),
-                ),
+        let r = ChinaRules::from_parts(
+            vec![],
+            vec![
+                ("10.0.0.0".parse().unwrap(), "10.255.255.255".parse().unwrap()),
+                ("2001:db8::".parse().unwrap(), "2001:db8:ffff:ffff:ffff:ffff:ffff:ffff".parse().unwrap()),
             ],
-        };
+        );
         assert!(r.matches_ip("10.1.2.3".parse().unwrap()));
         assert!(r.matches_ip("2001:db8::1".parse().unwrap()));
         assert!(!r.matches_ip("11.1.2.3".parse().unwrap()));
