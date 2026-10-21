@@ -620,7 +620,6 @@ fn automatic_udp_association_retains_choices_after_policy_replacement() {
     worker.join().unwrap();
 }
 
-
 fn socks5_proxy() -> (u16, thread::JoinHandle<String>) {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();
