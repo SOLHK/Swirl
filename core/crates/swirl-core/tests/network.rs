@@ -689,7 +689,11 @@ fn connect_host(core: &Core, host: &str, port: u16, expected_status: u16) -> Tcp
     eprintln!("awaiting CONNECT response for {host}:{port}, expected {expected_status}");
     let response = header(&mut stream).unwrap_or_else(|error| {
         let routes = core.snapshot().map(|snapshot| {
-            snapshot.connections.into_iter().map(|row| (row.host, row.node, row.category, row.error)).collect::<Vec<_>>()
+            snapshot
+                .connections
+                .into_iter()
+                .map(|row| (row.host, row.node, row.category, row.error))
+                .collect::<Vec<_>>()
         });
         panic!("CONNECT {host}:{port} response failed: {error}; route snapshot: {routes:?}");
     });
