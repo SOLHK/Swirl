@@ -126,7 +126,7 @@ CoreText parity: that original cannot load on this host.
 Independent fontTools/C1 checks preserve full cmap/GID order,47,103 loca entries
 and all22 table payloads between TTF/TTC. All94,204 HVAR/VVAR metric coefficient
 models are exactly consistent. A bounded original-HVF/HarfBuzz comparison used
-40 actual native glyph calls. Selected-variable target vs original ideal TABLE
+40 actual native glyph calls in explicit q coordinates. Selected-variable target vs original ideal TABLE
 advances has0/50 fields above1/32, maximum0.020268354564905167. Original-HB vs
 target-HB advances instead has6/50 fields above1/32, maximum0.328125: native
 integer-grid equivalence remains failed, without relabeling it as coefficient
@@ -136,6 +136,17 @@ DEFAULT_ONLY glyphs at nondefault positions. The raw contour comparator retains
 35/40 failures (`segment_count_differs`); no numeric outline PASS is inferred
 from incomparable paths. An additional target terminal zero-length closure is
 observed separately and does not erase those failures.
+
+`p7_validate_candidate.py` makes the bounded check reproducible with explicit
+`--mode q|nominal`, full original identity and fresh private-only output. Actual
+runs of each mode used32 native calls/four positions; all8 mixed shaping GID/
+cluster sequences per mode match and94,204 metric models pass consistency.
+Raw outline checks retain28/32 `segment_count_differs` failures per mode.
+Nominal mode keeps the unaccepted P4 source-q hypothesis explicit: selected
+nondefault HB source/target metrics fail3/30 fields, maximum0.46875; target vs
+ideal TABLE metrics fail1/30, maximum0.03369140625, still above1/32. These new
+nominal results do not replace the earlier q-scope samples. Raw path failures
+are never converted to numeric PASS by dropping segments in the comparator.
 
 Original-derived files and all private logs/raster/glyph records remain local.
 Windows11, original-derived DirectWrite, real Qt/Swirl and installation are
@@ -155,6 +166,10 @@ Its [CI39585811589](https://github.com/SOLHK/Swirl/actions/runs/39585811589)
 passed836 portable tests and6 audits, plus original-source macOS and authored
 Windows Server C1 jobs. That Windows job says nothing about this original-derived
 candidate or Windows11. Subsequent source/checkpoint hashes are in branch history.
+The nominal-axis/source-guard checkpoint
+`c13a57372ecb27145612094fe4704c5e0b8c3c69` is also pushed;
+[CI39587343174](https://github.com/SOLHK/Swirl/actions/runs/39587343174)
+passes840 portable tests and6 audits with the same separate native-job scopes.
 
 ## Resume commands (private outputs only)
 
@@ -178,6 +193,13 @@ python tools/swirl_vf/platform/p7_nominal_candidate.py \
   --source ~/Downloads/PingFangUI.ttc \
   --parent build/vf-takeover-private/p7-face-next \
   --output build/vf-takeover-private/p7-nominal-next
+python tools/swirl_vf/platform/p7_validate_candidate.py \
+  --source ~/Downloads/PingFangUI.ttc \
+  --candidate build/vf-takeover-private/p7-nominal-stage1/P7-Original-face0-NOMINAL-EXPERIMENTAL.ttc \
+  --binary build/vf-takeover-private/p7-original-hvf-native/gid-00000-default/hvf_oracle \
+  --mode nominal \
+  --expected-sha256 39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890 \
+  --output build/vf-takeover-private/p7-validation-next
 ```
 
 Next work should replace bounded sampled approximations with adequate original

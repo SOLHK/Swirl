@@ -62,6 +62,32 @@
   },
   "mixed_HarfBuzz_GID_cluster_matching_runs": 10,
   "mixed_HarfBuzz_runs": 10,
+  "repeatable_bounded_validator": {
+    "native_tested_validator_sha256": "1ecb6834ecf7ebfc4bda8436e82862f13b92b0f5d5e156f17981fb10e532b6ee",
+    "subsequent_change": "PRIVATE_OUTPUT_GUARD_ONLY_AUTHORED_PREFLIGHT_TESTS_PASS",
+    "q_native_calls": 32,
+    "nominal_native_calls": 32,
+    "locations_per_mode": 4,
+    "raw_outline_failures_per_mode": 28,
+    "raw_outline_checks_per_mode": 32,
+    "nominal_nondefault_selected_HB_advance_failures": 3,
+    "nominal_nondefault_selected_HB_advance_fields": 30,
+    "nominal_maximum_selected_HB_advance_error": 0.46875,
+    "nominal_nondefault_selected_table_advance_failures": 1,
+    "nominal_nondefault_selected_table_advance_fields": 30,
+    "nominal_maximum_selected_table_advance_error": 0.03369140625,
+    "mixed_GID_cluster_matching_runs_per_mode": 8,
+    "production_accepted": false
+  },
+  "public_CI_nominal_checkpoint": {
+    "source_commit": "c13a57372ecb27145612094fe4704c5e0b8c3c69",
+    "run_id": 39587343174,
+    "portable_passed": 840,
+    "audits_passed": 6,
+    "original_source_macOS": "PASS_EXISTING_SEPARATE_JOB",
+    "Windows_Server_authored_C1_control": "PASS",
+    "original_derived_candidate_tested_in_public_CI": false
+  },
   "public_CI_first_source": {
     "run_id": 39585811589,
     "portable_passed": 836,
