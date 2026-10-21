@@ -1,0 +1,97 @@
+{
+  "scope": "authored_font_only_scaled_GPOS_control_no_Apple_data",
+  "harfbuzz": "14.6.0",
+  "font_cases": 18,
+  "layout_observations": 1296,
+  "maximum_scaled_error_in_source_units": 0.03125,
+  "above_unchanged_1_32": 0,
+  "original_font_conversion": "NOT_RUN",
+  "DirectWrite": "NOT_RUN",
+  "CoreText": "NOT_RUN",
+  "Windows11": "NOT_RUN",
+  "Qt_Swirl": "NOT_RUN",
+  "source_UPEMs": [
+    1000,
+    1028,
+    1064,
+    1100,
+    1128,
+    1144
+  ],
+  "multiplier": 8,
+  "physical_table_verification": {
+    "cases": 18,
+    "status": "PASS_SERIALIZED_PHYSICAL_GEOMETRY_AND_METRICS",
+    "unchanged_tables": [
+      "cmap",
+      "fvar",
+      "GSUB"
+    ],
+    "scaled_and_verified": [
+      "glyf",
+      "gvar",
+      "hmtx",
+      "vmtx",
+      "HVAR",
+      "VVAR",
+      "head_bbox",
+      "hhea_metrics",
+      "vhea_metrics",
+      "OS/2_line_metrics"
+    ],
+    "raw_native_API_equality_asserted": false
+  },
+  "kind_summaries": [
+    {
+      "kind": "even",
+      "font_cases": 6,
+      "counts": {
+        "layout_glyphs": 432,
+        "scaled_above_1_over_32": 0,
+        "unscaled_above_1_over_32": 312,
+        "horizontal_identity_checks": 108,
+        "raw_metric_changes": 312
+      },
+      "maximum_error_in_source_units": {
+        "unscaled_layout": 0.25,
+        "scaled_layout": 0.03125,
+        "retained_raw_advance_change": 0.5
+      },
+      "raw_API_equality": "NOT_ASSERTED_RETAINED_DIFFERENCES"
+    },
+    {
+      "kind": "odd_width",
+      "font_cases": 6,
+      "counts": {
+        "layout_glyphs": 432,
+        "scaled_above_1_over_32": 0,
+        "unscaled_above_1_over_32": 336,
+        "horizontal_identity_checks": 108,
+        "raw_metric_changes": 312
+      },
+      "maximum_error_in_source_units": {
+        "unscaled_layout": 0.75,
+        "scaled_layout": 0.03125,
+        "retained_raw_advance_change": 0.5
+      },
+      "raw_API_equality": "NOT_ASSERTED_RETAINED_DIFFERENCES"
+    },
+    {
+      "kind": "odd_delta",
+      "font_cases": 6,
+      "counts": {
+        "layout_glyphs": 432,
+        "scaled_above_1_over_32": 0,
+        "unscaled_above_1_over_32": 324,
+        "horizontal_identity_checks": 108,
+        "raw_metric_changes": 312
+      },
+      "maximum_error_in_source_units": {
+        "unscaled_layout": 2.0,
+        "scaled_layout": 0.03125,
+        "retained_raw_advance_change": 0.5
+      },
+      "raw_API_equality": "NOT_ASSERTED_RETAINED_DIFFERENCES"
+    }
+  ]
+}
