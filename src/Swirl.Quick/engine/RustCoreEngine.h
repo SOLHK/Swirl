@@ -3,9 +3,6 @@
 #include <QLibrary>
 #include <QTimer>
 #include <QElapsedTimer>
-#include <QNetworkAccessManager>
-#include <QNetworkReply>
-#include <QPointer>
 
 // Qt control adapter only. All forwarding sockets, routing and protocol state
 // live in the Rust DLL. Called from ThreadedEngine's existing worker thread.
@@ -20,6 +17,9 @@ public:
  void setRoutingMode(const QString &) override;
  void probeNode(const QUrl &) override;
  Status status() const override {return m_status;}
+ QString probeFailureStage() const {return m_probeFailureStage;}
+ qint64 probeOutboundConnectMs() const {return m_probeOutboundConnectMs;}
+ qint64 probeOriginTlsMs() const {return m_probeOriginTlsMs;}
  QString configurationSummary() const override;
  QVariantList routingRules() const override;
  static QVariantList routingRulesForOptions(const EngineStartOptions &);
@@ -30,6 +30,10 @@ private:
  using Command=qintptr(*)(const unsigned char *,size_t,unsigned char *,size_t);
  QJsonObject call(QJsonObject);
  void fail(Error,const QString &);
+ void resetProbeState();
+ void cancelProbe();
+ void failProbe(const QString &stage,const QString &code,int httpStatus=0);
+ void updateProbe(const QJsonObject &);
  QLibrary m_library;
  Command m_command=nullptr;
  quint64 m_handle=0;
@@ -37,6 +41,7 @@ private:
  Status m_status;
  QTimer m_poll;
  QElapsedTimer m_uptime,m_rateClock;
- QNetworkAccessManager m_network;
- QPointer<QNetworkReply> m_reply;
+ qint64 m_probeRequestId=0;
+ QString m_probeFailureStage;
+ qint64 m_probeOutboundConnectMs=-1,m_probeOriginTlsMs=-1;
 };

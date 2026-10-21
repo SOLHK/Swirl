@@ -12,7 +12,7 @@ mod websocket;
 pub use diagnostics::{TcpAttempt, TcpDiagnostic, TcpOutcome, failure_stage};
 pub use dial::diagnose_tcp;
 use dial::{connect_tcp, within};
-pub use probe::health_probe;
+pub use probe::{UrlTestFailure, UrlTestMetrics, UrlTestStage, health_probe, url_test_head};
 pub use shadowsocks::{
     decrypt_datagram as ss_decrypt_datagram, encrypt_datagram as ss_encrypt_datagram,
 };

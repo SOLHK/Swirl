@@ -30,6 +30,9 @@ EngineStartOptions NodeTestService::isolatedOptions(const EngineStartOptions &so
  result.executablePath=source.executablePath;result.expectedSha256=source.expectedSha256;result.expectedVersion=source.expectedVersion;
  result.nodes=source.nodes;result.rulesDirectory=source.rulesDirectory;
  result.preferCompatibility=source.preferCompatibility;
+ // Keep live DNS settings out of isolated probes: they may point back to a
+ // session-owned resolver. The probe uses Rust's default DNS configuration;
+ // target lookup still follows the selected outbound's protocol semantics.
  result.routingMode="global";result.smartRouting=false;
  result.healthIntervalMs=2000;result.requestTimeoutMs=3000;result.startupTimeoutMs=20000;
  return result;
@@ -65,7 +68,18 @@ void NodeTestService::next(){
    if(status.state==ProxyEngine::State::Failed){finish(id,runner,{{"success",false},{"latency",-1},{"http",0},{"phase","startup"},{"engineError",int(status.error)},{"error",status.message}});return;}
    if(status.apiHealthy&&!runner->property("probeStarted").toBool()){runner->setProperty("probeStarted",true);QPointer<ProxyEngine> guard(runner);QTimer::singleShot(0,runner,[this,guard]{if(guard)guard->probeNode(m_url);});}
    if(runner->property("probeStarted").toBool()&&!status.nodeBusy&&(status.requestState==ProxyEngine::RequestState::Succeeded||status.requestState==ProxyEngine::RequestState::Failed||status.nodeHealth==ProxyEngine::NodeHealth::Unavailable)){
-    finish(id,runner,{{"success",status.requestState==ProxyEngine::RequestState::Succeeded},{"latency",status.latencyMs},{"http",status.responseCode},{"phase",status.nodeHealth==ProxyEngine::NodeHealth::Unavailable?"availability":"request"},{"error",status.requestState==ProxyEngine::RequestState::Succeeded?QString():status.nodeMessage}});
+    QString phase=status.nodeHealth==ProxyEngine::NodeHealth::Unavailable?"availability":"request";
+#ifdef SWIRL_USE_RUST_CORE
+    const auto probeStage=static_cast<RustCoreEngine *>(runner)->probeFailureStage();
+    if(!probeStage.isEmpty())phase=probeStage;
+#endif
+    QVariantMap result{{"success",status.requestState==ProxyEngine::RequestState::Succeeded},{"latency",status.latencyMs},{"http",status.responseCode},{"phase",phase},{"error",status.requestState==ProxyEngine::RequestState::Succeeded?QString():status.nodeMessage}};
+#ifdef SWIRL_USE_RUST_CORE
+    const auto *rust=static_cast<RustCoreEngine *>(runner);
+    result.insert("outboundConnectMs",rust->probeOutboundConnectMs());
+    result.insert("originTlsMs",rust->probeOriginTlsMs());
+#endif
+    finish(id,runner,result);
    }
   });runner->start(opts);
  }
@@ -73,7 +87,10 @@ void NodeTestService::next(){
 void NodeTestService::finish(const QString &id,ProxyEngine *runner,const QVariantMap &result){
  if(m_running.value(id)!=runner)return;m_running.remove(id);retire(runner);
  auto row=result;row["engineKind"]=runner->property("probeEngineKind");
- if(row.value("engineKind")==QStringLiteral("rust"))row["metricType"]=QStringLiteral("http_total");
+ if(row.value("engineKind")==QStringLiteral("rust")){
+  row["metricType"]=QStringLiteral("http_headers");
+  row["resolverPolicy"]=QStringLiteral("isolated_default_dns");
+ }
  row["time"]=QDateTime::currentDateTime().toString(Qt::ISODate);m_results[id]=row;++m_completed;if(row.value("success").toBool())++m_succeeded;else{++m_failed;emit diagnostic("NodeTestFailed",row.value("error").toString());}
  m_message=QString("%1/%2 · 成功 %3 · 失败 %4").arg(m_completed).arg(m_total).arg(m_succeeded).arg(m_failed);emit changed();QTimer::singleShot(0,this,&NodeTestService::next);
 }

@@ -25,6 +25,8 @@
 #include <QThreadPool>
 #include <QSignalSpy>
 #include <QElapsedTimer>
+#include <QTimer>
+#include <QPointer>
 #include <QFileInfo>
 #include <QSaveFile>
 #include <QScopeGuard>
@@ -1967,11 +1969,63 @@ private slots:
   ControlledNetwork net;QVERIFY(net.start());auto o=options(net);o.executablePath="must-not-start-mihomo.exe";
   NodeTestService probes;probes.start(o,{o.selectedNodeId},net.url());QVERIFY(QTest::qWaitFor([&]{return !probes.busy();},6000));
   QCOMPARE(probes.succeeded(),1);QCOMPARE(probes.result(o.selectedNodeId).value("engineKind").toString(),QString("rust"));
-  QCOMPARE(probes.result(o.selectedNodeId).value("metricType").toString(),QString("http_total"));
+  QCOMPARE(probes.result(o.selectedNodeId).value("metricType").toString(),QString("http_headers"));
+  QCOMPARE(probes.result(o.selectedNodeId).value("resolverPolicy").toString(),QString("isolated_default_dns"));
   o.nodes.first().protocol="ss";o.nodes.first().password="synthetic";o.nodes.first().cipher="2022-blake3-aes-128-gcm";
   probes.start(o,{o.selectedNodeId},net.url());QVERIFY(!probes.result(o.selectedNodeId).value("success").toBool());
   QVERIFY(QTest::qWaitFor([&]{return !probes.busy();},3000));QCOMPARE(probes.failed(),1);
   QCOMPARE(probes.result(o.selectedNodeId).value("engineKind").toString(),QString("rust"));
+ }
+ void nativeHeadProbeFinishesAtHeadersAndReportsHttpFailureStage(){
+  ControlledNetwork net;QVERIFY(net.start());QTcpServer origin;QVERIFY(origin.listen(QHostAddress::LocalHost,0));
+  net.a.targetPorts.append(origin.serverPort());
+  bool sawHead=false,returnFailure=false,holdHeaders=false;int requests=0;
+  auto bodySent=std::make_shared<bool>(false);auto headersReleased=std::make_shared<int>(0);
+  connect(&origin,&QTcpServer::newConnection,&origin,[&]{
+   while(origin.hasPendingConnections()){
+    auto *socket=origin.nextPendingConnection();
+    connect(socket,&QTcpSocket::disconnected,socket,&QObject::deleteLater);
+    connect(socket,&QTcpSocket::readyRead,socket,[&,socket,bodySent]{
+     auto request=socket->property("headers").toByteArray()+socket->readAll();socket->setProperty("headers",request);
+     if(!request.contains("\r\n\r\n")||socket->property("responded").toBool())return;
+     socket->setProperty("responded",true);sawHead=request.startsWith("HEAD ");++requests;
+     if(holdHeaders){
+      QPointer<QTcpSocket> guard(socket);
+      QTimer::singleShot(500,&origin,[guard,headersReleased]{++*headersReleased;if(guard)guard->write("HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");});
+      return;
+     }
+     if(returnFailure){socket->write("HTTP/1.1 503 Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");socket->disconnectFromHost();return;}
+     socket->write("HTTP/1.1 200 OK\r\nContent-Length: 1048576\r\nConnection: keep-alive\r\n\r\n");
+     QTimer::singleShot(2500,socket,[socket,bodySent]{*bodySent=true;socket->write("delayed-body");});
+    });
+   }
+  });
+  auto o=options(net);auto second=o.nodes.first();second.id=QUuid::createUuid().toString(QUuid::WithoutBraces);o.nodes.append(second);
+  RustCoreEngine engine;engine.start(o);QVERIFY2(engine.status().apiHealthy,qPrintable(engine.status().message));
+  const QUrl url(QStringLiteral("http://127.0.0.1:%1/headers").arg(origin.serverPort()));
+  engine.probeNode(url);QTRY_COMPARE_WITH_TIMEOUT(engine.status().requestState,ProxyEngine::RequestState::Succeeded,3000);
+  QVERIFY(sawHead);QVERIFY(!*bodySent);QCOMPARE(engine.status().responseCode,200);QVERIFY(engine.status().latencyMs>=0);
+  QVERIFY(engine.probeOutboundConnectMs()>=0);QCOMPARE(engine.probeOriginTlsMs(),qint64(-1));
+  returnFailure=true;engine.probeNode(url);
+  QTRY_COMPARE_WITH_TIMEOUT(engine.status().requestState,ProxyEngine::RequestState::Failed,3000);
+  QCOMPARE(engine.probeFailureStage(),QString("http_status"));QCOMPARE(engine.status().responseCode,503);
+  QCOMPARE(engine.status().nodeHealth,ProxyEngine::NodeHealth::Unknown);
+  QCOMPARE(engine.status().latencyMs,-1);QVERIFY(engine.status().nodeMessage.contains("http_status"));
+  NodeTestService probes;probes.start(o,{o.selectedNodeId},url);
+  QTRY_VERIFY_WITH_TIMEOUT(!probes.busy(),5000);
+  QCOMPARE(probes.failed(),1);QCOMPARE(probes.result(o.selectedNodeId).value("phase").toString(),QString("http_status"));
+  QCOMPARE(probes.result(o.selectedNodeId).value("http").toInt(),503);
+  holdHeaders=true;returnFailure=false;auto before=requests;
+  engine.probeNode(url);QTRY_VERIFY_WITH_TIMEOUT(requests>before,1500);QVERIFY(engine.status().nodeBusy);
+  engine.selectNode(second.id);QCOMPARE(engine.status().selectedNodeId,second.id);
+  QCOMPARE(engine.status().requestState,ProxyEngine::RequestState::NotTested);QCOMPARE(engine.status().latencyMs,-1);
+  QTRY_COMPARE_WITH_TIMEOUT(*headersReleased,1,1500);engine.refresh();
+  QCOMPARE(engine.status().requestState,ProxyEngine::RequestState::NotTested);
+  before=requests;engine.probeNode(url);QTRY_VERIFY_WITH_TIMEOUT(requests>before,1500);
+  engine.stop();
+  QTRY_COMPARE_WITH_TIMEOUT(*headersReleased,2,1500);
+  QCOMPARE(engine.status().state,ProxyEngine::State::Stopped);
+  QCOMPARE(engine.status().requestState,ProxyEngine::RequestState::NotTested);
  }
  void switchingNodesClearsOldHttpTiming(){
   ControlledNetwork net;QVERIFY(net.start());auto o=options(net);

@@ -39,7 +39,7 @@ Item {
     }
     property string editingId:""
     readonly property var tested:engineController.tests.results[selectedId]||({})
-    readonly property bool rustRequestMetric:engineController.engineKind==="rust"||engineController.engineIdentityLabel.startsWith("Swirl Core")
+    readonly property bool rustRequestMetric:engineController.rustCoreBuild
     function edit(node) {
         editingId=node?node.id:"";nodeName.text=node?node.name:"";nodeHost.text=node?node.host:"";nodePort.text=node?String(node.port):""
         nodeProtocol.currentIndex=node?page.protocols.indexOf(node.protocol):0
@@ -76,7 +76,7 @@ Item {
                     id:nodeTable;objectName:"realNodeTable";minimal:true;managedSelection:true;incrementalRows:true;animateRowChanges:false;animateLatency:true;itemHeight:Theme.dp(44);headerHeight:Theme.tableHeaderHeight;textPixelSize:13
                     anchors.fill:parent;anchors.margins:Theme.dp(16);rows:page.viewRows;selectedId:page.selectedId
                     cellPadding:Theme.dp(8)
-                    columns:[{key:"name",label:"节点名称",w:235,min:76},{key:"protocol",label:"协议",w:82,min:44},{key:"latency",label:page.rustRequestMetric?"HTTP ms":"延迟",w:76,min:52},{key:"status",label:"状态",w:92,min:58}]
+                    columns:[{key:"name",label:"节点名称",w:235,min:76},{key:"protocol",label:"协议",w:82,min:44},{key:"latency",label:page.rustRequestMetric?"首部 ms":"延迟",w:76,min:52},{key:"status",label:"状态",w:92,min:58}]
                     onRowSelected:function(row){page.selectRow(row)}
                 }
                 SwirlEmptyState {anchors.centerIn:parent;visible:page.viewRows.length===0;headline:page.allNodes.length?"没有匹配的节点":"没有保存的节点";detail:page.allNodes.length?"调整搜索、协议或地区筛选。":"添加节点，或导入配置、URI 与订阅"}
@@ -114,8 +114,8 @@ Item {
                             SwirlTextField {objectName:"nodeProxyPort";Layout.preferredWidth:Theme.dp(88);text:String(engineController.proxyPort);enabled:engineController.canStart;validator:IntValidator {bottom:1;top:65535}horizontalAlignment:TextInput.AlignHCenter;onEditingFinished:{if(acceptableInput)engineController.proxyPort=Number(text);text=String(engineController.proxyPort)}Accessible.name:"本机代理端口"}
                         }
                         Rectangle {Layout.fillWidth:true;implicitHeight:Theme.dp(1);color:Theme.border}
-                        SwirlText {renderType:Text.NativeRendering;objectName:"nodeRequestState";text:engineController.tests.busy?engineController.tests.message:page.tested.time?(page.tested.success?"独立测试成功（不代表已连接）":"独立测试失败")+" · HTTP "+page.tested.http+" · "+(page.tested.latency>=0?"完整请求 "+page.tested.latency+" ms":"无请求耗时结果")+(page.tested.error?"\n"+page.tested.error:""):engineController.requestStateText;color:engineController.tests.busy?Theme.muted:page.tested.time?(page.tested.success?Theme.green:Theme.orange):engineController.requestSucceeded?Theme.green:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
-                        SwirlText {renderType:Text.NativeRendering;text:"测速类型：完整 HTTP 请求（HTTPS 含 TLS），不是 TCP 往返延迟。";visible:page.rustRequestMetric;color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
+                        SwirlText {renderType:Text.NativeRendering;objectName:"nodeRequestState";text:engineController.tests.busy?engineController.tests.message:page.tested.time?(page.tested.success?"独立测试成功（不代表已连接）":"独立测试失败")+" · HTTP "+page.tested.http+" · "+(page.tested.latency>=0?(page.rustRequestMetric?"响应首部 ":"完整请求 ")+page.tested.latency+" ms":"无请求耗时结果")+(page.rustRequestMetric&&page.tested.success&&page.tested.outboundConnectMs>=0?"\n出站建立（含 DNS 与节点握手） "+page.tested.outboundConnectMs+" ms"+(page.tested.originTlsMs>=0?" · 目标 TLS "+page.tested.originTlsMs+" ms":""):"")+(page.tested.error?"\n"+page.tested.error:""):engineController.requestStateText;color:engineController.tests.busy?Theme.muted:page.tested.time?(page.tested.success?Theme.green:Theme.orange):engineController.requestSucceeded?Theme.green:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
+                        SwirlText {renderType:Text.NativeRendering;text:"测速类型：Rust Core 经所选节点发送 HEAD，计时至目标 HTTP 响应首部（HTTPS 含目标 TLS），不等待响应体。隔离测试不继承当前 DNS 设置，目标解析遵循出站协议；不是 TCP 往返延迟。";visible:page.rustRequestMetric;color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
                         SwirlText {renderType:Text.NativeRendering;text:engineController.nodeError||engineController.error;visible:text.length>0;color:Theme.orange;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
                     }
                 }

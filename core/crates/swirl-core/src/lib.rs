@@ -1,8 +1,11 @@
 //! Rust-owned runtime, sockets, scheduling, statistics and immutable session plans.
 mod policy;
+mod probe;
 mod socks5_udp;
 pub use policy::{MemberHealth, PolicyReport};
 use policy::{PolicyRuntime, PolicyView};
+use probe::ProbeRuntime;
+pub use probe::{ProbeFailure, ProbeMetrics, ProbePhase, ProbeStatus};
 use serde::Serialize;
 use std::{
     collections::{BTreeMap, HashMap},
@@ -16,7 +19,7 @@ use std::{
 use swirl_dns::Resolver;
 use swirl_protocol::{Inbound, Result, Target};
 use swirl_routing::{ChinaRules, load_rules_from_directory, shared_bundled_rules};
-use swirl_subscription::{Config, Outbound, PolicyStrategy};
+use swirl_subscription::{Config, HealthProbe, Outbound, PolicyStrategy};
 use swirl_transport::{Counters, bind_udp};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -138,6 +141,7 @@ impl Plan {
 }
 pub struct Core {
     runtime: Option<Runtime>,
+    probe: ProbeRuntime,
     stop: watch::Sender<bool>,
     task: Option<JoinHandle<()>>,
     plan: Arc<RwLock<Arc<Plan>>>,
@@ -213,6 +217,7 @@ impl Core {
             sessions.abort_all();while sessions.join_next().await.is_some() {}
         }});
         Ok(Self {
+            probe: ProbeRuntime::new(runtime.handle().clone()),
             runtime: Some(runtime),
             stop,
             task: Some(task),
@@ -238,6 +243,7 @@ impl Core {
         let policies = Arc::new(plan.policies.reconfigured(config.clone(), resolver.clone()));
         // All fallible validation has completed. Stop the replaced worker even
         // if an old session still owns its immutable configuration and choices.
+        self.probe.invalidate()?;
         plan.policies.stop();
         *plan = Arc::new(Plan {
             config,
@@ -257,6 +263,7 @@ impl Core {
         let mut next = (*plan.config).clone();
         next.selected = id.to_owned();
         next.validate()?;
+        self.probe.invalidate()?;
         *plan = Arc::new(Plan {
             config: Arc::new(next),
             resolver: plan.resolver.clone(),
@@ -286,6 +293,7 @@ impl Core {
         }
         selector.selected = member.to_owned();
         next.validate()?;
+        self.probe.invalidate()?;
         *plan = Arc::new(Plan {
             config: Arc::new(next),
             resolver: plan.resolver.clone(),
@@ -298,6 +306,51 @@ impl Core {
     }
     pub fn address(&self) -> SocketAddr {
         self.address
+    }
+    /// Schedule a fresh HEAD URL test for the concrete selected node. This
+    /// control call validates inputs and spawns work, but never awaits network I/O.
+    pub fn probe_start(
+        &self,
+        url: String,
+        timeout_ms: Option<u64>,
+        expected_status: Option<u16>,
+    ) -> Result<ProbeStatus> {
+        if self.runtime.is_none() {
+            return Err("CoreStopped");
+        }
+        if expected_status.is_some_and(|status| !(200..=299).contains(&status)) {
+            return Err("UrlTestExpectedStatus");
+        }
+        let options = HealthProbe {
+            url,
+            interval_ms: 300_000,
+            timeout_ms: timeout_ms.unwrap_or(8_000),
+            expected_status: expected_status.unwrap_or(204),
+            tolerance_ms: 0,
+            tls: None,
+        };
+        options.target()?;
+        let plan = self.plan.read().map_err(|_| "ConfigState")?;
+        let node = plan
+            .config
+            .nodes
+            .iter()
+            .find(|node| node.id == plan.config.selected)
+            .ok_or("ProbeSelectedNodeRequired")?;
+        if matches!(node.outbound, Outbound::Reject {}) {
+            return Err("ProbeSelectedNodeRejected");
+        }
+        let outbound = node.outbound.clone();
+        let resolver = plan.resolver.clone();
+        self.probe.start_with(async move {
+            swirl_protocol::url_test_head(&outbound, &options, &resolver, expected_status).await
+        })
+    }
+    pub fn probe_status(&self) -> Result<ProbeStatus> {
+        self.probe.status()
+    }
+    pub fn probe_cancel(&self) -> Result<ProbeStatus> {
+        self.probe.cancel()
     }
     pub fn snapshot(&self) -> Result<Snapshot> {
         let plan = self.plan.read().map_err(|_| "ConfigState")?;
@@ -353,6 +406,7 @@ impl Core {
         })
     }
     pub fn stop(&mut self) {
+        let _ = self.probe.invalidate();
         if let Ok(plan) = self.plan.read() {
             plan.policies.stop();
         }

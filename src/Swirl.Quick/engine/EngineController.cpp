@@ -488,12 +488,21 @@ void EngineController::setSystemProxy(bool enabled) {
     socket->connectToHost(QHostAddress::LocalHost,quint16(m_captureProxyPort>0?m_captureProxyPort:s.proxyPort));
 }
 QString EngineController::proxyEnvironmentAdvice() const {
+#ifdef SWIRL_USE_RUST_CORE
+    return QStringLiteral("从新的 PowerShell 会话启动支持代理变量的应用：\n"
+        "$env:HTTP_PROXY='http://127.0.0.1:%1'\n$env:HTTPS_PROXY='http://127.0.0.1:%1'\n"
+        "$env:ALL_PROXY='http://127.0.0.1:%1'\n$env:NO_PROXY='localhost,127.0.0.1,::1'\n"
+        "Codex 是否读取系统代理或这些变量取决于具体版本。完全退出后从该会话重新启动，已有进程不会自动继承。"
+        "当前 Rust Core 构建不提供 TUN；忽略代理设置的应用无法通过本页接入。"
+        "本页只提供建议，不写入环境变量、.codex 配置文件或密钥。").arg(m_options.proxyPort);
+#else
     return QStringLiteral("从新的 PowerShell 会话启动支持代理变量的应用：\n"
         "$env:HTTP_PROXY='http://127.0.0.1:%1'\n$env:HTTPS_PROXY='http://127.0.0.1:%1'\n"
         "$env:ALL_PROXY='http://127.0.0.1:%1'\n$env:NO_PROXY='localhost,127.0.0.1,::1'\n"
         "Codex 是否读取系统代理或这些变量取决于具体版本。完全退出后从该会话重新启动，已有进程不会自动继承。"
         "忽略两者的应用请使用自身代理设置，或由用户主动开启现有 TUN 增强模式。"
         "本页只提供建议，不写入环境变量、.codex 配置文件或密钥。").arg(m_options.proxyPort);
+#endif
 }
 void EngineController::setPreferCompatibility(bool enabled) {
 #ifdef SWIRL_USE_RUST_CORE

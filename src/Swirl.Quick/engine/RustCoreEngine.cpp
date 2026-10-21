@@ -4,14 +4,13 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QDateTime>
-#include <QNetworkProxy>
-#include <QNetworkRequest>
 #include <QUuid>
 #include <QSet>
 #include <QHostAddress>
 #include <QRegularExpression>
 #include <algorithm>
 #include <functional>
+#include <limits>
 
 namespace {
 const QStringList &privateSubnets(){
@@ -185,7 +184,6 @@ QString routingConfiguration(const EngineStartOptions &o,const QString &selected
 
 RustCoreEngine::RustCoreEngine(QObject *parent):ProxyEngine(parent){
  m_poll.setInterval(250);connect(&m_poll,&QTimer::timeout,this,&RustCoreEngine::refresh);
- m_network.setProxy(QNetworkProxy::NoProxy);
  m_status.engineName="Swirl Core Rust";m_status.engineKind="rust";
 }
 // Owners can destroy their telemetry members before their engine member.
@@ -364,7 +362,51 @@ QJsonObject RustCoreEngine::call(QJsonObject command){
  if(count<=0||count>output.size())return {{"ok",false},{"error","RustAbiFailure"}};
  output.resize(count);return QJsonDocument::fromJson(output).object();
 }
-void RustCoreEngine::fail(Error error,const QString &reason){m_status.state=State::Failed;m_status.error=error;m_status.message=reason;m_status.apiHealthy=false;emit diagnostic("SwirlRust","CoreFailure",reason);emit statusChanged();}
+void RustCoreEngine::resetProbeState(){
+ m_probeRequestId=0;m_probeFailureStage.clear();m_probeOutboundConnectMs=m_probeOriginTlsMs=-1;
+ m_status.nodeBusy=false;m_status.requestState=RequestState::NotTested;m_status.nodeHealth=NodeHealth::Unknown;
+ m_status.latencyMs=-1;m_status.responseCode=0;m_status.nodeMessage.clear();
+}
+void RustCoreEngine::cancelProbe(){
+ if(m_handle&&m_probeRequestId)call({{"op","probe_cancel"},{"handle",qint64(m_handle)}});
+ resetProbeState();
+}
+void RustCoreEngine::failProbe(const QString &stage,const QString &code,int httpStatus){
+ m_probeRequestId=0;m_probeFailureStage=stage;m_probeOutboundConnectMs=m_probeOriginTlsMs=-1;
+ m_status.nodeBusy=false;m_status.requestState=RequestState::Failed;
+ m_status.nodeHealth=QStringList{"dns","tcp_connect","outbound_handshake","outbound_connect"}.contains(stage)
+  ?NodeHealth::Unavailable:NodeHealth::Unknown;
+ m_status.latencyMs=-1;m_status.responseCode=httpStatus;
+ m_status.nodeMessage=QStringLiteral("Rust HEAD 探测失败（阶段 %1，代码 %2）").arg(stage.isEmpty()?QStringLiteral("unknown"):stage,code);
+}
+void RustCoreEngine::updateProbe(const QJsonObject &probe){
+ const auto requestId=probe.value("request_id").toInteger(-1);
+ if(requestId<=0){failProbe("probe_status","ProbeStateInvalid");return;}
+ if(requestId!=m_probeRequestId){resetProbeState();return;}
+ const auto state=probe.value("state").toString();
+ if(state=="running")return;
+ if(state=="succeeded"){
+  const auto metrics=probe.value("metrics").toObject();
+  const auto elapsed=metrics.value("response_headers_ms").toInteger(-1);
+  const auto outbound=metrics.value("outbound_connect_ms").toInteger(-1);
+  const auto tlsValue=metrics.value("origin_tls_ms");
+  const auto originTls=tlsValue.isNull()?-1:tlsValue.toInteger(-1);
+  const auto code=metrics.value("http_status").toInt();
+  if(elapsed<0||elapsed>std::numeric_limits<int>::max()||outbound<0||outbound>elapsed||(!tlsValue.isNull()&&originTls<0)||code<200||code>=300){failProbe("probe_status","ProbeMetricsInvalid");return;}
+  m_probeRequestId=0;m_probeFailureStage.clear();m_status.nodeBusy=false;
+  m_probeOutboundConnectMs=outbound;m_probeOriginTlsMs=originTls;
+  m_status.requestState=RequestState::Succeeded;m_status.nodeHealth=NodeHealth::Available;
+  m_status.latencyMs=int(elapsed);m_status.responseCode=code;
+  m_status.nodeMessage=QStringLiteral("Rust HEAD 响应首部已接收");return;
+ }
+ if(state=="failed"){
+  const auto failure=probe.value("failure").toObject();
+  failProbe(failure.value("stage").toString("probe_status"),failure.value("code").toString("ProbeFailed"),failure.value("http_status").toInt());return;
+ }
+ if(state=="idle"||state=="cancelled"){resetProbeState();return;}
+ failProbe("probe_status","ProbeStateInvalid");
+}
+void RustCoreEngine::fail(Error error,const QString &reason){cancelProbe();m_status.state=State::Failed;m_status.error=error;m_status.message=reason;m_status.apiHealthy=false;emit diagnostic("SwirlRust","CoreFailure",reason);emit statusChanged();}
 void RustCoreEngine::start(const EngineStartOptions &options){
  stop();m_options=options;m_status={};m_status.engineName="Swirl Core Rust";m_status.engineKind="rust";
  QJsonObject config;const auto reason=configuration(options,&config);if(!reason.isEmpty()){fail(Error::InvalidOptions,reason);return;}
@@ -386,7 +428,7 @@ void RustCoreEngine::start(const EngineStartOptions &options){
  m_uptime.start();m_rateClock.start();m_poll.start();refresh();
 }
 void RustCoreEngine::stop(){
- m_poll.stop();if(m_reply){m_reply->disconnect(this);m_reply->abort();m_reply->deleteLater();m_reply=nullptr;}
+ m_poll.stop();cancelProbe();
  if(m_handle){call({{"op","stop"},{"handle",qint64(m_handle)}});m_handle=0;}
  m_status.state=State::Stopped;m_status.processAlive=false;m_status.apiHealthy=false;m_status.nodeBusy=false;m_status.proxyPort=0;m_status.connections.clear();emit statusChanged();
 }
@@ -416,43 +458,50 @@ void RustCoreEngine::refresh(){
    {"closed",row["ended"].toBool()},{"uploadBytes",row["upload"].toInteger()},{"downloadBytes",row["download"].toInteger()},
    {"time",QDateTime::fromMSecsSinceEpoch(m_status.connectionsAt-row["elapsed_ms"].toInteger()).toString(Qt::ISODateWithMs)},{"process","未知进程"}});
  }
+ if(m_probeRequestId){
+  const auto result=call({{"op","probe_status"},{"handle",qint64(m_handle)}});
+  if(!result.value("ok").toBool()){cancelProbe();failProbe("probe_status",result.value("error").toString("ProbeStatusFailed"));}
+  else updateProbe(result.value("probe").toObject());
+ }
  emit statusChanged();
 }
 void RustCoreEngine::selectNode(const QString &id){
- if(!m_handle)return;auto options=m_options;options.selectedNodeId=id;options.directSession=false;
+ if(!m_handle)return;cancelProbe();auto options=m_options;options.selectedNodeId=id;options.directSession=false;
  if(options.routingMode=="direct"){
   // Validate the selected node independently of the current DIRECT route.
   // The installed route and its explicit DIRECT status remain unchanged.
   auto candidate=options;candidate.routingMode="global";QJsonObject node;
-  const auto reason=configuration(candidate,&node);if(!reason.isEmpty()){emit diagnostic("SwirlRust","SelectionUnsupported",reason);return;}
+   const auto reason=configuration(candidate,&node);if(!reason.isEmpty()){emit diagnostic("SwirlRust","SelectionUnsupported",reason);emit statusChanged();return;}
  }
- QJsonObject config;const auto reason=configuration(options,&config);if(!reason.isEmpty()){emit diagnostic("SwirlRust","SelectionUnsupported",reason);return;}
+  QJsonObject config;const auto reason=configuration(options,&config);if(!reason.isEmpty()){emit diagnostic("SwirlRust","SelectionUnsupported",reason);emit statusChanged();return;}
  const auto result=call({{"op","configure"},{"handle",qint64(m_handle)},{"config",config}});
- if(!result["ok"].toBool()){emit diagnostic("SwirlRust","SelectionFailed",result["error"].toString());return;}
+  if(!result["ok"].toBool()){emit diagnostic("SwirlRust","SelectionFailed",result["error"].toString());emit statusChanged();return;}
  m_options=options;m_status.selectedNodeId=id;m_status.directSession=options.directSession||options.routingMode=="direct";
  m_status.requestState=RequestState::NotTested;m_status.nodeHealth=NodeHealth::Unknown;
  m_status.latencyMs=-1;m_status.responseCode=0;m_status.nodeMessage.clear();refresh();
 }
 void RustCoreEngine::setRoutingMode(const QString &mode){
- if(!m_handle)return;auto options=m_options;options.routingMode=mode;options.directSession=mode=="direct";QJsonObject config;const auto reason=configuration(options,&config);
- if(!reason.isEmpty()){emit diagnostic("SwirlRust","RoutingUnsupported",reason);return;}
+ if(!m_handle)return;cancelProbe();auto options=m_options;options.routingMode=mode;options.directSession=mode=="direct";QJsonObject config;const auto reason=configuration(options,&config);
+ if(!reason.isEmpty()){emit diagnostic("SwirlRust","RoutingUnsupported",reason);emit statusChanged();return;}
  const auto result=call({{"op","configure"},{"handle",qint64(m_handle)},{"config",config}});
- if(!result["ok"].toBool()){emit diagnostic("SwirlRust","RoutingFailed",result["error"].toString());return;}
+ if(!result["ok"].toBool()){emit diagnostic("SwirlRust","RoutingFailed",result["error"].toString());emit statusChanged();return;}
  m_options=options;m_status.mode=mode;m_status.directSession=options.directSession||mode=="direct";refresh();
 }
 void RustCoreEngine::probeNode(const QUrl &url){
- if(!m_handle||m_reply)return;
- if(!url.isValid()||!QStringList{"http","https"}.contains(url.scheme())||url.host().isEmpty()||!url.userInfo().isEmpty()||url.hasFragment())return;
- m_network.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",m_status.proxyPort,m_options.inboundUsername,m_options.inboundPassword));
- QNetworkRequest request(url);request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,QNetworkRequest::ManualRedirectPolicy);request.setTransferTimeout(8000);request.setRawHeader("Connection","close");
- auto reply=m_network.get(request);m_reply=reply;reply->setReadBufferSize(65536);auto clock=std::make_shared<QElapsedTimer>();clock->start();
- auto deadline=new QTimer(reply);deadline->setSingleShot(true);connect(deadline,&QTimer::timeout,reply,&QNetworkReply::abort);deadline->start(9000);
- m_status.nodeBusy=true;m_status.requestState=RequestState::InProgress;
- m_status.nodeHealth=NodeHealth::Checking;m_status.latencyMs=-1;m_status.responseCode=0;m_status.nodeMessage.clear();emit statusChanged();
- connect(reply,&QNetworkReply::readyRead,this,[reply]{const auto count=reply->property("count").toLongLong()+reply->readAll().size();reply->setProperty("count",count);if(count>256*1024)reply->abort();});
- connect(reply,&QNetworkReply::finished,this,[this,reply,clock]{
-  m_reply=nullptr;const auto code=reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();const bool ok=reply->error()==QNetworkReply::NoError&&code>=200&&code<300;
-  m_status.nodeBusy=false;m_status.requestState=ok?RequestState::Succeeded:RequestState::Failed;m_status.nodeHealth=ok?NodeHealth::Available:NodeHealth::Unavailable;
-  m_status.responseCode=code;m_status.latencyMs=ok?int(clock->elapsed()):-1;m_status.nodeMessage=ok?"Rust 原生请求成功":"Rust 原生请求失败；未切换出口或重放请求";reply->deleteLater();refresh();
- });
+ if(!m_handle||m_probeRequestId)return;
+ const auto text=url.toString(QUrl::FullyEncoded);
+ if(text.size()>2048||!url.isValid()||!QStringList{"http","https"}.contains(url.scheme())||url.host().isEmpty()||!url.userInfo().isEmpty()||url.hasFragment()){
+  failProbe("input","ProbeUrlInvalid");emit statusChanged();return;
+ }
+ resetProbeState();
+ const auto response=call({{"op","probe_start"},{"handle",qint64(m_handle)},{"url",text},{"timeout_ms",8000}});
+ if(!response.value("ok").toBool()){
+  failProbe("probe_start",response.value("error").toString("ProbeStartFailed"));emit statusChanged();return;
+ }
+ const auto probe=response.value("probe").toObject();const auto requestId=probe.value("request_id").toInteger(-1);
+ if(requestId<=0||probe.value("state").toString()!="running"){
+  failProbe("probe_start","ProbeStateInvalid");emit statusChanged();return;
+ }
+ m_probeRequestId=requestId;m_status.nodeBusy=true;m_status.requestState=RequestState::InProgress;
+ m_status.nodeHealth=NodeHealth::Checking;emit statusChanged();
 }

@@ -7,11 +7,181 @@ use swirl_dns::Resolver;
 use swirl_subscription::{HealthProbe, Outbound};
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWriteExt},
-    time::{Duration, timeout},
+    time::{Duration, timeout, timeout_at},
 };
 
 const HEADER_LIMIT: usize = 8192;
 const INFORMATIONAL_LIMIT: usize = 8;
+
+/// The operation that failed. `OutboundConnect` includes the node's DNS,
+/// transport, and protocol setup; it is not a pure TCP round trip.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum UrlTestStage {
+    Input,
+    Dns,
+    TcpConnect,
+    OutboundHandshake,
+    OutboundConnect,
+    OriginTls,
+    RequestWrite,
+    ResponseHeaders,
+    HttpStatus,
+}
+
+/// Fixed, redacted failure code with the stage and optional HTTP status.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct UrlTestFailure {
+    pub stage: UrlTestStage,
+    pub code: &'static str,
+    pub http_status: Option<u16>,
+}
+
+impl UrlTestFailure {
+    fn at(stage: UrlTestStage, code: &'static str) -> Self {
+        Self {
+            stage,
+            code,
+            http_status: None,
+        }
+    }
+
+    fn outbound(code: &'static str) -> Self {
+        let stage = match crate::failure_stage(code) {
+            "dns" => UrlTestStage::Dns,
+            "tcp_connect" => UrlTestStage::TcpConnect,
+            "tls_handshake" | "reality_handshake" | "websocket_upgrade" | "protocol_handshake" => {
+                UrlTestStage::OutboundHandshake
+            }
+            _ => UrlTestStage::OutboundConnect,
+        };
+        Self::at(stage, code)
+    }
+
+    fn input(code: &'static str) -> Self {
+        let code = match code {
+            "PolicyProbeParameters" => "UrlTestParameters",
+            "PolicyProbeUrl" => "UrlTestUrl",
+            "PolicyProbeHost" => "UrlTestHost",
+            "PolicyProbePort" => "UrlTestPort",
+            "PolicyProbeTls" => "UrlTestTls",
+            _ => "UrlTestInput",
+        };
+        Self::at(UrlTestStage::Input, code)
+    }
+
+    fn response(code: &'static str) -> Self {
+        let code = match code {
+            "PolicyProbeHeaderLimit" => "UrlTestHeaderLimit",
+            "PolicyProbeInformationalLimit" => "UrlTestInformationalLimit",
+            "PolicyProbeHttp" => "UrlTestInvalidHttp",
+            "PolicyProbeRead" => "UrlTestRead",
+            _ => "UrlTestResponse",
+        };
+        Self::at(UrlTestStage::ResponseHeaders, code)
+    }
+}
+
+/// One fresh HEAD request through an explicit native outbound.
+/// `outbound_connect_ms` and `response_headers_ms` are cumulative from start;
+/// the former includes DNS and node handshake, and the latter ends at validated
+/// final headers before body or EOF. `origin_tls_ms` is that phase's duration.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct UrlTestMetrics {
+    pub outbound_connect_ms: u64,
+    pub origin_tls_ms: Option<u64>,
+    pub response_headers_ms: u64,
+    pub http_status: u16,
+}
+
+fn elapsed_ms(started: Instant) -> u64 {
+    started.elapsed().as_millis().min(u128::from(u64::MAX)) as u64
+}
+
+/// Measure a fresh native outbound with HEAD, with no redirect, retry, body
+/// download, external-core fallback, or implicit change to the selected node.
+/// The configured timeout is one shared deadline across every network phase.
+/// `expected_status = None` accepts any final 2xx response; `Some(status)`
+/// requires that exact 2xx status. Automatic policy health uses `health_probe`.
+///
+/// # Errors
+/// Returns a fixed-code failure tagged with the phase that failed. A response
+/// whose status differs from `expected_status` returns the actual status.
+pub async fn url_test_head(
+    outbound: &Outbound,
+    options: &HealthProbe,
+    resolver: &Resolver,
+    expected_status: Option<u16>,
+) -> std::result::Result<UrlTestMetrics, UrlTestFailure> {
+    if expected_status.is_some_and(|status| !(200..=299).contains(&status)) {
+        return Err(UrlTestFailure::at(
+            UrlTestStage::Input,
+            "UrlTestExpectedStatus",
+        ));
+    }
+    let target = options.target().map_err(UrlTestFailure::input)?;
+    let started = Instant::now();
+    let deadline = tokio::time::Instant::now() + Duration::from_millis(options.timeout_ms);
+    let mut stream = timeout_at(
+        deadline,
+        crate::connect(
+            outbound,
+            &Target {
+                host: target.host.clone(),
+                port: target.port,
+            },
+            resolver,
+            Duration::from_millis(options.timeout_ms),
+        ),
+    )
+    .await
+    .map_err(|_| UrlTestFailure::at(UrlTestStage::OutboundConnect, "UrlTestTimeout"))?
+    .map_err(UrlTestFailure::outbound)?;
+    let outbound_connect_ms = elapsed_ms(started);
+
+    let origin_tls_ms = if let Some(tls) = target.tls {
+        let tls_started = Instant::now();
+        stream = timeout_at(deadline, swirl_transport::secure(stream, &tls))
+            .await
+            .map_err(|_| UrlTestFailure::at(UrlTestStage::OriginTls, "UrlTestTimeout"))?
+            .map_err(|code| UrlTestFailure::at(UrlTestStage::OriginTls, code))?;
+        Some(elapsed_ms(tls_started))
+    } else {
+        None
+    };
+    let request = format!(
+        "HEAD {} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\nUser-Agent: Swirl-Core-URLTest/1\r\nAccept: */*\r\n\r\n",
+        target.path, target.authority
+    );
+    timeout_at(deadline, async {
+        stream.write_all(request.as_bytes()).await?;
+        stream.flush().await
+    })
+    .await
+    .map_err(|_| UrlTestFailure::at(UrlTestStage::RequestWrite, "UrlTestTimeout"))?
+    .map_err(|_| UrlTestFailure::at(UrlTestStage::RequestWrite, "UrlTestWrite"))?;
+
+    let status = timeout_at(deadline, response_code(&mut stream))
+        .await
+        .map_err(|_| UrlTestFailure::at(UrlTestStage::ResponseHeaders, "UrlTestTimeout"))?
+        .map_err(UrlTestFailure::response)?;
+    let response_headers_ms = elapsed_ms(started);
+    if !expected_status.map_or((200..=299).contains(&status), |expected| status == expected) {
+        return Err(UrlTestFailure {
+            stage: UrlTestStage::HttpStatus,
+            code: "UrlTestStatus",
+            http_status: Some(status),
+        });
+    }
+    // A HEAD response has no body. Drop our owned stream rather than waiting
+    // for the peer to close or for a TLS write shutdown after the metric ends.
+    drop(stream);
+    Ok(UrlTestMetrics {
+        outbound_connect_ms,
+        origin_tls_ms,
+        response_headers_ms,
+        http_status: status,
+    })
+}
 
 pub async fn health_probe(
     outbound: &Outbound,
@@ -60,6 +230,14 @@ pub async fn health_probe(
 }
 
 async fn response_status<R: AsyncRead + Unpin>(stream: &mut R, expected: u16) -> Result<()> {
+    if response_code(stream).await? == expected {
+        Ok(())
+    } else {
+        Err("PolicyProbeStatus")
+    }
+}
+
+async fn response_code<R: AsyncRead + Unpin>(stream: &mut R) -> Result<u16> {
     let mut response = Vec::with_capacity(1024);
     let mut total_headers = 0;
     let mut informational = 0;
@@ -91,11 +269,7 @@ async fn response_status<R: AsyncRead + Unpin>(stream: &mut R, expected: u16) ->
                 response.drain(..length);
                 continue;
             }
-            return if status == expected {
-                Ok(())
-            } else {
-                Err("PolicyProbeStatus")
-            };
+            return Ok(status);
         }
         let remaining = HEADER_LIMIT.saturating_sub(total_headers + response.len());
         if remaining == 0 {
@@ -113,6 +287,10 @@ async fn response_status<R: AsyncRead + Unpin>(stream: &mut R, expected: u16) ->
         response.extend_from_slice(&block[..count]);
     }
 }
+
+#[cfg(test)]
+#[path = "probe_tests.rs"]
+mod probe_tests;
 
 #[cfg(test)]
 mod tests {
