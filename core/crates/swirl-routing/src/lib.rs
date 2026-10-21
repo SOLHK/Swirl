@@ -1,5 +1,7 @@
 //! Ordered routing over immutable, validated IR. No implicit DIRECT fallback.
 use std::net::{IpAddr, SocketAddr};
+mod mrs;
+pub use mrs::{Behavior as MrsBehavior, ChinaRules};
 use swirl_subscription::{Config, Matcher, Node, PolicyStrategy};
 
 pub enum Decision<'a> {
