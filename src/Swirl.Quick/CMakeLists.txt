@@ -80,15 +80,16 @@ if(NOT SWIRL_USE_RUST_CORE OR SWIRL_BUILD_UI_TESTS)
   engine/OwnedProcess.h engine/OwnedProcess.cpp
   engine/MihomoAdapter.h engine/MihomoAdapter.cpp
   engine/MihomoLogDiagnostic.h engine/MihomoLogDiagnostic.cpp
-  engine/SwirlEngineManager.h engine/SwirlEngineManager.cpp)
+  engine/SwirlEngineManager.h engine/SwirlEngineManager.cpp
+  engine/SwirlProxyEngine.h engine/SwirlProxyEngine.cpp
+  engine/NativeDuplexRelay.h engine/NativeDuplexRelay.cpp
+  engine/SwirlUdpExchange.h engine/SwirlUdpExchange.cpp)
 endif()
 target_sources(SwirlEngine PRIVATE engine/ProxyNode.h engine/ProxyNode.cpp engine/NodeStore.h engine/NodeStore.cpp)
 target_sources(SwirlEngine PRIVATE engine/NodeImporter.h engine/NodeImporter.cpp)
 target_sources(SwirlEngine PRIVATE engine/SubscriptionNormalizer.h engine/SubscriptionNormalizer.cpp)
-target_sources(SwirlEngine PRIVATE engine/SwirlProtocolRegistry.h engine/SwirlProtocolRegistry.cpp engine/SwirlProxyEngine.h engine/SwirlProxyEngine.cpp)
-target_sources(SwirlEngine PRIVATE engine/NativeDuplexRelay.h engine/NativeDuplexRelay.cpp)
+target_sources(SwirlEngine PRIVATE engine/SwirlProtocolRegistry.h engine/SwirlProtocolRegistry.cpp)
 target_sources(SwirlEngine PRIVATE engine/ConnectionDiagnostics.h engine/ConnectionDiagnostics.cpp)
-target_sources(SwirlEngine PRIVATE engine/SwirlUdpExchange.h engine/SwirlUdpExchange.cpp)
 target_sources(SwirlEngine PRIVATE engine/NodeImportService.h engine/NodeImportService.cpp)
 target_sources(SwirlEngine PRIVATE engine/RustCoreEngine.h engine/RustCoreEngine.cpp)
 if(SWIRL_USE_RUST_CORE)
