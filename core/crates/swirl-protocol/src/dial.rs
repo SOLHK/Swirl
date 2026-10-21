@@ -202,6 +202,23 @@ pub(super) async fn connect_tcp(
         resolver.resolve(&target.host, target.port),
     )
     .await?;
+    connect_tcp_addresses(addresses, deadline).await
+}
+
+/// Connect DIRECT to addresses that were already resolved and selected by the
+/// caller. No second DNS lookup, proxy negotiation or application write occurs.
+/// All address attempts share one deadline and the losing sockets are dropped.
+pub async fn connect_direct_resolved(
+    addresses: Vec<SocketAddr>,
+    handshake_limit: Duration,
+) -> Result<swirl_transport::BoxStream> {
+    let deadline = Instant::now()
+        .checked_add(handshake_limit)
+        .ok_or("UpstreamTcpTimeout")?;
+    Ok(Box::new(connect_tcp_addresses(addresses, deadline).await?))
+}
+
+async fn connect_tcp_addresses(addresses: Vec<SocketAddr>, deadline: Instant) -> Result<TcpStream> {
     let stream = dial_addresses(addresses, deadline, TcpStream::connect).await?;
     stream.set_nodelay(true).map_err(|_| "SocketOptions")?;
     Ok(stream)
@@ -584,6 +601,45 @@ mod tests {
         let mut bytes = [0; 6];
         peer.read_exact(&mut bytes).await.unwrap();
         assert_eq!(&bytes, b"native");
+    }
+
+    #[tokio::test]
+    async fn resolved_direct_uses_fallback_without_sending_application_bytes() {
+        let reserved = TcpSocket::new_v4().unwrap();
+        reserved.bind(address("127.0.0.1:0")).unwrap();
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let mut connected = connect_direct_resolved(
+            vec![
+                reserved.local_addr().unwrap(),
+                listener.local_addr().unwrap(),
+            ],
+            Duration::from_secs(3),
+        )
+        .await
+        .unwrap();
+        let (mut peer, _) = listener.accept().await.unwrap();
+        assert!(
+            timeout(Duration::from_millis(20), peer.read_u8())
+                .await
+                .is_err()
+        );
+        connected.write_all(b"direct").await.unwrap();
+        let mut bytes = [0; 6];
+        peer.read_exact(&mut bytes).await.unwrap();
+        assert_eq!(&bytes, b"direct");
+    }
+
+    #[tokio::test]
+    async fn resolved_direct_expired_budget_prevents_socket_attempt() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let result =
+            connect_direct_resolved(vec![listener.local_addr().unwrap()], Duration::ZERO).await;
+        assert!(matches!(result, Err("UpstreamTcpTimeout")));
+        assert!(
+            timeout(Duration::from_millis(20), listener.accept())
+                .await
+                .is_err()
+        );
     }
 
     #[tokio::test(start_paused = true)]

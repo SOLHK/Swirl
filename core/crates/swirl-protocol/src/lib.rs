@@ -10,7 +10,7 @@ pub mod vision;
 mod vless;
 mod websocket;
 pub use diagnostics::{TcpAttempt, TcpDiagnostic, TcpOutcome, failure_stage};
-pub use dial::diagnose_tcp;
+pub use dial::{connect_direct_resolved, diagnose_tcp};
 use dial::{connect_tcp, within};
 pub use probe::{UrlTestFailure, UrlTestMetrics, UrlTestStage, health_probe, url_test_head};
 pub use shadowsocks::{

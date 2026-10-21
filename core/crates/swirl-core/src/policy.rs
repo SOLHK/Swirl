@@ -58,6 +58,17 @@ pub(super) struct PolicyView {
     pinned: Mutex<HashMap<String, String>>,
 }
 impl PolicyView {
+    /// Read a choice already consumed by this session. Checking alternate
+    /// DNS answers must not advance an unrelated load-balance group.
+    pub fn pinned_choice(&self, id: &str) -> Result<String> {
+        self.pinned
+            .lock()
+            .map_err(|_| "PolicyState")?
+            .get(id)
+            .cloned()
+            .ok_or("PolicyNotPinned")
+    }
+
     pub fn choose(&self, id: &str) -> Result<String> {
         let mut pinned = self.pinned.lock().map_err(|_| "PolicyState")?;
         if let Some(node) = pinned.get(id) {
@@ -491,6 +502,40 @@ mod tests {
             assert_eq!(view.choose("g").unwrap(), expected);
         }
         assert_eq!(cursor.load(Ordering::Relaxed), 3);
+    }
+
+    #[test]
+    fn alternate_address_check_reads_only_the_already_pinned_policy() {
+        let used_cursor = Arc::new(AtomicU64::new(0));
+        let unused_cursor = Arc::new(AtomicU64::new(0));
+        let view = PolicyView {
+            groups: HashMap::from([
+                (
+                    "used".into(),
+                    Choice {
+                        members: vec!["direct".into(), "other".into()],
+                        preferred: None,
+                        cursor: used_cursor.clone(),
+                        strategy: PolicyStrategy::LoadBalance,
+                    },
+                ),
+                (
+                    "unused".into(),
+                    Choice {
+                        members: vec!["direct".into(), "other".into()],
+                        preferred: None,
+                        cursor: unused_cursor.clone(),
+                        strategy: PolicyStrategy::LoadBalance,
+                    },
+                ),
+            ]),
+            pinned: Mutex::new(HashMap::new()),
+        };
+        assert_eq!(view.choose("used"), Ok("direct".into()));
+        assert_eq!(view.pinned_choice("used"), Ok("direct".into()));
+        assert_eq!(view.pinned_choice("unused"), Err("PolicyNotPinned"));
+        assert_eq!(used_cursor.load(Ordering::Relaxed), 1);
+        assert_eq!(unused_cursor.load(Ordering::Relaxed), 0);
     }
 
     #[test]

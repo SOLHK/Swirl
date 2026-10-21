@@ -485,27 +485,28 @@ async fn session(
         );
         return udp_associate(inbound, peer, request, plan, counters, state.totals.clone()).await;
     }
-    let (node, routed_target, rule_index) = match route(&plan, &request.target, peer.ip()).await {
-        Ok(route) => route,
-        Err(error) => {
-            state.records.lock().map_err(|_| "StatsState")?.insert(
-                id,
-                Record {
-                    peer,
-                    category: "route-error",
-                    target: request.target.clone(),
-                    node: String::new(),
-                    matched_rule: "ROUTE_ERROR".into(),
-                    started: Instant::now(),
-                    ended: false,
-                    error,
-                    counters: counters.clone(),
-                },
-            );
-            let _ = swirl_protocol::reply(&mut inbound, request.kind, false).await;
-            return Err(error);
-        }
-    };
+    let (node, routed_target, rule_index, direct_addresses) =
+        match route(&plan, &request.target, peer.ip(), true).await {
+            Ok(route) => route,
+            Err(error) => {
+                state.records.lock().map_err(|_| "StatsState")?.insert(
+                    id,
+                    Record {
+                        peer,
+                        category: "route-error",
+                        target: request.target.clone(),
+                        node: String::new(),
+                        matched_rule: "ROUTE_ERROR".into(),
+                        started: Instant::now(),
+                        ended: false,
+                        error,
+                        counters: counters.clone(),
+                    },
+                );
+                let _ = swirl_protocol::reply(&mut inbound, request.kind, false).await;
+                return Err(error);
+            }
+        };
     state.records.lock().map_err(|_| "StatsState")?.insert(
         id,
         Record {
@@ -526,7 +527,13 @@ async fn session(
             counters: counters.clone(),
         },
     );
-    let connected = swirl_protocol::connect(&node.outbound, &routed_target, resolver, limit).await;
+    let connected = if direct_addresses.len() > 1 {
+        // Only route-equivalent DIRECT addresses reach this scheduler. The
+        // selected outbound and matched rule cannot change after a TCP miss.
+        swirl_protocol::connect_direct_resolved(direct_addresses, limit).await
+    } else {
+        swirl_protocol::connect(&node.outbound, &routed_target, resolver, limit).await
+    };
     let mut upstream = match connected {
         Ok(s) => s,
         Err(e) => {
@@ -563,11 +570,18 @@ async fn route<'a>(
     plan: &'a SessionPlan,
     target: &Target,
     source: std::net::IpAddr,
-) -> Result<(&'a swirl_subscription::Node, Target, Option<usize>)> {
+    allow_direct_fallback: bool,
+) -> Result<(
+    &'a swirl_subscription::Node,
+    Target,
+    Option<usize>,
+    Vec<SocketAddr>,
+)> {
     let config = &plan.config;
     let resolver = &plan.resolver;
     use swirl_routing::Decision;
     let choose = |id: &str| plan.policies.choose(id);
+    let choose_pinned = |id: &str| plan.policies.pinned_choice(id);
     let china = match (plan.cn_domains.as_deref(), plan.cn_ips.as_deref()) {
         (Some(domains), Some(ips)) => Some((domains, ips)),
         (None, None) => None,
@@ -591,7 +605,7 @@ async fn route<'a>(
             {
                 routed.host = ip.to_string();
             }
-            Ok((node, routed, selected.matched_rule))
+            Ok((node, routed, selected.matched_rule, Vec::new()))
         }
         Decision::Resolve => {
             let addresses = timeout(
@@ -600,7 +614,15 @@ async fn route<'a>(
             )
             .await
             .map_err(|_| "RouteDnsTimeout")??;
-            route_resolved(config, target, source, &addresses, &choose, china)
+            route_resolved(
+                config,
+                target,
+                source,
+                &addresses,
+                (&choose, &choose_pinned),
+                china,
+                allow_direct_fallback,
+            )
         }
     }
 }
@@ -610,10 +632,20 @@ fn route_resolved<'a>(
     target: &Target,
     source: IpAddr,
     addresses: &[SocketAddr],
-    choose: &impl Fn(&str) -> Result<String>,
+    choices: (
+        &impl Fn(&str) -> Result<String>,
+        &impl Fn(&str) -> Result<String>,
+    ),
     china: Option<(&ChinaRules, &ChinaRules)>,
-) -> Result<(&'a swirl_subscription::Node, Target, Option<usize>)> {
+    allow_direct_fallback: bool,
+) -> Result<(
+    &'a swirl_subscription::Node,
+    Target,
+    Option<usize>,
+    Vec<SocketAddr>,
+)> {
     use swirl_routing::Decision;
+    let (choose, choose_pinned) = choices;
     // Match and dial the same address. Only pass the selected answer to
     // routing; later answers cannot change the first address's policy.
     let address = addresses.first().ok_or("RouteDnsEmpty")?;
@@ -629,14 +661,44 @@ fn route_resolved<'a>(
     match selected.decision {
         // Keep the destination as an IP literal so the outbound cannot resolve
         // the hostname again to a different address after routing.
-        Decision::Node(node) => Ok((
-            node,
-            Target {
-                host: address.ip().to_string(),
-                port: target.port,
-            },
-            selected.matched_rule,
-        )),
+        Decision::Node(node) => {
+            let mut direct_addresses = Vec::new();
+            if allow_direct_fallback && matches!(node.outbound, Outbound::Direct {}) {
+                direct_addresses.push(*address);
+                // Resolver output is bounded at 16. Recheck each later answer
+                // without choosing an unvisited automatic policy group.
+                for candidate in addresses.iter().take(16).skip(1) {
+                    if direct_addresses.contains(candidate) {
+                        continue;
+                    }
+                    let alternate = swirl_routing::select_with_trace_and_china(
+                        config,
+                        &target.host,
+                        target.port,
+                        source,
+                        Some(std::slice::from_ref(candidate)),
+                        choose_pinned,
+                        china,
+                    );
+                    if matches!(alternate, Ok(swirl_routing::TracedDecision {
+                        decision: Decision::Node(other),
+                        matched_rule,
+                    }) if other.id == node.id && matched_rule == selected.matched_rule)
+                    {
+                        direct_addresses.push(*candidate);
+                    }
+                }
+            }
+            Ok((
+                node,
+                Target {
+                    host: address.ip().to_string(),
+                    port: target.port,
+                },
+                selected.matched_rule,
+                direct_addresses,
+            ))
+        }
         Decision::Resolve => Err("RouteDnsUnresolved"),
     }
 }
@@ -678,7 +740,7 @@ async fn prepare_udp(
     source: std::net::IpAddr,
     permit: OwnedSemaphorePermit,
 ) -> Result<UdpDispatch> {
-    let (node, target, _) = route(&plan, &target, source).await?;
+    let (node, target, _, _) = route(&plan, &target, source, false).await?;
     let payload_len = payload.len();
     let (host, port, packet) = match &node.outbound {
         Outbound::Direct {} => (target.host.clone(), target.port, payload),
