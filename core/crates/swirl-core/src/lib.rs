@@ -33,6 +33,9 @@ fn load_china_rules(config: &Config) -> Result<ChinaRulePair> {
     if !config.smart_routing {
         return Ok((None, None));
     }
+    if !config.nodes.iter().any(|node| matches!(node.outbound, Outbound::Direct {})) {
+        return Err("SmartRoutingDirectMissing");
+    }
     let directory = config
         .china_rules_directory
         .as_deref()
@@ -140,7 +143,6 @@ pub struct Core {
 impl Core {
     pub fn start(config: Config) -> Result<Self> {
         config.validate()?;
-        swirl_routing::validate_smart_routing(&config)?;
         let runtime = Builder::new_multi_thread()
             .worker_threads(2)
             .max_blocking_threads(4)
