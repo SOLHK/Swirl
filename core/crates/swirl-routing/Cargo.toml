@@ -10,3 +10,4 @@ workspace = true
 
 # Zstandard decompression is required by the upstream MRS v1 container format.
 zstd = "0.13"
+sha2.workspace = true
