@@ -1,0 +1,31 @@
+name: R4 one-time Rust formatting
+on:
+  push:
+    branches: [work/core-rule-routing-20261021]
+permissions:
+  contents: write
+jobs:
+  format-and-remove-helper:
+    if: github.ref == 'refs/heads/work/core-rule-routing-20261021'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/core-rule-routing-20261021
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Format Rust workspace and remove this temporary workflow
+        run: |
+          cd core
+          cargo fmt --all
+          cd ..
+          rm .github/workflows/r4-format-once.yml
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -u
+          if ! git diff --cached --quiet; then
+            git commit -m "style(core): format R4 network integration test"
+            git push origin HEAD:work/core-rule-routing-20261021
+          fi
