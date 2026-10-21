@@ -48,8 +48,7 @@ pub fn load_rules_from_directory(
 ) -> Result<(ChinaRules, ChinaRules), &'static str> {
     let domain_bytes =
         std::fs::read(directory.join("cn-domain.mrs")).map_err(|_| "ChinaDomainRulesRead")?;
-    let ip_bytes =
-        std::fs::read(directory.join("cn-ip.mrs")).map_err(|_| "ChinaIpRulesRead")?;
+    let ip_bytes = std::fs::read(directory.join("cn-ip.mrs")).map_err(|_| "ChinaIpRulesRead")?;
     let domains = ChinaRules::parse(
         &domain_bytes,
         Behavior::Domain,
@@ -64,7 +63,6 @@ pub fn load_rules_from_directory(
     .map_err(|_| "ChinaIpRulesInvalid")?;
     Ok((domains, ips))
 }
-
 
 #[derive(Debug, Clone)]
 pub struct ChinaRules {
