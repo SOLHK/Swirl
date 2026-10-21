@@ -2,7 +2,7 @@
 use std::net::{IpAddr, SocketAddr};
 use swirl_subscription::{Config, Matcher, Node, PolicyStrategy};
 mod mrs;
-pub use mrs::{Behavior as MrsBehavior, ChinaRules};
+pub use mrs::{Behavior as MrsBehavior, ChinaRules, load_rules_from_directory};
 use mrs::{bundled_rules, validate_bundled_rules};
 
 pub enum Decision<'a> {
@@ -76,7 +76,11 @@ pub fn validate_smart_routing(config: &Config) -> Result<(), &'static str> {
     if !config.smart_routing {
         return Ok(());
     }
-    validate_bundled_rules()?;
+    if let Some(directory) = config.china_rules_directory.as_deref() {
+        load_rules_from_directory(std::path::Path::new(directory))?;
+    } else {
+        validate_bundled_rules()?;
+    }
     if !config
         .nodes
         .iter()
@@ -121,16 +125,15 @@ pub fn select_with_trace<'a>(
     choose: &impl Fn(&str) -> Result<String, &'static str>,
 ) -> Result<TracedDecision<'a>, &'static str> {
     if config.smart_routing {
-        let (domains, ips) = bundled_rules()?;
-        select_with_trace_and_china(
-            config,
-            host,
-            port,
-            source,
-            resolved,
-            choose,
-            Some((domains, ips)),
-        )
+        let loaded;
+        let providers = if let Some(directory) = config.china_rules_directory.as_deref() {
+            loaded = load_rules_from_directory(std::path::Path::new(directory))?;
+            Some((&loaded.0, &loaded.1))
+        } else {
+            let (domains, ips) = bundled_rules()?;
+            Some((domains, ips))
+        };
+        select_with_trace_and_china(config, host, port, source, resolved, choose, providers)
     } else {
         select_with_trace_and_china(config, host, port, source, resolved, choose, None)
     }
