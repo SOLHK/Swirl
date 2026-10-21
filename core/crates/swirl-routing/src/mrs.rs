@@ -421,6 +421,17 @@ mod tests {
     }
 
     #[test]
+    fn rejects_mismatched_rule_behavior() {
+        let payload = b"MRS\\x01\\x01";
+        let compressed = zstd::stream::encode_all(&payload[..], 1).unwrap();
+        let checksum = format!("{:x}", sha2::Sha256::digest(&compressed));
+        assert_eq!(
+            ChinaRules::parse(&compressed, Behavior::Domain, &checksum).unwrap_err(),
+            "MrsBehavior"
+        );
+    }
+
+    #[test]
     fn rejects_truncated_payload_and_unsupported_mrs_version() {
         use std::io::Write;
         let payload = b"MRS\x01\x00\x00\x00";
