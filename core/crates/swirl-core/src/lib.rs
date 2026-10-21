@@ -33,7 +33,11 @@ fn load_china_rules(config: &Config) -> Result<ChinaRulePair> {
     if !config.smart_routing {
         return Ok((None, None));
     }
-    if !config.nodes.iter().any(|node| matches!(node.outbound, Outbound::Direct {})) {
+    if !config
+        .nodes
+        .iter()
+        .any(|node| matches!(node.outbound, Outbound::Direct {}))
+    {
         return Err("SmartRoutingDirectMissing");
     }
     let directory = config
