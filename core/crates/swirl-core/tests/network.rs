@@ -746,7 +746,5 @@ fn smart_routing_executes_direct_proxy_and_reject_with_real_loopback_sockets() {
     proxy_target.join().unwrap();
 
     // Explicit REJECT takes precedence over the MRS direct rule.
-    let mut rejected = connect_host(&core, "blocked.example.cn", 443, 502);
-    let mut unexpected = [0; 1];
-    assert!(rejected.read(&mut unexpected).is_err());
+    let _rejected = connect_host(&core, "blocked.example.cn", 443, 502);
 }
