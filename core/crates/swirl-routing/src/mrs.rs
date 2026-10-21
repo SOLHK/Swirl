@@ -1,8 +1,8 @@
 //! Bounded reader for the bundled MetaCubeX MRS v1 domain/IP rule sets.
 //! The container is Zstandard-compressed; the decoded payload is validated
 //! independently of routing so malformed assets can never become permissive.
+use sha2::Digest;
 use std::{io::Read, net::IpAddr};
-use std::net::IpAddr;
 
 const MAX_COMPRESSED: usize = 16 * 1024 * 1024;
 const MAX_DECOMPRESSED: usize = 64 * 1024 * 1024;
@@ -93,22 +93,26 @@ fn select_one(bits: &[u64], nth: usize) -> Option<usize> {
     None
 }
 fn walk_domain(node: usize, path: &mut Vec<u8>, leaves: &[u64], bitmap: &[u64], labels: &[u8], out: &mut Vec<String>) -> Result<(), &'static str> {
-    if out.len() > MAX_ITEMS { return Err("MrsDomainBounds"); }
+    if node >= leaves.len() * 64 || out.len() > MAX_ITEMS { return Err("MrsDomainBounds"); }
     if bit(leaves, node) {
-        let mut key = path.clone(); key.reverse();
+        let mut key = path.clone();
+        key.reverse();
         let s = String::from_utf8(key).map_err(|_| "MrsDomainUtf8")?;
         if s.is_empty() { return Err("MrsDomainEmptyRule"); }
         out.push(s);
     }
+    // MRS domain_set_bin.go stores a LOUDS-like bitmap: one zero per edge,
+    // followed by a one at the end of each node's child list. The label array
+    // is indexed by zero-rank, and the child node index is zero-rank + 1.
     let end = select_one(bitmap, node).ok_or("MrsDomainBitmap")?;
     let start = if node == 0 { 0 } else { select_one(bitmap, node - 1).ok_or("MrsDomainBitmap")? + 1 };
     for pos in start..end {
         if !bit(bitmap, pos) {
-            let prior_ones = bitmap.iter().take(pos / 64).map(|v| v.count_ones() as usize).sum::<usize>() + (0..(pos % 64)).filter(|b| bit(bitmap, *b)).count();
-            let child = pos - prior_ones + 1;
-            let ch = *labels.get(child - 1).ok_or("MrsDomainLabels")?;
+            let zero_rank = bitmap.iter().take(pos / 64).map(|v| (!v).count_ones() as usize).sum::<usize>()
+                + (0..(pos % 64)).filter(|b| !bit(bitmap, *b)).count();
+            let ch = *labels.get(zero_rank).ok_or("MrsDomainLabels")?;
             path.push(ch);
-            walk_domain(child, path, leaves, bitmap, labels, out)?;
+            walk_domain(zero_rank + 1, path, leaves, bitmap, labels, out)?;
             path.pop();
         }
     }
@@ -161,8 +165,6 @@ impl<'a> Cursor<'a> {
     }
     fn is_empty(&self) -> bool { self.at == self.bytes.len() }
 }
-
-use sha2::Digest;
 
 #[cfg(test)]
 mod tests {
