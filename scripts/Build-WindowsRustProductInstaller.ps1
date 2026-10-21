@@ -26,6 +26,19 @@ $dirty=& git -C $repo status --porcelain
 if($LASTEXITCODE -ne 0 -or $dirty) { throw 'Commit source changes before packaging an exact SHA.' }
 $sourceSha=(& git -C $repo rev-parse HEAD).Trim()
 if($LASTEXITCODE -ne 0 -or $sourceSha -notmatch '^[0-9a-f]{40}$') { throw 'Source SHA is unavailable.' }
+$null=& git -C $repo cat-file -e 'HEAD^'
+if($LASTEXITCODE -ne 0) { throw 'Previous source revision is required for version comparison.' }
+$versionPath='src/Swirl.Quick/PRODUCT_VERSION.txt'
+$previousFile=& git -C $repo ls-tree --name-only 'HEAD^' -- $versionPath
+if($LASTEXITCODE -ne 0) { throw 'Previous source version lookup failed.' }
+$previousSourceVersion=''
+if($previousFile) {
+    $previousSourceVersion=(& git -C $repo show "HEAD^:$versionPath").Trim()
+    if($LASTEXITCODE -ne 0) { throw 'Previous source version could not be read.' }
+}
+$appVersion=& (Join-Path $PSScriptRoot 'Assert-WindowsRustProductVersion.ps1') `
+    -VersionFile (Join-Path $repo 'src\Swirl.Quick\PRODUCT_VERSION.txt') -OutRoot $out `
+    -PreviousSourceVersion $previousSourceVersion
 $cachePath=Join-Path $build 'CMakeCache.txt'
 if(-not (Test-Path -LiteralPath $cachePath -PathType Leaf)) { throw 'CMake cache is missing.' }
 $cache=Get-Content -LiteralPath $cachePath -Raw
@@ -46,6 +59,9 @@ $rustDll=Join-Path $build 'rust-target\release\swirl_api.dll'
 foreach($path in @($exe,$dll,$rustDll)) {
     if(-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Required build file missing: $path" }
 }
+if((Get-Item -LiteralPath $exe).VersionInfo.FileVersionRaw.ToString() -ne "$appVersion.0") {
+    throw 'Swirl.exe file version does not match src/Swirl.Quick/PRODUCT_VERSION.txt; rebuild the product.'
+}
 $exeHash=(Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash
 $dllHash=(Get-FileHash -LiteralPath $dll -Algorithm SHA256).Hash
 if($dllHash -ne (Get-FileHash -LiteralPath $rustDll -Algorithm SHA256).Hash) {
@@ -65,7 +81,7 @@ if(-not $shaFound) { throw 'Swirl.exe does not embed this source SHA.' }
 if(-not (Test-Path -LiteralPath $out -PathType Container)) {
     New-Item -ItemType Directory -Path $out -ErrorAction Stop | Out-Null
 }
-$name='Swirl-Rust-App-'+$sourceSha.Substring(0,12)+'-'+(Get-Date -Format 'yyyyMMdd-HHmmss')
+$name='Swirl-Rust-App-'+$appVersion+'-'+$sourceSha.Substring(0,12)+'-'+(Get-Date -Format 'yyyyMMdd-HHmmss')
 $stage=Join-Path $out $name
 if(Test-Path -LiteralPath $stage) { throw 'Fresh staging directory required.' }
 New-Item -ItemType Directory -Path $stage -ErrorAction Stop | Out-Null
@@ -135,7 +151,7 @@ if($forbidden.Count -gt 0 -or (Test-Path -LiteralPath (Join-Path $stage 'core'))
     throw 'Mihomo, test harness, or private runtime material entered the app package.'
 }
 $product=[ordered]@{
-    kind='windows-rust-product-preview';sourceSha=$sourceSha
+    kind='windows-rust-product-preview';appVersion=$appVersion;sourceSha=$sourceSha
     exeSha256=$exeHash;rustDllSha256=$dllHash
     rustCore=$true;uiTestHarness=$false;mihomoBundled=$false;privateNodeStoreBundled=$false
     createdUtc=[DateTime]::UtcNow.ToString('o')
@@ -143,6 +159,7 @@ $product=[ordered]@{
 $product | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath (Join-Path $stage 'PRODUCT.json') -Encoding utf8
 @"
 Swirl Core Windows product preview
+Product version: $appVersion
 Source SHA: $sourceSha
 Swirl.exe SHA-256: $exeHash
 swirl_api.dll SHA-256: $dllHash
@@ -173,13 +190,13 @@ New-Item -ItemType Directory -Path $temp -ErrorAction Stop | Out-Null
 $uninstallPath=Join-Path $temp 'UninstallFiles.nsh'
 $uninstall | Set-Content -LiteralPath $uninstallPath -Encoding utf8
 $short=$sourceSha.Substring(0,12)
-$setupId=$short+'-'+(Get-Date -Format 'yyyyMMdd-HHmmss')
+$setupId=$appVersion+'-'+$short+'-'+(Get-Date -Format 'yyyyMMdd-HHmmss')
 $setup=Join-Path $out ('Swirl-Rust-Core-Setup-'+$setupId+'.exe')
 if(Test-Path -LiteralPath $setup) { throw 'Fresh installer output path required.' }
 $nsi=Join-Path $repo 'src\Swirl.Quick\packaging\SwirlRustProduct.nsi'
 $arguments=@('/V2','/INPUTCHARSET','UTF8',
     "/DAPP_DIST=$stage", "/DOUT_DIR=$out", "/DUNINSTALL_LIST=$uninstallPath",
-    "/DSOURCE_SHORT=$setupId", "/DSOURCE_SHA=$sourceSha", $nsi)
+    "/DSOURCE_SHORT=$setupId", "/DSOURCE_SHA=$sourceSha", "/DAPP_VERSION=$appVersion", $nsi)
 $compilerOutput=@(& $Nsis @arguments 2>&1)
 $compilerExit=$LASTEXITCODE
 $compilerOutput | Set-Content -LiteralPath (Join-Path $temp 'makensis.log') -Encoding utf8
@@ -187,7 +204,7 @@ if($compilerExit -ne 0 -or -not (Test-Path -LiteralPath $setup -PathType Leaf)) 
     throw "NSIS failed with exit code $compilerExit; see $temp"
 }
 $result=[ordered]@{
-    kind='windows-rust-product-preview';sourceSha=$sourceSha
+    kind='windows-rust-product-preview';appVersion=$appVersion;sourceSha=$sourceSha
     stage=$stage;setup=$setup;setupSha256=(Get-FileHash -LiteralPath $setup -Algorithm SHA256).Hash
     setupBytes=(Get-Item -LiteralPath $setup).Length
     exeSha256=$exeHash;rustDllSha256=$dllHash

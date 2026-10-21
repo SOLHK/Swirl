@@ -107,7 +107,7 @@ int main(int argc, char *argv[])
     app.setApplicationName(QStringLiteral("Swirl"));
     app.setOrganizationName(QStringLiteral("SOLHK"));
     app.setOrganizationDomain(QStringLiteral("solhk.dev"));
-    app.setApplicationVersion(QStringLiteral("1.0.0-test-6A+")+QStringLiteral(SWIRL_BUILD_REVISION));
+    app.setApplicationVersion(QStringLiteral(SWIRL_APP_VERSION));
 #ifdef SWIRL_UI_TESTS
 #ifdef Q_OS_WIN
     // Read-only native QA capture, limited to the actual Windows taskbar.

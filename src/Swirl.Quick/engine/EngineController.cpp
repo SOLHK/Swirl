@@ -58,16 +58,23 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
     // would add unrelated Rust connections and corrupt per-request deltas.
     : QObject(parent), m_engine(std::move(engine)), m_store(storePath),m_imports(&m_store,this),m_telemetry(storePath.isEmpty()?QString():storePath+".telemetry",storePath.isEmpty()&&!realAcceptance) {
     m_options.autoControlPort=true;
-    m_imports.setConfigurationApplier([this](const NodeImporter::Result &result,const QString &sourceId,QString *error) {
+    m_imports.setConfigurationApplier([this](const NodeImporter::Result &result,const QString &sourceId,bool nodesOnly,QString *error) {
         const auto &configuration=result.configurationFormat=="ini"?result.executionConfiguration:result.configuration;
-        if(result.configuration.isEmpty()) {
+        if(nodesOnly || result.configuration.isEmpty()) {
             NodeStore::ImportPlan plan;
             if(!m_store.prepareImport(result.nodes,sourceId,&plan)){*error=m_store.error();return false;}
 #ifdef SWIRL_USE_RUST_CORE
             const auto nodes=plan.nodes();QVariantMap canonical;
             if(!validateNetworkConfiguration(networkConfigurationSnapshot(),&canonical,&nodes)){*error=m_networkError;return false;}
 #endif
-            if(!m_store.commitImport(plan)){*error=m_store.error();return false;}
+            auto retained=m_store.networkConfiguration();
+            if(nodesOnly && retained.contains("importedConfiguration") &&
+                retained.value("importedConfiguration").toObject().value("sourceId").toString()==sourceId) {
+                auto provenance=retained.value("importedConfiguration").toObject();
+                provenance.insert("policyRetainedAfterNodesOnlyRefresh",true);
+                retained.insert("importedConfiguration",provenance);
+            }
+            if(!m_store.commitImport(plan,retained)){*error=m_store.error();return false;}
             return true;
         }
 #ifndef SWIRL_USE_RUST_CORE
@@ -234,17 +241,21 @@ void EngineController::updateRoutingFlags() {
 }
 QString EngineController::engineIdentityLabel() const {
     const auto status=m_engine->status();
+    QString identity;
     if(status.processAlive) {
-        if(status.engineKind==QStringLiteral("rust"))return QStringLiteral("Swirl Core · 运行中");
-        if(status.engineKind==QStringLiteral("compatibility"))return QStringLiteral("Mihomo · 运行中");
-        if(status.engineKind==QStringLiteral("native"))return QStringLiteral("Swirl C++ Native · 运行中");
-        return QStringLiteral("未知内核 · 运行中");
-    }
+        if(status.engineKind==QStringLiteral("rust"))identity=QStringLiteral("Swirl Core");
+        else if(status.engineKind==QStringLiteral("compatibility"))identity=QStringLiteral("Mihomo");
+        else if(status.engineKind==QStringLiteral("native"))identity=QStringLiteral("Swirl C++ Native");
+        else identity=QStringLiteral("未知内核");
+    } else {
 #ifdef SWIRL_USE_RUST_CORE
-    return QStringLiteral("Swirl Core · 构建类型");
+        identity=QStringLiteral("Swirl Core");
 #else
-    return QStringLiteral("Mihomo · 构建类型");
+        identity=QStringLiteral("Mihomo");
 #endif
+    }
+    const auto version=QCoreApplication::applicationVersion();
+    return version.isEmpty()?identity:identity+QStringLiteral(" · v")+version;
 }
 bool EngineController::prepareRealAcceptance() {
     if(processAlive()||busy())return false;
@@ -303,9 +314,19 @@ QVariantList EngineController::nodes() const {
         auto row=value.toMap(); const bool active=processAlive() && row.value("id").toString()==status.selectedNodeId;
         row.insert("address",row.value("host").toString().isEmpty()?QStringLiteral("协议扩展配置"):row.value("host").toString()+":"+row.value("port").toString());
         row.insert("status",active?nodeStateText():QStringLiteral("未连接"));
+#ifdef SWIRL_USE_RUST_CORE
+        row.insert("latency",QStringLiteral("—"));
+#else
         row.insert("latency",active && status.latencyMs>=0?QString::number(status.latencyMs):QStringLiteral("—"));
+#endif
         const auto measured=m_tests.result(row.value("id").toString());
-        if(!measured.isEmpty()){row.insert("latency",measured.value("latency").toInt()>=0?QString::number(measured.value("latency").toInt()):QStringLiteral("失败"));row.insert("testHttp",measured.value("http"));row.insert("testError",measured.value("error"));}
+        if(!measured.isEmpty()){
+            const auto sample=measured.value(measured.value("metricType")==QStringLiteral("http_headers")
+                ?"outboundConnectMs":"latency");
+            const auto elapsed=sample.isValid()?sample.toInt():-1;
+            row.insert("latency",measured.value("success").toBool()&&elapsed>=0?QString::number(elapsed):QStringLiteral("失败"));
+            row.insert("testHttp",measured.value("http"));row.insert("testError",measured.value("error"));
+        }
         value=row;
     }
     return rows;

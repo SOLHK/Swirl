@@ -21,6 +21,9 @@ SetCompressor /SOLID zlib
 !ifndef SOURCE_SHA
 !error "SOURCE_SHA is required"
 !endif
+!ifndef APP_VERSION
+!error "APP_VERSION is required"
+!endif
 
 Var IsolatedInstall
 Var Parameters
@@ -31,10 +34,10 @@ InstallDir "D:\Codex\SwirlRust"
 RequestExecutionLevel user
 ShowInstDetails show
 ShowUnInstDetails show
-VIProductVersion "0.1.0.0"
+VIProductVersion "${APP_VERSION}.0"
 VIAddVersionKey /LANG=2052 "ProductName" "Swirl Core 预览版"
 VIAddVersionKey /LANG=2052 "FileDescription" "Swirl Core 应用安装程序"
-VIAddVersionKey /LANG=2052 "ProductVersion" "0.1.0.0"
+VIAddVersionKey /LANG=2052 "ProductVersion" "${APP_VERSION}.0"
 VIAddVersionKey /LANG=2052 "Comments" "Source ${SOURCE_SHA}"
 
 !insertmacro MUI_PAGE_WELCOME
@@ -90,7 +93,7 @@ Section "安装 Swirl Core"
     CreateShortCut "$SMPROGRAMS\Swirl Core\Swirl Core.lnk" "$INSTDIR\Swirl.exe" "" "$INSTDIR\Swirl.exe" 0
     CreateShortCut "$DESKTOP\Swirl Core.lnk" "$INSTDIR\Swirl.exe" "" "$INSTDIR\Swirl.exe" 0
     WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\SwirlRustCorePreview" "DisplayName" "Swirl Core（预览版）"
-    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\SwirlRustCorePreview" "DisplayVersion" "0.1.0.0"
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\SwirlRustCorePreview" "DisplayVersion" "${APP_VERSION}.0"
     WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\SwirlRustCorePreview" "InstallLocation" "$INSTDIR"
     WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\SwirlRustCorePreview" "DisplayIcon" "$INSTDIR\Swirl.exe"
     WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\SwirlRustCorePreview" "UninstallString" '"$INSTDIR\Uninstall-SwirlRust.exe"'

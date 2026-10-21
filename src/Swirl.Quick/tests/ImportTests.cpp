@@ -584,6 +584,13 @@ external-controller: 0.0.0.0:9090
         QVERIFY(!NodeStore::allowedSubscriptionUrl(QUrl("http://remote.example.org/private")));
         QVERIFY(!NodeStore::allowedSubscriptionUrl(QUrl("https://user:pass@remote.example.org/private")));
     }
+    void nodesOnlyRequiresNetworkGraphValidator() {
+        QTemporaryDir directory;NodeStore store(directory.filePath("nodes.dpapi"));NodeImportService service(&store);
+        service.importNodesOnlyText("proxies: [{name: A, type: socks5, server: 127.0.0.1, port: 1080}]\nmode: direct\n");
+        QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),4000);
+        QVERIFY(store.nodes().isEmpty());QVERIFY(!QFile::exists(store.filePath()));
+        QVERIFY(service.message().contains(QStringLiteral("无法校验当前网络配置")));
+    }
     void subscriptionAtomicRefreshAndEncryptedUrl() {
         SubscriptionServer server;QVERIFY(server.listen(QHostAddress::LocalHost,0));server.content=socks(1080);
         QTemporaryDir temp;NodeStore store(temp.filePath("nodes"));qint64 now=QDateTime::currentSecsSinceEpoch();
@@ -600,8 +607,9 @@ external-controller: 0.0.0.0:9090
         QCOMPARE(store.nodes().first().port,quint16(1081));QVERIFY(service.providers().first().toMap().value("status").toString().contains("失败"));
         server.code=403;service.refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),4000);
         QCOMPARE(store.selectedId(),id);QVERIFY(!service.message().contains("PRIVATE-TOKEN"));
-        QVERIFY(service.saveSubscription(source,"Paused",{},15,false));const int count=server.count;now+=10000;QTest::qWait(250);QCOMPARE(server.count,count);
-        NodeStore reloaded(store.filePath());QCOMPARE(reloaded.subscriptions().first().url,server.url());QCOMPARE(reloaded.nodes().first().port,quint16(1081));
+        QVERIFY(service.saveSubscription(source,"Paused",{},15,false,{},"nodes-only"));const int count=server.count;now+=10000;QTest::qWait(250);QCOMPARE(server.count,count);
+        NodeStore reloaded(store.filePath());QCOMPARE(reloaded.subscriptions().first().url,server.url());QCOMPARE(reloaded.subscriptions().first().importScope,QString("nodes-only"));QCOMPARE(reloaded.nodes().first().port,quint16(1081));
+        QVERIFY(service.saveSubscription(source,"Paused",{},15,false));QCOMPARE(store.subscriptions().first().importScope,QString("nodes-only"));
         QVERIFY(service.removeSubscription(source));QVERIFY(store.subscriptions().isEmpty());QVERIFY(store.nodes().first().sourceId.isEmpty());
     }
     void httpsRedirectAndDowngradeProtection() {
