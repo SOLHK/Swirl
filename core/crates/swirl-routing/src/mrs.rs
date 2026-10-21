@@ -618,16 +618,17 @@ mod tests {
             vec![],
             vec![
                 (
-                    "10.0.0.0".parse().unwrap(),
-                    "10.255.255.255".parse().unwrap(),
-                ),
-                (
                     "2001:db8::".parse().unwrap(),
                     "2001:db8:ffff:ffff:ffff:ffff:ffff:ffff".parse().unwrap(),
+                ),
+                (
+                    "10.0.0.0".parse().unwrap(),
+                    "10.255.255.255".parse().unwrap(),
                 ),
             ],
         );
         assert!(r.matches_ip("10.1.2.3".parse().unwrap()));
+        assert!(r.matches_ip("10.255.255.255".parse().unwrap()));
         assert!(r.matches_ip("2001:db8::1".parse().unwrap()));
         assert!(!r.matches_ip("11.1.2.3".parse().unwrap()));
     }
