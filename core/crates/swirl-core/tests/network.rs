@@ -26,7 +26,18 @@ fn echo() -> (u16, thread::JoinHandle<()>) {
             s.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
             let mut b = [0; 8192];
             loop {
-                let n = s.read(&mut b).unwrap();
+                let n = match s.read(&mut b) {
+                    Ok(n) => n,
+                    Err(error)
+                        if matches!(
+                            error.kind(),
+                            std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                        ) =>
+                    {
+                        break;
+                    }
+                    Err(error) => panic!("echo fixture read failed: {error}"),
+                };
                 if n == 0 {
                     break;
                 }
