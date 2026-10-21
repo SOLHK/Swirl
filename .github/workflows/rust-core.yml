@@ -6,7 +6,7 @@ on:
     branches: [test, main]
   workflow_dispatch:
 permissions:
-  contents: write
+  contents: read
 jobs:
   portable-rust:
     strategy:
@@ -23,20 +23,6 @@ jobs:
       - name: Install stable Rust tools
         run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy
       - run: cargo fmt --all -- --check
-      - name: Resolve and persist R4 Cargo.lock
-        if: github.ref_name == 'work/core-rule-routing-20261021'
-        shell: bash
-        run: |
-          cargo check --workspace
-          check_status=$?
-          if ! git -C .. diff --quiet -- core/Cargo.lock; then
-            git -C .. config user.name "github-actions[bot]"
-            git -C .. config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git -C .. add core/Cargo.lock
-            git -C .. commit -m "build(core): lock MRS parser dependencies"
-            git -C .. push origin "HEAD:${GITHUB_REF_NAME}"
-          fi
-          exit $check_status
       - run: cargo check --workspace --locked
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo test --workspace --locked
