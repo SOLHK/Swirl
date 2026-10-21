@@ -101,7 +101,7 @@ Item {
     Metric {objectName:"activityTotal";label:"累计流量";key:"totalTraffic";value:page.bytes(page.totals.total,page.totals.sampled);cumulative:true}
    }
    GridLayout {Layout.fillWidth:true;columns:page.wide?2:1;columnSpacing:Theme.gap;rowSpacing:Theme.gap
-    SwirlGlassPanel {Layout.fillWidth:true;Layout.fillHeight:false;Layout.minimumWidth:0;Layout.preferredWidth:7;Layout.preferredHeight:Theme.dp(212);Layout.alignment:Qt.AlignTop
+    SwirlGlassPanel {Layout.fillWidth:true;Layout.fillHeight:false;Layout.minimumWidth:0;Layout.preferredWidth:7;Layout.preferredHeight:Theme.dp(page.wide?232:212);Layout.alignment:Qt.AlignTop
      ColumnLayout {anchors.fill:parent;anchors.margins:Theme.cardPadding;spacing:Theme.dp(10)
       RowLayout {Layout.fillWidth:true;SwirlText {text:"流量趋势";color:Theme.text;font.pixelSize:Theme.fontSize(15);font.weight:Font.DemiBold;Layout.fillWidth:true}SwirlSegmentedControl {Layout.preferredWidth:Theme.dp(126);options:["全部","仅代理"];currentIndex:page.trafficKind;onActivated:index=>page.trafficKind=index}}
       Label {text:"今日累计分布 · 每柱 30 分钟";Layout.fillWidth:true}
@@ -110,7 +110,7 @@ Item {
     }
     SwirlHeroCard {
      id:diagnostic;objectName:"internetDiagnosticCard";Layout.fillWidth:true;Layout.minimumWidth:0;Layout.preferredWidth:5;Layout.preferredHeight:height;Layout.alignment:Qt.AlignTop
-     collapsedHeight:Theme.dp(240);expandedHeight:collapsedHeight+diagnosticDetails.implicitHeight+Theme.dp(16);expanded:page.diagnosticOpen
+     collapsedHeight:Theme.dp(page.wide?232:240);expandedHeight:collapsedHeight+diagnosticDetails.implicitHeight+Theme.dp(16);expanded:page.diagnosticOpen
      ColumnLayout {x:Theme.cardPadding;y:Theme.cardPadding;width:parent.width-2*Theme.cardPadding;spacing:Theme.dp(10)
       RowLayout {Layout.fillWidth:true
        SwirlText {text:"网络质量";color:Theme.text;font.pixelSize:Theme.fontSize(15);font.weight:Font.DemiBold;Layout.fillWidth:true}
