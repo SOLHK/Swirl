@@ -187,6 +187,31 @@ class CachedModelValidatorTests(unittest.TestCase):
             with self.subTest(rows=rows), self.assertRaises(ValueError):
                 validator.checked_batch(self.root)
 
+    def test_partial_plan_requires_optin_and_reports_pending_honestly(self):
+        recipe = dict(self.batch_recipe, gids=[1, 2, 3])
+        receipt = dict(recipe=recipe, recipe_sha256=validator.digest_value(recipe), rows={'1': self.row})
+        write(self.root/'batch-receipt.json', receipt)
+        with self.assertRaisesRegex(ValueError, 'complete_batch_rows_required'):
+            validator.checked_batch(self.root)
+        saved, _ = validator.checked_batch(self.root, allow_incomplete_batch=True)
+        self.assertEqual(validator.batch_scope(saved, True), dict(requested_GIDs=3, attempted_GIDs=1,
+            pending_GIDs=2, source_batch_complete=False, partial_batch_diagnostic=True, allow_incomplete_batch=True))
+        complete = dict(receipt, rows={'1': self.row, '2': {'status':'FAILED'}, '3': {'status':'FAILED'}})
+        write(self.root/'batch-receipt.json', complete)
+        saved, _ = validator.checked_batch(self.root)
+        self.assertEqual(validator.batch_scope(saved, False), dict(requested_GIDs=3, attempted_GIDs=3,
+            pending_GIDs=0, source_batch_complete=True, partial_batch_diagnostic=False, allow_incomplete_batch=False))
+
+    def test_partial_optin_does_not_admit_running_or_unplanned_GIDs(self):
+        recipe = dict(self.batch_recipe, gids=[1, 2, 3])
+        base = dict(recipe=recipe, recipe_sha256=validator.digest_value(recipe))
+        for rows in ({'1': self.row, '2': {'status':'RUNNING'}}, {'1': self.row, '4': {'status':'FAILED'}}):
+            write(self.root/'batch-receipt.json', dict(base, rows=rows))
+            with self.subTest(rows=rows), self.assertRaises(ValueError):
+                validator.checked_batch(self.root, allow_incomplete_batch=True)
+        with self.assertRaisesRegex(ValueError, 'explicit_partial_batch_optin'):
+            validator.checked_batch(self.root, allow_incomplete_batch=1)
+
     def test_wrong_source_and_output_traversal_rejected_before_font_or_cache_reads(self):
         source, candidate = self.root/'authored-source', self.root/'authored-candidate'
         for path in (source, candidate):

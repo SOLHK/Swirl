@@ -79,7 +79,8 @@ def case_indices(recipe):
     return [found[0], *[(f'holdout_{i}', len(training)+i) for i in range(4)], *found[1:]]
 
 
-def checked_batch(batch):
+def checked_batch(batch, *, allow_incomplete_batch=False):
+    require(type(allow_incomplete_batch) is bool, 'explicit_partial_batch_optin_required')
     receipt, digest = _json(Path(batch)/'batch-receipt.json')
     recipe = receipt.get('recipe')
     require(type(recipe) is dict and receipt.get('recipe_sha256') == digest_value(recipe)
@@ -89,11 +90,20 @@ def checked_batch(batch):
     gids, rows = recipe.get('gids'), receipt.get('rows')
     require(type(gids) is list and gids and len(gids) <= 47102 and len(set(gids)) == len(gids)
             and all(type(gid) is int and 0 <= gid < 47102 for gid in gids)
-            and type(rows) is dict and set(rows) == set(map(str, gids)), 'complete_batch_rows_required')
+            and type(rows) is dict and set(rows) <= set(map(str, gids))
+            and (allow_incomplete_batch or set(rows) == set(map(str, gids))), 'complete_batch_rows_required')
     require(all(type(row) is dict and row.get('status') in ('ENCODED_EXPERIMENTAL', 'FAILED')
                 for row in rows.values()), 'finished_batch_snapshot_required')
     require(any(row['status'] == 'ENCODED_EXPERIMENTAL' for row in rows.values()), 'encoded_GIDs_required')
     return receipt, digest
+
+
+def batch_scope(receipt, allow_incomplete_batch):
+    requested, attempted = len(receipt['recipe']['gids']), len(receipt['rows'])
+    return {'requested_GIDs': requested, 'attempted_GIDs': attempted,
+            'pending_GIDs': requested-attempted, 'source_batch_complete': attempted == requested,
+            'partial_batch_diagnostic': attempted < requested,
+            'allow_incomplete_batch': allow_incomplete_batch}
 
 
 def checked_native_cases(batch, gid, row, batch_recipe):
@@ -173,14 +183,14 @@ def checked_assembly(candidate, batch_digest, encoded, candidate_digest):
     return path, digest
 
 
-def validate(source, batch, candidate, output, expected_sha256=EXPECTED):
+def validate(source, batch, candidate, output, expected_sha256=EXPECTED, *, allow_incomplete_batch=False):
     source, batch, candidate = (Path(p).resolve(strict=True) for p in (source, batch, candidate))
     require(expected_sha256 == EXPECTED and sha256(source) == EXPECTED, 'exact_original_source_required')
     require(batch.is_relative_to(PRIVATE) and candidate.is_relative_to(PRIVATE), 'private_batch_and_candidate_required')
     output = Path(output).absolute()
     require(not output.exists() and not output.is_symlink(), 'fresh_validation_output_required')
     output = private_directory(output)
-    saved, batch_digest = checked_batch(batch)
+    saved, batch_digest = checked_batch(batch, allow_incomplete_batch=allow_incomplete_batch)
     before = sha256(candidate)
     rows = saved['rows']
     encoded = sorted(int(key) for key, row in rows.items() if row['status'] == 'ENCODED_EXPERIMENTAL')
@@ -189,7 +199,7 @@ def validate(source, batch, candidate, output, expected_sha256=EXPECTED):
         'candidate_sha256': before, 'batch_receipt_sha256': batch_digest, 'validator_sha256': sha256(Path(__file__)),
         'assembly_receipt_sha256': assembly_digest,
         'candidate_model_binding': 'ASSEMBLER_RECEIPT_BOUND_NOT_INDEPENDENT_COEFFICIENT_EQUALITY_PROOF',
-        'requested_GIDs': len(saved['recipe']['gids']), 'source_batch_encoded_GIDs': len(encoded),
+        **batch_scope(saved, allow_incomplete_batch), 'source_batch_encoded_GIDs': len(encoded),
         'failed_build_GIDs': len(rows)-len(encoded), 'GIDs_checked': 0, 'cases_checked': 0,
         'native_cache_files_verified': 0, 'native_calls': 0, 'limit_source_font_units': LIMIT,
         'HarfBuzz': hb.version_string(), 'source_user_mapping_accepted': False, 'production_accepted': False,
@@ -325,5 +335,8 @@ if __name__ == '__main__':
     for name in ('source', 'batch', 'candidate', 'output'):
         parser.add_argument('--'+name, required=True, type=Path)
     parser.add_argument('--expected-sha256', required=True)
+    parser.add_argument('--allow-incomplete-batch', action='store_true',
+                        help='Diagnostic only: measure finished rows of a paused incomplete plan; never accept the font.')
     args = parser.parse_args()
-    validate(args.source, args.batch, args.candidate, args.output, args.expected_sha256)
+    validate(args.source, args.batch, args.candidate, args.output, args.expected_sha256,
+             allow_incomplete_batch=args.allow_incomplete_batch)
