@@ -59,7 +59,12 @@ fn smart_decision<'a>(
         }
         return Ok(None);
     }
-    if cn_ips.is_some() {
+    // Never perform an implicit local/system DNS lookup just to classify an
+    // otherwise proxied hostname. IP-set resolution is allowed only when the
+    // user explicitly configured a DNS upstream (including DoT).
+    if cn_ips.is_some()
+        && (!config.dns.servers.is_empty() || !config.dns.tls_servers.is_empty())
+    {
         return Ok(Some(TracedDecision {
             decision: Decision::Resolve,
             matched_rule: Some(config.rules.len() + 1),
