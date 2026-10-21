@@ -422,7 +422,7 @@ mod tests {
 
     #[test]
     fn rejects_mismatched_rule_behavior() {
-        let payload = b"MRS\\x01\\x01";
+        let payload = b"MRS\x01\x01";
         let compressed = zstd::stream::encode_all(&payload[..], 1).unwrap();
         let checksum = format!("{:x}", sha2::Sha256::digest(&compressed));
         assert_eq!(
