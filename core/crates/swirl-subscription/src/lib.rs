@@ -357,7 +357,13 @@ impl Config {
         {
             return Err("ConfigBounds");
         }
-        if self.china_rules_directory.as_ref().is_some_and(|p| p.is_empty() || p.len() > 4096 || p.chars().any(char::is_control)) { return Err("ChinaRulesDirectory"); }
+        if self
+            .china_rules_directory
+            .as_ref()
+            .is_some_and(|p| p.is_empty() || p.len() > 4096 || p.chars().any(char::is_control))
+        {
+            return Err("ChinaRulesDirectory");
+        }
         self.dns.validate_query_family()?;
         self.dns.validate_tls()?;
         let mut host_names = HashSet::new();

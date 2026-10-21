@@ -25,33 +25,60 @@ fn smart_decision<'a>(
     cn_domains: Option<&ChinaRules>,
     cn_ips: Option<&ChinaRules>,
 ) -> Result<Option<TracedDecision<'a>>, &'static str> {
-    let direct = || config.nodes.iter()
-        .find(|node| matches!(node.outbound, swirl_subscription::Outbound::Direct {}))
-        .ok_or("SmartRoutingDirectMissing");
+    let direct = || {
+        config
+            .nodes
+            .iter()
+            .find(|node| matches!(node.outbound, swirl_subscription::Outbound::Direct {}))
+            .ok_or("SmartRoutingDirectMissing")
+    };
     if cn_domains.is_some_and(|rules| rules.matches_domain(host)) {
-        return Ok(Some(TracedDecision { decision: Decision::Node(direct()?), matched_rule: Some(config.rules.len()) }));
+        return Ok(Some(TracedDecision {
+            decision: Decision::Node(direct()?),
+            matched_rule: Some(config.rules.len()),
+        }));
     }
     if let Some(ip) = ip {
         if cn_ips.is_some_and(|rules| rules.matches_ip(ip)) {
-            return Ok(Some(TracedDecision { decision: Decision::Node(direct()?), matched_rule: Some(config.rules.len() + 1) }));
+            return Ok(Some(TracedDecision {
+                decision: Decision::Node(direct()?),
+                matched_rule: Some(config.rules.len() + 1),
+            }));
         }
         return Ok(None);
     }
     if let Some(addresses) = resolved {
-        if addresses.iter().any(|address| cn_ips.is_some_and(|rules| rules.matches_ip(address.ip()))) {
-            return Ok(Some(TracedDecision { decision: Decision::Node(direct()?), matched_rule: Some(config.rules.len() + 1) }));
+        if addresses
+            .iter()
+            .any(|address| cn_ips.is_some_and(|rules| rules.matches_ip(address.ip())))
+        {
+            return Ok(Some(TracedDecision {
+                decision: Decision::Node(direct()?),
+                matched_rule: Some(config.rules.len() + 1),
+            }));
         }
         return Ok(None);
     }
-    if cn_ips.is_some() { return Ok(Some(TracedDecision { decision: Decision::Resolve, matched_rule: Some(config.rules.len() + 1) })); }
+    if cn_ips.is_some() {
+        return Ok(Some(TracedDecision {
+            decision: Decision::Resolve,
+            matched_rule: Some(config.rules.len() + 1),
+        }));
+    }
     Ok(None)
 }
 
 /// Validates bundled assets before a smart-routing session is allowed to start.
 pub fn validate_smart_routing(config: &Config) -> Result<(), &'static str> {
-    if !config.smart_routing { return Ok(()); }
+    if !config.smart_routing {
+        return Ok(());
+    }
     validate_bundled_rules()?;
-    if !config.nodes.iter().any(|node| matches!(node.outbound, swirl_subscription::Outbound::Direct {})) {
+    if !config
+        .nodes
+        .iter()
+        .any(|node| matches!(node.outbound, swirl_subscription::Outbound::Direct {}))
+    {
         return Err("SmartRoutingDirectMissing");
     }
     Ok(())
@@ -92,7 +119,16 @@ pub fn select_with_trace<'a>(
 ) -> Result<TracedDecision<'a>, &'static str> {
     if config.smart_routing {
         let (domains, ips) = bundled_rules()?;
-        select_with_trace_and_china(config, host, port, source, resolved, choose, Some(domains), Some(ips))
+        select_with_trace_and_china(
+            config,
+            host,
+            port,
+            source,
+            resolved,
+            choose,
+            Some(domains),
+            Some(ips),
+        )
     } else {
         select_with_trace_and_china(config, host, port, source, resolved, choose, None, None)
     }
@@ -118,7 +154,9 @@ pub fn select_with_trace_and_china<'a>(
     for (index, rule) in config.rules.iter().enumerate() {
         if matches!(&rule.matcher, Matcher::Match {}) {
             if cn_domains.is_some() || cn_ips.is_some() {
-                if let Some(decision) = smart_decision(config, &host, ip, resolved, cn_domains, cn_ips)? {
+                if let Some(decision) =
+                    smart_decision(config, &host, ip, resolved, cn_domains, cn_ips)?
+                {
                     return Ok(decision);
                 }
             }
@@ -198,10 +236,18 @@ pub fn select_with_trace_and_china<'a>(
 }
 
 pub fn rule_label(config: &Config, index: Option<usize>) -> String {
-    let Some(index) = index else { return "DEFAULT".to_owned(); };
-    if index == config.rules.len() { return "MRS:CN-DOMAIN".to_owned(); }
-    if index == config.rules.len() + 1 { return "MRS:CN-IP".to_owned(); }
-    let Some(rule) = config.rules.get(index) else { return "DEFAULT".to_owned(); };
+    let Some(index) = index else {
+        return "DEFAULT".to_owned();
+    };
+    if index == config.rules.len() {
+        return "MRS:CN-DOMAIN".to_owned();
+    }
+    if index == config.rules.len() + 1 {
+        return "MRS:CN-IP".to_owned();
+    }
+    let Some(rule) = config.rules.get(index) else {
+        return "DEFAULT".to_owned();
+    };
     let matcher = match &rule.matcher {
         Matcher::Domain { value } => format!("DOMAIN,{value}"),
         Matcher::DomainSuffix { value } => format!("DOMAIN-SUFFIX,{value}"),
