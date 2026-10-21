@@ -140,7 +140,12 @@ impl ChinaRules {
             }
         }
         networks.sort_unstable_by(|a, b| a.0.cmp(&b.0));
-        Self { exact_domains, suffix_domains, wildcard_domains, networks }
+        Self {
+            exact_domains,
+            suffix_domains,
+            wildcard_domains,
+            networks,
+        }
     }
 
     pub fn matches_domain(&self, host: &str) -> bool {
@@ -155,7 +160,9 @@ impl ChinaRules {
                 return true;
             }
         }
-        self.wildcard_domains.iter().any(|pattern| wildcard_domain(pattern, &host))
+        self.wildcard_domains
+            .iter()
+            .any(|pattern| wildcard_domain(pattern, &host))
     }
 
     pub fn matches_ip(&self, ip: IpAddr) -> bool {
@@ -513,7 +520,10 @@ mod tests {
         let domains = ChinaRules::from_parts(vec!["+.example.cn".into()], vec![]);
         let ips = ChinaRules::from_parts(
             vec![],
-            vec![("10.0.0.0".parse().unwrap(), "10.255.255.255".parse().unwrap())],
+            vec![(
+                "10.0.0.0".parse().unwrap(),
+                "10.255.255.255".parse().unwrap(),
+            )],
         );
         let choose = |_: &str| -> Result<String, &'static str> { Err("NoAutomaticGroup") };
         let source = "127.0.0.1".parse().unwrap();
