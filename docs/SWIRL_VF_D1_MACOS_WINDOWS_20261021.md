@@ -689,3 +689,71 @@ This is an independent coordinator-review change to the shared entry on our
 branch only; C1's branch and staging engine remain untouched.
 
 Reproduce: `build/vf-d1-private/venv/bin/python -m unittest discover -s tools/swirl_vf/tests -p test_d3_layout_admission.py -v`.
+
+## D3 checkpoint 2 — retain confirmed faces across stale writers
+
+The first source fix is saved remotely as `1c90c4d93527b20c0430e59973ad80885b55b889`,
+with the exact tested tree `551fdb836b44472020fd5a6842e42bf7ba7f7535`. Terminal
+HTTPS push lacked credentials. The configured GitHub connector created that
+reviewed tree and advanced only this branch with `force=false` and an expected
+HEAD check. The already-created local commit `971c1d750d061983fa7147e16f1098420e03cb46`
+is preserved too: one-shot CI [39540451308](https://github.com/SOLHK/Swirl/actions/runs/39540451308)
+performed a normal push of own-branch merge `343460c430956b6312c434b467917321fa47b761`,
+retaining both identical-tree commits. Local synchronization was `git merge
+--ff-only`, with no reset, rebase, amend, discarded commit, other branch write,
+App change or secret change. The one-shot workflow is now removed; no general
+write automation is retained. PR #23 is not merged.
+
+C1's second previously documented shared-entry defect is now fixed in the
+existing `FaceCheckpoints`, without copying its staging engine. Two writers
+could load the same empty manifest; saving faces 0 and 1 in that order lost
+face 0's confirmed index despite retaining both font files. Three new tests
+first failed against the old implementation: lost index, replacement of a
+confirmed face, and overwriting an externally changed recipe.
+
+Initialization and save now use C1's OS-lock approach (`flock` on POSIX, one-byte
+`msvcrt.locking` on Windows). Each transaction reloads and verifies the recipe
+under that lock before publishing the font and manifest. A stale writer adding
+a different face preserves earlier entries; conflicting bytes or proof for an
+already-confirmed face are refused. Exact idempotent saves remain supported.
+Restore refreshes the index as well. Locks are nonblocking and use a permanent
+regular, non-hardlinked inode, avoiding delete-and-recreate lock races.
+The existing whole-face recipe/code hashes, transcript validation, no-replace
+font publication and atomic manifest replacement remain in force. This is a
+process-concurrency repair, not an added power-loss durability guarantee.
+
+All **5 new checkpoint tests pass**, including an actual separate process that
+owns the OS lock: a competing save and constructor fail without changing the
+manifest, and killing that process releases the lock so a save succeeds. A
+hardlinked lock file cannot change unrelated sentinel bytes. All **13 existing
+checkpoint tests pass**. Full Python: **619 discovered = 612 passed + 7 platform
+skips**, 28.250 s; audit **6/6**. The 8 new D3 tests are included in that count.
+
+The current production source also reran the existing real Mac table-metric /
+native-outline reconstruction control: two self-authored faces × three GIDs,
+174 original observations, 260 accepted reconstruction batches / 390 adapter
+records, 520 internal native requests / 780 native records. Saving/reopening
+and independent remeasurement completed **58 requests / 174 records**, zero
+source/candidate path-point, table-metric or bounds difference. Temporary
+synthetic fonts were removed by the existing test. The unchanged raw native
+metric gate still fails **849 vs 850 at 1/32**. Its failure is retained in the
+report, not upgraded by table-metric success. Evidence:
+[SWIRL_VF_D3_CHECKPOINTS_20261021.json](evidence/SWIRL_VF_D3_CHECKPOINTS_20261021.json).
+
+`platform/test_d3_rebuild_guards.py` now makes the first checkpoint's actual
+HarfBuzz and CoreText identity/admission check repeatable. It ran successfully
+against the current binary locally. The dedicated Mac/Windows workflow adds
+D3 and old checkpoint regressions; the old strict metric step remains intact.
+The costly D2 all-face HVF/480-axis job remains available on explicit workflow
+dispatch, rather than rerunning its unchanged matrix for each admission/storage
+patch. D3 does not change HVF geometry, Apple axis mapping or metric arithmetic.
+New cross-platform CI is pending at this source checkpoint.
+
+References inspected before this change: C1's audit and `_writer_lock` approach
+at c0fe6c4, CPython's [fcntl](https://docs.python.org/3/library/fcntl.html) and
+[msvcrt](https://docs.python.org/3/library/msvcrt.html) lock contracts. Only
+standard-library APIs were used; no new dependency or second TTC engine.
+
+Original build admission remains blocked by the independently established A3
+and B1 constraints. Original models/faces remain **0/32**, no original-derived
+Swirl-VF.ttc, Windows 11 and actual Qt/Swirl **NOT_RUN**.

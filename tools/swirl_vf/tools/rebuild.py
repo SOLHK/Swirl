@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import array
+from contextlib import contextmanager
 import copy
 import hashlib
 import itertools
@@ -24,6 +25,7 @@ import os
 from pathlib import Path
 import random
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -655,6 +657,46 @@ def verify_session_summary(summary, digest, requests, glyphs):
           "native session summary disagrees with this session's accepted requests/glyphs")
 
 
+@contextmanager
+def checkpoint_writer(directory):
+    """Serialize legacy manifest transactions using C1's OS-lock approach.
+
+    Keep one permanent lock inode: unlinking it on release would let another
+    process lock a different file while an existing writer still owns this one.
+    This private-directory lock is released by the OS on process death.
+    """
+    path = Path(directory) / '.writer.lock'
+    check(not path.is_symlink(), 'checkpoint writer lock must not be a symlink')
+    descriptor = os.open(path, os.O_RDWR | os.O_CREAT | getattr(os, 'O_NOFOLLOW', 0), 0o600)
+    locked = False
+    try:
+        info = os.fstat(descriptor)
+        check(stat.S_ISREG(info.st_mode) and info.st_nlink == 1, 'invalid checkpoint writer lock')
+        try:
+            if os.name == 'nt':
+                import msvcrt
+                msvcrt.locking(descriptor, msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as error:
+            raise ReconstructionError('checkpoint writer busy') from error
+        locked = True
+        if info.st_size == 0:
+            os.write(descriptor, b'\0')
+        yield
+    finally:
+        try:
+            if locked:
+                if os.name == 'nt':
+                    os.lseek(descriptor, 0, os.SEEK_SET)
+                    msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)
+                else:
+                    fcntl.flock(descriptor, fcntl.LOCK_UN)
+        finally:
+            os.close(descriptor)
+
+
 class FaceCheckpoints:
     """Private, verified whole-face checkpoints; never accept a partial face.
 
@@ -684,16 +726,34 @@ class FaceCheckpoints:
                   "fonttools_version": __import__('fontTools').__version__,
                   "numpy_version": np.__version__, "settings": settings}
         self.manifest = self.directory / "verified-faces.json"
+        self.recipe = recipe
+        created = False
         if self.directory.exists():
             check(self.directory.is_dir() and self.manifest.is_file()
                   and not self.manifest.is_symlink(), "existing checkpoint directory has no regular manifest")
-            self.state = json.loads(self.manifest.read_text(encoding="utf-8"))
-            check(self.state.get("recipe") == recipe, "checkpoint recipe differs from this build")
-            check(isinstance(self.state.get("faces"), dict), "invalid checkpoint face index")
         else:
-            self.directory.mkdir(parents=True, mode=0o700)
-            self.state = {"recipe": recipe, "faces": {}}
-            self._save_manifest()
+            try:
+                self.directory.mkdir(parents=True, mode=0o700)
+                created = True
+            except FileExistsError:
+                check(self.directory.is_dir() and not self.directory.is_symlink()
+                      and self.manifest.is_file() and not self.manifest.is_symlink(),
+                      "existing checkpoint directory has no regular manifest")
+        with checkpoint_writer(self.directory):
+            if created and not self.manifest.exists() and not self.manifest.is_symlink():
+                self.state = {"recipe": recipe, "faces": {}}
+                self._save_manifest()
+            else:
+                self._reload_manifest()
+
+    def _reload_manifest(self):
+        check(self.manifest.is_file() and not self.manifest.is_symlink(),
+              "existing checkpoint directory has no regular manifest")
+        state = json.loads(self.manifest.read_text(encoding="utf-8"))
+        check(type(state) is dict and state.get("recipe") == self.recipe,
+              "checkpoint recipe differs from this build")
+        check(type(state.get("faces")) is dict, "invalid checkpoint face index")
+        self.state = state
 
     def _save_manifest(self):
         check(not self.manifest.is_symlink(), "checkpoint manifest became a symlink")
@@ -709,6 +769,8 @@ class FaceCheckpoints:
                 os.unlink(temporary)
 
     def restore(self, index, source_font):
+        with checkpoint_writer(self.directory):
+            self._reload_manifest()
         entry = self.state["faces"].get(str(index))
         if entry is None:
             return None
@@ -756,8 +818,18 @@ class FaceCheckpoints:
                                evidence["request_count"], evidence["successful_glyph_count"])
 
     def save(self, index, path, report):
+        # Reload under the same lock as publication. Atomic replace alone does
+        # not stop a stale snapshot from deleting another writer's face entry.
+        with checkpoint_writer(self.directory):
+            self._reload_manifest()
+            self._save_face(index, path, report)
+
+    def _save_face(self, index, path, report):
         self.verify_transcript(index, report, report.get("glyph_count", 0))
         digest = sha256(path)
+        entry = {"sha256": digest, "report": copy.deepcopy(report)}
+        previous = self.state["faces"].get(str(index))
+        check(previous is None or previous == entry, "confirmed checkpoint face differs; previous entry retained")
         target = self.directory / f"face-{index}-{digest}.ttf"
         handle, temporary = tempfile.mkstemp(prefix=f"face-{index}-", suffix=".tmp", dir=self.directory)
         try:
@@ -773,7 +845,7 @@ class FaceCheckpoints:
             except FileExistsError:
                 check(target.is_file() and not target.is_symlink() and sha256(target) == digest,
                       f"checkpoint face {index}: existing file is not the verified face")
-            self.state["faces"][str(index)] = {"sha256": digest, "report": copy.deepcopy(report)}
+            self.state["faces"][str(index)] = entry
             self._save_manifest()
         finally:
             os.unlink(temporary)

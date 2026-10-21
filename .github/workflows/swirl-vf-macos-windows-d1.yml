@@ -1,4 +1,4 @@
-name: Swirl VF D1-D2 isolated native controls
+name: Swirl VF D1-D3 isolated native controls
 
 on:
   push:
@@ -29,6 +29,8 @@ jobs:
         run: |
           python -m unittest discover -s tools/swirl_vf/tests -p test_macos_source_baseline.py -v
           python -m unittest discover -s tools/swirl_vf/tests -p 'test_d2*.py' -v
+          python -m unittest discover -s tools/swirl_vf/tests -p 'test_d3*.py' -v
+          python -m unittest discover -s tools/swirl_vf/tests -p test_rebuild_checkpoints.py -v
       - name: Generate only the self-authored two-face fixture
         run: |
           mkdir -p build/d1
@@ -50,6 +52,10 @@ jobs:
         if: always()
         run: |
           python tools/swirl_vf/platform/test_native_table_metrics.py --output build/d1/table-metrics --require-native
+      - name: Verify the GDEF refusal with real native identity and HarfBuzz shaping
+        if: always()
+        run: |
+          python tools/swirl_vf/platform/test_d3_rebuild_guards.py --binary "$PWD/build/d1/table-metrics/coretext_extract" --output build/d3-synthetic-guards
       - name: Independently test frozen metric predictions at fresh UPEMs
         if: always()
         run: |
@@ -64,6 +70,7 @@ jobs:
             build/d1/strict/*.json
             build/d1/table-metrics/*.json
             build/d2-synthetic-upem/summary.json
+            build/d3-synthetic-guards/summary.json
           retention-days: 7
 
   windows-directwrite-synthetic:
@@ -92,6 +99,10 @@ jobs:
         run: |
           python -m unittest discover -s tools/swirl_vf/tests -p 'test_d2*.py' -v
           if ($LASTEXITCODE -ne 0) { throw 'D2 diagnostic tests failed' }
+          python -m unittest discover -s tools/swirl_vf/tests -p 'test_d3*.py' -v
+          if ($LASTEXITCODE -ne 0) { throw 'D3 production guard tests failed' }
+          python -m unittest discover -s tools/swirl_vf/tests -p test_rebuild_checkpoints.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Checkpoint recovery tests failed' }
       - name: Run actual DirectWrite all-glyph and five-DPI controls
         run: |
           ./tools/swirl_vf/platform/run_directwrite_probe.ps1 -Font build/d1/self-authored-standard.ttc -OutputDirectory build/d1/standard -AllGlyphs -Render
@@ -138,6 +149,9 @@ jobs:
           retention-days: 7
 
   original-source-d2:
+    # Outline and axis algorithms have not changed in D3. Keep this expensive
+    # D2 matrix available explicitly, without repeating it for every guard fix.
+    if: github.event_name == 'workflow_dispatch'
     # Exact original only. Native callbacks remain in memory; artifacts are
     # fixed aggregate summaries, never font tables, glyph payloads or logs.
     runs-on: xcode-27
