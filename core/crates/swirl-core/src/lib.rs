@@ -1,3 +1,17 @@
+fn load_china_rules(config: &Config) -> Result<(Option<Arc<ChinaRules>>, Option<Arc<ChinaRules>>)> {
+    let Some(directory) = config.china_rules_directory.as_ref() else { return Ok((None, None)); };
+    let directory = std::path::Path::new(directory);
+    let domain_path = directory.join("cn-domain.mrs");
+    let ip_path = directory.join("cn-ip.mrs");
+    let domain_bytes = std::fs::read(domain_path).map_err(|_| "ChinaDomainRulesRead")?;
+    let ip_bytes = std::fs::read(ip_path).map_err(|_| "ChinaIpRulesRead")?;
+    let domains = ChinaRules::parse(&domain_bytes, MrsBehavior::Domain, "e92bda4f0b9f05623663a882331a320ab4e266cada2046d3828a94572cdded46")
+        .map_err(|_| "ChinaDomainRulesInvalid")?;
+    let ips = ChinaRules::parse(&ip_bytes, MrsBehavior::IpCidr, "d95b3d125f6c74ce3c15e19ef794f142de91e21c3b8fb7767e76aebfabff5149")
+        .map_err(|_| "ChinaIpRulesInvalid")?;
+    Ok((Some(Arc::new(domains)), Some(Arc::new(ips))))
+}
+
 //! Rust-owned runtime, sockets, scheduling, statistics and immutable session plans.
 mod policy;
 mod socks5_udp;
@@ -14,6 +28,7 @@ use std::{
     time::{Duration, Instant},
 };
 use swirl_dns::Resolver;
+use swirl_routing::{ChinaRules, MrsBehavior};
 use swirl_protocol::{Inbound, Result, Target};
 use swirl_subscription::{Config, Outbound, PolicyStrategy};
 use swirl_transport::{Counters, bind_udp};
@@ -92,11 +107,15 @@ struct Plan {
     config: Arc<Config>,
     resolver: Arc<Resolver>,
     policies: Arc<PolicyRuntime>,
+    cn_domains: Option<Arc<ChinaRules>>,
+    cn_ips: Option<Arc<ChinaRules>>,
 }
 struct SessionPlan {
     config: Arc<Config>,
     resolver: Arc<Resolver>,
     policies: Arc<PolicyView>,
+    cn_domains: Option<Arc<ChinaRules>>,
+    cn_ips: Option<Arc<ChinaRules>>,
 }
 impl Plan {
     fn session(&self) -> Result<Arc<SessionPlan>> {
@@ -104,6 +123,8 @@ impl Plan {
             config: self.config.clone(),
             resolver: self.resolver.clone(),
             policies: Arc::new(self.policies.view(&self.config)?),
+            cn_domains: self.cn_domains.clone(),
+            cn_ips: self.cn_ips.clone(),
         }))
     }
 }
@@ -132,6 +153,7 @@ impl Core {
         let address = listener.local_addr().map_err(|_| "ListenerAddress")?;
         let capacity = config.limits.max_connections;
         let resolver = Arc::new(Resolver::default().with_config(&config.dns)?);
+        let (cn_domains, cn_ips) = load_china_rules(&config)?;
         let config = Arc::new(config);
         let policies = Arc::new(PolicyRuntime::new(
             runtime.handle().clone(),
@@ -142,6 +164,8 @@ impl Core {
             config,
             resolver,
             policies,
+            cn_domains,
+            cn_ips,
         })));
         let state = Arc::new(State::default());
         state.generation.store(1, Ordering::Relaxed);
@@ -201,6 +225,7 @@ impl Core {
             return Err("ListenerChangeRequiresRestart");
         }
         let resolver = Arc::new(plan.resolver.with_config(&config.dns)?);
+        let (cn_domains, cn_ips) = load_china_rules(&config)?;
         let config = Arc::new(config);
         let policies = Arc::new(plan.policies.reconfigured(config.clone(), resolver.clone()));
         // All fallible validation has completed. Stop the replaced worker even
@@ -210,6 +235,8 @@ impl Core {
             config,
             resolver,
             policies,
+            cn_domains,
+            cn_ips,
         });
         self.state.generation.fetch_add(1, Ordering::Relaxed);
         Ok(())
@@ -226,6 +253,8 @@ impl Core {
             config: Arc::new(next),
             resolver: plan.resolver.clone(),
             policies: plan.policies.clone(),
+            cn_domains: plan.cn_domains.clone(),
+            cn_ips: plan.cn_ips.clone(),
         });
         self.state.generation.fetch_add(1, Ordering::Relaxed);
         Ok(())
@@ -476,7 +505,7 @@ async fn route<'a>(
     use swirl_routing::Decision;
     let choose = |id: &str| plan.policies.choose(id);
     let selected =
-        swirl_routing::select_with_trace(config, &target.host, target.port, source, None, &choose)?;
+        swirl_routing::select_with_trace_and_china(config, &target.host, target.port, source, None, &choose, plan.cn_domains.as_deref(), plan.cn_ips.as_deref())?;
     match selected.decision {
         Decision::Node(node) => {
             let mut routed = target.clone();
@@ -505,6 +534,8 @@ async fn route<'a>(
                 source,
                 Some(&addresses),
                 &choose,
+                plan.cn_domains.as_deref(),
+                plan.cn_ips.as_deref(),
             )?;
             match selected.decision {
                 Decision::Node(node) => Ok((
