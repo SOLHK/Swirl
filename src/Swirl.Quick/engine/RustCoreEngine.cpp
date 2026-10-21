@@ -223,8 +223,6 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
  if(o.tunEnabled||o.gatewayForwarding)return "当前会话要求增强模式或网关转发，但 Rust 版尚未支持。请在“概览”关闭增强模式后重试。";
  if(o.allowLan)return "当前会话要求局域网代理，但 Rust 版尚未支持。请在“概览”关闭局域网代理后重试。";
  if(o.meteredNetwork)return "当前会话要求计费网络模式，但 Rust 版尚未支持。请在“设置”关闭计费网络模式后重试。";
- if(o.smartRouting&&o.routingMode=="rule"&&!o.directSession)
-  return "当前“规则判定”依赖尚未迁移的智能规则库。请在左侧“策略”选择“全局代理”，再返回节点页连接；不会自动更改系统代理。";
  if(o.routingMode!="global"&&o.routingMode!="rule"&&o.routingMode!="direct")return "Rust 路由模式无效。";
  QJsonObject dns;const auto dnsError=dnsConfiguration(o,&dns);if(!dnsError.isEmpty())return dnsError;
  QJsonArray nodes;QString selected=o.selectedNodeId;
@@ -354,6 +352,10 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
  QJsonArray rules,selectors;const auto routingError=routingConfiguration(o,selected,&nodes,&rules,&selectors);if(!routingError.isEmpty())return routingError;
  QJsonObject config{{"schema",1},{"listen",QString("127.0.0.1:%1").arg(o.proxyPort)},{"selected",selected},{"nodes",nodes},{"rules",rules},{"selectors",selectors},{"dns",dns},
   {"limits",QJsonObject{{"max_connections",128},{"handshake_timeout_ms",qBound(100,o.startupTimeoutMs,30000)}}}};
+ if(o.smartRouting&&o.routingMode=="rule"&&!o.directSession){
+  const auto directory=o.rulesDirectory.isEmpty()?QCoreApplication::applicationDirPath()+"/rules":o.rulesDirectory;
+  config["china_rules_directory"]=directory;
+ }
  if(!o.inboundUsername.isEmpty()||!o.inboundPassword.isEmpty())config["inbound_auth"]=QJsonObject{{"username",o.inboundUsername},{"password",o.inboundPassword}};
  *output=config;return {};
 }
