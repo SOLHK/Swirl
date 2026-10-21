@@ -209,12 +209,15 @@ mod tests {
         let checksum = format!("{:x}", sha2::Sha256::digest(&compressed));
         assert_eq!(ChinaRules::parse(&compressed, Behavior::Domain, &checksum).unwrap_err(), "MrsTruncated");
 
-        let wrong_version = b"MRS\\x02\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00";
+        let mut wrong_version = b"MRS\\x01\\x00".to_vec();
+        wrong_version.extend_from_slice(&1i64.to_be_bytes());
+        wrong_version.extend_from_slice(&0i64.to_be_bytes());
+        wrong_version.push(2); // unsupported domain trie payload version
         let mut encoder = zstd::stream::Encoder::new(Vec::new(), 1).unwrap();
-        encoder.write_all(wrong_version).unwrap();
+        encoder.write_all(&wrong_version).unwrap();
         let compressed = encoder.finish().unwrap();
         let checksum = format!("{:x}", sha2::Sha256::digest(&compressed));
-        assert_eq!(ChinaRules::parse(&compressed, Behavior::Domain, &checksum).unwrap_err(), "MrsMagic");
+        assert_eq!(ChinaRules::parse(&compressed, Behavior::Domain, &checksum).unwrap_err(), "MrsDomainVersion");
     }
 
     fn bundled(name: &str) -> Vec<u8> {
