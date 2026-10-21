@@ -238,12 +238,24 @@ ApplicationWindow {
         id:dashboardWindow;objectName:"dashboardWindow";function openProxyControl(){hide();AppState.navigate("policies");window.show();window.raise();window.requestActivate()}
         visible:false;width:Theme.dp(1300);height:Theme.dp(600);minimumWidth:Theme.dp(914);minimumHeight:Theme.dp(560);title:"Swirl 面板";flags:Qt.Window|Qt.FramelessWindowHint;color:"transparent"
         function openCaptureInspector(){window.openCaptureInspector()}
-        ExternalToolsPage{anchors.fill:parent;clip:true}
+        Loader {
+            property bool everOpened:false
+            anchors.fill:parent
+            active:dashboardWindow.visible || everOpened
+            onLoaded:everOpened=true
+            sourceComponent:ExternalToolsPage { anchors.fill:parent;clip:true }
+        }
     }
 
     SwirlDialog {
         id:captureInspectorDialog;title:"HTTP 请求详情";width:Math.min(Theme.dp(1000),window.width-Theme.dp(20));height:Math.min(Theme.dp(650),window.height-Theme.dp(20));padding:Theme.dp(14)
-        CaptureInspectorPage{captureProvider:window.captureProviderContext;anchors.fill:parent}
+        Loader {
+            property bool everOpened:false
+            anchors.fill:parent
+            active:captureInspectorDialog.visible || everOpened
+            onLoaded:everOpened=true
+            sourceComponent:CaptureInspectorPage { captureProvider:window.captureProviderContext;anchors.fill:parent }
+        }
     }
     // Native move and eight-edge resize keep Windows snap/DPI behavior.
     Repeater {
