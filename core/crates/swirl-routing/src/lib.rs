@@ -50,9 +50,11 @@ fn smart_decision<'a>(
         return Ok(None);
     }
     if let Some(addresses) = resolved {
+        // The caller dials the first resolved address. Route that exact IP;
+        // later answers must not change its outbound policy.
         if addresses
-            .iter()
-            .any(|address| cn_ips.is_some_and(|rules| rules.matches_ip(address.ip())))
+            .first()
+            .is_some_and(|address| cn_ips.is_some_and(|rules| rules.matches_ip(address.ip())))
         {
             return Ok(Some(TracedDecision {
                 decision: Decision::Node(direct()?),

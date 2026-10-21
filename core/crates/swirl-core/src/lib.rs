@@ -546,30 +546,44 @@ async fn route<'a>(
             )
             .await
             .map_err(|_| "RouteDnsTimeout")??;
-            // Match and dial the same address. Do not retry another DNS answer
-            // under the first address's policy or let an upstream resolve again.
-            let address = addresses.first().ok_or("RouteDnsEmpty")?;
-            let selected = swirl_routing::select_with_trace_and_china(
-                config,
-                &target.host,
-                target.port,
-                source,
-                Some(&addresses),
-                &choose,
-                china,
-            )?;
-            match selected.decision {
-                Decision::Node(node) => Ok((
-                    node,
-                    Target {
-                        host: address.ip().to_string(),
-                        port: target.port,
-                    },
-                    selected.matched_rule,
-                )),
-                Decision::Resolve => Err("RouteDnsUnresolved"),
-            }
+            route_resolved(config, target, source, &addresses, &choose, china)
         }
+    }
+}
+
+fn route_resolved<'a>(
+    config: &'a Config,
+    target: &Target,
+    source: IpAddr,
+    addresses: &[SocketAddr],
+    choose: &impl Fn(&str) -> Result<String>,
+    china: Option<(&ChinaRules, &ChinaRules)>,
+) -> Result<(&'a swirl_subscription::Node, Target, Option<usize>)> {
+    use swirl_routing::Decision;
+    // Match and dial the same address. Only pass the selected answer to
+    // routing; later answers cannot change the first address's policy.
+    let address = addresses.first().ok_or("RouteDnsEmpty")?;
+    let selected = swirl_routing::select_with_trace_and_china(
+        config,
+        &target.host,
+        target.port,
+        source,
+        Some(std::slice::from_ref(address)),
+        choose,
+        china,
+    )?;
+    match selected.decision {
+        // Keep the destination as an IP literal so the outbound cannot resolve
+        // the hostname again to a different address after routing.
+        Decision::Node(node) => Ok((
+            node,
+            Target {
+                host: address.ip().to_string(),
+                port: target.port,
+            },
+            selected.matched_rule,
+        )),
+        Decision::Resolve => Err("RouteDnsUnresolved"),
     }
 }
 
@@ -817,3 +831,7 @@ async fn udp_response(
         .fetch_add(payload.len() as u64, Ordering::Relaxed);
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "route_tests.rs"]
+mod route_tests;

@@ -808,6 +808,46 @@ mod tests {
             crate::rule_label(&config, china_ip.matched_rule),
             "MRS:CN-IP"
         );
+
+        // The core dials the first DNS answer. A later China address must not
+        // turn the first foreign address into a DIRECT connection.
+        let foreign_first = select_with_trace_and_china(
+            &config,
+            "www.example.com",
+            443,
+            source,
+            Some(&[
+                "8.8.8.8:443".parse::<SocketAddr>().unwrap(),
+                "10.2.3.4:443".parse::<SocketAddr>().unwrap(),
+            ]),
+            &choose,
+            Some((&domains, &ips)),
+        )
+        .unwrap();
+        assert!(matches!(foreign_first.decision, crate::Decision::Node(n) if n.id == "proxy"));
+        assert_eq!(
+            crate::rule_label(&config, foreign_first.matched_rule),
+            "#2 MATCH => proxy"
+        );
+
+        let china_first = select_with_trace_and_china(
+            &config,
+            "www.example.com",
+            443,
+            source,
+            Some(&[
+                "10.2.3.4:443".parse::<SocketAddr>().unwrap(),
+                "8.8.8.8:443".parse::<SocketAddr>().unwrap(),
+            ]),
+            &choose,
+            Some((&domains, &ips)),
+        )
+        .unwrap();
+        assert!(matches!(china_first.decision, crate::Decision::Node(n) if n.id == "direct"));
+        assert_eq!(
+            crate::rule_label(&config, china_first.matched_rule),
+            "MRS:CN-IP"
+        );
     }
 
     #[test]
