@@ -59,8 +59,13 @@ def save_new(path, value):
 
 def private_directory(path):
     path = Path(path).absolute()
-    require(path.is_relative_to(PRIVATE) and path != PRIVATE, 'private_build_output_required')
+    require(path.is_relative_to(PRIVATE) and path != PRIVATE and '..' not in path.parts,
+            'private_build_output_required')
     require(not any(p.is_symlink() for p in (path, *path.parents)), 'symlink_output_refused')
+    # A lexical prefix alone accepts private/../public. Resolve dot segments
+    # only after checking the supplied path for symlinks, before any mkdir.
+    path = path.resolve()
+    require(path.is_relative_to(PRIVATE) and path != PRIVATE, 'private_build_output_required')
     path.mkdir(parents=True, mode=0o700, exist_ok=True)
     return path
 

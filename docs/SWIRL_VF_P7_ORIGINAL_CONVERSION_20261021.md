@@ -73,14 +73,117 @@ UNVERIFIED; this is not production table support. Unsupported tables, point-inde
 layout anchors, overflow, incomplete GIDs and wrong model grids are refused.
 No production builder admission or whole-face production checkpoint is reused.
 
-Actual full-face execution is running at this first source checkpoint; its
-outcome will be appended. No Windows claim or completed face is implied here.
-Original-derived files remain strictly local and experimental. Windows11,
-original-derived DirectWrite, real Qt/Swirl and installation are NOT_RUN.
+Actual full-default-face execution finished successfully. Private outputs:
 
-Targeted authored regressions: glyph model4, original-driver safety3 and face
-assembler11 PASS. Tests contain only authored geometry; public CI never runs
+- `build/vf-takeover-private/p7-face-stage1/P7-Original-face0-EXPERIMENTAL.ttf`
+  SHA256 `84fe084e3baba854ceed659f80a8e4abb4248fa78fab6372905b89ec3f722c76`.
+- Its single-face TTC is34,890,808bytes, SHA256
+  `43d164785847dfaf27a19175ef4f1e7a00112f6f073b73a26f126364c2372fd4`.
+
+All47,102 measured default GIDs are present, including5 source-measured empty
+glyphs. Five have sampled variable models;47,097 remain DEFAULT_ONLY. The C1
+serialization verifier checked10,338,181 default points including phantoms and
+93 gvar tuples exactly after reopening; its existing binary packer verified
+one face,22 tables and table-payload preservation. These checks prove encoded
+data consistency, not original equivalence. Default grid quantization has a
+maximum0.0471366377656632 source-FUnit control-point error;2,770,607 default
+points exceed1/32 and remain failed. No strict threshold is changed.
+
+## Original nominal-axis experimental candidate
+
+`p7_nominal_candidate.py` reuses the P4 `rebase_design_font` algorithm; it does
+not introduce a second mapping algorithm. It applies the original WDTH/wght/
+HGHT ranges and legal avar to the partial q-face, rebuilds HVAR/VVAR from final
+phantoms, retains original cmap/GID order, and repeats C1 decoded-data and
+verified-hash packing checks. It never grants source-user mapping acceptance.
+
+Actual local outputs:
+
+- `build/vf-takeover-private/p7-nominal-stage1/P7-Original-face0-NOMINAL-EXPERIMENTAL.ttf`,
+  SHA256 `5e30320c0be56c8038b89ba8a86e6d25d0713952c006cc79071dc3f3386ab7bd`.
+- Its single-face TTC is34,970,788bytes, SHA256
+  `6be166ab88d5178a7697d14dcaaabe2e5d5b3690e18a4d58073cbfa3892ff0fa`.
+
+These are original-derived, partial-variable experimental files. Original named
+instances are not restored; metadata, retained unscaled trak/cidg/meta and
+component semantics need further acceptance. Neither file is a released
+`Swirl-VF.ttc`. A32-face expansion is not justified while one-face variable
+completeness, precision, metrics and mapping gates remain unresolved.
+
+## Actual native and independent checks
+
+Both q and nominal candidates loaded through the existing generic CoreText
+extractor on this Mac: each has64 actual glyph records,32 exact reverse replay
+pairs,56 nonempty paths and8 source-proven empty records. All22 table identities
+and candidate hashes were checked. Nominal axes expose WDTH1/500/1000,
+wght100/501/900,HGHT1/500/1000;24 strict effective-axis comparisons passed at
+four requested locations. Four nonempty selected variable GIDs change at all
+three nondefault positions; the three sampled DEFAULT_ONLY GIDs do not.
+The q candidate also completed24 actual CTFontDrawGlyphs draws into four private
+nonempty PNGs. These prove candidate loading and bounded behavior, not original
+CoreText parity: that original cannot load on this host.
+
+Independent fontTools/C1 checks preserve full cmap/GID order,47,103 loca entries
+and all22 table payloads between TTF/TTC. All94,204 HVAR/VVAR metric coefficient
+models are exactly consistent. A bounded original-HVF/HarfBuzz comparison used
+40 actual native glyph calls. Selected-variable target vs original ideal TABLE
+advances has0/50 fields above1/32, maximum0.020268354564905167. Original-HB vs
+target-HB advances instead has6/50 fields above1/32, maximum0.328125: native
+integer-grid equivalence remains failed, without relabeling it as coefficient
+accuracy. Ten mixed CJK/Latin horizontal/vertical shaping runs preserve GIDs and
+clusters;158/800 position fields fail, maximum159 sourceFUnits, including
+DEFAULT_ONLY glyphs at nondefault positions. The raw contour comparator retains
+35/40 failures (`segment_count_differs`); no numeric outline PASS is inferred
+from incomparable paths. An additional target terminal zero-length closure is
+observed separately and does not erase those failures.
+
+Original-derived files and all private logs/raster/glyph records remain local.
+Windows11, original-derived DirectWrite, real Qt/Swirl and installation are
+NOT_RUN. Public CI cannot receive these proprietary candidates under the user's
+no-upload constraint; authored controls are a separate validation scope.
+
+Targeted authored regressions: glyph model4, original-driver safety5, nominal
+driver integrity2 and face assembler11 PASS. The private-output guard now rejects
+dot-segment escape before mkdir, as well as symlink redirection. Source-bound
+sample recipes include driver hashes; old checkpoints remain historical evidence
+and must not be silently reused after a driver change.
+Tests contain only authored geometry; public CI never runs
 this converter against or uploads an Apple-derived font.
+
+First source checkpoint `b2f057e3420e192478c25862cbd9dc6eba78810a` is pushed.
+Its [CI39585811589](https://github.com/SOLHK/Swirl/actions/runs/39585811589)
+passed836 portable tests and6 audits, plus original-source macOS and authored
+Windows Server C1 jobs. That Windows job says nothing about this original-derived
+candidate or Windows11. Subsequent source/checkpoint hashes are in branch history.
+
+## Resume commands (private outputs only)
+
+Use the existing Python environment:
+`~/Swirl-worktrees/vf-macos-windows-d1/build/vf-d1-private/venv/bin/python`.
+Run from the isolated takeover worktree. Sample/native/model files are resumable
+only under their exact recipe; use a fresh directory for changed code. Completed
+face/nominal files are never overwritten.
+
+```sh
+python tools/swirl_vf/platform/p7_original_glyf.py sample \
+  --source ~/Downloads/PingFangUI.ttc \
+  --binary build/vf-takeover-private/p7-original-hvf-native/gid-00000-default/hvf_oracle \
+  --output build/vf-takeover-private/p7-models-next
+python tools/swirl_vf/platform/p7_original_glyf.py face \
+  --source ~/Downloads/PingFangUI.ttc \
+  --models build/vf-takeover-private/p7-models-next \
+  --native-cache ~/Swirl-worktrees/vf-macos-windows-d1/build/vf-d1-private/original-hvf-all-default/hvf-run.json \
+  --output build/vf-takeover-private/p7-face-next
+python tools/swirl_vf/platform/p7_nominal_candidate.py \
+  --source ~/Downloads/PingFangUI.ttc \
+  --parent build/vf-takeover-private/p7-face-next \
+  --output build/vf-takeover-private/p7-nominal-next
+```
+
+Next work should replace bounded sampled approximations with adequate original
+variation models before extending all GIDs/faces. Keep source-user mapping,
+native metric failures, phantom/vertical-origin semantics, unscaled tables,
+component provenance and Windows font-level acceptance as separate gates.
 
 Primary references reviewed before implementation: existing project HVF/C1
 code; [Apple HVGL](https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6hvgl.html),

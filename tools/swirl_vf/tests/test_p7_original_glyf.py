@@ -43,6 +43,27 @@ class OriginalGlyfExperimentTests(unittest.TestCase):
             self.assertFalse(target.exists())
             self.assertEqual(source.read_bytes(), b'authored wrong source')
 
+    def test_dot_segments_cannot_escape_private_root_before_mkdir(self):
+        with tempfile.TemporaryDirectory() as directory:
+            private = Path(directory)/'private'
+            private.mkdir()
+            target = private/'..'/'must-not-be-created'
+            with patch('p7_original_glyf.PRIVATE', private):
+                with self.assertRaisesRegex(ValueError, 'private_build_output_required'):
+                    private_directory(target)
+            self.assertFalse((Path(directory)/'must-not-be-created').exists())
+
+    def test_symlink_inside_private_root_cannot_redirect_font_output(self):
+        with tempfile.TemporaryDirectory() as directory:
+            private, outside = Path(directory)/'private', Path(directory)/'outside'
+            private.mkdir()
+            outside.mkdir()
+            (private/'link').symlink_to(outside, target_is_directory=True)
+            with patch('p7_original_glyf.PRIVATE', private):
+                with self.assertRaisesRegex(ValueError, 'symlink_output_refused'):
+                    private_directory(private/'link'/'must-not-be-created')
+            self.assertFalse((outside/'must-not-be-created').exists())
+
 
 if __name__=='__main__':
     unittest.main()
