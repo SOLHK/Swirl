@@ -1044,6 +1044,13 @@ class CoreDevelopmentTests(unittest.TestCase):
             self.assertEqual(present.stdout.strip(), "SUITE_STARTED")
 
     def test_branch_and_menu_drift_fail_closed(self):
+        checked_in = (Path(__file__).resolve().parents[2] / ".github/workflows/rust-core.yml").read_text(encoding="utf-8")
+        self.assertEqual(development.updated_workflow(checked_in), checked_in)
+        unreviewed_branch = checked_in.replace(
+            "work/rust-core-network-fixes-20261021", "work/unreviewed-network-branch", 1
+        )
+        with self.assertRaises(ValueError):
+            development.updated_workflow(unreviewed_branch)
         for source in (
             FIXTURE.replace("branches: [test, main]", "branches: [main]", 1),
             FIXTURE.replace("test_dns_tls.py", "test_dns_tls_renamed.py", 1),
