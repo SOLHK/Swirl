@@ -55,13 +55,28 @@ private slots:
         const QStringList formats{"Clash","Trojan Clash","Clash compatible","Trojan Clash compatible","Surge","Trojan Surge","Quantumult X","Trojan Quantumult X","Shadowrocket","Trojan Shadowrocket","Shadowsocks SIP002","Trojan URI","Surfboard","Trojan Surfboard","Loon","Trojan Loon","sing-box"};
         for(int i=0;i<formats.size();++i){
             const bool trojan=QList<int>{1,3,5,7,9,11,13,15}.contains(i);source.document=fixture(i,trojan?peers.trojanPort:peers.ssPort,peers.password);
-            QTemporaryDir temp;NodeStore store(temp.filePath("nodes"));NodeImportService importer(&store);QVERIFY(importer.saveSubscription({},"Isolated format source",source.url(),360,false));const auto sourceId=store.subscriptions().first().id;
+            QTemporaryDir temp;NodeStore store(temp.filePath("nodes"));
+            const QJsonObject retainedConfiguration{{"schema",1},{"dns",QJsonObject{}},{"rules",QJsonArray{}},{"groups",QJsonArray{}}};
+            QVERIFY(store.saveNetworkConfiguration(retainedConfiguration));
+            NodeImportService importer(&store);
+            importer.setConfigurationApplier([&store](const NodeImporter::Result &result,const QString &sourceId,bool nodesOnly,QString *error){
+                if(!nodesOnly){*error=QStringLiteral("Expected nodes-only import");return false;}
+                NodeStore::ImportPlan plan;
+                if(!store.prepareImport(result.nodes,sourceId,&plan) || !store.commitImport(plan,store.networkConfiguration())){
+                    *error=store.error();return false;
+                }
+                return true;
+            });
+            QVERIFY(importer.saveSubscription({},"Isolated format source",source.url(),360,false,{},"nodes-only"));
+            const auto sourceId=store.subscriptions().first().id;
+            QCOMPARE(store.subscriptions().first().importScope,QStringLiteral("nodes-only"));
             const auto count=source.requests;importer.refreshSubscription(sourceId);QTRY_VERIFY_WITH_TIMEOUT(!importer.busy(),8000);QVERIFY2(store.nodes().size()==1,qPrintable(formats[i]+": "+importer.message()));QCOMPARE(source.requests,count+1);
+            QCOMPARE(store.networkConfiguration(),retainedConfiguration);
             auto n=store.nodes().first();QVERIFY(n.conversionIssues.isEmpty());QVERIFY(store.select(n.id));
             // Test-only certificate pin for the isolated self-signed peer; no
             // system trust or skip-cert-verify changes, and no public material.
             if(trojan)QVERIFY(store.saveNode({{"id",n.id},{"name",n.name},{"protocol",n.protocol},{"host",n.host},{"port",n.port},{"options",QVariantMap{{"fingerprint",QString::fromLatin1(peers.fingerprint)}}}}));
-            NodeStore reloaded(store.filePath());QCOMPARE(reloaded.nodes().size(),1);QCOMPARE(reloaded.nodes().first().sourceId,sourceId);
+            NodeStore reloaded(store.filePath());QCOMPARE(reloaded.nodes().size(),1);QCOMPARE(reloaded.nodes().first().sourceId,sourceId);QCOMPARE(reloaded.networkConfiguration(),retainedConfiguration);
             EngineStartOptions opts;opts.executablePath=QCoreApplication::applicationDirPath()+"/core/mihomo.exe";QFile binary(opts.executablePath);QVERIFY(binary.open(QIODevice::ReadOnly));QCryptographicHash hash(QCryptographicHash::Sha256);QVERIFY(hash.addData(&binary));opts.expectedSha256=hash.result().toHex();opts.expectedVersion="v1.19.32";opts.controlPort=ControlledProtocolPeers::port();opts.proxyPort=ControlledProtocolPeers::port();while(opts.proxyPort==opts.controlPort)opts.proxyPort=ControlledProtocolPeers::port();opts.nodes=reloaded.nodes();opts.selectedNodeId=n.id;opts.routingMode="global";
             opts.startupTimeoutMs=15000;
             MihomoAdapter engine;engine.start(opts);QTRY_VERIFY2_WITH_TIMEOUT(engine.status().apiHealthy,qPrintable(formats[i]+": "+engine.status().message),15000);
@@ -69,7 +84,7 @@ private slots:
             const int forwarded=network.a.forwarded;
             for(bool tls:{false,true}){QNetworkRequest request(network.url(tls));request.setTransferTimeout(5000);auto reply=client.get(request);QSignalSpy finished(reply,&QNetworkReply::finished);QTRY_VERIFY_WITH_TIMEOUT(!finished.isEmpty(),7000);QCOMPARE(reply->error(),QNetworkReply::NoError);QCOMPARE(reply->readAll(),QByteArray("exit-A"));reply->deleteLater();}
             QVERIFY(network.a.forwarded>=forwarded+2);engine.stop();QTRY_VERIFY_WITH_TIMEOUT(!engine.status().processAlive,4000);
-            importer.refreshSubscription(sourceId);QTRY_VERIFY_WITH_TIMEOUT(!importer.busy(),8000);QCOMPARE(store.selectedId(),n.id);QCOMPARE(store.nodes().first().id,n.id);
+            importer.refreshSubscription(sourceId);QTRY_VERIFY_WITH_TIMEOUT(!importer.busy(),8000);QCOMPARE(store.selectedId(),n.id);QCOMPARE(store.nodes().first().id,n.id);QCOMPARE(store.networkConfiguration(),retainedConfiguration);
             qInfo()<<"FORMAT_REAL_HTTP_HTTPS"<<formats[i]<<"downloaded, parsed, DPAPI persisted, reloaded, Mihomo selected exit-A, disconnected, refreshed; local fixtures only";
         }
     }
