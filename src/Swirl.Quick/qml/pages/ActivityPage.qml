@@ -100,14 +100,14 @@ Item {
     Metric {objectName:"activityConnections";label:"活动连接";key:"activeConnections";value:page.telemetry.connectionsSampled?String(page.telemetry.activeConnections):"—";hint:page.telemetry.connectionsSampled?page.telemetry.activeProcesses+" 个进程":page.sampleState}
     Metric {objectName:"activityTotal";label:"累计流量";key:"totalTraffic";value:page.bytes(page.totals.total,page.totals.sampled);cumulative:true}
    }
-   SwirlGlassPanel {Layout.fillWidth:true;Layout.minimumWidth:0;Layout.preferredHeight:Theme.dp(240)
+   GridLayout {Layout.fillWidth:true;columns:page.wide?2:1;columnSpacing:Theme.gap;rowSpacing:Theme.gap
+    SwirlGlassPanel {Layout.fillWidth:true;Layout.fillHeight:false;Layout.minimumWidth:0;Layout.preferredWidth:7;Layout.preferredHeight:Theme.dp(212);Layout.alignment:Qt.AlignTop
      ColumnLayout {anchors.fill:parent;anchors.margins:Theme.cardPadding;spacing:Theme.dp(10)
       RowLayout {Layout.fillWidth:true;SwirlText {text:"流量趋势";color:Theme.text;font.pixelSize:Theme.fontSize(15);font.weight:Font.DemiBold;Layout.fillWidth:true}SwirlSegmentedControl {Layout.preferredWidth:Theme.dp(126);options:["全部","仅代理"];currentIndex:page.trafficKind;onActivated:index=>page.trafficKind=index}}
       Label {text:"今日累计分布 · 每柱 30 分钟";Layout.fillWidth:true}
       SwirlDailyTrafficChart {Layout.fillWidth:true;Layout.fillHeight:true;proxyOnly:page.trafficKind===1}
      }
-   }
-   GridLayout {Layout.fillWidth:true;columns:page.wide?2:1;columnSpacing:Theme.gap;rowSpacing:Theme.gap
+    }
     SwirlHeroCard {
      id:diagnostic;objectName:"internetDiagnosticCard";Layout.fillWidth:true;Layout.minimumWidth:0;Layout.preferredWidth:5;Layout.preferredHeight:height;Layout.alignment:Qt.AlignTop
      collapsedHeight:Theme.dp(240);expandedHeight:collapsedHeight+diagnosticDetails.implicitHeight+Theme.dp(16);expanded:page.diagnosticOpen
@@ -136,10 +136,14 @@ Item {
       Label {text:"代理："+(page.telemetry.latencies.proxy||"尚未测量")+" · "+(page.telemetry.proxyDiagnostic.detail||"通过当前代理入口单独测量 HTTPS 往返。")+(page.telemetry.proxyDiagnostic.networkError!==undefined?" · HTTP "+page.telemetry.proxyDiagnostic.http+" · 错误码 "+page.telemetry.proxyDiagnostic.networkError:"");Layout.fillWidth:true;wrapMode:Text.Wrap;elide:Text.ElideNone}
      }
     }
-    SwirlGlassPanel {Layout.fillWidth:true;Layout.fillHeight:false;Layout.minimumWidth:0;Layout.preferredWidth:7;Layout.preferredHeight:page.ranks.length===0?rankingContent.implicitHeight+2*Theme.cardPadding:Math.max(Theme.dp(240),rankingContent.implicitHeight+2*Theme.cardPadding);Layout.alignment:Qt.AlignTop
-    ColumnLayout {id:rankingContent;anchors.left:parent.left;anchors.right:parent.right;anchors.top:parent.top;anchors.margins:Theme.cardPadding;spacing:Theme.dp(12)
+   }
+   SwirlGlassPanel {Layout.fillWidth:true;Layout.fillHeight:false;Layout.minimumWidth:0;Layout.preferredHeight:page.ranks.length===0?rankingContent.implicitHeight+2*Theme.cardPadding:Math.max(Theme.dp(240),rankingContent.implicitHeight+2*Theme.cardPadding);Layout.alignment:Qt.AlignTop
+    ColumnLayout {id:rankingContent;anchors.left:parent.left;anchors.right:parent.right;anchors.top:parent.top;anchors.margins:Theme.cardPadding;spacing:page.ranks.length===0?Theme.dp(8):Theme.dp(12)
      RowLayout {Layout.fillWidth:true;SwirlText {text:"流量来源";color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold;Layout.fillWidth:true}SwirlButton {text:"查看全部";quiet:true;onClicked:{AppState.trafficPeriod=page.period===0?0:3;AppState.navigate(page.rankingKind===0?"processes":page.rankingKind===1?"gateway":"traffic")}}}
-     SwirlSegmentedControl {Layout.preferredWidth:Math.min(parent.width,Theme.dp(360));options:["进程","设备","域名","策略"];currentIndex:page.rankingKind;onActivated:index=>page.rankingKind=index}
+     RowLayout {Layout.fillWidth:true;spacing:Theme.dp(12)
+      SwirlSegmentedControl {Layout.preferredWidth:Math.min(rankingContent.width,Theme.dp(360));options:["进程","设备","域名","策略"];currentIndex:page.rankingKind;onActivated:index=>page.rankingKind=index}
+      Label {visible:page.wide&&page.ranks.length===0;text:"尚未采集排行数据";Layout.fillWidth:true;horizontalAlignment:Text.AlignRight}
+     }
      Repeater {model:page.ranks
       SwirlMotionButton {id:rank;readonly property Item motionTitle:rankName;readonly property Item motionSurface:background;required property var modelData;Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(32);padding:Theme.dp(4);hoverEnabled:true
        background:Rectangle {color:rank.down?Theme.pressed:rank.hovered?Theme.hover:"transparent";radius:Theme.controlRadius}
@@ -147,11 +151,12 @@ Item {
        onClicked:{AppState.trafficPeriod=page.period===0?0:3;if(page.rankingKind===0){AppState.trafficSelectedProcess=modelData.name;SwirlMotion.navigateFrom(rank,"processes","processName")}else if(page.rankingKind===1){AppState.trafficSelectedDevice=modelData.name;SwirlMotion.navigateFrom(rank,"gateway","deviceName")}else AppState.navigate("traffic")}
       }
      }
-     Label {visible:page.ranks.length===0;text:"尚未采集排行数据";Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(24)}
-     Label {text:"仅统计经过 Swirl 的流量 · "+(page.period===0?"今日":"本月")+" · DHCP 租用设备 "+gatewayProvider.devices.filter(r=>r.status==="租用中").length;Layout.fillWidth:true}
-     Label {text:"直连 "+(page.distribution[1]?page.distribution[1].value:"—")+" · 代理 "+(page.distribution[0]?page.distribution[0].value:"—")+(page.totals.sampled&&!page.telemetry.sampled?" · 历史累计":"");Layout.fillWidth:true}
+     Label {visible:!page.wide&&page.ranks.length===0;text:"尚未采集排行数据";Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(24)}
+     GridLayout {Layout.fillWidth:true;columns:page.wide?2:1;columnSpacing:Theme.dp(16);rowSpacing:Theme.dp(8)
+      Label {text:"仅统计经过 Swirl 的流量 · "+(page.period===0?"今日":"本月")+" · DHCP 租用设备 "+gatewayProvider.devices.filter(r=>r.status==="租用中").length;Layout.fillWidth:true;Layout.minimumWidth:0}
+      Label {text:"直连 "+(page.distribution[1]?page.distribution[1].value:"—")+" · 代理 "+(page.distribution[0]?page.distribution[0].value:"—")+(page.totals.sampled&&!page.telemetry.sampled?" · 历史累计":"");Layout.fillWidth:true;Layout.minimumWidth:0}
+     }
     }
-   }
    }
   }
  }
