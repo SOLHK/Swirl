@@ -164,13 +164,17 @@ fn decode_domains(c: &mut Cursor<'_>, count: usize) -> Result<Vec<String>, &'sta
         .iter()
         .map(|word| word.count_ones() as usize)
         .sum::<usize>();
-    let logical_bits = nodes.checked_add(labels.len()).ok_or("MrsDomainNodeCount")?;
+    let logical_bits = nodes
+        .checked_add(labels.len())
+        .ok_or("MrsDomainNodeCount")?;
     if nodes == 0
         || nodes > MAX_ITEMS
         || leaves.len() != nodes.div_ceil(64)
         || bitmap.len() != logical_bits.div_ceil(64)
         || (logical_bits % 64 != 0
-            && bitmap.last().is_some_and(|word| (word >> (logical_bits % 64)) != 0))
+            && bitmap
+                .last()
+                .is_some_and(|word| (word >> (logical_bits % 64)) != 0))
     {
         return Err("MrsDomainNodeCount");
     }
@@ -510,7 +514,10 @@ mod tests {
         assert!(!r.matches_domain("example.cn"));
         assert!(r.matches_domain("www.example.cn"));
         assert!(!r.matches_domain("notexample.cn"));
-        let apex_and_suffix = ChinaRules { domains: vec!["example.cn".into(), "+.example.cn".into()], networks: vec![] };
+        let apex_and_suffix = ChinaRules {
+            domains: vec!["example.cn".into(), "+.example.cn".into()],
+            networks: vec![],
+        };
         assert!(apex_and_suffix.matches_domain("example.cn"));
     }
     #[test]
