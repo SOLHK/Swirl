@@ -101,9 +101,16 @@ fn decode_domains(c: &mut Cursor<'_>, count: usize) -> Result<Vec<String>, &'sta
     let leaves = c.u64_vec()?; let bitmap = c.u64_vec()?; let labels = c.bytes_vec()?;
     if leaves.len() > MAX_ITEMS || bitmap.len() > MAX_ITEMS * 4 || labels.len() > MAX_ITEMS * 64 { return Err("MrsDomainBounds"); }
     if leaves.is_empty() || bitmap.is_empty() || labels.is_empty() { return Err("MrsDomainEmpty"); }
+    let nodes = bitmap.iter().map(|word| word.count_ones() as usize).sum::<usize>();
+    let edges = bitmap.iter().map(|word| word.count_zeros() as usize).sum::<usize>();
+    if nodes == 0 || nodes > MAX_ITEMS || leaves.len() != nodes.div_ceil(64)
+        || bitmap.len() != (nodes + labels.len()).div_ceil(64)
+        || edges.saturating_sub(nodes) < labels.len() {
+        return Err("MrsDomainNodeCount");
+    }
     let mut out = Vec::with_capacity(count.min(65536));
     let mut path = Vec::new();
-    walk_domain(0, &mut path, &leaves, &bitmap, &labels, &mut out)?;
+    walk_domain(0, nodes, &mut path, &leaves, &bitmap, &labels, &mut out)?;
     if out.is_empty() { return Err("MrsDomainEmpty"); }
     Ok(out)
 }
@@ -233,12 +240,12 @@ mod tests {
     #[test]
     fn rejects_truncated_payload_and_unsupported_mrs_version() {
         use std::io::Write;
-        let payload = b"MRS\\x01\\x00\\x00\\x00";
+        let payload = b"MRS\x01\x00\x00\x00";
         let compressed = zstd::stream::encode_all(&payload[..], 1).unwrap();
         let checksum = format!("{:x}", sha2::Sha256::digest(&compressed));
         assert_eq!(ChinaRules::parse(&compressed, Behavior::Domain, &checksum).unwrap_err(), "MrsTruncated");
 
-        let mut wrong_version = b"MRS\\x01\\x00".to_vec();
+        let mut wrong_version = b"MRS\x01\x00".to_vec();
         wrong_version.extend_from_slice(&1i64.to_be_bytes());
         wrong_version.extend_from_slice(&0i64.to_be_bytes());
         wrong_version.push(2); // unsupported domain trie payload version
@@ -259,13 +266,13 @@ mod tests {
     fn parses_bundled_mrs_assets_and_matches_domains_and_ips() {
         let domain = bundled("cn-domain.mrs");
         let domain_hash = "e92bda4f0b9f05623663a882331a320ab4e266cada2046d3828a94572cdded46";
-        let domains = ChinaRules::parse(&domain, Behavior::Domain, &domain_hash).expect("valid domain MRS");
+        let domains = ChinaRules::parse(&domain, Behavior::Domain, domain_hash).expect("valid domain MRS");
         assert!(domains.matches_domain("www.baidu.com"));
         assert!(domains.matches_domain("www.qq.com"));
 
         let ips = bundled("cn-ip.mrs");
         let ip_hash = "d95b3d125f6c74ce3c15e19ef794f142de91e21c3b8fb7767e76aebfabff5149";
-        let networks = ChinaRules::parse(&ips, Behavior::IpCidr, &ip_hash).expect("valid IP MRS");
+        let networks = ChinaRules::parse(&ips, Behavior::IpCidr, ip_hash).expect("valid IP MRS");
         assert!(networks.matches_ip("114.114.114.114".parse().unwrap()));
         assert!(networks.matches_ip("240e:3a1:1000::1".parse().unwrap()));
         assert!(!networks.matches_ip("8.8.8.8".parse().unwrap()));
