@@ -626,7 +626,9 @@ fn socks5_proxy() -> (u16, thread::JoinHandle<String>) {
     let port = listener.local_addr().unwrap().port();
     let worker = thread::spawn(move || {
         let (mut client, _) = listener.accept().unwrap();
-        client.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+        client
+            .set_read_timeout(Some(Duration::from_secs(5)))
+            .unwrap();
         let mut greeting = [0; 2];
         client.read_exact(&mut greeting).unwrap();
         assert_eq!(greeting[0], 5);
@@ -677,14 +679,19 @@ fn socks5_proxy() -> (u16, thread::JoinHandle<String>) {
 
 fn connect_host(core: &Core, host: &str, port: u16, expected_status: u16) -> TcpStream {
     let mut stream = TcpStream::connect(core.address()).unwrap();
-    stream.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+    stream
+        .set_read_timeout(Some(Duration::from_secs(5)))
+        .unwrap();
     write!(
         stream,
         "CONNECT {host}:{port} HTTP/1.1\\r\\nHost: {host}:{port}\\r\\n\\r\\n"
     )
     .unwrap();
     let response = header(&mut stream);
-    assert!(response.starts_with(format!("HTTP/1.1 {expected_status}").as_bytes()), "{response:?}");
+    assert!(
+        response.starts_with(format!("HTTP/1.1 {expected_status}").as_bytes()),
+        "{response:?}"
+    );
     stream
 }
 
