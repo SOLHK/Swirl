@@ -78,7 +78,7 @@ impl ChinaRules {
         expected: Behavior,
         expected_sha256_hex: &str,
     ) -> Result<Self, &'static str> {
-        if bytes.is_empty() || bytes.len() > MAX_COMPRESSED {
+        if bytes.len() < 4 || bytes.len() > MAX_COMPRESSED {
             return Err("MrsCompressedSize");
         }
         let digest = format!("{:x}", sha2::Sha256::digest(bytes));
