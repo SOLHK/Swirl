@@ -32,6 +32,23 @@ def require(condition, reason):
         raise ValueError(reason)
 
 
+def compress_integer_mapping(points):
+    """Compress validated integer pairs exactly, always retaining x=0.
+
+    Callers establish F2DOT14 range, monotonicity and required anchors before
+    supplying their points. No rounding or raw-source record editing occurs.
+    """
+    records = []
+    for point in points:
+        while len(records) >= 2 and records[-1][0] != 0:
+            a, b = records[-2:]
+            if (b[1] - a[1]) * (point[0] - b[0]) != (point[1] - b[1]) * (b[0] - a[0]):
+                break
+            records.pop()
+        records.append(point)
+    return tuple(records)
+
+
 def compile_axis(axis):
     """Return immutable unique/increasing integer records for one source axis.
 
@@ -46,7 +63,7 @@ def compile_axis(axis):
 
 @lru_cache(maxsize=128)
 def _compile_axis(axis):
-    records = []
+    points = []
     previous = None
     for n in range(-GRID, GRID + 1):
         span = axis.default - axis.minimum if n < 0 else axis.maximum - axis.default
@@ -57,16 +74,8 @@ def _compile_axis(axis):
         if n in (-GRID, 0, GRID):
             require(q == n, 'candidate_required_anchor_not_preserved')
         previous = q
-        point = (n, q)
-        # Remove an interior point only when all three lie on exactly the same
-        # rational line. Zero is a mandatory explicit anchor even if collinear.
-        while len(records) >= 2 and records[-1][0] != 0:
-            a, b = records[-2:]
-            if (b[1] - a[1]) * (point[0] - b[0]) != (point[1] - b[1]) * (b[0] - a[0]):
-                break
-            records.pop()
-        records.append(point)
-    result = tuple(records)
+        points.append((n, q))
+    result = compress_integer_mapping(points)
     require(len(result) <= 65535 and all(anchor in result for anchor in ANCHORS),
             'compiled_axis_records_or_anchors_invalid')
     return result

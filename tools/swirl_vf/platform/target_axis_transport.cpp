@@ -1,6 +1,6 @@
 // Optional authored-twin DirectWrite representation control; never a font-only
 // conversion solution, original-font acceptance, or production mapping repair.
-// args: normalized-control.ttc transported-control.ttc requests.tsv summary.json
+// args: normalized-control.ttc target-control.ttc requests.tsv summary.json [--font-level]
 // TSV: faceIndex qWidth qWeight qHeight targetWidth targetWeight targetHeight
 // q is an externally supplied signed 2.14 integer, not inferred from Apple x.
 // Primary APIs inspected before implementation:
@@ -28,6 +28,7 @@ int main() {
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <cwchar>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -96,7 +97,7 @@ struct LockedFont {
         need(found != face.tables.end() && found->second.second >= minimum, "fixture_table_missing");
         return bytes.data() + found->second.first;
     }
-    LockedFont(const fs::path& path, bool normalized) {
+    LockedFont(const fs::path& path, bool normalized, bool legal_avar = false) {
         // Deny writes/deletion throughout hashing, loading and observations.
         handle = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
                              FILE_ATTRIBUTE_NORMAL, nullptr);
@@ -145,13 +146,25 @@ struct LockedFont {
                      "fixture_identity_avar_header");
                 size_t position=8;
                 for(unsigned a=0;a<3;++a) {
-                    need(position+14<=length && be16(p+position)==3, "fixture_identity_avar_records");
+                    need(position+2<=length, "fixture_avar_count_missing");
+                    unsigned maps=be16(p+position);
+                    need(maps>=3 && position+2+4*size_t(maps)<=length,
+                         "fixture_avar_records_range");
+                    if(!legal_avar) need(maps==3, "fixture_identity_avar_records");
                     position+=2;
-                    for(int q:{-16384,0,16384}) {
-                        need(int16_t(be16(p+position))==q && int16_t(be16(p+position+2))==q,
-                             "fixture_nonidentity_avar_not_admitted");
+                    int previous_x=-16385,previous_y=-16385;unsigned anchors=0;
+                    for(unsigned m=0;m<maps;++m) {
+                        int x=int16_t(be16(p+position)),y=int16_t(be16(p+position+2));
+                        need(x>=-16384 && x<=16384 && y>=-16384 && y<=16384 &&
+                             x>previous_x && y>=previous_y, "fixture_avar_not_legal_monotonic");
+                        if(!legal_avar) need(x==y, "fixture_nonidentity_avar_not_admitted");
+                        if(x==y && x==-16384) anchors|=1;
+                        if(x==y && x==0) anchors|=2;
+                        if(x==y && x==16384) anchors|=4;
+                        previous_x=x;previous_y=y;
                         position+=4;
                     }
+                    need(anchors==7, "fixture_avar_required_anchor_missing");
                 }
                 need(position==length, "fixture_identity_avar_extent");
             }
@@ -244,14 +257,19 @@ int wmain(int argc,wchar_t** argv) {
     std::set<UINT32> seen_faces;
     std::string left_sha,right_sha,error;
     bool pass=false,unchanged=false;
-    if(argc!=5) { std::puts("{\"status\":\"FAILED\",\"error\":\"four_arguments_required\"}"); return 2; }
+    bool font_level=argc==6 && std::wcscmp(argv[5],L"--font-level")==0;
+    if(argc!=5 && !font_level) { std::puts("{\"status\":\"FAILED\",\"error\":\"invalid_arguments\"}"); return 2; }
     try {
-        LockedFont left(argv[1],true),right(argv[2],false);
+        LockedFont left(argv[1],true),right(argv[2],false,font_level);
         left_sha=left.digest;right_sha=right.digest;
         need(left.faces.size()==right.faces.size(), "twin_face_count_differs");
         for(size_t i=0;i<left.faces.size();++i) {
             need(left.faces[i].glyphs==right.faces[i].glyphs && left.faces[i].upm==right.faces[i].upm, "twin_glyph_or_upm_differs");
             for(auto name: {"glyf","loca","gvar","hmtx","vmtx","HVAR","VVAR","cmap"}) {
+                // The font-level control actually rebases variation stores;
+                // default geometry/metrics/cmap must still remain unchanged.
+                if(font_level && (std::strcmp(name,"gvar")==0 || std::strcmp(name,"HVAR")==0 ||
+                                  std::strcmp(name,"VVAR")==0)) continue;
                 auto a=left.faces[i].tables.find(tableTag(name)),b=right.faces[i].tables.find(tableTag(name));
                 need(a!=left.faces[i].tables.end() && b!=right.faces[i].tables.end() && a->second.second==b->second.second &&
                      std::memcmp(left.bytes.data()+a->second.first,right.bytes.data()+b->second.first,a->second.second)==0,
@@ -277,7 +295,7 @@ int wmain(int argc,wchar_t** argv) {
                 normalized[a]=request.q[a]/16384.0;
                 auto axis=right.faces[request.face].axes[a];
                 double expected=axis.value+normalized[a]*(request.q[a]<0 ? axis.value-axis.lo : axis.hi-axis.value);
-                need(request.y[a]==expected, "request_target_y_not_exact_q_transport");
+                if(!font_level) need(request.y[a]==expected, "request_target_y_not_exact_q_transport");
             }
             ComPtr<IDWriteFontResource> lr,rr;
             checked(factory->CreateFontResource(left_file.Get(),request.face,&lr), "left_font_resource_failed");
@@ -317,9 +335,9 @@ int wmain(int argc,wchar_t** argv) {
     // Error strings above are fixed codes; no paths, glyph coordinates or font
     // table data enter the public summary. Inputs remain locked until checks end.
     std::ostringstream out;out<<std::setprecision(17)
-        <<"{\"schema\":1,\"status\":\""<<(pass?"PASS_SYNTHETIC_TARGET_Q_TRANSPORT":"FAILED")
+        <<"{\"schema\":1,\"status\":\""<<(pass?(font_level?"PASS_AUTHORED_FONT_LEVEL_BASIS":"PASS_SYNTHETIC_TARGET_Q_TRANSPORT"):"FAILED")
         <<"\",\"backend\":\"DirectWrite_CreateFontResource\",\"data_origin\":\"self_authored_twins\","
-        <<"\"role\":\"optional_q_representation_control_not_font_only_solution\","
+        <<"\"role\":\""<<(font_level?"authored_font_only_axis_and_variation_rebase_control":"optional_q_representation_control_not_font_only_solution")<<"\","
         <<"\"original_font_acceptance\":\"NOT_RUN\",\"source_x_to_q_proven\":false,\"production_accepted\":false,"
         <<"\"windows11_acceptance\":\"NOT_RUN\",\"qt_swirl_acceptance\":\"NOT_RUN\","
         <<"\"normalized_twin_sha256\":\""<<left_sha<<"\",\"transported_twin_sha256\":\""<<right_sha

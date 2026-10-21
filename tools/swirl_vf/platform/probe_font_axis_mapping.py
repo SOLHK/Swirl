@@ -21,6 +21,8 @@ from fontTools.ttLib import TTCollection
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 from target_axis_mapping import source_plan, axes_from_font
 from font_axis_mapping import compile_axis
+from design_axis_basis import basis_from_axis, build_rebased_avar, encode_source_q, decode_target_r
+from audit_font import raw_avar
 from source_request_oracle import make_launcher, exact_json
 from rebuild import NativeOracle
 from probe_axis_anchor import (source_identities, hvf_events, raw_native_paths,
@@ -79,9 +81,19 @@ def run(source, output, native, hvf):
             identities = source_identities(fonts)
             cases = cases_for(fonts, identities)
             plans = [source_plan(fonts[row['face']], row['location']) for row in cases]
+            source_axes = [axes_from_font(font) for font in fonts]
+            bases = [{axis.tag: basis_from_axis(axis) for axis in axes} for axes in source_axes]
+            decoded = []
+            for row, plan in zip(cases, plans):
+                frame = bases[row['face']]
+                r = {tag: encode_source_q(frame[tag], plan['source_q'][tag]) for tag in TAGS}
+                decoded.append({tag: float(decode_target_r(frame[tag], r[tag])) / 16384 for tag in TAGS})
+                plan['target_r'] = r
+                plan['fractional_source_q_composition'] = decoded[-1]
             # Freeze all arithmetic before any new native observation.
             (output / 'private-plans.json').write_text(json.dumps(plans, allow_nan=False))
             legal, blocked = 0, {}
+            rebased_axis_count = 0
             for font in fonts:
                 for axis in axes_from_font(font):
                     try:
@@ -90,11 +102,17 @@ def run(source, output, native, hvf):
                     except ValueError as error:
                         key = axis.tag + ':' + str(error)
                         blocked[key] = blocked.get(key, 0) + 1
+                table, certificate = build_rebased_avar(axes_from_font(font))
+                parsed = raw_avar(table.compile(font), list(TAGS))
+                require(parsed['standard_record_conformance_pass'], 'rebased_avar_serialization_not_legal')
+                rebased_axis_count += len(certificate['bases'])
             summary.update(physical_faces=32, source_positions=len(cases),
                 fresh_seeded_positions=32, D2_fraction_positions=96, endpoint_controls=32,
                 historical_controls=5, direct_q_space_legal_axis_candidates=legal,
                 direct_q_space_compiler_refusals=blocked,
-                glyph_model_reparameterization='NOT_IMPLEMENTED',
+                rebased_legal_axis_candidates=rebased_axis_count,
+                original_glyph_model_reparameterization='NOT_RUN',
+                rebased_coordinate_probe_excludes_integer_coefficient_rounding=True,
                 all_plans_frozen_before_native=True)
             launcher = output / 'source-request-oracle'
             make_launcher(launcher, native)
@@ -134,29 +152,53 @@ def run(source, output, native, hvf):
                 finally:
                     oracle.close()
             geometry = control_stats()
+            rebased_geometry = control_stats()
             metric_max, metric_exact, metric_outside = 0., 0, 0
+            rebased_metric_max, rebased_metric_outside = 0., 0
+            metrics = {face: SourceMetrics(font) for face, font in enumerate(fonts)}
+            hvf_cache = {}
+            def hvf_get(face, gid, design):
+                key = (face, gid, *(design[tag] for tag in TAGS))
+                if key not in hvf_cache:
+                    hvf_cache[key] = raw_native_paths(hvf_events(hvf, source, face, gid, design))
+                return hvf_cache[key]
             for i, row in enumerate(cases):
                 design = {tag: plans[i]['source_q'][tag] / 16384 for tag in TAGS}
-                residual = metric_residuals(SourceMetrics(fonts[row['face']]), observations[i], design)
+                residual = metric_residuals(metrics[row['face']], observations[i], design)
                 metric_max = max(metric_max, residual['maximum_error'])
                 metric_exact += residual['exact']
                 metric_outside += not residual['within_1_32']
+                rounded_residual = metric_residuals(metrics[row['face']], observations[i], decoded[i])
+                rebased_metric_max = max(rebased_metric_max, rounded_residual['maximum_error'])
+                rebased_metric_outside += not rounded_residual['within_1_32']
                 for gid in (5, 19177):
-                    add_control(geometry, raw_native_paths(hvf_events(hvf, source, row['face'], gid, design)),
+                    add_control(geometry, hvf_get(row['face'], gid, design),
                         raw_coretext_paths(observations[i][gid]['commands']), row['face'], gid, row['location'])
-            (output / 'geometry-checks.private.json').write_text(json.dumps(geometry, allow_nan=False))
+                    add_control(rebased_geometry, hvf_get(row['face'], gid, decoded[i]),
+                        raw_coretext_paths(observations[i][gid]['commands']), row['face'], gid, row['location'])
+            (output / 'geometry-checks.private.json').write_text(json.dumps(
+                {'source_q': geometry, 'rebased_fractional_composition': rebased_geometry}, allow_nan=False))
             safe_geometry = {key: ({k: v for k, v in value.items() if k != 'examples'}
                                   if isinstance(value, dict) else value) for key, value in geometry.items()}
+            safe_rebased_geometry = {key: ({k: v for k, v in value.items() if k != 'examples'}
+                                          if isinstance(value, dict) else value)
+                                     for key, value in rebased_geometry.items()}
             finite_controls = metric_outside == 0 and geometry['preserved_controls']['failures'] == 0
+            rebased_controls = rebased_metric_outside == 0 and rebased_geometry['preserved_controls']['failures'] == 0
             summary.update(opposite_order_exact_glyph_pairs=opposite,
                 D2_strict_fraction_pass=strict_pass, D2_strict_fraction_fail=strict_fail,
                 HVAR={'positions': len(cases), 'exact_positions': metric_exact,
                       'outside_1_32': metric_outside, 'maximum_error': metric_max},
-                native_HVF_geometry=safe_geometry, native_HVF_calls=2 * len(cases),
+                native_HVF_geometry=safe_geometry, native_HVF_unique_calls=len(hvf_cache),
+                rebased_coordinate_composition={'positions': len(cases),
+                    'HVAR_maximum_error': rebased_metric_max, 'HVAR_outside_1_32': rebased_metric_outside,
+                    'native_HVF_geometry': safe_rebased_geometry,
+                    'glyph_integer_coefficient_reencoding': 'NOT_TESTED_BY_THIS_PROBE'},
                 finite_preserved_control_budget_passed=finite_controls,
+                rebased_coordinate_control_budget_passed=rebased_controls,
                 source_unchanged=hashlib.sha256(source.read_bytes()).hexdigest() == EXPECTED)
             require(summary['source_unchanged'], 'original_source_changed')
-            code = 0 if finite_controls else 2
+            code = 0 if finite_controls and rebased_controls else 2
             summary['status'] = 'COMPLETED_FINITE_SOURCE_Q_AND_FONT_REPRESENTATION_TEST_NOT_ACCEPTANCE'
     except Exception as error:
         summary.update(status='FAILED_P4_NATIVE_GATE', failure_type=type(error).__name__)

@@ -32,6 +32,24 @@ def authored_axes():
                    'HGHT': (1, 500, 1000)} for face in range(32)}
 
 
+def authored_control_face(face, axes, *, normalized):
+    font = make_face(face)
+    tags = REFERENCE if normalized else ORDER
+    for axis, source_tag, tag in zip(font['fvar'].axes, ORDER, tags):
+        axis.axisTag = tag
+        axis.minValue, axis.defaultValue, axis.maxValue = (
+            (-1, 0, 1) if normalized else axes[source_tag])
+    font['fvar'].instances = []
+    del font['STAT']
+    font['avar'].segments = {tag: {-1.: -1., 0.: 0., 1.: 1.} for tag in tags}
+    if normalized:
+        rename = dict(zip(ORDER, REFERENCE))
+        for tuples in font['gvar'].variations.values():
+            for variation in tuples:
+                variation.axes = {rename[tag]: value for tag, value in variation.axes.items()}
+    return font
+
+
 def write_controls(output, axes_by_face=None):
     output = Path(output)
     output.mkdir(parents=True, exist_ok=False)
@@ -41,20 +59,7 @@ def write_controls(output, axes_by_face=None):
     paths = {'normalized': [], 'transported': []}
     for face in range(32):
         for kind in paths:
-            font = make_face(face)
-            tags = REFERENCE if kind == 'normalized' else ORDER
-            for axis, source_tag, tag in zip(font['fvar'].axes, ORDER, tags):
-                axis.axisTag = tag
-                axis.minValue, axis.defaultValue, axis.maxValue = (
-                    (-1, 0, 1) if kind == 'normalized' else axes_by_face[face][source_tag])
-            font['fvar'].instances = []
-            del font['STAT']
-            font['avar'].segments = {tag: {-1.: -1., 0.: 0., 1.: 1.} for tag in tags}
-            if kind == 'normalized':
-                rename = dict(zip(ORDER, REFERENCE))
-                for tuples in font['gvar'].variations.values():
-                    for variation in tuples:
-                        variation.axes = {rename[tag]: value for tag, value in variation.axes.items()}
+            font = authored_control_face(face, axes_by_face[face], normalized=kind == 'normalized')
             path = output / f'{kind}-{face:02d}.ttf'
             with path.open('xb') as stream:
                 font.save(stream)

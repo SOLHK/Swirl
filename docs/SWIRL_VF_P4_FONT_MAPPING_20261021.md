@@ -142,6 +142,70 @@ The local generated8GID control at
 `build/vf-takeover-private/font-only-precision-control-stage1/` is authored
 data, not an original conversion candidate.
 
+## Font-file endpoint basis and actual variation-model reparameterization
+
+The next implementation explicitly distinguishes source post-avar q from
+target normalized r. `design_axis_basis.py` freezes each raw source axis's
+actual candidate endpoint q, maps its two sides to target endpoints-16384/+16384,
+and compiles legal standard avar in r. All32original profiles now serialize as
+legal three-axis avar candidates; no original table is overwritten. Integer
+q→r encoding is injective over the used q interval, but its fractional inverse
+has nonzero coordinate error. The reported exact rational bound is in q-grid
+units, never a claimed glyph error bound. Quarter-cell and input-collision
+counterexamples still apply. Ten new basis tests and nine compiler tests pass.
+
+`rebase_design_font.py` implements the previously missing transformation for
+an already standard q-space glyph model. It reuses FontTools' partial instancer
+with source q limits, converting actual gvar, HVAR/VVAR and layout variation
+regions/coefficients before restoring the original axis tags/ranges and legal
+avar. It accepts only explicit standard custom-axis q models, rejects
+proprietary HVGL/HVPM, returns a distinct candidate, and is not enabled in the
+production builder. Metadata is validated before the instancer can filter it:
+unsupported named/STAT coordinates are refused instead of silently discarded.
+
+Nine reparameterization regressions pass. They prove a clipped source peak
+must produce20→10, while merely relabeling supports incorrectly preserves20;
+actual HarfBuzz checks cover glyph extents/advance and a GDEF VarStore referenced
+by GPOS. All three clipped axes are checked on mixed corners with VVAR. An odd
+coefficient1 still has an explicitly measured0.5-FUnit endpoint discrepancy
+after integer serialization, above1/32. This failure is retained, not reported
+as lossless preservation or bypassed by a marker.
+
+The new32-face authored font-file control uses unchanged nominal user inputs
+on the target. The file itself contains reparameterized avar/gvar/HVAR/VVAR;
+there is no application coordinate conversion. Its independent q-space font
+is used solely as a reference. Local HarfBuzz checks256requests/5376glyph
+metric-extents comparisons exactly; all32faces retain exact default glyf,
+loca,hmtx,vmtx,cmap bytes. Both generated collections pass the existing C1
+binary/table checks. The reference's custom normalized axis tags are legal,
+and the target uses WDTH/wght/HGHT with the original numeric range families.
+Aggregate: [rebased local font](evidence/SWIRL_VF_P4_REBASED_FONT_LOCAL_20261021.json).
+
+The extended DirectWrite probe has a separate `--font-level` control mode:
+it verifies legal target avar and default tables, then compares actual metrics
+and full outline points at unchanged nominal inputs. The existing optional
+q-transport control retains its stricter identical variation-table requirement.
+Neither mode grants original/Windows11 acceptance. Actual Windows execution
+of the new font-level mode is pending at this source checkpoint.
+
+The original165-position experiment is extended for a new reason: compare the
+fractional q reconstructed from the quantized r against original CoreText/HVF.
+This measures coordinate-composition error separately from coefficient
+re-encoding; it does not pretend to be an original target-font build. Existing
+comparators and all original96readback failures remain. No expensive full-GID
+baseline is repeated. Formal original reconstruction remains NOT_RUN.
+
+P4 saved source checkpoints so far:
+- d3a766f03e2b70033a775702d87ecb5ddab7fb42: separated mapping/legal compiler;
+  actual original/native and Windows representation CI passed.
+- b9823c481eefef8a980d1d6671460fdbf1c0f406: font-only physical scaling/GPOS
+  control and input-bound UPEM postcondition; existing CI passed.
+
+The original Swirl-VF production guard remains closed. Actual source-HVF to
+standard glyph construction, full original metrics, font-level global input
+mapping, Windows11 and third-party application acceptance are still distinct
+outstanding gates. No proprietary source/derived font is uploaded.
+
 Primary references inspected before implementation:
 [OpenType normalization](https://learn.microsoft.com/en-us/typography/opentype/spec/otvaroverview#coordinate-scales-and-normalization),
 [avar record constraints](https://learn.microsoft.com/en-us/typography/opentype/spec/avar),
