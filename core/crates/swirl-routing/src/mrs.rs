@@ -139,7 +139,7 @@ impl ChinaRules {
                 exact_domains.insert(rule);
             }
         }
-        networks.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+        networks.sort_unstable_by_key(|range| range.0);
         Self {
             exact_domains,
             suffix_domains,
