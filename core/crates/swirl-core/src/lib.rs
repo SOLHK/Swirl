@@ -531,7 +531,7 @@ async fn route<'a>(
             // Match and dial the same address. Do not retry another DNS answer
             // under the first address's policy or let an upstream resolve again.
             let address = addresses.first().ok_or("RouteDnsEmpty")?;
-            let selected = swirl_routing::select_with_trace(
+            let selected = swirl_routing::select_with_trace_and_china(
                 config,
                 &target.host,
                 target.port,
