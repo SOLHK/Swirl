@@ -1,7 +1,7 @@
 name: Swirl Rust Core
 on:
   push:
-    branches: [test, main, work/core-completion-20261017, work/core-rule-routing-20261021]
+    branches: [test, main, work/core-completion-20261017, work/core-rule-routing-20261021, work/rust-core-network-fixes-20261021]
   pull_request:
     branches: [test, main]
   workflow_dispatch:

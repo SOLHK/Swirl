@@ -1,9 +1,10 @@
 #include "NodeTestService.h"
+#ifdef SWIRL_USE_RUST_CORE
+#include "RustCoreEngine.h"
+#else
 #include "MihomoAdapter.h"
 #include "SwirlProxyEngine.h"
 #include "SwirlProtocolRegistry.h"
-#ifdef SWIRL_USE_RUST_CORE
-#include "RustCoreEngine.h"
 #endif
 #include <QTcpServer>
 #include <QSet>

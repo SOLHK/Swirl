@@ -74,8 +74,9 @@
 #include "app/HdrOutput.h"
 #include "network/CaptureService.h"
 #include "network/GatewayService.h"
+#ifndef SWIRL_USE_RUST_CORE
 #include "engine/MihomoAdapter.h"
-#include "engine/SwirlEngineManager.h"
+#endif
 #include "engine/ThreadedEngine.h"
 #include "engine/EngineController.h"
 

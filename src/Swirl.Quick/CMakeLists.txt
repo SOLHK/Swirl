@@ -72,17 +72,22 @@ add_library(SwirlEngine STATIC
  engine/ProxyLatencyProbe.h engine/ProxyLatencyProbe.cpp
  engine/NodeTestService.h engine/NodeTestService.cpp
  engine/SystemProxySession.h engine/SystemProxySession.cpp
- engine/ProxyEngine.h engine/OwnedProcess.h engine/OwnedProcess.cpp
- engine/MihomoAdapter.h engine/MihomoAdapter.cpp
- engine/MihomoLogDiagnostic.h engine/MihomoLogDiagnostic.cpp
+ engine/ProxyEngine.h
  engine/EngineController.h engine/EngineController.cpp)
+if(NOT SWIRL_USE_RUST_CORE OR SWIRL_BUILD_UI_TESTS)
+ # Compatibility sources remain available to the legacy build and its test fixtures.
+ target_sources(SwirlEngine PRIVATE
+  engine/OwnedProcess.h engine/OwnedProcess.cpp
+  engine/MihomoAdapter.h engine/MihomoAdapter.cpp
+  engine/MihomoLogDiagnostic.h engine/MihomoLogDiagnostic.cpp
+  engine/SwirlEngineManager.h engine/SwirlEngineManager.cpp)
+endif()
 target_sources(SwirlEngine PRIVATE engine/ProxyNode.h engine/ProxyNode.cpp engine/NodeStore.h engine/NodeStore.cpp)
 target_sources(SwirlEngine PRIVATE engine/NodeImporter.h engine/NodeImporter.cpp)
 target_sources(SwirlEngine PRIVATE engine/SubscriptionNormalizer.h engine/SubscriptionNormalizer.cpp)
 target_sources(SwirlEngine PRIVATE engine/SwirlProtocolRegistry.h engine/SwirlProtocolRegistry.cpp engine/SwirlProxyEngine.h engine/SwirlProxyEngine.cpp)
 target_sources(SwirlEngine PRIVATE engine/NativeDuplexRelay.h engine/NativeDuplexRelay.cpp)
 target_sources(SwirlEngine PRIVATE engine/ConnectionDiagnostics.h engine/ConnectionDiagnostics.cpp)
-target_sources(SwirlEngine PRIVATE engine/SwirlEngineManager.h engine/SwirlEngineManager.cpp)
 target_sources(SwirlEngine PRIVATE engine/SwirlUdpExchange.h engine/SwirlUdpExchange.cpp)
 target_sources(SwirlEngine PRIVATE engine/NodeImportService.h engine/NodeImportService.cpp)
 target_sources(SwirlEngine PRIVATE engine/RustCoreEngine.h engine/RustCoreEngine.cpp)
@@ -157,8 +162,10 @@ endif()
 target_sources(Swirl PRIVATE network/GatewayService.h network/GatewayService.cpp network/GatewayRouting.h network/GatewayRouting.cpp network/DhcpServer.h network/DhcpServer.cpp network/Http2Session.h network/Http2Session.cpp network/TlsCertificateService.h network/TlsCertificateService.cpp)
 target_link_libraries(Swirl PRIVATE SwirlEngine SwirlHttp2 SwirlExtensions)
 add_dependencies(Swirl SwirlScriptRunner)
-qt_add_resources(Swirl engine_manifest PREFIX "/engine" BASE "${CMAKE_CURRENT_SOURCE_DIR}/packaging"
- FILES packaging/mihomo-manifest.json)
+if(NOT SWIRL_USE_RUST_CORE OR SWIRL_BUILD_UI_TESTS)
+ qt_add_resources(Swirl engine_manifest PREFIX "/engine" BASE "${CMAKE_CURRENT_SOURCE_DIR}/packaging"
+  FILES packaging/mihomo-manifest.json)
+endif()
 set(SWIRL_QML_FILES
  qml/controls/SwirlText.qml qml/controls/SwirlFontBinding.qml
  qml/controls/SwirlTextArea.qml qml/controls/SwirlToolTip.qml

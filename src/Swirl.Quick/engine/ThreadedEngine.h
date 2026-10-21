@@ -1,7 +1,8 @@
 #pragma once
-#include "SwirlEngineManager.h"
 #ifdef SWIRL_USE_RUST_CORE
 #include "RustCoreEngine.h"
+#else
+#include "SwirlEngineManager.h"
 #endif
 #include <QThread>
 

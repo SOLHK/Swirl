@@ -13,11 +13,13 @@
 #include <QHostAddress>
 #include <QRegularExpression>
 #include <QNetworkInterface>
+#ifndef SWIRL_USE_RUST_CORE
 #include <QTemporaryDir>
+#include "MihomoAdapter.h"
+#endif
 #include <QFutureWatcher>
 #include <QPromise>
 #include <QThreadPool>
-#include "MihomoAdapter.h"
 #ifdef SWIRL_USE_RUST_CORE
 #include "RustCoreEngine.h"
 #include "RustDnsConfiguration.h"
@@ -114,12 +116,14 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
     });
 #endif
     connect(this,&EngineController::diagnostic,&m_diagnostics,[this](const QString &module,const QString &code,const QString &message){m_diagnostics.noteEvent(module+" / "+code,message);});
+#ifndef SWIRL_USE_RUST_CORE
     QFile manifest(QStringLiteral(":/engine/mihomo-manifest.json"));
     if (manifest.open(QIODevice::ReadOnly)) {
         const auto object = QJsonDocument::fromJson(manifest.readAll()).object();
         m_options.expectedSha256 = object.value(QStringLiteral("executableSha256")).toString().toLatin1();
         m_options.expectedVersion = object.value(QStringLiteral("version")).toString();
     }
+#endif
     // The encrypted node snapshot is authoritative after the first migration.
     // Read legacy settings only when no embedded network snapshot exists.
     auto configuration=m_store.networkConfiguration();
@@ -188,7 +192,9 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
         } else if(s.state==ProxyEngine::State::Running&&s.apiHealthy&&m_proxyRequested&&!m_systemProxy.owned()&&!m_proxyChecking)setSystemProxy(true);
     });
     if(m_options.tunEnabled&&!elevated()){m_options.tunEnabled=false;m_options.meteredNetwork=false;m_routingError=QStringLiteral("增强模式需要管理员权限，本次启动保持关闭。");}
+#ifndef SWIRL_USE_RUST_CORE
     m_options.executablePath = QCoreApplication::applicationDirPath() + QStringLiteral("/core/mihomo.exe");
+#endif
     connect(m_engine.get(), &ProxyEngine::statusChanged, this, &EngineController::statusChanged);
     connect(&m_store,&NodeStore::changed,this,&EngineController::nodesChanged);
     connect(&m_store,&NodeStore::changed,this,&EngineController::nodeCatalogChanged);
@@ -527,16 +533,7 @@ bool EngineController::validateNetworkConfiguration(const QVariantMap &input,QVa
     const auto reject=[&]{m_networkError=staged.networkConfigurationError();emit optionsChanged();return false;};
     const auto dns=input.value("dns").toMap();if(!dns.isEmpty()&&!staged.configureDns(dns))return reject();
     const auto groups=input.value("groups").toList();if(groups.size()>128){m_networkError=QStringLiteral("最多支持 128 个策略组。");emit optionsChanged();return false;}
-#ifdef SWIRL_USE_RUST_CORE
-    if(input.contains("groups")&&!QJsonValue::fromVariant(input.value("groups")).isArray()){m_networkError=QStringLiteral("策略组必须是数组。");emit optionsChanged();return false;}
-    // Preserve the exact maps, including probe/default selection fields. A
-    // whole-graph conversion validates forward references before any save.
-    const auto groupError=RustCoreEngine::validatePolicyGroups(staged.m_store.nodes(),groups);
-    if(!groupError.isEmpty()){m_networkError=groupError;emit optionsChanged();return false;}
-    staged.m_options.customGroups=groups;
-#else
     for(const auto &entry:groups){const auto group=entry.toMap();if(!staged.savePolicyGroup(group.value("name").toString(),group.value("type").toString(),group.value("proxies").toStringList()))return reject();}
-#endif
     for(const auto &value:input.value("rules").toStringList()){const auto parts=value.split(',');
         if(parts.size()==2&&parts[0]=="MATCH"){if(!staged.saveRoutingRule("MATCH","",parts[1]))return reject();}
         else if(parts.size()==3){if(!staged.saveRoutingRule(parts[0],parts[1],parts[2]))return reject();}
