@@ -222,6 +222,70 @@ it is not modified. PR23 remains open/draft, unmerged, at54e579f. Only the
 new isolated takeover branch is written. No cross-window conflict was detected;
 the selected C1 overlap is documented by immutable source blobs.
 
+## Saved checkpoints and final acceptance scope
+
+All source checkpoints are saved remotely by normal fast-forward ref updates
+on this isolated branch only:
+
+- `dbff131cd04784e11a9f1c043ffec6b201040bf1`: exact original-request sampling.
+- `69ff9049de57c2690a5cdf6a62caf2ccb955785d`: C1 binary packaging gate and explicit
+  refusal to infer target approval from source-only replay.
+- `ccc36e2723d39afe365a186098883e3c3158238a`: original verified-face byte binding.
+
+Final source checkpoint passed all three jobs in
+[run39547674762](https://github.com/SOLHK/Swirl/actions/runs/39547674762).
+Linux actually ran707tests with no skips plus6audits. macOS27 exact-original
+replay again retained796verified batches/3184native glyph records and288/96
+strict D2 results. Windows Server2022 again loaded32authored C1-packed faces
+and captured10rasters. Machine-readable fixed aggregate:
+[final CI](evidence/SWIRL_VF_TAKEOVER_FINAL_CI_20261021.json).
+This documentation-only successor does not change the tested source tree.
+
+[Draft PR24](https://github.com/SOLHK/Swirl/pull/24) is stacked on PR23's
+unchanged branch, so reviewers see this takeover delta independently. GitHub
+reports it mergeable; it remains draft/unmerged. Integration-owner review and
+the ordering of PR23/PR24 are required. No automatic integration is performed.
+
+| Item | Actual final state |
+| --- | --- |
+| Original32-face source identity/native finite replay | PASS on macOS27.0.1, exact39d42acd source |
+| Original exact user-axis readback | FAIL retained:96/384 D2requests |
+| Global source-to-target coordinate mapping | UNACCEPTED; direct input collision evidence retained |
+| Synthetic raw CoreText849/850 metric test | FAIL retained at1/32; no raw API correction |
+| Native authored two-face outline/table-metric reconstruction | PASS,174records, zero observed source/candidate error |
+| Authored32-face C1 TTC binary structure/fontTools | PASS; packaging evidence only |
+| Authored32-face HarfBuzz shaping | PASS local smoke:64runs/192glyphs; no original equivalence claim |
+| Authored32-face Windows Server2022 DirectWrite | PASS actual load/axis movement/raster controls |
+| Original first-face/32-face target reconstruction | NOT_RUN: prerequisites unaccepted and source-only gate prohibits construction; no Apple-derived candidate |
+| Original Swirl-VF.ttc / Windows11 / actual Qt or Swirl | NOT_RUN / NOT_RUN / NOT_RUN |
+
+The retained local file is only the authored packaging control:
+`~/Swirl-worktrees/vf-takeover-abc/build/vf-takeover-private/c1-synthetic/c1-control.ttc`.
+It must never be described as a converted PingFang/Swirl-VF delivery font.
+Native authored reconstruction fonts were temporary and removed. Original user
+font remains untouched in Downloads, never registered/patched/uploaded.
+
+Next actionable work is a separately evidenced target representation contract,
+not another large original sweep. A3's ONCE_ALL finite design cohort is useful
+prior evidence, not a global map. The pending delivery decision is whether
+Qt/Swirl may compensate fixed verticalX500 versus DirectWrite's width-half
+placement while raw native API differences stay separately failing. No answer
+or permission is inferred from elapsed time. Even such a decision would not
+by itself resolve axis precision or authorize marking raw API equality passed.
+Do not remove the source-only production guard or change original tolerances
+without replacing them with independently verified target acceptance.
+
+Re-run the targeted corruption reproductions from this worktree:
+
+```sh
+/Users/mac430/Swirl-worktrees/vf-macos-windows-d1/build/vf-d1-private/venv/bin/python -m unittest discover -s tools/swirl_vf/tests -p test_verified_face_binding.py -v
+/Users/mac430/Swirl-worktrees/vf-macos-windows-d1/build/vf-d1-private/venv/bin/python -m unittest discover -s tools/swirl_vf/tests -p test_rebuild_pipeline.py -v
+```
+
+Use a fresh output directory for each native driver; never overwrite previous
+evidence. All private outputs remain ignored. The main and D1 worktrees are
+clean and unchanged; no source history from any other window was rewritten.
+
 ## Reproduction
 
 Use the existing D1 venv read-only, with new output directories in this worktree:
