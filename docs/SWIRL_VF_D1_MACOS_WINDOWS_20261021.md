@@ -757,3 +757,22 @@ standard-library APIs were used; no new dependency or second TTC engine.
 Original build admission remains blocked by the independently established A3
 and B1 constraints. Original models/faces remain **0/32**, no original-derived
 Swirl-VF.ttc, Windows 11 and actual Qt/Swirl **NOT_RUN**.
+
+### D3 checkpoint 2 actual CI and Windows witness transport correction
+
+Checkpoint source `e45d63bdc6a7110d43d1df8d66e2ce3a1969fa75` is saved remotely.
+[39541109084](https://github.com/SOLHK/Swirl/actions/runs/39541109084) completed
+**failure**. Actual Mac job 119028811170 passed the D3/checkpoint tests, native
+table reconstruction and new CoreText/HarfBuzz GDEF admission witness; the
+unchanged strict metric step still failed. Actual Windows job 119028811369
+passed D2 13 tests and 7/8 D3 tests, but failed before lock contention assertions:
+Python text stdout emitted `READY\r\n` whereas the readiness protocol requires
+`READY\n`. Its DirectWrite steps were consequently **SKIPPED / NOT_RUN** in
+this run. The original D2 matrix was deliberately skipped as configured.
+
+The witness subprocess now writes the specified LF bytes through
+`sys.stdout.buffer`, independently of platform text newline translation. The
+expected readiness bytes and every lock/metric/axis assertion are unchanged.
+All five checkpoint tests pass locally after this transport correction; actual
+Windows repetition is pending. This is a test-harness defect, not evidence that
+the native Windows file lock failed or previously passed its unexecuted checks.

@@ -97,7 +97,8 @@ class CheckpointWriterTests(unittest.TestCase):
         code = ('import sys;sys.path.insert(0, ' + repr(str(Path(rebuild.__file__).parent)) + ')\n'
                 'from pathlib import Path\nfrom rebuild import checkpoint_writer\n'
                 'with checkpoint_writer(Path(sys.argv[1])):\n'
-                ' print("READY", flush=True)\n sys.stdin.buffer.read(1)\n')
+                ' sys.stdout.buffer.write(b"READY\\n")\n sys.stdout.buffer.flush()\n'
+                ' sys.stdin.buffer.read(1)\n')
         child = subprocess.Popen([sys.executable, '-c', code, str(self.directory)],
                                  stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
         ready = queue.Queue()
