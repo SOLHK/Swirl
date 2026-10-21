@@ -124,7 +124,7 @@ def decode_model(value):
     return glyph, tuples, tuple(value['hmtx']), tuple(value['vmtx']), value['report']
 
 
-def sample(source, binary, output, gids, multiplier):
+def sample(source, binary, output, gids, multiplier, *, training_locations=None):
     require(sys.platform == 'darwin', 'Apple_HVF_native_runtime_required')
     source, binary = Path(source).resolve(strict=True), Path(binary).resolve(strict=True)
     require(sha256(source) == EXPECTED, 'exact_original_source_required')
@@ -133,11 +133,15 @@ def sample(source, binary, output, gids, multiplier):
     output = private_directory(output)
     dependencies = ('hvf', 'batch_geometry', 'tangent_geometry', 'transform_geometry',
                     'hvf_glyph_model', 'source_metrics', 'rebuild')
+    training = normalized_grid(CUSTOM) if training_locations is None else training_locations
+    require(type(training) is list and 1 <= len(training) <= 1020
+            and all(type(location) is dict and set(location) == set(CUSTOM)
+                    for location in training), 'explicit_training_locations_required')
     recipe = {'source_sha256': EXPECTED, 'face_index': 0, 'gids': gids, 'multiplier': multiplier,
         'binary_sha256': sha256(binary), 'oracle_source_sha256': sha256(ROOT/'platform/hvf_oracle.c'),
         'driver_sha256': sha256(Path(__file__)),
         'code': {name: sha256(ROOT/'tools'/f'{name}.py') for name in dependencies},
-        'training': normalized_grid(CUSTOM), 'holdout': [dict(zip(CUSTOM, p)) for p in HOLDOUT]}
+        'training': training, 'holdout': [dict(zip(CUSTOM, p)) for p in HOLDOUT]}
     recipe_hash = digest_value(recipe)
     receipt_path = output/'receipt.json'
     if receipt_path.exists():
@@ -228,7 +232,6 @@ def sample(source, binary, output, gids, multiplier):
 
 def full_face(source, models_directory, cache_receipt, output):
     """Reuse prior real native defaults; never refill missing glyphs with blanks."""
-    from hvf_experiment_face import assemble_experiment_face
     source = Path(source).resolve(strict=True)
     models_directory = Path(models_directory).resolve(strict=True)
     require(sha256(source)==EXPECTED, 'exact_original_source_required')
@@ -248,6 +251,21 @@ def full_face(source, models_directory, cache_receipt, output):
         require(value['recipe_sha256']==saved['recipe_sha256'] and value['glyph_id']==int(key),
                 'wrong_model_recipe_or_GID')
         selected[int(key)] = decode_model(value)
+    return assemble_verified_private_face(source, selected, multiplier=saved['recipe']['multiplier'],
+        cache_receipt=cache_receipt, output=output, model_receipt=models_directory/'receipt.json')
+
+
+def assemble_verified_private_face(source, selected, *, multiplier, cache_receipt, output, model_receipt):
+    """Shared P7/P8 experimental assembly; never a production admission.
+
+    Callers verify their source/code-bound per-GID model checkpoints first.
+    This retains the real native-default cache and C1 serialized-byte gates.
+    """
+    from hvf_experiment_face import assemble_experiment_face
+    source = Path(source).resolve(strict=True)
+    require(sha256(source) == EXPECTED, 'exact_original_source_required')
+    model_receipt = Path(model_receipt).resolve(strict=True)
+    model_digest = sha256(model_receipt)
     receipt_path = Path(cache_receipt).resolve(strict=True)
     cache = json.loads(receipt_path.read_text())
     native_path = receipt_path.with_name('hvf-outlines.jsonl')
@@ -269,7 +287,7 @@ def full_face(source, models_directory, cache_receipt, output):
                     yield {'glyph_id': value['part_index'], 'commands': events_to_commands(value['events'])}
     with TTCollection(source, lazy=True) as collection:
         font, report = assemble_experiment_face(collection.fonts[0], records(), selected,
-                                                multiplier=saved['recipe']['multiplier'])
+                                                multiplier=multiplier)
         target = output/'P7-Original-face0-EXPERIMENTAL.ttf'
         font.save(target)
         verified_digest = sha256(target)
@@ -285,7 +303,9 @@ def full_face(source, models_directory, cache_receipt, output):
                 verify_serialized_face(font, packed.fonts[0])
         report['packing'] = pack_collection([target], output/'P7-Original-face0-EXPERIMENTAL.ttc',
             expected_sha256=[verified_digest], validate=verify)
-        report.update(source_sha256=EXPECTED, model_receipt_sha256=sha256(models_directory/'receipt.json'),
+        require(sha256(native_path) == cache['outline_sha256'] and sha256(model_receipt) == model_digest,
+                'native_cache_or_model_receipt_changed_during_assembly')
+        report.update(source_sha256=EXPECTED, model_receipt_sha256=model_digest,
                       native_default_cache_sha256=cache['outline_sha256'], candidate_sha256=verified_digest)
         save_new(output/'face-report.json', report)
         font.close()
