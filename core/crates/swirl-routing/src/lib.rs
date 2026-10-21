@@ -137,6 +137,8 @@ pub fn select_with_trace<'a>(
     }
 }
 
+/// Injected immutable MRS snapshots keep tests deterministic and avoid per-request reloads.
+#[allow(clippy::too_many_arguments)]
 pub fn select_with_trace_and_china<'a>(
     config: &'a Config,
     host: &str,
@@ -156,12 +158,11 @@ pub fn select_with_trace_and_china<'a>(
     let mut matched_rule = None;
     for (index, rule) in config.rules.iter().enumerate() {
         if matches!(&rule.matcher, Matcher::Match {}) {
-            if cn_domains.is_some() || cn_ips.is_some() {
-                if let Some(decision) =
+            if (cn_domains.is_some() || cn_ips.is_some())
+                && let Some(decision) =
                     smart_decision(config, &host, ip, resolved, cn_domains, cn_ips)?
-                {
-                    return Ok(decision);
-                }
+            {
+                return Ok(decision);
             }
             id = &rule.outbound;
             matched_rule = Some(index);
@@ -206,10 +207,11 @@ pub fn select_with_trace_and_china<'a>(
             break;
         }
     }
-    if matched_rule.is_none() && (cn_domains.is_some() || cn_ips.is_some()) {
-        if let Some(decision) = smart_decision(config, &host, ip, resolved, cn_domains, cn_ips)? {
-            return Ok(decision);
-        }
+    if matched_rule.is_none()
+        && (cn_domains.is_some() || cn_ips.is_some())
+        && let Some(decision) = smart_decision(config, &host, ip, resolved, cn_domains, cn_ips)?
+    {
+        return Ok(decision);
     }
     let mut id = id.to_owned();
     // The validated graph has at most sixteen groups on any path. Keep this
