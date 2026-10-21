@@ -22,27 +22,29 @@ fn smart_decision<'a>(
     host: &str,
     ip: Option<IpAddr>,
     resolved: Option<&[SocketAddr]>,
+    cn_domains: Option<&ChinaRules>,
+    cn_ips: Option<&ChinaRules>,
 ) -> Result<Option<TracedDecision<'a>>, &'static str> {
-    let (domains, networks) = bundled_rules()?;
     let direct = || config.nodes.iter()
         .find(|node| matches!(node.outbound, swirl_subscription::Outbound::Direct {}))
         .ok_or("SmartRoutingDirectMissing");
-    if domains.matches_domain(host) {
+    if cn_domains.is_some_and(|rules| rules.matches_domain(host)) {
         return Ok(Some(TracedDecision { decision: Decision::Node(direct()?), matched_rule: Some(config.rules.len()) }));
     }
     if let Some(ip) = ip {
-        if networks.matches_ip(ip) {
+        if cn_ips.is_some_and(|rules| rules.matches_ip(ip)) {
             return Ok(Some(TracedDecision { decision: Decision::Node(direct()?), matched_rule: Some(config.rules.len() + 1) }));
         }
         return Ok(None);
     }
     if let Some(addresses) = resolved {
-        if addresses.iter().any(|address| networks.matches_ip(address.ip())) {
+        if addresses.iter().any(|address| cn_ips.is_some_and(|rules| rules.matches_ip(address.ip()))) {
             return Ok(Some(TracedDecision { decision: Decision::Node(direct()?), matched_rule: Some(config.rules.len() + 1) }));
         }
         return Ok(None);
     }
-    Ok(Some(TracedDecision { decision: Decision::Resolve, matched_rule: Some(config.rules.len() + 1) }))
+    if cn_ips.is_some() { return Ok(Some(TracedDecision { decision: Decision::Resolve, matched_rule: Some(config.rules.len() + 1) })); }
+    Ok(None)
 }
 
 /// Validates bundled assets before a smart-routing session is allowed to start.
@@ -88,6 +90,24 @@ pub fn select_with_trace<'a>(
     resolved: Option<&[SocketAddr]>,
     choose: &impl Fn(&str) -> Result<String, &'static str>,
 ) -> Result<TracedDecision<'a>, &'static str> {
+    if config.smart_routing {
+        let (domains, ips) = bundled_rules()?;
+        select_with_trace_and_china(config, host, port, source, resolved, choose, Some(domains), Some(ips))
+    } else {
+        select_with_trace_and_china(config, host, port, source, resolved, choose, None, None)
+    }
+}
+
+pub fn select_with_trace_and_china<'a>(
+    config: &'a Config,
+    host: &str,
+    port: u16,
+    source: IpAddr,
+    resolved: Option<&[SocketAddr]>,
+    choose: &impl Fn(&str) -> Result<String, &'static str>,
+    cn_domains: Option<&ChinaRules>,
+    cn_ips: Option<&ChinaRules>,
+) -> Result<TracedDecision<'a>, &'static str> {
     let host = host.to_ascii_lowercase();
     let ip = host.parse::<std::net::IpAddr>().ok();
     // Do not expose results to earlier no-resolve rules on the second pass:
@@ -97,8 +117,8 @@ pub fn select_with_trace<'a>(
     let mut matched_rule = None;
     for (index, rule) in config.rules.iter().enumerate() {
         if matches!(&rule.matcher, Matcher::Match {}) {
-            if config.smart_routing {
-                if let Some(decision) = smart_decision(config, &host, ip, resolved)? {
+            if cn_domains.is_some() || cn_ips.is_some() {
+                if let Some(decision) = smart_decision(config, &host, ip, resolved, cn_domains, cn_ips)? {
                     return Ok(decision);
                 }
             }
@@ -145,8 +165,8 @@ pub fn select_with_trace<'a>(
             break;
         }
     }
-    if matched_rule.is_none() && config.smart_routing {
-        if let Some(decision) = smart_decision(config, &host, ip, resolved)? {
+    if matched_rule.is_none() && (cn_domains.is_some() || cn_ips.is_some()) {
+        if let Some(decision) = smart_decision(config, &host, ip, resolved, cn_domains, cn_ips)? {
             return Ok(decision);
         }
     }
