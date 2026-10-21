@@ -335,6 +335,10 @@ jobs:
         run: |
           cargo build --release --locked -p swirl-transport --example reality-client
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify Windows Rust rule package assets
+        working-directory: .
+        shell: pwsh
+        run: ./tools/tests/Test-WindowsRustRulePackage.ps1
       - uses: actions/setup-python@v5
         with:
           python-version: '3.14'

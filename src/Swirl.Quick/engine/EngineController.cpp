@@ -149,7 +149,9 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
         const auto state=m_systemProxy.owned()?(m_systemProxy.enabled()?QStringLiteral("Swirl 已接管 Windows 系统代理"):QStringLiteral("接管状态未确认，恢复快照已保留")):QStringLiteral("Swirl 未接管 Windows 系统代理");
         if(state!=m_previousProxyState){m_previousProxyState=state;m_diagnostics.noteEvent(QStringLiteral("Windows 系统代理"),state);}
     });
+#ifndef SWIRL_USE_RUST_CORE
     m_options.rulesDirectory=QCoreApplication::applicationDirPath()+"/rules";
+#endif
     QSettings settings;
     m_options.preferCompatibility=settings.value("Proxy/preferCompatibility",false).toBool();
     m_options.routingMode=settings.value("Proxy/routingMode","rule").toString();

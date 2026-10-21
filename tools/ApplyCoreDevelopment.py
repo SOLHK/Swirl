@@ -807,12 +807,20 @@ def _previous_workflow(source: str) -> str:
     )
     if stage_counts not in ((0, 0, 0, 0), (2, 1, 1, 1)):
         raise ValueError("Rust CI policy/Qt stage is only partially present; review required")
-    source = _replace_checked(
-        source,
-        "  push:\n    branches: [test, main]\n",
-        "  push:\n    branches: [test, main, work/core-completion-20261017]\n",
-        "push branch list",
+    current_branch_list = (
+        "  push:\n    branches: [test, main, work/core-completion-20261017, "
+        "work/core-rule-routing-20261021]\n"
     )
+    if source.count(current_branch_list) == 1:
+        if source.count("  push:\n") != 1:
+            raise ValueError("Rust CI push branch list has drifted or is ambiguous; review required")
+    else:
+        source = _replace_checked(
+            source,
+            "  push:\n    branches: [test, main]\n",
+            "  push:\n    branches: [test, main, work/core-completion-20261017]\n",
+            "push branch list",
+        )
     anchor = "          python ../tools/tests/test_dns_tls.py\n"
     portable_tail = "  windows-rust:\n"
     portable_tests = "".join(

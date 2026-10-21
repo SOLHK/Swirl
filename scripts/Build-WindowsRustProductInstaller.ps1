@@ -81,7 +81,9 @@ foreach($file in @('libgcc_s_seh-1.dll','libstdc++-6.dll','libwinpthread-1.dll')
     if(-not (Test-Path -LiteralPath $from -PathType Leaf)) { throw "MinGW runtime missing: $file" }
     Copy-Item -LiteralPath $from -Destination (Join-Path $stage $file) -ErrorAction Stop
 }
-Copy-Item -LiteralPath (Join-Path $repo 'src\Swirl.Quick\packaging\rules') -Destination (Join-Path $stage 'rules') -Recurse -ErrorAction Stop
+& (Join-Path $PSScriptRoot 'Copy-VerifiedChinaRules.ps1') `
+    -SourceDirectory (Join-Path $repo 'src\Swirl.Quick\packaging\rules') `
+    -ApplicationDirectory $stage
 $icon=Join-Path $build 'brand\Swirl.ico'
 if(-not (Test-Path -LiteralPath $icon -PathType Leaf)) { throw 'Built Swirl icon is missing.' }
 Copy-Item -LiteralPath $icon -Destination (Join-Path $stage 'Swirl-brand-phase3.ico') -ErrorAction Stop

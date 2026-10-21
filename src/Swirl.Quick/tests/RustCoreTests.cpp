@@ -49,6 +49,15 @@ class RustCoreTests:public QObject {
  }
 private slots:
  void initTestCase(){QStandardPaths::setTestModeEnabled(true);SwirlPaths::initializeTestStorage();QSettings::setDefaultFormat(QSettings::IniFormat);QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,SwirlPaths::writableLocation(QStandardPaths::AppConfigLocation));}
+ void smartRoutingUsesBundledRulesUnlessDirectoryIsExplicit(){
+  ControlledNetwork net;QVERIFY(net.start());auto o=options(net);o.routingMode="rule";o.smartRouting=true;
+  QJsonObject config;QVERIFY(RustCoreEngine::configuration(o,&config).isEmpty());
+  QCOMPARE(config.value("smart_routing"),QJsonValue(true));
+  QVERIFY(!config.contains("china_rules_directory"));
+  o.rulesDirectory=QStringLiteral("D:/Codex/custom-rules");
+  QVERIFY(RustCoreEngine::configuration(o,&config).isEmpty());
+  QCOMPARE(config.value("china_rules_directory"),QJsonValue(o.rulesDirectory));
+ }
  void realAcceptanceStartsGlobalWithoutChangingSavedRouting(){
   ControlledNetwork net;QVERIFY(net.start());QTemporaryDir directory;QVERIFY(directory.isValid());
   QSettings settings;settings.setValue("Proxy/routingMode","rule");settings.sync();
