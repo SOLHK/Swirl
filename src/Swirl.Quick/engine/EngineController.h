@@ -198,11 +198,20 @@ signals:
     void optionsChanged();
     void nodesChanged();
 private:
+    struct NodeDisplayStatus {
+        bool processAlive=false,apiHealthy=false,directSession=false;
+        QString selectedNodeId;
+        ProxyEngine::NodeHealth nodeHealth=ProxyEngine::NodeHealth::Unknown;
+        int latencyMs=-1;
+        bool operator==(const NodeDisplayStatus &) const = default;
+    };
     void refreshLanAddresses();
     QStringList m_lanAddresses;
     QList<QNetworkInterface> m_interfaces;
     bool m_lanScanPending=false;
     bool m_shuttingDown=false;
+    bool m_ingestingEngineStatus=false;
+    NodeDisplayStatus m_lastNodeDisplayStatus;
     bool m_meteredPending=false,m_meteredOldTun=false;
     QString m_meteredOldMode;
     std::unique_ptr<ProxyEngine> m_engine;

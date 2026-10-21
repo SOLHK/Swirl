@@ -10,6 +10,7 @@
 #include <QSettings>
 #include <QJsonArray>
 #include <QSaveFile>
+#include <QScopedValueRollback>
 #include <QHostAddress>
 #include <QRegularExpression>
 #include <QNetworkInterface>
@@ -108,8 +109,11 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
         return true;
 #endif
     });
-    connect(m_engine.get(),&ProxyEngine::statusChanged,this,[this]{m_telemetry.ingest(m_engine->status());});
-    connect(&m_telemetry,&TelemetryService::changed,this,&EngineController::statusChanged);
+    connect(m_engine.get(),&ProxyEngine::statusChanged,this,[this]{
+        const QScopedValueRollback ingesting(m_ingestingEngineStatus,true);
+        m_telemetry.ingest(m_engine->status());
+    });
+    connect(&m_telemetry,&TelemetryService::changed,this,[this]{if(!m_ingestingEngineStatus)emit statusChanged();});
     connect(&m_tests,&NodeTestService::changed,this,&EngineController::nodesChanged);
     connect(m_engine.get(),&ProxyEngine::diagnostic,this,&EngineController::diagnostic);
 #ifdef SWIRL_USE_RUST_CORE
@@ -218,9 +222,27 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
         }
         emit nodesChanged();
     });
+    const auto initialNodeStatus=m_engine->status();
+    m_lastNodeDisplayStatus={initialNodeStatus.processAlive,initialNodeStatus.apiHealthy,
+        initialNodeStatus.directSession,initialNodeStatus.selectedNodeId,initialNodeStatus.nodeHealth,
+#ifdef SWIRL_USE_RUST_CORE
+        -1
+#else
+        initialNodeStatus.latencyMs
+#endif
+    };
     connect(m_engine.get(),&ProxyEngine::statusChanged,this,[this] {
-        emit nodesChanged();
-        if (!m_shuttingDown && m_restartPending && m_engine->status().state==ProxyEngine::State::Stopped) {
+        const auto status=m_engine->status();
+        const NodeDisplayStatus displayStatus{status.processAlive,status.apiHealthy,
+            status.directSession,status.selectedNodeId,status.nodeHealth,
+#ifdef SWIRL_USE_RUST_CORE
+            -1
+#else
+            status.latencyMs
+#endif
+        };
+        if(displayStatus!=m_lastNodeDisplayStatus){m_lastNodeDisplayStatus=displayStatus;emit nodesChanged();}
+        if (!m_shuttingDown && m_restartPending && status.state==ProxyEngine::State::Stopped) {
             m_restartPending=false;
             QTimer::singleShot(0,this,[this]{if(!m_shuttingDown && m_connectionRequested && (!m_options.selectedNodeId.isEmpty()||m_options.directSession))m_engine->start(m_options);});
         }

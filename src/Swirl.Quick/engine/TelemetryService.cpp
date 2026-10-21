@@ -36,12 +36,12 @@ TelemetryService::TelemetryService(QString path,bool networkMeasurements,QObject
  if(m_path.isEmpty())m_path=SwirlPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/telemetry.json";
  load();m_save.setInterval(5000);connect(&m_save,&QTimer::timeout,this,&TelemetryService::flush);m_save.start();
  m_measure.setInterval(60000);connect(&m_measure,&QTimer::timeout,this,[this]{if(m_networkEnabled&&m_status.apiHealthy)measureNetwork();});m_measure.start();
- m_stale.setInterval(1000);connect(&m_stale,&QTimer::timeout,this,[this]{if(!sampled()||!connectionsSampled())publish();});m_stale.start();
+ m_stale.setInterval(1000);connect(&m_stale,&QTimer::timeout,this,[this]{if(sampled()!=m_publishedSampled||connectionsSampled()!=m_publishedConnectionsSampled)publish();});m_stale.start();
 }
 TelemetryService::~TelemetryService(){flush();}
 bool TelemetryService::sampled() const{return m_status.apiHealthy&&m_status.trafficAt>0&&nowMs()-m_status.trafficAt<6000;}
 bool TelemetryService::connectionsSampled() const{return m_status.apiHealthy&&m_status.connectionsAt>0&&nowMs()-m_status.connectionsAt<6000;}
-void TelemetryService::publish(){m_periodCache.clear();++m_revision;emit changed();}
+void TelemetryService::publish(){m_publishedSampled=sampled();m_publishedConnectionsSampled=connectionsSampled();m_periodCache.clear();++m_revision;emit changed();}
 QString TelemetryService::formatBytes(double bytes) const {
  const QStringList units={"B","KB","MB","GB","TB"};int i=0;while(bytes>=1024&&i<4){bytes/=1024;++i;}
  return QString::number(bytes,'f',i?1:0)+" "+units[i];

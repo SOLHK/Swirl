@@ -1,4 +1,5 @@
 #include "engine/TelemetryService.h"
+#include "engine/EngineController.h"
 #include <QTest>
 #include <QSignalSpy>
 #include <QTemporaryDir>
@@ -10,10 +11,81 @@
 #include "engine/SwirlProxyEngine.h"
 #include "engine/MihomoAdapter.h"
 #include <QJsonDocument>
+class PulseEngine final:public ProxyEngine {
+public:
+ Status current;
+ void start(const EngineStartOptions &) override {}
+ void stop() override {}
+ void refresh() override {emit statusChanged();}
+ void selectNode(const QString &) override {}
+ void probeNode(const QUrl &) override {}
+ Status status() const override {return current;}
+ QString configurationSummary() const override {return {};}
+};
 class TelemetryTests:public QObject {
  Q_OBJECT
  ProxyEngine::Status sample(qint64 time,int up,int down){ProxyEngine::Status s;s.processAlive=true;s.processId=1;s.apiHealthy=true;s.connectionsAt=time;s.trafficAt=time;s.uploadTotal=up;s.downloadTotal=down;s.uploadRate=up;s.downloadRate=down;s.connections={QVariantMap{{"id","connection-a"},{"host","fixture.test"},{"process","fixture.exe"},{"policy","DIRECT"},{"category","direct"},{"uploadBytes",up},{"downloadBytes",down},{"time",QDateTime::fromMSecsSinceEpoch(time).toString(Qt::ISODateWithMs)}}};return s;}
 private slots:
+  void controllerPublishesOneStatusChangePerEnginePulse(){
+   QTemporaryDir temp;auto engine=std::make_unique<PulseEngine>();auto *pulse=engine.get();
+   EngineController controller(std::move(engine),nullptr,temp.filePath("nodes.dpapi"));
+   QSignalSpy controllerChanges(&controller,&EngineController::statusChanged);
+   QSignalSpy telemetryChanges(controller.telemetry(),&TelemetryService::changed);
+   pulse->refresh();
+   QCOMPARE(telemetryChanges.size(),1);QCOMPARE(controllerChanges.size(),1);
+   pulse->refresh();
+   QCOMPARE(telemetryChanges.size(),2);QCOMPARE(controllerChanges.size(),2);
+   controller.telemetry()->ingest({});
+   QCOMPARE(telemetryChanges.size(),3);QCOMPARE(controllerChanges.size(),3);
+  }
+  void nodeRowsNotifyOnlyForRelevantEngineStatus(){
+   QTemporaryDir temp;auto engine=std::make_unique<PulseEngine>();auto *pulse=engine.get();
+   EngineController controller(std::move(engine),nullptr,temp.filePath("nodes.dpapi"));
+   QVERIFY(controller.saveNode({{"name","fixture"},{"protocol","http"},{"host","127.0.0.1"},{"port",9}}));
+   const auto id=controller.nodes().first().toMap().value("id").toString();QVERIFY(!id.isEmpty());
+   QSignalSpy rows(&controller,&EngineController::nodesChanged);
+   pulse->refresh();pulse->refresh();QCOMPARE(rows.size(),0);
+   pulse->current.uptimeSeconds=10;pulse->current.uploadTotal=100;
+   pulse->refresh();QCOMPARE(rows.size(),0);
+   pulse->current.processAlive=true;pulse->current.apiHealthy=true;pulse->current.selectedNodeId=id;
+   pulse->current.nodeHealth=ProxyEngine::NodeHealth::Checking;pulse->current.latencyMs=42;
+   pulse->refresh();QCOMPARE(rows.size(),1);
+   QCOMPARE(controller.nodes().first().toMap().value("status").toString(),QStringLiteral("正在真实检测"));
+#ifndef SWIRL_USE_RUST_CORE
+   QCOMPARE(controller.nodes().first().toMap().value("latency").toString(),QStringLiteral("42"));
+#endif
+   pulse->current.nodeHealth=ProxyEngine::NodeHealth::Available;
+   pulse->refresh();QCOMPARE(rows.size(),2);
+   QCOMPARE(controller.nodes().first().toMap().value("status").toString(),QStringLiteral("节点可用"));
+   pulse->current.latencyMs=50;pulse->refresh();
+#ifndef SWIRL_USE_RUST_CORE
+   QCOMPARE(rows.size(),3);QCOMPARE(controller.nodes().first().toMap().value("latency").toString(),QStringLiteral("50"));
+#else
+   QCOMPARE(rows.size(),2);QCOMPARE(controller.nodes().first().toMap().value("latency").toString(),QStringLiteral("—"));
+#endif
+   const auto beforeDirect=rows.size();pulse->current.directSession=true;pulse->refresh();
+   QCOMPARE(rows.size(),beforeDirect+1);
+   QCOMPARE(controller.nodes().first().toMap().value("status").toString(),QStringLiteral("直接连接"));
+   pulse->current.apiHealthy=false;pulse->refresh();QCOMPARE(rows.size(),beforeDirect+2);
+   QCOMPARE(controller.nodes().first().toMap().value("status").toString(),QStringLiteral("节点可用"));
+   pulse->current.selectedNodeId.clear();pulse->refresh();QCOMPARE(rows.size(),beforeDirect+3);
+   QCOMPARE(controller.nodes().first().toMap().value("status").toString(),QStringLiteral("未连接"));
+  }
+  void stalePollingPublishesOnlySamplingTransitions(){
+   QTemporaryDir temp;TelemetryService model(temp.filePath("stale.json"),false);model.m_stale.stop();
+   QSignalSpy changes(&model,&TelemetryService::changed);
+   auto poll=[&]{QVERIFY(QMetaObject::invokeMethod(&model.m_stale,"timeout",Qt::DirectConnection));};
+   poll();poll();QCOMPARE(changes.size(),0);
+   model.ingest(sample(QDateTime::currentMSecsSinceEpoch(),0,0));
+   QCOMPARE(changes.size(),1);QVERIFY(model.sampled());QVERIFY(model.connectionsSampled());
+   poll();poll();QCOMPARE(changes.size(),1);
+   model.m_status.trafficAt=QDateTime::currentMSecsSinceEpoch()-7000;
+   poll();QCOMPARE(changes.size(),2);QVERIFY(!model.sampled());QVERIFY(model.connectionsSampled());
+   poll();QCOMPARE(changes.size(),2);
+   model.m_status.connectionsAt=QDateTime::currentMSecsSinceEpoch()-7000;
+   poll();QCOMPARE(changes.size(),3);QVERIFY(!model.connectionsSampled());
+   poll();poll();QCOMPARE(changes.size(),3);
+  }
  void proxyLatencyVerifiesRealTlsAndSelectedNodeChain_data(){QTest::addColumn<bool>("compatibility");QTest::newRow("native")<<false;QTest::newRow("mihomo")<<true;}
  void proxyLatencyVerifiesRealTlsAndSelectedNodeChain(){
   QFETCH(bool,compatibility);
