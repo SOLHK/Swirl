@@ -129,8 +129,7 @@ pub fn select_with_trace<'a>(
             source,
             resolved,
             choose,
-            Some(domains),
-            Some(ips),
+            Some((domains, ips)),
         )
     } else {
         select_with_trace_and_china(config, host, port, source, resolved, choose, None)
@@ -138,7 +137,6 @@ pub fn select_with_trace<'a>(
 }
 
 /// Injected immutable MRS snapshots keep tests deterministic and avoid per-request reloads.
-#[allow(clippy::too_many_arguments)]
 pub fn select_with_trace_and_china<'a>(
     config: &'a Config,
     host: &str,
