@@ -181,6 +181,14 @@ def scale_with_precision_metrics(source_font, new_upem):
     candidate = copy.deepcopy(source_font)
     if 'MVAR' in candidate:
         del candidate['MVAR']
+    # Fresh fontTools tables can expose authored high-level data (for example
+    # avar.segments) without an internal .table until their first compilation.
+    # Canonicalize only this detached copy before ScalerVisitor traverses it.
+    # MVAR stays detached, so its dimensionless rows never reach that visitor.
+    candidate.recalcTimestamp = False
+    prepared = io.BytesIO()
+    candidate.save(prepared)
+    candidate = TTFont(io.BytesIO(prepared.getvalue()), recalcTimestamp=False)
     scale_upem(candidate, new_upem)
     if mvar is not None:
         candidate['MVAR'] = mvar

@@ -50,6 +50,7 @@ hinting, rasterization and original HVF equivalence.
 
 A new authored seven-coefficient fixture at UPEM1144 defeats every legal
 integer grid1..14 at metric corners. It is rejected before candidate building;
+the best lower bound across those grids is7/208, still above1/32.
 it is not proof against noninteger UPEM ratios or all standard font encodings.
 The old96readback failures,849/850 synthetic API discrepancy, quarter-cell and
 same-FLOAT source collision remain unchanged.
@@ -77,3 +78,47 @@ Primary references reviewed before implementation:
 [MVAR](https://learn.microsoft.com/en-us/typography/opentype/spec/mvar),
 [VORG](https://learn.microsoft.com/en-us/typography/opentype/spec/vorg).
 Public APIs and existing project code are reused without copying upstream code.
+
+## Saved checkpoint and native controls
+
+Algorithm checkpoint88b6ca4fee854bc18ccf0c5cd958fb8cbac30f6c is saved by normal
+fast-forward on this branch. Its three existing automatic CI jobs passed in
+[run39564242758](https://github.com/SOLHK/Swirl/actions/runs/39564242758).
+No full baseline was manually dispatched. The following native-driver stage
+does not change the coefficient proof or relax any strict comparison.
+
+Actual authored32-face controls use six UPEM families,7GIDs per face, the
+unchanged original numeric axis ranges and target nominal user inputs. Both
+collections pass the C1 binary/table packer. Every face's serialized design
+model satisfies the same continuous1/80 metric and1/6400 squared-point bounds.
+The reference is already scaled5x; it is not the unscaled source's native
+rounding contract.384frozen positions exercise all three axes and combinations.
+
+Actual local HarfBuzz14.6.0 measurements retain failures:490/5376advance
+comparisons,350/10752extent fields and560/12288layout fields exceed1/32,
+maximum0.203125 source FUnit.768shaping runs preserve GIDs/clusters. On this
+finite metric cohort, exact coordinate-composition error is0, coefficient
+error1/80, reference rounding max105/1024 and target rounding max17/160.
+These separate terms expose the native integer-grid effects rather than
+incorrectly attributing them to coefficient-model error. HarfBuzz vertical
+advance signs are converted to the VVAR magnitude before this decomposition.
+Aggregate: [local controls](evidence/SWIRL_VF_P5_LOCAL_20261021.json).
+
+A real integration defect in the new scaler was also fixed: freshly authored
+avar v1 can have segments but no internal `.table`. A detached in-memory
+serialization before the upstream visitor makes it valid without changing the
+source.11metric-unit tests now pass, including that exact former exception.
+
+`target_axis_transport --precision-grid 5` is an explicit new diagnostic:
+it divides errors by the physical grid multiplier and counts every strict
+native metric/outline failure without treating completion as equivalence.
+Old q/font-level modes retain their original thresholds and behavior. The P5
+workflow separately reuses the existing all-GID DirectWrite load/raster probe
+on the actual bounded target, including its multi-DPI controls. Only fixed
+summaries are exported; fonts/TSV/raw output/rasters remain unexported.
+Actual Windows execution is pending at this driver checkpoint.
+
+Local authored target:
+`build/vf-takeover-private/p5-precision-controls-stage3/precision.ttc`,201268bytes,
+SHA256f1cb8e2719028151f45c9a55bd0c850d5159c656127813146a1829efe5008451.
+It is not an original PingFang conversion or Swirl-VF delivery font.

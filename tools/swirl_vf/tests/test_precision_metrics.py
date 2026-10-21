@@ -1,4 +1,5 @@
 """Authored metric records; source identity and per-tag units stay separate."""
+import copy
 import io
 from pathlib import Path
 import sys
@@ -15,6 +16,7 @@ sys.path.insert(0, str(ROOT/'platform'))
 from precision_metrics import (DESIGN_UNIT_MVAR_TAGS, DIMENSIONLESS_MVAR_TAGS,
     PPEM_MVAR_TAGS, PrecisionMetricError, scale_with_precision_metrics)
 from experiment_vertical_gpos import original_fixture, serialize
+from make_target_axis_controls import authored_axes, authored_control_face
 
 
 def authored_font(deltas=None, *, vorg=True):
@@ -60,6 +62,23 @@ def deltas_at(font, coordinate=.5):
 
 
 class PrecisionMetricsTests(unittest.TestCase):
+    def test_fresh_authored_avar_without_internal_table_scales_only_a_copy(self):
+        font = authored_control_face(0, authored_axes()[0], normalized=True)
+        self.assertFalse(hasattr(font['avar'], 'table'))
+        avar_state = copy.deepcopy(vars(font['avar']))
+        snapshot = copy.deepcopy(font)
+        snapshot.recalcTimestamp = False
+        before = serialize(snapshot)
+        expected_avar = snapshot.getTableData('avar')
+        candidate = scale_with_precision_metrics(font, font['head'].unitsPerEm*8)
+        self.assertEqual(candidate['head'].unitsPerEm, font['head'].unitsPerEm*8)
+        self.assertEqual(candidate.getTableData('avar'), expected_avar)
+        self.assertFalse(hasattr(font['avar'], 'table'))
+        self.assertEqual(vars(font['avar']), avar_state)
+        after = copy.deepcopy(font)
+        after.recalcTimestamp = False
+        self.assertEqual(serialize(after), before)
+
     def test_caret_ratio_counterexample_is_repaired_without_changing_source(self):
         font = authored_font({'hcrn': 2}, vorg=False)
         before = serialize(font)

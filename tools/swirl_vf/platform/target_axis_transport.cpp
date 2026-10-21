@@ -1,6 +1,7 @@
 // Optional authored-twin DirectWrite representation control; never a font-only
 // conversion solution, original-font acceptance, or production mapping repair.
-// args: normalized-control.ttc target-control.ttc requests.tsv summary.json [--font-level]
+// args: normalized-control.ttc target-control.ttc requests.tsv summary.json
+//       [--font-level | --precision-grid INTEGER_MULTIPLIER]
 // TSV: faceIndex qWidth qWeight qHeight targetWidth targetWeight targetHeight
 // q is an externally supplied signed 2.14 integer, not inferred from Apple x.
 // Primary APIs inspected before implementation:
@@ -226,11 +227,14 @@ struct Geometry final : IDWriteGeometrySink {
 };
 static ComPtr<IDWriteFontFace5> instance(IDWriteFontResource* resource,
         const std::array<DWRITE_FONT_AXIS_TAG,3>& tags, const std::array<double,3>& values,
-        uint64_t& bit_checks) {
+        uint64_t& bit_checks, uint64_t* observed_float_rounding = nullptr) {
     std::array<DWRITE_FONT_AXIS_VALUE,3> submitted;
     for(unsigned a=0;a<3;++a) {
         submitted[a]={tags[a],float(values[a])};
-        need(double(submitted[a].value)==values[a], "actual_FLOAT_lost_input");
+        bool exact=double(submitted[a].value)==values[a];
+        if(observed_float_rounding) *observed_float_rounding+=!exact;
+        else need(exact, "actual_FLOAT_lost_input");
+        need(std::isfinite(submitted[a].value), "actual_FLOAT_nonfinite");
         ++bit_checks;
     }
     ComPtr<IDWriteFontFace5> face;
@@ -253,22 +257,34 @@ static std::array<int64_t,7> fields(const DWRITE_GLYPH_METRICS& m) {
 
 int wmain(int argc,wchar_t** argv) {
     uint64_t completed=0,glyphs=0,metric_fields=0,outline_pairs=0,point_pairs=0,bit_equal_points=0,axis_bits=0;
+    uint64_t metric_field_failures=0,metric_glyph_failures=0,outline_point_failures=0,
+        outline_pair_failures=0,topology_failures=0,glyph_failures=0,request_failures=0,float_rounding=0;
+    unsigned precision_multiplier=1;
     double max_metric=0,max_geometry=0;
     std::set<UINT32> seen_faces;
     std::string left_sha,right_sha,error;
     bool pass=false,unchanged=false;
     bool font_level=argc==6 && std::wcscmp(argv[5],L"--font-level")==0;
-    if(argc!=5 && !font_level) { std::puts("{\"status\":\"FAILED\",\"error\":\"invalid_arguments\"}"); return 2; }
+    bool precision_grid=argc==7 && std::wcscmp(argv[5],L"--precision-grid")==0;
+    bool rebase_mode=font_level || precision_grid;
+    if(argc!=5 && !font_level && !precision_grid) { std::puts("{\"status\":\"FAILED\",\"error\":\"invalid_arguments\"}"); return 2; }
     try {
-        LockedFont left(argv[1],true),right(argv[2],false,font_level);
+        if(precision_grid) {
+            std::wistringstream value(argv[6]);std::wstring extra;
+            need(bool(value>>precision_multiplier) && !(value>>extra) && precision_multiplier>=1 &&
+                 precision_multiplier<=1024, "invalid_precision_grid_multiplier");
+        }
+        LockedFont left(argv[1],true),right(argv[2],false,rebase_mode);
         left_sha=left.digest;right_sha=right.digest;
         need(left.faces.size()==right.faces.size(), "twin_face_count_differs");
         for(size_t i=0;i<left.faces.size();++i) {
             need(left.faces[i].glyphs==right.faces[i].glyphs && left.faces[i].upm==right.faces[i].upm, "twin_glyph_or_upm_differs");
+            if(precision_grid) need(left.faces[i].upm<=16384 && left.faces[i].upm%precision_multiplier==0 &&
+                left.faces[i].upm/precision_multiplier>=16, "precision_grid_UPM_identity_invalid");
             for(auto name: {"glyf","loca","gvar","hmtx","vmtx","HVAR","VVAR","cmap"}) {
                 // The font-level control actually rebases variation stores;
                 // default geometry/metrics/cmap must still remain unchanged.
-                if(font_level && (std::strcmp(name,"gvar")==0 || std::strcmp(name,"HVAR")==0 ||
+                if(rebase_mode && (std::strcmp(name,"gvar")==0 || std::strcmp(name,"HVAR")==0 ||
                                   std::strcmp(name,"VVAR")==0)) continue;
                 auto a=left.faces[i].tables.find(tableTag(name)),b=right.faces[i].tables.find(tableTag(name));
                 need(a!=left.faces[i].tables.end() && b!=right.faces[i].tables.end() && a->second.second==b->second.second &&
@@ -289,18 +305,22 @@ int wmain(int argc,wchar_t** argv) {
             need(supported && n==left.faces.size(), "native_face_count_or_support");
         }
         for(const auto& request:plan) {
+            bool request_failed=false;
             need(request.face<left.faces.size(), "request_face_out_of_range");
             std::array<double,3> normalized;
             for(unsigned a=0;a<3;++a) {
                 normalized[a]=request.q[a]/16384.0;
                 auto axis=right.faces[request.face].axes[a];
                 double expected=axis.value+normalized[a]*(request.q[a]<0 ? axis.value-axis.lo : axis.hi-axis.value);
-                if(!font_level) need(request.y[a]==expected, "request_target_y_not_exact_q_transport");
+                if(!rebase_mode) need(request.y[a]==expected, "request_target_y_not_exact_q_transport");
+                if(precision_grid) need(request.y[a]>=axis.lo && request.y[a]<=axis.hi,
+                    "precision_grid_nominal_user_outside_original_range");
             }
             ComPtr<IDWriteFontResource> lr,rr;
             checked(factory->CreateFontResource(left_file.Get(),request.face,&lr), "left_font_resource_failed");
             checked(factory->CreateFontResource(right_file.Get(),request.face,&rr), "right_font_resource_failed");
-            auto lf=instance(lr.Get(),Q_TAGS,normalized,axis_bits),rf=instance(rr.Get(),USER_TAGS,request.y,axis_bits);
+            auto lf=instance(lr.Get(),Q_TAGS,normalized,axis_bits),
+                 rf=instance(rr.Get(),USER_TAGS,request.y,axis_bits,precision_grid?&float_rounding:nullptr);
             left.identity(lf.Get(),request.face);right.identity(rf.Get(),request.face);
             auto count=left.faces[request.face].glyphs;
             std::vector<UINT16> ids(count);for(UINT32 i=0;i<count;++i) ids[i]=UINT16(i);
@@ -308,36 +328,55 @@ int wmain(int argc,wchar_t** argv) {
             checked(lf->GetDesignGlyphMetrics(ids.data(),count,lm.data(),FALSE), "left_native_metrics_failed");
             checked(rf->GetDesignGlyphMetrics(ids.data(),count,rm.data(),FALSE), "right_native_metrics_failed");
             for(UINT32 i=0;i<count;++i) {
+                bool metric_failed=false,glyph_failed=false;
                 auto l=fields(lm[i]),r=fields(rm[i]);
-                for(unsigned j=0;j<7;++j){max_metric=std::max(max_metric,double(std::abs(l[j]-r[j])));++metric_fields;}
+                for(unsigned j=0;j<7;++j){
+                    double difference=double(std::abs(l[j]-r[j]))/precision_multiplier;
+                    max_metric=std::max(max_metric,difference);++metric_fields;
+                    metric_field_failures+=difference>LIMIT;metric_failed|=difference>LIMIT;
+                }
+                metric_glyph_failures+=metric_failed;glyph_failed|=metric_failed;
                 for(BOOL sideways:{FALSE,TRUE}) {
                     ComPtr<Geometry> ls,rs;ls.Attach(new Geometry);rs.Attach(new Geometry);
                     checked(lf->GetGlyphRunOutline(float(left.faces[request.face].upm),&ids[i],nullptr,nullptr,1,sideways,FALSE,ls.Get()), "left_native_outline_failed");
                     checked(rf->GetGlyphRunOutline(float(right.faces[request.face].upm),&ids[i],nullptr,nullptr,1,sideways,FALSE,rs.Get()), "right_native_outline_failed");
                     checked(ls->Close(), "left_outline_nonfinite");checked(rs->Close(), "right_outline_nonfinite");
-                    need(ls->structure==rs->structure && ls->points.size()==rs->points.size(), "native_outline_topology_differs");
+                    bool same_topology=ls->structure==rs->structure && ls->points.size()==rs->points.size();
+                    if(!same_topology && !precision_grid) need(false, "native_outline_topology_differs");
+                    if(!same_topology) {
+                        ++topology_failures;++outline_pair_failures;++outline_pairs;glyph_failed=true;
+                        continue;  // Observe the remaining glyphs; no false point correspondence.
+                    }
+                    bool outline_failed=false;
                     for(size_t j=0;j<ls->points.size();++j) {
                         auto p=ls->points[j],q=rs->points[j];
-                        max_geometry=std::max(max_geometry,std::hypot(double(p.x)-q.x,double(p.y)-q.y));
+                        double difference=std::hypot(double(p.x)-q.x,double(p.y)-q.y)/precision_multiplier;
+                        max_geometry=std::max(max_geometry,difference);
+                        outline_point_failures+=difference>LIMIT;outline_failed|=difference>LIMIT;
                         bit_equal_points+=bits(p.x)==bits(q.x)&&bits(p.y)==bits(q.y);++point_pairs;
                     }
+                    outline_pair_failures+=outline_failed;glyph_failed|=outline_failed;
                     ++outline_pairs;
                 }
+                glyph_failures+=glyph_failed;request_failed|=glyph_failed;
                 ++glyphs;
             }
+            request_failures+=request_failed;
             ++completed;seen_faces.insert(request.face);
         }
         left.unchanged();right.unchanged();unchanged=true;
-        need(max_metric<=LIMIT && max_geometry<=LIMIT, "native_target_q_transport_exceeds_1_32");
+        if(!precision_grid) need(max_metric<=LIMIT && max_geometry<=LIMIT, "native_target_q_transport_exceeds_1_32");
         pass=true;
     } catch(const ProbeError& e) { error=e.what(); }
       catch(const std::exception&) { error="unexpected_probe_failure"; }
     // Error strings above are fixed codes; no paths, glyph coordinates or font
     // table data enter the public summary. Inputs remain locked until checks end.
     std::ostringstream out;out<<std::setprecision(17)
-        <<"{\"schema\":1,\"status\":\""<<(pass?(font_level?"PASS_AUTHORED_FONT_LEVEL_BASIS":"PASS_SYNTHETIC_TARGET_Q_TRANSPORT"):"FAILED")
+        <<"{\"schema\":1,\"status\":\""<<(pass?(precision_grid?"COMPLETED_AUTHORED_PRECISION_DIAGNOSTIC_NOT_ACCEPTANCE":
+            (font_level?"PASS_AUTHORED_FONT_LEVEL_BASIS":"PASS_SYNTHETIC_TARGET_Q_TRANSPORT")):"FAILED")
         <<"\",\"backend\":\"DirectWrite_CreateFontResource\",\"data_origin\":\"self_authored_twins\","
-        <<"\"role\":\""<<(font_level?"authored_font_only_axis_and_variation_rebase_control":"optional_q_representation_control_not_font_only_solution")<<"\","
+        <<"\"role\":\""<<(precision_grid?"authored_native_precision_grid_diagnostic_not_original_native_parity":
+            (font_level?"authored_font_only_axis_and_variation_rebase_control":"optional_q_representation_control_not_font_only_solution"))<<"\","
         <<"\"original_font_acceptance\":\"NOT_RUN\",\"source_x_to_q_proven\":false,\"production_accepted\":false,"
         <<"\"windows11_acceptance\":\"NOT_RUN\",\"qt_swirl_acceptance\":\"NOT_RUN\","
         <<"\"normalized_twin_sha256\":\""<<left_sha<<"\",\"transported_twin_sha256\":\""<<right_sha
@@ -347,6 +386,19 @@ int wmain(int argc,wchar_t** argv) {
         <<",\"outline_point_pairs_checked\":"<<point_pairs<<",\"bit_exact_outline_point_pairs\":"<<bit_equal_points
         <<",\"actual_FLOAT_and_readback_bits_checked\":"<<axis_bits<<",\"max_metric_error_font_units\":"<<max_metric
         <<",\"max_outline_error_font_units\":"<<max_geometry<<",\"limit_font_units\":"<<LIMIT
+        <<",\"precision_grid_multiplier\":"<<precision_multiplier
+        <<",\"error_reporting_units\":\""<<(precision_grid?"original_unscaled_source_font_units":"input_font_units")<<"\""
+        <<",\"native_protocol_completed\":"<<(pass?"true":"false")
+        <<",\"within_1_32_native_parity\":"<<((pass && !topology_failures && max_metric<=LIMIT && max_geometry<=LIMIT)?"true":"false")
+        <<",\"strict_native_metric_field_failures\":"<<metric_field_failures
+        <<",\"strict_native_metric_glyph_failures\":"<<metric_glyph_failures
+        <<",\"strict_native_outline_point_failures\":"<<outline_point_failures
+        <<",\"strict_native_outline_pair_failures\":"<<outline_pair_failures
+        <<",\"native_outline_topology_failures\":"<<topology_failures
+        <<",\"strict_native_glyph_failures\":"<<glyph_failures
+        <<",\"strict_native_request_failures\":"<<request_failures
+        <<",\"target_double_to_FLOAT_rounding_observations\":"<<float_rounding
+        <<",\"rasterization\":\"NOT_RUN\",\"DPI_rendering\":\"NOT_RUN\""
         <<",\"error\":\""<<error<<"\"}\n";
     auto result=out.str();
     HANDLE file=CreateFileW(argv[4],GENERIC_WRITE,0,nullptr,CREATE_NEW,FILE_ATTRIBUTE_NORMAL,nullptr);

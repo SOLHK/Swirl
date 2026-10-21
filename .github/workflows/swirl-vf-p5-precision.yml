@@ -1,0 +1,112 @@
+name: Swirl VF P5 bounded precision
+
+on:
+  push:
+    branches: [work/vf-takeover-abc-20261021]
+    paths:
+      - 'tools/swirl_vf/tools/bounded_rebase.py'
+      - 'tools/swirl_vf/tools/continuous_model.py'
+      - 'tools/swirl_vf/tools/font_model_certificate.py'
+      - 'tools/swirl_vf/tools/precision_metrics.py'
+      - 'tools/swirl_vf/tests/test_bounded_rebase.py'
+      - 'tools/swirl_vf/tests/test_continuous_model.py'
+      - 'tools/swirl_vf/tests/test_font_model_certificate.py'
+      - 'tools/swirl_vf/tests/test_precision_metrics.py'
+      - 'tools/swirl_vf/platform/make_precision_controls.py'
+      - 'tools/swirl_vf/platform/target_axis_transport.cpp'
+      - '.github/workflows/swirl-vf-p5-precision.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exact-model:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install fonttools==4.61.1 numpy==2.2.6 uharfbuzz==0.56.3
+      - name: Targeted continuous and serialized-model regressions
+        run: |
+          python -m unittest discover -s tools/swirl_vf/tests -p test_bounded_rebase.py -v
+          python -m unittest discover -s tools/swirl_vf/tests -p test_continuous_model.py -v
+          python -m unittest discover -s tools/swirl_vf/tests -p test_font_model_certificate.py -v
+          python -m unittest discover -s tools/swirl_vf/tests -p test_precision_metrics.py -v
+      - name: Generate authored controls and retain actual HarfBuzz differences
+        run: python tools/swirl_vf/platform/make_precision_controls.py --output build/p5-private/controls
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: p5-model-aggregate-${{ github.sha }}
+          path: build/p5-private/controls/summary.json
+          retention-days: 7
+
+  windows-native:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install fonttools==4.61.1 numpy==2.2.6 uharfbuzz==0.56.3
+      - name: Generate the actual bounded authored fonts
+        run: |
+          python tools/swirl_vf/platform/make_precision_controls.py --output build/p5-private/controls
+          if ($LASTEXITCODE -ne 0) { throw 'Actual bounded model generation failed' }
+      - name: Compile existing native probe with explicit precision diagnostic
+        run: |
+          cmake -S tools/swirl_vf/platform/target_axis_transport -B build/p5-private/probe -A x64
+          if ($LASTEXITCODE -ne 0) { throw 'Probe configuration failed' }
+          cmake --build build/p5-private/probe --config Release
+          if ($LASTEXITCODE -ne 0) { throw 'Probe compilation failed' }
+      - name: Observe native metrics and outlines without hiding strict failures
+        run: |
+          & build/p5-private/probe/Release/target_axis_transport.exe build/p5-private/controls/normalized-scaled.ttc build/p5-private/controls/precision.ttc build/p5-private/controls/requests.tsv build/p5-private/controls/directwrite-summary.json --precision-grid 5
+          if ($LASTEXITCODE -ne 0) { throw 'Native protocol or font identity failed' }
+          Get-Content build/p5-private/controls/directwrite-summary.json
+      - name: Run existing all-GID native loading and multi-DPI raster control
+        run: |
+          ./tools/swirl_vf/platform/run_directwrite_probe.ps1 -Font build/p5-private/controls/precision.ttc -OutputDirectory build/p5-private/raster -AllGlyphs -Render
+          if ($LASTEXITCODE -ne 0) { throw 'Bounded authored font native loading/rendering failed' }
+      - name: Export fixed render scope only
+        shell: bash
+        run: |
+          python - <<'PYCODE'
+          import json
+          from pathlib import Path
+          root=Path('build/p5-private')
+          report=json.loads((root/'raster/directwrite-run.json').read_text(encoding='utf-8-sig'))
+          assert report['status']=='PASS_NATIVE_PROBE' and report['native_exit_code']==0
+          assert report['native_runtime']=='RAN' and report['input_unchanged'] is True
+          assert report['native_summary'][0]['faces_passed']==32
+          summary={'scope':'self_authored_P5_precision_target_only', 'faces_passed':32,
+              'windows_product':report['windows_product'],'windows_build':report['windows_build'],
+              'raster_count':len(report['rasters']), 'input_sha256':report['input_sha256'],
+              'raster_pixel_equivalence':'NOT_TESTED','original_font':'NOT_RUN',
+              'Windows11':'NOT_RUN','Qt_Swirl':'NOT_RUN','system_installation':'NOT_TESTED'}
+          (root/'controls/render-summary.json').write_text(json.dumps(summary,indent=2)+'\n')
+          print(json.dumps(summary))
+          PYCODE
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: p5-windows-aggregate-${{ github.sha }}
+          path: |
+            build/p5-private/controls/summary.json
+            build/p5-private/controls/directwrite-summary.json
+            build/p5-private/controls/render-summary.json
+          retention-days: 7
