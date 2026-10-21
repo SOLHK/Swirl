@@ -161,33 +161,61 @@ fn decode_domains(c: &mut Cursor<'_>, count: usize) -> Result<Vec<String>, &'sta
     let leaves = c.u64_vec()?;
     let bitmap = c.u64_vec()?;
     let labels = c.bytes_vec()?;
-    if leaves.len() > MAX_ITEMS || bitmap.len() > MAX_ITEMS * 4 || labels.len() > MAX_ITEMS * 64 {
+    if leaves.len() > MAX_ITEMS
+        || bitmap.len() > MAX_ITEMS * 4
+        || labels.len() > MAX_ITEMS * 64
+    {
         return Err("MrsDomainBounds");
     }
     if leaves.is_empty() || bitmap.is_empty() || labels.is_empty() {
         return Err("MrsDomainEmpty");
     }
-    let nodes = bitmap
-        .iter()
-        .map(|word| word.count_ones() as usize)
-        .sum::<usize>();
-    let logical_bits = nodes
-        .checked_add(labels.len())
-        .ok_or("MrsDomainNodeCount")?;
+    let nodes = bitmap.iter().map(|word| word.count_ones() as usize).sum::<usize>();
+    let logical_bits = nodes.checked_add(labels.len()).ok_or("MrsDomainBounds")?;
     if nodes == 0
         || nodes > MAX_ITEMS
+        || logical_bits.div_ceil(64) != bitmap.len()
         || leaves.len() != nodes.div_ceil(64)
-        || bitmap.len() != logical_bits.div_ceil(64)
-        || (logical_bits % 64 != 0
-            && bitmap
-                .last()
-                .is_some_and(|word| (word >> (logical_bits % 64)) != 0))
+        || bitmap
+            .last()
+            .is_some_and(|word| (logical_bits % 64 != 0) && (word >> (logical_bits % 64)) != 0)
     {
-        return Err("MrsDomainNodeCount");
+        return Err("MrsDomainBounds");
     }
+
+    // Precompute succinct-tree rank/select metadata once. Re-scanning the
+    // bitmap from its beginning for each node makes real-world MRS sets
+    // quadratic; these indexes keep traversal linear in the binary payload.
+    let mut one_positions = Vec::with_capacity(nodes);
+    let mut zero_prefix_words = Vec::with_capacity(bitmap.len());
+    let mut zeros = 0usize;
+    for (word_index, word) in bitmap.iter().enumerate() {
+        zero_prefix_words.push(zeros);
+        let valid = (logical_bits - word_index * 64).min(64);
+        for bit_index in 0..valid {
+            if (word & (1u64 << bit_index)) != 0 {
+                one_positions.push(word_index * 64 + bit_index);
+            } else {
+                zeros += 1;
+            }
+        }
+    }
+    if one_positions.len() != nodes || zeros != labels.len() {
+        return Err("MrsDomainBitmap");
+    }
+
     let mut out = Vec::with_capacity(count.min(65536));
     let mut path = Vec::new();
-    walk_domain(0, nodes, &mut path, &leaves, &bitmap, &labels, &mut out)?;
+    walk_domain(
+        0,
+        &mut path,
+        &leaves,
+        &bitmap,
+        &labels,
+        &one_positions,
+        &zero_prefix_words,
+        &mut out,
+    )?;
     if out.is_empty() {
         return Err("MrsDomainEmpty");
     }
@@ -196,64 +224,60 @@ fn decode_domains(c: &mut Cursor<'_>, count: usize) -> Result<Vec<String>, &'sta
 
 fn bit(bits: &[u64], index: usize) -> bool {
     bits.get(index / 64)
-        .is_some_and(|v| (v & (1u64 << (index % 64))) != 0)
+        .is_some_and(|value| (value & (1u64 << (index % 64))) != 0)
 }
-fn select_one(bits: &[u64], nth: usize) -> Option<usize> {
-    let mut seen = 0;
-    for (wi, word) in bits.iter().enumerate() {
-        let mut v = *word;
-        while v != 0 {
-            let bit = v.trailing_zeros() as usize;
-            if seen == nth {
-                return Some(wi * 64 + bit);
-            }
-            seen += 1;
-            v &= v - 1;
-        }
-    }
-    None
+
+fn zero_rank_before(bitmap: &[u64], zero_prefix_words: &[usize], position: usize) -> usize {
+    let word_index = position / 64;
+    let offset = position % 64;
+    let mask = if offset == 0 { 0 } else { (1u64 << offset) - 1 };
+    zero_prefix_words[word_index] + offset
+        - (bitmap[word_index] & mask).count_ones() as usize
 }
+
 fn walk_domain(
     node: usize,
-    node_count: usize,
     path: &mut Vec<u8>,
     leaves: &[u64],
     bitmap: &[u64],
     labels: &[u8],
+    one_positions: &[usize],
+    zero_prefix_words: &[usize],
     out: &mut Vec<String>,
 ) -> Result<(), &'static str> {
-    if node >= node_count || path.len() > 253 || out.len() > MAX_ITEMS {
+    if node >= one_positions.len() || out.len() > MAX_ITEMS {
         return Err("MrsDomainBounds");
     }
     if bit(leaves, node) {
         let mut key = path.clone();
         key.reverse();
-        let s = String::from_utf8(key).map_err(|_| "MrsDomainUtf8")?;
-        if s.is_empty() {
+        let value = String::from_utf8(key).map_err(|_| "MrsDomainUtf8")?;
+        if value.is_empty() {
             return Err("MrsDomainEmptyRule");
         }
-        out.push(s);
+        out.push(value);
     }
-    // MRS domain_set_bin.go stores a LOUDS-like bitmap: one zero per edge,
-    // followed by a one at the end of each node's child list. The label array
-    // is indexed by zero-rank, and the child node index is zero-rank + 1.
-    let end = select_one(bitmap, node).ok_or("MrsDomainBitmap")?;
+    let end = *one_positions.get(node).ok_or("MrsDomainBitmap")?;
     let start = if node == 0 {
         0
     } else {
-        select_one(bitmap, node - 1).ok_or("MrsDomainBitmap")? + 1
+        one_positions[node - 1] + 1
     };
-    for pos in start..end {
-        if !bit(bitmap, pos) {
-            let zero_rank = bitmap
-                .iter()
-                .take(pos / 64)
-                .map(|v| (!v).count_ones() as usize)
-                .sum::<usize>()
-                + (0..(pos % 64)).filter(|b| !bit(bitmap, *b)).count();
-            let ch = *labels.get(zero_rank).ok_or("MrsDomainLabels")?;
-            path.push(ch);
-            walk_domain(zero_rank + 1, node_count, path, leaves, bitmap, labels, out)?;
+    for position in start..end {
+        if !bit(bitmap, position) {
+            let rank = zero_rank_before(bitmap, zero_prefix_words, position);
+            let character = *labels.get(rank).ok_or("MrsDomainLabels")?;
+            path.push(character);
+            walk_domain(
+                rank + 1,
+                path,
+                leaves,
+                bitmap,
+                labels,
+                one_positions,
+                zero_prefix_words,
+                out,
+            )?;
             path.pop();
         }
     }
