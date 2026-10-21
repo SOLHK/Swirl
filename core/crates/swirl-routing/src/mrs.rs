@@ -492,8 +492,7 @@ mod tests {
             source,
             None,
             &choose,
-            Some(&domains),
-            Some(&ips),
+            Some((&domains, &ips)),
         )
         .unwrap();
         assert!(matches!(cn.decision, crate::Decision::Node(n) if n.id == "direct"));
