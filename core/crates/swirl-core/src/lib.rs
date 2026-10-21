@@ -521,6 +521,11 @@ async fn route<'a>(
     let resolver = &plan.resolver;
     use swirl_routing::Decision;
     let choose = |id: &str| plan.policies.choose(id);
+    let china = match (plan.cn_domains.as_deref(), plan.cn_ips.as_deref()) {
+        (Some(domains), Some(ips)) => Some((domains, ips)),
+        (None, None) => None,
+        _ => return Err("ChinaRuleSetIncomplete"),
+    };
     let selected = swirl_routing::select_with_trace_and_china(
         config,
         &target.host,
