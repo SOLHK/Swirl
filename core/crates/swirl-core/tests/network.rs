@@ -772,6 +772,8 @@ fn smart_routing_executes_direct_proxy_and_reject_with_real_loopback_sockets() {
             .unwrap()
             .connections
             .iter()
-            .any(|row| { row.category == "route-error" && row.host == "blocked.example.cn" })
+            .any(|row| {
+                row.category == "reject" && row.node == "reject" && row.host == "blocked.example.cn"
+            })
     );
 }
