@@ -2,7 +2,7 @@
 //! The container is Zstandard-compressed; the decoded payload is validated
 //! independently of routing so malformed assets can never become permissive.
 use std::{io::Read, net::IpAddr};
-use ipnet::IpNet;
+use std::net::IpAddr;
 
 const MAX_COMPRESSED: usize = 16 * 1024 * 1024;
 const MAX_DECOMPRESSED: usize = 64 * 1024 * 1024;
@@ -15,7 +15,7 @@ pub enum Behavior { Domain, IpCidr }
 #[derive(Debug, Clone)]
 pub struct ChinaRules {
     domains: Vec<String>,
-    networks: Vec<IpNet>,
+    networks: Vec<(IpAddr, IpAddr)>,
 }
 
 impl ChinaRules {
@@ -57,7 +57,7 @@ impl ChinaRules {
     }
 
     pub fn matches_ip(&self, ip: IpAddr) -> bool {
-        self.networks.iter().any(|net| net.contains(&ip))
+        self.networks.iter().any(|(start, end)| ip_cmp(ip, *start).is_some_and(|a| a >= 0) && ip_cmp(ip, *end).is_some_and(|b| b <= 0))
     }
 }
 
@@ -108,14 +108,15 @@ fn walk_domain(node: usize, path: &mut Vec<u8>, leaves: &[u64], bitmap: &[u64], 
             let ch = *labels.get(edge).ok_or("MrsDomainLabels")?;
             edge += 1;
             path.push(ch);
-            walk_domain(pos - (pos / 64) * 0 + 1, path, leaves, bitmap, labels, out)?;
+            let child = bitmap.iter().take(pos / 64).map(|v| v.count_zeros() as usize).sum::<usize>() + (0..(pos % 64)).filter(|b| !bit(bitmap, *b)).count() + 1;
+            walk_domain(child, path, leaves, bitmap, labels, out)?;
             path.pop();
         }
     }
     Ok(())
 }
 
-fn decode_ip_ranges(c: &mut Cursor<'_>, count: usize) -> Result<Vec<IpNet>, &'static str> {
+fn decode_ip_ranges(c: &mut Cursor<'_>, count: usize) -> Result<Vec<(IpAddr, IpAddr)>, &'static str> {
     let version = c.byte()?; if version != 1 { return Err("MrsIpVersion"); }
     let n = c.i64()?; if n < 1 || n as usize > MAX_ITEMS { return Err("MrsIpCount"); }
     let mut ranges = Vec::with_capacity(n as usize);
@@ -124,20 +125,19 @@ fn decode_ip_ranges(c: &mut Cursor<'_>, count: usize) -> Result<Vec<IpNet>, &'st
         let a = std::net::Ipv6Addr::from(<[u8;16]>::try_from(start).map_err(|_| "MrsIpTruncated")?);
         let b = std::net::Ipv6Addr::from(<[u8;16]>::try_from(end).map_err(|_| "MrsIpTruncated")?);
         let first = IpAddr::V6(a).to_canonical(); let last = IpAddr::V6(b).to_canonical();
-        if first.is_ipv4() != last.is_ipv4() || first > last { return Err("MrsIpRange"); }
-        let prefix = range_to_prefix(first, last).ok_or("MrsIpRangeNotPrefix")?;
-        ranges.push(prefix);
+        if first.is_ipv4() != last.is_ipv4() || ip_cmp(first, last).is_none_or(|order| order > 0) { return Err("MrsIpRange"); }
+        ranges.push((first, last));
     }
     if n as usize != count { return Err("MrsIpCountMismatch"); }
     Ok(ranges)
 }
 
-fn range_to_prefix(start: IpAddr, end: IpAddr) -> Option<IpNet> {
-    for bits in (0..=if start.is_ipv4() {32} else {128}).rev() {
-        let net = IpNet::new(start, bits).ok()?;
-        if net.broadcast() == end { return Some(net); }
+fn ip_cmp(a: IpAddr, b: IpAddr) -> Option<i8> {
+    match (a, b) {
+        (IpAddr::V4(a), IpAddr::V4(b)) => Some(if a < b {-1} else if a > b {1} else {0}),
+        (IpAddr::V6(a), IpAddr::V6(b)) => Some(if a < b {-1} else if a > b {1} else {0}),
+        _ => None,
     }
-    None
 }
 
 struct Cursor<'a> { bytes: &'a [u8], at: usize }
@@ -181,7 +181,7 @@ mod tests {
     }
     #[test]
     fn ipv4_and_ipv6_cidr_matching() {
-        let r = ChinaRules { domains: vec![], networks: vec!["10.0.0.0/8".parse().unwrap(), "2001:db8::/32".parse().unwrap()] };
+        let r = ChinaRules { domains: vec![], networks: vec![("10.0.0.0".parse().unwrap(), "10.255.255.255".parse().unwrap()), ("2001:db8::".parse().unwrap(), "2001:db8:ffff:ffff:ffff:ffff:ffff:ffff".parse().unwrap())] };
         assert!(r.matches_ip("10.1.2.3".parse().unwrap()));
         assert!(r.matches_ip("2001:db8::1".parse().unwrap()));
         assert!(!r.matches_ip("11.1.2.3".parse().unwrap()));
