@@ -528,8 +528,10 @@ async fn route<'a>(
         source,
         None,
         &choose,
-        plan.cn_domains.as_deref(),
-        plan.cn_ips.as_deref(),
+        match (plan.cn_domains.as_deref(), plan.cn_ips.as_deref()) {
+            (Some(domains), Some(ips)) => Some((domains, ips)),
+            _ => None,
+        },
     )?;
     match selected.decision {
         Decision::Node(node) => {
@@ -559,8 +561,10 @@ async fn route<'a>(
                 source,
                 Some(&addresses),
                 &choose,
-                plan.cn_domains.as_deref(),
-                plan.cn_ips.as_deref(),
+                match (plan.cn_domains.as_deref(), plan.cn_ips.as_deref()) {
+                    (Some(domains), Some(ips)) => Some((domains, ips)),
+                    _ => None,
+                },
             )?;
             match selected.decision {
                 Decision::Node(node) => Ok((
