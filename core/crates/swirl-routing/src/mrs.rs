@@ -398,6 +398,33 @@ mod tests {
         );
     }
 
+    #[test]
+    fn rejects_wrong_ip_payload_version_and_wrong_behavior() {
+        use std::io::Write;
+        let mut payload = b"MRS\x01\x01".to_vec();
+        payload.extend_from_slice(&1i64.to_be_bytes());
+        payload.extend_from_slice(&0i64.to_be_bytes());
+        payload.push(2); // unsupported IP range payload version
+        let mut encoder = zstd::stream::Encoder::new(Vec::new(), 1).unwrap();
+        encoder.write_all(&payload).unwrap();
+        let compressed = encoder.finish().unwrap();
+        let checksum = format!("{:x}", sha2::Sha256::digest(&compressed));
+        assert_eq!(
+            ChinaRules::parse(&compressed, Behavior::IpCidr, &checksum).unwrap_err(),
+            "MrsIpVersion"
+        );
+
+        let domain = bundled("cn-domain.mrs");
+        assert_eq!(
+            ChinaRules::parse(
+                &domain,
+                Behavior::IpCidr,
+                "e92bda4f0b9f05623663a882331a320ab4e266cada2046d3828a94572cdded46"
+            ).unwrap_err(),
+            "MrsBehavior"
+        );
+    }
+
     fn bundled(name: &str) -> Vec<u8> {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../../src/Swirl.Quick/packaging/rules")
