@@ -7,3 +7,6 @@ publish.workspace = true
 swirl-subscription.workspace = true
 [lints]
 workspace = true
+
+# Zstandard decompression is required by the upstream MRS v1 container format.
+zstd = "0.13"
