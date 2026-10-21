@@ -354,6 +354,7 @@ void WindowsBackdrop::destroyBackdropBlur() {
     if(m_blurHandle)DestroyWindow(reinterpret_cast<HWND>(m_blurHandle));
 #endif
     m_blurHandle=0;
+    m_blurSize={};m_blurDarkSet=false;
     if(m_blurActive){m_blurActive=false;emit changed();}
 }
 void WindowsBackdrop::updateBackdropBlur() {
@@ -379,7 +380,8 @@ void WindowsBackdrop::updateBackdropBlur() {
         DwmSetWindowAttribute(blur,2,&nc,sizeof(nc));
         DwmSetWindowAttribute(blur,33,&corner,sizeof(corner));
         DwmSetWindowAttribute(blur,34,&border,sizeof(border));
-        DwmSetWindowAttribute(blur,20,&dark,sizeof(dark));
+        m_blurDarkSet=SUCCEEDED(DwmSetWindowAttribute(blur,20,&dark,sizeof(dark)));
+        m_blurDark=m_dark;
         if(FAILED(DwmSetWindowAttribute(blur,38,&material,sizeof(material))) || FAILED(DwmExtendFrameIntoClientArea(blur,&margins))){DestroyWindow(blur);return;}
         // Desktop Acrylic becomes opaque for an inactive helper HWND. Use
         // the compositor's blur policy for this non-activating visual only.
@@ -398,14 +400,21 @@ void WindowsBackdrop::updateBackdropBlur() {
     if(!m_window->isVisible() || m_window->visibility()==QWindow::Minimized){ShowWindow(blur,SW_HIDE);return;}
     const HWND shell=reinterpret_cast<HWND>(m_window->winId());RECT bounds{};
     if(!GetWindowRect(shell,&bounds))return;
-    const BOOL dark=m_dark;DwmSetWindowAttribute(blur,20,&dark,sizeof(dark));
+    if(!m_blurDarkSet || m_blurDark!=m_dark){
+        const BOOL dark=m_dark;
+        m_blurDarkSet=SUCCEEDED(DwmSetWindowAttribute(blur,20,&dark,sizeof(dark)));
+        m_blurDark=m_dark;
+    }
     const auto dpr=m_window->devicePixelRatio();const int inset=qMax(1,qCeil(dpr));
     // One compositor-only surface covers the entire shell. Sidebar and
     // workspace sample the same live backdrop, with one uniform tint above.
     // No desktop capture, CPU blur, foreground texture or timer is involved.
-    SetWindowPos(blur,shell,bounds.left+inset,bounds.top+inset,
-        bounds.right-bounds.left-2*inset,bounds.bottom-bounds.top-2*inset,
-        SWP_NOACTIVATE|SWP_NOOWNERZORDER|SWP_SHOWWINDOW);
+    const QSize size(bounds.right-bounds.left-2*inset,bounds.bottom-bounds.top-2*inset);
+    // During a move the compositor surface keeps its size; only its position changes.
+    const UINT flags=SWP_NOACTIVATE|SWP_NOOWNERZORDER|SWP_SHOWWINDOW|
+        (size==m_blurSize?SWP_NOSIZE:0);
+    if(SetWindowPos(blur,shell,bounds.left+inset,bounds.top+inset,size.width(),size.height(),flags))
+        m_blurSize=size;
 #endif
 }
 void WindowsBackdrop::scheduleCornerUpdate() {
