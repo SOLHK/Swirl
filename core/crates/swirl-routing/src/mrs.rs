@@ -121,7 +121,8 @@ impl ChinaRules {
         let host = host.trim_end_matches('.').to_ascii_lowercase();
         self.domains.iter().any(|rule| {
             if let Some(suffix) = rule.strip_prefix("+.") {
-                host == suffix || host.strip_suffix(suffix).is_some_and(|p| p.ends_with('.'))
+                (host == suffix && self.domains.iter().any(|candidate| candidate == suffix))
+                    || host.strip_suffix(suffix).is_some_and(|p| p.ends_with('.'))
             } else if let Some(suffix) = rule.strip_prefix('.') {
                 host != suffix && host.strip_suffix(suffix).is_some_and(|p| p.ends_with('.'))
             } else if rule.contains('*') {
@@ -506,9 +507,11 @@ mod tests {
             domains: vec!["+.example.cn".into()],
             networks: vec![],
         };
-        assert!(r.matches_domain("example.cn"));
+        assert!(!r.matches_domain("example.cn"));
         assert!(r.matches_domain("www.example.cn"));
         assert!(!r.matches_domain("notexample.cn"));
+        let apex_and_suffix = ChinaRules { domains: vec!["example.cn".into(), "+.example.cn".into()], networks: vec![] };
+        assert!(apex_and_suffix.matches_domain("example.cn"));
     }
     #[test]
     fn ipv4_and_ipv6_cidr_matching() {
