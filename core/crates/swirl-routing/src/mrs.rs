@@ -102,13 +102,12 @@ fn walk_domain(node: usize, path: &mut Vec<u8>, leaves: &[u64], bitmap: &[u64], 
     }
     let end = select_one(bitmap, node).ok_or("MrsDomainBitmap")?;
     let start = if node == 0 { 0 } else { select_one(bitmap, node - 1).ok_or("MrsDomainBitmap")? + 1 };
-    let mut edge = 0usize;
     for pos in start..end {
         if !bit(bitmap, pos) {
-            let ch = *labels.get(edge).ok_or("MrsDomainLabels")?;
-            edge += 1;
+            let prior_ones = bitmap.iter().take(pos / 64).map(|v| v.count_ones() as usize).sum::<usize>() + (0..(pos % 64)).filter(|b| bit(bitmap, *b)).count();
+            let child = pos - prior_ones + 1;
+            let ch = *labels.get(child - 1).ok_or("MrsDomainLabels")?;
             path.push(ch);
-            let child = bitmap.iter().take(pos / 64).map(|v| v.count_zeros() as usize).sum::<usize>() + (0..(pos % 64)).filter(|b| !bit(bitmap, *b)).count() + 1;
             walk_domain(child, path, leaves, bitmap, labels, out)?;
             path.pop();
         }
