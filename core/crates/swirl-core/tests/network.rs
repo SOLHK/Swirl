@@ -43,18 +43,18 @@ fn connect(core: &Core, port: u16) -> TcpStream {
         "CONNECT 127.0.0.1:{port} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n\r\n"
     )
     .unwrap();
-    assert!(header(&mut s).starts_with(b"HTTP/1.1 200"));
+    assert!(header(&mut s).unwrap().starts_with(b"HTTP/1.1 200"));
     s
 }
-fn header(s: &mut TcpStream) -> Vec<u8> {
+fn header(s: &mut TcpStream) -> std::io::Result<Vec<u8>> {
     let mut data = Vec::new();
     while !data.ends_with(b"\r\n\r\n") {
         let mut b = [0];
-        s.read_exact(&mut b).unwrap();
+        s.read_exact(&mut b)?;
         data.push(b[0]);
         assert!(data.len() < 16384);
     }
-    data
+    Ok(data)
 }
 
 #[test]
@@ -118,7 +118,7 @@ fn resolving_cidr_pins_destination_and_rule_updates_preserve_stream() {
         "CONNECT localhost:{port} HTTP/1.1\r\nHost: localhost:{port}\r\n\r\n"
     )
     .unwrap();
-    assert!(header(&mut old).starts_with(b"HTTP/1.1 200"));
+    assert!(header(&mut old).unwrap().starts_with(b"HTTP/1.1 200"));
     c.rules =
         serde_json::from_value(json!([{"matcher":{"type":"match"},"outbound":"reject"}])).unwrap();
     core.configure(c).unwrap();
@@ -133,7 +133,7 @@ fn resolving_cidr_pins_destination_and_rule_updates_preserve_stream() {
         "CONNECT localhost:{port} HTTP/1.1\r\nHost: localhost:{port}\r\n\r\n"
     )
     .unwrap();
-    assert!(header(&mut new).starts_with(b"HTTP/1.1 502"));
+    assert!(header(&mut new).unwrap().starts_with(b"HTTP/1.1 502"));
     worker.join().unwrap();
 }
 #[test]
@@ -187,7 +187,7 @@ fn atomic_update_preserves_existing_stream_and_rejects_new() {
         "CONNECT 127.0.0.1:{port} HTTP/1.1\r\nHost: x\r\n\r\n"
     )
     .unwrap();
-    assert!(header(&mut denied).starts_with(b"HTTP/1.1 502"));
+    assert!(header(&mut denied).unwrap().starts_with(b"HTTP/1.1 502"));
     drop(old);
     peer.join().unwrap();
     core.stop();
@@ -687,7 +687,12 @@ fn connect_host(core: &Core, host: &str, port: u16, expected_status: u16) -> Tcp
     )
     .unwrap();
     eprintln!("awaiting CONNECT response for {host}:{port}, expected {expected_status}");
-    let response = header(&mut stream);
+    let response = header(&mut stream).unwrap_or_else(|error| {
+        let routes = core.snapshot().map(|snapshot| {
+            snapshot.connections.into_iter().map(|row| (row.host, row.node, row.category, row.error)).collect::<Vec<_>>()
+        });
+        panic!("CONNECT {host}:{port} response failed: {error}; route snapshot: {routes:?}");
+    });
     assert!(
         response.starts_with(format!("HTTP/1.1 {expected_status}").as_bytes()),
         "{response:?}"
