@@ -16,9 +16,11 @@ jobs:
       - name: Resolve lockfile, preserve it, and remove helper
         shell: bash
         run: |
+          set +e
           cd core
           cargo check --workspace
           check_status=$?
+          set -e
           cd ..
           git diff --check
           rm .github/workflows/r4-lock-once.yml
