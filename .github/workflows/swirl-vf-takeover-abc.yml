@@ -1,0 +1,62 @@
+name: Swirl VF A3 B1 C1 isolated takeover
+
+on:
+  push:
+    branches: [work/vf-takeover-abc-20261021]
+    paths:
+      - 'tools/swirl_vf/**'
+      - '.github/workflows/swirl-vf-takeover-abc.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  portable:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install fonttools==4.61.1 numpy==2.2.6 uharfbuzz==0.56.3
+      - name: Preserve all old and new portable regressions
+        run: |
+          python -m unittest discover -s tools/swirl_vf/tests -q
+          python -m unittest discover -s tools/swirl_vf/audit -p 'test_*.py' -q
+
+  original-source:
+    runs-on: xcode-27
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install fonttools==4.61.1 numpy==2.2.6
+      - name: Build unchanged native extractor
+        run: |
+          mkdir -p build/vf-takeover-private/bin
+          xcrun swiftc -O tools/swirl_vf/platform/coretext_extract.swift -o build/vf-takeover-private/bin/coretext_extract
+      - name: Verify original requests while retaining old strict failures
+        run: |
+          python tools/swirl_vf/platform/probe_source_request_replay.py \
+            /System/Library/PrivateFrameworks/FontServices.framework/Versions/A/Resources/Reserved/PingFangUI.ttc \
+            --binary build/vf-takeover-private/bin/coretext_extract \
+            --output build/vf-takeover-private/original-replay \
+            --expected-sha256 39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890 \
+            --source-kind original
+      - name: Export fixed aggregate only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: takeover-original-aggregate-${{ github.sha }}
+          path: build/vf-takeover-private/original-replay/summary.json
+          retention-days: 7

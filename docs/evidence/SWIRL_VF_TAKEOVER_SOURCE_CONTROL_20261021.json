@@ -1,0 +1,49 @@
+{
+  "status": "PASS_FINITE_ORIGINAL_REQUEST_REPLAY_NOT_MAPPING_ACCEPTANCE",
+  "source_kind": "installed_system_control",
+  "source_sha256": "7ea432196657d83d2675521224be420f9aeb0d7e9def7da6cb2b4c364d8e0983",
+  "host": "macOS-26.3-arm64-arm-64bit",
+  "native_os_version": "Version 26.3 (Build 25D125)",
+  "physical_faces_verified": 32,
+  "labelled_original_requests": 391,
+  "unique_original_positions": 390,
+  "predeclared_canonical_controls": 7,
+  "gids_per_position": 2,
+  "processes": 2,
+  "source_verified_batches": 796,
+  "internal_native_requests": 1592,
+  "internal_native_glyph_records": 3184,
+  "exact_opposite_order_payload_pairs": 796,
+  "original_strict_axis_failures_retained": 105,
+  "D2_cohort": {
+    "source_request_cases": 384,
+    "all_cases_exact_source_replay": true,
+    "strict_request_passed": 288,
+    "strict_request_failed": 96,
+    "mapping_accepted": false
+  },
+  "legacy_V2_offline_counts": {
+    "STRICT_V2_PASS": 4,
+    "native_replay_payload_not_exact": 2,
+    "native_readback_replay_not_exactly_stable": 1
+  },
+  "input_collision_observations": [
+    {
+      "gid": 5,
+      "raw_payload_differs": true,
+      "absolute_advance_difference": 0
+    },
+    {
+      "gid": 19177,
+      "raw_payload_differs": true,
+      "absolute_advance_difference": 0
+    }
+  ],
+  "source_unchanged": true,
+  "source_user_mapping_accepted": false,
+  "strict_axis_echo_accepted": false,
+  "original_font_generated": false,
+  "Windows11": "NOT_RUN",
+  "Qt_Swirl": "NOT_RUN",
+  "scope_note": "Installed macOS26 system control is a different source; exact original Mac27 evidence pending."
+}

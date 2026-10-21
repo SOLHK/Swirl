@@ -463,8 +463,25 @@ class NativeOracle:
             check(self.metadata.get("type") == "metadata", "native oracle metadata missing")
             check(self.metadata.get("source_sha256") == sha256(source), "native oracle source SHA mismatch")
             check(self.metadata.get("backend") == "CoreText", "need independent CoreText user-coordinate oracle")
-            check(self.metadata.get("axis_observations_only") is not True,
-                  "unverified native axis observations cannot be used for reconstruction")
+            self.source_request_identities = None
+            if (self.metadata.get("axis_observations_only") is True
+                    or "source_request_verification_backend" in self.metadata):
+                from source_request_oracle import BACKEND, validate_source_metadata
+                from verified_axis_oracle import source_identities, VerificationError
+                check(self.metadata.get("source_request_verification_backend") == BACKEND,
+                      "unverified native axis observations cannot be used for reconstruction")
+                with TTCollection(source, lazy=True) as collection:
+                    identities = source_identities(collection.fonts)
+                try:
+                    validate_source_metadata(self.metadata, sha256(source), source.stat().st_size, identities)
+                except VerificationError as error:
+                    raise ReconstructionError(str(error)) from error
+                # Source-input reproducibility is a distinct contract from
+                # exact axis echo. Keep its observation-only marker and raw
+                # strict failures; never promote this to a target mapping.
+                self.source_request_identities = identities
+                self.source_request_strict_counts = {
+                    'strict_axis_count': 0, 'strict_axis_pass_count': 0, 'strict_axis_failure_count': 0}
             check(bool(self.metadata.get("faces"))
                   and all(face.get("status") == "identity_verified" for face in self.metadata.get("faces", [])),
                   "native oracle could not verify every requested physical face")
@@ -511,7 +528,24 @@ class NativeOracle:
             check(type(gid) is int and gid in glyph_ids and gid not in results,
                   "missing, duplicate or unrelated native glyph")
             check(record.get("error") is None, f"native error on glyph {gid}: {record.get('error')}")
+            if getattr(self, "source_request_identities", None) is not None:
+                from source_request_oracle import validate_source_evidence
+                from verified_axis_oracle import VerificationError
+                check(type(face) is int and 0 <= face < len(self.source_request_identities),
+                      "source request face out of range")
+                try:
+                    validate_source_evidence(record, request, self.metadata["source_sha256"],
+                                             self.source_request_identities[face])
+                except VerificationError as error:
+                    raise ReconstructionError(str(error)) from error
+            else:
+                check("source_request_verification" not in record,
+                      "source request proof requires its bound sampling metadata")
             results[gid] = record
+        if getattr(self, "source_request_identities", None) is not None:
+            diagnostic = next(iter(results.values()))['source_request_verification']['readback_diagnostic']
+            for field in self.source_request_strict_counts:
+                self.source_request_strict_counts[field] += diagnostic[field]
         self.successful_glyph_count += len(results)
         return results
 
@@ -533,6 +567,15 @@ class NativeOracle:
               and type(summary.get("successful_glyph_count")) is int
               and summary["successful_glyph_count"] == self.successful_glyph_count,
               "native final summary is incomplete or disagrees with accepted requests/glyphs")
+        if getattr(self, "source_request_identities", None) is not None:
+            from source_request_oracle import BACKEND, POLICY, exact_json
+            check(summary.get("source_request_verification_backend") == BACKEND
+                  and exact_json(summary.get("source_request_verification_policy"), POLICY)
+                  and type(summary.get("verified_batch_count")) is int
+                  and summary["verified_batch_count"] == self.sequence
+                  and summary.get("source_unchanged") is True
+                  and exact_json(summary.get("source_request_readback_diagnostic"), self.source_request_strict_counts),
+                  "source request replay final evidence is incomplete")
         check(self.reader.readline(timeout=10.0) == "", "native oracle emitted data after its final summary")
         check(self.proc.wait(timeout=10) == 0, "native oracle failed after its final glyph")
         self.summary = summary
