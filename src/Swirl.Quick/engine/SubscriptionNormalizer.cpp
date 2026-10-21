@@ -3,6 +3,7 @@
 #include <QJsonDocument>
 #include <QUrl>
 #include <QUrlQuery>
+#include <QUuid>
 #include <QRegularExpression>
 #include <QSet>
 #include <algorithm>
@@ -62,9 +63,131 @@ void transport(QJsonObject &node,const QString &network,const QString &path,cons
     else if(network=="h2")node["h2-opts"]=QJsonObject{{"path",path.isEmpty()?"/":path},{"host",host.isEmpty()?QJsonArray():QJsonArray{host}}};
     else issue(issues,"此传输层尚未完成到 Mihomo 的映射。");
 }
+void hysteria2Uri(Result &r,const QString &line,qsizetype split){
+    // RFC 3986 authority split by hand: QUrl cannot parse Hysteria2's
+    // multi-port/port-hopping list (e.g. "server:443,5000-6000"), and
+    // QUrl::setUrl would silently reject or truncate it rather than erroring.
+    auto rest=line.mid(split+3);
+    const auto hash=rest.indexOf('#');
+    const auto name=hash<0?QString():rest.mid(hash+1);
+    if(hash>=0)rest=rest.left(hash);
+    const auto query=rest.indexOf('?');
+    const auto queryString=query<0?QString():rest.mid(query+1);
+    auto authority=query<0?rest:rest.left(query);
+    QString auth;
+    const auto at=authority.lastIndexOf('@');
+    if(at>=0){auth=authority.left(at);authority=authority.mid(at+1);}
+    QString host,portList;
+    if(authority.startsWith('[')){
+        const auto close=authority.indexOf(']');
+        if(close<0){r.error="Hysteria2 URI 的 IPv6 地址缺少右括号。";return;}
+        host=authority.mid(1,close-1); // 与 QUrl::host() 一致：不保留方括号。
+        const auto remainder=authority.mid(close+1);
+        if(!remainder.isEmpty()){
+            if(!remainder.startsWith(':')){r.error="Hysteria2 URI 的 IPv6 地址后存在无效字符。";return;}
+            portList=remainder.mid(1);
+        }
+    }else{
+        const auto colon=authority.indexOf(':');
+        host=colon<0?authority:authority.left(colon);
+        portList=colon<0?QString():authority.mid(colon+1);
+    }
+    host=QUrl::fromPercentEncoding(host.toUtf8());
+    if(host.isEmpty()){r.error="Hysteria2 URI 缺少服务器地址。";return;}
+    int port=0;QString ports;
+    if(portList.isEmpty()){
+        port=443; // RFC 3986 "port = *DIGIT"：省略端口按官方规范取默认值 443。
+    }else if(portList.contains(',')||portList.contains('-')){
+        // 多端口/端口跳跃语法没有单一数值端口；Mihomo 用 ports 承载完整列表，
+        // port 保持 0（validate() 对 hysteria/hysteria2 在 ports 非空时放行）。
+        static const QRegularExpression shape("^\\d{1,5}(-\\d{1,5})?(,\\d{1,5}(-\\d{1,5})?)*$");
+        if(!shape.match(portList).hasMatch()){r.error="Hysteria2 URI 的端口范围语法无效。";return;}
+        for(const auto &piece:portList.split(',')){
+            for(const auto &bound:piece.split('-')){
+                bool ok=false;const auto value=bound.toInt(&ok);
+                if(!ok||value<1||value>65535){r.error="Hysteria2 URI 的端口范围超出 1-65535。";return;}
+            }
+        }
+        ports=portList;
+    }else{
+        bool ok=false;port=portList.toInt(&ok);
+        if(!ok||port<1||port>65535){r.error="Hysteria2 URI 的端口无效。";return;}
+    }
+    // 认证信息整体映射为 password：官方规范里 userpass 服务器时服务器把
+    // "user:pass" 当成完整密码比对，不是用户名和密码两个独立字段。
+    const QString password=QUrl::fromPercentEncoding(auth.toUtf8());
+    QJsonObject node{{"name",QUrl::fromPercentEncoding(name.toUtf8())},{"type","hysteria2"},{"server",host}};
+    if(ports.isEmpty())node["port"]=port;else{node["port"]=0;node["ports"]=ports;}
+    if(!password.isEmpty())node["password"]=password;
+    QStringList issues;QUrlQuery q(queryString);QSet<QString> seen;QString obfs;
+    for(const auto &pair:q.queryItems(QUrl::FullyDecoded)){
+        const auto &key=pair.first;const auto &value=pair.second;
+        if(seen.contains(key)){r.error="Hysteria2 URI 含重复参数，无法安全确定配置。";return;}seen.insert(key);
+        if(key=="sni"||key=="peer")node["sni"]=value;
+        else if(key=="insecure"){
+            const auto b=boolean(value,true);if(!b){r.error="Hysteria2 URI 的 insecure 参数无效。";return;}
+            node["skip-cert-verify"]=*b; // true 会在 safeParameters 中被拒绝，与现有 trojan 行为一致。
+        }
+        else if(key=="obfs"){
+            if(value!="salamander"){issue(issues,"Hysteria2 URI 的混淆类型尚未支持，原始参数已保留。");continue;}
+            obfs=value;node["obfs"]=value;
+        }
+        else if(key=="obfs-password")node["obfs-password"]=value;
+        else if(key=="pinSHA256"){
+            auto fp=value.toLower();fp.remove(':');node["fingerprint"]=fp;
+        }
+        else if(key=="alpn")node["alpn"]=QJsonArray::fromStringList(value.split(',',Qt::SkipEmptyParts));
+        else if(key=="up")node["up"]=value;
+        else if(key=="down")node["down"]=value;
+        else if(key=="ech")issue(issues,"Hysteria2 URI 的 ECH 参数尚无等价映射，原始参数已保留，连接可能缺少该防护。");
+        else issue(issues,"Hysteria2 URI 包含未映射扩展，原始参数已保留。");
+    }
+    if(!obfs.isEmpty()&&!q.hasQueryItem("obfs-password")){r.error="Hysteria2 URI 指定了 obfs 却缺少 obfs-password。";return;}
+    append(r,node,QJsonObject{{"uri",line}},issues);
+}
+void tuicUri(Result &r,const QString &line,qsizetype split){
+    auto rest=line.mid(split+3);
+    const auto hash=rest.indexOf('#');
+    const auto name=hash<0?QString():rest.mid(hash+1);
+    if(hash>=0)rest=rest.left(hash);
+    const QUrl url("tuic://"+rest,QUrl::StrictMode);
+    if(!url.isValid()||url.host().isEmpty()||url.port(-1)<1||url.port()>65535){r.error="TUIC URI 的服务器或端口无效。";return;}
+    const auto uuid=url.userName(QUrl::FullyDecoded);
+    if(QUuid(uuid).isNull()){r.error="TUIC URI 需要有效 UUID。";return;}
+    QJsonObject node{{"name",QUrl::fromPercentEncoding(name.toUtf8())},{"type","tuic"},{"server",url.host()},{"port",url.port()},
+        {"uuid",uuid},{"password",url.password(QUrl::FullyDecoded)}};
+    QStringList issues;QUrlQuery q(url);QSet<QString> seen;
+    for(const auto &pair:q.queryItems(QUrl::FullyDecoded)){
+        const auto &key=pair.first;const auto &value=pair.second;
+        if(seen.contains(key)){r.error="TUIC URI 含重复参数，无法安全确定配置。";return;}seen.insert(key);
+        if(key=="sni")node["sni"]=value;
+        else if(key=="congestion_control"||key=="congestion-control")node["congestion-controller"]=value;
+        else if(key=="udp_relay_mode"||key=="udp-relay-mode")node["udp-relay-mode"]=value;
+        else if(key=="alpn")node["alpn"]=QJsonArray::fromStringList(value.split(',',Qt::SkipEmptyParts));
+        else if(key=="allow_insecure"||key=="allowInsecure"||key=="insecure"){
+            const auto b=boolean(value,true);if(!b){r.error="TUIC URI 的 allow_insecure 参数无效。";return;}
+            node["skip-cert-verify"]=*b;
+        }
+        else if(key=="disable_sni"){
+            const auto b=boolean(value,true);if(!b){r.error="TUIC URI 的 disable_sni 参数无效。";return;}
+            node["disable-sni"]=*b;
+        }
+        else if(key=="reduce_rtt"){
+            const auto b=boolean(value,true);if(!b){r.error="TUIC URI 的 reduce_rtt 参数无效。";return;}
+            node["reduce-rtt"]=*b;
+        }
+        else issue(issues,"TUIC URI 包含未映射扩展，原始参数已保留。");
+    }
+    append(r,node,QJsonObject{{"uri",line}},issues);
+}
 void uri(Result &r,const QString &line){
     const auto split=line.indexOf("://");if(split<1){r.error="通用订阅中存在无效 URI；未导入任何节点。";return;}
     const auto scheme=line.left(split).toLower();QJsonObject node;QStringList issues;
+    if(scheme=="hysteria2"||scheme=="hy2"){hysteria2Uri(r,line,split);return;}
+    if(scheme=="tuic"){tuicUri(r,line,split);return;}
+    // Hysteria v1 has no authoritative share-link specification; client
+    // field names differ. Never guess them or convert v1 into Hysteria2.
+    if(scheme=="hysteria"){r.error="Hysteria v1 分享链接没有统一规范，尚未支持；请提供原生 Clash/Mihomo 配置。未转换为 Hysteria2。";return;}
     if(scheme=="vmess"){
         const auto json=NodeImporter::strictJsonObject(base64(line.mid(split+3).toUtf8()));
         if(json.isEmpty()){r.error="VMess URI 需要有效的 Base64 JSON。";return;}
@@ -594,7 +717,7 @@ SubscriptionNormalizer::Result SubscriptionNormalizer::normalize(const QByteArra
     const auto firstContent=[&]{for(const auto &line:text.split('\n')){const auto value=line.trimmed();if(!value.isEmpty()&&!value.startsWith('#')&&!value.startsWith(';')&&!value.startsWith("//"))return value;}return QString();}();
     const bool iniHeading=QRegularExpression("^\\[\\s*[A-Za-z][A-Za-z0-9 _-]*(?:\\]|$)").match(firstContent).hasMatch();
     if(iniHeading&&!json.isArray()){ini(r,text);return r;}
-    if(QRegularExpression("^(ss|ssr|trojan|vmess|vless|socks4a|socks4|socks5|socks5-tls|socks|http|https)://",QRegularExpression::CaseInsensitiveOption).match(text).hasMatch()){
+    if(QRegularExpression("^(ss|ssr|trojan|vmess|vless|socks4a|socks4|socks5|socks5-tls|socks|http|https|hysteria2|hysteria|hy2|tuic)://",QRegularExpression::CaseInsensitiveOption).match(text).hasMatch()){
         r.handled=true;r.format="通用 URI / Shadowrocket";
         for(const auto &line:text.split('\n')){const auto value=line.trimmed();if(value.isEmpty()||value.startsWith('#'))continue;uri(r,value);if(!r.error.isEmpty())break;}return r;
     }

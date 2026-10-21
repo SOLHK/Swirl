@@ -658,6 +658,74 @@ external-controller: 0.0.0.0:9090
         QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),5000);QTest::qWait(300);QVERIFY(!controller.processAlive());
         qInfo()<<"IMPORTED_REAL_CHAIN: selected A remains live through refresh; manual reconnect selects B; no remote environment claimed";
     }
+    void hysteria2UriParsesAuthPortSniObfsAndFingerprint() {
+        for(const auto &scheme:QList<QByteArray>{"hysteria2","hy2"}){
+            const QByteArray uri=scheme+"://secret-auth@example.org:443?sni=camouflage.invalid&obfs=salamander&obfs-password=fixture-obfs&pinSHA256=AA:BB:CC:DD&alpn=h3&up=100&down=50#Fixture%20Node";
+            const auto parsed=NodeImporter::parse(uri);QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);
+            const auto node=parsed.nodes.first();QCOMPARE(node.protocol,QString("hysteria2"));QCOMPARE(node.host,QString("example.org"));QCOMPARE(node.port,quint16(443));
+            QCOMPARE(node.password,QString("secret-auth"));QCOMPARE(node.serverName,QString("camouflage.invalid"));QCOMPARE(node.name,QString("Fixture Node"));
+            QCOMPARE(node.parameters.value("obfs"),QJsonValue("salamander"));QCOMPARE(node.parameters.value("obfs-password"),QJsonValue("fixture-obfs"));
+            QCOMPARE(node.parameters.value("fingerprint"),QJsonValue("aabbccdd"));QCOMPARE(node.parameters.value("up"),QJsonValue("100"));QCOMPARE(node.parameters.value("down"),QJsonValue("50"));
+            QVERIFY(node.conversionIssues.isEmpty());
+        }
+    }
+    void hysteria2UriHandlesDefaultPortIPv6AndMultiPort() {
+        {
+            const QByteArray uri="hysteria2://example.org";
+            const auto parsed=NodeImporter::parse(uri);QVERIFY2(parsed,qPrintable(parsed.error));
+            QCOMPARE(parsed.nodes.first().port,quint16(443));QVERIFY(parsed.nodes.first().password.isEmpty());
+        }
+        {
+            const QByteArray uri="hy2://auth@[2001:db8::1]:8443";
+            const auto parsed=NodeImporter::parse(uri);QVERIFY2(parsed,qPrintable(parsed.error));
+            QCOMPARE(parsed.nodes.first().host,QString("2001:db8::1"));QCOMPARE(parsed.nodes.first().port,quint16(8443));
+        }
+        {
+            const QByteArray uri="hysteria2://auth@example.org:443,5000-6000";
+            const auto parsed=NodeImporter::parse(uri);QVERIFY2(parsed,qPrintable(parsed.error));
+            const auto node=parsed.nodes.first();QCOMPARE(node.port,quint16(0));QCOMPARE(node.parameters.value("ports"),QJsonValue("443,5000-6000"));
+        }
+    }
+    void hysteria2UriRejectsInvalidOrUnsafeInput() {
+        QVERIFY(!NodeImporter::parse("hysteria2://auth@example.org:0"));
+        QVERIFY(!NodeImporter::parse("hysteria2://auth@example.org:70000"));
+        QVERIFY(!NodeImporter::parse("hysteria2://auth@example.org:443,99999"));
+        QVERIFY(!NodeImporter::parse("hysteria2://auth@example.org:443?insecure=true"));
+        QVERIFY(!NodeImporter::parse("hysteria2://auth@example.org:443?obfs=salamander"));
+        QVERIFY(!NodeImporter::parse("hysteria2://auth@example.org:443?sni=a&sni=b"));
+        QVERIFY(!NodeImporter::parse("hysteria2://auth@"));
+        const auto echo=NodeImporter::parse("hysteria2://auth@example.org:443?ech=1");
+        QVERIFY2(echo,qPrintable(echo.error));QVERIFY(!echo.nodes.first().conversionIssues.isEmpty());
+    }
+    void tuicUriParsesUuidPasswordAndCongestionOptions() {
+        const QByteArray uri="tuic://00112233-4455-6677-8899-aabbccddeeff:fixture-pass@example.org:443?sni=camouflage.invalid&congestion_control=bbr&udp_relay_mode=native&alpn=h3&allow_insecure=0#TUIC%20Fixture";
+        const auto parsed=NodeImporter::parse(uri);QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);
+        const auto node=parsed.nodes.first();QCOMPARE(node.protocol,QString("tuic"));QCOMPARE(node.host,QString("example.org"));QCOMPARE(node.port,quint16(443));
+        QCOMPARE(node.parameters.value("uuid"),QJsonValue("00112233-4455-6677-8899-aabbccddeeff"));QCOMPARE(node.password,QString("fixture-pass"));
+        QCOMPARE(node.serverName,QString("camouflage.invalid"));QCOMPARE(node.name,QString("TUIC Fixture"));
+        QCOMPARE(node.parameters.value("congestion-controller"),QJsonValue("bbr"));QCOMPARE(node.parameters.value("udp-relay-mode"),QJsonValue("native"));
+        QCOMPARE(node.parameters.value("skip-cert-verify"),QJsonValue(false));QVERIFY(node.conversionIssues.isEmpty());
+    }
+    void tuicUriRejectsInvalidUuidOrDuplicateParameters() {
+        QVERIFY(!NodeImporter::parse("tuic://not-a-uuid:pass@example.org:443"));
+        QVERIFY(!NodeImporter::parse("tuic://00112233-4455-6677-8899-aabbccddeeff:pass@example.org:443?sni=a&sni=b"));
+        QVERIFY(!NodeImporter::parse("tuic://00112233-4455-6677-8899-aabbccddeeff:pass@example.org:0"));
+        const auto unknown=NodeImporter::parse("tuic://00112233-4455-6677-8899-aabbccddeeff:pass@example.org:443?unknown-flag=1");
+        QVERIFY2(unknown,qPrintable(unknown.error));QVERIFY(!unknown.nodes.first().conversionIssues.isEmpty());
+    }
+    void hysteriaV1UriIsExplicitlyRejectedNotConvertedToV2() {
+        const auto parsed=NodeImporter::parse(QByteArray("hysteria://example.org:443?peer=camouflage.invalid&auth=fixture&upmbps=100&downmbps=50"));
+        // The intent is that no node is produced and nothing is silently
+        // rewritten into a Hysteria2 outbound; the diagnostic may name v2 in
+        // order to state that it was NOT applied.
+        QVERIFY(!parsed);QVERIFY(parsed.nodes.isEmpty());QVERIFY(parsed.error.contains("v1",Qt::CaseInsensitive));
+    }
+    void multiNodeSubscriptionIsolatesOneInvalidHysteria2Node() {
+        const QByteArray good="hysteria2://auth@good.example.org:443?sni=good.invalid";
+        const QByteArray bad="hysteria2://auth@bad.example.org:443?sni=a&sni=b";
+        const auto parsed=NodeImporter::parse(good+"\n"+bad);
+        QVERIFY(!parsed);QVERIFY(!parsed.error.isEmpty());
+    }
 };
 QTEST_GUILESS_MAIN(ImportTests)
 #include "ImportTests.moc"
