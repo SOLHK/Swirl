@@ -350,7 +350,7 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
   nodes.append(QJsonObject{{"id",n.id},{"outbound",outbound}});
  }
  QJsonArray rules,selectors;const auto routingError=routingConfiguration(o,selected,&nodes,&rules,&selectors);if(!routingError.isEmpty())return routingError;
- QJsonObject config{{"schema",1},{"listen",QString("127.0.0.1:%1").arg(o.proxyPort)},{"selected",selected},{"nodes",nodes},{"rules",rules},{"selectors",selectors},{"dns",dns},
+ QJsonObject config{{"schema",1},{"listen",QString("127.0.0.1:%1").arg(o.proxyPort)},{"selected",selected},{"nodes",nodes},{"rules",rules},{"selectors",selectors},{"dns",dns},{"smart_routing",o.smartRouting&&o.routingMode=="rule"&&!o.directSession},
   {"limits",QJsonObject{{"max_connections",128},{"handshake_timeout_ms",qBound(100,o.startupTimeoutMs,30000)}}}};
  if(o.smartRouting&&o.routingMode=="rule"&&!o.directSession){
   const auto directory=o.rulesDirectory.isEmpty()?QCoreApplication::applicationDirPath()+"/rules":o.rulesDirectory;
