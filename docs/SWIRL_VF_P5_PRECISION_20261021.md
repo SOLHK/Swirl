@@ -157,3 +157,73 @@ The workflow now has a separate final strict-native acceptance step after
 successful load/render measurement. It checks the same1/32 result and must
 fail while these native discrepancies remain. Fixed summaries are still
 uploaded with always(); no failure is converted into an acceptance pass.
+
+## Final tested source checkpoint and production review
+
+Source8b1493fd153f28747b9ca6ab5606ff2e8adf4e89 is saved remotely. Its
+[P5 run39567110282](https://github.com/SOLHK/Swirl/actions/runs/39567110282)
+has exact-model **success**, Windows **failure at the strict native gate**.
+Compilation, identity checks, full observations,32-face loading and10rasters
+all completed before the gate failed. This is the correct observed failure,
+not a compiler error or a skipped native test.
+[Existing regression run39567110276](https://github.com/SOLHK/Swirl/actions/runs/39567110276)
+passed796portable tests and6audits;37P5targeted regressions passed separately.
+
+The final predeclared cohort includes the minimal counterexample:416positions,
+832forward/reverse Windows requests,5824glyph pairs,40768metric fields,
+11648outline pairs,36608point pairs,9984FLOAT/readback bit checks. There are
+1836strict metric-field failures,6936point failures,204request failures and
+zero topology/input-FLOAT failures. Maximum errors remain0.2/0.2000244140625
+source FUnit. The actual32-face target still loads/rasterizes; that smoke
+result does not erase strict parity failure. HarfBuzz now reports714/5824
+advance,510/11648extent and816/13312layout failures, maximum0.203125;
+832shaping runs preserve GIDs/clusters. The increased failure count includes
+the frozen extra counterexample, not a change to the font or threshold.
+Font hashes are identical to the earlier cohort.
+
+The source-only production guard at rebuild.py still rejects unchanged-source
+replay metadata before sampling/checkpointing. Its two direct regressions
+were rerun and passed. Bounded-rebase flags for original/source-user/whole-font
+and production acceptance remain false. No original q glyph model is built.
+The first original face is **not ready**: global source/target user mapping,
+strict native metrics/rounding, full MVAR/layout/vertical-origin behavior and
+original source-HVF model validation are unresolved. No production guard was
+removed, no proprietary conversion was attempted, and no Swirl-VF.ttc exists.
+
+macOS27.0.1 in the existing automatic workflow again verifies the exact original
+32face identity and3184native source records, preserving288pass/96fail D2
+strict readbacks. That is preserved source evidence, not a P5 target-font
+CoreText result; native macOS P5 candidate testing is NOT_RUN. Windows11,
+installation, Qt/Swirl, third-party applications and pixel equivalence are
+also NOT_RUN. MVAR unit-aware scaling/VORG table preservation are implemented;
+complete MVAR reparameterization and native VORG equivalence are not.
+Fixed evidence: [final CI and acceptance scope](evidence/SWIRL_VF_P5_FINAL_CI_20261021.json).
+
+Saved source checkpoints:
+
+- 88b6ca4fee854bc18ccf0c5cd958fb8cbac30f6c: actual coefficient-grid selection,
+  exact continuous model certificate and metric-unit transformations.
+- f3f04cff27c87359883f6fa10f78bab3bbb0de09: fresh-table scaler fix, actual
+  32-face controls and DirectWrite/raster diagnostic.
+- 8b1493fd153f28747b9ca6ab5606ff2e8adf4e89: minimal native-rounding reproducer
+  and separately failing unchanged native acceptance gate.
+
+No A3/B1/C1/W1/Core branch was changed. PR24 remains draft, stacked on PR23's
+unchanged D1 branch, with integration-owner review required. No automatic merge
+or history rewriting is permitted. This final documentation successor changes
+no tested source.
+
+Direct continuation commands from this worktree:
+
+```sh
+PY=/Users/mac430/Swirl-worktrees/vf-macos-windows-d1/build/vf-d1-private/venv/bin/python
+"$PY" -m unittest discover -s tools/swirl_vf/tests -p test_bounded_rebase.py -v
+"$PY" -m unittest discover -s tools/swirl_vf/tests -p test_font_model_certificate.py -v
+"$PY" tools/swirl_vf/platform/make_precision_controls.py --output build/vf-takeover-private/p5-next-controls
+```
+
+Generation refuses existing output. Start further work with the recorded native
+rounding counterexample or a separately bounded noninteger-grid/region
+representation; do not re-run full original glyph sweeps or claim the design
+certificate proves user mapping or renderer equality. Keep the native gate
+failing until a real font-level repair passes it without changing1/32.
