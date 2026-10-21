@@ -77,13 +77,13 @@ Binding {
         function onPreviewAxesChanged() { binding.scheduleRefresh() }
         function onPreviewAutomaticChanged() { binding.scheduleRefresh() }
     }
-    onTargetChanged: scheduleRefresh()
-    onWhenChanged: scheduleRefresh()
-    onTextRoleChanged: scheduleRefresh()
-    onPreviewChanged: scheduleRefresh()
-    onFitWidthChanged: scheduleRefresh()
-    onLogicalDpiChanged: scheduleRefresh()
-    onDevicePixelRatioChanged: scheduleRefresh()
-    onFontWindowChanged: scheduleRefresh()
-    Component.onCompleted: scheduleRefresh()
+    onTargetChanged: binding.scheduleRefresh()
+    onWhenChanged: binding.scheduleRefresh()
+    onTextRoleChanged: binding.scheduleRefresh()
+    onPreviewChanged: binding.scheduleRefresh()
+    onFitWidthChanged: binding.scheduleRefresh()
+    onLogicalDpiChanged: binding.scheduleRefresh()
+    onDevicePixelRatioChanged: binding.scheduleRefresh()
+    onFontWindowChanged: binding.scheduleRefresh()
+    Component.onCompleted: binding.scheduleRefresh()
 }
