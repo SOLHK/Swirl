@@ -1,0 +1,80 @@
+{
+  "stage": "X1.2-A",
+  "date": "2026-10-22",
+  "timezone": "Asia/Singapore",
+  "branch": "work/xray-v2ray-json-import-20261021",
+  "remote_base": "b88bb978d31fad1865e1b648cecd4f230bc3487c",
+  "recovered_local_candidate": "fde69c539a40c974c9244ca93f2e58851f0715ae",
+  "environment": {
+    "os": "Linux x86_64",
+    "rustc": "1.99.1 (58cf8f9c3 2026-10-13)",
+    "cargo": "1.99.1 (5f94df478 2026-08-27)"
+  },
+  "gates": [
+    {
+      "command": "cargo fmt --all -- --check",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo check --workspace --locked",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo clippy --workspace --all-targets --locked -- -D warnings",
+      "exit_code": 0
+    },
+    {
+      "command": "cargo test --workspace --locked",
+      "exit_code": 0,
+      "unit_integration_passed": 404,
+      "doctests_passed": 1,
+      "failed": 0,
+      "ignored": 0,
+      "execution": "Authorized expanded execution allowing local loopback sockets; source and assertions unchanged."
+    },
+    {
+      "command": "python tools/tests/test_core_development.py",
+      "exit_code": 0,
+      "passed": 57
+    }
+  ],
+  "subscription_tests": {
+    "unit_passed": 89,
+    "adversarial_passed": 11,
+    "public_structure_passed": 27,
+    "total_passed": 127,
+    "new_vs_remote_base": 45
+  },
+  "retained_initial_failure": {
+    "command": "cargo test --workspace --locked",
+    "exit_code": 101,
+    "test": "swirl_api::probe_tests::ffi_probe_starts_without_waiting_for_headers_and_returns_redacted_status",
+    "assertion": "started.ok was false",
+    "independent_environment_reproduction": "IPv4 and IPv6 loopback bind returned OS error 1: Operation not permitted in default sandbox",
+    "resolution": "Reran unchanged full workspace suite under authorized expanded execution; no source, assertions or suite filters changed."
+  },
+  "source_sha256": {
+    "core/crates/swirl-subscription/src/lib.rs": "73e23f2401b827ebaa887dadf6cd206177098b3485b8421457242fc1e7c72488",
+    "core/crates/swirl-subscription/src/xray.rs": "569fb22e3435640393169b1e53ec36357f4539aecca7e350e0994761fd7db027",
+    "core/crates/swirl-subscription/src/xray/strict.rs": "b445fedaa866d3d504c95cfdf4ba76258faa7a5a064e92836535418c0b93af22",
+    "core/crates/swirl-subscription/src/xray/schema.rs": "89599b9a5daf509c8c773eb4a1a28fd7fa2af62cf2a7f89a4924c40ed8a0aead",
+    "core/crates/swirl-subscription/tests/xray_adversarial.rs": "82f2b361e433255a13b8604a77e84aec2433ac4fbd34ad1c1024f190197c1346",
+    "core/crates/swirl-subscription/tests/xray_structure.rs": "894af6e7608257599394d1ea3a4d09da8828cfb7ed2ea28c7d31c0014fb8ac04",
+    ".github/workflows/rust-core.yml": "7c8fe1c98aca15a282a89f50485135bd904a3b81c8ccba9e8d907104535928a5",
+    "tools/ApplyCoreDevelopment.py": "601573609cbc3eba4127e5292a8935553dd8772bfd6db5e48687984b6d1bad4a",
+    "tools/tests/test_core_development.py": "3582b8c95d10e65a353cd399bbfc7d5bdcdf8a2078f7af37a23e156f1512f463"
+  },
+  "validation_log_sha256": {
+    "x12-fmt.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "x12-check.log": "4250d827065095a6439010ed68e86f3f6b9cccc86bb52f5b7e02c3dfda1af354",
+    "x12-clippy.log": "3eae8544b5cb1647992b66cd303115a7beaa117a5256f279667570ec7529ca93",
+    "x12-test.log": "f66b21d795226f2ca27f14509583e9327098161b60d3508fcccbc190bbd96091",
+    "x12-test-loopback.log": "2732e1390c814ca457ae906514aefe7112f26437cb025b7780352083ad3d3ba9"
+  },
+  "fixtures": "Synthetic and offline; no private subscriptions or provider credentials used.",
+  "limitations": [
+    "Parser only; no X1.2-B conversion or executable nodes.",
+    "No Qt/UI integration, VMess networking, routing or font changes.",
+    "Local execution is Linux only; GitHub CI results require exact published SHA."
+  ]
+}

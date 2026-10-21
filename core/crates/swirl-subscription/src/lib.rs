@@ -9,6 +9,7 @@ pub use policy::{HealthProbe, PolicyStrategy, ProbeTarget};
 pub use reality::Reality;
 pub use websocket::WebSocket;
 pub mod inspect;
+pub mod xray;
 pub use dns_tls::DnsTlsServer;
 use std::{collections::HashSet, net::SocketAddr};
 
