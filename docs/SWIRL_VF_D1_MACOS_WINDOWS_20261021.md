@@ -1,5 +1,11 @@
 # D1 macOS source baseline and cross-platform delivery — 2026-10-21
 
+D2 continuation is now complete for its bounded scope: 32 × 34 × 15 native
+samples passed the existing combined comparison on both Mac hosts; all original
+96 strict axis failures are diagnosed and retained; fresh-UPEM synthetic metric
+failures are reproduced without a production fix. See the final D2 section and
+[evidence](evidence/SWIRL_VF_D2_CI_20261021.json). Windows 11 remains NOT_RUN.
+
 Latest evidence: exact original loads on macOS 27.0.1 CI (32/32 identities), but
 has 96/384 strict axis-readback failures. Local macOS 26.3 refuses that source in
 CoreText while Apple HVF works. Full-GID default-design comparison completes
@@ -501,3 +507,116 @@ acceptance remain NOT_RUN/NOT_TESTED. The old strict native metric step and its
 failure propagation remain intact. Only original aggregate `summary.json`
 files are uploaded; private rows/logs/fonts are excluded. YAML parsing/branch
 checks pass. New remote native CI has not executed at this source checkpoint.
+
+## D2 final native CI, owner-facing evidence and review boundary
+
+Second D2 source checkpoint:
+**`a5bfb228522dff183074b25459a109dcc8b4a475`**, parent 30ff0ad.
+[Run 39534374343](https://github.com/SOLHK/Swirl/actions/runs/39534374343)
+completed **failure** at **2026-10-21 02:47:31 UTC**. All three actual terminal
+job states and complete job logs were read. The following are execution results,
+not predictions, running jobs, artifact metadata or a reused D1 run.
+
+| Actual job | Terminal result | Independently verified scope |
+| --- | --- | --- |
+| Original D2 **119007488141** | **success** | Actual macOS **27.0.1 / 26A434**, exact original; 32/32 identities, original 384 axis requests plus 96 preregistered controls; all 32-face HVF comparisons executed |
+| Synthetic Mac **119007487935** | **failure** | Actual macOS **15.7.9**; 8 D1 + 13 D2 regression tests pass; old strict 849/850 test fails; native/table reconstruction and new UPEM diagnosis execute successfully |
+| Synthetic Windows **119007488171** | **success** | Server 2022 Datacenter **20348**; 13 D2 tests pass; actual DirectWrite standard **3/3** and metric **2/2** faces pass, **10 raster images each** |
+
+Machine-readable safe summaries extracted from those actual logs are saved in
+[D2 CI evidence](evidence/SWIRL_VF_D2_CI_20261021.json). Full private logs/font data
+are not committed. New ZIP bytes were not downloaded or independently rehashed;
+no ZIP-content verification is claimed. Original artifact metadata identifies
+**12316713337**, 1,756 bytes, GitHub digest
+`1fef57c5c31ba7bb65ebcf9bc4a098e2f65798afabdd6621f4dfd94d933e4dee`;
+this is metadata only. The evidence here is bounded to actual terminal logs and
+explicit summary fields, not unseen artifact members.
+
+### A3 review: the original 96 failures are now classified
+
+Against the exact `39d42acd...` original on macOS 27, the new diagnostic actually
+confirms **288/384 strict passes**, **96/384 strict failures**; **32 failures per
+axis**, all at the preselected fractional request. Every failed effective echo
+matches its predeclared T(T(x)); all **96/96** independent controls echo that
+coordinate exactly and pass. Maximum errors equal the local control values
+above. Source unchanged; production extractor SHA remains
+`8e5aaa0a921f24a656766c1e24a0d388397cdaddbdfebae1ab415c0d7c3f3bbf`;
+new native harness SHA is
+`4a708e294f630475313201555baa19a2fa658c6b72f91de33d04e753211dab33`.
+
+Two compact numerical reproductions from the frozen plan explain the refusals:
+`WDTH = 1 + 999*.123456789 = 124.333332211` has effective echo 124.3333;
+the wght100..600 group requests `161.7283945` and has effective echo 161.7283.
+The latter also distinguishes the observed truncation-like value from nearest
+four-decimal rounding. Both differences exceed 1e-6. The unchanged Swift guard
+computes its failure **before JSON serialization**, and the Python diagnostic
+checks that verdict independently. These are actual numeric readback differences,
+not cosmetic decimal printing or Python display truncation.
+
+The accepted conclusion is narrowly that the **96 finite strict-readback
+refusals** have this reproducible numeric explanation. It does not establish
+original/replay glyph equivalence, Apple's internal interpolation coordinates,
+a universal decimal rule or A3 production mapping. Existing every-GID exact
+payload replay, omitted-nondefault handling and input-resolution obstructions
+still apply. Do not admit a diagnostic oracle or replace source coordinates
+because these 96 additional readback controls pass.
+
+### B1 review: independent support, strict failure still present
+
+The synthetic Mac CI repeats the final source script exactly (SHA
+`3a13b4b88f591b042a701021dca4034872079f20962670ed812a2b568bbf664c`):
+**40 unique fixture/height observations, 80 actual records, 40 exact reverse
+pairs**, **40/40 frozen height predictions match**, **36 strict height failures**.
+This agrees with the new local macOS-26 result; these fresh-UPEM experiments
+were run on **15.7.9 and 26.3**, not falsely labelled as fresh macOS-27 measurements.
+B1's prior matching-host 1000/1024 evidence remains its separately sourced result.
+
+Horizontal values repeat over the five heights for each UPEM: there are **8
+UPM bases, 6 fresh**, not 40 independent horizontal-width conditions. Likewise,
+the 32 faces share a single HVGL table: there are **510 distinct portable
+GID/design references**, with **16,320 actual native face observations** per
+host, not 16,320 distinct source models. Counts are not doubled across native
+replays or the local/CI repetitions.
+
+The old raw metric gate remains FAIL at 849/850 with 1/32 tolerance. Frozen
+arithmetic matching is not a source-API correction, and this window has not
+changed B1 metric writers, compensation, vertical-origin representation or
+reconstruction admission. A valid future repair still needs an independently
+frozen strict holdout set and original/application acceptance.
+
+### All-face confirmation and integration boundary
+
+The macOS-27 job executed the entire same bounded **16,320** native set in
+**325.703 s**: **16,256 legacy passes + 64 retained type rejections**, companion
+**64/64**, combined **16,320/16,320**, zero numeric failures, identical maximum
+point error **1.3073986337985843e-12**, unchanged 1/32 limit and source bytes.
+No unmeasured face or untested legacy rejection was silently omitted.
+
+D2 has therefore completed its independent bounded native validation and
+failure diagnosis. Original production reconstruction is still **0/32 faces**;
+no original-derived font was built in this continuation. The existing D1
+3,424-byte file remains only a synthetic control. Windows Server evidence is
+explicitly synthetic; Windows 11, original installation/DirectWrite, real
+Qt/Swirl, mixed-text rendering and product performance remain NOT_RUN.
+
+Integration review should focus on the new independent drivers, thirteen tests,
+strict failure retention and original-summary-only CI export. A3/B1/C1/W1
+algorithms and the UI are unchanged; no other development branch or integration
+history was merged or updated. B1's documented system/private-copy startup
+contrast also remains a confounder when interpreting D1's two-host loading
+contrast: it is not proof that OS version alone causes the refusal.
+This branch is a review candidate, not permission to merge or announce a font.
+
+Small synthetic metric reproduction (fresh directory; no Apple font needed):
+
+```sh
+build/vf-d1-private/venv/bin/python tools/swirl_vf/platform/d2_metric_upem.py \
+  --binary build/vf-d1-private/coretext/coretext_extract \
+  --output build/vf-d2-private/upem-next
+```
+
+Original 480-request diagnosis on a matching host uses
+`platform/d2_axis_readback.py SOURCE --expected-sha256 39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890 --output FRESH_PRIVATE_DIRECTORY`.
+It intentionally requires exact source identity and cannot replace the Mac-26
+source with a different system font under that hash. All result/raw/native
+checkpoints remain available locally under `build/vf-d2-private/`.
