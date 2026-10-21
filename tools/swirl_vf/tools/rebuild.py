@@ -890,7 +890,10 @@ def run(source, executable, destination, report_path, batch_size=64,
                             open_session()
                     check("MVAR" not in src and "VVAR" not in src,
                           "this reconstruction path has no native font-wide/VVAR metric oracle")
-                    for tag in ("GSUB", "GPOS", "BASE"):
+                    # GPOS VariationIndex records can reference GDEF.VarStore
+                    # indirectly. Retaining its bytes while replacing avar
+                    # changes layout at the same user location (C1 reproducer).
+                    for tag in ("GSUB", "GPOS", "BASE", "GDEF"):
                         if tag in src:
                             layout = src[tag].table
                             check(not getattr(layout, "FeatureVariations", None)
