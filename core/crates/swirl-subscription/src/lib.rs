@@ -264,6 +264,9 @@ pub struct Config {
     pub selectors: Vec<Selector>,
     #[serde(default)]
     pub dns: Dns,
+    /// Directory containing the two bundled, checksum-pinned MRS rule providers.
+    #[serde(default)]
+    pub china_rules_directory: Option<String>,
     #[serde(default)]
     pub inbound_auth: Option<Credentials>,
     #[serde(default)]
@@ -354,6 +357,7 @@ impl Config {
         {
             return Err("ConfigBounds");
         }
+        if self.china_rules_directory.as_ref().is_some_and(|p| p.is_empty() || p.len() > 4096 || p.chars().any(char::is_control)) { return Err("ChinaRulesDirectory"); }
         self.dns.validate_query_family()?;
         self.dns.validate_tls()?;
         let mut host_names = HashSet::new();
