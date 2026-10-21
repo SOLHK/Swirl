@@ -76,6 +76,8 @@ fn resolver(dns: Dns) -> Result<Resolver, &'static str> {
             outbound: Outbound::Direct {},
         }],
         rules: Vec::new(),
+        smart_routing: false,
+        china_rules_directory: None,
         selectors: Vec::new(),
         dns,
         inbound_auth: None,
