@@ -18,7 +18,7 @@ Item {
    RowLayout { Layout.fillWidth:true
     SwirlText {textRole:"largeTitle"; text:"流量分析";font.pixelSize:Theme.fontSize(30);font.weight:Font.DemiBold;color:Theme.text;Layout.fillWidth:true }
     SwirlButton {text:"返回";visible:SwirlMotion.returnShared && SwirlMotion.returnShared.route===AppState.currentPage;onClicked:SwirlMotion.returnToHub(totalTraffic)}
-    SwirlComboBox { model:["今日","昨日","本周","本月"];currentIndex:page.period;onActivated:page.period=currentIndex }
+     SwirlComboBox { objectName:"trafficPeriodSelector";model:["今日","昨日","本周","本月"];currentIndex:page.period;onActivated:page.period=currentIndex }
    }
    SwirlText { text:"仅统计经过 Swirl 的流量；排行基于已采集连接，短于采样间隔的连接可能无法归属。历史保留 32 天。";color:Theme.muted;Layout.fillWidth:true;wrapMode:Text.Wrap }
    SwirlGlassPanel {id:totalSurface;Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(72)

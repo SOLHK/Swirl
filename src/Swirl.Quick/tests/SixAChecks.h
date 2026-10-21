@@ -16,7 +16,22 @@ static int runSixAChecks(QQuickWindow *window,const QString &output) {
     if(metric){click(metric,{metric->width()/2,metric->height()/2});wait(55);check("metric-card-surface-transition",eval(window,"pageLoader.heroData!==null && pageLoader.moving").toBool());wait(450);check("metric-navigates-to-traffic",eval(window,"AppState.currentPage==='traffic'").toBool());shot("traffic");}
     eval(window,"AppState.navigate('activity')");wait(450);
     auto *cumulative=find(window->contentItem(),"activityMetricHit_totalTraffic");
-    if(cumulative){click(cumulative,{cumulative->width()*0.7,cumulative->height()+20});wait(100);check("metric-period-control-does-not-navigate",eval(window,"AppState.currentPage==='activity'").toBool());}
+    if(cumulative){
+        click(cumulative,{cumulative->width()/2,cumulative->height()/2});wait(450);
+        check("cumulative-card-navigates-to-traffic",eval(window,"AppState.currentPage==='traffic'").toBool());
+        auto *periodSelector=find(window->contentItem(),"trafficPeriodSelector");
+        check("traffic-detail-offers-period-selection",periodSelector&&periodSelector->isVisible()&&periodSelector->property("count").toInt()==4&&periodSelector->property("currentIndex").toInt()==0);
+        eval(window,"AppState.navigate('activity')");wait(450);
+    }
+    auto *trend=find(window->contentItem(),"activityTrendHit");
+    if(trend){click(trend,{trend->width()/2,trend->height()/2});wait(450);check("trend-card-navigates-to-traffic",eval(window,"AppState.currentPage==='traffic'").toBool());eval(window,"AppState.navigate('activity')");wait(450);}
+    else check("trend-card-hit-present",false);
+    auto *quality=find(window->contentItem(),"activityQualityHit");
+    if(quality){click(quality,{quality->width()/2,quality->height()/2});wait(450);auto *refresh=find(window->contentItem(),"networkDiagnosticButton");check("quality-card-opens-refresh-and-details",eval(window,"pageLoader.item.diagnosticOpen").toBool()&&refresh&&refresh->isVisible());click(quality,{quality->width()/2,quality->height()/2});wait(450);}
+    else check("quality-card-hit-present",false);
+    auto *sources=find(window->contentItem(),"activitySourcesHit");
+    if(sources){click(sources,{sources->width()/2,sources->height()/2});wait(450);check("source-card-navigates-to-processes",eval(window,"AppState.currentPage==='processes'").toBool());eval(window,"AppState.navigate('activity')");wait(450);}
+    else check("source-card-hit-present",false);
     auto *controller=qobject_cast<EngineController *>(qmlEngine(window)->rootContext()->contextProperty("engineController").value<QObject *>());
     for(int i=0;i<35;++i)controller->saveNode({{"name",QString("Fixture node %1 — long readable name").arg(i,2,10,QChar('0'))},{"protocol","socks5"},{"host","127.0.0.1"},{"port",1}});
     eval(window,"AppState.navigate('proxies')");wait(450);
