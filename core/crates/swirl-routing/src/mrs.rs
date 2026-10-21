@@ -597,10 +597,8 @@ mod tests {
         assert!(!r.matches_domain("example.cn"));
         assert!(r.matches_domain("www.example.cn"));
         assert!(!r.matches_domain("notexample.cn"));
-        let apex_and_suffix = ChinaRules::from_parts(
-            vec!["example.cn".into(), "+.example.cn".into()],
-            vec![],
-        );
+        let apex_and_suffix =
+            ChinaRules::from_parts(vec!["example.cn".into(), "+.example.cn".into()], vec![]);
         assert!(apex_and_suffix.matches_domain("example.cn"));
     }
     #[test]
@@ -608,8 +606,14 @@ mod tests {
         let r = ChinaRules::from_parts(
             vec![],
             vec![
-                ("10.0.0.0".parse().unwrap(), "10.255.255.255".parse().unwrap()),
-                ("2001:db8::".parse().unwrap(), "2001:db8:ffff:ffff:ffff:ffff:ffff:ffff".parse().unwrap()),
+                (
+                    "10.0.0.0".parse().unwrap(),
+                    "10.255.255.255".parse().unwrap(),
+                ),
+                (
+                    "2001:db8::".parse().unwrap(),
+                    "2001:db8:ffff:ffff:ffff:ffff:ffff:ffff".parse().unwrap(),
+                ),
             ],
         );
         assert!(r.matches_ip("10.1.2.3".parse().unwrap()));
