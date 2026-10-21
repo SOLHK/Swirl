@@ -41,7 +41,7 @@ class CheckpointWriterTests(unittest.TestCase):
         return rebuild.FaceCheckpoints(self.directory, self.source, self.executable,
                                        (), {}, self.identities)
 
-    def report(self, writer, index):
+    def report(self, writer, index, path=None):
         recipe = writer.state['recipe']
         summary = {'type': 'summary', 'source_sha256': recipe['source_sha256'],
                    'error_count': 0, 'request_count': 1, 'successful_glyph_count': 3,
@@ -54,6 +54,7 @@ class CheckpointWriterTests(unittest.TestCase):
                  'successful_glyph_count': 3, 'summary': summary}
         return {'face_index': index, 'glyph_count': 3, 'glyphs_completed': 3,
                 'serialized_model_verification': {'status': 'PASS', 'glyphs_checked': 3},
+                'serialized_model_sha256': rebuild.sha256(self.paths[index] if path is None else path),
                 'native_face_transcript': proof}
 
     def test_stale_writer_preserves_both_confirmed_faces(self):
@@ -77,8 +78,23 @@ class CheckpointWriterTests(unittest.TestCase):
             font['hhea'].ascent += 1
             font.save(self.root/'different.ttf')
         with self.assertRaisesRegex(rebuild.ReconstructionError, 'confirmed checkpoint face differs'):
-            second.save(0, self.root/'different.ttf', self.report(second, 0))
+            second.save(0, self.root/'different.ttf', self.report(second, 0, self.root/'different.ttf'))
         self.assertEqual(first.manifest.read_bytes(), before)
+
+    def test_missing_or_wrong_serialized_hash_cannot_authorize_a_checkpoint(self):
+        writer = self.writer()
+        before = writer.manifest.read_bytes()
+        for value in (None, '0' * 64):
+            report = self.report(writer, 0)
+            if value is None:
+                del report['serialized_model_sha256']
+            else:
+                report['serialized_model_sha256'] = value
+            with self.subTest(value=value), self.assertRaisesRegex(
+                    rebuild.ReconstructionError, 'serialized model changed after verification'):
+                writer.save(0, self.paths[0], report)
+            self.assertEqual(writer.manifest.read_bytes(), before)
+            self.assertFalse(list(self.directory.glob('*.ttf')))
 
     def test_changed_recipe_is_not_overwritten_by_a_stale_writer(self):
         first, second = self.writer(), self.writer()

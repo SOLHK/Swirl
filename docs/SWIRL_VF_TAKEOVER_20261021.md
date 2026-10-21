@@ -168,10 +168,59 @@ test data, not a PingFang conversion or delivery font. Safe aggregate:
 Full second-stage suite: **703 discovered =696passed +7platform skips**,34.485s;
 audit6/6. This includes all60selected C1 tests, the new production padding and
 checkpoint hash regressions, two source-only production-boundary tests and all
-old source/strict-axis tests. New Windows2022 CI packages the authored32-face
-control through this same C1 code and runs existing DirectWrite probing/raster
-capture; results pending at this checkpoint. No Apple font or derived font is
-uploaded by any job. Windows11 installation and actual Qt/Swirl are NOT_RUN.
+old source/strict-axis tests. Checkpoint
+`69ff9049de57c2690a5cdf6a62caf2ccb955785d` passed all three jobs in
+[run39547139952](https://github.com/SOLHK/Swirl/actions/runs/39547139952),
+including another exact-original macOS27 replay. Windows Server2022 Datacenter
+build20348 actually loaded all32 authored C1-packed faces, exercised existing
+all-GID axis movement checks and produced10 rasters at five DPIs/two themes.
+This establishes native synthetic packaging/loading only. Aggregate:
+[Windows C1](evidence/SWIRL_VF_TAKEOVER_C1_WINDOWS_20261021.json).
+No Apple font or derived font is uploaded by any job. Windows11 installation
+and actual Qt/Swirl remain NOT_RUN.
+
+## Additional real defect: verification-to-pack byte binding
+
+Review of the integration found a real production acceptance gap. Recomputing
+the expected hashes immediately before packing can bless a valid font altered
+after its complete serialized model was checked. On unmodified69ff904, two
+tests actually changed a gvar outline coefficient by200 after the third face
+passed (fresh build) or after the third cached face was restored (resume).
+Both production runs published a TTC marked sampled-pass; an independent
+TTCollection read confirmed the altered coefficient in the published output.
+These two RED failures are preserved privately in
+`build/vf-takeover-private/verified-face-binding-before.log` and use exclusively
+authored analytic fixtures. They contain no Apple font/glyph data.
+
+The fix captures SHA256 immediately before the complete face-model gate,
+requires the same digest afterward, and retains that digest in the face proof.
+Checkpoint save and restore bind their bytes to that original model digest.
+Packing receives these retained accepted hashes rather than fresh hashes of
+possibly modified inputs. No gate or geometry tolerance changes.
+
+Three actual corruption regressions now pass: mutation during the current
+model gate, mutation of an earlier newly verified face, and mutation of an
+earlier restored face. The latter keeps the existing manifest and accepted
+output unchanged. All reject final publication. One extra storage regression
+refuses missing or false model hashes. The concurrency fixtures now explicitly
+bind their authored byte hashes; their prior conflict, stale writer, real
+process lock and alias assertions remain unchanged. The initial full run
+reported three missing-hash fixture errors; all were fixed in the test proof
+constructors, without making the production check optional.
+
+Final local suite: **707 discovered =700passed +7platform skips**,29.112s;
+audit6/6. Native CoreText two-face reconstruction was rerun after the source
+fix:58requests/174records, zero observed outline/table-metric/bounds discrepancy,
+bound model hashes, independently checked C1 binary output. Its strict raw
+849/850 API gate still fails at unchanged1/32. Fonts remain temporary and are
+removed. Safe aggregate:
+[native hash binding](evidence/SWIRL_VF_TAKEOVER_FACE_BINDING_NATIVE_20261021.json).
+
+Fresh origin fetch after checkpoint69ff904 still finds the A3/B1/C1/integration
+tips listed above unchanged. W1 tip is2be6c78cae93544af57e90cb4904a399959d6b7c;
+it is not modified. PR23 remains open/draft, unmerged, at54e579f. Only the
+new isolated takeover branch is written. No cross-window conflict was detected;
+the selected C1 overlap is documented by immutable source blobs.
 
 ## Reproduction
 

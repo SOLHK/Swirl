@@ -832,6 +832,8 @@ class FaceCheckpoints:
         check(path.is_file() and not path.is_symlink() and sha256(path) == digest,
               f"checkpoint face {index}: verified font bytes changed or missing")
         report = copy.deepcopy(entry["report"])
+        check(report.get("serialized_model_sha256") == digest,
+              f"checkpoint face {index}: serialized model hash differs from verified bytes")
         count = len(source_font.getGlyphOrder())
         self.verify_transcript(index, report, count)
         check(report.get("face_index") == index and report.get("glyphs_completed") == count
@@ -878,6 +880,8 @@ class FaceCheckpoints:
     def _save_face(self, index, path, report):
         self.verify_transcript(index, report, report.get("glyph_count", 0))
         digest = sha256(path)
+        check(report.get("serialized_model_sha256") == digest,
+              f"checkpoint face {index}: serialized model changed after verification")
         entry = {"sha256": digest, "report": copy.deepcopy(report)}
         previous = self.state["faces"].get(str(index))
         check(previous is None or previous == entry, "confirmed checkpoint face differs; previous entry retained")
@@ -1143,9 +1147,12 @@ def run(source, executable, destination, report_path, batch_size=64,
                         path = Path(tmp) / f"face-{index}.ttf"
                         context = {"stage": "face_serialization", "face_index": index}
                         out.save(path)
+                        verified_digest = sha256(path)
                         with TTFont(path) as verified:
                             face_report["serialized_model_verification"] = verify_serialized_face(out, verified)
                             check(verified["cmap"].compile(verified) == src["cmap"].compile(src), "serialized cmap changed")
+                        check(sha256(path) == verified_digest, "serialized face changed during model verification")
+                        face_report["serialized_model_sha256"] = verified_digest
                         if checkpoints is not None:
                             context = {"stage": "native_face_finalization", "face_index": index}
                             face_report["native_face_transcript"] = finish_session(index)
@@ -1161,7 +1168,8 @@ def run(source, executable, destination, report_path, batch_size=64,
                     # independent raw TTC verifier. Table-byte equality alone
                     # cannot detect corrupt padding or directory aliases.
                     report["collection_packing"] = pack_collection(
-                        face_paths, candidate, expected_sha256=[sha256(path) for path in face_paths],
+                        face_paths, candidate,
+                        expected_sha256=[face["serialized_model_sha256"] for face in report["faces"]],
                         validate=verify_packed, share_tables=True)
                 except StagingError as error:
                     raise ReconstructionError("TTC staging rejected: " + str(error),
