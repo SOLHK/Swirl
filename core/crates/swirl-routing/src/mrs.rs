@@ -166,6 +166,30 @@ impl<'a> Cursor<'a> {
     fn is_empty(&self) -> bool { self.at == self.bytes.len() }
 }
 
+const CN_DOMAIN_SHA256: &str = "e92bda4f0b9f05623663a882331a320ab4e266cada2046d3828a94572cdded46";
+const CN_IP_SHA256: &str = "d95b3d125f6c74ce3c15e19ef794f142de91e21c3b8fb7767e76aebfabff5149";
+static BUNDLED: std::sync::OnceLock<Result<(ChinaRules, ChinaRules), &'static str>> = std::sync::OnceLock::new();
+
+/// Load the repository's checksum-pinned MRS assets once. Failure is sticky and
+/// explicit: routing must not silently turn an unavailable rule set into proxy-all.
+pub fn bundled_rules() -> Result<(&'static ChinaRules, &'static ChinaRules), &'static str> {
+    match BUNDLED.get_or_init(|| {
+        let domain = include_bytes!("../../../../src/Swirl.Quick/packaging/rules/cn-domain.mrs");
+        let ip = include_bytes!("../../../../src/Swirl.Quick/packaging/rules/cn-ip.mrs");
+        Ok((
+            ChinaRules::parse(domain, Behavior::Domain, CN_DOMAIN_SHA256)?,
+            ChinaRules::parse(ip, Behavior::IpCidr, CN_IP_SHA256)?,
+        ))
+    }) {
+        Ok((domain, ip)) => Ok((domain, ip)),
+        Err(error) => Err(*error),
+    }
+}
+
+pub fn validate_bundled_rules() -> Result<(), &'static str> {
+    bundled_rules().map(|_| ())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
