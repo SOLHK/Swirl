@@ -39,9 +39,17 @@ fn load_bundled_rules() -> Result<(ChinaRules, ChinaRules), &'static str> {
     let directory = packaged
         .filter(|p| p.join("cn-domain.mrs").is_file() && p.join("cn-ip.mrs").is_file())
         .unwrap_or(source);
+    load_rules_from_directory(&directory)
+}
+
+/// Loads only the two pinned bundled files; callers cannot substitute arbitrary filenames.
+pub fn load_rules_from_directory(
+    directory: &std::path::Path,
+) -> Result<(ChinaRules, ChinaRules), &'static str> {
     let domain_bytes =
         std::fs::read(directory.join("cn-domain.mrs")).map_err(|_| "ChinaDomainRulesRead")?;
-    let ip_bytes = std::fs::read(directory.join("cn-ip.mrs")).map_err(|_| "ChinaIpRulesRead")?;
+    let ip_bytes =
+        std::fs::read(directory.join("cn-ip.mrs")).map_err(|_| "ChinaIpRulesRead")?;
     let domains = ChinaRules::parse(
         &domain_bytes,
         Behavior::Domain,
@@ -56,6 +64,7 @@ fn load_bundled_rules() -> Result<(ChinaRules, ChinaRules), &'static str> {
     .map_err(|_| "ChinaIpRulesInvalid")?;
     Ok((domains, ips))
 }
+
 
 #[derive(Debug, Clone)]
 pub struct ChinaRules {
