@@ -15,7 +15,7 @@ use std::{
 };
 use swirl_dns::Resolver;
 use swirl_protocol::{Inbound, Result, Target};
-use swirl_routing::{ChinaRules, MrsBehavior};
+use swirl_routing::{ChinaRules, load_rules_from_directory};
 use swirl_subscription::{Config, Outbound, PolicyStrategy};
 use swirl_transport::{Counters, bind_udp};
 use tokio::{
@@ -33,25 +33,9 @@ fn load_china_rules(config: &Config) -> Result<(Option<Arc<ChinaRules>>, Option<
     }
     let directory = config
         .china_rules_directory
-        .as_ref()
+        .as_deref()
         .ok_or("ChinaRulesDirectoryMissing")?;
-    let directory = std::path::Path::new(directory);
-    let domain_path = directory.join("cn-domain.mrs");
-    let ip_path = directory.join("cn-ip.mrs");
-    let domain_bytes = std::fs::read(domain_path).map_err(|_| "ChinaDomainRulesRead")?;
-    let ip_bytes = std::fs::read(ip_path).map_err(|_| "ChinaIpRulesRead")?;
-    let domains = ChinaRules::parse(
-        &domain_bytes,
-        MrsBehavior::Domain,
-        "e92bda4f0b9f05623663a882331a320ab4e266cada2046d3828a94572cdded46",
-    )
-    .map_err(|_| "ChinaDomainRulesInvalid")?;
-    let ips = ChinaRules::parse(
-        &ip_bytes,
-        MrsBehavior::IpCidr,
-        "d95b3d125f6c74ce3c15e19ef794f142de91e21c3b8fb7767e76aebfabff5149",
-    )
-    .map_err(|_| "ChinaIpRulesInvalid")?;
+    let (domains, ips) = load_rules_from_directory(std::path::Path::new(directory))?;
     Ok((Some(Arc::new(domains)), Some(Arc::new(ips))))
 }
 
