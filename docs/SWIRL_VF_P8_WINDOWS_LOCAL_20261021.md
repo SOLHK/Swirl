@@ -19,6 +19,15 @@ It uploads only `public/summary.json`, never fonts, native logs or PNGs. Its
 Windows Server/authored scope cannot grant original-derived or Windows 11
 acceptance. The workflow's actual run result must be checked separately.
 
+Actual authored native smoke
+[39592789402](https://github.com/SOLHK/Swirl/actions/runs/39592789402) passed at
+`3a4ec7ab57481c09ffc0646347d9142b109e0bab`: Windows Server 2022 build 20348,
+product type 3; one face, seven sampled GIDs, 62 native instances, 186 strict
+binary32 axis comparisons, 17 cmap pairs and 10 raster captures. Windows
+regressions passed six tests and intentionally skipped the non-Windows route.
+Only the 589-byte authored aggregate ZIP was published. Original-derived fonts,
+Windows 11, Qt/Swirl and installation remain **NOT_RUN** for that run.
+
 On an authorized Windows machine with the checkout and candidate already under
 `D:\Codex`, use Python with fontTools 4.61.1, PowerShell 7, CMake and the existing
 Visual Studio C++/Windows SDK prerequisites. The wrapper keeps generated output

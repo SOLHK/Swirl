@@ -62,6 +62,96 @@ Primary implementations reviewed/reused:
 [Apple HVGL](https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6hvgl.html).
 No upstream code copied; only existing project algorithms and public APIs reused.
 
+## A2 actual100 GIDs and independent candidate validation
+
+All100 selected GIDs completed,0 build exceptions,12,900 actual Apple HVF
+source-extraction comparisons PASS. There are95 nonzero outline-variation
+models and100 nonzero metric-variation models; five genuinely empty outlines
+are separately identified. All100 have nonzero gvar data,10,281 tuples total.
+At all125 training plus4 frozen holdouts,5/100 pass the strict model outline
+bound (ALL five are empty) and85/100 pass TABLE metric bounds. No nonempty
+outline passes that broader bound. Maximum model errors remain8.51977856738663
+outline and1/30 TABLE FUnit. The resumed90 took207.458seconds.
+
+The actual assembled/compacted q candidate is local:
+`build/vf-takeover-private/p8-face-100-compact-stage1/P7-Original-face0-EXPERIMENTAL.ttc`.
+Its legacy P7 filename reflects the reused builder; this is the P8 batch output.
+TTC35,252,464bytes, SHA256
+`ee1c81a5efc9393aff92e648569bf3ab862c0890d7c629650fbfdbfb1bb66d74`;
+TTF SHA256 `e99aac02392e4c4d2e223a922abad6e3f720e72513d7714f85c281b32ff249c2`.
+All47,102 default GIDs/cmap remain; ONLY100 have selected variable models and
+47,002 remain DEFAULT_ONLY. C1 exactly reopens9,598,940 default/phantom points,
+10,281 tuples and22 table references. Closure compaction again removes739,241
+redundant points without changing hmtx/vmtx/HVAR/VVAR bytes. These are structure
+and serialized-model checks, not native original equivalence.
+
+`p8_validate_models.py` independently binds the actual candidate SHA to the
+assembly receipt, exact batch receipt SHA/selected model set and serialized
+verification. It verifies every model/glyf/native-cache hash; it does not simply
+assume an old five-model font contains the new100 models. Seven cached original
+native cases per GID (default, wght extremes, four unchanged holdouts) are then
+compared with ACTUAL decoded candidate HarfBuzz paths and advances. It makes
+ZERO new Apple calls while checking all12,900 native cache hashes.
+
+Actual independent result:100 GIDs/700 cases;167 outline cases pass,533 fail
+`outside_budget`, with maximum8.521084573934047 sourceFUnits.12 GIDs pass all
+SEVEN sampled outlines, including the five empty ones. TABLE metrics fail8 of
+1,400 advance fields, maximum0.0625;93 GIDs pass all seven TABLE-metric checks.
+Original-HB-reference metrics fail227/1,400, maximum0.53125;0 GIDs pass every
+HB-reference metric check. These seven-position results do NOT replace the
+broader129-position model checks. Source API, coefficient error, F2 coordinate
+quantization and native integer/output scaling remain separate;300 requested-q
+quantization observations are explicitly recorded. All original/native target
+acceptance flags remainfalse. No comparator/threshold/failed case was changed.
+
+Actual CoreText q-candidate extraction:600 records across100 GIDs, four locations
+and reverse default/mixed requests;200 exact reverse pairs,18 strict effective
+axis checks,22 table identities,570 nonempty paths and30 proven-empty records.
+95 GIDs show native outline movement and100 show raw metric movement. Actual
+bounded drawing also completes14 glyph draws into two private nonempty PNGs.
+Two earlier private scratch attempts exited139 BEFORE drawing because the
+harness incorrectly cast unboxed CoreText table tags to NSNumber. Those logs
+remain saved; using Apple's documented CFArrayGetValueAtIndex tag extraction
+fixes the private harness. No candidate raster failure is inferred from that
+bridge error. Original CoreText parity remains unavailable on this host.
+
+## Windows preparation and full-plan checkpoints
+
+P8 source checkpoints `d75b1b72951baaef17d4d66af3c8920ce4a8b4a1` (A1 batch)
+and `3a4ec7ab57481c09ffc0646347d9142b109e0bab` (local Windows gate) are pushed.
+The actual [Windows authored smoke39592789402](https://github.com/SOLHK/Swirl/actions/runs/39592789402)
+passes on Server2022/kernel20348/product_type3:1 authored face/7 GIDs,62 native
+instances,186 strict binary32 axis comparisons,17 cmap pairs and10 DPI/theme
+rasters. Only its fixed aggregate is published. Original-derived DirectWrite,
+Windows11, Qt/Swirl and installation are still NOT_RUN. See the separate
+[local Windows guide](SWIRL_VF_P8_WINDOWS_LOCAL_20261021.md).
+
+The original100 q-model build succeeds; nominal reparameterization exposed a
+new real block: interior gvar supports are not F2-exact before serialization,
+and the P7 frontend called the strict metric writer before that encoding step.
+First failure log `build/vf-takeover-private/p8-nominal-100-stage1.log` is preserved;
+no file was produced there and no guard was removed. The minimal fix and fresh
+nominal candidate will be recorded separately after actual verification.
+
+The all47,102-GID source-bound plan is initialized under
+`build/vf-takeover-private/p8-models-full-tensor-stage1/`.
+`p8_seed_batch.py` verifies and exclusively copies the immutable100 per-GID
+checkpoints into that larger plan, skipping its already valid GID0. It changes
+ONLY the exclusively owned target receipt after byte/recipe checks;0 native
+calls and no original100 checkpoint changes. The target RUNNER MUST BE STOPPED
+during seeding: current runner/seeder do not share a lock. Copies interrupted
+before confirmation remain uncounted and cause an explicit refusal on resume.
+The next bounded128-new-GID run is in progress, not a complete-face claim.
+
+Targeted additions at A2: independent validator12 and seeder5 authored regressions
+PASS. Global regression CI is automatic; no manual repetition of the old846
+baseline is used to claim original conversion progress.
+
+A new parallel branch `work/vf-p8-gvar-pro` was observed at
+`7ff8d17cb18c624b50895cda00216a2f3a86f844` and read only. Its point-ring identity
+helper has no file overlap or validated gvar mesh fix to reuse here. It is not
+merged or modified; all parallel history remains intact.
+
 ## Resume current batch
 
 ```sh
