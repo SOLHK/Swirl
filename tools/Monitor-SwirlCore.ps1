@@ -47,11 +47,39 @@ function Get-PassiveSnapshot([int]$Port) {
     $mode = 'UNKNOWN'
     try { $mode = [string](Get-ItemProperty 'HKCU:\Software\SOLHK\Swirl\Proxy' -ErrorAction Stop).routingMode } catch { }
     $mihomoCount = -1
-    try { $mihomoCount = @(Get-CimInstance Win32_Process -ErrorAction Stop |
-        Where-Object { $_.Name -match '(?i)mihomo|clash' }).Count } catch { }
+    $swirlToMihomo=0; $swirlOutbound=0; $mihomoOutbound=0; $connectionSample='UNAVAILABLE'
+    try {
+        $mihomoPids=@(Get-CimInstance Win32_Process -ErrorAction Stop |
+            Where-Object { $_.Name -match '(?i)mihomo|clash' } |
+            Select-Object -ExpandProperty ProcessId -Unique)
+        $mihomoCount=$mihomoPids.Count
+        $connections=@(Get-NetTCPConnection -ErrorAction Stop)
+        $mihomoPorts=@($connections | Where-Object {
+            $_.State -eq 'Listen' -and $mihomoPids -contains [int]$_.OwningProcess -and
+            $_.LocalAddress -in @('127.0.0.1','0.0.0.0','::1','::')
+        } | Select-Object -ExpandProperty LocalPort -Unique)
+        foreach($c in $connections) {
+            $owner=[int]$c.OwningProcess
+            if([string]$c.State -notin @('Established','SynSent','SynReceived')) { continue }
+            if($owner -ne $listenerPid -and $mihomoPids -notcontains $owner) { continue }
+            if($owner -eq $listenerPid -and [int]$c.LocalPort -eq $Port) { continue }
+            $ip=$null
+            if(-not [Net.IPAddress]::TryParse([string]$c.RemoteAddress,[ref]$ip)) { continue }
+            if($ip.IsIPv4MappedToIPv6) { $ip=$ip.MapToIPv4() }
+            if($ip.Equals([Net.IPAddress]::Any) -or $ip.Equals([Net.IPAddress]::IPv6Any)) { continue }
+            if($owner -eq $listenerPid) {
+                if([Net.IPAddress]::IsLoopback($ip)) {
+                    if($mihomoPorts -contains [int]$c.RemotePort) { $swirlToMihomo++ }
+                } else { $swirlOutbound++ }
+            } elseif(-not [Net.IPAddress]::IsLoopback($ip)) { $mihomoOutbound++ }
+        }
+        $connectionSample='SAMPLED'
+    } catch { }
     return [ordered]@{
         listenerPid=$listenerPid; listenerIsSwirl=($listenerPid -gt 0 -and $name -ieq 'Swirl.exe')
         systemProxy=$proxy; routingMode=$mode; mihomoProcessCount=$mihomoCount
+        connectionSample=$connectionSample; swirlToMihomoActive=$swirlToMihomo
+        swirlOutboundActive=$swirlOutbound; mihomoOutboundActive=$mihomoOutbound
     }
 }
 
@@ -143,6 +171,8 @@ function Write-Report($Snapshot) {
     $checked=[Net.WebUtility]::HtmlEncode([string]$Snapshot.active.checkedAt)
     $summary = "请求 $($Snapshot.active.requestsPassed)/$($Snapshot.active.requestsAttempted)；Swirl 新出站 $($Snapshot.active.newSwirlOutbound)；Swirl→Mihomo 本地连接 $($Snapshot.active.swirlToMihomo)"
     $summary = [Net.WebUtility]::HtmlEncode($summary)
+    $passiveSummary = "定时连接快照：Swirl→Mihomo $($Snapshot.passive.swirlToMihomoActive)，Swirl 非回环 $($Snapshot.passive.swirlOutboundActive)，Mihomo 非回环 $($Snapshot.passive.mihomoOutboundActive)；采样 $($Snapshot.passive.connectionSample)"
+    $passiveSummary = [Net.WebUtility]::HtmlEncode($passiveSummary)
     $html = @"
 <!doctype html><html lang='zh-CN'><head><meta charset='utf-8'><meta http-equiv='refresh' content='60'>
 <meta name='viewport' content='width=device-width, initial-scale=1'><title>Swirl Core 全天候验收</title>
@@ -152,7 +182,7 @@ main{max-width:900px;margin:auto;padding:32px 20px}h1{font-size:26px;margin:0 0 
 table{border-collapse:collapse;width:100%}th,td{text-align:left;border-bottom:1px solid #374151;padding:12px 8px}
 th{font-weight:600;width:50%}td{overflow-wrap:anywhere}small{color:#d1d5db}a{color:#93c5fd}
 </style></head><body><main><h1>Swirl Core 全天候验收</h1><p>最近更新：$time · 保存的路由模式：$mode</p>
-<section class='card' aria-label='联网路径'><h2>最近一次主动验收</h2><p>时间：$checked · $path</p><p>$summary</p>
+<section class='card' aria-label='联网路径'><h2>最近一次主动验收</h2><p>时间：$checked · $path</p><p>$summary</p><p>$passiveSummary</p>
 <small>没有观察到 Mihomo 本地链路，不等于排除所有 WFP/TUN 透明转发。</small></section>
 <section class='card' aria-label='项目状态'><h2>检测项目</h2><table><tbody>$($rows -join '')</tbody></table></section>
 <p>详细脱敏记录在同目录 events-YYYYMMDD.jsonl。规则名、用户目标与正文不写入报告。状态“未配置/无法观察”不计为通过。</p>

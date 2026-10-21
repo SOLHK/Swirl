@@ -1,6 +1,6 @@
 Swirl Core 全天候验收工具
 
-安装后自动开始后台监控，并在登录 Windows 时自动启动。开始菜单有“启动监控”“停止监控”“查看报告”。默认每 60 秒检查本机监听、系统代理和保存的规则模式；每 30 分钟做 3 次真实 HTTPS 请求及本机 IPv4/IPv6 DIRECT 目标检查。监控数据与配置保存在 D:\Codex\SwirlCoreMonitorData；安装、停止和卸载不会修改 Swirl、Mihomo、系统代理、TUN、DNS 或路由。卸载保留历史记录。
+安装后自动开始后台监控，并在登录 Windows 时自动启动。开始菜单有“启动监控”“停止监控”“查看报告”。默认每 30 秒检查本机监听、系统代理、保存的规则模式与 Swirl/Mihomo TCP 连接归属；每 30 分钟做 3 次真实 HTTPS 请求及本机 IPv4/IPv6 DIRECT 目标检查。监控数据与配置保存在 D:\Codex\SwirlCoreMonitorData；安装、停止和卸载不会修改 Swirl、Mihomo、系统代理、TUN、DNS 或路由。卸载保留历史记录。
 
 这会使用当前选定节点的少量代理流量。配置文件是 D:\Codex\SwirlCoreMonitorData\config.json，可将主动间隔调到 5-1440 分钟。不要把私人订阅或节点密码写进配置。报告在同目录 report.html，日志是按日期分开的脱敏 JSONL。
 
