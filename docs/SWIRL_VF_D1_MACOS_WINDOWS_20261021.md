@@ -633,3 +633,59 @@ conflict check, not merge approval. The PR remains draft/unmerged, with no
 reviewer assignment or automatic merge. Later integration changes must be
 reviewed independently. This final review-link update changes documentation
 only; source/native test evidence remains bound to a5bfb22.
+
+## D3 checkpoint 1 — repair retained GDEF variation admission
+
+Entry remote HEAD was independently verified as
+`57ffd081b850a094eaa2f93c557cc91f1a5047a2` (the prior prompt's SHA contained
+a transcription difference). Worktrees were clean; PR #23 remained draft,
+open, unmerged, mergeable. A3 `66594e9`, B1 `7902cdb`, C1 `c0fe6c4` and W1
+`2be6c78` were read-only references. Integration had independently advanced to
+`00b9f50`; its history was fetched and preserved, not merged here.
+
+The production constructor, source metric and reconstruction implementations
+are unchanged on A3/B1 since D2. Their documented decimal echo and metric
+failures have no accepted source correction to reuse. We retain the 96/384
+refusals, 849/850 failure, A3 finite-resolution counterexamples, and original
+vertical-X representation failures. No rounding compensation or altered
+expected values are introduced.
+
+A real independent production defect **is fixed**: `rebuild.run` replaced avar
+while examining GSUB/GPOS/BASE but omitting GDEF.VarStore. This is the exact
+shared-entry defect already documented by C1, not another TTC engine. GPOS
+VariationIndex records can refer to that store indirectly. The minimal source
+patch adds GDEF to the existing rejection loop, before any glyph sampling.
+No retained variation store is rewritten or silently discarded. Static GDEF
+continues to pass and is preserved byte-for-byte.
+
+The new three-test regression first ran against the old code: one failure
+(`ReconstructionError not raised`), two passes. After the patch all three pass;
+all six existing full pipeline tests also pass. The fixture is the existing
+self-authored analytic font with C1's nonidentity-avar / indirect-GPOS recipe.
+The finite source layout delta is 25, versus 50 under an identity-avar control.
+Actual **HarfBuzz 14.6.0** independently shapes GID1 with kern off/on: source
+advances 505/510 (adjustment +5), identity-avar control 510/540 (+30), retaining
+the static -20 plus variation. Thus table-byte preservation did not preserve
+the source layout function.
+
+On this actual **macOS 26.3** host, the existing native CoreText extractor
+verified the synthetic fixture's 1/1 face. The patched real production CLI
+then refused GDEF before any glyph batch, generated no TTC and left the source
+unchanged. This is a native identity/admission result, **not** a native glyph
+or original-font acceptance result. Safe evidence is
+[evidence/SWIRL_VF_D3_LAYOUT_20261021.json](evidence/SWIRL_VF_D3_LAYOUT_20261021.json);
+private fixture/control/native report remain in `build/vf-d3-private/gdef/`.
+
+Primary references reviewed before implementation: Microsoft's
+[GDEF variation-store contract](https://learn.microsoft.com/en-us/typography/opentype/spec/gdef),
+[fontTools 4.61.1 VarStore implementation](https://github.com/fonttools/fonttools/blob/4.61.1/Lib/fontTools/varLib/varStore.py)
+(MIT), and C1's handoff/audit/reproducer at c0fe6c4. The existing public APIs
+construct/evaluate the self-authored store; no upstream implementation copied.
+
+Original production reconstruction remains **0/32**, no original-derived TTC.
+Windows 11 and actual Qt/Swirl remain **NOT_RUN**. The patch tightens a false
+admission and does not resolve the original axis/vertical-origin obstructions.
+This is an independent coordinator-review change to the shared entry on our
+branch only; C1's branch and staging engine remain untouched.
+
+Reproduce: `build/vf-d1-private/venv/bin/python -m unittest discover -s tools/swirl_vf/tests -p test_d3_layout_admission.py -v`.
