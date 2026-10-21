@@ -10,4 +10,6 @@
 
 验证记录：本机 `Test-SwirlPrivateDirect.ps1 -SelfTest` 的 IPv4/IPv6 独立 HTTP 目标均通过，未使用 Swirl；在当前 `global` 模式运行时正确返回 `RULE_MODE_OFF`，没有把其记为 DIRECT 通过。`Monitor-SwirlCore.ps1 -Once` 对当前 Swirl PID 24804 得到 3/3 HTTPS 204、3 条新 Swirl 非回环连接、0 条 Swirl→Mihomo 本地连接，规则项目显示关闭。后台启动/停止测试在独立数据目录写入两次记录并正常退出，未注册开机启动。NSIS 隔离安装/卸载均退出 0、无开机启动项且用户系统代理和 Swirl PID 未变。正式安装的后台报告与开机启动项也实测出现，随后只停止本工具并卸载；系统代理与 Swirl PID 未变。最终提交安装包将再次检查。
 
+保留的后台失败：初版正常安装能启动、写报告，但首轮主动探测记为 `INCONCLUSIVE`、请求 0/0；相同脚本在前台为 3/3。拆开隐藏进程后复现：离线身份脚本在隐藏 Windows PowerShell 中找不到 `Get-FileHash`，提前返回 `BLOCKED`。改用 .NET SHA-256 文件流并让监控使用绝对 PowerShell 路径、保留脱敏原因码后，隐藏身份检查、隐藏联网路径检查和隐藏完整单轮监控均重新通过，3/3 HTTPS 204。修复后的最终安装包仍需完整安装回归。
+
 微软官方资料：[TCP 连接 PID](https://learn.microsoft.com/en-us/powershell/module/nettcpip/get-nettcpconnection)、[WFP 可透明重定向连接](https://learn.microsoft.com/en-us/windows-hardware/drivers/network/using-bind-or-connect-redirection)。因此“未观察到 Mihomo 本地链路”仍不等于排除所有 WFP/TUN 干预。

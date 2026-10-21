@@ -85,8 +85,10 @@ function Get-PassiveSnapshot([int]$Port) {
 
 function Read-ProbeJson([string]$Script,[string[]]$Arguments) {
     try {
-        $wire = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $Script @Arguments 2>$null
-        return $wire | ConvertFrom-Json
+        $exe=Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+        $wire = & $exe -NoProfile -ExecutionPolicy Bypass -File $Script @Arguments 2>$null
+        if(-not $wire) { return $null }
+        return ($wire -join "`n") | ConvertFrom-Json
     } catch { return $null }
 }
 
@@ -94,11 +96,18 @@ function Get-ActiveSnapshot([int]$Port,[int]$Requests,[string]$Mode) {
     $path = Read-ProbeJson (Join-Path $PSScriptRoot 'Test-SwirlMihomoPath.ps1') @('-Port',"$Port",'-RequestCount',"$Requests")
     $private = Read-ProbeJson (Join-Path $PSScriptRoot 'Test-SwirlPrivateDirect.ps1') @('-ProxyPort',"$Port")
     $pathStatus = if ($path) { [string]$path.status } else { 'INCONCLUSIVE' }
+    $pathReasonCode = if(-not $path) { 'NO_PROBE_JSON' }
+        elseif($pathStatus -eq 'MIHOMO_PATH_OBSERVED') { 'MIHOMO_CHAIN' }
+        elseif($pathStatus -eq 'SWIRL_NATIVE_EGRESS_OBSERVED') { 'NONE' }
+        elseif([int]$path.requestsAttempted -eq 0) { 'PREFLIGHT_BLOCKED' }
+        elseif([int]$path.requestsPassed -lt [int]$path.requestsAttempted) { 'REQUEST_FAILED' }
+        else { 'OBSERVATION_INCONCLUSIVE' }
     $private4 = if ($private) { [string]$private.ipv4 } else { 'INCONCLUSIVE' }
     $private6 = if ($private) { [string]$private.ipv6 } else { 'INCONCLUSIVE' }
     return [ordered]@{
         checkedAt=(Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
         pathStatus=$pathStatus
+        pathReasonCode=$pathReasonCode
         requestsPassed=if ($path) { [int]$path.requestsPassed } else { 0 }
         requestsAttempted=if ($path) { [int]$path.requestsAttempted } else { 0 }
         newSwirlOutbound=if ($path -and $path.observation) { [int]$path.observation.newSwirlNonLoopbackConnections } else { 0 }
@@ -154,6 +163,9 @@ function Write-Report($Snapshot) {
         SWIRL_NATIVE_EGRESS_OBSERVED='观察到 Swirl 自有出站'
         MIHOMO_PATH_OBSERVED='观察到 Swirl 连向 Mihomo'
         MONITOR_ERROR='监控周期出错'; ERROR='出错，等待下次重试'
+        NO_PROBE_JSON='探测脚本没有可解析结果'; PREFLIGHT_BLOCKED='身份或环境预检未通过'
+        MIHOMO_CHAIN='发现 Mihomo 本地链路'; REQUEST_FAILED='受控请求失败'
+        OBSERVATION_INCONCLUSIVE='连接采样证据不足'; NONE='无'
     }
     $rows = [Collections.Generic.List[string]]::new()
     foreach ($entry in $Snapshot.active.categories.GetEnumerator()) {
@@ -169,6 +181,8 @@ function Write-Report($Snapshot) {
     $rawPath=[string]$Snapshot.active.pathStatus
     $path = [Net.WebUtility]::HtmlEncode($(if($labels.ContainsKey($rawPath)){$labels[$rawPath]}else{$rawPath}))
     $checked=[Net.WebUtility]::HtmlEncode([string]$Snapshot.active.checkedAt)
+    $reasonCode=[string]$Snapshot.active.pathReasonCode
+    $reason=[Net.WebUtility]::HtmlEncode($(if($labels.ContainsKey($reasonCode)){$labels[$reasonCode]}else{$reasonCode}))
     $summary = "请求 $($Snapshot.active.requestsPassed)/$($Snapshot.active.requestsAttempted)；Swirl 新出站 $($Snapshot.active.newSwirlOutbound)；Swirl→Mihomo 本地连接 $($Snapshot.active.swirlToMihomo)"
     $summary = [Net.WebUtility]::HtmlEncode($summary)
     $passiveSummary = "定时连接快照：Swirl→Mihomo $($Snapshot.passive.swirlToMihomoActive)，Swirl 非回环 $($Snapshot.passive.swirlOutboundActive)，Mihomo 非回环 $($Snapshot.passive.mihomoOutboundActive)；采样 $($Snapshot.passive.connectionSample)"
@@ -182,7 +196,7 @@ main{max-width:900px;margin:auto;padding:32px 20px}h1{font-size:26px;margin:0 0 
 table{border-collapse:collapse;width:100%}th,td{text-align:left;border-bottom:1px solid #374151;padding:12px 8px}
 th{font-weight:600;width:50%}td{overflow-wrap:anywhere}small{color:#d1d5db}a{color:#93c5fd}
 </style></head><body><main><h1>Swirl Core 全天候验收</h1><p>最近更新：$time · 保存的路由模式：$mode</p>
-<section class='card' aria-label='联网路径'><h2>最近一次主动验收</h2><p>时间：$checked · $path</p><p>$summary</p><p>$passiveSummary</p>
+<section class='card' aria-label='联网路径'><h2>最近一次主动验收</h2><p>时间：$checked · $path</p><p>诊断：$reason</p><p>$summary</p><p>$passiveSummary</p>
 <small>没有观察到 Mihomo 本地链路，不等于排除所有 WFP/TUN 透明转发。</small></section>
 <section class='card' aria-label='项目状态'><h2>检测项目</h2><table><tbody>$($rows -join '')</tbody></table></section>
 <p>详细脱敏记录在同目录 events-YYYYMMDD.jsonl。规则名、用户目标与正文不写入报告。状态“未配置/无法观察”不计为通过。</p>

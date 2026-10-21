@@ -45,6 +45,13 @@ function Read-Exactly([System.IO.Stream]$Stream, [int]$Count) {
     return $bytes
 }
 
+function Get-Sha256([string]$Path) {
+    $stream = [IO.File]::OpenRead($Path)
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { return [BitConverter]::ToString($sha.ComputeHash($stream)).Replace('-','') }
+    finally { $sha.Dispose(); $stream.Dispose() }
+}
+
 try {
     $pidBefore = Get-ListenerPid $Port
     $result.listenerPid = $pidBefore
@@ -75,8 +82,8 @@ try {
         $result.sourceSha -match '^[0-9a-fA-F]{40}$')
     $result.rustBuildFlagEnabled = ($build -match 'SWIRL_USE_RUST_CORE=ON' -and
         $build -match [regex]::Escape($result.sourceSha))
-    $result.executableHashMatchesManifest = ((Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash -eq $manifest.exeSha256)
-    $result.rustDllHashMatchesManifest = ((Get-FileHash -LiteralPath $dllPath -Algorithm SHA256).Hash -eq $manifest.rustDllSha256)
+    $result.executableHashMatchesManifest = ((Get-Sha256 $exe) -eq $manifest.exeSha256)
+    $result.rustDllHashMatchesManifest = ((Get-Sha256 $dllPath) -eq $manifest.rustDllSha256)
 
     $live = Get-Process -Id $pidBefore -ErrorAction Stop
     $start = $live.StartTime.ToUniversalTime()
