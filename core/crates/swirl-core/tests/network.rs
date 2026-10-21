@@ -162,7 +162,7 @@ fn manual_selector_updates_only_new_streams_and_rejects_non_members() {
     let mut new = TcpStream::connect(core.address()).unwrap();
     new.set_read_timeout(Some(Duration::from_secs(3))).unwrap();
     write!(new, "CONNECT 127.0.0.1:{port} HTTP/1.1\r\nHost: x\r\n\r\n").unwrap();
-    assert!(header(&mut new).starts_with(b"HTTP/1.1 502"));
+    assert!(header(&mut new).unwrap().starts_with(b"HTTP/1.1 502"));
     drop(old);
     worker.join().unwrap();
 }
@@ -406,7 +406,7 @@ fn failed_socks_auth_never_reaches_target_or_direct() {
     s.set_read_timeout(Some(Duration::from_secs(3))).unwrap();
     s.write_all(b"CONNECT unreachable.invalid:443 HTTP/1.1\r\nHost: x\r\n\r\n")
         .unwrap();
-    assert!(header(&mut s).starts_with(b"HTTP/1.1 502"));
+    assert!(header(&mut s).unwrap().starts_with(b"HTTP/1.1 502"));
     reference.join().unwrap();
     assert_eq!(seen.load(Ordering::SeqCst), 1);
 }
