@@ -510,17 +510,11 @@ mod tests {
         }"#,
         )
         .unwrap();
-        let domains = ChinaRules {
-            domains: vec!["+.example.cn".into()],
-            networks: vec![],
-        };
-        let ips = ChinaRules {
-            domains: vec![],
-            networks: vec![(
-                "10.0.0.0".parse().unwrap(),
-                "10.255.255.255".parse().unwrap(),
-            )],
-        };
+        let domains = ChinaRules::from_parts(vec!["+.example.cn".into()], vec![]);
+        let ips = ChinaRules::from_parts(
+            vec![],
+            vec![("10.0.0.0".parse().unwrap(), "10.255.255.255".parse().unwrap())],
+        );
         let choose = |_: &str| -> Result<String, &'static str> { Err("NoAutomaticGroup") };
         let source = "127.0.0.1".parse().unwrap();
         let cn = select_with_trace_and_china(
