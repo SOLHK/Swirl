@@ -113,11 +113,15 @@ Source: https://github.com/SOLHK/Swirl
 Qt deployment: https://doc.qt.io/qt-6.10/windows-deployment.html
 '@ | Set-Content -LiteralPath (Join-Path $stage 'THIRD_PARTY_NOTICES.txt') -Encoding utf8
 $oldPath=$env:PATH
+$oldErrorActionPreference=$ErrorActionPreference
 try {
     $env:PATH="$mingw;$(Join-Path $qt 'bin');$env:PATH"
+    # Windows PowerShell 5.1 reports native stderr warnings as terminating
+    # errors under Stop even when windeployqt exits successfully.
+    $ErrorActionPreference='Continue'
     $deployOutput=@(& (Join-Path $qt 'bin\windeployqt.exe') --release --qmldir (Join-Path $repo 'src\Swirl.Quick\qml') (Join-Path $stage 'Swirl.exe') 2>&1)
     $deployExit=$LASTEXITCODE
-} finally { $env:PATH=$oldPath }
+} finally { $ErrorActionPreference=$oldErrorActionPreference; $env:PATH=$oldPath }
 if($deployExit -ne 0) { throw "Qt deployment failed with exit code $deployExit." }
 foreach($file in @('Qt6Core.dll','Qt6Gui.dll','Qt6Qml.dll','Qt6Quick.dll','platforms\qwindows.dll')) {
     if(-not (Test-Path -LiteralPath (Join-Path $stage $file) -PathType Leaf)) {
