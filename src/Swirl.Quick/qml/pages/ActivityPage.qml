@@ -55,18 +55,18 @@ Item {
   property bool primary:false
   readonly property Item motionTitle:metricValue
   readonly property Item motionSurface:metric
-  Layout.fillWidth:true;Layout.minimumWidth:0;Layout.preferredHeight:Theme.dp(116)
+  Layout.fillWidth:true;Layout.minimumWidth:0;Layout.preferredHeight:Theme.dp(100)
   function activate(){key==="activeConnections"?SwirlMotion.navigateFrom(metric,"connections",key):page.trafficFrom(metric,key)}
   SwirlMotionButton {
-   anchors.fill:parent;anchors.bottomMargin:metric.cumulative?Theme.dp(48):0
+   anchors.fill:parent;anchors.bottomMargin:metric.cumulative?Theme.dp(36):0
    objectName:"activityMetricHit_"+metric.key
    Accessible.name:metric.label+"详情";onClicked:metric.activate()
    background:Rectangle {radius:Theme.cardRadius;color:parent.down?Theme.selected:parent.hovered?Theme.hover:"transparent";border.width:parent.visualFocus?1:0;border.color:Theme.focusBorder}
    contentItem:Item {}
   }
-  ColumnLayout {anchors.fill:parent;anchors.margins:Theme.dp(12);spacing:Theme.dp(4)
+  ColumnLayout {anchors.fill:parent;anchors.margins:Theme.dp(10);spacing:Theme.dp(2)
    RowLayout {Layout.fillWidth:true;Label {text:metric.label;Layout.fillWidth:true}SwirlIconButton {implicitWidth:Theme.dp(22);implicitHeight:Theme.dp(22);iconName:"chevron-right";quiet:true;Accessible.name:metric.label+"详情";onClicked:metric.activate()}}
-   Value {id:metricValue;text:metric.value;font.pixelSize:Theme.fontSize(metric.primary?28:23);Layout.fillWidth:true}
+   Value {id:metricValue;text:metric.value;font.pixelSize:Theme.fontSize(metric.primary?24:22);Layout.fillWidth:true}
    Label {visible:!metric.cumulative;text:metric.hint;Layout.fillWidth:true}
    SwirlSegmentedControl {visible:metric.cumulative;Layout.fillWidth:true;options:["今日","本月"];currentIndex:page.period;onActivated:index=>page.period=index}
   }
@@ -94,22 +94,18 @@ Item {
      }
     }
    }
-   GridLayout {Layout.fillWidth:true;columns:page.paired?2:1;columnSpacing:Theme.gap;rowSpacing:Theme.gap;uniformCellWidths:true
+   GridLayout {Layout.fillWidth:true;columns:page.wide?4:page.paired?2:1;columnSpacing:Theme.gap;rowSpacing:Theme.gap;uniformCellWidths:true
     Metric {objectName:"activityUpload";label:"上传速率";key:"uploadRate";primary:true;value:page.bytes(page.telemetry.uploadRate,page.telemetry.sampled);hint:page.telemetry.sampled?"每秒":page.sampleState}
     Metric {objectName:"activityDownload";label:"下载速率";key:"downloadRate";primary:true;value:page.bytes(page.telemetry.downloadRate,page.telemetry.sampled);hint:page.telemetry.sampled?"每秒":page.sampleState}
+    Metric {objectName:"activityConnections";label:"活动连接";key:"activeConnections";value:page.telemetry.connectionsSampled?String(page.telemetry.activeConnections):"—";hint:page.telemetry.connectionsSampled?page.telemetry.activeProcesses+" 个进程":page.sampleState}
+    Metric {objectName:"activityTotal";label:"累计流量";key:"totalTraffic";value:page.bytes(page.totals.total,page.totals.sampled);cumulative:true}
    }
-   GridLayout {Layout.fillWidth:true;columns:page.wide?2:1;columnSpacing:Theme.gap;rowSpacing:Theme.gap
-    SwirlGlassPanel {Layout.fillWidth:true;Layout.minimumWidth:0;Layout.preferredWidth:7;Layout.preferredHeight:Theme.dp(248);Layout.alignment:Qt.AlignTop
+   SwirlGlassPanel {Layout.fillWidth:true;Layout.minimumWidth:0;Layout.preferredHeight:Theme.dp(240)
      ColumnLayout {anchors.fill:parent;anchors.margins:Theme.cardPadding;spacing:Theme.dp(10)
       RowLayout {Layout.fillWidth:true;SwirlText {text:"流量趋势";color:Theme.text;font.pixelSize:Theme.fontSize(15);font.weight:Font.DemiBold;Layout.fillWidth:true}SwirlSegmentedControl {Layout.preferredWidth:Theme.dp(126);options:["全部","仅代理"];currentIndex:page.trafficKind;onActivated:index=>page.trafficKind=index}}
       Label {text:"今日累计分布 · 每柱 30 分钟";Layout.fillWidth:true}
       SwirlDailyTrafficChart {Layout.fillWidth:true;Layout.fillHeight:true;proxyOnly:page.trafficKind===1}
      }
-    }
-    GridLayout {Layout.fillWidth:true;Layout.minimumWidth:0;Layout.preferredWidth:5;Layout.preferredHeight:Theme.dp(page.wide||!page.paired?248:116);columns:page.wide||!page.paired?1:2;columnSpacing:Theme.gap;rowSpacing:Theme.gap;uniformCellWidths:true
-     Metric {objectName:"activityConnections";label:"活动连接";key:"activeConnections";value:page.telemetry.connectionsSampled?String(page.telemetry.activeConnections):"—";hint:page.telemetry.connectionsSampled?page.telemetry.activeProcesses+" 个进程":page.sampleState}
-     Metric {objectName:"activityTotal";label:"累计流量";key:"totalTraffic";value:page.bytes(page.totals.total,page.totals.sampled);cumulative:true}
-    }
    }
    GridLayout {Layout.fillWidth:true;columns:page.wide?2:1;columnSpacing:Theme.gap;rowSpacing:Theme.gap
     SwirlHeroCard {
