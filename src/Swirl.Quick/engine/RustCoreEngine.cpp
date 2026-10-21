@@ -28,7 +28,7 @@ QString routingConfiguration(const EngineStartOptions &o,const QString &selected
  QSet<QString> reserved;for(const auto &n:o.nodes)reserved.insert(n.id);
  const auto unique=[&](const QString &base){QString id=base;int suffix=0;while(reserved.contains(id))id=base+'-'+QString::number(++suffix);reserved.insert(id);return id;};
  const auto direct=unique("swirl-rule-direct"),reject=unique("swirl-rule-reject");
- bool needsDirect=false,needsReject=false;int index=0;
+ bool needsDirect=o.smartRouting,needsReject=false;int index=0;
  QHash<QString,QString> groups;QSet<QString> included{selected};
  const auto invalidGroup=[] {return QString("Rust 策略组参数无效或尚未支持；配置保持原值，未忽略该组。");};
  const auto includeNode=[&](const QString &id){
