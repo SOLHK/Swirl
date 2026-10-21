@@ -13,10 +13,17 @@ Item {
  property int trafficKind:0
  property int rankingKind:0
  property bool diagnosticOpen:false
+ property bool previewMeasured:false
  property var network:systemProvider.currentNetwork()
  readonly property var telemetry:engineController.telemetry
+ readonly property var shownLatencies:previewMeasured?({internet:"347 ms",router:"2 ms",dns:"6 ms",proxy:"400 ms"}):telemetry.latencies
+ readonly property var shownInternetDiagnostic:previewMeasured?({success:true,route:"代理",advice:"HTTPS 请求完成，当前策略可用。",http:204,networkError:0,elapsedMs:347}):telemetry.internetDiagnostic
+ readonly property var shownProxyDiagnostic:previewMeasured?({detail:"通过当前代理入口单独测量 HTTPS 往返。",http:204,networkError:0}):telemetry.proxyDiagnostic
+ readonly property string shownMeasurementState:previewMeasured?"测量完成":telemetry.measurementState
  readonly property bool paired:scroll.width-2*Theme.pagePadding>=Theme.dp(460)
  readonly property bool wide:scroll.width-2*Theme.pagePadding>=Theme.dp(620)
+ readonly property real activityCardRadius:Theme.dp(24)
+ readonly property real activityTileHeight:Theme.dp(192)
  readonly property bool nodeConnected:engineController.processAlive&&engineController.activeNodeId.length>0
  readonly property string activeNodeName:{if(!nodeConnected)return "尚未连接节点";const node=engineController.nodes.find(n=>n.id===engineController.activeNodeId);return node?node.name:"运行中的节点"}
  readonly property string sampleState:!engineController.processAlive?"未连接":engineController.apiHealthy?"等待采样":"采样中断"
@@ -36,6 +43,7 @@ Item {
  function bytes(n,sampled){return sampled?telemetry.formatBytes(n):"—"}
  function trafficFrom(item,key){AppState.trafficPeriod=period===0?0:3;SwirlMotion.navigateFrom(item,"traffic",key)}
  function scrollToBottom(){scroll.contentY=Math.max(0,scroll.contentHeight-scroll.height)}
+ function preparePreviewState(state){if(previewCaptureMode&&(state==="activity-measured"||state==="activity-measured-expanded")){previewMeasured=true;diagnosticOpen=state==="activity-measured-expanded"}}
  onPeriodChanged:{snapshotDirty=true;refreshSnapshot()}
  onRankingKindChanged:{snapshotDirty=true;refreshSnapshot()}
  onVisibleChanged:if(visible)refreshSnapshot()
@@ -51,23 +59,30 @@ Item {
   property string value
   property string hint
   property string key
+  property string iconName
+  property color iconColor:Theme.accent
   property bool cumulative:false
   property bool primary:false
   readonly property Item motionTitle:metricValue
   readonly property Item motionSurface:metric
-  Layout.fillWidth:true;Layout.minimumWidth:0;Layout.preferredHeight:Theme.dp(100)
+  Layout.fillWidth:true;Layout.fillHeight:false;Layout.minimumWidth:0;Layout.preferredHeight:page.activityTileHeight;cornerRadius:page.activityCardRadius
   function activate(){key==="activeConnections"?SwirlMotion.navigateFrom(metric,"connections",key):page.trafficFrom(metric,key)}
   SwirlMotionButton {
    anchors.fill:parent;anchors.bottomMargin:metric.cumulative?Theme.dp(36):0
    objectName:"activityMetricHit_"+metric.key
    Accessible.name:metric.label+"详情";onClicked:metric.activate()
-   background:Rectangle {radius:Theme.cardRadius;color:parent.down?Theme.selected:parent.hovered?Theme.hover:"transparent";border.width:parent.visualFocus?1:0;border.color:Theme.focusBorder}
+   background:Rectangle {radius:page.activityCardRadius;color:parent.down?Theme.selected:parent.hovered?Theme.hover:"transparent";border.width:parent.visualFocus?1:0;border.color:Theme.focusBorder}
    contentItem:Item {}
   }
-  ColumnLayout {anchors.fill:parent;anchors.margins:Theme.dp(10);spacing:Theme.dp(2)
-   RowLayout {Layout.fillWidth:true;Label {text:metric.label;Layout.fillWidth:true}SwirlIconButton {implicitWidth:Theme.dp(22);implicitHeight:Theme.dp(22);iconName:"chevron-right";quiet:true;Accessible.name:metric.label+"详情";onClicked:metric.activate()}}
-   Value {id:metricValue;text:metric.value;font.pixelSize:Theme.fontSize(metric.primary?24:22);Layout.fillWidth:true}
-   Label {visible:!metric.cumulative;text:metric.hint;Layout.fillWidth:true}
+  ColumnLayout {anchors.fill:parent;anchors.margins:Theme.dp(12);spacing:Theme.dp(4)
+   RowLayout {Layout.fillWidth:true;SwirlText {text:metric.label;color:Theme.text;font.pixelSize:Theme.fontSize(14);font.weight:Font.DemiBold;Layout.fillWidth:true}SwirlIconButton {implicitWidth:Theme.dp(22);implicitHeight:Theme.dp(22);iconName:"chevron-right";quiet:true;Accessible.name:metric.label+"详情";onClicked:metric.activate()}}
+   Item {Layout.fillWidth:true;Layout.fillHeight:true
+    ColumnLayout {anchors.centerIn:parent;width:parent.width;spacing:Theme.dp(2)
+     SwirlIcon {name:metric.iconName;size:Theme.dp(38);color:metric.iconColor;Layout.alignment:Qt.AlignHCenter;Accessible.ignored:true}
+     Value {id:metricValue;text:metric.value;font.pixelSize:Theme.fontSize(metric.primary?29:28);Layout.fillWidth:true;horizontalAlignment:Text.AlignHCenter}
+    }
+   }
+   Label {visible:!metric.cumulative;text:metric.hint;Layout.fillWidth:true;horizontalAlignment:Text.AlignHCenter}
    SwirlSegmentedControl {visible:metric.cumulative;Layout.fillWidth:true;options:["今日","本月"];currentIndex:page.period;onActivated:index=>page.period=index}
   }
  }
@@ -79,7 +94,7 @@ Item {
   ScrollBar.vertical:SwirlScrollBar {}
   ColumnLayout {
    id:content;x:Theme.pagePadding;width:scroll.width-2*Theme.pagePadding;spacing:Theme.sectionGap
-   SwirlGlassPanel {Layout.fillWidth:true;Layout.preferredHeight:connectionContent.implicitHeight+Theme.dp(28);cornerRadius:Theme.cardRadius
+   SwirlGlassPanel {Layout.fillWidth:true;Layout.preferredHeight:connectionContent.implicitHeight+Theme.dp(28);cornerRadius:page.activityCardRadius
     ColumnLayout {id:connectionContent;anchors.left:parent.left;anchors.right:parent.right;anchors.top:parent.top;anchors.margins:Theme.dp(14);spacing:Theme.dp(10)
      RowLayout {Layout.fillWidth:true
       Rectangle {width:Theme.dp(7);height:width;radius:width/2;color:page.nodeConnected&&page.engineController.apiHealthy?Theme.statusGreen:Theme.muted}
@@ -94,50 +109,48 @@ Item {
      }
     }
    }
-   GridLayout {Layout.fillWidth:true;columns:page.wide?4:page.paired?2:1;columnSpacing:Theme.gap;rowSpacing:Theme.gap;uniformCellWidths:true
-    Metric {objectName:"activityUpload";label:"上传速率";key:"uploadRate";primary:true;value:page.bytes(page.telemetry.uploadRate,page.telemetry.sampled);hint:page.telemetry.sampled?"每秒":page.sampleState}
-    Metric {objectName:"activityDownload";label:"下载速率";key:"downloadRate";primary:true;value:page.bytes(page.telemetry.downloadRate,page.telemetry.sampled);hint:page.telemetry.sampled?"每秒":page.sampleState}
-    Metric {objectName:"activityConnections";label:"活动连接";key:"activeConnections";value:page.telemetry.connectionsSampled?String(page.telemetry.activeConnections):"—";hint:page.telemetry.connectionsSampled?page.telemetry.activeProcesses+" 个进程":page.sampleState}
-    Metric {objectName:"activityTotal";label:"累计流量";key:"totalTraffic";value:page.bytes(page.totals.total,page.totals.sampled);cumulative:true}
-   }
-   GridLayout {Layout.fillWidth:true;columns:page.wide?2:1;columnSpacing:Theme.gap;rowSpacing:Theme.gap
-    SwirlGlassPanel {Layout.fillWidth:true;Layout.fillHeight:false;Layout.minimumWidth:0;Layout.preferredWidth:7;Layout.preferredHeight:Theme.dp(page.wide?232:212);Layout.alignment:Qt.AlignTop
-     ColumnLayout {anchors.fill:parent;anchors.margins:Theme.cardPadding;spacing:Theme.dp(10)
+   GridLayout {Layout.fillWidth:true;columns:page.wide?3:page.paired?2:1;columnSpacing:Theme.gap;rowSpacing:Theme.gap;uniformCellWidths:true
+    Metric {objectName:"activityUpload";label:"上传速率";key:"uploadRate";iconName:"upload";iconColor:Theme.cyan;primary:true;value:page.bytes(page.telemetry.uploadRate,page.telemetry.sampled);hint:page.telemetry.sampled?"每秒":page.sampleState}
+    Metric {objectName:"activityDownload";label:"下载速率";key:"downloadRate";iconName:"download";iconColor:Theme.speedAccent;primary:true;value:page.bytes(page.telemetry.downloadRate,page.telemetry.sampled);hint:page.telemetry.sampled?"每秒":page.sampleState}
+    Metric {objectName:"activityConnections";label:"活动连接";key:"activeConnections";iconName:"link";iconColor:Theme.green;value:page.telemetry.connectionsSampled?String(page.telemetry.activeConnections):"—";hint:page.telemetry.connectionsSampled?page.telemetry.activeProcesses+" 个进程":page.sampleState}
+    Metric {objectName:"activityTotal";label:"累计流量";key:"totalTraffic";iconName:"chart";iconColor:Theme.accentIndigo;value:page.bytes(page.totals.total,page.totals.sampled);cumulative:true}
+    SwirlGlassPanel {Layout.fillWidth:true;Layout.fillHeight:false;Layout.minimumWidth:0;Layout.preferredHeight:page.activityTileHeight;Layout.alignment:Qt.AlignTop;cornerRadius:page.activityCardRadius
+     ColumnLayout {anchors.fill:parent;anchors.margins:Theme.dp(12);spacing:Theme.dp(6)
       RowLayout {Layout.fillWidth:true;SwirlText {text:"流量趋势";color:Theme.text;font.pixelSize:Theme.fontSize(15);font.weight:Font.DemiBold;Layout.fillWidth:true}SwirlSegmentedControl {Layout.preferredWidth:Theme.dp(126);options:["全部","仅代理"];currentIndex:page.trafficKind;onActivated:index=>page.trafficKind=index}}
       Label {text:"今日累计分布 · 每柱 30 分钟";Layout.fillWidth:true}
       SwirlDailyTrafficChart {Layout.fillWidth:true;Layout.fillHeight:true;proxyOnly:page.trafficKind===1}
      }
     }
     SwirlHeroCard {
-     id:diagnostic;objectName:"internetDiagnosticCard";Layout.fillWidth:true;Layout.minimumWidth:0;Layout.preferredWidth:5;Layout.preferredHeight:height;Layout.alignment:Qt.AlignTop
-     collapsedHeight:Theme.dp(page.wide?232:240);expandedHeight:collapsedHeight+diagnosticDetails.implicitHeight+Theme.dp(16);expanded:page.diagnosticOpen
-     ColumnLayout {x:Theme.cardPadding;y:Theme.cardPadding;width:parent.width-2*Theme.cardPadding;spacing:Theme.dp(10)
+     id:diagnostic;objectName:"internetDiagnosticCard";Layout.fillWidth:true;Layout.fillHeight:false;Layout.minimumWidth:0;Layout.preferredHeight:height;Layout.alignment:Qt.AlignTop;cornerRadius:page.activityCardRadius
+     collapsedHeight:page.activityTileHeight;expandedHeight:collapsedHeight+diagnosticDetails.implicitHeight+Theme.dp(16);expanded:page.diagnosticOpen
+     ColumnLayout {x:Theme.dp(12);y:Theme.dp(12);width:parent.width-2*Theme.dp(12);spacing:Theme.dp(4)
       RowLayout {Layout.fillWidth:true
        SwirlText {text:"网络质量";color:Theme.text;font.pixelSize:Theme.fontSize(15);font.weight:Font.DemiBold;Layout.fillWidth:true}
        SwirlIconButton {id:networkDiagnosticButton;objectName:"networkDiagnosticButton";iconName:"refresh";quiet:true;enabled:page.telemetry.measurementState!=="正在测量";onClicked:page.telemetry.measureNetwork();Accessible.name:"网络诊断";SwirlToolTip {parent:networkDiagnosticButton;visible:networkDiagnosticButton.hovered;text:"发起网络诊断";delay:650}}
        SwirlIconButton {objectName:"networkDiagnosticDetails";iconName:page.diagnosticOpen?"chevron-left":"chevron-right";quiet:true;onClicked:page.diagnosticOpen=!page.diagnosticOpen;Accessible.name:page.diagnosticOpen?"收起检测详情":"查看检测详情"}
       }
       Label {text:"HTTPS 请求耗时";Layout.fillWidth:true}
-      Value {text:page.telemetry.latencies.internet||"尚未检测";Layout.fillWidth:true}
-      Label {text:page.telemetry.internetDiagnostic.success?(page.telemetry.internetDiagnostic.route==="直连"?"直连":"当前策略")+" · 含连接/TLS/响应":page.telemetry.measurementState||"尚未检测";Layout.fillWidth:true}
+      Value {text:page.shownLatencies.internet||"尚未检测";Layout.fillWidth:true}
+      Label {text:page.shownInternetDiagnostic.success?(page.shownInternetDiagnostic.route==="直连"?"直连":"当前策略")+" · 含连接/TLS/响应":page.shownMeasurementState||"尚未检测";Layout.fillWidth:true}
       RowLayout {Layout.fillWidth:true;spacing:Theme.dp(8)
-       Repeater {model:[{label:"路由",value:page.telemetry.latencies.router||"—"},{label:"DNS",value:page.telemetry.latencies.dns||"—"},{label:"代理",value:page.nodeConnected?(page.telemetry.latencies.proxy||"—"):"未连接"}]
+       Repeater {model:[{label:"路由",value:page.shownLatencies.router||"—"},{label:"DNS",value:page.shownLatencies.dns||"—"},{label:"代理",value:page.nodeConnected||page.previewMeasured?(page.shownLatencies.proxy||"—"):"未连接"}]
         ColumnLayout {required property var modelData;Layout.fillWidth:true;Layout.minimumWidth:0;Label{text:modelData.label}SwirlText {text:modelData.value;color:Theme.text;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;elide:Text.ElideRight}}
        }
       }
       Label {text:"各项分别采样，不能相加";Layout.fillWidth:true}
      }
      ColumnLayout {id:diagnosticDetails;x:Theme.cardPadding;y:diagnostic.collapsedHeight;width:parent.width-2*Theme.cardPadding;spacing:Theme.dp(10);visible:diagnostic.reveal>0;enabled:diagnostic.expanded
-      SwirlText {text:page.telemetry.internetDiagnostic.advice||"点击刷新，发起真实的 HTTPS 请求。";color:Theme.text;Layout.fillWidth:true;wrapMode:Text.Wrap;font.pixelSize:Theme.fontSize(12)}
+      SwirlText {text:page.shownInternetDiagnostic.advice||"点击刷新，发起真实的 HTTPS 请求。";color:Theme.text;Layout.fillWidth:true;wrapMode:Text.Wrap;font.pixelSize:Theme.fontSize(12)}
       Label {text:"引擎："+(page.engineController.processAlive?"运行中":"未运行")+" · 接口："+(page.engineController.apiHealthy?"正常":"未就绪")+" · 端口："+(page.engineController.activeProxyPort||"未开放");Layout.fillWidth:true;wrapMode:Text.Wrap;elide:Text.ElideNone}
-      Label {text:"出站："+(page.telemetry.internetDiagnostic.route||"尚未检测")+" · 节点："+page.activeNodeName;Layout.fillWidth:true;wrapMode:Text.Wrap;elide:Text.ElideNone}
+      Label {text:"出站："+(page.shownInternetDiagnostic.route||"尚未检测")+" · 节点："+page.activeNodeName;Layout.fillWidth:true;wrapMode:Text.Wrap;elide:Text.ElideNone}
       Label {text:page.proxyState;Layout.fillWidth:true;wrapMode:Text.Wrap;elide:Text.ElideNone}
-      Label {text:page.telemetry.internetDiagnostic.http!==undefined?"HTTP "+page.telemetry.internetDiagnostic.http+" · 错误码 "+page.telemetry.internetDiagnostic.networkError+" · "+page.telemetry.internetDiagnostic.elapsedMs+" ms":"尚无 HTTPS 检测结果";Layout.fillWidth:true;wrapMode:Text.Wrap;elide:Text.ElideNone}
-      Label {text:"代理："+(page.telemetry.latencies.proxy||"尚未测量")+" · "+(page.telemetry.proxyDiagnostic.detail||"通过当前代理入口单独测量 HTTPS 往返。")+(page.telemetry.proxyDiagnostic.networkError!==undefined?" · HTTP "+page.telemetry.proxyDiagnostic.http+" · 错误码 "+page.telemetry.proxyDiagnostic.networkError:"");Layout.fillWidth:true;wrapMode:Text.Wrap;elide:Text.ElideNone}
+      Label {text:page.shownInternetDiagnostic.http!==undefined?"HTTP "+page.shownInternetDiagnostic.http+" · 错误码 "+page.shownInternetDiagnostic.networkError+" · "+page.shownInternetDiagnostic.elapsedMs+" ms":"尚无 HTTPS 检测结果";Layout.fillWidth:true;wrapMode:Text.Wrap;elide:Text.ElideNone}
+      Label {text:"代理："+(page.shownLatencies.proxy||"尚未测量")+" · "+(page.shownProxyDiagnostic.detail||"通过当前代理入口单独测量 HTTPS 往返。")+(page.shownProxyDiagnostic.networkError!==undefined?" · HTTP "+page.shownProxyDiagnostic.http+" · 错误码 "+page.shownProxyDiagnostic.networkError:"");Layout.fillWidth:true;wrapMode:Text.Wrap;elide:Text.ElideNone}
      }
     }
    }
-   SwirlGlassPanel {Layout.fillWidth:true;Layout.fillHeight:false;Layout.minimumWidth:0;Layout.preferredHeight:page.ranks.length===0?rankingContent.implicitHeight+2*Theme.cardPadding:Math.max(Theme.dp(240),rankingContent.implicitHeight+2*Theme.cardPadding);Layout.alignment:Qt.AlignTop
+   SwirlGlassPanel {Layout.fillWidth:true;Layout.fillHeight:false;Layout.minimumWidth:0;Layout.preferredHeight:page.ranks.length===0?rankingContent.implicitHeight+2*Theme.cardPadding:Math.max(Theme.dp(240),rankingContent.implicitHeight+2*Theme.cardPadding);Layout.alignment:Qt.AlignTop;cornerRadius:page.activityCardRadius
     ColumnLayout {id:rankingContent;anchors.left:parent.left;anchors.right:parent.right;anchors.top:parent.top;anchors.margins:Theme.cardPadding;spacing:page.ranks.length===0?Theme.dp(8):Theme.dp(12)
      RowLayout {Layout.fillWidth:true;SwirlText {text:"流量来源";color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold;Layout.fillWidth:true}SwirlButton {text:"查看全部";quiet:true;onClicked:{AppState.trafficPeriod=page.period===0?0:3;AppState.navigate(page.rankingKind===0?"processes":page.rankingKind===1?"gateway":"traffic")}}}
      RowLayout {Layout.fillWidth:true;spacing:Theme.dp(12)
