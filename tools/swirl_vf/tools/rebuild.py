@@ -488,7 +488,8 @@ class NativeOracle:
             line = self.reader.readline(timeout=self.response_timeout)
             check(bool(line), "native oracle ended before returning every requested glyph")
             record = json.loads(line)
-            check(record.get("request_id") == request_id and record.get("face_index") == face,
+            check(record.get("request_id") == request_id
+                  and type(record.get("face_index")) is int and record["face_index"] == face,
                   "native oracle response identity mismatch")
             # Request failures intentionally have no glyph/location payload.
             # Report the original native error before validating success fields,
@@ -498,13 +499,17 @@ class NativeOracle:
                 raise ReconstructionError(f"native request {request_id} face {face} failed: {record['error']}",
                                           native_observation=native_failure_details(record))
             check(record.get("type") != "request_error", "native request_error without error detail")
-            check(record.get("location") == location,
+            # Python equates True with 1 and False with 0, including inside
+            # dictionaries. A JSON boolean is not a numeric axis observation.
+            check(record.get("location") == location
+                  and all(type(value) in (int, float) for value in record["location"].values()),
                   "native oracle axis location mismatch: " + json.dumps({
                       "request_id": request_id, "face_index": face,
                       "requested": location, "received": record.get("location"),
                       "reported": record.get("reported_location")}, allow_nan=False))
             gid = record.get("glyph_id")
-            check(gid in glyph_ids and gid not in results, "missing, duplicate or unrelated native glyph")
+            check(type(gid) is int and gid in glyph_ids and gid not in results,
+                  "missing, duplicate or unrelated native glyph")
             check(record.get("error") is None, f"native error on glyph {gid}: {record.get('error')}")
             results[gid] = record
         self.successful_glyph_count += len(results)

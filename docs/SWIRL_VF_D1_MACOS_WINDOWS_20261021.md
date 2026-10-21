@@ -776,3 +776,71 @@ expected readiness bytes and every lock/metric/axis assertion are unchanged.
 All five checkpoint tests pass locally after this transport correction; actual
 Windows repetition is pending. This is a test-harness defect, not evidence that
 the native Windows file lock failed or previously passed its unexecuted checks.
+
+## D3 checkpoint 3 — enforce physical identity types on native observations
+
+The Windows readiness correction is saved as
+`216df0f60e910eae5a80c0518f68747785512015`. No source workaround for metric
+quantization was added. Subsequent source review found a separate real
+production admission defect: Python equality accepts JSON `true` as GID 1 or
+face 1, `false` as face 0, and numeric floats as integer face/GID identities.
+It also equates a boolean axis echo to the numeric endpoints 0/1. The direct
+`NativeOracle.samples` receiver used that equality without checking types.
+The existing exact-axis adapter already rejects these cases, but the direct
+strict native transport remained independently callable.
+
+New regressions first reproduced three failing test methods (seven recorded
+failure/subtest entries); the valid numeric-axis compatibility test passed.
+The minimal receiver change requires an actual JSON integer for face and GID,
+and numeric int/float values for echoed axes. Integer versus floating-point
+axis spelling remains accepted when the exact value agrees; booleans do not.
+Native request errors retain their original reason, exact decimal equality and
+the existing 1e-6 Swift guard are unchanged, and a rejected batch never adds
+successful glyph observations. No source coordinate, native metric or path is
+rewritten. This is a typed identity correction, **not** a decimal precision fix.
+
+Four new tests and all fourteen existing native-protocol tests pass. Full suite
+on the current production source: **623 discovered = 616 passed + 7 platform
+skips**, 34.621 s. All **12 D3 tests** pass after the binary-LF witness repair.
+The production code received a further read-only review with no material new
+correctness blocker.
+
+Since native transport changed, the real Mac reconstruction control ran again:
+self-authored two faces / three GIDs, exact native per-batch replay and table
+metrics, saved/reopened TTC, independent **58 requests / 174 records**, zero
+path-point/table-metric/bounds difference; source unchanged, temporary font
+cleanup confirmed. The original strict **849/850 FAIL** remains. Safe evidence:
+[SWIRL_VF_D3_TYPED_NATIVE_20261021.json](evidence/SWIRL_VF_D3_TYPED_NATIVE_20261021.json).
+Full private reports are under `build/vf-d3-private/table-metrics-stage3/`.
+
+### Current P0/P1/P2 decision boundary
+
+The 96/384 failures form one finite decimal-readback class, not 96 separate
+algorithm bugs: maximum observed error is 0.00009450000001720582 user units
+(D2's exact-original Mac-27 evidence), while the unmodified guard is 1e-6.
+Those measured errors are below 0.0001 but exceed exact-readback acceptance.
+This is a bound on the measured cohort, not a universal Apple quantization law.
+F2DOT14 is a design coordinate scale and 16.16 is another input/storage scale;
+neither is interchangeable with CTFontCopyVariation's user-axis echo.
+
+A3's stronger evidence also rules out promoting canonical echo to geometry:
+identical echo can hide different payloads, and the known colliding float32 /
+16.16 requests differ by 0.5474853515625 FUnit in advance. For a deterministic
+target given that same collapsed input, at least one error is >=0.27374267578125,
+well above 1/32. We retain the existing per-GID exact replay adapter and refuse
+the cases it cannot establish; no global source-to-design mapping is accepted.
+
+P1 remains a representation issue: original width800/1200 with vertical X500
+cannot satisfy the current standard glyph convention X=advance/2 (400/600).
+VORG stores Y only. B1's frozen arithmetic and D2's fresh UPEMs diagnose the
+synthetic 849/850 behavior, but do not justify changing raw API metrics or
+raising tolerance. Such a change would not repair original X and would fail
+other fractional measurements. No A3/B1 accepted repair was available at entry.
+
+Therefore **P2's existing admission conditions are still not met**. Formal
+original 32-face reconstruction was not started, no false synthetic delivery
+was substituted, and no proprietary candidate was uploaded. C1's engine stays
+on its owner's branch, unmerged. Its completed staging work should be reused
+after coordinator review defines an achievable source/target axis and vertical
+layout contract. Actual Qt/Swirl acceptance is NOT_RUN; this Mac has no detected
+Qt6 development CLI/toolchain and no accepted original conversion to load.
