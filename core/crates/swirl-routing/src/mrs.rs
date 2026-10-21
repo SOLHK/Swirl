@@ -501,6 +501,7 @@ mod tests {
         )
         .unwrap();
         assert!(matches!(cn.decision, crate::Decision::Node(n) if n.id == "direct"));
+        assert_eq!(crate::rule_label(&config, cn.matched_rule), "MRS:CN-DOMAIN");
         let reject = select_with_trace_and_china(
             &config,
             "blocked.example.cn",
@@ -547,6 +548,7 @@ mod tests {
         )
         .unwrap();
         assert!(matches!(china_ip.decision, crate::Decision::Node(n) if n.id == "direct"));
+        assert_eq!(crate::rule_label(&config, china_ip.matched_rule), "MRS:CN-IP");
     }
 
     #[test]
