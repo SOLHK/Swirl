@@ -37,6 +37,9 @@ VIAddVersionKey /LANG=2052 "LegalCopyright" "Copyright SOLHK"
 !insertmacro MUI_LANGUAGE "SimpChinese"
 
 Function .onInit
+    IfFileExists "$WINDIR\Sysnative\WindowsPowerShell\v1.0\powershell.exe" native_ok
+    Abort "需要 64 位 Windows PowerShell。"
+    native_ok:
     StrCpy $IsolatedInstall "0"
     ${GetParameters} $Parameters
     ClearErrors
@@ -57,7 +60,7 @@ Section "安装全天候验收工具"
     Abort "安装目录已有非本工具文件，停止安装。"
     owned:
     StrCmp $IsolatedInstall "1" copy_files
-    nsExec::ExecToStack '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "$INSTDIR\Stop-SwirlCoreMonitor.ps1"'
+    nsExec::ExecToStack '"$WINDIR\Sysnative\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "$INSTDIR\Stop-SwirlCoreMonitor.ps1"'
     Pop $0
     Pop $1
     StrCmp $0 "0" copy_files
@@ -96,7 +99,7 @@ Section "安装全天候验收工具"
     WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\SwirlCoreMonitor" "UninstallString" '"$INSTDIR\Uninstall-SwirlCoreMonitor.exe"'
     WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\SwirlCoreMonitor" "NoModify" 1
     WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\SwirlCoreMonitor" "NoRepair" 1
-    nsExec::ExecToStack '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "$INSTDIR\Start-SwirlCoreMonitor.ps1"'
+    nsExec::ExecToStack '"$WINDIR\Sysnative\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "$INSTDIR\Start-SwirlCoreMonitor.ps1"'
     Pop $0
     Pop $1
     StrCmp $0 "0" done
@@ -105,6 +108,9 @@ Section "安装全天候验收工具"
 SectionEnd
 
 Function un.onInit
+    IfFileExists "$WINDIR\Sysnative\WindowsPowerShell\v1.0\powershell.exe" native_ok
+    Abort "需要 64 位 Windows PowerShell 才能安全停止监控。"
+    native_ok:
     StrCmp $INSTDIR "D:\Codex\SwirlCoreMonitor" path_ok
     Abort "卸载路径不是本工具的固定目录。"
     path_ok:
@@ -117,7 +123,7 @@ Section "Uninstall"
     SetShellVarContext current
     IfFileExists "$INSTDIR\.swirl-monitor-isolated" isolated regular
     regular:
-    nsExec::ExecToStack '"$SYSDIR\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "$INSTDIR\Stop-SwirlCoreMonitor.ps1"'
+    nsExec::ExecToStack '"$WINDIR\Sysnative\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "$INSTDIR\Stop-SwirlCoreMonitor.ps1"'
     Pop $0
     Pop $1
     StrCmp $0 "0" stopped

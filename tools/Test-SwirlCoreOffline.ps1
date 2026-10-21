@@ -26,6 +26,12 @@ $result = [ordered]@{
     changedNetworkSettings = $false
 }
 
+if (-not [Environment]::Is64BitProcess) {
+    $result.reason = '64-bit Windows PowerShell is required to inspect the Swirl Rust DLL.'
+    $result | ConvertTo-Json -Depth 3
+    exit 2
+}
+
 function Get-ListenerPid([int]$LocalPort) {
     $rows = @(Get-NetTCPConnection -LocalPort $LocalPort -State Listen -ErrorAction SilentlyContinue |
         Where-Object { $_.LocalAddress -in @('127.0.0.1','0.0.0.0') })

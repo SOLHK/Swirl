@@ -12,4 +12,6 @@
 
 保留的后台失败：初版正常安装能启动、写报告，但首轮主动探测记为 `INCONCLUSIVE`、请求 0/0；相同脚本在前台为 3/3。拆开隐藏进程后复现：离线身份脚本在隐藏 Windows PowerShell 中找不到 `Get-FileHash`，提前返回 `BLOCKED`。改用 .NET SHA-256 文件流并让监控使用绝对 PowerShell 路径、保留脱敏原因码后，隐藏身份检查、隐藏联网路径检查和隐藏完整单轮监控均重新通过，3/3 HTTPS 204。修复后的最终安装包仍需完整安装回归。
 
+后续安装回归又保留一次 `PREFLIGHT_BLOCKED`、0/0：NSIS 默认 `$SYSDIR` 在 32 位安装器中映射到 32 位 PowerShell，无法枚举 64 位 Swirl 进程的 Rust DLL。显式用 SysWOW64 PowerShell 复现 `rustDllLoadedInListener=false`，同时 EXE/DLL 磁盘哈希仍匹配。安装器改由 `$WINDIR\Sysnative` 启动 64 位 PowerShell，脚本也在 32 位模式立即报告要求 64 位。修复后的 NSIS 预构建正常安装、自动后台启动、3/3 HTTPS 204、停机与卸载均通过；最终提交安装包仍需重复验证。
+
 微软官方资料：[TCP 连接 PID](https://learn.microsoft.com/en-us/powershell/module/nettcpip/get-nettcpconnection)、[WFP 可透明重定向连接](https://learn.microsoft.com/en-us/windows-hardware/drivers/network/using-bind-or-connect-redirection)。因此“未观察到 Mihomo 本地链路”仍不等于排除所有 WFP/TUN 干预。

@@ -7,6 +7,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
+if(-not [Environment]::Is64BitProcess) { throw '64-bit Windows PowerShell is required for this monitor.' }
 
 function Get-Configuration {
     $path = Join-Path $DataDirectory 'config.json'

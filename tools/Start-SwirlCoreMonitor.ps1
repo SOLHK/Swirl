@@ -3,6 +3,7 @@ param(
     [switch]$NoAutostart
 )
 $ErrorActionPreference='Stop'
+if(-not [Environment]::Is64BitProcess) { throw '64-bit Windows PowerShell is required to inspect the 64-bit Swirl process.' }
 $runner=Join-Path $PSScriptRoot 'Monitor-SwirlCore.ps1'
 $powershell=Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
 if(-not (Test-Path -LiteralPath $runner -PathType Leaf)) { throw 'Monitor script is missing.' }
