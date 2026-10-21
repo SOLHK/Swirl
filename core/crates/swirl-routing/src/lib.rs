@@ -1,3 +1,34 @@
+fn china_direct<'a>(
+    config: &'a Config,
+    host: &str,
+    ip: Option<IpAddr>,
+    resolved: Option<&[SocketAddr]>,
+    cn_domains: Option<&ChinaRules>,
+    cn_ips: Option<&ChinaRules>,
+) -> Result<Option<&'a Node>, &'static str> {
+    if cn_domains.is_none() && cn_ips.is_none() { return Ok(None); }
+    if cn_domains.is_some_and(|rules| rules.matches_domain(host)) {
+        return config.nodes.iter().find(|n| matches!(n.outbound, swirl_subscription::Outbound::Direct {}))
+            .map(Some).ok_or("ChinaDirectOutboundMissing");
+    }
+    if let Some(ip) = ip {
+        if cn_ips.is_some_and(|rules| rules.matches_ip(ip)) {
+            return config.nodes.iter().find(|n| matches!(n.outbound, swirl_subscription::Outbound::Direct {}))
+                .map(Some).ok_or("ChinaDirectOutboundMissing");
+        }
+        return Ok(None);
+    }
+    if let Some(addresses) = resolved {
+        if addresses.iter().any(|address| cn_ips.is_some_and(|rules| rules.matches_ip(address.ip()))) {
+            return config.nodes.iter().find(|n| matches!(n.outbound, swirl_subscription::Outbound::Direct {}))
+                .map(Some).ok_or("ChinaDirectOutboundMissing");
+        }
+        return Ok(None);
+    }
+    if cn_ips.is_some() { return Err("ChinaIpResolutionRequired"); }
+    Ok(None)
+}
+
 //! Ordered routing over immutable, validated IR. No implicit DIRECT fallback.
 use std::net::{IpAddr, SocketAddr};
 mod mrs;
@@ -49,6 +80,21 @@ pub fn select_with_trace<'a>(
     resolved: Option<&[SocketAddr]>,
     choose: &impl Fn(&str) -> Result<String, &'static str>,
 ) -> Result<TracedDecision<'a>, &'static str> {
+    select_with_trace_and_china(config, host, port, source, resolved, choose, None, None)
+}
+
+/// Apply the built-in China domain/IP providers before the terminal user MATCH
+/// rule, preserving the order of all explicit user rules.
+pub fn select_with_trace_and_china<'a>(
+    config: &'a Config,
+    host: &str,
+    port: u16,
+    source: IpAddr,
+    resolved: Option<&[SocketAddr]>,
+    choose: &impl Fn(&str) -> Result<String, &'static str>,
+    cn_domains: Option<&ChinaRules>,
+    cn_ips: Option<&ChinaRules>,
+) -> Result<TracedDecision<'a>, &'static str> {
     let host = host.to_ascii_lowercase();
     let ip = host.parse::<std::net::IpAddr>().ok();
     // Do not expose results to earlier no-resolve rules on the second pass:
@@ -57,6 +103,11 @@ pub fn select_with_trace<'a>(
     let mut id = config.selected.as_str();
     let mut matched_rule = None;
     for (index, rule) in config.rules.iter().enumerate() {
+        if matches!(rule.matcher, Matcher::Match {}) {
+            if let Some(direct) = china_direct(config, &host, ip, resolved, cn_domains, cn_ips)? {
+                return Ok(TracedDecision { decision: Decision::Node(direct), matched_rule: Some(index) });
+            }
+        }
         let matched = match &rule.matcher {
             Matcher::Domain { value } => host.eq_ignore_ascii_case(value),
             Matcher::DomainSuffix { value } => {
@@ -94,6 +145,14 @@ pub fn select_with_trace<'a>(
             id = &rule.outbound;
             matched_rule = Some(index);
             break;
+        }
+    }
+    // If there is no explicit MATCH rule, built-in providers still run
+    // before the selected-node fallback. A domain lookup is requested only
+    // after explicit rules have had their chance to match.
+    if matched_rule.is_none() {
+        if let Some(direct) = china_direct(config, &host, ip, resolved, cn_domains, cn_ips)? {
+            return Ok(TracedDecision { decision: Decision::Node(direct), matched_rule: None });
         }
     }
     let mut id = id.to_owned();
