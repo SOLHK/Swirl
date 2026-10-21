@@ -2,7 +2,7 @@
 //! The container is Zstandard-compressed; the decoded payload is validated
 //! independently of routing so malformed assets can never become permissive.
 use sha2::Digest;
-use std::{collections::HashSet, io::Read, net::IpAddr};
+use std::{collections::HashSet, io::Read, net::IpAddr, path::Path, sync::Arc};
 
 const MAX_COMPRESSED: usize = 16 * 1024 * 1024;
 const MAX_DECOMPRESSED: usize = 64 * 1024 * 1024;
@@ -15,40 +15,68 @@ pub enum Behavior {
     IpCidr,
 }
 
-static BUNDLED_RULES: std::sync::OnceLock<Result<(ChinaRules, ChinaRules), &'static str>> =
+type SharedChinaRules = (Arc<ChinaRules>, Arc<ChinaRules>);
+static BUNDLED_RULES: std::sync::OnceLock<Result<SharedChinaRules, &'static str>> =
     std::sync::OnceLock::new();
 
-pub fn bundled_rules() -> Result<(&'static ChinaRules, &'static ChinaRules), &'static str> {
+fn cached_bundled_rules() -> Result<&'static SharedChinaRules, &'static str> {
     match BUNDLED_RULES.get_or_init(load_bundled_rules) {
-        Ok((domains, ips)) => Ok((domains, ips)),
+        Ok(rules) => Ok(rules),
         Err(error) => Err(*error),
     }
+}
+
+pub fn bundled_rules() -> Result<(&'static ChinaRules, &'static ChinaRules), &'static str> {
+    let (domains, ips) = cached_bundled_rules()?;
+    Ok((domains, ips))
+}
+
+/// Shares the same verified bundled snapshots with long-lived Core plans.
+pub fn shared_bundled_rules() -> Result<(Arc<ChinaRules>, Arc<ChinaRules>), &'static str> {
+    let (domains, ips) = cached_bundled_rules()?;
+    Ok((domains.clone(), ips.clone()))
 }
 
 pub fn validate_bundled_rules() -> Result<(), &'static str> {
     bundled_rules().map(|_| ())
 }
 
-fn load_bundled_rules() -> Result<(ChinaRules, ChinaRules), &'static str> {
-    let executable_dir = std::env::current_exe()
-        .ok()
-        .and_then(|p| p.parent().map(|p| p.to_path_buf()));
-    let packaged = executable_dir.as_ref().map(|p| p.join("rules"));
-    let source = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../src/Swirl.Quick/packaging/rules");
-    let directory = packaged
-        .filter(|p| p.join("cn-domain.mrs").is_file() && p.join("cn-ip.mrs").is_file())
-        .unwrap_or(source);
-    load_rules_from_directory(&directory)
+fn bundled_rules_directory(
+    executable: &Path,
+    source: &Path,
+    development: bool,
+) -> std::path::PathBuf {
+    let packaged = executable.parent().unwrap_or(executable).join("rules");
+    if packaged.exists() || !development {
+        packaged
+    } else {
+        source.to_path_buf()
+    }
+}
+
+fn load_bundled_rules() -> Result<SharedChinaRules, &'static str> {
+    let executable = std::env::current_exe().map_err(|_| "ChinaRulesExecutablePath")?;
+    let source =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../src/Swirl.Quick/packaging/rules");
+    let directory = bundled_rules_directory(&executable, &source, cfg!(debug_assertions));
+    let (domains, ips) = load_rules_from_directory(&directory)?;
+    Ok((Arc::new(domains), Arc::new(ips)))
 }
 
 /// Loads only the two pinned bundled files; callers cannot substitute arbitrary filenames.
 pub fn load_rules_from_directory(
-    directory: &std::path::Path,
+    directory: &Path,
 ) -> Result<(ChinaRules, ChinaRules), &'static str> {
-    let domain_bytes =
-        std::fs::read(directory.join("cn-domain.mrs")).map_err(|_| "ChinaDomainRulesRead")?;
-    let ip_bytes = std::fs::read(directory.join("cn-ip.mrs")).map_err(|_| "ChinaIpRulesRead")?;
+    let read_bounded = |name, error| -> Result<Vec<u8>, &'static str> {
+        let file = std::fs::File::open(directory.join(name)).map_err(|_| error)?;
+        let mut bytes = Vec::new();
+        file.take((MAX_COMPRESSED + 1) as u64)
+            .read_to_end(&mut bytes)
+            .map_err(|_| error)?;
+        Ok(bytes)
+    };
+    let domain_bytes = read_bounded("cn-domain.mrs", "ChinaDomainRulesRead")?;
+    let ip_bytes = read_bounded("cn-ip.mrs", "ChinaIpRulesRead")?;
     let domains = ChinaRules::parse(
         &domain_bytes,
         Behavior::Domain,
@@ -402,6 +430,135 @@ impl<'a> Cursor<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    struct StagedRules(std::path::PathBuf);
+
+    impl StagedRules {
+        fn new() -> Self {
+            static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+            let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../target/china-rule-tests")
+                .join(format!(
+                    "mrs-{}-{}",
+                    std::process::id(),
+                    NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+                ));
+            std::fs::create_dir_all(&path).unwrap();
+            Self(path)
+        }
+
+        fn copy(&self, name: &str) {
+            let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../../src/Swirl.Quick/packaging/rules")
+                .join(name);
+            std::fs::copy(source, self.0.join("app/rules").join(name)).unwrap();
+        }
+    }
+
+    impl Drop for StagedRules {
+        fn drop(&mut self) {
+            std::fs::remove_dir_all(&self.0).unwrap();
+        }
+    }
+
+    #[test]
+    fn bundled_directory_uses_source_only_for_unstaged_development_executable() {
+        let source =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../src/Swirl.Quick/packaging/rules");
+        let executable = source.join("missing-app/Swirl.exe");
+        assert_eq!(bundled_rules_directory(&executable, &source, true), source);
+        assert_eq!(
+            bundled_rules_directory(&executable, &source, false),
+            executable.parent().unwrap().join("rules")
+        );
+    }
+
+    #[test]
+    fn packaged_directory_is_executable_relative_and_requires_both_rules() {
+        let stage = StagedRules::new();
+        let packaged = stage.0.join("app/rules");
+        std::fs::create_dir_all(&packaged).unwrap();
+        stage.copy("cn-domain.mrs");
+        let executable = stage.0.join("app/Swirl.exe");
+        let unrelated_source = stage.0.join("other-working-directory/rules");
+        let chosen = bundled_rules_directory(&executable, &unrelated_source, true);
+        assert_eq!(chosen, packaged);
+        assert_eq!(
+            load_rules_from_directory(&chosen).unwrap_err(),
+            "ChinaIpRulesRead"
+        );
+
+        stage.copy("cn-ip.mrs");
+        let (domains, ips) = load_rules_from_directory(&chosen).unwrap();
+        assert!(domains.matches_domain("www.baidu.com"));
+        assert!(ips.matches_ip("114.114.114.114".parse().unwrap()));
+        assert!(ips.matches_ip("240e:3a1:1000::1".parse().unwrap()));
+
+        let mut altered = std::fs::read(packaged.join("cn-domain.mrs")).unwrap();
+        altered.push(0);
+        std::fs::write(packaged.join("cn-domain.mrs"), altered).unwrap();
+        assert_eq!(
+            load_rules_from_directory(&chosen).unwrap_err(),
+            "ChinaDomainRulesInvalid"
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn relocated_windows_executable_uses_adjacent_rules_from_other_cwd() {
+        const CHILD_MODE: &str = "SWIRL_MRS_RELOCATED_TEST_MODE";
+        if let Some(mode) = std::env::var_os(CHILD_MODE) {
+            match mode.to_string_lossy().as_ref() {
+                "valid" => {
+                    let (domains, ips) = bundled_rules().unwrap();
+                    assert!(domains.matches_domain("www.baidu.com"));
+                    assert!(ips.matches_ip("114.114.114.114".parse().unwrap()));
+                }
+                "missing_ip" => assert_eq!(bundled_rules().map(|_| ()), Err("ChinaIpRulesRead")),
+                "corrupt_domain" => {
+                    assert_eq!(bundled_rules().map(|_| ()), Err("ChinaDomainRulesInvalid"));
+                }
+                other => panic!("unexpected relocated test mode: {other}"),
+            }
+            return;
+        }
+
+        let stage = StagedRules::new();
+        let app = stage.0.join("app");
+        let rules = app.join("rules");
+        let elsewhere = stage.0.join("unrelated-launch-directory");
+        std::fs::create_dir_all(&rules).unwrap();
+        std::fs::create_dir_all(&elsewhere).unwrap();
+        let executable = app.join("mrs-relocated-test.exe");
+        std::fs::copy(std::env::current_exe().unwrap(), &executable).unwrap();
+
+        let run = |mode: &str| {
+            let output = std::process::Command::new(&executable)
+                .arg("--exact")
+                .arg("mrs::tests::relocated_windows_executable_uses_adjacent_rules_from_other_cwd")
+                .current_dir(&elsewhere)
+                .env(CHILD_MODE, mode)
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "relocated {mode}: {} {}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+        };
+
+        stage.copy("cn-domain.mrs");
+        stage.copy("cn-ip.mrs");
+        run("valid");
+        std::fs::remove_file(rules.join("cn-ip.mrs")).unwrap();
+        run("missing_ip");
+        stage.copy("cn-ip.mrs");
+        let mut altered = std::fs::read(rules.join("cn-domain.mrs")).unwrap();
+        altered.push(0);
+        std::fs::write(rules.join("cn-domain.mrs"), altered).unwrap();
+        run("corrupt_domain");
+    }
     #[test]
     fn rejects_truncated_and_wrong_checksum_before_parsing() {
         assert_eq!(
@@ -506,6 +663,57 @@ mod tests {
         assert!(networks.matches_ip("114.114.114.114".parse().unwrap()));
         assert!(networks.matches_ip("240e:3a1:1000::1".parse().unwrap()));
         assert!(!networks.matches_ip("8.8.8.8".parse().unwrap()));
+    }
+
+    #[test]
+    fn real_mrs_rules_preserve_direct_proxy_reject_and_ordered_match() {
+        use crate::{Decision, select_with_trace_and_china};
+        let directory =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../src/Swirl.Quick/packaging/rules");
+        let (domains, ips) = load_rules_from_directory(&directory).unwrap();
+        let config = swirl_subscription::Config::parse(
+            br#"{
+                "schema":1,"listen":"127.0.0.1:0","selected":"proxy","smart_routing":true,
+                "nodes":[
+                    {"id":"direct","outbound":{"type":"direct"}},
+                    {"id":"reject","outbound":{"type":"reject"}},
+                    {"id":"proxy","outbound":{"type":"socks5","host":"127.0.0.1","port":1080,"auth":null}}
+                ],
+                "rules":[
+                    {"matcher":{"type":"domain","value":"www.baidu.com"},"outbound":"reject"},
+                    {"matcher":{"type":"domain_suffix","value":"blocked.example.org"},"outbound":"reject"},
+                    {"matcher":{"type":"domain","value":"blocked.example.org"},"outbound":"direct"},
+                    {"matcher":{"type":"match"},"outbound":"proxy"}
+                ]
+            }"#,
+        )
+        .unwrap();
+        let choose = |_: &str| -> Result<String, &'static str> { Err("NoAutomaticGroup") };
+        let source = "127.0.0.1".parse().unwrap();
+        let route = |host: &str| {
+            let selected = select_with_trace_and_china(
+                &config,
+                host,
+                443,
+                source,
+                None,
+                &choose,
+                Some((&domains, &ips)),
+            )
+            .unwrap();
+            let Decision::Node(node) = selected.decision else {
+                panic!("unexpected DNS decision for {host}")
+            };
+            (node.id.clone(), selected.matched_rule)
+        };
+
+        assert_eq!(route("www.qq.com"), ("direct".into(), Some(4)));
+        assert_eq!(route("114.114.114.114"), ("direct".into(), Some(5)));
+        assert_eq!(route("240e:3a1:1000::1"), ("direct".into(), Some(5)));
+        assert_eq!(route("www.baidu.com"), ("reject".into(), Some(0)));
+        assert_eq!(route("blocked.example.org"), ("reject".into(), Some(1)));
+        assert_eq!(route("www.example.com"), ("proxy".into(), Some(3)));
+        assert_eq!(route("8.8.8.8"), ("proxy".into(), Some(3)));
     }
 
     #[test]

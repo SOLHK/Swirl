@@ -2,7 +2,9 @@
 use std::net::{IpAddr, SocketAddr};
 use swirl_subscription::{Config, Matcher, Node, PolicyStrategy};
 mod mrs;
-pub use mrs::{Behavior as MrsBehavior, ChinaRules, load_rules_from_directory};
+pub use mrs::{
+    Behavior as MrsBehavior, ChinaRules, load_rules_from_directory, shared_bundled_rules,
+};
 use mrs::{bundled_rules, validate_bundled_rules};
 
 pub enum Decision<'a> {

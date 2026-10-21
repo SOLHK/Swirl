@@ -15,7 +15,7 @@ use std::{
 };
 use swirl_dns::Resolver;
 use swirl_protocol::{Inbound, Result, Target};
-use swirl_routing::{ChinaRules, load_rules_from_directory};
+use swirl_routing::{ChinaRules, load_rules_from_directory, shared_bundled_rules};
 use swirl_subscription::{Config, Outbound, PolicyStrategy};
 use swirl_transport::{Counters, bind_udp};
 use tokio::{
@@ -40,12 +40,13 @@ fn load_china_rules(config: &Config) -> Result<ChinaRulePair> {
     {
         return Err("SmartRoutingDirectMissing");
     }
-    let directory = config
-        .china_rules_directory
-        .as_deref()
-        .ok_or("ChinaRulesDirectoryMissing")?;
-    let (domains, ips) = load_rules_from_directory(std::path::Path::new(directory))?;
-    Ok((Some(Arc::new(domains)), Some(Arc::new(ips))))
+    let (domains, ips) = if let Some(directory) = config.china_rules_directory.as_deref() {
+        let (domains, ips) = load_rules_from_directory(std::path::Path::new(directory))?;
+        (Arc::new(domains), Arc::new(ips))
+    } else {
+        shared_bundled_rules()?
+    };
+    Ok((Some(domains), Some(ips)))
 }
 
 struct Record {

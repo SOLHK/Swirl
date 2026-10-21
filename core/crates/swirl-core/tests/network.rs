@@ -717,8 +717,6 @@ fn connect_host(core: &Core, host: &str, port: u16, expected_status: u16) -> Tcp
 
 #[test]
 fn smart_routing_executes_direct_proxy_and_reject_with_real_loopback_sockets() {
-    let rules_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../src/Swirl.Quick/packaging/rules");
     let (proxy_port, proxy_worker) = socks5_proxy();
     let config = Config::parse(
         &serde_json::to_vec(&json!({
@@ -726,7 +724,6 @@ fn smart_routing_executes_direct_proxy_and_reject_with_real_loopback_sockets() {
             "listen": "127.0.0.1:0",
             "selected": "proxy",
             "smart_routing": true,
-            "china_rules_directory": rules_dir.to_string_lossy(),
             "nodes": [
                 {"id":"direct","outbound":{"type":"direct"}},
                 {"id":"reject","outbound":{"type":"reject"}},
@@ -749,7 +746,20 @@ fn smart_routing_executes_direct_proxy_and_reject_with_real_loopback_sockets() {
         .unwrap(),
     )
     .unwrap();
-    let core = Core::start(config).unwrap();
+    let core = Core::start(config.clone()).unwrap();
+    let generation = core.snapshot().unwrap().generation;
+    let mut invalid = config;
+    invalid.china_rules_directory = Some(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join(format!(
+                "../../../target/china-rule-tests/absent-{}",
+                std::process::id()
+            ))
+            .to_string_lossy()
+            .into_owned(),
+    );
+    assert_eq!(core.configure(invalid), Err("ChinaDomainRulesRead"));
+    assert_eq!(core.snapshot().unwrap().generation, generation);
 
     // A real MRS domain hit must connect directly to the local fixture.
     let (direct_port, direct_peer) = echo();
@@ -791,4 +801,57 @@ fn smart_routing_executes_direct_proxy_and_reject_with_real_loopback_sockets() {
     assert!(core.snapshot().unwrap().connections.iter().any(|row| {
         row.category == "reject" && row.node == "reject" && row.host == "blocked.example.cn"
     }));
+}
+
+#[test]
+fn disabled_smart_routing_ignores_missing_rules_and_keeps_direct_route() {
+    let mut c = config();
+    c.china_rules_directory = Some(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join(format!(
+                "../../target/china-rule-tests/absent-{}",
+                std::process::id()
+            ))
+            .to_string_lossy()
+            .into_owned(),
+    );
+    let core = Core::start(c).unwrap();
+    let (port, peer) = echo();
+    let mut stream = connect(&core, port);
+    stream.write_all(b"direct").unwrap();
+    let mut response = [0; 6];
+    stream.read_exact(&mut response).unwrap();
+    assert_eq!(&response, b"direct");
+    drop(stream);
+    peer.join().unwrap();
+}
+
+#[test]
+fn configure_enables_and_disables_default_china_rules_on_live_core() {
+    let mut disabled = config();
+    disabled.selected = "reject".into();
+    disabled.dns.hosts = vec![swirl_subscription::HostMapping {
+        name: "www.baidu.com".into(),
+        address: "127.0.0.1".parse().unwrap(),
+    }];
+    let core = Core::start(disabled.clone()).unwrap();
+    let (port, peer) = echo();
+    let _before = connect_host(&core, "www.baidu.com", port, 502);
+
+    let mut enabled = disabled.clone();
+    enabled.smart_routing = true;
+    core.configure(enabled).unwrap();
+    let mut direct = connect_host(&core, "www.baidu.com", port, 200);
+    direct.write_all(b"rules").unwrap();
+    let mut response = [0; 5];
+    direct.read_exact(&mut response).unwrap();
+    assert_eq!(&response, b"rules");
+    assert!(core.snapshot().unwrap().connections.iter().any(|row| {
+        row.host == "www.baidu.com" && row.node == "direct" && row.matched_rule == "MRS:CN-DOMAIN"
+    }));
+    drop(direct);
+    peer.join().unwrap();
+
+    core.configure(disabled).unwrap();
+    let _after = connect_host(&core, "www.baidu.com", port, 502);
 }
