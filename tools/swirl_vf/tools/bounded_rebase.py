@@ -77,6 +77,26 @@ def bounded_rebase(font, source_axes, *, max_points=4096, max_vertices=100000):
     cannot leave disagreeing advance encodings. Unknown semantics and exhausted
     bounds reject the operation without writing files or changing the input.
     """
+    return _rebase(font, source_axes, max_points=max_points,
+                   max_vertices=max_vertices, exact=False)
+
+
+def exact_rebase(font, source_axes, *, max_points=4096, max_vertices=100000):
+    """Remove coefficient error when an exact legal integer grid exists.
+
+    A merely small coefficient error can straddle an engine's half-unit
+    rounding boundary. This path requires ZERO error in the independently
+    decoded continuous models, rather than accepting the first 1/32 grid.
+    This can remove that cause of a rounding mismatch; input-coordinate
+    quantization and engine arithmetic still require separate native tests.
+    Unsupported data and a missing exact legal grid remain explicit failures.
+    The original bounded path and all production gates are unchanged.
+    """
+    return _rebase(font, source_axes, max_points=max_points,
+                   max_vertices=max_vertices, exact=True)
+
+
+def _rebase(font, source_axes, *, max_points, max_vertices, exact):
     _validate_standard_q(font, source_axes)
     require(type(max_points) is int and max_points > 0
             and type(max_vertices) is int and max_vertices > 0, 'positive_proof_budgets_required')
@@ -105,7 +125,7 @@ def bounded_rebase(font, source_axes, *, max_points=4096, max_vertices=100000):
             lower = max((endpoint_lattice_error(value, multiplier) for value in values), default=Fraction(0))
             row = {'multiplier': multiplier, 'target_upem': upem * multiplier,
                    'endpoint_metric_lower_bound': lower}
-            if lower > LIMIT:
+            if lower > (0 if exact else LIMIT):
                 row['status'] = 'REFUSED_ENDPOINT_LATTICE'
                 attempts.append(row)
                 continue
@@ -124,13 +144,17 @@ def bounded_rebase(font, source_axes, *, max_points=4096, max_vertices=100000):
                     target_upem_multiplier=multiplier,
                     max_vertices=max_vertices, max_points=max_points)
                 row['certificate'] = certificate
-                row['status'] = 'PASS_CONTINUOUS_MODEL' if certificate['within_1_32'] else 'REFUSED_CONTINUOUS_MODEL'
+                accepted = (certificate['max_metric_error'] == 0
+                            and certificate['max_point_squared_error'] == 0) if exact else certificate['within_1_32']
+                row['status'] = 'PASS_CONTINUOUS_MODEL' if accepted else 'REFUSED_CONTINUOUS_MODEL'
                 attempts.append(row)
-                if certificate['within_1_32']:
-                    report.update(status='BOUNDED_STANDARD_Q_REBASE_CANDIDATE_ONLY',
+                if accepted:
+                    report.update(status=('EXACT_STANDARD_Q_REBASE_CANDIDATE_ONLY' if exact
+                                          else 'BOUNDED_STANDARD_Q_REBASE_CANDIDATE_ONLY'),
                         selected_multiplier=multiplier, source_units_per_em=upem,
                         target_units_per_em=upem * multiplier, attempts=tuple(attempts),
                         continuous_model_certificate=certificate,
+                        zero_coefficient_error_required=exact,
                         tolerance_source_font_units=LIMIT,
                         HVAR_VVAR_regenerated_from_serialized_gvar=True,
                         coordinate_mapping='NOT_PROVEN_BY_COEFFICIENT_CERTIFICATE',
@@ -149,6 +173,7 @@ def bounded_rebase(font, source_axes, *, max_points=4096, max_vertices=100000):
                     scaled.close()
                 if candidate is not None:
                     candidate.close()
-        raise RebasePrecisionError('no_legal_integer_grid_meets_continuous_budget', attempts)
+        raise RebasePrecisionError('no_exact_legal_integer_grid' if exact
+                                   else 'no_legal_integer_grid_meets_continuous_budget', attempts)
     finally:
         source.close()
