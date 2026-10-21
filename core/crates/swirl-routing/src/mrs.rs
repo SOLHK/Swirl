@@ -201,6 +201,22 @@ mod tests {
         assert_eq!(ChinaRules::parse(&bytes, Behavior::Domain, "00").unwrap_err(), "MrsChecksum");
     }
 
+    #[test]
+    fn rejects_truncated_payload_and_unsupported_mrs_version() {
+        use std::io::Write;
+        let payload = b"MRS\\x01\\x00\\x00\\x00";
+        let compressed = zstd::stream::encode_all(&payload[..], 1).unwrap();
+        let checksum = format!("{:x}", sha2::Sha256::digest(&compressed));
+        assert_eq!(ChinaRules::parse(&compressed, Behavior::Domain, &checksum).unwrap_err(), "MrsTruncated");
+
+        let wrong_version = b"MRS\\x02\\x00\\x00\\x00\\x00\\x00\\x00\\x00\\x00";
+        let mut encoder = zstd::stream::Encoder::new(Vec::new(), 1).unwrap();
+        encoder.write_all(wrong_version).unwrap();
+        let compressed = encoder.finish().unwrap();
+        let checksum = format!("{:x}", sha2::Sha256::digest(&compressed));
+        assert_eq!(ChinaRules::parse(&compressed, Behavior::Domain, &checksum).unwrap_err(), "MrsMagic");
+    }
+
     fn bundled(name: &str) -> Vec<u8> {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../../src/Swirl.Quick/packaging/rules").join(name);
