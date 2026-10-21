@@ -65,6 +65,34 @@ class BoundedRebaseTests(unittest.TestCase):
         self.assertEqual(report['continuous_model_certificate']['max_metric_error'], 0)
         self.assertLessEqual(report['continuous_model_certificate']['max_point_squared_error'], LIMIT**2)
 
+    def test_native_rounding_can_amplify_the_fixed_one_eightieth_model_error(self):
+        import uharfbuzz as hb
+        from continuous_model import evaluate_model
+        from font_model_certificate import advance_models
+        from precision_metrics import scale_with_precision_metrics
+        source = q_font(weight_delta=1)
+        candidate, report = bounded_rebase(source, clipped_axes())
+        reference = scale_with_precision_metrics(source, 5000)
+        q, r = (F(63, 16384), F(3, 16), F(0)), (F(63, 16384), F(1), F(0))
+        expected = [evaluate_model(advance_models(font)['HVAR', 'A'], location)[0]/5
+                    for font, location in ((reference, q), (candidate, r))]
+        self.assertEqual(expected, [F(299515, 1024), F(1497639, 5120)])
+        self.assertEqual(abs(expected[0]-expected[1]), F(1, 80))
+        actual = []
+        for font, location in (
+            (reference, {'XWDT': float(q[0]), 'XWGT': float(q[1]), 'XHGT': 0.}),
+            (candidate, {'WDTH': 500+500*float(r[0]), 'wght': 900., 'HGHT': 500.})):
+            native = hb.Font(hb.Face(serialize(font)))
+            hb.ot_font_set_funcs(native)
+            native.scale = (64000, 64000)  # identical physical output scale
+            native.set_variations(location)
+            actual.append(native.get_glyph_h_advance(2))
+        self.assertEqual(actual, [18714, 18726])
+        self.assertEqual(F(abs(actual[0]-actual[1]), 64), F(3, 16))
+        self.assertGreater(F(abs(actual[0]-actual[1]), 64), LIMIT)
+        self.assertTrue(report['continuous_model_certificate']['within_1_32'])
+        self.assertFalse(report['font_only_equivalence_accepted'])
+
     def test_all_six_UPM_families_fix_the_same_witness_with_legal_data(self):
         for upem in (1000, 1028, 1064, 1100, 1128, 1144):
             source = q_font(weight_delta=1)

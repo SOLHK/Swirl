@@ -77,7 +77,8 @@ def generate(output):
     for face, axes in enumerate(plans):
         vectors = [(0, 0, 0), (-16384, -16384, -16384), (16384, 16384, 16384),
                    (0, 8192, 0), (4096, -8192, -4096), (-12288, 4096, 12288),
-                   (256, 256, -256), (-256, -256, 256)]
+                   (256, 256, -256), (-256, -256, 256),
+                   (63, 16384, 0)]  # predeclared minimal native-rounding witness
         vectors += [tuple(256*rng.randint(-64, 64) for _ in ORDER) for _ in range(4)]
         for vector in vectors:
             user = [axis.default + n * (axis.default-axis.minimum if n < 0 else axis.maximum-axis.default)/16384

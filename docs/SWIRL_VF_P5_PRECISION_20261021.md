@@ -116,9 +116,44 @@ Old q/font-level modes retain their original thresholds and behavior. The P5
 workflow separately reuses the existing all-GID DirectWrite load/raster probe
 on the actual bounded target, including its multi-DPI controls. Only fixed
 summaries are exported; fonts/TSV/raw output/rasters remain unexported.
-Actual Windows execution is pending at this driver checkpoint.
+Windows execution was pending when that driver checkpoint was saved; actual
+results follow below.
 
 Local authored target:
 `build/vf-takeover-private/p5-precision-controls-stage3/precision.ttc`,201268bytes,
 SHA256f1cb8e2719028151f45c9a55bd0c850d5159c656127813146a1829efe5008451.
 It is not an original PingFang conversion or Swirl-VF delivery font.
+
+## Actual native result and retained acceptance failure
+
+Driver checkpointf3f04cff27c87359883f6fa10f78bab3bbb0de09 is saved remotely.
+Its [P5 diagnostic run39565842706](https://github.com/SOLHK/Swirl/actions/runs/39565842706)
+completed both jobs; existing takeover/P4 workflows also passed. Portable CI
+ran795tests+6audits. P5 has36targeted tests at that checkpoint. Success here
+means model/protocol/raster completion, not strict native equivalence.
+
+Actual Windows Server2022 Datacenter/build20348:32faces,768requests,
+5376glyph pairs,37632metric fields,10752outline pairs,33792point pairs,
+9216actual FLOAT/readback checks. No target FLOAT input rounding or outline
+topology failure occurred. Strict failures remain:1260metric fields,
+4760outline points,140requests; maximum metric error0.2 and point error
+0.2000244140625source FUnit. Native parity is **FAIL** at unchanged1/32.
+The separate existing loader/raster probe passed all32faces and produced10
+multi-DPI/theme rasters. Raster pixel equivalence was not tested.
+Aggregate: [Windows diagnostic and render scope](evidence/SWIRL_VF_P5_WINDOWS_20261021.json).
+
+A new executable minimal case isolates that amplification. For authoredGID2,
+design positions q=(63/16384,3/16,0),r=(63/16384,1,0), the exact source/target
+HVAR models are299515/1024 and1497639/5120: difference1/80. At the same physical
+HarfBuzz output scale they actually return18714and18726 in26.6 units,
+difference3/16FUnit. Both fonts are legal and use unchanged target nominal
+coordinates; the candidate's continuous-model bound still passes. This is a
+retained raw-native failure, not a target user-coordinate fix. The bounded
+test file now has7passing regressions, including the explicit reproduction of
+failed native parity. That case is also frozen into the next32-face native
+cohort; it is not fitted away.
+
+The workflow now has a separate final strict-native acceptance step after
+successful load/render measurement. It checks the same1/32 result and must
+fail while these native discrepancies remain. Fixed summaries are still
+uploaded with always(); no failure is converted into an acceptance pass.

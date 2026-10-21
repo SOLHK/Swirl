@@ -101,6 +101,11 @@ jobs:
           (root/'controls/render-summary.json').write_text(json.dumps(summary,indent=2)+'\n')
           print(json.dumps(summary))
           PYCODE
+      - name: Enforce unchanged strict native acceptance separately from diagnostics
+        run: |
+          $result = Get-Content build/p5-private/controls/directwrite-summary.json -Raw | ConvertFrom-Json
+          if (-not $result.native_protocol_completed -or -not $result.source_unchanged) { throw 'Native protocol or identity invalid' }
+          if (-not $result.within_1_32_native_parity) { throw 'STRICT_NATIVE_ACCEPTANCE_FAIL_RETAINED: unchanged 1/32 source-FUnit gate' }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
