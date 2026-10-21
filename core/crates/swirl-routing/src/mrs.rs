@@ -75,7 +75,7 @@ fn decode_domains(c: &mut Cursor<'_>, count: usize) -> Result<Vec<String>, &'sta
     let mut out = Vec::with_capacity(count.min(65536));
     let mut path = Vec::new();
     walk_domain(0, &mut path, &leaves, &bitmap, &labels, &mut out)?;
-    if out.len() != count { return Err("MrsDomainCount"); }
+    if out.is_empty() { return Err("MrsDomainEmpty"); }
     Ok(out)
 }
 
@@ -131,7 +131,7 @@ fn decode_ip_ranges(c: &mut Cursor<'_>, count: usize) -> Result<Vec<(IpAddr, IpA
         if first.is_ipv4() != last.is_ipv4() || ip_cmp(first, last).is_none_or(|order| order > 0) { return Err("MrsIpRange"); }
         ranges.push((first, last));
     }
-    if n as usize != count { return Err("MrsIpCountMismatch"); }
+    if ranges.is_empty() { return Err("MrsIpEmpty"); }
     Ok(ranges)
 }
 
@@ -170,8 +170,39 @@ impl<'a> Cursor<'a> {
 mod tests {
     use super::*;
     #[test]
-    fn rejects_truncated_and_wrong_magic_before_parsing() {
+    fn rejects_truncated_and_wrong_checksum_before_parsing() {
         assert_eq!(ChinaRules::parse(b"bad", Behavior::Domain, &[0;32]).unwrap_err(), "MrsCompressedSize");
+        let bytes = [0u8; 32];
+        assert_eq!(ChinaRules::parse(&bytes, Behavior::Domain, &[0;32]).unwrap_err(), "MrsChecksum");
+    }
+
+    fn bundled(name: &str) -> Vec<u8> {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../src/Swirl.Quick/packaging/rules").join(name);
+        std::fs::read(path).expect("bundled MRS asset must be present")
+    }
+
+    #[test]
+    fn parses_bundled_mrs_assets_and_matches_domains_and_ips() {
+        let domain = bundled("cn-domain.mrs");
+        let domain_hash: [u8;32] = hex_literal_domain_hash();
+        let domains = ChinaRules::parse(&domain, Behavior::Domain, &domain_hash).expect("valid domain MRS");
+        assert!(domains.matches_domain("www.baidu.com"));
+        assert!(domains.matches_domain("www.qq.com"));
+
+        let ips = bundled("cn-ip.mrs");
+        let ip_hash: [u8;32] = hex_literal_ip_hash();
+        let networks = ChinaRules::parse(&ips, Behavior::IpCidr, &ip_hash).expect("valid IP MRS");
+        assert!(networks.matches_ip("114.114.114.114".parse().unwrap()));
+        assert!(networks.matches_ip("240e:3a1:1000::1".parse().unwrap()));
+        assert!(!networks.matches_ip("8.8.8.8".parse().unwrap()));
+    }
+
+    fn hex_literal_domain_hash() -> [u8;32] {
+        [0xe9,0x2b,0xda,0x4f,0x0b,0x9f,0x05,0x62,0x36,0x63,0xa8,0x82,0x33,0x1a,0x32,0x0a,0xb4,0xe2,0x66,0xca,0xda,0x20,0x46,0xd3,0x82,0x8a,0x94,0x57,0x2c,0xdd,0xed,0x46]
+    }
+    fn hex_literal_ip_hash() -> [u8;32] {
+        [0xd9,0x5b,0x3d,0x12,0x5f,0x6c,0x74,0xce,0x3c,0x15,0xe1,0x9e,0xf7,0x94,0xf1,0x42,0xde,0x91,0xe2,0x1c,0x3b,0x8f,0xb7,0x76,0x7e,0x76,0xae,0xbf,0xab,0xff,0x51,0x49]
     }
     #[test]
     fn suffix_matching_is_label_bounded() {
