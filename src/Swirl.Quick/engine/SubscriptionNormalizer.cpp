@@ -73,11 +73,17 @@ void hysteria2Uri(Result &r,const QString &line,qsizetype split){
     if(hash>=0)rest=rest.left(hash);
     const auto query=rest.indexOf('?');
     const auto queryString=query<0?QString():rest.mid(query+1);
-    auto authority=query<0?rest:rest.left(query);
+    if(query>=0)rest=rest.left(query);
+    // RFC 3986: authority ends at the first '/', so "host:443/?sni=x" keeps
+    // the port intact. The share-link format defines no path semantics.
+    const auto slash=rest.indexOf('/');
+    auto authority=slash<0?rest:rest.left(slash);
+    const auto path=slash<0?QString():rest.mid(slash);
+    if(!path.isEmpty()&&path!="/"){r.error="Hysteria2 URI 含未定义的路径；未应用配置。";return;}
     QString auth;
     const auto at=authority.lastIndexOf('@');
     if(at>=0){auth=authority.left(at);authority=authority.mid(at+1);}
-    QString host,portList;
+    QString host,portList;bool portDelimiter=false;
     if(authority.startsWith('[')){
         const auto close=authority.indexOf(']');
         if(close<0){r.error="Hysteria2 URI 的 IPv6 地址缺少右括号。";return;}
@@ -85,13 +91,15 @@ void hysteria2Uri(Result &r,const QString &line,qsizetype split){
         const auto remainder=authority.mid(close+1);
         if(!remainder.isEmpty()){
             if(!remainder.startsWith(':')){r.error="Hysteria2 URI 的 IPv6 地址后存在无效字符。";return;}
-            portList=remainder.mid(1);
+            portList=remainder.mid(1);portDelimiter=true;
         }
     }else{
         const auto colon=authority.indexOf(':');
         host=colon<0?authority:authority.left(colon);
-        portList=colon<0?QString():authority.mid(colon+1);
+        portList=colon<0?QString():authority.mid(colon+1);portDelimiter=colon>=0;
     }
+    // "host:" is ambiguous in share links; only a fully omitted port uses 443.
+    if(portDelimiter&&portList.isEmpty()){r.error="Hysteria2 URI 的端口为空。";return;}
     host=QUrl::fromPercentEncoding(host.toUtf8());
     if(host.isEmpty()){r.error="Hysteria2 URI 缺少服务器地址。";return;}
     int port=0;QString ports;
@@ -134,7 +142,12 @@ void hysteria2Uri(Result &r,const QString &line,qsizetype split){
         }
         else if(key=="obfs-password")node["obfs-password"]=value;
         else if(key=="pinSHA256"){
-            auto fp=value.toLower();fp.remove(':');node["fingerprint"]=fp;
+            // A certificate pin only tightens verification. Reject anything
+            // that is not a SHA-256 digest instead of storing an unusable pin.
+            auto fp=value.toLower();fp.remove(':');
+            static const QRegularExpression sha256("^[0-9a-f]{64}$");
+            if(!sha256.match(fp).hasMatch()){r.error="Hysteria2 URI 的 pinSHA256 不是有效的 SHA-256 摘要。";return;}
+            node["fingerprint"]=fp;
         }
         else if(key=="alpn")node["alpn"]=QJsonArray::fromStringList(value.split(',',Qt::SkipEmptyParts));
         else if(key=="up")node["up"]=value;

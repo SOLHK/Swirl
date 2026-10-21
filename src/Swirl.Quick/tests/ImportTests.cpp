@@ -660,12 +660,12 @@ external-controller: 0.0.0.0:9090
     }
     void hysteria2UriParsesAuthPortSniObfsAndFingerprint() {
         for(const auto &scheme:QList<QByteArray>{"hysteria2","hy2"}){
-            const QByteArray uri=scheme+"://secret-auth@example.org:443?sni=camouflage.invalid&obfs=salamander&obfs-password=fixture-obfs&pinSHA256=AA:BB:CC:DD&alpn=h3&up=100&down=50#Fixture%20Node";
+            const QByteArray uri=scheme+"://secret-auth@example.org:443?sni=camouflage.invalid&obfs=salamander&obfs-password=fixture-obfs&pinSHA256="+QByteArray(32,'\xab').toHex(':').toUpper()+"&alpn=h3&up=100&down=50#Fixture%20Node";
             const auto parsed=NodeImporter::parse(uri);QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);
             const auto node=parsed.nodes.first();QCOMPARE(node.protocol,QString("hysteria2"));QCOMPARE(node.host,QString("example.org"));QCOMPARE(node.port,quint16(443));
             QCOMPARE(node.password,QString("secret-auth"));QCOMPARE(node.serverName,QString("camouflage.invalid"));QCOMPARE(node.name,QString("Fixture Node"));
             QCOMPARE(node.parameters.value("obfs"),QJsonValue("salamander"));QCOMPARE(node.parameters.value("obfs-password"),QJsonValue("fixture-obfs"));
-            QCOMPARE(node.parameters.value("fingerprint"),QJsonValue("aabbccdd"));QCOMPARE(node.parameters.value("up"),QJsonValue("100"));QCOMPARE(node.parameters.value("down"),QJsonValue("50"));
+            QCOMPARE(node.parameters.value("fingerprint"),QJsonValue(QString::fromLatin1(QByteArray(32,'\xab').toHex())));QCOMPARE(node.parameters.value("up"),QJsonValue("100"));QCOMPARE(node.parameters.value("down"),QJsonValue("50"));
             QVERIFY(node.conversionIssues.isEmpty());
         }
     }
@@ -686,7 +686,37 @@ external-controller: 0.0.0.0:9090
             const auto node=parsed.nodes.first();QCOMPARE(node.port,quint16(0));QCOMPARE(node.parameters.value("ports"),QJsonValue("443,5000-6000"));
         }
     }
+    void hysteria2UriAcceptsRootPathBeforeQuery() {
+        for(const auto &uri:QList<QByteArray>{"hysteria2://fixture-pass@example.com:443/?sni=example.com","hy2://fixture-pass@example.com/?sni=example.com",
+            "hysteria2://fixture-pass@[2001:db8::1]:8443/?sni=example.com","hysteria2://fixture-pass@example.com:443,5000-6000/?sni=example.com","hysteria2://fixture-pass@example.com:443/"}){
+            const auto parsed=NodeImporter::parse(uri);QVERIFY2(parsed,qPrintable(QString::fromUtf8(uri)+": "+parsed.error));
+            const auto node=parsed.nodes.first();QCOMPARE(node.password,QString("fixture-pass"));QVERIFY(node.conversionIssues.isEmpty());
+            QCOMPARE(node.originalConfiguration.value("uri"),QJsonValue(QString::fromUtf8(uri)));
+        }
+        QCOMPARE(NodeImporter::parse("hysteria2://fixture-pass@example.com:443/?sni=example.com").nodes.first().port,quint16(443));
+        QCOMPARE(NodeImporter::parse("hy2://fixture-pass@example.com/?sni=example.com").nodes.first().port,quint16(443));
+        QCOMPARE(NodeImporter::parse("hysteria2://fixture-pass@example.com:443/?sni=example.com").nodes.first().serverName,QString("example.com"));
+        QCOMPARE(NodeImporter::parse("hysteria2://fixture-pass@[2001:db8::1]:8443/?sni=example.com").nodes.first().host,QString("2001:db8::1"));
+        QCOMPARE(NodeImporter::parse("hysteria2://fixture-pass@example.com:443,5000-6000/?sni=example.com").nodes.first().parameters.value("ports"),QJsonValue("443,5000-6000"));
+        // Percent-encoded credentials and names decode exactly once.
+        const auto encoded=NodeImporter::parse("hysteria2://p%40ss%3Aword%2F@example.com:443/?sni=example.com#Node%20%E4%B8%80");
+        QVERIFY2(encoded,qPrintable(encoded.error));QCOMPARE(encoded.nodes.first().password,QString("p@ss:word/"));QCOMPARE(encoded.nodes.first().name,QString::fromUtf8("Node \xe4\xb8\x80"));
+        // A non-root path has no defined meaning and must not be dropped.
+        QVERIFY(!NodeImporter::parse("hysteria2://fixture-pass@example.com:443/extra?sni=example.com"));
+        QVERIFY(!NodeImporter::parse("hysteria2://fixture-pass@example.com:443//?sni=example.com"));
+        // pinSHA256 must be a full SHA-256 digest.
+        QVERIFY(!NodeImporter::parse("hysteria2://fixture-pass@example.com:443?pinSHA256=AA:BB:CC:DD"));
+        QVERIFY(!NodeImporter::parse("hysteria2://fixture-pass@example.com:443?pinSHA256="+QByteArray(64,'z')));
+        const auto plain=NodeImporter::parse("hysteria2://fixture-pass@example.com:443?pinSHA256="+QByteArray(32,'\x01').toHex());
+        QVERIFY2(plain,qPrintable(plain.error));QCOMPARE(plain.nodes.first().parameters.value("fingerprint"),QJsonValue(QString::fromLatin1(QByteArray(32,'\x01').toHex())));
+    }
     void hysteria2UriRejectsInvalidOrUnsafeInput() {
+        QVERIFY(!NodeImporter::parse("hysteria2://auth@example.org:"));
+        QVERIFY(!NodeImporter::parse("hysteria2://auth@example.org:44a"));
+        QVERIFY(!NodeImporter::parse("hysteria2://auth@example.org:443,"));
+        QVERIFY(!NodeImporter::parse("hysteria2://auth@[2001:db8::1"));
+        QVERIFY(!NodeImporter::parse("hysteria2://auth@[2001:db8::1]x"));
+        QVERIFY(!NodeImporter::parse("hysteria2://auth@example.org:443?insecure=yes"));
         QVERIFY(!NodeImporter::parse("hysteria2://auth@example.org:0"));
         QVERIFY(!NodeImporter::parse("hysteria2://auth@example.org:70000"));
         QVERIFY(!NodeImporter::parse("hysteria2://auth@example.org:443,99999"));
