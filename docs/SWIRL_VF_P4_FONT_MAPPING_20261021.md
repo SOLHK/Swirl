@@ -227,6 +227,8 @@ P4 saved source checkpoints so far:
 - 9f39f24acd0060e54e38302190bb72fe7300f245: legal endpoint-r basis and actual
   variation-model transformation; original finite coordinate and authored
   Windows Server font-file controls passed.
+- 73e1d430374acbf95e1c8f39fdfd224960502a14: guarded precision8 coefficient
+  candidate, packed-delta/MVAR/overflow safeguards and retained failure tests.
 
 ## Guarded fine-grid coefficient candidate
 
@@ -266,6 +268,67 @@ The original Swirl-VF production guard remains closed. Actual source-HVF to
 standard glyph construction, full original metrics, font-level global input
 mapping, Windows11 and third-party application acceptance are still distinct
 outstanding gates. No proprietary source/derived font is uploaded.
+
+## Final checkpoint and direct continuation
+
+All six automatic CI jobs passed at source73e1d43:
+[P4 run39558431396](https://github.com/SOLHK/Swirl/actions/runs/39558431396)
+and [existing takeover run39558431497](https://github.com/SOLHK/Swirl/actions/runs/39558431497).
+P4 has45targeted regressions; the existing portable suite has759passes and
+6audit passes. These are test counts, not conversion acceptance counts.
+Native original coordinate composition and authored font-only DirectWrite
+results reproduce the earlier exact numbers. The precision8 path itself has
+actual HarfBuzz/model evidence only; CoreText/DirectWrite precision8 are NOT_RUN.
+Fixed machine evidence: [final CI](evidence/SWIRL_VF_P4_FINAL_CI_20261021.json).
+
+Actual generated font-file control:
+`~/Swirl-worktrees/vf-takeover-abc/build/vf-takeover-private/p4-font-level-controls/font-level.ttc`
+(562696bytes,32authored faces/7GIDs, SHA256bac15ffe51c5b8b297acfaa46411bd420aa789ee5e270c79ca25d4e348e9b6ad).
+It is neither an original conversion candidate nor a Swirl-VF delivery font.
+The separate authored vertical precision control is at
+`build/vf-takeover-private/font-only-precision-control-stage1/authored-scaled-gpos.ttf`.
+No original-derived Swirl-VF.ttc was built; the production gate still refuses
+source-only evidence. No Windows11, installation, real Qt/Swirl or third-party
+Windows application acceptance is inferred from Server2022.
+
+No other worktree/source branch was modified. Main and D1 worktrees are clean.
+Final remote audit still observes A3=66594e9,B1=7902cdb,C1=c0fe6c4,
+integration=f87b6f9; PR23's API separately reports base snapshot70a18d5.
+Both observations are preserved, not resolved by rewriting integration.
+PR23 remains draft/unmerged at54e579f; PR24 remains draft and stacked on that
+same D1 base. No merge conflict was detected for PR24, and no automatic merge
+was attempted. Only the integration owner may decide review/integration order.
+
+Next work must close a real remaining gate rather than re-run a large baseline:
+
+1. Bound font-level normalized16 behavior between F2 knots while preserving the
+   quarter-cell witness and the same-FLOAT native collision. The latter rules
+   out global1/32 parity under unchanged nominal input, independent of UPEM.
+2. Establish a coefficient representation for actual source-HVF q models under
+   serialized integer budgets. Precision8 repairs the half witness, not the
+   retained3/16 or raw-native differences. A tag-aware MVAR path, hint/VORG
+   handling and original variable extrema bounds are prerequisites for reuse.
+3. Validate font-level vertical GPOS shaping in actual DirectWrite and target
+   software, retaining the raw849/850 and original fixed-X/API failures. A
+   shaping feature enabled in one engine is not universal application support.
+4. Only independently accepted original target mapping/metric contracts may
+   authorize the first original-face build. Keep resumable C1/model-byte gates.
+   Windows11 and third-party applications then require their own actual runs.
+
+Targeted commands (use the existing venv read-only):
+
+```sh
+PY=/Users/mac430/Swirl-worktrees/vf-macos-windows-d1/build/vf-d1-private/venv/bin/python
+"$PY" -m unittest discover -s tools/swirl_vf/tests -p test_rebase_design_font.py -v
+"$PY" -m unittest discover -s tools/swirl_vf/tests -p test_design_axis_basis.py -v
+"$PY" tools/swirl_vf/platform/make_font_level_controls.py --output build/vf-takeover-private/p4-font-level-next
+```
+
+Use a new output suffix; generation refuses existing output. The original
+native probe belongs on the verified macOS27 path in the workflow; this local
+Mac26.3 cannot CoreText-load the exact original and must not substitute its
+different system font. This documentation-only successor changes no tested
+source or acceptance gate.
 
 Primary references inspected before implementation:
 [OpenType normalization](https://learn.microsoft.com/en-us/typography/opentype/spec/otvaroverview#coordinate-scales-and-normalization),
