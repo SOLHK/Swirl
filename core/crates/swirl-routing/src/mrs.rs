@@ -490,9 +490,7 @@ mod tests {
                 "10.255.255.255".parse().unwrap(),
             )],
         };
-        let choose = |_: &str| -> Result<String, &'static str> {
-            Err("NoAutomaticGroup")
-        };
+        let choose = |_: &str| -> Result<String, &'static str> { Err("NoAutomaticGroup") };
         let source = "127.0.0.1".parse().unwrap();
         let cn = select_with_trace_and_china(
             &config,
