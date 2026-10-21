@@ -108,6 +108,8 @@ if(SWIRL_USE_RUST_CORE)
  target_compile_definitions(SwirlEngine PUBLIC SWIRL_USE_RUST_CORE)
  add_custom_command(TARGET Swirl POST_BUILD COMMAND "${CMAKE_COMMAND}" -E copy_if_different
   "${SWIRL_RUST_TARGET}/release/swirl_api.dll" "$<TARGET_FILE_DIR:Swirl>/swirl_api.dll")
+ add_custom_command(TARGET Swirl POST_BUILD COMMAND "${CMAKE_COMMAND}" -E copy_directory
+  "${CMAKE_CURRENT_SOURCE_DIR}/packaging/rules" "$<TARGET_FILE_DIR:Swirl>/rules")
 endif()
 target_link_libraries(SwirlEngine PUBLIC Qt6::Core Qt6::Network Qt6::Gui)
 add_library(SwirlExtensions STATIC app/ExtensionService.h app/ExtensionService.cpp)
@@ -261,7 +263,9 @@ if(SWIRL_BUILD_UI_TESTS)
   if(MSVC)
    target_compile_options(SwirlRustCoreTests PRIVATE /utf-8)
   endif()
-  add_custom_command(TARGET SwirlRustCoreTests POST_BUILD COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${SWIRL_RUST_TARGET}/release/swirl_api.dll" "$<TARGET_FILE_DIR:SwirlRustCoreTests>/swirl_api.dll")
+  add_custom_command(TARGET SwirlRustCoreTests POST_BUILD
+   COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${SWIRL_RUST_TARGET}/release/swirl_api.dll" "$<TARGET_FILE_DIR:SwirlRustCoreTests>/swirl_api.dll"
+   COMMAND "${CMAKE_COMMAND}" -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/packaging/rules" "$<TARGET_FILE_DIR:SwirlRustCoreTests>/rules")
   # Qt's Windows text logger may use OutputDebugString when the runner has no
   # console. Keep an explicit report so CI can show the actual failed assertion.
   add_test(NAME swirl-rust-qt-integration COMMAND SwirlRustCoreTests

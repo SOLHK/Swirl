@@ -85,7 +85,7 @@ private slots:
   controller.stop();QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive(),5000);
   QCOMPARE(controller.engineIdentityLabel(),QString::fromUtf8("Swirl Core · 构建类型"));
  }
- void savedRuleModePreflightsBeforeStartingRustSession(){
+ void savedRuleModeStartsWithBundledRulesWithoutChangingSavedRouting(){
   ControlledNetwork net;QVERIFY(net.start());QTemporaryDir directory;QVERIFY(directory.isValid());
   QSettings settings;const auto previous=settings.value("Proxy/routingMode");
   const auto restore=qScopeGuard([&]{if(previous.isValid())settings.setValue("Proxy/routingMode",previous);else settings.remove("Proxy/routingMode");settings.sync();});
@@ -101,13 +101,12 @@ private slots:
   const auto id=controller.nodeCatalog().first().toMap().value("id").toString();
   QVERIFY(controller.chooseNode(id));
   controller.connectNode(id);
-  QVERIFY(controller.nodeError().contains(QString::fromUtf8("策略")));
-  QVERIFY(controller.nodeError().contains(QString::fromUtf8("全局代理")));
-  QVERIFY(!controller.processAlive());QVERIFY(!controller.apiHealthy());
+  QTRY_VERIFY_WITH_TIMEOUT(controller.apiHealthy(),5000);
+  QCOMPARE(controller.routingMode(),QString("rule"));
+  QCOMPARE(controller.engineKind(),QString("rust"));
   QCOMPARE(QSettings().value("Proxy/routingMode").toString(),QString("rule"));
-  QTcpServer available;QVERIFY(available.listen(QHostAddress::LocalHost,o.proxyPort));available.close();
   controller.setRoutingMode("global");
-  controller.connectNode(id);QTRY_VERIFY_WITH_TIMEOUT(controller.apiHealthy(),5000);
+  QTRY_VERIFY_WITH_TIMEOUT(controller.apiHealthy(),5000);
   QCOMPARE(controller.engineKind(),QString("rust"));
   QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",o.proxyPort));
   QNetworkRequest request(net.url());request.setTransferTimeout(4000);
@@ -119,7 +118,9 @@ private slots:
  void unsupportedSessionMessagesIdentifyActualBlocker(){
   ControlledNetwork net;QVERIFY(net.start());const auto o=options(net);QJsonObject configuration;
   auto blocked=o;blocked.smartRouting=true;blocked.routingMode="rule";
-  QVERIFY(RustCoreEngine::configuration(blocked,&configuration).contains(QString::fromUtf8("全局代理")));
+  QVERIFY(RustCoreEngine::configuration(blocked,&configuration).isEmpty());
+  QCOMPARE(configuration.value("smart_routing"),QJsonValue(true));
+  QVERIFY(!configuration.contains("china_rules_directory"));
   blocked=o;blocked.preferCompatibility=true;
   QVERIFY(RustCoreEngine::configuration(blocked,&configuration).contains(QString::fromUtf8("兼容内核")));
   blocked=o;blocked.tunEnabled=true;
@@ -1667,11 +1668,15 @@ private slots:
    QTRY_VERIFY_WITH_TIMEOUT(!controller.imports()->busy(),5000);QCOMPARE(controller.nodeCatalog().size(),1);
    id=controller.nodeCatalog().first().toMap().value("id").toString();QVERIFY(controller.chooseNode(id));
    controller.setRoutingMode("rule");controller.connectNode(id);
-   QVERIFY(controller.nodeError().contains(QString::fromUtf8("智能规则库")));QVERIFY(!controller.processAlive());
-   controller.setRoutingMode("global");controller.connectNode(id);QTRY_VERIFY_WITH_TIMEOUT(controller.apiHealthy(),5000);
-   controller.setRoutingMode("rule");QCOMPARE(controller.routingMode(),QString("global"));
-   QVERIFY(controller.routingError().contains(QString::fromUtf8("智能规则库")));QVERIFY(controller.connected());
-   QCOMPARE(QSettings().value("Proxy/routingMode").toString(),QString("global"));
+   QTRY_VERIFY_WITH_TIMEOUT(controller.connected()&&!controller.nodeBusy()&&!controller.routingBusy(),5000);
+   QCOMPARE(controller.routingMode(),QString("rule"));
+   controller.setRoutingMode("global");QVERIFY2(controller.routingError().isEmpty(),qPrintable(controller.routingError()));
+   QTRY_COMPARE_WITH_TIMEOUT(controller.routingMode(),QString("global"),5000);
+   QTRY_VERIFY_WITH_TIMEOUT(controller.connected()&&!controller.nodeBusy()&&!controller.routingBusy(),5000);
+   controller.setRoutingMode("rule");QVERIFY2(controller.routingError().isEmpty(),qPrintable(controller.routingError()));
+   QTRY_COMPARE_WITH_TIMEOUT(controller.routingMode(),QString("rule"),5000);
+   QTRY_VERIFY_WITH_TIMEOUT(controller.connected()&&!controller.nodeBusy()&&!controller.routingBusy(),5000);
+   QCOMPARE(QSettings().value("Proxy/routingMode").toString(),QString("rule"));
    controller.stop();QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive(),5000);controller.setRoutingMode("rule");
    QVERIFY(controller.saveRoutingRule("DOMAIN-SUFFIX","ads.invalid","REJECT"));
    QVERIFY(!controller.saveRoutingRule("DOMAIN-SUFFIX","ads.invalid","DIRECT"));
