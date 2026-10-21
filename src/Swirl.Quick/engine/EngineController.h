@@ -14,6 +14,7 @@
 class EngineController final : public QObject {
     Q_OBJECT
     Q_PROPERTY(QString executablePath READ executablePath WRITE setExecutablePath NOTIFY optionsChanged)
+    Q_PROPERTY(bool rustCoreBuild READ rustCoreBuild CONSTANT)
     Q_PROPERTY(int controlPort READ controlPort WRITE setControlPort NOTIFY optionsChanged)
     Q_PROPERTY(QString expectedVersion READ expectedVersion CONSTANT)
     Q_PROPERTY(QString expectedSha256 READ expectedSha256 CONSTANT)
@@ -74,6 +75,13 @@ class EngineController final : public QObject {
     Q_PROPERTY(bool preferCompatibility READ preferCompatibility WRITE setPreferCompatibility NOTIFY optionsChanged)
 public:
     explicit EngineController(std::unique_ptr<ProxyEngine> engine, QObject *parent = nullptr, QString storePath = {},bool realAcceptance=false);
+    bool rustCoreBuild() const {
+#ifdef SWIRL_USE_RUST_CORE
+        return true;
+#else
+        return false;
+#endif
+    }
     QString executablePath() const { return m_options.executablePath; }
     int controlPort() const { return m_options.controlPort; }
     void setExecutablePath(const QString &path);

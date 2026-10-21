@@ -43,9 +43,9 @@ Item {
  Item{x:Theme.dp(24);anchors.bottom:parent.bottom;anchors.bottomMargin:Theme.dp(10);width:Math.floor((parent.width-Theme.dp(70))/2);height:Theme.dp(64)
   Rectangle{width:parent.width;height:Theme.dp(1);color:Theme.border}
   SwirlText {y:Theme.dp(15);text:"网关模式";color:Theme.text;font.pixelSize:Theme.fontSize(13);font.weight:Font.DemiBold}
-  SwirlToggle{objectName:"gatewayToggle";x:Theme.dp(68);y:Theme.dp(15);enabled:!gatewayProvider.busy;checked:gatewayProvider.running;onToggled:{const wanted=checked;if(wanted){if(!gatewayProvider.configured)page.configureGateway();else if(!gatewayProvider.start())AppState.notice(gatewayProvider.error)}else gatewayProvider.stop();checked=Qt.binding(()=>gatewayProvider.running)}Accessible.name:"网关模式"}
+  SwirlToggle{objectName:"gatewayToggle";x:Theme.dp(68);y:Theme.dp(15);enabled:!gatewayProvider.busy&&(!engineController.rustCoreBuild||gatewayProvider.running);checked:gatewayProvider.running;onToggled:{const wanted=checked;if(wanted){if(engineController.rustCoreBuild)AppState.notice("Rust Core 暂不支持 TUN 网关转发");else if(!gatewayProvider.configured)page.configureGateway();else if(!gatewayProvider.start())AppState.notice(gatewayProvider.error)}else gatewayProvider.stop();checked=Qt.binding(()=>gatewayProvider.running)}Accessible.name:"网关模式"}
   SwirlIconButton{id:gearButton;objectName:"gatewaySettings";quiet:true;anchors.right:parent.right;y:Theme.dp(10);width:Theme.dp(26);height:width;iconName:"settings";onClicked:page.openGatewayMenu()}
-  SwirlText {y:Theme.dp(41);width:parent.width;text:gatewayProvider.error||"使用自研 DHCP 和 Mihomo TUN 接管专用局域网设备。需要管理员权限和独立 LAN 接口。";color:Theme.muted;font.pixelSize:Theme.fontSize(10);lineHeightMode:Text.FixedHeight;lineHeight:Theme.dp(13);wrapMode:Text.WordWrap;maximumLineCount:2;elide:Text.ElideRight}
+  SwirlText {y:Theme.dp(41);width:parent.width;text:gatewayProvider.error||(engineController.rustCoreBuild?"Rust Core 暂不支持 TUN 网关转发；已保存配置保持不变。":"使用自研 DHCP 和 Mihomo TUN 接管专用局域网设备。需要管理员权限和独立 LAN 接口。");color:Theme.muted;font.pixelSize:Theme.fontSize(10);lineHeightMode:Text.FixedHeight;lineHeight:Theme.dp(13);wrapMode:Text.WordWrap;maximumLineCount:2;elide:Text.ElideRight}
   Menu{id:gatewayMenu;objectName:"gatewayMenu";popupType:Popup.Window;padding:Theme.dp(5);implicitWidth:Theme.dp(175);background:Rectangle{radius:Theme.popupRadius;color:Theme.dark?Theme.field:"#EAF2F8";border.color:Theme.border}
    GatewayMenuItem{text:"DHCP 服务器："+(gatewayProvider.running?"已启用":"未启用");enabled:false}
    GatewayMenuItem{text:"Swirl 网关："+(gatewayProvider.running?"已启用":"未启用");enabled:false}
@@ -58,7 +58,7 @@ Item {
  }
  SwirlDialog{id:gatewayDialog;title:"网关模式";width:Theme.dp(560)
   ColumnLayout{width:parent.width;spacing:Theme.dp(12)
-   SwirlText {text:"选择已设置静态 IPv4 地址的专用 LAN 接口。网关通过 Mihomo TUN 转发；不能选择系统当前的默认上网接口。";Layout.fillWidth:true;color:Theme.muted;font.pixelSize:Theme.fontSize(12);wrapMode:Text.WordWrap}
+   SwirlText {text:engineController.rustCoreBuild?"当前 Rust Core 构建尚不支持 TUN 网关转发。网关配置可以保留，但无法启用。":"选择已设置静态 IPv4 地址的专用 LAN 接口。网关通过 Mihomo TUN 转发；不能选择系统当前的默认上网接口。";Layout.fillWidth:true;color:Theme.muted;font.pixelSize:Theme.fontSize(12);wrapMode:Text.WordWrap}
    SwirlComboBox{id:lanInterface;objectName:"gatewayInterface";Layout.fillWidth:true;model:gatewayProvider.interfaces;textRole:"label";onActivated:{const entry=gatewayProvider.interfaces[currentIndex];gatewayIp.text=entry.ip;prefix.text=String(entry.prefix)}}
    SwirlText {visible:gatewayProvider.interfaces.length===0;text:"当前没有可用的专用 LAN 接口。请接入网卡并设置静态 IPv4 地址。";Layout.fillWidth:true;color:Theme.orange;font.pixelSize:Theme.fontSize(12);wrapMode:Text.WordWrap}
    RowLayout{SwirlText {text:"网关 IP";color:Theme.text;Layout.preferredWidth:Theme.dp(82)}SwirlTextField{id:gatewayIp;Layout.fillWidth:true;text:gatewayProvider.configuration.gateway||""}}

@@ -496,9 +496,17 @@ QString EngineController::proxyEnvironmentAdvice() const {
         "本页只提供建议，不写入环境变量、.codex 配置文件或密钥。").arg(m_options.proxyPort);
 }
 void EngineController::setPreferCompatibility(bool enabled) {
+#ifdef SWIRL_USE_RUST_CORE
+    const auto unsupported=QStringLiteral("当前 Rust Core 构建不提供兼容引擎；请关闭已保存的旧偏好后重试。");
+    if(enabled){m_routingError=unsupported;emit statusChanged();return;}
+#endif
     if(!canStart()){m_routingError=QStringLiteral("请先断开当前连接，再修改引擎兼容设置。");emit statusChanged();return;}
     if(m_options.preferCompatibility==enabled)return;m_options.preferCompatibility=enabled;
-    QSettings().setValue("Proxy/preferCompatibility",enabled);emit optionsChanged();
+    QSettings().setValue("Proxy/preferCompatibility",enabled);
+#ifdef SWIRL_USE_RUST_CORE
+    if(m_routingError==unsupported){m_routingError.clear();emit statusChanged();}
+#endif
+    emit optionsChanged();
 }
 
 bool EngineController::networkEditAllowed() {

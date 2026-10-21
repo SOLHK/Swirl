@@ -4,6 +4,7 @@
 #include <sys/socket.h>
 #endif
 #include "engine/RustCoreEngine.h"
+#include "engine/MihomoAdapter.h"
 #include "engine/ThreadedEngine.h"
 #include "engine/NodeTestService.h"
 #include "engine/NodeImporter.h"
@@ -49,6 +50,26 @@ class RustCoreTests:public QObject {
  }
 private slots:
  void initTestCase(){QStandardPaths::setTestModeEnabled(true);SwirlPaths::initializeTestStorage();QSettings::setDefaultFormat(QSettings::IniFormat);QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,SwirlPaths::writableLocation(QStandardPaths::AppConfigLocation));}
+ void rustBuildRejectsCompatibilityEnableAndPreservesSavedPreference(){
+  QTemporaryDir directory;QVERIFY(directory.isValid());
+  QSettings settings;const auto previous=settings.value("Proxy/preferCompatibility");
+  const auto restore=qScopeGuard([&]{if(previous.isValid())settings.setValue("Proxy/preferCompatibility",previous);else settings.remove("Proxy/preferCompatibility");settings.sync();});
+  settings.setValue("Proxy/preferCompatibility",false);settings.sync();
+  {
+   EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,directory.filePath("disabled.dpapi"));
+   QVERIFY(controller.rustCoreBuild());QVERIFY(controller.property("rustCoreBuild").toBool());
+   controller.setPreferCompatibility(true);
+   QVERIFY(!controller.preferCompatibility());QVERIFY(controller.routingError().contains("Rust Core"));
+   QCOMPARE(QSettings().value("Proxy/preferCompatibility").toBool(),false);
+  }
+  settings.setValue("Proxy/preferCompatibility",true);settings.sync();
+  {
+   EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,directory.filePath("saved.dpapi"));
+   QVERIFY(controller.preferCompatibility());QCOMPARE(QSettings().value("Proxy/preferCompatibility").toBool(),true);
+   controller.setPreferCompatibility(false);
+   QVERIFY(!controller.preferCompatibility());QCOMPARE(QSettings().value("Proxy/preferCompatibility").toBool(),false);
+  }
+ }
  void smartRoutingUsesBundledRulesUnlessDirectoryIsExplicit(){
   ControlledNetwork net;QVERIFY(net.start());auto o=options(net);o.routingMode="rule";o.smartRouting=true;
   QJsonObject config;QVERIFY(RustCoreEngine::configuration(o,&config).isEmpty());
