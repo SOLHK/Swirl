@@ -87,8 +87,15 @@ then passed. Full source-stage regression is recorded at the source checkpoint.
 
 The dedicated read-only CI workflow runs the exact original39d42acd on the
 existing macOS27 runner and uploads **only summary.json**. It never exports
-font bytes, raw original payloads, plans or private logs. Original CI is
-pending at this source checkpoint; installed-control success is not substituted.
+font bytes, raw original payloads, plans or private logs. Source checkpoint
+`dbff131cd04784e11a9f1c043ffec6b201040bf1` passed portable and original-source
+jobs in [run39546531075](https://github.com/SOLHK/Swirl/actions/runs/39546531075).
+Actual original macOS27.0.1/26A434 reproduced all3184 glyph records and796
+opposite-order pairs, with all384 D2 requests replayable and the original
+288pass/96fail strict result unchanged. The GID5 collision pair retained its
+0.5474853515625 advance difference. This is original evidence, separate from
+the installed control. Safe aggregate:
+[original replay](evidence/SWIRL_VF_TAKEOVER_ORIGINAL_REPLAY_20261021.json).
 
 Primary references reviewed before implementation: A3's prereadback handoff
 and immutable native evidence at66594e9; project's existing verified-axis
@@ -107,11 +114,64 @@ found; all strict failures remain. A delivery-contract question is pending
 about explicit Qt/Swirl layout compensation versus low-level native API
 equality. No dependent relaxation or compensating source edit is made.
 
-C1's reviewed packer/binary checker is prepared as a separate selected patch,
-not included in this first source-input checkpoint. Its synthetic-only engine
-is not enabled for original data by changing a marker. No original glyph
-model/face or Apple-derived Swirl-VF.ttc is generated here. Windows11 and
-actual Qt/Swirl remain NOT_RUN.
+C1's reviewed packer/binary checker is integrated as a separate selected patch;
+its synthetic-only reconstruction engine is not imported or enabled for Apple
+data. No original glyph model/face or Apple-derived Swirl-VF.ttc is generated.
+Windows11 and actual Qt/Swirl remain NOT_RUN.
+
+## Reviewed production boundary and actual C1 fix
+
+A follow-up independent review found a missing explicit distinction at the
+build entry point: accepting source replay in NativeOracle could otherwise
+allow the old approximate reconstruction to proceed without an accepted target
+mapping contract. The production entry now rejects source-request-only metadata
+before sampling, both on the first session and later resumed sessions. The
+diagnostic NativeOracle remains usable. Two regressions prove no new sample,
+checkpoint or final font is created, and a previously verified face survives a
+later rejected session. Existing complete analytic reconstruction remains valid.
+This closes the boundary rather than relying on current unrelated metric failures
+to prevent publication. Source replay alone never authorizes target construction.
+
+The existing production TTC serializer now calls the exact reviewed C1 packer
+and independent binary verifier, preserving its per-face/table comparison,
+native finalization, source rehash and final no-replace publication. C1's own
+`production_accepted=false` marker remains packaging scope only. All three C1
+modules are bound into resumable checkpoint recipe hashes. Provenance and exact
+source blobs are in [selected reuse](SWIRL_VF_C1_REUSE_20261021.md).
+
+An actual on-disk padding corruption reproduces the old false pass: all three
+face model gates and the table-byte gate pass before and after the mutation.
+The new raw checker rejects `serialization:ttc_nonzero_padding`, no native
+finalization/publication occurs, and typed safe failure context is retained.
+The old face-order corruption test still changes actual candidate bytes and
+fails the same name gate; its injection now uses the actual packer callback.
+Changing any selected packer/verifier code hash rejects an old checkpoint
+without modifying its manifest.
+
+Actual macOS26.3 native control reconstructs two authored faces through the new
+packer:58requests/174glyph records, zero observed source/candidate outline,
+table metric and bound discrepancy under the existing1-unit comparator.
+The separate strict raw API gate still fails849versus850 at unchanged1/32;
+table-metric reconstruction does not relabel that raw API failure. Static
+default/fractional instances also pass their existing checks. Fonts are temporary
+and removed by the existing native driver.
+
+An additional authored32-face/7GID control was packed locally:53896bytes,
+672table references/300unique tables/372shared references, all source table
+bytes preserved except required head checksum adjustment. FontTools and the
+independent binary checker pass; HarfBuzz14.6.0 ran64directional shaping smoke
+cases/192glyph records. File remains private at
+`build/vf-takeover-private/c1-synthetic/c1-control.ttc`; it is explicitly authored
+test data, not a PingFang conversion or delivery font. Safe aggregate:
+[C1 local](evidence/SWIRL_VF_TAKEOVER_C1_LOCAL_20261021.json).
+
+Full second-stage suite: **703 discovered =696passed +7platform skips**,34.485s;
+audit6/6. This includes all60selected C1 tests, the new production padding and
+checkpoint hash regressions, two source-only production-boundary tests and all
+old source/strict-axis tests. New Windows2022 CI packages the authored32-face
+control through this same C1 code and runs existing DirectWrite probing/raster
+capture; results pending at this checkpoint. No Apple font or derived font is
+uploaded by any job. Windows11 installation and actual Qt/Swirl are NOT_RUN.
 
 ## Reproduction
 

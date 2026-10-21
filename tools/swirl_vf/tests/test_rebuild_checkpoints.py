@@ -285,6 +285,27 @@ class RebuildCheckpointTests(unittest.TestCase):
         self.assertEqual(oracle.requests, [])
         self.assertFalse(self.output.exists())
 
+    def test_changed_c1_packing_or_binary_code_cannot_reuse_a_prior_acceptance(self):
+        self.interrupted()
+        manifest = self.checkpoints / "verified-faces.json"
+        before = manifest.read_bytes()
+        accepted = json.loads(before)
+        modules = ("ttc_staging_pack.py", "ttc_staging_binary.py", "ttc_staging_contract.py")
+        self.assertTrue(set(modules) <= set(accepted["recipe"]["code_sha256"]))
+        code_root = Path(rebuild.__file__).resolve().parent
+        original_sha = rebuild.sha256
+        for number, name in enumerate(modules):
+            def changed_module(path, name=name):
+                return "0" * 64 if Path(path) == code_root / name else original_sha(path)
+            oracle = OracleSessions(self.source)
+            with self.subTest(module=name), \
+                 mock.patch.object(rebuild, "sha256", side_effect=changed_module):
+                with self.assertRaisesRegex(rebuild.ReconstructionError, "checkpoint recipe differs"):
+                    self.invoke(f"changed-c1-module-{number}", oracle)
+            self.assertEqual(oracle.requests, [])
+            self.assertEqual(manifest.read_bytes(), before)
+            self.assertFalse(self.output.exists())
+
     def test_changed_source_cannot_reuse_a_prior_acceptance(self):
         self.interrupted()
         self.source.write_bytes(self.source.read_bytes() + b"changed source identity")

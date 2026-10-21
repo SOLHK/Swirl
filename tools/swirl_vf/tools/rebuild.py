@@ -39,6 +39,8 @@ from fontTools.ttLib.tables.TupleVariation import TupleVariation
 from fontTools.varLib.models import VariationModel, normalizeLocation
 from metric_variations import add_metric_variations, verify_metric_variations
 from incremental_pipe import TimedLineReader
+from ttc_staging_pack import pack_collection
+from ttc_staging_contract import StagingError
 
 
 class ReconstructionError(RuntimeError):
@@ -769,7 +771,8 @@ class FaceCheckpoints:
                   "source_face_identity_sha256": [identity_digest(face) for face in source_faces],
                   "native_transcript_policy": "independent_complete_native_session_before_each_face_checkpoint",
                   "code_sha256": {name: sha256(code_root / name) for name in
-                                  ("rebuild.py", "metric_variations.py", "audit_font.py", "incremental_pipe.py")},
+                                  ("rebuild.py", "metric_variations.py", "audit_font.py", "incremental_pipe.py",
+                                   "ttc_staging_pack.py", "ttc_staging_binary.py", "ttc_staging_contract.py")},
                   "python_version": list(sys.version_info[:3]),
                   "fonttools_version": __import__('fontTools').__version__,
                   "numpy_version": np.__version__, "settings": settings}
@@ -932,6 +935,8 @@ def run(source, executable, destination, report_path, batch_size=64,
         # the JSON boolean false, never a truthy or malformed diagnostic flag.
         check(oracle.metadata.get("diagnostic_readback_observation_only", False) is False,
               "diagnostic-only native observations cannot be used for reconstruction")
+        check("source_request_verification_backend" not in oracle.metadata,
+              "unchanged source-request replay cannot authorize target reconstruction")
         if source_faces is not None:
             verify_checkpoint_session_metadata(oracle.metadata, report["source_sha256"],
                                                source.stat().st_size, source_faces)
@@ -1148,14 +1153,19 @@ def run(source, executable, destination, report_path, batch_size=64,
                     face_paths.append(path)
                 context = {"stage": "collection_serialization"}
                 candidate = Path(tmp) / "candidate.ttc"
-                with TTCollection() as collection:
-                    # Packaging must not rewrite timestamps after each face's
-                    # complete serialized model has already been verified.
-                    for path in face_paths:
-                        collection.fonts.append(TTFont(path, lazy=True, recalcTimestamp=False))
-                    collection.save(candidate, shareTables=True)
-                    with TTCollection(candidate, lazy=True) as reopened:
+                def verify_packed(candidate_path):
+                    with TTCollection(candidate_path, lazy=True) as reopened:
                         report["collection_verification"] = verify_collection_tables(face_paths, reopened)
+                try:
+                    # Reuse C1's byte-preserving, bounded-buffer packer and its
+                    # independent raw TTC verifier. Table-byte equality alone
+                    # cannot detect corrupt padding or directory aliases.
+                    report["collection_packing"] = pack_collection(
+                        face_paths, candidate, expected_sha256=[sha256(path) for path in face_paths],
+                        validate=verify_packed, share_tables=True)
+                except StagingError as error:
+                    raise ReconstructionError("TTC staging rejected: " + str(error),
+                                              collection_packing=error.to_dict()) from error
                 context = {"stage": "native_finalization"}
                 if checkpoints is None:
                     report["oracle_summary"] = finish_session()["summary"]
@@ -1190,6 +1200,8 @@ def run(source, executable, destination, report_path, batch_size=64,
             context = {**context, "native_observation": native_failure_details(error.context["native_observation"])}
         if isinstance(error, ReconstructionError) and "metric_representation" in error.context:
             context = {**context, "metric_representation": metric_failure_details(error.context["metric_representation"])}
+        if isinstance(error, ReconstructionError) and "collection_packing" in error.context:
+            context = {**context, "collection_packing": error.context["collection_packing"]}
         report["failures"].append({"type": type(error).__name__, "message": str(error),
                                    "context": context})
         raise

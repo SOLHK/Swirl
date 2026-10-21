@@ -9,13 +9,14 @@ serialization gates still run and must block final-file publication.
 import hashlib
 import json
 from pathlib import Path
+import struct
 import sys
 import tempfile
 import unittest
 from unittest import mock
 
 import numpy as np
-from fontTools.ttLib import TTCollection, TTFont
+from fontTools.ttLib import TTCollection, TTFont, newTable
 from fontTools.varLib.instancer import instantiateVariableFont
 from fontTools.varLib.models import normalizeLocation
 
@@ -199,6 +200,15 @@ class RebuildPipelineTests(unittest.TestCase):
             self.assertEqual([f["face_index"] for f in result["faces"]], [0, 1, 2])
             self.assertEqual(result["collection_verification"]["status"], "PASS")
             self.assertEqual(result["collection_verification"]["faces_checked"], 3)
+            packing = result["collection_packing"]
+            self.assertEqual(packing["faces"], 3)
+            self.assertEqual(packing["sha256"], result["output_sha256"])
+            self.assertFalse(packing["production_accepted"])
+            self.assertFalse(packing["native_source_equivalence"])
+            binary = packing["binary_validation"]
+            self.assertEqual(binary["faces"], 3)
+            self.assertEqual(binary["sha256"], result["output_sha256"])
+            self.assertFalse(binary["production_accepted"])
             for face in result["faces"]:
                 self.assertEqual(face["glyph_count"], 3)
                 checked = face["serialized_model_verification"]
@@ -281,21 +291,22 @@ class RebuildPipelineTests(unittest.TestCase):
             source, output, report = self.fixture(root)
             before = source.read_bytes()
             oracle = OriginalAnalyticOracle(source)
-            original_save = TTCollection.save
+            original_pack = rebuild.pack_collection
             corrupted = []
 
-            def corrupt_saved_collection(collection, path, *args, **kwargs):
-                result = original_save(collection, path, *args, **kwargs)
-                if Path(path).name == "candidate.ttc":
-                    altered = Path(path).with_name("altered-collection.ttc")
-                    with TTCollection(path, recalcTimestamp=False) as mutant:
+            def corrupt_saved_collection(paths, destination, **kwargs):
+                validate = kwargs["validate"]
+                def corrupt_then_validate(candidate):
+                    altered = candidate.with_name("altered-collection.ttc")
+                    with TTCollection(candidate, recalcTimestamp=False) as mutant:
                         mutant.fonts.reverse()
-                        original_save(mutant, altered, shareTables=True)
-                    altered.replace(path)
-                    corrupted.append(path)
-                return result
+                        mutant.save(altered, shareTables=True)
+                    altered.replace(candidate)
+                    corrupted.append(candidate)
+                    validate(candidate)
+                return original_pack(paths, destination, **{**kwargs, "validate": corrupt_then_validate})
 
-            with mock.patch.object(TTCollection, "save", new=corrupt_saved_collection), \
+            with mock.patch.object(rebuild, "pack_collection", side_effect=corrupt_saved_collection), \
                  mock.patch.object(rebuild, "verify_serialized_face", wraps=rebuild.verify_serialized_face) as faces:
                 with self.assertRaisesRegex(rebuild.ReconstructionError, "TTC face 0: name bytes changed"):
                     self.invoke(source, output, report, oracle)
@@ -304,6 +315,64 @@ class RebuildPipelineTests(unittest.TestCase):
             saved = self.assert_blocked(root, source, before, output, report, oracle)
             self.assertEqual(len(saved["faces"]), 3)
             self.assertTrue(all(f["serialized_model_verification"]["status"] == "PASS" for f in saved["faces"]))
+
+    def test_actual_ttc_padding_corruption_passes_table_gate_but_blocks_publication(self):
+        with tempfile.TemporaryDirectory(prefix="analytic-padding-") as tmp:
+            root = Path(tmp)
+            source, output, report = self.fixture(root)
+            # Authored one-byte metadata forces three alignment bytes. It is
+            # unrelated to Apple source data and survives production rebuilding.
+            padded = root / "padded-source.ttc"
+            with TTCollection(source, recalcTimestamp=False) as collection:
+                for font in collection.fonts:
+                    font["PAD1"] = newTable("PAD1")
+                    font["PAD1"].data = b"x"
+                collection.save(padded, shareTables=True)
+            padded.replace(source)
+            before = source.read_bytes()
+            oracle = OriginalAnalyticOracle(source)
+            original_pack = rebuild.pack_collection
+            table_passes = []
+            corruptions = []
+
+            def inject_padding(paths, destination, **kwargs):
+                validate = kwargs["validate"]
+                def corrupt_after_table_gate(candidate):
+                    validate(candidate)
+                    table_passes.append("before_corruption")
+                    data = candidate.read_bytes()
+                    directory = struct.unpack_from(">I", data, 12)[0]
+                    count = struct.unpack_from(">H", data, directory + 4)[0]
+                    entries = [struct.unpack_from(">4sIII", data, directory + 12 + 16 * index)
+                               for index in range(count)]
+                    _, _, offset, length = next(entry for entry in entries if entry[0] == b"PAD1")
+                    self.assertEqual(length, 1)
+                    self.assertEqual(data[offset + length], 0)
+                    with candidate.open("r+b") as stream:
+                        stream.seek(offset + length)
+                        stream.write(b"!")
+                    corruptions.append(offset + length)
+                    # Reproduce the previous false pass on the actual corrupt
+                    # file: table data and their directories are still intact.
+                    validate(candidate)
+                    table_passes.append("after_corruption")
+                return original_pack(paths, destination,
+                                     **{**kwargs, "validate": corrupt_after_table_gate})
+
+            with mock.patch.object(rebuild, "pack_collection", side_effect=inject_padding), \
+                 mock.patch.object(rebuild, "verify_serialized_face", wraps=rebuild.verify_serialized_face) as faces:
+                with self.assertRaisesRegex(rebuild.ReconstructionError, "ttc_nonzero_padding"):
+                    self.invoke(source, output, report, oracle)
+            self.assertEqual(faces.call_count, 3)
+            self.assertEqual(table_passes, ["before_corruption", "after_corruption"])
+            self.assertEqual(len(corruptions), 1)
+            self.assertEqual(oracle.finish_count, 0)
+            saved = self.assert_blocked(root, source, before, output, report, oracle)
+            self.assertEqual(saved["collection_verification"]["status"], "PASS")
+            failure = saved["failures"][0]["context"]
+            self.assertEqual(failure["stage"], "collection_serialization")
+            self.assertEqual(failure["collection_packing"]["category"], "serialization")
+            self.assertEqual(failure["collection_packing"]["code"], "ttc_nonzero_padding")
 
     def test_final_name_and_existing_output_are_guarded_before_oracle(self):
         with tempfile.TemporaryDirectory(prefix="analytic-pipeline-") as tmp:
