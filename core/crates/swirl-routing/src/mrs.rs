@@ -503,8 +503,7 @@ mod tests {
             source,
             None,
             &choose,
-            Some(&domains),
-            Some(&ips),
+            Some((&domains, &ips)),
         )
         .unwrap();
         assert!(matches!(reject.decision, crate::Decision::Node(n) if n.id == "reject"));
@@ -515,8 +514,7 @@ mod tests {
             source,
             None,
             &choose,
-            Some(&domains),
-            Some(&ips),
+            Some((&domains, &ips)),
         )
         .unwrap();
         assert!(
@@ -529,8 +527,7 @@ mod tests {
             source,
             Some(&["8.8.8.8:443".parse::<SocketAddr>().unwrap()]),
             &choose,
-            Some(&domains),
-            Some(&ips),
+            Some((&domains, &ips)),
         )
         .unwrap();
         assert!(matches!(foreign.decision, crate::Decision::Node(n) if n.id == "proxy"));
@@ -541,8 +538,7 @@ mod tests {
             source,
             Some(&["10.2.3.4:443".parse::<SocketAddr>().unwrap()]),
             &choose,
-            Some(&domains),
-            Some(&ips),
+            Some((&domains, &ips)),
         )
         .unwrap();
         assert!(matches!(china_ip.decision, crate::Decision::Node(n) if n.id == "direct"));
