@@ -1,4 +1,5 @@
 //! Synthetic public protocol conversion regressions; no network or real credentials.
+use base64::{Engine, engine::general_purpose::STANDARD};
 use serde_json::{Value, json};
 use swirl_subscription::xray::InputSource;
 use swirl_subscription::xray::convert::{
@@ -56,6 +57,8 @@ fn ss_aead_and_unsupported_ciphers_are_retained_not_replaced() {
         "aes-256-gcm",
         "chacha20-ietf-poly1305",
         "2022-blake3-aes-128-gcm",
+        "2022-blake3-aes-256-gcm",
+        "2022-blake3-chacha20-poly1305",
         "aes-128-cfb",
         "future-cipher",
     ] {
@@ -65,7 +68,15 @@ fn ss_aead_and_unsupported_ciphers_are_retained_not_replaced() {
         assert!(
             matches!(d.nodes()[0].authentication(),Authentication::Password {method:Some(m),..} if m==method)
         );
-        if !["aes-128-gcm", "aes-256-gcm", "chacha20-ietf-poly1305"].contains(&method) {
+        if ![
+            "aes-128-gcm",
+            "aes-256-gcm",
+            "chacha20-ietf-poly1305",
+            "2022-blake3-aes-128-gcm",
+            "2022-blake3-aes-256-gcm",
+        ]
+        .contains(&method)
+        {
             assert!(
                 d.nodes()[0]
                     .diagnostics()
@@ -73,6 +84,38 @@ fn ss_aead_and_unsupported_ciphers_are_retained_not_replaced() {
                     .any(|x| x.code.starts_with("ShadowsocksCipher"))
             );
         }
+        if method.starts_with("2022-") {
+            // This fixture contains a historical arbitrary password, not a
+            // SIP022 fixed-length PSK. Never derive a key or downgrade it.
+            assert!(d.nodes()[0].native_outbound().is_none());
+        }
+    }
+}
+
+#[test]
+fn ss2022_base64_psk_is_preserved_and_identity_chains_remain_blocked() {
+    for (cipher, size) in [
+        ("2022-blake3-aes-128-gcm", 16),
+        ("2022-blake3-aes-256-gcm", 32),
+    ] {
+        let password = STANDARD.encode(vec![73; size]);
+        let mut value = source("shadowsocks");
+        value["settings"]["servers"][0]["method"] = json!(cipher);
+        value["settings"]["servers"][0]["password"] = json!(password);
+        value["streamSettings"] = json!({"network":"tcp","security":"none"});
+        let converted = roundtrip(&value);
+        assert!(
+            matches!(converted.nodes()[0].native_outbound(), Some(swirl_subscription::Outbound::Shadowsocks {
+            cipher: actual, password: actual_key, .. }) if actual == cipher && actual_key == &password)
+        );
+        assert!(!converted.nodes()[0].network_verified());
+        value["settings"]["servers"][0]["password"] = json!(format!("{password}:{password}"));
+        let converted = roundtrip(&value);
+        assert!(converted.nodes()[0].native_outbound().is_none());
+        assert!(
+            matches!(converted.nodes()[0].authentication(), Authentication::Password { password: Some(raw), .. }
+            if raw == &format!("{password}:{password}"))
+        );
     }
 }
 #[test]

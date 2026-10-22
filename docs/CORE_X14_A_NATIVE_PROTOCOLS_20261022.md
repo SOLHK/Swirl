@@ -130,3 +130,58 @@ tests separately verify modern VMess export/start/stop without dialing an
 upstream. A1 clean remote CI run 39779971139 passed fmt/check/clippy/test on
 Ubuntu, Windows and macOS. That run applies to A1, not to this newer code.
 There has been no Windows Qt product test or public subscription test here.
+
+## A3/A4: authenticated native QUIC protocols
+
+Hysteria2 and TUIC v5 now use the common native Quinn/rustls transport and Core
+TCP/UDP routing. Their exact official peer versions, source specifications,
+authentication, verified payloads, negative cases and retained limitations are
+recorded in [Hysteria2 evidence](HYSTERIA2_NATIVE_INTEROP_20261022.md) and
+[TUIC evidence](TUIC_NATIVE_INTEROP_20261022.md). Hysteria salamander and negotiated
+bandwidth limits are exercised with the official server. TUIC uses the v5 TLS
+exporter token, supports native/quic UDP relay modes, and keeps bounded sessions,
+reassembly, heartbeat and DNS-generation-aware connection reuse.
+
+A4 run `39783473847` passed native Rust gates on all three OSes. Official
+interoperability passed on Windows and Ubuntu. macOS failed two maximum-payload
+TUIC UDP cases plus their aggregate assertion: the independent destination never
+received either 65,507-byte packet. The original failure is retained in
+`docs/evidence/x14-a4-tuic/macos-ci-39783473847-*`. The new disposable-runner
+preparation records bare UDP behavior, OS buffer defaults and any explicit
+adjustment before retrying the unchanged payloads. It is not a product runtime
+dependency, and its addition does not by itself establish a macOS pass.
+
+## A5: persisted native transports and shared protocol integration
+
+The ordinary native configuration now persists typed gRPC, legacy HTTP/2,
+HTTPUpgrade and XHTTP stream-one options. Xray/V2Ray source JSON maps those
+options into the same Outbound used by normal Core start, configure, selection,
+probes and C ABI v1; no external transport override is needed. Source host/path,
+serviceName, supported headers, SNI, ALPN and inline verification CA survive
+archive restore. Unknown semantics, early data, unsupported fingerprint and
+XHTTP modes still block export. See the exact [imported transport results](
+IMPORTED_TRANSPORT_NATIVE_INTEROP_20261022.md): five official test methods,
+HTTP/HTTPS, 4 MiB in each direction, negative credentials/parameters and normal
+application completion. Legacy H2 is explicitly tied to Xray 1.8.24.
+
+This shared integration checkpoint also registers native Shadowsocks 2022 AES
+and classic VLESS/Trojan UDP carriers. The common Core UDP dispatcher remains
+bounded; VLESS carriers are keyed by destination, while Trojan uses per-packet
+addresses. New protocol frames have length/deadline limits and cancelled writes
+cannot silently reuse a partly written UDP carrier. The detailed consolidation
+evidence is retained separately under `x14-a6-ss2022` and `x14-a6-stream-udp`.
+
+TLS validates SNI, ALPN and custom CA material before DNS/socket allocation. A
+bounded 32-entry context cache avoids rebuilding root stores on repeated ordinary
+TLS connections; session resumption and early data remain disabled. Invalid
+reconfiguration preserves the running Core generation, verified through the
+actual C ABI. This proves an ABI/configuration boundary, not Qt UI integration.
+
+Local A5 gates on Linux completed with `cargo fmt --all -- --check`, `cargo check
+--workspace --locked`, `cargo clippy --workspace --all-targets --locked -- -D
+warnings`, and `cargo test --workspace --locked`: 631 tests passed, zero failed,
+zero ignored. Logs and scope are in `docs/evidence/x14-a5-local`. Two obsolete
+negative cases were updated to still-unsupported XHTTP auto and SS2022 ChaCha
+after gRPC and SS2022 AES became executable; rejection and sibling-isolation
+assertions remain. Official interop is an additional CI matrix with pinned peer
+downloads; local gates are never substituted for its actual result.

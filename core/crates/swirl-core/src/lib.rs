@@ -33,6 +33,19 @@ use tokio::{
 type ChinaRulePair = (Option<Arc<ChinaRules>>, Option<Arc<ChinaRules>>);
 
 fn validate_transports(config: &Config, transports: &BTreeMap<String, Transport>) -> Result<()> {
+    for node in &config.nodes {
+        let configured = Transport::configured(&node.outbound);
+        if let Some(transport) = &configured {
+            if transports.contains_key(&node.id) {
+                return Err("TransportConflict");
+            }
+            transport.validate_for(&node.outbound)?;
+        }
+        swirl_protocol::validate_tls(
+            &node.outbound,
+            configured.as_ref().or_else(|| transports.get(&node.id)),
+        )?;
+    }
     for (id, transport) in transports {
         let node = config
             .nodes
@@ -846,6 +859,24 @@ async fn prepare_udp(
             });
         }
         Outbound::Tuic(config) if config.udp => {
+            return Ok(UdpDispatch {
+                transport: UdpTransport::ProxySession { target, payload },
+                payload_len,
+                node_id: node.id.clone(),
+                permit,
+            });
+        }
+        Outbound::Vless { udp: true, .. } | Outbound::Trojan { udp: true, .. } => {
+            return Ok(UdpDispatch {
+                transport: UdpTransport::ProxySession { target, payload },
+                payload_len,
+                node_id: node.id.clone(),
+                permit,
+            });
+        }
+        Outbound::Shadowsocks {
+            cipher, udp: true, ..
+        } if cipher.starts_with("2022-") => {
             return Ok(UdpDispatch {
                 transport: UdpTransport::ProxySession { target, payload },
                 payload_len,

@@ -49,7 +49,9 @@ pub(super) fn adapt(
     let endpoint = endpoint?;
     let path = &source.outbound_path;
     // Never infer a missing layer from a port, and never flatten a transport.
-    if !matches!(mapping.transport, Transport::Tcp | Transport::WebSocket) {
+    if !matches!(mapping.transport, Transport::Tcp | Transport::WebSocket)
+        && mapping.stream_transport.is_none()
+    {
         return reject(
             sink,
             "NativeTransportUnsupported",
@@ -98,6 +100,8 @@ pub(super) fn adapt(
             reality: mapping.reality.clone(),
             websocket: mapping.websocket.clone(),
             flow: flow.clone(),
+            transport: mapping.stream_transport.clone(),
+            udp: false,
         },
         (
             Protocol::Trojan,
@@ -126,6 +130,8 @@ pub(super) fn adapt(
                 password: password.clone(),
                 tls,
                 websocket: mapping.websocket.clone(),
+                transport: mapping.stream_transport.clone(),
+                udp: false,
             }
         }
         (

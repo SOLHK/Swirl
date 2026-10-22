@@ -1,0 +1,13 @@
+{
+  "evidence_level": "official_server_independent_loopback",
+  "public_network_tested": false,
+  "qt_product_tested": false,
+  "platform": "Linux-6.18.55-x86_64-with-glibc2.39",
+  "official_server": "shadowsocks-rust v1.25.0",
+  "tests_run": 12,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "elapsed_seconds": 5.326,
+  "exit_code": 0
+}

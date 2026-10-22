@@ -7,6 +7,8 @@ mod probe;
 mod shadowsocks;
 mod socks4;
 mod socks5;
+pub mod ss2022;
+pub mod stream_udp;
 mod transport;
 pub mod tuic;
 pub mod vision;
@@ -427,7 +429,7 @@ pub async fn connect(
     resolver: &Resolver,
     handshake_limit: std::time::Duration,
 ) -> Result<swirl_transport::BoxStream> {
-    connect_selected(outbound, target, resolver, handshake_limit, None).await
+    connect_selected(outbound, target, resolver, handshake_limit, None, false).await
 }
 
 /// Connect an existing proxy protocol over an explicitly selected native
@@ -440,7 +442,35 @@ pub async fn connect_with_transport(
     handshake_limit: std::time::Duration,
     transport: &Transport,
 ) -> Result<swirl_transport::BoxStream> {
-    connect_selected(outbound, target, resolver, handshake_limit, Some(transport)).await
+    connect_selected(
+        outbound,
+        target,
+        resolver,
+        handshake_limit,
+        Some(transport),
+        false,
+    )
+    .await
+}
+
+pub(crate) async fn connect_udp_stream(
+    outbound: &Outbound,
+    target: &Target,
+    resolver: &Resolver,
+    handshake_limit: std::time::Duration,
+    transport: Option<&Transport>,
+) -> Result<swirl_transport::BoxStream> {
+    match outbound {
+        Outbound::Vless {
+            udp: true, flow, ..
+        } if flow.as_deref().is_none_or(str::is_empty) => (),
+        Outbound::Vless {
+            flow: Some(flow), ..
+        } if !flow.is_empty() => return Err("VisionUdpUnsupported"),
+        Outbound::Trojan { udp: true, .. } => (),
+        _ => return Err("StreamUdpUnsupported"),
+    }
+    connect_selected(outbound, target, resolver, handshake_limit, transport, true).await
 }
 
 async fn connect_selected(
@@ -449,8 +479,15 @@ async fn connect_selected(
     resolver: &Resolver,
     handshake_limit: std::time::Duration,
     transport: Option<&Transport>,
+    udp: bool,
 ) -> Result<swirl_transport::BoxStream> {
+    let configured = Transport::configured(outbound);
+    if configured.is_some() && transport.is_some() {
+        return Err("TransportConflict");
+    }
+    let transport = transport.or(configured.as_ref());
     transport::validate(outbound, transport)?;
+    validate_tls(outbound, transport)?;
     // DNS, all address attempts, TLS and protocol negotiation share this one
     // budget. A successful TCP connection ends address fallback permanently.
     let deadline = Instant::now() + handshake_limit;
@@ -467,6 +504,17 @@ async fn connect_selected(
             security,
             ..
         } => vmess::validate(uuid, *alter_id, security)?,
+        Outbound::Shadowsocks {
+            password,
+            cipher,
+            obfs_http,
+            ..
+        } if cipher.starts_with("2022-") => {
+            ss2022::validate(password, cipher)?;
+            if obfs_http.is_some() {
+                return Err("Shadowsocks2022ObfsUnsupported");
+            }
+        }
         _ => {}
     }
     if let Outbound::Vless {
@@ -563,7 +611,7 @@ async fn connect_selected(
         return within(
             deadline,
             "UpstreamProtocolTimeout",
-            handshake(outbound, target, stream, None, *port, handshake_limit),
+            handshake(outbound, target, stream, None, *port, handshake_limit, udp),
         )
         .await;
     }
@@ -679,9 +727,26 @@ async fn connect_selected(
     within(
         deadline,
         timeout_code,
-        handshake(outbound, target, stream, auth, port, handshake_limit),
+        handshake(outbound, target, stream, auth, port, handshake_limit, udp),
     )
     .await
+}
+
+/// Preflight ordinary TLS parameters independently from DNS/TCP and protocol
+/// credentials. QUIC and REALITY have their own validation paths.
+pub fn validate_tls(outbound: &Outbound, transport: Option<&Transport>) -> Result<()> {
+    let tls = match outbound {
+        Outbound::Trojan { tls, .. } => Some(tls),
+        Outbound::Vless { tls, .. }
+        | Outbound::Vmess { tls, .. }
+        | Outbound::Socks5 { tls, .. }
+        | Outbound::HttpConnect { tls, .. } => tls.as_ref(),
+        _ => None,
+    };
+    if let Some(tls) = tls {
+        swirl_transport::validate_tls(tls, transport.and_then(Transport::required_alpn))?;
+    }
+    Ok(())
 }
 
 async fn handshake(
@@ -691,6 +756,7 @@ async fn handshake(
     auth: Option<&Credentials>,
     port: u16,
     handshake_limit: std::time::Duration,
+    udp: bool,
 ) -> Result<swirl_transport::BoxStream> {
     if let Outbound::Vmess {
         uuid,
@@ -708,6 +774,9 @@ async fn handshake(
         ..
     } = outbound
     {
+        if cipher.starts_with("2022-") {
+            return ss2022::connect(stream, password, cipher, target, handshake_limit).await;
+        }
         let write_error = if obfs_http.is_some() {
             "ShadowsocksObfsWrite"
         } else {
@@ -733,7 +802,7 @@ async fn handshake(
     if let Outbound::Trojan { password, .. } = outbound {
         use sha2::{Digest, Sha224};
         let mut request = format!("{:x}\r\n", Sha224::digest(password.as_bytes())).into_bytes();
-        request.push(1);
+        request.push(if udp { 3 } else { 1 });
         target.encode(&mut request)?;
         request.extend(b"\r\n");
         stream
@@ -745,7 +814,11 @@ async fn handshake(
     }
     if let Outbound::Vless { uuid, .. } = outbound {
         stream
-            .write_all(&vless::request(uuid, target)?)
+            .write_all(&if udp {
+                vless::request_udp(uuid, target)?
+            } else {
+                vless::request(uuid, target)?
+            })
             .await
             .map_err(|_| "VlessHandshakeWrite")?;
         stream.flush().await.map_err(|_| "VlessHandshakeWrite")?;
@@ -833,6 +906,7 @@ mod connect_tests {
                 None,
                 443,
                 Duration::from_secs(1),
+                false,
             )
             .await
             .err()
@@ -865,6 +939,7 @@ mod connect_tests {
                 None,
                 443,
                 Duration::from_secs(1),
+                false,
             ),
         )
         .await

@@ -588,7 +588,15 @@ impl UdpAssociation {
     }
 
     pub async fn recv(&mut self) -> Result<(Target, Vec<u8>)> {
+        let mut processed = 0;
         loop {
+            // A peer can keep the receive queue ready with heartbeats or
+            // incomplete fragments. Bound work per poll independently of the
+            // QUIC implementation's own cooperative scheduling.
+            if processed == 32 {
+                tokio::task::yield_now().await;
+                processed = 0;
+            }
             let bytes = if self.native {
                 self.client
                     .session
@@ -600,6 +608,7 @@ impl UdpAssociation {
             } else {
                 self.receive_stream_packet().await?
             };
+            processed += 1;
             if bytes == [VERSION, HEARTBEAT] {
                 continue;
             }
@@ -680,12 +689,12 @@ impl UdpAssociation {
             Ok::<(), &'static str>(())
         })
         .await
-        .map_err(|_| "TuicDissociateTimeout")?;
+        .map_err(|_| "TuicDissociateTimeout");
         self.client
             .session
             .connection
             .close(VarInt::from_u32(0), b"");
-        result
+        result?
     }
 }
 

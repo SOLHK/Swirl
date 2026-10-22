@@ -1,0 +1,13 @@
+test_closed_carriers_do_not_replay_and_new_associations_reconnect (test_stream_udp_xray.StreamUdpXrayTests.test_closed_carriers_do_not_replay_and_new_associations_reconnect) ... ok
+test_dns_and_ipv6_destination_over_classic_udp (test_stream_udp_xray.StreamUdpXrayTests.test_dns_and_ipv6_destination_over_classic_udp) ... ok
+test_embedded_transport_has_the_same_udp_behavior_as_runtime_override (test_stream_udp_xray.StreamUdpXrayTests.test_embedded_transport_has_the_same_udp_behavior_as_runtime_override) ... ok
+test_node_selection_preserves_existing_udp_association_and_control_close_stops_it (test_stream_udp_xray.StreamUdpXrayTests.test_node_selection_preserves_existing_udp_association_and_control_close_stops_it) ... ok
+test_official_reply_size_boundaries_and_retained_upstream_limits (test_stream_udp_xray.StreamUdpXrayTests.test_official_reply_size_boundaries_and_retained_upstream_limits) ... ok
+test_tcp_tls_ws_and_grpc_transports_authenticate_and_relay_real_udp (test_stream_udp_xray.StreamUdpXrayTests.test_tcp_tls_ws_and_grpc_transports_authenticate_and_relay_real_udp) ... ok
+test_vless_targets_have_separate_carriers_and_trojan_frames_keep_each_address (test_stream_udp_xray.StreamUdpXrayTests.test_vless_targets_have_separate_carriers_and_trojan_frames_keep_each_address) ... ok
+test_wrong_credentials_and_tls_name_never_reach_the_udp_target (test_stream_udp_xray.StreamUdpXrayTests.test_wrong_credentials_and_tls_name_never_reach_the_udp_target) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 15.714s
+
+OK

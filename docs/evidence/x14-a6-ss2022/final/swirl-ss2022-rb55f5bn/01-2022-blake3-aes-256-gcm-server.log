@@ -1,0 +1,12 @@
+2026-10-22T22:07:21.608949346+09:00  INFO main ThreadId(01) shadowsocks_rust::service::server: shadowsocks server 1.25.0 build 2026-08-26T23:15:24.779049808+00:00
+2026-10-22T22:07:21.609437619+09:00  INFO main ThreadId(01) shadowsocks_service::server::tcprelay: shadowsocks tcp server listening on 127.0.0.1:56659, inbound address 127.0.0.1:56659
+2026-10-22T22:07:21.609447874+09:00  INFO main ThreadId(01) shadowsocks_service::server::udprelay: shadowsocks udp server listening on 127.0.0.1:56659, inbound address 127.0.0.1:56659
+2026-10-22T22:07:21.628342339+09:00 DEBUG main ThreadId(01) shadowsocks_service::server::tcprelay: tcp handshake failed, received EOF before a complete target Address, peer: 127.0.0.1:33854
+2026-10-22T22:07:21.634448122+09:00 DEBUG main ThreadId(01) shadowsocks_service::server::tcprelay: established tcp tunnel 127.0.0.1:33864 <-> 127.0.0.1:59267 with ConnectOpts { fwmark: None, bind_local_addr: None, bind_interface: None, tcp: TcpSocketOpts { send_buffer_size: None, recv_buffer_size: None, nodelay: true, fastopen: false, keepalive: Some(15s), mptcp: false }, udp: UdpSocketOpts { mtu: None, allow_fragmentation: false } }
+2026-10-22T22:07:21.650113845+09:00 DEBUG main ThreadId(01) shadowsocks_service::server::tcprelay: established tcp tunnel 127.0.0.1:33872 <-> 127.0.0.1:50859 with ConnectOpts { fwmark: None, bind_local_addr: None, bind_interface: None, tcp: TcpSocketOpts { send_buffer_size: None, recv_buffer_size: None, nodelay: true, fastopen: false, keepalive: Some(15s), mptcp: false }, udp: UdpSocketOpts { mtu: None, allow_fragmentation: false } }
+2026-10-22T22:07:21.659383038+09:00 DEBUG main ThreadId(01) shadowsocks_service::server::udprelay: created udp association for 127.0.0.1:36462 with session 11290799452739664167
+2026-10-22T22:07:21.659414665+09:00 DEBUG main ThreadId(01) shadowsocks::net::sys: IpStackCapability support_ipv4=true
+2026-10-22T22:07:21.659427223+09:00 DEBUG main ThreadId(01) shadowsocks::net::sys: IpStackCapability support_ipv6=true
+2026-10-22T22:07:21.659435225+09:00 DEBUG main ThreadId(01) shadowsocks::net::sys: IpStackCapability support_ipv4_mapped_ipv6=true
+2026-10-22T22:07:21.661892735+09:00  INFO main ThreadId(01) shadowsocks_rust::monitor::imp: received SIGTERM, exiting
+2026-10-22T22:07:21.661927917+09:00 DEBUG main ThreadId(01) shadowsocks_service::server::udprelay: udp association for 127.0.0.1:36462 is closed

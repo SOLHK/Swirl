@@ -11,6 +11,22 @@ fn configuration() -> Config {
     .unwrap()
 }
 
+#[test]
+fn native_tls_trust_errors_precede_listener_allocation() {
+    let occupied = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let mut config = configuration();
+    config.listen = occupied.local_addr().unwrap();
+    let Outbound::Vless { tls, .. } = &mut config.nodes[0].outbound else {
+        unreachable!()
+    };
+    *tls = Some(swirl_subscription::Tls {
+        server_name: "peer.invalid".into(),
+        alpn: Vec::new(),
+        ca_der_base64: Some("AA==".into()),
+    });
+    assert_eq!(Core::start(config).err(), Some("TlsTrustAnchor"));
+}
+
 fn websocket(path: &str) -> Transport {
     Transport::WebSocket {
         settings: swirl_subscription::WebSocket {

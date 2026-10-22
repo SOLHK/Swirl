@@ -61,6 +61,10 @@ jobs:
         run: python tools/Fetch-TransportPeers.py --output out/peers/xray
       - name: Download pinned Hysteria and TUIC server peers
         run: python tools/Fetch-NativeProtocolPeers.py --output out/peers/quic
+      - name: Download pinned official Shadowsocks server peer
+        run: python tools/tests/fetch_ss2022_peer.py out/peers/shadowsocks
+      - name: Measure and prepare disposable runner UDP prerequisites
+        run: python tools/Prepare-NativeInteropPlatform.py --prepare-macos --output out/native-interop/platform.json
       - name: Set native client and evidence paths
         shell: python
         run: |
@@ -79,11 +83,16 @@ jobs:
               'SWIRL_INSPECT_BINARY': binary / ('swirl-inspect' + suffix),
               'HY2_CLIENT': binary / ('examples/hysteria2-client' + suffix),
               'SWIRL_TUIC_CLIENT': binary / ('examples/tuic-client' + suffix),
+              'SWIRL_SS2022_CLIENT': binary / ('examples/ss2022-client' + suffix),
+              'SWIRL_SS2022_SERVER': root / 'out/peers/shadowsocks' / ('ssserver' + suffix),
               'SWIRL_TRANSPORT_EVIDENCE': evidence / 'vmess',
               'SWIRL_VMESS_EVIDENCE': evidence / 'vmess',
               'HY2_EVIDENCE': evidence / 'hysteria2.json',
               'SWIRL_TUIC_EVIDENCE': evidence / 'tuic.json',
               'SWIRL_QUIC_CORE_EVIDENCE': evidence / 'quic-core.json',
+              'SWIRL_SS2022_EVIDENCE': evidence / 'shadowsocks2022',
+              'SWIRL_STREAM_UDP_EVIDENCE': evidence / 'stream-udp.json',
+              'SWIRL_IMPORTED_TRANSPORT_EVIDENCE': evidence / 'imported-transports.json',
           }
           with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as output:
               for name, value in values.items():
@@ -99,6 +108,15 @@ jobs:
       - name: Native Core ingress TCP UDP DNS HTTPS and node switching
         if: ${{ !cancelled() }}
         run: python -m unittest -v test_quic_core
+      - name: Imported Xray V2Ray transport configs through ordinary Core start
+        if: ${{ !cancelled() }}
+        run: python -m unittest -v test_imported_transports_xray
+      - name: VLESS and Trojan UDP through official Xray
+        if: ${{ !cancelled() }}
+        run: python -m unittest -v test_stream_udp_xray
+      - name: Shadowsocks 2022 official data and replay rejection
+        if: ${{ !cancelled() }}
+        run: python tools/tests/test_ss2022_official.py
       - name: Upload actual interoperability receipts
         if: ${{ always() }}
         uses: actions/upload-artifact@v4

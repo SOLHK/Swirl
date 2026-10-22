@@ -1,0 +1,535 @@
+{
+  "runtime": "Swirl Rust Core ordinary start",
+  "runtime_sha256": "2ac11b95b6d67da9f9bd21c128fc7cae4d5e462cca80f7d10d5e2eaa29ed6d0f",
+  "inspector_sha256": "cfad43cdf4977b07d0fbef2cca3ea4bc1ce366eb2583aa2343223330f2903b3b",
+  "platform": "Linux-6.18.55-x86_64-with-glibc2.39",
+  "server_versions": [
+    [
+      "26.10.21",
+      "1b1647c"
+    ],
+    [
+      "1.8.24",
+      "6baad79"
+    ]
+  ],
+  "qt_product_acceptance": false,
+  "post_export_modifications": false,
+  "external_transport_map": false,
+  "records": [
+    {
+      "case": "test_four_mib_each_way_after_import_with_application_completed_close",
+      "protocol": "vless",
+      "transport": "grpc",
+      "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "uploaded": 4194304,
+      "downloaded": 4194304,
+      "elapsed_ms": 601.513,
+      "close": "application-complete",
+      "native_export": true
+    },
+    {
+      "case": "test_four_mib_each_way_after_import_with_application_completed_close",
+      "protocol": "vless:grpc:tls",
+      "active_after_close": 0,
+      "uploaded": 4194312,
+      "downloaded": 4194304,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_four_mib_each_way_after_import_with_application_completed_close",
+      "protocol": "trojan",
+      "transport": "grpc",
+      "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "uploaded": 4194304,
+      "downloaded": 4194304,
+      "elapsed_ms": 1641.829,
+      "close": "application-complete",
+      "native_export": true
+    },
+    {
+      "case": "test_four_mib_each_way_after_import_with_application_completed_close",
+      "protocol": "trojan:grpc:tls",
+      "active_after_close": 0,
+      "uploaded": 4194312,
+      "downloaded": 4194304,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_four_mib_each_way_after_import_with_application_completed_close",
+      "protocol": "vless",
+      "transport": "h2",
+      "server": "Xray 1.8.24 (Xray, Penetrates Everything.) 6baad79 (go1.23.0 linux/amd64)",
+      "uploaded": 4194304,
+      "downloaded": 4194304,
+      "elapsed_ms": 3680.214,
+      "close": "application-complete",
+      "native_export": true
+    },
+    {
+      "case": "test_four_mib_each_way_after_import_with_application_completed_close",
+      "protocol": "vless:http2:tls",
+      "active_after_close": 0,
+      "uploaded": 4194312,
+      "downloaded": 4194304,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_four_mib_each_way_after_import_with_application_completed_close",
+      "protocol": "vless",
+      "transport": "httpupgrade",
+      "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "uploaded": 4194304,
+      "downloaded": 4194304,
+      "elapsed_ms": 1790.827,
+      "close": "application-complete",
+      "native_export": true
+    },
+    {
+      "case": "test_four_mib_each_way_after_import_with_application_completed_close",
+      "protocol": "vless:httpupgrade:tls",
+      "active_after_close": 0,
+      "uploaded": 4194312,
+      "downloaded": 4194304,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_four_mib_each_way_after_import_with_application_completed_close",
+      "protocol": "vless",
+      "transport": "xhttp",
+      "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "uploaded": 4194304,
+      "downloaded": 4194304,
+      "elapsed_ms": 4502.218,
+      "close": "application-complete",
+      "native_export": true
+    },
+    {
+      "case": "test_four_mib_each_way_after_import_with_application_completed_close",
+      "protocol": "vless:xhttp:tls",
+      "active_after_close": 0,
+      "uploaded": 4194312,
+      "downloaded": 4194304,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_legacy_v2ray_envelope_and_concurrent_core_sessions",
+      "protocol": "vless:http2:tls",
+      "active_after_close": 0,
+      "uploaded": 6820,
+      "downloaded": 536006,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_legacy_v2ray_envelope_and_concurrent_core_sessions",
+      "source": "legacy-v2ray-outbound",
+      "server": "Xray 1.8.24 (Xray, Penetrates Everything.) 6baad79 (go1.23.0 linux/amd64)",
+      "concurrent_native_sessions": 4,
+      "native_export": true
+    },
+    {
+      "case": "test_required_combinations_import_to_core_http_https_and_normal_close",
+      "protocol": "vless",
+      "transport": "grpc",
+      "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "application_tls": false,
+      "downloaded": 131328,
+      "close": "clean",
+      "native_export": true
+    },
+    {
+      "case": "test_required_combinations_import_to_core_http_https_and_normal_close",
+      "protocol": "vless",
+      "transport": "grpc",
+      "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "application_tls": true,
+      "downloaded": 131328,
+      "close": "clean",
+      "native_export": true
+    },
+    {
+      "case": "test_required_combinations_import_to_core_http_https_and_normal_close",
+      "protocol": "vless:grpc:tls",
+      "active_after_close": 0,
+      "uploaded": 1768,
+      "downloaded": 265391,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_required_combinations_import_to_core_http_https_and_normal_close",
+      "protocol": "trojan",
+      "transport": "grpc",
+      "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "application_tls": false,
+      "downloaded": 131328,
+      "close": "clean",
+      "native_export": true
+    },
+    {
+      "case": "test_required_combinations_import_to_core_http_https_and_normal_close",
+      "protocol": "trojan",
+      "transport": "grpc",
+      "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "application_tls": true,
+      "downloaded": 131328,
+      "close": "clean",
+      "native_export": true
+    },
+    {
+      "case": "test_required_combinations_import_to_core_http_https_and_normal_close",
+      "protocol": "trojan:grpc:tls",
+      "active_after_close": 0,
+      "uploaded": 1768,
+      "downloaded": 265390,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_required_combinations_import_to_core_http_https_and_normal_close",
+      "protocol": "vless",
+      "transport": "http2",
+      "server": "Xray 1.8.24 (Xray, Penetrates Everything.) 6baad79 (go1.23.0 linux/amd64)",
+      "application_tls": false,
+      "downloaded": 131328,
+      "close": "clean",
+      "native_export": true
+    },
+    {
+      "case": "test_required_combinations_import_to_core_http_https_and_normal_close",
+      "protocol": "vless",
+      "transport": "http2",
+      "server": "Xray 1.8.24 (Xray, Penetrates Everything.) 6baad79 (go1.23.0 linux/amd64)",
+      "application_tls": true,
+      "downloaded": 131328,
+      "close": "clean",
+      "native_export": true
+    },
+    {
+      "case": "test_required_combinations_import_to_core_http_https_and_normal_close",
+      "protocol": "vless:http2:tls",
+      "active_after_close": 0,
+      "uploaded": 1768,
+      "downloaded": 265391,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_required_combinations_import_to_core_http_https_and_normal_close",
+      "protocol": "vless",
+      "transport": "httpupgrade",
+      "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "application_tls": false,
+      "downloaded": 131328,
+      "close": "clean",
+      "native_export": true
+    },
+    {
+      "case": "test_required_combinations_import_to_core_http_https_and_normal_close",
+      "protocol": "vless",
+      "transport": "httpupgrade",
+      "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "application_tls": true,
+      "downloaded": 131328,
+      "close": "clean",
+      "native_export": true
+    },
+    {
+      "case": "test_required_combinations_import_to_core_http_https_and_normal_close",
+      "protocol": "vless:httpupgrade:tls",
+      "active_after_close": 0,
+      "uploaded": 1768,
+      "downloaded": 265390,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_required_combinations_import_to_core_http_https_and_normal_close",
+      "protocol": "vless",
+      "transport": "xhttp",
+      "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "application_tls": false,
+      "downloaded": 131328,
+      "close": "clean",
+      "native_export": true
+    },
+    {
+      "case": "test_required_combinations_import_to_core_http_https_and_normal_close",
+      "protocol": "vless",
+      "transport": "xhttp",
+      "server": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "application_tls": true,
+      "downloaded": 131328,
+      "close": "clean",
+      "native_export": true
+    },
+    {
+      "case": "test_required_combinations_import_to_core_http_https_and_normal_close",
+      "protocol": "vless:xhttp:tls",
+      "active_after_close": 0,
+      "uploaded": 1768,
+      "downloaded": 265390,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_unsupported_security_transport_modes_and_options_block_native_export",
+      "native_export": false,
+      "diagnostics": [
+        "XHttpModeUnsupported"
+      ]
+    },
+    {
+      "case": "test_unsupported_security_transport_modes_and_options_block_native_export",
+      "native_export": false,
+      "diagnostics": [
+        "XHttpModeUnsupported"
+      ]
+    },
+    {
+      "case": "test_unsupported_security_transport_modes_and_options_block_native_export",
+      "native_export": false,
+      "diagnostics": [
+        "XHttpModeUnsupported"
+      ]
+    },
+    {
+      "case": "test_unsupported_security_transport_modes_and_options_block_native_export",
+      "native_export": false,
+      "diagnostics": [
+        "TransportOptionUnsupported"
+      ]
+    },
+    {
+      "case": "test_unsupported_security_transport_modes_and_options_block_native_export",
+      "native_export": false,
+      "diagnostics": [
+        "TransportOptionUnsupported"
+      ]
+    },
+    {
+      "case": "test_unsupported_security_transport_modes_and_options_block_native_export",
+      "native_export": false,
+      "diagnostics": [
+        "TransportOptionUnsupported"
+      ]
+    },
+    {
+      "case": "test_unsupported_security_transport_modes_and_options_block_native_export",
+      "native_export": false,
+      "diagnostics": [
+        "TlsFingerprintUnsupported"
+      ]
+    },
+    {
+      "case": "test_unsupported_security_transport_modes_and_options_block_native_export",
+      "native_export": false,
+      "diagnostics": [
+        "TlsInsecureUnsupported"
+      ]
+    },
+    {
+      "case": "test_unsupported_security_transport_modes_and_options_block_native_export",
+      "native_export": false,
+      "diagnostics": [
+        "TlsDisableSystemRootUnsupported"
+      ]
+    },
+    {
+      "case": "test_unsupported_security_transport_modes_and_options_block_native_export",
+      "native_export": false,
+      "diagnostics": [
+        "TransportOptionUnsupported"
+      ]
+    },
+    {
+      "case": "test_unsupported_security_transport_modes_and_options_block_native_export",
+      "native_export": false,
+      "diagnostics": [
+        "TransportOptionUnsupported"
+      ]
+    },
+    {
+      "case": "test_unsupported_security_transport_modes_and_options_block_native_export",
+      "native_export": false,
+      "diagnostics": [
+        "HttpUpgradeEarlyDataUnsupported"
+      ]
+    },
+    {
+      "case": "test_wrong_imported_service_path_sni_and_uuid_do_not_reach_the_target",
+      "transport": "grpc",
+      "negative_path": "transport",
+      "target_requests": 0,
+      "native_export": true
+    },
+    {
+      "case": "test_wrong_imported_service_path_sni_and_uuid_do_not_reach_the_target",
+      "protocol": "vless:grpc:tls",
+      "active_after_close": 0,
+      "uploaded": 0,
+      "downloaded": 0,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_wrong_imported_service_path_sni_and_uuid_do_not_reach_the_target",
+      "transport": "grpc",
+      "negative_path": "sni",
+      "target_requests": 0,
+      "native_export": true
+    },
+    {
+      "case": "test_wrong_imported_service_path_sni_and_uuid_do_not_reach_the_target",
+      "protocol": "vless:grpc:tls",
+      "active_after_close": 0,
+      "uploaded": 0,
+      "downloaded": 0,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_wrong_imported_service_path_sni_and_uuid_do_not_reach_the_target",
+      "transport": "grpc",
+      "negative_path": "uuid",
+      "target_requests": 0,
+      "native_export": true
+    },
+    {
+      "case": "test_wrong_imported_service_path_sni_and_uuid_do_not_reach_the_target",
+      "protocol": "vless:grpc:tls",
+      "active_after_close": 0,
+      "uploaded": 44,
+      "downloaded": 0,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_wrong_imported_service_path_sni_and_uuid_do_not_reach_the_target",
+      "transport": "h2",
+      "negative_path": "transport",
+      "target_requests": 0,
+      "native_export": true
+    },
+    {
+      "case": "test_wrong_imported_service_path_sni_and_uuid_do_not_reach_the_target",
+      "protocol": "vless:http2:tls",
+      "active_after_close": 0,
+      "uploaded": 0,
+      "downloaded": 0,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_wrong_imported_service_path_sni_and_uuid_do_not_reach_the_target",
+      "transport": "h2",
+      "negative_path": "sni",
+      "target_requests": 0,
+      "native_export": true
+    },
+    {
+      "case": "test_wrong_imported_service_path_sni_and_uuid_do_not_reach_the_target",
+      "protocol": "vless:http2:tls",
+      "active_after_close": 0,
+      "uploaded": 0,
+      "downloaded": 0,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_wrong_imported_service_path_sni_and_uuid_do_not_reach_the_target",
+      "transport": "h2",
+      "negative_path": "uuid",
+      "target_requests": 0,
+      "native_export": true
+    },
+    {
+      "case": "test_wrong_imported_service_path_sni_and_uuid_do_not_reach_the_target",
+      "protocol": "vless:http2:tls",
+      "active_after_close": 0,
+      "uploaded": 44,
+      "downloaded": 0,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_wrong_imported_service_path_sni_and_uuid_do_not_reach_the_target",
+      "transport": "httpupgrade",
+      "negative_path": "transport",
+      "target_requests": 0,
+      "native_export": true
+    },
+    {
+      "case": "test_wrong_imported_service_path_sni_and_uuid_do_not_reach_the_target",
+      "protocol": "vless:httpupgrade:tls",
+      "active_after_close": 0,
+      "uploaded": 0,
+      "downloaded": 0,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_wrong_imported_service_path_sni_and_uuid_do_not_reach_the_target",
+      "transport": "httpupgrade",
+      "negative_path": "sni",
+      "target_requests": 0,
+      "native_export": true
+    },
+    {
+      "case": "test_wrong_imported_service_path_sni_and_uuid_do_not_reach_the_target",
+      "protocol": "vless:httpupgrade:tls",
+      "active_after_close": 0,
+      "uploaded": 0,
+      "downloaded": 0,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_wrong_imported_service_path_sni_and_uuid_do_not_reach_the_target",
+      "transport": "httpupgrade",
+      "negative_path": "uuid",
+      "target_requests": 0,
+      "native_export": true
+    },
+    {
+      "case": "test_wrong_imported_service_path_sni_and_uuid_do_not_reach_the_target",
+      "protocol": "vless:httpupgrade:tls",
+      "active_after_close": 0,
+      "uploaded": 0,
+      "downloaded": 0,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_wrong_imported_service_path_sni_and_uuid_do_not_reach_the_target",
+      "transport": "xhttp",
+      "negative_path": "transport",
+      "target_requests": 0,
+      "native_export": true
+    },
+    {
+      "case": "test_wrong_imported_service_path_sni_and_uuid_do_not_reach_the_target",
+      "protocol": "vless:xhttp:tls",
+      "active_after_close": 0,
+      "uploaded": 44,
+      "downloaded": 0,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_wrong_imported_service_path_sni_and_uuid_do_not_reach_the_target",
+      "transport": "xhttp",
+      "negative_path": "sni",
+      "target_requests": 0,
+      "native_export": true
+    },
+    {
+      "case": "test_wrong_imported_service_path_sni_and_uuid_do_not_reach_the_target",
+      "protocol": "vless:xhttp:tls",
+      "active_after_close": 0,
+      "uploaded": 0,
+      "downloaded": 0,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_wrong_imported_service_path_sni_and_uuid_do_not_reach_the_target",
+      "transport": "xhttp",
+      "negative_path": "uuid",
+      "target_requests": 0,
+      "native_export": true
+    },
+    {
+      "case": "test_wrong_imported_service_path_sni_and_uuid_do_not_reach_the_target",
+      "protocol": "vless:xhttp:tls",
+      "active_after_close": 0,
+      "uploaded": 44,
+      "downloaded": 0,
+      "udp_dropped": 0
+    }
+  ]
+}

@@ -3,15 +3,18 @@
 use serde::{Deserialize, Serialize};
 mod dns_tls;
 pub mod hysteria2;
+pub mod ss2022;
 pub mod tuic;
 pub mod vmess;
 pub use hysteria2::Hysteria2;
 pub use tuic::Tuic;
 mod policy;
 mod reality;
+pub mod stream_transport;
 mod websocket;
 pub use policy::{HealthProbe, PolicyStrategy, ProbeTarget};
 pub use reality::Reality;
+pub use stream_transport::StreamTransport;
 pub use websocket::WebSocket;
 pub mod inspect;
 pub mod xray;
@@ -76,6 +79,10 @@ pub enum Outbound {
         reality: Option<Reality>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         flow: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        transport: Option<StreamTransport>,
+        #[serde(default)]
+        udp: bool,
     },
     Shadowsocks {
         host: String,
@@ -118,6 +125,10 @@ pub enum Outbound {
         tls: Tls,
         #[serde(default)]
         websocket: Option<WebSocket>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        transport: Option<StreamTransport>,
+        #[serde(default)]
+        udp: bool,
     },
 }
 
@@ -465,11 +476,23 @@ impl Config {
                         || *port == 0
                         || password.is_empty()
                         || password.len() > 1024
-                        || !["aes-128-gcm", "aes-256-gcm", "chacha20-ietf-poly1305"]
-                            .contains(&cipher.as_str())
+                        || ![
+                            "aes-128-gcm",
+                            "aes-256-gcm",
+                            "chacha20-ietf-poly1305",
+                            "2022-blake3-aes-128-gcm",
+                            "2022-blake3-aes-256-gcm",
+                        ]
+                        .contains(&cipher.as_str())
                         || obfs_http.as_ref().is_some_and(|o| !valid_host(&o.host))
                     {
                         return Err("ShadowsocksParameters");
+                    }
+                    if cipher.starts_with("2022-") {
+                        ss2022::validate(password, cipher)?;
+                        if obfs_http.is_some() {
+                            return Err("Shadowsocks2022ObfsUnsupported");
+                        }
                     }
                 }
                 Outbound::Socks5 {
@@ -498,6 +521,13 @@ impl Config {
                     return Err("NodeParameters");
                 }
                 _ => {}
+            }
+            if let Some(transport) = node.outbound.stream_transport() {
+                transport.validate_for(&node.outbound)?;
+            }
+            if matches!(&node.outbound, Outbound::Vless { udp: true, flow: Some(flow), .. } if !flow.is_empty())
+            {
+                return Err("VisionUdpUnsupported");
             }
             match &node.outbound {
                 Outbound::Vmess {

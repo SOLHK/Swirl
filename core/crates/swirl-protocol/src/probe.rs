@@ -161,6 +161,7 @@ async fn url_test_head_selected(
             resolver,
             Duration::from_millis(options.timeout_ms),
             transport,
+            false,
         ),
     )
     .await
@@ -252,6 +253,7 @@ async fn health_probe_selected(
             resolver,
             Duration::from_millis(options.timeout_ms),
             transport,
+            false,
         )
         .await?;
         if let Some(tls) = target.tls {

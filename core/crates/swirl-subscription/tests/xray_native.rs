@@ -232,9 +232,36 @@ fn shadowsocks_exact_aead_cipher_password_and_tcp_scope_are_preserved() {
 }
 
 #[test]
+fn shadowsocks_2022_exact_psk_executes_and_invalid_or_identity_keys_have_no_fallback() {
+    use base64::{Engine, engine::general_purpose::STANDARD};
+    for (cipher, size) in [
+        ("2022-blake3-aes-128-gcm", 16),
+        ("2022-blake3-aes-256-gcm", 32),
+    ] {
+        let password = STANDARD.encode(vec![73; size]);
+        let mut value = source("shadowsocks");
+        value["settings"]["method"] = json!(cipher);
+        value["settings"]["password"] = json!(password);
+        let config = executable(&value);
+        assert!(
+            matches!(&config.nodes[0].outbound, Outbound::Shadowsocks { cipher: actual, password: key, .. }
+            if actual == cipher && key == &password)
+        );
+        for invalid in [
+            "arbitrary-password".to_string(),
+            STANDARD.encode(vec![7; size + 1]),
+            format!("{password}:{password}"),
+        ] {
+            value["settings"]["password"] = json!(invalid);
+            blocked(&value);
+        }
+    }
+}
+
+#[test]
 fn unsupported_shadowsocks_methods_layers_and_replay_options_have_no_fallback() {
     for cipher in [
-        "2022-blake3-aes-128-gcm",
+        "2022-blake3-chacha20-poly1305",
         "aes-128-cfb",
         "none",
         "chacha20-poly1305",
@@ -425,14 +452,7 @@ fn short_custom_id_uses_the_fixed_upstream_utf8_byte_boundary() {
 
 #[test]
 fn unsupported_transports_tls_reality_conflict_and_vision_conflicts_stay_blocked() {
-    for network in [
-        "grpc",
-        "h2",
-        "http",
-        "httpupgrade",
-        "xhttp",
-        "synthetic-future",
-    ] {
+    for network in ["h2", "http", "xhttp", "synthetic-future"] {
         let mut value = source("vless");
         value["streamSettings"] = json!({"network":network});
         blocked(&value);

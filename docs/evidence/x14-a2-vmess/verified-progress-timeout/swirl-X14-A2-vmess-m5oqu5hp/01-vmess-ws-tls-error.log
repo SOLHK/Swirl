@@ -1,0 +1,56 @@
+2026/10/22 22:07:25.849921 [Debug] app/log: Logger started
+2026/10/22 22:07:25.849954 [Debug] app/proxyman/inbound: creating stream worker on 127.0.0.1:32883
+2026/10/22 22:07:25.852374 [Info] transport/internet/websocket: listening tcp(for WS) on 127.0.0.1:32883
+2026/10/22 22:07:25.853650 [Warning] core: Xray 26.10.21 started
+2026/10/22 22:07:25.866934 [Info] [3530738178] proxy/vmess/inbound: received request for tcp:127.0.0.1:45619
+2026/10/22 22:07:25.866957 [Info] [4065281130] proxy/vmess/inbound: received request for tcp:127.0.0.1:45619
+2026/10/22 22:07:25.866962 [Info] [3295237906] proxy/vmess/inbound: received request for tcp:127.0.0.1:45619
+2026/10/22 22:07:25.866966 [Info] [4065281130] app/dispatcher: default route for tcp:127.0.0.1:45619
+2026/10/22 22:07:25.866970 [Info] [4065281130] transport/internet/tcp: dialing TCP to tcp:127.0.0.1:45619
+2026/10/22 22:07:25.866974 [Debug] [4065281130] transport/internet: dialing to tcp:127.0.0.1:45619
+2026/10/22 22:07:25.867364 [Info] [3295237906] app/dispatcher: default route for tcp:127.0.0.1:45619
+2026/10/22 22:07:25.867377 [Info] [4065281130] proxy/freedom: connection opened to tcp:127.0.0.1:45619, local endpoint 127.0.0.1:37988, remote endpoint 127.0.0.1:45619
+2026/10/22 22:07:25.867381 [Info] [3530738178] app/dispatcher: default route for tcp:127.0.0.1:45619
+2026/10/22 22:07:25.867383 [Debug] [4065281130] proxy: CopyRawConn (maybe) readv
+2026/10/22 22:07:25.867385 [Info] [3530738178] transport/internet/tcp: dialing TCP to tcp:127.0.0.1:45619
+2026/10/22 22:07:25.867386 [Debug] [3530738178] transport/internet: dialing to tcp:127.0.0.1:45619
+2026/10/22 22:07:25.867388 [Info] [3295237906] transport/internet/tcp: dialing TCP to tcp:127.0.0.1:45619
+2026/10/22 22:07:25.867390 [Debug] [3295237906] transport/internet: dialing to tcp:127.0.0.1:45619
+2026/10/22 22:07:25.867395 [Info] [3530738178] proxy/freedom: connection opened to tcp:127.0.0.1:45619, local endpoint 127.0.0.1:37998, remote endpoint 127.0.0.1:45619
+2026/10/22 22:07:25.867397 [Debug] [3530738178] proxy: CopyRawConn (maybe) readv
+2026/10/22 22:07:25.867711 [Info] [3295237906] proxy/freedom: connection opened to tcp:127.0.0.1:45619, local endpoint 127.0.0.1:38000, remote endpoint 127.0.0.1:45619
+2026/10/22 22:07:25.867719 [Debug] [3295237906] proxy: CopyRawConn (maybe) readv
+2026/10/22 22:07:25.869386 [Info] [1886542241] proxy/vmess/inbound: received request for tcp:127.0.0.1:45619
+2026/10/22 22:07:25.869397 [Info] [1886542241] app/dispatcher: default route for tcp:127.0.0.1:45619
+2026/10/22 22:07:25.869400 [Info] [1886542241] transport/internet/tcp: dialing TCP to tcp:127.0.0.1:45619
+2026/10/22 22:07:25.869402 [Debug] [1886542241] transport/internet: dialing to tcp:127.0.0.1:45619
+2026/10/22 22:07:25.869468 [Info] [1886542241] proxy/freedom: connection opened to tcp:127.0.0.1:45619, local endpoint 127.0.0.1:38016, remote endpoint 127.0.0.1:45619
+2026/10/22 22:07:25.869479 [Debug] [1886542241] proxy: CopyRawConn (maybe) readv
+2026/10/22 22:07:25.883518 [Info] [3295237906] app/proxyman/inbound: connection ends > proxy/vmess/inbound: connection ends > proxy/vmess/inbound: failed to transfer request > websocket: close 1006 (abnormal closure): unexpected EOF
+2026/10/22 22:07:25.894781 [Info] [3885776593] proxy/vmess/inbound: received request for tcp:127.0.0.1:45619
+2026/10/22 22:07:25.894963 [Info] [3885776593] app/dispatcher: default route for tcp:127.0.0.1:45619
+2026/10/22 22:07:25.894967 [Info] [3885776593] transport/internet/tcp: dialing TCP to tcp:127.0.0.1:45619
+2026/10/22 22:07:25.894969 [Debug] [3885776593] transport/internet: dialing to tcp:127.0.0.1:45619
+2026/10/22 22:07:25.895019 [Info] [1631869409] proxy/vmess/inbound: received request for tcp:127.0.0.1:45619
+2026/10/22 22:07:25.895138 [Info] [1631869409] app/dispatcher: default route for tcp:127.0.0.1:45619
+2026/10/22 22:07:25.895142 [Info] [1631869409] transport/internet/tcp: dialing TCP to tcp:127.0.0.1:45619
+2026/10/22 22:07:25.895144 [Debug] [1631869409] transport/internet: dialing to tcp:127.0.0.1:45619
+2026/10/22 22:07:25.895192 [Info] [1631869409] proxy/freedom: connection opened to tcp:127.0.0.1:45619, local endpoint 127.0.0.1:38042, remote endpoint 127.0.0.1:45619
+2026/10/22 22:07:25.895199 [Debug] [1631869409] proxy: CopyRawConn (maybe) readv
+2026/10/22 22:07:25.895202 [Info] [3885776593] proxy/freedom: connection opened to tcp:127.0.0.1:45619, local endpoint 127.0.0.1:38032, remote endpoint 127.0.0.1:45619
+2026/10/22 22:07:25.895251 [Debug] [3885776593] proxy: CopyRawConn (maybe) readv
+2026/10/22 22:07:25.903684 [Info] [2335137440] proxy/vmess/inbound: received request for tcp:127.0.0.1:45619
+2026/10/22 22:07:25.903745 [Info] [2335137440] app/dispatcher: default route for tcp:127.0.0.1:45619
+2026/10/22 22:07:25.903863 [Info] [2335137440] transport/internet/tcp: dialing TCP to tcp:127.0.0.1:45619
+2026/10/22 22:07:25.903873 [Debug] [2335137440] transport/internet: dialing to tcp:127.0.0.1:45619
+2026/10/22 22:07:25.905465 [Info] [2335137440] proxy/freedom: connection opened to tcp:127.0.0.1:45619, local endpoint 127.0.0.1:38056, remote endpoint 127.0.0.1:45619
+2026/10/22 22:07:25.905482 [Debug] [2335137440] proxy: CopyRawConn (maybe) readv
+2026/10/22 22:07:25.905666 [Info] [478501341] proxy/vmess/inbound: received request for tcp:127.0.0.1:45619
+2026/10/22 22:07:25.905931 [Info] [478501341] app/dispatcher: default route for tcp:127.0.0.1:45619
+2026/10/22 22:07:25.905935 [Info] [478501341] transport/internet/tcp: dialing TCP to tcp:127.0.0.1:45619
+2026/10/22 22:07:25.905938 [Debug] [478501341] transport/internet: dialing to tcp:127.0.0.1:45619
+2026/10/22 22:07:25.906006 [Info] [478501341] proxy/freedom: connection opened to tcp:127.0.0.1:45619, local endpoint 127.0.0.1:38062, remote endpoint 127.0.0.1:45619
+2026/10/22 22:07:25.906017 [Debug] [478501341] proxy: CopyRawConn (maybe) readv
+2026/10/22 22:07:25.908949 [Info] [3885776593] app/proxyman/inbound: connection ends > proxy/vmess/inbound: connection ends > proxy/vmess/inbound: failed to transfer request > websocket: close 1006 (abnormal closure): unexpected EOF
+2026/10/22 22:07:25.914028 [Info] [2335137440] app/proxyman/inbound: connection ends > proxy/vmess/inbound: connection ends > proxy/vmess/inbound: failed to transfer request > websocket: close 1006 (abnormal closure): unexpected EOF
+2026/10/22 22:07:25.920198 [Debug] app/log: Logger closing

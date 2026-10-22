@@ -1,0 +1,17 @@
+2026/10/22 22:07:31.691145 [Debug] app/log: Logger started
+2026/10/22 22:07:31.691286 [Debug] app/proxyman/inbound: creating stream worker on 127.0.0.1:57463
+2026/10/22 22:07:31.693527 [Info] transport/internet/tcp: listening tcp on 127.0.0.1:57463
+2026/10/22 22:07:31.695763 [Warning] core: Xray 26.10.21 started
+2026/10/22 22:07:31.698937 [Info] [756847260] app/proxyman/inbound: connection ends > proxy/vmess/encoding: failed to read request header > EOF
+2026/10/22 22:07:31.706378 [Info] [2505759947] proxy/vmess/inbound: received request for tcp:127.0.0.1:33053
+2026/10/22 22:07:31.706554 [Info] [2505759947] app/dispatcher: default route for tcp:127.0.0.1:33053
+2026/10/22 22:07:31.706573 [Info] [2505759947] transport/internet/tcp: dialing TCP to tcp:127.0.0.1:33053
+2026/10/22 22:07:31.706578 [Debug] [2505759947] transport/internet: dialing to tcp:127.0.0.1:33053
+2026/10/22 22:07:31.706587 [Info] [2505759947] proxy/freedom: connection opened to tcp:127.0.0.1:33053, local endpoint 127.0.0.1:38084, remote endpoint 127.0.0.1:33053
+2026/10/22 22:07:31.706618 [Debug] [2505759947] proxy: CopyRawConn (maybe) readv
+2026/10/22 22:07:31.725682 [Info] [2274192531] proxy/vmess/inbound: received request for tcp:127.0.0.1:46035
+2026/10/22 22:07:31.725707 [Info] [2274192531] app/dispatcher: default route for tcp:127.0.0.1:46035
+2026/10/22 22:07:31.726369 [Info] [2274192531] transport/internet/tcp: dialing TCP to tcp:127.0.0.1:46035
+2026/10/22 22:07:31.726376 [Debug] [2274192531] transport/internet: dialing to tcp:127.0.0.1:46035
+2026/10/22 22:07:31.726424 [Info] [2274192531] proxy/freedom: connection opened to tcp:127.0.0.1:46035, local endpoint 127.0.0.1:33020, remote endpoint 127.0.0.1:46035
+2026/10/22 22:07:31.726431 [Debug] [2274192531] proxy: CopyRawConn (maybe) readv

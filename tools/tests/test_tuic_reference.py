@@ -14,6 +14,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import socket
 import socketserver
 import subprocess
@@ -36,6 +37,7 @@ OFFICIAL_SHA256 = {
     ("Windows", "AMD64"): "09c3bf3790117bf4c0d0505ada439800f19b68a52a018ca2cda7e7f8125adeb6",
 }
 RECORDS = []
+PEER_LOGS = []
 
 
 def verify_peer(binary):
@@ -89,12 +91,23 @@ class TuicReferenceTests(unittest.TestCase):
                 process.terminate()
             process.wait(timeout=5)
             output.close()
+            with open(output.name, "rb") as source:
+                size = source.seek(0, 2)
+                source.seek(max(0, size - 65_536))
+                message = source.read(65_536).decode("utf-8", errors="replace")
+            # Retain independent-peer failures without publishing identity or
+            # fixture secrets. The original CI artifact did not keep these.
+            message = re.sub(r"(?i)\b[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\b",
+                             "<redacted-uuid>", message).replace(PASSWORD, "<redacted-password>")
+            PEER_LOGS.append({"case": self.id().rsplit(".", 1)[-1],
+                              "peer_exit_code": process.returncode,
+                              "log_tail": message, "log_truncated": size > 65_536})
         for origin in self.origins:
             origin.shutdown()
             origin.server_close()
         self.temp.cleanup()
 
-    def peer(self, *, host="127.0.0.1", idle_timeout="10s"):
+    def peer(self, *, host="127.0.0.1", idle_timeout="10s", log_level="warn"):
         family = socket.AF_INET6 if ":" in host else socket.AF_INET
         with socket.socket(family, socket.SOCK_DGRAM) as reserve:
             reserve.bind((host, 0))
@@ -105,7 +118,7 @@ class TuicReferenceTests(unittest.TestCase):
                   "private_key": str(self.folder / "leaf.key"), "alpn": ["h3"],
                   "congestion_control": "cubic", "zero_rtt_handshake": False,
                   "max_idle_time": idle_timeout, "auth_timeout": "2s", "max_external_packet_size": 65535,
-                  "log_level": "warn"}
+                  "log_level": log_level}
         path = self.folder / f"server-{sequence}.json"
         path.write_text(json.dumps(config), encoding="utf-8")
         output = open(self.folder / f"server-{sequence}.log", "wb")
@@ -141,14 +154,23 @@ class TuicReferenceTests(unittest.TestCase):
     def run_client(self, request, *, ok=True):
         process = subprocess.run([self.client], input=json.dumps(request), capture_output=True, text=True, timeout=20)
         report = json.loads(process.stdout)
+        record = {"case": self.id().rsplit(".", 1)[-1], "expect_success": ok,
+                  "mode": request.get("mode", "tcp"), "payload_bytes": request["size"],
+                  "udp_relay_mode": request.get("outbound", {}).get("udp_relay_mode"),
+                  "client_exit_code": process.returncode, "result": report,
+                  "native_interoperability_pass": False}
+        # Append before asserting: failed positive cases must remain visible in
+        # JSON receipts as well as in the unittest traceback.
+        RECORDS.append(record)
         self.assertEqual(process.returncode, 0 if ok else 1, (report, process.stderr))
         self.assertEqual(report["ok"], ok, report)
-        RECORDS.append({"case": self.id().rsplit(".", 1)[-1], "expect_success": ok, "result": report})
         if ok:
             self.assertEqual(report["close"], "clean")
             self.assertEqual(report["downloaded"], request["size"] if request.get("mode") != "dns" else report["downloaded"])
             if request.get("mode") != "dns":
                 self.assertEqual(report["sha256"], pattern_hash(request["size"]))
+            record["native_interoperability_pass"] = True
+        record["expected_outcome_verified"] = True
         return report
 
     def test_tcp_authentication_large_bidirectional_transfer_and_half_close(self):
@@ -177,12 +199,23 @@ class TuicReferenceTests(unittest.TestCase):
         self.run_client(self.request(pinned, origin))
 
     def test_udp_native_and_quic_modes_small_and_fragmented(self):
-        outbound, origin = self.peer(), self.origin(udp=True)
+        outbound, origin = self.peer(log_level="info"), self.origin(udp=True)
         for mode in ("native", "quic"):
             for size in (123, 4096, 65_507):
                 with self.subTest(mode=mode, size=size):
                     node = copy.deepcopy(outbound); node["udp_relay_mode"] = mode
+                    log_path = Path(self.peers[-1][1].name)
+                    before = log_path.stat().st_size
                     self.run_client(self.request(node, origin, mode="udp", size=size))
+                    if mode == "native" and size == 4096:
+                        messages = log_path.read_bytes()[before:].decode("utf-8", errors="replace")
+                        fragments = [(int(index), int(total)) for index, total in re.findall(
+                            r"(?i)\[from-native\].*?fragment (\d+)/(\d+)", messages)]
+                        self.assertTrue(fragments, "official peer did not record native fragment reception")
+                        count = max(total for _, total in fragments)
+                        self.assertGreater(count, 1, "4096-byte payload did not exercise real TUIC fragmentation")
+                        self.assertEqual({index for index, total in fragments if total == count}, set(range(1, count + 1)))
+                        RECORDS[-1]["official_server_observed_fragments"] = count
         self.assertEqual([len(value) for value in origin.received], [123, 4096, 65_507] * 2)
 
     def test_historical_reference_empty_reply_limitation_is_recorded(self):
@@ -245,7 +278,7 @@ class TuicReferenceTests(unittest.TestCase):
             destination.write_text(json.dumps({"peer": "historical official tuic-server", "version": cls.version,
                                                "binary_sha256": cls.server_sha256, "platform": platform.platform(),
                                                "client": "Swirl Rust", "known_limitations": ["Historical reference server aborts while framing an empty UDP reply; this combination is not passed."],
-                                               "records": RECORDS}, indent=2) + "\n", encoding="utf-8")
+                                               "records": RECORDS, "peer_logs": PEER_LOGS}, indent=2) + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":

@@ -247,6 +247,69 @@ fn modern_vmess_import_roundtrips_through_c_abi_without_claiming_network_verific
 }
 
 #[test]
+fn persisted_http_transports_cross_actual_c_abi_and_invalid_reconfigure_is_atomic() {
+    let _serial = serialized_lifecycle();
+    let peer = loopback_peer();
+    let endpoint = peer.local_addr().unwrap();
+    for (network, key, options, expected_type) in [
+        (
+            "grpc",
+            "grpcSettings",
+            json!({"serviceName":"boundary"}),
+            "grpc",
+        ),
+        (
+            "h2",
+            "httpSettings",
+            json!({"host":["peer.invalid"],"path":"/h2"}),
+            "http2",
+        ),
+        (
+            "httpupgrade",
+            "httpupgradeSettings",
+            json!({"path":"/upgrade"}),
+            "httpupgrade",
+        ),
+        (
+            "xhttp",
+            "xhttpSettings",
+            json!({"path":"/split","mode":"stream-one"}),
+            "xhttp",
+        ),
+    ] {
+        let mut stream =
+            json!({"network":network,"security":"tls","tlsSettings":{"serverName":"peer.invalid"}});
+        stream[key] = options;
+        let input = serde_json::to_vec(&json!({"outbounds":[{"protocol":"vless",
+            "settings":{"vnext":[{"address":endpoint.ip().to_string(),"port":endpoint.port(),
+                "users":[{"id":UUID,"encryption":"none"}]}]},"streamSettings":stream}]}))
+        .unwrap();
+        let imported = import_document(&input, InputSource::Clipboard).unwrap();
+        let restored = ConvertedDocument::restore(&imported.save().unwrap()).unwrap();
+        assert!(!restored.nodes()[0].network_verified());
+        let mut native = serde_json::to_value(
+            restored
+                .native_config(0, "127.0.0.1:0".parse().unwrap())
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            native["nodes"][0]["outbound"]["transport"]["type"],
+            expected_type
+        );
+        let (mut core, status) = RunningCore::start(&native);
+        native["nodes"][0]["outbound"]["transport"]["config"]["headers"] =
+            json!([["Content-Type", "forbidden"]]);
+        let failed = command(json!({"op":"configure","handle":core.handle,"config":native}));
+        assert_eq!(failed["ok"], false);
+        assert_eq!(core.snapshot()["generation"], status["generation"]);
+        assert_eq!(core.snapshot()["accepted"], 0);
+        no_upstream_connection(&peer);
+        core.stop();
+    }
+}
+
+#[test]
 fn c_abi_refuses_xray_archives_unknown_fields_and_invalid_vmess_ir() {
     let _serial = serialized_lifecycle();
     let peer = loopback_peer();

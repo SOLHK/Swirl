@@ -358,7 +358,9 @@ fn xray_socks4a_case_alias_preserves_remote_name_and_userid_to_origin() {
 #[test]
 fn legacy_vmess_and_unsupported_transport_never_produce_a_runtime_or_socket() {
     let peer = TcpListener::bind("127.0.0.1:0").unwrap();
-    for (protocol, network) in [("vmess", "tcp"), ("vless", "grpc")] {
+    // XHTTP's default auto mode remains unsupported; explicit stream-one and
+    // gRPC now have native transports and separate positive official tests.
+    for (protocol, network) in [("vmess", "tcp"), ("vless", "xhttp")] {
         let user = if protocol == "vmess" {
             json!({"id":UUID,"alterId":16,"security":"none"})
         } else {

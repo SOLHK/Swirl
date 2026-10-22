@@ -1,0 +1,36 @@
+   Compiling syn v3.0.9
+   Compiling synstructure v0.14.0
+   Compiling zerofrom-derive v0.1.8
+   Compiling yoke-derive v0.8.4
+   Compiling zerovec-derive v0.11.6
+   Compiling zerofrom v0.1.8
+   Compiling yoke v0.8.3
+   Compiling displaydoc v0.2.7
+   Compiling zerotrie v0.2.5
+   Compiling zerovec v0.11.8
+   Compiling serde_derive v1.0.229
+   Compiling tinystr v0.8.4
+   Compiling icu_locale_core v2.1.1
+   Compiling potential_utf v0.1.6
+   Compiling icu_collections v2.1.1
+   Compiling icu_provider v2.1.1
+   Compiling icu_normalizer v2.1.1
+   Compiling icu_properties v2.1.2
+   Compiling serde v1.0.229
+   Compiling ipnet v2.12.2
+   Compiling idna_adapter v1.2.1
+   Compiling idna v1.1.0
+   Compiling url v2.5.8
+   Compiling swirl-subscription v0.1.0 (/workspace/scratch/63c2b083dcfa/Swirl-X14-A/core/crates/swirl-subscription)
+    Finished `test` profile [unoptimized] target(s) in 9.64s
+     Running unittests src/lib.rs (/workspace/scratch/63c2b083dcfa/build-rust/debug/deps/swirl_subscription-a1e2457cef9dc13b)
+
+running 5 tests
+test vmess::tests::unsupported_ws_headers_early_data_and_non_http1_alpn_are_rejected ... ok
+test vmess::tests::critical_fields_never_disappear_before_dialing ... ok
+test vmess::tests::clash_and_uri_produce_identical_native_parameters ... ok
+test vmess::tests::uri_envelope_conflicts_and_critical_unknown_fields_are_rejected ... ok
+test vmess::tests::websocket_tls_maps_sni_host_path_and_alpn_without_changing_identity ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 96 filtered out; finished in 0.00s
+

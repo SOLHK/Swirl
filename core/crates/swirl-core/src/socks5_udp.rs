@@ -46,7 +46,7 @@ impl Reply {
 }
 
 pub(super) struct Pool {
-    nodes: HashMap<String, mpsc::Sender<Datagram>>,
+    nodes: HashMap<(String, Option<String>), mpsc::Sender<Datagram>>,
     workers: JoinSet<()>,
     replies: mpsc::Receiver<Reply>,
     reply_sender: mpsc::Sender<Reply>,
@@ -76,32 +76,43 @@ impl Pool {
         payload: Vec<u8>,
         permit: OwnedSemaphorePermit,
     ) {
-        if !self.nodes.contains_key(&node_id) {
+        let Some(index) = self.plan.config.nodes.iter().position(|n| n.id == node_id) else {
+            udp_drop(&self.counters, &self.total);
+            return;
+        };
+        // Classic VLESS UDP binds its stream to one destination. Include that
+        // destination in the same bounded pool, never reuse a different target.
+        let key = (
+            node_id,
+            matches!(
+                self.plan.config.nodes[index].outbound,
+                Outbound::Vless { .. }
+            )
+            .then(|| target.authority()),
+        );
+        if !self.nodes.contains_key(&key) {
             if self.nodes.len() >= SESSION_LIMIT {
                 udp_drop(&self.counters, &self.total);
                 return;
             }
-            let Some(index) = self.plan.config.nodes.iter().position(|n| n.id == node_id) else {
-                udp_drop(&self.counters, &self.total);
-                return;
-            };
             let (sender, receiver) = mpsc::channel(QUEUE_LIMIT);
             self.workers.spawn(run(
                 self.plan.clone(),
                 index,
+                target.clone(),
                 receiver,
                 self.reply_sender.clone(),
                 self.counters.clone(),
                 self.total.clone(),
             ));
-            self.nodes.insert(node_id.clone(), sender);
+            self.nodes.insert(key.clone(), sender);
         }
         let message = Datagram {
             target,
             payload,
             _permit: permit,
         };
-        if self.nodes[&node_id].try_send(message).is_err() {
+        if self.nodes[&key].try_send(message).is_err() {
             udp_drop(&self.counters, &self.total);
         }
     }
@@ -122,16 +133,23 @@ impl Pool {
 async fn run(
     plan: Arc<SessionPlan>,
     index: usize,
+    first_target: Target,
     mut requests: mpsc::Receiver<Datagram>,
     replies: mpsc::Sender<Reply>,
     counters: Arc<Counters>,
     total: Arc<Counters>,
 ) {
-    if matches!(
-        plan.config.nodes[index].outbound,
-        Outbound::Hysteria2(_) | Outbound::Tuic(_)
-    ) {
-        run_quic(plan, index, requests, replies, counters, total).await;
+    if !matches!(plan.config.nodes[index].outbound, Outbound::Socks5 { .. }) {
+        run_proxy(
+            plan,
+            index,
+            first_target,
+            requests,
+            replies,
+            counters,
+            total,
+        )
+        .await;
         return;
     }
     let association = Socks5UdpAssociation::connect(
@@ -197,13 +215,19 @@ async fn run(
     discard_pending(&mut requests, &counters, &total);
 }
 
-enum QuicAssociation {
+enum ProxyAssociation {
     Hysteria2(swirl_protocol::hysteria2::UdpAssociation),
     Tuic(swirl_protocol::tuic::UdpAssociation),
+    Shadowsocks2022(Box<swirl_protocol::ss2022::UdpAssociation>),
+    Stream(swirl_protocol::stream_udp::UdpAssociation),
 }
 
-impl QuicAssociation {
-    async fn connect(plan: &SessionPlan, index: usize) -> Result<Self, &'static str> {
+impl ProxyAssociation {
+    async fn connect(
+        plan: &SessionPlan,
+        index: usize,
+        target: &Target,
+    ) -> Result<Self, &'static str> {
         let limit = Duration::from_millis(plan.config.limits.handshake_timeout_ms);
         match &plan.config.nodes[index].outbound {
             Outbound::Hysteria2(config) => Ok(Self::Hysteria2(
@@ -214,14 +238,46 @@ impl QuicAssociation {
                 swirl_protocol::tuic::UdpAssociation::connect(config, &plan.resolver, limit)
                     .await?,
             )),
+            Outbound::Shadowsocks {
+                host,
+                port,
+                password,
+                cipher,
+                udp: true,
+                ..
+            } if cipher.starts_with("2022-") => Ok(Self::Shadowsocks2022(Box::new(
+                swirl_protocol::ss2022::UdpAssociation::connect(
+                    host,
+                    *port,
+                    password,
+                    cipher,
+                    &plan.resolver,
+                    limit,
+                )
+                .await?,
+            ))),
+            outbound @ (Outbound::Vless { udp: true, .. } | Outbound::Trojan { udp: true, .. }) => {
+                Ok(Self::Stream(
+                    swirl_protocol::stream_udp::UdpAssociation::connect(
+                        outbound,
+                        target,
+                        &plan.resolver,
+                        limit,
+                        plan.transports.get(&plan.config.nodes[index].id),
+                    )
+                    .await?,
+                ))
+            }
             _ => Err("UdpProxyUnsupportedOrRejected"),
         }
     }
 
-    async fn send(&self, target: &Target, payload: &[u8]) -> Result<(), &'static str> {
+    async fn send(&mut self, target: &Target, payload: &[u8]) -> Result<(), &'static str> {
         match self {
             Self::Hysteria2(value) => value.send(target, payload).await,
             Self::Tuic(value) => value.send(target, payload).await,
+            Self::Shadowsocks2022(value) => value.send(target, payload).await,
+            Self::Stream(value) => value.send(target, payload).await,
         }
     }
 
@@ -229,19 +285,22 @@ impl QuicAssociation {
         match self {
             Self::Hysteria2(value) => value.recv().await,
             Self::Tuic(value) => value.recv().await,
+            Self::Shadowsocks2022(value) => value.recv().await,
+            Self::Stream(value) => value.recv().await,
         }
     }
 }
 
-async fn run_quic(
+async fn run_proxy(
     plan: Arc<SessionPlan>,
     index: usize,
+    first_target: Target,
     mut requests: mpsc::Receiver<Datagram>,
     replies: mpsc::Sender<Reply>,
     counters: Arc<Counters>,
     total: Arc<Counters>,
 ) {
-    let Ok(mut association) = QuicAssociation::connect(&plan, index).await else {
+    let Ok(mut association) = ProxyAssociation::connect(&plan, index, &first_target).await else {
         discard_pending(&mut requests, &counters, &total);
         return;
     };

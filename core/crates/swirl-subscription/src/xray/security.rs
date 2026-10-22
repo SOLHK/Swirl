@@ -6,7 +6,10 @@ use super::{
     strict::key_path,
 };
 use crate::{Reality, Tls, WebSocket};
-use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+use base64::{
+    Engine,
+    engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD},
+};
 use serde_json::{Map, Value};
 
 /// Candidate parameters only. Any blocking diagnostic prevents native execution.
@@ -17,6 +20,7 @@ pub(super) struct SecurityMapping {
     pub tls: Option<Tls>,
     pub reality: Option<Reality>,
     pub websocket: Option<WebSocket>,
+    pub stream_transport: Option<crate::StreamTransport>,
 }
 
 fn push(sink: &mut Sink, code: &str, path: &str, severity: &str) {
@@ -105,6 +109,7 @@ pub(super) fn map(
         tls: mapped.tls,
         reality: mapped.reality,
         websocket: mapped.websocket,
+        stream_transport: mapped.stream_transport,
     }
 }
 
@@ -143,6 +148,7 @@ struct StreamMapping {
     pub tls: Option<Tls>,
     pub reality: Option<Reality>,
     pub websocket: Option<WebSocket>,
+    pub stream_transport: Option<crate::StreamTransport>,
 }
 
 fn string<'a>(
@@ -286,6 +292,7 @@ fn tls(
     diagnostics: &mut Sink,
 ) -> Option<Tls> {
     let settings = object(settings, path, diagnostics)?;
+    let mut ca_der_base64 = None;
     for (key, value) in settings {
         let path = key_path(path, key);
         match key.as_str() {
@@ -312,15 +319,9 @@ fn tls(
             "rejectUnknownSni" | "verifyClientCertificate" => {
                 disabled_bool(value, &path, "TlsInboundOptionUnsupported", diagnostics)
             }
-            "certificates" => match value.as_array() {
-                Some(certificates) if certificates.is_empty() => (),
-                Some(_) => push(
-                    diagnostics,
-                    "TlsCertificatesUnsupported",
-                    &path,
-                    "unsupported",
-                ),
-                None => push(diagnostics, "ExpectedArray", &path, "error"),
+            "certificates" => match certificate_anchor(value) {
+                Ok(anchor) => ca_der_base64 = anchor,
+                Err(code) => push(diagnostics, code, &path, "unsupported"),
             },
             "minVersion" | "maxVersion" | "cipherSuites" | "masterKeyLog" => {
                 empty_string(value, &path, "TlsOptionUnsupported", diagnostics);
@@ -355,7 +356,7 @@ fn tls(
     }
     let alpn = alpn(
         settings.get("alpn"),
-        network == "ws",
+        matches!(network, "ws" | "httpupgrade"),
         &key_path(path, "alpn"),
         diagnostics,
     );
@@ -370,8 +371,65 @@ fn tls(
     Some(Tls {
         server_name: server_name.to_owned(),
         alpn,
-        ca_der_base64: None,
+        ca_der_base64,
     })
+}
+
+// Xray inline usage=verify adds a CA to the system trust store. Keep the same
+// meaning. Client identities, issuer CAs, files and certificate chains need
+// separate support and are never interpreted as a trust anchor accidentally.
+fn certificate_anchor(value: &Value) -> Result<Option<String>, &'static str> {
+    let certs = value.as_array().ok_or("TlsCertificatesType")?;
+    if certs.is_empty() {
+        return Ok(None);
+    }
+    if certs.len() != 1 {
+        return Err("TlsCertificateChainUnsupported");
+    }
+    let cert = certs[0].as_object().ok_or("TlsCertificatesType")?;
+    for (key, value) in cert {
+        match key.as_str() {
+            "certificate" | "usage" => (),
+            "oneTimeLoading" if value.is_boolean() => (),
+            "buildChain" if value == &Value::Bool(false) => (),
+            "ocspStapling" if value.as_u64() == Some(0) => (),
+            _ => return Err("TlsCertificateOptionUnsupported"),
+        }
+    }
+    if cert.get("usage").and_then(Value::as_str) != Some("verify") {
+        return Err("TlsCertificateUsageUnsupported");
+    }
+    let lines = cert
+        .get("certificate")
+        .and_then(Value::as_array)
+        .ok_or("TlsCertificateInlineRequired")?;
+    if lines.is_empty() || lines.len() > 1024 {
+        return Err("TlsCertificateLimit");
+    }
+    let mut pem = String::new();
+    for line in lines {
+        let line = line.as_str().ok_or("TlsCertificateInlineRequired")?;
+        if pem.len() + line.len() + 1 > 65536 {
+            return Err("TlsCertificateLimit");
+        }
+        pem.push_str(line);
+        pem.push('\n');
+    }
+    // Decode only one PEM block; any second block or non-base64 material fails.
+    let raw_body = pem
+        .trim()
+        .strip_prefix("-----BEGIN CERTIFICATE-----")
+        .and_then(|p| p.strip_suffix("-----END CERTIFICATE-----"))
+        .ok_or("TlsCertificatePem")?;
+    let encoded: String = raw_body
+        .chars()
+        .filter(|ch| !ch.is_ascii_whitespace())
+        .collect();
+    let der = STANDARD.decode(encoded).map_err(|_| "TlsCertificatePem")?;
+    if der.is_empty() || der.len() > 49152 {
+        return Err("TlsCertificateLimit");
+    }
+    Ok(Some(STANDARD.encode(der)))
 }
 
 fn reality(settings: &Value, address: &str, path: &str, diagnostics: &mut Sink) -> Option<Reality> {
@@ -749,8 +807,12 @@ fn map_stream(
         tls: None,
         reality: None,
         websocket: None,
+        stream_transport: None,
     };
-    if !matches!(mapping.network.as_str(), "tcp" | "ws") {
+    if !matches!(
+        mapping.network.as_str(),
+        "tcp" | "ws" | "grpc" | "h2" | "httpupgrade" | "xhttp"
+    ) {
         push(
             diagnostics,
             "TransportUnsupported",
@@ -769,6 +831,10 @@ fn map_stream(
             "realitySettings" if mapping.security == "reality" => (),
             "tcpSettings" | "rawSettings" if mapping.network == "tcp" => (),
             "wsSettings" if mapping.network == "ws" => (),
+            "grpcSettings" | "gunSettings" if mapping.network == "grpc" => (),
+            "httpSettings" if mapping.network == "h2" => (),
+            "httpupgradeSettings" if mapping.network == "httpupgrade" => (),
+            "xhttpSettings" | "splithttpSettings" if mapping.network == "xhttp" => (),
             "sockopt" if value.as_object().is_some_and(Map::is_empty) => (),
             "tlsSettings"
             | "realitySettings"
@@ -823,13 +889,6 @@ fn map_stream(
                     "RealityTransportConflict",
                     &key_path(path, "network"),
                     "error",
-                );
-            } else if mapping.network != "tcp" {
-                push(
-                    diagnostics,
-                    "RealityTransportUnsupported",
-                    &key_path(path, "network"),
-                    "unsupported",
                 );
             }
             if protocol != "vless" {
@@ -889,6 +948,27 @@ fn map_stream(
             address,
             port,
             &key_path(path, "wsSettings"),
+            diagnostics,
+        );
+    } else if matches!(
+        mapping.network.as_str(),
+        "grpc" | "h2" | "httpupgrade" | "xhttp"
+    ) {
+        if !matches!(protocol, "vless" | "trojan") {
+            push(
+                diagnostics,
+                "TransportProtocolUnsupported",
+                path,
+                "unsupported",
+            );
+        }
+        mapping.stream_transport = super::stream_transport::map(
+            stream,
+            &mapping.network,
+            mapping.tls.as_ref(),
+            address,
+            port,
+            path,
             diagnostics,
         );
     }

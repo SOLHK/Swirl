@@ -35,6 +35,9 @@ pub enum Transport {
 }
 
 impl Transport {
+    pub fn configured(outbound: &Outbound) -> Option<Self> {
+        outbound.stream_transport().map(Self::from)
+    }
     /// Validate this selection against an outbound before DNS, sockets or Core
     /// activation. Importers still own strict source-parameter conversion.
     pub fn validate_for(&self, outbound: &Outbound) -> Result<()> {
@@ -85,6 +88,48 @@ impl Transport {
             Self::XHttp { config } => {
                 swirl_transport::xhttp::connect_with_timeout(stream, config, tls, remaining).await
             }
+        }
+    }
+}
+
+impl From<&swirl_subscription::StreamTransport> for Transport {
+    fn from(value: &swirl_subscription::StreamTransport) -> Self {
+        use swirl_subscription::StreamTransport as Native;
+        use swirl_subscription::stream_transport::GrpcMode;
+        match value {
+            Native::Grpc { config } => Self::Grpc {
+                config: swirl_transport::grpc::Config {
+                    authority: config.authority.clone(),
+                    service_name: config.service_name.clone(),
+                    headers: config.headers.clone(),
+                    mode: match config.mode {
+                        GrpcMode::Tun => swirl_transport::grpc::Mode::Tun,
+                        GrpcMode::TunMulti => swirl_transport::grpc::Mode::TunMulti,
+                    },
+                },
+            },
+            Native::Http2 { config } => Self::Http2 {
+                config: swirl_transport::http2::Config {
+                    host: config.host.clone(),
+                    path: config.path.clone(),
+                    headers: config.headers.clone(),
+                },
+            },
+            Native::HttpUpgrade { config } => Self::HttpUpgrade {
+                config: swirl_transport::httpupgrade::Config {
+                    host: config.host.clone(),
+                    path: config.path.clone(),
+                    headers: config.headers.clone(),
+                },
+            },
+            Native::XHttp { config } => Self::XHttp {
+                config: swirl_transport::xhttp::Config {
+                    host: config.host.clone(),
+                    path: config.path.clone(),
+                    headers: config.headers.clone(),
+                    mode: config.mode.clone(),
+                },
+            },
         }
     }
 }

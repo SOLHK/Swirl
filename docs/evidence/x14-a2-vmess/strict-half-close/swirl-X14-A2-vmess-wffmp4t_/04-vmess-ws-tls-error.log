@@ -1,0 +1,11 @@
+2026/10/22 21:45:28.026841 [Debug] app/log: Logger started
+2026/10/22 21:45:28.027071 [Debug] app/proxyman/inbound: creating stream worker on 127.0.0.1:48603
+2026/10/22 21:45:28.029518 [Info] transport/internet/websocket: listening tcp(for WS) on 127.0.0.1:48603
+2026/10/22 21:45:28.030709 [Warning] core: Xray 26.10.21 started
+2026/10/22 21:45:28.041467 [Info] [768274937] proxy/vmess/inbound: received request for tcp:127.0.0.1:46543
+2026/10/22 21:45:28.041499 [Info] [768274937] app/dispatcher: default route for tcp:127.0.0.1:46543
+2026/10/22 21:45:28.041502 [Info] [768274937] transport/internet/tcp: dialing TCP to tcp:127.0.0.1:46543
+2026/10/22 21:45:28.041504 [Debug] [768274937] transport/internet: dialing to tcp:127.0.0.1:46543
+2026/10/22 21:45:28.041653 [Info] [768274937] proxy/freedom: connection opened to tcp:127.0.0.1:46543, local endpoint 127.0.0.1:53200, remote endpoint 127.0.0.1:46543
+2026/10/22 21:45:28.041664 [Debug] [768274937] proxy: CopyRawConn (maybe) readv
+2026/10/22 21:45:29.384300 [Info] [768274937] app/proxyman/inbound: connection ends > proxy/vmess/inbound: connection ends > context canceled

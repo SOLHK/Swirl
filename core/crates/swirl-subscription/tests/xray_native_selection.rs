@@ -122,7 +122,7 @@ fn invalid_uuid_account_stays_blocked_without_contaminating_valid_siblings() {
 fn unsupported_cipher_server_keeps_its_slot_and_does_not_replace_valid_siblings() {
     let value = json!({"outbounds":[{"protocol":"shadowsocks","settings":{"servers":[
         {"address":"first.example.invalid","port":1001,"method":"aes-128-gcm","password":"SYNTHETIC-FIRST"},
-        {"address":"blocked.example.invalid","port":1002,"method":"2022-blake3-aes-128-gcm","password":"QUFBQUFBQUFBQUFBQUFBQQ=="},
+        {"address":"blocked.example.invalid","port":1002,"method":"2022-blake3-chacha20-poly1305","password":"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUE="},
         {"address":"chosen.example.invalid","port":1003,"method":"chacha20-ietf-poly1305","password":" SYNTHETIC-LAST:密碼 "}
     ]}}]});
     let doc = restored(&value);

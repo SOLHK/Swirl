@@ -774,7 +774,15 @@ fn ss_outbound(raw: &Value, family: &str) -> Result<Outbound, &'static str> {
     {
         return Err("ConflictingCipher");
     }
-    if !["aes-128-gcm", "aes-256-gcm", "chacha20-ietf-poly1305"].contains(&cipher) {
+    if ![
+        "aes-128-gcm",
+        "aes-256-gcm",
+        "chacha20-ietf-poly1305",
+        "2022-blake3-aes-128-gcm",
+        "2022-blake3-aes-256-gcm",
+    ]
+    .contains(&cipher)
+    {
         return Err("CipherNotImplemented");
     }
     let obfs_http = if let Some(plugin) = raw.get("plugin") {
@@ -1208,6 +1216,8 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
                     websocket: None,
                     reality: None,
                     flow: None,
+                    transport: None,
+                    udp,
                 }),
                 "trojan" => tls.map(|tls| Outbound::Trojan {
                     host,
@@ -1215,6 +1225,8 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
                     password,
                     tls,
                     websocket: None,
+                    transport: None,
+                    udp,
                 }),
                 "http" => Some(Outbound::HttpConnect {
                     host,
@@ -1266,7 +1278,9 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
             udp_declared: udp,
             unrecognized_fields: unrecognized,
             native_tcp_candidate: candidate.is_some(),
-            native_udp_supported: (["ss", "socks5"].contains(&kind) && udp && candidate.is_some())
+            native_udp_supported: (["ss", "socks5", "vless", "trojan"].contains(&kind)
+                && udp
+                && candidate.is_some())
                 || matches!(&candidate, Some(Outbound::Hysteria2(config)) if config.udp)
                 || matches!(&candidate, Some(Outbound::Tuic(config)) if config.udp),
             real_network_verified: false,
@@ -1754,7 +1768,7 @@ mod tests {
             assert!(result.report.nodes[0].native_tcp_candidate);
             assert_eq!(result.originals[0]["udp"], declared);
             assert_eq!(result.report.nodes[0].udp_declared, declared);
-            assert!(!result.report.nodes[0].native_udp_supported);
+            assert_eq!(result.report.nodes[0].native_udp_supported, declared);
             assert_eq!(result.originals[0]["raw-uri"], input);
             assert_eq!(result.original, input.as_bytes());
             for query in [

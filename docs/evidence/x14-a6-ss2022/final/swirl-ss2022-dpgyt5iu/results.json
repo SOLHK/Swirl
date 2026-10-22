@@ -1,0 +1,45 @@
+{
+  "official_server": "shadowsocks-rust v1.25.0",
+  "server_only": true,
+  "server_sha256": "ce2ed6278044693b801c592642f3a5366b5d8b70db1bc537432c017ac4a844f7",
+  "commands": [
+    [
+      "/workspace/scratch/63c2b083dcfa/ss2022-research/ssserver",
+      "--config",
+      "/tmp/swirl-ss2022-dpgyt5iu/00-2022-blake3-aes-128-gcm.json",
+      "--single-threaded",
+      "-v"
+    ]
+  ],
+  "records": [
+    {
+      "client": "transport-client",
+      "cipher": "2022-blake3-aes-128-gcm",
+      "mode": "http",
+      "imported": false,
+      "exit_code": 0,
+      "result": {
+        "close": "clean",
+        "close_detail": null,
+        "connect_us": 674,
+        "downloaded": 131328,
+        "driver_drain_us": 6,
+        "ok": true,
+        "remaining_tasks": 0,
+        "sha256": "91f86bc16210e6eab1715b5e77465cc1a906243e758bcecb884060dbe9a26fe3",
+        "transfer_us": 5205,
+        "uploaded": 69
+      }
+    }
+  ],
+  "origins": [
+    {
+      "type": "http",
+      "requests": 1,
+      "received": 0,
+      "client_closes": 1,
+      "tls_closes": 0,
+      "errors": []
+    }
+  ]
+}

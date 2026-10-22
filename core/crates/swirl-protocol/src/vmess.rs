@@ -332,7 +332,7 @@ struct Stream {
     transport_closed: bool,
     failed: bool,
     limit: Duration,
-    header_deadline: Option<Pin<Box<tokio::time::Sleep>>>,
+    progress_deadline: Option<Pin<Box<tokio::time::Sleep>>>,
 }
 
 impl Stream {
@@ -364,7 +364,7 @@ impl Stream {
             transport_closed: false,
             failed: false,
             limit,
-            header_deadline: None,
+            progress_deadline: None,
         })
     }
 
@@ -413,12 +413,12 @@ impl Stream {
                 return Poll::Ready(Ok(()));
             }
             while self.input.len() < self.needed {
-                if let Some(deadline) = &mut self.header_deadline
+                if let Some(deadline) = &mut self.progress_deadline
                     && deadline.as_mut().poll(cx).is_ready()
                 {
                     return Poll::Ready(Err(io::Error::new(
                         io::ErrorKind::TimedOut,
-                        "VmessResponseTimeout",
+                        "VmessRecordTimeout",
                     )));
                 }
                 let mut data = [0; MAX_PAYLOAD];
@@ -430,10 +430,12 @@ impl Stream {
                     // record is truncation, not an accepted normal close.
                     return Poll::Ready(Err(io::ErrorKind::UnexpectedEof.into()));
                 }
-                if matches!(self.stage, ReadStage::HeaderLength | ReadStage::Header)
-                    && self.header_deadline.is_none()
-                {
-                    self.header_deadline = Some(Box::pin(tokio::time::sleep(self.limit)));
+                if self.progress_deadline.is_none() {
+                    // Idle time between complete records is application idle.
+                    // Once any prefix/ciphertext byte arrives, the entire
+                    // authenticated record must finish within this deadline.
+                    // Subsequent single-byte drips never extend the deadline.
+                    self.progress_deadline = Some(Box::pin(tokio::time::sleep(self.limit)));
                 }
                 self.input.extend_from_slice(buffer.filled());
             }
@@ -458,7 +460,7 @@ impl Stream {
                     if self.input != [self.session.response_byte, 0, 0, 0] {
                         return Poll::Ready(Err(invalid()));
                     }
-                    self.header_deadline = None;
+                    self.progress_deadline = None;
                     self.stage = ReadStage::Length;
                     self.needed = 2;
                 }
@@ -472,6 +474,7 @@ impl Stream {
                 }
                 ReadStage::Payload => {
                     self.receiver.open(&mut self.input)?;
+                    self.progress_deadline = None;
                     if self.input.is_empty() {
                         self.read_closed = true;
                         return self.finish_transport(cx);
@@ -738,6 +741,40 @@ mod tests {
             peer.write_all(&wire).await.unwrap();
             peer.shutdown().await.unwrap();
             assert!(client.read_u8().await.is_err());
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn body_prefix_and_ciphertext_drips_have_a_fixed_authentication_deadline() {
+        for prefix in [vec![1], vec![0, 32, 1]] {
+            let (client, mut peer) = tokio::io::duplex(4096);
+            let session = Session::new("auto").unwrap();
+            let wire = response(&session, &[session.response_byte, 0, 0, 0]);
+            let mut client =
+                Stream::new(Box::new(client), session, Duration::from_millis(20)).unwrap();
+            peer.write_all(&wire).await.unwrap();
+            // The authenticated response header may precede an arbitrarily
+            // idle application. Cancelling this read must preserve state.
+            assert!(
+                tokio::time::timeout(Duration::from_secs(1), client.read_u8())
+                    .await
+                    .is_err()
+            );
+            peer.write_all(&prefix).await.unwrap();
+            let drip = tokio::spawn(async move {
+                for _ in 0..6 {
+                    tokio::time::sleep(Duration::from_millis(5)).await;
+                    peer.write_all(&[0]).await.unwrap();
+                }
+                peer
+            });
+            let began = tokio::time::Instant::now();
+            let error = client.read_u8().await.unwrap_err();
+            assert_eq!(error.kind(), io::ErrorKind::TimedOut);
+            assert_eq!(began.elapsed(), Duration::from_millis(20));
+            assert!(client.read_u8().await.is_err());
+            drip.abort();
+            let _ = drip.await;
         }
     }
 

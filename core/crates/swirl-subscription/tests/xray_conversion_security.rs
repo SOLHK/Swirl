@@ -364,7 +364,7 @@ fn websocket_integer_range_matches_v2ray_signed_early_data_bound() {
 }
 
 #[test]
-fn unsupported_transports_are_identified_and_never_fall_back_to_tcp() {
+fn incompatible_transport_settings_are_preserved_and_never_fall_back_to_tcp() {
     for (name, kind) in [
         ("grpc", Transport::Grpc),
         ("http", Transport::Http2),
@@ -379,7 +379,8 @@ fn unsupported_transports_are_identified_and_never_fall_back_to_tcp() {
             "httpupgradeSettings":{"path":"/upgrade"},"xhttpSettings":{"mode":"stream-up"}});
         let doc = roundtrip(&vless(stream.clone()));
         assert_eq!(doc.nodes()[0].transport(), kind);
-        assert!(has(&doc, "TransportUnsupported"));
+        assert!(blocked(&doc));
+        assert!(has(&doc, "UnappliedStreamSettingsPreserved"));
         assert_eq!(doc.stream_settings(0), Some(&stream));
     }
 }
@@ -521,7 +522,7 @@ fn security_projections_are_bounded_and_diagnostics_redact_unknown_names() {
 #[test]
 fn unimplemented_or_unknown_stream_semantics_are_unverified_not_validated() {
     for stream in [
-        json!({"network":"grpc"}),
+        json!({"network":"future-grpc-version"}),
         json!({"security":"future-security"}),
         json!({"futureStream":{"secret":"SYNTHETIC"}}),
         json!({"network":"ws","wsSettings":{"host":"proxy.example.invalid","futureWS":true}}),

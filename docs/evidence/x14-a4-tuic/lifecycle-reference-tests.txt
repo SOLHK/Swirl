@@ -1,0 +1,14 @@
+test_clash_and_uri_import_reach_the_reference_server (test_tuic_reference.TuicReferenceTests.test_clash_and_uri_import_reach_the_reference_server) ... ok
+test_dns_request_through_both_udp_modes (test_tuic_reference.TuicReferenceTests.test_dns_request_through_both_udp_modes) ... ok
+test_historical_reference_empty_reply_limitation_is_recorded (test_tuic_reference.TuicReferenceTests.test_historical_reference_empty_reply_limitation_is_recorded) ... ok
+test_ipv6_endpoint_and_domain_destination (test_tuic_reference.TuicReferenceTests.test_ipv6_endpoint_and_domain_destination) ... ok
+test_reconnect_node_switch_and_parallel_connections (test_tuic_reference.TuicReferenceTests.test_reconnect_node_switch_and_parallel_connections) ... ok
+test_tcp_authentication_large_bidirectional_transfer_and_half_close (test_tuic_reference.TuicReferenceTests.test_tcp_authentication_large_bidirectional_transfer_and_half_close) ... ok
+test_tls_ca_sni_alpn_and_pin_fail_closed (test_tuic_reference.TuicReferenceTests.test_tls_ca_sni_alpn_and_pin_fail_closed) ... ok
+test_udp_native_and_quic_modes_small_and_fragmented (test_tuic_reference.TuicReferenceTests.test_udp_native_and_quic_modes_small_and_fragmented) ... ok
+test_wrong_password_and_uuid_never_reach_destination (test_tuic_reference.TuicReferenceTests.test_wrong_password_and_uuid_never_reach_destination) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 12.631s
+
+OK

@@ -1,0 +1,32 @@
+{
+  "command": [
+    "/workspace/scratch/63c2b083dcfa/build-rust/debug/examples/transport-client"
+  ],
+  "server_version": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+  "peers": [
+    {
+      "label": "01-vmess-raw-plain",
+      "server_version": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "environment_overrides": {}
+    },
+    {
+      "label": "02-vmess-ws-tls",
+      "server_version": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)",
+      "environment_overrides": {}
+    }
+  ],
+  "records": [],
+  "cleanup_errors": [],
+  "origins": [
+    {
+      "mode": "echo",
+      "tls": false,
+      "requests": 2,
+      "received": 15,
+      "client_closes": 2,
+      "tls_closes": 0,
+      "interruptions": 0,
+      "errors": []
+    }
+  ]
+}

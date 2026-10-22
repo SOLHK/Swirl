@@ -71,8 +71,8 @@ class _VmessXrayBase(unittest.TestCase):
     def peer(self, network="raw", tls=False, **options):
         return self.fixture.peer(network, protocol="vmess", tls=tls, **options)
 
-    def success(self, request, size=None):
-        process, report = self.fixture.run(request)
+    def success(self, request, size=None, *, timeout=20):
+        process, report = self.fixture.run(request, timeout=timeout)
         self.assertEqual(process.returncode, 0, (report, process.stderr))
         self.assertTrue(report["ok"], report)
         self.assertEqual(report["downloaded"], len(HTTP_BODY) if size is None else size)
@@ -134,6 +134,15 @@ class VmessXrayTests(_VmessXrayBase):
         peer, origin = self.peer(tls=True), self.fixture.origin(tls=True)
         self.success(self.fixture.request(peer, origin))
         self.fixture.assert_accepted(peer, origin)
+        self.fixture.assert_origin_closed(origin)
+
+    def test_streamed_64_mib_over_tcp_tls_with_authenticated_clean_close(self):
+        peer, origin = self.peer(tls=True), self.finite_echo_origin()
+        size = 64 * 1024 * 1024
+        request = self.fixture.request(peer, origin, mode="echo", size=size, timeout_ms=60000)
+        self.success(request, size, timeout=70)
+        self.fixture.assert_accepted(peer, origin)
+        self.assertEqual(origin.received, size)
         self.fixture.assert_origin_closed(origin)
 
     def test_wrong_uuid_never_reaches_origin_on_any_transport(self):

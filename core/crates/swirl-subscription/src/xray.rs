@@ -8,6 +8,7 @@ use std::fmt;
 pub mod convert;
 mod schema;
 mod security;
+mod stream_transport;
 mod strict;
 
 pub const MAX_JSON_INPUT: usize = 4 * 1024 * 1024;

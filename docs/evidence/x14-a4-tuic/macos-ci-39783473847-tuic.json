@@ -1,0 +1,346 @@
+{
+  "peer": "historical official tuic-server",
+  "version": "1.0.0",
+  "binary_sha256": "989c9fe8288bd07217198b844af83bfac7d949f1445b7447f324701e0e0b8825",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "client": "Swirl Rust",
+  "known_limitations": [
+    "Historical reference server aborts while framing an empty UDP reply; this combination is not passed."
+  ],
+  "records": [
+    {
+      "case": "test_clash_and_uri_import_reach_the_reference_server",
+      "expect_success": true,
+      "result": {
+        "close": "clean",
+        "connect_including_dns_quic_auth_us": 36133,
+        "downloaded": 65536,
+        "imported": true,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b2797a7998e01b1d4c7e9c0a31a0e1d3982028655eaa53615f50e24ece188773",
+        "total_us": 42717,
+        "uploaded": 65536
+      }
+    },
+    {
+      "case": "test_clash_and_uri_import_reach_the_reference_server",
+      "expect_success": true,
+      "result": {
+        "close": "clean",
+        "connect_including_dns_quic_auth_us": 3132,
+        "downloaded": 65536,
+        "imported": true,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b2797a7998e01b1d4c7e9c0a31a0e1d3982028655eaa53615f50e24ece188773",
+        "total_us": 10292,
+        "uploaded": 65536
+      }
+    },
+    {
+      "case": "test_dns_request_through_both_udp_modes",
+      "expect_success": true,
+      "result": {
+        "close": "clean",
+        "connect_including_dns_quic_auth_us": 4374,
+        "downloaded": 45,
+        "imported": false,
+        "mode": "dns",
+        "ok": true,
+        "sha256": "770622abdbf50d514ee038eff5c8a52360a441ac3b52e5359e7360044bb0874d",
+        "source_port": 58708,
+        "total_us": 6848,
+        "uploaded": 29
+      }
+    },
+    {
+      "case": "test_dns_request_through_both_udp_modes",
+      "expect_success": true,
+      "result": {
+        "close": "clean",
+        "connect_including_dns_quic_auth_us": 8756,
+        "downloaded": 45,
+        "imported": false,
+        "mode": "dns",
+        "ok": true,
+        "sha256": "770622abdbf50d514ee038eff5c8a52360a441ac3b52e5359e7360044bb0874d",
+        "source_port": 58708,
+        "total_us": 12443,
+        "uploaded": 29
+      }
+    },
+    {
+      "case": "test_historical_reference_empty_reply_limitation_is_recorded",
+      "expect_success": false,
+      "result": {
+        "error": "TotalTimeout",
+        "ok": false
+      },
+      "reference_peer_limitation": "empty UDP reply aborts tuic-server-1.0.0",
+      "native_interoperability_pass": false
+    },
+    {
+      "case": "test_ipv6_endpoint_and_domain_destination",
+      "expect_success": true,
+      "result": {
+        "close": "clean",
+        "connect_including_dns_quic_auth_us": 34402,
+        "downloaded": 65536,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b2797a7998e01b1d4c7e9c0a31a0e1d3982028655eaa53615f50e24ece188773",
+        "total_us": 57701,
+        "uploaded": 65536
+      }
+    },
+    {
+      "case": "test_reconnect_node_switch_and_parallel_connections",
+      "expect_success": true,
+      "result": {
+        "close": "clean",
+        "connect_including_dns_quic_auth_us": 5110,
+        "downloaded": 65536,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b2797a7998e01b1d4c7e9c0a31a0e1d3982028655eaa53615f50e24ece188773",
+        "total_us": 18432,
+        "uploaded": 65536
+      }
+    },
+    {
+      "case": "test_reconnect_node_switch_and_parallel_connections",
+      "expect_success": true,
+      "result": {
+        "close": "clean",
+        "connect_including_dns_quic_auth_us": 5783,
+        "downloaded": 65536,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b2797a7998e01b1d4c7e9c0a31a0e1d3982028655eaa53615f50e24ece188773",
+        "total_us": 15189,
+        "uploaded": 65536
+      }
+    },
+    {
+      "case": "test_reconnect_node_switch_and_parallel_connections",
+      "expect_success": true,
+      "result": {
+        "close": "clean",
+        "connect_including_dns_quic_auth_us": 6236,
+        "downloaded": 65536,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b2797a7998e01b1d4c7e9c0a31a0e1d3982028655eaa53615f50e24ece188773",
+        "total_us": 42036,
+        "uploaded": 65536
+      }
+    },
+    {
+      "case": "test_reconnect_node_switch_and_parallel_connections",
+      "expect_success": true,
+      "result": {
+        "close": "clean",
+        "connect_including_dns_quic_auth_us": 11805,
+        "downloaded": 65536,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b2797a7998e01b1d4c7e9c0a31a0e1d3982028655eaa53615f50e24ece188773",
+        "total_us": 61782,
+        "uploaded": 65536
+      }
+    },
+    {
+      "case": "test_reconnect_node_switch_and_parallel_connections",
+      "expect_success": true,
+      "result": {
+        "close": "clean",
+        "connect_including_dns_quic_auth_us": 9684,
+        "downloaded": 65536,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b2797a7998e01b1d4c7e9c0a31a0e1d3982028655eaa53615f50e24ece188773",
+        "total_us": 88196,
+        "uploaded": 65536
+      }
+    },
+    {
+      "case": "test_reconnect_node_switch_and_parallel_connections",
+      "expect_success": true,
+      "result": {
+        "close": "clean",
+        "connect_including_dns_quic_auth_us": 15656,
+        "downloaded": 65536,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b2797a7998e01b1d4c7e9c0a31a0e1d3982028655eaa53615f50e24ece188773",
+        "total_us": 72146,
+        "uploaded": 65536
+      }
+    },
+    {
+      "case": "test_reconnect_node_switch_and_parallel_connections",
+      "expect_success": true,
+      "result": {
+        "close": "clean",
+        "connect_including_dns_quic_auth_us": 16954,
+        "downloaded": 65536,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b2797a7998e01b1d4c7e9c0a31a0e1d3982028655eaa53615f50e24ece188773",
+        "total_us": 64963,
+        "uploaded": 65536
+      }
+    },
+    {
+      "case": "test_tcp_authentication_large_bidirectional_transfer_and_half_close",
+      "expect_success": true,
+      "result": {
+        "close": "clean",
+        "connect_including_dns_quic_auth_us": 5583,
+        "downloaded": 4194304,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "fa2797ae7c45bdf5d8ad88f4704ec73263b1a1642ccb0c0fa89e67435aadabc6",
+        "total_us": 866643,
+        "uploaded": 4194304
+      }
+    },
+    {
+      "case": "test_tls_ca_sni_alpn_and_pin_fail_closed",
+      "expect_success": false,
+      "result": {
+        "error": "QuicTlsVerificationOrHandshake",
+        "ok": false
+      }
+    },
+    {
+      "case": "test_tls_ca_sni_alpn_and_pin_fail_closed",
+      "expect_success": false,
+      "result": {
+        "error": "QuicTlsVerificationOrHandshake",
+        "ok": false
+      }
+    },
+    {
+      "case": "test_tls_ca_sni_alpn_and_pin_fail_closed",
+      "expect_success": false,
+      "result": {
+        "error": "QuicTlsVerificationOrHandshake",
+        "ok": false
+      }
+    },
+    {
+      "case": "test_tls_ca_sni_alpn_and_pin_fail_closed",
+      "expect_success": false,
+      "result": {
+        "error": "QuicTlsVerificationOrHandshake",
+        "ok": false
+      }
+    },
+    {
+      "case": "test_tls_ca_sni_alpn_and_pin_fail_closed",
+      "expect_success": true,
+      "result": {
+        "close": "clean",
+        "connect_including_dns_quic_auth_us": 5459,
+        "downloaded": 65536,
+        "imported": false,
+        "mode": "tcp",
+        "ok": true,
+        "sha256": "b2797a7998e01b1d4c7e9c0a31a0e1d3982028655eaa53615f50e24ece188773",
+        "total_us": 14763,
+        "uploaded": 65536
+      }
+    },
+    {
+      "case": "test_udp_native_and_quic_modes_small_and_fragmented",
+      "expect_success": true,
+      "result": {
+        "close": "clean",
+        "connect_including_dns_quic_auth_us": 4711,
+        "downloaded": 123,
+        "imported": false,
+        "mode": "udp",
+        "ok": true,
+        "sha256": "a6530926ec5ea8880eae4666add8fe14493346311f32a59ec563c6416714dfa3",
+        "source_port": 59375,
+        "total_us": 7781,
+        "uploaded": 123
+      }
+    },
+    {
+      "case": "test_udp_native_and_quic_modes_small_and_fragmented",
+      "expect_success": true,
+      "result": {
+        "close": "clean",
+        "connect_including_dns_quic_auth_us": 5091,
+        "downloaded": 4096,
+        "imported": false,
+        "mode": "udp",
+        "ok": true,
+        "sha256": "bb50289f8b754449c732d87f74370bea84c1a4e496f39389f428065b20057c9d",
+        "source_port": 59375,
+        "total_us": 25022,
+        "uploaded": 4096
+      }
+    },
+    {
+      "case": "test_udp_native_and_quic_modes_small_and_fragmented",
+      "expect_success": true,
+      "result": {
+        "close": "clean",
+        "connect_including_dns_quic_auth_us": 7046,
+        "downloaded": 123,
+        "imported": false,
+        "mode": "udp",
+        "ok": true,
+        "sha256": "a6530926ec5ea8880eae4666add8fe14493346311f32a59ec563c6416714dfa3",
+        "source_port": 59375,
+        "total_us": 12373,
+        "uploaded": 123
+      }
+    },
+    {
+      "case": "test_udp_native_and_quic_modes_small_and_fragmented",
+      "expect_success": true,
+      "result": {
+        "close": "clean",
+        "connect_including_dns_quic_auth_us": 10449,
+        "downloaded": 4096,
+        "imported": false,
+        "mode": "udp",
+        "ok": true,
+        "sha256": "bb50289f8b754449c732d87f74370bea84c1a4e496f39389f428065b20057c9d",
+        "source_port": 59375,
+        "total_us": 19373,
+        "uploaded": 4096
+      }
+    },
+    {
+      "case": "test_wrong_password_and_uuid_never_reach_destination",
+      "expect_success": false,
+      "result": {
+        "error": "TcpRead",
+        "ok": false
+      }
+    },
+    {
+      "case": "test_wrong_password_and_uuid_never_reach_destination",
+      "expect_success": false,
+      "result": {
+        "error": "TcpWrite",
+        "ok": false
+      }
+    }
+  ]
+}
