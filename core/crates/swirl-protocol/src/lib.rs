@@ -484,6 +484,28 @@ async fn connect_selected(
     transport: Option<&Transport>,
     udp: bool,
 ) -> Result<swirl_transport::BoxStream> {
+    // The protocol dispatch state machine is large. Keep its future off the
+    // caller stack (notably the Windows standalone Hysteria2 client stack).
+    // This allocation is scoped to one connection and drops on cancellation.
+    Box::pin(connect_selected_inner(
+        outbound,
+        target,
+        resolver,
+        handshake_limit,
+        transport,
+        udp,
+    ))
+    .await
+}
+
+async fn connect_selected_inner(
+    outbound: &Outbound,
+    target: &Target,
+    resolver: &Resolver,
+    handshake_limit: std::time::Duration,
+    transport: Option<&Transport>,
+    udp: bool,
+) -> Result<swirl_transport::BoxStream> {
     let configured = Transport::configured(outbound);
     if configured.is_some() && transport.is_some() {
         return Err("TransportConflict");
