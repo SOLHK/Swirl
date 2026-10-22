@@ -261,6 +261,71 @@ No tested node is globally marked network verified from this fixture evidence.
 Other protocol/transport combinations await B/C/VMess integration; their
 successful display or parameter validation is not a native-connectivity claim.
 
+## D8: executable acceptance gates and platform evidence
+
+The dedicated workflow now requires all five real Qt suites on Ubuntu 24.04,
+macOS 14 and Windows Server 2022. A missing, truncated, empty, failed or skipped
+XML report fails the job. Windows additionally requires the actual DPAPI
+roundtrip and the catalog cases for committed imports and running refresh.
+The independent official-peer HTTP/HTTPS gate runs on all three platforms;
+Windows must prove persistence/reload before starting the native runtime.
+Evidence uploads are allowlisted and exclude private peer configurations,
+raw subscription contents and unredacted protocol logs.
+
+The full Windows application builds against the same Rust DLL as the component
+tests; CI compares their SHA-256 values and rejects external proxy executables
+in the application output. It deploys the actual QML application and runs the
+existing load-aware page smoke plus an isolated JSON acceptance profile at
+device-pixel ratios 1 and 1.5. The new profile clicks the mounted import,
+confirmation and node-row controls; tests text, clipboard and Unicode-file
+previews; checks six protocol labels and REALITY/Vision details; confirms a
+real encrypted save/reload; checks repeat-import identity and strict malformed
+input rollback; and checks unsupported-row inspection without changing the
+selected executable row. It verifies actual DPR values, disabled unsupported
+actions, credential-free public text, process exit and QML-warning status.
+The acceptance flag is compiled only when explicitly enabled with the Rust
+application. No unrelated page or font implementation is changed.
+
+The earlier macOS downloader run failed before issuing a verified request.
+Fixture review found that the old CA certificate was also used as a server
+leaf and lacked a serverAuth EKU. The downloader fixture now uses a dedicated
+CA-signed, 730-day localhost
+server leaf with SANs and serverAuth, while clients explicitly trust only the
+test CA and retain VerifyPeer. The macOS test process enables Qt's temporary
+keychain path before TLS initialization, avoiding a login-keychain prompt.
+A bounded verified-handshake preflight exposes setup failure immediately;
+certificate validation is never disabled. The new test leaf expires in 2028
+and must be rotated before then.
+
+Local Linux acceptance on the cumulative D8 source passes 5/5 CTest suites:
+22 import, 15 HTTPS download, 11 applicable store, 5 runtime and 6 catalog
+methods, with zero failures or skips. All five complete XML documents were
+parsed immediately in the same test command. One earlier copy of the download
+report was observed truncated despite a successful process/text log; two
+isolated runs and the final complete suite did not reproduce it. That report
+was rejected, no gate was weakened, and the underlying cause remains unproven.
+The mounted UI helper and main entry pass C++23 syntax compilation against the
+real Qt SDK; workflow YAML, Bash and embedded Python also pass local syntax
+validation. Full Windows execution and macOS certificate acceptance require
+the exact published D8 workflow result, not these Linux checks.
+
+Previously obtained immutable evidence:
+
+| Commit/run | Actual evidence |
+| --- | --- |
+| D1 `38131212`, run [39720162765](https://github.com/SOLHK/Swirl/actions/runs/39720162765) | All three platform jobs passed, including the full Windows application. |
+| D5 `32354980`, run [39721951577](https://github.com/SOLHK/Swirl/actions/runs/39721951577) | Linux and Windows passed; Windows import 20, download 15 and store 13 methods, zero skips; old macOS HTTPS fixture failed. |
+| D6 `6ddf5312`, run [39723494413](https://github.com/SOLHK/Swirl/actions/runs/39723494413) | Windows XML proves import 20, download 15, store 23 and catalog 7 methods, zero failures/skips. Linux passed. Old macOS fixture failed. Windows full-build status must be read separately. |
+
+Remaining boundaries are explicit: there is no Linux/macOS secure storage
+backend or full native application package in this Windows-focused product;
+those store paths fail closed. Offscreen Windows Server CI does not certify a
+physical Windows 11 display or its native file-picker interaction. No real
+provider subscription or public-internet proxy node was supplied. VMess AEAD,
+general B native conversion and C transport integration are not implemented in
+this window. No external core masks these limitations. New pushes supersede
+older CI runs so runners validate the newest cumulative source.
+
 ## Applied engineering guidance
 
 Read repository `AGENTS.md`, `CONTINUE_DEVELOPMENT.md` and
@@ -277,6 +342,8 @@ Primary references consulted before implementation:
 - [Qt QJsonDocument](https://doc.qt.io/qt-6/qjsondocument.html): response decoding, not the strict-input authority.
 - [Qt QSaveFile](https://doc.qt.io/qt-6/qsavefile.html): atomic commit without direct-write fallback.
 - [Qt QNetworkRequest](https://doc.qt.io/qt-6/qnetworkrequest.html): bounded asynchronous downloads and redirects.
+- [Qt 6.10 QSslSocket](https://doc.qt.io/qt-6.10/qsslsocket.html#setLocalCertificate) and [Qt 6.10.3 SecureTransport](https://github.com/qt/qtbase/blob/v6.10.3/src/plugins/tls/securetransport/qtls_st.cpp): temporary-keychain behavior and explicit test trust anchors.
+- [Apple TLS server-certificate requirements](https://support.apple.com/en-us/103769): serverAuth EKU and certificate validity requirements for the HTTPS fixture.
 - [Qt QAbstractItemModel](https://doc.qt.io/qt-6/qabstractitemmodel.html): thread/selection guidance; existing QVariantList model retained.
 - [Qt implementation](https://github.com/qt/qtbase/blob/dev/src/corelib/io/qsavefile.cpp): atomic-save design reference.
 - [Xray outbound structure](https://xtls.github.io/en/config/outbound.html) and [V2Fly outbounds](https://www.v2fly.org/config/outbounds.html).

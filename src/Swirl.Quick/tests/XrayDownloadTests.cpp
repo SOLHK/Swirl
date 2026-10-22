@@ -38,21 +38,28 @@ QByteArray configuration(const QString &name = QStringLiteral("HTTPS 下载节�
 class FixtureTrust final {
 public:
     explicit FixtureTrust(bool trusted = true) : original(QSslConfiguration::defaultConfiguration()) {
-        QFile certificateFile(QStringLiteral(SWIRL_FIXTURE_DIR "/localhost-cert.pem"));
-        QFile keyFile(QStringLiteral(SWIRL_FIXTURE_DIR "/localhost-key.pem"));
-        if (!certificateFile.open(QIODevice::ReadOnly) || !keyFile.open(QIODevice::ReadOnly)) return;
+        QFile authorityFile(QStringLiteral(SWIRL_FIXTURE_DIR "/localhost-cert.pem"));
+        QFile certificateFile(QStringLiteral(SWIRL_FIXTURE_DIR "/xray-download-server-cert.pem"));
+        QFile keyFile(QStringLiteral(SWIRL_FIXTURE_DIR "/xray-download-server-key.pem"));
+        if (!authorityFile.open(QIODevice::ReadOnly) || !certificateFile.open(QIODevice::ReadOnly)
+            || !keyFile.open(QIODevice::ReadOnly)) return;
+        authority = QSslCertificate(authorityFile.readAll());
         certificate = QSslCertificate(certificateFile.readAll());
         key = QSslKey(keyFile.readAll(), QSsl::Rsa);
-        if (certificate.isNull() || key.isNull()) return;
+        if (authority.isNull() || certificate.isNull() || key.isNull()) return;
         auto client = original;
         auto authorities = client.caCertificates();
+        authorities.removeAll(authority);
         authorities.removeAll(certificate);
-        if (trusted) authorities.append(certificate);
+        if (trusted) authorities.append(authority);
         client.setCaCertificates(authorities);
         client.setPeerVerifyMode(QSslSocket::VerifyPeer);
         QSslConfiguration::setDefaultConfiguration(client);
         server = original;
-        server.setLocalCertificate(certificate);
+        // The existing shared fixture is a CA, not a server leaf. This dedicated
+        // 730-day leaf has serverAuth EKU, SAN and CA:false, including the policy
+        // requirements of SecureTransport's application-provided trust anchors.
+        server.setLocalCertificateChain({certificate, authority});
         server.setPrivateKey(key);
         server.setPeerVerifyMode(QSslSocket::VerifyNone);
         valid = true;
@@ -60,6 +67,7 @@ public:
     ~FixtureTrust() { QSslConfiguration::setDefaultConfiguration(original); }
     bool valid = false;
     QSslConfiguration server;
+    QSslCertificate authority;
     QSslCertificate certificate;
 private:
     QSslConfiguration original;
@@ -75,6 +83,12 @@ public:
         setHandshakeTimeout(5000);
         connect(this, &QSslServer::startedEncryptionHandshake, this, [this](QSslSocket *) {
             ++handshakeStarts;
+        });
+        connect(this, &QSslServer::errorOccurred, this, [this](QSslSocket *, QAbstractSocket::SocketError error) {
+            socketErrors.append(int(error));
+        });
+        connect(this, &QSslServer::sslErrors, this, [this](QSslSocket *, const QList<QSslError> &errors) {
+            for (const auto &error : errors) certificateErrors.append(int(error.error()));
         });
         connect(this, &QTcpServer::pendingConnectionAvailable, this, [this] {
             while (hasPendingConnections()) {
@@ -138,6 +152,7 @@ public:
     int requests = 0;
     int handshakeStarts = 0;
     int disconnections = 0;
+    QList<int> socketErrors, certificateErrors;
 private:
     QList<QPointer<QSslSocket>> sockets;
 };
@@ -214,12 +229,45 @@ class XrayDownloadTests final : public QObject {
     }
 private slots:
     void initTestCase() {
+#ifdef Q_OS_MACOS
+        // Qt's SecureTransport server imports its synthetic private key into
+        // the login keychain unless this documented opt-in is set. A headless
+        // runner cannot answer the resulting key-access dialog. Keep the key
+        // in Qt's temporary keychain; client VerifyPeer and CA checks stay on.
+        // https://doc.qt.io/qt-6.10/qsslsocket.html#setLocalCertificate
+        qputenv("QT_SSL_USE_TEMPORARY_KEYCHAIN", "1");
+#endif
         QVERIFY2(QSslSocket::supportsSsl(), "Qt must provide a real TLS backend; these tests cannot be skipped");
         FixtureTrust trust;
         QVERIFY(trust.valid);
         QVERIFY(trust.certificate.effectiveDate() <= QDateTime::currentDateTimeUtc());
         QVERIFY(trust.certificate.expiryDate() > QDateTime::currentDateTimeUtc());
         QCOMPARE(QSslConfiguration::defaultConfiguration().peerVerifyMode(), QSslSocket::VerifyPeer);
+        // Fail once, with bounded non-sensitive evidence, if the platform TLS
+        // fixture cannot authenticate. Do not let every download test wait for
+        // the same handshake failure until CTest kills an unfinished XML file.
+        HttpsFixture server(trust.server);
+        QVERIFY(server.listen(QHostAddress::LocalHost, 0));
+        QSslSocket client;
+        client.setSslConfiguration(QSslConfiguration::defaultConfiguration());
+        QList<int> clientCertificateErrors;
+        connect(&client, &QSslSocket::sslErrors, &client, [&](const QList<QSslError> &errors) {
+            for (const auto &error : errors) clientCertificateErrors.append(int(error.error()));
+        });
+        client.connectToHostEncrypted(QStringLiteral("127.0.0.1"), server.serverPort());
+        const bool completed = QTest::qWaitFor([&] {
+            return client.isEncrypted() || client.error() != QAbstractSocket::UnknownSocketError;
+        }, 10000);
+        if (!completed || !client.isEncrypted()) {
+            qWarning() << "XRAY_TLS_FIXTURE" << QSslSocket::activeBackend()
+                       << "started" << server.handshakeStarts << "serverSocket" << server.socketErrors
+                       << "serverCertificate" << server.certificateErrors << "clientSocket" << int(client.error())
+                       << "clientCertificate" << clientCertificateErrors;
+        }
+        QVERIFY2(completed && client.isEncrypted(), "Platform TLS fixture must authenticate with VerifyPeer before URL tests");
+        QVERIFY(clientCertificateErrors.isEmpty());
+        qInfo() << "XRAY_TLS_BACKEND" << QSslSocket::activeBackend() << "verified=true";
+        client.abort();
     }
     void trustedHttpsUsesStrictRustPreviewAndExplicitConfirmation() {
         FixtureTrust trust; QVERIFY(trust.valid);

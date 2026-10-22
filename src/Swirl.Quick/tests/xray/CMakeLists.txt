@@ -92,18 +92,11 @@ endfunction()
 
 swirl_add_xray_test(SwirlXrayImportTests XrayImportTests.cpp swirl-xray-import)
 swirl_add_xray_test(SwirlXrayDownloadTests XrayDownloadTests.cpp swirl-xray-download)
-# D1 precedes the storage stage. Once its source is committed, the same build
-# automatically runs the real DPAPI roundtrip on Windows and fails closed tests
-# on other platforms; CI verifies the required Windows test is actually present.
-if(EXISTS "${SWIRL_QUICK_SOURCE}/tests/XrayStoreTests.cpp")
-    swirl_add_xray_test(SwirlXrayStoreTests XrayStoreTests.cpp swirl-xray-store)
-endif()
-if(EXISTS "${SWIRL_QUICK_SOURCE}/tests/XrayRuntimeTests.cpp")
-    swirl_add_xray_test(SwirlXrayRuntimeTests XrayRuntimeTests.cpp swirl-xray-runtime)
-endif()
-if(EXISTS "${SWIRL_QUICK_SOURCE}/tests/XrayCatalogTests.cpp")
-    swirl_add_xray_test(SwirlXrayCatalogTests XrayCatalogTests.cpp swirl-xray-catalog)
-endif()
+# The complete product chain must not silently lose coverage if a test source
+# is removed or renamed. Windows executes DPAPI; other platforms fail closed.
+swirl_add_xray_test(SwirlXrayStoreTests XrayStoreTests.cpp swirl-xray-store)
+swirl_add_xray_test(SwirlXrayRuntimeTests XrayRuntimeTests.cpp swirl-xray-runtime)
+swirl_add_xray_test(SwirlXrayCatalogTests XrayCatalogTests.cpp swirl-xray-catalog)
 
 execute_process(COMMAND git rev-parse HEAD WORKING_DIRECTORY "${SWIRL_REPOSITORY}"
     OUTPUT_VARIABLE SWIRL_SOURCE_SHA OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)

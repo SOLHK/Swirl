@@ -7,6 +7,7 @@ set(SWIRL_TEST_FONT_DIRECTORY "C:/Windows/Fonts" CACHE PATH "Offscreen test font
 option(SWIRL_BUILD_UI_TESTS "Build the Qt input-driven overview checks" OFF)
 option(SWIRL_FONT_TESTS_ONLY "Configure only the independent Qt font tests, without the application or proxy engine" OFF)
 option(SWIRL_USE_RUST_CORE "Use Swirl Rust Core for production sessions and node probes; reject unsupported capabilities without external fallback" OFF)
+option(SWIRL_XRAY_UI_TESTS "Build the isolated JSON import acceptance profile in the real Rust application" OFF)
 
 # Keep the standalone CI and the existing UI suite on the same font targets.
 # This path deliberately precedes third_party and all application/core targets.
@@ -99,8 +100,10 @@ if(SWIRL_USE_RUST_CORE)
  endif()
  find_program(SWIRL_CARGO cargo REQUIRED)
  get_filename_component(SWIRL_RUST_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/../../core" ABSOLUTE)
- set(SWIRL_RUST_TARGET "${CMAKE_CURRENT_BINARY_DIR}/rust-target")
- file(GLOB_RECURSE SWIRL_RUST_INPUTS CONFIGURE_DEPENDS "${SWIRL_RUST_SOURCE}/crates/*.rs" "${SWIRL_RUST_SOURCE}/crates/Cargo.toml" "${SWIRL_RUST_SOURCE}/crates/*/Cargo.toml")
+ set(SWIRL_RUST_TARGET "${CMAKE_CURRENT_BINARY_DIR}/rust-target" CACHE PATH "Cargo target directory for the exact-source Rust application runtime")
+ file(GLOB_RECURSE SWIRL_RUST_INPUTS CONFIGURE_DEPENDS
+  "${SWIRL_RUST_SOURCE}/crates/*.rs" "${SWIRL_RUST_SOURCE}/crates/Cargo.toml" "${SWIRL_RUST_SOURCE}/crates/*/Cargo.toml"
+  "${SWIRL_RUST_SOURCE}/vendor/*.rs" "${SWIRL_RUST_SOURCE}/vendor/*/Cargo.toml")
  add_custom_command(OUTPUT "${SWIRL_RUST_TARGET}/release/swirl_api.dll"
   COMMAND "${SWIRL_CARGO}" build --release --locked --manifest-path "${SWIRL_RUST_SOURCE}/Cargo.toml" --target-dir "${SWIRL_RUST_TARGET}" -p swirl-api
   DEPENDS ${SWIRL_RUST_INPUTS} "${SWIRL_RUST_SOURCE}/Cargo.toml" "${SWIRL_RUST_SOURCE}/Cargo.lock"
@@ -242,6 +245,15 @@ target_sources(Swirl PRIVATE app/SvgIconProvider.h app/SvgIconProvider.cpp)
 target_link_libraries(Swirl PRIVATE Qt6::Quick Qt6::Qml Qt6::QuickControls2 Qt6::Network Qt6::Svg)
 if(MSVC)
  target_compile_options(Swirl PRIVATE /utf-8)
+endif()
+if(SWIRL_XRAY_UI_TESTS)
+ if(NOT SWIRL_USE_RUST_CORE)
+  message(FATAL_ERROR "The JSON import UI acceptance profile requires the real Rust Core build")
+ endif()
+ find_package(Qt6 REQUIRED COMPONENTS Test)
+ target_sources(Swirl PRIVATE tests/XrayUiChecks.h tests/XrayUiChecks.cpp)
+ target_compile_definitions(Swirl PRIVATE SWIRL_XRAY_UI_TESTS)
+ target_link_libraries(Swirl PRIVATE Qt6::Test)
 endif()
 if(SWIRL_BUILD_UI_TESTS)
  add_executable(SwirlStoragePathsTests tests/StoragePathsTests.cpp)
