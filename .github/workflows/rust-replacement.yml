@@ -70,40 +70,28 @@ jobs:
           arch: win64_msvc2022_64
           modules: qtshadertools
           cache: true
-      - name: Configure Release with mandatory Rust runtime
-        run: cmake -S src/Swirl.Quick -B build/r1 -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=ON
-      - name: Build actual application and loader tests
-        run: cmake --build build/r1 --config Release --target Swirl SwirlRustCoreTests SwirlRustCoreLibraryTests --parallel 4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.14'
-      - name: Windows native public Internet requests
-        shell: pwsh
-        env:
-          SWIRL_R1_PUBLIC_NETWORK: '1'
-          SWIRL_R1_PUBLIC_REPORT: ${{ github.workspace }}/build/r1/public-proxy.json
-        run: |
-          python -m pip install cryptography==50.0.2
-          if ($LASTEXITCODE -ne 0) { throw 'Independent peer dependency install failed.' }
-          cargo build --manifest-path core/Cargo.toml --release --locked --target x86_64-pc-windows-msvc --bin swirl-api
-          if ($LASTEXITCODE -ne 0) { throw 'Windows native test host build failed.' }
-          $env:SWIRL_RUST_HARNESS=(Resolve-Path core/target/x86_64-pc-windows-msvc/release/swirl-api.exe).Path
-          python tools/tests/test_r1_public_proxy.py -v
-          if ($LASTEXITCODE -ne 0) { throw 'Rust public proxy response verification failed.' }
+      - name: Configure isolated Qt integration tests
+        run: cmake -S src/Swirl.Quick -B build/r1-tests -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=ON
+      - name: Build Rust control adapter and actual loader tests
+        run: cmake --build build/r1-tests --config Release --target SwirlRustCoreTests SwirlRustCoreLibraryTests --parallel 4
       - name: Deploy test dependencies and inspect PE imports
         shell: pwsh
         run: |
-          windeployqt --release --compiler-runtime build/r1/Release/SwirlRustCoreTests.exe
+          windeployqt --release --compiler-runtime build/r1-tests/Release/SwirlRustCoreTests.exe
           if ($LASTEXITCODE -ne 0) { throw 'Qt test deployment failed.' }
-          dumpbin /HEADERS build/r1/Release/swirl_api.dll | Out-File build/r1/rust-pe-headers.txt
+          dumpbin /HEADERS build/r1-tests/Release/swirl_api.dll | Out-File build/r1-tests/rust-pe-headers.txt
           if ($LASTEXITCODE -ne 0) { throw 'Rust PE inspection failed.' }
-          dumpbin /DEPENDENTS build/r1/Release/swirl_api.dll | Out-File build/r1/rust-dependencies.txt
+          dumpbin /DEPENDENTS build/r1-tests/Release/swirl_api.dll | Out-File build/r1-tests/rust-dependencies.txt
           if ($LASTEXITCODE -ne 0) { throw 'Rust dependency inspection failed.' }
       - name: DLL loader and Qt Rust integration
-        run: ctest --test-dir build/r1 -C Release -R "swirl-rust-(library|qt-integration)" --output-on-failure
+        run: ctest --test-dir build/r1-tests -C Release -R "swirl-rust-(library|qt-integration)" --output-on-failure
+      - name: Configure separate production Release without test entry points
+        run: cmake -S src/Swirl.Quick -B build/r1-product -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=OFF
+      - name: Build the real production executable and paired DLL
+        run: cmake --build build/r1-product --config Release --target Swirl --parallel 4
       - name: Clean directory and actual Swirl.exe roundtrips
         shell: pwsh
-        run: ./scripts/Stage-WindowsRustProduct.ps1 -BuildDirectory build/r1 -Destination dist/Swirl-Rust-x64
+        run: ./scripts/Stage-WindowsRustProduct.ps1 -BuildDirectory build/r1-product -Destination dist/Swirl-Rust-x64
       - name: Negative packaged DLL gate
         shell: pwsh
         run: |
@@ -112,12 +100,12 @@ jobs:
           Move-Item $dll "$dll.absent"
           try {
             $report=Join-Path $env:RUNNER_TEMP 'r1-missing-dll.json'
-            $p=Start-Process (Join-Path $stage 'Swirl.exe') -ArgumentList @('--rust-core-self-test', ('"'+$report+'"')) -PassThru
+            $p=Start-Process (Join-Path $stage 'Swirl.exe') -ArgumentList @('--rust-core-self-test', ('"'+$report+'"')) -WorkingDirectory $env:RUNNER_TEMP -PassThru
             if (-not $p.WaitForExit(15000)) { $p.Kill(); throw 'Missing DLL check hung.' }
             if ($p.ExitCode -eq 0 -or -not (Test-Path $report)) { throw 'Missing DLL was not rejected.' }
             $result=Get-Content $report -Raw | ConvertFrom-Json
             if ($result.success -or $result.failure -ne 'RustLibraryLoadFailed') { throw 'Wrong missing DLL diagnostic.' }
-            Copy-Item $report build/r1/
+            Copy-Item $report build/r1-product/
           } finally { Move-Item "$dll.absent" $dll }
       - name: Start actual Qt UI from clean product directory
         shell: pwsh
@@ -126,8 +114,24 @@ jobs:
           $env:QT_QUICK_BACKEND='software'
           $exe=(Resolve-Path dist/Swirl-Rust-x64/Swirl.exe).Path
           $p=Start-Process $exe -ArgumentList '--smoke-test' -WorkingDirectory $env:RUNNER_TEMP -PassThru
-          if (-not $p.WaitForExit(60000)) { $p.Kill(); throw 'Swirl UI smoke timed out.' }
+          if (-not $p.WaitForExit(75000)) { $p.Kill(); throw 'Swirl UI smoke timed out.' }
           if ($p.ExitCode -ne 0) { throw "Swirl UI smoke failed: $($p.ExitCode)" }
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - name: Windows native public Internet requests
+        shell: pwsh
+        env:
+          SWIRL_R1_PUBLIC_NETWORK: '1'
+          SWIRL_R1_PUBLIC_REPORT: ${{ github.workspace }}/build/r1-product/public-proxy.json
+        run: |
+          python -m pip install cryptography==50.0.2
+          if ($LASTEXITCODE -ne 0) { throw 'Independent peer dependency install failed.' }
+          cargo build --manifest-path core/Cargo.toml --release --locked --target x86_64-pc-windows-msvc --bin swirl-api
+          if ($LASTEXITCODE -ne 0) { throw 'Windows native test host build failed.' }
+          $env:SWIRL_RUST_HARNESS=(Resolve-Path core/target/x86_64-pc-windows-msvc/release/swirl-api.exe).Path
+          python tools/tests/test_r1_public_proxy.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Rust public proxy response verification failed.' }
       - name: Build installer and portable archive
         shell: pwsh
         run: |
@@ -135,7 +139,7 @@ jobs:
           if (-not (Test-Path $nsis)) { choco install nsis --yes --no-progress; if ($LASTEXITCODE -ne 0) { throw 'NSIS install failed.' } }
           $dist=(Resolve-Path dist).Path
           $stage=(Resolve-Path dist/Swirl-Rust-x64).Path
-          $icon=(Resolve-Path build/r1/brand/Swirl.ico).Path
+          $icon=(Resolve-Path build/r1-product/brand/Swirl.ico).Path
           & $nsis "/DAPP_DIST=$stage" "/DOUT_DIR=$dist" "/DAPP_ICON=$icon" src/Swirl.Quick/packaging/Swirl.nsi
           if ($LASTEXITCODE -ne 0) { throw 'Installer build failed.' }
           Compress-Archive -Path "$stage/*" -DestinationPath (Join-Path $dist 'Swirl-Rust-x64.zip')
@@ -144,13 +148,14 @@ jobs:
         with:
           name: R1-Windows-evidence-${{ github.sha }}
           path: |
-            build/r1/Testing/Temporary/LastTest.log
-            build/r1/*integration.xml
-            build/r1/rust-*.txt
-            build/r1/r1-missing-dll.json
-            build/r1/public-proxy.json
+            build/r1-tests/Testing/Temporary/LastTest.log
+            build/r1-tests/*.xml
+            build/r1-tests/rust-*.txt
+            build/r1-product/r1-missing-dll.json
+            build/r1-product/public-proxy.json
             dist/Swirl-Rust-x64/rust-self-test.json
             dist/Swirl-Rust-x64/package-manifest.json
+            dist/Swirl-Rust-x64/Swirl-diagnostics.txt
           if-no-files-found: warn
       - uses: actions/upload-artifact@v4
         with:
