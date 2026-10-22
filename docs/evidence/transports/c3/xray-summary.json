@@ -1,0 +1,37 @@
+{
+  "suite": "test_transport_http2_xray.py",
+  "suite_exit_code": 0,
+  "test_methods": 8,
+  "suite_seconds": 3.978,
+  "fixture_result_files": 8,
+  "native_client_invocations": 28,
+  "client_exit_codes": {
+    "0": 14,
+    "1": 14
+  },
+  "expected_negative_errors": {
+    "VlessHandshakeWrite": 1,
+    "HttpRead": 4,
+    "TlsVerificationOrHandshake": 2,
+    "TlsAlpnUnsupported": 1,
+    "OperationTimeout": 1,
+    "Http2TlsRequired": 1,
+    "Http2ReservedHeader": 3,
+    "InputSyntax": 1
+  },
+  "successful_close_results": {
+    "cancelled": 8,
+    "clean": 6
+  },
+  "independent_server_versions": [
+    "Xray 1.8.24 (Xray, Penetrates Everything.) 6baad79 (go1.23.0 linux/amd64)"
+  ],
+  "remaining_driver_tasks": [
+    0
+  ],
+  "origin_request_count": 17,
+  "origin_plain_client_eofs": 12,
+  "origin_tls_close_notify_completions": 2,
+  "cleanup_errors": [],
+  "public_node_tested": false
+}

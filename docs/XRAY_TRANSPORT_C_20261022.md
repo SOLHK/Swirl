@@ -141,9 +141,42 @@ VLESS/Trojan authentication, real HTTP and verified inner HTTPS responses,
 8 MiB bidirectional transfers, eight concurrent cancellations, bad credentials,
 bad service/SNI/CA/ALPN, server interruption, bounded timeouts and clean close.
 Actual commands, output and per-attempt evidence are under
-`evidence/transports/c2/`. A transient local doctest failure caused by concurrent
-recompilation was resolved by freezing edits and running the complete gates
-serially; no test was removed or changed to hide that failure.
+`evidence/transports/c2/`. A transient local doctest dependency-artifact mismatch
+was resolved before the final successful serial run; no test was removed or
+changed to hide that failure. A similar local incremental-artifact collision
+reappeared during C3 without concurrent edits, so concurrency alone is not a
+proven root cause. C3 clears only generated local crate artifacts and repeats
+the complete gates. Fresh C2 CI checkouts passed the unit/doctest gate on all
+three platforms; macOS has also completed the full C2 interoperability job.
+
+## C3 legacy HTTP/2
+
+This connector implements the legacy streaming `PUT` request/response bodies
+from Xray 1.8.24, not CONNECT. It requires verified TLS and negotiated `h2`,
+preserves authority, decoded configured Path and allowed headers, and passes
+the body byte stream directly to VLESS/Trojan. Unsupported plaintext and method
+overrides are explicit errors. HTTP errors, GOAWAY, RST_STREAM, flow control,
+half-close and cancellation share the tested HTTP/2 engine from C2.
+
+Current Xray 26.10.21 explicitly removed the old transport; this checkpoint's
+independent peer is exactly Xray 1.8.24 / `6baad79`. Eight independent test
+methods passed in 3.978 seconds, exit zero: 28 native invocations with 14
+positive results and 14 expected rejections. Positive cases include VLESS and
+Trojan, custom Host/Path/headers, HTTP and verified target HTTPS, an 8 MiB duplex
+flow and eight concurrent cancellations. Target TLS close_notify and process
+task completion are observed separately. Wrong Host/Path, authentication,
+CA/SNI/ALPN, invalid method/header, timeout, interruption and fresh-connection
+recovery are covered. There is no automatic replay of an interrupted stream.
+
+The shared internal session supports multiple simultaneous independent streams
+on one connection and has direct regression tests for reuse and GOAWAY.
+Production outbound connections currently create their own sessions: a
+cross-outbound connection pool and Host-list selection are not implemented.
+The config accepts one resolved Host; B must not silently discard a Host list.
+C3's final serial fmt/check/clippy/test gates all passed after the generated
+artifact cleanup: 432 tests including doctests, zero failed/ignored. Evidence
+and the actual independent-server command output are in
+`evidence/transports/c3/`.
 
 ## Upstream pins and independent implementation
 

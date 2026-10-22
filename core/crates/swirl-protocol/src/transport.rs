@@ -20,12 +20,16 @@ pub enum Transport {
     Grpc {
         config: swirl_transport::grpc::Config,
     },
+    #[serde(rename = "http2", alias = "h2")]
+    Http2 {
+        config: swirl_transport::http2::Config,
+    },
 }
 
 impl Transport {
     pub(crate) fn required_alpn(&self) -> Option<&'static [u8]> {
         match self {
-            Self::Grpc { .. } => Some(b"h2"),
+            Self::Grpc { .. } | Self::Http2 { .. } => Some(b"h2"),
             _ => None,
         }
     }
@@ -43,6 +47,9 @@ impl Transport {
             }
             Self::Grpc { config } => {
                 swirl_transport::grpc::connect_with_timeout(stream, config, tls, remaining).await
+            }
+            Self::Http2 { config } => {
+                swirl_transport::http2::connect_with_timeout(stream, config, tls, remaining).await
             }
         }
     }
@@ -95,6 +102,12 @@ pub(crate) fn validate(outbound: &Outbound, selected: Option<&Transport>) -> Res
                 crate::websocket::validate_headers(headers)?;
             }
             Transport::Grpc { config } => config.validate()?,
+            Transport::Http2 { config } => {
+                if tls.is_none() {
+                    return Err("Http2TlsRequired");
+                }
+                config.validate()?;
+            }
             Transport::Tcp {} => {}
         }
     }
