@@ -14,7 +14,7 @@ NodeImportService::NodeImportService(NodeStore *store,QObject *parent,std::funct
     :QObject(parent),m_store(store),m_clock(clock?std::move(clock):[]{return QDateTime::currentSecsSinceEpoch();}) {
     m_network.setProxy(QNetworkProxy::NoProxy); // Never inherit/change the Windows system proxy.
     m_deadline.setSingleShot(true);m_deadline.setInterval(30000);
-    connect(&m_deadline,&QTimer::timeout,this,[this]{if(m_reply)m_reply->abort();});
+    connect(&m_deadline,&QTimer::timeout,this,[this]{m_downloadTimedOut=true;if(m_reply)m_reply->abort();});
     connect(&m_timer,&QTimer::timeout,this,&NodeImportService::checkDue);
     connect(store,&NodeStore::changed,this,&NodeImportService::changed);
     m_timer.start(qMax(100,interval));QTimer::singleShot(1000,this,&NodeImportService::checkDue);
@@ -76,7 +76,7 @@ void NodeImportService::importFile(const QUrl &file) {
 void NodeImportService::importUrl(const QUrl &url) {
     if(m_busy || hasPreview() || m_shuttingDown)return;
     if(!NodeStore::allowedSubscriptionUrl(url)){m_message=QStringLiteral("请使用 HTTPS 地址；只有本机测试地址允许 HTTP。");emit changed();return;}
-    m_previewRequested=false;m_importSource="url";
+    m_previewRequested=true;m_importSource="url";m_downloadTimedOut=false;
     m_busy=true;m_source.clear();m_formatHint="auto";m_message=QStringLiteral("正在安全下载节点配置…");emit changed();m_deadline.start();download(url);
 }
 bool NodeImportService::saveSubscription(const QString &id,const QString &name,const QUrl &url,int interval,bool enabled,const QString &formatHint) {
@@ -120,7 +120,7 @@ void NodeImportService::next() {
     while(!m_queue.isEmpty()) {
         const auto id=m_queue.dequeue();
         for(const auto &s:m_store->subscriptions())if(s.id==id){
-            m_previewRequested=false;m_importSource="subscription";
+            m_previewRequested=false;m_importSource="subscription";m_downloadTimedOut=false;
             m_source=id;m_formatHint=s.formatHint;m_busy=true;m_attempts.insert(id,m_clock());m_message=QStringLiteral("正在更新订阅（地址已隐藏）…");emit changed();
             m_deadline.start();download(s.url);return;
         }
@@ -132,24 +132,46 @@ void NodeImportService::download(const QUrl &url,int redirects) {
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,QNetworkRequest::ManualRedirectPolicy);
     const QHash<QString,QByteArray> agents{{"auto","Clash.Meta/1.19.32 Swirl/1.0"},{"loon","Loon/1.0"},{"shadowrocket","Shadowrocket/2.2.67"},{"surge","Surge/5.0"},{"quantumult-x","Quantumult X/1.0"},{"sing-box","sing-box/1.12"}};
     request.setRawHeader("User-Agent",agents.value(m_formatHint,agents.value("auto")));
-    request.setRawHeader("Accept","application/yaml, application/json, text/plain");
+    request.setRawHeader("Accept","application/json, application/yaml, text/plain");
     request.setTransferTimeout(15000);
     const bool local=url.host()=="localhost"||url.host()=="127.0.0.1"||url.host()=="::1";
     m_network.setProxy(!local&&m_proxyPort>0?QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",m_proxyPort):QNetworkProxy(QNetworkProxy::NoProxy));
-    auto *reply=m_network.get(request);m_reply=reply;reply->setReadBufferSize(NodeImporter::MaximumBytes+1);
+    auto *reply=m_network.get(request);m_reply=reply;reply->setReadBufferSize(64*1024);
+    const auto generation=m_generation;
     auto bytes=std::make_shared<QByteArray>();auto tooLarge=std::make_shared<bool>(false);
-    connect(reply,&QNetworkReply::readyRead,this,[reply,bytes,tooLarge]{
-        bytes->append(reply->readAll());if(bytes->size()>NodeImporter::MaximumBytes){*tooLarge=true;reply->abort();}
+    connect(reply,&QNetworkReply::metaDataChanged,this,[reply,tooLarge] {
+        bool ok=false;const auto length=reply->header(QNetworkRequest::ContentLengthHeader).toLongLong(&ok);
+        if(ok && length>NodeImporter::MaximumBytes){*tooLarge=true;reply->abort();}
     });
-    connect(reply,&QNetworkReply::finished,this,[this,reply,bytes,tooLarge,url,redirects]{
+    const auto drain=[reply,bytes,tooLarge] {
+        while(!*tooLarge && reply->bytesAvailable()>0) {
+            const auto remaining=NodeImporter::MaximumBytes+1-bytes->size();
+            const auto chunk=reply->read(qMin<qint64>(64*1024,remaining));
+            if(chunk.isEmpty())break;
+            bytes->append(chunk);
+            if(bytes->size()>NodeImporter::MaximumBytes){*tooLarge=true;reply->abort();}
+        }
+    };
+    connect(reply,&QNetworkReply::readyRead,this,drain);
+    connect(reply,&QNetworkReply::finished,this,[this,reply,bytes,tooLarge,url,redirects,generation,drain]{
+        if(m_shuttingDown || generation!=m_generation){reply->deleteLater();return;}
         if(m_reply==reply)m_reply=nullptr;
-        bytes->append(reply->readAll());const auto code=reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        drain();const auto code=reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         const auto redirect=reply->attribute(QNetworkRequest::RedirectionTargetAttribute).toUrl();
         const auto error=reply->error();reply->deleteLater();
         if(*tooLarge || bytes->size()>NodeImporter::MaximumBytes){finish(QStringLiteral("订阅内容超过 4 MiB；旧节点保持不变。"));return;}
+        if(m_downloadTimedOut){finish(QStringLiteral("订阅下载超过 30 秒；旧节点保持不变。"));return;}
         if((code==301||code==302||code==303||code==307||code==308) && !redirect.isEmpty()) {
             const auto nextUrl=url.resolved(redirect);
             if(url.scheme()=="https" && nextUrl.scheme()!="https"){finish(QStringLiteral("已拒绝从 HTTPS 降级的重定向。"));return;}
+            // Signed URLs and cookies must not cross an untrusted origin.
+            // Do not reflect either URL (which may include a secret) in errors.
+            const auto defaultPort=url.scheme()=="https"?443:80;
+            if(!NodeStore::allowedSubscriptionUrl(nextUrl) ||
+                nextUrl.scheme()!=url.scheme() || nextUrl.host().compare(url.host(),Qt::CaseInsensitive)!=0 ||
+                nextUrl.port(defaultPort)!=url.port(defaultPort)) {
+                finish(QStringLiteral("重定向目标不安全或不属于同一来源；请直接提供已授权的最终 HTTPS 地址。旧节点保持不变。"));return;
+            }
             download(nextUrl,redirects+1);return;
         }
         if(error!=QNetworkReply::NoError){finish(QStringLiteral("订阅下载失败（HTTP %1，网络错误 %2）；请检查认证、TLS 或网络出口。旧节点保持不变。").arg(code).arg(int(error)));return;}

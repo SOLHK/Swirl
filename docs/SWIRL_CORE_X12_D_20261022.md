@@ -81,6 +81,30 @@ confirmation does not duplicate the catalog and malformed input preserves
 it; Linux verifies encrypted-storage refusal. Broader identity updates and
 subscription refresh semantics are covered in D6.
 
+## D3: HTTPS JSON URL
+
+The existing subscription downloader now gives manual JSON URLs the same
+preview boundary. It retains the existing explicit download-proxy policy:
+direct download unless Swirl supplies its active local HTTP proxy; the
+operating system proxy is neither inherited nor modified. Default TLS
+certificate verification remains enabled. Redirects are manual, limited to
+five, and restricted to the same scheme, hostname and effective port.
+Cross-origin targets, HTTPS downgrade, embedded URL credentials and local
+file URLs are rejected without echoing either URL into errors.
+
+Downloads retain a 15-second idle timeout and 30-second overall deadline.
+Response metadata rejects declared bodies above 4 MiB before reading them;
+64 KiB bounded reads enforce the same ceiling for streaming/decompressed
+data. Interruption, malformed JSON, TLS failure and cancellation do not
+apply nodes. Auto-refresh reuses this path with its existing transaction.
+
+The actual Qt HTTPS fixture suite passes 15 cases on Linux, including
+trusted/untrusted certificates, zero requests to cross-origin targets,
+same-origin redirect, redirect limit, downgrade/file rejection, oversized
+headers and streamed bodies, truncation, strict malformed JSON, cancellation,
+token-free public state/logs, and the real 15-second idle timeout. These are
+real TLS download tests, not proxy-protocol connectivity claims.
+
 ## Applied engineering guidance
 
 Read repository `AGENTS.md`, `CONTINUE_DEVELOPMENT.md` and

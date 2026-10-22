@@ -67,5 +67,6 @@ private:
     bool m_previewRequested=false;
     quint64 m_generation=0;
     bool m_busy=false,m_shuttingDown=false;
+    bool m_downloadTimedOut=false;
     int m_proxyPort=0;
 };

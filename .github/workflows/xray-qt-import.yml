@@ -111,7 +111,7 @@ jobs:
           import xml.etree.ElementTree as ET
 
           root = pathlib.Path('build/xray-qt')
-          required = [('swirl-xray-import.xml', None)]
+          required = [('swirl-xray-import.xml', None), ('swirl-xray-download.xml', None)]
           if pathlib.Path('src/Swirl.Quick/tests/XrayStoreTests.cpp').is_file():
               required.append(('swirl-xray-store.xml',
                   'encryptedDocumentRoundtrip' if os.environ['RUNNER_OS'] == 'Windows' else None))
@@ -142,6 +142,7 @@ jobs:
           name: Xray-Qt-${{ matrix.os }}-${{ github.sha }}-${{ github.run_attempt }}
           path: |
             build/xray-qt/swirl-xray-import.xml
+            build/xray-qt/swirl-xray-download.xml
             build/xray-qt/swirl-xray-store.xml
             build/xray-qt/xray-toolchain.txt
             build/xray-qt/Testing/Temporary/LastTest.log

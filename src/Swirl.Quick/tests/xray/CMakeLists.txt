@@ -79,6 +79,7 @@ function(swirl_add_xray_test target source test_name)
 endfunction()
 
 swirl_add_xray_test(SwirlXrayImportTests XrayImportTests.cpp swirl-xray-import)
+swirl_add_xray_test(SwirlXrayDownloadTests XrayDownloadTests.cpp swirl-xray-download)
 # D1 precedes the storage stage. Once its source is committed, the same build
 # automatically runs the real DPAPI roundtrip on Windows and fails closed tests
 # on other platforms; CI verifies the required Windows test is actually present.
