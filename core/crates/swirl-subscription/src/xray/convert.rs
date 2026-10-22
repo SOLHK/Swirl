@@ -123,8 +123,7 @@ pub struct ValidatedOutbound {
     endpoint: Option<Endpoint>,
     authentication: Authentication,
     source: NodeSource,
-    transport: Transport,
-    security: Security,
+    pub(super) mapping: super::security::SecurityMapping,
     validation: ValidationStatus,
     diagnostics: Vec<Diagnostic>,
 }
@@ -142,10 +141,21 @@ impl ValidatedOutbound {
         &self.source
     }
     pub fn transport(&self) -> Transport {
-        self.transport
+        self.mapping.transport
     }
     pub fn security(&self) -> Security {
-        self.security
+        self.mapping.security
+    }
+    /// Recognized candidate parameters; diagnostics still determine executability.
+    /// These private-data views are not safe to log and never replace raw source.
+    pub fn projected_tls(&self) -> Option<&crate::Tls> {
+        self.mapping.tls.as_ref()
+    }
+    pub fn projected_reality(&self) -> Option<&crate::Reality> {
+        self.mapping.reality.as_ref()
+    }
+    pub fn projected_websocket(&self) -> Option<&crate::WebSocket> {
+        self.mapping.websocket.as_ref()
     }
     pub fn validation(&self) -> ValidationStatus {
         self.validation
@@ -334,6 +344,22 @@ pub fn import_document(bytes: &[u8], source: InputSource) -> Result<ConvertedDoc
             )?;
         }
     }
+    if parsed
+        .global_transport
+        .as_ref()
+        .is_some_and(|transport| !transport.as_object().is_some_and(serde_json::Map::is_empty))
+    {
+        if nodes.len() > MAX_JSON_DIAGNOSTICS - diagnostics_used {
+            return Err(diagnostic("DiagnosticLimit", "", "error"));
+        }
+        for node in &mut nodes {
+            node.diagnostics.push(diagnostic(
+                "GlobalTransportDefaultsUnsupported",
+                "transport",
+                "unsupported",
+            ));
+        }
+    }
     Ok(ConvertedDocument { parsed, nodes })
 }
 
@@ -348,55 +374,27 @@ fn protocol(name: &str) -> Protocol {
         _ => Protocol::Unknown,
     }
 }
-fn transport(outbound: &Value) -> Transport {
-    match outbound
-        .pointer("/streamSettings/network")
-        .and_then(Value::as_str)
-        .unwrap_or("tcp")
-    {
-        "tcp" | "raw" => Transport::Tcp,
-        "ws" => Transport::WebSocket,
-        "grpc" | "gun" => Transport::Grpc,
-        "http" | "h2" => Transport::Http2,
-        "httpupgrade" => Transport::HttpUpgrade,
-        "xhttp" | "splithttp" => Transport::Xhttp,
-        _ => Transport::Unknown,
-    }
-}
-fn security(outbound: &Value) -> Security {
-    match outbound
-        .pointer("/streamSettings/security")
-        .and_then(Value::as_str)
-        .unwrap_or("none")
-    {
-        "" | "none" => Security::None,
-        "tls" => Security::Tls,
-        "reality" => Security::Reality,
-        _ => Security::Unknown,
-    }
-}
-
 #[derive(Default)]
-struct Sink {
+pub(super) struct Sink {
     issues: Vec<Diagnostic>,
     unverified: bool,
     overflow: bool,
 }
 impl Sink {
-    fn issue(&mut self, code: &str, path: &str, severity: &str) {
+    pub(super) fn issue(&mut self, code: &str, path: &str, severity: &str) {
         if self.issues.len() == MAX_JSON_DIAGNOSTICS {
             self.overflow = true;
             return;
         }
         self.issues.push(diagnostic(code, path, severity));
     }
-    fn error(&mut self, code: &str, path: &str) {
+    pub(super) fn error(&mut self, code: &str, path: &str) {
         self.issue(code, path, "error");
     }
-    fn unsupported(&mut self, code: &str, path: &str) {
+    pub(super) fn unsupported(&mut self, code: &str, path: &str) {
         self.issue(code, path, "unsupported");
     }
-    fn unknown(&mut self, code: &str, path: &str) {
+    pub(super) fn unknown(&mut self, code: &str, path: &str) {
         self.unverified = true;
         self.unsupported(code, path);
     }
@@ -482,6 +480,14 @@ fn append(
     }
     let endpoint = endpoint(server, &source.server_path, &mut sink);
     let authentication = protocols::validate(outbound, protocol, server, user, &source, &mut sink);
+    let mapping = super::security::map(
+        outbound,
+        endpoint.as_ref(),
+        &authentication,
+        &source,
+        protocol,
+        &mut sink,
+    );
     let validation = sink.status();
     if sink.overflow || sink.issues.len() > MAX_JSON_DIAGNOSTICS - *used {
         return Err(diagnostic("DiagnosticLimit", "", "error"));
@@ -492,8 +498,7 @@ fn append(
         endpoint,
         authentication,
         source,
-        transport: transport(outbound),
-        security: security(outbound),
+        mapping,
         validation,
         diagnostics: sink.issues,
     });
