@@ -24,6 +24,36 @@ uses a separate, older C++ importer and outbound projection. Removing a protocol
 whitelist alone would leave authentication, TLS, transport and UDP fields
 unmapped. Unsupported options must continue to fail without silent downgrade.
 
+## Final Core prerequisite and other-branch reuse
+
+The prerequisite has now passed at `21c562a7c7adc2654416636e4de2f038ffc220cd`:
+[run 39814238782](https://github.com/SOLHK/Swirl/actions/runs/39814238782) completed
+successfully with all six jobs. The [final acceptance report](CORE_X14_A8_PROTOCOL_ACCEPTANCE_20261022.md)
+binds the original 17 methods, measured stack, lifecycle and dynamic C ABI
+receipts. **X1.4-B may start; no Qt product result has been upgraded.**
+
+The source findings below apply to this X14 branch. Read-only checks of the
+following other branches found existing implementations to integrate:
+
+- R1 at [`5d96214ac80d63985cdccf4942c3c1d79035e793`](https://github.com/SOLHK/Swirl/commit/5d96214ac80d63985cdccf4942c3c1d79035e793)
+  already removes the actual old engine implementations, enforces Rust in CMake,
+  and implements `RustCoreLibrary` PE/ABI/build-ID/source-SHA pairing. Integrate
+  its required Rust `swirl_core_build_info` export and build pipeline together
+  with the loader. Its Qt whitelist remains the old seven protocols.
+- Xray Qt import at [`506014d6386610411f48c939ab62cb93a3509431`](https://github.com/SOLHK/Swirl/commit/506014d6386610411f48c939ab62cb93a3509431)
+  already has `XrayJsonBridge`, `swirl_import_xray_v1`, private native outbound /
+  source-document storage, DPAPI persistence and Rust revalidation before use.
+  Reuse this architecture. That branch's Rust enum lacks VMess/Hysteria2/TUIC
+  and X14 enhanced fields; its Xray-only path does not cover HY2/TUIC URI or
+  all other subscription formats.
+- X13 runtime at [`fca13d3c06f9a6a45cab0b8e28c3587fbbe2f870`](https://github.com/SOLHK/Swirl/commit/fca13d3c06f9a6a45cab0b8e28c3587fbbe2f870)
+  retains the old projection/default in the Qt files checked here; its
+  transport history is not new-protocol Qt acceptance.
+
+No files or histories in those branches were changed, no merge was performed,
+and their complete CI was not requalified in A8. Do not implement their
+existing old-engine removal, DLL identity checks or Xray import bridge again.
+
 ## Ten product checks
 
 | Check | Verified source behavior | X1.4-B acceptance still needed |

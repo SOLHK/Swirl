@@ -1,0 +1,1807 @@
+{
+  "schema": 1,
+  "phase": "X1.4-A8 final code acceptance: stack dispatch and HTTP/3 authentication finish",
+  "head_sha": "21c562a7c7adc2654416636e4de2f038ffc220cd",
+  "workflow_run": {
+    "id": 39814238782,
+    "url": "https://github.com/SOLHK/Swirl/actions/runs/39814238782",
+    "status": "completed",
+    "conclusion": "success",
+    "created_at": "2026-10-22T16:27:30Z",
+    "updated_at": "2026-10-22T16:41:15Z",
+    "run_attempt": 1
+  },
+  "jobs": [
+    {
+      "id": 119948382878,
+      "name": "native-protocols (windows-latest)",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39814238782/job/119948382878",
+      "status": "completed",
+      "conclusion": "success",
+      "checked_out_head_present_in_log": true,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Install Rust tools",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Format",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Check",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Clippy",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Unit and local network tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15
+        }
+      ],
+      "rust_test_totals": {
+        "passed": 645,
+        "failed": 0,
+        "ignored": 0
+      },
+      "test_summary_lines": [
+        "2026-10-22T16:31:33.2021603Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+        "2026-10-22T16:31:33.2284205Z test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "2026-10-22T16:31:33.5228517Z test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s",
+        "2026-10-22T16:31:33.7022014Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s",
+        "2026-10-22T16:31:34.0392776Z test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s",
+        "2026-10-22T16:31:34.7944615Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.74s",
+        "2026-10-22T16:31:40.1866312Z test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.38s",
+        "2026-10-22T16:31:40.6413095Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.44s",
+        "2026-10-22T16:31:40.6915830Z test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s",
+        "2026-10-22T16:31:40.7155471Z test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "2026-10-22T16:31:41.5876693Z test result: ok. 119 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.86s",
+        "2026-10-22T16:31:41.6649029Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s",
+        "2026-10-22T16:31:41.6820241Z test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "2026-10-22T16:31:41.7930109Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s",
+        "2026-10-22T16:31:42.5467275Z test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.74s",
+        "2026-10-22T16:31:42.5847940Z test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s",
+        "2026-10-22T16:31:43.2778859Z test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.68s",
+        "2026-10-22T16:31:43.4846201Z test result: ok. 105 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s",
+        "2026-10-22T16:31:43.5754573Z test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s",
+        "2026-10-22T16:31:43.7256862Z test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s",
+        "2026-10-22T16:31:43.7476171Z test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "2026-10-22T16:31:43.7725392Z test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "2026-10-22T16:31:43.8024515Z test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+        "2026-10-22T16:31:43.8460197Z test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s",
+        "2026-10-22T16:31:43.8644274Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "2026-10-22T16:31:43.8823657Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "2026-10-22T16:31:44.0215662Z test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s",
+        "2026-10-22T16:31:47.0408654Z test result: ok. 112 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.00s",
+        "2026-10-22T16:31:47.0659649Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "2026-10-22T16:31:52.1622745Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.51s"
+      ],
+      "authentication_regression_lines": [
+        "2026-10-22T16:31:41.0485445Z test hysteria2::authentication_tests::normal_request_stop_preserves_rejected_auth_response ... ok",
+        "2026-10-22T16:31:41.1749554Z test hysteria2::authentication_tests::session_rejects_404_after_peer_stops_request_normally ... ok",
+        "2026-10-22T16:31:41.2377367Z test hysteria2::authentication_tests::normal_request_stop_preserves_successful_auth_response ... ok",
+        "2026-10-22T16:31:41.4281166Z test hysteria2::authentication_tests::abnormal_request_stop_remains_authentication_write_failure ... ok"
+      ],
+      "hysteria2_suite_summaries": [],
+      "hysteria2_original_method_lines": [],
+      "lifecycle_lines": [],
+      "github_error_annotation_present": false,
+      "stack_overflow_present": false
+    },
+    {
+      "id": 119948383253,
+      "name": "native-protocols (ubuntu-latest)",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39814238782/job/119948383253",
+      "status": "completed",
+      "conclusion": "success",
+      "checked_out_head_present_in_log": true,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Install Rust tools",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Format",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Check",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Clippy",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Unit and local network tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15
+        }
+      ],
+      "rust_test_totals": {
+        "passed": 644,
+        "failed": 0,
+        "ignored": 0
+      },
+      "test_summary_lines": [
+        "2026-10-22T16:29:04.0463731Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "2026-10-22T16:29:04.0506379Z test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "2026-10-22T16:29:04.3635531Z test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s",
+        "2026-10-22T16:29:04.4728736Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s",
+        "2026-10-22T16:29:04.7784381Z test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s",
+        "2026-10-22T16:29:05.4568307Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.67s",
+        "2026-10-22T16:29:10.8967232Z test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.44s",
+        "2026-10-22T16:29:11.3119810Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.41s",
+        "2026-10-22T16:29:11.3656662Z test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s",
+        "2026-10-22T16:29:11.3724628Z test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "2026-10-22T16:29:12.1562150Z test result: ok. 119 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.78s",
+        "2026-10-22T16:29:12.2119581Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s",
+        "2026-10-22T16:29:12.2178286Z test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "2026-10-22T16:29:12.3020080Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s",
+        "2026-10-22T16:29:12.6522610Z test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s",
+        "2026-10-22T16:29:12.6758384Z test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+        "2026-10-22T16:29:13.1800699Z test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.50s",
+        "2026-10-22T16:29:13.3611325Z test result: ok. 105 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s",
+        "2026-10-22T16:29:13.4234986Z test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s",
+        "2026-10-22T16:29:13.5574756Z test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s",
+        "2026-10-22T16:29:13.5660816Z test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "2026-10-22T16:29:13.5766772Z test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "2026-10-22T16:29:13.5949598Z test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+        "2026-10-22T16:29:13.6246249Z test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s",
+        "2026-10-22T16:29:13.6281850Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "2026-10-22T16:29:13.6336061Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "2026-10-22T16:29:13.7528865Z test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s",
+        "2026-10-22T16:29:16.5093200Z test result: ok. 112 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.75s",
+        "2026-10-22T16:29:16.5166873Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "2026-10-22T16:29:17.2896150Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s"
+      ],
+      "authentication_regression_lines": [
+        "2026-10-22T16:29:11.5347100Z test hysteria2::authentication_tests::session_rejects_404_after_peer_stops_request_normally ... ok",
+        "2026-10-22T16:29:11.7136316Z test hysteria2::authentication_tests::normal_request_stop_preserves_rejected_auth_response ... ok",
+        "2026-10-22T16:29:11.7200764Z test hysteria2::authentication_tests::normal_request_stop_preserves_successful_auth_response ... ok",
+        "2026-10-22T16:29:12.0553930Z test hysteria2::authentication_tests::abnormal_request_stop_remains_authentication_write_failure ... ok"
+      ],
+      "hysteria2_suite_summaries": [],
+      "hysteria2_original_method_lines": [],
+      "lifecycle_lines": [],
+      "github_error_annotation_present": false,
+      "stack_overflow_present": false
+    },
+    {
+      "id": 119948383323,
+      "name": "native-protocols (macos-latest)",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39814238782/job/119948383323",
+      "status": "completed",
+      "conclusion": "success",
+      "checked_out_head_present_in_log": true,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Install Rust tools",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Format",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Check",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Clippy",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Unit and local network tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15
+        }
+      ],
+      "rust_test_totals": {
+        "passed": 644,
+        "failed": 0,
+        "ignored": 0
+      },
+      "test_summary_lines": [
+        "2026-10-22T16:28:55.5278650Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s",
+        "2026-10-22T16:28:55.5384830Z test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "2026-10-22T16:28:55.8062820Z test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s",
+        "2026-10-22T16:28:56.1912180Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s",
+        "2026-10-22T16:28:56.4234220Z test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s",
+        "2026-10-22T16:28:56.8834160Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.46s",
+        "2026-10-22T16:29:02.1307770Z test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.24s",
+        "2026-10-22T16:29:02.5607850Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.42s",
+        "2026-10-22T16:29:02.6323530Z test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s",
+        "2026-10-22T16:29:02.6539660Z test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "2026-10-22T16:29:03.7708470Z test result: ok. 119 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.11s",
+        "2026-10-22T16:29:03.8315640Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s",
+        "2026-10-22T16:29:03.8378560Z test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "2026-10-22T16:29:03.9157050Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s",
+        "2026-10-22T16:29:05.0904080Z test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.17s",
+        "2026-10-22T16:29:05.1087700Z test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+        "2026-10-22T16:29:05.4352480Z test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s",
+        "2026-10-22T16:29:05.5153370Z test result: ok. 105 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s",
+        "2026-10-22T16:29:05.5587590Z test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s",
+        "2026-10-22T16:29:05.6646890Z test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s",
+        "2026-10-22T16:29:05.6744510Z test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "2026-10-22T16:29:05.6844330Z test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "2026-10-22T16:29:05.7014020Z test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "2026-10-22T16:29:05.7237410Z test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+        "2026-10-22T16:29:05.7296080Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "2026-10-22T16:29:05.7371140Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "2026-10-22T16:29:05.8131770Z test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s",
+        "2026-10-22T16:29:08.5617530Z test result: ok. 112 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.74s",
+        "2026-10-22T16:29:08.6139130Z test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s",
+        "2026-10-22T16:29:09.2533000Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s"
+      ],
+      "authentication_regression_lines": [
+        "2026-10-22T16:29:03.1502200Z test hysteria2::authentication_tests::normal_request_stop_preserves_successful_auth_response ... ok",
+        "2026-10-22T16:29:03.1764890Z test hysteria2::authentication_tests::normal_request_stop_preserves_rejected_auth_response ... ok",
+        "2026-10-22T16:29:03.2603560Z test hysteria2::authentication_tests::session_rejects_404_after_peer_stops_request_normally ... ok",
+        "2026-10-22T16:29:03.7707510Z test hysteria2::authentication_tests::abnormal_request_stop_remains_authentication_write_failure ... ok"
+      ],
+      "hysteria2_suite_summaries": [],
+      "hysteria2_original_method_lines": [],
+      "lifecycle_lines": [],
+      "github_error_annotation_present": false,
+      "stack_overflow_present": false
+    },
+    {
+      "id": 119948383364,
+      "name": "official-interop (macos-latest)",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39814238782/job/119948383364",
+      "status": "completed",
+      "conclusion": "success",
+      "checked_out_head_present_in_log": true,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Install test certificate library",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Install Rust",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Build native clients and Core harness",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Download pinned official Xray peers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Download pinned Hysteria and TUIC server peers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8
+        },
+        {
+          "name": "Download pinned official Shadowsocks server peer",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9
+        },
+        {
+          "name": "Measure and prepare disposable runner UDP prerequisites",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10
+        },
+        {
+          "name": "Set native client and evidence paths",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11
+        },
+        {
+          "name": "VMess official Xray data and completed-response closure",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12
+        },
+        {
+          "name": "Hysteria2 official server including retained limitation probes",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13
+        },
+        {
+          "name": "Hysteria2 original 17 methods with a measured 1 MiB main stack",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 14
+        },
+        {
+          "name": "Hysteria2 real future cancellation cleanup and same-runtime reconnect",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15
+        },
+        {
+          "name": "Hysteria2 cancellation cleanup with a measured 1 MiB main stack",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 16
+        },
+        {
+          "name": "TUIC historical official reference including retained limitation probe",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17
+        },
+        {
+          "name": "Native Core ingress TCP UDP DNS HTTPS and node switching",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18
+        },
+        {
+          "name": "Dynamically loaded C ABI library through official QUIC peers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19
+        },
+        {
+          "name": "Phase timing and authentication semantics through C ABI and official peers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 20
+        },
+        {
+          "name": "Imported Xray V2Ray transport configs through ordinary Core start",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 21
+        },
+        {
+          "name": "VLESS and Trojan UDP through official Xray",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 22
+        },
+        {
+          "name": "Shadowsocks 2022 official data and replay rejection",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 23
+        },
+        {
+          "name": "HTTP and SOCKS authentication TCP UDP and import through official Xray",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 24
+        },
+        {
+          "name": "REALITY Rustls through production Core and official Xray",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 25
+        },
+        {
+          "name": "REALITY Chrome133 through production Core and official Xray",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 26
+        },
+        {
+          "name": "Vision Rustls TLS13 Direct and authenticated closure",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 27
+        },
+        {
+          "name": "Vision Chrome133 TLS13 Direct and authenticated closure",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 28
+        },
+        {
+          "name": "Upload actual interoperability receipts",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 29
+        },
+        {
+          "name": "Post Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 57
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 58
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 59
+        }
+      ],
+      "rust_test_totals": null,
+      "test_summary_lines": [
+        "2026-10-22T16:29:28.6103050Z Ran 13 tests in 15.988s",
+        "2026-10-22T16:29:49.1501090Z Ran 17 tests in 20.159s",
+        "2026-10-22T16:29:53.7185310Z Ran 1 test in 4.161s",
+        "2026-10-22T16:30:07.5829280Z Ran 9 tests in 13.631s",
+        "2026-10-22T16:30:29.6395220Z Ran 6 tests in 21.681s",
+        "2026-10-22T16:30:54.1257590Z Ran 6 tests in 24.161s",
+        "2026-10-22T16:30:58.6152480Z Ran 3 tests in 2.663s",
+        "2026-10-22T16:31:10.1073130Z Ran 5 tests in 11.247s",
+        "2026-10-22T16:31:29.0721880Z Ran 8 tests in 18.613s",
+        "2026-10-22T16:31:36.2503660Z Ran 12 tests in 6.855s",
+        "2026-10-22T16:31:47.6390000Z Ran 8 tests in 10.973s",
+        "2026-10-22T16:31:55.4775490Z Ran 8 tests in 6.810s",
+        "2026-10-22T16:32:01.2995450Z Ran 8 tests in 5.484s",
+        "2026-10-22T16:32:09.2491810Z Ran 10 tests in 7.655s",
+        "2026-10-22T16:32:17.2504440Z Ran 10 tests in 7.736s"
+      ],
+      "authentication_regression_lines": [],
+      "hysteria2_suite_summaries": [
+        {
+          "expected_methods": 17,
+          "executed_methods": 17,
+          "failures": [],
+          "errors": [],
+          "skips": [],
+          "all_original_methods_passed": true,
+          "constrained_stack": false
+        }
+      ],
+      "hysteria2_original_method_lines": [
+        "2026-10-22T16:29:31.5511370Z test_01_tcp_and_clean_normal_close (test_hysteria2_official.Hysteria2Official.test_01_tcp_and_clean_normal_close) ... ok",
+        "2026-10-22T16:29:32.2175340Z test_02_large_bidirectional_data (test_hysteria2_official.Hysteria2Official.test_02_large_bidirectional_data) ... ok",
+        "2026-10-22T16:29:32.2754480Z test_03_udp_and_fragmented_datagrams (test_hysteria2_official.Hysteria2Official.test_03_udp_and_fragmented_datagrams) ... ok",
+        "2026-10-22T16:29:32.2870080Z test_04_dns (test_hysteria2_official.Hysteria2Official.test_04_dns) ... ok",
+        "2026-10-22T16:29:32.3089310Z test_05_wrong_password (test_hysteria2_official.Hysteria2Official.test_05_wrong_password) ... ok",
+        "2026-10-22T16:29:32.3308300Z test_06_tls_trust_and_sni (test_hysteria2_official.Hysteria2Official.test_06_tls_trust_and_sni) ... ok",
+        "2026-10-22T16:29:32.3630720Z test_07_certificate_pin (test_hysteria2_official.Hysteria2Official.test_07_certificate_pin) ... ok",
+        "2026-10-22T16:29:32.4262190Z test_08_imported_clash_and_uri (test_hysteria2_official.Hysteria2Official.test_08_imported_clash_and_uri) ... ok",
+        "2026-10-22T16:29:32.8806290Z test_09_node_switch_and_new_session_after_restart (test_hysteria2_official.Hysteria2Official.test_09_node_switch_and_new_session_after_restart) ... ok",
+        "2026-10-22T16:29:32.9191480Z test_10_https_through_native_proxy (test_hysteria2_official.Hysteria2Official.test_10_https_through_native_proxy) ... ok",
+        "2026-10-22T16:29:32.9467210Z test_11_invalid_options_fail_before_connection (test_hysteria2_official.Hysteria2Official.test_11_invalid_options_fail_before_connection) ... ok",
+        "2026-10-22T16:29:34.9712320Z test_12_record_official_server_limitations_without_claiming_support (test_hysteria2_official.Hysteria2Official.test_12_record_official_server_limitations_without_claiming_support) ... ok",
+        "2026-10-22T16:29:36.7037000Z test_13_salamander_tcp_udp_and_wrong_password (test_hysteria2_official.Hysteria2Official.test_13_salamander_tcp_udp_and_wrong_password) ... ok",
+        "2026-10-22T16:29:36.7400250Z test_14_explicit_insecure_still_enforces_certificate_pin (test_hysteria2_official.Hysteria2Official.test_14_explicit_insecure_still_enforces_certificate_pin) ... ok",
+        "2026-10-22T16:29:44.4950640Z test_15_negotiated_bandwidth_is_enforced_in_real_transfers (test_hysteria2_official.Hysteria2Official.test_15_negotiated_bandwidth_is_enforced_in_real_transfers) ... ok",
+        "2026-10-22T16:29:44.5371030Z test_16_ipv6_quic_and_ipv6_tcp_udp_targets (test_hysteria2_official.Hysteria2Official.test_16_ipv6_quic_and_ipv6_tcp_udp_targets) ... ok",
+        "2026-10-22T16:29:47.6648790Z test_17_concurrent_connections_and_multi_address_resolution (test_hysteria2_official.Hysteria2Official.test_17_concurrent_connections_and_multi_address_resolution) ... ok"
+      ],
+      "lifecycle_lines": [
+        "2026-10-22T16:29:53.7183770Z test_pending_and_authenticated_future_drop_then_same_runtime_reconnect (test_hysteria2_lifecycle.Hysteria2Lifecycle.test_pending_and_authenticated_future_drop_then_same_runtime_reconnect) ... ok"
+      ],
+      "github_error_annotation_present": false,
+      "stack_overflow_present": false
+    },
+    {
+      "id": 119948383479,
+      "name": "official-interop (windows-latest)",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39814238782/job/119948383479",
+      "status": "completed",
+      "conclusion": "success",
+      "checked_out_head_present_in_log": true,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Install test certificate library",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Install Rust",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Build native clients and Core harness",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Download pinned official Xray peers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Download pinned Hysteria and TUIC server peers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8
+        },
+        {
+          "name": "Download pinned official Shadowsocks server peer",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9
+        },
+        {
+          "name": "Measure and prepare disposable runner UDP prerequisites",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10
+        },
+        {
+          "name": "Set native client and evidence paths",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11
+        },
+        {
+          "name": "VMess official Xray data and completed-response closure",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12
+        },
+        {
+          "name": "Hysteria2 official server including retained limitation probes",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13
+        },
+        {
+          "name": "Hysteria2 original 17 methods with a measured 1 MiB main stack",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 14
+        },
+        {
+          "name": "Hysteria2 real future cancellation cleanup and same-runtime reconnect",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15
+        },
+        {
+          "name": "Hysteria2 cancellation cleanup with a measured 1 MiB main stack",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 16
+        },
+        {
+          "name": "TUIC historical official reference including retained limitation probe",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17
+        },
+        {
+          "name": "Native Core ingress TCP UDP DNS HTTPS and node switching",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18
+        },
+        {
+          "name": "Dynamically loaded C ABI library through official QUIC peers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19
+        },
+        {
+          "name": "Phase timing and authentication semantics through C ABI and official peers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 20
+        },
+        {
+          "name": "Imported Xray V2Ray transport configs through ordinary Core start",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 21
+        },
+        {
+          "name": "VLESS and Trojan UDP through official Xray",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 22
+        },
+        {
+          "name": "Shadowsocks 2022 official data and replay rejection",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 23
+        },
+        {
+          "name": "HTTP and SOCKS authentication TCP UDP and import through official Xray",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 24
+        },
+        {
+          "name": "REALITY Rustls through production Core and official Xray",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 25
+        },
+        {
+          "name": "REALITY Chrome133 through production Core and official Xray",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 26
+        },
+        {
+          "name": "Vision Rustls TLS13 Direct and authenticated closure",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 27
+        },
+        {
+          "name": "Vision Chrome133 TLS13 Direct and authenticated closure",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 28
+        },
+        {
+          "name": "Upload actual interoperability receipts",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 29
+        },
+        {
+          "name": "Post Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 57
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 58
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 59
+        }
+      ],
+      "rust_test_totals": null,
+      "test_summary_lines": [
+        "2026-10-22T16:29:50.1294905Z Ran 13 tests in 15.471s",
+        "2026-10-22T16:30:13.6618634Z Ran 17 tests in 22.783s",
+        "2026-10-22T16:30:18.8946609Z Ran 1 test in 4.587s",
+        "2026-10-22T16:30:35.6136812Z Ran 9 tests in 16.080s",
+        "2026-10-22T16:31:00.7387969Z Ran 6 tests in 24.411s",
+        "2026-10-22T16:31:25.8246100Z Ran 6 tests in 24.417s",
+        "2026-10-22T16:31:29.7966461Z Ran 3 tests in 2.828s",
+        "2026-10-22T16:31:42.5160383Z Ran 5 tests in 12.052s",
+        "2026-10-22T16:32:04.4060266Z Ran 8 tests in 21.270s",
+        "2026-10-22T16:32:14.2403335Z Ran 12 tests in 9.203s",
+        "2026-10-22T16:32:26.1519649Z Ran 8 tests in 11.116s",
+        "2026-10-22T16:32:43.7354310Z Ran 8 tests in 16.483s",
+        "2026-10-22T16:32:58.7326027Z Ran 8 tests in 14.339s",
+        "2026-10-22T16:33:15.3829531Z Ran 10 tests in 15.959s",
+        "2026-10-22T16:33:32.5097232Z Ran 10 tests in 16.439s"
+      ],
+      "authentication_regression_lines": [],
+      "hysteria2_suite_summaries": [
+        {
+          "expected_methods": 17,
+          "executed_methods": 17,
+          "failures": [],
+          "errors": [],
+          "skips": [],
+          "all_original_methods_passed": true,
+          "constrained_stack": false
+        }
+      ],
+      "hysteria2_original_method_lines": [
+        "2026-10-22T16:29:53.3495545Z test_01_tcp_and_clean_normal_close (test_hysteria2_official.Hysteria2Official.test_01_tcp_and_clean_normal_close) ... ok",
+        "2026-10-22T16:29:54.1522029Z test_02_large_bidirectional_data (test_hysteria2_official.Hysteria2Official.test_02_large_bidirectional_data) ... ok",
+        "2026-10-22T16:29:54.2573639Z test_03_udp_and_fragmented_datagrams (test_hysteria2_official.Hysteria2Official.test_03_udp_and_fragmented_datagrams) ... ok",
+        "2026-10-22T16:29:54.2835719Z test_04_dns (test_hysteria2_official.Hysteria2Official.test_04_dns) ... ok",
+        "2026-10-22T16:29:54.3087737Z test_05_wrong_password (test_hysteria2_official.Hysteria2Official.test_05_wrong_password) ... ok",
+        "2026-10-22T16:29:54.3457786Z test_06_tls_trust_and_sni (test_hysteria2_official.Hysteria2Official.test_06_tls_trust_and_sni) ... ok",
+        "2026-10-22T16:29:54.3933676Z test_07_certificate_pin (test_hysteria2_official.Hysteria2Official.test_07_certificate_pin) ... ok",
+        "2026-10-22T16:29:54.4801697Z test_08_imported_clash_and_uri (test_hysteria2_official.Hysteria2Official.test_08_imported_clash_and_uri) ... ok",
+        "2026-10-22T16:29:54.9747762Z test_09_node_switch_and_new_session_after_restart (test_hysteria2_official.Hysteria2Official.test_09_node_switch_and_new_session_after_restart) ... ok",
+        "2026-10-22T16:29:55.0082861Z test_10_https_through_native_proxy (test_hysteria2_official.Hysteria2Official.test_10_https_through_native_proxy) ... ok",
+        "2026-10-22T16:29:55.0561987Z test_11_invalid_options_fail_before_connection (test_hysteria2_official.Hysteria2Official.test_11_invalid_options_fail_before_connection) ... ok",
+        "2026-10-22T16:29:57.1090323Z test_12_record_official_server_limitations_without_claiming_support (test_hysteria2_official.Hysteria2Official.test_12_record_official_server_limitations_without_claiming_support) ... ok",
+        "2026-10-22T16:29:58.9340044Z test_13_salamander_tcp_udp_and_wrong_password (test_hysteria2_official.Hysteria2Official.test_13_salamander_tcp_udp_and_wrong_password) ... ok",
+        "2026-10-22T16:29:58.9840728Z test_14_explicit_insecure_still_enforces_certificate_pin (test_hysteria2_official.Hysteria2Official.test_14_explicit_insecure_still_enforces_certificate_pin) ... ok",
+        "2026-10-22T16:30:08.0367582Z test_15_negotiated_bandwidth_is_enforced_in_real_transfers (test_hysteria2_official.Hysteria2Official.test_15_negotiated_bandwidth_is_enforced_in_real_transfers) ... ok",
+        "2026-10-22T16:30:08.0894626Z test_16_ipv6_quic_and_ipv6_tcp_udp_targets (test_hysteria2_official.Hysteria2Official.test_16_ipv6_quic_and_ipv6_tcp_udp_targets) ... ok",
+        "2026-10-22T16:30:11.2427054Z test_17_concurrent_connections_and_multi_address_resolution (test_hysteria2_official.Hysteria2Official.test_17_concurrent_connections_and_multi_address_resolution) ... ok"
+      ],
+      "lifecycle_lines": [
+        "2026-10-22T16:30:18.8943965Z test_pending_and_authenticated_future_drop_then_same_runtime_reconnect (test_hysteria2_lifecycle.Hysteria2Lifecycle.test_pending_and_authenticated_future_drop_then_same_runtime_reconnect) ... ok"
+      ],
+      "github_error_annotation_present": false,
+      "stack_overflow_present": false
+    },
+    {
+      "id": 119948383611,
+      "name": "official-interop (ubuntu-latest)",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39814238782/job/119948383611",
+      "status": "completed",
+      "conclusion": "success",
+      "checked_out_head_present_in_log": true,
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Install test certificate library",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Install Rust",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Build native clients and Core harness",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Download pinned official Xray peers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Download pinned Hysteria and TUIC server peers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8
+        },
+        {
+          "name": "Download pinned official Shadowsocks server peer",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9
+        },
+        {
+          "name": "Measure and prepare disposable runner UDP prerequisites",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10
+        },
+        {
+          "name": "Set native client and evidence paths",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11
+        },
+        {
+          "name": "VMess official Xray data and completed-response closure",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12
+        },
+        {
+          "name": "Hysteria2 official server including retained limitation probes",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13
+        },
+        {
+          "name": "Hysteria2 original 17 methods with a measured 1 MiB main stack",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14
+        },
+        {
+          "name": "Hysteria2 real future cancellation cleanup and same-runtime reconnect",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15
+        },
+        {
+          "name": "Hysteria2 cancellation cleanup with a measured 1 MiB main stack",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16
+        },
+        {
+          "name": "TUIC historical official reference including retained limitation probe",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17
+        },
+        {
+          "name": "Native Core ingress TCP UDP DNS HTTPS and node switching",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18
+        },
+        {
+          "name": "Dynamically loaded C ABI library through official QUIC peers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19
+        },
+        {
+          "name": "Phase timing and authentication semantics through C ABI and official peers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 20
+        },
+        {
+          "name": "Imported Xray V2Ray transport configs through ordinary Core start",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 21
+        },
+        {
+          "name": "VLESS and Trojan UDP through official Xray",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 22
+        },
+        {
+          "name": "Shadowsocks 2022 official data and replay rejection",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 23
+        },
+        {
+          "name": "HTTP and SOCKS authentication TCP UDP and import through official Xray",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 24
+        },
+        {
+          "name": "REALITY Rustls through production Core and official Xray",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 25
+        },
+        {
+          "name": "REALITY Chrome133 through production Core and official Xray",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 26
+        },
+        {
+          "name": "Vision Rustls TLS13 Direct and authenticated closure",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 27
+        },
+        {
+          "name": "Vision Chrome133 TLS13 Direct and authenticated closure",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 28
+        },
+        {
+          "name": "Upload actual interoperability receipts",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 29
+        },
+        {
+          "name": "Post Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 57
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 58
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 59
+        }
+      ],
+      "rust_test_totals": null,
+      "test_summary_lines": [
+        "2026-10-22T16:28:20.3743216Z Ran 13 tests in 7.236s",
+        "2026-10-22T16:28:39.1003359Z Ran 17 tests in 18.592s",
+        "2026-10-22T16:28:58.6876786Z Ran 17 tests in 19.258s",
+        "2026-10-22T16:29:02.8549048Z Ran 1 test in 4.063s",
+        "2026-10-22T16:29:07.0515656Z Ran 1 test in 4.087s",
+        "2026-10-22T16:29:18.5211819Z Ran 9 tests in 11.369s",
+        "2026-10-22T16:29:38.5433738Z Ran 6 tests in 19.897s",
+        "2026-10-22T16:30:00.2210591Z Ran 6 tests in 21.566s",
+        "2026-10-22T16:30:02.0513851Z Ran 3 tests in 1.468s",
+        "2026-10-22T16:30:23.5099992Z Ran 5 tests in 21.346s",
+        "2026-10-22T16:30:38.0533101Z Ran 8 tests in 14.439s",
+        "2026-10-22T16:30:42.6533587Z Ran 12 tests in 4.503s",
+        "2026-10-22T16:30:56.9034026Z Ran 8 tests in 14.145s",
+        "2026-10-22T16:31:00.4022499Z Ran 8 tests in 3.312s",
+        "2026-10-22T16:31:03.9383732Z Ran 8 tests in 3.441s",
+        "2026-10-22T16:31:10.3074011Z Ran 10 tests in 6.270s",
+        "2026-10-22T16:31:16.8440293Z Ran 10 tests in 6.440s"
+      ],
+      "authentication_regression_lines": [],
+      "hysteria2_suite_summaries": [
+        {
+          "expected_methods": 17,
+          "executed_methods": 17,
+          "failures": [],
+          "errors": [],
+          "skips": [],
+          "all_original_methods_passed": true,
+          "constrained_stack": false
+        },
+        {
+          "expected_methods": 17,
+          "executed_methods": 17,
+          "failures": [],
+          "errors": [],
+          "skips": [],
+          "all_original_methods_passed": true,
+          "constrained_stack": true
+        }
+      ],
+      "hysteria2_original_method_lines": [
+        "2026-10-22T16:28:22.6575392Z test_01_tcp_and_clean_normal_close (test_hysteria2_official.Hysteria2Official.test_01_tcp_and_clean_normal_close) ... ok",
+        "2026-10-22T16:28:22.8633173Z test_02_large_bidirectional_data (test_hysteria2_official.Hysteria2Official.test_02_large_bidirectional_data) ... ok",
+        "2026-10-22T16:28:22.8855633Z test_03_udp_and_fragmented_datagrams (test_hysteria2_official.Hysteria2Official.test_03_udp_and_fragmented_datagrams) ... ok",
+        "2026-10-22T16:28:22.8921917Z test_04_dns (test_hysteria2_official.Hysteria2Official.test_04_dns) ... ok",
+        "2026-10-22T16:28:22.8979085Z test_05_wrong_password (test_hysteria2_official.Hysteria2Official.test_05_wrong_password) ... ok",
+        "2026-10-22T16:28:22.9061822Z test_06_tls_trust_and_sni (test_hysteria2_official.Hysteria2Official.test_06_tls_trust_and_sni) ... ok",
+        "2026-10-22T16:28:22.9183306Z test_07_certificate_pin (test_hysteria2_official.Hysteria2Official.test_07_certificate_pin) ... ok",
+        "2026-10-22T16:28:22.9839505Z test_08_imported_clash_and_uri (test_hysteria2_official.Hysteria2Official.test_08_imported_clash_and_uri) ... ok",
+        "2026-10-22T16:28:23.3776441Z test_09_node_switch_and_new_session_after_restart (test_hysteria2_official.Hysteria2Official.test_09_node_switch_and_new_session_after_restart) ... ok",
+        "2026-10-22T16:28:23.4285030Z test_10_https_through_native_proxy (test_hysteria2_official.Hysteria2Official.test_10_https_through_native_proxy) ... ok",
+        "2026-10-22T16:28:23.4379650Z test_11_invalid_options_fail_before_connection (test_hysteria2_official.Hysteria2Official.test_11_invalid_options_fail_before_connection) ... ok",
+        "2026-10-22T16:28:25.4499274Z test_12_record_official_server_limitations_without_claiming_support (test_hysteria2_official.Hysteria2Official.test_12_record_official_server_limitations_without_claiming_support) ... ok",
+        "2026-10-22T16:28:27.0534743Z test_13_salamander_tcp_udp_and_wrong_password (test_hysteria2_official.Hysteria2Official.test_13_salamander_tcp_udp_and_wrong_password) ... ok",
+        "2026-10-22T16:28:27.0672077Z test_14_explicit_insecure_still_enforces_certificate_pin (test_hysteria2_official.Hysteria2Official.test_14_explicit_insecure_still_enforces_certificate_pin) ... ok",
+        "2026-10-22T16:28:34.0481140Z test_15_negotiated_bandwidth_is_enforced_in_real_transfers (test_hysteria2_official.Hysteria2Official.test_15_negotiated_bandwidth_is_enforced_in_real_transfers) ... ok",
+        "2026-10-22T16:28:34.0659934Z test_16_ipv6_quic_and_ipv6_tcp_udp_targets (test_hysteria2_official.Hysteria2Official.test_16_ipv6_quic_and_ipv6_tcp_udp_targets) ... ok",
+        "2026-10-22T16:28:37.1557821Z test_17_concurrent_connections_and_multi_address_resolution (test_hysteria2_official.Hysteria2Official.test_17_concurrent_connections_and_multi_address_resolution) ... ok",
+        "2026-10-22T16:28:41.5970687Z test_01_tcp_and_clean_normal_close (test_hysteria2_official.Hysteria2Official.test_01_tcp_and_clean_normal_close) ... ok",
+        "2026-10-22T16:28:41.8229640Z test_02_large_bidirectional_data (test_hysteria2_official.Hysteria2Official.test_02_large_bidirectional_data) ... ok",
+        "2026-10-22T16:28:41.9019755Z test_03_udp_and_fragmented_datagrams (test_hysteria2_official.Hysteria2Official.test_03_udp_and_fragmented_datagrams) ... ok",
+        "2026-10-22T16:28:41.9290741Z test_04_dns (test_hysteria2_official.Hysteria2Official.test_04_dns) ... ok",
+        "2026-10-22T16:28:41.9562732Z test_05_wrong_password (test_hysteria2_official.Hysteria2Official.test_05_wrong_password) ... ok",
+        "2026-10-22T16:28:42.0124199Z test_06_tls_trust_and_sni (test_hysteria2_official.Hysteria2Official.test_06_tls_trust_and_sni) ... ok",
+        "2026-10-22T16:28:42.0825174Z test_07_certificate_pin (test_hysteria2_official.Hysteria2Official.test_07_certificate_pin) ... ok",
+        "2026-10-22T16:28:42.1635744Z test_08_imported_clash_and_uri (test_hysteria2_official.Hysteria2Official.test_08_imported_clash_and_uri) ... ok",
+        "2026-10-22T16:28:42.6441754Z test_09_node_switch_and_new_session_after_restart (test_hysteria2_official.Hysteria2Official.test_09_node_switch_and_new_session_after_restart) ... ok",
+        "2026-10-22T16:28:42.7127491Z test_10_https_through_native_proxy (test_hysteria2_official.Hysteria2Official.test_10_https_through_native_proxy) ... ok",
+        "2026-10-22T16:28:42.7933637Z test_11_invalid_options_fail_before_connection (test_hysteria2_official.Hysteria2Official.test_11_invalid_options_fail_before_connection) ... ok",
+        "2026-10-22T16:28:44.8460727Z test_12_record_official_server_limitations_without_claiming_support (test_hysteria2_official.Hysteria2Official.test_12_record_official_server_limitations_without_claiming_support) ... ok",
+        "2026-10-22T16:28:46.5040515Z test_13_salamander_tcp_udp_and_wrong_password (test_hysteria2_official.Hysteria2Official.test_13_salamander_tcp_udp_and_wrong_password) ... ok",
+        "2026-10-22T16:28:46.5507024Z test_14_explicit_insecure_still_enforces_certificate_pin (test_hysteria2_official.Hysteria2Official.test_14_explicit_insecure_still_enforces_certificate_pin) ... ok",
+        "2026-10-22T16:28:53.6035798Z test_15_negotiated_bandwidth_is_enforced_in_real_transfers (test_hysteria2_official.Hysteria2Official.test_15_negotiated_bandwidth_is_enforced_in_real_transfers) ... ok",
+        "2026-10-22T16:28:53.6538593Z test_16_ipv6_quic_and_ipv6_tcp_udp_targets (test_hysteria2_official.Hysteria2Official.test_16_ipv6_quic_and_ipv6_tcp_udp_targets) ... ok",
+        "2026-10-22T16:28:56.7907513Z test_17_concurrent_connections_and_multi_address_resolution (test_hysteria2_official.Hysteria2Official.test_17_concurrent_connections_and_multi_address_resolution) ... ok"
+      ],
+      "lifecycle_lines": [
+        "2026-10-22T16:29:02.8547886Z test_pending_and_authenticated_future_drop_then_same_runtime_reconnect (test_hysteria2_lifecycle.Hysteria2Lifecycle.test_pending_and_authenticated_future_drop_then_same_runtime_reconnect) ... ok",
+        "2026-10-22T16:29:07.0514449Z test_pending_and_authenticated_future_drop_then_same_runtime_reconnect (test_hysteria2_lifecycle.Hysteria2Lifecycle.test_pending_and_authenticated_future_drop_then_same_runtime_reconnect) ... ok"
+      ],
+      "github_error_annotation_present": false,
+      "stack_overflow_present": false
+    }
+  ],
+  "downloaded_artifact_receipts": [
+    {
+      "platform": "windows",
+      "artifact_id": 12440988754,
+      "name": "native-protocol-interop-windows-latest",
+      "archive_sha256": "69342ea6a02fb14c9d37623b587fd3ff370910c4411680b1c8a75d58db355c7a",
+      "hysteria2": [
+        {
+          "member": "hysteria2.json",
+          "member_sha256": "3bd7e88812685baa8024c56c756f082e82ef5ba9698e1f9d79ee25d40766a64e",
+          "suite": {
+            "expected_methods": 17,
+            "executed_methods": 17,
+            "failures": [],
+            "errors": [],
+            "skips": [],
+            "all_original_methods_passed": true,
+            "constrained_stack": false
+          },
+          "record_count": 41,
+          "client_sha256": "5de077125554a75bc21d2ca2af1cae61e81aa965346bf6c50f922898857203e8",
+          "official_server_sha256": "162ef8fe55dc7ec810dda662908f8e65ec36bd6da39cb87c3bd66184ab68f067",
+          "measured_stack_limits": [
+            "null"
+          ],
+          "selected_actual_records": [
+            {
+              "case": "tcp-clean-normal-close",
+              "expected_success": true,
+              "upstream_limitation_probe": false,
+              "client_exit": 0,
+              "elapsed_ms": 47,
+              "main_stack_limit": null,
+              "result": {
+                "close": "clean",
+                "dns_quic_auth_tcp_us": 22847,
+                "downloaded": 4096,
+                "imported": false,
+                "mode": "tcp",
+                "ok": true,
+                "sha256": "b7334dd1ec16d37dea26d574d23f09da6a898c9786b79d13fcf67a8133f76d2a",
+                "total_us": 24752,
+                "uploaded": 4096
+              }
+            },
+            {
+              "case": "tcp-4mib-bidirectional",
+              "expected_success": true,
+              "upstream_limitation_probe": false,
+              "client_exit": 0,
+              "elapsed_ms": 813,
+              "main_stack_limit": null,
+              "result": {
+                "close": "clean",
+                "dns_quic_auth_tcp_us": 21167,
+                "downloaded": 4194304,
+                "imported": false,
+                "mode": "tcp",
+                "ok": true,
+                "sha256": "a8ec6dd6b98ced548e257779ed68b08ae544037ff49b5cca6f8f994244fb92f6",
+                "total_us": 783421,
+                "uploaded": 4194304
+              }
+            },
+            {
+              "case": "wrong-password",
+              "expected_success": false,
+              "upstream_limitation_probe": false,
+              "client_exit": 1,
+              "elapsed_ms": 31,
+              "main_stack_limit": null,
+              "result": {
+                "code": "Hysteria2AuthenticationRejected",
+                "ok": false
+              }
+            }
+          ],
+          "known_upstream_limitations": {
+            "half_close": "Not passed: official copyTwoWay returns after either copy finishes and closes both directions.",
+            "udp_reply_buffer": "Official v2.13.0 allocates 4096 bytes for encoded messages; payload plus Hysteria header must fit that buffer.",
+            "source_urls": [
+              "https://github.com/HyNetworks/hysteria/blob/app/v2.13.0/core/server/copy.go",
+              "https://github.com/HyNetworks/hysteria/blob/app/v2.13.0/core/server/server.go",
+              "https://github.com/HyNetworks/hysteria/blob/app/v2.13.0/core/server/udp.go",
+              "https://github.com/HyNetworks/hysteria/blob/app/v2.13.0/core/internal/protocol/proxy.go"
+            ]
+          },
+          "qt_product_acceptance": false
+        }
+      ],
+      "lifecycle": [
+        {
+          "member": "hysteria2-lifecycle.json",
+          "member_sha256": "631edd3f64becf199100a3bff8d29f6a238e11225bf32b0731fb0628044a2f6b",
+          "receipt": {
+            "official_version": "v2.13.0",
+            "official_commit": "ca8fbd874fd6ca82413948de6dc5924405e103e1",
+            "official_server_sha256": "162ef8fe55dc7ec810dda662908f8e65ec36bd6da39cb87c3bd66184ab68f067",
+            "client_sha256": "9afa1da20362a0b7f59a7d33370da10e23d33aad2e59c021530ed19a18d106c1",
+            "client_role": "Swirl native Rust",
+            "server_role": "official Hysteria2 only",
+            "qt_product_acceptance": false,
+            "client_exit": 0,
+            "elapsed_ms": 3453,
+            "main_stack_limit": null,
+            "result": {
+              "authenticated_read_cancel": {
+                "alive_tasks_after_drop": 0,
+                "alive_tasks_before_cancel": 3,
+                "downloaded": 4096,
+                "future_owned_stream": true,
+                "sha256": "b7334dd1ec16d37dea26d574d23f09da6a898c9786b79d13fcf67a8133f76d2a",
+                "uploaded": 4096
+              },
+              "baseline_alive_tasks": 0,
+              "cleanup_asserted_before_process_exit": true,
+              "connect_future_cancel": {
+                "alive_tasks_after_drop": 0,
+                "alive_tasks_before_cancel": 2,
+                "stage": "pending connector with QUIC tasks; TLS and authentication not asserted"
+              },
+              "ok": true,
+              "runtime": "current_thread",
+              "same_runtime_reconnect": {
+                "alive_tasks_after_close": 0,
+                "close": "clean",
+                "downloaded": 65536,
+                "sha256": "b03a3e1e12b699bd2c526e13a0d73f39b761de545f248b3d5faac391ad3b8d97",
+                "uploaded": 65536
+              }
+            },
+            "independent_target": {
+              "accepted_connections": 2,
+              "closed_connections": 2,
+              "active_connections": 0,
+              "received_bytes": 69632
+            }
+          }
+        }
+      ],
+      "dynamic_c_abi": {
+        "member": "quic-ffi.json",
+        "member_sha256": "11d5543c72670a005f0c007299a155e8c37989fba8da5b911e6cbcac6871db00",
+        "runtime": "Swirl Rust Core",
+        "runtime_sha256": "193db182f698eedd65ddef55e4bff073c66b4f8a66e2fd337a06c55c5d740aa9",
+        "control_boundary": "exported_c_abi_dynamic_library",
+        "platform": "Windows-2025Server-10.0.26100-SP0",
+        "qt_product_acceptance": false,
+        "evidence_level": "exported_c_abi_official_quic_loopback",
+        "tests_run": 6,
+        "expected_tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "successful": true,
+        "source_commit": "21c562a7c7adc2654416636e4de2f038ffc220cd",
+        "worktree_changes": [
+          "?? out/"
+        ],
+        "source_sha256": {
+          "tools\\tests\\test_quic_ffi.py": "dbb2c46c0500cb9c8bd55adedcb1fef7ef6dedda68524214e2d4c59e8f3d1437",
+          "tools\\tests\\native_ffi_host.py": "6d655c7c8a0406c506d9356a6db68fc2423e97b0e633aa445130efbc2b7de088",
+          "tools\\tests\\test_quic_core.py": "5d150732211d8d8ac8303f3e2b9ceb4b24feded0c067d90afca0f2be5ae2db60",
+          "core\\Cargo.lock": "2a2c7bc86a0f2fbce9fbb62843e81d6ec77f6eb66a83d39b187bc94caf2ae301",
+          "core\\crates\\swirl-api\\src\\lib.rs": "bf38b038c84da297a4bb443d254f141b1de4ed920d9073c346b405fe6c86fbbd"
+        },
+        "public_network_tested": false
+      }
+    },
+    {
+      "platform": "macos",
+      "artifact_id": 12441941383,
+      "name": "native-protocol-interop-macos-latest",
+      "archive_sha256": "ea31c2ab540b8bbc34cd6d5b40ab5815a72f8397a98fd2c1efc6e640109402e2",
+      "hysteria2": [
+        {
+          "member": "hysteria2.json",
+          "member_sha256": "fc23ed7a79894b7d93c799378ce5f8e60787c8686678bc242876b176cbe98314",
+          "suite": {
+            "expected_methods": 17,
+            "executed_methods": 17,
+            "failures": [],
+            "errors": [],
+            "skips": [],
+            "all_original_methods_passed": true,
+            "constrained_stack": false
+          },
+          "record_count": 41,
+          "client_sha256": "c6cdc21f263678612bb4cc3899f125d0abfb3442760c07a6cd0f2cc4bddec326",
+          "official_server_sha256": "c8c3589239ce4ecf335c07a3f6ec11b3ef8fbdfe9e5a5ea0ef8ba8ce50d2bb90",
+          "measured_stack_limits": [
+            "null"
+          ],
+          "selected_actual_records": [
+            {
+              "case": "tcp-clean-normal-close",
+              "expected_success": true,
+              "upstream_limitation_probe": false,
+              "client_exit": 0,
+              "elapsed_ms": 129.446,
+              "main_stack_limit": null,
+              "result": {
+                "close": "clean",
+                "dns_quic_auth_tcp_us": 84560,
+                "downloaded": 4096,
+                "imported": false,
+                "mode": "tcp",
+                "ok": true,
+                "sha256": "b7334dd1ec16d37dea26d574d23f09da6a898c9786b79d13fcf67a8133f76d2a",
+                "total_us": 86701,
+                "uploaded": 4096
+              }
+            },
+            {
+              "case": "tcp-4mib-bidirectional",
+              "expected_success": true,
+              "upstream_limitation_probe": false,
+              "client_exit": 0,
+              "elapsed_ms": 665.628,
+              "main_stack_limit": null,
+              "result": {
+                "close": "clean",
+                "dns_quic_auth_tcp_us": 8808,
+                "downloaded": 4194304,
+                "imported": false,
+                "mode": "tcp",
+                "ok": true,
+                "sha256": "a8ec6dd6b98ced548e257779ed68b08ae544037ff49b5cca6f8f994244fb92f6",
+                "total_us": 657790,
+                "uploaded": 4194304
+              }
+            },
+            {
+              "case": "wrong-password",
+              "expected_success": false,
+              "upstream_limitation_probe": false,
+              "client_exit": 1,
+              "elapsed_ms": 21.445,
+              "main_stack_limit": null,
+              "result": {
+                "code": "Hysteria2AuthenticationRejected",
+                "ok": false
+              }
+            }
+          ],
+          "known_upstream_limitations": {
+            "half_close": "Not passed: official copyTwoWay returns after either copy finishes and closes both directions.",
+            "udp_reply_buffer": "Official v2.13.0 allocates 4096 bytes for encoded messages; payload plus Hysteria header must fit that buffer.",
+            "source_urls": [
+              "https://github.com/HyNetworks/hysteria/blob/app/v2.13.0/core/server/copy.go",
+              "https://github.com/HyNetworks/hysteria/blob/app/v2.13.0/core/server/server.go",
+              "https://github.com/HyNetworks/hysteria/blob/app/v2.13.0/core/server/udp.go",
+              "https://github.com/HyNetworks/hysteria/blob/app/v2.13.0/core/internal/protocol/proxy.go"
+            ]
+          },
+          "qt_product_acceptance": false
+        }
+      ],
+      "lifecycle": [
+        {
+          "member": "hysteria2-lifecycle.json",
+          "member_sha256": "90dcb9b5fc7c97bc4e0831c6f83744d7fc314f00b51558239e8a3ed8d2e5d121",
+          "receipt": {
+            "official_version": "v2.13.0",
+            "official_commit": "ca8fbd874fd6ca82413948de6dc5924405e103e1",
+            "official_server_sha256": "c8c3589239ce4ecf335c07a3f6ec11b3ef8fbdfe9e5a5ea0ef8ba8ce50d2bb90",
+            "client_sha256": "bcfbb697732c7c655f48c8db9c9df6541750fba83b8d7a7b89d357a00cb724d3",
+            "client_role": "Swirl native Rust",
+            "server_role": "official Hysteria2 only",
+            "qt_product_acceptance": false,
+            "client_exit": 0,
+            "elapsed_ms": 3323.608,
+            "main_stack_limit": null,
+            "result": {
+              "authenticated_read_cancel": {
+                "alive_tasks_after_drop": 0,
+                "alive_tasks_before_cancel": 3,
+                "downloaded": 4096,
+                "future_owned_stream": true,
+                "sha256": "b7334dd1ec16d37dea26d574d23f09da6a898c9786b79d13fcf67a8133f76d2a",
+                "uploaded": 4096
+              },
+              "baseline_alive_tasks": 0,
+              "cleanup_asserted_before_process_exit": true,
+              "connect_future_cancel": {
+                "alive_tasks_after_drop": 0,
+                "alive_tasks_before_cancel": 2,
+                "stage": "pending connector with QUIC tasks; TLS and authentication not asserted"
+              },
+              "ok": true,
+              "runtime": "current_thread",
+              "same_runtime_reconnect": {
+                "alive_tasks_after_close": 0,
+                "close": "clean",
+                "downloaded": 65536,
+                "sha256": "b03a3e1e12b699bd2c526e13a0d73f39b761de545f248b3d5faac391ad3b8d97",
+                "uploaded": 65536
+              }
+            },
+            "independent_target": {
+              "accepted_connections": 2,
+              "closed_connections": 2,
+              "active_connections": 0,
+              "received_bytes": 69632
+            }
+          }
+        }
+      ],
+      "dynamic_c_abi": {
+        "member": "quic-ffi.json",
+        "member_sha256": "84739e017a391595a8eeca838f068107d5830a01bf83e5ba20b7aefedb7fc0ab",
+        "runtime": "Swirl Rust Core",
+        "runtime_sha256": "01d6e4d9e42e5a0108d9bbf5a7bed54ede9ac372a29a01dd69e00450e2e36da5",
+        "control_boundary": "exported_c_abi_dynamic_library",
+        "platform": "macOS-26.6.2-arm64-arm-64bit",
+        "qt_product_acceptance": false,
+        "evidence_level": "exported_c_abi_official_quic_loopback",
+        "tests_run": 6,
+        "expected_tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "successful": true,
+        "source_commit": "21c562a7c7adc2654416636e4de2f038ffc220cd",
+        "worktree_changes": [
+          "?? out/"
+        ],
+        "source_sha256": {
+          "tools/tests/test_quic_ffi.py": "dbb2c46c0500cb9c8bd55adedcb1fef7ef6dedda68524214e2d4c59e8f3d1437",
+          "tools/tests/native_ffi_host.py": "6d655c7c8a0406c506d9356a6db68fc2423e97b0e633aa445130efbc2b7de088",
+          "tools/tests/test_quic_core.py": "5d150732211d8d8ac8303f3e2b9ceb4b24feded0c067d90afca0f2be5ae2db60",
+          "core/Cargo.lock": "2a2c7bc86a0f2fbce9fbb62843e81d6ec77f6eb66a83d39b187bc94caf2ae301",
+          "core/crates/swirl-api/src/lib.rs": "bf38b038c84da297a4bb443d254f141b1de4ed920d9073c346b405fe6c86fbbd"
+        },
+        "public_network_tested": false
+      }
+    },
+    {
+      "platform": "ubuntu",
+      "artifact_id": 12441661638,
+      "name": "native-protocol-interop-ubuntu-latest",
+      "archive_sha256": "40c94128a97b4760358c4b240264c9391afdfc47cca87e76111416bbcf44399f",
+      "hysteria2": [
+        {
+          "member": "hysteria2.json",
+          "member_sha256": "0fb999dae5dd33a49deea47ef9d1130411dec211aa28b0c09365a0c22925982e",
+          "suite": {
+            "expected_methods": 17,
+            "executed_methods": 17,
+            "failures": [],
+            "errors": [],
+            "skips": [],
+            "all_original_methods_passed": true,
+            "constrained_stack": false
+          },
+          "record_count": 41,
+          "client_sha256": "aee0e2149402ae1352e44b833eb6655efead108a7237b310f5064ac5f2bf5a32",
+          "official_server_sha256": "907ba8c9693edb104b20582681fb7dc15639d5b64a9cbb616a7b539190a86691",
+          "measured_stack_limits": [
+            "null"
+          ],
+          "selected_actual_records": [
+            {
+              "case": "tcp-clean-normal-close",
+              "expected_success": true,
+              "upstream_limitation_probe": false,
+              "client_exit": 0,
+              "elapsed_ms": 9.515,
+              "main_stack_limit": null,
+              "result": {
+                "close": "clean",
+                "dns_quic_auth_tcp_us": 5216,
+                "downloaded": 4096,
+                "imported": false,
+                "mode": "tcp",
+                "ok": true,
+                "sha256": "b7334dd1ec16d37dea26d574d23f09da6a898c9786b79d13fcf67a8133f76d2a",
+                "total_us": 6049,
+                "uploaded": 4096
+              }
+            },
+            {
+              "case": "tcp-4mib-bidirectional",
+              "expected_success": true,
+              "upstream_limitation_probe": false,
+              "client_exit": 0,
+              "elapsed_ms": 205.627,
+              "main_stack_limit": null,
+              "result": {
+                "close": "clean",
+                "dns_quic_auth_tcp_us": 3785,
+                "downloaded": 4194304,
+                "imported": false,
+                "mode": "tcp",
+                "ok": true,
+                "sha256": "a8ec6dd6b98ced548e257779ed68b08ae544037ff49b5cca6f8f994244fb92f6",
+                "total_us": 202278,
+                "uploaded": 4194304
+              }
+            },
+            {
+              "case": "wrong-password",
+              "expected_success": false,
+              "upstream_limitation_probe": false,
+              "client_exit": 1,
+              "elapsed_ms": 5.646,
+              "main_stack_limit": null,
+              "result": {
+                "code": "Hysteria2AuthenticationRejected",
+                "ok": false
+              }
+            }
+          ],
+          "known_upstream_limitations": {
+            "half_close": "Not passed: official copyTwoWay returns after either copy finishes and closes both directions.",
+            "udp_reply_buffer": "Official v2.13.0 allocates 4096 bytes for encoded messages; payload plus Hysteria header must fit that buffer.",
+            "source_urls": [
+              "https://github.com/HyNetworks/hysteria/blob/app/v2.13.0/core/server/copy.go",
+              "https://github.com/HyNetworks/hysteria/blob/app/v2.13.0/core/server/server.go",
+              "https://github.com/HyNetworks/hysteria/blob/app/v2.13.0/core/server/udp.go",
+              "https://github.com/HyNetworks/hysteria/blob/app/v2.13.0/core/internal/protocol/proxy.go"
+            ]
+          },
+          "qt_product_acceptance": false
+        },
+        {
+          "member": "hysteria2-small-stack.json",
+          "member_sha256": "07a86d492cd72c32cfffa154b7eb21a7c36cad2568e1a83743b811f2d6a3e415",
+          "suite": {
+            "expected_methods": 17,
+            "executed_methods": 17,
+            "failures": [],
+            "errors": [],
+            "skips": [],
+            "all_original_methods_passed": true,
+            "constrained_stack": true
+          },
+          "record_count": 41,
+          "client_sha256": "aee0e2149402ae1352e44b833eb6655efead108a7237b310f5064ac5f2bf5a32",
+          "official_server_sha256": "907ba8c9693edb104b20582681fb7dc15639d5b64a9cbb616a7b539190a86691",
+          "measured_stack_limits": [
+            "{\"hard_bytes\": 1048576, \"soft_bytes\": 1048576}"
+          ],
+          "selected_actual_records": [
+            {
+              "case": "tcp-clean-normal-close",
+              "expected_success": true,
+              "upstream_limitation_probe": false,
+              "client_exit": 0,
+              "elapsed_ms": 26.511,
+              "main_stack_limit": {
+                "soft_bytes": 1048576,
+                "hard_bytes": 1048576
+              },
+              "result": {
+                "close": "clean",
+                "dns_quic_auth_tcp_us": 5112,
+                "downloaded": 4096,
+                "imported": false,
+                "mode": "tcp",
+                "ok": true,
+                "sha256": "b7334dd1ec16d37dea26d574d23f09da6a898c9786b79d13fcf67a8133f76d2a",
+                "total_us": 5867,
+                "uploaded": 4096
+              }
+            },
+            {
+              "case": "tcp-4mib-bidirectional",
+              "expected_success": true,
+              "upstream_limitation_probe": false,
+              "client_exit": 0,
+              "elapsed_ms": 225.732,
+              "main_stack_limit": {
+                "soft_bytes": 1048576,
+                "hard_bytes": 1048576
+              },
+              "result": {
+                "close": "clean",
+                "dns_quic_auth_tcp_us": 4520,
+                "downloaded": 4194304,
+                "imported": false,
+                "mode": "tcp",
+                "ok": true,
+                "sha256": "a8ec6dd6b98ced548e257779ed68b08ae544037ff49b5cca6f8f994244fb92f6",
+                "total_us": 205793,
+                "uploaded": 4194304
+              }
+            },
+            {
+              "case": "wrong-password",
+              "expected_success": false,
+              "upstream_limitation_probe": false,
+              "client_exit": 1,
+              "elapsed_ms": 26.926,
+              "main_stack_limit": {
+                "soft_bytes": 1048576,
+                "hard_bytes": 1048576
+              },
+              "result": {
+                "code": "Hysteria2AuthenticationRejected",
+                "ok": false
+              }
+            }
+          ],
+          "known_upstream_limitations": {
+            "half_close": "Not passed: official copyTwoWay returns after either copy finishes and closes both directions.",
+            "udp_reply_buffer": "Official v2.13.0 allocates 4096 bytes for encoded messages; payload plus Hysteria header must fit that buffer.",
+            "source_urls": [
+              "https://github.com/HyNetworks/hysteria/blob/app/v2.13.0/core/server/copy.go",
+              "https://github.com/HyNetworks/hysteria/blob/app/v2.13.0/core/server/server.go",
+              "https://github.com/HyNetworks/hysteria/blob/app/v2.13.0/core/server/udp.go",
+              "https://github.com/HyNetworks/hysteria/blob/app/v2.13.0/core/internal/protocol/proxy.go"
+            ]
+          },
+          "qt_product_acceptance": false
+        }
+      ],
+      "lifecycle": [
+        {
+          "member": "hysteria2-lifecycle.json",
+          "member_sha256": "140c75f0827dd1624fa0361e4c612480fa6276a6e5664a53d41354d5c1422b96",
+          "receipt": {
+            "official_version": "v2.13.0",
+            "official_commit": "ca8fbd874fd6ca82413948de6dc5924405e103e1",
+            "official_server_sha256": "907ba8c9693edb104b20582681fb7dc15639d5b64a9cbb616a7b539190a86691",
+            "client_sha256": "69e30d2928e719ea73e45cdf441d12a52999c1302ec80a6e54fb0f1715a48ed5",
+            "client_role": "Swirl native Rust",
+            "server_role": "official Hysteria2 only",
+            "qt_product_acceptance": false,
+            "client_exit": 0,
+            "elapsed_ms": 3244.947,
+            "main_stack_limit": null,
+            "result": {
+              "authenticated_read_cancel": {
+                "alive_tasks_after_drop": 0,
+                "alive_tasks_before_cancel": 3,
+                "downloaded": 4096,
+                "future_owned_stream": true,
+                "sha256": "b7334dd1ec16d37dea26d574d23f09da6a898c9786b79d13fcf67a8133f76d2a",
+                "uploaded": 4096
+              },
+              "baseline_alive_tasks": 0,
+              "cleanup_asserted_before_process_exit": true,
+              "connect_future_cancel": {
+                "alive_tasks_after_drop": 0,
+                "alive_tasks_before_cancel": 2,
+                "stage": "pending connector with QUIC tasks; TLS and authentication not asserted"
+              },
+              "ok": true,
+              "runtime": "current_thread",
+              "same_runtime_reconnect": {
+                "alive_tasks_after_close": 0,
+                "close": "clean",
+                "downloaded": 65536,
+                "sha256": "b03a3e1e12b699bd2c526e13a0d73f39b761de545f248b3d5faac391ad3b8d97",
+                "uploaded": 65536
+              }
+            },
+            "independent_target": {
+              "accepted_connections": 2,
+              "closed_connections": 2,
+              "active_connections": 0,
+              "received_bytes": 69632
+            }
+          }
+        },
+        {
+          "member": "hysteria2-lifecycle-small-stack.json",
+          "member_sha256": "ceef7a956b9608e7cace7aec09691b0db7ea3defbe0450df17443b141c1ab2c0",
+          "receipt": {
+            "official_version": "v2.13.0",
+            "official_commit": "ca8fbd874fd6ca82413948de6dc5924405e103e1",
+            "official_server_sha256": "907ba8c9693edb104b20582681fb7dc15639d5b64a9cbb616a7b539190a86691",
+            "client_sha256": "69e30d2928e719ea73e45cdf441d12a52999c1302ec80a6e54fb0f1715a48ed5",
+            "client_role": "Swirl native Rust",
+            "server_role": "official Hysteria2 only",
+            "qt_product_acceptance": false,
+            "client_exit": 0,
+            "elapsed_ms": 3309.809,
+            "main_stack_limit": {
+              "soft_bytes": 1048576,
+              "hard_bytes": 1048576
+            },
+            "result": {
+              "authenticated_read_cancel": {
+                "alive_tasks_after_drop": 0,
+                "alive_tasks_before_cancel": 3,
+                "downloaded": 4096,
+                "future_owned_stream": true,
+                "sha256": "b7334dd1ec16d37dea26d574d23f09da6a898c9786b79d13fcf67a8133f76d2a",
+                "uploaded": 4096
+              },
+              "baseline_alive_tasks": 0,
+              "cleanup_asserted_before_process_exit": true,
+              "connect_future_cancel": {
+                "alive_tasks_after_drop": 0,
+                "alive_tasks_before_cancel": 2,
+                "stage": "pending connector with QUIC tasks; TLS and authentication not asserted"
+              },
+              "ok": true,
+              "runtime": "current_thread",
+              "same_runtime_reconnect": {
+                "alive_tasks_after_close": 0,
+                "close": "clean",
+                "downloaded": 65536,
+                "sha256": "b03a3e1e12b699bd2c526e13a0d73f39b761de545f248b3d5faac391ad3b8d97",
+                "uploaded": 65536
+              }
+            },
+            "independent_target": {
+              "accepted_connections": 2,
+              "closed_connections": 2,
+              "active_connections": 0,
+              "received_bytes": 69632
+            }
+          }
+        }
+      ],
+      "dynamic_c_abi": {
+        "member": "quic-ffi.json",
+        "member_sha256": "1a38c6c7f722a9223c372ff41e26ce23c1cd1aae98d149e464ab44442acb69e0",
+        "runtime": "Swirl Rust Core",
+        "runtime_sha256": "d1dab850b7642123a24e1d3148d838a8d002e7b696b4c4518c3be2712355446d",
+        "control_boundary": "exported_c_abi_dynamic_library",
+        "platform": "Linux-7.0.0-1017-azure-x86_64-with-glibc2.39",
+        "qt_product_acceptance": false,
+        "evidence_level": "exported_c_abi_official_quic_loopback",
+        "tests_run": 6,
+        "expected_tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "successful": true,
+        "source_commit": "21c562a7c7adc2654416636e4de2f038ffc220cd",
+        "worktree_changes": [
+          "?? out/"
+        ],
+        "source_sha256": {
+          "tools/tests/test_quic_ffi.py": "dbb2c46c0500cb9c8bd55adedcb1fef7ef6dedda68524214e2d4c59e8f3d1437",
+          "tools/tests/native_ffi_host.py": "6d655c7c8a0406c506d9356a6db68fc2423e97b0e633aa445130efbc2b7de088",
+          "tools/tests/test_quic_core.py": "5d150732211d8d8ac8303f3e2b9ceb4b24feded0c067d90afca0f2be5ae2db60",
+          "core/Cargo.lock": "2a2c7bc86a0f2fbce9fbb62843e81d6ec77f6eb66a83d39b187bc94caf2ae301",
+          "core/crates/swirl-api/src/lib.rs": "bf38b038c84da297a4bb443d254f141b1de4ed920d9073c346b405fe6c86fbbd"
+        },
+        "public_network_tested": false
+      }
+    }
+  ],
+  "notes": [
+    "All six final job states and full logs were read, then the three uploaded artifacts were downloaded and parsed.",
+    "All three default Hysteria2 suites actually ran all original 17 methods, with zero skips, errors or failures. Each contains 41 client-level records.",
+    "The additional Linux-only 1 MiB steps are conditionally absent on Windows/macOS; this does not skip any method of their default 17-method suites.",
+    "Linux constrained-stack artifacts record both actual RLIMIT_STACK limits as 1048576 bytes for all 41 standalone-client records and the lifecycle client.",
+    "All lifecycle receipts assert resource cleanup in the running current-thread runtime, before process exit; the pending-connect phase does not assert completed TLS or authentication.",
+    "Each C ABI receipt records this exact source commit. Its sole worktree change is the untracked generated out/ evidence directory.",
+    "Known half-close and large-UDP limitations remain explicit probes and are not promoted to supported interoperability.",
+    "Qt product acceptance and public-network acceptance remain false."
+  ]
+}

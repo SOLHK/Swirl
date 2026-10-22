@@ -76,8 +76,12 @@ The permanent Rust regression uses actual local Quinn/HTTP3 connections and
 real STOP_SENDING errors. It covers successful and rejected responses after a
 normal stop, and requires a non-normal stop to retain the write failure. The
 original 17 official-peer tests remain the independent interoperability gate.
-The final accepted source SHA and three-platform completion record are recorded
-in the separate A8 protocol acceptance report after those jobs finish.
+The final accepted source is `21c562a7c7adc2654416636e4de2f038ffc220cd`.
+[Run 39814238782](https://github.com/SOLHK/Swirl/actions/runs/39814238782) completed
+successfully with all six jobs; all four new authentication tests passed on
+Windows/macOS/Linux. The [A8 acceptance report](CORE_X14_A8_PROTOCOL_ACCEPTANCE_20261022.md)
+and [final CI receipt](evidence/x14-a8/ci-auth-fix-39814238782.json) retain the
+original 17-method results, complete job states and downloaded-artifact evidence.
 
 ## Verified local gate for the authentication correction
 
