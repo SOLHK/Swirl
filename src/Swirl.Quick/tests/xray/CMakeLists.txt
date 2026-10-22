@@ -23,6 +23,18 @@ endforeach()
 
 add_library(SwirlXrayProduct STATIC
     "${SWIRL_QUICK_SOURCE}/engine/ProxyEngine.h"
+    "${SWIRL_QUICK_SOURCE}/engine/EngineController.h"
+    "${SWIRL_QUICK_SOURCE}/engine/EngineController.cpp"
+    "${SWIRL_QUICK_SOURCE}/engine/NodeTestService.h"
+    "${SWIRL_QUICK_SOURCE}/engine/NodeTestService.cpp"
+    "${SWIRL_QUICK_SOURCE}/engine/TelemetryService.h"
+    "${SWIRL_QUICK_SOURCE}/engine/TelemetryService.cpp"
+    "${SWIRL_QUICK_SOURCE}/engine/ProxyLatencyProbe.h"
+    "${SWIRL_QUICK_SOURCE}/engine/ProxyLatencyProbe.cpp"
+    "${SWIRL_QUICK_SOURCE}/engine/SystemProxySession.h"
+    "${SWIRL_QUICK_SOURCE}/engine/SystemProxySession.cpp"
+    "${SWIRL_QUICK_SOURCE}/engine/ConnectionDiagnostics.h"
+    "${SWIRL_QUICK_SOURCE}/engine/ConnectionDiagnostics.cpp"
     "${SWIRL_QUICK_SOURCE}/engine/ProxyNode.h"
     "${SWIRL_QUICK_SOURCE}/engine/ProxyNode.cpp"
     "${SWIRL_QUICK_SOURCE}/engine/NodeImporter.h"
@@ -44,7 +56,7 @@ target_compile_definitions(SwirlXrayProduct PUBLIC SWIRL_USE_RUST_CORE)
 target_link_libraries(SwirlXrayProduct PUBLIC Qt6::Core Qt6::Network Qt6::Gui)
 if(WIN32)
     target_compile_definitions(SwirlXrayProduct PUBLIC NOMINMAX)
-    target_link_libraries(SwirlXrayProduct PRIVATE crypt32)
+    target_link_libraries(SwirlXrayProduct PRIVATE crypt32 wininet iphlpapi ws2_32)
 endif()
 if(MSVC)
     target_compile_options(SwirlXrayProduct PRIVATE /utf-8)
@@ -85,6 +97,12 @@ swirl_add_xray_test(SwirlXrayDownloadTests XrayDownloadTests.cpp swirl-xray-down
 # on other platforms; CI verifies the required Windows test is actually present.
 if(EXISTS "${SWIRL_QUICK_SOURCE}/tests/XrayStoreTests.cpp")
     swirl_add_xray_test(SwirlXrayStoreTests XrayStoreTests.cpp swirl-xray-store)
+endif()
+if(EXISTS "${SWIRL_QUICK_SOURCE}/tests/XrayRuntimeTests.cpp")
+    swirl_add_xray_test(SwirlXrayRuntimeTests XrayRuntimeTests.cpp swirl-xray-runtime)
+endif()
+if(EXISTS "${SWIRL_QUICK_SOURCE}/tests/XrayCatalogTests.cpp")
+    swirl_add_xray_test(SwirlXrayCatalogTests XrayCatalogTests.cpp swirl-xray-catalog)
 endif()
 
 execute_process(COMMAND git rev-parse HEAD WORKING_DIRECTORY "${SWIRL_REPOSITORY}"

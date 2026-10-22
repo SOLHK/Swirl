@@ -87,12 +87,18 @@ static ProxyNode deserialize(const QVariantMap &m) {
 NodeStore::NodeStore(QString path, QObject *parent) : QObject(parent), m_path(std::move(path)) {
     if (m_path.isEmpty()) m_path=SwirlPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/nodes.dpapi";
     load();
-    // Non-secret selection sidecar. Invalid/stale IDs never override the store.
+    // Bind the non-secret selection sidecar to this exact encrypted snapshot.
+    // A later import must not be undone by an older, still-valid selected ID.
+    // Existing v1 snapshots retain their old sidecar on their first read only.
     QFile selection(m_path+".selected");
-    if(m_healthy && selection.open(QIODevice::ReadOnly) && selection.size()<=256) {
-        const auto object=QJsonDocument::fromJson(selection.readAll()).object();
+    if(m_healthy && selection.open(QIODevice::ReadOnly) && selection.size()<=512) {
+        const auto object=QJsonDocument::fromJson(selection.read(513)).object();
         const auto id=object.value("selected").toString();
-        if(object.contains("selected") && (id.isEmpty() || std::any_of(m_nodes.cbegin(),m_nodes.cend(),[&](const auto &n){return n.id==id;})))m_selected=id;
+        const bool sameSnapshot=object.value("schema").toInt()==2 &&
+            object.value("snapshot").toString().toLatin1()==m_snapshotDigest;
+        const bool legacy=m_legacySelection && !object.contains("schema") && !object.contains("snapshot");
+        if((sameSnapshot || legacy) && object.value("selected").isString() &&
+            (id.isEmpty() || std::any_of(m_nodes.cbegin(),m_nodes.cend(),[&](const auto &n){return n.id==id;})))m_selected=id;
     }
 }
 NodeStore::~NodeStore() {
@@ -213,6 +219,8 @@ void NodeStore::load() {
     }
     m_networkConfiguration=network.toObject();
     m_nodes=nodes; m_selected=selected; m_subscriptions=subscriptions;m_healthy=true;
+    m_snapshotDigest=QCryptographicHash::hash(ciphertext,QCryptographicHash::Sha256).toHex();
+    m_legacySelection=catalogVersion==1;
 }
 namespace {
 struct StoreSnapshot {
@@ -225,7 +233,7 @@ struct StoreSnapshot {
 // receives only value snapshots, so an asynchronous save never accesses a
 // NodeStore or another QObject belonging to the UI thread.
 QString persistSnapshot(const QString &path,const StoreSnapshot &data,
-                        const std::shared_ptr<std::atomic_bool> &cancel = {}) {
+                        const std::shared_ptr<std::atomic_bool> &cancel = {},QByteArray *snapshotDigest = nullptr) {
     const auto cancelled=[&] {return cancel && cancel->load(std::memory_order_acquire);};
     if(cancelled())return QStringLiteral("节点保存已取消；原配置保持不变。");
     const auto &nodes=data.nodes;
@@ -283,11 +291,13 @@ QString persistSnapshot(const QString &path,const StoreSnapshot &data,
     if (!file.open(QIODevice::WriteOnly) || !file.setPermissions(QFile::ReadOwner|QFile::WriteOwner) || file.write(bytes)!=bytes.size() || cancelled() || !file.commit()) {
         return QStringLiteral("节点配置无法安全保存，旧配置保持不变。");
     }
+    if(snapshotDigest)*snapshotDigest=QCryptographicHash::hash(bytes,QCryptographicHash::Sha256).toHex();
     return {};
 }
 }
 void NodeStore::adoptSnapshot(const QList<ProxyNode> &nodes,const QString &selected,
-                              const QList<NodeSubscription> &subscriptions,const QJsonObject &networkConfiguration) {
+                              const QList<NodeSubscription> &subscriptions,const QJsonObject &networkConfiguration,const QByteArray &snapshotDigest) {
+    m_snapshotDigest=snapshotDigest;m_legacySelection=false;
     m_nodes=nodes;m_publicRows.clear();m_selected=selected;m_subscriptions=subscriptions;
     m_networkConfiguration=networkConfiguration;m_error.clear();++m_revision;emit changed();
 }
@@ -295,9 +305,10 @@ bool NodeStore::write(const QList<ProxyNode> &nodes,const QString &selected,
                       const QList<NodeSubscription> &subscriptions,const QJsonObject &networkConfiguration) {
     if(!allowMutation())return false;
     if(!m_healthy) {m_error=QStringLiteral("节点库损坏或无法解密；未覆盖原文件。");return false;}
-    m_error=persistSnapshot(m_path,{nodes,selected,subscriptions,networkConfiguration});
+    QByteArray snapshotDigest;
+    m_error=persistSnapshot(m_path,{nodes,selected,subscriptions,networkConfiguration},{},&snapshotDigest);
     if(!m_error.isEmpty())return false;
-    adoptSnapshot(nodes,selected,subscriptions,networkConfiguration);return true;
+    adoptSnapshot(nodes,selected,subscriptions,networkConfiguration,snapshotDigest);return true;
 }
 bool NodeStore::saveNode(const QVariantMap &input) {
     if(!allowMutation())return false;
@@ -362,7 +373,7 @@ bool NodeStore::select(const QString &id) {
     if(m_selected==id){m_error.clear();return true;}
     QSaveFile file(m_path+".selected");
     file.setDirectWriteFallback(false);
-    const auto bytes=QJsonDocument(QJsonObject{{"selected",id}}).toJson(QJsonDocument::Compact);
+    const auto bytes=QJsonDocument(QJsonObject{{"schema",2},{"snapshot",QString::fromLatin1(m_snapshotDigest)},{"selected",id}}).toJson(QJsonDocument::Compact);
     if(!QDir().mkpath(QFileInfo(m_path).absolutePath()) || !file.open(QIODevice::WriteOnly) ||
        !file.setPermissions(QFile::ReadOwner|QFile::WriteOwner) || file.write(bytes)!=bytes.size() || !file.commit()){
         m_error=QStringLiteral("无法保存节点选择，原选择保持不变。");return false;
@@ -405,38 +416,159 @@ bool NodeStore::removeSubscription(const QString &id) {
     auto nodes=m_nodes;for(auto &n:nodes)if(n.sourceId==id)n.sourceId.clear();
     return write(nodes,m_selected,sources,m_networkConfiguration);
 }
+namespace {
+struct IdentityCache {
+    QHash<quintptr,QByteArray> documents;
+    QHash<QByteArray,QByteArray> publicParts;
+};
+QJsonObject identitySource(const ProxyNode &node,const QByteArray &origin,IdentityCache &cache) {
+    auto original=node.originalConfiguration;
+    if(node.isXray()) {
+        auto outbound=original.value("outbound").toObject();outbound.remove("tag");
+        const auto source=original.value("source").toObject();
+        auto settings=outbound.value("settings").toObject();
+        const auto serverIndex=source.value("server_index").toInt(-1);
+        const auto userIndex=source.value("user_index").toInt(-1);
+        const auto serverPath=source.value("server_path").toString();
+        const auto key=serverPath.contains(".vnext[")?QStringLiteral("vnext"):
+            serverPath.contains(".servers[")?QStringLiteral("servers"):QString();
+        auto server=settings;
+        const auto servers=settings.value(key).toArray();
+        if(!key.isEmpty() && serverIndex>=0 && serverIndex<servers.size()) {
+            server=servers.at(serverIndex).toObject();settings.remove(key);
+        } else settings={};
+        if(outbound.contains("settings"))outbound.insert("settings",settings);
+        // Hash shared raw fields once. A 4 MiB transport object expanded to
+        // 2000 accounts must not be serialized 2000 times on the UI thread.
+        const auto partKey=origin.left(32)+":outbound:"+QByteArray::number(source.value("outbound_index").toInt(-1));
+        auto common=cache.publicParts.value(partKey);
+        if(common.isEmpty()) {
+            common=QCryptographicHash::hash(QJsonDocument(outbound).toJson(QJsonDocument::Compact),QCryptographicHash::Sha256).toHex();
+            cache.publicParts.insert(partKey,common);
+        }
+        QJsonValue user;
+        const auto users=server.value("users").toArray();
+        if(userIndex>=0 && userIndex<users.size()) {user=users.at(userIndex);server.remove("users");}
+        const auto serverKey=partKey+":server:"+key.toUtf8()+':'+QByteArray::number(serverIndex);
+        auto endpoint=cache.publicParts.value(serverKey);
+        if(endpoint.isEmpty()) {
+            endpoint=QCryptographicHash::hash(QJsonDocument(server).toJson(QJsonDocument::Compact),QCryptographicHash::Sha256).toHex();
+            cache.publicParts.insert(serverKey,endpoint);
+        }
+        // Selecting raw source elements is only an identity operation. The
+        // original document and Rust's execution mapping remain unchanged.
+        return {{"outbound",QString::fromLatin1(common)},{"server",QString::fromLatin1(endpoint)},{"user",user}};
+    }
+    if(node.conversionIssues.isEmpty())return {};
+    original.remove("name");original.remove("tag");original.remove("ps");
+    if(original.contains("vmess")) {
+        auto vmess=original.value("vmess").toObject();vmess.remove("ps");original.insert("vmess",vmess);original.remove("uri");
+    } else if(original.value("uri").isString()) {
+        auto uri=original.value("uri").toString();const auto fragment=uri.indexOf('#');
+        if(fragment>=0)uri.truncate(fragment);original.insert("uri",uri);
+    }
+    return original;
+}
+QByteArray sourceLocator(const ProxyNode &node,IdentityCache &cache) {
+    if(!node.isXray() || node.sourceDocument.isEmpty())return {};
+    const auto buffer=quintptr(node.sourceDocument.constData());
+    auto digest=cache.documents.value(buffer);
+    if(digest.isEmpty()) {digest=QCryptographicHash::hash(node.sourceDocument,QCryptographicHash::Sha256);cache.documents.insert(buffer,digest);}
+    return digest+':'+QByteArray::number(node.sourceNodeIndex);
+}
+QByteArray semanticIdentity(const ProxyNode &node,const QByteArray &source,IdentityCache &cache) {
+    // A missing/new DLL leaves only safe display data. Never merge those
+    // records using host/port while their authentication is still unverified.
+    if(node.isXray() && !node.originalConfiguration.value("outbound").isObject())
+        return QCryptographicHash::hash(QByteArray("unverified:")+source,QCryptographicHash::Sha256);
+    auto options=node.parameters;
+    if(node.isXray())for(const auto &key:{"streamSettings","mux","proxySettings"})options.remove(key);
+    const QJsonObject identity{{"protocol",node.protocol},{"host",node.host.toCaseFolded()},{"port",node.port},
+        {"username",node.username},{"password",node.password},{"cipher",node.cipher},{"serverName",node.serverName},
+        {"options",options},{"unmappedSource",identitySource(node,source,cache)}};
+    return QCryptographicHash::hash(QJsonDocument(identity).toJson(QJsonDocument::Compact),QCryptographicHash::Sha256);
+}
+QByteArray sourceAnchor(const ProxyNode &node) {
+    // Only an explicit original-source alias is a provider update key. A Qt
+    // display name alone never authorizes replacing another remote endpoint.
+    const auto original=node.originalConfiguration;
+    const auto tag=node.isXray()?original.value("outbound").toObject().value("tag"):original.value("name");
+    if(!tag.isString() || tag.toString().isEmpty())return {};
+    const auto source=original.value("source").toObject();
+    const QJsonArray anchor{node.protocol,tag,source.value("server_index"),source.value("user_index")};
+    return QCryptographicHash::hash(QJsonDocument(anchor).toJson(QJsonDocument::Compact),QCryptographicHash::Sha256);
+}
+}
 bool NodeStore::prepareImport(const QList<ProxyNode> &incoming,const QString &sourceId,ImportPlan *output) {
     if(!allowMutation())return false;
-    if(!output || !m_healthy || incoming.isEmpty()) {
-        m_error=QStringLiteral("无法准备空列表或不可读节点库；原配置保持不变。");return false;
+    if(!output || !m_healthy || incoming.isEmpty() || incoming.size()>2000) {
+        m_error=QStringLiteral("无法准备空列表、超过上限的列表或不可读节点库；原配置保持不变。");return false;
     }
     ImportPlan plan;plan.m_owner=this;plan.m_revision=m_revision;plan.m_sources=m_subscriptions;
     if(!sourceId.isEmpty()) {
         bool found=false;for(auto &source:plan.m_sources)if(source.id==sourceId){found=true;source.lastSuccess=QDateTime::currentSecsSinceEpoch();}
         if(!found){m_error=QStringLiteral("订阅已移除，已丢弃过期下载响应。");return false;}
     }
+    QHash<QByteArray,QList<QString>> existing,anchors,origins;
+    IdentityCache identityCache;
+    QHash<QString,QByteArray> oldIdentities;
+    QSet<QString> allIds,parsedIds;
+    for(const auto &old:m_nodes) {
+        allIds.insert(old.id);
+        if(old.sourceId!=sourceId)continue;
+        const auto origin=sourceLocator(old,identityCache);
+        const auto identity=semanticIdentity(old,origin,identityCache);existing[identity].append(old.id);oldIdentities.insert(old.id,identity);
+        if(!origin.isEmpty())origins[origin].append(old.id);
+        const auto anchor=sourceAnchor(old);if(!anchor.isEmpty())anchors[anchor].append(old.id);
+    }
+    QList<QByteArray> identities,incomingAnchors,incomingOrigins;
+    QSet<QByteArray> requested;
+    QHash<QByteArray,QSet<QByteArray>> anchorIdentities;
+    for(const auto &node:incoming) {
+        m_error=ProxyNode::validate(node);if(!m_error.isEmpty())return false;
+        if(parsedIds.contains(node.id)) {m_error=QStringLiteral("导入节点标识重复；原配置保持不变。");return false;}
+        parsedIds.insert(node.id);
+        const auto origin=sourceLocator(node,identityCache);
+        const auto identity=semanticIdentity(node,origin,identityCache),anchor=sourceAnchor(node);
+        incomingOrigins.append(origin);
+        identities.append(identity);incomingAnchors.append(anchor);requested.insert(identity);
+        if(!anchor.isEmpty())anchorIdentities[anchor].insert(identity);
+    }
     plan.m_nodes=m_nodes;
     if(!sourceId.isEmpty())plan.m_nodes.removeIf([&](const auto &node){return node.sourceId==sourceId;});
+    QHash<QByteArray,QString> imported;
     QSet<QString> assigned;
-    for(auto node:incoming) {
-        m_error=ProxyNode::validate(node);if(!m_error.isEmpty())return false;
-        const auto parsedId=node.id;
-        if(plan.m_names.contains(node.name) || plan.m_ids.contains(parsedId)) {
-            m_error=QStringLiteral("导入含重复节点名称或标识，无法唯一映射策略；原配置保持不变。");return false;
+    const auto mapName=[&](const QString &name,const QString &id) {
+        if(!plan.m_names.contains(name))plan.m_names.insert(name,id);
+        else if(plan.m_names.value(name)!=id)plan.m_names.insert(name,QString()); // Explicit policy ambiguity.
+    };
+    for(int i=0;i<incoming.size();++i) {
+        auto node=incoming[i];const auto parsedId=node.id;const auto identity=identities[i];
+        if(imported.contains(identity)) {
+            const auto id=imported.value(identity);
+            if(allIds.contains(parsedId) && parsedId!=id) {m_error=QStringLiteral("导入节点标识与其他节点或订阅冲突；原配置保持不变。");return false;}
+            plan.m_ids.insert(parsedId,id);mapName(node.name,id);continue;
         }
-        node.sourceId=sourceId;
-        int matches=0;
-        for(const auto &old:m_nodes)if(old.sourceId==sourceId && old.name==node.name && old.protocol==node.protocol){node.id=old.id;++matches;}
-        if(matches>1 || assigned.contains(node.id)) {
-            m_error=QStringLiteral("已有节点身份不唯一；原配置保持不变。");return false;
+        QString matched;
+        const auto exact=existing.value(identity);
+        if(exact.size()>1) {m_error=QStringLiteral("已有节点存在重复身份，无法安全确定更新目标；原配置保持不变。");return false;}
+        if(exact.size()==1)matched=exact.first();
+        if(matched.isEmpty() && !incomingOrigins[i].isEmpty()) {
+            const auto sameSource=origins.value(incomingOrigins[i]);
+            if(sameSource.size()>1) {m_error=QStringLiteral("已有节点源文档位置重复；原配置保持不变。");return false;}
+            if(sameSource.size()==1)matched=sameSource.first();
         }
-        // Never let a supplied UUID replace an unrelated node/source.
-        for(const auto &old:m_nodes)if(old.id==node.id &&
-            (old.sourceId!=sourceId || old.name!=node.name || old.protocol!=node.protocol)) {
-            m_error=QStringLiteral("导入节点标识与其他节点冲突；原配置保持不变。");return false;
+        if(matched.isEmpty() && !sourceId.isEmpty() && !incomingAnchors[i].isEmpty()) {
+            const auto candidates=anchors.value(incomingAnchors[i]);
+            if(candidates.size()==1 && anchorIdentities.value(incomingAnchors[i]).size()==1 &&
+               !requested.contains(oldIdentities.value(candidates.first())))matched=candidates.first();
         }
-        assigned.insert(node.id);plan.m_names.insert(node.name,node.id);plan.m_ids.insert(parsedId,node.id);
-        plan.m_nodes.removeIf([&](const auto &old){return old.id==node.id;});plan.m_nodes.append(node);
+        if(allIds.contains(parsedId) && parsedId!=matched) {m_error=QStringLiteral("导入节点标识与其他节点或订阅冲突；原配置保持不变。");return false;}
+        if(!matched.isEmpty())node.id=matched;
+        if(assigned.contains(node.id)) {m_error=QStringLiteral("订阅来源身份不唯一；原配置保持不变。");return false;}
+        node.sourceId=sourceId;assigned.insert(node.id);imported.insert(identity,node.id);
+        plan.m_ids.insert(parsedId,node.id);mapName(node.name,node.id);
+        plan.m_nodes.removeIf([&](const auto &old){return old.id==node.id;});plan.m_nodes.append(std::move(node));
     }
     if(plan.m_nodes.size()>2000){m_error=QStringLiteral("导入后超过 2000 个节点；原配置保持不变。");return false;}
     plan.m_selected=m_selected;
@@ -469,8 +601,8 @@ bool NodeStore::commitImportAsync(const ImportPlan &plan,const QJsonObject &netw
     // This also avoids an invokeMethod/delete race if the store is destroyed.
     auto dispatch=std::shared_ptr<QObject>(new QObject,[](QObject *object){object->deleteLater();});
     QThreadPool::globalInstance()->start([data,cancelled,revision,path,owner,dispatch,completion=std::move(completion)]() mutable {
-        const auto error=persistSnapshot(path,*data,cancelled);
-        QMetaObject::invokeMethod(dispatch.get(),[data,cancelled,revision,owner,dispatch,error,completion=std::move(completion)] {
+        QByteArray snapshotDigest;const auto error=persistSnapshot(path,*data,cancelled,&snapshotDigest);
+        QMetaObject::invokeMethod(dispatch.get(),[data,cancelled,revision,owner,dispatch,error,snapshotDigest,completion=std::move(completion)] {
             if(!owner)return;
             // The write lease rejects every mutation while the worker runs.
             // These checks protect future changes from publishing stale state.
@@ -482,7 +614,7 @@ bool NodeStore::commitImportAsync(const ImportPlan &plan,const QJsonObject &netw
                 completion(false,QStringLiteral("保存计划状态已失效；请重新加载节点库。"));return;
             }
             owner->m_saveCancelled.reset();owner->m_saving=false;
-            if(error.isEmpty())owner->adoptSnapshot(data->nodes,data->selected,data->subscriptions,data->networkConfiguration);
+            if(error.isEmpty())owner->adoptSnapshot(data->nodes,data->selected,data->subscriptions,data->networkConfiguration,snapshotDigest);
             else owner->m_error=error;
             if(owner)completion(error.isEmpty(),error);
         },Qt::QueuedConnection);

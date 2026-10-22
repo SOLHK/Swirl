@@ -77,7 +77,7 @@ private slots:
     }
     void selectingDoesNotRewriteCredentialsOrInvalidateRows() {
         QTemporaryDir temp;const auto path=temp.filePath("nodes.dpapi");NodeStore store(path);
-        QList<ProxyNode> nodes;for(int i=0;i<180;++i)nodes.append(node(QString("HK node %1").arg(i),1080));
+        QList<ProxyNode> nodes;for(int i=0;i<180;++i)nodes.append(node(QString("HK node %1").arg(i),quint16(1080+i)));
         QVERIFY(store.importNodes(nodes));
         QFile encrypted(path);QVERIFY(encrypted.open(QIODevice::ReadOnly));const auto original=encrypted.readAll();encrypted.close();
         QSignalSpy changed(&store,&NodeStore::changed),selection(&store,&NodeStore::selectionChanged);

@@ -23,6 +23,14 @@ ProxyNode node(const QString &name="fixture",quint16 port=8443) {
     n.name=name;n.protocol="http";n.host="proxy.example.invalid";n.port=port;
     n.username="synthetic-user";n.password="SYNTHETIC-PRIVATE-PASSWORD";return n;
 }
+QJsonObject vlessRecord(const QString &tag,int port,const QString &uuid) {
+    const QJsonObject user{{"id",uuid},{"encryption","none"}};
+    const QJsonObject server{{"address","proxy.example.invalid"},{"port",port},{"users",QJsonArray{user}}};
+    return {{"protocol","vless"},{"tag",tag},{"settings",QJsonObject{{"vnext",QJsonArray{server}}}}};
+}
+NodeImporter::Result parseOutbounds(const QJsonArray &outbounds) {
+    return XrayJsonBridge::parse(QJsonDocument(QJsonObject{{"outbounds",outbounds}}).toJson(QJsonDocument::Compact));
+}
 QByteArray read(const QString &path) {
     QFile file(path);if(!file.open(QIODevice::ReadOnly))return {};return file.readAll();
 }
@@ -54,6 +62,7 @@ QByteArray documentFixture() {
     QByteArray bytes=QByteArray::fromHex("efbbbf")+R"JSON( {
       "inbounds":[{"protocol":"socks","listen":"127.0.0.1","port":54321}],
       "outbounds":[
+        {"protocol":"freedom","tag":"local-action","settings":{}},
         {"protocol":"vless","tag":"WS 文本","settings":{"vnext":[{"address":"example.invalid","port":443,"users":[{"id":"11111111-1111-4111-8111-111111111111","encryption":"none"}]}]},"streamSettings":{"network":"ws","security":"tls","tlsSettings":{"serverName":"example.invalid","alpn":["http/1.1"],"fingerprint":"chrome"},"wsSettings":{"path":"/private-ws-path","headers":{"Host":"edge.example.invalid"}}}},
         {"protocol":"vless","tag":"REALITY Vision","settings":{"vnext":[{"address":"example.invalid","port":443,"users":[{"id":"22222222-2222-4222-8222-222222222222","encryption":"none","flow":"xtls-rprx-vision"}]}]},"streamSettings":{"network":"tcp","security":"reality","realitySettings":{"serverName":"example.invalid","publicKey":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","shortId":"aabbccdd","spiderX":"/private-spider","fingerprint":"chrome"}}},
         {"protocol":"vmess","tag":"VMess gRPC","settings":{"vnext":[{"address":"example.invalid","port":443,"users":[{"id":"33333333-3333-4333-8333-333333333333","alterId":0,"security":"auto"}]}]},"streamSettings":{"network":"grpc","security":"tls","grpcSettings":{"serviceName":"private-grpc","multiMode":true}}},
@@ -96,10 +105,10 @@ private slots:
 #endif
         QList<ProxyNode> incoming;
         for(int i=0;i<8;++i) {
-            auto n=node(QString("bounded-%1").arg(i));
+            auto n=node(QString("bounded-%1").arg(i),quint16(8443+i));
             n.sourceFormat="xray-v2ray-json";n.sourceNodeIndex=0;n.importSource="file";
             n.sourceDocument=QByteArray("{\"protocol\":\"http\",\"tag\":\"")+QByteArray::number(i)+
-                "\",\"settings\":{\"servers\":[{\"address\":\"proxy.example.invalid\",\"port\":8443}]},\"opaque\":\"";
+                "\",\"settings\":{\"servers\":[{\"address\":\"proxy.example.invalid\",\"port\":"+QByteArray::number(n.port)+"}]},\"opaque\":\"";
             n.sourceDocument+=QByteArray(NodeImporter::MaximumBytes-n.sourceDocument.size()-2,'x');
             n.sourceDocument+="\"}";QCOMPARE(n.sourceDocument.size(),NodeImporter::MaximumBytes);
             incoming.append(std::move(n));
@@ -172,6 +181,50 @@ private slots:
         QVERIFY(!called);QVERIFY(!QFile::exists(path));
     }
 
+    void duplicateBatchIdentity() {
+        QTemporaryDir temp;NodeStore store(temp.filePath("identity.dpapi"));
+        const auto a=node("same",8443),b=node("same",8444),renamed=node("renamed",8443);
+        NodeStore::ImportPlan plan;
+        QVERIFY2(store.prepareImport({a,b,renamed},{},&plan),qPrintable(store.error()));
+        QCOMPARE(plan.nodes().size(),2);QVERIFY(store.nodes().isEmpty());
+        QVERIFY(plan.nameToId().contains("same"));QVERIFY(plan.nameToId().value("same").isEmpty());
+        QCOMPARE(plan.nameToId().value("renamed"),a.id);
+        QCOMPARE(plan.importedToStoredIds().value(renamed.id),a.id);
+        QVERIFY(!store.prepareImport({a,a},{},&plan));QVERIFY(!QFile::exists(store.filePath()));
+        NodeStore other(temp.filePath("other.dpapi"));QVERIFY(!other.commitImport(plan));
+        NodeStore::ImportPlan empty;QVERIFY(!store.commitImport(empty));
+    }
+
+    void unverifiedSourcesDoNotMerge() {
+        auto first=node("unverified"),second=node("unverified"),duplicate=node("same bytes renamed");
+        for(auto *n:{&first,&second,&duplicate}) {n->sourceFormat="xray-v2ray-json";n->sourceNodeIndex=0;}
+        first.sourceDocument="{\"protocol\":\"http\",\"opaque\":1}";
+        second.sourceDocument="{\"protocol\":\"http\",\"opaque\":2}";duplicate.sourceDocument=first.sourceDocument;
+        QTemporaryDir temp;NodeStore store(temp.filePath("unverified.dpapi"));NodeStore::ImportPlan plan;
+        QVERIFY(store.prepareImport({first,second,duplicate},{},&plan));QCOMPARE(plan.nodes().size(),2);
+        QCOMPARE(plan.importedToStoredIds().value(duplicate.id),first.id);
+    }
+
+    void sharedTransportIdentityIsBounded() {
+        auto outbound=QJsonDocument::fromJson(expandedDocumentFixture()).object();
+        const QJsonObject xhttp{{"path","/synthetic"},{"extra",QJsonObject{{"opaque",QString(1024*1024,QChar('x'))}}}};
+        outbound.insert("streamSettings",QJsonObject{{"network","xhttp"},{"xhttpSettings",xhttp}});
+        const auto parsed=XrayJsonBridge::parse(QJsonDocument(outbound).toJson(QJsonDocument::Compact));
+        QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1000);
+        QTemporaryDir temp;NodeStore store(temp.filePath("shared-identity.dpapi"));NodeStore::ImportPlan plan;
+        QVERIFY2(store.prepareImport(parsed.nodes,{},&plan),qPrintable(store.error()));QCOMPARE(plan.nodes().size(),1000);
+    }
+
+    void sameTagsKeepDifferentAccounts() {
+        const auto parsed=parseOutbounds({vlessRecord("same",443,"11111111-1111-4111-8111-111111111111"),
+            vlessRecord("same",443,"22222222-2222-4222-8222-222222222222")});
+        QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),2);
+        QTemporaryDir temp;NodeStore store(temp.filePath("accounts.dpapi"));NodeStore::ImportPlan plan;
+        QVERIFY2(store.prepareImport(parsed.nodes,{},&plan),qPrintable(store.error()));
+        QCOMPARE(plan.nodes().size(),2);QVERIFY(plan.nodes()[0].id!=plan.nodes()[1].id);
+        QVERIFY(plan.nameToId().value("same").isEmpty());
+    }
+
 #ifndef Q_OS_WIN
     void encryptionUnavailableFailsClosed() {
         QTemporaryDir temp;NodeStore store(temp.filePath("no-backend.dpapi"));
@@ -183,7 +236,7 @@ private slots:
     void encryptedDocumentRoundtrip() {
         QTemporaryDir temp;QVERIFY(temp.isValid());const auto path=temp.filePath(QStringLiteral("节点保存.dpapi"));
         const auto source=documentFixture();const auto imported=XrayJsonBridge::parse(source);
-        QVERIFY2(imported,qPrintable(imported.error));QCOMPARE(imported.nodes.size(),7);
+        QVERIFY2(imported,qPrintable(imported.error));QCOMPARE(imported.nodes.size(),7);QVERIFY(imported.nodes.first().sourceNodeIndex>0);
         QList<ProxyNode> before;
         {
             NodeStore store(path);auto nodes=imported.nodes;
@@ -302,6 +355,96 @@ private slots:
             QCOMPARE(node.nativeOutbound,imported.nodes[i].nativeOutbound);disabled=disabled || !node.nativeExecutable;
         }
         QVERIFY(disabled);
+    }
+
+    void manualImportRenameAndCredentialSeparation() {
+        QTemporaryDir temp;NodeStore store(temp.filePath("manual.dpapi"));
+        const auto a=node("A");QVERIFY(store.importNodes({a}));QVERIFY(store.select(a.id));
+        auto renamed=node("renamed");QVERIFY(store.importNodes({renamed}));QCOMPARE(store.nodes().size(),1);
+        QCOMPARE(store.nodes().first().id,a.id);QCOMPARE(store.selectedId(),a.id);QCOMPARE(store.nodes().first().name,QString("renamed"));
+        auto different=node("renamed",9443);QVERIFY(store.importNodes({different}));QCOMPARE(store.nodes().size(),2);
+        QCOMPARE(store.selectedId(),a.id);
+        auto rotated=node("renamed");rotated.password="ANOTHER-SYNTHETIC-PASSWORD";
+        QVERIFY(store.importNodes({rotated}));QCOMPARE(store.nodes().size(),3);QCOMPARE(store.selectedId(),a.id);
+        NodeStore::ImportPlan stale;QVERIFY(store.prepareImport({node("renamed")},{},&stale));
+        QVERIFY(store.select(different.id));QVERIFY(!store.commitImport(stale));
+        const auto otherSource=QUuid::createUuid().toString(QUuid::WithoutBraces);
+        QVERIFY(!store.prepareImport({a},otherSource,&stale));QCOMPARE(store.nodes().size(),3);
+    }
+
+    void refreshAndSelectionIdentity() {
+        QTemporaryDir temp;const auto path=temp.filePath("refresh.dpapi");NodeStore store(path);
+        QVERIFY(store.saveSubscription({},"synthetic source",QUrl("https://example.invalid/config"),360,false,"xray-v2ray-json"));
+        const auto source=store.subscriptions().first().id;
+        const QString firstId="11111111-1111-4111-8111-111111111111",secondId="22222222-2222-4222-8222-222222222222";
+        QJsonArray raw{vlessRecord("A",443,firstId),vlessRecord("B",444,secondId)};
+        auto parsed=parseOutbounds(raw);QVERIFY(parsed);QVERIFY(store.importNodes(parsed.nodes,source));
+        const auto selected=store.nodes().first().id,other=store.nodes().last().id;
+        const auto activeSnapshot=store.nodes().first();QVERIFY(store.select(selected));
+        raw=QJsonArray{raw[1],raw[0]};parsed=parseOutbounds(raw);QVERIFY(parsed);QVERIFY(store.importNodes(parsed.nodes,source));
+        QCOMPARE(store.selectedId(),selected);QCOMPARE(store.nodes()[0].id,other);QCOMPARE(store.nodes()[1].id,selected);
+        raw[1]=vlessRecord("Renamed",443,firstId);parsed=parseOutbounds(raw);QVERIFY(parsed);QVERIFY(store.importNodes(parsed.nodes,source));
+        QCOMPARE(store.selectedId(),selected);QCOMPARE(store.nodes()[1].id,selected);QCOMPARE(store.nodes()[1].name,QString("Renamed"));
+        raw[1]=vlessRecord("Renamed",8443,"33333333-3333-4333-8333-333333333333");
+        parsed=parseOutbounds(raw);QVERIFY(parsed);QVERIFY(store.importNodes(parsed.nodes,source));
+        QCOMPARE(store.selectedId(),selected);QCOMPARE(store.nodes()[1].id,selected);QCOMPARE(store.nodes()[1].port,quint16(8443));
+        QCOMPARE(store.nodes()[1].parameters.value("authentication").toObject().value("id").toString(),QString("33333333-3333-4333-8333-333333333333"));
+        raw=QJsonArray{raw[0]};parsed=parseOutbounds(raw);QVERIFY(parsed);QVERIFY(store.importNodes(parsed.nodes,source));
+        QCOMPARE(store.nodes().size(),1);QCOMPARE(store.nodes().first().id,other);QVERIFY(store.selectedId().isEmpty());
+        // The running engine owns a value snapshot, not an address into the
+        // mutable catalog. NodeStore never mutates that old account in place.
+        QCOMPARE(activeSnapshot.port,quint16(443));QCOMPARE(activeSnapshot.parameters.value("authentication").toObject().value("id").toString(),firstId);
+        NodeStore restored(path);QVERIFY(restored.selectedId().isEmpty());QCOMPARE(restored.nodes().first().id,other);
+    }
+
+    void reorderedAccountsKeepSelectedIdentity() {
+        QTemporaryDir temp;NodeStore store(temp.filePath("reordered-accounts.dpapi"));
+        QVERIFY(store.saveSubscription({},"synthetic",QUrl("https://example.invalid/config"),360,false,"xray-v2ray-json"));
+        const auto source=store.subscriptions().first().id;
+        auto first=vlessRecord("shared",443,"11111111-1111-4111-8111-111111111111");
+        auto settings=first.value("settings").toObject();auto server=settings.value("vnext").toArray().first().toObject();
+        auto users=server.value("users").toArray();users.append(QJsonObject{{"id","22222222-2222-4222-8222-222222222222"},{"encryption","none"}});
+        server.insert("users",users);settings.insert("vnext",QJsonArray{server});first.insert("settings",settings);
+        auto parsed=parseOutbounds({first});QVERIFY(parsed);QVERIFY(store.importNodes(parsed.nodes,source));
+        const auto a=store.nodes().first().id,b=store.nodes().last().id;QVERIFY(store.select(a));
+        server.insert("users",QJsonArray{users[1],users[0]});settings.insert("vnext",QJsonArray{server});first.insert("settings",settings);
+        parsed=parseOutbounds({first});QVERIFY(parsed);QVERIFY(store.importNodes(parsed.nodes,source));
+        QCOMPARE(store.nodes()[0].id,b);QCOMPARE(store.nodes()[1].id,a);QCOMPARE(store.selectedId(),a);
+    }
+
+    void incomingExactMatchWinsOverSourceAlias() {
+        QTemporaryDir temp;NodeStore store(temp.filePath("exact-before-alias.dpapi"));
+        QVERIFY(store.saveSubscription({},"synthetic",QUrl("https://example.invalid/config"),360,false,"xray-v2ray-json"));
+        const auto source=store.subscriptions().first().id;
+        const auto a=vlessRecord("provider-name",443,"11111111-1111-4111-8111-111111111111");
+        auto parsed=parseOutbounds({a});QVERIFY(parsed);QVERIFY(store.importNodes(parsed.nodes,source));
+        const auto selected=store.nodes().first().id;QVERIFY(store.select(selected));
+        auto renamed=a;renamed.insert("tag","new-provider-name");
+        parsed=parseOutbounds({vlessRecord("provider-name",8443,"22222222-2222-4222-8222-222222222222"),renamed});
+        QVERIFY(parsed);QVERIFY(store.importNodes(parsed.nodes,source));QCOMPARE(store.nodes().size(),2);
+        QVERIFY(store.nodes()[0].id!=selected);QCOMPARE(store.nodes()[1].id,selected);QCOMPARE(store.selectedId(),selected);
+    }
+
+    void ambiguousSourceAliasesDoNotOverwrite() {
+        QTemporaryDir temp;NodeStore store(temp.filePath("ambiguous.dpapi"));
+        QVERIFY(store.saveSubscription({},"synthetic source",QUrl("https://example.invalid/config"),360,false,"xray-v2ray-json"));
+        const auto source=store.subscriptions().first().id;
+        auto parsed=parseOutbounds({vlessRecord("same",443,"11111111-1111-4111-8111-111111111111"),
+            vlessRecord("same",444,"22222222-2222-4222-8222-222222222222")});QVERIFY(parsed);
+        QVERIFY(store.importNodes(parsed.nodes,source));const auto old=store.nodes().first().id;QVERIFY(store.select(old));
+        parsed=parseOutbounds({vlessRecord("same",8443,"33333333-3333-4333-8333-333333333333"),
+            vlessRecord("same",8444,"44444444-4444-4444-8444-444444444444")});QVERIFY(parsed);
+        QVERIFY(store.importNodes(parsed.nodes,source));QCOMPARE(store.nodes().size(),2);QVERIFY(store.selectedId().isEmpty());
+        for(const auto &n:store.nodes())QVERIFY(n.id!=old);
+    }
+
+    void selectionSidecarSnapshotBinding() {
+        QTemporaryDir temp;const auto path=temp.filePath("selection.dpapi");NodeStore store(path);
+        const auto a=node("A"),b=node("B",8444);QVERIFY(store.importNodes({a,b}));QVERIFY(store.select(a.id));
+        const auto stale=read(path+".selected");QVERIFY(store.select(b.id));
+        auto edit=b.publicInfo();edit.insert("name","updated B");QVERIFY(store.saveNode(edit));
+        QVERIFY(write(path+".selected",stale));NodeStore loaded(path);QCOMPARE(loaded.selectedId(),b.id);
+        QVERIFY(loaded.select(a.id));NodeStore selected(path);QCOMPARE(selected.selectedId(),a.id);
     }
 
     void atomicFailureKeepsOldStore() {

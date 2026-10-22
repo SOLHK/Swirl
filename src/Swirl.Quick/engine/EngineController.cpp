@@ -212,6 +212,7 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
     connect(m_engine.get(), &ProxyEngine::statusChanged, this, &EngineController::statusChanged);
     connect(&m_store,&NodeStore::changed,this,&EngineController::nodesChanged);
     connect(&m_store,&NodeStore::changed,this,&EngineController::nodeCatalogChanged);
+    connect(&m_store,&NodeStore::changed,this,[this]{m_tests.invalidateResults();});
     connect(&m_store,&NodeStore::selectionChanged,this,&EngineController::selectionChanged);
     connect(this,&EngineController::nodesChanged,this,&EngineController::selectionChanged);
     connect(&m_imports,&NodeImportService::changed,this,&EngineController::statusChanged);
@@ -220,7 +221,10 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
         // A background subscription refresh must not interrupt live Codex/WS
         // streams. The current immutable engine snapshot lives until reconnect.
         if(m_connectionRequested && (processAlive() || busy())) {
-            m_nodeError=QStringLiteral("节点库已更新；当前连接继续使用启动时配置。新增节点与凭据更新在手动断开重连后生效。");
+            const auto active=m_engine->status().selectedNodeId;bool retained=false;
+            for(const auto &node:m_store.nodes())if(node.id==active){retained=true;break;}
+            m_nodeError=retained?QStringLiteral("节点库已更新；当前连接继续使用启动时配置。新增节点与凭据更新在手动断开重连后生效。"):
+                QStringLiteral("运行中的节点已从节点库移除；当前连接保留启动时配置直到断开，未自动切换其他节点。请重新选择节点后再连接。");
             emit diagnostic("EngineController","SubscriptionUpdateDeferred",m_nodeError);
         }
         emit nodesChanged();
@@ -641,6 +645,9 @@ bool EngineController::importNodesAndConfiguration(const QList<ProxyNode> &incom
             previousChoices.insert(group.value("name").toString(),group.value("default-selected",members.first()).toString());
     }
     QVariantList groups;const auto names=plan.nameToId();
+    for(auto it=names.cbegin();it!=names.cend();++it)if(it.value().isEmpty()) {
+        m_networkError=QStringLiteral("完整配置按名称引用了歧义节点；请为不同节点设置不同名称。旧节点与网络配置保持不变。");return false;
+    }
     QSet<QString> groupNames;for(const auto &entry:input.value("groups").toList())groupNames.insert(entry.toMap().value("name").toString());
     for(const auto &reserved:QStringList{"DIRECT","REJECT","SWIRL","GLOBAL"})if(names.contains(reserved)) {
         m_networkError=QStringLiteral("节点名称与保留策略名称冲突；未应用配置。");return false;

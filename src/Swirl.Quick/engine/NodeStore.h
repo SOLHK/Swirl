@@ -71,7 +71,7 @@ signals:
 private:
     bool write(const QList<ProxyNode> &nodes, const QString &selected, const QList<NodeSubscription> &subscriptions, const QJsonObject &networkConfiguration);
     bool allowMutation();
-    void adoptSnapshot(const QList<ProxyNode> &nodes, const QString &selected, const QList<NodeSubscription> &subscriptions, const QJsonObject &networkConfiguration);
+    void adoptSnapshot(const QList<ProxyNode> &nodes, const QString &selected, const QList<NodeSubscription> &subscriptions, const QJsonObject &networkConfiguration,const QByteArray &snapshotDigest);
     void load();
     QString m_path, m_selected, m_error;
     QList<ProxyNode> m_nodes;
@@ -79,6 +79,8 @@ private:
     QList<NodeSubscription> m_subscriptions;
     QJsonObject m_networkConfiguration;
     bool m_healthy = true;
+    QByteArray m_snapshotDigest;
+    bool m_legacySelection = true;
     bool m_saving = false;
     std::shared_ptr<std::atomic_bool> m_saveCancelled;
     quint64 m_revision=0;

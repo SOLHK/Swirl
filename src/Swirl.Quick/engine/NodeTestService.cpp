@@ -109,3 +109,10 @@ void NodeTestService::cancel(){
  if(!runners.isEmpty())m_message=QString("已取消 · 正在释放测试内核 · 完成 %1/%2").arg(m_completed).arg(m_total);
  emit changed();
 }
+void NodeTestService::invalidateResults(){
+ const bool hadWork=busy()||!m_results.isEmpty();
+ if(!hadWork)return;
+ cancel();m_results.clear();m_completed=0;m_total=0;m_succeeded=0;m_failed=0;
+ m_message=QStringLiteral("节点库已更新，旧测试结果已清除；请对当前参数重新发起请求。");
+ emit changed();
+}

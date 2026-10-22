@@ -164,6 +164,47 @@ and locked-file atomic rollback. Those platform results are reported from CI,
 not inferred from Linux. macOS/Linux have no credential-storage backend in
 the existing Windows product and deliberately refuse persistence.
 
+## D6: identities, refresh and selection ownership
+
+Deduplication compares connection semantics within the existing source scope,
+not the display name. A rename retains the stored ID; different endpoints or
+credentials with the same name remain distinct. A subscription can retain an
+ID across credential/address updates only through its unique original source
+alias and account position. Exact semantic matches take priority, including
+when accounts are reordered. Manual endpoint/credential changes do not gain
+permission to replace another node merely by reusing its name. Ambiguous names
+are rejected before a full configuration can bind policy references to them.
+
+The non-secret selection sidecar is now bound to the exact encrypted snapshot
+digest, so an older sidecar cannot restore a stale choice after refresh. A
+removed selected node clears selection; no replacement is silently selected.
+The running Rust engine owns its start snapshot. A refresh may update or remove
+its catalog row while established sessions continue with that snapshot until
+the user disconnects; the UI explicitly explains this state. Manual deletion
+during a running session remains guarded. Catalog mutation cancels independent
+node probes and clears their old parameter-dependent results, including queued
+callbacks. Failed writes leave those results and all prior state intact.
+
+Unavailable nodes can now be inspected in the existing details panel without
+changing the runtime selection. Connect/test still requires the current Rust
+capability, and inspection is never represented as successful connectivity.
+
+D6 is verified against an isolated source copy using the committed D5
+RustCoreEngine, excluding uncommitted D7 runtime changes. The Linux suite runs
+20 importer, 15 HTTPS download, 11 store and 6 catalog methods. The catalog
+tests use the real in-process Rust engine and real loopback HTTP CONNECT
+endpoints to check cancellation and immutable state; their deliberate rejected
+requests do not count as useful HTTP/HTTPS business traffic. Windows-only
+catalog cases additionally exercise actual DPAPI confirmation, live refresh,
+credential/address changes, running-row removal, manual reconnect and reload.
+Those Windows cases require CI execution; Linux syntax checks are not a
+substitute for them.
+
+The earlier D1 commit passed all three platform jobs, including the complete
+Windows application build. D5's Windows DPAPI tests passed, while its macOS
+HTTPS fixture exposed a SecureTransport compatibility issue; D8 tracks and
+retests that issue rather than treating the failed run as a pass.
+
 ## Applied engineering guidance
 
 Read repository `AGENTS.md`, `CONTINUE_DEVELOPMENT.md` and

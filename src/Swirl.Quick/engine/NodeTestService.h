@@ -21,6 +21,8 @@ public:
  static EngineStartOptions isolatedOptions(const EngineStartOptions &);
  void start(const EngineStartOptions &,const QStringList &ids,const QUrl &url);
  Q_INVOKABLE void cancel();
+ // A catalog change invalidates results for the old connection parameters.
+ void invalidateResults();
  bool busy() const { return !m_queue.isEmpty()||!m_running.isEmpty()||!m_retiring.isEmpty(); }
  int completed() const { return m_completed; }
  int total() const { return m_total; }

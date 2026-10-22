@@ -9,8 +9,10 @@ Item {
     id:page
     readonly property Item motionTitle:routeTitle
 
-    readonly property string selectedId:engineController.selectedNodeId
+    property string inspectedId:""
+    readonly property string selectedId:inspectedId||engineController.selectedNodeId
     readonly property var allNodes:engineController.nodes
+    onAllNodesChanged:if(inspectedId&&!allNodes.some(n=>n.id===inspectedId))inspectedId=""
     readonly property var selected:allNodes.find(n=>n.id===page.selectedId)||null
     readonly property bool selectedActive:selected!==null&&engineController.processAlive&&engineController.activeNodeId===selectedId
     property string sourceId:""
@@ -34,7 +36,8 @@ Item {
     readonly property var protocols:engineController.supportedProtocols
     function selectRow(row) {
         // One mounted surface follows the selected row; interrupted motion starts here.
-        if(engineController.chooseNode(row.id))nodeHero.start(nodeTable.selectedItem)
+        if(!row.capability.native&&!row.capability.compatible){inspectedId=row.id;nodeHero.start(nodeTable.selectedItem);return}
+        if(engineController.chooseNode(row.id)){inspectedId="";nodeHero.start(nodeTable.selectedItem)}
         else AppState.notice(engineController.nodeError)
     }
     property string editingId:""
@@ -164,6 +167,7 @@ Item {
                 SwirlText {objectName:"jsonNodeTransport";visible:page.selected!==null&&page.selected.jsonParsed;renderType:Text.NativeRendering;text:page.selected?page.selected.transportLabel+" · "+page.selected.securityLabel+(page.selected.visionEnabled?" · Vision":""):"";textFormat:Text.PlainText;color:Theme.text;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.WrapAnywhere}
                 SwirlText {objectName:"jsonNodeValidation";visible:page.selected!==null&&page.selected.jsonParsed;renderType:Text.NativeRendering;text:page.selected?page.selected.configurationState:"";textFormat:Text.PlainText;color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.WrapAnywhere}
                 SwirlText {objectName:"nodeUnsupportedReason";renderType:Text.NativeRendering;text:page.selected?page.selected.unsupportedReason||"":"";visible:text.length>0;textFormat:Text.PlainText;color:Theme.orange;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.WrapAnywhere}
+                SwirlText {visible:page.inspectedId.length>0;text:"正在查看不可执行节点；运行选择保持不变。";textFormat:Text.PlainText;color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.WrapAnywhere}
                 SwirlText {renderType:Text.NativeRendering;text:page.selected?page.selected.normalizationNotes||"":"";visible:text.length>0;color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
                 SwirlText {renderType:Text.NativeRendering;text:page.selected?((page.selected.conversionIssues||[]).join("\n")):"";visible:text.length>0;color:Theme.orange;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
                 SwirlText {renderType:Text.NativeRendering;text:page.selectedActive&&engineController.activeProxyPort>0?"本机入口  127.0.0.1:"+engineController.activeProxyPort:"";visible:text.length>0;color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true}
