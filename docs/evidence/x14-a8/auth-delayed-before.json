@@ -1,0 +1,140 @@
+{
+  "client_sha256": "c5de2b99e7c75b71b05d50da037f914292821a0d235347b5b43ee2dc915e4125",
+  "official_server_sha256": "907ba8c9693edb104b20582681fb7dc15639d5b64a9cbb616a7b539190a86691",
+  "count": 12,
+  "passed": 0,
+  "records": [
+    {
+      "iteration": 0,
+      "expected_success": true,
+      "passed": false,
+      "exit_code": 1,
+      "result": {
+        "code": "Hysteria2AuthenticationWrite",
+        "ok": false
+      },
+      "stderr": "HY2_AUTH_FINISH_DIAGNOSTIC RemoteTerminate { code: H3_NO_ERROR }\n"
+    },
+    {
+      "iteration": 1,
+      "expected_success": false,
+      "passed": false,
+      "exit_code": 1,
+      "result": {
+        "code": "Hysteria2AuthenticationWrite",
+        "ok": false
+      },
+      "stderr": "HY2_AUTH_FINISH_DIAGNOSTIC RemoteTerminate { code: H3_NO_ERROR }\n"
+    },
+    {
+      "iteration": 2,
+      "expected_success": true,
+      "passed": false,
+      "exit_code": 1,
+      "result": {
+        "code": "Hysteria2AuthenticationWrite",
+        "ok": false
+      },
+      "stderr": "HY2_AUTH_FINISH_DIAGNOSTIC RemoteTerminate { code: H3_NO_ERROR }\n"
+    },
+    {
+      "iteration": 3,
+      "expected_success": false,
+      "passed": false,
+      "exit_code": 1,
+      "result": {
+        "code": "Hysteria2AuthenticationWrite",
+        "ok": false
+      },
+      "stderr": "HY2_AUTH_FINISH_DIAGNOSTIC RemoteTerminate { code: H3_NO_ERROR }\n"
+    },
+    {
+      "iteration": 4,
+      "expected_success": true,
+      "passed": false,
+      "exit_code": 1,
+      "result": {
+        "code": "Hysteria2AuthenticationWrite",
+        "ok": false
+      },
+      "stderr": "HY2_AUTH_FINISH_DIAGNOSTIC RemoteTerminate { code: H3_NO_ERROR }\n"
+    },
+    {
+      "iteration": 5,
+      "expected_success": false,
+      "passed": false,
+      "exit_code": 1,
+      "result": {
+        "code": "Hysteria2AuthenticationWrite",
+        "ok": false
+      },
+      "stderr": "HY2_AUTH_FINISH_DIAGNOSTIC RemoteTerminate { code: H3_NO_ERROR }\n"
+    },
+    {
+      "iteration": 6,
+      "expected_success": true,
+      "passed": false,
+      "exit_code": 1,
+      "result": {
+        "code": "Hysteria2AuthenticationWrite",
+        "ok": false
+      },
+      "stderr": "HY2_AUTH_FINISH_DIAGNOSTIC RemoteTerminate { code: H3_NO_ERROR }\n"
+    },
+    {
+      "iteration": 7,
+      "expected_success": false,
+      "passed": false,
+      "exit_code": 1,
+      "result": {
+        "code": "Hysteria2AuthenticationWrite",
+        "ok": false
+      },
+      "stderr": "HY2_AUTH_FINISH_DIAGNOSTIC RemoteTerminate { code: H3_NO_ERROR }\n"
+    },
+    {
+      "iteration": 8,
+      "expected_success": true,
+      "passed": false,
+      "exit_code": 1,
+      "result": {
+        "code": "Hysteria2AuthenticationWrite",
+        "ok": false
+      },
+      "stderr": "HY2_AUTH_FINISH_DIAGNOSTIC RemoteTerminate { code: H3_NO_ERROR }\n"
+    },
+    {
+      "iteration": 9,
+      "expected_success": false,
+      "passed": false,
+      "exit_code": 1,
+      "result": {
+        "code": "Hysteria2AuthenticationWrite",
+        "ok": false
+      },
+      "stderr": "HY2_AUTH_FINISH_DIAGNOSTIC RemoteTerminate { code: H3_NO_ERROR }\n"
+    },
+    {
+      "iteration": 10,
+      "expected_success": true,
+      "passed": false,
+      "exit_code": 1,
+      "result": {
+        "code": "Hysteria2AuthenticationWrite",
+        "ok": false
+      },
+      "stderr": "HY2_AUTH_FINISH_DIAGNOSTIC RemoteTerminate { code: H3_NO_ERROR }\n"
+    },
+    {
+      "iteration": 11,
+      "expected_success": false,
+      "passed": false,
+      "exit_code": 1,
+      "result": {
+        "code": "Hysteria2AuthenticationWrite",
+        "ok": false
+      },
+      "stderr": "HY2_AUTH_FINISH_DIAGNOSTIC RemoteTerminate { code: H3_NO_ERROR }\n"
+    }
+  ]
+}

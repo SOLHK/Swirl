@@ -1,6 +1,8 @@
 //! Swirl's Hysteria 2 client: HTTP/3 authentication, native QUIC TCP streams,
 //! and bounded fragmented UDP datagrams. No external proxy process is used.
 //! The independent reference server is HyNetworks/hysteria, protocol v2.
+#[cfg(test)]
+mod authentication_tests;
 mod rate;
 mod salamander;
 use crate::timing::{self, Phase};
@@ -75,6 +77,21 @@ fn random<const N: usize>() -> Result<[u8; N]> {
 fn padding() -> Result<String> {
     use base64::Engine;
     Ok(base64::engine::general_purpose::STANDARD.encode(random::<24>()?))
+}
+
+fn authentication_finish(result: std::result::Result<(), h3::error::StreamError>) -> Result<()> {
+    match result {
+        Ok(()) => Ok(()),
+        // The header-only auth request can receive an early response. RFC 9114
+        // section 4.1 permits the peer to stop the request direction with
+        // H3_NO_ERROR; h3 can observe that while writing its final GREASE frame.
+        // This only permits reading the response, never authenticates it.
+        Err(h3::error::StreamError::RemoteTerminate {
+            code: h3::error::Code::H3_NO_ERROR,
+            ..
+        }) => Ok(()),
+        Err(_) => Err("Hysteria2AuthenticationWrite"),
+    }
 }
 
 /// Validate credentials and certificate material before resolving the proxy.
@@ -170,10 +187,7 @@ impl Session {
                     .send_request(request)
                     .await
                     .map_err(|_| "Hysteria2AuthenticationWrite")?;
-                stream
-                    .finish()
-                    .await
-                    .map_err(|_| "Hysteria2AuthenticationWrite")?;
+                authentication_finish(stream.finish().await)?;
                 let response = stream
                     .recv_response()
                     .await

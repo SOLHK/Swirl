@@ -1,0 +1,393 @@
+{
+  "source_base_commit": "5d6b9e370ae29add8ed11d8c8ebf9e54c2ea2611",
+  "production_and_regression_source_sha256": {
+    "core/crates/swirl-protocol/src/hysteria2.rs": "397c389cb397f2f419ef4e55c5d92af946e80947638f478990c995ba498c1fc3",
+    "core/crates/swirl-protocol/src/hysteria2/authentication_tests.rs": "c2a74c9bdeef018d28ecef243b1aae71b991b3dea6abd7cb6d0c86ef6d9dfd62"
+  },
+  "unmodified_original_suite_race_failures": [
+    {
+      "client_sha256": "89f7e48e64e31de91db7bb5bd6e0132eecf6a49a3aa801aaf34dc611e7152a71",
+      "official_server_sha256": "907ba8c9693edb104b20582681fb7dc15639d5b64a9cbb616a7b539190a86691",
+      "suite": {
+        "expected_methods": 17,
+        "executed_methods": 17,
+        "failures": [
+          "test_hysteria2_official.Hysteria2Official.test_05_wrong_password"
+        ],
+        "errors": [],
+        "skips": [],
+        "all_original_methods_passed": false,
+        "constrained_stack": false
+      },
+      "unexpected_write_failures": [
+        {
+          "case": "wrong-password",
+          "expected_success": false,
+          "upstream_limitation_probe": false,
+          "client_exit": 1,
+          "elapsed_ms": 12.259,
+          "main_stack_limit": null,
+          "result": {
+            "code": "Hysteria2AuthenticationWrite",
+            "ok": false
+          }
+        }
+      ]
+    },
+    {
+      "client_sha256": "89f7e48e64e31de91db7bb5bd6e0132eecf6a49a3aa801aaf34dc611e7152a71",
+      "official_server_sha256": "907ba8c9693edb104b20582681fb7dc15639d5b64a9cbb616a7b539190a86691",
+      "suite": {
+        "expected_methods": 17,
+        "executed_methods": 17,
+        "failures": [
+          "test_hysteria2_official.Hysteria2Official.test_08_imported_clash_and_uri"
+        ],
+        "errors": [],
+        "skips": [],
+        "all_original_methods_passed": false,
+        "constrained_stack": true
+      },
+      "unexpected_write_failures": [
+        {
+          "case": "hysteria2-uri-to-native",
+          "expected_success": true,
+          "upstream_limitation_probe": false,
+          "client_exit": 1,
+          "elapsed_ms": 31.34,
+          "main_stack_limit": {
+            "soft_bytes": 1048576,
+            "hard_bytes": 1048576
+          },
+          "result": {
+            "code": "Hysteria2AuthenticationWrite",
+            "ok": false
+          }
+        }
+      ]
+    }
+  ],
+  "diagnostic_scheduling_comparison": {
+    "delay_ms": 20,
+    "delay_committed_to_production": false,
+    "before": "auth-delayed-before.json",
+    "after": "auth-delayed-after.json"
+  },
+  "final_no_delay_repeated_auth": {
+    "client_sha256": "f28a1cafceb00d8c4d8980cd65015c418ff144112efe82b1e1cccfc357aa1c19",
+    "official_server_sha256": "907ba8c9693edb104b20582681fb7dc15639d5b64a9cbb616a7b539190a86691",
+    "count": 120,
+    "passed": 120
+  },
+  "final_no_delay_classes": {
+    "valid_password_echo_passed": 60,
+    "incorrect_password_rejected": 60,
+    "failures": []
+  },
+  "rust_gates": [
+    {
+      "gate": "fmt",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "duration_s": 0.603
+    },
+    {
+      "gate": "check",
+      "command": [
+        "cargo",
+        "check",
+        "--workspace",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "duration_s": 0.933
+    },
+    {
+      "gate": "clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--locked",
+        "--offline",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "duration_s": 1.587
+    },
+    {
+      "gate": "test",
+      "command": [
+        "cargo",
+        "test",
+        "--workspace",
+        "--locked",
+        "--offline"
+      ],
+      "exit_code": 0,
+      "duration_s": 18.256,
+      "test_counts": {
+        "passed": 644,
+        "failed": 0,
+        "ignored": 0
+      }
+    }
+  ],
+  "initial_local_gate_build_cache_failure": {
+    "test_exit_code": 101,
+    "before_tests_executed": true,
+    "error": "crate swirl_core required to be available in rlib format, but was not found in this form",
+    "recovery": "cargo clean -p swirl-core -p swirl-api in the isolated task target directory; all four gates rerun with no source or assertion change"
+  },
+  "actual_network_regression_tests": {
+    "command": "cargo test -p swirl-protocol --lib hysteria2::authentication_tests --locked --offline -- --nocapture",
+    "passed": 4,
+    "failed": 0,
+    "ignored": 0
+  },
+  "official_quic_suites": [
+    {
+      "suite": "hy2",
+      "command": [
+        "python",
+        "tools/tests/run_hysteria2_official.py"
+      ],
+      "returncode": 0,
+      "duration_s": 18.732,
+      "summary": [
+        "Ran 17 tests in 18.601s",
+        "OK"
+      ]
+    },
+    {
+      "suite": "hy2-small",
+      "command": [
+        "python",
+        "tools/tests/run_hysteria2_official.py"
+      ],
+      "returncode": 0,
+      "duration_s": 20.453,
+      "summary": [
+        "Ran 17 tests in 20.291s",
+        "OK"
+      ]
+    },
+    {
+      "suite": "lifecycle",
+      "command": [
+        "python",
+        "-m",
+        "unittest",
+        "-v",
+        "test_hysteria2_lifecycle"
+      ],
+      "returncode": 0,
+      "duration_s": 4.28,
+      "summary": [
+        "Ran 1 test in 4.103s",
+        "OK"
+      ]
+    },
+    {
+      "suite": "lifecycle-small",
+      "command": [
+        "python",
+        "-m",
+        "unittest",
+        "-v",
+        "test_hysteria2_lifecycle"
+      ],
+      "returncode": 0,
+      "duration_s": 4.279,
+      "summary": [
+        "Ran 1 test in 4.119s",
+        "OK"
+      ]
+    },
+    {
+      "suite": "tuic",
+      "command": [
+        "python",
+        "-m",
+        "unittest",
+        "-v",
+        "test_tuic_reference"
+      ],
+      "returncode": 0,
+      "duration_s": 12.753,
+      "summary": [
+        "Ran 9 tests in 12.646s",
+        "OK"
+      ]
+    },
+    {
+      "suite": "quic-core",
+      "command": [
+        "python",
+        "-m",
+        "unittest",
+        "-v",
+        "test_quic_core"
+      ],
+      "returncode": 0,
+      "duration_s": 23.038,
+      "summary": [
+        "Ran 6 tests in 22.888s",
+        "OK"
+      ]
+    },
+    {
+      "suite": "quic-ffi",
+      "command": [
+        "python",
+        "tools/tests/test_quic_ffi.py"
+      ],
+      "returncode": 0,
+      "duration_s": 22.685,
+      "summary": [
+        "Ran 6 tests in 22.528s",
+        "OK"
+      ]
+    },
+    {
+      "suite": "timing",
+      "command": [
+        "python",
+        "-m",
+        "unittest",
+        "-v",
+        "test_native_timing"
+      ],
+      "returncode": 0,
+      "duration_s": 1.97,
+      "summary": [
+        "Ran 3 tests in 1.822s",
+        "OK"
+      ]
+    }
+  ],
+  "final_official_hysteria2_suites": {
+    "hysteria2.json": {
+      "expected_methods": 17,
+      "executed_methods": 17,
+      "failures": [],
+      "errors": [],
+      "skips": [],
+      "all_original_methods_passed": true,
+      "constrained_stack": false
+    },
+    "hysteria2-small.json": {
+      "expected_methods": 17,
+      "executed_methods": 17,
+      "failures": [],
+      "errors": [],
+      "skips": [],
+      "all_original_methods_passed": true,
+      "constrained_stack": true
+    }
+  },
+  "lifecycle_reports": {
+    "lifecycle.json": {
+      "official_version": "v2.13.0",
+      "official_commit": "ca8fbd874fd6ca82413948de6dc5924405e103e1",
+      "official_server_sha256": "907ba8c9693edb104b20582681fb7dc15639d5b64a9cbb616a7b539190a86691",
+      "client_sha256": "769576a1a46d0c5d51c5b55fb67f464b5cf4084397275d5f423dd6dc71232a53",
+      "client_role": "Swirl native Rust",
+      "server_role": "official Hysteria2 only",
+      "qt_product_acceptance": false,
+      "client_exit": 0,
+      "elapsed_ms": 3317.633,
+      "main_stack_limit": null,
+      "result": {
+        "authenticated_read_cancel": {
+          "alive_tasks_after_drop": 0,
+          "alive_tasks_before_cancel": 3,
+          "downloaded": 4096,
+          "future_owned_stream": true,
+          "sha256": "b7334dd1ec16d37dea26d574d23f09da6a898c9786b79d13fcf67a8133f76d2a",
+          "uploaded": 4096
+        },
+        "baseline_alive_tasks": 0,
+        "cleanup_asserted_before_process_exit": true,
+        "connect_future_cancel": {
+          "alive_tasks_after_drop": 0,
+          "alive_tasks_before_cancel": 2,
+          "stage": "pending connector with QUIC tasks; TLS and authentication not asserted"
+        },
+        "ok": true,
+        "runtime": "current_thread",
+        "same_runtime_reconnect": {
+          "alive_tasks_after_close": 0,
+          "close": "clean",
+          "downloaded": 65536,
+          "sha256": "b03a3e1e12b699bd2c526e13a0d73f39b761de545f248b3d5faac391ad3b8d97",
+          "uploaded": 65536
+        }
+      },
+      "independent_target": {
+        "accepted_connections": 2,
+        "closed_connections": 2,
+        "active_connections": 0,
+        "received_bytes": 69632
+      }
+    },
+    "lifecycle-small.json": {
+      "official_version": "v2.13.0",
+      "official_commit": "ca8fbd874fd6ca82413948de6dc5924405e103e1",
+      "official_server_sha256": "907ba8c9693edb104b20582681fb7dc15639d5b64a9cbb616a7b539190a86691",
+      "client_sha256": "769576a1a46d0c5d51c5b55fb67f464b5cf4084397275d5f423dd6dc71232a53",
+      "client_role": "Swirl native Rust",
+      "server_role": "official Hysteria2 only",
+      "qt_product_acceptance": false,
+      "client_exit": 0,
+      "elapsed_ms": 3339.587,
+      "main_stack_limit": {
+        "soft_bytes": 1048576,
+        "hard_bytes": 1048576
+      },
+      "result": {
+        "authenticated_read_cancel": {
+          "alive_tasks_after_drop": 0,
+          "alive_tasks_before_cancel": 3,
+          "downloaded": 4096,
+          "future_owned_stream": true,
+          "sha256": "b7334dd1ec16d37dea26d574d23f09da6a898c9786b79d13fcf67a8133f76d2a",
+          "uploaded": 4096
+        },
+        "baseline_alive_tasks": 0,
+        "cleanup_asserted_before_process_exit": true,
+        "connect_future_cancel": {
+          "alive_tasks_after_drop": 0,
+          "alive_tasks_before_cancel": 2,
+          "stage": "pending connector with QUIC tasks; TLS and authentication not asserted"
+        },
+        "ok": true,
+        "runtime": "current_thread",
+        "same_runtime_reconnect": {
+          "alive_tasks_after_close": 0,
+          "close": "clean",
+          "downloaded": 65536,
+          "sha256": "b03a3e1e12b699bd2c526e13a0d73f39b761de545f248b3d5faac391ad3b8d97",
+          "uploaded": 65536
+        }
+      },
+      "independent_target": {
+        "accepted_connections": 2,
+        "closed_connections": 2,
+        "active_connections": 0,
+        "received_bytes": 69632
+      }
+    }
+  },
+  "qt_product_acceptance": false
+}
