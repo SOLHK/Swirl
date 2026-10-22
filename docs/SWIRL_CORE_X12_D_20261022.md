@@ -315,7 +315,28 @@ Previously obtained immutable evidence:
 | --- | --- |
 | D1 `38131212`, run [39720162765](https://github.com/SOLHK/Swirl/actions/runs/39720162765) | All three platform jobs passed, including the full Windows application. |
 | D5 `32354980`, run [39721951577](https://github.com/SOLHK/Swirl/actions/runs/39721951577) | Linux and Windows passed; Windows import 20, download 15 and store 13 methods, zero skips; old macOS HTTPS fixture failed. |
-| D6 `6ddf5312`, run [39723494413](https://github.com/SOLHK/Swirl/actions/runs/39723494413) | Windows XML proves import 20, download 15, store 23 and catalog 7 methods, zero failures/skips. Linux passed. Old macOS fixture failed. Windows full-build status must be read separately. |
+| D6 `6ddf5312`, run [39723494413](https://github.com/SOLHK/Swirl/actions/runs/39723494413) | Linux and Windows passed, including the complete Windows application build. Windows XML proves import 20, download 15, store 23 and catalog 7 methods, zero failures/skips. Old macOS fixture failed. |
+| D8 `b60b9fb6` | Clean published source was used to repeat-verify the official peer and rerun the real Qt/Rust HTTP/HTTPS chain on Linux: passed. This local result is not a three-platform CI result. |
+
+The official actionlint v1.7.7 validator also accepts the D8 workflow. GitHub
+reported the workflow active but created no run/check suite for its initial
+D8 push after more than five minutes. A normal follow-up documentation commit
+records the newly completed D6 evidence and supplies a new push event; no
+source rollback, force push, or change to main is used. Final CI must be
+associated with the resulting exact branch head.
+
+### Published stage ledger
+
+| Stage | Immutable commit |
+| --- | --- |
+| D1 file preview and strict ABI | [38131212c56f72b3108fa5324ce9f8b106f5eb58](https://github.com/SOLHK/Swirl/commit/38131212c56f72b3108fa5324ce9f8b106f5eb58) |
+| D2 text and clipboard | [e3ed5d82ada558f1960b838516d3a9d8a97892c1](https://github.com/SOLHK/Swirl/commit/e3ed5d82ada558f1960b838516d3a9d8a97892c1) |
+| D3 HTTPS configuration URL | [e048dd6c17968865465ad726aa46303344327e0e](https://github.com/SOLHK/Swirl/commit/e048dd6c17968865465ad726aa46303344327e0e) |
+| D4 truthful node model | [e6e3174a13dae6e115cfaec9555e66249d355d8e](https://github.com/SOLHK/Swirl/commit/e6e3174a13dae6e115cfaec9555e66249d355d8e) |
+| D5 encrypted atomic snapshots | [323549800227460c7dd1035a5ccab37a55d91260](https://github.com/SOLHK/Swirl/commit/323549800227460c7dd1035a5ccab37a55d91260) |
+| D6 identity and running refresh | [6ddf53128a6ebceaf62a45a1bc5842659ff538aa](https://github.com/SOLHK/Swirl/commit/6ddf53128a6ebceaf62a45a1bc5842659ff538aa) |
+| D7 Rust execution and business traffic | [148757627e8ac8d310e75e1af850b9598a18e072](https://github.com/SOLHK/Swirl/commit/148757627e8ac8d310e75e1af850b9598a18e072) |
+| D8 platform and mounted-QML gates | [b60b9fb6a551bbaf7b687a43987788dd10b1f059](https://github.com/SOLHK/Swirl/commit/b60b9fb6a551bbaf7b687a43987788dd10b1f059) |
 
 Remaining boundaries are explicit: there is no Linux/macOS secure storage
 backend or full native application package in this Windows-focused product;
