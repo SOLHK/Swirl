@@ -207,6 +207,53 @@ fn six_protocol_names_and_local_actions_are_not_renamed() {
 }
 
 #[test]
+fn password_getters_preserve_unicode_nul_and_exact_cipher_without_claiming_native_support() {
+    let password = "  SYNTHETIC_密碼\u{0000} 🌪  ";
+    let cases = [
+        ("trojan", None),
+        ("shadowsocks", Some("aes-128-gcm")),
+        ("shadowsocks", Some("aes-256-gcm")),
+        ("shadowsocks", Some("chacha20-ietf-poly1305")),
+    ];
+    let outbounds: Vec<Value> = cases
+        .iter()
+        .map(|(protocol, method)| {
+            let mut server = json!({"address":"proxy.invalid","port":443,
+                "password":password,"level":0,"email":"SYNTHETIC_EMAIL@example.invalid"});
+            if let Some(method) = method {
+                server["method"] = json!(method);
+            }
+            json!({"protocol":protocol,"tag":"密码节点 🌪","settings":{"servers":[server]}})
+        })
+        .collect();
+    let original = json!({"outbounds":outbounds});
+    let response = call_value(&original);
+    assert_eq!(response["schema"], 1);
+    assert_eq!(response["ok"], true);
+    // Keep credential-bearing values out of assertion diagnostics.
+    assert!(response["outbounds"] == original["outbounds"]);
+    assert_eq!(response["nodes"].as_array().unwrap().len(), cases.len());
+    for (index, (protocol, method)) in cases.iter().enumerate() {
+        let node = &response["nodes"][index];
+        assert_eq!(node["index"], index);
+        assert_eq!(node["source"]["outbound_index"], index);
+        assert_eq!(node["source"]["server_index"], 0);
+        assert_eq!(node["protocol"], *protocol);
+        assert_eq!(node["authentication"]["kind"], "password");
+        assert!(node["authentication"]["password"].as_str() == Some(password));
+        assert_eq!(node["authentication"]["method"].as_str(), *method);
+        assert_eq!(node["authentication"]["level"], 0);
+        assert!(node["authentication"]["email"] == "SYNTHETIC_EMAIL@example.invalid");
+        assert_eq!(node["validation"], "valid");
+        assert_eq!(node["executable"], false);
+        assert!(node["native_outbound"].is_null());
+        assert_eq!(node["execution_issues"], json!(["NativeConversionPending"]));
+        assert_eq!(node["network_verified"], false);
+        assert!(node["diagnostics"].as_array().unwrap().is_empty());
+    }
+}
+
+#[test]
 fn inbounds_never_become_remote_nodes_or_configure_listeners() {
     let original = json!({"inbounds":[{"protocol":"socks","port":23456,"listen":"0.0.0.0","settings":{}}],
         "outbounds":[vless()]});

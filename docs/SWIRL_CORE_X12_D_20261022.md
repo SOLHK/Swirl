@@ -205,6 +205,62 @@ Windows application build. D5's Windows DPAPI tests passed, while its macOS
 HTTPS fixture exposed a SecureTransport compatibility issue; D8 tracks and
 retests that issue rather than treating the failed run as a pass.
 
+## D7: authoritative native configuration and real traffic
+
+D7 merges B's published password-getter commit
+`4e9f6ea0411c03bba418bb46884748ba7e0ba03b` as a second parent. Its Trojan
+and Shadowsocks password/method validation is reused without a Qt converter.
+The B branch still lacks a general native-outbound conversion interface.
+C's observed published head is
+`4f3f0caba8f20e7fa776ea7a710864a685215d44`; this stage does not borrow its
+uncommitted work or implement its transport connectors.
+
+Every JSON node entering a selected or rule route is replayed from its exact
+bounded source through the Rust bridge. The resulting native outbound is the
+only executable configuration. Persisted capability flags, modified public
+fields and forged cached outbounds cannot authorize execution. Third-party
+listeners, routes and DNS settings cannot replace Swirl's locally owned
+options. Failure returns a bounded diagnostic and does not start another core.
+
+Actual Qt/Rust tests cover source replay against a forged cache, rejected
+invalid or unsupported sources, inert imported listeners/rules, invalid
+selection and start rollback, and Rust listener-port conflicts. The importer
+suite now has 22 methods, including B2 passwords containing Unicode, NUL and
+surrounding whitespace, exact Shadowsocks methods and credential-like tags.
+Display normalization cannot reveal a credential that previously contained
+control characters. These tests compare secrets without printing their values
+on assertion failure. The Rust workspace passes formatting, locked check,
+all-target Clippy with warnings denied, and 444 tests with zero failures or
+ignored tests. A local incremental compiler-cache failure was resolved by
+disabling incremental compilation; no protocol source was changed for it.
+
+`tools/tests/test_xray_qt_import.py` drives the actual Qt executable, which
+loads the actual Rust shared library in-process. It uses the repository's
+repeat-verified pinned official Xray peer and independent HTTP/HTTPS origins.
+The accepted profile is VLESS REALITY TCP, without Vision flow. The Qt process
+imports a Unicode-path JSON file, starts the selected Rust node, and launches
+a Python standard-library SSL business client through the Rust local proxy.
+The business client receives loopback URLs and its test CA, not node credentials
+or proxy-protocol configuration; it is not an alternative proxy engine.
+
+The gate requires valid HTTP and HTTPS responses and exact bodies, verified
+HTTPS certificates, successful official-peer REALITY authentication and VLESS
+requests, bidirectional Rust session counters, TLS close-notify in both
+directions, closed sessions, and a stopped/freed local listener. Seven evidence
+guard tests reject missing or contradictory proof. This controlled loopback
+chain passed on Linux against the merged B2 source. It proves real protocol
+traffic, not a connection to a user's remote provider. Linux's missing secure
+storage backend is explicitly reported; only Windows can additionally require
+DPAPI confirmation, object destruction, reload and selection before traffic.
+
+An optional QtNetwork business-client profile remains diagnostic: it received
+the HTTP/HTTPS responses but did not satisfy the independent authenticated
+TLS-shutdown gate. It is not reported as a complete successful chain. The
+default standard-library client satisfies the unchanged strict shutdown gate.
+No tested node is globally marked network verified from this fixture evidence.
+Other protocol/transport combinations await B/C/VMess integration; their
+successful display or parameter validation is not a native-connectivity claim.
+
 ## Applied engineering guidance
 
 Read repository `AGENTS.md`, `CONTINUE_DEVELOPMENT.md` and

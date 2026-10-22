@@ -35,6 +35,11 @@ QStringList diagnostics(const QJsonArray &items) {
     return result;
 }
 struct SecretNames { QSet<QString> values; bool hideAll=false; };
+QString displayName(QString value) {
+    static const QRegularExpression controls(QStringLiteral("[\\x00-\\x1f\\x7f-\\x9f]"));
+    value.replace(controls, QStringLiteral(" "));
+    return value.trimmed();
+}
 void findSecrets(const QJsonValue &value, SecretNames *secrets) {
     if (secrets->hideAll) return;
     if (value.isArray()) for (const auto &item : value.toArray()) findSecrets(item, secrets);
@@ -46,6 +51,11 @@ void findSecrets(const QJsonValue &value, SecretNames *secrets) {
             key.contains("password") || key.contains("token") || key.contains("authorization") || key.contains("privatekey"))) {
             const auto secret = it.value().toString();
             if (!secret.isEmpty() && secret.size() <= 128) secrets->values.insert(secret);
+            // A tag may repeat a password containing NUL/control characters
+            // or surrounding whitespace. Its display normalization must not
+            // turn the same credential into a different, unredacted string.
+            const auto visible = displayName(secret);
+            if (!visible.isEmpty() && visible.size() <= 128) secrets->values.insert(visible);
             // Keep name redaction work bounded even for adversarial unknowns.
             if (secrets->values.size() > 4096) { secrets->hideAll = true; return; }
         }
@@ -56,10 +66,11 @@ QString safeName(QString name, const SecretNames &secrets, int index) {
     const auto fallback = QStringLiteral("JSON 节点 %1").arg(index + 1);
     if (secrets.hideAll || name.size() > 128 || name.contains("://") ||
         name.contains(QRegularExpression(QStringLiteral("(?:token|password|authorization)\\s*[=:]|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"), QRegularExpression::CaseInsensitiveOption))) return fallback;
-    name.replace(QRegularExpression(QStringLiteral("[\\x00-\\x1f\\x7f-\\x9f]")), QStringLiteral(" "));
     for (const auto &secret : secrets.values)
         if (name == secret || (secret.size() >= 4 && name.contains(secret))) return fallback;
-    name = name.trimmed().left(128);
+    name = displayName(name);
+    for (const auto &secret : secrets.values)
+        if (name == secret || (secret.size() >= 4 && name.contains(secret))) return fallback;
     return name.isEmpty() ? fallback : name;
 }
 }

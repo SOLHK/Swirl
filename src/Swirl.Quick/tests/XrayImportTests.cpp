@@ -78,6 +78,32 @@ private slots:
             QVERIFY(!publicText.contains("SYNTHETIC-PASSWORD"));
         }
     }
+    void credentialTagsRemainRedactedAfterDisplayNormalization() {
+        const auto password = QStringLiteral("  SYNTHETIC_密碼") + QChar(0) + QStringLiteral("\t🌪  ");
+        const QStringList tags{password, QStringLiteral("SYNTHETIC_密碼  🌪")};
+        const QJsonObject server{{"address", "proxy.invalid"}, {"port", 443}, {"password", password}};
+        QJsonArray outbounds;
+        for (const auto &tag : tags) {
+            outbounds.append(QJsonObject{{"protocol", "trojan"}, {"tag", tag},
+                {"settings", QJsonObject{{"servers", QJsonArray{server}}}}});
+        }
+        const auto input = json(QJsonObject{{"outbounds", outbounds}});
+        const auto result = NodeImporter::parse(input);
+        QVERIFY2(result, qPrintable(result.error));
+        QCOMPARE(result.nodes.size(), tags.size());
+        for (qsizetype index = 0; index < result.nodes.size(); ++index) {
+            const auto &node = result.nodes.at(index);
+            // A failed assertion must not print the credential-bearing value.
+            QVERIFY(node.name == QStringLiteral("JSON 节点 %1").arg(index + 1));
+            QVERIFY(node.password == password);
+            QVERIFY(node.parameters.value("authentication").toObject().value("password").toString() == password);
+            QVERIFY(node.sourceDocument == input);
+            QVERIFY(node.originalConfiguration.value("outbound") == outbounds.at(index));
+            QVERIFY(node.originalConfiguration.value("outbound").toObject().value("tag").toString() == tags.at(index));
+            const auto publicText = QJsonDocument(QJsonObject::fromVariantMap(node.publicInfo())).toJson();
+            QVERIFY(!publicText.contains("SYNTHETIC_"));
+        }
+    }
     void syntaxAndParametersAreSeparate() {
         auto invalid = vless(); auto settings = invalid.value("settings").toObject();
         settings["id"] = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"; invalid["settings"] = settings;
@@ -114,6 +140,57 @@ private slots:
         QVERIFY2(result, qPrintable(result.error));
         QStringList protocols; for (const auto &node : result.nodes) protocols.append(node.protocol);
         QCOMPARE(protocols, (QStringList{"vless", "vmess", "trojan", "ss", "socks5", "http"}));
+    }
+    void passwordGettersPreserveUnicodeNulAndCipherPrivately() {
+        const auto password = QStringLiteral("  SYNTHETIC_密碼") + QChar(0) + QStringLiteral(" 🌪  ");
+        const QStringList methods{QString(), QStringLiteral("aes-128-gcm"),
+            QStringLiteral("aes-256-gcm"), QStringLiteral("chacha20-ietf-poly1305")};
+        QJsonArray outbounds;
+        for (qsizetype index = 0; index < methods.size(); ++index) {
+            QJsonObject server{{"address", "proxy.invalid"}, {"port", 443},
+                {"password", password}, {"level", 0}, {"email", "SYNTHETIC_EMAIL@example.invalid"}};
+            if (!methods.at(index).isEmpty()) server["method"] = methods.at(index);
+            outbounds.append(QJsonObject{{"protocol", index == 0 ? "trojan" : "shadowsocks"},
+                {"tag", QStringLiteral("密码节点 🌪")}, {"settings", QJsonObject{{"servers", QJsonArray{server}}}}});
+        }
+        const auto input = QByteArray::fromHex("efbbbf") + " \n" + json(QJsonObject{{"outbounds", outbounds}}) + "\n";
+        const auto result = NodeImporter::parse(input);
+        QVERIFY2(result, qPrintable(result.error));
+        QCOMPARE(result.nodes.size(), methods.size());
+        QVERIFY(result.configuration.isEmpty());
+        QVERIFY(result.executionConfiguration.isEmpty());
+        for (qsizetype index = 0; index < result.nodes.size(); ++index) {
+            const auto &node = result.nodes.at(index);
+            QCOMPARE(node.protocol, index == 0 ? QStringLiteral("trojan") : QStringLiteral("ss"));
+            QCOMPARE(node.sourceNodeIndex, index);
+            // Credential-bearing comparisons must not print values on failure.
+            QVERIFY(node.sourceDocument == input);
+            QVERIFY(node.originalConfiguration.value("outbound") == outbounds.at(index));
+            QVERIFY(node.password == password);
+            QCOMPARE(node.cipher, methods.at(index));
+            const auto authentication = node.parameters.value("authentication").toObject();
+            QCOMPARE(authentication.value("kind").toString(), QStringLiteral("password"));
+            QVERIFY(authentication.value("password").toString() == password);
+            QCOMPARE(authentication.value("method").toString(), methods.at(index));
+            QCOMPARE(authentication.value("level").toInt(-1), 0);
+            QVERIFY(authentication.value("email").toString() == QStringLiteral("SYNTHETIC_EMAIL@example.invalid"));
+            QCOMPARE(node.parameterState, QStringLiteral("valid"));
+            QVERIFY(ProxyNode::validate(node).isEmpty());
+            QVERIFY(!node.nativeExecutable);
+            QVERIFY(node.nativeOutbound.isEmpty());
+            QCOMPARE(node.runtimeIssues, QStringList{QStringLiteral("NativeConversionPending")});
+            const auto publicInfo = node.publicInfo();
+            QCOMPARE(publicInfo.value("parameterState").toString(), QStringLiteral("valid"));
+            QVERIFY(!publicInfo.value("nativeExecutable").toBool());
+            QVERIFY(!publicInfo.value("networkVerified").toBool());
+            QVERIFY(!publicInfo.value("capability").toMap().value("native").toBool());
+            const auto publicText = QJsonDocument(QJsonObject::fromVariantMap(publicInfo)).toJson();
+            QVERIFY(!publicText.contains("SYNTHETIC_"));
+            QVERIFY(!publicInfo.contains("password"));
+            QVERIFY(!publicInfo.contains("authentication"));
+            QVERIFY(!publicInfo.contains("sourceDocument"));
+            QVERIFY(!publicInfo.contains("originalConfiguration"));
+        }
     }
     void localActionsAreNotRemoteNodes() {
         const auto result = NodeImporter::parse(QJsonDocument(QJsonArray{
