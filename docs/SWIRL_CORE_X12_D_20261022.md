@@ -64,6 +64,23 @@ node is marked network verified. Display, parameter validation, native
 capability and real traffic evidence are separate. D7 connects executable
 outbounds to the product controller and D8 supplies real traffic evidence.
 
+## D2: text and clipboard
+
+Text and clipboard JSON now use the same original-byte Rust parser and
+explicit preview/confirm/cancel flow as files. UTF-8 encoding and parsing
+run on the worker pool after a cheap UTF-16 length bound. The actual byte
+ceiling remains 4 MiB, including multibyte Unicode. Source labels contain
+only `text` or `clipboard`; clipboard content is never logged or retained
+in UI messages. Generation checks discard canceled worker results.
+
+The real Qt/Rust library suite passes 17 test methods (plus init/cleanup),
+including Unicode multiple-node text, actual Qt clipboard retrieval,
+strict duplicate-key rejection, oversized Unicode, cancellation, and
+repeated imports. The Windows store path additionally checks that repeated
+confirmation does not duplicate the catalog and malformed input preserves
+it; Linux verifies encrypted-storage refusal. Broader identity updates and
+subscription refresh semantics are covered in D6.
+
 ## Applied engineering guidance
 
 Read repository `AGENTS.md`, `CONTINUE_DEVELOPMENT.md` and

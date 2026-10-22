@@ -1,5 +1,6 @@
 #include <QtTest>
 #include <QFile>
+#include <QClipboard>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QSignalSpy>
@@ -204,6 +205,61 @@ private slots:
         QCOMPARE(restored.nodes().size(), 1);QCOMPARE(restored.selectedId(), savedId);
         QCOMPARE(restored.nodes().first().sourceDocument, bytes);
 #endif
+    }
+    void textAndClipboardShareStrictPreview() {
+        QTemporaryDir directory;NodeStore store(directory.filePath("nodes.dpapi"));NodeImportService service(&store);
+        int applies=0;NodeImporter::Result committed;
+        service.setConfigurationApplier([&](const auto &result,const auto &source,QString *) {
+            ++applies;committed=result;return source.isEmpty();
+        });
+        const auto bytes=QJsonDocument(QJsonArray{vless(QStringLiteral("东京 🌏")),vless(QStringLiteral("香港"))}).toJson();
+        service.importText(QString::fromUtf8(bytes));QTRY_VERIFY_WITH_TIMEOUT(service.hasPreview(),10000);
+        QCOMPARE(service.preview().size(),2);QCOMPARE(applies,0);QVERIFY(store.nodes().isEmpty());
+        service.confirmImport();QCOMPARE(applies,1);
+        QCOMPARE(committed.nodes.first().sourceDocument,bytes);
+        QCOMPARE(committed.nodes.first().name,QStringLiteral("东京 🌏"));
+        QCOMPARE(committed.nodes.first().importSource,QStringLiteral("text"));
+        const auto previous=QGuiApplication::clipboard()->text();
+        QGuiApplication::clipboard()->setText(QString::fromUtf8(bytes));service.importClipboard();
+        QGuiApplication::clipboard()->setText(previous);
+        QTRY_VERIFY_WITH_TIMEOUT(service.hasPreview(),10000);QCOMPARE(applies,1);
+        service.confirmImport();QCOMPARE(applies,2);
+        QCOMPARE(committed.nodes.first().sourceDocument,bytes);
+        QCOMPARE(committed.nodes.first().importSource,QStringLiteral("clipboard"));service.shutdown();
+    }
+    void textFailureAndCancellationNeverApply() {
+        QTemporaryDir directory;NodeStore store(directory.filePath("nodes.dpapi"));NodeImportService service(&store);int applies=0;
+        service.setConfigurationApplier([&](const auto &,const auto &,QString *){++applies;return true;});
+        service.importText(QString::fromUtf8(json(vless())));service.cancelImport();QTest::qWait(100);
+        QVERIFY(!service.hasPreview());QCOMPARE(applies,0);
+        service.importText(QStringLiteral(R"({"protocol":"vless","settings":{"id":"SECRET-D2","id":"other"}})"));
+        QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),10000);QVERIFY(!service.hasPreview());
+        QVERIFY(service.message().contains("DuplicateJsonKey"));QVERIFY(!service.message().contains("SECRET-D2"));
+        service.importText(QString(NodeImporter::MaximumBytes+1,u' '));
+        QVERIFY(!service.busy());QVERIFY(service.message().contains("4 MiB"));
+        service.importText(QString(NodeImporter::MaximumBytes/2,u'中'));
+        QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),10000);QVERIFY(!service.hasPreview());
+        QVERIFY(service.message().contains("4 MiB"));QCOMPARE(applies,0);QVERIFY(store.nodes().isEmpty());
+        service.shutdown();
+    }
+    void repeatedTextKeepsRealStoreCatalog() {
+        QTemporaryDir directory;const auto storePath=directory.filePath("nodes.dpapi");NodeStore store(storePath);NodeImportService service(&store);
+        for(int pass=0;pass<2;++pass) {
+            service.importText(QString::fromUtf8(json(vless())));QTRY_VERIFY_WITH_TIMEOUT(service.hasPreview(),10000);
+            service.confirmImport();
+#ifdef Q_OS_WIN
+            QCOMPARE(store.nodes().size(),1);
+#else
+            QVERIFY(store.nodes().isEmpty());QVERIFY(!QFile::exists(storePath));
+#endif
+        }
+        service.importText(QStringLiteral("{\"protocol\":\"vless\",}"));QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),10000);
+#ifdef Q_OS_WIN
+        QCOMPARE(store.nodes().size(),1);
+#else
+        QVERIFY(store.nodes().isEmpty());
+#endif
+        service.shutdown();
     }
 };
 QTEST_MAIN(XrayImportTests)

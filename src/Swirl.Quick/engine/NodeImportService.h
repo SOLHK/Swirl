@@ -47,6 +47,7 @@ private:
     void checkDue();
     void next();
     void download(const QUrl &url,int redirects=0);
+    void parseText(const QString &text,const QString &origin);
     void parse(QByteArray bytes);
     void parsed(NodeImporter::Result result);
     void apply(NodeImporter::Result result);

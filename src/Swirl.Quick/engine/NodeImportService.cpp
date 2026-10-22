@@ -29,13 +29,26 @@ QVariantList NodeImportService::providers() const {
     }return rows;
 }
 void NodeImportService::importText(const QString &text) {
+    parseText(text,QStringLiteral("text"));
+}
+void NodeImportService::parseText(const QString &text,const QString &origin) {
     if(m_shuttingDown)return;
     if(m_busy || hasPreview()){m_message=QStringLiteral("请先确认或取消当前导入。");emit changed();return;}
-    m_previewRequested=false;m_importSource="text";
-    m_busy=true;m_source.clear();m_message=QStringLiteral("正在解析节点配置…");emit changed();parse(text.toUtf8());
+    // Every UTF-16 code unit needs at least one UTF-8 byte. Reject this
+    // inexpensive bound before allocating; the parser checks exact byte size.
+    if(text.size()>NodeImporter::MaximumBytes){m_message=QStringLiteral("配置文本超过 4 MiB；现有节点保持不变。");emit changed();return;}
+    m_previewRequested=true;m_importSource=origin;
+    m_busy=true;m_source.clear();m_message=QStringLiteral("正在解析节点配置…");emit changed();
+    QPointer<NodeImportService> guard(this);const auto generation=m_generation;
+    QThreadPool::globalInstance()->start([guard,generation,text] {
+        auto bytes=text.toUtf8();auto result=NodeImporter::parse(bytes);bytes.fill('\0');
+        QMetaObject::invokeMethod(QCoreApplication::instance(),[guard,generation,result=std::move(result)]() mutable {
+            if(guard && !guard->m_shuttingDown && guard->m_generation==generation)guard->parsed(std::move(result));
+        },Qt::QueuedConnection);
+    });
 }
 void NodeImportService::importClipboard() {
-    if(auto *clipboard=QGuiApplication::clipboard())importText(clipboard->text());
+    if(auto *clipboard=QGuiApplication::clipboard())parseText(clipboard->text(),QStringLiteral("clipboard"));
 }
 void NodeImportService::importFile(const QUrl &file) {
     if(m_busy || hasPreview() || m_shuttingDown)return;
