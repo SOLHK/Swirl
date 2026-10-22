@@ -129,6 +129,24 @@ QVariantList TelemetryService::dailyTraffic(bool proxyOnly) const {
  const auto date=QDate::currentDate();const auto buckets=m_days.value(date.toString(Qt::ISODate)).toObject().value("buckets").toObject();QVariantList rows;
  for(int i=0;i<48;++i){const auto bucket=buckets.value(QString::number(i)).toObject();rows.append(QVariantMap{{"time",QDateTime(date,QTime(i/2,(i%2)*30)).toMSecsSinceEpoch()},{"sampled",bucket.value("sampled").toBool()},{"value",bucket.value(proxyOnly?"proxy":"total").toDouble()}});}return rows;
 }
+QVariantList TelemetryService::periodTraffic(int period,bool proxyOnly) const {
+ if(period==0)return dailyTraffic(proxyOnly);
+ if(period!=3)return {};
+ const auto today=QDate::currentDate(),first=QDate(today.year(),today.month(),1);
+ QVariantList rows;
+ for(auto date=first;date<=today;date=date.addDays(1)){
+  const auto day=m_days.value(date.toString(Qt::ISODate)).toObject();
+  double value=day.value("up").toDouble()+day.value("down").toDouble();
+  if(proxyOnly){
+   value=0;
+   const auto buckets=day.value("buckets").toObject();
+   for(const auto &bucket:buckets)value+=bucket.toObject().value("proxy").toDouble();
+  }
+  rows.append(QVariantMap{{"time",QDateTime(date,QTime(0,0)).toMSecsSinceEpoch()},
+                          {"sampled",day.value("sampled").toBool()},{"value",value}});
+ }
+ return rows;
+}
 void TelemetryService::load(){QFile file(m_path);if(!file.exists())return;if(!file.open(QIODevice::ReadOnly)||file.size()>16*1024*1024){m_storageError="监控历史无法读取或超过大小限制";return;}QJsonParseError e;const auto doc=QJsonDocument::fromJson(file.readAll(),&e);if(e.error!=QJsonParseError::NoError||doc.object().value("schema").toInt()!=1){m_storageError="监控历史格式无效";return;}m_days=doc.object().value("days").toObject();m_history=doc.object().value("history").toArray().toVariantList();while(m_history.size()>3600)m_history.removeFirst();}
 void TelemetryService::flush(){if(!m_dirty)return;QDir().mkpath(QFileInfo(m_path).absolutePath());QSaveFile file(m_path);const auto bytes=QJsonDocument(QJsonObject{{"schema",1},{"days",m_days},{"history",QJsonArray::fromVariantList(m_history)}}).toJson(QJsonDocument::Compact);if(!file.open(QIODevice::WriteOnly)||file.write(bytes)!=bytes.size()||!file.commit()){m_storageError="监控历史保存失败";emit diagnostic("Telemetry","StorageWrite",m_storageError);publish();return;}m_dirty=false;}
 void TelemetryService::reportMeasurement(const QString &key,bool ok,const QString &message){

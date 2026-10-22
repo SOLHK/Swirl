@@ -16,8 +16,7 @@ Item {
             columns:Math.max(1,Math.floor(width/Theme.dp(210))); spacing:Theme.dp(10)
             Repeater {
                 model:[
-                    {title:"通用",icon:"settings",route:"settings",description:"基础配置与应用行为"},
-                    {title:"外观",icon:"appearance",route:"appearance",description:"主题、文字大小与动画"},
+                    {title:"通用",icon:"settings",route:"settings",description:"基础配置、主题、文字与动画"},
                     {title:"字体",icon:"typography",route:"fonts",description:"按系统选择清晰字体，也可导入本机字体"},
                     {title:"DNS",icon:"dns",route:"dns",description:"解析服务与本地映射"},
                     {title:"模块",icon:"modules",route:"modules",description:"管理配置扩展模块"},

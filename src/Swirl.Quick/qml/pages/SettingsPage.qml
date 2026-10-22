@@ -10,8 +10,8 @@ Item {
     // Existing isolated preview hook; normal navigation never invokes this.
     function scrollToBottom() { options.contentItem.contentY=Math.max(0,options.contentHeight-options.availableHeight) }
 
-    property string section:"外观"
-    property var sections:["常规","外观","字体","代理","TUN","DNS","端口","系统集成","启动","通知","数据管理","隐私与安全","快捷键","关于 Swirl"]
+    property string section:"常规"
+    property var sections:["常规","字体","代理","TUN","DNS","端口","系统集成","启动","通知","数据管理","隐私与安全","快捷键","关于 Swirl"]
     ColumnLayout {
         anchors.fill:parent; anchors.margins:Theme.dp(23); spacing:Theme.dp(14)
         RowLayout {
@@ -57,12 +57,13 @@ Item {
                         width:options.availableWidth; spacing:Theme.dp(17)
                         SwirlText {textRole:"pageTitle";id:routeTitle;Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:AppState.zh(page.section); color:Theme.text; font.pixelSize:Theme.fontSize(23); font.weight:Font.DemiBold }
                         SwirlText {
-                            text:page.section==="外观"?"主题、窗口材质、动画与界面缩放。":page.section==="字体"?"预览字体与可变轴，确认后应用到整个界面。":page.section==="代理"?"引擎、真实节点与当前用户系统代理 · 国内外分流。":page.section==="关于 Swirl"?"版本与项目信息":"此项研发中。"
+                            text:page.section==="常规"?"基础设置、主题、字体与动画集中在这里；可用选项会自动保存。":page.section==="字体"?"预览字体与可变轴，确认后应用到整个界面。":page.section==="代理"?"引擎、真实节点与当前用户系统代理 · 国内外分流。":page.section==="关于 Swirl"?"版本与项目信息":"此项研发中。"
                             color:Theme.muted; wrapMode:Text.WordWrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12)
                         }
                         Rectangle { Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(1); color:Theme.border }
                         ColumnLayout {
-                            visible:page.section==="外观"; spacing:Theme.dp(21); Layout.fillWidth:true
+                            visible:page.section==="常规"; spacing:Theme.dp(21); Layout.fillWidth:true
+                            SwirlText {text:"外观与主题";color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold;Layout.fillWidth:true}
                             GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
                                 Layout.fillWidth:true
                                 ColumnLayout {
@@ -86,6 +87,7 @@ Item {
                                 }
                                 SwirlToggle { checked:Theme.transparency; onToggled:Theme.transparency=checked }
                             }
+                            SwirlText {text:"动画与交互";color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold;Layout.fillWidth:true}
                             GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
                                 Layout.fillWidth:true
                                 ColumnLayout {
@@ -103,6 +105,11 @@ Item {
                                     SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap;text:"开启后，遵循系统的动画效果设置。";color:Theme.muted;font.pixelSize:Theme.fontSize(11)}
                                 }
                                 SwirlToggle {objectName:"followSystemMotionToggle";checked:Theme.followSystemMotion;onToggled:Theme.followSystemMotion=checked}
+                            }
+                            SwirlText {text:"字体与文字大小";color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold;Layout.fillWidth:true}
+                            RowLayout {Layout.fillWidth:true
+                                SwirlText {text:"界面缩放会同步调整文字与控件。字体家族和可变轴可单独设置。";color:Theme.muted;wrapMode:Text.WordWrap;Layout.fillWidth:true;font.pixelSize:Theme.fontSize(11)}
+                                SwirlButton {text:"选择字体";quiet:true;onClicked:page.section="字体"}
                             }
                             ColumnLayout {
                                 Layout.fillWidth:true; spacing:Theme.dp(10)
@@ -161,10 +168,11 @@ Item {
                                     SwirlButton { text:"恢复默认"; enabled:!Theme.followSystemScale || Theme.uiScale!==1.0; onClicked:Theme.resetScale() }
                                 }
                             }
-                            SwirlStatusBadge { label:AppState.zh("CHANGES ARE LOCAL TO THIS UI PREVIEW"); tone:"accent" }
+                            SwirlStatusBadge { label:"已实现的设置自动保存"; tone:"accent" }
                         }
                         ColumnLayout {
-                            visible:page.section!=="外观"&&page.section!=="字体"&&page.section!=="关于 Swirl"&&page.section!=="代理"; Layout.fillWidth:true; spacing:Theme.dp(17)
+                            visible:page.section!=="字体"&&page.section!=="关于 Swirl"&&page.section!=="代理"; Layout.fillWidth:true; spacing:Theme.dp(17)
+                            SwirlText {visible:page.section==="常规";text:"基础设置 · 研发中";color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold;Layout.fillWidth:true}
                             Repeater {
                                 model:page.section==="代理"?["系统代理","默认策略","进程绕过","代理身份验证"]:
                                       page.section==="DNS"?["解析器选择","加密 DNS","IPv6","虚拟 IP 处理"]:

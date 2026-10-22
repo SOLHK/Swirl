@@ -8,11 +8,11 @@ QtObject {
     property bool backdropTranslucent: false
     property bool windowActive:true
     // Windows supplies blur and luminosity. These are only the Swirl overlay.
-    readonly property color nativeTint: dark ? "#292C31" : "#EEF0F3"
-    readonly property real nativeTintOpacity: dark ? 0.90 : 0.86
+    readonly property color nativeTint: dark ? "#292C31" : "#E8F3FC"
+    readonly property real nativeTintOpacity: dark ? 0.90 : 0.90
     // Exact contours use restrained live alpha when DWM Acrylic cannot be
     // clipped smoothly. Keep background text subdued without masking glyphs.
-    readonly property real alphaTintOpacity: dark ? 0.94 : 0.92
+    readonly property real alphaTintOpacity: dark ? 0.94 : 0.95
     // Retained for the opt-in synthetic blur benchmark, never desktop sampling.
     property real glassBlurStrength: 0.85
     property int glassQuality: 1
@@ -37,13 +37,13 @@ QtObject {
     readonly property real uiScale: followSystemScale ? 1.0 : appearanceSettings.savedScalePercent / 100.0
     readonly property bool dark: mode === "Dark" || (mode === "System" && Qt.styleHints.colorScheme === Qt.Dark)
     // Opaque light surfaces separate the page from its white content cards.
-    readonly property color canvas: dark ? "#24272C" : "#EEF0F3"
+    readonly property color canvas: dark ? "#24272C" : "#E8F3FC"
     readonly property color surface: dark ? "#292C31" : "#FFFFFF"
     readonly property color independentCard: withAlpha(dark ? "#30343A" : "#FFFFFF", dark ? 0.96 : 0.98)
     readonly property color primaryContainer: withAlpha(dark ? "#2A3546" : "#F2F7FD",transparency?0.78:1)
     readonly property color raised: dark ? "#292929" : "#F7F7F7"
     // Neutral QML tint above the native window backdrop. Fall back to opacity 1.
-    readonly property color sidebarBase: dark ? "#292C31" : "#EEF0F3"
+    readonly property color sidebarBase: dark ? "#292C31" : "#E8F3FC"
     // Content materials are composed inside the system-owned HWND outline.
     readonly property real sidebarOpacity: transparency && backdropActive ? (dark ? 0.78 : 0.72) : 1.0
     readonly property real workspaceOpacity:transparency && (backdropActive || backdropTranslucent) ? (dark ? 0.88 : 0.84) : 1.0

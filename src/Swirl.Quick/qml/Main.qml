@@ -144,7 +144,6 @@ ApplicationWindow {
                                 AppState.currentPage==="inspector" ? inspector :
                                 AppState.currentPage==="scripts" ? scripts :
                                 AppState.currentPage==="settings" ? settings :
-                                AppState.currentPage==="appearance" ? appearance :
                                 AppState.currentPage==="fonts" ? fonts :
                                 AppState.currentPage==="toolbox" ? toolbox :
                                 AppState.currentPage==="dns" ? dns :
@@ -286,7 +285,6 @@ ApplicationWindow {
     Component { id:inspector; InspectorPage {} }
     Component { id:scripts; ScriptsPage {} }
     Component { id:settings; SettingsPage {section:"常规"} }
-    Component { id:appearance; SettingsPage {section:"外观"} }
     Component { id:fonts; SettingsPage {section:"字体"} }
     Component { id:toolbox; ToolboxPage {} }
     Component { id:dns; DNSPage {} }

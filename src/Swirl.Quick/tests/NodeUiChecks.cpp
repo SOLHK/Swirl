@@ -74,7 +74,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         probeSelected(net.a,net.b,"UI real request passes only through selected node A");
         const auto pid=controller->processId();
         const auto selectedBeforeNavigation=controller->selectedNodeId();
-        for(const auto &route:QStringList{"featurehub","settings","appearance","fonts","dns","modules","profiles","scripts","subscriptions","proxies"}){
+        for(const auto &route:QStringList{"featurehub","settings","fonts","dns","modules","profiles","scripts","subscriptions","proxies"}){
             eval("AppState.navigate('"+route+"')");
             check(QTest::qWaitFor([&]{auto *active=host?qvariant_cast<QObject *>(host->property("activeLoader")):nullptr;return active&&active->property("routeId").toString()==route&&!host->property("moving").toBool()&&!host->property("pendingGrab").toBool();},3500),"live navigation settles inside the main host");
             check(controller->processId()==pid&&controller->apiHealthy()&&controller->selectedNodeId()==selectedBeforeNavigation,"all settings routes preserve the real running proxy and selected node");
