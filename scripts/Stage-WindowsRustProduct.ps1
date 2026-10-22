@@ -8,9 +8,21 @@ Set-StrictMode -Version Latest
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $build = (Resolve-Path -LiteralPath $BuildDirectory).Path
 $cache = Get-Content -LiteralPath (Join-Path $build 'CMakeCache.txt') -Raw
+if ($Configuration -cne 'Release') { throw 'Product packaging requires the Release configuration.' }
+if ($cache -notmatch '(?m)^CMAKE_BUILD_TYPE:STRING=Release\s*$' -and
+    $cache -notmatch '(?m)^CMAKE_CONFIGURATION_TYPES:STRING=[^\r\n]*\bRelease\b[^\r\n]*$') {
+    throw 'The CMake build does not include a Release configuration.'
+}
+if ($cache -notmatch '(?m)^CMAKE_HOME_DIRECTORY:INTERNAL=(.+)$' -or
+    [IO.Path]::GetFullPath($Matches[1].Trim()).TrimEnd('\','/') -ne
+    [IO.Path]::GetFullPath((Join-Path $repo 'src/Swirl.Quick')).TrimEnd('\','/')) {
+    throw 'The build belongs to a different source tree.'
+}
 if ($cache -notmatch '(?m)^SWIRL_USE_RUST_CORE:BOOL=ON\s*$') { throw 'Rust Core must be the only configured product runtime.' }
 if ($cache -notmatch '(?m)^SWIRL_RUST_LIBRARY:INTERNAL=(.+)$') { throw 'Exact Cargo library path is missing.' }
 $rustLibrary = $Matches[1].Trim()
+if ($cache -notmatch '(?m)^SWIRL_RUST_BUILD_ID:INTERNAL=(.+)$') { throw 'Paired Rust build identity is missing.' }
+$buildId = $Matches[1].Trim()
 $bin = Join-Path $build $Configuration
 if (-not (Test-Path -LiteralPath (Join-Path $bin 'Swirl.exe'))) { $bin = $build }
 $stage = [IO.Path]::GetFullPath($Destination)
@@ -24,7 +36,8 @@ foreach ($name in $files) {
     if (-not (Test-Path -LiteralPath (Join-Path $bin $name) -PathType Leaf)) { throw "Missing build output: $name" }
 }
 $expected = Get-Content -LiteralPath (Join-Path $bin 'swirl-rust-build.json') -Raw | ConvertFrom-Json
-if ($expected.source_sha -ne $sourceSha -or $expected.target -ne 'x86_64-pc-windows-msvc') {
+if ($expected.source_sha -ne $sourceSha -or $expected.target -ne 'x86_64-pc-windows-msvc' -or
+    $expected.build_id -ne $buildId) {
     throw 'Release packaging requires current source and Windows x64 MSVC.'
 }
 if ((Get-FileHash -LiteralPath $rustLibrary -Algorithm SHA256).Hash -ne
@@ -34,6 +47,7 @@ foreach ($name in $files) { Copy-Item -LiteralPath (Join-Path $bin $name) -Desti
 & (Join-Path $PSScriptRoot 'Copy-VerifiedChinaRules.ps1') `
     -SourceDirectory (Join-Path $repo 'src/Swirl.Quick/packaging/rules') -ApplicationDirectory $stage
 Copy-Item -LiteralPath (Join-Path $repo 'src/Swirl.Quick/packaging/licenses') -Destination $stage -Recurse
+Copy-Item -LiteralPath (Join-Path $repo 'src/Swirl.Quick/packaging/THIRD_PARTY_NOTICES.txt') -Destination $stage
 Copy-Item -LiteralPath (Join-Path $repo 'src/Swirl.Quick/packaging/README-RustProductPreview.txt') -Destination (Join-Path $stage 'README.txt')
 foreach ($name in @('Swirl-brand-phase3.ico','Swirl-brand-phase3-v2.ico')) {
     Copy-Item -LiteralPath (Join-Path $build 'brand/Swirl.ico') -Destination (Join-Path $stage $name)
@@ -65,7 +79,10 @@ if (-not $report.success -or -not $report.http_response_verified -or
 Copy-Item -LiteralPath $reportPath -Destination (Join-Path $stage 'rust-self-test.json')
 $manifest = [ordered]@{ schema=1; source_sha=$sourceSha; rust=$expected; files=@() }
 foreach ($file in (Get-ChildItem -LiteralPath $stage -Recurse -File | Sort-Object FullName)) {
-    $manifest.files += [ordered]@{ path=[IO.Path]::GetRelativePath($stage,$file.FullName).Replace('\','/');
+    # Windows PowerShell 5.1 lacks Path.GetRelativePath. All entries were
+    # enumerated inside this stage, so the canonical directory prefix suffices.
+    $relativePath = $file.FullName.Substring($stage.TrimEnd('\','/').Length + 1).Replace('\','/')
+    $manifest.files += [ordered]@{ path=$relativePath;
         sha256=(Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant() }
 }
 $manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $stage 'package-manifest.json') -Encoding utf8

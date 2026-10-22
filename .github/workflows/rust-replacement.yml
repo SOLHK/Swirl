@@ -40,6 +40,12 @@ jobs:
           python tools/tests/test_native_probe.py -v
           python tools/tests/test_connection_stages.py -v
           python tools/tests/test_product_subscription_chain.py -v
+      - name: Public Internet through authenticated Rust Shadowsocks
+        env:
+          SWIRL_RUST_HARNESS: ${{ github.workspace }}/core/target/release/swirl-api
+          SWIRL_R1_PUBLIC_NETWORK: '1'
+          SWIRL_R1_PUBLIC_REPORT: ${{ runner.temp }}/r1-native/public-proxy.json
+        run: python tools/tests/test_r1_public_proxy.py -v
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -68,6 +74,22 @@ jobs:
         run: cmake -S src/Swirl.Quick -B build/r1 -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=ON
       - name: Build actual application and loader tests
         run: cmake --build build/r1 --config Release --target Swirl SwirlRustCoreTests SwirlRustCoreLibraryTests --parallel 4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - name: Windows native public Internet requests
+        shell: pwsh
+        env:
+          SWIRL_R1_PUBLIC_NETWORK: '1'
+          SWIRL_R1_PUBLIC_REPORT: ${{ github.workspace }}/build/r1/public-proxy.json
+        run: |
+          python -m pip install cryptography==50.0.2
+          if ($LASTEXITCODE -ne 0) { throw 'Independent peer dependency install failed.' }
+          cargo build --manifest-path core/Cargo.toml --release --locked --target x86_64-pc-windows-msvc --bin swirl-api
+          if ($LASTEXITCODE -ne 0) { throw 'Windows native test host build failed.' }
+          $env:SWIRL_RUST_HARNESS=(Resolve-Path core/target/x86_64-pc-windows-msvc/release/swirl-api.exe).Path
+          python tools/tests/test_r1_public_proxy.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'Rust public proxy response verification failed.' }
       - name: Deploy test dependencies and inspect PE imports
         shell: pwsh
         run: |
@@ -126,6 +148,7 @@ jobs:
             build/r1/*integration.xml
             build/r1/rust-*.txt
             build/r1/r1-missing-dll.json
+            build/r1/public-proxy.json
             dist/Swirl-Rust-x64/rust-self-test.json
             dist/Swirl-Rust-x64/package-manifest.json
           if-no-files-found: warn

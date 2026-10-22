@@ -232,14 +232,8 @@ Item {
                                 SwirlButton { text:"清空记录"; enabled:!engineController.diagnostics.busy; onClicked:engineController.diagnostics.clear() }
                             }
                             SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:"Codex 与其他应用兼容建议"; color:Theme.text; font.pixelSize:Theme.fontSize(14); font.weight:Font.DemiBold }
-                            GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
-                                Layout.fillWidth:true
-                                SwirlText {Layout.minimumWidth:0;wrapMode:Text.Wrap; text:engineController.rustCoreBuild?"旧兼容引擎偏好（Rust 构建不可启用）":"优先使用 Mihomo 兼容引擎"; color:Theme.text; font.pixelSize:Theme.fontSize(14); Layout.fillWidth:true }
-                                SwirlToggle { objectName:"compatibilityToggle"; checked:engineController.preferCompatibility; enabled:engineController.canStart&&(!engineController.rustCoreBuild||engineController.preferCompatibility); onToggled:if(!engineController.rustCoreBuild||!checked)engineController.preferCompatibility=checked; Accessible.name:engineController.rustCoreBuild?"关闭旧兼容引擎偏好":"优先使用 Mihomo 兼容引擎" }
-                            }
-                            SwirlText {Layout.minimumWidth:0; text:engineController.rustCoreBuild?(engineController.preferCompatibility?"旧偏好仍保存在设置中。断开后可手动关闭；当前构建不会启动兼容引擎。":"当前构建仅使用 Swirl Rust Core，兼容引擎不可启用。") :"断开后修改并重新连接生效，节点、DNS、规则和 TUN 配置保持原值。依赖 TLS EOF 定界或原生协议尚不兼容时可主动启用。"; color:Theme.muted; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
                             SwirlTextArea { readOnly:true; selectByMouse:true; text:engineController.proxyEnvironmentAdvice; Layout.fillWidth:true; wrapMode:TextEdit.Wrap; font.family:Theme.fontFamily; font.pixelSize:Theme.fontSize(12); color:Theme.text; background:null }
-                            SwirlText {Layout.minimumWidth:0; text:engineController.rustCoreBuild?"Rust Core 会在连接时校验节点、DNS 和规则能力；不支持的配置会显示阻止原因，原设置保持不变。当前版本尚不支持 TUN 网关转发，也不会回退到其他代理内核或静默直连。":"原生隧道取消 120 秒空闲断开，采用 TCP KeepAlive；节点切换对新连接生效，现有连接保持原出口。DNS、国内外分流、用户规则、策略组和 TUN 沿用当前配置。原生 TLS 上游保留反向读取，但 Qt 不支持独立 TLS 半关闭；依赖 EOF 定界的 TLS 请求仍需兼容引擎。"; color:Theme.muted; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
+                            SwirlText {Layout.minimumWidth:0; text:"Rust Core 会在连接时校验节点、DNS 和规则能力；不支持的配置会显示阻止原因，原设置保持不变。当前版本尚不支持 TUN 网关转发。"; color:Theme.muted; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
                             Rectangle { Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(1); color:Theme.border }
                             GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
                                 Layout.fillWidth:true
@@ -250,20 +244,19 @@ Item {
                                 objectName:"engineErrorText"; visible:engineController.error.length>0
                                 text:engineController.error; color:Theme.orange; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12)
                             }
-                            SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:engineController.rustCoreBuild?"内核模块":"程序路径"; color:Theme.text; font.pixelSize:Theme.fontSize(14) }
+                            SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:"内核模块"; color:Theme.text; font.pixelSize:Theme.fontSize(14) }
                             SwirlTextField {
-                                objectName:"enginePathField"; Layout.fillWidth:true; text:engineController.rustCoreBuild?"swirl_api.dll（随程序交付）":engineController.executablePath
-                                enabled:!engineController.rustCoreBuild&&engineController.canStart; onEditingFinished:if(!engineController.rustCoreBuild)engineController.executablePath=text
-                                Accessible.name:engineController.rustCoreBuild?"Swirl Rust Core 模块":"已校验引擎程序路径"
+                                objectName:"enginePathField"; Layout.fillWidth:true; text:"swirl_api.dll（随程序交付）"
+                                readOnly:true; selectByMouse:true
+                                Accessible.name:"Swirl Rust Core 模块"
                             }
                             GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
                                 Layout.fillWidth:true
-                                SwirlText {Layout.minimumWidth:0;wrapMode:Text.Wrap; text:engineController.rustCoreBuild?"控制接口":"本机控制端口"; color:Theme.text; font.pixelSize:Theme.fontSize(14); Layout.fillWidth:true }
+                                SwirlText {Layout.minimumWidth:0;wrapMode:Text.Wrap; text:"控制接口"; color:Theme.text; font.pixelSize:Theme.fontSize(14); Layout.fillWidth:true }
                                 SwirlTextField {
-                                    objectName:"enginePortField"; implicitWidth:Theme.dp(156); text:engineController.rustCoreBuild?"进程内（无需端口）":String(engineController.controlPort)
-                                    enabled:!engineController.rustCoreBuild&&engineController.canStart; validator:IntValidator { bottom:1; top:65535 }
-                                    onEditingFinished:if(!engineController.rustCoreBuild)engineController.controlPort=Number(text)
-                                    Accessible.name:engineController.rustCoreBuild?"进程内控制接口":"本机引擎控制端口"
+                                    objectName:"enginePortField"; implicitWidth:Theme.dp(156); text:"进程内（无需端口）"
+                                    readOnly:true; selectByMouse:true
+                                    Accessible.name:"进程内控制接口"
                                 }
                             }
                             SwirlText {
@@ -276,11 +269,11 @@ Item {
                                 color:Theme.muted; font.pixelSize:Theme.fontSize(12); wrapMode:Text.Wrap; Layout.fillWidth:true
                             }
                             SwirlText {
-                                text:(engineController.rustCoreBuild?"内核模块：swirl_api.dll":"已校验版本："+engineController.expectedVersion)+"　运行版本："+(engineController.engineKind==="rust"?(engineController.version||"未读取").replace("Swirl Core Rust","Swirl Core"):(engineController.version||"未读取"))+"　运行时间："+engineController.uptimeSeconds+" 秒"
+                                text:"内核模块：swirl_api.dll"+"　运行版本："+(engineController.engineKind==="rust"?(engineController.version||"未读取").replace("Swirl Core Rust","Swirl Core"):(engineController.version||"未读取"))+"　运行时间："+engineController.uptimeSeconds+" 秒"
                                 color:Theme.muted; font.pixelSize:Theme.fontSize(12); wrapMode:Text.Wrap; Layout.fillWidth:true
                             }
                             SwirlText {
-                                text:engineController.rustCoreBuild?"Rust Core 随当前程序构建交付；此处不使用旧内核的可执行文件清单。":"SHA-256："+engineController.expectedSha256
+                                text:"Rust Core 与当前程序配套交付，启动时验证 ABI 和构建标识。"
                                 color:Theme.muted; font.pixelSize:Theme.fontSize(11); wrapMode:Text.WrapAnywhere; Layout.fillWidth:true
                             }
                             GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
@@ -289,7 +282,7 @@ Item {
                                 SwirlButton { text:"检查状态"; enabled:engineController.processAlive&&!engineController.busy; onClicked:engineController.refresh(); Accessible.name:text }
                             }
                             SwirlText {
-                                text:engineController.configPath.length>0?"运行配置："+engineController.configPath:engineController.rustCoreBuild?"运行配置在启动时传入 Swirl Rust Core。":"运行配置在启动时由 Swirl 生成。"
+                                text:engineController.configPath.length>0?"运行配置："+engineController.configPath:"运行配置在启动时传入 Swirl Rust Core。"
                                 color:Theme.muted; font.pixelSize:Theme.fontSize(11); wrapMode:Text.WrapAnywhere; Layout.fillWidth:true
                             }
                             SwirlText {
@@ -336,7 +329,7 @@ Item {
                                 }
                             }
                             SwirlText {Layout.minimumWidth:0;wrapMode:Text.Wrap; text:"问题反馈请使用项目主页中的 GitHub Issues。"; Layout.fillWidth:true; horizontalAlignment:Text.AlignHCenter; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
-                            SwirlText {Layout.minimumWidth:0;wrapMode:Text.Wrap; text:engineController.rustCoreBuild?"第三方组件：Qt、MinGW 运行库、HarmonyOS Sans":"第三方组件：Qt、MinGW 运行库、Mihomo（GPL-3.0）、HarmonyOS Sans"; Layout.fillWidth:true; horizontalAlignment:Text.AlignHCenter; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
+                            SwirlText {Layout.minimumWidth:0;wrapMode:Text.Wrap; text:"第三方组件：Qt、Rust 网络与密码库、C++ 运行库、HarmonyOS Sans"; Layout.fillWidth:true; horizontalAlignment:Text.AlignHCenter; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
                         }
                         Item { Layout.preferredHeight:Theme.dp(25) }
                     }

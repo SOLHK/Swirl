@@ -72,15 +72,10 @@ class EngineController final : public QObject {
     Q_PROPERTY(QString networkConfigurationError READ networkConfigurationError NOTIFY optionsChanged)
     Q_PROPERTY(ConnectionDiagnostics* diagnostics READ diagnostics CONSTANT)
     Q_PROPERTY(QString proxyEnvironmentAdvice READ proxyEnvironmentAdvice NOTIFY optionsChanged)
-    Q_PROPERTY(bool preferCompatibility READ preferCompatibility WRITE setPreferCompatibility NOTIFY optionsChanged)
 public:
     explicit EngineController(std::unique_ptr<ProxyEngine> engine, QObject *parent = nullptr, QString storePath = {},bool realAcceptance=false);
     bool rustCoreBuild() const {
-#ifdef SWIRL_USE_RUST_CORE
         return true;
-#else
-        return false;
-#endif
     }
     QString executablePath() const { return m_options.executablePath; }
     int controlPort() const { return m_options.controlPort; }
@@ -156,8 +151,6 @@ public:
     QString networkConfigurationError() const { return m_networkError; }
     ConnectionDiagnostics *diagnostics() {return &m_diagnostics;}
     QString proxyEnvironmentAdvice() const;
-    bool preferCompatibility() const {return m_options.preferCompatibility;}
-    void setPreferCompatibility(bool enabled);
     bool tunRequested() const { return m_options.tunEnabled; }
     Q_INVOKABLE void setCaptureProxyPort(int port);
     bool tunEnabled() const { return m_engine->status().tunEnabled&&apiHealthy()&&processAlive(); }

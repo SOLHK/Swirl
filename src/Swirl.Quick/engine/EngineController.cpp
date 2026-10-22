@@ -13,17 +13,11 @@
 #include <QHostAddress>
 #include <QRegularExpression>
 #include <QNetworkInterface>
-#ifndef SWIRL_USE_RUST_CORE
-#include <QTemporaryDir>
-#include "MihomoAdapter.h"
-#endif
 #include <QFutureWatcher>
 #include <QPromise>
 #include <QThreadPool>
-#ifdef SWIRL_USE_RUST_CORE
 #include "RustCoreEngine.h"
 #include "RustDnsConfiguration.h"
-#endif
 #ifdef Q_OS_WIN
 #include <windows.h>
 #include <wincrypt.h>
@@ -63,16 +57,11 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
         if(result.configuration.isEmpty()) {
             NodeStore::ImportPlan plan;
             if(!m_store.prepareImport(result.nodes,sourceId,&plan)){*error=m_store.error();return false;}
-#ifdef SWIRL_USE_RUST_CORE
             const auto nodes=plan.nodes();QVariantMap canonical;
             if(!validateNetworkConfiguration(networkConfigurationSnapshot(),&canonical,&nodes)){*error=m_networkError;return false;}
-#endif
             if(!m_store.commitImport(plan)){*error=m_store.error();return false;}
             return true;
         }
-#ifndef SWIRL_USE_RUST_CORE
-        *error=QStringLiteral("完整订阅事务当前仅在 Rust 模式提供；旧配置保持不变。");return false;
-#else
         if(result.configurationFormat!="clash"&&(result.configurationFormat!="ini"||configuration.isEmpty())) {
             *error=QStringLiteral("此格式的完整配置尚未映射；未应用节点或全局配置，原有设置保持不变。");return false;
         }
@@ -99,13 +88,13 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
         auto input=mapped;if(!configuration.contains("proxy-groups"))input.remove("groups");if(!configuration.contains("rules"))input.remove("rules");
         if(!importNodesAndConfiguration(result.nodes,sourceId,input,result.configuration,result.configurationFormat)){*error=m_networkError;return false;}
         return true;
-#endif
     });
     connect(m_engine.get(),&ProxyEngine::statusChanged,this,[this]{m_telemetry.ingest(m_engine->status());});
     connect(&m_telemetry,&TelemetryService::changed,this,&EngineController::statusChanged);
+    connect(&m_telemetry,&TelemetryService::nativeProbeRequested,this,[this](const QUrl &url,quint64 tag){if(!m_shuttingDown)m_engine->probeNodeTagged(url,tag);});
+    connect(m_engine.get(),&ProxyEngine::probeRequestRejected,&m_telemetry,&TelemetryService::rejectNativeProbe);
     connect(&m_tests,&NodeTestService::changed,this,&EngineController::nodesChanged);
     connect(m_engine.get(),&ProxyEngine::diagnostic,this,&EngineController::diagnostic);
-#ifdef SWIRL_USE_RUST_CORE
     connect(m_engine.get(),&ProxyEngine::diagnostic,this,[this](const QString &module,const QString &code,const QString &message){
         if(module=="SwirlRust"&&(code=="SelectionUnsupported"||code=="SelectionFailed"))rollbackPendingSelection(message);
         if(module=="SwirlRust"&&(code=="RoutingUnsupported"||code=="RoutingFailed")){
@@ -114,16 +103,7 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
             emit statusChanged();
         }
     });
-#endif
     connect(this,&EngineController::diagnostic,&m_diagnostics,[this](const QString &module,const QString &code,const QString &message){m_diagnostics.noteEvent(module+" / "+code,message);});
-#ifndef SWIRL_USE_RUST_CORE
-    QFile manifest(QStringLiteral(":/engine/mihomo-manifest.json"));
-    if (manifest.open(QIODevice::ReadOnly)) {
-        const auto object = QJsonDocument::fromJson(manifest.readAll()).object();
-        m_options.expectedSha256 = object.value(QStringLiteral("executableSha256")).toString().toLatin1();
-        m_options.expectedVersion = object.value(QStringLiteral("version")).toString();
-    }
-#endif
     // The encrypted node snapshot is authoritative after the first migration.
     // Read legacy settings only when no embedded network snapshot exists.
     auto configuration=m_store.networkConfiguration();
@@ -153,11 +133,9 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
         const auto state=m_systemProxy.owned()?(m_systemProxy.enabled()?QStringLiteral("Swirl 已接管 Windows 系统代理"):QStringLiteral("接管状态未确认，恢复快照已保留")):QStringLiteral("Swirl 未接管 Windows 系统代理");
         if(state!=m_previousProxyState){m_previousProxyState=state;m_diagnostics.noteEvent(QStringLiteral("Windows 系统代理"),state);}
     });
-#ifndef SWIRL_USE_RUST_CORE
-    m_options.rulesDirectory=QCoreApplication::applicationDirPath()+"/rules";
-#endif
     QSettings settings;
-    m_options.preferCompatibility=settings.value("Proxy/preferCompatibility",false).toBool();
+    // Retired engine preferences remain on disk for data preservation, but
+    // never influence this Rust-only runtime or prevent its startup.
     m_options.routingMode=settings.value("Proxy/routingMode","rule").toString();
     if(m_options.routingMode!="rule"&&m_options.routingMode!="global"&&m_options.routingMode!="direct")m_options.routingMode="rule";
     if(m_options.meteredNetwork)m_options.routingMode="rule";
@@ -191,10 +169,7 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
             if(s.state==ProxyEngine::State::Failed)m_proxyRequested=false;
         } else if(s.state==ProxyEngine::State::Running&&s.apiHealthy&&m_proxyRequested&&!m_systemProxy.owned()&&!m_proxyChecking)setSystemProxy(true);
     });
-    if(m_options.tunEnabled&&!elevated()){m_options.tunEnabled=false;m_options.meteredNetwork=false;m_routingError=QStringLiteral("增强模式需要管理员权限，本次启动保持关闭。");}
-#ifndef SWIRL_USE_RUST_CORE
-    m_options.executablePath = QCoreApplication::applicationDirPath() + QStringLiteral("/core/mihomo.exe");
-#endif
+    if(m_options.tunEnabled)m_routingError=QStringLiteral("已保存的增强模式配置尚不受 Rust Core 支持；请明确关闭后再连接。配置保持原值。");
     connect(m_engine.get(), &ProxyEngine::statusChanged, this, &EngineController::statusChanged);
     connect(&m_store,&NodeStore::changed,this,&EngineController::nodesChanged);
     connect(&m_store,&NodeStore::changed,this,&EngineController::nodeCatalogChanged);
@@ -224,27 +199,16 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
     QTimer::singleShot(0,this,&EngineController::refreshLanAddresses);
 }
 void EngineController::updateRoutingFlags() {
-#ifdef SWIRL_USE_RUST_CORE
     m_options.smartRouting=m_smartRoutingEligible&&!m_nativeDocumentRouting&&m_options.customRules.isEmpty();
     m_options.nativePrivateRouting=m_smartRoutingEligible&&!m_nativeDocumentRouting&&!m_options.customRules.isEmpty();
-#else
-    m_options.smartRouting=m_smartRoutingEligible&&!m_nativeDocumentRouting;
-    m_options.nativePrivateRouting=false;
-#endif
 }
 QString EngineController::engineIdentityLabel() const {
     const auto status=m_engine->status();
     if(status.processAlive) {
         if(status.engineKind==QStringLiteral("rust"))return QStringLiteral("Swirl Core · 运行中");
-        if(status.engineKind==QStringLiteral("compatibility"))return QStringLiteral("Mihomo · 运行中");
-        if(status.engineKind==QStringLiteral("native"))return QStringLiteral("Swirl C++ Native · 运行中");
         return QStringLiteral("未知内核 · 运行中");
     }
-#ifdef SWIRL_USE_RUST_CORE
     return QStringLiteral("Swirl Core · 构建类型");
-#else
-    return QStringLiteral("Mihomo · 构建类型");
-#endif
 }
 bool EngineController::prepareRealAcceptance() {
     if(processAlive()||busy())return false;
@@ -272,9 +236,9 @@ QString EngineController::stateText() const {
     switch (m_engine->status().state) {
     case ProxyEngine::State::Stopped: return QStringLiteral("已停止");
     case ProxyEngine::State::Validating: return QStringLiteral("正在校验");
-    case ProxyEngine::State::Starting: return QStringLiteral("正在启动 · 等待认证 API");
-    case ProxyEngine::State::Running: return QStringLiteral("进程运行 · 控制接口健康");
-    case ProxyEngine::State::Degraded: return QStringLiteral("进程运行 · 控制接口异常");
+    case ProxyEngine::State::Starting: return QStringLiteral("正在启动 Rust Core");
+    case ProxyEngine::State::Running: return QStringLiteral("Rust Core 运行中");
+    case ProxyEngine::State::Degraded: return QStringLiteral("Rust Core 状态异常");
     case ProxyEngine::State::Stopping: return QStringLiteral("正在停止");
     case ProxyEngine::State::Failed: return QStringLiteral("引擎异常");
     }
@@ -287,7 +251,7 @@ bool EngineController::busy() const {
     const auto state = m_engine->status().state;
     return state == ProxyEngine::State::Validating || state == ProxyEngine::State::Starting || state == ProxyEngine::State::Stopping;
 }
-void EngineController::start() { if (canStart()) { m_connectionRequested=false;m_options.nodes=m_store.nodes(); m_options.selectedNodeId.clear();m_options.directSession=false; m_engine->start(m_options); } }
+void EngineController::start() { if(canStart())startConfiguredSession(); }
 void EngineController::stop() { rollbackPendingSelection(QStringLiteral("节点切换已取消，保留原选择。"));m_diagnostics.noteEvent(QStringLiteral("Swirl 操作"),QStringLiteral("用户停止引擎，现有本机代理连接将关闭。"));m_proxyRequested=false;m_systemProxy.disable(); m_connectionRequested=false;m_restartPending=false; m_options.selectedNodeId.clear();m_options.directSession=false; m_engine->stop(); }
 void EngineController::shutdown() {
     if(m_shuttingDown)return;
@@ -350,7 +314,6 @@ bool EngineController::chooseNode(const QString &id) {
     if(nodeBusy())return false;
     if(processAlive()&&!activeNodeId().isEmpty()&&!apiHealthy()){m_nodeError=QStringLiteral("控制接口未就绪，不能切换节点。");emit selectionChanged();return false;}
     const bool active=processAlive()&&!activeNodeId().isEmpty();
-#ifdef SWIRL_USE_RUST_CORE
     if(active&&id.isEmpty()){m_nodeError=QStringLiteral("连接期间不能清空节点选择；请先断开连接。");emit selectionChanged();return false;}
     if(!id.isEmpty()) {
         // A running session owns its original node snapshot. A refreshed or
@@ -364,12 +327,9 @@ bool EngineController::chooseNode(const QString &id) {
         QJsonObject configuration;const auto reason=RustCoreEngine::configuration(candidate,&configuration);
         if(!reason.isEmpty()){m_nodeError=reason;emit selectionChanged();return false;}
     }
-#endif
-#ifdef SWIRL_USE_RUST_CORE
     if(active&&activeNodeId()!=id){
         m_previousSelection=activeNodeId();m_pendingSelection=id;
     }
-#endif
     m_nodeError.clear();const bool ok=m_store.select(id);
     if(!ok){m_pendingSelection.clear();m_previousSelection.clear();}
     if(ok&&active&&activeNodeId()!=id){
@@ -388,7 +348,6 @@ void EngineController::connectNode(const QString &id) {
     if(id.isEmpty()){if(!nodeBusy())startConfiguredSession();return;}
     if(nodeBusy() || !chooseNode(id))return;
     if(processAlive() && !activeNodeId().isEmpty())return;
-#ifdef SWIRL_USE_RUST_CORE
     // Selection checks node eligibility in isolation. Starting a session must
     // also check the user's actual routing and network options before changing
     // engine state. Do not silently replace saved rule mode with global mode.
@@ -399,7 +358,6 @@ void EngineController::connectNode(const QString &id) {
     if(!m_nodeError.isEmpty()){
         m_connectionRequested=false;emit selectionChanged();emit statusChanged();return;
     }
-#endif
     m_connectionRequested=true;
     m_options.nodes=m_store.nodes();m_options.selectedNodeId=id;m_options.directSession=false;
     if(processAlive()){m_restartPending=true;m_engine->stop();}
@@ -407,7 +365,6 @@ void EngineController::connectNode(const QString &id) {
 }
 void EngineController::startConfiguredSession() {
     if(m_shuttingDown)return;
-#ifdef SWIRL_USE_RUST_CORE
     // An absent/deleted subscription selection is not authorization to bypass
     // proxies. DIRECT is an explicit routing mode, never the empty-ID default.
     if(m_store.selectedId().isEmpty()&&m_options.routingMode!="direct") {
@@ -421,15 +378,10 @@ void EngineController::startConfiguredSession() {
     if(!reason.isEmpty()){
         m_nodeError=reason;emit selectionChanged();emit statusChanged();return;
     }
-#endif
     m_nodeError.clear();
     m_connectionRequested=true;
     m_options.nodes=m_store.nodes();m_options.selectedNodeId=m_store.selectedId();
-#ifdef SWIRL_USE_RUST_CORE
     m_options.directSession=m_options.routingMode=="direct";
-#else
-    m_options.directSession=m_options.selectedNodeId.isEmpty()&&!m_nativeDocumentRouting;
-#endif
     if(processAlive()){m_systemProxy.disable();m_restartPending=true;m_engine->stop();}
     else m_engine->start(m_options);
     emit statusChanged();
@@ -445,18 +397,14 @@ void EngineController::setRoutingMode(const QString &mode) {
     if(busy()||routingBusy()||nodeBusy()||(processAlive()&&!connected())) {
         m_routingError=QStringLiteral("请等待当前操作完成，并连接节点后再切换运行模式。");emit statusChanged();return;
     }
-#ifdef SWIRL_USE_RUST_CORE
     if(processAlive()){
         auto candidate=m_options;candidate.routingMode=mode;candidate.directSession=mode=="direct";
         candidate.nodes=m_store.nodes();candidate.selectedNodeId=m_store.selectedId();
         QJsonObject configuration;const auto reason=RustCoreEngine::configuration(candidate,&configuration);
         if(!reason.isEmpty()){m_routingError=reason;emit statusChanged();return;}
     }
-#endif
     m_routingError.clear();m_options.routingMode=mode;
-#ifdef SWIRL_USE_RUST_CORE
     m_options.directSession=mode=="direct";
-#endif
     QSettings().setValue("Proxy/routingMode",mode);
     if(processAlive())m_engine->setRoutingMode(mode);
     emit statusChanged();
@@ -488,34 +436,12 @@ void EngineController::setSystemProxy(bool enabled) {
     socket->connectToHost(QHostAddress::LocalHost,quint16(m_captureProxyPort>0?m_captureProxyPort:s.proxyPort));
 }
 QString EngineController::proxyEnvironmentAdvice() const {
-#ifdef SWIRL_USE_RUST_CORE
     return QStringLiteral("从新的 PowerShell 会话启动支持代理变量的应用：\n"
         "$env:HTTP_PROXY='http://127.0.0.1:%1'\n$env:HTTPS_PROXY='http://127.0.0.1:%1'\n"
         "$env:ALL_PROXY='http://127.0.0.1:%1'\n$env:NO_PROXY='localhost,127.0.0.1,::1'\n"
         "Codex 是否读取系统代理或这些变量取决于具体版本。完全退出后从该会话重新启动，已有进程不会自动继承。"
         "当前 Rust Core 构建不提供 TUN；忽略代理设置的应用无法通过本页接入。"
         "本页只提供建议，不写入环境变量、.codex 配置文件或密钥。").arg(m_options.proxyPort);
-#else
-    return QStringLiteral("从新的 PowerShell 会话启动支持代理变量的应用：\n"
-        "$env:HTTP_PROXY='http://127.0.0.1:%1'\n$env:HTTPS_PROXY='http://127.0.0.1:%1'\n"
-        "$env:ALL_PROXY='http://127.0.0.1:%1'\n$env:NO_PROXY='localhost,127.0.0.1,::1'\n"
-        "Codex 是否读取系统代理或这些变量取决于具体版本。完全退出后从该会话重新启动，已有进程不会自动继承。"
-        "忽略两者的应用请使用自身代理设置，或由用户主动开启现有 TUN 增强模式。"
-        "本页只提供建议，不写入环境变量、.codex 配置文件或密钥。").arg(m_options.proxyPort);
-#endif
-}
-void EngineController::setPreferCompatibility(bool enabled) {
-#ifdef SWIRL_USE_RUST_CORE
-    const auto unsupported=QStringLiteral("当前 Rust Core 构建不提供兼容引擎；请关闭已保存的旧偏好后重试。");
-    if(enabled){m_routingError=unsupported;emit statusChanged();return;}
-#endif
-    if(!canStart()){m_routingError=QStringLiteral("请先断开当前连接，再修改引擎兼容设置。");emit statusChanged();return;}
-    if(m_options.preferCompatibility==enabled)return;m_options.preferCompatibility=enabled;
-    QSettings().setValue("Proxy/preferCompatibility",enabled);
-#ifdef SWIRL_USE_RUST_CORE
-    if(m_routingError==unsupported){m_routingError.clear();emit statusChanged();}
-#endif
-    emit optionsChanged();
 }
 
 bool EngineController::networkEditAllowed() {
@@ -527,7 +453,6 @@ bool EngineController::networkEditAllowed() {
 QVariantMap EngineController::networkConfigurationSnapshot() const {return {{"dns",m_options.dnsConfig},{"rules",m_options.customRules},{"groups",m_options.customGroups}};}
 bool EngineController::validateNetworkConfiguration(const QVariantMap &input,QVariantMap *canonical,const QList<ProxyNode> *candidateNodes) {
     for(const auto &key:input.keys())if(!QStringList{"dns","rules","groups"}.contains(key)){m_networkError=QStringLiteral("不支持的配置覆盖字段：")+key;emit optionsChanged();return false;}
-#ifdef SWIRL_USE_RUST_CORE
     const auto reject=[&](const QString &message){m_networkError=message;emit optionsChanged();return false;};
     if(input.contains("dns")&&!QJsonValue::fromVariant(input.value("dns")).isObject())return reject(QStringLiteral("DNS 配置必须为对象。"));
     if(input.contains("groups")&&!QJsonValue::fromVariant(input.value("groups")).isArray())return reject(QStringLiteral("策略组必须为数组。"));
@@ -540,23 +465,6 @@ bool EngineController::validateNetworkConfiguration(const QVariantMap &input,QVa
     const auto error=RustCoreEngine::validateNetworkConfiguration(candidateNodes?*candidateNodes:m_store.nodes(),dns,rules,groups);
     if(!error.isEmpty())return reject(error);
     if(canonical)*canonical={{"dns",dns},{"rules",rules},{"groups",groups}};m_networkError.clear();return true;
-#else
-    QTemporaryDir temporary;if(!temporary.isValid()){m_networkError=QStringLiteral("无法创建配置校验目录。");emit optionsChanged();return false;}
-    const auto store=temporary.filePath("nodes.dpapi");
-    if(candidateNodes){m_networkError=QStringLiteral("完整配置事务当前仅支持 Rust 模式。");return false;}
-    if(QFile::exists(m_store.filePath())&&!QFile::copy(m_store.filePath(),store)){m_networkError=QStringLiteral("无法校验当前节点配置。");return false;}
-    EngineController staged(std::make_unique<MihomoAdapter>(),nullptr,store);
-    staged.m_options.dnsConfig.clear();staged.m_options.customRules.clear();staged.m_options.customGroups.clear();
-    const auto reject=[&]{m_networkError=staged.networkConfigurationError();emit optionsChanged();return false;};
-    const auto dns=input.value("dns").toMap();if(!dns.isEmpty()&&!staged.configureDns(dns))return reject();
-    const auto groups=input.value("groups").toList();if(groups.size()>128){m_networkError=QStringLiteral("最多支持 128 个策略组。");emit optionsChanged();return false;}
-    for(const auto &entry:groups){const auto group=entry.toMap();if(!staged.savePolicyGroup(group.value("name").toString(),group.value("type").toString(),group.value("proxies").toStringList()))return reject();}
-    for(const auto &value:input.value("rules").toStringList()){const auto parts=value.split(',');
-        if(parts.size()==2&&parts[0]=="MATCH"){if(!staged.saveRoutingRule("MATCH","",parts[1]))return reject();}
-        else if(parts.size()==3){if(!staged.saveRoutingRule(parts[0],parts[1],parts[2]))return reject();}
-        else {m_networkError=QStringLiteral("规则需要 类型,匹配值,策略 或 MATCH,策略。");emit optionsChanged();return false;}}
-    if(canonical)*canonical=staged.networkConfigurationSnapshot();m_networkError.clear();return true;
-#endif
 }
 
 bool EngineController::replaceNetworkConfiguration(const QVariantMap &input) {
@@ -583,10 +491,8 @@ bool EngineController::saveNetworkConfiguration() {
     emit optionsChanged();emit statusChanged();return true;
 }
 bool EngineController::commitRoutingConfiguration(const QStringList &rules,const QVariantList &groups) {
-#ifdef SWIRL_USE_RUST_CORE
     const auto error=RustCoreEngine::validateNetworkConfiguration(m_store.nodes(),m_options.dnsConfig,rules,groups,m_smartRoutingEligible&&!m_nativeDocumentRouting&&!rules.isEmpty());
     if(!error.isEmpty()){m_networkError=error;emit optionsChanged();return false;}
-#endif
     if(rules==m_options.customRules&&groups==m_options.customGroups){emit optionsChanged();return true;}
     // Validate and durably save the candidate before publishing it to QML.
     // A failed QSaveFile commit must not expose even a transient edited state.
@@ -599,10 +505,6 @@ bool EngineController::commitRoutingConfiguration(const QStringList &rules,const
     emit optionsChanged();emit statusChanged();return true;
 }
 bool EngineController::importNodesAndConfiguration(const QList<ProxyNode> &incoming,const QString &sourceId,const QVariantMap &input,const QJsonObject &original,const QString &sourceFormat) {
-#ifndef SWIRL_USE_RUST_CORE
-    Q_UNUSED(incoming);Q_UNUSED(sourceId);Q_UNUSED(input);Q_UNUSED(original);Q_UNUSED(sourceFormat);
-    m_networkError=QStringLiteral("完整订阅事务当前仅在 Rust 模式提供。");return false;
-#else
     // Only this owner may apply while its importer is busy. Existing active
     // sessions and module overlays must never be reconfigured underneath them.
     if(m_shuttingDown || busy() || processAlive() || m_moduleOverlayActive) {
@@ -691,11 +593,9 @@ bool EngineController::importNodesAndConfiguration(const QList<ProxyNode> &incom
         m_options.dnsConfig=previous.value("dns").toMap();m_options.customRules=previous.value("rules").toStringList();m_options.customGroups=previous.value("groups").toList();emit optionsChanged();return false;
     }
     m_networkError.clear();emit optionsChanged();emit statusChanged();return true;
-#endif
 }
 bool EngineController::configureDns(const QVariantMap &input) {
     if(!networkEditAllowed())return false;
-#ifdef SWIRL_USE_RUST_CORE
     // The existing settings page sends its visible fields only. Preserve an
     // imported query policy unless the caller explicitly supplies a replacement.
     auto requested=input;
@@ -703,9 +603,6 @@ bool EngineController::configureDns(const QVariantMap &input) {
         requested.insert("queryFamily",m_options.dnsConfig.value("queryFamily"));
     QJsonObject validatedDns;const auto error=SwirlRustDns::configuration(requested,&validatedDns);
     if(!error.isEmpty()){m_networkError=error;emit optionsChanged();return false;}
-#else
-    if(input.contains("queryFamily") || m_options.dnsConfig.contains("queryFamily")){m_networkError=QStringLiteral("当前兼容内核不能执行已保存的 DNS 查询策略，请使用 Rust 内核。");emit optionsChanged();return false;}
-#endif
     const auto mode=input.value("mode",0).toInt();
     if(mode<0||mode>2){m_networkError=QStringLiteral("无效 DNS 模式。");emit optionsChanged();return false;}
     QStringList servers;
@@ -736,9 +633,7 @@ bool EngineController::configureDns(const QVariantMap &input) {
     const auto before=m_options.dnsConfig;
     m_options.dnsConfig={{"mode",mode},{"servers",servers.join(',')},{"encrypted",encrypted},{"hosts",hosts},
         {"useHosts",input.value("useHosts",true).toBool()},{"respectRules",input.value("respectRules",false).toBool()}};
-#ifdef SWIRL_USE_RUST_CORE
     if(requested.contains("queryFamily"))m_options.dnsConfig.insert("queryFamily",requested.value("queryFamily"));
-#endif
     if(saveNetworkConfiguration())return true;m_options.dnsConfig=before;emit optionsChanged();return false;
 }
 bool EngineController::saveRoutingRule(const QString &type,const QString &pattern,const QString &policy,int index) {
@@ -746,9 +641,7 @@ bool EngineController::saveRoutingRule(const QString &type,const QString &patter
     const QStringList types={"DOMAIN","DOMAIN-SUFFIX","DOMAIN-KEYWORD","IP-CIDR","IP-CIDR6","PROCESS-NAME","DST-PORT","SRC-IP-CIDR","MATCH"};
     bool valid=types.contains(type)&&pattern.size()<=2048&&!pattern.contains(QRegularExpression("[,\\r\\n]"));
     QStringList policies={"DIRECT","REJECT","SWIRL"};for(const auto &g:m_options.customGroups)policies.append(g.toMap().value("name").toString());
-#ifdef SWIRL_USE_RUST_CORE
     for(const auto &node:m_store.nodes())policies.append(node.id);
-#endif
     valid=valid&&policies.contains(policy)&&(type=="MATCH"||!pattern.trimmed().isEmpty());
     if(type=="IP-CIDR"||type=="IP-CIDR6"||type=="SRC-IP-CIDR") {
         const auto cidr=QHostAddress::parseSubnet(pattern);valid=valid&&!cidr.first.isNull()&&cidr.second>=0;
@@ -787,14 +680,9 @@ bool EngineController::savePolicyGroup(const QString &name,const QString &type,c
     auto groups=m_options.customGroups;
     int position=-1;for(int i=0;i<groups.size();++i)if(groups[i].toMap().value("name")==name.trimmed())position=i;
     QVariantMap group{{"name",name.trimmed()},{"type",type},{"proxies",members},{"url","https://www.gstatic.com/generate_204"},{"interval",300}};
-#ifdef SWIRL_USE_RUST_CORE
     // The existing editor edits name/type/members only; keep stored options it
     // cannot display, and reject incompatible combinations instead of erasing.
     if(position>=0){group=groups[position].toMap();group["type"]=type;group["proxies"]=members;}
-#else
-    QStringList available={"DIRECT","REJECT"};for(const auto &node:m_store.nodes())available.append(node.id);
-    for(const auto &member:members)if(!available.contains(member)){m_networkError=QStringLiteral("策略组包含不存在的节点。");emit optionsChanged();return false;}
-#endif
     if(position>=0)groups[position]=group;else groups.append(group);
     return commitRoutingConfiguration(m_options.customRules,groups);
 }
@@ -804,24 +692,16 @@ bool EngineController::removePolicyGroup(const QString &name) {
         const auto fields=routingRuleFields(rule);
         if(fields.value(routingRuleTargetIndex(fields))==name){m_networkError=QStringLiteral("请先删除引用此策略组的规则。");emit optionsChanged();return false;}
     }
-#ifdef SWIRL_USE_RUST_CORE
     for(const auto &value:m_options.customGroups){const auto group=value.toMap();if(group.value("name")!=name&&group.value("proxies").toStringList().contains(name)){m_networkError=QStringLiteral("请先移除其他策略组对此组的引用。");emit optionsChanged();return false;}}
-#endif
     auto groups=m_options.customGroups;
     for(int i=groups.size()-1;i>=0;--i)if(groups[i].toMap().value("name")==name)groups.removeAt(i);
     return commitRoutingConfiguration(m_options.customRules,groups);
 }
 QVariantList EngineController::routingRules() const {
     if(processAlive())return m_engine->routingRules();
-#ifdef SWIRL_USE_RUST_CORE
     auto preview=m_options;preview.routingMode="rule";preview.directSession=false;
     return RustCoreEngine::routingRulesForOptions(preview);
-#endif
-    QVariantList rows;int order=0;
-    for(const auto &line:m_options.customRules){const auto parts=routingRuleFields(line);const bool match=parts.value(0)=="MATCH";
-        rows.append(QVariantMap{{"id",QString::number(order)},{"order",order},{"customIndex",order},{"type",match?"FINAL":parts.value(0)},{"pattern",match?"":parts.value(1)},{"policy",parts.value(routingRuleTargetIndex(parts))},{"hits","—"}});++order;}
-    rows.append(QVariantMap{{"id","final"},{"order",order},{"type","FINAL"},{"pattern",""},{"policy","DIRECT"},{"hits","—"}});
-    return rows;
+
 }
 
 bool EngineController::elevated() const {
@@ -836,6 +716,7 @@ bool EngineController::elevated() const {
 }
 bool EngineController::setTunEnabled(bool enabled) {
     m_routingError.clear();
+    if(enabled){m_routingError=QStringLiteral("Rust Core 暂不支持 TUN 增强模式；已保存配置保持不变。");emit statusChanged();return false;}
     if(!enabled&&m_options.meteredNetwork){m_routingError=QStringLiteral("计费网络模式正在使用增强模式，请先关闭计费网络模式。");emit statusChanged();return false;}
     if(enabled&&!elevated()){m_routingError=QStringLiteral("请退出 Swirl，并以管理员身份运行后开启增强模式。");emit statusChanged();return false;}
     if(busy()||nodeBusy()||routingBusy()){m_routingError=QStringLiteral("请先选择一个可用代理节点，并等待当前操作结束。");emit statusChanged();return false;}
@@ -881,6 +762,7 @@ bool EngineController::configureLan(const QString &username,const QString &passw
 }
 bool EngineController::setLanEnabled(bool enabled) {
     m_networkError.clear();
+    if(enabled){m_networkError=QStringLiteral("Rust Core 暂不支持局域网代理；地址和认证配置保持不变。");emit optionsChanged();return false;}
     if(enabled&&!lanConfigured()){m_networkError=QStringLiteral("请先设置局域网代理用户名和密码。");emit optionsChanged();return false;}
     if(busy()||nodeBusy()||routingBusy()){m_networkError=QStringLiteral("请先选择代理节点，并等待当前操作结束。");emit optionsChanged();return false;}
     const bool previous=m_options.allowLan;m_options.allowLan=enabled;if(!saveNetworkConfiguration()){m_options.allowLan=previous;return false;}
@@ -889,6 +771,7 @@ bool EngineController::setLanEnabled(bool enabled) {
 }
 
 bool EngineController::setGatewayForwarding(bool enabled) {
+    if(enabled){m_routingError=QStringLiteral("Rust Core 暂不支持 TUN 网关转发；网关配置保持不变。");emit statusChanged();return false;}
     if(enabled&&m_options.meteredNetwork){m_routingError=QStringLiteral("请先关闭计费网络模式，再开启局域网网关。");emit statusChanged();return false;}
     if(enabled){if(m_options.gatewayForwarding)return true;m_tunBeforeGateway=m_options.tunEnabled;m_options.gatewayForwarding=true;
         if(setTunEnabled(true))return true;m_options.gatewayForwarding=false;return false;}
@@ -906,7 +789,9 @@ bool EngineController::configureMeteredAllowlist(const QStringList &processes) {
     if(m_options.meteredNetwork&&processAlive())startConfiguredSession();return true;
 }
 bool EngineController::setMeteredEnabled(bool enabled) {
-    m_routingError.clear();if(enabled==m_options.meteredNetwork)return true;
+    m_routingError.clear();
+    if(enabled){m_routingError=QStringLiteral("Rust Core 暂不支持计费网络接管；允许名单和已有配置保持不变。");emit statusChanged();return false;}
+    if(enabled==m_options.meteredNetwork)return true;
     if(busy()||nodeBusy()||routingBusy()||m_options.gatewayForwarding){m_routingError=QStringLiteral("请先停止网关并等待当前网络操作结束。");emit statusChanged();return false;}
     if(enabled&&!elevated()){m_routingError=QStringLiteral("计费网络模式需要管理员权限，以通过 TUN 接管程序网络。");emit statusChanged();return false;}
     const auto oldTun=m_options.tunEnabled;const auto oldMode=m_options.routingMode;

@@ -7,46 +7,62 @@
 #include <QTcpServer>
 #include <QTcpSocket>
 #include "ControlledNetwork.h"
-#include "engine/SwirlProxyEngine.h"
-#include "engine/MihomoAdapter.h"
+#include "engine/ThreadedEngine.h"
+#include <QUuid>
 #include <QJsonDocument>
 class TelemetryTests:public QObject {
  Q_OBJECT
  ProxyEngine::Status sample(qint64 time,int up,int down){ProxyEngine::Status s;s.processAlive=true;s.processId=1;s.apiHealthy=true;s.connectionsAt=time;s.trafficAt=time;s.uploadTotal=up;s.downloadTotal=down;s.uploadRate=up;s.downloadRate=down;s.connections={QVariantMap{{"id","connection-a"},{"host","fixture.test"},{"process","fixture.exe"},{"policy","DIRECT"},{"category","direct"},{"uploadBytes",up},{"downloadBytes",down},{"time",QDateTime::fromMSecsSinceEpoch(time).toString(Qt::ISODateWithMs)}}};return s;}
 private slots:
- void proxyLatencyVerifiesRealTlsAndSelectedNodeChain_data(){QTest::addColumn<bool>("compatibility");QTest::newRow("native")<<false;QTest::newRow("mihomo")<<true;}
- void proxyLatencyVerifiesRealTlsAndSelectedNodeChain(){
-  QFETCH(bool,compatibility);
-  ControlledNetwork net;QVERIFY(net.start());
+ void proxyLatencyComesFromRustAndRejectsUntrustedTargetTls(){
+  ControlledNetwork net;QVERIFY(net.start());QTemporaryDir directory;QVERIFY(directory.isValid());
   QTcpServer reservation;QVERIFY(reservation.listen(QHostAddress::LocalHost,0));
-  EngineStartOptions options;options.proxyPort=reservation.serverPort();reservation.close();
+  EngineStartOptions options;options.routingMode="global";options.proxyPort=reservation.serverPort();reservation.close();
   ProxyNode node;node.id=QUuid::createUuid().toString(QUuid::WithoutBraces);node.name="Probe node";node.protocol="socks5";node.host="127.0.0.1";node.port=net.a.serverPort();options.nodes={node};options.selectedNodeId=node.id;
-  std::unique_ptr<ProxyEngine> engine;
-  if(compatibility){
-   engine=std::make_unique<MihomoAdapter>();QFile manifest(":/engine/mihomo-manifest.json");QVERIFY(manifest.open(QIODevice::ReadOnly));const auto config=QJsonDocument::fromJson(manifest.readAll()).object();
-   options.executablePath=QCoreApplication::applicationDirPath()+"/core/mihomo.exe";options.expectedSha256=config.value("executableSha256").toString().toLatin1();options.expectedVersion=config.value("version").toString();options.healthIntervalMs=250;
-   QTcpServer control;QVERIFY(control.listen(QHostAddress::LocalHost,0));options.controlPort=control.serverPort();control.close();
-  }else engine=std::make_unique<SwirlProxyEngine>();
-  engine->start(options);QTRY_VERIFY_WITH_TIMEOUT(engine->status().apiHealthy,15000);
-  const auto original=QSslConfiguration::defaultConfiguration();auto trusted=original;trusted.addCaCertificate(net.certificate);QSslConfiguration::setDefaultConfiguration(trusted);
-  struct Restore {QSslConfiguration value;~Restore(){QSslConfiguration::setDefaultConfiguration(value);}} restore{original};
-  QVariantMap result;QPointer<ProxyLatencyProbe> probe;
-  auto connection=connect(engine.get(),&ProxyEngine::statusChanged,this,[&]{if(probe)probe->observe(engine->status());});
-  QTimer refresh;connect(&refresh,&QTimer::timeout,engine.get(),&ProxyEngine::refresh);refresh.start(50);
-  probe=new ProxyLatencyProbe(engine->status(),net.url(true),[&](const QVariantMap &r){result=r;},this);
-  QTRY_VERIFY_WITH_TIMEOUT(!result.isEmpty(),10000);
+  ThreadedEngine engine;TelemetryService model(directory.filePath("probe.json"),false);
+  connect(&engine,&ProxyEngine::statusChanged,&model,[&]{model.ingest(engine.status());});
+  connect(&model,&TelemetryService::nativeProbeRequested,&engine,&ProxyEngine::probeNodeTagged);
+  connect(&engine,&ProxyEngine::probeRequestRejected,&model,&TelemetryService::rejectNativeProbe);
+  engine.start(options);QTRY_VERIFY_WITH_TIMEOUT(engine.status().apiHealthy,5000);
+  model.m_internetProbe=net.url();model.measureProxy();QVERIFY(model.m_nativeProbePending);
+  QTRY_VERIFY_WITH_TIMEOUT(!model.m_nativeProbePending,5000);
+  const auto result=model.proxyDiagnostic();
   QVERIFY2(result.value("success").toBool(),qPrintable(result.value("state").toString()));
-  QVERIFY(result.value("routeVerified").toBool());QVERIFY(net.a.forwarded>0);QCOMPARE(net.b.forwarded,0);
-  QVERIFY(result.value("elapsedMs").toLongLong()>=0);
-  // Same real proxy/TLS path, but an expected node that does not match the
-  // observed raw chain must not be presented as a successful node measurement.
-  result.clear();auto different=engine->status();different.selectedNodeId="other-node";
-  probe=new ProxyLatencyProbe(different,net.url(true),[&](const QVariantMap &r){result=r;},this);
-  QTRY_VERIFY_WITH_TIMEOUT(!result.isEmpty(),10000);QCOMPARE(result.value("code").toString(),QString("route-mismatch"));
-  QSslConfiguration::setDefaultConfiguration(original);result.clear();
-  probe=new ProxyLatencyProbe(engine->status(),net.url(true),[&](const QVariantMap &r){result=r;},this);
-  QTRY_VERIFY_WITH_TIMEOUT(!result.isEmpty(),10000);QCOMPARE(result.value("code").toString(),QString("tls"));
-  disconnect(connection);engine->stop();
+  QCOMPARE(result.value("metricType").toString(),QString("http_headers"));QVERIFY(result.value("routeVerified").toBool());
+  QVERIFY(result.value("elapsedMs").toLongLong()>=0);QVERIFY(result.value("outboundConnectMs").toLongLong()>=0);
+  QCOMPARE(net.a.forwarded,1);QCOMPARE(net.b.forwarded,0);QCOMPARE(net.httpRequests,1);QCOMPARE(model.m_measurements,0);
+  // Queue a user URL before the worker's busy snapshot reaches the UI. The
+  // periodic request must not consume that other request's response.
+  engine.probeNode(net.url());model.measureProxy();
+  QTRY_VERIFY_WITH_TIMEOUT(!model.m_nativeProbePending,5000);
+  QCOMPARE(model.proxyDiagnostic().value("code").toString(),QString("probe-busy"));
+  QVERIFY(!model.proxyDiagnostic().value("success").toBool());
+  QTRY_VERIFY_WITH_TIMEOUT(!engine.status().nodeBusy,5000);QCOMPARE(net.httpRequests,2);
+  // The self-signed target certificate is not a Rust trusted CA. Qt's UI TLS
+  // state cannot accidentally make this core probe claim HTTPS success.
+  model.m_internetProbe=net.url(true);model.measureProxy();
+  QTRY_VERIFY_WITH_TIMEOUT(!model.m_nativeProbePending,5000);
+  QVERIFY(!model.proxyDiagnostic().value("success").toBool());
+  QCOMPARE(model.proxyDiagnostic().value("code").toString(),QString("origin_tls"));
+  QCOMPARE(model.m_measurements,0);engine.stop();QTRY_VERIFY_WITH_TIMEOUT(!engine.status().processAlive,5000);
+ }
+ void nativeProbeIgnoresStaleSuccessAndInvalidatesOnRouteChange(){
+  QTemporaryDir directory;TelemetryService model(directory.filePath("probe-generation.json"),false);
+  auto status=sample(QDateTime::currentMSecsSinceEpoch(),0,0);status.proxyPort=7898;status.selectedNodeId="A";model.ingest(status);
+  QSignalSpy requested(&model,&TelemetryService::nativeProbeRequested);model.measureProxy();QCOMPARE(requested.size(),1);
+  // A queued terminal snapshot from a previous request is not a new success.
+  status.requestState=ProxyEngine::RequestState::Succeeded;status.latencyMs=5;status.responseCode=200;model.ingest(status);
+  QVERIFY(model.m_nativeProbePending);QVERIFY(!model.proxyDiagnostic().value("success").toBool());
+  // A manual probe on the same node has tag zero and must not be attributed to
+  // the periodic URL, even if both requests were queued before UI refresh.
+  status.requestState=ProxyEngine::RequestState::InProgress;status.nodeBusy=true;model.ingest(status);QVERIFY(!model.m_nativeProbeObservedRunning);
+  status.probeRequestTag=requested.first().at(1).toULongLong();model.ingest(status);QVERIFY(model.m_nativeProbeObservedRunning);
+  status.selectedNodeId="B";model.ingest(status);QVERIFY(!model.m_nativeProbePending);QCOMPARE(model.m_measurements,0);
+  status.selectedNodeId="A";status.nodeBusy=false;status.requestState=ProxyEngine::RequestState::Succeeded;model.ingest(status);
+  QVERIFY(model.proxyDiagnostic().isEmpty());QCOMPARE(model.latencies().value("proxy").toString(),QStringLiteral("尚未测量"));
+  // A missing completion also has a bounded diagnostic, not an eternal spinner.
+  model.m_nativeProbeDeadline.setInterval(1);model.measureProxy();QTRY_VERIFY_WITH_TIMEOUT(!model.m_nativeProbePending,500);
+  QCOMPARE(model.proxyDiagnostic().value("code").toString(),QString("timeout"));QCOMPARE(model.m_measurements,0);
  }
  void httpProbeRejectsObsoleteRoundTrip(){
   QTemporaryDir temp;TelemetryService model(temp.filePath("proxy.json"),false);

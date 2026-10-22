@@ -37,6 +37,8 @@ TelemetryService::TelemetryService(QString path,bool networkMeasurements,QObject
  load();m_save.setInterval(5000);connect(&m_save,&QTimer::timeout,this,&TelemetryService::flush);m_save.start();
  m_measure.setInterval(60000);connect(&m_measure,&QTimer::timeout,this,[this]{if(m_networkEnabled&&m_status.apiHealthy)measureNetwork();});m_measure.start();
  m_stale.setInterval(1000);connect(&m_stale,&QTimer::timeout,this,[this]{if(!sampled()||!connectionsSampled())publish();});m_stale.start();
+ m_nativeProbeDeadline.setSingleShot(true);m_nativeProbeDeadline.setInterval(10000);
+ connect(&m_nativeProbeDeadline,&QTimer::timeout,this,[this]{finishNativeProbe({{"code","timeout"},{"state",QStringLiteral("Rust 节点检测超时")},{"success",false},{"metricType","http_headers"}});});
 }
 TelemetryService::~TelemetryService(){flush();}
 bool TelemetryService::sampled() const{return m_status.apiHealthy&&m_status.trafficAt>0&&nowMs()-m_status.trafficAt<6000;}
@@ -52,9 +54,21 @@ void TelemetryService::ingest(const ProxyEngine::Status &status){
  const auto epoch=QString::number(status.processId)+"/"+status.sessionId;
  if(status.processAlive&&m_epoch!=epoch){m_epoch=epoch;m_seen.clear();m_lastConnections=0;m_lastTraffic=0;m_lastUp=0;m_lastDown=0;m_externalIp.clear();m_latencies.clear();}
  const auto route=epoch+"/"+status.selectedNodeId+"/"+status.mode+"/"+QString::number(status.proxyPort)+"/"+QString::number(status.processAlive)+"/"+QString::number(status.apiHealthy)+"/"+QString::number(status.directSession);
- if(route!=m_routeEpoch){m_routeEpoch=route;++m_routeGeneration;m_externalIp.clear();m_latencies.clear();m_failedMeasurements.clear();m_internetDiagnostic.clear();m_proxyDiagnostic.clear();m_latencies["proxy"]=status.processAlive&&!status.directSession?QStringLiteral("尚未测量"):QStringLiteral("未连接");m_measurementState=QStringLiteral("尚未测量");}
+ if(route!=m_routeEpoch){m_routeEpoch=route;++m_routeGeneration;
+  // Switching away and back still invalidates the old native measurement.
+  if(m_nativeProbePending){m_nativeProbePending=false;m_nativeProbeObservedRunning=false;m_nativeProbeDeadline.stop();--m_measurements;}
+  m_externalIp.clear();m_latencies.clear();m_failedMeasurements.clear();m_internetDiagnostic.clear();m_proxyDiagnostic.clear();m_latencies["proxy"]=status.processAlive&&!status.directSession?QStringLiteral("尚未测量"):QStringLiteral("未连接");m_measurementState=QStringLiteral("尚未测量");}
  m_status=status;
- if(m_proxyProbe)m_proxyProbe->observe(status);
+ if(m_nativeProbePending&&m_nativeProbeGeneration==m_routeGeneration&&status.probeRequestTag==m_nativeProbeTag){
+  if(status.nodeBusy&&status.requestState==ProxyEngine::RequestState::InProgress)m_nativeProbeObservedRunning=true;
+  if(!status.nodeBusy&&(status.requestState==ProxyEngine::RequestState::Succeeded||status.requestState==ProxyEngine::RequestState::Failed)){
+   const bool ok=status.requestState==ProxyEngine::RequestState::Succeeded;
+   finishNativeProbe({{"code",ok?QString("success"):status.probeFailureStage.isEmpty()?QString("native-probe"):status.probeFailureStage},
+    {"state",ok?QString::number(status.latencyMs)+" ms":status.nodeMessage},{"success",ok},{"http",status.responseCode},{"elapsedMs",status.latencyMs},
+    {"outboundConnectMs",status.probeOutboundConnectMs},{"originTlsMs",status.probeOriginTlsMs},{"metricType","http_headers"},
+    {"routeVerified",ok},{"route",QStringLiteral("当前所选 Rust 出站")},{"detail",QStringLiteral("Rust Core 测量所选出站至最终响应首部；不含界面刷新等待时间。")}});
+  }
+ }
  if(!status.apiHealthy){for(auto it=m_seen.begin();it!=m_seen.end();++it)if(it->value("status")!="已结束")(*it)["status"]=status.processAlive?QStringLiteral("采样中断"):QStringLiteral("已结束");publish();return;}
  if(status.connectionsAt>m_lastConnections){
   m_lastConnections=status.connectionsAt;const auto date=QDateTime::fromMSecsSinceEpoch(status.connectionsAt).date().toString(Qt::ISODate);
@@ -146,9 +160,9 @@ void TelemetryService::recordInternetResult(int error,int http,bool proxy,qint64
  else if(error==int(QNetworkReply::SslHandshakeFailedError)){code="tls";state=QStringLiteral("TLS 握手失败");advice=QStringLiteral("检查证书信任与系统时间；不要关闭证书校验。");}
  else if(error==int(QNetworkReply::HostNotFoundError)||error==int(QNetworkReply::ProxyNotFoundError)){code="dns";state=QStringLiteral("DNS 解析失败");advice=QStringLiteral("检查系统 DNS 与 Swirl DNS 配置。");}
  else if(error==int(QNetworkReply::TimeoutError)||error==int(QNetworkReply::OperationCanceledError)){code="timeout";state=QStringLiteral("检测超时");advice=QStringLiteral("检查网络、节点可达性或稍后重试。");}
- else if(proxy && (error==int(QNetworkReply::ProxyConnectionRefusedError)||error==int(QNetworkReply::ConnectionRefusedError))){code="proxy-port";state=QStringLiteral("本地代理端口不可用");advice=QStringLiteral("确认 Mihomo 正在运行，且本地代理端口正常监听。");}
+ else if(proxy && (error==int(QNetworkReply::ProxyConnectionRefusedError)||error==int(QNetworkReply::ConnectionRefusedError))){code="proxy-port";state=QStringLiteral("本地代理端口不可用");advice=QStringLiteral("确认 Rust Core 正在运行，且本地代理端口正常监听。");}
  else if(!proxy && error==int(QNetworkReply::NetworkSessionFailedError)){code="offline";state=QStringLiteral("本机网络不可用");advice=QStringLiteral("检查 Wi-Fi、网线或系统网络连接。");}
- else if(!proxy && m_status.processAlive && !m_status.apiHealthy){code="proxy-unconnected";state=QStringLiteral("代理尚未就绪");advice=QStringLiteral("确认 Mihomo 控制接口健康，等待连接完成或检查引擎错误。");}
+ else if(!proxy && m_status.processAlive && !m_status.apiHealthy){code="proxy-unconnected";state=QStringLiteral("代理尚未就绪");advice=QStringLiteral("确认 Rust Core 状态健康，等待连接完成或检查内核错误。");}
  else if(http>=300){code="service";state=QStringLiteral("检测服务响应异常");advice=QStringLiteral("检测服务未返回成功响应，可使用节点详情中的自选 URL 测试。");}
  else {code="outbound";state=QStringLiteral("出站请求失败");advice=QStringLiteral("检查网络和节点；路由、DNS 有延迟不代表 HTTPS 出站成功。");}
  m_internetDiagnostic["code"]=code;m_internetDiagnostic["state"]=state;m_internetDiagnostic["advice"]=advice;
@@ -167,6 +181,25 @@ void TelemetryService::measureHttp(const QString &key,const QUrl &url,bool throu
  connect(reply,&QNetworkReply::readyRead,this,[reply]{if(reply->bytesAvailable()>4096)reply->abort();});
  connect(reply,&QNetworkReply::finished,this,[this,network,reply,timer,key,ip,epoch,throughProxy]{const auto code=reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();const bool ok=reply->error()==QNetworkReply::NoError&&code>=200&&code<300;if(epoch==m_routeGeneration){if(key=="internet")recordInternetResult(int(reply->error()),code,throughProxy,timer->elapsed());if(ip){const QString candidate=QString::fromUtf8(reply->readAll()).trimmed();m_externalIp=ok&&!QHostAddress(candidate).isNull()?candidate:QString();}else if(key!="internet")m_latencies[key]=ok?QString::number(timer->elapsed())+" ms":"检测失败";reportMeasurement(key,ok,QString("测量失败，HTTP %1，网络错误 %2").arg(code).arg(int(reply->error())));}reply->deleteLater();network->deleteLater();finishMeasurement(epoch);});
 }
+void TelemetryService::measureProxy(){
+ if(m_nativeProbePending)return;
+ if(!m_status.apiHealthy||!m_status.processAlive||m_status.directSession||m_status.selectedNodeId.isEmpty()){m_latencies["proxy"]=QStringLiteral("未连接");return;}
+ if(m_status.nodeBusy){m_latencies["proxy"]=QStringLiteral("节点检测进行中");return;}
+ ++m_measurements;m_nativeProbePending=true;m_nativeProbeObservedRunning=false;m_nativeProbeGeneration=m_routeGeneration;
+ m_latencies["proxy"]=QStringLiteral("测量中");m_proxyDiagnostic={{"code","measuring"},{"metricType","http_headers"},{"route",QStringLiteral("当前所选 Rust 出站")}};
+ if(++m_nativeProbeTag==0)++m_nativeProbeTag;
+ m_nativeProbeDeadline.start();emit nativeProbeRequested(m_internetProbe,m_nativeProbeTag);
+}
+void TelemetryService::rejectNativeProbe(quint64 tag,const QString &code){
+ if(m_nativeProbePending&&tag==m_nativeProbeTag)finishNativeProbe({{"code",code},{"state",code=="probe-busy"?QStringLiteral("另一个节点检测正在进行"):QStringLiteral("Rust 节点检测不可用")},{"success",false},{"metricType","http_headers"}});
+}
+void TelemetryService::finishNativeProbe(const QVariantMap &result){
+ if(!m_nativeProbePending)return;
+ m_nativeProbePending=false;m_nativeProbeObservedRunning=false;m_nativeProbeDeadline.stop();
+ const auto generation=m_nativeProbeGeneration;
+ if(generation==m_routeGeneration){m_proxyDiagnostic=result;m_latencies["proxy"]=result.value("state");reportMeasurement("proxy",result.value("success").toBool(),result.value("code").toString());}
+ finishMeasurement(generation);
+}
 void TelemetryService::measureNetwork(){
  if(!m_networkEnabled||m_measurements)return;m_measurementState="正在测量";m_measurements=2;
  // A fixed direct TCP handshake bypassed the selected proxy and falsely
@@ -175,14 +208,7 @@ void TelemetryService::measureNetwork(){
  const bool throughProxy=m_status.apiHealthy && m_status.proxyPort>0;
  m_internetDiagnostic={{"code","measuring"},{"state",QStringLiteral("正在检测")},{"route",throughProxy?QStringLiteral("Swirl 本地代理策略"):QStringLiteral("直连")},{"engineRunning",m_status.processAlive},{"apiHealthy",m_status.apiHealthy},{"proxyPort",m_status.proxyPort},{"selectedNode",!m_status.selectedNodeId.isEmpty()},{"directSession",m_status.directSession}};
  measureHttp("internet",m_internetProbe,throughProxy);
- if(throughProxy&&!m_status.directSession){
-  ++m_measurements;m_latencies["proxy"]=QStringLiteral("测量中");m_proxyDiagnostic={{"code","measuring"},{"entryPort",m_status.proxyPort},{"route",QStringLiteral("当前代理入口策略")}};
-  const auto generation=m_routeGeneration;
-  m_proxyProbe=new ProxyLatencyProbe(m_status,m_internetProbe,[this,generation](const QVariantMap &result){
-   if(generation==m_routeGeneration){m_proxyDiagnostic=result;m_latencies["proxy"]=result.value("state");reportMeasurement("proxy",result.value("success").toBool(),result.value("code").toString());}
-   finishMeasurement(generation);
-  },this);
- }
+ if(throughProxy&&!m_status.directSession)measureProxy();
  else m_latencies["proxy"]=QStringLiteral("未连接");
  if(m_status.apiHealthy&&m_status.proxyPort>0){++m_measurements;measureHttp("exit",QUrl("https://api.ipify.org"),true,true);}
  auto dns=new QDnsLookup(QDnsLookup::A,"www.microsoft.com",this);auto elapsed=std::make_shared<QElapsedTimer>();elapsed->start();const auto epoch=m_routeGeneration;
