@@ -1,0 +1,519 @@
+{
+  "schema": 1,
+  "repository": "SOLHK/Swirl",
+  "branch": "work/xray-v2ray-transport-20261022",
+  "sha": "4f3f0caba8f20e7fa776ea7a710864a685215d44",
+  "run_id": 39723505766,
+  "run_attempt": 1,
+  "run_url": "https://github.com/SOLHK/Swirl/actions/runs/39723505766",
+  "observed_jobs_at_utc": "2026-10-22 04:45:29 UTC",
+  "overall_run_status_at_observation": "in_progress",
+  "overall_run_conclusion_at_observation": null,
+  "scope": "Completed Linux and macOS jobs for the exact pushed C6 commit. Windows was assigned to a separate reviewer and is intentionally not inferred from these results.",
+  "sources": {
+    "run_api": "https://api.github.com/repos/SOLHK/Swirl/actions/runs/39723505766",
+    "jobs_api": "https://api.github.com/repos/SOLHK/Swirl/actions/runs/39723505766/jobs",
+    "job_logs_api": "https://api.github.com/repos/SOLHK/Swirl/actions/jobs/{job_id}/logs"
+  },
+  "jobs": [
+    {
+      "job_id": 119642111103,
+      "platform": "Linux",
+      "runner": "native-transports (ubuntu-latest)",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39723505766/job/119642111103",
+      "status": "completed",
+      "conclusion": "success",
+      "checks": [
+        {
+          "check": "fmt",
+          "name": "Format",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "check": "check",
+          "name": "Check",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "check": "clippy",
+          "name": "Clippy",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "check": "workspace_tests",
+          "name": "Unit and local network tests",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "check": "release_build",
+          "name": "Build native binaries and dynamic library",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "check": "C1",
+          "name": "Independent TCP and WebSocket Xray interoperability",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "check": "C2",
+          "name": "Independent streaming gRPC Xray interoperability",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "check": "C3",
+          "name": "Independent legacy HTTP2 Xray interoperability",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "check": "C4",
+          "name": "Independent HTTPUpgrade Xray interoperability",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "check": "C5",
+          "name": "Independent XHTTP stream-one Xray interoperability",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "check": "C6_core",
+          "name": "Core transport selection and probes through independent Xray",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "check": "C6_tls_policy",
+          "name": "Required TLS ALPN policy with trusted local peers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "check": "C6_reality",
+          "name": "Independent REALITY transport and raw Vision regression",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "check": "artifact",
+          "name": "Preserve peer identity and raw test evidence",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ],
+      "commands": [
+        "cargo fmt --all -- --check",
+        "cargo check --workspace --locked",
+        "cargo clippy --workspace --all-targets --locked -- -D warnings",
+        "cargo test --workspace --locked",
+        "cargo build --release --workspace --lib --bins --examples --locked",
+        "python tools/tests/test_transport_c1_xray.py -v",
+        "python tools/tests/test_transport_grpc_xray.py -v",
+        "python tools/tests/test_transport_http2_xray.py -v",
+        "python tools/tests/test_transport_http_xray.py -v",
+        "python tools/tests/test_transport_xhttp_xray.py -v",
+        "python tools/tests/test_transport_runtime_xray.py -v",
+        "python tools/tests/test_transport_tls_policy.py",
+        "python tools/tests/test_transport_reality_xray.py -v"
+      ],
+      "rust_tests": {
+        "failed": 0,
+        "ignored": 0,
+        "unit_or_binary": 445,
+        "doc": 1
+      },
+      "python_suites": [
+        {
+          "command": "python tools/tests/test_transport_c1_xray.py -v",
+          "evidence_level": "Independent pinned official Xray peer",
+          "result_line": "Ran 6 tests in 3.464s",
+          "result": "OK"
+        },
+        {
+          "command": "python tools/tests/test_transport_grpc_xray.py -v",
+          "evidence_level": "Independent pinned official Xray peer",
+          "result_line": "Ran 11 tests in 3.485s",
+          "result": "OK"
+        },
+        {
+          "command": "python tools/tests/test_transport_http2_xray.py -v",
+          "evidence_level": "Independent pinned official Xray peer",
+          "result_line": "Ran 8 tests in 2.049s",
+          "result": "OK"
+        },
+        {
+          "command": "python tools/tests/test_transport_http_xray.py -v",
+          "evidence_level": "Independent pinned official Xray peer",
+          "result_line": "Ran 9 tests in 2.669s",
+          "result": "OK"
+        },
+        {
+          "command": "python tools/tests/test_transport_xhttp_xray.py -v",
+          "evidence_level": "Independent pinned official Xray peer",
+          "result_line": "Ran 10 tests in 1.711s",
+          "result": "OK"
+        },
+        {
+          "command": "python tools/tests/test_transport_runtime_xray.py -v",
+          "evidence_level": "Independent pinned official Xray peer",
+          "result_line": "Ran 4 tests in 2.954s",
+          "result": "OK"
+        },
+        {
+          "command": "python tools/tests/test_transport_tls_policy.py",
+          "evidence_level": "Local trusted TLS fixture; no proxy interoperability claim",
+          "result_line": "Ran 3 tests in 0.019s",
+          "result": "OK"
+        },
+        {
+          "command": "python tools/tests/test_transport_reality_xray.py -v",
+          "evidence_level": "Independent pinned official Xray peer",
+          "result_line": "Ran 10 tests in 9.898s",
+          "result": "OK"
+        }
+      ],
+      "python_method_count": 61,
+      "official_peer_method_count": 58,
+      "local_tls_policy_method_count": 3,
+      "rust_result_excerpts": [
+        "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s",
+        "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.59s",
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.55s",
+        "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.41s",
+        "test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 70 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.46s",
+        "test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s",
+        "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s",
+        "test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+        "test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.52s",
+        "test result: ok. 89 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s",
+        "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s",
+        "test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s",
+        "test result: ok. 109 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.36s",
+        "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s"
+      ],
+      "errors": []
+    },
+    {
+      "job_id": 119642111380,
+      "platform": "macOS",
+      "runner": "native-transports (macos-latest)",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39723505766/job/119642111380",
+      "status": "completed",
+      "conclusion": "success",
+      "checks": [
+        {
+          "check": "fmt",
+          "name": "Format",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "check": "check",
+          "name": "Check",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "check": "clippy",
+          "name": "Clippy",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "check": "workspace_tests",
+          "name": "Unit and local network tests",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "check": "release_build",
+          "name": "Build native binaries and dynamic library",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "check": "C1",
+          "name": "Independent TCP and WebSocket Xray interoperability",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "check": "C2",
+          "name": "Independent streaming gRPC Xray interoperability",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "check": "C3",
+          "name": "Independent legacy HTTP2 Xray interoperability",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "check": "C4",
+          "name": "Independent HTTPUpgrade Xray interoperability",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "check": "C5",
+          "name": "Independent XHTTP stream-one Xray interoperability",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "check": "C6_core",
+          "name": "Core transport selection and probes through independent Xray",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "check": "C6_tls_policy",
+          "name": "Required TLS ALPN policy with trusted local peers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "check": "C6_reality",
+          "name": "Independent REALITY transport and raw Vision regression",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "check": "artifact",
+          "name": "Preserve peer identity and raw test evidence",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ],
+      "commands": [
+        "cargo fmt --all -- --check",
+        "cargo check --workspace --locked",
+        "cargo clippy --workspace --all-targets --locked -- -D warnings",
+        "cargo test --workspace --locked",
+        "cargo build --release --workspace --lib --bins --examples --locked",
+        "python tools/tests/test_transport_c1_xray.py -v",
+        "python tools/tests/test_transport_grpc_xray.py -v",
+        "python tools/tests/test_transport_http2_xray.py -v",
+        "python tools/tests/test_transport_http_xray.py -v",
+        "python tools/tests/test_transport_xhttp_xray.py -v",
+        "python tools/tests/test_transport_runtime_xray.py -v",
+        "python tools/tests/test_transport_tls_policy.py",
+        "python tools/tests/test_transport_reality_xray.py -v"
+      ],
+      "rust_tests": {
+        "unit_or_binary": 445,
+        "doc": 1,
+        "failed": 0,
+        "ignored": 0
+      },
+      "python_suites": [
+        {
+          "command": "python tools/tests/test_transport_c1_xray.py -v",
+          "evidence_level": "Independent pinned official Xray peer",
+          "result_line": "Ran 6 tests in 6.962s",
+          "result": "OK"
+        },
+        {
+          "command": "python tools/tests/test_transport_grpc_xray.py -v",
+          "evidence_level": "Independent pinned official Xray peer",
+          "result_line": "Ran 11 tests in 6.852s",
+          "result": "OK"
+        },
+        {
+          "command": "python tools/tests/test_transport_http2_xray.py -v",
+          "evidence_level": "Independent pinned official Xray peer",
+          "result_line": "Ran 8 tests in 3.802s",
+          "result": "OK"
+        },
+        {
+          "command": "python tools/tests/test_transport_http_xray.py -v",
+          "evidence_level": "Independent pinned official Xray peer",
+          "result_line": "Ran 9 tests in 4.576s",
+          "result": "OK"
+        },
+        {
+          "command": "python tools/tests/test_transport_xhttp_xray.py -v",
+          "evidence_level": "Independent pinned official Xray peer",
+          "result_line": "Ran 10 tests in 3.521s",
+          "result": "OK"
+        },
+        {
+          "command": "python tools/tests/test_transport_runtime_xray.py -v",
+          "evidence_level": "Independent pinned official Xray peer",
+          "result_line": "Ran 4 tests in 3.976s",
+          "result": "OK"
+        },
+        {
+          "command": "python tools/tests/test_transport_tls_policy.py",
+          "evidence_level": "Local trusted TLS fixture; no proxy interoperability claim",
+          "result_line": "Ran 3 tests in 0.035s",
+          "result": "OK"
+        },
+        {
+          "command": "python tools/tests/test_transport_reality_xray.py -v",
+          "evidence_level": "Independent pinned official Xray peer",
+          "result_line": "Ran 10 tests in 6.330s",
+          "result": "OK"
+        }
+      ],
+      "python_method_count": 61,
+      "official_peer_method_count": 58,
+      "local_tls_policy_method_count": 3,
+      "rust_result_excerpts": [
+        "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.06s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.41s",
+        "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.94s",
+        "test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.57s",
+        "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.46s",
+        "test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+        "test result: ok. 70 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.61s",
+        "test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s",
+        "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.68s",
+        "test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s",
+        "test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.41s",
+        "test result: ok. 89 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s",
+        "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s",
+        "test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s",
+        "test result: ok. 109 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.17s",
+        "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s"
+      ],
+      "errors": []
+    }
+  ],
+  "observations": [
+    {
+      "at_utc": "2026-10-22 04:39:32 UTC",
+      "jobs": [
+        {
+          "job_id": 119642111103,
+          "status": "in_progress",
+          "conclusion": null,
+          "active_steps": [
+            "Unit and local network tests"
+          ]
+        },
+        {
+          "job_id": 119642111380,
+          "status": "in_progress",
+          "conclusion": null,
+          "active_steps": [
+            "Check"
+          ]
+        }
+      ]
+    },
+    {
+      "at_utc": "2026-10-22 04:40:52 UTC",
+      "jobs": [
+        {
+          "job_id": 119642111103,
+          "status": "in_progress",
+          "conclusion": null,
+          "active_steps": [
+            "Build native binaries and dynamic library"
+          ]
+        },
+        {
+          "job_id": 119642111380,
+          "status": "in_progress",
+          "conclusion": null,
+          "active_steps": [
+            "Unit and local network tests"
+          ]
+        }
+      ]
+    },
+    {
+      "at_utc": "2026-10-22 04:42:16 UTC",
+      "jobs": [
+        {
+          "job_id": 119642111103,
+          "status": "in_progress",
+          "conclusion": null,
+          "active_steps": [
+            "Independent REALITY transport and raw Vision regression"
+          ]
+        },
+        {
+          "job_id": 119642111380,
+          "status": "in_progress",
+          "conclusion": null,
+          "active_steps": [
+            "Build native binaries and dynamic library"
+          ]
+        }
+      ]
+    },
+    {
+      "at_utc": "2026-10-22 04:43:32 UTC",
+      "jobs": [
+        {
+          "job_id": 119642111103,
+          "status": "completed",
+          "conclusion": "success",
+          "active_steps": []
+        },
+        {
+          "job_id": 119642111380,
+          "status": "in_progress",
+          "conclusion": null,
+          "active_steps": [
+            "Build native binaries and dynamic library"
+          ]
+        }
+      ]
+    },
+    {
+      "at_utc": "2026-10-22 04:45:29 UTC",
+      "jobs": [
+        {
+          "job_id": 119642111103,
+          "status": "completed",
+          "conclusion": "success",
+          "active_steps": []
+        },
+        {
+          "job_id": 119642111380,
+          "status": "completed",
+          "conclusion": "success",
+          "active_steps": []
+        }
+      ]
+    }
+  ],
+  "actions_taken": "Read-only GitHub metadata/log inspection. No source edits, Cargo runs, job retries, or repository changes.",
+  "limitation": "Test-method counts include parameterized subcases and do not equal native connection invocation counts. Overall three-platform status requires the independently observed Windows result."
+}

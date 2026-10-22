@@ -146,8 +146,8 @@ was resolved before the final successful serial run; no test was removed or
 changed to hide that failure. A similar local incremental-artifact collision
 reappeared during C3 without concurrent edits, so concurrency alone is not a
 proven root cause. C3 clears only generated local crate artifacts and repeats
-the complete gates. Fresh C2 CI checkouts passed the unit/doctest gate on all
-three platforms; macOS has also completed the full C2 interoperability job.
+the complete gates. Fresh C2 CI checkouts subsequently passed the complete
+Rust, release-build and interoperability jobs on all three platforms.
 
 ## C3 legacy HTTP/2
 
@@ -247,8 +247,10 @@ cancellations), 17 were correctly rejected. TLS/H2 and H2C, VLESS/Trojan,
 verified target HTTPS, Unicode Path and query, Host, 8 MiB duplex data, eight
 concurrent connections, bad credentials/CA/SNI/Host/Path, server interruption
 and a fresh connection passed. Unimplemented modes/options were rejected.
-Target TLS close_notify completed twice and every native result had zero
-remaining tasks; fixture cleanup had no errors. All four required Rust gates
+Target TLS close_notify completed twice. Every native result that constructed
+a runtime reported zero remaining tasks; three InputSyntax rejections occurred
+before runtime creation and have no task-count measurement. Fixture cleanup
+had no errors. All four required Rust gates
 passed with 441 tests including doctests, zero failed/ignored. Exact local
 evidence is under `evidence/transports/c5/`.
 
@@ -256,13 +258,13 @@ evidence is under `evidence/transports/c5/`.
 
 C2's [three-platform run 39720068070](https://github.com/SOLHK/Swirl/actions/runs/39720068070)
 passed completely. C3's [run 39720581183](https://github.com/SOLHK/Swirl/actions/runs/39720581183)
-passed Ubuntu/macOS, but Windows failed the unchanged two-second assertion
-that all eight cancelled legacy-H2 target sockets close. All eight native
+passed Ubuntu/macOS, but Windows failed the unchanged target half-close and
+eight-connection cancellation-release assertions. All eight native
 clients had correct hashes and zero driver tasks; the legacy official server
 logged all eight CANCEL frames. This is retained as a failure, not converted
-to success. Old Xray's Windows `readv` implementation is the current suspect;
-C6 will validate a fixture-only upstream-option workaround with the same
-official binary and unchanged transport/closure assertions.
+to success. Old Xray's Windows `readv` implementation was investigated;
+C6's subsequent fixture-only upstream-option validation uses the same official
+binary and unchanged transport/closure assertions, as recorded below.
 
 ## C6 native runtime and security integration
 
@@ -341,7 +343,16 @@ eight concurrent cancellations and two-second closure assertion are unchanged.
 Every fixture report records this environment override. Linux/macOS and the
 current-version server do not receive it. This is a test-server compatibility
 condition, not a claim that v1.8.24's default Windows readv behavior was fixed
-inside Swirl. Its result still requires the C6 Windows job.
+inside Swirl. The C6 Windows job passed all eight legacy-H2 methods, including
+the unchanged target half-close, eight-client cancellation and two-second
+target-release checks. All eight clients reported correct byte counts,
+payload hashes and zero remaining tasks;
+the origin reported eight client closes and zero interruptions. The executable
+digest matches the earlier failed C3 run. This observation does not establish
+readv as the sole cause of the earlier failures. The old server's fixed
+`CopyRawConn readv` log message also appears when its reader is SingleReader;
+that message alone does not identify the active reader optimization. See
+`evidence/transports/c6/ci-windows-final.json` for the exact logs and source links.
 
 ### Capability matrix at the C6 source boundary
 
@@ -413,8 +424,37 @@ an invalid request; the attempt counts above separate those cases. All observed
 native runtime driver counts drained to zero. Input-syntax rejections that occur
 before constructing a runtime have no task-count field and are not represented
 as measured runtime results. Exact commands, output, binary hashes and summaries
-are committed under `evidence/transports/c6/`. These local Linux results do not
-stand in for a later Windows/macOS CI execution.
+are committed under `evidence/transports/c6/`. The separate completed
+three-platform execution is recorded below.
+
+### Final three-platform CI
+
+Runtime source commit
+[`4f3f0caba8f20e7fa776ea7a710864a685215d44`](https://github.com/SOLHK/Swirl/commit/4f3f0caba8f20e7fa776ea7a710864a685215d44)
+passed [run 39723505766](https://github.com/SOLHK/Swirl/actions/runs/39723505766)
+on its first attempt. The overall run and every platform job are completed /
+success, with no failed or skipped steps:
+
+| Platform | Exact job | Result |
+| --- | --- | --- |
+| Linux | [119642111103](https://github.com/SOLHK/Swirl/actions/runs/39723505766/job/119642111103) | success |
+| Windows | [119642111443](https://github.com/SOLHK/Swirl/actions/runs/39723505766/job/119642111443) | success |
+| macOS | [119642111380](https://github.com/SOLHK/Swirl/actions/runs/39723505766/job/119642111380) | success |
+
+Each job passed fmt, check, clippy, workspace tests, the release dynamic-library /
+binary / example build, all eight Python suites and evidence upload. Each ran
+61 Python methods: 58 in suites using independent official servers and three
+controlled TLS-only policy tests. Linux and macOS each passed 445 unit/binary
+tests plus one doctest; Windows passed 446 unit/binary tests plus one doctest.
+All had zero failed or ignored Rust tests. This does not change the WSS close limitation,
+the Windows legacy-server condition or the failed public-target result.
+
+`evidence/transports/c6/ci-final.json` records the exact run/job metadata and
+source subtree identities. `ci-linux-macos-final.json` and
+`ci-windows-final.json` preserve compact command/output observations. The later
+documentation-only receipt adds these records and corrects the runtime-count
+wording; its source, test and workflow trees match the tested runtime commit.
+It is not represented as an additional runtime test execution.
 
 ### Finite release resource measurements
 
@@ -507,8 +547,9 @@ B can pass a validated `Outbound` and separate native `Transport` into
 `connect_with_transport`. Unsupported options must remain explicit errors;
 import success alone must not change execution capability reporting.
 VMess does not exist in this pinned native protocol baseline; an enum in an
-importer cannot make it executable. New transports will be tested with the
-implemented VLESS and Trojan connectors and report VMess separately.
+importer cannot make it executable. The new transports have independent tests
+with the implemented VLESS and Trojan connectors, subject to the exact
+combination limits above. VMess remains unimplemented.
 
 During C2, the B branch advanced to
 [`4606b6df484cd0504014b9bdac6cb237a813c9b3`](https://github.com/SOLHK/Swirl/commit/4606b6df484cd0504014b9bdac6cb237a813c9b3).
@@ -579,7 +620,7 @@ CI prerequisite.
 
 The dedicated `Swirl Native Transports` workflow runs all four Rust gates,
 dynamic-library/binary builds and independent server tests on Windows, Linux
-and macOS. A workflow definition is not a CI result: report exact-SHA outcomes
-after execution. Public/provider connectivity remains unverified; the failed
-public-target attempt and finite loopback resource measurements have separate
-evidence and do not change that status.
+and macOS. Its completed exact-SHA results are recorded in the final CI section.
+Public/provider connectivity remains unverified; the failed public-target
+attempt and finite loopback resource measurements have separate evidence and
+do not change that status.

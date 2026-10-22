@@ -1,0 +1,406 @@
+{
+  "schema": 1,
+  "repository": "SOLHK/Swirl",
+  "branch": "work/xray-v2ray-transport-20261022",
+  "runtime_source_commit": "4f3f0caba8f20e7fa776ea7a710864a685215d44",
+  "run": {
+    "id": 39723505766,
+    "url": "https://github.com/SOLHK/Swirl/actions/runs/39723505766",
+    "attempt": 1,
+    "status": "completed",
+    "conclusion": "success"
+  },
+  "jobs": [
+    {
+      "id": 119642111103,
+      "name": "native-transports (ubuntu-latest)",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39723505766/job/119642111103",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-22T04:38:35Z",
+      "completed_at": "2026-10-22T04:42:21Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install Rust tools",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Format",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Check",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Clippy",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Unit and local network tests",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build native binaries and dynamic library",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install synthetic certificate dependency",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Fetch independent pinned test servers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Independent TCP and WebSocket Xray interoperability",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Independent streaming gRPC Xray interoperability",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Independent legacy HTTP2 Xray interoperability",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Independent HTTPUpgrade Xray interoperability",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Independent XHTTP stream-one Xray interoperability",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Core transport selection and probes through independent Xray",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Required TLS ALPN policy with trusted local peers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Independent REALITY transport and raw Vision regression",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Preserve peer identity and raw test evidence",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 119642111380,
+      "name": "native-transports (macos-latest)",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39723505766/job/119642111380",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-22T04:38:36Z",
+      "completed_at": "2026-10-22T04:44:28Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install Rust tools",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Format",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Check",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Clippy",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Unit and local network tests",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build native binaries and dynamic library",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install synthetic certificate dependency",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Fetch independent pinned test servers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Independent TCP and WebSocket Xray interoperability",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Independent streaming gRPC Xray interoperability",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Independent legacy HTTP2 Xray interoperability",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Independent HTTPUpgrade Xray interoperability",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Independent XHTTP stream-one Xray interoperability",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Core transport selection and probes through independent Xray",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Required TLS ALPN policy with trusted local peers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Independent REALITY transport and raw Vision regression",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Preserve peer identity and raw test evidence",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "id": 119642111443,
+      "name": "native-transports (windows-latest)",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39723505766/job/119642111443",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-10-22T04:38:35Z",
+      "completed_at": "2026-10-22T04:47:14Z",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install Rust tools",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Format",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Check",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Clippy",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Unit and local network tests",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Build native binaries and dynamic library",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Install synthetic certificate dependency",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Fetch independent pinned test servers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Independent TCP and WebSocket Xray interoperability",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Independent streaming gRPC Xray interoperability",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Independent legacy HTTP2 Xray interoperability",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Independent HTTPUpgrade Xray interoperability",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Independent XHTTP stream-one Xray interoperability",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Core transport selection and probes through independent Xray",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Required TLS ALPN policy with trusted local peers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Independent REALITY transport and raw Vision regression",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Preserve peer identity and raw test evidence",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    }
+  ],
+  "source_verification": "The documentation-only receipt must preserve the tested core, tools and .github subtrees. No additional runtime execution is inferred from that receipt.",
+  "limitations": [
+    "C1 WSS complete-response/outer-close limitation remains.",
+    "Windows legacy Xray v1.8.24 fixture sets xray.buf.readv=disable; no claim that Swirl fixes that server's default reader or proves a sole cause.",
+    "XHTTP supports explicit stream-one over HTTP/2 only.",
+    "VMess native connector and B JSON-to-Core adapter are not implemented here.",
+    "Public-target attempt failed at environment DNS; no authorized remote public proxy node was tested."
+  ],
+  "tested_source_subtrees": {
+    "core": "5ffe8916783c34bc0af69ed3c3f6a57f5287eb60",
+    "tools": "064ccd6ad6899b98bd4b7363b013cce77de51e1d",
+    ".github": "3527657d1d3c21b338661ab2c7bd2aac7b239ba8"
+  }
+}
