@@ -12,6 +12,7 @@
 #include <QSet>
 #include <QFileInfo>
 #include <QDateTime>
+#include <QCryptographicHash>
 #include <QRegularExpression>
 #include <algorithm>
 #ifdef Q_OS_WIN
@@ -35,13 +36,13 @@ static QByteArray protect(const QByteArray &input, bool decrypt) {
 #endif
 }
 static QJsonObject serialize(const ProxyNode &n) {
-    auto result = QJsonObject::fromVariantMap(n.publicInfo());
-    result.remove("capability");result.remove("configurationState");result.remove("normalizationNotes");
-    result.remove("regionCode");result.remove("regionName");
-    result.remove("hasCredentials"); result.insert("username", n.username); result.insert("password", n.password);
-    result.insert("options",n.parameters);
-    result.insert("originalConfiguration",n.originalConfiguration);
-    return result;
+    // Explicit private persistence schema: adding a UI role must never cause
+    // executable capability caches or other derived flags to become authority.
+    return {{"id",n.id},{"name",n.name},{"protocol",n.protocol},{"host",n.host},{"port",n.port},
+        {"username",n.username},{"password",n.password},{"cipher",n.cipher},{"serverName",n.serverName},
+        {"sourceId",n.sourceId},{"sourceFormat",n.sourceFormat},{"importSource",n.importSource},
+        {"options",n.parameters},{"originalConfiguration",n.originalConfiguration},
+        {"conversionIssues",QJsonArray::fromStringList(n.conversionIssues)}};
 }
 static ProxyNode deserialize(const QVariantMap &m) {
     ProxyNode n; n.id=m.value("id").toString(); n.name=m.value("name").toString().trimmed();
@@ -52,6 +53,7 @@ static ProxyNode deserialize(const QVariantMap &m) {
     n.parameters=QJsonObject::fromVariantMap(m.value("options").toMap());n.sourceId=m.value("sourceId").toString();
     n.originalConfiguration=QJsonObject::fromVariantMap(m.value("originalConfiguration").toMap());
     n.sourceFormat=m.value("sourceFormat").toString();n.conversionIssues=m.value("conversionIssues").toStringList();
+    n.importSource=m.value("importSource").toString();
     // A previous importer may have accepted a URI while losing an unsupported
     // source field from its normalized options. Recheck the preserved source
     // with today's parser; capability changes must not authorize that loss.
@@ -86,20 +88,88 @@ void NodeStore::load() {
     QFile file(m_path);
     if (!file.exists()) return;
     m_healthy=false;
-    if (!file.open(QIODevice::ReadOnly) || file.size()>1024*1024) { m_error=QStringLiteral("节点文件无法读取；未覆盖原文件。"); return; }
-    auto ciphertext=file.readAll();
+    if (!file.open(QIODevice::ReadOnly) || file.size()>MaximumBytes) { m_error=QStringLiteral("节点文件无法读取或超过 32 MiB；未覆盖原文件。"); return; }
+    auto ciphertext=file.read(MaximumBytes+1);
+    if(ciphertext.size()>MaximumBytes || file.error()!=QFile::NoError) {m_error=QStringLiteral("节点文件读取失败或超过上限；未覆盖原文件。");return;}
     if (!ciphertext.startsWith("SWIRLNODE1\n")) { m_error=QStringLiteral("节点文件格式无效；未覆盖原文件。"); return; }
     auto plaintext=protect(ciphertext.mid(11), true);
+    if(plaintext.isEmpty() || plaintext.size()>MaximumBytes) {plaintext.fill('\0');m_error=QStringLiteral("节点解密失败或超过上限；原文件保持不变。");return;}
     QJsonParseError parse;
     const auto document=QJsonDocument::fromJson(plaintext, &parse); plaintext.fill('\0');
     if (parse.error!=QJsonParseError::NoError || !document.isObject() || document.object().value("schema").toInt()!=1) {
         m_error=QStringLiteral("DPAPI 节点解密失败或文件损坏；请使用保存它的 Windows 用户。原文件未覆盖。"); return;
     }
-    const auto array=document.object().value("nodes").toArray();
+    const auto snapshot=document.object();
+    const int catalogVersion=snapshot.value("catalogVersion").toInt(1);
+    if((catalogVersion!=1 && catalogVersion!=2) || !snapshot.value("nodes").isArray() ||
+       !snapshot.value("selected").isString() ||
+       (snapshot.contains("subscriptions") && !snapshot.value("subscriptions").isArray())) {
+        m_error=QStringLiteral("节点库版本或结构无效；原文件保持不变。");return;
+    }
+    // Store one exact byte sequence per document, even when it yielded 2000
+    // nodes. QByteArray copies below remain implicitly shared in memory.
+    QHash<QString,QByteArray> originals;
+    const auto storedDocuments=snapshot.value("documents");
+    if(!storedDocuments.isUndefined() && !storedDocuments.isObject()) {m_error=QStringLiteral("保存的源文档表无效。");return;}
+    const auto documents=storedDocuments.toObject();
+    if(documents.size()>2000) {m_error=QStringLiteral("保存的源文档数量超过上限。");return;}
+    static const QRegularExpression digestPattern(QStringLiteral("^[0-9a-f]{64}$"));
+    qsizetype originalBytes=0;
+    for(auto it=documents.begin();it!=documents.end();++it) {
+        if(!digestPattern.match(it.key()).hasMatch() || !it.value().isString() ||
+           it.value().toString().size()>((NodeImporter::MaximumBytes+2)/3)*4) {
+            m_error=QStringLiteral("保存的源文档标识或大小无效。");return;
+        }
+        auto decoded=QByteArray::fromBase64Encoding(it.value().toString().toLatin1(),QByteArray::AbortOnBase64DecodingErrors);
+        if(!decoded || decoded.decoded.isEmpty() || decoded.decoded.size()>NodeImporter::MaximumBytes ||
+           QCryptographicHash::hash(decoded.decoded,QCryptographicHash::Sha256).toHex()!=it.key().toLatin1()) {
+            m_error=QStringLiteral("保存的源文档校验失败；原文件保持不变。");return;
+        }
+        originalBytes+=decoded.decoded.size();
+        if(originalBytes>MaximumBytes) {m_error=QStringLiteral("保存的源文档超过总大小上限。");return;}
+        originals.insert(it.key(),std::move(decoded.decoded));
+    }
+    const auto array=snapshot.value("nodes").toArray();
     if (array.size()>2000) { m_error=QStringLiteral("节点数量超过上限。"); return; }
+    QHash<QString,QHash<int,ProxyNode>> replayedDocuments;
     QList<ProxyNode> nodes; QSet<QString> ids;
     for (const auto &entry : array) {
-        const auto n=deserialize(entry.toObject().toVariantMap());
+        if(!entry.isObject()) {m_error=QStringLiteral("保存的节点结构无效。");return;}
+        const auto object=entry.toObject();
+        auto n=deserialize(object.toVariantMap());
+        if(object.contains("sourceDocumentRef")) {
+            const auto reference=object.value("sourceDocumentRef");
+            const auto index=object.value("sourceNodeIndex");
+            if(!reference.isString() || !originals.contains(reference.toString()) ||
+               !index.isDouble() || index.toDouble()!=index.toInt(-1) || index.toInt(-1)<0 || index.toInt()>=2000) {
+                m_error=QStringLiteral("保存的节点源文档引用无效；原文件保持不变。");return;
+            }
+            n.sourceDocument=originals.value(reference.toString());n.sourceNodeIndex=index.toInt();
+            if(!replayedDocuments.contains(reference.toString())) {
+                // All runtime decisions are rebuilt by today's A/B parser,
+                // once per distinct source rather than once per node.
+                const auto parsed=NodeImporter::parse(n.sourceDocument);
+                QHash<int,ProxyNode> replay;
+                if(parsed)for(const auto &candidate:parsed.nodes)replay.insert(candidate.sourceNodeIndex,candidate);
+                replayedDocuments.insert(reference.toString(),std::move(replay));
+            }
+            const auto &replay=replayedDocuments[reference.toString()];
+            const auto found=replay.constFind(n.sourceNodeIndex);
+            if(found!=replay.cend()) {
+                // Raw source is authoritative for secrets/options. Preserve
+                // user identity, the editable display name and provenance.
+                const auto saved=n;n=found.value();
+                n.id=saved.id;n.name=saved.name;n.sourceId=saved.sourceId;n.importSource=saved.importSource;
+                n.sourceDocument=saved.sourceDocument;n.sourceNodeIndex=saved.sourceNodeIndex;
+            } else {
+                // A missing/new DLL or failed revalidation must disable the
+                // affected node, never erase an otherwise intact catalog.
+                n.nativeOutbound={};n.nativeExecutable=false;n.parameterState="unverified";
+                n.runtimeIssues={QStringLiteral("SavedXraySourceRevalidationFailed")};
+            }
+        } else if(object.contains("sourceNodeIndex")) {
+            m_error=QStringLiteral("保存的节点缺少源文档引用。");return;
+        }
         if (!ProxyNode::validate(n).isEmpty() || ids.contains(n.id)) { m_error=QStringLiteral("保存的节点参数无效；未覆盖原文件。"); return; }
         ids.insert(n.id); nodes.append(n);
     }
@@ -124,21 +194,50 @@ void NodeStore::load() {
 }
 bool NodeStore::write(const QList<ProxyNode> &nodes, const QString &selected, const QList<NodeSubscription> &subscriptions,const QJsonObject &networkConfiguration) {
     if (!m_healthy) { m_error=QStringLiteral("节点库损坏或无法解密；未覆盖原文件。"); return false; }
-    QJsonArray array; for (const auto &n : nodes) array.append(serialize(n));
+    if(nodes.size()>2000 || subscriptions.size()>32) {m_error=QStringLiteral("节点或订阅数量超过保存上限。");return false;}
+    QJsonArray array;QJsonObject documents;QHash<quintptr,QString> documentIds;qsizetype privateBytes=0;
+    for(const auto &n:nodes) {
+        auto stored=serialize(n);
+        if(!n.sourceDocument.isEmpty()) {
+            if(n.sourceDocument.size()>NodeImporter::MaximumBytes || n.sourceNodeIndex<0 || n.sourceNodeIndex>=2000) {
+                m_error=QStringLiteral("源文档大小或节点位置无效；旧配置保持不变。");return false;
+            }
+            // A batch shares the source QByteArray. Hash that shared buffer
+            // once, while different allocations still deduplicate by content.
+            const auto buffer=quintptr(n.sourceDocument.constData());
+            auto digest=documentIds.value(buffer);
+            if(digest.isEmpty()) {
+                digest=QString::fromLatin1(QCryptographicHash::hash(n.sourceDocument,QCryptographicHash::Sha256).toHex());
+                documentIds.insert(buffer,digest);
+            }
+            stored.insert("sourceDocumentRef",digest);stored.insert("sourceNodeIndex",n.sourceNodeIndex);
+            if(!documents.contains(digest)) {
+                const auto encoded=n.sourceDocument.toBase64();privateBytes+=encoded.size()+digest.size()+6;
+                if(privateBytes>MaximumBytes) {m_error=QStringLiteral("源文档超过 32 MiB 保存上限；旧配置保持不变。");return false;}
+                documents.insert(digest,QString::fromLatin1(encoded));
+            }
+        }
+        privateBytes+=QJsonDocument(stored).toJson(QJsonDocument::Compact).size()+1;
+        if(privateBytes>MaximumBytes) {m_error=QStringLiteral("节点库超过 32 MiB 保存上限；旧配置保持不变。");return false;}
+        array.append(stored);
+    }
     QJsonArray sources;
     for(const auto &s:subscriptions)sources.append(QJsonObject{{"id",s.id},{"name",s.name},{"formatHint",s.formatHint},{"url",s.url.toString(QUrl::FullyEncoded)},{"interval",s.intervalMinutes},{"enabled",s.enabled},{"lastSuccess",s.lastSuccess}});
-    QJsonObject snapshot{{"schema",1},{"selected",selected},{"nodes",array},{"subscriptions",sources}};
+    QJsonObject snapshot{{"schema",1},{"catalogVersion",2},{"selected",selected},{"nodes",array},{"subscriptions",sources}};
+    if(!documents.isEmpty())snapshot.insert("documents",documents);
     if(!networkConfiguration.isEmpty()) {
         if(networkConfiguration.value("schema").toInt()!=1){m_error=QStringLiteral("网络配置版本无效。");return false;}
         snapshot.insert("networkConfiguration",networkConfiguration);
     }
     auto plaintext=QJsonDocument(snapshot).toJson(QJsonDocument::Compact);
+    if(plaintext.size()>MaximumBytes) {plaintext.fill('\0');m_error=QStringLiteral("节点库超过 32 MiB 保存上限；旧配置保持不变。");return false;}
     const auto encrypted=protect(plaintext, false); plaintext.fill('\0');
     if (encrypted.isEmpty()) { m_error=QStringLiteral("Windows DPAPI 加密失败，未保存任何明文凭据。"); return false; }
     if (!QDir().mkpath(QFileInfo(m_path).absolutePath())) { m_error=QStringLiteral("节点目录无法创建。"); return false; }
     QSaveFile file(m_path); const auto bytes=QByteArray("SWIRLNODE1\n")+encrypted;
-    if(bytes.size()>1024*1024) {
-        m_error=QStringLiteral("节点库超过 1 MiB 保存上限；旧配置保持不变。"); return false;
+    file.setDirectWriteFallback(false);
+    if(bytes.size()>MaximumBytes) {
+        m_error=QStringLiteral("节点库超过 32 MiB 保存上限；旧配置保持不变。"); return false;
     }
     if (!file.open(QIODevice::WriteOnly) || !file.setPermissions(QFile::ReadOwner|QFile::WriteOwner) || file.write(bytes)!=bytes.size() || !file.commit()) {
         m_error=QStringLiteral("节点配置无法安全保存，旧配置保持不变。"); return false;
@@ -159,6 +258,26 @@ bool NodeStore::saveNode(const QVariantMap &input) {
     if (n.id.isEmpty()) n.id=QUuid::createUuid().toString(QUuid::WithoutBraces);
     else { for (int i=0;i<nodes.size();++i) if (nodes[i].id==n.id) index=i;
         if (index<0) { m_error=QStringLiteral("编辑的节点不存在。"); return false; } }
+    if(index>=0 && !nodes[index].sourceDocument.isEmpty()) {
+        // The raw JSON remains the authority for the imported node. Allow a
+        // local display-name edit, but never keep a stale raw source beside
+        // independently edited authentication or transport fields.
+        const auto &old=nodes[index];
+        const QHash<QString,QVariant> fixed{{"protocol",old.protocol},{"host",old.host},{"port",old.port},
+            {"cipher",old.cipher},{"serverName",old.serverName}};
+        bool changed=input.value("replaceCredentials").toBool();
+        for(auto it=fixed.cbegin();it!=fixed.cend();++it)if(input.contains(it.key())) {
+            if(it.key()=="port")changed=changed || input.value(it.key()).toInt()!=old.port;
+            else changed=changed || input.value(it.key()).toString()!=it.value().toString();
+        }
+        if(input.contains("options"))changed=changed || QJsonObject::fromVariantMap(input.value("options").toMap())!=old.parameters;
+        for(const auto &key:QStringList{"username","password"})if(input.contains(key) && !input.value(key).toString().isEmpty())
+            changed=changed || input.value(key).toString()!=(key=="username"?old.username:old.password);
+        if(changed) {m_error=QStringLiteral("JSON 导入节点仅支持修改显示名称；请修改原配置后重新导入以更新连接参数。");return false;}
+        auto renamed=old;if(input.contains("name"))renamed.name=input.value("name").toString().trimmed();
+        m_error=ProxyNode::validate(renamed);if(!m_error.isEmpty())return false;
+        nodes[index]=std::move(renamed);return write(nodes,m_selected,m_subscriptions,m_networkConfiguration);
+    }
     if (index>=0 && n.protocol==nodes[index].protocol && !input.value("replaceCredentials").toBool()) {
         if (n.password.isEmpty()) n.password=nodes[index].password;
         if (n.username.isEmpty()) n.username=nodes[index].username;
@@ -184,6 +303,7 @@ bool NodeStore::select(const QString &id) {
     if(!m_healthy){m_error=QStringLiteral("节点库无法解密；选择未保存。");return false;}
     if(m_selected==id){m_error.clear();return true;}
     QSaveFile file(m_path+".selected");
+    file.setDirectWriteFallback(false);
     const auto bytes=QJsonDocument(QJsonObject{{"selected",id}}).toJson(QJsonDocument::Compact);
     if(!QDir().mkpath(QFileInfo(m_path).absolutePath()) || !file.open(QIODevice::WriteOnly) ||
        !file.setPermissions(QFile::ReadOwner|QFile::WriteOwner) || file.write(bytes)!=bytes.size() || !file.commit()){

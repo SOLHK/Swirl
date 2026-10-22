@@ -6,6 +6,14 @@
 #include "RustCoreEngine.h"
 #endif
 QString SwirlProtocolRegistry::nativeNodeReason(const ProxyNode &node){
+    if (node.isXray()) {
+#ifdef SWIRL_USE_RUST_CORE
+        if (node.nativeExecutable && !node.nativeOutbound.isEmpty()) return {};
+        return QStringLiteral("Rust 尚不能执行：%1").arg(node.runtimeIssues.join(QStringLiteral("；")));
+#else
+        return QStringLiteral("JSON 节点需要 Swirl Rust Core；不会切换到兼容内核。");
+#endif
+    }
 #ifdef SWIRL_USE_RUST_CORE
     EngineStartOptions o;o.routingMode="global";o.nodes={node};o.selectedNodeId=node.id;
     QJsonObject ignored;return RustCoreEngine::configuration(o,&ignored);

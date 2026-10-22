@@ -36,6 +36,18 @@ static bool validHost(const QString &host) {
     return true;
 }
 QString ProxyNode::validate(const ProxyNode &n) {
+    if (n.isXray()) {
+        // Invalid/unsupported imported nodes are safe data and remain visible.
+        // Execution always replays the original document through Rust; these
+        // presence/budget checks grant no runtime permission.
+        if (QUuid(n.id).isNull() || n.name.trimmed().isEmpty() || n.name.size() > 128 ||
+            n.name.contains(QRegularExpression("[\\x00-\\x1f]"))) return QStringLiteral("JSON 节点标识或名称无效。");
+        if (n.sourceDocument.isEmpty() || n.sourceDocument.size() > 4 * 1024 * 1024 ||
+            n.sourceNodeIndex < 0 || n.sourceNodeIndex >= 2000 || n.conversionIssues.size() > 64 ||
+            n.runtimeIssues.size() > 64 || n.importSource.size() > 128)
+            return QStringLiteral("JSON 节点缺少有界原始配置；请重新导入。");
+        return {};
+    }
     if(QJsonDocument(n.originalConfiguration).toJson(QJsonDocument::Compact).size()>256*1024||n.conversionIssues.size()>32||n.sourceFormat.size()>128)return QStringLiteral("订阅原始差异超过保存上限。");
     int budget=10000;
     if(QJsonDocument(n.parameters).toJson(QJsonDocument::Compact).size()>256*1024 || !safeParameters(n.parameters,0,budget))return QStringLiteral("扩展选项超出安全范围：不允许本地文件、系统网络设置、额外监听、脚本或关闭证书验证。");

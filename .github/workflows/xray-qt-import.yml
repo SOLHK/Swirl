@@ -1,0 +1,172 @@
+name: Xray Qt import product chain
+
+on:
+  push:
+    branches: [work/xray-v2ray-qt-import-20261022]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: xray-qt-import-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  product-chain:
+    name: Qt and Rust / ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            qt-host: linux
+            qt-arch: linux_gcc_64
+            library: libswirl_api.so
+          - os: macos-14
+            qt-host: mac
+            qt-arch: clang_64
+            library: libswirl_api.dylib
+          - os: windows-2022
+            qt-host: windows
+            qt-arch: win64_msvc2022_64
+            library: swirl_api.dll
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Install Rust tools
+        run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy
+      - name: Check Rust formatting
+        working-directory: core
+        run: cargo +stable fmt --all -- --check
+      - name: Check locked Rust workspace
+        working-directory: core
+        run: cargo +stable check --workspace --locked
+      - name: Lint all Rust targets
+        working-directory: core
+        run: cargo +stable clippy --workspace --all-targets --locked -- -D warnings
+      - name: Test locked Rust workspace
+        working-directory: core
+        run: cargo +stable test --workspace --locked
+      - name: Build actual Rust FFI library
+        working-directory: core
+        run: cargo +stable build --release --locked -p swirl-api --lib
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Qt 6.10 SDK
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.10.3'
+          host: ${{ matrix.qt-host }}
+          target: desktop
+          arch: ${{ matrix.qt-arch }}
+          modules: qtshadertools
+          cache: true
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y ninja-build libgl1-mesa-dev libxkbcommon-dev libegl1-mesa-dev
+      - name: Configure isolated Qt importer tests (Linux and macOS)
+        if: runner.os != 'Windows'
+        run: >-
+          cmake -S src/Swirl.Quick/tests/xray -B build/xray-qt
+          -DCMAKE_BUILD_TYPE=Release
+          -DSWIRL_RUST_LIBRARY="${{ github.workspace }}/core/target/release/${{ matrix.library }}"
+      - name: Configure isolated Qt importer tests (Windows)
+        if: runner.os == 'Windows'
+        run: >-
+          cmake -S src/Swirl.Quick/tests/xray -B build/xray-qt
+          -G "Visual Studio 17 2022" -A x64
+          -DSWIRL_RUST_LIBRARY="${{ github.workspace }}/core/target/release/${{ matrix.library }}"
+      - name: Build actual Qt production importer and tests
+        run: cmake --build build/xray-qt --config Release --parallel 2
+      - name: Deploy Windows Qt test runtime
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Get-ChildItem build/xray-qt/bin -Filter '*Tests.exe' | ForEach-Object {
+            windeployqt --release --no-translations $_.FullName
+            if ($LASTEXITCODE -ne 0) { throw 'Qt test runtime deployment failed' }
+          }
+      - name: Execute Qt import, Rust FFI and platform storage tests
+        run: ctest --test-dir build/xray-qt -C Release --output-on-failure --no-tests=error
+      - name: Require actual test execution and Windows DPAPI roundtrip
+        if: always()
+        run: |
+          python - <<'PY'
+          import os
+          import pathlib
+          import xml.etree.ElementTree as ET
+
+          root = pathlib.Path('build/xray-qt')
+          required = [('swirl-xray-import.xml', None)]
+          if pathlib.Path('src/Swirl.Quick/tests/XrayStoreTests.cpp').is_file():
+              required.append(('swirl-xray-store.xml',
+                  'encryptedDocumentRoundtrip' if os.environ['RUNNER_OS'] == 'Windows' else None))
+          for filename, mandatory in required:
+              report = root / filename
+              if not report.is_file():
+                  raise SystemExit('Required Qt XML report missing: ' + filename)
+              document = ET.parse(report).getroot()
+              functions = document.findall('TestFunction')
+              tests = [f for f in functions if f.get('name') not in ('initTestCase', 'cleanupTestCase')]
+              if not tests:
+                  raise SystemExit('Qt report has no executed test functions: ' + filename)
+              for function in functions:
+                  outcomes = function.findall('Incident')
+                  skipped = any(m.get('type') == 'skip' for m in function.findall('Message'))
+                  if skipped or not outcomes or any(i.get('type') != 'pass' for i in outcomes):
+                      raise SystemExit('Qt case failed or skipped: ' + str(function.get('name')))
+              if mandatory and not any(f.get('name') == mandatory for f in tests):
+                  raise SystemExit('Required actual Windows DPAPI roundtrip did not execute')
+              print(filename + ': ' + str(len(tests)) + ' test functions passed, zero skips')
+          PY
+      - name: Verify build did not modify tracked source
+        run: git diff --exit-code
+      - name: Preserve exact-source test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Xray-Qt-${{ matrix.os }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            build/xray-qt/swirl-xray-import.xml
+            build/xray-qt/swirl-xray-store.xml
+            build/xray-qt/xray-toolchain.txt
+            build/xray-qt/Testing/Temporary/LastTest.log
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Configure complete Windows Rust application
+        if: runner.os == 'Windows'
+        run: >-
+          cmake -S src/Swirl.Quick -B build/xray-app
+          -G "Visual Studio 17 2022" -A x64
+          -DSWIRL_USE_RUST_CORE=ON -DSWIRL_BUILD_UI_TESTS=OFF
+      - name: Build complete Windows application
+        if: runner.os == 'Windows'
+        run: cmake --build build/xray-app --config Release --target Swirl --parallel 2
+      - name: Verify native application artifacts and source identity
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          foreach ($file in @('build/xray-app/Release/Swirl.exe', 'build/xray-app/Release/swirl_api.dll')) {
+            if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw 'Required native application artifact missing' }
+            Get-FileHash -Algorithm SHA256 -LiteralPath $file
+          }
+          $legacy = Get-ChildItem build/xray-app/Release -Recurse -File | Where-Object { $_.Name -match '^(mihomo|clash|xray|v2ray)(\.|-)' }
+          if ($legacy) { throw 'Unexpected external proxy runtime in Rust application output' }
+          git diff --exit-code
+          if ($LASTEXITCODE -ne 0) { throw 'Application build modified tracked source' }

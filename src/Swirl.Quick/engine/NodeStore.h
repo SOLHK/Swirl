@@ -17,6 +17,9 @@ struct NodeSubscription {
 class NodeStore final : public QObject {
     Q_OBJECT
 public:
+    // The ciphertext and decrypted snapshot are both bounded. Individual
+    // imported documents keep NodeImporter's smaller 4 MiB input limit.
+    static constexpr qsizetype MaximumBytes = 32 * 1024 * 1024;
     explicit NodeStore(QString path = {}, QObject *parent = nullptr);
     QList<ProxyNode> nodes() const { return m_nodes; }
     QVariantList publicRows() const;
@@ -29,7 +32,7 @@ public:
     QList<NodeSubscription> subscriptions() const { return m_subscriptions; }
     QVariantList publicSubscriptions() const;
     bool saveSubscription(const QString &id, const QString &name, const QUrl &url, int intervalMinutes, bool enabled,const QString &formatHint={});
-    static QStringList subscriptionFormats(){return {"auto","loon","shadowrocket","surge","quantumult-x","sing-box"};}
+    static QStringList subscriptionFormats(){return {"auto","loon","shadowrocket","surge","quantumult-x","sing-box","xray-v2ray-json"};}
     bool removeSubscription(const QString &id);
     // A prepared import is immutable outside this store. Names/parse IDs map to
     // the final stable UUIDs before any policy configuration is compiled.

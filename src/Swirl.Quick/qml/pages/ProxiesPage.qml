@@ -217,11 +217,11 @@ Item {
     FileDialog {
         parentWindow:page.Window.window;objectName:"settingsNodeFileDialog"
         id:configFile;title:"导入节点配置";nameFilters:["节点配置 (*.yaml *.yml *.json *.conf *.txt)","所有文件 (*)"]
-        onAccepted:engineController.imports.importFile(selectedFile)
+        onAccepted:{importDialog.open();engineController.imports.importFile(selectedFile)}
     }
     SwirlDialog {
         ownerItem:page
-        id:importDialog;objectName:"nodeImportDialog";title:"一键导入节点";onClosed:{importContent.text="";importAddress.text=""}
+        id:importDialog;objectName:"nodeImportDialog";title:"一键导入节点";onClosed:{engineController.imports.cancelImport();importContent.text="";importAddress.text=""}
         ColumnLayout {
             width:parent.width;spacing:Theme.dp(12)
             ScrollView {id:importForm;Layout.fillWidth:true;Layout.preferredHeight:Math.floor(Math.min(Theme.dp(340),page.height*0.55));clip:true;ScrollBar.horizontal.policy:ScrollBar.AlwaysOff
@@ -229,20 +229,35 @@ Item {
             SwirlText {renderType:Text.NativeRendering;text:"配置 / Base64 / URI（仅导入节点）";color:Theme.text;Layout.fillWidth:true;wrapMode:Text.Wrap}
             RowLayout {
                 Layout.fillWidth:true
-                SwirlButton {objectName:"importClipboardButton";text:"从剪贴板导入";enabled:!engineController.imports.busy;onClicked:engineController.imports.importClipboard()}
-                SwirlButton {text:"选择文件";enabled:!engineController.imports.busy;onClicked:configFile.open()}
+                SwirlButton {objectName:"importClipboardButton";text:"从剪贴板导入";enabled:!engineController.imports.busy&&!engineController.imports.hasPreview;onClicked:engineController.imports.importClipboard()}
+                SwirlButton {text:"选择文件";enabled:!engineController.imports.busy&&!engineController.imports.hasPreview;onClicked:configFile.open()}
             }
-            ScrollView {Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(130);clip:true
-                SwirlTextArea {id:importContent;objectName:"importContentField";placeholderText:"粘贴 Clash、Surge、Loon、Quantumult X、sing-box 配置或节点 URI";wrapMode:TextEdit.Wrap;font.family:importAddress.font.family;font.pixelSize:importAddress.font.pixelSize;color:Theme.text;selectByMouse:true;Accessible.name:"待导入的节点配置";background:Rectangle {color:Theme.field;radius:Theme.controlRadius;border.color:Theme.border;border.width:1}}
+            ScrollView {visible:!engineController.imports.hasPreview;Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(130);clip:true
+                SwirlTextArea {id:importContent;objectName:"importContentField";placeholderText:"粘贴 Xray / V2Ray JSON、Clash、Surge、Loon、Quantumult X、sing-box 配置或节点 URI";enabled:!engineController.imports.busy;wrapMode:TextEdit.Wrap;font.family:importAddress.font.family;font.pixelSize:importAddress.font.pixelSize;color:Theme.text;selectByMouse:true;Accessible.name:"待导入的节点配置";background:Rectangle {color:Theme.field;radius:Theme.controlRadius;border.color:Theme.border;border.width:1}}
             }
+            ListView {
+                objectName:"jsonImportPreview";visible:engineController.imports.hasPreview
+                Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(160);clip:true
+                model:engineController.imports.preview
+                delegate:Column {
+                    required property var modelData
+                    width:ListView.view.width;spacing:Theme.dp(3)
+                    SwirlText {width:parent.width;text:modelData.name+" · "+modelData.protocol.toUpperCase();textFormat:Text.PlainText;color:Theme.text;font.pixelSize:Theme.fontSize(12);wrapMode:Text.WrapAnywhere}
+                    SwirlText {width:parent.width;text:modelData.host+":"+modelData.port+" · "+modelData.capability.engine;textFormat:Text.PlainText;color:Theme.muted;font.pixelSize:Theme.fontSize(11);wrapMode:Text.WrapAnywhere}
+                    Item {width:1;height:Theme.dp(8)}
+                }
+                ScrollBar.vertical:SwirlScrollBar {}
+            }
+            SwirlText {visible:engineController.imports.hasPreview;Layout.fillWidth:true;text:engineController.imports.previewDiagnostics.join("\n");textFormat:Text.PlainText;color:Theme.muted;font.pixelSize:Theme.fontSize(11);wrapMode:Text.WrapAnywhere}
             SwirlText {renderType:Text.NativeRendering;text:"HTTPS 订阅地址（本次导入）";color:Theme.text}
-            SwirlTextField {id:importAddress;Layout.fillWidth:true;echoMode:TextInput.Password;placeholderText:"https://…";Accessible.name:"一次性导入地址"}
-            SwirlText {renderType:Text.NativeRendering;text:engineController.imports.message;color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
+            SwirlTextField {id:importAddress;Layout.fillWidth:true;enabled:!engineController.imports.busy&&!engineController.imports.hasPreview;echoMode:TextInput.Password;placeholderText:"https://…";Accessible.name:"一次性导入地址"}
+            SwirlText {objectName:"importResultMessage";renderType:Text.NativeRendering;text:engineController.imports.message;textFormat:Text.PlainText;color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.WrapAnywhere;Accessible.name:text}
                 }
             }
             RowLayout {Layout.alignment:Qt.AlignRight
                 SwirlButton {text:"关闭";onClicked:importDialog.close()}
-                SwirlButton {objectName:"importApplyButton";text:engineController.imports.busy?"正在导入…":"导入";primary:true;enabled:!engineController.imports.busy&&(importContent.text.trim().length>0||importAddress.text.trim().length>0);onClicked:{if(importAddress.text.trim().length)engineController.imports.importUrl(importAddress.text.trim());else engineController.imports.importText(importContent.text);importContent.text="";importAddress.text=""}}
+                SwirlButton {visible:engineController.imports.hasPreview;text:"取消本次导入";onClicked:engineController.imports.cancelImport()}
+                SwirlButton {objectName:"importApplyButton";text:engineController.imports.busy?"正在校验…":engineController.imports.hasPreview?"确认导入":"导入";primary:true;enabled:!engineController.imports.busy&&(engineController.imports.hasPreview||importContent.text.trim().length>0||importAddress.text.trim().length>0);onClicked:{if(engineController.imports.hasPreview)engineController.imports.confirmImport();else if(importAddress.text.trim().length)engineController.imports.importUrl(importAddress.text.trim());else engineController.imports.importText(importContent.text);importContent.text="";importAddress.text=""}}
             }
             SwirlButton {text:"保存为自动更新订阅";enabled:!engineController.imports.busy;onClicked:{importDialog.close();AppState.navigate("subscriptions")}}
         }
