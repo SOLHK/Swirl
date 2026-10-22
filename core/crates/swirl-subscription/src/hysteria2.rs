@@ -89,15 +89,23 @@ impl Hysteria2 {
         if self.ports.is_some() {
             return Err("Hysteria2PortHoppingUnsupported");
         }
-        if self.up_mbps.is_some_and(|value| value != 0)
-            || self.down_mbps.is_some_and(|value| value != 0)
-        {
-            return Err("Hysteria2BandwidthUnsupported");
-        }
+        self.bandwidth_bytes()?;
         if self.ech.is_some() {
             return Err("Hysteria2EchUnsupported");
         }
         Ok(())
+    }
+
+    /// Subscription bandwidth values are decimal megabits per second; the
+    /// Hysteria protocol authenticates with bytes per second. Zero means auto.
+    pub fn bandwidth_bytes(&self) -> Result<(u64, u64), &'static str> {
+        let convert = |value: Option<u64>| {
+            value
+                .unwrap_or(0)
+                .checked_mul(125_000)
+                .ok_or("Hysteria2BandwidthParameters")
+        };
+        Ok((convert(self.up_mbps)?, convert(self.down_mbps)?))
     }
 }
 
@@ -363,10 +371,6 @@ mod tests {
                 "hy2://pass@proxy.example/?client-fingerprint=chrome",
                 "Hysteria2UnmappedFields",
             ),
-            (
-                "hy2://pass@proxy.example/?up=100",
-                "Hysteria2BandwidthUnsupported",
-            ),
         ] {
             let raw = parse_uri(uri).unwrap();
             assert_eq!(raw["raw-uri"], uri);
@@ -410,6 +414,7 @@ mod tests {
             json!({"sni":"a.test","servername":"b.test"}),
             json!({"alpn":["h2"]}),
             json!({"password":"a\r\nb"}),
+            json!({"up":u64::MAX}),
         ] {
             let mut raw = json!({"type":"hysteria2","server":"host.test","password":"pass"});
             raw.as_object_mut()
@@ -417,5 +422,20 @@ mod tests {
                 .extend(extra.as_object().unwrap().clone());
             assert!(from_raw(&raw).is_err());
         }
+    }
+
+    #[test]
+    fn salamander_and_bandwidth_parameters_survive_both_import_paths() {
+        let uri = "hy2://pass@host.test/?obfs=salamander&obfs-password=long-secret&up=3&down=5";
+        let node = from_raw(&parse_uri(uri).unwrap()).unwrap();
+        assert_eq!(node.obfs.as_deref(), Some("salamander"));
+        assert_eq!(node.obfs_password.as_deref(), Some("long-secret"));
+        assert_eq!(node.bandwidth_bytes().unwrap(), (375000, 625000));
+        let node = from_raw(
+            &json!({"type":"hysteria2","server":"host.test","password":"pass",
+            "up":"3 Mbps","down":5}),
+        )
+        .unwrap();
+        assert_eq!(node.bandwidth_bytes().unwrap(), (375000, 625000));
     }
 }

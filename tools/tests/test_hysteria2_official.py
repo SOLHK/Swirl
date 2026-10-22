@@ -5,6 +5,7 @@ HY2_SERVER must be the pinned official server executable, never a client daemon.
 Requires Python cryptography for isolated, ephemeral CA/server certificates.
 """
 import base64
+from concurrent.futures import ThreadPoolExecutor
 import datetime
 import hashlib
 import http.server
@@ -46,6 +47,14 @@ class TCP(socketserver.ThreadingTCPServer):
 
 class UDP(socketserver.ThreadingUDPServer):
     daemon_threads = True
+
+
+class TCP6(TCP):
+    address_family = socket.AF_INET6
+
+
+class UDP6(UDP):
+    address_family = socket.AF_INET6
 
 
 class Echo(socketserver.BaseRequestHandler):
@@ -148,7 +157,8 @@ def certificate_files(directory):
           .not_valid_after(now + datetime.timedelta(days=2))
           .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
           .add_extension(x509.SubjectAlternativeName([x509.DNSName("hy2.test"),
-              x509.DNSName("localhost"), x509.IPAddress(ipaddress.ip_address("127.0.0.1"))]), critical=False)
+              x509.DNSName("localhost"), x509.IPAddress(ipaddress.ip_address("127.0.0.1")),
+              x509.IPAddress(ipaddress.ip_address("::1"))]), critical=False)
           .sign(ca_key, hashes.SHA256()))
     cert_path, key_path = directory / "server.pem", directory / "server-key.pem"
     cert_path.write_bytes(certificate.public_bytes(serialization.Encoding.PEM))
@@ -158,21 +168,24 @@ def certificate_files(directory):
 
 
 class OfficialPeer:
-    def __init__(self, binary, directory, cert, key, password, name, obfs_password=None):
+    def __init__(self, binary, directory, cert, key, password, name, obfs_password=None,
+                 host="127.0.0.1", ignore_client_bandwidth=True, bandwidth=None):
         self.binary, self.directory, self.name = binary, directory, name
         self.password = password
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as reserved:
-            reserved.bind(("127.0.0.1", 0))
+        with socket.socket(socket.AF_INET6 if ":" in host else socket.AF_INET, socket.SOCK_DGRAM) as reserved:
+            reserved.bind((host, 0))
             self.port = reserved.getsockname()[1]
         self.config = directory / f"{name}.json"
         config = {
-            "listen": f"127.0.0.1:{self.port}",
+            "listen": f"[{host}]:{self.port}" if ":" in host else f"{host}:{self.port}",
             "tls": {"cert": str(cert), "key": str(key)},
             "auth": {"type": "password", "password": password},
-            "ignoreClientBandwidth": True,
+            "ignoreClientBandwidth": ignore_client_bandwidth,
         }
         if obfs_password is not None:
             config["obfs"] = {"type": "salamander", "salamander": {"password": obfs_password}}
+        if bandwidth is not None:
+            config["bandwidth"] = bandwidth
         self.config.write_text(json.dumps(config), encoding="utf-8")
         self.process = None
         self.log = None
@@ -225,6 +238,11 @@ class Hysteria2Official(unittest.TestCase):
         cls.obfs_password = "synthetic-obfs-x14a-local-only"
         cls.peers.append(OfficialPeer(cls.server, cls.directory, cert, key,
             "synthetic:obfuscated-x14a-local-only", "obfuscated", cls.obfs_password))
+        cls.peers.append(OfficialPeer(cls.server, cls.directory, cert, key,
+            "synthetic:capped-x14a-local-only", "capped", ignore_client_bandwidth=False,
+            bandwidth={"down":"1 mbps"}))
+        cls.peers.append(OfficialPeer(cls.server, cls.directory, cert, key,
+            "synthetic:negotiated-x14a-local-only", "negotiated", ignore_client_bandwidth=False))
         cls.tcp = TCP(("127.0.0.1", 0), Echo)
         cls.delayed = TCP(("127.0.0.1", 0), DelayedEcho)
         cls.udp = UDP(("127.0.0.1", 0), EchoUDP)
@@ -238,6 +256,27 @@ class Hysteria2Official(unittest.TestCase):
             thread = threading.Thread(target=origin.serve_forever, daemon=True)
             thread.start()
             cls.threads.append(thread)
+        cls.ipv6_available = False
+        ipv6_origins=[]
+        try:
+            cls.tcp6 = TCP6(("::1",0),Echo)
+            ipv6_origins.append(cls.tcp6)
+            cls.udp6 = UDP6(("::1",0),EchoUDP)
+            ipv6_origins.append(cls.udp6)
+            cls.peers.append(OfficialPeer(cls.server, cls.directory, cert, key,
+                "synthetic:ipv6-x14a-local-only", "ipv6", host="::1"))
+        except OSError:
+            # The receipt records an unavailable IPv6 environment explicitly.
+            # A skipped platform is not counted as IPv6 interoperability.
+            for origin in ipv6_origins:
+                origin.server_close()
+        else:
+            cls.origins.extend(ipv6_origins)
+            for origin in ipv6_origins:
+                thread=threading.Thread(target=origin.serve_forever,daemon=True)
+                thread.start()
+                cls.threads.append(thread)
+            cls.ipv6_available = True
 
     @classmethod
     def tearDownClass(cls):
@@ -271,9 +310,9 @@ class Hysteria2Official(unittest.TestCase):
             "password":self.peers[peer].password,
             "tls":{"server_name":"hy2.test", "alpn":["h3"], "ca_der_base64":self.ca}}
 
-    def request(self, case, *, mode="tcp", size=4096, config=None, source=None, success=True, code=None, target=None, target_tls=None, timeout_ms=10000, limitation=False):
+    def request(self, case, *, mode="tcp", size=4096, config=None, source=None, success=True, code=None, target=None, target_tls=None, target_host="127.0.0.1", timeout_ms=10000, limitation=False):
         origin = target or (self.udp if mode == "udp" else self.dns if mode == "dns" else self.tcp)
-        request = {"target_host":"127.0.0.1", "target_port":origin.server_address[1],
+        request = {"target_host":target_host, "target_port":origin.server_address[1],
             "mode":mode, "size":size, "timeout_ms":timeout_ms}
         if source is not None:
             request["source"] = source
@@ -353,7 +392,7 @@ class Hysteria2Official(unittest.TestCase):
     def test_11_invalid_options_fail_before_connection(self):
         for field,value,code in (("obfs","gecko","Hysteria2ObfsUnsupported"),
                 ("ports","443,8443","Hysteria2PortHoppingUnsupported"),
-                ("up_mbps",100,"Hysteria2BandwidthUnsupported"),
+                ("up_mbps",2**64-1,"Hysteria2BandwidthParameters"),
                 ("ech","AAAA","Hysteria2EchUnsupported")):
             config=self.config();config[field]=value
             self.request("unsupported-"+field,config=config,success=False,code=code)
@@ -382,6 +421,35 @@ class Hysteria2Official(unittest.TestCase):
         self.request("explicit-insecure-correct-pin",config=config)
         config["pin_sha256"]="00"*32
         self.request("explicit-insecure-wrong-pin",config=config,success=False)
+
+    def test_15_negotiated_bandwidth_is_enforced_in_real_transfers(self):
+        config=self.config()
+        config["up_mbps"]=1
+        result=self.request("client-upload-rate-1mbps",config=config,size=256*1024)
+        self.assertGreater(result["total_us"],1_500_000)
+        result=self.request("server-receive-rate-1mbps",config=self.config(3),size=256*1024)
+        self.assertGreater(result["total_us"],1_500_000)
+        config=self.config(4)
+        config["down_mbps"]=1
+        result=self.request("negotiated-download-rate-1mbps",config=config,size=256*1024)
+        self.assertGreater(result["total_us"],1_500_000)
+
+    def test_16_ipv6_quic_and_ipv6_tcp_udp_targets(self):
+        if not self.ipv6_available:
+            self.records.append({"case":"ipv6","executed":False,"reason":"Ipv6LoopbackUnavailable"})
+            self.skipTest("IPv6 loopback unavailable; not accepted as supported on this runner")
+        config=self.config(5)
+        config["host"]="::1"
+        self.request("ipv6-quic-tcp",config=config,target=self.tcp6,target_host="::1")
+        self.request("ipv6-quic-udp",config=config,mode="udp",size=3072,target=self.udp6,target_host="::1")
+
+    def test_17_concurrent_connections_and_multi_address_resolution(self):
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            results=list(executor.map(lambda index:self.request(f"concurrent-{index}",size=256*1024),range(4)))
+        self.assertEqual(sum(result["downloaded"] for result in results),1024*1024)
+        config=self.config()
+        config["host"]="localhost"
+        self.request("multi-address-localhost-to-ipv4-server",config=config)
 
 
 if __name__ == "__main__":

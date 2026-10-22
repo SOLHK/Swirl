@@ -1,6 +1,7 @@
 //! Swirl's Hysteria 2 client: HTTP/3 authentication, native QUIC TCP streams,
 //! and bounded fragmented UDP datagrams. No external proxy process is used.
 //! The independent reference server is HyNetworks/hysteria, protocol v2.
+mod rate;
 mod salamander;
 use crate::{Result, Target};
 use bytes::Bytes;
@@ -93,27 +94,30 @@ impl Session {
             insecure: config.insecure,
             pin_sha256: config.pin_sha256.as_deref(),
         };
-        let transport = if config.obfs.as_deref() == Some("salamander") {
-            let password = zeroize::Zeroizing::new(
-                config
-                    .obfs_password
-                    .as_ref()
-                    .ok_or("Hysteria2ObfsParameters")?
-                    .as_bytes()
-                    .to_vec(),
-            );
-            quic::connect_with_socket_wrapper(
-                &addresses,
-                options,
-                Some(b"h3"),
-                "cubic",
-                deadline,
-                &move |socket| salamander::Socket::wrap(socket, &password),
-            )
-            .await?
-        } else {
-            quic::connect(&addresses, options, Some(b"h3"), "cubic", deadline).await?
-        };
+        let (upload_rate, download_rate) = config.bandwidth_bytes()?;
+        let upload_limit = rate::Limit::new(upload_rate);
+        let socket_limit = upload_limit.clone();
+        let password = config
+            .obfs_password
+            .as_ref()
+            .map(|password| zeroize::Zeroizing::new(password.as_bytes().to_vec()));
+        let transport = quic::connect_with_socket_wrapper(
+            &addresses,
+            options,
+            Some(b"h3"),
+            "cubic",
+            deadline,
+            &move |socket| {
+                // Apply pacing outside the obfuscator so its salt bytes count
+                // toward the negotiated wire rate as well.
+                let socket = rate::Socket::wrap(socket, socket_limit.clone());
+                match &password {
+                    Some(password) => salamander::Socket::wrap(socket, password),
+                    None => socket,
+                }
+            },
+        )
+        .await?;
         let (mut driver, mut requester) = bounded(deadline, "Hysteria2Http3Timeout", async {
             h3::client::builder()
                 .max_field_section_size(16384)
@@ -130,8 +134,9 @@ impl Session {
                 .method(http::Method::POST)
                 .uri("https://hysteria/auth")
                 .header("hysteria-auth", &config.password)
-                // Zero explicitly negotiates automatic congestion control.
-                .header("hysteria-cc-rx", "0")
+                // Zero negotiates automatic congestion control. Nonzero
+                // values are the receive limit, already converted to bytes/s.
+                .header("hysteria-cc-rx", download_rate.to_string())
                 .header("hysteria-padding", padding()?)
                 .body(())
                 .map_err(|_| "Hysteria2AuthenticationParameters")?;
@@ -159,16 +164,28 @@ impl Session {
                 Some("false") => false,
                 _ => return Err("Hysteria2AuthenticationResponse"),
             };
-            match headers
+            let server_rate = match headers
                 .get("hysteria-cc-rx")
                 .and_then(|value| value.to_str().ok())
             {
-                Some("auto" | "0") => {}
-                Some(value) if value.parse::<u64>().is_ok() => {
-                    return Err("Hysteria2ServerBandwidthUnsupported");
+                Some("auto") => 0,
+                Some(value)
+                    if !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit()) =>
+                {
+                    value
+                        .parse::<u64>()
+                        .map_err(|_| "Hysteria2AuthenticationResponse")?
                 }
                 _ => return Err("Hysteria2AuthenticationResponse"),
-            }
+            };
+            // Cubic is retained for congestion response in every mode. This
+            // wire-rate ceiling honours client/server bandwidth limits; it is
+            // deliberately not advertised as the Brutal controller.
+            upload_limit.set(match (upload_rate, server_rate) {
+                (0, server) => server,
+                (client, 0) => client,
+                (client, server) => client.min(server),
+            });
             // Authentication has no useful response body. Drop its stream;
             // retain the SendRequest owner because h3 closes on its last drop.
             Ok(udp && config.udp)
