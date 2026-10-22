@@ -178,6 +178,40 @@ artifact cleanup: 432 tests including doctests, zero failed/ignored. Evidence
 and the actual independent-server command output are in
 `evidence/transports/c3/`.
 
+## C4 HTTPUpgrade
+
+The native connector sends HTTP/1.1 `GET`, `Connection: Upgrade` and
+`Upgrade: websocket`, validates the status and both response tokens, and then
+exposes the unframed byte stream. It is separate from the RFC6455 WebSocket
+engine: there is no masking, binary message envelope or WebSocket Close frame.
+An upgrade response and first proxy bytes arriving together retain the tail
+in a buffered reader. Request headers are bounded to the pinned server's
+12 KiB limit, response headers to 16 KiB. Wrong status/tokens, forbidden header
+overrides and early data are errors. HTTP/1.1-compatible TLS ALPN is validated;
+the existing certificate/SNI verification remains mandatory.
+
+The current official dialer also emits optional Sec-WebSocket-Key/Version
+headers. The pinned official listener explicitly accepts the no-key handshake
+implemented here. This is direct-server compatibility, not evidence that a
+middlebox requiring a complete RFC6455 opening handshake will accept it.
+REALITY is not supported by this upstream HTTPUpgrade listener.
+
+C4's independent current-Xray suite passed nine methods in 3.705 seconds,
+exit zero: 22 native invocations, 13 successful transfers (seven clean closes,
+six explicit cancellations) and nine expected rejections. Both plain and TLS
+4 MiB duplex flows, custom literal Unicode/percent/query-like Path, Host,
+VLESS/Trojan with verified target HTTPS, six concurrent connections, invalid
+authentication/CA/SNI/ALPN/Host/Path, truncation, server termination and fresh
+connection recovery passed. Target reciprocal TLS close_notify was observed
+twice; every native result had zero remaining runtime tasks. Five focused
+HTTPUpgrade Rust tests include wrong status/tokens and same-packet upgrade tail.
+All four Rust gates and a complete native workspace build passed; 437 tests
+including doctests, zero failed/ignored. Evidence: `evidence/transports/c4/`.
+
+HTTP parsing reuses already-locked `httparse` 1.10.1 and `url` 2.5.8, both
+MIT/Apache-2.0; URL declares Rust 1.63. The only C4 lockfile change connects
+these existing dependencies to the transport crate; no package version changed.
+
 ## Upstream pins and independent implementation
 
 * [Xray v26.10.21 / 1b1647c](https://github.com/XTLS/Xray-core/tree/1b1647cd9ddf0abc34b981d4611fc03bcac1ca74): MPL-2.0. Read `transport/internet/{websocket,grpc,httpupgrade,splithttp,tls,reality}` and `infra/conf/transport_internet.go`.

@@ -2,6 +2,7 @@
 pub mod grpc;
 mod h2_stream;
 pub mod http2;
+pub mod httpupgrade;
 pub mod reality;
 mod udp;
 pub use udp::bind_udp;

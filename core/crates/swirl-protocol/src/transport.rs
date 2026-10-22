@@ -24,6 +24,10 @@ pub enum Transport {
     Http2 {
         config: swirl_transport::http2::Config,
     },
+    #[serde(rename = "httpupgrade")]
+    HttpUpgrade {
+        config: swirl_transport::httpupgrade::Config,
+    },
 }
 
 impl Transport {
@@ -50,6 +54,9 @@ impl Transport {
             }
             Self::Http2 { config } => {
                 swirl_transport::http2::connect_with_timeout(stream, config, tls, remaining).await
+            }
+            Self::HttpUpgrade { config } => {
+                swirl_transport::httpupgrade::connect_with_timeout(stream, config, remaining).await
             }
         }
     }
@@ -105,6 +112,12 @@ pub(crate) fn validate(outbound: &Outbound, selected: Option<&Transport>) -> Res
             Transport::Http2 { config } => {
                 if tls.is_none() {
                     return Err("Http2TlsRequired");
+                }
+                config.validate()?;
+            }
+            Transport::HttpUpgrade { config } => {
+                if tls.is_some_and(|tls| !(tls.alpn.is_empty() || tls.alpn == ["http/1.1"])) {
+                    return Err("HttpUpgradeAlpnUnsupported");
                 }
                 config.validate()?;
             }
