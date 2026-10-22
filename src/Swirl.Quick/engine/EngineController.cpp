@@ -51,7 +51,6 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
     // Runtime acceptance counts explicit requests. Its own periodic probes
     // would add unrelated Rust connections and corrupt per-request deltas.
     : QObject(parent), m_engine(std::move(engine)), m_store(storePath),m_imports(&m_store,this),m_telemetry(storePath.isEmpty()?QString():storePath+".telemetry",storePath.isEmpty()&&!realAcceptance) {
-    m_options.autoControlPort=true;
     m_imports.setConfigurationApplier([this](const NodeImporter::Result &result,const QString &sourceId,QString *error) {
         const auto &configuration=result.configurationFormat=="ini"?result.executionConfiguration:result.configuration;
         if(result.configuration.isEmpty()) {
@@ -140,10 +139,6 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
     if(m_options.routingMode!="rule"&&m_options.routingMode!="global"&&m_options.routingMode!="direct")m_options.routingMode="rule";
     if(m_options.meteredNetwork)m_options.routingMode="rule";
     connect(m_engine.get(),&ProxyEngine::statusChanged,this,[this] {
-        const int runtimePort=QUrl(m_engine->status().controlEndpoint).port();
-        if(m_options.autoControlPort && runtimePort>0 && runtimePort!=m_options.controlPort){
-            m_options.controlPort=quint16(runtimePort);emit optionsChanged();
-        }
         const auto s=m_engine->status();
         if(!m_pendingSelection.isEmpty()) {
             if(s.processAlive&&s.apiHealthy&&s.selectedNodeId==m_pendingSelection) {
@@ -223,15 +218,6 @@ bool EngineController::prepareRealAcceptance() {
     emit statusChanged();
     return true;
 }
-void EngineController::setExecutablePath(const QString &path) {
-    if (!canStart() || m_options.executablePath == path) return;
-    m_options.executablePath = path; emit optionsChanged();
-}
-void EngineController::setControlPort(int port) {
-    if (!canStart() || port < 1 || port > 65535) return;
-    m_options.autoControlPort=false;
-    m_options.controlPort = quint16(port); emit optionsChanged();
-}
 QString EngineController::stateText() const {
     switch (m_engine->status().state) {
     case ProxyEngine::State::Stopped: return QStringLiteral("已停止");
@@ -300,7 +286,7 @@ QString EngineController::requestStateText() const {
     }
     return {};
 }
-void EngineController::setProxyPort(int port) { if(canStart() && port>0 && port<=65535 && port!=controlPort()){m_options.proxyPort=quint16(port);emit optionsChanged();} }
+void EngineController::setProxyPort(int port) { if(canStart() && port>0 && port<=65535){m_options.proxyPort=quint16(port);emit optionsChanged();} }
 bool EngineController::saveNode(const QVariantMap &input) {
     if(processAlive() || busy() || m_imports.busy()) { m_nodeError=QStringLiteral("请先断开引擎并等待导入完成，再编辑节点。");emit nodesChanged();return false; }
     m_nodeError.clear(); const bool ok=m_store.saveNode(input);emit nodesChanged();return ok;

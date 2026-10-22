@@ -25,14 +25,9 @@ class NetworkRegressionTests : public QObject {
   }
   return 0;
  }
- EngineStartOptions options(ControlledNetwork &net,bool compatibility,const QString &mode){
-  EngineStartOptions o;o.preferCompatibility=compatibility;o.routingMode=mode;
+ EngineStartOptions options(ControlledNetwork &net,const QString &mode){
+  EngineStartOptions o;o.routingMode=mode;
   o.proxyPort=freeMixedPort();
-  QTcpServer reserve;
-  reserve.listen(QHostAddress::LocalHost);o.controlPort=reserve.serverPort();reserve.close();
-  QFile file(QString::fromUtf8(SWIRL_TEST_MANIFEST));file.open(QIODevice::ReadOnly);const auto m=QJsonDocument::fromJson(file.readAll()).object();
-  o.expectedSha256=m["executableSha256"].toString().toLatin1();o.expectedVersion=m["version"].toString();
-  o.executablePath=QCoreApplication::applicationDirPath()+"/core/mihomo.exe";
   ProxyNode a;a.id=QUuid::createUuid().toString(QUuid::WithoutBraces);a.name="A";a.protocol="socks5";a.host="127.0.0.1";a.port=net.a.serverPort();
   auto b=a;b.id=QUuid::createUuid().toString(QUuid::WithoutBraces);b.name="B";b.port=net.b.serverPort();b.username=QString::fromUtf8(net.b.username);b.password=QString::fromUtf8(net.b.password);
   o.nodes={a,b};o.selectedNodeId=a.id;return o;
@@ -49,25 +44,20 @@ class NetworkRegressionTests : public QObject {
   socket.setPeerVerifyName("localhost");socket.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",o.proxyPort));socket.connectToHostEncrypted("127.0.0.1",port);
  }
 private slots:
- void explicitOrRequiredCompatibilityProbeIsReported(){
-  ControlledNetwork net;QVERIFY(net.start());
-  for(bool explicitPreference:{false,true}){
-   auto o=options(net,explicitPreference,"global");o.executablePath="missing-test-compatibility.exe";
-   if(!explicitPreference)o.nodes.first().parameters["udp"]=true;
-   NodeTestService probes;probes.start(o,{o.nodes.first().id},net.url());
-   QVERIFY(QTest::qWaitFor([&]{return !probes.busy();},5000));
-   QCOMPARE(probes.failed(),1);QCOMPARE(probes.succeeded(),0);
-   QCOMPARE(probes.result(o.nodes.first().id).value("engineKind").toString(),QString("compatibility"));
-  }
+ void unsupportedProbeCannotStartAnotherRuntime(){
+  ControlledNetwork net;QVERIFY(net.start());auto o=options(net,"global");o.nodes.first().parameters["future-transport"]=true;
+  NodeTestService probes;probes.start(o,{o.nodes.first().id},net.url());
+  QVERIFY(QTest::qWaitFor([&]{return !probes.busy();},5000));QCOMPARE(probes.failed(),1);QCOMPARE(probes.succeeded(),0);
+  QCOMPARE(probes.result(o.nodes.first().id).value("engineKind").toString(),QString("rust"));
+  QCOMPARE(probes.result(o.nodes.first().id).value("phase").toString(),QString("configuration"));QCOMPARE(net.a.forwarded,0);
  }
  void nativeProbeFailureDoesNotFallbackOrBypass(){
-  ControlledNetwork net;QVERIFY(net.start());auto o=options(net,false,"global");
-  o.executablePath="must-not-run-compatibility.exe";
+  ControlledNetwork net;QVERIFY(net.start());auto o=options(net,"global");
   net.a.reject=true;const auto requests=net.httpRequests;
   NodeTestService probes;probes.start(o,{o.nodes.first().id},net.url());
   QVERIFY(QTest::qWaitFor([&]{return !probes.busy();},10000));
   QCOMPARE(probes.failed(),1);QCOMPARE(probes.succeeded(),0);
-  QCOMPARE(probes.result(o.nodes.first().id).value("engineKind").toString(),QString("native"));
+  QCOMPARE(probes.result(o.nodes.first().id).value("engineKind").toString(),QString("rust"));
   QCOMPARE(net.httpRequests,requests);
  }
  void importedNodeUpdatesPreserveExistingTunnel(){
@@ -76,7 +66,7 @@ private slots:
    connect(socket,&QTcpSocket::readyRead,socket,[socket]{socket->write(socket->readAll());});connect(socket,&QTcpSocket::disconnected,socket,&QObject::deleteLater);
   }});
   QTemporaryDir temporary;EngineController controller(std::make_unique<ThreadedEngine>(),nullptr,temporary.filePath("nodes.dpapi"));
-  const auto o=options(net,false,"global");controller.setProxyPort(o.proxyPort);controller.setRoutingMode("global");
+  const auto o=options(net,"global");controller.setProxyPort(o.proxyPort);controller.setRoutingMode("global");
   QVERIFY(controller.saveNode({{"name","original"},{"protocol","socks5"},{"host","127.0.0.1"},{"port",net.a.serverPort()}}));
   const auto id=controller.nodes().first().toMap().value("id").toString();controller.connectNode(id);QVERIFY(QTest::qWaitFor([&]{return controller.connected();},5000));
   const auto pid=controller.processId();QTcpSocket client;client.setProxy(QNetworkProxy::NoProxy);client.connectToHost(QHostAddress::LocalHost,controller.activeProxyPort());
@@ -90,11 +80,11 @@ private slots:
  }
 
  void streamedProtocolsSurviveMaintenance_data(){
-  QTest::addColumn<bool>("compatibility");QTest::addColumn<QString>("mode");
-  for(bool compatibility:{false,true})for(const auto &mode:{QString("rule"),QString("global")})QTest::newRow(qPrintable((compatibility?"mihomo-":"native-")+mode))<<compatibility<<mode;
+  QTest::addColumn<QString>("mode");
+  for(const auto &mode:{QString("rule"),QString("global")})QTest::newRow(qPrintable("rust-"+mode))<<mode;
  }
  void streamedProtocolsSurviveMaintenance(){
-  QFETCH(bool,compatibility);QFETCH(QString,mode);
+  QFETCH(QString,mode);
   ControlledNetwork net;QVERIFY(net.start());QSslServer origin;origin.setSslConfiguration(net.https.sslConfiguration());QVERIFY(origin.listen(QHostAddress::LocalHost));
   net.a.targetPorts.append(origin.serverPort());net.b.targetPorts.append(origin.serverPort());
   connect(&origin,&QTcpServer::pendingConnectionAvailable,&origin,[&]{while(auto *socket=origin.nextPendingConnection()){
@@ -135,7 +125,7 @@ private slots:
    });
    if(socket->bytesAvailable())QMetaObject::invokeMethod(socket,"readyRead",Qt::QueuedConnection);
   }});
-  auto o=options(net,compatibility,mode);ThreadedEngine engine;engine.start(o);
+  auto o=options(net,mode);ThreadedEngine engine;engine.start(o);
   QVERIFY2(QTest::qWaitFor([&]{return engine.status().apiHealthy;},15000),qPrintable(engine.status().message));const auto pid=engine.status().processId;const auto session=engine.status().sessionId;
   QSslSocket websocket;configure(websocket,net,o,origin.serverPort());QVERIFY(QTest::qWaitFor([&]{return websocket.isEncrypted();},5000));
   websocket.write("GET /ws HTTP/1.1\r\nHost: localhost\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n\r\n");
@@ -145,7 +135,7 @@ private slots:
   QVERIFY(QTest::qWaitFor([&]{return !probes.busy();},30000));
   if(probes.succeeded()!=1)qInfo()<<"ISOLATED_PROBE_FAILURE"<<probes.result(o.nodes.first().id);
   QCOMPARE(probes.succeeded(),1);
-  QCOMPARE(probes.result(o.nodes.first().id).value("engineKind").toString(),compatibility?QString("compatibility"):QString("native"));
+  QCOMPARE(probes.result(o.nodes.first().id).value("engineKind").toString(),QString("rust"));
   QCOMPARE(engine.status().processId,pid);QCOMPARE(engine.status().sessionId,session);
   engine.selectNode(o.nodes.last().id);QVERIFY(QTest::qWaitFor([&]{return engine.status().selectedNodeId==o.nodes.last().id;},5000));
   bytes.clear();websocket.write(frame("alive-after-probe-and-switch"));QVERIFY(receive(websocket,bytes,"alive-after-probe-and-switch"));

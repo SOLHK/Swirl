@@ -75,9 +75,6 @@
 #include "app/HdrOutput.h"
 #include "network/CaptureService.h"
 #include "network/GatewayService.h"
-#ifndef SWIRL_USE_RUST_CORE
-#include "engine/MihomoAdapter.h"
-#endif
 #include "engine/ThreadedEngine.h"
 #include "engine/EngineController.h"
 
@@ -223,13 +220,7 @@ int main(int argc, char *argv[])
     CaptureService capture(nullptr,isolatedRun?isolatedTls.filePath("ca.dpapi"):QString());
     ModuleDraftStore drafts;
     QTemporaryDir isolatedNodes;
-    std::unique_ptr<ProxyEngine> runtimeEngine;
-#ifndef SWIRL_USE_RUST_CORE
-    if(nodeTest||engineTest)runtimeEngine=std::make_unique<MihomoAdapter>(); // Pinned legacy regression fixtures.
-    else runtimeEngine=std::make_unique<ThreadedEngine>();
-#else
-    runtimeEngine=std::make_unique<ThreadedEngine>();
-#endif
+    auto runtimeEngine=std::make_unique<ThreadedEngine>();
     EngineController engineController(std::move(runtimeEngine),nullptr,realAcceptance?runtimeStore:isolatedRun?isolatedNodes.filePath("nodes.dpapi"):QString(),realAcceptance);
     ExtensionService extensions(&engineController,isolatedRun?isolatedNodes.filePath("extensions.dpapi"):QString());
     GatewayService gateway(&engineController,isolatedRun?isolatedNodes.filePath("gateway.json"):QString());
@@ -322,8 +313,8 @@ int main(int argc, char *argv[])
         const auto fixture=qEnvironmentVariable("SWIRL_LIFECYCLE_ENGINE");
         if(!fixture.isEmpty()){
             QTcpServer reserve;reserve.listen(QHostAddress::LocalHost);const auto port=reserve.serverPort();reserve.close();
-            engineController.setProxyPort(port);engineController.setRoutingMode("global");
-            engineController.setPreferCompatibility(fixture=="compatibility");
+            if(fixture!="rust")return 64;
+            engineController.setProxyPort(port);engineController.setRoutingMode("direct");
             QObject::connect(&engineController,&EngineController::statusChanged,&app,[&]{if(engineController.processAlive())app.setProperty("lifecycleEnginePid",engineController.processId());});
             engineController.connectNode("");
         }

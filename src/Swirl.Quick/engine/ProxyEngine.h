@@ -7,13 +7,6 @@
 
 // Swirl-owned UI/control contract; forwarding belongs exclusively to Rust.
 struct EngineStartOptions {
-    // Transitional fixture field only; production never reads this retired setting.
-    bool preferCompatibility=false;
-    QString executablePath;
-    QByteArray expectedSha256;
-    QString expectedVersion;
-    quint16 controlPort = 9097;
-    bool autoControlPort = false;
     int startupTimeoutMs = 10000;
     int requestTimeoutMs = 1000;
     int healthIntervalMs = 2000;
@@ -65,7 +58,6 @@ public:
         QString version;
         QString engineName="Swirl Core Rust",engineKind="rust",sessionId,engineReason;
         QString mode;
-        QString executablePath;
         QString configPath;
         QString controlEndpoint;
         QString selectedNodeId;

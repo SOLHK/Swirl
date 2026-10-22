@@ -390,7 +390,12 @@ def request(port, kind, deadline, result):
             result['tls_version'] = stream.version()
         request_target = f'http://{host}{path}' if kind == 'http' else path
         result['stage'] = 'public-response'
-        stream.sendall(f'GET {request_target} HTTP/1.1\r\nHost: {host}\r\nConnection: close\r\n\r\n'.encode())
+        # Initiate TLS shutdown after the complete 204 instead of relying on
+        # an HTTP Connection:close server policy. Missing close_notify remains
+        # an error: suppress_ragged_eofs=False and strict unwrap are unchanged.
+        connection = 'close' if kind == 'http' else 'keep-alive'
+        result['connection_policy'] = connection
+        stream.sendall(f'GET {request_target} HTTP/1.1\r\nHost: {host}\r\nConnection: {connection}\r\n\r\n'.encode())
         code, body = public_response(stream, deadline, expected, result)
         result['stage'] = 'origin-close'
         if kind == 'http':

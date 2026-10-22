@@ -155,3 +155,29 @@ staging/download scripts and packaging resources; `SwirlEngineManager.{h,cpp}`,
 non-production test-support location or replace those fixtures before deleting
 it. Remove old acceptance binaries/fixtures from product build inputs; do not
 remove the new independent protocol peers used to prove Rust interoperability.
+
+## R1-C/D physical removal checkpoint
+
+The retired process adapters, C++ TCP/UDP forwarding, compatibility selection,
+external control endpoint and downloader are physically removed in this stage.
+Qt import/persistence, system proxy ownership/recovery, telemetry presentation
+and capture/debugging services are retained. Source guards are not executable
+acceptance: Windows compile, Qt tests, clean-package loader and public response
+evidence must be obtained for the resulting commit before marking R1 complete.
+
+The old process-termination UI test is not meaningful for an in-process core;
+it would terminate Swirl itself. It is replaced by listener conflict, actual
+in-process identity, UI start/stop/restart and released-port checks. Missing DLL,
+wrong ABI/build/exports are tested using real shared-library fixtures.
+
+The 17-format Qt subscription test still downloads over authenticated loopback
+HTTPS, preserves secrets through DPAPI save/reload, refreshes stable IDs and
+checks exact native configuration. Its old external-server execution is removed;
+independent Python SS/Trojan/VLESS peer tests must separately run with the Qt
+product integration executable. Mapping alone is never counted as networking.
+
+R1-B public evidence received a certificate-verified HTTP 204 but failed during
+TLS shutdown. The new public check requests HTTPS keep-alive then initiates
+strict TLS shutdown itself. No close-notify, certificate or counter validation
+is removed, and the earlier failure remains a failure. Private supplier nodes
+and same-node Loon/Clash latency comparisons remain unverified.

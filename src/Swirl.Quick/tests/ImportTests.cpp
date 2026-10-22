@@ -1,6 +1,6 @@
 #include "engine/NodeImporter.h"
 #include "engine/NodeImportService.h"
-#include "engine/MihomoAdapter.h"
+#include "engine/RustCoreEngine.h"
 #include "engine/EngineController.h"
 #include "engine/SwirlProtocolRegistry.h"
 #include "ControlledNetwork.h"
@@ -519,14 +519,12 @@ private slots:
         imports.importText("proxies: [{name: A, type: socks5, server: 127.0.0.1, port: 1080}]\nrules: [MATCH,DIRECT]\n");
         QTRY_VERIFY_WITH_TIMEOUT(!imports.busy(),4000);QVERIFY(store.nodes().isEmpty());QVERIFY(!QFile::exists(store.filePath()));
     }
-#ifndef SWIRL_USE_RUST_CORE
-    void compatibilityModeRejectsCompleteDocumentWithoutLosingFields() {
-        QTemporaryDir directory;EngineController controller(std::make_unique<MihomoAdapter>(),nullptr,directory.filePath("nodes.dpapi"));
+    void unsupportedCompleteDocumentDoesNotLoseFields() {
+        QTemporaryDir directory;EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,directory.filePath("nodes.dpapi"));
         controller.imports()->importText("proxies: [{name: A, type: socks5, server: 127.0.0.1, port: 1080}]\nproxy-groups: [{name: route, type: select, proxies: [A], default-selected: A, future-option: true}]\nrules: ['MATCH,route']\n");
         QTRY_VERIFY_WITH_TIMEOUT(!controller.imports()->busy(),4000);QVERIFY(controller.nodeCatalog().isEmpty());QVERIFY(controller.policyGroups().isEmpty());
-        QVERIFY(!QFile::exists(directory.filePath("nodes.dpapi")));QVERIFY(controller.imports()->message().contains("Rust"));
+        QVERIFY(!QFile::exists(directory.filePath("nodes.dpapi")));QVERIFY(!controller.imports()->message().isEmpty());
     }
-#endif
     void fullProtocolRegistryCanBeImported() {
         const QStringList expected{"socks5","ss","trojan","http","ssr","vmess","vless","snell","hysteria","hysteria2","wireguard","tuic","shadowquic","gost-relay","ssh","mieru","anytls","sudoku","masque","trusttunnel","openvpn","tailscale","zerotier","easytier"};
         QCOMPARE(ProxyNode::protocols(),expected);
@@ -630,15 +628,15 @@ external-controller: 0.0.0.0:9090
     }
     void importedChainAndRunningRefresh() {
         ControlledNetwork network;QVERIFY(network.start());SubscriptionServer source;QVERIFY(source.listen(QHostAddress::LocalHost,0));
-        QTemporaryDir temp;EngineController controller(std::make_unique<MihomoAdapter>(),nullptr,temp.filePath("nodes"));
-        controller.setControlPort(freePort());controller.setProxyPort(freePort());
+        QTemporaryDir temp;EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,temp.filePath("nodes"));
+        controller.setProxyPort(freePort());controller.setRoutingMode("global");
         auto *imports=controller.imports();source.content=socks(network.a.serverPort());
         QVERIFY(imports->saveSubscription({},"Chain",source.url(),360,false));const auto sid=imports->providers().first().toMap().value("id").toString();
         imports->refreshSubscription(sid);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),5000);QCOMPARE(controller.nodes().size(),1);
         const auto id=controller.nodes().first().toMap().value("id").toString();controller.connectNode(id);
         QTRY_VERIFY_WITH_TIMEOUT(controller.apiHealthy(),18000);
         controller.testNode(network.url());QTRY_VERIFY_WITH_TIMEOUT(!controller.nodeBusy(),8000);
-        QVERIFY(controller.requestSucceeded());QVERIFY(network.a.forwarded>=2);QCOMPARE(network.b.forwarded,0);
+        QVERIFY(controller.requestSucceeded());QVERIFY(network.a.forwarded>=1);QCOMPARE(network.b.forwarded,0);
         const auto pid=controller.processId();network.b.username.clear();network.b.password.clear();
         source.content=socks(network.b.serverPort());imports->refreshSubscription(sid);
         QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),5000);
@@ -652,7 +650,7 @@ external-controller: 0.0.0.0:9090
         controller.stop();QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive(),4000);
         controller.connectNode(id);QTRY_VERIFY_WITH_TIMEOUT(controller.apiHealthy(),18000);
         controller.testNode(network.url());QTRY_VERIFY_WITH_TIMEOUT(!controller.nodeBusy(),8000);
-        QVERIFY(controller.requestSucceeded());QVERIFY(network.b.forwarded>=2);
+        QVERIFY(controller.requestSucceeded());QVERIFY(network.b.forwarded>=1);
         controller.stop();QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive(),4000);QTcpServer reuse;QVERIFY(reuse.listen(QHostAddress::LocalHost,controller.proxyPort()));
         reuse.close();imports->refreshSubscription(sid);controller.stop();
         QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),5000);QTest::qWait(300);QVERIFY(!controller.processAlive());

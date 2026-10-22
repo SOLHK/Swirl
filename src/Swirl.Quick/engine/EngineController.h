@@ -13,11 +13,7 @@
 // QML sees only Swirl's generic business facade. Engine implementations are injected in C++.
 class EngineController final : public QObject {
     Q_OBJECT
-    Q_PROPERTY(QString executablePath READ executablePath WRITE setExecutablePath NOTIFY optionsChanged)
     Q_PROPERTY(bool rustCoreBuild READ rustCoreBuild CONSTANT)
-    Q_PROPERTY(int controlPort READ controlPort WRITE setControlPort NOTIFY optionsChanged)
-    Q_PROPERTY(QString expectedVersion READ expectedVersion CONSTANT)
-    Q_PROPERTY(QString expectedSha256 READ expectedSha256 CONSTANT)
     Q_PROPERTY(QString stateText READ stateText NOTIFY statusChanged)
     Q_PROPERTY(QString error READ error NOTIFY statusChanged)
     Q_PROPERTY(QString errorCode READ errorCode NOTIFY statusChanged)
@@ -77,12 +73,6 @@ public:
     bool rustCoreBuild() const {
         return true;
     }
-    QString executablePath() const { return m_options.executablePath; }
-    int controlPort() const { return m_options.controlPort; }
-    void setExecutablePath(const QString &path);
-    void setControlPort(int port);
-    QString expectedVersion() const { return m_options.expectedVersion; }
-    QString expectedSha256() const { return QString::fromLatin1(m_options.expectedSha256); }
     QString stateText() const;
     QString error() const { return m_engine->status().message; }
     QString errorCode() const;

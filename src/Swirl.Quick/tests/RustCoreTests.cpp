@@ -470,7 +470,7 @@ private slots:
    const auto response=request(host,port,target,encrypted);return response.error==QNetworkReply::NoError&&response.status==200&&response.body==expected+':'+target.toUtf8();
   };
   {
-   EngineController controller(std::make_unique<ThreadedEngine>(),nullptr,path,true);controller.setProxyPort(proxyPort);controller.setExecutablePath("must-not-start-an-external-core.exe");
+   EngineController controller(std::make_unique<ThreadedEngine>(),nullptr,path,true);controller.setProxyPort(proxyPort);QCOMPARE(controller.metaObject()->indexOfProperty("executablePath"),-1);
    QCOMPARE(controller.selectedNodeId(),idA);QCOMPARE(QJsonObject::fromVariantMap(controller.networkConfigurationSnapshot()),QJsonObject::fromVariantMap(network));
    NodeStore restored(path);QCOMPARE(restored.nodes().size(),savedNodes.size());QCOMPARE(restored.networkConfiguration()["importedConfiguration"].toObject(),original);
    for(qsizetype i=0;i<savedNodes.size();++i){QCOMPARE(restored.nodes()[i].parameters,savedNodes[i].parameters);QCOMPARE(restored.nodes()[i].password,savedNodes[i].password);QCOMPARE(restored.nodes()[i].originalConfiguration,savedNodes[i].originalConfiguration);}
@@ -647,7 +647,7 @@ private slots:
    check["stage"]="complete";check["success"]=true;return finish();
   };
   {
-   EngineController controller(std::make_unique<ThreadedEngine>(),nullptr,path,true);controller.setProxyPort(proxyPort);controller.setRoutingMode("global");controller.setExecutablePath("must-not-start-an-external-core.exe");
+   EngineController controller(std::make_unique<ThreadedEngine>(),nullptr,path,true);controller.setProxyPort(proxyPort);controller.setRoutingMode("global");QCOMPARE(controller.metaObject()->indexOfProperty("executablePath"),-1);
    QVERIFY(controller.selectedNodeId()==idA);QVERIFY(controller.networkConfigurationSnapshot()==savedNetwork);
    NodeStore restored(path);const auto restoredNodes=restored.nodes();QVERIFY(restored.error().isEmpty()&&restoredNodes.size()==savedNodes.size());report["encrypted_store_reloaded"]=true;
    for(qsizetype i=0;i<savedNodes.size();++i){const auto &node=restoredNodes[i],&before=savedNodes[i];QVERIFY(node.parameters==before.parameters&&node.password==before.password&&node.originalConfiguration==before.originalConfiguration);}
@@ -775,7 +775,7 @@ private slots:
   };
   for(const auto frontend:{QNetworkProxy::HttpProxy,QNetworkProxy::Socks5Proxy}){
    const auto frontendName=frontend==QNetworkProxy::HttpProxy?QString("http-connect"):QString("socks5");
-   EngineController controller(std::make_unique<ThreadedEngine>(),nullptr,path,true);controller.setProxyPort(proxyPort);controller.setRoutingMode(mode=="reject"?"direct":"global");controller.setExecutablePath("must-not-start-an-external-core.exe");
+   EngineController controller(std::make_unique<ThreadedEngine>(),nullptr,path,true);controller.setProxyPort(proxyPort);controller.setRoutingMode(mode=="reject"?"direct":"global");QCOMPARE(controller.metaObject()->indexOfProperty("executablePath"),-1);
    QVERIFY(controller.selectedNodeId()==idA);
    QVERIFY(QJsonObject::fromVariantMap(controller.networkConfigurationSnapshot())==savedNetwork);
    NodeStore restored(path);QVERIFY(restored.error().isEmpty()&&restored.nodes().size()==savedNodes.size());report["encrypted_store_reloaded"]=true;
@@ -1221,7 +1221,7 @@ private slots:
   for(qsizetype index=0;index<sources.size();++index){
    const auto parsed=NodeImporter::parse(sources[index]);QVERIFY2(bool(parsed),qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);
    const auto &node=parsed.nodes.first();QVERIFY(node.conversionIssues.isEmpty());QCOMPARE(node.parameters.value("udp"),QJsonValue(true));
-   EngineStartOptions o;o.routingMode="global";o.nodes=parsed.nodes;o.selectedNodeId=node.id;o.executablePath="must-not-run-an-external-process.exe";
+   EngineStartOptions o;o.routingMode="global";o.nodes=parsed.nodes;o.selectedNodeId=node.id;
    QTcpServer port;QVERIFY(port.listen(QHostAddress::LocalHost));o.proxyPort=port.serverPort();port.close();
    ThreadedEngine engine;engine.start(o);
    QVERIFY2(QTest::qWaitFor([&]{return engine.status().apiHealthy;},5000),qPrintable(engine.status().message));
@@ -1966,7 +1966,7 @@ private slots:
   QTcpServer reuse;QVERIFY(reuse.listen(QHostAddress::LocalHost,o.proxyPort));
  }
  void nativeProbeAndUnsupportedUseRustOnly(){
-  ControlledNetwork net;QVERIFY(net.start());auto o=options(net);o.executablePath="must-not-run-an-external-process.exe";
+  ControlledNetwork net;QVERIFY(net.start());auto o=options(net);
   NodeTestService probes;probes.start(o,{o.selectedNodeId},net.url());QVERIFY(QTest::qWaitFor([&]{return !probes.busy();},6000));
   QCOMPARE(probes.succeeded(),1);QCOMPARE(probes.result(o.selectedNodeId).value("engineKind").toString(),QString("rust"));
   QCOMPARE(probes.result(o.selectedNodeId).value("metricType").toString(),QString("http_headers"));
