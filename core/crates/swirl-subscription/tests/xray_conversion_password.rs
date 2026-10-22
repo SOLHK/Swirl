@@ -194,7 +194,7 @@ fn official_ss_boolean_extensions_preserve_intent_and_reject_wrong_types() {
             assert_eq!(d.nodes()[0].validation(), ValidationStatus::Valid);
             assert_eq!(
                 d.nodes()[0].diagnostics().iter().any(|d| d.code == code),
-                enabled
+                enabled || key == "ivCheck"
             );
         }
         for wrong in [json!(null), json!(0), json!("false"), json!({})] {

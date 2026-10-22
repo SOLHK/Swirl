@@ -175,13 +175,16 @@ fn password(
         // V2Ray's official outbound extensions are booleans. Preserve both
         // values, but never claim the native connector applied an IV-check or
         // legacy OTA policy which is absent from Swirl's current IR.
+        // In particular, explicit ivCheck=false cannot disable the native
+        // connector's mandatory replay window. Do not weaken Core to import it.
         for (key, code) in [
             ("ivCheck", "ShadowsocksIvCheckUnsupported"),
             ("ota", "ShadowsocksOtaUnsupported"),
         ] {
             match server.get(key) {
-                None | Some(Value::Bool(false)) => (),
-                Some(Value::Bool(true)) => {
+                None => (),
+                Some(Value::Bool(false)) if key == "ota" => (),
+                Some(Value::Bool(_)) => {
                     sink.unsupported(code, &key_path(&source.server_path, key));
                 }
                 Some(_) => sink.error("ExpectedBoolean", &key_path(&source.server_path, key)),

@@ -10,6 +10,7 @@ use serde_json::Value;
 use std::fmt;
 
 mod auth;
+mod native;
 mod protocols;
 
 /// Expansion is bounded separately from the parser's outbound-object count.
@@ -35,6 +36,16 @@ pub enum ValidationStatus {
     Valid,
     Invalid,
     Unverified,
+}
+
+/// Local capability for one explicitly selected TCP proxy path, independent
+/// of syntax, semantic validity and network evidence. This is not approval of
+/// the source document's UDP, routing, DNS, inbound or load-balancing policy.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NativeStatus {
+    Executable,
+    Blocked,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -125,6 +136,7 @@ pub struct ValidatedOutbound {
     source: NodeSource,
     pub(super) mapping: super::security::SecurityMapping,
     validation: ValidationStatus,
+    native: Option<crate::Outbound>,
     diagnostics: Vec<Diagnostic>,
 }
 impl ValidatedOutbound {
@@ -163,6 +175,27 @@ impl ValidatedOutbound {
     pub fn diagnostics(&self) -> &[Diagnostic] {
         &self.diagnostics
     }
+    /// Secret-bearing native candidate. Checks final diagnostics, including
+    /// document-level transport inheritance added after per-node conversion.
+    /// This does not apply the original document's routing, DNS or inbound policy.
+    pub fn native_outbound(&self) -> Option<&crate::Outbound> {
+        if self.validation != ValidationStatus::Valid
+            || self
+                .diagnostics
+                .iter()
+                .any(|d| matches!(d.severity.as_str(), "error" | "unsupported"))
+        {
+            return None;
+        }
+        self.native.as_ref()
+    }
+    pub fn native_status(&self) -> NativeStatus {
+        if self.native_outbound().is_some() {
+            NativeStatus::Executable
+        } else {
+            NativeStatus::Blocked
+        }
+    }
     /// Conversion is not a network test and cannot manufacture network evidence.
     pub fn network_verified(&self) -> bool {
         false
@@ -174,6 +207,7 @@ impl fmt::Debug for ValidatedOutbound {
             .field("protocol", &self.protocol)
             .field("source", &self.source)
             .field("validation", &self.validation)
+            .field("native_status", &self.native_status())
             .field("diagnostics", &self.diagnostics)
             .finish_non_exhaustive()
     }
@@ -234,6 +268,34 @@ impl ConvertedDocument {
     }
     pub fn mux(&self, node: usize) -> Option<&Value> {
         self.raw_outbound(node)?.get("mux")
+    }
+    /// Build a private single-node TCP proxy configuration for an explicitly
+    /// selected expanded node. Source routing/DNS/inbounds/policy are retained
+    /// only in raw_json and are not applied by this node-export operation.
+    /// The caller must choose a loopback listen address; the real IR validator
+    /// is run again here and again by Core at start/configure. No network probe
+    /// or automatic server/account selection is performed.
+    pub fn native_config(
+        &self,
+        node: usize,
+        listen: std::net::SocketAddr,
+    ) -> Result<crate::Config, Diagnostic> {
+        let selected = self
+            .nodes
+            .get(node)
+            .ok_or_else(|| diagnostic("NativeNodeIndex", "", "error"))?;
+        let outbound = selected.native_outbound().ok_or_else(|| {
+            diagnostic(
+                "NativeExecutionBlocked",
+                &selected.source.outbound_path,
+                "unsupported",
+            )
+        })?;
+        let config = native::candidate_config(outbound.clone(), listen);
+        config
+            .validate()
+            .map_err(|code| diagnostic(code, "", "error"))?;
+        Ok(config)
     }
     /// Explicit secret-bearing persistence operation; not a logging interface.
     pub fn save(&self) -> Result<Vec<u8>, Diagnostic> {
@@ -488,6 +550,15 @@ fn append(
         protocol,
         &mut sink,
     );
+    let native = native::adapt(
+        outbound,
+        protocol,
+        endpoint.as_ref(),
+        &authentication,
+        &source,
+        &mapping,
+        &mut sink,
+    );
     let validation = sink.status();
     if sink.overflow || sink.issues.len() > MAX_JSON_DIAGNOSTICS - *used {
         return Err(diagnostic("DiagnosticLimit", "", "error"));
@@ -500,6 +571,7 @@ fn append(
         source,
         mapping,
         validation,
+        native,
         diagnostics: sink.issues,
     });
     Ok(())
@@ -550,11 +622,36 @@ fn validate_id(value: &Value, path: &str, sink: &mut Sink) {
     let id = value.get("id").and_then(Value::as_str);
     match id {
         Some(id) if crate::uuid_bytes(id).is_some() => (),
+        // Fixed Xray accepts compact hex and optional separators at UUID
+        // group boundaries. Recognize that syntax without normalizing it or
+        // trusting its more permissive treatment of trailing source bytes.
+        Some(id) if noncanonical_uuid_syntax(id) => {
+            sink.unknown("NonCanonicalUuidMappingUnsupported", &key_path(path, "id"))
+        }
         // Xray accepts short custom IDs via UUIDv5. Preserve, do not invent a
         // UUID or claim that a V2Ray producer necessarily accepts the same ID.
-        Some(id) if !id.is_empty() && id.len() < 30 => {
+        Some(id) if !id.is_empty() && id.len() <= 30 => {
             sink.unknown("CustomIdMappingUnsupported", &key_path(path, "id"))
         }
         _ => sink.error("InvalidUuid", &key_path(path, "id")),
     }
+}
+
+fn noncanonical_uuid_syntax(id: &str) -> bool {
+    if !(32..=36).contains(&id.len()) {
+        return false;
+    }
+    let mut digits = 0;
+    let mut separator = false;
+    for byte in id.bytes() {
+        if byte.is_ascii_hexdigit() {
+            digits += 1;
+            separator = false;
+        } else if byte == b'-' && !separator && [0, 8, 12, 16, 20].contains(&digits) {
+            separator = true;
+        } else {
+            return false;
+        }
+    }
+    digits == 32
 }
