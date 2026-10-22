@@ -1,0 +1,99 @@
+{
+  "schema": 1,
+  "phase": "X1.2-B6 local gates",
+  "base_commit": "a0ff384d01698047b28b468046dac319314994b8",
+  "source_identity": "Base commit plus the source hashes below; new selection regression is included. Final GitHub commit identity is independently verified after publication.",
+  "platform": "linux",
+  "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+  "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+  "dependency_mode": "--locked with public registry cache and CARGO_NET_OFFLINE=true",
+  "commands": [
+    {
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "started_utc": "2026-10-22T06:03:24.643698+00:00",
+      "duration_seconds": 0.356,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--workspace",
+        "--locked"
+      ],
+      "exit_code": 0,
+      "started_utc": "2026-10-22T06:03:24.999490+00:00",
+      "duration_seconds": 0.089,
+      "log_sha256": "9ddcb7a97f3589835ba8f354c41d25b0a805bd5f85ddbccaff009e6f6dc7236c"
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "started_utc": "2026-10-22T06:03:25.088337+00:00",
+      "duration_seconds": 0.225,
+      "log_sha256": "27adb32fb838a91ced35c6d2cb21a96a75e148c371bffe84fd638723e01e4717"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--workspace",
+        "--locked"
+      ],
+      "exit_code": 0,
+      "started_utc": "2026-10-22T06:03:25.313365+00:00",
+      "duration_seconds": 11.035,
+      "log_sha256": "169e02e02f6adb3cb5855117f6c8a1687324fd7fe32a7c128c6b2a358f0c13fe"
+    }
+  ],
+  "workspace_tests": {
+    "result_sections": 36,
+    "passed": 523,
+    "failed": 0,
+    "ignored": 0
+  },
+  "source_sha256": {
+    "core/crates/swirl-api/src/bin/inspect/xray_json.rs": "bd3844516c6a0c61eb503b1652078395469f2c314699ad463895494e76ce3ad8",
+    "core/crates/swirl-api/src/bin/swirl-inspect.rs": "24640ffacb47053bd4845674e86ee575b647faee23db3e49cfa030f2dd767b2e",
+    "core/crates/swirl-api/tests/xray_boundary.rs": "1ceebc74481f7c5e6bc9bfc65c8339ed98a7dbdf1508bd5e49e39cf219bd3db6",
+    "core/crates/swirl-api/tests/xray_cli.rs": "1afdcda8d9ce665e2ab1b66f8141fa62593cb45c326899091f3cd34a4e31f29a",
+    "core/crates/swirl-core/tests/china_rules.rs": "2fdc74c5acd0ea667bd17fdec6dfe751f5dbc0b0a95b9a8a2b7d3ad410d33c94",
+    "core/crates/swirl-core/tests/network.rs": "5f0a81527aecb80d0b3d25f4de04f274d5ace479e698ba5952b5b1b3e12816b3",
+    "core/crates/swirl-core/tests/socks5_udp.rs": "b6e0f77986f8463bd35bafa08749c0f93f43ec6a8a5e3019fcadfa33727e4ed1",
+    "core/crates/swirl-core/tests/xray_import.rs": "3f428c38bc75ce792e4eb9b862b35114e538f0cb96d6f84f149c82322b45d12f",
+    "core/crates/swirl-subscription/src/xray.rs": "1902106af4a6927f437827da6517fac67f7a277efc908669c455747606c679d8",
+    "core/crates/swirl-subscription/src/xray/convert.rs": "a47d8ba7bfd2b898b9548aa896d9a83d2f3cfb2bd886cf2513f8360f2e3f2a7a",
+    "core/crates/swirl-subscription/src/xray/convert/auth.rs": "4af21bf2645645732c8ecde1aa220259c18831084f8d8bd263a69893caf637de",
+    "core/crates/swirl-subscription/src/xray/convert/native.rs": "b0b13e2a0a86c605e1860add9b4e41a3a214c464c3c30573ff20d96e564e3470",
+    "core/crates/swirl-subscription/src/xray/convert/protocols.rs": "4688087992c82125a0bd138a335c2163e7b140bb3065183ef82fc5367d2029ff",
+    "core/crates/swirl-subscription/src/xray/schema.rs": "89599b9a5daf509c8c773eb4a1a28fd7fa2af62cf2a7f89a4924c40ed8a0aead",
+    "core/crates/swirl-subscription/src/xray/security.rs": "720e12855580ab9a3edbfcc80a77eac372db4dc100b37b88cd4f114e456b208c",
+    "core/crates/swirl-subscription/src/xray/strict.rs": "b445fedaa866d3d504c95cfdf4ba76258faa7a5a064e92836535418c0b93af22",
+    "core/crates/swirl-subscription/tests/xray_adversarial.rs": "82f2b361e433255a13b8604a77e84aec2433ac4fbd34ad1c1024f190197c1346",
+    "core/crates/swirl-subscription/tests/xray_conversion.rs": "35feacc8265916b0058b6248f504e7637ad1498f8c56ce911bd9715d4552935f",
+    "core/crates/swirl-subscription/tests/xray_conversion_auth.rs": "71023380c355b8eaa27cf96167be8411419895250b9f8d9466d65b2e24f746ac",
+    "core/crates/swirl-subscription/tests/xray_conversion_password.rs": "916eeb868ea95885f3167e20d9a2dac9687c636ad2597ab35bf7ee92b17e9f6f",
+    "core/crates/swirl-subscription/tests/xray_conversion_security.rs": "fceeddd0836ef1be82d24a0fb361593a87ffffdd8b07d3cc1529936dc1509ac7",
+    "core/crates/swirl-subscription/tests/xray_native.rs": "6418c0e948b503de89fd1fd40e5ef5c4a6cbf362694e7aff05f902c0028cff76",
+    "core/crates/swirl-subscription/tests/xray_native_selection.rs": "287e3b4380594f631e2f5d47e41b358d193462edf170bc2cfdfee8d850d2ae76",
+    "core/crates/swirl-subscription/tests/xray_structure.rs": "894af6e7608257599394d1ea3a4d09da8828cfb7ed2ea28c7d31c0014fb8ac04"
+  },
+  "network_scope": "New importer chain verifies five synthetic loopback protocol paths plus one blocked-runtime case; no TLS/REALITY/provider verdict is created by import.",
+  "ci_scope": "This local Linux evidence does not assert Windows or macOS success. Use exact-commit GitHub Actions results."
+}
