@@ -27,6 +27,24 @@ fn native_tls_trust_errors_precede_listener_allocation() {
     assert_eq!(Core::start(config).err(), Some("TlsTrustAnchor"));
 }
 
+#[test]
+fn invalid_quic_trust_is_rejected_before_core_activation() {
+    let occupied = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    for protocol in ["hysteria2", "tuic"] {
+        let mut config = configuration();
+        config.listen = occupied.local_addr().unwrap();
+        let mut outbound = serde_json::json!({
+            "type":protocol,"host":"peer.invalid","port":443,"password":"synthetic",
+            "tls":{"server_name":"peer.invalid","alpn":["h3"],"ca_der_base64":"AA=="}
+        });
+        if protocol == "tuic" {
+            outbound["uuid"] = serde_json::json!("00112233-4455-6677-8899-aabbccddeeff");
+        }
+        config.nodes[0].outbound = serde_json::from_value(outbound).unwrap();
+        assert_eq!(Core::start(config).err(), Some("TlsTrustAnchor"));
+    }
+}
+
 fn websocket(path: &str) -> Transport {
     Transport::WebSocket {
         settings: swirl_subscription::WebSocket {

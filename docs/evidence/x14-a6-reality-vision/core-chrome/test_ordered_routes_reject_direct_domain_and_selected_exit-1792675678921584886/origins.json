@@ -1,0 +1,17 @@
+{
+  "http_paths": [
+    "/route-a",
+    "/route-b",
+    "/direct"
+  ],
+  "https_paths": [],
+  "https_sni": [],
+  "https_authenticated_closes": 0,
+  "echo_bytes": 0,
+  "echo_sessions": [],
+  "origin_errors": {
+    "http": [],
+    "https": [],
+    "echo": []
+  }
+}

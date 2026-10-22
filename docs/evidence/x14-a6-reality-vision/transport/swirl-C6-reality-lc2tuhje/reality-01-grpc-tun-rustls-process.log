@@ -1,0 +1,47 @@
+Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)
+A unified platform for anti-censorship.
+2026/10/22 22:25:21.597180 [Info] infra/conf/serial: Reading config: &{Name:/tmp/swirl-C6-reality-lc2tuhje/reality-01-grpc-tun-rustls/xray-config.json Format:json}
+2026/10/22 22:25:21.598369 [Warning] common/errors: The feature gRPC transport (with unnecessary costs, etc.) is deprecated, not recommended for using and might be removed. Please migrate to XHTTP stream-up H2 as soon as possible.
+2026/10/22 22:25:21.598498 [Warning] infra/conf: REALITY: Listening on non-443 ports will increase the likelihood of your server's IP being blocked by the GFW
+2026/10/22 22:25:21.599238 [Debug] app/log: Logger started
+2026/10/22 22:25:21.599744 [Debug] app/proxyman/inbound: creating stream worker on 127.0.0.1:34991
+2026/10/22 22:25:21.605357 [Warning] core: Xray 26.10.21 started
+2026/10/22 22:25:21.606183 [Debug] transport/internet/grpc: gRPC listen for service name `swirl-reality` tun `Tun` multi tun `TunMulti`
+REALITY remoteAddr: 127.0.0.1:52738
+REALITY remoteAddr: 127.0.0.1:52738	hs.c.isHandshakeComplete.Load(): false
+REALITY remoteAddr: 127.0.0.1:52754
+[REDACTED: ephemeral REALITY test authentication material]
+REALITY remoteAddr: 127.0.0.1:52754	hs.c.conn == conn: false
+REALITY remoteAddr: 127.0.0.1:52754	forwarded SNI: swirl-reality-runtime.test
+REALITY remoteAddr: 127.0.0.1:52754	hs.c.isHandshakeComplete.Load(): false
+REALITY remoteAddr: 127.0.0.1:52762
+[REDACTED: ephemeral REALITY test authentication material]
+REALITY remoteAddr: 127.0.0.1:52762	hs.c.ClientVer: [0 1 0]
+REALITY remoteAddr: 127.0.0.1:52762	hs.c.ClientTime: 2026-10-22 22:25:21 +0900 KST
+[REDACTED: ephemeral REALITY test authentication material]
+REALITY remoteAddr: 127.0.0.1:52762	hs.c.conn == conn: false
+REALITY remoteAddr: 127.0.0.1:52762	forwarded SNI: swirl-reality-runtime.test
+REALITY remoteAddr: 127.0.0.1:52762	hs.c.isHandshakeComplete.Load(): false
+REALITY remoteAddr: 127.0.0.1:52768
+REALITY remoteAddr: 127.0.0.1:52768	forwarded SNI: wrong-reality.fixture.invalid
+REALITY remoteAddr: 127.0.0.1:52768	hs.c.isHandshakeComplete.Load(): false
+REALITY remoteAddr: 127.0.0.1:52774
+[REDACTED: ephemeral REALITY test authentication material]
+REALITY remoteAddr: 127.0.0.1:52774	hs.c.ClientVer: [0 1 0]
+REALITY remoteAddr: 127.0.0.1:52774	hs.c.ClientTime: 2026-10-22 22:25:21 +0900 KST
+[REDACTED: ephemeral REALITY test authentication material]
+REALITY remoteAddr: 127.0.0.1:52774	hs.c.conn == conn: true
+REALITY remoteAddr: 127.0.0.1:52774	len(s2cSaved): 709	Server Hello: 127
+REALITY remoteAddr: 127.0.0.1:52774	len(s2cSaved): 582	Change Cipher Spec: 6
+REALITY remoteAddr: 127.0.0.1:52774	len(s2cSaved): 576	Encrypted Extensions: 41
+REALITY remoteAddr: 127.0.0.1:52774	len(s2cSaved): 535	Certificate: 367
+REALITY remoteAddr: 127.0.0.1:52774	len(s2cSaved): 168	Certificate Verify: 94
+REALITY remoteAddr: 127.0.0.1:52774	len(s2cSaved): 74	Finished: 74
+REALITY remoteAddr: 127.0.0.1:52774	is using X25519MLKEM768 for TLS' communication: false
+REALITY remoteAddr: 127.0.0.1:52774	is using ML-DSA-65 for cert's extra signature: false
+REALITY remoteAddr: 127.0.0.1:52774	hs.handshake() err: <nil>
+REALITY remoteAddr: 127.0.0.1:52774	hs.readClientFinished() err: <nil>
+REALITY remoteAddr: 127.0.0.1:52774	hs.c.isHandshakeComplete.Load(): true
+2026/10/22 22:25:21.682008 [Info] [2933900022] proxy/vless/inbound: firstLen = 26
+2026/10/22 22:25:21.682025 [Info] [2933900022] app/proxyman/inbound: connection ends > proxy/vless/inbound: invalid request from 127.0.0.1:52774 > proxy/vless/encoding: invalid request user id: ffeeddcc-bbaa-9988-7766-554433221100
+2026/10/22 22:25:22.046886 [Debug] app/log: Logger closing

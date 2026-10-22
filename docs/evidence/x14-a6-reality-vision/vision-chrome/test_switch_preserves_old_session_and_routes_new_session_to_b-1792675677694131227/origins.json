@@ -1,0 +1,24 @@
+{
+  "http_paths": [
+    "/new-b"
+  ],
+  "https_paths": [],
+  "https_sni": [],
+  "https_authenticated_closes": 0,
+  "echo_bytes": 25,
+  "echo_sessions": [
+    {
+      "expected_bytes": 25,
+      "received_bytes": 25,
+      "cancelled": false,
+      "tail_after_client_halfclose": true,
+      "target_closed": true,
+      "sha256": "a2b976f92111f009d4c4687d3f530a1f82751d0367659fdeca2897804eb91bd5"
+    }
+  ],
+  "origin_errors": {
+    "http": [],
+    "https": [],
+    "echo": []
+  }
+}

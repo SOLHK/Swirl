@@ -316,6 +316,7 @@ fn proxy_no_auth_and_tls_are_distinct_valid_native_variants() {
             Outbound::Socks5 {
                 auth: None,
                 tls: None,
+                udp: true,
                 ..
             } | Outbound::HttpConnect {
                 auth: None,
@@ -331,6 +332,7 @@ fn proxy_no_auth_and_tls_are_distinct_valid_native_variants() {
             Outbound::Socks5 {
                 auth: None,
                 tls: Some(_),
+                udp: false,
                 ..
             } | Outbound::HttpConnect {
                 auth: None,

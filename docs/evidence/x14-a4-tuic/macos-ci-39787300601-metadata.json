@@ -1,0 +1,41 @@
+{
+  "run_id": 39787300601,
+  "job_id": 119853790695,
+  "commit": "40be930b6328e3d292eb913bc14e45c27ea95f42",
+  "job_url": "https://github.com/SOLHK/Swirl/actions/runs/39787300601/job/119853790695",
+  "artifact_id": 12429183080,
+  "artifact_zip_sha256": "675fd32ed0bb9d9a9f777d5d4e1b20e2f8a8e8f219b0d059d62b3fdb007f84ab",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "suite": {
+    "tuic": {
+      "methods": 9,
+      "seconds": 13.122,
+      "assertions_passed": true
+    },
+    "core_quic": {
+      "methods": 6,
+      "seconds": 21.361,
+      "assertions_passed": true
+    }
+  },
+  "qualification": "TUIC maximum-size UDP passed after explicit test-runner preparation; not a default-macOS or Qt product acceptance claim.",
+  "sysctl_before": {
+    "net.inet.udp.maxdgram": 9216,
+    "net.inet.udp.recvspace": 786896,
+    "kern.ipc.maxsockbuf": 8388608
+  },
+  "sysctl_after": {
+    "net.inet.udp.maxdgram": 65535,
+    "net.inet.udp.recvspace": 786896,
+    "kern.ipc.maxsockbuf": 8388608
+  },
+  "before_65507": "IPv4 and IPv6 send failed with EMSGSIZE errno40",
+  "after_raw_probe": "IPv4 and IPv6 123/4096/65507 bytes roundtrip exactly",
+  "native_4096_official_fragments": 4,
+  "maximum_udp_both_modes": {
+    "bytes": 65507,
+    "native": "actual roundtrip with clean close",
+    "quic": "actual roundtrip with clean close"
+  },
+  "original_failure_retained": 39783473847
+}

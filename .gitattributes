@@ -1,3 +1,5 @@
 * text=auto eol=lf
 *.png binary
 *.ico binary
+# Captured command output is retained byte-for-byte, including blank log lines.
+docs/evidence/** -whitespace

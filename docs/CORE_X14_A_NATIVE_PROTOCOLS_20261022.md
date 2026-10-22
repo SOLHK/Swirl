@@ -171,7 +171,7 @@ addresses. New protocol frames have length/deadline limits and cancelled writes
 cannot silently reuse a partly written UDP carrier. The detailed consolidation
 evidence is retained separately under `x14-a6-ss2022` and `x14-a6-stream-udp`.
 
-TLS validates SNI, ALPN and custom CA material before DNS/socket allocation. A
+Ordinary TLS validates SNI, ALPN and custom CA material before DNS/socket allocation. A
 bounded 32-entry context cache avoids rebuilding root stores on repeated ordinary
 TLS connections; session resumption and early data remain disabled. Invalid
 reconfiguration preserves the running Core generation, verified through the
@@ -185,3 +185,49 @@ negative cases were updated to still-unsupported XHTTP auto and SS2022 ChaCha
 after gRPC and SS2022 AES became executable; rejection and sibling-isolation
 assertions remain. Official interop is an additional CI matrix with pinned peer
 downloads; local gates are never substituted for its actual result.
+
+## A6: official consolidation and invalid-QUIC-configuration preflight
+
+A5 commit `40be930b6328e3d292eb913bc14e45c27ea95f42` completed GitHub Actions
+run [39787300601](https://github.com/SOLHK/Swirl/actions/runs/39787300601) successfully:
+all three native gates and all three official interoperability jobs passed.
+Windows ran 632 Rust tests; Linux and macOS ran 631 each, with no failed or
+ignored tests. Each official job ran 70 methods, including negative cases and
+explicitly retained upstream limitation probes, not 70 positive protocol
+combinations. The receipt is `evidence/x14-a5-local/github-actions.json`.
+macOS required the documented disposable-runner UDP prerequisite adjustment;
+the original A4 failure remains available.
+
+The new [HTTP/SOCKS official suite](HTTP_SOCKS_OFFICIAL_INTEROP_20261022.md)
+verifies noauth/Basic HTTP CONNECT, SOCKS4/4a and authenticated/unauthenticated
+SOCKS5 TCP/UDP through source import and the ordinary Core. It exposed a real
+mapping defect: plain Xray SOCKS5 outbounds support UDP without a separate
+source flag, but the native projection disabled it. The projection now enables
+that capability; SOCKS5 over TLS still rejects the unsupported UDP combination.
+
+Existing REALITY/Vision connectors were reused and independently retested:
+[46 Linux executions](REALITY_VISION_NATIVE_REGRESSION_X14A_20261022.md), including
+TLS 1.3 Direct and inner authenticated shutdown. Four release-peer Core suites
+and the HTTP/SOCKS suite are now additional three-platform CI steps. This local
+record does not predeclare those new CI steps successful.
+
+QUIC review found invalid custom CA DER could previously cause a DNS lookup
+before rejection. Hysteria2 and TUIC now validate credentials, SNI, ALPN, pin and
+trust material before DNS and Core activation, and share at most 32 cached TLS
+crypto contexts isolated by CA/ALPN/insecure/pin. Resumption and early data remain
+disabled. A real UDP DNS observer confirms zero queries on all four TCP/UDP
+paths; an occupied-listener regression verifies validation precedes allocation.
+The before/after evidence is `evidence/x14-a6-quic-preflight/`.
+
+After rebuilding the changed clients, Linux fmt/check/clippy/test all passed:
+633 passed, zero failed or ignored. Official Hysteria2 17/17, TUIC 9/9 and Core
+QUIC 6/6 reruns passed; existing limitation probes remain separate from positive
+data acceptance. Full logs and executable hashes are in `evidence/x14-a6-local/`.
+An earlier examples build failed because this task's temporary cache filled the
+shared-memory filesystem; that failure is retained, and the successful reruns
+used rebuilt binaries after cleaning only reproducible Swirl crate artifacts.
+
+[Product integration audit](CORE_X14_A_PRODUCT_INTEGRATION_AUDIT_20261022.md)
+identifies Qt importer/storage/configuration gaps. No Windows Qt, mobile or
+public-node acceptance is claimed. The separate public-target preflight failed
+system DNS and is retained under `evidence/x14-a7-environment/`.

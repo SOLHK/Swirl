@@ -577,7 +577,7 @@ def verified_build(evidence, qt=False, fingerprint="rustls"):
         "test_sha256": sha256(Path(__file__)), "python": sys.version, "openssl": ssl.OPENSSL_VERSION,
         "platform": sys.platform, "github_run_id": os.environ.get("GITHUB_RUN_ID"),
         "build_manifest": manifest,
-        "scope": "actual Windows Qt/DPAPI" if qt else "production Rust control ABI with portable JSON test host",
+        "scope": "actual Windows Qt/DPAPI" if qt else "production Rust Core JSON command host (Controller.dispatch; exported C ABI not exercised)",
         "provider_connection": False, "fingerprint": fingerprint,
         "client_hello_profile": "chrome_133" if fingerprint in ("chrome", "chrome_133") else "rustls"})
     return binary

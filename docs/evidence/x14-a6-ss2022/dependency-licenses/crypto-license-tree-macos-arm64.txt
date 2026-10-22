@@ -1,0 +1,23 @@
+aes v0.8.4|MIT OR Apache-2.0
+cfg-if v1.0.5|MIT OR Apache-2.0
+cipher v0.4.4|MIT OR Apache-2.0
+crypto-common v0.1.7|MIT OR Apache-2.0
+generic-array v0.14.7|MIT
+typenum v1.20.1|MIT OR Apache-2.0
+version_check v0.9.5|MIT/Apache-2.0
+typenum v1.20.1|MIT OR Apache-2.0
+inout v0.1.4|MIT OR Apache-2.0
+generic-array v0.14.7|MIT (*)
+cpufeatures v0.2.17|MIT OR Apache-2.0
+libc v0.2.190|MIT OR Apache-2.0
+
+blake3 v1.8.7|CC0-1.0 OR Apache-2.0 OR Apache-2.0 WITH LLVM-exception
+arrayvec v0.7.8|MIT OR Apache-2.0
+cfg-if v1.0.5|MIT OR Apache-2.0
+constant_time_eq v0.4.2|CC0-1.0 OR MIT-0 OR Apache-2.0
+cc v1.8.0|MIT OR Apache-2.0
+find-msvc-tools v0.1.14|MIT OR Apache-2.0
+jobserver v0.1.35|MIT OR Apache-2.0
+libc v0.2.190|MIT OR Apache-2.0
+libc v0.2.190|MIT OR Apache-2.0
+shlex v2.0.1|MIT OR Apache-2.0

@@ -1,0 +1,16 @@
+[
+  {
+    "protocol": "hysteria2",
+    "invalid_anchor": "base64 of non-DER bytes",
+    "core_start_ok": true,
+    "dns_packet_observed": true,
+    "dns_packet_bytes": 44
+  },
+  {
+    "protocol": "tuic",
+    "invalid_anchor": "base64 of non-DER bytes",
+    "core_start_ok": true,
+    "dns_packet_observed": true,
+    "dns_packet_bytes": 44
+  }
+]

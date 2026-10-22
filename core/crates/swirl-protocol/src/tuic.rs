@@ -58,6 +58,20 @@ impl Drop for Client {
 type Pool = VecDeque<((tokio::runtime::Id, [u8; 32]), Weak<Client>)>;
 static TCP_SESSIONS: LazyLock<Mutex<Pool>> = LazyLock::new(|| Mutex::new(VecDeque::new()));
 
+/// Validate credentials and certificate material before resolving the proxy.
+pub fn validate(config: &Tuic) -> Result<()> {
+    config.validate()?;
+    quic::validate(
+        TlsOptions {
+            tls: &config.tls,
+            insecure: config.insecure,
+            pin_sha256: config.pin_sha256.as_deref(),
+        },
+        None,
+        &config.congestion_control,
+    )
+}
+
 fn cache_key(config: &Tuic, addresses: &[SocketAddr]) -> [u8; 32] {
     let mut hash = digest::Context::new(&digest::SHA256);
     for value in [
@@ -223,7 +237,7 @@ pub async fn connect(
     resolver: &Resolver,
     handshake_limit: Duration,
 ) -> Result<BoxStream> {
-    config.validate()?;
+    validate(config)?;
     let mut request = vec![VERSION, CONNECT];
     encode_address(target, &mut request)?;
     let deadline =
@@ -525,7 +539,7 @@ impl UdpAssociation {
         resolver: &Resolver,
         handshake_limit: Duration,
     ) -> Result<Self> {
-        config.validate()?;
+        validate(config)?;
         if !config.udp {
             return Err("TuicUdpDisabled");
         }

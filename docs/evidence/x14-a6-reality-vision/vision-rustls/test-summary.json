@@ -1,0 +1,13 @@
+{
+  "tests_run": 10,
+  "expected_tests": 10,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "successful": true,
+  "evidence_level": "independent_official_release_core_loopback",
+  "protocol": "vless+reality+vision",
+  "fingerprint": "rustls",
+  "public_network_tested": false,
+  "qt_product_tested": false
+}

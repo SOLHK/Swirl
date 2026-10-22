@@ -267,7 +267,7 @@ fn invalid_server_does_not_shift_cross_outbound_indices_or_authorize_fallback_se
             port,
             auth: Some(auth),
             tls: None,
-            udp: false,
+            udp: true,
         } = &config.nodes[0].outbound
         else {
             panic!("explicit SOCKS sibling selection lost protocol or authentication");

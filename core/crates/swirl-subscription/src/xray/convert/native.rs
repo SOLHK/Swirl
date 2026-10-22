@@ -232,7 +232,12 @@ pub(super) fn adapt(
                         port,
                         auth,
                         tls: mapping.tls.clone(),
-                        udp: false,
+                        // Xray's SOCKS5 outbound selects UDP ASSOCIATE from
+                        // the destination network; its client schema has no
+                        // separate UDP opt-in. Preserve that native ability
+                        // for the supported plain control transport. The
+                        // current Core explicitly excludes TLS UDP control.
+                        udp: mapping.tls.is_none(),
                     }
                 } else {
                     Outbound::HttpConnect {

@@ -81,6 +81,9 @@ jobs:
               'SWIRL_TRANSPORT_RUNTIME': binary / ('examples/transport-runtime' + suffix),
               'SWIRL_INSPECT': binary / ('swirl-inspect' + suffix),
               'SWIRL_INSPECT_BINARY': binary / ('swirl-inspect' + suffix),
+              'SWIRL_RUST_INSPECTOR': binary / ('swirl-inspect' + suffix),
+              'SWIRL_RUST_HARNESS': binary / ('swirl-api' + suffix),
+              'SWIRL_XRAY_RELEASE_MANIFEST': root / 'out/peers/xray/manifest.json',
               'HY2_CLIENT': binary / ('examples/hysteria2-client' + suffix),
               'SWIRL_TUIC_CLIENT': binary / ('examples/tuic-client' + suffix),
               'SWIRL_SS2022_CLIENT': binary / ('examples/ss2022-client' + suffix),
@@ -93,6 +96,7 @@ jobs:
               'SWIRL_SS2022_EVIDENCE': evidence / 'shadowsocks2022',
               'SWIRL_STREAM_UDP_EVIDENCE': evidence / 'stream-udp.json',
               'SWIRL_IMPORTED_TRANSPORT_EVIDENCE': evidence / 'imported-transports.json',
+              'SWIRL_BASIC_PROXY_EVIDENCE': evidence / 'basic-proxies.json',
           }
           with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as output:
               for name, value in values.items():
@@ -117,6 +121,29 @@ jobs:
       - name: Shadowsocks 2022 official data and replay rejection
         if: ${{ !cancelled() }}
         run: python tools/tests/test_ss2022_official.py
+      - name: HTTP and SOCKS authentication TCP UDP and import through official Xray
+        if: ${{ !cancelled() }}
+        run: python tools/tests/test_basic_proxies_xray.py
+      - name: REALITY Rustls through production Core and official Xray
+        if: ${{ !cancelled() }}
+        env:
+          SWIRL_REALITY_RUNTIME_EVIDENCE: ${{ github.workspace }}/out/native-interop/reality-rustls
+        run: python tools/tests/test_reality_native_release.py
+      - name: REALITY Chrome133 through production Core and official Xray
+        if: ${{ !cancelled() }}
+        env:
+          SWIRL_REALITY_RUNTIME_EVIDENCE: ${{ github.workspace }}/out/native-interop/reality-chrome133
+        run: python tools/tests/test_reality_native_release.py --fingerprint chrome_133
+      - name: Vision Rustls TLS13 Direct and authenticated closure
+        if: ${{ !cancelled() }}
+        env:
+          SWIRL_REALITY_RUNTIME_EVIDENCE: ${{ github.workspace }}/out/native-interop/vision-rustls
+        run: python tools/tests/test_reality_native_release.py --vision
+      - name: Vision Chrome133 TLS13 Direct and authenticated closure
+        if: ${{ !cancelled() }}
+        env:
+          SWIRL_REALITY_RUNTIME_EVIDENCE: ${{ github.workspace }}/out/native-interop/vision-chrome133
+        run: python tools/tests/test_reality_native_release.py --vision --fingerprint chrome_133
       - name: Upload actual interoperability receipts
         if: ${{ always() }}
         uses: actions/upload-artifact@v4

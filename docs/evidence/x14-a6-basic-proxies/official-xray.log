@@ -1,0 +1,13 @@
+test_authenticated_socks5_udp_echo_dns_and_association_close (__main__.BasicProxyXrayTests.test_authenticated_socks5_udp_echo_dns_and_association_close) ... ok
+test_existing_session_survives_node_switch_and_concurrent_new_connections (__main__.BasicProxyXrayTests.test_existing_session_survives_node_switch_and_concurrent_new_connections) ... ok
+test_invalid_tcp_credentials_are_rejected_without_origin_traffic (__main__.BasicProxyXrayTests.test_invalid_tcp_credentials_are_rejected_without_origin_traffic) ... ok
+test_invalid_udp_credentials_cannot_reach_the_dns_target (__main__.BasicProxyXrayTests.test_invalid_udp_credentials_cannot_reach_the_dns_target) ... ok
+test_ipv6_official_peer_and_reconnect_after_server_restart (__main__.BasicProxyXrayTests.test_ipv6_official_peer_and_reconnect_after_server_restart) ... ok
+test_socks4_userid_ipv4_and_socks4a_remote_domain_through_official_server (__main__.BasicProxyXrayTests.test_socks4_userid_ipv4_and_socks4a_remote_domain_through_official_server) ... ok
+test_two_mib_binary_transfer_each_way_and_completed_application_close (__main__.BasicProxyXrayTests.test_two_mib_binary_transfer_each_way_and_completed_application_close) ... ok
+test_xray_import_http_https_authentication_and_normal_close (__main__.BasicProxyXrayTests.test_xray_import_http_https_authentication_and_normal_close) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 5.516s
+
+OK

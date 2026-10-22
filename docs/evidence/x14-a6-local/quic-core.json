@@ -1,0 +1,148 @@
+{
+  "runtime": "Swirl Rust Core",
+  "runtime_sha256": "e5077d1b59f50805eb4e4ecf9096ef1a0c6b11c40eee4c0d51c70c46f615f949",
+  "platform": "Linux-6.18.55-x86_64-with-glibc2.39",
+  "tuic_version": "1.0.0",
+  "tuic_peer_sha256": "adb808944ca829857bf408d2ee438a156e8171543dbbed3e94964b66b4135393",
+  "hysteria_version": "v2.13.0",
+  "hysteria_peer_sha256": "907ba8c9693edb104b20582681fb7dc15639d5b64a9cbb616a7b539190a86691",
+  "qt_product_acceptance": false,
+  "records": [
+    {
+      "case": "test_https_application_tls_through_native_core",
+      "protocol": "tuic:native",
+      "active_after_close": 0,
+      "uploaded": 1705,
+      "downloaded": 134002,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_https_application_tls_through_native_core",
+      "protocol": "tuic:quic",
+      "active_after_close": 0,
+      "uploaded": 1705,
+      "downloaded": 134001,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_https_application_tls_through_native_core",
+      "protocol": "hysteria2",
+      "active_after_close": 0,
+      "uploaded": 1705,
+      "downloaded": 134001,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_live_tcp_sessions_node_switch_parallel_streams_and_runtime_restart",
+      "protocol": "tuic:native",
+      "active_after_close": 0,
+      "uploaded": 262184,
+      "downloaded": 262184,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_live_tcp_sessions_node_switch_parallel_streams_and_runtime_restart",
+      "protocol": "tuic:native",
+      "active_after_close": 0,
+      "uploaded": 11,
+      "downloaded": 11,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_live_tcp_sessions_node_switch_parallel_streams_and_runtime_restart",
+      "protocol": "tuic:quic",
+      "active_after_close": 0,
+      "uploaded": 262184,
+      "downloaded": 262184,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_live_tcp_sessions_node_switch_parallel_streams_and_runtime_restart",
+      "protocol": "tuic:quic",
+      "active_after_close": 0,
+      "uploaded": 11,
+      "downloaded": 11,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_live_tcp_sessions_node_switch_parallel_streams_and_runtime_restart",
+      "protocol": "hysteria2",
+      "active_after_close": 0,
+      "uploaded": 262184,
+      "downloaded": 262184,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_live_tcp_sessions_node_switch_parallel_streams_and_runtime_restart",
+      "protocol": "hysteria2",
+      "active_after_close": 0,
+      "uploaded": 11,
+      "downloaded": 11,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_tuic_dns_configuration_change_does_not_reuse_an_old_resolved_endpoint",
+      "protocol": "tuic:native",
+      "active_after_close": 0,
+      "uploaded": 43,
+      "downloaded": 43,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_tuic_heartbeat_keeps_idle_authenticated_stream_open",
+      "protocol": "tuic:native",
+      "active_after_close": 0,
+      "uploaded": 21,
+      "downloaded": 21,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_udp_association_fragments_dns_and_control_close",
+      "protocol": "tuic:native",
+      "active_after_close": 0,
+      "uploaded": 7239,
+      "downloaded": 7255,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_udp_association_fragments_dns_and_control_close",
+      "protocol": "tuic:quic",
+      "active_after_close": 0,
+      "uploaded": 7239,
+      "downloaded": 7255,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_udp_association_fragments_dns_and_control_close",
+      "protocol": "hysteria2",
+      "active_after_close": 0,
+      "uploaded": 7239,
+      "downloaded": 7255,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_wrong_credentials_never_forward_tcp_or_udp_and_existing_session_survives_selection",
+      "protocol": "tuic:native",
+      "active_after_close": 0,
+      "uploaded": 76,
+      "downloaded": 44,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_wrong_credentials_never_forward_tcp_or_udp_and_existing_session_survives_selection",
+      "protocol": "tuic:quic",
+      "active_after_close": 0,
+      "uploaded": 76,
+      "downloaded": 44,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_wrong_credentials_never_forward_tcp_or_udp_and_existing_session_survives_selection",
+      "protocol": "hysteria2",
+      "active_after_close": 0,
+      "uploaded": 44,
+      "downloaded": 44,
+      "udp_dropped": 1
+    }
+  ]
+}

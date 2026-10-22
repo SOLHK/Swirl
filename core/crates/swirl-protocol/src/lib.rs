@@ -732,9 +732,15 @@ async fn connect_selected(
     .await
 }
 
-/// Preflight ordinary TLS parameters independently from DNS/TCP and protocol
-/// credentials. QUIC and REALITY have their own validation paths.
+/// Preflight TLS trust material independently from DNS, sockets and runtime
+/// activation. Protocol-specific QUIC authentication parameters are checked by
+/// the same preflight used by their direct TCP/UDP connectors.
 pub fn validate_tls(outbound: &Outbound, transport: Option<&Transport>) -> Result<()> {
+    match outbound {
+        Outbound::Hysteria2(config) => return hysteria2::validate(config),
+        Outbound::Tuic(config) => return tuic::validate(config),
+        _ => {}
+    }
     let tls = match outbound {
         Outbound::Trojan { tls, .. } => Some(tls),
         Outbound::Vless { tls, .. }

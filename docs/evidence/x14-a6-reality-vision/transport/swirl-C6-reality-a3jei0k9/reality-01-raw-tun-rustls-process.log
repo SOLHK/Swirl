@@ -1,0 +1,36 @@
+Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)
+A unified platform for anti-censorship.
+2026/10/22 22:25:24.662536 [Info] infra/conf/serial: Reading config: &{Name:/tmp/swirl-C6-reality-a3jei0k9/reality-01-raw-tun-rustls/xray-config.json Format:json}
+2026/10/22 22:25:24.663749 [Warning] infra/conf: REALITY: Listening on non-443 ports will increase the likelihood of your server's IP being blocked by the GFW
+2026/10/22 22:25:24.664600 [Debug] app/log: Logger started
+2026/10/22 22:25:24.664911 [Debug] app/proxyman/inbound: creating stream worker on 127.0.0.1:56077
+2026/10/22 22:25:24.667020 [Info] transport/internet/tcp: listening tcp on 127.0.0.1:56077
+2026/10/22 22:25:24.667349 [Warning] core: Xray 26.10.21 started
+REALITY remoteAddr: 127.0.0.1:42466
+REALITY remoteAddr: 127.0.0.1:42466	hs.c.isHandshakeComplete.Load(): false
+2026/10/22 22:25:24.685045 [Info] transport/internet/tcp: REALITY: processed invalid connection from 127.0.0.1:42466: failed to read client hello
+REALITY remoteAddr: 127.0.0.1:42478
+[REDACTED: ephemeral REALITY test authentication material]
+REALITY remoteAddr: 127.0.0.1:42478	hs.c.ClientVer: [0 1 0]
+REALITY remoteAddr: 127.0.0.1:42478	hs.c.ClientTime: 2026-10-22 22:25:24 +0900 KST
+[REDACTED: ephemeral REALITY test authentication material]
+REALITY remoteAddr: 127.0.0.1:42478	hs.c.conn == conn: true
+REALITY remoteAddr: 127.0.0.1:42478	len(s2cSaved): 709	Server Hello: 127
+REALITY remoteAddr: 127.0.0.1:42478	len(s2cSaved): 582	Change Cipher Spec: 6
+REALITY remoteAddr: 127.0.0.1:42478	len(s2cSaved): 576	Encrypted Extensions: 41
+REALITY remoteAddr: 127.0.0.1:42478	len(s2cSaved): 535	Certificate: 367
+REALITY remoteAddr: 127.0.0.1:42478	len(s2cSaved): 168	Certificate Verify: 94
+REALITY remoteAddr: 127.0.0.1:42478	len(s2cSaved): 74	Finished: 74
+REALITY remoteAddr: 127.0.0.1:42478	is using X25519MLKEM768 for TLS' communication: false
+REALITY remoteAddr: 127.0.0.1:42478	is using ML-DSA-65 for cert's extra signature: false
+REALITY remoteAddr: 127.0.0.1:42478	hs.handshake() err: <nil>
+REALITY remoteAddr: 127.0.0.1:42478	hs.readClientFinished() err: <nil>
+REALITY remoteAddr: 127.0.0.1:42478	hs.c.isHandshakeComplete.Load(): true
+2026/10/22 22:25:24.697618 [Info] [682074359] proxy/vless/inbound: firstLen = 26
+2026/10/22 22:25:24.697638 [Info] [682074359] proxy/vless/inbound: received request for tcp:127.0.0.1:33595
+2026/10/22 22:25:24.697642 [Info] [682074359] app/dispatcher: taking detour [origin-33595] for [tcp:127.0.0.1:33595]
+2026/10/22 22:25:24.697645 [Info] [682074359] transport/internet/tcp: dialing TCP to tcp:127.0.0.1:33595
+2026/10/22 22:25:24.697648 [Debug] [682074359] transport/internet: dialing to tcp:127.0.0.1:33595
+2026/10/22 22:25:24.698189 [Info] [682074359] proxy/freedom: connection opened to tcp:127.0.0.1:33595, local endpoint 127.0.0.1:54710, remote endpoint 127.0.0.1:33595
+2026/10/22 22:25:24.698201 [Debug] [682074359] proxy: CopyRawConn (maybe) readv
+2026/10/22 22:25:24.709383 [Debug] app/log: Logger closing

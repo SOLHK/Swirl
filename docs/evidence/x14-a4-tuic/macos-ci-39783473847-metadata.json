@@ -1,0 +1,38 @@
+{
+  "repository": "SOLHK/Swirl",
+  "commit": "930be89374a64d600730b3056e8a756bba5fcde4",
+  "run_id": 39783473847,
+  "job_id": 119840407828,
+  "artifact_id": 12426819315,
+  "artifact_sha256": "2bcf8e012f800a64b787ea6a649abcae5ed98a479cb547c3e7331c93cd01b569",
+  "job_url": "https://github.com/SOLHK/Swirl/actions/runs/39783473847/job/119840407828",
+  "artifact_url": "https://github.com/SOLHK/Swirl/actions/runs/39783473847/artifacts/12426819315",
+  "platform": "macOS 26.6.2 arm64, runner image macos-26-arm64/20261013.0424.1",
+  "suite_result": "FAILED (failures=3); two maximum-payload subtests and final origin list assertion",
+  "failed_roundtrips": [
+    {
+      "udp_relay_mode": "native",
+      "payload_bytes": 65507,
+      "client_error": "TotalTimeout",
+      "native_interoperability_pass": false
+    },
+    {
+      "udp_relay_mode": "quic",
+      "payload_bytes": 65507,
+      "client_error": "TotalTimeout",
+      "native_interoperability_pass": false
+    }
+  ],
+  "observed_origin_payload_lengths": [
+    123,
+    4096,
+    123,
+    4096
+  ],
+  "sysctl_values_measured_in_original_job": false,
+  "server_logs_preserved_in_original_artifact": false,
+  "original_json_limitation": "The old harness appended after assertions; failed positive cases are absent from its JSON. The unchanged job log preserves those failures. This is corrected for subsequent runs.",
+  "diagnosis_status": "Apple XNU and fixed TUIC socket source support a default socket-buffer limit; the corrected macOS CI must measure before/after values and rerun the unchanged protocol tests.",
+  "apple_xnu_source_commit": "f6217f891ac0bb64f3d375211650a4c1ff8ca1ea",
+  "tuic_reference_source_commit": "a299ef02d9f4ab5a0edbf58b9998f41bf768b332"
+}

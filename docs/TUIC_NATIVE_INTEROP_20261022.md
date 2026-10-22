@@ -32,7 +32,7 @@ Quinn `0.11.12` 和 quinn-proto `0.11.19` 的本地 crate manifest 许可均为 
 
 ## Linux 实际验收
 
-最新直接 connector suite 为 9 个测试方法、11.862 秒、20 次正向数据交换、6 次预期认证/TLS 拒绝，以及 1 次明确保留的上游缺陷探针。完整脱敏结果见 [reference-results.json](evidence/x14-a4-tuic/reference-results.json)，运行输出见 [reference-tests.txt](evidence/x14-a4-tuic/reference-tests.txt)。
+A4 提交时的直接 connector suite 为 9 个测试方法、11.862 秒、20 次正向数据交换、6 次预期认证/TLS 拒绝，以及 1 次明确保留的上游缺陷探针。完整脱敏结果见 [reference-results.json](evidence/x14-a4-tuic/reference-results.json)，运行输出见 [reference-tests.txt](evidence/x14-a4-tuic/reference-tests.txt)。
 
 | 组合/行为 | 实际证据 | 状态 |
 |---|---|---|
@@ -60,6 +60,50 @@ Core suite 为 6 个测试方法、20.018 秒，包含 TUIC `native`、TUIC `qui
 
 这些测试没有启动 Qt，因此**不是 Windows Qt 产品端到端验收**。
 
+后续生命周期复核修正了两点：Dissociate 等待超时或失败后也始终关闭 QUIC connection；接收队列持续就绪时，每处理 32 个心跳或不完整片段主动让出异步调度。使用修改后重新构建的客户端和 Core 再次执行固定官方对端测试，直接 suite 9 个方法 / 12.631 秒、Core suite 6 个方法 / 20.124 秒全部满足原有断言。保留独立后续记录 [lifecycle-reference-results.json](evidence/x14-a4-tuic/lifecycle-reference-results.json)、[lifecycle-reference-tests.txt](evidence/x14-a4-tuic/lifecycle-reference-tests.txt)、[lifecycle-core-results.json](evidence/x14-a4-tuic/lifecycle-core-results.json) 和 [lifecycle-core-tests.txt](evidence/x14-a4-tuic/lifecycle-core-tests.txt)。这次回归验证不把空 UDP 回复的历史对端缺陷改为通过。
+
+## macOS CI 原始失败、平台探针与修正范围
+
+A4 提交 `930be89374a64d600730b3056e8a756bba5fcde4` 的 [macOS 官方互通 job](https://github.com/SOLHK/Swirl/actions/runs/39783473847/job/119840407828) 实际失败：`native` 和 `quic` 模式的 65507 字节 UDP 均为 `TotalTimeout`，目标只收到两组 123/4096 字节数据，没有收到两个最大包。该 suite 为 9 个方法、36.395 秒、3 条失败（两个子测试及最终目标列表断言）。此结果不能记录为 macOS TUIC 全部通过。
+
+保留 [原始失败日志段](evidence/x14-a4-tuic/macos-ci-39783473847-failure.txt)、[原始 artifact 中的 tuic.json](evidence/x14-a4-tuic/macos-ci-39783473847-tuic.json) 和 [来源/摘要/限制元数据](evidence/x14-a4-tuic/macos-ci-39783473847-metadata.json)。下载的原 artifact ZIP SHA-256 为 `2bcf8e012f800a64b787ea6a649abcae5ed98a479cb547c3e7331c93cd01b569`，与 Actions 上传记录一致。旧 harness 在断言后才追加 JSON 记录，导致这两个失败正向 case 不在其 JSON 内；原 job 日志完整记录了失败。现已改为先记录结果、再断言，并用 `native_interoperability_pass: false` 保留未通过结果。
+
+Apple 官方 XNU 固定快照 `f6217f891ac0bb64f3d375211650a4c1ff8ca1ea` 的 [`udp_usrreq.c`](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/netinet/udp_usrreq.c) 将默认 `udp_sendspace` 设为 9216，由 `net.inet.udp.maxdgram` 控制新 UDP socket 的发送缓冲；[`uipc_socket.c`](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/kern/uipc_socket.c) 对超出该上限的原子 datagram 返回 `EMSGSIZE`。[IPv6 attach](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/bsd/netinet6/udp6_usrreq.c) 使用相同全局发送/接收默认值。当前源码接收默认值约为 192 KiB，并可在初始化时增大；不能套用其他版本的旧默认值。
+
+固定历史官方 TUIC 的 [`udp_session.rs`](https://github.com/tuic-protocol/tuic/blob/a299ef02d9f4ab5a0edbf58b9998f41bf768b332/tuic-server/src/connection/udp_session.rs) 为目标创建普通 UDP socket，未设置发送缓冲大小，最终直接 `send_to`。这些源码支持“服务端目标 UDP socket 的平台默认上限”这一原因；原 CI 没有记录 sysctl 或服务端日志，因此 **9216 是源码默认值，不能称为原失败 runner 的实测值**。修正后的 CI 必须用下面的探针和原协议测试进一步确认。
+
+新增独立测试准备脚本 `tools/Prepare-NativeInteropPlatform.py`：
+
+- 默认只测量，不修改系统。每次使用新建且未修改 buffer 的 socket，在 IPv4 和 IPv6 上实际往返 123、4096、65507 字节，记录阶段、errno、SO_SNDBUF/SO_RCVBUF 与 SHA-256。
+- Darwin 记录 `net.inet.udp.maxdgram`、`net.inet.udp.recvspace`、`kern.ipc.maxsockbuf`；只有显式 `--prepare-macos`、实测最大包失败与默认 buffer 上限相符时才允许 `sudo -n sysctl`。
+- 按需将 `maxdgram` 改为 65535。如果实测旧/自定义 `recvspace` 小于 65535，则按需设为 131072；当前默认足够时不改接收配置。不会扩大 `maxsockbuf`。
+- 调整在所有独立服务端创建 socket 前完成；随后用新的 socket 完整重测，任何失败返回非零。原 65507 字节 TUIC case 保持不变。普通 Linux/Windows 调用即使传此 flag，也不会修改任何系统设置。
+
+该脚本仅用于临时 CI runner，**不是产品运行依赖，也不证明任何代理协议互通**。没有把默认 macOS 的大包失败静默改为跳过。若机器不允许调整，探针明确失败，保留报告。
+
+Linux 对普通调用和带 flag 调用的 6 个底层往返均实际通过，且 `system_setting_changed: false`，见 [默认探针](evidence/x14-a4-tuic/platform-linux-default-probe.json) 和 [flag 探针](evidence/x14-a4-tuic/platform-linux-flag-probe.json)。修改后的官方 TUIC suite 再跑 9 个方法 / 11.773 秒，两个模式的原 65507 字节仍全部通过；4096 字节 native case 从独立官方服务端日志确认收到完整 **3 片**，见 [平台回归结果](evidence/x14-a4-tuic/platform-regression-linux-results.json) 与 [执行输出](evidence/x14-a4-tuic/platform-regression-linux-tests.txt)。每个独立服务端最多保留 64 KiB 脱敏日志，UUID/密码不进入公开证据。
+
+A5 提交 `40be930b6328e3d292eb913bc14e45c27ea95f42` 的 [macOS job 119853790695](https://github.com/SOLHK/Swirl/actions/runs/39787300601/job/119853790695) 已实际通过。已独立下载 artifact `12429183080` 并核对 SHA-256 `675fd32ed0bb9d9a9f777d5d4e1b20e2f8a8e8f219b0d059d62b3fdb007f84ab`，原始 [平台探针](evidence/x14-a4-tuic/macos-ci-39787300601-platform.json)、[TUIC 结果及脱敏服务端日志](evidence/x14-a4-tuic/macos-ci-39787300601-tuic.json) 和 [来源摘要](evidence/x14-a4-tuic/macos-ci-39787300601-metadata.json) 均已归档：
+
+| 该 runner 的实测值 | 调整前 | 调整后 |
+|---|---|---|
+| `net.inet.udp.maxdgram` / 新 socket `SO_SNDBUF` | 9216 | 65535 |
+| `net.inet.udp.recvspace` / 新 socket `SO_RCVBUF` | 786896 | 786896，未修改 |
+| `kern.ipc.maxsockbuf` | 8388608 | 8388608，未修改 |
+| IPv4 / IPv6 原始 65507 字节往返 | 发送即 `EMSGSIZE`，errno 40 | 完整往返、字节与 SHA-256 一致 |
+
+探针之后才启动的固定 TUIC 服务端通过全部 9 个测试方法（13.122 秒）；`native` 与 `quic` 的 65507 字节均真实上传、下载并正常关闭。4096 字节 native case 在服务端日志中观察到完整 **4 片**。片数受路径 MTU 影响；测试只要求多于一片且全部片号存在，不固定为 Linux 记录的 3 片。Core QUIC 入口同时通过 6 个方法（21.361 秒）。
+
+该结果证明**临时 macOS runner 显式调整 UDP 新 socket 发送上限后**的 Rust 原生 TUIC 互通，不证明未调整的默认 macOS 能让该历史参考服务端转发最大 UDP 包，也不属于 Qt 产品验收。原始 A4 失败记录继续保留；后续成功没有覆盖失败证据。
+
+## A6 配置预检与 QUIC 上下文复核
+
+定点检查发现一项实际缺陷：合法 base64 包装的无效 CA DER 能通过订阅结构验证，Core 启动后，Hysteria2 和 TUIC 在构建 QUIC TLS 配置前已先查询节点 DNS。使用真实本地 UDP DNS 观察 socket，旧二进制的两个协议均产生 44 字节查询，见 [修复前观察](evidence/x14-a6-quic-preflight/before-core-dns-observation.json)。这是一项无效配置先联网的缺陷，不能只依靠稍后的证书握手失败处理。
+
+修复增加无网络的 `quic::validate` 及 Hysteria2/TUIC 公共预检，TCP、UDP 在解析节点地址前完成 CA DER、SNI、ALPN、pin、拥塞控制及协议配置校验；Core 启动也使用同一入口。证书验证上下文缓存最多 32 项，按 CA、ALPN、显式 insecure 和 pin 隔离，不缓存 socket、endpoint 或 Tokio runtime；上下文复用不启用 session resumption 或 0-RTT。缓存锁内只查询或更新有界队列，证书解析在锁外完成。
+
+新增 `swirl-protocol/tests/quic_preflight.rs` 用真实本地 DNS socket 观察拒绝路径：两个协议的 TCP 和 UDP 均立即返回 `TlsTrustAnchor`，观察期间没有 DNS 数据。此定点回归已实际通过 1 个测试、0 个失败、0 个跳过，见 [执行日志](evidence/x14-a6-quic-preflight/dns-observer-regression.txt)。这项证据仅证明配置预检行为，不当作协议互通通过记录。后续完整门禁与固定官方对端回归结果以对应 A6 记录为准。
+
 ## 保留的失败与边界
 
 第一次未删减的参考服务端测试包含空 UDP round trip，导致该对端 abort，后续同进程测试随之失败。原始结果和输出保存在 [initial-failure.json](evidence/x14-a4-tuic/initial-failure.json) 与 [initial-failure.txt](evidence/x14-a4-tuic/initial-failure.txt)。定位到固定 tag 的 [`Fragments::next`](https://github.com/tuic-protocol/tuic/blob/a299ef02d9f4ab5a0edbf58b9998f41bf768b332/tuic/src/model/packet.rs)：为零长度 payload 取第一个字节的地址导致越界。后续把该缺陷探针隔离到独立服务端，并明确记录 `native_interoperability_pass: false`；未修改服务端，也未把空包 round trip 写成通过。
@@ -70,7 +114,7 @@ Core suite 为 6 个测试方法、20.018 秒，包含 TUIC `native`、TUIC `qui
 
 ## 性能记录的含义
 
-最新 debug loopback 单次 4 MiB 双向传输总耗时为 367218 微秒，连接阶段为 6752 微秒；20 次正向交换的连接阶段中位数为 5050 微秒。该字段名是 `connect_including_dns_quic_auth_us`，涵盖 DNS、QUIC/TLS 和认证请求发送，**不是纯 TCP 延迟，也不独立证明服务端已接受认证**。认证成功由随后独立目标的数据验证。未把本地 debug 数据用于声称公网吞吐或与其他产品的性能优劣。
+A4 提交记录中 debug loopback 单次 4 MiB 双向传输总耗时为 367218 微秒，连接阶段为 6752 微秒；20 次正向交换的连接阶段中位数为 5050 微秒。该字段名是 `connect_including_dns_quic_auth_us`，涵盖 DNS、QUIC/TLS 和认证请求发送，**不是纯 TCP 延迟，也不独立证明服务端已接受认证**。认证成功由随后独立目标的数据验证。未把本地 debug 数据用于声称公网吞吐或与其他产品的性能优劣。
 
 ## 复现
 

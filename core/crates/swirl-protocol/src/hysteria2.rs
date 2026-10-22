@@ -76,13 +76,27 @@ fn padding() -> Result<String> {
     Ok(base64::engine::general_purpose::STANDARD.encode(random::<24>()?))
 }
 
+/// Validate credentials and certificate material before resolving the proxy.
+pub fn validate(config: &Hysteria2) -> Result<()> {
+    config.validate()?;
+    quic::validate(
+        quic::TlsOptions {
+            tls: &config.tls,
+            insecure: config.insecure,
+            pin_sha256: config.pin_sha256.as_deref(),
+        },
+        Some(b"h3"),
+        "cubic",
+    )
+}
+
 impl Session {
     pub async fn connect(
         config: &Hysteria2,
         resolver: &Resolver,
         deadline: Instant,
     ) -> Result<Arc<Self>> {
-        config.validate()?;
+        validate(config)?;
         let addresses = bounded(
             deadline,
             "Hysteria2DnsTimeout",

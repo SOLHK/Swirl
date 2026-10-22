@@ -6,10 +6,11 @@ use quinn::{
 };
 use ring::digest::{SHA256, digest};
 use std::{
+    collections::VecDeque,
     io,
     net::SocketAddr,
     pin::Pin,
-    sync::Arc,
+    sync::{Arc, Mutex, OnceLock},
     task::{Context, Poll},
     time::Duration,
 };
@@ -134,6 +135,99 @@ pub fn client_config(
     build_client_config(options, required_alpn, congestion, false)
 }
 
+/// Validate complete QUIC TLS settings without DNS, socket creation or tasks.
+/// The same bounded crypto cache is used by the eventual connection builder.
+pub fn validate(
+    options: TlsOptions<'_>,
+    required_alpn: Option<&[u8]>,
+    congestion: &str,
+) -> Result<()> {
+    client_config(options, required_alpn, congestion).map(|_| ())
+}
+
+#[derive(Clone, PartialEq, Eq)]
+struct CryptoKey {
+    ca: Option<String>,
+    alpn: Vec<Vec<u8>>,
+    insecure: bool,
+    pin: Option<[u8; 32]>,
+}
+type Crypto = quinn::crypto::rustls::QuicClientConfig;
+type CryptoCache = Mutex<VecDeque<(CryptoKey, Arc<Crypto>)>>;
+static CRYPTO_CONTEXTS: OnceLock<CryptoCache> = OnceLock::new();
+
+fn crypto_context(
+    options: TlsOptions<'_>,
+    alpn: Vec<Vec<u8>>,
+    pin: Option<[u8; 32]>,
+) -> Result<Arc<Crypto>> {
+    if options
+        .tls
+        .ca_der_base64
+        .as_ref()
+        .is_some_and(|value| value.len() > 128 * 1024)
+    {
+        return Err("TlsTrustAnchor");
+    }
+    let key = CryptoKey {
+        ca: options.tls.ca_der_base64.clone(),
+        alpn,
+        insecure: options.insecure,
+        pin,
+    };
+    let cache = CRYPTO_CONTEXTS.get_or_init(|| Mutex::new(VecDeque::new()));
+    {
+        let mut entries = cache.lock().map_err(|_| "QuicContextState")?;
+        if let Some(index) = entries.iter().position(|(stored, _)| stored == &key) {
+            let entry = entries.remove(index).ok_or("QuicContextState")?;
+            let crypto = entry.1.clone();
+            entries.push_back(entry);
+            return Ok(crypto);
+        }
+    }
+    let mut roots = RootCertStore::from_iter(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+    if let Some(encoded) = &key.ca {
+        let der = base64::engine::general_purpose::STANDARD
+            .decode(encoded)
+            .map_err(|_| "TlsTrustAnchor")?;
+        roots
+            .add(CertificateDer::from(der))
+            .map_err(|_| "TlsTrustAnchor")?;
+    }
+    let provider = Arc::new(rustls::crypto::ring::default_provider());
+    let ordinary = WebPkiServerVerifier::builder_with_provider(Arc::new(roots), provider.clone())
+        .build()
+        .map_err(|_| "TlsTrustAnchor")?;
+    let verifier = Arc::new(Verifier {
+        ordinary,
+        insecure: key.insecure,
+        pin: key.pin,
+    });
+    let mut tls = rustls::ClientConfig::builder_with_provider(provider)
+        .with_protocol_versions(&[&rustls::version::TLS13])
+        .map_err(|_| "QuicTls13")?
+        .dangerous()
+        .with_custom_certificate_verifier(verifier)
+        .with_no_client_auth();
+    tls.alpn_protocols = key.alpn.clone();
+    // Cache configuration only: retain the previous per-connection session
+    // policy instead of implicitly enabling resumption through this cache.
+    tls.resumption = rustls::client::Resumption::disabled();
+    tls.enable_early_data = false;
+    let crypto = Arc::new(Crypto::try_from(tls).map_err(|_| "QuicTls13")?);
+    // No DNS, IO or certificate parsing runs under the global mutex. A race
+    // may prepare twice, but only one bounded context is retained per key.
+    let mut entries = cache.lock().map_err(|_| "QuicContextState")?;
+    if let Some((_, existing)) = entries.iter().find(|(stored, _)| stored == &key) {
+        return Ok(existing.clone());
+    }
+    if entries.len() == 32 {
+        entries.pop_front();
+    }
+    entries.push_back((key, crypto.clone()));
+    Ok(crypto)
+}
+
 fn build_client_config(
     options: TlsOptions<'_>,
     required_alpn: Option<&[u8]>,
@@ -167,36 +261,7 @@ fn build_client_config(
     if alpn.is_empty() {
         return Err("QuicAlpnRequired");
     }
-    let mut roots = RootCertStore::from_iter(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
-    if let Some(encoded) = &options.tls.ca_der_base64 {
-        if encoded.len() > 128 * 1024 {
-            return Err("TlsTrustAnchor");
-        }
-        let der = base64::engine::general_purpose::STANDARD
-            .decode(encoded)
-            .map_err(|_| "TlsTrustAnchor")?;
-        roots
-            .add(CertificateDer::from(der))
-            .map_err(|_| "TlsTrustAnchor")?;
-    }
-    let provider = Arc::new(rustls::crypto::ring::default_provider());
-    let ordinary = WebPkiServerVerifier::builder_with_provider(Arc::new(roots), provider.clone())
-        .build()
-        .map_err(|_| "TlsTrustAnchor")?;
-    let verifier = Arc::new(Verifier {
-        ordinary,
-        insecure: options.insecure,
-        pin,
-    });
-    let mut tls = rustls::ClientConfig::builder_with_provider(provider)
-        .with_protocol_versions(&[&rustls::version::TLS13])
-        .map_err(|_| "QuicTls13")?
-        .dangerous()
-        .with_custom_certificate_verifier(verifier)
-        .with_no_client_auth();
-    tls.alpn_protocols = alpn;
-    tls.enable_early_data = false;
-    let crypto = quinn::crypto::rustls::QuicClientConfig::try_from(tls).map_err(|_| "QuicTls13")?;
+    let crypto = crypto_context(options, alpn, pin)?;
     let mut transport = TransportConfig::default();
     transport.max_concurrent_bidi_streams(VarInt::from_u32(0));
     transport.max_concurrent_uni_streams(VarInt::from_u32(64));
@@ -226,7 +291,7 @@ fn build_client_config(
             .congestion_controller_factory(Arc::new(quinn::congestion::BbrConfig::default())),
         _ => return Err("QuicCongestionUnsupported"),
     };
-    let mut config = ClientConfig::new(Arc::new(crypto));
+    let mut config = ClientConfig::new(crypto);
     config.transport_config(Arc::new(transport));
     Ok(config)
 }
