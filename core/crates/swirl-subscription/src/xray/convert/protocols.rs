@@ -92,6 +92,14 @@ pub(super) fn validate(
                 }
             }
         }
+        Protocol::Socks | Protocol::Http => super::auth::validate(
+            outbound,
+            protocol,
+            server,
+            (!user.is_null()).then_some(user),
+            source,
+            sink,
+        ),
         Protocol::Trojan | Protocol::Shadowsocks => {
             password(outbound, protocol, server, source, sink)
         }

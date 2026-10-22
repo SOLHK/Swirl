@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fmt;
 
+mod auth;
 mod protocols;
 
 /// Expansion is bounded separately from the parser's outbound-object count.
@@ -452,7 +453,14 @@ fn expand_users(
         if matches!(protocol, Protocol::Vless | Protocol::Vmess) && !flat_uuid {
             sink.error("MissingUsers", &key_path(&loc.server_path, "users"));
         }
-        let account = if flat_uuid { Some(server) } else { None };
+        let flat_credentials = matches!(protocol, Protocol::Socks | Protocol::Http)
+            && loc.server_index.is_none()
+            && ["user", "pass"].iter().any(|key| server.get(key).is_some());
+        let account = if flat_uuid || flat_credentials {
+            Some(server)
+        } else {
+            None
+        };
         append(nodes, outbound, protocol, server, account, loc, sink, used)?;
     }
     Ok(())
