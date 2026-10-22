@@ -39,6 +39,9 @@ public:
     void shutdown();
     using ApplyConfiguration = std::function<bool(const NodeImporter::Result &,const QString &,QString *)>;
     void setConfigurationApplier(ApplyConfiguration apply) { m_apply=std::move(apply); }
+    using ApplyCompletion = std::function<void(bool,const QString &)>;
+    using ApplyConfigurationAsync = std::function<bool(const NodeImporter::Result &,const QString &,ApplyCompletion,QString *)>;
+    void setAsyncConfigurationApplier(ApplyConfigurationAsync apply) { m_applyAsync=std::move(apply); }
     void setDownloadProxy(int port) { m_proxyPort=port; }
 signals:
     void changed();
@@ -51,9 +54,11 @@ private:
     void parse(QByteArray bytes);
     void parsed(NodeImporter::Result result);
     void apply(NodeImporter::Result result);
+    void applied(const QString &format,qsizetype count,int incomplete);
     void finish(const QString &error={});
     NodeStore *m_store;
     ApplyConfiguration m_apply;
+    ApplyConfigurationAsync m_applyAsync;
     QNetworkAccessManager m_network;
     QPointer<QNetworkReply> m_reply;
     QTimer m_timer,m_deadline;
@@ -68,5 +73,6 @@ private:
     quint64 m_generation=0;
     bool m_busy=false,m_shuttingDown=false;
     bool m_downloadTimedOut=false;
+    bool m_committing=false;
     int m_proxyPort=0;
 };

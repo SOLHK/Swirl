@@ -58,6 +58,20 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
     // would add unrelated Rust connections and corrupt per-request deltas.
     : QObject(parent), m_engine(std::move(engine)), m_store(storePath),m_imports(&m_store,this),m_telemetry(storePath.isEmpty()?QString():storePath+".telemetry",storePath.isEmpty()&&!realAcceptance) {
     m_options.autoControlPort=true;
+    m_imports.setAsyncConfigurationApplier([this](const NodeImporter::Result &result,const QString &sourceId,
+                                                  NodeImportService::ApplyCompletion completion,QString *error) {
+        if(result.format!="xray-v2ray-json" || !result.configuration.isEmpty()) {
+            *error=QStringLiteral("此异步入口仅接受经过严格校验的 JSON 节点。");return false;
+        }
+        NodeStore::ImportPlan plan;
+        if(!m_store.prepareImport(result.nodes,sourceId,&plan)){*error=m_store.error();return false;}
+#ifdef SWIRL_USE_RUST_CORE
+        const auto nodes=plan.nodes();QVariantMap canonical;
+        if(!validateNetworkConfiguration(networkConfigurationSnapshot(),&canonical,&nodes)){*error=m_networkError;return false;}
+#endif
+        if(!m_store.commitImportAsync(plan,{},std::move(completion))){*error=m_store.error();return false;}
+        return true;
+    });
     m_imports.setConfigurationApplier([this](const NodeImporter::Result &result,const QString &sourceId,QString *error) {
         const auto &configuration=result.configurationFormat=="ini"?result.executionConfiguration:result.configuration;
         if(result.configuration.isEmpty()) {

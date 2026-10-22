@@ -190,6 +190,7 @@ private slots:
             NodeStore store(storePath);NodeImportService service(&store);
             service.importFile(QUrl::fromLocalFile(path));QTRY_VERIFY_WITH_TIMEOUT(service.hasPreview(), 10000);
             service.confirmImport();
+            QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),10000);
 #ifdef Q_OS_WIN
             QCOMPARE(store.nodes().size(), 1);savedId = store.nodes().first().id;
             QCOMPARE(store.nodes().first().sourceDocument, bytes);
@@ -247,6 +248,7 @@ private slots:
         for(int pass=0;pass<2;++pass) {
             service.importText(QString::fromUtf8(json(vless())));QTRY_VERIFY_WITH_TIMEOUT(service.hasPreview(),10000);
             service.confirmImport();
+            QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),10000);
 #ifdef Q_OS_WIN
             QCOMPARE(store.nodes().size(),1);
 #else
@@ -296,6 +298,23 @@ private slots:
         const auto publicBytes=QJsonDocument::fromVariant(parsed.nodes.first().publicInfo()).toJson();
         QVERIFY(!publicBytes.contains("SYNTHETIC-INBOUND-PASSWORD"));
         QCOMPARE(parsed.nodes.first().sourceDocument,input);
+    }
+    void confirmedAsyncCommitKeepsServiceBusyUntilResult() {
+        QTemporaryDir directory;NodeStore store(directory.filePath("nodes.dpapi"));NodeImportService service(&store);
+        NodeImportService::ApplyCompletion complete;int requests=0;QSignalSpy applied(&service,&NodeImportService::nodesApplied);
+        service.setAsyncConfigurationApplier([&](const auto &,const auto &,auto callback,QString *) {
+            ++requests;complete=std::move(callback);return true;
+        });
+        service.importText(QString::fromUtf8(json(vless())));QTRY_VERIFY_WITH_TIMEOUT(service.hasPreview(),10000);
+        service.confirmImport();QVERIFY(service.busy());QVERIFY(!service.hasPreview());QCOMPARE(requests,1);
+        service.cancelImport();QVERIFY(service.busy()); // Confirmation already authorized the atomic write.
+        service.importText(QString::fromUtf8(json(vless("other"))));QCOMPARE(requests,1);
+        complete(false,QStringLiteral("受控原子写入失败"));
+        QVERIFY(!service.busy());QCOMPARE(applied.count(),0);QVERIFY(store.nodes().isEmpty());
+        QVERIFY(service.message().contains(QStringLiteral("受控原子写入失败")));
+        service.importText(QString::fromUtf8(json(vless())));QTRY_VERIFY_WITH_TIMEOUT(service.hasPreview(),10000);
+        service.confirmImport();QVERIFY(service.busy());complete(true,{});
+        QVERIFY(!service.busy());QCOMPARE(applied.count(),1);service.shutdown();
     }
 };
 QTEST_MAIN(XrayImportTests)

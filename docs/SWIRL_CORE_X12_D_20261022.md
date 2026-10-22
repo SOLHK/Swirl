@@ -128,6 +128,42 @@ and credential-free public model. `qmlformat` parses the updated page
 successfully. This is model/syntax validation; complete Windows application
 compilation and UI acceptance remain separate CI evidence.
 
+## D5: asynchronous encrypted snapshots and replay
+
+JSON rows persist only safe catalog metadata and an expanded-node reference;
+the exact original bytes live once in a shared document table. Derived
+credentials, normalized parameters and raw outbounds are reconstructed by the
+same strict Rust bridge on reload. This preserves every original field,
+including UUID/password/cipher, TLS/SNI/ALPN/fingerprint, REALITY
+publicKey/shortId/spiderX, Vision flow, WebSocket Host/Path, gRPC serviceName,
+HTTP2, HTTPUpgrade, XHTTP and unknown extensions. It avoids duplicating a
+large multi-account outbound once for every account.
+
+Confirmed JSON imports and subscription updates serialize, encrypt and
+QSaveFile-commit on a worker. A store write lease blocks concurrent edits,
+selection changes and other commits until the owning thread adopts the
+successful snapshot. Failure releases the lease without changing nodes,
+selection or the old ciphertext. Canceling an unconfirmed preview discards
+it; a confirmed atomic write completes independently of closing its dialog.
+No worker mutates a QObject or falls back to plaintext. Store size is bounded
+at 32 MiB; source files retain the smaller 4 MiB limit.
+
+Schema-1 legacy data remains readable and safely migrates on the next
+successful write. Corrupt document hashes are rejected without overwriting
+the file. A valid stored document that today's parser/DLL cannot replay is
+retained as a disabled node; saved capability flags cannot authorize it.
+
+Linux local validation passes all 20 importer, 15 real HTTPS downloader and
+7 applicable store methods. Store tests exercise a 1000-account source,
+aggregate size rejection, corrupted-file protection, unavailable encryption,
+asynchronous write lease/callback thread, wrong-store plans and destruction
+before a queued write. Windows-only tests additionally require real DPAPI
+semantic roundtrip after object destruction, shared-document storage size,
+legacy migration, source-hash corruption, replay failure/forged capabilities
+and locked-file atomic rollback. Those platform results are reported from CI,
+not inferred from Linux. macOS/Linux have no credential-storage backend in
+the existing Windows product and deliberately refuse persistence.
+
 ## Applied engineering guidance
 
 Read repository `AGENTS.md`, `CONTINUE_DEVELOPMENT.md` and

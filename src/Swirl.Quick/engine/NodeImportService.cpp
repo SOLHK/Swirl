@@ -213,21 +213,44 @@ void NodeImportService::confirmImport() {
 void NodeImportService::cancelImport() {
     // Closing a manual dialog must discard its in-flight worker/download.
     // A background subscription refresh is owned by the subscription queue.
-    if(m_shuttingDown || !m_source.isEmpty() || (!m_busy && !m_pending))return;
+    if(m_shuttingDown || m_committing || !m_source.isEmpty() || (!m_busy && !m_pending))return;
     ++m_generation;
     if(m_reply){m_reply->disconnect(this);m_reply->abort();m_reply->deleteLater();m_reply=nullptr;}
     m_pending.reset();m_message=QStringLiteral("已取消导入，现有节点保持不变。");finish();
 }
 void NodeImportService::apply(NodeImporter::Result result) {
     const auto count=result.nodes.size();
+    if(result.format=="xray-v2ray-json" && (m_applyAsync || !m_apply)) {
+        m_committing=true;m_message=QStringLiteral("正在加密并原子保存节点…");emit changed();
+        const QPointer<NodeImportService> guard(this);const auto generation=m_generation;
+        auto completion=[guard,generation,format=result.format,count,incomplete=result.incompleteNodes](bool ok,const QString &error) {
+            if(!guard || guard->m_shuttingDown || guard->m_generation!=generation)return;
+            guard->m_committing=false;
+            if(!ok){guard->finish(error.isEmpty()?QStringLiteral("节点保存失败；旧配置保持不变。"):error);return;}
+            guard->applied(format,count,incomplete);
+        };
+        QString error;bool queued=false;
+        if(m_applyAsync)queued=m_applyAsync(result,m_source,std::move(completion),&error);
+        else if(!result.configuration.isEmpty())error=QStringLiteral("JSON 导入不允许应用第三方全局配置。");
+        else {
+            NodeStore::ImportPlan plan;
+            if(m_store->prepareImport(result.nodes,m_source,&plan))queued=m_store->commitImportAsync(plan,{},std::move(completion));
+            if(!queued)error=m_store->error();
+        }
+        if(!queued){m_committing=false;finish(error.isEmpty()?QStringLiteral("无法开始安全保存；旧配置保持不变。"):error);}
+        return;
+    }
     if(m_apply || !result.configuration.isEmpty()) {
         QString error;
         if(!m_apply || !m_apply(result,m_source,&error)) {
             finish(error.isEmpty()?QStringLiteral("导入包含全局配置，但当前入口不能验证其语义；旧配置保持不变。"):error);return;
         }
     } else if(!m_store->importNodes(std::move(result.nodes),m_source)){finish(m_store->error());return;}
-    m_message=QStringLiteral("%1 · 已解析并保存 %2 个节点；实际联网需检测。").arg(result.format).arg(count);
-    if(result.incompleteNodes)m_message+=QStringLiteral(" %1 个节点当前不可执行，原始参数已加密保留。").arg(result.incompleteNodes);
+    applied(result.format,count,result.incompleteNodes);
+}
+void NodeImportService::applied(const QString &format,qsizetype count,int incomplete) {
+    m_message=QStringLiteral("%1 · 已解析并保存 %2 个节点；实际联网需检测。").arg(format).arg(count);
+    if(incomplete)m_message+=QStringLiteral(" %1 个节点当前不可执行，原始参数已加密保留。").arg(incomplete);
     emit nodesApplied();finish();
 }
 void NodeImportService::finish(const QString &error) {

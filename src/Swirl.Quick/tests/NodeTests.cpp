@@ -310,16 +310,20 @@ private slots:
     }
     void oversizedStorePreservesPreviousFile() {
         QTemporaryDir temp;const auto path=temp.filePath("nodes.dat");NodeStore store(path);
-        auto n=node("large",1080);n.protocol="ss";n.cipher="aes-128-gcm";n.password=QString(4096,QChar(1));
-        auto input=n.publicInfo();input.remove("id");input.insert("password",n.password);
-        QByteArray previous;int accepted=0;
-        for(int i=0;i<100;++i) {
-            if(!store.saveNode(input))break;
-            ++accepted;QFile file(path);QVERIFY(file.open(QIODevice::ReadOnly));previous=file.readAll();
+        auto existing=node("existing",1080);auto input=existing.publicInfo();input.remove("id");
+        QVERIFY(store.saveNode(input));QVERIFY(store.select(store.nodes().first().id));
+        const auto selected=store.selectedId();QFile before(path);QVERIFY(before.open(QIODevice::ReadOnly));
+        const auto previous=before.readAll();before.close();
+        QList<ProxyNode> incoming;const QString payload(40*1024,u'x');
+        for(int i=0;i<1000;++i) {
+            auto large=node(QStringLiteral("large-%1").arg(i),1080);
+            large.parameters.insert("preserved-extension",payload);incoming.append(large);
         }
-        QVERIFY(accepted>0 && accepted<100);QVERIFY(previous.size()<=1024*1024);
-        QFile file(path);QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),previous);
-        NodeStore reloaded(path);QCOMPARE(reloaded.nodes().size(),accepted);QVERIFY(reloaded.error().isEmpty());
+        QVERIFY(!store.importNodes(incoming));QVERIFY(store.error().contains("32 MiB"));
+        QFile after(path);QVERIFY(after.open(QIODevice::ReadOnly));QCOMPARE(after.readAll(),previous);
+        QVERIFY(previous.size()<=NodeStore::MaximumBytes);
+        NodeStore reloaded(path);QCOMPARE(reloaded.nodes().size(),1);QCOMPARE(reloaded.selectedId(),selected);
+        QVERIFY(reloaded.error().isEmpty());
     }
     void encryptedPersistence() {
         QTemporaryDir temp;QVERIFY(temp.isValid());const auto path=temp.filePath("nodes.dat");
