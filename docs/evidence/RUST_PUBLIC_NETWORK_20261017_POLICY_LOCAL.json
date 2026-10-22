@@ -1,0 +1,83 @@
+{
+  "schema": 1,
+  "commit": "0bf2666e118134d25071cd93e743702cba672f83",
+  "platform": "Linux",
+  "tracked_worktree_clean": false,
+  "timestamp_utc": "2026-10-17T12:31:38.717406+00:00",
+  "harness_sha256": "5c939a58837bd014ae82537885410e37837ffedb6ff698427101f4328a43c81d",
+  "scope": "Public HTTPS via native DIRECT and native DoH; no provider, UDP, TUN or performance claim",
+  "checks": [
+    {
+      "host": "example.com",
+      "port": 443,
+      "method": "HEAD",
+      "path": "/",
+      "dns": "system",
+      "route": "explicit-native-direct",
+      "success": false,
+      "engine": "swirl-rust",
+      "failure_phase": "native-connect",
+      "error_type": "RuntimeError",
+      "error": "NativeConnectRejected",
+      "core": {
+        "accepted": 1,
+        "active": 0,
+        "failed": 1,
+        "upload": 0,
+        "download": 0,
+        "last_error": "DnsLookupFailed",
+        "recorded_connections": 1
+      },
+      "elapsed_ms": 6
+    },
+    {
+      "host": "www.rust-lang.org",
+      "port": 443,
+      "method": "HEAD",
+      "path": "/",
+      "dns": "system",
+      "route": "explicit-native-direct",
+      "success": false,
+      "engine": "swirl-rust",
+      "failure_phase": "native-connect",
+      "error_type": "RuntimeError",
+      "error": "NativeConnectRejected",
+      "core": {
+        "accepted": 1,
+        "active": 0,
+        "failed": 1,
+        "upload": 0,
+        "download": 0,
+        "last_error": "DnsTimeout",
+        "recorded_connections": 1
+      },
+      "elapsed_ms": 3505
+    },
+    {
+      "host": "example.com",
+      "port": 443,
+      "method": "HEAD",
+      "path": "/",
+      "dns": "native-doh",
+      "route": "explicit-native-direct",
+      "success": false,
+      "dns_endpoint": "https://cloudflare-dns.com/dns-query",
+      "dns_bootstrap": "1.1.1.1:443",
+      "engine": "swirl-rust",
+      "failure_phase": "native-connect",
+      "error_type": "RuntimeError",
+      "error": "NativeConnectRejected",
+      "core": {
+        "accepted": 1,
+        "active": 0,
+        "failed": 1,
+        "upload": 0,
+        "download": 0,
+        "last_error": "DnsHttpsConnect",
+        "recorded_connections": 1
+      },
+      "elapsed_ms": 4
+    }
+  ],
+  "success": false
+}

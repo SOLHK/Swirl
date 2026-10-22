@@ -1,0 +1,18 @@
+{
+  "scope": "Linux PySide QtNetwork -> Rust harness -> independent relay -> HTTPS; diagnostic only, not Windows DPAPI/C++ product acceptance",
+  "source_sha": "a066f7d4c8acb96f5d6a46cee5700b2590328b64",
+  "qt_version": "6.10.3",
+  "qt_ssl_backend": "openssl",
+  "proxy_mode": "explicit-connect",
+  "source_fixture_module_sha256": "2cc77c02e82be5d1f010460aae9b4feab3d92ee49290f28c42937a20168f365f",
+  "qt_ssl_library": "OpenSSL 3.0.13 30 Jan 2024",
+  "python_version": "3.12.14",
+  "system": "Linux",
+  "rust_binary_sha256": {
+    "swirl-api": "8730c60b40d00d7030635641bf4d623e0f537fa735d2f6348c61b43f64d91d6b",
+    "swirl-inspect": "56a812c2362d7495c82d7d7af2a8bb03b4e1a163b7b03365894dcf843ae24c64"
+  },
+  "passed": false,
+  "cases": [],
+  "error_type": "AssertionError"
+}

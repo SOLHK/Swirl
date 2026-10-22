@@ -1,0 +1,334 @@
+# P8 original variable-GID batch conversion
+
+Worktree `~/Swirl-worktrees/vf-takeover-abc`, only writable/pushable branch
+`work/vf-takeover-abc-20261021`. Fresh local/remote parent is
+`0aee48913ca7baec8cb2771c54552317153a7c36`; clean start. P4–P7 source,
+handoffs and C1 verified-byte packing are reused. Production gates, original
+1/32 limits and all old failure evidence remain unchanged.
+
+## A1 actual first batch
+
+The exact original source SHA is
+`39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890`.
+Face0 has47,102 GIDs and UPEM1028. The experiment uses legal15x/UPEM15420.
+The original and P7 candidates remain unchanged and strictly local.
+
+`hvf_representatives.py` deterministically selected100 original GIDs from the
+real cmap and cached HVGL DAG metadata, without a new full native sweep. The
+private plan includes historical failures, simple/complex outlines, up to904
+on/off points,72 contours and depth12; Latin, digits, punctuation, CJK regions,
+rotations and tangent types0/1/2 are represented. It includes all five genuinely
+empty original glyphs; these are measured cases, not fallback placeholders.
+
+`p8_batch_original.py` invokes the existing P7 converter independently per GID,
+binds each checkpoint to original/source/recipe/code/oracle bytes, verifies
+saved glyph/model/native hashes on resume, and isolates exceptions. No failed
+model is substituted with a static default and counted as variable success.
+The full-face path shares the existing P7/C1 assembler and gates. Native-default
+cache and model-receipt hashes are also checked after assembly.
+
+The bounded `tensor5` profile uses125 exact F2 training nodes and the SAME four
+independent P7 holdouts. The unchanged P7 default remains27 nodes. No holdout is
+promoted or removed. Reusing C1 VariationModel, actual original portable models
+improve fixed holdout error at GID1166 from15.9443759031 to5.76582403008 and at
+GID19177 from5.40384016468 to1.20298182408. Default quantization failures remain;
+this is finite interpolation improvement, not continuous-domain acceptance.
+The investigated axis-line-only critical-node prototype was not selected:
+it worsened one holdout and exceeded its budget on complex cases. That unused
+prototype and observations remain private, not a second conversion engine.
+
+Actual first checkpoint:10 GIDs encoded,0 exceptions,1,290 actual Apple HVF
+comparisons PASS against the unchanged portable/native geometry check. Six
+GIDs have nonzero outline variations; all10 have nonzero metric variations.
+Four empty-outline models pass the strict sampled outline bound, six models
+pass the strict sampled TABLE-metric bound. These are independent counts;
+NONE is accepted as native target equivalence. Maximum sampled outline error
+is8.51977856738663 and TABLE metric error1/30 FUnit; strict failures are retained.
+The first10 took18.997seconds; this does not justify an unmeasured all-face run.
+
+Private plan: `build/vf-takeover-private/p8-representatives-stage1.json`.
+Private checkpoints: `build/vf-takeover-private/p8-models-100-tensor-stage1/`.
+Every GID has a resumable P7 receipt and actual glyf/gvar model/native samples.
+All proprietary files/raw observations/execution logs remain under the ignored
+private build root and MUST NOT enter GitHub/Artifacts. Public evidence contains
+only whitelisted counts/scalars, not the full private receipt.
+
+Targeted authored regressions at A1: representative selector8, tensor grid3,
+batch identity/counting3 and existing P7 transport/integrity9 PASS.
+
+Primary implementations reviewed/reused:
+[fontTools4.61.1 VariationModel](https://github.com/fonttools/fonttools/blob/4.61.1/Lib/fontTools/varLib/models.py),
+[OpenType gvar/phantoms](https://learn.microsoft.com/en-us/typography/opentype/spec/gvar),
+[Apple HVGL](https://developer.apple.com/fonts/TrueType-Reference-Manual/RM06/Chap6hvgl.html).
+No upstream code copied; only existing project algorithms and public APIs reused.
+
+## A2 actual100 GIDs and independent candidate validation
+
+All100 selected GIDs completed,0 build exceptions,12,900 actual Apple HVF
+source-extraction comparisons PASS. There are95 nonzero outline-variation
+models and100 nonzero metric-variation models; five genuinely empty outlines
+are separately identified. All100 have nonzero gvar data,10,281 tuples total.
+At all125 training plus4 frozen holdouts,5/100 pass the strict model outline
+bound (ALL five are empty) and85/100 pass TABLE metric bounds. No nonempty
+outline passes that broader bound. Maximum model errors remain8.51977856738663
+outline and1/30 TABLE FUnit. The resumed90 took207.458seconds.
+
+The actual assembled/compacted q candidate is local:
+`build/vf-takeover-private/p8-face-100-compact-stage1/P7-Original-face0-EXPERIMENTAL.ttc`.
+Its legacy P7 filename reflects the reused builder; this is the P8 batch output.
+TTC35,252,464bytes, SHA256
+`ee1c81a5efc9393aff92e648569bf3ab862c0890d7c629650fbfdbfb1bb66d74`;
+TTF SHA256 `e99aac02392e4c4d2e223a922abad6e3f720e72513d7714f85c281b32ff249c2`.
+All47,102 default GIDs/cmap remain; ONLY100 have selected variable models and
+47,002 remain DEFAULT_ONLY. C1 exactly reopens9,598,940 default/phantom points,
+10,281 tuples and22 table references. Closure compaction again removes739,241
+redundant points without changing hmtx/vmtx/HVAR/VVAR bytes. These are structure
+and serialized-model checks, not native original equivalence.
+
+`p8_validate_models.py` independently binds the actual candidate SHA to the
+assembly receipt, exact batch receipt SHA/selected model set and serialized
+verification. It verifies every model/glyf/native-cache hash; it does not simply
+assume an old five-model font contains the new100 models. Seven cached original
+native cases per GID (default, wght extremes, four unchanged holdouts) are then
+compared with ACTUAL decoded candidate HarfBuzz paths and advances. It makes
+ZERO new Apple calls while checking all12,900 native cache hashes.
+
+Actual independent result:100 GIDs/700 cases;167 outline cases pass,533 fail
+`outside_budget`, with maximum8.521084573934047 sourceFUnits.12 GIDs pass all
+SEVEN sampled outlines, including the five empty ones. TABLE metrics fail8 of
+1,400 advance fields, maximum0.0625;93 GIDs pass all seven TABLE-metric checks.
+Original-HB-reference metrics fail227/1,400, maximum0.53125;0 GIDs pass every
+HB-reference metric check. These seven-position results do NOT replace the
+broader129-position model checks. Source API, coefficient error, F2 coordinate
+quantization and native integer/output scaling remain separate;300 requested-q
+quantization observations are explicitly recorded. All original/native target
+acceptance flags remainfalse. No comparator/threshold/failed case was changed.
+
+Actual CoreText q-candidate extraction:600 records across100 GIDs, four locations
+and reverse default/mixed requests;200 exact reverse pairs,18 strict effective
+axis checks,22 table identities,570 nonempty paths and30 proven-empty records.
+95 GIDs show native outline movement and100 show raw metric movement. Actual
+bounded drawing also completes14 glyph draws into two private nonempty PNGs.
+Two earlier private scratch attempts exited139 BEFORE drawing because the
+harness incorrectly cast unboxed CoreText table tags to NSNumber. Those logs
+remain saved; using Apple's documented CFArrayGetValueAtIndex tag extraction
+fixes the private harness. No candidate raster failure is inferred from that
+bridge error. Original CoreText parity remains unavailable on this host.
+
+## Windows preparation and full-plan checkpoints
+
+P8 source checkpoints `d75b1b72951baaef17d4d66af3c8920ce4a8b4a1` (A1 batch)
+and `3a4ec7ab57481c09ffc0646347d9142b109e0bab` (local Windows gate) are pushed.
+The actual [Windows authored smoke39592789402](https://github.com/SOLHK/Swirl/actions/runs/39592789402)
+passes on Server2022/kernel20348/product_type3:1 authored face/7 GIDs,62 native
+instances,186 strict binary32 axis comparisons,17 cmap pairs and10 DPI/theme
+rasters. Only its fixed aggregate is published. Original-derived DirectWrite,
+Windows11, Qt/Swirl and installation are still NOT_RUN. See the separate
+[local Windows guide](SWIRL_VF_P8_WINDOWS_LOCAL_20261021.md).
+
+The original100 q-model build succeeds; nominal reparameterization exposed a
+new real block: interior gvar supports are not F2-exact before serialization,
+and the P7 frontend called the strict metric writer before that encoding step.
+First failure log `build/vf-takeover-private/p8-nominal-100-stage1.log` is preserved;
+no file was produced there and no guard was removed. The minimal fix and fresh
+nominal candidate will be recorded separately after actual verification.
+
+The all47,102-GID source-bound plan is initialized under
+`build/vf-takeover-private/p8-models-full-tensor-stage1/`.
+`p8_seed_batch.py` verifies and exclusively copies the immutable100 per-GID
+checkpoints into that larger plan, skipping its already valid GID0. It changes
+ONLY the exclusively owned target receipt after byte/recipe checks;0 native
+calls and no original100 checkpoint changes. The target RUNNER MUST BE STOPPED
+during seeding: current runner/seeder do not share a lock. Copies interrupted
+before confirmation remain uncounted and cause an explicit refusal on resume.
+That bounded128-new-GID run completed in250.412seconds; the stopped full plan
+now has228 encoded GIDs,0 build exceptions and46,874 pending. This is not a
+complete-face claim. The original100 checkpoint remains unchanged.
+
+Targeted additions at A2: independent validator12 and seeder5 authored regressions
+PASS. Global regression CI is automatic; no manual repetition of the old846
+baseline is used to claim original conversion progress.
+
+A new parallel branch `work/vf-p8-gvar-pro` was observed at
+`7ff8d17cb18c624b50895cda00216a2f3a86f844` and read only. Its point-ring identity
+helper has no file overlap or validated gvar mesh fix to reuse here. It is not
+merged or modified; all parallel history remains intact.
+
+## Actual nominal support-encoding repair
+
+The minimal frontend fix is in `p7_nominal_candidate.serialized_metric_candidate`.
+After range restriction, an interior support may be2/3, which is not F2DOT14.
+The strict metric writer correctly refuses that transient value. The frontend
+now serializes/reopens gvar FIRST using the existing packed-delta/overflow
+validator, then derives HVAR/VVAR from the actual encoded supports and phantoms.
+The writer's exact-F2 check is unchanged; no tolerance is enlarged. The normalized
+support encoding difference is explicitly recorded in normalized-axis units,
+not relabelled as a glyph-FUnit accuracy result.
+
+The first repaired attempt exposed an additional wrapper assumption: fontTools
+instancer removes empty gvar dictionary entries, whereas reopening the binary
+table restores empty slots for every GID. The audit now captures all original
+GID slots with explicit empty lists. This was not a glyph-name/post-format
+change; that early hypothesis was ruled out by the actual instancer source.
+Default-only GIDs are still not counted as variable. Both failed private build
+logs at nominal100 stage1 and stage2 are preserved.
+
+Actual successful output:
+`build/vf-takeover-private/p8-nominal-100-stage3/P7-Original-face0-NOMINAL-EXPERIMENTAL.ttc`,
+35,315,848bytes, SHA256
+`ac721ddf2522db374ba2b873c4fc1c79e2d3b6a49798825f99bdb00c97051ead`;
+TTF SHA256 `48e49a8369b06bc6f98ce6776b836719965e5282c0022e0bda1892ecb3b49a44`.
+There are8,352 quantized support coordinates, maximum change
+0.000028316827352048435 normalized-axis units (< half an F2 cell). All94,204
+HVAR/VVAR metric models exactly match final gvar phantoms; C1 decoded-byte and
+22-table packing gates pass. All inherited source-model/native precision
+failures and every production acceptance flag remain unchanged/false.
+
+Actual CoreText nominal100 probe uses16 GIDs from the exact100 plan (all5 empty
+plus11 spread nonempty), four nominal positions and two reverse requests:
+96 records,32 exact reverse pairs,18 strict effective-axis checks,22 table
+identities,66 paths and30 source-proven empty records,0 terminal errors.
+All11 nonempty samples change outlines; all16 change raw metrics. Original and
+candidate hashes remain unchanged. No nominal raster, original CoreText parity,
+DirectWrite original or Windows11 acceptance is implied.
+
+Five focused nominal regressions pass, including the authored2/3 support failure
+before repair, actual encoded10923/16384 support after repair, exact metric
+consistency, packed-delta overflow rejection and default-only-slot handling.
+The original P7 identity/integrity tests remain intact.
+
+## C1 actual228 checkpoint and independent partial-plan diagnostics
+
+Source checkpoint `76e3d8f88585bffca16cff2c223089ec9aab8072` contains the
+nominal-support repair. Its actual [CI39597838138](https://github.com/SOLHK/Swirl/actions/runs/39597838138)
+passes887 portable regressions and6 audits. macOS27.0.1 verifies32 original
+faces,3,184 glyph records and796 opposite-order pairs, while retaining the
+D2 strict384-request result288 PASS/96 FAIL. Workflow success is not strict
+original target equivalence. Windows Server authored controls also pass;
+original-derived Windows and Windows11 remain NOT_RUN.
+
+The full-plan checkpoint now binds228 real models, including the initial100.
+223 have nonzero outline variations; all228 have metric/gvar variations and
+source HVF extraction PASS. At125 training plus4 unchanged holdouts, only5
+models pass the strict outline bound (all empty);130 pass TABLE metrics.
+There are21,255 gvar tuples. No failed static substitute is counted as variable.
+
+Actual compact q output:
+`build/vf-takeover-private/p8-face-228-compact-stage1/P7-Original-face0-EXPERIMENTAL.ttc`,
+35,903,208bytes, SHA256
+`e41c1a73da138872e6b367eb3e199fe137c53545b07675eadc4e6eba26f8caec`;
+TTF SHA256 `143677e98801afb6a0580c4c71fa6b2776446145cae8d29b5b573a02dce710de`.
+All47,102 GIDs/cmap are present;46,874 are explicitly DEFAULT_ONLY. C1 checks
+9,598,940 decoded default/phantom points,21,255 tuples and22 table references.
+HVAR/VVAR match94,204 actual gvar metric models. This is a full-GID partial
+variable candidate, not a complete-variable face or32-face TTC.
+
+The independent validator now has an explicit `--allow-incomplete-batch`
+diagnostic flag. Default validation STILL refuses incomplete batch rows.
+The opt-in reports requested/attempted/pending counts and refuses RUNNING or
+unplanned rows; it does not admit the font or relax any comparison. Fourteen
+validator regressions pass. The candidate must remain bound to the exact
+stopped batch/assembly/native/model hashes.
+
+Actual228 validation completes1,596 positions and checks29,412 native-cache
+SHA values with0 new native calls. Outline1,130/1,596 cases fail, all
+`outside_budget`;22 GIDs pass all seven positions, including5 empty outlines.
+TABLE metrics fail75/3,192 fields,173 GIDs pass all seven positions. Original-HB
+reference metrics fail672/3,192;0 GIDs pass all seven. Maximum observed source
+FUnit errors are8.521084573934047 outline,0.0625 TABLE and0.53125 HB-reference.
+Actual HB outline movement occurs in223 GIDs;684 requested-q quantization
+observations are retained. The broader129-position and independent7-position
+counts are different contracts, not conflicting pass counts. All native target
+and production acceptance flags remainfalse.
+
+The immutable batch snapshot SHA is
+`b59c8372963c1722fca6896fe7bb7a93f7a049338e01be14a625a082185b8459`.
+Full private evidence is under `p8-independent-228-stage1/`; only aggregate
+counts/hashes enter this repository. The batch is stopped safely for review.
+
+## Actual nominal228 native checkpoint and remaining limits
+
+The repaired existing P7 frontend also produces:
+`build/vf-takeover-private/p8-nominal-228-stage1/P7-Original-face0-NOMINAL-EXPERIMENTAL.ttc`,
+35,972,428bytes, SHA256
+`ed9a90eca316b76717c96a8e73ce52d9c85f63593cdbebc58a0d20d36e415100`;
+TTF SHA256 `e1208aea096ed2ef4277c6c1922e7dac6adea9a8e8a74cb1e7a6c94e2fbc82e8`.
+The final font restores original WDTH/wght/HGHT tags, ranges/defaults and flags.
+All34,555 cmap codepoint-to-original-GID pairs and47,102 GID slots are checked.
+There are21,730 encoded gvar tuples after nominal range restriction,17,514
+quantized support coordinates, and maximum support change
+0.000028316827352048435 NORMALIZED_AXIS_COORDINATE. This is not a source-FUnit
+outline bound. Exact serialization and94,204 HVAR/VVAR model checks PASS;
+nominal mapping/original native equivalence remain UNACCEPTED.
+
+Actual bounded CoreText extraction on20 GIDs (16 new beyond representative100
+and4 historical anchors) completes120 records,40 exact reverse pairs,18 strict
+effective-axis checks and22 table-identity checks. There are114 nonempty paths
+and6 source-proven empty records,0 terminal errors. Nineteen samples change
+outlines and20 change raw metrics. An additional actual TTC/default invocation
+loads2 GIDs through CoreText, verifies all22 tables and matches the corresponding
+TTF records exactly. This is native candidate loading, not original parity.
+Private evidence/harness and source hashes are in `p8-nominal-228-coretext/`.
+
+Latest tested source checkpoint `b0d26bf68c91d1f6cb7d692954c0950c37d0e09f`:
+[CI39598736413](https://github.com/SOLHK/Swirl/actions/runs/39598736413) PASS on
+889 portable tests plus6 audits, original-source macOS27 replay and authored
+Windows Server32-face controls. The historical96/384 strict source-axis failures
+are explicitly retained by that diagnostic job; success does not accept them.
+
+No full remaining sweep is launched. Measured128-new-GID extraction/model/cache
+time250.412s and representative90 time207.458s extrapolate to roughly25–30hours
+for46,874 remaining GIDs, with6,046,746 new native invocations under this
+per-GID129-case strategy. This is an estimate, not a performance guarantee.
+Naive full caching may occupy52–82GiB and6.2million files. More importantly,
+`p8_batch_original.face` currently materializes all selected models together;
+straight extrapolation of actual tuple-point counts suggests37–71GiB just for
+decoded Python pair containers, exceeding this Mac's16GiB. This is not a measured
+peak-RSS bound and the full-face memory path is NOT validated. The existing
+oracle already supports contiguous GID ranges: a future versioned batch cache
+can amortize process/source parsing, and assembly needs bounded model streaming.
+Existing228 code-bound checkpoints must be preserved when that implementation
+changes; do not silently reinterpret them under a new recipe.
+
+Precision remains the earlier blocker: no nonempty model passes all129 sampled
+outline bounds, the independent seven-position maximum is8.521084573934047,
+and metric errors remain above1/32. No continuous-domain proof exists. Source
+user-mapping, native metric/origin, flattened component, named-instance and
+retained trak/cidg/meta semantics remain unaccepted. The q-models are finite
+C1 sample reconstructions, not direct exact translation of all HVF coefficients.
+None of the full default-only population is counted as variable conversion.
+No application-specific compensation was added. Original-derived DirectWrite,
+Windows11, Qt/Swirl and third-party Windows validation remain NOT_RUN.
+
+P8 pushed source checkpoints, in order:
+
+| Commit | Reviewed scope |
+| --- | --- |
+| `d75b1b7` | Representative selection, tensor sampling, per-GID checkpoints |
+| `3a4ec7a` | Private local Windows gate and actual authored Windows CI |
+| `0896c39` | Independent100 validation and verified full-plan seeding |
+| `76e3d8f` | Actual nominal gvar-support serialization/metric repair |
+| `b0d26bf` | Independent incomplete-plan diagnostics and228 evidence |
+
+The documentation successor adds only these final verified aggregates. PR24
+stays draft, stacked on unchanged PR23; integration-owner review is required.
+Fresh remote inspection leaves A3/B1/C1/D1/W1/Core and the parallel P8 branch
+unchanged. No overlapping P8 source files or branch-write conflicts were found.
+
+## Resume current batch
+
+```sh
+SWIRL_VF_PY="$HOME/Swirl-worktrees/vf-macos-windows-d1/build/vf-d1-private/venv/bin/python"
+"$SWIRL_VF_PY" tools/swirl_vf/platform/p8_batch_original.py run \
+  --source ~/Downloads/PingFangUI.ttc \
+  --binary build/vf-takeover-private/p7-original-hvf-native/gid-00000-default/hvf_oracle \
+  --plan build/vf-takeover-private/p8-all-gids-plan-stage1.json \
+  --output build/vf-takeover-private/p8-models-full-tensor-stage1 \
+  --profile tensor5 --max-new-gids 128
+```
+
+Changing source, plan or code requires a fresh output; old checkpoints are never
+overwritten. Existing strict source/target mapping, native metrics, component,
+metadata/table and full-variable-model gates remain unresolved. Real original
+DirectWrite/Windows11 and a complete47,102-variable-GID face are NOT_RUN/NOT_BUILT.
+PR24 remains draft/unmerged; no other branch is changed.

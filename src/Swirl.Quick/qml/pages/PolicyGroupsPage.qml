@@ -21,7 +21,7 @@ Item {
   ScrollBar.horizontal.policy:ScrollBar.AlwaysOff;ScrollBar.vertical:SwirlScrollBar {}
  ColumnLayout {
   width:Math.floor(scroll.availableWidth);spacing:Theme.dp(16)
-  SwirlText {renderType:Text.NativeRendering;text:"策略";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.Bold}
+  SwirlText {textRole:"pageTitle";renderType:Text.NativeRendering;text:"策略";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.Bold}
   SwirlSegmentedControl {Layout.fillWidth:true;Layout.maximumWidth:Theme.dp(600);rounded:true;objectName:"routingModePicker";optionIcons:["code","network","route"];options:["直接连接","全局代理","规则判定"];textPixelSize:13;accentSelection:true;currentIndex:page.modeIndex;enabled:!page.engineController.busy&&!page.engineController.routingBusy;onActivated:index=>page.engineController.setRoutingMode(["direct","global","rule"][index])}
   SwirlText {renderType:Text.NativeRendering;text:["直接连接目标服务器。","所有流量通过代理处理。","根据规则系统判定处理方式。"][page.modeIndex];color:Theme.muted;font.pixelSize:Theme.fontSize(12)}
   RowLayout {Layout.fillWidth:true;SwirlText {renderType:Text.NativeRendering;text:"代理";color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold;Layout.fillWidth:true}SwirlButton {text:"节点管理";quiet:true;iconName:"server";onClicked:page.Window.window.openSettings("proxies")}SwirlButton {text:"测试全部";quiet:true;iconName:"activity";enabled:page.engineController.nodes.length>0&&!page.engineController.tests.busy;onClicked:page.engineController.testAllNodes("https://www.gstatic.com/generate_204")}}
@@ -35,7 +35,7 @@ Item {
        SwirlText {renderType:Text.NativeRendering;Layout.fillWidth:true;Layout.fillHeight:true;text:node.modelData.name;color:Theme.text;font.pixelSize:Theme.fontSize(13);wrapMode:Text.Wrap;maximumLineCount:2;elide:Text.ElideRight}
        SwirlText {renderType:Text.NativeRendering;Layout.fillWidth:true;text:node.modelData.protocol+" · "+node.modelData.latency;color:Theme.muted;font.pixelSize:Theme.fontSize(11);elide:Text.ElideRight}
       }
-      ToolTip.visible:hovered||activeFocus;ToolTip.text:modelData.name
+      SwirlToolTip {parent:node;visible:node.hovered||node.activeFocus;text:node.modelData.name}
       Accessible.name:modelData.name;onClicked:page.engineController.chooseNode(modelData.id)
      }
     }

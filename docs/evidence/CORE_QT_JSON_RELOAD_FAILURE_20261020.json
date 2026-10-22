@@ -1,0 +1,186 @@
+{
+  "schema": 1,
+  "recorded_utc": "2026-10-20T07:41:29.976595+00:00",
+  "failure": {
+    "source_sha": "f19b0ad51058580a8a0ed73008b22754e6f45ea0",
+    "run_url": "https://github.com/SOLHK/Swirl/actions/runs/39385375434",
+    "windows_job_id": 118503825875,
+    "qt_selected_tests": 5,
+    "passed": 4,
+    "failed": 1,
+    "skipped": 0,
+    "case": "test_actual_qt_domain_and_match_reject_a_proven_reachable_origin",
+    "cpp_assertion_line": 668,
+    "qt_exit_code": 1,
+    "qt_elapsed_ms": 158,
+    "stage": "before-direct-positive-control",
+    "failure_log_sha256": "3da0433ba1ebf26a35f60a797068e5b78ad8ec5681dabe2eac734b500b748e42",
+    "artifact": {
+      "id": 12248107025,
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39385375434/artifacts/12248107025",
+      "bytes": 27494,
+      "sha256": "134393f478bea4f680956c3e513680ccb3e580194b9a840dacb3254b7ae57c80",
+      "github_digest_matched": true
+    },
+    "later_windows_steps": {
+      "private_qt_inspector": "not-executed",
+      "public_qt_eight_requests": "not-executed",
+      "complete_swirl_exe": "not-executed"
+    }
+  },
+  "root_cause": "Optional DNS host metadata changes from invalid QVariant to JSON null during the existing serialized NodeStore roundtrip; raw QVariantMap comparison is not the persisted JSON contract.",
+  "fix": "Compare the complete saved and reloaded dns/rules/groups QJsonObject and retain a separate selected-node assertion. No field is filtered, no production DNS behavior or timeout is changed.",
+  "qt_type_reproduction": {
+    "all_checks_passed": true,
+    "changed_host_ip_rejected": true,
+    "changed_reject_rule_rejected": true,
+    "complete_sections": 3,
+    "full_json_equal": true,
+    "host_count": 2,
+    "host_fields_per_row": 5,
+    "qt_version": "6.4.2",
+    "schema": 1,
+    "scope": "Qt JSON roundtrip only; no Windows DPAPI or network execution",
+    "type_differences": [
+      {
+        "after_null": true,
+        "after_type": "std::nullptr_t",
+        "after_valid": true,
+        "before_null": true,
+        "before_type": "invalid",
+        "before_valid": false,
+        "field": "server",
+        "host_ordinal": 1
+      },
+      {
+        "after_null": true,
+        "after_type": "std::nullptr_t",
+        "after_valid": true,
+        "before_null": true,
+        "before_type": "invalid",
+        "before_valid": false,
+        "field": "comment",
+        "host_ordinal": 1
+      },
+      {
+        "after_null": true,
+        "after_type": "std::nullptr_t",
+        "after_valid": true,
+        "before_null": true,
+        "before_type": "invalid",
+        "before_valid": false,
+        "field": "server",
+        "host_ordinal": 2
+      },
+      {
+        "after_null": true,
+        "after_type": "std::nullptr_t",
+        "after_valid": true,
+        "before_null": true,
+        "before_type": "invalid",
+        "before_valid": false,
+        "field": "comment",
+        "host_ordinal": 2
+      }
+    ],
+    "variant_map_equal": false
+  },
+  "unchanged_product_slots": {
+    "subscriptionProductChainAgainstIndependentPeer": {
+      "unchanged": true,
+      "sha256": "fa26c54f07cdb97d31953dd2f8d9a3e3059202e73dea4da3f59a7511884364e1"
+    },
+    "publicRealityProductChainAgainstIndependentPeer": {
+      "unchanged": true,
+      "sha256": "aa89d5cd57903b547e6c80ad31c10afdfa36cbe2599c596e0069aded9cd07c9d"
+    }
+  },
+  "source_before_sha256": "4501742b37bcb1fcb717a43d6cb6454bbf8f1c3ae9296d1865d02be21cdaaac6",
+  "source_after_sha256": "e1182cda18207e4e246447d89289d7c1cd7ff411d36da32120d4b954edc9a262",
+  "local_verification": {
+    "rust_regular_tests": 324,
+    "rust_doctests": 1,
+    "rust_failed": 0,
+    "rust_ignored": 0,
+    "rust_gates": [
+      {
+        "step": "version-final",
+        "command": [
+          "cargo",
+          "--version"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 0.149
+      },
+      {
+        "step": "fmt-final",
+        "command": [
+          "cargo",
+          "fmt",
+          "--all",
+          "--",
+          "--check"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 1.123
+      },
+      {
+        "step": "check-final",
+        "command": [
+          "cargo",
+          "check",
+          "--workspace",
+          "--locked",
+          "--offline"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 0.68
+      },
+      {
+        "step": "clippy-final",
+        "command": [
+          "cargo",
+          "clippy",
+          "--workspace",
+          "--all-targets",
+          "--locked",
+          "--offline",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 0.623
+      },
+      {
+        "step": "test-final",
+        "command": [
+          "cargo",
+          "test",
+          "--workspace",
+          "--locked",
+          "--offline"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 12.606
+      }
+    ],
+    "rust_test_log_sha256": "9ef400a37ca01609ea3eba94641b6f5c00afa95d58516a335814ef432ad2c8e7",
+    "portable_tests_passed": 24,
+    "workflow_tests_passed": 56,
+    "workflow_generation_changed": false,
+    "qt_slot_moc_and_syntax_exit_codes": [
+      0,
+      0
+    ],
+    "qt_scope": "Exact updated lifecycle slot, Qt 6.4.2 C++23 moc/syntax; Windows DPAPI not executed locally"
+  },
+  "new_sha_windows_result": "pending actual CI after safe push",
+  "private_provider": "not-accessed; current 59-node candidate count unknown",
+  "historical_dns_doh_health_timeouts": "unresolved",
+  "frozen_acceptance": {
+    "items": 79,
+    "fully_passed": 6,
+    "weighted_percent": 10.83
+  }
+}

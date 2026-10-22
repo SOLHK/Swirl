@@ -1,0 +1,24 @@
+{
+  "scope": "authored_two_face_native_control_after_verified_face_hash_fix",
+  "status": "PASS_SYNTHETIC_NATIVE_OUTLINE_TABLE_METRIC_RECONSTRUCTION_ONLY",
+  "raw_strict_API_gate": "FAIL",
+  "raw_strict_API_tolerance": 0.03125,
+  "comparison": {
+    "status": "PASS",
+    "requests": 58,
+    "glyph_records": 174,
+    "max_control_point_error_font_units": 0.0,
+    "max_metric_error_font_units": 0.0,
+    "max_bounds_error_font_units": 0.0,
+    "limit_font_units": 1.0,
+    "continuous_space_proof": false,
+    "command_normalization": "only zero-length straight segments and redundant straight closing edges"
+  },
+  "face_model_hashes_retained": true,
+  "packing_binary_faces": 2,
+  "source_unchanged": true,
+  "temporary_fonts_removed": true,
+  "original_font_acceptance": "NOT_RUN",
+  "Windows11": "NOT_RUN",
+  "Qt_Swirl": "NOT_RUN"
+}

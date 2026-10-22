@@ -1,0 +1,18 @@
+{
+  "source_base": "5cb42619785c66317552867d251784df2b0323b9",
+  "started_utc": "2026-10-19T16:30:45.153343+00:00",
+  "command": [
+    "python3",
+    "tools/tests/test_connection_stages.py"
+  ],
+  "environment": {
+    "SWIRL_RUST_HARNESS": ".local-runtime/target/release/swirl-api"
+  },
+  "source_sha256_before": "7f4037d246f118dbf59d52fa2a5d366d1e5d5d38f7248cd12270ea57d5970165",
+  "binary_sha256": "8730c60b40d00d7030635641bf4d623e0f537fa735d2f6348c61b43f64d91d6b",
+  "scope": "Linux actual sockets plus allocation ownership/collision regressions; not native Windows proof",
+  "exit_code": 0,
+  "elapsed_seconds": 9.189,
+  "source_sha256_after": "7f4037d246f118dbf59d52fa2a5d366d1e5d5d38f7248cd12270ea57d5970165",
+  "log_sha256": "433d87e009503f9ba0df5a3bc68befcfc325f9f41c4c92cff79cd08f788e9c22"
+}

@@ -1,0 +1,279 @@
+{
+  "schema": 1,
+  "scope": "Actual GitHub Windows Qt/DPAPI product through in-process Rust and two independent Xray peers to public HTTP/HTTPS",
+  "source_sha": "ac0069ec645b552835d15534b93d6d2ae0c69620",
+  "source_url": "https://github.com/SOLHK/Swirl/commit/ac0069ec645b552835d15534b93d6d2ae0c69620",
+  "run": {
+    "id": 39382415888,
+    "url": "https://github.com/SOLHK/Swirl/actions/runs/39382415888"
+  },
+  "job": {
+    "id": 118494302821,
+    "name": "windows-rust",
+    "url": "https://github.com/SOLHK/Swirl/actions/runs/39382415888/job/118494302821",
+    "final_conclusion": "not-established-by-this-public-artifact"
+  },
+  "artifact": {
+    "id": 12246936624,
+    "name": "Swirl-Public-Qt-Chrome133-Vision-ac0069ec645b552835d15534b93d6d2ae0c69620-1",
+    "url": "https://github.com/SOLHK/Swirl/actions/runs/39382415888/artifacts/12246936624",
+    "zip_bytes": 6040,
+    "github_digest": "sha256:a5912da9cb3c23ca584ada1e0c030ddc600d88c358e73a358c2a0ec2cd37c96d",
+    "downloaded_sha256": "a5912da9cb3c23ca584ada1e0c030ddc600d88c358e73a358c2a0ec2cd37c96d",
+    "digest_matched": true
+  },
+  "audit_recorded_at_utc": "2026-10-20T07:12:56.289964+00:00",
+  "source_identity": {
+    "git_sha": "ac0069ec645b552835d15534b93d6d2ae0c69620",
+    "tracked_worktree_changes": [],
+    "platform": "win32",
+    "github_run_id": "39382415888",
+    "peer_build_source_sha": "ac0069ec645b552835d15534b93d6d2ae0c69620",
+    "source_hashes": {
+      "Verify-PublicQtReality.py": {
+        "sha256": "91be8a776ecbcbb694ab38509456948458965b2b24ea8d40e0c69ea443a67b36",
+        "gitBlobSha": "a540102c4b646ba1959fcc5bf251a1ad8d15a1a0",
+        "url": "https://github.com/SOLHK/Swirl/blob/ac0069ec645b552835d15534b93d6d2ae0c69620/tools/Verify-PublicQtReality.py"
+      },
+      "test_reality_runtime.py": {
+        "sha256": "25a2cbbac67bc8646942f7982519ea30ba26a18637c404217b902deef8e0d95d",
+        "gitBlobSha": "3c4bface6ed52c9ae062ae956028231e3cf6380d",
+        "url": "https://github.com/SOLHK/Swirl/blob/ac0069ec645b552835d15534b93d6d2ae0c69620/tools/tests/test_reality_runtime.py"
+      },
+      "RustCoreTests.cpp": {
+        "sha256": "a3d0970e8e864b3db41ec8ea0952d75ad3240c718e23ee9b1f6cb433dfc6e2ac",
+        "gitBlobSha": "10f3e1882a6eaadfd883796355231200b0f24d4e",
+        "url": "https://github.com/SOLHK/Swirl/blob/ac0069ec645b552835d15534b93d6d2ae0c69620/src/Swirl.Quick/tests/RustCoreTests.cpp"
+      }
+    },
+    "binary_hashes": {
+      "SWIRL_RUST_HARNESS": {
+        "file": "swirl-api.exe",
+        "sha256": "333124b137615ab1f0add1d31e5c54dc505bccb6d04f12523b653748c93dda09"
+      },
+      "SWIRL_RUST_INSPECTOR": {
+        "file": "swirl-inspect.exe",
+        "sha256": "8b06aa8ae406fcd54623fa7f22f2d8122cbc039893e38db0d9aa3fb24c3c1d25"
+      },
+      "SWIRL_RUST_QT_TESTS": {
+        "file": "SwirlRustCoreTests.exe",
+        "sha256": "88d31226e63240aae736366248857312cd34de8595ff2bca9333db4357dab708"
+      }
+    }
+  },
+  "qt_execution": {
+    "test": "RustCoreTests::publicRealityProductChainAgainstIndependentPeer",
+    "exit_code": 0,
+    "qt_version": "6.10.3",
+    "compiler": "MSVC 2022",
+    "runner_os": "Windows Server 2022",
+    "public_test_slots": 1,
+    "qtest_functions_including_init_cleanup": 3,
+    "failed": 0,
+    "skipped": 0,
+    "elapsed_ms": 1799
+  },
+  "product_states": {
+    "imported": true,
+    "encrypted_store_reloaded": true,
+    "parameters_preserved": true,
+    "in_process_rust": true,
+    "node_switch_verified": true,
+    "selected_node_restored": true,
+    "match_reject_verified": true,
+    "stopped": true,
+    "listener_released": true
+  },
+  "checks": [
+    {
+      "node": "A",
+      "frontend": "http-connect",
+      "host": "www.msftconnecttest.com",
+      "port": 80,
+      "method": "GET",
+      "proxy_host": "127.0.0.1",
+      "proxy_port": 60588,
+      "stage": "complete",
+      "closed": true,
+      "http_status": 200,
+      "certificate_verified": false,
+      "tls_version": "",
+      "expected_body_verified": true,
+      "success": true
+    },
+    {
+      "node": "A",
+      "frontend": "http-connect",
+      "host": "www.rust-lang.org",
+      "port": 443,
+      "method": "HEAD",
+      "proxy_host": "127.0.0.1",
+      "proxy_port": 60588,
+      "stage": "complete",
+      "closed": true,
+      "http_status": 301,
+      "certificate_verified": true,
+      "tls_version": "TLSv1.3",
+      "expected_body_verified": false,
+      "success": true
+    },
+    {
+      "node": "A",
+      "frontend": "socks5",
+      "host": "www.msftconnecttest.com",
+      "port": 80,
+      "method": "GET",
+      "proxy_host": "127.0.0.1",
+      "proxy_port": 60588,
+      "stage": "complete",
+      "closed": true,
+      "http_status": 200,
+      "certificate_verified": false,
+      "tls_version": "",
+      "expected_body_verified": true,
+      "success": true
+    },
+    {
+      "node": "A",
+      "frontend": "socks5",
+      "host": "www.rust-lang.org",
+      "port": 443,
+      "method": "HEAD",
+      "proxy_host": "127.0.0.1",
+      "proxy_port": 60588,
+      "stage": "complete",
+      "closed": true,
+      "http_status": 301,
+      "certificate_verified": true,
+      "tls_version": "TLSv1.3",
+      "expected_body_verified": false,
+      "success": true
+    },
+    {
+      "node": "B",
+      "frontend": "http-connect",
+      "host": "www.msftconnecttest.com",
+      "port": 80,
+      "method": "GET",
+      "proxy_host": "127.0.0.1",
+      "proxy_port": 60588,
+      "stage": "complete",
+      "closed": true,
+      "http_status": 200,
+      "certificate_verified": false,
+      "tls_version": "",
+      "expected_body_verified": true,
+      "success": true
+    },
+    {
+      "node": "B",
+      "frontend": "http-connect",
+      "host": "www.rust-lang.org",
+      "port": 443,
+      "method": "HEAD",
+      "proxy_host": "127.0.0.1",
+      "proxy_port": 60588,
+      "stage": "complete",
+      "closed": true,
+      "http_status": 301,
+      "certificate_verified": true,
+      "tls_version": "TLSv1.3",
+      "expected_body_verified": false,
+      "success": true
+    },
+    {
+      "node": "B",
+      "frontend": "socks5",
+      "host": "www.msftconnecttest.com",
+      "port": 80,
+      "method": "GET",
+      "proxy_host": "127.0.0.1",
+      "proxy_port": 60588,
+      "stage": "complete",
+      "closed": true,
+      "http_status": 200,
+      "certificate_verified": false,
+      "tls_version": "",
+      "expected_body_verified": true,
+      "success": true
+    },
+    {
+      "node": "B",
+      "frontend": "socks5",
+      "host": "www.rust-lang.org",
+      "port": 443,
+      "method": "HEAD",
+      "proxy_host": "127.0.0.1",
+      "proxy_port": 60588,
+      "stage": "complete",
+      "closed": true,
+      "http_status": 301,
+      "certificate_verified": true,
+      "tls_version": "TLSv1.3",
+      "expected_body_verified": false,
+      "success": true
+    }
+  ],
+  "independent_xray": [
+    {
+      "node": "A",
+      "reality_authenticated_sessions": 4,
+      "client_finished_verified_sessions": 4,
+      "vless_accepted_sessions": 4,
+      "vision_padding_events": 8,
+      "vision_unpadding_events": 6,
+      "vision_direct_upload_commands": 2,
+      "vision_direct_download_commands": 2,
+      "camouflage_application_bytes": 0,
+      "public_destinations": [
+        {
+          "host": "www.msftconnecttest.com",
+          "port": 80,
+          "connections": 2
+        },
+        {
+          "host": "www.rust-lang.org",
+          "port": 443,
+          "connections": 2
+        }
+      ],
+      "process_reaped": true,
+      "forced_kill": false,
+      "listener_closed": true,
+      "active_camouflage_connections": 0
+    },
+    {
+      "node": "B",
+      "reality_authenticated_sessions": 4,
+      "client_finished_verified_sessions": 4,
+      "vless_accepted_sessions": 4,
+      "vision_padding_events": 8,
+      "vision_unpadding_events": 6,
+      "vision_direct_upload_commands": 2,
+      "vision_direct_download_commands": 2,
+      "camouflage_application_bytes": 0,
+      "public_destinations": [
+        {
+          "host": "www.msftconnecttest.com",
+          "port": 80,
+          "connections": 2
+        },
+        {
+          "host": "www.rust-lang.org",
+          "port": 443,
+          "connections": 2
+        }
+      ],
+      "process_reaped": true,
+      "forced_kill": false,
+      "listener_closed": true,
+      "active_camouflage_connections": 0
+    }
+  ],
+  "public_evidence_audit_passed": true,
+  "complete_Swirl_exe_build": "not-final-at-public-artifact-review; this file does not certify the application build or final job conclusion",
+  "provider_connection": false,
+  "physical_windows_verified": false,
+  "tls12_authentication_failure_cancellation_scope": "not established by this public-only artifact; separate product lifecycle evidence is required",
+  "formal_project_acceptance_baseline_changed": false
+}

@@ -1,0 +1,13 @@
+{
+  "scope": "Local Linux QtNetwork/PySide diagnostic against independent Python HTTPS origin; not Windows Qt/DPAPI product acceptance",
+  "qt": "6.10.3",
+  "pyside": "6.10.3",
+  "qt_ssl_backend": "openssl",
+  "qt_ssl_runtime": "OpenSSL 3.0.13 30 Jan 2024",
+  "python": "3.12.14",
+  "system": "Linux",
+  "base_git_sha": "5cb42619785c66317552867d251784df2b0323b9",
+  "source_changes_uncommitted": true,
+  "tested_endpoints": "Loopback synthetic fixture only",
+  "assertions": "VerifyPeer, fixture CA only, exact HTTP body, wrong-name rejection, independent unwrap close_notify and raw EOF retained"
+}

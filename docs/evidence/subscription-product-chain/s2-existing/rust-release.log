@@ -1,0 +1,4 @@
+SOURCE 593e7cddc360cf7f51d9fdc988e6cf8fd99aea96
+COMMAND ["/workspace/scratch/ca6cd1f88f6f/Swirl/.local-runtime/cargo/bin/cargo", "build", "--workspace", "--release", "--locked"]
+
+    Finished `release` profile [optimized] target(s) in 0.05s

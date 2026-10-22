@@ -1,0 +1,38 @@
+name: Swirl VF original vertical text layout
+
+on:
+  push:
+    branches: [work/core-completion-20261017]
+    paths:
+      - '.github/workflows/swirl-vf-vertical-layout.yml'
+      - 'tools/swirl_vf/platform/probe_vertical_layout.py'
+      - 'tools/swirl_vf/platform/coretext_extract.swift'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  original-vertical-layout:
+    runs-on: xcode-27
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compare original CoreText frame drawing and explicit origin hypotheses
+        run: |
+          python -m pip install fonttools==4.61.1 numpy==2.2.6
+          python tools/swirl_vf/platform/probe_vertical_layout.py \
+            /System/Library/PrivateFrameworks/FontServices.framework/Versions/A/Resources/Reserved/PingFangUI.ttc \
+            --output build/vertical-layout-summary/layout.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: swirl-vf-original-vertical-layout-${{ github.sha }}
+          path: build/vertical-layout-summary/*.json
+          retention-days: 7

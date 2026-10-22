@@ -7,6 +7,9 @@
 #include <QNetworkInterface>
 #include <QDateTime>
 #include <QUrl>
+#include <QCoreApplication>
+#include <QFile>
+#include <QCryptographicHash>
 
 SystemDataProvider::SystemDataProvider(CaptureService *capture,EngineController *engine,DiagnosticService *diagnostics):m_capture(capture),m_engine(engine),m_diagnostics(diagnostics) {
     connect(engine,&EngineController::interfacesChanged,this,[this]{++m_revision;emit dataChanged();});
@@ -29,7 +32,16 @@ QVariantList SystemDataProvider::logs() const { return m_diagnostics->records();
 void SystemDataProvider::clearLogs() { m_diagnostics->clearView(); }
 QVariantMap SystemDataProvider::diagnosticSnapshot() const {
     const auto t=m_engine->telemetry();
+    const static auto executable=QCoreApplication::applicationFilePath();
+    const static auto executableHash=[] {
+        QFile binary(QCoreApplication::applicationFilePath());
+        if(!binary.open(QIODevice::ReadOnly))return QString();
+        QCryptographicHash hash(QCryptographicHash::Sha256);
+        return hash.addData(&binary)?QString::fromLatin1(hash.result().toHex()):QString();
+    }();
     return {{"engineState",m_engine->stateText()},{"engineError",m_engine->errorCode()},{"engineVersion",m_engine->version()},
+        {"sourceSha",QStringLiteral(SWIRL_SOURCE_SHA)},{"executablePath",executable},{"executableSha256",executableHash},
+        {"actualEngineType",m_engine->processAlive()?m_engine->engineKind():QStringLiteral("not-running")},{"engineProcessId",m_engine->processAlive()?m_engine->processId():QString()},
         {"apiHealthy",m_engine->apiHealthy()},{"processAlive",m_engine->processAlive()},{"routingMode",m_engine->routingMode()},
         {"systemProxyEnabled",m_engine->systemProxy()->enabled()},{"systemProxyOwned",m_engine->systemProxy()->owned()},
         {"systemProxyError",m_engine->systemProxy()->error()},{"networkType",currentNetwork().value("type")},

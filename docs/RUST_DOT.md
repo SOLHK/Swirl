@@ -1,6 +1,12 @@
 # Rust DNS over TLS（DoT）阶段
 
-本阶段从 `test` 的 `fbebb28` 接续。Rust DNS 原有 UDP/TCP、A/AAAA/CNAME、TTL 缓存没有重写；新增严格验证证书的 DoT 传输，并接入既有 Qt DNS 配置。不是 DoH、DNS 分流或全部加密 DNS 已完成。
+> **历史阶段范围：** 本文保留从 `test@fbebb28` 接续的 DoT 实现及当时验收范围，不是当前全部 DNS 能力表。
+> 后续开发分支已实现严格 HTTP/1.1 DoH 与现有 Qt `https://` 字段映射，见
+> [当前加密 DNS 概述](../core/README.md#encrypted-dns-dot-and-http11-doh) 和
+> [此前 DoH/公网验收](RUST_WS_VALIDATION_20261017.md)。最新回归和精确提交/CI 结果见
+> [策略阶段验收](RUST_POLICY_VALIDATION_20261017.md)。以下历史测试不会倒写为新版已测结果。
+
+本阶段从 `test` 的 `fbebb28` 接续。Rust DNS 原有 UDP/TCP、A/AAAA/CNAME、TTL 缓存没有重写；新增严格验证证书的 DoT 传输，并接入既有 Qt DNS 配置。当时仅完成本 DoT 阶段，未将其扩大为 DoH、DNS 分流或全部加密 DNS 验收。
 
 ## 实际代码与边界
 
@@ -34,9 +40,9 @@ DoT 超时、证书错误或无效响应不会回退为系统 DNS、明文 UDP/T
 
 这里的模式 0 只沿用既有设置容器；一旦 DoT 激活，普通目标的网络解析由 Rust DoT 执行，不调用系统 DNS。`useHosts` 开关仅决定是否读本机 hosts；显式本地映射始终保留。
 
-仅接受单个严格 `tls://` URL。用户信息、查询参数、fragment、自定义路径、scope ID、无效或组播 IP 均拒绝。传统服务器与 DoT 同填、自定义模式/混合模式、缺少域名 bootstrap 映射时明确报错，不忽略字段。
+该 DoT 配置路径接受单个严格 `tls://` URL。用户信息、查询参数、fragment、自定义路径、scope ID、无效或组播 IP 均拒绝。传统服务器与 DoT 同填、自定义模式/混合模式、缺少域名 bootstrap 映射时明确报错，不忽略字段。后续 `https://` DoH 使用单独的 HTTP POST 路径，不能把 DoT 的无自定义路径限制直接套到 DoH。
 
-Qt 入口当前使用公开根证书；测试控制 IR 可显式提供额外 DER/base64 CA，不读取私钥或任意文件路径。现有页面文案含历史兼容内核能力；为保持用户要求的 UI 不变没有修改它，不能据此认为 Rust 已支持 `https://` 或 `tcp://` URL。
+Qt 入口使用公开根证书；测试控制 IR 可显式提供额外 DER/base64 CA，不读取私钥或任意文件路径。现有页面文案含历史兼容内核能力；页面文字不能代替具体执行证据。`https://` 已在后续 DoH 阶段实现，详见顶部链接；显式 `tcp://` DNS 服务器 URL 仍未实现，UDP 截断后的 TCP 重试是另一条已有路径。
 
 ## 控制 IR 示例
 
@@ -85,7 +91,10 @@ CI 的 Linux、macOS、Windows jobs 已接入新的 DoT 测试。测试通过数
 
 ## 下一阶段
 
-继续实现 DoH、显式 bootstrap 策略与多地址重试、负缓存、DNS 分流；不要重复重写已完成的 UDP/TCP/DoT 报文逻辑。再推进自动策略组、缺少的协议传输和 TUN。不得把本阶段合成 TLS 测试扩大成全协议/完整内核验收。
+该历史阶段的后续清单包括 DoH、显式 bootstrap 策略与多地址重试、负缓存、DNS 分流及自动策略组。
+其中 DoH 和 Rust IR/API 自动策略组现已在后续阶段接入，见 [原生策略组](RUST_NATIVE_POLICIES.md)；
+不应重复实现或继续把它们视为未编译候选。域名 bootstrap、策略感知的多地址重试、负缓存、DNS 分流、
+更多协议传输、Qt 自动组映射和 TUN 仍待推进。不得把本阶段合成 TLS 测试扩大成全协议/完整内核验收。
 
 规范依据：
 - RFC 7858：<https://www.rfc-editor.org/rfc/rfc7858>

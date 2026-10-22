@@ -1,0 +1,52 @@
+test_all_ports_excluded_is_a_failure_not_an_ephemeral_fallback (__main__.LoopbackPortSelectionTests.test_all_ports_excluded_is_a_failure_not_an_ephemeral_fallback) ... Loopback pair reservation snapshot: ipv4 tcp
+Localized column labels
+----------    --------
+49152 65535
+* - Exclusions.
+
+Loopback pair reservation snapshot: ipv4 udp
+Localized column labels
+----------    --------
+49152 65535
+* - Exclusions.
+
+ok
+test_missing_or_malformed_exclusion_table_fails (__main__.LoopbackPortSelectionTests.test_missing_or_malformed_exclusion_table_fails) ... ok
+test_netsh_numeric_rows_and_empty_table (__main__.LoopbackPortSelectionTests.test_netsh_numeric_rows_and_empty_table) ... ok
+test_portable_candidate_remains_os_selected_without_netsh (__main__.LoopbackPortSelectionTests.test_portable_candidate_remains_os_selected_without_netsh) ... ok
+test_query_failures_never_bind_or_start_servers (__main__.LoopbackPortSelectionTests.test_query_failures_never_bind_or_start_servers) ... ok
+test_windows_candidate_excludes_both_protocols_on_each_family (__main__.LoopbackPortSelectionTests.test_windows_candidate_excludes_both_protocols_on_each_family) ... Loopback pair reservation snapshot: ipv4 tcp
+Localized column labels
+----------    --------
+49152 50788
+* - Exclusions.
+
+Loopback pair reservation snapshot: ipv4 udp
+Localized column labels
+----------    --------
+50790 65535
+* - Exclusions.
+
+Loopback pair reservation snapshot: ipv6 tcp
+Localized column labels
+----------    --------
+49152 50788
+* - Exclusions.
+
+Loopback pair reservation snapshot: ipv6 udp
+Localized column labels
+----------    --------
+50790 65535
+* - Exclusions.
+
+ok
+test_pair_allocation_cleans_up_other_errors_without_retry (__main__.DnsPeerAllocationTests.test_pair_allocation_cleans_up_other_errors_without_retry) ... ok
+test_pair_allocation_stops_after_bounded_collisions (__main__.DnsPeerAllocationTests.test_pair_allocation_stops_after_bounded_collisions) ... ok
+test_pair_retries_collision_and_releases_failed_sockets (__main__.DnsPeerAllocationTests.test_pair_retries_collision_and_releases_failed_sockets) ... ok
+test_tcp_reserves_port_before_udp_and_forwards_both_families (__main__.DnsPeerAllocationTests.test_tcp_reserves_port_before_udp_and_forwards_both_families) ... ok
+test_windows_access_denial_is_not_retried_on_either_endpoint (__main__.DnsPeerAllocationTests.test_windows_access_denial_is_not_retried_on_either_endpoint) ... ok
+
+----------------------------------------------------------------------
+Ran 11 tests in 6.043s
+
+OK

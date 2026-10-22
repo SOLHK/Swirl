@@ -51,10 +51,22 @@ static void captureRenderedFrame(QQuickWindow *window,const QString &path){
 // Test-build-only harness. It drives THIS Swirl window with the real encrypted
 // node store copy and real engine. It has no fixtures or access to other apps.
 void startRuntimeEvidence(QQuickWindow *window,EngineController *controller,SystemDataProvider *system,DiagnosticService *diagnostics,const QString &commandPath,const QString &statePath){
- controller->setControlPort(19097);controller->setProxyPort(17988);controller->connectNode(controller->selectedNodeId());
+ controller->setControlPort(19097);controller->setProxyPort(17988);
+ // Set an isolated global route before the first engine start.
+ // A saved production rule or DIRECT mode must never leak into this run.
+ if(!controller->prepareRealAcceptance()||controller->routingMode()!=QStringLiteral("global")){
+  qWarning()<<"Runtime acceptance refused non-global routing";QTimer::singleShot(0,qApp,&QCoreApplication::quit);return;
+ }
+ controller->connectNode(controller->selectedNodeId());
  auto timer=new QTimer(window);timer->setInterval(500);
  QObject::connect(timer,&QTimer::timeout,window,[=]{
   auto status=system->diagnosticSnapshot();status["testsBusy"]=controller->tests()->busy();status["testsCompleted"]=controller->tests()->completed();status["testsTotal"]=controller->tests()->total();status["testsSucceeded"]=controller->tests()->succeeded();status["testsFailed"]=controller->tests()->failed();status["hasExternalIp"]=!controller->telemetry()->externalIp().isEmpty();
+  // Numeric Rust counters are safe to inspect in memory per request. The full
+  // state file also contains node details and must never be copied to reports.
+  const auto rustTraffic=controller->rustTrafficTotals();
+  status["rustUploadTotal"]=rustTraffic.first;status["rustDownloadTotal"]=rustTraffic.second;
+  status["rustAccepted"]=controller->rustAccepted();status["rustFailed"]=controller->rustFailed();
+  status["rustLastErrorStage"]=controller->rustLastErrorStage();
   status["proxyMeasurement"]=controller->telemetry()->proxyDiagnostic();status["latencies"]=controller->telemetry()->latencies();
   QVariantList subscriptions;for(const auto &value:controller->imports()->providers()){const auto row=value.toMap();subscriptions.append(QVariantMap{{"name",row.value("name")},{"nodeCount",row.value("nodes")},{"status",row.value("status")},{"error",DiagnosticService::redact(row.value("error").toString())},{"updated",row.value("update")},{"nextUpdate",row.value("nextUpdate")}});}status["subscriptions"]=subscriptions;status["selectedNode"]=controller->selectedNodeName();status["activeNode"]=controller->activeNodeId();
   QSaveFile state(statePath);if(state.open(QIODevice::WriteOnly)){state.write(QJsonDocument(QJsonObject::fromVariantMap(status)).toJson());state.commit();}

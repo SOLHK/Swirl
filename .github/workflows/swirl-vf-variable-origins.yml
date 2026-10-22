@@ -1,0 +1,133 @@
+name: Swirl VF actual variable vertical layout
+
+on:
+  push:
+    branches: [work/core-completion-20261017]
+    paths:
+      - '.github/workflows/swirl-vf-variable-origins.yml'
+      - 'tools/swirl_vf/platform/experiment_vertical_gpos.py'
+      - 'tools/swirl_vf/platform/directwrite_vertical_layout.cpp'
+      - 'tools/swirl_vf/platform/probe_directwrite_vertical_layout.py'
+      - 'tools/swirl_vf/platform/probe_coretext_vertical_gpos.py'
+      - 'tools/swirl_vf/platform/probe_vertical_layout.py'
+      - 'tools/swirl_vf/platform/vertical_layout/**'
+      - 'tools/swirl_vf/tests/test_vertical_gpos_experiment.py'
+      - 'tools/swirl_vf/tests/test_directwrite_vertical_layout.py'
+      - 'tools/swirl_vf/tests/test_coretext_vertical_gpos_probe.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: swirl-vf-variable-origins-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  harfbuzz:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install fixed versions and run original layout regressions
+        run: |
+          python -m pip install fonttools==4.61.1 numpy==2.2.6 uharfbuzz==0.53.3
+          python -m unittest discover -s tools/swirl_vf/tests -p 'test_vertical_gpos_experiment.py' -v
+      - name: Measure actual shaping and retain both precision budgets
+        run: |
+          mkdir -p build/vertical-layout
+          git rev-parse HEAD > build/vertical-layout/commit.txt
+          python tools/swirl_vf/platform/experiment_vertical_gpos.py --output build/vertical-layout/harfbuzz.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: swirl-vf-harfbuzz-vertical-layout-${{ github.sha }}
+          path: |
+            build/vertical-layout/*.json
+            build/vertical-layout/*.txt
+          retention-days: 7
+
+  coretext-layout:
+    runs-on: xcode-27
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify native environment and exact installed source identity
+        run: |
+          mkdir -p build/vertical-layout
+          git rev-parse HEAD > build/vertical-layout/commit.txt
+          sw_vers > build/vertical-layout/macos.txt
+          xcodebuild -version > build/vertical-layout/xcode.txt
+          python - <<'PY'
+          import hashlib, pathlib
+          source=pathlib.Path('/System/Library/PrivateFrameworks/FontServices.framework/Versions/A/Resources/Reserved/PingFangUI.ttc')
+          with source.open('rb') as stream:
+              actual=hashlib.file_digest(stream, 'sha256').hexdigest()
+          expected='39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890'
+          if actual != expected: raise SystemExit('Installed original source SHA mismatch')
+          pathlib.Path('build/vertical-layout/installed-source-hash.txt').write_text(actual+'\n')
+          print('Exact installed source identity verified; this layout experiment uses original synthetic symbols only.')
+          PY
+          python -m pip install fonttools==4.61.1 numpy==2.2.6
+      - name: Compile and measure actual CoreText layout and drawing
+        run: |
+          python tools/swirl_vf/platform/probe_coretext_vertical_gpos.py --output build/vertical-layout/coretext.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: swirl-vf-coretext-vertical-layout-${{ github.sha }}
+          path: |
+            build/vertical-layout/*.json
+            build/vertical-layout/*.txt
+          retention-days: 7
+
+  directwrite-layout:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Record source and install fixed font tooling
+        run: |
+          New-Item -ItemType Directory -Force build/vertical-layout | Out-Null
+          git rev-parse HEAD | Set-Content build/vertical-layout/commit.txt
+          python -m pip install fonttools==4.61.1 numpy==2.2.6
+          if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed' }
+      - name: Compile the actual TextLayout and TextRenderer probe
+        run: |
+          cmake -S tools/swirl_vf/platform/vertical_layout -B build/vertical-layout/native -A x64
+          if ($LASTEXITCODE -ne 0) { throw 'DirectWrite layout configuration failed' }
+          cmake --build build/vertical-layout/native --config Release
+          if ($LASTEXITCODE -ne 0) { throw 'DirectWrite layout compilation failed' }
+      - name: Measure original symbols through real horizontal and vertical layout
+        run: |
+          python tools/swirl_vf/platform/probe_directwrite_vertical_layout.py --binary build/vertical-layout/native/Release/directwrite_vertical_layout.exe --output build/vertical-layout/directwrite.json --require-native
+          if ($LASTEXITCODE -ne 0) { throw 'DirectWrite layout observations incomplete; inspect the safe report' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: swirl-vf-directwrite-vertical-layout-${{ github.sha }}
+          path: |
+            build/vertical-layout/*.json
+            build/vertical-layout/*.txt
+          retention-days: 7

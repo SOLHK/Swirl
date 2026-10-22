@@ -11,6 +11,7 @@
 #include <QGuiApplication>
 #include <QDir>
 #include <QImage>
+#include <cstdio>
 #include <functional>
 
 int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
@@ -73,7 +74,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         probeSelected(net.a,net.b,"UI real request passes only through selected node A");
         const auto pid=controller->processId();
         const auto selectedBeforeNavigation=controller->selectedNodeId();
-        for(const auto &route:QStringList{"featurehub","settings","appearance","fonts","dns","modules","profiles","scripts","subscriptions","proxies"}){
+        for(const auto &route:QStringList{"featurehub","settings","fonts","dns","modules","profiles","scripts","subscriptions","proxies"}){
             eval("AppState.navigate('"+route+"')");
             check(QTest::qWaitFor([&]{auto *active=host?qvariant_cast<QObject *>(host->property("activeLoader")):nullptr;return active&&active->property("routeId").toString()==route&&!host->property("moving").toBool()&&!host->property("pendingGrab").toBool();},3500),"live navigation settles inside the main host");
             check(controller->processId()==pid&&controller->apiHealthy()&&controller->selectedNodeId()==selectedBeforeNavigation,"all settings routes preserve the real running proxy and selected node");
@@ -102,7 +103,13 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     fill("nodeTestUrl",net.url().toString());click("nodeTestButton");
     check(QTest::qWaitFor([&]{return !controller->tests()->busy();},41000) && controller->tests()->result(controller->selectedNodeId()).value("success").toBool(),"UI imported node forwards a real HTTP request");
     controller->stop();check(QTest::qWaitFor([&]{return !controller->processAlive();},4000),"UI imported node cleanup reaps owned engine");
-    controller->deleteNode(controller->nodes().first().toMap().value("id").toString());
+    const auto importedNodes=controller->nodes();
+    if(importedNodes.isEmpty()) {
+        const auto reason=controller->imports()->message().toUtf8();
+        std::fprintf(stderr,"NODE_UI_IMPORT_MISSING: %s\n",reason.constData());
+        return failures?failures:1;
+    }
+    controller->deleteNode(importedNodes.first().toMap().value("id").toString());
     // Exercise the actual subscription form against an isolated HTTPS server.
     // Only synthetic fixture data enters this temporary DPAPI store.
     QSslServer subscriptions;subscriptions.setSslConfiguration(net.https.sslConfiguration());

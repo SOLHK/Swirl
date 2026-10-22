@@ -1,5 +1,6 @@
 #pragma once
 #include <QNetworkInterface>
+#include <QPair>
 #include "ProxyEngine.h"
 #include "NodeStore.h"
 #include "NodeImportService.h"
@@ -13,6 +14,7 @@
 class EngineController final : public QObject {
     Q_OBJECT
     Q_PROPERTY(QString executablePath READ executablePath WRITE setExecutablePath NOTIFY optionsChanged)
+    Q_PROPERTY(bool rustCoreBuild READ rustCoreBuild CONSTANT)
     Q_PROPERTY(int controlPort READ controlPort WRITE setControlPort NOTIFY optionsChanged)
     Q_PROPERTY(QString expectedVersion READ expectedVersion CONSTANT)
     Q_PROPERTY(QString expectedSha256 READ expectedSha256 CONSTANT)
@@ -26,6 +28,7 @@ class EngineController final : public QObject {
     Q_PROPERTY(QString version READ version NOTIFY statusChanged)
     Q_PROPERTY(QString engineName READ engineName NOTIFY statusChanged)
     Q_PROPERTY(QString engineKind READ engineKind NOTIFY statusChanged)
+    Q_PROPERTY(QString engineIdentityLabel READ engineIdentityLabel NOTIFY statusChanged)
     Q_PROPERTY(QString engineReason READ engineReason NOTIFY statusChanged)
     Q_PROPERTY(QString processId READ processId NOTIFY statusChanged)
     Q_PROPERTY(qint64 uptimeSeconds READ uptimeSeconds NOTIFY statusChanged)
@@ -72,6 +75,13 @@ class EngineController final : public QObject {
     Q_PROPERTY(bool preferCompatibility READ preferCompatibility WRITE setPreferCompatibility NOTIFY optionsChanged)
 public:
     explicit EngineController(std::unique_ptr<ProxyEngine> engine, QObject *parent = nullptr, QString storePath = {},bool realAcceptance=false);
+    bool rustCoreBuild() const {
+#ifdef SWIRL_USE_RUST_CORE
+        return true;
+#else
+        return false;
+#endif
+    }
     QString executablePath() const { return m_options.executablePath; }
     int controlPort() const { return m_options.controlPort; }
     void setExecutablePath(const QString &path);
@@ -88,8 +98,19 @@ public:
     QString version() const { return m_engine->status().version; }
     QString engineName() const { return m_engine->status().engineName; }
     QString engineKind() const { return m_engine->status().engineKind; }
+    QString engineIdentityLabel() const;
+    bool prepareRealAcceptance(); // Called only by the isolated runtime harness.
     QString engineReason() const { return m_engine->status().engineReason; }
     QString processId() const { return QString::number(m_engine->status().processId); }
+    QPair<qint64,qint64> rustTrafficTotals() const {
+        const auto status=m_engine->status();
+        return status.engineKind==QStringLiteral("rust")
+            ? QPair<qint64,qint64>{status.uploadTotal,status.downloadTotal}
+            : QPair<qint64,qint64>{0,0};
+    }
+    qint64 rustAccepted() const { return m_engine->status().rustAccepted; }
+    qint64 rustFailed() const { return m_engine->status().rustFailed; }
+    QString rustLastErrorStage() const { return m_engine->status().rustLastErrorStage; }
     qint64 uptimeSeconds() const { return m_engine->status().uptimeSeconds; }
     QString configPath() const { return m_engine->status().configPath; }
     QString configurationSummary() const { return m_engine->configurationSummary(); }
@@ -107,7 +128,7 @@ public:
     QString nodeStateText() const;
     QString requestStateText() const;
     QString nodeError() const { return !m_nodeError.isEmpty()?m_nodeError:m_store.error(); }
-    bool nodeBusy() const { return m_engine->status().nodeBusy || busy() || m_restartPending || m_imports.busy(); }
+    bool nodeBusy() const { return m_engine->status().nodeBusy || busy() || m_restartPending || m_imports.busy() || !m_pendingSelection.isEmpty(); }
     NodeImportService *imports() { return &m_imports; }
     QStringList supportedProtocols() const { return ProxyNode::protocols(); }
     bool requestSucceeded() const { return m_engine->status().requestState==ProxyEngine::RequestState::Succeeded; }
@@ -157,7 +178,8 @@ public:
     Q_INVOKABLE bool setTunEnabled(bool enabled);
     Q_INVOKABLE bool configureDns(const QVariantMap &configuration);
     Q_INVOKABLE QVariantMap networkConfigurationSnapshot() const;
-    bool validateNetworkConfiguration(const QVariantMap &configuration,QVariantMap *canonical=nullptr);
+    bool validateNetworkConfiguration(const QVariantMap &configuration,QVariantMap *canonical=nullptr,const QList<ProxyNode> *candidateNodes=nullptr);
+    bool importNodesAndConfiguration(const QList<ProxyNode> &nodes,const QString &sourceId,const QVariantMap &configuration,const QJsonObject &original = {},const QString &sourceFormat = QStringLiteral("clash"));
     bool replaceNetworkConfiguration(const QVariantMap &configuration);
     void setModuleOverlayActive(bool active) { m_moduleOverlayActive=active; }
     Q_INVOKABLE bool saveRoutingRule(const QString &type,const QString &pattern,const QString &policy,int index=-1);
@@ -193,7 +215,9 @@ private:
     ConnectionDiagnostics m_diagnostics;
     QString m_previousProxyState;
     ProxyEngine::State m_previousEngineState=ProxyEngine::State::Stopped;
+    QJsonObject serializedNetworkConfiguration();
     bool saveNetworkConfiguration();
+    bool commitRoutingConfiguration(const QStringList &rules,const QVariantList &groups);
     bool networkEditAllowed();
     void startConfiguredSession();
     QString m_networkError;
@@ -202,10 +226,15 @@ private:
     bool m_proxyRequested=false;
     bool m_proxyChecking=false;
     QString m_nodeError;
+    QString m_pendingSelection,m_previousSelection;
+    void rollbackPendingSelection(const QString &reason);
     bool m_tunBeforeGateway=false;
     bool m_tunBeforeMetered=false;
     QString m_modeBeforeMetered="rule";
     bool m_restartPending=false;
     bool m_connectionRequested=false;
     bool m_moduleOverlayActive=false;
+    bool m_nativeDocumentRouting=false;
+    bool m_smartRoutingEligible=false;
+    void updateRoutingFlags();
 };

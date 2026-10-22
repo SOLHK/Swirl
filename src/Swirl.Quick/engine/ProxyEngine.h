@@ -26,6 +26,8 @@ struct EngineStartOptions {
     // Production uses verified, bundled China domain/IP MRS providers. The
     // controlled transport fixtures intentionally retain MATCH-only routing.
     bool smartRouting = false;
+    // Manually configured native rules reserve private destinations for DIRECT.
+    bool nativePrivateRouting = false;
     QString rulesDirectory;
     bool tunEnabled=false;
     bool gatewayForwarding=false;
@@ -78,6 +80,9 @@ public:
         qint64 trafficAt = 0;
         qint64 uploadTotal = 0;
         qint64 downloadTotal = 0;
+        qint64 rustAccepted = 0;
+        qint64 rustFailed = 0;
+        QString rustLastErrorStage;
         double uploadRate = 0;
         double downloadRate = 0;
         QString telemetryError;

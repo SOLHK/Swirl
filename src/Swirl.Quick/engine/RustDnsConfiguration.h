@@ -23,15 +23,19 @@ inline QString endpoint(const QHostAddress &address, int port) {
 inline QString configuration(const QVariantMap &input, QJsonObject *output) {
     const auto dns = QJsonObject::fromVariantMap(input);
     const auto invalid = [] {
-        return QString("Rust DNS 支持系统解析、自定义 IP DNS、精确映射、严格 DoT/DoH；配置含无效或尚未支持的选项。");
+        return QString("Rust DNS 支持系统解析、自定义 IP DNS、精确映射、严格 DoT 和 DoH POST；配置含无效或尚未支持的选项。");
     };
     for (auto it = dns.begin(); it != dns.end(); ++it)
-        if (!QStringList{"mode", "servers", "encrypted", "hosts", "useHosts", "respectRules"}.contains(it.key()))
+        if (!QStringList{"mode", "servers", "encrypted", "hosts", "useHosts", "respectRules", "queryFamily"}.contains(it.key()))
             return invalid();
     if (dns.contains("mode") && (!dns.value("mode").isDouble()
         || (dns.value("mode").toDouble() != 0 && dns.value("mode").toDouble() != 2)))
         return invalid();
     const bool custom = dns.value("mode").toInt() == 2;
+    const auto familyValue = dns.value("queryFamily");
+    if (dns.contains("queryFamily") && (!familyValue.isString()
+        || !QStringList{"dual", "ipv4_only"}.contains(familyValue.toString()))) return invalid();
+    const auto family = dns.contains("queryFamily") ? familyValue.toString() : QString("dual");
     for (const auto &key : QStringList{"servers", "encrypted"})
         if (dns.contains(key) && !dns.value(key).isString()) return invalid();
     const auto encrypted = dns.value("encrypted").toString().trimmed();
@@ -39,8 +43,10 @@ inline QString configuration(const QVariantMap &input, QJsonObject *output) {
     // Bootstrap via traditional DNS and mixed system/custom mode are separate
     // future stages. Never silently query an application target in plaintext.
     if (!encrypted.isEmpty() && (custom || !rawServers.trimmed().isEmpty()))
-        return "Rust 加密 DNS 请使用系统模式、留空传统服务器，并用显式 IP 或精确本地映射指定端点。";
+        return "Rust 加密 DNS 此阶段请使用系统模式、留空传统服务器，并用显式 IP 或精确本地映射指定 DoT 端点。";
     if (!custom && !rawServers.trimmed().isEmpty()) return invalid();
+    if (family != "dual" && !custom && encrypted.isEmpty())
+        return QStringLiteral("该 DNS 查询策略需要明确的 DNS 服务器；系统解析暂不支持限制查询类型。");
     QJsonArray servers;
     QSet<QString> serverSet;
     if (custom) {
@@ -82,19 +88,19 @@ inline QString configuration(const QVariantMap &input, QJsonObject *output) {
         seen.insert(name);
         mapped.append(QJsonObject{{"name", name}, {"address", address.toString()}});
     }
-    QJsonArray tlsServers,httpsServers;
+    // Native DoH and DoT existing-field mapping.
+    QJsonArray tlsServers;
     if (!encrypted.isEmpty()) {
-        // Restrict the literal syntax before QUrl normalizes it. Reject userinfo,
-        // percent escapes, paths and query options rather than silently stripping.
-        const bool https=encrypted.startsWith("https://");
-        const QRegularExpression syntax(https?"^https://(?:\\[[0-9A-Fa-f:]+\\]|[A-Za-z0-9.-]+)(?::[0-9]{1,5})?(?:/[^\\s#\\\\{}]*)?$":"^tls://(?:\\[[0-9A-Fa-f:]+\\]|[A-Za-z0-9.-]+)(?::[0-9]{1,5})?/?$");
+        const QRegularExpression syntax("^(?:tls|https)://(?:\\[[0-9A-Fa-f:]+\\]|[A-Za-z0-9.-]+)(?::[0-9]{1,5})?(?:/[^\\s?#\\\\]*)?$");
         const QUrl url(encrypted, QUrl::StrictMode);
-        if (encrypted.size() > 1024 || !syntax.match(encrypted).hasMatch()
-            || !url.isValid() || url.scheme() != (https?"https":"tls") || !url.userInfo().isEmpty()
-            || url.hasFragment() || (!https&&(url.hasQuery()||(!url.path().isEmpty()&&url.path()!="/"))))
+        const bool https = url.scheme() == "https";
+        if (encrypted.size() > 2048 || !syntax.match(encrypted).hasMatch()
+            || !url.isValid() || (!https && url.scheme() != "tls")
+            || !url.userInfo().isEmpty() || url.hasQuery() || url.hasFragment()
+            || (!https && !url.path().isEmpty() && url.path() != "/"))
             return invalid();
         const auto name = url.host().toLower();
-        const int port = url.port(https?443:853);
+        const int port = url.port(https ? 443 : 853);
         if (port < 1 || port > 65535 || name.size() > 253 || name.isEmpty()) return invalid();
         QHostAddress address;
         if (!address.setAddress(name)) {
@@ -108,20 +114,20 @@ inline QString configuration(const QVariantMap &input, QJsonObject *output) {
                 return "Rust 加密 DNS 服务器域名需要精确本地 IP 映射；未使用系统 DNS 引导或明文回退。";
         }
         if (!usableAddress(address)) return invalid();
-        if(https){
-            auto path=url.path(QUrl::FullyEncoded);if(path.isEmpty())path="/";if(url.hasQuery())path+='?'+url.query(QUrl::FullyEncoded);
-            if(path.startsWith("//"))return invalid();
-            httpsServers.append(QJsonObject{{"address",endpoint(address,port)},{"path",path},{"tls",QJsonObject{{"server_name",name},{"alpn",QJsonArray{"http/1.1"}}}}});
-        }else tlsServers.append(QJsonObject{
-            {"address", endpoint(address, port)},
-            {"tls", QJsonObject{{"server_name", name}, {"alpn", QJsonArray{"dot"}}}}
-        });
+        QJsonObject server{{"address", endpoint(address, port)},
+            {"tls", QJsonObject{{"server_name", name}, {"alpn", QJsonArray{https ? "http/1.1" : "dot"}}}}};
+        if (https) {
+            const auto path = url.path(QUrl::FullyEncoded).isEmpty() ? QString("/") : url.path(QUrl::FullyEncoded);
+            if (path.size() > 1024 || path.startsWith("//")) return invalid();
+            server["https_path"] = path;
+        }
+        tlsServers.append(server);
     }
     QJsonObject result{{"hosts", mapped}, {"force_proxy_hosts", dns.value("respectRules").toBool()},
         {"servers", servers}, {"use_system_hosts", !dns.contains("useHosts") || dns.value("useHosts").toBool()}};
     // Leave legacy JSON unchanged when the new feature is inactive.
     if (!tlsServers.isEmpty()) result["tls_servers"] = tlsServers;
-    if (!httpsServers.isEmpty()) result["https_servers"] = httpsServers;
+    if (family != "dual") result["query_family"] = family;
     *output = result;
     return {};
 }

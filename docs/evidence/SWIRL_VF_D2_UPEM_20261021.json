@@ -1,0 +1,697 @@
+{
+  "status": "SYNTHETIC_UPEM_DIAGNOSIS_COMPLETE_NOT_METRIC_ACCEPTANCE",
+  "scope": "self_authored_only_no_Apple_data",
+  "platform": "macOS-26.3-arm64-arm-64bit",
+  "script_sha256": "3a13b4b88f591b042a701021dca4034872079f20962670ed812a2b568bbf664c",
+  "native_binary_sha256": "016ba06a28476f168e06f19aac7aad2dbe81fa4e84daaacb006c9ab1ba0d8cb7",
+  "unique_fixture_coordinate_observations": 40,
+  "actual_native_records": 80,
+  "exact_reverse_pairs": 40,
+  "strict_height_failures": 36,
+  "frozen_B1_height_candidate_matches": 40,
+  "observations": [
+    {
+      "upm": 1000,
+      "user_HGHT": 1.0,
+      "actual_height": 849,
+      "continuous_height": 850.0,
+      "height_error": -1.0,
+      "strict_height_passed": false,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 669.9981689453125,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": false,
+        "16": true,
+        "20": false,
+        "24": false
+      }
+    },
+    {
+      "upm": 1000,
+      "user_HGHT": 500.0,
+      "actual_height": 1000,
+      "continuous_height": 1000.0,
+      "height_error": 0.0,
+      "strict_height_passed": true,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 669.9981689453125,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": false,
+        "16": true,
+        "20": false,
+        "24": false
+      }
+    },
+    {
+      "upm": 1000,
+      "user_HGHT": 1000.0,
+      "actual_height": 1149,
+      "continuous_height": 1150.0,
+      "height_error": -1.0,
+      "strict_height_passed": false,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 669.9981689453125,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": false,
+        "16": true,
+        "20": false,
+        "24": false
+      }
+    },
+    {
+      "upm": 1000,
+      "user_HGHT": 625.0,
+      "actual_height": 1037,
+      "continuous_height": 1037.5,
+      "height_error": -0.5,
+      "strict_height_passed": false,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 669.9981689453125,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": false,
+        "16": true,
+        "20": false,
+        "24": false
+      }
+    },
+    {
+      "upm": 1000,
+      "user_HGHT": 914.0625,
+      "actual_height": 1125,
+      "continuous_height": 1124.21875,
+      "height_error": 0.78125,
+      "strict_height_passed": false,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 669.9981689453125,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": false,
+        "16": true,
+        "20": false,
+        "24": false
+      }
+    },
+    {
+      "upm": 1024,
+      "user_HGHT": 1.0,
+      "actual_height": 850,
+      "continuous_height": 850.0,
+      "height_error": 0.0,
+      "strict_height_passed": true,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 670,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": true,
+        "16": true,
+        "20": true,
+        "24": true
+      }
+    },
+    {
+      "upm": 1024,
+      "user_HGHT": 500.0,
+      "actual_height": 1000,
+      "continuous_height": 1000.0,
+      "height_error": 0.0,
+      "strict_height_passed": true,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 670,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": true,
+        "16": true,
+        "20": true,
+        "24": true
+      }
+    },
+    {
+      "upm": 1024,
+      "user_HGHT": 1000.0,
+      "actual_height": 1150,
+      "continuous_height": 1150.0,
+      "height_error": 0.0,
+      "strict_height_passed": true,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 670,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": true,
+        "16": true,
+        "20": true,
+        "24": true
+      }
+    },
+    {
+      "upm": 1024,
+      "user_HGHT": 625.0,
+      "actual_height": 1038,
+      "continuous_height": 1037.5,
+      "height_error": 0.5,
+      "strict_height_passed": false,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 670,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": true,
+        "16": true,
+        "20": true,
+        "24": true
+      }
+    },
+    {
+      "upm": 1024,
+      "user_HGHT": 914.0625,
+      "actual_height": 1125,
+      "continuous_height": 1124.21875,
+      "height_error": 0.78125,
+      "strict_height_passed": false,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 670,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": true,
+        "16": true,
+        "20": true,
+        "24": true
+      }
+    },
+    {
+      "upm": 1001,
+      "user_HGHT": 1.0,
+      "actual_height": 849,
+      "continuous_height": 850.0,
+      "height_error": -1.0,
+      "strict_height_passed": false,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 669.9961090087891,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": false,
+        "16": true,
+        "20": false,
+        "24": false
+      }
+    },
+    {
+      "upm": 1001,
+      "user_HGHT": 500.0,
+      "actual_height": 999,
+      "continuous_height": 1000.0,
+      "height_error": -1.0,
+      "strict_height_passed": false,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 669.9961090087891,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": false,
+        "16": true,
+        "20": false,
+        "24": false
+      }
+    },
+    {
+      "upm": 1001,
+      "user_HGHT": 1000.0,
+      "actual_height": 1149,
+      "continuous_height": 1150.0,
+      "height_error": -1.0,
+      "strict_height_passed": false,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 669.9961090087891,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": false,
+        "16": true,
+        "20": false,
+        "24": false
+      }
+    },
+    {
+      "upm": 1001,
+      "user_HGHT": 625.0,
+      "actual_height": 1037,
+      "continuous_height": 1037.5,
+      "height_error": -0.5,
+      "strict_height_passed": false,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 669.9961090087891,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": false,
+        "16": true,
+        "20": false,
+        "24": false
+      }
+    },
+    {
+      "upm": 1001,
+      "user_HGHT": 914.0625,
+      "actual_height": 1124,
+      "continuous_height": 1124.21875,
+      "height_error": -0.21875,
+      "strict_height_passed": false,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 669.9961090087891,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": false,
+        "16": true,
+        "20": false,
+        "24": false
+      }
+    },
+    {
+      "upm": 1023,
+      "user_HGHT": 1.0,
+      "actual_height": 849,
+      "continuous_height": 850.0,
+      "height_error": -1.0,
+      "strict_height_passed": false,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 669.9857025146484,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": false,
+        "16": true,
+        "20": false,
+        "24": false
+      }
+    },
+    {
+      "upm": 1023,
+      "user_HGHT": 500.0,
+      "actual_height": 999,
+      "continuous_height": 1000.0,
+      "height_error": -1.0,
+      "strict_height_passed": false,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 669.9857025146484,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": false,
+        "16": true,
+        "20": false,
+        "24": false
+      }
+    },
+    {
+      "upm": 1023,
+      "user_HGHT": 1000.0,
+      "actual_height": 1149,
+      "continuous_height": 1150.0,
+      "height_error": -1.0,
+      "strict_height_passed": false,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 669.9857025146484,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": false,
+        "16": true,
+        "20": false,
+        "24": false
+      }
+    },
+    {
+      "upm": 1023,
+      "user_HGHT": 625.0,
+      "actual_height": 1037,
+      "continuous_height": 1037.5,
+      "height_error": -0.5,
+      "strict_height_passed": false,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 669.9857025146484,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": false,
+        "16": true,
+        "20": false,
+        "24": false
+      }
+    },
+    {
+      "upm": 1023,
+      "user_HGHT": 914.0625,
+      "actual_height": 1124,
+      "continuous_height": 1124.21875,
+      "height_error": -0.21875,
+      "strict_height_passed": false,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 669.9857025146484,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": false,
+        "16": true,
+        "20": false,
+        "24": false
+      }
+    },
+    {
+      "upm": 2047,
+      "user_HGHT": 1.0,
+      "actual_height": 849,
+      "continuous_height": 850.0,
+      "height_error": -1.0,
+      "strict_height_passed": false,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 669.9851989746094,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": false,
+        "16": true,
+        "20": false,
+        "24": false
+      }
+    },
+    {
+      "upm": 2047,
+      "user_HGHT": 500.0,
+      "actual_height": 999,
+      "continuous_height": 1000.0,
+      "height_error": -1.0,
+      "strict_height_passed": false,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 669.9851989746094,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": false,
+        "16": true,
+        "20": false,
+        "24": false
+      }
+    },
+    {
+      "upm": 2047,
+      "user_HGHT": 1000.0,
+      "actual_height": 1149,
+      "continuous_height": 1150.0,
+      "height_error": -1.0,
+      "strict_height_passed": false,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 669.9851989746094,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": false,
+        "16": true,
+        "20": false,
+        "24": false
+      }
+    },
+    {
+      "upm": 2047,
+      "user_HGHT": 625.0,
+      "actual_height": 1037,
+      "continuous_height": 1037.5,
+      "height_error": -0.5,
+      "strict_height_passed": false,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 669.9851989746094,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": false,
+        "16": true,
+        "20": false,
+        "24": false
+      }
+    },
+    {
+      "upm": 2047,
+      "user_HGHT": 914.0625,
+      "actual_height": 1124,
+      "continuous_height": 1124.21875,
+      "height_error": -0.21875,
+      "strict_height_passed": false,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 669.9851989746094,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": false,
+        "16": true,
+        "20": false,
+        "24": false
+      }
+    },
+    {
+      "upm": 4093,
+      "user_HGHT": 1.0,
+      "actual_height": 849,
+      "continuous_height": 850.0,
+      "height_error": -1.0,
+      "strict_height_passed": false,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 669.9464569091797,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": false,
+        "16": true,
+        "20": false,
+        "24": false
+      }
+    },
+    {
+      "upm": 4093,
+      "user_HGHT": 500.0,
+      "actual_height": 999,
+      "continuous_height": 1000.0,
+      "height_error": -1.0,
+      "strict_height_passed": false,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 669.9464569091797,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": false,
+        "16": true,
+        "20": false,
+        "24": false
+      }
+    },
+    {
+      "upm": 4093,
+      "user_HGHT": 1000.0,
+      "actual_height": 1149,
+      "continuous_height": 1150.0,
+      "height_error": -1.0,
+      "strict_height_passed": false,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 669.9464569091797,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": false,
+        "16": true,
+        "20": false,
+        "24": false
+      }
+    },
+    {
+      "upm": 4093,
+      "user_HGHT": 625.0,
+      "actual_height": 1037,
+      "continuous_height": 1037.5,
+      "height_error": -0.5,
+      "strict_height_passed": false,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 669.9464569091797,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": false,
+        "16": true,
+        "20": false,
+        "24": false
+      }
+    },
+    {
+      "upm": 4093,
+      "user_HGHT": 914.0625,
+      "actual_height": 1124,
+      "continuous_height": 1124.21875,
+      "height_error": -0.21875,
+      "strict_height_passed": false,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 669.9464569091797,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": false,
+        "16": true,
+        "20": false,
+        "24": false
+      }
+    },
+    {
+      "upm": 8191,
+      "user_HGHT": 1.0,
+      "actual_height": 849,
+      "continuous_height": 850.0,
+      "height_error": -1.0,
+      "strict_height_passed": false,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 669.918212890625,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": true,
+        "16": true,
+        "20": false,
+        "24": false
+      }
+    },
+    {
+      "upm": 8191,
+      "user_HGHT": 500.0,
+      "actual_height": 999,
+      "continuous_height": 1000.0,
+      "height_error": -1.0,
+      "strict_height_passed": false,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 669.918212890625,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": true,
+        "16": true,
+        "20": false,
+        "24": false
+      }
+    },
+    {
+      "upm": 8191,
+      "user_HGHT": 1000.0,
+      "actual_height": 1149,
+      "continuous_height": 1150.0,
+      "height_error": -1.0,
+      "strict_height_passed": false,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 669.918212890625,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": true,
+        "16": true,
+        "20": false,
+        "24": false
+      }
+    },
+    {
+      "upm": 8191,
+      "user_HGHT": 625.0,
+      "actual_height": 1037,
+      "continuous_height": 1037.5,
+      "height_error": -0.5,
+      "strict_height_passed": false,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 669.918212890625,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": true,
+        "16": true,
+        "20": false,
+        "24": false
+      }
+    },
+    {
+      "upm": 8191,
+      "user_HGHT": 914.0625,
+      "actual_height": 1124,
+      "continuous_height": 1124.21875,
+      "height_error": -0.21875,
+      "strict_height_passed": false,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 669.918212890625,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": true,
+        "16": true,
+        "20": false,
+        "24": false
+      }
+    },
+    {
+      "upm": 16383,
+      "user_HGHT": 1.0,
+      "actual_height": 849,
+      "continuous_height": 850.0,
+      "height_error": -1.0,
+      "strict_height_passed": false,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 669.9591064453125,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": true,
+        "16": true,
+        "20": false,
+        "24": false
+      }
+    },
+    {
+      "upm": 16383,
+      "user_HGHT": 500.0,
+      "actual_height": 999,
+      "continuous_height": 1000.0,
+      "height_error": -1.0,
+      "strict_height_passed": false,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 669.9591064453125,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": true,
+        "16": true,
+        "20": false,
+        "24": false
+      }
+    },
+    {
+      "upm": 16383,
+      "user_HGHT": 1000.0,
+      "actual_height": 1149,
+      "continuous_height": 1150.0,
+      "height_error": -1.0,
+      "strict_height_passed": false,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 669.9591064453125,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": true,
+        "16": true,
+        "20": false,
+        "24": false
+      }
+    },
+    {
+      "upm": 16383,
+      "user_HGHT": 625.0,
+      "actual_height": 1037,
+      "continuous_height": 1037.5,
+      "height_error": -0.5,
+      "strict_height_passed": false,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 669.9591064453125,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": true,
+        "16": true,
+        "20": false,
+        "24": false
+      }
+    },
+    {
+      "upm": 16383,
+      "user_HGHT": 914.0625,
+      "actual_height": 1124,
+      "continuous_height": 1124.21875,
+      "height_error": -0.21875,
+      "strict_height_passed": false,
+      "frozen_B1_height_candidate_matches": true,
+      "actual_horizontal_advance": 669.9591064453125,
+      "horizontal_candidate_matches": {
+        "6": false,
+        "14": true,
+        "16": true,
+        "20": false,
+        "24": false
+      }
+    }
+  ],
+  "production_fix_accepted": false,
+  "original_font_acceptance": "NOT_RUN",
+  "windows11_acceptance": "NOT_RUN"
+}

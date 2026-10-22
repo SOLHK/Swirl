@@ -17,3 +17,8 @@ private-capture/
 core/target/
 !core/crates/*/src/bin/
 !core/crates/*/src/bin/*.rs
+
+# User font imports and variable-font experiments are local-only.
+*.ttc
+*.otf
+*.ttf

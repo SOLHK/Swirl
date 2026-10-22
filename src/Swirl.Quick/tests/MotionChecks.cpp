@@ -282,7 +282,26 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
     auto *activity=qobject_cast<QQuickItem *>(item());
     auto *upload=findVisual(activity,"activityUpload");
     auto *activityScroll=findVisual(activity,"activityScroll");
-    check("activity-four-metrics-present",upload&&findVisual(activity,"activityDownload")&&findVisual(activity,"activityConnections")&&findVisual(activity,"activityTotal"));
+    auto *traffic=findVisual(activity,"activityTotal"),*diagnostic=findVisual(activity,"internetDiagnosticCard");
+    check("activity-three-metrics-and-one-traffic-card",upload&&findVisual(activity,"activityDownload")&&findVisual(activity,"activityConnections")&&traffic&&diagnostic);
+    if(traffic&&diagnostic&&activityScroll){
+        const bool wide=eval("pageLoader.item.statsWide").toBool();
+        const auto aligned=[&]{const auto top=traffic->mapToItem(activity,0,0).y(),other=diagnostic->mapToItem(activity,0,0).y();return wide?qAbs(top-other)<2:top+traffic->height()<other;};
+        check("activity-statistics-and-diagnostic-top-align",aligned());
+        const auto collapsed=diagnostic->height();
+        const auto contentHeight=activityScroll->property("contentHeight").toDouble();
+        eval("pageLoader.item.diagnosticOpen=true");wait(850);
+        check("activity-expanded-diagnostic-reflows-with-statistics",aligned()&&diagnostic->height()>collapsed+20&&activityScroll->property("contentHeight").toDouble()>contentHeight+20&&(!wide||qAbs(traffic->height()-diagnostic->height())<3));
+        eval("pageLoader.item.diagnosticOpen=false");wait(850);
+        check("activity-collapse-restores-aligned-cards",aligned()&&qAbs(diagnostic->height()-collapsed)<3);
+        const auto originalSize=window->size();window->resize(qMax(originalSize.width(),1200),qMax(originalSize.height(),760));wait(250);
+        const auto wideTop=[&]{return qAbs(traffic->mapToItem(activity,0,0).y()-diagnostic->mapToItem(activity,0,0).y())<2;};
+        qInfo()<<"ACTIVITY_WIDE_GEOMETRY"<<window->size()<<eval("pageLoader.item.statsWide").toBool()<<traffic->size()<<diagnostic->size()<<traffic->mapToItem(activity,0,0)<<diagnostic->mapToItem(activity,0,0);
+        check("activity-wide-statistics-spans-two-cells",eval("pageLoader.item.statsWide").toBool()&&wideTop()&&traffic->width()>diagnostic->width());
+        eval("pageLoader.item.diagnosticOpen=true");wait(850);
+        check("activity-wide-expansion-keeps-row-aligned",wideTop()&&qAbs(traffic->height()-diagnostic->height())<3);
+        eval("pageLoader.item.diagnosticOpen=false");wait(850);window->resize(originalSize);wait(250);
+    }
     if(activityScroll)activityScroll->setProperty("contentY",20);
     if(upload){
         qmlEngine(window)->rootContext()->setContextProperty("motionTestOrigin",upload);

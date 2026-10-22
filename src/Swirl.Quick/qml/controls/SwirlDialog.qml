@@ -54,6 +54,12 @@ Dialog {
         property var owner:dialog.ownerWindow
         function requestDismiss(){close()}
         modal:true;focus:true;title:"放弃未保存的修改？"
+        font.family:Theme.fontFamily
+        // The style owns this header (including its bold weight and padding).
+        // Resolve its actual font after inheritance, without replacing it.
+        SwirlFontBinding {target:discardPrompt.header;textRole:"pageTitle"}
+        Binding {target:discardPrompt.header;property:"font.hintingPreference";value:Font.PreferFullHinting}
+        Binding {target:discardPrompt.header;property:"renderType";value:Text.NativeRendering}
         parent:dialog.parent
         width:Math.floor(Math.min(Theme.dp(400),dialog.width))
         x:parent ? Math.round((parent.width-width)/2) : 0
@@ -84,6 +90,7 @@ Dialog {
         implicitHeight:Theme.dp(47)
         opacity:dialog.heroSource?Math.max(0,Math.min(1,(dialog.heroProgress-0.18)/0.65)):1
         SwirlText {
+            textRole: "pageTitle"
             text: dialog.title
             color: Theme.text; font.pixelSize:Theme.fontSize(18); font.weight: Font.DemiBold
             anchors.left: parent.left; anchors.leftMargin:dialog.leftPadding

@@ -112,7 +112,7 @@ Item {
             ColumnLayout {
                 anchors.fill:parent;anchors.margins:Theme.dp(26);spacing:Theme.dp(17);visible:page.tab===2
                 SwirlIcon {name:page.feature ? page.feature.icon : "grid";size:Theme.dp(38);color:Theme.accent}
-                SwirlText {text:"模块界面已具备，实际功能待接入";font.pixelSize:Theme.fontSize(22);font.weight:Font.DemiBold;color:Theme.text}
+                SwirlText {textRole:"pageTitle";text:"模块界面已具备，实际功能待接入";font.pixelSize:Theme.fontSize(22);font.weight:Font.DemiBold;color:Theme.text}
                 SwirlText {text:page.feature ? page.feature.sub : "";color:Theme.muted;font.pixelSize:Theme.fontSize(16);Layout.fillWidth:true;wrapMode:Text.WordWrap}
                 SwirlText {text:"可以编辑参数、增删条目、调整优先级、切换草稿启停、保存以及导入导出 JSON。这里的启用选项仅表示草稿意图，不代表操作系统或网络服务已经开启。";color:Theme.muted;font.pixelSize:Theme.fontSize(15);Layout.fillWidth:true;wrapMode:Text.WordWrap}
                 SwirlText {text:"Apple / 移动平台专有能力保留参考模块，Windows 的实际实现方式需后续确定。";color:Theme.muted;font.pixelSize:Theme.fontSize(15);Layout.fillWidth:true;wrapMode:Text.WordWrap}

@@ -1,0 +1,156 @@
+name: Swirl VF P8 Windows local wrapper (authored only)
+
+on:
+  push:
+    branches: [work/vf-takeover-abc-20261021]
+    paths:
+      - .github/workflows/swirl-vf-p8-windows-local.yml
+      - tools/swirl_vf/platform/p8_windows_local.py
+      - tools/swirl_vf/platform/directwrite_probe.cpp
+      - tools/swirl_vf/platform/run_directwrite_probe.ps1
+      - tools/swirl_vf/platform/CMakeLists.txt
+      - tools/swirl_vf/platform/rebuild_c1_fixture.py
+      - tools/swirl_vf/tests/test_p8_windows_local.py
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  authored-local-wrapper:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      P8_ROOT: D:\Codex\Swirl-VF-P8-${{ github.run_id }}-${{ github.run_attempt }}
+      P8_SOURCE_SHA: ${{ github.sha }}
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Create a fresh isolated D Codex checkout at the exact commit
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (Test-Path -LiteralPath $env:P8_ROOT) { throw 'P8 directory already exists; refusing reuse.' }
+          New-Item -ItemType Directory -Path $env:P8_ROOT | Out-Null
+          New-Item -ItemType Directory -Path "$env:P8_ROOT\tmp", "$env:P8_ROOT\public" | Out-Null
+          "TEMP=$env:P8_ROOT\tmp" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "TMP=$env:P8_ROOT\tmp" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "PIP_CACHE_DIR=$env:P8_ROOT\pip-cache" | Out-File -FilePath $env:GITHUB_ENV -Append
+          $source = "$env:P8_ROOT\source"
+          git init --quiet $source
+          if ($LASTEXITCODE -ne 0) { throw 'Fresh repository initialization failed.' }
+          git -C $source remote add origin "https://github.com/$env:GITHUB_REPOSITORY.git"
+          git -C $source fetch --no-tags --depth=1 origin $env:P8_SOURCE_SHA
+          if ($LASTEXITCODE -ne 0) { throw 'Exact public source fetch failed.' }
+          git -C $source checkout --detach FETCH_HEAD
+          if ($LASTEXITCODE -ne 0) { throw 'Fresh isolated checkout failed.' }
+          if ((git -C $source rev-parse HEAD).Trim() -ne $env:P8_SOURCE_SHA) { throw 'Checkout SHA mismatch.' }
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install authored-test dependencies in D Codex
+        run: |
+          python -m venv "$env:P8_ROOT\venv"
+          if ($LASTEXITCODE -ne 0) { throw 'D Codex virtual environment failed.' }
+          $python = "$env:P8_ROOT\venv\Scripts\python.exe"
+          & $python -m pip install --disable-pip-version-check --no-input fonttools==4.61.1 numpy==2.2.6
+          if ($LASTEXITCODE -ne 0) { throw 'Authored-test dependency installation failed.' }
+          "P8_PYTHON=$python" | Out-File -FilePath $env:GITHUB_ENV -Append
+      - name: Run focused authored wrapper regressions
+        run: |
+          Set-Location "$env:P8_ROOT\source"
+          & $env:P8_PYTHON -m unittest discover -s tools/swirl_vf/tests -p test_p8_windows_local.py -v
+          if ($LASTEXITCODE -ne 0) { throw 'P8 authored wrapper regressions failed.' }
+      - name: Build a seven-GID authored TTC with explicit mixed CJK mappings
+        run: |
+          Set-Location "$env:P8_ROOT\source"
+          @'
+          import hashlib, json, os, sys
+          from pathlib import Path
+          sys.path.insert(0, 'tools/swirl_vf/platform')
+          from fontTools.ttLib import TTCollection
+          from rebuild_c1_fixture import make_face
+          from p8_windows_local import PROBES
+          root = Path(os.environ['P8_ROOT']) / 'controls'
+          root.mkdir()
+          font = make_face(0)
+          # Independently authored rectangles/curve only. Cover every nominal
+          # code point used by the existing C++ mixed-CJK raster sheet.
+          raster = (0x4E2D,0x6587,0x5B57,0x4F53,0x6D4B,0x8BD5,0x20,0x7BC0,
+                    0x9AD4,0x6E2F,0x6FB3,0x65E5,0x41,0x42,0x43,0x61,0x67,
+                    0x30,0x31,0x32,0x38,0x39,0x25)
+          shapes = ('A', 'regional', 'regional.alt', 'curve')
+          mapping = {cp: ('space' if cp == 0x20 else shapes[i % len(shapes)])
+                     for i, cp in enumerate(sorted(set(PROBES) | set(raster)))}
+          for table in font['cmap'].tables:
+              if table.isUnicode() and table.format != 14:
+                  table.cmap.update(mapping)
+          font.recalcTimestamp = False
+          collection = TTCollection()
+          collection.fonts = [font]
+          path = root / 'authored-control.ttc'
+          collection.save(path)
+          collection.close()
+          receipt = {'sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
+                     'fixture_scope': 'self_authored_seven_GID_geometry_only',
+                     'original_font': 'NOT_RUN', 'Windows11': 'NOT_RUN'}
+          (root / 'fixture.json').write_text(json.dumps(receipt), encoding='utf-8')
+          '@ | & $env:P8_PYTHON -
+          if ($LASTEXITCODE -ne 0) { throw 'Authored fixture creation failed.' }
+      - name: Compile and run the existing DirectWrite probe through P8
+        run: |
+          Set-Location "$env:P8_ROOT\source"
+          $fixture = Get-Content "$env:P8_ROOT\controls\fixture.json" | ConvertFrom-Json
+          & $env:P8_PYTHON tools/swirl_vf/platform/p8_windows_local.py `
+            --font "$env:P8_ROOT\controls\authored-control.ttc" `
+            --expected-sha256 $fixture.sha256 --font-scope authored_control `
+            --expected-faces 1 --expected-glyphs 7 --output "$env:P8_ROOT\private-native"
+          if ($LASTEXITCODE -ne 0) { throw 'P8 actual authored native wrapper smoke failed.' }
+      - name: Write only a fixed whitelisted authored aggregate
+        if: always()
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $reportPath = "$env:P8_ROOT\private-native\p8-local-report.json"
+          $summary = [ordered]@{
+            schema = 1
+            scope = 'authored_seven_GID_wrapper_native_smoke_only'
+            source_commit = $env:P8_SOURCE_SHA
+            status = 'NOT_COMPLETED'
+            original_font = 'NOT_RUN'
+            original_derived_candidate = 'NOT_RUN'
+            Windows11 = 'NOT_RUN'
+            Qt_Swirl = 'NOT_RUN'
+            installation = 'NOT_RUN'
+            font_only_equivalence_accepted = $false
+            font_artifact_published = $false
+          }
+          if (Test-Path -LiteralPath $reportPath) {
+            $report = Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json -AsHashtable
+            $summary.status = $report.status
+            $summary.font_scope = $report.font_scope
+            $summary.input_unchanged = $report.input_unchanged
+            $summary.native_Windows_version = $report.native_Windows_version
+            $summary.Windows_scope = $report.Windows_scope
+            if ($report.observations) {
+              foreach ($field in @('physical_faces','sampled_glyphs_across_faces','native_instances',
+                                   'strict_binary32_axis_comparisons','raster_captures','cmap_probe_pairs')) {
+                $summary[$field] = $report.observations[$field]
+              }
+            }
+          }
+          $summary | ConvertTo-Json -Depth 6 | Set-Content "$env:P8_ROOT\public\summary.json" -Encoding UTF8
+          $summary | ConvertTo-Json -Depth 6
+          if ($summary.status -ne 'PASS_LOCAL_DIRECTWRITE_PROTOCOL_ONLY' -or
+              $summary.font_scope -ne 'authored_control' -or $summary.Windows_scope -ne 'WINDOWS_SERVER' -or
+              $summary.strict_binary32_axis_comparisons -ne 186 -or $summary.raster_captures -ne 10) {
+            throw 'Authored Windows Server P8 evidence incomplete; no original-font acceptance granted.'
+          }
+      - name: Publish the authored aggregate only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p8-authored-windows-server-summary-${{ github.sha }}
+          path: ${{ env.P8_ROOT }}\public\summary.json
+          if-no-files-found: error
+          retention-days: 7

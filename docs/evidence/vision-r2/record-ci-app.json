@@ -1,0 +1,1005 @@
+{
+  "schema_version": 1,
+  "verification": "passed",
+  "source_commit": "0be68231b15c1e4f69b138cda7bae0a3930d956b",
+  "run": {
+    "id": 39246770049,
+    "name": "Core implementation validation",
+    "node_id": "WFR_kwLOVCe3D88AAAAJI0ovgQ",
+    "head_branch": "work/core-completion-20261017",
+    "head_sha": "0be68231b15c1e4f69b138cda7bae0a3930d956b",
+    "path": ".github/workflows/core-development.yml",
+    "display_title": "fix(core): preserve TLS record boundaries before Vision Direct refusal",
+    "run_number": 81,
+    "event": "push",
+    "status": "completed",
+    "conclusion": "success",
+    "workflow_id": 387473073,
+    "check_suite_id": 106346979051,
+    "check_suite_node_id": "CS_kwDOVCe3D88AAAAYwsYe6w",
+    "url": "https://api.github.com/repos/SOLHK/Swirl/actions/runs/39246770049",
+    "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39246770049",
+    "pull_requests": [],
+    "created_at": "2026-10-19T11:44:05Z",
+    "updated_at": "2026-10-19T11:49:36Z",
+    "actor": {
+      "login": "SOLHK",
+      "id": 318204786,
+      "node_id": "U_kgDOEvdrcg",
+      "avatar_url": "https://avatars.githubusercontent.com/u/318204786?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/SOLHK",
+      "html_url": "https://github.com/SOLHK",
+      "followers_url": "https://api.github.com/users/SOLHK/followers",
+      "following_url": "https://api.github.com/users/SOLHK/following{/other_user}",
+      "gists_url": "https://api.github.com/users/SOLHK/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/SOLHK/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/SOLHK/subscriptions",
+      "organizations_url": "https://api.github.com/users/SOLHK/orgs",
+      "repos_url": "https://api.github.com/users/SOLHK/repos",
+      "events_url": "https://api.github.com/users/SOLHK/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/SOLHK/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "run_attempt": 1,
+    "referenced_workflows": [],
+    "run_started_at": "2026-10-19T11:44:05Z",
+    "triggering_actor": {
+      "login": "SOLHK",
+      "id": 318204786,
+      "node_id": "U_kgDOEvdrcg",
+      "avatar_url": "https://avatars.githubusercontent.com/u/318204786?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/SOLHK",
+      "html_url": "https://github.com/SOLHK",
+      "followers_url": "https://api.github.com/users/SOLHK/followers",
+      "following_url": "https://api.github.com/users/SOLHK/following{/other_user}",
+      "gists_url": "https://api.github.com/users/SOLHK/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/SOLHK/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/SOLHK/subscriptions",
+      "organizations_url": "https://api.github.com/users/SOLHK/orgs",
+      "repos_url": "https://api.github.com/users/SOLHK/repos",
+      "events_url": "https://api.github.com/users/SOLHK/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/SOLHK/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "jobs_url": "https://api.github.com/repos/SOLHK/Swirl/actions/runs/39246770049/jobs",
+    "logs_url": "https://api.github.com/repos/SOLHK/Swirl/actions/runs/39246770049/logs",
+    "check_suite_url": "https://api.github.com/repos/SOLHK/Swirl/check-suites/106346979051",
+    "artifacts_url": "https://api.github.com/repos/SOLHK/Swirl/actions/runs/39246770049/artifacts",
+    "cancel_url": "https://api.github.com/repos/SOLHK/Swirl/actions/runs/39246770049/cancel",
+    "rerun_url": "https://api.github.com/repos/SOLHK/Swirl/actions/runs/39246770049/rerun",
+    "previous_attempt_url": null,
+    "workflow_url": "https://api.github.com/repos/SOLHK/Swirl/actions/workflows/387473073",
+    "head_commit": {
+      "id": "0be68231b15c1e4f69b138cda7bae0a3930d956b",
+      "tree_id": "72cf2ebcb652baeefeb415be66ebe59184725697",
+      "message": "fix(core): preserve TLS record boundaries before Vision Direct refusal\n\nBound ciphertext reads and authenticated plaintext delivery so a coalesced raw inner TLS record cannot hide the preceding Vision command 2 behind an outer TLS bad-MAC error. Keep Direct ownership unavailable and retain all existing mature-peer assertions.\n\nAdd five deterministic real-TLS regressions for both read-ahead layers, authentication, EOF, cancellation and ownership. Preserve the first macOS/Windows CI failures and the exact local repair evidence.\n\nLocal validation: five workspace gates, 272 Rust tests plus one doctest, and four unchanged full-Xray cases passed. The original sandbox UDP-bind EPERM remains recorded separately. Exact committed CI is required after this push.",
+      "timestamp": "2026-10-19T11:44:00Z",
+      "author": {
+        "name": "Steam",
+        "email": "sysfrs@gmail.com"
+      },
+      "committer": {
+        "name": "Steam",
+        "email": "sysfrs@gmail.com"
+      }
+    },
+    "repository": {
+      "id": 1411888911,
+      "node_id": "R_kgDOVCe3Dw",
+      "name": "Swirl",
+      "full_name": "SOLHK/Swirl",
+      "private": false,
+      "owner": {
+        "login": "SOLHK",
+        "id": 318204786,
+        "node_id": "U_kgDOEvdrcg",
+        "avatar_url": "https://avatars.githubusercontent.com/u/318204786?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/SOLHK",
+        "html_url": "https://github.com/SOLHK",
+        "followers_url": "https://api.github.com/users/SOLHK/followers",
+        "following_url": "https://api.github.com/users/SOLHK/following{/other_user}",
+        "gists_url": "https://api.github.com/users/SOLHK/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/SOLHK/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/SOLHK/subscriptions",
+        "organizations_url": "https://api.github.com/users/SOLHK/orgs",
+        "repos_url": "https://api.github.com/users/SOLHK/repos",
+        "events_url": "https://api.github.com/users/SOLHK/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/SOLHK/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "html_url": "https://github.com/SOLHK/Swirl",
+      "description": "Swirl 是一款专为 Windows 打造的现代化专业网络工具，集代理管理、HTTP 抓包、流量分析、脚本扩展、规则改写与网络调试于一体。基于 C++23 和 Qt 6 构建，致力于提供强大、优雅、高效的网络管理体验。",
+      "fork": false,
+      "url": "https://api.github.com/repos/SOLHK/Swirl",
+      "forks_url": "https://api.github.com/repos/SOLHK/Swirl/forks",
+      "keys_url": "https://api.github.com/repos/SOLHK/Swirl/keys{/key_id}",
+      "collaborators_url": "https://api.github.com/repos/SOLHK/Swirl/collaborators{/collaborator}",
+      "teams_url": "https://api.github.com/repos/SOLHK/Swirl/teams",
+      "hooks_url": "https://api.github.com/repos/SOLHK/Swirl/hooks",
+      "issue_events_url": "https://api.github.com/repos/SOLHK/Swirl/issues/events{/number}",
+      "events_url": "https://api.github.com/repos/SOLHK/Swirl/events",
+      "assignees_url": "https://api.github.com/repos/SOLHK/Swirl/assignees{/user}",
+      "branches_url": "https://api.github.com/repos/SOLHK/Swirl/branches{/branch}",
+      "tags_url": "https://api.github.com/repos/SOLHK/Swirl/tags",
+      "blobs_url": "https://api.github.com/repos/SOLHK/Swirl/git/blobs{/sha}",
+      "git_tags_url": "https://api.github.com/repos/SOLHK/Swirl/git/tags{/sha}",
+      "git_refs_url": "https://api.github.com/repos/SOLHK/Swirl/git/refs{/sha}",
+      "trees_url": "https://api.github.com/repos/SOLHK/Swirl/git/trees{/sha}",
+      "statuses_url": "https://api.github.com/repos/SOLHK/Swirl/statuses/{sha}",
+      "languages_url": "https://api.github.com/repos/SOLHK/Swirl/languages",
+      "stargazers_url": "https://api.github.com/repos/SOLHK/Swirl/stargazers",
+      "contributors_url": "https://api.github.com/repos/SOLHK/Swirl/contributors",
+      "subscribers_url": "https://api.github.com/repos/SOLHK/Swirl/subscribers",
+      "subscription_url": "https://api.github.com/repos/SOLHK/Swirl/subscription",
+      "commits_url": "https://api.github.com/repos/SOLHK/Swirl/commits{/sha}",
+      "git_commits_url": "https://api.github.com/repos/SOLHK/Swirl/git/commits{/sha}",
+      "comments_url": "https://api.github.com/repos/SOLHK/Swirl/comments{/number}",
+      "issue_comment_url": "https://api.github.com/repos/SOLHK/Swirl/issues/comments{/number}",
+      "contents_url": "https://api.github.com/repos/SOLHK/Swirl/contents/{+path}",
+      "compare_url": "https://api.github.com/repos/SOLHK/Swirl/compare/{base}...{head}",
+      "merges_url": "https://api.github.com/repos/SOLHK/Swirl/merges",
+      "archive_url": "https://api.github.com/repos/SOLHK/Swirl/{archive_format}{/ref}",
+      "downloads_url": "https://api.github.com/repos/SOLHK/Swirl/downloads",
+      "issues_url": "https://api.github.com/repos/SOLHK/Swirl/issues{/number}",
+      "pulls_url": "https://api.github.com/repos/SOLHK/Swirl/pulls{/number}",
+      "milestones_url": "https://api.github.com/repos/SOLHK/Swirl/milestones{/number}",
+      "notifications_url": "https://api.github.com/repos/SOLHK/Swirl/notifications{?since,all,participating}",
+      "labels_url": "https://api.github.com/repos/SOLHK/Swirl/labels{/name}",
+      "releases_url": "https://api.github.com/repos/SOLHK/Swirl/releases{/id}",
+      "deployments_url": "https://api.github.com/repos/SOLHK/Swirl/deployments"
+    },
+    "head_repository": {
+      "id": 1411888911,
+      "node_id": "R_kgDOVCe3Dw",
+      "name": "Swirl",
+      "full_name": "SOLHK/Swirl",
+      "private": false,
+      "owner": {
+        "login": "SOLHK",
+        "id": 318204786,
+        "node_id": "U_kgDOEvdrcg",
+        "avatar_url": "https://avatars.githubusercontent.com/u/318204786?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/SOLHK",
+        "html_url": "https://github.com/SOLHK",
+        "followers_url": "https://api.github.com/users/SOLHK/followers",
+        "following_url": "https://api.github.com/users/SOLHK/following{/other_user}",
+        "gists_url": "https://api.github.com/users/SOLHK/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/SOLHK/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/SOLHK/subscriptions",
+        "organizations_url": "https://api.github.com/users/SOLHK/orgs",
+        "repos_url": "https://api.github.com/users/SOLHK/repos",
+        "events_url": "https://api.github.com/users/SOLHK/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/SOLHK/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "html_url": "https://github.com/SOLHK/Swirl",
+      "description": "Swirl 是一款专为 Windows 打造的现代化专业网络工具，集代理管理、HTTP 抓包、流量分析、脚本扩展、规则改写与网络调试于一体。基于 C++23 和 Qt 6 构建，致力于提供强大、优雅、高效的网络管理体验。",
+      "fork": false,
+      "url": "https://api.github.com/repos/SOLHK/Swirl",
+      "forks_url": "https://api.github.com/repos/SOLHK/Swirl/forks",
+      "keys_url": "https://api.github.com/repos/SOLHK/Swirl/keys{/key_id}",
+      "collaborators_url": "https://api.github.com/repos/SOLHK/Swirl/collaborators{/collaborator}",
+      "teams_url": "https://api.github.com/repos/SOLHK/Swirl/teams",
+      "hooks_url": "https://api.github.com/repos/SOLHK/Swirl/hooks",
+      "issue_events_url": "https://api.github.com/repos/SOLHK/Swirl/issues/events{/number}",
+      "events_url": "https://api.github.com/repos/SOLHK/Swirl/events",
+      "assignees_url": "https://api.github.com/repos/SOLHK/Swirl/assignees{/user}",
+      "branches_url": "https://api.github.com/repos/SOLHK/Swirl/branches{/branch}",
+      "tags_url": "https://api.github.com/repos/SOLHK/Swirl/tags",
+      "blobs_url": "https://api.github.com/repos/SOLHK/Swirl/git/blobs{/sha}",
+      "git_tags_url": "https://api.github.com/repos/SOLHK/Swirl/git/tags{/sha}",
+      "git_refs_url": "https://api.github.com/repos/SOLHK/Swirl/git/refs{/sha}",
+      "trees_url": "https://api.github.com/repos/SOLHK/Swirl/git/trees{/sha}",
+      "statuses_url": "https://api.github.com/repos/SOLHK/Swirl/statuses/{sha}",
+      "languages_url": "https://api.github.com/repos/SOLHK/Swirl/languages",
+      "stargazers_url": "https://api.github.com/repos/SOLHK/Swirl/stargazers",
+      "contributors_url": "https://api.github.com/repos/SOLHK/Swirl/contributors",
+      "subscribers_url": "https://api.github.com/repos/SOLHK/Swirl/subscribers",
+      "subscription_url": "https://api.github.com/repos/SOLHK/Swirl/subscription",
+      "commits_url": "https://api.github.com/repos/SOLHK/Swirl/commits{/sha}",
+      "git_commits_url": "https://api.github.com/repos/SOLHK/Swirl/git/commits{/sha}",
+      "comments_url": "https://api.github.com/repos/SOLHK/Swirl/comments{/number}",
+      "issue_comment_url": "https://api.github.com/repos/SOLHK/Swirl/issues/comments{/number}",
+      "contents_url": "https://api.github.com/repos/SOLHK/Swirl/contents/{+path}",
+      "compare_url": "https://api.github.com/repos/SOLHK/Swirl/compare/{base}...{head}",
+      "merges_url": "https://api.github.com/repos/SOLHK/Swirl/merges",
+      "archive_url": "https://api.github.com/repos/SOLHK/Swirl/{archive_format}{/ref}",
+      "downloads_url": "https://api.github.com/repos/SOLHK/Swirl/downloads",
+      "issues_url": "https://api.github.com/repos/SOLHK/Swirl/issues{/number}",
+      "pulls_url": "https://api.github.com/repos/SOLHK/Swirl/pulls{/number}",
+      "milestones_url": "https://api.github.com/repos/SOLHK/Swirl/milestones{/number}",
+      "notifications_url": "https://api.github.com/repos/SOLHK/Swirl/notifications{?since,all,participating}",
+      "labels_url": "https://api.github.com/repos/SOLHK/Swirl/labels{/name}",
+      "releases_url": "https://api.github.com/repos/SOLHK/Swirl/releases{/id}",
+      "deployments_url": "https://api.github.com/repos/SOLHK/Swirl/deployments"
+    }
+  },
+  "rust": {
+    "unit_integration_passed": 272,
+    "doctest_passed": 1,
+    "failed": 0,
+    "ignored": 0,
+    "filtered_out": 0,
+    "raw_summary_lines": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s",
+      "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.33s",
+      "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.41s",
+      "test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.44s",
+      "test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+      "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s",
+      "test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s",
+      "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 58 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s",
+      "test result: ok. 65 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s"
+    ],
+    "record_boundary_regressions": [
+      "test partial_header_survives_cancelled_read_and_write_half_close ... ok",
+      "test oversized_record_is_rejected_without_reading_its_body ... ok",
+      "test tampered_outer_direct_record_remains_an_authentication_failure ... ok",
+      "test real_tls_close_notify_is_required_even_at_record_boundaries ... ok",
+      "test both_boundaries_deliver_authenticated_direct_request_before_coalesced_raw_tls ... ok"
+    ],
+    "raw_doctest_lines": [
+      "test crates/swirl-transport/src/reality/mod.rs - reality::ClientKeys::authenticate (line 106) - compile fail ... ok"
+    ],
+    "record_source_sha256": "99172e1a3fba975dc7d12e028e42f4be7d2f2350fcd479427357cb869e74951f",
+    "record_test_source_sha256": "6471335d12d67e1e7a76834ad3924060f426b8583084f917ffb45897243c24e3"
+  },
+  "workflow_guards": {
+    "tests_passed": 41,
+    "failed": 0,
+    "skipped": 0,
+    "raw_success_lines": [
+      "test_adds_only_reviewed_tests_and_exact_development_trigger (__main__.CoreDevelopmentTests.test_adds_only_reviewed_tests_and_exact_development_trigger) ... ok",
+      "test_app_workflow_builds_and_requires_the_same_real_peer_client (__main__.CoreDevelopmentTests.test_app_workflow_builds_and_requires_the_same_real_peer_client) ... ok",
+      "test_branch_and_menu_drift_fail_closed (__main__.CoreDevelopmentTests.test_branch_and_menu_drift_fail_closed) ... ok",
+      "test_checked_in_rust_and_app_vector_menus_are_mandatory (__main__.CoreDevelopmentTests.test_checked_in_rust_and_app_vector_menus_are_mandatory) ... ok",
+      "test_checked_in_workflow_can_be_reviewed_and_contains_every_added_gate (__main__.CoreDevelopmentTests.test_checked_in_workflow_can_be_reviewed_and_contains_every_added_gate) ... ok",
+      "test_compatibility_import_partial_or_weakened_gates_are_rejected (__main__.CoreDevelopmentTests.test_compatibility_import_partial_or_weakened_gates_are_rejected) ... ok",
+      "test_compatibility_import_runs_alongside_the_existing_native_dns_guard (__main__.CoreDevelopmentTests.test_compatibility_import_runs_alongside_the_existing_native_dns_guard) ... ok",
+      "test_connection_suite_upgrades_verified_dns_stage_without_partial_acceptance (__main__.CoreDevelopmentTests.test_connection_suite_upgrades_verified_dns_stage_without_partial_acceptance) ... ok",
+      "test_connectivity_stage_rejects_partial_menus_guards_environment_and_artifact (__main__.CoreDevelopmentTests.test_connectivity_stage_rejects_partial_menus_guards_environment_and_artifact) ... ok",
+      "test_connectivity_stage_upgrades_previous_build_menus_and_artifact_together (__main__.CoreDevelopmentTests.test_connectivity_stage_upgrades_previous_build_menus_and_artifact_together) ... ok",
+      "test_crlf_checkout_is_validated_without_a_write (__main__.CoreDevelopmentTests.test_crlf_checkout_is_validated_without_a_write) ... ok",
+      "test_failed_late_validation_leaves_file_untouched (__main__.CoreDevelopmentTests.test_failed_late_validation_leaves_file_untouched) ... ok",
+      "test_forks_other_branches_manual_events_and_other_workflows_cannot_write (__main__.CoreDevelopmentTests.test_forks_other_branches_manual_events_and_other_workflows_cannot_write) ... ok",
+      "test_historical_build_and_artifact_drift_are_not_silently_overwritten (__main__.CoreDevelopmentTests.test_historical_build_and_artifact_drift_are_not_silently_overwritten) ... ok",
+      "test_idempotence_prevents_repeated_app_commits (__main__.CoreDevelopmentTests.test_idempotence_prevents_repeated_app_commits) ... ok",
+      "test_missing_binary_preflight_stops_before_a_suite_can_skip (__main__.CoreDevelopmentTests.test_missing_binary_preflight_stops_before_a_suite_can_skip) ... ok",
+      "test_missing_suite_prevents_workflow_claiming_it_is_covered (__main__.CoreDevelopmentTests.test_missing_suite_prevents_workflow_claiming_it_is_covered) ... ok",
+      "test_partial_or_duplicate_new_test_menu_fails_closed (__main__.CoreDevelopmentTests.test_partial_or_duplicate_new_test_menu_fails_closed) ... ok",
+      "test_partial_qt_and_policy_additions_fail_closed (__main__.CoreDevelopmentTests.test_partial_qt_and_policy_additions_fail_closed) ... ok",
+      "test_previous_dns_stage_upgrades_and_partial_new_menus_are_rejected (__main__.CoreDevelopmentTests.test_previous_dns_stage_upgrades_and_partial_new_menus_are_rejected) ... ok",
+      "test_previous_successful_workflow_upgrades_without_duplicate_suites (__main__.CoreDevelopmentTests.test_previous_successful_workflow_upgrades_without_duplicate_suites) ... ok",
+      "test_qt_reports_reject_missing_paths_expanded_artifacts_and_weakened_exits (__main__.CoreDevelopmentTests.test_qt_reports_reject_missing_paths_expanded_artifacts_and_weakened_exits) ... ok",
+      "test_qt_reports_upgrade_diagnostic_stage_and_preserve_exact_artifact_paths (__main__.CoreDevelopmentTests.test_qt_reports_upgrade_diagnostic_stage_and_preserve_exact_artifact_paths) ... ok",
+      "test_reality_partial_build_environment_preflight_or_suites_fail_closed (__main__.CoreDevelopmentTests.test_reality_partial_build_environment_preflight_or_suites_fail_closed) ... ok",
+      "test_reality_stage_builds_release_preflights_and_runs_peers_first (__main__.CoreDevelopmentTests.test_reality_stage_builds_release_preflights_and_runs_peers_first) ... ok",
+      "test_socks5_udp_adds_portable_qt_and_native_build_as_one_stage (__main__.CoreDevelopmentTests.test_socks5_udp_adds_portable_qt_and_native_build_as_one_stage) ... ok",
+      "test_socks5_udp_partial_commands_and_native_build_drift_are_rejected (__main__.CoreDevelopmentTests.test_socks5_udp_partial_commands_and_native_build_drift_are_rejected) ... ok",
+      "test_symlink_target_or_parent_is_rejected (__main__.CoreDevelopmentTests.test_symlink_target_or_parent_is_rejected) ... ok",
+      "test_update_touches_only_the_allowed_workflow_and_preserves_mode (__main__.CoreDevelopmentTests.test_update_touches_only_the_allowed_workflow_and_preserves_mode) ... ok",
+      "test_vision_fixture_failure_stops_before_later_peer_execution (__main__.CoreDevelopmentTests.test_vision_fixture_failure_stops_before_later_peer_execution) ... ok",
+      "test_vision_material_is_required_before_an_atomic_workflow_write (__main__.CoreDevelopmentTests.test_vision_material_is_required_before_an_atomic_workflow_write) ... ok",
+      "test_vision_partial_duplicate_modes_order_and_windows_exits_fail_closed (__main__.CoreDevelopmentTests.test_vision_partial_duplicate_modes_order_and_windows_exits_fail_closed) ... ok",
+      "test_vision_stage_upgrades_both_reviewed_histories_and_is_idempotent (__main__.CoreDevelopmentTests.test_vision_stage_upgrades_both_reviewed_histories_and_is_idempotent) ... ok",
+      "test_vision_xray_missing_material_prevents_any_workflow_write (__main__.CoreDevelopmentTests.test_vision_xray_missing_material_prevents_any_workflow_write) ... ok",
+      "test_vision_xray_partial_drift_duplicates_and_bypass_fail_atomically (__main__.CoreDevelopmentTests.test_vision_xray_partial_drift_duplicates_and_bypass_fail_atomically) ... ok",
+      "test_vision_xray_shell_propagates_build_missing_binary_and_peer_failure (__main__.CoreDevelopmentTests.test_vision_xray_shell_propagates_build_missing_binary_and_peer_failure) ... ok",
+      "test_vision_xray_stage_preserves_r3_and_is_idempotent_on_all_jobs (__main__.CoreDevelopmentTests.test_vision_xray_stage_preserves_r3_and_is_idempotent_on_all_jobs) ... ok",
+      "test_xray_build_failure_cannot_run_the_peer_or_become_success (__main__.CoreDevelopmentTests.test_xray_build_failure_cannot_run_the_peer_or_become_success) ... ok",
+      "test_xray_missing_material_prevents_any_workflow_write (__main__.CoreDevelopmentTests.test_xray_missing_material_prevents_any_workflow_write) ... ok",
+      "test_xray_partial_missing_duplicate_and_ignored_failure_are_rejected (__main__.CoreDevelopmentTests.test_xray_partial_missing_duplicate_and_ignored_failure_are_rejected) ... ok",
+      "test_xray_stage_is_complete_pinned_and_after_the_existing_peers (__main__.CoreDevelopmentTests.test_xray_stage_is_complete_pinned_and_after_the_existing_peers) ... ok"
+    ]
+  },
+  "job": {
+    "id": 118040482709,
+    "name": "core",
+    "status": "completed",
+    "conclusion": "success",
+    "run_id": 39246770049,
+    "logs_url": null,
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1
+      },
+      {
+        "name": "Generate scoped Swirl GitHub App token",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 2
+      },
+      {
+        "name": "Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3
+      },
+      {
+        "name": "Install Rust tools",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4
+      },
+      {
+        "name": "Apply checked core refactoring and format the development branch",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 5
+      },
+      {
+        "name": "Rust static and unit checks",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 6
+      },
+      {
+        "name": "Run actions/setup-python@v5",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 7
+      },
+      {
+        "name": "Independent network peers",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 8
+      },
+      {
+        "name": "Install pinned Go for the independent Xray peer",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 9
+      },
+      {
+        "name": "Build pinned Xray and verify REALITY interoperability",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 10
+      },
+      {
+        "name": "Preserve Xray build identity and raw interoperability evidence",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 11
+      },
+      {
+        "name": "Build native Vision client and verify Xray interoperability",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 12
+      },
+      {
+        "name": "Preserve Vision client and full Xray interoperability evidence",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 13
+      },
+      {
+        "name": "Export exact source and result identity",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 14
+      },
+      {
+        "name": "Run actions/upload-artifact@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 15
+      },
+      {
+        "name": "Post Install pinned Go for the independent Xray peer",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 27
+      },
+      {
+        "name": "Post Run actions/setup-python@v5",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 28
+      },
+      {
+        "name": "Post Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 29
+      },
+      {
+        "name": "Post Generate scoped Swirl GitHub App token",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 30
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 31
+      }
+    ],
+    "html_url": "https://github.com/SOLHK/Swirl/actions/runs/39246770049/job/118040482709"
+  },
+  "artifacts": [
+    {
+      "role": "vision",
+      "id": 12183723142,
+      "name": "App-Vision-Xray-Linux-0be68231b15c1e4f69b138cda7bae0a3930d956b-1",
+      "sha256": "d6690f3d342d0e1bc78a8eb7ca9372869f3d4f0431761a83a547d78cc4ef40c7",
+      "github_digest_matches": true,
+      "local_file": "/tmp/swirl-vision-fixed-app-vision.zip"
+    },
+    {
+      "role": "source",
+      "id": 12183118732,
+      "name": "Core-development-evidence",
+      "sha256": "c508f10677e8c6245b49b6a185d6747b08a66af1a629637118767261210caefb",
+      "github_digest_matches": true,
+      "local_file": "/tmp/swirl-vision-fixed-app-source.zip"
+    },
+    {
+      "role": "reality",
+      "id": 12182858860,
+      "name": "App-REALITY-Xray-Linux-0be68231b15c1e4f69b138cda7bae0a3930d956b-1",
+      "sha256": "39e675d43e9013ffa5de3742a40cd489ff6c6f07ff56cf335a6d67942cde5d62",
+      "github_digest_matches": true,
+      "local_file": "/tmp/swirl-vision-fixed-app-reality.zip"
+    }
+  ],
+  "source_identity": {
+    "actual_tested_sha": "0be68231b15c1e4f69b138cda7bae0a3930d956b",
+    "tar_commit": "0be68231b15c1e4f69b138cda7bae0a3930d956b",
+    "tree_sha": "72cf2ebcb652baeefeb415be66ebe59184725697",
+    "tar_sha256": "e595cc008f7daf970ed22dec10c6500554f8cc1767d736fe18f3f4b259673e63",
+    "archived_regular_files_matched_to_git_blob_and_mode": 262,
+    "all_archived_files_match_exact_commit": true,
+    "worktree_state": [
+      "?? CORE_TESTED_COMMIT",
+      "?? CORE_WORKTREE_STATE",
+      "?? core-tested-source.tar"
+    ],
+    "tracked_changes": false,
+    "archive_scopes": [
+      "core/",
+      "tools/",
+      ".github/workflows/",
+      "src/Swirl.Quick/engine/",
+      "src/Swirl.Quick/tests/"
+    ]
+  },
+  "reality": {
+    "tests_passed": 12,
+    "sessions": 13,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "raw_job_success_lines": [
+      "2026-10-19T11:49:11.1671087Z test_bare_tcp_fin_is_rejected_after_valid_echo (__main__.RealityXrayInterop.test_bare_tcp_fin_is_rejected_after_valid_echo) ... ok",
+      "2026-10-19T11:49:12.7016009Z test_data_cancellation_drops_transport_and_reaps_peer (__main__.RealityXrayInterop.test_data_cancellation_drops_transport_and_reaps_peer) ... ok",
+      "2026-10-19T11:49:14.2377738Z test_data_timeout_drops_transport_and_reaps_peer (__main__.RealityXrayInterop.test_data_timeout_drops_transport_and_reaps_peer) ... ok",
+      "2026-10-19T11:49:14.2473737Z test_empty_application_still_requires_both_finished_and_close_notify (__main__.RealityXrayInterop.test_empty_application_still_requires_both_finished_and_close_notify) ... ok",
+      "2026-10-19T11:49:14.8776099Z test_handshake_cancellation_drops_transport_and_reaps_peer (__main__.RealityXrayInterop.test_handshake_cancellation_drops_transport_and_reaps_peer) ... ok",
+      "2026-10-19T11:49:15.5175749Z test_handshake_timeout_drops_transport_and_reaps_peer (__main__.RealityXrayInterop.test_handshake_timeout_drops_transport_and_reaps_peer) ... ok",
+      "2026-10-19T11:49:15.5287737Z test_native_hybrid_authentication_finished_bidirectional_data_and_close (__main__.RealityXrayInterop.test_native_hybrid_authentication_finished_bidirectional_data_and_close) ... ok",
+      "2026-10-19T11:49:15.5392158Z test_native_x25519_authentication_finished_bidirectional_data_and_close (__main__.RealityXrayInterop.test_native_x25519_authentication_finished_bidirectional_data_and_close) ... ok",
+      "2026-10-19T11:49:15.7354281Z test_one_mebibyte_binary_transfer_with_short_reads_and_writes (__main__.RealityXrayInterop.test_one_mebibyte_binary_transfer_with_short_reads_and_writes) ... ok",
+      "2026-10-19T11:49:15.7772458Z test_single_byte_socket_boundaries (__main__.RealityXrayInterop.test_single_byte_socket_boundaries) ... ok",
+      "2026-10-19T11:49:15.7862720Z test_wrong_reality_public_key_never_exposes_application_data (__main__.RealityXrayInterop.test_wrong_reality_public_key_never_exposes_application_data) ... ok",
+      "2026-10-19T11:49:15.7944634Z test_wrong_short_id_never_exposes_application_data (__main__.RealityXrayInterop.test_wrong_short_id_never_exposes_application_data) ... ok"
+    ],
+    "session_status_counts": {
+      "intentional_unclean_eof": 1,
+      "cancelled": 4,
+      "completed": 6,
+      "authentication_rejected": 2
+    },
+    "session_results": [
+      {
+        "case": "001-test_bare_tcp_fin_is_rejected_after_valid_echo",
+        "server_status": "intentional_unclean_eof",
+        "client_status": "error",
+        "client_exit_code": 1,
+        "received_bytes": 45,
+        "sent_bytes": 45,
+        "group": 4588,
+        "client_finished_verified": true,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0,
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        }
+      },
+      {
+        "case": "002-test_data_cancellation_drops_transport_and_reaps_peer",
+        "server_status": "cancelled",
+        "client_status": "error",
+        "client_exit_code": 1,
+        "received_bytes": 37,
+        "sent_bytes": 0,
+        "group": 4588,
+        "client_finished_verified": true,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0,
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        }
+      },
+      {
+        "case": "003-test_data_timeout_drops_transport_and_reaps_peer",
+        "server_status": "cancelled",
+        "client_status": "error",
+        "client_exit_code": 1,
+        "received_bytes": 37,
+        "sent_bytes": 0,
+        "group": 4588,
+        "client_finished_verified": true,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0,
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        }
+      },
+      {
+        "case": "004-test_empty_application_still_requires_both_finished_and_close_notify",
+        "server_status": "completed",
+        "client_status": "ok",
+        "client_exit_code": 0,
+        "received_bytes": 0,
+        "sent_bytes": 0,
+        "group": 4588,
+        "client_finished_verified": true,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0,
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        }
+      },
+      {
+        "case": "005-test_handshake_cancellation_drops_transport_and_reaps_peer",
+        "server_status": "cancelled",
+        "client_status": "error",
+        "client_exit_code": 1,
+        "received_bytes": 0,
+        "sent_bytes": 0,
+        "group": 0,
+        "client_finished_verified": false,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0,
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        }
+      },
+      {
+        "case": "006-test_handshake_timeout_drops_transport_and_reaps_peer",
+        "server_status": "cancelled",
+        "client_status": "error",
+        "client_exit_code": 1,
+        "received_bytes": 0,
+        "sent_bytes": 0,
+        "group": 0,
+        "client_finished_verified": false,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0,
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        }
+      },
+      {
+        "case": "007-test_native_hybrid_authentication_finished_bidirectional_data_and_close",
+        "server_status": "completed",
+        "client_status": "ok",
+        "client_exit_code": 0,
+        "received_bytes": 32769,
+        "sent_bytes": 32769,
+        "group": 4588,
+        "client_finished_verified": true,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0,
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        }
+      },
+      {
+        "case": "008-test_native_x25519_authentication_finished_bidirectional_data_and_close",
+        "server_status": "completed",
+        "client_status": "ok",
+        "client_exit_code": 0,
+        "received_bytes": 32769,
+        "sent_bytes": 32769,
+        "group": 29,
+        "client_finished_verified": true,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0,
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        }
+      },
+      {
+        "case": "009-test_one_mebibyte_binary_transfer_with_short_reads_and_writes",
+        "server_status": "completed",
+        "client_status": "ok",
+        "client_exit_code": 0,
+        "received_bytes": 1048576,
+        "sent_bytes": 1048576,
+        "group": 4588,
+        "client_finished_verified": true,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0,
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        }
+      },
+      {
+        "case": "010-test_single_byte_socket_boundaries",
+        "server_status": "completed",
+        "client_status": "ok",
+        "client_exit_code": 0,
+        "received_bytes": 310,
+        "sent_bytes": 310,
+        "group": 4588,
+        "client_finished_verified": true,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0,
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        }
+      },
+      {
+        "case": "011-test_single_byte_socket_boundaries",
+        "server_status": "completed",
+        "client_status": "ok",
+        "client_exit_code": 0,
+        "received_bytes": 310,
+        "sent_bytes": 310,
+        "group": 29,
+        "client_finished_verified": true,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0,
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        }
+      },
+      {
+        "case": "012-test_wrong_reality_public_key_never_exposes_application_data",
+        "server_status": "authentication_rejected",
+        "client_status": "error",
+        "client_exit_code": 1,
+        "received_bytes": 0,
+        "sent_bytes": 0,
+        "group": 0,
+        "client_finished_verified": false,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0,
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        }
+      },
+      {
+        "case": "013-test_wrong_short_id_never_exposes_application_data",
+        "server_status": "authentication_rejected",
+        "client_status": "error",
+        "client_exit_code": 1,
+        "received_bytes": 0,
+        "sent_bytes": 0,
+        "group": 0,
+        "client_finished_verified": false,
+        "active_connections": 0,
+        "camouflage_application_bytes": 0,
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        }
+      }
+    ],
+    "client_binary_sha256": "69d128cf25c51fe15b7ddfaebf8369675ad99976f285f39d48150517092d6faa"
+  },
+  "vision": {
+    "tests_passed": 4,
+    "positive_tls12": 3,
+    "negative_direct_refusal": 1,
+    "failed": 0,
+    "errors": 0,
+    "skipped": 0,
+    "raw_job_success_lines": [
+      "2026-10-19T11:49:29.7763665Z test_tls12_authentication_framing_bidirectional_data_and_close (__main__.VisionXrayInterop.test_tls12_authentication_framing_bidirectional_data_and_close) ... ok",
+      "2026-10-19T11:49:30.0761115Z test_tls12_large_transfer_pause_resume_and_application_boundaries (__main__.VisionXrayInterop.test_tls12_large_transfer_pause_resume_and_application_boundaries) ... ok",
+      "2026-10-19T11:49:30.2041365Z test_tls12_single_byte_reads_and_small_writes (__main__.VisionXrayInterop.test_tls12_single_byte_reads_and_small_writes) ... ok",
+      "2026-10-19T11:49:30.3318135Z test_tls13_direct_request_is_rejected_without_application_data (__main__.VisionXrayInterop.test_tls13_direct_request_is_rejected_without_application_data) ... ok"
+    ],
+    "cases": [
+      {
+        "case": "001-test_tls12_authentication_framing_bidirectional_data_and_close-1792410569642738543",
+        "invocation": {
+          "elapsed_seconds": 0.08558248600002116,
+          "exit_code": 0,
+          "payload_bytes": 45,
+          "payload_sha256": "35a8d48b9ca999ef7d4958538f214584ccf004f1c4c31830c6fa179cdf99f2a4",
+          "tls13": false,
+          "pause_reads": false,
+          "read_chunk": 16384,
+          "write_chunk": 16384
+        },
+        "client": {
+          "direct_ready": false,
+          "direct_rejected": false,
+          "ok": true,
+          "payload_sha256": "35a8d48b9ca999ef7d4958538f214584ccf004f1c4c31830c6fa179cdf99f2a4",
+          "received": 45,
+          "stage": "complete",
+          "tls13_candidate": false,
+          "uploaded": 45
+        },
+        "target": {
+          "tls_version": "TLSv1.2",
+          "handshake_complete": true,
+          "received_bytes": 45,
+          "sent_bytes": 45,
+          "close_notify_received": true,
+          "close_notify_sent": true,
+          "probe_bytes_sent": 0,
+          "connection_closed": true,
+          "thread_released": true,
+          "error": null,
+          "cipher": "ECDHE-ECDSA-AES256-GCM-SHA384",
+          "received_sha256": "35a8d48b9ca999ef7d4958538f214584ccf004f1c4c31830c6fa179cdf99f2a4",
+          "sent_sha256": "35a8d48b9ca999ef7d4958538f214584ccf004f1c4c31830c6fa179cdf99f2a4"
+        },
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_kill": false,
+          "listener_closed": true,
+          "exit_code": 0
+        }
+      },
+      {
+        "case": "002-test_tls12_large_transfer_pause_resume_and_application_boundaries-1792410569776545285",
+        "invocation": {
+          "elapsed_seconds": 0.25628873799996654,
+          "exit_code": 0,
+          "payload_bytes": 524288,
+          "payload_sha256": "33bc8aab40703678c3ebe94d2dd8f2afff285dd901f9234e841e4679f8204fd5",
+          "tls13": false,
+          "pause_reads": true,
+          "read_chunk": 257,
+          "write_chunk": 1021
+        },
+        "client": {
+          "direct_ready": false,
+          "direct_rejected": false,
+          "ok": true,
+          "payload_sha256": "33bc8aab40703678c3ebe94d2dd8f2afff285dd901f9234e841e4679f8204fd5",
+          "received": 524288,
+          "stage": "complete",
+          "tls13_candidate": false,
+          "uploaded": 524288
+        },
+        "target": {
+          "tls_version": "TLSv1.2",
+          "handshake_complete": true,
+          "received_bytes": 524288,
+          "sent_bytes": 524288,
+          "close_notify_received": true,
+          "close_notify_sent": true,
+          "probe_bytes_sent": 0,
+          "connection_closed": true,
+          "thread_released": true,
+          "error": null,
+          "cipher": "ECDHE-ECDSA-AES256-GCM-SHA384",
+          "received_sha256": "33bc8aab40703678c3ebe94d2dd8f2afff285dd901f9234e841e4679f8204fd5",
+          "sent_sha256": "33bc8aab40703678c3ebe94d2dd8f2afff285dd901f9234e841e4679f8204fd5"
+        },
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_kill": false,
+          "listener_closed": true,
+          "exit_code": 0
+        }
+      },
+      {
+        "case": "003-test_tls12_single_byte_reads_and_small_writes-1792410570075961756",
+        "invocation": {
+          "elapsed_seconds": 0.0864144870000132,
+          "exit_code": 0,
+          "payload_bytes": 289,
+          "payload_sha256": "7624e91e9f7222304a0dec9f6c720c4adf5d283342a9e70a9e46006fb678af12",
+          "tls13": false,
+          "pause_reads": false,
+          "read_chunk": 1,
+          "write_chunk": 7
+        },
+        "client": {
+          "direct_ready": false,
+          "direct_rejected": false,
+          "ok": true,
+          "payload_sha256": "7624e91e9f7222304a0dec9f6c720c4adf5d283342a9e70a9e46006fb678af12",
+          "received": 289,
+          "stage": "complete",
+          "tls13_candidate": false,
+          "uploaded": 289
+        },
+        "target": {
+          "tls_version": "TLSv1.2",
+          "handshake_complete": true,
+          "received_bytes": 289,
+          "sent_bytes": 289,
+          "close_notify_received": true,
+          "close_notify_sent": true,
+          "probe_bytes_sent": 0,
+          "connection_closed": true,
+          "thread_released": true,
+          "error": null,
+          "cipher": "ECDHE-ECDSA-AES256-GCM-SHA384",
+          "received_sha256": "7624e91e9f7222304a0dec9f6c720c4adf5d283342a9e70a9e46006fb678af12",
+          "sent_sha256": "7624e91e9f7222304a0dec9f6c720c4adf5d283342a9e70a9e46006fb678af12"
+        },
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_kill": false,
+          "listener_closed": true,
+          "exit_code": 0
+        }
+      },
+      {
+        "case": "004-test_tls13_direct_request_is_rejected_without_application_data-1792410570204043183",
+        "invocation": {
+          "elapsed_seconds": 0.08586728299997048,
+          "exit_code": 1,
+          "payload_bytes": 38,
+          "payload_sha256": "c3a31b1a3f789f68185194d9c231610f1a2d601749f5a6feb7d86c0f47daa364",
+          "tls13": true,
+          "pause_reads": false,
+          "read_chunk": 16384,
+          "write_chunk": 16384
+        },
+        "client": {
+          "direct_ready": false,
+          "direct_rejected": true,
+          "error": "VisionDirectOwnershipUnavailable",
+          "error_kind": "PermissionDenied",
+          "ok": false,
+          "received": 0,
+          "stage": "server_first_probe",
+          "tls13_candidate": true,
+          "uploaded": 0
+        },
+        "target": {
+          "tls_version": "TLSv1.3",
+          "handshake_complete": true,
+          "received_bytes": 0,
+          "sent_bytes": 0,
+          "close_notify_received": false,
+          "close_notify_sent": false,
+          "probe_bytes_sent": 34,
+          "connection_closed": true,
+          "thread_released": true,
+          "error": {
+            "type": "SSLEOFError",
+            "message": "[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:2713)"
+          },
+          "cipher": "TLS_AES_256_GCM_SHA384",
+          "probe_sha256": "d50b77b997f88e72a20fafecc7af9ab0a5c6d19d18b81276262ace4216eb7316",
+          "received_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "sent_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_kill": false,
+          "listener_closed": true,
+          "exit_code": 0
+        }
+      }
+    ],
+    "client_binary_sha256": "4c424670a498bb838d89817ec63d2a1c60e964a6aa6fb39f676634f6e66c68aa",
+    "server_first_probe_verified_from_archived_test_source": true,
+    "direct_ready_ever_true": false
+  },
+  "build_identity": {
+    "go_version": "go1.27.2",
+    "upstream_xray": {
+      "commit": "92ccc939aaf4f8965f369cf0b142e005aeaa11d5",
+      "go_mod_sha256": "31fe6bd6c04eb2738e157b850236b1376cbbac3f33e974256bb7325c8c764250",
+      "go_sum_sha256": "a72c2f2b5dd38fcf42ef55034bd55038703448b55a878eafddd60d4af1f63145",
+      "release": "v26.10.17",
+      "repository": "https://github.com/XTLS/Xray-core.git",
+      "tree": "55fc871fdf3e63149066956e7c60670f3a44fbf2"
+    },
+    "upstream_reality": {
+      "commit": "83f621788ca88b83179810b12baa7ae518aacb83",
+      "go_mod_sum": "h1:ptlSkJ8k/7IDauNH0SA96JPOo+nYGLTv2Y3UMpwvAsY=",
+      "module": "github.com/xtls/reality",
+      "sum": "h1:RjLnVvlzK4q6zWaSBPNRGsrgx2fbJDeUWffjw574uzs=",
+      "version": "v0.0.0-20261014101318-83f621788ca8"
+    },
+    "source_and_module_hashes_match_exact_commit": true,
+    "reproducible_rebuild": {
+      "reality_peer": {
+        "first_sha256": "3e6409da2cc210aa0636b4e191796817ac1ca20befd9f6d2daecc237e6767ef9",
+        "matches": true,
+        "repeated_sha256": "3e6409da2cc210aa0636b4e191796817ac1ca20befd9f6d2daecc237e6767ef9"
+      },
+      "xray": {
+        "first_sha256": "a5a3bf1c921d8a19224a26abc5b251cd9f38c3608ba74c319307b72184e44c9a",
+        "matches": true,
+        "repeated_sha256": "a5a3bf1c921d8a19224a26abc5b251cd9f38c3608ba74c319307b72184e44c9a"
+      }
+    },
+    "same_manifest_and_build_log_in_both_artifacts": true,
+    "both_go_mod_verify_passed": true,
+    "binary_hash_verification_scope": "CI builder and tests hash the binaries; downloaded evidence archives do not contain those binaries."
+  },
+  "raw_logs": {
+    "job": "/tmp/swirl-vision-fixed-app-job.log",
+    "builder": "/tmp/swirl-vision-fixed-app-builder.log",
+    "vision_build": "/tmp/swirl-vision-fixed-app-client-build.log",
+    "vision_tests": "/tmp/swirl-vision-fixed-app-peer-test.log"
+  },
+  "scope": "Exact App core-development run for the record-boundary fix at 0be68231b15c1e4f69b138cda7bae0a3930d956b, separate from earlier f3ce257f evidence. Direct rejection is not Direct interoperability; full Qt product, raw ownership handoff, combined REALITY/Vision and private-provider acceptance are not implied.",
+  "issues": []
+}

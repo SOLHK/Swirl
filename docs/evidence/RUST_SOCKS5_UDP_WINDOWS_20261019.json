@@ -1,0 +1,1065 @@
+{
+  "schema": 1,
+  "implementation_commit": "8d045ab888e6ed0af6dea87adfb752793c455b5b",
+  "verified_commit": "dc3ed5ef8ba9d3ec3d8d05e9ae0c7e810f19cfbb",
+  "verified_tree": "9078aeb88f993a62a3d380a1bfc840c516d51d99",
+  "branch": "work/core-completion-20261017",
+  "workflow": {
+    "run_id": 39181705419,
+    "run_attempt": 1,
+    "url": "https://github.com/SOLHK/Swirl/actions/runs/39181705419",
+    "status": "completed",
+    "conclusion": "success",
+    "run_started_at": "2026-10-19T00:38:44Z",
+    "updated_at": "2026-10-19T01:03:09Z",
+    "jobs": [
+      {
+        "id": 117835644603,
+        "name": "portable-rust (ubuntu-latest)",
+        "conclusion": "success"
+      },
+      {
+        "id": 117835644727,
+        "name": "portable-rust (macos-latest)",
+        "conclusion": "success"
+      },
+      {
+        "id": 117835644750,
+        "name": "windows-rust",
+        "conclusion": "success"
+      }
+    ],
+    "windows_job_id": 117835644750,
+    "windows_job_url": "https://github.com/SOLHK/Swirl/actions/runs/39181705419/job/117835644750",
+    "windows_steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1
+      },
+      {
+        "name": "Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 2
+      },
+      {
+        "name": "Install stable Rust tools",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3
+      },
+      {
+        "name": "Run cargo fmt --all -- --check",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4
+      },
+      {
+        "name": "Run cargo check --workspace --locked",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 5
+      },
+      {
+        "name": "Run cargo clippy --workspace --all-targets --locked -- -D warnings",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 6
+      },
+      {
+        "name": "Run cargo test --workspace --locked",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 7
+      },
+      {
+        "name": "Run cargo build --release --locked --workspace --lib --bins",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 8
+      },
+      {
+        "name": "Run actions/setup-python@v5",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 9
+      },
+      {
+        "name": "Independent TLS and protocol peers",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 10
+      },
+      {
+        "name": "Run actions/upload-artifact@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 11
+      },
+      {
+        "name": "Install Qt for Rust control adapter",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 12
+      },
+      {
+        "name": "Build Qt to Rust integration test",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 13
+      },
+      {
+        "name": "Reject native DNS policy in compatibility builds without starting a core",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 14
+      },
+      {
+        "name": "Run Qt to Rust integration without Mihomo",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 15
+      },
+      {
+        "name": "Build complete native Rust application",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 16
+      },
+      {
+        "name": "Preserve isolated Qt test reports",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 17
+      },
+      {
+        "name": "Post Install Qt for Rust control adapter",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 32
+      },
+      {
+        "name": "Post Run actions/setup-python@v5",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 33
+      },
+      {
+        "name": "Post Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 34
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 35
+      }
+    ],
+    "windows_decoded_log_sha256": "42414479fcd46d62af62b49a04f5c73b8f1d96691a920fb803c1a4cc0fda8fae"
+  },
+  "environment": {
+    "runner_image": "windows-2022",
+    "os_observed": "Windows Server 2022",
+    "qt_version": "6.10.3",
+    "qt_binary_abi": "win64_msvc2022_64",
+    "compiler": "MSVC 19.44.35229.0",
+    "cmake_generator": "Visual Studio 17 2022",
+    "architecture": "x64",
+    "configuration": "Release",
+    "rust_toolchain": "stable-x86_64-pc-windows-msvc",
+    "rustc": "1.99.1 (58cf8f9c3 2026-10-13)",
+    "native_cmake_options": {
+      "SWIRL_USE_RUST_CORE": "ON",
+      "SWIRL_BUILD_UI_TESTS": "ON"
+    },
+    "compatibility_cmake_options": {
+      "SWIRL_USE_RUST_CORE": "OFF",
+      "SWIRL_BUILD_UI_TESTS": "ON"
+    },
+    "isolated_test_roots": true
+  },
+  "rust": {
+    "workspace_test_incidents": {
+      "passed": 154,
+      "failed": 0,
+      "ignored": 0
+    },
+    "fmt": "passed",
+    "check": "passed",
+    "clippy_warnings_denied": "passed",
+    "release_build": "passed"
+  },
+  "preflight_regression": {
+    "script": "tools/tests/test_core_development.py",
+    "case": "test_missing_binary_preflight_stops_before_a_suite_can_skip",
+    "outcome": "pass",
+    "suite": {
+      "passed": 25,
+      "failed": 0,
+      "skipped": 0,
+      "seconds": 1.021
+    },
+    "both_platform_script_structures_checked": true,
+    "expected_guards_per_peer_step": 3,
+    "missing_binary_assertion_passed": true,
+    "all_binaries_present_assertion_passed": true,
+    "checks_scoped_to_named_peer_steps": true
+  },
+  "socks5_udp_portable_peer": {
+    "script": "tools/tests/test_socks5_udp.py",
+    "passed": 12,
+    "failed": 0,
+    "skipped": 1,
+    "seconds": 8.179,
+    "skipped_test": "test_qt_imported_socks5_udp_data_path",
+    "skip_reason": "Windows Qt integration executable required",
+    "scope": "Independent loopback protocol suite before the Qt executable is built; the Qt hook runs separately later."
+  },
+  "qt": {
+    "artifact": {
+      "id": 12157296715,
+      "name": "Swirl-Rust-Qt-Tests-dc3ed5ef8ba9d3ec3d8d05e9ae0c7e810f19cfbb-1",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39181705419/artifacts/12157296715",
+      "sha256": "b49c0ed9d7fbe6049a19f0257bb4485034adac89bbe15606b2d2e6b3b09e71ee",
+      "bytes": 4321,
+      "digest_matches_github": true,
+      "retention_days": 7,
+      "xml_files": [
+        {
+          "archive_entry": "rust-qt/swirl-rust-qt-integration.xml",
+          "relative_path": "rust-qt/swirl-rust-qt-integration.xml",
+          "bytes": 10425,
+          "sha256": "dfeccd5b0beea920315a2c7f780a7a00e08bad9013644136a66f0413145d2559"
+        },
+        {
+          "archive_entry": "rust-qt/swirl-import-boundaries.xml",
+          "relative_path": "rust-qt/swirl-import-boundaries.xml",
+          "bytes": 1986,
+          "sha256": "94ec1421c827db16d292af920b0c0dae4abd3c08be938afe46d319dd0b7cf9b8"
+        },
+        {
+          "archive_entry": "compat-dns/swirl-native-dns-compatibility-guard.xml",
+          "relative_path": "compat-dns/swirl-native-dns-compatibility-guard.xml",
+          "bytes": 964,
+          "sha256": "a87aa8f613a5ba9a3269829cb977a32878c2b9a630a0e973f133d54d42cfd031"
+        },
+        {
+          "archive_entry": "compat-dns/swirl-import-boundaries.xml",
+          "relative_path": "compat-dns/swirl-import-boundaries.xml",
+          "bytes": 1985,
+          "sha256": "aa1c410cc33d72012d0d9065fbd7387378debb440261601aef6c98a67fff8b92"
+        }
+      ]
+    },
+    "native_ctest": {
+      "passed": 3,
+      "failed": 0,
+      "seconds": 17.66,
+      "targets": [
+        "swirl-storage-paths",
+        "swirl-rust-qt-integration",
+        "swirl-import-boundaries"
+      ]
+    },
+    "compatibility_ctest": {
+      "passed": 2,
+      "failed": 0,
+      "seconds": 4.15,
+      "targets": [
+        "swirl-import-boundaries",
+        "swirl-native-dns-compatibility-guard"
+      ]
+    },
+    "storage_paths": {
+      "ctest_outcome": "pass",
+      "seconds": 0.33,
+      "xml_in_this_artifact": false,
+      "case_count_not_inferred": true
+    },
+    "reports": {
+      "compat-dns/swirl-import-boundaries.xml": {
+        "test_case": "ImportTests",
+        "environment": {
+          "QtVersion": "6.10.3",
+          "QtBuild": "Qt 6.10.3 (x86_64-little_endian-llp64 shared (dynamic) release build; by MSVC 2022)",
+          "QTestVersion": "6.10.3"
+        },
+        "function_count_excluding_lifecycle": 8,
+        "lifecycle_counts": {
+          "pass": 2
+        },
+        "messages": {},
+        "sha256": "aa1c410cc33d72012d0d9065fbd7387378debb440261601aef6c98a67fff8b92",
+        "cases": [
+          {
+            "name": "sourceGlobalsArePreservedAndCannotBecomeNodeOnlyImports",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "iniCompleteProfileHasClosedExecutionSemantics",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "iniTransportAliasesCannotDowngradeSecurity",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "iniEnvelopeAndWrappedJsonFailClosed",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "typedOptionsAndAliasesCannotOverwriteImportedState",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "legacyLoonAndEquivalentUriAliasesRetainTypedValues",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "completeConfigurationWithoutOwnerDoesNotDiscardGlobals",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "socks5TlsUriAliasesPreserveSecurity",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          }
+        ],
+        "duration_milliseconds": 3953.8,
+        "lifecycle_excluded": true,
+        "count_unit": "QTest incidents; data rows count separately, initTestCase and cleanupTestCase excluded",
+        "passed": 8,
+        "failed": 0,
+        "skipped": 0
+      },
+      "compat-dns/swirl-native-dns-compatibility-guard.xml": {
+        "test_case": "EngineTests",
+        "environment": {
+          "QtVersion": "6.10.3",
+          "QtBuild": "Qt 6.10.3 (x86_64-little_endian-llp64 shared (dynamic) release build; by MSVC 2022)",
+          "QTestVersion": "6.10.3"
+        },
+        "function_count_excluding_lifecycle": 2,
+        "lifecycle_counts": {
+          "pass": 2
+        },
+        "messages": {},
+        "sha256": "a87aa8f613a5ba9a3269829cb977a32878c2b9a630a0e973f133d54d42cfd031",
+        "cases": [
+          {
+            "name": "nativeDnsQueryPolicyCannotBeLostOrRunByCompatibilityCore",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "networkPreferencesValidateAndPersist",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          }
+        ],
+        "duration_milliseconds": 36.7466,
+        "lifecycle_excluded": true,
+        "count_unit": "QTest incidents; data rows count separately, initTestCase and cleanupTestCase excluded",
+        "passed": 2,
+        "failed": 0,
+        "skipped": 0
+      },
+      "rust-qt/swirl-import-boundaries.xml": {
+        "test_case": "ImportTests",
+        "environment": {
+          "QtVersion": "6.10.3",
+          "QtBuild": "Qt 6.10.3 (x86_64-little_endian-llp64 shared (dynamic) release build; by MSVC 2022)",
+          "QTestVersion": "6.10.3"
+        },
+        "function_count_excluding_lifecycle": 8,
+        "lifecycle_counts": {
+          "pass": 2
+        },
+        "messages": {},
+        "sha256": "94ec1421c827db16d292af920b0c0dae4abd3c08be938afe46d319dd0b7cf9b8",
+        "cases": [
+          {
+            "name": "sourceGlobalsArePreservedAndCannotBecomeNodeOnlyImports",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "iniCompleteProfileHasClosedExecutionSemantics",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "iniTransportAliasesCannotDowngradeSecurity",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "iniEnvelopeAndWrappedJsonFailClosed",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "typedOptionsAndAliasesCannotOverwriteImportedState",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "legacyLoonAndEquivalentUriAliasesRetainTypedValues",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "completeConfigurationWithoutOwnerDoesNotDiscardGlobals",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "socks5TlsUriAliasesPreserveSecurity",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          }
+        ],
+        "duration_milliseconds": 3933.07,
+        "lifecycle_excluded": true,
+        "count_unit": "QTest incidents; data rows count separately, initTestCase and cleanupTestCase excluded",
+        "passed": 8,
+        "failed": 0,
+        "skipped": 0
+      },
+      "rust-qt/swirl-rust-qt-integration.xml": {
+        "test_case": "RustCoreTests",
+        "environment": {
+          "QtVersion": "6.10.3",
+          "QtBuild": "Qt 6.10.3 (x86_64-little_endian-llp64 shared (dynamic) release build; by MSVC 2022)",
+          "QTestVersion": "6.10.3"
+        },
+        "function_count_excluding_lifecycle": 49,
+        "lifecycle_counts": {
+          "pass": 2
+        },
+        "messages": {},
+        "sha256": "dfeccd5b0beea920315a2c7f780a7a00e08bad9013644136a66f0413145d2559",
+        "cases": [
+          {
+            "name": "fullDocumentCannotUseExternalSelectedNodeAlias",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "nonClashGlobalConfigurationDoesNotAlterNativeState",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "fullClashSubscriptionReachesNativePolicyAndRejectsPartialUpdates",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "iniProfileImportConnectsAndUpdatesAtomically",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "iniRealityCannotStartAsOrdinaryTls",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "profileRefreshKeepsOnlyItsOwnValidSelection",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "atomicNodeNetworkImportUsesPreparedIdsAndSurvivesReload",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "atomicNodeNetworkImportRejectsInvalidGraphAndWriteFailure",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "legacyNetworkSettingsMigrateWithoutStaleSidecarOverride",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "candidateValidationPreservesIndependentSourceNamespaces",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "shutdownDiscardsPendingParsedConfiguration",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "preparedImportMapsStableIdsWithoutPublishingBeforeCommit",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "preparedImportRejectsAmbiguousIdsCrossSourceAndStalePlans",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "preparedImportWriteFailurePreservesMemoryAndDurableSnapshot",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "socks5UdpMappingPreservesTypedOptionsAndTls",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "socks5UdpThroughIndependentPeer",
+            "incidents": [
+              {
+                "outcome": "skip",
+                "reason": "Independent Python SOCKS5 UDP peer supplies isolated ports and authentication mode in its integration run."
+              }
+            ]
+          },
+          {
+            "name": "socks4ImportsMapAndAcceptAcrossNativeAbi",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "socks4ImportsRejectAuthenticationAndUnmappedExtensions",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "socks4ThroughIndependentPeer",
+            "incidents": [
+              {
+                "outcome": "skip",
+                "reason": "Independent Python SOCKS4/4a peer supplies isolated ports in its integration run."
+              }
+            ]
+          },
+          {
+            "name": "webSocketThroughIndependentPeer",
+            "incidents": [
+              {
+                "outcome": "skip",
+                "reason": "Independent Python VLESS WS peer supplies isolated ports in its integration run."
+              }
+            ]
+          },
+          {
+            "name": "webSocketMapsExistingFieldsAndRustAcceptsConfiguration",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "webSocketRejectsUnsupportedParametersWithoutPartialConfiguration",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "dnsQueryFamilyMapsStrictlyAndPersistsAcrossLegacyEdits",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "nativeDohMapsExistingHttpsField",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "strictDotMapsExistingFieldWithoutResolvingOrChangingUi",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "strictDotRejectsAmbiguousOrUnimplementedBootstrap",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "customDnsMapsServersWithoutChangingSystemSettings",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "dnsSettingsUseLocalMappingsAndProxyToggle",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "manualGroupUsesItsMemberRatherThanGlobalSelection",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "nestedAutomaticGroupsUseNativeDataPath",
+            "incidents": [
+              {
+                "outcome": "pass",
+                "data_tag": "url-test"
+              },
+              {
+                "outcome": "pass",
+                "data_tag": "fallback"
+              },
+              {
+                "outcome": "pass",
+                "data_tag": "round-robin"
+              }
+            ]
+          },
+          {
+            "name": "roundRobinPolicyBalancesNewNativeSessions",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "policyConversionRejectsUnknownSemanticsAndBounds",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "policySettingsPreserveFullMapsAndRejectInvalidReplacements",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "rulesUseActualRustDataPathAndModeSwitches",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "controllerRuleEditsPreserveNoResolve",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "controllerRuleReferencesPreventGroupDeletion",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "controllerRuleValidationAndPersistenceAreAtomic",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "rulesValidateAllFieldsAndPreserveUnsupportedImports",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "vlessThroughIndependentPeer",
+            "incidents": [
+              {
+                "outcome": "skip",
+                "reason": "Independent VLESS peer supplies the port in its integration run."
+              }
+            ]
+          },
+          {
+            "name": "capabilityUsesTheSelectedRustRuntime",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "shadowsocksThroughIndependentPeer",
+            "incidents": [
+              {
+                "outcome": "skip",
+                "reason": "Independent Python SS peer supplies the isolated port in its integration run."
+              }
+            ]
+          },
+          {
+            "name": "disabledFastOpenIsAnExactNoOpAcrossNativeProtocols",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "disabledFastOpenForwardsThroughNativeSocks5",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "loonShadowsocksImportsKeepCredentialsAndRejectUnsafeOptions",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "loonShadowsocksThroughIndependentPeer",
+            "incidents": [
+              {
+                "outcome": "skip",
+                "reason": "Independent Python SS peer supplies the isolated port."
+              }
+            ]
+          },
+          {
+            "name": "referenceAdapterBlockedAtCompileTime",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "realForwardingThroughQtFacade",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "nativeProbeAndUnsupportedDoNotStartCompatibility",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          },
+          {
+            "name": "unsupportedSessionRejectedAndOldStreamSurvivesBadSelection",
+            "incidents": [
+              {
+                "outcome": "pass"
+              }
+            ]
+          }
+        ],
+        "duration_milliseconds": 13314.9,
+        "lifecycle_excluded": true,
+        "count_unit": "QTest incidents; data rows count separately, initTestCase and cleanupTestCase excluded",
+        "passed": 45,
+        "failed": 0,
+        "skipped": 6
+      }
+    },
+    "standalone_peer_skips_retained": 6,
+    "independent_python_hooks": [
+      {
+        "script": "tools/tests/test_shadowsocks.py",
+        "python_test": "test_qt_facade_http_obfs_with_udp_declared",
+        "qt_slots": [
+          "shadowsocksThroughIndependentPeer",
+          "loonShadowsocksThroughIndependentPeer"
+        ],
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "seconds": 0.868,
+        "passed_at": "2026-10-19T00:53:47.4705040Z",
+        "report_scope": "Explicit independent peer process, separate from standalone CTest XML"
+      },
+      {
+        "script": "tools/tests/test_rust_core.py",
+        "python_test": "test_vless_qt_data_path",
+        "qt_slots": [
+          "vlessThroughIndependentPeer"
+        ],
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "seconds": 0.675,
+        "passed_at": "2026-10-19T00:53:48.3611913Z",
+        "report_scope": "Explicit independent peer process, separate from standalone CTest XML"
+      },
+      {
+        "script": "tools/tests/test_socks4.py",
+        "python_test": "test_qt_imported_socks4_and_4a_data_path",
+        "qt_slots": [
+          "socks4ThroughIndependentPeer"
+        ],
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "seconds": 2.466,
+        "passed_at": "2026-10-19T00:53:51.0598013Z",
+        "report_scope": "Explicit independent peer process, separate from standalone CTest XML"
+      },
+      {
+        "script": "tools/tests/test_websocket_transport.py",
+        "python_test": "test_qt_vless_websocket_data_path",
+        "qt_slots": [
+          "webSocketThroughIndependentPeer"
+        ],
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "seconds": 1.142,
+        "passed_at": "2026-10-19T00:53:52.4123648Z",
+        "report_scope": "Explicit independent peer process, separate from standalone CTest XML"
+      },
+      {
+        "script": "tools/tests/test_socks5_udp.py",
+        "python_test": "test_qt_imported_socks5_udp_data_path",
+        "qt_slots": [
+          "socks5UdpThroughIndependentPeer"
+        ],
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "seconds": 1.319,
+        "passed_at": "2026-10-19T00:53:53.8840340Z",
+        "report_scope": "Explicit independent peer process, separate from standalone CTest XML"
+      }
+    ],
+    "counting_note": "Keep all six standalone peer skips in the native XML. Five later Python hook tests separately execute six Qt peer slots; the Shadowsocks hook executes two slots. Lifecycle incidents are excluded from every report count."
+  },
+  "socks5_udp_qt_data_path": {
+    "qt_slot": "socks5UdpThroughIndependentPeer",
+    "python_hook": "Socks5UdpIntegration.test_qt_imported_socks5_udp_data_path",
+    "outcome": "pass",
+    "authentication_modes": [
+      "none",
+      "username_password"
+    ],
+    "import_formats_per_mode": [
+      "Clash",
+      "INI"
+    ],
+    "qt_processes": 2,
+    "asserted_udp_packets_forwarded": 4,
+    "asserted_origin_payloads_received": 4,
+    "payload": "qt-socks5-udp",
+    "exact_response": "socks5-udp-native:qt-socks5-udp",
+    "asserted_per_mode": {
+      "accepted_control_connections": 2,
+      "udp_associate_commands": 2,
+      "udp_packets_forwarded": 2,
+      "origin_payloads_received": 2,
+      "association_client_address": "0.0.0.0",
+      "association_client_port": 0,
+      "all_upstream_controls_closed": true
+    },
+    "relay_udp_bound_port_differs_from_control_tcp_port": true,
+    "source_headers_origin_address_and_port_checked": true,
+    "port_reclamation_checked": true,
+    "authentication_exchange_checked": true,
+    "proof_basis": "The successful Windows Python hook asserts exact counters, payloads and control closure for both authentication subtests. Each Qt process must return zero and its temporary XML must contain the exact slot pass and only pass incidents. These temporary per-auth XMLs are consumed by the hook and are not included in the four-report artifact."
+  },
+  "full_native_application": {
+    "step": "Build complete native Rust application",
+    "outcome": "success",
+    "command": "cmake --build build/rust-qt --config Release --target Swirl --parallel 2",
+    "executable": "build/rust-qt/Release/Swirl.exe",
+    "command_group_started_at": "2026-10-19T00:53:53.9428902Z",
+    "executable_link_logged_at": "2026-10-19T01:03:05.1404709Z",
+    "command_group_to_executable_log_seconds": 551.198,
+    "executable_existence_gate_passed": true,
+    "application_launched_in_this_core_job": false,
+    "executable_uploaded_by_this_job": false
+  },
+  "earlier_failure": {
+    "commit": "8d045ab888e6ed0af6dea87adfb752793c455b5b",
+    "run_id": 39180142737,
+    "url": "https://github.com/SOLHK/Swirl/actions/runs/39180142737",
+    "windows_job_id": 117830957733,
+    "step": "Independent TLS and protocol peers",
+    "test": "CoreDevelopmentTests.test_missing_binary_preflight_stops_before_a_suite_can_skip",
+    "assertion": "4 != 3",
+    "cause": "The old test scanned the full Windows job, so it counted the later full-application executable check as a fourth protocol-suite preflight guard.",
+    "repair": "Extract only the named independent peer step; validate Linux and Windows script structures on every platform and preserve the three-guard, missing-binary and present-binaries assertions.",
+    "qt_reports_generated": 0,
+    "qt_steps_skipped": true,
+    "full_application_build_skipped": true,
+    "decoded_log_sha256": "e1bddea98148469224d87be5d550865046f02ac788de116d01db426aef5fa2c2"
+  },
+  "limits": {
+    "physical_windows_11_acceptance": false,
+    "private_provider_tests_run": 0,
+    "private_subscription_data_used": false,
+    "private_fonts_used_or_uploaded": false,
+    "socks5_tls_udp_supported": false,
+    "real_dpi_or_240hz_font_acceptance": false,
+    "application_runtime_smoke_in_this_core_job": false,
+    "note": "Hosted Windows builds and synthetic loopback peers establish this implementation and integration boundary. They do not establish private-provider readiness or physical Windows 11 visual/performance acceptance."
+  },
+  "contains_private_configuration": false
+}

@@ -1,0 +1,110 @@
+{
+  "schema": 1,
+  "recorded_at_utc": "2026-10-18T09:45:34.245650+00:00",
+  "base_commit": "5f1fd1347ba4f82854e3f773f90e093c3074ce40",
+  "implementation_binding": "LF-normalized source hashes; exact commit and CI pending push",
+  "source_sha256_lf": {
+    "src/Swirl.Quick/CMakeLists.txt": "355dcc762e95197fe57eeba51c46b50552982c63cefc90f436740dd69252a23a",
+    "src/Swirl.Quick/engine/EngineController.cpp": "981631e60fe20b68914efa9652f6b1f419554ece4a9953b96cfb9536a0f1c38a",
+    "src/Swirl.Quick/engine/EngineController.h": "46f970e8efdd98df0a433a6abe929ab5473c261a56b8f3e3ec0bc285f2828438",
+    "src/Swirl.Quick/engine/NodeImporter.cpp": "0b52022ecacbcc0c4e48de0696d5948659e1bf9dcd14908e8824175309241052",
+    "src/Swirl.Quick/engine/NodeImporter.h": "5313ae2fd2ea9625c792818413662caad1e15228ebf99f358353aff9cec3d9d8",
+    "src/Swirl.Quick/engine/SubscriptionNormalizer.cpp": "b272d4dee0b0e6c525977eec180b9898e35ff11e3fe2248c6cc01a4a6ef0dc14",
+    "src/Swirl.Quick/engine/SubscriptionNormalizer.h": "9eec0c6e94e29a3d449567057038f566362e60b9a6f748db8072ad048d688cb5",
+    "src/Swirl.Quick/tests/ImportTests.cpp": "47eb8c85218e36dd5756f0d4cd98f28a837710fda84ba434eacedd6f1ce871f9",
+    "src/Swirl.Quick/tests/RustCoreTests.cpp": "40f20eba389e19f25c4d0883acfc26c3ea36c88be0bdb33fa81b5b1b93f33f73"
+  },
+  "validation": {
+    "qt_native": {
+      "passed": 43,
+      "failed": 0,
+      "skipped_external_peer_hooks": 5
+    },
+    "native_and_compatibility_import_suites_passed": 2,
+    "independent_websocket_tests_passed": 11,
+    "independent_shadowsocks_tests_passed": 9,
+    "development_tests": {
+      "run": 19,
+      "skipped_existing_symlink_privilege": 1,
+      "failed": 0
+    },
+    "full_windows_application_build": true,
+    "real_internet_node_tests": 0,
+    "supplier_requests": 0,
+    "source_refreshes": "local synthetic fixtures only"
+  },
+  "logs": {
+    "qt_native": {
+      "path": "D:\\Codex\\work\\ini-profile-qt-verified-4.log",
+      "bytes": 4614,
+      "sha256": "3fe5e2aa358f15f8f27d1b1012ef13ecadca27b678691862e8b1f264e576e040"
+    },
+    "native_import_boundaries": {
+      "path": "D:\\Codex\\work\\ini-profile-import-verified-3.log",
+      "bytes": 221,
+      "sha256": "bb7750d16740b0e4d0b1925a29f386a216284302806069b1b4b1cc90942d9a67"
+    },
+    "compatibility_import_boundaries": {
+      "path": "D:\\Codex\\work\\ini-profile-compat-ctest-verified.log",
+      "bytes": 227,
+      "sha256": "8f6218e3a40ff8d810c8b8ceddbc94bf2fdabbe260e7749dd88bc692ec9790a5"
+    },
+    "full_application_build": {
+      "path": "D:\\Codex\\work\\ini-profile-build-verified-2.log",
+      "bytes": 1887,
+      "sha256": "84116f7e15cbaa43cdc6d1ade4355b32f7a0a5d82408758b5d755e26bbb3d596"
+    },
+    "final_qt_test_build": {
+      "path": "D:\\Codex\\work\\ini-profile-build-verified-4.log",
+      "bytes": 779,
+      "sha256": "047e691b5bbd57f97917a8f4e8af822c9ff04062c7d44ebda54c5a1e6cabb641"
+    },
+    "compatibility_build": {
+      "path": "D:\\Codex\\work\\ini-profile-compat-build-verified.log",
+      "bytes": 282,
+      "sha256": "a9416d9d7e9df53cc0ff71a873ee7d72b78cee6282fb67f19c9b2676939cb827"
+    },
+    "websocket_independent_peers": {
+      "path": "D:\\Codex\\work\\ini-profile-ws-peers.log",
+      "bytes": 116,
+      "sha256": "4779e7fedfb60da0185684cacbcd32a37fcd80d91e70007b27072c9be6c52971"
+    },
+    "shadowsocks_independent_peers": {
+      "path": "D:\\Codex\\work\\ini-profile-ss-peers.log",
+      "bytes": 113,
+      "sha256": "111c4dc1952d0adb70c9699e3581a3bee20ab1be5410b461a7c5ab0b257a7a24"
+    },
+    "development_guards": {
+      "path": "D:\\Codex\\work\\ini-profile-development-tests-native-encoding.log",
+      "bytes": 135,
+      "sha256": "eef1d4853b770bca2899f1af0136e52515cec3c9bcc05e73401e4923bce37aa7"
+    },
+    "ini_red": {
+      "path": "D:\\Codex\\work\\ini-profile-red.log",
+      "bytes": 675,
+      "sha256": "3a3f3ed11585043df943650eb76c11fb68283880cebcb25e371fec0b54a2c5d4"
+    },
+    "transport_red": {
+      "path": "D:\\Codex\\work\\ini-transport-red.log",
+      "bytes": 591,
+      "sha256": "19e3b28b6d3be165bd86f2703a9aa2f10be298276fe240c8fe20e288447f350d"
+    },
+    "review": {
+      "path": "D:\\Codex\\outputs\\INI_PROFILE_REVIEW_20261018.md",
+      "bytes": 10311,
+      "sha256": "f333b4dde084c2a163f0a69279f75bd42cfef5700d8944e94c443244c187e8b2"
+    }
+  },
+  "limits": [
+    "Only the closed Proxy/Proxy Group(select)/Rule(domain rules + FINAL) INI product subset is executable.",
+    "No General/DNS, remote rules, automatic INI groups, arbitrary client globals or complete Quantumult X/sing-box support.",
+    "Targets are declared groups or DIRECT/REJECT; document-external aliases and direct node-name rule targets remain rejected.",
+    "Qt existing maximum is 1000 rules; no limit raised or rule truncated.",
+    "Cached old full-profile 0/18 acceptance is unchanged, not rerun through a new complete-profile matrix in this stage.",
+    "New unlimited source remains 59 VLESS/TCP/REALITY,55 Vision,0 real-node attempts/successes.",
+    "Standalone Rust inspector complete-profile capability is not changed by this Qt product mapping.",
+    "First manual group import uses its first member; same source/group retains a valid choice, source explicit selection wins, removed choice falls back to first declared member.",
+    "Node rename creates a new identity; stable same-source name/protocol keeps ID.",
+    "No UI/font/system network/driver modifications."
+  ]
+}

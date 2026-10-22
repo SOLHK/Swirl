@@ -1,0 +1,75 @@
+name: Swirl VF native transform stages
+
+on:
+  push:
+    branches: [work/core-completion-20261017]
+    paths:
+      - '.github/workflows/swirl-vf-transform-stages.yml'
+      - 'tools/swirl_vf/platform/probe_transform_stages.py'
+      - 'tools/swirl_vf/platform/verify_transform_stages.py'
+      - 'tools/swirl_vf/tools/transform_geometry.py'
+      - 'tools/swirl_vf/tests/test_transform_geometry.py'
+      - 'tools/swirl_vf/tools/tangent_geometry.py'
+      - 'tools/swirl_vf/tools/hvf.py'
+      - 'tools/swirl_vf/tools/batch_geometry.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: swirl-vf-transform-stages-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  native-transform-stages:
+    runs-on: xcode-27
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Preserve exact source-only reproduction snapshot
+        run: |
+          mkdir -p build/transform-evidence
+          git rev-parse HEAD > build/transform-evidence/commit.txt
+          sw_vers > build/transform-evidence/macos.txt
+          xcodebuild -version > build/transform-evidence/xcode.txt
+          python - <<'PY'
+          import pathlib, subprocess, zipfile
+          allowed = {'.py', '.c', '.cpp', '.swift', '.md', '.ps1', '.yml', '.txt'}
+          files = subprocess.check_output(['git', 'ls-files', 'tools/swirl_vf', '.github/workflows', 'AGENTS.md'], text=True).splitlines()
+          with zipfile.ZipFile('build/transform-evidence/source-only.zip', 'x', compression=zipfile.ZIP_DEFLATED) as archive:
+              for name in files:
+                  if pathlib.Path(name).suffix in allowed:
+                      archive.write(name, name)
+          PY
+      - name: Compile native engine and run existing Python regressions
+        id: native
+        run: |
+          python -m pip install fonttools==4.61.1 numpy==2.2.6
+          python -m unittest discover -s tools/swirl_vf/tests -v
+          python -m unittest discover -s tools/swirl_vf/audit -p 'test_*.py' -v
+          xcrun clang -std=c11 -O2 -Wall -Wextra -Werror -mmacosx-version-min=15.4 tools/swirl_vf/platform/hvf_oracle.c -lhvf -o build/hvf_oracle
+      - name: Observe independently authored master and extremum transform stages
+        run: |
+          python tools/swirl_vf/platform/verify_transform_stages.py --binary build/hvf_oracle --output build/transform-evidence/transform-stages.json
+      - name: Preserve all 124 original tangent and 28 hierarchy regressions
+        if: ${{ always() && steps.native.outcome == 'success' }}
+        run: |
+          python tools/swirl_vf/platform/verify_tangent_projection.py --native-binary build/hvf_oracle --output build/transform-evidence/tangents.json
+          python tools/swirl_vf/platform/probe_hierarchy_rules.py --binary build/hvf_oracle --output build/transform-evidence/hierarchy.json --require-pass
+      - name: Rerun unchanged 1088 exact-source comparisons without publishing outlines
+        if: ${{ always() && steps.native.outcome == 'success' }}
+        run: |
+          python tools/swirl_vf/platform/verify_tangent_projection.py --native-binary build/hvf_oracle --source /System/Library/PrivateFrameworks/FontServices.framework/Versions/A/Resources/Reserved/PingFangUI.ttc --output build/transform-evidence/source-projection.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: swirl-vf-transform-stages-${{ github.sha }}
+          path: build/transform-evidence/
+          retention-days: 7

@@ -185,7 +185,7 @@ int runWindowChecks(QQuickWindow *window, WindowsBackdrop *backdrop, const QStri
     }
     // Cards remain readable while the shell and page gutter reveal the desktop.
     const auto materialAlpha=window->grabWindow().pixelColor(int(window->width()*0.995*window->devicePixelRatio()),int(window->height()*0.5*window->devicePixelRatio())).alpha();
-    check(exactOpaque ? materialAlpha==255 : backdrop->blurActive()?materialAlpha>=187&&materialAlpha<=191:backdrop->translucent()?materialAlpha>=232&&materialAlpha<=242:materialAlpha>=215&&materialAlpha<=225,"actual alpha matches the single material tint");
+    check(exactOpaque ? materialAlpha==255 : backdrop->blurActive()?materialAlpha>=207&&materialAlpha<=211:backdrop->translucent()?materialAlpha>=240&&materialAlpha<=244:materialAlpha>=227&&materialAlpha<=231,"actual alpha matches the single material tint");
     // Move Swirl relative to a split-color native QML window to verify position-
     // dependent composition. The scene is a test window, not a wallpaper image.
     QQuickItem split;

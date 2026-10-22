@@ -6,7 +6,7 @@
 #include <QNetworkProxy>
 #include <QRandomGenerator>
 #include <QSaveFile>
-#include <QStandardPaths>
+#include "../app/StoragePaths.h"
 
 ConnectionDiagnostics::ConnectionDiagnostics(QObject *parent):QObject(parent) {
     m_deadline.setSingleShot(true);m_observation.setSingleShot(true);
@@ -29,7 +29,7 @@ QString ConnectionDiagnostics::report() const {
     return text;
 }
 QString ConnectionDiagnostics::saveReport() {
-    const auto dir=QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/diagnostics";
+    const auto dir=SwirlPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/diagnostics";
     if(!QDir().mkpath(dir))return {};
     const auto path=dir+"/connection-"+QDateTime::currentDateTime().toString("yyyyMMdd-HHmmss-zzz")+".txt";
     QSaveFile file(path);if(!file.open(QIODevice::WriteOnly))return {};

@@ -1,0 +1,28 @@
+name: Focused DNS worker diagnostic
+on:
+  workflow_dispatch:
+  push:
+    branches: [work/core-completion-20261017]
+    paths:
+      - '.github/workflows/connectivity-diagnostic.yml'
+      - 'tools/Diagnose-NativeConnectivity.py'
+      - 'tools/tests/test_connectivity_diagnostics.py'
+permissions:
+  contents: read
+jobs:
+  dns-worker:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - name: Observe bounded DNS worker with synthetic input
+        run: python tools/tests/test_connectivity_diagnostics.py ConnectivityDiagnostics.test_permanently_stalled_dns_worker_does_not_hold_process_open
+      - name: Observe full Python diagnostic suite
+        run: python tools/tests/test_connectivity_diagnostics.py

@@ -1,0 +1,212 @@
+{
+  "source_commit": "fddb0f81c76a21113b26fd37a35c3f38f0709ddd",
+  "run": {
+    "id": 39541637771,
+    "url": "https://github.com/SOLHK/Swirl/actions/runs/39541637771",
+    "status": "completed",
+    "conclusion": "failure",
+    "updated_at": "2026-10-21T04:01:26Z"
+  },
+  "local": {
+    "host": "macOS 26.3 build 25D125 arm64",
+    "suite": {
+      "discovered": 623,
+      "passed": 616,
+      "skipped": 7,
+      "seconds": 34.621
+    },
+    "audit_passed": 6,
+    "D3_passed": 12,
+    "native_protocol_passed": 14,
+    "native_synthetic_remeasurement": {
+      "requests": 58,
+      "glyph_records": 174,
+      "maximum_path_point_error": 0,
+      "maximum_table_metric_error": 0,
+      "maximum_bounds_error": 0
+    },
+    "strict_849_850": "FAIL_UNCHANGED"
+  },
+  "mac": {
+    "job_id": 119030483024,
+    "conclusion": "failure",
+    "targeted_tests": {
+      "D1": 8,
+      "D2": 13,
+      "D3": 12,
+      "legacy_checkpoint": 13
+    },
+    "all_targeted_tests_passed": true,
+    "strict_native_metric_step": "FAIL_849_VS_850_LIMIT_0.03125",
+    "native_table_reconstruction_step": "success",
+    "new_native_admission_summary": {
+      "status": "PASS_SYNTHETIC_NATIVE_ADMISSION_ONLY",
+      "host": "macOS-15.7.9-arm64-arm-64bit",
+      "scope": "self_authored_analytic_no_Apple_data",
+      "harfbuzz_version": "14.6.0",
+      "shaping": [
+        {
+          "fixture": "source",
+          "unpositioned_advance": 505,
+          "positioned_advance": 510,
+          "GPOS_adjustment": 5
+        },
+        {
+          "fixture": "identity-avar-control",
+          "unpositioned_advance": 510,
+          "positioned_advance": 540,
+          "GPOS_adjustment": 30
+        }
+      ],
+      "native_backend": "CoreText",
+      "physical_faces_verified": 1,
+      "native_glyph_batches": 0,
+      "source_unchanged": true,
+      "font_generated": false,
+      "original_conversion_faces": 0,
+      "Windows11": "NOT_RUN",
+      "Qt_Swirl": "NOT_RUN"
+    }
+  },
+  "windows": {
+    "job_id": 119030483284,
+    "conclusion": "success",
+    "targeted_tests": {
+      "D2": 13,
+      "D3": 12,
+      "legacy_checkpoint": 13
+    },
+    "all_targeted_tests_passed": true,
+    "scope": {
+      "scope": "self_authored_synthetic_controls_only",
+      "controls": [
+        {
+          "fixture": "standard",
+          "faces_passed": 3,
+          "windows_product": "Microsoft Windows Server 2022 Datacenter",
+          "windows_build": "20348",
+          "raster_count": 10,
+          "input_sha256": "5120611edc79613a48a2467ecf73b6a7a599e40eb2debbd5dbb62cd6e95c30b7"
+        },
+        {
+          "fixture": "metrics",
+          "faces_passed": 2,
+          "windows_product": "Microsoft Windows Server 2022 Datacenter",
+          "windows_build": "20348",
+          "raster_count": 10,
+          "input_sha256": "ad29b7b3e4fe6c654cb7487fb31fe6bad13f2c7940ad09fadf1357cd50cf5e3c"
+        }
+      ],
+      "original_font_acceptance": "NOT_RUN",
+      "windows11_desktop_acceptance": "NOT_RUN",
+      "system_installation": "NOT_TESTED",
+      "actual_qt_swirl_acceptance": "NOT_RUN"
+    }
+  },
+  "original_finite_confirmation": {
+    "source_commit": "1c90c4d93527b20c0430e59973ad80885b55b889",
+    "run_id": 39540402958,
+    "job_id": 119026568458,
+    "conclusion": "success",
+    "summaries": [
+      {
+        "status": "AXIS_READBACK_DIAGNOSIS_NOT_MAPPING_ACCEPTANCE",
+        "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+        "faces": 32,
+        "physical_faces_verified": 32,
+        "original_requests": 384,
+        "original_strict_passed": 288,
+        "original_strict_failed": 96,
+        "predeclared_replay_requests": 96,
+        "replay_strict_passed": 96,
+        "replay_echo_exact": 96,
+        "original_errors_match_predeclared_TT": 96,
+        "failure_fraction_counts": {
+          "1": 96
+        },
+        "by_axis": {
+          "WDTH": {
+            "requests": 128,
+            "strict_failed": 32,
+            "maximum_absolute_readback_error": 3.2211000004167545e-05
+          },
+          "wght": {
+            "requests": 128,
+            "strict_failed": 32,
+            "maximum_absolute_readback_error": 9.450000001720582e-05
+          },
+          "HGHT": {
+            "requests": 128,
+            "strict_failed": 32,
+            "maximum_absolute_readback_error": 3.2211000004167545e-05
+          }
+        },
+        "mapping_accepted": false,
+        "glyph_equivalence_tested": false,
+        "font_generated": false,
+        "os_version": "Version 27.0.1 (Build 26A434)",
+        "diagnostic_sha256": "28e70b905118d03882b877d364a9d995f272f0d895885c81b12130f46fc57b88",
+        "extractor_sha256": "8e5aaa0a921f24a656766c1e24a0d388397cdaddbdfebae1ab415c0d7c3f3bbf",
+        "harness_sha256": "4a708e294f630475313201555baa19a2fa658c6b72f91de33d04e753211dab33",
+        "source_unchanged": true
+      },
+      {
+        "status": "COMPLETED_32_FACE_FINITE_DESIGN_COMPARISON_NOT_FONT_ACCEPTANCE",
+        "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+        "recipe_sha256": "3716029e1be06b9d25acb20be9eb815bdd0df9717f80f56de83a31d9a08f10aa",
+        "native_faces": 32,
+        "gids_per_face": 34,
+        "locations_per_face": 15,
+        "unique_portable_hvgl_tables": 1,
+        "coverage": {
+          "type2_shapes_covered": 13,
+          "type2_shapes_present": 13,
+          "maximum_tree_depth_tested": 12,
+          "selected_rotation_roots": 4
+        },
+        "limit_font_units": 0.03125,
+        "elapsed_seconds": 310.44396525,
+        "source_unchanged": true,
+        "font_generated": false,
+        "mapping_accepted": false,
+        "metrics_tested": false,
+        "windows11_acceptance": "NOT_RUN",
+        "completed": 16320,
+        "legacy_passed": 16256,
+        "legacy_failed": 64,
+        "companion_calls": 64,
+        "companion_passed": 64,
+        "combined_passed": 16320,
+        "combined_failed": 0,
+        "maximum_point_error": 1.3073986337985843e-12
+      }
+    ]
+  },
+  "original_reconstruction": {
+    "models_completed": 0,
+    "faces_completed": 0,
+    "font_generated": false,
+    "build_admission": "BLOCKED_A3_AND_B1",
+    "Windows11": "NOT_RUN",
+    "Qt_Swirl": "NOT_RUN"
+  },
+  "artifacts": {
+    "full_job_logs_read": true,
+    "proprietary_fonts_uploaded": false,
+    "original_raw_glyph_data_uploaded": false,
+    "ZIPs_downloaded_or_rehashed": false
+  },
+  "isolation": {
+    "branch": "work/vf-macos-windows-d1-20261021",
+    "other_development_branches_modified": false,
+    "force_push": false,
+    "PR23_merged": false,
+    "conflict_check": {
+      "command": "git merge-tree --write-tree HEAD origin/work/core-completion-20261017",
+      "integration_sha": "f87b6f98eb7018c4a5e86f281fe707764565ce58",
+      "exit_code": 0,
+      "textual_conflicts": false,
+      "branch_updated": false
+    }
+  }
+}

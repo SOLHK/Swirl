@@ -1,0 +1,10 @@
+{
+  "revision": "b90e58362328870ad44ea3bfcbf62fc18c7434e3",
+  "licenseRevision": "4178770badecb1b349fbcd62c737e0d7a2079729",
+  "assets": [
+    { "source": "geoip.metadb", "file": "geoip.metadb", "key": "mmdb", "sha256": "f23bfcf35ba92bd1a84e15e813622cdef9c02d43cd3144ddff7b9d6e7ba30798" },
+    { "source": "geoip.dat", "file": "GeoIP.dat", "key": "geoip", "sha256": "116cc0f03d48991962f7f9cdbbcf53d45d89777f9c3cd1a663210853e5df6093" },
+    { "source": "geosite.dat", "file": "GeoSite.dat", "key": "geosite", "sha256": "7a17130f9fdd19cd0df73b1adacf7d7900f42cf76750507f538f066c37da4a93" },
+    { "source": "GeoLite2-ASN.mmdb", "file": "ASN.mmdb", "key": "asn", "sha256": "d82d2f39ea82a175a3d63484c8b4723040d134ba1edf4b27d6819c2f96c14a9b" }
+  ]
+}

@@ -1,0 +1,19 @@
+SOURCE 593e7cddc360cf7f51d9fdc988e6cf8fd99aea96
+COMMAND ["/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3", "/workspace/scratch/ca6cd1f88f6f/Swirl/tools/tests/test_websocket_transport.py", "-v"]
+
+test_control_only_and_empty_frames_return_to_the_forwarding_loop (__main__.WebSocketPeerTests.test_control_only_and_empty_frames_return_to_the_forwarding_loop) ... ok
+test_bad_upgrades_fail_without_sending_credentials_or_origin_traffic (__main__.WebSocketTransportTests.test_bad_upgrades_fail_without_sending_credentials_or_origin_traffic) ... ok
+test_coalesced_ping_burst_preserves_the_connection_and_all_pongs (__main__.WebSocketTransportTests.test_coalesced_ping_burst_preserves_the_connection_and_all_pongs) ... ok
+test_configuration_generation_preserves_existing_ws_stream (__main__.WebSocketTransportTests.test_configuration_generation_preserves_existing_ws_stream) ... ok
+test_control_only_pong_does_not_block_the_origin_response_tail (__main__.WebSocketTransportTests.test_control_only_pong_does_not_block_the_origin_response_tail) ... ok
+test_fragmented_binary_messages_and_interleaved_ping_are_not_payload (__main__.WebSocketTransportTests.test_fragmented_binary_messages_and_interleaved_ping_are_not_payload) ... ok
+test_malformed_frames_never_release_invalid_payload (__main__.WebSocketTransportTests.test_malformed_frames_never_release_invalid_payload) ... ok
+test_qt_vless_websocket_data_path (__main__.WebSocketTransportTests.test_qt_vless_websocket_data_path) ... skipped 'Qt integration executable required'
+test_stop_cancels_owned_ws_driver_and_releases_network (__main__.WebSocketTransportTests.test_stop_cancels_owned_ws_driver_and_releases_network) ... ok
+test_vless_ws_wss_trojan_wss_forward_actual_origin_and_mask_frames (__main__.WebSocketTransportTests.test_vless_ws_wss_trojan_wss_forward_actual_origin_and_mask_frames) ... ok
+test_wss_verifies_name_and_trust_before_http_upgrade (__main__.WebSocketTransportTests.test_wss_verifies_name_and_trust_before_http_upgrade) ... ok
+
+----------------------------------------------------------------------
+Ran 11 tests in 9.709s
+
+OK (skipped=1)

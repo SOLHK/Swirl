@@ -1,0 +1,45 @@
+{
+  "scope": "self_authored_standard_q_fonts_only",
+  "status": "BOUNDED_MODEL_REPAIR_WITH_RETAINED_NATIVE_AND_QUANTIZATION_FAILURES",
+  "algorithm": "fontTools scale_upem before partial instancing",
+  "application_compensation": false,
+  "local_regression_tests_passed": 16,
+  "local_regression_seconds": 2.628,
+  "odd_half_coefficient": {
+    "unscaled_endpoint_error_source_font_units": 0.5,
+    "precision8_serialized_model_error": 0.0,
+    "mixed_positions_checked": 7,
+    "tables_compared": ["gvar", "HVAR", "VVAR"]
+  },
+  "retained_three_sixteenths_counterexample": {
+    "precision8_error_source_font_units": 0.0625,
+    "strict_limit_source_font_units": 0.03125,
+    "within_limit": false
+  },
+  "actual_HarfBuzz_raw_advance_parity": {
+    "observations": 49,
+    "above_1_32": 42,
+    "maximum_difference_source_font_units": 0.375,
+    "status": "FAIL_RETAINED",
+    "precision8_target_matches_continuous_HVAR_model_at_fixed_output_scale": true
+  },
+  "MVAR_dimensionless_caret_reproduction": {
+    "authored_tag": "hcrn",
+    "original_ratio": 1.0,
+    "blind_upstream_scaled_ratio": 0.125,
+    "precision8_action": "REJECT_UNREVIEWED_MVAR",
+    "source_bytes_unchanged": true
+  },
+  "refused_cases": [
+    "UPM_above_16384", "glyf_field_overflow", "gvar_packed_delta_outside_int16",
+    "hint_program", "unreviewed_VORG", "AAT", "unknown_table", "MVAR"
+  ],
+  "lossless_conversion": false,
+  "universal_physical_error_bound": "NOT_ESTABLISHED",
+  "original_font": "NOT_RUN",
+  "precision8_CoreText": "NOT_RUN",
+  "precision8_DirectWrite": "NOT_RUN",
+  "Windows11": "NOT_RUN",
+  "Qt_Swirl": "NOT_RUN",
+  "production_accepted": false
+}

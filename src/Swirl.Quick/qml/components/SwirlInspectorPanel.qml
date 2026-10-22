@@ -66,7 +66,7 @@ SwirlGlassPanel {
                 visible:inspector.activeTab!=="Preview"&&inspector.activeTab!=="WebSocket"
                 anchors.fill:parent
                 clip:true
-                TextArea { renderType: TextEdit.NativeRendering; font.weight: Theme.bodyFontWeight; font.hintingPreference: Font.PreferFullHinting; Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) }
+                SwirlTextArea {
                 readOnly:true
                 text:inspector.detailsText()
                 wrapMode:Text.WrapAnywhere

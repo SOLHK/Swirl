@@ -16,20 +16,20 @@ Item {
  ScrollView { id:scroll;anchors.fill:parent;anchors.margins:Theme.pagePadding;clip:true;ScrollBar.horizontal.policy:ScrollBar.AlwaysOff;ScrollBar.vertical:SwirlScrollBar {}
   ColumnLayout { width:Math.floor(scroll.availableWidth);spacing:Theme.gap
    RowLayout { Layout.fillWidth:true
-    SwirlText { text:"流量分析";font.pixelSize:Theme.fontSize(30);font.weight:Font.DemiBold;color:Theme.text;Layout.fillWidth:true }
+    SwirlText {textRole:"largeTitle"; text:"流量分析";font.pixelSize:Theme.fontSize(30);font.weight:Font.DemiBold;color:Theme.text;Layout.fillWidth:true }
     SwirlButton {text:"返回";visible:SwirlMotion.returnShared && SwirlMotion.returnShared.route===AppState.currentPage;onClicked:SwirlMotion.returnToHub(totalTraffic)}
     SwirlComboBox { model:["今日","昨日","本周","本月"];currentIndex:page.period;onActivated:page.period=currentIndex }
    }
    SwirlText { text:"仅统计经过 Swirl 的流量；排行基于已采集连接，短于采样间隔的连接可能无法归属。历史保留 32 天。";color:Theme.muted;Layout.fillWidth:true;wrapMode:Text.Wrap }
    SwirlGlassPanel {id:totalSurface;Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(72)
-    RowLayout {anchors.fill:parent;anchors.margins:Theme.cardPadding;SwirlText{text:"累计流量";color:Theme.muted}SwirlText{id:totalTraffic;text:page.totals.sampled?page.telemetry.formatBytes(page.totals.total):"—";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold;Layout.fillWidth:true}}
+    RowLayout {anchors.fill:parent;anchors.margins:Theme.cardPadding;SwirlText{text:"累计流量";color:Theme.muted}SwirlText{textRole:"data";id:totalTraffic;text:page.totals.sampled?page.telemetry.formatBytes(page.totals.total):"—";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold;Layout.fillWidth:true}}
    }
    RowLayout {Layout.fillWidth:true;spacing:Theme.gap
     SwirlGlassPanel {id:uploadSurface;Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(90)
-     ColumnLayout {anchors.fill:parent;anchors.margins:Theme.cardPadding;SwirlText{text:"实时上传 / 秒";color:Theme.muted}SwirlText{id:uploadRate;text:page.telemetry.sampled?page.telemetry.formatBytes(page.telemetry.uploadRate):"—";color:Theme.text;font.pixelSize:Theme.fontSize(23);Layout.fillWidth:true}}
+     ColumnLayout {anchors.fill:parent;anchors.margins:Theme.cardPadding;SwirlText{text:"实时上传 / 秒";color:Theme.muted}SwirlText{textRole:"data";id:uploadRate;text:page.telemetry.sampled?page.telemetry.formatBytes(page.telemetry.uploadRate):"—";color:Theme.text;font.pixelSize:Theme.fontSize(23);Layout.fillWidth:true}}
     }
     SwirlGlassPanel {id:downloadSurface;Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(90)
-     ColumnLayout {anchors.fill:parent;anchors.margins:Theme.cardPadding;SwirlText{text:"实时下载 / 秒";color:Theme.muted}SwirlText{id:downloadRate;text:page.telemetry.sampled?page.telemetry.formatBytes(page.telemetry.downloadRate):"—";color:Theme.text;font.pixelSize:Theme.fontSize(23);Layout.fillWidth:true}}
+     ColumnLayout {anchors.fill:parent;anchors.margins:Theme.cardPadding;SwirlText{text:"实时下载 / 秒";color:Theme.muted}SwirlText{textRole:"data";id:downloadRate;text:page.telemetry.sampled?page.telemetry.formatBytes(page.telemetry.downloadRate):"—";color:Theme.text;font.pixelSize:Theme.fontSize(23);Layout.fillWidth:true}}
     }
    }
    GridLayout { Layout.fillWidth:true;columns:page.width>Theme.dp(800)?4:2;columnSpacing:Theme.gap;rowSpacing:Theme.gap

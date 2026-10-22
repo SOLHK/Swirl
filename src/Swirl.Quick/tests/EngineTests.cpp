@@ -5,6 +5,7 @@
 #include <QCryptographicHash>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonArray>
 #include <QNetworkReply>
 #include <QNetworkProxy>
 #include <QSettings>
@@ -12,6 +13,8 @@
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QTest>
+#include <QSettings>
+#include "app/StoragePaths.h"
 #include <QTcpSocket>
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -144,8 +147,19 @@ private slots:
         engine.stop();QTRY_VERIFY_WITH_TIMEOUT(!engine.status().processAlive,4000);qunsetenv("SWIRL_FIXTURE_CONTROL");
     }
 
-    void initTestCase() { QStandardPaths::setTestModeEnabled(true); }
+    void initTestCase() { QStandardPaths::setTestModeEnabled(true);SwirlPaths::initializeTestStorage();QSettings::setDefaultFormat(QSettings::IniFormat);QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,SwirlPaths::writableLocation(QStandardPaths::AppConfigLocation)); }
     void cleanup() { qunsetenv("SWIRL_FIXTURE_MODE"); qunsetenv("SWIRL_FIXTURE_CONTROL"); }
+    void nativeDnsQueryPolicyCannotBeLostOrRunByCompatibilityCore() {
+        QTemporaryDir directory;const auto path=directory.filePath("nodes.dpapi");NodeStore seed(path);
+        const QJsonObject dns{{"mode",2},{"servers","127.0.0.1"},{"queryFamily","ipv4_only"},{"useHosts",false}};
+        QVERIFY(seed.saveNetworkConfiguration(QJsonObject{{"schema",1},{"dns",dns}}));
+        EngineController controller(std::make_unique<MihomoAdapter>(),nullptr,path);QCOMPARE(QJsonObject::fromVariantMap(controller.dnsConfiguration()),dns);
+        QFile file(path);QVERIFY(file.open(QIODevice::ReadOnly));const auto before=file.readAll();file.close();
+        QVERIFY(!controller.configureDns({{"mode",2},{"servers","::1"}}));QCOMPARE(QJsonObject::fromVariantMap(controller.dnsConfiguration()),dns);
+        QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),before);file.close();
+        MihomoAdapter adapter;auto config=options();config.dnsConfig=dns.toVariantMap();adapter.start(config);
+        QCOMPARE(adapter.status().error,ProxyEngine::Error::InvalidOptions);QVERIFY(!adapter.status().processAlive);
+    }
     void networkPreferencesValidateAndPersist() {
         QTemporaryDir directory;const auto store=directory.filePath("nodes.dpapi");
         EngineController controller(std::make_unique<MihomoAdapter>(),nullptr,store);
@@ -157,7 +171,7 @@ private slots:
         QVERIFY(controller.configureDns(dns));
         QVERIFY(!controller.configureLan("bad:username","long-enough"));QVERIFY(!controller.configureLan("swirl","short"));
         QVERIFY(controller.configureLan("swirl","swirl-test-password"));QVERIFY(controller.lanConfigured());
-        QFile networkStore(store+".network.json");QVERIFY(networkStore.open(QIODevice::ReadOnly));QVERIFY(!networkStore.readAll().contains("swirl-test-password"));networkStore.close();
+        QFile networkStore(store);QVERIFY(networkStore.open(QIODevice::ReadOnly));QVERIFY(!networkStore.readAll().contains("swirl-test-password"));networkStore.close();
         QVERIFY(!controller.saveRoutingRule("DOMAIN-SUFFIX","test\nMATCH,REJECT","DIRECT"));
         QVERIFY(!controller.saveRoutingRule("IP-CIDR","not-a-subnet","DIRECT"));
         QVERIFY(!controller.saveRoutingRule("DOMAIN","fixture.test","missing-group"));
@@ -182,6 +196,15 @@ private slots:
         QCOMPARE(restored.routingRules().first().toMap().value("policy").toString(),QStringLiteral("Local"));
         QCOMPARE(restored.routingRules().first().toMap().value("pattern").toString(),QStringLiteral("edited.fixture.test"));
         QVERIFY(restored.removeRoutingRule(0));QVERIFY(restored.removePolicyGroup("Local"));
+        QVERIFY(restored.saveRoutingRule("PROCESS-NAME","fixture-process.exe","DIRECT"));
+        QCOMPARE(restored.routingRules().first().toMap().value("type").toString(),QStringLiteral("PROCESS-NAME"));
+        // Existing compatibility modifiers are retained by the unchanged editor.
+        NodeStore seed(store);auto snapshot=seed.networkConfiguration();
+        snapshot["rules"]=QJsonArray{"PROCESS-NAME,fixture-process.exe,DIRECT","IP-CIDR,198.51.100.0/24,DIRECT,no-resolve,src"};
+        QVERIFY(seed.saveNetworkConfiguration(snapshot));
+        EngineController compatibility(std::make_unique<MihomoAdapter>(),nullptr,store);
+        QVERIFY(compatibility.saveRoutingRule("IP-CIDR","192.0.2.0/24","DIRECT",1));
+        QCOMPARE(compatibility.networkConfigurationSnapshot().value("rules").toStringList()[1],QStringLiteral("IP-CIDR,192.0.2.0/24,DIRECT,no-resolve,src"));
     }
     void missingAndTampered() {
         MihomoAdapter engine;

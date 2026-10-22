@@ -4,7 +4,7 @@ import SwirlQuick
 TextField {
     renderType:TextInput.NativeRendering
     font.hintingPreference:Font.PreferFullHinting
-    Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) }
+    SwirlFontBinding { target: control; textRole: "input" }
     id: control
     implicitHeight:Theme.controlHeight
     leftPadding:Theme.controlPadding; rightPadding:Theme.controlPadding

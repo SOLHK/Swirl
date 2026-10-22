@@ -28,8 +28,7 @@ Item {
                 }
                 onClicked:{if(index===0)lights.targetWindow.close();else if(index===1)lights.targetWindow.showMinimized();else if(lights.targetWindow.visibility===Window.FullScreen)lights.targetWindow.showNormal();else lights.targetWindow.showFullScreen()}
                 Accessible.name:index===0?"关闭":index===1?"最小化":lights.targetWindow.visibility===Window.FullScreen?"退出全屏":"进入全屏"
-                ToolTip.visible:hovered && !previewCaptureMode
-                ToolTip.delay:650;ToolTip.text:Accessible.name
+                SwirlToolTip {parent:lamp;visible:lamp.hovered && !previewCaptureMode;delay:650;text:lamp.Accessible.name}
             }
         }
     }

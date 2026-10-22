@@ -1,0 +1,40 @@
+name: Swirl VF A3 evidence integrity and handoff
+
+on:
+  push:
+    branches: [work/vf-axis-a3]
+    paths:
+      - '.github/workflows/swirl-vf-a3-evidence.yml'
+      - 'tools/swirl_vf/platform/axis_a3_evidence_manifest_20261020.json'
+      - 'tools/swirl_vf/platform/axis_a3_native_*.zip'
+      - 'tools/swirl_vf/platform/axis_a3_windows_contract.json'
+      - 'tools/swirl_vf/platform/axis_a3_handoff_20261020.md'
+      - 'tools/swirl_vf/tests/test_axis_a3_evidence.py'
+      - 'tools/swirl_vf/tests/test_axis_a3_windows_contract.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evidence-and-contracts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare native synthetic controls and source parsers
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libharfbuzz0b libfreetype6
+          python -m pip install fonttools==4.61.1 numpy==2.2.6
+      - name: Verify complete A3 evidence and input contracts
+        run: |
+          python -c 'import ctypes.util; assert ctypes.util.find_library("harfbuzz") and ctypes.util.find_library("freetype")'
+          python -m unittest discover -s tools/swirl_vf/tests -p 'test_axis_a3*.py' -v
+          python -m unittest discover -s tools/swirl_vf/tests -p 'test_axis_input_resolution.py' -v

@@ -1,0 +1,35 @@
+{
+  "fixture": "self_authored_analytic_no_Apple_data",
+  "harfbuzz_version": "14.6.0",
+  "shaping": [
+    {
+      "font": "source",
+      "unpositioned_advance": 505,
+      "positioned_advance": 510,
+      "GPOS_adjustment": 5
+    },
+    {
+      "font": "identity-avar-control",
+      "unpositioned_advance": 510,
+      "positioned_advance": 540,
+      "GPOS_adjustment": 30
+    }
+  ],
+  "production_native_gate": "BLOCKED",
+  "native_backend": "CoreText",
+  "physical_faces_verified": 1,
+  "native_glyph_batches": 0,
+  "output_generated": false,
+  "source_unchanged": true,
+  "baseline_sha": "57ffd081b850a094eaa2f93c557cc91f1a5047a2",
+  "source_fix": "GDEF.VarStore rejection before replacing avar",
+  "owner_reproducer": "origin/work/vf-rebuild-c1 c0fe6c47f1a4a0854fcbbde7c9f08b791b44123e; test_ttc_staging_contract.py",
+  "regressions": {
+    "D3_layout": 3,
+    "pipeline": 6
+  },
+  "host": "macOS 26.3 build 25D125 arm64",
+  "original_conversion_faces": 0,
+  "Windows11": "NOT_RUN",
+  "Qt_Swirl": "NOT_RUN"
+}

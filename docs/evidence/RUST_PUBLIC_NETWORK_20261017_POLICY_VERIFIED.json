@@ -1,0 +1,86 @@
+{
+  "schema": 1,
+  "commit": "5dbe762d4b85543939d8ca476451f137e210a559",
+  "platform": "Linux",
+  "tracked_worktree_clean": true,
+  "timestamp_utc": "2026-10-17T12:48:17.280556+00:00",
+  "harness_sha256": "914ee31cac2e00f75bb78bde55a22f68e60c6e98b4af8e6e71d906b59b5e1da0",
+  "scope": "Public HTTPS via native DIRECT and native DoH; no provider, UDP, TUN or performance claim",
+  "checks": [
+    {
+      "host": "example.com",
+      "port": 443,
+      "method": "HEAD",
+      "path": "/",
+      "dns": "system",
+      "route": "explicit-native-direct",
+      "success": true,
+      "engine": "swirl-rust",
+      "certificate_verified": true,
+      "tls_version": "TLSv1.3",
+      "http_status": 200,
+      "orderly_close": true,
+      "core": {
+        "accepted": 1,
+        "active": 0,
+        "failed": 0,
+        "upload": 700,
+        "download": 4790,
+        "last_error": "",
+        "recorded_connections": 1
+      },
+      "elapsed_ms": 92
+    },
+    {
+      "host": "www.rust-lang.org",
+      "port": 443,
+      "method": "HEAD",
+      "path": "/",
+      "dns": "system",
+      "route": "explicit-native-direct",
+      "success": true,
+      "engine": "swirl-rust",
+      "certificate_verified": true,
+      "tls_version": "TLSv1.3",
+      "http_status": 301,
+      "orderly_close": true,
+      "core": {
+        "accepted": 1,
+        "active": 0,
+        "failed": 0,
+        "upload": 690,
+        "download": 5386,
+        "last_error": "",
+        "recorded_connections": 1
+      },
+      "elapsed_ms": 150
+    },
+    {
+      "host": "example.com",
+      "port": 443,
+      "method": "HEAD",
+      "path": "/",
+      "dns": "native-doh",
+      "route": "explicit-native-direct",
+      "success": true,
+      "dns_endpoint": "https://cloudflare-dns.com/dns-query",
+      "dns_bootstrap": "1.1.1.1:443",
+      "engine": "swirl-rust",
+      "certificate_verified": true,
+      "tls_version": "TLSv1.3",
+      "http_status": 200,
+      "orderly_close": true,
+      "core": {
+        "accepted": 1,
+        "active": 0,
+        "failed": 0,
+        "upload": 700,
+        "download": 4790,
+        "last_error": "",
+        "recorded_connections": 1
+      },
+      "elapsed_ms": 190
+    }
+  ],
+  "success": true
+}

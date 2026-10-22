@@ -83,11 +83,11 @@ int runOverviewChecks(QQuickWindow *window) {
     window->requestActivate();click("nav-external");QQuickWindow *dashboard=nullptr;for(auto *candidate:QGuiApplication::allWindows())if(candidate->objectName()=="dashboardWindow")dashboard=qobject_cast<QQuickWindow *>(candidate);
     check(dashboard&&dashboard->isVisible()&&dashboard->width()==1300,"Panel opens the independent native request window");
     if(dashboard){check(item("windowCloseButton",dashboard)&&item("windowMinimizeButton",dashboard)&&item("windowMaximizeButton",dashboard),"request panel has all three window controls");click("windowCloseButton",dashboard);check(!dashboard->isVisible()&&window->isVisible(),"panel red button closes only the panel");}
-    for(const auto *route:{"settings","appearance","fonts","profiles","dns","modules","scripts","subscriptions","proxies"}){
+    for(const auto *route:{"settings","fonts","profiles","dns","modules","scripts","subscriptions","proxies"}){
         state(QString("window.openSettings('%1')").arg(route));QTest::qWait(80);settled();
         auto *page=qobject_cast<QQuickItem *>(state("pageLoader.item").value<QObject *>());
         check(page&&page->window()==window&&window->winId()==nativeHandle&&item("windowCloseButton")&&item("windowMinimizeButton")&&item("windowMaximizeButton"),"every settings route uses the original main shell and its controls");
-        if(QString::fromLatin1(route)=="appearance"){
+        if(QString::fromLatin1(route)=="settings"){
             state("pageLoader.item.section='关于 Swirl'");QTest::qWait(80);
             const auto *brand=item("brandVector");check(brand&&brand->isVisible()&&brand->width()>=104,"About retains the enlarged brand mark inside the settings page");
         }

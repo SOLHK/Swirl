@@ -1,0 +1,743 @@
+{
+  "schema_version": 1,
+  "scope": "Original committed Vision R2 Windows failure retained without relabeling as success",
+  "source_commit": "f3ce257f14e59e82977d89ac4be436d08926c6b8",
+  "run_id": 39243009089,
+  "run_url": "https://github.com/SOLHK/Swirl/actions/runs/39243009089",
+  "job": {
+    "id": 118028095366,
+    "name": "windows-rust",
+    "status": "completed",
+    "conclusion": "failure",
+    "run_id": 39243009089,
+    "logs_url": null,
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1
+      },
+      {
+        "name": "Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 2
+      },
+      {
+        "name": "Install stable Rust tools",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3
+      },
+      {
+        "name": "Run cargo fmt --all -- --check",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4
+      },
+      {
+        "name": "Run cargo check --workspace --locked",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 5
+      },
+      {
+        "name": "Run cargo clippy --workspace --all-targets --locked -- -D warnings",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 6
+      },
+      {
+        "name": "Run cargo test --workspace --locked",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 7
+      },
+      {
+        "name": "Run cargo build --release --locked --workspace --lib --bins",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 8
+      },
+      {
+        "name": "Build native REALITY TLS peer client",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 9
+      },
+      {
+        "name": "Run actions/setup-python@v5",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 10
+      },
+      {
+        "name": "Independent TLS and protocol peers",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 11
+      },
+      {
+        "name": "Diagnose hosted Windows port allocation after a peer failure",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 12
+      },
+      {
+        "name": "Install pinned Go for the independent Xray peer",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 13
+      },
+      {
+        "name": "Build pinned Xray and verify REALITY interoperability",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 14
+      },
+      {
+        "name": "Preserve Xray build identity and raw interoperability evidence",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 15
+      },
+      {
+        "name": "Build native Vision client and verify Xray interoperability",
+        "status": "completed",
+        "conclusion": "failure",
+        "number": 16
+      },
+      {
+        "name": "Preserve Vision client and full Xray interoperability evidence",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 17
+      },
+      {
+        "name": "Run actions/upload-artifact@v4",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 18
+      },
+      {
+        "name": "Install Qt for Rust control adapter",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 19
+      },
+      {
+        "name": "Build Qt to Rust integration test",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 20
+      },
+      {
+        "name": "Reject native DNS policy in compatibility builds without starting a core",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 21
+      },
+      {
+        "name": "Run Qt to Rust integration without Mihomo",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 22
+      },
+      {
+        "name": "Build complete native Rust application",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 23
+      },
+      {
+        "name": "Preserve isolated Qt test reports",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 24
+      },
+      {
+        "name": "Post Install pinned Go for the independent Xray peer",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 46
+      },
+      {
+        "name": "Post Run actions/setup-python@v5",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 47
+      },
+      {
+        "name": "Post Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 48
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 49
+      }
+    ],
+    "url": "https://github.com/SOLHK/Swirl/actions/runs/39243009089/job/118028095366"
+  },
+  "complete_job_success": false,
+  "original_failure_preserved": true,
+  "artifacts": [
+    {
+      "metadata": {
+        "id": 12183535068,
+        "name": "Swirl-Vision-Xray-Windows-f3ce257f14e59e82977d89ac4be436d08926c6b8-1",
+        "size_in_bytes": 38644,
+        "url": "https://api.github.com/repos/SOLHK/Swirl/actions/artifacts/12183535068",
+        "archive_download_url": "https://api.github.com/repos/SOLHK/Swirl/actions/artifacts/12183535068/zip",
+        "expired": false,
+        "created_at": "2026-10-19T11:25:08Z",
+        "expires_at": "2026-11-02T11:25:08Z",
+        "updated_at": "2026-10-19T11:25:08Z",
+        "digest": "sha256:7b86bdcfc684d9ad1ce669ea592b23f29bfce389a32a55cd51777d8f8a2904df",
+        "workflow_run": {
+          "id": 39243009089,
+          "repository_id": 1411888911,
+          "head_repository_id": 1411888911,
+          "head_branch": "work/core-completion-20261017",
+          "head_sha": "f3ce257f14e59e82977d89ac4be436d08926c6b8"
+        }
+      },
+      "local_zip": "/tmp/swirl-vision-windows-12183535068.zip",
+      "downloaded_sha256": "7b86bdcfc684d9ad1ce669ea592b23f29bfce389a32a55cd51777d8f8a2904df",
+      "github_digest_matches": true
+    },
+    {
+      "metadata": {
+        "id": 12182199993,
+        "name": "Swirl-REALITY-Xray-Windows-f3ce257f14e59e82977d89ac4be436d08926c6b8-1",
+        "size_in_bytes": 55504,
+        "url": "https://api.github.com/repos/SOLHK/Swirl/actions/artifacts/12182199993",
+        "archive_download_url": "https://api.github.com/repos/SOLHK/Swirl/actions/artifacts/12182199993/zip",
+        "expired": false,
+        "created_at": "2026-10-19T11:24:39Z",
+        "expires_at": "2026-11-02T11:24:39Z",
+        "updated_at": "2026-10-19T11:24:39Z",
+        "digest": "sha256:92a5fd1251b0f5c7cfb99bbe1faba8861a14d0007587eab3690d242771f7400c",
+        "workflow_run": {
+          "id": 39243009089,
+          "repository_id": 1411888911,
+          "head_repository_id": 1411888911,
+          "head_branch": "work/core-completion-20261017",
+          "head_sha": "f3ce257f14e59e82977d89ac4be436d08926c6b8"
+        }
+      },
+      "local_zip": "/tmp/swirl-vision-r3-windows-12182199993.zip",
+      "downloaded_sha256": "92a5fd1251b0f5c7cfb99bbe1faba8861a14d0007587eab3690d242771f7400c",
+      "github_digest_matches": true
+    }
+  ],
+  "source_identity": {
+    "git_sha": "f3ce257f14e59e82977d89ac4be436d08926c6b8",
+    "tracked_changes": false,
+    "client_sha256": "63db73d01045283db7cb3c6fe0a810226af9d4998d72ad7e884cb5b9dd6d07b5",
+    "test_sha256": "6148d18e541cc5f540318e221efc4f25ca8646bd174ea9253f0ec7466b07d0bd",
+    "client_source_sha256": "cfd6d60ee91fde4596c1241b05b3903453f5ad9e4a858a5b73766a0b683f7f0a",
+    "python": "3.14.8 (tags/v3.14.8:8e6e75d, Sep 30 2026, 18:19:33) [MSC v.1944 64 bit (AMD64)]",
+    "openssl": "OpenSSL 3.5.9 29 Sep 2026",
+    "platform": "win32",
+    "github_run_id": "39243009089",
+    "build_manifest": {
+      "binaries": {
+        "reality_peer": {
+          "file": "reality-peer.exe",
+          "sha256": "3abf8cc1c232372aef35d68394c5eee288d1510d84149e30ee32dabdba443cac"
+        },
+        "xray": {
+          "file": "xray.exe",
+          "sha256": "093eca6d231af725b9e5ddf5322764a190edceff35a49c29e0a3f8f6c07d06b1"
+        }
+      },
+      "finished_unix": 1792409066,
+      "go_version": "go1.27.2",
+      "helper_source_sha256": "17b9af2d2bda7b3c57e95f87e3777065d29f05ffe418ce8c3cfde7beaa691ea0",
+      "lock_sha256": "b32dd9af801c8ed97c489f1120209b74224e595353b19fbfc13bce981eaaa925",
+      "peer_version_output": {
+        "event": "version",
+        "go_version": "go1.27.2",
+        "reality_version": "v0.0.0-20261014101318-83f621788ca8",
+        "xray_commit": "92ccc939aaf4f8965f369cf0b142e005aeaa11d5"
+      },
+      "platform": "Windows-2022Server-10.0.20348-SP0",
+      "reality": {
+        "commit": "83f621788ca88b83179810b12baa7ae518aacb83",
+        "go_mod_sum": "h1:ptlSkJ8k/7IDauNH0SA96JPOo+nYGLTv2Y3UMpwvAsY=",
+        "module": "github.com/xtls/reality",
+        "sum": "h1:RjLnVvlzK4q6zWaSBPNRGsrgx2fbJDeUWffjw574uzs=",
+        "version": "v0.0.0-20261014101318-83f621788ca8"
+      },
+      "reproducible_rebuild": {
+        "reality_peer": {
+          "first_sha256": "3abf8cc1c232372aef35d68394c5eee288d1510d84149e30ee32dabdba443cac",
+          "matches": true,
+          "repeated_sha256": "3abf8cc1c232372aef35d68394c5eee288d1510d84149e30ee32dabdba443cac"
+        },
+        "xray": {
+          "first_sha256": "093eca6d231af725b9e5ddf5322764a190edceff35a49c29e0a3f8f6c07d06b1",
+          "matches": true,
+          "repeated_sha256": "093eca6d231af725b9e5ddf5322764a190edceff35a49c29e0a3f8f6c07d06b1"
+        }
+      },
+      "schema_version": 1,
+      "started_unix": 1792409005,
+      "status": "success",
+      "swirl_source_commit": "f3ce257f14e59e82977d89ac4be436d08926c6b8",
+      "swirl_worktree_status": "",
+      "xray": {
+        "commit": "92ccc939aaf4f8965f369cf0b142e005aeaa11d5",
+        "go_mod_sha256": "31fe6bd6c04eb2738e157b850236b1376cbbac3f33e974256bb7325c8c764250",
+        "go_sum_sha256": "a72c2f2b5dd38fcf42ef55034bd55038703448b55a878eafddd60d4af1f63145",
+        "release": "v26.10.17",
+        "repository": "https://github.com/XTLS/Xray-core.git",
+        "tree": "55fc871fdf3e63149066956e7c60670f3a44fbf2"
+      },
+      "xray_version_output": "Xray 26.10.17 (Xray, Penetrates Everything.) 92ccc93 (go1.27.2 windows/amd64)\nA unified platform for anti-censorship."
+    }
+  },
+  "r3_source_identity": {
+    "git_sha": "f3ce257f14e59e82977d89ac4be436d08926c6b8",
+    "tracked_changes": false,
+    "platform": "win32",
+    "python": "3.14.8 (tags/v3.14.8:8e6e75d, Sep 30 2026, 18:19:33) [MSC v.1944 64 bit (AMD64)]",
+    "github_run_id": "39243009089",
+    "github_run_attempt": "1",
+    "client_sha256": "0721442ff79368958af0a036178927b16a5ba6a30d1ee11816cafc9dbbafe68a",
+    "peer_sha256": "3abf8cc1c232372aef35d68394c5eee288d1510d84149e30ee32dabdba443cac",
+    "xray_sha256": "093eca6d231af725b9e5ddf5322764a190edceff35a49c29e0a3f8f6c07d06b1",
+    "build_manifest": {
+      "binaries": {
+        "reality_peer": {
+          "file": "reality-peer.exe",
+          "sha256": "3abf8cc1c232372aef35d68394c5eee288d1510d84149e30ee32dabdba443cac"
+        },
+        "xray": {
+          "file": "xray.exe",
+          "sha256": "093eca6d231af725b9e5ddf5322764a190edceff35a49c29e0a3f8f6c07d06b1"
+        }
+      },
+      "finished_unix": 1792409066,
+      "go_version": "go1.27.2",
+      "helper_source_sha256": "17b9af2d2bda7b3c57e95f87e3777065d29f05ffe418ce8c3cfde7beaa691ea0",
+      "lock_sha256": "b32dd9af801c8ed97c489f1120209b74224e595353b19fbfc13bce981eaaa925",
+      "peer_version_output": {
+        "event": "version",
+        "go_version": "go1.27.2",
+        "reality_version": "v0.0.0-20261014101318-83f621788ca8",
+        "xray_commit": "92ccc939aaf4f8965f369cf0b142e005aeaa11d5"
+      },
+      "platform": "Windows-2022Server-10.0.20348-SP0",
+      "reality": {
+        "commit": "83f621788ca88b83179810b12baa7ae518aacb83",
+        "go_mod_sum": "h1:ptlSkJ8k/7IDauNH0SA96JPOo+nYGLTv2Y3UMpwvAsY=",
+        "module": "github.com/xtls/reality",
+        "sum": "h1:RjLnVvlzK4q6zWaSBPNRGsrgx2fbJDeUWffjw574uzs=",
+        "version": "v0.0.0-20261014101318-83f621788ca8"
+      },
+      "reproducible_rebuild": {
+        "reality_peer": {
+          "first_sha256": "3abf8cc1c232372aef35d68394c5eee288d1510d84149e30ee32dabdba443cac",
+          "matches": true,
+          "repeated_sha256": "3abf8cc1c232372aef35d68394c5eee288d1510d84149e30ee32dabdba443cac"
+        },
+        "xray": {
+          "first_sha256": "093eca6d231af725b9e5ddf5322764a190edceff35a49c29e0a3f8f6c07d06b1",
+          "matches": true,
+          "repeated_sha256": "093eca6d231af725b9e5ddf5322764a190edceff35a49c29e0a3f8f6c07d06b1"
+        }
+      },
+      "schema_version": 1,
+      "started_unix": 1792409005,
+      "status": "success",
+      "swirl_source_commit": "f3ce257f14e59e82977d89ac4be436d08926c6b8",
+      "swirl_worktree_status": "",
+      "xray": {
+        "commit": "92ccc939aaf4f8965f369cf0b142e005aeaa11d5",
+        "go_mod_sha256": "31fe6bd6c04eb2738e157b850236b1376cbbac3f33e974256bb7325c8c764250",
+        "go_sum_sha256": "a72c2f2b5dd38fcf42ef55034bd55038703448b55a878eafddd60d4af1f63145",
+        "release": "v26.10.17",
+        "repository": "https://github.com/XTLS/Xray-core.git",
+        "tree": "55fc871fdf3e63149066956e7c60670f3a44fbf2"
+      },
+      "xray_version_output": "Xray 26.10.17 (Xray, Penetrates Everything.) 92ccc93 (go1.27.2 windows/amd64)\nA unified platform for anti-censorship."
+    },
+    "test_source_sha256": "94eeb538bd7d076ca6a78846e6723c6a27ce909c5222e860086e93740d935273",
+    "client_source_sha256": "6a8548bb59c6362d99d23a5a5293439f6fb7cce8aa84751eb58f314e8cf7cfa5"
+  },
+  "rust_workspace_passed_including_doctest": 268,
+  "rust_failed": 0,
+  "rust_ignored": 0,
+  "r3_summary": {
+    "tests_run": 12,
+    "successful": true,
+    "failures": [],
+    "errors": [],
+    "skipped": []
+  },
+  "r3_session_count": 13,
+  "r3_sessions": [
+    {
+      "name": "001-test_bare_tcp_fin_is_rejected_after_valid_echo",
+      "status": "intentional_unclean_eof",
+      "active_connections": 0,
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "name": "002-test_data_cancellation_drops_transport_and_reaps_peer",
+      "status": "cancelled",
+      "active_connections": 0,
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "name": "003-test_data_timeout_drops_transport_and_reaps_peer",
+      "status": "cancelled",
+      "active_connections": 0,
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "name": "004-test_empty_application_still_requires_both_finished_and_close_notify",
+      "status": "completed",
+      "active_connections": 0,
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "name": "005-test_handshake_cancellation_drops_transport_and_reaps_peer",
+      "status": "cancelled",
+      "active_connections": 0,
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "name": "006-test_handshake_timeout_drops_transport_and_reaps_peer",
+      "status": "cancelled",
+      "active_connections": 0,
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "name": "007-test_native_hybrid_authentication_finished_bidirectional_data_and_close",
+      "status": "completed",
+      "active_connections": 0,
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "name": "008-test_native_x25519_authentication_finished_bidirectional_data_and_close",
+      "status": "completed",
+      "active_connections": 0,
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "name": "009-test_one_mebibyte_binary_transfer_with_short_reads_and_writes",
+      "status": "completed",
+      "active_connections": 0,
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "name": "010-test_single_byte_socket_boundaries",
+      "status": "completed",
+      "active_connections": 0,
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "name": "011-test_single_byte_socket_boundaries",
+      "status": "completed",
+      "active_connections": 0,
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "name": "012-test_wrong_reality_public_key_never_exposes_application_data",
+      "status": "authentication_rejected",
+      "active_connections": 0,
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "name": "013-test_wrong_short_id_never_exposes_application_data",
+      "status": "authentication_rejected",
+      "active_connections": 0,
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    }
+  ],
+  "vision_summary": {
+    "tests_run": 4,
+    "failures": 1,
+    "errors": 0,
+    "skipped": 0,
+    "successful": false,
+    "passed": 3
+  },
+  "vision_cases": [
+    {
+      "name": "001-test_tls12_authentication_framing_bidirectional_data_and_close-1792409104883087500",
+      "outcome": "passed",
+      "client_result": {
+        "direct_ready": false,
+        "direct_rejected": false,
+        "ok": true,
+        "payload_sha256": "35a8d48b9ca999ef7d4958538f214584ccf004f1c4c31830c6fa179cdf99f2a4",
+        "received": 45,
+        "stage": "complete",
+        "tls13_candidate": false,
+        "uploaded": 45
+      },
+      "target_result": {
+        "tls_version": "TLSv1.2",
+        "handshake_complete": true,
+        "received_bytes": 45,
+        "sent_bytes": 45,
+        "close_notify_received": true,
+        "close_notify_sent": true,
+        "probe_bytes_sent": 0,
+        "connection_closed": true,
+        "thread_released": true,
+        "error": null,
+        "cipher": "ECDHE-ECDSA-AES256-GCM-SHA384",
+        "received_sha256": "35a8d48b9ca999ef7d4958538f214584ccf004f1c4c31830c6fa179cdf99f2a4",
+        "sent_sha256": "35a8d48b9ca999ef7d4958538f214584ccf004f1c4c31830c6fa179cdf99f2a4"
+      },
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_kill": false,
+        "listener_closed": true,
+        "exit_code": 1
+      }
+    },
+    {
+      "name": "002-test_tls12_large_transfer_pause_resume_and_application_boundaries-1792409105637784600",
+      "outcome": "passed",
+      "client_result": {
+        "direct_ready": false,
+        "direct_rejected": false,
+        "ok": true,
+        "payload_sha256": "33bc8aab40703678c3ebe94d2dd8f2afff285dd901f9234e841e4679f8204fd5",
+        "received": 524288,
+        "stage": "complete",
+        "tls13_candidate": false,
+        "uploaded": 524288
+      },
+      "target_result": {
+        "tls_version": "TLSv1.2",
+        "handshake_complete": true,
+        "received_bytes": 524288,
+        "sent_bytes": 524288,
+        "close_notify_received": true,
+        "close_notify_sent": true,
+        "probe_bytes_sent": 0,
+        "connection_closed": true,
+        "thread_released": true,
+        "error": null,
+        "cipher": "ECDHE-ECDSA-AES256-GCM-SHA384",
+        "received_sha256": "33bc8aab40703678c3ebe94d2dd8f2afff285dd901f9234e841e4679f8204fd5",
+        "sent_sha256": "33bc8aab40703678c3ebe94d2dd8f2afff285dd901f9234e841e4679f8204fd5"
+      },
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_kill": false,
+        "listener_closed": true,
+        "exit_code": 1
+      }
+    },
+    {
+      "name": "003-test_tls12_single_byte_reads_and_small_writes-1792409106548619800",
+      "outcome": "passed",
+      "client_result": {
+        "direct_ready": false,
+        "direct_rejected": false,
+        "ok": true,
+        "payload_sha256": "7624e91e9f7222304a0dec9f6c720c4adf5d283342a9e70a9e46006fb678af12",
+        "received": 289,
+        "stage": "complete",
+        "tls13_candidate": false,
+        "uploaded": 289
+      },
+      "target_result": {
+        "tls_version": "TLSv1.2",
+        "handshake_complete": true,
+        "received_bytes": 289,
+        "sent_bytes": 289,
+        "close_notify_received": true,
+        "close_notify_sent": true,
+        "probe_bytes_sent": 0,
+        "connection_closed": true,
+        "thread_released": true,
+        "error": null,
+        "cipher": "ECDHE-ECDSA-AES256-GCM-SHA384",
+        "received_sha256": "7624e91e9f7222304a0dec9f6c720c4adf5d283342a9e70a9e46006fb678af12",
+        "sent_sha256": "7624e91e9f7222304a0dec9f6c720c4adf5d283342a9e70a9e46006fb678af12"
+      },
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_kill": false,
+        "listener_closed": true,
+        "exit_code": 1
+      }
+    },
+    {
+      "name": "004-test_tls13_direct_request_is_rejected_without_application_data-1792409107273850700",
+      "outcome": "failed",
+      "client_result": {
+        "direct_ready": false,
+        "direct_rejected": false,
+        "error": "SyntheticVisionSessionFailed",
+        "error_kind": "InvalidData",
+        "ok": false,
+        "received": 0,
+        "stage": "server_first_probe",
+        "tls13_candidate": true,
+        "uploaded": 0
+      },
+      "target_result": {
+        "tls_version": "TLSv1.3",
+        "handshake_complete": true,
+        "received_bytes": 0,
+        "sent_bytes": 0,
+        "close_notify_received": false,
+        "close_notify_sent": false,
+        "probe_bytes_sent": 34,
+        "connection_closed": true,
+        "thread_released": true,
+        "error": {
+          "type": "SSLEOFError",
+          "message": "[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:2713)"
+        },
+        "cipher": "TLS_AES_256_GCM_SHA384",
+        "probe_sha256": "d50b77b997f88e72a20fafecc7af9ab0a5c6d19d18b81276262ace4216eb7316",
+        "received_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sent_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_kill": false,
+        "listener_closed": true,
+        "exit_code": 1
+      }
+    }
+  ],
+  "original_peer_test_log": {
+    "sha256": "64df0127442e14f28b456db0c64deb0db1b2849d997a6a878c10784a734a2840",
+    "text": "test_tls12_authentication_framing_bidirectional_data_and_close (__main__.VisionXrayInterop.test_tls12_authentication_framing_bidirectional_data_and_close) ... ok\r\ntest_tls12_large_transfer_pause_resume_and_application_boundaries (__main__.VisionXrayInterop.test_tls12_large_transfer_pause_resume_and_application_boundaries) ... ok\r\ntest_tls12_single_byte_reads_and_small_writes (__main__.VisionXrayInterop.test_tls12_single_byte_reads_and_small_writes) ... ok\r\ntest_tls13_direct_request_is_rejected_without_application_data (__main__.VisionXrayInterop.test_tls13_direct_request_is_rejected_without_application_data) ... FAIL\r\n\r\n======================================================================\r\nFAIL: test_tls13_direct_request_is_rejected_without_application_data (__main__.VisionXrayInterop.test_tls13_direct_request_is_rejected_without_application_data)\r\n----------------------------------------------------------------------\r\nTraceback (most recent call last):\r\n  File \"D:\\a\\Swirl\\Swirl\\tools\\tests\\test_vision_xray.py\", line 400, in test_tls13_direct_request_is_rejected_without_application_data\r\n    self.exchange(b\"must-not-cross-unowned-direct-boundary\", tls13=True)\r\n    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\r\n  File \"D:\\a\\Swirl\\Swirl\\tools\\tests\\test_vision_xray.py\", line 349, in exchange\r\n    self.assertTrue(client[\"direct_rejected\"], client)\r\n    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\r\nAssertionError: False is not true : {'direct_ready': False, 'direct_rejected': False, 'error': 'SyntheticVisionSessionFailed', 'error_kind': 'InvalidData', 'ok': False, 'received': 0, 'stage': 'server_first_probe', 'tls13_candidate': True, 'uploaded': 0}\r\n\r\n----------------------------------------------------------------------\r\nRan 4 tests in 3.200s\r\n\r\nFAILED (failures=1)\r\n"
+  },
+  "original_failure_case": {
+    "name": "004-test_tls13_direct_request_is_rejected_without_application_data-1792409107273850700",
+    "outcome": "failed",
+    "files": {
+      "client-stdout.jsonl": {
+        "sha256": "e4a762588eef6aba252ab0637da8978b1c434e5f307c2b7a0bf6f870da394172",
+        "text": "{\"direct_ready\":false,\"direct_rejected\":false,\"error\":\"SyntheticVisionSessionFailed\",\"error_kind\":\"InvalidData\",\"ok\":false,\"received\":0,\"stage\":\"server_first_probe\",\"tls13_candidate\":true,\"uploaded\":0}\r\n"
+      },
+      "client-stderr.log": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "text": ""
+      },
+      "target-result.json": {
+        "sha256": "464e706664fa824a46341ea4241276ecdab1d48919cd4603c7010ccbda35a1b1",
+        "text": "{\r\n  \"tls_version\": \"TLSv1.3\",\r\n  \"handshake_complete\": true,\r\n  \"received_bytes\": 0,\r\n  \"sent_bytes\": 0,\r\n  \"close_notify_received\": false,\r\n  \"close_notify_sent\": false,\r\n  \"probe_bytes_sent\": 34,\r\n  \"connection_closed\": true,\r\n  \"thread_released\": true,\r\n  \"error\": {\r\n    \"type\": \"SSLEOFError\",\r\n    \"message\": \"[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:2713)\"\r\n  },\r\n  \"cipher\": \"TLS_AES_256_GCM_SHA384\",\r\n  \"probe_sha256\": \"d50b77b997f88e72a20fafecc7af9ab0a5c6d19d18b81276262ace4216eb7316\",\r\n  \"received_sha256\": \"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\r\n  \"sent_sha256\": \"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\"\r\n}\r\n"
+      },
+      "xray-lifecycle.json": {
+        "sha256": "457a973e0cf6e593322df0e2cf198b97afd118ebb787099fd14a2234847885e8",
+        "text": "{\r\n  \"process_reaped\": true,\r\n  \"forced_kill\": false,\r\n  \"listener_closed\": true,\r\n  \"exit_code\": 1\r\n}\r\n"
+      },
+      "xray.log": {
+        "sha256": "99416ed7f5325985a92418d8df38967ef84e4cd63c8ad6fd5809026f87ab5dc4",
+        "text": "Xray 26.10.17 (Xray, Penetrates Everything.) 92ccc93 (go1.27.2 windows/amd64)\nA unified platform for anti-censorship.\n2026/10/19 11:25:07.370732 [Info] infra/conf/serial: Reading config: &{Name:D:\\a\\_temp\\swirl-vision-results\\004-test_tls13_direct_request_is_rejected_without_application_data-1792409107273850700\\xray-config.json Format:json}\r\n2026/10/19 11:25:07.372952 [Debug] app/log: Logger started\r\n2026/10/19 11:25:07.375273 [Debug] app/proxyman/inbound: creating stream worker on 127.0.0.1:50490\r\n2026/10/19 11:25:07.379236 [Info] transport/internet/tcp: listening tcp on 127.0.0.1:50490\r\n2026/10/19 11:25:07.381266 [Warning] core: Xray 26.10.17 started\r\n2026/10/19 11:25:07.451161 [Info] [2395929499] app/proxyman/inbound: connection ends > EOF\r\n2026/10/19 11:25:07.459865 [Info] [821685454] proxy/vless/inbound: firstLen = 44\r\n2026/10/19 11:25:07.459938 from 127.0.0.1:50493 accepted tcp:127.0.0.1:50489 [loopback]\r\n2026/10/19 11:25:07.459938 [Info] [821685454] proxy/vless/inbound: received request for tcp:127.0.0.1:50489\r\n2026/10/19 11:25:07.459938 [Info] [821685454] app/dispatcher: taking detour [loopback] for [tcp:127.0.0.1:50489]\r\n2026/10/19 11:25:07.459938 [Info] [821685454] transport/internet/tcp: dialing TCP to tcp:127.0.0.1:50489\r\n2026/10/19 11:25:07.459938 [Debug] [821685454] transport/internet: dialing to tcp:127.0.0.1:50489\r\n2026/10/19 11:25:07.459938 [Info] [821685454] proxy/freedom: connection opened to tcp:127.0.0.1:50489, local endpoint 127.0.0.1:50494, remote endpoint 127.0.0.1:50489\r\n2026/10/19 11:25:07.459938 [Debug] [821685454] proxy: CopyRawConn (maybe) readv\r\n2026/10/19 11:25:07.459938 [Debug] [821685454] proxy: Xtls Unpadding new block, content 250 padding 1149 command 0\r\n2026/10/19 11:25:07.459938 [Debug] [821685454] proxy: XtlsFilterTls found tls client hello! 250\r\n2026/10/19 11:25:07.460896 [Debug] [821685454] proxy: XtlsFilterTls found tls 1.3! 1138 TLS_AES_256_GCM_SHA384\r\n2026/10/19 11:25:07.460896 [Debug] [821685454] proxy: XtlsPadding 1138 180 0\r\n2026/10/19 11:25:07.461554 [Debug] [821685454] proxy: Xtls Unpadding new block, content 6 padding 1025 command 0\r\n2026/10/19 11:25:07.461603 [Debug] [821685454] proxy: Xtls Unpadding new block, content 74 padding 1097 command 1\r\n2026/10/19 11:25:07.461677 [Debug] [821685454] proxy: XtlsPadding 79 938 2\r\n2026/10/19 11:25:07.462203 [Info] [821685454] app/proxyman/outbound: app/proxyman/outbound: failed to process outbound traffic > proxy/freedom: connection ends > proxy/freedom: failed to process request > remote error: tls: bad record MAC\r\n"
+      },
+      "invocation.json": {
+        "sha256": "d69ee077bd1ad996cbfefe933303597db1b8b57690f5c1b16b7847ff5b38205e",
+        "text": "{\r\n  \"elapsed_seconds\": 0.014823599999999715,\r\n  \"exit_code\": 1,\r\n  \"payload_bytes\": 38,\r\n  \"payload_sha256\": \"c3a31b1a3f789f68185194d9c231610f1a2d601749f5a6feb7d86c0f47daa364\",\r\n  \"tls13\": true,\r\n  \"pause_reads\": false,\r\n  \"read_chunk\": 16384,\r\n  \"write_chunk\": 16384\r\n}\r\n"
+      }
+    }
+  },
+  "raw_job_log": {
+    "path": "/tmp/swirl-vision-windows-f3ce-job.log",
+    "sha256": "6c386665ffeddb6a21e6fb2b51f833008496211ff76bc0a693facc6e0ce47cca"
+  },
+  "observed_failure": "The real Xray server logged command 2; the client returned InvalidData at server_first_probe before DirectRequested was observed, so the required Direct rejection assertion failed. Xray then logged remote TLS bad record MAC.",
+  "safety_observations": "The client reported no application upload/receipt and no DirectReady; the target sent the separate 34-byte TLS1.3 probe and observed no client application data. These observations do not convert the failed Direct-refusal test into a pass.",
+  "limitations": [
+    "No Windows Vision acceptance is claimed for this SHA.",
+    "The Windows Qt integration and full native App steps were skipped after the Vision failure and are not claimed to have passed.",
+    "Target truncation and OS reference-process termination are not normal TLS close_notify outcomes.",
+    "R3 and Rust results belong to this precise SHA and are recorded separately from the failed Vision suite."
+  ],
+  "steps_skipped_after_failure": [
+    "Diagnose hosted Windows port allocation after a peer failure",
+    "Run actions/upload-artifact@v4",
+    "Install Qt for Rust control adapter",
+    "Build Qt to Rust integration test",
+    "Reject native DNS policy in compatibility builds without starting a core",
+    "Run Qt to Rust integration without Mihomo",
+    "Build complete native Rust application",
+    "Post Install pinned Go for the independent Xray peer",
+    "Post Run actions/setup-python@v5"
+  ],
+  "qt_app_executed": false
+}

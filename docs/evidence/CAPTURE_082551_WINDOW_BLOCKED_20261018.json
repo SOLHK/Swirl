@@ -1,0 +1,28 @@
+{
+  "window_open_utc": "2026-10-18T08:25:51Z",
+  "hard_cutoff_utc": "2026-10-18T08:33:30Z",
+  "recorded_at_utc": "2026-10-18T08:35:09.133232+00:00",
+  "original_manifest_indices": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    13,
+    14,
+    15
+  ],
+  "supplier_requests": 0,
+  "new_encrypted_responses": 0,
+  "capture_started": false,
+  "window_closed": true,
+  "late_approval_must_not_start_capture": true,
+  "first_approval_result": "rejected: relayed authorization not accepted by execution reviewer",
+  "single_review_retry_result": "approval review timeout; CreateProcess did not start",
+  "preflight": "physical WLAN route for all resolved supplier destinations; no active TUN route observed, not a packet/WFP audit",
+  "latest_token_equality_verified": false,
+  "existing_cache_preserved": true,
+  "pending_supplier_processes": 0,
+  "preflight_evidence": "D:/Codex/outputs/capture-082551-direct-preflight.json"
+}

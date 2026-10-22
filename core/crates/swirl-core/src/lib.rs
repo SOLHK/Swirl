@@ -1,4 +1,11 @@
 //! Rust-owned runtime, sockets, scheduling, statistics and immutable session plans.
+mod policy;
+mod probe;
+mod socks5_udp;
+pub use policy::{MemberHealth, PolicyReport};
+use policy::{PolicyRuntime, PolicyView};
+use probe::ProbeRuntime;
+pub use probe::{ProbeFailure, ProbeMetrics, ProbePhase, ProbeStatus};
 use serde::Serialize;
 use std::{
     collections::{BTreeMap, HashMap},
@@ -11,24 +18,49 @@ use std::{
 };
 use swirl_dns::Resolver;
 use swirl_protocol::{Inbound, Result, Target};
-use swirl_subscription::{Config, Outbound};
-use swirl_transport::Counters;
+use swirl_routing::{ChinaRules, load_rules_from_directory, shared_bundled_rules};
+use swirl_subscription::{Config, HealthProbe, Outbound, PolicyStrategy};
+use swirl_transport::{Counters, bind_udp};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream, UdpSocket},
     runtime::{Builder, Runtime},
-    sync::{Semaphore, watch},
+    sync::{OwnedSemaphorePermit, Semaphore, watch},
     task::{JoinHandle, JoinSet},
     time::timeout,
 };
+
+type ChinaRulePair = (Option<Arc<ChinaRules>>, Option<Arc<ChinaRules>>);
+
+fn load_china_rules(config: &Config) -> Result<ChinaRulePair> {
+    if !config.smart_routing {
+        return Ok((None, None));
+    }
+    if !config
+        .nodes
+        .iter()
+        .any(|node| matches!(node.outbound, Outbound::Direct {}))
+    {
+        return Err("SmartRoutingDirectMissing");
+    }
+    let (domains, ips) = if let Some(directory) = config.china_rules_directory.as_deref() {
+        let (domains, ips) = load_rules_from_directory(std::path::Path::new(directory))?;
+        (Arc::new(domains), Arc::new(ips))
+    } else {
+        shared_bundled_rules()?
+    };
+    Ok((Some(domains), Some(ips)))
+}
 
 struct Record {
     peer: SocketAddr,
     category: &'static str,
     target: Target,
     node: String,
+    matched_rule: String,
     started: Instant,
     ended: bool,
+    error: &'static str,
     counters: Arc<Counters>,
 }
 #[derive(Default)]
@@ -51,7 +83,11 @@ pub struct Connection {
     pub host: String,
     pub port: u16,
     pub node: String,
+    pub matched_rule: String,
+    pub transport_state: &'static str,
     pub ended: bool,
+    pub error: &'static str,
+    pub failure_stage: &'static str,
     pub upload: u64,
     pub download: u64,
     pub udp_dropped: u64,
@@ -65,6 +101,7 @@ pub struct Snapshot {
     pub generation: u64,
     pub selected: String,
     pub selectors: BTreeMap<String, String>,
+    pub policies: BTreeMap<String, PolicyReport>,
     pub running: bool,
     pub active: usize,
     pub accepted: u64,
@@ -74,14 +111,37 @@ pub struct Snapshot {
     pub download: u64,
     pub udp_dropped: u64,
     pub last_error: &'static str,
+    pub last_error_stage: &'static str,
     pub connections: Vec<Connection>,
 }
 struct Plan {
     config: Arc<Config>,
     resolver: Arc<Resolver>,
+    policies: Arc<PolicyRuntime>,
+    cn_domains: Option<Arc<ChinaRules>>,
+    cn_ips: Option<Arc<ChinaRules>>,
+}
+struct SessionPlan {
+    config: Arc<Config>,
+    resolver: Arc<Resolver>,
+    policies: Arc<PolicyView>,
+    cn_domains: Option<Arc<ChinaRules>>,
+    cn_ips: Option<Arc<ChinaRules>>,
+}
+impl Plan {
+    fn session(&self) -> Result<Arc<SessionPlan>> {
+        Ok(Arc::new(SessionPlan {
+            config: self.config.clone(),
+            resolver: self.resolver.clone(),
+            policies: Arc::new(self.policies.view(&self.config)?),
+            cn_domains: self.cn_domains.clone(),
+            cn_ips: self.cn_ips.clone(),
+        }))
+    }
 }
 pub struct Core {
     runtime: Option<Runtime>,
+    probe: ProbeRuntime,
     stop: watch::Sender<bool>,
     task: Option<JoinHandle<()>>,
     plan: Arc<RwLock<Arc<Plan>>>,
@@ -105,9 +165,19 @@ impl Core {
         let address = listener.local_addr().map_err(|_| "ListenerAddress")?;
         let capacity = config.limits.max_connections;
         let resolver = Arc::new(Resolver::default().with_config(&config.dns)?);
+        let (cn_domains, cn_ips) = load_china_rules(&config)?;
+        let config = Arc::new(config);
+        let policies = Arc::new(PolicyRuntime::new(
+            runtime.handle().clone(),
+            config.clone(),
+            resolver.clone(),
+        ));
         let plan = Arc::new(RwLock::new(Arc::new(Plan {
-            config: Arc::new(config),
+            config,
             resolver,
+            policies,
+            cn_domains,
+            cn_ips,
         })));
         let state = Arc::new(State::default());
         state.generation.store(1, Ordering::Relaxed);
@@ -124,24 +194,30 @@ impl Core {
                         let Ok((socket,peer))=accepted else {break;};
                         let Ok(permit)=permits.clone().try_acquire_owned() else {state.rejected.fetch_add(1,Ordering::Relaxed);continue;};
                         let Ok(current)=plan.read().map(|c|c.clone()) else {break;};
-                        let config=current.config.clone();let resolver=current.resolver.clone();
+                        let Ok(session_plan)=current.session() else {break;};
                         let state=state.clone();
                         let id=state.accepted.fetch_add(1,Ordering::Relaxed)+1;
                         state.active.fetch_add(1,Ordering::Relaxed);
                         let guard=SessionGuard {state:state.clone(),id};
                         sessions.spawn(async move {
                             let _permit=permit;let _guard=guard;
-                            if let Err(code)=session(socket,peer,config,resolver,state.clone(),id).await {
+                            if let Err(code)=session(socket,peer,session_plan,state.clone(),id).await {
                                 state.failed.fetch_add(1,Ordering::Relaxed);
                                 if let Ok(mut error)=state.last_error.lock(){*error=code;}
+                                if let Ok(mut records)=state.records.lock()
+                                    && let Some(record)=records.get_mut(&id) {
+                                    record.error=code;
+                                }
                             }
                         });
                     }
                 }
             }
+            if let Ok(current)=plan.read() {current.policies.stop();}
             sessions.abort_all();while sessions.join_next().await.is_some() {}
         }});
         Ok(Self {
+            probe: ProbeRuntime::new(runtime.handle().clone()),
             runtime: Some(runtime),
             stop,
             task: Some(task),
@@ -151,6 +227,9 @@ impl Core {
         })
     }
     pub fn configure(&self, config: Config) -> Result<()> {
+        if self.runtime.is_none() {
+            return Err("CoreStopped");
+        }
         config.validate()?;
         let mut plan = self.plan.write().map_err(|_| "ConfigState")?;
         if config.listen != plan.config.listen
@@ -159,26 +238,46 @@ impl Core {
             return Err("ListenerChangeRequiresRestart");
         }
         let resolver = Arc::new(plan.resolver.with_config(&config.dns)?);
+        let (cn_domains, cn_ips) = load_china_rules(&config)?;
+        let config = Arc::new(config);
+        let policies = Arc::new(plan.policies.reconfigured(config.clone(), resolver.clone()));
+        // All fallible validation has completed. Stop the replaced worker even
+        // if an old session still owns its immutable configuration and choices.
+        self.probe.invalidate()?;
+        plan.policies.stop();
         *plan = Arc::new(Plan {
-            config: Arc::new(config),
+            config,
             resolver,
+            policies,
+            cn_domains,
+            cn_ips,
         });
         self.state.generation.fetch_add(1, Ordering::Relaxed);
         Ok(())
     }
     pub fn select_node(&self, id: &str) -> Result<()> {
+        if self.runtime.is_none() {
+            return Err("CoreStopped");
+        }
         let mut plan = self.plan.write().map_err(|_| "ConfigState")?;
         let mut next = (*plan.config).clone();
         next.selected = id.to_owned();
         next.validate()?;
+        self.probe.invalidate()?;
         *plan = Arc::new(Plan {
             config: Arc::new(next),
             resolver: plan.resolver.clone(),
+            policies: plan.policies.clone(),
+            cn_domains: plan.cn_domains.clone(),
+            cn_ips: plan.cn_ips.clone(),
         });
         self.state.generation.fetch_add(1, Ordering::Relaxed);
         Ok(())
     }
     pub fn select_group(&self, id: &str, member: &str) -> Result<()> {
+        if self.runtime.is_none() {
+            return Err("CoreStopped");
+        }
         let mut plan = self.plan.write().map_err(|_| "ConfigState")?;
         let mut next = (*plan.config).clone();
         let selector = next
@@ -186,14 +285,21 @@ impl Core {
             .iter_mut()
             .find(|s| s.id == id)
             .ok_or("SelectorMissing")?;
+        if selector.strategy != PolicyStrategy::Manual {
+            return Err("AutomaticPolicySelection");
+        }
         if !selector.members.iter().any(|id| id == member) {
             return Err("SelectorMemberMissing");
         }
         selector.selected = member.to_owned();
         next.validate()?;
+        self.probe.invalidate()?;
         *plan = Arc::new(Plan {
             config: Arc::new(next),
             resolver: plan.resolver.clone(),
+            policies: plan.policies.clone(),
+            cn_domains: plan.cn_domains.clone(),
+            cn_ips: plan.cn_ips.clone(),
         });
         self.state.generation.fetch_add(1, Ordering::Relaxed);
         Ok(())
@@ -201,21 +307,67 @@ impl Core {
     pub fn address(&self) -> SocketAddr {
         self.address
     }
+    /// Schedule a fresh HEAD URL test for the concrete selected node. This
+    /// control call validates inputs and spawns work, but never awaits network I/O.
+    pub fn probe_start(
+        &self,
+        url: String,
+        timeout_ms: Option<u64>,
+        expected_status: Option<u16>,
+    ) -> Result<ProbeStatus> {
+        if self.runtime.is_none() {
+            return Err("CoreStopped");
+        }
+        if expected_status.is_some_and(|status| !(200..=299).contains(&status)) {
+            return Err("UrlTestExpectedStatus");
+        }
+        let options = HealthProbe {
+            url,
+            interval_ms: 300_000,
+            timeout_ms: timeout_ms.unwrap_or(8_000),
+            expected_status: expected_status.unwrap_or(204),
+            tolerance_ms: 0,
+            tls: None,
+        };
+        options.target()?;
+        let plan = self.plan.read().map_err(|_| "ConfigState")?;
+        let node = plan
+            .config
+            .nodes
+            .iter()
+            .find(|node| node.id == plan.config.selected)
+            .ok_or("ProbeSelectedNodeRequired")?;
+        if matches!(node.outbound, Outbound::Reject {}) {
+            return Err("ProbeSelectedNodeRejected");
+        }
+        let outbound = node.outbound.clone();
+        let resolver = plan.resolver.clone();
+        self.probe.start_with(async move {
+            swirl_protocol::url_test_head(&outbound, &options, &resolver, expected_status).await
+        })
+    }
+    pub fn probe_status(&self) -> Result<ProbeStatus> {
+        self.probe.status()
+    }
+    pub fn probe_cancel(&self) -> Result<ProbeStatus> {
+        self.probe.cancel()
+    }
     pub fn snapshot(&self) -> Result<Snapshot> {
         let plan = self.plan.read().map_err(|_| "ConfigState")?;
+        let policies = plan.policies.report(&plan.config)?;
         let records = self.state.records.lock().map_err(|_| "StatsState")?;
+        let last_error = *self.state.last_error.lock().map_err(|_| "StatsState")?;
         Ok(Snapshot {
             schema: 1,
             engine: "swirl-rust",
             address: self.address,
             generation: self.state.generation.load(Ordering::Relaxed),
             selected: plan.config.selected.clone(),
-            selectors: plan
-                .config
-                .selectors
+            selectors: policies
                 .iter()
-                .map(|s| (s.id.clone(), s.selected.clone()))
+                .map(|(id, policy)| (id.clone(), policy.selected.clone().unwrap_or_default()))
                 .collect(),
+            policies,
             running: self.task.as_ref().is_some_and(|t| !t.is_finished()),
             active: self.state.active.load(Ordering::Relaxed),
             accepted: self.state.accepted.load(Ordering::Relaxed),
@@ -224,7 +376,8 @@ impl Core {
             upload: self.state.totals.upload.load(Ordering::Relaxed),
             download: self.state.totals.download.load(Ordering::Relaxed),
             udp_dropped: self.state.totals.udp_dropped.load(Ordering::Relaxed),
-            last_error: *self.state.last_error.lock().map_err(|_| "StatsState")?,
+            last_error,
+            last_error_stage: swirl_protocol::failure_stage(last_error),
             connections: records
                 .iter()
                 .map(|(id, r)| Connection {
@@ -235,7 +388,15 @@ impl Core {
                     host: r.target.host.clone(),
                     port: r.target.port,
                     node: r.node.clone(),
+                    matched_rule: r.matched_rule.clone(),
+                    transport_state: if r.error.is_empty() {
+                        if r.ended { "closed" } else { "active" }
+                    } else {
+                        "failed"
+                    },
                     ended: r.ended,
+                    error: r.error,
+                    failure_stage: swirl_protocol::failure_stage(r.error),
                     upload: r.counters.upload.load(Ordering::Relaxed),
                     download: r.counters.download.load(Ordering::Relaxed),
                     udp_dropped: r.counters.udp_dropped.load(Ordering::Relaxed),
@@ -245,6 +406,10 @@ impl Core {
         })
     }
     pub fn stop(&mut self) {
+        let _ = self.probe.invalidate();
+        if let Ok(plan) = self.plan.read() {
+            plan.policies.stop();
+        }
         let _ = self.stop.send(true);
         if let Some(runtime) = self.runtime.take() {
             if let Some(task) = self.task.take() {
@@ -288,11 +453,12 @@ impl Drop for SessionGuard {
 async fn session(
     mut inbound: TcpStream,
     peer: SocketAddr,
-    config: Arc<Config>,
-    resolver: Arc<Resolver>,
+    plan: Arc<SessionPlan>,
     state: Arc<State>,
     id: u64,
 ) -> Result<()> {
+    let config = &plan.config;
+    let resolver = &plan.resolver;
     inbound.set_nodelay(true).map_err(|_| "SocketOptions")?;
     let limit = Duration::from_millis(config.limits.handshake_timeout_ms);
     let request = timeout(
@@ -307,32 +473,40 @@ async fn session(
             id,
             Record {
                 peer,
-                category: "direct",
+                category: "udp",
                 target: request.target.clone(),
                 node: "udp-routed".into(),
+                matched_rule: "PER_DATAGRAM".into(),
                 started: Instant::now(),
                 ended: false,
+                error: "",
                 counters: counters.clone(),
             },
         );
-        return udp_associate(
-            inbound,
-            peer,
-            request,
-            config,
-            resolver,
-            counters,
-            state.totals.clone(),
-        )
-        .await;
+        return udp_associate(inbound, peer, request, plan, counters, state.totals.clone()).await;
     }
-    let (node, routed_target) = match route(&config, &request.target, peer.ip(), &resolver).await {
-        Ok(route) => route,
-        Err(error) => {
-            let _ = swirl_protocol::reply(&mut inbound, request.kind, false).await;
-            return Err(error);
-        }
-    };
+    let (node, routed_target, rule_index, direct_addresses) =
+        match route(&plan, &request.target, peer.ip(), true).await {
+            Ok(route) => route,
+            Err(error) => {
+                state.records.lock().map_err(|_| "StatsState")?.insert(
+                    id,
+                    Record {
+                        peer,
+                        category: "route-error",
+                        target: request.target.clone(),
+                        node: String::new(),
+                        matched_rule: "ROUTE_ERROR".into(),
+                        started: Instant::now(),
+                        ended: false,
+                        error,
+                        counters: counters.clone(),
+                    },
+                );
+                let _ = swirl_protocol::reply(&mut inbound, request.kind, false).await;
+                return Err(error);
+            }
+        };
     state.records.lock().map_err(|_| "StatsState")?.insert(
         id,
         Record {
@@ -346,18 +520,20 @@ async fn session(
             },
             target: request.target.clone(),
             node: node.id.clone(),
+            matched_rule: swirl_routing::rule_label(config, rule_index),
             started: Instant::now(),
             ended: false,
+            error: "",
             counters: counters.clone(),
         },
     );
-    let connected = timeout(
-        limit,
-        swirl_protocol::connect(&node.outbound, &routed_target, &resolver, limit),
-    )
-    .await
-    .map_err(|_| "UpstreamTimeout")
-    .and_then(|r| r);
+    let connected = if direct_addresses.len() > 1 {
+        // Only route-equivalent DIRECT addresses reach this scheduler. The
+        // selected outbound and matched rule cannot change after a TCP miss.
+        swirl_protocol::connect_direct_resolved(direct_addresses, limit).await
+    } else {
+        swirl_protocol::connect(&node.outbound, &routed_target, resolver, limit).await
+    };
     let mut upstream = match connected {
         Ok(s) => s,
         Err(e) => {
@@ -391,13 +567,36 @@ async fn session(
 }
 
 async fn route<'a>(
-    config: &'a Config,
+    plan: &'a SessionPlan,
     target: &Target,
     source: std::net::IpAddr,
-    resolver: &Resolver,
-) -> Result<(&'a swirl_subscription::Node, Target)> {
+    allow_direct_fallback: bool,
+) -> Result<(
+    &'a swirl_subscription::Node,
+    Target,
+    Option<usize>,
+    Vec<SocketAddr>,
+)> {
+    let config = &plan.config;
+    let resolver = &plan.resolver;
     use swirl_routing::Decision;
-    match swirl_routing::select(config, &target.host, target.port, source, None)? {
+    let choose = |id: &str| plan.policies.choose(id);
+    let choose_pinned = |id: &str| plan.policies.pinned_choice(id);
+    let china = match (plan.cn_domains.as_deref(), plan.cn_ips.as_deref()) {
+        (Some(domains), Some(ips)) => Some((domains, ips)),
+        (None, None) => None,
+        _ => return Err("ChinaRuleSetIncomplete"),
+    };
+    let selected = swirl_routing::select_with_trace_and_china(
+        config,
+        &target.host,
+        target.port,
+        source,
+        None,
+        &choose,
+        china,
+    )?;
+    match selected.decision {
         Decision::Node(node) => {
             let mut routed = target.clone();
             if config.dns.force_proxy_hosts
@@ -406,7 +605,7 @@ async fn route<'a>(
             {
                 routed.host = ip.to_string();
             }
-            Ok((node, routed))
+            Ok((node, routed, selected.matched_rule, Vec::new()))
         }
         Decision::Resolve => {
             let addresses = timeout(
@@ -415,34 +614,110 @@ async fn route<'a>(
             )
             .await
             .map_err(|_| "RouteDnsTimeout")??;
-            // Match and dial the same address. Do not retry another DNS answer
-            // under the first address's policy or let an upstream resolve again.
-            let address = addresses.first().ok_or("RouteDnsEmpty")?;
-            match swirl_routing::select(
+            route_resolved(
                 config,
-                &target.host,
-                target.port,
+                target,
                 source,
-                Some(&addresses),
-            )? {
-                Decision::Node(node) => Ok((
-                    node,
-                    Target {
-                        host: address.ip().to_string(),
-                        port: target.port,
-                    },
-                )),
-                Decision::Resolve => Err("RouteDnsUnresolved"),
-            }
+                &addresses,
+                (&choose, &choose_pinned),
+                china,
+                allow_direct_fallback,
+            )
         }
     }
 }
 
+fn route_resolved<'a>(
+    config: &'a Config,
+    target: &Target,
+    source: IpAddr,
+    addresses: &[SocketAddr],
+    choices: (
+        &impl Fn(&str) -> Result<String>,
+        &impl Fn(&str) -> Result<String>,
+    ),
+    china: Option<(&ChinaRules, &ChinaRules)>,
+    allow_direct_fallback: bool,
+) -> Result<(
+    &'a swirl_subscription::Node,
+    Target,
+    Option<usize>,
+    Vec<SocketAddr>,
+)> {
+    use swirl_routing::Decision;
+    let (choose, choose_pinned) = choices;
+    // Match and dial the same address. Only pass the selected answer to
+    // routing; later answers cannot change the first address's policy.
+    let address = addresses.first().ok_or("RouteDnsEmpty")?;
+    let selected = swirl_routing::select_with_trace_and_china(
+        config,
+        &target.host,
+        target.port,
+        source,
+        Some(std::slice::from_ref(address)),
+        choose,
+        china,
+    )?;
+    match selected.decision {
+        // Keep the destination as an IP literal so the outbound cannot resolve
+        // the hostname again to a different address after routing.
+        Decision::Node(node) => {
+            let mut direct_addresses = Vec::new();
+            if allow_direct_fallback && matches!(node.outbound, Outbound::Direct {}) {
+                direct_addresses.push(*address);
+                // Resolver output is bounded at 16. Recheck each later answer
+                // without choosing an unvisited automatic policy group.
+                for candidate in addresses.iter().take(16).skip(1) {
+                    if direct_addresses.contains(candidate) {
+                        continue;
+                    }
+                    let alternate = swirl_routing::select_with_trace_and_china(
+                        config,
+                        &target.host,
+                        target.port,
+                        source,
+                        Some(std::slice::from_ref(candidate)),
+                        choose_pinned,
+                        china,
+                    );
+                    if matches!(alternate, Ok(swirl_routing::TracedDecision {
+                        decision: Decision::Node(other),
+                        matched_rule,
+                    }) if other.id == node.id && matched_rule == selected.matched_rule)
+                    {
+                        direct_addresses.push(*candidate);
+                    }
+                }
+            }
+            Ok((
+                node,
+                Target {
+                    host: address.ip().to_string(),
+                    port: target.port,
+                },
+                selected.matched_rule,
+                direct_addresses,
+            ))
+        }
+        Decision::Resolve => Err("RouteDnsUnresolved"),
+    }
+}
+
 struct UdpDispatch {
-    address: SocketAddr,
-    packet: Vec<u8>,
+    transport: UdpTransport,
     payload_len: usize,
     node_id: String,
+    permit: OwnedSemaphorePermit,
+}
+enum UdpTransport {
+    Datagram {
+        address: SocketAddr,
+        packet: Vec<u8>,
+    },
+    Socks5 {
+        target: Target,
+        payload: Vec<u8>,
+    },
 }
 fn udp_drop(local: &Counters, total: &Counters) {
     local.udp_dropped.fetch_add(1, Ordering::Relaxed);
@@ -459,15 +734,28 @@ fn transient_udp(error: &std::io::Error) -> bool {
     )
 }
 async fn prepare_udp(
-    config: Arc<Config>,
-    resolver: Arc<Resolver>,
+    plan: Arc<SessionPlan>,
     target: Target,
     payload: Vec<u8>,
     source: std::net::IpAddr,
+    permit: OwnedSemaphorePermit,
 ) -> Result<UdpDispatch> {
-    let (node, target) = route(&config, &target, source, &resolver).await?;
+    let (node, target, _, _) = route(&plan, &target, source, false).await?;
+    let payload_len = payload.len();
     let (host, port, packet) = match &node.outbound {
-        Outbound::Direct {} => (target.host.clone(), target.port, payload.clone()),
+        Outbound::Direct {} => (target.host.clone(), target.port, payload),
+        Outbound::Socks5 {
+            udp: true,
+            tls: None,
+            ..
+        } => {
+            return Ok(UdpDispatch {
+                transport: UdpTransport::Socks5 { target, payload },
+                payload_len,
+                node_id: node.id.clone(),
+                permit,
+            });
+        }
         Outbound::Shadowsocks {
             host,
             port,
@@ -485,25 +773,25 @@ async fn prepare_udp(
         }
         _ => return Err("UdpProxyUnsupportedOrRejected"),
     };
-    let address = resolver
+    let address = plan
+        .resolver
         .resolve(&host, port)
         .await?
         .into_iter()
         .next()
         .ok_or("DnsEmpty")?;
     Ok(UdpDispatch {
-        address,
-        packet,
-        payload_len: payload.len(),
+        transport: UdpTransport::Datagram { address, packet },
+        payload_len,
         node_id: node.id.clone(),
+        permit,
     })
 }
 async fn udp_associate(
     mut control: TcpStream,
     peer: SocketAddr,
     request: Inbound,
-    config: Arc<Config>,
-    resolver: Arc<Resolver>,
+    plan: Arc<SessionPlan>,
     counters: Arc<Counters>,
     total: Arc<Counters>,
 ) -> Result<()> {
@@ -516,9 +804,15 @@ async fn udp_associate(
     if !requested_ip.is_unspecified() && requested_ip != peer.ip() {
         return Err("UdpClientAddress");
     }
-    let relay = UdpSocket::bind(SocketAddr::new(peer.ip(), 0))
+    let relay = bind_udp(SocketAddr::new(peer.ip(), 0))
         .await
         .map_err(|_| "UdpBind")?;
+    let v4 = bind_udp(SocketAddr::from(([0, 0, 0, 0], 0)))
+        .await
+        .map_err(|_| "UdpBind")?;
+    let v6 = bind_udp(SocketAddr::from(([0u16; 8], 0)))
+        .await
+        .map_err(|_| "UdpBindV6")?;
     let local = relay.local_addr().map_err(|_| "UdpBind")?;
     let mut response = vec![5, 0, 0];
     Target {
@@ -527,8 +821,6 @@ async fn udp_associate(
     }
     .encode(&mut response)?;
     control.write_all(&response).await.map_err(|_| "UdpReply")?;
-    let v4 = UdpSocket::bind("0.0.0.0:0").await.map_err(|_| "UdpBind")?;
-    let v6 = UdpSocket::bind("[::]:0").await.map_err(|_| "UdpBindV6")?;
     let mut client = if request.target.port == 0 {
         None
     } else {
@@ -540,17 +832,34 @@ async fn udp_associate(
     // A bounded per-association preparation queue lets DNS wait independently
     // from received replies. Dropping the JoinSet cancels all queued work.
     let mut pending: JoinSet<Result<UdpDispatch>> = JoinSet::new();
+    let slots = Arc::new(Semaphore::new(4));
+    let mut socks = socks5_udp::Pool::new(plan.clone(), counters.clone(), total.clone());
     loop {
         tokio::select! {
             _=control.read(&mut closed)=>return Ok(()),
             Some(prepared)=pending.join_next(), if !pending.is_empty()=>{
-                let dispatch=match prepared {Ok(Ok(d))=>d,_=>{udp_drop(&counters,&total);continue;}};
+                let UdpDispatch {transport,payload_len,node_id,permit}=match prepared {Ok(Ok(d))=>d,_=>{udp_drop(&counters,&total);continue;}};
+                let (address,packet)=match transport {
+                    UdpTransport::Datagram {address,packet}=>(address,packet),
+                    UdpTransport::Socks5 {target,payload}=>{socks.send(node_id,target,payload,permit);continue;}
+                };
                 destinations.retain(|_,(at,_)|at.elapsed()<Duration::from_secs(30));
-                if (destinations.len()>=64 && !destinations.contains_key(&dispatch.address)) || destinations.get(&dispatch.address).is_some_and(|(_,id)|id!=&dispatch.node_id){udp_drop(&counters,&total);continue;}
-                let socket=if dispatch.address.is_ipv4(){&v4}else{&v6};
-                if socket.send_to(&dispatch.packet,dispatch.address).await.is_err(){udp_drop(&counters,&total);continue;}
-                destinations.insert(dispatch.address,(Instant::now(),dispatch.node_id));
-                counters.upload.fetch_add(dispatch.payload_len as u64,Ordering::Relaxed);total.upload.fetch_add(dispatch.payload_len as u64,Ordering::Relaxed);
+                if (destinations.len()>=64 && !destinations.contains_key(&address)) || destinations.get(&address).is_some_and(|(_,id)|id!=&node_id){udp_drop(&counters,&total);continue;}
+                let socket=if address.is_ipv4(){&v4}else{&v6};
+                if socket.send_to(&packet,address).await.is_err(){udp_drop(&counters,&total);continue;}
+                destinations.insert(address,(Instant::now(),node_id));
+                counters.upload.fetch_add(payload_len as u64,Ordering::Relaxed);total.upload.fetch_add(payload_len as u64,Ordering::Relaxed);
+                drop(permit);
+            }
+            Some(response)=socks.next_reply()=>{
+                let Some(client)=client else {continue;};
+                let forwarded=tokio::select! {
+                    biased;
+                    _=control.read(&mut closed)=>return Ok(()),
+                    sent=response.send_to(&relay,client)=>sent,
+                };
+                let Ok(payload_len)=forwarded else {udp_drop(&counters,&total);continue;};
+                counters.download.fetch_add(payload_len as u64,Ordering::Relaxed);total.download.fetch_add(payload_len as u64,Ordering::Relaxed);
             }
             packet=relay.recv_from(&mut from_client)=>{
                 let (n,source)=match packet {Ok(v)=>v,Err(e) if transient_udp(&e)=>{udp_drop(&counters,&total);continue;},Err(_)=>return Err("UdpReceive")};
@@ -559,16 +868,16 @@ async fn udp_associate(
                 let Ok(target)=swirl_protocol::read_target(&mut cursor,false).await else {continue;};
                 client=Some(source);
                 if cursor.len()>65507 {continue;}
-                if pending.len()>=4{udp_drop(&counters,&total);continue;}
-                pending.spawn(prepare_udp(config.clone(),resolver.clone(),target,cursor.to_vec(),source.ip()));
+                let Ok(permit)=slots.clone().try_acquire_owned() else {udp_drop(&counters,&total);continue;};
+                pending.spawn(prepare_udp(plan.clone(),target,cursor.to_vec(),source.ip(),permit));
             }
             packet=v4.recv_from(&mut from_v4)=>{
                 let (n,source)=match packet {Ok(v)=>v,Err(e) if transient_udp(&e)=>{udp_drop(&counters,&total);continue;},Err(_)=>return Err("UdpReceive")};
-                udp_response(&relay,client,source,&from_v4[..n],&destinations,&config,(&counters,&total)).await?;
+                udp_response(&relay,client,source,&from_v4[..n],&destinations,&plan.config,(&counters,&total)).await?;
             }
             packet=v6.recv_from(&mut from_v6)=>{
                 let (n,source)=match packet {Ok(v)=>v,Err(e) if transient_udp(&e)=>{udp_drop(&counters,&total);continue;},Err(_)=>return Err("UdpReceive")};
-                udp_response(&relay,client,source,&from_v6[..n],&destinations,&config,(&counters,&total)).await?;
+                udp_response(&relay,client,source,&from_v6[..n],&destinations,&plan.config,(&counters,&total)).await?;
             }
         }
     }
@@ -638,3 +947,7 @@ async fn udp_response(
         .fetch_add(payload.len() as u64, Ordering::Relaxed);
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "route_tests.rs"]
+mod route_tests;

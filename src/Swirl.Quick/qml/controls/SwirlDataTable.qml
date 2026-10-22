@@ -80,6 +80,7 @@ Item {
                             SwirlText {renderType:Text.NativeRendering;
                                 text:AppState.zh(modelData.label)
                                 color:table.minimal?Theme.muted:Theme.text
+                                textRole:"smallLabel"
                                 font.pixelSize:Theme.fontSize(table.headerPixelSize)
                                 font.family:Theme.fontFamily
                                 font.weight:Theme.bodyFontWeight
@@ -151,14 +152,14 @@ Item {
                                     text:measured>=0?String(Math.round(displayed)):raw
                                     textFormat:Text.PlainText
                                     color:Theme.text
+                                    textRole:"list"
                                     font.pixelSize:Theme.fontSize(table.textPixelSize)
                                     font.family:Theme.fontFamily
                                     verticalAlignment:Text.AlignVCenter
                                     elide:Text.ElideRight
                                 }
                                 HoverHandler {id:cellHover}
-                                ToolTip.visible:cellHover.hovered&&cell.truncated
-                                ToolTip.text:cell.raw;ToolTip.delay:600
+                                SwirlToolTip {parent:cell.parent;visible:cellHover.hovered&&cell.truncated;text:cell.raw;delay:600}
                             }
                         }
                     }

@@ -8,6 +8,7 @@ import base64
 import concurrent.futures
 import datetime
 import hashlib
+import importlib.util
 import ipaddress
 import json
 import os
@@ -15,6 +16,7 @@ from pathlib import Path
 import socket
 import socketserver
 import ssl
+import struct
 import subprocess
 import tempfile
 import threading
@@ -25,6 +27,11 @@ from cryptography import x509
 from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
+
+_public_spec = importlib.util.spec_from_file_location(
+    'swirl_public_verifier', Path(__file__).resolve().parents[1] / 'Verify-PublicRustCore.py')
+public_verifier = importlib.util.module_from_spec(_public_spec)
+_public_spec.loader.exec_module(public_verifier)
 
 
 def exact(s, n):
@@ -162,6 +169,20 @@ class Handler(socketserver.BaseRequestHandler):
                     else:
                         s.sendall(b'HTTP/1.1 200 OK\r\nContent-Length: 9\r\nConnection: close\r\n\r\norigin-ok'); return
                     destination = ('synthetic', 1)
+                elif protocol.startswith('https-head-'):
+                    data = header(s); self.server.requests.append(data)
+                    assert data.startswith(b'HEAD / HTTP/1.1\r\n')
+                    s.sendall(b'HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n')
+                    if protocol == 'https-head-truncated':
+                        return  # Deliberately omit TLS close_notify.
+                    if protocol == 'https-head-stalled':
+                        assert self.server.release_close.wait(3)
+                    with s.unwrap() as plain:
+                        self.server.tls_closed = True
+                        plain.shutdown(socket.SHUT_WR)
+                        self.server.tcp_closed = plain.recv(1) == b''
+                        self.server.close_complete.set()
+                    return
                 else:
                     destination = ('synthetic', 1)
                 self.server.accepted += 1
@@ -207,6 +228,9 @@ class RustCoreIntegration(unittest.TestCase):
         server = Reference(('127.0.0.1', 0), Handler)
         server.protocol, server.tls = protocol, self.context if tls else None
         server.requests, server.errors, server.accepted = [], [], 0
+        server.tls_closed = server.tcp_closed = False
+        server.release_close = threading.Event()
+        server.close_complete = threading.Event()
         threading.Thread(target=server.serve_forever, daemon=True).start()
         self.servers.append(server)
         return server
@@ -459,6 +483,95 @@ class RustCoreIntegration(unittest.TestCase):
                     self.assertIn(b'data: before',data); self.assertIn(b'data: after',data)
                 else:
                     self.assertIn(b'101',response);s.sendall(b'opaque-encrypted-frame');self.assertEqual(exact(s,22),b'opaque-encrypted-frame')
+
+    def public_head(self, server):
+        raw, response = self.tunnel(server.server_address[1])
+        self.assertIn(b'200 Connection Established', response)
+        context = ssl.create_default_context(cadata=self.ca_pem)
+        try:
+            stream = context.wrap_socket(raw, server_hostname='localhost')
+        except BaseException:
+            raw.close()
+            raise
+        try:
+            stream.sendall(b'HEAD / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n')
+            response = public_verifier.read_header(stream, time.monotonic() + 3)
+            self.assertTrue(response.startswith(b'HTTP/1.1 200 '))
+            return stream
+        except BaseException:
+            stream.close()
+            raise
+
+    def settled_public_stats(self, deadline=None):
+        outcome = {}
+        state = public_verifier.settled_snapshot(
+            lambda _deadline, **value: self.command(**value), self.handle,
+            deadline if deadline is not None else time.monotonic() + 3, outcome)
+        self.assertEqual(outcome['core'], state)
+        return state
+
+    def test_public_https_orderly_close_finishes_without_native_relay_errors(self):
+        server = self.server('https-head-orderly', tls=True); self.start()
+        with self.public_head(server) as stream:
+            public_verifier.close_https(stream, time.monotonic() + 3)
+        state = self.settled_public_stats()
+        self.assertIsNone(public_verifier.native_traffic_error(state), state)
+        self.assertTrue(server.close_complete.wait(1))
+        self.assertTrue(server.tls_closed)
+        self.assertTrue(server.tcp_closed)
+
+    def test_public_https_missing_close_notify_is_not_success(self):
+        server = self.server('https-head-truncated', tls=True); self.start()
+        with self.public_head(server) as stream:
+            with self.assertRaises(ssl.SSLError):
+                public_verifier.close_https(stream, time.monotonic() + 3)
+        self.settled_public_stats()
+        self.assertFalse(server.tls_closed)
+
+    def test_public_https_accounting_rejects_real_reset_after_http_success(self):
+        server = self.server('https-head-orderly', tls=True); self.start()
+        with self.public_head(server) as stream:
+            # The origin waits for close_notify, so this deterministic client
+            # reset happens after HTTP 200 and while the Rust relay is active.
+            linger = struct.pack('HH' if os.name == 'nt' else 'ii', 1, 0)
+            stream.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, linger)
+        state = self.settled_public_stats()
+        self.assertEqual(state['accepted'], 1)
+        self.assertGreater(state['upload'], 0)
+        self.assertGreater(state['download'], 0)
+        self.assertEqual(state['failed'], 1)
+        self.assertEqual(state['last_error'], 'StreamIo')
+        self.assertEqual(public_verifier.native_traffic_error(state), 'NativeRelayFailed')
+
+    def test_public_https_close_and_active_snapshot_share_the_deadline(self):
+        server = self.server('https-head-stalled', tls=True); self.start()
+        try:
+            with self.public_head(server) as stream:
+                # Successful HTTP and nonzero counters cannot bypass an active
+                # relay; neither settling nor TLS shutdown gets a fresh budget.
+                before = time.monotonic()
+                with self.assertRaises(TimeoutError):
+                    self.settled_public_stats(deadline=before + 0.15)
+                self.assertLess(time.monotonic() - before, 2)
+                before = time.monotonic()
+                with self.assertRaises(TimeoutError):
+                    public_verifier.close_https(stream, before + 0.15)
+                self.assertLess(time.monotonic() - before, 2)
+        finally:
+            server.release_close.set()
+        self.settled_public_stats()
+
+    def test_public_https_missing_connection_record_is_not_success(self):
+        # Clean-looking counters cannot stand in for the one completed session.
+        status = {'accepted': 1, 'active': 0, 'failed': 0, 'upload': 1,
+                  'download': 1, 'last_error': '', 'connections': []}
+        outcome = {}
+        state = public_verifier.settled_snapshot(
+            lambda _deadline, **_value: {'ok': True, 'status': status},
+            1, time.monotonic() + 1, outcome)
+        self.assertEqual(state['recorded_connections'], 0)
+        self.assertEqual(public_verifier.native_traffic_error(state),
+                         'NativeConnectionRecordCount')
 
     def test_auth_headers_not_forwarded_and_bad_framing_rejected(self):
         server=self.server('http-origin');self.start(inbound_auth={'username':'fixture-user','password':'fixture-password'})

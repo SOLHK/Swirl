@@ -1,0 +1,84 @@
+{
+  "status": "COMPLETED_AUTHORED_PRECISION_CONTROL_NOT_ACCEPTANCE",
+  "font_kind": "self_authored_32_faces_7_GIDs_only",
+  "faces": 32,
+  "selected_multiplier": 5,
+  "requests": 384,
+  "HarfBuzz": "14.6.0",
+  "continuous_decoded_model": {
+    "all_32_within_1_32": true,
+    "maximum_metric_error_exact": [
+      1,
+      80
+    ],
+    "maximum_point_squared_error_exact": [
+      1,
+      6400
+    ],
+    "scope": "entire_design_cube_only_excludes_user_mapping_and_native_rounding"
+  },
+  "actual_HarfBuzz_native": {
+    "metrics": {
+      "observations": 5376,
+      "above_1_32": 490,
+      "maximum_error_source_font_units": 0.203125,
+      "within_1_32": false
+    },
+    "extent_fields": {
+      "observations": 10752,
+      "above_1_32": 350,
+      "maximum_error_source_font_units": 0.203125,
+      "within_1_32": false
+    },
+    "layout_fields": {
+      "observations": 12288,
+      "above_1_32": 560,
+      "maximum_error_source_font_units": 0.203125,
+      "within_1_32": false
+    },
+    "shaping_runs": 768,
+    "GIDs_and_clusters_preserved": true,
+    "reference_already_upscaled": true
+  },
+  "finite_metric_error_components_exact": {
+    "coordinate_composition": [
+      0,
+      1
+    ],
+    "coefficient_model": [
+      1,
+      80
+    ],
+    "reference_native_rounding": [
+      105,
+      1024
+    ],
+    "target_native_rounding": [
+      17,
+      160
+    ]
+  },
+  "target_user_inputs": "unchanged_nominal",
+  "application_compensation": false,
+  "packing": {
+    "normalized-scaled": {
+      "faces": 32,
+      "sha256": "9de2e8490be445c1e18aeb35b1a117ae5deb1f6c95f1322500e0b6562eb05cd1",
+      "byte_size": 53480
+    },
+    "precision": {
+      "faces": 32,
+      "sha256": "f1cb8e2719028151f45c9a55bd0c850d5159c656127813146a1829efe5008451",
+      "byte_size": 201268
+    }
+  },
+  "original_font": "NOT_RUN",
+  "Windows11": "NOT_RUN",
+  "Qt_Swirl": "NOT_RUN",
+  "production_accepted": false,
+  "provenance": {
+    "algorithm_source_commit": "88b6ca4fee854bc18ccf0c5cd958fb8cbac30f6c",
+    "generator_source_sha256": "52c83de8e84488ba54a5f10c05f1c4776d62fbbc208e8f763ea3f23087bd928d",
+    "scope": "local_authored_controls_only"
+  }
+}

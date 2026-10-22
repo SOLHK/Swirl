@@ -22,7 +22,7 @@ Item {
   anchors.fill:parent;anchors.margins:Theme.dp(24);spacing:Theme.gap
   RowLayout {Layout.fillWidth:true
    ColumnLayout {Layout.fillWidth:true;spacing:Theme.dp(5)
-    SwirlText {renderType:Text.NativeRendering;text:"进程";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.Bold}
+    SwirlText {textRole:"pageTitle";renderType:Text.NativeRendering;text:"进程";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.Bold}
     SwirlText {renderType:Text.NativeRendering;text:"选择应用，查看实际采集的流量与连接摘要。";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
    }
    SwirlComboBox {objectName:"processSortPicker";Layout.preferredWidth:Theme.dp(154);Accessible.name:"进程排序";model:["按流量排序","按速度排序","按名称排序"];onActivated:page.sortIndex=currentIndex}
@@ -71,7 +71,7 @@ Item {
  ColumnLayout{width:meteredScroll.availableWidth;spacing:Theme.dp(12)
   SwirlText {renderType:Text.NativeRendering;text:"默认阻止所有程序的网络，仅允许下面的程序继续按分流规则访问。启用时自动开启增强模式，并保持规则判定。";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.WordWrap}
   SwirlText {text:page.engineController.elevated?"管理员权限已具备；保存名单不会自动开启计费模式。":"开启计费模式需要管理员权限；保存名单不会自动开启。";color:Theme.muted;Layout.fillWidth:true;wrapMode:Text.WordWrap;font.pixelSize:Theme.fontSize(12)}
-  TextArea { renderType: TextEdit.NativeRendering; font.weight: Theme.bodyFontWeight; font.hintingPreference: Font.PreferFullHinting; Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) }id:allowedProcesses;objectName:"meteredAllowlistEditor";Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(140);placeholderText:"每行一个程序名，例如 chrome.exe";font.pixelSize:Theme.fontSize(13);selectByMouse:true;wrapMode:TextEdit.NoWrap}
+  SwirlTextArea {id:allowedProcesses;objectName:"meteredAllowlistEditor";Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(140);placeholderText:"每行一个程序名，例如 chrome.exe";font.pixelSize:Theme.fontSize(13);selectByMouse:true;wrapMode:TextEdit.NoWrap}
   SwirlText {renderType:Text.NativeRendering;text:page.engineController.networkConfigurationError||page.engineController.routingError;color:Theme.orange;Layout.fillWidth:true;wrapMode:Text.WordWrap;font.pixelSize:Theme.fontSize(12)}
  }}
  footer:RowLayout{spacing:Theme.dp(10);height:Theme.dp(58)

@@ -16,7 +16,7 @@
 #include <QSaveFile>
 #include <QSet>
 #include <algorithm>
-#include <QStandardPaths>
+#include "../app/StoragePaths.h"
 #ifdef Q_OS_WIN
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -125,7 +125,7 @@ bool MihomoAdapter::lockAndVerifyExecutable() {
 }
 
 bool MihomoAdapter::prepareConfiguration() {
-    const auto root = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + QStringLiteral("/engine");
+    const auto root = SwirlPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + QStringLiteral("/engine");
     if (!QDir().mkpath(root)) return false;
     m_directory = std::make_unique<QTemporaryDir>(root + QStringLiteral("/session-XXXXXX"));
     if (!m_directory->isValid()) return false;
@@ -391,6 +391,9 @@ void MihomoAdapter::start(const EngineStartOptions &options) {
     unlockExecutable(); m_directory.reset(); m_uptime.invalidate();
     m_secret.clear(); m_generatedConfig.clear(); m_output.clear();
     m_options = options; m_status = {}; m_failureExit = false;
+    if(options.dnsConfig.contains("queryFamily")){
+        fail(Error::InvalidOptions,QStringLiteral("当前兼容内核不能执行已保存的 DNS 查询策略，请使用 Rust 内核。"));return;
+    }
     for(const auto &node:options.nodes)if(node.id==options.selectedNodeId&&!node.conversionIssues.isEmpty()){
         fail(Error::InvalidNode,QStringLiteral("此节点存在未映射的订阅选项，不能安全执行。原始配置已加密保留；请使用完整 Clash 节点配置重新导入。"));return;
     }

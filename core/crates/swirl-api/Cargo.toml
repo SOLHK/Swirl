@@ -8,5 +8,8 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true
+tokio.workspace = true
+swirl-dns.workspace = true
+swirl-protocol.workspace = true
 swirl-core.workspace = true
 swirl-subscription.workspace = true

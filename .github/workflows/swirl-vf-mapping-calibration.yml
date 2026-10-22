@@ -1,0 +1,42 @@
+name: Swirl VF original axis mapping diagnosis
+
+on:
+  push:
+    branches: [work/core-completion-20261017]
+    paths:
+      - '.github/workflows/swirl-vf-mapping-calibration.yml'
+      - 'tools/swirl_vf/platform/calibrate_avar_metrics.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: swirl-vf-mapping-calibration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-mapping:
+    runs-on: xcode-27
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compare intact source records with actual CoreText metrics
+        shell: bash
+        run: |
+          python -m pip install fonttools==4.61.1 numpy==2.2.6
+          python tools/swirl_vf/platform/calibrate_avar_metrics.py \
+            /System/Library/PrivateFrameworks/FontServices.framework/Versions/A/Resources/Reserved/PingFangUI.ttc \
+            --output build/avar-mapping-summary/mapping.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: swirl-vf-avar-mapping-${{ github.sha }}
+          path: build/avar-mapping-summary/*.json
+          retention-days: 7

@@ -1,0 +1,28 @@
+{
+  "source_sha": "598a8a77400236e6f817a1e4782f1c4f0da4bbd0",
+  "platform": "win32",
+  "binaries": {
+    "SWIRL_RUST_HARNESS": {
+      "filename": "swirl-api.exe",
+      "available": true,
+      "sha256": "74bab1d91c2530475a13e0be4c77bfb29a23259564ac0bfbba4d6f163ccd68c1"
+    },
+    "SWIRL_RUST_INSPECTOR": {
+      "filename": "swirl-inspect.exe",
+      "available": true,
+      "sha256": "fad043762864c25f15e4c8e8122807617d4ea167e5521db03edacc34566552ea"
+    }
+  },
+  "tracked_worktree_changes": [],
+  "tests": 9,
+  "failures": 0,
+  "errors": 0,
+  "skipped": [
+    {
+      "test": "test_actual_product_import_persist_select_route_and_recreate (__main__.ProductQtIntegration.test_actual_product_import_persist_select_route_and_recreate)",
+      "reason": "Windows Qt/DPAPI integration executable required"
+    }
+  ],
+  "success": true,
+  "scope": "Rust test-host JSON persistence; only ProductQtIntegration uses product Qt/DPAPI"
+}

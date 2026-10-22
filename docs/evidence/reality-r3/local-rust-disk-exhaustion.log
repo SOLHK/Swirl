@@ -1,0 +1,106 @@
+   Compiling cfg-if v1.0.5
+   Compiling stable_deref_trait v1.2.1
+   Compiling zeroize v1.9.1
+   Compiling typenum v1.20.1
+   Compiling writeable v0.6.4
+   Compiling litemap v0.8.3
+   Compiling zerofrom v0.1.8
+   Compiling smallvec v1.16.3
+   Compiling icu_normalizer_data v2.1.1
+   Compiling serde_core v1.0.229
+   Compiling icu_properties_data v2.1.2
+   Compiling yoke v0.8.3
+   Compiling num-traits v0.2.19
+   Compiling core_detect v1.0.0
+   Compiling scopeguard v1.2.0
+   Compiling cmov v0.5.4
+   Compiling simdutf8 v0.1.5
+   Compiling zerovec v0.11.8
+   Compiling zerotrie v0.2.5
+   Compiling libc v0.2.190
+   Compiling ctutils v0.4.3
+   Compiling encoding_rs v0.8.42
+   Compiling unicode-width v0.2.2
+   Compiling utf8_iter v1.0.4
+   Compiling percent-encoding v2.3.2
+   Compiling anstyle v1.0.14
+   Compiling arraydeque v0.5.1
+   Compiling tinystr v0.8.4
+   Compiling potential_utf v0.1.6
+   Compiling granit-parser v2.0.0
+   Compiling icu_collections v2.1.1
+   Compiling icu_locale_core v2.1.1
+   Compiling annotate-snippets v0.12.16
+   Compiling hybrid-array v0.4.15
+   Compiling form_urlencoded v1.2.2
+   Compiling zmij v1.0.23
+   Compiling itoa v1.0.18
+   Compiling memchr v2.8.3
+   Compiling rand_core v0.10.1
+   Compiling encoding_rs_io v0.1.8
+   Compiling icu_provider v2.1.1
+   Compiling base64 v0.22.1
+   Compiling icu_properties v2.1.2
+   Compiling icu_normalizer v2.1.1
+   Compiling crypto-common v0.2.2
+   Compiling getrandom v0.2.17
+   Compiling rustls-pki-types v1.15.1
+   Compiling subtle v2.6.1
+   Compiling untrusted v0.9.0
+   Compiling ring v0.17.14
+   Compiling serde v1.0.229
+   Compiling serde-saphyr v2.0.0
+   Compiling serde_json v1.0.154
+   Compiling keccak v0.2.2
+   Compiling sponge-cursor v0.1.0
+   Compiling flagset v0.4.7
+   Compiling const-oid v0.10.2
+   Compiling digest v0.11.3
+   Compiling socket2 v0.6.5
+   Compiling idna_adapter v1.2.1
+   Compiling idna v1.1.0
+   Compiling ipnet v2.12.2
+   Compiling mio v1.2.4
+   Compiling cpufeatures v0.3.1
+   Compiling once_cell v1.21.4
+   Compiling url v2.5.8
+   Compiling pin-project-lite v0.2.17
+   Compiling bytes v1.12.1
+   Compiling rustls-webpki v0.103.15
+   Compiling curve25519-dalek v5.0.0
+   Compiling shake v0.1.0
+   Compiling sha3 v0.12.0
+   Compiling kem v0.3.0
+   Compiling rustls v0.23.46
+   Compiling tokio v1.53.3
+   Compiling swirl-subscription v0.1.0 (/tmp/swirl-r3-validation/core/crates/swirl-subscription)
+   Compiling module-lattice v0.2.3
+   Compiling x25519-dalek v3.0.0
+   Compiling ml-kem v0.3.3
+   Compiling webpki-roots v1.0.9
+   Compiling generic-array v0.14.7
+   Compiling cpufeatures v0.2.17
+   Compiling httparse v1.10.1
+   Compiling der v0.8.2
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.7
+   Compiling digest v0.10.7
+   Compiling md-5 v0.10.6
+   Compiling sha2 v0.10.9
+   Compiling swirl-routing v0.1.0 (/tmp/swirl-r3-validation/core/crates/swirl-routing)
+   Compiling spki v0.8.1
+   Compiling x509-cert v0.3.0
+   Compiling tokio-rustls v0.26.6
+   Compiling swirl-transport v0.1.0 (/tmp/swirl-r3-validation/core/crates/swirl-transport)
+   Compiling swirl-dns v0.1.0 (/tmp/swirl-r3-validation/core/crates/swirl-dns)
+   Compiling swirl-protocol v0.1.0 (/tmp/swirl-r3-validation/core/crates/swirl-protocol)
+   Compiling swirl-core v0.1.0 (/tmp/swirl-r3-validation/core/crates/swirl-core)
+rustc-LLVM ERROR: IO failure on output stream: No space left on device
+rustc-LLVM ERROR: IO failure on output stream: No space left on device
+error: could not compile `swirl-core` (lib)
+
+Caused by:
+  No space left on device (os error 28)
+
+Caused by:
+  failed to parse process output: `/tmp/swirl-toolchains/rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/rustc --crate-name swirl_core --edition=2024 crates/swirl-core/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debuginfo=2 --forbid=unsafe_code --check-cfg 'cfg(docsrs,test)' --check-cfg 'cfg(feature, values())' -C metadata=9e0498ab860bfd6b -C extra-filename=-e2e0245a6383148d --out-dir /tmp/swirl-r3-

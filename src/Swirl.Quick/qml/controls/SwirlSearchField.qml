@@ -5,7 +5,7 @@ import "../components"
 TextField {
     renderType:TextInput.NativeRendering
     font.hintingPreference:Font.PreferFullHinting
-    Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) }
+    SwirlFontBinding { target: control; textRole: "input" }
     id: control
     property bool borderless:false
     implicitHeight:Theme.controlHeight

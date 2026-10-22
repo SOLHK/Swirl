@@ -1,0 +1,4 @@
+SOURCE 593e7cddc360cf7f51d9fdc988e6cf8fd99aea96
+COMMAND ["/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3", "/workspace/scratch/ca6cd1f88f6f/Swirl/tools/tests/generate_reality_vectors.py", "--check"]
+
+REALITY vectors verified: 3 auth cases, genuine ML-KEM decapsulation, 2 TLS transcripts, 22 negative checks. No network or provider test.

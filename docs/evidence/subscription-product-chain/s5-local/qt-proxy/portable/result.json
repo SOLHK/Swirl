@@ -1,0 +1,28 @@
+{
+  "source_sha": "a066f7d4c8acb96f5d6a46cee5700b2590328b64",
+  "platform": "linux",
+  "binaries": {
+    "SWIRL_RUST_HARNESS": {
+      "filename": "swirl-api",
+      "available": true,
+      "sha256": "8730c60b40d00d7030635641bf4d623e0f537fa735d2f6348c61b43f64d91d6b"
+    },
+    "SWIRL_RUST_INSPECTOR": {
+      "filename": "swirl-inspect",
+      "available": true,
+      "sha256": "56a812c2362d7495c82d7d7af2a8bb03b4e1a163b7b03365894dcf843ae24c64"
+    }
+  },
+  "tracked_worktree_changes": [
+    " M .github/workflows/core-development.yml",
+    " M docs/CORE_SUBSCRIPTION_PRODUCT_CHAIN_20261019.md",
+    " M tools/tests/test_core_development.py",
+    " M tools/tests/test_product_subscription_chain.py"
+  ],
+  "tests": 8,
+  "failures": 0,
+  "errors": 0,
+  "skipped": [],
+  "success": true,
+  "scope": "Rust test-host JSON persistence; only ProductQtIntegration uses product Qt/DPAPI"
+}
