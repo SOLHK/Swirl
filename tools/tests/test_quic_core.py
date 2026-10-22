@@ -1,8 +1,10 @@
 """Real Core SOCKS5/HTTP -> native QUIC protocols -> independent official peers.
 
 No proxy implementation lives in this fixture. SOCKS5 clients are Python sockets,
-the client engine is the compiled transport-runtime example, and the only proxy
+the client engine is the compiled Rust Core, and the only proxy
 servers are pinned Hysteria 2 and historical official TUIC v5 reference binaries.
+By default the host is transport-runtime. Explicit SWIRL_NATIVE_LIBRARY selects
+the ctypes host that loads the actual exported C ABI, with unchanged network tests.
 Missing runtime/peer executables fail the suite. This is not Qt product acceptance.
 """
 from __future__ import annotations
@@ -20,6 +22,7 @@ import socket
 import socketserver
 import ssl
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -55,9 +58,11 @@ class QuicCoreTests(unittest.TestCase):
     origin = tuic.TuicReferenceTests.origin
     close = tuic.TuicReferenceTests.close
     records = []
+    evidence_env = "SWIRL_QUIC_CORE_EVIDENCE"
 
     @classmethod
     def setUpClass(cls):
+        cls.records, cls.ffi_hosts = [], []
         cls.server = os.environ["SWIRL_TUIC_SERVER"]
         cls.tuic_version, cls.tuic_hash = tuic.verify_peer(cls.server)
         cls.hy2_server = Path(os.environ["HY2_SERVER"]).resolve(strict=True)
@@ -68,7 +73,15 @@ class QuicCoreTests(unittest.TestCase):
                                           stderr=subprocess.STDOUT, timeout=10).decode()
         if hy2.OFFICIAL_VERSION not in version or hy2.OFFICIAL_COMMIT not in version:
             raise AssertionError("official Hysteria version/commit mismatch")
-        cls.harness = Path(os.environ["SWIRL_TRANSPORT_RUNTIME"]).resolve(strict=True)
+        cls.native_library = (Path(os.environ["SWIRL_NATIVE_LIBRARY"]).resolve(strict=True)
+                              if os.environ.get("SWIRL_NATIVE_LIBRARY") else None)
+        if cls.native_library:
+            cls.harness = Path(__file__).with_name("native_ffi_host.py").resolve(strict=True)
+            cls.harness_command = [sys.executable, "-u", str(cls.harness)]
+        else:
+            cls.harness = Path(os.environ["SWIRL_TRANSPORT_RUNTIME"]).resolve(strict=True)
+            cls.harness_command = [str(cls.harness)]
+        cls.runtime_hash = hashlib.sha256((cls.native_library or cls.harness).read_bytes()).hexdigest()
 
     def setUp(self):
         tuic.TuicReferenceTests.setUp(self)
@@ -76,7 +89,7 @@ class QuicCoreTests(unittest.TestCase):
         self.addCleanup(lambda: [peer.stop() for peer in self.hy2_peers])
         self.associations = []
         self.stderr = tempfile.TemporaryFile()
-        self.runtime = subprocess.Popen([str(self.harness)], stdin=subprocess.PIPE,
+        self.runtime = subprocess.Popen(self.harness_command, stdin=subprocess.PIPE,
             stdout=subprocess.PIPE, stderr=self.stderr, text=True)
         self.responses = queue.Queue(maxsize=32)
 
@@ -88,11 +101,27 @@ class QuicCoreTests(unittest.TestCase):
         self.reader = threading.Thread(target=reader, daemon=True)
         self.reader.start()
         self.addCleanup(self.close_runtime)
+        if self.native_library:
+            identity = self.command(op="host_identity")
+            self.assertEqual(identity["control_boundary"], "exported_c_abi_dynamic_library")
+            self.assertEqual(identity["abi_version"], 1)
+            self.assertEqual(identity["library_sha256"], self.runtime_hash)
+            self.assertTrue(all(identity["buffer_boundaries"].values()))
+            self.ffi_record = {"case": self._testMethodName, "startup": identity}
+            self.ffi_hosts.append(self.ffi_record)
 
     def close_runtime(self):
         for control, client, _ in self.associations:
             control.close()
             client.close()
+        identity_error = None
+        if getattr(self, "native_library", None) and hasattr(self, "ffi_record") and self.runtime.poll() is None:
+            try:
+                self.ffi_record["before_eof"] = self.command(op="host_identity")
+            except Exception as error:
+                # A broken control channel must still close stdin and reap its
+                # child; metadata failure never bypasses runtime cleanup.
+                identity_error = error
         self.runtime.stdin.close()
         try:
             self.runtime.wait(timeout=5)
@@ -110,6 +139,12 @@ class QuicCoreTests(unittest.TestCase):
         self.assertFalse(self.reader.is_alive())
         self.assertNotIn(tuic.PASSWORD, diagnostic)
         self.assertNotIn("synthetic-hy2-core", diagnostic)
+        if identity_error is not None:
+            raise identity_error
+        if getattr(self, "native_library", None) and hasattr(self, "ffi_record"):
+            identity = self.ffi_record["before_eof"]
+            self.assertEqual(identity["active_handles"], 0)
+            self.assertEqual(identity["handles_started"], identity["handles_stopped"])
 
     def command(self, **value):
         self.runtime.stdin.write(json.dumps(value) + "\n")
@@ -383,15 +418,17 @@ class QuicCoreTests(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        if path := os.environ.get("SWIRL_QUIC_CORE_EVIDENCE"):
+        if path := os.environ.get(cls.evidence_env):
             destination = Path(path)
             destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_text(json.dumps({"runtime": "Swirl Rust Core",
-                "runtime_sha256": hashlib.sha256(cls.harness.read_bytes()).hexdigest(),
+                "runtime_sha256": cls.runtime_hash,
+                "control_boundary": "exported_c_abi_dynamic_library" if cls.native_library else "rust_core_example",
+                "control_host_sha256": hashlib.sha256(cls.harness.read_bytes()).hexdigest(),
                 "platform": platform.platform(), "tuic_version": cls.tuic_version,
                 "tuic_peer_sha256": cls.tuic_hash, "hysteria_version": hy2.OFFICIAL_VERSION,
                 "hysteria_peer_sha256": cls.hy2_hash, "qt_product_acceptance": False,
-                "records": cls.records}, indent=2) + "\n", encoding="utf-8")
+                "records": cls.records, "ffi_hosts": cls.ffi_hosts}, indent=2) + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":

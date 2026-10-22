@@ -1,0 +1,8 @@
+test_hysteria_authentication_response_and_rejection_are_observed (test_native_timing.NativeTimingTests.test_hysteria_authentication_response_and_rejection_are_observed) ... ok
+test_tuic_auth_write_and_live_connection_reuse_are_not_fake_handshakes (test_native_timing.NativeTimingTests.test_tuic_auth_write_and_live_connection_reuse_are_not_fake_handshakes) ... ok
+test_vmess_wss_and_failed_status_keep_distinct_setup_phases (test_native_timing.NativeTimingTests.test_vmess_wss_and_failed_status_keep_distinct_setup_phases) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 2.287s
+
+OK

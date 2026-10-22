@@ -231,3 +231,48 @@ used rebuilt binaries after cleaning only reproducible Swirl crate artifacts.
 identifies Qt importer/storage/configuration gaps. No Windows Qt, mobile or
 public-node acceptance is claimed. The separate public-target preflight failed
 system DNS and is retained under `evidence/x14-a7-environment/`.
+
+## A7: exported library boundary and phase observations
+
+A6 commit `42fd5782c1d30f32bb4cc2aef21857c52af50dc7` completed run
+[39789898464](https://github.com/SOLHK/Swirl/actions/runs/39789898464): all six
+jobs succeeded. Rust tests were 634 on Windows and 633 on Linux/macOS, with no
+failures or ignored tests. Each official job executed 114 methods, including
+the new eight HTTP/SOCKS methods and 36 REALITY/Vision Core methods. Counts
+include negative cases and explicit upstream limitations. The exact receipt is
+`evidence/x14-a6-local/github-actions.json`.
+
+The actual exported C ABI now has additional import/persistence/selection tests
+for HY2/Hysteria2 URI, TUIC URI, Clash and Shadowsocks 2022 SIP002 input. Invalid
+QUIC trust and wrong-length SS2022 keys are rejected without changing a running
+Core. These configuration tests do not claim a proxy handshake.
+
+The separate [exported-library network suite](QUIC_EXPORTED_C_ABI_INTEROP_20261022.md)
+actually loads `libswirl_api.so` on Linux and drives the unchanged six official
+Hysteria2/TUIC Core network methods through `swirl_core_command`. All six passed;
+17 handles were started/stopped and no active handle remained. The new workflow
+builds `--lib` and runs the same suite with the platform's DLL/dylib/so. This
+local result does not establish Windows/macOS dynamic loading before their CI.
+
+URL probes now return bounded optional `outbound_timing` observations for
+resolution, TCP attempts, proxy TLS/REALITY, QUIC including TLS, transport setup,
+protocol request writes, acknowledged authentication and CONNECT exchanges.
+Request-write timing is not authentication confirmation. HY2 explicitly accepts
+HTTP 233; TUIC has no positive AUTH acknowledgement. QUIC does not invent TCP or
+separate TLS durations. TLS inside DNS resolution belongs to resolution, while
+target HTTPS TLS retains its separate existing metric. The collector is local
+to one task and has no log/event queue or observer tasks. Timeout errors retain
+partial observations; explicit user cancellation keeps the existing empty
+Cancelled state. C ABI function signatures and version 1 are unchanged.
+
+Final local A7 fmt/check/clippy/test and workspace library/binary/example builds
+passed: 639 tests, zero failures or ignored tests. Actual logs are in
+`evidence/x14-a7-local/`. Three official HEAD timing methods and the six exported
+library methods are additional three-platform CI gates, not replacements for
+the existing full data suites. Exact final commit/CI acceptance is recorded in
+the final acceptance report after GitHub completes it.
+
+Public network preflight also tried direct IPv4 HTTPS endpoints after DNS
+failed; both TCP connections were refused before TLS. The original failures
+are preserved, and no public internet or Qt acceptance is inferred from any
+loopback result.

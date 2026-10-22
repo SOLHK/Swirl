@@ -1,0 +1,387 @@
+{
+  "platform": "Linux-6.18.55-x86_64-with-glibc2.39",
+  "scope": "native Core HEAD phase observation; not Qt acceptance",
+  "control_boundary": "native_core_runtime_example",
+  "runtime_sha256": "46f3bb0984629424da7352766cb8a8b384787f3306140259f92e141f80116d03",
+  "tuic_reference_version": "1.0.0",
+  "tuic_reference_sha256": "adb808944ca829857bf408d2ee438a156e8171543dbbed3e94964b66b4135393",
+  "hysteria2_sha256": "907ba8c9693edb104b20582681fb7dc15639d5b64a9cbb616a7b539190a86691",
+  "observations": [
+    {
+      "case": "test_hysteria_authentication_response_and_rejection_are_observed",
+      "protocol": "hysteria2",
+      "expected_success": true,
+      "probe": {
+        "metrics": {
+          "http_status": 204,
+          "origin_tls_ms": null,
+          "outbound_connect_ms": 7,
+          "outbound_timing": {
+            "authentication_exchange_us": 1840,
+            "authentication_request_encode_write_us": null,
+            "authentication_response_accepted": true,
+            "failed_operations": 0,
+            "interrupted": false,
+            "protocol_request_encode_write_us": null,
+            "proxy_connect_exchange_us": 896,
+            "proxy_negotiation_us": null,
+            "proxy_tls_handshake_us": null,
+            "quic_connection_reused": false,
+            "quic_handshake_including_tls_us": 4478,
+            "reality_handshake_us": null,
+            "resolution_us": 8,
+            "tcp_attempts": 0,
+            "tcp_cancelled_attempts": 0,
+            "tcp_connected_attempt_us": null,
+            "tcp_dial_us": null,
+            "tcp_failed_attempts": 0,
+            "transport_setup_us": 178
+          },
+          "response_headers_ms": 8
+        },
+        "request_id": 1,
+        "state": "succeeded"
+      },
+      "target_requests_before": 0,
+      "target_requests_after": 1,
+      "target_received_bytes": 114,
+      "target_sent_bytes": 65,
+      "expected_outcome_verified": true
+    },
+    {
+      "case": "test_hysteria_authentication_response_and_rejection_are_observed",
+      "protocol": "hysteria2",
+      "expected_success": false,
+      "probe": {
+        "failure": {
+          "code": "Hysteria2AuthenticationRejected",
+          "outbound_timing": {
+            "authentication_exchange_us": 919,
+            "authentication_request_encode_write_us": null,
+            "authentication_response_accepted": false,
+            "failed_operations": 1,
+            "interrupted": false,
+            "protocol_request_encode_write_us": null,
+            "proxy_connect_exchange_us": null,
+            "proxy_negotiation_us": null,
+            "proxy_tls_handshake_us": null,
+            "quic_connection_reused": false,
+            "quic_handshake_including_tls_us": 3967,
+            "reality_handshake_us": null,
+            "resolution_us": 4,
+            "tcp_attempts": 0,
+            "tcp_cancelled_attempts": 0,
+            "tcp_connected_attempt_us": null,
+            "tcp_dial_us": null,
+            "tcp_failed_attempts": 0,
+            "transport_setup_us": 175
+          },
+          "stage": "outbound_handshake"
+        },
+        "request_id": 1,
+        "state": "failed"
+      },
+      "target_requests_before": 1,
+      "target_requests_after": 1,
+      "target_received_bytes": 114,
+      "target_sent_bytes": 65,
+      "expected_outcome_verified": true
+    },
+    {
+      "case": "test_tuic_auth_write_and_live_connection_reuse_are_not_fake_handshakes",
+      "protocol": "tuic:native",
+      "expected_success": true,
+      "probe": {
+        "metrics": {
+          "http_status": 204,
+          "origin_tls_ms": null,
+          "outbound_connect_ms": 4,
+          "outbound_timing": {
+            "authentication_exchange_us": null,
+            "authentication_request_encode_write_us": 70,
+            "authentication_response_accepted": false,
+            "failed_operations": 0,
+            "interrupted": false,
+            "protocol_request_encode_write_us": 195,
+            "proxy_connect_exchange_us": null,
+            "proxy_negotiation_us": null,
+            "proxy_tls_handshake_us": null,
+            "quic_connection_reused": false,
+            "quic_handshake_including_tls_us": 3763,
+            "reality_handshake_us": null,
+            "resolution_us": 4,
+            "tcp_attempts": 0,
+            "tcp_cancelled_attempts": 0,
+            "tcp_connected_attempt_us": null,
+            "tcp_dial_us": null,
+            "tcp_failed_attempts": 0,
+            "transport_setup_us": null
+          },
+          "response_headers_ms": 6
+        },
+        "request_id": 1,
+        "state": "succeeded"
+      },
+      "target_requests_before": 0,
+      "target_requests_after": 1,
+      "target_received_bytes": 114,
+      "target_sent_bytes": 65,
+      "expected_outcome_verified": true
+    },
+    {
+      "case": "test_tuic_auth_write_and_live_connection_reuse_are_not_fake_handshakes",
+      "protocol": "tuic:native",
+      "expected_success": true,
+      "probe": {
+        "metrics": {
+          "http_status": 204,
+          "origin_tls_ms": null,
+          "outbound_connect_ms": 0,
+          "outbound_timing": {
+            "authentication_exchange_us": null,
+            "authentication_request_encode_write_us": null,
+            "authentication_response_accepted": false,
+            "failed_operations": 0,
+            "interrupted": false,
+            "protocol_request_encode_write_us": 15,
+            "proxy_connect_exchange_us": null,
+            "proxy_negotiation_us": null,
+            "proxy_tls_handshake_us": null,
+            "quic_connection_reused": true,
+            "quic_handshake_including_tls_us": null,
+            "reality_handshake_us": null,
+            "resolution_us": 1,
+            "tcp_attempts": 0,
+            "tcp_cancelled_attempts": 0,
+            "tcp_connected_attempt_us": null,
+            "tcp_dial_us": null,
+            "tcp_failed_attempts": 0,
+            "transport_setup_us": null
+          },
+          "response_headers_ms": 1
+        },
+        "request_id": 2,
+        "state": "succeeded"
+      },
+      "target_requests_before": 1,
+      "target_requests_after": 2,
+      "target_received_bytes": 228,
+      "target_sent_bytes": 130,
+      "expected_outcome_verified": true,
+      "live_stream_echo_bytes": 94
+    },
+    {
+      "case": "test_tuic_auth_write_and_live_connection_reuse_are_not_fake_handshakes",
+      "protocol": "tuic:native",
+      "expected_success": false,
+      "probe": {
+        "failure": {
+          "code": "UrlTestRead",
+          "outbound_timing": {
+            "authentication_exchange_us": null,
+            "authentication_request_encode_write_us": 374,
+            "authentication_response_accepted": false,
+            "failed_operations": 0,
+            "interrupted": false,
+            "protocol_request_encode_write_us": 18,
+            "proxy_connect_exchange_us": null,
+            "proxy_negotiation_us": null,
+            "proxy_tls_handshake_us": null,
+            "quic_connection_reused": false,
+            "quic_handshake_including_tls_us": 3603,
+            "reality_handshake_us": null,
+            "resolution_us": 3,
+            "tcp_attempts": 0,
+            "tcp_cancelled_attempts": 0,
+            "tcp_connected_attempt_us": null,
+            "tcp_dial_us": null,
+            "tcp_failed_attempts": 0,
+            "transport_setup_us": null
+          },
+          "stage": "response_headers"
+        },
+        "request_id": 1,
+        "state": "failed"
+      },
+      "target_requests_before": 2,
+      "target_requests_after": 2,
+      "target_received_bytes": 228,
+      "target_sent_bytes": 130,
+      "expected_outcome_verified": true
+    },
+    {
+      "case": "test_vmess_wss_and_failed_status_keep_distinct_setup_phases",
+      "protocol": "vmess",
+      "expected_success": true,
+      "probe": {
+        "metrics": {
+          "http_status": 204,
+          "origin_tls_ms": null,
+          "outbound_connect_ms": 4,
+          "outbound_timing": {
+            "authentication_exchange_us": null,
+            "authentication_request_encode_write_us": null,
+            "authentication_response_accepted": false,
+            "failed_operations": 0,
+            "interrupted": false,
+            "protocol_request_encode_write_us": 948,
+            "proxy_connect_exchange_us": null,
+            "proxy_negotiation_us": null,
+            "proxy_tls_handshake_us": 2290,
+            "quic_connection_reused": false,
+            "quic_handshake_including_tls_us": null,
+            "reality_handshake_us": null,
+            "resolution_us": 5,
+            "tcp_attempts": 1,
+            "tcp_cancelled_attempts": 0,
+            "tcp_connected_attempt_us": 420,
+            "tcp_dial_us": 456,
+            "tcp_failed_attempts": 0,
+            "transport_setup_us": 777
+          },
+          "response_headers_ms": 6
+        },
+        "request_id": 1,
+        "state": "succeeded"
+      },
+      "target_requests_before": 0,
+      "target_requests_after": 1,
+      "target_received_bytes": 114,
+      "target_sent_bytes": 65,
+      "expected_outcome_verified": true,
+      "official_xray_version": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)"
+    },
+    {
+      "case": "test_vmess_wss_and_failed_status_keep_distinct_setup_phases",
+      "protocol": "vmess",
+      "expected_success": false,
+      "probe": {
+        "failure": {
+          "code": "UrlTestStatus",
+          "http_status": 503,
+          "outbound_timing": {
+            "authentication_exchange_us": null,
+            "authentication_request_encode_write_us": null,
+            "authentication_response_accepted": false,
+            "failed_operations": 0,
+            "interrupted": false,
+            "protocol_request_encode_write_us": 1312,
+            "proxy_connect_exchange_us": null,
+            "proxy_negotiation_us": null,
+            "proxy_tls_handshake_us": 1375,
+            "quic_connection_reused": false,
+            "quic_handshake_including_tls_us": null,
+            "reality_handshake_us": null,
+            "resolution_us": 2,
+            "tcp_attempts": 1,
+            "tcp_cancelled_attempts": 0,
+            "tcp_connected_attempt_us": 142,
+            "tcp_dial_us": 167,
+            "tcp_failed_attempts": 0,
+            "transport_setup_us": 396
+          },
+          "stage": "http_status"
+        },
+        "request_id": 2,
+        "state": "failed"
+      },
+      "target_requests_before": 1,
+      "target_requests_after": 2,
+      "target_received_bytes": 228,
+      "target_sent_bytes": 139,
+      "expected_outcome_verified": true,
+      "official_xray_version": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)"
+    },
+    {
+      "case": "test_vmess_wss_and_failed_status_keep_distinct_setup_phases",
+      "protocol": "vmess",
+      "expected_success": false,
+      "probe": {
+        "failure": {
+          "code": "UrlTestRead",
+          "outbound_timing": {
+            "authentication_exchange_us": null,
+            "authentication_request_encode_write_us": null,
+            "authentication_response_accepted": false,
+            "failed_operations": 0,
+            "interrupted": false,
+            "protocol_request_encode_write_us": 1172,
+            "proxy_connect_exchange_us": null,
+            "proxy_negotiation_us": null,
+            "proxy_tls_handshake_us": 1771,
+            "quic_connection_reused": false,
+            "quic_handshake_including_tls_us": null,
+            "reality_handshake_us": null,
+            "resolution_us": 4,
+            "tcp_attempts": 1,
+            "tcp_cancelled_attempts": 0,
+            "tcp_connected_attempt_us": 412,
+            "tcp_dial_us": 431,
+            "tcp_failed_attempts": 0,
+            "transport_setup_us": 434
+          },
+          "stage": "response_headers"
+        },
+        "request_id": 1,
+        "state": "failed"
+      },
+      "target_requests_before": 2,
+      "target_requests_after": 2,
+      "target_received_bytes": 228,
+      "target_sent_bytes": 139,
+      "expected_outcome_verified": true,
+      "official_xray_version": "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)"
+    }
+  ],
+  "core_sessions": [
+    {
+      "case": "test_hysteria_authentication_response_and_rejection_are_observed",
+      "protocol": "hysteria2",
+      "active_after_close": 0,
+      "uploaded": 0,
+      "downloaded": 0,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_hysteria_authentication_response_and_rejection_are_observed",
+      "protocol": "hysteria2",
+      "active_after_close": 0,
+      "uploaded": 0,
+      "downloaded": 0,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_tuic_auth_write_and_live_connection_reuse_are_not_fake_handshakes",
+      "protocol": "tuic:native",
+      "active_after_close": 0,
+      "uploaded": 94,
+      "downloaded": 94,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_tuic_auth_write_and_live_connection_reuse_are_not_fake_handshakes",
+      "protocol": "tuic:native",
+      "active_after_close": 0,
+      "uploaded": 0,
+      "downloaded": 0,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_vmess_wss_and_failed_status_keep_distinct_setup_phases",
+      "protocol": "vmess",
+      "active_after_close": 0,
+      "uploaded": 0,
+      "downloaded": 0,
+      "udp_dropped": 0
+    },
+    {
+      "case": "test_vmess_wss_and_failed_status_keep_distinct_setup_phases",
+      "protocol": "vmess",
+      "active_after_close": 0,
+      "uploaded": 0,
+      "downloaded": 0,
+      "udp_dropped": 0
+    }
+  ],
+  "ffi_hosts": []
+}

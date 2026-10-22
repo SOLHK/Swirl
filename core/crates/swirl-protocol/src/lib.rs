@@ -9,6 +9,7 @@ mod socks4;
 mod socks5;
 pub mod ss2022;
 pub mod stream_udp;
+mod timing;
 mod transport;
 pub mod tuic;
 pub mod vision;
@@ -29,6 +30,8 @@ pub use socks5::UdpAssociation as Socks5UdpAssociation;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use swirl_dns::Resolver;
 use swirl_subscription::{Credentials, Outbound, valid_host};
+pub use timing::ConnectTimings;
+use timing::Phase;
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
@@ -574,11 +577,15 @@ async fn connect_selected(
         }
         // The Chrome profile owns its fixed h2/http1.1 offer. Do not rewrite
         // its ClientHello. REALITY has its own authenticated ALPN policy below.
-        let stream = within(deadline, "RealityHandshakeTimeout", async {
-            swirl_transport::reality::connect(tcp, &parameters, unix_time, &alpn)
-                .await
-                .map_err(|_| "RealityAuthenticationOrHandshake")
-        })
+        let stream = within(
+            deadline,
+            "RealityHandshakeTimeout",
+            timing::measure(Phase::Reality, async {
+                swirl_transport::reality::connect(tcp, &parameters, unix_time, &alpn)
+                    .await
+                    .map_err(|_| "RealityAuthenticationOrHandshake")
+            }),
+        )
         .await?;
         if let Some(transport) = transport {
             transport.validate_reality_alpn(stream.tls().alpn_protocol())?;
@@ -590,7 +597,10 @@ async fn connect_selected(
             let stream = within(
                 deadline,
                 "UpstreamProtocolTimeout",
-                vision::client_over_reality(stream, uuid, target, handshake_limit),
+                timing::measure(
+                    Phase::RequestEncodeWrite,
+                    vision::client_over_reality(stream, uuid, target, handshake_limit),
+                ),
             )
             .await?;
             return Ok(Box::new(stream));
@@ -678,10 +688,13 @@ async fn connect_selected(
         within(
             deadline,
             "UpstreamTlsTimeout",
-            swirl_transport::secure_with_alpn(
-                tcp,
-                tls,
-                transport.and_then(Transport::required_alpn),
+            timing::measure(
+                Phase::ProxyTls,
+                swirl_transport::secure_with_alpn(
+                    tcp,
+                    tls,
+                    transport.and_then(Transport::required_alpn),
+                ),
             ),
         )
         .await?
@@ -709,7 +722,7 @@ async fn connect_selected(
         stream = within(
             deadline,
             "WebSocketUpgradeTimeout",
-            websocket::connect(stream, ws),
+            timing::measure(Phase::TransportSetup, websocket::connect(stream, ws)),
         )
         .await?;
     }
@@ -756,6 +769,31 @@ pub fn validate_tls(outbound: &Outbound, transport: Option<&Transport>) -> Resul
 }
 
 async fn handshake(
+    outbound: &Outbound,
+    target: &Target,
+    stream: swirl_transport::BoxStream,
+    auth: Option<&Credentials>,
+    port: u16,
+    handshake_limit: std::time::Duration,
+    udp: bool,
+) -> Result<swirl_transport::BoxStream> {
+    let future = handshake_inner(outbound, target, stream, auth, port, handshake_limit, udp);
+    if matches!(
+        outbound,
+        Outbound::Vmess { .. }
+            | Outbound::Vless { .. }
+            | Outbound::Trojan { .. }
+            | Outbound::Shadowsocks { .. }
+    ) {
+        // These protocols may defer a response until application data, or
+        // have no acknowledgement. Measure encoding/writing, never auth OK.
+        timing::measure(Phase::RequestEncodeWrite, future).await
+    } else {
+        future.await
+    }
+}
+
+async fn handshake_inner(
     outbound: &Outbound,
     target: &Target,
     mut stream: swirl_transport::BoxStream,
@@ -833,44 +871,63 @@ async fn handshake(
         return Ok(Box::new(vless::Stream::new(stream, handshake_limit)));
     }
     if matches!(outbound, Outbound::Socks5 { .. }) {
-        socks5::authenticate(&mut stream, auth).await?;
-        socks5::request(&mut stream, 1, target, true).await?;
+        timing::measure(
+            if auth.is_some() {
+                Phase::AuthenticationExchange
+            } else {
+                Phase::ProxyNegotiation
+            },
+            socks5::authenticate(&mut stream, auth),
+        )
+        .await?;
+        if auth.is_some() {
+            timing::authentication_response_accepted();
+        }
+        timing::measure(
+            Phase::ProxyConnectExchange,
+            socks5::request(&mut stream, 1, target, true),
+        )
+        .await?;
     } else {
-        let mut request = format!(
-            "CONNECT {} HTTP/1.1\r\nHost: {}\r\n",
-            target.authority(),
-            target.authority()
-        );
-        if let Some(auth) = auth {
-            request += &format!(
-                "Proxy-Authorization: Basic {}\r\n",
-                STANDARD.encode(format!("{}:{}", auth.username, auth.password))
+        timing::measure(Phase::ProxyConnectExchange, async {
+            let mut request = format!(
+                "CONNECT {} HTTP/1.1\r\nHost: {}\r\n",
+                target.authority(),
+                target.authority()
             );
-        }
-        request += "\r\n";
-        stream
-            .write_all(request.as_bytes())
-            .await
-            .map_err(|_| "HttpUpstreamWrite")?;
-        stream.flush().await.map_err(|_| "HttpUpstreamWrite")?;
-        // Read exactly through the header: tunnel bytes must stay in the socket.
-        let mut header = Vec::new();
-        while !header.ends_with(b"\r\n\r\n") {
-            if header.len() >= 16384 {
-                return Err("UpstreamHeaderTooLarge");
+            if let Some(auth) = auth {
+                request += &format!(
+                    "Proxy-Authorization: Basic {}\r\n",
+                    STANDARD.encode(format!("{}:{}", auth.username, auth.password))
+                );
             }
-            header.push(stream.read_u8().await.map_err(|_| "HttpUpstreamRead")?);
-        }
-        let mut fields = [httparse::EMPTY_HEADER; 64];
-        let mut response = httparse::Response::new(&mut fields);
-        if !response
-            .parse(&header)
-            .map_err(|_| "HttpUpstreamSyntax")?
-            .is_complete()
-            || response.code != Some(200)
-        {
-            return Err("UpstreamRejected");
-        }
+            request += "\r\n";
+            stream
+                .write_all(request.as_bytes())
+                .await
+                .map_err(|_| "HttpUpstreamWrite")?;
+            stream.flush().await.map_err(|_| "HttpUpstreamWrite")?;
+            // Read exactly through the header: tunnel bytes must stay in the socket.
+            let mut header = Vec::new();
+            while !header.ends_with(b"\r\n\r\n") {
+                if header.len() >= 16384 {
+                    return Err("UpstreamHeaderTooLarge");
+                }
+                header.push(stream.read_u8().await.map_err(|_| "HttpUpstreamRead")?);
+            }
+            let mut fields = [httparse::EMPTY_HEADER; 64];
+            let mut response = httparse::Response::new(&mut fields);
+            if !response
+                .parse(&header)
+                .map_err(|_| "HttpUpstreamSyntax")?
+                .is_complete()
+                || response.code != Some(200)
+            {
+                return Err("UpstreamRejected");
+            }
+            Ok(())
+        })
+        .await?;
     }
     Ok(stream)
 }

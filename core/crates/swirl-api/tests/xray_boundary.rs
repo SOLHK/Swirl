@@ -3,7 +3,7 @@
 //! acceptance here is not a proxy handshake, TLS, REALITY, or network test.
 use serde_json::{Value, json};
 use std::{
-    net::{SocketAddr, TcpListener},
+    net::{SocketAddr, TcpListener, UdpSocket},
     sync::{Mutex, MutexGuard},
 };
 use swirl_api::{OUTPUT_CAPACITY, swirl_core_abi_version, swirl_core_command};
@@ -21,7 +21,15 @@ const UUID: &str = "00112233-4455-6677-8899-aabbccddeeff";
 const PRIVATE_FIELD: &str = "synthetic-private-field-name";
 const PRIVATE_VALUE: &str = "synthetic-private-field-value";
 const PUBLIC_KEY: &str = "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE";
-const SECRETS: [&str; 5] = [USER, PASSWORD, UUID, PRIVATE_FIELD, PRIVATE_VALUE];
+const SS2022_PSK: &str = "AgICAgICAgICAgICAgICAg==";
+const SECRETS: [&str; 6] = [
+    USER,
+    PASSWORD,
+    UUID,
+    PRIVATE_FIELD,
+    PRIVATE_VALUE,
+    SS2022_PSK,
+];
 static LIFECYCLE: Mutex<()> = Mutex::new(());
 
 fn serialized_lifecycle() -> MutexGuard<'static, ()> {
@@ -487,4 +495,147 @@ fn reloaded_legacy_vmess_and_conflicting_source_security_have_no_abi_export() {
         );
     }
     no_upstream_connection(&peer);
+}
+
+fn inspected_outbound(source: &str, expected: &str) -> Value {
+    let inspection = swirl_subscription::inspect::inspect(source.as_bytes());
+    assert!(inspection.report.parsed);
+    assert_eq!(inspection.original, source.as_bytes());
+    assert_eq!(inspection.report.nodes.len(), 1);
+    assert!(inspection.report.nodes[0].native_tcp_candidate);
+    assert!(!inspection.report.nodes[0].real_network_verified);
+    assert_redacted(&serde_json::to_string(&inspection.report).unwrap());
+    let outbound = serde_json::to_value(inspection.tcp_candidates[0].as_ref().unwrap()).unwrap();
+    assert_eq!(outbound["type"], expected);
+    outbound
+}
+
+#[test]
+fn quic_and_ss2022_source_imports_survive_abi_configuration_and_selection() {
+    let _serial = serialized_lifecycle();
+    let tcp = loopback_peer();
+    let endpoint = tcp.local_addr().unwrap();
+    let udp = UdpSocket::bind(endpoint).unwrap();
+    udp.set_nonblocking(true).unwrap();
+    let port = endpoint.port();
+    let groups = [
+        (
+            "hysteria2",
+            vec![
+                format!("hy2://{PASSWORD}@{endpoint}/?sni=localhost"),
+                format!("hysteria2://{PASSWORD}@{endpoint}/?sni=localhost"),
+                format!(
+                    "proxies:\n  - name: boundary\n    type: hysteria2\n    server: 127.0.0.1\n    port: {port}\n    password: {PASSWORD}\n    sni: localhost\n"
+                ),
+            ],
+        ),
+        (
+            "tuic",
+            vec![
+                format!("tuic://{UUID}:{PASSWORD}@{endpoint}/?sni=localhost&alpn=h3"),
+                format!(
+                    "proxies:\n  - name: boundary\n    type: tuic\n    server: 127.0.0.1\n    port: {port}\n    uuid: {UUID}\n    password: {PASSWORD}\n    sni: localhost\n    alpn: [h3]\n"
+                ),
+            ],
+        ),
+        (
+            "shadowsocks",
+            vec![
+                format!(
+                    "ss://2022-blake3-aes-128-gcm:{}@{endpoint}/",
+                    SS2022_PSK.replace('=', "%3D")
+                ),
+                format!(
+                    "proxies:\n  - name: boundary\n    type: ss\n    server: 127.0.0.1\n    port: {port}\n    cipher: 2022-blake3-aes-128-gcm\n    password: {SS2022_PSK}\n"
+                ),
+            ],
+        ),
+    ];
+    let mut native = json!({"schema":1,"listen":"127.0.0.1:0","selected":"node0","nodes":[]});
+    for (index, (protocol, sources)) in groups.iter().enumerate() {
+        let first = inspected_outbound(&sources[0], protocol);
+        for source in &sources[1..] {
+            // Different subscription dialects must produce identical native IR.
+            assert_eq!(inspected_outbound(source, protocol), first);
+        }
+        native["nodes"].as_array_mut().unwrap().push(json!({
+            "id":format!("node{index}"),"outbound":first
+        }));
+    }
+    // Exercise storage serialization before crossing caller-owned ABI buffers.
+    let persisted = Config::parse(&serde_json::to_vec(&native).unwrap()).unwrap();
+    let native = serde_json::to_value(persisted).unwrap();
+    let (mut core, before) = RunningCore::start(&native);
+    for index in [1, 2, 0] {
+        let id = format!("node{index}");
+        assert_eq!(
+            command(json!({"op":"select","handle":core.handle,"id":id})),
+            json!({"ok":true})
+        );
+        assert_eq!(core.snapshot()["selected"], id);
+    }
+    assert_eq!(
+        command(json!({"op":"configure","handle":core.handle,"config":native})),
+        json!({"ok":true})
+    );
+    let after = core.snapshot();
+    assert_eq!(after["address"], before["address"]);
+    assert_eq!(after["accepted"], 0);
+    assert_eq!(after["failed"], 0);
+    no_upstream_connection(&tcp);
+    let mut packet = [0; 64];
+    assert_eq!(
+        udp.recv_from(&mut packet).unwrap_err().kind(),
+        std::io::ErrorKind::WouldBlock
+    );
+    core.stop();
+    let address: SocketAddr = before["address"].as_str().unwrap().parse().unwrap();
+    let released = TcpListener::bind(address).expect("ABI stop must release its listener");
+    drop(released);
+}
+
+#[test]
+fn quic_trust_and_ss2022_key_rejections_are_atomic_at_exported_abi() {
+    let _serial = serialized_lifecycle();
+    let peer = loopback_peer();
+    let native = fixture("http", peer.local_addr().unwrap()).native;
+    let (mut core, before) = RunningCore::start(&native);
+    for protocol in ["hysteria2", "tuic", "shadowsocks"] {
+        let mut rejected_config = native.clone();
+        let mut outbound = json!({"type":protocol,"host":"127.0.0.1",
+            "port":peer.local_addr().unwrap().port(),"password":PASSWORD});
+        let expected = if protocol == "shadowsocks" {
+            outbound["cipher"] = "2022-blake3-aes-128-gcm".into();
+            "Ss2022Key"
+        } else {
+            outbound["tls"] = json!({"server_name":"localhost","alpn":["h3"],
+                "ca_der_base64":"bm90LWEtY2VydGlmaWNhdGU="});
+            if protocol == "tuic" {
+                outbound["uuid"] = UUID.into();
+            }
+            "TlsTrustAnchor"
+        };
+        rejected_config["nodes"][0]["outbound"] = outbound;
+        rejected(json!({"op":"start","config":rejected_config}), expected);
+        rejected(
+            json!({"op":"configure","handle":core.handle,"config":rejected_config}),
+            expected,
+        );
+        for field in [
+            "generation",
+            "selected",
+            "address",
+            "running",
+            "accepted",
+            "failed",
+        ] {
+            assert_eq!(
+                core.snapshot()[field],
+                before[field],
+                "rejected ABI update changed state"
+            );
+        }
+    }
+    no_upstream_connection(&peer);
+    core.stop();
 }

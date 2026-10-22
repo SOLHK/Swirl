@@ -165,3 +165,17 @@ reconfiguration with the actual Windows Qt application and independent servers.
 The existing ABI start/configure boundary can then consume those same native
 outbounds. Removing only the protocol whitelist would be insufficient: it would
 leave credential, TLS, transport and UDP fields unmapped.
+
+## A7 additive evidence after this A5/A6 source audit
+
+The new [exported C ABI interoperability suite](QUIC_EXPORTED_C_ABI_INTEROP_20261022.md)
+actually loads the Linux `libswirl_api.so` and executes all six official QUIC
+Core tests through the exported functions: 6/6 passed, 17 handles cleanly
+started/stopped. This updates the library-boundary evidence; it does not fill
+the Qt importer, private storage or projection gaps identified above. Later
+Windows/macOS DLL/dylib runs must be judged by their actual CI receipts.
+
+Probe JSON gains optional fixed-size `outbound_timing` observations. Existing
+Qt `RustCoreEngine::updateProbe` reads its existing fields and ignores added
+fields; exported signatures and ABI version 1 remain unchanged. This is a
+source compatibility check, not a newly executed Qt build or product test.

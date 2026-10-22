@@ -1,6 +1,9 @@
 //! Explicit transport selection at the protocol boundary. Import/conversion is
 //! deliberately separate: unsupported settings fail before DNS or socket I/O.
-use crate::Result;
+use crate::{
+    Result,
+    timing::{self, Phase},
+};
 use serde::{Deserialize, Serialize};
 use swirl_subscription::{Outbound, WebSocket};
 use swirl_transport::BoxStream;
@@ -71,24 +74,34 @@ impl Transport {
         tls: bool,
         remaining: std::time::Duration,
     ) -> Result<BoxStream> {
-        match self {
-            Self::Tcp {} => Ok(stream),
-            Self::WebSocket { settings, headers } => {
-                crate::websocket::connect_with_headers(stream, settings, headers).await
-            }
-            Self::Grpc { config } => {
-                swirl_transport::grpc::connect_with_timeout(stream, config, tls, remaining).await
-            }
-            Self::Http2 { config } => {
-                swirl_transport::http2::connect_with_timeout(stream, config, tls, remaining).await
-            }
-            Self::HttpUpgrade { config } => {
-                swirl_transport::httpupgrade::connect_with_timeout(stream, config, remaining).await
-            }
-            Self::XHttp { config } => {
-                swirl_transport::xhttp::connect_with_timeout(stream, config, tls, remaining).await
-            }
+        if matches!(self, Self::Tcp {}) {
+            return Ok(stream);
         }
+        timing::measure(Phase::TransportSetup, async {
+            match self {
+                Self::Tcp {} => Ok(stream),
+                Self::WebSocket { settings, headers } => {
+                    crate::websocket::connect_with_headers(stream, settings, headers).await
+                }
+                Self::Grpc { config } => {
+                    swirl_transport::grpc::connect_with_timeout(stream, config, tls, remaining)
+                        .await
+                }
+                Self::Http2 { config } => {
+                    swirl_transport::http2::connect_with_timeout(stream, config, tls, remaining)
+                        .await
+                }
+                Self::HttpUpgrade { config } => {
+                    swirl_transport::httpupgrade::connect_with_timeout(stream, config, remaining)
+                        .await
+                }
+                Self::XHttp { config } => {
+                    swirl_transport::xhttp::connect_with_timeout(stream, config, tls, remaining)
+                        .await
+                }
+            }
+        })
+        .await
     }
 }
 

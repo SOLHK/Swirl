@@ -3,6 +3,7 @@
 //! The independent reference server is HyNetworks/hysteria, protocol v2.
 mod rate;
 mod salamander;
+use crate::timing::{self, Phase};
 use crate::{Result, Target};
 use bytes::Bytes;
 use ring::rand::{SecureRandom, SystemRandom};
@@ -100,7 +101,10 @@ impl Session {
         let addresses = bounded(
             deadline,
             "Hysteria2DnsTimeout",
-            resolver.resolve(&config.host, config.port),
+            timing::measure(
+                Phase::Resolution,
+                resolver.resolve(&config.host, config.port),
+            ),
         )
         .await?;
         let options = quic::TlsOptions {
@@ -115,95 +119,104 @@ impl Session {
             .obfs_password
             .as_ref()
             .map(|password| zeroize::Zeroizing::new(password.as_bytes().to_vec()));
-        let transport = quic::connect_with_socket_wrapper(
-            &addresses,
-            options,
-            Some(b"h3"),
-            "cubic",
-            deadline,
-            &move |socket| {
-                // Apply pacing outside the obfuscator so its salt bytes count
-                // toward the negotiated wire rate as well.
-                let socket = rate::Socket::wrap(socket, socket_limit.clone());
-                match &password {
-                    Some(password) => salamander::Socket::wrap(socket, password),
-                    None => socket,
-                }
-            },
+        let transport = timing::measure(
+            Phase::Quic,
+            quic::connect_with_socket_wrapper(
+                &addresses,
+                options,
+                Some(b"h3"),
+                "cubic",
+                deadline,
+                &move |socket| {
+                    // Apply pacing outside the obfuscator so its salt bytes count
+                    // toward the negotiated wire rate as well.
+                    let socket = rate::Socket::wrap(socket, socket_limit.clone());
+                    match &password {
+                        Some(password) => salamander::Socket::wrap(socket, password),
+                        None => socket,
+                    }
+                },
+            ),
         )
         .await?;
-        let (mut driver, mut requester) = bounded(deadline, "Hysteria2Http3Timeout", async {
-            h3::client::builder()
-                .max_field_section_size(16384)
-                .build(h3_quinn::Connection::new(transport.connection.clone()))
-                .await
-                .map_err(|_| "Hysteria2Http3Setup")
-        })
+        let (mut driver, mut requester) = timing::measure(
+            Phase::TransportSetup,
+            bounded(deadline, "Hysteria2Http3Timeout", async {
+                h3::client::builder()
+                    .max_field_section_size(16384)
+                    .build(h3_quinn::Connection::new(transport.connection.clone()))
+                    .await
+                    .map_err(|_| "Hysteria2Http3Setup")
+            }),
+        )
         .await?;
         let driver = Task(tokio::spawn(async move {
             let _ = poll_fn(|context| driver.poll_close(context)).await;
         }));
-        let result = bounded(deadline, "Hysteria2AuthenticationTimeout", async {
-            let request = http::Request::builder()
-                .method(http::Method::POST)
-                .uri("https://hysteria/auth")
-                .header("hysteria-auth", &config.password)
-                // Zero negotiates automatic congestion control. Nonzero
-                // values are the receive limit, already converted to bytes/s.
-                .header("hysteria-cc-rx", download_rate.to_string())
-                .header("hysteria-padding", padding()?)
-                .body(())
-                .map_err(|_| "Hysteria2AuthenticationParameters")?;
-            let mut stream = requester
-                .send_request(request)
-                .await
-                .map_err(|_| "Hysteria2AuthenticationWrite")?;
-            stream
-                .finish()
-                .await
-                .map_err(|_| "Hysteria2AuthenticationWrite")?;
-            let response = stream
-                .recv_response()
-                .await
-                .map_err(|_| "Hysteria2AuthenticationRead")?;
-            if response.status().as_u16() != 233 {
-                return Err("Hysteria2AuthenticationRejected");
-            }
-            let headers = response.headers();
-            let udp = match headers
-                .get("hysteria-udp")
-                .and_then(|value| value.to_str().ok())
-            {
-                Some("true") => true,
-                Some("false") => false,
-                _ => return Err("Hysteria2AuthenticationResponse"),
-            };
-            let server_rate = match headers
-                .get("hysteria-cc-rx")
-                .and_then(|value| value.to_str().ok())
-            {
-                Some("auto") => 0,
-                Some(value)
-                    if !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit()) =>
-                {
-                    value
-                        .parse::<u64>()
-                        .map_err(|_| "Hysteria2AuthenticationResponse")?
+        let result = timing::measure(
+            Phase::AuthenticationExchange,
+            bounded(deadline, "Hysteria2AuthenticationTimeout", async {
+                let request = http::Request::builder()
+                    .method(http::Method::POST)
+                    .uri("https://hysteria/auth")
+                    .header("hysteria-auth", &config.password)
+                    // Zero negotiates automatic congestion control. Nonzero
+                    // values are the receive limit, already converted to bytes/s.
+                    .header("hysteria-cc-rx", download_rate.to_string())
+                    .header("hysteria-padding", padding()?)
+                    .body(())
+                    .map_err(|_| "Hysteria2AuthenticationParameters")?;
+                let mut stream = requester
+                    .send_request(request)
+                    .await
+                    .map_err(|_| "Hysteria2AuthenticationWrite")?;
+                stream
+                    .finish()
+                    .await
+                    .map_err(|_| "Hysteria2AuthenticationWrite")?;
+                let response = stream
+                    .recv_response()
+                    .await
+                    .map_err(|_| "Hysteria2AuthenticationRead")?;
+                if response.status().as_u16() != 233 {
+                    return Err("Hysteria2AuthenticationRejected");
                 }
-                _ => return Err("Hysteria2AuthenticationResponse"),
-            };
-            // Cubic is retained for congestion response in every mode. This
-            // wire-rate ceiling honours client/server bandwidth limits; it is
-            // deliberately not advertised as the Brutal controller.
-            upload_limit.set(match (upload_rate, server_rate) {
-                (0, server) => server,
-                (client, 0) => client,
-                (client, server) => client.min(server),
-            });
-            // Authentication has no useful response body. Drop its stream;
-            // retain the SendRequest owner because h3 closes on its last drop.
-            Ok(udp && config.udp)
-        })
+                let headers = response.headers();
+                let udp = match headers
+                    .get("hysteria-udp")
+                    .and_then(|value| value.to_str().ok())
+                {
+                    Some("true") => true,
+                    Some("false") => false,
+                    _ => return Err("Hysteria2AuthenticationResponse"),
+                };
+                let server_rate = match headers
+                    .get("hysteria-cc-rx")
+                    .and_then(|value| value.to_str().ok())
+                {
+                    Some("auto") => 0,
+                    Some(value)
+                        if !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit()) =>
+                    {
+                        value
+                            .parse::<u64>()
+                            .map_err(|_| "Hysteria2AuthenticationResponse")?
+                    }
+                    _ => return Err("Hysteria2AuthenticationResponse"),
+                };
+                // Cubic is retained for congestion response in every mode. This
+                // wire-rate ceiling honours client/server bandwidth limits; it is
+                // deliberately not advertised as the Brutal controller.
+                upload_limit.set(match (upload_rate, server_rate) {
+                    (0, server) => server,
+                    (client, 0) => client,
+                    (client, server) => client.min(server),
+                });
+                // Authentication has no useful response body. Drop its stream;
+                // retain the SendRequest owner because h3 closes on its last drop.
+                Ok(udp && config.udp)
+            }),
+        )
         .await;
         let udp_enabled = match result {
             Ok(value) => value,
@@ -212,6 +225,7 @@ impl Session {
                 return Err(error);
             }
         };
+        timing::authentication_response_accepted();
         Ok(Arc::new(Self {
             transport,
             _requester: Mutex::new(requester),
@@ -226,29 +240,32 @@ impl Session {
         if address.len() > MAX_ADDRESS {
             return Err("Hysteria2AddressLength");
         }
-        bounded(deadline, "Hysteria2StreamTimeout", async {
-            let (mut send, mut recv) = self
-                .transport
-                .connection
-                .open_bi()
-                .await
-                .map_err(|_| "Hysteria2StreamOpen")?;
-            let mut request = Vec::with_capacity(address.len() + 64);
-            put_varint(0x401, &mut request)?;
-            put_varint(address.len() as u64, &mut request)?;
-            request.extend(address.as_bytes());
-            let padding = padding()?;
-            put_varint(padding.len() as u64, &mut request)?;
-            request.extend(padding.as_bytes());
-            send.write_all(&request)
-                .await
-                .map_err(|_| "Hysteria2RequestWrite")?;
-            read_tcp_response(&mut recv).await?;
-            Ok(Box::new(Stream {
-                stream: quic::Stream::new(self.transport.clone(), send, recv),
-                _session: self.clone(),
-            }) as BoxStream)
-        })
+        timing::measure(
+            Phase::ProxyConnectExchange,
+            bounded(deadline, "Hysteria2StreamTimeout", async {
+                let (mut send, mut recv) = self
+                    .transport
+                    .connection
+                    .open_bi()
+                    .await
+                    .map_err(|_| "Hysteria2StreamOpen")?;
+                let mut request = Vec::with_capacity(address.len() + 64);
+                put_varint(0x401, &mut request)?;
+                put_varint(address.len() as u64, &mut request)?;
+                request.extend(address.as_bytes());
+                let padding = padding()?;
+                put_varint(padding.len() as u64, &mut request)?;
+                request.extend(padding.as_bytes());
+                send.write_all(&request)
+                    .await
+                    .map_err(|_| "Hysteria2RequestWrite")?;
+                read_tcp_response(&mut recv).await?;
+                Ok(Box::new(Stream {
+                    stream: quic::Stream::new(self.transport.clone(), send, recv),
+                    _session: self.clone(),
+                }) as BoxStream)
+            }),
+        )
         .await
     }
 }

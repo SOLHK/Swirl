@@ -2,6 +2,7 @@
 //! Wire specification: https://github.com/tuic-protocol/tuic/blob/master/SPEC.md
 //! TUIC has no authentication/CONNECT acknowledgement. Returning a stream only
 //! means the request was sent; successful target data is separate evidence.
+use crate::timing::{self, Phase};
 use crate::{Result, Target};
 use bytes::Bytes;
 use quinn::VarInt;
@@ -128,9 +129,15 @@ fn cache_key(config: &Tuic, addresses: &[SocketAddr]) -> [u8; 32] {
 }
 
 async fn resolve(config: &Tuic, resolver: &Resolver, deadline: Instant) -> Result<Vec<SocketAddr>> {
-    timeout_at(deadline, resolver.resolve(&config.host, config.port))
-        .await
-        .map_err(|_| "TuicDnsTimeout")?
+    timeout_at(
+        deadline,
+        timing::measure(
+            Phase::Resolution,
+            resolver.resolve(&config.host, config.port),
+        ),
+    )
+    .await
+    .map_err(|_| "TuicDnsTimeout")?
 }
 
 async fn new_client(
@@ -139,42 +146,49 @@ async fn new_client(
     deadline: Instant,
 ) -> Result<Arc<Client>> {
     config.validate()?;
-    let session = quic::connect(
-        addresses,
-        TlsOptions {
-            tls: &config.tls,
-            insecure: config.insecure,
-            pin_sha256: config.pin_sha256.as_deref(),
-        },
-        None,
-        &config.congestion_control,
-        deadline,
+    let session = timing::measure(
+        Phase::Quic,
+        quic::connect(
+            addresses,
+            TlsOptions {
+                tls: &config.tls,
+                insecure: config.insecure,
+                pin_sha256: config.pin_sha256.as_deref(),
+            },
+            None,
+            &config.congestion_control,
+            deadline,
+        ),
     )
     .await?;
-    let id = uuid_bytes(&config.uuid).ok_or("TuicUuid")?;
-    let mut token = Zeroizing::new([0; 32]);
-    session
-        .connection
-        .export_keying_material(&mut *token, &id, config.password.as_bytes())
-        .map_err(|_| "TuicExporter")?;
-    let mut request = Zeroizing::new(vec![VERSION, AUTHENTICATE]);
-    request.extend_from_slice(&id);
-    request.extend_from_slice(&*token);
-    timeout_at(deadline, async {
-        let mut stream = session
+    timing::measure(Phase::AuthenticationRequestEncodeWrite, async {
+        let id = uuid_bytes(&config.uuid).ok_or("TuicUuid")?;
+        let mut token = Zeroizing::new([0; 32]);
+        session
             .connection
-            .open_uni()
-            .await
-            .map_err(|_| "TuicAuthenticationStream")?;
-        stream
-            .write_all(&request)
-            .await
-            .map_err(|_| "TuicAuthenticationWrite")?;
-        stream.finish().map_err(|_| "TuicAuthenticationWrite")?;
+            .export_keying_material(&mut *token, &id, config.password.as_bytes())
+            .map_err(|_| "TuicExporter")?;
+        let mut request = Zeroizing::new(vec![VERSION, AUTHENTICATE]);
+        request.extend_from_slice(&id);
+        request.extend_from_slice(&*token);
+        timeout_at(deadline, async {
+            let mut stream = session
+                .connection
+                .open_uni()
+                .await
+                .map_err(|_| "TuicAuthenticationStream")?;
+            stream
+                .write_all(&request)
+                .await
+                .map_err(|_| "TuicAuthenticationWrite")?;
+            stream.finish().map_err(|_| "TuicAuthenticationWrite")?;
+            Ok::<(), &'static str>(())
+        })
+        .await
+        .map_err(|_| "TuicAuthenticationTimeout")??;
         Ok::<(), &'static str>(())
     })
-    .await
-    .map_err(|_| "TuicAuthenticationTimeout")??;
+    .await?;
     let connection = session.connection.clone();
     let interval = Duration::from_millis(config.heartbeat_interval_ms);
     let heartbeat = tokio::spawn(async move {
@@ -207,6 +221,7 @@ async fn tcp_client(config: &Tuic, resolver: &Resolver, deadline: Instant) -> Re
             .and_then(|(_, client)| client.upgrade())
             && client.session.connection.close_reason().is_none()
         {
+            timing::reused_quic_connection();
             return Ok(client);
         }
     }
@@ -221,6 +236,7 @@ async fn tcp_client(config: &Tuic, resolver: &Resolver, deadline: Instant) -> Re
         .and_then(|(_, client)| client.upgrade())
         && existing.session.connection.close_reason().is_none()
     {
+        timing::reused_quic_connection();
         return Ok(existing);
     }
     pool.retain(|(other, _)| other != &key);
@@ -238,19 +254,27 @@ pub async fn connect(
     handshake_limit: Duration,
 ) -> Result<BoxStream> {
     validate(config)?;
-    let mut request = vec![VERSION, CONNECT];
-    encode_address(target, &mut request)?;
+    let request = timing::measure(Phase::RequestEncodeWrite, async {
+        let mut request = vec![VERSION, CONNECT];
+        encode_address(target, &mut request)?;
+        Ok::<_, &'static str>(request)
+    })
+    .await?;
     let deadline =
         Instant::now() + handshake_limit.min(Duration::from_millis(config.request_timeout_ms));
     let client = tcp_client(config, resolver, deadline).await?;
-    let (mut send, recv) = timeout_at(deadline, client.session.connection.open_bi())
-        .await
-        .map_err(|_| "TuicConnectTimeout")?
-        .map_err(|_| "TuicConnectStream")?;
-    timeout_at(deadline, send.write_all(&request))
-        .await
-        .map_err(|_| "TuicConnectTimeout")?
-        .map_err(|_| "TuicConnectWrite")?;
+    let (send, recv) = timing::measure(Phase::RequestEncodeWrite, async {
+        let (mut send, recv) = timeout_at(deadline, client.session.connection.open_bi())
+            .await
+            .map_err(|_| "TuicConnectTimeout")?
+            .map_err(|_| "TuicConnectStream")?;
+        timeout_at(deadline, send.write_all(&request))
+            .await
+            .map_err(|_| "TuicConnectTimeout")?
+            .map_err(|_| "TuicConnectWrite")?;
+        Ok::<_, &'static str>((send, recv))
+    })
+    .await?;
     Ok(Box::new(Stream {
         inner: quic::Stream::new(client.session.clone(), send, recv),
         _client: client,

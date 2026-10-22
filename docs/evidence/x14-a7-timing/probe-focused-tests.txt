@@ -1,0 +1,122 @@
+   Compiling swirl-protocol v0.1.0 (/workspace/scratch/63c2b083dcfa/Swirl-X14-A/core/crates/swirl-protocol)
+   Compiling swirl-core v0.1.0 (/workspace/scratch/63c2b083dcfa/Swirl-X14-A/core/crates/swirl-core)
+   Compiling swirl-api v0.1.0 (/workspace/scratch/63c2b083dcfa/Swirl-X14-A/core/crates/swirl-api)
+    Finished `test` profile [unoptimized] target(s) in 13.31s
+     Running unittests src/lib.rs (/workspace/scratch/63c2b083dcfa/build-rust/debug/deps/swirl_api-42b0838309c7ea44)
+
+running 1 test
+test probe_tests::ffi_probe_starts_without_waiting_for_headers_and_returns_redacted_status ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.01s
+
+     Running unittests src/main.rs (/workspace/scratch/63c2b083dcfa/build-rust/debug/deps/swirl_api-3a245f3df3bf7d79)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/swirl-diagnose.rs (/workspace/scratch/63c2b083dcfa/build-rust/debug/deps/swirl_diagnose-f4842024ded02788)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+     Running unittests src/bin/swirl-inspect.rs (/workspace/scratch/63c2b083dcfa/build-rust/debug/deps/swirl_inspect-1b63e484c0fb5c67)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/xray_boundary.rs (/workspace/scratch/63c2b083dcfa/build-rust/debug/deps/xray_boundary-96edf27b66a0261f)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+     Running tests/xray_cli.rs (/workspace/scratch/63c2b083dcfa/build-rust/debug/deps/xray_cli-c6ddae35272deaf9)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/workspace/scratch/63c2b083dcfa/build-rust/debug/deps/swirl_core-379d944e071d9ba0)
+
+running 3 tests
+test probe::tests::cancellation_and_new_generation_discard_late_probe_results ... ok
+test probe::tests::selecting_configuring_and_stopping_invalidate_running_probes ... ok
+test transport_tests::rejected_reconfiguration_preserves_generation_probes_and_transport ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 16 filtered out; finished in 0.00s
+
+     Running tests/china_rules.rs (/workspace/scratch/63c2b083dcfa/build-rust/debug/deps/china_rules-6a170b521301fd30)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+     Running tests/network.rs (/workspace/scratch/63c2b083dcfa/build-rust/debug/deps/network-f3cb8b6b5880cd91)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.00s
+
+     Running tests/socks5_udp.rs (/workspace/scratch/63c2b083dcfa/build-rust/debug/deps/socks5_udp-70ecd54dd52b30a6)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+     Running tests/xray_import.rs (/workspace/scratch/63c2b083dcfa/build-rust/debug/deps/xray_import-a5a004e7b52aa683)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/workspace/scratch/63c2b083dcfa/build-rust/debug/deps/swirl_protocol-03b0d166102e6f1c)
+
+running 12 tests
+test probe::probe_tests::url_test_head_optional_expected_status_is_exact ... ok
+test probe::probe_tests::url_test_head_reports_http_status_failure_without_latency ... ok
+test probe::tests::header_completion_does_not_wait_for_a_response_body ... ok
+test probe::probe_tests::health_probe_preserves_get_request_and_header_timing ... ok
+test probe::tests::fragmented_interim_responses_require_a_complete_final_status ... ok
+test probe::probe_tests::url_test_head_reports_truncated_headers_as_response_failure ... ok
+test probe::probe_tests::url_test_head_returns_before_peer_body_or_close ... ok
+test probe::tests::interim_headers_share_one_total_byte_and_count_budget ... ok
+test probe::tests::malformed_truncated_redirect_and_upgrade_responses_are_unhealthy ... ok
+test probe::probe_tests::url_test_head_rejects_untrusted_https_certificate_at_origin_tls ... ok
+test probe::probe_tests::url_test_head_authenticates_https_and_reports_origin_tls_phase ... ok
+test probe::probe_tests::url_test_tls_timeout_keeps_partial_outbound_timing ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 102 filtered out; finished in 0.16s
+
+     Running tests/quic_preflight.rs (/workspace/scratch/63c2b083dcfa/build-rust/debug/deps/quic_preflight-eb33ec2f79c86e9f)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+     Running tests/vision.rs (/workspace/scratch/63c2b083dcfa/build-rust/debug/deps/vision-9c0ac449dc15bf69)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 21 filtered out; finished in 0.00s
+
+     Running tests/vision_record.rs (/workspace/scratch/63c2b083dcfa/build-rust/debug/deps/vision_record-6d9c638b7d34b054)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+
+     Running tests/vision_stream.rs (/workspace/scratch/63c2b083dcfa/build-rust/debug/deps/vision_stream-191a2ab310586915)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 16 filtered out; finished in 0.00s
+
+     Running tests/vision_tls.rs (/workspace/scratch/63c2b083dcfa/build-rust/debug/deps/vision_tls-84a6da560f92b99d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 0.00s
+
