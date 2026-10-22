@@ -35,11 +35,31 @@ pub enum Transport {
 }
 
 impl Transport {
+    /// Validate this selection against an outbound before DNS, sockets or Core
+    /// activation. Importers still own strict source-parameter conversion.
+    pub fn validate_for(&self, outbound: &Outbound) -> Result<()> {
+        validate(outbound, Some(self))
+    }
+
     pub(crate) fn required_alpn(&self) -> Option<&'static [u8]> {
         match self {
             Self::Grpc { .. } | Self::Http2 { .. } | Self::XHttp { .. } => Some(b"h2"),
             _ => None,
         }
+    }
+
+    /// Only for an already authenticated REALITY session. Xray's pinned
+    /// REALITY server deliberately sets NextProtos=nil, then starts its gRPC
+    /// or XHTTP HTTP/2 listener with prior knowledge. An absent selection is
+    /// therefore expected there; a present incompatible protocol still fails.
+    /// Ordinary certificate-based TLS requires negotiated h2 in `secure_with_alpn`.
+    pub(crate) fn validate_reality_alpn(&self, negotiated: Option<&[u8]>) -> Result<()> {
+        if let (Some(required), Some(negotiated)) = (self.required_alpn(), negotiated)
+            && required != negotiated
+        {
+            return Err("RealityAlpnNegotiation");
+        }
+        Ok(())
     }
 
     pub(crate) async fn wrap(
@@ -80,15 +100,22 @@ pub(crate) fn validate(outbound: &Outbound, selected: Option<&Transport>) -> Res
         } => (
             tls.as_ref(),
             websocket.as_ref(),
-            reality.is_some(),
+            reality.as_ref(),
             flow.as_deref(),
         ),
-        Outbound::Trojan { tls, websocket, .. } => (Some(tls), websocket.as_ref(), false, None),
+        Outbound::Trojan { tls, websocket, .. } => (Some(tls), websocket.as_ref(), None, None),
         _ if selected.is_some() => return Err("TransportProtocolUnsupported"),
         _ => return Ok(()),
     };
+    if let Some(reality) = reality {
+        if tls.is_some() || websocket.is_some() {
+            return Err("RealityTransportConflict");
+        }
+        reality.validate()?;
+    }
     if let Some(ws) = websocket {
         ws.validate_tls(tls)?;
+        crate::websocket::validate_settings(ws, &[])?;
         if selected.is_some() {
             return Err("TransportConflict");
         }
@@ -97,7 +124,9 @@ pub(crate) fn validate(outbound: &Outbound, selected: Option<&Transport>) -> Res
         if matches!(selected, Transport::Tcp {}) {
             return Ok(());
         }
-        if reality {
+        if reality.is_some()
+            && !matches!(selected, Transport::Grpc { .. } | Transport::XHttp { .. })
+        {
             return Err("RealityTransportUnsupported");
         }
         if flow.is_some_and(|value| !value.is_empty()) {
@@ -110,10 +139,21 @@ pub(crate) fn validate(outbound: &Outbound, selected: Option<&Transport>) -> Res
         {
             return Err("TlsAlpnUnsupported");
         }
+        if let Some(required) = selected.required_alpn()
+            && reality.is_some_and(|reality| {
+                !reality.alpn.is_empty()
+                    && !reality
+                        .alpn
+                        .iter()
+                        .any(|value| value.as_bytes() == required)
+            })
+        {
+            return Err("RealityAlpnUnsupported");
+        }
         match selected {
             Transport::WebSocket { settings, headers } => {
                 settings.validate_tls(tls)?;
-                crate::websocket::validate_headers(headers)?;
+                crate::websocket::validate_settings(settings, headers)?;
             }
             Transport::Grpc { config } => config.validate()?,
             Transport::Http2 { config } => {
@@ -150,6 +190,43 @@ mod tests {
             r#"{"type":"xhttp","mode":"auto"}"#,
         ] {
             assert!(serde_json::from_str::<Transport>(input).is_err());
+        }
+    }
+
+    #[test]
+    fn reality_prior_knowledge_does_not_accept_incompatible_alpn() {
+        let mut outbound: Outbound = serde_json::from_str(
+            r#"{"type":"vless","host":"peer.invalid","port":443,
+                "uuid":"00112233-4455-6677-8899-aabbccddeeff","reality":{
+                "server_name":"peer.invalid",
+                "public_key":"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE",
+                "short_id":"01","fingerprint":"rustls","alpn":[]}}"#,
+        )
+        .unwrap();
+        for input in [
+            r#"{"type":"grpc","config":{"authority":"peer.invalid","service_name":"tunnel","mode":"tun"}}"#,
+            r#"{"type":"xhttp","config":{"host":"peer.invalid","path":"/tunnel","mode":"stream-one"}}"#,
+        ] {
+            let selected: Transport = serde_json::from_str(input).unwrap();
+            assert_eq!(selected.validate_for(&outbound), Ok(()));
+            assert_eq!(selected.validate_reality_alpn(None), Ok(()));
+            assert_eq!(selected.validate_reality_alpn(Some(b"h2")), Ok(()));
+            assert_eq!(
+                selected.validate_reality_alpn(Some(b"http/1.1")),
+                Err("RealityAlpnNegotiation")
+            );
+            let Outbound::Vless { reality, .. } = &mut outbound else {
+                unreachable!()
+            };
+            reality.as_mut().unwrap().alpn = vec!["http/1.1".into()];
+            assert_eq!(
+                selected.validate_for(&outbound),
+                Err("RealityAlpnUnsupported")
+            );
+            let Outbound::Vless { reality, .. } = &mut outbound else {
+                unreachable!()
+            };
+            reality.as_mut().unwrap().alpn.clear();
         }
     }
 }

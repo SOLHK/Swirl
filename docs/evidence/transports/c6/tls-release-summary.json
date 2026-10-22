@@ -1,0 +1,62 @@
+{
+  "tests_run": 3,
+  "failures": 0,
+  "errors": 0,
+  "skips": 0,
+  "exit_code": 0,
+  "elapsed_seconds": 0.033,
+  "proxy_interoperability": false,
+  "public_network_tested": false,
+  "client_sha256": "f4fa8cfb328d8f9f38ce96d8dba588c1ff4df406276c4cd12d4fc09f06ed50b6",
+  "cases": [
+    {
+      "case": "test_empty_client_alpn_offers_h2_to_the_tls_peer",
+      "client_alpn": [],
+      "server_alpn": [
+        "h2"
+      ],
+      "selected_alpn": "h2",
+      "tls_handshake": true,
+      "application_bytes": 24,
+      "proxy_interoperability": false,
+      "client_result": {
+        "driver_drain_us": 3128,
+        "error": "HttpRead",
+        "ok": false,
+        "remaining_tasks": 0
+      }
+    },
+    {
+      "case": "test_h1_only_server_cannot_accept_automatic_h2_offer",
+      "client_alpn": [],
+      "server_alpn": [
+        "http/1.1"
+      ],
+      "selected_alpn": null,
+      "tls_handshake": true,
+      "application_bytes": 0,
+      "proxy_interoperability": false,
+      "client_result": {
+        "driver_drain_us": 1,
+        "error": "TlsAlpnNegotiation",
+        "ok": false,
+        "remaining_tasks": 0
+      }
+    },
+    {
+      "case": "test_missing_negotiated_alpn_rejects_before_proxy_bytes",
+      "client_alpn": [],
+      "server_alpn": [],
+      "selected_alpn": null,
+      "tls_handshake": true,
+      "application_bytes": 0,
+      "proxy_interoperability": false,
+      "client_result": {
+        "driver_drain_us": 1,
+        "error": "TlsAlpnNegotiation",
+        "ok": false,
+        "remaining_tasks": 0
+      }
+    }
+  ]
+}

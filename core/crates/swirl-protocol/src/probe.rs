@@ -1,7 +1,7 @@
 //! Explicit health requests run through the selected native outbound. The
 //! measured interval ends at validated final response headers, not at a TCP
 //! connect or an unrelated direct request. No application traffic is replayed.
-use crate::{Result, Target};
+use crate::{Result, Target, Transport};
 use std::time::Instant;
 use swirl_dns::Resolver;
 use swirl_subscription::{HealthProbe, Outbound};
@@ -112,6 +112,35 @@ pub async fn url_test_head(
     resolver: &Resolver,
     expected_status: Option<u16>,
 ) -> std::result::Result<UrlTestMetrics, UrlTestFailure> {
+    url_test_head_selected(outbound, options, resolver, expected_status, None).await
+}
+
+/// Run the same bounded HEAD probe through an explicit native transport. The
+/// node and its transport remain fixed for the entire probe, with no fallback.
+pub async fn url_test_head_with_transport(
+    outbound: &Outbound,
+    options: &HealthProbe,
+    resolver: &Resolver,
+    expected_status: Option<u16>,
+    transport: &Transport,
+) -> std::result::Result<UrlTestMetrics, UrlTestFailure> {
+    url_test_head_selected(
+        outbound,
+        options,
+        resolver,
+        expected_status,
+        Some(transport),
+    )
+    .await
+}
+
+async fn url_test_head_selected(
+    outbound: &Outbound,
+    options: &HealthProbe,
+    resolver: &Resolver,
+    expected_status: Option<u16>,
+    transport: Option<&Transport>,
+) -> std::result::Result<UrlTestMetrics, UrlTestFailure> {
     if expected_status.is_some_and(|status| !(200..=299).contains(&status)) {
         return Err(UrlTestFailure::at(
             UrlTestStage::Input,
@@ -123,7 +152,7 @@ pub async fn url_test_head(
     let deadline = tokio::time::Instant::now() + Duration::from_millis(options.timeout_ms);
     let mut stream = timeout_at(
         deadline,
-        crate::connect(
+        crate::connect_selected(
             outbound,
             &Target {
                 host: target.host.clone(),
@@ -131,6 +160,7 @@ pub async fn url_test_head(
             },
             resolver,
             Duration::from_millis(options.timeout_ms),
+            transport,
         ),
     )
     .await
@@ -188,12 +218,32 @@ pub async fn health_probe(
     options: &HealthProbe,
     resolver: &Resolver,
 ) -> Result<u64> {
+    health_probe_selected(outbound, options, resolver, None).await
+}
+
+/// Run an automatic-policy health request through the node's explicit native
+/// transport, preserving the existing shared timeout and shutdown semantics.
+pub async fn health_probe_with_transport(
+    outbound: &Outbound,
+    options: &HealthProbe,
+    resolver: &Resolver,
+    transport: &Transport,
+) -> Result<u64> {
+    health_probe_selected(outbound, options, resolver, Some(transport)).await
+}
+
+async fn health_probe_selected(
+    outbound: &Outbound,
+    options: &HealthProbe,
+    resolver: &Resolver,
+    transport: Option<&Transport>,
+) -> Result<u64> {
     let target = options.target()?;
     let started = Instant::now();
     // Resolution, proxy negotiation, origin TLS, request, response and write
     // shutdown share a single deadline. Redirects and retries are forbidden.
     timeout(Duration::from_millis(options.timeout_ms), async {
-        let mut stream = crate::connect(
+        let mut stream = crate::connect_selected(
             outbound,
             &Target {
                 host: target.host.clone(),
@@ -201,6 +251,7 @@ pub async fn health_probe(
             },
             resolver,
             Duration::from_millis(options.timeout_ms),
+            transport,
         )
         .await?;
         if let Some(tls) = target.tls {

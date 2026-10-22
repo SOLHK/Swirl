@@ -264,6 +264,195 @@ to success. Old Xray's Windows `readv` implementation is the current suspect;
 C6 will validate a fixture-only upstream-option workaround with the same
 official binary and unchanged transport/closure assertions.
 
+## C6 native runtime and security integration
+
+`Core::start_with_transports(Config, BTreeMap<String, Transport>)` and
+`Core::configure_with_transports(Config, map)` add an explicit, immutable map
+keyed by concrete node ID. The map is validated before starting listeners or
+policy workers. Selection, manual groups, automatic groups, ordinary sessions,
+manual HEAD probes and automatic GET health checks all use the same map.
+Existing `start` keeps its legacy behavior. Existing `configure` preserves and
+revalidates the map; removing/renaming a mapped node cannot silently revert to
+raw TCP. Replacing configuration and map is atomic, and accepted sessions keep
+their previous immutable map. Four Rust transaction tests cover rejected
+activation, preserved probes/generation, old-session ownership and replacement.
+The shared WebSocket preflight also rejects literal or percent-encoded `ed`
+queries before activating an explicit Core map or starting DNS/socket work;
+previously the same rejection occurred only after the outer connection opened.
+
+The independent Core suite additionally exercises two real gRPC/XHTTP TLS
+nodes, concrete/group selection, both probe types, rejected XHTTP `auto`, and
+wrong service/path failures without reaching a target. Its four methods passed
+locally, with 19 actual authenticated Xray requests after deduplicating the
+per-peer cumulative log counts. The existing WS/WSS cases also verify an active
+session survives reconfiguration, cancellation closes its target socket, and
+the listener is unavailable after Core stop. This is actual Core operation,
+not only direct calls to the new transport client example.
+
+### REALITY and ALPN semantics
+
+The existing REALITY record engine and Vision owner were retained. The protocol
+boundary now wraps an authenticated REALITY stream in gRPC or XHTTP before
+writing VLESS bytes. A conflicting TLS or legacy WebSocket setting is rejected.
+REALITY with WebSocket, HTTPUpgrade or legacy HTTP/2 is rejected; non-raw Vision
+is rejected. There is no ordinary TLS fallback, insecure verification, or
+replacement of the fixed Chrome 133 ClientHello profile.
+
+ALPN has a deliberate upstream distinction. Ordinary TLS gRPC/HTTP2/XHTTP must
+negotiate `h2`; missing ALPN or an HTTP/1-only server is rejected before proxy
+bytes. An empty caller offer is extended with `h2`, while an explicitly
+incompatible offer is rejected. Three controlled TLS-only tests verify that
+behavior; they are not proxy interoperability evidence.
+
+In Xray v26.10.21,
+[`reality/config.go`](https://github.com/XTLS/Xray-core/blob/1b1647cd9ddf0abc34b981d4611fc03bcac1ca74/transport/internet/reality/config.go)
+deliberately sets `NextProtos` to nil. Its pinned REALITY dependency
+[`83f621788ca88b83179810b12baa7ae518aacb83`](https://github.com/XTLS/REALITY/tree/83f621788ca88b83179810b12baa7ae518aacb83)
+therefore sends no selected ALPN in EncryptedExtensions. The official gRPC
+dialer and XHTTP dialer/listener start HTTP/2 with prior knowledge after REALITY
+authentication. Applying the ordinary TLS requirement here initially rejected
+all new positive combinations, and that failed test run is retained.
+
+The corrected rule preserves the advertised `h2` offer (or the fixed Chrome
+offer), permits absent selected ALPN only on the already authenticated REALITY
+path, and rejects a present incompatible selection. A focused regression covers
+these cases. Four independent wire observations (gRPC/XHTTP × rustls/Chrome133)
+reported authenticated handshakes with `alpn=null`; these observations sent no
+proxy payload and are not counted as full interoperability. The subsequent
+full suite passed ten methods: 41 native attempts, 21 successful transfers
+(13 clean closes, eight deliberate cancellations), and 20 expected rejections.
+It includes gRPC Tun/TunMulti, XHTTP stream-one, both fingerprints, HTTP,
+verified target HTTPS, 4 MiB duplex data, concurrent cancellation, bad key,
+short ID, SNI, UUID and target certificate. Every native driver drained to zero.
+The official peer reported 25 authenticated REALITY sessions, 25 verified
+client Finished messages and 23 accepted VLESS requests; the latter include
+two intentionally rejected target certificates. Camouflage application bytes
+and record-size failures were zero. Raw REALITY and raw REALITY+Vision also
+passed; the Vision peer observed actual Direct commands in both directions.
+
+### Windows legacy-server lifecycle condition
+
+The C3/C4/C5 Windows failures are preserved in `evidence/transports/c6/`.
+The official v1.8.24 Windows reader calls blocking `WSARecv` from its readv
+path; current Xray adds a readiness handoff before that call. C6 starts only
+the **legacy Windows test server** with its supported
+`xray.buf.readv=disable` setting. The pinned executable, protocol settings,
+eight concurrent cancellations and two-second closure assertion are unchanged.
+Every fixture report records this environment override. Linux/macOS and the
+current-version server do not receive it. This is a test-server compatibility
+condition, not a claim that v1.8.24's default Windows readv behavior was fixed
+inside Swirl. Its result still requires the C6 Windows job.
+
+### Capability matrix at the C6 source boundary
+
+| Native selection | VLESS | Trojan | REALITY | Vision | Independent server scope |
+| --- | --- | --- | --- | --- | --- |
+| TCP / raw | plain or TLS | TLS | VLESS only | VLESS/raw/REALITY | current Xray |
+| WS | plain | not represented without TLS in existing Trojan IR | rejected | rejected | current Xray, VLESS |
+| WSS | verified TLS | verified TLS | rejected | rejected | current Xray; close limitation above remains |
+| gRPC Tun / TunMulti | H2C or TLS | TLS; independent Trojan case uses Tun | VLESS, authenticated H2 prior knowledge | rejected | current Xray |
+| legacy HTTP/2 PUT | TLS | TLS | rejected | rejected | Xray v1.8.24; removed in current Xray |
+| HTTPUpgrade | plain or TLS | TLS | rejected | rejected | current Xray |
+| XHTTP stream-one | H2C or TLS | TLS | VLESS, authenticated H2 prior knowledge | rejected | current Xray |
+| XHTTP auto / stream-up / packet-up | rejected | rejected | rejected | rejected | not implemented |
+| XHTTP HTTP/1.1 / HTTP/3 / XMUX / separate download settings | rejected or unrepresented typed fields | same | same | same | not implemented |
+
+The Trojan/XHTTP independent case uses an HTTP destination; verified HTTPS over
+XHTTP is separately established with VLESS. Trojan/TunMulti is not an independently
+tested combination here. Core-level map/probe tests cover WS/WSS, gRPC and XHTTP;
+legacy HTTP2 and HTTPUpgrade have direct native connector/protocol interoperability
+evidence, without a separate Core map/probe-specific server case.
+
+VMess has no native connector in this baseline, for any of these transports.
+`spiderX` is not represented by the existing REALITY IR and is rejected as an
+unknown field, not silently discarded. The existing ordinary TLS IR does not
+offer arbitrary uTLS fingerprints or insecure certificate settings. Explicit
+unsupported options must remain errors in B's adapter. Cross-outbound HTTP/2
+pooling, configurable active gRPC keepalive and non-default XHTTP padding are
+not implemented. The shared internal HTTP/2 session supports bounded stream
+reuse in tests; the production connector currently creates one session per
+outbound connection. No stream or proxy request is automatically replayed
+after a network interruption; tests verify a fresh explicit connection works.
+
+### Public-target attempt
+
+A separate manual test attempted `http://example.com/` and
+`https://example.com/` through the local independent Xray server. Xray accepted
+both VLESS target requests, but its outbound DNS lookups failed with connection
+refused/timeouts. The direct preflight also failed system name resolution.
+The test exited 1 with two native `OperationTimeout` results and zero remaining
+tasks. No public response or verified public HTTPS result was obtained. No DNS
+or trust settings were changed. An authorized remote public proxy node was
+not supplied or tested. This failure is retained and does not qualify as
+public connectivity success.
+
+### Final local source and release regression
+
+All four required Rust commands passed on the final C6 source in a fresh Cargo
+target directory: **446 tests passed**, zero failed/ignored, including doctests.
+An earlier reused local directory produced an E0460 stale `swirl_api`/`swirl_core`
+artifact error before tests executed; that failure is archived separately. No
+test was removed or weakened. The final release build includes the workspace
+dynamic library, binaries and every example. The release transport client has
+SHA256 `f4fa8cfb328d8f9f38ce96d8dba588c1ff4df406276c4cd12d4fc09f06ed50b6`.
+
+| Final release suite | Methods | Actual exit code | Evidence scope |
+| --- | ---: | ---: | --- |
+| C1 TCP / WS / WSS | 6 | 0 | 35 accepted official-server proxy requests; WSS outer-close gap retained |
+| C2 gRPC | 11 | 0 | 37 native attempts: 24 positive, 13 expected negative |
+| C3 legacy HTTP/2 | 8 | 0 | 28 native attempts: 14 positive, 14 expected negative |
+| C4 HTTPUpgrade | 9 | 0 | 22 native attempts: 13 positive, nine expected negative |
+| C5 XHTTP stream-one | 10 | 0 | 31 native attempts: 14 positive, 17 expected negative |
+| C6 Core selection/probes | 4 | 0 | 19 accepted official-server proxy requests |
+| C6 ordinary TLS ALPN | 3 | 0 | controlled trusted TLS-only peers; not proxy interoperability |
+| C6 REALITY / raw Vision regression | 10 | 0 | 41 native attempts: 21 positive, 20 expected negative |
+
+That is 61 Python test methods, of which 58 belong to suites using independent
+official Xray servers. A passed method can deliberately assert rejection of
+an invalid request; the attempt counts above separate those cases. All observed
+native runtime driver counts drained to zero. Input-syntax rejections that occur
+before constructing a runtime have no task-count field and are not represented
+as measured runtime results. Exact commands, output, binary hashes and summaries
+are committed under `evidence/transports/c6/`. These local Linux results do not
+stand in for a later Windows/macOS CI execution.
+
+### Finite release resource measurements
+
+The Linux release benchmark exited 0 without retries. It uses VLESS and
+verified outer TLS for every transport, the same loopback origin and byte
+pattern, three 16 MiB uploads plus simultaneous 16 MiB downloads per transport,
+one 64 KiB warmup and 20 subsequent 64 KiB lifecycle connections. All 144
+connections met exact hash/byte-count and clean-close assertions. No Cargo or
+other transport suite ran during these measurements. Legacy H2 necessarily
+uses Xray v1.8.24; all other rows use v26.10.21, so these figures must not be
+presented as a controlled comparison of transport efficiency alone.
+
+| TLS transport | Median payload MiB/s per direction | Connector return ms | Native peak RSS KiB | Native CPU user / system s |
+| --- | ---: | ---: | ---: | ---: |
+| raw | 214.36 | 1.220 | 4,600 | 0.05 / 0.01 |
+| WSS | 195.19 | 1.349 | 5,132 | 0.09 / 0.03 |
+| gRPC | 162.86 | 1.281 | 5,520 | 0.09 / 0.03 |
+| legacy HTTP/2 | 140.12 | 1.375 | 5,488 | 0.09 / 0.05 |
+| HTTPUpgrade | 182.44 | 1.620 | 4,932 | 0.06 / 0.02 |
+| XHTTP stream-one | 145.47 | 1.579 | 5,516 | 0.09 / 0.03 |
+
+Each-direction throughput is 16 MiB divided by the complete duplex-transfer
+interval; the sum of directions is twice that value. Connector return time
+excludes process startup and can precede deferred response/authentication
+checks, which are included in transfer time. GNU time CPU/RSS covers the native
+client process including startup/shutdown, excluding Xray and Python. The
+machine is a Linux x86_64 container on an AMD EPYC 9V74 host; raw measurements,
+exact commands, environment and hashes are in `benchmark-release.json` and
+`environment.json` under the C6 evidence directory.
+
+Persistent server descriptor counts remained 9 for current Xray and 8 for
+legacy H2 after warmup, every transfer and each sequential connection; target
+active sockets ended at zero. Clients are fresh processes per connection, so
+this is finite resource-release evidence, not proof that a long-lived native
+runtime has no leaks. WSS clean closes in this particular echo benchmark do
+not erase its separately observed non-clean close for the C1 HTTP response.
+There is no WAN, Clash, Loon or third-party-client performance comparison.
+
 ## Upstream pins and independent implementation
 
 * [Xray v26.10.21 / 1b1647c](https://github.com/XTLS/Xray-core/tree/1b1647cd9ddf0abc34b981d4611fc03bcac1ca74): MPL-2.0. Read `transport/internet/{websocket,grpc,httpupgrade,splithttp,tls,reality}` and `infra/conf/transport_internet.go`.
@@ -341,6 +530,18 @@ invoke legacy raw TCP. The adapter belongs at protocol/Core/API level, avoiding
 a `subscription -> protocol -> subscription` dependency cycle. This branch
 does not take over B's parameter conversion.
 
+For full Core integration, B's downstream adapter should pass the map to
+`start_with_transports` / `configure_with_transports` in the same transaction
+as `Config`. Map keys are the final concrete `Config.nodes[*].id`, including
+each node produced by server/user expansion, never a group ID. Supplying an
+empty map is an explicit return to legacy settings; omitting an unsupported
+transport entry is not a valid conversion. This C branch exposes and tests the
+native boundary but does not add the B JSON-to-Core adapter or modify B's files.
+Some new transport errors retain the legacy generic diagnostic stage while
+preserving their exact fixed error code; a separate diagnostic-vocabulary
+change should distinguish configuration, handshake and stream failures rather
+than classify every `Grpc*` / `Http2*` error as a handshake failure.
+
 ## Reproduction
 
 From `core/`:
@@ -350,7 +551,7 @@ cargo fmt --all -- --check
 cargo check --workspace --locked
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked
-cargo build --locked -p swirl-api --bin swirl-api -p swirl-protocol --example transport-client
+cargo build --release --workspace --lib --bins --examples --locked
 ```
 
 From the repository root, with `SWIRL_XRAY_BINARY`, `SWIRL_RUST_HARNESS`,
@@ -358,10 +559,27 @@ From the repository root, with `SWIRL_XRAY_BINARY`, `SWIRL_RUST_HARNESS`,
 
 ```sh
 python tools/tests/test_transport_c1_xray.py -v
+python tools/tests/test_transport_grpc_xray.py -v
+python tools/tests/test_transport_http2_xray.py -v
+python tools/tests/test_transport_http_xray.py -v
+python tools/tests/test_transport_xhttp_xray.py -v
+python tools/tests/test_transport_runtime_xray.py -v
+python tools/tests/test_transport_tls_policy.py
+python tools/tests/test_transport_reality_xray.py -v
 ```
+
+The legacy H2 suite additionally requires `SWIRL_XRAY_LEGACY_BINARY`; the Core
+suite requires `SWIRL_TRANSPORT_RUNTIME` pointing to the built
+`examples/transport-runtime` executable. `tools/Fetch-TransportPeers.py` obtains
+both exact official server archives and verifies their digests. The workflow
+provides the exact executable paths and separate evidence directories for all
+suites. `benchmark_transport.py` is an optional Linux-only GNU time diagnostic;
+`test_transport_public.py` is an explicit manual public-target attempt, not a
+CI prerequisite.
 
 The dedicated `Swirl Native Transports` workflow runs all four Rust gates,
 dynamic-library/binary builds and independent server tests on Windows, Linux
 and macOS. A workflow definition is not a CI result: report exact-SHA outcomes
-after execution. Public/provider connectivity and comparative performance are
-not established by this C1 checkpoint.
+after execution. Public/provider connectivity remains unverified; the failed
+public-target attempt and finite loopback resource measurements have separate
+evidence and do not change that status.

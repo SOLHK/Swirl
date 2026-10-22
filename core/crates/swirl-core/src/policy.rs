@@ -11,6 +11,7 @@ use std::{
     time::{Duration, Instant},
 };
 use swirl_dns::Resolver;
+use swirl_protocol::Transport;
 use swirl_subscription::{Config, PolicyStrategy, Selector};
 use tokio::{
     runtime::Handle,
@@ -152,14 +153,26 @@ pub(super) struct PolicyRuntime {
     worker: Option<JoinHandle<()>>,
 }
 impl PolicyRuntime {
-    pub fn new(runtime: Handle, config: Arc<Config>, resolver: Arc<Resolver>) -> Self {
-        Self::with_budget(runtime, Arc::new(Semaphore::new(4)), config, resolver)
+    pub fn new(
+        runtime: Handle,
+        config: Arc<Config>,
+        resolver: Arc<Resolver>,
+        transports: Arc<BTreeMap<String, Transport>>,
+    ) -> Self {
+        Self::with_budget(
+            runtime,
+            Arc::new(Semaphore::new(4)),
+            config,
+            resolver,
+            transports,
+        )
     }
     fn with_budget(
         runtime: Handle,
         budget: Arc<Semaphore>,
         config: Arc<Config>,
         resolver: Arc<Resolver>,
+        transports: Arc<BTreeMap<String, Transport>>,
     ) -> Self {
         let registry: HashMap<_, _> = config
             .selectors
@@ -180,7 +193,13 @@ impl PolicyRuntime {
         let automatic = !registry.is_empty();
         let registry = Arc::new(Mutex::new(registry));
         let worker = if automatic {
-            Some(runtime.spawn(run(config, resolver, registry.clone(), budget.clone())))
+            Some(runtime.spawn(run(
+                config,
+                resolver,
+                transports,
+                registry.clone(),
+                budget.clone(),
+            )))
         } else {
             None
         };
@@ -191,8 +210,19 @@ impl PolicyRuntime {
             worker,
         }
     }
-    pub fn reconfigured(&self, config: Arc<Config>, resolver: Arc<Resolver>) -> Self {
-        Self::with_budget(self.runtime.clone(), self.budget.clone(), config, resolver)
+    pub fn reconfigured(
+        &self,
+        config: Arc<Config>,
+        resolver: Arc<Resolver>,
+        transports: Arc<BTreeMap<String, Transport>>,
+    ) -> Self {
+        Self::with_budget(
+            self.runtime.clone(),
+            self.budget.clone(),
+            config,
+            resolver,
+            transports,
+        )
     }
     pub fn stop(&self) {
         if let Some(worker) = &self.worker {
@@ -300,6 +330,7 @@ fn due_job(jobs: &[ProbeJob], now: Instant) -> Option<usize> {
 async fn run(
     config: Arc<Config>,
     resolver: Arc<Resolver>,
+    transports: Arc<BTreeMap<String, Transport>>,
     registry: Arc<Mutex<HashMap<String, Group>>>,
     budget: Arc<Semaphore>,
 ) {
@@ -349,6 +380,7 @@ async fn run(
             let node_index = job.node;
             let config = config.clone();
             let resolver = resolver.clone();
+            let transports = transports.clone();
             let budget = budget.clone();
             running.spawn(async move {
                 let result = async {
@@ -365,14 +397,20 @@ async fn run(
                         .await
                         .map_err(|_| "PolicyProbeBusy")?
                         .map_err(|_| "PolicyProbeStopped")?;
-                    timeout_at(
-                        deadline,
-                        swirl_protocol::health_probe(
-                            &config.nodes[node_index].outbound,
-                            probe,
-                            &resolver,
-                        ),
-                    )
+                    timeout_at(deadline, async {
+                        let node = &config.nodes[node_index];
+                        if let Some(transport) = transports.get(&node.id) {
+                            swirl_protocol::health_probe_with_transport(
+                                &node.outbound,
+                                probe,
+                                &resolver,
+                                transport,
+                            )
+                            .await
+                        } else {
+                            swirl_protocol::health_probe(&node.outbound, probe, &resolver).await
+                        }
+                    })
                     .await
                     .map_err(|_| "PolicyProbeTimeout")?
                 }

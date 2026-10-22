@@ -1,0 +1,16 @@
+test_custom_literal_path_host_and_http_destination (test_transport_http_xray.HttpUpgradeXrayTests.test_custom_literal_path_host_and_http_destination) ... ok
+test_failed_authentication_cannot_reach_the_destination (test_transport_http_xray.HttpUpgradeXrayTests.test_failed_authentication_cannot_reach_the_destination) ... ok
+test_four_mib_bidirectional_stream_with_plaintext_and_tls (test_transport_http_xray.HttpUpgradeXrayTests.test_four_mib_bidirectional_stream_with_plaintext_and_tls) ... ok
+test_parallel_connections_and_client_cancellation (test_transport_http_xray.HttpUpgradeXrayTests.test_parallel_connections_and_client_cancellation) ... ok
+test_server_termination_and_fresh_connection_recovery (test_transport_http_xray.HttpUpgradeXrayTests.test_server_termination_and_fresh_connection_recovery) ... ok
+test_tls_httpupgrade_with_vless_trojan_and_https_destinations (test_transport_http_xray.HttpUpgradeXrayTests.test_tls_httpupgrade_with_vless_trojan_and_https_destinations) ... ok
+test_truncation_and_network_interrupt_do_not_replay_requests (test_transport_http_xray.HttpUpgradeXrayTests.test_truncation_and_network_interrupt_do_not_replay_requests) ... ok
+test_untrusted_certificate_wrong_sni_and_wrong_alpn_fail_closed (test_transport_http_xray.HttpUpgradeXrayTests.test_untrusted_certificate_wrong_sni_and_wrong_alpn_fail_closed) ... ok
+test_wrong_path_and_host_are_rejected_before_proxy_request (test_transport_http_xray.HttpUpgradeXrayTests.test_wrong_path_and_host_are_rejected_before_proxy_request) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 2.885s
+
+OK
+
+actual_exit_code=0

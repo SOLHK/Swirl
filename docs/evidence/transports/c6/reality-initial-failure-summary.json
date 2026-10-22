@@ -1,0 +1,19 @@
+{
+  "suite": "C6 initial REALITY integration run before upstream ALPN semantics correction",
+  "command": "python -m unittest -v test_transport_reality_xray",
+  "unittest_methods": 10,
+  "unittest_subtest_failures": 11,
+  "exit_code": 1,
+  "native_invocations": 35,
+  "native_successes": 2,
+  "native_error_codes": {
+    "RealityTransportUnsupported": 3,
+    "VisionTransportUnsupported": 2,
+    "InputSyntax": 2,
+    "RealityFingerprintUnsupported": 1,
+    "RealityAlpnNegotiation": 19,
+    "RealityAuthenticationOrHandshake": 6
+  },
+  "evidence_directory": "/workspace/scratch/ece554ece7c1/c6-reality-evidence-verified",
+  "interpretation": "The suite failed. Non-raw positive paths rejected the deliberately absent selected REALITY ALPN before proxy requests. Raw and raw+Vision regression success does not establish gRPC/XHTTP interop; see separately retained corrected run."
+}

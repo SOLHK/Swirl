@@ -470,6 +470,20 @@ fn requests_early_data(path: &str) -> bool {
     })
 }
 
+/// Shared preflight for Core activation, protocol dialing and direct callers.
+/// Unsupported early data must fail before DNS or opening the outer socket.
+pub(crate) fn validate_settings(
+    settings: &WebSocket,
+    headers: &[(String, String)],
+) -> Result<(), &'static str> {
+    settings.validate()?;
+    validate_headers(headers)?;
+    if requests_early_data(&settings.path) {
+        return Err("WebSocketEarlyDataUnsupported");
+    }
+    Ok(())
+}
+
 /// Open the existing RFC 6455 binary stream with bounded custom HTTP headers.
 /// The caller supplies an already authenticated TLS stream for WSS and bounds
 /// this opening handshake with its shared connection deadline.
@@ -478,11 +492,7 @@ pub async fn connect_with_headers(
     settings: &WebSocket,
     headers: &[(String, String)],
 ) -> Result<BoxStream, &'static str> {
-    settings.validate()?;
-    validate_headers(headers)?;
-    if requests_early_data(&settings.path) {
-        return Err("WebSocketEarlyDataUnsupported");
-    }
+    validate_settings(settings, headers)?;
     let mut nonce = [0; 16];
     SystemRandom::new()
         .fill(&mut nonce)

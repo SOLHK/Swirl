@@ -1,0 +1,9 @@
+test_grpc_and_xhttp_maps_route_sessions_and_both_probe_types (__main__.TransportRuntimeTests.test_grpc_and_xhttp_maps_route_sessions_and_both_probe_types) ... ok
+test_probe_cancellation_timeout_and_wss_runtime_payload (__main__.TransportRuntimeTests.test_probe_cancellation_timeout_and_wss_runtime_payload) ... ok
+test_session_selection_and_reconfiguration_preserve_native_transport (__main__.TransportRuntimeTests.test_session_selection_and_reconfiguration_preserve_native_transport) ... ok
+test_user_and_automatic_health_probes_share_the_native_transport (__main__.TransportRuntimeTests.test_user_and_automatic_health_probes_share_the_native_transport) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 3.171s
+
+OK

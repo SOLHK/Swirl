@@ -236,11 +236,20 @@ class Fixture:
                   "outbounds": [freedom]}
         config_path = self.folder / f"{label}.json"
         config_path.write_text(json.dumps(config), encoding="utf-8")
+        environment_overrides = {}
+        peer_env = None
+        if legacy and platform.system() == "Windows":
+            # Xray 1.8.24's optional Windows readv uses blocking WSARecv. Disable
+            # that optimization in the official peer, retaining its wire protocol.
+            environment_overrides["xray.buf.readv"] = "disable"
+            peer_env = os.environ.copy()
+            peer_env.update(environment_overrides)
         process = subprocess.Popen([binary, "run", "-config", str(config_path)],
-                                   stdout=output, stderr=subprocess.STDOUT)
+                                   stdout=output, stderr=subprocess.STDOUT, env=peer_env)
         peer = {"process": process, "output": output, "access": access, "error": error,
                 "label": label, "port": port, "host": listen, "protocol": protocol,
                 "network": network, "tls": tls, "version": version,
+                "environment_overrides": environment_overrides,
                 "outbound": outbound, "transport": transport, "config": config}
         self.peers.append(peer)
         deadline = time.monotonic() + 8
@@ -279,6 +288,7 @@ class Fixture:
                      if peer["port"] == request["outbound"]["port"]), None)
         record = {"stage": self.stage, "platform": platform.system(),
                   "server": peer["version"] if peer else self.version,
+                  "server_environment_overrides": peer.get("environment_overrides", {}) if peer else {},
                   "transport": request.get("transport", {}).get("type"),
                   "protocol": request["outbound"]["type"],
                   "tls": bool(request["outbound"].get("tls")),
@@ -347,6 +357,9 @@ class Fixture:
             errors.extend(origin.errors)
         (self.evidence / "results.json").write_text(json.dumps({
             "command": [self.client], "server_version": self.version,
+            "peers": [{"label": peer["label"], "server_version": peer["version"],
+                       "environment_overrides": peer.get("environment_overrides", {})}
+                      for peer in self.peers],
             "records": self.records, "cleanup_errors": errors,
             "origins": [{"mode": origin.mode, "tls": bool(origin.context),
                          "requests": len(origin.requests), "received": origin.received,

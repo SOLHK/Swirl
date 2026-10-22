@@ -1,0 +1,115 @@
+{
+  "base_commit": "ff2e2ad76022a2742b1eb256fdb8058873ca1a3e",
+  "parent_commit": "a2fd0fd782841dafaaa5a1bcf5f2c0f45b479572",
+  "rust_tests_passed": 446,
+  "rust_tests_failed": 0,
+  "rust_tests_ignored": 0,
+  "required_gates": [
+    {
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit_code": 0,
+      "seconds": 0.425,
+      "log": "fmt.log"
+    },
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--workspace",
+        "--locked"
+      ],
+      "exit_code": 0,
+      "seconds": 13.408,
+      "log": "check.log"
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--workspace",
+        "--all-targets",
+        "--locked",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit_code": 0,
+      "seconds": 6.69,
+      "log": "clippy.log"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--workspace",
+        "--locked"
+      ],
+      "exit_code": 0,
+      "seconds": 31.439,
+      "log": "test.log"
+    }
+  ],
+  "build": "cargo build --release --workspace --lib --bins --examples --locked",
+  "build_exit_code": 0,
+  "python_methods": 61,
+  "independent_server_suite_methods": 58,
+  "tls_only_control_methods": 3,
+  "public_network_success": false,
+  "authorized_remote_node_tested": false,
+  "source_sha256": {
+    ".github/workflows/rust-transport.yml": "932b485d3536cf3ed89e8203546510506e196437d6f68a068f5892a0919b25ac",
+    "core/Cargo.lock": "c60955db11ea6d608fb6d5dddd735f15ce3b67a23a3cefe9d0a4248db6cc4171",
+    "core/Cargo.toml": "67c3a4d818279ff027f4263b4a7c3b68c40ff69214a63c639e566cbe8597cb9c",
+    "core/crates/swirl-core/examples/transport-runtime.rs": "7f48578d609aa71473604a212b9ef7a6d185af5b2f68b1662922355f934f41b7",
+    "core/crates/swirl-core/src/lib.rs": "0986dff91bab7fd56f2fbf91dc179b69e0f1b828bba88693580991a593a74a4f",
+    "core/crates/swirl-core/src/policy.rs": "297c85240f40d6d923e72487f0e74c68a044010fc3ea4eea0e2861a31e1c1f87",
+    "core/crates/swirl-core/src/transport_tests.rs": "ed7534eebe92e5b950fb6e9d731817bffddfe49ff7657adac635dbf472226955",
+    "core/crates/swirl-protocol/examples/transport-client.rs": "f9ccef1c06a0bf11fa7cd1699924912686205d4577c5cdded1d9a3b271cbe8b4",
+    "core/crates/swirl-protocol/src/lib.rs": "d9c17da73310c8ab3c5f944b67f211d8bff8fe05e373be038d5759d65fc7efbe",
+    "core/crates/swirl-protocol/src/probe.rs": "cac42c317e5ebc2a9641408f131c6d8c88919bd53f40e6d7921ac9fe746848af",
+    "core/crates/swirl-protocol/src/transport.rs": "97747ec8f62880d87974a57e18de2e49a996fff6f3690437372a352a8c1e4db7",
+    "core/crates/swirl-protocol/src/websocket.rs": "85e6d6e8fe164afb134b95e00492c43d9808eabda814864d57da8418415fdeac",
+    "core/crates/swirl-transport/Cargo.toml": "8cb1db0d801fb883c7d17dfb2eedef2e0b257fb38ba55c3828339792cf9f3abe",
+    "core/crates/swirl-transport/src/grpc.rs": "2e480fd7443493b0b94878a38ec7b0eb956112df377e62e613783ac3f2ce942d",
+    "core/crates/swirl-transport/src/grpc_tests.rs": "34e184007ad87a15404e0fc55ad2c649d62a5b7888fffd1a85fc2a024d8ff38b",
+    "core/crates/swirl-transport/src/h2_stream.rs": "ef949cebc4bbf156dc1f45acb9c811271aab2e2c437915c5448f1d6551e1fd55",
+    "core/crates/swirl-transport/src/h2_stream_tests.rs": "3593aa96b0556c995482a77266f499eac82ea98bf676aa5696b54c79b158189d",
+    "core/crates/swirl-transport/src/http2.rs": "3d463817f9534e36c28a6ffa528a9a5dac246ea1b39d94de7eedf25422d50490",
+    "core/crates/swirl-transport/src/httpupgrade.rs": "54d6e43b14c76d7b6fb69231972cbf37283e6752525de7b3910d71524b062677",
+    "core/crates/swirl-transport/src/lib.rs": "3865885e847d3d66c7f8ac6332c2fdd9a2990d70a3534d6283fe17e6f2eb8c78",
+    "core/crates/swirl-transport/src/xhttp.rs": "c9d77810646f140101a59fa0c4d614540623d2d176a2bdb2bc8efa716cbe48c2",
+    "tools/Fetch-TransportPeers.py": "6a74cc52d1fb8cc08cb2becca638401ef5c1cbdf02829f29654bd8df6018b8bf",
+    "tools/tests/benchmark_transport.py": "40690806b09560db48b61a228592cb67e1d948a391005ac07e31d43d756152f2",
+    "tools/tests/test_transport_c1_xray.py": "75b05ff96f00ce20aa5efd5464cf79d53827a8bafca06607dd7d3903987e40c2",
+    "tools/tests/test_transport_grpc_xray.py": "e104592c5ecb185f57b6c2cab9531116a1f3c1603a22a7265e2c9077c17d83cc",
+    "tools/tests/test_transport_http2_xray.py": "ae92dc91fa2cc798e0b18d756ce2d3deb6a5db5e1fa3ca13e1b701d225dbf5c2",
+    "tools/tests/test_transport_http_xray.py": "b0a3034a71d5e063959cd8cc8444994b98a8e9875f0d87930d1e358e0c09b308",
+    "tools/tests/test_transport_public.py": "8aa507529a21c4d5e53b6db9e6d27535968db846c8bf5dc85d3406c91706a371",
+    "tools/tests/test_transport_reality_xray.py": "628f0a94870f8dbb562a3adcdf8bca6eb2f5ab56db91236d2356c374bae57d58",
+    "tools/tests/test_transport_runtime_xray.py": "a70fd09cdc47519b66ad3a79013e7e0e7f949584f990387f0f710659b7842ac6",
+    "tools/tests/test_transport_tls_policy.py": "7307299a0bc761e90385dba7533c4b595d2d695380816611ef826ea34e9db9ff",
+    "tools/tests/test_transport_xhttp_xray.py": "44ebc3e0219a8a54cdf04de5fde111d801249941abbe0a65c664880c7d192b1e",
+    "tools/tests/transport-peer-lock.json": "40bf940cd0ac0d325f75dcc83869d8935cb7b49ead962e2f6a96b90e4f15dec7",
+    "tools/tests/transport_peer.py": "330e633224588ee1d92cb4af9f1547539c2828052189af7fc07c15cee4da87a6"
+  },
+  "release_binary_sha256": {
+    "core/target/release/examples/transport-client": "f4fa8cfb328d8f9f38ce96d8dba588c1ff4df406276c4cd12d4fc09f06ed50b6",
+    "core/target/release/examples/transport-runtime": "2e2d8b43876f0a714876518824d8fbc7cadf86038219f11901b79d3662f29fa9",
+    "core/target/release/swirl-api": "191bf8741033fc8288438c75825838f7f834f66dd4d79d319ba629b5ca84df09",
+    "core/target/release/libswirl_api.so": "0fdc2969fcce787bab791bff6f4a9301c45a18c08765b04d2e02d769ebb85ed6"
+  },
+  "caveats": [
+    "WS/WSS complete payload and outer close are separate; retained WSS transport_error is not a clean close.",
+    "Initial stale Cargo artifact and overly strict REALITY ALPN failures are preserved separately from final-source success.",
+    "C6 three-platform CI requires the exact post-push run; earlier phase CI is not substituted."
+  ],
+  "benchmark_exit_code": 0,
+  "benchmark_transports": 6,
+  "benchmark_connections": 144
+}

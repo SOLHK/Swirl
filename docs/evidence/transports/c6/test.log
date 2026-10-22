@@ -1,0 +1,728 @@
+   Compiling cfg-if v1.0.5
+   Compiling stable_deref_trait v1.2.1
+   Compiling typenum v1.20.1
+   Compiling libc v0.2.190
+   Compiling writeable v0.6.4
+   Compiling litemap v0.8.3
+   Compiling zeroize v1.9.1
+   Compiling zerofrom v0.1.8
+   Compiling smallvec v1.16.3
+   Compiling icu_normalizer_data v2.1.1
+   Compiling serde_core v1.0.229
+   Compiling yoke v0.8.3
+   Compiling icu_properties_data v2.1.2
+   Compiling num-traits v0.2.19
+   Compiling itoa v1.0.18
+   Compiling scopeguard v1.2.0
+   Compiling zerovec v0.11.8
+   Compiling zerotrie v0.2.5
+   Compiling simdutf8 v0.1.5
+   Compiling core_detect v1.0.0
+   Compiling encoding_rs v0.8.42
+   Compiling unicode-width v0.2.2
+   Compiling utf8_iter v1.0.4
+   Compiling percent-encoding v2.3.2
+   Compiling anstyle v1.0.14
+   Compiling arraydeque v0.5.1
+   Compiling annotate-snippets v0.12.16
+   Compiling form_urlencoded v1.2.2
+   Compiling tinystr v0.8.4
+   Compiling potential_utf v0.1.6
+   Compiling granit-parser v2.0.0
+   Compiling icu_collections v2.1.1
+   Compiling icu_locale_core v2.1.1
+   Compiling zmij v1.0.23
+   Compiling jobserver v0.1.35
+   Compiling cmov v0.5.4
+   Compiling cc v1.8.0
+   Compiling encoding_rs_io v0.1.8
+   Compiling memchr v2.8.3
+   Compiling ctutils v0.4.3
+   Compiling icu_provider v2.1.1
+   Compiling base64 v0.22.1
+   Compiling icu_normalizer v2.1.1
+   Compiling icu_properties v2.1.2
+   Compiling hybrid-array v0.4.15
+   Compiling rand_core v0.10.1
+   Compiling alloc-no-stdlib v2.0.4
+   Compiling bytes v1.12.1
+   Compiling once_cell v1.21.4
+   Compiling pin-project-lite v0.2.17
+   Compiling serde v1.0.229
+   Compiling serde-saphyr v2.0.0
+   Compiling serde_json v1.0.154
+   Compiling alloc-stdlib v0.2.4
+   Compiling socket2 v0.6.5
+   Compiling getrandom v0.2.17
+   Compiling ipnet v2.12.2
+   Compiling crypto-common v0.2.2
+   Compiling mio v1.2.4
+   Compiling idna_adapter v1.2.1
+   Compiling idna v1.1.0
+   Compiling rustls-pki-types v1.15.1
+   Compiling untrusted v0.9.0
+   Compiling subtle v2.6.1
+   Compiling tokio v1.53.3
+   Compiling ring v0.17.14
+   Compiling brotli-decompressor v5.0.3
+   Compiling url v2.5.8
+   Compiling digest v0.11.3
+   Compiling keccak v0.2.2
+   Compiling flagset v0.4.7
+   Compiling sponge-cursor v0.1.0
+   Compiling const-oid v0.10.2
+   Compiling tracing-core v0.1.36
+   Compiling hashbrown v0.17.1
+   Compiling swirl-subscription v0.1.0 (/workspace/scratch/ece554ece7c1/Swirl-transport/core/crates/swirl-subscription)
+   Compiling brotli v8.0.4
+   Compiling cpufeatures v0.3.1
+   Compiling equivalent v1.0.3
+   Compiling futures-sink v0.3.34
+   Compiling futures-core v0.3.34
+   Compiling indexmap v2.14.2
+   Compiling curve25519-dalek v5.0.0
+   Compiling tracing v0.1.44
+   Compiling shake v0.1.0
+   Compiling sha3 v0.12.0
+   Compiling kem v0.3.0
+   Compiling module-lattice v0.2.3
+   Compiling http v1.5.0
+   Compiling rustls v0.23.46 (/workspace/scratch/ece554ece7c1/Swirl-transport/core/vendor/rustls)
+   Compiling atomic-waker v1.1.2
+   Compiling slab v0.4.12
+   Compiling fnv v1.0.7
+   Compiling ml-kem v0.3.3
+   Compiling x25519-dalek v3.0.0
+   Compiling httparse v1.10.1
+   Compiling der v0.8.2
+   Compiling webpki-roots v1.0.9
+   Compiling generic-array v0.14.7
+   Compiling cpufeatures v0.2.17
+   Compiling zstd-sys v2.0.16+zstd.1.5.7
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.7
+   Compiling digest v0.10.7
+   Compiling sha2 v0.10.9
+   Compiling rustls-webpki v0.103.15
+   Compiling tokio-util v0.7.20
+   Compiling spki v0.8.1
+   Compiling x509-cert v0.3.0
+   Compiling h2 v0.4.20
+   Compiling md-5 v0.10.6
+   Compiling zstd-safe v7.2.4
+   Compiling zstd v0.13.3
+   Compiling swirl-routing v0.1.0 (/workspace/scratch/ece554ece7c1/Swirl-transport/core/crates/swirl-routing)
+   Compiling tokio-rustls v0.26.6
+   Compiling swirl-transport v0.1.0 (/workspace/scratch/ece554ece7c1/Swirl-transport/core/crates/swirl-transport)
+   Compiling swirl-dns v0.1.0 (/workspace/scratch/ece554ece7c1/Swirl-transport/core/crates/swirl-dns)
+   Compiling swirl-protocol v0.1.0 (/workspace/scratch/ece554ece7c1/Swirl-transport/core/crates/swirl-protocol)
+   Compiling swirl-core v0.1.0 (/workspace/scratch/ece554ece7c1/Swirl-transport/core/crates/swirl-core)
+   Compiling swirl-api v0.1.0 (/workspace/scratch/ece554ece7c1/Swirl-transport/core/crates/swirl-api)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 19.94s
+     Running unittests src/lib.rs (/workspace/scratch/ece554ece7c1/c6-verified-target/debug/deps/swirl_api-bdc00d190ccf4ede)
+
+running 2 tests
+test tests::rejects_unknown_and_redacts_secrets ... ok
+test probe_tests::ffi_probe_starts_without_waiting_for_headers_and_returns_redacted_status ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running unittests src/main.rs (/workspace/scratch/ece554ece7c1/c6-verified-target/debug/deps/swirl_api-442b86687dc7e3ee)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/swirl-diagnose.rs (/workspace/scratch/ece554ece7c1/c6-verified-target/debug/deps/swirl_diagnose-b6b03f55cc5605ca)
+
+running 3 tests
+test tests::stdin_preserves_small_budgets_and_normalizes_ipv6 ... ok
+test tests::diagnostic_uses_product_dns_validation ... ok
+test tests::stdin_rejects_ambiguous_input_and_never_echoes_private_values ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/swirl-inspect.rs (/workspace/scratch/ece554ece7c1/c6-verified-target/debug/deps/swirl_inspect-16ea10a04ff7acba)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/workspace/scratch/ece554ece7c1/c6-verified-target/debug/deps/swirl_core-ede49e3f4c5101a1)
+
+running 17 tests
+test policy::tests::alternate_address_check_reads_only_the_already_pinned_policy ... ok
+test policy::tests::fallback_keeps_member_priority_and_fails_closed_when_health_expires ... ok
+test policy::tests::round_robin_advances_only_once_per_used_policy_and_session ... ok
+test policy::tests::url_test_hysteresis_and_expiration_are_explicit ... ok
+test policy::tests::accepted_policy_views_do_not_change_when_live_health_changes ... ok
+test policy::tests::scheduler_skips_active_members_and_never_enqueues_catchup_rounds ... ok
+test probe::tests::cancellation_and_new_generation_discard_late_probe_results ... ok
+test route_tests::rejected_first_answer_never_falls_back_to_direct ... ok
+test route_tests::same_direct_node_under_different_rule_is_not_a_fallback ... ok
+test route_tests::direct_resolved_candidates_fall_back_across_families_under_same_rule ... ok
+test transport_tests::invalid_transport_configuration_is_rejected_before_listener_start ... ok
+test probe::tests::selecting_configuring_and_stopping_invalidate_running_probes ... ok
+test transport_tests::rejected_reconfiguration_preserves_generation_probes_and_transport ... ok
+test transport_tests::selecting_and_legacy_configuring_preserve_the_explicit_transport ... ok
+test transport_tests::explicit_replacement_keeps_accepted_session_transport_immutable ... ok
+test socks5_udp::tests::queued_reply_cannot_outlive_its_control_worker ... ok
+test route_tests::mixed_china_dns_answers_pin_the_first_address_and_its_outbound ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
+
+     Running tests/china_rules.rs (/workspace/scratch/ece554ece7c1/c6-verified-target/debug/deps/china_rules-528e8cc0d52178a0)
+
+running 4 tests
+test explicit_missing_directory_fails_without_bundled_fallback ... ok
+test explicit_partial_directory_rejects_each_missing_file ... ok
+test explicit_tampered_or_truncated_rules_fail_closed ... ok
+test explicit_valid_directory_loads_real_domain_and_ip_rules ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.76s
+
+     Running tests/network.rs (/workspace/scratch/ece554ece7c1/c6-verified-target/debug/deps/network-e026291ca4f332d5)
+
+running 14 tests
+test atomic_update_preserves_existing_stream_and_rejects_new ... ok
+test failed_socks_auth_never_reaches_target_or_direct ... ok
+test manual_selector_updates_only_new_streams_and_rejects_non_members ... ok
+test disabled_smart_routing_ignores_missing_rules_and_keeps_direct_route ... ok
+test resolving_cidr_pins_destination_and_rule_updates_preserve_stream ... ok
+test tcp_large_transfer_halfclose_and_exact_counters ... ok
+test udp_associate_preserves_boundaries_and_rejects_fragments ... ok
+test automatic_udp_association_retains_choices_after_policy_replacement ... ok
+test socks5_fragmented_ipv6_and_bad_command ... ok
+test udp_reject_dns_and_icmp_do_not_kill_association_or_change_snapshot ... ok
+test inbound_authentication_and_resource_limit ... ok
+test configure_enables_and_disables_default_china_rules_on_live_core ... ok
+test automatic_health_generation_manual_selection_and_stop_preserve_lifetimes ... ok
+test smart_routing_executes_direct_proxy_and_reject_with_real_loopback_sockets ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.50s
+
+     Running tests/socks5_udp.rs (/workspace/scratch/ece554ece7c1/c6-verified-target/debug/deps/socks5_udp-bf195b404d99f952)
+
+running 2 tests
+test association_reuses_control_keeps_old_route_and_closes_with_inbound ... ok
+test closed_proxy_never_reconnects_or_sends_direct_and_other_routes_survive ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.41s
+
+     Running unittests src/lib.rs (/workspace/scratch/ece554ece7c1/c6-verified-target/debug/deps/swirl_dns-d19e4f8dc9e22ca2)
+
+running 19 tests
+test dot::doh::tests::strict_http_metadata_and_cache_hints ... ok
+test dot::doh::tests::chunked_body_is_exact_and_bounded ... ok
+test tests::failure_cache_preserves_code_deadline_and_successful_answers ... ok
+test tests::cached_ip_sets_share_hosts_and_attach_each_requested_port ... ok
+test tests::host_maps_are_case_insensitive_and_generations_share_only_budget ... ok
+test tests::hosts_file_aliases_comments_and_duplicate_priority ... ok
+test tests::negative_cache_is_shared_across_ports_but_not_configurations ... ok
+test wire::tests::ipv6_and_cname_only_responses_preserve_ttl ... ok
+test wire::tests::cname_denials_belong_to_the_terminal_name_and_obey_alias_ttl ... ok
+test wire::tests::soa_mailbox_local_part_is_a_dns_label_not_a_hostname ... ok
+test tests::ipv4_query_policy_preserves_literal_and_static_ipv6_without_os_fallback ... ok
+test wire::tests::soa_rdata_names_must_fit_the_record_and_use_valid_compression ... ok
+test wire::tests::validates_identity_question_and_all_truncations ... ok
+test wire::tests::negative_responses_require_complete_matching_messages_and_applicable_soa ... ok
+test tests::failure_cache_is_bounded_and_excludes_local_and_invalid_response_errors ... ok
+test tests::cancelled_upstream_query_does_not_create_failure_cache ... ok
+test wire::tests::rejects_alias_loops_compression_cycles_and_foreign_answers ... ok
+test wire::tests::family_merge_never_confuses_nodata_name_error_or_transport_failure ... ok
+test tests::ipv4_ipv6_and_system_localhost ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (/workspace/scratch/ece554ece7c1/c6-verified-target/debug/deps/swirl_protocol-d51d5c9a569072d5)
+
+running 70 tests
+test dial::tests::caller_cancellation_drops_all_pending_dials ... ok
+test dial::tests::diagnostic_classifies_os_failures_without_preserving_error_messages ... ok
+test dial::tests::a_single_address_retains_the_original_budget ... ok
+test dial::tests::address_limit_is_checked_before_any_socket_attempt ... ok
+test dial::tests::diagnostic_dns_cap_prevents_tcp_and_total_cap_can_be_shorter ... ok
+test connect_tests::shadowsocks_initial_write_reports_plain_and_obfs_failures_separately ... ok
+test dial::tests::diagnostic_dns_error_has_a_fixed_redacted_category ... ok
+test dial::tests::diagnostic_dns_time_reduces_tcp_budget_and_counts_unattempted_addresses ... ok
+test dial::tests::diagnostic_invalid_budget_does_not_poll_dns_or_dial ... ok
+test dial::tests::diagnostic_counts_unique_families_and_records_cancelled_loser ... ok
+test dial::tests::diagnostic_real_loopback_connect_closes_without_application_data ... ok
+test dial::tests::hanging_first_family_does_not_block_other_family_and_losers_drop ... ok
+test dial::tests::external_cancellation_updates_trace_and_drops_all_connects ... ok
+test dial::tests::diagnostic_slot_timeout_and_winner_cancellation_remain_distinct ... ok
+test connect_tests::shadowsocks_obfs_does_not_wait_for_application_response_during_connect ... ok
+test dial::tests::refusal_and_expiration_are_distinct_and_no_new_dial_passes_deadline ... ok
+test dial::tests::protocol_phases_use_the_same_deadline_without_renewing_it ... ok
+test dial::tests::refused_first_address_does_not_spend_a_short_budget_waiting_for_stagger ... ok
+test dial::tests::two_stalled_addresses_release_a_slot_for_the_third ... ok
+test probe::probe_tests::health_probe_preserves_get_request_and_header_timing ... ok
+test probe::probe_tests::url_test_head_optional_expected_status_is_exact ... ok
+test probe::probe_tests::url_test_head_reports_http_status_failure_without_latency ... ok
+test probe::probe_tests::url_test_head_reports_truncated_headers_as_response_failure ... ok
+test probe::probe_tests::url_test_head_returns_before_peer_body_or_close ... ok
+test probe::tests::header_completion_does_not_wait_for_a_response_body ... ok
+test probe::tests::fragmented_interim_responses_require_a_complete_final_status ... ok
+test probe::tests::malformed_truncated_redirect_and_upgrade_responses_are_unhealthy ... ok
+test shadowsocks::tests::coalesced_http_header_and_ciphertext_are_buffered_without_loss ... ok
+test shadowsocks::tests::nonce_overflow_fails_closed ... ok
+test shadowsocks::tests::replay_is_key_scoped ... ok
+test probe::tests::interim_headers_share_one_total_byte_and_count_budget ... ok
+test socks5::tests::authentication_is_shared_strict_and_does_not_downgrade ... ok
+test socks5::tests::datagram_boundaries_addresses_and_fragments ... ok
+test socks5::tests::malformed_associate_replies_are_rejected ... ok
+test transport::tests::raw_alias_and_unsupported_options_fail_closed ... ok
+test transport::tests::reality_prior_knowledge_does_not_accept_incompatible_alpn ... ok
+test vision::stream::direct_tests::abort_pending_direct_flush_drops_the_only_owner ... ok
+test vision::stream::direct_tests::direct_read_keeps_terminal_tail_engine_residual_and_raw_bytes_in_order ... ok
+test vision::stream::direct_tests::direct_request_at_partial_inner_record_refuses_and_releases_both_directions ... ok
+test dial::tests::resolved_direct_uses_fallback_without_sending_application_bytes ... ok
+test dial::tests::resolved_direct_expired_budget_prevents_socket_attempt ... ok
+test dial::tests::real_tcp_refusal_falls_back_without_sending_application_bytes ... ok
+test vision::stream::direct_tests::write_half_close_does_not_drop_later_direct_downlink ... ok
+test vless::tests::canonical_uuid_and_domain_wire_layout ... ok
+test vision::stream::direct_tests::first_peer_frame_can_establish_read_eligibility_and_direct_boundary ... ok
+test vless::tests::unsupported_request_flow_is_a_static_error_instead_of_empty_addons ... ok
+test vless::tests::vision_and_unchanged_empty_addons_complete_request_layouts ... ok
+test websocket::tests::close_codes_and_utf8_are_validated ... ok
+test websocket::tests::closed_control_receiver_fails_without_waiting_or_releasing_payload ... ok
+test websocket::tests::coalesced_ping_burst_backpressures_the_bounded_control_queue ... ok
+test websocket::tests::custom_headers_cannot_replace_handshake_or_inject_requests ... ok
+test websocket::tests::custom_path_ipv6_authority_headers_and_coalesced_binary_payload ... ok
+test websocket::tests::early_data_is_rejected_before_any_handshake_bytes ... ok
+test probe::probe_tests::url_test_head_rejects_untrusted_https_certificate_at_origin_tls ... ok
+test websocket::tests::handshake_token_and_unsolicited_extensions ... ok
+test websocket::tests::idle_has_no_deadline_and_drop_cancels_blocked_drivers ... ok
+test websocket::tests::invalid_server_frame_headers_fail_before_releasing_data ... ok
+test websocket::tests::local_eof_flushes_queued_data_and_answers_ping_until_peer_close ... ok
+test websocket::tests::local_shutdown_bounds_a_previously_backpressured_data_frame ... ok
+test vision::stream::direct_tests::no_direct_transition_until_terminal_padding_is_complete ... ok
+test websocket::tests::one_close_deadline_covers_write_flush_peer_reply_and_shutdown ... ok
+test websocket::tests::peer_close_behind_a_full_control_queue_has_a_deadline ... ok
+test websocket::tests::transport_eof_without_peer_close_is_never_reported_as_success ... ok
+test websocket::tests::silent_peer_and_repeated_shutdown_cannot_extend_the_close_budget ... ok
+test vision::stream::direct_tests::direct_write_flush_is_cancellation_safe_and_never_replays_or_interleaves ... ok
+test websocket::tests::full_duplex_fragmented_transfer_and_ping_survive_backpressure ... ok
+test probe::probe_tests::url_test_head_authenticates_https_and_reports_origin_tls_phase ... ok
+test vless::tests::partial_response_header_has_deadline_without_timing_out_idle_application ... ok
+test socks5::tests::disabled_tls_and_handshake_timeout_fail_closed ... ok
+test socks5::tests::relay_uses_bound_address_configured_dns_and_control_lifetime ... ok
+
+test result: ok. 70 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.44s
+
+     Running tests/vision.rs (/workspace/scratch/ece554ece7c1/c6-verified-target/debug/deps/vision-6712b1f59a01bb14)
+
+running 21 tests
+test advertised_maximum_lengths_do_not_require_the_body_to_be_buffered ... ok
+test empty_decode_is_not_an_eof_signal ... ok
+test directions_keep_independent_uuid_and_terminal_state ... ok
+test encoder_enforces_both_wire_limits_before_changing_first_frame_state ... ok
+test empty_and_complete_frame_eof_are_legal_and_idempotent ... ok
+test content_and_padding_eof_are_distinguished_at_every_partial_offset ... ok
+test direct_is_only_an_event_after_all_content_and_padding ... ok
+test every_unknown_command_is_rejected_without_returning_payload ... ok
+test encoders_reject_frames_after_either_terminal_command ... ok
+test payload_header_lookalikes_are_never_reinterpreted_as_framing ... ok
+test request_addons_match_independent_protobuf_vectors ... ok
+test encoder_matches_ten_independent_python_wire_vectors ... ok
+test first_uuid_is_mandatory_and_all_mismatch_positions_poison_decoder ... ok
+test terminal_boundary_does_not_consume_or_forward_pending_transport_bytes ... ok
+test unknown_flows_cannot_silently_become_empty_addons ... ok
+test later_partial_headers_are_not_mistaken_for_clean_eof ... ok
+test padding_only_frames_make_bounded_progress_without_payload_or_extra_events ... ok
+test uuid_and_header_eof_are_distinguished_at_every_partial_offset ... ok
+test several_frames_in_one_read_keep_boundaries_and_payload_order ... ok
+test maximum_content_and_padding_are_accepted_without_decoder_buffering ... ok
+test decoder_accepts_independent_vectors_at_every_split_and_bytewise ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/vision_record.rs (/workspace/scratch/ece554ece7c1/c6-verified-target/debug/deps/vision_record-3b601e4ece8bdbd8)
+
+running 5 tests
+test partial_header_survives_cancelled_read_and_write_half_close ... ok
+test tampered_outer_direct_record_remains_an_authentication_failure ... ok
+test oversized_record_is_rejected_without_reading_its_body ... ok
+test real_tls_close_notify_is_required_even_at_record_boundaries ... ok
+test both_boundaries_deliver_authenticated_direct_request_before_coalesced_raw_tls ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+
+     Running tests/vision_stream.rs (/workspace/scratch/ece554ece7c1/c6-verified-target/debug/deps/vision_stream-e850c359a25bdf4c)
+
+running 16 tests
+test direct_command_drops_owned_stream_and_never_releases_terminal_tail ... ok
+test client_component_uses_real_vless_flow_request_and_lazy_response_prefix ... ok
+test incomplete_direct_frame_is_rejected_before_releasing_terminal_content ... ok
+test eof_in_every_partial_frame_position_remains_an_error ... ok
+test invalid_uuid_or_command_is_fatal_in_both_directions ... ok
+test invalid_vless_response_cannot_be_reinterpreted_as_vision_payload ... ok
+test outer_tls_truncation_is_not_converted_to_clean_framing_eof ... ok
+test upload_half_close_keeps_downlink_alive_and_cannot_be_reopened ... ok
+test write_zero_drops_owner_instead_of_reencoding_or_spinning ... ok
+test abort_releases_paused_transport_and_cannot_resume ... ok
+test abort_releases_partial_inner_tls_hello_and_pending_frame_memory ... ok
+test cancelling_flush_keeps_the_exact_partial_wire_offset ... ok
+test paused_reader_limits_writer_to_one_owned_frame_and_resumes_without_replay ... ok
+test cancelling_read_keeps_partial_uuid_and_padding_state ... ok
+test terminal_frame_tail_and_many_padding_frames_keep_exact_order ... ok
+test large_bidirectional_transfer_survives_partial_writes_and_backpressure ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+
+     Running tests/vision_tls.rs (/workspace/scratch/ece554ece7c1/c6-verified-target/debug/deps/vision_tls-7ae533af4c0cd4c6)
+
+running 12 tests
+test duplicate_extensions_and_trailing_or_short_lengths_fail_closed ... ok
+test random_and_unknown_extension_patterns_cannot_claim_tls13 ... ok
+test encrypted_record_is_complete_only_after_its_last_byte ... ok
+test hello_retry_request_never_becomes_a_final_server_hello ... ok
+test wrong_message_type_and_mid_hello_non_handshake_record_are_rejected ... ok
+test tls12_and_missing_client_tls13_offer_are_not_candidates ... ok
+test supported_suites_require_exact_client_offer_and_reject_short_tag_cipher ... ok
+test advertised_limits_reject_without_allocating_untrusted_body ... ok
+test session_id_echo_and_tls13_legacy_fields_are_checked ... ok
+test randomized_bidirectional_slices_preserve_hello_and_record_state ... ok
+test incomplete_hellos_never_become_candidates ... ok
+test both_hellos_work_at_every_network_split_and_one_byte_records ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+
+     Running unittests src/lib.rs (/workspace/scratch/ece554ece7c1/c6-verified-target/debug/deps/swirl_routing-1f6661c5ab6ea01c)
+
+running 15 tests
+test mrs::tests::ipv4_and_ipv6_cidr_matching ... ok
+test mrs::tests::bundled_directory_uses_source_only_for_unstaged_development_executable ... ok
+test mrs::tests::ordered_routing_applies_cn_fallback_but_preserves_user_reject ... ok
+test mrs::tests::rejects_truncated_and_wrong_checksum_before_parsing ... ok
+test mrs::tests::rejects_mismatched_rule_behavior ... ok
+test tests::dns_is_lazy_and_no_resolve_does_not_reorder_rules ... ok
+test mrs::tests::rejects_truncated_payload_and_unsupported_mrs_version ... ok
+test tests::keyword_port_source_and_final_are_ordered ... ok
+test tests::nested_and_automatic_groups_require_a_valid_runtime_choice ... ok
+test mrs::tests::suffix_matching_is_label_bounded ... ok
+test tests::suffix_is_label_bounded_and_first_match_wins ... ok
+test mrs::tests::rejects_wrong_ip_payload_version_and_wrong_behavior ... ok
+test mrs::tests::packaged_directory_is_executable_relative_and_requires_both_rules ... ok
+test mrs::tests::parses_bundled_mrs_assets_and_matches_domains_and_ips ... ok
+test mrs::tests::real_mrs_rules_preserve_direct_proxy_reject_and_ordered_match ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.44s
+
+     Running unittests src/lib.rs (/workspace/scratch/ece554ece7c1/c6-verified-target/debug/deps/swirl_subscription-034c6bf4ac543c5f)
+
+running 89 tests
+test dns_tls::tests::legacy_dns_and_explicit_tls_round_trip ... ok
+test dns_tls::tests::tls_cannot_downgrade_or_exceed_endpoint_budget ... ok
+test dns_tls::tests::https_is_explicit_and_cannot_use_dot_or_h2_framing ... ok
+test dns_tls::tests::query_family_is_strict_defaults_to_dual_and_requires_explicit_upstream ... ok
+test dns_tls::tests::tls_rejects_ambiguous_addresses_names_and_options ... ok
+test inspect::inspect_boundaries::uri_alpn_maps_ordered_values_and_round_trips_without_losing_raw_input ... ok
+test inspect::inspect_reality::fingerprints::reality_uri_explicit_no_header_preserves_profile_and_original ... ok
+test inspect::inspect_boundaries::document_protocols_with_implicit_tls_never_lose_or_override_it ... ok
+test inspect::inspect_reality::fingerprints::browser_profile_alpn_is_fixed_while_native_rustls_keeps_custom_alpn ... ok
+test inspect::inspect_reality::fingerprints::browser_profiles_survive_uri_yaml_singbox_xray_and_ir_without_renaming ... ok
+test inspect::inspect_reality::fingerprints::vless_uri_neutral_root_path_keeps_the_same_authenticated_outbound ... ok
+test inspect::inspect_reality::fingerprints::vless_uri_unmapped_authority_and_path_fail_before_candidate_mapping ... ok
+test inspect::inspect_reality::fingerprints::reality_uri_header_mapping_does_not_discard_transport_requirements ... ok
+test inspect::inspect_reality::tests::explicit_native_reality_survives_uri_json_yaml_and_ir_roundtrip ... ok
+test inspect::inspect_reality::tests::missing_required_parameters_are_not_guessed ... ok
+test inspect::inspect_reality::tests::vision_flow_is_retained_only_with_supported_reality ... ok
+test inspect::inspect_reality::fingerprints::source_fingerprint_and_alpn_aliases_cannot_overwrite_each_other ... ok
+test inspect::inspect_boundaries::endpoint_aliases_validate_both_values_and_never_select_a_conflict ... ok
+test inspect::inspect_reality::xray::tests::mapping_one_xray_node_does_not_claim_full_document_execution ... ok
+test inspect::inspect_reality::fingerprints::singbox_utls_requires_an_explicit_supported_browser_profile ... ok
+test inspect::inspect_reality::xray::tests::explicit_native_profile_xray_uri_yaml_and_wrapped_json_preserve_same_parameters ... ok
+test inspect::inspect_reality::xray::tests::xray_non_vision_and_explicit_empty_short_id_are_preserved ... ok
+test inspect::inspect_reality::tests::unsupported_profiles_conflicts_and_unknown_fields_never_downgrade ... ok
+test inspect::inspect_boundaries::trojan_username_is_not_silently_discarded_by_tcp_or_websocket_mapping ... ok
+test inspect::inspect_socks4::tests::userid_is_not_base64_password_authentication ... ok
+test inspect::inspect_socks4::tests::formats_preserve_userid_and_local_or_remote_dns ... ok
+test inspect::tests::alias_coalescing_cannot_override_authority_authentication_or_plugin_options ... ok
+test inspect::inspect_reality::xray::tests::conflicting_or_unimplemented_xray_features_fail_with_original_retained ... ok
+test inspect::tests::base64_uri_and_ini ... ok
+test inspect::tests::duplicate_keys_and_remote_tags_fail ... ok
+test inspect::tests::ini_comments_and_builtin_policies_do_not_hide_nodes ... ok
+test inspect::tests::ini_control_validation_precedes_whitespace_normalization ... ok
+test inspect::inspect_boundaries::alpn_aliases_cannot_hide_conflicts_invalid_types_or_order ... ok
+test inspect::tests::ini_duplicate_proxy_sections_and_empty_node_names_fail_closed ... ok
+test inspect::tests::ini_implicit_tls_cannot_be_downgraded ... ok
+test inspect::inspect_socks4::tests::unsafe_or_ambiguous_parameters_stay_preserved_and_unexecutable ... ok
+test inspect::tests::ini_positional_and_named_authentication_cannot_overwrite_each_other ... ok
+test inspect::inspect_websocket::tests::known_websocket_formats_map_but_extensions_remain_rejected ... ok
+test inspect::tests::equivalent_distinct_uri_aliases_preserve_originals_and_typed_values ... ok
+test inspect::tests::ini_string_credentials_and_alias_collisions ... ok
+test inspect::tests::ini_rejects_malformed_structure_after_valid_nodes ... ok
+test inspect::tests::ini_section_spacing_comments_and_unknown_bodies_are_preserved ... ok
+test inspect::tests::legacy_loon_colon_options_cannot_overwrite_named_parameters ... ok
+test inspect::tests::json_with_resource_urls_is_not_misclassified_as_uri ... ok
+test inspect::tests::ipv6_base64_subscription_preserves_ss_authentication_and_unknowns ... ok
+test inspect::tests::legacy_loon_trojan_options_preserve_credentials_and_tls_policy ... ok
+test inspect::tests::legacy_ss_does_not_discard_authority_options_or_accept_unknown_ciphers ... ok
+test inspect::tests::malformed_ipv6_authorities_do_not_become_candidates ... ok
+test inspect::tests::ipv6_uri_hosts_are_literals_in_typed_outbounds ... ok
+test inspect::tests::loon_obfs_unsupported_modes_options_and_incomplete_pairs_never_downgrade ... ok
+test inspect::tests::names_never_determine_protocol ... ok
+test inspect::inspect_boundaries::explicit_invalid_network_never_becomes_default_tcp ... ok
+test inspect::tests::loon_http_obfs_positional_and_named_exports_use_native_ss ... ok
+test inspect::tests::quoted_ini_credentials_preserve_spaces_and_escaped_quotes ... ok
+test inspect::tests::quoted_ini_password_delimiters_remain_credentials ... ok
+test inspect::tests::private_fields_retained_not_reported ... ok
+test inspect::tests::sip002_base64_userinfo_can_escape_its_padding ... ok
+test inspect::tests::legacy_ss_passwords_keep_reserved_characters_and_literal_percent_sequences ... ok
+test inspect::inspect_reality::xray::tests::unknown_fields_at_every_xray_boundary_are_rejected_before_normalization ... ok
+test inspect::tests::sip002_percent_encoding_is_distinct_from_legacy_password_text ... ok
+test inspect::tests::uri_insecure_alias_is_typed_and_never_overwrites ... ok
+test inspect::tests::unsupported_transport_and_bool_rejected ... ok
+test inspect::tests::unequal_aliases_repeated_keys_and_invalid_booleans_fail_closed ... ok
+test inspect::tests::unsupported_tls_policy_is_explicit_and_preserved ... ok
+test inspect::tests::socks5_udp_capability_requires_plain_standard_transport ... ok
+test inspect::tests::sip002_plugin_mapping_escaping_and_unknown_retention ... ok
+test inspect::tests::ss_aead_http_obfs_maps_without_losing_unsupported_options ... ok
+test inspect::tests::uri_udp_boolean_mapping_preserves_capability_and_certificate_limits ... ok
+test tests::duplicate_schema_rejected ... ok
+test policy::tests::nested_manual_groups_are_acyclic_and_reference_real_members ... ok
+test tests::host_validation_rejects_injection ... ok
+test tests::dns_rejects_ambiguous_mapping_and_unknown_settings ... ok
+test inspect::tests::vless_base_tls_maps_but_flow_and_reality_never_downgrade ... ok
+test tests::unknown_fields_preserved_but_not_executed ... ok
+test policy::tests::automatic_groups_reject_implicit_defaults_nested_members_and_ignored_options ... ok
+test tests::socks5_udp_is_explicit_and_never_weakens_tls ... ok
+test policy::tests::automatic_policy_requires_explicit_bounded_safe_probe ... ok
+test tests::selectors_reject_missing_duplicate_nested_and_unknown_members ... ok
+test websocket::tests::websocket_rejects_header_injection_ambiguous_hosts_and_bad_escapes ... ok
+test tests::invalid_routing_fields_fail_before_activation ... ok
+test xray::strict::tests::json_preserves_missing_null_false_empty_and_numbers ... ok
+test xray::strict::tests::duplicate_keys_are_checked_before_normalization_at_every_depth ... ok
+test xray::strict::tests::rejects_yaml_comments_trailing_content_bad_unicode_and_numbers ... ok
+test xray::structure_tests::structural_diagnostics_are_paths_without_values ... ok
+test xray::structure_tests::recognizes_config_single_and_explicit_extension_array ... ok
+test xray::structure_tests::rejects_empty_wrong_types_and_server_listeners ... ok
+test policy::tests::policy_depth_and_total_probe_work_are_bounded ... ok
+test inspect::inspect_reality::xray::tests::missing_and_mistyped_xray_security_parameters_never_become_candidates ... ok
+test xray::strict::tests::bounds_input_depth_and_total_values_before_expansion ... ok
+
+test result: ok. 89 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+
+     Running tests/xray_adversarial.rs (/workspace/scratch/ece554ece7c1/c6-verified-target/debug/deps/xray_adversarial-5e756c68acfa2313)
+
+running 11 tests
+test escaped_non_ascii_duplicate_keys_are_compared_after_decoding ... ok
+test duplicate_keys_in_nonexecuted_sections_are_still_rejected ... ok
+test depth_budget_applies_inside_unknown_metadata_before_projection ... ok
+test json_extensions_cannot_pass_through_the_structural_entrypoint ... ok
+test malformed_input_reports_schema_paths_without_values_or_unknown_keys ... ok
+test unknown_source_values_remain_distinct_and_diagnostics_redact_their_names ... ok
+test inbound_credentials_never_become_client_outbounds ... ok
+test invalid_global_and_outbound_section_types_do_not_normalize_to_defaults ... ok
+test file_bom_is_accepted_but_size_and_encoding_limits_are_not_bypassed ... ok
+test outbound_count_boundary_is_enforced_for_full_and_extension_documents ... ok
+test value_budget_applies_to_large_unselected_arrays ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/xray_structure.rs (/workspace/scratch/ece554ece7c1/c6-verified-target/debug/deps/xray_structure-d9937fb612a022b8)
+
+running 27 tests
+test caller_provenance_is_preserved_without_urls_or_paths ... ok
+test depth_budget_counts_root_as_zero_and_checks_unknown_values ... ok
+test duplicate_keys_are_detected_after_escape_decoding_at_all_depths ... ok
+test empty_or_absent_outbounds_never_fall_back_to_server_inbounds ... ok
+test diagnostics_never_echo_credentials_header_values_or_private_urls ... ok
+test empty_files_and_invalid_encodings_have_explicit_errors ... ok
+test malformed_json_is_not_repaired_or_treated_as_yaml ... ok
+test diagnostic_budget_bounds_unrecognized_global_fields ... ok
+test optional_values_remain_distinct_without_invented_defaults ... ok
+test official_style_v2ray_configuration_keeps_global_transport_and_all_users ... ok
+test grpc_signed_integer_types_remain_distinct_from_unsigned_ports ... ok
+test nested_structural_errors_have_exact_outbound_and_user_paths ... ok
+test official_style_xray_full_configuration_preserves_every_section ... ok
+test original_bytes_keep_numeric_lexemes_order_whitespace_and_bom ... ok
+test required_protocol_distinguishes_missing_wrong_type_and_empty ... ok
+test string_list_fields_accept_both_upstream_forms_without_normalizing ... ok
+test server_markers_are_rejected_in_every_client_envelope ... ok
+test single_multi_and_extension_envelopes_preserve_order ... ok
+test recognized_global_and_inbound_children_are_typed_without_execution ... ok
+test unknown_protocol_fields_are_preserved_for_later_conversion ... ok
+test v2ray_v5_envelopes_are_retained_without_claiming_conversion ... ok
+test outbound_port_types_follow_uint16_and_preserve_flat_settings ... ok
+test scalar_roots_and_nonobject_array_members_are_rejected ... ok
+test truncations_and_small_hostile_byte_corpus_do_not_panic ... ok
+test legacy_v2ray_envelopes_preserve_source_paths_and_upstream_order ... ok
+test byte_budget_accepts_exact_limit_and_rejects_one_more_before_decode ... ok
+test value_budget_accepts_exact_limit_and_rejects_one_more ... ok
+
+test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+     Running unittests src/lib.rs (/workspace/scratch/ece554ece7c1/c6-verified-target/debug/deps/swirl_transport-f40e411137d2d6e2)
+
+running 109 tests
+test grpc::tests::known_wire_bytes_singular_last_value_multi_concatenation_and_unknown_fields ... ok
+test grpc::tests::paths_follow_xray_normal_and_custom_service_semantics ... ok
+test grpc::tests::write_then_read_without_flush_delivers_pending_frame ... ok
+test h2_stream::tests::cancelling_one_stream_resets_it_without_poisoning_session ... ok
+test grpc::tests::oversized_compressed_truncated_envelopes_fail ... ok
+test grpc::tests::protocol_is_bidirectional_post_and_headers_cannot_replace_framing ... ok
+test h2_stream::tests::goaway_rejects_new_stream_without_replaying_bytes ... ok
+test h2_stream::tests::early_response_no_error_reset_does_not_hide_grpc_status ... ok
+test h2_stream::tests::initial_grpc_status_does_not_mask_missing_terminal_trailers ... ok
+test h2_stream::tests::grpc_nonzero_terminal_trailer_is_not_successful_eof ... ok
+test h2_stream::tests::reserved_and_injected_headers_are_rejected ... ok
+test grpc::tests::early_response_preserves_reverse_bytes_with_a_blocked_upload ... ok
+test h2_stream::tests::non_success_http_grpc_status_and_rst_are_errors ... ok
+test h2_stream::tests::response_can_wait_for_first_request_bytes ... ok
+test http2::tests::legacy_method_host_and_decoded_path_match_upstream ... ok
+test h2_stream::tests::response_first_then_shutdown_drop_delivers_request_end_stream ... ok
+test http2::tests::path_and_host_cannot_inject_http_fields ... ok
+test httpupgrade::tests::rejects_wrong_status_protocol_and_framing ... ok
+test httpupgrade::tests::response_size_is_bounded ... ok
+test h2_stream::tests::one_connection_serves_concurrent_independent_streams ... ok
+test httpupgrade::tests::validates_headers_and_literal_path ... ok
+test httpupgrade::tests::preserves_upgrade_tail_and_raw_bidirectional_half_close ... ok
+test reality::backend::tests::actual_clienthello_has_bound_authentication_and_only_native_tls13_profile ... ok
+test httpupgrade::tests::stalled_server_times_out_and_owned_stream_closes ... ok
+test reality::backend::tests::alpn_limits_preserve_raw_values_order_and_exact_boundaries ... ok
+test h2_stream::tests::response_deadline_cancels_an_unresponsive_peer ... ok
+test grpc::tests::arbitrary_envelope_fragmentation_preserves_binary_stream ... ok
+test reality::backend::tests::chrome_profile_rejects_unsupported_names_and_alpn_without_constructing_a_connection ... ok
+test reality::backend::tests::encrypted_flight_tampering_fails_before_application_plaintext ... ok
+test reality::backend::tests::failed_constructor_and_unwind_drop_untransferred_material ... ok
+test reality::backend::tests::first_flight_rejects_partial_records_extra_records_and_unknown_framing ... ok
+test reality::backend::tests::chrome_authentication_uses_standalone_key_and_binds_every_hello_byte ... ok
+test reality::backend::tests::modifying_only_queued_network_bytes_cannot_match_the_tls_transcript ... ok
+test reality::backend::tests::preview_has_no_completion_or_server_authentication_capability ... ok
+test reality::backend::tests::reentry_and_key_start_order_are_bounded_without_owner_aliases ... ok
+test reality::backend::tests::scoped_rng_refuses_wrong_shape_extra_calls_and_outside_calls ... ok
+test reality::backend::tests::chrome_finished_and_unimplemented_alps_fail_with_valid_record_authentication ... ok
+test reality::backend::tests::simultaneous_connections_get_distinct_randoms_sessions_and_keys ... ok
+test reality::backend::tests::valid_certificate_mac_does_not_replace_real_certificateverify_transcript ... ok
+test reality::certificate::tests::all_three_ed25519_algorithm_identifiers_require_absent_parameters ... ok
+test reality::certificate::tests::bit_strings_require_exact_key_and_mac_lengths_and_no_unused_bits ... ok
+test reality::certificate::tests::certificate_chain_and_ocsp_are_explicitly_rejected ... ok
+test reality::certificate::tests::certificate_mac_and_public_key_tampering_are_rejected ... ok
+test reality::certificate::tests::certificate_verify_never_accepts_an_unauthenticated_key ... ok
+test reality::backend::tests::native_three_suite_profile_authenticates_cv_finished_data_and_close ... ok
+test reality::certificate::tests::debug_redacts_authentication_key ... ok
+test reality::certificate::tests::certificate_verify_rejects_modified_transcript_context_and_signature ... ok
+test reality::certificate::tests::independent_certificate_hmac_and_upstream_minimal_profile_are_accepted ... ok
+test reality::certificate::tests::every_truncated_certificate_and_trailing_data_are_rejected ... ok
+test reality::backend::tests::valid_der_and_possession_do_not_replace_certificate_authentication ... ok
+test reality::certificate::tests::malformed_year_one_placeholder_is_not_accepted_as_arbitrary_time ... ok
+test reality::certificate::tests::independent_sha256_and_sha384_certificate_verify_transcripts_are_accepted ... ok
+test reality::certificate::tests::nested_trailing_fields_and_nonminimal_lengths_are_rejected ... ok
+test reality::certificate::tests::ordinary_valid_certificate_and_unsupported_mldsa_have_no_fallback ... ok
+test reality::backend::tests::chrome_certificate_authentication_and_certificate_verify_stay_strict ... ok
+test reality::certificate::tests::tls12_and_other_certificate_verify_algorithms_are_rejected ... ok
+test reality::certificate::tests::wrong_authentication_key_is_rejected ... ok
+test reality::client::tests::a_blocked_partial_record_is_resumable_without_reauthentication ... ok
+test reality::certificate::tests::rustls_rejects_wrong_reality_authentication_before_plaintext ... ok
+test reality::client::tests::debug_output_contains_no_keys_session_or_server_identity ... ok
+test reality::client::tests::fatal_read_and_write_errors_preserve_the_first_error_and_end_the_attempt ... ok
+test reality::certificate::tests::rustls_rejects_tampered_encrypted_server_flight_before_plaintext ... ok
+test reality::certificate::tests::rustls_verifier_and_classical_hybrid_component_complete_tls13_data_and_close ... ok
+test reality::client::tests::hrr_is_rejected_without_emitting_a_second_clienthello ... ok
+test reality::client::tests::first_flight_budgets_and_trailing_plaintext_are_rejected ... ok
+test reality::client::tests::initial_flight_partial_and_blocked_writes_preserve_all_bytes ... ok
+test reality::client::tests::interrupted_read_and_write_remain_resumable ... ok
+test reality::client::tests::invalid_session_echo_fails_before_backend_and_poison_is_sticky ... ok
+test reality::client::tests::first_flight_does_not_treat_ccs_or_ciphertext_as_authenticated_data ... ok
+test reality::client::tests::no_application_or_negotiated_success_before_finished ... ok
+test reality::client::tests::server_hello_input_never_consumes_bytes_from_the_next_record ... ok
+test reality::client::tests::zero_write_with_pending_flight_fails_instead_of_spinning ... ok
+test h2_stream::tests::multi_megabyte_duplex_and_half_close_obey_flow_control ... ok
+test reality::stream::tests::bare_outer_eof_is_not_a_tls_close ... ok
+test reality::client::tests::fragmented_record_and_handshake_eof_are_failures ... ok
+test reality::client::tests::malformed_record_headers_fail_before_payload_allocation ... ok
+test reality::stream::tests::cancellation_releases_pending_handshake_without_detached_tasks ... ok
+test reality::stream::tests::downlink_raw_transition_remains_available_after_upload_half_close ... ok
+test reality::backend::tests::chrome_both_owned_key_branches_complete_real_tls_data_and_close ... ok
+test reality::stream::tests::failed_authentication_releases_transport_and_returns_no_stream ... ok
+test reality::client::tests::server_hello_record_fragmentation_preserves_the_exact_message ... ok
+test reality::stream::tests::cancelled_partial_record_cannot_be_reinterpreted_as_raw ... ok
+test reality::stream::tests::raw_handoff_preserves_tls_tail_and_raw_suffix_without_outer_close_alert ... ok
+test reality::tests::client_hello_extension_semantics_never_silently_downgrade ... ok
+test reality::tests::every_truncated_client_hello_is_rejected_without_panic ... ok
+test reality::tests::corrupted_mlkem_ciphertext_requires_later_finished_rejection ... ok
+test reality::tests::client_hello_requires_owned_random_keys_name_and_zero_session_id ... ok
+test reality::tests::fresh_key_owners_do_not_reuse_random_or_either_share ... ok
+test reality::tests::grease_key_shares_must_follow_the_unique_supported_group_order ... ok
+test reality::tests::authentication_matches_independent_python_vectors_byte_for_byte ... ok
+test reality::tests::optional_classical_share_must_follow_hybrid_and_use_same_key ... ok
+test reality::tests::key_group_advertises_only_tls13_and_retains_the_classical_owner ... ok
+test reality::tests::nested_client_hello_vectors_reject_truncation_with_correct_outer_lengths ... ok
+test reality::tests::ordinary_low_order_server_authentication_key_is_rejected ... ok
+test reality::tests::all_aad_bytes_are_authenticated_and_records_are_not_in_the_transcript ... ok
+test tests::eof_keeps_reverse_direction_alive ... ok
+test udp::tests::buffer_setup_retains_larger_existing_values ... ok
+test reality::tests::real_mlkem_ciphertext_matches_independent_openssl_shared_secret ... ok
+test xhttp::tests::oversized_or_injected_request_fields_are_rejected ... ok
+test xhttp::tests::path_and_ipv6_authority_are_preserved ... ok
+test xhttp::tests::stream_one_has_raw_body_semantics_and_default_padding_headers ... ok
+test xhttp::tests::unsupported_modes_and_ambiguous_headers_are_rejected ... ok
+test udp::tests::full_datagrams_survive_small_buffers_and_address_families ... ok
+test reality::tests::server_hello_rejects_truncation_echo_hrr_tls12_and_unoffered_cipher ... ok
+test reality::tests::server_hello_matches_independent_sha256_and_sha384_checkpoints ... ok
+test reality::tests::hybrid_key_share_lengths_and_noncontributory_peers_fail ... ok
+test h2_stream::tests::graceful_drop_bounds_an_unfinished_response_and_keeps_session_usable ... ok
+test h2_stream::tests::shutdown_then_drop_keeps_final_data_with_an_unread_response ... ok
+test reality::stream::tests::tiny_partial_io_and_backpressure_preserve_data_and_authenticated_half_close ... ok
+
+test result: ok. 109 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.38s
+
+     Running tests/client_hello_customizer.rs (/workspace/scratch/ece554ece7c1/c6-verified-target/debug/deps/client_hello_customizer-11a610048e1c7984)
+
+running 9 tests
+test unconfigured_client_keeps_upstream_constructor ... ok
+test callback_rejects_tls12_engine_and_early_data_before_running ... ok
+test unchanged_callback_sends_the_exact_transcript_input ... ok
+test hello_retry_request_never_runs_a_second_customization ... ok
+test callback_cannot_replace_fresh_random_session_id_or_key_material ... ok
+test callback_cannot_change_configured_identity_application_or_decompression ... ok
+test callback_rejects_malformed_oversize_duplicate_and_protocol_state_extensions ... ok
+test unknown_grease_is_preserved_in_the_actual_wire_encoding ... ok
+test advertised_brotli_is_real_and_enforces_exact_output_length ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests swirl_api
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests swirl_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests swirl_dns
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests swirl_protocol
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests swirl_routing
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests swirl_subscription
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests swirl_transport
+
+running 1 test
+test crates/swirl-transport/src/reality/mod.rs - reality::ClientKeys::authenticate (line 127) - compile fail ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s

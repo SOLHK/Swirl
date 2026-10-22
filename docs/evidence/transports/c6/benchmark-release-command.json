@@ -1,0 +1,18 @@
+{
+  "command": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+    "tools/tests/benchmark_transport.py",
+    "--output",
+    "/workspace/scratch/ece554ece7c1/transport-evidence/c6-benchmark-release.json",
+    "--build-label",
+    "release",
+    "--size-mib",
+    "16",
+    "--samples",
+    "3",
+    "--repetitions",
+    "20"
+  ],
+  "exit_code": 0,
+  "log": "/workspace/scratch/ece554ece7c1/transport-evidence/c6-benchmark-release.log"
+}

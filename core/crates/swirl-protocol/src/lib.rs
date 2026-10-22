@@ -13,7 +13,10 @@ pub mod websocket;
 pub use diagnostics::{TcpAttempt, TcpDiagnostic, TcpOutcome, failure_stage};
 pub use dial::{connect_direct_resolved, diagnose_tcp};
 use dial::{connect_tcp, within};
-pub use probe::{UrlTestFailure, UrlTestMetrics, UrlTestStage, health_probe, url_test_head};
+pub use probe::{
+    UrlTestFailure, UrlTestMetrics, UrlTestStage, health_probe, health_probe_with_transport,
+    url_test_head, url_test_head_with_transport,
+};
 pub use shadowsocks::{
     decrypt_datagram as ss_decrypt_datagram, encrypt_datagram as ss_encrypt_datagram,
 };
@@ -491,17 +494,29 @@ async fn connect_selected(
             .ok()
             .and_then(|value| u32::try_from(value.as_secs()).ok())
             .ok_or("RealityClock")?;
-        let alpn: Vec<Vec<u8>> = reality
+        let required_alpn = transport.and_then(Transport::required_alpn);
+        let mut alpn: Vec<Vec<u8>> = reality
             .alpn
             .iter()
             .map(|value| value.as_bytes().to_vec())
             .collect();
+        if alpn.is_empty()
+            && reality.fingerprint == "rustls"
+            && let Some(required) = required_alpn
+        {
+            alpn.push(required.to_vec());
+        }
+        // The Chrome profile owns its fixed h2/http1.1 offer. Do not rewrite
+        // its ClientHello. REALITY has its own authenticated ALPN policy below.
         let stream = within(deadline, "RealityHandshakeTimeout", async {
             swirl_transport::reality::connect(tcp, &parameters, unix_time, &alpn)
                 .await
                 .map_err(|_| "RealityAuthenticationOrHandshake")
         })
         .await?;
+        if let Some(transport) = transport {
+            transport.validate_reality_alpn(stream.tls().alpn_protocol())?;
+        }
         if flow == "xtls-rprx-vision" {
             // Keep the concrete authenticated owner until the Vision adapter
             // installs its directional raw handoff. The wire request retains
@@ -514,17 +529,23 @@ async fn connect_selected(
             .await?;
             return Ok(Box::new(stream));
         }
+        let mut stream: swirl_transport::BoxStream = Box::new(stream);
+        if let Some(transport) = transport {
+            stream = within(
+                deadline,
+                "TransportHandshakeTimeout",
+                transport.wrap(
+                    stream,
+                    true,
+                    deadline.saturating_duration_since(Instant::now()),
+                ),
+            )
+            .await?;
+        }
         return within(
             deadline,
             "UpstreamProtocolTimeout",
-            handshake(
-                outbound,
-                target,
-                Box::new(stream),
-                None,
-                *port,
-                handshake_limit,
-            ),
+            handshake(outbound, target, stream, None, *port, handshake_limit),
         )
         .await;
     }

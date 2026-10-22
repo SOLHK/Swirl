@@ -65,6 +65,23 @@ jobs:
           SWIRL_TRANSPORT_CLIENT: ${{ github.workspace }}/core/target/release/examples/transport-client${{ runner.os == 'Windows' && '.exe' || '' }}
           SWIRL_TRANSPORT_EVIDENCE: ${{ runner.temp }}/transport-evidence/c5
         run: python tools/tests/test_transport_xhttp_xray.py -v
+      - name: Core transport selection and probes through independent Xray
+        env:
+          SWIRL_TRANSPORT_RUNTIME: ${{ github.workspace }}/core/target/release/examples/transport-runtime${{ runner.os == 'Windows' && '.exe' || '' }}
+          SWIRL_TRANSPORT_CLIENT: ${{ github.workspace }}/core/target/release/examples/transport-client${{ runner.os == 'Windows' && '.exe' || '' }}
+          SWIRL_C6_EVIDENCE: ${{ runner.temp }}/transport-evidence/c6-core
+          SWIRL_TRANSPORT_EVIDENCE: ${{ runner.temp }}/transport-evidence/c6-core-peers
+        run: python tools/tests/test_transport_runtime_xray.py -v
+      - name: Required TLS ALPN policy with trusted local peers
+        env:
+          SWIRL_TRANSPORT_CLIENT: ${{ github.workspace }}/core/target/release/examples/transport-client${{ runner.os == 'Windows' && '.exe' || '' }}
+          SWIRL_TLS_POLICY_EVIDENCE: ${{ runner.temp }}/transport-evidence/c6-tls-policy
+        run: python tools/tests/test_transport_tls_policy.py
+      - name: Independent REALITY transport and raw Vision regression
+        env:
+          SWIRL_TRANSPORT_CLIENT: ${{ github.workspace }}/core/target/release/examples/transport-client${{ runner.os == 'Windows' && '.exe' || '' }}
+          SWIRL_TRANSPORT_EVIDENCE: ${{ runner.temp }}/transport-evidence/c6-reality
+        run: python tools/tests/test_transport_reality_xray.py -v
       - name: Preserve peer identity and raw test evidence
         if: always()
         uses: actions/upload-artifact@v4
