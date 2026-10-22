@@ -291,7 +291,11 @@ jobs:
                 throw 'Navigation marker did not prove each page was mounted and ready'
               }
               foreach ($route in $ready) {
-                if ($route.Groups[1].Value -ne $route.Groups[2].Value) { throw 'Mounted route differs from requested page' }
+                # Main.qml intentionally mounts these two existing aliases
+                # as activity. Every other requested route must match exactly.
+                $expectedRoute = $route.Groups[1].Value
+                if ($expectedRoute -in @('dashboard', 'requestlogs')) { $expectedRoute = 'activity' }
+                if ($expectedRoute -ne $route.Groups[2].Value) { throw 'Mounted route differs from requested page' }
               }
             }
             Write-Host ($profile.Name + ': exit 0 and required completion marker')
