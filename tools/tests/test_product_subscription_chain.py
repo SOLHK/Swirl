@@ -153,10 +153,10 @@ class SsStream:
 
     def recv(self, count):
         while not self.pending:
-            try:
-                self.pending.extend(self.reader.chunk())
-            except EOFError:
+            chunk = self.reader.chunk(allow_boundary_eof=True)
+            if chunk is None:
                 return b''
+            self.pending.extend(chunk)
         value = bytes(self.pending[:count])
         del self.pending[:count]
         return value
@@ -268,7 +268,9 @@ class Relay:
                     assert port in owner.ports
                     upstream = socket.create_connection(('127.0.0.1', port), timeout=8)
                     event = {'peer': identity, 'host': host, 'port': port, 'upload': 0,
-                             'download': 0, 'prefix': b''}
+                             'download': 0, 'prefix': b'', 'upload_eof': False,
+                             'download_eof': False, 'write_shutdown': None,
+                             'upload_truncated': False}
                     owner.connections.append(event)
                     if protocol == 'http':
                         wire.sendall(b'HTTP/1.1 200 Connection Established\r\n\r\n')
@@ -287,7 +289,12 @@ class Relay:
                                     owner.upload += len(data)
                                     event['upload'] += len(data)
                                     event['prefix'] = (event['prefix'] + data)[:4096]
-                        except (OSError, EOFError, InvalidTag):
+                            event['upload_eof'] = True
+                        except EOFError:
+                            # SsStream returns empty only between complete
+                            # authenticated records; partial records fail.
+                            event['upload_truncated'] = True
+                        except (OSError, InvalidTag):
                             pass
                         finally:
                             try:
@@ -303,10 +310,24 @@ class Relay:
                             with owner.lock:
                                 owner.download += len(data)
                                 event['download'] += len(data)
-                        wire.shutdown(socket.SHUT_WR)
+                        event['download_eof'] = True
+                        try:
+                            wire.shutdown(socket.SHUT_WR)
+                            event['write_shutdown'] = 'sent'
+                        except OSError as error:
+                            # Darwin can finish TCP close before this final
+                            # half-close after the origin EOF. Accept only that
+                            # state, and verify the upload's EOF after joining.
+                            if (error.errno != errno.ENOTCONN and
+                                    getattr(error, 'winerror', None) != 10057):
+                                raise
+                            event['write_shutdown'] = 'already_closed'
                     finally:
                         uploader.join(8)
                         assert not uploader.is_alive(), 'RelayUploadDidNotFinish'
+                        assert not event['upload_truncated'], 'RelayUploadRecordTruncated'
+                    if event['write_shutdown'] == 'already_closed':
+                        assert event['upload_eof'], 'RelayClosedBeforeUploadEof'
                 except InvalidTag:
                     owner.denied.append('Authentication')
                 except (EOFError, ConnectionError, socket.timeout):
@@ -349,6 +370,148 @@ class Relay:
         self.server.server_close()
         self.thread.join(2)
         assert not self.errors, self.errors
+
+
+class RelayHalfCloseChecks(unittest.TestCase):
+    """Exercise the independent fixture over real sockets with OS close races."""
+
+    def exchange(self, shutdown_errno=None, upload_error=False, protocol='http',
+                 cipher='chacha20-ietf-poly1305', truncated_tail=None):
+        from unittest import mock
+        origin = Origin(echo=True)
+        relay = Relay(protocol, 'halfclose-check', [origin.port], cipher=cipher)
+        finished = threading.Event()
+        original_process = relay.server.process_request_thread
+        original_shutdown = socket.socket.shutdown
+        original_recv = socket.socket.recv
+        injected = False
+
+        def process(request, address):
+            try:
+                original_process(request, address)
+            finally:
+                finished.set()
+
+        relay.server.process_request_thread = process
+
+        def shutdown(stream, how):
+            nonlocal injected
+            selected = (stream.getsockname()[1] == relay.port and
+                        how == socket.SHUT_WR and not injected and
+                        shutdown_errno is not None)
+            try:
+                result = original_shutdown(stream, how)
+            except OSError as error:
+                if (not selected or (error.errno != errno.ENOTCONN and
+                                     getattr(error, 'winerror', None) != 10057)):
+                    raise
+                result = None
+            if selected:
+                injected = True
+                # Actual FIN/data delivery happens first; Darwin can report
+                # ENOTCONN when the peer has already completed its close.
+                raise OSError(shutdown_errno, 'synthetic fixture shutdown state')
+            return result
+
+        def recv(stream, count, *args):
+            data = original_recv(stream, count, *args)
+            if upload_error and not data and stream.getsockname()[1] == relay.port:
+                raise OSError(errno.EIO, 'synthetic fixture receive failure')
+            return data
+
+        payload = b'independent-relay-halfclose' * 257
+        close_failed = False
+        try:
+            with mock.patch.object(socket.socket, 'shutdown', shutdown), \
+                    mock.patch.object(socket.socket, 'recv', recv):
+                with socket.create_connection(('127.0.0.1', relay.port), timeout=3) as stream:
+                    if protocol == 'http':
+                        auth = base64.b64encode((USER + ':' + PASSWORD).encode())
+                        stream.sendall(f'CONNECT localhost:{origin.port} HTTP/1.1\r\n'.encode() +
+                                       b'Proxy-Authorization: Basic ' + auth + b'\r\n\r\n')
+                        self.assertIn(b'200 Connection Established', header(stream))
+                        stream.sendall(payload)
+                        response = stream
+                    else:
+                        self.assertEqual(protocol, 'ss')
+                        writer = Writer(cipher)
+                        address = b'\x03\x09localhost' + origin.port.to_bytes(2, 'big')
+                        stream.sendall(writer.salt + writer.chunk(b'') +
+                                       writer.chunk(address + payload) + writer.chunk(b''))
+                        response = SsStream(stream, cipher, PASSWORD)
+                    self.assertEqual(exact(response, len(payload)), payload)
+                    if truncated_tail is not None:
+                        stream.sendall(writer.chunk(b'must-not-reach-origin')[:truncated_tail])
+                    stream.shutdown(socket.SHUT_WR)
+                    self.assertEqual(exact(response, len(TAIL)), TAIL)
+                    self.assertEqual(response.recv(1), b'')
+                self.assertTrue(finished.wait(3), 'independent relay did not finish')
+            self.assertEqual(relay.upload, len(payload))
+            self.assertEqual(relay.download, len(payload) + len(TAIL))
+            self.assertEqual(b''.join(origin.payloads), payload)
+        finally:
+            try:
+                relay.close()
+            except AssertionError:
+                close_failed = True
+            origin.close()
+        return relay, injected, close_failed
+
+    def test_normal_halfclose_delivers_payload_tail_and_eof(self):
+        relay, injected, failed = self.exchange()
+        self.assertFalse(injected)
+        self.assertFalse(failed)
+        self.assertEqual(relay.errors, [])
+
+    def test_not_connected_after_both_eofs_is_a_completed_close(self):
+        relay, injected, failed = self.exchange(errno.ENOTCONN)
+        self.assertTrue(injected)
+        self.assertFalse(failed, relay.errors)
+        self.assertEqual(relay.errors, [])
+        self.assertEqual(relay.connections[0]['write_shutdown'], 'already_closed')
+        self.assertTrue(relay.connections[0]['upload_eof'])
+        self.assertTrue(relay.connections[0]['download_eof'])
+
+    def test_other_shutdown_errors_still_fail_the_fixture(self):
+        for code in (errno.EBADF, errno.EIO):
+            with self.subTest(errno=code):
+                relay, injected, failed = self.exchange(code)
+                self.assertTrue(injected)
+                self.assertTrue(failed)
+                self.assertEqual([error['errno'] for error in relay.errors], [code])
+
+    def test_not_connected_without_verified_upload_eof_still_fails(self):
+        relay, injected, failed = self.exchange(errno.ENOTCONN, upload_error=True)
+        self.assertTrue(injected)
+        self.assertTrue(failed)
+        self.assertEqual([error['type'] for error in relay.errors], ['AssertionError'])
+
+
+    def test_ss_record_boundary_eof_and_close_for_all_aead_ciphers(self):
+        for cipher in ('aes-128-gcm', 'aes-256-gcm', 'chacha20-ietf-poly1305'):
+            with self.subTest(cipher=cipher):
+                relay, injected, failed = self.exchange(errno.ENOTCONN, protocol='ss', cipher=cipher)
+                self.assertTrue(injected)
+                self.assertFalse(failed, relay.errors)
+                self.assertEqual(relay.errors, [])
+                self.assertTrue(relay.connections[0]['upload_eof'])
+                self.assertEqual(relay.connections[0]['write_shutdown'], 'already_closed')
+
+    def test_ss_partial_encrypted_header_is_not_record_boundary_eof(self):
+        for count in (1, 17):
+            with self.subTest(bytes=count):
+                relay, _, failed = self.exchange(protocol='ss', truncated_tail=count)
+                self.assertTrue(failed, 'truncated SS header must fail the fixture')
+                self.assertFalse(relay.connections[0]['upload_eof'])
+                self.assertEqual([error['type'] for error in relay.errors], ['AssertionError'])
+
+    def test_ss_partial_encrypted_payload_is_not_record_boundary_eof(self):
+        for count in (18, 19, 18 + len(b'must-not-reach-origin') + 15):
+            with self.subTest(bytes=count):
+                relay, _, failed = self.exchange(protocol='ss', truncated_tail=count)
+                self.assertTrue(failed, 'truncated SS payload or tag must fail the fixture')
+                self.assertFalse(relay.connections[0]['upload_eof'])
+                self.assertEqual([error['type'] for error in relay.errors], ['AssertionError'])
 
 
 class Harness:
