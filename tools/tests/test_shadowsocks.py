@@ -25,8 +25,14 @@ class Reader:
         self.cipher=cipher_key(method,self.salt);self.nonce=0
     def decrypt(self, data):
         result=self.cipher.decrypt(self.nonce.to_bytes(12,'little'),data,None);self.nonce+=1;return result
-    def chunk(self):
-        length=int.from_bytes(self.decrypt(exact(self.s,18)),'big')
+    def chunk(self, *, allow_boundary_eof=False):
+        # Only EOF before the first encrypted length byte ends a record stream.
+        # Partial length, payload and authentication-tag EOFs remain errors.
+        first=self.s.recv(1)
+        if not first:
+            if allow_boundary_eof:return None
+            raise EOFError('SS record boundary EOF')
+        length=int.from_bytes(self.decrypt(first+exact(self.s,17)),'big')
         assert length<=16383
         return self.decrypt(exact(self.s,length+16))
 

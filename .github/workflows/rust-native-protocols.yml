@@ -1,0 +1,35 @@
+name: Swirl Native Protocols X14
+on:
+  push:
+    branches: [work/rust-native-protocols-x14a-20261022]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-protocols:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    env:
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust tools
+        run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy
+      - name: Format
+        working-directory: core
+        run: cargo fmt --all -- --check
+      - name: Check
+        working-directory: core
+        run: cargo check --workspace --locked
+      - name: Clippy
+        working-directory: core
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Unit and local network tests
+        working-directory: core
+        run: cargo test --workspace --locked

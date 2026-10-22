@@ -1,11 +1,13 @@
-//! Bounded, offline Xray/V2Ray JSON parsing, without protocol conversion.
+//! Bounded, offline Xray/V2Ray JSON parsing and lossless protocol conversion.
 //! Only diagnostics and the redacted `Debug` view are safe to publish. Raw
 //! source and parsed values can contain credentials and must stay private.
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fmt;
 
+pub mod convert;
 mod schema;
+mod security;
 mod strict;
 
 pub const MAX_JSON_INPUT: usize = 4 * 1024 * 1024;
