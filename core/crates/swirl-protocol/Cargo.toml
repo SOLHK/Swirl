@@ -13,6 +13,13 @@ swirl-dns.workspace = true
 swirl-transport.workspace = true
 sha2.workspace = true
 ring.workspace = true
+aes.workspace = true
+quinn.workspace = true
+h3.workspace = true
+h3-quinn.workspace = true
+bytes.workspace = true
+http.workspace = true
+blake2.workspace = true
 md-5.workspace = true
 zeroize.workspace = true
 [dev-dependencies]

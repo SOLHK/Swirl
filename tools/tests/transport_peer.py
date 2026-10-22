@@ -222,8 +222,11 @@ class Fixture:
             settings = {"clients": [{"password": PASSWORD}]}
             outbound.pop("uuid")
             outbound["password"] = PASSWORD
+        elif protocol == "vmess":
+            settings = {"clients": [{"id": UUID, "alterId": 0}]}
+            outbound.update({"alter_id": 0, "security": "auto"})
         elif protocol != "vless":
-            raise ValueError("fixture supports implemented VLESS/Trojan connectors only")
+            raise ValueError("fixture supports implemented VLESS/Trojan/VMess connectors only")
         freedom = {"protocol": "freedom"}
         if not legacy:
             # Current upstream deliberately protects private destinations by

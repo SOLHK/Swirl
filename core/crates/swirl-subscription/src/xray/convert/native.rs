@@ -238,12 +238,34 @@ pub(super) fn adapt(
                 }
             }
         }
-        (Protocol::Vmess, _) => {
-            return reject(
-                sink,
-                "VmessNativeOutboundUnavailable",
-                &key_path(path, "protocol"),
-            );
+        (
+            Protocol::Vmess,
+            Authentication::Vmess {
+                id: Some(uuid),
+                alter_id,
+                security,
+                ..
+            },
+        ) => {
+            if mapping.reality.is_some() || mapping.security == Security::Reality {
+                return reject(
+                    sink,
+                    "VmessRealityUnsupported",
+                    &key_path(path, "streamSettings"),
+                );
+            }
+            Outbound::Vmess {
+                host,
+                port,
+                uuid: uuid.clone(),
+                alter_id: u32::from(alter_id.unwrap_or(0)),
+                security: security
+                    .clone()
+                    .filter(|s| !s.is_empty())
+                    .unwrap_or_else(|| "auto".into()),
+                tls: mapping.tls.clone(),
+                websocket: mapping.websocket.clone(),
+            }
         }
         _ => {
             return reject(

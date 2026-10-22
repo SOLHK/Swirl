@@ -104,6 +104,7 @@ pub(crate) fn validate(outbound: &Outbound, selected: Option<&Transport>) -> Res
             flow.as_deref(),
         ),
         Outbound::Trojan { tls, websocket, .. } => (Some(tls), websocket.as_ref(), None, None),
+        Outbound::Vmess { tls, websocket, .. } => (tls.as_ref(), websocket.as_ref(), None, None),
         _ if selected.is_some() => return Err("TransportProtocolUnsupported"),
         _ => return Ok(()),
     };
@@ -121,6 +122,11 @@ pub(crate) fn validate(outbound: &Outbound, selected: Option<&Transport>) -> Res
         }
     }
     if let Some(selected) = selected {
+        if matches!(outbound, Outbound::Vmess { .. })
+            && !matches!(selected, Transport::Tcp {} | Transport::WebSocket { .. })
+        {
+            return Err("VmessTransportUnsupported");
+        }
         if matches!(selected, Transport::Tcp {}) {
             return Ok(());
         }

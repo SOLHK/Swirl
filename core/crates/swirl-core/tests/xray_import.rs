@@ -356,7 +356,7 @@ fn xray_socks4a_case_alias_preserves_remote_name_and_userid_to_origin() {
     roundtrip_runtime(PeerProtocol::Socks4a);
 }
 #[test]
-fn vmess_and_unsupported_transport_never_produce_a_runtime_or_socket() {
+fn legacy_vmess_and_unsupported_transport_never_produce_a_runtime_or_socket() {
     let peer = TcpListener::bind("127.0.0.1:0").unwrap();
     for (protocol, network) in [("vmess", "tcp"), ("vless", "grpc")] {
         let user = if protocol == "vmess" {

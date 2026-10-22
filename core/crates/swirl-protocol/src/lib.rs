@@ -2,13 +2,16 @@
 use base64::{Engine, engine::general_purpose::STANDARD};
 mod diagnostics;
 mod dial;
+pub mod hysteria2;
 mod probe;
 mod shadowsocks;
 mod socks4;
 mod socks5;
 mod transport;
+pub mod tuic;
 pub mod vision;
 mod vless;
+mod vmess;
 pub mod websocket;
 pub use diagnostics::{TcpAttempt, TcpDiagnostic, TcpOutcome, failure_stage};
 pub use dial::{connect_direct_resolved, diagnose_tcp};
@@ -451,6 +454,21 @@ async fn connect_selected(
     // DNS, all address attempts, TLS and protocol negotiation share this one
     // budget. A successful TCP connection ends address fallback permanently.
     let deadline = Instant::now() + handshake_limit;
+    match outbound {
+        Outbound::Hysteria2(config) => {
+            return hysteria2::connect(config, target, resolver, handshake_limit).await;
+        }
+        Outbound::Tuic(config) => {
+            return tuic::connect(config, target, resolver, handshake_limit).await;
+        }
+        Outbound::Vmess {
+            uuid,
+            alter_id,
+            security,
+            ..
+        } => vmess::validate(uuid, *alter_id, security)?,
+        _ => {}
+    }
     if let Outbound::Vless {
         host,
         port,
@@ -593,7 +611,11 @@ async fn connect_selected(
         } => (host, *port, None, Some(tls)),
         Outbound::Vless {
             host, port, tls, ..
+        }
+        | Outbound::Vmess {
+            host, port, tls, ..
         } => (host, *port, None, tls.as_ref()),
+        Outbound::Hysteria2(_) | Outbound::Tuic(_) => return Err("QuicDispatchInvariant"),
     };
     let tcp = connect_tcp(
         resolver,
@@ -619,9 +641,9 @@ async fn connect_selected(
         Box::new(tcp)
     };
     let ws = match outbound {
-        Outbound::Vless { websocket, .. } | Outbound::Trojan { websocket, .. } => {
-            websocket.as_ref()
-        }
+        Outbound::Vless { websocket, .. }
+        | Outbound::Trojan { websocket, .. }
+        | Outbound::Vmess { websocket, .. } => websocket.as_ref(),
         _ => None,
     };
     if let Some(transport) = transport {
@@ -670,6 +692,15 @@ async fn handshake(
     port: u16,
     handshake_limit: std::time::Duration,
 ) -> Result<swirl_transport::BoxStream> {
+    if let Outbound::Vmess {
+        uuid,
+        alter_id,
+        security,
+        ..
+    } = outbound
+    {
+        return vmess::connect(stream, uuid, *alter_id, security, target, handshake_limit).await;
+    }
     if let Outbound::Shadowsocks {
         password,
         cipher,

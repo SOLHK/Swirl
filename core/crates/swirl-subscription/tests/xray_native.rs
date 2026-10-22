@@ -183,7 +183,7 @@ fn vless_and_trojan_websocket_tls_keep_both_layers_host_and_path() {
 }
 
 #[test]
-fn vmess_tcp_and_ws_tls_keep_protocol_alter_id_and_cipher_but_cannot_execute() {
+fn vmess_tcp_and_ws_tls_preserve_supported_aead_and_reject_legacy_modes() {
     for stream in [json!({"network":"tcp"}), ws_tls()] {
         for alter_id in [0, 64, 65535] {
             for cipher in ["auto", "aes-128-gcm", "chacha20-poly1305", "none", "zero"] {
@@ -191,7 +191,14 @@ fn vmess_tcp_and_ws_tls_keep_protocol_alter_id_and_cipher_but_cannot_execute() {
                 value["settings"]["alterId"] = json!(alter_id);
                 value["settings"]["security"] = json!(cipher);
                 value["streamSettings"] = stream.clone();
-                blocked(&value);
+                if alter_id == 0 && ["auto", "aes-128-gcm", "chacha20-poly1305"].contains(&cipher) {
+                    let config = executable(&value);
+                    assert!(
+                        matches!(&config.nodes[0].outbound, Outbound::Vmess { uuid, alter_id: 0, security, .. } if uuid == ID && security == cipher)
+                    );
+                } else {
+                    blocked(&value);
+                }
                 assert_eq!(roundtrip(&value).nodes()[0].protocol(), Protocol::Vmess);
             }
         }
@@ -541,7 +548,12 @@ fn listen_address_and_mutated_native_config_are_revalidated_at_the_real_ir_bound
         .unwrap();
     let mut wire = serde_json::to_value(config).unwrap();
     wire["nodes"][0]["outbound"]["type"] = json!("vmess");
+    wire["nodes"][0]["outbound"]["alter_id"] = json!(16);
     assert!(Config::parse(&serde_json::to_vec(&wire).unwrap()).is_err());
+    wire["nodes"][0]["outbound"]
+        .as_object_mut()
+        .unwrap()
+        .remove("alter_id");
     wire["nodes"][0]["outbound"]["type"] = json!("vless");
     wire["nodes"][0]["outbound"]["flow"] = json!("xtls-rprx-vision");
     assert!(Config::parse(&serde_json::to_vec(&wire).unwrap()).is_err());
@@ -572,7 +584,11 @@ fn archive_and_diagnostics_cannot_forge_or_leak_execution_authority() {
     archive["raw_json"] = json!(serde_json::to_string(&source("vmess")).unwrap());
     let changed = ConvertedDocument::restore(&serde_json::to_vec(&archive).unwrap()).unwrap();
     assert_eq!(changed.nodes()[0].protocol(), Protocol::Vmess);
-    assert_eq!(changed.nodes()[0].native_status(), NativeStatus::Blocked);
+    assert_eq!(changed.nodes()[0].native_status(), NativeStatus::Executable);
+    assert!(matches!(
+        changed.nodes()[0].native_outbound(),
+        Some(Outbound::Vmess { alter_id: 0, .. })
+    ));
     assert!(!changed.nodes()[0].network_verified());
 }
 

@@ -216,7 +216,38 @@ fn restored_native_config_crosses_actual_c_abi_start_configure_snapshot_stop() {
 }
 
 #[test]
-fn c_abi_refuses_xray_archives_unknown_fields_and_forged_vmess_ir() {
+fn modern_vmess_import_roundtrips_through_c_abi_without_claiming_network_verification() {
+    let _serial = serialized_lifecycle();
+    let peer = loopback_peer();
+    let endpoint = peer.local_addr().unwrap();
+    let input = serde_json::to_vec(&json!({"outbounds": [{
+        "protocol": "vmess", "settings": {"vnext": [{
+            "address": endpoint.ip().to_string(), "port": endpoint.port(),
+            "users": [{"id": UUID, "alterId": 0, "security": "aes-128-gcm"}]
+        }]}
+    }]}))
+    .unwrap();
+    let imported = import_document(&input, InputSource::Clipboard).unwrap();
+    let restored = ConvertedDocument::restore(&imported.save().unwrap()).unwrap();
+    assert_eq!(
+        restored.nodes()[0].native_status(),
+        NativeStatus::Executable
+    );
+    assert!(!restored.nodes()[0].network_verified());
+    let config = restored
+        .native_config(0, "127.0.0.1:0".parse().unwrap())
+        .unwrap();
+    let native = serde_json::to_value(&config).unwrap();
+    assert_eq!(native["nodes"][0]["outbound"]["type"], "vmess");
+    assert_eq!(native["nodes"][0]["outbound"]["uuid"], UUID);
+    let (mut core, status) = RunningCore::start(&native);
+    assert_eq!(status["accepted"], 0);
+    no_upstream_connection(&peer);
+    core.stop();
+}
+
+#[test]
+fn c_abi_refuses_xray_archives_unknown_fields_and_invalid_vmess_ir() {
     let _serial = serialized_lifecycle();
     let peer = loopback_peer();
     let http = fixture("http", peer.local_addr().unwrap());
@@ -266,7 +297,7 @@ fn c_abi_refuses_xray_archives_unknown_fields_and_forged_vmess_ir() {
     let mut forged_vmess = http.native.clone();
     forged_vmess["nodes"][0]["outbound"] = json!({
         "type": "vmess", "host": "127.0.0.1", "port": peer.local_addr().unwrap().port(),
-        "uuid": UUID, "alter_id": 0, "security": "auto"
+        "uuid": UUID, "alter_id": 0, "security": "auto", "unmapped_requirement": true
     });
     rejected(
         json!({"op": "start", "config": forged_vmess}),
@@ -341,7 +372,7 @@ fn c_abi_revalidates_security_and_failed_configure_keeps_running_generation() {
 }
 
 #[test]
-fn reloaded_vmess_and_conflicting_source_security_have_no_abi_export() {
+fn reloaded_legacy_vmess_and_conflicting_source_security_have_no_abi_export() {
     let _serial = serialized_lifecycle();
     let peer = loopback_peer();
     for protocol in ["vmess", "vless"] {
@@ -362,6 +393,8 @@ fn reloaded_vmess_and_conflicting_source_security_have_no_abi_export() {
                     "shortId": "aabb", "fingerprint": "chrome"
                 }
             });
+        } else {
+            outbound["settings"]["vnext"][0]["users"][0]["alterId"] = json!(16);
         }
         let source = serde_json::to_vec(&json!({"outbounds": [outbound]})).unwrap();
         let imported = import_document(&source, InputSource::File).unwrap();

@@ -79,10 +79,12 @@ pub(super) fn validate(
                 if alter_id.is_some_and(|n| n != 0) {
                     sink.unsupported("VmessLegacyAlterIdUnsupported", &key_path(path, "alterId"));
                 }
-                sink.unsupported(
-                    "VmessNativeOutboundUnavailable",
-                    &key_path(&source.outbound_path, "protocol"),
-                );
+                if matches!(
+                    user.get("security").and_then(Value::as_str),
+                    Some("none" | "zero")
+                ) {
+                    sink.unsupported("VmessSecurityUnsupported", &key_path(path, "security"));
+                }
                 Authentication::Vmess {
                     id: string(user, "id"),
                     alter_id,

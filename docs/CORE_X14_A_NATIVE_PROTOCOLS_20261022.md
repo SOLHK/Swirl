@@ -89,3 +89,44 @@ builds disable debug symbols and incremental compilation, and use two build jobs
 This changes build resource use, not protocol behavior or test assertions.
 Actual final gate results are recorded in the stage evidence; no failed or
 unexecuted run is counted as a pass.
+
+
+## A2: native VMess and common QUIC foundation
+
+Native VMess AEAD now owns AuthID, request/response authentication, KDF,
+AES-128-GCM and ChaCha20-Poly1305 frames, bounded lengths and nonce exhaustion.
+The connector handles TCP, TLS, WS and WSS with UUID and alterId=0. Nonzero
+alterId and legacy/none/zero/CFB security are rejected rather than rewritten.
+Clash, VMess URI, Xray/V2Ray JSON and restored archives project to the same
+`Outbound::Vmess`; the C ABI and inspector preserve that type. Import and
+lifecycle acceptance continue to report `network_verified=false`.
+
+Independent Xray 26.10.21 (commit 1b1647cd9ddf0abc34b981d4611fc03bcac1ca74)
+was the server only. Swirl's Rust executable was the client. The completed-response
+suite ran 12 test methods, zero failures/errors/skips: four transports with two
+AEAD ciphers, 4 MiB verified bidirectional payload, eight concurrent connections,
+HTTPS target, invalid UUID/cipher/alterId/certificate/SNI rejection, IPv6 target,
+Clash/URI/Xray import and Core node selection. Normal application completion
+returned authenticated clean closure. Detailed receipts and command logs are
+in `docs/evidence/x14-a2-vmess/`.
+
+**Strict target half-close is not accepted.** The separately executed
+`--strict-half-close` suite ran two methods and reported five subtest failures.
+All four transports returned the expected 4 MiB hash, but the official peer did
+not deliver authenticated VMess terminal closure when the target waited for
+client EOF; concurrent WSS also failed this requirement. The initial failed
+attempt and the strict rerun remain versioned. Finite application-response
+completion is reported separately and is not substituted for half-close.
+
+This checkpoint also registers the common Quinn/rustls TLS1.3 transport and
+native Hysteria2/TUIC modules in the unified Core. Their ongoing acceptance is
+reported in A3/A4, not inferred from compilation. SOCKS5 UDP associations use
+bounded protocol workers, including the new QUIC outbounds. TUIC URI passwords
+are now preserved. No third-party client executable is invoked.
+
+Before the two new positive ABI/CLI tests, the integrated workspace ran 596
+unit/integration/doc tests with zero failures or ignored tests. The two boundary
+tests separately verify modern VMess export/start/stop without dialing an
+upstream. A1 clean remote CI run 39779971139 passed fmt/check/clippy/test on
+Ubuntu, Windows and macOS. That run applies to A1, not to this newer code.
+There has been no Windows Qt product test or public subscription test here.

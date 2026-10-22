@@ -186,6 +186,39 @@ fn xray_public_mode_reports_distinct_states_and_safe_source_indices() {
 }
 
 #[test]
+fn modern_vmess_cli_export_preserves_aead_and_separates_execution_from_evidence() {
+    let input = bytes(&json!({"outbounds": [{
+        "protocol": "vmess", "settings": {"vnext": [{
+            "address": HOST, "port": 443,
+            "users": [{"id": UUID, "alterId": 0, "security": "chacha20-poly1305"}]
+        }]}
+    }]}));
+    let public = run(&["--xray-json"], &input);
+    assert_eq!(public.code, 0);
+    assert_eq!(public.value["native_executable_nodes"], 1);
+    assert_eq!(public.value["network_verified"], false);
+    redacted(&public.stdout);
+    let exported = run(
+        &[
+            "--xray-json",
+            "--private-json",
+            "--native-node",
+            "0",
+            "--listen",
+            "127.0.0.1:0",
+        ],
+        &input,
+    );
+    assert_eq!(exported.code, 0);
+    let outbound = &exported.value["native_config"]["nodes"][0]["outbound"];
+    assert_eq!(outbound["type"], "vmess");
+    assert_eq!(outbound["uuid"], UUID);
+    assert_eq!(outbound["alter_id"], 0);
+    assert_eq!(outbound["security"], "chacha20-poly1305");
+    assert_eq!(exported.value["report"]["network_verified"], false);
+}
+
+#[test]
 fn explicit_private_mode_preserves_bom_raw_archive_and_all_native_candidates() {
     let input = format!("\u{feff}  {}\r\n", socks()).into_bytes();
     let output = run(&["--private-json", "--xray-json"], &input);
@@ -416,11 +449,11 @@ fn input_limit_uses_strict_xray_budget() {
 }
 
 #[test]
-fn vmess_is_preserved_but_native_export_is_rejected_without_private_payload() {
+fn legacy_vmess_is_preserved_but_native_export_is_rejected_without_private_payload() {
     let input = bytes(&json!({"outbounds": [{
         "protocol": "vmess", "tag": TAG,
         "settings": {"vnext": [{"address": HOST, "port": 443,
-            "users": [{"id": UUID, "alterId": 0, "security": "auto"}]}]}
+            "users": [{"id": UUID, "alterId": 16, "security": "auto"}]}]}
     }]}));
     let output = run(&["--xray-json", "--private-json"], &input);
     assert_eq!(output.code, 0);

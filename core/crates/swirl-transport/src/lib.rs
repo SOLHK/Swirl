@@ -3,6 +3,7 @@ pub mod grpc;
 mod h2_stream;
 pub mod http2;
 pub mod httpupgrade;
+pub mod quic;
 pub mod reality;
 mod udp;
 pub mod xhttp;

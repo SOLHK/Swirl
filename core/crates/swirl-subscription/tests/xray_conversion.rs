@@ -92,7 +92,7 @@ fn vmess_legacy_alter_id_cipher_and_protocol_never_change() {
     assert!(
         n.diagnostics()
             .iter()
-            .any(|d| d.code == "VmessNativeOutboundUnavailable")
+            .any(|d| d.code == "VmessSecurityUnsupported")
     );
 }
 #[test]

@@ -1,4 +1,4 @@
-//! Bounded SOCKS5 relay sessions owned by one inbound UDP association. Failed
+//! Bounded native proxy relay sessions owned by one inbound UDP association. Failed
 //! node entries remain closed, so later datagrams cannot reconnect or replay.
 use super::{SessionPlan, transient_udp, udp_drop};
 use std::{
@@ -8,6 +8,7 @@ use std::{
     time::{Duration, Instant},
 };
 use swirl_protocol::{Socks5UdpAssociation, Target};
+use swirl_subscription::Outbound;
 use swirl_transport::Counters;
 use tokio::{
     net::UdpSocket,
@@ -126,6 +127,13 @@ async fn run(
     counters: Arc<Counters>,
     total: Arc<Counters>,
 ) {
+    if matches!(
+        plan.config.nodes[index].outbound,
+        Outbound::Hysteria2(_) | Outbound::Tuic(_)
+    ) {
+        run_quic(plan, index, requests, replies, counters, total).await;
+        return;
+    }
     let association = Socks5UdpAssociation::connect(
         &plan.config.nodes[index].outbound,
         &plan.resolver,
@@ -181,6 +189,98 @@ async fn run(
                 };
                 let reply = Reply { payload_len: payload.len(), packet: buffer[..n].to_vec(), alive: alive.clone() };
                 if replies.try_send(reply).is_err() {
+                    udp_drop(&counters, &total);
+                }
+            }
+        }
+    }
+    discard_pending(&mut requests, &counters, &total);
+}
+
+enum QuicAssociation {
+    Hysteria2(swirl_protocol::hysteria2::UdpAssociation),
+    Tuic(swirl_protocol::tuic::UdpAssociation),
+}
+
+impl QuicAssociation {
+    async fn connect(plan: &SessionPlan, index: usize) -> Result<Self, &'static str> {
+        let limit = Duration::from_millis(plan.config.limits.handshake_timeout_ms);
+        match &plan.config.nodes[index].outbound {
+            Outbound::Hysteria2(config) => Ok(Self::Hysteria2(
+                swirl_protocol::hysteria2::UdpAssociation::connect(config, &plan.resolver, limit)
+                    .await?,
+            )),
+            Outbound::Tuic(config) => Ok(Self::Tuic(
+                swirl_protocol::tuic::UdpAssociation::connect(config, &plan.resolver, limit)
+                    .await?,
+            )),
+            _ => Err("UdpProxyUnsupportedOrRejected"),
+        }
+    }
+
+    async fn send(&self, target: &Target, payload: &[u8]) -> Result<(), &'static str> {
+        match self {
+            Self::Hysteria2(value) => value.send(target, payload).await,
+            Self::Tuic(value) => value.send(target, payload).await,
+        }
+    }
+
+    async fn recv(&mut self) -> Result<(Target, Vec<u8>), &'static str> {
+        match self {
+            Self::Hysteria2(value) => value.recv().await,
+            Self::Tuic(value) => value.recv().await,
+        }
+    }
+}
+
+async fn run_quic(
+    plan: Arc<SessionPlan>,
+    index: usize,
+    mut requests: mpsc::Receiver<Datagram>,
+    replies: mpsc::Sender<Reply>,
+    counters: Arc<Counters>,
+    total: Arc<Counters>,
+) {
+    let Ok(mut association) = QuicAssociation::connect(&plan, index).await else {
+        discard_pending(&mut requests, &counters, &total);
+        return;
+    };
+    let (_lifetime, alive) = watch::channel(());
+    let mut last_send: Option<Instant> = None;
+    loop {
+        tokio::select! {
+            request = requests.recv() => {
+                let Some(request) = request else { break; };
+                // A stream-mode UDP send can await flow-control credit. Bound
+                // that wait and retain the shared permit until it finishes.
+                let sent = tokio::time::timeout(
+                    Duration::from_millis(plan.config.limits.handshake_timeout_ms),
+                    association.send(&request.target, &request.payload),
+                ).await;
+                if !matches!(sent, Ok(Ok(()))) {
+                    udp_drop(&counters, &total);
+                    break;
+                }
+                last_send = Some(Instant::now());
+                let size = request.payload.len() as u64;
+                counters.upload.fetch_add(size, Ordering::Relaxed);
+                total.upload.fetch_add(size, Ordering::Relaxed);
+            }
+            response = association.recv() => {
+                let Ok((target, payload)) = response else { break; };
+                if !last_send.is_some_and(|at| at.elapsed() < Duration::from_secs(30)) {
+                    udp_drop(&counters, &total);
+                    continue;
+                }
+                let Ok(packet) = Socks5UdpAssociation::encode_datagram(&target, &payload) else {
+                    udp_drop(&counters, &total);
+                    continue;
+                };
+                if packet.len() > 65507 {
+                    udp_drop(&counters, &total);
+                    continue;
+                }
+                if replies.try_send(Reply { packet, payload_len: payload.len(), alive: alive.clone() }).is_err() {
                     udp_drop(&counters, &total);
                 }
             }

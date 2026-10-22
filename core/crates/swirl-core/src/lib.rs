@@ -795,7 +795,7 @@ enum UdpTransport {
         address: SocketAddr,
         packet: Vec<u8>,
     },
-    Socks5 {
+    ProxySession {
         target: Target,
         payload: Vec<u8>,
     },
@@ -831,7 +831,23 @@ async fn prepare_udp(
             ..
         } => {
             return Ok(UdpDispatch {
-                transport: UdpTransport::Socks5 { target, payload },
+                transport: UdpTransport::ProxySession { target, payload },
+                payload_len,
+                node_id: node.id.clone(),
+                permit,
+            });
+        }
+        Outbound::Hysteria2(config) if config.udp => {
+            return Ok(UdpDispatch {
+                transport: UdpTransport::ProxySession { target, payload },
+                payload_len,
+                node_id: node.id.clone(),
+                permit,
+            });
+        }
+        Outbound::Tuic(config) if config.udp => {
+            return Ok(UdpDispatch {
+                transport: UdpTransport::ProxySession { target, payload },
                 payload_len,
                 node_id: node.id.clone(),
                 permit,
@@ -922,7 +938,7 @@ async fn udp_associate(
                 let UdpDispatch {transport,payload_len,node_id,permit}=match prepared {Ok(Ok(d))=>d,_=>{udp_drop(&counters,&total);continue;}};
                 let (address,packet)=match transport {
                     UdpTransport::Datagram {address,packet}=>(address,packet),
-                    UdpTransport::Socks5 {target,payload}=>{socks.send(node_id,target,payload,permit);continue;}
+                    UdpTransport::ProxySession {target,payload}=>{socks.send(node_id,target,payload,permit);continue;}
                 };
                 destinations.retain(|_,(at,_)|at.elapsed()<Duration::from_secs(30));
                 if (destinations.len()>=64 && !destinations.contains_key(&address)) || destinations.get(&address).is_some_and(|(_,id)|id!=&node_id){udp_drop(&counters,&total);continue;}

@@ -2,6 +2,11 @@
 //! No Mihomo configuration or proxy engine is an internal execution dependency.
 use serde::{Deserialize, Serialize};
 mod dns_tls;
+pub mod hysteria2;
+pub mod tuic;
+pub mod vmess;
+pub use hysteria2::Hysteria2;
+pub use tuic::Tuic;
 mod policy;
 mod reality;
 mod websocket;
@@ -44,6 +49,21 @@ pub struct ObfsHttp {
 pub enum Outbound {
     Direct {},
     Reject {},
+    Vmess {
+        host: String,
+        port: u16,
+        uuid: String,
+        #[serde(default)]
+        alter_id: u32,
+        #[serde(default = "vmess_default_security")]
+        security: String,
+        #[serde(default)]
+        tls: Option<Tls>,
+        #[serde(default)]
+        websocket: Option<WebSocket>,
+    },
+    Hysteria2(Hysteria2),
+    Tuic(Tuic),
     Vless {
         host: String,
         port: u16,
@@ -99,6 +119,10 @@ pub enum Outbound {
         #[serde(default)]
         websocket: Option<WebSocket>,
     },
+}
+
+fn vmess_default_security() -> String {
+    "auto".into()
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -397,6 +421,21 @@ impl Config {
                 return Err("NodeId");
             }
             match &node.outbound {
+                Outbound::Vmess {
+                    host,
+                    port,
+                    uuid,
+                    alter_id,
+                    security,
+                    ..
+                } => {
+                    if !valid_host(host) || *port == 0 {
+                        return Err("VmessParameters");
+                    }
+                    vmess::validate(uuid, *alter_id, security)?;
+                }
+                Outbound::Hysteria2(config) => config.validate()?,
+                Outbound::Tuic(config) => config.validate()?,
                 Outbound::Socks4 {
                     host,
                     port,
@@ -461,6 +500,11 @@ impl Config {
                 _ => {}
             }
             match &node.outbound {
+                Outbound::Vmess {
+                    websocket: Some(ws),
+                    tls,
+                    ..
+                } => ws.validate_tls(tls.as_ref())?,
                 Outbound::Vless {
                     reality,
                     flow,
@@ -493,8 +537,11 @@ impl Config {
             let tls = match &node.outbound {
                 Outbound::Socks5 { tls, .. }
                 | Outbound::HttpConnect { tls, .. }
+                | Outbound::Vmess { tls, .. }
                 | Outbound::Vless { tls, .. } => tls.as_ref(),
                 Outbound::Trojan { tls, .. } => Some(tls),
+                Outbound::Hysteria2(config) => Some(&config.tls),
+                Outbound::Tuic(config) => Some(&config.tls),
                 _ => None,
             };
             if let Some(tls) = tls

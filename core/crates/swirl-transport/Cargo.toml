@@ -17,6 +17,7 @@ webpki-roots.workspace = true
 swirl-subscription.workspace = true
 base64.workspace = true
 ring.workspace = true
+quinn.workspace = true
 zeroize.workspace = true
 x25519-dalek.workspace = true
 ml-kem.workspace = true
