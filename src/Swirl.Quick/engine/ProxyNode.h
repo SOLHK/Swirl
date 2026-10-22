@@ -17,7 +17,7 @@ struct ProxyNode {
     // the encrypted store deduplicates it. Never expose it or nativeOutbound to QML.
     QByteArray sourceDocument;
     int sourceNodeIndex = -1;
-    QString importSource, parameterState, transportType, securityType;
+    QString importSource, parameterState, transportType, securityType, sourceFingerprint;
     QJsonObject nativeOutbound;
     QStringList runtimeIssues;
     bool nativeExecutable = false;

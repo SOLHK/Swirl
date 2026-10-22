@@ -261,6 +261,42 @@ private slots:
 #endif
         service.shutdown();
     }
+    void publicModelSeparatesValidationCapabilityAndNetwork() {
+        auto outbound=vless();auto settings=outbound.value("settings").toObject();
+        settings["flow"]="xtls-rprx-vision";outbound["settings"]=settings;
+        outbound["streamSettings"]=QJsonObject{{"network","ws"},{"security","reality"},
+            {"wsSettings",QJsonObject{{"path","/private"},{"headers",QJsonObject{{"Host","web.example.invalid"}}}}},
+            {"realitySettings",QJsonObject{{"publicKey","CQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk"},{"shortId","a1b2"},
+                {"spiderX","/secret-path"},{"serverName","tls.example.invalid"},{"fingerprint","rustls"}}}};
+        const auto result=NodeImporter::parse(json(outbound));QVERIFY2(result,qPrintable(result.error));
+        const auto &node=result.nodes.first();const auto row=node.publicInfo();
+        QCOMPARE(row.value("protocolLabel").toString(),QStringLiteral("VLESS"));
+        QCOMPARE(row.value("transportLabel").toString(),QStringLiteral("WebSocket"));
+        QCOMPARE(row.value("securityLabel").toString(),QStringLiteral("REALITY"));
+        QVERIFY(row.value("visionEnabled").toBool());QVERIFY(row.value("jsonParsed").toBool());
+        QVERIFY(!row.value("nativeExecutable").toBool());QVERIFY(!row.value("networkVerified").toBool());
+        QVERIFY(!row.value("unsupportedReason").toString().isEmpty());
+        QVERIFY(row.value("configurationState").toString().contains(QStringLiteral("未验证业务流量")));
+        QVERIFY(!row.value("capability").toMap().value("tested").toBool());
+        QCOMPARE(node.originalConfiguration.value("outbound").toObject(),outbound);
+        const auto publicBytes=QJsonDocument::fromVariant(row).toJson();
+        QVERIFY(!publicBytes.contains("11111111-2222-4333-8444-555555555555"));
+        QVERIFY(!publicBytes.contains("/secret-path"));QVERIFY(!publicBytes.contains("/private"));
+        const QMap<QString,QString> labels{{"vmess","VMess"},{"trojan","Trojan"},{"shadowsocks","Shadowsocks"},{"socks","SOCKS5"},{"http","HTTP"}};
+        for(auto it=labels.begin();it!=labels.end();++it) {
+            auto input=vless();input["protocol"]=it.key();const auto parsed=NodeImporter::parse(json(input));QVERIFY(parsed);
+            QCOMPARE(parsed.nodes.first().publicInfo().value("protocolLabel").toString(),it.value());
+        }
+    }
+    void globalCredentialsCannotBecomeNodeLabels() {
+        const auto input=json(QJsonObject{{"inbounds",QJsonArray{QJsonObject{{"protocol","socks"},{"port",1080},
+            {"settings",QJsonObject{{"accounts",QJsonArray{QJsonObject{{"user","synthetic"},{"pass","SYNTHETIC-INBOUND-PASSWORD"}}}}}}}}},
+            {"outbounds",QJsonArray{vless("SYNTHETIC-INBOUND-PASSWORD")}}});
+        const auto parsed=NodeImporter::parse(input);QVERIFY2(parsed,qPrintable(parsed.error));
+        const auto publicBytes=QJsonDocument::fromVariant(parsed.nodes.first().publicInfo()).toJson();
+        QVERIFY(!publicBytes.contains("SYNTHETIC-INBOUND-PASSWORD"));
+        QCOMPARE(parsed.nodes.first().sourceDocument,input);
+    }
 };
 QTEST_MAIN(XrayImportTests)
 #include "XrayImportTests.moc"

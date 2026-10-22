@@ -9,7 +9,7 @@ QString SwirlProtocolRegistry::nativeNodeReason(const ProxyNode &node){
     if (node.isXray()) {
 #ifdef SWIRL_USE_RUST_CORE
         if (node.nativeExecutable && !node.nativeOutbound.isEmpty()) return {};
-        return QStringLiteral("Rust 尚不能执行：%1").arg(node.runtimeIssues.join(QStringLiteral("；")));
+        return QStringLiteral("Rust 尚不能执行：%1").arg(node.runtimeIssues.isEmpty()?QStringLiteral("原生转换接口尚未提供此节点的可执行配置"):node.runtimeIssues.join(QStringLiteral("；")));
 #else
         return QStringLiteral("JSON 节点需要 Swirl Rust Core；不会切换到兼容内核。");
 #endif
@@ -54,7 +54,7 @@ QVariantMap SwirlProtocolRegistry::describe(const ProxyNode &n){
     const auto reason=nativeNodeReason(n);
     return {{"native",reason.isEmpty()},{"compatible",false},{"engine",reason.isEmpty()?QStringLiteral("Swirl Rust 原生"):QStringLiteral("Rust 尚未支持")},{"reason",reason},{"tested",false}};
 #else
-    const auto reason=nativeNodeReason(n);const bool compatible=ProxyNode::protocols().contains(n.protocol)&&n.conversionIssues.isEmpty();
+    const auto reason=nativeNodeReason(n);const bool compatible=!n.isXray()&&ProxyNode::protocols().contains(n.protocol)&&n.conversionIssues.isEmpty();
     return {{"native",reason.isEmpty()},{"compatible",compatible},{"engine",reason.isEmpty()?QStringLiteral("Swirl 原生（TCP）"):compatible?QStringLiteral("Mihomo 兼容"):QStringLiteral("尚未支持")},{"reason",reason},{"tested",false}};
 #endif
 }

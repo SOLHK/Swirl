@@ -302,7 +302,9 @@ QVariantList EngineController::nodes() const {
     for (auto &value : rows) {
         auto row=value.toMap(); const bool active=processAlive() && row.value("id").toString()==status.selectedNodeId;
         row.insert("address",row.value("host").toString().isEmpty()?QStringLiteral("协议扩展配置"):row.value("host").toString()+":"+row.value("port").toString());
-        row.insert("status",active?nodeStateText():QStringLiteral("未连接"));
+        const auto capability=row.value("capability").toMap();
+        const bool executable=capability.value("native").toBool()||capability.value("compatible").toBool();
+        row.insert("status",active?nodeStateText():!executable?QStringLiteral("不可执行"):QStringLiteral("未连接"));
         row.insert("latency",active && status.latencyMs>=0?QString::number(status.latencyMs):QStringLiteral("—"));
         const auto measured=m_tests.result(row.value("id").toString());
         if(!measured.isEmpty()){row.insert("latency",measured.value("latency").toInt()>=0?QString::number(measured.value("latency").toInt()):QStringLiteral("失败"));row.insert("testHttp",measured.value("http"));row.insert("testError",measured.value("error"));}

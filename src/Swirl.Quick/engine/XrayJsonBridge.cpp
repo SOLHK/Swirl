@@ -1,5 +1,6 @@
 #include "XrayJsonBridge.h"
 #include <QCoreApplication>
+#include <QCryptographicHash>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QLibrary>
@@ -104,7 +105,13 @@ NodeImporter::Result XrayJsonBridge::parse(const QByteArray &bytes) {
         return result;
     }
     const auto outbounds = object.value("outbounds").toArray();
-    SecretNames secrets;findSecrets(outbounds, &secrets);
+    const auto sourceFingerprint=QString::fromLatin1(QCryptographicHash::hash(bytes,QCryptographicHash::Sha256).toHex());
+    // Input has already passed Rust's strict checks. This read only finds
+    // credential strings for redaction (including inbound/global secrets);
+    // it never decides syntax validity, converts protocols or enables options.
+    const auto redactionSource=QJsonDocument::fromJson(bytes);
+    SecretNames secrets;
+    findSecrets(redactionSource.isArray()?QJsonValue(redactionSource.array()):QJsonValue(redactionSource.object()), &secrets);
     const auto nodes = object.value("nodes").toArray();
     if (nodes.isEmpty() || nodes.size() > 2000) {
         result.error = QStringLiteral("JSON 必须包含 1–2000 个出站节点。");
@@ -131,6 +138,7 @@ NodeImporter::Result XrayJsonBridge::parse(const QByteArray &bytes) {
         node.port = quint16(item.value("port").toInt());
         node.sourceFormat = result.format;
         node.sourceDocument = bytes;
+        node.sourceFingerprint = sourceFingerprint;
         node.sourceNodeIndex = index;
         node.parameterState = item.value("validation").toString("unverified");
         node.transportType = item.value("transport").toString("unknown");

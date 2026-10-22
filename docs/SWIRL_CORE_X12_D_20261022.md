@@ -105,6 +105,29 @@ headers and streamed bodies, truncation, strict malformed JSON, cancellation,
 token-free public state/logs, and the real 15-second idle timeout. These are
 real TLS download tests, not proxy-protocol connectivity claims.
 
+## D4: node model and existing QML page
+
+The node model exposes separate safe roles for JSON syntax, Rust parameter
+validation, Rust executable capability and unverified business traffic.
+Display labels distinguish VLESS, VMess, Trojan, Shadowsocks, SOCKS5 and
+HTTP, plus TCP/WebSocket/gRPC/HTTP2/HTTPUpgrade/XHTTP and TLS/REALITY.
+Vision is a boolean display hint; its full flow remains private. Source
+labels show input kind and a short document fingerprint, never token URLs
+or source contents. Runtime capability and reasons come from the Rust FFI
+result, with no fallback to a different engine.
+
+The existing QML table/preview/details render these roles and disable
+connect/test for unavailable nodes. Imported JSON can be renamed without
+editing derived protocol fields; connection changes require reimporting the
+authoritative source. Long diagnostics wrap as plain text. Global/inbound
+credential values are also prevented from being reflected as outbound names.
+
+The real Qt/Rust importer suite passes 19 methods, including the six labels,
+REALITY versus TLS, Vision and WebSocket preservation, four-state separation,
+and credential-free public model. `qmlformat` parses the updated page
+successfully. This is model/syntax validation; complete Windows application
+compilation and UI acceptance remain separate CI evidence.
+
 ## Applied engineering guidance
 
 Read repository `AGENTS.md`, `CONTINUE_DEVELOPMENT.md` and
