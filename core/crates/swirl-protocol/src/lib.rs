@@ -6,9 +6,10 @@ mod probe;
 mod shadowsocks;
 mod socks4;
 mod socks5;
+mod transport;
 pub mod vision;
 mod vless;
-mod websocket;
+pub mod websocket;
 pub use diagnostics::{TcpAttempt, TcpDiagnostic, TcpOutcome, failure_stage};
 pub use dial::{connect_direct_resolved, diagnose_tcp};
 use dial::{connect_tcp, within};
@@ -25,6 +26,7 @@ use tokio::{
     net::TcpStream,
     time::Instant,
 };
+pub use transport::Transport;
 
 pub type Result<T> = std::result::Result<T, &'static str>;
 #[derive(Clone, Debug)]
@@ -419,6 +421,30 @@ pub async fn connect(
     resolver: &Resolver,
     handshake_limit: std::time::Duration,
 ) -> Result<swirl_transport::BoxStream> {
+    connect_selected(outbound, target, resolver, handshake_limit, None).await
+}
+
+/// Connect an existing proxy protocol over an explicitly selected native
+/// transport. This additive API lets importers supply transport settings without
+/// changing the existing subscription IR or the legacy `connect` entry point.
+pub async fn connect_with_transport(
+    outbound: &Outbound,
+    target: &Target,
+    resolver: &Resolver,
+    handshake_limit: std::time::Duration,
+    transport: &Transport,
+) -> Result<swirl_transport::BoxStream> {
+    connect_selected(outbound, target, resolver, handshake_limit, Some(transport)).await
+}
+
+async fn connect_selected(
+    outbound: &Outbound,
+    target: &Target,
+    resolver: &Resolver,
+    handshake_limit: std::time::Duration,
+    transport: Option<&Transport>,
+) -> Result<swirl_transport::BoxStream> {
+    transport::validate(outbound, transport)?;
     // DNS, all address attempts, TLS and protocol negotiation share this one
     // budget. A successful TCP connection ends address fallback permanently.
     let deadline = Instant::now() + handshake_limit;
@@ -573,7 +599,14 @@ pub async fn connect(
         }
         _ => None,
     };
-    if let Some(ws) = ws {
+    if let Some(transport) = transport {
+        stream = within(
+            deadline,
+            "TransportHandshakeTimeout",
+            transport.wrap(stream, tls.is_some()),
+        )
+        .await?;
+    } else if let Some(ws) = ws {
         stream = within(
             deadline,
             "WebSocketUpgradeTimeout",

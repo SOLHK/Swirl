@@ -1,0 +1,57 @@
+name: Swirl Native Transports
+on:
+  push:
+    branches: [work/xray-v2ray-transport-20261022]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-transports:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust tools
+        run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy
+      - name: Format
+        working-directory: core
+        run: cargo fmt --all -- --check
+      - name: Check
+        working-directory: core
+        run: cargo check --workspace --locked
+      - name: Clippy
+        working-directory: core
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Unit and local network tests
+        working-directory: core
+        run: cargo test --workspace --locked
+      - name: Build native binaries and dynamic library
+        working-directory: core
+        run: cargo build --release --workspace --lib --bins --examples --locked
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - name: Install synthetic certificate dependency
+        run: python -m pip install cryptography==50.0.2
+      - name: Fetch independent pinned test servers
+        run: python tools/Fetch-TransportPeers.py --output "${{ runner.temp }}/transport-peers"
+      - name: Independent TCP and WebSocket Xray interoperability
+        env:
+          SWIRL_RUST_HARNESS: ${{ github.workspace }}/core/target/release/swirl-api${{ runner.os == 'Windows' && '.exe' || '' }}
+          SWIRL_TRANSPORT_CLIENT: ${{ github.workspace }}/core/target/release/examples/transport-client${{ runner.os == 'Windows' && '.exe' || '' }}
+          SWIRL_C1_EVIDENCE: ${{ runner.temp }}/transport-evidence/c1
+        run: python tools/tests/test_transport_c1_xray.py -v
+      - name: Preserve peer identity and raw test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-transports-${{ runner.os }}-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/transport-peers/manifest.json
+            ${{ runner.temp }}/transport-evidence
+          if-no-files-found: error
+          retention-days: 14
