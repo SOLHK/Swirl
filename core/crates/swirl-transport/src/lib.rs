@@ -5,6 +5,7 @@ pub mod http2;
 pub mod httpupgrade;
 pub mod reality;
 mod udp;
+pub mod xhttp;
 pub use udp::bind_udp;
 
 use std::{

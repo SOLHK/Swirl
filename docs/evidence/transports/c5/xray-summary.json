@@ -1,0 +1,46 @@
+{
+  "suite": "C5 XHTTP stream-one HTTP/2 and h2c",
+  "command": "python -m unittest -v test_transport_xhttp_xray",
+  "unittest_cases": 10,
+  "unittest_result": "OK",
+  "exit_code": 0,
+  "server_versions": [
+    "Xray 26.10.21 (Xray, Penetrates Everything.) 1b1647c (go1.27.3 linux/amd64)"
+  ],
+  "fixture_reports": 10,
+  "native_client_invocations": 31,
+  "successes": 14,
+  "expected_rejections": 17,
+  "close_results": {
+    "clean": 6,
+    "cancelled": 8
+  },
+  "rejection_codes": {
+    "HttpRead": 5,
+    "HttpWrite": 1,
+    "XHttpModeUnsupported": 5,
+    "InputSyntax": 3,
+    "TlsAlpnUnsupported": 1,
+    "TlsVerificationOrHandshake": 2
+  },
+  "uploaded_bytes_success": 12583329,
+  "downloaded_bytes_success": 13239552,
+  "maximum_remaining_native_tasks": 0,
+  "origin_http_count": 5,
+  "origin_echo_received": 12582912,
+  "origin_plain_eof_count": 12,
+  "origin_tls_close_notify_count": 2,
+  "cleanup_errors": [],
+  "unsupported": [
+    "auto",
+    "stream-up",
+    "packet-up",
+    "HTTP/1.1",
+    "HTTP/3",
+    "XMUX policy",
+    "separate downloadSettings",
+    "nondefault padding placement"
+  ],
+  "evidence_directory": "/workspace/scratch/ece554ece7c1/c5-evidence-verified",
+  "scope": "Pinned independent loopback Xray interoperability for explicit stream-one HTTP/2 only; no public-node test."
+}

@@ -28,12 +28,16 @@ pub enum Transport {
     HttpUpgrade {
         config: swirl_transport::httpupgrade::Config,
     },
+    #[serde(rename = "xhttp")]
+    XHttp {
+        config: swirl_transport::xhttp::Config,
+    },
 }
 
 impl Transport {
     pub(crate) fn required_alpn(&self) -> Option<&'static [u8]> {
         match self {
-            Self::Grpc { .. } | Self::Http2 { .. } => Some(b"h2"),
+            Self::Grpc { .. } | Self::Http2 { .. } | Self::XHttp { .. } => Some(b"h2"),
             _ => None,
         }
     }
@@ -57,6 +61,9 @@ impl Transport {
             }
             Self::HttpUpgrade { config } => {
                 swirl_transport::httpupgrade::connect_with_timeout(stream, config, remaining).await
+            }
+            Self::XHttp { config } => {
+                swirl_transport::xhttp::connect_with_timeout(stream, config, tls, remaining).await
             }
         }
     }
@@ -121,6 +128,7 @@ pub(crate) fn validate(outbound: &Outbound, selected: Option<&Transport>) -> Res
                 }
                 config.validate()?;
             }
+            Transport::XHttp { config } => config.validate()?,
             Transport::Tcp {} => {}
         }
     }

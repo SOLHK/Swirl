@@ -60,6 +60,11 @@ jobs:
           SWIRL_TRANSPORT_CLIENT: ${{ github.workspace }}/core/target/release/examples/transport-client${{ runner.os == 'Windows' && '.exe' || '' }}
           SWIRL_TRANSPORT_EVIDENCE: ${{ runner.temp }}/transport-evidence/c4
         run: python tools/tests/test_transport_http_xray.py -v
+      - name: Independent XHTTP stream-one Xray interoperability
+        env:
+          SWIRL_TRANSPORT_CLIENT: ${{ github.workspace }}/core/target/release/examples/transport-client${{ runner.os == 'Windows' && '.exe' || '' }}
+          SWIRL_TRANSPORT_EVIDENCE: ${{ runner.temp }}/transport-evidence/c5
+        run: python tools/tests/test_transport_xhttp_xray.py -v
       - name: Preserve peer identity and raw test evidence
         if: always()
         uses: actions/upload-artifact@v4

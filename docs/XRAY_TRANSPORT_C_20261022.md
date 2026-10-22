@@ -212,6 +212,58 @@ HTTP parsing reuses already-locked `httparse` 1.10.1 and `url` 2.5.8, both
 MIT/Apache-2.0; URL declares Rust 1.63. The only C4 lockfile change connects
 these existing dependencies to the transport crate; no package version changed.
 
+## C5 XHTTP supported subset
+
+This stage implements **explicit `stream-one` over HTTP/2**, both verified
+TLS/H2 and prior-knowledge H2C when the server enables it. A single full-duplex
+POST carries raw proxy bytes in its request and response bodies. The upstream
+`application/grpc` camouflage header does not imply a gRPC/protobuf envelope.
+There is no session ID, sequence counter, split download channel or packet
+upload in this mode. Path normalization and query preservation follow pinned
+upstream semantics; the default Referer contains cryptographically randomized
+100–1000-byte `x_padding`. Header limits reserve the maximum padding size before
+dialing, avoiding random configuration acceptance near the limit.
+
+`auto`, `packet-up`, `stream-up`, HTTP/3/QUIC, XMUX tuning, downloadSettings,
+custom padding placements/ranges and other unrepresented `extra` options are
+explicitly unsupported. No mode falls back to TCP, WebSocket, gRPC or another
+XHTTP mode. In particular, upstream `auto` with ordinary TLS usually chooses
+packet-up, so it cannot be mapped to stream-one. The upstream plain client
+defaults to HTTP/1.1 whereas this implementation's plain subset is explicit
+H2C; the pinned official server permits that H2C subset. A future B conversion
+must first apply upstream `extra` precedence (top-level host/path/mode remain,
+other settings come from extra), then reject settings this connector cannot
+represent. There is no attempt to resume/replay a partially sent proxy request.
+
+Repeated module registration in this container exposed stale local Rust
+incremental metadata (`StableCrateId` / missing rlib) despite unchanged tests.
+For C5 and subsequent local gates, only generated workspace artifacts were
+cleared and `CARGO_INCREMENTAL=0` disables caching. Source semantics and test
+coverage are unchanged. Independent fresh-checkout CI is a separate check.
+
+C5 verification: ten independent current-Xray methods passed in 2.674 seconds,
+exit zero. Of 31 native invocations, 14 succeeded (six clean and eight explicit
+cancellations), 17 were correctly rejected. TLS/H2 and H2C, VLESS/Trojan,
+verified target HTTPS, Unicode Path and query, Host, 8 MiB duplex data, eight
+concurrent connections, bad credentials/CA/SNI/Host/Path, server interruption
+and a fresh connection passed. Unimplemented modes/options were rejected.
+Target TLS close_notify completed twice and every native result had zero
+remaining tasks; fixture cleanup had no errors. All four required Rust gates
+passed with 441 tests including doctests, zero failed/ignored. Exact local
+evidence is under `evidence/transports/c5/`.
+
+### Platform issue found while C5 ran
+
+C2's [three-platform run 39720068070](https://github.com/SOLHK/Swirl/actions/runs/39720068070)
+passed completely. C3's [run 39720581183](https://github.com/SOLHK/Swirl/actions/runs/39720581183)
+passed Ubuntu/macOS, but Windows failed the unchanged two-second assertion
+that all eight cancelled legacy-H2 target sockets close. All eight native
+clients had correct hashes and zero driver tasks; the legacy official server
+logged all eight CANCEL frames. This is retained as a failure, not converted
+to success. Old Xray's Windows `readv` implementation is the current suspect;
+C6 will validate a fixture-only upstream-option workaround with the same
+official binary and unchanged transport/closure assertions.
+
 ## Upstream pins and independent implementation
 
 * [Xray v26.10.21 / 1b1647c](https://github.com/XTLS/Xray-core/tree/1b1647cd9ddf0abc34b981d4611fc03bcac1ca74): MPL-2.0. Read `transport/internet/{websocket,grpc,httpupgrade,splithttp,tls,reality}` and `infra/conf/transport_internet.go`.
