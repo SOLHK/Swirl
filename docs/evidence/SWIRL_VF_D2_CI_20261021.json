@@ -1,0 +1,139 @@
+{
+  "schema_version": 1,
+  "source_commit": "a5bfb228522dff183074b25459a109dcc8b4a475",
+  "run_id": 39534374343,
+  "overall_conclusion": "failure",
+  "logs_read": true,
+  "artifact_zip_downloaded": false,
+  "original_job": {
+    "id": 119007488141,
+    "conclusion": "success",
+    "axis": {
+      "status": "AXIS_READBACK_DIAGNOSIS_NOT_MAPPING_ACCEPTANCE",
+      "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+      "faces": 32,
+      "physical_faces_verified": 32,
+      "original_requests": 384,
+      "original_strict_passed": 288,
+      "original_strict_failed": 96,
+      "predeclared_replay_requests": 96,
+      "replay_strict_passed": 96,
+      "replay_echo_exact": 96,
+      "original_errors_match_predeclared_TT": 96,
+      "failure_fraction_counts": {
+        "1": 96
+      },
+      "by_axis": {
+        "WDTH": {
+          "requests": 128,
+          "strict_failed": 32,
+          "maximum_absolute_readback_error": 0.000032211000004167545
+        },
+        "wght": {
+          "requests": 128,
+          "strict_failed": 32,
+          "maximum_absolute_readback_error": 0.00009450000001720582
+        },
+        "HGHT": {
+          "requests": 128,
+          "strict_failed": 32,
+          "maximum_absolute_readback_error": 0.000032211000004167545
+        }
+      },
+      "mapping_accepted": false,
+      "glyph_equivalence_tested": false,
+      "font_generated": false,
+      "os_version": "Version 27.0.1 (Build 26A434)",
+      "diagnostic_sha256": "28e70b905118d03882b877d364a9d995f272f0d895885c81b12130f46fc57b88",
+      "extractor_sha256": "8e5aaa0a921f24a656766c1e24a0d388397cdaddbdfebae1ab415c0d7c3f3bbf",
+      "harness_sha256": "4a708e294f630475313201555baa19a2fa658c6b72f91de33d04e753211dab33",
+      "source_unchanged": true
+    },
+    "geometry": {
+      "status": "COMPLETED_32_FACE_FINITE_DESIGN_COMPARISON_NOT_FONT_ACCEPTANCE",
+      "source_sha256": "39d42acd292ed5c9de5cf185b54a3c460630d610a718ed84c9e4f148e226f890",
+      "recipe_sha256": "128e78cd25861ac8459339e3f2f9cd70bd12c0393c956282efa60b71f427a5d2",
+      "native_faces": 32,
+      "gids_per_face": 34,
+      "locations_per_face": 15,
+      "unique_portable_hvgl_tables": 1,
+      "coverage": {
+        "type2_shapes_covered": 13,
+        "type2_shapes_present": 13,
+        "maximum_tree_depth_tested": 12,
+        "selected_rotation_roots": 4
+      },
+      "limit_font_units": 0.03125,
+      "elapsed_seconds": 325.702797958,
+      "source_unchanged": true,
+      "font_generated": false,
+      "mapping_accepted": false,
+      "metrics_tested": false,
+      "windows11_acceptance": "NOT_RUN",
+      "completed": 16320,
+      "legacy_passed": 16256,
+      "legacy_failed": 64,
+      "companion_calls": 64,
+      "companion_passed": 64,
+      "combined_passed": 16320,
+      "combined_failed": 0,
+      "maximum_point_error": 1.3073986337985843e-12
+    }
+  },
+  "macos_synthetic_job": {
+    "id": 119007487935,
+    "conclusion": "failure",
+    "d2_unit_tests": 13,
+    "unchanged_strict_gate": "FAIL_849_VS_850_AT_0.03125",
+    "native_table_reconstruction_step": "success",
+    "fresh_upem": {
+      "status": "SYNTHETIC_UPEM_DIAGNOSIS_COMPLETE_NOT_METRIC_ACCEPTANCE",
+      "scope": "self_authored_only_no_Apple_data",
+      "platform": "macOS-15.7.9-arm64-arm-64bit",
+      "script_sha256": "3a13b4b88f591b042a701021dca4034872079f20962670ed812a2b568bbf664c",
+      "native_binary_sha256": "8151cc4f38d69d568749ac2e4c88415027546bce46cb7497fd5d651b82fa1fe3",
+      "unique_fixture_coordinate_observations": 40,
+      "actual_native_records": 80,
+      "exact_reverse_pairs": 40,
+      "strict_height_failures": 36,
+      "frozen_B1_height_candidate_matches": 40,
+      "production_fix_accepted": false,
+      "original_font_acceptance": "NOT_RUN",
+      "windows11_acceptance": "NOT_RUN"
+    }
+  },
+  "windows_synthetic_job": {
+    "id": 119007488171,
+    "conclusion": "success",
+    "d2_unit_tests": 13,
+    "acceptance_scope": {
+      "scope": "self_authored_synthetic_controls_only",
+      "controls": [
+        {
+          "fixture": "standard",
+          "faces_passed": 3,
+          "windows_product": "Microsoft Windows Server 2022 Datacenter",
+          "windows_build": "20348",
+          "raster_count": 10,
+          "input_sha256": "5120611edc79613a48a2467ecf73b6a7a599e40eb2debbd5dbb62cd6e95c30b7"
+        },
+        {
+          "fixture": "metrics",
+          "faces_passed": 2,
+          "windows_product": "Microsoft Windows Server 2022 Datacenter",
+          "windows_build": "20348",
+          "raster_count": 10,
+          "input_sha256": "ad29b7b3e4fe6c654cb7487fb31fe6bad13f2c7940ad09fadf1357cd50cf5e3c"
+        }
+      ],
+      "original_font_acceptance": "NOT_RUN",
+      "windows11_desktop_acceptance": "NOT_RUN",
+      "system_installation": "NOT_TESTED",
+      "actual_qt_swirl_acceptance": "NOT_RUN"
+    }
+  },
+  "mapping_accepted": false,
+  "original_font_generated": false,
+  "windows11_acceptance": "NOT_RUN",
+  "actual_qt_swirl_acceptance": "NOT_RUN"
+}

@@ -1,0 +1,118 @@
+{
+  "schema": 1,
+  "stage": "Windows Qt lifecycle gate source extension",
+  "source_sha256": {
+    "src/Swirl.Quick/tests/RustCoreTests.cpp": "4501742b37bcb1fcb717a43d6cb6454bbf8f1c3ae9296d1865d02be21cdaaac6",
+    "tools/tests/test_reality_runtime.py": "7a1ad40efd4e75b0264d0fb9a2699204bf794a5ce4a36a09651b654c13d4d610",
+    "tools/tests/test_qt_reality_lifecycle.py": "a279310f614d27d427bbcda557afdd70b090764c59cab570c9a5b326e6874582",
+    "tools/ApplyCoreDevelopment.py": "7704cc6db13118ea9fc40b0715dcb99dd856f9a4c226311be0a6940b11253bf0",
+    "tools/tests/test_core_development.py": "b75edc626fe946f24c9ff48eac0c42d98dd42712d2ccb67c1cf34c9c09d1da68",
+    ".github/workflows/rust-core.yml": "e9d0d6f1d49b2b908c695332cb2228e3d38a04d363ec945a386a53c4c3557bb3"
+  },
+  "local_validation": [
+    {
+      "scope": "Offline lifecycle evidence guards",
+      "tests_run": 8,
+      "failures": 0,
+      "errors": 0,
+      "result": "passed",
+      "log_sha256": "4ebdce887f8e3189421095795d96ec05747e48274892dd910779e1b30caa8500"
+    },
+    {
+      "scope": "Existing public Qt evidence guards",
+      "tests_run": 9,
+      "failures": 0,
+      "errors": 0,
+      "result": "passed",
+      "log_sha256": "f0b5d8989fd6c7ff288aeefd2ed07bab35433d9282e269570add946be675b95a"
+    },
+    {
+      "scope": "Workflow mutation guards and generator idempotence",
+      "tests_run": 56,
+      "failures": 0,
+      "errors": 0,
+      "result": "passed",
+      "log_sha256": "21743390457006f74fe7afcfe9254ea8a3f9ecb6163a5f7260ac182cca4cbe99"
+    },
+    {
+      "scope": "Linux existing TLS1.2 and four bad credential component fixture diagnostics; not Qt",
+      "tests_run": 2,
+      "failures": 0,
+      "errors": 0,
+      "result": "passed",
+      "log_sha256": "347473913cb6c952566ea8e9722015429dcf775e1c933af7f06a79964a2ddbf7"
+    },
+    {
+      "scope": "Linux current Runtime cancellation fixture diagnostic; target closure checked before peer cleanup",
+      "tests_run": 1,
+      "failures": 0,
+      "errors": 0,
+      "result": "passed",
+      "log_sha256": "1c2b435c921f224ee6f0b37e1265d41ab21356dbf5362c851902ded29f62ec8a"
+    }
+  ],
+  "cpp_syntax": {
+    "passed": true,
+    "scope": "Exact lifecycle slot with production engine declarations; Linux Qt 6.4.2/C++23 syntax only. Windows DPAPI not executed. Harness omits unused StoragePaths.h requiring newer Qt and supplies existing fixture macro.",
+    "slot_sha256": "175992e0e611632e226cd976b5d6852c22c26590ae1b5ad519ad7ca9edfbab2e"
+  },
+  "existing_public_eight_case_slot_unchanged": true,
+  "existing_controlled_product_slot_unchanged": true,
+  "cancellation_before_peer_cleanup": {
+    "elapsed_ms": 1005,
+    "sessions_before_peer_cleanup": [
+      {
+        "expected_bytes": 44,
+        "received_bytes": 43,
+        "cancelled": true,
+        "tail_after_client_halfclose": false,
+        "target_closed": true
+      }
+    ],
+    "active_origin_sockets": 0,
+    "origin_errors": []
+  },
+  "diagnostic_binary_identity": {
+    "scope": "Fixture diagnosis with existing pinned Xray and current local Rust binary; NOT Qt/Windows or same-SHA formal acceptance",
+    "xray_manifest_original_commit": "b91d0e2dfbf7413256e8b5c51d1ad98556a0a12c",
+    "xray_sha256": "a5a3bf1c921d8a19224a26abc5b251cd9f38c3608ba74c319307b72184e44c9a",
+    "runtime_sha256": "0e99b14dc6d63bdbdee0a9b44f2de8c9d241e12a8ed0d5336c9a4fa604da8732"
+  },
+  "retained_initial_failure": {
+    "scope": "First Linux fixture attempt",
+    "reason": "Sandbox prohibited creating a loopback socket (PermissionError errno 1)",
+    "protocol_result": "not executed",
+    "authorized_unsandboxed_rerun": "passed"
+  },
+  "windows_qt_lifecycle_executed_locally": false,
+  "private_provider_connection": false,
+  "formal_new_windows_required_qt_test_count": 5,
+  "new_case_frontends": [
+    "http-connect",
+    "socks5"
+  ],
+  "new_cases": [
+    "TLS1.2 verified certificate and no Vision Direct",
+    "Four wrong REALITY/VLESS credentials; no origin or spare route",
+    "Runtime cancellation after exact authenticated echo; origin closes before peer cleanup",
+    "Reachable DIRECT positive controls followed by exact DOMAIN and MATCH rejections"
+  ],
+  "ci_limits_changed": false,
+  "full_acceptance_baseline": {
+    "items": 79,
+    "fully_passed": 6,
+    "weighted_completion_percent": 10.83,
+    "unchanged": true
+  },
+  "implementation_base_confirmed_by_root": "5f16245a238411c8e57d097995fded50edc65522",
+  "last_remote_head_confirmed_by_root_at_local_validation": "a34e9b989d7b15a16996fcb235b255cb32435481",
+  "root_final_regression": {
+    "portableCombinedTests": 24,
+    "portableCombinedFailed": 0,
+    "portableCombinedSkipped": 0,
+    "workflowGuards": 56,
+    "workflowExitCode": 0,
+    "diffCheckExitCode": 0,
+    "nativeWindowsLifecycle": "pending-new-sha-ci"
+  }
+}

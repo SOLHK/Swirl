@@ -1,0 +1,164 @@
+{
+  "opened_at": "2026-10-18T06:55:48Z",
+  "hard_cutoff": "2026-10-18T07:05:30Z",
+  "min_fetchedAt": "2026-10-18T06:59:22.458010Z",
+  "max_fetchedAt": "2026-10-18T06:59:26.846559Z",
+  "captured_entries": 18,
+  "failed_entries": 0,
+  "encrypted_response_files": 17,
+  "mapping_count": 18,
+  "bytes": {
+    "raw": 375728,
+    "decoded": 2180913,
+    "ciphertext": 556376
+  },
+  "hashes_verified": true,
+  "encrypted_roundtrip_verified": true,
+  "supplier_requests_stopped": true,
+  "schema": 1,
+  "finished_at": "2026-10-18T06:59:26.871576+00:00",
+  "http_200_responses": 17,
+  "http_200_entries": 18,
+  "offline_verification_supplier_requests": 0,
+  "full_configuration_execution_verified": false,
+  "real_nodes_tested_this_stage": 0,
+  "responses": [
+    {
+      "ordinal": 1,
+      "http_status": 200,
+      "entry_mapping_count": 1,
+      "raw_hash_verified": true,
+      "decoded_hash_verified": true,
+      "persisted_dpapi_verified": true
+    },
+    {
+      "ordinal": 2,
+      "http_status": 200,
+      "entry_mapping_count": 1,
+      "raw_hash_verified": true,
+      "decoded_hash_verified": true,
+      "persisted_dpapi_verified": true
+    },
+    {
+      "ordinal": 3,
+      "http_status": 200,
+      "entry_mapping_count": 1,
+      "raw_hash_verified": true,
+      "decoded_hash_verified": true,
+      "persisted_dpapi_verified": true
+    },
+    {
+      "ordinal": 4,
+      "http_status": 200,
+      "entry_mapping_count": 1,
+      "raw_hash_verified": true,
+      "decoded_hash_verified": true,
+      "persisted_dpapi_verified": true
+    },
+    {
+      "ordinal": 5,
+      "http_status": 200,
+      "entry_mapping_count": 1,
+      "raw_hash_verified": true,
+      "decoded_hash_verified": true,
+      "persisted_dpapi_verified": true
+    },
+    {
+      "ordinal": 6,
+      "http_status": 200,
+      "entry_mapping_count": 1,
+      "raw_hash_verified": true,
+      "decoded_hash_verified": true,
+      "persisted_dpapi_verified": true
+    },
+    {
+      "ordinal": 7,
+      "http_status": 200,
+      "entry_mapping_count": 1,
+      "raw_hash_verified": true,
+      "decoded_hash_verified": true,
+      "persisted_dpapi_verified": true
+    },
+    {
+      "ordinal": 8,
+      "http_status": 200,
+      "entry_mapping_count": 1,
+      "raw_hash_verified": true,
+      "decoded_hash_verified": true,
+      "persisted_dpapi_verified": true
+    },
+    {
+      "ordinal": 9,
+      "http_status": 200,
+      "entry_mapping_count": 1,
+      "raw_hash_verified": true,
+      "decoded_hash_verified": true,
+      "persisted_dpapi_verified": true
+    },
+    {
+      "ordinal": 10,
+      "http_status": 200,
+      "entry_mapping_count": 1,
+      "raw_hash_verified": true,
+      "decoded_hash_verified": true,
+      "persisted_dpapi_verified": true
+    },
+    {
+      "ordinal": 11,
+      "http_status": 200,
+      "entry_mapping_count": 1,
+      "raw_hash_verified": true,
+      "decoded_hash_verified": true,
+      "persisted_dpapi_verified": true
+    },
+    {
+      "ordinal": 12,
+      "http_status": 200,
+      "entry_mapping_count": 1,
+      "raw_hash_verified": true,
+      "decoded_hash_verified": true,
+      "persisted_dpapi_verified": true
+    },
+    {
+      "ordinal": 13,
+      "http_status": 200,
+      "entry_mapping_count": 1,
+      "raw_hash_verified": true,
+      "decoded_hash_verified": true,
+      "persisted_dpapi_verified": true
+    },
+    {
+      "ordinal": 14,
+      "http_status": 200,
+      "entry_mapping_count": 1,
+      "raw_hash_verified": true,
+      "decoded_hash_verified": true,
+      "persisted_dpapi_verified": true
+    },
+    {
+      "ordinal": 15,
+      "http_status": 200,
+      "entry_mapping_count": 1,
+      "raw_hash_verified": true,
+      "decoded_hash_verified": true,
+      "persisted_dpapi_verified": true
+    },
+    {
+      "ordinal": 16,
+      "http_status": 200,
+      "entry_mapping_count": 1,
+      "raw_hash_verified": true,
+      "decoded_hash_verified": true,
+      "persisted_dpapi_verified": true
+    },
+    {
+      "ordinal": 17,
+      "http_status": 200,
+      "entry_mapping_count": 2,
+      "raw_hash_verified": true,
+      "decoded_hash_verified": true,
+      "persisted_dpapi_verified": true
+    }
+  ],
+  "local_integrity_report_sha256": "152be7ae6f6accf9de8b95f52f9185060e513c094b70ea5103dbc7c620e41b44"
+}

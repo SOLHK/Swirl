@@ -215,11 +215,36 @@ def decode_body(raw, encoding):
         raise CaptureError("InvalidCompressedBody") from None
 
 
+def strict_uri_subscription(body):
+    """Recognize a complete URI list for a mislabelled HTML response.
+
+    This is only a capture gate, not protocol/credential validation. Never
+    extract a URI from HTML, ignore malformed lines, or recursively decode.
+    """
+    try:
+        text = body.decode("utf-8-sig").strip()
+        def uri_lines(value):
+            lines = [line.strip() for line in value.splitlines() if line.strip()]
+            return bool(lines) and all(re.fullmatch(
+                r"(?:ss|ssr|trojan|vmess|vless|tuic|hy2|hysteria2|socks|socks5)://[^\s<>\x00-\x1f\x7f]+", line
+            ) for line in lines)
+        if uri_lines(text):
+            return True
+        compact = re.sub(r"[ \t\r\n]", "", text)
+        decoded = base64.b64decode(compact + "=" * (-len(compact) % 4),
+                                   altchars=b"-_", validate=True)
+        return uri_lines(decoded.decode("utf-8-sig"))
+    except (ValueError, UnicodeError):
+        return False
+
+
 def document_status(body, content_type):
     if not body.strip():
         raise CaptureError("EmptyResponse")
     text = body[:65536].decode("utf-8-sig", "replace").lstrip().lower()
-    if "text/html" in content_type.lower() or re.search(r"^<(?:!doctype\s+html|html|head|body|form)\b", text):
+    if re.search(r"^<(?:!doctype\s+html|html|head|body|form)\b", text):
+        raise CaptureError("HTMLOrLoginPage")
+    if "text/html" in content_type.lower() and not strict_uri_subscription(body):
         raise CaptureError("HTMLOrLoginPage")
     if text.startswith(("access denied", "unauthorized", "forbidden", "error:", "subscription expired")):
         raise CaptureError("ErrorDocument")

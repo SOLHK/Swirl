@@ -1,0 +1,187 @@
+{
+  "scope": "Linux PySide QtNetwork -> Rust harness -> independent relay -> HTTPS; diagnostic only, not Windows DPAPI/C++ product acceptance",
+  "source_sha": "a066f7d4c8acb96f5d6a46cee5700b2590328b64",
+  "qt_version": "6.10.3",
+  "qt_ssl_backend": "openssl",
+  "proxy_mode": "qt-http-proxy",
+  "diagnostic_fixture_close_direction": "source-client-first",
+  "source_fixture_module_sha256": "842e4375437716a94e3ede0f9178eeb7b13472965dee49f860a003e61d80fa92",
+  "qt_ssl_library": "OpenSSL 3.0.13 30 Jan 2024",
+  "python_version": "3.12.14",
+  "system": "Linux",
+  "rust_binary_sha256": {
+    "swirl-api": "8730c60b40d00d7030635641bf4d623e0f537fa735d2f6348c61b43f64d91d6b",
+    "swirl-inspect": "56a812c2362d7495c82d7d7af2a8bb03b4e1a163b7b03365894dcf843ae24c64"
+  },
+  "passed": true,
+  "cases": [
+    {
+      "protocol": "http",
+      "status": "passed",
+      "parsed_subscription": true,
+      "positive": {
+        "tls_verified": true,
+        "http_sent": true,
+        "http_status": 200,
+        "body": "product-origin-ok:/through-qt-proxy",
+        "socket_state": "UnconnectedState"
+      },
+      "negative": {
+        "tls_verified": false,
+        "error": "SslHandshakeFailedError",
+        "verification_error": "HostNameMismatch",
+        "http_sent": false
+      },
+      "origin_http_count": 1,
+      "origin_sni": [
+        "localhost",
+        "wrong.fixture.invalid"
+      ],
+      "origin_tls_closed": 1,
+      "origin_errors": [],
+      "relay_errors": [],
+      "relay_connections": [
+        {
+          "peer": "A",
+          "host": "localhost",
+          "port": 51937,
+          "upload": 713,
+          "download": 1498
+        },
+        {
+          "peer": "A",
+          "host": "wrong.fixture.invalid",
+          "port": 51937,
+          "upload": 517,
+          "download": 841
+        }
+      ]
+    },
+    {
+      "protocol": "socks5",
+      "status": "passed",
+      "parsed_subscription": true,
+      "positive": {
+        "tls_verified": true,
+        "http_sent": true,
+        "http_status": 200,
+        "body": "product-origin-ok:/through-qt-proxy",
+        "socket_state": "UnconnectedState"
+      },
+      "negative": {
+        "tls_verified": false,
+        "error": "SslHandshakeFailedError",
+        "verification_error": "HostNameMismatch",
+        "http_sent": false
+      },
+      "origin_http_count": 1,
+      "origin_sni": [
+        "localhost",
+        "wrong.fixture.invalid"
+      ],
+      "origin_tls_closed": 1,
+      "origin_errors": [],
+      "relay_errors": [],
+      "relay_connections": [
+        {
+          "peer": "A",
+          "host": "localhost",
+          "port": 53697,
+          "upload": 713,
+          "download": 1498
+        },
+        {
+          "peer": "A",
+          "host": "wrong.fixture.invalid",
+          "port": 53697,
+          "upload": 517,
+          "download": 839
+        }
+      ]
+    },
+    {
+      "protocol": "ss",
+      "status": "passed",
+      "parsed_subscription": true,
+      "positive": {
+        "tls_verified": true,
+        "http_sent": true,
+        "http_status": 200,
+        "body": "product-origin-ok:/through-qt-proxy",
+        "socket_state": "UnconnectedState"
+      },
+      "negative": {
+        "tls_verified": false,
+        "error": "SslHandshakeFailedError",
+        "verification_error": "HostNameMismatch",
+        "http_sent": false
+      },
+      "origin_http_count": 1,
+      "origin_sni": [
+        "localhost",
+        "wrong.fixture.invalid"
+      ],
+      "origin_tls_closed": 1,
+      "origin_errors": [],
+      "relay_errors": [],
+      "relay_connections": [
+        {
+          "peer": "A",
+          "host": "localhost",
+          "port": 41679,
+          "upload": 713,
+          "download": 1497
+        },
+        {
+          "peer": "A",
+          "host": "wrong.fixture.invalid",
+          "port": 41679,
+          "upload": 517,
+          "download": 840
+        }
+      ]
+    },
+    {
+      "protocol": "vless",
+      "status": "passed",
+      "parsed_subscription": true,
+      "positive": {
+        "tls_verified": true,
+        "http_sent": true,
+        "http_status": 200,
+        "body": "product-origin-ok:/through-qt-proxy",
+        "socket_state": "UnconnectedState"
+      },
+      "negative": {
+        "tls_verified": false,
+        "error": "SslHandshakeFailedError",
+        "verification_error": "HostNameMismatch",
+        "http_sent": false
+      },
+      "origin_http_count": 1,
+      "origin_sni": [
+        "localhost",
+        "wrong.fixture.invalid"
+      ],
+      "origin_tls_closed": 1,
+      "origin_errors": [],
+      "relay_errors": [],
+      "relay_connections": [
+        {
+          "peer": "A",
+          "host": "localhost",
+          "port": 41505,
+          "upload": 713,
+          "download": 1497
+        },
+        {
+          "peer": "A",
+          "host": "wrong.fixture.invalid",
+          "port": 41505,
+          "upload": 517,
+          "download": 841
+        }
+      ]
+    }
+  ]
+}

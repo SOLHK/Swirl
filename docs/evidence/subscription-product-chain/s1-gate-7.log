@@ -1,0 +1,8 @@
+test_pair_allocation_preserves_denials_and_cleans_up_non_socket_errors (__main__.SsPolicyPeerAllocationTests.test_pair_allocation_preserves_denials_and_cleans_up_non_socket_errors) ... ok
+test_pair_allocation_stops_after_eight_collisions_with_original_error (__main__.SsPolicyPeerAllocationTests.test_pair_allocation_stops_after_eight_collisions_with_original_error) ... ok
+test_pair_retries_only_collisions_and_releases_failed_sockets (__main__.SsPolicyPeerAllocationTests.test_pair_retries_only_collisions_and_releases_failed_sockets) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.010s
+
+OK

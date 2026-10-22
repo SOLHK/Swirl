@@ -1,0 +1,73 @@
+{
+  "schema": 1,
+  "verified_at_utc": "2026-10-18T09:40:37.379128+00:00",
+  "implementation_commit": "5f1fd1347ba4f82854e3f773f90e093c3074ce40",
+  "source_sha256_lf": {
+    "core/crates/swirl-subscription/src/inspect.rs": "9ef995a8c3a4c76463f1a10b91701b0dcf891028f46ead9fe1a06202a16b801b",
+    "src/Swirl.Quick/CMakeLists.txt": "9e9c736166eb97b4c69d81797ba5d2519eefc1f3c20e3a9f015977f848f4e46c",
+    "src/Swirl.Quick/engine/RustCoreEngine.cpp": "1161e3565f2ff71cc6b69f6471d171da23bef7c520997496f0a8c980f4ca1abe",
+    "src/Swirl.Quick/engine/SubscriptionNormalizer.cpp": "1730a2ce8c82d64d63a4121873b49cd818904d00c9cb79c453dca60a9c249298",
+    "src/Swirl.Quick/tests/ImportTests.cpp": "ae577de09d1716152925fb08fd1b77c470ef80c67fb9e9380834cca24ed6d657",
+    "src/Swirl.Quick/tests/RustCoreTests.cpp": "a6995f66e787aa680bcccf2c0ef57230215b6a2349f005e5c68b3eb5ccb66ee8",
+    "tools/tests/test_shadowsocks.py": "60203ba15a5198fdb49bcb6e3330e7f9359c19d3074107f17eff56aa4e815800"
+  },
+  "ci": [
+    {
+      "id": 39114652905,
+      "name": "Core implementation validation",
+      "status": "completed",
+      "conclusion": "success",
+      "sha": "5f1fd1347ba4f82854e3f773f90e093c3074ce40",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39114652905",
+      "jobs": [
+        {
+          "id": 117637854077,
+          "name": "core",
+          "status": "completed",
+          "conclusion": "success",
+          "active": [],
+          "failed": []
+        }
+      ]
+    },
+    {
+      "id": 39114652890,
+      "name": "Swirl Rust Core",
+      "status": "completed",
+      "conclusion": "success",
+      "sha": "5f1fd1347ba4f82854e3f773f90e093c3074ce40",
+      "url": "https://github.com/SOLHK/Swirl/actions/runs/39114652890",
+      "jobs": [
+        {
+          "id": 117637854034,
+          "name": "windows-rust",
+          "status": "completed",
+          "conclusion": "success",
+          "active": [],
+          "failed": []
+        },
+        {
+          "id": 117637854133,
+          "name": "portable-rust (macos-latest)",
+          "status": "completed",
+          "conclusion": "success",
+          "active": [],
+          "failed": []
+        },
+        {
+          "id": 117637854151,
+          "name": "portable-rust (ubuntu-latest)",
+          "status": "completed",
+          "conclusion": "success",
+          "active": [],
+          "failed": []
+        }
+      ]
+    }
+  ],
+  "prior_local_evidence": "SUBSCRIPTION_TYPED_OPTIONS_20261018.json",
+  "limitations": [
+    "CI success does not resolve subsequently identified INI transport aliases; follow INI profile stage.",
+    "New 59 REALITY nodes remain unconnected; no real-node or old-supplier requests in this verification."
+  ]
+}

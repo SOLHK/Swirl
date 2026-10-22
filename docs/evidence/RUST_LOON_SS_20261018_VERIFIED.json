@@ -1,0 +1,580 @@
+{
+  "product_source_sha": "4ea41397386bed2678f8af41ba110965037f421d",
+  "validation_source_sha": "d7e79df2f1519da97507d2d3a1a92ff869543017",
+  "product_tree_unchanged_between_these_commits": true,
+  "supplier_requests": 0,
+  "local_network_verified": true,
+  "corpus": {
+    "supplier_requests": 0,
+    "entries": 18,
+    "parsed_entries": 18,
+    "total_records_including_duplicate_sources": 1558,
+    "total_tcp_candidates_including_duplicate_sources": 450,
+    "body_15": {
+      "local_index": 15,
+      "format": "ini",
+      "recognized": true,
+      "parsed": true,
+      "parse_error": null,
+      "nodes": 90,
+      "native_tcp_candidates": 90,
+      "unrecognized_fields": 0,
+      "capability_groups": [
+        {
+          "protocol": "ss",
+          "cipher": "aes-128-gcm",
+          "transport": "tcp",
+          "obfuscation": "http",
+          "tls": "not-enabled",
+          "diagnostic": "TcpCandidateNotYetVerified",
+          "native_tcp_candidate": true,
+          "native_udp_supported": false,
+          "count": 90
+        }
+      ],
+      "complete_configuration_execution_supported": false
+    }
+  },
+  "samples": [
+    {
+      "node_index": 1,
+      "dns_tcp_agreement": "both_connected",
+      "dns_tcp_elapsed_ms": 328,
+      "https": {
+        "success": true,
+        "origin_certificate_verified": true,
+        "origin_tls_version": "TLSv1.3",
+        "http_status": 200,
+        "origin_orderly_close": true,
+        "native_session_settled": true
+      }
+    },
+    {
+      "node_index": 2,
+      "dns_tcp_agreement": "both_connected",
+      "dns_tcp_elapsed_ms": 375,
+      "https": {
+        "success": true,
+        "origin_certificate_verified": true,
+        "origin_tls_version": "TLSv1.3",
+        "http_status": 200,
+        "origin_orderly_close": true,
+        "native_session_settled": true
+      }
+    },
+    {
+      "node_index": 3,
+      "dns_tcp_agreement": "both_connected",
+      "dns_tcp_elapsed_ms": 266,
+      "https": {
+        "success": true,
+        "origin_certificate_verified": true,
+        "origin_tls_version": "TLSv1.3",
+        "http_status": 200,
+        "origin_orderly_close": true,
+        "native_session_settled": true
+      }
+    }
+  ],
+  "rust_tests_passed": 132,
+  "python_suites": [
+    {
+      "suite": "continue-test_codex_management",
+      "total": 11,
+      "skipped": 1,
+      "passed": true
+    },
+    {
+      "suite": "continue-test_connection_stages",
+      "total": 8,
+      "skipped": 0,
+      "passed": true
+    },
+    {
+      "suite": "continue-test_core_development-utf8",
+      "total": 19,
+      "skipped": 1,
+      "passed": true
+    },
+    {
+      "suite": "continue-test_dns_https",
+      "total": 9,
+      "skipped": 0,
+      "passed": true
+    },
+    {
+      "suite": "continue-test_dns_negative",
+      "total": 23,
+      "skipped": 0,
+      "passed": true
+    },
+    {
+      "suite": "continue-test_dns_tls",
+      "total": 11,
+      "skipped": 0,
+      "passed": true
+    },
+    {
+      "suite": "continue-test_native_probe",
+      "total": 7,
+      "skipped": 0,
+      "passed": true
+    },
+    {
+      "suite": "continue-test_policy_groups",
+      "total": 13,
+      "skipped": 0,
+      "passed": true
+    },
+    {
+      "suite": "continue-test_rust_core",
+      "total": 24,
+      "skipped": 1,
+      "passed": true
+    },
+    {
+      "suite": "continue-test_shadowsocks",
+      "total": 9,
+      "skipped": 1,
+      "passed": true
+    },
+    {
+      "suite": "continue-test_socks4",
+      "total": 10,
+      "skipped": 1,
+      "passed": true
+    },
+    {
+      "suite": "continue-test_subscription_capture",
+      "total": 26,
+      "skipped": 1,
+      "passed": true
+    },
+    {
+      "suite": "continue-test_subscription_import",
+      "total": 9,
+      "skipped": 0,
+      "passed": true
+    },
+    {
+      "suite": "continue-test_websocket_transport",
+      "total": 11,
+      "skipped": 1,
+      "passed": true
+    },
+    {
+      "suite": "connectivity_diagnostics_final",
+      "total": 21,
+      "skipped": 0,
+      "passed": true
+    }
+  ],
+  "qt_ctest_passed": true,
+  "qt_independent_peers_passed": 4,
+  "known_macos_observations": [
+    {
+      "source_sha": "7f7ecfbeac6161716f48d8c1dbc2aab8e7f085d2",
+      "job_id": 117603271986,
+      "dns_budget_ms": 30,
+      "dns_elapsed_ms": 158,
+      "tcp_attempts": 0
+    },
+    {
+      "source_sha": "4ea41397386bed2678f8af41ba110965037f421d",
+      "job_id": 117604795941,
+      "dns_budget_ms": 30,
+      "dns_elapsed_ms": 151,
+      "thread_start_ms": 0,
+      "queue_wait_ms": 151,
+      "tcp_attempts": 0
+    }
+  ],
+  "final_ci": {
+    "tested_source_sha": "d7e79df2f1519da97507d2d3a1a92ff869543017",
+    "product_source_sha": "4ea41397386bed2678f8af41ba110965037f421d",
+    "runs": [
+      {
+        "id": 39104085580,
+        "name": "Focused DNS worker diagnostic",
+        "status": "completed",
+        "conclusion": "success",
+        "attempt": 1,
+        "sha": "d7e79df2f1519da97507d2d3a1a92ff869543017",
+        "url": "https://github.com/SOLHK/Swirl/actions/runs/39104085580",
+        "jobs": [
+          {
+            "id": 117606135785,
+            "name": "dns-worker (macos-latest)",
+            "status": "completed",
+            "conclusion": "success",
+            "active": [],
+            "failed": []
+          },
+          {
+            "id": 117606135922,
+            "name": "dns-worker (ubuntu-latest)",
+            "status": "completed",
+            "conclusion": "success",
+            "active": [],
+            "failed": []
+          },
+          {
+            "id": 117606135923,
+            "name": "dns-worker (windows-2022)",
+            "status": "completed",
+            "conclusion": "success",
+            "active": [],
+            "failed": []
+          }
+        ]
+      },
+      {
+        "id": 39104085583,
+        "name": "Core implementation validation",
+        "status": "completed",
+        "conclusion": "success",
+        "attempt": 1,
+        "sha": "d7e79df2f1519da97507d2d3a1a92ff869543017",
+        "url": "https://github.com/SOLHK/Swirl/actions/runs/39104085583",
+        "jobs": [
+          {
+            "id": 117606135777,
+            "name": "core",
+            "status": "completed",
+            "conclusion": "success",
+            "active": [],
+            "failed": []
+          }
+        ]
+      },
+      {
+        "id": 39104085584,
+        "name": "Swirl Rust Core",
+        "status": "completed",
+        "conclusion": "success",
+        "attempt": 1,
+        "sha": "d7e79df2f1519da97507d2d3a1a92ff869543017",
+        "url": "https://github.com/SOLHK/Swirl/actions/runs/39104085584",
+        "jobs": [
+          {
+            "id": 117606135755,
+            "name": "windows-rust",
+            "status": "completed",
+            "conclusion": "success",
+            "active": [],
+            "failed": []
+          },
+          {
+            "id": 117606135913,
+            "name": "portable-rust (ubuntu-latest)",
+            "status": "completed",
+            "conclusion": "success",
+            "active": [],
+            "failed": []
+          },
+          {
+            "id": 117606135967,
+            "name": "portable-rust (macos-latest)",
+            "status": "completed",
+            "conclusion": "success",
+            "active": [],
+            "failed": []
+          }
+        ]
+      }
+    ],
+    "previous_runs": {
+      "7f7ecfb": [
+        {
+          "id": 39103115995,
+          "name": "Focused DNS worker diagnostic",
+          "status": "completed",
+          "conclusion": "success",
+          "attempt": 1,
+          "sha": "7f7ecfbeac6161716f48d8c1dbc2aab8e7f085d2",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39103115995",
+          "jobs": [
+            {
+              "id": 117603272183,
+              "name": "dns-worker (ubuntu-latest)",
+              "status": "completed",
+              "conclusion": "success",
+              "active": [],
+              "failed": []
+            },
+            {
+              "id": 117603272292,
+              "name": "dns-worker (macos-latest)",
+              "status": "completed",
+              "conclusion": "success",
+              "active": [],
+              "failed": []
+            },
+            {
+              "id": 117603272411,
+              "name": "dns-worker (windows-2022)",
+              "status": "completed",
+              "conclusion": "success",
+              "active": [],
+              "failed": []
+            }
+          ]
+        },
+        {
+          "id": 39103115927,
+          "name": "Core implementation validation",
+          "status": "completed",
+          "conclusion": "success",
+          "attempt": 1,
+          "sha": "7f7ecfbeac6161716f48d8c1dbc2aab8e7f085d2",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39103115927",
+          "jobs": [
+            {
+              "id": 117603272179,
+              "name": "core",
+              "status": "completed",
+              "conclusion": "success",
+              "active": [],
+              "failed": []
+            }
+          ]
+        },
+        {
+          "id": 39103115921,
+          "name": "Swirl Rust Core",
+          "status": "completed",
+          "conclusion": "failure",
+          "attempt": 1,
+          "sha": "7f7ecfbeac6161716f48d8c1dbc2aab8e7f085d2",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39103115921",
+          "jobs": [
+            {
+              "id": 117603271918,
+              "name": "portable-rust (ubuntu-latest)",
+              "status": "completed",
+              "conclusion": "success",
+              "active": [],
+              "failed": []
+            },
+            {
+              "id": 117603271979,
+              "name": "windows-rust",
+              "status": "completed",
+              "conclusion": "success",
+              "active": [],
+              "failed": []
+            },
+            {
+              "id": 117603271986,
+              "name": "portable-rust (macos-latest)",
+              "status": "completed",
+              "conclusion": "failure",
+              "active": [],
+              "failed": [
+                "Independent portable protocol peers"
+              ]
+            }
+          ]
+        }
+      ],
+      "4ea4139": [
+        {
+          "id": 39103629127,
+          "name": "Focused DNS worker diagnostic",
+          "status": "completed",
+          "conclusion": "success",
+          "attempt": 1,
+          "sha": "4ea41397386bed2678f8af41ba110965037f421d",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39103629127",
+          "jobs": [
+            {
+              "id": 117604795855,
+              "name": "dns-worker (windows-2022)",
+              "status": "completed",
+              "conclusion": "success",
+              "active": [],
+              "failed": []
+            },
+            {
+              "id": 117604795992,
+              "name": "dns-worker (ubuntu-latest)",
+              "status": "completed",
+              "conclusion": "success",
+              "active": [],
+              "failed": []
+            },
+            {
+              "id": 117604796030,
+              "name": "dns-worker (macos-latest)",
+              "status": "completed",
+              "conclusion": "success",
+              "active": [],
+              "failed": []
+            }
+          ]
+        },
+        {
+          "id": 39103629153,
+          "name": "Core implementation validation",
+          "status": "completed",
+          "conclusion": "success",
+          "attempt": 1,
+          "sha": "4ea41397386bed2678f8af41ba110965037f421d",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39103629153",
+          "jobs": [
+            {
+              "id": 117604796007,
+              "name": "core",
+              "status": "completed",
+              "conclusion": "success",
+              "active": [],
+              "failed": []
+            }
+          ]
+        },
+        {
+          "id": 39103629123,
+          "name": "Swirl Rust Core",
+          "status": "completed",
+          "conclusion": "failure",
+          "attempt": 1,
+          "sha": "4ea41397386bed2678f8af41ba110965037f421d",
+          "url": "https://github.com/SOLHK/Swirl/actions/runs/39103629123",
+          "jobs": [
+            {
+              "id": 117604795772,
+              "name": "windows-rust",
+              "status": "completed",
+              "conclusion": "success",
+              "active": [],
+              "failed": []
+            },
+            {
+              "id": 117604795923,
+              "name": "portable-rust (ubuntu-latest)",
+              "status": "completed",
+              "conclusion": "success",
+              "active": [],
+              "failed": []
+            },
+            {
+              "id": 117604795941,
+              "name": "portable-rust (macos-latest)",
+              "status": "completed",
+              "conclusion": "failure",
+              "active": [],
+              "failed": [
+                "Independent portable protocol peers"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "private_run": {
+      "run_id": 39104294687,
+      "conclusion": "success",
+      "private_source_sha": "381f3c608e4363870e57529437650efa53ad8cfd",
+      "public_source_sha": "d7e79df2f1519da97507d2d3a1a92ff869543017",
+      "comparison": {
+        "schema": 1,
+        "supplier_requests": 0,
+        "comparison_completed": true,
+        "local_manifest_entries": 18,
+        "local_distinct_urls": 17,
+        "remote_entries": 16,
+        "remote_distinct_urls": 16,
+        "local_cached_bodies": 17,
+        "local_distinct_bodies": 15,
+        "remote_distinct_bodies": 7,
+        "exact_local_entries": 16,
+        "serialization_only_local_entries": 0,
+        "unmatched_local_entries": 2
+      },
+      "identical_bodies": 0,
+      "equal_candidate_parameter_pairs": 5,
+      "fixed_ss": {
+        "fixed_samples": 3,
+        "recorded_samples": 3,
+        "python_tcp_connected": 3,
+        "rust_tcp_connected": 3,
+        "both_tcp_connected": 3,
+        "inconclusive": 0,
+        "protocol_attempted": 3,
+        "protocol_verified": 3
+      },
+      "network_verified": true
+    },
+    "macos_failure_is_test_assumption_not_product_timeout_change": true,
+    "product_diagnostic_and_timeouts_unchanged": true
+  },
+  "binary_sha256": {
+    "swirl-api.exe": "3592ea968e420cfa17e3fa63a5207664150e3d1a307df14e8fbe53f3d1917049",
+    "swirl-inspect.exe": "2ac03e3aaafd0603f50ca5b05a7cc425aeec0361a6e55a3de68e9cdd2b781367",
+    "swirl-diagnose.exe": "bfb9c54aac5433990753df61f2ebdafacab93c9eb7b196574345d45a0d3db939",
+    "swirl_api.dll": "54b421ac84ce06f72ddfe4b56788c5d8a232fec3ab123c2dafb1cf3d2e1c3ff1"
+  },
+  "private_verification": {
+    "run_id": 39104294687,
+    "conclusion": "success",
+    "private_source_sha": "381f3c608e4363870e57529437650efa53ad8cfd",
+    "public_source_sha": "d7e79df2f1519da97507d2d3a1a92ff869543017",
+    "comparison": {
+      "schema": 1,
+      "supplier_requests": 0,
+      "comparison_completed": true,
+      "local_manifest_entries": 18,
+      "local_distinct_urls": 17,
+      "remote_entries": 16,
+      "remote_distinct_urls": 16,
+      "local_cached_bodies": 17,
+      "local_distinct_bodies": 15,
+      "remote_distinct_bodies": 7,
+      "exact_local_entries": 16,
+      "serialization_only_local_entries": 0,
+      "unmatched_local_entries": 2
+    },
+    "identical_bodies": 0,
+    "equal_candidate_parameter_pairs": 5,
+    "fixed_ss": {
+      "fixed_samples": 3,
+      "recorded_samples": 3,
+      "python_tcp_connected": 3,
+      "rust_tcp_connected": 3,
+      "both_tcp_connected": 3,
+      "inconclusive": 0,
+      "protocol_attempted": 3,
+      "protocol_verified": 3
+    },
+    "network_verified": true
+  },
+  "python_distinct_passed_after_qt_reruns": 208,
+  "python_remaining_skipped": 3,
+  "private_final_head": "7ac895141a29ce3aa86f6afba7a3b7a9fce972d8",
+  "local_artifacts": {
+    "D:\\Codex\\work\\Swirl\\core\\target\\release\\swirl-api.exe": {
+      "bytes": 4117471,
+      "sha256": "3592ea968e420cfa17e3fa63a5207664150e3d1a307df14e8fbe53f3d1917049"
+    },
+    "D:\\Codex\\work\\Swirl\\core\\target\\release\\swirl-inspect.exe": {
+      "bytes": 2366844,
+      "sha256": "2ac03e3aaafd0603f50ca5b05a7cc425aeec0361a6e55a3de68e9cdd2b781367"
+    },
+    "D:\\Codex\\work\\Swirl\\core\\target\\release\\swirl-diagnose.exe": {
+      "bytes": 3139676,
+      "sha256": "bfb9c54aac5433990753df61f2ebdafacab93c9eb7b196574345d45a0d3db939"
+    },
+    "D:\\Codex\\work\\Swirl\\core\\target\\release\\swirl_api.dll": {
+      "bytes": 7416070,
+      "sha256": "54b421ac84ce06f72ddfe4b56788c5d8a232fec3ab123c2dafb1cf3d2e1c3ff1"
+    },
+    "D:\\Codex\\work\\build-rust-qt\\SwirlRustCoreTests.exe": {
+      "bytes": 2349771,
+      "sha256": "bb62e2a03116a7c963d50cfc1256a1fafae319bf3ea9edbcc9a3564483a76f48"
+    },
+    "D:\\Codex\\work\\build-rust-qt\\swirl_api.dll": {
+      "bytes": 7416118,
+      "sha256": "ff8e62f98987549d6137ed43cf2fcf9dcf56de3807ee4e040de79b0e8a36ec37"
+    }
+  }
+}

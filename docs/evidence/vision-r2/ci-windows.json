@@ -1,0 +1,1899 @@
+{
+  "schema_version": 1,
+  "evidence_kind": "exact_commit_github_actions_complete_job_downloaded_peer_and_qt_artifacts",
+  "observed_utc": "2026-10-19T12:46:28.664127+00:00",
+  "source_commit": "7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167",
+  "run_id": 39250098899,
+  "run_attempt": 1,
+  "run_url": "https://github.com/SOLHK/Swirl/actions/runs/39250098899",
+  "job_url": "https://github.com/SOLHK/Swirl/actions/runs/39250098899/job/118051505764",
+  "job": {
+    "id": 118051505764,
+    "name": "windows-rust",
+    "status": "completed",
+    "conclusion": "success",
+    "run_id": 39250098899,
+    "logs_url": null,
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1
+      },
+      {
+        "name": "Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 2
+      },
+      {
+        "name": "Install stable Rust tools",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3
+      },
+      {
+        "name": "Run cargo fmt --all -- --check",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4
+      },
+      {
+        "name": "Run cargo check --workspace --locked",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 5
+      },
+      {
+        "name": "Run cargo clippy --workspace --all-targets --locked -- -D warnings",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 6
+      },
+      {
+        "name": "Run cargo test --workspace --locked",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 7
+      },
+      {
+        "name": "Run cargo build --release --locked --workspace --lib --bins",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 8
+      },
+      {
+        "name": "Build native REALITY TLS peer client",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 9
+      },
+      {
+        "name": "Run actions/setup-python@v5",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 10
+      },
+      {
+        "name": "Independent TLS and protocol peers",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 11
+      },
+      {
+        "name": "Diagnose hosted Windows port allocation after a peer failure",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 12
+      },
+      {
+        "name": "Install pinned Go for the independent Xray peer",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 13
+      },
+      {
+        "name": "Build pinned Xray and verify REALITY interoperability",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 14
+      },
+      {
+        "name": "Preserve Xray build identity and raw interoperability evidence",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 15
+      },
+      {
+        "name": "Build native Vision client and verify Xray interoperability",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 16
+      },
+      {
+        "name": "Preserve Vision client and full Xray interoperability evidence",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 17
+      },
+      {
+        "name": "Run actions/upload-artifact@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 18
+      },
+      {
+        "name": "Install Qt for Rust control adapter",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 19
+      },
+      {
+        "name": "Build Qt to Rust integration test",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 20
+      },
+      {
+        "name": "Reject native DNS policy in compatibility builds without starting a core",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 21
+      },
+      {
+        "name": "Run Qt to Rust integration without Mihomo",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 22
+      },
+      {
+        "name": "Build complete native Rust application",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 23
+      },
+      {
+        "name": "Preserve isolated Qt test reports",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 24
+      },
+      {
+        "name": "Post Install Qt for Rust control adapter",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 45
+      },
+      {
+        "name": "Post Install pinned Go for the independent Xray peer",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 46
+      },
+      {
+        "name": "Post Run actions/setup-python@v5",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 47
+      },
+      {
+        "name": "Post Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 48
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 49
+      }
+    ]
+  },
+  "all_rust_run_jobs_completed_success": true,
+  "artifacts": [
+    {
+      "github": {
+        "id": 12185407758,
+        "name": "Swirl-Vision-Xray-Windows-7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167-1",
+        "size_in_bytes": 38369,
+        "url": "https://api.github.com/repos/SOLHK/Swirl/actions/artifacts/12185407758",
+        "archive_download_url": "https://api.github.com/repos/SOLHK/Swirl/actions/artifacts/12185407758/zip",
+        "expired": false,
+        "created_at": "2026-10-19T12:23:06Z",
+        "expires_at": "2026-11-02T12:23:05Z",
+        "updated_at": "2026-10-19T12:23:06Z",
+        "digest": "sha256:adc1d87180b807fdea96440647338159a9380da1ca5d30a963a7072b10094600",
+        "workflow_run": {
+          "id": 39250098899,
+          "repository_id": 1411888911,
+          "head_repository_id": 1411888911,
+          "head_branch": "work/core-completion-20261017",
+          "head_sha": "7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167"
+        }
+      },
+      "downloaded_zip": "/tmp/swirl-vision-final-windows-12185407758.zip",
+      "downloaded_sha256": "adc1d87180b807fdea96440647338159a9380da1ca5d30a963a7072b10094600",
+      "github_digest_matches": true
+    },
+    {
+      "github": {
+        "id": 12184789030,
+        "name": "Swirl-REALITY-Xray-Windows-7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167-1",
+        "size_in_bytes": 55498,
+        "url": "https://api.github.com/repos/SOLHK/Swirl/actions/artifacts/12184789030",
+        "archive_download_url": "https://api.github.com/repos/SOLHK/Swirl/actions/artifacts/12184789030/zip",
+        "expired": false,
+        "created_at": "2026-10-19T12:22:38Z",
+        "expires_at": "2026-11-02T12:22:37Z",
+        "updated_at": "2026-10-19T12:22:38Z",
+        "digest": "sha256:88fa625f8583114ed8d992c0ba6f1e22b63d5a6dd5786bb7d6cb875694d79295",
+        "workflow_run": {
+          "id": 39250098899,
+          "repository_id": 1411888911,
+          "head_repository_id": 1411888911,
+          "head_branch": "work/core-completion-20261017",
+          "head_sha": "7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167"
+        }
+      },
+      "downloaded_zip": "/tmp/swirl-reality-final-windows-12184789030.zip",
+      "downloaded_sha256": "88fa625f8583114ed8d992c0ba6f1e22b63d5a6dd5786bb7d6cb875694d79295",
+      "github_digest_matches": true
+    },
+    {
+      "github": {
+        "id": 12186422235,
+        "name": "Swirl-Rust-Qt-Tests-7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167-1",
+        "size_in_bytes": 4564,
+        "url": "https://api.github.com/repos/SOLHK/Swirl/actions/artifacts/12186422235",
+        "archive_download_url": "https://api.github.com/repos/SOLHK/Swirl/actions/artifacts/12186422235/zip",
+        "expired": false,
+        "created_at": "2026-10-19T12:41:53Z",
+        "expires_at": "2026-10-26T12:41:52Z",
+        "updated_at": "2026-10-19T12:41:53Z",
+        "digest": "sha256:d0ffff58239d5034a443bc8e6c9786b5b93c4021cf00452913bc1a2b6afec1ae",
+        "workflow_run": {
+          "id": 39250098899,
+          "repository_id": 1411888911,
+          "head_repository_id": 1411888911,
+          "head_branch": "work/core-completion-20261017",
+          "head_sha": "7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167"
+        }
+      },
+      "downloaded_zip": "/tmp/swirl-qt-final-windows-12186422235.zip",
+      "downloaded_sha256": "d0ffff58239d5034a443bc8e6c9786b5b93c4021cf00452913bc1a2b6afec1ae",
+      "github_digest_matches": true
+    }
+  ],
+  "source_identity": {
+    "vision": {
+      "git_sha": "7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167",
+      "tracked_changes": false,
+      "client_sha256": "40b0cedfe6eba80f28408034ae34008db7cb4855d8c3b7aa9e2134282afadfe2",
+      "test_sha256": "6148d18e541cc5f540318e221efc4f25ca8646bd174ea9253f0ec7466b07d0bd",
+      "client_source_sha256": "0ea01d72b175de36a8d101efaf42e13f70b6fb4a7fe322699152057fdd5aa1c6",
+      "python": "3.14.8 (tags/v3.14.8:8e6e75d, Sep 30 2026, 18:19:33) [MSC v.1944 64 bit (AMD64)]",
+      "openssl": "OpenSSL 3.5.9 29 Sep 2026",
+      "platform": "win32",
+      "github_run_id": "39250098899"
+    },
+    "reality": {
+      "git_sha": "7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167",
+      "tracked_changes": false,
+      "platform": "win32",
+      "python": "3.14.8 (tags/v3.14.8:8e6e75d, Sep 30 2026, 18:19:33) [MSC v.1944 64 bit (AMD64)]",
+      "github_run_id": "39250098899",
+      "github_run_attempt": "1",
+      "client_sha256": "1488f0313329f1cfaa19d904f2e48d5742cc13c4188b1836ce3fc4dfac8f1d67",
+      "peer_sha256": "3abf8cc1c232372aef35d68394c5eee288d1510d84149e30ee32dabdba443cac",
+      "xray_sha256": "093eca6d231af725b9e5ddf5322764a190edceff35a49c29e0a3f8f6c07d06b1",
+      "test_source_sha256": "94eeb538bd7d076ca6a78846e6723c6a27ce909c5222e860086e93740d935273",
+      "client_source_sha256": "6a8548bb59c6362d99d23a5a5293439f6fb7cce8aa84751eb58f314e8cf7cfa5"
+    }
+  },
+  "build_manifest": {
+    "binaries": {
+      "reality_peer": {
+        "file": "reality-peer.exe",
+        "sha256": "3abf8cc1c232372aef35d68394c5eee288d1510d84149e30ee32dabdba443cac"
+      },
+      "xray": {
+        "file": "xray.exe",
+        "sha256": "093eca6d231af725b9e5ddf5322764a190edceff35a49c29e0a3f8f6c07d06b1"
+      }
+    },
+    "finished_unix": 1792412544,
+    "go_version": "go1.27.2",
+    "helper_source_sha256": "17b9af2d2bda7b3c57e95f87e3777065d29f05ffe418ce8c3cfde7beaa691ea0",
+    "lock_sha256": "b32dd9af801c8ed97c489f1120209b74224e595353b19fbfc13bce981eaaa925",
+    "peer_version_output": {
+      "event": "version",
+      "go_version": "go1.27.2",
+      "reality_version": "v0.0.0-20261014101318-83f621788ca8",
+      "xray_commit": "92ccc939aaf4f8965f369cf0b142e005aeaa11d5"
+    },
+    "platform": "Windows-2022Server-10.0.20348-SP0",
+    "reality": {
+      "commit": "83f621788ca88b83179810b12baa7ae518aacb83",
+      "go_mod_sum": "h1:ptlSkJ8k/7IDauNH0SA96JPOo+nYGLTv2Y3UMpwvAsY=",
+      "module": "github.com/xtls/reality",
+      "sum": "h1:RjLnVvlzK4q6zWaSBPNRGsrgx2fbJDeUWffjw574uzs=",
+      "version": "v0.0.0-20261014101318-83f621788ca8"
+    },
+    "reproducible_rebuild": {
+      "reality_peer": {
+        "first_sha256": "3abf8cc1c232372aef35d68394c5eee288d1510d84149e30ee32dabdba443cac",
+        "matches": true,
+        "repeated_sha256": "3abf8cc1c232372aef35d68394c5eee288d1510d84149e30ee32dabdba443cac"
+      },
+      "xray": {
+        "first_sha256": "093eca6d231af725b9e5ddf5322764a190edceff35a49c29e0a3f8f6c07d06b1",
+        "matches": true,
+        "repeated_sha256": "093eca6d231af725b9e5ddf5322764a190edceff35a49c29e0a3f8f6c07d06b1"
+      }
+    },
+    "schema_version": 1,
+    "started_unix": 1792412483,
+    "status": "success",
+    "swirl_source_commit": "7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167",
+    "swirl_worktree_status": "",
+    "xray": {
+      "commit": "92ccc939aaf4f8965f369cf0b142e005aeaa11d5",
+      "go_mod_sha256": "31fe6bd6c04eb2738e157b850236b1376cbbac3f33e974256bb7325c8c764250",
+      "go_sum_sha256": "a72c2f2b5dd38fcf42ef55034bd55038703448b55a878eafddd60d4af1f63145",
+      "release": "v26.10.17",
+      "repository": "https://github.com/XTLS/Xray-core.git",
+      "tree": "55fc871fdf3e63149066956e7c60670f3a44fbf2"
+    },
+    "xray_version_output": "Xray 26.10.17 (Xray, Penetrates Everything.) 92ccc93 (go1.27.2 windows/amd64)\nA unified platform for anti-censorship."
+  },
+  "build_log_sha256": "35a8a14a2559ab8d783ee399032fd44ecdec98c2b9dfc73dc14b5f03c4921c80",
+  "source_and_identity_review": {
+    "exact_sha_clean": true,
+    "all_downloaded_github_digests_match": true,
+    "pinned_upstream_dependency_checksums_match": true,
+    "both_repeated_binary_builds_match": true,
+    "vision_python_assertions_unchanged": true,
+    "vision_example_matches_record_fix_source": true
+  },
+  "rust": {
+    "unit_and_integration_passed": 272,
+    "doctests_passed": 1,
+    "total": 273,
+    "failed": 0,
+    "ignored": 0,
+    "new_record_boundary_regressions_passed": 5,
+    "raw_regression_lines": [
+      "2026-10-19T12:13:33.9719113Z test partial_header_survives_cancelled_read_and_write_half_close ... ok",
+      "2026-10-19T12:13:33.9898171Z test oversized_record_is_rejected_without_reading_its_body ... ok",
+      "2026-10-19T12:13:33.9899012Z test tampered_outer_direct_record_remains_an_authentication_failure ... ok",
+      "2026-10-19T12:13:34.0050787Z test real_tls_close_notify_is_required_even_at_record_boundaries ... ok",
+      "2026-10-19T12:13:34.0098739Z test both_boundaries_deliver_authenticated_direct_request_before_coalesced_raw_tls ... ok"
+    ]
+  },
+  "independent_protocol_peers": {
+    "step": "success",
+    "dns_negative_tests": 37,
+    "dns_seconds": 98.35,
+    "port_selector_tests_in_dns_suite": 6,
+    "raw_selector_case_lines": [
+      "2026-10-19T12:20:10.7677227Z test_all_ports_excluded_is_a_failure_not_an_ephemeral_fallback (__main__.LoopbackPortSelectionTests.test_all_ports_excluded_is_a_failure_not_an_ephemeral_fallback) ... Loopback pair reservation snapshot: ipv4 tcp",
+      "2026-10-19T12:20:10.7707695Z test_missing_or_malformed_exclusion_table_fails (__main__.LoopbackPortSelectionTests.test_missing_or_malformed_exclusion_table_fails) ... ok",
+      "2026-10-19T12:20:10.7710207Z test_netsh_numeric_rows_and_empty_table (__main__.LoopbackPortSelectionTests.test_netsh_numeric_rows_and_empty_table) ... ok",
+      "2026-10-19T12:20:10.7714492Z test_portable_candidate_remains_os_selected_without_netsh (__main__.LoopbackPortSelectionTests.test_portable_candidate_remains_os_selected_without_netsh) ... ok",
+      "2026-10-19T12:20:10.7728667Z test_query_failures_never_bind_or_start_servers (__main__.LoopbackPortSelectionTests.test_query_failures_never_bind_or_start_servers) ... ok",
+      "2026-10-19T12:20:10.7732506Z test_windows_candidate_excludes_both_protocols_on_each_family (__main__.LoopbackPortSelectionTests.test_windows_candidate_excludes_both_protocols_on_each_family) ... Loopback pair reservation snapshot: ipv4 tcp"
+    ],
+    "policy_group_tests_including_ss_fixture_regressions": 16,
+    "policy_group_seconds": 6.902,
+    "raw_policy_case_lines": [
+      "2026-10-19T12:18:25.4611180Z test_all_unhealthy_fails_without_direct_fallback (__main__.PolicyIntegration.test_all_unhealthy_fails_without_direct_fallback) ... ok",
+      "2026-10-19T12:18:25.7148306Z test_fallback_priority_and_failed_request_are_never_replayed (__main__.PolicyIntegration.test_fallback_priority_and_failed_request_are_never_replayed) ... ok",
+      "2026-10-19T12:18:25.8714476Z test_https_origin_inside_verified_tls_proxy_uses_two_tls_sessions (__main__.PolicyIntegration.test_https_origin_inside_verified_tls_proxy_uses_two_tls_sessions) ... ok",
+      "2026-10-19T12:18:26.0290328Z test_https_untrusted_or_wrong_certificate_never_becomes_healthy (__main__.PolicyIntegration.test_https_untrusted_or_wrong_certificate_never_becomes_healthy) ... ok",
+      "2026-10-19T12:18:26.1860576Z test_invalid_reconfigure_is_atomic_and_does_not_probe (__main__.PolicyIntegration.test_invalid_reconfigure_is_atomic_and_does_not_probe) ... ok",
+      "2026-10-19T12:18:26.3426120Z test_manual_selection_keeps_health_and_existing_connections (__main__.PolicyIntegration.test_manual_selection_keeps_health_and_existing_connections) ... ok",
+      "2026-10-19T12:18:26.4685900Z test_redirect_is_unhealthy_and_target_is_never_followed (__main__.PolicyIntegration.test_redirect_is_unhealthy_and_target_is_never_followed) ... ok",
+      "2026-10-19T12:18:26.6721465Z test_round_robin_consumes_only_new_routed_sessions (__main__.PolicyIntegration.test_round_robin_consumes_only_new_routed_sessions) ... ok",
+      "2026-10-19T12:18:28.1743710Z test_saturated_probe_budget_stops_and_reconfigure_does_not_leak (__main__.PolicyIntegration.test_saturated_probe_budget_stops_and_reconfigure_does_not_leak) ... ok",
+      "2026-10-19T12:18:28.2152470Z test_udp_association_pins_distinct_ss_exit_across_health_and_configure (__main__.PolicyIntegration.test_udp_association_pins_distinct_ss_exit_across_health_and_configure) ... Loopback pair reservation snapshot: ipv4 tcp",
+      "2026-10-19T12:18:30.2004132Z test_unsupported_udp_member_does_not_retry_a_direct_member (__main__.PolicyIntegration.test_unsupported_udp_member_does_not_retry_a_direct_member) ... ok",
+      "2026-10-19T12:18:31.5892901Z test_url_test_switches_only_new_tcp_sessions (__main__.PolicyIntegration.test_url_test_switches_only_new_tcp_sessions) ... ok",
+      "2026-10-19T12:18:31.6989988Z test_verified_https_runs_inside_native_proxy_tunnel (__main__.PolicyIntegration.test_verified_https_runs_inside_native_proxy_tunnel) ... ok",
+      "2026-10-19T12:18:31.7034093Z test_pair_allocation_preserves_denials_and_cleans_up_non_socket_errors (__main__.SsPolicyPeerAllocationTests.test_pair_allocation_preserves_denials_and_cleans_up_non_socket_errors) ... ok",
+      "2026-10-19T12:18:31.7067351Z test_pair_allocation_stops_after_eight_collisions_with_original_error (__main__.SsPolicyPeerAllocationTests.test_pair_allocation_stops_after_eight_collisions_with_original_error) ... ok",
+      "2026-10-19T12:18:32.1996413Z test_pair_retries_only_collisions_and_releases_failed_sockets (__main__.SsPolicyPeerAllocationTests.test_pair_retries_only_collisions_and_releases_failed_sockets) ... ok"
+    ],
+    "shadowsocks_tests_initial_invocation": {
+      "tests": 9,
+      "passed": 8,
+      "skipped_qt_wrapper": 1,
+      "seconds": 10.36
+    },
+    "legacy_python_initial_skip_lines": [
+      "2026-10-19T12:17:22.3751319Z test_vless_qt_data_path (__main__.RustCoreIntegration.test_vless_qt_data_path) ... skipped 'Qt executable required'",
+      "2026-10-19T12:17:26.7610337Z test_qt_facade_http_obfs_with_udp_declared (__main__.ShadowsocksTests.test_qt_facade_http_obfs_with_udp_declared) ... skipped 'Qt integration executable required'",
+      "2026-10-19T12:18:04.3051225Z test_qt_imported_socks4_and_4a_data_path (__main__.Socks4Integration.test_qt_imported_socks4_and_4a_data_path) ... skipped 'Qt integration executable required'",
+      "2026-10-19T12:18:13.5837656Z test_qt_vless_websocket_data_path (__main__.WebSocketTransportTests.test_qt_vless_websocket_data_path) ... skipped 'Qt integration executable required'",
+      "2026-10-19T12:20:59.6278264Z test_qt_imported_socks5_udp_data_path (__main__.Socks5UdpIntegration.test_qt_imported_socks5_udp_data_path) ... skipped 'Windows Qt integration executable required'",
+      "2026-10-19T12:21:01.9497563Z test_offline_cpp_import_and_existing_store_protection (__main__.CaptureTests.test_offline_cpp_import_and_existing_store_protection) ... skipped 'Set SWIRL_CAPTURE_INSPECTOR to the built C++ importer'",
+      "2026-10-19T12:21:04.4001597Z test_installed_cli_apply_and_rollback_only_in_temporary_home (__main__.InstalledCliTests.test_installed_cli_apply_and_rollback_only_in_temporary_home) ... skipped 'opt-in real CLI with isolated home'"
+    ]
+  },
+  "windows_port_reservation_fix": {
+    "actual_host_read_only_netsh_snapshots": {
+      "ipv4": {
+        "tcp": {
+          "ranges": [
+            [
+              80,
+              80
+            ],
+            [
+              5985,
+              5985
+            ],
+            [
+              5986,
+              5986
+            ],
+            [
+              47001,
+              47001
+            ],
+            [
+              52704,
+              52803
+            ],
+            [
+              52804,
+              52903
+            ]
+          ],
+          "raw_lines": [
+            "2026-10-19T12:16:54.7703954Z test_custom_dns_cache_expiry_and_zero_ttl (__main__.RustCoreIntegration.test_custom_dns_cache_expiry_and_zero_ttl) ... Loopback pair reservation snapshot: ipv4 tcp",
+            "2026-10-19T12:16:54.7704626Z ",
+            "2026-10-19T12:16:54.7704639Z ",
+            "2026-10-19T12:16:54.7704761Z Protocol tcp Port Exclusion Ranges",
+            "2026-10-19T12:16:54.7704941Z ",
+            "2026-10-19T12:16:54.7704946Z ",
+            "2026-10-19T12:16:54.7704950Z ",
+            "2026-10-19T12:16:54.7705040Z Start Port    End Port      ",
+            "2026-10-19T12:16:54.7705197Z ",
+            "2026-10-19T12:16:54.7705299Z ----------    --------      ",
+            "2026-10-19T12:16:54.7705443Z ",
+            "2026-10-19T12:16:54.7705523Z         80          80      ",
+            "2026-10-19T12:16:54.7705651Z ",
+            "2026-10-19T12:16:54.7705723Z       5985        5985      ",
+            "2026-10-19T12:16:54.7705845Z ",
+            "2026-10-19T12:16:54.7705919Z       5986        5986      ",
+            "2026-10-19T12:16:54.7706056Z ",
+            "2026-10-19T12:16:54.7706120Z      47001       47001      ",
+            "2026-10-19T12:16:54.7706254Z ",
+            "2026-10-19T12:16:54.7706319Z      52704       52803      ",
+            "2026-10-19T12:16:54.7706450Z ",
+            "2026-10-19T12:16:54.7706790Z      52804       52903      ",
+            "2026-10-19T12:16:54.7706923Z ",
+            "2026-10-19T12:16:54.7706928Z ",
+            "2026-10-19T12:16:54.7706932Z ",
+            "2026-10-19T12:16:54.7707057Z * - Administered port exclusions."
+          ]
+        },
+        "udp": {
+          "ranges": [
+            [
+              61227,
+              61326
+            ],
+            [
+              61327,
+              61426
+            ]
+          ],
+          "raw_lines": [
+            "2026-10-19T12:16:54.8063328Z Loopback pair reservation snapshot: ipv4 udp",
+            "2026-10-19T12:16:54.8063718Z ",
+            "2026-10-19T12:16:54.8063726Z ",
+            "2026-10-19T12:16:54.8063917Z Protocol udp Port Exclusion Ranges",
+            "2026-10-19T12:16:54.8064236Z ",
+            "2026-10-19T12:16:54.8064243Z ",
+            "2026-10-19T12:16:54.8064249Z ",
+            "2026-10-19T12:16:54.8064360Z Start Port    End Port      ",
+            "2026-10-19T12:16:54.8064539Z ",
+            "2026-10-19T12:16:54.8064636Z ----------    --------      ",
+            "2026-10-19T12:16:54.8064793Z ",
+            "2026-10-19T12:16:54.8064880Z      61227       61326      ",
+            "2026-10-19T12:16:54.8065023Z ",
+            "2026-10-19T12:16:54.8065105Z      61327       61426      ",
+            "2026-10-19T12:16:54.8065246Z ",
+            "2026-10-19T12:16:54.8065250Z ",
+            "2026-10-19T12:16:54.8065274Z ",
+            "2026-10-19T12:16:54.8065375Z * - Administered port exclusions."
+          ]
+        },
+        "candidate_count_computed_from_observed_union": 15984,
+        "candidate_count_is_inferred_from_raw_tables_not_directly_logged": true
+      },
+      "ipv6": {
+        "tcp": {
+          "ranges": [
+            [
+              80,
+              80
+            ],
+            [
+              5985,
+              5985
+            ],
+            [
+              5986,
+              5986
+            ],
+            [
+              47001,
+              47001
+            ],
+            [
+              52704,
+              52803
+            ],
+            [
+              52804,
+              52903
+            ]
+          ],
+          "raw_lines": [
+            "2026-10-19T12:17:08.6285087Z test_custom_dns_ipv6_server_and_tcp_retry (__main__.RustCoreIntegration.test_custom_dns_ipv6_server_and_tcp_retry) ... Loopback pair reservation snapshot: ipv6 tcp",
+            "2026-10-19T12:17:08.6285727Z ",
+            "2026-10-19T12:17:08.6285732Z ",
+            "2026-10-19T12:17:08.6285839Z Protocol tcp Port Exclusion Ranges",
+            "2026-10-19T12:17:08.6286033Z ",
+            "2026-10-19T12:17:08.6286037Z ",
+            "2026-10-19T12:17:08.6286043Z ",
+            "2026-10-19T12:17:08.6286165Z Start Port    End Port      ",
+            "2026-10-19T12:17:08.6286316Z ",
+            "2026-10-19T12:17:08.6286403Z ----------    --------      ",
+            "2026-10-19T12:17:08.6286544Z ",
+            "2026-10-19T12:17:08.6286616Z         80          80      ",
+            "2026-10-19T12:17:08.6286752Z ",
+            "2026-10-19T12:17:08.6286817Z       5985        5985      ",
+            "2026-10-19T12:17:08.6286946Z ",
+            "2026-10-19T12:17:08.6287011Z       5986        5986      ",
+            "2026-10-19T12:17:08.6287144Z ",
+            "2026-10-19T12:17:08.6287208Z      47001       47001      ",
+            "2026-10-19T12:17:08.6287348Z ",
+            "2026-10-19T12:17:08.6287446Z      52704       52803      ",
+            "2026-10-19T12:17:08.6287581Z ",
+            "2026-10-19T12:17:08.6287651Z      52804       52903      ",
+            "2026-10-19T12:17:08.6287773Z ",
+            "2026-10-19T12:17:08.6287777Z ",
+            "2026-10-19T12:17:08.6287781Z ",
+            "2026-10-19T12:17:08.6287878Z * - Administered port exclusions."
+          ]
+        },
+        "udp": {
+          "ranges": [
+            [
+              61227,
+              61326
+            ],
+            [
+              61327,
+              61426
+            ]
+          ],
+          "raw_lines": [
+            "2026-10-19T12:17:08.6620535Z Loopback pair reservation snapshot: ipv6 udp",
+            "2026-10-19T12:17:08.6620832Z ",
+            "2026-10-19T12:17:08.6620837Z ",
+            "2026-10-19T12:17:08.6620942Z Protocol udp Port Exclusion Ranges",
+            "2026-10-19T12:17:08.6621130Z ",
+            "2026-10-19T12:17:08.6621134Z ",
+            "2026-10-19T12:17:08.6621139Z ",
+            "2026-10-19T12:17:08.6621231Z Start Port    End Port      ",
+            "2026-10-19T12:17:08.6621379Z ",
+            "2026-10-19T12:17:08.6621459Z ----------    --------      ",
+            "2026-10-19T12:17:08.6621597Z ",
+            "2026-10-19T12:17:08.6621675Z      61227       61326      ",
+            "2026-10-19T12:17:08.6621804Z ",
+            "2026-10-19T12:17:08.6621883Z      61327       61426      ",
+            "2026-10-19T12:17:08.6622014Z ",
+            "2026-10-19T12:17:08.6622018Z ",
+            "2026-10-19T12:17:08.6622022Z ",
+            "2026-10-19T12:17:08.6622112Z * - Administered port exclusions."
+          ]
+        },
+        "candidate_count_computed_from_observed_union": 15984,
+        "candidate_count_is_inferred_from_raw_tables_not_directly_logged": true
+      }
+    },
+    "controlled_mock_selector_tests_distinguished_from_actual_host_snapshots": true,
+    "all_37_dns_cases_and_16_policy_group_cases_passed": true,
+    "permission_denial_and_query_failures_remain_errors_as_verified_by_named_selector_and_fixture_tests": true
+  },
+  "reality": {
+    "summary": {
+      "tests_run": 12,
+      "successful": true,
+      "failures": [],
+      "errors": [],
+      "skipped": []
+    },
+    "session_count": 13,
+    "seconds": 11.975,
+    "all_connections_processes_and_reader_threads_released": true,
+    "forced_cleanup": false,
+    "sessions": [
+      {
+        "case": "001-test_bare_tcp_fin_is_rejected_after_valid_echo",
+        "peer_result": {
+          "event": "result",
+          "status": "intentional_unclean_eof",
+          "handshake_complete": true,
+          "client_hello_authenticated": true,
+          "client_finished_verified": true,
+          "tls_version": 772,
+          "group": 4588,
+          "cipher_suite": 4865,
+          "received_bytes": 45,
+          "sent_bytes": 45,
+          "received_sha256": "981f5db04b36e9f6d574c66383fb062514d2696bb47cc41548af9ec4c9bc9377",
+          "sent_sha256": "981f5db04b36e9f6d574c66383fb062514d2696bb47cc41548af9ec4c9bc9377",
+          "close_notify_received": true,
+          "close_notify_sent": false,
+          "transport_eof": false,
+          "active_connections": 0,
+          "camouflage_application_bytes": 0
+        },
+        "client": {
+          "alpn": null,
+          "cipher_suite": 4865,
+          "client_close_notify": true,
+          "error": "peer closed connection without sending TLS close_notify: https://docs.rs/rustls/latest/rustls/manual/_03_howto/index.html#unexpected-eof",
+          "error_kind": "UnexpectedEof",
+          "group": 4588,
+          "handshake_verified": true,
+          "payload_matches": true,
+          "received_bytes": 45,
+          "server_close_notify": false,
+          "stage": "close",
+          "status": "error",
+          "uploaded_bytes": 45
+        },
+        "invocation": {
+          "payload_bytes": 45,
+          "payload_sha256": "981f5db04b36e9f6d574c66383fb062514d2696bb47cc41548af9ec4c9bc9377",
+          "changes": {},
+          "changed_auth_fields": [],
+          "elapsed_seconds": 0.011076100000082079,
+          "exit_code": 1
+        },
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        },
+        "raw_sha256": {
+          "client-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "peer-stdout.jsonl": "93c6188675995bf7d74f3c32fe8a3f895adc5675605cfc38e0851338883c914a",
+          "peer-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "lifecycle.json": "833b6ce5a648db34128e9443216d752989d59858ff950a5639674cccd515a533",
+          "client-stdout.jsonl": "0e916f48c0ae5a57cd98c13baa78a671a436c914fc74bcbd50c795bca47c85c2",
+          "client-invocation.json": "bc8e1ce37b2d5a3dbd93c55158b5fcf4582db7695dc6b106a308e15b8406650b"
+        }
+      },
+      {
+        "case": "002-test_data_cancellation_drops_transport_and_reaps_peer",
+        "peer_result": {
+          "event": "result",
+          "status": "cancelled",
+          "handshake_complete": true,
+          "client_hello_authenticated": true,
+          "client_finished_verified": true,
+          "tls_version": 772,
+          "group": 4588,
+          "cipher_suite": 4865,
+          "received_bytes": 37,
+          "sent_bytes": 0,
+          "received_sha256": "4fe39b322239459ddc4c9d64609e0d04e0a1d231a24479947cbc86e6760344cd",
+          "sent_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "close_notify_received": false,
+          "close_notify_sent": false,
+          "transport_eof": true,
+          "active_connections": 0,
+          "camouflage_application_bytes": 0
+        },
+        "client": {
+          "alpn": null,
+          "cipher_suite": 4865,
+          "client_close_notify": false,
+          "error": "SyntheticPeerCancelled",
+          "error_kind": "Interrupted",
+          "group": 4588,
+          "handshake_verified": true,
+          "payload_matches": false,
+          "received_bytes": 0,
+          "server_close_notify": false,
+          "stage": "data",
+          "status": "error",
+          "uploaded_bytes": 37
+        },
+        "invocation": {
+          "payload_bytes": 37,
+          "payload_sha256": "4fe39b322239459ddc4c9d64609e0d04e0a1d231a24479947cbc86e6760344cd",
+          "changes": {
+            "cancel_after_ms": 1500
+          },
+          "changed_auth_fields": [],
+          "elapsed_seconds": 1.528060699999969,
+          "exit_code": 1
+        },
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        },
+        "raw_sha256": {
+          "client-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "peer-stdout.jsonl": "4c54b4ff31c4211507ba65ce6de097b69c9ea5442ada4bc2904d8c3a2e1d2713",
+          "peer-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "lifecycle.json": "833b6ce5a648db34128e9443216d752989d59858ff950a5639674cccd515a533",
+          "client-stdout.jsonl": "da757f8643fa10cd8104bcad6b17bcbd61f11c14b31ec5eba72a6fab5e3b601e",
+          "client-invocation.json": "a6a1781f2414ff2a072519f441a6cf39a1aca96ea9c817a216a4f54039e3de52"
+        }
+      },
+      {
+        "case": "003-test_data_timeout_drops_transport_and_reaps_peer",
+        "peer_result": {
+          "event": "result",
+          "status": "cancelled",
+          "handshake_complete": true,
+          "client_hello_authenticated": true,
+          "client_finished_verified": true,
+          "tls_version": 772,
+          "group": 4588,
+          "cipher_suite": 4865,
+          "received_bytes": 37,
+          "sent_bytes": 0,
+          "received_sha256": "4fe39b322239459ddc4c9d64609e0d04e0a1d231a24479947cbc86e6760344cd",
+          "sent_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "close_notify_received": false,
+          "close_notify_sent": false,
+          "transport_eof": true,
+          "active_connections": 0,
+          "camouflage_application_bytes": 0
+        },
+        "client": {
+          "alpn": null,
+          "cipher_suite": 4865,
+          "client_close_notify": false,
+          "error": "SyntheticPeerDeadline",
+          "error_kind": "TimedOut",
+          "group": 4588,
+          "handshake_verified": true,
+          "payload_matches": false,
+          "received_bytes": 0,
+          "server_close_notify": false,
+          "stage": "data",
+          "status": "error",
+          "uploaded_bytes": 37
+        },
+        "invocation": {
+          "payload_bytes": 37,
+          "payload_sha256": "4fe39b322239459ddc4c9d64609e0d04e0a1d231a24479947cbc86e6760344cd",
+          "changes": {
+            "timeout_ms": 1500
+          },
+          "changed_auth_fields": [],
+          "elapsed_seconds": 1.5303745000001072,
+          "exit_code": 1
+        },
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        },
+        "raw_sha256": {
+          "client-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "peer-stdout.jsonl": "a1066475eb1d19e10cd889e3783c317ec8e41f44753944d4f6a8d37cba0bb9a4",
+          "peer-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "lifecycle.json": "833b6ce5a648db34128e9443216d752989d59858ff950a5639674cccd515a533",
+          "client-stdout.jsonl": "ffe0f018401dba330e0aca1dfda3aac03911c884240e3d4fc9b3eaeb6709432b",
+          "client-invocation.json": "90b1e530b1a6d5db28ea1da120e8e1995ca0af87126a55f989036f62820902b7"
+        }
+      },
+      {
+        "case": "004-test_empty_application_still_requires_both_finished_and_close_notify",
+        "peer_result": {
+          "event": "result",
+          "status": "completed",
+          "handshake_complete": true,
+          "client_hello_authenticated": true,
+          "client_finished_verified": true,
+          "tls_version": 772,
+          "group": 4588,
+          "cipher_suite": 4865,
+          "received_bytes": 0,
+          "sent_bytes": 0,
+          "received_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "sent_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "close_notify_received": true,
+          "close_notify_sent": true,
+          "transport_eof": false,
+          "active_connections": 0,
+          "camouflage_application_bytes": 0
+        },
+        "client": {
+          "alpn": null,
+          "cipher_suite": 4865,
+          "client_close_notify": true,
+          "group": 4588,
+          "handshake_verified": true,
+          "payload_matches": true,
+          "received_bytes": 0,
+          "server_close_notify": true,
+          "stage": "close",
+          "status": "ok",
+          "transport_read_bytes": 2154,
+          "transport_written_bytes": 1515,
+          "uploaded_bytes": 0
+        },
+        "invocation": {
+          "payload_bytes": 0,
+          "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "changes": {
+            "read_chunk": 16384,
+            "write_chunk": 16384
+          },
+          "changed_auth_fields": [],
+          "elapsed_seconds": 0.01030809999997473,
+          "exit_code": 0
+        },
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        },
+        "raw_sha256": {
+          "client-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "peer-stdout.jsonl": "1df32efef16fb334a754db27d31042950499ecf294f3d0f0fd63ec8bd2b85025",
+          "peer-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "lifecycle.json": "833b6ce5a648db34128e9443216d752989d59858ff950a5639674cccd515a533",
+          "client-stdout.jsonl": "758f2aa5d84a62ed98a1ee859b9e81b5861e2e46e613ce4feb02121aa5e58cbd",
+          "client-invocation.json": "e45f79caa7197aa1bf0dab7b8d0646ba17ddeee3fa1747de1b28597b32337072"
+        }
+      },
+      {
+        "case": "005-test_handshake_cancellation_drops_transport_and_reaps_peer",
+        "peer_result": {
+          "event": "result",
+          "status": "cancelled",
+          "handshake_complete": false,
+          "client_hello_authenticated": false,
+          "client_finished_verified": false,
+          "tls_version": 0,
+          "group": 0,
+          "cipher_suite": 0,
+          "received_bytes": 0,
+          "sent_bytes": 0,
+          "received_sha256": "",
+          "sent_sha256": "",
+          "close_notify_received": false,
+          "close_notify_sent": false,
+          "transport_eof": true,
+          "active_connections": 0,
+          "camouflage_application_bytes": 0
+        },
+        "client": {
+          "client_close_notify": false,
+          "error": "SyntheticPeerCancelled",
+          "error_kind": "Interrupted",
+          "handshake_verified": false,
+          "payload_matches": false,
+          "received_bytes": 0,
+          "server_close_notify": false,
+          "stage": "handshake",
+          "status": "error",
+          "uploaded_bytes": 0
+        },
+        "invocation": {
+          "payload_bytes": 37,
+          "payload_sha256": "4fe39b322239459ddc4c9d64609e0d04e0a1d231a24479947cbc86e6760344cd",
+          "changes": {
+            "cancel_after_ms": 600
+          },
+          "changed_auth_fields": [],
+          "elapsed_seconds": 0.635910400000057,
+          "exit_code": 1
+        },
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        },
+        "raw_sha256": {
+          "client-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "peer-stdout.jsonl": "71202d5a8dd8f6ed53230e4602afe87c3c2bb1cd095a65741d4f936023902a8b",
+          "peer-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "lifecycle.json": "833b6ce5a648db34128e9443216d752989d59858ff950a5639674cccd515a533",
+          "client-stdout.jsonl": "4dd08cda660721b67efa145e693c36765b6b30f1d881e830a897692fb3092821",
+          "client-invocation.json": "b55a15e2d43616f5ed429dacc06f398700ea734f6b1d00c5b668853c9cfc5acc"
+        }
+      },
+      {
+        "case": "006-test_handshake_timeout_drops_transport_and_reaps_peer",
+        "peer_result": {
+          "event": "result",
+          "status": "cancelled",
+          "handshake_complete": false,
+          "client_hello_authenticated": false,
+          "client_finished_verified": false,
+          "tls_version": 0,
+          "group": 0,
+          "cipher_suite": 0,
+          "received_bytes": 0,
+          "sent_bytes": 0,
+          "received_sha256": "",
+          "sent_sha256": "",
+          "close_notify_received": false,
+          "close_notify_sent": false,
+          "transport_eof": true,
+          "active_connections": 0,
+          "camouflage_application_bytes": 0
+        },
+        "client": {
+          "client_close_notify": false,
+          "error": "SyntheticPeerDeadline",
+          "error_kind": "TimedOut",
+          "handshake_verified": false,
+          "payload_matches": false,
+          "received_bytes": 0,
+          "server_close_notify": false,
+          "stage": "handshake",
+          "status": "error",
+          "uploaded_bytes": 0
+        },
+        "invocation": {
+          "payload_bytes": 37,
+          "payload_sha256": "4fe39b322239459ddc4c9d64609e0d04e0a1d231a24479947cbc86e6760344cd",
+          "changes": {
+            "timeout_ms": 600
+          },
+          "changed_auth_fields": [],
+          "elapsed_seconds": 0.6368297000001348,
+          "exit_code": 1
+        },
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        },
+        "raw_sha256": {
+          "client-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "peer-stdout.jsonl": "f7d4bd85a35c6cde1c0a0ab8cf6cdf9d03a06a63b2a1e0120ed602af4734daa1",
+          "peer-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "lifecycle.json": "833b6ce5a648db34128e9443216d752989d59858ff950a5639674cccd515a533",
+          "client-stdout.jsonl": "e4d8cf73e5d056573f57ebf8d6832b3a985b79f83135a2916c9b749e44b2df61",
+          "client-invocation.json": "1038c9b07ce56f02bef73d56ee0d127e86f8b4826107a992ffed1c92806d51e2"
+        }
+      },
+      {
+        "case": "007-test_native_hybrid_authentication_finished_bidirectional_data_and_close",
+        "peer_result": {
+          "event": "result",
+          "status": "completed",
+          "handshake_complete": true,
+          "client_hello_authenticated": true,
+          "client_finished_verified": true,
+          "tls_version": 772,
+          "group": 4588,
+          "cipher_suite": 4865,
+          "received_bytes": 32769,
+          "sent_bytes": 32769,
+          "received_sha256": "b93c16c99895f1593347ab57af0c0a82f9672ecb3debb59d124e1b38f3871f01",
+          "sent_sha256": "b93c16c99895f1593347ab57af0c0a82f9672ecb3debb59d124e1b38f3871f01",
+          "close_notify_received": true,
+          "close_notify_sent": true,
+          "transport_eof": false,
+          "active_connections": 0,
+          "camouflage_application_bytes": 0
+        },
+        "client": {
+          "alpn": null,
+          "cipher_suite": 4865,
+          "client_close_notify": true,
+          "group": 4588,
+          "handshake_verified": true,
+          "payload_matches": true,
+          "received_bytes": 32769,
+          "server_close_notify": true,
+          "stage": "close",
+          "status": "ok",
+          "transport_read_bytes": 35869,
+          "transport_written_bytes": 34350,
+          "uploaded_bytes": 32769
+        },
+        "invocation": {
+          "payload_bytes": 32769,
+          "payload_sha256": "b93c16c99895f1593347ab57af0c0a82f9672ecb3debb59d124e1b38f3871f01",
+          "changes": {
+            "read_chunk": 16384,
+            "write_chunk": 16384
+          },
+          "changed_auth_fields": [],
+          "elapsed_seconds": 0.012327599999935046,
+          "exit_code": 0
+        },
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        },
+        "raw_sha256": {
+          "client-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "peer-stdout.jsonl": "496b869cf225511700046a993228c552bb57f93e1fe61cb4563825943188f51d",
+          "peer-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "lifecycle.json": "833b6ce5a648db34128e9443216d752989d59858ff950a5639674cccd515a533",
+          "client-stdout.jsonl": "7358992a7211c2ca3123ab61df025e1421d12926a19743857c9c991cf647b089",
+          "client-invocation.json": "8a6c514bb505344cadbfba053e4f57805b9583e43fdb3ed684fc3740b9b1adfe"
+        }
+      },
+      {
+        "case": "008-test_native_x25519_authentication_finished_bidirectional_data_and_close",
+        "peer_result": {
+          "event": "result",
+          "status": "completed",
+          "handshake_complete": true,
+          "client_hello_authenticated": true,
+          "client_finished_verified": true,
+          "tls_version": 772,
+          "group": 29,
+          "cipher_suite": 4865,
+          "received_bytes": 32769,
+          "sent_bytes": 32769,
+          "received_sha256": "751b017cb23d0f5f0baf7fac5a2357b94feff6623f1ee693b53d2bd067ffa257",
+          "sent_sha256": "751b017cb23d0f5f0baf7fac5a2357b94feff6623f1ee693b53d2bd067ffa257",
+          "close_notify_received": true,
+          "close_notify_sent": true,
+          "transport_eof": false,
+          "active_connections": 0,
+          "camouflage_application_bytes": 0
+        },
+        "client": {
+          "alpn": null,
+          "cipher_suite": 4865,
+          "client_close_notify": true,
+          "group": 29,
+          "handshake_verified": true,
+          "payload_matches": true,
+          "received_bytes": 32769,
+          "server_close_notify": true,
+          "stage": "close",
+          "status": "ok",
+          "transport_read_bytes": 34780,
+          "transport_written_bytes": 34350,
+          "uploaded_bytes": 32769
+        },
+        "invocation": {
+          "payload_bytes": 32769,
+          "payload_sha256": "751b017cb23d0f5f0baf7fac5a2357b94feff6623f1ee693b53d2bd067ffa257",
+          "changes": {
+            "read_chunk": 16384,
+            "write_chunk": 16384
+          },
+          "changed_auth_fields": [],
+          "elapsed_seconds": 0.0123198000001139,
+          "exit_code": 0
+        },
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        },
+        "raw_sha256": {
+          "client-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "peer-stdout.jsonl": "d595305d7bbe8f278b119bfc53de9b2c6e40cdeae25e0a2c5ae9a776ca8fec64",
+          "peer-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "lifecycle.json": "833b6ce5a648db34128e9443216d752989d59858ff950a5639674cccd515a533",
+          "client-stdout.jsonl": "eb389bafdc23584203f4e2a053094b78b8ec15be6b0a6b7785bce79ab21f28cd",
+          "client-invocation.json": "dbbb6b75397687d6225c5107026d45b931f36df104cd41b8eca995a98fe47a0f"
+        }
+      },
+      {
+        "case": "009-test_one_mebibyte_binary_transfer_with_short_reads_and_writes",
+        "peer_result": {
+          "event": "result",
+          "status": "completed",
+          "handshake_complete": true,
+          "client_hello_authenticated": true,
+          "client_finished_verified": true,
+          "tls_version": 772,
+          "group": 4588,
+          "cipher_suite": 4865,
+          "received_bytes": 1048576,
+          "sent_bytes": 1048576,
+          "received_sha256": "fbbab289f7f94b25736c58be46a994c441fd02552cc6022352e3d86d2fab7c83",
+          "sent_sha256": "fbbab289f7f94b25736c58be46a994c441fd02552cc6022352e3d86d2fab7c83",
+          "close_notify_received": true,
+          "close_notify_sent": true,
+          "transport_eof": false,
+          "active_connections": 0,
+          "camouflage_application_bytes": 0
+        },
+        "client": {
+          "alpn": null,
+          "cipher_suite": 4865,
+          "client_close_notify": true,
+          "group": 4588,
+          "handshake_verified": true,
+          "payload_matches": true,
+          "received_bytes": 1048576,
+          "server_close_notify": true,
+          "stage": "close",
+          "status": "ok",
+          "transport_read_bytes": 1080297,
+          "transport_written_bytes": 1051499,
+          "uploaded_bytes": 1048576
+        },
+        "invocation": {
+          "payload_bytes": 1048576,
+          "payload_sha256": "fbbab289f7f94b25736c58be46a994c441fd02552cc6022352e3d86d2fab7c83",
+          "changes": {
+            "read_chunk": 257,
+            "write_chunk": 131
+          },
+          "changed_auth_fields": [],
+          "elapsed_seconds": 0.21286770000006072,
+          "exit_code": 0
+        },
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        },
+        "raw_sha256": {
+          "client-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "peer-stdout.jsonl": "7c9eacc1f8ab1b6428b984b833d8cbaadd2e1576081b8909890f0c258eb88de4",
+          "peer-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "lifecycle.json": "833b6ce5a648db34128e9443216d752989d59858ff950a5639674cccd515a533",
+          "client-stdout.jsonl": "ee122322b1c3a93d64662874db7ea13366d7b798643cf2df542b8ba1e9a0eef6",
+          "client-invocation.json": "2fc41f515e1f495ae702c3e01bc98e005f761cde807c47b63df4cf539fa46cfe"
+        }
+      },
+      {
+        "case": "010-test_single_byte_socket_boundaries",
+        "peer_result": {
+          "event": "result",
+          "status": "completed",
+          "handshake_complete": true,
+          "client_hello_authenticated": true,
+          "client_finished_verified": true,
+          "tls_version": 772,
+          "group": 4588,
+          "cipher_suite": 4865,
+          "received_bytes": 310,
+          "sent_bytes": 310,
+          "received_sha256": "6499a23dc424e2be745d98f1423f9ebeb6c3dc2ada20e1f5fc393cb08a36afb6",
+          "sent_sha256": "6499a23dc424e2be745d98f1423f9ebeb6c3dc2ada20e1f5fc393cb08a36afb6",
+          "close_notify_received": true,
+          "close_notify_sent": true,
+          "transport_eof": false,
+          "active_connections": 0,
+          "camouflage_application_bytes": 0
+        },
+        "client": {
+          "alpn": null,
+          "cipher_suite": 4865,
+          "client_close_notify": true,
+          "group": 4588,
+          "handshake_verified": true,
+          "payload_matches": true,
+          "received_bytes": 310,
+          "server_close_notify": true,
+          "stage": "close",
+          "status": "ok",
+          "transport_read_bytes": 2486,
+          "transport_written_bytes": 1847,
+          "uploaded_bytes": 310
+        },
+        "invocation": {
+          "payload_bytes": 310,
+          "payload_sha256": "6499a23dc424e2be745d98f1423f9ebeb6c3dc2ada20e1f5fc393cb08a36afb6",
+          "changes": {
+            "read_chunk": 1,
+            "write_chunk": 3
+          },
+          "changed_auth_fields": [],
+          "elapsed_seconds": 0.018359400000008463,
+          "exit_code": 0
+        },
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        },
+        "raw_sha256": {
+          "client-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "peer-stdout.jsonl": "8145399e14581bb3eb71c79b86d168c190e78236691c8083d69843a33877bb2f",
+          "peer-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "lifecycle.json": "833b6ce5a648db34128e9443216d752989d59858ff950a5639674cccd515a533",
+          "client-stdout.jsonl": "2e1a55b8ff7f2fa67f922a47f0114e41fa913e2f71f550a084f49189ba4cdafd",
+          "client-invocation.json": "6987b71ec5073a841058ee9533417a2b89a099e663ae0c59f415a235e8a743db"
+        }
+      },
+      {
+        "case": "011-test_single_byte_socket_boundaries",
+        "peer_result": {
+          "event": "result",
+          "status": "completed",
+          "handshake_complete": true,
+          "client_hello_authenticated": true,
+          "client_finished_verified": true,
+          "tls_version": 772,
+          "group": 29,
+          "cipher_suite": 4865,
+          "received_bytes": 310,
+          "sent_bytes": 310,
+          "received_sha256": "6499a23dc424e2be745d98f1423f9ebeb6c3dc2ada20e1f5fc393cb08a36afb6",
+          "sent_sha256": "6499a23dc424e2be745d98f1423f9ebeb6c3dc2ada20e1f5fc393cb08a36afb6",
+          "close_notify_received": true,
+          "close_notify_sent": true,
+          "transport_eof": false,
+          "active_connections": 0,
+          "camouflage_application_bytes": 0
+        },
+        "client": {
+          "alpn": null,
+          "cipher_suite": 4865,
+          "client_close_notify": true,
+          "group": 29,
+          "handshake_verified": true,
+          "payload_matches": true,
+          "received_bytes": 310,
+          "server_close_notify": true,
+          "stage": "close",
+          "status": "ok",
+          "transport_read_bytes": 1398,
+          "transport_written_bytes": 1847,
+          "uploaded_bytes": 310
+        },
+        "invocation": {
+          "payload_bytes": 310,
+          "payload_sha256": "6499a23dc424e2be745d98f1423f9ebeb6c3dc2ada20e1f5fc393cb08a36afb6",
+          "changes": {
+            "read_chunk": 7,
+            "write_chunk": 1
+          },
+          "changed_auth_fields": [],
+          "elapsed_seconds": 0.025590100000044913,
+          "exit_code": 0
+        },
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        },
+        "raw_sha256": {
+          "client-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "peer-stdout.jsonl": "f617769be046b4181e691935765af078ff6625682ed86c90f7500810e9957b9a",
+          "peer-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "lifecycle.json": "833b6ce5a648db34128e9443216d752989d59858ff950a5639674cccd515a533",
+          "client-stdout.jsonl": "3066d74afe2a9df1627e6aee9e457b668f494c409117a3d0af8496aa0092d45c",
+          "client-invocation.json": "1a8aae48a6137fafa055884bd0bb9032fe2dea5be63c915893a29538f0f28eb2"
+        }
+      },
+      {
+        "case": "012-test_wrong_reality_public_key_never_exposes_application_data",
+        "peer_result": {
+          "event": "result",
+          "status": "authentication_rejected",
+          "handshake_complete": false,
+          "client_hello_authenticated": false,
+          "client_finished_verified": false,
+          "tls_version": 0,
+          "group": 0,
+          "cipher_suite": 0,
+          "received_bytes": 0,
+          "sent_bytes": 0,
+          "received_sha256": "",
+          "sent_sha256": "",
+          "close_notify_received": false,
+          "close_notify_sent": false,
+          "transport_eof": false,
+          "active_connections": 0,
+          "camouflage_application_bytes": 0,
+          "error": "upstream REALITY handshake rejected"
+        },
+        "client": {
+          "client_close_notify": false,
+          "error": "unexpected error: RealityCertificateProfileUnsupported",
+          "error_kind": "InvalidData",
+          "handshake_verified": false,
+          "payload_matches": false,
+          "received_bytes": 0,
+          "server_close_notify": false,
+          "stage": "handshake",
+          "status": "error",
+          "uploaded_bytes": 0
+        },
+        "invocation": {
+          "payload_bytes": 46,
+          "payload_sha256": "6a0bf8819d8d266ea453a716c978e1f36a532081fb37229c02f7d87f8078c5f2",
+          "changes": {},
+          "changed_auth_fields": [
+            "public_key_hex"
+          ],
+          "elapsed_seconds": 0.00965209999981198,
+          "exit_code": 1
+        },
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        },
+        "raw_sha256": {
+          "client-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "peer-stdout.jsonl": "a62625d69d79c700235d5f4bcd55aa5d7ff8cf98351e1684ab24e4cc6e5dc7b7",
+          "peer-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "lifecycle.json": "833b6ce5a648db34128e9443216d752989d59858ff950a5639674cccd515a533",
+          "client-stdout.jsonl": "e0e34f4fa368c706e7f2ceaaf56983580f455fad11654aca0a8f9c58f6a254ce",
+          "client-invocation.json": "71d45edb82213b4d8cc9690f3aa83b9f0833fb68730029d165a6bbe8002b2ea4"
+        }
+      },
+      {
+        "case": "013-test_wrong_short_id_never_exposes_application_data",
+        "peer_result": {
+          "event": "result",
+          "status": "authentication_rejected",
+          "handshake_complete": false,
+          "client_hello_authenticated": false,
+          "client_finished_verified": false,
+          "tls_version": 0,
+          "group": 0,
+          "cipher_suite": 0,
+          "received_bytes": 0,
+          "sent_bytes": 0,
+          "received_sha256": "",
+          "sent_sha256": "",
+          "close_notify_received": false,
+          "close_notify_sent": false,
+          "transport_eof": false,
+          "active_connections": 0,
+          "camouflage_application_bytes": 0,
+          "error": "upstream REALITY handshake rejected"
+        },
+        "client": {
+          "client_close_notify": false,
+          "error": "unexpected error: RealityCertificateProfileUnsupported",
+          "error_kind": "InvalidData",
+          "handshake_verified": false,
+          "payload_matches": false,
+          "received_bytes": 0,
+          "server_close_notify": false,
+          "stage": "handshake",
+          "status": "error",
+          "uploaded_bytes": 0
+        },
+        "invocation": {
+          "payload_bytes": 46,
+          "payload_sha256": "6a0bf8819d8d266ea453a716c978e1f36a532081fb37229c02f7d87f8078c5f2",
+          "changes": {},
+          "changed_auth_fields": [
+            "short_id_hex"
+          ],
+          "elapsed_seconds": 0.009830100000044695,
+          "exit_code": 1
+        },
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_cleanup": false,
+          "reader_released": true,
+          "exit_code": 0
+        },
+        "raw_sha256": {
+          "client-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "peer-stdout.jsonl": "d673918b0a1641d15e862db2b013cd365b688790f623d733b5849fd966891ecd",
+          "peer-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "lifecycle.json": "833b6ce5a648db34128e9443216d752989d59858ff950a5639674cccd515a533",
+          "client-stdout.jsonl": "e0e34f4fa368c706e7f2ceaaf56983580f455fad11654aca0a8f9c58f6a254ce",
+          "client-invocation.json": "13264b7541a3d5eafb560e5a34cb562225e0fed45fac6e6b2bc1438d67f6b0d2"
+        }
+      }
+    ]
+  },
+  "vision": {
+    "summary": {
+      "tests_run": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "successful": true
+    },
+    "seconds": 3.148,
+    "strict_negative_permission_denied_observed": true,
+    "strict_negative_zero_application_data": true,
+    "raw_direct_enabled": false,
+    "bad_record_mac_found": false,
+    "all_target_threads_connections_and_xray_processes_released": true,
+    "forced_kill": false,
+    "sessions": [
+      {
+        "case": "001-test_tls12_authentication_framing_bidirectional_data_and_close-1792412582326838000",
+        "client": {
+          "direct_ready": false,
+          "direct_rejected": false,
+          "ok": true,
+          "payload_sha256": "35a8d48b9ca999ef7d4958538f214584ccf004f1c4c31830c6fa179cdf99f2a4",
+          "received": 45,
+          "stage": "complete",
+          "tls13_candidate": false,
+          "uploaded": 45
+        },
+        "target": {
+          "tls_version": "TLSv1.2",
+          "handshake_complete": true,
+          "received_bytes": 45,
+          "sent_bytes": 45,
+          "close_notify_received": true,
+          "close_notify_sent": true,
+          "probe_bytes_sent": 0,
+          "connection_closed": true,
+          "thread_released": true,
+          "error": null,
+          "cipher": "ECDHE-ECDSA-AES256-GCM-SHA384",
+          "received_sha256": "35a8d48b9ca999ef7d4958538f214584ccf004f1c4c31830c6fa179cdf99f2a4",
+          "sent_sha256": "35a8d48b9ca999ef7d4958538f214584ccf004f1c4c31830c6fa179cdf99f2a4"
+        },
+        "invocation": {
+          "elapsed_seconds": 0.022391100000049846,
+          "exit_code": 0,
+          "payload_bytes": 45,
+          "payload_sha256": "35a8d48b9ca999ef7d4958538f214584ccf004f1c4c31830c6fa179cdf99f2a4",
+          "tls13": false,
+          "pause_reads": false,
+          "read_chunk": 16384,
+          "write_chunk": 16384
+        },
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_kill": false,
+          "listener_closed": true,
+          "exit_code": 1
+        },
+        "raw": {
+          "client-stdout.jsonl": {
+            "sha256": "1251386669da70352152d5735c5caadf40abce6a201ae81e3a3e7a1a1e0efd95",
+            "text": "{\"direct_ready\":false,\"direct_rejected\":false,\"ok\":true,\"payload_sha256\":\"35a8d48b9ca999ef7d4958538f214584ccf004f1c4c31830c6fa179cdf99f2a4\",\"received\":45,\"stage\":\"complete\",\"tls13_candidate\":false,\"uploaded\":45}\r\n"
+          },
+          "client-stderr.log": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "text": ""
+          },
+          "target-result.json": {
+            "sha256": "26c2b51eda56468924b4916202a33004e17eb47d2982924b2d78e848f18a5b86",
+            "text": "{\r\n  \"tls_version\": \"TLSv1.2\",\r\n  \"handshake_complete\": true,\r\n  \"received_bytes\": 45,\r\n  \"sent_bytes\": 45,\r\n  \"close_notify_received\": true,\r\n  \"close_notify_sent\": true,\r\n  \"probe_bytes_sent\": 0,\r\n  \"connection_closed\": true,\r\n  \"thread_released\": true,\r\n  \"error\": null,\r\n  \"cipher\": \"ECDHE-ECDSA-AES256-GCM-SHA384\",\r\n  \"received_sha256\": \"35a8d48b9ca999ef7d4958538f214584ccf004f1c4c31830c6fa179cdf99f2a4\",\r\n  \"sent_sha256\": \"35a8d48b9ca999ef7d4958538f214584ccf004f1c4c31830c6fa179cdf99f2a4\"\r\n}\r\n"
+          },
+          "xray-lifecycle.json": {
+            "sha256": "457a973e0cf6e593322df0e2cf198b97afd118ebb787099fd14a2234847885e8",
+            "text": "{\r\n  \"process_reaped\": true,\r\n  \"forced_kill\": false,\r\n  \"listener_closed\": true,\r\n  \"exit_code\": 1\r\n}\r\n"
+          },
+          "invocation.json": {
+            "sha256": "136e736dc26f29a035e7c58ae8e83902697dc0ab5c761d20aefc1d3382f120c6",
+            "text": "{\r\n  \"elapsed_seconds\": 0.022391100000049846,\r\n  \"exit_code\": 0,\r\n  \"payload_bytes\": 45,\r\n  \"payload_sha256\": \"35a8d48b9ca999ef7d4958538f214584ccf004f1c4c31830c6fa179cdf99f2a4\",\r\n  \"tls13\": false,\r\n  \"pause_reads\": false,\r\n  \"read_chunk\": 16384,\r\n  \"write_chunk\": 16384\r\n}\r\n"
+          },
+          "xray.log": {
+            "sha256": "93396f2689f1ae4bf91e08beac33da74b3dfb3247d14d27b59efa1b3ff4467ea",
+            "text": "Xray 26.10.17 (Xray, Penetrates Everything.) 92ccc93 (go1.27.2 windows/amd64)\nA unified platform for anti-censorship.\n2026/10/19 12:23:02.452905 [Info] infra/conf/serial: Reading config: &{Name:D:\\a\\_temp\\swirl-vision-results\\001-test_tls12_authentication_framing_bidirectional_data_and_close-1792412582326838000\\xray-config.json Format:json}\r\n2026/10/19 12:23:02.456290 [Debug] app/log: Logger started\r\n2026/10/19 12:23:02.459469 [Debug] app/proxyman/inbound: creating stream worker on 127.0.0.1:55916\r\n2026/10/19 12:23:02.463673 [Info] transport/internet/tcp: listening tcp on 127.0.0.1:55916\r\n2026/10/19 12:23:02.465250 [Warning] core: Xray 26.10.17 started\r\n2026/10/19 12:23:02.523374 [Info] [643587628] app/proxyman/inbound: connection ends > EOF\r\n2026/10/19 12:23:02.539620 [Info] [2110703916] proxy/vless/inbound: firstLen = 44\r\n2026/10/19 12:23:02.539620 [Info] [2110703916] proxy/vless/inbound: received request for tcp:127.0.0.1:55915\r\n2026/10/19 12:23:02.539620 [Info] [2110703916] app/dispatcher: taking detour [loopback] for [tcp:127.0.0.1:55915]\r\n2026/10/19 12:23:02.539620 from 127.0.0.1:55919 accepted tcp:127.0.0.1:55915 [loopback]\r\n2026/10/19 12:23:02.539620 [Info] [2110703916] transport/internet/tcp: dialing TCP to tcp:127.0.0.1:55915\r\n2026/10/19 12:23:02.539620 [Debug] [2110703916] transport/internet: dialing to tcp:127.0.0.1:55915\r\n2026/10/19 12:23:02.540209 [Info] [2110703916] proxy/freedom: connection opened to tcp:127.0.0.1:55915, local endpoint 127.0.0.1:55920, remote endpoint 127.0.0.1:55915\r\n2026/10/19 12:23:02.540209 [Debug] [2110703916] proxy: CopyRawConn (maybe) readv\r\n2026/10/19 12:23:02.540739 [Debug] [2110703916] proxy: Xtls Unpadding new block, content 250 padding 870 command 0\r\n2026/10/19 12:23:02.540739 [Debug] [2110703916] proxy: XtlsFilterTls found tls client hello! 250\r\n2026/10/19 12:23:02.541356 [Debug] [2110703916] proxy: XtlsFilterTls found tls 1.2! 985\r\n2026/10/19 12:23:02.541356 [Debug] [2110703916] proxy: XtlsPadding 985 130 0\r\n2026/10/19 12:23:02.542260 [Debug] [2110703916] proxy: Xtls Unpadding new block, content 42 padding 1057 command 1\r\n2026/10/19 12:23:02.542260 [Debug] [2110703916] proxy: XtlsPadding 51 1055 0\r\n2026/10/19 12:23:02.543036 [Debug] [2110703916] proxy: XtlsPadding 74 834 1\r\n"
+          }
+        }
+      },
+      {
+        "case": "002-test_tls12_large_transfer_pause_resume_and_application_boundaries-1792412583047492700",
+        "client": {
+          "direct_ready": false,
+          "direct_rejected": false,
+          "ok": true,
+          "payload_sha256": "33bc8aab40703678c3ebe94d2dd8f2afff285dd901f9234e841e4679f8204fd5",
+          "received": 524288,
+          "stage": "complete",
+          "tls13_candidate": false,
+          "uploaded": 524288
+        },
+        "target": {
+          "tls_version": "TLSv1.2",
+          "handshake_complete": true,
+          "received_bytes": 524288,
+          "sent_bytes": 524288,
+          "close_notify_received": true,
+          "close_notify_sent": true,
+          "probe_bytes_sent": 0,
+          "connection_closed": true,
+          "thread_released": true,
+          "error": null,
+          "cipher": "ECDHE-ECDSA-AES256-GCM-SHA384",
+          "received_sha256": "33bc8aab40703678c3ebe94d2dd8f2afff285dd901f9234e841e4679f8204fd5",
+          "sent_sha256": "33bc8aab40703678c3ebe94d2dd8f2afff285dd901f9234e841e4679f8204fd5"
+        },
+        "invocation": {
+          "elapsed_seconds": 0.21606150000002344,
+          "exit_code": 0,
+          "payload_bytes": 524288,
+          "payload_sha256": "33bc8aab40703678c3ebe94d2dd8f2afff285dd901f9234e841e4679f8204fd5",
+          "tls13": false,
+          "pause_reads": true,
+          "read_chunk": 257,
+          "write_chunk": 1021
+        },
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_kill": false,
+          "listener_closed": true,
+          "exit_code": 1
+        },
+        "raw": {
+          "client-stdout.jsonl": {
+            "sha256": "6367f709344749e1244e883c1d413b738696c2f80e4b93091986400161732acb",
+            "text": "{\"direct_ready\":false,\"direct_rejected\":false,\"ok\":true,\"payload_sha256\":\"33bc8aab40703678c3ebe94d2dd8f2afff285dd901f9234e841e4679f8204fd5\",\"received\":524288,\"stage\":\"complete\",\"tls13_candidate\":false,\"uploaded\":524288}\r\n"
+          },
+          "client-stderr.log": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "text": ""
+          },
+          "target-result.json": {
+            "sha256": "04ec1572f8ea51c9df56b05e2a8a87a1f42ba270e403b99c0f5c884d0b4d6031",
+            "text": "{\r\n  \"tls_version\": \"TLSv1.2\",\r\n  \"handshake_complete\": true,\r\n  \"received_bytes\": 524288,\r\n  \"sent_bytes\": 524288,\r\n  \"close_notify_received\": true,\r\n  \"close_notify_sent\": true,\r\n  \"probe_bytes_sent\": 0,\r\n  \"connection_closed\": true,\r\n  \"thread_released\": true,\r\n  \"error\": null,\r\n  \"cipher\": \"ECDHE-ECDSA-AES256-GCM-SHA384\",\r\n  \"received_sha256\": \"33bc8aab40703678c3ebe94d2dd8f2afff285dd901f9234e841e4679f8204fd5\",\r\n  \"sent_sha256\": \"33bc8aab40703678c3ebe94d2dd8f2afff285dd901f9234e841e4679f8204fd5\"\r\n}\r\n"
+          },
+          "xray-lifecycle.json": {
+            "sha256": "457a973e0cf6e593322df0e2cf198b97afd118ebb787099fd14a2234847885e8",
+            "text": "{\r\n  \"process_reaped\": true,\r\n  \"forced_kill\": false,\r\n  \"listener_closed\": true,\r\n  \"exit_code\": 1\r\n}\r\n"
+          },
+          "invocation.json": {
+            "sha256": "1de5f3e324e95352f48690098608dbe9f2a88044eeccf4010e58c6bd64364ed7",
+            "text": "{\r\n  \"elapsed_seconds\": 0.21606150000002344,\r\n  \"exit_code\": 0,\r\n  \"payload_bytes\": 524288,\r\n  \"payload_sha256\": \"33bc8aab40703678c3ebe94d2dd8f2afff285dd901f9234e841e4679f8204fd5\",\r\n  \"tls13\": false,\r\n  \"pause_reads\": true,\r\n  \"read_chunk\": 257,\r\n  \"write_chunk\": 1021\r\n}\r\n"
+          },
+          "xray.log": {
+            "sha256": "a98021d5ad8e4150effc142ad65376067e27d533c0915ca9dfe2a139500fb53c",
+            "text": "Xray 26.10.17 (Xray, Penetrates Everything.) 92ccc93 (go1.27.2 windows/amd64)\nA unified platform for anti-censorship.\n2026/10/19 12:23:03.148904 [Info] infra/conf/serial: Reading config: &{Name:D:\\a\\_temp\\swirl-vision-results\\002-test_tls12_large_transfer_pause_resume_and_application_boundaries-1792412583047492700\\xray-config.json Format:json}\r\n2026/10/19 12:23:03.151239 [Debug] app/log: Logger started\r\n2026/10/19 12:23:03.153831 [Debug] app/proxyman/inbound: creating stream worker on 127.0.0.1:55923\r\n2026/10/19 12:23:03.156884 [Info] transport/internet/tcp: listening tcp on 127.0.0.1:55923\r\n2026/10/19 12:23:03.158597 [Warning] core: Xray 26.10.17 started\r\n2026/10/19 12:23:03.223571 [Info] [398903657] app/proxyman/inbound: connection ends > EOF\r\n2026/10/19 12:23:03.241503 [Info] [3030020675] proxy/vless/inbound: firstLen = 44\r\n2026/10/19 12:23:03.241503 [Info] [3030020675] proxy/vless/inbound: received request for tcp:127.0.0.1:55922\r\n2026/10/19 12:23:03.241503 [Info] [3030020675] app/dispatcher: taking detour [loopback] for [tcp:127.0.0.1:55922]\r\n2026/10/19 12:23:03.241503 from 127.0.0.1:55926 accepted tcp:127.0.0.1:55922 [loopback]\r\n2026/10/19 12:23:03.241503 [Info] [3030020675] transport/internet/tcp: dialing TCP to tcp:127.0.0.1:55922\r\n2026/10/19 12:23:03.241503 [Debug] [3030020675] transport/internet: dialing to tcp:127.0.0.1:55922\r\n2026/10/19 12:23:03.242140 [Info] [3030020675] proxy/freedom: connection opened to tcp:127.0.0.1:55922, local endpoint 127.0.0.1:55927, remote endpoint 127.0.0.1:55922\r\n2026/10/19 12:23:03.242140 [Debug] [3030020675] proxy: CopyRawConn (maybe) readv\r\n2026/10/19 12:23:03.242140 [Debug] [3030020675] proxy: Xtls Unpadding new block, content 250 padding 1014 command 0\r\n2026/10/19 12:23:03.242140 [Debug] [3030020675] proxy: XtlsFilterTls found tls client hello! 250\r\n2026/10/19 12:23:03.242979 [Debug] [3030020675] proxy: XtlsFilterTls found tls 1.2! 984\r\n2026/10/19 12:23:03.242979 [Debug] [3030020675] proxy: XtlsPadding 984 104 0\r\n2026/10/19 12:23:03.243509 [Debug] [3030020675] proxy: Xtls Unpadding new block, content 42 padding 1183 command 1\r\n2026/10/19 12:23:03.243833 [Debug] [3030020675] proxy: XtlsPadding 51 1162 0\r\n2026/10/19 12:23:03.394454 [Debug] [3030020675] proxy: XtlsPadding 1026 210 1\r\n"
+          }
+        }
+      },
+      {
+        "case": "003-test_tls12_single_byte_reads_and_small_writes-1792412583956627500",
+        "client": {
+          "direct_ready": false,
+          "direct_rejected": false,
+          "ok": true,
+          "payload_sha256": "7624e91e9f7222304a0dec9f6c720c4adf5d283342a9e70a9e46006fb678af12",
+          "received": 289,
+          "stage": "complete",
+          "tls13_candidate": false,
+          "uploaded": 289
+        },
+        "target": {
+          "tls_version": "TLSv1.2",
+          "handshake_complete": true,
+          "received_bytes": 289,
+          "sent_bytes": 289,
+          "close_notify_received": true,
+          "close_notify_sent": true,
+          "probe_bytes_sent": 0,
+          "connection_closed": true,
+          "thread_released": true,
+          "error": null,
+          "cipher": "ECDHE-ECDSA-AES256-GCM-SHA384",
+          "received_sha256": "7624e91e9f7222304a0dec9f6c720c4adf5d283342a9e70a9e46006fb678af12",
+          "sent_sha256": "7624e91e9f7222304a0dec9f6c720c4adf5d283342a9e70a9e46006fb678af12"
+        },
+        "invocation": {
+          "elapsed_seconds": 0.01624339999989388,
+          "exit_code": 0,
+          "payload_bytes": 289,
+          "payload_sha256": "7624e91e9f7222304a0dec9f6c720c4adf5d283342a9e70a9e46006fb678af12",
+          "tls13": false,
+          "pause_reads": false,
+          "read_chunk": 1,
+          "write_chunk": 7
+        },
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_kill": false,
+          "listener_closed": true,
+          "exit_code": 1
+        },
+        "raw": {
+          "client-stdout.jsonl": {
+            "sha256": "dba3af9d777952e8273b928dea2d5809e494b26fac424a9ee38a56c4056346b9",
+            "text": "{\"direct_ready\":false,\"direct_rejected\":false,\"ok\":true,\"payload_sha256\":\"7624e91e9f7222304a0dec9f6c720c4adf5d283342a9e70a9e46006fb678af12\",\"received\":289,\"stage\":\"complete\",\"tls13_candidate\":false,\"uploaded\":289}\r\n"
+          },
+          "client-stderr.log": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "text": ""
+          },
+          "target-result.json": {
+            "sha256": "7aafc86431c1d31a562ce8cacfc1df8e2eaabeb49f36396a7adc89d90c406eb4",
+            "text": "{\r\n  \"tls_version\": \"TLSv1.2\",\r\n  \"handshake_complete\": true,\r\n  \"received_bytes\": 289,\r\n  \"sent_bytes\": 289,\r\n  \"close_notify_received\": true,\r\n  \"close_notify_sent\": true,\r\n  \"probe_bytes_sent\": 0,\r\n  \"connection_closed\": true,\r\n  \"thread_released\": true,\r\n  \"error\": null,\r\n  \"cipher\": \"ECDHE-ECDSA-AES256-GCM-SHA384\",\r\n  \"received_sha256\": \"7624e91e9f7222304a0dec9f6c720c4adf5d283342a9e70a9e46006fb678af12\",\r\n  \"sent_sha256\": \"7624e91e9f7222304a0dec9f6c720c4adf5d283342a9e70a9e46006fb678af12\"\r\n}\r\n"
+          },
+          "xray-lifecycle.json": {
+            "sha256": "457a973e0cf6e593322df0e2cf198b97afd118ebb787099fd14a2234847885e8",
+            "text": "{\r\n  \"process_reaped\": true,\r\n  \"forced_kill\": false,\r\n  \"listener_closed\": true,\r\n  \"exit_code\": 1\r\n}\r\n"
+          },
+          "invocation.json": {
+            "sha256": "f31a71317d133145f79d5523f3490ff85a3c794024b001bad4c6b239bc1ef02a",
+            "text": "{\r\n  \"elapsed_seconds\": 0.01624339999989388,\r\n  \"exit_code\": 0,\r\n  \"payload_bytes\": 289,\r\n  \"payload_sha256\": \"7624e91e9f7222304a0dec9f6c720c4adf5d283342a9e70a9e46006fb678af12\",\r\n  \"tls13\": false,\r\n  \"pause_reads\": false,\r\n  \"read_chunk\": 1,\r\n  \"write_chunk\": 7\r\n}\r\n"
+          },
+          "xray.log": {
+            "sha256": "d4594e3f489fd9ed25eb47d69ffca03c82fd84b4f0318d19acb0f52a13c5370d",
+            "text": "Xray 26.10.17 (Xray, Penetrates Everything.) 92ccc93 (go1.27.2 windows/amd64)\nA unified platform for anti-censorship.\n2026/10/19 12:23:04.065817 [Info] infra/conf/serial: Reading config: &{Name:D:\\a\\_temp\\swirl-vision-results\\003-test_tls12_single_byte_reads_and_small_writes-1792412583956627500\\xray-config.json Format:json}\r\n2026/10/19 12:23:04.068312 [Debug] app/log: Logger started\r\n2026/10/19 12:23:04.070675 [Debug] app/proxyman/inbound: creating stream worker on 127.0.0.1:55930\r\n2026/10/19 12:23:04.073812 [Info] transport/internet/tcp: listening tcp on 127.0.0.1:55930\r\n2026/10/19 12:23:04.076139 [Warning] core: Xray 26.10.17 started\r\n2026/10/19 12:23:04.144049 [Info] [2219662395] app/proxyman/inbound: connection ends > EOF\r\n2026/10/19 12:23:04.152576 [Info] [3959391057] proxy/vless/inbound: firstLen = 44\r\n2026/10/19 12:23:04.152576 [Info] [3959391057] proxy/vless/inbound: received request for tcp:127.0.0.1:55929\r\n2026/10/19 12:23:04.152576 [Info] [3959391057] app/dispatcher: taking detour [loopback] for [tcp:127.0.0.1:55929]\r\n2026/10/19 12:23:04.152576 from 127.0.0.1:55934 accepted tcp:127.0.0.1:55929 [loopback]\r\n2026/10/19 12:23:04.152576 [Info] [3959391057] transport/internet/tcp: dialing TCP to tcp:127.0.0.1:55929\r\n2026/10/19 12:23:04.152576 [Debug] [3959391057] transport/internet: dialing to tcp:127.0.0.1:55929\r\n2026/10/19 12:23:04.153467 [Info] [3959391057] proxy/freedom: connection opened to tcp:127.0.0.1:55929, local endpoint 127.0.0.1:55935, remote endpoint 127.0.0.1:55929\r\n2026/10/19 12:23:04.153467 [Debug] [3959391057] proxy: CopyRawConn (maybe) readv\r\n2026/10/19 12:23:04.153467 [Debug] [3959391057] proxy: Xtls Unpadding new block, content 250 padding 848 command 0\r\n2026/10/19 12:23:04.153467 [Debug] [3959391057] proxy: XtlsFilterTls found tls client hello! 250\r\n2026/10/19 12:23:04.153999 [Debug] [3959391057] proxy: XtlsFilterTls found tls 1.2! 982\r\n2026/10/19 12:23:04.154088 [Debug] [3959391057] proxy: XtlsPadding 982 190 0\r\n2026/10/19 12:23:04.154614 [Debug] [3959391057] proxy: Xtls Unpadding new block, content 42 padding 1248 command 1\r\n2026/10/19 12:23:04.154670 [Debug] [3959391057] proxy: XtlsPadding 51 1248 0\r\n2026/10/19 12:23:04.155341 [Debug] [3959391057] proxy: XtlsPadding 36 1100 1\r\n"
+          }
+        }
+      },
+      {
+        "case": "004-test_tls13_direct_request_is_rejected_without_application_data-1792412584661930700",
+        "client": {
+          "direct_ready": false,
+          "direct_rejected": true,
+          "error": "VisionDirectOwnershipUnavailable",
+          "error_kind": "PermissionDenied",
+          "ok": false,
+          "received": 0,
+          "stage": "server_first_probe",
+          "tls13_candidate": true,
+          "uploaded": 0
+        },
+        "target": {
+          "tls_version": "TLSv1.3",
+          "handshake_complete": true,
+          "received_bytes": 0,
+          "sent_bytes": 0,
+          "close_notify_received": false,
+          "close_notify_sent": false,
+          "probe_bytes_sent": 34,
+          "connection_closed": true,
+          "thread_released": true,
+          "error": {
+            "type": "SSLEOFError",
+            "message": "[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:2713)"
+          },
+          "cipher": "TLS_AES_256_GCM_SHA384",
+          "probe_sha256": "d50b77b997f88e72a20fafecc7af9ab0a5c6d19d18b81276262ace4216eb7316",
+          "received_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "sent_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "invocation": {
+          "elapsed_seconds": 0.012988899999982095,
+          "exit_code": 1,
+          "payload_bytes": 38,
+          "payload_sha256": "c3a31b1a3f789f68185194d9c231610f1a2d601749f5a6feb7d86c0f47daa364",
+          "tls13": true,
+          "pause_reads": false,
+          "read_chunk": 16384,
+          "write_chunk": 16384
+        },
+        "lifecycle": {
+          "process_reaped": true,
+          "forced_kill": false,
+          "listener_closed": true,
+          "exit_code": 1
+        },
+        "raw": {
+          "client-stdout.jsonl": {
+            "sha256": "a870a21be4e33a9c2255fa80f61393550a94db766eb078cf27dbf4fefad29754",
+            "text": "{\"direct_ready\":false,\"direct_rejected\":true,\"error\":\"VisionDirectOwnershipUnavailable\",\"error_kind\":\"PermissionDenied\",\"ok\":false,\"received\":0,\"stage\":\"server_first_probe\",\"tls13_candidate\":true,\"uploaded\":0}\r\n"
+          },
+          "client-stderr.log": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "text": ""
+          },
+          "target-result.json": {
+            "sha256": "464e706664fa824a46341ea4241276ecdab1d48919cd4603c7010ccbda35a1b1",
+            "text": "{\r\n  \"tls_version\": \"TLSv1.3\",\r\n  \"handshake_complete\": true,\r\n  \"received_bytes\": 0,\r\n  \"sent_bytes\": 0,\r\n  \"close_notify_received\": false,\r\n  \"close_notify_sent\": false,\r\n  \"probe_bytes_sent\": 34,\r\n  \"connection_closed\": true,\r\n  \"thread_released\": true,\r\n  \"error\": {\r\n    \"type\": \"SSLEOFError\",\r\n    \"message\": \"[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:2713)\"\r\n  },\r\n  \"cipher\": \"TLS_AES_256_GCM_SHA384\",\r\n  \"probe_sha256\": \"d50b77b997f88e72a20fafecc7af9ab0a5c6d19d18b81276262ace4216eb7316\",\r\n  \"received_sha256\": \"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\r\n  \"sent_sha256\": \"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\"\r\n}\r\n"
+          },
+          "xray-lifecycle.json": {
+            "sha256": "457a973e0cf6e593322df0e2cf198b97afd118ebb787099fd14a2234847885e8",
+            "text": "{\r\n  \"process_reaped\": true,\r\n  \"forced_kill\": false,\r\n  \"listener_closed\": true,\r\n  \"exit_code\": 1\r\n}\r\n"
+          },
+          "invocation.json": {
+            "sha256": "9ab47c3a70a22b7cc9ea909294bc824fc472ec8d50050b6610dab8fd9ae7256e",
+            "text": "{\r\n  \"elapsed_seconds\": 0.012988899999982095,\r\n  \"exit_code\": 1,\r\n  \"payload_bytes\": 38,\r\n  \"payload_sha256\": \"c3a31b1a3f789f68185194d9c231610f1a2d601749f5a6feb7d86c0f47daa364\",\r\n  \"tls13\": true,\r\n  \"pause_reads\": false,\r\n  \"read_chunk\": 16384,\r\n  \"write_chunk\": 16384\r\n}\r\n"
+          },
+          "xray.log": {
+            "sha256": "87dbf92c24d05d7b2772ba2a616b62332eb6e0ef7e5c44f8d4f3b8d2cf1d0ec6",
+            "text": "Xray 26.10.17 (Xray, Penetrates Everything.) 92ccc93 (go1.27.2 windows/amd64)\nA unified platform for anti-censorship.\n2026/10/19 12:23:04.755989 [Info] infra/conf/serial: Reading config: &{Name:D:\\a\\_temp\\swirl-vision-results\\004-test_tls13_direct_request_is_rejected_without_application_data-1792412584661930700\\xray-config.json Format:json}\r\n2026/10/19 12:23:04.758256 [Debug] app/log: Logger started\r\n2026/10/19 12:23:04.760798 [Debug] app/proxyman/inbound: creating stream worker on 127.0.0.1:55938\r\n2026/10/19 12:23:04.763814 [Info] transport/internet/tcp: listening tcp on 127.0.0.1:55938\r\n2026/10/19 12:23:04.766100 [Warning] core: Xray 26.10.17 started\r\n2026/10/19 12:23:04.836119 [Info] [2627577028] app/proxyman/inbound: connection ends > EOF\r\n2026/10/19 12:23:04.844514 [Info] [3632014364] proxy/vless/inbound: firstLen = 44\r\n2026/10/19 12:23:04.844514 [Info] [3632014364] proxy/vless/inbound: received request for tcp:127.0.0.1:55937\r\n2026/10/19 12:23:04.844514 [Info] [3632014364] app/dispatcher: taking detour [loopback] for [tcp:127.0.0.1:55937]\r\n2026/10/19 12:23:04.844514 [Info] [3632014364] transport/internet/tcp: dialing TCP to tcp:127.0.0.1:55937\r\n2026/10/19 12:23:04.844514 [Debug] [3632014364] transport/internet: dialing to tcp:127.0.0.1:55937\r\n2026/10/19 12:23:04.844514 from 127.0.0.1:55941 accepted tcp:127.0.0.1:55937 [loopback]\r\n2026/10/19 12:23:04.845094 [Info] [3632014364] proxy/freedom: connection opened to tcp:127.0.0.1:55937, local endpoint 127.0.0.1:55942, remote endpoint 127.0.0.1:55937\r\n2026/10/19 12:23:04.845094 [Debug] [3632014364] proxy: CopyRawConn (maybe) readv\r\n2026/10/19 12:23:04.845094 [Debug] [3632014364] proxy: Xtls Unpadding new block, content 250 padding 826 command 0\r\n2026/10/19 12:23:04.845094 [Debug] [3632014364] proxy: XtlsFilterTls found tls client hello! 250\r\n2026/10/19 12:23:04.845977 [Debug] [3632014364] proxy: XtlsFilterTls found tls 1.3! 1137 TLS_AES_256_GCM_SHA384\r\n2026/10/19 12:23:04.845977 [Debug] [3632014364] proxy: XtlsPadding 1137 215 0\r\n2026/10/19 12:23:04.846536 [Debug] [3632014364] proxy: Xtls Unpadding new block, content 6 padding 1214 command 0\r\n2026/10/19 12:23:04.846536 [Debug] [3632014364] proxy: Xtls Unpadding new block, content 74 padding 1080 command 1\r\n2026/10/19 12:23:04.846536 [Debug] [3632014364] proxy: XtlsPadding 79 1236 2\r\n2026/10/19 12:23:04.847670 [Info] [3632014364] app/proxyman/outbound: app/proxyman/outbound: failed to process outbound traffic > proxy/freedom: connection ends > proxy/freedom: failed to process request > read tcp 127.0.0.1:55938->127.0.0.1:55941: wsarecv: An existing connection was forcibly closed by the remote host.\r\n"
+          }
+        }
+      }
+    ],
+    "peer_test_log": {
+      "sha256": "eb5e3b088639225a1207399422b8be35093a0bd5571b1b95332cf7567fca56c6",
+      "text": "test_tls12_authentication_framing_bidirectional_data_and_close (__main__.VisionXrayInterop.test_tls12_authentication_framing_bidirectional_data_and_close) ... ok\r\ntest_tls12_large_transfer_pause_resume_and_application_boundaries (__main__.VisionXrayInterop.test_tls12_large_transfer_pause_resume_and_application_boundaries) ... ok\r\ntest_tls12_single_byte_reads_and_small_writes (__main__.VisionXrayInterop.test_tls12_single_byte_reads_and_small_writes) ... ok\r\ntest_tls13_direct_request_is_rejected_without_application_data (__main__.VisionXrayInterop.test_tls13_direct_request_is_rejected_without_application_data) ... ok\r\n\r\n----------------------------------------------------------------------\r\nRan 4 tests in 3.148s\r\n\r\nOK\r\n"
+    }
+  },
+  "qt_and_app": {
+    "compatibility_ctest_suites_passed": 2,
+    "native_ctest_suites_passed": 3,
+    "native_rust_qt_incidents": {
+      "passed": 49,
+      "failed": 0,
+      "conditional_skips": 6
+    },
+    "original_native_conditional_skip_lines": [
+      "2026-10-19T12:31:01.5105461Z 6: SKIP   : RustCoreTests::socks5UdpThroughIndependentPeer() Independent Python SOCKS5 UDP peer supplies isolated ports and authentication mode in its integration run.",
+      "2026-10-19T12:31:01.5420597Z 6: SKIP   : RustCoreTests::socks4ThroughIndependentPeer() Independent Python SOCKS4/4a peer supplies isolated ports in its integration run.",
+      "2026-10-19T12:31:01.5423541Z 6: SKIP   : RustCoreTests::webSocketThroughIndependentPeer() Independent Python VLESS WS peer supplies isolated ports in its integration run.",
+      "2026-10-19T12:31:09.0108807Z 6: SKIP   : RustCoreTests::vlessThroughIndependentPeer() Independent VLESS peer supplies the port in its integration run.",
+      "2026-10-19T12:31:09.0121322Z 6: SKIP   : RustCoreTests::shadowsocksThroughIndependentPeer() Independent Python SS peer supplies the isolated port in its integration run.",
+      "2026-10-19T12:31:09.1532420Z 6: SKIP   : RustCoreTests::loonShadowsocksThroughIndependentPeer() Independent Python SS peer supplies the isolated port."
+    ],
+    "subsequent_independent_python_wrappers_passed": 5,
+    "original_wrapper_pass_lines": [
+      "2026-10-19T12:31:15.4343021Z test_qt_facade_http_obfs_with_udp_declared (__main__.ShadowsocksTests.test_qt_facade_http_obfs_with_udp_declared) ... ok",
+      "2026-10-19T12:31:16.2718348Z test_vless_qt_data_path (__main__.RustCoreIntegration.test_vless_qt_data_path) ... ok",
+      "2026-10-19T12:31:18.9150146Z test_qt_imported_socks4_and_4a_data_path (__main__.Socks4Integration.test_qt_imported_socks4_and_4a_data_path) ... ok",
+      "2026-10-19T12:31:20.2520487Z test_qt_vless_websocket_data_path (__main__.WebSocketTransportTests.test_qt_vless_websocket_data_path) ... ok",
+      "2026-10-19T12:31:21.6440519Z test_qt_imported_socks5_udp_data_path (__main__.Socks5UdpIntegration.test_qt_imported_socks5_udp_data_path) ... ok"
+    ],
+    "original_summary_lines": [
+      "2026-10-19T12:30:54.6822389Z 15: Totals: 13 passed, 0 failed, 0 skipped, 0 blacklisted, 4822ms",
+      "2026-10-19T12:30:54.7395625Z 17: Totals: 4 passed, 0 failed, 0 skipped, 0 blacklisted, 33ms",
+      "2026-10-19T12:30:54.7436918Z 100% tests passed, 0 tests failed out of 2",
+      "2026-10-19T12:31:09.5532218Z 6: Totals: 49 passed, 0 failed, 6 skipped, 0 blacklisted, 12946ms",
+      "2026-10-19T12:31:14.4460515Z 16: Totals: 13 passed, 0 failed, 0 skipped, 0 blacklisted, 4855ms",
+      "2026-10-19T12:31:14.4524431Z 100% tests passed, 0 tests failed out of 3",
+      "2026-10-19T12:31:15.4345390Z Ran 1 test in 0.734s",
+      "2026-10-19T12:31:16.2727225Z Ran 1 test in 0.656s",
+      "2026-10-19T12:31:18.9152067Z Ran 1 test in 2.466s",
+      "2026-10-19T12:31:20.2529343Z Ran 1 test in 1.161s",
+      "2026-10-19T12:31:21.6442635Z Ran 1 test in 1.267s"
+    ],
+    "qt_reports": [
+      {
+        "file": "compat-dns/swirl-import-boundaries.xml",
+        "case": "ImportTests",
+        "incidents": {
+          "pass": 13
+        },
+        "raw": {
+          "sha256": "62fb6b275303cee78c7acebb3e38094f4d17156f8e17b5c40f0b3b0348af91da",
+          "text": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n<TestCase name=\"ImportTests\">\r\n  <Environment>\r\n    <QtVersion>6.10.3</QtVersion>\r\n    <QtBuild>Qt 6.10.3 (x86_64&#x002D;little_endian&#x002D;llp64 shared (dynamic) release build; by MSVC 2022)</QtBuild>\r\n    <QTestVersion>6.10.3</QTestVersion>\r\n  </Environment>\r\n  <TestFunction name=\"initTestCase\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"3.6025\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"sourceGlobalsArePreservedAndCannotBecomeNodeOnlyImports\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"222.069\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"iniCompleteProfileHasClosedExecutionSemantics\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"115.546\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"iniTransportAliasesCannotDowngradeSecurity\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"15.3946\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"iniEnvelopeAndWrappedJsonFailClosed\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"16.5627\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"typedOptionsAndAliasesCannotOverwriteImportedState\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"4314.9\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"legacyLoonAndEquivalentUriAliasesRetainTypedValues\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"3.6964\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"completeConfigurationWithoutOwnerDoesNotDiscardGlobals\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"51.602\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"socks5TlsUriAliasesPreserveSecurity\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"6.5279\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"uriRealityRequiresAnExplicitSecurityLayerAndCredential\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"38.1871\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"singBoxTlsTypesAndFingerprintIntentArePreserved\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"13.7847\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"singBoxTransportShapesAndFieldsCannotDowngrade\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"18.4528\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"cleanupTestCase\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"0.0152\"/>\r\n  </TestFunction>\r\n  <Duration msecs=\"4821.66\"/>\r\n</TestCase>\r\n"
+        }
+      },
+      {
+        "file": "compat-dns/swirl-native-dns-compatibility-guard.xml",
+        "case": "EngineTests",
+        "incidents": {
+          "pass": 4
+        },
+        "raw": {
+          "sha256": "7505c4355721687c70778b37997a26b7947eace9cc44decdcd65cc2fdf126f7c",
+          "text": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n<TestCase name=\"EngineTests\">\r\n  <Environment>\r\n    <QtVersion>6.10.3</QtVersion>\r\n    <QtBuild>Qt 6.10.3 (x86_64&#x002D;little_endian&#x002D;llp64 shared (dynamic) release build; by MSVC 2022)</QtBuild>\r\n    <QTestVersion>6.10.3</QTestVersion>\r\n  </Environment>\r\n  <TestFunction name=\"initTestCase\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"2.1148\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"nativeDnsQueryPolicyCannotBeLostOrRunByCompatibilityCore\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"11.8284\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"networkPreferencesValidateAndPersist\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"18.306\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"cleanupTestCase\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"0.0306\"/>\r\n  </TestFunction>\r\n  <Duration msecs=\"33.1977\"/>\r\n</TestCase>\r\n"
+        }
+      },
+      {
+        "file": "rust-qt/swirl-import-boundaries.xml",
+        "case": "ImportTests",
+        "incidents": {
+          "pass": 13
+        },
+        "raw": {
+          "sha256": "c734d89478bfe7908f864cc24b8b6bba0093a59c9213708facc9408427c13430",
+          "text": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n<TestCase name=\"ImportTests\">\r\n  <Environment>\r\n    <QtVersion>6.10.3</QtVersion>\r\n    <QtBuild>Qt 6.10.3 (x86_64&#x002D;little_endian&#x002D;llp64 shared (dynamic) release build; by MSVC 2022)</QtBuild>\r\n    <QTestVersion>6.10.3</QTestVersion>\r\n  </Environment>\r\n  <TestFunction name=\"initTestCase\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"2.4388\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"sourceGlobalsArePreservedAndCannotBecomeNodeOnlyImports\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"221.525\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"iniCompleteProfileHasClosedExecutionSemantics\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"114.277\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"iniTransportAliasesCannotDowngradeSecurity\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"15.9488\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"iniEnvelopeAndWrappedJsonFailClosed\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"17.025\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"typedOptionsAndAliasesCannotOverwriteImportedState\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"4348.92\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"legacyLoonAndEquivalentUriAliasesRetainTypedValues\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"3.8033\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"completeConfigurationWithoutOwnerDoesNotDiscardGlobals\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"52.5789\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"socks5TlsUriAliasesPreserveSecurity\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"6.4235\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"uriRealityRequiresAnExplicitSecurityLayerAndCredential\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"37.9919\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"singBoxTlsTypesAndFingerprintIntentArePreserved\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"14.4396\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"singBoxTransportShapesAndFieldsCannotDowngrade\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"18.8834\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"cleanupTestCase\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"0.0145\"/>\r\n  </TestFunction>\r\n  <Duration msecs=\"4855.43\"/>\r\n</TestCase>\r\n"
+        }
+      },
+      {
+        "file": "rust-qt/swirl-rust-qt-integration.xml",
+        "case": "RustCoreTests",
+        "incidents": {
+          "pass": 49,
+          "skip": 6
+        },
+        "raw": {
+          "sha256": "1293dd5628fa278a8908b3cf466fab6ff8df270dd654345d7904bfd7c6952acf",
+          "text": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\r\n<TestCase name=\"RustCoreTests\">\r\n  <Environment>\r\n    <QtVersion>6.10.3</QtVersion>\r\n    <QtBuild>Qt 6.10.3 (x86_64&#x002D;little_endian&#x002D;llp64 shared (dynamic) release build; by MSVC 2022)</QtBuild>\r\n    <QTestVersion>6.10.3</QTestVersion>\r\n  </Environment>\r\n  <TestFunction name=\"initTestCase\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"2.6686\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"fullDocumentCannotUseExternalSelectedNodeAlias\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"73.2377\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"nonClashGlobalConfigurationDoesNotAlterNativeState\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"157.899\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"fullClashSubscriptionReachesNativePolicyAndRejectsPartialUpdates\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"1933.26\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"iniProfileImportConnectsAndUpdatesAtomically\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"2641.29\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"iniRealityCannotStartAsOrdinaryTls\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"1.3472\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"importedRealityVisionAndDefaultUtlsCannotStartAsOrdinaryTls\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"9.6577\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"singBoxTransportMapsExactlyAndRejectsUnmappedFieldsBeforeStart\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"8.2823\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"profileRefreshKeepsOnlyItsOwnValidSelection\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"13.2121\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"atomicNodeNetworkImportUsesPreparedIdsAndSurvivesReload\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"9.1421\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"atomicNodeNetworkImportRejectsInvalidGraphAndWriteFailure\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"6.797\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"legacyNetworkSettingsMigrateWithoutStaleSidecarOverride\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"4.3265\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"candidateValidationPreservesIndependentSourceNamespaces\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"10.8378\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"shutdownDiscardsPendingParsedConfiguration\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"1.3677\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"preparedImportMapsStableIdsWithoutPublishingBeforeCommit\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"5.6887\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"preparedImportRejectsAmbiguousIdsCrossSourceAndStalePlans\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"3.8152\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"preparedImportWriteFailurePreservesMemoryAndDurableSnapshot\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"3.0426\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"socks5UdpMappingPreservesTypedOptionsAndTls\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"16.0365\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"socks5UdpThroughIndependentPeer\">\r\n    <Incident type=\"skip\" file=\"D:\\a\\Swirl\\Swirl\\src\\Swirl.Quick\\tests\\RustCoreTests.cpp\" line=\"418\">\r\n      <Description><![CDATA[Independent Python SOCKS5 UDP peer supplies isolated ports and authentication mode in its integration run.]]></Description>\r\n    </Incident>\r\n    <Duration msecs=\"0.0806\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"socks4ImportsMapAndAcceptAcrossNativeAbi\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"18.8734\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"socks4ImportsRejectAuthenticationAndUnmappedExtensions\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"12.4606\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"socks4ThroughIndependentPeer\">\r\n    <Incident type=\"skip\" file=\"D:\\a\\Swirl\\Swirl\\src\\Swirl.Quick\\tests\\RustCoreTests.cpp\" line=\"528\">\r\n      <Description><![CDATA[Independent Python SOCKS4/4a peer supplies isolated ports in its integration run.]]></Description>\r\n    </Incident>\r\n    <Duration msecs=\"0.0815\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"webSocketThroughIndependentPeer\">\r\n    <Incident type=\"skip\" file=\"D:\\a\\Swirl\\Swirl\\src\\Swirl.Quick\\tests\\RustCoreTests.cpp\" line=\"554\">\r\n      <Description><![CDATA[Independent Python VLESS WS peer supplies isolated ports in its integration run.]]></Description>\r\n    </Incident>\r\n    <Duration msecs=\"0.0797\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"webSocketMapsExistingFieldsAndRustAcceptsConfiguration\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"4.3095\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"webSocketRejectsUnsupportedParametersWithoutPartialConfiguration\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"2.8205\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"dnsQueryFamilyMapsStrictlyAndPersistsAcrossLegacyEdits\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"8.0155\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"nativeDohMapsExistingHttpsField\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"3.042\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"strictDotMapsExistingFieldWithoutResolvingOrChangingUi\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"2.2914\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"strictDotRejectsAmbiguousOrUnimplementedBootstrap\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"2.1474\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"customDnsMapsServersWithoutChangingSystemSettings\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"57.4272\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"dnsSettingsUseLocalMappingsAndProxyToggle\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"267.627\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"manualGroupUsesItsMemberRatherThanGlobalSelection\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"650.782\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"nestedAutomaticGroupsUseNativeDataPath\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\">\r\n      <DataTag><![CDATA[url-test]]></DataTag>\r\n    </Incident>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\">\r\n      <DataTag><![CDATA[fallback]]></DataTag>\r\n    </Incident>\r\n    <Incident type=\"pass\" file=\"\" line=\"0\">\r\n      <DataTag><![CDATA[round-robin]]></DataTag>\r\n    </Incident>\r\n    <Duration msecs=\"2449.15\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"roundRobinPolicyBalancesNewNativeSessions\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"1328.99\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"policyConversionRejectsUnknownSemanticsAndBounds\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"11.3818\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"policySettingsPreserveFullMapsAndRejectInvalidReplacements\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"4.5754\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"rulesUseActualRustDataPathAndModeSwitches\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"379.995\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"controllerRuleEditsPreserveNoResolve\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"2267.85\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"controllerRuleReferencesPreventGroupDeletion\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"15.2999\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"controllerRuleValidationAndPersistenceAreAtomic\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"8.6932\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"rulesValidateAllFieldsAndPreserveUnsupportedImports\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"3.9334\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"vlessThroughIndependentPeer\">\r\n    <Incident type=\"skip\" file=\"D:\\a\\Swirl\\Swirl\\src\\Swirl.Quick\\tests\\RustCoreTests.cpp\" line=\"964\">\r\n      <Description><![CDATA[Independent VLESS peer supplies the port in its integration run.]]></Description>\r\n    </Incident>\r\n    <Duration msecs=\"0.093\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"capabilityUsesTheSelectedRustRuntime\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"1.121\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"shadowsocksThroughIndependentPeer\">\r\n    <Incident type=\"skip\" file=\"D:\\a\\Swirl\\Swirl\\src\\Swirl.Quick\\tests\\RustCoreTests.cpp\" line=\"983\">\r\n      <Description><![CDATA[Independent Python SS peer supplies the isolated port in its integration run.]]></Description>\r\n    </Incident>\r\n    <Duration msecs=\"0.0504\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"disabledFastOpenIsAnExactNoOpAcrossNativeProtocols\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"4.4979\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"disabledFastOpenForwardsThroughNativeSocks5\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"133.33\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"loonShadowsocksImportsKeepCredentialsAndRejectUnsafeOptions\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"3.1765\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"loonShadowsocksThroughIndependentPeer\">\r\n    <Incident type=\"skip\" file=\"D:\\a\\Swirl\\Swirl\\src\\Swirl.Quick\\tests\\RustCoreTests.cpp\" line=\"1039\">\r\n      <Description><![CDATA[Independent Python SS peer supplies the isolated port.]]></Description>\r\n    </Incident>\r\n    <Duration msecs=\"0.054\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"referenceAdapterBlockedAtCompileTime\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"0.1954\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"realForwardingThroughQtFacade\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"261.749\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"nativeProbeAndUnsupportedDoNotStartCompatibility\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"136.038\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"unsupportedSessionRejectedAndOldStreamSurvivesBadSelection\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"1.7876\"/>\r\n  </TestFunction>\r\n  <TestFunction name=\"cleanupTestCase\">\r\n    <Incident type=\"pass\" file=\"\" line=\"0\" />\r\n    <Duration msecs=\"0.0138\"/>\r\n  </TestFunction>\r\n  <Duration msecs=\"12945.6\"/>\r\n</TestCase>\r\n"
+        }
+      }
+    ],
+    "full_swirl_executable_built": true,
+    "original_executable_build_lines": [
+      "2026-10-19T12:41:51.8080046Z   Swirl.vcxproj -> D:\\a\\Swirl\\Swirl\\build\\rust-qt\\Release\\Swirl.exe"
+    ],
+    "post_build_file_exists_guard_passed": true,
+    "note": "Generic RustCoreTests initially skips six peer-dependent functions. Five independent Python wrappers subsequently run successfully; the Shadowsocks wrapper covers both standard and Loon Shadowsocks methods."
+  },
+  "raw_job_log": {
+    "path": "/tmp/swirl-vision-final-windows-job.log",
+    "sha256": "34ca2dc7b19148b9f9b76d3befc5f938288e153aa6dde4185b84eab7727cef45",
+    "test_summary_lines": [
+      "2026-10-19T12:13:30.6313939Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "2026-10-19T12:13:30.6390462Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "2026-10-19T12:13:30.6493821Z test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "2026-10-19T12:13:30.6575363Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "2026-10-19T12:13:30.7335753Z test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s",
+      "2026-10-19T12:13:33.0827581Z test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.34s",
+      "2026-10-19T12:13:33.5236870Z test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.43s",
+      "2026-10-19T12:13:33.5424785Z test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s",
+      "2026-10-19T12:13:33.9471983Z test result: ok. 49 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.40s",
+      "2026-10-19T12:13:33.9603389Z test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "2026-10-19T12:13:34.0099514Z test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s",
+      "2026-10-19T12:13:34.8634630Z test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.84s",
+      "2026-10-19T12:13:34.9024531Z test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s",
+      "2026-10-19T12:13:34.9134733Z test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "2026-10-19T12:13:34.9532108Z test result: ok. 58 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s",
+      "2026-10-19T12:13:35.2596014Z test result: ok. 65 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s",
+      "2026-10-19T12:13:35.3343155Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "2026-10-19T12:13:35.4272997Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "2026-10-19T12:13:35.5012240Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "2026-10-19T12:13:35.6213643Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "2026-10-19T12:13:35.6691558Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "2026-10-19T12:13:35.8338002Z test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+      "2026-10-19T12:13:36.0069044Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s",
+      "2026-10-19T12:16:51.9595063Z Ran 16 tests in 0.032s",
+      "2026-10-19T12:16:51.9595419Z OK",
+      "2026-10-19T12:16:52.4187527Z Ran 19 tests in 0.282s",
+      "2026-10-19T12:16:52.4187868Z OK",
+      "2026-10-19T12:17:24.0025122Z Ran 24 tests in 31.384s",
+      "2026-10-19T12:17:24.0025804Z OK (skipped=1)",
+      "2026-10-19T12:17:34.5551931Z Ran 9 tests in 10.360s",
+      "2026-10-19T12:17:34.5552326Z OK (skipped=1)",
+      "2026-10-19T12:17:46.9824521Z Ran 11 tests in 12.248s",
+      "2026-10-19T12:17:46.9824779Z OK",
+      "2026-10-19T12:18:00.4806257Z Ran 9 tests in 13.319s",
+      "2026-10-19T12:18:00.4806617Z OK",
+      "2026-10-19T12:18:06.0853700Z Ran 10 tests in 5.416s",
+      "2026-10-19T12:18:06.0853986Z OK (skipped=1)",
+      "2026-10-19T12:18:17.2814223Z Ran 11 tests in 11.009s",
+      "2026-10-19T12:18:17.2815174Z OK (skipped=1)",
+      "2026-10-19T12:18:24.8525830Z Ran 41 tests in 7.443s",
+      "2026-10-19T12:18:24.8526123Z OK",
+      "2026-10-19T12:18:32.1998478Z Ran 16 tests in 6.902s",
+      "2026-10-19T12:18:32.1998811Z OK",
+      "2026-10-19T12:20:10.7759706Z Ran 37 tests in 98.350s",
+      "2026-10-19T12:20:10.7760682Z OK",
+      "2026-10-19T12:20:11.0145349Z Ran 7 tests in 0.081s",
+      "2026-10-19T12:20:11.0145702Z OK",
+      "2026-10-19T12:20:37.3977545Z Ran 8 tests in 26.202s",
+      "2026-10-19T12:20:37.3977923Z OK",
+      "2026-10-19T12:20:47.2102373Z Ran 21 tests in 9.657s",
+      "2026-10-19T12:20:47.2102636Z OK",
+      "2026-10-19T12:20:51.9635003Z Ran 11 tests in 4.578s",
+      "2026-10-19T12:20:51.9635515Z OK",
+      "2026-10-19T12:21:00.3951035Z Ran 13 tests in 8.255s",
+      "2026-10-19T12:21:00.3951592Z OK (skipped=1)",
+      "2026-10-19T12:21:04.2300394Z Ran 26 tests in 3.649s",
+      "2026-10-19T12:21:04.2300670Z OK (skipped=1)",
+      "2026-10-19T12:21:04.5715114Z Ran 11 tests in 0.171s",
+      "2026-10-19T12:21:04.5715423Z OK (skipped=1)",
+      "2026-10-19T12:22:36.7610017Z Ran 12 tests in 11.975s",
+      "2026-10-19T12:22:36.7610291Z OK",
+      "2026-10-19T12:23:05.3619747Z \u001b[31;1mRan 4 tests in 3.148s\u001b[0m",
+      "2026-10-19T12:31:15.4345390Z Ran 1 test in 0.734s",
+      "2026-10-19T12:31:15.4345781Z OK",
+      "2026-10-19T12:31:16.2727225Z Ran 1 test in 0.656s",
+      "2026-10-19T12:31:16.2727525Z OK",
+      "2026-10-19T12:31:18.9152067Z Ran 1 test in 2.466s",
+      "2026-10-19T12:31:18.9152739Z OK",
+      "2026-10-19T12:31:20.2529343Z Ran 1 test in 1.161s",
+      "2026-10-19T12:31:20.2529727Z OK",
+      "2026-10-19T12:31:21.6442635Z Ran 1 test in 1.267s",
+      "2026-10-19T12:31:21.6442974Z OK"
+    ]
+  },
+  "limits": [
+    "Vision TLS 1.3 direct ownership transfer remains unsupported and is actively refused. The negative target reports protocol EOF after refusal and explicit reference-process cleanup; it is not a successful graceful TLS closure.",
+    "Windows reference-process terminate uses OS termination (recorded exit codes in lifecycle); forced_kill=false means the timeout kill fallback was not needed.",
+    "The full native application executable builds successfully and Qt integration gates pass. This does not prove end-to-end REALITY/Vision integration through the whole product or any private proxy provider.",
+    "Original f3ce257f macOS/Windows Vision failures and the 0be6823 Windows DNS reservation failure remain separate, unchanged evidence."
+  ]
+}

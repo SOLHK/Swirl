@@ -1,0 +1,269 @@
+name: Core implementation validation
+on:
+  push:
+    branches: [work/core-completion-20261017]
+concurrency:
+  group: core-implementation-validation
+  # Preserve each pushed commit's validation and evidence.
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  core:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - name: Generate scoped Swirl GitHub App token
+        id: swirl-app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.SWIRL_APP_ID }}
+          private-key: ${{ secrets.SWIRL_APP_PRIVATE_KEY }}
+          permission-contents: read
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          token: ${{ steps.swirl-app-token.outputs.token }}
+      - name: Install Rust tools
+        run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy
+      - name: Verify exact pushed source and reviewed CI gates
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = refs/heads/work/core-completion-20261017
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test -z "$(git status --porcelain --untracked-files=all)"
+          python tools/ApplyCoreDevelopment.py --check
+          cargo fmt --manifest-path core/Cargo.toml --all -- --check
+          git diff --exit-code HEAD --
+          git rev-parse HEAD | tee CORE_TESTED_COMMIT
+      - name: Rust static and unit checks
+        working-directory: core
+        run: |
+          cargo fmt --all -- --check
+          cargo check --workspace --locked
+          cargo clippy --workspace --all-targets --locked -- -D warnings
+          cargo test --workspace --locked
+          cargo build --release --locked -p swirl-api --bins
+          cargo build --release --locked -p swirl-transport --example reality-client
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - name: Independent network peers
+        run: |
+          set -euo pipefail
+          python -m pip install cryptography==50.0.2
+          python tools/tests/generate_reality_vectors.py --check
+          python tools/tests/generate_vision_vectors.py --check
+          export SWIRL_RUST_HARNESS="$PWD/core/target/release/swirl-api"
+          export SWIRL_RUST_INSPECTOR="$PWD/core/target/release/swirl-inspect"
+          export SWIRL_REALITY_CLIENT="$PWD/core/target/release/examples/reality-client"
+          test -x "$SWIRL_RUST_HARNESS"
+          test -x "$SWIRL_RUST_INSPECTOR"
+          test -x "$SWIRL_REALITY_CLIENT"
+          python tools/tests/test_reality_peer.py
+          python tools/tests/test_reality_tls.py
+          python tools/tests/test_rust_core.py
+          python tools/tests/test_shadowsocks.py
+          python tools/tests/test_dns_tls.py
+          python tools/tests/test_dns_https.py
+          if test -f tools/tests/test_socks4.py; then python tools/tests/test_socks4.py; fi
+          if test -f tools/tests/test_websocket_transport.py; then python tools/tests/test_websocket_transport.py; fi
+      - name: Subscription to native proxy and target
+        working-directory: .
+        shell: bash
+        env:
+          SWIRL_RUST_HARNESS: ${{ github.workspace }}/core/target/release/swirl-api
+          SWIRL_RUST_INSPECTOR: ${{ github.workspace }}/core/target/release/swirl-inspect
+          SWIRL_PRODUCT_EVIDENCE: ${{ runner.temp }}/swirl-product-chain-rust
+        run: |
+          set -euo pipefail
+          test -x "$SWIRL_RUST_HARNESS"
+          test -x "$SWIRL_RUST_INSPECTOR"
+          python tools/tests/test_product_subscription_chain.py -v
+      - name: Preserve subscription product rust evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: App-Product-Chain-${{ runner.os }}-rust-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swirl-product-chain-rust
+          if-no-files-found: error
+          retention-days: 14
+      - name: Install pinned Go for the independent Xray peer
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        with:
+          go-version: '1.27.2'
+          cache: false
+      - name: Build pinned Xray and verify REALITY interoperability
+        working-directory: .
+        shell: bash
+        env:
+          SWIRL_XRAY_PEER_DIR: ${{ runner.temp }}/swirl-xray-peer
+          SWIRL_XRAY_EVIDENCE: ${{ runner.temp }}/swirl-xray-results
+          SWIRL_REALITY_CLIENT: ${{ github.workspace }}/core/target/release/examples/reality-client
+        run: |
+          set -euo pipefail
+          python tools/Build-XrayPeer.py --output "$SWIRL_XRAY_PEER_DIR"
+          python tools/tests/test_reality_xray.py
+      - name: Preserve Xray build identity and raw interoperability evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: App-REALITY-Xray-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/swirl-xray-peer/build.log
+            ${{ runner.temp }}/swirl-xray-peer/build-manifest.json
+            ${{ runner.temp }}/swirl-xray-results
+          if-no-files-found: error
+          retention-days: 14
+      - name: Build native Vision client and verify Xray interoperability
+        working-directory: .
+        shell: bash
+        env:
+          SWIRL_XRAY_PEER_DIR: ${{ runner.temp }}/swirl-xray-peer
+          SWIRL_VISION_EVIDENCE: ${{ runner.temp }}/swirl-vision-results
+          SWIRL_VISION_CLIENT: ${{ github.workspace }}/core/target/release/examples/vision-client
+        run: |
+          set -euo pipefail
+          mkdir -p "$SWIRL_VISION_EVIDENCE"
+          cargo build --manifest-path core/Cargo.toml --release --locked -p swirl-protocol --example vision-client 2>&1 | tee "$SWIRL_VISION_EVIDENCE/client-build.log"
+          test -x "$SWIRL_VISION_CLIENT"
+          python tools/tests/test_vision_xray.py 2>&1 | tee "$SWIRL_VISION_EVIDENCE/peer-test.log"
+      - name: Preserve Vision client and full Xray interoperability evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: App-Vision-Xray-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/swirl-xray-peer/build.log
+            ${{ runner.temp }}/swirl-xray-peer/build-manifest.json
+            ${{ runner.temp }}/swirl-vision-results
+          if-no-files-found: error
+          retention-days: 14
+      - name: Build native ClientHello and verify independent Chrome133 fingerprint
+        working-directory: .
+        shell: bash
+        env:
+          SWIRL_XRAY_PEER_DIR: ${{ runner.temp }}/swirl-xray-peer
+          SWIRL_FINGERPRINT_EVIDENCE: ${{ runner.temp }}/swirl-fingerprint-results
+          SWIRL_REALITY_HELLO: ${{ github.workspace }}/core/target/release/examples/reality-hello
+        run: |
+          set -euo pipefail
+          mkdir -p "$SWIRL_FINGERPRINT_EVIDENCE"
+          cargo build --manifest-path core/Cargo.toml --release --locked -p swirl-transport --example reality-hello 2>&1 | tee "$SWIRL_FINGERPRINT_EVIDENCE/client-build.log"
+          test -x "$SWIRL_REALITY_HELLO"
+          test -x "$SWIRL_XRAY_PEER_DIR/utls-hello"
+          python tools/tests/test_reality_fingerprint.py 2>&1 | tee "$SWIRL_FINGERPRINT_EVIDENCE/oracle-test.log"
+      - name: Preserve raw ClientHello and independent uTLS fingerprint evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: App-Chrome133-Fingerprint-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/swirl-xray-peer/build.log
+            ${{ runner.temp }}/swirl-xray-peer/build-manifest.json
+            ${{ runner.temp }}/swirl-fingerprint-results
+          if-no-files-found: error
+          retention-days: 14
+      - name: Production REALITY Runtime through full Xray to HTTP and HTTPS
+        working-directory: .
+        shell: bash
+        env:
+          SWIRL_XRAY_PEER_DIR: ${{ runner.temp }}/swirl-xray-peer
+          SWIRL_RUST_HARNESS: ${{ github.workspace }}/core/target/release/swirl-api
+          SWIRL_RUST_INSPECTOR: ${{ github.workspace }}/core/target/release/swirl-inspect
+          SWIRL_REALITY_RUNTIME_EVIDENCE: ${{ runner.temp }}/swirl-reality-runtime-rust
+        run: |
+          set -euo pipefail
+          python tools/tests/test_reality_runtime.py
+      - name: Preserve production REALITY Runtime rust evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: App-REALITY-Runtime-${{ runner.os }}-rust-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swirl-reality-runtime-rust
+          if-no-files-found: error
+          retention-days: 14
+      - name: Production REALITY + Vision Runtime through full Xray to HTTP and HTTPS
+        working-directory: .
+        shell: bash
+        env:
+          SWIRL_XRAY_PEER_DIR: ${{ runner.temp }}/swirl-xray-peer
+          SWIRL_RUST_HARNESS: ${{ github.workspace }}/core/target/release/swirl-api
+          SWIRL_RUST_INSPECTOR: ${{ github.workspace }}/core/target/release/swirl-inspect
+          SWIRL_REALITY_RUNTIME_EVIDENCE: ${{ runner.temp }}/swirl-reality-vision-runtime-rust
+        run: |
+          set -euo pipefail
+          python tools/tests/test_reality_runtime.py --vision
+      - name: Preserve production REALITY + Vision Runtime rust evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: App-REALITY-Vision-Runtime-${{ runner.os }}-rust-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swirl-reality-vision-runtime-rust
+          if-no-files-found: error
+          retention-days: 14
+      - name: Production REALITY + Chrome133 Runtime through full Xray to HTTP and HTTPS
+        working-directory: .
+        shell: bash
+        env:
+          SWIRL_XRAY_PEER_DIR: ${{ runner.temp }}/swirl-xray-peer
+          SWIRL_RUST_HARNESS: ${{ github.workspace }}/core/target/release/swirl-api
+          SWIRL_RUST_INSPECTOR: ${{ github.workspace }}/core/target/release/swirl-inspect
+          SWIRL_REALITY_RUNTIME_EVIDENCE: ${{ runner.temp }}/swirl-reality-runtime-chrome133-rust
+        run: |
+          set -euo pipefail
+          python tools/tests/test_reality_runtime.py --fingerprint chrome
+      - name: Preserve production REALITY + Chrome133 Runtime rust evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: App-REALITY-Runtime-Chrome133-${{ runner.os }}-rust-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swirl-reality-runtime-chrome133-rust
+          if-no-files-found: error
+          retention-days: 14
+      - name: Production REALITY + Vision + Chrome133 Runtime through full Xray to HTTP and HTTPS
+        working-directory: .
+        shell: bash
+        env:
+          SWIRL_XRAY_PEER_DIR: ${{ runner.temp }}/swirl-xray-peer
+          SWIRL_RUST_HARNESS: ${{ github.workspace }}/core/target/release/swirl-api
+          SWIRL_RUST_INSPECTOR: ${{ github.workspace }}/core/target/release/swirl-inspect
+          SWIRL_REALITY_RUNTIME_EVIDENCE: ${{ runner.temp }}/swirl-reality-vision-runtime-chrome133-rust
+        run: |
+          set -euo pipefail
+          python tools/tests/test_reality_runtime.py --vision --fingerprint chrome
+      - name: Preserve production REALITY + Vision + Chrome133 Runtime rust evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: App-REALITY-Vision-Runtime-Chrome133-${{ runner.os }}-rust-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/swirl-reality-vision-runtime-chrome133-rust
+          if-no-files-found: error
+          retention-days: 14
+      - name: Export exact source and result identity
+        if: always()
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$GITHUB_SHA" > CORE_TRIGGER_COMMIT
+          git status --porcelain > CORE_WORKTREE_STATE
+          git diff --binary "$GITHUB_SHA" -- > CORE_SOURCE_DIFF.patch
+          git ls-files --others --exclude-standard -- core tools .github/workflows src/Swirl.Quick/engine src/Swirl.Quick/tests > CORE_UNTRACKED_SOURCE
+          git archive "$GITHUB_SHA" core tools .github/workflows src/Swirl.Quick/engine src/Swirl.Quick/tests > core-tested-source.tar
+          test "$(cat CORE_TESTED_COMMIT)" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test ! -s CORE_SOURCE_DIFF.patch
+          test ! -s CORE_UNTRACKED_SOURCE
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Core-development-evidence
+          path: |
+            CORE_TRIGGER_COMMIT
+            CORE_TESTED_COMMIT
+            CORE_WORKTREE_STATE
+            CORE_SOURCE_DIFF.patch
+            CORE_UNTRACKED_SOURCE
+            core-tested-source.tar
+          retention-days: 7

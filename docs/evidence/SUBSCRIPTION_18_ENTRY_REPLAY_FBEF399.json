@@ -1,0 +1,545 @@
+{
+  "schema": 1,
+  "recorded_utc": "2026-10-18T08:21:39.996195+00:00",
+  "source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+  "rust_core_tree": "8e3b3e57e212affa2c7b391128fe45d58629c89c",
+  "inspector_sha256": "55a3ad7fab5c9b1fa1eafdf1ae5aaff9a40626629fa1461f868c6e5776988ac5",
+  "inspector_bytes": 2370195,
+  "inspector_mtime_utc": "2026-10-18T07:09:31.911354+00:00",
+  "cargo_build": "cargo build --release --locked -p swirl-api --bin swirl-inspect --manifest-path core/Cargo.toml",
+  "build_result": "success; Cargo verified existing artifact up to date for unchanged Rust source",
+  "build_log_sha256": "e299448c62e2c54acfb5dbbb4f7349ee274a4a92d4d916eddfa7654af8da55e2",
+  "private_json_mode": false,
+  "supplier_requests": 0,
+  "real_node_requests": 0,
+  "plaintext_written": false,
+  "entries": 18,
+  "parsed_entries": 18,
+  "total_records_including_duplicate_sources": 1558,
+  "total_tcp_candidates_including_duplicate_sources": 450,
+  "sources": [
+    {
+      "local_index": 1,
+      "format": "clash-yaml",
+      "recognized": true,
+      "parsed": true,
+      "parse_error": null,
+      "nodes": 90,
+      "native_tcp_candidates": 90,
+      "unrecognized_fields": 0,
+      "capability_groups": [
+        {
+          "protocol": "ss",
+          "cipher": "aes-128-gcm",
+          "transport": "tcp",
+          "obfuscation": "http",
+          "tls": "not-enabled",
+          "diagnostic": "TcpCandidateNotYetVerified",
+          "native_tcp_candidate": true,
+          "native_udp_supported": false,
+          "count": 90
+        }
+      ],
+      "complete_configuration_execution_supported": false,
+      "full_configuration_sections_preserved": 18,
+      "configuration_sections_unvalidated": 18,
+      "ciphertext_sha256": "357bc90d2bac5b1c18778b03eb2ea080fef32146b4ad6daf1ba2847f8b8bb0b1",
+      "raw_sha256_verified": true,
+      "decoded_sha256_verified": true
+    },
+    {
+      "local_index": 2,
+      "format": "clash-yaml",
+      "recognized": true,
+      "parsed": true,
+      "parse_error": null,
+      "nodes": 90,
+      "native_tcp_candidates": 0,
+      "unrecognized_fields": 0,
+      "capability_groups": [
+        {
+          "protocol": "trojan",
+          "cipher": "not-declared-or-unrecognized",
+          "transport": "tcp",
+          "obfuscation": "none",
+          "tls": "tls",
+          "diagnostic": "CertificateVerificationDisabledUnsupported",
+          "native_tcp_candidate": false,
+          "native_udp_supported": false,
+          "count": 90
+        }
+      ],
+      "complete_configuration_execution_supported": false,
+      "full_configuration_sections_preserved": 18,
+      "configuration_sections_unvalidated": 18,
+      "ciphertext_sha256": "b42f2e592bf1cbe18d21396c537d40177d057c259ac88a4d004a58404416637a",
+      "raw_sha256_verified": true,
+      "decoded_sha256_verified": true
+    },
+    {
+      "local_index": 3,
+      "format": "clash-yaml",
+      "recognized": true,
+      "parsed": true,
+      "parse_error": null,
+      "nodes": 90,
+      "native_tcp_candidates": 90,
+      "unrecognized_fields": 0,
+      "capability_groups": [
+        {
+          "protocol": "ss",
+          "cipher": "aes-128-gcm",
+          "transport": "tcp",
+          "obfuscation": "http",
+          "tls": "not-enabled",
+          "diagnostic": "TcpCandidateNotYetVerified",
+          "native_tcp_candidate": true,
+          "native_udp_supported": false,
+          "count": 90
+        }
+      ],
+      "complete_configuration_execution_supported": false,
+      "full_configuration_sections_preserved": 18,
+      "configuration_sections_unvalidated": 18,
+      "ciphertext_sha256": "8242d33009d2492b155be3356d82e9ccc354f61a242a7d14df4f3d0e7b083187",
+      "raw_sha256_verified": true,
+      "decoded_sha256_verified": true
+    },
+    {
+      "local_index": 4,
+      "format": "clash-yaml",
+      "recognized": true,
+      "parsed": true,
+      "parse_error": null,
+      "nodes": 90,
+      "native_tcp_candidates": 0,
+      "unrecognized_fields": 0,
+      "capability_groups": [
+        {
+          "protocol": "trojan",
+          "cipher": "not-declared-or-unrecognized",
+          "transport": "tcp",
+          "obfuscation": "none",
+          "tls": "tls",
+          "diagnostic": "CertificateVerificationDisabledUnsupported",
+          "native_tcp_candidate": false,
+          "native_udp_supported": false,
+          "count": 90
+        }
+      ],
+      "complete_configuration_execution_supported": false,
+      "full_configuration_sections_preserved": 18,
+      "configuration_sections_unvalidated": 18,
+      "ciphertext_sha256": "c906874021eed789d8c054fc8a36a5914cd5b79988fc7bb6e3725d2546050717",
+      "raw_sha256_verified": true,
+      "decoded_sha256_verified": true
+    },
+    {
+      "local_index": 5,
+      "format": "ini",
+      "recognized": true,
+      "parsed": true,
+      "parse_error": null,
+      "nodes": 90,
+      "native_tcp_candidates": 0,
+      "unrecognized_fields": 0,
+      "capability_groups": [
+        {
+          "protocol": "ss",
+          "cipher": "aes-128-gcm",
+          "transport": "tcp",
+          "obfuscation": "http",
+          "tls": "not-enabled",
+          "diagnostic": "TcpFastOpenNotImplemented",
+          "native_tcp_candidate": false,
+          "native_udp_supported": false,
+          "count": 90
+        }
+      ],
+      "complete_configuration_execution_supported": false,
+      "full_configuration_sections_preserved": 8,
+      "configuration_sections_unvalidated": 8,
+      "ciphertext_sha256": "5c8c89657b0b362bb5bdd2fd08ef368c331f9ae1fb1acc9343c2b1ad209a0fad",
+      "raw_sha256_verified": true,
+      "decoded_sha256_verified": true
+    },
+    {
+      "local_index": 6,
+      "format": "ini",
+      "recognized": true,
+      "parsed": true,
+      "parse_error": null,
+      "nodes": 90,
+      "native_tcp_candidates": 0,
+      "unrecognized_fields": 0,
+      "capability_groups": [
+        {
+          "protocol": "trojan",
+          "cipher": "not-declared-or-unrecognized",
+          "transport": "tcp",
+          "obfuscation": "none",
+          "tls": "tls",
+          "diagnostic": "CertificateVerificationDisabledUnsupported",
+          "native_tcp_candidate": false,
+          "native_udp_supported": false,
+          "count": 90
+        }
+      ],
+      "complete_configuration_execution_supported": false,
+      "full_configuration_sections_preserved": 8,
+      "configuration_sections_unvalidated": 8,
+      "ciphertext_sha256": "5d920ba519e17d3af24aa28ab7ce8dd9b93a565a623bab6b248e6205ef2ca60d",
+      "raw_sha256_verified": true,
+      "decoded_sha256_verified": true
+    },
+    {
+      "local_index": 7,
+      "format": "ini",
+      "recognized": true,
+      "parsed": true,
+      "parse_error": null,
+      "nodes": 90,
+      "native_tcp_candidates": 90,
+      "unrecognized_fields": 0,
+      "capability_groups": [
+        {
+          "protocol": "ss",
+          "cipher": "aes-128-gcm",
+          "transport": "tcp",
+          "obfuscation": "http",
+          "tls": "not-enabled",
+          "diagnostic": "TcpCandidateNotYetVerified",
+          "native_tcp_candidate": true,
+          "native_udp_supported": false,
+          "count": 90
+        }
+      ],
+      "complete_configuration_execution_supported": false,
+      "full_configuration_sections_preserved": 4,
+      "configuration_sections_unvalidated": 4,
+      "ciphertext_sha256": "6b0518a0fa066ee78a5a4cce2d81dae4f14211ce83b2b9a271972dfd4ec55b53",
+      "raw_sha256_verified": true,
+      "decoded_sha256_verified": true
+    },
+    {
+      "local_index": 8,
+      "format": "ini",
+      "recognized": true,
+      "parsed": true,
+      "parse_error": null,
+      "nodes": 90,
+      "native_tcp_candidates": 0,
+      "unrecognized_fields": 0,
+      "capability_groups": [
+        {
+          "protocol": "trojan",
+          "cipher": "not-declared-or-unrecognized",
+          "transport": "tcp",
+          "obfuscation": "none",
+          "tls": "tls",
+          "diagnostic": "CertificateVerificationDisabledUnsupported",
+          "native_tcp_candidate": false,
+          "native_udp_supported": false,
+          "count": 90
+        }
+      ],
+      "complete_configuration_execution_supported": false,
+      "full_configuration_sections_preserved": 4,
+      "configuration_sections_unvalidated": 4,
+      "ciphertext_sha256": "1136ff7e2652c22d218f0ef7afd0339910e6dd5557b7d8a1a9029b2ed7624e43",
+      "raw_sha256_verified": true,
+      "decoded_sha256_verified": true
+    },
+    {
+      "local_index": 9,
+      "format": "base64",
+      "recognized": true,
+      "parsed": true,
+      "parse_error": null,
+      "nodes": 90,
+      "native_tcp_candidates": 90,
+      "unrecognized_fields": 0,
+      "capability_groups": [
+        {
+          "protocol": "ss",
+          "cipher": "aes-128-gcm",
+          "transport": "tcp",
+          "obfuscation": "http",
+          "tls": "not-enabled",
+          "diagnostic": "TcpCandidateNotYetVerified",
+          "native_tcp_candidate": true,
+          "native_udp_supported": false,
+          "count": 90
+        }
+      ],
+      "complete_configuration_execution_supported": false,
+      "full_configuration_sections_preserved": 0,
+      "configuration_sections_unvalidated": 0,
+      "ciphertext_sha256": "810ed81fde59accdaeed4aa94eb190e3a7745976f34a8997898711311a275fa5",
+      "raw_sha256_verified": true,
+      "decoded_sha256_verified": true
+    },
+    {
+      "local_index": 10,
+      "format": "base64",
+      "recognized": true,
+      "parsed": true,
+      "parse_error": null,
+      "nodes": 90,
+      "native_tcp_candidates": 0,
+      "unrecognized_fields": 0,
+      "capability_groups": [
+        {
+          "protocol": "trojan",
+          "cipher": "not-declared-or-unrecognized",
+          "transport": "tcp",
+          "obfuscation": "none",
+          "tls": "tls",
+          "diagnostic": "CertificateVerificationDisabledUnsupported",
+          "native_tcp_candidate": false,
+          "native_udp_supported": false,
+          "count": 90
+        }
+      ],
+      "complete_configuration_execution_supported": false,
+      "full_configuration_sections_preserved": 0,
+      "configuration_sections_unvalidated": 0,
+      "ciphertext_sha256": "fc80f6c2903f367bead45866a58e56f6f38d693efe5f31ce73d71688dc29ff53",
+      "raw_sha256_verified": true,
+      "decoded_sha256_verified": true
+    },
+    {
+      "local_index": 11,
+      "format": "ini",
+      "recognized": true,
+      "parsed": true,
+      "parse_error": null,
+      "nodes": 90,
+      "native_tcp_candidates": 0,
+      "unrecognized_fields": 0,
+      "capability_groups": [
+        {
+          "protocol": "ss",
+          "cipher": "aes-128-gcm",
+          "transport": "tcp",
+          "obfuscation": "http",
+          "tls": "not-enabled",
+          "diagnostic": "TcpFastOpenNotImplemented",
+          "native_tcp_candidate": false,
+          "native_udp_supported": false,
+          "count": 90
+        }
+      ],
+      "complete_configuration_execution_supported": false,
+      "full_configuration_sections_preserved": 4,
+      "configuration_sections_unvalidated": 4,
+      "ciphertext_sha256": "4895053c0ec26295a9dc6ffcf7405916facc910d6d5bda5e61fcae0a937e4999",
+      "raw_sha256_verified": true,
+      "decoded_sha256_verified": true
+    },
+    {
+      "local_index": 12,
+      "format": "ini",
+      "recognized": true,
+      "parsed": true,
+      "parse_error": null,
+      "nodes": 90,
+      "native_tcp_candidates": 0,
+      "unrecognized_fields": 0,
+      "capability_groups": [
+        {
+          "protocol": "trojan",
+          "cipher": "not-declared-or-unrecognized",
+          "transport": "tcp",
+          "obfuscation": "none",
+          "tls": "tls",
+          "diagnostic": "CertificateVerificationDisabledUnsupported",
+          "native_tcp_candidate": false,
+          "native_udp_supported": false,
+          "count": 90
+        }
+      ],
+      "complete_configuration_execution_supported": false,
+      "full_configuration_sections_preserved": 4,
+      "configuration_sections_unvalidated": 4,
+      "ciphertext_sha256": "256763e6e61d2303ea5bc1fa7ae1496106db817f330dc03a31ed8d19f82e8aec",
+      "raw_sha256_verified": true,
+      "decoded_sha256_verified": true
+    },
+    {
+      "local_index": 13,
+      "format": "ini",
+      "recognized": true,
+      "parsed": true,
+      "parse_error": null,
+      "nodes": 90,
+      "native_tcp_candidates": 0,
+      "unrecognized_fields": 0,
+      "capability_groups": [
+        {
+          "protocol": "ss",
+          "cipher": "aes-128-gcm",
+          "transport": "tcp",
+          "obfuscation": "http",
+          "tls": "not-enabled",
+          "diagnostic": "TcpFastOpenNotImplemented",
+          "native_tcp_candidate": false,
+          "native_udp_supported": false,
+          "count": 90
+        }
+      ],
+      "complete_configuration_execution_supported": false,
+      "full_configuration_sections_preserved": 9,
+      "configuration_sections_unvalidated": 9,
+      "ciphertext_sha256": "1770a28b7d399a5ab962530fd53f644b7f3541d4c4d543a1e0af1e5abb108504",
+      "raw_sha256_verified": true,
+      "decoded_sha256_verified": true
+    },
+    {
+      "local_index": 14,
+      "format": "ini",
+      "recognized": true,
+      "parsed": true,
+      "parse_error": null,
+      "nodes": 90,
+      "native_tcp_candidates": 0,
+      "unrecognized_fields": 0,
+      "capability_groups": [
+        {
+          "protocol": "trojan",
+          "cipher": "not-declared-or-unrecognized",
+          "transport": "tcp",
+          "obfuscation": "none",
+          "tls": "tls",
+          "diagnostic": "CertificateVerificationDisabledUnsupported",
+          "native_tcp_candidate": false,
+          "native_udp_supported": false,
+          "count": 90
+        }
+      ],
+      "complete_configuration_execution_supported": false,
+      "full_configuration_sections_preserved": 9,
+      "configuration_sections_unvalidated": 9,
+      "ciphertext_sha256": "642e6ee62e652a2cd3ca682e0a2944da49ed78f9058964199baddb05dbe25fd0",
+      "raw_sha256_verified": true,
+      "decoded_sha256_verified": true
+    },
+    {
+      "local_index": 15,
+      "format": "ini",
+      "recognized": true,
+      "parsed": true,
+      "parse_error": null,
+      "nodes": 90,
+      "native_tcp_candidates": 90,
+      "unrecognized_fields": 0,
+      "capability_groups": [
+        {
+          "protocol": "ss",
+          "cipher": "aes-128-gcm",
+          "transport": "tcp",
+          "obfuscation": "http",
+          "tls": "not-enabled",
+          "diagnostic": "TcpCandidateNotYetVerified",
+          "native_tcp_candidate": true,
+          "native_udp_supported": false,
+          "count": 90
+        }
+      ],
+      "complete_configuration_execution_supported": false,
+      "full_configuration_sections_preserved": 12,
+      "configuration_sections_unvalidated": 12,
+      "ciphertext_sha256": "2cc1abed9cbbf48d96d2adf3d49b1770dd211b06860c932e66242dacc52b4d6d",
+      "raw_sha256_verified": true,
+      "decoded_sha256_verified": true
+    },
+    {
+      "local_index": 16,
+      "format": "ini",
+      "recognized": true,
+      "parsed": true,
+      "parse_error": null,
+      "nodes": 90,
+      "native_tcp_candidates": 0,
+      "unrecognized_fields": 0,
+      "capability_groups": [
+        {
+          "protocol": "trojan",
+          "cipher": "not-declared-or-unrecognized",
+          "transport": "tcp",
+          "obfuscation": "none",
+          "tls": "tls",
+          "diagnostic": "UnmappedOrInvalidParameters",
+          "native_tcp_candidate": false,
+          "native_udp_supported": false,
+          "count": 90
+        }
+      ],
+      "complete_configuration_execution_supported": false,
+      "full_configuration_sections_preserved": 12,
+      "configuration_sections_unvalidated": 12,
+      "ciphertext_sha256": "331583c959180a8e5aa1a27a7a44c1c9b9001d023c1bbe35b171eea117bbb54d",
+      "raw_sha256_verified": true,
+      "decoded_sha256_verified": true
+    },
+    {
+      "local_index": 17,
+      "format": "base64",
+      "recognized": true,
+      "parsed": true,
+      "parse_error": null,
+      "nodes": 59,
+      "native_tcp_candidates": 0,
+      "unrecognized_fields": 531,
+      "capability_groups": [
+        {
+          "protocol": "vless",
+          "cipher": "not-declared-or-unrecognized",
+          "transport": "tcp",
+          "obfuscation": "none",
+          "tls": "reality",
+          "diagnostic": "RealityNotImplemented",
+          "native_tcp_candidate": false,
+          "native_udp_supported": false,
+          "count": 59
+        }
+      ],
+      "complete_configuration_execution_supported": false,
+      "full_configuration_sections_preserved": 0,
+      "configuration_sections_unvalidated": 0,
+      "ciphertext_sha256": "0937bbd6e019c05221ef277cd6389498e8c317049f223ee6dce9b0220788b0e3",
+      "raw_sha256_verified": true,
+      "decoded_sha256_verified": true
+    },
+    {
+      "local_index": 18,
+      "format": "base64",
+      "recognized": true,
+      "parsed": true,
+      "parse_error": null,
+      "nodes": 59,
+      "native_tcp_candidates": 0,
+      "unrecognized_fields": 531,
+      "capability_groups": [
+        {
+          "protocol": "vless",
+          "cipher": "not-declared-or-unrecognized",
+          "transport": "tcp",
+          "obfuscation": "none",
+          "tls": "reality",
+          "diagnostic": "RealityNotImplemented",
+          "native_tcp_candidate": false,
+          "native_udp_supported": false,
+          "count": 59
+        }
+      ],
+      "complete_configuration_execution_supported": false,
+      "full_configuration_sections_preserved": 0,
+      "configuration_sections_unvalidated": 0,
+      "ciphertext_sha256": "0937bbd6e019c05221ef277cd6389498e8c317049f223ee6dce9b0220788b0e3",
+      "raw_sha256_verified": true,
+      "decoded_sha256_verified": true
+    }
+  ],
+  "previous_corpus_semantics_equal": true
+}

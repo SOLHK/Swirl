@@ -1,9 +1,13 @@
 //! Swirl IR v1. External documents remain available even if execution is rejected.
 //! No Mihomo configuration or proxy engine is an internal execution dependency.
 use serde::{Deserialize, Serialize};
-mod dns_https;
 mod dns_tls;
-pub use dns_https::DnsHttpsServer;
+mod policy;
+mod reality;
+mod websocket;
+pub use policy::{HealthProbe, PolicyStrategy, ProbeTarget};
+pub use reality::Reality;
+pub use websocket::WebSocket;
 pub mod inspect;
 pub use dns_tls::DnsTlsServer;
 use std::{collections::HashSet, net::SocketAddr};
@@ -45,6 +49,12 @@ pub enum Outbound {
         uuid: String,
         #[serde(default)]
         tls: Option<Tls>,
+        #[serde(default)]
+        websocket: Option<WebSocket>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        reality: Option<Reality>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        flow: Option<String>,
     },
     Shadowsocks {
         host: String,
@@ -56,12 +66,22 @@ pub enum Outbound {
         #[serde(default)]
         obfs_http: Option<ObfsHttp>,
     },
+    Socks4 {
+        host: String,
+        port: u16,
+        #[serde(default)]
+        user_id: String,
+        #[serde(default = "default_true")]
+        remote_dns: bool,
+    },
     Socks5 {
         host: String,
         port: u16,
         auth: Option<Credentials>,
         #[serde(default)]
         tls: Option<Tls>,
+        #[serde(default)]
+        udp: bool,
     },
     HttpConnect {
         host: String,
@@ -75,6 +95,8 @@ pub enum Outbound {
         port: u16,
         password: String,
         tls: Tls,
+        #[serde(default)]
+        websocket: Option<WebSocket>,
     },
 }
 
@@ -119,13 +141,19 @@ pub struct Rule {
     pub outbound: String,
 }
 
-/// Explicit manual selector. Members are concrete nodes, not nested groups.
+/// Explicit policy group. Manual groups can contain validated groups; automatic
+/// groups probe concrete nodes and never replay application requests.
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Selector {
     pub id: String,
     pub members: Vec<String>,
+    #[serde(default)]
     pub selected: String,
+    #[serde(default)]
+    pub strategy: PolicyStrategy,
+    #[serde(default)]
+    pub probe: Option<HealthProbe>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -135,9 +163,36 @@ pub struct HostMapping {
     pub address: std::net::IpAddr,
 }
 
+/// Which wire record families explicit DNS upstreams may query. This does not
+/// disable IPv6 literal destinations or exact static host mappings.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", try_from = "String")]
+pub enum DnsQueryFamily {
+    #[default]
+    Dual,
+    Ipv4Only,
+}
+impl TryFrom<String> for DnsQueryFamily {
+    type Error = &'static str;
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match value.as_str() {
+            "dual" => Ok(Self::Dual),
+            "ipv4_only" => Ok(Self::Ipv4Only),
+            _ => Err("DnsQueryFamilyValue"),
+        }
+    }
+}
+impl DnsQueryFamily {
+    fn is_default(&self) -> bool {
+        *self == Self::Dual
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Dns {
+    #[serde(default, skip_serializing_if = "DnsQueryFamily::is_default")]
+    pub query_family: DnsQueryFamily,
     #[serde(default)]
     pub hosts: Vec<HostMapping>,
     #[serde(default)]
@@ -147,22 +202,32 @@ pub struct Dns {
     /// Strict DoT endpoints; mutually exclusive with plaintext servers.
     #[serde(default)]
     pub tls_servers: Vec<DnsTlsServer>,
-    #[serde(default)]
-    pub https_servers: Vec<DnsHttpsServer>,
     #[serde(default = "default_true")]
     pub use_system_hosts: bool,
 }
 fn default_true() -> bool {
     true
 }
+impl Dns {
+    pub fn validate_query_family(&self) -> Result<(), &'static str> {
+        // Filtering OS lookup results would not prevent unrequested wire queries.
+        if self.query_family != DnsQueryFamily::Dual
+            && self.servers.is_empty()
+            && self.tls_servers.is_empty()
+        {
+            return Err("DnsQueryFamilyRequiresExplicitServer");
+        }
+        Ok(())
+    }
+}
 impl Default for Dns {
     fn default() -> Self {
         Self {
+            query_family: DnsQueryFamily::Dual,
             hosts: Vec::new(),
             force_proxy_hosts: false,
             servers: Vec::new(),
             tls_servers: Vec::new(),
-            https_servers: Vec::new(),
             use_system_hosts: true,
         }
     }
@@ -192,10 +257,16 @@ pub struct Config {
     pub nodes: Vec<Node>,
     #[serde(default)]
     pub rules: Vec<Rule>,
+    /// Enable bundled, checksum-pinned China MRS fallback before MATCH.
+    #[serde(default)]
+    pub smart_routing: bool,
     #[serde(default)]
     pub selectors: Vec<Selector>,
     #[serde(default)]
     pub dns: Dns,
+    /// Directory containing the two bundled, checksum-pinned MRS rule providers.
+    #[serde(default)]
+    pub china_rules_directory: Option<String>,
     #[serde(default)]
     pub inbound_auth: Option<Credentials>,
     #[serde(default)]
@@ -279,7 +350,6 @@ impl Config {
                 .any(|s| s.port() == 0 || s.ip().is_unspecified() || s.ip().is_multicast())
             || (self.dns.servers.is_empty()
                 && self.dns.tls_servers.is_empty()
-                && self.dns.https_servers.is_empty()
                 && !self.dns.use_system_hosts)
             || !(1..=256).contains(&self.limits.max_connections)
             || !(100..=30000).contains(&self.limits.handshake_timeout_ms)
@@ -287,6 +357,14 @@ impl Config {
         {
             return Err("ConfigBounds");
         }
+        if self
+            .china_rules_directory
+            .as_ref()
+            .is_some_and(|p| p.is_empty() || p.len() > 4096 || p.chars().any(char::is_control))
+        {
+            return Err("ChinaRulesDirectory");
+        }
+        self.dns.validate_query_family()?;
         self.dns.validate_tls()?;
         let mut host_names = HashSet::new();
         let mut servers = HashSet::new();
@@ -318,6 +396,18 @@ impl Config {
                 return Err("NodeId");
             }
             match &node.outbound {
+                Outbound::Socks4 {
+                    host,
+                    port,
+                    user_id,
+                    ..
+                } if !valid_host(host)
+                    || *port == 0
+                    || user_id.len() > 255
+                    || user_id.chars().any(char::is_control) =>
+                {
+                    return Err("Socks4Parameters");
+                }
                 Outbound::Vless {
                     host, port, uuid, ..
                 } if !valid_host(host) || *port == 0 || uuid_bytes(uuid).is_none() => {
@@ -350,6 +440,11 @@ impl Config {
                 } if !valid_host(host) || *port == 0 || !valid_auth(auth) => {
                     return Err("NodeParameters");
                 }
+                Outbound::Socks5 {
+                    udp: true,
+                    tls: Some(_),
+                    ..
+                } => return Err("Socks5UdpTlsUnsupported"),
                 Outbound::Trojan {
                     host,
                     port,
@@ -362,6 +457,36 @@ impl Config {
                 {
                     return Err("NodeParameters");
                 }
+                _ => {}
+            }
+            match &node.outbound {
+                Outbound::Vless {
+                    reality,
+                    flow,
+                    tls,
+                    websocket,
+                    ..
+                } => {
+                    if flow.as_deref().is_some_and(|value| {
+                        !value.is_empty() && (reality.is_none() || value != "xtls-rprx-vision")
+                    }) {
+                        return Err("VlessFlowUnsupported");
+                    }
+                    if let Some(reality) = reality {
+                        if tls.is_some() || websocket.is_some() {
+                            return Err("RealityTransportConflict");
+                        }
+                        reality.validate()?;
+                    }
+                    if let Some(ws) = websocket {
+                        ws.validate_tls(tls.as_ref())?;
+                    }
+                }
+                Outbound::Trojan {
+                    websocket: Some(ws),
+                    tls,
+                    ..
+                } => ws.validate_tls(Some(tls))?,
                 _ => {}
             }
             let tls = match &node.outbound {
@@ -383,9 +508,6 @@ impl Config {
                 return Err("TlsParameters");
             }
         }
-        if !ids.contains(self.selected.as_str()) {
-            return Err("SelectedNodeMissing");
-        }
         let mut selector_ids = HashSet::new();
         for selector in &self.selectors {
             if selector.id.is_empty()
@@ -399,18 +521,25 @@ impl Config {
             {
                 return Err("SelectorId");
             }
+        }
+        if !ids.contains(self.selected.as_str()) && !selector_ids.contains(self.selected.as_str()) {
+            return Err("SelectedNodeMissing");
+        }
+        for selector in &self.selectors {
             let mut members = HashSet::new();
             if selector.members.is_empty()
                 || selector.members.len() > 512
-                || selector
-                    .members
-                    .iter()
-                    .any(|id| !ids.contains(id.as_str()) || !members.insert(id.as_str()))
-                || !members.contains(selector.selected.as_str())
+                || selector.members.iter().any(|id| {
+                    (!ids.contains(id.as_str()) && !selector_ids.contains(id.as_str()))
+                        || !members.insert(id.as_str())
+                })
+                || (selector.strategy == PolicyStrategy::Manual
+                    && !members.contains(selector.selected.as_str()))
             {
                 return Err("SelectorMembers");
             }
         }
+        self.validate_policies()?;
         for rule in &self.rules {
             if !ids.contains(rule.outbound.as_str())
                 && !selector_ids.contains(rule.outbound.as_str())
@@ -460,6 +589,32 @@ impl ImportedDocument {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn socks5_udp_is_explicit_and_never_weakens_tls() {
+        for (extra, udp) in [
+            ("", false),
+            (",\"udp\":false", false),
+            (",\"udp\":true", true),
+        ] {
+            let document = format!(
+                r#"{{"schema":1,"listen":"127.0.0.1:0","selected":"s","nodes":[{{"id":"s","outbound":{{"type":"socks5","host":"proxy.fixture.test","port":1080{extra}}}}}]}}"#
+            );
+            let config = Config::parse(document.as_bytes()).unwrap();
+            assert!(
+                matches!(&config.nodes[0].outbound, Outbound::Socks5 { udp: actual, .. } if *actual == udp)
+            );
+            let tls =
+                document.replace("1080", r#"1080,"tls":{"server_name":"proxy.fixture.test"}"#);
+            if udp {
+                assert!(matches!(
+                    Config::parse(tls.as_bytes()),
+                    Err("Socks5UdpTlsUnsupported")
+                ));
+            } else {
+                assert!(Config::parse(tls.as_bytes()).is_ok());
+            }
+        }
+    }
     #[test]
     fn unknown_fields_preserved_but_not_executed() {
         let data = br#"{"schema":1,"unknown_tls_secret":"fixture"}"#;

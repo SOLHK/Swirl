@@ -1,0 +1,48 @@
+name: Swirl VF native axis plateau construction
+
+on:
+  push:
+    branches: [work/core-completion-20261017]
+    paths:
+      - '.github/workflows/swirl-vf-axis-plateau.yml'
+      - 'tools/swirl_vf/platform/probe_axis_plateau.py'
+      - 'tools/swirl_vf/platform/plateau_construction_harness.py'
+      - 'tools/swirl_vf/platform/probe_axis_thresholds.py'
+      - 'tools/swirl_vf/platform/coretext_extract.swift'
+      - 'tools/swirl_vf/platform/compare_axis_construction.py'
+      - 'tools/swirl_vf/platform/calibrate_avar_metrics.py'
+      - 'tools/swirl_vf/platform/calibrate_hvf_geometry.py'
+      - 'tools/swirl_vf/platform/probe_user_axis_geometry.py'
+      - 'tools/swirl_vf/platform/hvf_oracle.c'
+      - 'tools/swirl_vf/tools/rebuild.py'
+      - 'tools/swirl_vf/tools/source_metrics.py'
+      - 'tools/swirl_vf/tools/verified_axis_oracle.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-axis-plateau:
+    runs-on: xcode-27
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Observe plateau boundaries through independent native constructors
+        run: |
+          python -m pip install fonttools==4.61.1 numpy==2.2.6
+          python tools/swirl_vf/platform/probe_axis_plateau.py \
+            /System/Library/PrivateFrameworks/FontServices.framework/Versions/A/Resources/Reserved/PingFangUI.ttc \
+            --output build/axis-plateau-summary/plateau.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: swirl-vf-axis-plateau-${{ github.sha }}
+          path: build/axis-plateau-summary/*.json
+          retention-days: 7

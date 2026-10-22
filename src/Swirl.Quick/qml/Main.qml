@@ -26,6 +26,7 @@ ApplicationWindow {
     minimumWidth:Theme.windowMinimumWidth; minimumHeight:Theme.windowMinimumHeight
     title:"Swirl"; flags:Qt.Window | Qt.FramelessWindowHint; color:"transparent"
     font.family:Theme.fontFamily; font.pixelSize:Theme.fontSize(16)
+    SwirlFontBinding { target: window; fontWindow: window; textRole: "body" }
     palette.window:Theme.canvas
     palette.base:Theme.material("field")
     palette.button:Theme.buttonBase
@@ -110,7 +111,7 @@ ApplicationWindow {
             id:mainArea; x:window.actualSidebarWidth+window.sidebarGutter; width:parent.width-x-Theme.dp(12); height:parent.height
             RowLayout {
                 id:toolbar; visible:AppState.currentPage==="activity"; x:Theme.pagePadding; y:Theme.dp(16); width:parent.width-2*Theme.pagePadding; height:Theme.dp(32); spacing:Theme.dp(8)
-                SwirlText {text:"活动";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold;Layout.fillWidth:true}
+                SwirlText {textRole:"pageTitle";text:"活动";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold;Layout.fillWidth:true}
                 SwirlStatusCapsule { objectName:"eventsCapsule"; Layout.preferredWidth:implicitWidth; Layout.preferredHeight:Theme.statusHeight; label:systemProvider.eventCount>0?systemProvider.eventCount+" 个事件":"暂无事件";tone:systemProvider.eventCount>0?"info":"neutral";detail:"查看事件与活动记录"; onClicked:AppState.navigate("logs") }
                 SwirlStatusCapsule {id:proxyCapsule;objectName:"proxyCapsule";Layout.preferredWidth:implicitWidth;Layout.preferredHeight:Theme.statusHeight;label:window.proxyStatusLabel;tone:window.proxyTogglePending?"info":engineController.systemProxy.error.length||engineController.routingError.length?"warning":engineController.systemProxy.owned&&engineController.systemProxy.enabled?"success":"neutral";detail:"查看系统代理状态与操作";onClicked:proxyPanel.toggle()}
 
@@ -143,7 +144,6 @@ ApplicationWindow {
                                 AppState.currentPage==="inspector" ? inspector :
                                 AppState.currentPage==="scripts" ? scripts :
                                 AppState.currentPage==="settings" ? settings :
-                                AppState.currentPage==="appearance" ? appearance :
                                 AppState.currentPage==="fonts" ? fonts :
                                 AppState.currentPage==="toolbox" ? toolbox :
                                 AppState.currentPage==="dns" ? dns :
@@ -285,7 +285,6 @@ ApplicationWindow {
     Component { id:inspector; InspectorPage {} }
     Component { id:scripts; ScriptsPage {} }
     Component { id:settings; SettingsPage {section:"常规"} }
-    Component { id:appearance; SettingsPage {section:"外观"} }
     Component { id:fonts; SettingsPage {section:"字体"} }
     Component { id:toolbox; ToolboxPage {} }
     Component { id:dns; DNSPage {} }
@@ -330,6 +329,14 @@ ApplicationWindow {
         running:smokeTestMode; repeat:true; interval:200
         property int index:0
         onTriggered:{
+            // Font review waits for real route loading and transition state;
+            // the existing standalone smoke driver retains its rapid cadence.
+            if(fontSmokeReadyMode){
+                const loader=pageLoader.activeLoader
+                if(pageLoader.pendingGrab || pageLoader.moving || !loader ||
+                    loader.status!==Loader.Ready || !loader.item || loader.routeId!==pageLoader.routeKey)return
+                if(index>0)console.info("FONT_SMOKE_ROUTE_READY",AppState.allPageIds[index-1],loader.routeId)
+            }
             if(index>=AppState.allPageIds.length){console.info("SMOKE_PAGES",index);stop();window.navigationSmokeCompleted();return}
             AppState.currentPage=AppState.allPageIds[index++]
         }

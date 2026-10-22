@@ -12,6 +12,15 @@ Swirl 是面向 Windows 的网络工具，桌面界面保留 **C++23、Qt 6 Quic
 
 [![Windows Qt 构建与测试](https://github.com/SOLHK/Swirl/actions/workflows/build-qt-quick-ui.yml/badge.svg?branch=main)](https://github.com/SOLHK/Swirl/actions/workflows/build-qt-quick-ui.yml) · [测试版安装程序](https://github.com/SOLHK/Swirl/releases) · [测试分支](https://github.com/SOLHK/Swirl/tree/test)
 
+## 官方社区
+
+| 入口 | 用途 |
+| --- | --- |
+| [Swirl官方频道](https://t.me/SwirlUpdates) | 版本更新与官方公告 |
+| [Swirl交流群](https://t.me/SwirlHQ) | 使用交流与经验分享 |
+
+Bug 和功能请求请提交到 [GitHub Issues](https://github.com/SOLHK/Swirl/issues)，便于正式跟踪；社区讨论不替代 Issue 记录。
+
 ## 主要功能与边界
 
 | 功能 | 当前实现 |

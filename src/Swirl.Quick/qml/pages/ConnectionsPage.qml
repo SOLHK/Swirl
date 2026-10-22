@@ -31,7 +31,7 @@ Item {
         anchors.leftMargin:Theme.dp(23); anchors.rightMargin:Theme.dp(23); anchors.bottomMargin:Theme.dp(14)
         spacing:Theme.dp(14)
         SwirlGlassPanel {id:connectionSummary;Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(72)
-         RowLayout {anchors.fill:parent;anchors.margins:Theme.dp(16);SwirlText {text:"活动连接";color:Theme.text;font.pixelSize:Theme.fontSize(22);Layout.fillWidth:true}SwirlText {id:activeCount;text:engineController.telemetry.connectionsSampled?String(engineController.telemetry.activeConnections):"—";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold}SwirlButton {text:"返回";visible:SwirlMotion.returnShared && SwirlMotion.returnShared.route===AppState.currentPage;onClicked:SwirlMotion.returnToHub(activeCount)}}
+         RowLayout {anchors.fill:parent;anchors.margins:Theme.dp(16);SwirlText {textRole:"pageTitle";text:"活动连接";color:Theme.text;font.pixelSize:Theme.fontSize(22);Layout.fillWidth:true}SwirlText {textRole:"data";id:activeCount;text:engineController.telemetry.connectionsSampled?String(engineController.telemetry.activeConnections):"—";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold}SwirlButton {text:"返回";visible:SwirlMotion.returnShared && SwirlMotion.returnShared.route===AppState.currentPage;onClicked:SwirlMotion.returnToHub(activeCount)}}
         }
         RowLayout {
             Layout.fillWidth:true; spacing:Theme.dp(10)
@@ -94,6 +94,9 @@ Item {
                             ["Protocol",page.selected?page.selected.protocol:"—"],
                             ["匹配策略",page.selected?page.selected.policy:"—"],
                             ["匹配规则",page.selected?page.selected.rule:"—"],
+                            ["最终出站",page.selected?page.selected.outbound:"—"],
+                            ["代理节点",page.selected&&page.selected.proxyNode?page.selected.proxyNode:"—"],
+                            ["传输状态",page.selected&&page.selected.transportState?page.selected.transportState:"—"],
                             ["Upload",page.selected?page.selected.up:"—"],
                             ["Download",page.selected?page.selected.down:"—"],
                             ["Latency",page.selected?page.selected.latency:"—"],

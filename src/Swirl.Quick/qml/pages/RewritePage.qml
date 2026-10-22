@@ -17,7 +17,7 @@ Item {
   SwirlButton{anchors.right:parent.right;anchors.rightMargin:Theme.dp(16);y:Theme.dp(96);implicitHeight:Theme.dp(24);text:card.buttonText;onClicked:page.Window.window.openRewriteEditor(card.moduleId,card.title)}
  }
  Flickable{anchors.fill:parent;contentWidth:Theme.dp(698);contentHeight:Theme.dp(574);clip:true
-  SwirlText {x:Theme.dp(4);y:Theme.dp(6);text:"重写 & 映射";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.Bold}
+  SwirlText {textRole:"pageTitle";x:Theme.dp(4);y:Theme.dp(6);text:"重写 & 映射";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.Bold}
   SwirlToggle{x:Theme.dp(156);y:Theme.dp(10);large:true;checked:captureProvider.rewriteEnabled;onToggled:captureProvider.rewriteEnabled=checked;Accessible.name:"重写与映射"}
   RewriteCard{x:Theme.dp(4);y:Theme.dp(80);title:"URL 重定向";description:"重定向 HTTP 请求。此功能也称为 Map Remote。Swirl 可以用 3 种不同的方法重写请求的 URL。有关更多信息，请查看手册。";buttonText:"编辑 URL 重定向规则…";moduleId:"redirect"}
   RewriteCard{x:Theme.dp(356);y:Theme.dp(80);title:"Header 重写";description:"Swirl 可以修改发送到服务器的 HTTP Header，以及修改返回响应的 Header。";buttonText:"编辑 Header 重写规则…";moduleId:"header"}

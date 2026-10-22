@@ -1,7 +1,7 @@
 #include "ModuleDraftStore.h"
 #include <QDir>
 #include <QSettings>
-#include <QStandardPaths>
+#include "StoragePaths.h"
 #include <QSaveFile>
 #include <QFile>
 #include <QFileInfo>
@@ -9,11 +9,11 @@
 #include <QJsonObject>
 ModuleDraftStore::ModuleDraftStore(QObject *parent):QObject(parent) {
     #ifdef SWIRL_UI_TESTS
-    if(qEnvironmentVariableIsSet("SWIRL_TEST_DRAFTS")) {
+    if(SwirlPaths::testRoot().isEmpty()&&qEnvironmentVariableIsSet("SWIRL_TEST_DRAFTS")) {
         m_path=qEnvironmentVariable("SWIRL_TEST_DRAFTS");return;
     }
 #endif
-    m_path=QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation)+"/Swirl/qt-ui/module-drafts.ini";
+    m_path=SwirlPaths::writableLocation(QStandardPaths::GenericDataLocation)+"/Swirl/qt-ui/module-drafts.ini";
 }
 bool ModuleDraftStore::fail(const QString &message) {m_error=message;emit errorChanged();return false;}
 QVariantMap ModuleDraftStore::load(const QString &id) const {

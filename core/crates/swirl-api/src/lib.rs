@@ -33,6 +33,18 @@ enum Command {
     Snapshot {
         handle: u64,
     },
+    ProbeStart {
+        handle: u64,
+        url: String,
+        timeout_ms: Option<u64>,
+        expected_status: Option<u16>,
+    },
+    ProbeStatus {
+        handle: u64,
+    },
+    ProbeCancel {
+        handle: u64,
+    },
     Stop {
         handle: u64,
     },
@@ -84,6 +96,24 @@ impl Controller {
             Command::Snapshot { handle } => Ok(
                 json!({"ok":true,"status":self.cores.get(&handle).ok_or("UnknownHandle")?.snapshot()?}),
             ),
+            Command::ProbeStart {
+                handle,
+                url,
+                timeout_ms,
+                expected_status,
+            } => Ok(json!({
+                "ok": true,
+                "probe": self.cores.get(&handle).ok_or("UnknownHandle")?
+                    .probe_start(url, timeout_ms, expected_status)?
+            })),
+            Command::ProbeStatus { handle } => Ok(json!({
+                "ok": true,
+                "probe": self.cores.get(&handle).ok_or("UnknownHandle")?.probe_status()?
+            })),
+            Command::ProbeCancel { handle } => Ok(json!({
+                "ok": true,
+                "probe": self.cores.get(&handle).ok_or("UnknownHandle")?.probe_cancel()?
+            })),
             Command::SelectGroup { handle, id, member } => {
                 self.cores
                     .get(&handle)
@@ -169,3 +199,7 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "probe_tests.rs"]
+mod probe_tests;

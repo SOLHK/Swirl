@@ -1,4 +1,5 @@
-//! VLESS wire version 0, TCP command, no flow or addons. Generic TLS is separate.
+//! VLESS wire version 0, TCP command and a lazy response prefix. The wrapper
+//! retains its concrete transport owner when a subsequent Vision handoff needs it.
 use crate::{Result, Target};
 use std::{
     future::Future,
@@ -11,10 +12,20 @@ use swirl_transport::BoxStream;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 pub fn request(uuid: &str, target: &Target) -> Result<Vec<u8>> {
+    request_with_flow(uuid, target, None)
+}
+
+pub(crate) fn request_with_flow(
+    uuid: &str,
+    target: &Target,
+    flow: Option<&str>,
+) -> Result<Vec<u8>> {
+    let addons = crate::vision::request_addons(flow).map_err(|_| "VlessFlow")?;
     let id = swirl_subscription::uuid_bytes(uuid).ok_or("VlessUuid")?;
     let mut bytes = vec![0];
     bytes.extend(id);
-    bytes.extend([0, 1]);
+    bytes.extend(addons);
+    bytes.push(1);
     bytes.extend(target.port.to_be_bytes());
     match target.host.parse::<IpAddr>() {
         Ok(IpAddr::V4(ip)) => {
@@ -39,16 +50,16 @@ fn invalid() -> io::Error {
         "VLESS response version or addons unsupported",
     )
 }
-pub struct Stream {
-    inner: BoxStream,
+pub struct Stream<S = BoxStream> {
+    inner: S,
     header: [u8; 2],
     received: usize,
     failed: bool,
     limit: std::time::Duration,
     partial_deadline: Option<Pin<Box<tokio::time::Sleep>>>,
 }
-impl Stream {
-    pub fn new(inner: BoxStream, limit: std::time::Duration) -> Self {
+impl<S> Stream<S> {
+    pub fn new(inner: S, limit: std::time::Duration) -> Self {
         Self {
             inner,
             header: [0; 2],
@@ -58,8 +69,22 @@ impl Stream {
             partial_deadline: None,
         }
     }
+
+    pub(crate) fn transport_mut(&mut self) -> io::Result<&mut S> {
+        if self.failed {
+            return Err(invalid());
+        }
+        Ok(&mut self.inner)
+    }
+
+    pub(crate) fn response_transport_mut(&mut self) -> io::Result<&mut S> {
+        if self.received != 2 || self.header != [0, 0] {
+            return Err(invalid());
+        }
+        self.transport_mut()
+    }
 }
-impl AsyncRead for Stream {
+impl<S: AsyncRead + Unpin> AsyncRead for Stream<S> {
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -106,7 +131,7 @@ impl AsyncRead for Stream {
     }
 }
 
-impl AsyncWrite for Stream {
+impl<S: AsyncWrite + Unpin> AsyncWrite for Stream<S> {
     fn poll_write(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -170,5 +195,85 @@ mod tests {
         assert!(
             swirl_subscription::uuid_bytes("00112233-4455-6677-8899-aabbccddeeff-extra").is_none()
         );
+    }
+
+    #[test]
+    fn vision_and_unchanged_empty_addons_complete_request_layouts() {
+        let uuid = "00112233-4455-6677-8899-aabbccddeeff";
+        // Fixed complete known-answer headers, including all three VLESS address types.
+        let cases = [
+            (
+                "192.0.2.10",
+                80,
+                "0000112233445566778899aabbccddeeff0001005001c000020a",
+                "0000112233445566778899aabbccddeeff120a1078746c732d727072782d766973696f6e01005001c000020a",
+            ),
+            (
+                "example.org",
+                443,
+                "0000112233445566778899aabbccddeeff000101bb020b6578616d706c652e6f7267",
+                "0000112233445566778899aabbccddeeff120a1078746c732d727072782d766973696f6e0101bb020b6578616d706c652e6f7267",
+            ),
+            (
+                "2001:db8::1",
+                8443,
+                "0000112233445566778899aabbccddeeff000120fb0320010db8000000000000000000000001",
+                "0000112233445566778899aabbccddeeff120a1078746c732d727072782d766973696f6e0120fb0320010db8000000000000000000000001",
+            ),
+        ];
+        let hex = |text: &str| -> Vec<u8> {
+            assert_eq!(text.len() % 2, 0);
+            text.as_bytes()
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|pair| u8::from_str_radix(std::str::from_utf8(pair).unwrap(), 16).unwrap())
+                .collect()
+        };
+        for (host, port, ordinary, vision) in cases {
+            let target = Target {
+                host: host.into(),
+                port,
+            };
+            assert_eq!(request(uuid, &target).unwrap(), hex(ordinary));
+            assert_eq!(
+                request_with_flow(uuid, &target, None).unwrap(),
+                hex(ordinary)
+            );
+            assert_eq!(
+                request_with_flow(uuid, &target, Some("")).unwrap(),
+                hex(ordinary)
+            );
+            assert_eq!(
+                request_with_flow(uuid, &target, Some("xtls-rprx-vision")).unwrap(),
+                hex(vision),
+            );
+        }
+    }
+
+    #[test]
+    fn unsupported_request_flow_is_a_static_error_instead_of_empty_addons() {
+        let target = Target {
+            host: "example.org".into(),
+            port: 443,
+        };
+        for flow in [
+            "xtls-rprx-vision-udp443",
+            "xtls-rprx-direct",
+            "XTLS-RPRX-VISION",
+            " xtls-rprx-vision",
+            "xtls-rprx-vision ",
+            "xtls-rprx-vision\0",
+            " ",
+            "none",
+            "vision",
+            "synthetic-secret-unknown-flow",
+        ] {
+            let error =
+                request_with_flow("00112233-4455-6677-8899-aabbccddeeff", &target, Some(flow))
+                    .unwrap_err();
+            assert_eq!(error, "VlessFlow");
+            assert!(!error.contains(flow));
+        }
     }
 }

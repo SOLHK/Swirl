@@ -51,7 +51,7 @@ Item {
                 anchors.fill:parent; anchors.margins:Theme.dp(18)
                 ColumnLayout {
                     Layout.fillWidth:true; spacing:Theme.dp(6)
-                    SwirlText { text:AppState.page(page.pageId).title+"工作区"; color:Theme.text; font.pixelSize:Theme.fontSize(20); font.weight:Font.DemiBold }
+                    SwirlText {textRole:"pageTitle"; text:AppState.page(page.pageId).title+"工作区"; color:Theme.text; font.pixelSize:Theme.fontSize(20); font.weight:Font.DemiBold }
                     SwirlText { text:featureList.length+" 个功能区域研发中，保留布局供后续接入。"; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
                 }
                 SwirlStatusBadge { label:"研发中"; tone:"warning" }
@@ -128,7 +128,7 @@ Item {
                         color:Theme.field; radius:Theme.roundedRadius(width,height); border.color:Theme.border
                         ScrollView {
                             anchors.fill:parent; anchors.margins:Theme.dp(8)
-                            TextArea { renderType: TextEdit.NativeRendering; font.weight: Theme.bodyFontWeight; font.hintingPreference: Font.PreferFullHinting; Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) }
+                            SwirlTextArea {
                                 text:"# Swirl\nfeature: "+page.selected+"\nstatus: not connected\n\n# Changes will not affect system settings."
                                 color:Theme.text
                                 font.family:"Cascadia Code"; font.pixelSize:Theme.fontSize(11)

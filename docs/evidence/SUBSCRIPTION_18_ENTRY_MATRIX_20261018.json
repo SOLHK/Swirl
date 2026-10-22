@@ -1,0 +1,1230 @@
+{
+  "schema": 1,
+  "generated_at": "2026-10-18T08:04:33.261222+00:00",
+  "scope": "18 original manifest entries; new 2026-10-18 06:55:48 UTC capture versus separately identified historical samples",
+  "supplier_requests_this_audit": 0,
+  "decrypted_response_bodies_this_audit": 18,
+  "manifest_only_in_memory_decryption": false,
+  "evidence": {
+    "new_corpus": {
+      "path": "D:\\Codex\\outputs\\capture-065548-corpus.json",
+      "sha256": "5d4d905274df760c9d7f6e17ad02c4b8256877772e5ea6858e1273e4b34db100"
+    },
+    "new_integrity": {
+      "path": "D:\\Codex\\outputs\\capture-065548-integrity.json",
+      "sha256": "152be7ae6f6accf9de8b95f52f9185060e513c094b70ea5103dbc7c620e41b44"
+    },
+    "historical_fixed_windows": {
+      "path": "D:\\Codex\\work\\Swirl\\docs\\evidence\\RUST_WINDOWS_FIXED_SS_20261018_VERIFIED.json",
+      "sha256": "f533af32846c21f6f1e30374ab97d34a2050aa7642b83174226a555f5516b18b"
+    },
+    "historical_loon_windows": {
+      "path": "D:\\Codex\\outputs\\core-continuation-loon-network.json",
+      "sha256": "2c0dccb0e7eb0cc92e199882bf652ef48a603ffbc4ef034bc007822f8993da15"
+    },
+    "capture_checkpoint_document": {
+      "path": "D:\\Codex\\work\\Swirl\\docs\\RUST_CAPTURE_065548_20261018.md",
+      "sha256": "988c463ed001ec6c522019d46e09f6b7c77d14bca0053a6596527f0d082e522e"
+    },
+    "historical_fixed_document": {
+      "path": "D:\\Codex\\work\\Swirl\\docs\\RUST_WINDOWS_FIXED_SS_20261018.md",
+      "sha256": "ff89b308f5eae0a01a61923b54ea7513374d621368397ca02628f71ceae8b331"
+    }
+  },
+  "manifest_identity_checks": {
+    "new_prior_original_order_and_exact_urls_equal": true,
+    "new_manifest_ciphertext_sha256": "2e299bda0378b4c387e918a888b9b5a5871487cceb9d2410314c22425222dd7e",
+    "prior_manifest_ciphertext_sha256": "be4ae1c20ae4d4e8cb14d31c03d4cba39df3e22fccc6df904527dc318ac21667",
+    "original_manifest_ciphertext_sha256": "103b5dcf8466cf8b7c07effa117e725e73779d27328755e2c295525f1335a09b",
+    "urls_emitted": false,
+    "credentials_emitted": false,
+    "entry_ordinals_one_based": true,
+    "fixed_remote_9_to_local_manifest_entry": 7,
+    "historical_local_cache_enumeration_for_remote_9": 8,
+    "cache_enumeration_is_not_manifest_entry_number": true,
+    "mapping_basis": "historical fixed report url_mapping exact match + in-memory equality of all three authorized manifest URL orders; no ordinal guessing"
+  },
+  "summary": {
+    "entries": 18,
+    "unique_urls": 17,
+    "parse_passed_entries": 18,
+    "parse_failed_entries": 0,
+    "captured_entries": 18,
+    "encrypted_response_files": 17,
+    "full_product_chain_accepted_entries": 0,
+    "new_cache_network_tested": 0,
+    "new_cache_network_success": 0,
+    "new_cache_network_failure": 0,
+    "new_cache_network_success_rate": null,
+    "node_records_including_duplicate_sources": 1558,
+    "protocol_record_totals": {
+      "ss": 720,
+      "trojan": 720,
+      "vless": 118
+    },
+    "native_tcp_candidate_records_including_duplicate_sources": 450,
+    "candidate_entry_ordinals": [
+      1,
+      3,
+      7,
+      9,
+      15
+    ],
+    "historical_windows_verified_sample_records": 6,
+    "historical_windows_verified_entry_groups": [
+      7,
+      15
+    ],
+    "unique_historical_servers_or_nodes": "not established; do not equate six sample records with six distinct servers"
+  },
+  "entries": [
+    {
+      "entry": 1,
+      "manifest_client_label": "Clash standard",
+      "label_provenance": "literal client field of original authorized DPAPI manifest; not inferred from syntax",
+      "actual_producing_application": "not independently established; label describes declared client target",
+      "observed_body_format": "clash-yaml",
+      "protocol_counts": {
+        "ss": 90
+      },
+      "node_records": 90,
+      "native_tcp_candidate_records": 90,
+      "capability_groups": [
+        {
+          "protocol": "ss",
+          "cipher": "aes-128-gcm",
+          "transport": "tcp",
+          "obfuscation": "http",
+          "tls": "not-enabled",
+          "diagnostic": "TcpCandidateNotYetVerified",
+          "native_tcp_candidate": true,
+          "native_udp_supported": false,
+          "count": 90
+        }
+      ],
+      "unrecognized_fields": 0,
+      "parse_status": "passed",
+      "complete_product_chain": {
+        "status": "not_accepted",
+        "inspector_complete_configuration_execution_supported": false,
+        "new_corpus_product_import_to_dns_routing_qt_to_internet_verified": false,
+        "note": "All real corpus rows remain unaccepted; later synthetic self-contained Clash fixture is not evidence for these bodies."
+      },
+      "new_065548_network": {
+        "tested": 0,
+        "success": 0,
+        "failure": 0,
+        "not_tested": 90,
+        "status": "not_tested",
+        "success_rate": null
+      },
+      "historical_network": [],
+      "exact_remote_manifest_indices_from_historical_mapping": [
+        1
+      ],
+      "duplicate_url_entry_ordinals": [
+        1
+      ],
+      "evidence": [
+        "new_corpus",
+        "new_integrity"
+      ],
+      "parser_source_binding": {
+        "checkpoint_checkout_sha": "d3bf1eb25d0eab3fa0c5227e25b1b7e020bada27",
+        "executable_source_sha": null,
+        "note": "Checkpoint reused an existing inspector; corpus report does not record binary hash/source SHA. Checkout SHA is not asserted as tested executable source."
+      },
+      "parser_source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+      "configuration_sections_unvalidated": 18,
+      "body_integrity_verified": true
+    },
+    {
+      "entry": 2,
+      "manifest_client_label": "Trojan Clash standard",
+      "label_provenance": "literal client field of original authorized DPAPI manifest; not inferred from syntax",
+      "actual_producing_application": "not independently established; label describes declared client target",
+      "observed_body_format": "clash-yaml",
+      "protocol_counts": {
+        "trojan": 90
+      },
+      "node_records": 90,
+      "native_tcp_candidate_records": 0,
+      "capability_groups": [
+        {
+          "protocol": "trojan",
+          "cipher": "not-declared-or-unrecognized",
+          "transport": "tcp",
+          "obfuscation": "none",
+          "tls": "tls",
+          "diagnostic": "CertificateVerificationDisabledUnsupported",
+          "native_tcp_candidate": false,
+          "native_udp_supported": false,
+          "count": 90
+        }
+      ],
+      "unrecognized_fields": 0,
+      "parse_status": "passed",
+      "complete_product_chain": {
+        "status": "not_accepted",
+        "inspector_complete_configuration_execution_supported": false,
+        "new_corpus_product_import_to_dns_routing_qt_to_internet_verified": false,
+        "note": "All real corpus rows remain unaccepted; later synthetic self-contained Clash fixture is not evidence for these bodies."
+      },
+      "new_065548_network": {
+        "tested": 0,
+        "success": 0,
+        "failure": 0,
+        "not_tested": 90,
+        "status": "not_tested",
+        "success_rate": null
+      },
+      "historical_network": [],
+      "exact_remote_manifest_indices_from_historical_mapping": [
+        2
+      ],
+      "duplicate_url_entry_ordinals": [
+        2
+      ],
+      "evidence": [
+        "new_corpus",
+        "new_integrity"
+      ],
+      "parser_source_binding": {
+        "checkpoint_checkout_sha": "d3bf1eb25d0eab3fa0c5227e25b1b7e020bada27",
+        "executable_source_sha": null,
+        "note": "Checkpoint reused an existing inspector; corpus report does not record binary hash/source SHA. Checkout SHA is not asserted as tested executable source."
+      },
+      "parser_source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+      "configuration_sections_unvalidated": 18,
+      "body_integrity_verified": true
+    },
+    {
+      "entry": 3,
+      "manifest_client_label": "Clash compatible",
+      "label_provenance": "literal client field of original authorized DPAPI manifest; not inferred from syntax",
+      "actual_producing_application": "not independently established; label describes declared client target",
+      "observed_body_format": "clash-yaml",
+      "protocol_counts": {
+        "ss": 90
+      },
+      "node_records": 90,
+      "native_tcp_candidate_records": 90,
+      "capability_groups": [
+        {
+          "protocol": "ss",
+          "cipher": "aes-128-gcm",
+          "transport": "tcp",
+          "obfuscation": "http",
+          "tls": "not-enabled",
+          "diagnostic": "TcpCandidateNotYetVerified",
+          "native_tcp_candidate": true,
+          "native_udp_supported": false,
+          "count": 90
+        }
+      ],
+      "unrecognized_fields": 0,
+      "parse_status": "passed",
+      "complete_product_chain": {
+        "status": "not_accepted",
+        "inspector_complete_configuration_execution_supported": false,
+        "new_corpus_product_import_to_dns_routing_qt_to_internet_verified": false,
+        "note": "All real corpus rows remain unaccepted; later synthetic self-contained Clash fixture is not evidence for these bodies."
+      },
+      "new_065548_network": {
+        "tested": 0,
+        "success": 0,
+        "failure": 0,
+        "not_tested": 90,
+        "status": "not_tested",
+        "success_rate": null
+      },
+      "historical_network": [],
+      "exact_remote_manifest_indices_from_historical_mapping": [
+        3
+      ],
+      "duplicate_url_entry_ordinals": [
+        3
+      ],
+      "evidence": [
+        "new_corpus",
+        "new_integrity"
+      ],
+      "parser_source_binding": {
+        "checkpoint_checkout_sha": "d3bf1eb25d0eab3fa0c5227e25b1b7e020bada27",
+        "executable_source_sha": null,
+        "note": "Checkpoint reused an existing inspector; corpus report does not record binary hash/source SHA. Checkout SHA is not asserted as tested executable source."
+      },
+      "parser_source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+      "configuration_sections_unvalidated": 18,
+      "body_integrity_verified": true
+    },
+    {
+      "entry": 4,
+      "manifest_client_label": "Trojan Clash compatible",
+      "label_provenance": "literal client field of original authorized DPAPI manifest; not inferred from syntax",
+      "actual_producing_application": "not independently established; label describes declared client target",
+      "observed_body_format": "clash-yaml",
+      "protocol_counts": {
+        "trojan": 90
+      },
+      "node_records": 90,
+      "native_tcp_candidate_records": 0,
+      "capability_groups": [
+        {
+          "protocol": "trojan",
+          "cipher": "not-declared-or-unrecognized",
+          "transport": "tcp",
+          "obfuscation": "none",
+          "tls": "tls",
+          "diagnostic": "CertificateVerificationDisabledUnsupported",
+          "native_tcp_candidate": false,
+          "native_udp_supported": false,
+          "count": 90
+        }
+      ],
+      "unrecognized_fields": 0,
+      "parse_status": "passed",
+      "complete_product_chain": {
+        "status": "not_accepted",
+        "inspector_complete_configuration_execution_supported": false,
+        "new_corpus_product_import_to_dns_routing_qt_to_internet_verified": false,
+        "note": "All real corpus rows remain unaccepted; later synthetic self-contained Clash fixture is not evidence for these bodies."
+      },
+      "new_065548_network": {
+        "tested": 0,
+        "success": 0,
+        "failure": 0,
+        "not_tested": 90,
+        "status": "not_tested",
+        "success_rate": null
+      },
+      "historical_network": [],
+      "exact_remote_manifest_indices_from_historical_mapping": [
+        4
+      ],
+      "duplicate_url_entry_ordinals": [
+        4
+      ],
+      "evidence": [
+        "new_corpus",
+        "new_integrity"
+      ],
+      "parser_source_binding": {
+        "checkpoint_checkout_sha": "d3bf1eb25d0eab3fa0c5227e25b1b7e020bada27",
+        "executable_source_sha": null,
+        "note": "Checkpoint reused an existing inspector; corpus report does not record binary hash/source SHA. Checkout SHA is not asserted as tested executable source."
+      },
+      "parser_source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+      "configuration_sections_unvalidated": 18,
+      "body_integrity_verified": true
+    },
+    {
+      "entry": 5,
+      "manifest_client_label": "Surge",
+      "label_provenance": "literal client field of original authorized DPAPI manifest; not inferred from syntax",
+      "actual_producing_application": "not independently established; label describes declared client target",
+      "observed_body_format": "ini",
+      "protocol_counts": {
+        "ss": 90
+      },
+      "node_records": 90,
+      "native_tcp_candidate_records": 0,
+      "capability_groups": [
+        {
+          "protocol": "ss",
+          "cipher": "aes-128-gcm",
+          "transport": "tcp",
+          "obfuscation": "http",
+          "tls": "not-enabled",
+          "diagnostic": "TcpFastOpenNotImplemented",
+          "native_tcp_candidate": false,
+          "native_udp_supported": false,
+          "count": 90
+        }
+      ],
+      "unrecognized_fields": 0,
+      "parse_status": "passed",
+      "complete_product_chain": {
+        "status": "not_accepted",
+        "inspector_complete_configuration_execution_supported": false,
+        "new_corpus_product_import_to_dns_routing_qt_to_internet_verified": false,
+        "note": "All real corpus rows remain unaccepted; later synthetic self-contained Clash fixture is not evidence for these bodies."
+      },
+      "new_065548_network": {
+        "tested": 0,
+        "success": 0,
+        "failure": 0,
+        "not_tested": 90,
+        "status": "not_tested",
+        "success_rate": null
+      },
+      "historical_network": [],
+      "exact_remote_manifest_indices_from_historical_mapping": [
+        5
+      ],
+      "duplicate_url_entry_ordinals": [
+        5
+      ],
+      "evidence": [
+        "new_corpus",
+        "new_integrity"
+      ],
+      "parser_source_binding": {
+        "checkpoint_checkout_sha": "d3bf1eb25d0eab3fa0c5227e25b1b7e020bada27",
+        "executable_source_sha": null,
+        "note": "Checkpoint reused an existing inspector; corpus report does not record binary hash/source SHA. Checkout SHA is not asserted as tested executable source."
+      },
+      "parser_source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+      "configuration_sections_unvalidated": 8,
+      "body_integrity_verified": true
+    },
+    {
+      "entry": 6,
+      "manifest_client_label": "Trojan Surge",
+      "label_provenance": "literal client field of original authorized DPAPI manifest; not inferred from syntax",
+      "actual_producing_application": "not independently established; label describes declared client target",
+      "observed_body_format": "ini",
+      "protocol_counts": {
+        "trojan": 90
+      },
+      "node_records": 90,
+      "native_tcp_candidate_records": 0,
+      "capability_groups": [
+        {
+          "protocol": "trojan",
+          "cipher": "not-declared-or-unrecognized",
+          "transport": "tcp",
+          "obfuscation": "none",
+          "tls": "tls",
+          "diagnostic": "CertificateVerificationDisabledUnsupported",
+          "native_tcp_candidate": false,
+          "native_udp_supported": false,
+          "count": 90
+        }
+      ],
+      "unrecognized_fields": 0,
+      "parse_status": "passed",
+      "complete_product_chain": {
+        "status": "not_accepted",
+        "inspector_complete_configuration_execution_supported": false,
+        "new_corpus_product_import_to_dns_routing_qt_to_internet_verified": false,
+        "note": "All real corpus rows remain unaccepted; later synthetic self-contained Clash fixture is not evidence for these bodies."
+      },
+      "new_065548_network": {
+        "tested": 0,
+        "success": 0,
+        "failure": 0,
+        "not_tested": 90,
+        "status": "not_tested",
+        "success_rate": null
+      },
+      "historical_network": [],
+      "exact_remote_manifest_indices_from_historical_mapping": [
+        6
+      ],
+      "duplicate_url_entry_ordinals": [
+        6
+      ],
+      "evidence": [
+        "new_corpus",
+        "new_integrity"
+      ],
+      "parser_source_binding": {
+        "checkpoint_checkout_sha": "d3bf1eb25d0eab3fa0c5227e25b1b7e020bada27",
+        "executable_source_sha": null,
+        "note": "Checkpoint reused an existing inspector; corpus report does not record binary hash/source SHA. Checkout SHA is not asserted as tested executable source."
+      },
+      "parser_source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+      "configuration_sections_unvalidated": 8,
+      "body_integrity_verified": true
+    },
+    {
+      "entry": 7,
+      "manifest_client_label": "Shadowrocket",
+      "label_provenance": "literal client field of original authorized DPAPI manifest; not inferred from syntax",
+      "actual_producing_application": "not independently established; label describes declared client target",
+      "observed_body_format": "ini",
+      "protocol_counts": {
+        "ss": 90
+      },
+      "node_records": 90,
+      "native_tcp_candidate_records": 90,
+      "capability_groups": [
+        {
+          "protocol": "ss",
+          "cipher": "aes-128-gcm",
+          "transport": "tcp",
+          "obfuscation": "http",
+          "tls": "not-enabled",
+          "diagnostic": "TcpCandidateNotYetVerified",
+          "native_tcp_candidate": true,
+          "native_udp_supported": false,
+          "count": 90
+        }
+      ],
+      "unrecognized_fields": 0,
+      "parse_status": "passed",
+      "complete_product_chain": {
+        "status": "not_accepted",
+        "inspector_complete_configuration_execution_supported": false,
+        "new_corpus_product_import_to_dns_routing_qt_to_internet_verified": false,
+        "note": "All real corpus rows remain unaccepted; later synthetic self-contained Clash fixture is not evidence for these bodies."
+      },
+      "new_065548_network": {
+        "tested": 0,
+        "success": 0,
+        "failure": 0,
+        "not_tested": 90,
+        "status": "not_tested",
+        "success_rate": null
+      },
+      "historical_network": [
+        {
+          "sample_set": "immutable_remote_20261017_subscription_9_nodes_1_2_3",
+          "cache_generation": "historical_immutable_remote_window_20261017",
+          "environment": "user_windows",
+          "tested": 3,
+          "strict_https_success": 3,
+          "strict_https_failure": 0,
+          "scope": "native SS TCP plus strict origin TLS/HTTP and normal close; not full product configuration",
+          "source_checkout_sha": "2b2044bb43ee5da8596b9e6f99418790df666245",
+          "product_implementation_sha": "cafdd62a556165bb5796fcac7f9fd8ef95643143",
+          "three_platform_tested_source_sha": "b903b8b1d9c5e0c40c3dee5033447900665d1835",
+          "private_run_id": 39099020539,
+          "evidence": "historical_fixed_windows",
+          "body_identity_with_new_cache": "not_established; URL identity does not establish body/node identity"
+        },
+        {
+          "sample_set": "same_immutable_remote_20261017_subscription_9_nodes_1_2_3",
+          "environment": "hosted_linux",
+          "tested": 3,
+          "tcp_success": 0,
+          "tcp_failure": 3,
+          "strict_https_attempted": 0,
+          "failure_stage": "upstream_tcp_timeout",
+          "private_run_id": 39097562489,
+          "evidence": "historical_fixed_document",
+          "note": "historical environment result; not failures of new065548 bodies"
+        }
+      ],
+      "exact_remote_manifest_indices_from_historical_mapping": [
+        9
+      ],
+      "duplicate_url_entry_ordinals": [
+        7
+      ],
+      "evidence": [
+        "new_corpus",
+        "new_integrity"
+      ],
+      "parser_source_binding": {
+        "checkpoint_checkout_sha": "d3bf1eb25d0eab3fa0c5227e25b1b7e020bada27",
+        "executable_source_sha": null,
+        "note": "Checkpoint reused an existing inspector; corpus report does not record binary hash/source SHA. Checkout SHA is not asserted as tested executable source."
+      },
+      "parser_source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+      "configuration_sections_unvalidated": 4,
+      "body_integrity_verified": true
+    },
+    {
+      "entry": 8,
+      "manifest_client_label": "Trojan Shadowrocket",
+      "label_provenance": "literal client field of original authorized DPAPI manifest; not inferred from syntax",
+      "actual_producing_application": "not independently established; label describes declared client target",
+      "observed_body_format": "ini",
+      "protocol_counts": {
+        "trojan": 90
+      },
+      "node_records": 90,
+      "native_tcp_candidate_records": 0,
+      "capability_groups": [
+        {
+          "protocol": "trojan",
+          "cipher": "not-declared-or-unrecognized",
+          "transport": "tcp",
+          "obfuscation": "none",
+          "tls": "tls",
+          "diagnostic": "CertificateVerificationDisabledUnsupported",
+          "native_tcp_candidate": false,
+          "native_udp_supported": false,
+          "count": 90
+        }
+      ],
+      "unrecognized_fields": 0,
+      "parse_status": "passed",
+      "complete_product_chain": {
+        "status": "not_accepted",
+        "inspector_complete_configuration_execution_supported": false,
+        "new_corpus_product_import_to_dns_routing_qt_to_internet_verified": false,
+        "note": "All real corpus rows remain unaccepted; later synthetic self-contained Clash fixture is not evidence for these bodies."
+      },
+      "new_065548_network": {
+        "tested": 0,
+        "success": 0,
+        "failure": 0,
+        "not_tested": 90,
+        "status": "not_tested",
+        "success_rate": null
+      },
+      "historical_network": [],
+      "exact_remote_manifest_indices_from_historical_mapping": [
+        10
+      ],
+      "duplicate_url_entry_ordinals": [
+        8
+      ],
+      "evidence": [
+        "new_corpus",
+        "new_integrity"
+      ],
+      "parser_source_binding": {
+        "checkpoint_checkout_sha": "d3bf1eb25d0eab3fa0c5227e25b1b7e020bada27",
+        "executable_source_sha": null,
+        "note": "Checkpoint reused an existing inspector; corpus report does not record binary hash/source SHA. Checkout SHA is not asserted as tested executable source."
+      },
+      "parser_source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+      "configuration_sections_unvalidated": 4,
+      "body_integrity_verified": true
+    },
+    {
+      "entry": 9,
+      "manifest_client_label": "Shadowsocks SIP002",
+      "label_provenance": "literal client field of original authorized DPAPI manifest; not inferred from syntax",
+      "actual_producing_application": "not independently established; label describes declared client target",
+      "observed_body_format": "base64",
+      "protocol_counts": {
+        "ss": 90
+      },
+      "node_records": 90,
+      "native_tcp_candidate_records": 90,
+      "capability_groups": [
+        {
+          "protocol": "ss",
+          "cipher": "aes-128-gcm",
+          "transport": "tcp",
+          "obfuscation": "http",
+          "tls": "not-enabled",
+          "diagnostic": "TcpCandidateNotYetVerified",
+          "native_tcp_candidate": true,
+          "native_udp_supported": false,
+          "count": 90
+        }
+      ],
+      "unrecognized_fields": 0,
+      "parse_status": "passed",
+      "complete_product_chain": {
+        "status": "not_accepted",
+        "inspector_complete_configuration_execution_supported": false,
+        "new_corpus_product_import_to_dns_routing_qt_to_internet_verified": false,
+        "note": "All real corpus rows remain unaccepted; later synthetic self-contained Clash fixture is not evidence for these bodies."
+      },
+      "new_065548_network": {
+        "tested": 0,
+        "success": 0,
+        "failure": 0,
+        "not_tested": 90,
+        "status": "not_tested",
+        "success_rate": null
+      },
+      "historical_network": [],
+      "exact_remote_manifest_indices_from_historical_mapping": [
+        11
+      ],
+      "duplicate_url_entry_ordinals": [
+        9
+      ],
+      "evidence": [
+        "new_corpus",
+        "new_integrity"
+      ],
+      "parser_source_binding": {
+        "checkpoint_checkout_sha": "d3bf1eb25d0eab3fa0c5227e25b1b7e020bada27",
+        "executable_source_sha": null,
+        "note": "Checkpoint reused an existing inspector; corpus report does not record binary hash/source SHA. Checkout SHA is not asserted as tested executable source."
+      },
+      "parser_source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+      "configuration_sections_unvalidated": 0,
+      "body_integrity_verified": true
+    },
+    {
+      "entry": 10,
+      "manifest_client_label": "Trojan URI",
+      "label_provenance": "literal client field of original authorized DPAPI manifest; not inferred from syntax",
+      "actual_producing_application": "not independently established; label describes declared client target",
+      "observed_body_format": "base64",
+      "protocol_counts": {
+        "trojan": 90
+      },
+      "node_records": 90,
+      "native_tcp_candidate_records": 0,
+      "capability_groups": [
+        {
+          "protocol": "trojan",
+          "cipher": "not-declared-or-unrecognized",
+          "transport": "tcp",
+          "obfuscation": "none",
+          "tls": "tls",
+          "diagnostic": "CertificateVerificationDisabledUnsupported",
+          "native_tcp_candidate": false,
+          "native_udp_supported": false,
+          "count": 90
+        }
+      ],
+      "unrecognized_fields": 0,
+      "parse_status": "passed",
+      "complete_product_chain": {
+        "status": "not_accepted",
+        "inspector_complete_configuration_execution_supported": false,
+        "new_corpus_product_import_to_dns_routing_qt_to_internet_verified": false,
+        "note": "All real corpus rows remain unaccepted; later synthetic self-contained Clash fixture is not evidence for these bodies."
+      },
+      "new_065548_network": {
+        "tested": 0,
+        "success": 0,
+        "failure": 0,
+        "not_tested": 90,
+        "status": "not_tested",
+        "success_rate": null
+      },
+      "historical_network": [],
+      "exact_remote_manifest_indices_from_historical_mapping": [
+        12
+      ],
+      "duplicate_url_entry_ordinals": [
+        10
+      ],
+      "evidence": [
+        "new_corpus",
+        "new_integrity"
+      ],
+      "parser_source_binding": {
+        "checkpoint_checkout_sha": "d3bf1eb25d0eab3fa0c5227e25b1b7e020bada27",
+        "executable_source_sha": null,
+        "note": "Checkpoint reused an existing inspector; corpus report does not record binary hash/source SHA. Checkout SHA is not asserted as tested executable source."
+      },
+      "parser_source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+      "configuration_sections_unvalidated": 0,
+      "body_integrity_verified": true
+    },
+    {
+      "entry": 11,
+      "manifest_client_label": "Surfboard",
+      "label_provenance": "literal client field of original authorized DPAPI manifest; not inferred from syntax",
+      "actual_producing_application": "not independently established; label describes declared client target",
+      "observed_body_format": "ini",
+      "protocol_counts": {
+        "ss": 90
+      },
+      "node_records": 90,
+      "native_tcp_candidate_records": 0,
+      "capability_groups": [
+        {
+          "protocol": "ss",
+          "cipher": "aes-128-gcm",
+          "transport": "tcp",
+          "obfuscation": "http",
+          "tls": "not-enabled",
+          "diagnostic": "TcpFastOpenNotImplemented",
+          "native_tcp_candidate": false,
+          "native_udp_supported": false,
+          "count": 90
+        }
+      ],
+      "unrecognized_fields": 0,
+      "parse_status": "passed",
+      "complete_product_chain": {
+        "status": "not_accepted",
+        "inspector_complete_configuration_execution_supported": false,
+        "new_corpus_product_import_to_dns_routing_qt_to_internet_verified": false,
+        "note": "All real corpus rows remain unaccepted; later synthetic self-contained Clash fixture is not evidence for these bodies."
+      },
+      "new_065548_network": {
+        "tested": 0,
+        "success": 0,
+        "failure": 0,
+        "not_tested": 90,
+        "status": "not_tested",
+        "success_rate": null
+      },
+      "historical_network": [],
+      "exact_remote_manifest_indices_from_historical_mapping": [
+        13
+      ],
+      "duplicate_url_entry_ordinals": [
+        11
+      ],
+      "evidence": [
+        "new_corpus",
+        "new_integrity"
+      ],
+      "parser_source_binding": {
+        "checkpoint_checkout_sha": "d3bf1eb25d0eab3fa0c5227e25b1b7e020bada27",
+        "executable_source_sha": null,
+        "note": "Checkpoint reused an existing inspector; corpus report does not record binary hash/source SHA. Checkout SHA is not asserted as tested executable source."
+      },
+      "parser_source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+      "configuration_sections_unvalidated": 4,
+      "body_integrity_verified": true
+    },
+    {
+      "entry": 12,
+      "manifest_client_label": "Trojan Surfboard",
+      "label_provenance": "literal client field of original authorized DPAPI manifest; not inferred from syntax",
+      "actual_producing_application": "not independently established; label describes declared client target",
+      "observed_body_format": "ini",
+      "protocol_counts": {
+        "trojan": 90
+      },
+      "node_records": 90,
+      "native_tcp_candidate_records": 0,
+      "capability_groups": [
+        {
+          "protocol": "trojan",
+          "cipher": "not-declared-or-unrecognized",
+          "transport": "tcp",
+          "obfuscation": "none",
+          "tls": "tls",
+          "diagnostic": "CertificateVerificationDisabledUnsupported",
+          "native_tcp_candidate": false,
+          "native_udp_supported": false,
+          "count": 90
+        }
+      ],
+      "unrecognized_fields": 0,
+      "parse_status": "passed",
+      "complete_product_chain": {
+        "status": "not_accepted",
+        "inspector_complete_configuration_execution_supported": false,
+        "new_corpus_product_import_to_dns_routing_qt_to_internet_verified": false,
+        "note": "All real corpus rows remain unaccepted; later synthetic self-contained Clash fixture is not evidence for these bodies."
+      },
+      "new_065548_network": {
+        "tested": 0,
+        "success": 0,
+        "failure": 0,
+        "not_tested": 90,
+        "status": "not_tested",
+        "success_rate": null
+      },
+      "historical_network": [],
+      "exact_remote_manifest_indices_from_historical_mapping": [
+        14
+      ],
+      "duplicate_url_entry_ordinals": [
+        12
+      ],
+      "evidence": [
+        "new_corpus",
+        "new_integrity"
+      ],
+      "parser_source_binding": {
+        "checkpoint_checkout_sha": "d3bf1eb25d0eab3fa0c5227e25b1b7e020bada27",
+        "executable_source_sha": null,
+        "note": "Checkpoint reused an existing inspector; corpus report does not record binary hash/source SHA. Checkout SHA is not asserted as tested executable source."
+      },
+      "parser_source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+      "configuration_sections_unvalidated": 4,
+      "body_integrity_verified": true
+    },
+    {
+      "entry": 13,
+      "manifest_client_label": "Quantumult X",
+      "label_provenance": "literal client field of original authorized DPAPI manifest; not inferred from syntax",
+      "actual_producing_application": "not independently established; label describes declared client target",
+      "observed_body_format": "ini",
+      "protocol_counts": {
+        "ss": 90
+      },
+      "node_records": 90,
+      "native_tcp_candidate_records": 0,
+      "capability_groups": [
+        {
+          "protocol": "ss",
+          "cipher": "aes-128-gcm",
+          "transport": "tcp",
+          "obfuscation": "http",
+          "tls": "not-enabled",
+          "diagnostic": "TcpFastOpenNotImplemented",
+          "native_tcp_candidate": false,
+          "native_udp_supported": false,
+          "count": 90
+        }
+      ],
+      "unrecognized_fields": 0,
+      "parse_status": "passed",
+      "complete_product_chain": {
+        "status": "not_accepted",
+        "inspector_complete_configuration_execution_supported": false,
+        "new_corpus_product_import_to_dns_routing_qt_to_internet_verified": false,
+        "note": "All real corpus rows remain unaccepted; later synthetic self-contained Clash fixture is not evidence for these bodies."
+      },
+      "new_065548_network": {
+        "tested": 0,
+        "success": 0,
+        "failure": 0,
+        "not_tested": 90,
+        "status": "not_tested",
+        "success_rate": null
+      },
+      "historical_network": [],
+      "exact_remote_manifest_indices_from_historical_mapping": [
+        7
+      ],
+      "duplicate_url_entry_ordinals": [
+        13
+      ],
+      "evidence": [
+        "new_corpus",
+        "new_integrity"
+      ],
+      "parser_source_binding": {
+        "checkpoint_checkout_sha": "d3bf1eb25d0eab3fa0c5227e25b1b7e020bada27",
+        "executable_source_sha": null,
+        "note": "Checkpoint reused an existing inspector; corpus report does not record binary hash/source SHA. Checkout SHA is not asserted as tested executable source."
+      },
+      "parser_source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+      "configuration_sections_unvalidated": 9,
+      "body_integrity_verified": true
+    },
+    {
+      "entry": 14,
+      "manifest_client_label": "Trojan Quantumult X",
+      "label_provenance": "literal client field of original authorized DPAPI manifest; not inferred from syntax",
+      "actual_producing_application": "not independently established; label describes declared client target",
+      "observed_body_format": "ini",
+      "protocol_counts": {
+        "trojan": 90
+      },
+      "node_records": 90,
+      "native_tcp_candidate_records": 0,
+      "capability_groups": [
+        {
+          "protocol": "trojan",
+          "cipher": "not-declared-or-unrecognized",
+          "transport": "tcp",
+          "obfuscation": "none",
+          "tls": "tls",
+          "diagnostic": "CertificateVerificationDisabledUnsupported",
+          "native_tcp_candidate": false,
+          "native_udp_supported": false,
+          "count": 90
+        }
+      ],
+      "unrecognized_fields": 0,
+      "parse_status": "passed",
+      "complete_product_chain": {
+        "status": "not_accepted",
+        "inspector_complete_configuration_execution_supported": false,
+        "new_corpus_product_import_to_dns_routing_qt_to_internet_verified": false,
+        "note": "All real corpus rows remain unaccepted; later synthetic self-contained Clash fixture is not evidence for these bodies."
+      },
+      "new_065548_network": {
+        "tested": 0,
+        "success": 0,
+        "failure": 0,
+        "not_tested": 90,
+        "status": "not_tested",
+        "success_rate": null
+      },
+      "historical_network": [],
+      "exact_remote_manifest_indices_from_historical_mapping": [
+        8
+      ],
+      "duplicate_url_entry_ordinals": [
+        14
+      ],
+      "evidence": [
+        "new_corpus",
+        "new_integrity"
+      ],
+      "parser_source_binding": {
+        "checkpoint_checkout_sha": "d3bf1eb25d0eab3fa0c5227e25b1b7e020bada27",
+        "executable_source_sha": null,
+        "note": "Checkpoint reused an existing inspector; corpus report does not record binary hash/source SHA. Checkout SHA is not asserted as tested executable source."
+      },
+      "parser_source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+      "configuration_sections_unvalidated": 9,
+      "body_integrity_verified": true
+    },
+    {
+      "entry": 15,
+      "manifest_client_label": "Loon",
+      "label_provenance": "literal client field of original authorized DPAPI manifest; not inferred from syntax",
+      "actual_producing_application": "not independently established; label describes declared client target",
+      "observed_body_format": "ini",
+      "protocol_counts": {
+        "ss": 90
+      },
+      "node_records": 90,
+      "native_tcp_candidate_records": 90,
+      "capability_groups": [
+        {
+          "protocol": "ss",
+          "cipher": "aes-128-gcm",
+          "transport": "tcp",
+          "obfuscation": "http",
+          "tls": "not-enabled",
+          "diagnostic": "TcpCandidateNotYetVerified",
+          "native_tcp_candidate": true,
+          "native_udp_supported": false,
+          "count": 90
+        }
+      ],
+      "unrecognized_fields": 0,
+      "parse_status": "passed",
+      "complete_product_chain": {
+        "status": "not_accepted",
+        "inspector_complete_configuration_execution_supported": false,
+        "new_corpus_product_import_to_dns_routing_qt_to_internet_verified": false,
+        "note": "All real corpus rows remain unaccepted; later synthetic self-contained Clash fixture is not evidence for these bodies."
+      },
+      "new_065548_network": {
+        "tested": 0,
+        "success": 0,
+        "failure": 0,
+        "not_tested": 90,
+        "status": "not_tested",
+        "success_rate": null
+      },
+      "historical_network": [
+        {
+          "sample_set": "local_manifest_entry_15_nodes_1_2_3",
+          "cache_generation": "historical_local_cache_before_065548_window",
+          "environment": "user_windows",
+          "tested": 3,
+          "strict_https_success": 3,
+          "strict_https_failure": 0,
+          "scope": "native SS TCP plus strict origin TLS/HTTP and normal close; not full product configuration",
+          "product_source_sha": "4ea41397386bed2678f8af41ba110965037f421d",
+          "binary_sha256": {
+            "swirl-api": "3592ea968e420cfa17e3fa63a5207664150e3d1a307df14e8fbe53f3d1917049",
+            "swirl-inspect": "2ac03e3aaafd0603f50ca5b05a7cc425aeec0361a6e55a3de68e9cdd2b781367"
+          },
+          "evidence": "historical_loon_windows",
+          "body_identity_with_new_cache": "not_established; same URL is not a new-cache network test"
+        }
+      ],
+      "exact_remote_manifest_indices_from_historical_mapping": [
+        15
+      ],
+      "duplicate_url_entry_ordinals": [
+        15
+      ],
+      "evidence": [
+        "new_corpus",
+        "new_integrity"
+      ],
+      "parser_source_binding": {
+        "checkpoint_checkout_sha": "d3bf1eb25d0eab3fa0c5227e25b1b7e020bada27",
+        "executable_source_sha": null,
+        "note": "Checkpoint reused an existing inspector; corpus report does not record binary hash/source SHA. Checkout SHA is not asserted as tested executable source."
+      },
+      "parser_source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+      "configuration_sections_unvalidated": 12,
+      "body_integrity_verified": true
+    },
+    {
+      "entry": 16,
+      "manifest_client_label": "Trojan Loon",
+      "label_provenance": "literal client field of original authorized DPAPI manifest; not inferred from syntax",
+      "actual_producing_application": "not independently established; label describes declared client target",
+      "observed_body_format": "ini",
+      "protocol_counts": {
+        "trojan": 90
+      },
+      "node_records": 90,
+      "native_tcp_candidate_records": 0,
+      "capability_groups": [
+        {
+          "protocol": "trojan",
+          "cipher": "not-declared-or-unrecognized",
+          "transport": "tcp",
+          "obfuscation": "none",
+          "tls": "tls",
+          "diagnostic": "UnmappedOrInvalidParameters",
+          "native_tcp_candidate": false,
+          "native_udp_supported": false,
+          "count": 90
+        }
+      ],
+      "unrecognized_fields": 0,
+      "parse_status": "passed",
+      "complete_product_chain": {
+        "status": "not_accepted",
+        "inspector_complete_configuration_execution_supported": false,
+        "new_corpus_product_import_to_dns_routing_qt_to_internet_verified": false,
+        "note": "All real corpus rows remain unaccepted; later synthetic self-contained Clash fixture is not evidence for these bodies."
+      },
+      "new_065548_network": {
+        "tested": 0,
+        "success": 0,
+        "failure": 0,
+        "not_tested": 90,
+        "status": "not_tested",
+        "success_rate": null
+      },
+      "historical_network": [],
+      "exact_remote_manifest_indices_from_historical_mapping": [
+        16
+      ],
+      "duplicate_url_entry_ordinals": [
+        16
+      ],
+      "evidence": [
+        "new_corpus",
+        "new_integrity"
+      ],
+      "parser_source_binding": {
+        "checkpoint_checkout_sha": "d3bf1eb25d0eab3fa0c5227e25b1b7e020bada27",
+        "executable_source_sha": null,
+        "note": "Checkpoint reused an existing inspector; corpus report does not record binary hash/source SHA. Checkout SHA is not asserted as tested executable source."
+      },
+      "parser_source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+      "configuration_sections_unvalidated": 12,
+      "body_integrity_verified": true
+    },
+    {
+      "entry": 17,
+      "manifest_client_label": "Hiddify",
+      "label_provenance": "literal client field of original authorized DPAPI manifest; not inferred from syntax",
+      "actual_producing_application": "not independently established; label describes declared client target",
+      "observed_body_format": "base64",
+      "protocol_counts": {
+        "vless": 59
+      },
+      "node_records": 59,
+      "native_tcp_candidate_records": 0,
+      "capability_groups": [
+        {
+          "protocol": "vless",
+          "cipher": "not-declared-or-unrecognized",
+          "transport": "tcp",
+          "obfuscation": "none",
+          "tls": "reality",
+          "diagnostic": "RealityNotImplemented",
+          "native_tcp_candidate": false,
+          "native_udp_supported": false,
+          "count": 59
+        }
+      ],
+      "unrecognized_fields": 531,
+      "parse_status": "passed",
+      "complete_product_chain": {
+        "status": "not_accepted",
+        "inspector_complete_configuration_execution_supported": false,
+        "new_corpus_product_import_to_dns_routing_qt_to_internet_verified": false,
+        "note": "All real corpus rows remain unaccepted; later synthetic self-contained Clash fixture is not evidence for these bodies."
+      },
+      "new_065548_network": {
+        "tested": 0,
+        "success": 0,
+        "failure": 0,
+        "not_tested": 59,
+        "status": "not_tested",
+        "success_rate": null
+      },
+      "historical_network": [],
+      "exact_remote_manifest_indices_from_historical_mapping": [],
+      "duplicate_url_entry_ordinals": [
+        17,
+        18
+      ],
+      "evidence": [
+        "new_corpus",
+        "new_integrity"
+      ],
+      "parser_source_binding": {
+        "checkpoint_checkout_sha": "d3bf1eb25d0eab3fa0c5227e25b1b7e020bada27",
+        "executable_source_sha": null,
+        "note": "Checkpoint reused an existing inspector; corpus report does not record binary hash/source SHA. Checkout SHA is not asserted as tested executable source."
+      },
+      "parser_source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+      "configuration_sections_unvalidated": 0,
+      "body_integrity_verified": true
+    },
+    {
+      "entry": 18,
+      "manifest_client_label": "Singbox",
+      "label_provenance": "literal client field of original authorized DPAPI manifest; not inferred from syntax",
+      "actual_producing_application": "not independently established; label describes declared client target",
+      "observed_body_format": "base64",
+      "protocol_counts": {
+        "vless": 59
+      },
+      "node_records": 59,
+      "native_tcp_candidate_records": 0,
+      "capability_groups": [
+        {
+          "protocol": "vless",
+          "cipher": "not-declared-or-unrecognized",
+          "transport": "tcp",
+          "obfuscation": "none",
+          "tls": "reality",
+          "diagnostic": "RealityNotImplemented",
+          "native_tcp_candidate": false,
+          "native_udp_supported": false,
+          "count": 59
+        }
+      ],
+      "unrecognized_fields": 531,
+      "parse_status": "passed",
+      "complete_product_chain": {
+        "status": "not_accepted",
+        "inspector_complete_configuration_execution_supported": false,
+        "new_corpus_product_import_to_dns_routing_qt_to_internet_verified": false,
+        "note": "All real corpus rows remain unaccepted; later synthetic self-contained Clash fixture is not evidence for these bodies."
+      },
+      "new_065548_network": {
+        "tested": 0,
+        "success": 0,
+        "failure": 0,
+        "not_tested": 59,
+        "status": "not_tested",
+        "success_rate": null
+      },
+      "historical_network": [],
+      "exact_remote_manifest_indices_from_historical_mapping": [],
+      "duplicate_url_entry_ordinals": [
+        17,
+        18
+      ],
+      "evidence": [
+        "new_corpus",
+        "new_integrity"
+      ],
+      "parser_source_binding": {
+        "checkpoint_checkout_sha": "d3bf1eb25d0eab3fa0c5227e25b1b7e020bada27",
+        "executable_source_sha": null,
+        "note": "Checkpoint reused an existing inspector; corpus report does not record binary hash/source SHA. Checkout SHA is not asserted as tested executable source."
+      },
+      "parser_source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+      "configuration_sections_unvalidated": 0,
+      "body_integrity_verified": true
+    }
+  ],
+  "limitations": [
+    "Manifest client labels identify declared export targets, not independently verified producing software. In particular Hiddify/Singbox share one URL and return Base64 VLESS REALITY records, not observed sing-box JSON.",
+    "Parsing, protocol candidacy, product-chain acceptance and real network verification are separate measures.",
+    "No success percentage is defined for zero attempted new-cache network samples.",
+    "Historical Windows success and Linux TCP failure remain separate environments and cache generations.",
+    "The initial audit read only manifest metadata. The later bound replay decrypted response bodies in memory and verified the existing Cargo artifact; no supplier/node request, credential export or plaintext-file write occurred."
+  ],
+  "parser_binding": {
+    "source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+    "rust_core_tree": "8e3b3e57e212affa2c7b391128fe45d58629c89c",
+    "inspector_sha256": "55a3ad7fab5c9b1fa1eafdf1ae5aaff9a40626629fa1461f868c6e5776988ac5",
+    "inspector_bytes": 2370195,
+    "inspector_mtime_utc": "2026-10-18T07:09:31.911354+00:00",
+    "recorded_utc": "2026-10-18T08:21:39.996195+00:00",
+    "build_result": "success; Cargo verified existing artifact up to date for unchanged Rust source",
+    "private_json_mode": false,
+    "supplier_requests": 0,
+    "real_node_requests": 0,
+    "plaintext_written": false,
+    "previous_corpus_semantics_equal": true,
+    "evidence": "SUBSCRIPTION_18_ENTRY_REPLAY_FBEF399.json",
+    "evidence_sha256": "af006859cc7e0ba6f3768140c6c157777b427b968cf1be8062bbfd7ed7b372fe"
+  },
+  "distinct_ciphertexts_replayed": 17,
+  "plaintext_written": false
+}

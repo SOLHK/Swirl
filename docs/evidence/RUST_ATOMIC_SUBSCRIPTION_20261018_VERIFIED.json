@@ -1,0 +1,290 @@
+{
+  "stage": "stable identities and atomic native subscription profile",
+  "base_commit": "064bfa3218758162dd3af89d3bf03b27a6cb3237",
+  "product_commit": "ed2f87fb56f704b365a392b691bd138995273867",
+  "branch": "work/core-completion-20261017",
+  "supplier_refresh_requests": 0,
+  "private_urls_or_credentials_in_public_evidence": false,
+  "native_qt": {
+    "passed": 35,
+    "failed": 0,
+    "skipped": 5,
+    "skip_reason": "external Python peers supplied by separate checks"
+  },
+  "external_qt_peer_suites": {
+    "shadowsocks_and_loon_ss": "passed",
+    "vless": "passed",
+    "socks4_and_socks4a": "passed",
+    "websocket": "passed"
+  },
+  "compatibility_imports": {
+    "passed": 11,
+    "failed": 0,
+    "skipped": 0
+  },
+  "compatibility_preferences": {
+    "passed": 3,
+    "failed": 0,
+    "skipped": 0
+  },
+  "storage_paths": {
+    "passed": 21,
+    "failed": 0,
+    "production_path_invariance": true
+  },
+  "appearance": {
+    "passed": true,
+    "original_timeout_seconds": 45,
+    "first_corrected_seconds": 5.68,
+    "final_seconds": 5.53,
+    "failures": 0,
+    "fresh_process_restore": true,
+    "owned_test_processes_exited": true
+  },
+  "known_prior_failures": [
+    {
+      "failure": "unfiltered appearance timeout and subsequent missing Qt6Gui.dll dialog",
+      "status": "resolved by process-local runtime and explicit storage isolation; original log retained"
+    },
+    {
+      "failure": "reload comparison used QVariant QStringList vs decoded QVariantList types",
+      "status": "test now compares exact JSON values/order; native regression passes"
+    },
+    {
+      "failure": "review found DNS clearing, duplicate names, unsupported rules, legacy field loss, dangling references and UUID aliases",
+      "status": "fixed with executable regressions; unsupported profiles rejected"
+    }
+  ],
+  "network_evidence": {
+    "controlled_subscription_http_download": true,
+    "native_policy_exit_b_transfer": true,
+    "production_flag_reload_exit_b_transfer": true,
+    "new_provider_internet_tests": 0,
+    "full_private_corpus_product_execution_accepted": false
+  },
+  "native_document_profile": {
+    "formats": [
+      "self-contained Clash YAML",
+      "self-contained Clash JSON"
+    ],
+    "explicit_terminal_match_required": true,
+    "external_dns_semantics_supported": false,
+    "unknown_globals_rejected": true,
+    "standalone_no_owner_and_compatibility_mode_reject_full_documents": true,
+    "unchanged_dns_preserved": true,
+    "atomic_snapshot": "DPAPI + QSaveFile",
+    "legacy_sidecar": "read-only migration; embedded snapshot authoritative",
+    "all_power_loss_and_product_recovery_matrix_complete": false
+  },
+  "source_file_hashes": {
+    ".github/workflows/rust-core.yml": {
+      "raw_sha256": "29f6fa83371c4527a64d52011933d62b2a59dc9323912082f7222669b6e1f366",
+      "lf_sha256": "8bc85b1ddbcddb05a68147765e6686187ebf31d3b7e5ecaf4687f438b65114aa"
+    },
+    "src/Swirl.Quick/CMakeLists.txt": {
+      "raw_sha256": "58975b067387aa8a7b2ae5798fb28e696c6c393e13de6ff9244219f12331f701",
+      "lf_sha256": "c516d2270fedc081e0e7ff106e6ee202f02212bc12c5f98e6478edaeafc0bffb"
+    },
+    "src/Swirl.Quick/app/DiagnosticService.cpp": {
+      "raw_sha256": "04b56aa3830208bae1604c4ca24bcdda1a1c71045cedf28223d253d62da7c043",
+      "lf_sha256": "04b56aa3830208bae1604c4ca24bcdda1a1c71045cedf28223d253d62da7c043"
+    },
+    "src/Swirl.Quick/app/ExtensionService.cpp": {
+      "raw_sha256": "d7b4648b7cda7c6d2feec0c2dd2fe4526dff0d7100fe5d96f19c76bfa6e47673",
+      "lf_sha256": "d7b4648b7cda7c6d2feec0c2dd2fe4526dff0d7100fe5d96f19c76bfa6e47673"
+    },
+    "src/Swirl.Quick/app/FontManager.cpp": {
+      "raw_sha256": "7079da2e36a68af8481059dc7a60339e085a3413812ad38573bb6f7d2ce276df",
+      "lf_sha256": "7079da2e36a68af8481059dc7a60339e085a3413812ad38573bb6f7d2ce276df"
+    },
+    "src/Swirl.Quick/app/ModuleDraftStore.cpp": {
+      "raw_sha256": "ed6e0fa3d91afcd2a5ef56e00cd9085a69f8bf817b5641354b59cd66f35e9f9d",
+      "lf_sha256": "ed6e0fa3d91afcd2a5ef56e00cd9085a69f8bf817b5641354b59cd66f35e9f9d"
+    },
+    "src/Swirl.Quick/engine/ConnectionDiagnostics.cpp": {
+      "raw_sha256": "12e7fabd1fe1ef9281a559e9b3ff6b9afbcf7145ed8815ea7c03ef18311d4d16",
+      "lf_sha256": "12e7fabd1fe1ef9281a559e9b3ff6b9afbcf7145ed8815ea7c03ef18311d4d16"
+    },
+    "src/Swirl.Quick/engine/EngineController.cpp": {
+      "raw_sha256": "1a87580419bcb424164ed1432d1033e1a72a5e1b47a4d2a597a81d110dfa47a0",
+      "lf_sha256": "774e48fb9e3b0b8ca0f91e95df43e05953f9d696b5d47e0bd836fa8a84eb613c"
+    },
+    "src/Swirl.Quick/engine/EngineController.h": {
+      "raw_sha256": "d9e4b3d8bc627db9c972b4924a9e91887720e4a08a09145c5dacbfb2f321a30c",
+      "lf_sha256": "ee886e0226bfcd1b9980da84ef6725936c0ae2b529ab14ccb2d3ebf61ab09e62"
+    },
+    "src/Swirl.Quick/engine/MihomoAdapter.cpp": {
+      "raw_sha256": "f7454afd0f827fead32a6653240e7a305143bfc9b3e49ba4bc1a3951511b5850",
+      "lf_sha256": "f7454afd0f827fead32a6653240e7a305143bfc9b3e49ba4bc1a3951511b5850"
+    },
+    "src/Swirl.Quick/engine/NodeImportService.cpp": {
+      "raw_sha256": "244c5ea4925cc370b0d6ee8c36c8dff4da9e4aaaff087f13f5b4b59473ec7798",
+      "lf_sha256": "e7d1654d06df154d26e9f6054485eb1e663ba9ffb5efccf627d70c0fc1df315c"
+    },
+    "src/Swirl.Quick/engine/NodeImportService.h": {
+      "raw_sha256": "f910c10058ee6819dafdbdaa1d636a2cca6f53e8e7ea9fa11cad509540c546ca",
+      "lf_sha256": "7b57bd85d80fc8bcead2055fe225900cbac534c1dc73e3dbf39353f4ec6aae30"
+    },
+    "src/Swirl.Quick/engine/NodeImporter.cpp": {
+      "raw_sha256": "9b8370a3d1a26e0fc28112f18eb22d9862bb29e5baae73f45cafe9bcb36f7c72",
+      "lf_sha256": "2afbad5a78492ad35a18d3a2d5235094cb2a5f208d96496d4c5d56278115f436"
+    },
+    "src/Swirl.Quick/engine/NodeImporter.h": {
+      "raw_sha256": "b8d86c3af7ff55c1c75c1467d4926ae42944e5c5b81929c1fe11099f27634e43",
+      "lf_sha256": "5b5dd9c272e9677e793367ab6761df0231269a13db674e278fafef2046bdbe36"
+    },
+    "src/Swirl.Quick/engine/NodeStore.cpp": {
+      "raw_sha256": "41b5f91ae3f90e65d2b8ddc97b7edb6fffb66408825e96c2af5f2f12e6a14bfc",
+      "lf_sha256": "81a5a93462bc0953dd40efbd5853c034504feff230781049dc01260a3acb3eb7"
+    },
+    "src/Swirl.Quick/engine/NodeStore.h": {
+      "raw_sha256": "76214ad5b4bbc05a7def79c741cd7c1b1943e0a2d8e6c46c852cb8cf6fc8db98",
+      "lf_sha256": "39186386edbfeabb44f98b1b566f4cd8cd724acdecd702738f6414c7400d89e6"
+    },
+    "src/Swirl.Quick/engine/RustCoreEngine.cpp": {
+      "raw_sha256": "0f6477e20d72ec3f052a7a646511382fe966d1bd086d222f5aa5c039c745921d",
+      "lf_sha256": "974c4fc93903414a1129c3d5b08570bbe8bdb902920e6928d1c11666ab45b162"
+    },
+    "src/Swirl.Quick/engine/RustCoreEngine.h": {
+      "raw_sha256": "7f7c3ac301ec09e59980398c6b4e3cf7c3b3211095a39f4ea1d5905234816e85",
+      "lf_sha256": "579a2a2816bf60ae2c55d697796b55710bf424812ac0063b9ddce64adcedac33"
+    },
+    "src/Swirl.Quick/engine/SystemProxySession.cpp": {
+      "raw_sha256": "e21e6a7a572cf3ef8740a215688182cb0f0219b4e3777743f4cee60bb6a25594",
+      "lf_sha256": "e21e6a7a572cf3ef8740a215688182cb0f0219b4e3777743f4cee60bb6a25594"
+    },
+    "src/Swirl.Quick/engine/TelemetryService.cpp": {
+      "raw_sha256": "c8b342ea52478cecffc270f023b7d0fc32fa7d2dc33cd1139a80516d03a42c88",
+      "lf_sha256": "c8b342ea52478cecffc270f023b7d0fc32fa7d2dc33cd1139a80516d03a42c88"
+    },
+    "src/Swirl.Quick/main.cpp": {
+      "raw_sha256": "d68f196250414f62d7a5fa70ca5ff89a02b927db2965727f93a392c03744e8b1",
+      "lf_sha256": "d68f196250414f62d7a5fa70ca5ff89a02b927db2965727f93a392c03744e8b1"
+    },
+    "src/Swirl.Quick/network/GatewayService.cpp": {
+      "raw_sha256": "74a3f4a3496c9ec3a00f2b493bc66c22c35ba0361d0ccf490037a3678c758113",
+      "lf_sha256": "74a3f4a3496c9ec3a00f2b493bc66c22c35ba0361d0ccf490037a3678c758113"
+    },
+    "src/Swirl.Quick/network/TlsCertificateService.cpp": {
+      "raw_sha256": "62d7df79283a4164acfb57cd549dfde9120d5e80bc48f6773d7c2f5bb1f2748a",
+      "lf_sha256": "62d7df79283a4164acfb57cd549dfde9120d5e80bc48f6773d7c2f5bb1f2748a"
+    },
+    "src/Swirl.Quick/tests/EngineTests.cpp": {
+      "raw_sha256": "21c1c2bd409668cd36aad5d2c22a785c513402df17650190f5cf9be99be12cb2",
+      "lf_sha256": "59396c41b9997316db7401dfcf528846398caae4a7f8546958ddb709072883e4"
+    },
+    "src/Swirl.Quick/tests/ImportTests.cpp": {
+      "raw_sha256": "8c947fa2f2cb5215c334eaa90b27e63e9ad5efc4bd707a28e3b2afff345c1974",
+      "lf_sha256": "2f1794f5724868ec4bed13ade22a691090d7ccc8eb39898272f2e79abdec751e"
+    },
+    "src/Swirl.Quick/tests/RustCoreTests.cpp": {
+      "raw_sha256": "51160ea27957277204edd901f7472bbdde948881c52070305b43e226b32646bb",
+      "lf_sha256": "a4ffd200ef5e0cc2f6a06dcd95e8e4cbb2960a81f6e6fea00cb444352cd67a23"
+    },
+    "src/Swirl.Quick/app/StoragePaths.h": {
+      "raw_sha256": "ea1f15cbc1b992e083d117ca9be7dfa562ae03da458208d4a4ba0817f09eb9ae",
+      "lf_sha256": "ea1f15cbc1b992e083d117ca9be7dfa562ae03da458208d4a4ba0817f09eb9ae"
+    },
+    "src/Swirl.Quick/tests/StoragePathsTests.cpp": {
+      "raw_sha256": "7a3ed731fc49d327255149950d116ec1563a1b974e16e4ce6a53f5b394a44357",
+      "lf_sha256": "7a3ed731fc49d327255149950d116ec1563a1b974e16e4ce6a53f5b394a44357"
+    }
+  },
+  "local_binary_sha256": {
+    "Swirl.exe": "40fbf818bcfc91acef7d825aef019fd2425e6f33229d66bfe32e31e91ef40364",
+    "SwirlRustCoreTests.exe": "8ec9539d5ca5441159940d46ce626154dade726fba51f327d2106b0e3f53cd85",
+    "SwirlStoragePathsTests.exe": "b1d96f352e6b919d8f6bb0398d77c7a8820fdcc6cebfac14c85d2cf7120a04d8",
+    "swirl_api.dll": "017873953d39ce75886b0bc97a1937149c12906f7049bca6e4cb178646e7fbca"
+  },
+  "local_log_sha256": {
+    "atomic-acceptance-build.log": "047e691b5bbd57f97917a8f4e8af822c9ff04062c7d44ebda54c5a1e6cabb641",
+    "atomic-native-acceptance.log": "5b2558b6490040602b0f41f9bfa23b32759fecc44956dfc73b0284fb6e0affcf",
+    "atomic-compatible-imports.log": "efa44183adf52d3756133dd963d7a26d1e287a691e8580bdeca9c6e3113860c2",
+    "atomic-compatible-preferences.log": "24c317ed59f32bb8696855155ca431bf26d2a2a67b9ebf10376459dc52f9b66d",
+    "atomic-peer-ss.log": "6e0bc82e01d2426328540c53deb730844e2e9d3fa248bb4991b78113d55f52bc",
+    "atomic-peer-vless.log": "cfada4c4072920102e55ace2f5086a7d499de45175be39d37359303e6272460b",
+    "atomic-peer-socks4.log": "3ddd49185b2f51b99e9cef8d74ea361a24074976cadfb78574a98233b6020ad8",
+    "atomic-peer-ws.log": "4ee7188b8e9bcf3d9b5fc45df7719382433180dc556febc0328a6e869169fef4",
+    "atomic-ui-acceptance.log": "b3acd4c263c9dc9bcf2b9fc698386f9fbcc25d513704d70981b6e42e9613fbde",
+    "atomic-compat-configure.log": "32605e7c5f345c7ac9954a01dbcc43d48cf65f62eac2594a3c26708e40233982",
+    "atomic-compat-build.log": "0abaa3f62f41df7b13a3954414c3e5bf5f2c64c305b849f1aa5eb942e1b89b9a",
+    "atomic-native-final-build.log": "74abb53500a4497bbe5839fdcf07fc11d1013d8ff228f18e633ab500236c0f2c",
+    "ini-qt-unfiltered-aborted.log": "56621dcefb1b4b7868c160a78c20ebee143420e34d18f786e775ea2f73760586",
+    "atomic-rust-qt-detail.log": "c491f399baae9588d6200c719b22c5655b809a04eaa46ea7b864571fcbdf6d27",
+    "atomic-development-checks.log": "752dc8b2953687135ce339863ecba12c4e33c03b59f9a7cbc6f8733ea7ac220b"
+  },
+  "ci": {
+    "current_stage": [
+      {
+        "id": 39109242588,
+        "name": "Core implementation validation",
+        "status": "completed",
+        "conclusion": "success",
+        "sha": "ed2f87fb56f704b365a392b691bd138995273867",
+        "url": "https://github.com/SOLHK/Swirl/actions/runs/39109242588",
+        "jobs": [
+          {
+            "id": 117621596930,
+            "name": "core",
+            "status": "completed",
+            "conclusion": "success",
+            "active": [],
+            "failed": []
+          }
+        ]
+      },
+      {
+        "id": 39109242589,
+        "name": "Swirl Rust Core",
+        "status": "completed",
+        "conclusion": "success",
+        "sha": "ed2f87fb56f704b365a392b691bd138995273867",
+        "url": "https://github.com/SOLHK/Swirl/actions/runs/39109242589",
+        "jobs": [
+          {
+            "id": 117621596764,
+            "name": "windows-rust",
+            "status": "completed",
+            "conclusion": "success",
+            "active": [],
+            "failed": []
+          },
+          {
+            "id": 117621596865,
+            "name": "portable-rust (ubuntu-latest)",
+            "status": "completed",
+            "conclusion": "success",
+            "active": [],
+            "failed": []
+          },
+          {
+            "id": 117621596918,
+            "name": "portable-rust (macos-latest)",
+            "status": "completed",
+            "conclusion": "success",
+            "active": [],
+            "failed": []
+          }
+        ]
+      }
+    ],
+    "previous_product_commit": "4e993d62884b138d4ee5bbe604e90d85cde6bb33",
+    "previous_rust_run": 39106885139,
+    "previous_platforms": {
+      "windows": "success",
+      "linux": "success",
+      "macos": "success"
+    }
+  },
+  "progress_baseline": "v1",
+  "verified_acceptance_weight_percent": 10.833333,
+  "next": "strict external DNS semantics, full-document provenance and remaining client profiles; preserve legacy settings, then private corpus execution ledger",
+  "development_checks": "passed",
+  "post_stage_finding": {
+    "code": "ImportedSwirlAliasCanReferenceSelectedNode",
+    "reproduced": true,
+    "evidence": "normalizer-policy-red.log",
+    "follow_up": "RUST_SUBSCRIPTION_BOUNDARIES_20261018.md",
+    "note": "Passing CI did not detect this document-scoping issue. The follow-up adds a failing regression before fixing it."
+  }
+}

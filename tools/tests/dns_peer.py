@@ -2,7 +2,9 @@
 import socketserver
 import socket
 import struct
-import threading
+from threading import Thread
+
+from loopback_ports import ExclusiveLoopbackBind, reserve_tcp_udp
 
 
 def exact(sock, size):
@@ -26,13 +28,13 @@ class DnsPeer:
         self.queries, self.errors = [], []
         owner = self
 
-        class UDP(socketserver.ThreadingUDPServer):
+        class UDP(ExclusiveLoopbackBind, socketserver.ThreadingUDPServer):
             daemon_threads = True
             address_family=socket.AF_INET6 if ipv6 else socket.AF_INET
             def handle_error(self, request, address):
                 owner.errors.append('udp-handler')
 
-        class TCP(socketserver.ThreadingTCPServer):
+        class TCP(ExclusiveLoopbackBind, socketserver.ThreadingTCPServer):
             daemon_threads = True
             address_family=socket.AF_INET6 if ipv6 else socket.AF_INET
             def handle_error(self, request, address):
@@ -58,12 +60,12 @@ class DnsPeer:
                 except (EOFError, OSError):
                     pass
 
-        host='::1' if ipv6 else '127.0.0.1'
-        self.udp = UDP((host, 0), UDPHandler)
-        self.port = self.udp.server_address[1]
-        self.tcp = TCP((host, self.port), TCPHandler)
+        self.tcp, self.udp = reserve_tcp_udp(
+            lambda address: TCP(address, TCPHandler),
+            lambda address: UDP(address, UDPHandler), ipv6=ipv6, label='DNS fixture')
+        self.port = self.tcp.server_address[1]
         for server in (self.udp, self.tcp):
-            threading.Thread(target=server.serve_forever, daemon=True).start()
+            Thread(target=server.serve_forever, daemon=True).start()
 
     @property
     def address(self):

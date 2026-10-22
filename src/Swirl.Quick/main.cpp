@@ -2,6 +2,7 @@
 #include "app/SingleInstance.h"
 #include "app/ShutdownCoordinator.h"
 #include "app/FontManager.h"
+#include "app/StoragePaths.h"
 #include "app/FontRendering.h"
 #if defined(SWIRL_UI_TESTS) && defined(Q_OS_WIN)
 #include "tests/third_party/renderdoc_app.h"
@@ -52,6 +53,10 @@
 #include "tests/WindowChecks.h"
 #include "tests/WindowRadiusChecks.h"
 #include "tests/UiQualityChecks.h"
+#include "tests/FontUiChecks.h"
+#include "tests/FontFrameChecks.h"
+#include "tests/FontAcceptanceChecks.h"
+#include "tests/FontDpiWatch.h"
 #include "tests/HdrChecks.h"
 #include "tests/EngineUiChecks.h"
 #include "tests/NodeUiChecks.h"
@@ -69,8 +74,9 @@
 #include "app/HdrOutput.h"
 #include "network/CaptureService.h"
 #include "network/GatewayService.h"
+#ifndef SWIRL_USE_RUST_CORE
 #include "engine/MihomoAdapter.h"
-#include "engine/SwirlEngineManager.h"
+#endif
 #include "engine/ThreadedEngine.h"
 #include "engine/EngineController.h"
 
@@ -101,7 +107,7 @@ int main(int argc, char *argv[])
     app.setApplicationName(QStringLiteral("Swirl"));
     app.setOrganizationName(QStringLiteral("SOLHK"));
     app.setOrganizationDomain(QStringLiteral("solhk.dev"));
-    app.setApplicationVersion(QStringLiteral("1.0.0-test-6A+")+QStringLiteral(SWIRL_BUILD_REVISION));
+    app.setApplicationVersion(QStringLiteral(SWIRL_APP_VERSION));
 #ifdef SWIRL_UI_TESTS
 #ifdef Q_OS_WIN
     // Read-only native QA capture, limited to the actual Windows taskbar.
@@ -142,7 +148,12 @@ int main(int argc, char *argv[])
     const bool radiusTest=app.arguments().contains("--window-radius-test");
     const bool appearanceTest=app.arguments().contains("--appearance-test")||app.arguments().contains("--appearance-restore-test");
     const bool uiQualityTest=app.arguments().contains("--ui-quality-test");
-    bool previewMode=uiQualityTest;
+    const bool fontUiTest=app.arguments().contains("--font-ui-test");
+    const bool fontReview=app.arguments().contains("--font-review");
+    const bool fontFrameTest=app.arguments().contains("--font-frame-test");
+    const bool fontAcceptanceTest=app.arguments().contains("--font-acceptance-test");
+    const bool fontDpiWatch=app.arguments().contains("--font-dpi-watch");
+    bool previewMode=uiQualityTest||fontUiTest||fontReview||fontFrameTest||fontAcceptanceTest||fontDpiWatch;
     for(const QString &argument:app.arguments())
         if(argument.startsWith(QStringLiteral("--material-test-output="))||argument.startsWith(QStringLiteral("--viewport-test-output="))||argument.startsWith(QStringLiteral("--motion-demo-output="))||argument.startsWith(QStringLiteral("--motion-visual-dir="))||argument.startsWith(QStringLiteral("--capture-preview="))||argument.startsWith(QStringLiteral("--capture-native-frame=")))previewMode=true;
     const bool hdrTest=app.arguments().contains("--hdr-self-test");
@@ -162,7 +173,7 @@ int main(int argc, char *argv[])
 #ifdef SWIRL_UI_TESTS
     lifecycleTest=app.arguments().contains("--lifecycle-test");
 #endif
-    const bool isolatedRun=lifecycleTest||realAcceptance||heroTest||navigationTest||radiusTest||nodeTest||motionTest||engineTest||hdrDisplayTest||hdrTest||app.arguments().contains("--interaction-test")||app.arguments().contains("--capture-self-test")||app.arguments().contains("--gateway-self-test")||app.arguments().contains("--smoke-test")||app.arguments().contains("--window-test")||previewMode;
+    const bool isolatedRun=appearanceTest||lifecycleTest||realAcceptance||heroTest||navigationTest||radiusTest||nodeTest||motionTest||engineTest||hdrDisplayTest||hdrTest||app.arguments().contains("--interaction-test")||app.arguments().contains("--capture-self-test")||app.arguments().contains("--gateway-self-test")||app.arguments().contains("--smoke-test")||app.arguments().contains("--window-test")||previewMode;
     SingleInstance instance;
     if(lifecycleTest || (!isolatedRun && !appearanceTest)) {
         const auto ownership=instance.acquire(lifecycleTest?QStringLiteral("isolated-lifecycle-test"):QStringLiteral("production"));
@@ -170,21 +181,31 @@ int main(int argc, char *argv[])
     }
     if(isolatedRun||appearanceTest) {
         QStandardPaths::setTestModeEnabled(true);
+        SwirlPaths::initializeTestStorage();
         QSettings::setDefaultFormat(QSettings::IniFormat);
-        QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation));
+        QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,SwirlPaths::writableLocation(QStandardPaths::AppConfigLocation));
         QSettings isolatedSettings;
         if(!app.arguments().contains("--preview-preserve-settings"))isolatedSettings.clear();
         isolatedSettings.sync();
     }
+#ifdef SWIRL_UI_TESTS
+    if(fontUiTest)app.setProperty("fontBeforeManagerBytes",fontUiPrivateBytes());
+#endif
     QTemporaryDir previewFonts;
-    FontManager fontManager(nullptr,previewMode?previewFonts.path():QString());
+    FontManager fontManager(nullptr,previewMode&&!fontReview?previewFonts.path():QString());
+#ifdef SWIRL_UI_TESTS
+    if(fontUiTest)app.setProperty("fontAfterManagerBytes",fontUiPrivateBytes());
+#endif
     if(previewMode)for(const auto &argument:app.arguments()){
         if(argument.startsWith("--preview-font-file=")){
-            if(!fontManager.importFont(QUrl::fromLocalFile(argument.mid(20))))return 3;
+            if(!fontManager.importFont(QUrl::fromLocalFile(argument.mid(20)))||(!fontReview&&!fontManager.applyPreview()))return 3;
         }else if(argument.startsWith("--preview-font-family=")){
             if(!fontManager.selectFamily(argument.mid(22)))return 3;
         }
     }
+#ifdef SWIRL_UI_TESTS
+    if(fontUiTest)app.setProperty("fontAfterImportBytes",fontUiPrivateBytes());
+#endif
     WindowsBackdrop backdrop;
     WindowsBackdrop panelBackdrop;
     HdrOutput hdrOutput;
@@ -258,6 +279,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("previewTheme", previewTheme);
     engine.rootContext()->setContextProperty("previewState", previewState);
     engine.rootContext()->setContextProperty("smokeTestMode", smoke);
+    engine.rootContext()->setContextProperty("fontSmokeReadyMode", smoke && fontReview);
     engine.rootContext()->setContextProperty("systemProvider", &systemData);
     engine.rootContext()->setContextProperty("extensionsProvider", &extensions);
     engine.rootContext()->setContextProperty("diagnostics", &diagnostics);
@@ -449,6 +471,47 @@ int main(int argc, char *argv[])
         return 4;
 #endif
     }
+    if(fontDpiWatch) {
+#ifdef SWIRL_UI_TESTS
+        startFontDpiWatch(rootWindow,&fontManager,argumentValue(QStringLiteral("--font-source-file=")),argumentValue(QStringLiteral("--font-dpi-output=")));
+#else
+        return 4;
+#endif
+    }
+    if(fontAcceptanceTest) {
+#ifdef SWIRL_UI_TESTS
+        const auto output=argumentValue(QStringLiteral("--font-acceptance-output="));
+        const auto source=argumentValue(QStringLiteral("--font-source-file="));
+        const bool currentPageOnly=app.arguments().contains("--font-acceptance-current-page");
+        QTimer::singleShot(700,&app,[&app,rootWindow,&fontManager,output,source,currentPageOnly]{app.exit(runFontAcceptanceChecks(rootWindow,&fontManager,source,output,currentPageOnly));});
+#else
+        return 4;
+#endif
+    }
+    if(fontFrameTest) {
+#ifdef SWIRL_UI_TESTS
+        const auto output=argumentValue(QStringLiteral("--font-frame-output="));
+        QTimer::singleShot(700,&app,[&app,rootWindow,&fontManager,output]{app.exit(runFontFrameChecks(rootWindow,&fontManager,output));});
+#else
+        return 4;
+#endif
+    }
+#ifdef SWIRL_UI_TESTS
+    if(fontReview && rootWindow) {
+        const double points=argumentValue(QStringLiteral("--font-reading-points=")).toDouble();
+        const auto label=argumentValue(QStringLiteral("--font-reading-label="));
+        const auto readingOutput=argumentValue(QStringLiteral("--font-reading-output="));
+        if(points>=9 && points<=16)QTimer::singleShot(700,rootWindow,[rootWindow,points,label,readingOutput]{applyFontReadingReview(rootWindow,points,label,readingOutput);});
+    }
+#endif
+    if(fontUiTest) {
+#ifdef SWIRL_UI_TESTS
+        const auto output=argumentValue(QStringLiteral("--font-ui-output="));
+        QTimer::singleShot(500,&app,[&app,rootWindow,&fontManager,output]{app.exit(runFontUiChecks(rootWindow,&fontManager,output));});
+#else
+        return 4;
+#endif
+    }
     if (uiQualityTest) {
 #ifdef SWIRL_UI_TESTS
         const auto output=argumentValue(QStringLiteral("--ui-quality-output="));
@@ -506,7 +569,7 @@ int main(int argc, char *argv[])
             });
             auto *captureBackdrop=previewPage=="external"?&panelBackdrop:&backdrop;
             if(!nativeFramePath.isEmpty())QTimer::singleShot(400,&app,[&app,captureBackdrop]{if(!captureBackdrop->prepareNativeCapture()){qCritical()<<"Native capture blocked: cannot activate target window";app.exit(3);}});
-            QTimer::singleShot(900, &app, [window, previewPage, previewPath, nativeFramePath, captureBackdrop, &app, &previewCaptured]() {
+            QTimer::singleShot(fontReview && !argumentValue(QStringLiteral("--font-reading-points=")).isEmpty()?1500:900, &app, [window, previewPage, previewPath, nativeFramePath, captureBackdrop, &app, &previewCaptured]() {
                 QQuickWindow *captureWindow=window;
                 const QString targetName=previewPage=="external"?"dashboardWindow":QString();
                 if(!targetName.isEmpty())for(auto *candidate:QGuiApplication::allWindows())if(candidate->isVisible()&&candidate->objectName()==targetName)if(auto *quick=qobject_cast<QQuickWindow *>(candidate)){captureWindow=quick;break;}

@@ -1,0 +1,1053 @@
+{
+  "schema": 1,
+  "audit_status": "passed",
+  "audited_at_utc": "2026-10-19T12:20:21.400534+00:00",
+  "commit": "7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167",
+  "tree": "79d2eba424535d42ba95c9e97ca6d0b44bdb7420",
+  "run_id": 39250098899,
+  "run_attempt": 1,
+  "job_id": 118051505320,
+  "run_url": "https://github.com/SOLHK/Swirl/actions/runs/39250098899",
+  "job_url": "https://github.com/SOLHK/Swirl/actions/runs/39250098899/job/118051505320",
+  "job": {
+    "id": 118051505320,
+    "name": "portable-rust (ubuntu-latest)",
+    "status": "completed",
+    "conclusion": "success",
+    "run_id": 39250098899,
+    "logs_url": null,
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1
+      },
+      {
+        "name": "Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 2
+      },
+      {
+        "name": "Install stable Rust tools",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3
+      },
+      {
+        "name": "Run cargo fmt --all -- --check",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4
+      },
+      {
+        "name": "Run cargo check --workspace --locked",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 5
+      },
+      {
+        "name": "Run cargo clippy --workspace --all-targets --locked -- -D warnings",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 6
+      },
+      {
+        "name": "Run cargo test --workspace --locked",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 7
+      },
+      {
+        "name": "Run cargo build --release --locked --workspace --lib --bins",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 8
+      },
+      {
+        "name": "Run cargo build --release --locked -p swirl-transport --example reality-client",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 9
+      },
+      {
+        "name": "Run actions/setup-python@v5",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 10
+      },
+      {
+        "name": "Independent portable protocol peers",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 11
+      },
+      {
+        "name": "Install pinned Go for the independent Xray peer",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 12
+      },
+      {
+        "name": "Build pinned Xray and verify REALITY interoperability",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 13
+      },
+      {
+        "name": "Preserve Xray build identity and raw interoperability evidence",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 14
+      },
+      {
+        "name": "Build native Vision client and verify Xray interoperability",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 15
+      },
+      {
+        "name": "Preserve Vision client and full Xray interoperability evidence",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 16
+      },
+      {
+        "name": "Native public HTTPS and DoH verification",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 17
+      },
+      {
+        "name": "Preserve public network evidence",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 18
+      },
+      {
+        "name": "Post Install pinned Go for the independent Xray peer",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 34
+      },
+      {
+        "name": "Post Run actions/setup-python@v5",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 35
+      },
+      {
+        "name": "Post Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 36
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 37
+      }
+    ]
+  },
+  "artifact_digest_verifications": [
+    {
+      "id": 12186215372,
+      "name": "Swirl-REALITY-Xray-Linux-7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167-1",
+      "size_in_bytes": 55069,
+      "url": "https://api.github.com/repos/SOLHK/Swirl/actions/artifacts/12186215372",
+      "archive_download_url": "https://api.github.com/repos/SOLHK/Swirl/actions/artifacts/12186215372/zip",
+      "expired": false,
+      "created_at": "2026-10-19T12:18:25Z",
+      "expires_at": "2026-11-02T12:18:25Z",
+      "updated_at": "2026-10-19T12:18:25Z",
+      "digest": "sha256:3579129d0a5252f88a0761ebe18ed5a5cd7f461e2e82524cb9a825e1ae8d6266",
+      "workflow_run": {
+        "id": 39250098899,
+        "repository_id": 1411888911,
+        "head_repository_id": 1411888911,
+        "head_branch": "work/core-completion-20261017",
+        "head_sha": "7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167"
+      },
+      "local_zip_path": "/tmp/swirl-vision-final-linux-ci/12186215372.zip",
+      "computed_digest": "sha256:3579129d0a5252f88a0761ebe18ed5a5cd7f461e2e82524cb9a825e1ae8d6266"
+    },
+    {
+      "id": 12185931150,
+      "name": "Swirl-Core-Public-Network",
+      "size_in_bytes": 857,
+      "url": "https://api.github.com/repos/SOLHK/Swirl/actions/artifacts/12185931150",
+      "archive_download_url": "https://api.github.com/repos/SOLHK/Swirl/actions/artifacts/12185931150/zip",
+      "expired": false,
+      "created_at": "2026-10-19T12:18:42Z",
+      "expires_at": "2026-10-26T12:18:42Z",
+      "updated_at": "2026-10-19T12:18:42Z",
+      "digest": "sha256:bae8f6cdcda9acc056f40ab6118f96f767f0e021cd1345dae6dffec7b380961b",
+      "workflow_run": {
+        "id": 39250098899,
+        "repository_id": 1411888911,
+        "head_repository_id": 1411888911,
+        "head_branch": "work/core-completion-20261017",
+        "head_sha": "7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167"
+      },
+      "local_zip_path": "/tmp/swirl-vision-final-linux-ci/12185931150.zip",
+      "computed_digest": "sha256:bae8f6cdcda9acc056f40ab6118f96f767f0e021cd1345dae6dffec7b380961b"
+    },
+    {
+      "id": 12185746742,
+      "name": "Swirl-Vision-Xray-Linux-7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167-1",
+      "size_in_bytes": 37893,
+      "url": "https://api.github.com/repos/SOLHK/Swirl/actions/artifacts/12185746742",
+      "archive_download_url": "https://api.github.com/repos/SOLHK/Swirl/actions/artifacts/12185746742/zip",
+      "expired": false,
+      "created_at": "2026-10-19T12:18:41Z",
+      "expires_at": "2026-11-02T12:18:40Z",
+      "updated_at": "2026-10-19T12:18:41Z",
+      "digest": "sha256:7f3c19b1bc5386905486375866d9759f513c93e8ff2d5094033c7c767e3d7d7c",
+      "workflow_run": {
+        "id": 39250098899,
+        "repository_id": 1411888911,
+        "head_repository_id": 1411888911,
+        "head_branch": "work/core-completion-20261017",
+        "head_sha": "7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167"
+      },
+      "local_zip_path": "/tmp/swirl-vision-final-linux-ci/12185746742.zip",
+      "computed_digest": "sha256:7f3c19b1bc5386905486375866d9759f513c93e8ff2d5094033c7c767e3d7d7c"
+    }
+  ],
+  "exact_source_hashes": {
+    "tools/tests/xray_peer/lock.json": {
+      "git_blob_sha": "c908d3f06d772c65eec8f8c6ca46b55edd6e0e49",
+      "sha256": "b32dd9af801c8ed97c489f1120209b74224e595353b19fbfc13bce981eaaa925"
+    },
+    "tools/tests/xray_peer/main.go": {
+      "git_blob_sha": "90652da84427e12723e68866510bd25f6ea17655",
+      "sha256": "17b9af2d2bda7b3c57e95f87e3777065d29f05ffe418ce8c3cfde7beaa691ea0"
+    },
+    "core/crates/swirl-transport/examples/reality-client.rs": {
+      "git_blob_sha": "8ea9072138c33f84ef4703fc6c5efc1aad971578",
+      "sha256": "6a8548bb59c6362d99d23a5a5293439f6fb7cce8aa84751eb58f314e8cf7cfa5"
+    },
+    "tools/tests/test_reality_xray.py": {
+      "git_blob_sha": "9311ca323edc604a51e319db7dee7c1510e8f93b",
+      "sha256": "94eeb538bd7d076ca6a78846e6723c6a27ce909c5222e860086e93740d935273"
+    },
+    "core/crates/swirl-protocol/examples/vision-client.rs": {
+      "git_blob_sha": "34a85d8c9207caf92aa57dd7f5b99929f258bb1f",
+      "sha256": "0ea01d72b175de36a8d101efaf42e13f70b6fb4a7fe322699152057fdd5aa1c6"
+    },
+    "tools/tests/test_vision_xray.py": {
+      "git_blob_sha": "fa82bba712ff31d076086ed84a73e4da209408a0",
+      "sha256": "6148d18e541cc5f540318e221efc4f25ca8646bd174ea9253f0ec7466b07d0bd"
+    },
+    "core/crates/swirl-protocol/src/vision/record.rs": {
+      "git_blob_sha": "48452bcc47fc0cfea95d4dec0fc9ed9b45a3f68d",
+      "sha256": "99172e1a3fba975dc7d12e028e42f4be7d2f2350fcd479427357cb869e74951f"
+    },
+    "core/crates/swirl-protocol/tests/vision_record.rs": {
+      "git_blob_sha": "430dca98ac882ac4e90afb64674243939fa845fc",
+      "sha256": "6471335d12d67e1e7a76834ad3924060f426b8583084f917ffb45897243c24e3"
+    },
+    "tools/tests/loopback_ports.py": {
+      "git_blob_sha": "63efbe66345e9be42ff10c6237434e15e77ce067",
+      "sha256": "7ee427dd9c9a3fa070bee35f0373401e43e6d5da5edbf1847f718db9504905ef"
+    },
+    "tools/tests/dns_peer.py": {
+      "git_blob_sha": "e0adb6502a89294a49392a884009362e00c4f7b4",
+      "sha256": "60afcdacc06b46b3c792107121715740a47e788abf61e2625b159742fe6c13c0"
+    },
+    "tools/tests/test_dns_negative.py": {
+      "git_blob_sha": "7ce275b93c1869782efe24f8d04619171b2b7808",
+      "sha256": "d1848648836733ccd544233f2238b1f918114cd8d0332983e1339424d9db7933"
+    },
+    "tools/tests/test_policy_groups.py": {
+      "git_blob_sha": "2e7a026a4036e8f5485a66d2bff8b9c62ac2ffbf",
+      "sha256": "a48ae272ed8fd1983c136e5041ec6940374e9f37a71f5c2100bac18a4a133b84"
+    }
+  },
+  "raw_job_log": {
+    "path": "/tmp/swirl-vision-final-linux-ci/linux-job.log",
+    "bytes": 171637,
+    "sha256": "ca5b093b19f2fe4e46d2c8f4dd523c099475e911481f10d6d400af2786e9220a"
+  },
+  "raw_directory": "/tmp/swirl-vision-final-linux-ci",
+  "rust": {
+    "unit_and_integration_passed": 272,
+    "doctests_passed": 1,
+    "failed": 0,
+    "ignored": 0
+  },
+  "workflow_guards": {
+    "passed": 41,
+    "failed": 0,
+    "skipped": 0
+  },
+  "source_identities": {
+    "vision": {
+      "git_sha": "7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167",
+      "tracked_changes": false,
+      "client_sha256": "4c424670a498bb838d89817ec63d2a1c60e964a6aa6fb39f676634f6e66c68aa",
+      "test_sha256": "6148d18e541cc5f540318e221efc4f25ca8646bd174ea9253f0ec7466b07d0bd",
+      "client_source_sha256": "0ea01d72b175de36a8d101efaf42e13f70b6fb4a7fe322699152057fdd5aa1c6",
+      "python": "3.14.8 (main, Oct  1 2026, 02:38:33) [GCC 13.3.0]",
+      "openssl": "OpenSSL 3.0.13 30 Jan 2024",
+      "platform": "linux",
+      "github_run_id": "39250098899"
+    },
+    "reality": {
+      "git_sha": "7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167",
+      "tracked_changes": false,
+      "platform": "linux",
+      "python": "3.14.8 (main, Oct  1 2026, 02:38:33) [GCC 13.3.0]",
+      "github_run_id": "39250098899",
+      "github_run_attempt": "1",
+      "client_sha256": "69d128cf25c51fe15b7ddfaebf8369675ad99976f285f39d48150517092d6faa",
+      "peer_sha256": "3e6409da2cc210aa0636b4e191796817ac1ca20befd9f6d2daecc237e6767ef9",
+      "xray_sha256": "a5a3bf1c921d8a19224a26abc5b251cd9f38c3608ba74c319307b72184e44c9a",
+      "test_source_sha256": "94eeb538bd7d076ca6a78846e6723c6a27ce909c5222e860086e93740d935273",
+      "client_source_sha256": "6a8548bb59c6362d99d23a5a5293439f6fb7cce8aa84751eb58f314e8cf7cfa5"
+    }
+  },
+  "peer_build_manifest": {
+    "binaries": {
+      "reality_peer": {
+        "file": "reality-peer",
+        "sha256": "3e6409da2cc210aa0636b4e191796817ac1ca20befd9f6d2daecc237e6767ef9"
+      },
+      "xray": {
+        "file": "xray",
+        "sha256": "a5a3bf1c921d8a19224a26abc5b251cd9f38c3608ba74c319307b72184e44c9a"
+      }
+    },
+    "finished_unix": 1792412300,
+    "go_version": "go1.27.2",
+    "helper_source_sha256": "17b9af2d2bda7b3c57e95f87e3777065d29f05ffe418ce8c3cfde7beaa691ea0",
+    "lock_sha256": "b32dd9af801c8ed97c489f1120209b74224e595353b19fbfc13bce981eaaa925",
+    "peer_version_output": {
+      "event": "version",
+      "go_version": "go1.27.2",
+      "reality_version": "v0.0.0-20261014101318-83f621788ca8",
+      "xray_commit": "92ccc939aaf4f8965f369cf0b142e005aeaa11d5"
+    },
+    "platform": "Linux-6.17.0-1022-azure-x86_64-with-glibc2.39",
+    "reality": {
+      "commit": "83f621788ca88b83179810b12baa7ae518aacb83",
+      "go_mod_sum": "h1:ptlSkJ8k/7IDauNH0SA96JPOo+nYGLTv2Y3UMpwvAsY=",
+      "module": "github.com/xtls/reality",
+      "sum": "h1:RjLnVvlzK4q6zWaSBPNRGsrgx2fbJDeUWffjw574uzs=",
+      "version": "v0.0.0-20261014101318-83f621788ca8"
+    },
+    "reproducible_rebuild": {
+      "reality_peer": {
+        "first_sha256": "3e6409da2cc210aa0636b4e191796817ac1ca20befd9f6d2daecc237e6767ef9",
+        "matches": true,
+        "repeated_sha256": "3e6409da2cc210aa0636b4e191796817ac1ca20befd9f6d2daecc237e6767ef9"
+      },
+      "xray": {
+        "first_sha256": "a5a3bf1c921d8a19224a26abc5b251cd9f38c3608ba74c319307b72184e44c9a",
+        "matches": true,
+        "repeated_sha256": "a5a3bf1c921d8a19224a26abc5b251cd9f38c3608ba74c319307b72184e44c9a"
+      }
+    },
+    "schema_version": 1,
+    "started_unix": 1792412256,
+    "status": "success",
+    "swirl_source_commit": "7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167",
+    "swirl_worktree_status": "",
+    "xray": {
+      "commit": "92ccc939aaf4f8965f369cf0b142e005aeaa11d5",
+      "go_mod_sha256": "31fe6bd6c04eb2738e157b850236b1376cbbac3f33e974256bb7325c8c764250",
+      "go_sum_sha256": "a72c2f2b5dd38fcf42ef55034bd55038703448b55a878eafddd60d4af1f63145",
+      "release": "v26.10.17",
+      "repository": "https://github.com/XTLS/Xray-core.git",
+      "tree": "55fc871fdf3e63149066956e7c60670f3a44fbf2"
+    },
+    "xray_version_output": "Xray 26.10.17 (Xray, Penetrates Everything.) 92ccc93 (go1.27.2 linux/amd64)\nA unified platform for anti-censorship."
+  },
+  "suite_summaries": {
+    "vision": {
+      "tests_run": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "successful": true
+    },
+    "reality": {
+      "tests_run": 12,
+      "successful": true,
+      "failures": [],
+      "errors": [],
+      "skipped": []
+    }
+  },
+  "reality_sessions": [
+    {
+      "case": "001-test_bare_tcp_fin_is_rejected_after_valid_echo",
+      "client_status": "error",
+      "client_error_kind": "UnexpectedEof",
+      "stage": "close",
+      "group": 4588,
+      "handshake_verified": true,
+      "client_finished_verified": true,
+      "uploaded_bytes": 45,
+      "received_bytes": 45,
+      "close_notify_sent": false,
+      "close_notify_received": true,
+      "camouflage_application_bytes": 0,
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "case": "002-test_data_cancellation_drops_transport_and_reaps_peer",
+      "client_status": "error",
+      "client_error_kind": "Interrupted",
+      "stage": "data",
+      "group": 4588,
+      "handshake_verified": true,
+      "client_finished_verified": true,
+      "uploaded_bytes": 37,
+      "received_bytes": 0,
+      "close_notify_sent": false,
+      "close_notify_received": false,
+      "camouflage_application_bytes": 0,
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "case": "003-test_data_timeout_drops_transport_and_reaps_peer",
+      "client_status": "error",
+      "client_error_kind": "TimedOut",
+      "stage": "data",
+      "group": 4588,
+      "handshake_verified": true,
+      "client_finished_verified": true,
+      "uploaded_bytes": 37,
+      "received_bytes": 0,
+      "close_notify_sent": false,
+      "close_notify_received": false,
+      "camouflage_application_bytes": 0,
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "case": "004-test_empty_application_still_requires_both_finished_and_close_notify",
+      "client_status": "ok",
+      "client_error_kind": null,
+      "stage": "close",
+      "group": 4588,
+      "handshake_verified": true,
+      "client_finished_verified": true,
+      "uploaded_bytes": 0,
+      "received_bytes": 0,
+      "close_notify_sent": true,
+      "close_notify_received": true,
+      "camouflage_application_bytes": 0,
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "case": "005-test_handshake_cancellation_drops_transport_and_reaps_peer",
+      "client_status": "error",
+      "client_error_kind": "Interrupted",
+      "stage": "handshake",
+      "group": null,
+      "handshake_verified": false,
+      "client_finished_verified": false,
+      "uploaded_bytes": 0,
+      "received_bytes": 0,
+      "close_notify_sent": false,
+      "close_notify_received": false,
+      "camouflage_application_bytes": 0,
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "case": "006-test_handshake_timeout_drops_transport_and_reaps_peer",
+      "client_status": "error",
+      "client_error_kind": "TimedOut",
+      "stage": "handshake",
+      "group": null,
+      "handshake_verified": false,
+      "client_finished_verified": false,
+      "uploaded_bytes": 0,
+      "received_bytes": 0,
+      "close_notify_sent": false,
+      "close_notify_received": false,
+      "camouflage_application_bytes": 0,
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "case": "007-test_native_hybrid_authentication_finished_bidirectional_data_and_close",
+      "client_status": "ok",
+      "client_error_kind": null,
+      "stage": "close",
+      "group": 4588,
+      "handshake_verified": true,
+      "client_finished_verified": true,
+      "uploaded_bytes": 32769,
+      "received_bytes": 32769,
+      "close_notify_sent": true,
+      "close_notify_received": true,
+      "camouflage_application_bytes": 0,
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "case": "008-test_native_x25519_authentication_finished_bidirectional_data_and_close",
+      "client_status": "ok",
+      "client_error_kind": null,
+      "stage": "close",
+      "group": 29,
+      "handshake_verified": true,
+      "client_finished_verified": true,
+      "uploaded_bytes": 32769,
+      "received_bytes": 32769,
+      "close_notify_sent": true,
+      "close_notify_received": true,
+      "camouflage_application_bytes": 0,
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "case": "009-test_one_mebibyte_binary_transfer_with_short_reads_and_writes",
+      "client_status": "ok",
+      "client_error_kind": null,
+      "stage": "close",
+      "group": 4588,
+      "handshake_verified": true,
+      "client_finished_verified": true,
+      "uploaded_bytes": 1048576,
+      "received_bytes": 1048576,
+      "close_notify_sent": true,
+      "close_notify_received": true,
+      "camouflage_application_bytes": 0,
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "case": "010-test_single_byte_socket_boundaries",
+      "client_status": "ok",
+      "client_error_kind": null,
+      "stage": "close",
+      "group": 4588,
+      "handshake_verified": true,
+      "client_finished_verified": true,
+      "uploaded_bytes": 310,
+      "received_bytes": 310,
+      "close_notify_sent": true,
+      "close_notify_received": true,
+      "camouflage_application_bytes": 0,
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "case": "011-test_single_byte_socket_boundaries",
+      "client_status": "ok",
+      "client_error_kind": null,
+      "stage": "close",
+      "group": 29,
+      "handshake_verified": true,
+      "client_finished_verified": true,
+      "uploaded_bytes": 310,
+      "received_bytes": 310,
+      "close_notify_sent": true,
+      "close_notify_received": true,
+      "camouflage_application_bytes": 0,
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "case": "012-test_wrong_reality_public_key_never_exposes_application_data",
+      "client_status": "error",
+      "client_error_kind": "InvalidData",
+      "stage": "handshake",
+      "group": null,
+      "handshake_verified": false,
+      "client_finished_verified": false,
+      "uploaded_bytes": 0,
+      "received_bytes": 0,
+      "close_notify_sent": false,
+      "close_notify_received": false,
+      "camouflage_application_bytes": 0,
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    },
+    {
+      "case": "013-test_wrong_short_id_never_exposes_application_data",
+      "client_status": "error",
+      "client_error_kind": "InvalidData",
+      "stage": "handshake",
+      "group": null,
+      "handshake_verified": false,
+      "client_finished_verified": false,
+      "uploaded_bytes": 0,
+      "received_bytes": 0,
+      "close_notify_sent": false,
+      "close_notify_received": false,
+      "camouflage_application_bytes": 0,
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_cleanup": false,
+        "reader_released": true,
+        "exit_code": 0
+      }
+    }
+  ],
+  "vision_cases": [
+    {
+      "case": "001-test_tls12_authentication_framing_bidirectional_data_and_close-1792412319907089510",
+      "client": {
+        "direct_ready": false,
+        "direct_rejected": false,
+        "ok": true,
+        "payload_sha256": "35a8d48b9ca999ef7d4958538f214584ccf004f1c4c31830c6fa179cdf99f2a4",
+        "received": 45,
+        "stage": "complete",
+        "tls13_candidate": false,
+        "uploaded": 45
+      },
+      "target": {
+        "tls_version": "TLSv1.2",
+        "handshake_complete": true,
+        "received_bytes": 45,
+        "sent_bytes": 45,
+        "close_notify_received": true,
+        "close_notify_sent": true,
+        "probe_bytes_sent": 0,
+        "connection_closed": true,
+        "thread_released": true,
+        "error": null,
+        "cipher": "ECDHE-ECDSA-AES256-GCM-SHA384",
+        "received_sha256": "35a8d48b9ca999ef7d4958538f214584ccf004f1c4c31830c6fa179cdf99f2a4",
+        "sent_sha256": "35a8d48b9ca999ef7d4958538f214584ccf004f1c4c31830c6fa179cdf99f2a4"
+      },
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_kill": false,
+        "listener_closed": true,
+        "exit_code": 0
+      },
+      "invocation": {
+        "elapsed_seconds": 0.08676723200005654,
+        "exit_code": 0,
+        "payload_bytes": 45,
+        "payload_sha256": "35a8d48b9ca999ef7d4958538f214584ccf004f1c4c31830c6fa179cdf99f2a4",
+        "tls13": false,
+        "pause_reads": false,
+        "read_chunk": 16384,
+        "write_chunk": 16384
+      }
+    },
+    {
+      "case": "002-test_tls12_large_transfer_pause_resume_and_application_boundaries-1792412320045451815",
+      "client": {
+        "direct_ready": false,
+        "direct_rejected": false,
+        "ok": true,
+        "payload_sha256": "33bc8aab40703678c3ebe94d2dd8f2afff285dd901f9234e841e4679f8204fd5",
+        "received": 524288,
+        "stage": "complete",
+        "tls13_candidate": false,
+        "uploaded": 524288
+      },
+      "target": {
+        "tls_version": "TLSv1.2",
+        "handshake_complete": true,
+        "received_bytes": 524288,
+        "sent_bytes": 524288,
+        "close_notify_received": true,
+        "close_notify_sent": true,
+        "probe_bytes_sent": 0,
+        "connection_closed": true,
+        "thread_released": true,
+        "error": null,
+        "cipher": "ECDHE-ECDSA-AES256-GCM-SHA384",
+        "received_sha256": "33bc8aab40703678c3ebe94d2dd8f2afff285dd901f9234e841e4679f8204fd5",
+        "sent_sha256": "33bc8aab40703678c3ebe94d2dd8f2afff285dd901f9234e841e4679f8204fd5"
+      },
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_kill": false,
+        "listener_closed": true,
+        "exit_code": 0
+      },
+      "invocation": {
+        "elapsed_seconds": 0.2581186259999413,
+        "exit_code": 0,
+        "payload_bytes": 524288,
+        "payload_sha256": "33bc8aab40703678c3ebe94d2dd8f2afff285dd901f9234e841e4679f8204fd5",
+        "tls13": false,
+        "pause_reads": true,
+        "read_chunk": 257,
+        "write_chunk": 1021
+      }
+    },
+    {
+      "case": "003-test_tls12_single_byte_reads_and_small_writes-1792412320351328992",
+      "client": {
+        "direct_ready": false,
+        "direct_rejected": false,
+        "ok": true,
+        "payload_sha256": "7624e91e9f7222304a0dec9f6c720c4adf5d283342a9e70a9e46006fb678af12",
+        "received": 289,
+        "stage": "complete",
+        "tls13_candidate": false,
+        "uploaded": 289
+      },
+      "target": {
+        "tls_version": "TLSv1.2",
+        "handshake_complete": true,
+        "received_bytes": 289,
+        "sent_bytes": 289,
+        "close_notify_received": true,
+        "close_notify_sent": true,
+        "probe_bytes_sent": 0,
+        "connection_closed": true,
+        "thread_released": true,
+        "error": null,
+        "cipher": "ECDHE-ECDSA-AES256-GCM-SHA384",
+        "received_sha256": "7624e91e9f7222304a0dec9f6c720c4adf5d283342a9e70a9e46006fb678af12",
+        "sent_sha256": "7624e91e9f7222304a0dec9f6c720c4adf5d283342a9e70a9e46006fb678af12"
+      },
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_kill": false,
+        "listener_closed": true,
+        "exit_code": 0
+      },
+      "invocation": {
+        "elapsed_seconds": 0.08750805099998615,
+        "exit_code": 0,
+        "payload_bytes": 289,
+        "payload_sha256": "7624e91e9f7222304a0dec9f6c720c4adf5d283342a9e70a9e46006fb678af12",
+        "tls13": false,
+        "pause_reads": false,
+        "read_chunk": 1,
+        "write_chunk": 7
+      }
+    },
+    {
+      "case": "004-test_tls13_direct_request_is_rejected_without_application_data-1792412320484736726",
+      "client": {
+        "direct_ready": false,
+        "direct_rejected": true,
+        "error": "VisionDirectOwnershipUnavailable",
+        "error_kind": "PermissionDenied",
+        "ok": false,
+        "received": 0,
+        "stage": "server_first_probe",
+        "tls13_candidate": true,
+        "uploaded": 0
+      },
+      "target": {
+        "tls_version": "TLSv1.3",
+        "handshake_complete": true,
+        "received_bytes": 0,
+        "sent_bytes": 0,
+        "close_notify_received": false,
+        "close_notify_sent": false,
+        "probe_bytes_sent": 34,
+        "connection_closed": true,
+        "thread_released": true,
+        "error": {
+          "type": "SSLEOFError",
+          "message": "[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:2713)"
+        },
+        "cipher": "TLS_AES_256_GCM_SHA384",
+        "probe_sha256": "d50b77b997f88e72a20fafecc7af9ab0a5c6d19d18b81276262ace4216eb7316",
+        "received_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sent_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "lifecycle": {
+        "process_reaped": true,
+        "forced_kill": false,
+        "listener_closed": true,
+        "exit_code": 0
+      },
+      "invocation": {
+        "elapsed_seconds": 0.0864322169999241,
+        "exit_code": 1,
+        "payload_bytes": 38,
+        "payload_sha256": "c3a31b1a3f789f68185194d9c231610f1a2d601749f5a6feb7d86c0f47daa364",
+        "tls13": true,
+        "pause_reads": false,
+        "read_chunk": 16384,
+        "write_chunk": 16384
+      }
+    }
+  ],
+  "public_https_and_doh": {
+    "schema": 1,
+    "commit": "7c8affbaeb0a32aa9dbf08f1eff5a7221ab4c167",
+    "platform": "Linux",
+    "tracked_worktree_clean": true,
+    "timestamp_utc": "2026-10-19T12:18:41.653635+00:00",
+    "harness_sha256": "6237dc98633fa6d065b68d6aeed50420fe0b13541a55fd1e93376b26aa21306b",
+    "scope": "Public HTTPS via native DIRECT and native DoH; no provider, UDP, TUN or performance claim",
+    "checks": [
+      {
+        "host": "example.com",
+        "port": 443,
+        "method": "HEAD",
+        "path": "/",
+        "dns": "system",
+        "route": "explicit-native-direct",
+        "success": true,
+        "engine": "swirl-rust",
+        "native_connect_accepted": true,
+        "certificate_verified": true,
+        "tls_version": "TLSv1.3",
+        "http_status": 200,
+        "orderly_close": true,
+        "core": {
+          "accepted": 1,
+          "active": 0,
+          "failed": 0,
+          "upload": 700,
+          "download": 4791,
+          "last_error": "",
+          "last_error_stage": "",
+          "recorded_connections": 1
+        },
+        "native_session_settled": true,
+        "elapsed_ms": 98
+      },
+      {
+        "host": "www.rust-lang.org",
+        "port": 443,
+        "method": "HEAD",
+        "path": "/",
+        "dns": "system",
+        "route": "explicit-native-direct",
+        "success": true,
+        "engine": "swirl-rust",
+        "native_connect_accepted": true,
+        "certificate_verified": true,
+        "tls_version": "TLSv1.3",
+        "http_status": 301,
+        "orderly_close": true,
+        "core": {
+          "accepted": 1,
+          "active": 0,
+          "failed": 0,
+          "upload": 690,
+          "download": 5381,
+          "last_error": "",
+          "last_error_stage": "",
+          "recorded_connections": 1
+        },
+        "native_session_settled": true,
+        "elapsed_ms": 126
+      },
+      {
+        "host": "example.com",
+        "port": 443,
+        "method": "HEAD",
+        "path": "/",
+        "dns": "native-doh",
+        "route": "explicit-native-direct",
+        "success": true,
+        "dns_endpoint": "https://cloudflare-dns.com/dns-query",
+        "dns_bootstrap": "1.1.1.1:443",
+        "engine": "swirl-rust",
+        "native_connect_accepted": true,
+        "certificate_verified": true,
+        "tls_version": "TLSv1.3",
+        "http_status": 200,
+        "orderly_close": true,
+        "core": {
+          "accepted": 1,
+          "active": 0,
+          "failed": 0,
+          "upload": 700,
+          "download": 4793,
+          "last_error": "",
+          "last_error_stage": "",
+          "recorded_connections": 1
+        },
+        "native_session_settled": true,
+        "elapsed_ms": 218
+      }
+    ],
+    "success": true
+  },
+  "scope": "Exact-SHA Linux component CI. TLS 1.2 Vision interoperability plus strict TLS 1.3 Direct refusal; no DirectReady, raw transport handoff, provider or complete product claim.",
+  "negative_tls13_close_note": "The reference target observed abnormal TLS EOF during intentional Direct refusal cleanup; this is not reported as close_notify or a normal TLS shutdown.",
+  "local_tests_rerun_for_audit": false,
+  "python_suites": {
+    "dns_negative": {
+      "passed": 37,
+      "failed": 0,
+      "skipped": 0,
+      "cases": [
+        "LoopbackPortSelectionTests.test_netsh_numeric_rows_and_empty_table",
+        "LoopbackPortSelectionTests.test_missing_or_malformed_exclusion_table_fails",
+        "LoopbackPortSelectionTests.test_windows_candidate_excludes_both_protocols_on_each_family",
+        "LoopbackPortSelectionTests.test_query_failures_never_bind_or_start_servers",
+        "LoopbackPortSelectionTests.test_all_ports_excluded_is_a_failure_not_an_ephemeral_fallback",
+        "LoopbackPortSelectionTests.test_portable_candidate_remains_os_selected_without_netsh",
+        "DnsPeerAllocationTests.test_tcp_reserves_port_before_udp_and_forwards_both_families",
+        "DnsPeerAllocationTests.test_windows_access_denial_is_not_retried_on_either_endpoint",
+        "DnsPeerAllocationTests.test_pair_retries_collision_and_releases_failed_sockets",
+        "DnsPeerAllocationTests.test_pair_allocation_stops_after_bounded_collisions",
+        "DnsPeerAllocationTests.test_pair_allocation_cleans_up_other_errors_without_retry",
+        "DnsNegativeIntegration.test_nxdomain_cache_shares_ports_and_case_on_every_transport",
+        "DnsNegativeIntegration.test_resolution_failure_cache_expires_and_recovers_real_forwarding",
+        "DnsNegativeIntegration.test_failure_is_cached_only_after_all_configured_servers_fail",
+        "DnsNegativeIntegration.test_timeout_failure_cache_starts_after_resolution_finishes",
+        "DnsNegativeIntegration.test_configuration_replacement_clears_failure_cache",
+        "DnsNegativeIntegration.test_nodata_is_separate_from_name_error_and_requires_both_families",
+        "DnsNegativeIntegration.test_positive_addresses_share_hostname_but_use_each_real_destination_port",
+        "DnsNegativeIntegration.test_soa_record_ttl_and_minimum_both_expire_denials",
+        "DnsNegativeIntegration.test_cname_followup_denial_never_outlives_earliest_alias",
+        "DnsNegativeIntegration.test_inline_cname_uses_terminal_soa_and_preserves_mailbox_label_bytes",
+        "DnsNegativeIntegration.test_missing_foreign_additional_or_wrong_class_soa_is_never_cached",
+        "DnsNegativeIntegration.test_zero_negative_ttls_are_not_cached_on_any_transport",
+        "DnsNegativeIntegration.test_doh_age_and_cache_control_also_limit_negative_ttl",
+        "DnsNegativeIntegration.test_inconsistent_families_and_failed_families_never_create_negative_cache",
+        "DnsNegativeIntegration.test_invalid_negative_packets_are_rejected_and_never_cached",
+        "DnsNegativeIntegration.test_validated_tcp_retry_can_cache_the_complete_negative_answer",
+        "DnsNegativeIntegration.test_unproven_empty_answers_fail_over_but_valid_zero_ttl_denials_are_terminal",
+        "DnsNegativeIntegration.test_config_generation_drops_old_negative_cache",
+        "DnsNegativeIntegration.test_negative_cache_capacity_does_not_grow_beyond_existing_bound",
+        "DnsNegativeIntegration.test_ipv4_only_omits_aaaa_and_preserves_tcp_retry_and_cname",
+        "DnsNegativeIntegration.test_ipv4_only_negative_soa_cache_expires_without_querying_aaaa",
+        "DnsNegativeIntegration.test_ipv4_only_unproven_empty_failover_and_zero_ttl_denial",
+        "DnsNegativeIntegration.test_ipv4_only_can_query_an_ipv6_upstream_on_all_transports",
+        "DnsNegativeIntegration.test_ipv4_only_nxdomain_without_soa_is_terminal_but_never_cached",
+        "DnsNegativeIntegration.test_ipv4_only_doh_age_and_no_store_bound_single_family_cache",
+        "DnsNegativeIntegration.test_query_family_reconfiguration_discards_the_previous_cache"
+      ]
+    },
+    "ss_policy": {
+      "passed": 16,
+      "failed": 0,
+      "skipped": 0,
+      "cases": [
+        "SsPolicyPeerAllocationTests.test_pair_retries_only_collisions_and_releases_failed_sockets",
+        "SsPolicyPeerAllocationTests.test_pair_allocation_stops_after_eight_collisions_with_original_error",
+        "SsPolicyPeerAllocationTests.test_pair_allocation_preserves_denials_and_cleans_up_non_socket_errors",
+        "PolicyIntegration.test_fallback_priority_and_failed_request_are_never_replayed",
+        "PolicyIntegration.test_url_test_switches_only_new_tcp_sessions",
+        "PolicyIntegration.test_round_robin_consumes_only_new_routed_sessions",
+        "PolicyIntegration.test_all_unhealthy_fails_without_direct_fallback",
+        "PolicyIntegration.test_verified_https_runs_inside_native_proxy_tunnel",
+        "PolicyIntegration.test_https_untrusted_or_wrong_certificate_never_becomes_healthy",
+        "PolicyIntegration.test_https_origin_inside_verified_tls_proxy_uses_two_tls_sessions",
+        "PolicyIntegration.test_redirect_is_unhealthy_and_target_is_never_followed",
+        "PolicyIntegration.test_manual_selection_keeps_health_and_existing_connections",
+        "PolicyIntegration.test_invalid_reconfigure_is_atomic_and_does_not_probe",
+        "PolicyIntegration.test_saturated_probe_budget_stops_and_reconfigure_does_not_leak",
+        "PolicyIntegration.test_udp_association_pins_distinct_ss_exit_across_health_and_configure",
+        "PolicyIntegration.test_unsupported_udp_member_does_not_retry_a_direct_member"
+      ]
+    }
+  },
+  "port_selector_regressions": {
+    "passed": 6,
+    "failed": 0,
+    "skipped": 0,
+    "cases": [
+      "test_all_ports_excluded_is_a_failure_not_an_ephemeral_fallback",
+      "test_missing_or_malformed_exclusion_table_fails",
+      "test_netsh_numeric_rows_and_empty_table",
+      "test_portable_candidate_remains_os_selected_without_netsh",
+      "test_query_failures_never_bind_or_start_servers",
+      "test_windows_candidate_excludes_both_protocols_on_each_family"
+    ]
+  },
+  "qt_wrapper_skips": {
+    "count": 5,
+    "cases": [
+      {
+        "test": "test_vless_qt_data_path",
+        "class": "RustCoreIntegration",
+        "reason": "'Qt executable required'"
+      },
+      {
+        "test": "test_qt_facade_http_obfs_with_udp_declared",
+        "class": "ShadowsocksTests",
+        "reason": "'Qt integration executable required'"
+      },
+      {
+        "test": "test_qt_imported_socks4_and_4a_data_path",
+        "class": "Socks4Integration",
+        "reason": "'Qt integration executable required'"
+      },
+      {
+        "test": "test_qt_vless_websocket_data_path",
+        "class": "WebSocketTransportTests",
+        "reason": "'Qt integration executable required'"
+      },
+      {
+        "test": "test_qt_imported_socks5_udp_data_path",
+        "class": "Socks5UdpIntegration",
+        "reason": "'Windows Qt integration executable required'"
+      }
+    ],
+    "scope": "Expected portable Linux wrappers requiring a Qt test executable; excluded from the zero-skip REALITY/Vision/DNS/SS assertions. No Qt product acceptance is inferred."
+  },
+  "record_boundary_regressions": {
+    "passed": 5,
+    "failed": 0,
+    "ignored": 0,
+    "test_names": [
+      "both_boundaries_deliver_authenticated_direct_request_before_coalesced_raw_tls",
+      "tampered_outer_direct_record_remains_an_authentication_failure",
+      "real_tls_close_notify_is_required_even_at_record_boundaries",
+      "partial_header_survives_cancelled_read_and_write_half_close",
+      "oversized_record_is_rejected_without_reading_its_body"
+    ]
+  },
+  "previous_failed_ci_commit": "f3ce257f14e59e82977d89ac4be436d08926c6b8"
+}

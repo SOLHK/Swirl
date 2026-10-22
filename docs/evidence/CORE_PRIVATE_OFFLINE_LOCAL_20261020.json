@@ -1,0 +1,145 @@
+{
+  "schema": 1,
+  "recordedAt": "2026-10-20 06:56:26 UTC",
+  "scope": "Validated local working-file content; native Windows test remains pending and requires its own exact CI SHA",
+  "sourceSha256": {
+    "tools/Analyze-CapturedSubscriptions.py": "ac05705a2eead74a8524ec2f64a46d09af7edd35a9c72d16b1ffd431660db2a8",
+    "src/Swirl.Quick/tools/InspectPrivateSubscription.cpp": "9ca166ca88064f4d108537109440ca93a78d8ae91a274cbfa6620cbe976f000c",
+    "tools/tests/test_subscription_capture.py": "dbb23777fff9b71f12e83714d57adda736d8f2e96bae9a853ea4bc0b92046699",
+    "docs/CORE_PRIVATE_OFFLINE_ACCEPTANCE_20261020.md": "30c87a7ed25c802b10bd8f3601a41587d539243ae965da76b11288bb8b501290"
+  },
+  "portablePython": {
+    "command": "python -m unittest tools.tests.test_subscription_capture.EvidenceTests -v",
+    "exitCode": 0,
+    "tests": 7,
+    "passed": 7,
+    "failed": 0,
+    "skipped": 0,
+    "output": "test_analysis_allowlist_rejects_private_fields_and_unproven_success (tools.tests.test_subscription_capture.EvidenceTests.test_analysis_allowlist_rejects_private_fields_and_unproven_success) ... ok\ntest_analysis_does_not_mark_failed_parse_or_cache_as_passed (tools.tests.test_subscription_capture.EvidenceTests.test_analysis_does_not_mark_failed_parse_or_cache_as_passed) ... ok\ntest_analysis_offline_pipeline_sanitizes_reports_and_verifies_output_reload (tools.tests.test_subscription_capture.EvidenceTests.test_analysis_offline_pipeline_sanitizes_reports_and_verifies_output_reload) ... ok\ntest_analysis_outputs_cannot_overwrite_existing_or_input_cache (tools.tests.test_subscription_capture.EvidenceTests.test_analysis_outputs_cannot_overwrite_existing_or_input_cache) ... ok\ntest_generated_cases_require_network_evidence (tools.tests.test_subscription_capture.EvidenceTests.test_generated_cases_require_network_evidence) ... ok\ntest_html_mime_allows_only_complete_uri_subscriptions (tools.tests.test_subscription_capture.EvidenceTests.test_html_mime_allows_only_complete_uri_subscriptions) ... ok\ntest_html_mime_rejects_html_mixed_and_invalid_base64 (tools.tests.test_subscription_capture.EvidenceTests.test_html_mime_rejects_html_mixed_and_invalid_base64) ... ok\n\n----------------------------------------------------------------------\nRan 7 tests in 0.022s\n\nOK\n"
+  },
+  "qtCppSyntax": {
+    "compiler": "g++",
+    "standard": "c++23",
+    "qtVersion": "6.4.2",
+    "rustBuildDefinition": true,
+    "exitCode": 0,
+    "scope": "Linux syntax only; Windows DPAPI branch not compiled or executed"
+  },
+  "rustOfflineMatrix": {
+    "inspectorSha256": "45315bfa9c746329cd4194daa3c2b8f67dd1636a748a3c007360719329daea85",
+    "syntheticCases": [
+      {
+        "case": "chrome",
+        "processExit": 0,
+        "parsed": true,
+        "nativeTcpCandidates": 1,
+        "reasonCode": "TcpCandidateNotYetVerified",
+        "redactionPassed": true,
+        "networkStages": "not-tested"
+      },
+      {
+        "case": "chrome_133",
+        "processExit": 0,
+        "parsed": true,
+        "nativeTcpCandidates": 1,
+        "reasonCode": "TcpCandidateNotYetVerified",
+        "redactionPassed": true,
+        "networkStages": "not-tested"
+      },
+      {
+        "case": "uri_password",
+        "processExit": 0,
+        "parsed": false,
+        "nativeTcpCandidates": 0,
+        "reasonCode": "VlessUriPassword",
+        "redactionPassed": true,
+        "networkStages": "not-tested"
+      },
+      {
+        "case": "tcp_path",
+        "processExit": 0,
+        "parsed": true,
+        "nativeTcpCandidates": 0,
+        "reasonCode": "RealityUnmappedFields",
+        "redactionPassed": true,
+        "networkStages": "not-tested"
+      },
+      {
+        "case": "firefox",
+        "processExit": 0,
+        "parsed": true,
+        "nativeTcpCandidates": 0,
+        "reasonCode": "RealityFingerprintUnsupported",
+        "redactionPassed": true,
+        "networkStages": "not-tested"
+      },
+      {
+        "case": "spider_x",
+        "processExit": 0,
+        "parsed": true,
+        "nativeTcpCandidates": 0,
+        "reasonCode": "RealityUnmappedFields",
+        "redactionPassed": true,
+        "networkStages": "not-tested"
+      },
+      {
+        "case": "alpn_single",
+        "processExit": 0,
+        "parsed": true,
+        "nativeTcpCandidates": 0,
+        "reasonCode": "RealityFingerprintAlpnUnsupported",
+        "redactionPassed": true,
+        "networkStages": "not-tested"
+      },
+      {
+        "case": "duplicate_fp",
+        "processExit": 0,
+        "parsed": false,
+        "nativeTcpCandidates": 0,
+        "reasonCode": "DuplicateUriParameter",
+        "redactionPassed": true,
+        "networkStages": "not-tested"
+      }
+    ],
+    "networkRequests": 0,
+    "privateWindowsInputRead": false,
+    "exitCode": 0
+  },
+  "diffCheck": {
+    "exitCode": 0,
+    "scope": "Only Stage E source/test/doc paths"
+  },
+  "nativeWindows": {
+    "test": "tools.tests.test_subscription_capture.CaptureTests.test_qt_offline_inspector_reloads_and_redacts_actual_dpapi",
+    "status": "not-executed-locally",
+    "requiredEnvironment": "SWIRL_QT_PRIVATE_INSPECTOR",
+    "requires": "Windows Rust-mode Qt build and windeployqt; formal step must fail on absent executable"
+  },
+  "privateProvider": {
+    "windowsUserFilesRead": false,
+    "requests": 0,
+    "candidateCountAmongPrior59": null,
+    "realityAuthentication": "not-tested",
+    "visionDirect": "not-tested",
+    "http": "not-tested",
+    "https": "not-tested"
+  },
+  "formalProjectBaseline": {
+    "items": 79,
+    "fullyPassed": 6,
+    "weightedPercent": 10.83,
+    "changed": false
+  },
+  "requiredWindowsGate": {
+    "generatorCheckExitCode": 0,
+    "guardTests": 55,
+    "guardPassed": 55,
+    "nativeExecution": "pending-exact-sha-windows-ci",
+    "preflight": "Windows and nonempty inspector path and executable leaf required before windeployqt and exact DPAPI unittest",
+    "sourceSha256": {
+      "tools/ApplyCoreDevelopment.py": "adae5ab6856df55ee858555a152a98db5bad20d63507e0f12e7277532a0d8972",
+      "tools/tests/test_core_development.py": "13e675693581b2ab098462d024f3e9dc9d3e9f59eb8fd881ca038803fe9f2b57",
+      ".github/workflows/rust-core.yml": "8a7e832e71ad3d4941213f75767352c5e0daba9c6727dd9a68664989bcdd873d"
+    }
+  }
+}

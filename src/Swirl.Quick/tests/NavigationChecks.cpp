@@ -57,7 +57,7 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
  check(!item("settingsBackButton"),"settings hub has no redundant back control");
  QSet<QWindow *> windows;for(auto *candidate:QGuiApplication::allWindows())windows.insert(candidate);
  auto noNewWindows=[&]{for(auto *candidate:QGuiApplication::allWindows())if(!windows.contains(candidate))return false;return true;};
- const QStringList routes{"settings","appearance","fonts","dns","modules","profiles","scripts","subscriptions","proxies"};
+ const QStringList routes{"settings","fonts","dns","modules","profiles","scripts","subscriptions","proxies"};
  QMap<QString,QObject *> pages;
  for(int round=0;round<2;++round)for(const auto &id:routes){
   auto *source=item("settings-"+id);check(source!=nullptr,"hub card remains reachable: "+id);
@@ -90,7 +90,7 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
   check(window->winId()==handle&&window->geometry()==geometry,"navigation leaves the native shell stationary: "+id);
   check(item("nav-featurehub")&&item("windowCloseButton"),"sidebar and original traffic lights remain present: "+id);
   if(round==0)pages.insert(id,page);else check(pages.value(id)==page,"same cached page is reused: "+id);
-  if(id=="appearance"||id=="fonts"||id=="settings")check(page&&page->property("section").toString()==(id=="appearance"?"外观":id=="fonts"?"字体":"常规"),"independent settings sections retain their route: "+id);
+  if(id=="fonts"||id=="settings")check(page&&page->property("section").toString()==(id=="fonts"?"字体":"常规"),"independent settings sections retain their route: "+id);
   if(round==0&&id=="dns")if(auto *field=item("dnsServerAddress"))field->setProperty("text","1.1.1.1, 8.8.8.8");
   if(round==1&&id=="dns")check(item("dnsServerAddress")&&item("dnsServerAddress")->property("text").toString()=="1.1.1.1, 8.8.8.8","unsubmitted DNS draft survives back and re-entry");
   if(id=="proxies"){
@@ -106,7 +106,7 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
    }
    if(table)check(table->property("renderedRows").toInt()>0&&table->property("renderedRows").toInt()<60,"180-node table only mounts the visible virtualized rows");
   }
-  if(!qApp->arguments().contains("--hero-no-recording")&&(id=="dns"||id=="proxies"||id=="appearance"))window->grabWindow().save(directory+"/"+id+"-embedded.png");
+  if(!qApp->arguments().contains("--hero-no-recording")&&(id=="dns"||id=="proxies"||id=="settings"))window->grabWindow().save(directory+"/"+id+"-embedded.png");
   const auto contentCenter=page?page->mapToScene(QPointF(page->width()/2,page->height()/2)):QPointF();
   click("settingsBackButton");
   if(round==0){
@@ -166,7 +166,7 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
  }
  const auto cacheCount=eval("pageLoader.cachedPageCount").toInt();
  for(int i=0;i<27;++i){eval("window.openSettings('"+routes[i%routes.size()]+"')");wait(9);}
- check(settle()&&eval("AppState.currentPage==='proxies'").toBool(),"rapid requests settle at the last requested route");
+ check(settle()&&eval("AppState.currentPage==='"+routes[26%routes.size()]+"'").toBool(),"rapid requests settle at the last requested route");
  check(noNewWindows()&&eval("pageLoader.cachedPageCount").toInt()==cacheCount,"rapid requests create one cached instance per route and no windows");
  route("featurehub");click("settings-subscriptions");
  wait(70);auto *surface=item("sharedSurface");const auto before=surface?QRectF(surface->position(),surface->size()):QRectF();

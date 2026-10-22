@@ -1,0 +1,77 @@
+{
+  "schema": 1,
+  "commit": "a60c446fdb54c10753c2d367752c4e0275a89922",
+  "platform": "Linux",
+  "tracked_worktree_clean": true,
+  "timestamp_utc": "2026-10-17T11:36:23.119344+00:00",
+  "harness_sha256": "7e83e9b89232f4712335ca9e4d8e6f3dacbb52b5f2daefbe357055792ce132d9",
+  "scope": "Public HTTPS via native DIRECT and native DoH; no provider, UDP, TUN or performance claim",
+  "checks": [
+    {
+      "host": "example.com",
+      "port": 443,
+      "method": "HEAD",
+      "path": "/",
+      "dns": "system",
+      "route": "explicit-native-direct",
+      "success": true,
+      "engine": "swirl-rust",
+      "certificate_verified": true,
+      "tls_version": "TLSv1.3",
+      "http_status": 200,
+      "core": {
+        "accepted": 1,
+        "failed": 1,
+        "upload": 676,
+        "download": 4793,
+        "last_error": "StreamIo"
+      },
+      "elapsed_ms": 124
+    },
+    {
+      "host": "www.rust-lang.org",
+      "port": 443,
+      "method": "HEAD",
+      "path": "/",
+      "dns": "system",
+      "route": "explicit-native-direct",
+      "success": true,
+      "engine": "swirl-rust",
+      "certificate_verified": true,
+      "tls_version": "TLSv1.3",
+      "http_status": 301,
+      "core": {
+        "accepted": 1,
+        "failed": 1,
+        "upload": 666,
+        "download": 5385,
+        "last_error": "StreamIo"
+      },
+      "elapsed_ms": 224
+    },
+    {
+      "host": "example.com",
+      "port": 443,
+      "method": "HEAD",
+      "path": "/",
+      "dns": "native-doh",
+      "route": "explicit-native-direct",
+      "success": true,
+      "dns_endpoint": "https://cloudflare-dns.com/dns-query",
+      "dns_bootstrap": "1.1.1.1:443",
+      "engine": "swirl-rust",
+      "certificate_verified": true,
+      "tls_version": "TLSv1.3",
+      "http_status": 200,
+      "core": {
+        "accepted": 1,
+        "failed": 1,
+        "upload": 676,
+        "download": 4793,
+        "last_error": "StreamIo"
+      },
+      "elapsed_ms": 233
+    }
+  ],
+  "success": true
+}

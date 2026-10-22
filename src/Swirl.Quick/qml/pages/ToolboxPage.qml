@@ -12,7 +12,7 @@ Item {
     property var tools:["DNS 查询","TCP 连通性","Traceroute","HTTP 请求","TLS 证书检查","端口检查","IP 地址查询","Whois","连接测试","网络接口信息"]
     ColumnLayout {
         anchors.fill:parent; anchors.margins:Theme.dp(23); spacing:Theme.dp(14)
-        SwirlText { text:"网络诊断";font.weight:Font.DemiBold; font.pixelSize:Theme.fontSize(28);color:Theme.text }
+        SwirlText {textRole:"pageTitle"; text:"网络诊断";font.weight:Font.DemiBold; font.pixelSize:Theme.fontSize(28);color:Theme.text }
         RowLayout {
             Layout.fillWidth:true
             SwirlText {text:engineController.telemetry.measurementState||"尚未测量";color:Theme.muted;Layout.fillWidth:true}
@@ -65,7 +65,7 @@ Item {
                         Layout.fillWidth:true
                         ColumnLayout {
                             Layout.fillWidth:true
-                            SwirlText { text:page.tool; color:Theme.text; font.pixelSize:Theme.fontSize(22); font.weight:Font.DemiBold }
+                            SwirlText {textRole:"pageTitle"; text:page.tool; color:Theme.text; font.pixelSize:Theme.fontSize(22); font.weight:Font.DemiBold }
                             SwirlText { text:"独立检查面板"; color:Theme.muted; font.pixelSize:Theme.fontSize(12) }
                         }
                         SwirlStatusBadge { label:"本地"; tone:"accent" }
@@ -101,7 +101,7 @@ Item {
                         color:Theme.field; border.color:Theme.border; radius:Theme.roundedRadius(width,height)
                         ScrollView {
                             anchors.fill:parent; anchors.margins:Theme.dp(12)
-                            TextArea { renderType: TextEdit.NativeRendering; font.weight: Theme.bodyFontWeight; font.hintingPreference: Font.PreferFullHinting; Binding on font.variableAxes { delayed:true; value:Theme.variableAxesFor(font.family,font.weight) }
+                            SwirlTextArea {
                                 readOnly:true; selectByMouse:true
                                 text:page.result
                                 color:Theme.text

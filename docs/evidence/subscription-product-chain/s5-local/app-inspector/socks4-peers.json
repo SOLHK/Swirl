@@ -1,0 +1,29 @@
+{
+  "label": "socks4-peers",
+  "command": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "tools/tests/test_socks4.py",
+    "-v"
+  ],
+  "source_base_sha": "a066f7d4c8acb96f5d6a46cee5700b2590328b64",
+  "source_hashes": {
+    ".github/workflows/core-development.yml": "e8a8dfb7873046a8c3df30ab70ed528699400c1db6b65d7a9413b1a546eddbd4",
+    "tools/tests/test_core_development.py": "36feb71cf3469381b751dfa1e9224f447e2f9e4ee8f8ae394094c37075536a15",
+    "tools/ApplyCoreDevelopment.py": "6256e0df347dd5b966f1afe1abf8dd51a8a6775cdf2274e44362cea2f068150b",
+    ".github/workflows/rust-core.yml": "260738d1637d3351a94171ce677ac0881be22e76017d36b9362ad361da6cee45",
+    "tools/tests/test_socks4.py": "2da52d3c5cf02c41518363ebd188b963c804e019be45635d70bf4f7cb5df7f60"
+  },
+  "source_unchanged_during_test": true,
+  "exit_code": 0,
+  "elapsed_seconds": 5.244,
+  "log": "/workspace/scratch/ca6cd1f88f6f/swirl-chain-evidence/s5-app-inspector/socks4-peers.log",
+  "log_sha256": "22363a2505bbe64fbc4a2b144e725cd3385fc2c49f26582e21791e6669ba3c92",
+  "binary_paths": {
+    "SWIRL_RUST_HARNESS": "/workspace/scratch/ca6cd1f88f6f/Swirl/.local-runtime/target/release/swirl-api",
+    "SWIRL_RUST_INSPECTOR": "/workspace/scratch/ca6cd1f88f6f/Swirl/.local-runtime/target/release/swirl-inspect"
+  },
+  "binary_sha256": {
+    "SWIRL_RUST_HARNESS": "8730c60b40d00d7030635641bf4d623e0f537fa735d2f6348c61b43f64d91d6b",
+    "SWIRL_RUST_INSPECTOR": "56a812c2362d7495c82d7d7af2a8bb03b4e1a163b7b03365894dcf843ae24c64"
+  }
+}

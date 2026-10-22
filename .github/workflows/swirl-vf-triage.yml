@@ -1,0 +1,24 @@
+name: Swirl VF private-safe failure triage
+on:
+  push:
+    branches: [work/core-completion-20261017]
+    paths:
+      - 'tools/swirl_vf/platform/triage_source_projection.py'
+      - 'tools/swirl_vf/tests/test_triage_source_projection.py'
+      - '.github/workflows/swirl-vf-triage.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  triage-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate strict non-outline failure accounting
+        run: python -m unittest discover -s tools/swirl_vf/tests -p test_triage_source_projection.py -v

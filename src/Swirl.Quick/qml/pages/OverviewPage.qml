@@ -18,7 +18,7 @@ Item {
  }
  Flickable {id:scroll;anchors.fill:parent;contentWidth:width;contentHeight:body.implicitHeight+2*Theme.pagePadding;clip:true;boundsBehavior:Flickable.StopAtBounds;flickableDirection:Flickable.VerticalFlick;ScrollBar.vertical:SwirlScrollBar{}
   ColumnLayout {id:body;x:Theme.pagePadding;width:scroll.width-2*Theme.pagePadding;spacing:Theme.sectionGap
-   SwirlText {text:"概览";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold}
+   SwirlText {textRole:"pageTitle";text:"概览";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold}
    SwirlText {text:"配置与服务状态";color:Theme.muted;font.pixelSize:Theme.fontSize(13)}
    SwirlText {text:"网络接管";color:Theme.text;font.pixelSize:Theme.fontSize(16);font.weight:Font.DemiBold}
    GridLayout {Layout.fillWidth:true;columns:width>=Theme.dp(650)?2:1;columnSpacing:Theme.gap;rowSpacing:Theme.gap

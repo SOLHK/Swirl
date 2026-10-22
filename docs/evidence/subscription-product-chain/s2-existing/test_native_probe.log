@@ -1,0 +1,15 @@
+SOURCE 593e7cddc360cf7f51d9fdc988e6cf8fd99aea96
+COMMAND ["/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3", "/workspace/scratch/ca6cd1f88f6f/Swirl/tools/tests/test_native_probe.py", "-v"]
+
+test_configuration_limit_accounts_for_json_escaping_and_envelope (__main__.ProbeConfiguration.test_configuration_limit_accounts_for_json_escaping_and_envelope) ... ok
+test_direct_reject_unknown_and_config_shaped_values_never_spawn (__main__.ProbeConfiguration.test_direct_reject_unknown_and_config_shaped_values_never_spawn) ... ok
+test_explicit_proxy_has_one_immutable_route_without_fallback (__main__.ProbeConfiguration.test_explicit_proxy_has_one_immutable_route_without_fallback) ... ok
+test_failure_stage_is_preserved_without_leaking_arbitrary_peer_text (__main__.ProbeConfiguration.test_failure_stage_is_preserved_without_leaking_arbitrary_peer_text) ... ok
+test_public_cli_configuration_and_authenticated_dns_remain_explicit (__main__.ProbeConfiguration.test_public_cli_configuration_and_authenticated_dns_remain_explicit) ... ok
+test_rejecting_independent_ss_peer_is_a_failed_native_probe (__main__.ProbeConfiguration.test_rejecting_independent_ss_peer_is_a_failed_native_probe) ... ok
+test_rules_groups_and_combined_dns_never_become_an_isolated_probe (__main__.ProbeConfiguration.test_rules_groups_and_combined_dns_never_become_an_isolated_probe) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.009s
+
+OK

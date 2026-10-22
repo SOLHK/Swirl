@@ -1,0 +1,15 @@
+test_existing_socks4_session_survives_atomic_update (__main__.Socks4Integration.test_existing_socks4_session_survives_atomic_update) ... ok
+test_inbound_ipv4_and_4a_fragmented_with_coalesced_payload (__main__.Socks4Integration.test_inbound_ipv4_and_4a_fragmented_with_coalesced_payload) ... ok
+test_invalid_command_userid_domain_and_zero_port_are_rejected (__main__.Socks4Integration.test_invalid_command_userid_domain_and_zero_port_are_rejected) ... ok
+test_invalid_configuration_rejected_without_activation (__main__.Socks4Integration.test_invalid_configuration_rejected_without_activation) ... ok
+test_ipv6_destination_rejected_before_proxy_connection (__main__.Socks4Integration.test_ipv6_destination_rejected_before_proxy_connection) ... ok
+test_outbound_v4_local_dns_and_4a_remote_dns (__main__.Socks4Integration.test_outbound_v4_local_dns_and_4a_remote_dns) ... ok
+test_password_protected_inbound_rejects_socks4 (__main__.Socks4Integration.test_password_protected_inbound_rejects_socks4) ... ok
+test_qt_imported_socks4_and_4a_data_path (__main__.Socks4Integration.test_qt_imported_socks4_and_4a_data_path) ... skipped 'Qt integration executable required'
+test_rejected_or_wrong_version_upstream_never_falls_back (__main__.Socks4Integration.test_rejected_or_wrong_version_upstream_never_falls_back) ... ok
+test_subscription_candidates_forward_through_independent_peer (__main__.Socks4Integration.test_subscription_candidates_forward_through_independent_peer) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 5.112s
+
+OK (skipped=1)

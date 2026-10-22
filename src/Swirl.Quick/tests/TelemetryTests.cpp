@@ -128,6 +128,18 @@ private slots:
  }
  void dailyBucketsPreserveGapsAndProxyFilter(){QTemporaryDir temp;const auto path=temp.filePath("day.json");TelemetryService model(path,false);const auto now=QDateTime::currentMSecsSinceEpoch();auto s=sample(now,100,200);auto row=s.connections.first().toMap();row["category"]="proxy";s.connections={row};model.ingest(s);model.ingest(s);s=sample(now+1,150,300);row=s.connections.first().toMap();row["category"]="proxy";s.connections={row};model.ingest(s);
   const auto all=model.dailyTraffic(),proxy=model.dailyTraffic(true);QCOMPARE(all.size(),48);int observed=0;double sum=0,proxySum=0;for(int i=0;i<48;++i){observed+=all[i].toMap().value("sampled").toBool();sum+=all[i].toMap().value("value").toDouble();proxySum+=proxy[i].toMap().value("value").toDouble();}QCOMPARE(observed,1);QCOMPARE(sum,450.0);QCOMPARE(proxySum,450.0);model.flush();TelemetryService restored(path,false);QCOMPARE(restored.dailyTraffic(),all);}
+ void monthlyTrafficUsesSummaryDaysAndProxyBuckets(){QTemporaryDir temp;TelemetryService model(temp.filePath("month.json"),false);
+  const auto today=QDate::currentDate(),first=QDate(today.year(),today.month(),1);
+  const QJsonObject bucket{{"sampled",true},{"total",30},{"proxy",9}};
+  model.m_days[first.toString(Qt::ISODate)]=QJsonObject{{"sampled",true},{"up",12},{"down",18},{"buckets",QJsonObject{{"0",bucket}}}};
+  model.m_days[first.addDays(-1).toString(Qt::ISODate)]=QJsonObject{{"sampled",true},{"up",70},{"down",30}};
+  const auto all=model.periodTraffic(3),proxy=model.periodTraffic(3,true);
+  QCOMPARE(all.size(),today.day());QCOMPARE(proxy.size(),all.size());
+  QCOMPARE(model.summary(3).value("total").toDouble(),30.0);
+  double total=0,proxyTotal=0;for(int i=0;i<all.size();++i){total+=all[i].toMap().value("value").toDouble();proxyTotal+=proxy[i].toMap().value("value").toDouble();}
+  QCOMPARE(total,30.0);QCOMPARE(proxyTotal,9.0);QVERIFY(all.first().toMap().value("sampled").toBool());
+  QCOMPARE(model.periodTraffic(0),model.dailyTraffic());
+ }
  void processAndDeviceRates(){QTemporaryDir temp;TelemetryService model(temp.filePath("rates.json"),false);auto s=sample(QDateTime::currentMSecsSinceEpoch(),100,200);auto row=s.connections.first().toMap();row["sourceIp"]="192.0.2.100";s.connections={row};model.ingest(s);QCOMPARE(model.ranking("apps").first().toMap().value("speed").toDouble(),0.0);
   s.connectionsAt+=1000;s.trafficAt=s.connectionsAt;s.uploadTotal=400;s.downloadTotal=900;row["uploadBytes"]=400;row["downloadBytes"]=900;s.connections={row};model.ingest(s);
   QCOMPARE(model.ranking("apps").first().toMap().value("speed").toDouble(),1000.0);QCOMPARE(model.ranking("devices").first().toMap().value("total").toDouble(),1300.0);QCOMPARE(model.ranking("devices").first().toMap().value("speed").toDouble(),1000.0);

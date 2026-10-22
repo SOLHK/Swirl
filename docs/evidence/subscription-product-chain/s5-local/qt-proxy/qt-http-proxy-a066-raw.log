@@ -1,0 +1,20 @@
+Traceback (most recent call last):
+  File "/workspace/scratch/ca6cd1f88f6f/swirl-chain-evidence/s4-qt-proxy/qt-proxy-diagnostic.py", line 101, in run_protocol
+    wait_for(lambda: origin.tls_closed == 1)
+  File "/workspace/scratch/ca6cd1f88f6f/swirl-chain-evidence/s4-qt-proxy/qt-proxy-diagnostic.py", line 34, in wait_for
+    assert time.monotonic() < deadline, 'DiagnosticDeadlineExceeded'
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: DiagnosticDeadlineExceeded
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/workspace/scratch/ca6cd1f88f6f/swirl-chain-evidence/s4-qt-proxy/qt-proxy-diagnostic.py", line 141, in <module>
+    result = run_protocol(protocol)
+             ^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/ca6cd1f88f6f/swirl-chain-evidence/s4-qt-proxy/qt-proxy-diagnostic.py", line 126, in run_protocol
+    origin.close()
+  File "/workspace/scratch/ca6cd1f88f6f/Swirl/tools/tests/test_product_subscription_chain.py", line 132, in close
+    assert not self.errors, self.errors
+           ^^^^^^^^^^^^^^^
+AssertionError: [{'category': 'IndependentFixtureAssertion', 'fixture': 'tls-origin', 'type': 'SSLEOFError', 'errno': 8, 'winerror': None, 'frames': [{'file': 'socketserver.py', 'function': 'process_request_thread', 'line': 697}, {'file': 'socketserver.py', 'function': 'finish_request', 'line': 362}, {'file': 'socketserver.py', 'function': '__init__', 'line': 766}, {'file': 'test_product_subscription_chain.py', 'function': 'handle', 'line': 101}, {'file': 'ssl.py', 'function': 'unwrap', 'line': 1307}]}]

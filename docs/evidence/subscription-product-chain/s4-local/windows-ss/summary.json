@@ -1,0 +1,18 @@
+{
+  "source_base_sha": "41555465b72fd59d42bc473f0d097c93e210c240",
+  "modified_file": "tools/tests/test_policy_groups.py",
+  "sha256": "9f247371278a5c4d9981e904a01980128ad504f6868208bad8e363c88968a532",
+  "source_unchanged_during_test": true,
+  "command": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "-u",
+    "tools/tests/test_policy_groups.py",
+    "-v"
+  ],
+  "SWIRL_RUST_HARNESS": "/workspace/scratch/ca6cd1f88f6f/Swirl/.local-runtime/target/release/swirl-api",
+  "exit_code": 0,
+  "elapsed_seconds": 5.503,
+  "log": "/workspace/scratch/ca6cd1f88f6f/swirl-chain-evidence/s4-windows-ss/policy-groups.log",
+  "log_sha256": "9f1389d5029286a532b3c762ba659cfc1df392c80a7aa1d15fde238c01ba220b",
+  "scope": "Local Linux actual sockets, simulated Windows exclusion-table branch; actual Windows CI remains required."
+}

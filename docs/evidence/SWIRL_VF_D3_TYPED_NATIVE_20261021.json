@@ -1,0 +1,33 @@
+{
+  "scope": "typed_native_observation_admission_and_self_authored_fixture_controls",
+  "core_sha256": "2ad25dbf747ba574228c8375c6c10ade965641340afb2266f5596e57c81a6f02",
+  "D3_tests": 12,
+  "native_protocol_tests": 14,
+  "full_suite": {
+    "discovered": 623,
+    "passed": 616,
+    "skipped": 7,
+    "seconds": 34.621
+  },
+  "original_96_failures_reclassified_as_pass": false,
+  "native_control": {
+    "status": "PASS_SYNTHETIC_NATIVE_OUTLINE_TABLE_METRIC_RECONSTRUCTION_ONLY",
+    "comparison": {
+      "status": "PASS",
+      "requests": 58,
+      "glyph_records": 174,
+      "max_control_point_error_font_units": 0.0,
+      "max_metric_error_font_units": 0.0,
+      "max_bounds_error_font_units": 0.0,
+      "limit_font_units": 1.0,
+      "continuous_space_proof": false,
+      "command_normalization": "only zero-length straight segments and redundant straight closing edges"
+    },
+    "old_strict_API_gate": "FAIL",
+    "source_unchanged": true,
+    "temporary_fonts_removed": true
+  },
+  "original_reconstructed_faces": 0,
+  "Windows11": "NOT_RUN",
+  "Qt_Swirl": "NOT_RUN"
+}

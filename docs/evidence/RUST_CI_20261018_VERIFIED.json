@@ -1,0 +1,875 @@
+{
+  "source_commit": "056fd56387e15d65259eff5f612b3ad7a1ce7009",
+  "source_tree": "251146540cf5b742da6fb69de7d780fe2a10c18c",
+  "remote_head_verified": "056fd56387e15d65259eff5f612b3ad7a1ce7009",
+  "rust_core": {
+    "run_id": 39093009560,
+    "run_number": 35,
+    "url": "https://github.com/SOLHK/Swirl/actions/runs/39093009560",
+    "linux": {
+      "job_id": 117573535041,
+      "conclusion": "success",
+      "rust": {
+        "passed": 125,
+        "failed": 0,
+        "ignored": 0,
+        "fmt": "success",
+        "check": "success",
+        "clippy": "success",
+        "release": "success",
+        "release_scope": "--workspace --lib --bins"
+      },
+      "python": [
+        {
+          "run": 24,
+          "seconds": 26.565,
+          "status": "OK (skipped=1)",
+          "skipped": 1,
+          "failed": 0
+        },
+        {
+          "run": 9,
+          "seconds": 12.232,
+          "status": "OK (skipped=1)",
+          "skipped": 1,
+          "failed": 0
+        },
+        {
+          "run": 11,
+          "seconds": 10.243,
+          "status": "OK",
+          "skipped": 0,
+          "failed": 0
+        },
+        {
+          "run": 9,
+          "seconds": 8.63,
+          "status": "OK",
+          "skipped": 0,
+          "failed": 0
+        },
+        {
+          "run": 10,
+          "seconds": 5.063,
+          "status": "OK (skipped=1)",
+          "skipped": 1,
+          "failed": 0
+        },
+        {
+          "run": 11,
+          "seconds": 9.628,
+          "status": "OK (skipped=1)",
+          "skipped": 1,
+          "failed": 0
+        },
+        {
+          "run": 19,
+          "seconds": 0.049,
+          "status": "OK",
+          "skipped": 0,
+          "failed": 0
+        },
+        {
+          "run": 13,
+          "seconds": 5.231,
+          "status": "OK",
+          "skipped": 0,
+          "failed": 0
+        },
+        {
+          "run": 18,
+          "seconds": 38.723,
+          "status": "OK",
+          "skipped": 0,
+          "failed": 0
+        },
+        {
+          "run": 7,
+          "seconds": 0.026,
+          "status": "OK",
+          "skipped": 0,
+          "failed": 0
+        },
+        {
+          "run": 8,
+          "seconds": 9.036,
+          "status": "OK",
+          "skipped": 0,
+          "failed": 0
+        },
+        {
+          "run": 20,
+          "seconds": 5.172,
+          "status": "OK",
+          "skipped": 0,
+          "failed": 0
+        },
+        {
+          "run": 7,
+          "seconds": 3.021,
+          "status": "OK",
+          "skipped": 0,
+          "failed": 0
+        }
+      ],
+      "python_totals": {
+        "suites": 13,
+        "run": 166,
+        "passed": 162,
+        "skipped": 4,
+        "failed": 0
+      },
+      "loopback_observations": [
+        "REFUSAL OBSERVATION: {\"per_probe_budget_ms\": 3000, \"os_outcome\": \"refused\", \"os_elapsed_ms\": 0, \"diagnostic_outcomes\": [\"refused\"], \"diagnostic_elapsed_ms\": 0}",
+        "FALLBACK OBSERVATION: {\"budget_ms\": 1000, \"elapsed_ms\": 0, \"outcomes\": [\"refused\", \"success\"], \"started_ms\": [0, 0], \"peak_pending\": 1}"
+      ]
+    },
+    "macos": {
+      "job_id": 117573535074,
+      "conclusion": "success",
+      "rust": {
+        "passed": 125,
+        "failed": 0,
+        "ignored": 0,
+        "fmt": "success",
+        "check": "success",
+        "clippy": "success",
+        "release": "success",
+        "release_scope": "--workspace --lib --bins"
+      },
+      "python": [
+        {
+          "run": 24,
+          "seconds": 29.537,
+          "status": "OK (skipped=1)",
+          "skipped": 1,
+          "failed": 0
+        },
+        {
+          "run": 9,
+          "seconds": 9.771,
+          "status": "OK (skipped=1)",
+          "skipped": 1,
+          "failed": 0
+        },
+        {
+          "run": 11,
+          "seconds": 11.127,
+          "status": "OK",
+          "skipped": 0,
+          "failed": 0
+        },
+        {
+          "run": 9,
+          "seconds": 11.683,
+          "status": "OK",
+          "skipped": 0,
+          "failed": 0
+        },
+        {
+          "run": 10,
+          "seconds": 6.187,
+          "status": "OK (skipped=1)",
+          "skipped": 1,
+          "failed": 0
+        },
+        {
+          "run": 11,
+          "seconds": 14.191,
+          "status": "OK (skipped=1)",
+          "skipped": 1,
+          "failed": 0
+        },
+        {
+          "run": 19,
+          "seconds": 0.068,
+          "status": "OK",
+          "skipped": 0,
+          "failed": 0
+        },
+        {
+          "run": 13,
+          "seconds": 7.469,
+          "status": "OK",
+          "skipped": 0,
+          "failed": 0
+        },
+        {
+          "run": 18,
+          "seconds": 44.494,
+          "status": "OK",
+          "skipped": 0,
+          "failed": 0
+        },
+        {
+          "run": 7,
+          "seconds": 0.022,
+          "status": "OK",
+          "skipped": 0,
+          "failed": 0
+        },
+        {
+          "run": 8,
+          "seconds": 10.205,
+          "status": "OK",
+          "skipped": 0,
+          "failed": 0
+        },
+        {
+          "run": 20,
+          "seconds": 5.342,
+          "status": "OK",
+          "skipped": 0,
+          "failed": 0
+        },
+        {
+          "run": 7,
+          "seconds": 2.743,
+          "status": "OK",
+          "skipped": 0,
+          "failed": 0
+        }
+      ],
+      "python_totals": {
+        "suites": 13,
+        "run": 166,
+        "passed": 162,
+        "skipped": 4,
+        "failed": 0
+      },
+      "loopback_observations": [
+        "REFUSAL OBSERVATION: {\"per_probe_budget_ms\": 3000, \"os_outcome\": \"refused\", \"os_elapsed_ms\": 0, \"diagnostic_outcomes\": [\"refused\"], \"diagnostic_elapsed_ms\": 0}",
+        "FALLBACK OBSERVATION: {\"budget_ms\": 1000, \"elapsed_ms\": 0, \"outcomes\": [\"refused\", \"success\"], \"started_ms\": [0, 0], \"peak_pending\": 1}"
+      ]
+    },
+    "windows": {
+      "schema_version": 1,
+      "repository": "SOLHK/Swirl",
+      "branch": "work/core-completion-20261017",
+      "head_sha": "056fd56387e15d65259eff5f612b3ad7a1ce7009",
+      "workflow": "Swirl Rust Core",
+      "run_number": 35,
+      "run_id": 39093009560,
+      "job_id": 117573534873,
+      "job_name": "windows-rust",
+      "job_url": "https://github.com/SOLHK/Swirl/actions/runs/39093009560/job/117573534873",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Install stable Rust tools",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Run cargo fmt --all -- --check",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Run cargo check --workspace --locked",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Run cargo clippy --workspace --all-targets --locked -- -D warnings",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Run cargo test --workspace --locked",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Run cargo build --release --locked --workspace --lib --bins",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8
+        },
+        {
+          "name": "Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9
+        },
+        {
+          "name": "Independent TLS and protocol peers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10
+        },
+        {
+          "name": "Run actions/upload-artifact@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11
+        },
+        {
+          "name": "Install Qt for Rust control adapter",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12
+        },
+        {
+          "name": "Build Qt to Rust integration test",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13
+        },
+        {
+          "name": "Run Qt to Rust integration without Mihomo",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14
+        },
+        {
+          "name": "Post Install Qt for Rust control adapter",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 26
+        },
+        {
+          "name": "Post Run actions/setup-python@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 27
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 28
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 29
+        }
+      ],
+      "rust": {
+        "passed": 125,
+        "failed": 0,
+        "ignored": 0,
+        "fmt": "success",
+        "check": "success",
+        "clippy": "success",
+        "release": "success",
+        "release_scope": "--workspace --lib --bins"
+      },
+      "python": {
+        "initial": {
+          "cases": 200,
+          "passed": 194,
+          "failed": 0,
+          "skipped": 6
+        },
+        "qt_supplements": {
+          "cases": 4,
+          "passed": 4,
+          "failed": 0,
+          "skipped": 0
+        },
+        "raw_invocations": {
+          "cases": 204,
+          "passed": 198,
+          "failed": 0,
+          "skipped": 6
+        },
+        "distinct_cases": {
+          "cases": 200,
+          "passed": 198,
+          "failed": 0,
+          "remaining_skipped": 2
+        },
+        "suites": [
+          {
+            "suite": "test_rust_core.py",
+            "ran": 24,
+            "seconds": 28.226,
+            "status": "OK (skipped=1)"
+          },
+          {
+            "suite": "test_shadowsocks.py",
+            "ran": 9,
+            "seconds": 8.892,
+            "status": "OK (skipped=1)"
+          },
+          {
+            "suite": "test_dns_tls.py",
+            "ran": 11,
+            "seconds": 12.749,
+            "status": "OK"
+          },
+          {
+            "suite": "test_dns_https.py",
+            "ran": 9,
+            "seconds": 12.293,
+            "status": "OK"
+          },
+          {
+            "suite": "test_socks4.py",
+            "ran": 10,
+            "seconds": 6.39,
+            "status": "OK (skipped=1)"
+          },
+          {
+            "suite": "test_websocket_transport.py",
+            "ran": 11,
+            "seconds": 11.563,
+            "status": "OK (skipped=1)"
+          },
+          {
+            "suite": "test_core_development.py",
+            "ran": 19,
+            "seconds": 1.075,
+            "status": "OK"
+          },
+          {
+            "suite": "test_policy_groups.py",
+            "ran": 13,
+            "seconds": 6.442,
+            "status": "OK"
+          },
+          {
+            "suite": "test_dns_negative.py",
+            "ran": 18,
+            "seconds": 42.389,
+            "status": "OK"
+          },
+          {
+            "suite": "test_native_probe.py",
+            "ran": 7,
+            "seconds": 0.079,
+            "status": "OK"
+          },
+          {
+            "suite": "test_connection_stages.py",
+            "ran": 8,
+            "seconds": 26.703,
+            "status": "OK"
+          },
+          {
+            "suite": "test_connectivity_diagnostics.py",
+            "ran": 20,
+            "seconds": 9.623,
+            "status": "OK"
+          },
+          {
+            "suite": "test_subscription_import.py",
+            "ran": 7,
+            "seconds": 2.818,
+            "status": "OK"
+          },
+          {
+            "suite": "test_subscription_capture.py",
+            "ran": 23,
+            "seconds": 3.709,
+            "status": "OK (skipped=1)"
+          },
+          {
+            "suite": "test_codex_management.py",
+            "ran": 11,
+            "seconds": 0.221,
+            "status": "OK (skipped=1)"
+          }
+        ],
+        "supplement_suites": [
+          {
+            "suite": "SS HTTP obfs with UDP declared",
+            "ran": 1,
+            "seconds": 0.659,
+            "status": "OK"
+          },
+          {
+            "suite": "VLESS",
+            "ran": 1,
+            "seconds": 0.647,
+            "status": "OK"
+          },
+          {
+            "suite": "SOCKS4 and SOCKS4a",
+            "ran": 1,
+            "seconds": 2.472,
+            "status": "OK"
+          },
+          {
+            "suite": "VLESS WebSocket",
+            "ran": 1,
+            "seconds": 1.177,
+            "status": "OK"
+          }
+        ],
+        "initial_skip_details": [
+          "test_vless_qt_data_path (__main__.RustCoreIntegration.test_vless_qt_data_path) ... skipped 'Qt executable required'",
+          "test_qt_facade_http_obfs_with_udp_declared (__main__.ShadowsocksTests.test_qt_facade_http_obfs_with_udp_declared) ... skipped 'Qt integration executable required'",
+          "test_qt_imported_socks4_and_4a_data_path (__main__.Socks4Integration.test_qt_imported_socks4_and_4a_data_path) ... skipped 'Qt integration executable required'",
+          "test_qt_vless_websocket_data_path (__main__.WebSocketTransportTests.test_qt_vless_websocket_data_path) ... skipped 'Qt integration executable required'",
+          "test_offline_cpp_import_and_existing_store_protection (__main__.CaptureTests.test_offline_cpp_import_and_existing_store_protection) ... skipped 'Set SWIRL_CAPTURE_INSPECTOR to the built C++ importer'",
+          "test_installed_cli_apply_and_rollback_only_in_temporary_home (__main__.InstalledCliTests.test_installed_cli_apply_and_rollback_only_in_temporary_home) ... skipped 'opt-in real CLI with isolated home'"
+        ],
+        "remaining_skips": [
+          {
+            "test": "test_offline_cpp_import_and_existing_store_protection",
+            "reason": "Set SWIRL_CAPTURE_INSPECTOR to the built C++ importer"
+          },
+          {
+            "test": "test_installed_cli_apply_and_rollback_only_in_temporary_home",
+            "reason": "Opt-in real CLI with isolated home"
+          }
+        ]
+      },
+      "loopback_refusal": {
+        "per_probe_budget_ms": 3000,
+        "os_outcome": "refused",
+        "os_elapsed_ms": 2006,
+        "diagnostic_outcomes": [
+          "refused"
+        ],
+        "diagnostic_elapsed_ms": 2027
+      },
+      "loopback_fallback": {
+        "budget_ms": 1000,
+        "elapsed_ms": 264,
+        "outcomes": [
+          "cancelled",
+          "success"
+        ],
+        "started_ms": [
+          0,
+          263
+        ],
+        "peak_pending": 2
+      },
+      "qt": {
+        "version": "6.10.3",
+        "architecture": "msvc2022_64",
+        "cmake_build": "success",
+        "target": "SwirlRustCoreTests",
+        "ctest": {
+          "test": "swirl-rust-qt-integration",
+          "passed": 1,
+          "failed": 0,
+          "elapsed_seconds": 6.85
+        },
+        "rust_target_directory": "build/rust-qt/rust-target",
+        "dll_provenance": "CMake independently builds swirl-api from the same source into its own rust-target and copies that DLL next to SwirlRustCoreTests.",
+        "artifact_dll_byte_identity_verified": false
+      },
+      "artifact_github": {
+        "id": 12123637108,
+        "name": "Swirl-Rust-Core-Windows",
+        "size_in_bytes": 5259771,
+        "url": "https://api.github.com/repos/SOLHK/Swirl/actions/artifacts/12123637108",
+        "archive_download_url": "https://api.github.com/repos/SOLHK/Swirl/actions/artifacts/12123637108/zip",
+        "expired": false,
+        "created_at": "2026-10-18T03:23:05Z",
+        "expires_at": "2027-01-16T03:16:01Z",
+        "updated_at": "2026-10-18T03:23:05Z",
+        "digest": "sha256:2147a349e02100c0a901c34032f49db8e92d14c66f5f13544a40ef88928a7182",
+        "workflow_run": {
+          "id": 39093009560,
+          "repository_id": 1411888911,
+          "head_repository_id": 1411888911,
+          "head_branch": "work/core-completion-20261017",
+          "head_sha": "056fd56387e15d65259eff5f612b3ad7a1ce7009"
+        }
+      },
+      "limitations": [
+        "Windows verification uses independent local peers; it is not evidence of live provider connectivity.",
+        "Four initial Qt skips were executed later; two opt-in cases remain skipped.",
+        "CMake's Qt DLL and the standalone artifact DLL were built separately. Byte-for-byte identity was not tested.",
+        "The CI success follows a test fixture correction only; no product timeout or connection scheduler was changed by 056fd563.",
+        "The historical #33 and #34 failures remain failures and are retained as evidence."
+      ],
+      "raw_log": {
+        "run_number": 35,
+        "job_id": 117573534873,
+        "bytes": 158248,
+        "sha256": "5cde0156022703a8d988ed54942e85344aa3ed5179ab76f723c72054e58a70e4",
+        "file_name": "swirl-windows-core35-117573534873.log"
+      },
+      "historical_failure_logs": [
+        {
+          "run_number": 34,
+          "job_id": 117571330034,
+          "bytes": 100756,
+          "sha256": "7ff6f5ff6093f6af424b1b2284eb08c631aa1df9ae35d96cd580e99856cb1262",
+          "file_name": "swirl-windows-core34-117571330034.log"
+        },
+        {
+          "run_number": 33,
+          "job_id": 117569371937,
+          "bytes": 100755,
+          "sha256": "cb89ef36581d1f298f2b271e5b9506be2ecae112292c146cbadc4a6ffdfebb78",
+          "file_name": "swirl-windows-core33-117569371937.log"
+        }
+      ],
+      "artifact_verification": {
+        "bytes": 5259771,
+        "sha256": "2147a349e02100c0a901c34032f49db8e92d14c66f5f13544a40ef88928a7182",
+        "matches_github_digest": true,
+        "zip_crc_passed": true,
+        "executed_locally": false,
+        "entries": [
+          {
+            "path": "core/target/release/swirl_api.dll",
+            "bytes": 3410944,
+            "sha256": "20f9c9975631f4e763ddd475b7b818d3338098a149f49c8f964b15ec705f7b49",
+            "dos_signature": "MZ",
+            "nt_signature": "PE",
+            "machine": "AMD64",
+            "pe_header_verified": true
+          },
+          {
+            "path": "core/target/release/swirl-api.exe",
+            "bytes": 3523072,
+            "sha256": "24a48f9b7923e04c55778ee8d0cab98f7b8b0a65606caddf6bce595f35d03038",
+            "dos_signature": "MZ",
+            "nt_signature": "PE",
+            "machine": "AMD64",
+            "pe_header_verified": true
+          },
+          {
+            "path": "core/target/release/swirl-inspect.exe",
+            "bytes": 2073088,
+            "sha256": "fb3298384f3f87affb30608ce7fd08a30c537a5f79c051bd7b3f17017ab0a1c1",
+            "dos_signature": "MZ",
+            "nt_signature": "PE",
+            "machine": "AMD64",
+            "pe_header_verified": true
+          },
+          {
+            "path": "core/target/release/swirl-diagnose.exe",
+            "bytes": 2507776,
+            "sha256": "da0633a5cff68531f11ae5dd7ee5bc43f5916fb8df2760c2c770f8d82e95469d",
+            "dos_signature": "MZ",
+            "nt_signature": "PE",
+            "machine": "AMD64",
+            "pe_header_verified": true
+          },
+          {
+            "path": "core/Cargo.lock",
+            "bytes": 24495,
+            "sha256": "fdd119e25b615e2d60b151528095a59ae8f62642b2bc94eb1d4e6b316e593b49"
+          },
+          {
+            "path": "tools/SwirlCodexManage.py",
+            "bytes": 9804,
+            "sha256": "a05414d82b39edc8ef32f2f47023bd84b13dc63064bcceb9e6a7ea56bee588b9"
+          },
+          {
+            "path": "tools/SubscriptionCapture.py",
+            "bytes": 30589,
+            "sha256": "8b5e316159a8bdb463273dc6e1279227c908d693f12a207964d8400fc0a25c65"
+          },
+          {
+            "path": "docs/CODEX_PROXY_MANAGEMENT.md",
+            "bytes": 3130,
+            "sha256": "d5443bd65825824aa066ef9de30b3e731c7e0719df16b84027b3f5c03e45a71c"
+          }
+        ],
+        "file_name": "Swirl-Rust-Core-Windows-056fd563.zip"
+      }
+    },
+    "status": "completed",
+    "conclusion": "success",
+    "completed_utc": "2026-10-18T03:28:03Z"
+  },
+  "app": {
+    "run_id": 39093009558,
+    "run_number": 32,
+    "job_id": 117573535140,
+    "conclusion": "success",
+    "url": "https://github.com/SOLHK/Swirl/actions/runs/39093009558",
+    "rust": {
+      "passed": 125,
+      "failed": 0,
+      "ignored": 0
+    },
+    "updater": {
+      "passed": 19,
+      "failed": 0,
+      "before_sha256": "9d72dd3d6aa7b58590eeae4ca5621094110a5f5d77f2486fde0ea19376ffba7d",
+      "after_sha256": "9d72dd3d6aa7b58590eeae4ca5621094110a5f5d77f2486fde0ea19376ffba7d"
+    },
+    "python_peers": {
+      "suites": 6,
+      "run": 74,
+      "passed": 69,
+      "skipped": 5,
+      "failed": 0
+    },
+    "artifact": {
+      "id": 12123149508,
+      "sha256": "8181d5ce2e40d544f98d16d25ae250c8530b20543f44998826b0ca6a5310ee1b",
+      "tested_commit": "056fd56387e15d65259eff5f612b3ad7a1ce7009",
+      "source_files_verified": 157,
+      "source_bytes_and_executable_modes_match": true,
+      "worktree_state": "?? CORE_TESTED_COMMIT\n?? CORE_WORKTREE_STATE\n?? core-tested-source.tar\n"
+    }
+  },
+  "public_network_artifact": {
+    "id": 12123219094,
+    "sha256": "fc741bb6bb582587006854ea5da10cbb2a342d6b62fcdbc50a6da85425b8fba9",
+    "source_commit": "056fd56387e15d65259eff5f612b3ad7a1ce7009",
+    "file": "RUST_PUBLIC_NETWORK_20261018_VERIFIED.json"
+  },
+  "preserved_prior_failures": [
+    {
+      "source_commit": "44488e7a88c66125164e85720278be052f4aa74b",
+      "run_id": 39091610693,
+      "macos_diagnostic_failures": 2,
+      "windows_diagnostic_failures": 2
+    },
+    {
+      "source_commit": "63df5807499fddad6936d918f8807e550ca3e528",
+      "run_id": 39092269132,
+      "macos_diagnostic_failures": 0,
+      "windows_diagnostic_failures": 2
+    }
+  ],
+  "public_network": {
+    "schema": 1,
+    "commit": "056fd56387e15d65259eff5f612b3ad7a1ce7009",
+    "platform": "Linux",
+    "tracked_worktree_clean": true,
+    "timestamp_utc": "2026-10-18T03:20:18.524387+00:00",
+    "harness_sha256": "d659bdb675b8e09d7b80e1c25222d60ecd3ee18ffd7753645296286d6c185f77",
+    "scope": "Public HTTPS via native DIRECT and native DoH; no provider, UDP, TUN or performance claim",
+    "checks": [
+      {
+        "host": "example.com",
+        "port": 443,
+        "method": "HEAD",
+        "path": "/",
+        "dns": "system",
+        "route": "explicit-native-direct",
+        "success": true,
+        "engine": "swirl-rust",
+        "native_connect_accepted": true,
+        "certificate_verified": true,
+        "tls_version": "TLSv1.3",
+        "http_status": 200,
+        "orderly_close": true,
+        "core": {
+          "accepted": 1,
+          "active": 0,
+          "failed": 0,
+          "upload": 700,
+          "download": 4788,
+          "last_error": "",
+          "last_error_stage": "",
+          "recorded_connections": 1
+        },
+        "native_session_settled": true,
+        "elapsed_ms": 107
+      },
+      {
+        "host": "www.rust-lang.org",
+        "port": 443,
+        "method": "HEAD",
+        "path": "/",
+        "dns": "system",
+        "route": "explicit-native-direct",
+        "success": true,
+        "engine": "swirl-rust",
+        "native_connect_accepted": true,
+        "certificate_verified": true,
+        "tls_version": "TLSv1.3",
+        "http_status": 301,
+        "orderly_close": true,
+        "core": {
+          "accepted": 1,
+          "active": 0,
+          "failed": 0,
+          "upload": 690,
+          "download": 5407,
+          "last_error": "",
+          "last_error_stage": "",
+          "recorded_connections": 1
+        },
+        "native_session_settled": true,
+        "elapsed_ms": 118
+      },
+      {
+        "host": "example.com",
+        "port": 443,
+        "method": "HEAD",
+        "path": "/",
+        "dns": "native-doh",
+        "route": "explicit-native-direct",
+        "success": true,
+        "dns_endpoint": "https://cloudflare-dns.com/dns-query",
+        "dns_bootstrap": "1.1.1.1:443",
+        "engine": "swirl-rust",
+        "native_connect_accepted": true,
+        "certificate_verified": true,
+        "tls_version": "TLSv1.3",
+        "http_status": 200,
+        "orderly_close": true,
+        "core": {
+          "accepted": 1,
+          "active": 0,
+          "failed": 0,
+          "upload": 700,
+          "download": 4789,
+          "last_error": "",
+          "last_error_stage": "",
+          "recorded_connections": 1
+        },
+        "native_session_settled": true,
+        "elapsed_ms": 222
+      }
+    ],
+    "success": true
+  },
+  "evidence_files": {
+    "rust-core-39093009560-linux.log": {
+      "bytes": 101494,
+      "sha256": "e454ab453e523eeef55e2e96fd630866a2149a6baa4c67d077fe06708c1ad0f3"
+    },
+    "rust-core-39093009560-macos.log": {
+      "bytes": 92966,
+      "sha256": "4638931fae33c20dc3f7e8c89c5ce27aa14f45e2484201fb27d1e97ce1043076"
+    },
+    "app-39093009558.log": {
+      "bytes": 83556,
+      "sha256": "a7a01496ddbfdb79a4dbba2f075625461f17f7246ec139160bd9aa82406ec667"
+    },
+    "Swirl-Core-Public-Network-39093009560.zip": {
+      "bytes": 859,
+      "sha256": "fc741bb6bb582587006854ea5da10cbb2a342d6b62fcdbc50a6da85425b8fba9"
+    },
+    "CORE_PUBLIC_NETWORK-39093009560.json": {
+      "bytes": 2553,
+      "sha256": "78a9cabd9a61a40835935c20b2e431081c15c541fb3fef8c7e92d253153339c0"
+    },
+    "Core-development-evidence-39093009558.zip": {
+      "bytes": 430335,
+      "sha256": "8181d5ce2e40d544f98d16d25ae250c8530b20543f44998826b0ca6a5310ee1b"
+    }
+  },
+  "schema_version": 1,
+  "repository": "SOLHK/Swirl",
+  "branch": "work/core-completion-20261017",
+  "verification_scope": "Completed CI for the exact source commit; later documentation-only handoff does not change source, tests or workflows."
+}

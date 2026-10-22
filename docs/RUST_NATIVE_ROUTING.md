@@ -3,6 +3,12 @@
 The existing Qt rule editor now feeds executable rules to Swirl Rust when
 `SWIRL_USE_RUST_CORE=ON`. No QML, layout, styling or system proxy settings change.
 
+**2026-10-17 policy update:** the Rust IR/API now executes nested manual groups
+and native `url_test`, `fallback` and per-session `load_balance` groups. See
+[native policy semantics and evidence](RUST_NATIVE_POLICIES.md). The Qt group
+mapper still accepts the smaller manual subset described below; Rust API
+support does not imply that the existing Qt editor maps these newer groups.
+
 ## Executed subset
 
 | Existing rule | Rust matcher | Behavior |
@@ -26,14 +32,17 @@ list before an atomic update. Even unsupported rules below MATCH are rejected;
 they are not silently lost. Running rule rows are supplied through the existing
 engine interface. Hit counts remain unavailable, displayed as “—”.
 
-Process rules, rule providers/MRS/GeoIP, automatic smart routing, automatic policy groups,
+Process rules, rule providers/MRS/GeoIP, automatic smart routing,
 port ranges, regex and logical expressions are not implemented here. Active
 unsupported rules fail with their index. Existing smart-routing sessions remain
 blocked in the Rust preview until their provider semantics are implemented.
+Automatic policy groups execute through the Rust IR/API; their Qt mapping is
+not yet implemented.
 
 ## Manual policy groups
 
-The existing group editor's `select` groups map to typed Rust selectors. Members
+The existing Qt group editor's `select` groups map to typed Rust selectors. In
+this Qt mapping, members
 must be concrete supported nodes, DIRECT or REJECT. The first ordered member is
 selected on startup; an explicitly supplied `default-selected` must name a member.
 The unchanged editor has no separate live group-member selection control. Its
@@ -41,19 +50,25 @@ global node buttons continue to change SWIRL, not every custom group.
 
 The local Rust control API provides
 `{"op":"select_group","handle":1,"id":"group-id","member":"node-id"}`.
-It atomically changes only that selector for new connections. Snapshots report
+For IR-defined nested manual groups, `member` can also be a declared group
+member; all membership paths are checked for cycles and a maximum depth of 16.
+Automatic groups reject this command with `AutomaticPolicySelection`.
+It atomically changes only that manual selector for new connections. Snapshots report
 selector IDs and their selected members. Existing streams/UDP associations keep
 their original plan. Invalid groups or members do not advance the generation or
 mutate the plan. Node selection now also holds the same write lock throughout
 its read/modify/commit to avoid lost concurrent selector changes.
 
-The mapper validates every declared group and member in rule mode. Duplicate
+The Qt mapper validates every declared group and member in rule mode. Duplicate
 names/members, missing nodes, nested groups, unsupported protocols, arbitrary
 extra fields, non-member defaults and automatic group types fail explicitly.
 Inactive groups remain stored in global/direct mode. Limits are 128 selectors,
 512 members per selector and 512 total executable nodes (Qt reserves two slots
-for built-in policies). There is no fallback, retry/replay, group health probing,
-load balancing or imported group nesting. A failed selected member stays failed.
+for built-in policies). This Qt mapping does not activate automatic fallback,
+group health probing, load balancing or imported group nesting. A failed selected
+member stays failed. Native IR-defined automatic groups are documented separately;
+they select new sessions from independent health checks and never replay failed
+application requests.
 
 The editor unconditionally stores its default health URL and 300-second interval
 on manual groups too. Only these exact defaults or absent values are accepted as
@@ -68,7 +83,7 @@ rollback and no implicit DIRECT; UDP tests retain the old selector snapshot.
 
 ## DNS and connection lifetime
 
-IP rules from Qt trigger bounded system DNS only when an unresolved destination
+IP rules from Qt trigger bounded configured DNS only when an unresolved destination
 actually reaches a resolving CIDR rule. An earlier domain/port/final match never
 does this lookup. An explicit `no-resolve` suffix skips unresolved names; it can
 use an address obtained by an earlier resolving rule. The second matching pass

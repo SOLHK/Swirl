@@ -33,6 +33,7 @@ SwirlMotionButton {
         spacing:Theme.dp(10)
         SwirlIcon { name: "nav-"+entry.pageId; size:Theme.dp(18); color:entry.chosen?Theme.navigationAccent:entry.hovered?Theme.text:Theme.muted }
         SwirlText {renderType:Text.NativeRendering;
+            textRole: "navigation"
             visible: !entry.compact; Layout.fillWidth: true
             text: entry.title; color: Theme.text
             font.pixelSize:Theme.fontSize(13); font.family: Theme.fontFamily
@@ -45,6 +46,5 @@ SwirlMotionButton {
     Accessible.role: Accessible.ListItem
     Accessible.selectable: true
     Accessible.selected: chosen
-    ToolTip.visible: hovered && compact && !previewCaptureMode
-    ToolTip.text: title
+    SwirlToolTip { parent: entry; visible: entry.hovered && entry.compact && !previewCaptureMode; text: entry.title }
 }

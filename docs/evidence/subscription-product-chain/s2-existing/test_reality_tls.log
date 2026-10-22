@@ -1,0 +1,27 @@
+SOURCE 593e7cddc360cf7f51d9fdc988e6cf8fd99aea96
+COMMAND ["/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3", "/workspace/scratch/ca6cd1f88f6f/Swirl/tools/tests/test_reality_tls.py", "-v"]
+
+test_aes128_hybrid_transcript_data_and_close (__main__.RealityTlsInterop.test_aes128_hybrid_transcript_data_and_close) ... ok
+test_aes128_offered_classical_transcript_data_and_close (__main__.RealityTlsInterop.test_aes128_offered_classical_transcript_data_and_close) ... ok
+test_aes256_hybrid_transcript_data_and_close (__main__.RealityTlsInterop.test_aes256_hybrid_transcript_data_and_close) ... ok
+test_aes256_offered_classical_transcript_data_and_close (__main__.RealityTlsInterop.test_aes256_offered_classical_transcript_data_and_close) ... ok
+test_alpn_selection_preserves_explicit_offer (__main__.RealityTlsInterop.test_alpn_selection_preserves_explicit_offer) ... ok
+test_authenticated_wrong_short_id_is_refused (__main__.RealityTlsInterop.test_authenticated_wrong_short_id_is_refused) ... ok
+test_bad_certificate_mac_is_refused (__main__.RealityTlsInterop.test_bad_certificate_mac_is_refused) ... ok
+test_bad_certificate_verify_is_refused (__main__.RealityTlsInterop.test_bad_certificate_verify_is_refused) ... ok
+test_bad_server_finished_is_refused (__main__.RealityTlsInterop.test_bad_server_finished_is_refused) ... ok
+test_chacha_hybrid_transcript_data_and_close (__main__.RealityTlsInterop.test_chacha_hybrid_transcript_data_and_close) ... ok
+test_chacha_offered_classical_transcript_data_and_close (__main__.RealityTlsInterop.test_chacha_offered_classical_transcript_data_and_close) ... ok
+test_empty_full_record_and_multiple_record_payloads (__main__.RealityTlsInterop.test_empty_full_record_and_multiple_record_payloads) ... ok
+test_hello_retry_request_is_refused_without_second_client_hello (__main__.RealityTlsInterop.test_hello_retry_request_is_refused_without_second_client_hello) ... ok
+test_small_socket_writes_reads_and_fragmented_encrypted_handshake (__main__.RealityTlsInterop.test_small_socket_writes_reads_and_fragmented_encrypted_handshake) ... ok
+test_tcp_eof_after_echo_is_not_authenticated_close (__main__.RealityTlsInterop.test_tcp_eof_after_echo_is_not_authenticated_close) ... ok
+test_unoffered_alpn_is_refused (__main__.RealityTlsInterop.test_unoffered_alpn_is_refused) ... ok
+test_wrong_client_static_public_key_is_refused (__main__.RealityTlsInterop.test_wrong_client_static_public_key_is_refused) ... ok
+test_wrong_server_authentication_key_never_reaches_finished (__main__.RealityTlsInterop.test_wrong_server_authentication_key_never_reaches_finished) ... ok
+test_wrong_session_id_echo_is_refused (__main__.RealityTlsInterop.test_wrong_session_id_echo_is_refused) ... ok
+
+----------------------------------------------------------------------
+Ran 19 tests in 0.120s
+
+OK

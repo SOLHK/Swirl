@@ -22,7 +22,6 @@ SwirlMotionButton {
         opacity: control.enabled ? 1 : 0.45
     }
     contentItem: Item { SwirlIcon { anchors.centerIn:parent; name:control.iconName; size:control.iconSize; color:control.iconColor } }
-    ToolTip.visible: hovered && tooltip.length > 0 && !previewCaptureMode
-    ToolTip.text: tooltip
+    SwirlToolTip { parent: control; visible: control.hovered && control.tooltip.length > 0 && !previewCaptureMode; text: control.tooltip }
     Accessible.name: tooltip
 }

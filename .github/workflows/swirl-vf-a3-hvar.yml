@@ -1,0 +1,53 @@
+name: Swirl VF A3 isolated three-axis HVAR diagnosis
+
+on:
+  push:
+    branches: [work/vf-axis-a3]
+    paths:
+      - '.github/workflows/swirl-vf-a3-hvar.yml'
+      - 'tools/swirl_vf/platform/probe_axis_a3_hvar.py'
+      - 'tools/swirl_vf/tests/test_axis_a3_hvar.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  independent-controls:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install fonttools==4.61.1 numpy==2.2.6
+      - run: python -m unittest discover -s tools/swirl_vf/tests -p 'test_axis_a3_hvar.py' -v
+
+  native-three-axis-diagnosis:
+    needs: independent-controls
+    runs-on: xcode-27
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install fonttools==4.61.1 numpy==2.2.6
+      - name: Observe archived failure, new axis controls, holdouts and direct Apple HVF
+        run: |
+          python tools/swirl_vf/platform/probe_axis_a3_hvar.py \
+            /System/Library/PrivateFrameworks/FontServices.framework/Versions/A/Resources/Reserved/PingFangUI.ttc \
+            --output build/axis-a3-hvar-summary/hvar.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: swirl-vf-a3-hvar-${{ github.sha }}
+          path: build/axis-a3-hvar-summary/*.json
+          retention-days: 7

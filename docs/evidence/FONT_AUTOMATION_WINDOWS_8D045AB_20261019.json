@@ -1,0 +1,609 @@
+{
+  "schema": 1,
+  "evidenceKind": "downloaded-github-actions-artifact-extract",
+  "runUrl": "https://github.com/SOLHK/Swirl/actions/runs/39180142727",
+  "jobUrl": "https://github.com/SOLHK/Swirl/actions/runs/39180142727/job/117830957641",
+  "workflowConclusion": "success",
+  "artifactId": 12156730169,
+  "artifactName": "Swirl-Font-Evidence-8d045ab888e6ed0af6dea87adfb752793c455b5b-1",
+  "artifactCreatedAt": "2026-10-19T00:31:14Z",
+  "artifactExpiresAt": "2026-10-26T00:31:13Z",
+  "artifactZipSha256": "edcd6023e6ae2c892db2a1bc9cabf5b68ea928c45c6f50eb053989f9b375c1ef",
+  "artifactDigestVerified": true,
+  "source": {
+    "commit": "8d045ab888e6ed0af6dea87adfb752793c455b5b",
+    "ref": "refs/heads/work/core-completion-20261017",
+    "runId": "39180142727",
+    "runAttempt": "1",
+    "runner": "windows-2022",
+    "qtRequested": "6.10.3",
+    "qtArchitecture": "win64_msvc2022_64",
+    "nativeRendererRequested": "D3D11 WARP",
+    "physicalDpiVerified": false,
+    "refresh240HzVerified": false
+  },
+  "toolchain": {
+    "Qt": "6.10.3",
+    "Compiler": "MSVC",
+    "CompilerVersion": "19.44.35229.0",
+    "Generator": "Visual Studio 17 2022",
+    "GeneratorPlatform": "x64",
+    "PointerSize": "8",
+    "CxxStandard": "23",
+    "QtMkspec": "win32-msvc"
+  },
+  "stages": {
+    "fontSmoke": "success",
+    "fontReport": "success",
+    "qt": "success",
+    "fontCTest": "success",
+    "configure": "success",
+    "applicationBuild": "success",
+    "fontBuild": "success"
+  },
+  "ctest": {
+    "passed": 3,
+    "failed": 0,
+    "totalSeconds": 8.06
+  },
+  "qtest": {
+    "schema": 1,
+    "countsExcludingLifecycle": {
+      "pass": 50,
+      "skip": 8
+    },
+    "errors": [],
+    "cases": [
+      {
+        "report": "font-selection.xml",
+        "function": "initTestCase",
+        "data": "",
+        "status": "pass",
+        "description": "",
+        "lifecycle": true
+      },
+      {
+        "report": "font-selection.xml",
+        "function": "defaultSelectionAndPersistence",
+        "data": "",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-selection.xml",
+        "function": "importKeepsOriginalFile",
+        "data": "",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-selection.xml",
+        "function": "importOptionalPingFangUiCollection",
+        "data": "",
+        "status": "skip",
+        "description": "Set SWIRL_TEST_TTC to test a local PingFang UI collection",
+        "lifecycle": false
+      },
+      {
+        "report": "font-selection.xml",
+        "function": "optionalVariableAxesAndLivePreview",
+        "data": "",
+        "status": "skip",
+        "description": "Local-only variable font fixture not supplied",
+        "lifecycle": false
+      },
+      {
+        "report": "font-selection.xml",
+        "function": "optionalRestartRead",
+        "data": "",
+        "status": "skip",
+        "description": "Only run as the independent restoration child",
+        "lifecycle": false
+      },
+      {
+        "report": "font-selection.xml",
+        "function": "optionalRenderMatrix",
+        "data": "",
+        "status": "skip",
+        "description": "Local-only matrix requires fixture and evidence directory",
+        "lifecycle": false
+      },
+      {
+        "report": "font-selection.xml",
+        "function": "optionalNativePointSizes",
+        "data": "",
+        "status": "skip",
+        "description": "Local Windows font fixture required",
+        "lifecycle": false
+      },
+      {
+        "report": "font-selection.xml",
+        "function": "optionalMetadataReplacement",
+        "data": "",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-selection.xml",
+        "function": "malformedImportPreservesState",
+        "data": "",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-selection.xml",
+        "function": "optionalPaintedPreviewAxes",
+        "data": "",
+        "status": "skip",
+        "description": "Local font fixture required",
+        "lifecycle": false
+      },
+      {
+        "report": "font-selection.xml",
+        "function": "optionalRasterQualityMatrix",
+        "data": "",
+        "status": "skip",
+        "description": "An authorized local font and local evidence directory are required",
+        "lifecycle": false
+      },
+      {
+        "report": "font-selection.xml",
+        "function": "optionalCffImport",
+        "data": "",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-selection.xml",
+        "function": "automaticAxesRespectDesignAndDpi",
+        "data": "",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-selection.xml",
+        "function": "manualProfilesAndAutomaticRestore",
+        "data": "",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-selection.xml",
+        "function": "automaticProfilesRestartAcrossProcess",
+        "data": "",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-selection.xml",
+        "function": "legacyAxisSettingsArePreserved",
+        "data": "",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-selection.xml",
+        "function": "automaticAxesProduceRealGlyphsAndFallback",
+        "data": "",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-selection.xml",
+        "function": "fontCachesAreBoundedAndStable",
+        "data": "",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-selection.xml",
+        "function": "displayContextHasBoundedLifecycle",
+        "data": "",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-selection.xml",
+        "function": "qmlLiveAutomaticFonts",
+        "data": "",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-selection.xml",
+        "function": "fontDisplayContextLifetime",
+        "data": "",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-selection.xml",
+        "function": "previewFontResourcesInvalidateRaster",
+        "data": "",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-selection.xml",
+        "function": "previewWindowMetricsAndIdleStability",
+        "data": "",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-selection.xml",
+        "function": "nativeGlyphsHaveNoColourFringes",
+        "data": "",
+        "status": "skip",
+        "description": "Requires the native Windows platform",
+        "lifecycle": false
+      },
+      {
+        "report": "font-selection.xml",
+        "function": "cleanupTestCase",
+        "data": "",
+        "status": "pass",
+        "description": "",
+        "lifecycle": true
+      },
+      {
+        "report": "font-axis-policy.xml",
+        "function": "initTestCase",
+        "data": "",
+        "status": "pass",
+        "description": "",
+        "lifecycle": true
+      },
+      {
+        "report": "font-axis-policy.xml",
+        "function": "ordinaryFontsReceiveNoAxes",
+        "data": "",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-axis-policy.xml",
+        "function": "designerDefaultsArePreserved",
+        "data": "",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-axis-policy.xml",
+        "function": "qtWeightUsesOpenTypeScale",
+        "data": "minimum",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-axis-policy.xml",
+        "function": "qtWeightUsesOpenTypeScale",
+        "data": "thin",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-axis-policy.xml",
+        "function": "qtWeightUsesOpenTypeScale",
+        "data": "intermediate",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-axis-policy.xml",
+        "function": "qtWeightUsesOpenTypeScale",
+        "data": "body",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-axis-policy.xml",
+        "function": "qtWeightUsesOpenTypeScale",
+        "data": "medium",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-axis-policy.xml",
+        "function": "qtWeightUsesOpenTypeScale",
+        "data": "demibold",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-axis-policy.xml",
+        "function": "qtWeightUsesOpenTypeScale",
+        "data": "bold",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-axis-policy.xml",
+        "function": "qtWeightUsesOpenTypeScale",
+        "data": "maximum",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-axis-policy.xml",
+        "function": "designWeightsClampToActualFontRange",
+        "data": "",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-axis-policy.xml",
+        "function": "opticalSizeUsesPoints",
+        "data": "points",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-axis-policy.xml",
+        "function": "opticalSizeUsesPoints",
+        "data": "points-priority",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-axis-policy.xml",
+        "function": "opticalSizeUsesPoints",
+        "data": "points-high-dpi",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-axis-policy.xml",
+        "function": "opticalSizeUsesPoints",
+        "data": "logical-pixels",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-axis-policy.xml",
+        "function": "opticalSizeUsesPoints",
+        "data": "fractional-dpr",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-axis-policy.xml",
+        "function": "opticalSizeUsesPoints",
+        "data": "retina-dpr",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-axis-policy.xml",
+        "function": "opticalSizeUsesPoints",
+        "data": "logical-dpi-change",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-axis-policy.xml",
+        "function": "opticalSizeUsesPoints",
+        "data": "72-logical-dpi",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-axis-policy.xml",
+        "function": "opticalSizeUsesPoints",
+        "data": "below-minimum",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-axis-policy.xml",
+        "function": "opticalSizeUsesPoints",
+        "data": "above-maximum",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-axis-policy.xml",
+        "function": "opticalSizeUsesPoints",
+        "data": "unknown-size",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-axis-policy.xml",
+        "function": "invalidOpticalInputsKeepDefault",
+        "data": "",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-axis-policy.xml",
+        "function": "heightAndWidthNeverEmulateOpticalSize",
+        "data": "",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-axis-policy.xml",
+        "function": "manualCoordinatesAreExactAndClamped",
+        "data": "",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-axis-policy.xml",
+        "function": "invalidManualValuesKeepDesignerDefaults",
+        "data": "",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-axis-policy.xml",
+        "function": "automaticIgnoresPersistedManualOverrides",
+        "data": "",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-axis-policy.xml",
+        "function": "axesNeverLeakToAnotherFont",
+        "data": "",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-axis-policy.xml",
+        "function": "automaticDoesNotMaskQtItalicSelection",
+        "data": "",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-axis-policy.xml",
+        "function": "invalidMetadataIsExcluded",
+        "data": "",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-axis-policy.xml",
+        "function": "duplicateAxesAreRejectedIndependentlyOfOrder",
+        "data": "",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-axis-policy.xml",
+        "function": "fixedAxisRangeIsValid",
+        "data": "",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-axis-policy.xml",
+        "function": "rolesAndNamesNeverInventFontProfiles",
+        "data": "",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-axis-policy.xml",
+        "function": "cleanupTestCase",
+        "data": "",
+        "status": "pass",
+        "description": "",
+        "lifecycle": true
+      },
+      {
+        "report": "font-native-raster.xml",
+        "function": "initTestCase",
+        "data": "",
+        "status": "pass",
+        "description": "",
+        "lifecycle": true
+      },
+      {
+        "report": "font-native-raster.xml",
+        "function": "nativeGlyphsHaveNoColourFringes",
+        "data": "",
+        "status": "pass",
+        "description": "",
+        "lifecycle": false
+      },
+      {
+        "report": "font-native-raster.xml",
+        "function": "cleanupTestCase",
+        "data": "",
+        "status": "pass",
+        "description": "",
+        "lifecycle": true
+      }
+    ],
+    "physicalDpiVerified": false,
+    "refresh240HzVerified": false
+  },
+  "qtestCountsByReportExcludingLifecycle": {
+    "font-selection.xml": {
+      "pass": 16,
+      "skip": 8
+    },
+    "font-axis-policy.xml": {
+      "pass": 33
+    },
+    "font-native-raster.xml": {
+      "pass": 1
+    }
+  },
+  "applicationSmoke": {
+    "exitCode": 0,
+    "navigationRequests": 61,
+    "readyRoutes": 61,
+    "font": "Swirl Automation Probe",
+    "uniqueRequestedRoutes": 61,
+    "uniqueActualRouteKeys": 60
+  },
+  "nativeBackendObserved": {
+    "api": "D3D11",
+    "device": "Microsoft Basic Render Driver",
+    "preferSoftwareDevice": true
+  },
+  "qtestWarnings": [],
+  "applicationSmokeWarnings": [],
+  "applicationBuildWarnings": [
+    "GatewayChecks.cpp:40 C4834",
+    "ScriptRunner.cpp:18 C4834",
+    "ScriptRunner.cpp:36 C4834",
+    "Qt GuiPrivate configuration compatibility notice"
+  ],
+  "applicationBinaryPublished": false,
+  "physicalDpiVerified": false,
+  "refresh240HzVerified": false
+}

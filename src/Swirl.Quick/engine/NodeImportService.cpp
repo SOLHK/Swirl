@@ -29,27 +29,48 @@ QVariantList NodeImportService::providers() const {
     }return rows;
 }
 void NodeImportService::importText(const QString &text) {
+    startText(text,false);
+}
+void NodeImportService::importNodesOnlyText(const QString &text) {
+    startText(text,true);
+}
+void NodeImportService::startText(const QString &text,bool nodesOnly) {
     if(m_busy){m_message=QStringLiteral("已有导入或更新正在进行，请稍后重试。");emit changed();return;}
-    m_busy=true;m_source.clear();m_message=QStringLiteral("正在解析节点配置…");emit changed();parse(text.toUtf8());
+    m_busy=true;m_source.clear();m_nodesOnly=nodesOnly;m_message=QStringLiteral("正在解析节点配置…");emit changed();parse(text.toUtf8());
 }
 void NodeImportService::importClipboard() {
     if(auto *clipboard=QGuiApplication::clipboard())importText(clipboard->text());
 }
+void NodeImportService::importNodesOnlyClipboard() {
+    if(auto *clipboard=QGuiApplication::clipboard())importNodesOnlyText(clipboard->text());
+}
 void NodeImportService::importFile(const QUrl &file) {
+    startFile(file,false);
+}
+void NodeImportService::importNodesOnlyFile(const QUrl &file) {
+    startFile(file,true);
+}
+void NodeImportService::startFile(const QUrl &file,bool nodesOnly) {
     if(m_busy)return;
     if(!file.isLocalFile() || !file.host().isEmpty() || file.toLocalFile().startsWith("\\\\")) {m_message=QStringLiteral("请选择本机 YAML/JSON 文件。");emit changed();return;}
     QFile input(file.toLocalFile());
     if(!input.open(QIODevice::ReadOnly) || input.size()>NodeImporter::MaximumBytes){m_message=QStringLiteral("导入文件无法读取或超过 4 MiB。");emit changed();return;}
-    m_busy=true;m_source.clear();m_message=QStringLiteral("正在导入本机配置…");emit changed();parse(input.read(NodeImporter::MaximumBytes+1));
+    m_busy=true;m_source.clear();m_nodesOnly=nodesOnly;m_message=QStringLiteral("正在导入本机配置…");emit changed();parse(input.read(NodeImporter::MaximumBytes+1));
 }
 void NodeImportService::importUrl(const QUrl &url) {
+    startUrl(url,false);
+}
+void NodeImportService::importNodesOnlyUrl(const QUrl &url) {
+    startUrl(url,true);
+}
+void NodeImportService::startUrl(const QUrl &url,bool nodesOnly) {
     if(m_busy)return;
     if(!NodeStore::allowedSubscriptionUrl(url)){m_message=QStringLiteral("请使用 HTTPS 地址；只有本机测试地址允许 HTTP。");emit changed();return;}
-    m_busy=true;m_source.clear();m_formatHint="auto";m_message=QStringLiteral("正在安全下载节点配置…");emit changed();m_deadline.start();download(url);
+    m_busy=true;m_source.clear();m_nodesOnly=nodesOnly;m_formatHint="auto";m_message=QStringLiteral("正在安全下载节点配置…");emit changed();m_deadline.start();download(url);
 }
-bool NodeImportService::saveSubscription(const QString &id,const QString &name,const QUrl &url,int interval,bool enabled,const QString &formatHint) {
+bool NodeImportService::saveSubscription(const QString &id,const QString &name,const QUrl &url,int interval,bool enabled,const QString &formatHint,const QString &importScope) {
     if(m_busy)return false;
-    const bool ok=m_store->saveSubscription(id,name,url,interval,enabled,formatHint);
+    const bool ok=m_store->saveSubscription(id,name,url,interval,enabled,formatHint,importScope);
     m_message=ok?QStringLiteral("订阅已加密保存；自动更新设置已生效。"):m_store->error();
     if(ok && !id.isEmpty())m_errors.remove(id);
     emit changed();return ok;
@@ -87,7 +108,7 @@ void NodeImportService::next() {
     while(!m_queue.isEmpty()) {
         const auto id=m_queue.dequeue();
         for(const auto &s:m_store->subscriptions())if(s.id==id){
-            m_source=id;m_formatHint=s.formatHint;m_busy=true;m_attempts.insert(id,m_clock());m_message=QStringLiteral("正在更新订阅（地址已隐藏）…");emit changed();
+            m_source=id;m_formatHint=s.formatHint;m_nodesOnly=s.importScope=="nodes-only";m_busy=true;m_attempts.insert(id,m_clock());m_message=QStringLiteral("正在更新订阅（地址已隐藏）…");emit changed();
             m_deadline.start();download(s.url);return;
         }
     }
@@ -118,6 +139,7 @@ void NodeImportService::download(const QUrl &url,int redirects) {
             if(url.scheme()=="https" && nextUrl.scheme()!="https"){finish(QStringLiteral("已拒绝从 HTTPS 降级的重定向。"));return;}
             download(nextUrl,redirects+1);return;
         }
+        if(error==QNetworkReply::ProtocolInvalidOperationError){finish(QStringLiteral("订阅下载失败（HTTP %1；Qt 协议操作无效，错误码 302，并非 HTTP 重定向）；旧节点保持不变。").arg(code));return;}
         if(error!=QNetworkReply::NoError){finish(QStringLiteral("订阅下载失败（HTTP %1，网络错误 %2）；请检查认证、TLS 或网络出口。旧节点保持不变。").arg(code).arg(int(error)));return;}
         if(code!=200){finish(QStringLiteral("订阅服务器返回 HTTP %1；旧节点保持不变。").arg(code));return;}
         m_deadline.stop();parse(*bytes);
@@ -128,11 +150,18 @@ void NodeImportService::parse(QByteArray bytes) {
     QThreadPool::globalInstance()->start([guard,bytes=std::move(bytes)]() mutable {
         auto result=NodeImporter::parse(bytes);bytes.fill('\0');
         QMetaObject::invokeMethod(QCoreApplication::instance(),[guard,result=std::move(result)]() mutable {
-            if(!guard)return;
+            if(!guard || guard->m_shuttingDown)return;
             if(!result){guard->finish(result.error);return;}
+            if(guard->m_nodesOnly && !guard->m_apply){guard->finish(QStringLiteral("节点专用导入无法校验当前网络配置；旧节点保持不变。"));return;}
             const auto count=result.nodes.size();
-            if(!guard->m_store->importNodes(std::move(result.nodes),guard->m_source)){guard->finish(guard->m_store->error());return;}
+            if(guard->m_apply || !result.configuration.isEmpty()) {
+                QString error;
+                if(!guard->m_apply || !guard->m_apply(result,guard->m_source,guard->m_nodesOnly,&error)) {
+                    guard->finish(error.isEmpty()?QStringLiteral("导入包含全局配置，但当前入口不能验证其语义；旧配置保持不变。"):error);return;
+                }
+            } else if(!guard->m_store->importNodes(std::move(result.nodes),guard->m_source)){guard->finish(guard->m_store->error());return;}
             guard->m_message=QStringLiteral("%1 · 已解析并保存 %2 个节点；实际联网需检测。").arg(result.format).arg(count);
+            if(guard->m_nodesOnly && !result.configuration.isEmpty())guard->m_message+=QStringLiteral(" 本次仅更新节点；已保存的规则与 DNS 保持不变。");
             if(result.incompleteNodes)guard->m_message+=QStringLiteral(" %1 个节点含未映射选项，原始差异已加密保留，拒绝静默执行。").arg(result.incompleteNodes);
             emit guard->nodesApplied();guard->finish();
         },Qt::QueuedConnection);

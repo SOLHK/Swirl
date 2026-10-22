@@ -1,0 +1,40 @@
+{
+  "status": "AXIS_READBACK_DIAGNOSIS_NOT_MAPPING_ACCEPTANCE",
+  "source_sha256": "7ea432196657d83d2675521224be420f9aeb0d7e9def7da6cb2b4c364d8e0983",
+  "faces": 32,
+  "physical_faces_verified": 32,
+  "original_requests": 384,
+  "original_strict_passed": 288,
+  "original_strict_failed": 96,
+  "predeclared_replay_requests": 96,
+  "replay_strict_passed": 96,
+  "replay_echo_exact": 96,
+  "original_errors_match_predeclared_TT": 96,
+  "failure_fraction_counts": {
+    "1": 96
+  },
+  "by_axis": {
+    "WDTH": {
+      "requests": 128,
+      "strict_failed": 32,
+      "maximum_absolute_readback_error": 3.2211000004167545e-05
+    },
+    "wght": {
+      "requests": 128,
+      "strict_failed": 32,
+      "maximum_absolute_readback_error": 9.450000001720582e-05
+    },
+    "HGHT": {
+      "requests": 128,
+      "strict_failed": 32,
+      "maximum_absolute_readback_error": 3.2211000004167545e-05
+    }
+  },
+  "mapping_accepted": false,
+  "glyph_equivalence_tested": false,
+  "font_generated": false,
+  "os_version": "Version 26.3 (Build 25D125)",
+  "source_unchanged": true,
+  "diagnostic_sha256": "28e70b905118d03882b877d364a9d995f272f0d895885c81b12130f46fc57b88",
+  "harness_sha256": "4a708e294f630475313201555baa19a2fa658c6b72f91de33d04e753211dab33"
+}

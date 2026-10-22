@@ -1,0 +1,71 @@
+name: Swirl VF tangent-rule development
+
+on:
+  push:
+    branches: [work/core-completion-20261017]
+    paths:
+      - '.github/workflows/swirl-vf-tangents.yml'
+      - 'tools/swirl_vf/platform/probe_tangent_rules.py'
+      - 'tools/swirl_vf/platform/probe_hierarchy_rules.py'
+      - 'tools/swirl_vf/tests/test_hierarchy_probe.py'
+      - 'tools/swirl_vf/tools/tangent_geometry.py'
+      - 'tools/swirl_vf/tools/hvf.py'
+      - 'tools/swirl_vf/tools/batch_geometry.py'
+      - 'tools/swirl_vf/platform/verify_tangent_projection.py'
+      - 'tools/swirl_vf/tests/test_tangent_geometry.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: swirl-vf-tangents-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-tangent-diagnosis:
+    runs-on: xcode-27
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run native tangent experiments with self-authored geometry only
+        id: native
+        run: |
+          set -euo pipefail
+          mkdir -p build/tangent-evidence
+          git rev-parse HEAD
+          sw_vers
+          xcodebuild -version
+          python -m pip install fonttools==4.61.1 numpy==2.2.6
+          python -m unittest discover -s tools/swirl_vf/tests -p test_hierarchy_probe.py -v
+          python -m unittest discover -s tools/swirl_vf/tests -p test_tangent_geometry.py -v
+          python -m unittest discover -s tools/swirl_vf/tests -p test_batch_geometry.py -v
+          python -m unittest discover -s tools/swirl_vf/tests -p test_hvf.py -v
+          xcrun clang -std=c11 -O2 -Wall -Wextra -Werror -mmacosx-version-min=15.4 tools/swirl_vf/platform/hvf_oracle.c -lhvf -o build/hvf_oracle
+          python tools/swirl_vf/platform/probe_tangent_rules.py --binary build/hvf_oracle --output build/tangent-evidence/synthetic.json
+      - name: Compare native rotations and nested translations without relaxing the budget
+        run: |
+          set -euo pipefail
+          python tools/swirl_vf/platform/probe_hierarchy_rules.py --binary build/hvf_oracle --output build/tangent-evidence/hierarchy.json --require-pass
+      - name: Verify all previous cases plus 54 unseen boundary cases
+        if: ${{ always() && steps.native.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          python tools/swirl_vf/platform/verify_tangent_projection.py --native-binary build/hvf_oracle --output build/tangent-evidence/projection-independent.json
+      - name: Recheck identical original source without publishing any outlines
+        if: ${{ always() && steps.native.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          python tools/swirl_vf/platform/verify_tangent_projection.py --native-binary build/hvf_oracle --source /System/Library/PrivateFrameworks/FontServices.framework/Versions/A/Resources/Reserved/PingFangUI.ttc --output build/tangent-evidence/source-projection.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: swirl-vf-tangent-diagnostic-${{ github.sha }}
+          path: build/tangent-evidence/*.json
+          retention-days: 7

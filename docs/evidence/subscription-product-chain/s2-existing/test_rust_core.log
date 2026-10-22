@@ -1,0 +1,32 @@
+SOURCE 593e7cddc360cf7f51d9fdc988e6cf8fd99aea96
+COMMAND ["/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3", "/workspace/scratch/ca6cd1f88f6f/Swirl/tools/tests/test_rust_core.py", "-v"]
+
+test_auth_headers_not_forwarded_and_bad_framing_rejected (__main__.RustCoreIntegration.test_auth_headers_not_forwarded_and_bad_framing_rejected) ... ok
+test_concurrent_large_transfer_and_invalid_update (__main__.RustCoreIntegration.test_concurrent_large_transfer_and_invalid_update) ... ok
+test_custom_dns_cache_expiry_and_zero_ttl (__main__.RustCoreIntegration.test_custom_dns_cache_expiry_and_zero_ttl) ... ok
+test_custom_dns_cname_tcp_retry_and_declared_server_failover (__main__.RustCoreIntegration.test_custom_dns_cname_tcp_retry_and_declared_server_failover) ... ok
+test_custom_dns_errors_never_fall_back_to_system (__main__.RustCoreIntegration.test_custom_dns_errors_never_fall_back_to_system) ... ok
+test_custom_dns_ipv6_server_and_tcp_retry (__main__.RustCoreIntegration.test_custom_dns_ipv6_server_and_tcp_retry) ... ok
+test_custom_dns_udp_target_and_nxdomain_is_terminal (__main__.RustCoreIntegration.test_custom_dns_udp_target_and_nxdomain_is_terminal) ... ok
+test_hosts_update_preserves_old_stream_and_new_target (__main__.RustCoreIntegration.test_hosts_update_preserves_old_stream_and_new_target) ... ok
+test_https_sse_and_wss_application_passthrough (__main__.RustCoreIntegration.test_https_sse_and_wss_application_passthrough) ... ok
+test_independent_socks_and_http_upstream_auth (__main__.RustCoreIntegration.test_independent_socks_and_http_upstream_auth) ... ok
+test_local_hosts_follow_proxy_toggle_and_preserve_tls_name (__main__.RustCoreIntegration.test_local_hosts_follow_proxy_toggle_and_preserve_tls_name) ... ok
+test_manual_selector_api_preserves_stream_and_never_falls_back (__main__.RustCoreIntegration.test_manual_selector_api_preserves_stream_and_never_falls_back) ... ok
+test_plain_http_proxy_and_websocket_upgrade (__main__.RustCoreIntegration.test_plain_http_proxy_and_websocket_upgrade) ... ok
+test_public_https_accounting_rejects_real_reset_after_http_success (__main__.RustCoreIntegration.test_public_https_accounting_rejects_real_reset_after_http_success) ... ok
+test_public_https_close_and_active_snapshot_share_the_deadline (__main__.RustCoreIntegration.test_public_https_close_and_active_snapshot_share_the_deadline) ... ok
+test_public_https_missing_close_notify_is_not_success (__main__.RustCoreIntegration.test_public_https_missing_close_notify_is_not_success) ... ok
+test_public_https_missing_connection_record_is_not_success (__main__.RustCoreIntegration.test_public_https_missing_connection_record_is_not_success) ... ok
+test_public_https_orderly_close_finishes_without_native_relay_errors (__main__.RustCoreIntegration.test_public_https_orderly_close_finishes_without_native_relay_errors) ... ok
+test_resolving_rules_send_the_matched_ip_to_upstream (__main__.RustCoreIntegration.test_resolving_rules_send_the_matched_ip_to_upstream) ... ok
+test_tls_http_socks_and_trojan_with_validated_certificate (__main__.RustCoreIntegration.test_tls_http_socks_and_trojan_with_validated_certificate) ... ok
+test_untrusted_or_wrong_name_tls_fails_closed (__main__.RustCoreIntegration.test_untrusted_or_wrong_name_tls_fails_closed) ... ok
+test_vless_qt_data_path (__main__.RustCoreIntegration.test_vless_qt_data_path) ... skipped 'Qt executable required'
+test_vless_tcp_tls_addresses_and_invalid_responses (__main__.RustCoreIntegration.test_vless_tcp_tls_addresses_and_invalid_responses) ... ok
+test_vless_uuid_and_tls_fail_closed (__main__.RustCoreIntegration.test_vless_uuid_and_tls_fail_closed) ... ok
+
+----------------------------------------------------------------------
+Ran 24 tests in 26.058s
+
+OK (skipped=1)

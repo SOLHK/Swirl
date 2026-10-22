@@ -1,0 +1,10 @@
+{
+  "source_sha": "19afd34fca898615d89796cb8d158b4be17ff2e9",
+  "branch": "work/core-completion-20261017",
+  "cmake_home": "D:/Codex/work/Swirl/src/Swirl.Quick",
+  "rust_core_enabled": "ON",
+  "application_path": "D:\\Codex\\work\\build-rust-qt\\Swirl.exe",
+  "application_sha256": "6fbcb527ba85f3a9355bf9b5a5d418cb1de556e811085470ff5e335ad49277c9",
+  "application_bytes": 58017211,
+  "tracked_changes": null
+}

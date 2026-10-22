@@ -1,0 +1,41 @@
+{
+  "source_sha": "292df3ba9763414947ec9b5dffa7886c45a00879",
+  "platform": "linux",
+  "binaries": {
+    "SWIRL_RUST_HARNESS": {
+      "filename": "swirl-api",
+      "available": true,
+      "sha256": "8730c60b40d00d7030635641bf4d623e0f537fa735d2f6348c61b43f64d91d6b"
+    },
+    "SWIRL_RUST_INSPECTOR": {
+      "filename": "swirl-inspect",
+      "available": true,
+      "sha256": "56a812c2362d7495c82d7d7af2a8bb03b4e1a163b7b03365894dcf843ae24c64"
+    }
+  },
+  "tracked_worktree_changes": [
+    " M .github/workflows/core-development.yml",
+    " M .github/workflows/rust-core.yml",
+    " M docs/CONTINUE_DEVELOPMENT.md",
+    " M docs/CORE_SUBSCRIPTION_PRODUCT_CHAIN_20261019.md",
+    " M docs/SELF_DEVELOPMENT_PROGRESS.md",
+    " M src/Swirl.Quick/engine/EngineController.cpp",
+    " M src/Swirl.Quick/engine/EngineController.h",
+    " M src/Swirl.Quick/engine/NodeStore.cpp",
+    " M src/Swirl.Quick/engine/RustCoreEngine.cpp",
+    " M src/Swirl.Quick/tests/RustCoreTests.cpp",
+    " M tools/ApplyCoreDevelopment.py",
+    " M tools/tests/test_core_development.py"
+  ],
+  "tests": 9,
+  "failures": 0,
+  "errors": 0,
+  "skipped": [
+    {
+      "test": "test_actual_product_import_persist_select_route_and_recreate (__main__.ProductQtIntegration.test_actual_product_import_persist_select_route_and_recreate)",
+      "reason": "Windows Qt/DPAPI integration executable required"
+    }
+  ],
+  "success": true,
+  "scope": "Rust test-host JSON persistence; only ProductQtIntegration uses product Qt/DPAPI"
+}

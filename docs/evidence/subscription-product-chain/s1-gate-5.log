@@ -1,0 +1,8 @@
+   Compiling swirl-subscription v0.1.0 (/workspace/scratch/ca6cd1f88f6f/Swirl/core/crates/swirl-subscription)
+   Compiling swirl-transport v0.1.0 (/workspace/scratch/ca6cd1f88f6f/Swirl/core/crates/swirl-transport)
+   Compiling swirl-routing v0.1.0 (/workspace/scratch/ca6cd1f88f6f/Swirl/core/crates/swirl-routing)
+   Compiling swirl-dns v0.1.0 (/workspace/scratch/ca6cd1f88f6f/Swirl/core/crates/swirl-dns)
+   Compiling swirl-protocol v0.1.0 (/workspace/scratch/ca6cd1f88f6f/Swirl/core/crates/swirl-protocol)
+   Compiling swirl-core v0.1.0 (/workspace/scratch/ca6cd1f88f6f/Swirl/core/crates/swirl-core)
+   Compiling swirl-api v0.1.0 (/workspace/scratch/ca6cd1f88f6f/Swirl/core/crates/swirl-api)
+    Finished `release` profile [optimized] target(s) in 27.73s

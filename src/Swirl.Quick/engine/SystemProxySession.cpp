@@ -1,6 +1,6 @@
 #include "SystemProxySession.h"
 #include <QCoreApplication>
-#include <QStandardPaths>
+#include "../app/StoragePaths.h"
 #include <QDir>
 #include <QFile>
 #include <QSaveFile>
@@ -136,7 +136,7 @@ bool matchesSettings(QJsonObject current,const QJsonObject &expected) {
     return current==expected;
 }
 }
-QString SystemProxySession::journalPath() { return QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/system-proxy.dpapi"; }
+QString SystemProxySession::journalPath() { return SwirlPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/system-proxy.dpapi"; }
 SystemProxySession::SystemProxySession(QObject *parent, QString journal):QObject(parent),m_journal(journal.isEmpty()?journalPath():journal) {
     recover(m_journal,&m_error);refresh();m_poll.setInterval(500);
     connect(&m_poll,&QTimer::timeout,this,&SystemProxySession::refresh);m_poll.start();

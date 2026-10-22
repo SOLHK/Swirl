@@ -1,16 +1,29 @@
 //! Swirl-owned HTTP/SOCKS state machines. Underlying Tokio is generic socket I/O.
 use base64::{Engine, engine::general_purpose::STANDARD};
+mod diagnostics;
+mod dial;
+mod probe;
 mod shadowsocks;
+mod socks4;
+mod socks5;
+pub mod vision;
 mod vless;
+mod websocket;
+pub use diagnostics::{TcpAttempt, TcpDiagnostic, TcpOutcome, failure_stage};
+pub use dial::{connect_direct_resolved, diagnose_tcp};
+use dial::{connect_tcp, within};
+pub use probe::{UrlTestFailure, UrlTestMetrics, UrlTestStage, health_probe, url_test_head};
 pub use shadowsocks::{
     decrypt_datagram as ss_decrypt_datagram, encrypt_datagram as ss_encrypt_datagram,
 };
+pub use socks5::UdpAssociation as Socks5UdpAssociation;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use swirl_dns::Resolver;
 use swirl_subscription::{Credentials, Outbound, valid_host};
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
+    time::Instant,
 };
 
 pub type Result<T> = std::result::Result<T, &'static str>;
@@ -111,6 +124,7 @@ pub async fn read_target<R: AsyncRead + Unpin>(stream: &mut R, allow_zero: bool)
 
 #[derive(Clone, Copy)]
 pub enum InboundKind {
+    Socks4,
     Socks5,
     HttpConnect,
     HttpForward,
@@ -145,6 +159,9 @@ async fn http_header(stream: &mut TcpStream, mut data: Vec<u8>) -> Result<(Vec<u
 
 pub async fn accept(stream: &mut TcpStream, auth: &Option<Credentials>) -> Result<Inbound> {
     let first = stream.read_u8().await.map_err(|_| "InboundClosed")?;
+    if first == 4 {
+        return socks4::accept(stream, auth).await;
+    }
     if first == 5 {
         return accept_socks(stream, auth).await;
     }
@@ -382,6 +399,7 @@ async fn accept_http(
 }
 pub async fn reply(stream: &mut TcpStream, kind: InboundKind, ok: bool) -> Result<()> {
     let bytes = match kind {
+        InboundKind::Socks4 => vec![0, if ok { 90 } else { 91 }, 0, 0, 0, 0, 0, 0],
         InboundKind::Socks5 => {
             if ok {
                 vec![5, 0, 0, 1, 0, 0, 0, 0, 0, 0]
@@ -395,30 +413,127 @@ pub async fn reply(stream: &mut TcpStream, kind: InboundKind, ok: bool) -> Resul
     };
     stream.write_all(&bytes).await.map_err(|_| "InboundReply")
 }
-pub async fn connect_tcp(resolver: &Resolver, target: &Target) -> Result<TcpStream> {
-    for address in resolver.resolve(&target.host, target.port).await? {
-        if let Ok(stream) = TcpStream::connect(address).await {
-            stream.set_nodelay(true).map_err(|_| "SocketOptions")?;
-            return Ok(stream);
-        }
-    }
-    Err("UpstreamConnectFailed")
-}
 pub async fn connect(
     outbound: &Outbound,
     target: &Target,
     resolver: &Resolver,
     handshake_limit: std::time::Duration,
 ) -> Result<swirl_transport::BoxStream> {
+    // DNS, all address attempts, TLS and protocol negotiation share this one
+    // budget. A successful TCP connection ends address fallback permanently.
+    let deadline = Instant::now() + handshake_limit;
+    if let Outbound::Vless {
+        host,
+        port,
+        uuid,
+        reality: Some(reality),
+        tls,
+        websocket,
+        flow,
+        ..
+    } = outbound
+    {
+        // Validate before any socket or DNS operation even for direct callers
+        // of this API. There is no ordinary TLS/TCP or DIRECT failure branch.
+        reality.validate()?;
+        if tls.is_some() || websocket.is_some() {
+            return Err("RealityTransportConflict");
+        }
+        let flow = flow.as_deref().unwrap_or("");
+        if !flow.is_empty() && flow != "xtls-rprx-vision" {
+            return Err("VlessFlowUnsupported");
+        }
+        let (key, short_id) = reality.key_material()?;
+        let parameters = swirl_transport::reality::ClientParameters::new(
+            &reality.server_name,
+            key,
+            &short_id,
+            [0, 1, 0],
+        )?
+        .with_fingerprint(&reality.fingerprint)?;
+        let tcp = connect_tcp(
+            resolver,
+            &Target {
+                host: host.clone(),
+                port: *port,
+            },
+            deadline,
+        )
+        .await?;
+        let unix_time = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .ok()
+            .and_then(|value| u32::try_from(value.as_secs()).ok())
+            .ok_or("RealityClock")?;
+        let alpn: Vec<Vec<u8>> = reality
+            .alpn
+            .iter()
+            .map(|value| value.as_bytes().to_vec())
+            .collect();
+        let stream = within(deadline, "RealityHandshakeTimeout", async {
+            swirl_transport::reality::connect(tcp, &parameters, unix_time, &alpn)
+                .await
+                .map_err(|_| "RealityAuthenticationOrHandshake")
+        })
+        .await?;
+        if flow == "xtls-rprx-vision" {
+            // Keep the concrete authenticated owner until the Vision adapter
+            // installs its directional raw handoff. The wire request retains
+            // the declared flow; no ordinary VLESS request is sent first.
+            let stream = within(
+                deadline,
+                "UpstreamProtocolTimeout",
+                vision::client_over_reality(stream, uuid, target, handshake_limit),
+            )
+            .await?;
+            return Ok(Box::new(stream));
+        }
+        return within(
+            deadline,
+            "UpstreamProtocolTimeout",
+            handshake(
+                outbound,
+                target,
+                Box::new(stream),
+                None,
+                *port,
+                handshake_limit,
+            ),
+        )
+        .await;
+    }
+    if matches!(outbound, Outbound::Vless { flow: Some(flow), .. } if !flow.is_empty()) {
+        return Err("VlessFlowUnsupported");
+    }
     let (host, port, auth, tls) = match outbound {
-        Outbound::Direct {} => return Ok(Box::new(connect_tcp(resolver, target).await?)),
+        Outbound::Direct {} => {
+            return Ok(Box::new(connect_tcp(resolver, target, deadline).await?));
+        }
         Outbound::Reject {} => return Err("RouteRejected"),
+        Outbound::Socks4 {
+            host,
+            port,
+            user_id,
+            remote_dns,
+        } => {
+            return socks4::connect(
+                host,
+                *port,
+                user_id,
+                *remote_dns,
+                target,
+                resolver,
+                deadline,
+            )
+            .await;
+        }
         Outbound::Shadowsocks { host, port, .. } => (host, *port, None, None),
         Outbound::Socks5 {
             host,
             port,
             auth,
             tls,
+            ..
         }
         | Outbound::HttpConnect {
             host,
@@ -439,13 +554,60 @@ pub async fn connect(
             host: host.clone(),
             port,
         },
+        deadline,
     )
     .await?;
     let mut stream: swirl_transport::BoxStream = if let Some(tls) = tls {
-        swirl_transport::secure(tcp, tls).await?
+        within(
+            deadline,
+            "UpstreamTlsTimeout",
+            swirl_transport::secure(tcp, tls),
+        )
+        .await?
     } else {
         Box::new(tcp)
     };
+    let ws = match outbound {
+        Outbound::Vless { websocket, .. } | Outbound::Trojan { websocket, .. } => {
+            websocket.as_ref()
+        }
+        _ => None,
+    };
+    if let Some(ws) = ws {
+        stream = within(
+            deadline,
+            "WebSocketUpgradeTimeout",
+            websocket::connect(stream, ws),
+        )
+        .await?;
+    }
+    let timeout_code = if matches!(
+        outbound,
+        Outbound::Shadowsocks {
+            obfs_http: Some(_),
+            ..
+        }
+    ) {
+        "ShadowsocksObfsWriteTimeout"
+    } else {
+        "UpstreamProtocolTimeout"
+    };
+    within(
+        deadline,
+        timeout_code,
+        handshake(outbound, target, stream, auth, port, handshake_limit),
+    )
+    .await
+}
+
+async fn handshake(
+    outbound: &Outbound,
+    target: &Target,
+    mut stream: swirl_transport::BoxStream,
+    auth: Option<&Credentials>,
+    port: u16,
+    handshake_limit: std::time::Duration,
+) -> Result<swirl_transport::BoxStream> {
     if let Outbound::Shadowsocks {
         password,
         cipher,
@@ -453,6 +615,11 @@ pub async fn connect(
         ..
     } = outbound
     {
+        let write_error = if obfs_http.is_some() {
+            "ShadowsocksObfsWrite"
+        } else {
+            "ShadowsocksHandshakeWrite"
+        };
         let mut encrypted = shadowsocks::Stream::new(
             stream,
             password,
@@ -466,11 +633,8 @@ pub async fn connect(
         encrypted
             .write_all(&address)
             .await
-            .map_err(|_| "ShadowsocksHandshakeWrite")?;
-        encrypted
-            .flush()
-            .await
-            .map_err(|_| "ShadowsocksHandshakeWrite")?;
+            .map_err(|_| write_error)?;
+        encrypted.flush().await.map_err(|_| write_error)?;
         return Ok(Box::new(encrypted));
     }
     if let Outbound::Trojan { password, .. } = outbound {
@@ -497,54 +661,8 @@ pub async fn connect(
         return Ok(Box::new(vless::Stream::new(stream, handshake_limit)));
     }
     if matches!(outbound, Outbound::Socks5 { .. }) {
-        let method = if auth.is_some() { 2 } else { 0 };
-        stream
-            .write_all(&[5, 1, method])
-            .await
-            .map_err(|_| "SocksUpstreamWrite")?;
-        stream.flush().await.map_err(|_| "SocksUpstreamWrite")?;
-        let mut response = [0; 2];
-        stream
-            .read_exact(&mut response)
-            .await
-            .map_err(|_| "SocksUpstreamRead")?;
-        if response != [5, method] {
-            return Err("UpstreamAuthentication");
-        }
-        if let Some(auth) = auth {
-            let mut request = vec![1, auth.username.len() as u8];
-            request.extend(auth.username.as_bytes());
-            request.push(auth.password.len() as u8);
-            request.extend(auth.password.as_bytes());
-            stream
-                .write_all(&request)
-                .await
-                .map_err(|_| "SocksUpstreamWrite")?;
-            stream.flush().await.map_err(|_| "SocksUpstreamWrite")?;
-            stream
-                .read_exact(&mut response)
-                .await
-                .map_err(|_| "SocksUpstreamRead")?;
-            if response != [1, 0] {
-                return Err("UpstreamAuthentication");
-            }
-        }
-        let mut request = vec![5, 1, 0];
-        target.encode(&mut request)?;
-        stream
-            .write_all(&request)
-            .await
-            .map_err(|_| "SocksUpstreamWrite")?;
-        stream.flush().await.map_err(|_| "SocksUpstreamWrite")?;
-        let mut header = [0; 3];
-        stream
-            .read_exact(&mut header)
-            .await
-            .map_err(|_| "SocksUpstreamRead")?;
-        if header != [5, 0, 0] {
-            return Err("UpstreamRejected");
-        }
-        read_target(&mut stream, true).await?;
+        socks5::authenticate(&mut stream, auth).await?;
+        socks5::request(&mut stream, 1, target, true).await?;
     } else {
         let mut request = format!(
             "CONNECT {} HTTP/1.1\r\nHost: {}\r\n",
@@ -583,4 +701,85 @@ pub async fn connect(
         }
     }
     Ok(stream)
+}
+
+#[cfg(test)]
+mod connect_tests {
+    use super::*;
+    use std::time::Duration;
+
+    fn ss(obfs: bool) -> Outbound {
+        Outbound::Shadowsocks {
+            host: "fixture.invalid".into(),
+            port: 443,
+            password: "local-synthetic-only".into(),
+            cipher: "aes-128-gcm".into(),
+            udp: false,
+            obfs_http: obfs.then(|| swirl_subscription::ObfsHttp {
+                host: "obfs.invalid".into(),
+            }),
+        }
+    }
+
+    #[tokio::test]
+    async fn shadowsocks_initial_write_reports_plain_and_obfs_failures_separately() {
+        let target = Target {
+            host: "target.invalid".into(),
+            port: 443,
+        };
+        for (obfs, expected) in [
+            (false, "ShadowsocksHandshakeWrite"),
+            (true, "ShadowsocksObfsWrite"),
+        ] {
+            let (stream, peer) = tokio::io::duplex(256);
+            drop(peer);
+            let error = handshake(
+                &ss(obfs),
+                &target,
+                Box::new(stream),
+                None,
+                443,
+                Duration::from_secs(1),
+            )
+            .await
+            .err()
+            .unwrap();
+            assert_eq!(error, expected);
+            assert_eq!(
+                failure_stage(error),
+                if obfs {
+                    "http_obfs"
+                } else {
+                    "protocol_handshake"
+                }
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn shadowsocks_obfs_does_not_wait_for_application_response_during_connect() {
+        let (stream, mut peer) = tokio::io::duplex(4096);
+        let target = Target {
+            host: "target.invalid".into(),
+            port: 443,
+        };
+        let connected = tokio::time::timeout(
+            Duration::from_millis(100),
+            handshake(
+                &ss(true),
+                &target,
+                Box::new(stream),
+                None,
+                443,
+                Duration::from_secs(1),
+            ),
+        )
+        .await
+        .expect("connection establishment must not await a lazy response")
+        .unwrap();
+        let mut prefix = [0; 4];
+        peer.read_exact(&mut prefix).await.unwrap();
+        assert_eq!(&prefix, b"GET ");
+        drop(connected);
+    }
 }

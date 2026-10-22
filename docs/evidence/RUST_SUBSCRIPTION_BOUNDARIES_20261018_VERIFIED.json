@@ -1,0 +1,265 @@
+{
+  "schema": 1,
+  "stage": "subscription dialect and document-target boundaries",
+  "product_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+  "base_commit": "ed2f87fb56f704b365a392b691bd138995273867",
+  "branch": "work/core-completion-20261017",
+  "recorded_utc": "2026-10-18T08:14:46.326119+00:00",
+  "supplier_refresh_requests": 0,
+  "new_provider_node_attempts": 0,
+  "real_node_sampling_status": "paused pending scope confirmation relayed by parent",
+  "tests": {
+    "native_qt": {
+      "passed": 37,
+      "failed": 0,
+      "skipped": 5,
+      "external_hooks_verified_by_separate_peers": true
+    },
+    "native_import_boundary": {
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0
+    },
+    "ctest": {
+      "passed": 2,
+      "failed": 0,
+      "seconds": 9.31
+    },
+    "compatibility_import": {
+      "passed": 13,
+      "failed": 0,
+      "skipped": 0
+    },
+    "independent_qt_peers": {
+      "ss_loon_ss": "passed",
+      "vless": "passed",
+      "socks4_4a": "passed",
+      "vless_websocket": "passed"
+    },
+    "development_helper": {
+      "passed": 18,
+      "failed": 0,
+      "skipped": 1,
+      "reason": "existing Windows symlink privilege absence"
+    },
+    "application_build": "passed",
+    "appearance": "not rerun; prior ed2f87f evidence only"
+  },
+  "confirmed_red_regression": {
+    "test": "fullDocumentCannotUseExternalSelectedNodeAlias",
+    "failed_before_fix": 1,
+    "passed_after_fix": true,
+    "log": "normalizer-policy-red.log"
+  },
+  "source_files": {
+    ".github/workflows/rust-core.yml": {
+      "raw_sha256": "def7cb685a3ad1abfc4be18d4c6ae242b798ef27b5e2423960c4be5e57148228",
+      "lf_sha256": "05ac7cee7f7abf3c31faca2b24811af5b6f67daa7cf116cc412cb17a8b822653"
+    },
+    "src/Swirl.Quick/CMakeLists.txt": {
+      "raw_sha256": "495ef30475dda3f9288556bd177b3a36bfd367ac5e79142c0ca816a127415ec4",
+      "lf_sha256": "7125703c11168255c1c6201b3f95b45a90a32c4dfb1d473368e660432ba8494a"
+    },
+    "src/Swirl.Quick/engine/EngineController.cpp": {
+      "raw_sha256": "f0cc70073f4828884136de1e41b3c4b1a0a087af7efe70f3b2dbf6a172e207ef",
+      "lf_sha256": "36c19c2dea746d00fce9e7a87975665b102676d3c5ed30066bb1d6257581dd33"
+    },
+    "src/Swirl.Quick/engine/NodeImporter.cpp": {
+      "raw_sha256": "f64597eb70f9233b56c2dc42142ec39f1a362cdce06fe187b67d6f55e437b6c3",
+      "lf_sha256": "6a3830f216d4113fd61e7a42d979633f88fb5f652d55a591e8965958b4f4d5b8"
+    },
+    "src/Swirl.Quick/engine/NodeImporter.h": {
+      "raw_sha256": "61de8e45b28ebef960bbdd70838f14021fcbf5736fe0bc63e77ca6831446367e",
+      "lf_sha256": "ac87ea9b4faddd5d7d6cfd5f0b2780fe0e090876410ef3e0ac2789d5cb86ce6b"
+    },
+    "src/Swirl.Quick/engine/SubscriptionNormalizer.cpp": {
+      "raw_sha256": "bc418d47a241ab3cddc89e75383655e811cbf073cbae02e579a60821150e8108",
+      "lf_sha256": "186e5dd0f4f1ad8a1fadb80a82f3d5a9d84637bfa2c1d7f59102c1514001678f"
+    },
+    "src/Swirl.Quick/engine/SubscriptionNormalizer.h": {
+      "raw_sha256": "92dc4e298dc50aa8384c5674366e0d83865089714b6df79a5fcebbd4bce4bff7",
+      "lf_sha256": "89bcbcecfcef201daaedc24fee9aadc8d7d45c891643d9b0602224eb8703b323"
+    },
+    "src/Swirl.Quick/tests/ImportTests.cpp": {
+      "raw_sha256": "d23ce741424ba38d1a304d4e9e8ed8794440ea78c46eaf383994eacae92d8436",
+      "lf_sha256": "fa823765f0d46a27f7860d456e22f40298d214896bf832044866b061e3804f7c"
+    },
+    "src/Swirl.Quick/tests/RustCoreTests.cpp": {
+      "raw_sha256": "78508e617915bae5206d03657509b687f2cead34fedd2f52eb588ba16bb20fc8",
+      "lf_sha256": "36974524437c93d5ccb4f3ed96c595d9517b908a1e768bf073e5c553fc40dcfe"
+    }
+  },
+  "logs": {
+    "normalizer-policy-red.log": {
+      "bytes": 648,
+      "sha256": "8582a649a0e3305da09c9fe4937883434fc8805f14b584152595eacd80f3fb0d"
+    },
+    "normalizer-acceptance-build.log": {
+      "bytes": 19907,
+      "sha256": "c87cb0009f4dabb008f6ab177867bfe985be9767918b7b442d0305152dfc6e9c"
+    },
+    "normalizer-acceptance-ctest.log": {
+      "bytes": 333,
+      "sha256": "470752c42484622643df9b19952b67bfad014b2d2a81bbfa972a0026efa0e7bd"
+    },
+    "normalizer-acceptance-detail.log": {
+      "bytes": 1509,
+      "sha256": "7d56a7bb602e128c27ea7730bb82cd81888bcad7365c59e81c7846ba9a1fddce"
+    },
+    "normalizer-acceptance-native-logged.log": {
+      "bytes": 4177,
+      "sha256": "224ad470e8dec814863a015ef00f7627bc2151ec0ddeadb57e7301c9008cdb15"
+    },
+    "normalizer-acceptance-import-logged.log": {
+      "bytes": 600,
+      "sha256": "1e177847c88bf69ee397b39ddf7882622ce2788cc4917d792bb005ff435c550e"
+    },
+    "normalizer-acceptance-compat-build.log": {
+      "bytes": 2618,
+      "sha256": "83444fa96171ec0f912b745f6b0b14c8937a237a94120f80678ac2177f4eadec"
+    },
+    "normalizer-acceptance-compat.log": {
+      "bytes": 1107,
+      "sha256": "915ee9e3f7d8efddf00c58897bdb81d375d216ed0d5e78dc17c5db5fe33cdbb9"
+    },
+    "normalizer-peer-ss.log": {
+      "bytes": 224,
+      "sha256": "fdb0274c866b7b5a9631addea487447db14ce60c60c574a32e5aac9ad48c62fa"
+    },
+    "normalizer-peer-vless.log": {
+      "bytes": 189,
+      "sha256": "57e172d158001a70cec26eac088ed866bdffaf3114570e88a9503a75bb404f5b"
+    },
+    "normalizer-peer-socks4.log": {
+      "bytes": 221,
+      "sha256": "ce2cb3f0c852ab73b1a8e74dc19a82ed0ea10795b49d7bb912fa4cb06c670cf2"
+    },
+    "normalizer-peer-ws.log": {
+      "bytes": 213,
+      "sha256": "d7109858f59daeb73de61d273d2566cb87beca300e7a2211d672ce4ec3246c1f"
+    },
+    "normalizer-development-checks.log": {
+      "bytes": 4182,
+      "sha256": "4b9d14704c11dacf32b8cae8c769c962e1e5a97d3d43467a29ee0769b2b9f088"
+    }
+  },
+  "binaries": {
+    "Swirl.exe": {
+      "bytes": 56818086,
+      "sha256": "637531d61cf221e369b45a71f9f21247e804b8a7af9c2637fe3f9161ae671d06"
+    },
+    "SwirlRustCoreTests.exe": {
+      "bytes": 2519339,
+      "sha256": "ab14951f4c4838454bb6ff52ea41b6225f967cd383812d50ebd7881c055e0583"
+    },
+    "SwirlImportTests.exe": {
+      "bytes": 2220845,
+      "sha256": "0c8afa645ffdb7fc418f334f0aa480652993491225eb5e6103e6927721e968d8"
+    },
+    "swirl_api.dll": {
+      "bytes": 7418485,
+      "sha256": "017873953d39ce75886b0bc97a1937149c12906f7049bca6e4cb178646e7fbca"
+    }
+  },
+  "ci": {
+    "checked_at_utc": "2026-10-18T08:32:38.470135+00:00",
+    "runs": [
+      {
+        "id": 39110589665,
+        "name": "Core implementation validation",
+        "status": "completed",
+        "conclusion": "success",
+        "sha": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+        "url": "https://github.com/SOLHK/Swirl/actions/runs/39110589665",
+        "jobs": [
+          {
+            "id": 117625704469,
+            "name": "core",
+            "status": "completed",
+            "conclusion": "success",
+            "active": [],
+            "failed": []
+          }
+        ]
+      },
+      {
+        "id": 39110589656,
+        "name": "Swirl Rust Core",
+        "status": "completed",
+        "conclusion": "success",
+        "sha": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+        "url": "https://github.com/SOLHK/Swirl/actions/runs/39110589656",
+        "jobs": [
+          {
+            "id": 117625704223,
+            "name": "windows-rust",
+            "status": "completed",
+            "conclusion": "success",
+            "active": [],
+            "failed": []
+          },
+          {
+            "id": 117625704385,
+            "name": "portable-rust (ubuntu-latest)",
+            "status": "completed",
+            "conclusion": "success",
+            "active": [],
+            "failed": []
+          },
+          {
+            "id": 117625704434,
+            "name": "portable-rust (macos-latest)",
+            "status": "completed",
+            "conclusion": "success",
+            "active": [],
+            "failed": []
+          }
+        ]
+      }
+    ],
+    "all_succeeded": true,
+    "note": "Exact fbef399 implementation commit; later evidence-only commit does not change source."
+  },
+  "limitations": [
+    "Non-Clash full profiles retained in parse result but rejected; no new persistent archive for rejected GUI input.",
+    "INI non-node body grammar and global semantics not fully validated.",
+    "No new protocol/TUN/provider internet acceptance.",
+    "Full Clash DNS remains rejected pending equivalent query-family/hosts/bootstrap mapping."
+  ],
+  "progress_baseline": {
+    "version": 1,
+    "items": 79,
+    "accepted": 6,
+    "weighted_acceptance_percent": 10.833333333333334,
+    "not_code_completion": true
+  },
+  "independent_review": {
+    "normalizer": "reviewed; truncated UTF-8, duplicate BOM and multiple YAML documents corrected",
+    "import_rule_targets": "reviewed; no concrete bypass found in final diff",
+    "withdrawn_static_finding": "Reviewer initially misread missing-rules callback guard; root checked unconditional empty/terminal MATCH guard and reviewer explicitly withdrew the claim."
+  },
+  "offline_corpus_replay": {
+    "source_commit": "fbef3993e9decc68c8be93a17551536ea9013fd8",
+    "rust_core_tree": "8e3b3e57e212affa2c7b391128fe45d58629c89c",
+    "inspector_sha256": "55a3ad7fab5c9b1fa1eafdf1ae5aaff9a40626629fa1461f868c6e5776988ac5",
+    "inspector_bytes": 2370195,
+    "inspector_mtime_utc": "2026-10-18T07:09:31.911354+00:00",
+    "recorded_utc": "2026-10-18T08:21:39.996195+00:00",
+    "build_result": "success; Cargo verified existing artifact up to date for unchanged Rust source",
+    "private_json_mode": false,
+    "supplier_requests": 0,
+    "real_node_requests": 0,
+    "plaintext_written": false,
+    "previous_corpus_semantics_equal": true,
+    "evidence": "SUBSCRIPTION_18_ENTRY_REPLAY_FBEF399.json",
+    "evidence_sha256": "af006859cc7e0ba6f3768140c6c157777b427b968cf1be8062bbfd7ed7b372fe"
+  },
+  "execution_recovery": {
+    "transient_exec_disconnect": true,
+    "reconnected_at_utc": "2026-10-18T08:19:21Z",
+    "failed_command_started": false,
+    "source_diff_after_reconnect": false,
+    "orphan_build_or_test_processes": 0,
+    "existing_user_swirl_untouched": true
+  }
+}

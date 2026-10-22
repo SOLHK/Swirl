@@ -1,0 +1,111 @@
+{
+  "protocol": "http",
+  "origin_http_paths": [
+    "/selected-a",
+    "/selected-b",
+    "/restored-b",
+    "/rule-a",
+    "/rule-b",
+    "/rule-choice",
+    "/rule-direct",
+    "/rule-suffix",
+    "/rule-keyword",
+    "/rule-port"
+  ],
+  "origin_https_sni": [
+    "localhost",
+    "wrong.fixture.invalid"
+  ],
+  "origin_https_tls_closed": 1,
+  "origin_errors": {
+    "http": [],
+    "https": [],
+    "echo": []
+  },
+  "peers": [
+    {
+      "peer": "A",
+      "host": "a.product.invalid",
+      "port": 64671,
+      "upload": 161,
+      "download": 87
+    },
+    {
+      "peer": "A",
+      "host": "localhost",
+      "port": 64672,
+      "upload": 1794,
+      "download": 2561
+    },
+    {
+      "peer": "A",
+      "host": "stream.product.invalid",
+      "port": 64673,
+      "upload": 262180,
+      "download": 262202
+    },
+    {
+      "peer": "A",
+      "host": "a.product.invalid",
+      "port": 64671,
+      "upload": 157,
+      "download": 83
+    },
+    {
+      "peer": "A",
+      "host": "choice.product.invalid",
+      "port": 64671,
+      "upload": 167,
+      "download": 88
+    },
+    {
+      "peer": "A",
+      "host": "keyword.product.invalid",
+      "port": 64671,
+      "upload": 169,
+      "download": 89
+    },
+    {
+      "peer": "B",
+      "host": "b.product.invalid",
+      "port": 64671,
+      "upload": 161,
+      "download": 87
+    },
+    {
+      "peer": "B",
+      "host": "wrong.fixture.invalid",
+      "port": 64672,
+      "upload": 1606,
+      "download": 1907
+    },
+    {
+      "peer": "B",
+      "host": "b.product.invalid",
+      "port": 64671,
+      "upload": 161,
+      "download": 87
+    },
+    {
+      "peer": "B",
+      "host": "b.product.invalid",
+      "port": 64671,
+      "upload": 157,
+      "download": 83
+    },
+    {
+      "peer": "B",
+      "host": "nested.suffix.product.invalid",
+      "port": 64671,
+      "upload": 174,
+      "download": 88
+    },
+    {
+      "peer": "B",
+      "host": "port.product.invalid",
+      "port": 64671,
+      "upload": 163,
+      "download": 86
+    }
+  ]
+}

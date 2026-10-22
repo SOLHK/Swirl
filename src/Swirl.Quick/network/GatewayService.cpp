@@ -2,7 +2,7 @@
 #include "GatewayRouting.h"
 #include "engine/EngineController.h"
 #include <QNetworkInterface>
-#include <QStandardPaths>
+#include "../app/StoragePaths.h"
 #include <QFile>
 #include <QFileInfo>
 #include <QDir>
@@ -33,7 +33,7 @@ QString csv(QString value){return '"'+value.replace('"',"\"\"")+'"';}
 }
 GatewayService::GatewayService(EngineController *engine,QString path,QObject *parent):QObject(parent),m_engine(engine),m_path(std::move(path)),m_dhcp(false,this) {
     connect(engine,&EngineController::interfacesChanged,this,&GatewayService::interfacesChanged);
-    if(m_path.isEmpty())m_path=QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/gateway.json";
+    if(m_path.isEmpty())m_path=SwirlPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/gateway.json";
     m_journal=m_path+".forwarding";m_dhcp.setLeaseStorePath(m_path+".leases");loadConfiguration();
     connect(&m_dhcp,&DhcpServer::changed,this,[this]{if(m_forwarding&&!m_dhcp.running()&&!busy()){m_error=m_dhcp.error();stop();}emit changed();});
     connect(&m_process,qOverload<int,QProcess::ExitStatus>(&QProcess::finished),this,[this](int code,QProcess::ExitStatus){processFinished(code);});

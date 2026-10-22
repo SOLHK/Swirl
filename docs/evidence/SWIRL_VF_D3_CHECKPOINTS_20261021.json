@@ -1,0 +1,38 @@
+{
+  "scope": "self_authored_fixtures_and_legacy_checkpoint_storage_no_Apple_data",
+  "host": "macOS-26.3-arm64-arm-64bit",
+  "checkpoint_tests": 5,
+  "existing_checkpoint_tests": 13,
+  "full_suite": {
+    "discovered": 619,
+    "passed": 612,
+    "skipped": 7,
+    "seconds": 28.25
+  },
+  "audit_passed": 6,
+  "native_control": {
+    "status": "PASS_SYNTHETIC_NATIVE_OUTLINE_TABLE_METRIC_RECONSTRUCTION_ONLY",
+    "source_records": 174,
+    "reconstructed_faces": 2,
+    "gids_per_face": 3,
+    "comparison": {
+      "status": "PASS",
+      "requests": 58,
+      "glyph_records": 174,
+      "max_control_point_error_font_units": 0.0,
+      "max_metric_error_font_units": 0.0,
+      "max_bounds_error_font_units": 0.0,
+      "limit_font_units": 1.0,
+      "continuous_space_proof": false,
+      "command_normalization": "only zero-length straight segments and redundant straight closing edges"
+    },
+    "strict_raw_API_gate": "FAIL",
+    "strict_failure": "request=face0-point0 face=0 gid=2: vertical advance is raw CGSize.width: actual=849, expected=850.0, tolerance=0.03125",
+    "source_unchanged": true,
+    "temporary_fonts_removed": true
+  },
+  "original_reconstructed_faces": 0,
+  "Windows11": "NOT_RUN",
+  "Qt_Swirl": "NOT_RUN",
+  "rebuild_sha256": "a01472e69a1f6c0fd5d86db2ba16aa85877956cd8a2f6691ecc402bacdfdd770"
+}

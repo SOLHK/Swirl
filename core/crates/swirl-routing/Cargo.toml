@@ -3,7 +3,11 @@ name = "swirl-routing"
 version.workspace = true
 edition.workspace = true
 publish.workspace = true
+
 [dependencies]
 swirl-subscription.workspace = true
+sha2.workspace = true
+zstd = "0.13"
+
 [lints]
 workspace = true
