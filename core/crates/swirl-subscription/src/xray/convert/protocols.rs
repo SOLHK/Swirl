@@ -123,7 +123,9 @@ fn password(
     let fields: &[&str] = if protocol == Protocol::Trojan {
         &["address", "port", "password", "level", "email", "flow"]
     } else {
-        &["address", "port", "password", "level", "email", "method"]
+        &[
+            "address", "port", "password", "level", "email", "method", "ivCheck", "ota",
+        ]
     };
     allow_keys(server, &source.server_path, fields, sink);
     let password = string(server, "password");
@@ -162,6 +164,21 @@ fn password(
             sink.error("TrojanFlowRemoved", &key_path(&source.server_path, "flow"));
         }
     } else {
+        // V2Ray's official outbound extensions are booleans. Preserve both
+        // values, but never claim the native connector applied an IV-check or
+        // legacy OTA policy which is absent from Swirl's current IR.
+        for (key, code) in [
+            ("ivCheck", "ShadowsocksIvCheckUnsupported"),
+            ("ota", "ShadowsocksOtaUnsupported"),
+        ] {
+            match server.get(key) {
+                None | Some(Value::Bool(false)) => (),
+                Some(Value::Bool(true)) => {
+                    sink.unsupported(code, &key_path(&source.server_path, key));
+                }
+                Some(_) => sink.error("ExpectedBoolean", &key_path(&source.server_path, key)),
+            }
+        }
         match server.get("method").and_then(Value::as_str) {
             None | Some("") => sink.error(
                 "MissingShadowsocksMethod",
@@ -178,7 +195,13 @@ fn password(
                 | "aes-128-cfb"
                 | "aes-256-cfb"
                 | "chacha20"
-                | "chacha20-ietf",
+                | "chacha20-ietf"
+                | "aead_aes_128_gcm"
+                | "aead_aes_256_gcm"
+                | "aead_chacha20_poly1305"
+                | "xchacha20-poly1305"
+                | "xchacha20-ietf-poly1305"
+                | "aead_xchacha20_poly1305",
             ) => {
                 sink.unsupported(
                     "ShadowsocksCipherUnsupported",

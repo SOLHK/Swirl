@@ -179,3 +179,73 @@ fn ss_plugins_uot_and_unknown_secret_keys_survive_with_blocking_diagnostics() {
             .contains("SYNTHETIC_PRIVATE_KEY")
     );
 }
+
+#[test]
+fn official_ss_boolean_extensions_preserve_intent_and_reject_wrong_types() {
+    for (key, code) in [
+        ("ivCheck", "ShadowsocksIvCheckUnsupported"),
+        ("ota", "ShadowsocksOtaUnsupported"),
+    ] {
+        for enabled in [false, true] {
+            let mut s = source("shadowsocks");
+            s["settings"]["servers"][0][key] = json!(enabled);
+            let d = roundtrip(&s);
+            assert_eq!(d.configuration(), &s);
+            assert_eq!(d.nodes()[0].validation(), ValidationStatus::Valid);
+            assert_eq!(
+                d.nodes()[0].diagnostics().iter().any(|d| d.code == code),
+                enabled
+            );
+        }
+        for wrong in [json!(null), json!(0), json!("false"), json!({})] {
+            let mut s = source("shadowsocks");
+            s["settings"]["servers"][0][key] = wrong;
+            let d = roundtrip(&s);
+            assert_eq!(d.configuration(), &s);
+            assert_eq!(d.nodes()[0].validation(), ValidationStatus::Invalid);
+            assert!(
+                d.nodes()[0]
+                    .diagnostics()
+                    .iter()
+                    .any(|d| d.code == "ExpectedBoolean")
+            );
+        }
+    }
+}
+
+#[test]
+fn official_ss_cipher_aliases_and_xchacha_are_not_rewritten_to_a_native_method() {
+    for method in [
+        "aead_aes_128_gcm",
+        "aead_aes_256_gcm",
+        "aead_chacha20_poly1305",
+        "xchacha20-poly1305",
+        "xchacha20-ietf-poly1305",
+        "aead_xchacha20_poly1305",
+    ] {
+        let mut s = source("shadowsocks");
+        s["settings"]["servers"][0]["method"] = json!(method);
+        let d = roundtrip(&s);
+        assert!(
+            matches!(d.nodes()[0].authentication(), Authentication::Password { method: Some(m), .. } if m == method)
+        );
+        assert!(
+            d.nodes()[0]
+                .diagnostics()
+                .iter()
+                .any(|d| d.code == "ShadowsocksCipherUnsupported")
+        );
+        assert!(!d.nodes()[0].network_verified());
+    }
+}
+
+#[test]
+fn trojan_tls_ws_and_mux_are_retained_independently_of_password_projection() {
+    let mut s = source("trojan");
+    s["mux"] = json!({"enabled": true, "concurrency": 8});
+    s["streamSettings"]["wsSettings"]["headers"]["Authorization"] = json!("SYNTHETIC_HEADER");
+    let d = roundtrip(&s);
+    assert_eq!(d.stream_settings(0), s.get("streamSettings"));
+    assert_eq!(d.mux(0), s.get("mux"));
+    assert!(!format!("{:?}", d.nodes()[0]).contains("SYNTHETIC_HEADER"));
+}
