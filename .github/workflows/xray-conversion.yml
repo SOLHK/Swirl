@@ -1,0 +1,54 @@
+name: Xray JSON conversion
+on:
+  push:
+    branches: [work/xray-v2ray-json-b-20261022, work/xray-v2ray-json-import-20261021]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  rust:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-2022]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: core
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Install Rust tools
+        run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy
+      - run: cargo fmt --all -- --check
+      - run: cargo check --workspace --locked
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - run: cargo test --workspace --locked
+      - name: Verify source was not changed during tests
+        working-directory: .
+        run: git diff --exit-code
+      # The editing environment has no Rust toolchain or network. Export only
+      # public source and public build tools for equivalent offline validation.
+      # No credentials, environment dump, font files, or private data are included.
+      - name: Export offline Linux validation tools
+        if: runner.os == 'Linux'
+        working-directory: .
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/xray-offline"
+          git archive HEAD core AGENTS.md docs/SWIRL_CORE_DEVELOPMENT_CONTRACT.md > "$RUNNER_TEMP/xray-offline/source.tar"
+          toolchain="$(rustc --print sysroot)"
+          tar -C "$toolchain" -czf "$RUNNER_TEMP/xray-offline/rust-tools.tar.gz" bin lib libexec
+          tar -C "$HOME/.cargo" -czf "$RUNNER_TEMP/xray-offline/cargo-registry.tar.gz" registry
+          git rev-parse HEAD > "$RUNNER_TEMP/xray-offline/commit.txt"
+      - name: Preserve offline Linux validation tools
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Xray-offline-tools-${{ github.sha }}
+          path: ${{ runner.temp }}/xray-offline
+          if-no-files-found: error
+          retention-days: 3
