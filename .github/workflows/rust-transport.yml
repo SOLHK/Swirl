@@ -45,6 +45,11 @@ jobs:
           SWIRL_TRANSPORT_CLIENT: ${{ github.workspace }}/core/target/release/examples/transport-client${{ runner.os == 'Windows' && '.exe' || '' }}
           SWIRL_C1_EVIDENCE: ${{ runner.temp }}/transport-evidence/c1
         run: python tools/tests/test_transport_c1_xray.py -v
+      - name: Independent streaming gRPC Xray interoperability
+        env:
+          SWIRL_TRANSPORT_CLIENT: ${{ github.workspace }}/core/target/release/examples/transport-client${{ runner.os == 'Windows' && '.exe' || '' }}
+          SWIRL_TRANSPORT_EVIDENCE: ${{ runner.temp }}/transport-evidence/c2
+        run: python tools/tests/test_transport_grpc_xray.py -v
       - name: Preserve peer identity and raw test evidence
         if: always()
         uses: actions/upload-artifact@v4

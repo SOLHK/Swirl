@@ -587,7 +587,11 @@ async fn connect_selected(
         within(
             deadline,
             "UpstreamTlsTimeout",
-            swirl_transport::secure(tcp, tls),
+            swirl_transport::secure_with_alpn(
+                tcp,
+                tls,
+                transport.and_then(Transport::required_alpn),
+            ),
         )
         .await?
     } else {
@@ -603,7 +607,11 @@ async fn connect_selected(
         stream = within(
             deadline,
             "TransportHandshakeTimeout",
-            transport.wrap(stream, tls.is_some()),
+            transport.wrap(
+                stream,
+                tls.is_some(),
+                deadline.saturating_duration_since(Instant::now()),
+            ),
         )
         .await?;
     } else if let Some(ws) = ws {

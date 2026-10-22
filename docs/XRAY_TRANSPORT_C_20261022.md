@@ -95,11 +95,61 @@ Current upstream also defaults to rejecting private destinations. The test
 server explicitly authorizes only its own loopback origins in freedom
 `finalRules`; the product routing code is unchanged.
 
+## C2 implementation and limits
+
+The native gRPC connector sends a bidirectional streaming `POST` to the exact
+Xray/V2Ray `serviceName` method path. It supports both `Tun` (`Hunk`) and
+`TunMulti` (`MultiHunk`): uncompressed five-byte gRPC envelopes, protobuf bytes
+field number one, and terminal `grpc-status`. Custom service/method paths and
+upstream percent escaping are covered. No unary RPC or HTTP CONNECT is used.
+The adapter removes RPC message boundaries and returns the original proxy
+byte stream to the existing VLESS/Trojan authentication code.
+
+TLS uses the existing certificate/SNI verifier. HTTP/2 adds `h2` only when the
+ALPN offer is empty; an explicitly incompatible offer or an incompatible
+negotiated protocol is an error. Plain gRPC uses prior-knowledge HTTP/2 only
+with a server that actually permits it. User metadata cannot replace framing,
+gRPC status or hop-by-hop headers. Unsupported keepalive/window configuration
+fields are rejected by the typed config; configurable active PING keepalive
+is not implemented. The `h2` library handles peer PING, SETTINGS, flow control,
+GOAWAY and stream resets. No failed request is replayed.
+
+The HTTP/2 adapter uses 16 KiB write chunks, 64 KiB receive windows and an
+explicit 64 KiB send-buffer limit per stream. A connection owns one driver
+task. Up to 64 active or retiring streams are permitted per internal session;
+the retirement queue shares that bound. Dropping an unfinished upload cancels
+it. After an explicit write shutdown, dropping the application stream retains
+its response in the same driver for at most one second, allowing queued final
+DATA/END_STREAM to reach the peer. This avoids losing a nested TLS
+`close_notify` to an immediate CANCEL. It does not turn write shutdown into a
+wait for the response: independent half-close remains available.
+
+A gRPC message is limited to 4 MiB; decoding can temporarily retain both the
+encoded and decoded message, approximately 8 MiB at that maximum, in addition
+to HTTP/2/socket buffers. Ordinary 16 KiB chunks use much less. Direct gRPC
+read-to-EOF validates terminal status; after a caller drops a stream (including
+after nested TLS has independently reached its authenticated EOF), background
+draining is resource cleanup and cannot report a late status to that caller.
+The test client reports application close, exact payload integrity and remaining
+runtime tasks separately and waits for actual driver completion before exiting.
+
+C2 verification: all four required Rust gates passed; 430 workspace tests
+including doctests passed with zero failed/ignored. The independent current
+Xray suite passed all 11 test methods, zero failures/skips, in 5.243 seconds.
+It covers Tun/TunMulti, plain and verified TLS gRPC, custom service paths,
+VLESS/Trojan authentication, real HTTP and verified inner HTTPS responses,
+8 MiB bidirectional transfers, eight concurrent cancellations, bad credentials,
+bad service/SNI/CA/ALPN, server interruption, bounded timeouts and clean close.
+Actual commands, output and per-attempt evidence are under
+`evidence/transports/c2/`. A transient local doctest failure caused by concurrent
+recompilation was resolved by freezing edits and running the complete gates
+serially; no test was removed or changed to hide that failure.
+
 ## Upstream pins and independent implementation
 
 * [Xray v26.10.21 / 1b1647c](https://github.com/XTLS/Xray-core/tree/1b1647cd9ddf0abc34b981d4611fc03bcac1ca74): MPL-2.0. Read `transport/internet/{websocket,grpc,httpupgrade,splithttp,tls,reality}` and `infra/conf/transport_internet.go`.
 * [Legacy Xray v1.8.24 / 6baad79](https://github.com/XTLS/Xray-core/tree/6baad79f9881ee2cf75bdc825b3e2e92b289477a): MPL-2.0; retained legacy HTTP/2 fixture. Current Xray rejects that removed transport, so current-version H2 transport support is not claimed.
-* V2Ray v5.39.0: MIT; gRPC and HTTP streaming wire/configuration comparison.
+* [V2Ray v5.39.0 / 8eef1bb](https://github.com/v2fly/v2ray-core/tree/8eef1bbfb1b4bdb3919b4e27a89abb0fa3252d6f): MIT; gRPC and HTTP streaming wire/configuration comparison.
 * [sing-box v1.13.3 / d3768cc](https://github.com/SagerNet/sing-box/tree/d3768cca3602c2949417fe767c1acd88d7f67698): GPL-3.0-or-later with upstream additional condition; architecture reference only. No source or runtime core imported.
 * [RFC6455](https://www.rfc-editor.org/rfc/rfc6455): WebSocket opening handshake, binary fragmentation and closing behavior.
 
@@ -115,6 +165,32 @@ this transport-only task. `AGENTS.md`, the continuation handoff and Core
 development contract were read; this user's dedicated C branch instruction
 supersedes their older branch destination.
 
+### Rust component selection
+
+The workspace already uses Tokio 1.53.3, patched rustls 0.23.46,
+tokio-rustls 0.26.6 and bytes 1.12.1. New HTTP/2 framing uses exactly
+`h2 = 0.4.20`, `http = 1.5.0` and `bytes = 1.12.1`, checked against their
+published manifests, source and licenses. Their declared minimum Rust versions
+(1.63, 1.57 and 1.57 respectively) fit this workspace's Rust 1.89 minimum.
+`h2` is MIT, `http` is MIT/Apache-2.0, and `bytes` is MIT. The lockfile change
+adds the required HTTP/2 graph without upgrading the existing Tokio/TLS graph.
+
+Hyper 1.12.0 (MIT), tonic 0.14.6 (MIT), futures-util 0.3.34 (MIT/Apache-2.0),
+and tokio-tungstenite 0.30.0 (MIT) were reviewed. A direct `h2` adapter avoids
+adding a generated RPC client/runtime for this small fixed wire schema and
+also supplies the raw streaming bodies needed by legacy HTTP/2 and XHTTP.
+The existing verified WebSocket engine remains in place. Quinn 0.11.12,
+h3 0.0.8 and h3-quinn 0.0.10 (MIT/Apache-2.0 or MIT as declared upstream)
+were inspected for possible HTTP/3 follow-up; no QUIC stack is added or claimed.
+
+### C1 platform evidence
+
+Commit [`4ad768303f4dbea289d87714974e752f544c2542`](https://github.com/SOLHK/Swirl/commit/4ad768303f4dbea289d87714974e752f544c2542)
+passed all three jobs in [run 39717767373](https://github.com/SOLHK/Swirl/actions/runs/39717767373):
+Ubuntu, Windows and macOS. Each job ran the Rust gates, release dynamic-library
+and example build, and independent C1 server suite. These are exact-C1 results,
+not evidence for a later unexecuted revision.
+
 ## B integration boundary
 
 `Transport` is deliberately outside `swirl-subscription`, avoiding changes to
@@ -125,6 +201,26 @@ import success alone must not change execution capability reporting.
 VMess does not exist in this pinned native protocol baseline; an enum in an
 importer cannot make it executable. New transports will be tested with the
 implemented VLESS and Trojan connectors and report VMess separately.
+
+During C2, the B branch advanced to
+[`4606b6df484cd0504014b9bdac6cb237a813c9b3`](https://github.com/SOLHK/Swirl/commit/4606b6df484cd0504014b9bdac6cb237a813c9b3).
+It was fetched and reviewed without merging. Its four changed files are the
+conversion workflow, `xray.rs`, `xray/convert.rs` and conversion tests. There is
+no edit to existing Outbound/Config structures or Core/protocol/transport files.
+That checkpoint is offline projection and archival: transport/security details
+remain accessible as source JSON, `network_verified()` is false, and it has no
+native Core adapter. Its `ValidationStatus::Valid` must not be used as an
+execution-capability signal; inspect capability diagnostics separately.
+
+The downstream adapter must explicitly map B's classification enum to this
+settings-bearing transport enum (their serialized names are not identical).
+Security stays in `Outbound.tls/reality/flow`. Explicit WebSocket selection
+requires `Outbound.websocket = None` to avoid conflicting configurations;
+Host goes to `settings.host`, custom headers remain a separate list. An
+unsupported option must return an error, never omit the selection and thereby
+invoke legacy raw TCP. The adapter belongs at protocol/Core/API level, avoiding
+a `subscription -> protocol -> subscription` dependency cycle. This branch
+does not take over B's parameter conversion.
 
 ## Reproduction
 

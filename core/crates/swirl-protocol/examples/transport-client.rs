@@ -45,7 +45,15 @@ fn pattern(at: usize) -> u8 {
     ((at * 31 + 17) % 251) as u8
 }
 
-async fn close(stream: &mut BoxStream) -> &'static str {
+fn read_error(error: std::io::Error, fallback: &'static str) -> &'static str {
+    if error.kind() == std::io::ErrorKind::TimedOut {
+        "TransportReadTimeout"
+    } else {
+        fallback
+    }
+}
+
+async fn close(stream: &mut BoxStream) -> (&'static str, Option<String>) {
     match tokio::time::timeout(Duration::from_secs(2), async {
         stream.shutdown().await?;
         let mut tail = [0];
@@ -56,10 +64,36 @@ async fn close(stream: &mut BoxStream) -> &'static str {
     })
     .await
     {
-        Ok(Ok(())) => "clean",
-        Ok(Err(error)) if error.kind() == std::io::ErrorKind::UnexpectedEof => "unexpected_eof",
-        Ok(Err(_)) => "transport_error",
-        Err(_) => "timeout",
+        Ok(Ok(())) => ("clean", None),
+        Ok(Err(error)) => {
+            let message = error.to_string();
+            let detail = if [
+                "Http2StreamReset",
+                "Http2ResponseReset",
+                "Http2BodyReset",
+                "GrpcStatus",
+                "GrpcStatusMissing",
+                "GrpcTrailersReset",
+                "WebSocketTransportClosed",
+                "WebSocketControlClosed",
+                "WebSocketCloseTimeout",
+            ]
+            .contains(&message.as_str())
+            {
+                message
+            } else {
+                format!("{:?}", error.kind())
+            };
+            (
+                if error.kind() == std::io::ErrorKind::UnexpectedEof {
+                    "unexpected_eof"
+                } else {
+                    "transport_error"
+                },
+                Some(detail),
+            )
+        }
+        Err(_) => ("timeout", Some("CloseTimeout".into())),
     }
 }
 
@@ -124,7 +158,7 @@ async fn run(input: Input) -> Result<Value, &'static str> {
                 reader
                     .read_exact(&mut chunk[..n])
                     .await
-                    .map_err(|_| "EchoRead")?;
+                    .map_err(|error| read_error(error, "EchoRead"))?;
                 if chunk[..n]
                     .iter()
                     .enumerate()
@@ -159,7 +193,12 @@ async fn run(input: Input) -> Result<Value, &'static str> {
             if header.len() >= 16384 {
                 return Err("HttpHeaderLimit");
             }
-            header.push(stream.read_u8().await.map_err(|_| "HttpRead")?);
+            header.push(
+                stream
+                    .read_u8()
+                    .await
+                    .map_err(|error| read_error(error, "HttpRead"))?,
+            );
         }
         let mut fields = [httparse::EMPTY_HEADER; 64];
         let mut response = httparse::Response::new(&mut fields);
@@ -185,7 +224,7 @@ async fn run(input: Input) -> Result<Value, &'static str> {
             stream
                 .read_exact(&mut chunk[..n])
                 .await
-                .map_err(|_| "HttpBodyRead")?;
+                .map_err(|error| read_error(error, "HttpBodyRead"))?;
             digest.update(&chunk[..n]);
             received += n;
         }
@@ -194,15 +233,15 @@ async fn run(input: Input) -> Result<Value, &'static str> {
         return Err("ModeUnsupported");
     };
     let transfer_us = transfer.elapsed().as_micros();
-    let closure = if input.mode == "cancel" {
+    let (closure, close_detail) = if input.mode == "cancel" {
         drop(stream);
-        "cancelled"
+        ("cancelled", None)
     } else {
         close(&mut stream).await
     };
     Ok(
         json!({"ok":true,"uploaded":uploaded,"downloaded":downloaded,"sha256":sha256,
-        "connect_us":connect_us,"transfer_us":transfer_us,"close":closure}),
+        "connect_us":connect_us,"transfer_us":transfer_us,"close":closure,"close_detail":close_detail}),
     )
 }
 
@@ -222,11 +261,37 @@ fn main() {
             .enable_all()
             .build()
             .expect("test runtime");
-        match runtime.block_on(async { tokio::time::timeout(limit, run(input)).await }) {
-            Ok(Ok(report)) => report,
-            Ok(Err(error)) => json!({"ok":false,"error":error}),
-            Err(_) => json!({"ok":false,"error":"OperationTimeout"}),
+        let mut report =
+            match runtime.block_on(async { tokio::time::timeout(limit, run(input)).await }) {
+                Ok(Ok(report)) => report,
+                Ok(Err(error)) => json!({"ok":false,"error":error}),
+                Err(_) => json!({"ok":false,"error":"OperationTimeout"}),
+            };
+        // This executable owns its runtime. A successful stream shutdown can
+        // queue a final HTTP/2 DATA/END_STREAM while its connection driver is
+        // still flushing. Observe completion before destroying the runtime;
+        // a fixed sleep would neither prove completion nor detect a leak.
+        let metrics = runtime.metrics();
+        let drain_started = std::time::Instant::now();
+        let drained = runtime.block_on(async {
+            tokio::time::timeout(Duration::from_secs(3), async {
+                while metrics.num_alive_tasks() != 0 {
+                    tokio::time::sleep(Duration::from_millis(2)).await;
+                }
+            })
+            .await
+            .is_ok()
+        });
+        report["driver_drain_us"] = json!(drain_started.elapsed().as_micros());
+        report["remaining_tasks"] = json!(metrics.num_alive_tasks());
+        if !drained {
+            if report["ok"] == true {
+                report["error"] = json!("TransportTasksNotDrained");
+            }
+            report["ok"] = json!(false);
+            report["runtime_error"] = json!("TransportTasksNotDrained");
         }
+        report
     } else {
         json!({"ok":false,"error":"InputSyntax"})
     };

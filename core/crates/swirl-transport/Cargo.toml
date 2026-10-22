@@ -5,6 +5,10 @@ edition.workspace = true
 publish.workspace = true
 [dependencies]
 tokio.workspace = true
+h2.workspace = true
+http.workspace = true
+bytes.workspace = true
+serde.workspace = true
 socket2.workspace = true
 tokio-rustls.workspace = true
 webpki-roots.workspace = true

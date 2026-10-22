@@ -1,4 +1,6 @@
 //! Fixed-buffer full-duplex transfer with independent half-close and live counters.
+pub mod grpc;
+mod h2_stream;
 pub mod reality;
 mod udp;
 pub use udp::bind_udp;
@@ -28,6 +30,17 @@ pub async fn secure<S: Stream + 'static>(
     stream: S,
     tls: &swirl_subscription::Tls,
 ) -> Result<BoxStream, &'static str> {
+    secure_with_alpn(stream, tls, None).await
+}
+
+/// Authenticate TLS and require the selected application protocol where the
+/// transport needs it. An empty offer gets that transport's protocol; an
+/// explicit incompatible offer or a different negotiated protocol is rejected.
+pub async fn secure_with_alpn<S: Stream + 'static>(
+    stream: S,
+    tls: &swirl_subscription::Tls,
+    required_alpn: Option<&[u8]>,
+) -> Result<BoxStream, &'static str> {
     use tokio_rustls::{
         TlsConnector,
         rustls::{ClientConfig, RootCertStore, pki_types::ServerName},
@@ -46,11 +59,21 @@ pub async fn secure<S: Stream + 'static>(
         .with_root_certificates(roots)
         .with_no_client_auth();
     config.alpn_protocols = tls.alpn.iter().map(|s| s.as_bytes().to_vec()).collect();
+    if let Some(required) = required_alpn {
+        if config.alpn_protocols.is_empty() {
+            config.alpn_protocols.push(required.to_vec());
+        } else if !config.alpn_protocols.iter().any(|value| value == required) {
+            return Err("TlsAlpnUnsupported");
+        }
+    }
     let name = ServerName::try_from(tls.server_name.clone()).map_err(|_| "TlsServerName")?;
     let stream = TlsConnector::from(Arc::new(config))
         .connect(name, stream)
         .await
         .map_err(|_| "TlsVerificationOrHandshake")?;
+    if required_alpn.is_some_and(|required| stream.get_ref().1.alpn_protocol() != Some(required)) {
+        return Err("TlsAlpnNegotiation");
+    }
     Ok(Box::new(stream))
 }
 

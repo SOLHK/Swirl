@@ -17,14 +17,32 @@ pub enum Transport {
         #[serde(default)]
         headers: Vec<(String, String)>,
     },
+    Grpc {
+        config: swirl_transport::grpc::Config,
+    },
 }
 
 impl Transport {
-    pub(crate) async fn wrap(&self, stream: BoxStream, _tls: bool) -> Result<BoxStream> {
+    pub(crate) fn required_alpn(&self) -> Option<&'static [u8]> {
+        match self {
+            Self::Grpc { .. } => Some(b"h2"),
+            _ => None,
+        }
+    }
+
+    pub(crate) async fn wrap(
+        &self,
+        stream: BoxStream,
+        tls: bool,
+        remaining: std::time::Duration,
+    ) -> Result<BoxStream> {
         match self {
             Self::Tcp {} => Ok(stream),
             Self::WebSocket { settings, headers } => {
                 crate::websocket::connect_with_headers(stream, settings, headers).await
+            }
+            Self::Grpc { config } => {
+                swirl_transport::grpc::connect_with_timeout(stream, config, tls, remaining).await
             }
         }
     }
@@ -54,15 +72,31 @@ pub(crate) fn validate(outbound: &Outbound, selected: Option<&Transport>) -> Res
             return Err("TransportConflict");
         }
     }
-    if let Some(Transport::WebSocket { settings, headers }) = selected {
+    if let Some(selected) = selected {
+        if matches!(selected, Transport::Tcp {}) {
+            return Ok(());
+        }
         if reality {
             return Err("RealityTransportUnsupported");
         }
         if flow.is_some_and(|value| !value.is_empty()) {
             return Err("VisionTransportUnsupported");
         }
-        settings.validate_tls(tls)?;
-        crate::websocket::validate_headers(headers)?;
+        if let Some(required) = selected.required_alpn()
+            && tls.is_some_and(|tls| {
+                !tls.alpn.is_empty() && !tls.alpn.iter().any(|v| v.as_bytes() == required)
+            })
+        {
+            return Err("TlsAlpnUnsupported");
+        }
+        match selected {
+            Transport::WebSocket { settings, headers } => {
+                settings.validate_tls(tls)?;
+                crate::websocket::validate_headers(headers)?;
+            }
+            Transport::Grpc { config } => config.validate()?,
+            Transport::Tcp {} => {}
+        }
     }
     Ok(())
 }
