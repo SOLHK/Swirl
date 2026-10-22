@@ -289,7 +289,12 @@ class ImportedTransportXrayTests(unittest.TestCase):
                                 stream.sendall(b"GET /transport HTTP/1.1\r\nHost: localhost\r\n\r\n")
                                 try:
                                     self.assertEqual(stream.recv(1), b"")
-                                except ConnectionResetError:
+                                except (ConnectionResetError, ConnectionAbortedError):
+                                    # Winsock can report WSAECONNABORTED (10053)
+                                    # when the relay closes after authentication
+                                    # rejection. Only terminal closure is valid:
+                                    # timeouts and received application bytes
+                                    # still fail, as does any origin request.
                                     pass
                             else:
                                 self.assertIn(b"502 Bad Gateway", response)

@@ -89,12 +89,14 @@ jobs:
               'SWIRL_BUILT_LIBRARY': binary / library,
               'SWIRL_XRAY_RELEASE_MANIFEST': root / 'out/peers/xray/manifest.json',
               'HY2_CLIENT': binary / ('examples/hysteria2-client' + suffix),
+              'HY2_LIFECYCLE_CLIENT': binary / ('examples/hysteria2-lifecycle' + suffix),
               'SWIRL_TUIC_CLIENT': binary / ('examples/tuic-client' + suffix),
               'SWIRL_SS2022_CLIENT': binary / ('examples/ss2022-client' + suffix),
               'SWIRL_SS2022_SERVER': root / 'out/peers/shadowsocks' / ('ssserver' + suffix),
               'SWIRL_TRANSPORT_EVIDENCE': evidence / 'vmess',
               'SWIRL_VMESS_EVIDENCE': evidence / 'vmess',
               'HY2_EVIDENCE': evidence / 'hysteria2.json',
+              'HY2_LIFECYCLE_EVIDENCE': evidence / 'hysteria2-lifecycle.json',
               'SWIRL_TUIC_EVIDENCE': evidence / 'tuic.json',
               'SWIRL_QUIC_CORE_EVIDENCE': evidence / 'quic-core.json',
               'SWIRL_QUIC_FFI_EVIDENCE': evidence / 'quic-ffi.json',
@@ -111,7 +113,22 @@ jobs:
         run: python tools/tests/test_vmess_xray.py
       - name: Hysteria2 official server including retained limitation probes
         if: ${{ !cancelled() }}
-        run: python -m unittest -v test_hysteria2_official
+        run: python tools/tests/run_hysteria2_official.py
+      - name: Hysteria2 original 17 methods with a measured 1 MiB main stack
+        if: ${{ !cancelled() && runner.os == 'Linux' }}
+        env:
+          HY2_CONSTRAINED_STACK: '1'
+          HY2_EVIDENCE: ${{ github.workspace }}/out/native-interop/hysteria2-small-stack.json
+        run: python tools/tests/run_hysteria2_official.py
+      - name: Hysteria2 real future cancellation cleanup and same-runtime reconnect
+        if: ${{ !cancelled() }}
+        run: python -m unittest -v test_hysteria2_lifecycle
+      - name: Hysteria2 cancellation cleanup with a measured 1 MiB main stack
+        if: ${{ !cancelled() && runner.os == 'Linux' }}
+        env:
+          HY2_CONSTRAINED_STACK: '1'
+          HY2_LIFECYCLE_EVIDENCE: ${{ github.workspace }}/out/native-interop/hysteria2-lifecycle-small-stack.json
+        run: python -m unittest -v test_hysteria2_lifecycle
       - name: TUIC historical official reference including retained limitation probe
         if: ${{ !cancelled() }}
         run: python -m unittest -v test_tuic_reference

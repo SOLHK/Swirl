@@ -23,6 +23,8 @@ import time
 import unittest
 from urllib.parse import quote
 
+from native_client_stack import client_command, stack_receipt
+
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -321,14 +323,16 @@ class Hysteria2Official(unittest.TestCase):
         if target_tls is not None:
             request["target_tls"] = target_tls
         before = time.monotonic()
-        result = subprocess.run([str(self.client)], input=json.dumps(request),
+        result = subprocess.run(client_command(self.client), input=json.dumps(request),
             text=True, capture_output=True, timeout=15)
+        measured_stack = stack_receipt(result.stderr)
         try:
             report = json.loads(result.stdout)
         except (ValueError, TypeError):
             report = {"ok":False, "code":"AcceptanceDriverOutput"}
         self.records.append({"case":case, "expected_success":success, "upstream_limitation_probe":limitation,
-            "client_exit":result.returncode, "elapsed_ms":round((time.monotonic()-before)*1000,3), "result":report})
+            "client_exit":result.returncode, "elapsed_ms":round((time.monotonic()-before)*1000,3),
+            "main_stack_limit":measured_stack, "result":report})
         self.assertEqual(report.get("ok"),success,case + ": " + str(report))
         self.assertEqual(result.returncode,0 if success else 1)
         if code is not None:

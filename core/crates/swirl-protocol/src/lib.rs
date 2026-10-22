@@ -484,28 +484,6 @@ async fn connect_selected(
     transport: Option<&Transport>,
     udp: bool,
 ) -> Result<swirl_transport::BoxStream> {
-    // The protocol dispatch state machine is large. Keep its future off the
-    // caller stack (notably the Windows standalone Hysteria2 client stack).
-    // This allocation is scoped to one connection and drops on cancellation.
-    Box::pin(connect_selected_inner(
-        outbound,
-        target,
-        resolver,
-        handshake_limit,
-        transport,
-        udp,
-    ))
-    .await
-}
-
-async fn connect_selected_inner(
-    outbound: &Outbound,
-    target: &Target,
-    resolver: &Resolver,
-    handshake_limit: std::time::Duration,
-    transport: Option<&Transport>,
-    udp: bool,
-) -> Result<swirl_transport::BoxStream> {
     let configured = Transport::configured(outbound);
     if configured.is_some() && transport.is_some() {
         return Err("TransportConflict");
@@ -513,16 +491,50 @@ async fn connect_selected_inner(
     let transport = transport.or(configured.as_ref());
     transport::validate(outbound, transport)?;
     validate_tls(outbound, transport)?;
+    // A boxed future still executes its poll method on the caller's stack.
+    // Dispatch QUIC before constructing/polling the large TCP/TLS/REALITY
+    // state machine, so unrelated branches cannot exhaust a Windows stack.
+    // Each connection owns one box; dropping it still cancels the operation
+    // in place, without spawning a task or detaching any resource owners.
+    match outbound {
+        Outbound::Hysteria2(config) => {
+            Box::pin(hysteria2::connect(
+                config,
+                target,
+                resolver,
+                handshake_limit,
+            ))
+            .await
+        }
+        Outbound::Tuic(config) => {
+            Box::pin(tuic::connect(config, target, resolver, handshake_limit)).await
+        }
+        _ => {
+            Box::pin(connect_stream_selected(
+                outbound,
+                target,
+                resolver,
+                handshake_limit,
+                transport,
+                udp,
+            ))
+            .await
+        }
+    }
+}
+
+async fn connect_stream_selected(
+    outbound: &Outbound,
+    target: &Target,
+    resolver: &Resolver,
+    handshake_limit: std::time::Duration,
+    transport: Option<&Transport>,
+    udp: bool,
+) -> Result<swirl_transport::BoxStream> {
     // DNS, all address attempts, TLS and protocol negotiation share this one
     // budget. A successful TCP connection ends address fallback permanently.
     let deadline = Instant::now() + handshake_limit;
     match outbound {
-        Outbound::Hysteria2(config) => {
-            return hysteria2::connect(config, target, resolver, handshake_limit).await;
-        }
-        Outbound::Tuic(config) => {
-            return tuic::connect(config, target, resolver, handshake_limit).await;
-        }
         Outbound::Vmess {
             uuid,
             alter_id,
@@ -958,6 +970,31 @@ async fn handshake_inner(
 mod connect_tests {
     use super::*;
     use std::time::Duration;
+
+    #[test]
+    fn public_connect_futures_have_bounded_inline_storage() {
+        let outbound = Outbound::Reject {};
+        let target = Target {
+            host: "target.invalid".into(),
+            port: 443,
+        };
+        let resolver = Resolver::default();
+        let transport = Transport::Tcp {};
+        let limit = Duration::from_secs(1);
+        let ordinary = connect(&outbound, &target, &resolver, limit);
+        let explicit = connect_with_transport(&outbound, &target, &resolver, limit, &transport);
+        let udp = connect_udp_stream(&outbound, &target, &resolver, limit, None);
+        // This protects caller storage only. The official 1 MiB main-stack
+        // regression also exercises future construction and nested poll frames.
+        for (name, bytes) in [
+            ("connect", std::mem::size_of_val(&ordinary)),
+            ("connect_with_transport", std::mem::size_of_val(&explicit)),
+            ("connect_udp_stream", std::mem::size_of_val(&udp)),
+        ] {
+            println!("{name} future: {bytes} bytes");
+            assert!(bytes <= 1024, "{name} grew to {bytes} bytes");
+        }
+    }
 
     fn ss(obfs: bool) -> Outbound {
         Outbound::Shadowsocks {
