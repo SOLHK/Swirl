@@ -1,8 +1,10 @@
 //! Public conversion tests. All endpoints and credentials are synthetic.
 use serde_json::{Value, json};
+use swirl_subscription::xray::convert::{
+    Authentication, ConvertedDocument, MAX_EXPANDED_NODES, Protocol, Security, Transport,
+    ValidationStatus, convert_document, import_document,
+};
 use swirl_subscription::xray::{InputSource, parse_document};
-use swirl_subscription::xray::convert::{Authentication, ConvertedDocument, Protocol,
-    Security, Transport, ValidationStatus, MAX_EXPANDED_NODES, convert_document, import_document};
 
 const ID1: &str = "00000000-0000-4000-8000-000000000001";
 const ID2: &str = "00000000-0000-4000-8000-000000000002";
@@ -39,7 +41,9 @@ fn vless_flat_roundtrip_preserves_required_fields_and_missing_optional_fields() 
     let n = &doc.nodes()[0];
     assert_eq!(n.protocol(), Protocol::Vless);
     assert_eq!(n.validation(), ValidationStatus::Valid);
-    assert!(matches!(n.authentication(), Authentication::Vless { id: Some(id), encryption: Some(e), flow: None, level: None, email: None } if id == ID1 && e == "none"));
+    assert!(
+        matches!(n.authentication(), Authentication::Vless { id: Some(id), encryption: Some(e), flow: None, level: None, email: None } if id == ID1 && e == "none")
+    );
     assert_eq!(n.transport(), Transport::Tcp);
     assert_eq!(n.security(), Security::None);
     assert!(doc.stream_settings(0).is_none());
@@ -53,12 +57,21 @@ fn multiple_servers_expand_only_their_own_users_in_original_order() {
     let doc = roundtrip(&source);
     assert_eq!(doc.nodes().len(), 3);
     for (n, (s, u, host, port)) in doc.nodes().iter().zip([
-        (0,0,"one.example.invalid",443), (0,1,"one.example.invalid",443), (1,0,"two.example.invalid",8443)]) {
+        (0, 0, "one.example.invalid", 443),
+        (0, 1, "one.example.invalid", 443),
+        (1, 0, "two.example.invalid", 8443),
+    ]) {
         assert_eq!(n.source().server_index, Some(s));
         assert_eq!(n.source().user_index, Some(u));
         assert_eq!(n.source().outbound_path, "outbounds[0]");
-        assert_eq!(n.source().user_path.as_deref(), Some(format!("outbounds[0].settings.vnext[{s}].users[{u}]").as_str()));
-        assert!(n.endpoint().is_some_and(|e| e.address == host && e.port == port));
+        assert_eq!(
+            n.source().user_path.as_deref(),
+            Some(format!("outbounds[0].settings.vnext[{s}].users[{u}]").as_str())
+        );
+        assert!(
+            n.endpoint()
+                .is_some_and(|e| e.address == host && e.port == port)
+        );
     }
 }
 #[test]
@@ -68,17 +81,37 @@ fn vmess_legacy_alter_id_cipher_and_protocol_never_change() {
     let doc = roundtrip(&source);
     let n = &doc.nodes()[0];
     assert_eq!(n.protocol(), Protocol::Vmess);
-    assert!(matches!(n.authentication(), Authentication::Vmess { alter_id: Some(64), security: Some(s), .. } if s == "none"));
-    assert!(n.diagnostics().iter().any(|d| d.code == "VmessLegacyAlterIdUnsupported"));
-    assert!(n.diagnostics().iter().any(|d| d.code == "VmessNativeOutboundUnavailable"));
+    assert!(
+        matches!(n.authentication(), Authentication::Vmess { alter_id: Some(64), security: Some(s), .. } if s == "none")
+    );
+    assert!(
+        n.diagnostics()
+            .iter()
+            .any(|d| d.code == "VmessLegacyAlterIdUnsupported")
+    );
+    assert!(
+        n.diagnostics()
+            .iter()
+            .any(|d| d.code == "VmessNativeOutboundUnavailable")
+    );
 }
 #[test]
 fn vmess_known_and_unknown_ciphers_are_preserved_without_fallback() {
-    for cipher in ["auto","aes-128-gcm","chacha20-poly1305","none","zero","aes-128-cfb","future-cipher"] {
+    for cipher in [
+        "auto",
+        "aes-128-gcm",
+        "chacha20-poly1305",
+        "none",
+        "zero",
+        "aes-128-cfb",
+        "future-cipher",
+    ] {
         let source = json!({"protocol":"vmess","settings":{"address":"vm.example.invalid","port":443,
             "id":ID1,"alterId":0,"security":cipher}});
         let doc = roundtrip(&source);
-        assert!(matches!(doc.nodes()[0].authentication(), Authentication::Vmess { alter_id: Some(0), security: Some(s), .. } if s == cipher));
+        assert!(
+            matches!(doc.nodes()[0].authentication(), Authentication::Vmess { alter_id: Some(0), security: Some(s), .. } if s == cipher)
+        );
         assert_eq!(doc.nodes()[0].protocol(), Protocol::Vmess);
     }
 }
@@ -94,7 +127,9 @@ fn security_transport_mux_and_unknown_parameters_survive_archive() {
     assert_eq!(doc.stream_settings(0), source.get("streamSettings"));
     assert_eq!(doc.mux(0), source.get("mux"));
     assert_eq!(doc.nodes()[0].security(), Security::Reality);
-    assert!(matches!(doc.nodes()[0].authentication(), Authentication::Vless { flow: Some(s), .. } if s == "xtls-rprx-vision"));
+    assert!(
+        matches!(doc.nodes()[0].authentication(), Authentication::Vless { flow: Some(s), .. } if s == "xtls-rprx-vision")
+    );
 }
 #[test]
 fn websocket_tls_host_path_headers_and_early_data_are_not_lost() {
@@ -102,7 +137,10 @@ fn websocket_tls_host_path_headers_and_early_data_are_not_lost() {
         let mut source = vless();
         source["protocol"] = json!(protocol);
         if protocol == "vmess" {
-            source["settings"].as_object_mut().unwrap().remove("encryption");
+            source["settings"]
+                .as_object_mut()
+                .unwrap()
+                .remove("encryption");
             source["settings"]["alterId"] = json!(0);
         }
         source["streamSettings"] = json!({"network":"ws","security":"tls",
@@ -143,82 +181,157 @@ fn archives_reject_forged_execution_flags_versions_unknowns_and_duplicates() {
     assert!(ConvertedDocument::restore(&serde_json::to_vec(&value).unwrap()).is_err());
     value.as_object_mut().unwrap().remove("executable");
     value["schema"] = json!(2);
-    assert_eq!(ConvertedDocument::restore(&serde_json::to_vec(&value).unwrap()).unwrap_err().code, "ArchiveVersion");
-    let text = String::from_utf8(saved).unwrap().replacen("\"schema\":1", "\"schema\":1,\"schema\":1", 1);
-    assert_eq!(ConvertedDocument::restore(text.as_bytes()).unwrap_err().code, "ArchiveSyntax");
+    assert_eq!(
+        ConvertedDocument::restore(&serde_json::to_vec(&value).unwrap())
+            .unwrap_err()
+            .code,
+        "ArchiveVersion"
+    );
+    let text =
+        String::from_utf8(saved)
+            .unwrap()
+            .replacen("\"schema\":1", "\"schema\":1,\"schema\":1", 1);
+    assert_eq!(
+        ConvertedDocument::restore(text.as_bytes())
+            .unwrap_err()
+            .code,
+        "ArchiveSyntax"
+    );
 }
 #[test]
 fn archive_reload_rechecks_duplicate_keys_inside_the_raw_document() {
     let archive = json!({"schema":1,"source":"file","raw_json":"{\"protocol\":\"http\",\"protocol\":\"socks\"}"});
-    assert_eq!(ConvertedDocument::restore(&serde_json::to_vec(&archive).unwrap()).unwrap_err().code, "DuplicateJsonKey");
+    assert_eq!(
+        ConvertedDocument::restore(&serde_json::to_vec(&archive).unwrap())
+            .unwrap_err()
+            .code,
+        "DuplicateJsonKey"
+    );
 }
 #[test]
 fn invalid_uuid_empty_host_zero_port_and_missing_auth_are_diagnosed() {
-    for (field, value, code) in [("id",json!("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"),"InvalidUuid"),
-        ("address",json!(""),"InvalidServerAddress"), ("port",json!(0),"InvalidServerPort"),
-        ("encryption",json!(""),"MissingVlessEncryption")] {
-        let mut source = vless(); source["settings"][field] = value;
+    for (field, value, code) in [
+        (
+            "id",
+            json!("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"),
+            "InvalidUuid",
+        ),
+        ("address", json!(""), "InvalidServerAddress"),
+        ("port", json!(0), "InvalidServerPort"),
+        ("encryption", json!(""), "MissingVlessEncryption"),
+    ] {
+        let mut source = vless();
+        source["settings"][field] = value;
         let doc = roundtrip(&source);
         assert_eq!(doc.nodes()[0].validation(), ValidationStatus::Invalid);
         assert!(doc.nodes()[0].diagnostics().iter().any(|d| d.code == code));
     }
-    let mut source = vless(); source["settings"].as_object_mut().unwrap().remove("id");
-    assert_eq!(import(&source).nodes()[0].validation(), ValidationStatus::Invalid);
+    let mut source = vless();
+    source["settings"].as_object_mut().unwrap().remove("id");
+    assert_eq!(
+        import(&source).nodes()[0].validation(),
+        ValidationStatus::Invalid
+    );
 }
 #[test]
 fn malformed_types_and_out_of_range_ports_still_use_the_strict_parser() {
-    for value in [json!(65536),json!(-1),json!("443"),json!(443.0),json!(false)] {
-        let mut source = vless(); source["settings"]["port"] = value;
-        assert!(import_document(&serde_json::to_vec(&source).unwrap(),InputSource::File).is_err());
+    for value in [
+        json!(65536),
+        json!(-1),
+        json!("443"),
+        json!(443.0),
+        json!(false),
+    ] {
+        let mut source = vless();
+        source["settings"]["port"] = value;
+        assert!(import_document(&serde_json::to_vec(&source).unwrap(), InputSource::File).is_err());
     }
-    let mut source = vless(); source["settings"]["id"] = json!(42);
-    assert!(import_document(&serde_json::to_vec(&source).unwrap(),InputSource::File).is_err());
+    let mut source = vless();
+    source["settings"]["id"] = json!(42);
+    assert!(import_document(&serde_json::to_vec(&source).unwrap(), InputSource::File).is_err());
 }
 #[test]
 fn flat_and_array_forms_are_never_silently_prioritized() {
     let mut source = vless();
     source["settings"]["vnext"] = json!([{"address":"other.example.invalid","port":80,"users":[{"id":ID2,"encryption":"none"}]}]);
     let doc = roundtrip(&source);
-    assert!(doc.nodes()[0].diagnostics().iter().any(|d| d.code == "AmbiguousEndpointForms"));
-    assert_eq!(doc.nodes()[0].validation(),ValidationStatus::Invalid);
+    assert!(
+        doc.nodes()[0]
+            .diagnostics()
+            .iter()
+            .any(|d| d.code == "AmbiguousEndpointForms")
+    );
+    assert_eq!(doc.nodes()[0].validation(), ValidationStatus::Invalid);
 }
 #[test]
 fn expansion_budget_applies_to_accounts_not_only_outbound_count() {
     let user = json!({"id":ID1,"encryption":"none"});
     let mut source = json!({"protocol":"vless","settings":{"vnext":[{"address":"example.invalid","port":443,
         "users":vec![user.clone();MAX_EXPANDED_NODES]}]}});
-    assert_eq!(import(&source).nodes().len(),MAX_EXPANDED_NODES);
-    source["settings"]["vnext"][0]["users"].as_array_mut().unwrap().push(user);
-    assert_eq!(import_document(&serde_json::to_vec(&source).unwrap(),InputSource::File).unwrap_err().code,"ExpandedNodeLimit");
+    assert_eq!(import(&source).nodes().len(), MAX_EXPANDED_NODES);
+    source["settings"]["vnext"][0]["users"]
+        .as_array_mut()
+        .unwrap()
+        .push(user);
+    assert_eq!(
+        import_document(&serde_json::to_vec(&source).unwrap(), InputSource::File)
+            .unwrap_err()
+            .code,
+        "ExpandedNodeLimit"
+    );
 }
 #[test]
 fn conversion_diagnostics_are_bounded_and_unknown_keys_are_masked() {
     let mut source = vless();
-    for index in 0..65 { source["settings"][format!("SYNTHETIC_SECRET_{index}")] = json!(true); }
-    let err = import_document(&serde_json::to_vec(&source).unwrap(),InputSource::File).unwrap_err();
-    assert_eq!(err.code,"DiagnosticLimit");
+    for index in 0..65 {
+        source["settings"][format!("SYNTHETIC_SECRET_{index}")] = json!(true);
+    }
+    let err =
+        import_document(&serde_json::to_vec(&source).unwrap(), InputSource::File).unwrap_err();
+    assert_eq!(err.code, "DiagnosticLimit");
     assert!(!format!("{err:?}").contains("SYNTHETIC_SECRET"));
 }
 #[test]
 fn all_public_debug_views_redact_credentials_and_unknown_names() {
-    let mut source = vless(); source["settings"]["SYNTHETIC_TOKEN"] = json!("SYNTHETIC_PASSWORD");
+    let mut source = vless();
+    source["settings"]["SYNTHETIC_TOKEN"] = json!("SYNTHETIC_PASSWORD");
     let doc = import(&source);
     let node = &doc.nodes()[0];
-    let text = format!("{doc:?} {node:?} {:?} {:?} {}",node.authentication(),node.endpoint(),serde_json::to_string(node.diagnostics()).unwrap());
-    for secret in [ID1,"SYNTHETIC_TOKEN","SYNTHETIC_PASSWORD"] { assert!(!text.contains(secret)); }
+    let text = format!(
+        "{doc:?} {node:?} {:?} {:?} {}",
+        node.authentication(),
+        node.endpoint(),
+        serde_json::to_string(node.diagnostics()).unwrap()
+    );
+    for secret in [ID1, "SYNTHETIC_TOKEN", "SYNTHETIC_PASSWORD"] {
+        assert!(!text.contains(secret));
+    }
 }
 #[test]
 fn legacy_envelope_paths_survive_save_reload() {
     let source = json!({"outbound":vless(),"outboundDetour":[vless()],"outbounds":[vless()]});
     let doc = roundtrip(&source);
-    assert_eq!(doc.nodes().iter().map(|n| n.source().outbound_path.as_str()).collect::<Vec<_>>(),
-        ["outbound","outboundDetour[0]","outbounds[0]"]);
+    assert_eq!(
+        doc.nodes()
+            .iter()
+            .map(|n| n.source().outbound_path.as_str())
+            .collect::<Vec<_>>(),
+        ["outbound", "outboundDetour[0]", "outbounds[0]"]
+    );
 }
 #[test]
 fn short_xray_custom_ids_are_preserved_but_never_pretend_to_be_native_uuids() {
-    let mut source = vless(); source["settings"]["id"] = json!("custom-id");
+    let mut source = vless();
+    source["settings"]["id"] = json!("custom-id");
     let doc = roundtrip(&source);
-    assert_eq!(doc.nodes()[0].validation(),ValidationStatus::Unverified);
-    assert!(doc.nodes()[0].diagnostics().iter().any(|d| d.code == "CustomIdMappingUnsupported"));
-    assert!(matches!(doc.nodes()[0].authentication(),Authentication::Vless { id: Some(id), .. } if id == "custom-id"));
+    assert_eq!(doc.nodes()[0].validation(), ValidationStatus::Unverified);
+    assert!(
+        doc.nodes()[0]
+            .diagnostics()
+            .iter()
+            .any(|d| d.code == "CustomIdMappingUnsupported")
+    );
+    assert!(
+        matches!(doc.nodes()[0].authentication(),Authentication::Vless { id: Some(id), .. } if id == "custom-id")
+    );
 }
