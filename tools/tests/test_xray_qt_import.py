@@ -396,13 +396,17 @@ def run_case(protocol, executable, evidence, xray=None, client="python-stdlib-ss
                    "QT_QPA_PLATFORM": "offscreen", "QT_FORCE_STDERR_LOGGING": "1"}
             # Qt diagnostics remain private temporary data. Publish structured
             # incident locations only; assertion text can contain credentials.
-            with (folder / "qt-private.log").open("wb") as log:
-                result = subprocess.run([str(executable), QT_SLOT, "-o", str(xml_path) + ",xml"],
-                                        env=env, stdout=log, stderr=log, timeout=90)
+            # Qt 6.10's logger opens -o paths through narrow fopen_s on MSVC.
+            # Capture its XML stdout with Python's Unicode-safe file handle;
+            # configuration, fixture and encrypted-store paths stay Unicode.
+            with (folder / "qt-private.log").open("wb") as log, xml_path.open("wb") as xml:
+                result = subprocess.run([str(executable), QT_SLOT, "-o", "-,xml"],
+                                        env=env, stdout=xml, stderr=log, timeout=90)
             report["qt_exit_code"] = result.returncode
             if output.is_file():
                 report["qt"] = report_whitelist(json.loads(read_bounded(output)))
             require(xml_path.is_file(), "QtXmlReportMissing")
+            require(xml_path.stat().st_size > 0, "QtXmlReportEmpty")
             report["qtest"] = qt_outcome(read_bounded(xml_path))
             require(result.returncode == 0, "QtProcessFailed")
             validate_qt_outcome(report["qtest"])

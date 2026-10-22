@@ -317,6 +317,19 @@ Previously obtained immutable evidence:
 | D5 `32354980`, run [39721951577](https://github.com/SOLHK/Swirl/actions/runs/39721951577) | Linux and Windows passed; Windows import 20, download 15 and store 13 methods, zero skips; old macOS HTTPS fixture failed. |
 | D6 `6ddf5312`, run [39723494413](https://github.com/SOLHK/Swirl/actions/runs/39723494413) | Linux and Windows passed, including the complete Windows application build. Windows XML proves import 20, download 15, store 23 and catalog 7 methods, zero failures/skips. Old macOS fixture failed. |
 | D8 `b60b9fb6` | Clean published source was used to repeat-verify the official peer and rerun the real Qt/Rust HTTP/HTTPS chain on Linux: passed. This local result is not a three-platform CI result. |
+| D8 follow-up `514bf757`, run [39727257693](https://github.com/SOLHK/Swirl/actions/runs/39727257693) | Linux and macOS passed all gates, including authenticated HTTP/HTTPS traffic. Windows passed 72 Qt methods (including DPAPI) and 444 Rust tests plus one doctest, but its separate traffic process exited before producing XML; the full application/UI gates were not reached. |
+
+The latter Windows failure matches Qt 6.10.3's narrow-character test logger:
+[`qExec(QStringList)`](https://github.com/qt/qtbase/blob/v6.10.3/src/testlib/qtestcase.cpp#L2101-L2115)
+converts arguments with `toLocal8Bit()`, and the MSVC
+[`QAbstractTestLogger`](https://github.com/qt/qtbase/blob/v6.10.3/src/testlib/qabstracttestlogger.cpp#L115-L128)
+uses `fopen_s()` and exits with code 1 when its path cannot be opened. The
+private stderr was not uploaded, so this is a source-supported diagnosis, not
+a claim that the failed run's exact message was captured. The harness now
+requests XML on stdout and lets Python open the Unicode report path. All
+Unicode product/configuration/store paths and traffic assertions remain in
+place; empty output explicitly fails. Only the subsequent Windows workflow
+can confirm that this change restores the complete product chain.
 
 The official actionlint v1.7.7 validator also accepts the D8 workflow. GitHub
 reported the workflow active but created no run/check suite for its initial
