@@ -6,7 +6,6 @@ set(CMAKE_AUTOMOC ON)
 set(SWIRL_TEST_FONT_DIRECTORY "C:/Windows/Fonts" CACHE PATH "Offscreen test font directory")
 option(SWIRL_BUILD_UI_TESTS "Build the Qt input-driven overview checks" OFF)
 option(SWIRL_FONT_TESTS_ONLY "Configure only the independent Qt font tests, without the application or proxy engine" OFF)
-option(SWIRL_USE_RUST_CORE "Use Swirl Rust Core for production sessions and node probes; reject unsupported capabilities without external fallback" OFF)
 
 # Keep the standalone CI and the existing UI suite on the same font targets.
 # This path deliberately precedes third_party and all application/core targets.
@@ -45,6 +44,13 @@ if(SWIRL_FONT_TESTS_ONLY)
  swirl_add_font_tests()
  return()
 endif()
+
+# The old runtime selector is accepted only as ON for existing build scripts.
+# Font-only projects return above and never acquire a proxy runtime dependency.
+if(DEFINED SWIRL_USE_RUST_CORE AND NOT SWIRL_USE_RUST_CORE)
+ message(FATAL_ERROR "SWIRL_USE_RUST_CORE=OFF is no longer supported; Rust is the only product runtime")
+endif()
+set(SWIRL_USE_RUST_CORE ON CACHE BOOL "Deprecated: the product always uses Rust Core" FORCE)
 
 find_package(Qt6 6.9 REQUIRED COMPONENTS Quick Qml QuickControls2 Network Svg GuiPrivate ShaderTools)
 qt_standard_project_setup(REQUIRES 6.8)
@@ -92,31 +98,11 @@ target_sources(SwirlEngine PRIVATE engine/SwirlProtocolRegistry.h engine/SwirlPr
 target_sources(SwirlEngine PRIVATE engine/ConnectionDiagnostics.h engine/ConnectionDiagnostics.cpp)
 target_sources(SwirlEngine PRIVATE engine/NodeImportService.h engine/NodeImportService.cpp)
 target_sources(SwirlEngine PRIVATE engine/RustCoreEngine.h engine/RustCoreEngine.cpp)
-if(SWIRL_USE_RUST_CORE)
- if(NOT WIN32)
-  message(FATAL_ERROR "Rust Qt packaging is currently validated on Windows only")
- endif()
- find_program(SWIRL_CARGO cargo REQUIRED)
- get_filename_component(SWIRL_RUST_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/../../core" ABSOLUTE)
- set(SWIRL_RUST_TARGET "${CMAKE_CURRENT_BINARY_DIR}/rust-target")
- file(GLOB_RECURSE SWIRL_RUST_INPUTS CONFIGURE_DEPENDS "${SWIRL_RUST_SOURCE}/crates/*.rs" "${SWIRL_RUST_SOURCE}/crates/Cargo.toml" "${SWIRL_RUST_SOURCE}/crates/*/Cargo.toml")
- add_custom_command(OUTPUT "${SWIRL_RUST_TARGET}/release/swirl_api.dll"
-  COMMAND "${SWIRL_CARGO}" build --release --locked --manifest-path "${SWIRL_RUST_SOURCE}/Cargo.toml" --target-dir "${SWIRL_RUST_TARGET}" -p swirl-api
-  DEPENDS ${SWIRL_RUST_INPUTS} "${SWIRL_RUST_SOURCE}/Cargo.toml" "${SWIRL_RUST_SOURCE}/Cargo.lock"
-  VERBATIM)
- # Refresh the deployed DLL even when only Rust sources changed and no Qt
- # target needs relinking (POST_BUILD alone leaves a stale runtime in that case).
- add_custom_target(SwirlRustCore
-  COMMAND "${CMAKE_COMMAND}" -E make_directory "$<TARGET_FILE_DIR:Swirl>"
-  COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${SWIRL_RUST_TARGET}/release/swirl_api.dll" "$<TARGET_FILE_DIR:Swirl>/swirl_api.dll"
-  DEPENDS "${SWIRL_RUST_TARGET}/release/swirl_api.dll")
- add_dependencies(SwirlEngine SwirlRustCore)
- target_compile_definitions(SwirlEngine PUBLIC SWIRL_USE_RUST_CORE)
- add_custom_command(TARGET Swirl POST_BUILD COMMAND "${CMAKE_COMMAND}" -E copy_if_different
-  "${SWIRL_RUST_TARGET}/release/swirl_api.dll" "$<TARGET_FILE_DIR:Swirl>/swirl_api.dll")
- add_custom_command(TARGET Swirl POST_BUILD COMMAND "${CMAKE_COMMAND}" -E copy_directory
-  "${CMAKE_CURRENT_SOURCE_DIR}/packaging/rules" "$<TARGET_FILE_DIR:Swirl>/rules")
-endif()
+include(cmake/SwirlRustCore.cmake)
+swirl_pair_rust_core(SwirlEngine)
+swirl_stage_rust_core(Swirl)
+target_sources(SwirlEngine PRIVATE engine/RustCoreLibrary.h engine/RustCoreLibrary.cpp)
+target_sources(Swirl PRIVATE engine/RustCoreSelfTest.h engine/RustCoreSelfTest.cpp)
 target_link_libraries(SwirlEngine PUBLIC Qt6::Core Qt6::Network Qt6::Gui)
 add_library(SwirlExtensions STATIC app/ExtensionService.h app/ExtensionService.cpp)
 target_link_libraries(SwirlExtensions PUBLIC SwirlEngine Qt6::Core Qt6::Qml)
@@ -264,16 +250,13 @@ if(SWIRL_BUILD_UI_TESTS)
  if(SWIRL_USE_RUST_CORE)
   add_executable(SwirlRustCoreTests tests/RustCoreTests.cpp)
   target_link_libraries(SwirlRustCoreTests PRIVATE SwirlEngine Qt6::Test)
-  add_custom_command(TARGET SwirlRustCore POST_BUILD
-   COMMAND "${CMAKE_COMMAND}" -E make_directory "$<TARGET_FILE_DIR:SwirlRustCoreTests>"
-   COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${SWIRL_RUST_TARGET}/release/swirl_api.dll" "$<TARGET_FILE_DIR:SwirlRustCoreTests>/swirl_api.dll")
+  swirl_stage_rust_core(SwirlRustCoreTests)
+  include(cmake/RustCoreLibraryTests.cmake)
+  swirl_add_rust_library_tests()
   target_compile_definitions(SwirlRustCoreTests PRIVATE SWIRL_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
   if(MSVC)
    target_compile_options(SwirlRustCoreTests PRIVATE /utf-8)
   endif()
-  add_custom_command(TARGET SwirlRustCoreTests POST_BUILD
-   COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${SWIRL_RUST_TARGET}/release/swirl_api.dll" "$<TARGET_FILE_DIR:SwirlRustCoreTests>/swirl_api.dll"
-   COMMAND "${CMAKE_COMMAND}" -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/packaging/rules" "$<TARGET_FILE_DIR:SwirlRustCoreTests>/rules")
   # Qt's Windows text logger may use OutputDebugString when the runner has no
   # console. Keep an explicit report so CI can show the actual failed assertion.
   add_test(NAME swirl-rust-qt-integration COMMAND SwirlRustCoreTests
@@ -444,3 +427,12 @@ if(WIN32)
  target_sources(Swirl PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/Swirl.rc")
  target_link_libraries(Swirl PRIVATE dwmapi advapi32 psapi shell32)
 endif()
+
+foreach(runtime_target IN ITEMS SwirlProxyGuard SwirlExtensionTests SwirlTelemetryTests
+ SwirlDiagnosticTests SwirlSystemProxyTests SwirlAcceptance SwirlNodeTests
+ SwirlNetworkRegressionTests SwirlImportTests SwirlSubscriptionFormatTests
+ SwirlPrivateSubscriptionInspect)
+ if(TARGET ${runtime_target})
+  swirl_stage_rust_core(${runtime_target})
+ endif()
+endforeach()

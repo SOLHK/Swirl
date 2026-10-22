@@ -1,4 +1,5 @@
 #include <QGuiApplication>
+#include "engine/RustCoreSelfTest.h"
 #include "app/SingleInstance.h"
 #include "app/ShutdownCoordinator.h"
 #include "app/FontManager.h"
@@ -94,6 +95,15 @@ static void recordQtDiagnostic(QtMsgType type, const QMessageLogContext &, const
 
 int main(int argc, char *argv[])
 {
+    // Package verification runs the real EXE/DLL, before any UI, NodeStore,
+    // system-proxy ownership, or persisted settings are opened.
+    for (int i = 1; i < argc; ++i) {
+        if (QByteArray(argv[i]) == "--rust-core-self-test") {
+            QCoreApplication selfTest(argc, argv);
+            if (i + 1 >= argc) return 64;
+            return runRustCoreSelfTest(QString::fromLocal8Bit(argv[i + 1]));
+        }
+    }
 #ifdef Q_OS_WIN
     SetCurrentProcessExplicitAppUserModelID(L"SOLHK.Swirl.Desktop");
 #endif

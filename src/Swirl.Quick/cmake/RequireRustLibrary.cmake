@@ -1,0 +1,7 @@
+if(NOT DEFINED SWIRL_LIBRARY OR NOT EXISTS "${SWIRL_LIBRARY}" OR IS_DIRECTORY "${SWIRL_LIBRARY}")
+ message(FATAL_ERROR "Cargo did not produce the required Rust Core library: ${SWIRL_LIBRARY}")
+endif()
+file(SIZE "${SWIRL_LIBRARY}" size)
+if(size LESS 1024)
+ message(FATAL_ERROR "The Rust Core library is empty or truncated: ${SWIRL_LIBRARY}")
+endif()
