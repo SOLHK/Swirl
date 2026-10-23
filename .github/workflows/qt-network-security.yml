@@ -1,0 +1,126 @@
+name: Qt HTTP client security
+
+on:
+  push:
+    branches: [work/qt-http2-security-20261023]
+  pull_request:
+    paths:
+      - '.github/workflows/qt-network-security.yml'
+      - 'src/Swirl.Quick/network/**'
+      - 'src/Swirl.Quick/engine/**'
+      - 'src/Swirl.Quick/tests/**'
+      - 'src/Swirl.Quick/CMakeLists.txt'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qt-network-security-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  downloader:
+    name: Qt 6.10.3 downloader (${{ matrix.host }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            host: linux
+            arch: linux_gcc_64
+            generator: Ninja
+            configure_args: ''
+          - os: macos-latest
+            host: mac
+            arch: clang_64
+            generator: Ninja
+            configure_args: ''
+          - os: windows-2022
+            host: windows
+            arch: win64_msvc2022_64
+            generator: Visual Studio 17 2022
+            configure_args: -A x64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Linux Qt dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1-mesa-dev libxkbcommon-dev
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.10.3'
+          host: ${{ matrix.host }}
+          target: desktop
+          arch: ${{ matrix.arch }}
+          cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install independent TLS fixture certificate support
+        run: python -m pip install cryptography==50.0.2
+      - name: Configure real downloader tests without starting a proxy core
+        run: cmake -S src/Swirl.Quick/tests/qt-network -B build/qt-network -G "${{ matrix.generator }}" ${{ matrix.configure_args }} -DCMAKE_BUILD_TYPE=Release
+      - run: cmake --build build/qt-network --config Release --parallel 2
+      - name: Deploy Windows Qt runtime
+        if: runner.os == 'Windows'
+        run: windeployqt --release build/qt-network/Release/SwirlQtNetworkPolicyTests.exe
+      - name: Verify real TLS negotiation, redirects, parsing and rejection paths
+        run: ctest --test-dir build/qt-network -C Release --output-on-failure
+      - name: Preserve exact-source network evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qt-network-${{ matrix.host }}-${{ github.sha }}
+          path: |
+            build/qt-network/qt-network-policy.xml
+            build/qt-network/Testing/Temporary/LastTest.log
+          if-no-files-found: error
+
+  windows-product:
+    name: Windows Qt product regression
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain for the actual product
+        run: rustup toolchain install stable --profile minimal --target x86_64-pc-windows-msvc
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.10.3'
+          host: windows
+          target: desktop
+          arch: win64_msvc2022_64
+          modules: qtshadertools
+          cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install independent TLS fixture certificate support
+        run: python -m pip install cryptography==50.0.2
+      - name: Configure product with existing regression drivers
+        run: cmake -S src/Swirl.Quick -B build/qt-product -G "Visual Studio 17 2022" -A x64 -DSWIRL_BUILD_UI_TESTS=ON
+      - name: Build product and network regression targets
+        run: cmake --build build/qt-product --config Release --target Swirl SwirlImportTests SwirlTelemetryTests SwirlQtNetworkPolicyTests --parallel 2
+      - name: Deploy actual Qt product runtime
+        run: windeployqt --release --qmldir src/Swirl.Quick/qml build/qt-product/Release/Swirl.exe
+      - name: Verify Windows DPAPI subscription refresh and redirects
+        shell: pwsh
+        run: |
+          & build/qt-product/Release/SwirlImportTests.exe subscriptionAtomicRefreshAndEncryptedUrl httpsRedirectAndDowngradeProtection redirectsPreserveNodesAndBoundLoops -o build/qt-product/subscription-security.xml,xml -o -,txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify download policy, HTTPS measurements and preserved capture HTTP/2 input
+        run: ctest --test-dir build/qt-product -C Release -R "^swirl-(qt-network-policy|telemetry-accounting|capture-network)$" --output-on-failure
+      - name: Preserve Windows product evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qt-network-product-windows-${{ github.sha }}
+          path: |
+            build/qt-product/subscription-security.xml
+            build/qt-product/qt-network-policy.xml
+            build/qt-product/Testing/Temporary/LastTest.log
+          if-no-files-found: error

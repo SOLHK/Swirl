@@ -4,6 +4,7 @@
 #include <QTemporaryDir>
 #include <QDateTime>
 #include <QNetworkReply>
+#include <QNetworkProxy>
 #include <QTcpServer>
 #include <QTcpSocket>
 #include "ControlledNetwork.h"
@@ -14,6 +15,64 @@ class TelemetryTests:public QObject {
  Q_OBJECT
  ProxyEngine::Status sample(qint64 time,int up,int down){ProxyEngine::Status s;s.processAlive=true;s.processId=1;s.apiHealthy=true;s.connectionsAt=time;s.trafficAt=time;s.uploadTotal=up;s.downloadTotal=down;s.uploadRate=up;s.downloadRate=down;s.connections={QVariantMap{{"id","connection-a"},{"host","fixture.test"},{"process","fixture.exe"},{"policy","DIRECT"},{"category","direct"},{"uploadBytes",up},{"downloadBytes",down},{"time",QDateTime::fromMSecsSinceEpoch(time).toString(Qt::ISODateWithMs)}}};return s;}
 private slots:
+ void httpsMeasurementStaysHttp1WhenOriginOffersHttp2(){
+  const auto original=QSslConfiguration::defaultConfiguration();
+  struct RestoreSsl {QSslConfiguration value;~RestoreSsl(){QSslConfiguration::setDefaultConfiguration(value);}} restore{original};
+  QFile certificate(QStringLiteral(SWIRL_FIXTURE_DIR "/localhost-cert.pem"));
+  QFile key(QStringLiteral(SWIRL_FIXTURE_DIR "/localhost-key.pem"));
+  QVERIFY(certificate.open(QIODevice::ReadOnly));QVERIFY(key.open(QIODevice::ReadOnly));
+  const QSslCertificate cert(certificate.readAll());const QSslKey privateKey(key.readAll(),QSsl::Rsa);
+  QVERIFY(!cert.isNull());QVERIFY(!privateKey.isNull());
+  auto trusted=original;trusted.addCaCertificate(cert);
+  QSslConfiguration::setDefaultConfiguration(trusted);
+  auto serverSsl=trusted;serverSsl.setLocalCertificate(cert);serverSsl.setPrivateKey(privateKey);
+  serverSsl.setPeerVerifyMode(QSslSocket::VerifyNone); // This fixture does not require client certificates.
+  serverSsl.setAllowedNextProtocols({QByteArray("h2"),QByteArray("http/1.1")});
+  QList<QByteArray> protocols,requestLines;
+  QSslServer origin;origin.setSslConfiguration(serverSsl);
+  QVERIFY(origin.listen(QHostAddress::LocalHost,0));
+  connect(&origin,&QSslServer::pendingConnectionAvailable,&origin,[&]{
+   while(origin.hasPendingConnections()){
+    auto *socket=qobject_cast<QSslSocket *>(origin.nextPendingConnection());
+    if(!socket)continue;
+    const auto protocol=socket->sslConfiguration().nextNegotiatedProtocol();protocols.append(protocol);
+    connect(socket,&QTcpSocket::disconnected,socket,&QObject::deleteLater);
+    // Negotiating h2 is the regression: this endpoint deliberately handles
+    // only HTTP/1.1 payloads and never sends malformed HTTP/2 frames.
+    if(protocol=="h2"){socket->disconnectFromHost();continue;}
+    auto data=std::make_shared<QByteArray>();
+    const auto respond=[&,socket,data]{
+     *data+=socket->readAll();if(!data->contains("\r\n\r\n")||socket->property("responded").toBool())return;
+     socket->setProperty("responded",true);requestLines.append(data->left(data->indexOf("\r\n")));
+     socket->write("HTTP/1.1 200 OK\r\nContent-Length: 12\r\nConnection: close\r\n\r\n203.0.113.10");
+     socket->disconnectFromHost();
+    };
+    connect(socket,&QTcpSocket::readyRead,socket,respond);if(socket->bytesAvailable())respond();
+   }
+  });
+  // A verified TLS positive control proves this exact origin can select h2.
+  QSslSocket control;control.setProxy(QNetworkProxy::NoProxy);
+  auto controlSsl=trusted;controlSsl.setAllowedNextProtocols({QByteArray("h2"),QByteArray("http/1.1")});
+  control.setSslConfiguration(controlSsl);QSignalSpy encrypted(&control,&QSslSocket::encrypted);
+  control.connectToHostEncrypted("localhost",origin.serverPort());
+  QTRY_VERIFY_WITH_TIMEOUT(!encrypted.isEmpty(),4000);
+  QTRY_COMPARE_WITH_TIMEOUT(protocols.size(),1,4000);QCOMPARE(protocols.first(),QByteArray("h2"));
+  control.abort();protocols.clear();
+
+  QTemporaryDir temp;QVERIFY(temp.isValid());TelemetryService model(temp.filePath("https-policy.json"),false);
+  const QUrl url(QString("https://localhost:%1/probe").arg(origin.serverPort()));
+  model.m_measurements=1;model.measureHttp("internet",url,false);
+  QTRY_COMPARE_WITH_TIMEOUT(model.m_measurements,0,5000);
+  QVERIFY(model.internetDiagnostic().value("success").toBool());
+  QCOMPARE(model.internetDiagnostic().value("http").toInt(),200);
+  // The public-IP measurement uses the same real request path.
+  model.m_measurements=1;model.measureHttp("exit",url,false,true);
+  QTRY_COMPARE_WITH_TIMEOUT(model.m_measurements,0,5000);
+  QCOMPARE(model.externalIp(),QString("203.0.113.10"));
+  QCOMPARE(protocols.size(),2);QCOMPARE(requestLines.size(),2);
+  for(const auto &protocol:protocols)QVERIFY(protocol.isEmpty()||protocol=="http/1.1");
+  for(const auto &line:requestLines)QCOMPARE(line,QByteArray("GET /probe HTTP/1.1"));
+ }
  void proxyLatencyComesFromRustAndRejectsUntrustedTargetTls(){
   ControlledNetwork net;QVERIFY(net.start());QTemporaryDir directory;QVERIFY(directory.isValid());
   QTcpServer reservation;QVERIFY(reservation.listen(QHostAddress::LocalHost,0));

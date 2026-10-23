@@ -121,3 +121,25 @@ GCC 13.3, Rust 1.99.1 and the isolated checkout. Commands: `cargo fmt --all
 and CMake/CTest in `src/Swirl.Quick/tests/xray`. These are checkpoint checks,
 not final U1 acceptance. The final SHA will be rebuilt and tested after the
 subscription bridge, security and CI changes are integrated.
+
+## U1-E1: Qt request mitigation in the product path
+
+Security source `9dd8a675eed6374ac1c35265074f594a39262479` is retained
+as this merge's second parent. Its request policy covers subscription download,
+telemetry, capture-origin requests and the product self-test, including rebuilt
+redirect requests. All three Qt HTTP/2 request switches are explicitly disabled;
+certificate verification and Rust's native HTTP/2/gRPC transports are preserved.
+
+The official Qt advisory identifies 6.8.0–6.8.9 and 6.9.0–6.11.2 as affected,
+and names 6.8.10/6.11.3 or its qtbase patch as fixes. U1's local installed SDK is
+6.10.3, so local runs test the advisory's temporary request-level mitigation.
+The unified CI must validate the fixed 6.11.3 product SDK before claiming an
+upgraded shipped library. See the advisory linked in the source policy.
+
+Integration found that the security branch's redirect fixture changed ports,
+while the newer subscription bridge deliberately rejects cross-origin URLs to
+protect signed source URLs/cookies. The positive TLS redirect case now exercises
+two real same-origin requests; an additional negative case verifies a different
+origin is rejected before TLS/HTTP reaches it. No production redirect restriction
+was relaxed. The standalone suite now links the current JSON converter and
+builds/stages the same checked Rust library as the product.
