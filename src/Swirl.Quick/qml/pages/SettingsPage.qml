@@ -247,10 +247,10 @@ Item {
                             SwirlText {Layout.minimumWidth:0;Layout.fillWidth:true;wrapMode:Text.Wrap; text:"Codex 与其他应用兼容建议"; color:Theme.text; font.pixelSize:Theme.fontSize(14); font.weight:Font.DemiBold }
                             GridLayout {columns:width<Theme.dp(430)?1:2;columnSpacing:Theme.compactGap;rowSpacing:Theme.compactGap;
                                 Layout.fillWidth:true
-                                SwirlText {Layout.minimumWidth:0;wrapMode:Text.Wrap; text:"Swirl Core 代理内核"; color:Theme.text; font.pixelSize:Theme.fontSize(14); Layout.fillWidth:true }
-                                SwirlToggle { objectName:"nativeCoreStatus"; checked:true; enabled:false; Accessible.name:"Swirl Core 代理内核" }
+                                SwirlText {Layout.minimumWidth:0;wrapMode:Text.Wrap; text:"Rust Core 代理内核"; color:Theme.text; font.pixelSize:Theme.fontSize(14); Layout.fillWidth:true }
+                                SwirlToggle { objectName:"nativeCoreStatus"; checked:true; enabled:false; Accessible.name:"Rust Core 代理内核" }
                             }
-                            SwirlText {Layout.minimumWidth:0; text:"当前版本使用 Swirl Core，节点连接由原生内核执行。"; color:Theme.muted; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
+                            SwirlText {Layout.minimumWidth:0; text:"Swirl 使用自研 Rust Core 执行节点连接。"; color:Theme.muted; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
                             SwirlTextArea { readOnly:true; selectByMouse:true; text:engineController.proxyEnvironmentAdvice; Layout.fillWidth:true; wrapMode:TextEdit.Wrap; font.family:Theme.fontFamily; font.pixelSize:Theme.fontSize(12); color:Theme.text; background:null }
                             SwirlText {Layout.minimumWidth:0; text:"Rust Core 会在连接时校验节点、DNS 和规则能力；不支持的配置会显示阻止原因，原设置保持不变。当前版本尚不支持 TUN 网关转发。"; color:Theme.muted; wrapMode:Text.Wrap; Layout.fillWidth:true; font.pixelSize:Theme.fontSize(12) }
                             Rectangle { Layout.fillWidth:true; Layout.preferredHeight:Theme.dp(1); color:Theme.border }
@@ -279,7 +279,7 @@ Item {
                                 }
                             }
                             SwirlText {
-                                text:"当前引擎："+(engineController.engineKind==="rust"?"Swirl Core":engineController.engineName)+(engineController.engineReason?"\n"+engineController.engineReason:"")
+                                text:"当前引擎："+(engineController.engineKind==="rust"?"Rust Core":engineController.engineName)+(engineController.engineReason?"\n"+engineController.engineReason:"")
                                 color:Theme.muted;font.pixelSize:Theme.fontSize(12);wrapMode:Text.Wrap;Layout.fillWidth:true
                             }
                             SwirlText {
@@ -288,7 +288,7 @@ Item {
                                 color:Theme.muted; font.pixelSize:Theme.fontSize(12); wrapMode:Text.Wrap; Layout.fillWidth:true
                             }
                             SwirlText {
-                                text:"内核模块：swirl_api.dll"+"　运行版本："+(engineController.engineKind==="rust"?(engineController.version||"未读取").replace("Swirl Core Rust","Swirl Core"):(engineController.version||"未读取"))+"　运行时间："+engineController.uptimeSeconds+" 秒"
+                                text:"内核模块：swirl_api.dll"+"　运行版本："+(engineController.engineKind==="rust"?(engineController.version||"未读取").replace("Swirl Core Rust","Rust Core"):(engineController.version||"未读取"))+"　运行时间："+engineController.uptimeSeconds+" 秒"
                                 color:Theme.muted; font.pixelSize:Theme.fontSize(12); wrapMode:Text.Wrap; Layout.fillWidth:true
                             }
                             SwirlText {
@@ -305,7 +305,7 @@ Item {
                                 color:Theme.muted; font.pixelSize:Theme.fontSize(11); wrapMode:Text.WrapAnywhere; Layout.fillWidth:true
                             }
                             SwirlText {
-                                text:engineController.engineKind==="rust"?engineController.configurationSummary.replace("Swirl Core Rust","Swirl Core"):engineController.configurationSummary; visible:text.length>0
+                                text:engineController.engineKind==="rust"?engineController.configurationSummary.replace("Swirl Core Rust","Rust Core"):engineController.configurationSummary; visible:text.length>0
                                 color:Theme.muted; font.pixelSize:Theme.fontSize(11); wrapMode:Text.WrapAnywhere; Layout.fillWidth:true
                             }
                         }

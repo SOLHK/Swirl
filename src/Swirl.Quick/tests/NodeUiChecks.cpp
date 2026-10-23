@@ -129,12 +129,21 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     check(subscriptions.listen(QHostAddress::LocalHost,0),"subscription HTTPS fixture listens");
     eval("AppState.navigate('subscriptions')");QTest::qWait(350);
     click("addSubscription");fill("subscriptionName","Subscription fixture");fill("subscriptionUrl",QString("https://localhost:%1/fixture").arg(subscriptions.serverPort()));click("saveSubscription");
+    const auto pendingProviders=controller->imports()->providers();
+    if(!pendingProviders.isEmpty()){
+        auto *badge=item("subscriptionStatus-"+pendingProviders.first().toMap().value("id").toString());
+        check(badge&&badge->property("busy").toBool()==controller->imports()->busy(),"subscription indicator reflects the actual pending operation");
+    }
     const auto businessQa=qEnvironmentVariable("SWIRL_UI_QA_DIRECTORY");
     if(!businessQa.isEmpty()) {
         QDir().mkpath(businessQa+"/business-frames");
         for(int frame=0;frame<25;++frame){QTest::qWait(40);window->grabWindow().scaledToWidth(1000,Qt::SmoothTransformation).save(businessQa+QString("/business-frames/%1.png").arg(frame,3,10,QChar('0')));}
     }
     check(QTest::qWaitFor([&]{return !controller->imports()->busy();},8000)&&controller->imports()->providers().size()==1&&controller->nodes().size()==1&&subscriptionRequests==1,"subscription UI saves HTTPS source and imports an actual node");
+    if(!controller->imports()->providers().isEmpty()){
+        auto *badge=item("subscriptionStatus-"+controller->imports()->providers().first().toMap().value("id").toString());
+        check(badge&&!badge->property("busy").toBool()&&badge->property("tone").toString()=="success","subscription success follows completed storage and stops busy motion");
+    }
     eval("AppState.navigate('proxies')");QTest::qWait(350);
     check(eval("pageLoader.item.countries.length===1 && pageLoader.item.countries[0].code==='HK'").toBool(),"country filter contains only the imported subscription's actual Hong Kong label");
     eval("pageLoader.item.countryCode='HK'");

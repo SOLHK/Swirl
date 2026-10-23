@@ -13,10 +13,11 @@ Item {
   function edit(record){editingId=record?record.id:"";displayName.text=record?record.name:"";urlField.text="";formatPreference.currentIndex=record?Math.max(0,["auto","loon","shadowrocket","surge","quantumult-x","sing-box"].indexOf(record.formatHint)):0;importScope.currentIndex=record&&record.importScope==="full-profile"?1:0;interval.currentIndex=record?Math.max(0,[360,720,1440,10080].indexOf(record.intervalMinutes)):0;autoEnabled.checked=record?record.enabled:true;addDialog.open()}
  readonly property var providers:engineController.imports.providers
  SwirlAnimatedModel{id:subscriptionModel;source:page.listed;keyRole:"id"}
- readonly property var listed:providers.filter(function(r){return r.name.toLowerCase().indexOf(search.text.toLowerCase())>=0})
+ readonly property string searchQuery:search.text.trim().toLowerCase()
+ readonly property var listed:providers.filter(function(r){return r.name.toLowerCase().indexOf(page.searchQuery)>=0})
  ColumnLayout { anchors.fill:parent;anchors.margins:Theme.dp(24);spacing:Theme.gap
   RowLayout { Layout.fillWidth:true
-   SwirlText {textRole:"largeTitle";id:routeTitle; text:"订阅管理";color:Theme.text;font.pixelSize:Theme.fontSize(30);font.weight:Font.DemiBold;Layout.fillWidth:true }
+   SwirlText {textRole:"pageTitle";id:routeTitle; text:"订阅管理";color:Theme.text;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold;Layout.fillWidth:true }
    SwirlButton { text:"更新全部";enabled:!engineController.imports.busy;onClicked:engineController.imports.refreshAll() }
    SwirlButton { objectName:"addSubscription";text:"添加订阅";primary:true;enabled:!engineController.imports.busy;onClicked:page.edit(null) }
   }
@@ -26,7 +27,7 @@ Item {
    ListView { pixelAligned: true; id:subscriptionList;objectName:"subscriptionList";model:subscriptionModel;spacing:Theme.gap;clip:true
     add:Transition{enabled:!SwirlMotion.reduced;NumberAnimation{property:"opacity";from:0;to:1;duration:SwirlMotion.duration}}
     remove:Transition{enabled:!SwirlMotion.reduced;NumberAnimation{property:"opacity";to:0;duration:SwirlMotion.exitDuration}}
-    displaced:Transition{enabled:!SwirlMotion.reduced;NumberAnimation{property:"y";duration:SwirlMotion.expandDuration;easing.type:Easing.OutCubic}}
+    displaced:Transition{enabled:!SwirlMotion.reduced;NumberAnimation{property:"y";duration:SwirlMotion.expandDuration;easing.type:SwirlMotion.standardEasing}}
     delegate:SwirlHeroCard {
       id:provider;objectName:'subscriptionCard-'+record.id
       required property var entry;readonly property var record:entry
@@ -38,7 +39,7 @@ Item {
         id:header;x:Theme.cardPadding;y:Theme.cardPadding;width:parent.width-2*Theme.cardPadding;spacing:Theme.dp(9)
         RowLayout {Layout.fillWidth:true
           SwirlText {objectName:'subscriptionTitle-'+provider.record.id;text:provider.record.name;textFormat:Text.PlainText;color:Theme.text;font.pixelSize:Theme.fontSize(18+4*provider.reveal);font.weight:Font.DemiBold;Layout.fillWidth:true;elide:Text.ElideRight}
-          SwirlStatusBadge {busy:provider.record.status==='正在更新';label:provider.record.status;tone:provider.record.status==='已保存真实节点'?'success':provider.record.status==='更新失败'?'warning':'neutral'}
+          SwirlStatusBadge {objectName:'subscriptionStatus-'+provider.record.id;busy:provider.record.status==='正在更新';label:provider.record.status==='已保存真实节点'?'已更新':provider.record.status;tone:provider.record.status==='已保存真实节点'?'success':provider.record.status==='更新失败'?'warning':'neutral'}
           SwirlText {text:provider.record.nodes+' 个节点';color:Theme.muted}
         }
         SwirlText {text:'最近更新：'+provider.record.update;color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
@@ -76,7 +77,7 @@ Item {
         SwirlButton {objectName:'deleteSubscription-'+provider.record.id;text:'删除';danger:true;enabled:!engineController.imports.busy;onClicked:{deleteDialog.recordId=provider.record.id;deleteDialog.open()}}
       }
     }
-    footer:SwirlText {visible:page.listed.length===0;text:"暂无订阅。添加订阅后，可在卡片内查看更新状态。";color:Theme.muted;width:subscriptionList.width;wrapMode:Text.Wrap}
+    footer:SwirlText {visible:page.listed.length===0;text:page.providers.length?"没有匹配的订阅。请调整搜索内容。":"暂无订阅。添加订阅后，可在卡片内查看更新状态。";color:Theme.muted;width:subscriptionList.width;wrapMode:Text.Wrap}
 
    }
   }

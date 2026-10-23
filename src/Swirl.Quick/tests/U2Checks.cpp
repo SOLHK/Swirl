@@ -2,6 +2,7 @@
 #include <QQuickItem>
 #include <QQmlExpression>
 #include <QQmlContext>
+#include <QJSValue>
 #include <QTest>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -12,6 +13,11 @@
 #include <QElapsedTimer>
 #include <QTimer>
 #include <QEventLoop>
+#include <QMutex>
+#include <QMutexLocker>
+#include <algorithm>
+#include <functional>
+#include <memory>
 #include "app/NodeViewModel.h"
 #ifdef Q_OS_WIN
 #define WIN32_LEAN_AND_MEAN
@@ -41,6 +47,85 @@ int runU2Checks(QQuickWindow *window, const QString &output) {
     const QSize initial=window->size();
     const double sidebar=eval("window.actualSidebarWidth").toDouble();
     sample("cold");
+    if(phase=="S4"){
+        navigate("proxies");
+        auto *model=window->findChild<NodeViewModel *>("nodeViewModel");
+        if(!model)return 2;
+        auto *controller=model->controller();model->setController(nullptr);
+        auto *table=window->findChild<QQuickItem *>("realNodeTable");
+        auto *list=table?table->findChild<QQuickItem *>("tableRowsViewport"):nullptr;
+        auto *hero=window->findChild<QQuickItem *>("nodeHero");
+        if(!table||!list||!hero)return 2;
+        QList<double> navigationResponses,navigationComplete,selectionResponses,selectionComplete;
+        for(const int count:{100,500,1000,2000}){
+            QVariantList rows;
+            for(int i=0;i<count;++i)rows.append(QVariantMap{{"id",QString::number(i)},{"name",QString("日本 Tokyo · 性能样本 %1").arg(i,4,10,QChar('0'))},{"protocol",i%2?"vless":"ss"},{"host","node.example.test"},{"port",9},{"address","node.example.test:9"},{"regionName","日本"},{"regionCode","JP"},{"status","可用"},{"latency",QString::number(10+i)},{"capability",QVariantMap{{"native",false},{"compatible",false},{"engine","synthetic fixture"}}}});
+            QElapsedTimer load;load.start();model->updateRows(rows);const double updateMs=load.nsecsElapsed()/1e6;wait(180);
+            check(QString("nodes-%1").arg(count),model->rowCount()==count);
+            check(QString("virtualized-%1").arg(count),table->property("renderedRows").toInt()<100);
+            sample(QString("nodes-%1-before").arg(count));
+            QElapsedTimer search;search.start();
+            for(int i=0;i<20;++i){model->setQuery(i%2?"TOKYO":"VLESS");check("search-count",model->rowCount()==(i%2?count:count/2));}
+            const double searchMs=search.nsecsElapsed()/1e6;model->setQuery("");wait(100);
+            struct FrameSamples {QList<double> values;QMutex mutex;QElapsedTimer clock;qint64 last=0;};
+            const auto frameSamples=std::make_shared<FrameSamples>();frameSamples->clock.start();
+            auto connection=QObject::connect(window,&QQuickWindow::frameSwapped,window,[frameSamples]{QMutexLocker lock(&frameSamples->mutex);const auto now=frameSamples->clock.nsecsElapsed();if(frameSamples->last)frameSamples->values.append((now-frameSamples->last)/1e6);frameSamples->last=now;},Qt::DirectConnection);
+            QElapsedTimer eventClock;eventClock.start();double maxGap=0;QTimer ticker;ticker.setInterval(8);
+            QObject::connect(&ticker,&QTimer::timeout,&ticker,[&]{maxGap=qMax(maxGap,eventClock.nsecsElapsed()/1e6);eventClock.restart();});ticker.start();
+            const double extent=qMax(0.0,list->property("contentHeight").toDouble()-list->height());
+            QHash<QObject *,QString> identities;int reused=0,stale=0;
+            auto *content=list->property("contentItem").value<QQuickItem *>();
+            std::function<void(QQuickItem *)> inspectLatency=[&](QQuickItem *cell){
+                if(cell->property("measured").isValid()&&cell->property("measured").toDouble()>=0&&qAbs(cell->property("measured").toDouble()-cell->property("displayed").toDouble())>.01)++stale;
+                for(auto *child:cell->childItems())inspectLatency(child);
+            };
+            for(int i=0;i<80;++i){list->setProperty("contentY",extent*(i<40?i:79-i)/39.0);wait(8);
+                for(auto *row:content?content->childItems():QList<QQuickItem *>{}){
+                    const auto value=row->property("record");
+                    const auto record=value.metaType()==QMetaType::fromType<QJSValue>()?value.value<QJSValue>().toVariant().toMap():value.toMap();if(record.isEmpty())continue;
+                    const auto id=record.value("id").toString();
+                    if(identities.contains(row)&&identities.value(row)!=id){++reused;inspectLatency(row);}
+                    identities.insert(row,id);
+                }
+            }
+            check(QString("pooled-latency-identity-%1").arg(count),reused>0&&stale==0);
+            ticker.stop();QObject::disconnect(connection);QList<double> frames;
+            {QMutexLocker lock(&frameSamples->mutex);frames=frameSamples->values;}
+            std::sort(frames.begin(),frames.end());
+            const auto percentile=[&](const QList<double> &values,double p){return values.isEmpty()?0:values[qMin(values.size()-1,qsizetype(values.size()*p))];};
+            samples.append(QJsonObject{{"scenario",QString("nodes-%1-scroll").arg(count)},{"updateMs",updateMs},{"search20Ms",searchMs},{"renderedRows",table->property("renderedRows").toInt()},{"frames",frames.size()},{"p95FrameMs",percentile(frames,.95)},{"p99FrameMs",percentile(frames,.99)},{"maxEventLoopGapMs",maxGap},{"reusedDelegates",reused},{"staleLatencyOnReuse",stale}});
+            list->setProperty("contentY",0);wait(150);
+            QQmlExpression firstRow(qmlContext(list),list,"itemAtIndex(0)");
+            auto *first=qobject_cast<QQuickItem *>(firstRow.evaluate().value<QObject *>());
+            QQuickItem *latencyCell=nullptr;
+            std::function<void(QQuickItem *)> findLatency=[&](QQuickItem *item){if(item->property("measured").isValid()&&item->property("measured").toDouble()>=0)latencyCell=item;for(auto *child:item->childItems())findLatency(child);};
+            if(first)findLatency(first);
+            auto changedRow=rows[0].toMap();changedRow["latency"]="90";rows[0]=changedRow;model->updateRows(rows);wait(40);
+            const double intermediate=latencyCell?latencyCell->property("displayed").toDouble():-1;
+            check("same-node-latency-still-animates",intermediate>10&&intermediate<90);
+            wait(300);check("same-node-latency-settles-to-real-measurement",latencyCell&&qAbs(latencyCell->property("displayed").toDouble()-90)<.01);
+            samples.append(QJsonObject{{"scenario",QString("nodes-%1-latency").arg(count)},{"intermediate",intermediate},{"settled",latencyCell?latencyCell->property("displayed").toDouble():-1},{"measured",latencyCell?latencyCell->property("measured").toDouble():-1}});
+            for(int i=0;i<8;++i){
+                QElapsedTimer response;response.start();
+                QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,table->mapToScene(QPointF(85,table->property("headerHeight").toDouble()+table->property("itemHeight").toDouble()*(i%4+.5))).toPoint());
+                selectionResponses.append(response.nsecsElapsed()/1e6);
+                check("selection-opens-actual-detail",hero->property("opened").toBool());
+                check("selection-settles",QTest::qWaitFor([&]{return !hero->property("moving").toBool();},2500));selectionComplete.append(response.nsecsElapsed()/1e6);
+                QTest::keyClick(window,Qt::Key_Escape);check("escape-restores-list",QTest::qWaitFor([&]{return !hero->property("opened").toBool()&&!hero->property("moving").toBool();},2500));
+            }
+            window->grabWindow().save(QFileInfo(output).absolutePath()+QString("/nodes-%1.png").arg(count));
+            sample(QString("nodes-%1-after").arg(count));
+        }
+        model->setController(controller);
+        for(int i=0;i<20;++i){QElapsedTimer response;response.start();eval(i%2?"AppState.navigate('proxies')":"AppState.navigate('activity')");navigationResponses.append(response.nsecsElapsed()/1e6);check("navigation-settles",QTest::qWaitFor([&]{return !eval("pageLoader.pendingGrab || pageLoader.moving || !pageLoader.item || pageLoader.activeLoader.routeId!==pageLoader.routeKey").toBool();},3000));navigationComplete.append(response.nsecsElapsed()/1e6);}
+        navigate("activity");wait(600);sample("idle-start");wait(3000);sample("idle-end");
+        window->showMinimized();wait(300);sample("minimized-start");wait(3000);sample("minimized-end");window->showNormal();wait(100);
+        QJsonObject timing;
+        for(auto pair:{qMakePair(QString("navigationDispatch"),&navigationResponses),qMakePair(QString("navigationComplete"),&navigationComplete),qMakePair(QString("selectionDispatch"),&selectionResponses),qMakePair(QString("selectionComplete"),&selectionComplete)}){std::sort(pair.second->begin(),pair.second->end());timing[pair.first+"P95Ms"]=pair.second->isEmpty()?0:pair.second->at(qMin(pair.second->size()-1,qsizetype(pair.second->size()*.95)));}
+        check("shell-size-preserved",window->size()==initial);check("sidebar-preserved",eval("window.actualSidebarWidth").toDouble()==sidebar);
+        QFile file(output);QDir().mkpath(QFileInfo(output).absolutePath());if(!file.open(QIODevice::WriteOnly))return 2;
+        file.write(QJsonDocument(QJsonObject{{"phase",phase},{"checks",checks},{"failures",failures},{"samples",samples},{"timing",timing},{"dpr",window->devicePixelRatio()},{"note","Synthetic public model data only; no network acceptance. Dispatch is synchronous event handling, completion includes full animation; neither is input-to-photon latency."}}).toJson());return failures?1:0;
+    }
     if(phase=="navigation"){
         navigate("activity");QTest::keyClick(window,Qt::Key_Escape);wait(250);
         check("primary-escape-keeps-window",window->isVisible()&&eval("AppState.currentPage").toString()=="activity");
@@ -115,7 +200,7 @@ int runU2Checks(QQuickWindow *window, const QString &output) {
         check("native-node-model",model!=nullptr);
         if(model){
             auto *controller=model->controller();model->setController(nullptr);
-            for(const int count:{419,5000}){
+            for(const int count:{100,500,1000,2000,419,5000}){
                 QVariantList rows;for(int i=0;i<count;++i)rows.append(QVariantMap{{"id",QString::number(i)},{"name",QString("日本 Tokyo · 长节点名称性能样本 %1").arg(i)},{"protocol",i%2?"vless":"ss"},{"host","node.example.test"},{"regionName","日本"},{"regionCode","JP"},{"status","未测试"},{"latency","—"}});
                 QElapsedTimer load;load.start();model->updateRows(rows);wait(100);
                 check(QString("nodes-%1").arg(count),model->rowCount()==count);

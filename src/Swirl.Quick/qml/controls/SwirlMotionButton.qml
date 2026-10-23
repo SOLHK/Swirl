@@ -8,7 +8,7 @@ Button {
     property real motionScale: pressMotion && enabled && down ? SwirlMotion.pressScale : 1
     Behavior on motionScale {
         enabled: !SwirlMotion.reduced
-        NumberAnimation { duration:control.down?SwirlMotion.pressDuration:SwirlMotion.releaseDuration; easing.type:Easing.OutCubic }
+        NumberAnimation { duration:control.down?SwirlMotion.pressDuration:SwirlMotion.releaseDuration; easing.type:SwirlMotion.standardEasing }
     }
     Binding { target:control.background; property:"scale"; value:control.motionScale; when:control.background!==null }
     onPressed: SwirlMotion.noteTrigger(control)

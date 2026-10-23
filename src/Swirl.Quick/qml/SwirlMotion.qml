@@ -8,6 +8,7 @@ QtObject {
     readonly property bool reduced: Theme.reduceMotion || (Theme.followSystemMotion && motionPolicy.systemReducedMotion)
     readonly property real spring: 3.2 * speed * speed
     readonly property real damping: 0.28
+    readonly property int standardEasing: Easing.OutCubic
     function ms(value){return reduced ? 0 : Math.round(value/Math.max(0.25,speed))}
     readonly property int duration:ms(180)
     readonly property int pressDuration:ms(80)
@@ -19,6 +20,8 @@ QtObject {
     readonly property int dialogDuration:ms(220)
     readonly property int exitDuration:ms(160)
     readonly property int expandDuration:ms(360)
+    readonly property int statusDuration:ms(160)
+    readonly property int activityCycleDuration:ms(900)
     readonly property real pressScale: reduced ? 1 : 0.98
     property bool transitioning: false
     readonly property bool busy: transitioning || SwirlTransitionRegistry.activeCount>0

@@ -4,7 +4,7 @@ Item {
     id:motion
     property var control:parent
     property real value:control && control.down?SwirlMotion.pressScale:1
-    Behavior on value {enabled:!SwirlMotion.reduced;NumberAnimation {duration:motion.control && motion.control.down?SwirlMotion.pressDuration:SwirlMotion.releaseDuration;easing.type:Easing.OutCubic}}
+    Behavior on value {enabled:!SwirlMotion.reduced;NumberAnimation {duration:motion.control && motion.control.down?SwirlMotion.pressDuration:SwirlMotion.releaseDuration;easing.type:SwirlMotion.standardEasing}}
     Binding {target:motion.control?motion.control.background:null;property:"scale";value:motion.value;when:motion.control!==null && motion.control.background!==null}
     Connections {target:motion.control;function onPressed(){SwirlMotion.noteTrigger(motion.control)}}
 }

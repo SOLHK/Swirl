@@ -4,6 +4,7 @@
 #include <QGuiApplication>
 #include <QClipboard>
 #include <limits>
+#include <algorithm>
 
 QVariant NodeRows::data(const QModelIndex &index,int role) const {
     return index.isValid()&&index.row()<rows.size()&&role==Qt::UserRole?QVariant(rows[index.row()]):QVariant();
@@ -11,18 +12,31 @@ QVariant NodeRows::data(const QModelIndex &index,int role) const {
 bool NodeRows::update(const QVariantList &values) {
     bool changed=false;
     QSet<QString> incoming;for(const auto &v:values)incoming.insert(v.toMap().value("id").toString());
-    for(int i=rows.size()-1;i>=0;--i)if(!incoming.contains(rows[i].value("id").toString())){beginRemoveRows({},i,i);rows.removeAt(i);endRemoveRows();changed=true;}
+    for(int last=rows.size()-1;last>=0;){
+        if(incoming.contains(rows[last].value("id").toString())){--last;continue;}
+        const int end=last;
+        while(last>=0&&!incoming.contains(rows[last].value("id").toString()))--last;
+        beginRemoveRows({},last+1,end);rows.remove(last+1,end-last);endRemoveRows();changed=true;
+    }
     QHash<QString,int> indices;for(int i=0;i<rows.size();++i)indices.insert(rows[i].value("id").toString(),i);
     QList<QVariantMap> added;
+    QList<int> updated;
     for(const auto &v:values){const auto row=v.toMap();const auto id=row.value("id").toString();if(id.isEmpty())continue;
         const int index=indices.value(id,-1);
         if(index<0){indices.insert(id,rows.size()+added.size());added.append(row);}
-        else if(index<rows.size()&&rows[index]!=row){rows[index]=row;emit dataChanged(this->index(index),this->index(index),{Qt::UserRole});changed=true;}
+        else if(index<rows.size()&&rows[index]!=row){rows[index]=row;updated.append(index);changed=true;}
+    }
+    // Publish adjacent changes together after all rows are current. The proxy
+    // sorts/filters one range instead of doing that work once per test result.
+    std::sort(updated.begin(),updated.end());
+    for(qsizetype i=0;i<updated.size();){const int first=updated[i];int last=first;
+        while(++i<updated.size()&&updated[i]<=last+1)last=updated[i];
+        emit dataChanged(this->index(first),this->index(last),{Qt::UserRole});
     }
     if(!added.isEmpty()){beginInsertRows({},rows.size(),rows.size()+added.size()-1);rows.append(added);endInsertRows();changed=true;}
     return changed;
 }
-NodeViewModel::NodeViewModel(QObject *parent):QSortFilterProxyModel(parent),m_rows(this) {
+NodeViewModel::NodeViewModel(QObject *parent):QSortFilterProxyModel(parent),m_rows(this),m_refreshTimer(this) {
     QSettings settings;const auto saved=settings.value("NodePreferences/favorites").toStringList();m_favorites=QSet<QString>(saved.begin(),saved.end());
     m_recent=settings.value("NodePreferences/recent").toStringList();m_recent=m_recent.mid(0,32);
     setSourceModel(&m_rows);setDynamicSortFilter(true);setSortRole(Qt::UserRole);sort(0);
@@ -34,8 +48,10 @@ void NodeViewModel::setController(EngineController *value){
     m_refreshTimer.stop();
     if(value){connect(value,&EngineController::nodesChanged,this,&NodeViewModel::scheduleRefresh);connect(value,&EngineController::statusChanged,this,[this]{
         if(m_controller->connected()&&m_controller->requestSucceeded()&&!m_controller->activeNodeId().isEmpty()){
-            const auto id=m_controller->activeNodeId();if(id!=m_lastConnected){m_lastConnected=id;m_recent.removeAll(id);m_recent.prepend(id);m_recent=m_recent.mid(0,32);QSettings().setValue("NodePreferences/recent",m_recent);}
-        }else m_lastConnected.clear();scheduleRefresh();
+            const auto id=m_controller->activeNodeId();if(id!=m_lastConnected){m_lastConnected=id;m_recent.removeAll(id);m_recent.prepend(id);m_recent=m_recent.mid(0,32);QSettings().setValue("NodePreferences/recent",m_recent);scheduleRefresh();}
+        }else m_lastConnected.clear();
+        // EngineController emits nodesChanged for row-affecting state. Traffic,
+        // uptime and subscription progress must not rebuild the whole catalog.
     });}
     refresh();emit controllerChanged();
 }

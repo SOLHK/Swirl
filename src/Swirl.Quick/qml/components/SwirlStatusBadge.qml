@@ -6,7 +6,9 @@ Rectangle {
     property string label: ""
     property string tone: "neutral"
     property bool busy:false
-    Behavior on color{ColorAnimation{duration:SwirlMotion.duration}}
+    Accessible.role:Accessible.StaticText
+    Accessible.name:AppState.zh(label)
+    Behavior on color{enabled:!SwirlMotion.reduced;ColorAnimation{duration:SwirlMotion.statusDuration}}
     SwirlActivityIndicator{anchors.left:parent.left;anchors.leftMargin:Theme.dp(6);anchors.verticalCenter:parent.verticalCenter;busy:badge.busy}
     implicitWidth: caption.implicitWidth + Theme.dp(busy?40:20)
     implicitHeight:Theme.dp(24)
@@ -23,8 +25,8 @@ Rectangle {
         text: AppState.zh(badge.label)
         font.pixelSize:Theme.fontSize(11)
         font.weight: Font.Medium
-        color: tone === "success" ? Theme.green :
-               tone === "warning" ? Theme.orange :
+        color: tone === "success" ? (Theme.dark?"#A6EDC6":"#176341") :
+               tone === "warning" ? (Theme.dark?"#FFE0AD":"#82420A") :
                tone === "accent" ? Theme.accent : Theme.muted
     }
 }

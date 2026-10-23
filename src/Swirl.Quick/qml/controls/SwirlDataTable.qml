@@ -125,7 +125,9 @@ Item {
                     z:1
                     width:list.width; height:table.itemHeight
                     property var record:table.externalModel!==null||table.incrementalRows?model.entry:modelData
-                    ListView.onPooled:if(table.selectedItem===recordRow)table.selectedItem=null
+                    property bool pooled:false
+                    ListView.onPooled:{pooled=true;if(table.selectedItem===recordRow)table.selectedItem=null}
+                    ListView.onReused:pooled=false
                     property Item titleElement:null
                     Accessible.role:Accessible.ListItem
                     Accessible.selected:table.selectedId===String(record.id||record.name)
@@ -150,7 +152,16 @@ Item {
                                     readonly property real measured:table.animateLatency && modelData.key==="latency" && raw.length && isFinite(Number(raw))?Number(raw):-1
                                     property real displayed:-1
                                     property real previous:-1
-                                    onMeasuredChanged:{if(measured>=0 && previous>=0 && !SwirlMotion.reduced)numberSlide.restart();else{numberSlide.stop();displayed=measured}previous=measured}
+                                    readonly property string rowIdentity:String(recordRow.record.id||recordRow.record.name||"")
+                                    property string measuredIdentity:""
+                                    function settleMeasurement(){numberSlide.stop();displayed=measured;previous=measured;measuredIdentity=rowIdentity}
+                                    onRowIdentityChanged:settleMeasurement()
+                                    onMeasuredChanged:{
+                                        if(rowIdentity===measuredIdentity && measured>=0 && previous>=0 && !recordRow.pooled && recordRow.visible && !SwirlMotion.reduced){numberSlide.to=measured;numberSlide.restart()}
+                                        else{numberSlide.stop();displayed=measured}
+                                        previous=measured;measuredIdentity=rowIdentity
+                                    }
+                                    Connections {target:recordRow;function onPooledChanged(){cell.settleMeasurement()}function onVisibleChanged(){if(!recordRow.visible)cell.settleMeasurement()}}
                                     SmoothedAnimation{id:numberSlide;target:cell;property:"displayed";to:cell.measured;duration:SwirlMotion.duration;velocity:-1}
                                     text:measured>=0?String(Math.round(displayed)):raw
                                     textFormat:Text.PlainText
