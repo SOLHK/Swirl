@@ -336,3 +336,74 @@ The four product suites that formerly wrote only text files now also emit XML
 and stdout, preserving assertions while making future CI failures directly
 diagnosable. Changes in this section need a fresh clean-SHA regression; the
 stage runs above are not added together into final acceptance.
+
+## U1-F4: platform regression corrections and preserved failure evidence
+
+The last pre-publication branch check, at `2026-10-23 05:12:30 UTC`, still
+contains 47 branches. Every source branch matches the previous freeze snapshot;
+only this integration branch advanced. No source worktree, source branch or
+`main` was changed. The following are **historical results for exactly
+`cf9de0fcd1bf0e70e58d2d8fa7b76b7a797bb702`**, not acceptance of this next commit.
+
+| Exact stage evidence | Actual result and scope |
+| --- | --- |
+| [Native protocols 39903102964](https://github.com/SOLHK/Swirl/actions/runs/39903102964) | All six jobs passed. Rust workspace totals were 674 on Linux/macOS and 675 on Windows, with no failed/ignored tests. The extra Windows case executes relocated-executable MRS lookup from a different working directory. The official/reference-peer menus passed on all three platforms, including the strict Windows Hysteria2 and SS2022 startup regressions. |
+| [Native transports 39903102974](https://github.com/SOLHK/Swirl/actions/runs/39903102974) | All three platform jobs passed. Each DNS/routing menu executed 132 tests without failures, errors or skips; the later transport menus retain their separate actual results. This is controlled routing/peer evidence, not a physical-device or provider-network result. |
+| [Qt security 39903103044](https://github.com/SOLHK/Swirl/actions/runs/39903103044) | All six OS/SDK download jobs and the Windows fixed-Qt product-security job passed. Each downloader matrix job has 11 passing Qt incidents, no failures/skips, and source-matched Rust metadata. |
+| [Product 39903102958](https://github.com/SOLHK/Swirl/actions/runs/39903102958) | Linux/macOS complete Qt 6.11.3 application builds, 25-incident native loader tests and actual application loopback self-tests passed. Windows executed 14 CTest suites: 13 passed; one REALITY source-provenance assertion failed. The subsequent independent Qt subscription fixture, production package, repeated UI starts and installer were not reached and are not marked passed. |
+| [Nine Qt fixtures 39903102999](https://github.com/SOLHK/Swirl/actions/runs/39903102999) | Failed because installing Qt changed the active Python after `cryptography` had been installed. Actual XML covers only one of nine slots (SOCKS5 UDP); eight are missing and no REALITY lifecycle mode ran. The collector correctly returned failure rather than counting the missing slots as successes. |
+| [Observation 39903102991](https://github.com/SOLHK/Swirl/actions/runs/39903102991) | PowerShell 7 passed on Windows/Linux. Windows PowerShell 5.1 failed the JSON-array rejection contract. Its concrete type-wrapper difference requires the correction below and a new Windows 5.1 run. |
+| [Importer 39903102938](https://github.com/SOLHK/Swirl/actions/runs/39903102938) | Linux/macOS completed all nine Qt suites with no failing/skipped incidents, plus seven actual HTTP/HTTPS node cases. Those portable reports explicitly say `persisted=false` and `reloaded=false`. Windows built the complete application and passed seven of nine Qt suites (211 passing, 11 failing, zero skipped incidents). One policy reload comparison confused QStringList with QVariantList; ten negative-loader fixtures were built into a different configuration directory. The real production DLL checks passed. Windows download cancellation/retry, encrypted snapshot/restore and active-session protection passed; subsequent Windows protocol/UI steps were not reached. |
+| Local full product at this same stage SHA | Qt 6.10.3/GCC 13/C++23 complete application build and actual HTTP/SOCKS5/CONNECT/cleanup self-test passed. Twelve product CTest suites were executed: six passed and six failed at the missing non-Windows encrypted-storage precondition. The failures remain failures, including 28 RustCoreTests cases; no DPAPI replacement, plaintext fallback or new skip was introduced. |
+
+The product workflow also retained a genuine public-network failure: authenticated
+Rust Shadowsocks delivered HTTP 200 and verified TLS/HTTPS 204, but strict TLS
+shutdown failed with `SSLEOFError` at `origin-close`. Core/listener/peer cleanup
+completed. This result is not converted into a pass because the response arrived.
+The next test records the failed Core snapshot and performs at most one bounded
+diagnostic connection to the same chosen public IP/SNI/ALPN/HTTP target. Its
+result has `proxy_result=false`, cannot replace the original failure, and still
+requires certificate verification and strict TLS shutdown. Three real local TLS
+controls require orderly close, reject truncation after 204 and reject an
+untrusted certificate. The local public direct-control attempt was blocked by
+DNS resolution, so it supplies no conclusion about the remote origin.
+
+Corrections included at this checkpoint:
+
+- Require an actual `System.Management.Automation.PSCustomObject` for manifest
+  roots, nested Rust metadata and file entries on both PowerShell generations.
+  Preserve the original 36 cases and add six array-wrapper rejection cases.
+- Install the locked Python TLS dependency after the Qt action changes PATH,
+  using the same Python 3.12 interpreter that executes all nine real fixtures.
+  No fixture, lifecycle mode, public-network or zero-skip gate is removed.
+- Preserve direct JSON source bytes exactly; for a Base64 wrapper, compare the
+  exact effective bytes produced by the existing outer-whitespace normalizer.
+  A new parser test checks byte equality, SHA-256, source index and preserved
+  outbound values for raw and wrapped input. The Windows encrypted reload test
+  additionally compares source document, fingerprint and node index unchanged.
+  Protocol/profile/ALPN assertions and unsupported-option negatives remain.
+- Compare reloaded policy snapshots in the actual persisted JSON model, while
+  retaining the strict in-memory comparison and every DNS/group/rule value.
+  Require the same explicitly selected node ID after refresh, NodeStore reload
+  and EngineController recreation; container-type differences cannot conceal
+  changed values or array order.
+- Explicitly place all ten malformed-library fixtures in the test executable's
+  `loader-fixtures` directory for every CMake configuration. Parent-project
+  `RUNTIME_OUTPUT_DIRECTORY_RELEASE` previously overrode the generic directory
+  on Windows. The original actual-DLL/ABI/identity checks remain, and future
+  Windows failures also emit stderr diagnostics.
+- Retain the original public-network failure and strict-close assertions while
+  adding the bounded direct-origin diagnostic and independent TLS controls.
+
+Local candidate checks for this correction passed 42 PowerShell 7 identity
+cases, three real TLS controls and nine fixture-evidence guard tests. The actual
+Qt parser also passed exact byte/hash/index checks for direct JSON, Base64 and
+Base64 with outer whitespace; both changed Qt test executables compiled. These
+are pre-commit component checks. An actual Ninja Multi-Config Release build with
+both parent output-directory overrides produced all ten shared fixtures in the
+expected directory and passed the original 25 loader incidents without skips;
+Windows DLL verification still requires the new commit's runner. All final
+builds and regressions must run again on
+the newly published clean SHA; the earlier stage's green jobs cannot be carried
+forward. The known non-Windows storage, unsupported product-mode and real-device
+limits remain classified in the source/feature audits.

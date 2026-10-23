@@ -21,13 +21,14 @@ import socketserver
 import ssl
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import unittest
 
 from cryptography.exceptions import InvalidTag
 from test_product_subscription_chain import Relay, Server, SsStream
-from test_rust_core import public_verifier, target
+from test_rust_core import certificates, public_verifier, target
 
 
 PUBLIC_TARGETS = {('example.com', 80), ('www.gstatic.com', 443)}
@@ -171,6 +172,51 @@ def resolve_public_targets(deadline):
     return endpoints, evidence
 
 
+def direct_tls_close_control(endpoint, deadline, *, host='www.gstatic.com', port=443, context=None):
+    """One diagnostic connection to the failed request's exact public endpoint.
+
+    Its result never changes the proxy result. Preserve certificate validation,
+    HTTP framing and strict TLS shutdown so an origin-side EOF can be compared
+    without inventing a proxy fallback or retrying the failed business request.
+    The context/authority overrides are only for independent loopback tests.
+    """
+    family, address = endpoint
+    result = {'scope': 'direct-origin-diagnostic-only', 'proxy_result': False,
+              'host': host, 'port': port, 'address': address, 'path': '/generate_204',
+              'attempted': False, 'success': False, 'certificate_verified': False,
+              'environment_proxy_used': False, 'connection_policy': 'keep-alive'}
+    deadline = min(deadline, time.monotonic() + 8)
+    stream = None
+    phase = 'tcp'
+    try:
+        timeout = remaining(deadline, 8)
+        result['attempted'] = True
+        stream = socket.socket(family, socket.SOCK_STREAM)
+        stream.settimeout(timeout)
+        stream.connect((address, port))
+        phase = 'origin-tls'
+        context = context or ssl.create_default_context()
+        context.set_alpn_protocols(['http/1.1'])
+        stream = context.wrap_socket(stream, server_hostname=host,
+                                     do_handshake_on_connect=False, suppress_ragged_eofs=False)
+        stream.settimeout(remaining(deadline, 8))
+        stream.do_handshake()
+        result.update(certificate_verified=True, tls_version=stream.version())
+        phase = 'public-response'
+        stream.settimeout(remaining(deadline, 8))
+        stream.sendall(f'GET /generate_204 HTTP/1.1\r\nHost: {host}\r\nConnection: keep-alive\r\n\r\n'.encode())
+        public_response(stream, deadline, 204, result)
+        phase = 'origin-close'
+        public_verifier.close_https(stream, deadline)
+        result.update(success=True, orderly_close=True)
+    except Exception as error:
+        result.update(failure_phase=phase, failure=safe_error(error))
+    finally:
+        if stream is not None:
+            stream.close()
+    return result
+
+
 class PublicShadowsocksRelay(Relay):
     """Relay's node/document API with a separate, fixed public destination policy.
 
@@ -213,6 +259,7 @@ class PublicShadowsocksRelay(Relay):
                     with owner.lock:
                         owner.live_sockets.add(upstream)
                         event = {'peer': identity, 'host': host, 'port': port,
+                                 'origin_address': address, 'origin_family': int(family),
                                  'authenticated': True, 'upload': 0, 'download': 0,
                                  'closed': False}
                         owner.connections.append(event)
@@ -507,6 +554,28 @@ class R1PublicProxyTests(unittest.TestCase):
             failure = error
             report['failure_phase'] = phase
             report['failure'] = safe_error(error)
+            if control is not None and handle is not None and control.usable:
+                try:
+                    snapshot = control.command(work_deadline, op='snapshot', handle=handle)
+                    state = snapshot.get('status', {}) if snapshot.get('ok') else {}
+                    report['failure_core'] = {key: state.get(key) for key in
+                        ('accepted', 'active', 'failed', 'upload', 'download',
+                         'last_error', 'last_error_stage')}
+                except Exception as diagnostic_error:
+                    report['failure_core_error'] = safe_error(diagnostic_error)
+            # Compare only a failed TLS request which reached its authenticated
+            # peer. Pin that same chosen address: no DNS refresh, alternate
+            # endpoint, provider credential, extra formal request or retry.
+            if report['requests'] and report['requests'][-1].get('stage') in (
+                    'origin-tls', 'public-response', 'origin-close'):
+                request_result = report['requests'][-1]
+                matching = [event for peer in peers if peer.identity == request_result['node']
+                            for event in peer.connections
+                            if event['host'] == 'www.gstatic.com' and event['port'] == 443]
+                if matching:
+                    event = matching[-1]
+                    report['direct_origin_control'] = direct_tls_close_control(
+                        (event['origin_family'], event['origin_address']), work_deadline)
         finally:
             if control is not None and handle is not None and control.usable:
                 try:
@@ -551,6 +620,81 @@ class R1PublicProxyTests(unittest.TestCase):
             output.write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
         self.assertTrue(report['success'], json.dumps({key: report.get(key) for key in
                         ('failure_phase', 'failure', 'cleanup')}, sort_keys=True))
+
+
+class PublicTlsControlTests(unittest.TestCase):
+    """Actual TLS peers prove the diagnostic does not accept truncation."""
+    def run_control(self, *, truncate=False, trusted=True):
+        with tempfile.TemporaryDirectory() as folder:
+            server_context, _, ca_pem = certificates(folder)
+            closed = threading.Event()
+            requests = []
+
+            class Handler(socketserver.BaseRequestHandler):
+                def handle(self):
+                    stream = self.request
+                    stream.settimeout(3)
+                    try:
+                        stream = server_context.wrap_socket(stream, server_side=True,
+                                                            suppress_ragged_eofs=False)
+                        requests.append(read_header(stream, time.monotonic() + 3))
+                        stream.sendall(b'HTTP/1.1 204 No Content\r\nContent-Length: 0\r\n\r\n')
+                        if not truncate:
+                            stream = stream.unwrap()
+                            stream.shutdown(socket.SHUT_WR)
+                            require(stream.recv(1) == b'', 'ControlClientDidNotClose')
+                            closed.set()
+                    except ssl.SSLError:
+                        if trusted:
+                            raise
+                    finally:
+                        stream.close()
+
+            server = Server(('127.0.0.1', 0), Handler)
+            server.errors, server.fixture_kind = [], 'public-close-control'
+            thread = threading.Thread(target=server.serve_forever,
+                                      kwargs={'poll_interval': 0.01}, daemon=True)
+            thread.start()
+            try:
+                context = ssl.create_default_context(cadata=ca_pem) if trusted else ssl.create_default_context()
+                result = direct_tls_close_control((socket.AF_INET, '127.0.0.1'),
+                    time.monotonic() + 3, host='localhost', port=server.server_address[1], context=context)
+                if result['success']:
+                    self.assertTrue(closed.wait(1))
+                return result, requests
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(1)
+                self.assertFalse(thread.is_alive())
+                self.assertEqual(server.errors, [])
+
+    def test_control_requires_verified_tls_response_and_orderly_close(self):
+        result, requests = self.run_control()
+        self.assertTrue(result['success'], result)
+        self.assertTrue(result['certificate_verified'])
+        self.assertTrue(result['orderly_close'])
+        self.assertFalse(result['proxy_result'])
+        self.assertEqual(result['http_status'], 204)
+        self.assertEqual(len(requests), 1)
+        self.assertIn(b'Connection: keep-alive\r\n', requests[0])
+
+    def test_control_records_missing_close_notify_as_failure_after_204(self):
+        result, requests = self.run_control(truncate=True)
+        self.assertFalse(result['success'], result)
+        self.assertTrue(result['certificate_verified'])
+        self.assertEqual(result['http_status'], 204)
+        self.assertEqual(result['failure_phase'], 'origin-close')
+        self.assertEqual(result['failure']['type'], 'SSLEOFError')
+        self.assertEqual(len(requests), 1)
+
+    def test_control_rejects_untrusted_tls_before_http(self):
+        result, requests = self.run_control(trusted=False)
+        self.assertFalse(result['success'], result)
+        self.assertFalse(result['certificate_verified'])
+        self.assertEqual(result['failure_phase'], 'origin-tls')
+        self.assertEqual(result['failure']['type'], 'SSLCertVerificationError')
+        self.assertEqual(requests, [])
 
 
 if __name__ == '__main__':

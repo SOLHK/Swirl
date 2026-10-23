@@ -32,13 +32,6 @@ jobs:
           arch: x64
       - name: Rust MSVC x64
         run: rustup toolchain install stable --profile minimal --target x86_64-pc-windows-msvc
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Install independent fixture TLS implementation
-        run: python -m pip install cryptography==50.0.2
-      - name: Validate the fixture evidence gate
-        run: python -m unittest discover -s tools/tests -p test_u1_qt_fixtures.py -v
       - uses: jurplel/install-qt-action@v4
         with:
           version: '6.11.3'
@@ -49,6 +42,16 @@ jobs:
           # Upstream PR 1000 handles Qt 6.11's architecture-specific repository path.
           aqtsource: 'git+https://github.com/miurahr/aqtinstall.git@8c3695d4a4e1ceabf6a74dc6c79681656dc6b74b'
           cache: true
+      # The Qt action runs setup-python itself. Restore the acceptance Python
+      # after it changes PATH, then install and exercise the fixture dependency
+      # with the same interpreter that will execute the nine protocol slots.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install independent fixture TLS implementation
+        run: python -m pip install cryptography==50.0.2
+      - name: Validate the fixture evidence gate
+        run: python -m unittest discover -s tools/tests -p test_u1_qt_fixtures.py -v
       - name: Build current-source Rust command hosts
         run: cargo build --manifest-path core/Cargo.toml --workspace --release --locked --lib --bins
       - name: Configure the paired Qt fixture executable

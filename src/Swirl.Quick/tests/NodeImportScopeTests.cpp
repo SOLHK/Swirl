@@ -265,6 +265,7 @@ private slots:
         auto *imports=controller.imports();QVERIFY(imports->saveSubscription({},"profile",source.url(),360,false));
         const auto sourceId=imports->providers().first().toMap().value("id").toString();imports->refreshSubscription(sourceId);
         QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),10000);QVERIFY2(controller.nodeCatalog().size()==1,qPrintable(imports->message()));
+        const auto nodeId=controller.nodeCatalog().first().toMap().value("id").toString();QVERIFY(controller.chooseNode(nodeId));
         const auto retained=controller.networkConfigurationSnapshot();NodeStore original(path);
         const auto provenance=original.networkConfiguration().value("importedConfiguration").toObject();
         QCOMPARE(provenance.value("sourceId").toString(),sourceId);
@@ -272,9 +273,16 @@ private slots:
         payload["dns"]=QJsonObject{{"nameserver",QJsonArray{"192.0.2.53"}}};payload["rules"]=QJsonArray{"MATCH,DIRECT"};
         source.body=QJsonDocument(payload).toJson();imports->refreshSubscription(sourceId);
         QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),10000);QCOMPARE(source.requests,2);QCOMPARE(controller.networkConfigurationSnapshot(),retained);
+        QCOMPARE(controller.selectedNodeId(),nodeId);
         NodeStore reloaded(path);auto updated=reloaded.networkConfiguration().value("importedConfiguration").toObject();
         QVERIFY(updated.take("policyRetainedAfterNodesOnlyRefresh").toBool());QCOMPARE(updated,provenance);
-        EngineController reopened(std::make_unique<RustCoreEngine>(),nullptr,path,true);QCOMPARE(reopened.networkConfigurationSnapshot(),retained);
+        EngineController reopened(std::make_unique<RustCoreEngine>(),nullptr,path,true);
+        // JSON persists arrays, not QVariant's QStringList/QVariantList type
+        // distinction. Compare every policy value in its persisted data model;
+        // a changed DNS server, group member, or rule must still fail this check.
+        QCOMPARE(QJsonObject::fromVariantMap(reopened.networkConfigurationSnapshot()),QJsonObject::fromVariantMap(retained));
+        QCOMPARE(reopened.nodeCatalog().size(),1);QCOMPARE(reopened.nodeCatalog().first().toMap().value("id").toString(),nodeId);
+        QCOMPARE(reloaded.selectedId(),nodeId);QCOMPARE(reopened.selectedNodeId(),nodeId);
         reopened.shutdown();controller.shutdown();
     }
 

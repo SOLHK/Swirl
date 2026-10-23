@@ -126,6 +126,30 @@ try {
     Assert-Rejected 'bad-json' { param($p) [IO.File]::WriteAllText((Join-Path $p 'package-manifest.json'),'{') } 'IDENTITY_METADATA_SIZE'
     Assert-Rejected 'invalid-json' { param($p) [IO.File]::WriteAllText((Join-Path $p 'package-manifest.json'),'{broken}') } 'IDENTITY_METADATA_JSON'
     Assert-Rejected 'array-json' { param($p) [IO.File]::WriteAllText((Join-Path $p 'package-manifest.json'),'[]') } 'IDENTITY_METADATA_OBJECT'
+    Assert-Rejected 'single-manifest-array' {
+        param($p) $file=Join-Path $p 'package-manifest.json';$json=[IO.File]::ReadAllText($file)
+        [IO.File]::WriteAllText($file,(" `r`n["+$json+"] `r`n"))
+    } 'IDENTITY_METADATA_OBJECT'
+    Assert-Rejected 'multiple-manifest-array' {
+        param($p) $file=Join-Path $p 'package-manifest.json';$json=[IO.File]::ReadAllText($file)
+        [IO.File]::WriteAllText($file,('['+$json+','+$json+']'))
+    } 'IDENTITY_METADATA_OBJECT'
+    Assert-Rejected 'single-rust-array' {
+        param($p) $file=Join-Path $p 'swirl-rust-build.json';$json=[IO.File]::ReadAllText($file)
+        [IO.File]::WriteAllText($file,('['+$json+']'))
+    } 'IDENTITY_METADATA_OBJECT'
+    Assert-Rejected 'single-legacy-array' {
+        param($p) $file=Join-Path $p 'PRODUCT.json';$json=[IO.File]::ReadAllText($file)
+        [IO.File]::WriteAllText($file,('['+$json+']'))
+    } 'IDENTITY_METADATA_OBJECT' $true
+    Assert-Rejected 'nested-rust-array' {
+        param($p) $file=Join-Path $p 'package-manifest.json';$json=Read-SwirlIdentityJson $file (8*1024*1024)
+        $json.rust=@($json.rust);Write-Json $file $json
+    } 'IDENTITY_CURRENT_MANIFEST_INVALID'
+    Assert-Rejected 'nested-file-entry-array' {
+        param($p) $file=Join-Path $p 'package-manifest.json';$json=Read-SwirlIdentityJson $file (8*1024*1024)
+        $json.files[0]=@($json.files[0]);Write-Json $file $json
+    } 'IDENTITY_MANIFEST_ENTRY_INVALID'
     Assert-Rejected 'oversized-json' { param($p) [IO.File]::WriteAllText((Join-Path $p 'swirl-rust-build.json'),(' ' * 65537)) } 'IDENTITY_METADATA_SIZE'
     Assert-Rejected 'legacy-build-disabled' { param($p) [IO.File]::WriteAllText((Join-Path $p 'BUILD.txt'),"$source SWIRL_USE_RUST_CORE=OFF") } 'IDENTITY_LEGACY_BUILD_MISMATCH' $true
     Assert-Rejected 'legacy-core-claim' {

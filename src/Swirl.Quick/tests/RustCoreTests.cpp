@@ -253,7 +253,12 @@ private slots:
      QVERIFY(original.nativeExecutable);QVERIFY(original.runtimeIssues.isEmpty());
      QCOMPARE(original.nativeOutbound.value("reality").toObject().value("fingerprint"),QJsonValue(profile));
      const auto decoded=body.startsWith('{')?body:QByteArray::fromBase64(body);
-     QCOMPARE(original.sourceDocument,decoded);QCOMPARE(original.sourceNodeIndex,0);
+     // Direct JSON reaches Rust byte-for-byte. Base64 wrappers first pass
+     // through SubscriptionNormalizer, which removes only outer whitespace.
+     // Preserve the exact effective source on each path, including all JSON
+     // interior whitespace and values; neither path reparses/reprints it.
+     const auto effectiveSource=body.startsWith('{')?decoded:decoded.trimmed();
+     QCOMPARE(original.sourceDocument,effectiveSource);QCOMPARE(original.sourceNodeIndex,0);
      QCOMPARE(original.originalConfiguration.value("outbound"),QJsonDocument::fromJson(decoded).object().value("outbounds").toArray().first());
      QCOMPARE(imported.configurationFormat,QString("xray-v2ray-json"));QVERIFY(imported.configuration.isEmpty());QVERIFY(imported.executionConfiguration.isEmpty());
     }else{QVERIFY(original.conversionIssues.isEmpty());QCOMPARE(original.parameters.value("client-fingerprint"),QJsonValue(profile));}
@@ -262,6 +267,7 @@ private slots:
     {NodeStore saved(path);QVERIFY(saved.importNodes(imported.nodes));id=saved.nodes().first().id;QVERIFY(saved.select(id));}
     NodeStore restored(path);QCOMPARE(restored.nodes().size(),1);QCOMPARE(restored.selectedId(),id);
     const auto node=restored.nodes().first();QCOMPARE(node.parameters,original.parameters);QCOMPARE(node.originalConfiguration,original.originalConfiguration);
+    QCOMPARE(node.sourceDocument,original.sourceDocument);QCOMPARE(node.sourceFingerprint,original.sourceFingerprint);QCOMPARE(node.sourceNodeIndex,original.sourceNodeIndex);
     QVERIFY(SwirlProtocolRegistry::nativeNodeReason(node).isEmpty());QCOMPARE(SwirlProtocolRegistry::describe(node).value("tested"),QVariant(false));
     EngineStartOptions options;options.nodes=restored.nodes();options.selectedNodeId=id;options.routingMode="global";options.proxyPort=12345;
     QJsonObject configuration;const auto reason=RustCoreEngine::configuration(options,&configuration);QVERIFY2(reason.isEmpty(),qPrintable(reason));

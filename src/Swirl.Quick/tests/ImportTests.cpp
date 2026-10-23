@@ -12,6 +12,7 @@
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QCryptographicHash>
 #include <QSignalSpy>
 #include <QNetworkProxy>
 #include <QNetworkReply>
@@ -196,6 +197,25 @@ private slots:
         }
         for(const auto &body:{QByteArray("[Proxy]\nA = socks5, 127.0.0.1, 1080\nBypass = direct\n"),QByteArray(R"({"outbounds":[{"type":"socks","tag":"A","server":"127.0.0.1","server_port":1080},{"type":"direct","tag":"bypass"}]})")}){
             const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));QVERIFY(!parsed.configuration.isEmpty());
+        }
+    }
+    void xrayEffectiveSourceRetainsExactBytesAfterWrapperNormalization() {
+        auto source=xrayRealitySource();source["tag"]="  fixture name  ";
+        const QByteArray document=" \t\r\n"+QJsonDocument(QJsonObject{{"outbounds",QJsonArray{source}}}).toJson()+" \t\r\n";
+        // Compare bytes and their fingerprint, not semantic JSON equality.
+        // Direct JSON bypasses wrapper normalization. Base64 keeps interior
+        // whitespace/values but follows the normalizer's outer-trim contract.
+        const QList<QPair<QByteArray,QByteArray>> inputs{
+            {document,document},{document.toBase64(),document.trimmed()},
+            {" \r\n"+document.toBase64()+"\r\n ",document.trimmed()}};
+        for(const auto &[input,expected]:inputs){
+            const auto parsed=NodeImporter::parse(input);QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);
+            const auto node=parsed.nodes.first();QVERIFY(node.isXray());QVERIFY(node.nativeExecutable);
+            QCOMPARE(node.sourceDocument,expected);
+            QCOMPARE(node.sourceFingerprint,QString::fromLatin1(QCryptographicHash::hash(expected,QCryptographicHash::Sha256).toHex()));
+            QCOMPARE(node.sourceNodeIndex,0);QCOMPARE(node.originalConfiguration.value("outbound"),QJsonValue(source));
+            QCOMPARE(node.nativeOutbound.value("reality").toObject().value("fingerprint"),QJsonValue("chrome"));
+            QVERIFY(parsed.configuration.isEmpty());QVERIFY(parsed.executionConfiguration.isEmpty());
         }
     }
     void xrayRealityRejectsUnknownConflictingOrMultipleSourceParameters() {

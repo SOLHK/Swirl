@@ -14,9 +14,16 @@ function Read-SwirlIdentityJson {
     if (-not [IO.File]::Exists($Path)) { throw 'IDENTITY_METADATA_MISSING' }
     $length = ([IO.FileInfo]$Path).Length
     if ($length -lt 2 -or $length -gt $MaximumBytes) { throw 'IDENTITY_METADATA_SIZE' }
-    try { $document = [IO.File]::ReadAllText($Path) | ConvertFrom-Json -ErrorAction Stop }
+    try {
+        $json = [IO.File]::ReadAllText($Path)
+        $document = $json | ConvertFrom-Json -ErrorAction Stop
+    }
     catch { throw 'IDENTITY_METADATA_JSON' }
-    if ($null -eq $document -or $document -isnot [pscustomobject]) { throw 'IDENTITY_METADATA_OBJECT' }
+    # The [pscustomobject] accelerator is PSObject, including wrapped arrays on
+    # Windows PowerShell 5.1. ConvertFrom-Json can also enumerate a one-element
+    # array into its object. Require the source root and the actual custom type.
+    if (-not $json.TrimStart().StartsWith('{') -or $null -eq $document -or
+        $document -isnot [System.Management.Automation.PSCustomObject]) { throw 'IDENTITY_METADATA_OBJECT' }
     return $document
 }
 
@@ -57,7 +64,7 @@ function Get-SwirlInstalledIdentity {
         $package = Read-SwirlIdentityJson $packagePath (8 * 1024 * 1024)
         $rust = Read-SwirlIdentityJson $rustPath (64 * 1024)
         if (($package.schema -isnot [int] -and $package.schema -isnot [long]) -or $package.schema -ne 1 -or $package.source_sha -isnot [string] -or
-            $package.source_sha -notmatch '^[0-9a-f]{40}$' -or $package.rust -isnot [pscustomobject] -or
+            $package.source_sha -notmatch '^[0-9a-f]{40}$' -or $package.rust -isnot [System.Management.Automation.PSCustomObject] -or
             $package.files -isnot [array] -or $package.files.Count -lt 5 -or $package.files.Count -gt 20000) {
             throw 'IDENTITY_CURRENT_MANIFEST_INVALID'
         }
@@ -69,7 +76,7 @@ function Get-SwirlInstalledIdentity {
         if ($rust.build_id -cne $package.rust.build_id) { throw 'IDENTITY_RUST_BUILD_MISMATCH' }
         $hashes = @{}
         foreach ($entry in $package.files) {
-            if ($entry -isnot [pscustomobject] -or $entry.path -isnot [string] -or
+            if ($entry -isnot [System.Management.Automation.PSCustomObject] -or $entry.path -isnot [string] -or
                 $entry.path.Length -gt 1024 -or $entry.path -notmatch '^[^/\\:\x00-\x1f<>"|?*]+(?:/[^/\\:\x00-\x1f<>"|?*]+)*$' -or
                 @($entry.path.Split('/') | Where-Object { $_ -in @('.','..') -or $_.EndsWith('.') -or $_.EndsWith(' ') }).Count -gt 0 -or
                 $entry.sha256 -isnot [string] -or $entry.sha256 -notmatch '^[0-9a-fA-F]{64}$' -or
