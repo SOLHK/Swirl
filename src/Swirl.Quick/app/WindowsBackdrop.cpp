@@ -83,8 +83,8 @@ QImage shadowImage(QSize body, qreal radius, qreal dpr, bool active) {
             const qreal dy = qMax<qreal>(0, qMax(radius - localY, localY - (body.height() - radius)));
             const qreal inset = radius - std::pow(qMax<qreal>(0,
                 std::pow(radius, 2.5) - std::pow(dy, 2.5)), 0.4);
-            clearLeft = padding + qMax(0, qCeil(inset - 0.5));
-            clearRight = padding + body.width() - qMax(0, qCeil(inset - 0.5));
+              clearLeft = padding + qMax(0, qCeil(inset + 0.5));
+              clearRight = padding + body.width() - qMax(0, qCeil(inset + 0.5));
         }
         for (int x = 0; x < image.width(); ++x) {
             if (x == clearLeft) { x = clearRight; if (x >= image.width()) break; }
@@ -93,9 +93,12 @@ QImage shadowImage(QSize body, qreal radius, qreal dpr, bool active) {
                 && localY >= 0 && localY < body.height()) continue;
             if (localY >= radius && localY < body.height() - radius
                 && localX >= 0 && localX < body.width()) continue;
-            if (roundedDistance(localX, localY, body.width(), body.height(), radius) <= 0) continue;
+            const qreal edge = roundedDistance(localX, localY, body.width(), body.height(), radius);
+            if (edge <= -0.5) continue;
+            const qreal t = qBound<qreal>(0, edge + 0.5, 1);
+            const qreal coverage = t * t * (3 - 2 * t);
             const qreal distance = qMax<qreal>(0, roundedDistance(localX, localY - offset, body.width(), body.height(), radius));
-            const int alpha = qRound(255 * strength * std::exp(-distance * distance / (2 * sigma * sigma)));
+            const int alpha = qRound(255 * strength * coverage * std::exp(-distance * distance / (2 * sigma * sigma)));
             row[x] = qRgba(0, 0, 0, alpha);
         }
     }
@@ -145,7 +148,7 @@ void WindowsBackdrop::refresh() {
             SetWindowLongPtrW(hwnd, GWL_STYLE, style);
             SetWindowPos(hwnd, nullptr, 0, 0, 0, 0, SWP_NOMOVE|SWP_NOSIZE|SWP_NOZORDER|SWP_NOACTIVATE|SWP_FRAMECHANGED);
         }
-        // Exact regions cannot receive the system's automatic rounded shadow.
+        // Custom alpha contours cannot receive the system's rounded shadow.
         // Their input-transparent sibling supplies the matching shadow below.
         const int nc = 1; // DWMNCRP_DISABLED: no system caption band
         DwmSetWindowAttribute(hwnd, 2, &nc, sizeof(nc));
@@ -225,12 +228,13 @@ void WindowsBackdrop::updateCornerMask() {
         if (m_exactCorners && m_regionSize == physicalSize && qFuzzyCompare(m_regionDpr, dpr)
             && qFuzzyCompare(m_cornerRadius + 1, effectiveRadius + 1)) { updateCompatibilityShadow(); return; }
         const bool software=QQuickWindow::graphicsApi()==QSGRendererInterface::Software;
-        // The native surface must share the QML contour too: a rectangular
-        // HWND can leave a compositor edge outside the alpha-rounded content.
-        // Retain one physical pixel of coverage for WindowEdge's AA fringe,
-        // instead of clipping its partially covered pixels at the 50% contour.
-        const HRGN region = rectangular ? nullptr : roundedWindowRegion(physicalSize.width(), physicalSize.height(), radius * dpr,software?0:1,2.5);
-        if (!rectangular && !region) return;
+        // A binary HWND region cuts away fractional alpha at the final DWM
+        // composition and reintroduces staircase pixels. On the GPU path,
+        // WindowEdge owns the visible contour; only the inset blur helper is
+        // region-clipped. The software fallback still needs a native region.
+        const bool useRegion = !rectangular && software;
+        const HRGN region = useRegion ? roundedWindowRegion(physicalSize.width(), physicalSize.height(), radius * dpr,0,2.5) : nullptr;
+        if (useRegion && !region) return;
         // Windows takes ownership only after a successful SetWindowRgn.
         if (!SetWindowRgn(hwnd, region, FALSE)) {
             if (region) DeleteObject(region);
@@ -366,7 +370,7 @@ void WindowsBackdrop::destroyBackdropBlur() {
 #ifdef Q_OS_WIN
     if(m_blurHandle)DestroyWindow(reinterpret_cast<HWND>(m_blurHandle));
 #endif
-    m_blurHandle=0;
+    m_blurHandle=0;m_blurRegionSize={};m_blurRegionRadius=-1;
     if(m_blurActive){m_blurActive=false;emit changed();}
 }
 void WindowsBackdrop::updateBackdropBlur() {
@@ -385,9 +389,9 @@ void WindowsBackdrop::updateBackdropBlur() {
         }();
         if(!registered)return;
         const HWND blur=CreateWindowExW(WS_EX_TOOLWINDOW|WS_EX_NOACTIVATE|WS_EX_TRANSPARENT,
-            L"SwirlUnifiedBackdrop",L"",WS_POPUP|WS_THICKFRAME,0,0,0,0,nullptr,nullptr,GetModuleHandleW(nullptr),nullptr);
+            L"SwirlUnifiedBackdrop",L"",WS_POPUP,0,0,0,0,nullptr,nullptr,GetModuleHandleW(nullptr),nullptr);
         if(!blur)return;
-        const int material=1,corner=2,nc=1;const DWORD border=0xFFFFFFFE;
+        const int material=1,corner=1,nc=1;const DWORD border=0xFFFFFFFE;
         const BOOL dark=m_dark;const MARGINS margins{-1,-1,-1,-1};
         DwmSetWindowAttribute(blur,2,&nc,sizeof(nc));
         DwmSetWindowAttribute(blur,33,&corner,sizeof(corner));
@@ -412,12 +416,31 @@ void WindowsBackdrop::updateBackdropBlur() {
     const HWND shell=reinterpret_cast<HWND>(m_window->winId());RECT bounds{};
     if(!GetWindowRect(shell,&bounds))return;
     const BOOL dark=m_dark;DwmSetWindowAttribute(blur,20,&dark,sizeof(dark));
-    const auto dpr=m_window->devicePixelRatio();const int inset=qMax(1,qCeil(dpr));
+    const auto dpr=m_window->devicePixelRatio();
+    const bool rectangular=m_window->visibility()==QWindow::Maximized || m_window->visibility()==QWindow::FullScreen;
+    const qreal requested=m_window->property("swirlWindowRadius").toReal();
+    // Accent blur can ignore HRGN in DWM. Its rectangular HWND must itself
+    // fit inside the visible curve: at the diagonal the superellipse cuts
+    // r * (1 - 2^(-1/2.5)) from each axis. Keep one physical AA pixel clear.
+    const int inset=rectangular?1:qMax(1,qCeil(requested*dpr*(1-std::pow(0.5,0.4))+1));
+    const QSize body(bounds.right-bounds.left-2*inset,bounds.bottom-bounds.top-2*inset);
+    const qreal radius=rectangular?0:qMax<qreal>(0,requested*dpr-inset);
+    if(body!=m_blurRegionSize || !qFuzzyCompare(radius+1,m_blurRegionRadius+1)){
+        // Keep the compositor blur's hard edge inside fully covered shell
+        // pixels. A system preset radius here leaks beyond the custom curve.
+        const HRGN region=rectangular?nullptr:roundedWindowRegion(body.width(),body.height(),radius,0,2.5);
+        if(!rectangular&&!region){ShowWindow(blur,SW_HIDE);return;}
+        if(!SetWindowRgn(blur,region,FALSE)){
+            if(region)DeleteObject(region);
+            ShowWindow(blur,SW_HIDE);return;
+        }
+        m_blurRegionSize=body;m_blurRegionRadius=radius;
+    }
     // One compositor-only surface covers the entire shell. Sidebar and
     // workspace sample the same live backdrop, with one uniform tint above.
     // No desktop capture, CPU blur, foreground texture or timer is involved.
     SetWindowPos(blur,shell,bounds.left+inset,bounds.top+inset,
-        bounds.right-bounds.left-2*inset,bounds.bottom-bounds.top-2*inset,
+        body.width(),body.height(),
         SWP_NOACTIVATE|SWP_NOOWNERZORDER|SWP_SHOWWINDOW);
 #endif
 }

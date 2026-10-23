@@ -53,6 +53,8 @@ private:
     bool m_translucent = false;
     bool m_blurActive = false;
     quintptr m_blurHandle = 0;
+    QSize m_blurRegionSize;
+    qreal m_blurRegionRadius = -1;
     void updateBackdropBlur();
     void destroyBackdropBlur();
     bool m_exactCorners = false;

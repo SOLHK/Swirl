@@ -2010,6 +2010,39 @@ private slots:
   engine.stop();QVERIFY(QTest::qWaitFor([&]{return !engine.status().processAlive;},5000));
   QTcpServer reuse;QVERIFY(reuse.listen(QHostAddress::LocalHost,o.proxyPort));
  }
+ void queuedProbesRecoverAfterPeerRejectionAndCancellation(){
+  ControlledNetwork net;QVERIFY(net.start());auto o=options(net);
+  const int count=qBound(24,qEnvironmentVariableIntValue("SWIRL_U2_PROBE_COUNT"),5000);
+  const auto prototype=o.nodes.first();o.nodes.clear();QStringList ids;
+  for(int i=0;i<count;++i){auto node=prototype;node.id=QUuid::createUuid().toString(QUuid::WithoutBraces);node.name=QString("probe-%1").arg(i);o.nodes.append(node);ids.append(node.id);}
+  o.selectedNodeId=ids.first();NodeTestService probes;
+  int peakActive=0;QElapsedTimer heartbeat;heartbeat.start();qint64 maxGap=0;
+  QTimer ticker;ticker.setInterval(10);
+  connect(&ticker,&QTimer::timeout,&ticker,[&]{
+   maxGap=qMax(maxGap,heartbeat.restart());int active=0;
+   for(auto *runner:probes.findChildren<ProxyEngine *>(QString(),Qt::FindDirectChildrenOnly)){
+    const auto s=runner->status();if(s.processAlive||s.state==ProxyEngine::State::Starting||s.state==ProxyEngine::State::Stopping)++active;
+   }
+   peakActive=qMax(peakActive,active);
+  });ticker.start();
+  net.a.reject=true;const auto before=net.httpRequests;
+  probes.start(o,ids.mid(0,6),net.url());
+  QVERIFY(QTest::qWaitFor([&]{return !probes.busy();},15000));
+  QCOMPARE(probes.failed(),6);QCOMPARE(probes.succeeded(),0);QCOMPARE(net.httpRequests,before);
+  net.a.reject=false;QElapsedTimer elapsed;elapsed.start();
+  probes.start(o,ids,net.url());
+  QVERIFY(QTest::qWaitFor([&]{return !probes.busy();},qMax(30000,count*1000)));
+  if(probes.failed())qInfo()<<"Loopback probe failure"<<probes.result(ids.first()).value("phase")<<probes.result(ids.first()).value("error");
+  QCOMPARE(probes.succeeded(),count);QCOMPARE(probes.failed(),0);QVERIFY(net.a.forwarded>=count);
+  for(const auto &id:ids){QVERIFY(probes.result(id).value("success").toBool());QCOMPARE(probes.result(id).value("engineKind").toString(),QString("rust"));}
+  qInfo()<<"U2 real loopback bulk probe count"<<count<<"elapsedMs"<<elapsed.elapsed()<<"maxEventLoopGapMs"<<maxGap<<"peakActive"<<peakActive;
+  QVERIFY(peakActive<=3);
+  probes.start(o,ids,net.url());probes.cancel();
+  QVERIFY(QTest::qWaitFor([&]{return !probes.busy();},10000));QVERIFY(probes.completed()<count);
+  probes.start(o,ids.mid(0,3),net.url());
+  QVERIFY(QTest::qWaitFor([&]{return !probes.busy();},10000));QCOMPARE(probes.succeeded(),3);
+  QVERIFY(QTest::qWaitFor([&]{return probes.findChildren<ProxyEngine *>(QString(),Qt::FindDirectChildrenOnly).isEmpty();},3000));
+ }
  void nativeProbeAndUnsupportedDoNotStartCompatibility(){
   ControlledNetwork net;QVERIFY(net.start());auto o=options(net);o.executablePath="must-not-start-mihomo.exe";
   NodeTestService probes;probes.start(o,{o.selectedNodeId},net.url());QVERIFY(QTest::qWaitFor([&]{return !probes.busy();},6000));
