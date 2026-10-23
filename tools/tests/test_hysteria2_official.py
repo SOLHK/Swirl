@@ -389,9 +389,15 @@ class Hysteria2Official(unittest.TestCase):
         self.request("new-session-after-server-restart")
 
     def test_10_https_through_native_proxy(self):
-        self.request("verified-https-through-native-proxy",mode="http",target=self.https,
-            target_tls={"server_name":"localhost","ca_der_base64":self.ca})
-        self.assertEqual(HTTP.tls_close_errors,[])
+        # Releasing the final QUIC owner used to race the queued TLS alert.
+        # Exercise repeated fresh sessions; a 200 response still cannot excuse
+        # even one origin-side missing close_notify.
+        for attempt in range(8):
+            with self.subTest(attempt=attempt):
+                self.request("verified-https-through-native-proxy-"+str(attempt),
+                    mode="http",target=self.https,
+                    target_tls={"server_name":"localhost","ca_der_base64":self.ca})
+                self.assertEqual(HTTP.tls_close_errors,[])
 
     def test_11_invalid_options_fail_before_connection(self):
         for field,value,code in (("obfs","gecko","Hysteria2ObfsUnsupported"),

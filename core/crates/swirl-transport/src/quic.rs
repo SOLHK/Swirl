@@ -1,5 +1,7 @@
 //! Shared native QUIC transport. Proxy authentication and framing stay in
 //! swirl-protocol; Quinn only owns QUIC/TLS and reliable byte streams.
+#[cfg(test)]
+mod shutdown_tests;
 use base64::Engine;
 use quinn::{
     ClientConfig, Connection, Endpoint, RecvStream, Runtime, SendStream, TransportConfig, VarInt,
@@ -7,11 +9,12 @@ use quinn::{
 use ring::digest::{SHA256, digest};
 use std::{
     collections::VecDeque,
+    future::Future,
     io,
     net::SocketAddr,
     pin::Pin,
     sync::{Arc, Mutex, OnceLock},
-    task::{Context, Poll},
+    task::{Context, Poll, ready},
     time::Duration,
 };
 use swirl_subscription::Tls;
@@ -431,10 +434,31 @@ async fn connect_inner(
     Err(last_error)
 }
 
+#[derive(Clone, Copy)]
+enum ShutdownFailure {
+    TimedOut,
+    PeerStopped,
+    ConnectionLost,
+}
+impl ShutdownFailure {
+    fn into_io(self) -> io::Error {
+        let (kind, code) = match self {
+            Self::TimedOut => (io::ErrorKind::TimedOut, "QuicShutdownAckTimeout"),
+            Self::PeerStopped => (io::ErrorKind::BrokenPipe, "QuicShutdownPeerStopped"),
+            Self::ConnectionLost => (io::ErrorKind::BrokenPipe, "QuicShutdownConnectionLost"),
+        };
+        io::Error::new(kind, code)
+    }
+}
+type ShutdownResult = std::result::Result<(), ShutdownFailure>;
+type ShutdownCompletion = Pin<Box<dyn Future<Output = ShutdownResult> + Send + Sync>>;
+
 pub struct Stream {
     pub session: Arc<Session>,
     send: SendStream,
     recv: RecvStream,
+    shutdown: Option<ShutdownCompletion>,
+    shutdown_result: Option<ShutdownResult>,
 }
 impl Stream {
     pub fn new(session: Arc<Session>, send: SendStream, recv: RecvStream) -> Self {
@@ -442,6 +466,8 @@ impl Stream {
             session,
             send,
             recv,
+            shutdown: None,
+            shutdown_result: None,
         }
     }
 }
@@ -466,7 +492,41 @@ impl AsyncWrite for Stream {
         AsyncWrite::poll_flush(Pin::new(&mut self.send), cx)
     }
     fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        AsyncWrite::poll_shutdown(Pin::new(&mut self.send), cx)
+        if let Some(result) = self.shutdown_result {
+            return Poll::Ready(result.map_err(ShutdownFailure::into_io));
+        }
+        if self.shutdown.is_none() {
+            // Quinn's AsyncWrite::shutdown only queues FIN. A final owner can
+            // then close the connection before queued bytes (e.g. a TLS close
+            // notification) leave it. stopped() confirms acknowledged delivery
+            // or reports peer rejection; neither flush nor finish does that.
+            // https://docs.rs/quinn/0.11.12/quinn/struct.SendStream.html#method.stopped
+            if self.send.finish().is_err() {
+                self.shutdown_result = Some(Err(ShutdownFailure::ConnectionLost));
+                return Poll::Ready(Err(ShutdownFailure::ConnectionLost.into_io()));
+            }
+            let completion = self.send.stopped();
+            self.shutdown = Some(Box::pin(async move {
+                match tokio::time::timeout(Duration::from_secs(5), completion).await {
+                    Ok(Ok(None)) => Ok(()),
+                    Ok(Ok(Some(_))) => Err(ShutdownFailure::PeerStopped),
+                    Ok(Err(_)) => Err(ShutdownFailure::ConnectionLost),
+                    Err(_) => Err(ShutdownFailure::TimedOut),
+                }
+            }));
+        }
+        // This future stays owned by the stream. Cancellation drops it and the
+        // session normally; no detached drain task can outlive a stopped core.
+        let result = ready!(
+            self.shutdown
+                .as_mut()
+                .expect("shutdown initialized")
+                .as_mut()
+                .poll(cx)
+        );
+        self.shutdown_result = Some(result);
+        self.shutdown = None;
+        Poll::Ready(result.map_err(ShutdownFailure::into_io))
     }
 }
 

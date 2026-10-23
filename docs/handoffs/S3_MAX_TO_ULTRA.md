@@ -22,6 +22,14 @@
 
 ## 当前验证状态
 
+### 第五阶段：由新 CI 失败定位并修复 QUIC 关闭竞态
+
+- `61f9458628b0bb0a64d07bb3db1bfbc8a6c896e2` 本机完整 CTest 28/28、独立 Qt 导入 9/9、原生网络 103/103 通过；但 [native CI 39972868023](https://github.com/SOLHK/Swirl/actions/runs/39972868023) 的 macOS 官方 Hysteria2 HTTPS 发生真实 `SSLEOFError`。旧成功没有覆盖这个失败。
+- `quinn::SendStream::poll_shutdown` 只调用 finish、把 FIN 加入发送队列，不等待对端 ACK；最后会话 Drop 随即关连接，可能丢失队列中的 TLS close_notify。它还会把已收到 STOP_SENDING 的 finish 当成功。
+- 新增无固定 sleep 的真实 QUIC 回归：在单线程 runtime 首次 poll 时尚无机会收到 FIN ACK，shutdown 必须 Pending；收到 STOP_SENDING 不能报 clean；上传结束后继续收尾部响应，重复 shutdown 保持幂等。修改前 0 passed / 2 failed，修复后 2/2。
+- 共享 QUIC Stream 现在在 5 秒上限内等待 `stopped()` 确认发送完成；STOP_SENDING、连接中断和超时保留错误。Future 归 stream 所有，取消不会留下 detached drain task，读半边继续可用。
+- 官方 Hysteria2 HTTPS 原测试增加 8 次独立会话重复，仍要求对端每次收到 TLS 关闭通知；没有放宽 200/204 或 EOF 断言。Windows/macOS/Linux 必须在新提交重跑，修复前 macOS 失败证据保留。
+
 ### 第四阶段：保留 U2 性能和更新过时的 UI 测试契约
 
 - 修复节点状态指纹未初始化和会话延迟被误算为节点列表变化的问题；流量/运行时间/请求耗时变化不再无故刷新节点行。保留真实请求成功与仅会话就绪的区别。Telemetry 23/23。
