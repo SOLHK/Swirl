@@ -70,7 +70,10 @@ int runAppearanceChecks(QQuickWindow *window,bool restoreOnly) {
     auto *pane=find(window->contentItem(),"sidebarFloatingBackground");
     check(pane!=nullptr,"sidebar pane exists");
     if(pane){
-        check(pane->property("color").value<QColor>().alpha()==0,"sidebar has no independent white or grey fill");
+        // The approved U2 sidebar is an Item with shader children, not a
+        // Rectangle. An absent color converted to QColor is opaque/invalid.
+        // Require that structural contract as well as the pixel checks below.
+        check(pane->metaObject()->indexOfProperty("color")==-1,"sidebar container has no independent fill property");
         QTest::qWait(250);
         const auto at=pane->mapToScene(QPointF(pane->width()-18,pane->height()/2))*window->devicePixelRatio();
         const auto before=window->grabWindow();

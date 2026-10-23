@@ -1,6 +1,7 @@
 #include "HeroChecks.h"
 #include "NavigationChecks.h"
 #include "engine/EngineController.h"
+#include "app/NodeViewModel.h"
 #include "app/MotionPolicy.h"
 #include <QQuickWindow>
 #include <QQuickItem>
@@ -70,7 +71,7 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
  eval("Theme.mode='Light';Theme.transparency=true;Theme.reduceMotion=false;SwirlMotion.speed=1");route("featurehub");
  check(!eval("SwirlMotion.reduced").toBool(),"animated fixture resolves independently of the Windows accessibility preference");
  check(item("settings-proxies")&&item("settings-subscriptions")&&!item("settings-license"),"More has direct node/subscription entries and no paid license entry");
- QString yaml="proxies:\n";for(int i=0;i<180;++i)yaml+=QString("  - {name: 'Fixture node %1', type: socks5, server: 127.0.0.1, port: 9}\n").arg(i,3,10,QChar('0'));
+ QString yaml="proxies:\n";for(int i=0;i<180;++i)yaml+=QString("  - {name: 'Fixture node %1', type: socks5, server: 127.0.0.1, port: %2}\n").arg(i,3,10,QChar('0')).arg(10000+i);
  controller->imports()->importText(yaml);check(QTest::qWaitFor([&]{return !controller->imports()->busy();},8000)&&controller->nodes().size()==180,"180 synthetic node records imported by the real importer for rendering stress only");
  failures+=runNavigationChecks(window,controller,directory);
  // Synthetic metadata stays in the application's isolated DPAPI test store.
@@ -87,7 +88,8 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
  eval("Theme.reduceMotion=true");click("expandSubscription-"+subscriptionId);check(card&&!card->property("moving").toBool()&&card->property("reveal").toDouble()==1,"reduced motion commits final geometry directly");eval("Theme.reduceMotion=false");
  route("proxies");auto table=item("realNodeTable");
  if(table)QMetaObject::invokeMethod(table,"scrollToBeginning");wait(35);
- check(table&&eval("pageLoader.item.viewRows.length===180").toBool(),"node list exposes all 180 records");
+ auto *nodeModel=window->findChild<NodeViewModel *>("nodeViewModel");
+ check(table&&nodeModel&&nodeModel->rowCount()==180,"node list exposes all 180 records");
  if(table){auto point=[&](int row){return table->mapToScene(QPointF(65,table->property("headerHeight").toDouble()+table->property("itemHeight").toInt()*(row+0.5))).toPoint();};
   QElapsedTimer response;response.start();
   QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,point(1));
@@ -101,11 +103,21 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
   check(QTest::qWaitFor([&]{return hero&&!hero->property("moving").toBool()&&requestSurface&&requestSurface->isVisible()&&requestSurface->opacity()>0.99;},2000),"detail controls reach full opacity after the boundary transition");
   const auto identityRect=identity?QRectF(identity->position(),identity->size()):QRectF();
   double slowest=dispatchMs;
-  for(int i=0;i<10;++i){response.restart();QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,point(i%6));const auto ms=response.nsecsElapsed()/1000000.0;nodeClickMs.append(ms);slowest=qMax(slowest,ms);wait(12);}
-  check(item("nodeDetailTitle")&&item("nodeDetailTitle")->property("text").toString()==controller->selectedNodeName(),"rapid selection keeps the latest clicked node");
-  check(QTest::qWaitFor([&]{return hero&&!hero->property("moving").toBool();},2000),"rapid selection settles the last requested boundary");
-  check(identity&&identity==item("nodeIdentitySurface")&&QRectF(identity->position(),identity->size())==identityRect,"rapid selection retains the same inspector and returns to its settled geometry");
-  check(slowest<100,"all rapid node click dispatches complete within 100 ms");qInfo()<<"NODE_CLICK_MAX_MS"<<slowest;
+  for(int i=0;i<10;++i){
+   // U2 details cover the list. Clicking old row coordinates while the detail
+   // is open hits its Edit button, not another node. Exercise actual visible
+   // controls and require the requested node on every return/select cycle.
+   click("nodeReturnButton");
+   check(!hero->property("opened").toBool(),"return action closes details before another row is clicked");
+   check(QTest::qWaitFor([&]{return !hero->property("moving").toBool();},2000),"node list becomes available after return");
+   response.restart();QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,point(i%6));
+   const auto ms=response.nsecsElapsed()/1000000.0;nodeClickMs.append(ms);slowest=qMax(slowest,ms);
+   check(controller->selectedNodeName()==QString("Fixture node %1").arg(i%6,3,10,QChar('0')),"repeated visible row input selects the requested real node");
+   check(QTest::qWaitFor([&]{return !hero->property("moving").toBool();},2000),"repeated selection settles its boundary");
+  }
+  check(item("nodeDetailTitle")&&item("nodeDetailTitle")->property("text").toString()==controller->selectedNodeName(),"repeated selection keeps the latest clicked node");
+  check(identity&&identity==item("nodeIdentitySurface")&&QRectF(identity->position(),identity->size())==identityRect,"repeated selection retains the same inspector and settled geometry");
+  check(slowest<100,"all repeated node click dispatches complete within 100 ms");qInfo()<<"NODE_CLICK_MAX_MS"<<slowest;
   check(table->scale()==1&&eval("motionPolicy.activeGrabCount===0 && SwirlTransitionRegistry.activeCount===0").toBool(),"settled node selection retains no table textures or transient transition resources");
   click("nodeReturnButton");record("node-return");
   check(hero&&!hero->property("opened").toBool(),"return closes the inspector immediately");
@@ -114,9 +126,9 @@ int runHeroChecks(QQuickWindow *window,EngineController *controller,const QStrin
  snapshot("nodes-180");check(!controller->processAlive(),"rendering fixture selection never starts a proxy or fabricates a connection");
  if(auto *search=item("nodeSearchField")) {
   QElapsedTimer filter;filter.start();search->setProperty("text","179");const double filterMs=filter.nsecsElapsed()/1000000.0;
-  check(eval("pageLoader.item.viewRows.length===1 && pageLoader.item.viewRows[0].name==='Fixture node 179'").toBool(),"tail search prunes a large prefix and keeps the real node ID");
-  check(filterMs<100,"180-node tail filter updates within 100 ms");qInfo()<<"NODE_FILTER_DISPATCH_MS"<<filterMs;
-  search->setProperty("text","");check(eval("pageLoader.item.viewRows.length===180").toBool(),"clearing search restores the entire catalog");
+  check(QTest::qWaitFor([&]{return nodeModel&&nodeModel->rowCount()==1&&nodeModel->get(0).value("name")=="Fixture node 179";},1000),"debounced tail search prunes a large prefix and keeps the real node ID");
+  check(filterMs<100,"180-node tail filter input dispatch completes within 100 ms");qInfo()<<"NODE_FILTER_DISPATCH_MS"<<filterMs;
+  search->setProperty("text","");check(QTest::qWaitFor([&]{return nodeModel&&nodeModel->rowCount()==180;},1000),"clearing search restores the entire catalog");
  }
  route("featurehub");snapshot("more");route("activity");snapshot("activity");eval("Theme.mode='Dark'");snapshot("activity-dark");eval("Theme.mode='Light'");
  eval("window.openDashboard()");wait(350);QQuickWindow *panel=nullptr;for(auto candidate:QGuiApplication::allWindows())if(candidate->objectName()=="dashboardWindow")panel=qobject_cast<QQuickWindow *>(candidate);

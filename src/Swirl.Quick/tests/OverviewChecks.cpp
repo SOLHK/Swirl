@@ -81,7 +81,10 @@ int runOverviewChecks(QQuickWindow *window) {
     check(state("AppState.currentPage==='featurehub'").toBool(),"cached form and its page dismiss independently after reopening");
     QTest::keyClick(window,Qt::Key_Escape);QTest::qWait(100);check(window->isVisible(),"Escape on the hub never exits Swirl");
     window->requestActivate();click("nav-external");QQuickWindow *dashboard=nullptr;for(auto *candidate:QGuiApplication::allWindows())if(candidate->objectName()=="dashboardWindow")dashboard=qobject_cast<QQuickWindow *>(candidate);
-    check(dashboard&&dashboard->isVisible()&&dashboard->width()==1300,"Panel opens the independent native request window");
+    check(dashboard&&dashboard->isVisible()
+          &&dashboard->width()==qRound(state("Theme.windowDefaultWidth").toReal())
+          &&dashboard->height()==qRound(state("Theme.windowDefaultHeight").toReal()),
+          "Panel opens the independent native request window at the approved UI dimensions");
     if(dashboard){check(item("windowCloseButton",dashboard)&&item("windowMinimizeButton",dashboard)&&item("windowMaximizeButton",dashboard),"request panel has all three window controls");click("windowCloseButton",dashboard);check(!dashboard->isVisible()&&window->isVisible(),"panel red button closes only the panel");}
     for(const auto *route:{"settings","fonts","profiles","dns","modules","scripts","subscriptions","proxies"}){
         state(QString("window.openSettings('%1')").arg(route));QTest::qWait(80);settled();

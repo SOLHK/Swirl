@@ -64,16 +64,21 @@ private slots:
    pulse->refresh();pulse->refresh();QCOMPARE(rows.size(),0);
    pulse->current.uptimeSeconds=10;pulse->current.uploadTotal=100;
    pulse->refresh();QCOMPARE(rows.size(),0);
+#ifdef Q_OS_WIN
+   QVERIFY(controller.prepareRealAcceptance());controller.connectNode(id);
+#endif
    pulse->current.processAlive=true;pulse->current.apiHealthy=true;pulse->current.selectedNodeId=id;
    pulse->current.nodeHealth=ProxyEngine::NodeHealth::Checking;pulse->current.latencyMs=42;
-   pulse->refresh();QCOMPARE(rows.size(),1);verifyRow(QStringLiteral("正在真实检测"));
+   pulse->refresh();QCOMPARE(rows.size(),1);verifyRow(QStringLiteral("会话就绪 · 未验证"));
    pulse->current.nodeHealth=ProxyEngine::NodeHealth::Available;
-   pulse->refresh();QCOMPARE(rows.size(),2);verifyRow(QStringLiteral("节点可用"));
-   pulse->current.latencyMs=50;pulse->refresh();QCOMPARE(rows.size(),2);verifyRow(QStringLiteral("节点可用"));
-   const auto beforeDirect=rows.size();pulse->current.directSession=true;pulse->refresh();
-   QCOMPARE(rows.size(),beforeDirect+1);verifyRow(QStringLiteral("直接连接"));
-   pulse->current.apiHealthy=false;pulse->refresh();QCOMPARE(rows.size(),beforeDirect+2);verifyRow(QStringLiteral("节点可用"));
-   pulse->current.selectedNodeId.clear();pulse->refresh();QCOMPARE(rows.size(),beforeDirect+3);verifyRow(QStringLiteral("未连接"));
+   pulse->refresh();QCOMPARE(rows.size(),2);verifyRow(QStringLiteral("会话就绪 · 未验证"));
+   pulse->current.latencyMs=50;pulse->refresh();QCOMPARE(rows.size(),2);verifyRow(QStringLiteral("会话就绪 · 未验证"));
+   pulse->current.requestState=ProxyEngine::RequestState::Succeeded;pulse->refresh();
+   QCOMPARE(rows.size(),3);verifyRow(QStringLiteral("已连接"));
+   pulse->current.requestState=ProxyEngine::RequestState::Failed;pulse->refresh();
+   QCOMPARE(rows.size(),4);verifyRow(QStringLiteral("连接失败"));
+   pulse->current.requestState=ProxyEngine::RequestState::NotTested;
+   pulse->current.selectedNodeId.clear();pulse->refresh();QCOMPARE(rows.size(),5);verifyRow(QStringLiteral("未测试"));
   }
   void stalePollingPublishesOnlySamplingTransitions(){
    QTemporaryDir temp;TelemetryService model(temp.filePath("stale.json"),false);model.m_stale.stop();

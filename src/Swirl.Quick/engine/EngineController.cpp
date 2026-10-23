@@ -213,9 +213,15 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
         }
         emit nodesChanged();
     });
-    connect(m_engine.get(),&ProxyEngine::statusChanged,this,[this] {
+    const auto nodePresentation=[this] {
         const auto nodeStatus=m_engine->status();
-        const QVariantList presentation{int(nodeStatus.state),nodeStatus.selectedNodeId,int(nodeStatus.nodeHealth),int(nodeStatus.requestState),nodeStatus.processAlive,nodeStatus.apiHealthy,nodeStatus.directSession,nodeStatus.nodeBusy,nodeStatus.latencyMs,m_connectionRequested,m_options.selectedNodeId};
+        // Rust node rows show the dedicated NodeTestService measurement, never
+        // the current session's full request latency or byte counters.
+        return QVariantList{int(nodeStatus.state),nodeStatus.selectedNodeId,int(nodeStatus.nodeHealth),int(nodeStatus.requestState),nodeStatus.processAlive,nodeStatus.apiHealthy,nodeStatus.directSession,nodeStatus.nodeBusy,m_connectionRequested,m_options.selectedNodeId};
+    };
+    m_previousNodePresentation=nodePresentation();
+    connect(m_engine.get(),&ProxyEngine::statusChanged,this,[this,nodePresentation] {
+        const auto presentation=nodePresentation();
         if(presentation!=m_previousNodePresentation){m_previousNodePresentation=presentation;emit nodesChanged();}
         if (!m_shuttingDown && m_restartPending && m_engine->status().state==ProxyEngine::State::Stopped) {
             m_restartPending=false;

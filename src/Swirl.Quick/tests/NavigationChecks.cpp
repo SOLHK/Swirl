@@ -43,7 +43,7 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
  auto click=[&](const QString &name){auto *control=item(name);check(control!=nullptr,"input exists: "+name);if(control)QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,control->mapToScene(QPointF(control->width()/2,control->height()/2)).toPoint());};
  auto route=[&](const QString &id){eval("AppState.navigate('"+id+"')");return settle();};
  if(controller->nodes().isEmpty()){
-  QString yaml="proxies:\n";for(int i=0;i<180;++i)yaml+=QString("  - {name: 'Fixture node %1', type: socks5, server: 127.0.0.1, port: 9}\n").arg(i,3,10,QChar('0'));
+  QString yaml="proxies:\n";for(int i=0;i<180;++i)yaml+=QString("  - {name: 'Fixture node %1', type: socks5, server: 127.0.0.1, port: %2}\n").arg(i,3,10,QChar('0')).arg(10000+i);
   controller->imports()->importText(yaml);
   check(await([&]{return !controller->imports()->busy();},8000)&&controller->nodes().size()==180,"standalone navigation fixture imports 180 local node records");
  }
@@ -57,7 +57,7 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
  check(!item("settingsBackButton"),"settings hub has no redundant back control");
  QSet<QWindow *> windows;for(auto *candidate:QGuiApplication::allWindows())windows.insert(candidate);
  auto noNewWindows=[&]{for(auto *candidate:QGuiApplication::allWindows())if(!windows.contains(candidate))return false;return true;};
- const QStringList routes{"settings","fonts","dns","modules","profiles","scripts","subscriptions","proxies"};
+ const QStringList routes{"settings","dns","modules","profiles","scripts","subscriptions","proxies"};
  QMap<QString,QObject *> pages;
  for(int round=0;round<2;++round)for(const auto &id:routes){
   auto *source=item("settings-"+id);check(source!=nullptr,"hub card remains reachable: "+id);
@@ -90,7 +90,14 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
   check(window->winId()==handle&&window->geometry()==geometry,"navigation leaves the native shell stationary: "+id);
   check(item("nav-featurehub")&&item("windowCloseButton"),"sidebar and original traffic lights remain present: "+id);
   if(round==0)pages.insert(id,page);else check(pages.value(id)==page,"same cached page is reused: "+id);
-  if(id=="fonts"||id=="settings")check(page&&page->property("section").toString()==(id=="fonts"?"字体":"常规"),"independent settings sections retain their route: "+id);
+  if(id=="settings"){
+   check(page&&page->property("section").toString()=="常规","general settings retain their section");
+   // U2 moved fonts inside General. Keep actual font-control coverage without
+   // inventing a removed eighth hub card or changing the approved QML layout.
+   if(page){page->setProperty("section",QStringLiteral("字体"));wait(100);}
+   check(item("fontSearch")&&item("fontFamilyList")&&noNewWindows(),"font controls are reachable inside the cached general settings page");
+   if(page){page->setProperty("section",QStringLiteral("常规"));wait(100);}
+  }
   if(round==0&&id=="dns")if(auto *field=item("dnsServerAddress"))field->setProperty("text","1.1.1.1, 8.8.8.8");
   if(round==1&&id=="dns")check(item("dnsServerAddress")&&item("dnsServerAddress")->property("text").toString()=="1.1.1.1, 8.8.8.8","unsubmitted DNS draft survives back and re-entry");
   if(id=="proxies"){
@@ -189,7 +196,10 @@ int runNavigationChecks(QQuickWindow *window,EngineController *controller,const 
  route("proxies");auto *page=qobject_cast<QQuickItem *>(pages.value("proxies"));
  window->resize(window->minimumWidth(),window->minimumHeight());wait(180);
  auto *table=item("realNodeTable");check(table&&page&&table->mapToItem(page,QPointF()).x()>=0&&table->mapToItem(page,QPointF(table->width(),table->height())).x()<=page->width()+1,"node table fits the main content at minimum window size");
- check(item("nodeSearchField")&&item("nodeCountryFilter")&&item("nodeImportButton")&&item("nodeAddButton")&&item("allNodesTestButton"),"embedded nodes retain search, filters, import, add and test controls");
+ check(item("nodeSearchField")&&item("nodeFiltersButton")&&item("nodeImportButton")&&item("nodeAddButton")&&item("allNodesTestButton"),"embedded nodes retain search, filters, import, add and test controls");
+ click("nodeFiltersButton");
+ check(await([&]{return item("nodeCountryFilter")&&item("nodeSourceFilter");},1000),"node region and source controls open in the approved filter dialog");
+ QTest::keyClick(window,Qt::Key_Escape);wait(100);
  window->setGeometry(geometry);wait(150);
  check(controller->processId()==pid&&controller->selectedNodeId()==selected&&controller->nodes().size()==nodeCount,"navigation preserves proxy process, selected node and stored records");
  check(eval("motionPolicy.activeGrabCount===0 && SwirlTransitionRegistry.activeCount===0").toBool(),"navigation releases all transient resources");

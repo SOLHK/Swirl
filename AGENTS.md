@@ -1,3 +1,12 @@
+# Current S3 integration contract (2026-10-23)
+
+- Work on `work/swirl-s3-max-ultra-20261023`, based on the user-approved `work/ui-window-node-performance-20261023` (`7056dea1c920cee57208c1aae54b3550a850f758`). Do not reset, force-push, or modify main/test/other development branches.
+- Read `docs/handoffs/S3_MAX_TO_ULTRA.md` before continuing. Earlier branch/version/compatibility instructions below are historical and do not override this contract.
+- Preserve the current window and sidebar contours, geometry, clipping, antialiasing, glass and interaction infrastructure. Run `python tools/Verify-S3UiBaseline.py`; do not replace QML with old subscription-branch files.
+- Rust Core is the sole product proxy runtime. Do not restore Mihomo or the former C++ proxy engine. Parsing another application's subscription format does not authorize bundling its core.
+- The user currently relies on Clash for this conversation. Local tests must not stop it or change system proxy, TUN, routes or DNS. Keep system-proxy mutation tests on disposable CI runners. Use isolated test storage and loopback peers; do not request or upload private subscriptions.
+- Preserve strict protocol/TLS closure failures. L1 recognition, L2 conversion, L3 startup, L4 independent-peer transfer and L5 user acceptance are separate claims.
+
 # UI/UX Guidance
 
 ## UI update delivery requirements (2026-10-23)
