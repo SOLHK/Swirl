@@ -68,30 +68,28 @@ int runAppearanceChecks(QQuickWindow *window,bool restoreOnly) {
     eval("Theme.transparency=true;Theme.increaseContrast=false;AppState.navigate('activity')");
     check(QTest::qWaitFor([&]{return eval("pageLoader.activeLoader.routeId==='activity' && !pageLoader.pendingGrab && !pageLoader.moving").toBool();},3500),"activity route settles");
     auto *pane=find(window->contentItem(),"sidebarFloatingBackground");
-    auto *sidebar=find(window->contentItem(),"sidebar");
-    const bool blur=pane && pane->property("liveGlass").toBool();
     check(pane!=nullptr,"sidebar pane exists");
-    if(blur && pane && sidebar){
-        check(pane->property("color").value<QColor>().alpha()==0,"glass pane has no white or grey color fill");
-        const auto original=sidebar->property("glassSource");
+    if(pane){
+        check(pane->property("color").value<QColor>().alpha()==0,"sidebar has no independent white or grey fill");
+        QTest::qWait(250);
+        const auto at=pane->mapToScene(QPointF(pane->width()-18,pane->height()/2))*window->devicePixelRatio();
+        const auto before=window->grabWindow();
+        const auto expected=eval("Theme.canvas").value<QColor>();
+        const auto actual=before.isNull()?QColor():before.pixelColor(at.toPoint());
+        check(actual.isValid() && qAbs(actual.red()-expected.red())<=2 && qAbs(actual.green()-expected.green())<=2 && qAbs(actual.blue()-expected.blue())<=2,"sidebar interior retains the actual continuous canvas color");
         QQmlComponent fixture(qmlEngine(window));
-        fixture.setData("import QtQuick; Rectangle {width:400;height:900;visible:false}",QUrl());
-        auto *source=qobject_cast<QQuickItem *>(fixture.create());
-        check(source!=nullptr,"in-app background fixture created");
-        if(source){
-            source->setParentItem(window->contentItem());
-            sidebar->setProperty("glassSource",QVariant::fromValue(source));
-            for(const auto &color:{QColor("#647D92"),QColor("#7D6859")}){
-                source->setProperty("color",color);window->update();QTest::qWait(250);
-                const auto frame=window->grabWindow();
-                const auto at=pane->mapToScene(QPointF(pane->width()-18,pane->height()/2))*window->devicePixelRatio();
-                const auto actual=frame.isNull()?QColor():frame.pixelColor(at.toPoint());
-                qInfo()<<"SIDEBAR_BACKGROUND_COLOR"<<color<<"rendered"<<actual;
-                check(actual.isValid() && qAbs(actual.red()-color.red())<=4 && qAbs(actual.green()-color.green())<=4 && qAbs(actual.blue()-color.blue())<=4,"glass transmits changing app background without independent tint");
-            }
-            sidebar->setProperty("glassSource",original);
-            delete source;
+        fixture.setData("import QtQuick; Rectangle {width:600;height:900;color:'#D02A65'; Text {anchors.fill:parent;text:'RIGHT PAGE CONTENT';font.pixelSize:60;wrapMode:Text.Wrap}}",QUrl());
+        auto *overlay=qobject_cast<QQuickItem *>(fixture.create());
+        auto *mainArea=qvariant_cast<QQuickItem *>(eval("mainArea"));
+        check(overlay && mainArea,"right-page regression fixture created");
+        if(overlay && mainArea){
+            overlay->setParentItem(mainArea);overlay->setZ(999);window->update();QTest::qWait(250);
+            const auto after=window->grabWindow();
+            const auto origin=pane->mapToScene(QPointF(pane->width()-18,120))*window->devicePixelRatio();
+            const QRect strip(origin.toPoint(),QSize(4,qRound((pane->height()-240)*window->devicePixelRatio())));
+            check(!before.isNull() && !after.isNull() && before.copy(strip)==after.copy(strip),"right-page text and color never get copied underneath sidebar navigation");
         }
+        delete overlay;
     }
     auto *proxy=find(window->contentItem(),"proxyCapsule");
     if(proxy){
