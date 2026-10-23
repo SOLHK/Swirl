@@ -22,11 +22,9 @@ QtObject {
     property alias increaseContrast: appearanceStore.savedIncreaseContrast
     readonly property color interactionHover: withAlpha(dark ? "#FFFFFF" : "#000000", dark ? 0.10 : 0.045)
     readonly property color interactionPressed: withAlpha(dark ? "#FFFFFF" : "#000000", dark ? 0.16 : 0.09)
-    readonly property color glassFill: withAlpha(dark ? "#363A40" : "#F0F1F3", transparency && !increaseContrast ? 0.88 : 1)
-    readonly property color glassTop: withAlpha(dark ? "#474B51" : "#FFFFFF", transparency && !increaseContrast ? 0.88 : 1)
+    readonly property color glassFill: dark ? "#3B3D40" : "#E4E5E7"
+    readonly property color glassTop: dark ? "#45474A" : "#EFF0F1"
     readonly property color glassHoverTop: dark ? "#51565D" : "#FFFFFF"
-    readonly property color sidebarGlassTop: withAlpha(dark ? "#494F58" : "#FFFFFF", transparency && !increaseContrast ? 0.94 : 1)
-    readonly property color sidebarGlassBase: withAlpha(dark ? "#353B43" : "#FDFEFF", transparency && !increaseContrast ? 0.84 : 1)
     readonly property real sidebarShadowOpacity: dark ? 0.24 : 0.13
     readonly property color separator: increaseContrast ? text : withAlpha(dark ? "#FFFFFF" : "#18202B", dark ? 0.12 : 0.10)
     property string pageBranch: "B"
@@ -80,13 +78,13 @@ QtObject {
     readonly property color navigationSelected: withAlpha(dark ? "#FFFFFF" : "#000000", dark ? 0.12 : 0.05)
     readonly property color navigationPressed: dark ? "#636871" : "#B4BAC3"
     readonly property color selected: dark ? "#484848" : "#E3E4E7"
-    readonly property color segmentSelected: dark ? "#546173" : "#FFFFFF"
+    readonly property color segmentSelected: dark ? "#64666A" : "#FFFFFF"
     readonly property color hover: dark ? "#3A4B65" : "#E6EDFA"
     readonly property color pressed: dark ? "#465A78" : "#D7E3F7"
     readonly property color controlBorder: pillRim
     readonly property color focusBorder: dark ? "#9AC8FF" : "#005BBF"
     readonly property color tableToolbar: dark ? "#333333" : "#ECECED"
-    readonly property color buttonBase: dark ? "#3C4654" : "#F8FAFD"
+    readonly property color buttonBase: dark ? "#3B3D40" : "#E4E5E7"
     readonly property color field: dark ? "#2C3A50" : "#F2F5FC"
     readonly property color capsuleSurface: dark ? "#38383C" : "#ECEDEF"
     readonly property color green: dark ? "#75DD91" : "#30C759"

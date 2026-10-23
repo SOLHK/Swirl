@@ -8,7 +8,7 @@ Development branch: `work/ui-liquid-glass-unification-20261023`.
 - `Theme.qml`: shared light/dark content colors, glass tint, separator and accessibility tokens. Existing `SwirlMotion.qml` remains the motion-token singleton.
 - `SwirlGlassPanel`: ordinary opaque content material; one background-only analytic shadow. Activity retains two 276 DIP cards and three unboxed lower sections.
 - `SwirlClearGlassSurface`: retained public component name; regular, legible navigation/control material, with optional elevation. It does not implement Apple's native optical refraction or a per-control backdrop blur.
-- `SwirlSidebar`: one glass surface with its own broad, offset shadow and tint, so the large navigation plane remains visibly elevated on a light canvas. Selection is an ordinary overlay, not another glass panel.
+- `SwirlSidebar`: transparent pane sampling mirrored adjacent app content through a bounded Qt blur and edge lens. An exterior-only shadow preserves the transmitted color. Selection is an ordinary overlay, not another glass panel.
 - Buttons, icon buttons, status capsules, segmented controls, combo boxes and dialogs share the material. Content tables and charts stay ordinary surfaces.
 - `SwirlWindowControls`: right-aligned Windows-style minimize, maximize/restore and close controls using QWindow operations. This is a Qt-drawn caption, not an OS-drawn caption; Windows Snap Layout hover is not implemented. Native move/resize and the system menu remain in the existing Windows adapter.
 
@@ -23,7 +23,7 @@ Development branch: `work/ui-liquid-glass-unification-20261023`.
 
 ## Motion
 
-Hover 150 ms, press 80 ms, release 140 ms, selection 220 ms, page 190 ms, dialog 220 ms. Buttons and switches use bounded cubic easing rather than springs for press feedback. Existing retargetable page/sidebar animation ownership remains in place. Reduced motion and inactive-window policy suppress decorative motion. Increased contrast and reduced transparency have explicit shared-material behavior.
+Hover 150 ms, press 80 ms, release 140 ms, selection 220 ms, page 190 ms, dialog 220 ms. Buttons and switches use bounded cubic easing rather than springs for press feedback. Existing retargetable page/sidebar animation ownership remains in place. Reduced motion suppresses decorative motion; activation changes do not cancel popup interaction. Increased contrast and reduced transparency have explicit shared-material behavior.
 
 ## Verification status
 
@@ -54,3 +54,19 @@ Existing limitations found in this baseline: the Qt/Rust product packaging CMake
 - https://github.com/stdware/qwindowkit (Apache-2.0; considered as a reference, not copied or added. Its private-Qt dependency and framework scope are unnecessary for this bounded change.)
 
 The Apple Music screenshot supplied by the user guides the sidebar's inset contour, broad soft shadow and material separation. It does not authorize adding glass to content cards or restoring traffic-light buttons.
+
+## 0.1.8 user-directed corrections
+
+User-confirmed material source: Swirl's internal background and content, not desktop windows. No independent white/grey tint may be added to the sidebar. The former 0.1.7 sidebar was not accepted.
+
+- The pane fill is transparent. A bounded crop of the adjacent app content is mirrored below it, blurred with Qt MultiEffect, and sampled with a small rounded-edge lens shader. No tint, brightness or saturation adjustment is applied. Native content text remains outside this effect path.
+- An exterior-only analytic shadow replaces the full-area shadow behind this transparent pane, so the shadow cannot darken its interior. The original app canvas remains the underlying background.
+- Neutral grey/white control surfaces improve affordance, with a distinct selected segment.
+- The system-proxy capsule now navigates to `proxies`; the separate status popup and its full-window input-catching MouseArea are removed. It does not toggle network state.
+- Non-Activity pages start below a 48 DIP caption exclusion area. Activity card geometry is preserved.
+- Capture and Rewrite use complete grid rows; TLS right panel fills the height of the left column. The extra Fonts tile is removed from More; font settings remain under General. The final More tile spans the incomplete row.
+- Combo boxes use an in-window popup. Opening a separate native popup no longer interacts with main-window activation. Window activation no longer changes the reduced-motion preference/transition policy. Static combo delegates no longer have insert/remove animations that can interfere with popup timing.
+
+Functional verification is distinct from user visual acceptance. The targeted appearance test now exercises real pointer selection through Light/Dark/System repeatedly, keyboard selection, the next switch click, persistence, and direct proxy-to-node navigation while preserving proxy state. At reported DPR 1.5/D3D11, two different homogeneous in-app color fixtures were transmitted with identical RGB values and no pane tint. These are synthetic rendering checks, not a claim that the final look matches Apple Music. Final appearance remains pending user review.
+
+No Rust source or dependency changed. Qt shaders are bundled through qsb; non-Windows builds remain NOT TESTED. Windows-only backdrop integration remains outside Rust Core.

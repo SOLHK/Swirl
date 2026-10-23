@@ -49,7 +49,7 @@ Item {
       }
      }
     }
-    SwirlGlassPanel {Layout.fillWidth:true;Layout.preferredWidth:1;Layout.minimumWidth:0;Layout.alignment:Qt.AlignTop;Layout.preferredHeight:Math.max(Theme.dp(350),hostBody.implicitHeight+2*Theme.cardPadding)
+    SwirlGlassPanel {Layout.fillWidth:true;Layout.fillHeight:true;Layout.preferredWidth:1;Layout.minimumWidth:0;Layout.preferredHeight:Math.max(Theme.dp(350),hostBody.implicitHeight+2*Theme.cardPadding)
      ColumnLayout {id:hostBody;anchors.left:parent.left;anchors.right:parent.right;anchors.top:parent.top;anchors.margins:Theme.cardPadding;spacing:Theme.dp(14)
       RowLayout {Layout.fillWidth:true;Title {text:"MitM 主机名"}SwirlText {renderType:Text.NativeRendering;text:page.domainRows.length+" 项";color:Theme.muted;font.pixelSize:Theme.fontSize(12)}}
       Note {text:"仅解密列表中的域名，支持 *.example.com 等通配符。"}

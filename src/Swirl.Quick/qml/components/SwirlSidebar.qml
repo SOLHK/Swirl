@@ -6,6 +6,8 @@ import SwirlQuick
 import "../controls"
 Item {
  id:sidebar
+ objectName:"sidebar"
+ property Item glassSource:null
  property int geometryRevision:0
  property var entries:({})
  readonly property Item selectedEntry:entries[AppState.sidebarPage] || null
@@ -16,9 +18,46 @@ Item {
   x:Theme.dp(5);y:Theme.dp(5)
   width:sidebar.width-Theme.dp(10);height:sidebar.height-Theme.dp(10)
   radius:Theme.dp(14)
-  topColor:Theme.sidebarGlassTop;baseColor:Theme.sidebarGlassBase
-  shadowBlur:Theme.dp(20);shadowOpacity:Theme.sidebarShadowOpacity
-  shadowOffset:Qt.vector2d(Theme.dp(4),Theme.dp(3))
+  readonly property bool liveGlass:Theme.transparency && !Theme.increaseContrast && Theme.effectsSupported && sidebar.glassSource!==null
+  color:liveGlass?"transparent":Theme.canvas
+  gradient:null;elevated:false
+  ShaderEffectSource {
+   id:glassCapture
+   sourceItem:floatingBackground.liveGlass?sidebar.glassSource:null
+   sourceRect:Qt.rect(0,floatingBackground.y,floatingBackground.width,floatingBackground.height)
+   textureSize:Qt.size(Math.max(1,Math.round(floatingBackground.width*Screen.devicePixelRatio/2)),Math.max(1,Math.round(floatingBackground.height*Screen.devicePixelRatio/2)))
+   hideSource:false;visible:false;live:floatingBackground.liveGlass && sidebar.visible;smooth:true
+  }
+  MultiEffect {
+   id:backgroundBlur
+   width:floatingBackground.width;height:floatingBackground.height;visible:false
+   source:floatingBackground.liveGlass?glassCapture:null
+   autoPaddingEnabled:false;blurEnabled:true;blurMax:32;blur:0.8
+  }
+  ShaderEffectSource {
+   id:blurredCapture
+   sourceItem:floatingBackground.liveGlass?backgroundBlur:null
+   textureSize:glassCapture.textureSize;hideSource:true;visible:false
+   live:floatingBackground.liveGlass && sidebar.visible;smooth:true
+  }
+  ShaderEffect {
+   anchors.fill:parent;visible:floatingBackground.liveGlass
+   property var source:blurredCapture
+   property vector2d surfaceSize:Qt.vector2d(width,height)
+   property real cornerRadius:floatingBackground.radius
+   fragmentShader:"qrc:/swirl/shaders/sidebar-glass.frag.qsb"
+  }
+  ShaderEffect {
+   readonly property real padding:Theme.dp(24)
+   x:-padding;y:-padding;width:floatingBackground.width+2*padding;height:floatingBackground.height+2*padding
+   z:-1;visible:Theme.effectsSupported && !Theme.increaseContrast
+   property vector2d surfaceSize:Qt.vector2d(floatingBackground.width,floatingBackground.height)
+   property real cornerRadius:floatingBackground.radius
+   property vector2d shadowOffset:Qt.vector2d(Theme.dp(3),Theme.dp(3))
+   property real softness:Theme.dp(9)
+   property color shadowColor:Theme.withAlpha("#000000",Theme.sidebarShadowOpacity)
+   fragmentShader:"qrc:/swirl/shaders/sidebar-shadow.frag.qsb"
+  }
  }
  // A single visual owner: retarget y from its rendered position, in local coordinates.
  Rectangle {

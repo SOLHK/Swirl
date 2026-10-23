@@ -65,7 +65,8 @@ ComboBox {
     popup: Popup {
         parent:control
         focus:true
-        popupType:Popup.Window
+        popupType:Popup.Item
+        closePolicy:Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent
         transformOrigin:Item.TopLeft
     onAboutToShow: {
         if(SwirlMotion.reduced){scale=1;opacity=1}
@@ -87,10 +88,6 @@ ComboBox {
         exit: Transition { enabled:!SwirlMotion.reduced; ParallelAnimation { NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.duration} } }
         background: SwirlClearGlassSurface { radius:Theme.popupRadius; elevated:false }
         contentItem: ListView { pixelAligned: true;
-                    add: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";to:1;duration:SwirlMotion.duration} }
-                    remove: Transition { enabled:!SwirlMotion.reduced; NumberAnimation {property:"opacity";to:0;duration:SwirlMotion.duration} }
-                    move: Transition {enabled:!SwirlMotion.reduced;SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration}}
-                    displaced: Transition { enabled:!SwirlMotion.reduced; SmoothedAnimation {properties:"x,y";velocity:1200*SwirlMotion.speed;duration:SwirlMotion.duration} }
             clip: true
             implicitHeight: contentHeight
             model: control.popup.visible ? control.delegateModel : null

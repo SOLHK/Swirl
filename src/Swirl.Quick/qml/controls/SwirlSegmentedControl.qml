@@ -22,7 +22,7 @@ Item {
         width:control.segmentWidth(control.currentIndex)
         height:control.height-Theme.dp(4)
         radius:control.rounded?height/2:Theme.segmentedSelectedRadius
-        color:control.accentSelection?Theme.primaryControl:control.clearGlass?Theme.withAlpha("#FFFFFF",Theme.dark?0.14:0.72):control.rounded?Theme.buttonBase:Theme.segmentSelected
+        color:control.accentSelection?Theme.primaryControl:Theme.segmentSelected
         border.width:0
         border.color:control.clearGlass?Theme.withAlpha(Theme.dark?"#FFFFFF":"#777777",Theme.dark?0.14:0.10):"transparent"
         Behavior on selectionPosition{enabled:!SwirlMotion.reduced;NumberAnimation{duration:SwirlMotion.switchDuration;easing.type:Easing.OutCubic}}

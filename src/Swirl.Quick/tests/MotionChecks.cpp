@@ -370,20 +370,13 @@ int runMotionChecks(QQuickWindow *window, const QString &output) {
         check("activity-return-preserves-scroll",item()==activity&&activityScroll&&qAbs(activityScroll->property("contentY").toDouble()-activityScrollBefore)<1);
         check("shared-surfaces-restored",!upload->property("surfaceHidden").toBool()&&host->property("sourceSurface").value<QObject *>()==nullptr);
     }
+    route("activity");
     auto *capsule=findVisual(window->contentItem(),"proxyCapsule");
     if(capsule){
-        const auto at=capsule->mapToScene(QPointF(capsule->width()/2,capsule->height()/2)).toPoint();
-        const auto toast=eval("AppState.toast").toString();
-        QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,at);wait(70);
-        check("proxy-capsule-opens-local-status",eval("proxyPanel.visible && proxyPanel.desired").toBool());
-        check("proxy-panel-anchored-to-capsule",eval("proxyPanel.x>=window.actualSidebarWidth && Math.abs(proxyPanel.x+proxyPanel.width-proxyPanel.origin.x-proxyCapsule.width)<2").toBool());
-        eval("proxyPanel.requestDismiss()");wait(20);eval("proxyPanel.toggle()");wait(320);
-        check("proxy-panel-reverses-without-stale-close",eval("proxyPanel.visible && proxyPanel.reveal===1").toBool());
-        check("opening-status-does-not-toggle-proxy-or-toast",eval("AppState.toast").toString()==toast&&!eval("window.proxyTogglePending").toBool());
-        eval("proxyPanel.requestDismiss()");wait(320);
-        check("proxy-panel-restores-focus-and-source",!eval("proxyPanel.visible").toBool()&&capsule->opacity()==1&&capsule->hasActiveFocus());
-        QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,at);wait(60);QTest::keyClick(window,Qt::Key_Escape);wait(320);
-        check("proxy-panel-escape-uses-same-close-path",!eval("proxyPanel.visible").toBool()&&capsule->opacity()==1);
+        const auto proxyBefore=eval("engineController.systemProxy.enabled");
+        QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,capsule->mapToScene(QPointF(capsule->width()/2,capsule->height()/2)).toPoint());
+        check("proxy-capsule-opens-node-management",settle(3500) && eval("AppState.currentPage==='proxies'").toBool());
+        check("opening-node-management-does-not-toggle-proxy",eval("engineController.systemProxy.enabled")==proxyBefore);
     }
     QList<double> intervals;QList<double> warmIntervals;bool warmPhase=false;bool measuring=true;QMutex frameMutex;
     QElapsedTimer clock;clock.start();qint64 last=0;
