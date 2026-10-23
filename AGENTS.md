@@ -1,4 +1,13 @@
-# Current S3 integration contract (2026-10-23)
+# Current S4 integration contract (2026-10-24)
+
+- Active work is `work/swirl-s4-final-completion-20261023`, based on frozen S3 `9f8af5754d2a932f7b967eea0e64cbc75717e6be`. The S3 instructions below are historical; do not modify S3, main, test or parallel branches.
+- Read `docs/S4_BASELINE_AUDIT.md` and `docs/S4_CROSS_PLATFORM.md`. Keep protocol, subscription semantics, DNS, routing and measurement in portable Rust. Windows, Apple, Android and HarmonyOS SDK calls belong only in separate platform adapters; no Qt or WinTUN dependency in common Rust crates.
+- Preserve the existing window/sidebar geometry, contours, clipping and sizing policy exactly. Content refinements must retain functions and interruptible motion. Measure before and after on the same machine.
+- Before each commit run the portable dependency guard and applicable target checks. Distinguish native tests, cross-compilation, system permissions and device acceptance. OpenHarmony target compilation is not HarmonyOS NEXT VPN acceptance; Android VPN APIs are not a substitute.
+- Commit and push verified stages promptly to S4 without force. Final product gates and package identity must use one integrated SHA. Preserve failed and skipped evidence; do not lower strict network assertions.
+- Existing local Clash/system proxy/TUN/routes/DNS and private subscriptions remain untouched. Use isolated data and controlled peers. The user performs final private-provider acceptance after development.
+
+# Historical S3 integration contract (2026-10-23)
 
 - Work on `work/swirl-s3-max-ultra-20261023`, based on the user-approved `work/ui-window-node-performance-20261023` (`7056dea1c920cee57208c1aae54b3550a850f758`). Do not reset, force-push, or modify main/test/other development branches.
 - Read `docs/handoffs/S3_MAX_TO_ULTRA.md` before continuing. Earlier branch/version/compatibility instructions below are historical and do not override this contract.
