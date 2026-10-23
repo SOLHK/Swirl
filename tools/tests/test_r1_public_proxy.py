@@ -201,7 +201,8 @@ def direct_tls_close_control(endpoint, deadline, *, host='www.gstatic.com', port
                                      do_handshake_on_connect=False, suppress_ragged_eofs=False)
         stream.settimeout(remaining(deadline, 8))
         stream.do_handshake()
-        result.update(certificate_verified=True, tls_version=stream.version())
+        result.update(certificate_verified=True, tls_version=stream.version(),
+                      peer_certificate_sha256=hashlib.sha256(stream.getpeercert(binary_form=True)).hexdigest())
         phase = 'public-response'
         stream.settimeout(remaining(deadline, 8))
         stream.sendall(f'GET /generate_204 HTTP/1.1\r\nHost: {host}\r\nConnection: keep-alive\r\n\r\n'.encode())
@@ -435,6 +436,7 @@ def request(port, kind, deadline, result):
             stream.do_handshake()
             result['certificate_verified'] = True
             result['tls_version'] = stream.version()
+            result['peer_certificate_sha256'] = hashlib.sha256(stream.getpeercert(binary_form=True)).hexdigest()
         request_target = f'http://{host}{path}' if kind == 'http' else path
         result['stage'] = 'public-response'
         # Initiate TLS shutdown after the complete 204 instead of relying on
@@ -576,6 +578,12 @@ class R1PublicProxyTests(unittest.TestCase):
                     event = matching[-1]
                     report['direct_origin_control'] = direct_tls_close_control(
                         (event['origin_family'], event['origin_address']), work_deadline)
+                    direct = report['direct_origin_control']
+                    proxy_certificate = request_result.get('peer_certificate_sha256')
+                    direct_certificate = direct.get('peer_certificate_sha256')
+                    direct['matches_proxy_certificate'] = (
+                        proxy_certificate == direct_certificate
+                        if proxy_certificate and direct_certificate else None)
         finally:
             if control is not None and handle is not None and control.usable:
                 try:
@@ -704,6 +712,7 @@ class PublicTlsControlTests(unittest.TestCase):
         result, requests = self.run_control()
         self.assertTrue(result['success'], result)
         self.assertTrue(result['certificate_verified'])
+        self.assertEqual(len(result['peer_certificate_sha256']), 64)
         self.assertTrue(result['orderly_close'])
         self.assertFalse(result['proxy_result'])
         self.assertEqual(result['http_status'], 204)
@@ -714,6 +723,7 @@ class PublicTlsControlTests(unittest.TestCase):
         result, requests = self.run_control(truncate=True)
         self.assertFalse(result['success'], result)
         self.assertTrue(result['certificate_verified'])
+        self.assertEqual(len(result['peer_certificate_sha256']), 64)
         self.assertEqual(result['http_status'], 204)
         self.assertEqual(result['failure_phase'], 'origin-close')
         self.assertEqual(result['failure']['type'], 'SSLEOFError')
@@ -724,6 +734,7 @@ class PublicTlsControlTests(unittest.TestCase):
         result, requests = self.run_control(trusted=False)
         self.assertFalse(result['success'], result)
         self.assertFalse(result['certificate_verified'])
+        self.assertNotIn('peer_certificate_sha256', result)
         self.assertEqual(result['failure_phase'], 'origin-tls')
         self.assertEqual(result['failure']['type'], 'SSLCertVerificationError')
         self.assertNotIn('http_status', result)

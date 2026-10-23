@@ -2,7 +2,7 @@ name: U1 retained native network regressions
 
 on:
   push:
-    branches: [work/subscription-unified-integration-20261023, work/swirl-s3-max-ultra-20261023]
+    branches: [work/subscription-unified-integration-20261023, work/swirl-s3-max-ultra-20261023, work/swirl-s4-final-completion-20261023]
   workflow_dispatch:
 
 permissions:
@@ -91,7 +91,7 @@ jobs:
               ['cargo', 'build', '--manifest-path', 'core/Cargo.toml', '--release', '--locked',
                '-p', 'swirl-transport', '--example', 'reality-client', '--example', 'reality-hello'],
               ['cargo', 'build', '--manifest-path', 'core/Cargo.toml', '--release', '--locked',
-               '-p', 'swirl-protocol', '--example', 'vision-client', '--example', 'transport-client'],
+               '-p', 'swirl-protocol', '--example', 'vision-client', '--example', 'transport-client', '--example', 'transport-runtime'],
           ]
           for index, command in enumerate(commands, 1):
               with (output / f'rust-build-{index}.log').open('w', encoding='utf-8') as log:
@@ -161,6 +161,21 @@ jobs:
       - name: Execute both original strict VMess peer-closure methods
         if: ${{ !cancelled() }}
         run: python tools/Run-U1NativeSupplement.py --phase strict-vmess --output "${{ runner.temp }}/u1-native-supplement"
+      - name: Compare native and official clients using a target post-EOF receipt
+        if: ${{ !cancelled() }}
+        shell: python
+        run: |
+          import os, pathlib, subprocess, sys
+          root = pathlib.Path.cwd()
+          suffix = '.exe' if os.name == 'nt' else ''
+          output = pathlib.Path(os.environ['RUNNER_TEMP']) / 'u1-native-supplement' / 's4-close-control'
+          env = dict(os.environ)
+          env.update(SWIRL_TRANSPORT_CLIENT=str(root / 'core/target/release/examples' / ('transport-client' + suffix)),
+                     SWIRL_TRANSPORT_RUNTIME=str(root / 'core/target/release/examples' / ('transport-runtime' + suffix)),
+                     SWIRL_TRANSPORT_EVIDENCE=str(output / 'peers'),
+                     SWIRL_XRAY_BINARY=str(pathlib.Path(os.environ['RUNNER_TEMP']) / 'u1-release-xray-peers/current' / ('xray' + suffix)))
+          subprocess.run([sys.executable, '-m', 'unittest', 'discover', '-s', 'tools/tests', '-p', 'test_vmess_close_diagnostic.py', '-v'], check=True)
+          subprocess.run([sys.executable, 'tools/tests/diagnose_vmess_close.py', '--output', str(output / 'receipt.json')], env=env, check=True)
       # The original public REALITY verifier explicitly requires Linux.
       # Keep every public menu independent so a prior failure cannot suppress it.
       - name: Original public REALITY with the Rust TLS fingerprint
