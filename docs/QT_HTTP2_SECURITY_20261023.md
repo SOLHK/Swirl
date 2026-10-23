@@ -1,5 +1,7 @@
 # Qt HTTP client mitigation for CVE-2026-96432
 
+S4 recheck on 2026-10-24: Qt also published [CVE-2026-95620](https://www.qt.io/blog/security-advisory-cve-2026-95620), a use-after-free in the HTTP/2 client affecting the local Qt 6.10.3 line. The same request-level HTTP/1.1 policy keeps those Qt requests out of that HTTP/2 implementation. Production packaging continues to require Qt 6.11.3, the fixed release named by Qt; local MinGW 6.10.3 measurements are reported separately. TLS certificate checks remain enabled. This records dependency/mitigation scope, not a claim to have reproduced either vulnerability or patched the local Qt DLLs.
+
 ## Scope and status
 
 The Qt advisory published on 2026-10-21 covers Qt 6.8.0–6.8.9 and

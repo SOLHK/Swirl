@@ -5,7 +5,7 @@
 
 namespace SwirlNetwork {
 
-// Qt 6.10.3 is affected by CVE-2026-96432 in its HTTP/2 client.
+// Qt 6.10.3 is affected by CVE-2026-96432 and CVE-2026-95620 in its HTTP/2 client.
 // Apply the official mitigation to every Qt HTTP request, including requests
 // rebuilt for redirects. Direct HTTP/2 takes precedence over Allowed; explicitly
 // disable h2c too so QT_NETWORK_H2C_ALLOWED cannot change this policy.

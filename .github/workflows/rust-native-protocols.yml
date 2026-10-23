@@ -1,7 +1,7 @@
 name: Swirl Native Protocols X14
 on:
   push:
-    branches: [work/rust-native-protocols-x14a-20261022, work/subscription-unified-integration-20261023, work/swirl-s3-max-ultra-20261023]
+    branches: [work/rust-native-protocols-x14a-20261022, work/subscription-unified-integration-20261023, work/swirl-s3-max-ultra-20261023, work/swirl-s4-final-completion-20261023]
   workflow_dispatch:
 permissions:
   contents: read

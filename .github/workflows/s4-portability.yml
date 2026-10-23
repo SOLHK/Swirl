@@ -1,0 +1,78 @@
+name: S4 mobile Rust compilation boundaries
+on:
+  push:
+    branches: [work/swirl-s4-final-completion-20261023]
+    paths: ['core/**', 'tools/tests/test_portable_core_boundary.py', '.github/workflows/s4-portability.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: s4-portability-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  mobile-libraries:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            target: aarch64-apple-ios
+            scope: full-library-check
+          - os: ubuntu-24.04
+            target: aarch64-linux-android
+            scope: full-library-check
+          - os: ubuntu-24.04
+            target: aarch64-unknown-linux-ohos
+            scope: subscription-and-platform-only
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      SWIRL_TARGET: ${{ matrix.target }}
+      SWIRL_COMPILE_SCOPE: ${{ matrix.scope }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Install target and test source boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install stable --profile minimal --target "$SWIRL_TARGET"
+          python3 tools/tests/test_portable_core_boundary.py
+      - name: Configure Android NDK C dependencies
+        if: matrix.target == 'aarch64-linux-android'
+        shell: bash
+        run: |
+          set -euo pipefail
+          ndk="${ANDROID_NDK_LATEST_HOME:-${ANDROID_NDK_HOME:-}}"
+          test -n "$ndk"
+          cc="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang"
+          ar="$ndk/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-ar"
+          test -x "$cc"
+          test -x "$ar"
+          printf 'CC_aarch64_linux_android=%s\nAR_aarch64_linux_android=%s\n' "$cc" "$ar" >> "$GITHUB_ENV"
+      - name: Compile and preserve exact scope and failure status
+        shell: python
+        run: |
+          import json, os, pathlib, subprocess
+          output = pathlib.Path('out/portability')
+          output.mkdir(parents=True, exist_ok=True)
+          target = os.environ['SWIRL_TARGET']
+          scope = os.environ['SWIRL_COMPILE_SCOPE']
+          command = ['cargo', '+stable', 'check', '--manifest-path', 'core/Cargo.toml', '--locked', '--target', target]
+          command += (['-p', 'swirl-subscription', '-p', 'swirl-platform'] if scope == 'subscription-and-platform-only' else ['--workspace', '--lib'])
+          with (output / 'compile.log').open('w') as log:
+              result = subprocess.run(command, stdout=log, stderr=subprocess.STDOUT)
+          report = {'source_sha': os.environ['GITHUB_SHA'], 'target': target, 'scope': scope,
+                    'command': command, 'exit_code': result.returncode, 'compile_passed': result.returncode == 0,
+                    'system_adapter_verified': False, 'network_permissions_verified': False,
+                    'device_networking_verified': False}
+          (output / 'result.json').write_text(json.dumps(report, indent=2) + '\n')
+          print((output / 'compile.log').read_text())
+          raise SystemExit(result.returncode)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: S4-compile-${{ matrix.target }}-${{ github.sha }}
+          path: out/portability
+          if-no-files-found: warn

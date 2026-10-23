@@ -56,11 +56,14 @@ try {
     if ($LASTEXITCODE) { throw 'Production build failed; no package was staged.' }
     & (Join-Path $PSScriptRoot 'Stage-WindowsRustProduct.ps1') -BuildDirectory $BuildDir -Destination $DistDir
     $stage = (Resolve-Path -LiteralPath $DistDir).Path
-    $p = Start-Process (Join-Path $stage 'Swirl.exe') -ArgumentList '--smoke-test' -WorkingDirectory ([IO.Path]::GetTempPath()) -PassThru
+    $p = Start-Process (Join-Path $stage 'Swirl.exe') -ArgumentList '--smoke-test' -WorkingDirectory ([IO.Path]::GetTempPath()) -WindowStyle Hidden -PassThru
     if (-not $p.WaitForExit(75000)) { $p.Kill(); throw 'Packaged Qt UI smoke timed out.' }
     if ($p.ExitCode) { throw 'Packaged Qt UI smoke failed.' }
     New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
     $out = (Resolve-Path -LiteralPath $OutDir).Path
+    $uninstallList = Join-Path $out 'Swirl-UninstallFiles.nsh'
+    & (Join-Path $PSScriptRoot 'Finalize-WindowsRustProduct.ps1') -ApplicationDirectory $stage `
+        -EvidenceDirectory (Join-Path $out 'package-evidence') -UninstallList $uninstallList
     $zip = Join-Path $out 'Swirl-Rust-x64.zip'
     if (Test-Path -LiteralPath $zip) { throw 'Use a fresh OutDir; existing archive is preserved.' }
     Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zip
@@ -70,7 +73,7 @@ try {
         $icon = (Resolve-Path -LiteralPath (Join-Path $BuildDir 'brand/Swirl.ico')).Path
         $appVersion = (Get-Content -LiteralPath 'src/Swirl.Quick/PRODUCT_VERSION.txt' -Raw).Trim()
         if ($appVersion -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid PRODUCT_VERSION.txt' }
-        & $Nsis /INPUTCHARSET UTF8 "/DAPP_DIST=$stage" "/DOUT_DIR=$out" "/DAPP_ICON=$icon" "/DAPP_VERSION=$appVersion" src/Swirl.Quick/packaging/Swirl.nsi
+        & $Nsis /INPUTCHARSET UTF8 "/DAPP_DIST=$stage" "/DOUT_DIR=$out" "/DAPP_ICON=$icon" "/DAPP_VERSION=$appVersion" "/DUNINSTALL_LIST=$uninstallList" src/Swirl.Quick/packaging/Swirl.nsi
         if ($LASTEXITCODE) { throw 'NSIS failed; verified portable output is retained.' }
     }
     Write-Host "Verified Rust-only product: $stage"

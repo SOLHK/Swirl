@@ -220,6 +220,9 @@ NodeImporter::Result NodeImporter::parse(const QByteArray &bytes) {
         n.username=params.take("username").toString();n.password=params.take("password").toString();
         n.cipher=params.take("cipher").toString();n.serverName=params.take("sni").toString();
         if(n.serverName.isEmpty())n.serverName=params.value("servername").toString();
+        if(n.serverName.isEmpty()&&params.value("_swirl-source-format")==QJsonValue("sing-box")&&
+            (n.protocol=="tuic"||n.protocol=="hysteria2"))
+            n.serverName=params.value("tls").toObject().value("server_name").toString();
         n.parameters=params;
         auto error=ProxyNode::validate(n);
         if(!safeOptions(params))error=QStringLiteral("节点含本地文件、脚本或系统网络设置；请移除此类字段后导入。");

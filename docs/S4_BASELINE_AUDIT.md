@@ -35,8 +35,8 @@ Existing S3 executable, Qt 6.10.3, Windows D3D11, DPR 1.5, display refresh 240 H
 | P99 frame interval | 62.7856 ms |
 | Frames over 50 ms | 8 / 470 |
 | Warm P95 frame interval | 4.9591 ms |
-| Private memory at motion measurement | 397,901,824 bytes |
-| Repeated-navigation private-memory growth | 311,296 bytes |
+| Working set at motion measurement | 397,901,824 bytes |
+| Repeated-navigation working-set growth | 311,296 bytes |
 | Idle frames during harness window | 1 |
 | Cached pages after visiting all routes | 16 |
 

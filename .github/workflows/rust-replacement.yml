@@ -1,7 +1,7 @@
 name: Rust sole runtime and unified product
 on:
   push:
-    branches: [work/rust-core-full-replacement-20261022, work/subscription-unified-integration-20261023, work/swirl-s3-max-ultra-20261023]
+    branches: [work/rust-core-full-replacement-20261022, work/subscription-unified-integration-20261023, work/swirl-s3-max-ultra-20261023, work/swirl-s4-final-completion-20261023]
   workflow_dispatch:
 permissions:
   contents: read
@@ -99,7 +99,7 @@ jobs:
       - name: Configure isolated Qt integration tests
         run: cmake -S src/Swirl.Quick -B build/r1-tests -G "Visual Studio 17 2022" -A x64 -DSWIRL_USE_RUST_CORE=ON -DSWIRL_BUILD_UI_TESTS=ON -DSWIRL_RUST_TARGET="${{ github.workspace }}/core/target"
       - name: Build product, subscription, telemetry, stream, security and loader regressions
-        run: cmake --build build/r1-tests --config Release --target Swirl SwirlRustCoreTests SwirlRustCoreLibraryTests SwirlNodeTests SwirlImportTests SwirlSubscriptionFormatTests SwirlTelemetryTests SwirlNetworkRegressionTests SwirlDiagnosticTests SwirlSystemProxyStateTests SwirlQtNetworkPolicyTests --parallel 4
+        run: cmake --build build/r1-tests --config Release --target Swirl SwirlRustCoreTests SwirlRustCoreLibraryTests SwirlNodeTests SwirlNodeViewModelTests SwirlImportTests SwirlSubscriptionFormatTests SwirlTelemetryTests SwirlNetworkRegressionTests SwirlDiagnosticTests SwirlSystemProxyStateTests SwirlQtNetworkPolicyTests --parallel 4
       - name: Deploy test dependencies and inspect PE imports
         shell: pwsh
         run: |
@@ -115,6 +115,19 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Rust dependency inspection failed.' }
       - name: Windows native product and subscription regression
         run: ctest --test-dir build/r1-tests -C Release -R "^swirl-(rust-library-loader|rust-qt-integration|node-real-chain|node-ui|engine-ui|stream-regression|import-subscription|import-boundaries|subscription-formats|telemetry-accounting|diagnostic-export|system-proxy-state|qt-network-policy|capture-network)$" --output-on-failure --no-tests=error
+      - name: S4 content, model and motion correctness (offscreen software renderer)
+        run: ctest --test-dir build/r1-tests -C Release -R "^swirl-(motion|all-pages|appearance-ui|node-view-model)$" --output-on-failure --no-tests=error
+      - name: S4 synthetic node scale and fixed geometry (not native GPU acceptance)
+        shell: pwsh
+        env:
+          SWIRL_U2_CHECKS: S4
+        run: |
+          $output=Join-Path $env:RUNNER_TEMP 's4-ui-stress.json'
+          $p=Start-Process build/r1-tests/Release/Swirl.exe -ArgumentList @('--motion-test', ('--motion-output='+$output)) -WindowStyle Hidden -PassThru
+          if (-not $p.WaitForExit(120000)) { $p.Kill(); throw 'S4 node scale UI check timed out.' }
+          if ($p.ExitCode -ne 0) { throw 'S4 node scale UI check failed.' }
+          $result=Get-Content -LiteralPath $output -Raw | ConvertFrom-Json
+          if ($result.failures -ne 0) { throw 'S4 node scale UI assertions failed.' }
       - name: Actual Windows Qt import, DPAPI restore, selection and routing
         env:
           SWIRL_RUST_QT_TESTS: ${{ github.workspace }}/build/r1-tests/Release/SwirlRustCoreTests.exe
@@ -195,9 +208,13 @@ jobs:
           $dist=(Resolve-Path dist).Path
           $stage=(Resolve-Path dist/Swirl-Rust-x64).Path
           $icon=(Resolve-Path build/r1-product/brand/Swirl.ico).Path
+          ./scripts/tests/Test-S4InstallerLifecycle.ps1 -Nsis $nsis -Icon $icon -EvidenceRoot (Join-Path $env:RUNNER_TEMP 's4-package-lifecycle')
+          if ($LASTEXITCODE -ne 0) { throw 'Installer lifecycle and retained-data regression failed.' }
           $appVersion=(Get-Content -LiteralPath src/Swirl.Quick/PRODUCT_VERSION.txt -Raw).Trim()
           if ($appVersion -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid product version.' }
-          & $nsis "/DAPP_VERSION=$appVersion" "/DAPP_DIST=$stage" "/DOUT_DIR=$dist" "/DAPP_ICON=$icon" src/Swirl.Quick/packaging/Swirl.nsi
+          $uninstallList=Join-Path $dist 'Swirl-UninstallFiles.nsh'
+          ./scripts/Finalize-WindowsRustProduct.ps1 -ApplicationDirectory $stage -EvidenceDirectory build/r1-product/package-evidence -UninstallList $uninstallList
+          & $nsis "/DAPP_VERSION=$appVersion" "/DAPP_DIST=$stage" "/DOUT_DIR=$dist" "/DAPP_ICON=$icon" "/DUNINSTALL_LIST=$uninstallList" src/Swirl.Quick/packaging/Swirl.nsi
           if ($LASTEXITCODE -ne 0) { throw 'Installer build failed.' }
           Compress-Archive -Path "$stage/*" -DestinationPath (Join-Path $dist 'Swirl-Rust-x64.zip')
       - name: Windows native public Internet requests
@@ -235,7 +252,10 @@ jobs:
             build/r1-product/ui-repeated-start.json
             dist/Swirl-Rust-x64/rust-self-test.json
             dist/Swirl-Rust-x64/package-manifest.json
-            dist/Swirl-Rust-x64/Swirl-diagnostics.txt
+            build/r1-product/package-evidence
+            ${{ runner.temp }}/s4-package-lifecycle
+            ${{ runner.temp }}/s4-ui-stress.json
+            build/r1-tests/Release/motion-report.json
           if-no-files-found: warn
       - name: Preserve candidate package for review (not a release)
         uses: actions/upload-artifact@v4

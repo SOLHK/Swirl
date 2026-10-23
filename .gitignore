@@ -5,6 +5,7 @@ dist/
 *.zip
 
 build/
+/work/
 system-proxy-tests.txt
 routing-tests.txt
 

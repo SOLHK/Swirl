@@ -8,7 +8,8 @@ $denied = @('mihomo.exe','engine/mihomo-windows-amd64.exe','licenses/mihomo.exe'
     'licenses/mihomo-GPL-3.0.txt.exe','mihomo-GPL-3.0.txt','other/licenses/mihomo-GPL-3.0.txt',
     'Mihomo.dll','clash.exe','xray.exe','sing-box.exe','mihomo-manifest.json',
     'SwirlRustCoreTests.exe','SwirlEngineFixture.exe','swirl_loader_fixture_1.dll',
-    'swirl_loader_fixture_10.dll','nodes.dpapi','subscriptions.private')
+    'swirl_loader_fixture_10.dll','nodes.dpapi','subscriptions.private',
+    'Swirl-diagnostics.txt','Swirl-motion-diagnostics.txt')
 foreach ($path in $allowed) {
     if (Test-SwirlForbiddenProductPath $path) { throw "Allowed package entry was rejected: $path" }
 }
@@ -79,3 +80,53 @@ try {
     Remove-Item -LiteralPath $cacheRoot -Recurse -Force
 }
 Write-Host "Release cache policy: $caseCount staging cases passed."
+
+# Reproduce post-smoke contamination and payload changes, not only filename rules.
+$manifestRoot = Join-Path ([IO.Path]::GetTempPath()) ('swirl-manifest-' + [guid]::NewGuid().ToString('N'))
+$manifestSha = '0123456789abcdef0123456789abcdef01234567'
+New-Item -ItemType Directory -Path $manifestRoot | Out-Null
+try {
+    $payload = Join-Path $manifestRoot 'Swirl.exe'
+    [IO.File]::WriteAllText($payload, 'synthetic product bytes')
+    $manifestData = @{ schema=1; source_sha=$manifestSha; rust=@{source_sha=$manifestSha}; files=@(
+        @{path='Swirl.exe'; sha256=(Get-FileHash -LiteralPath $payload -Algorithm SHA256).Hash}) }
+    $manifestFile = Join-Path $manifestRoot 'package-manifest.json'
+    $manifestData | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $manifestFile -Encoding utf8
+    $null = Assert-SwirlProductManifest $manifestRoot $manifestSha
+    $diagnostic = Join-Path $manifestRoot 'Swirl-diagnostics.txt'
+    [IO.File]::WriteAllText($diagnostic, 'synthetic smoke diagnostic')
+    $failure = $null
+    try { $null = Assert-SwirlProductManifest $manifestRoot $manifestSha } catch { $failure=$_.Exception.Message }
+    if ($failure -notlike 'Unlisted package entry:*') { throw 'Post-smoke unlisted diagnostics were accepted.' }
+    $null = Assert-SwirlProductManifest $manifestRoot $manifestSha -AllowSmokeDiagnostic
+    [IO.File]::WriteAllText((Join-Path $manifestRoot 'unexpected.txt'), 'unlisted bytes')
+    $failure = $null
+    try { $null = Assert-SwirlProductManifest $manifestRoot $manifestSha -AllowSmokeDiagnostic } catch { $failure=$_.Exception.Message }
+    if ($failure -notlike 'Unlisted package entry:*') { throw 'Smoke exception accepted unrelated payload.' }
+    Remove-Item -LiteralPath (Join-Path $manifestRoot 'unexpected.txt')
+    Remove-Item -LiteralPath $diagnostic
+    [IO.File]::WriteAllText($payload, 'modified bytes after manifest')
+    $failure = $null
+    try { $null = Assert-SwirlProductManifest $manifestRoot $manifestSha } catch { $failure=$_.Exception.Message }
+    if ($failure -notlike 'Package digest mismatch:*') { throw 'Changed payload hash was accepted.' }
+    Remove-Item -LiteralPath $payload
+    $failure = $null
+    try { $null = Assert-SwirlProductManifest $manifestRoot $manifestSha } catch { $failure=$_.Exception.Message }
+    if ($failure -notlike 'Missing package entry:*') { throw 'Missing payload was accepted.' }
+    foreach ($unsafePath in @('../outside.exe','/absolute.exe','C:/outside.exe','folder/../outside.exe','folder//file.exe','folder\file.exe','inject$INSTDIR.exe')) {
+        $manifestData.files[0].path=$unsafePath
+        $manifestData | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $manifestFile -Encoding utf8
+        $failure = $null
+        try { $null = Assert-SwirlProductManifest $manifestRoot $manifestSha } catch { $failure=$_.Exception.Message }
+        if ($failure -ne 'Unsafe or duplicate package manifest path.') { throw "Unsafe manifest path accepted: $unsafePath" }
+    }
+    $manifestData.files=@(@{path='Swirl.exe';sha256=('a'*64)},@{path='SWIRL.EXE';sha256=('a'*64)})
+    $manifestData | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $manifestFile -Encoding utf8
+    $failure=$null
+    try { $null=Assert-SwirlProductManifest $manifestRoot $manifestSha } catch { $failure=$_.Exception.Message }
+    if ($failure -ne 'Unsafe or duplicate package manifest path.') { throw 'Windows case-colliding manifest paths accepted.' }
+} finally {
+    if ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($manifestRoot)) -ne [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\','/')) { throw 'Unexpected manifest cleanup path.' }
+    Remove-Item -LiteralPath $manifestRoot -Recurse -Force
+}
+Write-Host 'Final manifest regression: 14 scenarios passed.'
