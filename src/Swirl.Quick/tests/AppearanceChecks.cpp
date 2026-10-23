@@ -90,6 +90,37 @@ int runAppearanceChecks(QQuickWindow *window,bool restoreOnly) {
             check(!before.isNull() && !after.isNull() && before.copy(strip)==after.copy(strip),"right-page text and color never get copied underneath sidebar navigation");
         }
         delete overlay;
+        auto *transmission=find(window->contentItem(),"sidebarTransmission");
+        check(transmission!=nullptr,"sidebar interior material exists");
+        if(transmission){
+            check(!transmission->isVisible(),"dark sidebar remains unchanged");
+            eval("Theme.mode='Light';Theme.reduceMotion=true");QTest::qWait(350);
+            check(transmission->isVisible(),"light sidebar uses the interior material");
+            const auto material=window->grabWindow();
+            transmission->setOpacity(0);QTest::qWait(150);
+            const auto clear=window->grabWindow();
+            const auto dpr=window->devicePixelRatio();
+            const auto topLeft=pane->mapToScene(QPointF(0,0))*dpr;
+            const QRectF bounds(topLeft,QSizeF(pane->width()*dpr,pane->height()*dpr));
+            const auto area=bounds.adjusted(-6*dpr,-6*dpr,24*dpr,6*dpr).toAlignedRect().intersected(material.rect());
+            const auto interior=bounds.adjusted(6*dpr,6*dpr,-6*dpr,-6*dpr);
+            int changed=0,outside=0,maxDelta=0;
+            if(!material.isNull() && material.size()==clear.size()){
+                for(int y=area.top();y<=area.bottom();++y)for(int x=area.left();x<=area.right();++x){
+                    const auto a=material.pixelColor(x,y),b=clear.pixelColor(x,y);
+                    if(a==b)continue;
+                    ++changed;
+                    if(!interior.contains(QPointF(x+0.5,y+0.5)))++outside;
+                    maxDelta=qMax(maxDelta,qMax(qAbs(a.red()-b.red()),qMax(qAbs(a.green()-b.green()),qAbs(a.blue()-b.blue()))));
+                }
+            }
+            check(changed>0 && maxDelta<=7,"interior adjustment is visible but limited to seven RGB levels");
+            check(outside==0,"contour and exterior shadow pixels remain identical");
+            transmission->setOpacity(1);
+            eval("Theme.increaseContrast=true");check(!transmission->isVisible(),"increased contrast bypasses interior material");
+            eval("Theme.increaseContrast=false;Theme.transparency=false");check(!transmission->isVisible(),"reduced transparency bypasses interior material");
+            eval("Theme.transparency=true");
+        }
     }
     auto *proxy=find(window->contentItem(),"proxyCapsule");
     if(proxy){
