@@ -266,7 +266,7 @@ Item {
             }
             RowLayout {Layout.alignment:Qt.AlignRight
                 SwirlButton {text:"关闭";onClicked:importDialog.close()}
-                SwirlButton {visible:engineController.imports.hasPreview;text:"取消本次导入";onClicked:engineController.imports.cancelImport()}
+                SwirlButton {objectName:"importCancelPreviewButton";visible:engineController.imports.hasPreview;text:"取消本次导入";onClicked:engineController.imports.cancelImport()}
                 SwirlButton {objectName:"importApplyButton";text:engineController.imports.busy?"正在校验…":engineController.imports.hasPreview?"确认导入":"导入";primary:true;enabled:!engineController.imports.busy&&(engineController.imports.hasPreview||importContent.text.trim().length>0||importAddress.text.trim().length>0);onClicked:{if(engineController.imports.hasPreview)engineController.imports.confirmImport();else if(importAddress.text.trim().length)engineController.imports.importUrl(importAddress.text.trim());else engineController.imports.importText(importContent.text);importContent.text="";importAddress.text=""}}
             }
             SwirlButton {text:"保存为自动更新订阅";enabled:!engineController.imports.busy;onClicked:{importDialog.close();AppState.navigate("subscriptions")}}

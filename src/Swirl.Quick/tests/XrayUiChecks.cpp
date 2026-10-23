@@ -14,6 +14,7 @@
 #include <QSet>
 #include <QSignalSpy>
 #include <QTemporaryDir>
+#include <QtQuickTest/quicktest.h>
 #include <QtTest>
 #include <functional>
 
@@ -104,15 +105,25 @@ public:
     }
     bool click(const char *name) { return clickObject(named(m_window, name), name); }
     bool clickObject(QObject *object, const char *code) {
-        const auto *item = qobject_cast<QQuickItem *>(object);
-        if (!require(item && item->isVisible() && item->isEnabled() && item->window() == m_window
-                         && item->width() > 0 && item->height() > 0, code)) return false;
+        const auto fail = [code](const char *phase) {
+            qCritical().noquote() << "XRAY_UI_FAIL" << code << phase;
+            return false;
+        };
+        QPointer<QQuickItem> item = qobject_cast<QQuickItem *>(object);
+        if (!item || item->window() != m_window) return fail("missing-or-detached");
+        // Preview/busy changes can leave a visible button at its old positive
+        // geometry until its parent RowLayout is polished. Wait for the whole
+        // window: the button itself need not have a pending polish request.
+        if (!QQuickTest::qWaitForPolish(m_window, 2000)) return fail("pending-layout");
+        if (!item || !item->isVisible() || !item->isEnabled() || item->window() != m_window
+            || item->width() <= 0 || item->height() <= 0) return fail("not-interactable");
         const auto point = item->mapToScene(QPointF(item->width() / 2, item->height() / 2));
-        if (!require(QRectF(QPointF(0, 0), m_window->size()).contains(point), code)) return false;
-        QSignalSpy clicked(object, SIGNAL(clicked()));
-        if (!require(clicked.isValid(), code)) return false;
+        if (!QRectF(QPointF(0, 0), m_window->size()).contains(point)) return fail("outside-window");
+        QSignalSpy clicked(item.data(), SIGNAL(clicked()));
+        if (!clicked.isValid()) return fail("clicked-signal");
         QTest::mouseClick(m_window, Qt::LeftButton, Qt::NoModifier, point.toPoint());
-        return wait([&] { return clicked.count() == 1; }, code, 2000);
+        if (!QTest::qWaitFor([&] { return clicked.count() == 1; }, 2000)) return fail("click-not-observed");
+        return true;
     }
     bool clickRow(QObject *table, const QString &identity, const char *code) {
         auto *tableItem = qobject_cast<QQuickItem *>(table);
@@ -220,10 +231,7 @@ int runXrayUiChecks(QQuickWindow *window, EngineController *controller, const QS
             && preview && preview->property("visible").toBool() && preview->property("count").toInt() == 6;
     };
     const auto cancelPreview = [&] {
-        QObject *button = nullptr;
-        for (auto *object : objects(window))
-            if (object->property("text").toString() == QStringLiteral("取消本次导入")
-                && object->metaObject()->indexOfMethod("clicked()") >= 0) { button = object; break; }
+        auto *button = named(named(window, "nodeImportDialog"), "importCancelPreviewButton");
         return check.clickObject(button, "cancel-preview-button")
             && check.wait([&] { return !service->busy() && !service->hasPreview(); }, "cancel-preview");
     };

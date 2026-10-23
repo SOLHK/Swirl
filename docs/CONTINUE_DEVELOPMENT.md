@@ -14,6 +14,16 @@ Private-provider/full-subscription completion is not implied. Windows packaging
 builds the final DLL before tests copy and exercise it, retaining hash equality
 and mounted QML gates.
 
+The initial published integration `7b35bb14` passed Linux/macOS fully and
+Windows through Rust, component/DPAPI, seven actual-traffic profiles, complete
+application/DLL identity and page smoke. Its scale-1 import UI test failed at
+`cancel-preview-button`, so scale 1.5 did not run. The follow-up synchronizes
+real button clicks with Qt window polish, uses a dialog-scoped cancellation
+object name and reports individual click phases. The standalone Linux check
+proved stale geometry but did not reproduce the Windows miss. The new exact
+commit still requires all three CI jobs and both mounted QML scales; retain
+the original failed run and do not substitute earlier passes.
+
 The newer user instruction to preserve parallel windows and use an independent
 branch applies to this stage; the single-branch entries below remain history.
 Never overwrite the other branches or borrow earlier CI success.

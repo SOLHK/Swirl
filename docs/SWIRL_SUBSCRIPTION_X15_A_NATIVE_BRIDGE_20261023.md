@@ -168,11 +168,51 @@ bridge, Qt mapping, workflow and runtime fixture files were recovered and their
 Git blob hashes matched the first implementation; the restored source is
 verified again before publication. No old CI success is borrowed.
 
+## Published checkpoint and mounted QML follow-up
+
+The initial integration was published as
+`7b35bb1474fa5827c3e184231e07d059609532a7`. Its tree is identical to the
+locally verified checkpoint. [Run 39885164416](https://github.com/SOLHK/Swirl/actions/runs/39885164416)
+passed all Linux and macOS gates: 661 Rust tests, 62 Qt test functions and
+all seven actual-traffic profiles on each platform. Windows passed 662 Rust
+tests, 76 Qt functions (including actual DPAPI account replay), seven traffic
+profiles, the complete application build, tested/packaged DLL equality and
+page smoke. It then failed `json-scale-1` at
+`XRAY_UI_FAIL cancel-preview-button`; scale 1.5 did not execute. That run is
+retained as a failure, not complete Windows acceptance.
+
+The button-click driver previously used display text to locate cancellation
+and sampled scene coordinates immediately. A standalone Qt 6.10.3 experiment
+confirmed that making a footer button visible can leave positive but stale
+geometry while its parent layout has pending polish. The button's own polish
+flag can already be false, so the whole window must be considered. Linux
+offscreen still delivered every immediate click successfully; this experiment
+did not reproduce the Windows failure or prove its exact cause.
+
+The follow-up gives the existing cancellation button a stable object name,
+finds it within the actual import dialog, and calls Qt's public
+`QQuickTest::qWaitForPolish(window)` before computing pointer coordinates.
+It retains real pointer input, exactly one observed click, visibility,
+enabled/geometry/bounds checks, and the read-only cancellation assertions.
+Failures now identify the individual click phase. QuickTest is linked only
+when the existing UI acceptance build option is enabled; the production UI
+layout and import semantics are unchanged.
+
+Local validation compiled the complete modified C++ acceptance driver against
+Qt 6.10.3. Eighteen immediate/polished footer trials all observed the correct
+click (no fail-before/pass-after claim), and twelve additional mounted-dialog
+trials confirmed scoped lookup selects the actual visual button. See the
+[failure and follow-up receipt](evidence/SUBSCRIPTION_X15_A_QML_FOLLOWUP_20261023.json).
+The new exact commit must run the unchanged three-platform workflow through
+both QML scales; earlier successes do not replace those gates.
+
 ## Primary references and reuse
 
 - [Xray outbound structure](https://xtls.github.io/en/config/outbound.html): protocol and stream settings retain separate semantics.
 - [Official SOCKS source](https://github.com/XTLS/Xray-core/blob/main/infra/conf/socks.go): explicit SOCKS version semantics survive display/runtime projection.
 - [v2rayN subscription documentation](https://github.com/2dust/v2rayN/wiki/Description-of-subscription): imported profiles retain source-format identity.
+- [Qt Quick Test polish synchronization](https://doc.qt.io/qt-6/qquicktest.html) and
+  [Qt 6.10.3 implementation](https://github.com/qt/qtdeclarative/blob/v6.10.3/src/qmltest/quicktest.cpp): wait for all pending window layout work before input coordinates are sampled.
 - Existing Swirl converter and pinned official-server infrastructure from the native B6/X14 histories.
 
 The implementation reuses Swirl's authoritative converter and test servers.
