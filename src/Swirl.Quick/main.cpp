@@ -153,7 +153,8 @@ int main(int argc, char *argv[])
     const bool fontFrameTest=app.arguments().contains("--font-frame-test");
     const bool fontAcceptanceTest=app.arguments().contains("--font-acceptance-test");
     const bool fontDpiWatch=app.arguments().contains("--font-dpi-watch");
-    bool previewMode=uiQualityTest||fontUiTest||fontReview||fontFrameTest||fontAcceptanceTest||fontDpiWatch;
+    const bool interactivePreview=app.arguments().contains("--ui-preview");
+    bool previewMode=interactivePreview||uiQualityTest||fontUiTest||fontReview||fontFrameTest||fontAcceptanceTest||fontDpiWatch;
     for(const QString &argument:app.arguments())
         if(argument.startsWith(QStringLiteral("--material-test-output="))||argument.startsWith(QStringLiteral("--viewport-test-output="))||argument.startsWith(QStringLiteral("--motion-demo-output="))||argument.startsWith(QStringLiteral("--motion-visual-dir="))||argument.startsWith(QStringLiteral("--capture-preview="))||argument.startsWith(QStringLiteral("--capture-native-frame=")))previewMode=true;
     const bool hdrTest=app.arguments().contains("--hdr-self-test");
@@ -274,7 +275,7 @@ int main(int argc, char *argv[])
                <<"NativeRendering / FullHinting";
     }
     engine.rootContext()->setContextProperty("previewPage", previewPage);
-    engine.rootContext()->setContextProperty("previewCaptureMode", previewMode);
+    engine.rootContext()->setContextProperty("previewCaptureMode", previewMode && !interactivePreview);
     engine.rootContext()->setContextProperty("gpuEffectsSupported", QQuickWindow::graphicsApi()!=QSGRendererInterface::Software && qEnvironmentVariable("QT_QUICK_BACKEND")!=QStringLiteral("software"));
     engine.rootContext()->setContextProperty("previewTheme", previewTheme);
     engine.rootContext()->setContextProperty("previewState", previewState);
