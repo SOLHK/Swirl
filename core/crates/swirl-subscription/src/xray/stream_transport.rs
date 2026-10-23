@@ -45,7 +45,7 @@ fn headers(value: Option<&Value>, arrays: bool) -> Result<Vec<(String, String)>,
     Ok(output)
 }
 
-fn build(
+pub(crate) fn build(
     stream: &Map<String, Value>,
     network: &str,
     tls: Option<&Tls>,

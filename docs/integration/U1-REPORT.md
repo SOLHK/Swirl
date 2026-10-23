@@ -143,3 +143,57 @@ two real same-origin requests; an additional negative case verifies a different
 origin is rejected before TLS/HTTP reaches it. No production redirect restriction
 was relaxed. The standalone suite now links the current JSON converter and
 builds/stages the same checked Rust library as the product.
+
+## U1-B/C2/F1: one subscription-to-Core product chain
+
+The ordinary URI/Clash-shaped node path now calls `swirl_import_node_v1` through
+the same checked library as JSON import and runtime control. It reuses the Rust
+subscription inspector, typed transport builder and final `Config::validate`;
+the former C++ runtime protocol converter is removed. VMess, Hysteria2, TUIC,
+SS2022, stream UDP and supported VLESS/Trojan transports can reach the existing
+native runtime. Unsupported options remain preserved and explicitly rejected.
+The import ABI reports `network_verified: false`: parsing or listener startup
+is never represented as a successful remote connection.
+
+Nodes-only import/policy retention is selectively integrated from
+`bbb4ea33d3a3ae596027b840af630260ba6bdbcc` and its regression work at
+`871cc6e93a083c8624aadae8d9f4c1fe8db6e7e8`. Existing subscriptions without a
+scope retain full-profile semantics; new node imports preserve DNS/rules/groups.
+Refresh validates the replacement catalogue before the encrypted atomic commit,
+retains source provenance and rejects dangling policy references. JSON async
+transactions, stable identities, selection and original documents are retained.
+INI section headers are recognized before JSON-array sniffing, restoring the
+existing Surge/Quantumult X/Surfboard/Loon path without loosening JSON checks.
+
+Subscription download now queries the platform proxy for the exact URL on a
+worker, while preserving live Swirl proxy priority and local-target bypass.
+The total 30-second deadline includes discovery. Cancellation discards late
+query results; it does not claim to terminate an uninterruptible OS PAC call.
+Actual previously owned Swirl/capture ports are excluded after shutdown, with
+an explicit diagnostic if no valid proxy alternative remains. Tests use real
+HTTP CONNECT and verified TLS, redirects, rejected certificates and retry.
+
+Performance changes from `2b186783a704af3f4c1a91cd835997485282e2ec` and
+`9e892b3746012ef8b1d983467b45cf6f336ddbe7` merge redundant UI notifications
+and distinguish outbound establishment, origin TLS, HEAD response-header time
+and complete Qt GET response time. A displayed outbound duration requires a
+successful real request. No latency is fabricated, cached as a new result or
+compared against Loon/Clash measurements with different definitions.
+
+The final X14 source checkpoint `2a41b360d0fed90bf2818d5e4c8e93b4f41f021b`
+adds source handoff/evidence only; its protocol implementation was already in
+the baseline. Its historical green runs are retained as provenance, not U1
+acceptance. This integration commit retains that source as an additional parent.
+
+Six existing workflows now trigger on the U1 branch and check out the triggering
+full SHA. They cover three-platform Rust/protocol/transport tests, the Qt product
+chain, DLL identity, Windows packaging, and Qt request safety. Product SDK jobs
+request Qt 6.11.3 and check the actual version; security jobs additionally retain
+6.10.3 on all three systems to verify the temporary mitigation. Linux/macOS
+build the complete product and execute its real loopback runtime self-test.
+
+**Material platform limit:** encrypted catalogue storage currently implements
+Windows DPAPI only. Linux/macOS reject persistence instead of writing secrets
+in plaintext. Building those products and passing native/network tests does not
+close their persistent UI import/restart loop. This is remaining code work,
+not a physical-device validation item.

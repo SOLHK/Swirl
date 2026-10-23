@@ -82,7 +82,7 @@ add_library(SwirlEngine STATIC
  engine/EngineController.h engine/EngineController.cpp)
 target_sources(SwirlEngine PRIVATE engine/ProxyNode.h engine/ProxyNode.cpp engine/NodeStore.h engine/NodeStore.cpp)
 target_sources(SwirlEngine PRIVATE engine/NodeImporter.h engine/NodeImporter.cpp)
-target_sources(SwirlEngine PRIVATE engine/XrayJsonBridge.h engine/XrayJsonBridge.cpp)
+target_sources(SwirlEngine PRIVATE engine/XrayJsonBridge.h engine/XrayJsonBridge.cpp engine/NativeNodeBridge.h engine/NativeNodeBridge.cpp)
 target_sources(SwirlEngine PRIVATE engine/SubscriptionNormalizer.h engine/SubscriptionNormalizer.cpp)
 target_sources(SwirlEngine PRIVATE engine/SwirlProtocolRegistry.h engine/SwirlProtocolRegistry.cpp)
 target_sources(SwirlEngine PRIVATE engine/ConnectionDiagnostics.h engine/ConnectionDiagnostics.cpp)

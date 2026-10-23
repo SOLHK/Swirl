@@ -151,7 +151,7 @@ struct Download {
     Download() {
         // Observe the real download-to-parser boundary through the existing
         // owner callback. Persistence remains covered by Windows ImportTests.
-        service.setConfigurationApplier([this](const NodeImporter::Result &result, const QString &, QString *) {
+        service.setConfigurationApplier([this](const NodeImporter::Result &result, const QString &, bool, QString *) {
             parsed = result.nodes;
             ++applied;
             return true;

@@ -2,7 +2,7 @@ name: Xray Qt import product chain
 
 on:
   push:
-    branches: [work/xray-v2ray-qt-import-20261022, work/subscription-native-bridge-20261023]
+    branches: [work/xray-v2ray-qt-import-20261022, work/subscription-native-bridge-20261023, work/subscription-unified-integration-20261023]
   workflow_dispatch:
 
 permissions:
@@ -24,15 +24,12 @@ jobs:
           - os: ubuntu-24.04
             qt-host: linux
             qt-arch: linux_gcc_64
-            library: libswirl_api.so
           - os: macos-14
             qt-host: mac
             qt-arch: clang_64
-            library: libswirl_api.dylib
           - os: windows-2022
             qt-host: windows
             qt-arch: win64_msvc2022_64
-            library: swirl_api.dll
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
     defaults:
@@ -62,10 +59,10 @@ jobs:
         working-directory: core
         run: cargo +stable build --release --locked -p swirl-api -p swirl-protocol --lib --bins --examples
 
-      - name: Install Qt 6.10 SDK
+      - name: Install Qt 6.11.3 SDK
         uses: jurplel/install-qt-action@v4
         with:
-          version: '6.10.3'
+          version: '6.11.3'
           host: ${{ matrix.qt-host }}
           target: desktop
           arch: ${{ matrix.qt-arch }}
@@ -84,9 +81,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y ninja-build libgl1-mesa-dev libxkbcommon-dev libegl1-mesa-dev
-      # Build the packaged DLL before the test targets copy it. The complete
-      # application CMake invocation may rebuild the Rust crate with different
-      # Cargo target selection; tests must exercise that final packaged DLL.
+      # Both CMake projects use R1's exact-source pairing function and shared
+      # Cargo cache. It resolves target-triple/release, verifies the build ID,
+      # and stages the actual library; never pass the old target/release DLL.
       - name: Configure complete Windows Rust application
         if: runner.os == 'Windows'
         run: >-
@@ -102,13 +99,13 @@ jobs:
         run: >-
           cmake -S src/Swirl.Quick/tests/xray -B build/xray-qt
           -DCMAKE_BUILD_TYPE=Release
-          -DSWIRL_RUST_LIBRARY="${{ github.workspace }}/core/target/release/${{ matrix.library }}"
+          -DSWIRL_RUST_TARGET="${{ github.workspace }}/core/target"
       - name: Configure isolated Qt importer tests (Windows)
         if: runner.os == 'Windows'
         run: >-
           cmake -S src/Swirl.Quick/tests/xray -B build/xray-qt
           -G "Visual Studio 17 2022" -A x64
-          -DSWIRL_RUST_LIBRARY="${{ github.workspace }}/core/target/release/${{ matrix.library }}"
+          -DSWIRL_RUST_TARGET="${{ github.workspace }}/core/target"
       - name: Build actual Qt production importer and tests
         run: cmake --build build/xray-qt --config Release --parallel 2
       - name: Deploy Windows Qt test runtime
@@ -131,6 +128,8 @@ jobs:
           import xml.etree.ElementTree as ET
 
           root = pathlib.Path('build/xray-qt')
+          if 'Qt=6.11.3\n' not in (root / 'xray-toolchain.txt').read_text():
+              raise SystemExit('Importer tests did not compile against the required fixed Qt SDK')
           required = [
               ('swirl-xray-import.xml', {'allSixProtocolsExposeAuthoritativeNativeCandidates',
                   'socksVersionsKeepValidatedDisplayAndDnsSemantics',
@@ -233,6 +232,7 @@ jobs:
             build/xray-qt/swirl-xray-catalog.xml
             build/xray-qt/swirl-xray-runtime.xml
             build/xray-qt/xray-toolchain.txt
+            build/xray-qt/swirl-rust-build.json
             build/xray-qt/Testing/Temporary/LastTest.log
           if-no-files-found: warn
           retention-days: 14
@@ -249,6 +249,9 @@ jobs:
           $tested = (Get-FileHash -Algorithm SHA256 -LiteralPath 'build/xray-qt/bin/swirl_api.dll').Hash
           $packaged = (Get-FileHash -Algorithm SHA256 -LiteralPath 'build/xray-app/Release/swirl_api.dll').Hash
           if ($tested -ne $packaged) { throw 'Packaged Rust DLL differs from the actual tested DLL' }
+          $testedIdentity = Get-Content build/xray-qt/bin/swirl-rust-build.json -Raw | ConvertFrom-Json
+          $productIdentity = Get-Content build/xray-app/Release/swirl-rust-build.json -Raw | ConvertFrom-Json
+          if ($testedIdentity.source_sha -ne $env:GITHUB_SHA -or $productIdentity.source_sha -ne $env:GITHUB_SHA -or $testedIdentity.build_id -ne $productIdentity.build_id) { throw 'Importer and product DLLs do not identify this source commit' }
           $legacy = Get-ChildItem build/xray-app/Release -Recurse -File | Where-Object { $_.Name -match '^(mihomo|clash|xray|v2ray)(\.|-)' }
           if ($legacy) { throw 'Unexpected external proxy runtime in Rust application output' }
           git diff --exit-code

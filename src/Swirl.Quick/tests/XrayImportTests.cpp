@@ -334,7 +334,7 @@ private slots:
         const auto bytes = json(vless()); QVERIFY(write(path, bytes));
         NodeStore store(directory.filePath("nodes.dpapi")); NodeImportService service(&store);
         int applies = 0; NodeImporter::Result committed;
-        service.setConfigurationApplier([&](const auto &result, const QString &source, QString *) {
+        service.setConfigurationApplier([&](const auto &result, const QString &source, bool, QString *) {
             ++applies; committed = result; return source.isEmpty();
         });
         service.importFile(QUrl::fromLocalFile(path));
@@ -353,7 +353,7 @@ private slots:
         QTemporaryDir directory; const auto path = directory.filePath("nodes.json"); QVERIFY(write(path, json(vless())));
         NodeStore store(directory.filePath("nodes.dpapi")); NodeImportService service(&store);
         int applies = 0;
-        service.setConfigurationApplier([&](const auto &, const auto &, QString *error) {
+        service.setConfigurationApplier([&](const auto &, const auto &, bool, QString *error) {
             ++applies; *error = QStringLiteral("受控保存失败"); return false;
         });
         service.importFile(QUrl::fromLocalFile(path)); QTRY_VERIFY_WITH_TIMEOUT(service.hasPreview(), 10000);
@@ -378,7 +378,7 @@ private slots:
     void cancelInFlightFileDiscardsQueuedResult() {
         QTemporaryDir directory;const auto path=directory.filePath("cancel.json");QVERIFY(write(path,json(vless())));
         NodeStore store(directory.filePath("nodes.dpapi"));NodeImportService service(&store);int applies=0;
-        service.setConfigurationApplier([&](const auto &,const auto &,QString *){++applies;return true;});
+        service.setConfigurationApplier([&](const auto &,const auto &,bool,QString *){++applies;return true;});
         service.importFile(QUrl::fromLocalFile(path));service.cancelImport();
         QVERIFY(!service.busy());QTest::qWait(100);
         QVERIFY(!service.hasPreview());QCOMPARE(applies,0);QVERIFY(store.nodes().isEmpty());service.shutdown();
@@ -411,7 +411,7 @@ private slots:
     void textAndClipboardShareStrictPreview() {
         QTemporaryDir directory;NodeStore store(directory.filePath("nodes.dpapi"));NodeImportService service(&store);
         int applies=0;NodeImporter::Result committed;
-        service.setConfigurationApplier([&](const auto &result,const auto &source,QString *) {
+        service.setConfigurationApplier([&](const auto &result,const auto &source,bool,QString *) {
             ++applies;committed=result;return source.isEmpty();
         });
         const auto bytes=QJsonDocument(QJsonArray{vless(QStringLiteral("东京 🌏")),vless(QStringLiteral("香港"))}).toJson();
@@ -431,7 +431,7 @@ private slots:
     }
     void textFailureAndCancellationNeverApply() {
         QTemporaryDir directory;NodeStore store(directory.filePath("nodes.dpapi"));NodeImportService service(&store);int applies=0;
-        service.setConfigurationApplier([&](const auto &,const auto &,QString *){++applies;return true;});
+        service.setConfigurationApplier([&](const auto &,const auto &,bool,QString *){++applies;return true;});
         service.importText(QString::fromUtf8(json(vless())));service.cancelImport();QTest::qWait(100);
         QVERIFY(!service.hasPreview());QCOMPARE(applies,0);
         service.importText(QStringLiteral(R"({"protocol":"vless","settings":{"id":"SECRET-D2","id":"other"}})"));
@@ -503,7 +503,7 @@ private slots:
     void confirmedAsyncCommitKeepsServiceBusyUntilResult() {
         QTemporaryDir directory;NodeStore store(directory.filePath("nodes.dpapi"));NodeImportService service(&store);
         NodeImportService::ApplyCompletion complete;int requests=0;QSignalSpy applied(&service,&NodeImportService::nodesApplied);
-        service.setAsyncConfigurationApplier([&](const auto &,const auto &,auto callback,QString *) {
+        service.setAsyncConfigurationApplier([&](const auto &,const auto &,bool,auto callback,QString *) {
             ++requests;complete=std::move(callback);return true;
         });
         service.importText(QString::fromUtf8(json(vless())));QTRY_VERIFY_WITH_TIMEOUT(service.hasPreview(),10000);

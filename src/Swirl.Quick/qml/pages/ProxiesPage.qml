@@ -79,7 +79,7 @@ Item {
                     id:nodeTable;objectName:"realNodeTable";minimal:true;managedSelection:true;incrementalRows:true;animateRowChanges:false;animateLatency:true;itemHeight:Theme.dp(44);headerHeight:Theme.tableHeaderHeight;textPixelSize:13
                     anchors.fill:parent;anchors.margins:Theme.dp(16);rows:page.viewRows;selectedId:page.selectedId
                     cellPadding:Theme.dp(8)
-                    columns:[{key:"name",label:"节点名称",w:235,min:76},{key:"protocolLabel",label:"协议",w:82,min:44},{key:"latency",label:page.rustRequestMetric?"首部 ms":"延迟",w:76,min:52},{key:"status",label:"状态",w:92,min:58}]
+                    columns:[{key:"name",label:"节点名称",w:235,min:76},{key:"protocolLabel",label:"协议",w:82,min:44},{key:"latency",label:page.rustRequestMetric?"出站 ms":"延迟",w:76,min:52},{key:"status",label:"状态",w:92,min:58}]
                     onRowSelected:function(row){page.selectRow(row)}
                 }
                 SwirlEmptyState {anchors.centerIn:parent;visible:page.viewRows.length===0;headline:page.allNodes.length?"没有匹配的节点":"没有保存的节点";detail:page.allNodes.length?"调整搜索、协议或地区筛选。":"添加节点，或导入配置、URI 与订阅"}
@@ -118,7 +118,7 @@ Item {
                         }
                         Rectangle {Layout.fillWidth:true;implicitHeight:Theme.dp(1);color:Theme.border}
                         SwirlText {renderType:Text.NativeRendering;objectName:"nodeRequestState";text:engineController.tests.busy?engineController.tests.message:page.tested.time?(page.tested.success?"独立测试成功（不代表已连接）":"独立测试失败")+" · HTTP "+page.tested.http+" · "+(page.tested.latency>=0?"响应首部 "+page.tested.latency+" ms":"无请求耗时结果")+(page.tested.success&&page.tested.outboundConnectMs>=0?"\n出站建立（含 DNS 与节点握手） "+page.tested.outboundConnectMs+" ms"+(page.tested.originTlsMs>=0?" · 目标 TLS "+page.tested.originTlsMs+" ms":""):"")+(page.tested.error?"\n"+page.tested.error:""):engineController.requestStateText;color:engineController.tests.busy?Theme.muted:page.tested.time?(page.tested.success?Theme.green:Theme.orange):engineController.requestSucceeded?Theme.green:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
-                        SwirlText {renderType:Text.NativeRendering;text:"测速类型：Rust Core 经所选节点发送 HEAD，计时至目标 HTTP 响应首部（HTTPS 含目标 TLS），不等待响应体。隔离测试不继承当前 DNS 设置，目标解析遵循出站协议；不是 TCP 往返延迟。";color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
+                        SwirlText {renderType:Text.NativeRendering;text:"列表显示出站建立耗时（含 DNS 与节点握手），仅在目标 HEAD 请求成功后记录。详情保留完整响应首部耗时（HTTPS 含目标 TLS），不等待响应体。隔离测试不继承当前 DNS 设置，目标解析遵循出站协议；不是 ICMP ping 或 TCP 往返延迟。";color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
                         SwirlText {renderType:Text.NativeRendering;text:engineController.nodeError||engineController.error;visible:text.length>0;color:Theme.orange;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
                     }
                 }
@@ -224,7 +224,7 @@ Item {
     FileDialog {
         parentWindow:page.Window.window;objectName:"settingsNodeFileDialog"
         id:configFile;title:"导入节点配置";nameFilters:["节点配置 (*.yaml *.yml *.json *.conf *.txt)","所有文件 (*)"]
-        onAccepted:{importDialog.open();engineController.imports.importFile(selectedFile)}
+        onAccepted:{importDialog.open();engineController.imports.importNodesOnlyFile(selectedFile)}
     }
     SwirlDialog {
         ownerItem:page
@@ -236,7 +236,7 @@ Item {
             SwirlText {renderType:Text.NativeRendering;text:"配置 / Base64 / URI（仅导入节点）";color:Theme.text;Layout.fillWidth:true;wrapMode:Text.Wrap}
             RowLayout {
                 Layout.fillWidth:true
-                SwirlButton {objectName:"importClipboardButton";text:"从剪贴板导入";enabled:!engineController.imports.busy&&!engineController.imports.hasPreview;onClicked:engineController.imports.importClipboard()}
+                SwirlButton {objectName:"importClipboardButton";text:"从剪贴板导入";enabled:!engineController.imports.busy&&!engineController.imports.hasPreview;onClicked:engineController.imports.importNodesOnlyClipboard()}
                 SwirlButton {text:"选择文件";enabled:!engineController.imports.busy&&!engineController.imports.hasPreview;onClicked:configFile.open()}
             }
             ScrollView {visible:!engineController.imports.hasPreview;Layout.fillWidth:true;Layout.preferredHeight:Theme.dp(130);clip:true
@@ -266,7 +266,7 @@ Item {
             RowLayout {Layout.alignment:Qt.AlignRight
                 SwirlButton {text:"关闭";onClicked:importDialog.close()}
                 SwirlButton {objectName:"importCancelPreviewButton";visible:engineController.imports.hasPreview;text:"取消本次导入";onClicked:engineController.imports.cancelImport()}
-                SwirlButton {objectName:"importApplyButton";text:engineController.imports.busy?"正在校验…":engineController.imports.hasPreview?"确认导入":"导入";primary:true;enabled:!engineController.imports.busy&&(engineController.imports.hasPreview||importContent.text.trim().length>0||importAddress.text.trim().length>0);onClicked:{if(engineController.imports.hasPreview)engineController.imports.confirmImport();else if(importAddress.text.trim().length)engineController.imports.importUrl(importAddress.text.trim());else engineController.imports.importText(importContent.text);importContent.text="";importAddress.text=""}}
+                SwirlButton {objectName:"importApplyButton";text:engineController.imports.busy?"正在校验…":engineController.imports.hasPreview?"确认导入":"导入";primary:true;enabled:!engineController.imports.busy&&(engineController.imports.hasPreview||importContent.text.trim().length>0||importAddress.text.trim().length>0);onClicked:{if(engineController.imports.hasPreview)engineController.imports.confirmImport();else if(importAddress.text.trim().length)engineController.imports.importNodesOnlyUrl(importAddress.text.trim());else engineController.imports.importNodesOnlyText(importContent.text);importContent.text="";importAddress.text=""}}
             }
             SwirlButton {text:"保存为自动更新订阅";enabled:!engineController.imports.busy;onClicked:{importDialog.close();AppState.navigate("subscriptions")}}
         }

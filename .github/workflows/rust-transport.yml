@@ -1,7 +1,7 @@
 name: Swirl Native Transports
 on:
   push:
-    branches: [work/xray-v2ray-transport-20261022]
+    branches: [work/xray-v2ray-transport-20261022, work/subscription-unified-integration-20261023]
   workflow_dispatch:
 permissions:
   contents: read
@@ -13,8 +13,13 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
+    env:
+      SWIRL_SOURCE_SHA: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
       - name: Install Rust tools
         run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy
       - name: Format
@@ -86,7 +91,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: native-transports-${{ runner.os }}-${{ github.sha }}
+          name: native-transports-${{ runner.os }}-${{ github.sha }}-${{ github.run_attempt }}
           path: |
             ${{ runner.temp }}/transport-peers/manifest.json
             ${{ runner.temp }}/transport-evidence

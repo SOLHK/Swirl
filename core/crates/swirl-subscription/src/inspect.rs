@@ -9,6 +9,8 @@ mod inspect_boundaries;
 mod inspect_reality;
 #[path = "inspect_socks4.rs"]
 mod inspect_socks4;
+#[path = "inspect_stream.rs"]
+mod inspect_stream;
 #[path = "inspect_websocket.rs"]
 mod inspect_websocket;
 use base64::{
@@ -899,6 +901,9 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
         ],
         "unknown",
     );
+    if matches!(kind, "vless" | "trojan") && inspect_stream::declared(raw) {
+        return inspect_stream::inspect(raw, index, family);
+    }
     if kind == "vless" && inspect_reality::declared(raw) {
         return inspect_reality::inspect(raw, index, family);
     }
@@ -1169,6 +1174,10 @@ fn capability(raw: &Value, index: usize, family: &str) -> (NodeCapability, Optio
                     .or_else(|| raw.get("servername"))
                     .or_else(|| raw.pointer("/tls/server_name"))
                     .and_then(Value::as_str)
+                    // Clash's omitted/empty SNI both use the endpoint name;
+                    // aliases and source types were checked above. Retaining
+                    // an empty source string must not break saved Qt nodes.
+                    .filter(|name| !name.is_empty())
                     .unwrap_or(&host)
                     .to_string();
                 let alpn = raw

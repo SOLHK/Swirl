@@ -42,6 +42,8 @@ add_library(SwirlXrayProduct STATIC
     "${SWIRL_QUICK_SOURCE}/engine/NodeImportService.cpp"
     "${SWIRL_QUICK_SOURCE}/engine/SwirlProtocolRegistry.h"
     "${SWIRL_QUICK_SOURCE}/engine/SwirlProtocolRegistry.cpp"
+    "${SWIRL_QUICK_SOURCE}/engine/NativeNodeBridge.h"
+    "${SWIRL_QUICK_SOURCE}/engine/NativeNodeBridge.cpp"
     "${SWIRL_QUICK_SOURCE}/engine/XrayJsonBridge.h"
     "${SWIRL_QUICK_SOURCE}/engine/XrayJsonBridge.cpp"
     "${SWIRL_QUICK_SOURCE}/engine/RustCoreLibrary.h"
@@ -79,6 +81,8 @@ function(swirl_add_xray_test target source test_name)
         ENVIRONMENT "QT_QPA_PLATFORM=offscreen;QT_FORCE_STDERR_LOGGING=1;SWIRL_TEST_ROOT=${CMAKE_CURRENT_BINARY_DIR}/${test_name}-state")
 endfunction()
 
+swirl_add_xray_test(SwirlNativeNodeBridgeTests NativeNodeBridgeTests.cpp swirl-native-node-bridge)
+
 swirl_add_xray_test(SwirlXrayImportTests XrayImportTests.cpp swirl-xray-import)
 swirl_add_xray_test(SwirlXrayDownloadTests XrayDownloadTests.cpp swirl-xray-download)
 # The complete product chain must not silently lose coverage if a test source
@@ -86,6 +90,7 @@ swirl_add_xray_test(SwirlXrayDownloadTests XrayDownloadTests.cpp swirl-xray-down
 swirl_add_xray_test(SwirlXrayStoreTests XrayStoreTests.cpp swirl-xray-store)
 swirl_add_xray_test(SwirlXrayRuntimeTests XrayRuntimeTests.cpp swirl-xray-runtime)
 swirl_add_xray_test(SwirlXrayCatalogTests XrayCatalogTests.cpp swirl-xray-catalog)
+swirl_add_xray_test(SwirlNodeImportScopeTests NodeImportScopeTests.cpp swirl-node-import-scope)
 
 execute_process(COMMAND git rev-parse HEAD WORKING_DIRECTORY "${SWIRL_REPOSITORY}"
     OUTPUT_VARIABLE SWIRL_SOURCE_SHA OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)

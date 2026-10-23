@@ -1,3 +1,15 @@
+# 2026-10-23: U1 unified product integration
+
+Active integration branch: `work/subscription-unified-integration-20261023`.
+Read [the U1 report](integration/U1-REPORT.md) and its pinned source inventory.
+R1, native X14, JSON and generic subscription bridges, download security and
+product scope fixes are being verified together. The historical acceptance
+records below are source provenance, never acceptance evidence for the latest
+U1 SHA. Do not update other windows' source branches or restore the removed
+Mihomo runtime. Final regression must use the final integrated commit.
+
+---
+
 # 2026-10-23: X1.5-A JSON subscription to native Qt product bridge
 
 The current independent integration branch is
@@ -27,6 +39,50 @@ the original failed run and do not substitute earlier passes.
 The newer user instruction to preserve parallel windows and use an independent
 branch applies to this stage; the single-branch entries below remain history.
 Never overwrite the other branches or borrow earlier CI success.
+
+---
+
+# 2026-10-22: X1.4-A8 Core acceptance complete; Qt integration can start
+
+The dedicated branch `work/rust-native-protocols-x14a-20261022` has accepted code
+at `21c562a7c7adc2654416636e4de2f038ffc220cd`. Its
+[39814238782 CI run](https://github.com/SOLHK/Swirl/actions/runs/39814238782) is
+**completed / success, all six Windows/macOS/Linux jobs successful**. All four
+Rust gates passed (Windows 645 tests, macOS/Linux 644 each). Each platform
+actually ran the original 17 Hysteria2 methods without skips, plus cancellation
+and reconnect checks; each dynamically loaded C ABI suite passed all six cases.
+Linux additionally passed all 17 methods and lifecycle checks with measured
+1,048,576-byte soft/hard main-stack limits. Full logs and all three uploaded
+artifacts were read; this is not an inference from an earlier green run.
+
+The original A7 and b6 stack failures remain recorded. Boxing the public future
+alone did not fix the large synchronous poll frame; A8 separates QUIC dispatch
+from the large TCP/TLS/REALITY future. Final checks also exposed and fixed a
+separate HTTP/3 normal STOP_SENDING authentication-response race. Authentication,
+error handling and negative tests remain strict; no Windows stack increase,
+timeout increase, reduced test data or skipped original methods was used.
+
+Read the [final protocol and transport matrix](CORE_X14_A8_PROTOCOL_ACCEPTANCE_20261022.md),
+[stack regression](CORE_X14_A8_STACK_REGRESSION_20261022.md),
+[authentication correction](CORE_X14_A8_AUTH_FINISH_20261022.md), and
+[Qt handoff](CORE_X14_A8_QT_HANDOFF_20261022.md). X1.4-A may close only for the
+explicitly accepted Core subsets. Known half-close/UDP peer limitations,
+unimplemented extensions and combinations not run in this workflow remain
+explicit. This does not close Qt product, physical Windows, supplier, TUN,
+weak-network or whole-project acceptance; historical project baselines below
+are not recomputed by these Core results.
+
+X1.4-B may start formally. First reconcile the existing R1 Rust-only runtime /
+paired DLL loader at `5d96214ac80d63985cdccf4942c3c1d79035e793` and the Xray Qt
+native import bridge at `506014d6386610411f48c939ab62cb93a3509431`. These were
+read-only audited, not merged into this branch. Reuse those implementations,
+then integrate VMess/Hysteria2/TUIC, SS2022, stream UDP and typed transports,
+preserve private configuration across DPAPI reload, and run the real packaged
+Qt import → selection → Rust traffic → switch → stop product gate. Current
+X14 Qt projection still rejects the new protocols; a visible node name or a
+successful ctypes DLL test is not Swirl.exe acceptance. Preserve other windows'
+branches and worktrees. This final checkpoint changes documentation only.
+
 
 ---
 

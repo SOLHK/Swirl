@@ -26,6 +26,7 @@ add_executable(SwirlQtNetworkPolicyTests
  "${SWIRL_QUICK_SOURCE}/engine/ProxyNode.cpp"
  "${SWIRL_QUICK_SOURCE}/engine/SwirlProtocolRegistry.cpp"
  "${SWIRL_QUICK_SOURCE}/engine/XrayJsonBridge.cpp"
+ "${SWIRL_QUICK_SOURCE}/engine/NativeNodeBridge.cpp"
  "${SWIRL_QUICK_SOURCE}/engine/RustCoreEngine.cpp"
  "${SWIRL_QUICK_SOURCE}/engine/RustCoreLibrary.cpp"
  "${SWIRL_QUICK_SOURCE}/engine/ProxyEngine.h")

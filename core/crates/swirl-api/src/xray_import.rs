@@ -1,8 +1,8 @@
 //! Private Qt projection of the authoritative Xray/V2Ray converter. There is no second
 //! JSON parser, protocol converter, or runtime here. Only the diagnostics are
 //! suitable for logs; successful responses contain credentials and raw data.
+use crate::import_ffi::encoded_response;
 use serde::Serialize;
-use std::io::{self, Write};
 use swirl_subscription::{
     Outbound,
     xray::{
@@ -14,11 +14,7 @@ use swirl_subscription::{
     },
 };
 
-const MAX_OUTPUT: usize = 64 * 1024 * 1024;
-const INVALID_BUFFER: isize = -1;
-const PANIC: isize = -2;
 const INTERNAL_ERROR: isize = -3;
-const OUTPUT_LIMIT: isize = -4;
 
 #[derive(Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -215,74 +211,6 @@ fn response(document: &ConvertedDocument) -> Result<Response<'_>, isize> {
     })
 }
 
-struct BoundedWriter<W> {
-    inner: W,
-    written: usize,
-    exceeded: bool,
-    maximum: usize,
-}
-
-impl<W: Write> Write for BoundedWriter<W> {
-    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        if bytes.len() > self.maximum.saturating_sub(self.written) {
-            self.exceeded = true;
-            return Err(io::Error::other("ImportOutputLimit"));
-        }
-        let written = self.inner.write(bytes)?;
-        self.written += written;
-        Ok(written)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        self.inner.flush()
-    }
-}
-
-fn serialize<T: Serialize, W: Write>(value: &T, writer: W, maximum: usize) -> Result<W, isize> {
-    let mut bounded = BoundedWriter {
-        inner: writer,
-        written: 0,
-        exceeded: false,
-        maximum,
-    };
-    if serde_json::to_writer(&mut bounded, value).is_err() {
-        return Err(if bounded.exceeded {
-            OUTPUT_LIMIT
-        } else {
-            INTERNAL_ERROR
-        });
-    }
-    Ok(bounded.inner)
-}
-
-#[derive(Default)]
-struct Counter(usize);
-impl Write for Counter {
-    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        self.0 += bytes.len();
-        Ok(bytes.len())
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
-    }
-}
-
-fn encoded_response<T: Serialize>(
-    value: &T,
-    capacity: usize,
-) -> Result<(usize, Option<Vec<u8>>), isize> {
-    // The size query allocates no output buffer, and overflow is rejected before
-    // constructing one. This also leaves an insufficient caller buffer intact.
-    let size = serialize(value, Counter::default(), MAX_OUTPUT)?.0;
-    let bytes = if size <= capacity {
-        Some(serialize(value, Vec::with_capacity(size), size)?)
-    } else {
-        None
-    };
-    Ok((size, bytes))
-}
-
 fn import_response(input: &[u8], capacity: usize) -> Result<(usize, Option<Vec<u8>>), isize> {
     match import_document(input, InputSource::Unknown) {
         Ok(document) => encoded_response(&response(&document)?, capacity),
@@ -315,51 +243,18 @@ pub unsafe extern "C" fn swirl_import_xray_v1(
     output: *mut u8,
     output_capacity: usize,
 ) -> isize {
-    if (input.is_null() && input_len != 0)
-        || (output.is_null() && output_capacity != 0)
-        || input_len > MAX_JSON_INPUT
-        || output_capacity > MAX_OUTPUT
-    {
-        return INVALID_BUFFER;
+    // SAFETY: forwards the documented caller buffer contract to one shared
+    // implementation, including overlap and integer-overflow checks.
+    unsafe {
+        crate::import_ffi::call(
+            input,
+            input_len,
+            output,
+            output_capacity,
+            MAX_JSON_INPUT,
+            import_response,
+        )
     }
-    let Some(input_end) = (input as usize).checked_add(input_len) else {
-        return INVALID_BUFFER;
-    };
-    let Some(output_end) = (output as usize).checked_add(output_capacity) else {
-        return INVALID_BUFFER;
-    };
-    if input_len != 0
-        && output_capacity != 0
-        && (input as usize) < output_end
-        && (output as usize) < input_end
-    {
-        return INVALID_BUFFER;
-    }
-    std::panic::catch_unwind(|| {
-        let input = if input_len == 0 {
-            &[]
-        } else {
-            // SAFETY: ABI caller guarantees initialized immutable input bytes;
-            // null, oversized, overflowed and overlapping regions were rejected.
-            unsafe { std::slice::from_raw_parts(input, input_len) }
-        };
-        match import_response(input, output_capacity) {
-            Ok((size, bytes)) => {
-                if let Some(mut bytes) = bytes {
-                    // SAFETY: caller guarantees a writable nonoverlapping region
-                    // and serialization has checked its entire required size.
-                    unsafe {
-                        std::ptr::copy_nonoverlapping(bytes.as_ptr(), output, bytes.len());
-                    }
-                    // Avoid retaining an extra serialized credential copy.
-                    bytes.fill(0);
-                }
-                size as isize
-            }
-            Err(code) => code,
-        }
-    })
-    .unwrap_or(PANIC)
 }
 
 #[cfg(test)]

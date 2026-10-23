@@ -14,10 +14,19 @@
 #include <QDir>
 #include <QElapsedTimer>
 #include <rhi/qrhi.h>
+#ifdef Q_OS_WIN
 #include <private/qrhid3d11_p.h>
+#endif
 #include <algorithm>
 #include <memory>
 #include <cmath>
+#ifndef Q_OS_WIN
+int runMaterialChecks(QQuickWindow *appWindow,const QString &directory) {
+ Q_UNUSED(appWindow);Q_UNUSED(directory);
+ qCritical()<<"The D3D11 material benchmark requires Windows; no benchmark was executed.";
+ return 3;
+}
+#else
 int runMaterialChecks(QQuickWindow *appWindow,const QString &directory) {
  QDir().mkpath(directory);QRhiD3D11InitParams params;
  std::unique_ptr<QRhi> rhi(QRhi::create(QRhi::D3D11,&params,QRhi::EnableTimestamps));
@@ -78,3 +87,4 @@ int runMaterialChecks(QQuickWindow *appWindow,const QString &directory) {
  report.write(QJsonDocument(QJsonObject{{"records",records},{"failures",failures},{"adapter",QString::fromUtf8(rhi->driverInfo().deviceName)},{"method","D3D11 QRhi GPU timestamps; controlled offscreen recomputation benchmark, not display FPS. Input is original synthetic complex wallpaper; PSF sigma calibrated independently. Production blur caches are event driven."}}).toJson());
  return failures?2:0;
 }
+#endif

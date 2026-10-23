@@ -37,14 +37,14 @@ TelemetryService::TelemetryService(QString path,bool networkMeasurements,QObject
  if(m_path.isEmpty())m_path=SwirlPaths::writableLocation(QStandardPaths::AppLocalDataLocation)+"/telemetry.json";
  load();m_save.setInterval(5000);connect(&m_save,&QTimer::timeout,this,&TelemetryService::flush);m_save.start();
  m_measure.setInterval(60000);connect(&m_measure,&QTimer::timeout,this,[this]{if(m_networkEnabled&&m_status.apiHealthy)measureNetwork();});m_measure.start();
- m_stale.setInterval(1000);connect(&m_stale,&QTimer::timeout,this,[this]{if(!sampled()||!connectionsSampled())publish();});m_stale.start();
+ m_stale.setInterval(1000);connect(&m_stale,&QTimer::timeout,this,[this]{if(sampled()!=m_publishedSampled||connectionsSampled()!=m_publishedConnectionsSampled)publish();});m_stale.start();
  m_nativeProbeDeadline.setSingleShot(true);m_nativeProbeDeadline.setInterval(10000);
  connect(&m_nativeProbeDeadline,&QTimer::timeout,this,[this]{finishNativeProbe({{"code","timeout"},{"state",QStringLiteral("Rust 节点检测超时")},{"success",false},{"metricType","http_headers"}});});
 }
 TelemetryService::~TelemetryService(){flush();}
 bool TelemetryService::sampled() const{return m_status.apiHealthy&&m_status.trafficAt>0&&nowMs()-m_status.trafficAt<6000;}
 bool TelemetryService::connectionsSampled() const{return m_status.apiHealthy&&m_status.connectionsAt>0&&nowMs()-m_status.connectionsAt<6000;}
-void TelemetryService::publish(){m_periodCache.clear();++m_revision;emit changed();}
+void TelemetryService::publish(){m_publishedSampled=sampled();m_publishedConnectionsSampled=connectionsSampled();m_periodCache.clear();++m_revision;emit changed();}
 QString TelemetryService::formatBytes(double bytes) const {
  const QStringList units={"B","KB","MB","GB","TB"};int i=0;while(bytes>=1024&&i<4){bytes/=1024;++i;}
  return QString::number(bytes,'f',i?1:0)+" "+units[i];
@@ -155,7 +155,7 @@ void TelemetryService::reportMeasurement(const QString &key,bool ok,const QStrin
 void TelemetryService::recordInternetResult(int error,int http,bool proxy,qint64 elapsed) {
  QString code,state,advice;
  const bool success=error==int(QNetworkReply::NoError)&&http>=200&&http<300;
- if(success){code="ok";state=QStringLiteral("请求成功");advice=proxy?QStringLiteral("HTTPS 已通过 Swirl 当前代理策略；此结果仅代表本次检测请求。"):QStringLiteral("直连 HTTPS 请求成功；未验证代理节点。");}
+ if(success){code="ok";state=QStringLiteral("请求成功");advice=proxy?QStringLiteral("HTTPS 请求经 Swirl 当前策略完成；耗时包含连接、TLS 与目标响应，仅代表本次检测。"):QStringLiteral("直连 HTTPS 请求成功；耗时包含连接、TLS 与目标响应，未验证代理节点。");}
  else if(m_status.error==ProxyEngine::Error::SelectionFailed){code="policy";state=QStringLiteral("策略选择失败");advice=QStringLiteral("检查所选节点和代理策略。");}
  else if(proxy && m_status.nodeHealth==ProxyEngine::NodeHealth::Unavailable){code="node";state=QStringLiteral("节点不可用");advice=QStringLiteral("尝试测速或切换节点，再检测实际请求。");}
  else if(error==int(QNetworkReply::SslHandshakeFailedError)){code="tls";state=QStringLiteral("TLS 握手失败");advice=QStringLiteral("检查证书信任与系统时间；不要关闭证书校验。");}

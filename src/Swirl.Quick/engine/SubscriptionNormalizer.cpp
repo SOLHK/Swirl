@@ -56,12 +56,22 @@ bool endpoint(const QString &text,QString &host,int &port){
     return url.isValid()&&!host.isEmpty()&&port>0&&port<=65535&&url.userInfo().isEmpty()&&url.path().isEmpty()&&!url.hasQuery()&&!url.hasFragment();
 }
 void transport(QJsonObject &node,const QString &network,const QString &path,const QString &host,QStringList &issues){
-    if(network.isEmpty()||network=="tcp")return;
+    if(network.isEmpty()||network=="tcp"){
+        if(!host.isEmpty()||(!path.isEmpty()&&path!="/"))issue(issues,"TCP 传输含未映射的 Host 或路径；原始参数已保留。");
+        return;
+    }
     node["network"]=network;
     if(network=="ws")node["ws-opts"]=QJsonObject{{"path",path.isEmpty()?"/":path},{"headers",host.isEmpty()?QJsonObject():QJsonObject{{"Host",host}}}};
-    else if(network=="grpc")node["grpc-opts"]=QJsonObject{{"grpc-service-name",path}};
+    else if(network=="httpupgrade"){
+        node["network"]="ws";
+        node["ws-opts"]=QJsonObject{{"path",path.isEmpty()?"/":path},{"headers",host.isEmpty()?QJsonObject():QJsonObject{{"Host",host}}},{"v2ray-http-upgrade",true}};
+    }
+    else if(network=="grpc"){
+        node["grpc-opts"]=QJsonObject{{"grpc-service-name",path}};
+        if(!host.isEmpty())issue(issues,"gRPC URI 的 Host 尚无无损映射；原始参数已保留，不能忽略后连接。");
+    }
     else if(network=="h2")node["h2-opts"]=QJsonObject{{"path",path.isEmpty()?"/":path},{"host",host.isEmpty()?QJsonArray():QJsonArray{host}}};
-    else issue(issues,"此传输层尚未完成到 Swirl 节点模型的映射。");
+    else issue(issues,"此传输层尚未完成到 Rust Core 的映射。");
 }
 void hysteria2Uri(Result &r,const QString &line,qsizetype split){
     // RFC 3986 authority split by hand: QUrl cannot parse Hysteria2's
@@ -131,7 +141,10 @@ void hysteria2Uri(Result &r,const QString &line,qsizetype split){
     for(const auto &pair:q.queryItems(QUrl::FullyDecoded)){
         const auto &key=pair.first;const auto &value=pair.second;
         if(seen.contains(key)){r.error="Hysteria2 URI 含重复参数，无法安全确定配置。";return;}seen.insert(key);
-        if(key=="sni"||key=="peer")node["sni"]=value;
+        if(key=="sni"||key=="peer"){
+            if(node.contains("sni")&&node.value("sni")!=QJsonValue(value)){r.error="Hysteria2 URI 的 SNI 别名参数冲突。";return;}
+            node["sni"]=value;
+        }
         else if(key=="insecure"){
             const auto b=boolean(value,true);if(!b){r.error="Hysteria2 URI 的 insecure 参数无效。";return;}
             node["skip-cert-verify"]=*b; // true 会在 safeParameters 中被拒绝，与现有 trojan 行为一致。
@@ -149,7 +162,7 @@ void hysteria2Uri(Result &r,const QString &line,qsizetype split){
             if(!sha256.match(fp).hasMatch()){r.error="Hysteria2 URI 的 pinSHA256 不是有效的 SHA-256 摘要。";return;}
             node["fingerprint"]=fp;
         }
-        else if(key=="alpn")node["alpn"]=QJsonArray::fromStringList(value.split(',',Qt::SkipEmptyParts));
+        else if(key=="alpn")node["alpn"]=QJsonArray::fromStringList(value.split(',',Qt::KeepEmptyParts));
         else if(key=="up")node["up"]=value;
         else if(key=="down")node["down"]=value;
         else if(key=="ech")issue(issues,"Hysteria2 URI 的 ECH 参数尚无等价映射，原始参数已保留，连接可能缺少该防护。");
@@ -165,18 +178,26 @@ void tuicUri(Result &r,const QString &line,qsizetype split){
     if(hash>=0)rest=rest.left(hash);
     const QUrl url("tuic://"+rest,QUrl::StrictMode);
     if(!url.isValid()||url.host().isEmpty()||url.port(-1)<1||url.port()>65535){r.error="TUIC URI 的服务器或端口无效。";return;}
+    if(!url.path().isEmpty()&&url.path()!="/"){r.error="TUIC URI 含未定义的路径；未应用配置。";return;}
     const auto uuid=url.userName(QUrl::FullyDecoded);
     if(QUuid(uuid).isNull()){r.error="TUIC URI 需要有效 UUID。";return;}
     QJsonObject node{{"name",QUrl::fromPercentEncoding(name.toUtf8())},{"type","tuic"},{"server",url.host()},{"port",url.port()},
         {"uuid",uuid},{"password",url.password(QUrl::FullyDecoded)}};
-    QStringList issues;QUrlQuery q(url);QSet<QString> seen;
+    QStringList issues;QUrlQuery q(url);QSet<QString> seen;QJsonObject aliases;
     for(const auto &pair:q.queryItems(QUrl::FullyDecoded)){
         const auto &key=pair.first;const auto &value=pair.second;
         if(seen.contains(key)){r.error="TUIC URI 含重复参数，无法安全确定配置。";return;}seen.insert(key);
+        const auto canonical=key=="congestion_control"?QString("congestion-control"):key=="udp_relay_mode"?QString("udp-relay-mode"):key=="allow_insecure"||key=="allowInsecure"?QString("insecure"):key;
+        QJsonValue typed=value;
+        if(canonical=="insecure"){
+            const auto b=boolean(value,true);if(!b){r.error="TUIC URI 的 allow_insecure 参数无效。";return;}typed=*b;
+        }
+        if(aliases.contains(canonical)&&aliases.value(canonical)!=typed){r.error="TUIC URI 的别名参数冲突；未应用配置。";return;}
+        aliases[canonical]=typed;
         if(key=="sni")node["sni"]=value;
         else if(key=="congestion_control"||key=="congestion-control")node["congestion-controller"]=value;
         else if(key=="udp_relay_mode"||key=="udp-relay-mode")node["udp-relay-mode"]=value;
-        else if(key=="alpn")node["alpn"]=QJsonArray::fromStringList(value.split(',',Qt::SkipEmptyParts));
+        else if(key=="alpn")node["alpn"]=QJsonArray::fromStringList(value.split(',',Qt::KeepEmptyParts));
         else if(key=="allow_insecure"||key=="allowInsecure"||key=="insecure"){
             const auto b=boolean(value,true);if(!b){r.error="TUIC URI 的 allow_insecure 参数无效。";return;}
             node["skip-cert-verify"]=*b;
@@ -195,6 +216,16 @@ void tuicUri(Result &r,const QString &line,qsizetype split){
 }
 void uri(Result &r,const QString &line){
     const auto split=line.indexOf("://");if(split<1){r.error="通用订阅中存在无效 URI；未导入任何节点。";return;}
+    const auto encoded=line.toUtf8();
+    const auto hex=[](char c){return (c>='0'&&c<='9')||(c>='a'&&c<='f')||(c>='A'&&c<='F');};
+    for(qsizetype i=0;i<encoded.size();++i)if(encoded[i]=='%'){
+        if(i+2>=encoded.size()||!hex(encoded[i+1])||!hex(encoded[i+2])){r.error="节点 URI 的百分号编码无效；未应用配置。";return;}
+        i+=2;
+    }
+    QStringDecoder decoder(QStringDecoder::Utf8);
+    const QString decoded=decoder.decode(QByteArray::fromPercentEncoding(encoded));
+    Q_UNUSED(decoded);
+    if(decoder.hasError()){r.error="节点 URI 的编码不是有效 UTF-8；未应用配置。";return;}
     const auto scheme=line.left(split).toLower();QJsonObject node;QStringList issues;
     if(scheme=="hysteria2"||scheme=="hy2"){hysteria2Uri(r,line,split);return;}
     if(scheme=="tuic"){tuicUri(r,line,split);return;}
@@ -204,14 +235,38 @@ void uri(Result &r,const QString &line){
     if(scheme=="vmess"){
         const auto json=NodeImporter::strictJsonObject(base64(line.mid(split+3).toUtf8()));
         if(json.isEmpty()){r.error="VMess URI 需要有效的 Base64 JSON。";return;}
-        node={{"name",json.value("ps")},{"type","vmess"},{"server",json.value("add")},{"port",json.value("port")},{"uuid",json.value("id")},{"alterId",json.value("aid").toVariant().toInt()},{"cipher",json.value("scy").toString("auto")}};
-        const auto tls=json.value("tls").toString();node["tls"]=tls=="tls";
-        node["servername"]=json.value("sni");
+        // Keep source scalar types visible to validation. QVariant::toInt and
+        // QJsonValue::toString(default) otherwise turn malformed authentication
+        // or TLS controls into usable defaults before Rust sees the node.
+        for(const auto &key:QStringList{"ps","add","id","scy","net","type","host","path","tls","sni","alpn","fp"}){
+            if(json.contains(key)&&!json.value(key).isString()){r.error="VMess URI 含类型无效的字符串参数；未应用配置。";return;}
+        }
+        const auto unsignedInteger=[](const QJsonValue &v,quint32 fallback)->std::optional<quint32>{
+            if(v.isUndefined())return fallback;
+            if(v.isDouble()){
+                const auto n=v.toDouble();
+                if(n>=0&&n<=4294967295.0&&n==double(quint32(n)))return quint32(n);
+            }else if(v.isString()&&QRegularExpression("^[0-9]+$").match(v.toString()).hasMatch()){
+                bool ok=false;const auto n=v.toString().toULongLong(&ok);
+                if(ok&&n<=4294967295ULL)return quint32(n);
+            }
+            return std::nullopt;
+        };
+        const auto version=unsignedInteger(json.value("v"),2),aid=unsignedInteger(json.value("aid"),0);
+        if(!version||*version!=2||!aid){r.error="VMess URI 的版本或 alterId 无效；未应用配置。";return;}
+        node={{"name",json.value("ps").toString()},{"type","vmess"},{"server",json.value("add")},{"port",json.value("port")},{"uuid",json.value("id")},{"alterId",qint64(*aid)},{"cipher",json.value("scy").toString("auto")}};
+        const auto tls=json.value("tls").toString();
+        if(!tls.isEmpty()&&tls!="none"&&tls!="tls"){r.error="VMess URI 的 TLS 参数无效；未应用配置。";return;}
+        node["tls"]=tls=="tls";
+        if(json.contains("sni"))node["servername"]=json.value("sni");
         transport(node,json.value("net").toString(),json.value("path").toString(),json.value("host").toString(),issues);
         if(json.value("type").toString()!="none"&&!json.value("type").toString().isEmpty())issue(issues,"VMess URI 的头部伪装尚未映射。");
         const QSet<QString> known{"v","ps","add","port","id","aid","scy","net","type","host","path","tls","sni","alpn","fp"};
         for(auto it=json.begin();it!=json.end();++it)if(!known.contains(it.key()))issue(issues,"VMess URI 包含未映射扩展，原始参数已保留。");
-        if(json.contains("alpn"))node["alpn"]=QJsonArray::fromStringList(json.value("alpn").toString().split(',',Qt::SkipEmptyParts));
+        if(json.contains("alpn")){
+            const auto alpn=json.value("alpn").toString();
+            node["alpn"]=alpn.isEmpty()?QJsonArray():QJsonArray::fromStringList(alpn.split(',',Qt::KeepEmptyParts));
+        }
         if(json.contains("fp"))node["client-fingerprint"]=json.value("fp");
         append(r,node,QJsonObject{{"uri",line},{"vmess",json}},issues);return;
     }

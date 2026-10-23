@@ -10,6 +10,7 @@
 #include <QSettings>
 #include <QJsonArray>
 #include <QSaveFile>
+#include <QScopedValueRollback>
 #include <QHostAddress>
 #include <QRegularExpression>
 #include <QNetworkInterface>
@@ -51,7 +52,17 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
     // Runtime acceptance counts explicit requests. Its own periodic probes
     // would add unrelated Rust connections and corrupt per-request deltas.
     : QObject(parent), m_engine(std::move(engine)), m_store(storePath),m_imports(&m_store,this),m_telemetry(storePath.isEmpty()?QString():storePath+".telemetry",storePath.isEmpty()&&!realAcceptance) {
-    m_imports.setAsyncConfigurationApplier([this](const NodeImporter::Result &result,const QString &sourceId,
+    const auto retainedNodeConfiguration=[this](const QString &sourceId,bool nodesOnly) {
+        auto retained=m_store.networkConfiguration();
+        if(nodesOnly && !sourceId.isEmpty() && retained.contains("importedConfiguration") &&
+           retained.value("importedConfiguration").toObject().value("sourceId").toString()==sourceId) {
+            auto provenance=retained.value("importedConfiguration").toObject();
+            provenance.insert("policyRetainedAfterNodesOnlyRefresh",true);
+            retained.insert("importedConfiguration",provenance);
+        }
+        return retained;
+    };
+    m_imports.setAsyncConfigurationApplier([this,retainedNodeConfiguration](const NodeImporter::Result &result,const QString &sourceId,bool nodesOnly,
                                                   NodeImportService::ApplyCompletion completion,QString *error) {
         if(result.format!="xray-v2ray-json" || !result.configuration.isEmpty()) {
             *error=QStringLiteral("此异步入口仅接受经过严格校验的 JSON 节点。");return false;
@@ -62,17 +73,17 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
         const auto nodes=plan.nodes();QVariantMap canonical;
         if(!validateNetworkConfiguration(networkConfigurationSnapshot(),&canonical,&nodes)){*error=m_networkError;return false;}
 #endif
-        if(!m_store.commitImportAsync(plan,{},std::move(completion))){*error=m_store.error();return false;}
+        if(!m_store.commitImportAsync(plan,retainedNodeConfiguration(sourceId,nodesOnly),std::move(completion))){*error=m_store.error();return false;}
         return true;
     });
-    m_imports.setConfigurationApplier([this](const NodeImporter::Result &result,const QString &sourceId,QString *error) {
+    m_imports.setConfigurationApplier([this,retainedNodeConfiguration](const NodeImporter::Result &result,const QString &sourceId,bool nodesOnly,QString *error) {
         const auto &configuration=result.configurationFormat=="ini"?result.executionConfiguration:result.configuration;
-        if(result.configuration.isEmpty()) {
+        if(nodesOnly || result.configuration.isEmpty()) {
             NodeStore::ImportPlan plan;
             if(!m_store.prepareImport(result.nodes,sourceId,&plan)){*error=m_store.error();return false;}
             const auto nodes=plan.nodes();QVariantMap canonical;
             if(!validateNetworkConfiguration(networkConfigurationSnapshot(),&canonical,&nodes)){*error=m_networkError;return false;}
-            if(!m_store.commitImport(plan)){*error=m_store.error();return false;}
+            if(!m_store.commitImport(plan,retainedNodeConfiguration(sourceId,nodesOnly))){*error=m_store.error();return false;}
             return true;
         }
         if(result.configurationFormat!="clash"&&(result.configurationFormat!="ini"||configuration.isEmpty())) {
@@ -102,8 +113,11 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
         if(!importNodesAndConfiguration(result.nodes,sourceId,input,result.configuration,result.configurationFormat)){*error=m_networkError;return false;}
         return true;
     });
-    connect(m_engine.get(),&ProxyEngine::statusChanged,this,[this]{m_telemetry.ingest(m_engine->status());});
-    connect(&m_telemetry,&TelemetryService::changed,this,&EngineController::statusChanged);
+    connect(m_engine.get(),&ProxyEngine::statusChanged,this,[this]{
+        const QScopedValueRollback ingesting(m_ingestingEngineStatus,true);
+        m_telemetry.ingest(m_engine->status());
+    });
+    connect(&m_telemetry,&TelemetryService::changed,this,[this]{if(!m_ingestingEngineStatus)emit statusChanged();});
     connect(&m_telemetry,&TelemetryService::nativeProbeRequested,this,[this](const QUrl &url,quint64 tag){if(!m_shuttingDown)m_engine->probeNodeTagged(url,tag);});
     connect(m_engine.get(),&ProxyEngine::probeRequestRejected,&m_telemetry,&TelemetryService::rejectNativeProbe);
     connect(&m_tests,&NodeTestService::changed,this,&EngineController::nodesChanged);
@@ -172,7 +186,7 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
             else if(s.state==ProxyEngine::State::Failed)m_diagnostics.noteEvent(QStringLiteral("Swirl 引擎异常"),s.message);
             m_previousEngineState=s.state;
         }
-        m_imports.setDownloadProxy(s.processAlive?s.proxyPort:0);
+        m_imports.setDownloadProxy(s.processAlive&&(s.state==ProxyEngine::State::Running||s.state==ProxyEngine::State::Degraded)?s.proxyPort:0);
         if(s.state==ProxyEngine::State::Stopping||s.state==ProxyEngine::State::Stopped||s.state==ProxyEngine::State::Failed) {
             m_systemProxy.disable();
             if(s.state==ProxyEngine::State::Failed)m_proxyRequested=false;
@@ -199,9 +213,27 @@ EngineController::EngineController(std::unique_ptr<ProxyEngine> engine, QObject 
         }
         emit nodesChanged();
     });
+    const auto initialNodeStatus=m_engine->status();
+    m_lastNodeDisplayStatus={initialNodeStatus.processAlive,initialNodeStatus.apiHealthy,
+        initialNodeStatus.directSession,initialNodeStatus.selectedNodeId,initialNodeStatus.nodeHealth,
+#ifdef SWIRL_USE_RUST_CORE
+        -1
+#else
+        initialNodeStatus.latencyMs
+#endif
+    };
     connect(m_engine.get(),&ProxyEngine::statusChanged,this,[this] {
-        emit nodesChanged();
-        if (!m_shuttingDown && m_restartPending && m_engine->status().state==ProxyEngine::State::Stopped) {
+        const auto status=m_engine->status();
+        const NodeDisplayStatus displayStatus{status.processAlive,status.apiHealthy,
+            status.directSession,status.selectedNodeId,status.nodeHealth,
+#ifdef SWIRL_USE_RUST_CORE
+            -1
+#else
+            status.latencyMs
+#endif
+        };
+        if(displayStatus!=m_lastNodeDisplayStatus){m_lastNodeDisplayStatus=displayStatus;emit nodesChanged();}
+        if (!m_shuttingDown && m_restartPending && status.state==ProxyEngine::State::Stopped) {
             m_restartPending=false;
             QTimer::singleShot(0,this,[this]{if(!m_shuttingDown && m_connectionRequested && (!m_options.selectedNodeId.isEmpty()||m_options.directSession))m_engine->start(m_options);});
         }
@@ -273,9 +305,20 @@ QVariantList EngineController::nodes() const {
         const auto capability=row.value("capability").toMap();
         const bool executable=capability.value("native").toBool()||capability.value("compatible").toBool();
         row.insert("status",active?nodeStateText():!executable?QStringLiteral("不可执行"):QStringLiteral("未连接"));
+#ifdef SWIRL_USE_RUST_CORE
+        // The live health probe times the complete HEAD request. The node
+        // table reports the isolated probe's outbound establishment instead.
+        row.insert("latency",QStringLiteral("—"));
+#else
         row.insert("latency",active && status.latencyMs>=0?QString::number(status.latencyMs):QStringLiteral("—"));
+#endif
         const auto measured=m_tests.result(row.value("id").toString());
-        if(!measured.isEmpty()){row.insert("latency",measured.value("latency").toInt()>=0?QString::number(measured.value("latency").toInt()):QStringLiteral("失败"));row.insert("testHttp",measured.value("http"));row.insert("testError",measured.value("error"));}
+        if(!measured.isEmpty()){
+            const auto timing=measured.value(measured.value("metricType")==QStringLiteral("http_headers")?"outboundConnectMs":"latency");
+            bool valid=false;const auto elapsed=timing.toLongLong(&valid);
+            row.insert("latency",measured.value("success").toBool()&&valid&&elapsed>=0?QString::number(elapsed):QStringLiteral("失败"));
+            row.insert("testHttp",measured.value("http"));row.insert("testError",measured.value("error"));
+        }
         value=row;
     }
     return rows;
@@ -431,8 +474,13 @@ void EngineController::setSystemProxy(bool enabled) {
     connect(socket,&QTcpSocket::connected,this,[this,socket,timer,s] {
         timer->stop();m_proxyChecking=false;socket->deleteLater();
         const auto now=m_engine->status();
-        if(m_proxyRequested&&now.processAlive&&now.apiHealthy&&now.processId==s.processId&&now.proxyPort==s.proxyPort)
-            if(!m_systemProxy.enable(m_captureProxyPort>0?m_captureProxyPort:s.proxyPort,s.processId))m_proxyRequested=false;
+        if(m_proxyRequested&&now.processAlive&&now.apiHealthy&&now.processId==s.processId&&now.proxyPort==s.proxyPort) {
+            const auto port=m_captureProxyPort>0?m_captureProxyPort:s.proxyPort;
+            // The capture relay is also a Swirl-owned loopback endpoint. Do
+            // not rediscover it as an external proxy after the core stops.
+            m_imports.rememberOwnedProxyPort(port);
+            if(!m_systemProxy.enable(port,s.processId))m_proxyRequested=false;
+        }
         emit statusChanged();
     });
     const auto failed=[this,socket,timer] {if(!m_proxyChecking)return;timer->stop();m_proxyChecking=false;m_proxyRequested=false;

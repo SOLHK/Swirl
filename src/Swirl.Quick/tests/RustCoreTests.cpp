@@ -1404,6 +1404,32 @@ private slots:
   engine.start(o);
   QVERIFY2(engine.status().state==ProxyEngine::State::Running,qPrintable(engine.status().message));engine.stop();
  }
+ void webSocketUdpDeclarationSurvivesNativeMappingAndRuntimeStartup(){
+  ControlledNetwork net;QVERIFY(net.start());
+  for(const bool udp:{false,true}){
+   const QJsonObject raw{{"name","ws-udp-fixture"},{"type","vless"},{"server","127.0.0.1"},{"port",net.a.serverPort()},
+    {"uuid","00112233-4455-6677-8899-aabbccddeeff"},{"network","ws"},{"tls",true},{"sni","tls.fixture.invalid"},
+    {"alpn",QJsonArray{"http/1.1"}},{"udp",udp},
+    {"ws-opts",QJsonObject{{"path","/proxy"},{"headers",QJsonObject{{"Host","ws.fixture.invalid"}}}}}};
+   const auto parsed=NodeImporter::parse(QJsonDocument(QJsonObject{{"proxies",QJsonArray{raw}}}).toJson());
+   QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.first().parameters.value("udp"),QJsonValue(udp));
+   QCOMPARE(parsed.nodes.first().originalConfiguration,raw);
+   auto start=options(net);start.nodes=parsed.nodes;start.selectedNodeId=parsed.nodes.first().id;
+   QJsonObject config;const auto error=RustCoreEngine::configuration(start,&config);QVERIFY2(error.isEmpty(),qPrintable(error));
+   const auto outbound=config.value("nodes").toArray().first().toObject().value("outbound").toObject();
+   QCOMPARE(outbound.value("udp"),QJsonValue(udp));
+   QCOMPARE(outbound.value("websocket").toObject(),QJsonObject({{"host","ws.fixture.invalid"},{"path","/proxy"}}));
+   QCOMPARE(outbound.value("tls").toObject().value("server_name"),QJsonValue("tls.fixture.invalid"));
+   RustCoreEngine engine;engine.start(start);
+   QVERIFY2(engine.status().state==ProxyEngine::State::Running,qPrintable(engine.status().message));
+   QVERIFY(engine.status().apiHealthy);QCOMPARE(engine.status().engineKind,QString("rust"));
+   // This exercises actual native configuration/lifecycle (level 2). The
+   // inherited Rust UDP-over-stream peer suites verify protocol datagrams;
+   // listener startup is not labeled as external UDP interoperability.
+   engine.stop();QCOMPARE(engine.status().state,ProxyEngine::State::Stopped);
+   QTcpServer reclaimed;QVERIFY(reclaimed.listen(QHostAddress::LocalHost,start.proxyPort));
+  }
+ }
  void webSocketRejectsUnsupportedParametersWithoutPartialConfiguration(){
   ControlledNetwork net;QVERIFY(net.start());auto valid=options(net);
   auto &node=valid.nodes.first();node.protocol="vless";node.serverName="tls.fixture.invalid";
@@ -1421,7 +1447,11 @@ private slots:
    {"header injection",{{"ws-opts",QJsonObject{{"headers",QJsonObject{{"Host","ws.fixture.invalid\r\nX-Fixture: 1"}}}}}}},
    {"ambiguous request target",{{"ws-opts",QJsonObject{{"path","//other.fixture.invalid/proxy"}}}}},
    {"unsupported ALPN",{{"alpn",QJsonArray{"h2"}}}},
-   {"unsupported proxy UDP",{{"udp",true}}},
+   {"string UDP flag",{{"udp","true"}}},
+   {"numeric UDP flag",{{"udp",1}}},
+   {"null UDP flag",{{"udp",QJsonValue(QJsonValue::Null)}}},
+   {"object UDP flag",{{"udp",QJsonObject{}}}},
+   {"array UDP flag",{{"udp",QJsonArray{}}}},
    {"disabled certificate verification",{{"skip-cert-verify",true}}},
    {"unsupported VLESS flow",{{"flow","xtls-rprx-vision"}}}
   };

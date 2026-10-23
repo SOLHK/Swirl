@@ -31,6 +31,14 @@ extern "C" {
 intptr_t swirl_import_xray_v1(const uint8_t *input, size_t input_len,
                             uint8_t *output, size_t output_capacity);
 
+/* Same offline buffer/ownership contract. Input (at most 1 MiB) must contain
+ * exactly {"proxies":[one_complete_normalized_node]}. Every supplied option is
+ * validated by the authoritative Rust subscription inspector. A successful
+ * response contains private native_outbound data; it is not network evidence.
+ */
+intptr_t swirl_import_node_v1(const uint8_t *input, size_t input_len,
+                            uint8_t *output, size_t output_capacity);
+
 uint32_t swirl_core_abi_version(void);
 /* UTF-8 JSON: abi_version, build_id, source_sha, package_version, target.
  * Returns bytes excluding NUL, -1 for a null/short buffer, -2 for caught panic.

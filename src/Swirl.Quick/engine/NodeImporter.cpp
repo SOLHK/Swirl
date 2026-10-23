@@ -18,6 +18,13 @@ bool xrayJsonCandidate(const QByteArray &bytes) {
     // This is only dialect selection. Every Xray candidate, including invalid
     // JSON, is passed unmodified to Rust before a single node is constructed.
     const auto sniff = QJsonDocument::fromJson(view);
+    // A section header such as [Proxy] or [server_local] belongs to the INI
+    // normalizer. Do not let the JSON array prefix capture those subscriptions.
+    // Valid JSON arrays and every other malformed JSON candidate remain on the
+    // strict Rust path; the INI parser still validates headers and all content.
+    if (sniff.isNull() && view.startsWith('[') &&
+        QRegularExpression("^\\[\\s*[A-Za-z][A-Za-z0-9 _-]*(?:\\]|$)").match(QString::fromUtf8(view.split('\n').first())).hasMatch())
+        return false;
     if (sniff.isObject()) {
         const auto object = sniff.object();
         for (const auto &key : {"protocol", "outbound", "outboundDetour", "inbound", "inboundDetour"})

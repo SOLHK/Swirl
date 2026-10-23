@@ -72,6 +72,7 @@ private:
  QString m_path,m_epoch,m_routeEpoch,m_storageError,m_externalIp,m_measurementState;
  int m_revision=0,m_measurements=0;
  bool m_networkEnabled=true,m_dirty=false;
+ bool m_publishedSampled=false,m_publishedConnectionsSampled=false;
  qint64 m_lastConnections=0,m_lastTraffic=0,m_lastUp=0,m_lastDown=0;
  ProxyEngine::Status m_status;
  mutable QHash<int,QJsonObject> m_periodCache;

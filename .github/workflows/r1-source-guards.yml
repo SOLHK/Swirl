@@ -1,7 +1,7 @@
 name: R1 source and package guards
 on:
   push:
-    branches: [work/rust-core-full-replacement-20261022]
+    branches: [work/rust-core-full-replacement-20261022, work/subscription-unified-integration-20261023]
   workflow_dispatch:
 permissions:
   contents: read
@@ -11,6 +11,11 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Reject removed runtime sources and product fallback paths
+        run: python tools/test_rust_only_runtime.py -v
       - name: CMake dependency graph regression
         run: python tools/test_rust_build_chain.py -v
       - name: Preserve exact reviewable source snapshot without font binaries
@@ -45,6 +50,9 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
       - name: PowerShell 7 package path tests
         shell: pwsh
         run: ./scripts/tests/Test-RustProductPackagePolicy.ps1

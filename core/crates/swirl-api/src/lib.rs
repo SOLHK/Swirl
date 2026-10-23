@@ -9,6 +9,9 @@ use std::{
 use swirl_core::Core;
 use swirl_subscription::Config;
 
+mod import_ffi;
+mod node_import;
+pub use node_import::swirl_import_node_v1;
 mod xray_import;
 pub use xray_import::swirl_import_xray_v1;
 

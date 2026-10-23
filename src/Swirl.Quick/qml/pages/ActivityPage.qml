@@ -115,7 +115,7 @@ Item {
        SwirlIconButton {id:networkDiagnosticButton;objectName:"networkDiagnosticButton";iconName:"refresh";quiet:true;enabled:page.telemetry.measurementState!=="正在测量";onClicked:page.telemetry.measureNetwork();Accessible.name:"网络诊断";SwirlToolTip {parent:networkDiagnosticButton;visible:networkDiagnosticButton.hovered;text:"发起网络诊断";delay:650}}
        SwirlIconButton {objectName:"networkDiagnosticDetails";iconName:page.diagnosticOpen?"chevron-left":"chevron-right";quiet:true;onClicked:page.diagnosticOpen=!page.diagnosticOpen;Accessible.name:page.diagnosticOpen?"收起检测详情":"查看检测详情"}
       }
-      Label {text:"互联网延迟";Layout.fillWidth:true}
+      Label {text:"HTTPS 请求耗时";Layout.fillWidth:true}
       Value {text:page.telemetry.latencies.internet||"尚未检测";Layout.fillWidth:true}
       Label {text:page.telemetry.measurementState||"尚未检测";Layout.fillWidth:true}
       RowLayout {Layout.fillWidth:true;spacing:Theme.dp(8)

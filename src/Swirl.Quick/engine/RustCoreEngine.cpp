@@ -1,6 +1,7 @@
 #include "RustCoreEngine.h"
 #include "RustDnsConfiguration.h"
 #include "XrayJsonBridge.h"
+#include "NativeNodeBridge.h"
 #include <QCoreApplication>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -241,10 +242,6 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
    nodes.append(QJsonObject{{"id",n.id},{"outbound",outbound}});
   }else{
   if(!n.conversionIssues.isEmpty()||!ProxyNode::validate(n).isEmpty())return "节点含无效或未映射参数，Rust 拒绝执行。";
-  if(!QStringList{"http","socks4","socks4a","socks5","trojan","ss","vless"}.contains(n.protocol))return "此节点协议尚未迁移到 Rust；未使用外部内核。";
-  if(n.protocol!="ss"&&!n.cipher.isEmpty())return "Rust 尚未映射此协议声明的 cipher；未丢弃加密参数。";
-  if(n.protocol=="trojan"&&!n.username.isEmpty())return "Trojan 只支持密码认证；未丢弃 username。";
-  const bool socks4=n.protocol=="socks4"||n.protocol=="socks4a";
   const bool reality=n.protocol=="vless"&&n.parameters.contains("reality-opts");
   // Check the preserved sing-box requirement before accepting its normalized
   // profile. A default inferred by the importer cannot authorize a browser
@@ -261,99 +258,10 @@ QString RustCoreEngine::configuration(const EngineStartOptions &o,QJsonObject *o
    }else if((!utls.value("enabled").isUndefined()&&utls.value("enabled")!=QJsonValue(false))||utls.contains("fingerprint"))return "源配置 uTLS 未明确启用却含指纹要求；未丢弃原值。";
   }
   if(reality&&n.originalConfiguration.value("_swirl-default-client-fingerprint").toBool())return "REALITY 需要源配置明确声明受支持的指纹；未执行导入时推断的默认值。";
-  QSet<QString> allowed=socks4?QSet<QString>{"tls","udp","network","tfo","skip-cert-verify"}:n.protocol=="ss"?QSet<QString>{"udp","plugin","plugin-opts"}:QSet<QString>{"tls","udp","sni","servername","alpn","skip-cert-verify"};
-  allowed.insert("tfo");
-  if(n.parameters.contains("tfo")&&n.parameters.value("tfo")!=QJsonValue(false))return "Rust 尚未实现 TCP Fast Open；必须明确为 false。";
-  if(n.protocol=="vless")allowed.unite(QSet<QString>{"uuid","flow","encryption"});
-  if(reality)allowed.unite(QSet<QString>{"reality-opts","client-fingerprint"});
-  if(n.protocol=="vless"||n.protocol=="trojan")allowed.unite(QSet<QString>{"network","ws-opts"});
-  for(auto p=n.parameters.begin();p!=n.parameters.end();++p)if(!allowed.contains(p.key()))return "Rust 尚未实现此传输或扩展参数。";
-  for(const auto &key:QStringList{"tls","udp","skip-cert-verify"})if(n.parameters.contains(key)&&!n.parameters.value(key).isBool())return "Rust 布尔参数类型无效。";
-  if(n.parameters.value("skip-cert-verify").toBool())return "Rust 不允许关闭证书验证。";
-  const bool udp=n.parameters.value("udp").toBool();
-  if(udp&&n.protocol!="ss"&&n.protocol!="socks5")return "Rust 尚不支持该出口的代理 UDP。";
-  for(const auto &key:QStringList{"sni","servername"})if(n.parameters.contains(key)&&(!n.parameters.value(key).isString()||n.parameters.value(key).toString()!=n.serverName))return "TLS 名称字段不一致。";
-  if(n.protocol=="trojan"&&n.parameters.contains("tls")&&!n.parameters.value("tls").toBool())return "Trojan 必须使用 TLS。";
-  const bool tls=n.protocol=="trojan"||n.parameters.value("tls").toBool();
-  if(reality&&!tls)return "REALITY 必须明确启用安全连接；未降级为 TCP。";
-  if(n.protocol=="socks5"&&udp&&tls)return "Rust 尚未验证 SOCKS5 TLS 与 UDP 的组合；未丢弃 TLS 或 UDP 参数。";
-  if(!tls&&(!n.serverName.isEmpty()||n.parameters.contains("alpn")))return "未启用 TLS 却含 TLS 参数。";
-  QJsonObject outbound{{"type",socks4?"socks4":n.protocol=="http"?"http_connect":n.protocol=="ss"?"shadowsocks":n.protocol},{"host",n.host},{"port",n.port}};
-  if(socks4){
-   if(tls||!n.cipher.isEmpty()||(n.parameters.contains("tfo")&&n.parameters.value("tfo")!=QJsonValue(false)))return "SOCKS4/4a 不支持 TLS、密码加密或 TCP Fast Open。";
-   if(n.parameters.contains("network")&&n.parameters.value("network")!=QJsonValue(QStringLiteral("tcp")))return "SOCKS4/4a 此阶段只支持 TCP。";
-   outbound["user_id"]=n.username;outbound["remote_dns"]=n.protocol=="socks4a";
-  }
-  else if(n.protocol=="ss"){
-   if(!n.username.isEmpty()||!QStringList{"aes-128-gcm","aes-256-gcm","chacha20-ietf-poly1305"}.contains(n.cipher))return "Rust 尚未实现此 Shadowsocks 加密或认证方式。";
-   outbound["password"]=n.password;outbound["cipher"]=n.cipher;outbound["udp"]=n.parameters.value("udp").toBool();
-   if(n.parameters.contains("plugin")){
-    if(!n.parameters.value("plugin").isString()||!QStringList{"obfs","obfs-local","simple-obfs"}.contains(n.parameters.value("plugin").toString())||!n.parameters.value("plugin-opts").isObject())return "Rust 尚未实现此 Shadowsocks 插件。";
-    const auto plugin=n.parameters.value("plugin-opts").toObject();
-    for(auto p=plugin.begin();p!=plugin.end();++p)if(p.key()!="mode"&&p.key()!="host")return "Rust 尚未映射此混淆参数。";
-    if(plugin.value("mode").toString()!="http"||!plugin.value("host").isString()||plugin.value("host").toString().isEmpty())return "Rust 目前只支持显式主机的 HTTP 混淆。";
-    outbound["obfs_http"]=QJsonObject{{"host",plugin.value("host")}};
-   }else if(n.parameters.contains("plugin-opts"))return "缺少 Shadowsocks 插件类型。";
-  }
-  else if(n.protocol=="vless"){
-   if(!n.username.isEmpty()||!n.password.isEmpty())return "VLESS 只支持 UUID 认证。";
-   if(n.parameters.contains("flow")){const auto flow=n.parameters.value("flow");if(!flow.isString()||(!flow.toString().isEmpty()&&(!reality||flow.toString()!="xtls-rprx-vision")))return "Rust 仅支持 REALITY 的 xtls-rprx-vision flow；未删除或更换原值。";}
-   if(n.parameters.contains("encryption")&&n.parameters.value("encryption").toString()!="none")return "Rust 尚未实现该 VLESS encryption 扩展。";
-   outbound["uuid"]=QUuid(n.parameters.value("uuid").toString()).toString(QUuid::WithoutBraces);
-   if(n.parameters.contains("flow"))outbound["flow"]=n.parameters.value("flow");
-  }
-  else if(n.protocol=="trojan")outbound["password"]=n.password;
-  else if(!n.username.isEmpty()||!n.password.isEmpty())outbound["auth"]=QJsonObject{{"username",n.username},{"password",n.password}};
-  if(n.protocol=="socks5")outbound["udp"]=udp;
-  if(reality){
-   const auto fingerprint=n.parameters.value("client-fingerprint");
-   if(!fingerprint.isString()||!QStringList{"rustls","chrome","chrome_133"}.contains(fingerprint.toString()))return "REALITY 指纹尚未支持；当前支持显式 rustls、chrome 或 chrome_133，未替换源配置。";
-   if(!n.parameters.value("reality-opts").isObject())return "REALITY 参数必须是对象。";
-   if(n.parameters.contains("network")&&n.parameters.value("network")!=QJsonValue(QStringLiteral("tcp")))return "REALITY 当前仅支持 TCP 传输。";
-   if(n.parameters.contains("ws-opts"))return "REALITY 不能附带 WebSocket 参数。";
-   const auto settings=n.parameters.value("reality-opts").toObject();
-   for(auto p=settings.begin();p!=settings.end();++p)if(p.key()!="public-key"&&p.key()!="short-id")return "REALITY 含尚未映射的参数；未丢弃原值。";
-   if(!settings.value("public-key").isString()||!settings.value("short-id").isString())return "REALITY 公钥或 shortId 类型无效。";
-   const auto key=settings.value("public-key").toString(),shortId=settings.value("short-id").toString();
-   if(!QRegularExpression("^[A-Za-z0-9_-]{43}=?$").match(key).hasMatch())return "REALITY 公钥编码无效。";
-   const auto decoded=QByteArray::fromBase64Encoding(key.toLatin1(),QByteArray::Base64UrlEncoding|QByteArray::AbortOnBase64DecodingErrors);
-   if(!decoded||decoded.decoded.size()!=32||decoded.decoded==QByteArray(32,'\0'))return "REALITY 公钥无效。";
-   const auto canonical=decoded.decoded.toBase64(QByteArray::Base64UrlEncoding|QByteArray::OmitTrailingEquals);if(key.toLatin1()!=canonical&&key.toLatin1()!=canonical+'=')return "REALITY 公钥必须使用规范的 Base64URL 编码。";
-   if(!QRegularExpression("^(?:[0-9A-Fa-f]{2}){0,8}$").match(shortId).hasMatch())return "REALITY shortId 必须是最长 8 字节的十六进制。";
-   if(n.serverName.isEmpty()||n.serverName.size()>253||!QHostAddress(n.serverName).isNull()||!QRegularExpression("^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*$").match(n.serverName).hasMatch())return "REALITY 需要明确的有效 SNI 域名。";
-   const auto alpn=n.parameters.value("alpn");if(!alpn.isUndefined()&&!alpn.isArray())return "REALITY ALPN 格式无效。";
-   if(fingerprint!=QJsonValue(QStringLiteral("rustls"))&&!alpn.toArray().isEmpty()&&alpn.toArray()!=QJsonArray{"h2","http/1.1"})return "REALITY Chrome 指纹仅支持默认 ALPN 或按顺序声明 h2、http/1.1；未替换源配置。";
-   if(alpn.toArray().size()>16)return "REALITY ALPN 数量超过限制。";
-   QSet<QString> seenAlpn;int totalAlpn=0;for(const auto &value:alpn.toArray()){const auto text=value.toString();if(seenAlpn.contains(text)||(totalAlpn+=text.size())>1024)return "REALITY ALPN 重复或总长度超过限制。";seenAlpn.insert(text);}
-   for(const auto &value:alpn.toArray())if(!value.isString()||value.toString().isEmpty()||value.toString().size()>255||!QRegularExpression("^[\\x20-\\x7e]+$").match(value.toString()).hasMatch())return "REALITY ALPN 值无效。";
-   outbound["reality"]=QJsonObject{{"server_name",n.serverName},{"public_key",key},{"short_id",shortId},{"fingerprint",fingerprint},{"alpn",alpn.isUndefined()?QJsonArray{}:alpn.toArray()}};
-  }
-  else if(tls){
-   auto alpn=n.parameters.value("alpn");if(!alpn.isUndefined()&&!alpn.isArray())return "ALPN 格式无效。";
-   outbound["tls"]=QJsonObject{{"server_name",n.serverName.isEmpty()?n.host:n.serverName},{"alpn",alpn.isUndefined()?QJsonArray{}:alpn.toArray()}};
-  }
-  // Native WS mapping; no QML changes.
-  if(n.parameters.contains("network")||n.parameters.contains("ws-opts")){
-   const auto network=n.parameters.value("network");
-   if(!network.isString()||(network.toString()!="tcp"&&network.toString()!="ws"))return "Rust 尚未实现此传输。";
-   if(network.toString()=="ws"){
-    if(n.parameters.contains("ws-opts")&&!n.parameters.value("ws-opts").isObject())return "WebSocket 配置类型无效。";
-    const auto ws=n.parameters.value("ws-opts").toObject();
-    for(auto p=ws.begin();p!=ws.end();++p)if(p.key()!="path"&&p.key()!="headers")return "WebSocket 含未实现的扩展，未忽略。";
-    if(ws.contains("path")&&!ws.value("path").isString())return "WebSocket 路径类型无效。";
-    QString host=n.host.contains(':')?"["+n.host+"]":n.host;
-    if(ws.contains("headers")){
-     if(!ws.value("headers").isObject())return "WebSocket 请求头类型无效。";
-     const auto headers=ws.value("headers").toObject();if(headers.size()>1)return "WebSocket 此阶段只支持 Host 请求头。";
-     for(auto h=headers.begin();h!=headers.end();++h){if(h.key().compare("host",Qt::CaseInsensitive)!=0||!h.value().isString())return "WebSocket 请求头尚未实现。";host=h.value().toString();}
-    }
-    const auto path=ws.contains("path")?ws.value("path").toString():QString("/");
-    if(host.isEmpty()||host.contains(QRegularExpression("[\\s/@?#]"))||!path.startsWith('/')||path.startsWith("//")||path.size()>2048||path.contains(QRegularExpression("[\\s#]")))return "WebSocket Host 或路径无效。";
-    const auto alpn=outbound.value("tls").toObject().value("alpn").toArray();
-    if(!alpn.isEmpty()&&alpn!=QJsonArray{"http/1.1"})return "WebSocket 目前仅支持 HTTP/1.1 ALPN。";
-    outbound["websocket"]=QJsonObject{{"host",host},{"path",path}};
-   }else if(n.parameters.contains("ws-opts"))return "TCP 传输不能附带 WebSocket 配置。";
-  }
+  // The same Rust inspector owns non-JSON protocol, transport and UDP
+  // mapping. No stale C++ protocol allowlist can hide completed Rust work.
+  QJsonObject outbound;const auto error=NativeNodeBridge::executableOutbound(n,&outbound);
+  if(!error.isEmpty())return error;
   nodes.append(QJsonObject{{"id",n.id},{"outbound",outbound}});
   }
  }

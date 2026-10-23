@@ -2,7 +2,9 @@
 #include "../network/HttpRequestPolicy.h"
 #include <QNetworkReply>
 #include <QNetworkProxy>
+#include <QNetworkProxyFactory>
 #include <QNetworkRequest>
+#include <QHostAddress>
 #include <QDateTime>
 #include <QFile>
 #include <QFileInfo>
@@ -11,11 +13,31 @@
 #include <QCoreApplication>
 #include <QThreadPool>
 
-NodeImportService::NodeImportService(NodeStore *store,QObject *parent,std::function<qint64()> clock,int interval)
-    :QObject(parent),m_store(store),m_clock(clock?std::move(clock):[]{return QDateTime::currentSecsSinceEpoch();}) {
-    m_network.setProxy(QNetworkProxy::NoProxy); // Never inherit/change the Windows system proxy.
+namespace {
+bool loopbackHost(const QString &host) {
+    return host.compare("localhost",Qt::CaseInsensitive)==0 || host.compare("localhost.",Qt::CaseInsensitive)==0 || QHostAddress(host).isLoopback();
+}
+class DownloadProxyFactory final : public QNetworkProxyFactory {
+public:
+    explicit DownloadProxyFactory(QList<QNetworkProxy> proxies):m_proxies(std::move(proxies)){}
+    QList<QNetworkProxy> queryProxy(const QNetworkProxyQuery &) override{return m_proxies;}
+private:
+    const QList<QNetworkProxy> m_proxies;
+};
+}
+
+NodeImportService::NodeImportService(NodeStore *store,QObject *parent,std::function<qint64()> clock,int interval,SystemProxyResolver systemProxies)
+    :QObject(parent),m_store(store),m_clock(clock?std::move(clock):[]{return QDateTime::currentSecsSinceEpoch();}),m_systemProxyResolver(std::move(systemProxies)) {
+    // Query system/PAC settings only for this downloader. Do not change the
+    // application's other sockets or the user's operating-system settings.
+    if(!m_systemProxyResolver)m_systemProxyResolver=[](const QNetworkProxyQuery &query){return QNetworkProxyFactory::systemProxyForQuery(query);};
     m_deadline.setSingleShot(true);m_deadline.setInterval(30000);
-    connect(&m_deadline,&QTimer::timeout,this,[this]{m_downloadTimedOut=true;if(m_reply)m_reply->abort();});
+    connect(&m_deadline,&QTimer::timeout,this,[this]{
+        if(!m_busy)return;
+        m_downloadTimedOut=true;
+        if(m_reply)m_reply->abort();
+        else {++m_generation;finish(QStringLiteral("订阅下载超过 30 秒（含系统代理发现）；旧节点保持不变。"));}
+    });
     connect(&m_timer,&QTimer::timeout,this,&NodeImportService::checkDue);
     connect(store,&NodeStore::changed,this,&NodeImportService::changed);
     m_timer.start(qMax(100,interval));QTimer::singleShot(1000,this,&NodeImportService::checkDue);
@@ -30,15 +52,18 @@ QVariantList NodeImportService::providers() const {
     }return rows;
 }
 void NodeImportService::importText(const QString &text) {
-    parseText(text,QStringLiteral("text"));
+    parseText(text,QStringLiteral("text"),false);
 }
-void NodeImportService::parseText(const QString &text,const QString &origin) {
+void NodeImportService::importNodesOnlyText(const QString &text) {
+    parseText(text,QStringLiteral("text"),true);
+}
+void NodeImportService::parseText(const QString &text,const QString &origin,bool nodesOnly) {
     if(m_shuttingDown)return;
     if(m_busy || hasPreview()){m_message=QStringLiteral("请先确认或取消当前导入。");emit changed();return;}
     // Every UTF-16 code unit needs at least one UTF-8 byte. Reject this
     // inexpensive bound before allocating; the parser checks exact byte size.
     if(text.size()>NodeImporter::MaximumBytes){m_message=QStringLiteral("配置文本超过 4 MiB；现有节点保持不变。");emit changed();return;}
-    m_previewRequested=true;m_importSource=origin;
+    m_previewRequested=true;m_importSource=origin;m_nodesOnly=nodesOnly;
     m_busy=true;m_source.clear();m_message=QStringLiteral("正在解析节点配置…");emit changed();
     QPointer<NodeImportService> guard(this);const auto generation=m_generation;
     QThreadPool::globalInstance()->start([guard,generation,text] {
@@ -49,12 +74,21 @@ void NodeImportService::parseText(const QString &text,const QString &origin) {
     });
 }
 void NodeImportService::importClipboard() {
-    if(auto *clipboard=QGuiApplication::clipboard())parseText(clipboard->text(),QStringLiteral("clipboard"));
+    if(auto *clipboard=QGuiApplication::clipboard())parseText(clipboard->text(),QStringLiteral("clipboard"),false);
+}
+void NodeImportService::importNodesOnlyClipboard() {
+    if(auto *clipboard=QGuiApplication::clipboard())parseText(clipboard->text(),QStringLiteral("clipboard"),true);
 }
 void NodeImportService::importFile(const QUrl &file) {
+    startFile(file,false);
+}
+void NodeImportService::importNodesOnlyFile(const QUrl &file) {
+    startFile(file,true);
+}
+void NodeImportService::startFile(const QUrl &file,bool nodesOnly) {
     if(m_busy || hasPreview() || m_shuttingDown)return;
     if(!file.isLocalFile() || !file.host().isEmpty() || file.toLocalFile().startsWith("\\\\")) {m_message=QStringLiteral("请选择本机 YAML/JSON 文件。");emit changed();return;}
-    m_busy=true;m_source.clear();m_importSource="file";m_previewRequested=true;
+    m_busy=true;m_source.clear();m_importSource="file";m_previewRequested=true;m_nodesOnly=nodesOnly;
     m_message=QStringLiteral("正在读取并校验本机配置…");emit changed();
     const auto path=file.toLocalFile();QPointer<NodeImportService> guard(this);const auto generation=m_generation;
     QThreadPool::globalInstance()->start([guard,path,generation]{
@@ -75,14 +109,20 @@ void NodeImportService::importFile(const QUrl &file) {
     });
 }
 void NodeImportService::importUrl(const QUrl &url) {
+    startUrl(url,false);
+}
+void NodeImportService::importNodesOnlyUrl(const QUrl &url) {
+    startUrl(url,true);
+}
+void NodeImportService::startUrl(const QUrl &url,bool nodesOnly) {
     if(m_busy || hasPreview() || m_shuttingDown)return;
     if(!NodeStore::allowedSubscriptionUrl(url)){m_message=QStringLiteral("请使用 HTTPS 地址；只有本机测试地址允许 HTTP。");emit changed();return;}
-    m_previewRequested=true;m_importSource="url";m_downloadTimedOut=false;
+    m_previewRequested=true;m_importSource="url";m_downloadTimedOut=false;m_nodesOnly=nodesOnly;
     m_busy=true;m_source.clear();m_formatHint="auto";m_message=QStringLiteral("正在安全下载节点配置…");emit changed();m_deadline.start();download(url);
 }
-bool NodeImportService::saveSubscription(const QString &id,const QString &name,const QUrl &url,int interval,bool enabled,const QString &formatHint) {
+bool NodeImportService::saveSubscription(const QString &id,const QString &name,const QUrl &url,int interval,bool enabled,const QString &formatHint,const QString &importScope) {
     if(m_busy || hasPreview())return false;
-    const bool ok=m_store->saveSubscription(id,name,url,interval,enabled,formatHint);
+    const bool ok=m_store->saveSubscription(id,name,url,interval,enabled,formatHint,importScope);
     m_message=ok?QStringLiteral("订阅已加密保存；自动更新设置已生效。"):m_store->error();
     if(ok && !id.isEmpty())m_errors.remove(id);
     emit changed();return ok;
@@ -122,13 +162,51 @@ void NodeImportService::next() {
         const auto id=m_queue.dequeue();
         for(const auto &s:m_store->subscriptions())if(s.id==id){
             m_previewRequested=false;m_importSource="subscription";m_downloadTimedOut=false;
-            m_source=id;m_formatHint=s.formatHint;m_busy=true;m_attempts.insert(id,m_clock());m_message=QStringLiteral("正在更新订阅（地址已隐藏）…");emit changed();
+            m_source=id;m_formatHint=s.formatHint;m_nodesOnly=s.importScope=="nodes-only";m_busy=true;m_attempts.insert(id,m_clock());m_message=QStringLiteral("正在更新订阅（地址已隐藏）…");emit changed();
             m_deadline.start();download(s.url);return;
         }
     }
 }
+void NodeImportService::setDownloadProxy(int port) {
+    m_proxyPort=port>0&&port<=65535?port:0;
+    rememberOwnedProxyPort(m_proxyPort);
+}
+void NodeImportService::rememberOwnedProxyPort(int port) {
+    // Only actual runtime ports are recorded. A third-party loopback proxy at
+    // a coincidentally configured but never-used Swirl port remains eligible.
+    if(port>0&&port<=65535)m_ownedProxyPorts.insert(quint16(port));
+}
 void NodeImportService::download(const QUrl &url,int redirects) {
     if(!NodeStore::allowedSubscriptionUrl(url) || redirects>5){finish(QStringLiteral("订阅重定向不安全或次数过多；旧节点保持不变。"));return;}
+    if(loopbackHost(url.host())){startDownload(url,redirects,{QNetworkProxy(QNetworkProxy::NoProxy)});return;}
+    if(m_proxyPort){startDownload(url,redirects,{QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",quint16(m_proxyPort))});return;}
+    // PAC discovery can block in platform APIs. Keep it off the UI thread and
+    // within the same cancellation generation / total download deadline.
+    const auto resolver=m_systemProxyResolver;const auto generation=m_generation;QPointer<NodeImportService> guard(this);
+    QThreadPool::globalInstance()->start([guard,generation,resolver,url,redirects]{
+        const auto proxies=resolver(QNetworkProxyQuery(url));
+        QMetaObject::invokeMethod(QCoreApplication::instance(),[guard,generation,url,redirects,proxies]{
+            if(!guard || guard->m_shuttingDown || !guard->m_busy || guard->m_generation!=generation)return;
+            if(guard->m_proxyPort){guard->startDownload(url,redirects,{QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",quint16(guard->m_proxyPort))});return;}
+            QList<QNetworkProxy> usable;bool stoppedCore=false;
+            for(const auto &proxy:proxies){
+                if(proxy.type()==QNetworkProxy::NoProxy){usable.append(proxy);continue;}
+                if(loopbackHost(proxy.hostName()) && guard->m_ownedProxyPorts.contains(proxy.port())){stoppedCore=true;continue;}
+                if(proxy.hostName().isEmpty() || !proxy.port())continue;
+                if(proxy.type()==QNetworkProxy::HttpProxy || proxy.type()==QNetworkProxy::Socks5Proxy ||
+                   (url.scheme()=="http" && proxy.type()==QNetworkProxy::HttpCachingProxy))usable.append(proxy);
+            }
+            if(usable.isEmpty()){
+                guard->finish(stoppedCore?QStringLiteral("系统代理仍指向已停止的 Swirl 端口；请恢复系统代理或重新连接后重试。旧节点保持不变。"):
+                    QStringLiteral("无法获得适用于订阅下载的系统代理；请检查系统代理设置后重试。旧节点保持不变。"));return;
+            }
+            // Preserve the platform's ordered alternatives, including DIRECT
+            // only when the platform explicitly returned NoProxy.
+            guard->startDownload(url,redirects,usable);
+        },Qt::QueuedConnection);
+    });
+}
+void NodeImportService::startDownload(const QUrl &url,int redirects,const QList<QNetworkProxy> &proxies) {
     QNetworkRequest request(url);
     SwirlNetwork::applyHttp1OnlyPolicy(request);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,QNetworkRequest::ManualRedirectPolicy);
@@ -136,8 +214,7 @@ void NodeImportService::download(const QUrl &url,int redirects) {
     request.setRawHeader("User-Agent",agents.value(m_formatHint,agents.value("auto")));
     request.setRawHeader("Accept","application/json, application/yaml, text/plain");
     request.setTransferTimeout(15000);
-    const bool local=url.host()=="localhost"||url.host()=="127.0.0.1"||url.host()=="::1";
-    m_network.setProxy(!local&&m_proxyPort>0?QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",m_proxyPort):QNetworkProxy(QNetworkProxy::NoProxy));
+    m_network.setProxyFactory(new DownloadProxyFactory(proxies));
     auto *reply=m_network.get(request);m_reply=reply;reply->setReadBufferSize(64*1024);
     const auto generation=m_generation;
     auto bytes=std::make_shared<QByteArray>();auto tooLarge=std::make_shared<bool>(false);
@@ -222,6 +299,9 @@ void NodeImportService::cancelImport() {
 }
 void NodeImportService::apply(NodeImporter::Result result) {
     const auto count=result.nodes.size();
+    if(m_nodesOnly && !m_apply && !m_applyAsync){
+        finish(QStringLiteral("节点专用导入无法校验当前网络配置；旧节点保持不变。"));return;
+    }
     if(result.format=="xray-v2ray-json" && (m_applyAsync || !m_apply)) {
         m_committing=true;m_message=QStringLiteral("正在加密并原子保存节点…");emit changed();
         const QPointer<NodeImportService> guard(this);const auto generation=m_generation;
@@ -232,7 +312,7 @@ void NodeImportService::apply(NodeImporter::Result result) {
             guard->applied(format,count,incomplete);
         };
         QString error;bool queued=false;
-        if(m_applyAsync)queued=m_applyAsync(result,m_source,std::move(completion),&error);
+        if(m_applyAsync)queued=m_applyAsync(result,m_source,m_nodesOnly,std::move(completion),&error);
         else if(!result.configuration.isEmpty())error=QStringLiteral("JSON 导入不允许应用第三方全局配置。");
         else {
             NodeStore::ImportPlan plan;
@@ -242,9 +322,9 @@ void NodeImportService::apply(NodeImporter::Result result) {
         if(!queued){m_committing=false;finish(error.isEmpty()?QStringLiteral("无法开始安全保存；旧配置保持不变。"):error);}
         return;
     }
-    if(m_apply || !result.configuration.isEmpty()) {
+    if(m_apply || m_nodesOnly || !result.configuration.isEmpty()) {
         QString error;
-        if(!m_apply || !m_apply(result,m_source,&error)) {
+        if(!m_apply || !m_apply(result,m_source,m_nodesOnly,&error)) {
             finish(error.isEmpty()?QStringLiteral("导入包含全局配置，但当前入口不能验证其语义；旧配置保持不变。"):error);return;
         }
     } else if(!m_store->importNodes(std::move(result.nodes),m_source)){finish(m_store->error());return;}
@@ -252,6 +332,7 @@ void NodeImportService::apply(NodeImporter::Result result) {
 }
 void NodeImportService::applied(const QString &format,qsizetype count,int incomplete) {
     m_message=QStringLiteral("%1 · 已解析并保存 %2 个节点；实际联网需检测。").arg(format).arg(count);
+    if(m_nodesOnly)m_message+=QStringLiteral(" 本次仅更新节点；DNS、规则与策略组保持不变。");
     if(incomplete)m_message+=QStringLiteral(" %1 个节点当前不可执行，原始参数已加密保留。").arg(incomplete);
     emit nodesApplied();finish();
 }
@@ -259,5 +340,5 @@ void NodeImportService::finish(const QString &error) {
     m_deadline.stop();
     if(!m_source.isEmpty()){if(error.isEmpty())m_errors.remove(m_source);else m_errors.insert(m_source,error);}
     if(!error.isEmpty())m_message=error;
-    m_source.clear();m_busy=false;emit changed();QTimer::singleShot(0,this,&NodeImportService::next);
+    m_source.clear();m_busy=false;m_nodesOnly=false;emit changed();QTimer::singleShot(0,this,&NodeImportService::next);
 }

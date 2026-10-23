@@ -36,6 +36,23 @@ class SubscriptionFormatTests:public QObject {
         return format==8||format==9?uri.toBase64():uri;
     }
 private slots:
+    void formatFixturesKeepProtocolOptionsDistinctAndRejectCrossProtocolFields(){
+        for(int format=0;format<17;++format){
+            const auto parsed=NodeImporter::parse(fixture(format,443,"synthetic-format-password"));
+            QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);
+            const auto &node=parsed.nodes.first();const bool trojan=node.protocol=="trojan";
+            if(trojan){QVERIFY(node.cipher.isEmpty());QCOMPARE(node.serverName,QString("localhost"));}
+            else {QCOMPARE(node.cipher,QString("aes-128-gcm"));QVERIFY(node.serverName.isEmpty());}
+            EngineStartOptions options;options.nodes=parsed.nodes;options.selectedNodeId=node.id;options.routingMode="global";
+            QJsonObject valid;const auto error=RustCoreEngine::configuration(options,&valid);QVERIFY2(error.isEmpty(),qPrintable(error));
+            // Keep inapplicable fields as explicit negative coverage. Correct
+            // fixtures must not rely on a converter silently deleting them.
+            if(trojan)options.nodes.first().cipher="aes-128-gcm";
+            else options.nodes.first().serverName="localhost";
+            const QJsonObject sentinel{{"unchanged",true}};QJsonObject rejected=sentinel;
+            QVERIFY(!RustCoreEngine::configuration(options,&rejected).isEmpty());QCOMPARE(rejected,sentinel);
+        }
+    }
     void normalizationPreservesSensitiveExtensions(){
         const auto result=NodeImporter::parse(R"({"outbounds":[{"tag":"extra","type":"vless","server":"edge.example.org","server_port":443,"uuid":"11111111-1111-4111-8111-111111111111","tls":{"enabled":true,"server_name":"edge.example.org"},"transport":{"type":"ws","path":"/socket","headers":{"Host":"edge.example.org"}},"multiplex":{"enabled":true},"unknown_secret":"private-test-only"}]})");
         QVERIFY2(bool(result),qPrintable(result.error));QCOMPARE(result.incompleteNodes,1);const auto n=result.nodes.first();

@@ -1,7 +1,7 @@
 name: Swirl Native Protocols X14
 on:
   push:
-    branches: [work/rust-native-protocols-x14a-20261022]
+    branches: [work/rust-native-protocols-x14a-20261022, work/subscription-unified-integration-20261023]
   workflow_dispatch:
 permissions:
   contents: read
@@ -14,11 +14,15 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 35
     env:
+      SWIRL_SOURCE_SHA: ${{ github.sha }}
       CARGO_INCREMENTAL: '0'
       CARGO_PROFILE_DEV_DEBUG: '0'
       CARGO_PROFILE_TEST_DEBUG: '0'
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
       - name: Install Rust tools
         run: rustup toolchain install stable --profile minimal --component rustfmt --component clippy
       - name: Format
@@ -41,12 +45,16 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 40
     env:
+      SWIRL_SOURCE_SHA: ${{ github.sha }}
       CARGO_INCREMENTAL: '0'
       CARGO_PROFILE_DEV_DEBUG: '0'
       CARGO_PROFILE_TEST_DEBUG: '0'
       PYTHONUTF8: '1'
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -68,7 +76,11 @@ jobs:
       - name: Set native client and evidence paths
         shell: python
         run: |
+          import hashlib
+          import json
           import os
+          import platform
+          import subprocess
           import sys
           from pathlib import Path
           root = Path.cwd()
@@ -109,6 +121,21 @@ jobs:
           with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as output:
               for name, value in values.items():
                   output.write(f'{name}={value}\n')
+          source = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          if source != os.environ['GITHUB_SHA']:
+              raise SystemExit('Native protocol checkout differs from the triggered commit')
+          clients = [values[key] for key in (
+              'HY2_CLIENT', 'HY2_LIFECYCLE_CLIENT', 'SWIRL_TUIC_CLIENT',
+              'SWIRL_TRANSPORT_CLIENT', 'SWIRL_BUILT_LIBRARY')]
+          identity = {
+              'source_sha': source, 'runner_os': os.environ['RUNNER_OS'],
+              'platform': platform.platform(),
+              'rustc': subprocess.check_output(['rustc', '-vV'], text=True),
+              'artifacts': {str(path.relative_to(root)): hashlib.sha256(path.read_bytes()).hexdigest()
+                            for path in clients},
+              'qt_product_acceptance': False,
+          }
+          (evidence / 'source.json').write_text(json.dumps(identity, indent=2) + '\n', encoding='utf-8')
       - name: VMess official Xray data and completed-response closure
         run: python tools/tests/test_vmess_xray.py
       - name: Hysteria2 official server including retained limitation probes
@@ -129,6 +156,28 @@ jobs:
           HY2_CONSTRAINED_STACK: '1'
           HY2_LIFECYCLE_EVIDENCE: ${{ github.workspace }}/out/native-interop/hysteria2-lifecycle-small-stack.json
         run: python -m unittest -v test_hysteria2_lifecycle
+      - name: Require original Hysteria2 methods and lifecycle evidence on this runner
+        if: ${{ !cancelled() }}
+        shell: python
+        run: |
+          import hashlib, json, os
+          from pathlib import Path
+          root = Path('out/native-interop')
+          identity = json.loads((root / 'source.json').read_text())
+          official = json.loads((root / 'hysteria2.json').read_text())
+          lifecycle = json.loads((root / 'hysteria2-lifecycle.json').read_text())
+          suite = official['suite']
+          assert identity['source_sha'] == os.environ['GITHUB_SHA']
+          assert identity['runner_os'] == os.environ['RUNNER_OS']
+          assert suite['expected_methods'] == suite['executed_methods'] == 17
+          assert suite['all_original_methods_passed'] and not (suite['failures'] or suite['errors'] or suite['skips'])
+          for report, variable in ((official, 'HY2_CLIENT'), (lifecycle, 'HY2_LIFECYCLE_CLIENT')):
+              path = Path(os.environ[variable])
+              assert report['client_sha256'] == hashlib.sha256(path.read_bytes()).hexdigest()
+          assert lifecycle['client_exit'] == 0 and lifecycle['result']['ok']
+          assert lifecycle['result']['cleanup_asserted_before_process_exit']
+          assert lifecycle['result']['same_runtime_reconnect']['alive_tasks_after_close'] == 0
+          print(os.environ['RUNNER_OS'] + ': exact-source HY2 17 methods and same-runtime cleanup/reconnect passed')
       - name: TUIC historical official reference including retained limitation probe
         if: ${{ !cancelled() }}
         run: python -m unittest -v test_tuic_reference
@@ -181,6 +230,6 @@ jobs:
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: native-protocol-interop-${{ matrix.os }}
+          name: native-protocol-interop-${{ matrix.os }}-${{ github.sha }}-${{ github.run_attempt }}
           path: out/native-interop
           if-no-files-found: warn

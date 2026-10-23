@@ -6,6 +6,7 @@
 #include <QMutex>
 #include <QMutexLocker>
 #include <QPointer>
+#include <QSemaphore>
 #include <QSignalSpy>
 #include <QSslCertificate>
 #include <QSslConfiguration>
@@ -15,6 +16,7 @@
 #include <QTcpServer>
 #include <QTemporaryDir>
 #include <QUrlQuery>
+#include <atomic>
 #include <functional>
 #include <memory>
 #include "engine/NodeImportService.h"
@@ -37,9 +39,10 @@ QByteArray configuration(const QString &name = QStringLiteral("HTTPS 下载节�
 // server's optional client certificate request, not the download client.
 class FixtureTrust final {
 public:
-    explicit FixtureTrust(bool trusted = true) : original(QSslConfiguration::defaultConfiguration()) {
+    explicit FixtureTrust(bool trusted = true,bool proxyLeaf = false) : original(QSslConfiguration::defaultConfiguration()) {
         QFile authorityFile(QStringLiteral(SWIRL_FIXTURE_DIR "/localhost-cert.pem"));
-        QFile certificateFile(QStringLiteral(SWIRL_FIXTURE_DIR "/xray-download-server-cert.pem"));
+        QFile certificateFile(proxyLeaf?QStringLiteral(SWIRL_FIXTURE_DIR "/xray-proxy-server-cert.pem"):
+            QStringLiteral(SWIRL_FIXTURE_DIR "/xray-download-server-cert.pem"));
         QFile keyFile(QStringLiteral(SWIRL_FIXTURE_DIR "/xray-download-server-key.pem"));
         if (!authorityFile.open(QIODevice::ReadOnly) || !certificateFile.open(QIODevice::ReadOnly)
             || !keyFile.open(QIODevice::ReadOnly)) return;
@@ -157,19 +160,68 @@ private:
     QList<QPointer<QSslSocket>> sockets;
 };
 
+// A real HTTP CONNECT proxy restricted to one synthetic authority. It never
+// resolves the requested name or connects outside loopback. The TLS bytes are
+// relayed unmodified, so the downloader still verifies the origin certificate.
+class ConnectProxyFixture final : public QTcpServer {
+public:
+    explicit ConnectProxyFixture(quint16 tlsPort):m_tlsPort(tlsPort) {
+        connect(this,&QTcpServer::newConnection,this,[this]{while(hasPendingConnections()){
+            auto *client=nextPendingConnection();m_clients.append(client);
+            auto header=std::make_shared<QByteArray>();auto handled=std::make_shared<bool>(false);
+            connect(client,&QTcpSocket::disconnected,this,[this,client]{++disconnections;client->deleteLater();});
+            connect(client,&QTcpSocket::readyRead,client,[this,client,header,handled]{
+                if(*handled)return;
+                header->append(client->readAll());if(header->size()>16384){client->abort();return;}
+                const auto end=header->indexOf("\r\n\r\n");if(end<0)return;
+                *handled=true;++connections;requests.append(header->left(end));
+                if(!header->startsWith("CONNECT subscription.example.invalid:443 HTTP/1.")){
+                    client->write("HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");client->disconnectFromHost();return;
+                }
+                auto *upstream=new QTcpSocket(client);upstream->setProxy(QNetworkProxy::NoProxy);
+                connect(client,&QTcpSocket::readyRead,upstream,[client,upstream]{upstream->write(client->readAll());});
+                connect(upstream,&QTcpSocket::readyRead,client,[client,upstream]{client->write(upstream->readAll());});
+                connect(client,&QTcpSocket::disconnected,upstream,&QTcpSocket::abort);
+                connect(upstream,&QTcpSocket::disconnected,client,&QTcpSocket::disconnectFromHost);
+                connect(upstream,&QTcpSocket::errorOccurred,client,[client]{client->abort();});
+                const auto tail=header->mid(end+4);
+                connect(upstream,&QTcpSocket::connected,client,[client,upstream,tail]{
+                    client->write("HTTP/1.1 200 Connection Established\r\n\r\n");
+                    if(!tail.isEmpty())upstream->write(tail);
+                });
+                upstream->connectToHost(QHostAddress::LocalHost,m_tlsPort);
+            });
+        }});
+    }
+    ~ConnectProxyFixture() override {
+        close();for(const auto &client:m_clients)if(client){client->disconnect(this);client->abort();}
+    }
+    QNetworkProxy proxy() const {return QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",serverPort());}
+    static QUrl remoteUrl(const QString &path="/config.json") {
+        QUrl url;url.setScheme("https");url.setHost("subscription.example.invalid");url.setPath(path);
+        QUrlQuery query;query.addQueryItem("token",Token);url.setQuery(query);return url;
+    }
+    int connections=0,disconnections=0;
+    QList<QByteArray> requests;
+private:
+    const quint16 m_tlsPort;
+    QList<QPointer<QTcpSocket>> m_clients;
+};
+
 struct ImportFixture {
     QTemporaryDir directory;
     NodeStore store{directory.filePath(QStringLiteral("nodes.dpapi"))};
-    NodeImportService service{&store};
+    NodeImportService service;
     QSignalSpy applied{&service, &NodeImportService::nodesApplied};
     int commits = 0;
     bool manualSource = false;
     NodeImporter::Result committed;
     QStringList messages;
-    ImportFixture() {
+    explicit ImportFixture(NodeImportService::SystemProxyResolver resolver={})
+        :service(&store,nullptr,{},60000,std::move(resolver)) {
         // This observer checks the explicit confirmation boundary. Real DPAPI
         // persistence is tested separately by XrayImportTests/XrayStoreTests.
-        service.setConfigurationApplier([this](const auto &result, const QString &source, QString *) {
+        service.setConfigurationApplier([this](const auto &result, const QString &source, bool, QString *) {
             ++commits;
             manualSource = source.isEmpty();
             committed = result;
@@ -308,6 +360,153 @@ private slots:
         QCOMPARE(server.requests, 0);
         QVERIFY(!import.service.message().isEmpty());
         verifyUnchanged(import);
+    }
+    void systemHttpProxyConnectPreservesTlsAndSameOriginRedirect() {
+        FixtureTrust trust(true,true);QVERIFY(trust.valid);HttpsFixture server(trust.server);
+        server.respond=[](QSslSocket *socket,const QByteArray &target){
+            if(target.startsWith("/first?"))HttpsFixture::reply(socket,{},302,"/final?token="+Token.toUtf8());
+            else HttpsFixture::reply(socket,configuration());
+        };
+        QVERIFY(server.listen(QHostAddress::LocalHost));ConnectProxyFixture proxy(server.serverPort());QVERIFY(proxy.listen(QHostAddress::LocalHost));
+        const auto queries=std::make_shared<std::atomic_int>(0),invalidQuery=std::make_shared<std::atomic_int>(0);
+        ImportFixture import([choice=proxy.proxy(),queries,invalidQuery](const QNetworkProxyQuery &query){
+            ++*queries;if(query.queryType()!=QNetworkProxyQuery::UrlRequest || query.url().host()!="subscription.example.invalid")++*invalidQuery;
+            return QList<QNetworkProxy>{choice};
+        });
+        const auto applicationProxy=QNetworkProxy::applicationProxy();
+        import.service.importUrl(ConnectProxyFixture::remoteUrl("/first"));QTRY_VERIFY_WITH_TIMEOUT(import.service.hasPreview(),10000);
+        QCOMPARE(server.requests,2);QCOMPARE(proxy.connections,2);QCOMPARE(queries->load(),2);QCOMPARE(invalidQuery->load(),0);
+        QCOMPARE(QNetworkProxy::applicationProxy(),applicationProxy);QCOMPARE(import.commits,0);
+        for(const auto &request:proxy.requests){QVERIFY(request.startsWith("CONNECT subscription.example.invalid:443 "));QVERIFY(!request.contains(Token.toUtf8()));}
+        QVERIFY(!import.publicState().contains(Token.toUtf8()));import.service.cancelImport();verifyUnchanged(import);
+    }
+    void systemProxyTunnelDoesNotDisableCertificateVerification() {
+        FixtureTrust trust(false,true);QVERIFY(trust.valid);HttpsFixture server(trust.server);
+        server.respond=[](QSslSocket *socket,const auto &){HttpsFixture::reply(socket,configuration());};
+        QVERIFY(server.listen(QHostAddress::LocalHost));ConnectProxyFixture proxy(server.serverPort());QVERIFY(proxy.listen(QHostAddress::LocalHost));
+        ImportFixture import([choice=proxy.proxy()](const auto &){return QList<QNetworkProxy>{choice};});
+        import.service.importUrl(ConnectProxyFixture::remoteUrl());QTRY_VERIFY_WITH_TIMEOUT(!import.service.busy(),10000);
+        QCOMPARE(proxy.connections,1);QVERIFY(server.handshakeStarts>=1);QCOMPARE(server.requests,0);verifyUnchanged(import);
+    }
+    void systemProxyRedirectCannotChangeOrigin() {
+        FixtureTrust trust(true,true);QVERIFY(trust.valid);HttpsFixture server(trust.server);
+        server.respond=[](QSslSocket *socket,const auto &){HttpsFixture::reply(socket,{},302,"https://other.example.invalid/private?token="+Token.toUtf8());};
+        QVERIFY(server.listen(QHostAddress::LocalHost));ConnectProxyFixture proxy(server.serverPort());QVERIFY(proxy.listen(QHostAddress::LocalHost));
+        const auto queries=std::make_shared<std::atomic_int>(0);
+        ImportFixture import([choice=proxy.proxy(),queries](const auto &){++*queries;return QList<QNetworkProxy>{choice};});
+        import.service.importUrl(ConnectProxyFixture::remoteUrl());QTRY_VERIFY_WITH_TIMEOUT(!import.service.busy(),10000);
+        QCOMPARE(proxy.connections,1);QCOMPARE(server.requests,1);QCOMPARE(queries->load(),1);
+        QVERIFY(import.service.message().contains(QStringLiteral("同一来源")));verifyUnchanged(import);
+    }
+#ifdef Q_OS_LINUX
+    void platformEnvironmentProxyUsesTheProductionResolver() {
+        FixtureTrust trust(true,true);QVERIFY(trust.valid);HttpsFixture server(trust.server);
+        server.respond=[](QSslSocket *socket,const auto &){HttpsFixture::reply(socket,configuration());};
+        QVERIFY(server.listen(QHostAddress::LocalHost));ConnectProxyFixture proxy(server.serverPort());QVERIFY(proxy.listen(QHostAddress::LocalHost));
+        // Qt's Linux platform resolver reads these process-local variables.
+        // Restore even on assertion failure; no desktop/system setting changes.
+        struct Environment {
+            struct Entry {QByteArray name,value;bool present;};QList<Entry> entries;
+            void set(const QByteArray &name,const QByteArray &value){entries.append({name,qgetenv(name.constData()),qEnvironmentVariableIsSet(name.constData())});qputenv(name.constData(),value);}
+            ~Environment(){for(const auto &entry:entries)if(entry.present)qputenv(entry.name.constData(),entry.value);else qunsetenv(entry.name.constData());}
+        } environment;
+        const auto endpoint="http://127.0.0.1:"+QByteArray::number(proxy.serverPort());
+        for(const auto *name:{"http_proxy","https_proxy","all_proxy","HTTP_PROXY","HTTPS_PROXY","ALL_PROXY"})environment.set(name,endpoint);
+        environment.set("no_proxy",{});environment.set("NO_PROXY",{});
+        ImportFixture import; // Deliberately no injected resolver.
+        import.service.importUrl(ConnectProxyFixture::remoteUrl());QTRY_VERIFY_WITH_TIMEOUT(import.service.hasPreview(),10000);
+        QCOMPARE(proxy.connections,1);QCOMPARE(server.requests,1);import.service.cancelImport();verifyUnchanged(import);
+    }
+#endif
+    void coreDownloadProxyHasPriorityAndStoppedCoreFallsBackToSystem() {
+        FixtureTrust trust(true,true);QVERIFY(trust.valid);HttpsFixture server(trust.server);
+        server.respond=[](QSslSocket *socket,const auto &){HttpsFixture::reply(socket,configuration());};
+        QVERIFY(server.listen(QHostAddress::LocalHost));ConnectProxyFixture core(server.serverPort()),system(server.serverPort());
+        QVERIFY(core.listen(QHostAddress::LocalHost));QVERIFY(system.listen(QHostAddress::LocalHost));
+        const auto queries=std::make_shared<std::atomic_int>(0);
+        ImportFixture import([choice=system.proxy(),queries](const auto &){++*queries;return QList<QNetworkProxy>{choice};});
+        import.service.setDownloadProxy(core.serverPort());import.service.importUrl(ConnectProxyFixture::remoteUrl());
+        QTRY_VERIFY_WITH_TIMEOUT(import.service.hasPreview(),10000);QCOMPARE(core.connections,1);QCOMPARE(system.connections,0);QCOMPARE(queries->load(),0);
+        import.service.cancelImport();import.service.setDownloadProxy(0);import.service.importUrl(ConnectProxyFixture::remoteUrl());
+        QTRY_VERIFY_WITH_TIMEOUT(import.service.hasPreview(),10000);QCOMPARE(core.connections,1);QCOMPARE(system.connections,1);QCOMPARE(queries->load(),1);
+        QCOMPARE(server.requests,2);import.service.cancelImport();verifyUnchanged(import);
+    }
+    void staleOwnSystemProxyIsRejectedBeforeConnecting_data() {
+        QTest::addColumn<bool>("captureRelay");QTest::newRow("core endpoint")<<false;QTest::newRow("owned capture relay")<<true;
+    }
+    void staleOwnSystemProxyIsRejectedBeforeConnecting() {
+        QFETCH(bool,captureRelay);
+        ConnectProxyFixture stale(0);QVERIFY(stale.listen(QHostAddress::LocalHost));
+        ImportFixture import([choice=stale.proxy()](const auto &){return QList<QNetworkProxy>{choice};});
+        if(captureRelay)import.service.rememberOwnedProxyPort(stale.serverPort());
+        else {import.service.setDownloadProxy(stale.serverPort());import.service.setDownloadProxy(0);}
+        QElapsedTimer elapsed;elapsed.start();import.service.importUrl(ConnectProxyFixture::remoteUrl());
+        QTRY_VERIFY_WITH_TIMEOUT(!import.service.busy(),3000);QVERIFY(elapsed.elapsed()<3000);QCOMPARE(stale.connections,0);
+        QVERIFY(import.service.message().contains(QStringLiteral("已停止的 Swirl")));verifyUnchanged(import);
+    }
+    void staleOwnSystemProxyDoesNotDiscardOtherSystemAlternatives() {
+        FixtureTrust trust(true,true);QVERIFY(trust.valid);HttpsFixture server(trust.server);
+        server.respond=[](QSslSocket *socket,const auto &){HttpsFixture::reply(socket,configuration());};
+        QVERIFY(server.listen(QHostAddress::LocalHost));ConnectProxyFixture stale(0),system(server.serverPort());
+        QVERIFY(stale.listen(QHostAddress::LocalHost));QVERIFY(system.listen(QHostAddress::LocalHost));
+        ImportFixture import([first=stale.proxy(),second=system.proxy()](const auto &){return QList<QNetworkProxy>{first,second};});
+        import.service.setDownloadProxy(stale.serverPort());import.service.setDownloadProxy(0);import.service.importUrl(ConnectProxyFixture::remoteUrl());
+        QTRY_VERIFY_WITH_TIMEOUT(import.service.hasPreview(),10000);QCOMPARE(stale.connections,0);QCOMPARE(system.connections,1);QCOMPARE(server.requests,1);
+        import.service.cancelImport();verifyUnchanged(import);
+    }
+    void loopbackHttpBypassesSystemAndCoreProxies() {
+        QTcpServer source;int requests=0;
+        connect(&source,&QTcpServer::newConnection,&source,[&]{while(source.hasPendingConnections()){
+            auto *socket=source.nextPendingConnection();connect(socket,&QTcpSocket::disconnected,socket,&QObject::deleteLater);
+            connect(socket,&QTcpSocket::readyRead,socket,[&,socket]{
+                auto bytes=socket->property("request").toByteArray()+socket->readAll();socket->setProperty("request",bytes);
+                if(!bytes.contains("\r\n\r\n")||socket->property("done").toBool())return;
+                socket->setProperty("done",true);++requests;const auto body=configuration();
+                socket->write("HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: "+QByteArray::number(body.size())+"\r\n\r\n"+body);socket->disconnectFromHost();
+            });
+        }});
+        QVERIFY(source.listen(QHostAddress::LocalHost));ConnectProxyFixture proxy(0);QVERIFY(proxy.listen(QHostAddress::LocalHost));
+        const auto queries=std::make_shared<std::atomic_int>(0);
+        ImportFixture import([choice=proxy.proxy(),queries](const auto &){++*queries;return QList<QNetworkProxy>{choice};});
+        import.service.setDownloadProxy(proxy.serverPort());import.service.importUrl(QUrl(QString("http://127.0.0.1:%1/config").arg(source.serverPort())));
+        QTRY_VERIFY_WITH_TIMEOUT(import.service.hasPreview(),10000);QCOMPARE(requests,1);QCOMPARE(proxy.connections,0);QCOMPARE(queries->load(),0);
+        import.service.cancelImport();verifyUnchanged(import);
+    }
+    void cancellationClosesSystemProxyTunnelAndAllowsRetry() {
+        FixtureTrust trust(true,true);QVERIFY(trust.valid);HttpsFixture server(trust.server);const auto body=configuration();
+        server.respond=[&](QSslSocket *socket,const QByteArray &target){
+            if(target.startsWith("/fresh?")){HttpsFixture::reply(socket,body);return;}
+            socket->write("HTTP/1.1 200 OK\r\nContent-Length: "+QByteArray::number(body.size())+"\r\nConnection: keep-alive\r\n\r\n"+body.left(body.size()/2));socket->flush();
+        };
+        QVERIFY(server.listen(QHostAddress::LocalHost));ConnectProxyFixture proxy(server.serverPort());QVERIFY(proxy.listen(QHostAddress::LocalHost));
+        ImportFixture import([choice=proxy.proxy()](const auto &){return QList<QNetworkProxy>{choice};});
+        import.service.importUrl(ConnectProxyFixture::remoteUrl("/slow"));QTRY_COMPARE_WITH_TIMEOUT(server.requests,1,10000);
+        import.service.cancelImport();verifyUnchanged(import);QTRY_COMPARE_WITH_TIMEOUT(proxy.disconnections,1,5000);
+        QTRY_COMPARE_WITH_TIMEOUT(server.disconnections,1,5000);
+        import.service.importUrl(ConnectProxyFixture::remoteUrl("/fresh"));QTRY_VERIFY_WITH_TIMEOUT(import.service.hasPreview(),10000);
+        QCOMPARE(proxy.connections,2);QCOMPARE(server.requests,2);import.service.cancelImport();verifyUnchanged(import);
+    }
+    void systemProxyLookupIsCancellableAndBounded_data() {
+        QTest::addColumn<bool>("timeout");QTest::newRow("cancel")<<false;QTest::newRow("total deadline")<<true;
+    }
+    void systemProxyLookupIsCancellableAndBounded() {
+        QFETCH(bool,timeout);FixtureTrust trust(true,true);QVERIFY(trust.valid);HttpsFixture server(trust.server);
+        server.respond=[](QSslSocket *socket,const auto &){HttpsFixture::reply(socket,configuration());};
+        QVERIFY(server.listen(QHostAddress::LocalHost));ConnectProxyFixture proxy(server.serverPort());QVERIFY(proxy.listen(QHostAddress::LocalHost));
+        const auto gate=std::make_shared<QSemaphore>();const auto entered=std::make_shared<std::atomic_bool>(false),returned=std::make_shared<std::atomic_bool>(false);
+        struct Release {std::shared_ptr<QSemaphore> gate;~Release(){gate->release();}} release{gate};
+        ImportFixture import([choice=proxy.proxy(),gate,entered,returned](const auto &){
+            entered->store(true);gate->acquire();returned->store(true);return QList<QNetworkProxy>{choice};
+        });
+        import.service.importUrl(ConnectProxyFixture::remoteUrl());QTRY_VERIFY_WITH_TIMEOUT(entered->load(),3000);
+        if(timeout){QTRY_VERIFY_WITH_TIMEOUT(!import.service.busy(),35000);QVERIFY(import.service.message().contains(QStringLiteral("30 秒")));}
+        else import.service.cancelImport();
+        verifyUnchanged(import);QCOMPARE(proxy.connections,0);
+        // The canceled platform query may still return. A new authorized
+        // runtime request must not inherit or be overwritten by that result.
+        import.service.setDownloadProxy(proxy.serverPort());import.service.importUrl(ConnectProxyFixture::remoteUrl());
+        gate->release();QTRY_VERIFY_WITH_TIMEOUT(returned->load(),3000);QTRY_VERIFY_WITH_TIMEOUT(import.service.hasPreview(),10000);
+        QCOMPARE(proxy.connections,1);QCOMPARE(server.requests,1);import.service.cancelImport();verifyUnchanged(import);
     }
     void sameOriginRelativeRedirectPreservesAuthorizedRequest() {
         FixtureTrust trust; QVERIFY(trust.valid);

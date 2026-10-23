@@ -1,4 +1,7 @@
 #include "engine/TelemetryService.h"
+#include "engine/EngineController.h"
+#include <QElapsedTimer>
+#include <QScopeGuard>
 #include <QTest>
 #include <QSignalSpy>
 #include <QTemporaryDir>
@@ -11,10 +14,143 @@
 #include "engine/ThreadedEngine.h"
 #include <QUuid>
 #include <QJsonDocument>
+class PulseEngine final:public ProxyEngine {
+public:
+ Status current;
+ void start(const EngineStartOptions &) override {}
+ void stop() override {}
+ void refresh() override {emit statusChanged();}
+ void selectNode(const QString &) override {}
+ void probeNode(const QUrl &) override {}
+ Status status() const override {return current;}
+ QString configurationSummary() const override {return {};}
+};
 class TelemetryTests:public QObject {
  Q_OBJECT
  ProxyEngine::Status sample(qint64 time,int up,int down){ProxyEngine::Status s;s.processAlive=true;s.processId=1;s.apiHealthy=true;s.connectionsAt=time;s.trafficAt=time;s.uploadTotal=up;s.downloadTotal=down;s.uploadRate=up;s.downloadRate=down;s.connections={QVariantMap{{"id","connection-a"},{"host","fixture.test"},{"process","fixture.exe"},{"policy","DIRECT"},{"category","direct"},{"uploadBytes",up},{"downloadBytes",down},{"time",QDateTime::fromMSecsSinceEpoch(time).toString(Qt::ISODateWithMs)}}};return s;}
 private slots:
+  void controllerPublishesOneStatusChangePerEnginePulse(){
+   QTemporaryDir temp;auto engine=std::make_unique<PulseEngine>();auto *pulse=engine.get();
+   EngineController controller(std::move(engine),nullptr,temp.filePath("nodes.dpapi"));
+   QSignalSpy controllerChanges(&controller,&EngineController::statusChanged);
+   QSignalSpy telemetryChanges(controller.telemetry(),&TelemetryService::changed);
+   pulse->refresh();
+   QCOMPARE(telemetryChanges.size(),1);QCOMPARE(controllerChanges.size(),1);
+   pulse->refresh();
+   QCOMPARE(telemetryChanges.size(),2);QCOMPARE(controllerChanges.size(),2);
+   controller.telemetry()->ingest({});
+   QCOMPARE(telemetryChanges.size(),3);QCOMPARE(controllerChanges.size(),3);
+  }
+  void nodeRowsNotifyOnlyForRelevantEngineStatus(){
+   QTemporaryDir temp;auto engine=std::make_unique<PulseEngine>();auto *pulse=engine.get();
+   EngineController controller(std::move(engine),nullptr,temp.filePath("nodes.dpapi"));
+   const auto saved=controller.saveNode({{"name","fixture"},{"protocol","http"},{"host","127.0.0.1"},{"port",9}});
+#ifdef Q_OS_WIN
+   QVERIFY(saved);const auto id=controller.nodes().first().toMap().value("id").toString();QVERIFY(!id.isEmpty());
+#else
+   // Non-Windows storage intentionally fails closed. Exercise every display
+   // invalidation transition without inventing an unencrypted saved catalogue.
+   QVERIFY(!saved);QVERIFY(controller.nodes().isEmpty());const QString id="fixture";
+#endif
+   const auto verifyRow=[&](const QString &status){
+#ifdef Q_OS_WIN
+    QCOMPARE(controller.nodes().first().toMap().value("status").toString(),status);
+    QCOMPARE(controller.nodes().first().toMap().value("latency").toString(),QStringLiteral("—"));
+#else
+    Q_UNUSED(status);QVERIFY(controller.nodes().isEmpty());
+#endif
+   };
+   QSignalSpy rows(&controller,&EngineController::nodesChanged);
+   pulse->refresh();pulse->refresh();QCOMPARE(rows.size(),0);
+   pulse->current.uptimeSeconds=10;pulse->current.uploadTotal=100;
+   pulse->refresh();QCOMPARE(rows.size(),0);
+   pulse->current.processAlive=true;pulse->current.apiHealthy=true;pulse->current.selectedNodeId=id;
+   pulse->current.nodeHealth=ProxyEngine::NodeHealth::Checking;pulse->current.latencyMs=42;
+   pulse->refresh();QCOMPARE(rows.size(),1);verifyRow(QStringLiteral("正在真实检测"));
+   pulse->current.nodeHealth=ProxyEngine::NodeHealth::Available;
+   pulse->refresh();QCOMPARE(rows.size(),2);verifyRow(QStringLiteral("节点可用"));
+   pulse->current.latencyMs=50;pulse->refresh();QCOMPARE(rows.size(),2);verifyRow(QStringLiteral("节点可用"));
+   const auto beforeDirect=rows.size();pulse->current.directSession=true;pulse->refresh();
+   QCOMPARE(rows.size(),beforeDirect+1);verifyRow(QStringLiteral("直接连接"));
+   pulse->current.apiHealthy=false;pulse->refresh();QCOMPARE(rows.size(),beforeDirect+2);verifyRow(QStringLiteral("节点可用"));
+   pulse->current.selectedNodeId.clear();pulse->refresh();QCOMPARE(rows.size(),beforeDirect+3);verifyRow(QStringLiteral("未连接"));
+  }
+  void stalePollingPublishesOnlySamplingTransitions(){
+   QTemporaryDir temp;TelemetryService model(temp.filePath("stale.json"),false);model.m_stale.stop();
+   QSignalSpy changes(&model,&TelemetryService::changed);
+   auto poll=[&]{QVERIFY(QMetaObject::invokeMethod(&model.m_stale,"timeout",Qt::DirectConnection));};
+   poll();poll();QCOMPARE(changes.size(),0);
+   model.ingest(sample(QDateTime::currentMSecsSinceEpoch(),0,0));
+   QCOMPARE(changes.size(),1);QVERIFY(model.sampled());QVERIFY(model.connectionsSampled());
+   poll();poll();QCOMPARE(changes.size(),1);
+   model.m_status.trafficAt=QDateTime::currentMSecsSinceEpoch()-7000;
+   poll();QCOMPARE(changes.size(),2);QVERIFY(!model.sampled());QVERIFY(model.connectionsSampled());
+   poll();QCOMPARE(changes.size(),2);
+   model.m_status.connectionsAt=QDateTime::currentMSecsSinceEpoch()-7000;
+   poll();QCOMPARE(changes.size(),3);QVERIFY(!model.connectionsSampled());
+   poll();poll();QCOMPARE(changes.size(),3);
+  }
+ void httpsMeasurementWaitsForCompleteResponse(){
+  QTemporaryDir temp;TelemetryService model(temp.filePath("https-timing.json"),false);
+  QFile cert(QString::fromUtf8(SWIRL_FIXTURE_DIR)+"/localhost-cert.pem"),key(QString::fromUtf8(SWIRL_FIXTURE_DIR)+"/localhost-key.pem");
+  QVERIFY(cert.open(QIODevice::ReadOnly));QVERIFY(key.open(QIODevice::ReadOnly));
+  const QSslCertificate certificate(cert.readAll());auto serverTls=QSslConfiguration::defaultConfiguration();
+  serverTls.setLocalCertificate(certificate);serverTls.setPrivateKey(QSslKey(key.readAll(),QSsl::Rsa));
+  serverTls.setPeerVerifyMode(QSslSocket::VerifyNone);serverTls.setAllowedNextProtocols({QByteArray("http/1.1")});
+  QSslServer origin;origin.setSslConfiguration(serverTls);QVERIFY(origin.listen(QHostAddress::LocalHost,0));
+  const auto original=QSslConfiguration::defaultConfiguration();auto trusted=original;trusted.addCaCertificate(certificate);
+  const auto restore=qScopeGuard([&]{QSslConfiguration::setDefaultConfiguration(original);});
+  QSslConfiguration::setDefaultConfiguration(trusted);
+  QPointer<QTcpSocket> pending;QByteArray request;
+  connect(&origin,&QTcpServer::pendingConnectionAvailable,&origin,[&]{
+   auto *socket=origin.nextPendingConnection();pending=socket;connect(socket,&QTcpSocket::disconnected,socket,&QObject::deleteLater);
+   connect(socket,&QTcpSocket::readyRead,&origin,[&,socket]{request+=socket->readAll();});
+   request+=socket->readAll();
+  });
+  model.m_measurements=1;model.measureHttp("internet",QUrl(QString("https://127.0.0.1:%1/timing").arg(origin.serverPort())),false);
+  QTRY_VERIFY_WITH_TIMEOUT(request.contains("\r\n\r\n"),5000);QVERIFY(request.startsWith("GET /timing HTTP/1.1"));
+  pending->write("HTTP/1.1 200 OK\r\nContent-Length: 4\r\nConnection: close\r\n\r\n");
+  QElapsedTimer bodyDelay;bodyDelay.start();QTest::qWait(100);
+  // The diagnostic measures QNetworkReply completion, not TCP/TLS handshake
+  // or HTTP headers. A response whose body is withheld must remain pending.
+  QCOMPARE(model.m_measurements,1);QVERIFY(model.internetDiagnostic().isEmpty());
+  const auto withheldMs=bodyDelay.elapsed();pending->write("done");pending->disconnectFromHost();
+  QTRY_COMPARE_WITH_TIMEOUT(model.m_measurements,0,3000);
+  const auto result=model.internetDiagnostic();QVERIFY(result.value("success").toBool());
+  QVERIFY(result.value("elapsedMs").toLongLong()>=withheldMs);
+  QCOMPARE(model.latencies().value("internet").toString(),QString::number(result.value("elapsedMs").toLongLong())+" ms");
+  QVERIFY(result.value("advice").toString().contains(QStringLiteral("连接、TLS 与目标响应")));
+ }
+#ifdef SWIRL_USE_RUST_CORE
+ void nativeNodeProbeKeepsOutboundAndHeaderDurationsSeparate(){
+  ControlledNetwork net;QVERIFY(net.start());QTcpServer origin;QVERIFY(origin.listen(QHostAddress::LocalHost,0));
+  net.a.targetPorts.append(origin.serverPort());QPointer<QTcpSocket> pending;QByteArray request;
+  connect(&origin,&QTcpServer::newConnection,&origin,[&]{
+   auto *socket=origin.nextPendingConnection();pending=socket;connect(socket,&QTcpSocket::disconnected,socket,&QObject::deleteLater);
+   connect(socket,&QTcpSocket::readyRead,&origin,[&,socket]{request+=socket->readAll();});
+   request+=socket->readAll();
+  });
+  EngineStartOptions options;ProxyNode node;node.id="timing-fixture";node.name="Timing fixture";node.protocol="socks5";node.host="127.0.0.1";node.port=net.a.serverPort();options.nodes={node};
+  NodeTestService probes;const QUrl url(QString("http://127.0.0.1:%1/timing").arg(origin.serverPort()));
+  probes.start(options,{node.id},url);QTRY_VERIFY_WITH_TIMEOUT(request.contains("\r\n\r\n"),5000);
+  QVERIFY(request.startsWith("HEAD /timing HTTP/1.1"));QElapsedTimer headerDelay;headerDelay.start();QTest::qWait(100);
+  QVERIFY(probes.busy());QVERIFY(probes.result(node.id).isEmpty());const auto withheldMs=headerDelay.elapsed();
+  // A HEAD response completes at headers; the declared body is never sent.
+  pending->write("HTTP/1.1 200 OK\r\nContent-Length: 1000\r\nConnection: close\r\n\r\n");
+  QTRY_VERIFY_WITH_TIMEOUT(!probes.busy(),5000);const auto result=probes.result(node.id);
+  QVERIFY2(result.value("success").toBool(),qPrintable(result.value("error").toString()));
+  QCOMPARE(result.value("metricType").toString(),QString("http_headers"));
+  const auto outbound=result.value("outboundConnectMs").toLongLong(),headers=result.value("latency").toLongLong();
+  QVERIFY(outbound>=0);QVERIFY(headers>outbound);QVERIFY(headers>=withheldMs);
+  QCOMPARE(result.value("originTlsMs").toLongLong(),qint64(-1));QCOMPARE(net.a.forwarded,1);
+  request.clear();probes.start(options,{node.id},url);QTRY_VERIFY_WITH_TIMEOUT(request.contains("\r\n\r\n"),5000);
+  pending->write("HTTP/1.1 503 Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");pending->disconnectFromHost();
+  QTRY_VERIFY_WITH_TIMEOUT(!probes.busy(),5000);const auto failed=probes.result(node.id);
+  QVERIFY(!failed.value("success").toBool());QCOMPARE(failed.value("latency").toLongLong(),qint64(-1));
+  QCOMPARE(failed.value("outboundConnectMs").toLongLong(),qint64(-1));QCOMPARE(net.a.forwarded,2);
+ }
+#endif
+
  void httpsMeasurementStaysHttp1WhenOriginOffersHttp2(){
   const auto original=QSslConfiguration::defaultConfiguration();
   struct RestoreSsl {QSslConfiguration value;~RestoreSsl(){QSslConfiguration::setDefaultConfiguration(value);}} restore{original};

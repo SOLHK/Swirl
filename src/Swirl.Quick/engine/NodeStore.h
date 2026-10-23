@@ -11,6 +11,8 @@
 struct NodeSubscription {
     QString id, name;
     QString formatHint="auto";
+    // Preserve the existing full-profile behavior for old snapshots and callers.
+    QString importScope="full-profile";
     QUrl url; // Token-bearing URL is DPAPI protected and never exposed to QML.
     int intervalMinutes=360;
     bool enabled=true;
@@ -36,8 +38,9 @@ public:
     bool select(const QString &id);
     QList<NodeSubscription> subscriptions() const { return m_subscriptions; }
     QVariantList publicSubscriptions() const;
-    bool saveSubscription(const QString &id, const QString &name, const QUrl &url, int intervalMinutes, bool enabled,const QString &formatHint={});
+    bool saveSubscription(const QString &id, const QString &name, const QUrl &url, int intervalMinutes, bool enabled,const QString &formatHint={},const QString &importScope={});
     static QStringList subscriptionFormats(){return {"auto","loon","shadowrocket","surge","quantumult-x","sing-box","xray-v2ray-json"};}
+    static QStringList subscriptionScopes(){return {"full-profile","nodes-only"};}
     bool removeSubscription(const QString &id);
     // A prepared import is immutable outside this store. Names/parse IDs map to
     // the final stable UUIDs before any policy configuration is compiled.
