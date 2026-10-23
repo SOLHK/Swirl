@@ -4,6 +4,10 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 find_package(Qt6 6.9 REQUIRED COMPONENTS Core Gui Network Test)
+if(NOT SWIRL_TEST_PYTHON)
+ find_package(Python3 3.9 REQUIRED COMPONENTS Interpreter)
+ set(SWIRL_TEST_PYTHON "${Python3_EXECUTABLE}")
+endif()
 enable_testing()
 
 get_filename_component(SWIRL_QUICK_SOURCE "${CMAKE_CURRENT_LIST_DIR}/../.." ABSOLUTE)
@@ -26,7 +30,8 @@ add_executable(SwirlQtNetworkPolicyTests
 target_include_directories(SwirlQtNetworkPolicyTests PRIVATE "${SWIRL_QUICK_SOURCE}")
 target_compile_definitions(SwirlQtNetworkPolicyTests PRIVATE
  SWIRL_USE_RUST_CORE
- SWIRL_FIXTURE_DIR="${SWIRL_QUICK_SOURCE}/tests/fixtures")
+ SWIRL_TEST_PYTHON="${SWIRL_TEST_PYTHON}"
+ SWIRL_TLS_FIXTURE_SCRIPT="${CMAKE_CURRENT_LIST_DIR}/tls_origin.py")
 target_link_libraries(SwirlQtNetworkPolicyTests PRIVATE Qt6::Core Qt6::Gui Qt6::Network Qt6::Test)
 if(WIN32)
  target_compile_definitions(SwirlQtNetworkPolicyTests PRIVATE NOMINMAX)

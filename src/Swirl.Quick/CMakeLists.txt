@@ -311,9 +311,12 @@ if(SWIRL_BUILD_UI_TESTS)
  add_test(NAME swirl-stream-regression COMMAND SwirlNetworkRegressionTests -o stream-regression.txt,txt)
  set_tests_properties(swirl-stream-regression PROPERTIES TIMEOUT 180)
  add_executable(SwirlImportTests tests/ImportTests.cpp tests/ControlledNetwork.h)
+ find_package(Python3 3.9 REQUIRED COMPONENTS Interpreter)
  add_executable(SwirlQtNetworkPolicyTests tests/QtNetworkPolicyTests.cpp)
  target_link_libraries(SwirlQtNetworkPolicyTests PRIVATE SwirlEngine Qt6::Test)
- target_compile_definitions(SwirlQtNetworkPolicyTests PRIVATE SWIRL_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
+ target_compile_definitions(SwirlQtNetworkPolicyTests PRIVATE
+  SWIRL_TEST_PYTHON="${Python3_EXECUTABLE}"
+  SWIRL_TLS_FIXTURE_SCRIPT="${CMAKE_CURRENT_SOURCE_DIR}/tests/qt-network/tls_origin.py")
  if(MSVC)
   target_compile_options(SwirlQtNetworkPolicyTests PRIVATE /utf-8)
  endif()

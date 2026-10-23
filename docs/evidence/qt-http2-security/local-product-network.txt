@@ -1,12 +1,12 @@
 Test project /workspace/scratch/3a49b1a53628/Swirl-qt-http2/build/product
     Start  8: swirl-telemetry-accounting
-1/2 Test  #8: swirl-telemetry-accounting .......   Passed    1.50 sec
+1/2 Test  #8: swirl-telemetry-accounting .......   Passed    1.53 sec
     Start 12: swirl-qt-network-policy
-2/2 Test #12: swirl-qt-network-policy ..........   Passed    0.65 sec
+2/2 Test #12: swirl-qt-network-policy ..........   Passed    2.33 sec
 
 100% tests passed out of 2
 
 Label Time Summary:
-security    =   0.65 sec*proc (1 test)
+security    =   2.33 sec*proc (1 test)
 
-Total Test time (real) =   2.15 sec
+Total Test time (real) =   3.87 sec

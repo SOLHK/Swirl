@@ -79,9 +79,36 @@ HTTPS redirect/downgrade and redirect-loop tests, as well as telemetry and captu
 regressions. The capture tests retain concurrent inbound HTTP/2 streams and a
 3 MiB response while requiring HTTP/1.1 at the Qt upstream destination.
 
+### Native TLS backend coverage
+
+The first CI run, [39891955000](https://github.com/SOLHK/Swirl/actions/runs/39891955000),
+tested commit `8cf8d9ed93a38816ba09112ab485911e29480fca`. Windows and Linux
+downloader jobs passed, but macOS reported 4 passed / 6 failed / 0 skipped.
+That failure is retained in the run's artifacts. Qt's SecureTransport backend
+does not implement server-side ALPN, so using `QSslServer` on that backend
+cannot provide the required HTTP/2 positive control. The original long-lived
+self-signed fixture also lacks the serverAuth EKU required by Apple's server
+certificate rules; the initial log does not establish the sole cause of the
+other handshake failures.
+
+The downloader suite therefore uses an independent Python/OpenSSL TLS server
+on all three platforms. The Qt client still uses its platform's native backend.
+A temporary CA signs a short-lived leaf with serverAuth, CA:false and loopback
+SANs; only the test process trusts the CA. No system trust store is modified,
+no SSL errors are ignored, and missing TLS/ALPN capability is a test failure.
+Python and `cryptography==50.0.2` are test-only dependencies, not shipped
+application dependencies.
+
+The platform matrix covers the real downloader, parser and policy. Full
+application regressions run on Windows. A local attempt to build all existing
+UI-test drivers on Linux stopped at the pre-existing D3D11-only
+`MaterialChecks.cpp` include; the separately built production-linked downloader
+and telemetry targets passed. No claim of a complete Linux UI build is made.
+
 Run the portable test with:
 
 ```sh
+python -m pip install cryptography==50.0.2
 cmake -S src/Swirl.Quick/tests/qt-network -B build/qt-network -DCMAKE_BUILD_TYPE=Release
 cmake --build build/qt-network --config Release --parallel 2
 ctest --test-dir build/qt-network -C Release --output-on-failure
@@ -99,6 +126,9 @@ are refreshed, exposed or committed.
 - [Qt request attribute semantics](https://doc.qt.io/qt-6/qnetworkrequest.html#Attribute-enum)
 - [Qt 6.10.3 request and redirect implementation](https://github.com/qt/qtbase/blob/v6.10.3/src/network/access/qnetworkreplyhttpimpl.cpp)
 - [Qt 6.10.3 connection type and ALPN selection](https://github.com/qt/qtbase/blob/v6.10.3/src/network/access/qhttpthreaddelegate.cpp)
+- [Qt TLS backend capability limits](https://doc.qt.io/qt-6.10/qssl.html#SupportedFeature-enum)
+- [Apple TLS server certificate requirements](https://support.apple.com/en-us/103769)
+- [Python's OpenSSL-backed TLS server and ALPN API](https://docs.python.org/3/library/ssl.html)
 
 These primary upstream references were reviewed before implementation. No
 upstream implementation code or exploit was copied. Dependency follow-up remains
