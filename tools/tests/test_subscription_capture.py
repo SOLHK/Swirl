@@ -333,8 +333,15 @@ class CaptureTests(unittest.TestCase):
         self.assertEqual(report['nativeTcpCandidates'], 1)
         self.assertEqual(report['encryptedSaveReload'], 'passed')
         self.assertTrue(report['inputUnchanged'])
-        self.assertEqual(report['cases'][1]['conversionIssueCodes'], ['TcpUriTransportOptionsUnsupported'])
+        self.assertEqual(report['cases'][0]['reasonCode'], 'TcpCandidateNotYetVerified')
+        self.assertEqual(report['cases'][0]['conversionIssueCodes'], [])
+        self.assertTrue(report['cases'][0]['nativeTcpCandidate'])
+        self.assertEqual(report['cases'][1]['conversionIssueCodes'],
+                         ['TcpUriTransportOptionsUnsupported', 'TcpTransportOptionsUnsupported'])
+        self.assertEqual(report['cases'][1]['reasonCode'], 'UnmappedOrInvalidParameters')
+        self.assertFalse(report['cases'][1]['nativeTcpCandidate'])
         self.assertEqual(report['cases'][2]['reasonCode'], 'RealityFingerprintUnsupported')
+        self.assertFalse(report['cases'][2]['nativeTcpCandidate'])
         encrypted_before = store_path.read_bytes()
         for secret in [credential.encode(), key.encode(), b'PRIVATE_', b'private-origin.invalid']:
             self.assertNotIn(secret, encrypted_before)
@@ -344,7 +351,11 @@ class CaptureTests(unittest.TestCase):
         self.assertEqual(reloaded['encryptedSaveReload'], 'reload-only')
         self.assertEqual(store_path.read_bytes(), encrypted_before)
         self.assertFalse(Path(str(store_path)+'.selected').exists())
-        for case in reloaded['cases']:
+        self.assertEqual(len(reloaded['cases']), len(report['cases']))
+        for original, case in zip(report['cases'], reloaded['cases']):
+            self.assertEqual(case['conversionIssueCodes'], original['conversionIssueCodes'])
+            self.assertEqual(case['reasonCode'], original['reasonCode'])
+            self.assertEqual(case['nativeTcpCandidate'], original['nativeTcpCandidate'])
             self.assertEqual(case['stages']['qtNodeStoreReload'], 'passed')
             self.assertEqual(case['stages']['sourceRemapping'], 'passed')
             for stage in ('runtimeStart', 'proxyConnect', 'realityConnection', 'realityAuthentication', 'vision', 'visionDirect', 'http', 'https'):

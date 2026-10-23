@@ -193,3 +193,23 @@ That component result is separate from Qt 6.11.3 Windows product acceptance.
 The actual Windows test is added to the new fixture workflow; the root product
 workflow executes fresh-directory and repeat-same-directory production launches.
 Those launches verify restart behavior and do not by themselves prove cache hits.
+
+## Final source rechecks
+
+[U1-final-source-recheck.json](U1-final-source-recheck.json) records 48 branch
+heads at 05:44 UTC. The extra branch is the isolated public-close diagnostic;
+its collection-only workflow is not product implementation. Activity V7 advanced
+to `537221d61f74df631d7122ff4d99ae1100c2711d`; all changed source was inspected
+and remained visual-only, so it was excluded.
+
+After the execution environment was replaced, a fresh GitHub read and independent
+clone confirmed the U1 head was still `1cd5a84315360c007fcca16c14752d0bc82c9f32`.
+[U1-resumed-source-recheck.json](U1-resumed-source-recheck.json) pins all 49 heads.
+Activity V7's four new commits only change preview version, Theme and the rounded
+glass surface. The new Liquid Glass branch adds six visual/preview delivery
+commits and no new engine changes relative to that Activity head. Its earlier
+`bbb4ea33d3a3ae596027b840af630260ba6bdbcc` product/import/latency changes were
+already independently reviewed and resolved above. New visuals, preview-version
+changes and the separate isolated preview installer are not merged into U1.
+All other relevant subscription/Core source heads are unchanged. Historical
+snapshot SHAs remain historical and are not silently relabeled as current.

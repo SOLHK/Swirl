@@ -110,6 +110,42 @@ jobs:
           -DSWIRL_RUST_TARGET="${{ github.workspace }}/core/target"
       - name: Build actual Qt production importer and tests
         run: cmake --build build/xray-qt --config Release --parallel 2
+      - name: Use the complete Windows product Rust DLL as the test input
+        if: runner.os == 'Windows'
+        run: |
+          python - <<'PY'
+          import hashlib, json, os, pathlib, re, shutil
+
+          product = pathlib.Path('build/xray-app/Release')
+          tests = pathlib.Path('build/xray-qt/bin')
+          source = os.environ['GITHUB_SHA']
+          expected = json.loads(pathlib.Path('build/xray-qt/swirl-rust-build.json').read_text())
+          for folder in (product, tests):
+              identity = json.loads((folder / 'swirl-rust-build.json').read_text())
+              if (identity != expected or identity.get('source_sha') != source
+                      or identity.get('abi_version') != 1
+                      or identity.get('target') != 'x86_64-pc-windows-msvc'
+                      or not re.fullmatch('[0-9a-f]{64}', identity.get('build_id', ''))):
+                  raise SystemExit('Product and importer compile-time Rust identities differ')
+          digest = lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
+          runtime = product / 'swirl_api.dll'
+          test_runtime = tests / 'swirl_api.dll'
+          report = {'schema': 1, 'source_sha': source, 'rust': expected,
+                    'product_exe_sha256': digest(product / 'Swirl.exe'),
+                    'product_dll_sha256': digest(runtime),
+                    'importer_generated_dll_sha256': digest(test_runtime),
+                    'staged_before_tests': True}
+          # Separate MSBuild invocations can rebuild native Cargo dependencies.
+          # Test the DLL already shipped with Swirl, before any Qt/network test;
+          # never replace the product after tests or relax the final hash gate.
+          shutil.copyfile(runtime, test_runtime)
+          report['test_input_dll_sha256'] = digest(test_runtime)
+          if report['test_input_dll_sha256'] != report['product_dll_sha256']:
+              raise SystemExit('Product Rust DLL was not staged as the actual test input')
+          pathlib.Path('build/xray-qt/product-runtime-input.json').write_text(
+              json.dumps(report, indent=2) + '\n', encoding='utf-8')
+          print(json.dumps(report))
+          PY
       - name: Deploy Windows Qt test runtime
         if: runner.os == 'Windows'
         shell: pwsh
@@ -247,6 +283,7 @@ jobs:
             build/xray-qt/swirl-xray-runtime.xml
             build/xray-qt/xray-toolchain.txt
             build/xray-qt/swirl-rust-build.json
+            build/xray-qt/product-runtime-input.json
             build/xray-qt/Testing/Temporary/LastTest.log
           if-no-files-found: warn
           retention-days: 14

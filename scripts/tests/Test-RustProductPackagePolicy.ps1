@@ -28,3 +28,52 @@ try {
     Remove-Item -LiteralPath $root -Recurse -Force
 }
 Write-Host "Package policy: $($allowed.Count + $denied.Count + 2) assertions passed."
+
+# Exercise the real staging entry point. Valid caches must reach the later
+# missing-product guard; no executable, Qt installation or output stage exists.
+# Visual Studio writes CRLF caches, while Ninja and Unix commonly write LF.
+$repo = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
+$staging = Join-Path $repo 'scripts/Stage-WindowsRustProduct.ps1'
+$cacheRoot = Join-Path ([IO.Path]::GetTempPath()) ('swirl-release-cache-' + [guid]::NewGuid().ToString('N'))
+$build = Join-Path $cacheRoot 'build'
+$destination = Join-Path $cacheRoot 'unused-stage'
+New-Item -ItemType Directory -Path $build -Force | Out-Null
+$cacheCases = @(
+    @{ Line='CMAKE_BUILD_TYPE:STRING=Release'; Accepted=$true },
+    @{ Line='CMAKE_CONFIGURATION_TYPES:STRING=Debug;Release;MinSizeRel;RelWithDebInfo'; Accepted=$true },
+    @{ Line='CMAKE_CONFIGURATION_TYPES:STRING=Release;Debug'; Accepted=$true },
+    @{ Line='CMAKE_CONFIGURATION_TYPES:STRING=Debug;Release'; Accepted=$true },
+    @{ Line='CMAKE_CONFIGURATION_TYPES:STRING=Debug;RelWithDebInfo'; Accepted=$false },
+    @{ Line='CMAKE_CONFIGURATION_TYPES:STRING=Debug;PreRelease'; Accepted=$false },
+    @{ Line='CMAKE_CONFIGURATION_TYPES:STRING=Debug;ReleaseCandidate'; Accepted=$false }
+)
+$caseCount = 0
+try {
+    foreach ($ending in @("`n", "`r`n")) {
+        foreach ($case in $cacheCases) {
+            $lines = @('SWIRL_BUILD_UI_TESTS:BOOL=OFF', $case.Line,
+                ('CMAKE_HOME_DIRECTORY:INTERNAL=' + (Join-Path $repo 'src/Swirl.Quick')),
+                'SWIRL_USE_RUST_CORE:BOOL=ON',
+                ('SWIRL_RUST_LIBRARY:INTERNAL=' + (Join-Path $build 'unused.dll')),
+                'SWIRL_RUST_BUILD_ID:INTERNAL=cache-policy-fixture')
+            [IO.File]::WriteAllText((Join-Path $build 'CMakeCache.txt'), (($lines -join $ending) + $ending))
+            $failure = $null
+            try {
+                & $staging -BuildDirectory $build -Destination $destination
+            } catch {
+                $failure = $_.Exception.Message
+            }
+            $expected = if ($case.Accepted) { 'Missing build output: Swirl.exe' } else {
+                'The CMake build does not include a Release configuration.'
+            }
+            if ($failure -cne $expected) {
+                throw "Staging cache gate mismatch for $($case.Line), newline length $($ending.Length): $failure"
+            }
+            if (Test-Path -LiteralPath $destination) { throw 'Cache regression created a product stage.' }
+            $caseCount++
+        }
+    }
+} finally {
+    Remove-Item -LiteralPath $cacheRoot -Recurse -Force
+}
+Write-Host "Release cache policy: $caseCount staging cases passed."

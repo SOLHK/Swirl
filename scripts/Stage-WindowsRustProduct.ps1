@@ -12,7 +12,7 @@ $cache = Get-Content -LiteralPath (Join-Path $build 'CMakeCache.txt') -Raw
 if ($Configuration -cne 'Release') { throw 'Product packaging requires the Release configuration.' }
 if ($cache -notmatch '(?m)^SWIRL_BUILD_UI_TESTS:BOOL=OFF\s*$') { throw 'Never package an executable with UI test entry points enabled.' }
 if ($cache -notmatch '(?m)^CMAKE_BUILD_TYPE:STRING=Release\s*$' -and
-    $cache -notmatch '(?m)^CMAKE_CONFIGURATION_TYPES:STRING=[^\r\n]*\bRelease\b[^\r\n]*$') {
+    $cache -notmatch '(?m)^CMAKE_CONFIGURATION_TYPES:STRING=[^\r\n]*\bRelease\b[^\r\n]*\r?$') {
     throw 'The CMake build does not include a Release configuration.'
 }
 if ($cache -notmatch '(?m)^CMAKE_HOME_DIRECTORY:INTERNAL=(.+)$' -or

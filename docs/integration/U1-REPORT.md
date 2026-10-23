@@ -407,3 +407,117 @@ builds and regressions must run again on
 the newly published clean SHA; the earlier stage's green jobs cannot be carried
 forward. The known non-Windows storage, unsupported product-mode and real-device
 limits remain classified in the source/feature audits.
+
+## U1-F5: restore complete menus and repair Windows delivery gates
+
+This section records historical results of the published F4 commit
+`1cd5a84315360c007fcca16c14752d0bc82c9f32` and the corrections made afterwards.
+**These results are not acceptance of this new commit.** All final tests and
+packages must identify the newly published full SHA and execute again.
+
+| F4 workflow | Actual outcome and boundary |
+| --- | --- |
+| [Native protocols 39905833205](https://github.com/SOLHK/Swirl/actions/runs/39905833205) | Six jobs passed. Rust: Windows 675, Linux/macOS 674 each, zero failed/ignored. Official/reference-peer menus: 127 method executions on Windows/macOS, 145 on Linux including the additional constrained-stack Hysteria2 run. Windows cancellation, same-runtime reconnect and zero remaining tasks were observed. |
+| [Transports 39905833198](https://github.com/SOLHK/Swirl/actions/runs/39905833198) | Three platform jobs passed. Each executed 132 DNS/routing methods and 61 transport-method executions with zero reported skips and actual cleanup. Three TLS ALPN methods are policy checks, explicitly not protocol interoperability. |
+| [Qt security 39905833201](https://github.com/SOLHK/Swirl/actions/runs/39905833201) | All seven jobs passed. Six OS/Qt combinations each have 11 passing downloader incidents, zero failed/skipped. The Windows Qt 6.11.3 product job also passed its real DPAPI/import subset, telemetry, HTTP policy and actual application capture. |
+| [Observation 39905833235](https://github.com/SOLHK/Swirl/actions/runs/39905833235) | Windows PowerShell 5.1, Windows PowerShell 7 and Linux PowerShell 7 each passed all 42 identity assertions. |
+| [Source/package guards 39905833277](https://github.com/SOLHK/Swirl/actions/runs/39905833277) | Both jobs passed: runtime guards 8/8, dependency guards 3/3, Windows PS5/7 package-path assertions 28 each. Actual MRS copying from another working directory and missing/corrupt-resource rejection passed. The 2,094-file source artifact was hash-checked. |
+| [Qt importer 39905833229](https://github.com/SOLHK/Swirl/actions/runs/39905833229) | All platforms passed nine Qt suites: Windows 222, Linux 182, macOS 181 passing incidents, zero failures/skips, and seven actual HTTP/verified-HTTPS protocol cases each. Linux/macOS jobs passed. Windows failed the later product-versus-tested-DLL hash gate; deployment and mounted QML checks did not execute. Portable evidence retains `persisted=false`/`reloaded=false`. |
+| [Nine Qt fixtures 39905833261](https://github.com/SOLHK/Swirl/actions/runs/39905833261) | All nine slots executed: 22 XML documents, 67 passing incidents, zero failed/skipped; all five lifecycle modes executed. Public REALITY/Vision made eight HTTP/HTTPS requests after Qt import, DPAPI save/reload and A/B selection. This menu does not assert Python's strict TLS close contract. Its later private-inspector diagnostic classification failed, so the workflow remained failed. |
+| [Unified product 39905833227](https://github.com/SOLHK/Swirl/actions/runs/39905833227) | Linux/macOS complete Qt 6.11.3 builds, 25-incident loader suites and actual executable self-tests passed. Linux Rust fmt/check/Clippy/674 tests passed, but the strict public Shadowsocks closure gate failed. Windows passed all 14 CTest suites, actual Qt/DPAPI product integration, test and production builds, and paired DLL hashes. Staging then misread CRLF CMake configuration; its remaining production and packaging steps did not execute. |
+| Local F4 | fmt/check/Clippy and 674 Rust tests passed; complete Qt 6.10.3 product and importer builds passed. Actual Swirl HTTP/SOCKS5/CONNECT/listener cleanup passed. Nine standalone Qt suites passed, 182 incidents, zero failed/skipped. Full product CTest remained six passed/six failed because non-Windows encrypted persistence is unimplemented. These failures were retained. |
+
+QTest incident counts include initialization, cleanup and data rows; they are
+not unique method counts. Windows product CTest includes 11 QTest runs totaling
+258 passing incidents and ten original conditional skips (nine fixture cases
+plus one private-provider case), including repeated import-boundary execution.
+The other three entries execute actual Node UI, Engine UI and capture. The
+separate nine-slot workflow actually exercises the nine conditional fixtures
+with zero skips. None of these results is physical Windows 11 acceptance.
+
+### Failures retained without weakening assertions
+
+The F4 public Shadowsocks gate completed HTTP 200, then verified TLS 1.3 and
+HTTP 204 before `SSLEOFError` at strict `origin-close`. Its failure-time Core
+snapshot has accepted=2, active=0, failed=0 and peer-consistent byte totals;
+Core/process/listener cleanup succeeded. A bounded direct connection to the
+same IP/SNI/ALPN also verified the certificate and 204, then failed identically.
+The isolated [diagnostic run 39907081127](https://github.com/SOLHK/Swirl/actions/runs/39907081127),
+workflow commit `5ae6b88270193fc40c3a08d871031b050fc500f2`, checked out F4 and
+tested keep-alive, Connection-close and omitted-Connection variants on Linux
+and Windows. All six completed certificate verification and HTTP 204, and all
+six failed strict TLS closure. Diagnostic collection success is explicitly
+`product_acceptance_evaluated=false`. No endpoint substitution, ignored EOF or
+weaker shutdown assertion was introduced.
+
+The original two `test_vmess_xray.py --strict-half-close` methods also actually
+ran on clean F4 with a fresh release example and pinned official Xray. Exit 1
+contained five failed assertions, zero errors/skips. Four variants received
+`4 MiB + 17` bytes with matching hashes but reported `UnexpectedEof` or
+`WebSocketTransportClosed`; the concurrent case stopped with six actual records,
+not eight completed sessions. Tasks reached zero and cleanup errors were empty.
+The example has no embedded source-SHA API: its identity was based on clean
+checkout, build command, source and executable hashes. Strict closure remains
+unaccepted independently of the ordinary 13-method VMess menu.
+
+### Changes at this checkpoint
+
+- Private inspection recognizes two complete fixed normalizer/native diagnostic
+  strings; unknown strings still become `UnclassifiedNativeOrImportDiagnostic`.
+  Native eligibility remains independently calculated. DPAPI, redaction,
+  zero-network, immutable ciphertext/sidecar, overwrite and tamper assertions
+  remain; exact diagnostics and eligibility must survive reload.
+  Isolated source: `89cc64e31ae12a4fe143cf43aad175c5b4e9deaa`.
+- The Windows fixture workflow runs the entire original 31-method subscription
+  capture module using the same actual Qt inspector for both entry points.
+  Actual discovered/executed IDs, source/ABI/binary identity and counts are
+  recorded; absent required methods, skips and expected failures fail. It runs
+  independently after prior fixture failures without converting them to success.
+  Sources: `b46fc1f18eacdbe95e1eadafdb0deae802fd09a3` and
+  `c3b196a57aa89227a1d6049615fd8da0d92e6062`.
+- The new supplemental workflow restores 76 omitted existing methods: REALITY
+  peer 16, TLS 19, source Xray 14, fingerprint oracle 4, standalone Vision 4,
+  native SOCKS4 9 and native WebSocket 10. Both vector checks and original strict
+  VMess methods run on three platforms. The original four REALITY public menus
+  and DIRECT/native-DoH menu retain their Linux requirement. Independent menus
+  continue after failures, with no `continue-on-error`; failures and incomplete
+  source identity still fail the final summary. Existing protocol assertions
+  are unchanged. Sources: runner `a04936c692979cc7a16b1087358c280555126bee`,
+  workflow `839b2f277f163584c3b83d4abcbc97470c4fb38f`.
+- Windows Release staging accepts the CRLF line ending in Visual Studio's
+  CMake cache by adding only `\r?` before the existing multiline end anchor.
+  Fourteen LF/CRLF cases invoke the actual staging entry point and preserve all
+  28 package-policy checks. Missing Release, wrong source, UI-test builds and
+  incorrect native identity remain rejected. Source:
+  `cd344b530440e8bc7d2203bdefd58c389a98e8be`.
+- The Windows importer now tests the actual product DLL. The two MSBuild/Cargo
+  invocations had rebuilt native dependencies and produced different bytes.
+  F4 importer metadata was observed; product metadata was not read before the
+  old hash gate failed, so equality was not an observed result. The new step
+  checks both identities against compile-time metadata before any tests, records
+  both original hashes, and stages the product DLL into the test directory.
+  All suites then use that DLL; the final strict hash gate and malformed-library
+  fixtures remain unchanged. Source: `dfbc2d41e8edb93b86d29a40375c8f6056b17fb1`.
+- Candidate NSIS/ZIP compilation follows all production identity, actual EXE,
+  missing-DLL and repeated-UI gates, and precedes the mandatory public test.
+  Original packaging commands and public assertions are unchanged. A later
+  public failure still fails the job; a built package is retained explicitly as
+  a candidate, not a release. Packaging-only failure does not suppress the
+  independent public test after the UI gate. Initial ordering source:
+  `db47935298c8de44e61967e1152490cb580adbf5`.
+
+Candidate checks passed nine scheduler guards, seven subscription evidence
+guards, 16 original REALITY peer methods, both vector checks, and the 28+14
+PowerShell package-policy cases. After an execution-environment replacement,
+all ten code/workflow files were recovered byte-for-byte against their previously
+reviewed Git blob hashes; the nine and seven Python guards passed again. These
+component checks do not replace final-commit CI. The earlier F4 Windows importer
+and fixture artifact ZIP digests were reverified after recovery.
+
+The 48-branch snapshot is [U1-final-source-recheck.json](U1-final-source-recheck.json).
+The resumed 49-branch check is [U1-resumed-source-recheck.json](U1-resumed-source-recheck.json):
+the integration head and all subscription/Core source heads remained unchanged;
+only explicit visual/preview work advanced. Those independent UI branches are
+excluded. Non-Windows secure storage, unsupported product/protocol modes,
+strict-close failures and real-device/provider acceptance remain separate A/C/D
+issues. No earlier stage's green jobs transfer to the newly published SHA.

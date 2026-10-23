@@ -168,6 +168,7 @@ jobs:
             Copy-Item $report build/r1-product/
           } finally { Move-Item "$dll.absent" $dll }
       - name: Start actual Qt UI twice with one isolated cache
+        id: production_ui_ready
         shell: pwsh
         run: |
           $env:QT_QPA_PLATFORM='offscreen'
@@ -183,7 +184,22 @@ jobs:
             $launches+=@{phase=$phase;exitCode=$p.ExitCode}
           }
           @{source_sha=$env:GITHUB_SHA;launches=$launches;physical_windows_verified=$false} | ConvertTo-Json -Depth 4 | Set-Content build/r1-product/ui-repeated-start.json -Encoding utf8
+      # Retain a reviewable candidate after all production identity and UI gates.
+      # The mandatory public test below still fails the job on any failed assertion.
+      - name: Build candidate installer and portable archive
+        id: candidate_package
+        shell: pwsh
+        run: |
+          $nsis='C:/Program Files (x86)/NSIS/makensis.exe'
+          if (-not (Test-Path $nsis)) { choco install nsis --yes --no-progress; if ($LASTEXITCODE -ne 0) { throw 'NSIS install failed.' } }
+          $dist=(Resolve-Path dist).Path
+          $stage=(Resolve-Path dist/Swirl-Rust-x64).Path
+          $icon=(Resolve-Path build/r1-product/brand/Swirl.ico).Path
+          & $nsis "/DAPP_DIST=$stage" "/DOUT_DIR=$dist" "/DAPP_ICON=$icon" src/Swirl.Quick/packaging/Swirl.nsi
+          if ($LASTEXITCODE -ne 0) { throw 'Installer build failed.' }
+          Compress-Archive -Path "$stage/*" -DestinationPath (Join-Path $dist 'Swirl-Rust-x64.zip')
       - name: Windows native public Internet requests
+        if: ${{ !cancelled() && steps.production_ui_ready.outcome == 'success' }}
         shell: pwsh
         env:
           SWIRL_R1_PUBLIC_NETWORK: '1'
@@ -196,17 +212,6 @@ jobs:
           $env:SWIRL_RUST_HARNESS=(Resolve-Path core/target/x86_64-pc-windows-msvc/release/swirl-api.exe).Path
           python tools/tests/test_r1_public_proxy.py -v
           if ($LASTEXITCODE -ne 0) { throw 'Rust public proxy response verification failed.' }
-      - name: Build installer and portable archive
-        shell: pwsh
-        run: |
-          $nsis='C:/Program Files (x86)/NSIS/makensis.exe'
-          if (-not (Test-Path $nsis)) { choco install nsis --yes --no-progress; if ($LASTEXITCODE -ne 0) { throw 'NSIS install failed.' } }
-          $dist=(Resolve-Path dist).Path
-          $stage=(Resolve-Path dist/Swirl-Rust-x64).Path
-          $icon=(Resolve-Path build/r1-product/brand/Swirl.ico).Path
-          & $nsis "/DAPP_DIST=$stage" "/DOUT_DIR=$dist" "/DAPP_ICON=$icon" src/Swirl.Quick/packaging/Swirl.nsi
-          if ($LASTEXITCODE -ne 0) { throw 'Installer build failed.' }
-          Compress-Archive -Path "$stage/*" -DestinationPath (Join-Path $dist 'Swirl-Rust-x64.zip')
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -228,9 +233,11 @@ jobs:
             dist/Swirl-Rust-x64/package-manifest.json
             dist/Swirl-Rust-x64/Swirl-diagnostics.txt
           if-no-files-found: warn
-      - uses: actions/upload-artifact@v4
+      - name: Preserve candidate package for review (not a release)
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() && steps.candidate_package.outcome == 'success' }}
         with:
-          name: Swirl-Rust-Windows-x64-${{ github.sha }}-${{ github.run_attempt }}
+          name: Swirl-Rust-Windows-x64-candidate-${{ github.sha }}-${{ github.run_attempt }}
           path: |
             dist/Swirl-Rust-x64.zip
             dist/Swirl-Setup.exe
