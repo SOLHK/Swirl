@@ -109,8 +109,9 @@ Item {
         id: titleControl
         property string caption: ""
         signal navigate()
-        implicitHeight: Theme.dp(34); hoverEnabled: true; padding: 0
-        background: Item {}
+        implicitHeight: Theme.dp(34); hoverEnabled: true
+        topPadding: 0; bottomPadding: 0; leftPadding: Theme.dp(9); rightPadding: Theme.dp(9)
+        background: SwirlClearGlassSurface { radius: height / 2; focused: titleControl.activeFocus; pressed: titleControl.down; hovered: titleControl.hovered }
         contentItem: RowLayout {
             spacing: Theme.dp(5)
             SwirlText { text: titleControl.caption; color: Theme.text; font.pixelSize: Theme.fontSize(16); font.weight: Font.DemiBold }
@@ -156,8 +157,8 @@ Item {
                     Layout.preferredWidth: page.wide ? (content.width - cards.columnSpacing) * 0.474 : content.width
                     Layout.preferredHeight: Theme.dp(276)
                     cornerRadius: Theme.dp(9); independentCard: false
-                    color: Theme.dark ? Theme.surface : Theme.withAlpha("#FFFFFF", 0.97)
-                    border.color: Theme.withAlpha(Theme.border, 0.7)
+                    color: "transparent"; border.width: 0
+                    SwirlClearGlassSurface { anchors.fill: parent; radius: diagnosticCard.cornerRadius; visible: !diagnosticCard.surfaceHidden }
 
                     SwirlText { x: Theme.dp(18); y: Theme.dp(19); text: "INTERNET 延迟"; color: Theme.muted; font.pixelSize: Theme.fontSize(13) }
                     SwirlIconButton {
@@ -218,8 +219,8 @@ Item {
                     Layout.row: page.wide ? 0 : 1; Layout.column: page.wide ? 1 : 0
                     Layout.fillWidth: true; Layout.preferredHeight: Theme.dp(276)
                     cornerRadius: diagnosticCard.cornerRadius; independentCard: false
-                    color: diagnosticCard.color
-                    border.color: diagnosticCard.border.color
+                    color: "transparent"; border.width: 0
+                    SwirlClearGlassSurface { anchors.fill: parent; radius: trafficCard.cornerRadius; visible: !trafficCard.surfaceHidden }
 
                     SwirlText { x: Theme.dp(18); y: Theme.dp(19); text: "流量"; color: Theme.muted; font.pixelSize: Theme.fontSize(14); font.weight: Font.DemiBold }
                     SwirlSegmentedControl {
@@ -320,6 +321,7 @@ Item {
                             objectName: "activityPeriodFilter"
                             anchors.right: parent.right; y: Theme.dp(1)
                             width: Theme.dp(117); height: Theme.dp(28)
+                            clearGlass: true
                             options: ["今日", "本月"]; currentIndex: page.period
                             onActivated: index => page.period = index
                         }
