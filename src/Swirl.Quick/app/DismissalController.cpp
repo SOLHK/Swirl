@@ -42,12 +42,15 @@ bool DismissalController::eventFilter(QObject *receiver,QEvent *event) {
     auto *key=static_cast<QKeyEvent *>(event);
     auto *window=qobject_cast<QQuickWindow *>(receiver);
     if(!window || key->key()!=Qt::Key_Escape)return false;
+    // Let the focused editor cancel its IME composition before navigating.
+    if(window->activeFocusItem()&&window->activeFocusItem()->property("inputMethodComposing").toBool())return false;
     const bool popup=hasPopup(window);
     const bool dismissible=window->property("swirlDismissibleWindow").toBool();
-    if(!popup && !dismissible)return false;
+    const bool back=window->property("swirlBackAvailable").toBool();
+    if(!popup && !dismissible && !back)return false;
     event->accept();
     if(event->type()==QEvent::KeyPress && !key->isAutoRepeat()) {
-        if(popup)dismiss(window);else window->close();
+        if(popup)dismiss(window);else if(back)QMetaObject::invokeMethod(window,"handleEscape");else window->close();
     }
     return true;
 }

@@ -3,15 +3,17 @@ import QtQuick.Controls
 import SwirlQuick
 Menu {
     id: menu
+    function requestDismiss(){close()}
     property var items: ["查看详情", "复制", "导出"]
     property string payload: ""
     padding:Theme.dp(6)
     transformOrigin:Item.TopLeft
     onAboutToShow: {
+        dismissals.push(menu,parent?parent.Window.window:null)
         if(SwirlMotion.reduced){scale=1;opacity=1}
         else if(scale===1 && opacity===1){scale=0.96;opacity=0}
     }
-    onClosed:{scale=1;opacity=1}
+    onClosed:{dismissals.pop(menu);scale=1;opacity=1}
     enter:Transition {
         enabled:!SwirlMotion.reduced
         ParallelAnimation {

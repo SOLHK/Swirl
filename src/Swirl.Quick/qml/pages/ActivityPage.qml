@@ -67,13 +67,13 @@ Item {
         AppState.trafficPeriod = period === 0 ? 0 : 3
         if (row.kind === "apps") {
             AppState.trafficSelectedProcess = row.name
-            AppState.navigate("processes")
+            AppState.openDetail("processes")
         } else if (row.kind === "devices") {
             AppState.trafficSelectedDevice = row.name
-            AppState.navigate("gateway")
+            AppState.openDetail("gateway")
         } else {
             AppState.connectionSearchQuery = row.name
-            AppState.navigate("connections")
+            AppState.openDetail("connections")
         }
     }
     function scrollToBottom() { scroll.contentY = Math.max(0, scroll.contentHeight - scroll.height) }
@@ -173,7 +173,7 @@ Item {
                         objectName: "networkDiagnosticDetails"
                         anchors.right: parent.right; anchors.rightMargin: Theme.dp(11); y: Theme.dp(14)
                         width: Theme.dp(94); implicitHeight: Theme.dp(28); text: "网络诊断"
-                        onClicked: { page.telemetry.measureNetwork(); AppState.navigate("toolbox") }
+                        onClicked: { page.telemetry.measureNetwork(); AppState.openDetail("toolbox") }
                     }
                     Row {
                         x: Theme.dp(18); y: Theme.dp(66); spacing: Theme.dp(5)

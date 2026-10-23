@@ -181,8 +181,14 @@ ApplicationWindow {
         else AppState.navigate(route)
     }
     function closeSettings() {
+        if(pageLoader.item && pageLoader.item.dismissDetail && pageLoader.item.dismissDetail())return
         if(AppState.historyIndex>0)AppState.goBack()
         else AppState.navigate("featurehub")
+    }
+    readonly property bool swirlBackAvailable:AppState.canGoBack || (pageLoader.item!==null && pageLoader.item.detailOpen===true)
+    function handleEscape() {
+        if(pageLoader.item && pageLoader.item.dismissDetail && pageLoader.item.dismissDetail())return
+        if(AppState.canGoBack)AppState.goBack()
     }
     function persistExitDrafts(){
         const loader=pageLoader.pages["dns"]
@@ -222,7 +228,6 @@ ApplicationWindow {
     }
     Shortcut { sequence:"Alt+Space"; context:Qt.ApplicationShortcut; onActivated:backdrop.showSystemMenu() }
     Shortcut { enabled:dismissals.count===0;sequence:"Ctrl+K"; context:Qt.ApplicationShortcut; onActivated:sidebar.openSearch() }
-    Shortcut { enabled:dismissals.count===0 && AppState.inSettings;sequence:"Esc";onActivated:window.closeSettings() }
     Shortcut { enabled:dismissals.count===0;sequence:"Alt+Left"; onActivated:AppState.goBack() }
     Shortcut { enabled:dismissals.count===0;sequence:"Alt+Right"; onActivated:AppState.goForward() }
     Shortcut { enabled:dismissals.count===0;sequence:"Ctrl+1"; onActivated:AppState.navigate("overview") }

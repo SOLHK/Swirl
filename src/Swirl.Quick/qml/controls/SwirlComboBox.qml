@@ -62,16 +62,19 @@ ComboBox {
         }
     }
     popup: Popup {
+        id:popupLayer
+        function requestDismiss(){close()}
         parent:control
         focus:true
         popupType:Popup.Item
         closePolicy:Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent
         transformOrigin:Item.TopLeft
     onAboutToShow: {
+        dismissals.push(popupLayer,control.Window.window)
         if(SwirlMotion.reduced){scale=1;opacity=1}
         else opacity=0
     }
-    onClosed:{scale=1;opacity=1}
+    onClosed:{dismissals.pop(popupLayer);scale=1;opacity=1}
 
         y: control.height+Theme.dp(4)
         x:0

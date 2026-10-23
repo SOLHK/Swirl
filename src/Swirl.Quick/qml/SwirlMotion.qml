@@ -47,9 +47,10 @@ QtObject {
             targetKey:targetKey || "title",text:titleItem.text || ""}
         returnShared={route:route,previous:AppState.currentPage,source:titleItem,card:item,
             surface:surface,targetKey:targetKey || "title"}
-        AppState.navigate(route)
+        AppState.openDetail(route)
     }
     function returnToHub(item) {
-        AppState.navigate(returnShared && returnShared.route===AppState.currentPage ? returnShared.previous : "featurehub")
+        if(AppState.canGoBack)AppState.goBack()
+        else AppState.navigate(returnShared && returnShared.route===AppState.currentPage ? returnShared.previous : "featurehub")
     }
 }
