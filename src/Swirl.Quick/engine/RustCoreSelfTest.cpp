@@ -1,6 +1,7 @@
 #include "RustCoreSelfTest.h"
 #include "RustCoreEngine.h"
 #include "RustCoreLibrary.h"
+#include "../network/HttpRequestPolicy.h"
 #include <QCoreApplication>
 #include <QElapsedTimer>
 #include <QEventLoop>
@@ -90,6 +91,7 @@ int runRustCoreSelfTest(const QString &reportPath)
         QNetworkAccessManager client;
         client.setProxy(QNetworkProxy(type, "127.0.0.1", port));
         QNetworkRequest input(url);
+        SwirlNetwork::applyHttp1OnlyPolicy(input);
         input.setTransferTimeout(4000);
         input.setRawHeader("Connection", "close");
         auto *reply = client.get(input);

@@ -1,5 +1,6 @@
 #include "CaptureService.h"
 #include "Http2Session.h"
+#include "HttpRequestPolicy.h"
 #include <QTcpSocket>
 #include <QNetworkProxy>
 #include <QNetworkReply>
@@ -296,7 +297,9 @@ void CaptureService::handle(const std::shared_ptr<Connection> &c) {
     }
     QNetworkRequest request(c->url);request.setTransferTimeout(20000);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,QNetworkRequest::ManualRedirectPolicy);
-    request.setAttribute(QNetworkRequest::Http2AllowedAttribute,c->decrypted&&m_tls.http2Enabled());
+    // Only the Qt upstream client is restricted. The independent nghttp2
+    // client-facing session continues to support HTTP/2 when enabled.
+    SwirlNetwork::applyHttp1OnlyPolicy(request);
     QList<QByteArray> connectionTokens;
     for(const auto &h:c->rawHeaders)if(h.first.toLower()=="connection")for(auto name:h.second.split(','))connectionTokens<<name.trimmed().toLower();
     for(const auto &h:c->rawHeaders)if(!hopHeader(h.first) && h.first.toLower()!="host" && h.first.toLower()!="content-length" && !connectionTokens.contains(h.first.toLower()))request.setRawHeader(h.first,h.second);

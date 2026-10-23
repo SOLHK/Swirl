@@ -1,0 +1,47 @@
+{
+  "base_commit": "5d96214ac80d63985cdccf4942c3c1d79035e793",
+  "branch": "work/qt-http2-security-20261023",
+  "mitigation": "Official Qt application request mitigation; Qt library remains 6.10.3",
+  "local_environment": {
+    "os": "Ubuntu 24.04",
+    "Qt": "6.10.3",
+    "compiler": "GCC 13.3.0",
+    "tls": "OpenSSL 3.0.13"
+  },
+  "baseline_regression": {
+    "behavior_cases_passed": 1,
+    "behavior_cases_failed": 3,
+    "failure_scope": [
+      "HTTPS download selected h2",
+      "HTTPS redirect selected h2",
+      "Cleartext request included Upgrade: h2c"
+    ],
+    "downloader_git_blob": "20320ae5b753ba85cfe1f4e66823d4cf9952cc41",
+    "cve_crash_reproduced": false
+  },
+  "mitigated_portable_tests": {
+    "behavior_cases_passed": 8,
+    "qt_test_total_passed": 10,
+    "failed": 0,
+    "skipped": 0,
+    "persistence_claimed": false
+  },
+  "local_product_ctest": {
+    "passed": [
+      "swirl-telemetry-accounting",
+      "swirl-qt-network-policy"
+    ],
+    "failed": []
+  },
+  "ci_status": "Pending exact pushed commit validation",
+  "file_sha256": {
+    "src/Swirl.Quick/network/HttpRequestPolicy.h": "e3d4958c9204040f4fd8c6f85b5102e338cf293c7420a8cc4c068ce4e440c48e",
+    "src/Swirl.Quick/engine/NodeImportService.cpp": "51fa8364be2d683c8dda9b960f5a286f26c73f1a69cbdd25fcf155e3ee76b518",
+    "src/Swirl.Quick/engine/TelemetryService.cpp": "af81e423f4c307d3097b572895e38df47c81d2107a142cc46e7968729627b39a",
+    "src/Swirl.Quick/network/CaptureService.cpp": "245d9b9bfc77f6d62694926ecf339195a8c0b25282700f7219a834f8cf0d5b7c",
+    "src/Swirl.Quick/engine/RustCoreSelfTest.cpp": "84406d2f8df8b20fcbef9298cca65ac42e481974cb48f94b7fc9d3bcf9dcc6ae",
+    "src/Swirl.Quick/tests/QtNetworkPolicyTests.cpp": "e48ee895948029baf1bf712482f843fa31211e80f46254f78b107b5111f7320a",
+    "src/Swirl.Quick/tests/TelemetryTests.cpp": "9760f2ecc5be63172ef6cecb2e6b30d6ac2815effd58b4d10da384bcbdb35358",
+    "src/Swirl.Quick/tests/CaptureChecks.cpp": "0f9522380b4346d8d6bd7e8ee0667cb8cdbb3c75297d2a04e75ee1253caf1ca6"
+  }
+}

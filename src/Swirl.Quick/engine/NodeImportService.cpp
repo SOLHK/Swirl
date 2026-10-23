@@ -1,4 +1,5 @@
 #include "NodeImportService.h"
+#include "../network/HttpRequestPolicy.h"
 #include <QNetworkReply>
 #include <QNetworkProxy>
 #include <QNetworkRequest>
@@ -95,6 +96,7 @@ void NodeImportService::next() {
 void NodeImportService::download(const QUrl &url,int redirects) {
     if(!NodeStore::allowedSubscriptionUrl(url) || redirects>5){finish(QStringLiteral("订阅重定向不安全或次数过多；旧节点保持不变。"));return;}
     QNetworkRequest request(url);
+    SwirlNetwork::applyHttp1OnlyPolicy(request);
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,QNetworkRequest::ManualRedirectPolicy);
     const QHash<QString,QByteArray> agents{{"auto","Clash.Meta/1.19.32 Swirl/1.0"},{"loon","Loon/1.0"},{"shadowrocket","Shadowrocket/2.2.67"},{"surge","Surge/5.0"},{"quantumult-x","Quantumult X/1.0"},{"sing-box","sing-box/1.12"}};
     request.setRawHeader("User-Agent",agents.value(m_formatHint,agents.value("auto")));
