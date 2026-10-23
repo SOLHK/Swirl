@@ -43,6 +43,7 @@ public:
     Q_INVOKABLE bool saveSubscription(const QString &id,const QString &name,const QUrl &url,int intervalMinutes,bool enabled,const QString &formatHint={},const QString &importScope={});
     Q_INVOKABLE bool removeSubscription(const QString &id);
     Q_INVOKABLE void refreshSubscription(const QString &id);
+    Q_INVOKABLE bool cancelRefresh(const QString &id);
     Q_INVOKABLE void refreshAll();
     void shutdown();
     using ApplyConfiguration = std::function<bool(const NodeImporter::Result &,const QString &,bool,QString *)>;
@@ -76,6 +77,7 @@ private:
     QTimer m_timer,m_deadline;
     QQueue<QString> m_queue;
     QHash<QString,QString> m_errors;
+    QSet<QString> m_cancelled;
     QHash<QString,qint64> m_attempts;
     std::function<qint64()> m_clock;
     SystemProxyResolver m_systemProxyResolver;

@@ -7,11 +7,13 @@ replacement Shadowsocks server. Missing executables fail, never skip.
 import base64
 import concurrent.futures
 import copy
+import errno
 import hashlib
 import json
 import os
 from pathlib import Path
 import platform
+import re
 import select
 import socket
 import socketserver
@@ -20,6 +22,7 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest.mock import patch
 from urllib.parse import quote
 
 from test_rust_core import certificates, exact, target
@@ -27,6 +30,48 @@ from transport_peer import _Origin, _OriginHandler, HTTP_BODY, pattern_hash
 
 
 CIPHERS = ("2022-blake3-aes-128-gcm", "2022-blake3-aes-256-gcm")
+
+
+def _exclusive_address(sock):
+    # Winsock otherwise permits another SO_REUSEADDR socket to share an
+    # occupied port. Set this before bind for both reservations and conflicts.
+    option = getattr(socket, "SO_EXCLUSIVEADDRUSE", None)
+    if option is not None:
+        sock.setsockopt(socket.SOL_SOCKET, option, 1)
+
+
+def _unused_tcp_udp_port(listen):
+    """Check both transports; a later bind race is handled only at startup."""
+    family = socket.AF_INET6 if ":" in listen else socket.AF_INET
+    for _ in range(32):
+        with socket.socket(family, socket.SOCK_STREAM) as tcp, socket.socket(family, socket.SOCK_DGRAM) as udp:
+            _exclusive_address(tcp)
+            _exclusive_address(udp)
+            tcp.bind((listen, 0))
+            port = tcp.getsockname()[1]
+            try:
+                udp.bind((listen, port))
+            except OSError as error:
+                if error.errno in (errno.EADDRINUSE, 10048):
+                    continue
+                raise
+            return port
+    raise RuntimeError("No unused TCP/UDP peer port found")
+
+
+def _startup_log(path):
+    with path.open("r", encoding="utf-8", errors="replace") as handle:
+        value = handle.read(65537)
+    if len(value) > 65536:
+        raise AssertionError("official ssserver startup log exceeded its bound")
+    return value
+
+
+def _startup_bind_conflict(exit_code, log):
+    # The pinned ssserver reports fatal bind failures with EX_SOFTWARE (70).
+    # These are EADDRINUSE on Darwin/Linux/Windows, not protocol/auth failures.
+    return exit_code == 70 and re.search(
+        r"(?m)^server aborted with [^\r\n]*\(os error (?:48|98|10048)\)\s*$", log) is not None
 
 
 class _UdpOrigin(socketserver.ThreadingUDPServer):
@@ -158,33 +203,94 @@ class Ss2022OfficialTests(unittest.TestCase):
         self.addCleanup(self.finish)
 
     def peer(self, cipher, *, listen="127.0.0.1", port=None):
-        if port is None:
-            with socket.socket(socket.AF_INET6 if ":" in listen else socket.AF_INET) as reserve:
-                reserve.bind((listen, 0))
-                port = reserve.getsockname()[1]
         key = base64.b64encode(bytes([73]) * (16 if cipher == CIPHERS[0] else 32)).decode()
-        config = {"server": listen, "server_port": port, "password": key, "method": cipher,
-                  "mode": "tcp_and_udp", "timeout": 3, "udp_timeout": 60,
-                  "udp_max_associations": 32, "no_delay": True}
-        label = f"{len(self.peers):02d}-{cipher}"
-        path = self.folder / f"{label}.json"
-        path.write_text(json.dumps(config))
-        log = (self.evidence / f"{label}-server.log").open("w")
-        command = [self.server, "--config", str(path), "--single-threaded", "-v"]
-        process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT)
-        peer = {"process": process, "log": log, "command": command, "host": listen, "port": port,
-                "outbound": {"type": "shadowsocks", "host": listen, "port": port,
-                             "password": key, "cipher": cipher, "udp": True}}
-        self.peers.append(peer)
-        deadline = time.monotonic() + 5
-        while time.monotonic() < deadline:
-            self.assertIsNone(process.poll(), "official ssserver exited at startup")
-            try:
-                with socket.create_connection((listen, port), timeout=0.1):
-                    return peer
-            except OSError:
+        # ssserver cannot inherit our reservations, so another process may bind
+        # between the check and spawn. Re-select only before traffic, only for an
+        # observed bind conflict, and never for the fixed-port restart tests.
+        attempts = 4 if port is None else 1
+        for attempt in range(attempts):
+            selected_port = _unused_tcp_udp_port(listen) if port is None else port
+            config = {"server": listen, "server_port": selected_port, "password": key, "method": cipher,
+                      "mode": "tcp_and_udp", "timeout": 3, "udp_timeout": 60,
+                      "udp_max_associations": 32, "no_delay": True}
+            label = f"{len(self.peers):02d}-{cipher}"
+            path = self.folder / f"{label}.json"
+            path.write_text(json.dumps(config))
+            log_path = self.evidence / f"{label}-server.log"
+            log = log_path.open("w")
+            command = [self.server, "--config", str(path), "--single-threaded", "-v"]
+            process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT)
+            startup = {"attempt": attempt + 1, "fixed_port": port is not None, "port": selected_port,
+                       "log": log_path.name, "reason": "pending", "exit_code": None}
+            peer = {"process": process, "log": log, "command": command, "host": listen, "port": selected_port,
+                    "startup": startup,
+                    "outbound": {"type": "shadowsocks", "host": listen, "port": selected_port,
+                                 "password": key, "cipher": cipher, "udp": True}}
+            self.peers.append(peer)
+            endpoint = f"[{listen}]:{selected_port}" if ":" in listen else f"{listen}:{selected_port}"
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline:
+                exited = process.poll()
+                observed = _startup_log(log_path)
+                if exited is not None:
+                    collision = _startup_bind_conflict(exited, observed)
+                    startup.update(exit_code=exited, reason="AddressInUse" if collision else "StartupExit")
+                    if collision and port is None and attempt + 1 < attempts:
+                        break
+                    self.fail(f"official ssserver startup {startup['reason']} (exit {exited}); see {log_path.name}")
+                # A connection to an unrelated listener is not evidence that
+                # our child owns both endpoints. Confirm the pinned server's
+                # actual TCP and UDP bind messages before the TCP readiness probe.
+                if all(f"shadowsocks {protocol} server listening on {endpoint}," in observed
+                       for protocol in ("tcp", "udp")):
+                    try:
+                        with socket.create_connection((listen, selected_port), timeout=0.1):
+                            self.assertIsNone(process.poll(), "official ssserver exited after binding")
+                            startup["reason"] = "ready"
+                            return peer
+                    except OSError:
+                        pass
                 threading.Event().wait(0.02)
-        self.fail("official ssserver startup timed out")
+            else:
+                startup["reason"] = "StartupTimeout"
+                self.fail(f"official ssserver startup timed out; see {log_path.name}")
+        self.fail("official ssserver exhausted its bounded bind attempts")
+
+    def test_random_startup_port_conflict_reselects_before_protocol_traffic(self):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as occupied:
+            _exclusive_address(occupied)
+            occupied.bind(("127.0.0.1", 0))
+            occupied.listen()
+            blocked = occupied.getsockname()[1]
+            original = _unused_tcp_udp_port
+            calls = []
+            def allocate(listen):
+                calls.append(listen)
+                return blocked if len(calls) == 1 else original(listen)
+            # Force the real check/spawn race. Both server processes are the
+            # actual pinned binary, and the successful attempt carries traffic.
+            with patch(__name__ + "._unused_tcp_udp_port", side_effect=allocate):
+                peer = self.peer(CIPHERS[0])
+            self.assertEqual(len(calls), 2)
+            self.assertEqual(self.peers[-2]["startup"]["reason"], "AddressInUse")
+            self.assertEqual(self.peers[-2]["process"].returncode, 70)
+            self.assertNotEqual(peer["port"], blocked)
+            origin = self.origin()
+            self.run_client(self.request(peer, origin))
+            self.assert_closed(origin)
+
+    def test_fixed_port_conflict_and_non_bind_startup_failures_are_not_retried(self):
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as occupied:
+            _exclusive_address(occupied)
+            occupied.bind(("127.0.0.1", 0))
+            blocked = occupied.getsockname()[1]
+            with self.assertRaisesRegex(AssertionError, "AddressInUse"):
+                self.peer(CIPHERS[0], port=blocked)
+            self.assertEqual(len(self.peers), 1)
+            self.assertEqual(self.peers[0]["port"], blocked)
+        with self.assertRaisesRegex(AssertionError, "StartupExit"):
+            self.peer("invalid-synthetic-cipher")
+        self.assertEqual(len(self.peers), 2, "unrelated startup failures must not be retried")
 
     def origin(self, *, echo=False, tls=False, ipv6=False):
         server_type = type("Ipv6Origin", (_Origin,), {"address_family": socket.AF_INET6}) if ipv6 else _Origin
@@ -506,6 +612,7 @@ class Ss2022OfficialTests(unittest.TestCase):
             "official_server": "shadowsocks-rust v1.25.0", "server_only": True,
             "server_sha256": hashlib.sha256(Path(self.server).read_bytes()).hexdigest(),
             "commands": [peer["command"] for peer in self.peers],
+            "startups": [peer["startup"] for peer in self.peers],
             "records": self.records, "origins": origins,
         }, indent=2) + "\n")
 

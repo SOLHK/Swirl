@@ -1,4 +1,4 @@
-"""Xray/V2Ray JSON -> native config -> ordinary Core start -> official server.
+"""Subscription JSON -> native config -> ordinary Core start -> official server.
 
 The exported configuration is passed unmodified to Core. There is no external
 transport map, no post-export certificate injection and no third-party client.
@@ -119,13 +119,14 @@ class ImportedTransportXrayTests(unittest.TestCase):
         return native
 
     def start(self, config):
-        # This is the complete exported native config. In particular no
-        # transports argument, CA patch, credential rewrite or fallback exists.
+        # Imported outbounds reach ordinary Core start without a separate
+        # transports argument, CA patch, credential rewrite or fallback.
         result = self.command(op="start", config=config)
         self.assertTrue(result["ok"], result)
         self.port = int(result["status"]["address"].rsplit(":", 1)[1])
         node = config["nodes"][0]["outbound"]
-        self.protocol = node["type"] + ":" + node["transport"]["type"] + ":tls"
+        self.protocol = node["type"] + ":" + node["transport"]["type"]
+        self.protocol += ":tls" if node.get("tls") else ":plain"
 
     @contextlib.contextmanager
     def running(self, config):
@@ -190,6 +191,43 @@ class ImportedTransportXrayTests(unittest.TestCase):
                         self.records.append({"case": self._testMethodName, "protocol": protocol,
                             "transport": expected, "server": peer["version"], "application_tls": tls,
                             "downloaded": len(HTTP_BODY), "close": "clean", "native_export": True})
+
+    def test_clash_grpc_import_reaches_official_server_without_transport_patch(self):
+        # Regression for the formerly unsupported Clash gRPC product case. A
+        # raw VLESS fixture cannot prove gRPC interoperability, so use the same
+        # pinned official server as the retained Xray JSON transport cases.
+        peer = self.fixture.peer("grpc", protocol="vless", service_name="synthetic")
+        node = {"name": "synthetic-clash-grpc", "type": "vless",
+                "server": peer["host"], "port": peer["port"],
+                "uuid": peer["outbound"]["uuid"], "network": "grpc",
+                "grpc-opts": {"grpc-service-name": "synthetic",
+                              "grpc-user-agent": "Swirl-synthetic-product-chain",
+                              "ping-interval": 0}}
+        result = subprocess.run([str(self.inspector), "--private-json"],
+            input=json.dumps({"proxies": [node]}), text=True, capture_output=True, timeout=10)
+        exported = json.loads(result.stdout)
+        self.assertEqual(result.returncode, 0, exported.get("report"))
+        self.assertTrue(exported["report"]["parsed"])
+        self.assertEqual(exported["nodes"], [node])
+        self.assertTrue(exported["report"]["nodes"][0]["native_tcp_candidate"])
+        self.assertFalse(exported["report"]["nodes"][0]["real_network_verified"])
+        outbound = exported["tcpCandidates"][0]
+        self.assertEqual((outbound["host"], outbound["port"], outbound["uuid"]),
+                         (peer["host"], peer["port"], peer["outbound"]["uuid"]))
+        self.assertEqual(outbound["transport"], {"type": "grpc", "config": {
+            "authority": f'{peer["host"]}:{peer["port"]}', "service_name": "synthetic",
+            "mode": "tun", "headers": [["user-agent", "Swirl-synthetic-product-chain"]]}})
+        native = {"schema": 1, "listen": "127.0.0.1:0", "selected": "A",
+                  "nodes": [{"id": "A", "outbound": outbound}]}
+        with self.running(native):
+            for tls in (False, True):
+                origin = self.fixture.origin(tls=tls)
+                self.application(origin)
+                self.fixture.assert_accepted(peer, origin)
+                self.records.append({"case": self._testMethodName, "source": "clash-json",
+                    "protocol": "vless", "transport": "grpc", "server": peer["version"],
+                    "application_tls": tls, "downloaded": len(HTTP_BODY), "close": "clean",
+                    "native_export": True, "post_export_modifications": False})
 
     def test_four_mib_each_way_after_import_with_application_completed_close(self):
         size = 4 * 1024 * 1024

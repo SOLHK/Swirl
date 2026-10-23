@@ -31,6 +31,43 @@
 #include <QScopeGuard>
 #include "app/StoragePaths.h"
 
+// Keep real Rust listeners and real A/B traffic while making one asynchronous
+// control failure deterministic. Invalid configurations are now rejected before
+// the worker, so they cannot stand in for a later selection failure.
+class RejectOneSelectionEngine final : public ProxyEngine {
+public:
+ RejectOneSelectionEngine(){
+  connect(&m_engine,&ProxyEngine::statusChanged,this,&ProxyEngine::statusChanged);
+  connect(&m_engine,&ProxyEngine::diagnostic,this,&ProxyEngine::diagnostic);
+  connect(&m_engine,&ProxyEngine::probeRequestRejected,this,&ProxyEngine::probeRequestRejected);
+ }
+ QString rejectNextSelection;
+ int selectionCalls=0,injectedRejections=0;
+ void start(const EngineStartOptions &options) override{m_engine.start(options);}
+ void stop() override{m_engine.stop();}
+ void refresh() override{m_engine.refresh();}
+ void selectNode(const QString &id) override{
+  ++selectionCalls;
+  if(!rejectNextSelection.isEmpty()&&id==rejectNextSelection){
+   rejectNextSelection.clear();
+   QMetaObject::invokeMethod(this,[this]{
+    ++injectedRejections;
+    emit diagnostic(QStringLiteral("SwirlRust"),QStringLiteral("SelectionFailed"),QStringLiteral("Synthetic queued control failure; current Rust session retained."));
+   },Qt::QueuedConnection);
+   return;
+  }
+  m_engine.selectNode(id);
+ }
+ void probeNode(const QUrl &url) override{m_engine.probeNode(url);}
+ void probeNodeTagged(const QUrl &url,quint64 tag) override{m_engine.probeNodeTagged(url,tag);}
+ void setRoutingMode(const QString &mode) override{m_engine.setRoutingMode(mode);}
+ Status status() const override{return m_engine.status();}
+ QString configurationSummary() const override{return m_engine.configurationSummary();}
+ QVariantList routingRules() const override{return m_engine.routingRules();}
+private:
+ ThreadedEngine m_engine;
+};
+
 class RustCoreTests:public QObject {
  Q_OBJECT
  EngineStartOptions options(ControlledNetwork &net){
@@ -194,7 +231,9 @@ private slots:
    if(!explicitAlpn){
     const QJsonObject user{{"id","00112233-4455-6677-8899-aabbccddeeff"},{"encryption","none"},{"flow","xtls-rprx-vision"}};
     const QJsonObject endpoint{{"address","proxy.invalid"},{"port",443},{"users",QJsonArray{user}}};
-    const QJsonObject reality{{"serverName","camouflage.invalid"},{"fingerprint",profile},{"publicKey",QString::fromLatin1(key)},{"shortId","a1B2"}};
+    // Xray source names are distinct from Swirl's native IR aliases.
+    const auto sourceProfile=profile=="chrome_133"?QStringLiteral("HelloChrome_133"):profile;
+    const QJsonObject reality{{"serverName","camouflage.invalid"},{"fingerprint",sourceProfile},{"publicKey",QString::fromLatin1(key)},{"shortId","a1B2"}};
     const QJsonObject stream{{"network","raw"},{"security","reality"},{"realitySettings",reality}};
     const QJsonObject legacy{{"protocol","vless"},{"tag","fixture"},{"settings",QJsonObject{{"vnext",QJsonArray{endpoint}}}},{"streamSettings",stream}};
     auto tcp=legacy;auto tcpStream=stream;tcpStream["network"]="tcp";tcpStream["tcpSettings"]=QJsonObject{{"header",QJsonObject{{"type","none"}}}};tcp["streamSettings"]=tcpStream;
@@ -206,9 +245,19 @@ private slots:
    QJsonObject expected;
    for(const auto &body:bodies){
     const auto imported=NodeImporter::parse(body);QVERIFY2(imported,qPrintable(imported.error));QCOMPARE(imported.nodes.size(),1);
-    const auto original=imported.nodes.first();QVERIFY(original.conversionIssues.isEmpty());QCOMPARE(original.parameters.value("client-fingerprint"),QJsonValue(profile));
+    const auto original=imported.nodes.first();
+    if(original.isXray()){
+     // The authoritative Rust import retains an informational semantic notice:
+     // native authentication fails closed instead of invoking Xray's crawler.
+     QCOMPARE(original.conversionIssues,QStringList{QStringLiteral("RealityNativeAuthenticationOnly · outbounds[0].streamSettings.realitySettings")});
+     QVERIFY(original.nativeExecutable);QVERIFY(original.runtimeIssues.isEmpty());
+     QCOMPARE(original.nativeOutbound.value("reality").toObject().value("fingerprint"),QJsonValue(profile));
+     const auto decoded=body.startsWith('{')?body:QByteArray::fromBase64(body);
+     QCOMPARE(original.sourceDocument,decoded);QCOMPARE(original.sourceNodeIndex,0);
+     QCOMPARE(original.originalConfiguration.value("outbound"),QJsonDocument::fromJson(decoded).object().value("outbounds").toArray().first());
+     QCOMPARE(imported.configurationFormat,QString("xray-v2ray-json"));QVERIFY(imported.configuration.isEmpty());QVERIFY(imported.executionConfiguration.isEmpty());
+    }else{QVERIFY(original.conversionIssues.isEmpty());QCOMPARE(original.parameters.value("client-fingerprint"),QJsonValue(profile));}
     if(body==json||body==json.toBase64())QCOMPARE(original.originalConfiguration,source);
-    if(original.sourceFormat.contains("Xray")){const auto decoded=body.startsWith('{')?body:QByteArray::fromBase64(body);QCOMPARE(original.originalConfiguration,QJsonDocument::fromJson(decoded).object().value("outbounds").toArray().first().toObject());QCOMPARE(imported.configurationFormat,QString("xray-v2ray-json"));QVERIFY(imported.configuration.isEmpty());QVERIFY(imported.executionConfiguration.isEmpty());}
     const auto path=directory.filePath(QString("browser-reality-%1.dat").arg(index++));QString id;
     {NodeStore saved(path);QVERIFY(saved.importNodes(imported.nodes));id=saved.nodes().first().id;QVERIFY(saved.select(id));}
     NodeStore restored(path);QCOMPARE(restored.nodes().size(),1);QCOMPARE(restored.selectedId(),id);
@@ -216,11 +265,40 @@ private slots:
     QVERIFY(SwirlProtocolRegistry::nativeNodeReason(node).isEmpty());QCOMPARE(SwirlProtocolRegistry::describe(node).value("tested"),QVariant(false));
     EngineStartOptions options;options.nodes=restored.nodes();options.selectedNodeId=id;options.routingMode="global";options.proxyPort=12345;
     QJsonObject configuration;const auto reason=RustCoreEngine::configuration(options,&configuration);QVERIFY2(reason.isEmpty(),qPrintable(reason));
-    const auto outbound=configuration.value("nodes").toArray().first().toObject().value("outbound").toObject();
+    auto outbound=configuration.value("nodes").toArray().first().toObject().value("outbound").toObject();
+    // Serde emits absent Option values as null; generic-node conversion omits
+    // the same absent values. Neither representation may carry ordinary TLS/WS.
+    for(const auto &optional:{"tls","websocket"}){QVERIFY(outbound.value(optional).isNull()||outbound.value(optional).isUndefined());outbound.remove(optional);}
     if(expected.isEmpty())expected=outbound;else QCOMPARE(outbound,expected);
     QVERIFY(!outbound.contains("tls"));QVERIFY(!outbound.contains("websocket"));QCOMPARE(outbound.value("flow"),QJsonValue("xtls-rprx-vision"));
     const auto reality=outbound.value("reality").toObject();QCOMPARE(reality.value("fingerprint"),QJsonValue(profile));QCOMPARE(reality.value("public_key"),QJsonValue(QString::fromLatin1(key)));QCOMPARE(reality.value("short_id"),QJsonValue("a1B2"));QCOMPARE(reality.value("server_name"),QJsonValue("camouflage.invalid"));
     const QJsonArray expectedAlpn=explicitAlpn?QJsonArray{"h2","http/1.1"}:QJsonArray{};QCOMPARE(reality.value("alpn"),QJsonValue(expectedAlpn));
+   }
+  }
+ }
+ void browserRealityXraySourceNamesAndUnsupportedProfilesRemainExplicit(){
+  const auto key=QString::fromLatin1(QByteArray(32,'\x09').toBase64(QByteArray::Base64UrlEncoding|QByteArray::OmitTrailingEquals));
+  for(const auto &sourceProfile:QStringList{"chrome","HelloChrome_133","chrome_133","rustls","firefox"}){
+   const bool supported=sourceProfile=="chrome"||sourceProfile=="HelloChrome_133";
+   const QJsonObject reality{{"serverName","camouflage.invalid"},{"fingerprint",sourceProfile},{"publicKey",key},{"shortId","a1B2"}};
+   const QJsonObject user{{"id","00112233-4455-6677-8899-aabbccddeeff"},{"encryption","none"},{"flow","xtls-rprx-vision"}};
+   const QJsonObject endpoint{{"address","proxy.invalid"},{"port",443},{"users",QJsonArray{user}}};
+   const QJsonObject source{{"protocol","vless"},{"tag","fixture"},{"settings",QJsonObject{{"vnext",QJsonArray{endpoint}}}},{"streamSettings",QJsonObject{{"network","raw"},{"security","reality"},{"realitySettings",reality}}}};
+   const auto document=QJsonDocument(QJsonObject{{"outbounds",QJsonArray{source}}}).toJson();
+   const auto parsed=NodeImporter::parse(document);QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);
+   const auto node=parsed.nodes.first();QVERIFY(node.isXray());QCOMPARE(node.sourceDocument,document);
+   QCOMPARE(node.originalConfiguration.value("outbound"),QJsonValue(source));QCOMPARE(node.nativeExecutable,supported);
+   QCOMPARE(SwirlProtocolRegistry::describe(node).value("tested"),QVariant(false));
+   EngineStartOptions options;options.nodes=parsed.nodes;options.selectedNodeId=node.id;options.routingMode="global";
+   QJsonObject config{{"sentinel",true}};const auto reason=RustCoreEngine::configuration(options,&config);
+   if(supported){
+    QVERIFY2(reason.isEmpty(),qPrintable(reason));QVERIFY(node.runtimeIssues.isEmpty());
+    const auto outbound=config.value("nodes").toArray().first().toObject().value("outbound").toObject();
+    QCOMPARE(outbound.value("reality").toObject().value("fingerprint"),QJsonValue(sourceProfile=="chrome"?"chrome":"chrome_133"));
+    QCOMPARE(outbound.value("flow"),QJsonValue("xtls-rprx-vision"));QVERIFY(outbound.value("tls").isNull());
+   }else{
+    QVERIFY(!reason.isEmpty());QCOMPARE(config,QJsonObject({{"sentinel",true}}));
+    QVERIFY(node.nativeOutbound.isEmpty());QVERIFY(node.runtimeIssues.contains(QStringLiteral("RealitySourceFingerprintUnsupported")));
    }
   }
  }
@@ -321,7 +399,7 @@ private slots:
   // HTTP imports can preserve passwords up to the product's storage bound;
   // this value exceeds the native runtime's narrower credential capability.
   auto nativeLimit=a;nativeLimit["name"]="native-limit";nativeLimit["type"]="http";nativeLimit["username"]="synthetic";nativeLimit["password"]=QString(256,'x');
-  auto engine=std::make_unique<ThreadedEngine>();const auto *runtime=engine.get();EngineController controller(std::move(engine),nullptr,path);auto o=options(net);controller.setProxyPort(o.proxyPort);controller.setRoutingMode("global");
+  auto engine=std::make_unique<RejectOneSelectionEngine>();auto *runtime=engine.get();EngineController controller(std::move(engine),nullptr,path);auto o=options(net);controller.setProxyPort(o.proxyPort);controller.setRoutingMode("global");
   controller.imports()->importText(QString::fromUtf8(QJsonDocument(QJsonObject{{"proxies",QJsonArray{a,b,unsupported,nativeLimit}}}).toJson()));
   QTRY_VERIFY_WITH_TIMEOUT(!controller.imports()->busy(),5000);QCOMPARE(controller.nodeCatalog().size(),4);
   const auto catalog=controller.nodeCatalog();const auto idA=catalog[0].toMap()["id"].toString(),idB=catalog[1].toMap()["id"].toString();
@@ -330,13 +408,20 @@ private slots:
   QVERIFY(!controller.chooseNode(catalog[2].toMap()["id"].toString()));QCOMPARE(controller.selectedNodeId(),idA);QCOMPARE(controller.activeNodeId(),idA);QCOMPARE(NodeStore(path).selectedId(),idA);
   QVERIFY(!controller.chooseNode("missing"));QVERIFY(!controller.chooseNode({}));QCOMPARE(NodeStore(path).selectedId(),idA);
   QSignalSpy diagnostics(&controller,&EngineController::diagnostic);
-  QVERIFY(controller.chooseNode(catalog[3].toMap()["id"].toString()));
+  QVERIFY(!controller.chooseNode(catalog[3].toMap()["id"].toString()));
+  QVERIFY(!controller.nodeBusy());QCOMPARE(runtime->selectionCalls,0);QCOMPARE(diagnostics.count(),0);
+  QCOMPARE(controller.selectedNodeId(),idA);QCOMPARE(controller.activeNodeId(),idA);QCOMPARE(NodeStore(path).selectedId(),idA);
+  QCOMPARE(runtime->status().sessionId,sessionA);QCOMPARE(request(),QByteArray("exit-A"));
+  // Preserve the asynchronous rollback contract independently of the earlier
+  // native capability check. B is valid, but one queued control result fails.
+  runtime->rejectNextSelection=idB;QVERIFY(controller.chooseNode(idB));QCOMPARE(runtime->selectionCalls,1);
+  QCOMPARE(NodeStore(path).selectedId(),idB);QCOMPARE(controller.activeNodeId(),idA);
   // The worker result is queued. An immediate reconnect request must obey the
   // same pending-selection gate and must not restart A with the unaccepted ID.
   QVERIFY(controller.nodeBusy());controller.connectNode({});QVERIFY(!controller.busy());QVERIFY(controller.apiHealthy());QCOMPARE(runtime->status().sessionId,sessionA);
   QTRY_VERIFY_WITH_TIMEOUT(!controller.nodeBusy(),5000);QCOMPARE(controller.selectedNodeId(),idA);QCOMPARE(controller.activeNodeId(),idA);QCOMPARE(NodeStore(path).selectedId(),idA);
   QCOMPARE(runtime->status().sessionId,sessionA);
-  bool rejectedByRuntime=false;for(const auto &event:diagnostics)if(event[0].toString()=="SwirlRust"&&event[1].toString()=="SelectionFailed")rejectedByRuntime=true;QVERIFY(rejectedByRuntime);
+  bool receivedQueuedFailure=false;for(const auto &event:diagnostics)if(event[0].toString()=="SwirlRust"&&event[1].toString()=="SelectionFailed")receivedQueuedFailure=true;QVERIFY(receivedQueuedFailure);QCOMPARE(runtime->injectedRejections,1);
   QCOMPARE(request(),QByteArray("exit-A"));QCOMPARE(net.b.forwarded,0);
   QVERIFY(controller.chooseNode(idB));QTRY_COMPARE_WITH_TIMEOUT(controller.activeNodeId(),idB,5000);QCOMPARE(NodeStore(path).selectedId(),idB);QCOMPARE(request(),QByteArray("exit-B"));
   controller.stop();QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive(),5000);
@@ -919,8 +1004,20 @@ private slots:
   status=503;body=original;imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);QCOMPARE(controller.nodeCatalog(),beforeNodes);status=200;
   body="[Proxy]\n"+a+"[Proxy Group]\nroute = select,A\n[Rule]\nFINAL,route\n";imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);QCOMPARE(controller.nodeCatalog().size(),1);QCOMPARE(controller.nodeCatalog().first().toMap().value("id").toString(),id);
   controller.connectNode(id);QTRY_VERIFY_WITH_TIMEOUT(controller.apiHealthy(),4000);reply=client.get(request);QTRY_VERIFY_WITH_TIMEOUT(reply->isFinished(),5000);QCOMPARE(reply->error(),QNetworkReply::NoError);QCOMPARE(reply->readAll(),QByteArray("exit-A"));reply->deleteLater();controller.disconnectNode();QTRY_VERIFY_WITH_TIMEOUT(!controller.processAlive(),4000);
-  body.replace("A =","Renamed =");body.replace("select,A","select,Renamed");imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);QCOMPARE(controller.nodeCatalog().size(),1);const auto renamed=controller.nodeCatalog().first().toMap().value("id").toString();QVERIFY(renamed!=id);
-  EngineController reopened(std::make_unique<RustCoreEngine>(),nullptr,path,true);reopened.setProxyPort(proxyPort);reopened.connectNode(renamed);QTRY_VERIFY_WITH_TIMEOUT(reopened.apiHealthy(),4000);reply=client.get(request);QTRY_VERIFY_WITH_TIMEOUT(reply->isFinished(),5000);QCOMPARE(reply->readAll(),QByteArray("exit-A"));reply->deleteLater();reopened.stop();QTRY_VERIFY_WITH_TIMEOUT(!reopened.processAlive(),4000);
+  body.replace("A =","Renamed =");body.replace("select,A","select,Renamed");imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);QCOMPARE(controller.nodeCatalog().size(),1);
+  const auto renamed=controller.nodeCatalog().first().toMap().value("id").toString();
+  // Display names are not semantic identities. The same source-owned endpoint
+  // retains its ID and selection while the policy resolves the new source name.
+  QCOMPARE(renamed,id);QCOMPARE(controller.nodeCatalog().first().toMap().value("name").toString(),QString("Renamed"));QCOMPARE(controller.selectedNodeId(),id);
+  QCOMPARE(controller.policyGroups().first().toMap().value("proxies").toStringList(),QStringList{id});
+  {NodeStore disk(path);QCOMPARE(disk.selectedId(),id);QCOMPARE(disk.nodes().first().sourceId,source);QCOMPARE(disk.nodes().first().name,QString("Renamed"));}
+  const auto renamedCatalog=controller.nodeCatalog();const auto renamedNetwork=controller.networkConfigurationSnapshot();
+  QVERIFY(file.open(QIODevice::ReadOnly));const auto renamedCiphertext=file.readAll();file.close();
+  body.replace("select,Renamed","select,A");imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);
+  QCOMPARE(controller.nodeCatalog(),renamedCatalog);QCOMPARE(controller.networkConfigurationSnapshot(),renamedNetwork);
+  QVERIFY(imports->providers().first().toMap().value("status").toString().contains(QStringLiteral("失败")));
+  QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),renamedCiphertext);file.close();
+  EngineController reopened(std::make_unique<RustCoreEngine>(),nullptr,path,true);QCOMPARE(reopened.selectedNodeId(),id);reopened.setProxyPort(proxyPort);reopened.connectNode(renamed);QTRY_VERIFY_WITH_TIMEOUT(reopened.apiHealthy(),4000);reply=client.get(request);QTRY_VERIFY_WITH_TIMEOUT(reply->isFinished(),5000);QCOMPARE(reply->readAll(),QByteArray("exit-A"));reply->deleteLater();reopened.stop();QTRY_VERIFY_WITH_TIMEOUT(!reopened.processAlive(),4000);
  }
  void iniRealityCannotStartAsOrdinaryTls(){
   QTcpServer endpoint;QVERIFY(endpoint.listen(QHostAddress::LocalHost));int requests=0;connect(&endpoint,&QTcpServer::newConnection,this,[&]{++requests;});

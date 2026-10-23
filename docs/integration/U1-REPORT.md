@@ -1,5 +1,15 @@
 # U1 unified subscription and native Core integration
 
+This file is a chronological integration ledger. Tables inside an earlier
+checkpoint describe that checkpoint, not final acceptance. The complete source
+disposition is in [U1-source-resolution.md](U1-source-resolution.md), the
+product feature/gap matrix in
+[U1-subscription-feature-audit.md](U1-subscription-feature-audit.md), and the
+required conditional Qt menu in [U1-qt-fixture-audit.md](U1-qt-fixture-audit.md).
+Only test artifacts whose `source_sha` equals the delivered branch tip can
+establish the final result. A workflow's build success does not erase the
+non-Windows encrypted-storage code gap or establish physical-device acceptance.
+
 ## U1-A: verified baseline and source inventory
 
 Integration branch: `work/subscription-unified-integration-20261023`.
@@ -42,7 +52,7 @@ report the exact integrated SHA.
 | `work/xray-v2ray-qt-import-20261022` | `506014d6386610411f48c939ab62cb93a3509431` | Ancestor | included-in-baseline |
 | `work/xray-v2ray-transport-20261022` | `fca13d3c06f9a6a45cab0b8e28c3587fbbe2f870` | Ancestor | included-in-baseline |
 
-## Verified remaining integration conflicts
+## Integration conflicts identified at U1-A
 
 - R1 (`5d96214ac80d63985cdccf4942c3c1d79035e793`) has five source-only commits:
   paired Rust build/loader identity, native lifecycle/probes, license packaging
@@ -78,7 +88,7 @@ an unimplemented code capability, not a physical-device-only validation item.
 
 ## Stages and acceptance
 
-| Stage | Scope | Current result |
+| Stage | Scope | U1-A checkpoint result |
 |---|---|---|
 | U1-A | Remote inventory, isolated baseline, ancestry/duplicate identification | Source audit complete; no product acceptance claimed |
 | U1-B | Unified subscription and persistence chain | In progress |
@@ -243,3 +253,86 @@ boundary. See [U1-source-recheck.json](U1-source-recheck.json). Source inclusion
 checkpoint tests, CI builds, independent-peer traffic and physical Windows use
 remain separate evidence categories. None of these checkpoint results is final
 U1 acceptance.
+
+## U1-B/F3: system proxy diagnostics and complete Qt fixture inventory
+
+The independent legacy diagnostic fix at
+`564e213ce604d7b79bb2414cd3aefba5744d46eb` is selectively integrated.
+WinINET and the native registry manual-proxy state are observed separately;
+registry-only activation is no longer shown as disabled. Unknown/malformed
+values and read errors stay distinguishable. The current encrypted recovery
+journal, ownership rules, external-change detection and independent guard are
+preserved. Diagnostic export uses an allowlist and redacts additional protocol
+URIs, PSKs, auth-str and Unicode hostnames. No visual redesign is included.
+
+The shared registry reader is bounded and read-only. Windows fixtures use only
+a unique temporary volatile HKCU key; live Internet Settings are not mutated.
+The standalone importer now links the same new state module as the complete
+product. The Windows product and three-platform importer CI both execute its
+tests. Local integrated candidate checks pass: 23 proxy-state cases, 12 export
+cases, and the importer/scope/loader suites. Final-SHA regression remains required.
+
+The original RustCoreTests menu contains nine conditional independent-peer
+slots. U1 now executes all nine through their existing Python harnesses instead
+of relying on a green baseline run that omitted fixture-dependent cases. The
+new Windows workflow checks the complete slot inventory, all five existing
+REALITY lifecycle modes, actual Qt XML, source SHA, paired DLL metadata and
+zero fixture skips. Public endpoint failure remains a test failure. Details:
+[U1-qt-fixture-audit.md](U1-qt-fixture-audit.md). This is a new execution gate,
+not a claim that the fixtures have already passed on the unified final commit.
+
+The observation workflow's dynamic shell was moved to the supported job
+`defaults.run.shell` location. The previous stage's fixed Qt 6.11.3 Windows
+installation and four-job R1 workflow now start successfully in GitHub Actions;
+that establishes installation/startup only, not product acceptance. Obsolete
+U1 runs may be cancelled when a newer integrated SHA is pushed. Cancelled and
+superseded runs are never counted toward final acceptance.
+
+## U1-B/F3 continuation: cancellation, cache isolation and real regression fixes
+
+Background subscription updates now have an explicit `cancelRefresh(id)` owner.
+The existing refresh control exposes queued/active cancellation without allowing
+a manual import dialog to cancel an unrelated subscription. Cancellation revokes
+the generation, aborts the owned reply, removes only that provider's queue item,
+and keeps the encrypted snapshot and selected node. Retry starts a fresh request.
+Once encryption/atomic commit begins, cancellation is rejected through the
+`nodesApplied` notification; the UI must not report cancellation after a save.
+Direct Qt signal reentrancy is checked at text/file/URL/confirmation/refresh entry
+points, so a cancellation or shutdown during `changed` cannot launch stale work.
+Tests include real stalled TLS, manual-owner isolation, synchronous cancellation,
+and Windows actual encrypted snapshot equality, reload, retry and commit guards.
+Windows cases are mandatory in the importer XML gate; they are not treated as
+executed by a Linux component check.
+
+The source cache/log patches `3410ffb2ab872d4dd264e8431fd083193e0a8741` and
+`ac4b051f2ac048bb56144245e558d5244f3f4d54` are selectively integrated. QML cache
+paths include content revision, Qt version and QA/production flavor, respect
+explicit production overrides and preserve old files for rollback. The existing
+production EXE is launched twice against the same isolated directory in CI.
+Successful public-endpoint diagnostics are INFO; failure diagnostics remain
+ERROR. Neither change imports the source branch's visual redesign.
+
+Actual CI at `208e50dbd5f0b05b607afab0386fd4bb0dae8b79` exposed additional
+regressions; those results are retained as failed stage evidence:
+
+| Exact stage run | Observed result and follow-up |
+| --- | --- |
+| [Rust/product 39900630355](https://github.com/SOLHK/Swirl/actions/runs/39900630355) | Linux/macOS complete product builds, loader and executable self-tests passed. The Rust menu had an obsolete gRPC negative. Windows full product exposed six failing suites and did not reach final packaging acceptance. |
+| [Transports 39900630389](https://github.com/SOLHK/Swirl/actions/runs/39900630389) | The added complete routing/subscription menu exposed the same obsolete gRPC negative. Supported gRPC now has positive mapping/startup and ordinary imported-config traffic through the locked official Xray peer; unsupported options remain negative cases. |
+| [Protocols 39900630419](https://github.com/SOLHK/Swirl/actions/runs/39900630419) | macOS official SS2022 failed before traffic: its server log reported `Address already in use`. TCP/UDP port ownership and bounded startup-conflict handling require revalidation; protocol/authentication/replay assertions are retained. |
+| [Importer 39900630400](https://github.com/SOLHK/Swirl/actions/runs/39900630400) | macOS proxy download positive controls failed. The test CONNECT relay aborted on a normal upstream close and could discard response bytes. It now drains/flushes normal closure; certificate and redirect rejection assertions remain unchanged. Final macOS execution is required. |
+| [Qt security 39900630424](https://github.com/SOLHK/Swirl/actions/runs/39900630424) | All six OS/SDK downloader jobs and the Windows fixed-SDK product security menu passed on this stage SHA only. |
+
+The Windows failures also exposed assumptions invalidated by semantic node
+identity. Rename tests must keep the same ID and selected policy reference;
+adding a distinct authenticated endpoint still exercises live-tunnel preservation.
+The >32 MiB rejection fixture now uses 1,000 distinct endpoints and asserts the
+prepared count before retaining the original size/error/old-file checks.
+Hysteria2 positive native-listener startup is distinguished from the still
+unsupported port-hopping negative; neither local startup nor a rejected option
+is presented as a successful remote QUIC session.
+
+The four product suites that formerly wrote only text files now also emit XML
+and stdout, preserving assertions while making future CI failures directly
+diagnosable. Changes in this section need a fresh clean-SHA regression; the
+stage runs above are not added together into final acceptance.

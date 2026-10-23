@@ -204,6 +204,12 @@ int main(int argc, char *argv[])
         if(!app.arguments().contains("--preview-preserve-settings"))isolatedSettings.clear();
         isolatedSettings.sync();
     }
+#if defined(SWIRL_UI_TESTS) || defined(SWIRL_XRAY_UI_TESTS)
+    const QString qmlCacheFlavor=QStringLiteral("qa");
+#else
+    const QString qmlCacheFlavor=QStringLiteral("release");
+#endif
+    SwirlPaths::initializeQmlCache(QStringLiteral(SWIRL_QML_CACHE_REVISION),qmlCacheFlavor);
 #ifdef SWIRL_UI_TESTS
     if(fontUiTest)app.setProperty("fontBeforeManagerBytes",fontUiPrivateBytes());
 #endif

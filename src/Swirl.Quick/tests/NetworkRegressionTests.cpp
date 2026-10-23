@@ -74,7 +74,15 @@ private slots:
   client.write("CONNECT 127.0.0.1:"+QByteArray::number(origin.serverPort())+" HTTP/1.1\r\nHost: fixture\r\n\r\n");QByteArray bytes;
   QVERIFY(QTest::qWaitFor([&]{bytes+=client.readAll();return bytes.contains("200 Connection Established");},5000));
   controller.imports()->importText(QString("socks5://127.0.0.1:%1#new-subscription-node").arg(net.a.serverPort()));
-  QVERIFY(QTest::qWaitFor([&]{return !controller.imports()->busy();},5000));QVERIFY(controller.nodes().size()>=2);QCOMPARE(controller.processId(),pid);
+  QVERIFY(QTest::qWaitFor([&]{return !controller.imports()->busy();},5000));
+  // Renaming the same endpoint preserves its semantic identity; importing a
+  // genuinely different endpoint must still append without replacing A's live tunnel.
+  QCOMPARE(controller.nodes().size(),1);QCOMPARE(controller.nodes().first().toMap().value("id").toString(),id);
+  QCOMPARE(controller.nodes().first().toMap().value("name").toString(),QString("new-subscription-node"));QCOMPARE(controller.processId(),pid);
+  controller.imports()->importText(QString("socks5://%1:%2@127.0.0.1:%3#second-subscription-node")
+      .arg(QString::fromLatin1(QUrl::toPercentEncoding(QString::fromUtf8(net.b.username))),
+           QString::fromLatin1(QUrl::toPercentEncoding(QString::fromUtf8(net.b.password)))).arg(net.b.serverPort()));
+  QVERIFY(QTest::qWaitFor([&]{return !controller.imports()->busy();},5000));QCOMPARE(controller.nodes().size(),2);QCOMPARE(controller.processId(),pid);
   client.write("still-connected-after-import");bytes.clear();QVERIFY(QTest::qWaitFor([&]{bytes+=client.readAll();return bytes=="still-connected-after-import";},5000));
   client.abort();controller.shutdown();QVERIFY(QTest::qWaitFor([&]{return !controller.processAlive();},5000));
  }

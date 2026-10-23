@@ -6,6 +6,9 @@
 #include "engine/NodeImporter.h"
 #include "engine/NodeImportService.h"
 #include "engine/RustCoreEngine.h"
+#include "engine/EngineController.h"
+#include "app/StoragePaths.h"
+#include <QSettings>
 #include <QNetworkReply>
 #include <QSignalSpy>
 #include <QJsonArray>
@@ -36,6 +39,7 @@ class SubscriptionFormatTests:public QObject {
         return format==8||format==9?uri.toBase64():uri;
     }
 private slots:
+    void initTestCase(){QStandardPaths::setTestModeEnabled(true);SwirlPaths::initializeTestStorage();QSettings::setDefaultFormat(QSettings::IniFormat);QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,SwirlPaths::writableLocation(QStandardPaths::AppConfigLocation));}
     void formatFixturesKeepProtocolOptionsDistinctAndRejectCrossProtocolFields(){
         for(int format=0;format<17;++format){
             const auto parsed=NodeImporter::parse(fixture(format,443,"synthetic-format-password"));
@@ -78,10 +82,14 @@ private slots:
         const QStringList formats{"Clash","Trojan Clash","Clash compatible","Trojan Clash compatible","Surge","Trojan Surge","Quantumult X","Trojan Quantumult X","Shadowrocket","Trojan Shadowrocket","Shadowsocks SIP002","Trojan URI","Surfboard","Trojan Surfboard","Loon","Trojan Loon","sing-box"};
         for(int i=0;i<formats.size();++i){
             const bool trojan=QList<int>{1,3,5,7,9,11,13,15}.contains(i);source.document=fixture(i,443,"r1-format-fixture-password");
-            QTemporaryDir temp;NodeStore store(temp.filePath("nodes"));NodeImportService importer(&store);QVERIFY(importer.saveSubscription({},"Isolated format source",source.url(),360,false));const auto sourceId=store.subscriptions().first().id;
-            const auto count=source.requests;importer.refreshSubscription(sourceId);QTRY_VERIFY_WITH_TIMEOUT(!importer.busy(),8000);QVERIFY2(store.nodes().size()==1,qPrintable(formats[i]+": "+importer.message()));QCOMPARE(source.requests,count+1);
-            auto n=store.nodes().first();QVERIFY(n.conversionIssues.isEmpty());QVERIFY(store.select(n.id));
-            NodeStore reloaded(store.filePath());QCOMPARE(reloaded.nodes().size(),1);QCOMPARE(reloaded.nodes().first().sourceId,sourceId);
+            QTemporaryDir temp;const auto path=temp.filePath("nodes");EngineController controller(std::make_unique<RustCoreEngine>(),nullptr,path,true);
+            const QVariantMap policy{{"groups",QVariantList{QVariantMap{{"name","retained-format-policy"},{"type","select"},{"proxies",QStringList{"DIRECT"}}}}},{"rules",QStringList{"MATCH,retained-format-policy"}}};
+            QVERIFY2(controller.replaceNetworkConfiguration(policy),qPrintable(controller.networkConfigurationError()));const auto retained=controller.networkConfigurationSnapshot();
+            auto *importer=controller.imports();QVERIFY(importer->saveSubscription({},"Isolated format source",source.url(),360,false,"auto","nodes-only"));const auto sourceId=importer->providers().first().toMap()["id"].toString();
+            const auto count=source.requests;importer->refreshSubscription(sourceId);QTRY_VERIFY_WITH_TIMEOUT(!importer->busy(),8000);QVERIFY2(controller.nodeCatalog().size()==1,qPrintable(formats[i]+": "+importer->message()));QCOMPARE(source.requests,count+1);
+            QCOMPARE(controller.networkConfigurationSnapshot(),retained);
+            NodeStore store(path);const auto n=store.nodes().first();QVERIFY(n.conversionIssues.isEmpty());QVERIFY(controller.chooseNode(n.id));
+            NodeStore reloaded(path);QCOMPARE(reloaded.nodes().size(),1);QCOMPARE(reloaded.nodes().first().sourceId,sourceId);QCOMPARE(reloaded.selectedId(),n.id);QCOMPARE(reloaded.subscriptions().first().importScope,QString("nodes-only"));
             QCOMPARE(reloaded.nodes().first().password,QString("r1-format-fixture-password"));
             QFile encrypted(store.filePath());QVERIFY(encrypted.open(QIODevice::ReadOnly));QVERIFY(!encrypted.readAll().contains("r1-format-fixture-password"));
             EngineStartOptions opts;opts.nodes=reloaded.nodes();opts.selectedNodeId=n.id;opts.routingMode="global";
@@ -91,8 +99,10 @@ private slots:
             QCOMPARE(outbound.value("password").toString(),QString("r1-format-fixture-password"));
             if(trojan)QCOMPARE(outbound.value("tls").toObject().value("server_name").toString(),QString("localhost"));
             else QCOMPARE(outbound.value("cipher").toString(),QString("aes-128-gcm"));
-            importer.refreshSubscription(sourceId);QTRY_VERIFY_WITH_TIMEOUT(!importer.busy(),8000);QCOMPARE(store.selectedId(),n.id);QCOMPARE(store.nodes().first().id,n.id);
+            importer->refreshSubscription(sourceId);QTRY_VERIFY_WITH_TIMEOUT(!importer->busy(),8000);QCOMPARE(controller.selectedNodeId(),n.id);QCOMPARE(controller.networkConfigurationSnapshot(),retained);
+            NodeStore refreshed(path);QCOMPARE(refreshed.selectedId(),n.id);QCOMPARE(refreshed.nodes().first().id,n.id);QCOMPARE(refreshed.networkConfiguration(),reloaded.networkConfiguration());
             qInfo()<<"FORMAT_DOWNLOAD_STORE_RUST_MAPPING"<<formats[i]<<"downloaded, parsed, DPAPI persisted, reloaded and mapped; protocol execution is a separate independent-peer test";
+            controller.shutdown();
         }
     }
 };

@@ -28,6 +28,8 @@ add_library(SwirlXrayProduct STATIC
     "${SWIRL_QUICK_SOURCE}/engine/TelemetryService.cpp"
     "${SWIRL_QUICK_SOURCE}/engine/SystemProxySession.h"
     "${SWIRL_QUICK_SOURCE}/engine/SystemProxySession.cpp"
+    "${SWIRL_QUICK_SOURCE}/engine/SystemProxyState.h"
+    "${SWIRL_QUICK_SOURCE}/engine/SystemProxyState.cpp"
     "${SWIRL_QUICK_SOURCE}/engine/ConnectionDiagnostics.h"
     "${SWIRL_QUICK_SOURCE}/engine/ConnectionDiagnostics.cpp"
     "${SWIRL_QUICK_SOURCE}/engine/ProxyNode.h"
@@ -91,6 +93,7 @@ swirl_add_xray_test(SwirlXrayStoreTests XrayStoreTests.cpp swirl-xray-store)
 swirl_add_xray_test(SwirlXrayRuntimeTests XrayRuntimeTests.cpp swirl-xray-runtime)
 swirl_add_xray_test(SwirlXrayCatalogTests XrayCatalogTests.cpp swirl-xray-catalog)
 swirl_add_xray_test(SwirlNodeImportScopeTests NodeImportScopeTests.cpp swirl-node-import-scope)
+swirl_add_xray_test(SwirlSystemProxyStateTests SystemProxyStateTests.cpp swirl-system-proxy-state)
 
 execute_process(COMMAND git rev-parse HEAD WORKING_DIRECTORY "${SWIRL_REPOSITORY}"
     OUTPUT_VARIABLE SWIRL_SOURCE_SHA OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)

@@ -133,10 +133,18 @@ jobs:
           if 'Qt=6.11.3\n' not in (root / 'xray-toolchain.txt').read_text():
               raise SystemExit('Importer tests did not compile against the required fixed Qt SDK')
           required = [
+              ('swirl-native-node-bridge.xml', set()),
+              ('swirl-node-import-scope.xml', set()),
+              ('swirl-rust-library-loader.xml', set()),
+              ('swirl-system-proxy-state.xml', {'nativeRegistryReaderUsesIsolatedFixture'}
+                  if os.environ['RUNNER_OS'] == 'Windows' else set()),
               ('swirl-xray-import.xml', {'allSixProtocolsExposeAuthoritativeNativeCandidates',
                   'socksVersionsKeepValidatedDisplayAndDnsSemantics',
                   'expandedNativeCandidatesKeepServerAccountAndFilteredSourceIndices'}),
-              ('swirl-xray-download.xml', set()),
+              ('swirl-xray-download.xml', {'subscriptionCancellationCannotCancelManualDownload',
+                  'synchronousCancellationCannotRestartManualWork'} | (
+                  {'subscriptionRefreshCancellationPreservesEncryptedSnapshotAndRetries',
+                   'synchronousRefreshCancellationStartsNoDownload'} if os.environ['RUNNER_OS'] == 'Windows' else set())),
               ('swirl-xray-store.xml', {'encryptedDocumentRoundtrip',
                   'expandedServerAccountsReloadCorrectNativeCandidate'}
                   if os.environ['RUNNER_OS'] == 'Windows' else set()),
@@ -228,6 +236,10 @@ jobs:
         with:
           name: Xray-Qt-${{ matrix.os }}-${{ github.sha }}-${{ github.run_attempt }}
           path: |
+            build/xray-qt/swirl-native-node-bridge.xml
+            build/xray-qt/swirl-node-import-scope.xml
+            build/xray-qt/swirl-rust-library-loader.xml
+            build/xray-qt/swirl-system-proxy-state.xml
             build/xray-qt/swirl-xray-import.xml
             build/xray-qt/swirl-xray-download.xml
             build/xray-qt/swirl-xray-store.xml

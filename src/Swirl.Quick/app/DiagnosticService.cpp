@@ -56,14 +56,16 @@ DiagnosticService::~DiagnosticService(){if(active==this){qInstallMessageHandler(
 QString DiagnosticService::redact(QString text){
  text=text.left(8192);
  text.replace(QRegularExpression("-----BEGIN [^-]*PRIVATE KEY-----[\\s\\S]*?(?:-----END [^-]*PRIVATE KEY-----|$)"),"[private key removed]");
- text.replace(QRegularExpression("(?:https?|ss|ssr|vmess|vless|trojan|hysteria2?)://[^\\s\\\"<>]+",QRegularExpression::CaseInsensitiveOption),"[URL removed]");
+ text.replace(QRegularExpression("[A-Za-z][A-Za-z0-9+.-]*://[^\\s\\\"<>]+"),"[URL removed]");
  text.replace(QRegularExpression("(authorization|cookie|set-cookie)\\s*[:=]\\s*[^\\r\\n]+",QRegularExpression::CaseInsensitiveOption),"\\1: [removed]");
- text.replace(QRegularExpression("[\\\"']?(?:password|passwd|token|secret|uuid|api[-_]?key|private[-_]?key|subscription)[\\\"']?\\s*[:=]\\s*(?:\\\"[^\\\"]*\\\"|'[^']*'|[^,;\\s}]+)",QRegularExpression::CaseInsensitiveOption),"[credential removed]");
+ text.replace(QRegularExpression("[\\\"']?(?:user(?:name)?|password|passwd|passphrase|token|secret|uuid|psk|auth(?:entication)?(?:[-_]?str)?|short[-_]?id|api[-_]?key|private[-_]?key(?:[-_]?passphrase)?|pre[-_]?shared[-_]?key|subscription)[\\\"']?\\s*[:=]\\s*(?:\\\"[^\\\"]*\\\"|'[^']*'|[^,;\\s}]+)",QRegularExpression::CaseInsensitiveOption),"[credential removed]");
  text.replace(QRegularExpression("\\b[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\\b",QRegularExpression::CaseInsensitiveOption),"[UUID removed]");
  text.replace(QRegularExpression("\\b(?:[0-9]{1,3}\\.){3}[0-9]{1,3}\\b"),"[IP removed]");
  text.replace(QRegularExpression("\\b[0-9a-f]{0,4}:[0-9a-f:]{2,}\\b",QRegularExpression::CaseInsensitiveOption),"[IP removed]");
  text.replace(QRegularExpression("[A-Za-z]:[\\\\/][^\\r\\n\\\"]*"),"[local path removed]");
  text.replace(QRegularExpression("\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\\b"),"[email removed]");
+ // Bare DNS names in TLS/network errors are browsing metadata too.
+ text.replace(QRegularExpression("(?:[\\p{L}\\p{M}\\p{N}-]+\\.)+[\\p{L}]{2,63}"),"[hostname removed]");
  text.replace(QRegularExpression("\\b[A-Za-z0-9_-]{32,}={0,2}\\b"),"[opaque value removed]");
  return text;
 }

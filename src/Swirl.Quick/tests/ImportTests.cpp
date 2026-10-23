@@ -3,6 +3,7 @@
 #include "engine/RustCoreEngine.h"
 #include "engine/EngineController.h"
 #include "engine/SwirlProtocolRegistry.h"
+#include "engine/NativeNodeBridge.h"
 #include "ControlledNetwork.h"
 #include <QTest>
 #include <QSettings>
@@ -173,13 +174,24 @@ private slots:
         const QByteArray json=R"({"outbounds":[{"type":"socks","tag":"A","server":"127.0.0.1","server_port":1080},{"type":"selector","tag":"choice","outbounds":["A"]}],"route":{"final":"choice"},"future":{"fixture-secret":true}})";
         const auto xray=QJsonDocument(QJsonObject{{"outbounds",QJsonArray{xrayRealitySource(),QJsonObject{{"protocol","freedom"},{"tag","direct"}}}},{"routing",QJsonObject{{"domainStrategy","IPIfNonMatch"}}},{"future",QJsonObject{{"fixture-secret",true}}}}).toJson();
         for(const auto &original:{ini,json,xray})for(const auto &body:{original,original.toBase64()}){
-            const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);QVERIFY(!parsed.configuration.isEmpty());
+            const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);
             if(original==ini){QCOMPARE(parsed.configurationFormat,QString("ini"));QVERIFY(parsed.configuration["document"].toString().contains("opaque fixture-secret"));}
-            else {QCOMPARE(parsed.configurationFormat,original==json?QString("sing-box"):QString("xray-v2ray-json"));QCOMPARE(parsed.configuration,QJsonDocument::fromJson(original).object());QVERIFY(parsed.executionConfiguration.isEmpty());}
+            else if(original==xray){
+                // The unified Rust JSON bridge retains the complete private
+                // document; global settings never become an executable Qt
+                // configuration. Manual imports require preview confirmation.
+                QCOMPARE(parsed.configurationFormat,QString("xray-v2ray-json"));
+                QVERIFY(parsed.configuration.isEmpty());QVERIFY(parsed.executionConfiguration.isEmpty());
+                QCOMPARE(QJsonDocument::fromJson(parsed.nodes.first().sourceDocument).object(),QJsonDocument::fromJson(original).object());
+                QVERIFY(!parsed.nodes.first().parameters.contains("routing"));
+                QVERIFY(!parsed.nodes.first().parameters.contains("future"));
+            }
+            else {QCOMPARE(parsed.configurationFormat,QString("sing-box"));QCOMPARE(parsed.configuration,QJsonDocument::fromJson(original).object());QVERIFY(parsed.executionConfiguration.isEmpty());}
             QTemporaryDir directory;NodeStore store(directory.filePath("nodes.dpapi"));NodeImportService service(&store);
             const auto seed=NodeImporter::parse("proxies: [{name: retained, type: socks5, server: 127.0.0.1, port: 1081}]");QVERIFY(seed);QVERIFY(store.importNodes(seed.nodes));
             QFile file(store.filePath());QVERIFY(file.open(QIODevice::ReadOnly));const auto before=file.readAll();file.close();
             service.importText(QString::fromUtf8(body));QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),4000);QCOMPARE(store.nodes().size(),1);QCOMPARE(store.nodes().first().name,QString("retained"));
+            if(original==xray){QVERIFY(service.hasPreview());service.cancelImport();QVERIFY(!service.hasPreview());}
             QVERIFY(file.open(QIODevice::ReadOnly));QCOMPARE(file.readAll(),before);QVERIFY(!service.message().contains("fixture-secret"));
         }
         for(const auto &body:{QByteArray("[Proxy]\nA = socks5, 127.0.0.1, 1080\nBypass = direct\n"),QByteArray(R"({"outbounds":[{"type":"socks","tag":"A","server":"127.0.0.1","server_port":1080},{"type":"direct","tag":"bypass"}]})")}){
@@ -191,21 +203,27 @@ private slots:
         const auto endpoint=settings.value("vnext").toArray().first().toObject();const auto user=endpoint.value("users").toArray().first().toObject();
         const auto stream=source.value("streamSettings").toObject();const auto reality=stream.value("realitySettings").toObject();
         QList<QJsonObject> rejected;
+        struct ExecutableCase{QJsonObject node;int count=1;QString defaulted;};
+        QList<ExecutableCase> executable;
         auto withStream=[&](const QJsonObject &value){auto node=source;node["streamSettings"]=value;return node;};
         auto withReality=[&](const QJsonObject &value){auto changed=stream;changed["realitySettings"]=value;return withStream(changed);};
         auto withEndpoint=[&](const QJsonObject &value){auto node=source;node["settings"]=QJsonObject{{"vnext",QJsonArray{value}}};return node;};
         auto withUser=[&](const QJsonObject &value){auto changed=endpoint;changed["users"]=QJsonArray{value};return withEndpoint(changed);};
         for(const auto &key:QStringList{"sendThrough","proxySettings","future"}){auto node=source;node[key]="fixture-secret";rejected.append(node);}
-        for(const auto &mux:QJsonArray{QJsonValue(),true,QJsonObject{},QJsonObject{{"enabled",true}},QJsonObject{{"enabled",false},{"concurrency",1}}}){auto node=source;node["mux"]=mux;rejected.append(node);}
+        for(const auto &mux:QJsonArray{QJsonValue(),true,QJsonObject{{"enabled",true}}}){auto node=source;node["mux"]=mux;rejected.append(node);}
+        for(const auto &mux:QJsonArray{QJsonObject{},QJsonObject{{"enabled",false},{"concurrency",1}}}){auto node=source;node["mux"]=mux;executable.append({node});}
         for(const auto &key:QStringList{"address","future"}){auto node=source;auto changed=settings;changed[key]="fixture-secret";node["settings"]=changed;rejected.append(node);}
-        for(const auto &endpoints:QJsonArray{QJsonValue(),QJsonObject{},QJsonArray{},QJsonArray{endpoint,endpoint}}){auto node=source;node["settings"]=QJsonObject{{"vnext",endpoints}};rejected.append(node);}
-        for(const auto &users:QJsonArray{QJsonValue(),QJsonObject{},QJsonArray{},QJsonArray{user,user}}){auto changed=endpoint;changed["users"]=users;rejected.append(withEndpoint(changed));}
+        for(const auto &endpoints:QJsonArray{QJsonValue(),QJsonObject{},QJsonArray{}}){auto node=source;node["settings"]=QJsonObject{{"vnext",endpoints}};rejected.append(node);}
+        {auto node=source;node["settings"]=QJsonObject{{"vnext",QJsonArray{endpoint,endpoint}}};executable.append({node,2});}
+        for(const auto &users:QJsonArray{QJsonValue(),QJsonObject{},QJsonArray{}}){auto changed=endpoint;changed["users"]=users;rejected.append(withEndpoint(changed));}
+        {auto changed=endpoint;changed["users"]=QJsonArray{user,user};executable.append({withEndpoint(changed),2});}
         for(const auto &port:QJsonArray{QJsonValue(),"443",false,0,65536,443.5}){auto changed=endpoint;changed["port"]=port;rejected.append(withEndpoint(changed));}
         auto changedEndpoint=endpoint;changedEndpoint["future"]="fixture-secret";rejected.append(withEndpoint(changedEndpoint));
         for(const auto &key:QStringList{"level","future"}){auto changed=user;changed[key]="fixture-secret";rejected.append(withUser(changed));}
         for(const auto &encryption:QJsonArray{QJsonValue(),"",true,"fixture-secret"}){auto changed=user;changed["encryption"]=encryption;rejected.append(withUser(changed));}
         auto missing=user;missing.remove("encryption");rejected.append(withUser(missing));missing=user;missing.remove("id");rejected.append(withUser(missing));
-        for(const auto &key:QStringList{"network","security","realitySettings"}){auto changed=stream;changed.remove(key);rejected.append(withStream(changed));}
+        for(const auto &key:QStringList{"security","realitySettings"}){auto changed=stream;changed.remove(key);rejected.append(withStream(changed));}
+        {auto changed=stream;changed.remove("network");executable.append({withStream(changed)});}
         for(const auto &network:QJsonArray{QJsonValue(),"ws","",false}){auto changed=stream;changed["network"]=network;rejected.append(withStream(changed));}
         auto changedStream=stream;changedStream["security"]="tls";rejected.append(withStream(changedStream));
         changedStream=stream;changedStream["sockopt"]=QJsonObject{{"mark",1}};rejected.append(withStream(changedStream));
@@ -213,20 +231,68 @@ private slots:
             auto changed=stream;changed["tcpSettings"]=tcp;rejected.append(withStream(changed));
         }
         changedStream=stream;changedStream["tcpSettings"]=QJsonObject{};changedStream["rawSettings"]=QJsonObject{{"header",QJsonObject{{"type","none"}}}};rejected.append(withStream(changedStream));
-        for(const auto &key:QStringList{"publicKey","serverName","fingerprint","shortId"}){auto changed=reality;changed.remove(key);rejected.append(withReality(changed));changed=reality;changed[key]=false;rejected.append(withReality(changed));}
+        for(const auto &key:QStringList{"publicKey","serverName","fingerprint","shortId"}){
+            auto changed=reality;changed.remove(key);
+            if(key=="serverName"||key=="shortId")executable.append({withReality(changed),1,key});else rejected.append(withReality(changed));
+            changed=reality;changed[key]=false;rejected.append(withReality(changed));
+        }
         for(const auto &key:QStringList{"alpn","mldsa65Verify","future","spiderX"}){auto changed=reality;changed[key]="fixture-secret";rejected.append(withReality(changed));}
         auto changedReality=reality;changedReality["password"]="fixture-secret";rejected.append(withReality(changedReality));
         changedReality=reality;changedReality["show"]=true;rejected.append(withReality(changedReality));
         for(const auto &node:rejected){
-            // A valid preceding node cannot authorize a partial import after a
-            // later malformed node, nor can wrapping it in Base64 hide fields.
+            // The unified Rust parser rejects malformed types, or preserves
+            // valid JSON as explicitly non-executable nodes. A preceding valid
+            // node and Base64 wrapping must never authorize the rejected node.
             for(const auto &nodes:QList<QJsonArray>{QJsonArray{node},QJsonArray{source,node}}){
                 const auto original=QJsonDocument(QJsonObject{{"outbounds",nodes}}).toJson();
-                for(const auto &body:{original,original.toBase64()}){const auto parsed=NodeImporter::parse(body);QVERIFY2(!parsed,"Xray source fields were dropped or a list was flattened");QVERIFY(parsed.nodes.isEmpty());QVERIFY(!parsed.error.contains("fixture-secret"));QVERIFY(!parsed.error.contains(reality.value("publicKey").toString()));}
+                for(const auto &body:{original,original.toBase64()}){
+                    const auto parsed=NodeImporter::parse(body);
+                    QVERIFY(!parsed.error.contains("fixture-secret"));QVERIFY(!parsed.error.contains(reality.value("publicKey").toString()));
+                    if(!parsed){QVERIFY(parsed.nodes.isEmpty());continue;}
+                    QCOMPARE(parsed.nodes.size(),nodes.size());const auto &blocked=parsed.nodes.last();
+                    QCOMPARE(QJsonDocument::fromJson(blocked.sourceDocument).object(),QJsonDocument::fromJson(original).object());
+                    QCOMPARE(blocked.originalConfiguration["outbound"],QJsonValue(node));
+                    QVERIFY(!blocked.nativeExecutable);QVERIFY(blocked.nativeOutbound.isEmpty());QVERIFY(!blocked.runtimeIssues.isEmpty());
+                    QVERIFY(!SwirlProtocolRegistry::nativeNodeReason(blocked).isEmpty());
+                    const auto publicJson=QJsonDocument::fromVariant(blocked.publicInfo()).toJson();
+                    QVERIFY(!publicJson.contains("fixture-secret"));QVERIFY(!publicJson.contains(reality["publicKey"].toString().toUtf8()));
+                    EngineStartOptions options;options.nodes=parsed.nodes;options.selectedNodeId=blocked.id;options.routingMode="global";
+                    const QJsonObject sentinel{{"unchanged",true}};QJsonObject native=sentinel;
+                    QVERIFY(!RustCoreEngine::configuration(options,&native).isEmpty());QCOMPARE(native,sentinel);
+                }
             }
         }
         auto noFlow=user;noFlow.remove("flow");auto node=withUser(noFlow);auto emptyShortId=reality;emptyShortId["shortId"]="";auto changed=stream;changed["realitySettings"]=emptyShortId;node["streamSettings"]=changed;
-        const auto original=QJsonDocument(QJsonObject{{"outbounds",QJsonArray{node}}}).toJson();const auto parsed=NodeImporter::parse(original);QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.first().originalConfiguration,node);QVERIFY(!parsed.nodes.first().parameters.contains("flow"));QCOMPARE(parsed.nodes.first().parameters.value("reality-opts").toObject().value("short-id"),QJsonValue(""));
+        executable.append({node,1,"noFlow"});
+        const auto baseline=NodeImporter::parse(QJsonDocument(QJsonObject{{"outbounds",QJsonArray{source}}}).toJson());QVERIFY(baseline);QVERIFY(baseline.nodes.first().nativeExecutable);
+        for(const auto &entry:executable)for(const bool preceding:{false,true}){
+            const auto nodes=preceding?QJsonArray{source,entry.node}:QJsonArray{entry.node};
+            const auto original=QJsonDocument(QJsonObject{{"outbounds",nodes}}).toJson();
+            for(const auto &body:{original,original.toBase64()}){
+                const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),entry.count+int(preceding));
+                QSet<QByteArray> sourcePaths;
+                for(const auto &candidate:parsed.nodes){
+                    const auto provenance=candidate.originalConfiguration["source"].toObject();const auto index=provenance["outbound_index"].toInt(-1);QVERIFY(index>=0&&index<nodes.size());
+                    QCOMPARE(candidate.originalConfiguration["outbound"],nodes[index]);
+                    QCOMPARE(QJsonDocument::fromJson(candidate.sourceDocument).object(),QJsonDocument::fromJson(original).object());
+                    sourcePaths.insert(QJsonDocument(provenance).toJson(QJsonDocument::Compact));
+                    auto expected=baseline.nodes.first().nativeOutbound;
+                    if(!preceding||index>0){
+                        auto security=expected["reality"].toObject();
+                        if(entry.defaulted=="serverName")security["server_name"]="proxy.invalid";
+                        if(entry.defaulted=="shortId"||entry.defaulted=="noFlow")security["short_id"]="";
+                        expected["reality"]=security;if(entry.defaulted=="noFlow")expected.remove("flow");
+                    }
+                    QVERIFY(candidate.nativeExecutable);QCOMPARE(candidate.nativeOutbound,expected);
+                    QVERIFY(SwirlProtocolRegistry::nativeNodeReason(candidate).isEmpty());
+                    QCOMPARE(SwirlProtocolRegistry::describe(candidate).value("tested"),QVariant(false));
+                    EngineStartOptions options;options.nodes={candidate};options.selectedNodeId=candidate.id;options.routingMode="global";
+                    QJsonObject native;const auto error=RustCoreEngine::configuration(options,&native);QVERIFY2(error.isEmpty(),qPrintable(error));
+                    QCOMPARE(native["nodes"].toArray().first().toObject()["outbound"],QJsonValue(expected));
+                }
+                QCOMPARE(sourcePaths.size(),parsed.nodes.size());
+            }
+        }
     }
     void socks5TlsUriAliasesPreserveSecurity() {
         const QByteArray prefix="socks5-tls://synthetic-socks5-user:synthetic-socks5-password@127.0.0.1:1080";
@@ -421,11 +487,18 @@ private slots:
         }
         const auto grpc=NodeImporter::parse(prefix+R"({"type":"grpc","service_name":"fixture-service"}}]})");QVERIFY(grpc);
         QCOMPARE(grpc.nodes.first().parameters.value("network"),QJsonValue("grpc"));QCOMPARE(grpc.nodes.first().parameters.value("grpc-opts").toObject().value("grpc-service-name"),QJsonValue("fixture-service"));
-        QVERIFY(!SwirlProtocolRegistry::nativeNodeReason(grpc.nodes.first()).isEmpty());
+        QVERIFY(SwirlProtocolRegistry::nativeNodeReason(grpc.nodes.first()).isEmpty());
         const auto nullGrpc=NodeImporter::parse(prefix+R"({"type":"grpc","service_name":null}}]})");QVERIFY(nullGrpc);
         QCOMPARE(nullGrpc.nodes.first().parameters.value("grpc-opts").toObject().value("grpc-service-name"),QJsonValue(""));
         QVERIFY(nullGrpc.nodes.first().originalConfiguration.value("transport").toObject().value("service_name").isNull());
-        QVERIFY(!SwirlProtocolRegistry::nativeNodeReason(nullGrpc.nodes.first()).isEmpty());
+        QVERIFY(SwirlProtocolRegistry::nativeNodeReason(nullGrpc.nodes.first()).isEmpty());
+        for(const auto &node:{grpc.nodes.first(),nullGrpc.nodes.first()}){
+            QJsonObject outbound;const auto error=NativeNodeBridge::executableOutbound(node,&outbound);QVERIFY2(error.isEmpty(),qPrintable(error));
+            const auto transport=outbound["transport"].toObject();QCOMPARE(transport["type"],QJsonValue("grpc"));
+            QCOMPARE(transport["config"].toObject()["service_name"],node.parameters["grpc-opts"].toObject()["grpc-service-name"]);
+            QCOMPARE(outbound["uuid"],node.parameters["uuid"]);QCOMPARE(outbound["host"],QJsonValue(node.host));QCOMPARE(outbound["port"],QJsonValue(node.port));
+            QCOMPARE(SwirlProtocolRegistry::describe(node).value("tested"),QVariant(false));
+        }
     }
     void iniCompleteProfileHasClosedExecutionSemantics() {
         const QByteArray original="[Proxy]\nA = socks5,127.0.0.1,1080\nDIRECT = direct\nREJECT = reject\n[Proxy Group]\nroute = select,A,DIRECT\nnested = select,route,REJECT\n[Rule]\nDOMAIN,exact.invalid,REJECT\nDOMAIN-SUFFIX,suffix.invalid,route\nDOMAIN-KEYWORD,keyword,nested\nFINAL,route\n";
@@ -457,7 +530,17 @@ private slots:
             const auto body=yaml+suffix;for(const auto &wrapped:{body,body.toBase64(),QByteArray("STATUS=fixture\n")+body})QVERIFY(!NodeImporter::parse(wrapped));
         }
         const auto json=malformed.last();QVERIFY(!NodeImporter::parse("STATUS=fixture\n"+json));QVERIFY(!NodeImporter::parse(QByteArray("\xef\xbb\xbf")+json));QVERIFY(!NodeImporter::parse(QByteArray("\xef\xbb\xbf\xef\xbb\xbf")+json));
-        QVERIFY(NodeImporter::parse("[{name: flow, type: socks5, server: 127.0.0.1, port: 1080}]"));
+        const QByteArray flow="[{name: flow, type: socks5, server: 127.0.0.1, port: 1080}]";
+        for(const auto &body:{flow,flow.toBase64(),QByteArray("\xef\xbb\xbf")+flow,QByteArray("STATUS=fixture\n")+flow}){
+            const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));QCOMPARE(parsed.nodes.size(),1);
+            QCOMPARE(parsed.nodes.first().name,QString("flow"));QCOMPARE(parsed.nodes.first().protocol,QString("socks5"));QCOMPARE(parsed.nodes.first().port,quint16(1080));
+        }
+        for(const auto &body:QList<QByteArray>{
+            "[{name: flow, type: socks5, server: 127.0.0.1, port: 1080, port: 1081}]",
+            R"([{"name":"flow","type":"socks5","server":"127.0.0.1","port":1080,"port":1081}])",
+            "[{name: flow, type: socks5, protocol: socks, server: 127.0.0.1, port: 1080}]",
+            flow.left(flow.size()-1)})
+            for(const auto &wrapped:{body,body.toBase64()})QVERIFY(!NodeImporter::parse(wrapped));
         QVERIFY(NodeImporter::parse("[\n{name: flow, type: socks5, server: 127.0.0.1, port: 1080}\n]"));
         for(const auto &body:{QByteArray("; comments\n[ Proxy ] # nodes\n")+node,QByteArray("[server_local] ; nodes\nsocks5=127.0.0.1:1080, tag=A\n"),node}){
             const auto parsed=NodeImporter::parse(body);QVERIFY2(parsed,qPrintable(parsed.error));QVERIFY(parsed.configuration.isEmpty());

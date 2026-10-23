@@ -182,8 +182,17 @@ public:
                 connect(client,&QTcpSocket::readyRead,upstream,[client,upstream]{upstream->write(client->readAll());});
                 connect(upstream,&QTcpSocket::readyRead,client,[client,upstream]{client->write(upstream->readAll());});
                 connect(client,&QTcpSocket::disconnected,upstream,&QTcpSocket::abort);
-                connect(upstream,&QTcpSocket::disconnected,client,&QTcpSocket::disconnectFromHost);
-                connect(upstream,&QTcpSocket::errorOccurred,client,[client]{client->abort();});
+                connect(upstream,&QTcpSocket::disconnected,client,[client,upstream]{
+                    if(client->state()==QAbstractSocket::UnconnectedState)return;
+                    if(upstream->bytesAvailable()>0)client->write(upstream->readAll());
+                    client->disconnectFromHost();
+                });
+                connect(upstream,&QTcpSocket::errorOccurred,client,[client](QAbstractSocket::SocketError error){
+                    // A graceful origin close emits RemoteHostClosedError too.
+                    // Aborting here discards pending TLS/HTTP response bytes on
+                    // slower event loops, especially macOS SecureTransport.
+                    if(error!=QAbstractSocket::RemoteHostClosedError)client->abort();
+                });
                 const auto tail=header->mid(end+4);
                 connect(upstream,&QTcpSocket::connected,client,[client,upstream,tail]{
                     client->write("HTTP/1.1 200 Connection Established\r\n\r\n");
@@ -374,7 +383,7 @@ private slots:
             return QList<QNetworkProxy>{choice};
         });
         const auto applicationProxy=QNetworkProxy::applicationProxy();
-        import.service.importUrl(ConnectProxyFixture::remoteUrl("/first"));QTRY_VERIFY_WITH_TIMEOUT(import.service.hasPreview(),10000);
+        import.service.importUrl(ConnectProxyFixture::remoteUrl("/first"));QTRY_VERIFY2_WITH_TIMEOUT(import.service.hasPreview(),qPrintable(import.service.message()),10000);
         QCOMPARE(server.requests,2);QCOMPARE(proxy.connections,2);QCOMPARE(queries->load(),2);QCOMPARE(invalidQuery->load(),0);
         QCOMPARE(QNetworkProxy::applicationProxy(),applicationProxy);QCOMPARE(import.commits,0);
         for(const auto &request:proxy.requests){QVERIFY(request.startsWith("CONNECT subscription.example.invalid:443 "));QVERIFY(!request.contains(Token.toUtf8()));}
@@ -483,7 +492,7 @@ private slots:
         import.service.importUrl(ConnectProxyFixture::remoteUrl("/slow"));QTRY_COMPARE_WITH_TIMEOUT(server.requests,1,10000);
         import.service.cancelImport();verifyUnchanged(import);QTRY_COMPARE_WITH_TIMEOUT(proxy.disconnections,1,5000);
         QTRY_COMPARE_WITH_TIMEOUT(server.disconnections,1,5000);
-        import.service.importUrl(ConnectProxyFixture::remoteUrl("/fresh"));QTRY_VERIFY_WITH_TIMEOUT(import.service.hasPreview(),10000);
+        import.service.importUrl(ConnectProxyFixture::remoteUrl("/fresh"));QTRY_VERIFY2_WITH_TIMEOUT(import.service.hasPreview(),qPrintable(import.service.message()),10000);
         QCOMPARE(proxy.connections,2);QCOMPARE(server.requests,2);import.service.cancelImport();verifyUnchanged(import);
     }
     void systemProxyLookupIsCancellableAndBounded_data() {
@@ -505,7 +514,7 @@ private slots:
         // The canceled platform query may still return. A new authorized
         // runtime request must not inherit or be overwritten by that result.
         import.service.setDownloadProxy(proxy.serverPort());import.service.importUrl(ConnectProxyFixture::remoteUrl());
-        gate->release();QTRY_VERIFY_WITH_TIMEOUT(returned->load(),3000);QTRY_VERIFY_WITH_TIMEOUT(import.service.hasPreview(),10000);
+        gate->release();QTRY_VERIFY_WITH_TIMEOUT(returned->load(),3000);QTRY_VERIFY2_WITH_TIMEOUT(import.service.hasPreview(),qPrintable(import.service.message()),10000);
         QCOMPARE(proxy.connections,1);QCOMPARE(server.requests,1);import.service.cancelImport();verifyUnchanged(import);
     }
     void sameOriginRelativeRedirectPreservesAuthorizedRequest() {
@@ -736,6 +745,110 @@ private slots:
         QCOMPARE(import.applied.count(), 1);
         QVERIFY(!import.publicState().contains(Token.toUtf8()));
     }
+    void subscriptionCancellationCannotCancelManualDownload() {
+        FixtureTrust trust;QVERIFY(trust.valid);HttpsFixture server(trust.server);
+        server.respond=[](QSslSocket *,const auto &){};
+        QVERIFY(server.listen(QHostAddress::LocalHost,0));ImportFixture import;
+        import.service.importUrl(server.url());QTRY_COMPARE_WITH_TIMEOUT(server.requests,1,10000);
+        QVERIFY(!import.service.cancelRefresh(QStringLiteral("unknown-provider")));
+        QVERIFY(!import.service.cancelRefresh({}));QVERIFY(import.service.busy());
+        QCOMPARE(server.disconnections,0);import.service.cancelImport();
+        QTRY_COMPARE_WITH_TIMEOUT(server.disconnections,1,5000);verifyUnchanged(import);
+    }
+    void synchronousCancellationCannotRestartManualWork_data() {
+        QTest::addColumn<QString>("entry");
+        for(const auto &entry:QStringList{"text","file","url","confirm"})QTest::newRow(qPrintable(entry))<<entry;
+    }
+    void synchronousCancellationCannotRestartManualWork() {
+        QFETCH(QString,entry);FixtureTrust trust;QVERIFY(trust.valid);HttpsFixture server(trust.server);
+        server.respond=[](QSslSocket *socket,const auto &){HttpsFixture::reply(socket,configuration());};
+        QVERIFY(server.listen(QHostAddress::LocalHost,0));ImportFixture import;
+        const auto path=import.directory.filePath("manual.json");QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly));QCOMPARE(file.write(configuration()),configuration().size());file.close();
+        if(entry=="confirm"){
+            import.service.importText(QString::fromUtf8(configuration()));QTRY_VERIFY_WITH_TIMEOUT(import.service.hasPreview(),10000);
+        }
+        bool cancelled=false;
+        connect(&import.service,&NodeImportService::changed,&import.service,[&]{
+            if(import.service.busy()&&!cancelled){cancelled=true;import.service.cancelImport();}
+        });
+        if(entry=="text")import.service.importText(QString::fromUtf8(configuration()));
+        else if(entry=="file")import.service.importFile(QUrl::fromLocalFile(path));
+        else if(entry=="url")import.service.importUrl(server.url());
+        else import.service.confirmImport();
+        QVERIFY(cancelled);QVERIFY(!import.service.busy());QTest::qWait(150);
+        QCOMPARE(server.handshakeStarts,0);QCOMPARE(server.requests,0);verifyUnchanged(import);
+    }
+#ifdef Q_OS_WIN
+    void synchronousRefreshCancellationStartsNoDownload() {
+        FixtureTrust trust;QVERIFY(trust.valid);HttpsFixture server(trust.server);
+        server.respond=[](QSslSocket *socket,const auto &){HttpsFixture::reply(socket,configuration());};
+        QVERIFY(server.listen(QHostAddress::LocalHost,0));QTemporaryDir temp;QVERIFY(temp.isValid());
+        NodeStore store(temp.filePath("cancel.dpapi"));QVERIFY(store.saveSubscription({},"cancel",server.url(),360,false));
+        const auto id=store.subscriptions().first().id;QFile saved(store.filePath());QVERIFY(saved.open(QIODevice::ReadOnly));
+        const auto before=saved.readAll();saved.close();NodeImportService service(&store);QSignalSpy applied(&service,&NodeImportService::nodesApplied);
+        bool cancelled=false;connect(&service,&NodeImportService::changed,&service,[&]{
+            if(service.busy()&&!cancelled){cancelled=true;QVERIFY(service.cancelRefresh(id));}
+        });
+        service.refreshSubscription(id);QVERIFY(cancelled);QVERIFY(!service.busy());QTest::qWait(150);
+        QCOMPARE(server.handshakeStarts,0);QCOMPARE(server.requests,0);QCOMPARE(applied.count(),0);
+        QVERIFY(saved.open(QIODevice::ReadOnly));QCOMPARE(saved.readAll(),before);QVERIFY(store.nodes().isEmpty());
+        QCOMPARE(service.providers().first().toMap().value("status").toString(),QStringLiteral("已取消"));
+    }
+    void subscriptionRefreshCancellationPreservesEncryptedSnapshotAndRetries() {
+        FixtureTrust trust;QVERIFY(trust.valid);HttpsFixture server(trust.server);
+        const auto document=configuration(QStringLiteral("Retained subscription node"));
+        server.respond=[&](QSslSocket *socket,const auto &){
+            socket->write("HTTP/1.1 200 OK\r\nContent-Length: "+QByteArray::number(document.size())+"\r\nConnection: keep-alive\r\n\r\n");
+            socket->write(document.left(document.size()/2));socket->flush();
+        };
+        QVERIFY(server.listen(QHostAddress::LocalHost,0));QTemporaryDir temp;QVERIFY(temp.isValid());
+        NodeStore store(temp.filePath(QStringLiteral("refresh.dpapi")));
+        QVERIFY(store.saveSubscription({},"active",server.url("/active"),360,false));
+        QVERIFY(store.saveSubscription({},"queued",server.url("/queued"),360,false));
+        const auto active=store.subscriptions().at(0).id,queued=store.subscriptions().at(1).id;
+        const auto parsed=NodeImporter::parse(document);QVERIFY2(parsed,qPrintable(parsed.error));
+        QVERIFY(store.importNodes(parsed.nodes,active));const auto selected=store.nodes().first().id;QVERIFY(store.select(selected));
+        const auto bytes=[&]{QFile file(store.filePath());if(!file.open(QIODevice::ReadOnly))return QByteArray{};return file.readAll();};
+        const auto before=bytes();QVERIFY(!before.isEmpty());QVERIFY(!before.contains(Uuid.toUtf8()));QVERIFY(!before.contains(Token.toUtf8()));
+        NodeImportService service(&store);QSignalSpy applied(&service,&NodeImportService::nodesApplied),changes(&service,&NodeImportService::changed);
+        service.refreshSubscription(active);QTRY_COMPARE_WITH_TIMEOUT(server.requests,1,10000);
+        QVERIFY(service.busy());QVERIFY(service.providers().at(0).toMap().value("canCancel").toBool());
+        service.cancelImport();QVERIFY(service.busy()); // Closing a manual dialog cannot own this refresh.
+        const auto changesBeforeQueue=changes.count();service.refreshSubscription(queued);QVERIFY(changes.count()>changesBeforeQueue);
+        QVERIFY(service.providers().at(1).toMap().value("queued").toBool());
+        QVERIFY(service.cancelRefresh(queued));QVERIFY(service.busy());
+        QVERIFY(service.cancelRefresh(active));QVERIFY(!service.busy());
+        QTRY_COMPARE_WITH_TIMEOUT(server.disconnections,1,5000);QTest::qWait(100);
+        QCOMPARE(server.requests,1);QCOMPARE(applied.count(),0);QCOMPARE(bytes(),before);
+        QCOMPARE(store.selectedId(),selected);QCOMPARE(store.nodes().size(),1);
+        for(const auto &provider:service.providers()){
+            QCOMPARE(provider.toMap().value("status").toString(),QStringLiteral("已取消"));
+            QVERIFY(!provider.toMap().value("canCancel").toBool());
+        }
+        {NodeStore reloaded(store.filePath());QCOMPARE(reloaded.selectedId(),selected);QCOMPARE(reloaded.nodes().size(),1);}
+        server.respond=[&](QSslSocket *socket,const auto &){HttpsFixture::reply(socket,document);};
+        bool sawCommit=false,acceptedCommitCancellation=false,commitWasCancelable=false,acceptedAppliedCancellation=false;
+        connect(&service,&NodeImportService::changed,&service,[&]{
+            if(service.busy()&&service.message().startsWith(QStringLiteral("正在加密"))){
+                sawCommit=true;commitWasCancelable|=service.providers().at(0).toMap().value("canCancel").toBool();
+                acceptedCommitCancellation|=service.cancelRefresh(active);
+            }
+        });
+        connect(&service,&NodeImportService::nodesApplied,&service,[&]{
+            acceptedAppliedCancellation=service.cancelRefresh(active);
+            QVERIFY(!service.providers().at(0).toMap().value("canCancel").toBool());
+        });
+        service.refreshSubscription(active);QTRY_COMPARE_WITH_TIMEOUT(applied.count(),1,15000);
+        QTRY_VERIFY_WITH_TIMEOUT(!service.busy(),5000);QVERIFY(sawCommit);
+        QVERIFY(!acceptedCommitCancellation);QVERIFY(!acceptedAppliedCancellation);QVERIFY(!commitWasCancelable);QCOMPARE(server.requests,2);
+        QCOMPARE(store.selectedId(),selected);QCOMPARE(store.nodes().size(),1);QVERIFY(!service.hasPreview());
+        const auto publicState=QJsonDocument::fromVariant(service.providers()).toJson();
+        QVERIFY(!publicState.contains(Token.toUtf8()));QVERIFY(!publicState.contains(Uuid.toUtf8()));
+        NodeStore restored(store.filePath());QCOMPARE(restored.selectedId(),selected);
+        QCOMPARE(restored.nodes().first().sourceDocument,document);
+    }
+#endif
     void stalledServerReachesDownloadTimeout() {
         FixtureTrust trust; QVERIFY(trust.valid);
         HttpsFixture server(trust.server);

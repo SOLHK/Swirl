@@ -5,6 +5,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: rust-native-protocols-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref == 'refs/heads/work/subscription-unified-integration-20261023' }}
 jobs:
   native-protocols:
     strategy:

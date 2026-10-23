@@ -5,6 +5,18 @@
 class DiagnosticTests:public QObject {
  Q_OBJECT
 private slots:
+ void bareBrowsingMetadataIsRemoved(){const auto safe=DiagnosticService::redact("TLS failure for private.example.net and https://private.example.net/path Cookie: session-private");QVERIFY(!safe.contains("private.example.net"));QVERIFY(!safe.contains("session-private"));}
+ void unicodeHostsAndProxyUrisAreRemoved(){const auto safe=DiagnosticService::redact(QStringLiteral("TLS failure for 私人.测试 socks5://fixture-user:fixture-secret@fixture.test:1080 tuic://fixture-id:fixture-pass@fixture.test username=fixture-account"));for(const auto &value:{QStringLiteral("私人.测试"),QStringLiteral("fixture-user"),QStringLiteral("fixture-secret"),QStringLiteral("fixture-pass"),QStringLiteral("fixture-account")})QVERIFY(!safe.contains(value));}
+ void protocolCredentialsAreRemoved(){const auto safe=DiagnosticService::redact("psk=fixture-psk pre-shared-key=fixture-peer auth-str=fixture-auth private-key-passphrase=fixture-pass short-id=abcdef12");for(const auto &value:{"fixture-psk","fixture-peer","fixture-auth","fixture-pass","abcdef12"})QVERIFY(!safe.contains(value));}
+ void nativeProtocolSecretsStayRemovedAfterRestartAndExport(){
+  QTemporaryDir temp;const auto path=temp.filePath("native-diagnostics.zip");
+  const auto message=QStringLiteral("tuic://fixture-user:fixture-password@fixture.invalid:443 psk=fixture-psk auth-str=fixture-auth 私人.测试");
+  {DiagnosticService log(temp.path());log.record("ERROR","NativeProxy","Handshake",message);}
+  DiagnosticService restored(temp.path());QCOMPARE(restored.records().size(),1);
+  QVERIFY(restored.exportReport(QUrl::fromLocalFile(path),{{"failure",message}}));
+  QFile archive(path);QVERIFY(archive.open(QIODevice::ReadOnly));const auto bytes=archive.readAll();
+  for(const auto &secret:{QByteArray("fixture-user"),QByteArray("fixture-password"),QByteArray("fixture-psk"),QByteArray("fixture-auth"),QStringLiteral("私人.测试").toUtf8()})QVERIFY(!bytes.contains(secret));
+ }
  // Native failure stages are verified in RustCoreTests and the real DLL
  // loader tests. Keep the application log/redaction/export tests independent
  // of a removed third-party log grammar.

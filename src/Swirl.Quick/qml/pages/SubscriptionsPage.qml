@@ -66,7 +66,7 @@ Item {
         id:actions;x:Theme.cardPadding;y:provider.height-Theme.cardPadding-implicitHeight;width:parent.width-2*Theme.cardPadding;spacing:Theme.dp(8)
         SwirlButton {objectName:'expandSubscription-'+provider.record.id;text:provider.expanded?'收起详情':'展开详情';onClicked:page.expandedId=provider.expanded?'':provider.record.id;Accessible.name:text+' '+provider.record.name}
         Item {Layout.fillWidth:true}
-        SwirlButton {objectName:'refreshSubscription-'+provider.record.id;text:'刷新';enabled:!engineController.imports.busy;onClicked:engineController.imports.refreshSubscription(provider.record.id)}
+        SwirlButton {objectName:'refreshSubscription-'+provider.record.id;text:provider.record.canCancel?(provider.record.queued?'取消排队':'取消更新'):'刷新';enabled:provider.record.canCancel||(!engineController.imports.busy&&!engineController.imports.hasPreview);onClicked:{if(provider.record.canCancel)engineController.imports.cancelRefresh(provider.record.id);else engineController.imports.refreshSubscription(provider.record.id)}}
         SwirlButton {objectName:'editSubscription-'+provider.record.id;text:'编辑';enabled:!engineController.imports.busy;onClicked:page.edit(provider.record)}
         SwirlButton {objectName:'deleteSubscription-'+provider.record.id;text:'删除';danger:true;enabled:!engineController.imports.busy;onClicked:{deleteDialog.recordId=provider.record.id;deleteDialog.open()}}
       }

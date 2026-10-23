@@ -242,7 +242,9 @@ private slots:
         QNetworkAccessManager client;client.setProxy(QNetworkProxy(QNetworkProxy::HttpProxy,"127.0.0.1",opts.proxyPort));auto reply=client.get(QNetworkRequest(QUrl(QString("http://127.0.0.1:%1/real-stream").arg(origin.serverPort()))));QTRY_VERIFY_WITH_TIMEOUT(model.sampled()&&model.downloadRate()>0,6000);QTRY_VERIFY_WITH_TIMEOUT(!model.connections().isEmpty(),6000);QTRY_VERIFY_WITH_TIMEOUT(reply->isFinished(),7000);QCOMPARE(reply->readAll().size(),65536);QTRY_VERIFY_WITH_TIMEOUT(model.summary().value("total").toDouble()>=65536,4000);QVERIFY(!model.ranking("domains").isEmpty());QTRY_VERIFY_WITH_TIMEOUT(model.activeConnections()==0,4000);QVERIFY(!model.connections().isEmpty());engine.stop();QTRY_VERIFY_WITH_TIMEOUT(!engine.status().processAlive,4000);
     }
     void unsupportedImportedProtocolIsPreservedButCannotStart() {
-        const auto parsed=NodeImporter::parse(R"({"name":"pending","type":"hysteria2","server":"127.0.0.1","port":443,"password":"private-test-only"})");
+        // Hysteria2 itself is implemented. Port hopping is still unsupported
+        // and must survive persistence without silently becoming single-port.
+        const auto parsed=NodeImporter::parse(R"({"name":"pending","type":"hysteria2","server":"127.0.0.1","port":443,"ports":"443-445","password":"private-test-only"})");
         QVERIFY2(bool(parsed),qPrintable(parsed.error));QTemporaryDir directory;NodeStore store(directory.filePath("nodes"));
         QVERIFY(store.importNodes(parsed.nodes));NodeStore loaded(store.filePath());QCOMPARE(loaded.nodes().size(),1);
         QCOMPARE(loaded.nodes().first().password,QString("private-test-only"));auto opts=options();
@@ -250,6 +252,17 @@ private slots:
         QCOMPARE(engine.status().state,ProxyEngine::State::Failed);QCOMPARE(engine.status().error,ProxyEngine::Error::InvalidOptions);
         QVERIFY(!engine.status().message.contains("private-test-only"));QVERIFY(!engine.status().processAlive);
         QCOMPARE(loaded.nodes().first().protocol,QString("hysteria2"));
+        QCOMPARE(loaded.nodes().first().parameters.value("ports").toString(),QString("443-445"));
+    }
+    void importedHysteria2StartsNativeListenerWithoutClaimingPeerHandshake() {
+        const auto parsed=NodeImporter::parse(R"({"name":"native-hy2","type":"hysteria2","server":"127.0.0.1","port":443,"password":"private-test-only"})");
+        QVERIFY2(parsed,qPrintable(parsed.error));auto opts=options();opts.nodes=parsed.nodes;opts.selectedNodeId=parsed.nodes.first().id;
+        QJsonObject config;QVERIFY2(RustCoreEngine::configuration(opts,&config).isEmpty(),"Supported Hysteria2 must reach native configuration");
+        QCOMPARE(config.value("nodes").toArray().first().toObject().value("outbound").toObject().value("type").toString(),QString("hysteria2"));
+        RustCoreEngine engine;engine.start(opts);QTRY_VERIFY_WITH_TIMEOUT(engine.status().apiHealthy,10000);
+        QVERIFY(engine.status().processAlive);QVERIFY(!engine.status().message.contains("private-test-only"));
+        engine.stop();QTRY_VERIFY_WITH_TIMEOUT(!engine.status().processAlive,5000);
+        qInfo()<<"HY2_NATIVE_LISTENER startup/stop verified; no remote QUIC handshake claimed";
     }
     void importedVlessKeepsTransportPrivate() {
         QTemporaryDir temp; const auto path=temp.filePath("import.dpapi"); NodeStore store(path);
@@ -269,9 +282,12 @@ private slots:
         const auto previous=before.readAll();before.close();
         QList<ProxyNode> incoming;const QString payload(40*1024,u'x');
         for(int i=0;i<1000;++i) {
-            auto large=node(QStringLiteral("large-%1").arg(i),1080);
+            // Distinct endpoints prevent semantic deduplication from reducing
+            // the intended >32 MiB snapshot to one node.
+            auto large=node(QStringLiteral("large-%1").arg(i),quint16(10000+i));
             large.parameters.insert("preserved-extension",payload);incoming.append(large);
         }
+        NodeStore::ImportPlan plan;QVERIFY(store.prepareImport(incoming,{},&plan));QCOMPARE(plan.nodes().size(),1001);
         QVERIFY(!store.importNodes(incoming));QVERIFY(store.error().contains("32 MiB"));
         QFile after(path);QVERIFY(after.open(QIODevice::ReadOnly));QCOMPARE(after.readAll(),previous);
         QVERIFY(previous.size()<=NodeStore::MaximumBytes);

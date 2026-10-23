@@ -17,7 +17,7 @@ permissions:
 
 concurrency:
   group: qt-network-security-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.ref == 'refs/heads/work/subscription-unified-integration-20261023' }}
 
 jobs:
   downloader:

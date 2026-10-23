@@ -791,7 +791,9 @@ class ProductChainIntegration(ChainBase):
         peer = self.relay('vless', 'A')
         for extra in ({'reality-opts': {'public-key': 'synthetic-public-key', 'short-id': 'ab'}},
                       {'tls': True, 'flow': 'xtls-rprx-vision'},
-                      {'network': 'grpc', 'grpc-opts': {'grpc-service-name': 'synthetic'}},
+                      {'network': 'grpc', 'grpc-opts': {'grpc-service-name': 'synthetic',
+                                                       'ping-interval': 30}},
+                      {'network': 'grpc'},
                       {'network': 'xhttp', 'xhttp-opts': {'path': '/preserve'}},
                       {'network': None}, {'future-security': {'enabled': False, 'key': None}}):
             with self.subTest(fields=list(extra)):
@@ -808,6 +810,36 @@ class ProductChainIntegration(ChainBase):
                     'schema': 1, 'listen': '127.0.0.1:0', 'selected': 'A',
                     'nodes': [{'id': 'A', 'outbound': result['tcpCandidates'][0]}]})
                 self.assertFalse(rejected['ok'])
+        self.assertEqual(peer.connections, [])
+        self.assertEqual(self.http.requests, [])
+        self.assertEqual(self.https.requests, [])
+
+    def test_representable_grpc_retains_parameters_and_starts_without_claiming_interop(self):
+        # gRPC was implemented after this suite's original unsupported list.
+        # Cover that supported transport as a positive import/start case; unsupported
+        # keepalive options and missing transport settings remain rejected above.
+        # Real gRPC HTTP/HTTPS, duplex and closure interoperability is exercised
+        # by test_transport_grpc_xray.py and test_imported_transports_xray.py.
+        peer = self.relay('vless', 'A')
+        node = {**peer.node(), 'network': 'grpc', 'grpc-opts': {
+            'grpc-service-name': 'synthetic',
+            'grpc-user-agent': 'Swirl-synthetic-product-chain', 'ping-interval': 0}}
+        result = self.inspect(json.dumps({'proxies': [node]}))
+        self.assertTrue(result['report']['parsed'])
+        self.assertEqual(result['nodes'], [node])
+        candidate = result['tcpCandidates'][0]
+        self.assertIsNotNone(candidate, result['report'])
+        self.assertEqual((candidate['host'], candidate['port'], candidate['uuid']),
+                         ('127.0.0.1', peer.port, UUID))
+        self.assertEqual(candidate['transport'], {'type': 'grpc', 'config': {
+            'authority': f'127.0.0.1:{peer.port}', 'service_name': 'synthetic',
+            'mode': 'tun', 'headers': [['user-agent', 'Swirl-synthetic-product-chain']]}})
+        capability = result['report']['nodes'][0]
+        self.assertTrue(capability['native_tcp_candidate'])
+        self.assertFalse(capability['real_network_verified'])
+        self.start({'schema': 1, 'listen': '127.0.0.1:0', 'selected': 'A',
+                    'nodes': [{'id': 'A', 'outbound': candidate}]})
+        self.assertTrue(self.core.command(op='stop', handle=self.handle)['ok'])
         self.assertEqual(peer.connections, [])
         self.assertEqual(self.http.requests, [])
         self.assertEqual(self.https.requests, [])

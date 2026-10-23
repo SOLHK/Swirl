@@ -9,7 +9,7 @@ env:
   SWIRL_SOURCE_SHA: ${{ github.sha }}
 concurrency:
   group: rust-replacement-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.ref == 'refs/heads/work/subscription-unified-integration-20261023' }}
 jobs:
   rust:
     runs-on: ubuntu-latest
@@ -99,7 +99,7 @@ jobs:
       - name: Configure isolated Qt integration tests
         run: cmake -S src/Swirl.Quick -B build/r1-tests -G "Visual Studio 17 2022" -A x64 -DSWIRL_USE_RUST_CORE=ON -DSWIRL_BUILD_UI_TESTS=ON -DSWIRL_RUST_TARGET="${{ github.workspace }}/core/target"
       - name: Build product, subscription, telemetry, stream, security and loader regressions
-        run: cmake --build build/r1-tests --config Release --target Swirl SwirlRustCoreTests SwirlRustCoreLibraryTests SwirlNodeTests SwirlImportTests SwirlSubscriptionFormatTests SwirlTelemetryTests SwirlNetworkRegressionTests SwirlDiagnosticTests SwirlQtNetworkPolicyTests --parallel 4
+        run: cmake --build build/r1-tests --config Release --target Swirl SwirlRustCoreTests SwirlRustCoreLibraryTests SwirlNodeTests SwirlImportTests SwirlSubscriptionFormatTests SwirlTelemetryTests SwirlNetworkRegressionTests SwirlDiagnosticTests SwirlSystemProxyStateTests SwirlQtNetworkPolicyTests --parallel 4
       - name: Deploy test dependencies and inspect PE imports
         shell: pwsh
         run: |
@@ -114,7 +114,7 @@ jobs:
           dumpbin /DEPENDENTS build/r1-tests/Release/swirl_api.dll | Out-File build/r1-tests/rust-dependencies.txt
           if ($LASTEXITCODE -ne 0) { throw 'Rust dependency inspection failed.' }
       - name: Windows native product and subscription regression
-        run: ctest --test-dir build/r1-tests -C Release -R "^swirl-(rust-library-loader|rust-qt-integration|node-real-chain|node-ui|engine-ui|stream-regression|import-subscription|import-boundaries|subscription-formats|telemetry-accounting|diagnostic-export|qt-network-policy|capture-network)$" --output-on-failure --no-tests=error
+        run: ctest --test-dir build/r1-tests -C Release -R "^swirl-(rust-library-loader|rust-qt-integration|node-real-chain|node-ui|engine-ui|stream-regression|import-subscription|import-boundaries|subscription-formats|telemetry-accounting|diagnostic-export|system-proxy-state|qt-network-policy|capture-network)$" --output-on-failure --no-tests=error
       - name: Actual Windows Qt import, DPAPI restore, selection and routing
         env:
           SWIRL_RUST_QT_TESTS: ${{ github.workspace }}/build/r1-tests/Release/SwirlRustCoreTests.exe
@@ -167,15 +167,22 @@ jobs:
             if ($result.success -or $result.failure -ne 'RustLibraryLoadFailed') { throw 'Wrong missing DLL diagnostic.' }
             Copy-Item $report build/r1-product/
           } finally { Move-Item "$dll.absent" $dll }
-      - name: Start actual Qt UI from clean product directory
+      - name: Start actual Qt UI twice with one isolated cache
         shell: pwsh
         run: |
           $env:QT_QPA_PLATFORM='offscreen'
           $env:QT_QUICK_BACKEND='software'
           $exe=(Resolve-Path dist/Swirl-Rust-x64/Swirl.exe).Path
-          $p=Start-Process $exe -ArgumentList '--smoke-test' -WorkingDirectory $env:RUNNER_TEMP -PassThru
-          if (-not $p.WaitForExit(75000)) { $p.Kill(); throw 'Swirl UI smoke timed out.' }
-          if ($p.ExitCode -ne 0) { throw "Swirl UI smoke failed: $($p.ExitCode)" }
+          $env:SWIRL_TEST_ROOT=Join-Path $env:RUNNER_TEMP ('u1-production-ui-'+[guid]::NewGuid().ToString('N'))
+          New-Item -ItemType Directory -Path $env:SWIRL_TEST_ROOT | Out-Null
+          $launches=@()
+          foreach ($phase in @('fresh-directory','repeat-same-directory')) {
+            $p=Start-Process $exe -ArgumentList '--smoke-test' -WorkingDirectory $env:RUNNER_TEMP -PassThru
+            if (-not $p.WaitForExit(75000)) { $p.Kill(); throw "Swirl UI $phase timed out." }
+            if ($p.ExitCode -ne 0) { throw "Swirl UI $phase failed: $($p.ExitCode)" }
+            $launches+=@{phase=$phase;exitCode=$p.ExitCode}
+          }
+          @{source_sha=$env:GITHUB_SHA;launches=$launches;physical_windows_verified=$false} | ConvertTo-Json -Depth 4 | Set-Content build/r1-product/ui-repeated-start.json -Encoding utf8
       - name: Windows native public Internet requests
         shell: pwsh
         env:
@@ -216,6 +223,7 @@ jobs:
             build/r1-tests/product-chain
             build/r1-product/r1-missing-dll.json
             build/r1-product/public-proxy.json
+            build/r1-product/ui-repeated-start.json
             dist/Swirl-Rust-x64/rust-self-test.json
             dist/Swirl-Rust-x64/package-manifest.json
             dist/Swirl-Rust-x64/Swirl-diagnostics.txt

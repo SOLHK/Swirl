@@ -1,0 +1,102 @@
+name: U1 complete Windows Qt independent fixtures
+on:
+  push:
+    branches: [work/subscription-unified-integration-20261023]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: u1-qt-fixtures-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref == 'refs/heads/work/subscription-unified-integration-20261023' }}
+env:
+  SWIRL_SOURCE_SHA: ${{ github.sha }}
+  PYTHONUTF8: '1'
+jobs:
+  qt-fixtures:
+    runs-on: windows-2022
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      QT_QPA_PLATFORM: offscreen
+      QT_QUICK_BACKEND: software
+      QT_FORCE_STDERR_LOGGING: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+      - name: Rust MSVC x64
+        run: rustup toolchain install stable --profile minimal --target x86_64-pc-windows-msvc
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install independent fixture TLS implementation
+        run: python -m pip install cryptography==50.0.2
+      - name: Validate the fixture evidence gate
+        run: python -m unittest discover -s tools/tests -p test_u1_qt_fixtures.py -v
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.11.3'
+          host: windows
+          target: desktop
+          arch: win64_msvc2022_64
+          modules: qtshadertools
+          # Upstream PR 1000 handles Qt 6.11's architecture-specific repository path.
+          aqtsource: 'git+https://github.com/miurahr/aqtinstall.git@8c3695d4a4e1ceabf6a74dc6c79681656dc6b74b'
+          cache: true
+      - name: Build current-source Rust command hosts
+        run: cargo build --manifest-path core/Cargo.toml --workspace --release --locked --lib --bins
+      - name: Configure the paired Qt fixture executable
+        run: cmake -S src/Swirl.Quick -B build/u1-qt-fixtures -G "Visual Studio 17 2022" -A x64 -DSWIRL_USE_RUST_CORE=ON -DSWIRL_BUILD_UI_TESTS=ON -DSWIRL_RUST_TARGET="${{ github.workspace }}/core/target"
+      - name: Build actual Qt product-chain and private-inspector tests
+        run: cmake --build build/u1-qt-fixtures --config Release --target SwirlRustCoreTests SwirlPrivateSubscriptionInspect SwirlStoragePathsTests --parallel 4
+      - name: Deploy Qt dependencies and initialize isolated fixture paths
+        run: |
+          $ErrorActionPreference = 'Stop'
+          windeployqt --release --compiler-runtime build/u1-qt-fixtures/Release/SwirlRustCoreTests.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Qt fixture deployment failed.' }
+          windeployqt --release --compiler-runtime build/u1-qt-fixtures/Release/SwirlPrivateSubscriptionInspect.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Qt private inspector deployment failed.' }
+          $root = Join-Path $env:RUNNER_TEMP 'u1-qt-fixture-tests'
+          New-Item -ItemType Directory -Force -Path $root | Out-Null
+          "SWIRL_TEST_ROOT=$root" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "SWIRL_XRAY_PEER_DIR=$(Join-Path $env:RUNNER_TEMP 'u1-qt-xray-peer')" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "SWIRL_RUST_HARNESS=$((Resolve-Path core/target/release/swirl-api.exe).Path)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "SWIRL_RUST_INSPECTOR=$((Resolve-Path core/target/release/swirl-inspect.exe).Path)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "SWIRL_RUST_QT_TESTS=$((Resolve-Path build/u1-qt-fixtures/Release/SwirlRustCoreTests.exe).Path)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "SWIRL_QT_PRIVATE_INSPECTOR=$((Resolve-Path build/u1-qt-fixtures/Release/SwirlPrivateSubscriptionInspect.exe).Path)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      - name: Install the toolchain pinned by the independent Xray peer lock
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16
+        with:
+          go-version: '1.27.2'
+          cache: false
+      - name: Build and repeat-verify the locked official Xray peer
+        run: python tools/Build-XrayPeer.py --output "$env:SWIRL_XRAY_PEER_DIR"
+      - name: Exercise all nine Qt fixture slots with zero skips
+        run: python tools/Run-U1QtFixtures.py --output "$env:RUNNER_TEMP/u1-qt-fixture-evidence" --qt-version 6.11.3
+      - name: Verify isolated persistent storage and per-build QML cache paths
+        run: ctest --test-dir build/u1-qt-fixtures -C Release -R '^swirl-storage-paths$' --output-on-failure --no-tests=error
+      - name: Actual private-inspector DPAPI persistence and redaction
+        run: |
+          python -m unittest tools.tests.test_subscription_capture.CaptureTests.test_qt_offline_inspector_reloads_and_redacts_actual_dpapi -v
+          if ($LASTEXITCODE -ne 0) { throw 'Actual Qt private-inspector DPAPI test failed.' }
+          python tools/tests/test_qt_reality_lifecycle.py
+          if ($LASTEXITCODE -ne 0) { throw 'Qt lifecycle evidence guards failed.' }
+          python tools/tests/test_public_qt_reality.py
+          if ($LASTEXITCODE -ne 0) { throw 'Qt public-exit evidence guards failed.' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: U1-Windows-Qt-nine-fixtures-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/u1-qt-fixture-evidence
+            ${{ runner.temp }}/u1-qt-xray-peer/build-manifest.json
+            ${{ runner.temp }}/u1-qt-xray-peer/build.log
+            build/u1-qt-fixtures/Release/swirl-rust-build.json
+          if-no-files-found: error
+          retention-days: 14

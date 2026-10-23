@@ -78,6 +78,7 @@ add_library(SwirlEngine STATIC
  engine/TelemetryService.h engine/TelemetryService.cpp
  engine/NodeTestService.h engine/NodeTestService.cpp
  engine/SystemProxySession.h engine/SystemProxySession.cpp
+ engine/SystemProxyState.h engine/SystemProxyState.cpp
  engine/ProxyEngine.h
  engine/EngineController.h engine/EngineController.cpp)
 target_sources(SwirlEngine PRIVATE engine/ProxyNode.h engine/ProxyNode.cpp engine/NodeStore.h engine/NodeStore.cpp)
@@ -183,6 +184,17 @@ foreach(file IN LISTS SWIRL_QML_FILES)
     set_source_files_properties("${file}" PROPERTIES QT_RESOURCE_ALIAS "${qml_alias}")
 endforeach()
 set_source_files_properties(qml/SwirlMotion.qml qml/SwirlTransitionRegistry.qml qml/Theme.qml qml/AppState.qml qml/FeatureCatalog.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+# Resource URLs are shared across branches and test/production builds. Bind the
+# disk cache to QML contents even when resource timestamps have not changed.
+set(SWIRL_QML_CACHE_INPUT "")
+foreach(qml IN LISTS SWIRL_QML_FILES)
+ file(SHA256 "${CMAKE_CURRENT_SOURCE_DIR}/${qml}" qml_hash)
+ string(APPEND SWIRL_QML_CACHE_INPUT "${qml}:${qml_hash}\n")
+ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${qml}")
+endforeach()
+string(SHA256 SWIRL_QML_CACHE_HASH "${SWIRL_QML_CACHE_INPUT}")
+string(SUBSTRING "${SWIRL_QML_CACHE_HASH}" 0 16 SWIRL_QML_CACHE_REVISION)
+target_compile_definitions(Swirl PRIVATE SWIRL_QML_CACHE_REVISION="${SWIRL_QML_CACHE_REVISION}")
 qt_add_qml_module(Swirl
     URI SwirlQuick
     VERSION 1.0
@@ -293,6 +305,15 @@ if(SWIRL_BUILD_UI_TESTS)
   target_compile_options(SwirlDiagnosticTests PRIVATE /utf-8)
  endif()
  add_test(NAME swirl-diagnostic-export COMMAND SwirlDiagnosticTests)
+ add_executable(SwirlSystemProxyStateTests tests/SystemProxyStateTests.cpp)
+ target_link_libraries(SwirlSystemProxyStateTests PRIVATE SwirlEngine Qt6::Test)
+ if(MSVC)
+  target_compile_options(SwirlSystemProxyStateTests PRIVATE /utf-8)
+ endif()
+ # Read-only live observations and a unique temporary registry key only;
+ # this does not opt in to changing the user's Internet Settings.
+ add_test(NAME swirl-system-proxy-state COMMAND SwirlSystemProxyStateTests)
+ set_tests_properties(swirl-system-proxy-state PROPERTIES LABELS security TIMEOUT 30)
  if(WIN32)
   add_executable(SwirlSystemProxyTests tests/SystemProxyTests.cpp)
   target_link_libraries(SwirlSystemProxyTests PRIVATE SwirlEngine Qt6::Test)
@@ -315,11 +336,11 @@ if(SWIRL_BUILD_UI_TESTS)
  if(MSVC)
   target_compile_options(SwirlNodeTests PRIVATE /utf-8)
  endif()
- add_test(NAME swirl-node-real-chain COMMAND SwirlNodeTests -o node-chain.txt,txt)
+ add_test(NAME swirl-node-real-chain COMMAND SwirlNodeTests -o node-chain.txt,txt -o node-chain.xml,xml -o -,txt)
  add_executable(SwirlNetworkRegressionTests tests/NetworkRegressionTests.cpp)
  target_link_libraries(SwirlNetworkRegressionTests PRIVATE SwirlEngine Qt6::Test)
  target_compile_definitions(SwirlNetworkRegressionTests PRIVATE SWIRL_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
- add_test(NAME swirl-stream-regression COMMAND SwirlNetworkRegressionTests -o stream-regression.txt,txt)
+ add_test(NAME swirl-stream-regression COMMAND SwirlNetworkRegressionTests -o stream-regression.txt,txt -o stream-regression.xml,xml -o -,txt)
  set_tests_properties(swirl-stream-regression PROPERTIES TIMEOUT 180)
  add_executable(SwirlImportTests tests/ImportTests.cpp tests/ControlledNetwork.h)
  find_package(Python3 3.9 REQUIRED COMPONENTS Interpreter)
@@ -345,14 +366,14 @@ if(SWIRL_BUILD_UI_TESTS)
  if(MSVC)
   target_compile_options(SwirlSubscriptionFormatTests PRIVATE /utf-8)
  endif()
- add_test(NAME swirl-subscription-formats COMMAND SwirlSubscriptionFormatTests -o subscription-formats.txt,txt)
+ add_test(NAME swirl-subscription-formats COMMAND SwirlSubscriptionFormatTests -o subscription-formats.txt,txt -o subscription-formats.xml,xml -o -,txt)
  set_tests_properties(swirl-subscription-formats PROPERTIES TIMEOUT 180)
  target_link_libraries(SwirlImportTests PRIVATE SwirlEngine Qt6::Test)
  target_compile_definitions(SwirlImportTests PRIVATE SWIRL_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures")
  if(MSVC)
   target_compile_options(SwirlImportTests PRIVATE /utf-8)
  endif()
- add_test(NAME swirl-import-subscription COMMAND SwirlImportTests -o import-subscription.txt,txt)
+ add_test(NAME swirl-import-subscription COMMAND SwirlImportTests -o import-subscription.txt,txt -o import-subscription.xml,xml -o -,txt)
  set_tests_properties(swirl-import-subscription PROPERTIES TIMEOUT 120)
  add_test(NAME swirl-import-boundaries COMMAND SwirlImportTests sourceGlobalsArePreservedAndCannotBecomeNodeOnlyImports iniCompleteProfileHasClosedExecutionSemantics iniTransportAliasesCannotDowngradeSecurity iniEnvelopeAndWrappedJsonFailClosed typedOptionsAndAliasesCannotOverwriteImportedState legacyLoonAndEquivalentUriAliasesRetainTypedValues completeConfigurationWithoutOwnerDoesNotDiscardGlobals socks5TlsUriAliasesPreserveSecurity uriRealityRequiresAnExplicitSecurityLayerAndCredential tcpUriTransportRequirementsRemainBlockedAfterPersistence vlessUriAuthorityAndPathRequirementsRemainBlocked uriHeaderTypeHasClosedTransportSemantics preUpgradeUriStoreRechecksSourceWithoutRewriting singBoxTlsTypesAndFingerprintIntentArePreserved singBoxTransportShapesAndFieldsCannotDowngrade
   -o "${CMAKE_CURRENT_BINARY_DIR}/swirl-import-boundaries.xml,xml" -o -,txt)
@@ -410,7 +431,7 @@ if(WIN32)
 endif()
 
 foreach(runtime_target IN ITEMS SwirlProxyGuard SwirlExtensionTests SwirlTelemetryTests
- SwirlDiagnosticTests SwirlSystemProxyTests SwirlAcceptance SwirlNodeTests
+ SwirlDiagnosticTests SwirlSystemProxyStateTests SwirlSystemProxyTests SwirlAcceptance SwirlNodeTests
  SwirlNetworkRegressionTests SwirlImportTests SwirlSubscriptionFormatTests
  SwirlPrivateSubscriptionInspect)
  if(TARGET ${runtime_target})

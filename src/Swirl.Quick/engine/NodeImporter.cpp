@@ -11,6 +11,8 @@
 #include <stdexcept>
 
 namespace {
+QJsonValue singleDocument(const QByteArray &bytes);
+bool safeShape(const QByteArray &bytes);
 bool xrayJsonCandidate(const QByteArray &bytes) {
     auto view = bytes.trimmed();
     if (view.startsWith("\xef\xbb\xbf")) view = view.mid(3).trimmed();
@@ -25,6 +27,22 @@ bool xrayJsonCandidate(const QByteArray &bytes) {
     if (sniff.isNull() && view.startsWith('[') &&
         QRegularExpression("^\\[\\s*[A-Za-z][A-Za-z0-9 _-]*(?:\\]|$)").match(QString::fromUtf8(view.split('\n').first())).hasMatch())
         return false;
+    // A Clash flow sequence uses the same '[' prefix as a JSON array, but
+    // permits unquoted YAML keys. Only a complete, bounded, strict YAML
+    // sequence of typed Clash nodes can leave the JSON path. Malformed JSON,
+    // duplicate keys and mixed/Xray dialects still reach Rust unchanged.
+    if (sniff.isNull() && view.startsWith('[') && safeShape(view)) {
+        try {
+            const auto root = singleDocument(view);
+            const auto nodes = root.toArray();
+            if (!nodes.isEmpty() && std::all_of(nodes.cbegin(), nodes.cend(), [](const auto &node) {
+                return node.isObject() && node.toObject().value("type").isString()
+                    && !node.toObject().contains("protocol");
+            })) return false;
+        } catch (...) {
+            // Parser messages may contain credentials and are never exposed.
+        }
+    }
     if (sniff.isObject()) {
         const auto object = sniff.object();
         for (const auto &key : {"protocol", "outbound", "outboundDetour", "inbound", "inboundDetour"})

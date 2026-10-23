@@ -45,7 +45,9 @@ NodeImportService::NodeImportService(NodeStore *store,QObject *parent,std::funct
 QVariantList NodeImportService::providers() const {
     auto rows=m_store->publicSubscriptions();
     for(auto &row:rows){auto r=row.toMap();const auto id=r.value("id").toString();
-        r.insert("status",m_busy&&id==m_source?QStringLiteral("正在更新"):m_errors.contains(id)?QStringLiteral("更新失败"):r.value("lastSuccess").toLongLong()>0?QStringLiteral("已保存真实节点"):QStringLiteral("等待更新"));
+        const bool updating=m_busy&&id==m_source,queued=m_queue.contains(id);
+        r.insert("status",updating?QStringLiteral("正在更新"):queued?QStringLiteral("等待更新"):m_cancelled.contains(id)?QStringLiteral("已取消"):m_errors.contains(id)?QStringLiteral("更新失败"):r.value("lastSuccess").toLongLong()>0?QStringLiteral("已保存真实节点"):QStringLiteral("等待更新"));
+        r.insert("queued",queued);r.insert("canCancel",!m_shuttingDown&&(queued||(updating&&!m_committing)));
         r.insert("error",m_errors.value(id));
         const auto due=qMax(r.value("lastSuccess").toLongLong()+r.value("intervalMinutes").toLongLong()*60,m_attempts.value(id)+900);
         r.insert("nextUpdate",r.value("enabled").toBool()?QDateTime::fromSecsSinceEpoch(qMax(due,m_clock())).toLocalTime().toString("yyyy-MM-dd HH:mm"):QStringLiteral("已关闭"));row=r;
@@ -64,8 +66,9 @@ void NodeImportService::parseText(const QString &text,const QString &origin,bool
     // inexpensive bound before allocating; the parser checks exact byte size.
     if(text.size()>NodeImporter::MaximumBytes){m_message=QStringLiteral("配置文本超过 4 MiB；现有节点保持不变。");emit changed();return;}
     m_previewRequested=true;m_importSource=origin;m_nodesOnly=nodesOnly;
-    m_busy=true;m_source.clear();m_message=QStringLiteral("正在解析节点配置…");emit changed();
-    QPointer<NodeImportService> guard(this);const auto generation=m_generation;
+    m_busy=true;m_source.clear();m_message=QStringLiteral("正在解析节点配置…");
+    QPointer<NodeImportService> guard(this);const auto generation=m_generation;emit changed();
+    if(!guard || m_shuttingDown || !m_busy || m_generation!=generation)return;
     QThreadPool::globalInstance()->start([guard,generation,text] {
         auto bytes=text.toUtf8();auto result=NodeImporter::parse(bytes);bytes.fill('\0');
         QMetaObject::invokeMethod(QCoreApplication::instance(),[guard,generation,result=std::move(result)]() mutable {
@@ -89,8 +92,9 @@ void NodeImportService::startFile(const QUrl &file,bool nodesOnly) {
     if(m_busy || hasPreview() || m_shuttingDown)return;
     if(!file.isLocalFile() || !file.host().isEmpty() || file.toLocalFile().startsWith("\\\\")) {m_message=QStringLiteral("请选择本机 YAML/JSON 文件。");emit changed();return;}
     m_busy=true;m_source.clear();m_importSource="file";m_previewRequested=true;m_nodesOnly=nodesOnly;
-    m_message=QStringLiteral("正在读取并校验本机配置…");emit changed();
-    const auto path=file.toLocalFile();QPointer<NodeImportService> guard(this);const auto generation=m_generation;
+    m_message=QStringLiteral("正在读取并校验本机配置…");
+    const auto path=file.toLocalFile();QPointer<NodeImportService> guard(this);const auto generation=m_generation;emit changed();
+    if(!guard || m_shuttingDown || !m_busy || m_generation!=generation)return;
     QThreadPool::globalInstance()->start([guard,path,generation]{
         NodeImporter::Result result;
         const QFileInfo info(path);QFile input(path);
@@ -118,27 +122,53 @@ void NodeImportService::startUrl(const QUrl &url,bool nodesOnly) {
     if(m_busy || hasPreview() || m_shuttingDown)return;
     if(!NodeStore::allowedSubscriptionUrl(url)){m_message=QStringLiteral("请使用 HTTPS 地址；只有本机测试地址允许 HTTP。");emit changed();return;}
     m_previewRequested=true;m_importSource="url";m_downloadTimedOut=false;m_nodesOnly=nodesOnly;
-    m_busy=true;m_source.clear();m_formatHint="auto";m_message=QStringLiteral("正在安全下载节点配置…");emit changed();m_deadline.start();download(url);
+    m_busy=true;m_source.clear();m_formatHint="auto";m_message=QStringLiteral("正在安全下载节点配置…");
+    const QPointer<NodeImportService> guard(this);const auto generation=m_generation;emit changed();
+    if(!guard || m_shuttingDown || !m_busy || m_generation!=generation)return;
+    m_deadline.start();download(url);
 }
 bool NodeImportService::saveSubscription(const QString &id,const QString &name,const QUrl &url,int interval,bool enabled,const QString &formatHint,const QString &importScope) {
     if(m_busy || hasPreview())return false;
     const bool ok=m_store->saveSubscription(id,name,url,interval,enabled,formatHint,importScope);
     m_message=ok?QStringLiteral("订阅已加密保存；自动更新设置已生效。"):m_store->error();
-    if(ok && !id.isEmpty())m_errors.remove(id);
+    if(ok && !id.isEmpty()){m_errors.remove(id);m_cancelled.remove(id);}
     emit changed();return ok;
 }
 bool NodeImportService::removeSubscription(const QString &id) {
     if(m_busy || hasPreview())return false;
     const bool ok=m_store->removeSubscription(id);
     m_message=ok?QStringLiteral("订阅已删除，已导入节点保留为手动节点。"):m_store->error();
-    m_errors.remove(id);emit changed();return ok;
+    if(ok)m_cancelled.remove(id);m_errors.remove(id);emit changed();return ok;
 }
 void NodeImportService::refreshSubscription(const QString &id) {
-    if(id.isEmpty())return;
-    if(!m_queue.contains(id) && !(m_busy&&m_source==id))m_queue.enqueue(id);next();
+    if(id.isEmpty() || m_shuttingDown)return;
+    const QPointer<NodeImportService> guard(this);
+    if(!m_queue.contains(id) && !(m_busy&&m_source==id)){m_queue.enqueue(id);emit changed();}
+    if(guard)next();
 }
 void NodeImportService::refreshAll() {
-    for(const auto &s:m_store->subscriptions())if(!m_queue.contains(s.id) && !(m_busy&&m_source==s.id))m_queue.enqueue(s.id);next();
+    if(m_shuttingDown)return;
+    bool queued=false;
+    for(const auto &s:m_store->subscriptions())if(!m_queue.contains(s.id) && !(m_busy&&m_source==s.id)){m_queue.enqueue(s.id);queued=true;}
+    const QPointer<NodeImportService> guard(this);
+    if(queued)emit changed();if(guard)next();
+}
+bool NodeImportService::cancelRefresh(const QString &id) {
+    if(id.isEmpty() || m_shuttingDown)return false;
+    const bool active=m_busy&&m_source==id;
+    // Encryption/atomic commit already owns a durable write lease. Do not
+    // report cancellation after any node state may have been committed.
+    if(active&&m_committing)return false;
+    const bool queued=m_queue.removeAll(id)>0;
+    if(!active&&!queued)return false;
+    m_cancelled.insert(id);m_errors.remove(id);m_attempts.insert(id,m_clock());
+    m_message=active?QStringLiteral("已取消订阅更新，现有节点保持不变。"):QStringLiteral("已取消此订阅的排队更新，现有节点保持不变。");
+    if(active){
+        ++m_generation; // Revoke late system-proxy discovery and parser callbacks.
+        if(m_reply){m_reply->disconnect(this);m_reply->abort();m_reply->deleteLater();m_reply=nullptr;}
+        m_pending.reset();finish();
+    }else emit changed();
+    return true;
 }
 void NodeImportService::shutdown() {
     m_shuttingDown=true;++m_generation;m_timer.stop();m_deadline.stop();m_queue.clear();
@@ -161,9 +191,15 @@ void NodeImportService::next() {
     while(!m_queue.isEmpty()) {
         const auto id=m_queue.dequeue();
         for(const auto &s:m_store->subscriptions())if(s.id==id){
+            // Direct signal handlers can cancel, edit or remove this provider.
+            // Keep value copies and do not start work after a cancelled signal.
+            const auto url=s.url;const auto generation=m_generation;
+            const QPointer<NodeImportService> guard(this);
+            m_cancelled.remove(id);
             m_previewRequested=false;m_importSource="subscription";m_downloadTimedOut=false;
             m_source=id;m_formatHint=s.formatHint;m_nodesOnly=s.importScope=="nodes-only";m_busy=true;m_attempts.insert(id,m_clock());m_message=QStringLiteral("正在更新订阅（地址已隐藏）…");emit changed();
-            m_deadline.start();download(s.url);return;
+            if(!guard || m_shuttingDown || !m_busy || m_source!=id || m_generation!=generation)return;
+            m_deadline.start();download(url);return;
         }
     }
 }
@@ -286,7 +322,9 @@ void NodeImportService::parsed(NodeImporter::Result result) {
 }
 void NodeImportService::confirmImport() {
     if(m_busy || !m_pending || m_shuttingDown)return;
-    m_busy=true;auto result=std::move(*m_pending);m_pending.reset();emit changed();
+    m_busy=true;auto result=std::move(*m_pending);m_pending.reset();
+    const QPointer<NodeImportService> guard(this);const auto generation=m_generation;emit changed();
+    if(!guard || m_shuttingDown || !m_busy || m_generation!=generation)return;
     apply(std::move(result));
 }
 void NodeImportService::cancelImport() {
@@ -303,12 +341,14 @@ void NodeImportService::apply(NodeImporter::Result result) {
         finish(QStringLiteral("节点专用导入无法校验当前网络配置；旧节点保持不变。"));return;
     }
     if(result.format=="xray-v2ray-json" && (m_applyAsync || !m_apply)) {
-        m_committing=true;m_message=QStringLiteral("正在加密并原子保存节点…");emit changed();
         const QPointer<NodeImportService> guard(this);const auto generation=m_generation;
+        m_committing=true;m_message=QStringLiteral("正在加密并原子保存节点…");emit changed();
+        if(!guard || m_shuttingDown || !m_busy || m_generation!=generation)return;
         auto completion=[guard,generation,format=result.format,count,incomplete=result.incompleteNodes](bool ok,const QString &error) {
             if(!guard || guard->m_shuttingDown || guard->m_generation!=generation)return;
-            guard->m_committing=false;
             if(!ok){guard->finish(error.isEmpty()?QStringLiteral("节点保存失败；旧配置保持不变。"):error);return;}
+            // Keep the write boundary through nodesApplied. Its direct signal
+            // handlers must not report cancellation after the durable commit.
             guard->applied(format,count,incomplete);
         };
         QString error;bool queued=false;
@@ -322,6 +362,9 @@ void NodeImportService::apply(NodeImporter::Result result) {
         if(!queued){m_committing=false;finish(error.isEmpty()?QStringLiteral("无法开始安全保存；旧配置保持不变。"):error);}
         return;
     }
+    const QPointer<NodeImportService> guard(this);const auto generation=m_generation;
+    m_committing=true;emit changed();
+    if(!guard || m_shuttingDown || !m_busy || m_generation!=generation)return;
     if(m_apply || m_nodesOnly || !result.configuration.isEmpty()) {
         QString error;
         if(!m_apply || !m_apply(result,m_source,m_nodesOnly,&error)) {
@@ -334,11 +377,12 @@ void NodeImportService::applied(const QString &format,qsizetype count,int incomp
     m_message=QStringLiteral("%1 · 已解析并保存 %2 个节点；实际联网需检测。").arg(format).arg(count);
     if(m_nodesOnly)m_message+=QStringLiteral(" 本次仅更新节点；DNS、规则与策略组保持不变。");
     if(incomplete)m_message+=QStringLiteral(" %1 个节点当前不可执行，原始参数已加密保留。").arg(incomplete);
-    emit nodesApplied();finish();
+    const QPointer<NodeImportService> guard(this);emit nodesApplied();if(guard)finish();
 }
 void NodeImportService::finish(const QString &error) {
     m_deadline.stop();
     if(!m_source.isEmpty()){if(error.isEmpty())m_errors.remove(m_source);else m_errors.insert(m_source,error);}
     if(!error.isEmpty())m_message=error;
-    m_source.clear();m_busy=false;m_nodesOnly=false;emit changed();QTimer::singleShot(0,this,&NodeImportService::next);
+    m_source.clear();m_busy=false;m_committing=false;m_nodesOnly=false;
+    const QPointer<NodeImportService> guard(this);emit changed();if(guard)QTimer::singleShot(0,this,&NodeImportService::next);
 }

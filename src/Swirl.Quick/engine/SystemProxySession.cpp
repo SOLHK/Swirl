@@ -17,6 +17,7 @@
 #include <wininet.h>
 #include <wincrypt.h>
 #endif
+#include "SystemProxyState.h"
 
 namespace {
 QByteArray crypt(const QByteArray &bytes, bool decrypt) {
@@ -46,24 +47,6 @@ bool write(const QString &path, const QJsonObject &object) {
 constexpr auto internetKey=L"Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings";
 constexpr const wchar_t *registryNames[]={L"ProxyEnable",L"ProxyServer",L"ProxyOverride",L"AutoConfigURL"};
 constexpr const char *registryKeys[]={"ProxyEnable","ProxyServer","ProxyOverride","AutoConfigURL"};
-// Preserve presence, native type and bytes: missing values are not empty strings,
-// and WinINET's connection store can legitimately differ from these values.
-QJsonObject registrySnapshot(QString *error) {
-    HKEY key{};auto status=RegOpenKeyExW(HKEY_CURRENT_USER,internetKey,0,KEY_QUERY_VALUE,&key);
-    if(status!=ERROR_SUCCESS){SetLastError(status);if(error)*error=QStringLiteral("无法读取当前用户代理注册表（错误 %1）。").arg(status);return {};}
-    QJsonObject result;
-    for(int i=0;i<4;++i) {
-        DWORD type=0,size=0;status=RegQueryValueExW(key,registryNames[i],nullptr,&type,nullptr,&size);
-        if(status==ERROR_FILE_NOT_FOUND){result.insert(registryKeys[i],QJsonObject{{"present",false}});continue;}
-        if(status!=ERROR_SUCCESS||size>65536){RegCloseKey(key);if(error)*error=QStringLiteral("无法安全读取代理注册表值。");return {};}
-        QByteArray bytes(size,Qt::Uninitialized);
-        status=RegQueryValueExW(key,registryNames[i],nullptr,&type,reinterpret_cast<BYTE *>(bytes.data()),&size);
-        if(status!=ERROR_SUCCESS){RegCloseKey(key);if(error)*error=QStringLiteral("代理注册表值在读取时发生变化。");return {};}
-        bytes.resize(size);
-        result.insert(registryKeys[i],QJsonObject{{"present",true},{"type",double(type)},{"data",QString::fromLatin1(bytes.toBase64())}});
-    }
-    RegCloseKey(key);return result;
-}
 bool validRegistry(const QJsonObject &values) {
     if(values.size()!=4)return false;
     for(const auto name:registryKeys) {
@@ -160,7 +143,7 @@ QJsonObject SystemProxySession::snapshot(QString *error) {
     QJsonObject result{{"flags",int(options[0].Value.dwValue)}};
     const char *keys[]={"server","bypass","pac"};
     for(int i=1;i<4;++i){result.insert(keys[i-1],QString::fromWCharArray(options[i].Value.pszValue?options[i].Value.pszValue:L""));if(options[i].Value.pszValue)GlobalFree(options[i].Value.pszValue);}
-    const auto registry=registrySnapshot(error);if(registry.isEmpty())return {};
+    const auto registry=SystemProxyState::readRegistry(HKEY_CURRENT_USER,internetKey,error);if(registry.isEmpty())return {};
     result.insert("registry",registry);
     return result;
 #else
@@ -269,23 +252,38 @@ bool SystemProxySession::disable() {
 }
 void SystemProxySession::refresh() {
     const auto record=read(m_journal);QString readError;const auto current=snapshot(&readError);
+    bool observationChanged=m_readError!=readError;m_readError=readError;
+    if(!current.isEmpty()) {
+        const auto state=SystemProxyState::inspect(current);
+        observationChanged=observationChanged||m_systemEnabled!=state.enabled()||m_stateDiffers!=state.differs();
+        m_systemEnabled=state.enabled();m_stateDiffers=state.differs();
+    }
     // A transient WinINET read failure is not an external ownership change.
     // Retain the encrypted recovery record so the independent guard can act.
     if(current.isEmpty()||(m_owned&&record.isEmpty()&&QFile::exists(m_journal))) {
         const bool wasEnabled=m_enabled;m_enabled=false;
         if(m_owned)m_error=readError.isEmpty()?QStringLiteral("恢复记录暂时无法读取；接管状态未确认，快照已保留。"):readError;
-        if(wasEnabled||m_owned)emit changed();return;
+        if(observationChanged||wasEnabled||m_owned)emit changed();return;
     }
     const bool ownSession=!m_session.isEmpty()&&record.value("session").toString()==m_session;
     const bool same=ownSession&&matchesSettings(current,record.value("applied").toObject());
     if(m_owned&&ownSession&&record.value("applyUnconfirmed").toBool()&&!same&&!matchesSettings(current,record.value("original").toObject())) {
         m_enabled=false;m_error=QStringLiteral("代理部分写入或外部修改的来源尚未确认；恢复快照已保留，请检查 Windows 代理。");emit changed();return;
     }
-    if(m_owned&&!same){m_owned=false;if(ownSession)QFile::remove(m_journal);m_error=QStringLiteral("系统代理已由外部修改或安全恢复，Swirl 已放弃控制。");}
+    if(m_owned&&!same){m_owned=false;if(ownSession)QFile::remove(m_journal);m_error=QStringLiteral("系统代理已由外部修改或安全恢复，Swirl 已放弃控制。");observationChanged=true;}
     const bool enabled=m_owned&&same;
-    const bool systemEnabled=(current.value("flags").toInt()&2)!=0;
-    if(systemEnabled!=m_systemEnabled){m_systemEnabled=systemEnabled;emit changed();}
-    if(enabled!=m_enabled){m_enabled=enabled;emit changed();}
+    if(enabled!=m_enabled){m_enabled=enabled;observationChanged=true;}
+    if(observationChanged)emit changed();
+}
+QVariantMap SystemProxySession::diagnosticState() const {
+    QString readError;
+    auto state=SystemProxyState::inspect(snapshot(&readError)).diagnostics();
+    state.insert("swirlEnabled",m_enabled);state.insert("owned",m_owned);
+    state.insert("readError",readError);state.insert("recoveryError",m_error);
+    const bool journalPresent=QFile::exists(m_journal);
+    state.insert("recoveryJournalPresent",journalPresent);
+    state.insert("guardAcknowledged",m_owned&&journalPresent&&QFile::exists(m_journal+".ready"));
+    return state;
 }
 int SystemProxySession::guard(const QString &journal) {
 #ifdef Q_OS_WIN
