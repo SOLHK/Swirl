@@ -13,6 +13,9 @@ Var Parameters
 !ifndef APP_ICON
 !error "APP_ICON required (generated from Swirl SVG)"
 !endif
+!ifndef APP_VERSION
+!error "APP_VERSION is required (read PRODUCT_VERSION.txt)"
+!endif
 !define MUI_ABORTWARNING
 !define MUI_ICON "${APP_ICON}"
 !define MUI_UNICON "${APP_ICON}"
@@ -25,11 +28,11 @@ InstallDirRegKey HKCU "Software\\Swirl" "InstallDir"
 RequestExecutionLevel user
 ShowInstDetails show
 ShowUnInstDetails show
-VIProductVersion "1.0.0.0"
+VIProductVersion "${APP_VERSION}.0"
 VIAddVersionKey /LANG=2052 "ProductName" "Swirl"
 VIAddVersionKey /LANG=2052 "FileDescription" "Swirl 安装程序"
-VIAddVersionKey /LANG=2052 "FileVersion" "1.0.0.0"
-VIAddVersionKey /LANG=2052 "ProductVersion" "1.0.0.0"
+VIAddVersionKey /LANG=2052 "FileVersion" "${APP_VERSION}.0"
+VIAddVersionKey /LANG=2052 "ProductVersion" "${APP_VERSION}.0"
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
@@ -44,6 +47,12 @@ Function .onInit
     ${GetOptions} $Parameters "/ISOLATED" $0
     IfErrors +2 0
     StrCpy $IsolatedInstall "1"
+    StrCmp $IsolatedInstall "1" 0 init_done
+    StrCpy $0 $INSTDIR 9
+    StrCmp $0 "D:\Codex\" init_done
+    SetErrorLevel 2
+    Abort "隔离安装必须明确指定 D:\Codex 下的测试目录。"
+    init_done:
 FunctionEnd
 Function un.onInit
     StrCpy $IsolatedInstall "0"
@@ -80,7 +89,9 @@ Section "安装 Swirl"
     regular:
     CreateDirectory "$SMPROGRAMS\\Swirl"
     CreateShortCut "$SMPROGRAMS\\Swirl\\Swirl.lnk" "$INSTDIR\\Swirl.exe" "" "$INSTDIR\\Swirl-brand-phase3-v2.ico" 0
+    !if /FileExists "${APP_DIST}\SwirlCodexLauncher.exe"
     CreateShortCut "$SMPROGRAMS\\Swirl\\通过 Swirl 启动 Codex.lnk" "$INSTDIR\\SwirlCodexLauncher.exe" "" "$INSTDIR\\Swirl-brand-phase3-v2.ico" 0
+    !endif
     CreateShortCut "$DESKTOP\\Swirl.lnk" "$INSTDIR\\Swirl.exe" "" "$INSTDIR\\Swirl-brand-phase3-v2.ico" 0
     ExecWait '"$INSTDIR\SwirlProxyGuard.exe" --repair-shortcut "$DESKTOP\Swirl.lnk" "$INSTDIR\Swirl.exe" "$INSTDIR\Swirl-brand-phase3-v2.ico"' $0
     StrCmp $0 0 +2
@@ -93,7 +104,8 @@ Section "安装 Swirl"
     StrCmp $0 0 +2
     DetailPrint "Swirl 任务栏图标刷新未完成，错误 $0。"
     WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "DisplayName" "Swirl"
-    WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "DisplayVersion" "1.0.0.0"
+    WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "DisplayVersion" "${APP_VERSION}.0"
+    WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "InstallLocation" "$INSTDIR"
     WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "UninstallString" '"$INSTDIR\\卸载 Swirl.exe"'
     WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "DisplayIcon" "$INSTDIR\\Swirl-brand-phase3-v2.ico"
     WriteRegStr HKCU "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Swirl" "Publisher" "Swirl"

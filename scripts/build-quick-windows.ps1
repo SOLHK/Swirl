@@ -75,7 +75,9 @@ try {
     Copy-Item -LiteralPath 'src/Swirl.Quick/CAPTURE.md','docs/LOCAL_EXTENSIONS.md','docs/FONTS.md','docs/ANIMATION_DEPENDENCY_RESEARCH.md','docs/PR12_GRAPHICS_UPGRADE.md','docs/PR12_NATIVE_ACCEPTANCE.md','docs/PR12_NATIVE_UI_FIXES.md','docs/SWIRL_NATIVE_RESEARCH.md' -Destination $documentation
     $dist = (Resolve-Path $DistDir).Path
     $out = (Resolve-Path $OutDir).Path
-    & $Nsis /INPUTCHARSET UTF8 "/DAPP_DIST=$dist" "/DOUT_DIR=$out" "/DAPP_ICON=$icon" src/Swirl.Quick/packaging/Swirl.nsi
+    $appVersion = (Get-Content -LiteralPath 'src/Swirl.Quick/PRODUCT_VERSION.txt' -Raw).Trim()
+    if ($appVersion -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid PRODUCT_VERSION.txt' }
+    & $Nsis /INPUTCHARSET UTF8 "/DAPP_DIST=$dist" "/DOUT_DIR=$out" "/DAPP_ICON=$icon" "/DAPP_VERSION=$appVersion" src/Swirl.Quick/packaging/Swirl.nsi
     if ($LASTEXITCODE) { throw "NSIS packaging failed." }
     Get-Item (Join-Path $out "Swirl-Setup.exe")
 } finally { Pop-Location }
