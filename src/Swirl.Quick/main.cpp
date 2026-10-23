@@ -570,12 +570,13 @@ int main(int argc, char *argv[])
             });
             auto *captureBackdrop=previewPage=="external"?&panelBackdrop:&backdrop;
             if(!nativeFramePath.isEmpty())QTimer::singleShot(400,&app,[&app,captureBackdrop]{if(!captureBackdrop->prepareNativeCapture()){qCritical()<<"Native capture blocked: cannot activate target window";app.exit(3);}});
-            QTimer::singleShot(fontReview && !argumentValue(QStringLiteral("--font-reading-points=")).isEmpty()?1500:900, &app, [window, previewPage, previewPath, nativeFramePath, captureBackdrop, &app, &previewCaptured]() {
+            const int nativeMargin=qBound(0,argumentValue(QStringLiteral("--capture-native-margin=")).toInt(),80);
+            QTimer::singleShot(fontReview && !argumentValue(QStringLiteral("--font-reading-points=")).isEmpty()?1500:900, &app, [window, previewPage, previewPath, nativeFramePath, nativeMargin, captureBackdrop, &app, &previewCaptured]() {
                 QQuickWindow *captureWindow=window;
                 const QString targetName=previewPage=="external"?"dashboardWindow":QString();
                 if(!targetName.isEmpty())for(auto *candidate:QGuiApplication::allWindows())if(candidate->isVisible()&&candidate->objectName()==targetName)if(auto *quick=qobject_cast<QQuickWindow *>(candidate)){captureWindow=quick;break;}
                 if(!nativeFramePath.isEmpty()&&!captureBackdrop->isCaptureForeground()){qCritical()<<"Native capture blocked: target window lost foreground";captureBackdrop->finishNativeCapture();app.exit(3);return;}
-                QImage screenshot = nativeFramePath.isEmpty()?captureWindow->grabWindow():captureWindow->screen()->grabWindow(0,captureWindow->x(),captureWindow->y(),captureWindow->width(),captureWindow->height()).toImage();
+                QImage screenshot = nativeFramePath.isEmpty()?captureWindow->grabWindow():captureWindow->screen()->grabWindow(0,captureWindow->x()-nativeMargin,captureWindow->y()-nativeMargin,captureWindow->width()+2*nativeMargin,captureWindow->height()+2*nativeMargin).toImage();
                 if(nativeFramePath.isEmpty()&&captureWindow==window){
                     QList<QQuickWindow *> popups;QRect bounds=window->geometry();
                     for(auto *candidate:QGuiApplication::allWindows())if(candidate!=window&&candidate->isVisible()&&candidate->flags().testFlag(Qt::Popup))if(auto *quick=qobject_cast<QQuickWindow *>(candidate)){popups.append(quick);bounds=bounds.united(candidate->geometry());}

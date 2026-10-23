@@ -267,7 +267,7 @@ ApplicationWindow {
     // Exact-region windows use this single matching rim; other native windows
     // retain their DWM rim. The native region clips all children at once.
     SwirlContinuousSurface {
-        objectName:"windowOutline";visible:backdrop.exactCorners || !backdrop.nativeCorners
+        objectName:"windowOutline";visible:Theme.increaseContrast && (backdrop.exactCorners || !backdrop.nativeCorners)
         anchors.fill:parent;z:998;color:"transparent";antialiasing:true
         radius:window.shellRadius
         border.width:window.visibility===Window.Maximized?0:1/Screen.devicePixelRatio

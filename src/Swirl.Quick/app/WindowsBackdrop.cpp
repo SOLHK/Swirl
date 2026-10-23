@@ -20,14 +20,15 @@ namespace {
 // Evaluate a circular corner at physical pixel centres. Mirroring each row
 // makes all four curves identical at fractional DPI, without rounding the
 // design radius to a logical pixel or allocating a whole-window texture.
-HRGN roundedWindowRegion(int width, int height, qreal radius) {
+HRGN roundedWindowRegion(int width, int height, qreal radius, qreal coverageFringe = 0) {
     radius = qBound<qreal>(0, radius, qMin(width, height) / 2.0);
     const int rows = qCeil(radius);
     const HRGN region = CreateRectRgn(0, rows, width, height - rows);
     if (!region) return nullptr;
     for (int y = 0; y < rows; ++y) {
         const qreal dy = qMax<qreal>(0, radius - y - 0.5);
-        const int inset = qMax(0, qCeil(radius - std::sqrt(qMax<qreal>(0, radius * radius - dy * dy)) - 0.5));
+        const qreal coverageRadius=radius+coverageFringe;
+        const int inset = qMax(0, qCeil(radius - std::sqrt(qMax<qreal>(0, coverageRadius * coverageRadius - dy * dy)) - 0.5));
         const HRGN top = CreateRectRgn(inset, y, width - inset, y + 1);
         const HRGN bottom = CreateRectRgn(inset, height - y - 1, width - inset, height - y);
         if (top) { CombineRgn(region, region, top, RGN_OR); DeleteObject(top); }
@@ -220,11 +221,12 @@ void WindowsBackdrop::updateCornerMask() {
         if (m_exactCorners && m_regionSize == physicalSize && qFuzzyCompare(m_regionDpr, dpr)
             && qFuzzyCompare(m_cornerRadius + 1, effectiveRadius + 1)) { updateCompatibilityShadow(); return; }
         const bool software=QQuickWindow::graphicsApi()==QSGRendererInterface::Software;
-        // Accelerated windows feather the final framebuffer alpha using four
-        // tiny WindowEdge quads. An integer HRGN would cut those AA samples off.
-        // Software remains an explicitly reported binary compatibility path.
-        const HRGN region = rectangular || !software ? nullptr : roundedWindowRegion(physicalSize.width(), physicalSize.height(), radius * dpr);
-        if (!rectangular && software && !region) return;
+        // The native surface must share the QML contour too: a rectangular
+        // HWND can leave a compositor edge outside the alpha-rounded content.
+        // Retain one physical pixel of coverage for WindowEdge's AA fringe,
+        // instead of clipping its partially covered pixels at the 50% contour.
+        const HRGN region = rectangular ? nullptr : roundedWindowRegion(physicalSize.width(), physicalSize.height(), radius * dpr,software?0:1);
+        if (!rectangular && !region) return;
         // Windows takes ownership only after a successful SetWindowRgn.
         if (!SetWindowRgn(hwnd, region, FALSE)) {
             if (region) DeleteObject(region);
