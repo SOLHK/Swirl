@@ -29,6 +29,7 @@ public:
  QString message() const { return m_message; }
  QVariantMap results() const { return m_results; }
  QVariantMap result(const QString &id) const { return m_results.value(id).toMap(); }
+ bool testing(const QString &id) const { return m_running.contains(id)||m_queue.contains(id); }
 signals:
  void changed();
  void diagnostic(const QString &code,const QString &message);

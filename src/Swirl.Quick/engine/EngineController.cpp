@@ -313,13 +313,25 @@ QVariantList EngineController::nodes() const {
     for (auto &value : rows) {
         auto row=value.toMap(); const bool active=processAlive() && row.value("id").toString()==status.selectedNodeId;
         row.insert("address",row.value("host").toString().isEmpty()?QStringLiteral("协议扩展配置"):row.value("host").toString()+":"+row.value("port").toString());
-        row.insert("status",active?nodeStateText():QStringLiteral("未连接"));
+        const auto id=row.value("id").toString();
+        const auto measured=m_tests.result(id);
+        QString nodeStatus=QStringLiteral("未测试");
+        if(m_tests.testing(id))nodeStatus=QStringLiteral("测试中");
+        else if(!measured.isEmpty())nodeStatus=measured.value("success").toBool()?QStringLiteral("可用"):
+            measured.value("error").toString().contains("timeout",Qt::CaseInsensitive)||measured.value("error").toString().contains(QStringLiteral("超时"))?QStringLiteral("超时"):QStringLiteral("测试失败");
+        if(m_connectionRequested&&m_options.selectedNodeId==id){
+            if(status.state==ProxyEngine::State::Failed||status.requestState==ProxyEngine::RequestState::Failed||status.nodeHealth==ProxyEngine::NodeHealth::Unavailable)nodeStatus=QStringLiteral("连接失败");
+            else if(active&&status.requestState==ProxyEngine::RequestState::Succeeded)nodeStatus=QStringLiteral("已连接");
+            else if(busy()||status.nodeBusy)nodeStatus=QStringLiteral("正在连接");
+            else if(active)nodeStatus=QStringLiteral("会话就绪 · 未验证");
+        }
+        row.insert("status",nodeStatus);
+        row.insert("testAvailable",!m_tests.testing(id)&&measured.value("success").toBool());
 #ifdef SWIRL_USE_RUST_CORE
         row.insert("latency",QStringLiteral("—"));
 #else
         row.insert("latency",active && status.latencyMs>=0?QString::number(status.latencyMs):QStringLiteral("—"));
 #endif
-        const auto measured=m_tests.result(row.value("id").toString());
         if(!measured.isEmpty()){
             const auto sample=measured.value(measured.value("metricType")==QStringLiteral("http_headers")
                 ?"outboundConnectMs":"latency");

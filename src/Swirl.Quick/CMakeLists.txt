@@ -221,7 +221,7 @@ qt_add_qml_module(Swirl
     RESOURCE_PREFIX /qt/qml
     NO_GENERATE_EXTRA_QMLDIRS
     QML_FILES ${SWIRL_QML_FILES}
-    SOURCES app/JavascriptHighlighter.h app/JavascriptHighlighter.cpp app/WindowEdge.h app/WindowEdge.cpp app/VariableFontPreview.h app/VariableFontPreview.cpp app/FontDisplayContext.h app/FontDisplayContext.cpp
+    SOURCES app/JavascriptHighlighter.h app/JavascriptHighlighter.cpp app/WindowEdge.h app/WindowEdge.cpp app/VariableFontPreview.h app/VariableFontPreview.cpp app/FontDisplayContext.h app/FontDisplayContext.cpp app/NodeViewModel.h app/NodeViewModel.cpp
 )
 set(SWIRL_ASSET_PATH "${CMAKE_CURRENT_SOURCE_DIR}/assets")
 file(GLOB SWIRL_UI_ICONS CONFIGURE_DEPENDS "${SWIRL_ASSET_PATH}/icons/ui/*.svg")
@@ -253,6 +253,10 @@ if(SWIRL_BUILD_UI_TESTS)
  add_test(NAME swirl-storage-paths COMMAND SwirlStoragePathsTests)
  file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/packaging/rules" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
  find_package(Qt6 REQUIRED COMPONENTS Test)
+ qt_add_executable(SwirlNodeViewModelTests tests/NodeViewModelTests.cpp app/NodeViewModel.h app/NodeViewModel.cpp)
+ target_link_libraries(SwirlNodeViewModelTests PRIVATE SwirlEngine Qt6::Qml Qt6::Test)
+ target_include_directories(SwirlNodeViewModelTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+ add_test(NAME swirl-node-view-model COMMAND SwirlNodeViewModelTests)
  swirl_add_font_tests()
  target_sources(Swirl PRIVATE tests/GatewayChecks.cpp tests/GatewayChecks.h tests/HdrChecks.cpp tests/HdrChecks.h tests/OverviewChecks.cpp tests/OverviewChecks.h tests/CaptureChecks.cpp tests/CaptureChecks.h tests/WindowChecks.cpp tests/WindowChecks.h)
  target_sources(Swirl PRIVATE tests/UiQualityChecks.h tests/UiQualityChecks.cpp)

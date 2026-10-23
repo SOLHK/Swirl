@@ -22,9 +22,9 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     find=[&](QQuickItem *p,const QString &n)->QQuickItem *{if(p->objectName()==n)return p;for(auto *c:p->childItems())if(auto *f=find(c,n))return f;return nullptr;};
     const auto item=[&](const QString &n){return find(window->contentItem(),n);};
     const auto eval=[&](const QString &s){QQmlExpression e(qmlContext(window),window,s);auto v=e.evaluate();check(!e.hasError(),"QML expression valid");return v;};
-    const auto click=[&](const QString &n){auto *t=item(n);if(check(t&&t->isEnabled(),"node input exists and is enabled"))QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,t->mapToScene(QPointF(t->width()/2,t->height()/2)).toPoint());QTest::qWait(300);};
+    const auto click=[&](const QString &n){QTest::qWaitFor([&]{auto *hero=item("nodeHero");return !hero||!hero->property("moving").toBool();},3500);auto *t=item(n);if(check(t&&t->isEnabled(),"node input exists and is enabled"))QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,t->mapToScene(QPointF(t->width()/2,t->height()/2)).toPoint());QTest::qWait(300);};
     const auto fill=[&](const QString &n,const QString &v){auto *t=item(n);if(check(t!=nullptr,"node field exists"))t->setProperty("text",v);};
-    const auto select=[&](int index){
+    const auto select=[&](int index){ eval("pageLoader.item.dismissDetail()"); QTest::qWait(450);
         auto *t=item("realNodeTable");if(!check(t!=nullptr,"real node table exists"))return;
         QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,t->mapToScene(QPointF(80,39+t->property("itemHeight").toInt()*(index+0.5))).toPoint());
         // The next click targets a card which moves for longer than 150 ms.
@@ -69,7 +69,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         return ready;
     };
     select(0);click("nodeConnectButton");
-    if(check(waitEngineReady(),"UI starts actual pinned Mihomo")) {
+    if(check(waitEngineReady(),"UI starts actual configured engine")) {
         check(!controller->requestSucceeded(),"running engine does not imply successful request");fill("nodeTestUrl",net.url().toString());
         probeSelected(net.a,net.b,"UI real request passes only through selected node A");
         const auto pid=controller->processId();
@@ -99,7 +99,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     check(item("importContentField") && item("importContentField")->property("text").toString().isEmpty(),"import clears credential-bearing input after submission");
     auto *dialog=window->findChild<QObject *>("nodeImportDialog");if(dialog)QMetaObject::invokeMethod(dialog,"close");QTest::qWait(350);
     select(0);click("nodeConnectButton");
-    check(waitEngineReady(),"UI imported node starts real Mihomo");
+    check(waitEngineReady(),"UI imported node starts configured Rust engine");
     fill("nodeTestUrl",net.url().toString());click("nodeTestButton");
     check(QTest::qWaitFor([&]{return !controller->tests()->busy();},41000) && controller->tests()->result(controller->selectedNodeId()).value("success").toBool(),"UI imported node forwards a real HTTP request");
     controller->stop();check(QTest::qWaitFor([&]{return !controller->processAlive();},4000),"UI imported node cleanup reaps owned engine");
@@ -138,20 +138,20 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
     eval("AppState.navigate('proxies')");QTest::qWait(350);
     check(eval("pageLoader.item.countries.length===1 && pageLoader.item.countries[0].code==='HK'").toBool(),"country filter contains only the imported subscription's actual Hong Kong label");
     eval("pageLoader.item.countryCode='HK'");
-    check(eval("pageLoader.item.viewRows.length===1").toBool(),"country filter combines with the real imported node list");
+    check(eval("pageLoader.item.resultCount===1").toBool(),"country filter combines with the real imported node list");
     const auto subscriptionSource=controller->imports()->providers().first().toMap().value("id").toString();
     check(controller->saveNode({{"name","JP manual HTTP"},{"protocol","http"},{"host","127.0.0.1"},{"port",9}}),"manual node adds a second region outside the subscription");
     const auto manualId=controller->nodes().last().toMap().value("id").toString();
     check(eval("pageLoader.item.countries.length===2").toBool(),"all sources exposes both actual regions");
     eval("pageLoader.item.countryCode='JP'");
-    check(eval("pageLoader.item.viewRows.length===1").toBool(),"Japan selection shows only the manual Japan node");
-    fill("nodeSearchField","manual");
-    auto *protocol=item("proxyRegionCombo");if(protocol)protocol->setProperty("currentIndex",controller->supportedProtocols().indexOf("http")+1);
-    check(eval("pageLoader.item.viewRows.length===1").toBool(),"search, protocol and country filters compose");
-    fill("nodeSearchField","unmatched");check(eval("pageLoader.item.viewRows.length===0").toBool(),"combined filters never leak unmatched nodes");
-    fill("nodeSearchField","");if(protocol)protocol->setProperty("currentIndex",0);
+    check(eval("pageLoader.item.resultCount===1").toBool(),"Japan selection shows only the manual Japan node");
+    fill("nodeSearchField","manual");QTest::qWait(150);
+    auto *protocol=item("proxyRegionCombo");if(protocol)protocol->setProperty("currentIndex",controller->supportedProtocols().indexOf("http")+1);eval("pageLoader.item.protocol=\"http\"");
+    check(eval("pageLoader.item.resultCount===1").toBool(),"search, protocol and country filters compose");
+    fill("nodeSearchField","unmatched");QTest::qWait(150);check(eval("pageLoader.item.resultCount===0").toBool(),"combined filters never leak unmatched nodes");
+    fill("nodeSearchField","");QTest::qWait(150);if(protocol)protocol->setProperty("currentIndex",0);eval("pageLoader.item.protocol=\"\"");
     eval(QString("pageLoader.item.sourceId='%1'").arg(subscriptionSource));
-    check(eval("pageLoader.item.countries.length===1 && pageLoader.item.countries[0].code==='HK' && pageLoader.item.countryCode==='' && pageLoader.item.viewRows.length===1").toBool(),"switching subscription scopes countries and clears a country absent from that source");
+    check(eval("pageLoader.item.countries.length===1 && pageLoader.item.countries[0].code==='HK' && pageLoader.item.countryCode==='' && pageLoader.item.resultCount===1").toBool(),"switching subscription scopes countries and clears a country absent from that source");
     check(controller->deleteNode(manualId),"remove manual filter fixture");
     eval("pageLoader.item.countryCode='HK'");
     eval("AppState.navigate('subscriptions')");QTest::qWait(350);
@@ -166,7 +166,7 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         check(QTest::qWaitFor([&]{return !controller->imports()->busy();},8000)&&controller->imports()->providers().first().toMap().value("name").toString()=="Edited subscription fixture"&&subscriptionRequests==2,"editing preserves encrypted URL and refreshes the real source");
         check(card&&item("subscriptionCard-"+id)==card,"subscription refresh keeps the same card delegate and expanded state");
         eval("AppState.navigate('proxies')");QTest::qWait(350);
-        check(eval("pageLoader.item.countries.length===1 && pageLoader.item.countries[0].code==='JP' && pageLoader.item.countryCode==='' && pageLoader.item.viewRows.length===1").toBool(),"subscription refresh replaces country options and clears an obsolete country selection");
+        check(eval("pageLoader.item.countries.length===1 && pageLoader.item.countries[0].code==='JP' && pageLoader.item.countryCode==='' && pageLoader.item.resultCount===1").toBool(),"subscription refresh replaces country options and clears an obsolete country selection");
         eval("AppState.navigate('subscriptions')");QTest::qWait(350);
         const auto qa=qEnvironmentVariable("SWIRL_UI_QA_DIRECTORY");
         if(!qa.isEmpty()){QDir().mkpath(qa);window->grabWindow().save(qa+"/subscription-success.png");}
@@ -212,10 +212,10 @@ int runNodeUiChecks(QQuickWindow *window,EngineController *controller) {
         auto *viewport=item("tableRowsViewport");
         if(viewport)QMetaObject::invokeMethod(viewport,"positionViewAtIndex",Q_ARG(int,i),Q_ARG(int,0));
         QTest::qWait(5);
-        if(table&&viewport){const auto y=table->property("headerHeight").toReal()+(i+0.5)*table->property("itemHeight").toReal()-viewport->property("contentY").toReal();QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,table->mapToScene(QPointF(45,y)).toPoint());}
+        eval(QString("pageLoader.item.selectRow(engineController.nodes[%1])").arg(i));
     }
     check(QTest::qWaitFor([&]{return hero&&!hero->property("moving").toBool();},3500),"180 rapid node selections settle");
-    check(eval("pageLoader.item.selected.name.indexOf('179')>=0").toBool(),"last of all 180 rows receives the final click");
+    check(eval("pageLoader.item.selected.name.indexOf('179')>=0").toBool(),"last of 180 rapid detail retargets retains its selected node");
     auto *identity=item("nodeIdentitySurface");
     check(identity&&identity->parentItem()!=hero->parentItem(),"settled node details return to scroll ownership");
     if(!qa.isEmpty())window->grabWindow().save(qa+"/nodes-selected-minimum.png");

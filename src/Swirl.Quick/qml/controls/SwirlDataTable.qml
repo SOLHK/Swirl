@@ -6,6 +6,7 @@ Item {
     id:table
     property var columns:[{key:"name",label:"名称",w:220}]
     property var rows:[]
+    property var externalModel:null
     property bool incrementalRows:false
     property bool followTail:false
     property string anchorKey:""
@@ -108,7 +109,8 @@ Item {
                 width:horizontal.contentWidth
                 height:Math.max(0,horizontal.height-table.headerHeight-(horizontal.contentWidth>horizontal.width?Theme.dp(10):0))
                 clip:true
-                model:table.incrementalRows?stableRows:table.rows
+                model:table.externalModel!==null?table.externalModel:table.incrementalRows?stableRows:table.rows
+                reuseItems:table.externalModel!==null
                 boundsBehavior:Flickable.StopAtBounds
                 pixelAligned:false
                 activeFocusOnTab:true
@@ -122,7 +124,8 @@ Item {
                     id:recordRow
                     z:1
                     width:list.width; height:table.itemHeight
-                    property var record:table.incrementalRows?model.entry:modelData
+                    property var record:table.externalModel!==null||table.incrementalRows?model.entry:modelData
+                    ListView.onPooled:if(table.selectedItem===recordRow)table.selectedItem=null
                     property Item titleElement:null
                     Accessible.role:Accessible.ListItem
                     Accessible.selected:table.selectedId===String(record.id||record.name)

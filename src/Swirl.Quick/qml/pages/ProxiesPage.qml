@@ -8,30 +8,30 @@ import "../controls"
 Item {
     id:page
     readonly property Item motionTitle:routeTitle
+    readonly property bool detailOpen:nodeHero.opened
 
     readonly property string selectedId:engineController.selectedNodeId
-    readonly property var allNodes:engineController.nodes
-    readonly property var selected:allNodes.find(n=>n.id===page.selectedId)||null
-    readonly property bool selectedActive:selected!==null&&engineController.processAlive&&engineController.activeNodeId===selectedId
+    NodeViewModel { id:nodes;objectName:"nodeViewModel";controller:engineController }
+    readonly property var selected:{nodes.revision;return nodes.find(page.selectedId)}
+    onSelectedChanged:if(selected.id===undefined&&nodeHero.opened)nodeHero.returnTo(null)
+    readonly property bool selectedActive:selected.id!==undefined&&engineController.processAlive&&engineController.activeNodeId===selectedId
     property string sourceId:""
     property string countryCode:""
+    property string protocol:""
+    property string statusFilter:""
+    property int maxLatency:-1
+    property bool availableOnly:false
+    property int groupIndex:0
     readonly property var sources:engineController.imports.providers
-    readonly property var sourceRows:allNodes.filter(n=>!sourceId || n.sourceId===sourceId)
-    // Region options/order depend only on metadata, never on latency telemetry.
-    readonly property var catalogRows:engineController.nodeCatalog.filter(n=>!sourceId || n.sourceId===sourceId)
-    readonly property var nodeById:{const rows={};for(const node of allNodes)rows[node.id]=node;return rows}
-    readonly property var countries:{
-        const names={}
-        for(const node of catalogRows)names[node.regionCode]=node.regionName
-        return Object.keys(names).sort((a,b)=>names[a].localeCompare(names[b])).map(code=>({code:code,name:names[code]}))
-    }
-    onSourcesChanged:if(sourceId && !sources.some(s=>s.id===sourceId))sourceId=""
-    onCountriesChanged:if(countryCode && !countries.some(c=>c.code===countryCode))countryCode=""
-    readonly property var sortedRows:catalogRows.slice().sort((a,b)=>a.name.localeCompare(b.name))
-    readonly property string searchQuery:search.text.trim().toLowerCase()
-    readonly property var viewRows:sortedRows.filter(n=>(n.name+" "+n.host).toLowerCase().indexOf(searchQuery)>=0 &&
-        (protocolFilter.currentIndex===0||n.protocol===page.protocols[protocolFilter.currentIndex-1]) && (!countryCode||n.regionCode===countryCode)).map(n=>nodeById[n.id]||n)
+    readonly property var countries:{const names={};for(const n of engineController.nodeCatalog)if(!sourceId||n.sourceId===sourceId)names[n.regionCode]=n.regionName;return Object.keys(names).sort().map(code=>({code:code,name:names[code]}))}
+    onCountriesChanged:if(countryCode&&!countries.some(c=>c.code===countryCode))countryCode=""
+    readonly property int resultCount:nodes.count
     readonly property var protocols:engineController.supportedProtocols
+    readonly property var filterState:({protocol:protocol,regionCode:countryCode,sourceId:sourceId,status:statusFilter,maxLatency:maxLatency,available:availableOnly,group:["all","recent","favorites"][groupIndex],sort:["name","latency","regionName","protocol"][sortOrder.currentIndex]})
+    onFilterStateChanged:nodes.filters=filterState
+    onSourcesChanged:if(sourceId&&!sources.some(s=>s.id===sourceId))sourceId=""
+    Timer {id:searchDelay;interval:100;onTriggered:nodes.query=search.text}
+    function dismissDetail(){if(!nodeHero.opened)return false;nodeHero.returnTo(nodeTable.selectedItem);return true}
     function selectRow(row) {
         // One mounted surface follows the selected row; interrupted motion starts here.
         if(engineController.chooseNode(row.id))nodeHero.start(nodeTable.selectedItem)
@@ -48,25 +48,27 @@ Item {
         nodeUuid.text="";nodeOptions.text="";replaceCredentials.checked=false;nodeSni.text=node?node.serverName:"";nodeUsername.text="";nodePassword.text="";addDialog.open()
     }
     ColumnLayout {
+        opacity:1-nodeHero.progress
         anchors.fill:parent;anchors.margins:Theme.dp(24);spacing:Theme.dp(16)
         RowLayout {
             Layout.fillWidth:true;spacing:Theme.dp(12)
             SwirlText {textRole:"pageTitle";id:routeTitle;renderType:Text.NativeRendering;text:"节点";color:Theme.text;font.family:Theme.fontFamily;font.pixelSize:Theme.fontSize(26);font.weight:Font.DemiBold;Layout.fillWidth:true}
-            SwirlButton {objectName:"allNodesTestButton";text:engineController.tests.busy?"取消测速":"测速";quiet:true;iconName:"activity";enabled:engineController.nodes.length>0;onClicked:engineController.tests.busy?engineController.tests.cancel():engineController.testAllNodes(testUrl.text)}
+            SwirlButton {objectName:"allNodesTestButton";text:engineController.tests.busy?"取消测速":"测速";quiet:true;iconName:"activity";enabled:nodes.total>0;onClicked:engineController.tests.busy?engineController.tests.cancel():engineController.testAllNodes(testUrl.text)}
             SwirlButton {objectName:"nodeImportButton";text:"导入";quiet:true;iconName:"download";enabled:!engineController.imports.busy;onClicked:importDialog.open()}
             SwirlButton {objectName:"nodeAddButton";text:"添加节点";iconName:"plus";primary:true;enabled:engineController.canStart;onClicked:page.edit(null)}
         }
         RowLayout {
-            Layout.fillWidth:true;spacing:Theme.dp(12)
-            SwirlSearchField {id:search;objectName:"nodeSearchField";Layout.fillWidth:true;implicitHeight:Theme.controlHeight;placeholderText:"搜索节点名称或服务器";font.pixelSize:Theme.fontSize(13)}
-            SwirlComboBox {id:protocolFilter;objectName:"proxyRegionCombo";implicitHeight:Theme.controlHeight;implicitWidth:Theme.dp(136);model:["全部协议"].concat(page.protocols);Accessible.name:"按协议筛选节点"}
-            SwirlComboBox {id:countryFilter;objectName:"nodeCountryFilter";implicitWidth:Theme.dp(148);model:["全部地区"].concat(page.countries.map(c=>c.name));currentIndex:Math.max(0,page.countries.findIndex(c=>c.code===page.countryCode)+1);onActivated:page.countryCode=currentIndex>0?page.countries[currentIndex-1].code:"";Accessible.name:"按国家或地区筛选节点"}
+            Layout.fillWidth:true;spacing:Theme.dp(8)
+            SwirlSearchField {id:search;objectName:"nodeSearchField";Layout.fillWidth:true;Layout.minimumWidth:0;placeholderText:"搜索节点名称、地区、服务器或协议";onTextChanged:searchDelay.restart();Accessible.name:placeholderText}
+            SwirlIconButton {iconName:"close";tooltip:"清空搜索";visible:search.text.length>0;onClicked:search.clear()}
+            SwirlButton {objectName:"nodeFiltersButton";text:"筛选";quiet:true;onClicked:filtersDialog.open()}
+            SwirlComboBox {id:sortOrder;objectName:"nodeSortOrder";Layout.preferredWidth:Theme.dp(110);model:["名称排序","延迟排序","地区排序","协议排序"];Accessible.name:"节点排序"}
         }
         RowLayout {
-            Layout.fillWidth:true
-            SwirlComboBox {objectName:"nodeSourceFilter";visible:page.sources.length>0;implicitWidth:Theme.dp(170);model:["全部来源"].concat(page.sources.map(s=>s.name));currentIndex:Math.max(0,page.sources.findIndex(s=>s.id===page.sourceId)+1);onActivated:page.sourceId=currentIndex>0?page.sources[currentIndex-1].id:"";Accessible.name:"筛选订阅来源"}
-            SwirlText {renderType:Text.NativeRendering;text:page.viewRows.length+" / "+page.sourceRows.length+" 个节点";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true}
-            SwirlText {renderType:Text.NativeRendering;text:engineController.tests.message||engineController.stateText+" · "+engineController.nodeStateText;color:Theme.muted;font.pixelSize:Theme.fontSize(12);elide:Text.ElideRight;Layout.maximumWidth:Math.floor(page.width*0.55)}
+            Layout.fillWidth:true;spacing:Theme.dp(8)
+            SwirlSegmentedControl {Layout.preferredWidth:Theme.dp(240);options:["全部","最近使用","收藏"];currentIndex:page.groupIndex;onActivated:index=>page.groupIndex=index}
+            SwirlText {text:nodes.count+" / "+nodes.total+" 个节点";color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;elide:Text.ElideRight}
+            SwirlText {text:engineController.tests.message;color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.maximumWidth:Theme.dp(190);elide:Text.ElideRight}
         }
         RowLayout {
             Layout.fillWidth:true;Layout.fillHeight:true;spacing:Theme.dp(16)
@@ -74,25 +76,39 @@ Item {
                 Layout.fillWidth:true;Layout.preferredWidth:1;Layout.minimumWidth:Theme.dp(262);Layout.fillHeight:true;cornerRadius:Theme.independentCardRadius
                 color:Theme.surface;border.width:0
                 SwirlDataTable {
-                    id:nodeTable;objectName:"realNodeTable";minimal:true;managedSelection:true;incrementalRows:true;animateRowChanges:false;animateLatency:true;itemHeight:Theme.dp(44);headerHeight:Theme.tableHeaderHeight;textPixelSize:13
-                    anchors.fill:parent;anchors.margins:Theme.dp(16);rows:page.viewRows;selectedId:page.selectedId
+                    id:nodeTable;objectName:"realNodeTable";minimal:true;managedSelection:true;incrementalRows:false;animateRowChanges:false;animateLatency:true;itemHeight:Theme.dp(44);headerHeight:Theme.tableHeaderHeight;textPixelSize:13
+                    anchors.fill:parent;anchors.margins:Theme.dp(16);externalModel:nodes;selectedId:page.selectedId
                     cellPadding:Theme.dp(8)
-                    columns:[{key:"name",label:"节点名称",w:235,min:76},{key:"protocol",label:"协议",w:82,min:44},{key:"latency",label:page.rustRequestMetric?"出站 ms":"延迟",w:76,min:52},{key:"status",label:"状态",w:92,min:58}]
+                    columns:[{key:"name",label:"节点名称",w:235,min:76},{key:"protocol",label:"协议",w:62,min:44},{key:"regionName",label:"地区提示",w:70,min:54},{key:"latency",label:page.rustRequestMetric?"出站 ms":"延迟",w:76,min:52},{key:"status",label:"状态",w:92,min:58}]
                     onRowSelected:function(row){page.selectRow(row)}
                 }
-                SwirlEmptyState {anchors.centerIn:parent;visible:page.viewRows.length===0;headline:page.allNodes.length?"没有匹配的节点":"没有保存的节点";detail:page.allNodes.length?"调整搜索、协议或地区筛选。":"添加节点，或导入配置、URI 与订阅"}
+                SwirlEmptyState {anchors.centerIn:parent;visible:nodes.count===0;headline:nodes.total?"没有匹配的节点":"没有保存的节点";detail:nodes.total?"调整搜索、协议或地区筛选。":"添加节点，或导入配置、URI 与订阅"}
             }
-            ScrollView {
-                id:detailScroll;Layout.preferredWidth:Math.min(Theme.dp(300),page.width*0.43);Layout.minimumWidth:Theme.dp(180);Layout.maximumWidth:Theme.dp(340);Layout.fillHeight:true;clip:true
-                ScrollBar.horizontal.policy:ScrollBar.AlwaysOff;ScrollBar.vertical:SwirlScrollBar {}
-                ColumnLayout {width:detailScroll.availableWidth;spacing:Theme.dp(14)
+        }
+    }
+    Rectangle {objectName:"nodeDetailScrim";anchors.fill:parent;radius:Theme.cardRadius;antialiasing:true;z:10;visible:nodeHero.opened||nodeHero.moving;color:Theme.withAlpha("#000000",0.10*nodeHero.progress)
+        MouseArea {anchors.fill:parent;onClicked:page.dismissDetail()}
+    }
+    Item {
+        id:detailViewport;z:12;x:Theme.dp(24);y:Theme.dp(24);width:page.width-Theme.dp(48);height:page.height-Theme.dp(48)
+        visible:nodeHero.opened||nodeHero.moving;opacity:nodeHero.progress
+        Rectangle {anchors.fill:parent;radius:Theme.cardRadius;color:Theme.surface}
+        RowLayout {
+            x:Theme.dp(16);y:Theme.dp(10);width:parent.width-Theme.dp(32);height:Theme.dp(36)
+            SwirlText {text:"节点详情";textRole:"pageTitle";font.pixelSize:Theme.fontSize(18);color:Theme.text;Layout.fillWidth:true}
+            SwirlButton {objectName:"nodeReturnButton";text:"返回节点列表";iconName:"chevron-left";quiet:true;onClicked:page.dismissDetail()}
+        }
+        ScrollView {
+                id:detailScroll;objectName:"nodeDetailScroll";x:Theme.dp(12);y:Theme.dp(56);width:parent.width-Theme.dp(24);height:parent.height-y-Theme.dp(12);clip:true
+                ScrollBar.horizontal.policy:ScrollBar.AlwaysOff;ScrollBar.vertical:SwirlScrollBar {policy:detailScroll.contentHeight>detailScroll.height?ScrollBar.AlwaysOn:ScrollBar.AsNeeded}
+                GridLayout {width:detailScroll.availableWidth;columns:width>=Theme.dp(580)?2:1;columnSpacing:Theme.dp(12);rowSpacing:Theme.dp(12)
                 Item {
-                    id:summarySlot;Layout.fillWidth:true;Layout.preferredHeight:summaryBody.implicitHeight+2*Theme.cardPadding
+                    id:summarySlot;Layout.fillWidth:true;Layout.minimumWidth:0;Layout.preferredWidth:1;Layout.alignment:Qt.AlignTop;Layout.preferredHeight:summaryBody.implicitHeight+2*Theme.cardPadding
                     SwirlText {renderType:Text.NativeRendering;anchors.centerIn:parent;visible:!nodeHero.opened&&!nodeHero.moving;text:"选择节点查看详情";color:Theme.muted;font.pixelSize:Theme.fontSize(13)}
                 }
                 Item {
                     id:requestSlot
-                    visible:nodeHero.opened||nodeHero.moving;Layout.fillWidth:true;Layout.preferredHeight:requestOptions.implicitHeight+2*Theme.cardPadding
+                    visible:nodeHero.opened||nodeHero.moving;Layout.fillWidth:true;Layout.minimumWidth:0;Layout.preferredWidth:1;Layout.alignment:Qt.AlignTop;Layout.preferredHeight:requestOptions.implicitHeight+2*Theme.cardPadding
                 SwirlGlassPanel {
                     objectName:"nodeRequestSurface"
                     parent:requestSlot
@@ -123,6 +139,18 @@ Item {
                 }
                 }
             }
+    }
+    SwirlDialog {
+        id:filtersDialog;objectName:"nodeFiltersDialog";title:"筛选节点";guardChanges:false
+        ColumnLayout {width:parent.width;spacing:Theme.dp(12)
+            SwirlComboBox {id:protocolFilter;objectName:"proxyRegionCombo";Layout.fillWidth:true;model:["全部协议"].concat(page.protocols);onActivated:page.protocol=currentIndex?page.protocols[currentIndex-1]:"";Accessible.name:"协议"}
+            SwirlComboBox {objectName:"nodeCountryFilter";Layout.fillWidth:true;model:["全部地区提示"].concat(page.countries.map(c=>c.name));onActivated:page.countryCode=currentIndex?page.countries[currentIndex-1].code:"";Accessible.name:"订阅名称中的地区提示"}
+            SwirlComboBox {objectName:"nodeSourceFilter";Layout.fillWidth:true;model:["全部订阅来源"].concat(page.sources.map(s=>s.name));onActivated:page.sourceId=currentIndex?page.sources[currentIndex-1].id:"";Accessible.name:"订阅来源"}
+            SwirlComboBox {Layout.fillWidth:true;model:["全部状态","未测试","测试中","可用","超时","测试失败","正在连接","已连接","连接失败","会话就绪 · 未验证"];onActivated:page.statusFilter=currentIndex?currentText:"";Accessible.name:"状态"}
+            SwirlComboBox {Layout.fillWidth:true;model:["不限延迟","低于 100 ms","低于 300 ms","低于 1000 ms"];onActivated:page.maxLatency=[-1,99,299,999][currentIndex];Accessible.name:"延迟"}
+            RowLayout {SwirlText {text:"只看实际测试可用";color:Theme.text;Layout.fillWidth:true} SwirlToggle {checked:page.availableOnly;onToggled:page.availableOnly=checked}}
+            SwirlText {text:nodes.count+" 个匹配节点";color:Theme.muted}
+            SwirlButton {text:"完成";onClicked:filtersDialog.close()}
         }
     }
     SwirlNodeTransfer {
@@ -138,38 +166,37 @@ Item {
         visible:nodeHero.opened||nodeHero.moving;z:20;clip:true;opacity:SwirlMotion.reduced?nodeHero.progress:1
         cornerRadius:Theme.independentCardRadius;color:Theme.surface;border.width:0
         ColumnLayout {
-            id:summaryBody;x:Theme.cardPadding;y:Theme.dp(6)+(Theme.cardPadding-Theme.dp(6))*nodeHero.reveal;width:summarySlot.width-2*Theme.cardPadding;opacity:Math.max(0,Math.min(1,(nodeHero.reveal-0.18)/0.65));spacing:Theme.dp(12)
-            RowLayout {
-                Layout.fillWidth:true;spacing:Theme.dp(8)*nodeHero.reveal
-                SwirlIcon {name:"globe";size:Theme.dp(22);Layout.preferredWidth:Theme.dp(22)*nodeHero.reveal;opacity:nodeHero.reveal;color:Theme.accent}
-                SwirlText {renderType:Text.NativeRendering;text:"节点详情";color:Theme.text;font.pixelSize:Theme.fontSize(14);font.weight:Font.Medium;Layout.fillWidth:true}
-                SwirlIconButton {objectName:"nodeReturnButton";implicitWidth:Theme.dp(24);implicitHeight:Theme.dp(26);iconName:"chevron-left";quiet:true;opacity:nodeHero.reveal;tooltip:"返回节点列表";onClicked:nodeHero.returnTo(nodeTable.selectedItem)}
-            }
+            id:summaryBody;objectName:"nodeDetailBody";x:Theme.cardPadding;y:Theme.cardPadding;width:summarySlot.width-2*Theme.cardPadding;spacing:Theme.dp(12)
             SwirlText {
                 id:nodeDetailTitle;objectName:"nodeDetailTitle";renderType:Text.NativeRendering
-                text:page.selected?page.selected.name:"未选择节点";textFormat:Text.PlainText;color:Theme.text;font.family:Theme.fontFamily;font.pixelSize:Theme.fontSize(18);font.weight:Font.Medium
+                text:page.selected.id!==undefined?page.selected.name:"未选择节点";textFormat:Text.PlainText;color:Theme.text;font.family:Theme.fontFamily;font.pixelSize:Theme.fontSize(18);font.weight:Font.Medium
                 Layout.fillWidth:true;wrapMode:Text.Wrap;activeFocusOnTab:true
                 HoverHandler {id:nodeNameHover}
-                SwirlToolTip {parent:nodeDetailTitle;visible:page.selected!==null&&(nodeNameHover.hovered||nodeDetailTitle.activeFocus);text:nodeDetailTitle.text;delay:600}
+                SwirlToolTip {parent:nodeDetailTitle;visible:page.selected.id!==undefined&&(nodeNameHover.hovered||nodeDetailTitle.activeFocus);text:nodeDetailTitle.text;delay:600}
             }
             ColumnLayout {
                 Layout.fillWidth:true;spacing:Theme.dp(10)
                 RowLayout {
                     Layout.fillWidth:true;spacing:Theme.dp(8)
-                    SwirlStatusBadge {label:page.selected?page.selected.protocol.toUpperCase():"未选择";tone:"neutral"}
+                    SwirlStatusBadge {label:page.selected.id!==undefined?page.selected.protocol.toUpperCase():"未选择";tone:"neutral"}
                     SwirlStatusBadge {Layout.fillWidth:false;busy:engineController.nodeBusy;label:page.selectedActive?engineController.nodeStateText:"未连接";tone:page.selectedActive?(engineController.nodeError.length?"warning":"accent"):"neutral"}
                 }
-                SwirlText {renderType:Text.NativeRendering;text:page.selected?page.selected.address:"选择一个节点开始连接";textFormat:Text.PlainText;color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
-                SwirlText {renderType:Text.NativeRendering;text:page.selected?(page.selected.sourceFormat||"手动节点")+" · "+page.selected.capability.engine:"";color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
-                SwirlText {renderType:Text.NativeRendering;text:page.selected?page.selected.normalizationNotes||"":"";visible:text.length>0;color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
-                SwirlText {renderType:Text.NativeRendering;text:page.selected?((page.selected.conversionIssues||[]).join("\n")):"";visible:text.length>0;color:Theme.orange;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
+                SwirlText {renderType:Text.NativeRendering;text:page.selected.id!==undefined?page.selected.address:"选择一个节点开始连接";textFormat:Text.PlainText;color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true;wrapMode:Text.Wrap}
+                SwirlText {text:page.selected.status||"未测试";color:Theme.muted;Layout.fillWidth:true;wrapMode:Text.Wrap}
+                SwirlText {text:"来源："+((page.sources.find(s=>s.id===page.selected.sourceId)||{}).name||"未知订阅");visible:!!page.selected.sourceId;color:Theme.muted;Layout.fillWidth:true;wrapMode:Text.Wrap}
+                SwirlText {text:"地区："+(page.selected.regionName||"未知")+"（订阅名称提示，未经地理验证）";color:Theme.muted;Layout.fillWidth:true;wrapMode:Text.Wrap;font.pixelSize:Theme.fontSize(11)}
+                SwirlText {renderType:Text.NativeRendering;text:page.selected.id!==undefined?(page.selected.sourceFormat||"手动节点")+" · "+page.selected.capability.engine:"";color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
+                SwirlText {renderType:Text.NativeRendering;text:page.selected.id!==undefined?page.selected.normalizationNotes||"":"";visible:text.length>0;color:Theme.muted;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
+                SwirlText {renderType:Text.NativeRendering;text:page.selected.id!==undefined?((page.selected.conversionIssues||[]).join("\n")):"";visible:text.length>0;color:Theme.orange;font.pixelSize:Theme.fontSize(11);Layout.fillWidth:true;wrapMode:Text.Wrap}
                 SwirlText {renderType:Text.NativeRendering;text:page.selectedActive&&engineController.activeProxyPort>0?"本机入口  127.0.0.1:"+engineController.activeProxyPort:"";visible:text.length>0;color:Theme.muted;font.pixelSize:Theme.fontSize(12);Layout.fillWidth:true}
                 GridLayout {
                     Layout.fillWidth:true;columns:2;rowSpacing:Theme.dp(8);columnSpacing:Theme.dp(8)
-                    SwirlButton {objectName:"nodeConnectButton";Layout.fillWidth:true;Layout.preferredWidth:1;implicitHeight:Theme.controlHeight;text:engineController.nodeBusy?"连接中…":page.selectedActive?"断开节点":"连接节点";primary:true;enabled:page.selected!==null&&!engineController.nodeBusy;onClicked:{if(page.selectedActive)engineController.disconnectNode();else engineController.connectNode(page.selectedId)}}
-                    SwirlButton {objectName:"nodeTestButton";text:engineController.tests.busy?"测试中…":"测试请求";Layout.fillWidth:true;Layout.preferredWidth:1;enabled:page.selected!==null&&!engineController.tests.busy&&/^https?:\/\/\S+$/i.test(testUrl.text.trim());onClicked:engineController.testSelectedNode(page.selectedId,testUrl.text.trim())}
-                    SwirlButton {objectName:"nodeEditButton";text:"编辑节点";Layout.fillWidth:true;Layout.preferredWidth:1;enabled:page.selected!==null&&engineController.canStart;onClicked:page.edit(page.selected)}
-                    SwirlButton {objectName:"nodeDeleteButton";text:"删除节点";danger:true;Layout.fillWidth:true;Layout.preferredWidth:1;enabled:page.selected!==null&&engineController.canStart;onClicked:engineController.deleteNode(page.selectedId)}
+                    SwirlButton {objectName:"nodeConnectButton";Layout.fillWidth:true;Layout.preferredWidth:1;implicitHeight:Theme.controlHeight;text:engineController.nodeBusy?"连接中…":page.selectedActive?"断开节点":"连接节点";primary:true;enabled:page.selected.id!==undefined&&!engineController.nodeBusy;onClicked:{if(page.selectedActive)engineController.disconnectNode();else engineController.connectNode(page.selectedId)}}
+                    SwirlButton {objectName:"nodeTestButton";text:engineController.tests.busy?"测试中…":"测试请求";Layout.fillWidth:true;Layout.preferredWidth:1;enabled:page.selected.id!==undefined&&!engineController.tests.busy&&/^https?:\/\/\S+$/i.test(testUrl.text.trim());onClicked:engineController.testSelectedNode(page.selectedId,testUrl.text.trim())}
+                    SwirlButton {text:page.selected.favorite?"取消收藏":"收藏";Layout.fillWidth:true;enabled:page.selected.id!==undefined;onClicked:nodes.toggleFavorite(page.selectedId)}
+                    SwirlButton {text:"复制安全信息";Layout.fillWidth:true;enabled:page.selected.id!==undefined;onClicked:nodes.copySafeInfo(page.selectedId)}
+                    SwirlButton {objectName:"nodeEditButton";text:"编辑节点";Layout.fillWidth:true;Layout.preferredWidth:1;enabled:page.selected.id!==undefined&&!page.selected.sourceId&&engineController.canStart;onClicked:page.edit(page.selected)}
+                    SwirlButton {objectName:"nodeDeleteButton";text:"删除节点";danger:true;Layout.fillWidth:true;Layout.preferredWidth:1;enabled:page.selected.id!==undefined&&!page.selected.sourceId&&engineController.canStart;onClicked:engineController.deleteNode(page.selectedId)}
                 }
             }
         }
@@ -210,7 +237,7 @@ Item {
             RowLayout {
                 Layout.alignment:Qt.AlignRight
                 SwirlButton {text:"取消";onClicked:addDialog.close()}
-                SwirlButton {objectName:"nodeSaveButton";text:"保存";primary:true;enabled:nodeName.text.trim().length>0&&(nodePort.acceptableInput||["wireguard","tailscale","zerotier","easytier","openvpn"].indexOf(nodeProtocol.currentText)>=0);onClicked:{var input={id:page.editingId,name:nodeName.text,protocol:nodeProtocol.currentText,host:nodeHost.text,port:Number(nodePort.text),username:nodeUsername.text,password:nodePassword.text,replaceCredentials:replaceCredentials.checked,cipher:nodeProtocol.currentText==="ss"?(nodeCipher.editText||nodeCipher.currentText):"",serverName:nodeSni.text};try{if(nodeOptions.text.trim().length)input.options=JSON.parse(nodeOptions.text);if(nodeUuid.text.trim().length){if(!input.options)input.options={};input.options.uuid=nodeUuid.text.trim()}}catch(e){AppState.notice("扩展选项须为合法 JSON 对象");return}if(engineController.saveNode(input)){engineController.chooseNode(page.editingId||engineController.nodes[engineController.nodes.length-1].id);nodeHero.opened=true;addDialog.close()}}}
+                SwirlButton {objectName:"nodeSaveButton";text:"保存";primary:true;enabled:nodeName.text.trim().length>0&&(nodePort.acceptableInput||["wireguard","tailscale","zerotier","easytier","openvpn"].indexOf(nodeProtocol.currentText)>=0);onClicked:{var input={id:page.editingId,name:nodeName.text,protocol:nodeProtocol.currentText,host:nodeHost.text,port:Number(nodePort.text),username:nodeUsername.text,password:nodePassword.text,replaceCredentials:replaceCredentials.checked,cipher:nodeProtocol.currentText==="ss"?(nodeCipher.editText||nodeCipher.currentText):"",serverName:nodeSni.text};try{if(nodeOptions.text.trim().length)input.options=JSON.parse(nodeOptions.text);if(nodeUuid.text.trim().length){if(!input.options)input.options={};input.options.uuid=nodeUuid.text.trim()}}catch(e){AppState.notice("扩展选项须为合法 JSON 对象");return}if(engineController.saveNode(input)){engineController.chooseNode(page.editingId||engineController.nodes[engineController.nodes.length-1].id);addDialog.close()}}}
             }
         }
     }
