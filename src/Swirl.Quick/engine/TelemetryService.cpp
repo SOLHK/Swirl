@@ -58,7 +58,10 @@ void TelemetryService::ingest(const ProxyEngine::Status &status){
  if(!status.apiHealthy){for(auto it=m_seen.begin();it!=m_seen.end();++it)if(it->value("status")!="已结束")(*it)["status"]=status.processAlive?QStringLiteral("采样中断"):QStringLiteral("已结束");publish();return;}
  if(status.connectionsAt>m_lastConnections){
   m_lastConnections=status.connectionsAt;const auto date=QDateTime::fromMSecsSinceEpoch(status.connectionsAt).date().toString(Qt::ISODate);
-  auto day=m_days.value(date).toObject();day["sampled"]=true;
+  auto day=m_days.value(date).toObject();
+  // Earlier persisted days cannot be split by source after the fact.
+  if(!day.value("sampled").toBool()&&!day.contains("proxyRankingComplete"))day["proxyRankingComplete"]=true;
+  day["sampled"]=true;
   // Session counters are owned by this process. A reset starts a new baseline.
   const auto up=qMax<qint64>(0,status.uploadTotal),down=qMax<qint64>(0,status.downloadTotal);
   const auto totalDelta=(up>=m_lastUp?up-m_lastUp:up)+(down>=m_lastDown?down-m_lastDown:down);
@@ -72,12 +75,21 @@ void TelemetryService::ingest(const ProxyEngine::Status &status){
    const auto ou=old.value("uploadBytes").toLongLong(),od=old.value("downloadBytes").toLongLong();
    const auto du=qMax<qint64>(0,u>=ou?u-ou:u),dd=qMax<qint64>(0,d>=od?d-od:d);
    const bool count=old.value("accountedDay").toString()!=date;
+   const bool proxy=row.value("category").toString()==QStringLiteral("proxy");
+   const bool proxyCount=old.value("proxyAccountedDay").toString()!=date;
    aggregate(day,"apps",row.value("process","未知进程").toString(),du,dd,count);
    aggregate(day,"domains",row.value("host",row.value("ip")).toString(),du,dd,count);
    if(!row.value("sourceIp").toString().isEmpty())aggregate(day,"devices",row.value("sourceIp").toString(),du,dd,count);
    aggregate(day,"nodes",row.value("policy").toString(),du,dd,count);
    aggregate(day,"categories",row.value("category","other").toString(),du,dd,count);
-   if(row.value("category")=="proxy")add(bucket,"proxy",du+dd);
+   if(proxy){
+    aggregate(day,"proxyApps",row.value("process","未知进程").toString(),du,dd,proxyCount);
+    aggregate(day,"proxyDomains",row.value("host",row.value("ip")).toString(),du,dd,proxyCount);
+    if(!row.value("sourceIp").toString().isEmpty())aggregate(day,"proxyDevices",row.value("sourceIp").toString(),du,dd,proxyCount);
+    aggregate(day,"proxyNodes",row.value("policy").toString(),du,dd,proxyCount);
+    add(bucket,"proxy",du+dd);
+    row["proxyAccountedDay"]=date;
+   }else if(old.contains("proxyAccountedDay"))row["proxyAccountedDay"]=old.value("proxyAccountedDay");
    const auto interval=status.connectionsAt-old.value("lastSeen").toLongLong();
    row["uploadRate"]=!old.isEmpty()&&interval>0?double(du)*1000/interval:0;row["downloadRate"]=!old.isEmpty()&&interval>0?double(dd)*1000/interval:0;
    row["accountedDay"]=date;row["lastSeen"]=status.connectionsAt;row["status"]=row.value("closed").toBool()?"已结束":"活动";
@@ -98,19 +110,25 @@ QJsonObject TelemetryService::periodData(int period) const {
  const auto today=QDate::currentDate();
  if(m_periodCacheDate!=today){m_periodCache.clear();m_periodCacheDate=today;}
  if(m_periodCache.contains(period))return m_periodCache.value(period);
- QJsonObject out;const auto start=period==1?today.addDays(-1):period==2?today.addDays(1-today.dayOfWeek()):period==3?QDate(today.year(),today.month(),1):today;
+ QJsonObject out{{"proxyRankingComplete",true}};const auto start=period==1?today.addDays(-1):period==2?today.addDays(1-today.dayOfWeek()):period==3?QDate(today.year(),today.month(),1):today;
  const auto end=period==1?today.addDays(-1):today;
- for(const auto &key:m_days.keys()){const auto date=QDate::fromString(key,Qt::ISODate);if(date<start||date>end)continue;const auto d=m_days.value(key).toObject();if(d.value("sampled").toBool())out["sampled"]=true;add(out,"up",d.value("up").toDouble());add(out,"down",d.value("down").toDouble());
-  for(const auto &kind:{"apps","domains","nodes","devices","categories"}){auto group=out.value(kind).toObject();const auto entries=d.value(kind).toObject();for(const auto &name:entries.keys()){auto sum=group.value(name).toObject();const auto row=entries.value(name).toObject();for(const auto &field:{"up","down","count"})add(sum,field,row.value(field).toDouble());group[name]=sum;}out[kind]=group;}
+ for(const auto &key:m_days.keys()){const auto date=QDate::fromString(key,Qt::ISODate);if(date<start||date>end)continue;const auto d=m_days.value(key).toObject();if(d.value("sampled").toBool()){out["sampled"]=true;if(!d.value("proxyRankingComplete").toBool())out["proxyRankingComplete"]=false;}add(out,"up",d.value("up").toDouble());add(out,"down",d.value("down").toDouble());
+  for(const auto &kind:{"apps","domains","nodes","devices","categories","proxyApps","proxyDomains","proxyNodes","proxyDevices"}){auto group=out.value(kind).toObject();const auto entries=d.value(kind).toObject();for(const auto &name:entries.keys()){auto sum=group.value(name).toObject();const auto row=entries.value(name).toObject();for(const auto &field:{"up","down","count"})add(sum,field,row.value(field).toDouble());group[name]=sum;}out[kind]=group;}
  }m_periodCache.insert(period,out);return out;
 }
 QVariantMap TelemetryService::summary(int period) const {auto d=periodData(period);return {{"sampled",d.value("sampled").toBool()},{"up",d.value("up").toDouble()},{"down",d.value("down").toDouble()},{"total",d.value("up").toDouble()+d.value("down").toDouble()},{"domains",d.value("domains").toObject().size()},{"apps",d.value("apps").toObject().size()}};}
-QVariantList TelemetryService::ranking(const QString &kind,int period,int limit) const {
- if(kind!="apps"&&kind!="domains"&&kind!="nodes"&&kind!="devices")return {};const auto data=periodData(period),entries=data.value(kind).toObject();QVariantList result;const auto total=data.value("up").toDouble()+data.value("down").toDouble();
+bool TelemetryService::proxyRankingAvailable(int period) const {return periodData(period).value("proxyRankingComplete").toBool();}
+QVariantList TelemetryService::ranking(const QString &kind,int period,int limit,bool proxyOnly) const {
+ if(kind!="apps"&&kind!="domains"&&kind!="nodes"&&kind!="devices")return {};
+ const auto data=periodData(period);
+ if(proxyOnly&&!data.value("proxyRankingComplete").toBool())return {};
+ const auto group=proxyOnly?QStringLiteral("proxy")+kind.left(1).toUpper()+kind.mid(1):kind;
+ const auto entries=data.value(group).toObject();QVariantList result;
+ const auto total=proxyOnly?data.value("categories").toObject().value("proxy").toObject().value("up").toDouble()+data.value("categories").toObject().value("proxy").toObject().value("down").toDouble():data.value("up").toDouble()+data.value("down").toDouble();
  for(const auto &name:entries.keys()){const auto r=entries.value(name).toObject();const auto up=r.value("up").toDouble(),down=r.value("down").toDouble();result.append(QVariantMap{{"id",name},{"name",name},{"upload",formatBytes(up)},{"download",formatBytes(down)},{"value",formatBytes(up+down)},{"total",up+down},{"connections",r.value("count").toDouble()},{"percent",total>0?QString::number(100*(up+down)/total,'f',1)+"%":"0%"},{"mark",name.left(1)},{"color","#596273"}});}
  QHash<QString,double> speeds;
  if(connectionsSampled())for(const auto &value:m_seen){
-  if(value.value("status")!="活动")continue;
+  if(value.value("status")!="活动"||(proxyOnly&&value.value("category")!="proxy"))continue;
   const auto key=kind=="apps"?value.value("process"):kind=="domains"?value.value("host",value.value("ip")):kind=="devices"?value.value("sourceIp"):value.value("policy");
   speeds[key.toString()]+=value.value("uploadRate").toDouble()+value.value("downloadRate").toDouble();
  }

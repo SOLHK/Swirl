@@ -11,6 +11,12 @@ Item {
  readonly property Item selectedEntry:entries[AppState.sidebarPage] || null
  function registerEntry(item){const next=Object.assign({},entries);next[item.pageId]=item;entries=next}
  function unregisterEntry(item){const next=Object.assign({},entries);delete next[item.pageId];entries=next}
+ SwirlClearGlassSurface {
+  id:floatingBackground;objectName:"sidebarFloatingBackground"
+  x:Theme.dp(5);y:Theme.dp(5)
+  width:sidebar.width-Theme.dp(10);height:sidebar.height-Theme.dp(10)
+  radius:Theme.dp(14)
+ }
  // A single visual owner: retarget y from its rendered position, in local coordinates.
  Rectangle {
   id:selection;objectName:"sidebarSelectionIndicator"

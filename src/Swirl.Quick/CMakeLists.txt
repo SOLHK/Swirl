@@ -193,7 +193,7 @@ set(SWIRL_QML_FILES
  qml/controls/SwirlSearchField.qml qml/controls/SwirlTextField.qml
  qml/controls/SwirlComboBox.qml qml/controls/SwirlDialog.qml
  qml/controls/SwirlDataTable.qml qml/controls/SwirlContextMenu.qml
- qml/components/SwirlGlassPanel.qml qml/components/SwirlNavigationItem.qml
+ qml/components/SwirlClearGlassSurface.qml qml/components/SwirlGlassPanel.qml qml/components/SwirlNavigationItem.qml
  qml/components/SwirlSidebar.qml qml/components/SwirlTrafficChart.qml
  qml/components/SwirlMetricCard.qml qml/components/SwirlStatusBadge.qml
  qml/components/SwirlInspectorPanel.qml qml/components/SwirlEmptyState.qml

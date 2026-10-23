@@ -45,7 +45,8 @@ public:
  QVariantMap proxyDiagnostic() const { return m_proxyDiagnostic; }
  QString storageError() const { return m_storageError; }
  Q_INVOKABLE QVariantMap summary(int period=0) const;
- Q_INVOKABLE QVariantList ranking(const QString &kind,int period=0,int limit=50) const;
+ Q_INVOKABLE QVariantList ranking(const QString &kind,int period=0,int limit=50,bool proxyOnly=false) const;
+ Q_INVOKABLE bool proxyRankingAvailable(int period=0) const;
  Q_INVOKABLE QVariantList distribution(int period=0) const;
  Q_INVOKABLE QVariantList history(const QString &series="down",int seconds=60,bool normalized=false) const;
  Q_INVOKABLE QVariantList historyPoints(const QString &series="down",int seconds=60) const;
