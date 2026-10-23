@@ -107,7 +107,7 @@ QtObject {
     readonly property real secondaryRadius: popupRadius
     readonly property real controlRadius: dp(10)
     readonly property real buttonRadius: controlRadius
-    readonly property real sidebarWidth: dp(208)
+    readonly property real sidebarWidth: dp(168)
     readonly property real pageInset: dp(6)
     readonly property real space: dp(4)
     readonly property real pagePadding: dp(24)
@@ -125,6 +125,8 @@ QtObject {
     readonly property real gap: dp(16)
     readonly property real windowMinimumWidth: dp(760)
     readonly property real windowMinimumHeight: dp(672)
+    readonly property real windowDefaultWidth: dp(914)
+    readonly property real windowDefaultHeight: dp(672)
     readonly property real sidebarRowHeight: dp(40)
     readonly property real sidebarRowInset: dp(10)
     readonly property real sidebarRowRadius: sidebarRowHeight / 2

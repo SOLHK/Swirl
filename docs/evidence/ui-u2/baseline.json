@@ -1,0 +1,1297 @@
+{
+    "checks": [
+        {
+            "name": "loaded-overview",
+            "passed": true
+        },
+        {
+            "name": "geometry-overview",
+            "passed": true
+        },
+        {
+            "name": "sidebar-overview",
+            "passed": false
+        },
+        {
+            "name": "loaded-dashboard",
+            "passed": true
+        },
+        {
+            "name": "geometry-dashboard",
+            "passed": true
+        },
+        {
+            "name": "sidebar-dashboard",
+            "passed": false
+        },
+        {
+            "name": "loaded-profiles",
+            "passed": true
+        },
+        {
+            "name": "geometry-profiles",
+            "passed": true
+        },
+        {
+            "name": "sidebar-profiles",
+            "passed": false
+        },
+        {
+            "name": "loaded-proxies",
+            "passed": true
+        },
+        {
+            "name": "geometry-proxies",
+            "passed": true
+        },
+        {
+            "name": "sidebar-proxies",
+            "passed": false
+        },
+        {
+            "name": "loaded-policies",
+            "passed": true
+        },
+        {
+            "name": "geometry-policies",
+            "passed": true
+        },
+        {
+            "name": "sidebar-policies",
+            "passed": false
+        },
+        {
+            "name": "loaded-subscriptions",
+            "passed": true
+        },
+        {
+            "name": "geometry-subscriptions",
+            "passed": true
+        },
+        {
+            "name": "sidebar-subscriptions",
+            "passed": false
+        },
+        {
+            "name": "loaded-rules",
+            "passed": true
+        },
+        {
+            "name": "geometry-rules",
+            "passed": true
+        },
+        {
+            "name": "sidebar-rules",
+            "passed": false
+        },
+        {
+            "name": "loaded-dns",
+            "passed": true
+        },
+        {
+            "name": "geometry-dns",
+            "passed": true
+        },
+        {
+            "name": "sidebar-dns",
+            "passed": false
+        },
+        {
+            "name": "loaded-capture",
+            "passed": true
+        },
+        {
+            "name": "geometry-capture",
+            "passed": true
+        },
+        {
+            "name": "sidebar-capture",
+            "passed": false
+        },
+        {
+            "name": "loaded-connections",
+            "passed": true
+        },
+        {
+            "name": "geometry-connections",
+            "passed": true
+        },
+        {
+            "name": "sidebar-connections",
+            "passed": false
+        },
+        {
+            "name": "loaded-inspector",
+            "passed": true
+        },
+        {
+            "name": "geometry-inspector",
+            "passed": true
+        },
+        {
+            "name": "sidebar-inspector",
+            "passed": false
+        },
+        {
+            "name": "loaded-traffic",
+            "passed": true
+        },
+        {
+            "name": "geometry-traffic",
+            "passed": true
+        },
+        {
+            "name": "sidebar-traffic",
+            "passed": false
+        },
+        {
+            "name": "loaded-tls",
+            "passed": true
+        },
+        {
+            "name": "geometry-tls",
+            "passed": true
+        },
+        {
+            "name": "sidebar-tls",
+            "passed": false
+        },
+        {
+            "name": "loaded-rewrite",
+            "passed": true
+        },
+        {
+            "name": "geometry-rewrite",
+            "passed": true
+        },
+        {
+            "name": "sidebar-rewrite",
+            "passed": false
+        },
+        {
+            "name": "loaded-map",
+            "passed": true
+        },
+        {
+            "name": "geometry-map",
+            "passed": true
+        },
+        {
+            "name": "sidebar-map",
+            "passed": false
+        },
+        {
+            "name": "loaded-breakpoint",
+            "passed": true
+        },
+        {
+            "name": "geometry-breakpoint",
+            "passed": true
+        },
+        {
+            "name": "sidebar-breakpoint",
+            "passed": false
+        },
+        {
+            "name": "loaded-replay",
+            "passed": true
+        },
+        {
+            "name": "geometry-replay",
+            "passed": true
+        },
+        {
+            "name": "sidebar-replay",
+            "passed": false
+        },
+        {
+            "name": "loaded-scripts",
+            "passed": true
+        },
+        {
+            "name": "geometry-scripts",
+            "passed": true
+        },
+        {
+            "name": "sidebar-scripts",
+            "passed": false
+        },
+        {
+            "name": "loaded-modules",
+            "passed": true
+        },
+        {
+            "name": "geometry-modules",
+            "passed": true
+        },
+        {
+            "name": "sidebar-modules",
+            "passed": false
+        },
+        {
+            "name": "loaded-automation",
+            "passed": true
+        },
+        {
+            "name": "geometry-automation",
+            "passed": true
+        },
+        {
+            "name": "sidebar-automation",
+            "passed": false
+        },
+        {
+            "name": "loaded-toolbox",
+            "passed": true
+        },
+        {
+            "name": "geometry-toolbox",
+            "passed": true
+        },
+        {
+            "name": "sidebar-toolbox",
+            "passed": false
+        },
+        {
+            "name": "loaded-api",
+            "passed": true
+        },
+        {
+            "name": "geometry-api",
+            "passed": true
+        },
+        {
+            "name": "sidebar-api",
+            "passed": false
+        },
+        {
+            "name": "loaded-gateway",
+            "passed": true
+        },
+        {
+            "name": "geometry-gateway",
+            "passed": true
+        },
+        {
+            "name": "sidebar-gateway",
+            "passed": false
+        },
+        {
+            "name": "loaded-logs",
+            "passed": true
+        },
+        {
+            "name": "geometry-logs",
+            "passed": true
+        },
+        {
+            "name": "sidebar-logs",
+            "passed": false
+        },
+        {
+            "name": "loaded-settings",
+            "passed": true
+        },
+        {
+            "name": "geometry-settings",
+            "passed": true
+        },
+        {
+            "name": "sidebar-settings",
+            "passed": false
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "geometry-featurehub",
+            "passed": true
+        },
+        {
+            "name": "sidebar-featurehub",
+            "passed": false
+        },
+        {
+            "name": "loaded-processes",
+            "passed": true
+        },
+        {
+            "name": "geometry-processes",
+            "passed": true
+        },
+        {
+            "name": "sidebar-processes",
+            "passed": false
+        },
+        {
+            "name": "loaded-requestlogs",
+            "passed": true
+        },
+        {
+            "name": "geometry-requestlogs",
+            "passed": true
+        },
+        {
+            "name": "sidebar-requestlogs",
+            "passed": false
+        },
+        {
+            "name": "loaded-feature-system",
+            "passed": true
+        },
+        {
+            "name": "geometry-feature-system",
+            "passed": true
+        },
+        {
+            "name": "sidebar-feature-system",
+            "passed": false
+        },
+        {
+            "name": "loaded-feature-enhanced",
+            "passed": true
+        },
+        {
+            "name": "geometry-feature-enhanced",
+            "passed": true
+        },
+        {
+            "name": "sidebar-feature-enhanced",
+            "passed": false
+        },
+        {
+            "name": "loaded-feature-networks",
+            "passed": true
+        },
+        {
+            "name": "geometry-feature-networks",
+            "passed": true
+        },
+        {
+            "name": "sidebar-feature-networks",
+            "passed": false
+        },
+        {
+            "name": "loaded-feature-routing",
+            "passed": true
+        },
+        {
+            "name": "geometry-feature-routing",
+            "passed": true
+        },
+        {
+            "name": "sidebar-feature-routing",
+            "passed": false
+        },
+        {
+            "name": "loaded-feature-protocols",
+            "passed": true
+        },
+        {
+            "name": "geometry-feature-protocols",
+            "passed": true
+        },
+        {
+            "name": "sidebar-feature-protocols",
+            "passed": false
+        },
+        {
+            "name": "loaded-feature-policyadvanced",
+            "passed": true
+        },
+        {
+            "name": "geometry-feature-policyadvanced",
+            "passed": true
+        },
+        {
+            "name": "sidebar-feature-policyadvanced",
+            "passed": false
+        },
+        {
+            "name": "loaded-feature-rulesets",
+            "passed": true
+        },
+        {
+            "name": "geometry-feature-rulesets",
+            "passed": true
+        },
+        {
+            "name": "sidebar-feature-rulesets",
+            "passed": false
+        },
+        {
+            "name": "loaded-feature-udp",
+            "passed": true
+        },
+        {
+            "name": "geometry-feature-udp",
+            "passed": true
+        },
+        {
+            "name": "sidebar-feature-udp",
+            "passed": false
+        },
+        {
+            "name": "loaded-feature-encrypteddns",
+            "passed": true
+        },
+        {
+            "name": "geometry-feature-encrypteddns",
+            "passed": true
+        },
+        {
+            "name": "sidebar-feature-encrypteddns",
+            "passed": false
+        },
+        {
+            "name": "loaded-feature-hosts",
+            "passed": true
+        },
+        {
+            "name": "geometry-feature-hosts",
+            "passed": true
+        },
+        {
+            "name": "sidebar-feature-hosts",
+            "passed": false
+        },
+        {
+            "name": "loaded-feature-fakeip",
+            "passed": true
+        },
+        {
+            "name": "geometry-feature-fakeip",
+            "passed": true
+        },
+        {
+            "name": "sidebar-feature-fakeip",
+            "passed": false
+        },
+        {
+            "name": "loaded-feature-dnspolicy",
+            "passed": true
+        },
+        {
+            "name": "geometry-feature-dnspolicy",
+            "passed": true
+        },
+        {
+            "name": "sidebar-feature-dnspolicy",
+            "passed": false
+        },
+        {
+            "name": "loaded-feature-certificates",
+            "passed": true
+        },
+        {
+            "name": "geometry-feature-certificates",
+            "passed": true
+        },
+        {
+            "name": "sidebar-feature-certificates",
+            "passed": false
+        },
+        {
+            "name": "loaded-feature-bodyrewrite",
+            "passed": true
+        },
+        {
+            "name": "geometry-feature-bodyrewrite",
+            "passed": true
+        },
+        {
+            "name": "sidebar-feature-bodyrewrite",
+            "passed": false
+        },
+        {
+            "name": "loaded-feature-mock",
+            "passed": true
+        },
+        {
+            "name": "geometry-feature-mock",
+            "passed": true
+        },
+        {
+            "name": "sidebar-feature-mock",
+            "passed": false
+        },
+        {
+            "name": "loaded-feature-websocket",
+            "passed": true
+        },
+        {
+            "name": "geometry-feature-websocket",
+            "passed": true
+        },
+        {
+            "name": "sidebar-feature-websocket",
+            "passed": false
+        },
+        {
+            "name": "loaded-feature-managed",
+            "passed": true
+        },
+        {
+            "name": "geometry-feature-managed",
+            "passed": true
+        },
+        {
+            "name": "sidebar-feature-managed",
+            "passed": false
+        },
+        {
+            "name": "loaded-feature-moduleadvanced",
+            "passed": true
+        },
+        {
+            "name": "geometry-feature-moduleadvanced",
+            "passed": true
+        },
+        {
+            "name": "sidebar-feature-moduleadvanced",
+            "passed": false
+        },
+        {
+            "name": "loaded-feature-scripthooks",
+            "passed": true
+        },
+        {
+            "name": "geometry-feature-scripthooks",
+            "passed": true
+        },
+        {
+            "name": "sidebar-feature-scripthooks",
+            "passed": false
+        },
+        {
+            "name": "loaded-feature-panels",
+            "passed": true
+        },
+        {
+            "name": "geometry-feature-panels",
+            "passed": true
+        },
+        {
+            "name": "sidebar-feature-panels",
+            "passed": false
+        },
+        {
+            "name": "loaded-feature-sync",
+            "passed": true
+        },
+        {
+            "name": "geometry-feature-sync",
+            "passed": true
+        },
+        {
+            "name": "sidebar-feature-sync",
+            "passed": false
+        },
+        {
+            "name": "loaded-feature-dhcp",
+            "passed": true
+        },
+        {
+            "name": "geometry-feature-dhcp",
+            "passed": true
+        },
+        {
+            "name": "sidebar-feature-dhcp",
+            "passed": false
+        },
+        {
+            "name": "loaded-feature-forwarding",
+            "passed": true
+        },
+        {
+            "name": "geometry-feature-forwarding",
+            "passed": true
+        },
+        {
+            "name": "sidebar-feature-forwarding",
+            "passed": false
+        },
+        {
+            "name": "loaded-feature-ponte",
+            "passed": true
+        },
+        {
+            "name": "geometry-feature-ponte",
+            "passed": true
+        },
+        {
+            "name": "sidebar-feature-ponte",
+            "passed": false
+        },
+        {
+            "name": "loaded-feature-snellserver",
+            "passed": true
+        },
+        {
+            "name": "geometry-feature-snellserver",
+            "passed": true
+        },
+        {
+            "name": "sidebar-feature-snellserver",
+            "passed": false
+        },
+        {
+            "name": "loaded-feature-mtproto",
+            "passed": true
+        },
+        {
+            "name": "geometry-feature-mtproto",
+            "passed": true
+        },
+        {
+            "name": "sidebar-feature-mtproto",
+            "passed": false
+        },
+        {
+            "name": "loaded-feature-remote",
+            "passed": true
+        },
+        {
+            "name": "geometry-feature-remote",
+            "passed": true
+        },
+        {
+            "name": "sidebar-feature-remote",
+            "passed": false
+        },
+        {
+            "name": "loaded-feature-benchmark",
+            "passed": true
+        },
+        {
+            "name": "geometry-feature-benchmark",
+            "passed": true
+        },
+        {
+            "name": "sidebar-feature-benchmark",
+            "passed": false
+        },
+        {
+            "name": "loaded-feature-urlscheme",
+            "passed": true
+        },
+        {
+            "name": "geometry-feature-urlscheme",
+            "passed": true
+        },
+        {
+            "name": "sidebar-feature-urlscheme",
+            "passed": false
+        },
+        {
+            "name": "loaded-feature-notifications",
+            "passed": true
+        },
+        {
+            "name": "geometry-feature-notifications",
+            "passed": true
+        },
+        {
+            "name": "sidebar-feature-notifications",
+            "passed": false
+        },
+        {
+            "name": "loaded-feature-platform",
+            "passed": true
+        },
+        {
+            "name": "geometry-feature-platform",
+            "passed": true
+        },
+        {
+            "name": "sidebar-feature-platform",
+            "passed": false
+        },
+        {
+            "name": "loaded-feature-external",
+            "passed": true
+        },
+        {
+            "name": "geometry-feature-external",
+            "passed": true
+        },
+        {
+            "name": "sidebar-feature-external",
+            "passed": false
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "geometry-activity",
+            "passed": true
+        },
+        {
+            "name": "sidebar-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-settings",
+            "passed": true
+        },
+        {
+            "name": "geometry-settings",
+            "passed": true
+        },
+        {
+            "name": "sidebar-settings",
+            "passed": false
+        },
+        {
+            "name": "loaded-proxies",
+            "passed": true
+        },
+        {
+            "name": "geometry-proxies",
+            "passed": true
+        },
+        {
+            "name": "sidebar-proxies",
+            "passed": false
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "geometry-featurehub",
+            "passed": true
+        },
+        {
+            "name": "sidebar-featurehub",
+            "passed": false
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "manual-geometry-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "manual-geometry-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-settings",
+            "passed": true
+        },
+        {
+            "name": "manual-geometry-settings",
+            "passed": true
+        },
+        {
+            "name": "loaded-proxies",
+            "passed": true
+        },
+        {
+            "name": "manual-geometry-proxies",
+            "passed": true
+        },
+        {
+            "name": "loaded-overview",
+            "passed": true
+        },
+        {
+            "name": "manual-geometry-overview",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "manual-geometry-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        },
+        {
+            "name": "loaded-featurehub",
+            "passed": true
+        },
+        {
+            "name": "loaded-activity",
+            "passed": true
+        }
+    ],
+    "dpr": 1.5,
+    "failures": 63,
+    "logicalHeight": 672,
+    "logicalWidth": 914,
+    "maxEventLoopGapMs": 32,
+    "note": "Isolated test storage; real Qt event loop. Synthetic node data, when used, is not networking acceptance. DPI factor is process-local, not a change to Windows display settings.",
+    "phase": "baseline",
+    "samples": [
+        {
+            "cachedPages": 1,
+            "cpuMilliseconds": 875,
+            "objects": 2778,
+            "privateBytes": 203988992,
+            "scenario": "cold",
+            "workingSetBytes": 228515840
+        },
+        {
+            "cachedPages": 28,
+            "cpuMilliseconds": 5515.625,
+            "objects": 20275,
+            "privateBytes": 379256832,
+            "scenario": "all-pages-warm",
+            "workingSetBytes": 394326016
+        },
+        {
+            "cachedPages": 28,
+            "cpuMilliseconds": 6843.75,
+            "objects": 20277,
+            "privateBytes": 381198336,
+            "scenario": "switch-20",
+            "workingSetBytes": 405446656
+        },
+        {
+            "cachedPages": 28,
+            "cpuMilliseconds": 8234.375,
+            "objects": 20277,
+            "privateBytes": 392441856,
+            "scenario": "switch-40",
+            "workingSetBytes": 416772096
+        },
+        {
+            "cachedPages": 28,
+            "cpuMilliseconds": 9562.5,
+            "objects": 20277,
+            "privateBytes": 404803584,
+            "scenario": "switch-60",
+            "workingSetBytes": 428437504
+        },
+        {
+            "cachedPages": 28,
+            "cpuMilliseconds": 11281.25,
+            "objects": 20277,
+            "privateBytes": 417140736,
+            "scenario": "switch-80",
+            "workingSetBytes": 440741888
+        },
+        {
+            "cachedPages": 28,
+            "cpuMilliseconds": 12765.625,
+            "objects": 20278,
+            "privateBytes": 432041984,
+            "scenario": "switch-100",
+            "workingSetBytes": 455479296
+        },
+        {
+            "cachedPages": 28,
+            "cpuMilliseconds": 12765.625,
+            "objects": 20278,
+            "privateBytes": 432041984,
+            "scenario": "final",
+            "workingSetBytes": 455479296
+        }
+    ]
+}

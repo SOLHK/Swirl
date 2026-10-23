@@ -18,7 +18,7 @@ ApplicationWindow {
     // path can operate per primitive. HDR capability/readback remains available
     // in the dedicated test renderer; no foreground postprocessing is applied.
     visible:true
-    width:Theme.dp(914); height:Theme.dp(672)
+    width:Theme.windowDefaultWidth; height:Theme.windowDefaultHeight
     // Qt Quick reports logical dimensions and handles each QScreen's device
     // pixel ratio. Manual sizing is applied to design metrics, not a scene transform.
     readonly property real contentScale:1.0
@@ -48,7 +48,7 @@ ApplicationWindow {
     Connections { target:backdrop; function onChanged() { Theme.backdropActive=backdrop.active;Theme.backdropTranslucent=backdrop.translucent } }
     Binding { target:Theme; property:"windowActive"; value:previewState==="inactive"?false:window.active }
     readonly property real sidebarGutter:0
-    readonly property real actualSidebarWidth:AppState.currentPage==="activity" ? Theme.dp(168) : Theme.sidebarWidth
+    readonly property real actualSidebarWidth:Theme.sidebarWidth
     readonly property bool swirlUnifiedBlur:true
     Settings { id:windowSettings; category:"Window"; property int normalWidth:0; property int normalHeight:0 }
     onWidthChanged:if(geometryReady && visibility===Window.Windowed)windowSettings.normalWidth=Math.round(width)
@@ -65,8 +65,8 @@ ApplicationWindow {
             window.width=windowSettings.normalWidth
             window.height=windowSettings.normalHeight
         } else {
-            window.width=Math.max(Theme.dp(914),minimumWidth)
-            window.height=minimumHeight
+            window.width=Math.max(Theme.windowDefaultWidth,minimumWidth)
+            window.height=Math.max(Theme.windowDefaultHeight,minimumHeight)
         }
         geometryReady=true
         backdrop.apply(window,Theme.transparency,Theme.dark)
@@ -193,7 +193,7 @@ ApplicationWindow {
     SwirlSecondaryWindow {
         composition:panelBackdrop
         id:dashboardWindow;objectName:"dashboardWindow";function openProxyControl(){hide();AppState.navigate("policies");window.show();window.raise();window.requestActivate()}
-        visible:false;width:Theme.dp(1300);height:Theme.dp(600);minimumWidth:Theme.dp(914);minimumHeight:Theme.dp(560);title:"Swirl 面板";flags:Qt.Window|Qt.FramelessWindowHint;color:"transparent"
+        visible:false;width:Theme.windowDefaultWidth;height:Theme.windowDefaultHeight;minimumWidth:Theme.windowMinimumWidth;minimumHeight:Theme.windowMinimumHeight;title:"Swirl 面板";flags:Qt.Window|Qt.FramelessWindowHint;color:"transparent"
         function openCaptureInspector(){window.openCaptureInspector()}
         ExternalToolsPage{anchors.fill:parent;clip:true}
     }

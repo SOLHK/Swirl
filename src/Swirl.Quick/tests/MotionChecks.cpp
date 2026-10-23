@@ -142,6 +142,10 @@ int runMotionVisualChecks(QQuickWindow *window, const QString &directory) {
 #include "ScrollBench.h"
 #include "SixAChecks.h"
 int runMotionChecks(QQuickWindow *window, const QString &output) {
+    if(qEnvironmentVariableIsSet("SWIRL_U2_CHECKS")) {
+        extern int runU2Checks(QQuickWindow *, const QString &);
+        return runU2Checks(window,output);
+    }
     if(qEnvironmentVariableIsSet("SWIRL_LIQUID_GLASS_CHECKS")) {
         extern int runLiquidGlassChecks(QQuickWindow *, const QString &);
         return runLiquidGlassChecks(window,output);
