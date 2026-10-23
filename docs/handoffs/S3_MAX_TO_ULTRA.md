@@ -22,6 +22,21 @@
 
 ## 当前验证状态
 
+### 第二阶段：Rust 运行时替换事务与线程顺序
+
+- 第一集成检查点已推送：`e4c5ebdb7f662106e14079456d57fc565a4f17b8`。
+- 复现 `RustCoreEngine::start()` 先 stop 后 validate 的根因：6 个无效替换数据行断开有效会话，1 个重复启动更换会话并关闭原隧道。新增回归修改前 3 passed / 7 failed，修改后全部通过。
+- 运行中的 start 使用 Rust `configure` 原子操作；无效配置、未选节点、监听地址变更均拒绝并保留原会话。有效配置复用同一监听，旧隧道保持 A 出口，新请求使用 B 出口。
+- `ThreadedEngine` 的显式 stop 不因之后排队的 start 而丢弃；旧诊断和旧状态均按 epoch 过滤。覆盖停止后立即换端口启动、原监听释放和后续真实流量。
+- 修正旧 UI 分支的订阅测试前提：仅修改名称在 U1 应保留身份并成功；新增真正更换端点的失败场景，同时断言加密文件、策略、节点 ID、端点和成功时间原样保留。
+- 节点模型测试改用 QCoreApplication，增加 60 秒门禁；它只测试模型，不应初始化 GUI 平台。首次本机 CTest 因部署目录只包含 qwindows、缺少 qoffscreen 而阻塞，保留诊断，后续测试显式使用已安装 Qt 的测试插件目录。
+- 第二阶段工作树 Rust–Qt：85 passed / 0 failed / 9 conditional skips；5000 节点模型 3 passed。独立 fixture 的条件项不计为完成。
+- Windows GNU 独立服务端：Hysteria2 17/17；HY2 取消/同 runtime 重连、TUIC、QUIC Core/C ABI/UDP/计时合计 25/25。
+- VMess 严格关闭仍 FAIL：2 个方法，5 个断言失败，四组 4 MiB+17 字节哈希完整不能替代关闭。原断言未删除或放宽。
+- 首提交的三平台原生协议 CI：[39964203419](https://github.com/SOLHK/Swirl/actions/runs/39964203419) success；源码/打包保护：[39964203522](https://github.com/SOLHK/Swirl/actions/runs/39964203522) success。
+- 首提交严格 VMess CI：[39964203370](https://github.com/SOLHK/Swirl/actions/runs/39964203370) 三平台失败；产品 CI [39964203663](https://github.com/SOLHK/Swirl/actions/runs/39964203663) Linux 公开 Shadowsocks 严格 TLS 关闭失败。这些结果属于首提交，后续提交必须重跑。
+- 用户当前依靠 Clash 联网。本机不得运行会接管 WinINET 的 `SwirlSystemProxyTests`，不得停止/暂停 Clash 或修改代理/TUN/路由/DNS。系统代理写入验收只放在一次性 CI runner。
+
 - Windows GNU Rust workspace 首轮：678 passed（含 1 doctest），0 failed、0 ignored；合并工作树验证，尚非最终提交验收。
 - Rust-only source guards：8 passed。
 - 最初离线依赖检查缺少 `http`；按锁文件联网补齐后 workspace 通过。

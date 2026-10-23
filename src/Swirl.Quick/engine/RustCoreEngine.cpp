@@ -326,8 +326,24 @@ void RustCoreEngine::updateProbe(const QJsonObject &probe){
 }
 void RustCoreEngine::fail(Error error,const QString &reason){cancelProbe();m_status.state=State::Failed;m_status.error=error;m_status.message=reason;m_status.apiHealthy=false;emit diagnostic("SwirlRust","CoreFailure",reason);emit statusChanged();}
 void RustCoreEngine::start(const EngineStartOptions &options){
+ QJsonObject config;const auto reason=configuration(options,&config);
+ if(m_handle){
+  // A duplicate/queued start must not destroy the valid runtime before the
+  // candidate has passed every Rust validation. configure commits atomically,
+  // retains established streams and rejects listener changes without rebinding.
+  if(!reason.isEmpty()){
+   emit diagnostic("SwirlRust","CoreStartRejected",reason);emit statusChanged();return;
+  }
+  const auto response=call({{"op","configure"},{"handle",qint64(m_handle)},{"config",config}});
+  if(!response.value("ok").toBool()){
+   emit diagnostic("SwirlRust","CoreStartRejected",response.value("error").toString("RustConfigureFailed"));emit statusChanged();return;
+  }
+  cancelProbe();m_options=options;
+  m_status.mode=options.routingMode;m_status.directSession=options.directSession||options.routingMode=="direct";
+  m_status.selectedNodeId=options.selectedNodeId;resetProbeState();refresh();return;
+ }
  stop();m_options=options;m_status={};m_status.engineName="Swirl Core Rust";m_status.engineKind="rust";
- QJsonObject config;const auto reason=configuration(options,&config);if(!reason.isEmpty()){fail(Error::InvalidOptions,reason);return;}
+ if(!reason.isEmpty()){fail(Error::InvalidOptions,reason);return;}
  if(!m_command){
   if(!m_library.load()){fail(Error::MissingExecutable,m_library.errorString());return;}
   m_command=m_library.command();

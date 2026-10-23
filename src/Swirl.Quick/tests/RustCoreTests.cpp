@@ -88,6 +88,76 @@ class RustCoreTests:public QObject {
  }
 private slots:
  void initTestCase(){QStandardPaths::setTestModeEnabled(true);SwirlPaths::initializeTestStorage();QSettings::setDefaultFormat(QSettings::IniFormat);QSettings::setPath(QSettings::IniFormat,QSettings::UserScope,SwirlPaths::writableLocation(QStandardPaths::AppConfigLocation));}
+ void startRejectsInvalidReplacementWithoutStoppingLiveRuntime_data(){
+  QTest::addColumn<bool>("threaded");QTest::addColumn<int>("invalidKind");
+  for(const bool threaded:{false,true})for(int kind=0;kind<3;++kind)
+   QTest::newRow(qPrintable(QString("%1-%2").arg(threaded?"worker":"direct").arg(kind)))<<threaded<<kind;
+ }
+ void startRejectsInvalidReplacementWithoutStoppingLiveRuntime(){
+  QFETCH(bool,threaded);QFETCH(int,invalidKind);
+  ControlledNetwork net;QVERIFY(net.start());auto original=options(net);
+  std::unique_ptr<ProxyEngine> engine;
+  if(threaded)engine=std::make_unique<ThreadedEngine>();else engine=std::make_unique<RustCoreEngine>();
+  engine->start(original);QTRY_VERIFY_WITH_TIMEOUT(engine->status().apiHealthy,5000);
+  const auto previous=engine->status();auto invalid=original;
+  QTcpServer occupied;QVERIFY(occupied.listen(QHostAddress::LocalHost,0));
+  if(invalidKind==0)invalid.tunEnabled=true;
+  else if(invalidKind==1)invalid.selectedNodeId="missing-node";
+  else invalid.proxyPort=occupied.serverPort();
+  QSignalSpy diagnostics(engine.get(),&ProxyEngine::diagnostic);engine->start(invalid);
+  QTRY_VERIFY_WITH_TIMEOUT(!diagnostics.isEmpty(),5000);
+  QCOMPARE(engine->status().state,ProxyEngine::State::Running);
+  QVERIFY(engine->status().apiHealthy);QCOMPARE(engine->status().sessionId,previous.sessionId);
+  QCOMPARE(engine->status().proxyPort,previous.proxyPort);QCOMPARE(engine->status().selectedNodeId,previous.selectedNodeId);
+  QCOMPARE(diagnostics.last()[1].toString(),QString("CoreStartRejected"));
+  QNetworkAccessManager manager;manager.setProxy(QNetworkProxy(QNetworkProxy::Socks5Proxy,"127.0.0.1",previous.proxyPort));
+  auto *reply=manager.get(QNetworkRequest(net.url()));QTRY_VERIFY_WITH_TIMEOUT(reply->isFinished(),5000);
+  QCOMPARE(reply->error(),QNetworkReply::NoError);QCOMPARE(reply->readAll(),QByteArray("exit-A"));
+  reply->deleteLater();engine->stop();QTRY_VERIFY_WITH_TIMEOUT(!engine->status().processAlive,5000);
+  QTcpServer released;QVERIFY(released.listen(QHostAddress::LocalHost,previous.proxyPort));
+ }
+ void repeatedStartReconfiguresOneRuntimeAndPreservesEstablishedTunnel(){
+  ControlledNetwork net;QVERIFY(net.start());auto config=options(net);
+  auto second=config.nodes.first();second.id=QUuid::createUuid().toString(QUuid::WithoutBraces);second.name="second";
+  second.port=net.b.serverPort();second.username=QString::fromUtf8(net.b.username);second.password=QString::fromUtf8(net.b.password);
+  config.nodes.append(second);ThreadedEngine engine;engine.start(config);
+  QTRY_VERIFY_WITH_TIMEOUT(engine.status().apiHealthy,5000);const auto previous=engine.status();
+  QTcpSocket held;held.setProxy(QNetworkProxy::NoProxy);held.connectToHost(QHostAddress::LocalHost,previous.proxyPort);
+  QTRY_COMPARE_WITH_TIMEOUT(held.state(),QAbstractSocket::ConnectedState,5000);
+  const auto authority=QByteArray("127.0.0.1:")+QByteArray::number(net.url().port());
+  held.write("CONNECT "+authority+" HTTP/1.1\r\nHost: "+authority+"\r\n\r\n");
+  QByteArray response;QVERIFY(QTest::qWaitFor([&]{response+=held.readAll();return response.contains("\r\n\r\n");},5000));
+  QVERIFY(response.startsWith("HTTP/1.1 200"));QCOMPARE(net.a.forwarded,1);
+  config.selectedNodeId=second.id;engine.start(config);
+  QTRY_COMPARE_WITH_TIMEOUT(engine.status().selectedNodeId,second.id,5000);
+  QCOMPARE(engine.status().sessionId,previous.sessionId);QCOMPARE(engine.status().proxyPort,previous.proxyPort);
+  response.clear();held.write("GET / HTTP/1.1\r\nHost: "+authority+"\r\nConnection: close\r\n\r\n");
+  QVERIFY(QTest::qWaitFor([&]{response+=held.readAll();return response.endsWith("exit-A");},5000));
+  QNetworkAccessManager manager;manager.setProxy(QNetworkProxy(QNetworkProxy::Socks5Proxy,"127.0.0.1",previous.proxyPort));
+  auto *reply=manager.get(QNetworkRequest(net.url()));QTRY_VERIFY_WITH_TIMEOUT(reply->isFinished(),5000);
+  QCOMPARE(reply->error(),QNetworkReply::NoError);QCOMPARE(reply->readAll(),QByteArray("exit-B"));
+  QCOMPARE(net.a.forwarded,1);QCOMPARE(net.b.forwarded,1);reply->deleteLater();
+  engine.stop();QTRY_VERIFY_WITH_TIMEOUT(!engine.status().processAlive,5000);
+ }
+ void invalidColdStartDoesNotOpenListenerAndCanRecover(){
+  ControlledNetwork net;QVERIFY(net.start());auto config=options(net);auto invalid=config;invalid.tunEnabled=true;
+  RustCoreEngine engine;engine.start(invalid);QCOMPARE(engine.status().state,ProxyEngine::State::Failed);
+  QVERIFY(!engine.status().processAlive);QTcpServer available;QVERIFY(available.listen(QHostAddress::LocalHost,config.proxyPort));available.close();
+  engine.start(config);QVERIFY(engine.status().apiHealthy);engine.stop();QVERIFY(!engine.status().processAlive);
+ }
+ void queuedExplicitStopThenStartReleasesPreviousListener(){
+  ControlledNetwork net;QVERIFY(net.start());auto first=options(net);ThreadedEngine engine;
+  engine.start(first);QTRY_VERIFY_WITH_TIMEOUT(engine.status().apiHealthy,5000);const auto previous=engine.status();
+  auto next=first;QTcpServer port;QVERIFY(port.listen(QHostAddress::LocalHost,0));next.proxyPort=port.serverPort();port.close();
+  engine.stop();engine.start(next);
+  QTRY_VERIFY_WITH_TIMEOUT(engine.status().apiHealthy&&engine.status().proxyPort==next.proxyPort,5000);
+  QVERIFY(engine.status().sessionId!=previous.sessionId);
+  QTcpServer released;QVERIFY(released.listen(QHostAddress::LocalHost,previous.proxyPort));
+  QNetworkAccessManager manager;manager.setProxy(QNetworkProxy(QNetworkProxy::Socks5Proxy,"127.0.0.1",next.proxyPort));
+  auto *reply=manager.get(QNetworkRequest(net.url()));QTRY_VERIFY_WITH_TIMEOUT(reply->isFinished(),5000);
+  QCOMPARE(reply->error(),QNetworkReply::NoError);QCOMPARE(reply->readAll(),QByteArray("exit-A"));reply->deleteLater();
+  engine.stop();QTRY_VERIFY_WITH_TIMEOUT(!engine.status().processAlive,5000);
+ }
  void retiredPreferenceCannotSelectAnEngineOrBlockRustStartup(){
   QTemporaryDir directory;QVERIFY(directory.isValid());
   QSettings settings;const auto previous=settings.value("Proxy/preferCompatibility"),previousMode=settings.value("Proxy/routingMode");
@@ -976,11 +1046,22 @@ private slots:
    const auto id=controller.nodeCatalog().first().toMap().value("id").toString();
    const QVariantMap policy{{"groups",QVariantList{QVariantMap{{"name","route"},{"type","select"},{"proxies",QStringList{id}}}}},{"rules",QStringList{"MATCH,route"}}};
    QVERIFY2(controller.replaceNetworkConfiguration(policy),qPrintable(controller.networkConfigurationError()));const auto retained=controller.networkConfigurationSnapshot();
-   proxy["name"]="B";body=document();NodeStore before(path);const auto success=before.subscriptions().first().lastSuccess;
+   // U1 preserves identity across a display-name-only refresh. Verify that
+   // stronger contract before constructing a genuinely dangling policy.
+   proxy["name"]="B";body=document();
    imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);QCOMPARE(downloads,2);
+   QCOMPARE(controller.nodeCatalog().size(),1);QCOMPARE(controller.nodeCatalog().first().toMap().value("id").toString(),id);
+   QCOMPARE(controller.nodeCatalog().first().toMap().value("name").toString(),QString("B"));
+   QCOMPARE(controller.networkConfigurationSnapshot(),retained);QVERIFY(!imports->providers().first().toMap().value("status").toString().contains(QStringLiteral("失败")));
+   NodeStore before(path);const auto success=before.subscriptions().first().lastSuccess;
+   QFile saved(path);QVERIFY(saved.open(QIODevice::ReadOnly));const auto ciphertext=saved.readAll();saved.close();
+   proxy["name"]="C";proxy["port"]=1082;body=document();
+   imports->refreshSubscription(source);QTRY_VERIFY_WITH_TIMEOUT(!imports->busy(),4000);QCOMPARE(downloads,3);
    QCOMPARE(controller.nodeCatalog().size(),1);QCOMPARE(controller.nodeCatalog().first().toMap().value("id").toString(),id);
    QCOMPARE(controller.networkConfigurationSnapshot(),retained);QVERIFY(imports->providers().first().toMap().value("status").toString().contains(QStringLiteral("失败")));
    NodeStore after(path);QCOMPARE(after.subscriptions().first().lastSuccess,success);QCOMPARE(after.nodes().first().id,id);
+   QCOMPARE(after.nodes().first().name,QString("B"));QCOMPARE(after.nodes().first().port,quint16(1080));
+   QVERIFY(saved.open(QIODevice::ReadOnly));QCOMPARE(saved.readAll(),ciphertext);
   }
  void fullClashSubscriptionReachesNativePolicyAndRejectsPartialUpdates(){
   ControlledNetwork net;QVERIFY(net.start());QTemporaryDir directory;const auto path=directory.filePath("nodes.dpapi");

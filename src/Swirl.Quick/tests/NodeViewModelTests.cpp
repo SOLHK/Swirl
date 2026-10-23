@@ -31,5 +31,5 @@ private slots:
         model.updateRows({});QCOMPARE(model.rowCount(),0);
     }
 };
-QTEST_MAIN(NodeViewModelTests)
+QTEST_GUILESS_MAIN(NodeViewModelTests)
 #include "NodeViewModelTests.moc"

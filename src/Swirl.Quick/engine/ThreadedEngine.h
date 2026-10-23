@@ -26,7 +26,8 @@ public:
                 },Qt::QueuedConnection);
             });
             connect(m_engine,&ProxyEngine::diagnostic,m_context,[this](const QString &module,const QString &code,const QString &message){
-                QMetaObject::invokeMethod(this,[this,module,code,message]{emit diagnostic(module,code,message);},Qt::QueuedConnection);
+                const auto epoch=m_workerEpoch;
+                QMetaObject::invokeMethod(this,[this,module,code,message,epoch]{if(epoch==m_epoch)emit diagnostic(module,code,message);},Qt::QueuedConnection);
             });
         });
         m_thread.setObjectName("Swirl network");m_thread.start();
@@ -43,7 +44,9 @@ public:
     }
     void stop() override {
         const auto epoch=++m_epoch;m_status.state=State::Stopping;emit statusChanged();
-        QMetaObject::invokeMethod(m_context,[this,epoch]{if(epoch!=m_epoch)return;m_workerEpoch=epoch;m_workerProbeTag=0;m_engine->stop();
+        // An explicit stop remains ordered before a subsequently queued start.
+        // Suppress stale snapshots, not the resource-release operation itself.
+        QMetaObject::invokeMethod(m_context,[this,epoch]{m_workerEpoch=epoch;m_workerProbeTag=0;m_engine->stop();
             const auto status=m_engine->status();
             QMetaObject::invokeMethod(this,[this,status,epoch]{if(epoch==m_epoch){m_status=status;emit statusChanged();}},Qt::QueuedConnection);},Qt::QueuedConnection);
     }
