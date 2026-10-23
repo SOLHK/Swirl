@@ -12,14 +12,15 @@ Item {
  readonly property Item selectedEntry:entries[AppState.sidebarPage] || null
  function registerEntry(item){const next=Object.assign({},entries);next[item.pageId]=item;entries=next}
  function unregisterEntry(item){const next=Object.assign({},entries);delete next[item.pageId];entries=next}
- Rectangle {
+ Item {
   id:floatingBackground;objectName:"sidebarFloatingBackground"
   x:Theme.dp(8);y:Theme.dp(8)
   width:sidebar.width-Theme.dp(16);height:sidebar.height-Theme.dp(16)
-  radius:Theme.sidebarRadius;antialiasing:true
-  color:"transparent"
-  border.width:Theme.increaseContrast?1/Screen.devicePixelRatio:0
-  border.color:Theme.text
+  readonly property real radius:Theme.sidebarRadius
+  SwirlShellOutline {
+   anchors.fill:parent;radius:floatingBackground.radius
+   strokeColor:Theme.increaseContrast?Theme.text:Theme.dark?Qt.rgba(1,1,1,0.12):Qt.rgba(0,0,0,0.04)
+  }
   ShaderEffect {
    objectName:"sidebarTransmission"
    anchors.fill:parent

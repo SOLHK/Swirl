@@ -1,0 +1,94 @@
+********* Start testing of RustCoreTests *********
+Config: Using QtTest library 6.10.3, Qt 6.10.3 (x86_64-little_endian-llp64 shared (dynamic) release build; by GCC 13.1.0), windows 11
+PASS   : RustCoreTests::initTestCase()
+PASS   : RustCoreTests::rustBuildRejectsCompatibilityEnableAndPreservesSavedPreference()
+PASS   : RustCoreTests::smartRoutingUsesBundledRulesUnlessDirectoryIsExplicit()
+PASS   : RustCoreTests::realAcceptanceStartsGlobalWithoutChangingSavedRouting()
+PASS   : RustCoreTests::savedRuleModeStartsWithBundledRulesWithoutChangingSavedRouting()
+PASS   : RustCoreTests::unsupportedSessionMessagesIdentifyActualBlocker()
+PASS   : RustCoreTests::nativeRealityParametersSurviveEncryptedStoreAndConfiguration()
+PASS   : RustCoreTests::browserRealityParametersSurviveImportStoreAndConfiguration()
+PASS   : RustCoreTests::browserRealityAlpnAndSourceFingerprintCannotBeOverwritten()
+PASS   : RustCoreTests::importedScalarTypesCannotBecomeCredentialsOrTlsDefaults()
+PASS   : RustCoreTests::extractedUnsupportedFieldsNeverDisappearBeforeNativeValidation()
+PASS   : RustCoreTests::importedParametersSurviveStoreDestructionAndNativeRoundTrip()
+PASS   : RustCoreTests::controllerSelectionFailureRestoresPersistenceAndActualExit()
+PASS   : RustCoreTests::storeCredentialEditsRejectCoercionWithoutRewritingTheSnapshot()
+PASS   : RustCoreTests::lostSubscriptionSelectionCannotActivateImplicitDirect()
+PASS   : RustCoreTests::leavingExplicitDirectUsesTheSavedNodeForGlobalAndRuleModes()
+PASS   : RustCoreTests::importedRulesResolveNodeNamesToStableSourceOwnedIds()
+SKIP   : RustCoreTests::subscriptionProductChainAgainstIndependentPeer() Independent Python product-chain fixture supplies synthetic subscription, proxy peers and origins.
+D:/Codex/work/Swirl-ui-u2-20261023/src/Swirl.Quick/tests/RustCoreTests.cpp(414) : failure location
+SKIP   : RustCoreTests::publicRealityProductChainAgainstIndependentPeer() The explicit public Windows Qt fixture supplies synthetic peers and fixed public targets.
+D:/Codex/work/Swirl-ui-u2-20261023/src/Swirl.Quick/tests/RustCoreTests.cpp(533) : failure location
+SKIP   : RustCoreTests::realityLifecycleProductChainAgainstIndependentPeer() The explicit independent Qt lifecycle fixture supplies synthetic peers and origins.
+D:/Codex/work/Swirl-ui-u2-20261023/src/Swirl.Quick/tests/RustCoreTests.cpp(701) : failure location
+PASS   : RustCoreTests::fullDocumentCannotUseExternalSelectedNodeAlias()
+PASS   : RustCoreTests::nonClashGlobalConfigurationDoesNotAlterNativeState()
+PASS   : RustCoreTests::manualNodesOnlyImportDoesNotInventPolicyMetadata()
+PASS   : RustCoreTests::nodesOnlySubscriptionPreservesLocalPolicyAndRejectsDanglingRefresh()
+PASS   : RustCoreTests::fullClashSubscriptionReachesNativePolicyAndRejectsPartialUpdates()
+PASS   : RustCoreTests::iniProfileImportConnectsAndUpdatesAtomically()
+PASS   : RustCoreTests::iniRealityCannotStartAsOrdinaryTls()
+PASS   : RustCoreTests::importedRealityVisionAndDefaultUtlsCannotStartAsOrdinaryTls()
+PASS   : RustCoreTests::singBoxTransportMapsExactlyAndRejectsUnmappedFieldsBeforeStart()
+PASS   : RustCoreTests::profileRefreshKeepsOnlyItsOwnValidSelection()
+PASS   : RustCoreTests::atomicNodeNetworkImportUsesPreparedIdsAndSurvivesReload()
+PASS   : RustCoreTests::atomicNodeNetworkImportRejectsInvalidGraphAndWriteFailure()
+PASS   : RustCoreTests::legacyNetworkSettingsMigrateWithoutStaleSidecarOverride()
+PASS   : RustCoreTests::candidateValidationPreservesIndependentSourceNamespaces()
+PASS   : RustCoreTests::shutdownDiscardsPendingParsedConfiguration()
+PASS   : RustCoreTests::preparedImportMapsStableIdsWithoutPublishingBeforeCommit()
+PASS   : RustCoreTests::preparedImportRejectsAmbiguousIdsCrossSourceAndStalePlans()
+PASS   : RustCoreTests::preparedImportWriteFailurePreservesMemoryAndDurableSnapshot()
+PASS   : RustCoreTests::socks5UdpMappingPreservesTypedOptionsAndTls()
+SKIP   : RustCoreTests::socks5UdpThroughIndependentPeer() Independent Python SOCKS5 UDP peer supplies isolated ports and authentication mode in its integration run.
+D:/Codex/work/Swirl-ui-u2-20261023/src/Swirl.Quick/tests/RustCoreTests.cpp(1253) : failure location
+PASS   : RustCoreTests::socks4ImportsMapAndAcceptAcrossNativeAbi()
+PASS   : RustCoreTests::socks4ImportsRejectAuthenticationAndUnmappedExtensions()
+SKIP   : RustCoreTests::socks4ThroughIndependentPeer() Independent Python SOCKS4/4a peer supplies isolated ports in its integration run.
+D:/Codex/work/Swirl-ui-u2-20261023/src/Swirl.Quick/tests/RustCoreTests.cpp(1363) : failure location
+SKIP   : RustCoreTests::webSocketThroughIndependentPeer() Independent Python VLESS WS peer supplies isolated ports in its integration run.
+D:/Codex/work/Swirl-ui-u2-20261023/src/Swirl.Quick/tests/RustCoreTests.cpp(1389) : failure location
+PASS   : RustCoreTests::webSocketMapsExistingFieldsAndRustAcceptsConfiguration()
+PASS   : RustCoreTests::webSocketRejectsUnsupportedParametersWithoutPartialConfiguration()
+PASS   : RustCoreTests::dnsQueryFamilyMapsStrictlyAndPersistsAcrossLegacyEdits()
+PASS   : RustCoreTests::nativeDohMapsExistingHttpsField()
+PASS   : RustCoreTests::strictDotMapsExistingFieldWithoutResolvingOrChangingUi()
+PASS   : RustCoreTests::strictDotRejectsAmbiguousOrUnimplementedBootstrap()
+PASS   : RustCoreTests::customDnsMapsServersWithoutChangingSystemSettings()
+PASS   : RustCoreTests::dnsSettingsUseLocalMappingsAndProxyToggle()
+PASS   : RustCoreTests::manualGroupUsesItsMemberRatherThanGlobalSelection()
+PASS   : RustCoreTests::nestedAutomaticGroupsUseNativeDataPath(url-test)
+PASS   : RustCoreTests::nestedAutomaticGroupsUseNativeDataPath(fallback)
+PASS   : RustCoreTests::nestedAutomaticGroupsUseNativeDataPath(round-robin)
+PASS   : RustCoreTests::roundRobinPolicyBalancesNewNativeSessions()
+PASS   : RustCoreTests::policyConversionRejectsUnknownSemanticsAndBounds()
+PASS   : RustCoreTests::policySettingsPreserveFullMapsAndRejectInvalidReplacements()
+PASS   : RustCoreTests::rulesUseActualRustDataPathAndModeSwitches()
+PASS   : RustCoreTests::manualWindowsRulesUseTwoIndependentTargetsAndPersist()
+PASS   : RustCoreTests::nativePrivateRulesPrecedeTerminalMatch()
+PASS   : RustCoreTests::controllerRuleEditsPreserveNoResolve()
+PASS   : RustCoreTests::controllerRuleReferencesPreventGroupDeletion()
+PASS   : RustCoreTests::controllerRuleValidationAndPersistenceAreAtomic()
+PASS   : RustCoreTests::rulesValidateAllFieldsAndPreserveUnsupportedImports()
+SKIP   : RustCoreTests::vlessThroughIndependentPeer() Independent VLESS peer supplies the port in its integration run.
+D:/Codex/work/Swirl-ui-u2-20261023/src/Swirl.Quick/tests/RustCoreTests.cpp(1911) : failure location
+PASS   : RustCoreTests::capabilityUsesTheSelectedRustRuntime()
+SKIP   : RustCoreTests::shadowsocksThroughIndependentPeer() Independent Python SS peer supplies the isolated port in its integration run.
+D:/Codex/work/Swirl-ui-u2-20261023/src/Swirl.Quick/tests/RustCoreTests.cpp(1930) : failure location
+PASS   : RustCoreTests::disabledFastOpenIsAnExactNoOpAcrossNativeProtocols()
+PASS   : RustCoreTests::disabledFastOpenForwardsThroughNativeSocks5()
+PASS   : RustCoreTests::loonShadowsocksImportsKeepCredentialsAndRejectUnsafeOptions()
+SKIP   : RustCoreTests::loonShadowsocksThroughIndependentPeer() Independent Python SS peer supplies the isolated port.
+D:/Codex/work/Swirl-ui-u2-20261023/src/Swirl.Quick/tests/RustCoreTests.cpp(1986) : failure location
+PASS   : RustCoreTests::referenceAdapterBlockedAtCompileTime()
+PASS   : RustCoreTests::realForwardingThroughQtFacade()
+PASS   : RustCoreTests::nativeProbeAndUnsupportedDoNotStartCompatibility()
+PASS   : RustCoreTests::nodeListShowsValidatedOutboundSetupTime()
+PASS   : RustCoreTests::nativeHeadProbeFinishesAtHeadersAndReportsHttpFailureStage()
+PASS   : RustCoreTests::switchingNodesClearsOldHttpTiming()
+PASS   : RustCoreTests::unsupportedSessionRejectedAndOldStreamSurvivesBadSelection()
+PASS   : RustCoreTests::cleanupTestCase()
+Totals: 72 passed, 0 failed, 9 skipped, 0 blacklisted, 26174ms
+********* Finished testing of RustCoreTests *********

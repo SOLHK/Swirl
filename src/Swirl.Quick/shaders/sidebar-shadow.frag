@@ -14,7 +14,8 @@ layout(std140,binding=0) uniform buf {
 float distanceToSurface(vec2 p) {
     float r=min(cornerRadius,min(surfaceSize.x,surfaceSize.y)*0.5);
     vec2 q=abs(p)-surfaceSize*0.5+r;
-    return length(max(q,vec2(0)))+min(max(q.x,q.y),0.0)-r;
+    vec2 corner=max(q,vec2(0));
+    return pow(pow(corner.x,2.5)+pow(corner.y,2.5),0.4)+min(max(q.x,q.y),0.0)-r;
 }
 void main() {
     vec2 p=(qt_TexCoord0-0.5)*(surfaceSize+2.0*padding);

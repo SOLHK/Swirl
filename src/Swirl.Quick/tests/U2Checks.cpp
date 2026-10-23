@@ -79,6 +79,18 @@ int runU2Checks(QQuickWindow *window, const QString &output) {
             check("scrim-corner-preserves-background",before.rect().contains(pixel)&&after.rect().contains(pixel)&&before.pixelColor(pixel)==after.pixelColor(pixel));
         }
         window->grabWindow().save(QFileInfo(output).absolutePath()+"/detail.png");
+        window->resize(window->minimumWidth(),window->minimumHeight());wait(500);
+        auto *scroll=window->findChild<QQuickItem *>("nodeDetailScroll");
+        auto *flick=scroll?scroll->property("contentItem").value<QQuickItem *>():nullptr;
+        if(flick){flick->setProperty("contentY",qMax(0.0,flick->property("contentHeight").toDouble()-flick->height()));wait(150);}
+        auto *port=window->findChild<QQuickItem *>("nodeProxyPort");
+        const QRectF viewport=scroll?QRectF(scroll->mapToScene(QPointF()),QSizeF(scroll->width(),scroll->height())):QRectF();
+        check("minimum-size-detail-port-reachable",port&&viewport.contains(port->mapToScene(QPointF(port->width()/2,port->height()/2))));
+        auto *back=window->findChild<QQuickItem *>("nodeReturnButton");
+        check("detail-back-header-stays-visible",back&&back->isVisible()&&QRectF(0,0,window->width(),window->height()).contains(back->mapToScene(QPointF(back->width()/2,back->height()/2))));
+        window->grabWindow().save(QFileInfo(output).absolutePath()+"/detail-minimum.png");
+        if(back)QTest::mouseClick(window,Qt::LeftButton,Qt::NoModifier,back->mapToScene(QPointF(back->width()/2,back->height()/2)).toPoint());wait(500);
+        check("detail-close-restores-list",hero&&!hero->property("opened").toBool());
         QFile f(output);if(!f.open(QIODevice::WriteOnly))return 2;f.write(QJsonDocument(QJsonObject{{"checks",checks},{"samples",samples},{"failures",failures}}).toJson());return failures?1:0;
     }
     const auto routes=QJsonDocument::fromJson(eval("JSON.stringify(AppState.allPageIds.concat(['activity','settings','proxies','featurehub']))").toString().toUtf8()).array();
@@ -92,8 +104,8 @@ int runU2Checks(QQuickWindow *window, const QString &output) {
     for(const auto &route:{"activity","featurehub","settings","proxies","overview","activity"}){navigate(route);check(QString("manual-geometry-")+route,window->size()==resized);}
     window->resize(initial);navigate("activity");
     if(phase!="baseline"&&phase!="A"){
-        check("window-radius-14",eval("Theme.windowRadius").toDouble()==14);
-        check("sidebar-radius-14",eval("sidebar.children[0].radius").toDouble()==14);
+        check("window-reference-corner-extent-24",eval("Theme.windowRadius").toDouble()==24);
+        check("sidebar-radius-16",eval("sidebar.children[0].radius").toDouble()==16);
         window->grabWindow().save(QFileInfo(output).absolutePath()+"/corners-"+QString::number(window->devicePixelRatio())+".png");
     }
     sample("all-pages-warm");

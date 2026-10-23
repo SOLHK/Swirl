@@ -12,7 +12,8 @@ void main() {
     vec2 uv=qt_TexCoord0;
     float r=min(cornerRadius,min(surfaceSize.x,surfaceSize.y)*0.5);
     vec2 q=abs((uv-0.5)*surfaceSize)-surfaceSize*0.5+r;
-    float distanceInside=-(length(max(q,vec2(0)))+min(max(q.x,q.y),0.0)-r);
+    vec2 corner=max(q,vec2(0));
+    float distanceInside=-(pow(pow(corner.x,2.5)+pow(corner.y,2.5),0.4)+min(max(q.x,q.y),0.0)-r);
     // Leave the existing contour and exterior shadow completely untouched.
     float interior=smoothstep(inset,inset*4.0,distanceInside);
     float breadth=sin(uv.x*3.14159265);

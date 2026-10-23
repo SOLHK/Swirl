@@ -271,12 +271,12 @@ ApplicationWindow {
     Timer { interval:1000; running:true; repeat:true; onTriggered:AppState.tickTraffic() }
     // Exact-region windows use this single matching rim; other native windows
     // retain their DWM rim. The native region clips all children at once.
-    SwirlContinuousSurface {
-        objectName:"windowOutline";visible:Theme.increaseContrast && (backdrop.exactCorners || !backdrop.nativeCorners)
-        anchors.fill:parent;z:998;color:"transparent";antialiasing:true
+    SwirlShellOutline {
+        objectName:"windowOutline";visible:backdrop.exactCorners || !backdrop.nativeCorners
+        anchors.fill:parent;z:998
         radius:window.shellRadius
-        border.width:window.visibility===Window.Maximized?0:1/Screen.devicePixelRatio
-        border.color:Theme.dark?Qt.rgba(1,1,1,window.active?0.30:0.20):Qt.rgba(0,0,0,window.active?0.12:0.08)
+        strokeWidth:window.visibility===Window.Maximized?0:1/Screen.devicePixelRatio
+        strokeColor:Theme.increaseContrast?Theme.text:Theme.dark?Qt.rgba(1,1,1,0.14):Qt.rgba(0,0,0,0.055)
     }
     Timer { id:toastTimer; interval:3200; onTriggered:AppState.toast="" }
     WindowEdge {anchors.fill:parent;z:10000;radius:window.shellRadius}

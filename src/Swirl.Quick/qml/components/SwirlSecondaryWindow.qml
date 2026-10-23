@@ -23,13 +23,12 @@ Window {
     SwirlGlassMaterial { targetWindow: shell; composition: shell.composition }
     SwirlWindowTitleBar { id: titleBar; anchors.left:parent.left; anchors.right:parent.right; targetWindow:shell }
     Item { id:bodyItem; anchors.left:parent.left;anchors.right:parent.right;anchors.top:titleBar.bottom;anchors.bottom:parent.bottom;clip:true }
-    SwirlContinuousSurface {
+    SwirlShellOutline {
         parent:shell.contentItem;anchors.fill:parent;z:998
         visible:shell.composition.exactCorners
         radius:shell.visibility===Window.Maximized || shell.visibility===Window.FullScreen?0:Theme.windowRadius
-        color:"transparent"
-        border.width:shell.visibility===Window.Maximized || shell.visibility===Window.FullScreen?0:1/Screen.devicePixelRatio
-        border.color:Theme.dark?Qt.rgba(1,1,1,shell.active?0.30:0.20):Qt.rgba(0,0,0,shell.active?0.12:0.08)
+        strokeWidth:shell.visibility===Window.Maximized || shell.visibility===Window.FullScreen?0:1/Screen.devicePixelRatio
+        strokeColor:Theme.dark?Qt.rgba(1,1,1,shell.active?0.14:0.10):Qt.rgba(0,0,0,shell.active?0.055:0.04)
     }
     WindowEdge {parent:shell.contentItem;anchors.fill:parent;z:10000;radius:shell.visibility===Window.Maximized || shell.visibility===Window.FullScreen?0:Theme.windowRadius}
 }

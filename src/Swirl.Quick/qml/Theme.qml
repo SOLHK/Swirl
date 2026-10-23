@@ -91,9 +91,11 @@ QtObject {
     readonly property color statusGreen: dark ? "#75DD91" : "#00B832"
     readonly property color orange: dark ? "#F5C67D" : "#FF9229"
     readonly property color red: dark ? "#FF9A93" : "#CF3029"
-    // Shell and floating sidebar share one contour, independent of content zoom.
+    // Logical point-style design sizes, independent of content zoom.
     // Qt maps these logical pixels to each screen's device pixel ratio.
-    enum ShellMetrics { WindowCornerRadius = 14, SidebarCornerRadius = 14 }
+    // Apple image reference normalized to the existing 672-unit shell height.
+    // These are corner extents for the shared 2.5-power contour, not circle radii.
+    enum ShellMetrics { WindowCornerRadius = 24, SidebarCornerRadius = 16 }
     readonly property real windowRadius: Theme.WindowCornerRadius
     readonly property real sidebarRadius: Theme.SidebarCornerRadius
     // Cards at the same hierarchy share a token, including the settings grid.
